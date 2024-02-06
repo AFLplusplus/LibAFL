@@ -2267,7 +2267,7 @@ where
     #[cfg(any(all(unix, not(miri)), all(windows, feature = "std")))]
     fn setup_handlers() {
         #[cfg(all(unix, not(miri)))]
-        if let Err(e) = unsafe { setup_signal_handler(&mut LLMP_SIGHANDLER_STATE) } {
+        if let Err(e) = unsafe { setup_signal_handler(ptr::addr_of_mut!(LLMP_SIGHANDLER_STATE)) } {
             // We can live without a proper ctrl+c signal handler - Ignore.
             log::info!("Failed to setup signal handlers: {e}");
         } else {
@@ -2275,7 +2275,7 @@ where
         }
 
         #[cfg(all(windows, feature = "std"))]
-        if let Err(e) = unsafe { setup_ctrl_handler(&mut LLMP_SIGHANDLER_STATE) } {
+        if let Err(e) = unsafe { setup_ctrl_handler(ptr::addr_of_mut!(LLMP_SIGHANDLER_STATE)) } {
             // We can live without a proper ctrl+c signal handler - Ignore.
             log::info!("Failed to setup control handlers: {e}");
         } else {

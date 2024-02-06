@@ -1,7 +1,7 @@
 use std::{
     fs::File,
     io::{BufRead, BufReader, BufWriter, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
 };
 
@@ -16,22 +16,25 @@ fn main() {
     if cfg!(any(feature = "cargo-clippy", docsrs)) {
         return; // skip when clippy or docs is running
     }
-    assert!(
-        cfg!(target_os = "linux"),
-        "The libafl_libfuzzer runtime may only be built for linux; failing fast."
-    );
+
+    if cfg!(not(any(target_os = "linux", target_os = "macos"))) {
+        println!(
+            "cargo:warning=The libafl_libfuzzer runtime may only be built for linux or macos; failing fast."
+        );
+        return;
+    }
 
     println!("cargo:rerun-if-changed=libafl_libfuzzer_runtime/src");
     println!("cargo:rerun-if-changed=libafl_libfuzzer_runtime/Cargo.toml");
     println!("cargo:rerun-if-changed=libafl_libfuzzer_runtime/build.rs");
 
     let custom_lib_dir =
-        PathBuf::from(std::env::var_os("OUT_DIR").unwrap()).join("libafl_libfuzzer");
+        AsRef::<Path>::as_ref(&std::env::var_os("OUT_DIR").unwrap()).join("libafl_libfuzzer");
     std::fs::create_dir_all(&custom_lib_dir)
         .expect("Couldn't create the output directory for the fuzzer runtime build");
 
-    let mut lib_src = PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap());
-    lib_src.push("libafl_libfuzzer_runtime");
+    let lib_src: PathBuf = AsRef::<Path>::as_ref(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+        .join("libafl_libfuzzer_runtime");
 
     let mut command = Command::new(std::env::var_os("CARGO").unwrap());
     command
@@ -74,17 +77,15 @@ fn main() {
         .arg(std::env::var_os("TARGET").unwrap());
 
     assert!(
-        !command.status().map(|s| !s.success()).unwrap_or(true),
+        command.status().map_or(false, |s| s.success()),
         "Couldn't build runtime crate! Did you remember to use nightly? (`rustup default nightly` to install) Or, did you remember to install ucd-generate? (`cargo install ucd-generate` to install)"
     );
 
-    let mut lib_path = custom_lib_dir.join(std::env::var_os("TARGET").unwrap());
-    lib_path.push("release");
+    let mut archive_path = custom_lib_dir.join(std::env::var_os("TARGET").unwrap());
+    archive_path.push("release");
 
-    if cfg!(target_family = "unix") {
-        use std::path::Path;
-
-        lib_path.push("libafl_libfuzzer_runtime.a");
+    if cfg!(unix) {
+        archive_path.push("libafl_libfuzzer_runtime.a");
         let target_libdir = Command::new("rustc")
             .args(["--print", "target-libdir"])
             .output()
@@ -92,50 +93,52 @@ fn main() {
         let target_libdir = String::from_utf8(target_libdir.stdout).unwrap();
         let target_libdir = Path::new(target_libdir.trim());
 
-        let rust_lld = target_libdir.join("../bin/rust-lld");
-        let rust_ar = target_libdir.join("../bin/llvm-ar"); // NOTE: depends on llvm-tools
         let rust_objcopy = target_libdir.join("../bin/llvm-objcopy"); // NOTE: depends on llvm-tools
-        let nm = "nm"; // NOTE: we use system nm here because llvm-nm doesn't respect the encoding?
+        let nm = if cfg!(target_os = "macos") {
+            // NOTE: depends on llvm-tools
+            target_libdir.join("../bin/llvm-nm")
+        } else {
+            // NOTE: we use system nm on linux because llvm-nm doesn't respect the encoding?
+            PathBuf::from("nm")
+        };
 
+        let redefined_archive_path = custom_lib_dir.join("libFuzzer.a");
         let redefined_symbols = custom_lib_dir.join("redefs.txt");
 
-        let objfile_orig = custom_lib_dir.join("libFuzzer.o");
-        let objfile_dest = custom_lib_dir.join("libFuzzer-mimalloc.o");
-
-        let mut command = Command::new(rust_lld);
-        command
-            .args(["-flavor", "gnu"])
-            .arg("-r")
-            .arg("--whole-archive")
-            .arg(lib_path)
-            .args(["-o", objfile_orig.to_str().expect("Invalid path characters present in your current directory prevent us from linking to the runtime")]);
-
-        assert!(
-            !command.status().map(|s| !s.success()).unwrap_or(true),
-            "Couldn't link runtime crate! Do you have the llvm-tools component installed? (`rustup component add llvm-tools-preview` to install)"
-        );
-
-        let mut child = Command::new(nm)
-            .arg(&objfile_orig)
+        let mut nm_child = Command::new(nm)
+            .arg(&archive_path)
             .stdout(Stdio::piped())
             .spawn()
             .unwrap();
 
         let mut redefinitions_file = BufWriter::new(File::create(&redefined_symbols).unwrap());
 
-        let replacement = format!("_ZN{NAMESPACE_LEN}{NAMESPACE}");
+        let zn_prefix = if cfg!(target_os = "macos") {
+            // macOS symbols have an extra `_`
+            "__ZN"
+        } else {
+            "_ZN"
+        };
+
+        let replacement = format!("{zn_prefix}{NAMESPACE_LEN}{NAMESPACE}");
 
         // redefine all the rust-mangled symbols we can
         // TODO this will break when v0 mangling is stabilised
-        for line in BufReader::new(child.stdout.take().unwrap()).lines() {
+        for line in BufReader::new(nm_child.stdout.take().unwrap()).lines() {
             let line = line.unwrap();
+
+            // Skip headers
+            if line.ends_with(':') || line.is_empty() {
+                continue;
+            }
             let (_, symbol) = line.rsplit_once(' ').unwrap();
-            if symbol.starts_with("_ZN") {
+
+            if symbol.starts_with(zn_prefix) {
                 writeln!(
                     redefinitions_file,
                     "{} {}",
                     symbol,
-                    symbol.replacen("_ZN", &replacement, 1)
+                    symbol.replacen(zn_prefix, &replacement, 1)
                 )
                 .unwrap();
             }
@@ -144,11 +147,11 @@ fn main() {
         drop(redefinitions_file);
 
         assert!(
-            !child.wait().map(|s| !s.success()).unwrap_or(true),
+            nm_child.wait().map_or(false, |s| s.success()),
             "Couldn't link runtime crate! Do you have the llvm-tools component installed? (`rustup component add llvm-tools-preview` to install)"
         );
 
-        let mut command = Command::new(rust_objcopy);
+        let mut objcopy_command = Command::new(rust_objcopy);
 
         for symbol in [
             "__rust_drop_panic",
@@ -170,30 +173,25 @@ fn main() {
             "__rust_no_alloc_shim_is_unstable",
             "__rust_alloc_error_handler_should_panic",
         ] {
-            command
+            let mut symbol = symbol.to_string();
+            // macOS symbols have an extra `_`
+            if cfg!(target_os = "macos") {
+                symbol.insert(0, '_');
+            }
+
+            objcopy_command
                 .arg("--redefine-sym")
                 .arg(format!("{symbol}={symbol}_libafl_libfuzzer_runtime"));
         }
 
-        command
+        objcopy_command
             .arg("--redefine-syms")
             .arg(redefined_symbols)
-            .args([&objfile_orig, &objfile_dest]);
+            .args([&archive_path, &redefined_archive_path]);
 
         assert!(
-            !command.status().map(|s| !s.success()).unwrap_or(true),
+            objcopy_command.status().map_or(false, |s| s.success()),
             "Couldn't rename allocators in the runtime crate! Do you have the llvm-tools component installed? (`rustup component add llvm-tools-preview` to install)"
-        );
-
-        let mut command = Command::new(rust_ar);
-        command
-            .arg("cr")
-            .arg(custom_lib_dir.join("libFuzzer.a"))
-            .arg(objfile_dest);
-
-        assert!(
-            !command.status().map(|s| !s.success()).unwrap_or(true),
-            "Couldn't create runtime archive!"
         );
 
         #[cfg(feature = "embed-runtime")]
@@ -202,7 +200,7 @@ fn main() {
             // https://gist.github.com/novafacing/1389cbb2f0a362d7eb103e67b4468e2b
             println!(
                 "cargo:rustc-env=LIBAFL_LIBFUZZER_RUNTIME_PATH={}",
-                custom_lib_dir.join("libFuzzer.a").display()
+                redefined_archive_path.display()
             );
         }
 
@@ -211,13 +209,11 @@ fn main() {
             custom_lib_dir.to_str().unwrap()
         );
         println!("cargo:rustc-link-lib=static=Fuzzer");
-    } else {
-        println!(
-            "cargo:rustc-link-search=native={}",
-            lib_path.to_str().unwrap()
-        );
-        println!("cargo:rustc-link-lib=static=afl_fuzzer_runtime");
-    }
 
-    println!("cargo:rustc-link-lib=stdc++");
+        if cfg!(target_os = "macos") {
+            println!("cargo:rustc-link-lib=c++");
+        } else {
+            println!("cargo:rustc-link-lib=stdc++");
+        }
+    }
 }

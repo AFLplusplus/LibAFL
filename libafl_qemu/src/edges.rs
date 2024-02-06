@@ -463,7 +463,7 @@ where
     }
 }
 
-thread_local!(static PREV_LOC : UnsafeCell<u64> = UnsafeCell::new(0));
+thread_local!(static PREV_LOC : UnsafeCell<u64> = const { UnsafeCell::new(0) });
 
 pub fn gen_unique_edge_ids<QT, S>(
     hooks: &mut QemuHooks<QT, S>,

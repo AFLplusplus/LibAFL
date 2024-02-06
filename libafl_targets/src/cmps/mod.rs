@@ -17,7 +17,7 @@ use libafl::{
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 pub use stages::*;
 
-use crate::{AFLPP_CMPLOG_MAP_H, AFLPP_CMPLOG_MAP_W, CMPLOG_MAP_H, CMPLOG_MAP_W};
+use crate::{CMPLOG_MAP_H, CMPLOG_MAP_W};
 
 // CONSTANTS
 
@@ -31,13 +31,15 @@ pub const CMPLOG_RTN_LEN: usize = 32;
 pub const CMPLOG_MAP_RTN_H: usize = (CMPLOG_MAP_H * core::mem::size_of::<CmpLogInstruction>())
     / core::mem::size_of::<CmpLogRoutine>();
 
+/// The height of extended rountine map
+pub const CMPLOG_MAP_RTN_EXTENDED_H: usize = CMPLOG_MAP_H
+    * core::mem::size_of::<AFLppCmpLogOperands>()
+    / core::mem::size_of::<AFLppCmpLogFnOperands>();
+
 /// `CmpLog` instruction kind
 pub const CMPLOG_KIND_INS: u8 = 0;
 /// `CmpLog` routine kind
 pub const CMPLOG_KIND_RTN: u8 = 1;
-
-/// The height for RTN
-pub const AFL_CMPLOG_MAP_RTN_H: usize = AFLPP_CMPLOG_MAP_H / 2;
 
 /// The AFL++ `CMP_TYPE_INS`
 pub const AFL_CMP_TYPE_INS: u32 = 1;
@@ -269,8 +271,8 @@ impl Debug for CmpLogVals {
 #[repr(C, packed)]
 /// Comparison values
 pub union AFLppCmpLogVals {
-    operands: [[AFLppCmpLogOperands; AFLPP_CMPLOG_MAP_H]; AFLPP_CMPLOG_MAP_W],
-    fn_operands: [[AFLppCmpLogFnOperands; AFL_CMPLOG_MAP_RTN_H]; AFLPP_CMPLOG_MAP_W],
+    operands: [[AFLppCmpLogOperands; CMPLOG_MAP_H]; CMPLOG_MAP_W],
+    fn_operands: [[AFLppCmpLogFnOperands; CMPLOG_MAP_RTN_EXTENDED_H]; CMPLOG_MAP_W],
 }
 
 impl Debug for AFLppCmpLogVals {
@@ -282,15 +284,13 @@ impl Debug for AFLppCmpLogVals {
 impl AFLppCmpLogVals {
     #[must_use]
     /// Reference comparison values as comparison operands
-    pub fn operands(&self) -> &[[AFLppCmpLogOperands; AFLPP_CMPLOG_MAP_H]; AFLPP_CMPLOG_MAP_W] {
+    pub fn operands(&self) -> &[[AFLppCmpLogOperands; CMPLOG_MAP_H]; CMPLOG_MAP_W] {
         unsafe { &self.operands }
     }
 
     #[must_use]
     /// Mutably reference comparison values as comparison operands
-    pub fn operands_mut(
-        &mut self,
-    ) -> &mut [[AFLppCmpLogOperands; AFLPP_CMPLOG_MAP_H]; AFLPP_CMPLOG_MAP_W] {
+    pub fn operands_mut(&mut self) -> &mut [[AFLppCmpLogOperands; CMPLOG_MAP_H]; CMPLOG_MAP_W] {
         unsafe { &mut self.operands }
     }
 
@@ -298,7 +298,7 @@ impl AFLppCmpLogVals {
     /// Reference comparison values as comparison function operands
     pub fn fn_operands(
         &self,
-    ) -> &[[AFLppCmpLogFnOperands; AFL_CMPLOG_MAP_RTN_H]; AFLPP_CMPLOG_MAP_W] {
+    ) -> &[[AFLppCmpLogFnOperands; CMPLOG_MAP_RTN_EXTENDED_H]; CMPLOG_MAP_W] {
         unsafe { &self.fn_operands }
     }
 
@@ -306,7 +306,7 @@ impl AFLppCmpLogVals {
     /// Mutably reference comparison values as comparison function operands
     pub fn fn_operands_mut(
         &mut self,
-    ) -> &mut [[AFLppCmpLogFnOperands; AFL_CMPLOG_MAP_RTN_H]; AFLPP_CMPLOG_MAP_W] {
+    ) -> &mut [[AFLppCmpLogFnOperands; CMPLOG_MAP_RTN_EXTENDED_H]; CMPLOG_MAP_W] {
         unsafe { &mut self.fn_operands }
     }
 }
@@ -412,6 +412,7 @@ pub static mut libafl_cmplog_map: CmpLogMap = CmpLogMap {
 
 /// The globale `CmpLog` map, aflpp style
 #[no_mangle]
+#[cfg(feature = "cmplog_extended_instrumentation")]
 #[allow(clippy::large_stack_arrays)]
 pub static mut libafl_cmplog_map_extended: AFLppCmpLogMap = AFLppCmpLogMap {
     headers: [AFLppCmpLogHeader { data: [0; 8] }; CMPLOG_MAP_W],
@@ -426,13 +427,14 @@ pub static mut libafl_cmplog_map_extended: AFLppCmpLogMap = AFLppCmpLogMap {
 };
 
 pub use libafl_cmplog_map as CMPLOG_MAP;
+#[cfg(feature = "cmplog_extended_instrumentation")]
 pub use libafl_cmplog_map_extended as CMPLOG_MAP_EXTENDED;
 
 #[derive(Debug, Clone)]
 #[repr(C, packed)]
 /// Comparison map compatible with AFL++ cmplog instrumentation
 pub struct AFLppCmpLogMap {
-    headers: [AFLppCmpLogHeader; AFLPP_CMPLOG_MAP_W],
+    headers: [AFLppCmpLogHeader; CMPLOG_MAP_W],
     vals: AFLppCmpLogVals,
 }
 
@@ -500,7 +502,7 @@ impl<'de> Deserialize<'de> for AFLppCmpLogMap {
 
 impl CmpMap for AFLppCmpLogMap {
     fn len(&self) -> usize {
-        AFLPP_CMPLOG_MAP_W
+        CMPLOG_MAP_W
     }
 
     fn executions_for(&self, idx: usize) -> usize {
@@ -509,15 +511,15 @@ impl CmpMap for AFLppCmpLogMap {
 
     fn usable_executions_for(&self, idx: usize) -> usize {
         if self.headers[idx]._type() == AFL_CMP_TYPE_INS {
-            if self.executions_for(idx) < AFLPP_CMPLOG_MAP_H {
+            if self.executions_for(idx) < CMPLOG_MAP_H {
                 self.executions_for(idx)
             } else {
-                AFLPP_CMPLOG_MAP_H
+                CMPLOG_MAP_H
             }
-        } else if self.executions_for(idx) < AFL_CMPLOG_MAP_RTN_H {
+        } else if self.executions_for(idx) < CMPLOG_MAP_RTN_H {
             self.executions_for(idx)
         } else {
-            AFL_CMPLOG_MAP_RTN_H
+            CMPLOG_MAP_RTN_H
         }
     }
 

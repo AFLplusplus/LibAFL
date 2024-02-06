@@ -5,6 +5,8 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+#[cfg(all(unix, not(miri), feature = "std"))]
+use core::ptr::addr_of_mut;
 #[cfg(feature = "std")]
 use core::sync::atomic::{compiler_fence, Ordering};
 use core::{marker::PhantomData, num::NonZeroUsize, time::Duration};
@@ -962,6 +964,8 @@ where
 
     /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
+        state.on_restart()?;
+
         // First, reset the page to 0 so the next iteration can read read from the beginning of this page
         self.staterestorer.reset();
         self.staterestorer.save(&(
@@ -1259,7 +1263,9 @@ where
 
             // We setup signal handlers to clean up shmem segments used by state restorer
             #[cfg(all(unix, not(miri)))]
-            if let Err(_e) = unsafe { setup_signal_handler(&mut EVENTMGR_SIGHANDLER_STATE) } {
+            if let Err(_e) =
+                unsafe { setup_signal_handler(addr_of_mut!(EVENTMGR_SIGHANDLER_STATE)) }
+            {
                 // We can live without a proper ctrl+c signal handler. Print and ignore.
                 log::error!("Failed to setup signal handlers: {_e}");
             }
@@ -1275,6 +1281,9 @@ where
                     self.shmem_provider.pre_fork()?;
                     match unsafe { fork() }? {
                         ForkResult::Parent(handle) => {
+                            unsafe {
+                                EVENTMGR_SIGHANDLER_STATE.set_exit_from_main();
+                            }
                             self.shmem_provider.post_fork(false)?;
                             handle.status()
                         }
@@ -1284,6 +1293,11 @@ where
                         }
                     }
                 };
+
+                #[cfg(all(unix, not(feature = "fork")))]
+                unsafe {
+                    EVENTMGR_SIGHANDLER_STATE.set_exit_from_main();
+                }
 
                 // On Windows (or in any case without fork), we spawn ourself again
                 #[cfg(any(windows, not(feature = "fork")))]

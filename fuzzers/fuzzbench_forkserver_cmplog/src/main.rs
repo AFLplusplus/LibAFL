@@ -9,9 +9,9 @@ use std::{
 
 use clap::{Arg, ArgAction, Command};
 use libafl::{
-    corpus::{Corpus, CorpusId, InMemoryOnDiskCorpus, OnDiskCorpus},
+    corpus::{Corpus, HasCurrentCorpusIdx, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::forkserver::{ForkserverExecutor, TimeoutForkserverExecutor},
+    executors::forkserver::ForkserverExecutor,
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -314,19 +314,18 @@ fn fuzz(
 
     let colorization = ColorizationStage::new(&edges_observer);
     let mut tokens = Tokens::new();
-    let forkserver = ForkserverExecutor::builder()
+    let mut executor = ForkserverExecutor::builder()
         .program(executable)
         .debug_child(debug_child)
         .shmem_provider(&mut shmem_provider)
         .autotokens(&mut tokens)
         .parse_afl_cmdline(arguments)
         .coverage_map_size(MAP_SIZE)
+        .timeout(timeout)
+        .kill_signal(signal)
         .is_persistent(true)
         .build_dynamic_map(edges_observer, tuple_list!(time_observer))
         .unwrap();
-
-    let mut executor = TimeoutForkserverExecutor::with_signal(forkserver, timeout, signal)
-        .expect("Failed to create the executor.");
 
     // Read tokens
     if let Some(tokenfile) = tokenfile {
@@ -353,18 +352,16 @@ fn fuzz(
 
         let cmplog_observer = AFLppCmpLogObserver::new("cmplog", cmpmap, true);
 
-        let cmplog_forkserver = ForkserverExecutor::builder()
+        let cmplog_executor = ForkserverExecutor::builder()
             .program(exec)
             .debug_child(debug_child)
             .shmem_provider(&mut shmem_provider)
             .parse_afl_cmdline(arguments)
             .is_persistent(true)
+            .timeout(timeout * 10)
+            .kill_signal(signal)
             .build(tuple_list!(cmplog_observer))
             .unwrap();
-
-        let cmplog_executor =
-            TimeoutForkserverExecutor::with_signal(cmplog_forkserver, timeout * 10, signal)
-                .expect("Failed to create the executor.");
 
         let tracing = AFLppCmplogTracingStage::with_cmplog_observer_name(cmplog_executor, "cmplog");
 
@@ -374,9 +371,14 @@ fn fuzz(
         let cb = |_fuzzer: &mut _,
                   _executor: &mut _,
                   state: &mut StdState<_, InMemoryOnDiskCorpus<_>, _, _>,
-                  _event_manager: &mut _,
-                  corpus_id: CorpusId|
-         -> Result<bool, libafl::Error> {
+                  _event_manager: &mut _|
+         -> Result<bool, Error> {
+            let Some(corpus_id) = state.current_corpus_idx()? else {
+                return Err(Error::illegal_state(
+                    "state is not currently processing a corpus index",
+                ));
+            };
+
             let corpus = state.corpus().get(corpus_id)?.borrow();
             let res = corpus.scheduled_count() == 1; // let's try on the 2nd trial
 

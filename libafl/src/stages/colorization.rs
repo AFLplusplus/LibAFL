@@ -10,7 +10,7 @@ use libafl_bolts::{rands::Rand, tuples::MatchName};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, CorpusId},
+    corpus::{Corpus, HasCurrentCorpusIdx},
     events::EventFirer,
     executors::{Executor, HasObservers},
     inputs::HasBytesVec,
@@ -77,6 +77,8 @@ where
     O: MapObserver,
     Z: UsesState<State = E::State>,
 {
+    type Progress = (); // TODO this stage needs resume
+
     #[inline]
     #[allow(clippy::let_and_return)]
     fn perform(
@@ -85,17 +87,9 @@ where
         executor: &mut E, // don't need the *main* executor for tracing
         state: &mut E::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         // Run with the mutated input
-        Self::colorize(
-            fuzzer,
-            executor,
-            state,
-            manager,
-            corpus_idx,
-            &self.map_observer_name,
-        )?;
+        Self::colorize(fuzzer, executor, state, manager, &self.map_observer_name)?;
 
         Ok(())
     }
@@ -156,9 +150,14 @@ where
         executor: &mut E,
         state: &mut E::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
         name: &str,
     ) -> Result<E::Input, Error> {
+        let Some(corpus_idx) = state.current_corpus_idx()? else {
+            return Err(Error::illegal_state(
+                "state is not currently processing a corpus index",
+            ));
+        };
+
         let mut input = state.corpus().cloned_input_for_id(corpus_idx)?;
         // The backup of the input
         let backup = input.clone();

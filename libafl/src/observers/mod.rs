@@ -1384,7 +1384,10 @@ pub mod pybind {
 #[cfg(test)]
 mod tests {
 
+    use core::ptr::addr_of_mut;
+
     use libafl_bolts::{
+        ownedref::OwnedMutSlice,
         tuples::{tuple_list, tuple_list_type},
         Named,
     };
@@ -1396,7 +1399,10 @@ mod tests {
     #[test]
     fn test_observer_serde() {
         let obv = tuple_list!(TimeObserver::new("time"), unsafe {
-            StdMapObserver::new("map", &mut MAP)
+            StdMapObserver::from_ownedref(
+                "map",
+                OwnedMutSlice::from_raw_parts_mut(addr_of_mut!(MAP) as *mut u32, MAP.len()),
+            )
         });
         let vec = postcard::to_allocvec(&obv).unwrap();
         log::info!("{vec:?}");

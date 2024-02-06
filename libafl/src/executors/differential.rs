@@ -77,7 +77,6 @@ where
             .pre_observe_first_all(observers.primary.as_mut())?;
         observers.primary.as_mut().pre_exec_all(state, input)?;
         let ret1 = self.primary.run_target(fuzzer, state, mgr, input)?;
-        self.primary.post_run_reset();
         observers
             .primary
             .as_mut()
@@ -90,7 +89,6 @@ where
             .pre_observe_second_all(observers.secondary.as_mut())?;
         observers.secondary.as_mut().pre_exec_all(state, input)?;
         let ret2 = self.secondary.run_target(fuzzer, state, mgr, input)?;
-        self.secondary.post_run_reset();
         observers
             .secondary
             .as_mut()

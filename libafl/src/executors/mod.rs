@@ -1,49 +1,48 @@
 //! Executors take input, and run it in the target.
 
-pub mod inprocess;
-pub use inprocess::InProcessExecutor;
-#[cfg(all(feature = "std", feature = "fork", unix))]
-pub use inprocess::InProcessForkExecutor;
+#[cfg(unix)]
+use alloc::vec::Vec;
+use core::fmt::Debug;
 
-pub mod differential;
-pub use differential::DiffExecutor;
-
-/// Timeout executor.
-/// Not possible on `no-std` Windows or `no-std`, but works for unix
-#[cfg(any(unix, feature = "std"))]
-pub mod timeout;
-#[cfg(any(unix, feature = "std"))]
-pub use timeout::TimeoutExecutor;
-
-#[cfg(all(feature = "std", feature = "fork", unix))]
-pub mod forkserver;
-#[cfg(all(feature = "std", feature = "fork", unix))]
-pub use forkserver::{Forkserver, ForkserverExecutor, TimeoutForkserverExecutor};
-
-pub mod combined;
 pub use combined::CombinedExecutor;
-
-pub mod shadow;
-pub use shadow::ShadowExecutor;
-
-pub mod with_observers;
-pub use with_observers::WithObservers;
-
-#[cfg(all(feature = "std", any(unix, doc)))]
-pub mod command;
-use core::{fmt::Debug, marker::PhantomData};
-
 #[cfg(all(feature = "std", any(unix, doc)))]
 pub use command::CommandExecutor;
-use libafl_bolts::AsSlice;
+pub use differential::DiffExecutor;
+#[cfg(all(feature = "std", feature = "fork", unix))]
+pub use forkserver::{Forkserver, ForkserverExecutor};
+pub use inprocess::InProcessExecutor;
+#[cfg(all(feature = "std", feature = "fork", unix))]
+pub use inprocess_fork::InProcessForkExecutor;
+#[cfg(unix)]
+use libafl_bolts::os::unix_signals::Signal;
 use serde::{Deserialize, Serialize};
+pub use shadow::ShadowExecutor;
+pub use with_observers::WithObservers;
 
 use crate::{
-    inputs::HasTargetBytes,
     observers::{ObserversTuple, UsesObservers},
-    state::{HasExecutions, State, UsesState},
+    state::UsesState,
     Error,
 };
+
+pub mod combined;
+#[cfg(all(feature = "std", any(unix, doc)))]
+pub mod command;
+pub mod differential;
+#[cfg(all(feature = "std", feature = "fork", unix))]
+pub mod forkserver;
+pub mod inprocess;
+
+/// The module for inproc fork executor
+#[cfg(all(feature = "std", unix))]
+pub mod inprocess_fork;
+
+pub mod shadow;
+
+pub mod with_observers;
+
+/// The module for all the hooks
+pub mod hooks;
 
 /// How an execution finished.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -143,64 +142,99 @@ where
     {
         WithObservers::new(self, observers)
     }
-
-    /// Custom Reset Handler, e.g., to reset timers
-    #[inline]
-    fn post_run_reset(&mut self) {}
 }
 
-/// A simple executor that does nothing.
-/// If intput len is 0, `run_target` will return Err
-#[derive(Debug)]
-struct NopExecutor<S> {
-    phantom: PhantomData<S>,
-}
-
-impl<S> UsesState for NopExecutor<S>
-where
-    S: State,
-{
-    type State = S;
-}
-
-impl<EM, S, Z> Executor<EM, Z> for NopExecutor<S>
-where
-    EM: UsesState<State = S>,
-    S: State + HasExecutions,
-    S::Input: HasTargetBytes,
-    Z: UsesState<State = S>,
-{
-    fn run_target(
-        &mut self,
-        _fuzzer: &mut Z,
-        state: &mut Self::State,
-        _mgr: &mut EM,
-        input: &Self::Input,
-    ) -> Result<ExitKind, Error> {
-        *state.executions_mut() += 1;
-
-        if input.target_bytes().as_slice().is_empty() {
-            Err(Error::empty("Input Empty"))
-        } else {
-            Ok(ExitKind::Ok)
-        }
-    }
+/// The common signals we want to handle
+#[cfg(unix)]
+#[inline]
+#[must_use]
+pub fn common_signals() -> Vec<Signal> {
+    vec![
+        Signal::SigAlarm,
+        Signal::SigUser2,
+        Signal::SigAbort,
+        Signal::SigBus,
+        #[cfg(feature = "handle_sigpipe")]
+        Signal::SigPipe,
+        Signal::SigFloatingPointException,
+        Signal::SigIllegalInstruction,
+        Signal::SigSegmentationFault,
+        Signal::SigTrap,
+    ]
 }
 
 #[cfg(test)]
-mod test {
+pub mod test {
     use core::marker::PhantomData;
 
-    use super::{Executor, NopExecutor};
-    use crate::{events::NopEventManager, inputs::BytesInput, state::NopState, NopFuzzer};
+    use libafl_bolts::{AsSlice, Error};
+
+    use crate::{
+        events::NopEventManager,
+        executors::{Executor, ExitKind},
+        fuzzer::test::NopFuzzer,
+        inputs::{BytesInput, HasTargetBytes},
+        state::{test::NopState, HasExecutions, State, UsesState},
+    };
+
+    /// A simple executor that does nothing.
+    /// If intput len is 0, `run_target` will return Err
+    #[derive(Debug)]
+    pub struct NopExecutor<S> {
+        phantom: PhantomData<S>,
+    }
+
+    impl<S> NopExecutor<S> {
+        #[must_use]
+        pub fn new() -> Self {
+            Self {
+                phantom: PhantomData,
+            }
+        }
+    }
+
+    impl<S> Default for NopExecutor<S> {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
+    impl<S> UsesState for NopExecutor<S>
+    where
+        S: State,
+    {
+        type State = S;
+    }
+
+    impl<EM, S, Z> Executor<EM, Z> for NopExecutor<S>
+    where
+        EM: UsesState<State = S>,
+        S: State + HasExecutions,
+        S::Input: HasTargetBytes,
+        Z: UsesState<State = S>,
+    {
+        fn run_target(
+            &mut self,
+            _fuzzer: &mut Z,
+            state: &mut Self::State,
+            _mgr: &mut EM,
+            input: &Self::Input,
+        ) -> Result<ExitKind, Error> {
+            *state.executions_mut() += 1;
+
+            if input.target_bytes().as_slice().is_empty() {
+                Err(Error::empty("Input Empty"))
+            } else {
+                Ok(ExitKind::Ok)
+            }
+        }
+    }
 
     #[test]
     fn nop_executor() {
         let empty_input = BytesInput::new(vec![]);
         let nonempty_input = BytesInput::new(vec![1u8]);
-        let mut executor = NopExecutor {
-            phantom: PhantomData,
-        };
+        let mut executor = NopExecutor::new();
         let mut fuzzer = NopFuzzer::new();
 
         let mut state = NopState::new();

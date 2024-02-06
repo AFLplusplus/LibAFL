@@ -5,8 +5,7 @@ use alloc::vec::Vec;
 use core::{
     cell::UnsafeCell,
     fmt::{self, Display, Formatter},
-    ptr,
-    ptr::write_volatile,
+    ptr::{self, addr_of_mut, write_volatile},
     sync::atomic::{compiler_fence, Ordering},
 };
 use std::os::raw::{c_long, c_void};
@@ -362,7 +361,10 @@ pub unsafe extern "system" fn handle_exception(
         .as_mut()
         .unwrap()
         .ExceptionCode;
-    let exception_code = ExceptionCode::try_from(code.0).unwrap();
+    let exception_code = match ExceptionCode::try_from(code.0) {
+        Ok(x) => x,
+        Err(_) => ExceptionCode::Other,
+    };
     log::info!("Received exception; code: {}", exception_code);
     internal_handle_exception(exception_code, exception_pointers)
 }
@@ -381,8 +383,8 @@ unsafe extern "C" fn handle_signal(_signum: i32) {
 /// # Safety
 /// Exception handlers are usually ugly, handle with care!
 #[cfg(feature = "alloc")]
-pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: &mut T) -> Result<(), Error> {
-    let exceptions = handler.exceptions();
+pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: *mut T) -> Result<(), Error> {
+    let exceptions = (*handler).exceptions();
     let mut catch_assertions = false;
     for exception_code in exceptions {
         if exception_code == ExceptionCode::AssertionFailure {
@@ -393,7 +395,7 @@ pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: &mut T) -> 
             .position(|x| *x == exception_code)
             .unwrap();
         write_volatile(
-            &mut EXCEPTION_HANDLERS[index],
+            addr_of_mut!(EXCEPTION_HANDLERS[index]),
             Some(HandlerHolder {
                 handler: UnsafeCell::new(handler as *mut dyn Handler),
             }),
@@ -401,7 +403,7 @@ pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: &mut T) -> 
     }
 
     write_volatile(
-        &mut EXCEPTION_HANDLERS[EXCEPTION_HANDLERS_SIZE - 1],
+        addr_of_mut!(EXCEPTION_HANDLERS[EXCEPTION_HANDLERS_SIZE - 1]),
         Some(HandlerHolder {
             handler: UnsafeCell::new(handler as *mut dyn Handler),
         }),
@@ -436,10 +438,10 @@ static mut CTRL_HANDLER: Option<CtrlHandlerHolder> = None;
 /// # Safety
 /// Same safety considerations as in `setup_exception_handler`
 pub(crate) unsafe fn setup_ctrl_handler<T: 'static + CtrlHandler>(
-    handler: &mut T,
+    handler: *mut T,
 ) -> Result<(), Error> {
     write_volatile(
-        &mut CTRL_HANDLER,
+        addr_of_mut!(CTRL_HANDLER),
         Some(CtrlHandlerHolder {
             handler: UnsafeCell::new(handler as *mut dyn CtrlHandler),
         }),

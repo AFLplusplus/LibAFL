@@ -9,7 +9,7 @@ use clap::{builder::Str, Parser};
 use libafl::{
     corpus::{Corpus, NopCorpus},
     events::{launcher::Launcher, EventConfig, EventRestarter},
-    executors::{ExitKind, TimeoutExecutor},
+    executors::ExitKind,
     fuzzer::StdFuzzer,
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
@@ -34,6 +34,11 @@ use rangemap::RangeMap;
 
 #[derive(Default)]
 pub struct Version;
+
+/// Parse a millis string to a [`Duration`]. Used for arg parsing.
+fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
+    Ok(Duration::from_millis(time.parse()?))
+}
 
 impl From<Version> for Str {
     fn from(_: Version) -> Str {
@@ -73,8 +78,8 @@ pub struct FuzzerOptions {
     #[arg(long, help = "Input directory")]
     input: String,
 
-    #[arg(long, help = "Timeout in seconds", default_value_t = 1_u64)]
-    timeout: u64,
+    #[arg(long, help = "Timeout in seconds", default_value = "5000", value_parser = timeout_from_millis_str)]
+    timeout: Duration,
 
     #[arg(long = "port", help = "Broker port", default_value_t = 1337_u16)]
     port: u16,
@@ -245,17 +250,16 @@ pub fn fuzz() {
             )),
         );
 
-        let executor = QemuExecutor::new(
+        let mut executor = QemuExecutor::new(
             &mut hooks,
             &mut harness,
             (),
             &mut fuzzer,
             &mut state,
             &mut mgr,
+            options.timeout,
         )
         .expect("Failed to create QemuExecutor");
-
-        let mut executor = TimeoutExecutor::new(executor, Duration::from_secs(options.timeout));
 
         if state.must_load_initial_inputs() {
             state

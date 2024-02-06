@@ -400,7 +400,6 @@ impl Monitor for TuiMonitor {
         for (key, val) in &client.user_monitor {
             write!(fmt, ", {key}: {val}").unwrap();
         }
-        write!(fmt, ", (Aggregated):").unwrap();
         for (key, val) in &self.aggregator.aggregated {
             write!(fmt, ", {key}: {val}").unwrap();
         }

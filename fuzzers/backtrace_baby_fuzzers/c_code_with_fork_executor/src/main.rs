@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Duration};
 
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
@@ -98,6 +98,7 @@ pub fn main() {
         &mut fuzzer,
         &mut state,
         &mut mgr,
+        Duration::from_millis(5000),
         shmem_provider,
     )
     .expect("Failed to create the Executor");

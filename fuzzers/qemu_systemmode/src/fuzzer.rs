@@ -6,7 +6,7 @@ use std::{env, path::PathBuf, process};
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig},
-    executors::{ExitKind, TimeoutExecutor},
+    executors::ExitKind,
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -36,6 +36,7 @@ use libafl_qemu::{
 
 pub static mut MAX_INPUT_SIZE: usize = 50;
 
+#[allow(clippy::too_many_lines)]
 pub fn fuzz() {
     env_logger::init();
 
@@ -56,12 +57,13 @@ pub fn fuzz() {
     )
     .unwrap();
 
-    let input_addr = elf
-        .resolve_symbol(
+    let input_addr = GuestPhysAddr::from(
+        elf.resolve_symbol(
             &env::var("FUZZ_INPUT").unwrap_or_else(|_| "FUZZ_INPUT".to_owned()),
             0,
         )
-        .expect("Symbol or env FUZZ_INPUT not found") as GuestPhysAddr;
+        .expect("Symbol or env FUZZ_INPUT not found"),
+    );
     println!("FUZZ_INPUT @ {input_addr:#x}");
 
     let main_addr = elf
@@ -85,14 +87,14 @@ pub fn fuzz() {
 
         emu.set_breakpoint(main_addr);
         unsafe {
-            emu.run();
+            emu.run().unwrap();
         }
         emu.remove_breakpoint(main_addr);
 
         emu.set_breakpoint(breakpoint); // BREAKPOINT
 
         let devices = emu.list_devices();
-        println!("Devices = {:?}", devices);
+        println!("Devices = {devices:?}");
 
         // let saved_cpu_states: Vec<_> = (0..emu.num_cpus())
         //     .map(|i| emu.cpu_from_index(i).save_state())
@@ -115,7 +117,7 @@ pub fn fuzz() {
 
                 emu.write_phys_mem(input_addr, buf);
 
-                emu.run();
+                emu.run().unwrap();
 
                 // If the execution stops at any point other then the designated breakpoint (e.g. a breakpoint on a panic method) we consider it a crash
                 let mut pcs = (0..emu.num_cpus())
@@ -202,14 +204,12 @@ pub fn fuzz() {
             &mut fuzzer,
             &mut state,
             &mut mgr,
+            timeout,
         )
         .expect("Failed to create QemuExecutor");
 
         // Instead of calling the timeout handler and restart the process, trigger a breakpoint ASAP
         executor.break_on_timeout();
-
-        // Wrap the executor to keep track of the timeout
-        let mut executor = TimeoutExecutor::new(executor, timeout);
 
         if state.must_load_initial_inputs() {
             state

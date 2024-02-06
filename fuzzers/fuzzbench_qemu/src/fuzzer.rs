@@ -15,7 +15,7 @@ use clap::{Arg, Command};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleRestartingEventManager,
-    executors::{ExitKind, ShadowExecutor, TimeoutExecutor},
+    executors::{ExitKind, ShadowExecutor},
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -351,6 +351,7 @@ fn fuzz(
         ),
     );
 
+    // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let executor = QemuExecutor::new(
         &mut hooks,
         &mut harness,
@@ -358,10 +359,9 @@ fn fuzz(
         &mut fuzzer,
         &mut state,
         &mut mgr,
+        timeout,
     )?;
 
-    // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let executor = TimeoutExecutor::new(executor, timeout);
     // Show the cmplog observer
     let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
 

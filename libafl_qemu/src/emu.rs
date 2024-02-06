@@ -17,10 +17,72 @@ use std::{ffi::CString, ptr, slice::from_raw_parts, str::from_utf8_unchecked};
 use libc::c_int;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use num_traits::Num;
+use paste::paste;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::{GuestReg, Regs};
+
+/// Safe linking with of extern "C" functions.
+/// This macro makes sure the declared symbol is defined *at link time*, avoiding declaring non-existant symbols
+/// that could be silently ignored during linking if unused.
+///
+/// This macro relies on a nightly feature, and can only be used in this mode
+/// It is (nearly) a drop-in replacement for extern "C" { } blocks containing function and static declarations, and will have the same effect in practice.
+macro_rules! extern_c_checked {
+    () => {};
+
+    ($visibility:vis fn $c_fn:ident($($param_ident:ident : $param_ty:ty),*) $( -> $ret_ty:ty )?; $($tail:tt)*) =>  {
+        paste! {
+            #[cfg_attr(nightly, used(linker))]
+            static [<__ $c_fn:upper __>]: unsafe extern "C" fn($($param_ty),*) $( -> $ret_ty )? = $c_fn;
+        }
+
+        extern "C" {
+            $visibility fn $c_fn($($param_ident : $param_ty),*) $( -> $ret_ty )?;
+        }
+
+        extern_c_checked!($($tail)*);
+    };
+
+    ($visibility:vis static $c_var:ident : $c_var_ty:ty; $($tail:tt)*) => {
+        paste! {
+            #[allow(non_camel_case_types)]
+            #[allow(unused)]
+            struct [<__ $c_var:upper _STRUCT__>] { member: *const $c_var_ty }
+
+            unsafe impl Sync for [<__ $c_var:upper _STRUCT__>] {}
+
+            #[cfg_attr(nightly, used(linker))]
+            static [<__ $c_var:upper __>]: [<__ $c_var:upper _STRUCT__>] = unsafe { [<__ $c_var:upper _STRUCT__>] { member: core::ptr::addr_of!($c_var) } };
+        }
+
+        extern "C" {
+            $visibility static $c_var: $c_var_ty;
+        }
+
+        extern_c_checked!($($tail)*);
+    };
+
+    ($visibility:vis static mut $c_var:ident : $c_var_ty:ty; $($tail:tt)*) => {
+        paste! {
+            #[allow(non_camel_case_types)]
+            #[allow(unused)]
+            struct [<__ $c_var:upper _STRUCT__>] { member: *const $c_var_ty }
+
+            unsafe impl Sync for [<__ $c_var:upper _STRUCT__>] {}
+
+            #[cfg_attr(nightly, used(linker))]
+            static mut [<__ $c_var:upper __>]: [<__ $c_var:upper _STRUCT__>] = unsafe { [<__ $c_var:upper _STRUCT__>] { member: core::ptr::addr_of!($c_var) } };
+        }
+
+        extern "C" {
+            $visibility static mut $c_var: $c_var_ty;
+        }
+
+        extern_c_checked!($($tail)*);
+    };
+}
 
 pub type GuestAddr = libafl_qemu_sys::target_ulong;
 pub type GuestUsize = libafl_qemu_sys::target_ulong;
@@ -316,7 +378,7 @@ impl MapInfo {
 }
 
 #[cfg(emulation_mode = "usermode")]
-extern "C" {
+extern_c_checked! {
     fn qemu_user_init(argc: i32, argv: *const *const u8, envp: *const *const u8) -> i32;
 
     fn libafl_qemu_run() -> i32;
@@ -339,7 +401,7 @@ extern "C" {
 }
 
 #[cfg(emulation_mode = "systemmode")]
-extern "C" {
+extern_c_checked! {
     fn qemu_init(argc: i32, argv: *const *const u8, envp: *const *const u8);
 
     fn vm_start();
@@ -348,6 +410,8 @@ extern "C" {
 
     fn libafl_save_qemu_snapshot(name: *const u8, sync: bool);
     fn libafl_load_qemu_snapshot(name: *const u8, sync: bool);
+
+    fn libafl_qemu_current_paging_id(cpu: CPUStatePtr) -> GuestPhysAddr;
 }
 
 #[cfg(emulation_mode = "systemmode")]
@@ -358,7 +422,7 @@ extern "C" fn qemu_cleanup_atexit() {
 }
 
 // TODO rely completely on libafl_qemu_sys
-extern "C" {
+extern_c_checked! {
     //static libafl_page_size: GuestUsize;
     fn libafl_page_from_addr(addr: GuestAddr) -> GuestAddr;
 
@@ -387,12 +451,9 @@ extern "C" {
 
     fn libafl_qemu_add_gdb_cmd(
         callback: extern "C" fn(*const (), *const u8, usize) -> i32,
-        data: *const (),
+        data: *const ()
     );
     fn libafl_qemu_gdb_reply(buf: *const u8, len: usize);
-
-    #[cfg(emulation_mode = "systemmode")]
-    fn libafl_qemu_current_paging_id(cpu: CPUStatePtr) -> GuestPhysAddr;
 }
 
 #[cfg(emulation_mode = "usermode")]
@@ -462,7 +523,8 @@ impl Drop for GuestMaps {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FatPtr(pub *const c_void, pub *const c_void);
 
-static mut GDB_COMMANDS: Vec<FatPtr> = vec![];
+#[allow(clippy::vec_box)]
+static mut GDB_COMMANDS: Vec<Box<FatPtr>> = vec![];
 
 extern "C" fn gdb_cmd(data: *const (), buf: *const u8, len: usize) -> i32 {
     unsafe {
@@ -491,7 +553,7 @@ pub trait ArchExtras {
     fn write_return_address<T>(&self, val: T) -> Result<(), String>
     where
         T: Into<GuestReg>;
-    fn read_function_argument<T>(&self, conv: CallingConvention, idx: i32) -> Result<T, String>
+    fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, String>
     where
         T: From<GuestReg>;
     fn write_function_argument<T>(
@@ -732,7 +794,7 @@ impl CPU {
         #[cfg(emulation_mode = "usermode")]
         {
             thread_local! {
-                static PAGE_SIZE: OnceCell<usize> = OnceCell::new();
+                static PAGE_SIZE: OnceCell<usize> = const { OnceCell::new() };
             }
 
             PAGE_SIZE.with(|s| {
@@ -771,8 +833,45 @@ impl CPU {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub struct HookId(pub(crate) usize);
+pub trait HookId {
+    fn remove(&self, invalidate_block: bool) -> bool;
+}
+
+macro_rules! create_hook_id {
+    ($name:ident, $sys:ident, true) => {
+        paste::paste! {
+            #[derive(Clone, Copy, PartialEq, Debug)]
+            pub struct [<$name HookId>](pub(crate) usize);
+            impl HookId for [<$name HookId>] {
+                fn remove(&self, invalidate_block: bool) -> bool {
+                    unsafe { libafl_qemu_sys::$sys(self.0, invalidate_block.into()) != 0 }
+                }
+            }
+        }
+    };
+    ($name:ident, $sys:ident, false) => {
+        paste::paste! {
+            #[derive(Clone, Copy, PartialEq, Debug)]
+            pub struct [<$name HookId>](pub(crate) usize);
+            impl HookId for [<$name HookId>] {
+                fn remove(&self, _invalidate_block: bool) -> bool {
+                    unsafe { libafl_qemu_sys::$sys(self.0) != 0 }
+                }
+            }
+        }
+    };
+}
+
+create_hook_id!(Instruction, libafl_qemu_remove_hook, true);
+create_hook_id!(Backdoor, libafl_qemu_remove_backdoor_hook, true);
+create_hook_id!(Edge, libafl_qemu_remove_edge_hook, true);
+create_hook_id!(Block, libafl_qemu_remove_block_hook, true);
+create_hook_id!(Read, libafl_qemu_remove_read_hook, true);
+create_hook_id!(Write, libafl_qemu_remove_write_hook, true);
+create_hook_id!(Cmp, libafl_qemu_remove_cmp_hook, true);
+create_hook_id!(PreSyscall, libafl_qemu_remove_pre_syscall_hook, false);
+create_hook_id!(PostSyscall, libafl_qemu_remove_post_syscall_hook, false);
+create_hook_id!(NewThread, libafl_qemu_remove_new_thread_hook, false);
 
 use std::{pin::Pin, sync::OnceLock};
 
@@ -977,7 +1076,7 @@ impl Emulator {
                     envp.as_ptr() as *const *const u8,
                 );
                 libc::atexit(qemu_cleanup_atexit);
-                libafl_qemu_sys::syx_snapshot_init();
+                libafl_qemu_sys::syx_snapshot_init(true);
             }
         }
 
@@ -996,7 +1095,7 @@ impl Emulator {
     /// Should not be used if `Emulator::init` has never been used before (otherwise QEMU will not be initialized).
     /// Prefer `Emulator::get` for a safe version of this method.
     #[must_use]
-    unsafe fn new_empty() -> Emulator {
+    pub unsafe fn new_empty() -> Emulator {
         Emulator { _private: () }
     }
 
@@ -1278,7 +1377,7 @@ impl Emulator {
         addr: GuestAddr,
         callback: extern "C" fn(T, GuestAddr),
         invalidate_block: bool,
-    ) -> HookId {
+    ) -> InstructionHookId {
         unsafe {
             let data: u64 = data.into().0;
             let callback: extern "C" fn(u64, GuestAddr) = core::mem::transmute(callback);
@@ -1288,13 +1387,13 @@ impl Emulator {
                 data,
                 i32::from(invalidate_block),
             );
-            HookId(num)
+            InstructionHookId(num)
         }
     }
 
     #[must_use]
-    pub fn remove_hook(&self, id: HookId, invalidate_block: bool) -> bool {
-        unsafe { libafl_qemu_sys::libafl_qemu_remove_hook(id.0, i32::from(invalidate_block)) != 0 }
+    pub fn remove_hook(&self, id: impl HookId, invalidate_block: bool) -> bool {
+        id.remove(invalidate_block)
     }
 
     #[must_use]
@@ -1309,14 +1408,14 @@ impl Emulator {
         data: T,
         gen: Option<extern "C" fn(T, GuestAddr, GuestAddr) -> u64>,
         exec: Option<extern "C" fn(T, u64)>,
-    ) -> HookId {
+    ) -> EdgeHookId {
         unsafe {
             let data: u64 = data.into().0;
             let gen: Option<extern "C" fn(u64, GuestAddr, GuestAddr) -> u64> =
                 core::mem::transmute(gen);
             let exec: Option<extern "C" fn(u64, u64)> = core::mem::transmute(exec);
             let num = libafl_qemu_sys::libafl_add_edge_hook(gen, exec, data);
-            HookId(num)
+            EdgeHookId(num)
         }
     }
 
@@ -1326,7 +1425,7 @@ impl Emulator {
         gen: Option<extern "C" fn(T, GuestAddr) -> u64>,
         post_gen: Option<extern "C" fn(T, GuestAddr, GuestUsize)>,
         exec: Option<extern "C" fn(T, u64)>,
-    ) -> HookId {
+    ) -> BlockHookId {
         unsafe {
             let data: u64 = data.into().0;
             let gen: Option<extern "C" fn(u64, GuestAddr) -> u64> = core::mem::transmute(gen);
@@ -1334,7 +1433,7 @@ impl Emulator {
                 core::mem::transmute(post_gen);
             let exec: Option<extern "C" fn(u64, u64)> = core::mem::transmute(exec);
             let num = libafl_qemu_sys::libafl_add_block_hook(gen, post_gen, exec, data);
-            HookId(num)
+            BlockHookId(num)
         }
     }
 
@@ -1347,7 +1446,7 @@ impl Emulator {
         exec4: Option<extern "C" fn(T, u64, GuestAddr)>,
         exec8: Option<extern "C" fn(T, u64, GuestAddr)>,
         exec_n: Option<extern "C" fn(T, u64, GuestAddr, usize)>,
-    ) -> HookId {
+    ) -> ReadHookId {
         unsafe {
             let data: u64 = data.into().0;
             let gen: Option<extern "C" fn(u64, GuestAddr, libafl_qemu_sys::MemOpIdx) -> u64> =
@@ -1361,7 +1460,7 @@ impl Emulator {
             let num = libafl_qemu_sys::libafl_add_read_hook(
                 gen, exec1, exec2, exec4, exec8, exec_n, data,
             );
-            HookId(num)
+            ReadHookId(num)
         }
     }
 
@@ -1375,7 +1474,7 @@ impl Emulator {
         exec4: Option<extern "C" fn(T, u64, GuestAddr)>,
         exec8: Option<extern "C" fn(T, u64, GuestAddr)>,
         exec_n: Option<extern "C" fn(T, u64, GuestAddr, usize)>,
-    ) -> HookId {
+    ) -> WriteHookId {
         unsafe {
             let data: u64 = data.into().0;
             let gen: Option<extern "C" fn(u64, GuestAddr, libafl_qemu_sys::MemOpIdx) -> u64> =
@@ -1389,7 +1488,7 @@ impl Emulator {
             let num = libafl_qemu_sys::libafl_add_write_hook(
                 gen, exec1, exec2, exec4, exec8, exec_n, data,
             );
-            HookId(num)
+            WriteHookId(num)
         }
     }
 
@@ -1401,7 +1500,7 @@ impl Emulator {
         exec2: Option<extern "C" fn(T, u64, u16, u16)>,
         exec4: Option<extern "C" fn(T, u64, u32, u32)>,
         exec8: Option<extern "C" fn(T, u64, u64, u64)>,
-    ) -> HookId {
+    ) -> CmpHookId {
         unsafe {
             let data: u64 = data.into().0;
             let gen: Option<extern "C" fn(u64, GuestAddr, usize) -> u64> =
@@ -1411,7 +1510,7 @@ impl Emulator {
             let exec4: Option<extern "C" fn(u64, u64, u32, u32)> = core::mem::transmute(exec4);
             let exec8: Option<extern "C" fn(u64, u64, u64, u64)> = core::mem::transmute(exec8);
             let num = libafl_qemu_sys::libafl_add_cmp_hook(gen, exec1, exec2, exec4, exec8, data);
-            HookId(num)
+            CmpHookId(num)
         }
     }
 
@@ -1419,12 +1518,12 @@ impl Emulator {
         &self,
         data: T,
         callback: extern "C" fn(T, GuestAddr),
-    ) -> HookId {
+    ) -> BackdoorHookId {
         unsafe {
             let data: u64 = data.into().0;
             let callback: extern "C" fn(u64, GuestAddr) = core::mem::transmute(callback);
             let num = libafl_qemu_sys::libafl_add_backdoor_hook(Some(callback), data);
-            HookId(num)
+            BackdoorHookId(num)
         }
     }
 
@@ -1445,7 +1544,7 @@ impl Emulator {
             GuestAddr,
             GuestAddr,
         ) -> SyscallHookResult,
-    ) -> HookId {
+    ) -> PreSyscallHookId {
         unsafe {
             let data: u64 = data.into().0;
             let callback: extern "C" fn(
@@ -1461,7 +1560,7 @@ impl Emulator {
                 GuestAddr,
             ) -> libafl_qemu_sys::syshook_ret = core::mem::transmute(callback);
             let num = libafl_qemu_sys::libafl_add_pre_syscall_hook(Some(callback), data);
-            HookId(num)
+            PreSyscallHookId(num)
         }
     }
 
@@ -1483,7 +1582,7 @@ impl Emulator {
             GuestAddr,
             GuestAddr,
         ) -> GuestAddr,
-    ) -> HookId {
+    ) -> PostSyscallHookId {
         unsafe {
             let data: u64 = data.into().0;
             let callback: extern "C" fn(
@@ -1500,7 +1599,7 @@ impl Emulator {
                 GuestAddr,
             ) -> GuestAddr = core::mem::transmute(callback);
             let num = libafl_qemu_sys::libafl_add_post_syscall_hook(Some(callback), data);
-            HookId(num)
+            PostSyscallHookId(num)
         }
     }
 
@@ -1509,12 +1608,12 @@ impl Emulator {
         &self,
         data: T,
         callback: extern "C" fn(T, tid: u32) -> bool,
-    ) -> HookId {
+    ) -> NewThreadHookId {
         unsafe {
             let data: u64 = data.into().0;
             let callback: extern "C" fn(u64, u32) -> bool = core::mem::transmute(callback);
             let num = libafl_qemu_sys::libafl_add_new_thread_hook(Some(callback), data);
-            HookId(num)
+            NewThreadHookId(num)
         }
     }
 
@@ -1536,6 +1635,7 @@ impl Emulator {
         unsafe {
             libafl_qemu_sys::syx_snapshot_new(
                 track,
+                true,
                 libafl_qemu_sys::DeviceSnapshotKind_DEVICE_SNAPSHOT_ALL,
                 null_mut(),
             )
@@ -1553,6 +1653,7 @@ impl Emulator {
         unsafe {
             libafl_qemu_sys::syx_snapshot_new(
                 track,
+                true,
                 device_filter.enum_id(),
                 device_filter.devices(&mut v),
             )
@@ -1590,11 +1691,9 @@ impl Emulator {
     #[allow(clippy::type_complexity)]
     pub fn add_gdb_cmd(&self, callback: Box<dyn FnMut(&Self, &str) -> bool>) {
         unsafe {
-            GDB_COMMANDS.push(core::mem::transmute(callback));
-            libafl_qemu_add_gdb_cmd(
-                gdb_cmd,
-                GDB_COMMANDS.last().unwrap() as *const _ as *const (),
-            );
+            let fat: Box<FatPtr> = Box::new(transmute(callback));
+            libafl_qemu_add_gdb_cmd(gdb_cmd, &*fat as *const _ as *const ());
+            GDB_COMMANDS.push(fat);
         }
     }
 
@@ -1630,7 +1729,7 @@ impl ArchExtras for Emulator {
             .write_return_address::<T>(val)
     }
 
-    fn read_function_argument<T>(&self, conv: CallingConvention, idx: i32) -> Result<T, String>
+    fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, String>
     where
         T: From<GuestReg>,
     {
@@ -1666,7 +1765,7 @@ pub mod pybind {
     static mut PY_GENERIC_HOOKS: Vec<(GuestAddr, PyObject)> = vec![];
 
     extern "C" fn py_syscall_hook_wrapper(
-        data: u64,
+        _data: u64,
         sys_num: i32,
         a0: u64,
         a1: u64,
@@ -1764,7 +1863,7 @@ pub mod pybind {
 
         fn run(&self) {
             unsafe {
-                self.emu.run();
+                self.emu.run().unwrap();
             }
         }
 

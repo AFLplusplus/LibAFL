@@ -70,7 +70,7 @@ pub fn main() {
     let mut scheduler = QueueScheduler::new();
 
     // Create the executor for an in-process function with just one observer
-    //let mut executor = InProcessExecutor::new(&mut harness, &mut fuzzer, &mut state, &mut mgr)
+    //let mut executor = InProcessExecutor::new(tuple_list!(), &mut harness, &mut fuzzer, &mut state, &mut mgr)
     //    .expect("Failed to create the Executor");
 
     let testcase = Testcase::new(BytesInput::new(b"aaaa".to_vec()));

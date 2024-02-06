@@ -9,7 +9,7 @@ use libafl_bolts::current_time;
 use serde_json::json;
 
 use crate::{
-    corpus::{Corpus, CorpusId},
+    corpus::{Corpus, HasCurrentCorpusIdx},
     events::EventFirer,
     schedulers::minimizer::IsFavoredMetadata,
     stages::Stage,
@@ -62,14 +62,21 @@ where
     Z: UsesState<State = E::State>,
     E::State: HasImported + HasCorpus + HasMetadata,
 {
+    type Progress = (); // this stage does not require resume
+
     fn perform(
         &mut self,
         _fuzzer: &mut Z,
         _executor: &mut E,
         state: &mut E::State,
         _manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
+        let Some(corpus_idx) = state.current_corpus_idx()? else {
+            return Err(Error::illegal_state(
+                "state is not currently processing a corpus index",
+            ));
+        };
+
         // Report your stats every `STATS_REPORT_INTERVAL`
         // compute pending, pending_favored, imported, own_finds
         {

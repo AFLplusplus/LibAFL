@@ -7,7 +7,7 @@ use frida_gum::{
 };
 #[cfg(windows)]
 use libafl::{
-    executors::inprocess::{HasInProcessHandlers, InProcessHandlers},
+    executors::{hooks::inprocess::InProcessHooks, inprocess::HasInProcessHooks},
     state::{HasCorpus, HasSolutions},
 };
 use libafl::{
@@ -18,6 +18,7 @@ use libafl::{
     Error,
 };
 
+#[cfg(not(test))]
 #[cfg(unix)]
 use crate::asan::errors::ASAN_ERRORS;
 use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
@@ -31,7 +32,7 @@ where
     S::Input: HasTargetBytes,
     S: State,
     OT: ObserversTuple<S>,
-    'a: 'b,
+    'b: 'a,
 {
     base: InProcessExecutor<'a, H, OT, S>,
     // thread_id for the Stalker
@@ -102,6 +103,8 @@ where
         if self.helper.stalker_enabled() {
             self.stalker.deactivate();
         }
+
+        #[cfg(not(test))]
         #[cfg(unix)]
         unsafe {
             if ASAN_ERRORS.is_some() && !ASAN_ERRORS.as_ref().unwrap().is_empty() {
@@ -227,7 +230,7 @@ where
 }
 
 #[cfg(windows)]
-impl<'a, 'b, 'c, H, OT, RT, S> HasInProcessHandlers
+impl<'a, 'b, 'c, H, OT, RT, S> HasInProcessHooks
     for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
@@ -238,7 +241,13 @@ where
 {
     /// the timeout handler
     #[inline]
-    fn inprocess_handlers(&self) -> &InProcessHandlers {
-        &self.base.handlers()
+    fn inprocess_hooks(&self) -> &InProcessHooks {
+        &self.base.hooks().0
+    }
+
+    /// the timeout handler
+    #[inline]
+    fn inprocess_hooks_mut(&mut self) -> &mut InProcessHooks {
+        &mut self.base.hooks_mut().0
     }
 }

@@ -21,7 +21,7 @@ RUN rustup default nightly
 
 # Install clang 11, common build tools
 RUN apt update && apt install -y build-essential gdb git wget python3-venv ninja-build lsb-release software-properties-common gnupg
-RUN wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && ./llvm.sh 16
+RUN wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && ./llvm.sh 15
 
 # Copy a dummy.rs and Cargo.toml first, so that dependencies are cached
 WORKDIR /libafl

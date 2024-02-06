@@ -94,7 +94,6 @@ pub mod drcov_rt;
 pub mod executor;
 
 /// Utilities
-#[cfg(unix)]
 pub mod utils;
 
 // for parsing asan and cmplog cores
@@ -342,5 +341,183 @@ impl Default for FridaOptions {
             instrument_suppress_locations: None,
             enable_cmplog: false,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{ptr::addr_of, sync::OnceLock};
+
+    use clap::Parser;
+    use frida_gum::Gum;
+    use libafl::{
+        corpus::{Corpus, InMemoryCorpus, Testcase},
+        events::NopEventManager,
+        executors::{ExitKind, InProcessExecutor},
+        feedback_and_fast, feedback_or_fast,
+        feedbacks::ConstFeedback,
+        inputs::{BytesInput, HasTargetBytes},
+        mutators::{mutations::BitFlipMutator, StdScheduledMutator},
+        schedulers::StdScheduler,
+        stages::StdMutationalStage,
+        state::{HasSolutions, StdState},
+        Fuzzer, StdFuzzer,
+    };
+    use libafl_bolts::{
+        cli::FuzzerOptions, rands::StdRand, tuples::tuple_list, AsSlice, SimpleStdoutLogger,
+    };
+
+    use crate::{
+        asan::{
+            asan_rt::AsanRuntime,
+            errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS},
+        },
+        coverage_rt::CoverageRuntime,
+        executor::FridaInProcessExecutor,
+        helper::FridaInstrumentationHelper,
+    };
+
+    static GUM: OnceLock<Gum> = OnceLock::new();
+
+    unsafe fn test_asan(options: &FuzzerOptions) {
+        // The names of the functions to run
+        let tests = vec![
+            ("LLVMFuzzerTestOneInput", 0),
+            ("heap_oob_read", 1),
+            ("heap_oob_write", 1),
+            ("heap_uaf_write", 1),
+            ("heap_uaf_read", 1),
+            ("malloc_heap_oob_read", 1),
+            ("malloc_heap_oob_write", 1),
+            ("malloc_heap_uaf_write", 1),
+            ("malloc_heap_uaf_read", 1),
+        ];
+
+        let lib = libloading::Library::new(options.clone().harness.unwrap()).unwrap();
+
+        let coverage = CoverageRuntime::new();
+        let asan = AsanRuntime::new(options);
+        let mut frida_helper = FridaInstrumentationHelper::new(
+            GUM.get().expect("Gum uninitialized"),
+            options,
+            tuple_list!(coverage, asan),
+        );
+
+        // Run the tests for each function
+        for test in tests {
+            let (function_name, err_cnt) = test;
+            log::info!("Testing with harness function {}", function_name);
+
+            let mut corpus = InMemoryCorpus::<BytesInput>::new();
+
+            //TODO - make sure we use the right one
+            let testcase = Testcase::new(vec![0; 4].into());
+            corpus.add(testcase).unwrap();
+
+            let rand = StdRand::with_seed(0);
+
+            let mut feedback = ConstFeedback::new(false);
+
+            // Feedbacks to recognize an input as solution
+            let mut objective = feedback_or_fast!(
+                // true enables the AsanErrorFeedback
+                feedback_and_fast!(ConstFeedback::from(true), AsanErrorsFeedback::new())
+            );
+
+            let mut state = StdState::new(
+                rand,
+                corpus,
+                InMemoryCorpus::<BytesInput>::new(),
+                &mut feedback,
+                &mut objective,
+            )
+            .unwrap();
+
+            let mut event_manager = NopEventManager::new();
+
+            let mut fuzzer = StdFuzzer::new(StdScheduler::new(), feedback, objective);
+
+            let observers = tuple_list!(
+                AsanErrorsObserver::new(addr_of!(ASAN_ERRORS)) //,
+            );
+
+            {
+                let target_func: libloading::Symbol<
+                    unsafe extern "C" fn(data: *const u8, size: usize) -> i32,
+                > = lib.get(function_name.as_bytes()).unwrap();
+
+                let mut harness = |input: &BytesInput| {
+                    let target = input.target_bytes();
+                    let buf = target.as_slice();
+                    (target_func)(buf.as_ptr(), buf.len());
+                    ExitKind::Ok
+                };
+
+                let mut executor = FridaInProcessExecutor::new(
+                    GUM.get().expect("Gum uninitialized"),
+                    InProcessExecutor::new(
+                        &mut harness,
+                        observers, // tuple_list!(),
+                        &mut fuzzer,
+                        &mut state,
+                        &mut event_manager,
+                    )
+                    .unwrap(),
+                    &mut frida_helper,
+                );
+
+                let mutator = StdScheduledMutator::new(tuple_list!(BitFlipMutator::new()));
+                let mut stages = tuple_list!(StdMutationalStage::with_max_iterations(mutator, 1));
+
+                // log::info!("Starting fuzzing!");
+                fuzzer
+                    .fuzz_one(&mut stages, &mut executor, &mut state, &mut event_manager)
+                    .unwrap_or_else(|_| panic!("Error in fuzz_one"));
+
+                log::info!("Done fuzzing! Got {} solutions", state.solutions().count());
+            }
+            assert_eq!(state.solutions().count(), err_cnt);
+        }
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn run_test_asan() {
+        // Read RUST_LOG from the environment and set the log level accordingly (not using env_logger)
+        // Note that in cargo test, the output of successfull tests is suppressed by default,
+        // both those sent to stdout and stderr. To see the output, run `cargo test -- --nocapture`.
+        if let Ok(value) = std::env::var("RUST_LOG") {
+            match value.as_str() {
+                "off" => log::set_max_level(log::LevelFilter::Off),
+                "error" => log::set_max_level(log::LevelFilter::Error),
+                "warn" => log::set_max_level(log::LevelFilter::Warn),
+                "info" => log::set_max_level(log::LevelFilter::Info),
+                "debug" => log::set_max_level(log::LevelFilter::Debug),
+                "trace" => log::set_max_level(log::LevelFilter::Trace),
+                _ => panic!("Unknown RUST_LOG level: {value}"),
+            }
+        }
+
+        SimpleStdoutLogger::set_logger().unwrap();
+
+        // Check if the harness dynamic library is present, if not - skip the test
+        let test_harness = "test_harness.so";
+        assert!(
+            std::path::Path::new(test_harness).exists(),
+            "Skipping test, {test_harness} not found"
+        );
+
+        GUM.set(unsafe { Gum::obtain() })
+            .unwrap_or_else(|_| panic!("Failed to initialize Gum"));
+        let simulated_args = vec![
+            "libafl_frida_test",
+            "-A",
+            "--disable-excludes",
+            "--continue-on-error",
+            "-H",
+            test_harness,
+        ];
+        let options: FuzzerOptions = FuzzerOptions::try_parse_from(simulated_args).unwrap();
+        unsafe { test_asan(&options) }
     }
 }
