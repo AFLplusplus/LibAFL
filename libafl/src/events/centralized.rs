@@ -86,10 +86,19 @@ where
     ///
     /// The port must not be bound yet to have a broker.
     #[cfg(feature = "std")]
-    pub fn on_port(shmem_provider: SP, port: u16) -> Result<Self, Error> {
+    pub fn on_port(
+        shmem_provider: SP,
+        port: u16,
+        client_timeout: Option<Duration>,
+    ) -> Result<Self, Error> {
         Ok(Self {
             // TODO switch to false after solving the bug
-            llmp: LlmpBroker::with_keep_pages_attach_to_tcp(shmem_provider, port, true)?,
+            llmp: LlmpBroker::with_keep_pages_attach_to_tcp(
+                shmem_provider,
+                port,
+                true,
+                client_timeout,
+            )?,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             phantom: PhantomData,
