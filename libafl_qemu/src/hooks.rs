@@ -1,12 +1,12 @@
 //! The high-level hooks
 #![allow(clippy::type_complexity)]
-#![allow(clippy::vec_box)]
 
 use core::{
     ffi::c_void,
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
     mem::transmute,
+    pin::Pin,
     ptr::{self, addr_of, addr_of_mut},
 };
 
@@ -243,13 +243,13 @@ macro_rules! create_exec_wrapper {
     }
 }
 
-static mut GENERIC_HOOKS: Vec<Box<(InstructionHookId, FatPtr)>> = vec![];
+static mut GENERIC_HOOKS: Vec<Pin<Box<(InstructionHookId, FatPtr)>>> = vec![];
 create_wrapper!(generic, (pc: GuestAddr));
-static mut BACKDOOR_HOOKS: Vec<Box<(BackdoorHookId, FatPtr)>> = vec![];
+static mut BACKDOOR_HOOKS: Vec<Pin<Box<(BackdoorHookId, FatPtr)>>> = vec![];
 create_wrapper!(backdoor, (pc: GuestAddr));
 
 #[cfg(emulation_mode = "usermode")]
-static mut PRE_SYSCALL_HOOKS: Vec<Box<(PreSyscallHookId, FatPtr)>> = vec![];
+static mut PRE_SYSCALL_HOOKS: Vec<Pin<Box<(PreSyscallHookId, FatPtr)>>> = vec![];
 #[cfg(emulation_mode = "usermode")]
 create_wrapper!(pre_syscall, (sys_num: i32,
     a0: GuestAddr,
@@ -261,7 +261,7 @@ create_wrapper!(pre_syscall, (sys_num: i32,
     a6: GuestAddr,
     a7: GuestAddr), SyscallHookResult);
 #[cfg(emulation_mode = "usermode")]
-static mut POST_SYSCALL_HOOKS: Vec<Box<(PostSyscallHookId, FatPtr)>> = vec![];
+static mut POST_SYSCALL_HOOKS: Vec<Pin<Box<(PostSyscallHookId, FatPtr)>>> = vec![];
 #[cfg(emulation_mode = "usermode")]
 create_wrapper!(post_syscall, (res: GuestAddr, sys_num: i32,
     a0: GuestAddr,
@@ -273,20 +273,20 @@ create_wrapper!(post_syscall, (res: GuestAddr, sys_num: i32,
     a6: GuestAddr,
     a7: GuestAddr), GuestAddr);
 #[cfg(emulation_mode = "usermode")]
-static mut NEW_THREAD_HOOKS: Vec<Box<(NewThreadHookId, FatPtr)>> = vec![];
+static mut NEW_THREAD_HOOKS: Vec<Pin<Box<(NewThreadHookId, FatPtr)>>> = vec![];
 #[cfg(emulation_mode = "usermode")]
 create_wrapper!(new_thread, (tid: u32), bool);
 
-static mut EDGE_HOOKS: Vec<Box<HookState<1, EdgeHookId>>> = vec![];
+static mut EDGE_HOOKS: Vec<Pin<Box<HookState<1, EdgeHookId>>>> = vec![];
 create_gen_wrapper!(edge, (src: GuestAddr, dest: GuestAddr), u64, 1, EdgeHookId);
 create_exec_wrapper!(edge, (id: u64), 0, 1, EdgeHookId);
 
-static mut BLOCK_HOOKS: Vec<Box<HookState<1, BlockHookId>>> = vec![];
+static mut BLOCK_HOOKS: Vec<Pin<Box<HookState<1, BlockHookId>>>> = vec![];
 create_gen_wrapper!(block, (addr: GuestAddr), u64, 1, BlockHookId);
 create_post_gen_wrapper!(block, (addr: GuestAddr, len: GuestUsize), 1, BlockHookId);
 create_exec_wrapper!(block, (id: u64), 0, 1, BlockHookId);
 
-static mut READ_HOOKS: Vec<Box<HookState<5, ReadHookId>>> = vec![];
+static mut READ_HOOKS: Vec<Pin<Box<HookState<5, ReadHookId>>>> = vec![];
 create_gen_wrapper!(read, (pc: GuestAddr, info: MemAccessInfo), u64, 5, ReadHookId);
 create_exec_wrapper!(read, (id: u64, addr: GuestAddr), 0, 5, ReadHookId);
 create_exec_wrapper!(read, (id: u64, addr: GuestAddr), 1, 5, ReadHookId);
@@ -294,7 +294,7 @@ create_exec_wrapper!(read, (id: u64, addr: GuestAddr), 2, 5, ReadHookId);
 create_exec_wrapper!(read, (id: u64, addr: GuestAddr), 3, 5, ReadHookId);
 create_exec_wrapper!(read, (id: u64, addr: GuestAddr, size: usize), 4, 5, ReadHookId);
 
-static mut WRITE_HOOKS: Vec<Box<HookState<5, WriteHookId>>> = vec![];
+static mut WRITE_HOOKS: Vec<Pin<Box<HookState<5, WriteHookId>>>> = vec![];
 create_gen_wrapper!(write, (pc: GuestAddr, info: MemAccessInfo), u64, 5, WriteHookId);
 create_exec_wrapper!(write, (id: u64, addr: GuestAddr), 0, 5, WriteHookId);
 create_exec_wrapper!(write, (id: u64, addr: GuestAddr), 1, 5, WriteHookId);
@@ -302,7 +302,7 @@ create_exec_wrapper!(write, (id: u64, addr: GuestAddr), 2, 5, WriteHookId);
 create_exec_wrapper!(write, (id: u64, addr: GuestAddr), 3, 5, WriteHookId);
 create_exec_wrapper!(write, (id: u64, addr: GuestAddr, size: usize), 4, 5, WriteHookId);
 
-static mut CMP_HOOKS: Vec<Box<HookState<4, CmpHookId>>> = vec![];
+static mut CMP_HOOKS: Vec<Pin<Box<HookState<4, CmpHookId>>>> = vec![];
 create_gen_wrapper!(cmp, (pc: GuestAddr, size: usize), u64, 4, CmpHookId);
 create_exec_wrapper!(cmp, (id: u64, v0: u8, v1: u8), 0, 4, CmpHookId);
 create_exec_wrapper!(cmp, (id: u64, v0: u16, v1: u16), 1, 4, CmpHookId);
@@ -461,14 +461,24 @@ where
     ) -> InstructionHookId {
         unsafe {
             let fat: FatPtr = transmute(hook);
-            GENERIC_HOOKS.push(Box::new((InstructionHookId(0), fat)));
+            GENERIC_HOOKS.push(Box::pin((InstructionHookId(0), fat)));
             let id = self.emulator.set_hook(
-                &mut ((*addr_of_mut!(GENERIC_HOOKS)).last_mut().unwrap().1),
+                &mut GENERIC_HOOKS
+                    .last_mut()
+                    .unwrap()
+                    .as_mut()
+                    .get_unchecked_mut()
+                    .1,
                 addr,
                 closure_generic_hook_wrapper::<QT, S>,
                 invalidate_block,
             );
-            GENERIC_HOOKS.last_mut().unwrap().0 = id;
+            GENERIC_HOOKS
+                .last_mut()
+                .unwrap()
+                .as_mut()
+                .get_unchecked_mut()
+                .0 = id;
             id
         }
     }
@@ -508,16 +518,23 @@ where
                 edge_0_exec_hook_wrapper::<QT, S>,
                 extern "C" fn(&mut HookState<1, EdgeHookId>, id: u64)
             );
-            EDGE_HOOKS.push(Box::new(HookState {
+            EDGE_HOOKS.push(Box::pin(HookState {
                 id: EdgeHookId(0),
                 gen: hook_to_repr!(generation_hook),
                 post_gen: HookRepr::Empty,
                 execs: [hook_to_repr!(execution_hook)],
             }));
-            let id = self
-                .emulator
-                .add_edge_hooks(&mut **EDGE_HOOKS.last_mut().unwrap(), gen, exec);
-            EDGE_HOOKS.last_mut().unwrap().id = id;
+            let id = self.emulator.add_edge_hooks(
+                EDGE_HOOKS.last_mut().unwrap().as_mut().get_unchecked_mut(),
+                gen,
+                exec,
+            );
+            EDGE_HOOKS
+                .last_mut()
+                .unwrap()
+                .as_mut()
+                .get_unchecked_mut()
+                .id = id;
             id
         }
     }
@@ -560,19 +577,24 @@ where
                 block_0_exec_hook_wrapper::<QT, S>,
                 extern "C" fn(&mut HookState<1, BlockHookId>, id: u64)
             );
-            BLOCK_HOOKS.push(Box::new(HookState {
+            BLOCK_HOOKS.push(Box::pin(HookState {
                 id: BlockHookId(0),
                 gen: hook_to_repr!(generation_hook),
                 post_gen: hook_to_repr!(post_generation_hook),
                 execs: [hook_to_repr!(execution_hook)],
             }));
             let id = self.emulator.add_block_hooks(
-                &mut **BLOCK_HOOKS.last_mut().unwrap(),
+                BLOCK_HOOKS.last_mut().unwrap().as_mut().get_unchecked_mut(),
                 gen,
                 postgen,
                 exec,
             );
-            BLOCK_HOOKS.last_mut().unwrap().id = id;
+            BLOCK_HOOKS
+                .last_mut()
+                .unwrap()
+                .as_mut()
+                .get_unchecked_mut()
+                .id = id;
             id
         }
     }
@@ -653,7 +675,7 @@ where
                 read_4_exec_hook_wrapper::<QT, S>,
                 extern "C" fn(&mut HookState<5, ReadHookId>, id: u64, addr: GuestAddr, size: usize)
             );
-            READ_HOOKS.push(Box::new(HookState {
+            READ_HOOKS.push(Box::pin(HookState {
                 id: ReadHookId(0),
                 gen: hook_to_repr!(generation_hook),
                 post_gen: HookRepr::Empty,
@@ -666,7 +688,7 @@ where
                 ],
             }));
             let id = self.emulator.add_read_hooks(
-                &mut **READ_HOOKS.last_mut().unwrap(),
+                READ_HOOKS.last_mut().unwrap().as_mut().get_unchecked_mut(),
                 gen,
                 exec1,
                 exec2,
@@ -674,7 +696,12 @@ where
                 exec8,
                 execn,
             );
-            READ_HOOKS.last_mut().unwrap().id = id;
+            READ_HOOKS
+                .last_mut()
+                .unwrap()
+                .as_mut()
+                .get_unchecked_mut()
+                .id = id;
             id
         }
     }
@@ -760,7 +787,7 @@ where
                     size: usize,
                 )
             );
-            WRITE_HOOKS.push(Box::new(HookState {
+            WRITE_HOOKS.push(Box::pin(HookState {
                 id: WriteHookId(0),
                 gen: hook_to_repr!(generation_hook),
                 post_gen: HookRepr::Empty,
@@ -773,7 +800,7 @@ where
                 ],
             }));
             let id = self.emulator.add_write_hooks(
-                &mut **WRITE_HOOKS.last_mut().unwrap(),
+                WRITE_HOOKS.last_mut().unwrap().as_mut().get_unchecked_mut(),
                 gen,
                 exec1,
                 exec2,
@@ -781,7 +808,12 @@ where
                 exec8,
                 execn,
             );
-            WRITE_HOOKS.last_mut().unwrap().id = id;
+            WRITE_HOOKS
+                .last_mut()
+                .unwrap()
+                .as_mut()
+                .get_unchecked_mut()
+                .id = id;
             id
         }
     }
@@ -842,7 +874,7 @@ where
                 cmp_3_exec_hook_wrapper::<QT, S>,
                 extern "C" fn(&mut HookState<4, CmpHookId>, id: u64, v0: u64, v1: u64)
             );
-            CMP_HOOKS.push(Box::new(HookState {
+            CMP_HOOKS.push(Box::pin(HookState {
                 id: CmpHookId(0),
                 gen: hook_to_repr!(generation_hook),
                 post_gen: HookRepr::Empty,
@@ -854,14 +886,19 @@ where
                 ],
             }));
             let id = self.emulator.add_cmp_hooks(
-                &mut **CMP_HOOKS.last_mut().unwrap(),
+                CMP_HOOKS.last_mut().unwrap().as_mut().get_unchecked_mut(),
                 gen,
                 exec1,
                 exec2,
                 exec4,
                 exec8,
             );
-            CMP_HOOKS.last_mut().unwrap().id = id;
+            CMP_HOOKS
+                .last_mut()
+                .unwrap()
+                .as_mut()
+                .get_unchecked_mut()
+                .id = id;
             id
         }
     }
@@ -901,12 +938,22 @@ where
     ) -> BackdoorHookId {
         unsafe {
             let fat: FatPtr = transmute(hook);
-            BACKDOOR_HOOKS.push(Box::new((BackdoorHookId(0), fat)));
+            BACKDOOR_HOOKS.push(Box::pin((BackdoorHookId(0), fat)));
             let id = self.emulator.add_backdoor_hook(
-                &mut ((*addr_of_mut!(BACKDOOR_HOOKS)).last_mut().unwrap().1),
+                &mut BACKDOOR_HOOKS
+                    .last_mut()
+                    .unwrap()
+                    .as_mut()
+                    .get_unchecked_mut()
+                    .1,
                 closure_backdoor_hook_wrapper::<QT, S>,
             );
-            BACKDOOR_HOOKS.last_mut().unwrap().0 = id;
+            BACKDOOR_HOOKS
+                .last_mut()
+                .unwrap()
+                .as_mut()
+                .get_unchecked_mut()
+                .0 = id;
             id
         }
     }
@@ -1015,12 +1062,22 @@ where
     ) -> PreSyscallHookId {
         unsafe {
             let fat: FatPtr = transmute(hook);
-            PRE_SYSCALL_HOOKS.push(Box::new((PreSyscallHookId(0), fat)));
+            PRE_SYSCALL_HOOKS.push(Box::pin((PreSyscallHookId(0), fat)));
             let id = self.emulator.add_pre_syscall_hook(
-                &mut ((*addr_of_mut!(PRE_SYSCALL_HOOKS)).last_mut().unwrap().1),
+                &mut PRE_SYSCALL_HOOKS
+                    .last_mut()
+                    .unwrap()
+                    .as_mut()
+                    .get_unchecked_mut()
+                    .1,
                 closure_pre_syscall_hook_wrapper::<QT, S>,
             );
-            PRE_SYSCALL_HOOKS.last_mut().unwrap().0 = id;
+            PRE_SYSCALL_HOOKS
+                .last_mut()
+                .unwrap()
+                .as_mut()
+                .get_unchecked_mut()
+                .0 = id;
             id
         }
     }
@@ -1134,12 +1191,22 @@ where
     ) -> PostSyscallHookId {
         unsafe {
             let fat: FatPtr = transmute(hook);
-            POST_SYSCALL_HOOKS.push(Box::new((PostSyscallHookId(0), fat)));
+            POST_SYSCALL_HOOKS.push(Box::pin((PostSyscallHookId(0), fat)));
             let id = self.emulator.add_post_syscall_hook(
-                &mut ((*addr_of_mut!(POST_SYSCALL_HOOKS)).last_mut().unwrap().1),
+                &mut POST_SYSCALL_HOOKS
+                    .last_mut()
+                    .unwrap()
+                    .as_mut()
+                    .get_unchecked_mut()
+                    .1,
                 closure_post_syscall_hook_wrapper::<QT, S>,
             );
-            POST_SYSCALL_HOOKS.last_mut().unwrap().0 = id;
+            POST_SYSCALL_HOOKS
+                .last_mut()
+                .unwrap()
+                .as_mut()
+                .get_unchecked_mut()
+                .0 = id;
             id
         }
     }
@@ -1182,12 +1249,22 @@ where
     ) -> NewThreadHookId {
         unsafe {
             let fat: FatPtr = transmute(hook);
-            NEW_THREAD_HOOKS.push(Box::new((NewThreadHookId(0), fat)));
+            NEW_THREAD_HOOKS.push(Box::pin((NewThreadHookId(0), fat)));
             let id = self.emulator.add_new_thread_hook(
-                &mut (*addr_of_mut!(NEW_THREAD_HOOKS)).last_mut().unwrap().1,
+                &mut NEW_THREAD_HOOKS
+                    .last_mut()
+                    .unwrap()
+                    .as_mut()
+                    .get_unchecked_mut()
+                    .1,
                 closure_new_thread_hook_wrapper::<QT, S>,
             );
-            NEW_THREAD_HOOKS.last_mut().unwrap().0 = id;
+            NEW_THREAD_HOOKS
+                .last_mut()
+                .unwrap()
+                .as_mut()
+                .get_unchecked_mut()
+                .0 = id;
             id
         }
     }
