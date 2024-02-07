@@ -109,10 +109,15 @@ where
     ///
     /// The port must not be bound yet to have a broker.
     #[cfg(feature = "std")]
-    pub fn on_port(shmem_provider: SP, monitor: MT, port: u16) -> Result<Self, Error> {
+    pub fn on_port(
+        shmem_provider: SP,
+        monitor: MT,
+        port: u16,
+        client_timeout: Option<Duration>,
+    ) -> Result<Self, Error> {
         Ok(Self {
             monitor,
-            llmp: llmp::LlmpBroker::create_attach_to_tcp(shmem_provider, port)?,
+            llmp: llmp::LlmpBroker::create_attach_to_tcp(shmem_provider, port, client_timeout)?,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             phantom: PhantomData,
@@ -1172,8 +1177,10 @@ where
         false
     }
 
-    /// Launch the restarting manager
-    pub fn launch(&mut self) -> Result<(Option<S>, LlmpRestartingEventManager<S, SP>), Error> {
+    fn launch_internal(
+        &mut self,
+        client_timeout: Option<Duration>,
+    ) -> Result<(Option<S>, LlmpRestartingEventManager<S, SP>), Error> {
         // We start ourself as child process to actually fuzz
         let (staterestorer, new_shmem_provider, core_id) = if std::env::var(_ENV_FUZZER_SENDER)
             .is_err()
@@ -1195,8 +1202,11 @@ where
             // We get here if we are on Unix, or we are a broker on Windows (or without forks).
             let (mgr, core_id) = match self.kind {
                 ManagerKind::Any => {
-                    let connection =
-                        LlmpConnection::on_port(self.shmem_provider.clone(), self.broker_port)?;
+                    let connection = LlmpConnection::on_port(
+                        self.shmem_provider.clone(),
+                        self.broker_port,
+                        client_timeout,
+                    )?;
                     match connection {
                         LlmpConnection::IsBroker { broker } => {
                             let event_broker = LlmpEventBroker::<S::Input, MT, SP>::new(
@@ -1224,6 +1234,7 @@ where
                         self.shmem_provider.clone(),
                         self.monitor.take().unwrap(),
                         self.broker_port,
+                        client_timeout,
                     )?;
 
                     broker_things(event_broker, self.remote_broker_addr)?;
@@ -1385,6 +1396,19 @@ where
         */
 
         Ok((state, mgr))
+    }
+
+    /// Launch the restarting manager
+    pub fn launch(&mut self) -> Result<(Option<S>, LlmpRestartingEventManager<S, SP>), Error> {
+        self.launch_internal(None)
+    }
+
+    /// Launch the restarting manager with a custom client timeout
+    pub fn launch_with_client_timeout(
+        &mut self,
+        client_timeout: Duration,
+    ) -> Result<(Option<S>, LlmpRestartingEventManager<S, SP>), Error> {
+        self.launch_internal(Some(client_timeout))
     }
 }
 

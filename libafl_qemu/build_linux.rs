@@ -85,6 +85,6 @@ pub fn build() {
             .status()
             .expect("make failed")
             .success());
-        println!("cargo:rerun-if-changed={}/libqasan.so", target_dir.display());
+        // println!("cargo:rerun-if-changed={}/libqasan.so", target_dir.display());
     }
 }

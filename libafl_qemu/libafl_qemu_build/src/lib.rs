@@ -22,10 +22,16 @@ pub fn build_with_bindings(
     jobs: Option<u32>,
     bindings_file: &Path,
 ) {
-    let (qemu_dir, build_dir) = build::build(cpu_target, is_big_endian, is_usermode, jobs);
-    let clang_args = qemu_bindgen_clang_args(&qemu_dir, &build_dir, cpu_target, is_usermode);
+    let build_result = build::build(cpu_target, is_big_endian, is_usermode, jobs);
 
-    let bind = bindings::generate(&build_dir, cpu_target, clang_args)
+    let clang_args = qemu_bindgen_clang_args(
+        &build_result.qemu_path,
+        &build_result.build_dir,
+        cpu_target,
+        is_usermode,
+    );
+
+    let bind = bindings::generate(&build_result.build_dir, cpu_target, clang_args)
         .expect("Failed to generate the bindings");
     bind.write_to_file(bindings_file)
         .expect("Faield to write to the bindings file");
