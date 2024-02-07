@@ -11,7 +11,6 @@ const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
 const QEMU_REVISION: &str = "75d15d54f4417a4766d2dcb493982d9df0e8eac4";
 
 pub struct BuildResult {
-    pub make_done: bool,
     pub qemu_path: PathBuf,
     pub build_dir: PathBuf,
 }
@@ -30,7 +29,6 @@ pub fn build(
     is_usermode: bool,
     jobs: Option<u32>,
 ) -> BuildResult {
-    let mut make_done = false;
     let mut cpu_target = cpu_target.to_string();
     // qemu-system-arm supports both big and little endian configurations and so
     // therefore the "be" feature should ignored in this configuration. Also
@@ -127,10 +125,16 @@ pub fn build(
         "softmmu".to_string()
     };
 
-    let output_lib = if is_usermode {
-        build_dir.join(format!("libqemu-{cpu_target}.so"))
+    let (output_lib, output_lib_link) = if is_usermode {
+        (
+            build_dir.join(format!("libqemu-{cpu_target}.so")),
+            format!("qemu-{cpu_target}"),
+        )
     } else {
-        build_dir.join(format!("libqemu-system-{cpu_target}.so"))
+        (
+            build_dir.join(format!("libqemu-system-{cpu_target}.so")),
+            format!("qemu-system-{cpu_target}"),
+        )
     };
 
     // println!("cargo:rerun-if-changed={}", output_lib.to_string_lossy());
@@ -319,7 +323,6 @@ pub fn build(
                 .status()
                 .expect("Make failed");
         }
-        make_done = true;
     }
 
     /*
@@ -345,12 +348,18 @@ pub fn build(
     }
     */
 
-    let compile_commands_string =
-        &fs::read_to_string(build_dir.join("linkinfo.json")).expect("Failed to read linkinfo.json");
+    if cfg!(feature = "shared") {
+        println!(
+            "cargo:rustc-link-search=native={}",
+            build_dir.to_string_lossy()
+        );
+        println!("cargo:rustc-link-lib=dylib={output_lib_link}");
+    } else {
+        let compile_commands_string = &fs::read_to_string(build_dir.join("linkinfo.json"))
+            .expect("Failed to read linkinfo.json");
 
-    let linkinfo = json::parse(compile_commands_string).expect("Failed to parse linkinfo.json");
+        let linkinfo = json::parse(compile_commands_string).expect("Failed to parse linkinfo.json");
 
-    if make_done {
         let mut cmd = vec![];
         for arg in linkinfo["cmd"].members() {
             cmd.push(
@@ -461,23 +470,23 @@ pub fn build(
             .arg(build_dir.join("libqemu-partially-linked.o"))
             .status()
             .expect("Ar creation");
-    }
 
-    println!("cargo:rustc-link-search=native={out_dir}");
-    println!("cargo:rustc-link-lib=static=qemu-partially-linked");
+        println!("cargo:rustc-link-search=native={out_dir}");
+        println!("cargo:rustc-link-lib=static=qemu-partially-linked");
 
-    for arg in linkinfo["search"].members() {
-        let val = arg
-            .as_str()
-            .expect("linkinfo.json `search` values must be strings");
-        println!("cargo:rustc-link-search={val}");
-    }
+        for arg in linkinfo["search"].members() {
+            let val = arg
+                .as_str()
+                .expect("linkinfo.json `search` values must be strings");
+            println!("cargo:rustc-link-search={val}");
+        }
 
-    for arg in linkinfo["libs"].members() {
-        let val = arg
-            .as_str()
-            .expect("linkinfo.json `libs` values must be strings");
-        println!("cargo:rustc-link-lib={val}");
+        for arg in linkinfo["libs"].members() {
+            let val = arg
+                .as_str()
+                .expect("linkinfo.json `libs` values must be strings");
+            println!("cargo:rustc-link-lib={val}");
+        }
     }
 
     /*
@@ -511,7 +520,6 @@ pub fn build(
     }
 
     BuildResult {
-        make_done,
         qemu_path,
         build_dir,
     }

@@ -23,9 +23,6 @@ pub fn build_with_bindings(
     bindings_file: &Path,
 ) {
     let build_result = build::build(cpu_target, is_big_endian, is_usermode, jobs);
-    if !build_result.make_done {
-        return;
-    }
 
     let clang_args = qemu_bindgen_clang_args(
         &build_result.qemu_path,
