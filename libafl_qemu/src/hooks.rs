@@ -1,5 +1,6 @@
 //! The high-level hooks
 #![allow(clippy::type_complexity)]
+#![allow(clippy::vec_box)]
 
 use core::{
     ffi::c_void,
