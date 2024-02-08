@@ -24,6 +24,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *******************************************************************************/
 
 #include "libqasan.h"
+#include "printf/printf.h"
 #include "map_macro.h"
 #include <unistd.h>
 #include <sys/syscall.h>
@@ -592,4 +593,27 @@ int wcscmp(const wchar_t *s1, const wchar_t *s2) {
   QASAN_DEBUG("\t\t = %d\n", r);
 
   return r;
+}
+
+int asprintf(char **restrict strp, const char *restrict fmt, ...) {
+  void *rtv = __builtin_return_address(0);
+
+  QASAN_DEBUG("%14p: asprintf(%p, %p)\n", rtv, strp, fmt);
+  va_list va;
+  va_start(va, fmt);
+  int len = __libqasan_vasprintf(strp, fmt, va);
+  va_end(va);
+  QASAN_DEBUG("\t\t = %d [*strp = %p]\n", len, *strp);
+
+  return len;
+}
+
+int vasprintf(char **restrict strp, const char *restrict fmt, va_list ap) {
+  void *rtv = __builtin_return_address(0);
+
+  QASAN_DEBUG("%14p: vasprintf(%p, %p)\n", rtv, strp, fmt);
+  int len = __libqasan_vasprintf(strp, fmt, ap);
+  QASAN_DEBUG("\t\t = %d [*strp = %p]\n", len, *strp);
+
+  return len;
 }
