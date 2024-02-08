@@ -42,26 +42,32 @@ use crate::{
 };
 
 /// The process executor simply calls a target function, as mutable reference to a closure
-pub type InProcessExecutor<'a, H, OT, S> = GenericInProcessExecutor<H, &'a mut H, (), OT, S>;
+pub type InProcessExecutor<'a, H, OT, S> = GenericInProcessExecutor<H, &'a mut H, (), OT, S, E, EM, Z>;
 
 /// The process executor simply calls a target function, as boxed `FnMut` trait object
-pub type OwnedInProcessExecutor<OT, S> = GenericInProcessExecutor<
+pub type OwnedInProcessExecutor<OT, S, E, EM, Z> = GenericInProcessExecutor<
     dyn FnMut(&<S as UsesInput>::Input) -> ExitKind,
     Box<dyn FnMut(&<S as UsesInput>::Input) -> ExitKind>,
     (),
     OT,
     S,
+    E,
+    EM,
+    Z
 >;
 
 /// The inmem executor simply calls a target function, then returns afterwards.
 #[allow(dead_code)]
-pub struct GenericInProcessExecutor<H, HB, HT, OT, S>
+pub struct GenericInProcessExecutor<H, HB, HT, OT, S, E, EM, Z>
 where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&S::Input, &mut E) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple,
     OT: ObserversTuple<S>,
     S: State,
+    E: Executor<EM, Z, State = S>,
+    EM: UsesState<State = S>,
+    Z: UsesState<State = S>,
 {
     /// The harness function, being executed for each fuzzing loop execution
     harness_fn: HB,
@@ -69,16 +75,19 @@ where
     observers: OT,
     // Crash and timeout hah
     hooks: (InProcessHooks, HT),
-    phantom: PhantomData<(S, *const H)>,
+    phantom: PhantomData<(S, *const H, E, EM, Z)>,
 }
 
-impl<H, HB, HT, OT, S> Debug for GenericInProcessExecutor<H, HB, HT, OT, S>
+impl<H, HB, HT, OT, S, E, EM, Z> Debug for GenericInProcessExecutor<H, HB, HT, OT, S, E, EM, Z>
 where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&S::Input, &mut E) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple,
     OT: ObserversTuple<S> + Debug,
     S: State,
+    E: Executor<EM, Z, State = S>,
+    EM: UsesState<State = S>,
+    Z: UsesState<State = S>,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("GenericInProcessExecutor")
@@ -88,37 +97,46 @@ where
     }
 }
 
-impl<H, HB, HT, OT, S> UsesState for GenericInProcessExecutor<H, HB, HT, OT, S>
+impl<H, HB, OT, S, E, EM, Z> UsesState for GenericInProcessExecutor<H, HB, OT, S, E, EM, Z>
 where
-    H: ?Sized + FnMut(&S::Input) -> ExitKind,
+    H: FnMut(&S::Input, &mut E) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple,
     OT: ObserversTuple<S>,
     S: State,
+    E: Executor<EM, Z, State = S>,
+    EM: UsesState<State = S>,
+    Z: UsesState<State = S>,
 {
     type State = S;
 }
 
-impl<H, HB, HT, OT, S> UsesObservers for GenericInProcessExecutor<H, HB, HT, OT, S>
+impl<H, HB, HT, OT, S, E, EM, Z> UsesObservers for GenericInProcessExecutor<H, HB, HT, OT, S, E, EM, Z>
 where
-    H: ?Sized + FnMut(&S::Input) -> ExitKind,
+    H: FnMut(&S::Input, &mut E) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple,
     OT: ObserversTuple<S>,
     S: State,
+    E: Executor<EM, Z, State = S>,
+    EM: UsesState<State = S>,
+    Z: UsesState<State = S>,
 {
     type Observers = OT;
 }
 
-impl<EM, H, HB, HT, OT, S, Z> Executor<EM, Z> for GenericInProcessExecutor<H, HB, HT, OT, S>
+impl<EM, H, HB, HT, OT, S, Z, E, SEM, SZ> Executor<EM, Z> for GenericInProcessExecutor<H, HB, HT, OT, S, E, SEM, SZ>
 where
     EM: UsesState<State = S>,
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&S::Input, &mut E) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple,
     OT: ObserversTuple<S>,
     S: State + HasExecutions,
     Z: UsesState<State = S>,
+    E: Executor<SEM, SZ, State = S>,
+    SEM: UsesState<State = S>,
+    SZ: UsesState<State = S>,
 {
     fn run_target(
         &mut self,
@@ -139,13 +157,16 @@ where
     }
 }
 
-impl<H, HB, HT, OT, S> HasObservers for GenericInProcessExecutor<H, HB, HT, OT, S>
+impl<H, HB, HT, OT, S, E, EM, Z> HasObservers for GenericInProcessExecutor<H, HB, HT, OT, S, E, EM, Z>
 where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&S::Input, &mut E) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple,
     OT: ObserversTuple<S>,
     S: State,
+    E: Executor<EM, Z, State = S>,
+    EM: UsesState<State = S>,
+    Z: UsesState<State = S>,
 {
     #[inline]
     fn observers(&self) -> &OT {
@@ -340,13 +361,16 @@ where
     }
 }
 
-impl<H, HB, HT, OT, S> GenericInProcessExecutor<H, HB, HT, OT, S>
+impl<H, HB, HT, OT, S, E, SEM, SZ> GenericInProcessExecutor<H, HB, HT, OT, S, E, SEM, SZ>
 where
-    H: FnMut(&<S as UsesInput>::Input) -> ExitKind + ?Sized,
+    H: FnMut(&S::Input, &mut E) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple,
     OT: ObserversTuple<S>,
     S: HasExecutions + HasSolutions + HasCorpus + State,
+    E: Executor<SEM, SZ, State = S>,
+    SEM: UsesState<State = S>,
+    SZ: UsesState<State = S>,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
     pub fn generic<EM, OF, Z>(
