@@ -1531,7 +1531,7 @@ impl AsanRuntime {
                 NonZeroUsize::new_unchecked(0x1000),
                 ProtFlags::all(),
                 MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE,
-                -1,
+                None,
                 0,
             )
             .unwrap();
