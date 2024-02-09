@@ -593,8 +593,8 @@ pub mod unix_shmem {
         use std::{io::Write, process};
 
         use libc::{
-            c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, close, ftruncate, mmap, munmap,
-            perror, shm_open, shm_unlink, shmat, shmctl, shmdt, shmget,
+            c_int, c_uchar, close, ftruncate, mmap, munmap, perror, shm_open, shm_unlink, shmat,
+            shmctl, shmdt, shmget,
         };
 
         use crate::{
