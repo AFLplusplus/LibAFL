@@ -8,7 +8,7 @@ use libafl_bolts::{ownedref::OwnedMutPtr, tuples::MatchName};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    executors::{Executor, ExitKind, HasObservers},
+    executors::{Executor, ExitKind, HasExecutorState, HasObservers},
     inputs::UsesInput,
     observers::{DifferentialObserversTuple, ObserversTuple, UsesObservers},
     state::UsesState,
@@ -55,13 +55,15 @@ impl<A, B, OTA, OTB, DOT> DiffExecutor<A, B, OTA, OTB, DOT> {
     }
 }
 
-impl<A, B, EM, DOT, Z> Executor<EM, Z> for DiffExecutor<A, B, A::Observers, B::Observers, DOT>
+impl<A, B, EM, DOT, Z, ES> Executor<EM, Z, ES>
+    for DiffExecutor<A, B, A::Observers, B::Observers, DOT>
 where
-    A: Executor<EM, Z> + HasObservers,
-    B: Executor<EM, Z, State = A::State> + HasObservers,
+    A: Executor<EM, Z, ES> + HasObservers,
+    B: Executor<EM, Z, ES, State = A::State> + HasObservers,
     EM: UsesState<State = A::State>,
     DOT: DifferentialObserversTuple<A::Observers, B::Observers, A::State>,
     Z: UsesState<State = A::State>,
+    ES: HasExecutorState,
 {
     fn run_target(
         &mut self,
@@ -69,6 +71,7 @@ where
         state: &mut Self::State,
         mgr: &mut EM,
         input: &Self::Input,
+        executor_state: &mut ES::ExecutorState,
     ) -> Result<ExitKind, Error> {
         self.observers(); // update in advance
         let observers = self.observers.get_mut();
@@ -76,7 +79,9 @@ where
             .differential
             .pre_observe_first_all(observers.primary.as_mut())?;
         observers.primary.as_mut().pre_exec_all(state, input)?;
-        let ret1 = self.primary.run_target(fuzzer, state, mgr, input)?;
+        let ret1 = self
+            .primary
+            .run_target(fuzzer, state, mgr, input, executor_state)?;
         observers
             .primary
             .as_mut()
@@ -88,7 +93,9 @@ where
             .differential
             .pre_observe_second_all(observers.secondary.as_mut())?;
         observers.secondary.as_mut().pre_exec_all(state, input)?;
-        let ret2 = self.secondary.run_target(fuzzer, state, mgr, input)?;
+        let ret2 = self
+            .secondary
+            .run_target(fuzzer, state, mgr, input, executor_state)?;
         observers
             .secondary
             .as_mut()

@@ -2,7 +2,7 @@ use core::marker::PhantomData;
 use std::time::Duration;
 
 use libafl::{
-    executors::{Executor, ExitKind, HasObservers},
+    executors::{Executor, ExitKind, HasObservers, NopExecutorState},
     inputs::HasTargetBytes,
     observers::{ObserversTuple, UsesObservers},
     state::{HasExecutions, State, UsesState},
@@ -40,7 +40,7 @@ where
     }
 }
 
-impl<'a, EM, S, SP, OT, Z> Executor<EM, Z> for TinyInstExecutor<'a, S, SP, OT>
+impl<'a, EM, S, SP, OT, Z> Executor<EM, Z, NopExecutorState> for TinyInstExecutor<'a, S, SP, OT>
 where
     EM: UsesState<State = S>,
     S: State + HasExecutions,
@@ -55,6 +55,7 @@ where
         state: &mut Self::State,
         _mgr: &mut EM,
         input: &Self::Input,
+        _executor_state: &mut (),
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
         match &self.map {

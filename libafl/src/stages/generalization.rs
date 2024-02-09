@@ -10,7 +10,7 @@ use libafl_bolts::AsSlice;
 
 use crate::{
     corpus::{Corpus, HasCurrentCorpusIdx},
-    executors::{Executor, HasObservers},
+    executors::{Executor, HasObservers, NopExecutorState},
     feedbacks::map::MapNoveltiesMetadata,
     inputs::{BytesInput, GeneralizedInputMetadata, GeneralizedItem, HasBytesVec, UsesInput},
     mark_feature_time,
@@ -58,7 +58,7 @@ where
 impl<E, EM, O, Z> Stage<E, EM, Z> for GeneralizationStage<EM, O, E::Observers, Z>
 where
     O: MapObserver,
-    E: Executor<EM, Z> + HasObservers,
+    E: Executor<EM, Z, NopExecutorState> + HasObservers,
     E::Observers: ObserversTuple<E::State>,
     E::State: UsesInput<Input = BytesInput> + HasExecutions + HasMetadata + HasCorpus,
     EM: UsesState<State = E::State>,
@@ -349,7 +349,7 @@ where
         input: &BytesInput,
     ) -> Result<bool, Error>
     where
-        E: Executor<EM, Z> + HasObservers<Observers = OT, State = EM::State>,
+        E: Executor<EM, Z, NopExecutorState> + HasObservers<Observers = OT, State = EM::State>,
         Z: UsesState<State = EM::State>,
     {
         start_timer!(state);
@@ -357,7 +357,7 @@ where
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
         start_timer!(state);
-        let exit_kind = executor.run_target(fuzzer, state, manager, input)?;
+        let exit_kind = executor.run_target(fuzzer, state, manager, input, &mut ())?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
         *state.executions_mut() += 1;
@@ -395,7 +395,7 @@ where
         split_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, Z> + HasObservers<Observers = OT, State = EM::State>,
+        E: Executor<EM, Z, NopExecutorState> + HasObservers<Observers = OT, State = EM::State>,
         Z: UsesState<State = EM::State>,
     {
         let mut start = 0;
@@ -438,7 +438,7 @@ where
         closing_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, Z> + HasObservers<Observers = OT, State = EM::State>,
+        E: Executor<EM, Z, NopExecutorState> + HasObservers<Observers = OT, State = EM::State>,
         Z: UsesState<State = EM::State>,
     {
         let mut index = 0;

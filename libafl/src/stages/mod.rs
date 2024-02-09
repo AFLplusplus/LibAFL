@@ -34,7 +34,7 @@ use self::push::PushStage;
 use crate::{
     corpus::HasCurrentCorpusIdx,
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
-    executors::{Executor, HasObservers},
+    executors::{Executor, HasObservers, NopExecutorState},
     inputs::UsesInput,
     observers::ObserversTuple,
     schedulers::Scheduler,
@@ -273,7 +273,7 @@ where
     CS: Scheduler,
     CS::State:
         HasExecutions + HasMetadata + HasRand + HasCorpus + HasLastReportTime + HasCurrentCorpusIdx,
-    E: Executor<EM, Z> + HasObservers<Observers = OT, State = CS::State>,
+    E: Executor<EM, Z, NopExecutorState> + HasObservers<Observers = OT, State = CS::State>,
     EM: EventFirer<State = CS::State>
         + EventRestarter
         + HasEventManagerId

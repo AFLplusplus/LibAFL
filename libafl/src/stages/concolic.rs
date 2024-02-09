@@ -38,7 +38,7 @@ impl<E, EM, TE, Z> Stage<E, EM, Z> for ConcolicTracingStage<EM, TE, Z>
 where
     E: UsesState<State = TE::State>,
     EM: UsesState<State = TE::State>,
-    TE: Executor<EM, Z> + HasObservers,
+    TE: Executor<EM, Z, NopExecutorState> + HasObservers,
     TE::State: HasExecutions + HasCorpus,
     Z: UsesState<State = TE::State>,
 {
@@ -92,7 +92,7 @@ use libafl_bolts::tuples::MatchName;
 
 #[cfg(all(feature = "concolic_mutation", feature = "introspection"))]
 use crate::monitors::PerfFeature;
-use crate::{corpus::HasCurrentCorpusIdx, state::UsesState};
+use crate::{corpus::HasCurrentCorpusIdx, executors::NopExecutorState, state::UsesState};
 #[cfg(feature = "concolic_mutation")]
 use crate::{
     inputs::HasBytesVec,

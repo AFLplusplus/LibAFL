@@ -9,7 +9,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusIdx, HasTestcase, Testcase},
     events::{Event, EventConfig, EventFirer, EventProcessor, ProgressReporter},
-    executors::{Executor, ExitKind, HasObservers},
+    executors::{Executor, ExitKind, HasObservers, NopExecutorState},
     feedbacks::Feedback,
     inputs::UsesInput,
     mark_feature_time,
@@ -98,7 +98,7 @@ pub trait EvaluatorObservers<OT>: UsesState + Sized {
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
     where
-        E: Executor<EM, Self> + HasObservers<Observers = OT, State = Self::State>,
+        E: Executor<EM, Self, NopExecutorState> + HasObservers<Observers = OT, State = Self::State>,
         EM: EventFirer<State = Self::State>;
 }
 
@@ -456,7 +456,7 @@ where
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
     where
-        E: Executor<EM, Self> + HasObservers<Observers = OT, State = Self::State>,
+        E: Executor<EM, Self, NopExecutorState> + HasObservers<Observers = OT, State = Self::State>,
         EM: EventFirer<State = Self::State>,
     {
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
@@ -471,7 +471,7 @@ where
 impl<CS, E, EM, F, OF, OT> Evaluator<E, EM> for StdFuzzer<CS, F, OF, OT>
 where
     CS: Scheduler,
-    E: HasObservers<State = CS::State, Observers = OT> + Executor<EM, Self>,
+    E: HasObservers<State = CS::State, Observers = OT> + Executor<EM, Self, NopExecutorState>,
     EM: EventFirer<State = CS::State>,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
@@ -671,7 +671,7 @@ where
         input: &<CS::State as UsesInput>::Input,
     ) -> Result<ExitKind, Error>
     where
-        E: Executor<EM, Self> + HasObservers<Observers = OT, State = CS::State>,
+        E: Executor<EM, Self, NopExecutorState> + HasObservers<Observers = OT, State = CS::State>,
         EM: UsesState<State = CS::State>,
         OT: ObserversTuple<CS::State>,
     {
@@ -680,7 +680,7 @@ where
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
         start_timer!(state);
-        let exit_kind = executor.run_target(self, state, event_mgr, input)?;
+        let exit_kind = executor.run_target(self, state, event_mgr, input, &mut ())?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
         start_timer!(state);
@@ -714,7 +714,7 @@ where
     CS: Scheduler,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
-    E: Executor<EM, Self> + HasObservers<State = CS::State>,
+    E: Executor<EM, Self, NopExecutorState> + HasObservers<State = CS::State>,
     EM: UsesState<State = CS::State>,
     CS::State: UsesInput + HasExecutions + HasCorpus,
 {
@@ -731,7 +731,7 @@ where
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
         start_timer!(state);
-        let exit_kind = executor.run_target(self, state, event_mgr, input)?;
+        let exit_kind = executor.run_target(self, state, event_mgr, input, &mut ())?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
         start_timer!(state);

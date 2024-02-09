@@ -3,7 +3,7 @@
 use core::fmt::{self, Debug, Formatter};
 
 use crate::{
-    executors::{Executor, ExitKind, HasObservers},
+    executors::{Executor, ExitKind, HasExecutorState, HasObservers},
     observers::{ObserversTuple, UsesObservers},
     state::UsesState,
     Error,
@@ -56,12 +56,13 @@ where
     }
 }
 
-impl<E, EM, SOT, Z> Executor<EM, Z> for ShadowExecutor<E, SOT>
+impl<E, EM, SOT, Z, ES> Executor<EM, Z, ES> for ShadowExecutor<E, SOT>
 where
-    E: Executor<EM, Z> + HasObservers,
+    E: Executor<EM, Z, ES> + HasObservers,
     SOT: ObserversTuple<E::State>,
     EM: UsesState<State = E::State>,
     Z: UsesState<State = E::State>,
+    ES: HasExecutorState,
 {
     fn run_target(
         &mut self,
@@ -69,8 +70,10 @@ where
         state: &mut Self::State,
         mgr: &mut EM,
         input: &Self::Input,
+        executor_state: &mut ES::ExecutorState,
     ) -> Result<ExitKind, Error> {
-        self.executor.run_target(fuzzer, state, mgr, input)
+        self.executor
+            .run_target(fuzzer, state, mgr, input, executor_state)
     }
 }
 

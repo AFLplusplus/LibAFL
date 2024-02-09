@@ -1,5 +1,5 @@
 use core::ptr::addr_of_mut;
-use std::{marker::PhantomData, process};
+use std::{fmt::Debug, marker::PhantomData, process};
 
 #[cfg(feature = "simplemgr")]
 use libafl::events::SimpleEventManager;
@@ -40,6 +40,7 @@ use libafl_bolts::{
 use libafl_qemu::{
     cmplog::CmpLogObserver,
     edges::{edges_map_mut_slice, MAX_EDGES_NUM},
+    executor::QemuExecutorState,
     helper::QemuHelperTuple,
     Emulator, QemuExecutor, QemuHooks,
 };
@@ -70,7 +71,7 @@ pub struct Instance<'a, M: Monitor> {
 impl<'a, M: Monitor> Instance<'a, M> {
     pub fn run<QT>(&mut self, helpers: QT, state: Option<ClientState>) -> Result<(), Error>
     where
-        QT: QemuHelperTuple<ClientState>,
+        QT: QemuHelperTuple<ClientState> + Debug,
     {
         let mut hooks = QemuHooks::new(self.emu.clone(), helpers);
 
@@ -148,7 +149,8 @@ impl<'a, M: Monitor> Instance<'a, M> {
         state.add_metadata(tokens);
 
         let harness = Harness::new(self.emu)?;
-        let mut harness = |input: &BytesInput| harness.run(input);
+        let mut harness =
+            |input: &BytesInput, _executor_state: &mut QemuExecutorState<_, _>| harness.run(input);
 
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);

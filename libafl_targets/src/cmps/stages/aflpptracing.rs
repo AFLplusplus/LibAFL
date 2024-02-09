@@ -5,7 +5,7 @@ use core::marker::PhantomData;
 use libafl::state::HasClientPerfMonitor;
 use libafl::{
     corpus::{Corpus, HasCurrentCorpusIdx},
-    executors::{Executor, HasObservers},
+    executors::{Executor, HasObservers, NopExecutorState},
     inputs::{BytesInput, UsesInput},
     observers::ObserversTuple,
     stages::{colorization::TaintMetadata, Stage},
@@ -35,7 +35,7 @@ where
 impl<E, EM, TE, Z> Stage<E, EM, Z> for AFLppCmplogTracingStage<EM, TE, Z>
 where
     E: UsesState<State = TE::State>,
-    TE: Executor<EM, Z> + HasObservers,
+    TE: Executor<EM, Z, NopExecutorState> + HasObservers,
     TE::State: HasExecutions + HasCorpus + HasMetadata + UsesInput<Input = BytesInput>,
     EM: UsesState<State = TE::State>,
     Z: UsesState<State = TE::State>,
@@ -77,7 +77,7 @@ where
 
         let exit_kind =
             self.tracer_executor
-                .run_target(fuzzer, state, manager, &unmutated_input)?;
+                .run_target(fuzzer, state, manager, &unmutated_input, &mut ())?;
 
         *state.executions_mut() += 1;
 
@@ -109,9 +109,9 @@ where
             .observers_mut()
             .pre_exec_all(state, &mutated_input)?;
 
-        let exit_kind = self
-            .tracer_executor
-            .run_target(fuzzer, state, manager, &mutated_input)?;
+        let exit_kind =
+            self.tracer_executor
+                .run_target(fuzzer, state, manager, &mutated_input, &mut ())?;
 
         *state.executions_mut() += 1;
 

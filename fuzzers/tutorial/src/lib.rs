@@ -56,7 +56,7 @@ pub extern "C" fn libafl_main() {
 /// The actual fuzzer
 fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Result<(), Error> {
     // The wrapped harness function, calling out to the LLVM-style harness
-    let mut harness = |input: &PacketData| {
+    let mut harness = |input: &PacketData, _executor_state: &mut ()| {
         let target = input.target_bytes();
         let buf = target.as_slice();
         libfuzzer_test_one_input(buf);

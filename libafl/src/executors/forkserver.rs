@@ -34,7 +34,7 @@ use nix::{
 #[cfg(feature = "regex")]
 use crate::observers::{get_asan_runtime_flags_with_log_path, AsanBacktraceObserver};
 use crate::{
-    executors::{Executor, ExitKind, HasObservers},
+    executors::{Executor, ExitKind, HasObservers, NopExecutorState},
     inputs::{HasTargetBytes, Input, UsesInput},
     mutators::Tokens,
     observers::{MapObserver, Observer, ObserversTuple, UsesObservers},
@@ -1060,7 +1060,7 @@ impl<'a> Default for ForkserverExecutorBuilder<'a, UnixShMemProvider> {
     }
 }
 
-impl<EM, OT, S, SP, Z> Executor<EM, Z> for ForkserverExecutor<OT, S, SP>
+impl<EM, OT, S, SP, Z> Executor<EM, Z, NopExecutorState> for ForkserverExecutor<OT, S, SP>
 where
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
@@ -1076,6 +1076,7 @@ where
         state: &mut Self::State,
         _mgr: &mut EM,
         input: &Self::Input,
+        _execution_state: &mut (),
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
 

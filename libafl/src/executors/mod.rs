@@ -117,10 +117,11 @@ pub trait HasObservers: UsesObservers {
 }
 
 /// An executor takes the given inputs, and runs the harness/target.
-pub trait Executor<EM, Z>: UsesState
+pub trait Executor<EM, Z, ES>: UsesState
 where
     EM: UsesState<State = Self::State>,
     Z: UsesState<State = Self::State>,
+    ES: HasExecutorState,
 {
     /// Instruct the target about the input and run
     fn run_target(
@@ -129,6 +130,7 @@ where
         state: &mut Self::State,
         mgr: &mut EM,
         input: &Self::Input,
+        executor_state: &mut ES::ExecutorState,
     ) -> Result<ExitKind, Error>;
 
     /// Wraps this Executor with the given [`ObserversTuple`] to implement [`HasObservers`].
@@ -142,6 +144,21 @@ where
     {
         WithObservers::new(self, observers)
     }
+}
+
+/// Executors may contain internal states, that may be mutated at runtime.
+pub trait HasExecutorState {
+    /// The concrete type storing the state of the executor.
+    type ExecutorState;
+}
+
+/// Nop Execution State.
+/// Useful when there is no execution state to expose in harnesses.
+#[derive(Debug)]
+pub struct NopExecutorState;
+
+impl HasExecutorState for NopExecutorState {
+    type ExecutorState = ();
 }
 
 /// The common signals we want to handle
@@ -171,7 +188,7 @@ pub mod test {
 
     use crate::{
         events::NopEventManager,
-        executors::{Executor, ExitKind},
+        executors::{Executor, ExitKind, NopExecutorState},
         fuzzer::test::NopFuzzer,
         inputs::{BytesInput, HasTargetBytes},
         state::{test::NopState, HasExecutions, State, UsesState},
@@ -206,7 +223,7 @@ pub mod test {
         type State = S;
     }
 
-    impl<EM, S, Z> Executor<EM, Z> for NopExecutor<S>
+    impl<EM, S, Z> Executor<EM, Z, NopExecutorState> for NopExecutor<S>
     where
         EM: UsesState<State = S>,
         S: State + HasExecutions,

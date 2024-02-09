@@ -4,7 +4,7 @@ use core::{fmt::Debug, marker::PhantomData};
 
 use crate::{
     corpus::{Corpus, HasCurrentCorpusIdx},
-    executors::{Executor, HasObservers, ShadowExecutor},
+    executors::{Executor, HasObservers, NopExecutorState, ShadowExecutor},
     mark_feature_time,
     observers::ObserversTuple,
     stages::Stage,
@@ -33,7 +33,7 @@ where
 impl<E, EM, TE, Z> Stage<E, EM, Z> for TracingStage<EM, TE, Z>
 where
     E: UsesState<State = TE::State>,
-    TE: Executor<EM, Z> + HasObservers,
+    TE: Executor<EM, Z, NopExecutorState> + HasObservers,
     TE::State: HasExecutions + HasCorpus,
     EM: UsesState<State = TE::State>,
     Z: UsesState<State = TE::State>,
@@ -68,7 +68,7 @@ where
         start_timer!(state);
         let exit_kind = self
             .tracer_executor
-            .run_target(fuzzer, state, manager, &input)?;
+            .run_target(fuzzer, state, manager, &input, &mut ())?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
         *state.executions_mut() += 1;
@@ -118,7 +118,7 @@ where
 
 impl<E, EM, SOT, Z> Stage<ShadowExecutor<E, SOT>, EM, Z> for ShadowTracingStage<E, EM, SOT, Z>
 where
-    E: Executor<EM, Z> + HasObservers,
+    E: Executor<EM, Z, NopExecutorState> + HasObservers,
     EM: UsesState<State = E::State>,
     SOT: ObserversTuple<E::State>,
     Z: UsesState<State = E::State>,
@@ -153,7 +153,7 @@ where
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
         start_timer!(state);
-        let exit_kind = executor.run_target(fuzzer, state, manager, &input)?;
+        let exit_kind = executor.run_target(fuzzer, state, manager, &input, &mut ())?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
         *state.executions_mut() += 1;
@@ -173,7 +173,7 @@ where
 
 impl<E, EM, SOT, Z> ShadowTracingStage<E, EM, SOT, Z>
 where
-    E: Executor<EM, Z> + HasObservers,
+    E: Executor<EM, Z, NopExecutorState> + HasObservers,
     E::State: State + HasExecutions + HasCorpus,
     EM: UsesState<State = E::State>,
     SOT: ObserversTuple<E::State>,

@@ -24,7 +24,7 @@ use libafl_bolts::{
 
 use super::HasObservers;
 #[cfg(all(feature = "std", unix))]
-use crate::executors::{Executor, ExitKind};
+use crate::executors::{Executor, ExitKind, NopExecutorState};
 #[cfg(feature = "std")]
 use crate::{inputs::Input, Error};
 use crate::{
@@ -310,7 +310,7 @@ where
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
 #[cfg(all(feature = "std", unix))]
-impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<OT, S, T>
+impl<EM, OT, S, T, Z> Executor<EM, Z, NopExecutorState> for CommandExecutor<OT, S, T>
 where
     EM: UsesState<State = S>,
     S: State + HasExecutions,
@@ -325,6 +325,7 @@ where
         state: &mut Self::State,
         _mgr: &mut EM,
         input: &Self::Input,
+        _execution_state: &mut (),
     ) -> Result<ExitKind, Error> {
         use std::os::unix::prelude::ExitStatusExt;
 

@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     corpus::{Corpus, HasCurrentCorpusIdx, SchedulerTestcaseMetadata},
     events::{Event, EventFirer, LogSeverity},
-    executors::{Executor, ExitKind, HasObservers},
+    executors::{Executor, ExitKind, HasObservers, NopExecutorState},
     feedbacks::{map::MapFeedbackMetadata, HasObserverName},
     fuzzer::Evaluator,
     monitors::{AggregatorOps, UserStats, UserStatsValue},
@@ -84,7 +84,7 @@ where
 
 impl<E, EM, O, OT, Z> Stage<E, EM, Z> for CalibrationStage<O, OT, E::State>
 where
-    E: Executor<EM, Z> + HasObservers<Observers = OT>,
+    E: Executor<EM, Z, NopExecutorState> + HasObservers<Observers = OT>,
     EM: EventFirer<State = E::State>,
     O: MapObserver,
     for<'de> <O as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static,
@@ -132,7 +132,7 @@ where
 
         let mut start = current_time();
 
-        let exit_kind = executor.run_target(fuzzer, state, mgr, &input)?;
+        let exit_kind = executor.run_target(fuzzer, state, mgr, &input, &mut ())?;
         let mut total_time = if exit_kind == ExitKind::Ok {
             current_time() - start
         } else {
@@ -168,7 +168,7 @@ where
             executor.observers_mut().pre_exec_all(state, &input)?;
             start = current_time();
 
-            let exit_kind = executor.run_target(fuzzer, state, mgr, &input)?;
+            let exit_kind = executor.run_target(fuzzer, state, mgr, &input, &mut ())?;
             if exit_kind != ExitKind::Ok {
                 if !has_errors {
                     mgr.log(

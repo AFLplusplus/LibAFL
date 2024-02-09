@@ -15,7 +15,7 @@ use crate::state::HasClientPerfMonitor;
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase},
     events::{llmp::LlmpEventConverter, Event, EventConfig, EventFirer},
-    executors::{Executor, ExitKind, HasObservers},
+    executors::{Executor, ExitKind, HasObservers, NopExecutorState},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, UsesInput},
     stages::Stage,
@@ -247,7 +247,7 @@ where
     EM: UsesState<State = S> + EventFirer,
     S: State + HasExecutions + HasCorpus + HasRand + HasMetadata + HasTestcase,
     SP: ShMemProvider,
-    E: HasObservers<State = S> + Executor<EM, Z>,
+    E: HasObservers<State = S> + Executor<EM, Z, NopExecutorState>,
     for<'a> E::Observers: Deserialize<'a>,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers, State = S>,
     IC: InputConverter<From = S::Input, To = DI>,

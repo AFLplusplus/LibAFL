@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     corpus::{Corpus, HasCurrentCorpusIdx},
     events::EventFirer,
-    executors::{Executor, HasObservers},
+    executors::{Executor, HasObservers, NopExecutorState},
     inputs::HasBytesVec,
     mutators::mutations::buffer_copy,
     observers::{MapObserver, ObserversTuple},
@@ -71,7 +71,7 @@ where
 impl<E, EM, O, Z> Stage<E, EM, Z> for ColorizationStage<EM, O, E, Z>
 where
     EM: UsesState<State = E::State> + EventFirer,
-    E: HasObservers + Executor<EM, Z>,
+    E: HasObservers + Executor<EM, Z, NopExecutorState>,
     E::State: HasCorpus + HasMetadata + HasRand,
     E::Input: HasBytesVec,
     O: MapObserver,
@@ -138,7 +138,7 @@ impl<EM, O, E, Z> ColorizationStage<EM, O, E, Z>
 where
     EM: UsesState<State = E::State> + EventFirer,
     O: MapObserver,
-    E: HasObservers + Executor<EM, Z>,
+    E: HasObservers + Executor<EM, Z, NopExecutorState>,
     E::State: HasCorpus + HasMetadata + HasRand,
     E::Input: HasBytesVec,
     Z: UsesState<State = E::State>,
@@ -305,7 +305,7 @@ where
     ) -> Result<usize, Error> {
         executor.observers_mut().pre_exec_all(state, &input)?;
 
-        let exit_kind = executor.run_target(fuzzer, state, manager, &input)?;
+        let exit_kind = executor.run_target(fuzzer, state, manager, &input, &mut ())?;
 
         let observer = executor
             .observers()

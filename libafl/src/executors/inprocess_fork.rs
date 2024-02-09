@@ -26,7 +26,7 @@ use crate::{
         hooks::inprocess_fork::{
             InChildProcessHooks, InProcessForkExecutorGlobalData, FORK_EXECUTOR_GLOBAL_DATA,
         },
-        Executor, ExitKind, HasObservers,
+        Executor, ExitKind, HasExecutorState, HasObservers,
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
@@ -35,6 +35,7 @@ use crate::{
     state::{HasExecutions, HasSolutions, State, UsesState},
     Error,
 };
+
 /// The signature of the crash handler function
 pub(crate) type ForkHandlerFuncPtr = unsafe fn(
     Signal,
@@ -47,15 +48,16 @@ pub(crate) type ForkHandlerFuncPtr = unsafe fn(
 use crate::executors::hooks::timer::{setitimer, Itimerval, Timeval, ITIMER_REAL};
 
 /// The `InProcessForkExecutor` with no user hooks
-pub type InProcessForkExecutor<'a, H, OT, S, SP> =
-    GenericInProcessForkExecutor<'a, H, (), OT, S, SP>;
+pub type InProcessForkExecutor<'a, H, OT, S, SP, ES> =
+    GenericInProcessForkExecutor<'a, H, (), OT, S, SP, ES>;
 
-impl<'a, H, OT, S, SP> InProcessForkExecutor<'a, H, OT, S, SP>
+impl<'a, H, OT, S, SP, ES> InProcessForkExecutor<'a, H, OT, S, SP, ES>
 where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&S::Input, &mut ES::ExecutorState) -> ExitKind + ?Sized,
     S: State,
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
+    ES: HasExecutorState,
 {
     #[allow(clippy::too_many_arguments)]
     /// The constructor for `InProcessForkExecutor`
@@ -88,13 +90,14 @@ where
 }
 
 /// [`GenericInProcessForkExecutor`] is an executor that forks the current process before each execution.
-pub struct GenericInProcessForkExecutor<'a, H, HT, OT, S, SP>
+pub struct GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES>
 where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&S::Input, &mut ES::ExecutorState) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
     S: UsesInput,
     SP: ShMemProvider,
     HT: ExecutorHooksTuple,
+    ES: HasExecutorState,
 {
     hooks: (InChildProcessHooks, HT),
     harness_fn: &'a mut H,
@@ -104,16 +107,17 @@ where
     itimerspec: libc::itimerspec,
     #[cfg(all(unix, not(target_os = "linux")))]
     itimerval: Itimerval,
-    phantom: PhantomData<S>,
+    phantom: PhantomData<(S, ES)>,
 }
 
-impl<'a, H, HT, OT, S, SP> Debug for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP>
+impl<'a, H, HT, OT, S, SP, ES> Debug for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES>
 where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&S::Input, &mut ES::ExecutorState) -> ExitKind + ?Sized,
     OT: ObserversTuple<S> + Debug,
     S: UsesInput,
     SP: ShMemProvider,
     HT: ExecutorHooksTuple,
+    ES: HasExecutorState,
 {
     #[cfg(target_os = "linux")]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -136,27 +140,29 @@ where
     }
 }
 
-impl<'a, H, HT, OT, S, SP> UsesState for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP>
+impl<'a, H, HT, OT, S, SP, ES> UsesState for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES>
 where
-    H: ?Sized + FnMut(&S::Input) -> ExitKind,
+    H: FnMut(&S::Input, &mut ES::ExecutorState) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
     S: State,
     SP: ShMemProvider,
     HT: ExecutorHooksTuple,
+    ES: HasExecutorState,
 {
     type State = S;
 }
 
-impl<'a, EM, H, HT, OT, S, SP, Z> Executor<EM, Z>
-    for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP>
+impl<'a, EM, H, HT, OT, S, SP, Z, ES> Executor<EM, Z, ES>
+    for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES>
 where
     EM: UsesState<State = S>,
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&S::Input, &mut ES::ExecutorState) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
     S: State + HasExecutions,
     SP: ShMemProvider,
     HT: ExecutorHooksTuple,
     Z: UsesState<State = S>,
+    ES: HasExecutorState,
 {
     #[allow(unreachable_code)]
     #[inline]
@@ -166,6 +172,7 @@ where
         state: &mut Self::State,
         mgr: &mut EM,
         input: &Self::Input,
+        execution_state: &mut ES::ExecutorState,
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
 
@@ -207,7 +214,7 @@ where
                         setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
                     }
                     // log::trace!("{v:#?} {}", nix::errno::errno());
-                    (self.harness_fn)(input);
+                    (self.harness_fn)(input, execution_state);
 
                     self.observers
                         .post_exec_child_all(state, input, &ExitKind::Ok)
@@ -257,13 +264,14 @@ where
     }
 }
 
-impl<'a, H, HT, OT, S, SP> GenericInProcessForkExecutor<'a, H, HT, OT, S, SP>
+impl<'a, H, HT, OT, S, SP, ES> GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES>
 where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&S::Input, &mut ES::ExecutorState) -> ExitKind + ?Sized,
     HT: ExecutorHooksTuple,
     S: State,
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
+    ES: HasExecutorState,
 {
     #[inline]
     /// This function marks the boundary between the fuzzer and the target.
@@ -411,24 +419,28 @@ where
     }
 }
 
-impl<'a, H, HT, OT, S, SP> UsesObservers for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP>
+impl<'a, H, HT, OT, S, SP, ES> UsesObservers
+    for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES>
 where
-    H: ?Sized + FnMut(&S::Input) -> ExitKind,
+    H: FnMut(&S::Input, &mut ES::ExecutorState) -> ExitKind + ?Sized,
     HT: ExecutorHooksTuple,
     OT: ObserversTuple<S>,
     S: State,
     SP: ShMemProvider,
+    ES: HasExecutorState,
 {
     type Observers = OT;
 }
 
-impl<'a, H, HT, OT, S, SP> HasObservers for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP>
+impl<'a, H, HT, OT, S, SP, ES> HasObservers
+    for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES>
 where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&S::Input, &mut ES::ExecutorState) -> ExitKind + ?Sized,
     HT: ExecutorHooksTuple,
     S: State,
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
+    ES: HasExecutorState,
 {
     #[inline]
     fn observers(&self) -> &OT {

@@ -28,11 +28,14 @@ use crate::executors::hooks::unix::unix_signal_handler;
 use crate::state::State;
 use crate::{
     events::{EventFirer, EventRestarter},
-    executors::{hooks::ExecutorHook, inprocess::HasInProcessHooks, Executor, HasObservers},
+    executors::{
+        hooks::ExecutorHook, inprocess::HasInProcessHooks, Executor, HasExecutorState, HasObservers,
+    },
     feedbacks::Feedback,
     state::{HasCorpus, HasExecutions, HasSolutions},
     Error, HasObjective,
 };
+
 /// The inmem executor's handlers.
 #[allow(missing_debug_implementations)]
 pub struct InProcessHooks {
@@ -221,13 +224,14 @@ impl InProcessHooks {
     /// Create new [`InProcessHooks`].
     #[cfg(unix)]
     #[allow(unused_variables)]
-    pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
+    pub fn new<E, EM, OF, Z, ES>(exec_tmout: Duration) -> Result<Self, Error>
     where
-        E: Executor<EM, Z> + HasObservers + HasInProcessHooks,
+        E: Executor<EM, Z, ES> + HasObservers + HasInProcessHooks,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
+        ES: HasExecutorState,
     {
         #[cfg_attr(miri, allow(unused_variables))]
         unsafe {
@@ -239,7 +243,7 @@ impl InProcessHooks {
             compiler_fence(Ordering::SeqCst);
             Ok(Self {
                 #[cfg(feature = "std")]
-                crash_handler: unix_signal_handler::inproc_crash_handler::<E, EM, OF, Z>
+                crash_handler: unix_signal_handler::inproc_crash_handler::<E, EM, OF, Z, ES>
                     as *const c_void,
                 #[cfg(feature = "std")]
                 timeout_handler: unix_signal_handler::inproc_timeout_handler::<E, EM, OF, Z>

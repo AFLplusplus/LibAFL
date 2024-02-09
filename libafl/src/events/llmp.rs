@@ -49,7 +49,7 @@ use crate::{
         BrokerEventResult, Event, EventConfig, EventFirer, EventManager, EventManagerId,
         EventProcessor, EventRestarter, HasCustomBufHandlers, HasEventManagerId, ProgressReporter,
     },
-    executors::{Executor, HasObservers},
+    executors::{Executor, HasObservers, NopExecutorState},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, UsesInput},
     monitors::Monitor,
@@ -577,7 +577,7 @@ where
         event: Event<S::Input>,
     ) -> Result<(), Error>
     where
-        E: Executor<Self, Z> + HasObservers<State = S>,
+        E: Executor<Self, Z, NopExecutorState> + HasObservers<State = S>,
         for<'a> E::Observers: Deserialize<'a>,
         Z: ExecutionProcessor<E::Observers, State = S> + EvaluatorObservers<E::Observers>,
     {
@@ -768,7 +768,7 @@ impl<E, S, SP, Z> EventProcessor<E, Z> for LlmpEventManager<S, SP>
 where
     S: State + HasExecutions + HasMetadata,
     SP: ShMemProvider,
-    E: HasObservers<State = S> + Executor<Self, Z>,
+    E: HasObservers<State = S> + Executor<Self, Z, NopExecutorState>,
     for<'a> E::Observers: Deserialize<'a>,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers, State = S>,
 {
@@ -811,7 +811,7 @@ where
 
 impl<E, S, SP, Z> EventManager<E, Z> for LlmpEventManager<S, SP>
 where
-    E: HasObservers<State = S> + Executor<Self, Z>,
+    E: HasObservers<State = S> + Executor<Self, Z, NopExecutorState>,
     for<'a> E::Observers: Deserialize<'a>,
     S: State + HasExecutions + HasMetadata + HasLastReportTime,
     SP: ShMemProvider,
@@ -994,7 +994,7 @@ where
 #[cfg(feature = "std")]
 impl<E, S, SP, Z> EventProcessor<E, Z> for LlmpRestartingEventManager<S, SP>
 where
-    E: HasObservers<State = S> + Executor<LlmpEventManager<S, SP>, Z>,
+    E: HasObservers<State = S> + Executor<LlmpEventManager<S, SP>, Z, NopExecutorState>,
     for<'a> E::Observers: Deserialize<'a>,
     S: State + HasExecutions + HasMetadata,
     SP: ShMemProvider + 'static,
@@ -1008,7 +1008,7 @@ where
 #[cfg(feature = "std")]
 impl<E, S, SP, Z> EventManager<E, Z> for LlmpRestartingEventManager<S, SP>
 where
-    E: HasObservers<State = S> + Executor<LlmpEventManager<S, SP>, Z>,
+    E: HasObservers<State = S> + Executor<LlmpEventManager<S, SP>, Z, NopExecutorState>,
     for<'a> E::Observers: Deserialize<'a>,
     S: State + HasExecutions + HasMetadata + HasLastReportTime,
     SP: ShMemProvider + 'static,
@@ -1550,7 +1550,7 @@ where
         event: Event<DI>,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, Z> + HasObservers<State = S>,
+        E: Executor<EM, Z, NopExecutorState> + HasObservers<State = S>,
         EM: UsesState<State = S> + EventFirer,
         for<'a> E::Observers: Deserialize<'a>,
         Z: ExecutionProcessor<E::Observers, State = S> + EvaluatorObservers<E::Observers>,
@@ -1609,7 +1609,7 @@ where
         manager: &mut EM,
     ) -> Result<usize, Error>
     where
-        E: Executor<EM, Z> + HasObservers<State = S>,
+        E: Executor<EM, Z, NopExecutorState> + HasObservers<State = S>,
         EM: UsesState<State = S> + EventFirer,
         for<'a> E::Observers: Deserialize<'a>,
         Z: ExecutionProcessor<E::Observers, State = S> + EvaluatorObservers<E::Observers>,
@@ -1831,7 +1831,7 @@ mod tests {
 
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-        let mut harness = |_buf: &BytesInput| ExitKind::Ok;
+        let mut harness = |_buf: &BytesInput, _executor_state: &mut _| ExitKind::Ok;
         let mut executor = InProcessExecutor::new(
             &mut harness,
             tuple_list!(),

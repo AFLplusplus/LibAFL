@@ -14,7 +14,7 @@ pub mod unix_signal_handler {
             common_signals,
             hooks::inprocess::{HasTimeout, InProcessExecutorHandlerData, GLOBAL_STATE},
             inprocess::{run_observers_and_save_state, HasInProcessHooks},
-            Executor, ExitKind, HasObservers,
+            Executor, ExitKind, HasExecutorState, HasObservers,
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
@@ -171,17 +171,18 @@ pub mod unix_signal_handler {
     /// Well, signal handling is not safe
     #[allow(clippy::too_many_lines)]
     #[allow(clippy::needless_pass_by_value)]
-    pub unsafe fn inproc_crash_handler<E, EM, OF, Z>(
+    pub unsafe fn inproc_crash_handler<E, EM, OF, Z, ES>(
         signal: Signal,
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: Executor<EM, Z> + HasObservers,
+        E: Executor<EM, Z, ES> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
+        ES: HasExecutorState,
     {
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
         let _context = _context.map(|p| {

@@ -1,7 +1,7 @@
 use std::{fmt::Debug, marker::PhantomData};
 
 use libafl::{
-    executors::{Executor, ExitKind, HasObservers},
+    executors::{Executor, ExitKind, HasObservers, NopExecutorState},
     inputs::HasTargetBytes,
     observers::{ObserversTuple, UsesObservers},
     state::{HasExecutions, State, UsesState},
@@ -45,7 +45,7 @@ where
     type Observers = OT;
 }
 
-impl<'a, EM, S, Z, OT> Executor<EM, Z> for NyxExecutor<'a, S, OT>
+impl<'a, EM, S, Z, OT> Executor<EM, Z, NopExecutorState> for NyxExecutor<'a, S, OT>
 where
     EM: UsesState<State = S>,
     S: State + HasExecutions,
@@ -58,6 +58,7 @@ where
         state: &mut Self::State,
         _mgr: &mut EM,
         input: &Self::Input,
+        _executor_state: &mut (),
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
         let input_owned = input.target_bytes();

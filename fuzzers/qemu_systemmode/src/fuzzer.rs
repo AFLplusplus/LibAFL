@@ -31,6 +31,7 @@ use libafl_qemu::{
     edges::{edges_map_mut_slice, QemuEdgeCoverageHelper, MAX_EDGES_NUM},
     elf::EasyElf,
     emu::Emulator,
+    executor::QemuExecutorState,
     GuestPhysAddr, QemuExecutor, QemuHooks, Regs,
 };
 
@@ -105,7 +106,7 @@ pub fn fuzz() {
         let snap = emu.create_fast_snapshot(true);
 
         // The wrapped harness function, calling out to the LLVM-style harness
-        let mut harness = |input: &BytesInput| {
+        let mut harness = |input: &BytesInput, _executor_state: &mut QemuExecutorState<_, _>| {
             let target = input.target_bytes();
             let mut buf = target.as_slice();
             let len = buf.len();
@@ -117,7 +118,7 @@ pub fn fuzz() {
 
                 emu.write_phys_mem(input_addr, buf);
 
-                emu.run().unwrap();
+                let _ = emu.run();
 
                 // If the execution stops at any point other then the designated breakpoint (e.g. a breakpoint on a panic method) we consider it a crash
                 let mut pcs = (0..emu.num_cpus())

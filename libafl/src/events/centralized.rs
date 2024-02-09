@@ -27,7 +27,7 @@ use crate::{
         llmp::EventStatsCollector, BrokerEventResult, Event, EventConfig, EventFirer, EventManager,
         EventManagerId, EventProcessor, EventRestarter, HasEventManagerId, LogSeverity,
     },
-    executors::{Executor, HasObservers},
+    executors::{Executor, HasObservers, NopExecutorState},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, UsesInput},
     observers::ObserversTuple,
@@ -402,7 +402,7 @@ where
 impl<E, EM, SP, Z> EventProcessor<E, Z> for CentralizedEventManager<EM, SP>
 where
     EM: EventStatsCollector + EventProcessor<E, Z> + EventFirer + HasEventManagerId,
-    E: HasObservers<State = Self::State> + Executor<Self, Z>,
+    E: HasObservers<State = Self::State> + Executor<Self, Z, NopExecutorState>,
     for<'a> E::Observers: Deserialize<'a>,
     Z: EvaluatorObservers<E::Observers, State = Self::State>
         + ExecutionProcessor<E::Observers, State = Self::State>,
@@ -429,7 +429,7 @@ impl<E, EM, SP, Z> EventManager<E, Z> for CentralizedEventManager<EM, SP>
 where
     EM: EventStatsCollector + EventManager<E, Z>,
     EM::State: HasExecutions + HasMetadata + HasLastReportTime,
-    E: HasObservers<State = Self::State> + Executor<Self, Z>,
+    E: HasObservers<State = Self::State> + Executor<Self, Z, NopExecutorState>,
     for<'a> E::Observers: Deserialize<'a>,
     Z: EvaluatorObservers<E::Observers, State = Self::State>
         + ExecutionProcessor<E::Observers, State = Self::State>,
@@ -599,7 +599,7 @@ where
         executor: &mut E,
     ) -> Result<usize, Error>
     where
-        E: Executor<Self, Z> + HasObservers<State = EM::State>,
+        E: Executor<Self, Z, NopExecutorState> + HasObservers<State = EM::State>,
         EM::State: UsesInput + HasExecutions + HasMetadata,
         for<'a> E::Observers: Deserialize<'a>,
         Z: ExecutionProcessor<E::Observers, State = EM::State> + EvaluatorObservers<E::Observers>,
@@ -645,7 +645,7 @@ where
         event: Event<<EM::State as UsesInput>::Input>,
     ) -> Result<(), Error>
     where
-        E: Executor<Self, Z> + HasObservers<State = EM::State>,
+        E: Executor<Self, Z, NopExecutorState> + HasObservers<State = EM::State>,
         EM::State: UsesInput + HasExecutions + HasMetadata,
         for<'a> E::Observers: Deserialize<'a>,
         Z: ExecutionProcessor<E::Observers, State = EM::State> + EvaluatorObservers<E::Observers>,
