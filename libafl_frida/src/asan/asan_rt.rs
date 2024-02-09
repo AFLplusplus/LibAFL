@@ -1404,6 +1404,8 @@ impl AsanRuntime {
     #[allow(clippy::unused_self, clippy::identity_op)]
     #[allow(clippy::too_many_lines)]
     fn generate_shadow_check_function(&mut self) {
+        use std::fs::File;
+
         let shadow_bit = self.allocator.shadow_bit();
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
 
@@ -1526,7 +1528,7 @@ impl AsanRuntime {
             );
         let blob = ops.finalize().unwrap();
         unsafe {
-            let mapping = mmap(
+            let mapping = mmap::<File>(
                 None,
                 NonZeroUsize::new_unchecked(0x1000),
                 ProtFlags::all(),
