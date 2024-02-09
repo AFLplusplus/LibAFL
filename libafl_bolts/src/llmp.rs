@@ -75,7 +75,6 @@ use core::{
     sync::atomic::{fence, AtomicU16, Ordering},
     time::Duration,
 };
-#[cfg(all(unix, feature = "std"))]
 #[cfg(feature = "std")]
 use std::{
     env,
