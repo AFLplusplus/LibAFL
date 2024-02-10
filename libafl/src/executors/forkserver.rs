@@ -532,7 +532,7 @@ where
     }
 
     /// Get a mutable reference to the [`Forkserver`] instance.
-    pub fn forkserver(&mut self) -> &mut Forkserver {
+    pub fn forkserver_mut(&mut self) -> &mut Forkserver {
         &mut self.forkserver
     }
 
