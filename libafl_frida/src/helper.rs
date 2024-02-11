@@ -510,7 +510,7 @@ where
                     if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
                         rt.emit_shadow_check(
                             address,
-                            &output,
+                            output,
                             basereg,
                             indexreg,
                             displacement,
@@ -587,23 +587,25 @@ where
     // workaround frida's frida-gum-allocate-near bug:
     #[cfg(unix)]
     fn workaround_gum_allocate_near() {
+        use std::fs::File;
+
         unsafe {
             for _ in 0..512 {
-                mmap(
+                mmap::<File>(
                     None,
                     std::num::NonZeroUsize::new_unchecked(128 * 1024),
                     ProtFlags::PROT_NONE,
                     ANONYMOUS_FLAG | MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
-                    -1,
+                    None,
                     0,
                 )
                 .expect("Failed to map dummy regions for frida workaround");
-                mmap(
+                mmap::<File>(
                     None,
                     std::num::NonZeroUsize::new_unchecked(4 * 1024 * 1024),
                     ProtFlags::PROT_NONE,
                     ANONYMOUS_FLAG | MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
-                    -1,
+                    None,
                     0,
                 )
                 .expect("Failed to map dummy regions for frida workaround");
