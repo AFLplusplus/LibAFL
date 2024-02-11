@@ -75,9 +75,6 @@ use core::{
     sync::atomic::{fence, AtomicU16, Ordering},
     time::Duration,
 };
-#[cfg(all(unix, feature = "std"))]
-#[cfg(not(any(target_os = "solaris", target_os = "illumos")))]
-use std::os::unix::io::AsRawFd;
 #[cfg(feature = "std")]
 use std::{
     env,
@@ -452,7 +449,7 @@ fn tcp_bind(port: u16) -> Result<TcpListener, Error> {
 
     #[cfg(unix)]
     #[cfg(not(any(target_os = "solaris", target_os = "illumos")))]
-    socket::setsockopt(listener.as_raw_fd(), ReusePort, &true)?;
+    socket::setsockopt(&listener, ReusePort, &true)?;
 
     Ok(listener)
 }

@@ -9,7 +9,10 @@ use core::{
 use std::{
     ffi::{OsStr, OsString},
     io::{self, prelude::*, ErrorKind},
-    os::unix::{io::RawFd, process::CommandExt},
+    os::{
+        fd::{AsRawFd, BorrowedFd},
+        unix::{io::RawFd, process::CommandExt},
+    },
     path::Path,
     process::{Child, Command, Stdio},
 };
@@ -439,11 +442,15 @@ impl Forkserver {
             )));
         };
 
+        // # Safety
+        // The FDs are valid as this point in time.
+        let st_read = unsafe { BorrowedFd::borrow_raw(st_read) };
+
         let mut readfds = FdSet::new();
-        readfds.insert(st_read);
+        readfds.insert(&st_read);
         // We'll pass a copied timeout to keep the original timeout intact, because select updates timeout to indicate how much time was left. See select(2)
         let sret = pselect(
-            Some(readfds.highest().unwrap() + 1),
+            Some(readfds.highest().unwrap().as_raw_fd() + 1),
             &mut readfds,
             None,
             None,
