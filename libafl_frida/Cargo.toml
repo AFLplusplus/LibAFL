@@ -82,7 +82,6 @@ log = "0.4.20"
 mmap-rs = "0.6.0"
 
 yaxpeax-arch = "0.2.7"
-xxhash-rust = { version = "0.8.5", features = ["xxh3"]} # xxh3 hashing for rust
 
 [dev-dependencies]
 serial_test = { version = "2", default-features = false, features = ["logging"] }

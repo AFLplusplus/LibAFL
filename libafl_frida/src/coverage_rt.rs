@@ -7,7 +7,7 @@ use dynasmrt::DynasmLabelApi;
 use dynasmrt::{dynasm, DynasmApi};
 use frida_gum::{instruction_writer::InstructionWriter, stalker::StalkerOutput, ModuleMap};
 use rangemap::RangeMap;
-use xxhash_rust::xxh3::xxh3_64;
+use libafl_bolts::hash_std;
 
 use crate::helper::FridaRuntime;
 
@@ -186,7 +186,7 @@ impl CoverageRuntime {
     /// Emits coverage mapping into the current basic block.
     #[inline]
     pub fn emit_coverage_mapping(&mut self, address: u64, output: &StalkerOutput) {
-        let h64 = xxh3_64(&address.to_le_bytes());
+        let h64 = hash_std(&address.to_le_bytes());
         let writer = output.writer();
 
         // Since the AARCH64 instruction set requires that a register be used if
