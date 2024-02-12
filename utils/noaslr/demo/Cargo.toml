@@ -7,6 +7,6 @@ edition = "2021"
 vergen = { version = "8.1.1", features = ["build", "cargo", "git", "gitcl", "rustc", "si"] }
 
 [dependencies]
-anyhow = { version = "1.0.71", default-features = false }
-clap = { version = "4.2.0", default-features = false, features = ["derive", "string", "std", "help"] }
+anyhow = { version = "1.0", default-features = false }
+clap = { version = "4.5", default-features = false, features = ["derive", "string", "std", "help"] }
 readonly = { version = "0.2.8", default-features = false }
