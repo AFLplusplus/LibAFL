@@ -8,9 +8,9 @@ vergen = { version = "8.1.1", features = ["build", "cargo", "git", "gitcl", "rus
 
 [dependencies]
 anyhow = { version = "1.0", default-features = false }
-clap = { version = "4.2", default-features = false, features = ["derive", "string", "std", "help", "derive", "error-context", "usage"] }
+clap = { version = "4.5", default-features = false, features = ["derive", "string", "std", "help", "derive", "error-context", "usage"] }
 libc = {version = "0.2", default-features = false }
-log = { version = "0.4", default-features = false }
-nix = { version = "0.26", default-features = false, features = ["signal", "fs"] }
+log = { version = "0.4.20", default-features = false }
+nix = { version = "0.27", default-features = false, features = ["signal", "fs"] }
 readonly = { version = "0.2.8", default-features = false }
 simplelog = { version = "0.12.1", default-features = false }
