@@ -716,11 +716,11 @@ impl AFLppRedQueen {
             };
 
             // Try arith
-            let diff = pattern as i64 - b_val as i64;
-            let new_diff = another_pattern as i64 - o_b_val as i64;
+            let diff = (pattern as i64).wrapping_sub(b_val as i64);
+            let new_diff = (another_pattern as i64).wrapping_sub(o_b_val as i64);
 
             if diff == new_diff && diff != 0 {
-                let new_repl: u64 = (repl as i64 - diff) as u64;
+                let new_repl: u64 = (repl as i64).wrapping_sub(diff) as u64;
 
                 let ret = self.cmp_extend_encoding(
                     pattern,
@@ -987,7 +987,7 @@ impl AFLppRedQueen {
                 }
             } else if attr < CMP_ATTRIBUTE_IS_FP {
                 if attr & CMP_ATTRIBUTE_IS_GREATER != 0 {
-                    let repl_new = repl + 1;
+                    let repl_new = repl.wrapping_add(1);
 
                     let ret = self.cmp_extend_encoding(
                         pattern,
@@ -1008,7 +1008,7 @@ impl AFLppRedQueen {
                         return true;
                     }
                 } else {
-                    let repl_new = repl - 1;
+                    let repl_new = repl.wrapping_sub(1);
 
                     let ret = self.cmp_extend_encoding(
                         pattern,
@@ -1872,7 +1872,7 @@ mod tests {
     use std::fs;
 
     #[cfg(feature = "std")]
-    use super::Tokens;
+    use super::{AFLppRedQueen, Tokens};
 
     #[cfg(feature = "std")]
     #[test]
@@ -1890,5 +1890,39 @@ token2="B"
         log::info!("Token file entries: {:?}", tokens.tokens());
         assert_eq!(tokens.tokens().len(), 2);
         let _res = fs::remove_file("test.tkns");
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    #[cfg_attr(feature = "panic_checks", no_panic::no_panic)]
+    fn test_token_mutations() {
+        let rq = AFLppRedQueen::with_cmplog_options(true, true);
+        let pattern = 0;
+        let repl = 0;
+        let another_pattern = 0;
+        let changed_val = 0;
+        let attr = 0;
+        let another_buf = &[0, 0, 0, 0];
+        let buf = &[0, 0, 0, 0];
+        let buf_idx = 0;
+        let taint_len = 0;
+        let input_len = 0;
+        let hshape = 0;
+        let mut vec = std::vec::Vec::new();
+
+        let _res = rq.cmp_extend_encoding(
+            pattern,
+            repl,
+            another_pattern,
+            changed_val,
+            attr,
+            another_buf,
+            buf,
+            buf_idx,
+            taint_len,
+            input_len,
+            hshape,
+            &mut vec,
+        );
     }
 }
