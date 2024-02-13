@@ -661,7 +661,7 @@ impl AFLppRedQueen {
         input_len: usize,
         hshape: usize,
         vec: &mut Vec<Vec<u8>>,
-    ) -> bool {
+    ) -> Result<bool, Error> {
         // TODO: ascii2num (we need check q->is_ascii (in calibration stage(?)))
 
         // try Transform
@@ -679,7 +679,7 @@ impl AFLppRedQueen {
                 _ => 8,
             };
             // prevent overflow
-            bytes = core::cmp::min(bytes, input_len - buf_idx);
+            bytes = core::cmp::min(bytes, input_len.wrapping_sub(buf_idx));
 
             let (b_val, o_b_val, mask): (u64, u64, u64) = match bytes {
                 0 => {
@@ -735,9 +735,9 @@ impl AFLppRedQueen {
                     input_len,
                     hshape,
                     vec,
-                );
+                )?;
                 if ret {
-                    return true;
+                    return Ok(true);
                 }
             }
 
@@ -762,10 +762,10 @@ impl AFLppRedQueen {
                     input_len,
                     hshape,
                     vec,
-                );
+                )?;
 
                 if ret {
-                    return true;
+                    return Ok(true);
                 }
             }
 
@@ -790,10 +790,10 @@ impl AFLppRedQueen {
                     input_len,
                     hshape,
                     vec,
-                );
+                )?;
 
                 if ret {
-                    return true;
+                    return Ok(true);
                 }
             }
 
@@ -818,15 +818,15 @@ impl AFLppRedQueen {
                     input_len,
                     hshape,
                     vec,
-                );
+                )?;
 
                 if ret {
-                    return true;
+                    return Ok(true);
                 }
             }
         }
 
-        let its_len = core::cmp::min(input_len - buf_idx, taint_len);
+        let its_len = core::cmp::min(input_len.wrapping_sub(buf_idx), taint_len);
 
         // Try pattern matching
         // println!("Pattern match");
@@ -840,29 +840,29 @@ impl AFLppRedQueen {
                     let mut cloned = buf.to_vec();
                     cloned[buf_idx] = repl as u8;
                     vec.push(cloned);
-                    return true;
+                    return Ok(true);
                 }
             }
             2 | 3 => {
                 if its_len >= 2 {
-                    let buf_16 = u16::from_be_bytes(buf[buf_idx..buf_idx + 2].try_into().unwrap());
+                    let buf_16 = u16::from_be_bytes(buf[buf_idx..buf_idx + 2].try_into()?);
                     let another_buf_16 =
-                        u16::from_be_bytes(another_buf[buf_idx..buf_idx + 2].try_into().unwrap());
+                        u16::from_be_bytes(another_buf[buf_idx..buf_idx + 2].try_into()?);
 
                     if buf_16 == pattern as u16 && another_buf_16 == another_pattern as u16 {
                         let mut cloned = buf.to_vec();
                         cloned[buf_idx + 1] = (repl & 0xff) as u8;
                         cloned[buf_idx] = (repl >> 8 & 0xff) as u8;
                         vec.push(cloned);
-                        return true;
+                        return Ok(true);
                     }
                 }
             }
             4..=7 => {
                 if its_len >= 4 {
-                    let buf_32 = u32::from_be_bytes(buf[buf_idx..buf_idx + 4].try_into().unwrap());
+                    let buf_32 = u32::from_be_bytes(buf[buf_idx..buf_idx + 4].try_into()?);
                     let another_buf_32 =
-                        u32::from_be_bytes(another_buf[buf_idx..buf_idx + 4].try_into().unwrap());
+                        u32::from_be_bytes(another_buf[buf_idx..buf_idx + 4].try_into()?);
                     // println!("buf: {buf_32} {another_buf_32} {pattern} {another_pattern}");
                     if buf_32 == pattern as u32 && another_buf_32 == another_pattern as u32 {
                         let mut cloned = buf.to_vec();
@@ -872,15 +872,15 @@ impl AFLppRedQueen {
                         cloned[buf_idx] = (repl >> 24 & 0xff) as u8;
                         vec.push(cloned);
 
-                        return true;
+                        return Ok(true);
                     }
                 }
             }
             _ => {
                 if its_len >= 8 {
-                    let buf_64 = u64::from_be_bytes(buf[buf_idx..buf_idx + 8].try_into().unwrap());
+                    let buf_64 = u64::from_be_bytes(buf[buf_idx..buf_idx + 8].try_into()?);
                     let another_buf_64 =
-                        u64::from_be_bytes(another_buf[buf_idx..buf_idx + 8].try_into().unwrap());
+                        u64::from_be_bytes(another_buf[buf_idx..buf_idx + 8].try_into()?);
 
                     if buf_64 == pattern && another_buf_64 == another_pattern {
                         let mut cloned = buf.to_vec();
@@ -895,7 +895,7 @@ impl AFLppRedQueen {
                         cloned[buf_idx] = (repl >> 48 & 0xff) as u8;
 
                         vec.push(cloned);
-                        return true;
+                        return Ok(true);
                     }
                 }
             }
@@ -904,7 +904,7 @@ impl AFLppRedQueen {
         // Try arith
         if self.enable_arith || attr != CMP_ATTRIBUTE_IS_TRANSFORM {
             if (attr & (CMP_ATTRIBUTE_IS_GREATER | CMP_ATTRIBUTE_IS_LESSER)) == 0 || hshape < 4 {
-                return false;
+                return Ok(false);
             }
 
             // Transform >= to < and <= to >
@@ -934,7 +934,7 @@ impl AFLppRedQueen {
                         g += 1.0;
                         repl_new = g as u64;
                     } else {
-                        return false;
+                        return Ok(false);
                     }
 
                     let ret = self.cmp_extend_encoding(
@@ -950,9 +950,9 @@ impl AFLppRedQueen {
                         input_len,
                         hshape,
                         vec,
-                    );
+                    )?;
                     if ret {
-                        return true;
+                        return Ok(true);
                     }
                 } else {
                     if hshape == 4 && its_len >= 4 {
@@ -964,7 +964,7 @@ impl AFLppRedQueen {
                         g -= 1.0;
                         repl_new = g as u64;
                     } else {
-                        return false;
+                        return Ok(false);
                     }
 
                     let ret = self.cmp_extend_encoding(
@@ -980,9 +980,9 @@ impl AFLppRedQueen {
                         input_len,
                         hshape,
                         vec,
-                    );
+                    )?;
                     if ret {
-                        return true;
+                        return Ok(true);
                     }
                 }
             } else if attr < CMP_ATTRIBUTE_IS_FP {
@@ -1002,10 +1002,10 @@ impl AFLppRedQueen {
                         input_len,
                         hshape,
                         vec,
-                    );
+                    )?;
 
                     if ret {
-                        return true;
+                        return Ok(true);
                     }
                 } else {
                     let repl_new = repl.wrapping_sub(1);
@@ -1023,18 +1023,18 @@ impl AFLppRedQueen {
                         input_len,
                         hshape,
                         vec,
-                    );
+                    )?;
 
                     if ret {
-                        return true;
+                        return Ok(true);
                     }
                 }
             } else {
-                return false;
+                return Ok(false);
             }
         }
 
-        false
+        Ok(false)
     }
 
     /// rtn part from AFL++
@@ -1057,7 +1057,7 @@ impl AFLppRedQueen {
         let ol0 = o_pattern.len();
         let lmax = core::cmp::max(l0, ol0);
         let its_len = core::cmp::min(
-            core::cmp::min(input_len - buf_idx, taint_len),
+            core::cmp::min(input_len.wrapping_sub(buf_idx), taint_len),
             core::cmp::min(lmax, hshape),
         );
 
@@ -1315,7 +1315,7 @@ where
                                     input_len,
                                     hshape,
                                     &mut ret,
-                                );
+                                )?;
 
                                 // Swapped
                                 // Compare v0 against v1
@@ -1332,7 +1332,7 @@ where
                                     input_len,
                                     hshape,
                                     &mut ret,
-                                );
+                                )?;
                             }
 
                             if new_v1 != orig_v1 && orig_v0 != orig_v1 {
@@ -1350,7 +1350,7 @@ where
                                     input_len,
                                     hshape,
                                     &mut ret,
-                                );
+                                )?;
 
                                 // Swapped
                                 self.cmp_extend_encoding(
@@ -1366,7 +1366,7 @@ where
                                     input_len,
                                     hshape,
                                     &mut ret,
-                                );
+                                )?;
                             }
 
                             /*
@@ -1404,7 +1404,7 @@ where
                                     input_len,
                                     hshape,
                                     &mut ret,
-                                );
+                                )?;
 
                                 // swapped
                                 // Compare v0 against v1
@@ -1421,7 +1421,7 @@ where
                                     input_len,
                                     hshape,
                                     &mut ret,
-                                );
+                                )?;
                             }
 
                             if new_v1 != orig_v1 && orig_v0 != orig_v1 {
@@ -1439,7 +1439,7 @@ where
                                     input_len,
                                     hshape,
                                     &mut ret,
-                                );
+                                )?;
 
                                 // Swapped
                                 // Compare v1 against v0
@@ -1456,7 +1456,7 @@ where
                                     input_len,
                                     hshape,
                                     &mut ret,
-                                );
+                                )?;
                             }
 
                             if !cmp_found {
@@ -1497,7 +1497,7 @@ where
                                     input_len,
                                     hshape,
                                     &mut ret,
-                                );
+                                )?;
 
                                 // Swapped
                                 // Compare v0 against v1
@@ -1514,7 +1514,7 @@ where
                                     input_len,
                                     hshape,
                                     &mut ret,
-                                );
+                                )?;
                             }
 
                             if new_v1 != orig_v1 && orig_v0 != orig_v1 {
@@ -1532,7 +1532,7 @@ where
                                     input_len,
                                     hshape,
                                     &mut ret,
-                                );
+                                )?;
 
                                 // Swapped
                                 // Compare v1 against v0
@@ -1549,7 +1549,7 @@ where
                                     input_len,
                                     hshape,
                                     &mut ret,
-                                );
+                                )?;
                             }
 
                             if !cmp_found {
@@ -1894,7 +1894,6 @@ token2="B"
 
     #[cfg(feature = "std")]
     #[test]
-    #[cfg_attr(feature = "panic_checks", no_panic::no_panic)]
     fn test_token_mutations() {
         let rq = AFLppRedQueen::with_cmplog_options(true, true);
         let pattern = 0;
