@@ -1942,7 +1942,7 @@ impl AsanRuntime {
             ;->accessed_address:
             ; .dword 0x0
             ; self_addr:
-            ; .qword self as *mut _  as *mut c_void as i64
+            ; .qword core::ptr::from_mut(self)  as *mut c_void as i64
             ; self_regs_addr:
             ; .qword addr_of_mut!(self.regs) as i64
             ; trap_func:

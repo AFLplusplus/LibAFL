@@ -716,11 +716,11 @@ impl AFLppRedQueen {
             };
 
             // Try arith
-            let diff = pattern as i64 - b_val as i64;
-            let new_diff = another_pattern as i64 - o_b_val as i64;
+            let diff = (pattern as i64).wrapping_sub(b_val as i64);
+            let new_diff = (another_pattern as i64).wrapping_sub(o_b_val as i64);
 
             if diff == new_diff && diff != 0 {
-                let new_repl: u64 = (repl as i64 - diff) as u64;
+                let new_repl: u64 = (repl as i64).wrapping_sub(diff) as u64;
 
                 let ret = self.cmp_extend_encoding(
                     pattern,
@@ -987,7 +987,7 @@ impl AFLppRedQueen {
                 }
             } else if attr < CMP_ATTRIBUTE_IS_FP {
                 if attr & CMP_ATTRIBUTE_IS_GREATER != 0 {
-                    let repl_new = repl + 1;
+                    let repl_new = repl.wrapping_add(1);
 
                     let ret = self.cmp_extend_encoding(
                         pattern,
@@ -1008,7 +1008,7 @@ impl AFLppRedQueen {
                         return true;
                     }
                 } else {
-                    let repl_new = repl - 1;
+                    let repl_new = repl.wrapping_sub(1);
 
                     let ret = self.cmp_extend_encoding(
                         pattern,

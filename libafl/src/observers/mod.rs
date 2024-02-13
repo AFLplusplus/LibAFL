@@ -1047,7 +1047,7 @@ pub mod pybind {
 
     impl Named for PythonObserver {
         fn name(&self) -> &str {
-            let ptr = unwrap_me!(self.wrapper, o, { o.name() as *const str });
+            let ptr = unwrap_me!(self.wrapper, o, { core::ptr::from_ref::<str>(o.name()) });
             unsafe { ptr.as_ref().unwrap() }
         }
     }
@@ -1266,7 +1266,7 @@ pub mod pybind {
                             }
                             PythonObserverWrapper::Python(py_wrapper) => {
                                 if type_eq::<PyObjectObserver, T>() && py_wrapper.name() == name {
-                                    r = (py_wrapper as *const _ as *const T).as_ref();
+                                    r = (core::ptr::from_ref(py_wrapper) as *const T).as_ref();
                                 }
                             }
                         }
@@ -1359,7 +1359,7 @@ pub mod pybind {
                             }
                             PythonObserverWrapper::Python(py_wrapper) => {
                                 if type_eq::<PyObjectObserver, T>() && py_wrapper.name() == name {
-                                    r = (py_wrapper as *mut _ as *mut T).as_mut();
+                                    r = (core::ptr::from_mut(py_wrapper) as *mut T).as_mut();
                                 }
                             }
                         }
