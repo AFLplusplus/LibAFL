@@ -178,25 +178,25 @@ where
             let data = addr_of_mut!(GLOBAL_STATE);
             write_volatile(
                 addr_of_mut!((*data).current_input_ptr),
-                input as *const _ as *const c_void,
+                core::ptr::from_ref(input) as *const c_void,
             );
             write_volatile(
                 addr_of_mut!((*data).executor_ptr),
-                self as *const _ as *const c_void,
+                core::ptr::from_ref(self) as *const c_void,
             );
             // Direct raw pointers access /aliasing is pretty undefined behavior.
             // Since the state and event may have moved in memory, refresh them right before the signal may happen
             write_volatile(
                 addr_of_mut!((*data).state_ptr),
-                state as *mut _ as *mut c_void,
+                core::ptr::from_mut(state) as *mut c_void,
             );
             write_volatile(
                 addr_of_mut!((*data).event_mgr_ptr),
-                mgr as *mut _ as *mut c_void,
+                core::ptr::from_mut(mgr) as *mut c_void,
             );
             write_volatile(
                 addr_of_mut!((*data).fuzzer_ptr),
-                fuzzer as *mut _ as *mut c_void,
+                core::ptr::from_mut(fuzzer) as *mut c_void,
             );
             compiler_fence(Ordering::SeqCst);
         }
@@ -252,7 +252,8 @@ where
         )
     }
 
-    /// Create a new in mem executor with the default timeout and use batch mode(5 sec)
+    /// Create a new in mem executor with the default timeout and use batch mode (5 sec)
+    /// Do not use batched mode timeouts with cmplog cores. It is not supported
     #[cfg(all(feature = "std", target_os = "linux"))]
     pub fn batched_timeouts<EM, OF, Z>(
         harness_fn: &'a mut H,
