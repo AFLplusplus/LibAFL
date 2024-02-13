@@ -1872,7 +1872,7 @@ mod tests {
     use std::fs;
 
     #[cfg(feature = "std")]
-    use super::Tokens;
+    use super::{AFLppRedQueen, Tokens};
 
     #[cfg(feature = "std")]
     #[test]
@@ -1890,5 +1890,39 @@ token2="B"
         log::info!("Token file entries: {:?}", tokens.tokens());
         assert_eq!(tokens.tokens().len(), 2);
         let _res = fs::remove_file("test.tkns");
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    #[cfg_attr(feature = "panic_checks", no_panic::no_panic)]
+    fn test_token_mutations() {
+        let rq = AFLppRedQueen::with_cmplog_options(true, true);
+        let pattern = 0;
+        let repl = 0;
+        let another_pattern = 0;
+        let changed_val = 0;
+        let attr = 0;
+        let another_buf = &[0, 0, 0, 0];
+        let buf = &[0, 0, 0, 0];
+        let buf_idx = 0;
+        let taint_len = 0;
+        let input_len = 0;
+        let hshape = 0;
+        let mut vec = std::vec::Vec::new();
+
+        let _res = rq.cmp_extend_encoding(
+            pattern,
+            repl,
+            another_pattern,
+            changed_val,
+            attr,
+            another_buf,
+            buf,
+            buf_idx,
+            taint_len,
+            input_len,
+            hshape,
+            &mut vec,
+        );
     }
 }

@@ -135,6 +135,9 @@ agpl = ["nautilus"]
 ## Enables the [`Nautilus`](https://wcventure.github.io/FuzzingPaper/Paper/NDSS19_Nautilus.pdf) Grammar Mutator (AGPL-licensed)
 nautilus = ["grammartec", "std", "serde_json/std"]
 
+## Enables no_panic checks for mathematical functions
+panic_checks = ["dep:no-panic"]
+
 [build-dependencies]
 reqwest = { version = "0.11", features = ["blocking"], optional = true}
 rustversion = "1.0"
@@ -199,6 +202,9 @@ document-features = { version = "0.2", optional = true }
 # AGPL
 # !!! this create requires nightly
 grammartec = { version = "0.3.1", optional = true }
+
+# Ensure functions which do significant math cannot panic
+no-panic = { version = "0.1.29", optional = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2" # For (*nix) libc
