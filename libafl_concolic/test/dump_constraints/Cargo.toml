@@ -16,4 +16,4 @@ categories = ["development-tools::testing", "emulators", "embedded", "os", "no-s
 [dependencies]
 libafl = {path = "../../../libafl"}
 libafl_bolts = {path = "../../../libafl_bolts"}
-clap = { version = "4.0", features = ["derive"] }
+clap = { version = "4.5", features = ["derive"] }

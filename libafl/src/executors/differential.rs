@@ -205,8 +205,8 @@ where
 
 impl<A, B, DOT> ProxyObserversTuple<A, B, DOT> {
     fn set(&mut self, primary: &A, secondary: &B) {
-        self.primary = OwnedMutPtr::Ptr(primary as *const A as *mut A);
-        self.secondary = OwnedMutPtr::Ptr(secondary as *const B as *mut B);
+        self.primary = OwnedMutPtr::Ptr(core::ptr::from_ref::<A>(primary) as *mut A);
+        self.secondary = OwnedMutPtr::Ptr(core::ptr::from_ref::<B>(secondary) as *mut B);
     }
 }
 

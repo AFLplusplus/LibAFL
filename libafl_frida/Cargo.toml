@@ -51,7 +51,7 @@ libafl_targets = { path = "../libafl_targets", version = "0.11.2", features = [
     "sancov_cmplog",
 ] }
 
-nix = "0.26"
+nix = { version = "0.27", features = ["mman"] }
 libc = "0.2"
 hashbrown = "0.14"
 rangemap = "1.3"
@@ -85,5 +85,5 @@ yaxpeax-arch = "0.2.7"
 
 [dev-dependencies]
 serial_test = { version = "2", default-features = false, features = ["logging"] }
-clap = {version = "4.0", features = ["derive"]}
+clap = {version = "4.5", features = ["derive"]}
 libloading = "0.7"
