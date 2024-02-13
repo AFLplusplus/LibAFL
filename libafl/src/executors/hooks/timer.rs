@@ -299,7 +299,7 @@ impl TimerStruct {
                 let data = addr_of_mut!(GLOBAL_STATE);
                 write_volatile(
                     addr_of_mut!((*data).executor_ptr),
-                    self as *mut _ as *mut c_void,
+                    core::ptr::from_mut(self) as *mut c_void,
                 );
 
                 if self.executions == 0 {

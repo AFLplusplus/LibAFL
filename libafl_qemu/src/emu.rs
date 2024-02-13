@@ -1700,7 +1700,7 @@ impl Emulator {
     pub fn add_gdb_cmd(&self, callback: Box<dyn FnMut(&Self, &str) -> bool>) {
         unsafe {
             let fat: Box<FatPtr> = Box::new(transmute(callback));
-            libafl_qemu_add_gdb_cmd(gdb_cmd, &*fat as *const _ as *const ());
+            libafl_qemu_add_gdb_cmd(gdb_cmd, core::ptr::from_ref(&*fat) as *const ());
             GDB_COMMANDS.push(fat);
         }
     }
