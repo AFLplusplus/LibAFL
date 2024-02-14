@@ -1469,7 +1469,7 @@ impl AsanRuntime {
             .operands
             .iter()
             .position(|item| *item == Operand::Nothing)
-            .unwrap_or_else(|| 4);
+            .unwrap_or(4);
 
         //the memory operand is always the last operand in aarch64
         let (base_reg, index_reg, displacement) = match insn.operands[operands_len - 1] {
@@ -1500,7 +1500,7 @@ impl AsanRuntime {
                     actual_pc,
                     (
                         Some(base_reg),
-                        Some(index_reg.unwrap_or_else(|| 0xffff)),
+                        Some(index_reg.unwrap_or(0xffff)),
                         displacement as usize,
                         fault_address,
                     ),
@@ -1512,7 +1512,7 @@ impl AsanRuntime {
                     actual_pc,
                     (
                         Some(base_reg),
-                        Some(index_reg.unwrap_or_else(|| 0xffff)),
+                        Some(index_reg.unwrap_or(0xffff)),
                         displacement as usize,
                         fault_address,
                     ),
@@ -1528,7 +1528,7 @@ impl AsanRuntime {
                 pc: actual_pc,
                 fault: (
                     Some(base_reg),
-                    Some(index_reg.unwrap_or_else(|| 0xffff)),
+                    Some(index_reg.unwrap_or(0xffff)),
                     displacement as usize,
                     fault_address,
                 ),
@@ -1552,7 +1552,7 @@ impl AsanRuntime {
                 actual_pc,
                 (
                     Some(base_reg),
-                    Some(index_reg.unwrap_or_else(|| 0xffff)),
+                    Some(index_reg.unwrap_or(0xffff)),
                     displacement as usize,
                     fault_address,
                 ),
@@ -1875,7 +1875,7 @@ impl AsanRuntime {
             ;->accessed_address:
             ; .dword 0x0
             ; self_addr:
-            ; .qword self as *mut _  as *mut c_void as i64
+            ; .qword core::ptr::from_mut(self)  as *mut c_void as i64
             ; self_regs_addr:
             ; .qword addr_of_mut!(self.regs) as i64
             ; trap_func:
@@ -2112,6 +2112,7 @@ impl AsanRuntime {
     #[cfg(target_arch = "aarch64")]
     #[must_use]
     #[inline]
+    #[allow(clippy::similar_names, clippy::type_complexity)]
     pub fn asan_is_interesting_instruction(
         decoder: InstDecoder,
         _address: u64,
@@ -2155,7 +2156,7 @@ impl AsanRuntime {
             .operands
             .iter()
             .position(|item| *item == Operand::Nothing)
-            .unwrap_or_else(|| 4);
+            .unwrap_or(4);
         if operands_len < 2 {
             return None;
         }
@@ -2174,6 +2175,7 @@ impl AsanRuntime {
 
         // println!("{:?} {}", instr, memory_access_size);
         //abuse the fact that the last operand is always the mem operand
+        #[allow(clippy::let_and_return)]
         match instr.operands[operands_len - 1] {
             Operand::RegRegOffset(reg1, reg2, size, shift, shift_size) => {
                 let ret = Some((
@@ -2184,27 +2186,25 @@ impl AsanRuntime {
                     Some((shift, shift_size)),
                 ));
                 // log::trace!("Interesting instruction: {}, {:?}", instr.to_string(), ret);
-                return ret;
+                ret
             }
             Operand::RegPreIndex(reg, disp, _) => {
                 let ret = Some((reg, None, disp, instruction_width(&instr), None));
                 // log::trace!("Interesting instruction: {}, {:?}", instr.to_string(), ret);
-                return ret;
+                ret
             }
             Operand::RegPostIndex(reg, _) => {
                 //in post index the disp is applied after so it doesn't matter for this memory access
                 let ret = Some((reg, None, 0, instruction_width(&instr), None));
                 // log::trace!("Interesting instruction: {}, {:?}", instr.to_string(), ret);
-                return ret;
+                ret
             }
             Operand::RegPostIndexReg(reg, _) => {
                 let ret = Some((reg, None, 0, instruction_width(&instr), None));
                 //  log::trace!("Interesting instruction: {}, {:?}", instr.to_string(), ret);
-                return ret;
+                ret
             }
-            _ => {
-                return None;
-            }
+            _ => None,
         }
     }
 
@@ -2538,9 +2538,9 @@ impl AsanRuntime {
                     _ => -1,
                 };
                 let (shift_encoding, shift_amount): (i32, u32) = match shift_type {
-                    ShiftStyle::LSL => (0b00, amount as u32),
-                    ShiftStyle::LSR => (0b01, amount as u32),
-                    ShiftStyle::ASR => (0b10, amount as u32),
+                    ShiftStyle::LSL => (0b00, u32::from(amount)),
+                    ShiftStyle::LSR => (0b01, u32::from(amount)),
+                    ShiftStyle::ASR => (0b10, u32::from(amount)),
                     _ => (-1, 0),
                 };
 

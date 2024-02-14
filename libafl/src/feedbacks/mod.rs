@@ -1187,9 +1187,9 @@ pub mod pybind {
             // # Safety
             // We use this observer in Python ony when the ObserverTuple is PythonObserversTuple
             let dont_look_at_this: &PythonObserversTuple =
-                unsafe { &*(observers as *const OT as *const PythonObserversTuple) };
+                unsafe { &*(core::ptr::from_ref::<OT>(observers) as *const PythonObserversTuple) };
             let dont_look_at_this2: &PythonEventManager =
-                unsafe { &*(manager as *mut EM as *const PythonEventManager) };
+                unsafe { &*(core::ptr::from_mut::<EM>(manager) as *const PythonEventManager) };
             Ok(Python::with_gil(|py| -> PyResult<bool> {
                 let r: bool = self
                     .inner
@@ -1221,7 +1221,7 @@ pub mod pybind {
             // # Safety
             // We use this observer in Python ony when the ObserverTuple is PythonObserversTuple
             let dont_look_at_this: &PythonObserversTuple =
-                unsafe { &*(observers as *const OT as *const PythonObserversTuple) };
+                unsafe { &*(core::ptr::from_ref::<OT>(observers) as *const PythonObserversTuple) };
             Python::with_gil(|py| -> PyResult<()> {
                 self.inner.call_method1(
                     py,

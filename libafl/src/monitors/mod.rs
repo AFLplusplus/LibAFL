@@ -1407,14 +1407,14 @@ pub mod pybind {
     impl Monitor for PythonMonitor {
         fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
             let ptr = unwrap_me_mut!(self.wrapper, m, {
-                m.client_stats_mut() as *mut Vec<ClientStats>
+                core::ptr::from_mut::<Vec<ClientStats>>(m.client_stats_mut())
             });
             unsafe { ptr.as_mut().unwrap() }
         }
 
         fn client_stats(&self) -> &[ClientStats] {
             let ptr = unwrap_me!(self.wrapper, m, {
-                m.client_stats() as *const [ClientStats]
+                core::ptr::from_ref::<[ClientStats]>(m.client_stats())
             });
             unsafe { ptr.as_ref().unwrap() }
         }
