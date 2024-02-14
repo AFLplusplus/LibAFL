@@ -278,15 +278,15 @@ where
             let data = addr_of_mut!(FORK_EXECUTOR_GLOBAL_DATA);
             write_volatile(
                 addr_of_mut!((*data).executor_ptr),
-                self as *const _ as *const c_void,
+                core::ptr::from_ref(self) as *const c_void,
             );
             write_volatile(
                 addr_of_mut!((*data).current_input_ptr),
-                input as *const _ as *const c_void,
+                core::ptr::from_ref(input) as *const c_void,
             );
             write_volatile(
                 addr_of_mut!((*data).state_ptr),
-                state as *mut _ as *mut c_void,
+                core::ptr::from_mut(state) as *mut c_void,
             );
             compiler_fence(Ordering::SeqCst);
         }

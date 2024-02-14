@@ -533,9 +533,14 @@ where
         &self.args
     }
 
-    /// The [`Forkserver`] instance.
+    /// Get a reference to the [`Forkserver`] instance.
     pub fn forkserver(&self) -> &Forkserver {
         &self.forkserver
+    }
+
+    /// Get a mutable reference to the [`Forkserver`] instance.
+    pub fn forkserver_mut(&mut self) -> &mut Forkserver {
+        &mut self.forkserver
     }
 
     /// The [`InputFile`] used by this [`Executor`].
