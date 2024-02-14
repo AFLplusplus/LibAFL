@@ -197,6 +197,7 @@ pub fn build(
                 })
                 .arg("--enable-fdt=internal")
                 .arg("--audio-drv-list=")
+                .arg("--disable-af-xdp")
                 .arg("--disable-alsa")
                 .arg("--disable-attr")
                 .arg("--disable-auth-pam")
