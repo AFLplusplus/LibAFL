@@ -498,7 +498,7 @@ pub mod pybind {
         #[inline]
         fn observers(&self) -> &PythonObserversTuple {
             let ptr = unwrap_me!(self.wrapper, e, {
-                e.observers() as *const PythonObserversTuple
+                core::ptr::from_ref::<PythonObserversTuple>(e.observers())
             });
             unsafe { ptr.as_ref().unwrap() }
         }
@@ -506,7 +506,7 @@ pub mod pybind {
         #[inline]
         fn observers_mut(&mut self) -> &mut PythonObserversTuple {
             let ptr = unwrap_me_mut!(self.wrapper, e, {
-                e.observers_mut() as *mut PythonObserversTuple
+                core::ptr::from_mut::<PythonObserversTuple>(e.observers_mut())
             });
             unsafe { ptr.as_mut().unwrap() }
         }
