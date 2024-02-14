@@ -24,4 +24,4 @@ libafl = { path = "../../libafl/" }
 libafl_bolts = { path = "../../libafl_bolts/" }
 libafl_targets = { path = "../../libafl_targets/" }
 clap = { version = "4.0", features = ["default"] }
-nix = "0.26"
+nix = "0.27"

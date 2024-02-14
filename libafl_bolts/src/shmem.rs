@@ -593,8 +593,8 @@ pub mod unix_shmem {
         use std::{io::Write, process};
 
         use libc::{
-            c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, close, ftruncate, mmap, munmap,
-            perror, shm_open, shm_unlink, shmat, shmctl, shmdt, shmget,
+            c_int, c_uchar, close, ftruncate, mmap, munmap, perror, shm_open, shm_unlink, shmat,
+            shmctl, shmdt, shmget,
         };
 
         use crate::{
@@ -602,38 +602,6 @@ pub mod unix_shmem {
             shmem::{ShMem, ShMemId, ShMemProvider},
             AsMutSlice, AsSlice, Error,
         };
-        #[cfg(unix)]
-        #[derive(Copy, Clone)]
-        #[repr(C)]
-        struct ipc_perm {
-            pub __key: c_int,
-            pub uid: c_uint,
-            pub gid: c_uint,
-            pub cuid: c_uint,
-            pub cgid: c_uint,
-            pub mode: c_ushort,
-            pub __pad1: c_ushort,
-            pub __seq: c_ushort,
-            pub __pad2: c_ushort,
-            pub __glibc_reserved1: c_ulong,
-            pub __glibc_reserved2: c_ulong,
-        }
-
-        #[cfg(unix)]
-        #[derive(Copy, Clone)]
-        #[repr(C)]
-        struct shmid_ds {
-            pub shm_perm: ipc_perm,
-            pub shm_segsz: c_ulong,
-            pub shm_atime: c_long,
-            pub shm_dtime: c_long,
-            pub shm_ctime: c_long,
-            pub shm_cpid: c_int,
-            pub shm_lpid: c_int,
-            pub shm_nattch: c_ulong,
-            pub __glibc_reserved4: c_ulong,
-            pub __glibc_reserved5: c_ulong,
-        }
 
         // This is macOS's limit
         // https://stackoverflow.com/questions/38049068/osx-shm-open-returns-enametoolong

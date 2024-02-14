@@ -11,9 +11,9 @@ crate-type = ["dylib"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = { version = "1.0.71", default-features = false }
+anyhow = { version = "1.0", default-features = false }
 ctor = { version = "0.2", default-features = false }
-nix = { version = "0.26.2", default-features = false, features = ["process", "personality"] }
+nix = { version = "0.27", default-features = false, features = ["process", "personality"] }
 
 [target.'cfg(any(target_os = "freebsd", target_os = "netbsd"))'.dependencies]
 libc = "0.2" 
