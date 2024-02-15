@@ -8,7 +8,7 @@ use core::{
 #[cfg(target_os = "linux")]
 use core::{
     mem::zeroed,
-    ptr::{addr_of, null_mut},
+    ptr::{self, addr_of, null_mut},
 };
 
 #[cfg(all(unix, not(target_os = "linux")))]
