@@ -471,6 +471,21 @@ char *strdup(const char *s) {
   return r;
 }
 
+char *strndup(const char *s, size_t n) {
+  void *rtv = __builtin_return_address(0);
+
+  QASAN_DEBUG("%14p: strndup(%p, %zu)\n", rtv, s, n);
+  size_t l = __libqasan_strnlen(s, n);
+  if (l > n) { l = n; }
+  QASAN_LOAD(s, l + 1);
+  void *r = __libqasan_malloc(l + 1);
+  __libqasan_memcpy(r, s, l);
+  ((char*)r)[l] = 0;
+  QASAN_DEBUG("\t\t = %p\n", r);
+
+  return r;
+}
+
 size_t strlen(const char *s) {
   void *rtv = __builtin_return_address(0);
 

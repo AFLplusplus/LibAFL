@@ -214,6 +214,7 @@ void __libqasan_hotpatch(void) {
   HOTPATCH(strncpy)
   HOTPATCH(stpcpy)
   HOTPATCH(strdup)
+  HOTPATCH(strndup)
   HOTPATCH(strlen)
   HOTPATCH(strnlen)
   HOTPATCH(strstr)
