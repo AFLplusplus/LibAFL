@@ -247,7 +247,7 @@ impl CmpLogRuntime {
                 ; ldp x2, x3, [sp], #0x10
                 ; b >done
                 ; self_addr:
-                ; .qword self as *mut _  as *mut c_void as i64
+                ; .qword core::ptr::from_mut(self) as *mut c_void as i64
                 ; populate_lists:
                 ; .qword  CmpLogRuntime::populate_lists as *mut c_void as i64
                 ; done:
