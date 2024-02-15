@@ -481,7 +481,7 @@ impl Serialize for AFLppCmpLogMap {
     {
         let slice = unsafe {
             core::slice::from_raw_parts(
-                (self as *const Self) as *const u8,
+                (core::ptr::from_ref::<Self>(self)) as *const u8,
                 core::mem::size_of::<Self>(),
             )
         };
