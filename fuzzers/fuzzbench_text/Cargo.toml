@@ -26,7 +26,7 @@ libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_h
 # TODO Include it only when building cc
 libafl_cc = { path = "../../libafl_cc/" }
 clap = { version = "4.0", features = ["default"] }
-nix = "0.26"
+nix = { version = "0.27", features = ["fs"] }
 mimalloc = { version = "*", default-features = false }
 content_inspector = "0.2.4"
 #log = "0.4"

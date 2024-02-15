@@ -361,22 +361,20 @@ pub mod pybind {
         fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<BytesInput>>, Error> {
             let ptr = unwrap_me!(self.wrapper, c, {
                 c.get(idx)
-                    .map(|v| v as *const RefCell<Testcase<BytesInput>>)
+                    .map(core::ptr::from_ref::<RefCell<Testcase<BytesInput>>>)
             })?;
             Ok(unsafe { ptr.as_ref().unwrap() })
         }
 
         #[inline]
         fn current(&self) -> &Option<CorpusId> {
-            let ptr = unwrap_me!(self.wrapper, c, { c.current() as *const Option<CorpusId> });
+            let ptr = unwrap_me!(self.wrapper, c, { core::ptr::from_ref(c.current()) });
             unsafe { ptr.as_ref().unwrap() }
         }
 
         #[inline]
         fn current_mut(&mut self) -> &mut Option<CorpusId> {
-            let ptr = unwrap_me_mut!(self.wrapper, c, {
-                c.current_mut() as *mut Option<CorpusId>
-            });
+            let ptr = unwrap_me_mut!(self.wrapper, c, { core::ptr::from_mut(c.current_mut()) });
             unsafe { ptr.as_mut().unwrap() }
         }
 

@@ -497,17 +497,13 @@ pub mod pybind {
     impl HasObservers for PythonExecutor {
         #[inline]
         fn observers(&self) -> &PythonObserversTuple {
-            let ptr = unwrap_me!(self.wrapper, e, {
-                e.observers() as *const PythonObserversTuple
-            });
+            let ptr = unwrap_me!(self.wrapper, e, { core::ptr::from_ref(e.observers()) });
             unsafe { ptr.as_ref().unwrap() }
         }
 
         #[inline]
         fn observers_mut(&mut self) -> &mut PythonObserversTuple {
-            let ptr = unwrap_me_mut!(self.wrapper, e, {
-                e.observers_mut() as *mut PythonObserversTuple
-            });
+            let ptr = unwrap_me_mut!(self.wrapper, e, { core::ptr::from_mut(e.observers_mut()) });
             unsafe { ptr.as_mut().unwrap() }
         }
     }

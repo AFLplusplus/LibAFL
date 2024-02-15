@@ -90,11 +90,11 @@ impl<T> __IncompleteArrayField<T> {
     }
     #[inline]
     pub fn as_ptr(&self) -> *const T {
-        self as *const _ as *const T
+        core::ptr::from_ref(self) as *const T
     }
     #[inline]
     pub fn as_mut_ptr(&mut self) -> *mut T {
-        self as *mut _ as *mut T
+        core::ptr::from_mut(self) as *mut T
     }
     #[inline]
     pub unsafe fn as_slice(&self, len: usize) -> &[T] {

@@ -35,6 +35,7 @@
 #include <stdint.h>
 
 #include "printf.h"
+#include "../libqasan.h"
 
 // qasan define
 #define PRINTF_SUPPORT_FLOAT
@@ -909,6 +910,17 @@ int __libqasan_snprintf(char *buffer, size_t count, const char *format, ...) {
 int __libqasan_vprintf(const char *format, va_list va) {
   char buffer[1];
   return _vsnprintf(_out_char, buffer, (size_t)-1, format, va);
+}
+
+int __libqasan_vasprintf(char **restrict strp, const char *restrict format,
+                         va_list va) {
+  // get the string size
+  const int len = _vsnprintf(NULL, NULL, (size_t)-1, format, va);
+
+  void *buffer = __libqasan_malloc(len + 1);
+  *strp = buffer;
+  const int ret = _vsnprintf(_out_buffer, buffer, len + 1, format, va);
+  return ret;
 }
 
 int __libqasan_vsnprintf(char *buffer, size_t count, const char *format,

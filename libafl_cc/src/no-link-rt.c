@@ -56,7 +56,7 @@ void __cmplog_ins_hook8(uint64_t arg1, uint64_t arg2) {
   (void)arg2;
 }
 
-#ifndef _WIN32
+#if !defined(_WIN32) && defined(__SIZEOF_INT128__)
 void __cmplog_ins_hook16_extended(uint128_t arg1, uint128_t arg2,
                                   uint8_t attr) {
   (void)attr;

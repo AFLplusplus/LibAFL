@@ -8,7 +8,7 @@ use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "75d15d54f4417a4766d2dcb493982d9df0e8eac4";
+const QEMU_REVISION: &str = "194b3a987c751f98c0db0f3537fa789b43b4e663";
 
 pub struct BuildResult {
     pub qemu_path: PathBuf,
@@ -197,6 +197,7 @@ pub fn build(
                 })
                 .arg("--enable-fdt=internal")
                 .arg("--audio-drv-list=")
+                .arg("--disable-af-xdp")
                 .arg("--disable-alsa")
                 .arg("--disable-attr")
                 .arg("--disable-auth-pam")

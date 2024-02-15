@@ -1,4 +1,6 @@
 //! A `QEMU`-based executor for binary-only instrumentation in `LibAFL`
+#[cfg(emulation_mode = "usermode")]
+use core::ptr;
 use core::{
     ffi::c_void,
     fmt::{self, Debug, Formatter},
@@ -79,8 +81,8 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, OF, Z>(
     Z: HasObjective<Objective = OF, State = E::State>,
 {
     let puc = match &mut context {
-        Some(v) => (*v) as *mut ucontext_t as *mut c_void,
-        None => core::ptr::null_mut(),
+        Some(v) => ptr::from_mut::<ucontext_t>(*v) as *mut c_void,
+        None => ptr::null_mut(),
     };
     libafl_qemu_handle_crash(signal as i32, info, puc);
 }
