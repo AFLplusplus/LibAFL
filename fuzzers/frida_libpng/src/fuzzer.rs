@@ -51,7 +51,9 @@ use libafl_targets::cmplog::CmpLogObserver;
 
 /// The main fn, usually parsing parameters, and starting the fuzzer
 pub fn main() {
+    env_logger::init();
     color_backtrace::install();
+    log::info!("hello!");
 
     let options = parse_args();
 
@@ -98,7 +100,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
                 #[cfg(unix)]
                 let mut frida_helper =
-                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage, asan));
+                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(asan, coverage));
                 #[cfg(windows)]
                 let mut frida_helper =
                     FridaInstrumentationHelper::new(&gum, &options, tuple_list!(coverage));

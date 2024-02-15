@@ -176,9 +176,16 @@ pub fn writer_register(reg: RegSpec) -> X86Register {
 }
 
 /// Translates a frida instruction to a disassembled instruction.
-#[cfg(all(target_arch = "x86_64", unix))]
+#[cfg(all(target_arch = "x86_64"))]
 pub(crate) fn frida_to_cs(decoder: InstDecoder, frida_insn: &frida_gum_sys::Insn) -> Instruction {
-    decoder.decode_slice(frida_insn.bytes()).unwrap()
+    match decoder.decode_slice(frida_insn.bytes()) {
+        Ok(result) => return result,
+        Err(error) => {
+        log::error!("{:?}: {:x}: {:?}", error, frida_insn.address(), frida_insn.bytes());
+        panic!("FAILED");
+        }
+
+    };
 }
 
 #[cfg(target_arch = "x86_64")]
@@ -221,6 +228,22 @@ pub fn operand_details(operand: &Operand) -> Option<(X86Register, X86Register, u
             let index = writer_register(*index);
             Some((base, index, *scale, *disp))
         }
+        _ => None,
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+/// Get the immediate value of the operand
+pub fn immediate_value(operand: &Operand) -> Option<i64> {
+    match operand {
+        Operand::ImmediateI8(v) => Some(*v as i64),
+        Operand::ImmediateU8(v) => Some(*v as i64),
+        Operand::ImmediateI16(v) => Some(*v as i64),
+        Operand::ImmediateI32(v) => Some(*v as i64),
+        Operand::ImmediateU16(v) => Some(*v as i64),
+        Operand::ImmediateU32(v) => Some(*v as i64),
+        Operand::ImmediateI64(v) => Some(*v),
+        Operand::ImmediateU64(v) => Some(*v as i64),
         _ => None,
     }
 }
