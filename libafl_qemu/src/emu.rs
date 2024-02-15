@@ -390,7 +390,7 @@ extern_c_checked! {
     fn read_self_maps() -> *const c_void;
     fn free_self_maps(map_info: *const c_void);
 
-    fn libafl_maps_next(map_info: *const c_void, ret: *mut MapInfo) -> *const c_void;
+    fn libafl_maps_next(map_info: *const c_void, ret: *mut MapInfo, is_root: bool) -> *const c_void;
 
     static exec_path: *const u8;
     static guest_base: usize;
@@ -461,6 +461,7 @@ extern_c_checked! {
 pub struct GuestMaps {
     orig_c_iter: *const c_void,
     c_iter: *const c_void,
+    first_iter: bool,
 }
 
 // Consider a private new only for Emulator
@@ -473,6 +474,7 @@ impl GuestMaps {
             Self {
                 orig_c_iter: maps,
                 c_iter: maps,
+                first_iter: true,
             }
         }
     }
@@ -489,7 +491,10 @@ impl Iterator for GuestMaps {
         }
         unsafe {
             let mut ret = MaybeUninit::uninit();
-            self.c_iter = libafl_maps_next(self.c_iter, ret.as_mut_ptr());
+            self.c_iter = libafl_maps_next(self.c_iter, ret.as_mut_ptr(), self.first_iter);
+
+            self.first_iter = false;
+
             if self.c_iter.is_null() {
                 None
             } else {
