@@ -252,7 +252,8 @@ where
         )
     }
 
-    /// Create a new in mem executor with the default timeout and use batch mode(5 sec)
+    /// Create a new in mem executor with the default timeout and use batch mode (5 sec)
+    /// Do not use batched mode timeouts with cmplog cores. It is not supported
     #[cfg(all(feature = "std", target_os = "linux"))]
     pub fn batched_timeouts<EM, OF, Z>(
         harness_fn: &'a mut H,

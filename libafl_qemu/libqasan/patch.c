@@ -200,6 +200,9 @@ void __libqasan_hotpatch(void) {
   HOTPATCH(bcmp)
   #endif
 
+  HOTPATCH(asprintf)
+  HOTPATCH(vasprintf)
+
   HOTPATCH(strchr)
   HOTPATCH(strrchr)
   HOTPATCH(strcasecmp)
