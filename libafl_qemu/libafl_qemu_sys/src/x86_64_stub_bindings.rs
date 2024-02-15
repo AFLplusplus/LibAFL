@@ -90,7 +90,7 @@ impl<T> __IncompleteArrayField<T> {
     }
     #[inline]
     pub fn as_ptr(&self) -> *const T {
-        core::ptr::from_const(self) as *const T
+        core::ptr::from_ref(self) as *const T
     }
     #[inline]
     pub fn as_mut_ptr(&mut self) -> *mut T {
