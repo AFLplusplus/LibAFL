@@ -1097,6 +1097,7 @@ impl From<bool> for ConstFeedback {
 #[allow(clippy::unnecessary_fallible_conversions)]
 #[allow(missing_docs)]
 pub mod pybind {
+    use core::ptr;
     use std::cell::UnsafeCell;
 
     use libafl_bolts::Named;
@@ -1187,9 +1188,9 @@ pub mod pybind {
             // # Safety
             // We use this observer in Python ony when the ObserverTuple is PythonObserversTuple
             let dont_look_at_this: &PythonObserversTuple =
-                unsafe { &*(core::ptr::from_ref::<OT>(observers) as *const PythonObserversTuple) };
+                unsafe { &*(ptr::from_ref(observers) as *const PythonObserversTuple) };
             let dont_look_at_this2: &PythonEventManager =
-                unsafe { &*(core::ptr::from_mut::<EM>(manager) as *const PythonEventManager) };
+                unsafe { &*(ptr::from_mut(manager) as *const PythonEventManager) };
             Ok(Python::with_gil(|py| -> PyResult<bool> {
                 let r: bool = self
                     .inner
@@ -1221,7 +1222,7 @@ pub mod pybind {
             // # Safety
             // We use this observer in Python ony when the ObserverTuple is PythonObserversTuple
             let dont_look_at_this: &PythonObserversTuple =
-                unsafe { &*(core::ptr::from_ref::<OT>(observers) as *const PythonObserversTuple) };
+                unsafe { &*(ptr::from_ref(observers) as *const PythonObserversTuple) };
             Python::with_gil(|py| -> PyResult<()> {
                 self.inner.call_method1(
                     py,

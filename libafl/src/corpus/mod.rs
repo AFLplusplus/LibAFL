@@ -368,17 +368,13 @@ pub mod pybind {
 
         #[inline]
         fn current(&self) -> &Option<CorpusId> {
-            let ptr = unwrap_me!(self.wrapper, c, {
-                core::ptr::from_ref::<Option<CorpusId>>(c.current())
-            });
+            let ptr = unwrap_me!(self.wrapper, c, { core::ptr::from_ref(c.current()) });
             unsafe { ptr.as_ref().unwrap() }
         }
 
         #[inline]
         fn current_mut(&mut self) -> &mut Option<CorpusId> {
-            let ptr = unwrap_me_mut!(self.wrapper, c, {
-                core::ptr::from_mut::<Option<CorpusId>>(c.current_mut())
-            });
+            let ptr = unwrap_me_mut!(self.wrapper, c, { core::ptr::from_mut(c.current_mut()) });
             unsafe { ptr.as_mut().unwrap() }
         }
 
