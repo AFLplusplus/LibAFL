@@ -22,6 +22,7 @@ all-features = true
 
 [features]
 default = [
+    "sancov_ngram4",
     "std",
     "sanitizers_flags",
     "windows_asan",
@@ -42,6 +43,8 @@ sancov_pcguard_edges = ["coverage"]
 sancov_pcguard_hitcounts = ["coverage"]
 sancov_value_profile = ["common"]
 sancov_8bit = []
+sancov_ngram4 = []
+sancov_ngram8 = []
 sancov_cmplog = ["common"] # Defines cmp and __sanitizer_weak_hook functions. Use libfuzzer_interceptors to define interceptors (only compatible with Linux)
 sancov_pcguard = ["sancov_pcguard_hitcounts"]
 sanitizer_interfaces = []

@@ -1,5 +1,7 @@
 //! [`LLVM` `PcGuard`](https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-pcs-with-guards) runtime for `LibAFL`.
 
+use core::simd::num::SimdUint;
+
 use crate::coverage::{EDGES_MAP, MAX_EDGES_NUM};
 #[cfg(feature = "pointer_maps")]
 use crate::coverage::{EDGES_MAP_PTR, EDGES_MAP_PTR_NUM};
@@ -10,6 +12,19 @@ compile_error!(
     "the libafl_targets `sancov_pcguard_edges` and `sancov_pcguard_hitcounts` features are mutually exclusive."
 );
 
+#[cfg(feature = "sancov_ngram4")]
+type Ngram4 = core::simd::u32x4;
+#[cfg(feature = "sancov_ngram8")]
+type Ngram8 = core::simd::u32x8;
+
+/// The array holding the previous locs. This is required for NGRAM-4 instrumentation
+#[cfg(feature = "sancov_ngram4")]
+pub static mut PREV_ARRAY: Ngram4 = Ngram4::from_array([0, 0, 0, 0]);
+
+/// The array holding the previous locs. This is required for NGRAM-8 instrumentation
+#[cfg(feature = "sancov_ngram8")]
+pub static mut PREV_ARRAY: Ngram8 = Ngram8::from_array([0, 0, 0, 0]);
+
 /// Callback for sancov `pc_guard` - usually called by `llvm` on each block or edge.
 ///
 /// # Safety
@@ -17,7 +32,17 @@ compile_error!(
 /// Should usually not be called directly.
 #[no_mangle]
 pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
-    let pos = *guard as usize;
+    let mut pos = *guard as usize;
+
+    #[cfg(feature = "sancov_ngram4")]
+    {
+        let reduced = PREV_ARRAY.reduce_xor() as usize;
+        pos = pos ^ reduced;
+
+        PREV_ARRAY = PREV_ARRAY.rotate_elements_right::<1>();
+        PREV_ARRAY.as_mut_array()[0] = (pos as u32) << 1;
+    }
+
     #[cfg(feature = "pointer_maps")]
     {
         #[cfg(feature = "sancov_pcguard_edges")]
