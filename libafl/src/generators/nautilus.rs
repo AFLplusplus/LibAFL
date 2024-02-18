@@ -47,6 +47,8 @@ impl NautilusContext {
     /// # Examples
     ///
     /// ```
+    /// use libafl::generators::nautilus::NautilusContext;
+    ///
     /// // Create a simple grammar for a series of null-terminated data.
     /// let null = vec![0];
     /// let mut rules = vec![
