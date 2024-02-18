@@ -35,7 +35,7 @@ struct CoverageRuntimeInner {
 #[derive(Debug)]
 pub struct CoverageRuntime {
     inner: Pin<Rc<RefCell<CoverageRuntimeInner>>>,
-    block_mode: bool,
+    inner_bbs: Pin<Rc<RefCell<CoverageRuntimeInner>>>,
     /// The memory ranges of this target
     ranges: RangeMap<usize, (u16, String)>,
     save_dr_cov: bool,
@@ -77,7 +77,7 @@ impl FridaRuntime for CoverageRuntime {
         &mut self,
         input: &I,
     ) -> Result<(), libafl::Error> {
-        if self.block_mode && self.save_dr_cov {
+        if self.save_dr_cov {
             self.cnt += 1;
             if self.max_cnt > 0 && self.cnt < self.max_cnt {
                 return Ok(());
@@ -88,7 +88,7 @@ impl FridaRuntime for CoverageRuntime {
 
             for (key, value) in &self.basic_blocks {
                 // Is map[key] greater than 0?
-                if self.inner.borrow().map[*key as usize] == 0 {
+                if self.inner_bbs.borrow().map[*key as usize] == 0 {
                     continue;
                 }
 
@@ -129,6 +129,9 @@ impl FridaRuntime for CoverageRuntime {
                 self.cnt = 0;
             }
 
+            //reset the inner_bbs map
+            self.inner_bbs.borrow_mut().map = [0_u8; MAP_SIZE];
+
             return Ok(());
         }
         Ok(())
@@ -145,7 +148,11 @@ impl CoverageRuntime {
                 previous_pc: 0,
                 _pinned: PhantomPinned,
             })),
-            block_mode: false,
+            inner_bbs: Rc::pin(RefCell::new(CoverageRuntimeInner {
+                map: [0_u8; MAP_SIZE],
+                previous_pc: 0,
+                _pinned: PhantomPinned,
+            })),
             ranges: RangeMap::new(),
             save_dr_cov: false,
             coverage_directory: PathBuf::from("./coverage"),
@@ -154,14 +161,6 @@ impl CoverageRuntime {
             max_cnt: 0,
             stored_cnt: 0,
         }
-    }
-
-    /// Set the block mode
-    #[must_use]
-    pub fn block_mode(mut self, block_mode: bool) -> Self {
-        log::info!("Setting block mode to {}", block_mode);
-        self.block_mode = block_mode;
-        self
     }
 
     /// Set whether to save `DrCov` files
@@ -194,7 +193,11 @@ impl CoverageRuntime {
                 previous_pc: 0,
                 _pinned: PhantomPinned,
             })),
-            block_mode: self.block_mode,
+            inner_bbs: Rc::pin(RefCell::new(CoverageRuntimeInner {
+                map: [0_u8; MAP_SIZE],
+                previous_pc: 0,
+                _pinned: PhantomPinned,
+            })),
             ranges: self.ranges,
             save_dr_cov: self.save_dr_cov,
             coverage_directory: self.coverage_directory,
@@ -215,12 +218,13 @@ impl CoverageRuntime {
     /// block.
     #[cfg(target_arch = "aarch64")]
     #[allow(clippy::cast_possible_wrap)]
-    pub fn generate_inline_code(&mut self, h64: u64, block_mode: bool) -> Box<[u8]> {
+    pub fn generate_inline_code(&mut self, h64: u64, save_block_cov: bool) -> Box<[u8]> {
         let mut borrow = self.inner.borrow_mut();
         let prev_loc_ptr = addr_of_mut!(borrow.previous_pc);
         let map_addr_ptr = addr_of_mut!(borrow.map);
+        let bbs_map_addr_ptr = addr_of_mut!(self.inner_bbs.borrow_mut().map);
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
-        if block_mode {
+        if save_block_cov {
             dynasm!(ops
                 ;   .arch aarch64
                 // Store the context
@@ -229,11 +233,34 @@ impl CoverageRuntime {
                 ;   stp x16, x17, [sp, -0x90]!
                 ; start:
 
-                // Load the block id
+                // Load the previous_pc
+                ;   ldr x17, >previous_loc
+                ;   ldr x17, [x17]
+
+                // Calculate the edge id
                 ;   ldr x16, >loc
+                ;   eor x16, x17, x16
 
                 // Load the map byte address
                 ;   ldr x17, >map_addr
+                ;   add x16, x17, x16
+
+                // Update the map byte
+                ;   ldrb w17, [x16]
+                ;   add w17, w17, #1
+                ;   add x17, x17, x17, lsr #8
+                ;   strb w17, [x16]
+
+                // Update the previous_pc value
+                ;   ldr x16, >loc_shr
+                ;   ldr x17, >previous_loc
+                ;   str x16, [x17]
+
+                // Load the block id
+                ;   ldr x16, >loc
+
+                // Load the bbs map byte address
+                ;   ldr x17, >bbs_map_addr
                 ;   add x16, x17, x16
 
                 // Update the map byte
@@ -250,6 +277,8 @@ impl CoverageRuntime {
 
                 ;map_addr:
                 ;.qword map_addr_ptr as i64
+                ;bbs_map_addr:
+                ;.qword bbs_map_addr_ptr as i64
                 ;previous_loc:
                 ;.qword prev_loc_ptr as i64
                 ;loc:
@@ -313,12 +342,13 @@ impl CoverageRuntime {
 
     /// Write inline instrumentation for coverage
     #[cfg(target_arch = "x86_64")]
-    pub fn generate_inline_code(&mut self, h64: u64, block_mode: bool) -> Box<[u8]> {
+    pub fn generate_inline_code(&mut self, h64: u64, save_block_cov: bool) -> Box<[u8]> {
         let mut borrow = self.inner.borrow_mut();
         let prev_loc_ptr = addr_of_mut!(borrow.previous_pc);
         let map_addr_ptr = addr_of_mut!(borrow.map);
+        let bbs_map_addr_ptr = addr_of_mut!(self.inner_bbs.borrow_mut().map);
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
-        if block_mode {
+        if save_block_cov {
             dynasm!(ops
                 ;   .arch x64
                 // Store the context
@@ -327,14 +357,37 @@ impl CoverageRuntime {
                 ; mov    QWORD [rsp-0x90], rax
                 ; mov    QWORD [rsp-0x98], rbx
 
-                // Load the block id
-                ; mov eax, WORD h64 as i32
+                // Load the previous_pc
+                ; mov rax, QWORD prev_loc_ptr as _
+                ; mov rax, QWORD [rax]
+
+                // Calculate the edge id
+                ; mov ebx, WORD h64 as i32
+                ; xor rax, rbx
 
                 // Load the map byte address
                 ; mov rbx, QWORD map_addr_ptr as _
                 ; add rax, rbx
 
                 // Update the map byte
+                ; mov bl, BYTE [rax]
+                ; add bl,0x1
+                ; adc bl,0x0
+                ; mov BYTE [rax],bl
+
+                // Update the previous_pc value
+                ; mov rax, QWORD prev_loc_ptr as _
+                ; mov ebx, WORD (h64 >> 1) as i32
+                ; mov QWORD [rax], rbx
+
+                // Load the block id
+                ; mov eax, WORD h64 as i32
+
+                // Load the bbs map byte address
+                ; mov rbx, QWORD bbs_map_addr_ptr as _
+                ; add rax, rbx
+
+                // Update the bbs map byte
                 ; mov bl, BYTE [rax]
                 ; add bl,0x1
                 ; adc bl,0x0
@@ -427,7 +480,7 @@ impl CoverageRuntime {
             writer.reset(pc - 4);
         }
 
-        let code = self.generate_inline_code(h64 & (MAP_SIZE as u64 - 1), self.block_mode);
+        let code = self.generate_inline_code(h64 & (MAP_SIZE as u64 - 1), self.save_dr_cov);
         writer.put_bytes(&code);
     }
 }

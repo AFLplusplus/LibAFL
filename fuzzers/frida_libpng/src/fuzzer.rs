@@ -347,7 +347,6 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let gum = Gum::obtain();
 
                 let coverage = CoverageRuntime::new()
-                    .block_mode(options.bb_coverage)
                     .save_dr_cov(options.save_bb_coverage)
                     .max_cnt(options.drcov_max_execution_cnt)
                     .build();

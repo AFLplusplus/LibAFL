@@ -231,11 +231,6 @@ pub struct FuzzerOptions {
     #[arg(long, help_heading = "Frida Options")]
     pub disable_coverage: bool,
 
-    /// Collect basic block coverage instead of edge coverage
-    #[cfg(feature = "frida_cli")]
-    #[arg(long, help_heading = "Frida Options")]
-    pub bb_coverage: bool,
-
     /// Write basic block coverage to disk in DrCov format
     #[cfg(feature = "frida_cli")]
     #[arg(long, help_heading = "Frida Options")]
