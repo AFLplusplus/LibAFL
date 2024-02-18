@@ -484,9 +484,7 @@ where
                         rt.emit_coverage_mapping(address, output);
                     }
 
-                    if let Some(_rt) = runtimes.match_first_type_mut::<DrCovRuntime>() {
-                        basic_block_start = address;
-                    }
+                    basic_block_start = address;
                 }
 
                 #[cfg(unix)]
@@ -549,19 +547,23 @@ where
                     );
                 }
 
-                if let Some(_rt) = runtimes.match_first_type_mut::<DrCovRuntime>() {
-                    basic_block_size += instr_size;
-                }
+                basic_block_size += instr_size;
             }
             instruction.keep();
         }
         if basic_block_size != 0 {
+            log::trace!("{basic_block_start:#016X}:{basic_block_size:X}");
             if let Some(rt) = runtimes.borrow_mut().match_first_type_mut::<DrCovRuntime>() {
-                log::trace!("{basic_block_start:#016X}:{basic_block_size:X}");
                 rt.drcov_basic_blocks.push(DrCovBasicBlock::new(
                     basic_block_start as usize,
                     basic_block_start as usize + basic_block_size,
                 ));
+            }
+            if let Some(rt) = runtimes
+                .borrow_mut()
+                .match_first_type_mut::<CoverageRuntime>()
+            {
+                rt.set_bb_size(basic_block_start, basic_block_size);
             }
         }
     }

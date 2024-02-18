@@ -346,7 +346,11 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
             (|state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _>, _core_id| {
                 let gum = Gum::obtain();
 
-                let coverage = CoverageRuntime::new();
+                let coverage = CoverageRuntime::new()
+                    .block_mode(options.bb_coverage)
+                    .save_dr_cov(options.save_bb_coverage)
+                    .max_cnt(options.drcov_max_execution_cnt)
+                    .build();
 
                 let mut frida_helper =
                     FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage));
