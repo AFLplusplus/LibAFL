@@ -87,6 +87,11 @@ impl FridaRuntime for CoverageRuntime {
             let mut drcov_basic_blocks: Vec<DrCovBasicBlock> = vec![];
 
             for (key, value) in &self.basic_blocks {
+                // Is map[key] greater than 0?
+                if self.inner.borrow().map[*key as usize] == 0 {
+                    continue;
+                }
+
                 log::trace!(
                     "Covered BB key: {:x}, value: {:016x} - {:016x}",
                     key,
