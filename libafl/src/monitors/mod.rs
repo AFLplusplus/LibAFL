@@ -1303,13 +1303,16 @@ pub mod pybind {
     use super::ClientStats;
     use crate::monitors::{Monitor, SimpleMonitor};
 
+    /// A [`SimpleMonitor`] type with a boxed `FnMut` for printing
+    pub type SimpleBoxedFnMonitor = SimpleMonitor<Box<dyn FnMut(&str)>>;
+
     // TODO create a PyObjectFnMut to pass, track stabilization of https://github.com/rust-lang/rust/issues/29625
 
     #[pyclass(unsendable, name = "SimpleMonitor")]
     /// Python class for SimpleMonitor
     pub struct PythonSimpleMonitor {
         /// Rust wrapped SimpleMonitor object
-        pub inner: SimpleMonitor<Box<dyn FnMut(&str)>>,
+        pub inner: SimpleBoxedFnMonitor,
         print_fn: PyObject,
     }
 
