@@ -88,7 +88,7 @@ class CtxPass : public ModulePass {
 #endif
 
  protected:
-  uint32_t                          map_size = MAP_SIZE;
+  uint32_t map_size = MAP_SIZE;
 
  private:
   bool isLLVMIntrinsicFn(StringRef &n) {
@@ -140,46 +140,36 @@ bool CtxPass::runOnModule(Module &M) {
   srand(rand_seed);
 
   GlobalVariable *AFLContext = new GlobalVariable(
-        M, Int32Ty, false, GlobalValue::ExternalLinkage, 0, "__afl_prev_ctx", 0,
-        GlobalVariable::GeneralDynamicTLSModel, 0, false);
-  Value *PrevCtx = NULL; // the ctx value up until now that we save on the stack
+      M, Int32Ty, false, GlobalValue::ExternalLinkage, 0, "__afl_prev_ctx");
+  Value *PrevCtx =
+      NULL;  // the ctx value up until now that we save on the stack
 
-  for(auto &F: M) {
+  for (auto &F : M) {
     int has_calls = 0;
 
-    if(isIgnoreFunction(&F)) {
-      continue;
-    }
-    if (F.size() < 1) {
-      continue;
-    }
-    for (auto &BB: F) {
+    if (isIgnoreFunction(&F)) { continue; }
+    if (F.size() < 1) { continue; }
+    for (auto &BB : F) {
       BasicBlock::iterator IP = BB.getFirstInsertionPt();
-      IRBuilder<> IRB(&(*IP));
-
-      if(&BB == &F.getEntryBlock()) {
-        // if this is the first block.. 
-        LoadInst *PrevCtxLoad = IRB.CreateLoad(
-          IRB.getInt32Ty(),
-          AFLContext
-        );
+      IRBuilder<>          IRB(&(*IP));
+      llvm::outs() << "instrumenting..\n";
+      if (&BB == &F.getEntryBlock()) {
+        // if this is the first block..
+        LoadInst *PrevCtxLoad = IRB.CreateLoad(IRB.getInt32Ty(), AFLContext);
         PrevCtxLoad->setMetadata(M.getMDKindID("nosanitize"),
                                  MDNode::get(C, None));
         PrevCtx = PrevCtxLoad;
 
         // now check for if calls exists
-        for (auto &BB_2: F)  {
-          if (has_calls) {
-            break;
-          }
-          for(auto &IN: BB_2) {
+        for (auto &BB_2 : F) {
+          if (has_calls) { break; }
+          for (auto &IN : BB_2) {
             CallInst *callInst = nullptr;
-            if((callInst = dyn_cast<CallInst>(&IN))) {
-              Function *Callee = callInst -> getCalledFunction();
-              if(!Callee || Callee -> size() < 1) {
+            if ((callInst = dyn_cast<CallInst>(&IN))) {
+              Function *Callee = callInst->getCalledFunction();
+              if (!Callee || Callee->size() < 1) {
                 continue;
-              }
-              else {
+              } else {
                 has_calls = 1;
                 break;
               }
@@ -191,17 +181,19 @@ bool CtxPass::runOnModule(Module &M) {
           Value *NewCtx = ConstantInt::get(Int32Ty, RandBelow(map_size));
           NewCtx = IRB.CreateXor(IRB.CreateLShr(PrevCtx, 1), NewCtx);
           StoreInst *StoreCtx = IRB.CreateStore(NewCtx, AFLContext);
-          StoreCtx->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
+          StoreCtx->setMetadata(M.getMDKindID("nosanitize"),
+                                MDNode::get(C, None));
         }
-
-        // Restore the ctx at the end of BB
-        Instruction *Inst = BB.getTerminator();
-        if(isa<ReturnInst>(Inst) || isa<ResumeInst>(Inst)) {
+      }
+      // Restore the ctx at the end of BB
+      Instruction *Inst = BB.getTerminator();
+      if (has_calls) {
+        if (isa<ReturnInst>(Inst) || isa<ResumeInst>(Inst)) {
           IRBuilder<> Post_IRB(Inst);
-          StoreInst *RestoreCtx;
-
+          StoreInst  *RestoreCtx;
           RestoreCtx = Post_IRB.CreateStore(PrevCtx, AFLContext);
-          RestoreCtx->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
+          RestoreCtx->setMetadata(M.getMDKindID("nosanitize"),
+                                  MDNode::get(C, None));
         }
       }
     }
@@ -219,12 +211,11 @@ bool CtxPass::runOnModule(Module &M) {
 
 #else
 static void registerCtxPass(const PassManagerBuilder &,
-                                legacy::PassManagerBase &PM) {
+                            legacy::PassManagerBase &PM) {
   PM.add(new CtxPass());
 }
 
-static RegisterPass<CtxPass> X("ctx", "ctx instrumentation pass",
-                                   false, false);
+static RegisterPass<CtxPass> X("ctx", "ctx instrumentation pass", false, false);
 
 static RegisterStandardPasses RegisterCtxPass(
     PassManagerBuilder::EP_OptimizerLast, registerCtxPass);

@@ -64,8 +64,9 @@ impl LLVMPasses {
             #[cfg(unix)]
             LLVMPasses::CmpLogInstructions => PathBuf::from(env!("OUT_DIR"))
                 .join(format!("cmplog-instructions-pass.{}", dll_extension())),
-            LLVMPasses::Ctx => PathBuf::from(env!("OUT_DIR"))
-                .join(format!("ctx-pass.{}", dll_extension())),
+            LLVMPasses::Ctx => {
+                PathBuf::from(env!("OUT_DIR")).join(format!("ctx-pass.{}", dll_extension()))
+            }
         }
     }
 }
