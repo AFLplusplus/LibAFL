@@ -7,7 +7,7 @@ use std::{
     sync::OnceLock,
 };
 
-use clap::{self, Parser};
+use clap::Parser;
 use libafl::generators::gramatron::{Automaton, Trigger};
 use regex::Regex;
 use serde_json::Value;

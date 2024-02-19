@@ -1,12 +1,9 @@
 //! LLVM compiler Wrapper from `LibAFL`
 
 use std::{
-    convert::Into,
     env,
     path::{Path, PathBuf},
     str::FromStr,
-    string::String,
-    vec::Vec,
 };
 
 use crate::{CompilerWrapper, Error, ToolWrapper, LIB_EXT, LIB_PREFIX};
