@@ -394,7 +394,7 @@ where
 
 fn find_function(
     emu: &Emulator,
-    file: &String,
+    file: &str,
     function: &str,
     loadaddr: GuestAddr,
 ) -> Result<Option<GuestAddr>, Error> {
