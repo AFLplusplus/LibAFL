@@ -2,7 +2,7 @@
 use core::{debug_assert, fmt::Debug};
 
 #[cfg(feature = "rand_trait")]
-use rand_core::{self, impls::fill_bytes_via_next, RngCore};
+use rand_core::{impls::fill_bytes_via_next, RngCore};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 #[cfg(feature = "std")]
