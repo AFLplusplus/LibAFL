@@ -22,7 +22,7 @@ use crossterm::{
 use hashbrown::HashMap;
 use libafl_bolts::{current_time, format_duration_hms, ClientId};
 use ratatui::{backend::CrosstermBackend, Terminal};
-use serde_json::{self, Value};
+use serde_json::Value;
 
 #[cfg(feature = "introspection")]
 use super::{ClientPerfMonitor, PerfFeature};

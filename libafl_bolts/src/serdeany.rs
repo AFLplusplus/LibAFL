@@ -73,7 +73,6 @@ pub mod serdeany_registry {
         hash_map::{Keys, Values, ValuesMut},
         HashMap,
     };
-    use postcard;
     use serde::{Deserialize, Serialize};
 
     use crate::{

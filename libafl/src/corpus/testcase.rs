@@ -4,8 +4,6 @@
 use alloc::string::String;
 use core::{
     cell::{Ref, RefMut},
-    default::Default,
-    option::Option,
     time::Duration,
 };
 #[cfg(feature = "std")]
