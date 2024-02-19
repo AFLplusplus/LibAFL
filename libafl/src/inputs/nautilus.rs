@@ -5,7 +5,7 @@
 //use core::hash::Hasher;
 
 use alloc::{rc::Rc, string::String, vec::Vec};
-use core::{cell::RefCell, convert::From};
+use core::cell::RefCell;
 use std::hash::{Hash, Hasher};
 
 use grammartec::{

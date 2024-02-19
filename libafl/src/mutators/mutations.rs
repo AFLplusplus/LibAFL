@@ -1401,7 +1401,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        corpus::{Corpus, InMemoryCorpus},
+        corpus::InMemoryCorpus,
         feedbacks::ConstFeedback,
         inputs::BytesInput,
         mutators::MutatorsTuple,

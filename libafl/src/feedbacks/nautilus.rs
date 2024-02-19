@@ -6,7 +6,6 @@ use std::fs::create_dir_all;
 use grammartec::{chunkstore::ChunkStore, context::Context};
 use libafl_bolts::Named;
 use serde::{Deserialize, Serialize};
-use serde_json;
 
 use crate::{
     corpus::{Corpus, Testcase},
