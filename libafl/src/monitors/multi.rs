@@ -65,7 +65,8 @@ where
         self.aggregator.aggregate(name, &self.client_stats);
     }
 
-    fn display(&mut self, event_msg: String, sender_id: ClientId) {
+    fn display<S: AsRef<str>>(&mut self, event_msg: S, sender_id: ClientId) {
+        let event_msg = event_msg.as_ref();
         let sender = format!("#{}", sender_id.0);
         let pad = if event_msg.len() + sender.len() < 13 {
             " ".repeat(13 - event_msg.len() - sender.len())

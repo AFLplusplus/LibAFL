@@ -497,7 +497,7 @@ pub trait Monitor {
     fn set_start_time(&mut self, time: Duration);
 
     /// Show the monitor to the user
-    fn display(&mut self, event_msg: String, sender_id: ClientId);
+    fn display<S: AsRef<str>>(&mut self, event_msg: S, sender_id: ClientId);
 
     /// Amount of elements in the corpus (combined for all children)
     fn corpus_size(&self) -> u64 {
@@ -591,7 +591,8 @@ impl Monitor for NopMonitor {
         self.start_time = time;
     }
 
-    fn display(&mut self, _event_msg: String, _sender_id: ClientId) {}
+    #[inline]
+    fn display<S: AsRef<str>>(&mut self, _event_msg: S, _sender_id: ClientId) {}
 }
 
 impl NopMonitor {
@@ -660,7 +661,7 @@ impl Monitor for SimplePrintingMonitor {
         self.start_time = time;
     }
 
-    fn display(&mut self, event_msg: String, sender_id: ClientId) {
+    fn display<S: AsRef<str>>(&mut self, event_msg: S, sender_id: ClientId) {
         let mut userstats = self.client_stats()[sender_id.0 as usize]
             .user_monitor
             .iter()
@@ -669,7 +670,7 @@ impl Monitor for SimplePrintingMonitor {
         userstats.sort();
         println!(
             "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}, {}",
-            event_msg,
+            event_msg.as_ref(),
             sender_id.0,
             format_duration_hms(&(current_time() - self.start_time)),
             self.client_stats().len(),
@@ -742,10 +743,10 @@ where
         self.start_time = time;
     }
 
-    fn display(&mut self, event_msg: String, sender_id: ClientId) {
+    fn display<S: AsRef<str>>(&mut self, event_msg: S, sender_id: ClientId) {
         let mut fmt = format!(
             "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
-            event_msg,
+            event_msg.as_ref(),
             sender_id.0,
             format_duration_hms(&(current_time() - self.start_time)),
             self.client_stats().len(),
@@ -1427,7 +1428,7 @@ pub mod pybind {
             unwrap_me_mut!(self.wrapper, m, { m.set_start_time(time) });
         }
 
-        fn display(&mut self, event_msg: String, sender_id: ClientId) {
+        fn display<S: AsRef<str>>(&mut self, event_msg: S, sender_id: ClientId) {
             unwrap_me_mut!(self.wrapper, m, { m.display(event_msg, sender_id) });
         }
     }

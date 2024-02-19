@@ -357,7 +357,8 @@ impl Monitor for TuiMonitor {
     }
 
     #[allow(clippy::cast_sign_loss)]
-    fn display(&mut self, event_msg: String, sender_id: ClientId) {
+    fn display<S: AsRef<str>>(&mut self, event_msg: S, sender_id: ClientId) {
+        let event_msg = event_msg.as_ref();
         let cur_time = current_time();
 
         {
