@@ -47,7 +47,7 @@ use crate::monitors::{ClientStats, Monitor, UserStatsValue};
 #[derive(Clone)]
 pub struct PrometheusMonitor<F>
 where
-    F: FnMut(String),
+    F: FnMut(&str),
 {
     print_fn: F,
     start_time: Duration,
@@ -63,7 +63,7 @@ where
 
 impl<F> Debug for PrometheusMonitor<F>
 where
-    F: FnMut(String),
+    F: FnMut(&str),
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("PrometheusMonitor")
@@ -75,7 +75,7 @@ where
 
 impl<F> Monitor for PrometheusMonitor<F>
 where
-    F: FnMut(String),
+    F: FnMut(&str),
 {
     /// the client monitor, mutable
     fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
@@ -162,7 +162,7 @@ where
             self.total_execs(),
             self.execs_per_sec_pretty()
         );
-        (self.print_fn)(fmt);
+        (self.print_fn)(&fmt);
 
         self.client_stats_insert(sender_id);
         let cur_client = self.client_stats_mut_for(sender_id);
@@ -192,7 +192,7 @@ where
 
 impl<F> PrometheusMonitor<F>
 where
-    F: FnMut(String),
+    F: FnMut(&str),
 {
     pub fn new(listener: String, print_fn: F) -> Self {
         // Gauge's implementation of clone uses Arc

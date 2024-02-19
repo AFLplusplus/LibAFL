@@ -698,7 +698,7 @@ impl Monitor for SimplePrintingMonitor {
 #[derive(Clone)]
 pub struct SimpleMonitor<F>
 where
-    F: FnMut(String),
+    F: FnMut(&str),
 {
     print_fn: F,
     start_time: Duration,
@@ -708,7 +708,7 @@ where
 
 impl<F> Debug for SimpleMonitor<F>
 where
-    F: FnMut(String),
+    F: FnMut(&str),
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SimpleMonitor")
@@ -720,7 +720,7 @@ where
 
 impl<F> Monitor for SimpleMonitor<F>
 where
-    F: FnMut(String),
+    F: FnMut(&str),
 {
     /// the client monitor, mutable
     fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
@@ -763,7 +763,7 @@ where
             }
         }
 
-        (self.print_fn)(fmt);
+        (self.print_fn)(&fmt);
 
         // Only print perf monitor if the feature is enabled
         #[cfg(feature = "introspection")]
@@ -773,17 +773,17 @@ where
                 "Client {:03}:\n{}",
                 sender_id.0, self.client_stats[sender_id.0 as usize].introspection_monitor
             );
-            (self.print_fn)(fmt);
+            (self.print_fn)(&fmt);
 
             // Separate the spacing just a bit
-            (self.print_fn)(String::new());
+            (self.print_fn)("");
         }
     }
 }
 
 impl<F> SimpleMonitor<F>
 where
-    F: FnMut(String),
+    F: FnMut(&str),
 {
     /// Creates the monitor, using the `current_time` as `start_time`.
     pub fn new(print_fn: F) -> Self {
@@ -1308,7 +1308,7 @@ pub mod pybind {
     /// Python class for SimpleMonitor
     pub struct PythonSimpleMonitor {
         /// Rust wrapped SimpleMonitor object
-        pub inner: SimpleMonitor<Box<dyn FnMut(String)>>,
+        pub inner: SimpleMonitor<Box<dyn FnMut(&str)>>,
         print_fn: PyObject,
     }
 
@@ -1323,9 +1323,9 @@ pub mod pybind {
     impl Clone for PythonSimpleMonitor {
         fn clone(&self) -> PythonSimpleMonitor {
             let py_print_fn = self.print_fn.clone();
-            let closure = move |s: String| {
+            let closure = move |s: &str| {
                 Python::with_gil(|py| -> PyResult<()> {
-                    py_print_fn.call1(py, (PyUnicode::new(py, &s),))?;
+                    py_print_fn.call1(py, (PyUnicode::new(py, s),))?;
                     Ok(())
                 })
                 .unwrap();
@@ -1348,9 +1348,9 @@ pub mod pybind {
         #[new]
         fn new(py_print_fn: PyObject) -> Self {
             let py_print_fn1 = py_print_fn.clone();
-            let closure = move |s: String| {
+            let closure = move |s: &str| {
                 Python::with_gil(|py| -> PyResult<()> {
-                    py_print_fn1.call1(py, (PyUnicode::new(py, &s),))?;
+                    py_print_fn1.call1(py, (PyUnicode::new(py, s),))?;
                     Ok(())
                 })
                 .unwrap();
