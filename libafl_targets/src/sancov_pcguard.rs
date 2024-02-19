@@ -52,6 +52,7 @@ extern "C" {
 /// Dereferences `guard`, reads the position from there, then dereferences the [`EDGES_MAP`] at that position.
 /// Should usually not be called directly.
 #[no_mangle]
+#[allow(unused_assignments)]
 pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
     let mut pos = *guard as usize;
 
