@@ -520,10 +520,15 @@ where
 
 #[cfg(test)]
 mod test {
-    use libafl_bolts::rands::StdRand;
+    use libafl_bolts::{rands::StdRand, Error};
 
-    use super::*;
-    use crate::{corpus::NopCorpus, stages::extract_metadata, state::StdState};
+    use crate::{
+        corpus::NopCorpus,
+        inputs::{BytesInput, HasBytesVec},
+        mutators::{Mutator, StringCategoryRandMutator, StringSubcategoryRandMutator},
+        stages::extract_metadata,
+        state::StdState,
+    };
 
     // a not-so-useful test for this
     #[test]
