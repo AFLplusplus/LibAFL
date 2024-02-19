@@ -1,6 +1,6 @@
 //! TCP-backed event manager for scalable multi-processed fuzzing
 
-use alloc::{boxed::Box, string::String, vec::Vec};
+use alloc::{boxed::Box, vec::Vec};
 #[cfg(all(unix, feature = "std", not(miri)))]
 use core::ptr::addr_of_mut;
 use core::{
@@ -755,7 +755,7 @@ where
 {
     fn add_custom_buf_handler(
         &mut self,
-        handler: Box<dyn FnMut(&mut S, &String, &[u8]) -> Result<CustomBufEventResult, Error>>,
+        handler: Box<dyn FnMut(&mut S, &str, &[u8]) -> Result<CustomBufEventResult, Error>>,
     ) {
         self.custom_buf_handlers.push(handler);
     }

@@ -1,6 +1,6 @@
 //! A very simple event manager, that just supports log outputs, but no multiprocessing
 
-use alloc::{boxed::Box, string::String, vec::Vec};
+use alloc::{boxed::Box, vec::Vec};
 #[cfg(all(unix, not(miri), feature = "std"))]
 use core::ptr::addr_of_mut;
 use core::{fmt::Debug, marker::PhantomData};
@@ -142,7 +142,7 @@ where
     fn add_custom_buf_handler(
         &mut self,
         handler: Box<
-            dyn FnMut(&mut Self::State, &String, &[u8]) -> Result<CustomBufEventResult, Error>,
+            dyn FnMut(&mut Self::State, &str, &[u8]) -> Result<CustomBufEventResult, Error>,
         >,
     ) {
         self.custom_buf_handlers.push(handler);
@@ -403,7 +403,7 @@ where
 {
     fn add_custom_buf_handler(
         &mut self,
-        handler: Box<dyn FnMut(&mut S, &String, &[u8]) -> Result<CustomBufEventResult, Error>>,
+        handler: Box<dyn FnMut(&mut S, &str, &[u8]) -> Result<CustomBufEventResult, Error>>,
     ) {
         self.simple_event_mgr.add_custom_buf_handler(handler);
     }
