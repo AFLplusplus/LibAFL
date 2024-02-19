@@ -98,7 +98,7 @@ where
     }
 
     #[allow(clippy::cast_sign_loss)]
-    fn display<S: AsRef<str>>(&mut self, event_msg: S, sender_id: ClientId) {
+    fn display(&mut self, event_msg: &str, sender_id: ClientId) {
         // Update the prometheus metrics
         // Label each metric with the sender / client_id
         // The gauges must take signed i64's, with max value of 2^63-1 so it is
@@ -153,7 +153,7 @@ where
         // display stats in a SimpleMonitor format
         let fmt = format!(
             "[Prometheus] [{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
-            event_msg.as_ref(),
+            event_msg,
             sender_id.0,
             format_duration_hms(&(current_time() - self.start_time)),
             self.client_stats().len(),
