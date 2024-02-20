@@ -1,7 +1,14 @@
 //! [`LLVM` `PcGuard`](https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-pcs-with-guards) runtime for `LibAFL`.
 
 #[rustversion::nightly]
+#[cfg(feature = "sancov_ngram4")]
 use core::simd::num::SimdUint;
+
+#[cfg(feature = "sancov_ngram4")]
+use libafl::executors::hooks::ExecutorHook;
+
+#[cfg(feature = "sancov_ngram4")]
+use crate::EDGES_MAP_SIZE;
 
 use crate::coverage::{EDGES_MAP, MAX_EDGES_NUM};
 #[cfg(feature = "pointer_maps")]
@@ -22,18 +29,31 @@ type Ngram4 = core::simd::u32x4;
 #[rustversion::nightly]
 pub static mut PREV_ARRAY: Ngram4 = Ngram4::from_array([0, 0, 0, 0]);
 
+#[cfg(feature = "sancov_ngram4")]
+#[rustversion::nightly]
+pub struct NgramHook {}
+
+#[cfg(feature = "sancov_ngram4")]
+#[rustversion::nightly]
+impl ExecutorHook for NgramHook {
+    pub fn
+}
+
 #[rustversion::nightly]
 unsafe fn update_ngram(mut pos: usize) -> usize {
     #[cfg(feature = "sancov_ngram4")]
     {
+        println!("before: PREV_ARRAY {:#?}", PREV_ARRAY);
+        println!("{}", pos);
+        PREV_ARRAY = PREV_ARRAY.rotate_elements_right::<1>();
+        PREV_ARRAY.as_mut_array()[0] = pos as u32;
+        println!("after: PREV_ARRAY {:#?}", PREV_ARRAY);
         let reduced = PREV_ARRAY.reduce_xor() as usize;
         pos = pos ^ reduced;
-
-        PREV_ARRAY = PREV_ARRAY.rotate_elements_right::<1>();
-        PREV_ARRAY.as_mut_array()[0] = (pos as u32) << 1;
-
-        pos
+        println!("{}", pos);
+        pos = pos % EDGES_MAP_SIZE
     }
+    pos
 }
 
 #[rustversion::not(nightly)]
@@ -59,6 +79,7 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
     #[cfg(feature = "sancov_ngram4")]
     {
         pos = update_ngram(pos);
+        println!("Wrinting to {} {}", pos, EDGES_MAP_SIZE);
     }
 
     #[cfg(feature = "sancov_ctx")]

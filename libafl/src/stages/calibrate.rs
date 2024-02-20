@@ -254,6 +254,7 @@ where
                 .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?;
 
             let mut bitmap_size = map.count_bytes();
+            assert!(bitmap_size != 0);
             bitmap_size = bitmap_size.max(1); // just don't make it 0 because we take log2 of it later.
             let psmeta = state
                 .metadata_map_mut()
