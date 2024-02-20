@@ -598,8 +598,7 @@ where
 }
 
 /// The handler function for custom buffers exchanged via [`EventManager`]
-type CustomBufHandlerFn<S> =
-    dyn FnMut(&mut S, &String, &[u8]) -> Result<CustomBufEventResult, Error>;
+type CustomBufHandlerFn<S> = dyn FnMut(&mut S, &str, &[u8]) -> Result<CustomBufEventResult, Error>;
 
 /// Supports custom buf handlers to handle `CustomBuf` events.
 pub trait HasCustomBufHandlers: UsesState {
@@ -677,7 +676,7 @@ where
     fn add_custom_buf_handler(
         &mut self,
         _handler: Box<
-            dyn FnMut(&mut Self::State, &String, &[u8]) -> Result<CustomBufEventResult, Error>,
+            dyn FnMut(&mut Self::State, &str, &[u8]) -> Result<CustomBufEventResult, Error>,
         >,
     ) {
     }
@@ -808,7 +807,7 @@ where
     fn add_custom_buf_handler(
         &mut self,
         handler: Box<
-            dyn FnMut(&mut Self::State, &String, &[u8]) -> Result<CustomBufEventResult, Error>,
+            dyn FnMut(&mut Self::State, &str, &[u8]) -> Result<CustomBufEventResult, Error>,
         >,
     ) {
         self.inner.add_custom_buf_handler(handler);

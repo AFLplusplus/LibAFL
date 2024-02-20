@@ -57,7 +57,7 @@
     )
 )]
 
-use std::{convert::Into, path::Path, process::Command, string::String, vec::Vec};
+use std::{path::Path, process::Command};
 
 pub mod ar;
 pub use ar::ArWrapper;

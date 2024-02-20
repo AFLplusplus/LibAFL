@@ -9,7 +9,6 @@ use alloc::{borrow::ToOwned, rc::Rc, string::String, vec::Vec};
 use core::str::from_utf8;
 use core::{
     cell::RefCell,
-    convert::From,
     hash::{BuildHasher, Hasher},
 };
 

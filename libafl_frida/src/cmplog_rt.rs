@@ -14,7 +14,7 @@ use libafl::{
     inputs::{HasTargetBytes, Input},
     Error,
 };
-use libafl_targets::{self, CMPLOG_MAP_W};
+use libafl_targets::CMPLOG_MAP_W;
 use rangemap::RangeMap;
 
 use crate::helper::FridaRuntime;

@@ -497,7 +497,7 @@ pub trait Monitor {
     fn set_start_time(&mut self, time: Duration);
 
     /// Show the monitor to the user
-    fn display(&mut self, event_msg: String, sender_id: ClientId);
+    fn display(&mut self, event_msg: &str, sender_id: ClientId);
 
     /// Amount of elements in the corpus (combined for all children)
     fn corpus_size(&self) -> u64 {
@@ -591,7 +591,8 @@ impl Monitor for NopMonitor {
         self.start_time = time;
     }
 
-    fn display(&mut self, _event_msg: String, _sender_id: ClientId) {}
+    #[inline]
+    fn display(&mut self, _event_msg: &str, _sender_id: ClientId) {}
 }
 
 impl NopMonitor {
@@ -660,7 +661,7 @@ impl Monitor for SimplePrintingMonitor {
         self.start_time = time;
     }
 
-    fn display(&mut self, event_msg: String, sender_id: ClientId) {
+    fn display(&mut self, event_msg: &str, sender_id: ClientId) {
         let mut userstats = self.client_stats()[sender_id.0 as usize]
             .user_monitor
             .iter()
@@ -698,7 +699,7 @@ impl Monitor for SimplePrintingMonitor {
 #[derive(Clone)]
 pub struct SimpleMonitor<F>
 where
-    F: FnMut(String),
+    F: FnMut(&str),
 {
     print_fn: F,
     start_time: Duration,
@@ -708,7 +709,7 @@ where
 
 impl<F> Debug for SimpleMonitor<F>
 where
-    F: FnMut(String),
+    F: FnMut(&str),
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SimpleMonitor")
@@ -720,7 +721,7 @@ where
 
 impl<F> Monitor for SimpleMonitor<F>
 where
-    F: FnMut(String),
+    F: FnMut(&str),
 {
     /// the client monitor, mutable
     fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
@@ -742,7 +743,7 @@ where
         self.start_time = time;
     }
 
-    fn display(&mut self, event_msg: String, sender_id: ClientId) {
+    fn display(&mut self, event_msg: &str, sender_id: ClientId) {
         let mut fmt = format!(
             "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             event_msg,
@@ -763,7 +764,7 @@ where
             }
         }
 
-        (self.print_fn)(fmt);
+        (self.print_fn)(&fmt);
 
         // Only print perf monitor if the feature is enabled
         #[cfg(feature = "introspection")]
@@ -773,17 +774,17 @@ where
                 "Client {:03}:\n{}",
                 sender_id.0, self.client_stats[sender_id.0 as usize].introspection_monitor
             );
-            (self.print_fn)(fmt);
+            (self.print_fn)(&fmt);
 
             // Separate the spacing just a bit
-            (self.print_fn)(String::new());
+            (self.print_fn)("");
         }
     }
 }
 
 impl<F> SimpleMonitor<F>
 where
-    F: FnMut(String),
+    F: FnMut(&str),
 {
     /// Creates the monitor, using the `current_time` as `start_time`.
     pub fn new(print_fn: F) -> Self {
@@ -1293,7 +1294,7 @@ impl Default for ClientPerfMonitor {
 #[allow(clippy::unnecessary_fallible_conversions)]
 #[allow(missing_docs)]
 pub mod pybind {
-    use alloc::{boxed::Box, string::String, vec::Vec};
+    use alloc::{boxed::Box, vec::Vec};
     use core::time::Duration;
 
     use libafl_bolts::ClientId;
@@ -1302,13 +1303,16 @@ pub mod pybind {
     use super::ClientStats;
     use crate::monitors::{Monitor, SimpleMonitor};
 
+    /// A [`SimpleMonitor`] type with a boxed `FnMut` for printing
+    pub type SimpleBoxedFnMonitor = SimpleMonitor<Box<dyn FnMut(&str)>>;
+
     // TODO create a PyObjectFnMut to pass, track stabilization of https://github.com/rust-lang/rust/issues/29625
 
     #[pyclass(unsendable, name = "SimpleMonitor")]
     /// Python class for SimpleMonitor
     pub struct PythonSimpleMonitor {
         /// Rust wrapped SimpleMonitor object
-        pub inner: SimpleMonitor<Box<dyn FnMut(String)>>,
+        pub inner: SimpleBoxedFnMonitor,
         print_fn: PyObject,
     }
 
@@ -1323,9 +1327,9 @@ pub mod pybind {
     impl Clone for PythonSimpleMonitor {
         fn clone(&self) -> PythonSimpleMonitor {
             let py_print_fn = self.print_fn.clone();
-            let closure = move |s: String| {
+            let closure = move |s: &str| {
                 Python::with_gil(|py| -> PyResult<()> {
-                    py_print_fn.call1(py, (PyUnicode::new(py, &s),))?;
+                    py_print_fn.call1(py, (PyUnicode::new(py, s),))?;
                     Ok(())
                 })
                 .unwrap();
@@ -1348,9 +1352,9 @@ pub mod pybind {
         #[new]
         fn new(py_print_fn: PyObject) -> Self {
             let py_print_fn1 = py_print_fn.clone();
-            let closure = move |s: String| {
+            let closure = move |s: &str| {
                 Python::with_gil(|py| -> PyResult<()> {
-                    py_print_fn1.call1(py, (PyUnicode::new(py, &s),))?;
+                    py_print_fn1.call1(py, (PyUnicode::new(py, s),))?;
                     Ok(())
                 })
                 .unwrap();
@@ -1427,7 +1431,7 @@ pub mod pybind {
             unwrap_me_mut!(self.wrapper, m, { m.set_start_time(time) });
         }
 
-        fn display(&mut self, event_msg: String, sender_id: ClientId) {
+        fn display(&mut self, event_msg: &str, sender_id: ClientId) {
             unwrap_me_mut!(self.wrapper, m, { m.display(event_msg, sender_id) });
         }
     }
