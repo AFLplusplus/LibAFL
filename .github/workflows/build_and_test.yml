@@ -608,6 +608,8 @@ jobs:
       run: cd fuzzers/frida_gdiplus/ && cargo make test && cargo make test_cmplog
     - name: Build fuzzers/tinyinst_simple
       run: cd fuzzers/tinyinst_simple/ && cargo make test
+    - name: Build fuzzers/libfuzzer_windows_asan
+      run: cd fuzzers/libfuzzer_windows_asan/ && cargo make test
 
   windows-clippy:
     runs-on: windows-latest
