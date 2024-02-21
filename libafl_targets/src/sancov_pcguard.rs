@@ -5,14 +5,13 @@
 use core::simd::num::SimdUint;
 
 #[cfg(feature = "sancov_ngram4")]
-use libafl::executors::hooks::ExecutorHook;
-
-#[cfg(feature = "sancov_ngram4")]
-use crate::EDGES_MAP_SIZE;
+use libafl::executors::{hooks::ExecutorHook, HasObservers};
 
 use crate::coverage::{EDGES_MAP, MAX_EDGES_NUM};
 #[cfg(feature = "pointer_maps")]
 use crate::coverage::{EDGES_MAP_PTR, EDGES_MAP_PTR_NUM};
+#[cfg(feature = "sancov_ngram4")]
+use crate::EDGES_MAP_SIZE;
 
 #[cfg(all(feature = "sancov_pcguard_edges", feature = "sancov_pcguard_hitcounts"))]
 #[cfg(not(any(doc, feature = "clippy")))]
@@ -29,28 +28,76 @@ type Ngram4 = core::simd::u32x4;
 #[rustversion::nightly]
 pub static mut PREV_ARRAY: Ngram4 = Ngram4::from_array([0, 0, 0, 0]);
 
+/// The hook to initialize ngram everytime we run the harness
 #[cfg(feature = "sancov_ngram4")]
 #[rustversion::nightly]
+#[derive(Default, Debug, Clone, Copy)]
 pub struct NgramHook {}
+
+/// The hook to initialize ctx everytime we run the harness
+#[cfg(feature = "sancov_ctx")]
+#[rustversion::nightly]
+#[derive(Default, Debug, Clone, Copy)]
+pub struct CtxHook {}
 
 #[cfg(feature = "sancov_ngram4")]
 #[rustversion::nightly]
 impl ExecutorHook for NgramHook {
-    pub fn
+    fn init<E: HasObservers, S>(&mut self, _state: &mut S) {}
+    fn pre_exec<EM, I, S, Z>(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _mgr: &mut EM,
+        _input: &I,
+    ) {
+        unsafe {
+            PREV_ARRAY = Ngram4::from_array([0, 0, 0, 0]);
+        }
+    }
+    fn post_exec<EM, I, S, Z>(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _mgr: &mut EM,
+        _input: &I,
+    ) {
+    }
+}
+
+#[cfg(feature = "sancov_ctx")]
+#[rustversion::nightly]
+impl ExecutorHook for CtxHook {
+    fn init<E: HasObservers, S>(&mut self, _state: &mut S) {}
+    fn pre_exec<EM, I, S, Z>(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _mgr: &mut EM,
+        _input: &I,
+    ) {
+        unsafe {
+            __afl_prev_ctx = 0;
+        }
+    }
+    fn post_exec<EM, I, S, Z>(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _mgr: &mut EM,
+        _input: &I,
+    ) {
+    }
 }
 
 #[rustversion::nightly]
 unsafe fn update_ngram(mut pos: usize) -> usize {
     #[cfg(feature = "sancov_ngram4")]
     {
-        println!("before: PREV_ARRAY {:#?}", PREV_ARRAY);
-        println!("{}", pos);
         PREV_ARRAY = PREV_ARRAY.rotate_elements_right::<1>();
         PREV_ARRAY.as_mut_array()[0] = pos as u32;
-        println!("after: PREV_ARRAY {:#?}", PREV_ARRAY);
         let reduced = PREV_ARRAY.reduce_xor() as usize;
         pos = pos ^ reduced;
-        println!("{}", pos);
         pos = pos % EDGES_MAP_SIZE
     }
     pos
