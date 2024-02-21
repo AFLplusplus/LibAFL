@@ -7,10 +7,12 @@ use core::simd::num::SimdUint;
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ctx"))]
 use libafl::executors::{hooks::ExecutorHook, HasObservers};
 
-use crate::coverage::{EDGES_MAP, MAX_EDGES_NUM};
 #[cfg(feature = "pointer_maps")]
 use crate::coverage::{EDGES_MAP_PTR, EDGES_MAP_PTR_NUM};
-use crate::EDGES_MAP_SIZE;
+use crate::{
+    coverage::{EDGES_MAP, MAX_EDGES_NUM},
+    EDGES_MAP_SIZE,
+};
 
 #[cfg(all(feature = "sancov_pcguard_edges", feature = "sancov_pcguard_hitcounts"))]
 #[cfg(not(any(doc, feature = "clippy")))]

@@ -28,7 +28,7 @@ use libafl::{
         scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
         StdMOptMutator, StdScheduledMutator, Tokens,
     },
-    observers::{HitcountsMapObserver, TimeObserver, StdMapObserver},
+    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
@@ -42,6 +42,7 @@ use libafl::{
 use libafl_bolts::{
     current_nanos, current_time,
     os::dup2,
+    ownedref::OwnedMutSlice,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
@@ -50,9 +51,9 @@ use libafl_bolts::{
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl_targets::autotokens;
 use libafl_targets::{
-    libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver, CtxHook, EDGES_MAP_SIZE, edges_map_mut_ptr
+    edges_map_mut_ptr, libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer,
+    CmpLogObserver, CtxHook, EDGES_MAP_SIZE,
 };
-use libafl_bolts::ownedref::OwnedMutSlice;
 #[cfg(unix)]
 use nix::{self, unistd::dup};
 
@@ -244,7 +245,10 @@ fn fuzz(
     // Create an observation channel using the coverage map
     // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)
     let edges_observer = HitcountsMapObserver::new(unsafe {
-        StdMapObserver::from_mut_slice("edges", OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_SIZE))
+        StdMapObserver::from_mut_slice(
+            "edges",
+            OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_SIZE),
+        )
     });
 
     // Create an observation channel to keep track of the execution time
