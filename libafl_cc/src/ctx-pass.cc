@@ -152,7 +152,6 @@ bool CtxPass::runOnModule(Module &M) {
     for (auto &BB : F) {
       BasicBlock::iterator IP = BB.getFirstInsertionPt();
       IRBuilder<>          IRB(&(*IP));
-      llvm::outs() << "instrumenting..\n";
       if (&BB == &F.getEntryBlock()) {
         // if this is the first block..
         LoadInst *PrevCtxLoad = IRB.CreateLoad(IRB.getInt32Ty(), AFLContext);
@@ -179,7 +178,7 @@ bool CtxPass::runOnModule(Module &M) {
 
         if (has_calls) {
           Value *NewCtx = ConstantInt::get(Int32Ty, RandBelow(map_size));
-          NewCtx = IRB.CreateXor(IRB.CreateLShr(PrevCtx, 1), NewCtx);
+          NewCtx = IRB.CreateXor(PrevCtx, NewCtx);
           StoreInst *StoreCtx = IRB.CreateStore(NewCtx, AFLContext);
           StoreCtx->setMetadata(M.getMDKindID("nosanitize"),
                                 MDNode::get(C, None));
