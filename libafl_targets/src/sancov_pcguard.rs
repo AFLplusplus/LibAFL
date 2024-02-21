@@ -99,8 +99,8 @@ unsafe fn update_ngram(mut pos: usize) -> usize {
         PREV_ARRAY = PREV_ARRAY.rotate_elements_right::<1>();
         PREV_ARRAY.as_mut_array()[0] = pos as u32;
         let reduced = PREV_ARRAY.reduce_xor() as usize;
-        pos = pos ^ reduced;
-        pos = pos % EDGES_MAP_SIZE
+        pos ^= reduced;
+        pos %= EDGES_MAP_SIZE;
     }
     pos
 }
@@ -134,7 +134,7 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
 
     #[cfg(feature = "sancov_ctx")]
     {
-        pos = pos ^ __afl_prev_ctx as usize;
+        pos ^= __afl_prev_ctx as usize;
         // println!("Wrinting to {} {}", pos, EDGES_MAP_SIZE);
     }
 
