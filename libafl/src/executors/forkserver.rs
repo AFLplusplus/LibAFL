@@ -7,6 +7,7 @@ use core::{
     time::Duration,
 };
 use std::{
+    env,
     ffi::{OsStr, OsString},
     io::{self, prelude::*, ErrorKind},
     os::{
@@ -290,6 +291,14 @@ impl Forkserver {
         debug_output: bool,
         kill_signal: Signal,
     ) -> Result<Self, Error> {
+        if env::var("AFL_MAP_SIZE").is_err() {
+            log::warn!("AFL_MAP_SIZE not set. If it is unset, the forkserver may fail to start up");
+        }
+
+        if env::var("__AFL_SHM_ID").is_err() {
+            log::warn!("__AFL_SHM_ID not set. It is necessary to set this env, otherwise the forkserver cannot communicate with the fuzzer");
+        }
+
         let mut st_pipe = Pipe::new().unwrap();
         let mut ctl_pipe = Pipe::new().unwrap();
 
