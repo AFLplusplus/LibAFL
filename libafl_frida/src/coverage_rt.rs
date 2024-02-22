@@ -15,7 +15,7 @@ use ahash::RandomState;
 use dynasmrt::DynasmLabelApi;
 use dynasmrt::{dynasm, DynasmApi};
 use frida_gum::{instruction_writer::InstructionWriter, stalker::StalkerOutput, ModuleMap};
-use libafl_bolts::{hash_std, AsSlice};
+use libafl_bolts::hash_std;
 use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 use rangemap::RangeMap;
 
@@ -31,19 +31,23 @@ struct CoverageRuntimeInner {
     _pinned: PhantomPinned,
 }
 
-/// Frida binary-only coverage
 #[derive(Debug)]
-pub struct CoverageRuntime {
-    inner: Pin<Rc<RefCell<CoverageRuntimeInner>>>,
-    inner_bbs: Pin<Rc<RefCell<CoverageRuntimeInner>>>,
-    /// The memory ranges of this target
+struct DrCov {
     ranges: RangeMap<usize, (u16, String)>,
-    save_dr_cov: bool,
     coverage_directory: PathBuf,
     basic_blocks: HashMap<u64, DrCovBasicBlock>,
     cnt: usize,
     max_cnt: usize,
     stored_cnt: usize,
+}
+
+/// Frida binary-only coverage
+#[derive(Debug)]
+pub struct CoverageRuntime {
+    inner: Pin<Rc<RefCell<CoverageRuntimeInner>>>,
+    inner_bbs: Pin<Rc<RefCell<CoverageRuntimeInner>>>,
+    save_dr_cov: bool,
+    drcov: DrCov,
 }
 
 impl Default for CoverageRuntime {
@@ -61,9 +65,11 @@ impl FridaRuntime for CoverageRuntime {
         ranges: &RangeMap<usize, (u16, String)>,
         _module_map: &Rc<ModuleMap>,
     ) {
-        self.ranges = ranges.clone();
-        std::fs::create_dir_all(&self.coverage_directory)
-            .expect("failed to create directory for coverage files");
+        if self.save_dr_cov {
+            self.drcov.ranges = ranges.clone();
+            std::fs::create_dir_all(&self.drcov.coverage_directory)
+                .expect("failed to create directory for coverage files");
+        }
     }
 
     fn pre_exec<I: libafl::inputs::Input + libafl::inputs::HasTargetBytes>(
@@ -78,32 +84,22 @@ impl FridaRuntime for CoverageRuntime {
         input: &I,
     ) -> Result<(), libafl::Error> {
         if self.save_dr_cov {
-            self.cnt += 1;
-            if self.max_cnt > 0 && self.cnt < self.max_cnt {
+            self.drcov.cnt += 1;
+            if self.drcov.max_cnt > 0 && self.drcov.cnt < self.drcov.max_cnt {
                 return Ok(());
             }
 
             // Create basic blocks
             let mut drcov_basic_blocks: Vec<DrCovBasicBlock> = vec![];
 
-            for (key, value) in &self.basic_blocks {
+            for (key, value) in &self.drcov.basic_blocks {
                 // Is map[key] greater than 0?
                 if self.inner_bbs.borrow().map[*key as usize] == 0 {
                     continue;
                 }
 
-                log::trace!(
-                    "Covered BB key: {:x}, value: {:016x} - {:016x}",
-                    key,
-                    value.start,
-                    value.end
-                );
                 drcov_basic_blocks.push(*value);
             }
-
-            let mut input_hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
-            input_hasher.write(input.target_bytes().as_slice());
-            let input_hash = input_hasher.finish();
 
             let mut coverage_hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
             for bb in &drcov_basic_blocks {
@@ -111,22 +107,23 @@ impl FridaRuntime for CoverageRuntime {
                 coverage_hasher.write_usize(bb.end);
             }
             let coverage_hash = coverage_hasher.finish();
-
-            let filename = if self.max_cnt > 0 {
-                self.coverage_directory.join(format!(
-                    "{input_hash:016x}_{coverage_hash:016x}_{}-{}.drcov",
-                    self.stored_cnt,
-                    self.stored_cnt + self.cnt
+            let input_name = input.generate_name(0);// The input index is not known at this point, but is not used in the filename
+            let filename = if self.drcov.max_cnt > 0 {
+                self.drcov.coverage_directory.join(format!(
+                    "{}_{coverage_hash:016x}_{}-{}.drcov",
+                    &input_name, 
+                    self.drcov.stored_cnt,
+                    self.drcov.stored_cnt + self.drcov.cnt
                 ))
             } else {
-                self.coverage_directory
-                    .join(format!("{input_hash:016x}_{coverage_hash:016x}.drcov"))
+                self.drcov.coverage_directory
+                    .join(format!("{}_{coverage_hash:016x}.drcov", &input_name))
             };
 
-            DrCovWriter::new(&self.ranges).write(filename, &drcov_basic_blocks)?;
-            if self.max_cnt > 0 {
-                self.stored_cnt += self.cnt;
-                self.cnt = 0;
+            DrCovWriter::new(&self.drcov.ranges).write(filename, &drcov_basic_blocks)?;
+            if self.drcov.max_cnt > 0 {
+                self.drcov.stored_cnt += self.drcov.cnt;
+                self.drcov.cnt = 0;
             }
 
             //reset the inner_bbs map
@@ -153,13 +150,15 @@ impl CoverageRuntime {
                 previous_pc: 0,
                 _pinned: PhantomPinned,
             })),
-            ranges: RangeMap::new(),
-            save_dr_cov: false,
-            coverage_directory: PathBuf::from("./coverage"),
-            basic_blocks: HashMap::new(),
-            cnt: 0,
-            max_cnt: 0,
-            stored_cnt: 0,
+            save_dr_cov: false,            
+            drcov: DrCov {
+                ranges: RangeMap::new(),
+                coverage_directory: PathBuf::from("./coverage"),
+                basic_blocks: HashMap::new(),
+                cnt: 0,
+                max_cnt: 0,
+                stored_cnt: 0,
+            },
         }
     }
 
@@ -173,39 +172,15 @@ impl CoverageRuntime {
     /// Set the coverage directory
     #[must_use]
     pub fn coverage_directory(mut self, coverage_directory: &str) -> Self {
-        self.coverage_directory = PathBuf::from(coverage_directory);
+        self.drcov.coverage_directory = PathBuf::from(coverage_directory);
         self
     }
 
     /// Set the maximum number of executions to accumulate before writing the coverage to disk
     #[must_use]
     pub fn max_cnt(mut self, max_cnt: usize) -> Self {
-        self.max_cnt = max_cnt;
+        self.drcov.max_cnt = max_cnt;
         self
-    }
-
-    /// Builder pattern
-    #[must_use]
-    pub fn build(self) -> CoverageRuntime {
-        CoverageRuntime {
-            inner: Rc::pin(RefCell::new(CoverageRuntimeInner {
-                map: [0_u8; MAP_SIZE],
-                previous_pc: 0,
-                _pinned: PhantomPinned,
-            })),
-            inner_bbs: Rc::pin(RefCell::new(CoverageRuntimeInner {
-                map: [0_u8; MAP_SIZE],
-                previous_pc: 0,
-                _pinned: PhantomPinned,
-            })),
-            ranges: self.ranges,
-            save_dr_cov: self.save_dr_cov,
-            coverage_directory: self.coverage_directory,
-            basic_blocks: self.basic_blocks,
-            cnt: self.cnt,
-            max_cnt: self.max_cnt,
-            stored_cnt: self.stored_cnt,
-        }
     }
 
     /// Retrieve the coverage map pointer
@@ -450,7 +425,7 @@ impl CoverageRuntime {
             let h64 = hash_std(&address.to_le_bytes());
             let map_idx: u64 = h64 & (MAP_SIZE as u64 - 1);
             let basic_block = DrCovBasicBlock::with_size(address as usize, size);
-            self.basic_blocks.insert(map_idx, basic_block);
+            self.drcov.basic_blocks.insert(map_idx, basic_block);
         }
     }
 

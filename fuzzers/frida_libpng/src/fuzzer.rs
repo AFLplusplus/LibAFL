@@ -348,8 +348,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
                 let coverage = CoverageRuntime::new()
                     .save_dr_cov(options.save_bb_coverage)
-                    .max_cnt(options.drcov_max_execution_cnt)
-                    .build();
+                    .max_cnt(options.drcov_max_execution_cnt);
 
                 let mut frida_helper =
                     FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage));

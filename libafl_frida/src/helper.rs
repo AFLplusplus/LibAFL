@@ -552,7 +552,7 @@ where
             instruction.keep();
         }
         if basic_block_size != 0 {
-            log::trace!("{basic_block_start:#016X}:{basic_block_size:X}");
+            // log::trace!("{basic_block_start:#016X}:{basic_block_size:X}");
             if let Some(rt) = runtimes.borrow_mut().match_first_type_mut::<DrCovRuntime>() {
                 rt.drcov_basic_blocks.push(DrCovBasicBlock::new(
                     basic_block_start as usize,

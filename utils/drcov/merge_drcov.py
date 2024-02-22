@@ -27,8 +27,9 @@ class HashableDrcovBasicBlock(drcov.DrcovBasicBlock):
     
 # A class that creates a DrCov file
 class DrcovFile:
-    def __init__(self, file_name):
+    def __init__(self, file_name, allow_duplicates=False):
         self.file_name = file_name
+        self.allow_duplicates = allow_duplicates
         # Each module is a dictionary with the following keys
         # m = {
         # 'id': idx,
@@ -37,7 +38,11 @@ class DrcovFile:
         # 'end': end,
         # 'size': size}
         self.mods = dict() # A dictionary of modules id -> {path, base, end, size}
-        self.bbs = set() # A set HashableDrcovBasicBlock
+        if self.allow_duplicates:
+            self.bbs = []
+        else:
+            self.bbs = set() # A set HashableDrcovBasicBlock
+
 
     def _write_header(self):
         header = ''
@@ -118,11 +123,17 @@ class DrcovFile:
         hbb = HashableDrcovBasicBlock(drcov_bb)
         if hbb.mod_id not in self.mods:
             raise ValueError("Module ID %d not found" % hbb.mod_id)
-        if hbb in self.bbs:
-            if verbose:
-                print("Duplicate basic block found:", hbb)
-            return True
-        self.bbs.add(hbb)
+        if self.allow_duplicates:
+            if hbb in self.bbs:
+                if verbose:
+                    print("Duplicate basic block found:", hbb)
+            self.bbs.append(hbb)
+        else:
+            if hbb in self.bbs:
+                if verbose:
+                    print("Duplicate basic block found:", hbb)
+                return True
+            self.bbs.add(hbb)
         return False
     
     def write(self):
@@ -272,17 +283,18 @@ if __name__ == "__main__":
     convert_parser = subparsers.add_parser('convert')
     convert_parser.add_argument("-i", "--input", required=True, help="Input drcov file")
     convert_parser.add_argument("-o", "--output", required=True, help="Output drcov file")
+    convert_parser.add_argument("-d", "--allow-duplicates", action="store_true", help="Allow duplicate basic blocks in the output file")
 
     args = parser.parse_args()
 
     verbose = args.verbose
     if args.command == "convert":
         drcov_data = drcov.DrcovData(args.input)
-        writer = DrcovFile(args.output)
+        writer = DrcovFile(args.output, args.allow_duplicates)
         for _, mods in drcov_data.modules.items():
             for m in mods:
                 writer.add_module(m.id, m.path, m.base, m.end)
-        for bb in drcov_data.bbs:
+        for bb in tqdm.tqdm(drcov_data.bbs):
             writer.add_bb(bb)                   
 
         writer.write()
