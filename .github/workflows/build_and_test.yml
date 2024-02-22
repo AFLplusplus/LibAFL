@@ -168,13 +168,26 @@ jobs:
   ubuntu-check:
     runs-on: ubuntu-22.04
     steps:
-    - name: Remove Dotnet & Haskell
-      run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
         toolchain: stable
-        components: llvm-tools
+        components: llvm-tools  
+    - name: Free Disk Space (Ubuntu)
+      uses: jlumbroso/free-disk-space@main
+      with:
+        # this might remove tools that are actually needed,
+        # if set to "true" but frees about 6 GB
+        tool-cache: false
+
+        # all of these default to true, but feel free to set to
+        # "false" if necessary for your workflow
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: false
+        docker-images: true
+        swap-storage: true
     - name: Remove existing clang and LLVM
       run: sudo apt purge llvm* clang*
     - name: Install and cache deps
