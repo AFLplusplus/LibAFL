@@ -107,16 +107,17 @@ impl FridaRuntime for CoverageRuntime {
                 coverage_hasher.write_usize(bb.end);
             }
             let coverage_hash = coverage_hasher.finish();
-            let input_name = input.generate_name(0);// The input index is not known at this point, but is not used in the filename
+            let input_name = input.generate_name(0); // The input index is not known at this point, but is not used in the filename
             let filename = if self.drcov.max_cnt > 0 {
                 self.drcov.coverage_directory.join(format!(
                     "{}_{coverage_hash:016x}_{}-{}.drcov",
-                    &input_name, 
+                    &input_name,
                     self.drcov.stored_cnt,
                     self.drcov.stored_cnt + self.drcov.cnt
                 ))
             } else {
-                self.drcov.coverage_directory
+                self.drcov
+                    .coverage_directory
                     .join(format!("{}_{coverage_hash:016x}.drcov", &input_name))
             };
 
@@ -150,7 +151,7 @@ impl CoverageRuntime {
                 previous_pc: 0,
                 _pinned: PhantomPinned,
             })),
-            save_dr_cov: false,            
+            save_dr_cov: false,
             drcov: DrCov {
                 ranges: RangeMap::new(),
                 coverage_directory: PathBuf::from("./coverage"),
