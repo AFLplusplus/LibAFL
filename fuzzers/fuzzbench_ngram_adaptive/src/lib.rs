@@ -241,14 +241,12 @@ fn fuzz(
             }
         },
     };
-    let map_size = core::cmp::max(EDGES_MAP_SIZE, 2 * edges_max_num());
-
     // Create an observation channel using the coverage map
     // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)
     let edges_observer = HitcountsMapObserver::new(unsafe {
         StdMapObserver::from_mut_slice(
             "edges",
-            OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), map_size),
+            OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), 2 * edges_max_num()),
         )
     });
 
