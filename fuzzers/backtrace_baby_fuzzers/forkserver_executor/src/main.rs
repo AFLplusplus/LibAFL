@@ -30,7 +30,7 @@ use libafl_bolts::{
 
 #[allow(clippy::similar_names)]
 pub fn main() {
-    const MAP_SIZE: usize = 65536;
+    const MAP_SIZE: usize = 2621440;
 
     //Coverage map shared between observer and executor
     #[cfg(target_vendor = "apple")]

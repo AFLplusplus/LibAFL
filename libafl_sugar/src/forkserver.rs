@@ -33,9 +33,6 @@ use typed_builder::TypedBuilder;
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
 
-/// The default coverage map size to use for forkserver targets
-pub const DEFAULT_MAP_SIZE: usize = 65536;
-
 /// Creates a Forkserver-based fuzzer.
 #[derive(Debug, TypedBuilder)]
 pub struct ForkserverBytesCoverageSugar<'a> {
