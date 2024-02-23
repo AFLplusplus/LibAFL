@@ -37,7 +37,6 @@ pub struct NgramHook {}
 
 /// The hook to initialize ctx everytime we run the harness
 #[cfg(feature = "sancov_ctx")]
-#[rustversion::nightly]
 #[derive(Default, Debug, Clone, Copy)]
 pub struct CtxHook {}
 
@@ -67,7 +66,6 @@ impl ExecutorHook for NgramHook {
 }
 
 #[cfg(feature = "sancov_ctx")]
-#[rustversion::nightly]
 impl ExecutorHook for CtxHook {
     fn init<E: HasObservers, S>(&mut self, _state: &mut S) {}
     fn pre_exec<EM, I, S, Z>(
