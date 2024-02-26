@@ -11,6 +11,7 @@ use core::{
     marker::PhantomData,
     ops::{BitAnd, BitOr},
 };
+use std::collections::HashSet;
 
 use libafl_bolts::{AsIter, AsMutSlice, AsSlice, HasRefCnt, Named};
 use num_traits::PrimInt;
@@ -607,7 +608,20 @@ where
         let initial = observer.initial();
         if interesting {
             let len = history_map.len();
-            let filled = history_map.iter().filter(|&&i| i != initial).count();
+            let novelties = self
+                .novelties
+                .as_ref()
+                .unwrap_or(&Vec::new())
+                .iter()
+                .copied()
+                .collect::<HashSet<usize>>();
+            let previously_filled = history_map
+                .iter()
+                .enumerate()
+                .filter(|(idx, &i)| i != initial && !novelties.contains(idx))
+                .count();
+            let new_total = previously_filled + novelties.len();
+
             // opt: if not tracking optimisations, we technically don't show the *current* history
             // map but the *last* history map; this is better than walking over and allocating
             // unnecessarily
@@ -616,13 +630,7 @@ where
                 Event::UpdateUserStats {
                     name: self.stats_name.to_string(),
                     value: UserStats::new(
-                        UserStatsValue::Ratio(
-                            self.novelties
-                                .as_ref()
-                                .map_or(filled, |novelties| filled + novelties.len())
-                                as u64,
-                            len as u64,
-                        ),
+                        UserStatsValue::Ratio(new_total as u64, len as u64),
                         AggregatorOps::Avg,
                     ),
                     phantom: PhantomData,
@@ -818,7 +826,20 @@ where
 
         if interesting || self.always_track {
             let len = history_map.len();
-            let filled = history_map.iter().filter(|&&i| i != initial).count();
+            let novelties = self
+                .novelties
+                .as_ref()
+                .unwrap_or(&Vec::new())
+                .iter()
+                .copied()
+                .collect::<HashSet<usize>>();
+            let previously_filled = history_map
+                .iter()
+                .enumerate()
+                .filter(|(idx, &i)| i != initial && !novelties.contains(idx))
+                .count();
+            let new_total = previously_filled + novelties.len();
+
             // opt: if not tracking optimisations, we technically don't show the *current* history
             // map but the *last* history map; this is better than walking over and allocating
             // unnecessarily
@@ -827,13 +848,7 @@ where
                 Event::UpdateUserStats {
                     name: self.stats_name.to_string(),
                     value: UserStats::new(
-                        UserStatsValue::Ratio(
-                            self.novelties
-                                .as_ref()
-                                .map_or(filled, |novelties| filled + novelties.len())
-                                as u64,
-                            len as u64,
-                        ),
+                        UserStatsValue::Ratio(new_total as u64, len as u64),
                         AggregatorOps::Avg,
                     ),
                     phantom: PhantomData,
