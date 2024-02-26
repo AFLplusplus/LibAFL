@@ -11,7 +11,7 @@ use core::{
     marker::PhantomData,
     ops::{BitAnd, BitOr},
 };
-use std::collections::HashSet;
+use hashbrown::HashSet;
 
 use libafl_bolts::{AsIter, AsMutSlice, AsSlice, HasRefCnt, Named};
 use num_traits::PrimInt;
