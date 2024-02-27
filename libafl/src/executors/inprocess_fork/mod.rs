@@ -16,7 +16,7 @@ use libafl_bolts::{
 use libc::siginfo_t;
 use nix::{
     sys::wait::{waitpid, WaitStatus},
-    unistd::{fork, ForkResult},
+    unistd::{fork, ForkResult, Pid},
 };
 
 use super::hooks::ExecutorHooksTuple;
@@ -26,7 +26,7 @@ use crate::{
         hooks::inprocess_fork::{
             InChildProcessHooks, InProcessForkExecutorGlobalData, FORK_EXECUTOR_GLOBAL_DATA,
         },
-        Executor, ExitKind, HasExecutorState, HasObservers,
+        Executor, ExitKind, HasObservers,
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
@@ -46,22 +46,28 @@ pub(crate) type ForkHandlerFuncPtr = unsafe fn(
 
 #[cfg(all(unix, not(target_os = "linux")))]
 use crate::executors::hooks::timer::{setitimer, Itimerval, Timeval, ITIMER_REAL};
+use crate::executors::NopExecutorState;
+
+pub mod with_state;
 
 /// The `InProcessForkExecutor` with no user hooks
-pub type InProcessForkExecutor<'a, H, OT, S, SP, ES> =
-    GenericInProcessForkExecutor<'a, H, (), OT, S, SP, ES>;
+pub type InProcessForkExecutor<'a, H, OT, S, SP, EM, Z> =
+    GenericInProcessForkExecutor<'a, H, (), OT, S, SP, EM, Z>;
 
-impl<'a, H, OT, S, SP, ES> InProcessForkExecutor<'a, H, OT, S, SP, ES>
+impl<'a, H, OT, S, SP, EM, Z, OF> InProcessForkExecutor<'a, H, OT, S, SP, EM, Z>
 where
-    H: FnMut(&S::Input, &mut ES::ExecutorState) -> ExitKind + ?Sized,
+    H: FnMut(&S::Input) -> ExitKind + ?Sized,
     S: State,
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
-    ES: HasExecutorState,
+    EM: EventFirer<State = S> + EventRestarter<State = S>,
+    OF: State + Feedback<S>,
+    S: HasSolutions,
+    Z: HasObjective<Objective = OF, State = S>,
 {
     #[allow(clippy::too_many_arguments)]
     /// The constructor for `InProcessForkExecutor`
-    pub fn new<EM, OF, Z>(
+    pub fn new(
         harness_fn: &'a mut H,
         observers: OT,
         fuzzer: &mut Z,
@@ -69,13 +75,7 @@ where
         event_mgr: &mut EM,
         timeout: Duration,
         shmem_provider: SP,
-    ) -> Result<Self, Error>
-    where
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
-        OF: Feedback<S>,
-        S: HasSolutions,
-        Z: HasObjective<Objective = OF, State = S>,
-    {
+    ) -> Result<Self, Error> {
         Self::with_hooks(
             tuple_list!(),
             harness_fn,
@@ -89,39 +89,53 @@ where
     }
 }
 
-/// [`GenericInProcessForkExecutor`] is an executor that forks the current process before each execution.
-pub struct GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES>
+/// Inner state of GenericInProcessExecutor-like structures.
+pub struct GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
 where
-    H: FnMut(&S::Input, &mut ES::ExecutorState) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
     S: UsesInput,
     SP: ShMemProvider,
     HT: ExecutorHooksTuple,
-    ES: HasExecutorState,
+    EM: UsesState<State = S>,
+    Z: UsesState<State = S>,
 {
     hooks: (InChildProcessHooks, HT),
-    harness_fn: &'a mut H,
     shmem_provider: SP,
     observers: OT,
     #[cfg(target_os = "linux")]
     itimerspec: libc::itimerspec,
     #[cfg(all(unix, not(target_os = "linux")))]
     itimerval: Itimerval,
-    phantom: PhantomData<(S, ES)>,
+    phantom: PhantomData<(S, EM, Z)>,
 }
 
-impl<'a, H, HT, OT, S, SP, ES> Debug for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES>
+/// [`GenericInProcessForkExecutor`] is an executor that forks the current process before each execution.
+pub struct GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, EM, Z>
 where
-    H: FnMut(&S::Input, &mut ES::ExecutorState) -> ExitKind + ?Sized,
+    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    OT: ObserversTuple<S>,
+    S: UsesInput,
+    SP: ShMemProvider,
+    HT: ExecutorHooksTuple,
+    EM: UsesState<State = S>,
+    Z: UsesState<State = S>,
+{
+    harness_fn: &'a mut H,
+    inner: GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>,
+}
+
+impl<HT, OT, S, SP, EM, Z> Debug for GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
+where
     OT: ObserversTuple<S> + Debug,
     S: UsesInput,
     SP: ShMemProvider,
     HT: ExecutorHooksTuple,
-    ES: HasExecutorState,
+    EM: UsesState<State = S>,
+    Z: UsesState<State = S>,
 {
     #[cfg(target_os = "linux")]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("GenericInProcessForkExecutor")
+        f.debug_struct("GenericInProcessForkExecutorInner")
             .field("observers", &self.observers)
             .field("shmem_provider", &self.shmem_provider)
             .field("itimerspec", &self.itimerspec)
@@ -132,7 +146,7 @@ where
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         #[cfg(not(target_os = "linux"))]
         return f
-            .debug_struct("GenericInProcessForkExecutor")
+            .debug_struct("GenericInProcessForkExecutorInner")
             .field("observers", &self.observers)
             .field("shmem_provider", &self.shmem_provider)
             .field("itimerval", &self.itimerval)
@@ -140,29 +154,166 @@ where
     }
 }
 
-impl<'a, H, HT, OT, S, SP, ES> UsesState for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES>
+impl<'a, H, HT, OT, S, SP, EM, Z> Debug
+    for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, EM, Z>
 where
-    H: FnMut(&S::Input, &mut ES::ExecutorState) -> ExitKind + ?Sized,
+    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    OT: ObserversTuple<S> + Debug,
+    S: UsesInput,
+    SP: ShMemProvider,
+    HT: ExecutorHooksTuple,
+    EM: UsesState<State = S>,
+    Z: UsesState<State = S>,
+{
+    #[cfg(target_os = "linux")]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("GenericInProcessForkExecutor")
+            .field("GenericInProcessForkExecutorInner", &self.inner)
+            .finish()
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        #[cfg(not(target_os = "linux"))]
+        return f
+            .debug_struct("GenericInProcessForkExecutor")
+            .field("GenericInProcessForkExecutorInner", &self.inner)
+            .finish();
+    }
+}
+
+impl<HT, OT, S, SP, EM, Z> UsesState for GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
+where
     OT: ObserversTuple<S>,
     S: State,
     SP: ShMemProvider,
     HT: ExecutorHooksTuple,
-    ES: HasExecutorState,
+    EM: UsesState<State = S>,
+    Z: UsesState<State = S>,
 {
     type State = S;
 }
 
-impl<'a, EM, H, HT, OT, S, SP, Z, ES> Executor<EM, Z, ES>
-    for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES>
+impl<'a, H, HT, OT, S, SP, EM, Z> UsesState
+    for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, EM, Z>
 where
-    EM: UsesState<State = S>,
-    H: FnMut(&S::Input, &mut ES::ExecutorState) -> ExitKind + ?Sized,
+    H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
+    S: State,
+    SP: ShMemProvider,
+    HT: ExecutorHooksTuple,
+    EM: UsesState<State = S>,
+    Z: UsesState<State = S>,
+{
+    type State = S;
+}
+
+impl<EM, HT, OT, S, SP, Z, OF> GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
+where
+    OT: ObserversTuple<S> + Debug,
+    S: State + UsesInput,
+    SP: ShMemProvider,
+    HT: ExecutorHooksTuple,
+    EM: EventFirer<State = S> + EventRestarter<State = S>,
+    Z: HasObjective<Objective = OF, State = S>,
+    OF: Feedback<S>,
+{
+    unsafe fn pre_run_target_child(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut <GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z> as UsesState>::State,
+        mgr: &mut EM,
+        input: &<GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z> as UsesInput>::Input,
+    ) -> Result<(), Error> {
+        self.shmem_provider.post_fork(true)?;
+
+        self.enter_target(fuzzer, state, mgr, input);
+        self.hooks.pre_exec_all(fuzzer, state, mgr, input);
+
+        self.observers
+            .pre_exec_child_all(state, input)
+            .expect("Failed to run post_exec on observers");
+
+        #[cfg(target_os = "linux")]
+        {
+            let mut timerid: libc::timer_t = null_mut();
+            // creates a new per-process interval timer
+            // we can't do this from the parent, timerid is unique to each process.
+            libc::timer_create(libc::CLOCK_MONOTONIC, null_mut(), addr_of_mut!(timerid));
+
+            // log::info!("Set timer! {:#?} {timerid:#?}", self.itimerspec);
+            let _: i32 = libc::timer_settime(timerid, 0, addr_of_mut!(self.itimerspec), null_mut());
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
+        }
+        // log::trace!("{v:#?} {}", nix::errno::errno());
+
+        Ok(())
+    }
+
+    unsafe fn post_run_target_child(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut <GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z> as UsesState>::State,
+        mgr: &mut EM,
+        input: &<GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z> as UsesInput>::Input,
+    ) {
+        self.observers
+            .post_exec_child_all(state, input, &ExitKind::Ok)
+            .expect("Failed to run post_exec on observers");
+
+        self.hooks.post_exec_all(fuzzer, state, mgr, input);
+        self.leave_target(fuzzer, state, mgr, input);
+
+        libc::_exit(0);
+    }
+
+    fn parent(&mut self, child: Pid) -> Result<ExitKind, Error> {
+        // log::trace!("from parent {} child is {}", std::process::id(), child);
+        self.shmem_provider.post_fork(false)?;
+
+        let res = waitpid(child, None)?;
+        log::trace!("{res:#?}");
+        match res {
+            WaitStatus::Signaled(_, signal, _) => match signal {
+                nix::sys::signal::Signal::SIGALRM | nix::sys::signal::Signal::SIGUSR2 => {
+                    Ok(ExitKind::Timeout)
+                }
+                _ => Ok(ExitKind::Crash),
+            },
+            WaitStatus::Exited(_, code) => {
+                if code > 128 && code < 160 {
+                    // Signal exit codes
+                    let signal = code - 128;
+                    if signal == Signal::SigAlarm as libc::c_int
+                        || signal == Signal::SigUser2 as libc::c_int
+                    {
+                        Ok(ExitKind::Timeout)
+                    } else {
+                        Ok(ExitKind::Crash)
+                    }
+                } else {
+                    Ok(ExitKind::Ok)
+                }
+            }
+            _ => Ok(ExitKind::Ok),
+        }
+    }
+}
+
+impl<'a, EM, H, HT, OT, S, SP, Z, OF> Executor<EM, Z, NopExecutorState>
+    for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, EM, Z>
+where
+    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    OT: ObserversTuple<S> + Debug,
     S: State + HasExecutions,
     SP: ShMemProvider,
     HT: ExecutorHooksTuple,
-    Z: UsesState<State = S>,
-    ES: HasExecutorState,
+    EM: EventFirer<State = S> + EventRestarter<State = S>,
+    Z: HasObjective<Objective = OF, State = S>,
+    OF: Feedback<S>,
 {
     #[allow(unreachable_code)]
     #[inline]
@@ -172,91 +323,23 @@ where
         state: &mut Self::State,
         mgr: &mut EM,
         input: &Self::Input,
-        execution_state: &mut ES::ExecutorState,
+        _execution_state: &mut (),
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
 
         unsafe {
-            self.shmem_provider.pre_fork()?;
+            self.inner.shmem_provider.pre_fork()?;
             match fork() {
                 Ok(ForkResult::Child) => {
                     // Child
-                    self.shmem_provider.post_fork(true)?;
-
-                    self.enter_target(fuzzer, state, mgr, input);
-                    self.hooks.pre_exec_all(fuzzer, state, mgr, input);
-
-                    self.observers
-                        .pre_exec_child_all(state, input)
-                        .expect("Failed to run post_exec on observers");
-
-                    #[cfg(target_os = "linux")]
-                    {
-                        let mut timerid: libc::timer_t = null_mut();
-                        // creates a new per-process interval timer
-                        // we can't do this from the parent, timerid is unique to each process.
-                        libc::timer_create(
-                            libc::CLOCK_MONOTONIC,
-                            null_mut(),
-                            addr_of_mut!(timerid),
-                        );
-
-                        // log::info!("Set timer! {:#?} {timerid:#?}", self.itimerspec);
-                        let _: i32 = libc::timer_settime(
-                            timerid,
-                            0,
-                            addr_of_mut!(self.itimerspec),
-                            null_mut(),
-                        );
-                    }
-                    #[cfg(not(target_os = "linux"))]
-                    {
-                        setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
-                    }
-                    // log::trace!("{v:#?} {}", nix::errno::errno());
-                    (self.harness_fn)(input, execution_state);
-
-                    self.observers
-                        .post_exec_child_all(state, input, &ExitKind::Ok)
-                        .expect("Failed to run post_exec on observers");
-
-                    self.hooks.post_exec_all(fuzzer, state, mgr, input);
-                    self.leave_target(fuzzer, state, mgr, input);
-
-                    libc::_exit(0);
-
+                    self.inner.pre_run_target_child(fuzzer, state, mgr, input)?;
+                    (self.harness_fn)(input);
+                    self.inner.post_run_target_child(fuzzer, state, mgr, input);
                     Ok(ExitKind::Ok)
                 }
                 Ok(ForkResult::Parent { child }) => {
                     // Parent
-                    // log::trace!("from parent {} child is {}", std::process::id(), child);
-                    self.shmem_provider.post_fork(false)?;
-
-                    let res = waitpid(child, None)?;
-                    log::trace!("{res:#?}");
-                    match res {
-                        WaitStatus::Signaled(_, signal, _) => match signal {
-                            nix::sys::signal::Signal::SIGALRM
-                            | nix::sys::signal::Signal::SIGUSR2 => Ok(ExitKind::Timeout),
-                            _ => Ok(ExitKind::Crash),
-                        },
-                        WaitStatus::Exited(_, code) => {
-                            if code > 128 && code < 160 {
-                                // Signal exit codes
-                                let signal = code - 128;
-                                if signal == Signal::SigAlarm as libc::c_int
-                                    || signal == Signal::SigUser2 as libc::c_int
-                                {
-                                    Ok(ExitKind::Timeout)
-                                } else {
-                                    Ok(ExitKind::Crash)
-                                }
-                            } else {
-                                Ok(ExitKind::Ok)
-                            }
-                        }
-                        _ => Ok(ExitKind::Ok),
-                    }
+                    self.inner.parent(child)
                 }
                 Err(e) => Err(Error::from(e)),
             }
@@ -264,18 +347,19 @@ where
     }
 }
 
-impl<'a, H, HT, OT, S, SP, ES> GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES>
+impl<HT, OT, S, SP, EM, Z, OF> GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
 where
-    H: FnMut(&S::Input, &mut ES::ExecutorState) -> ExitKind + ?Sized,
     HT: ExecutorHooksTuple,
     S: State,
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
-    ES: HasExecutorState,
+    EM: EventFirer<State = S> + EventRestarter<State = S>,
+    Z: HasObjective<Objective = OF, State = S>,
+    OF: Feedback<S>,
 {
     #[inline]
     /// This function marks the boundary between the fuzzer and the target.
-    pub fn enter_target<EM, Z>(
+    pub fn enter_target(
         &mut self,
         _fuzzer: &mut Z,
         state: &mut <Self as UsesState>::State,
@@ -302,7 +386,7 @@ where
 
     #[inline]
     /// This function marks the boundary between the fuzzer and the target.
-    pub fn leave_target<EM, Z>(
+    pub fn leave_target(
         &mut self,
         _fuzzer: &mut Z,
         _state: &mut <Self as UsesState>::State,
@@ -315,22 +399,15 @@ where
     /// Creates a new [`GenericInProcessForkExecutor`] with custom hooks
     #[cfg(target_os = "linux")]
     #[allow(clippy::too_many_arguments)]
-    pub fn with_hooks<EM, OF, Z>(
+    pub fn with_hooks(
         userhooks: HT,
-        harness_fn: &'a mut H,
         observers: OT,
         _fuzzer: &mut Z,
         state: &mut S,
         _event_mgr: &mut EM,
         timeout: Duration,
         shmem_provider: SP,
-    ) -> Result<Self, Error>
-    where
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
-        OF: Feedback<S>,
-        S: HasSolutions,
-        Z: HasObjective<Objective = OF, State = S>,
-    {
+    ) -> Result<Self, Error> {
         let default_hooks = InChildProcessHooks::new::<Self>()?;
         let mut hooks = tuple_list!(default_hooks).merge(userhooks);
         hooks.init_all::<Self, S>(state);
@@ -350,7 +427,6 @@ where
         };
 
         Ok(Self {
-            harness_fn,
             shmem_provider,
             observers,
             hooks,
@@ -362,22 +438,15 @@ where
     /// Creates a new [`GenericInProcessForkExecutor`], non linux
     #[cfg(not(target_os = "linux"))]
     #[allow(clippy::too_many_arguments)]
-    pub fn with_hooks<EM, OF, Z>(
+    pub fn with_hooks(
         userhooks: HT,
-        harness_fn: &'a mut H,
         observers: OT,
         _fuzzer: &mut Z,
         state: &mut S,
         _event_mgr: &mut EM,
         timeout: Duration,
         shmem_provider: SP,
-    ) -> Result<Self, Error>
-    where
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
-        OF: Feedback<S>,
-        S: HasSolutions,
-        Z: HasObjective<Objective = OF, State = S>,
-    {
+    ) -> Result<Self, Error> {
         let default_hooks = InChildProcessHooks::new::<Self>()?;
         let mut hooks = tuple_list!(default_hooks).merge(userhooks);
         hooks.init_all::<Self, S>(state);
@@ -397,7 +466,6 @@ where
         };
 
         Ok(Self {
-            harness_fn,
             shmem_provider,
             observers,
             hooks,
@@ -405,42 +473,93 @@ where
             phantom: PhantomData,
         })
     }
+}
+
+impl<'a, H, HT, OT, S, SP, EM, Z, OF> GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, EM, Z>
+where
+    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    HT: ExecutorHooksTuple,
+    OT: ObserversTuple<S>,
+    SP: ShMemProvider,
+    EM: EventFirer<State = S> + EventRestarter<State = S>,
+    OF: State + Feedback<S>,
+    S: State + HasSolutions,
+    Z: HasObjective<Objective = OF, State = S>,
+{
+    /// Creates a new [`GenericInProcessForkExecutor`] with custom hooks
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_hooks(
+        userhooks: HT,
+        harness_fn: &'a mut H,
+        observers: OT,
+        fuzzer: &mut Z,
+        state: &mut S,
+        event_mgr: &mut EM,
+        timeout: Duration,
+        shmem_provider: SP,
+    ) -> Result<Self, Error>
+where {
+        Ok(Self {
+            harness_fn,
+            inner: GenericInProcessForkExecutorInner::with_hooks(
+                userhooks,
+                observers,
+                fuzzer,
+                state,
+                event_mgr,
+                timeout,
+                shmem_provider,
+            )?,
+        })
+    }
 
     /// Retrieve the harness function.
     #[inline]
     pub fn harness(&self) -> &H {
-        self.harness_fn
+        &self.harness_fn
     }
 
     /// Retrieve the harness function for a mutable reference.
     #[inline]
     pub fn harness_mut(&mut self) -> &mut H {
-        self.harness_fn
+        &mut self.harness_fn
     }
 }
 
-impl<'a, H, HT, OT, S, SP, ES> UsesObservers
-    for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES>
+impl<HT, OT, S, SP, EM, Z> UsesObservers for GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
 where
-    H: FnMut(&S::Input, &mut ES::ExecutorState) -> ExitKind + ?Sized,
     HT: ExecutorHooksTuple,
     OT: ObserversTuple<S>,
     S: State,
     SP: ShMemProvider,
-    ES: HasExecutorState,
+    EM: UsesState<State = S>,
+    Z: UsesState<State = S>,
 {
     type Observers = OT;
 }
 
-impl<'a, H, HT, OT, S, SP, ES> HasObservers
-    for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES>
+impl<'a, H, HT, OT, S, SP, EM, Z> UsesObservers
+    for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, EM, Z>
 where
-    H: FnMut(&S::Input, &mut ES::ExecutorState) -> ExitKind + ?Sized,
+    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    HT: ExecutorHooksTuple,
+    OT: ObserversTuple<S>,
+    S: State,
+    SP: ShMemProvider,
+    EM: UsesState<State = S>,
+    Z: UsesState<State = S>,
+{
+    type Observers = OT;
+}
+
+impl<HT, OT, S, SP, EM, Z> HasObservers for GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
+where
     HT: ExecutorHooksTuple,
     S: State,
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
-    ES: HasExecutorState,
+    EM: UsesState<State = S>,
+    Z: UsesState<State = S>,
 {
     #[inline]
     fn observers(&self) -> &OT {
@@ -452,6 +571,29 @@ where
         &mut self.observers
     }
 }
+
+impl<'a, H, HT, OT, S, SP, EM, Z> HasObservers
+    for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, EM, Z>
+where
+    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    HT: ExecutorHooksTuple,
+    S: State,
+    OT: ObserversTuple<S>,
+    SP: ShMemProvider,
+    EM: UsesState<State = S>,
+    Z: UsesState<State = S>,
+{
+    #[inline]
+    fn observers(&self) -> &OT {
+        self.inner.observers()
+    }
+
+    #[inline]
+    fn observers_mut(&mut self) -> &mut OT {
+        self.inner.observers_mut()
+    }
+}
+
 /// signal hooks and `panic_hooks` for the child process
 
 pub mod child_signal_handlers {
@@ -551,7 +693,10 @@ pub mod child_signal_handlers {
 mod tests {
     use libafl_bolts::tuples::tuple_list;
 
-    use crate::{executors::ExitKind, inputs::NopInput};
+    use crate::{
+        executors::{inprocess_fork::GenericInProcessForkExecutorInner, ExitKind},
+        inputs::NopInput,
+    };
 
     #[test]
     #[cfg_attr(miri, ignore)]
@@ -603,12 +748,14 @@ mod tests {
         let default = InChildProcessHooks::nop();
         #[cfg(target_os = "linux")]
         let mut in_process_fork_executor = GenericInProcessForkExecutor::<_, (), (), _, _> {
-            hooks: tuple_list!(default),
             harness_fn: &mut harness,
-            shmem_provider: provider,
-            observers: tuple_list!(),
-            itimerspec,
-            phantom: PhantomData,
+            inner: GenericInProcessForkExecutorInner {
+                hooks: tuple_list!(default),
+                shmem_provider: provider,
+                observers: tuple_list!(),
+                itimerspec,
+                phantom: PhantomData,
+            },
         };
         #[cfg(not(target_os = "linux"))]
         let mut in_process_fork_executor = GenericInProcessForkExecutor::<_, (), (), _, _> {
@@ -624,7 +771,7 @@ mod tests {
         let mut state = NopState::new();
         let mut mgr = SimpleEventManager::printing();
         in_process_fork_executor
-            .run_target(&mut fuzzer, &mut state, &mut mgr, &input)
+            .run_target(&mut fuzzer, &mut state, &mut mgr, &input, &mut ())
             .unwrap();
     }
 }
