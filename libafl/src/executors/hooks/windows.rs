@@ -15,7 +15,7 @@ pub mod windows_asan_handler {
         events::{EventFirer, EventRestarter},
         executors::{
             hooks::inprocess::GLOBAL_STATE, inprocess::run_observers_and_save_state, Executor,
-            ExitKind, HasObservers, HasExecutorState,
+            ExitKind, HasExecutorState, HasObservers,
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
@@ -128,7 +128,7 @@ pub mod windows_exception_handler {
         executors::{
             hooks::inprocess::{HasTimeout, InProcessExecutorHandlerData, GLOBAL_STATE},
             inprocess::{run_observers_and_save_state, HasInProcessHooks},
-            Executor, ExitKind, HasObservers, HasExecutorState,
+            Executor, ExitKind, HasExecutorState, HasObservers,
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
