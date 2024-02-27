@@ -718,6 +718,7 @@ mod tests {
                 &mut NopState::new(),
                 &mut mgr,
                 &BytesInput::new(b"test".to_vec()),
+                &mut (),
             )
             .unwrap();
     }
@@ -746,6 +747,7 @@ mod tests {
                 &mut NopState::new(),
                 &mut mgr,
                 &BytesInput::new(b"test".to_vec()),
+                &mut (),
             )
             .unwrap();
     }
