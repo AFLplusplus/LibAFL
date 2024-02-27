@@ -105,6 +105,7 @@ impl<EM, TE, Z> TracingStage<EM, TE, Z> {
 
     /// Apply a certain amount of tries that this stage will attempt to trace the input before
     /// giving up and not processing the input again.
+    #[must_use]
     pub fn with_tries(mut self, initial_tries: usize) -> Self {
         self.initial_tries = initial_tries;
         self
@@ -218,6 +219,7 @@ where
 
     /// Apply a certain amount of tries that this stage will attempt to trace the input before
     /// giving up and not processing the input again.
+    #[must_use]
     pub fn with_tries(mut self, initial_tries: usize) -> Self {
         self.initial_tries = initial_tries;
         self
