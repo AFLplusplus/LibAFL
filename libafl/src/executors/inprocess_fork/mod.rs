@@ -695,7 +695,7 @@ mod tests {
     use libafl_bolts::tuples::tuple_list;
 
     use crate::{
-        executors::ExitKind,
+        executors::{inprocess_fork::GenericInProcessForkExecutorInner, ExitKind},
         inputs::NopInput,
     };
 
