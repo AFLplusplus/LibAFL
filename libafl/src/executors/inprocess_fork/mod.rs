@@ -714,7 +714,7 @@ mod tests {
             events::SimpleEventManager,
             executors::{
                 hooks::inprocess_fork::InChildProcessHooks,
-                inprocess_fork::GenericInProcessForkExecutor, Executor,
+                inprocess_fork::GenericInProcessForkExecutor,
             },
             fuzzer::test::NopFuzzer,
             state::test::NopState,

@@ -9,8 +9,6 @@ use libafl_bolts::{shmem::ShMemProvider, tuples::tuple_list};
 use nix::unistd::{fork, ForkResult};
 
 use super::super::hooks::ExecutorHooksTuple;
-#[cfg(all(unix, not(target_os = "linux")))]
-use crate::executors::hooks::timer::{setitimer, Itimerval, Timeval, ITIMER_REAL};
 use crate::{
     events::{EventFirer, EventRestarter},
     executors::{
@@ -185,7 +183,6 @@ where
     Z: HasObjective<Objective = OF, State = S>,
 {
     /// Creates a new [`GenericInProcessForkExecutorWithState`] with custom hooks
-    #[cfg(target_os = "linux")]
     #[allow(clippy::too_many_arguments)]
     pub fn with_hooks(
         userhooks: HT,
@@ -197,40 +194,6 @@ where
         timeout: Duration,
         shmem_provider: SP,
     ) -> Result<Self, Error> {
-        Ok(Self {
-            harness_fn,
-            inner: GenericInProcessForkExecutorInner::with_hooks(
-                userhooks,
-                observers,
-                fuzzer,
-                state,
-                event_mgr,
-                timeout,
-                shmem_provider,
-            )?,
-            phantom: PhantomData,
-        })
-    }
-
-    /// Creates a new [`GenericInProcessForkExecutor`], non linux
-    #[cfg(not(target_os = "linux"))]
-    #[allow(clippy::too_many_arguments)]
-    pub fn with_hooks<EM, OF, Z>(
-        userhooks: HT,
-        harness_fn: &'a mut H,
-        observers: OT,
-        _fuzzer: &mut Z,
-        state: &mut S,
-        _event_mgr: &mut EM,
-        timeout: Duration,
-        shmem_provider: SP,
-    ) -> Result<Self, Error>
-    where
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
-        OF: Feedback<S>,
-        S: HasSolutions,
-        Z: HasObjective<Objective = OF, State = S>,
-    {
         Ok(Self {
             harness_fn,
             inner: GenericInProcessForkExecutorInner::with_hooks(

@@ -263,6 +263,7 @@ pub mod test {
                 &mut state,
                 &mut NopEventManager::new(),
                 &empty_input,
+                &mut (),
             )
             .unwrap_err();
         executor
@@ -271,6 +272,7 @@ pub mod test {
                 &mut state,
                 &mut NopEventManager::new(),
                 &nonempty_input,
+                &mut (),
             )
             .unwrap();
     }
@@ -283,6 +285,7 @@ pub mod pybind {
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};
 
+    use crate::prelude::NopExecutorState;
     use crate::{
         events::pybind::PythonEventManager,
         executors::{
@@ -407,7 +410,7 @@ pub mod pybind {
         }
     }
 
-    impl Executor<PythonEventManager, PythonStdFuzzer> for PyObjectExecutor {
+    impl Executor<PythonEventManager, PythonStdFuzzer, NopExecutorState> for PyObjectExecutor {
         #[inline]
         fn run_target(
             &mut self,
@@ -415,6 +418,7 @@ pub mod pybind {
             state: &mut Self::State,
             mgr: &mut PythonEventManager,
             input: &Self::Input,
+            _executor_state: &mut (),
         ) -> Result<ExitKind, Error> {
             let ek = Python::with_gil(|py| -> PyResult<_> {
                 let ek: PythonExitKind = self
@@ -526,7 +530,7 @@ pub mod pybind {
         }
     }
 
-    impl Executor<PythonEventManager, PythonStdFuzzer> for PythonExecutor {
+    impl Executor<PythonEventManager, PythonStdFuzzer, NopExecutorState> for PythonExecutor {
         #[inline]
         fn run_target(
             &mut self,
@@ -534,6 +538,7 @@ pub mod pybind {
             state: &mut Self::State,
             mgr: &mut PythonEventManager,
             input: &Self::Input,
+            _executor_state: &mut (),
         ) -> Result<ExitKind, Error> {
             unwrap_me_mut!(self.wrapper, e, { e.run_target(fuzzer, state, mgr, input) })
         }
