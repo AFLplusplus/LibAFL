@@ -12,7 +12,7 @@ use crate::{
     corpus::{Corpus, CorpusId, Testcase},
     feedbacks::MapIndexesMetadata,
     inputs::UsesInput,
-    observers::ObserversTuple,
+    observers::{ObserversTuple, TrackingHint},
     schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
     state::{HasCorpus, HasMetadata, HasRand, UsesState},
     Error,
@@ -371,7 +371,7 @@ where
     /// and has a default probability to skip non-faved [`Testcase`]s of [`DEFAULT_SKIP_NON_FAVORED_PROB`].
     /// This will remove the metadata `M` when it is no longer needed, after consumption. This might
     /// for example be a `MapIndexesMetadata`.
-    pub fn new(base: CS) -> Self {
+    pub fn new<O: TrackingHint<true, NTH>, const NTH: bool>(_obs: &O, base: CS) -> Self {
         Self {
             base,
             skip_non_favored_prob: DEFAULT_SKIP_NON_FAVORED_PROB,

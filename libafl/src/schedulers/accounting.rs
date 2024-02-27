@@ -11,7 +11,7 @@ use crate::{
     corpus::{Corpus, CorpusId},
     feedbacks::MapIndexesMetadata,
     inputs::UsesInput,
-    observers::ObserversTuple,
+    observers::{ObserversTuple, TrackingHint},
     schedulers::{
         minimizer::{IsFavoredMetadata, MinimizerScheduler, DEFAULT_SKIP_NON_FAVORED_PROB},
         LenTimeMulTestcaseScore, Scheduler,
@@ -307,7 +307,12 @@ where
 
     /// Creates a new [`CoverageAccountingScheduler`] that wraps a `base` [`Scheduler`]
     /// and has a default probability to skip non-faved Testcases of [`DEFAULT_SKIP_NON_FAVORED_PROB`].
-    pub fn new(state: &mut CS::State, base: CS, accounting_map: &'a [u32]) -> Self {
+    pub fn new<O: TrackingHint<true, NTH>, const NTH: bool>(
+        obs: &O,
+        state: &mut CS::State,
+        base: CS,
+        accounting_map: &'a [u32],
+    ) -> Self {
         match state.metadata_map().get::<TopAccountingMetadata>() {
             Some(meta) => {
                 if meta.max_accounting.len() != accounting_map.len() {
@@ -320,7 +325,7 @@ where
         }
         Self {
             accounting_map,
-            inner: MinimizerScheduler::new(base),
+            inner: MinimizerScheduler::new(obs, base),
             skip_non_favored_prob: DEFAULT_SKIP_NON_FAVORED_PROB,
         }
     }
