@@ -10,7 +10,11 @@ use core::{
     ptr::{self, addr_of, addr_of_mut},
 };
 
-use libafl::{executors::hooks::inprocess::inprocess_get_state, inputs::UsesInput};
+use libafl::{
+    executors::{hooks::inprocess::inprocess_get_state, ExitKind},
+    inputs::UsesInput,
+    state::NopState,
+};
 
 pub use crate::emu::SyscallHookResult;
 use crate::{
@@ -337,6 +341,7 @@ where
 }
 
 static mut HOOKS_IS_INITIALIZED: bool = false;
+static mut FIRST_EXEC: bool = true;
 
 pub struct QemuHooks<QT, S>
 where
@@ -358,6 +363,36 @@ where
             .field("helpers", &self.helpers)
             .field("emulator", &self.emulator)
             .finish()
+    }
+}
+
+impl<I, QT> QemuHooks<QT, NopState<I>>
+where
+    QT: QemuHelperTuple<NopState<I>>,
+    NopState<I>: UsesInput<Input = I>,
+{
+    pub fn reproducer(emulator: Emulator, helpers: QT) -> Box<Self> {
+        Self::new(emulator, helpers)
+    }
+
+    pub fn repro_run<H>(&mut self, harness: &mut H, input: &I) -> ExitKind
+    where
+        H: FnMut(&I) -> ExitKind,
+    {
+        unsafe {
+            if FIRST_EXEC {
+                self.helpers.first_exec_all(self);
+                FIRST_EXEC = false;
+            }
+        }
+        self.helpers.pre_exec_all(&self.emulator, input);
+
+        let mut exit_kind = harness(input);
+
+        self.helpers
+            .post_exec_all(&self.emulator, input, &mut (), &mut exit_kind);
+
+        exit_kind
     }
 }
 

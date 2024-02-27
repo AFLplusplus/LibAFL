@@ -174,7 +174,7 @@ pub mod test {
         executors::{Executor, ExitKind},
         fuzzer::test::NopFuzzer,
         inputs::{BytesInput, HasTargetBytes},
-        state::{test::NopState, HasExecutions, State, UsesState},
+        state::{HasExecutions, NopState, State, UsesState},
     };
 
     /// A simple executor that does nothing.
