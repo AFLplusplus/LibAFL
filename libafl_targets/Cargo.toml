@@ -31,7 +31,7 @@ default = [
     "common",
 ]
 std = ["libafl/std"]
-libfuzzer = ["std", "common", "sanitizer_interfaces"]
+libfuzzer = ["std", "common"]
 libfuzzer_no_link_main = ["libfuzzer"]
 libfuzzer_define_run_driver = ["libfuzzer"]
 libfuzzer_interceptors = ["libfuzzer", "sancov_cmplog"]

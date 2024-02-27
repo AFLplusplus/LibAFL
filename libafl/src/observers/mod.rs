@@ -593,6 +593,7 @@ where
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
+    use core::ptr;
     use std::cell::UnsafeCell;
 
     use libafl_bolts::{
@@ -1047,7 +1048,7 @@ pub mod pybind {
 
     impl Named for PythonObserver {
         fn name(&self) -> &str {
-            let ptr = unwrap_me!(self.wrapper, o, { o.name() as *const str });
+            let ptr = unwrap_me!(self.wrapper, o, { ptr::from_ref::<str>(o.name()) });
             unsafe { ptr.as_ref().unwrap() }
         }
     }
@@ -1266,7 +1267,7 @@ pub mod pybind {
                             }
                             PythonObserverWrapper::Python(py_wrapper) => {
                                 if type_eq::<PyObjectObserver, T>() && py_wrapper.name() == name {
-                                    r = (py_wrapper as *const _ as *const T).as_ref();
+                                    r = (ptr::from_ref(py_wrapper) as *const T).as_ref();
                                 }
                             }
                         }
@@ -1352,14 +1353,13 @@ pub mod pybind {
                                 if type_eq::<PythonMapObserverU64, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = (std::ptr::addr_of!(*(*py_wrapper).borrow_mut(py))
-                                        as *mut T)
+                                    r = (ptr::addr_of!(*(*py_wrapper).borrow_mut(py)) as *mut T)
                                         .as_mut();
                                 }
                             }
                             PythonObserverWrapper::Python(py_wrapper) => {
                                 if type_eq::<PyObjectObserver, T>() && py_wrapper.name() == name {
-                                    r = (py_wrapper as *mut _ as *mut T).as_mut();
+                                    r = (ptr::from_mut(py_wrapper) as *mut T).as_mut();
                                 }
                             }
                         }

@@ -140,14 +140,11 @@ typedef uint128_t         u128;
 #else
 
   #if defined(__APPLE__)
-    // On Apple, weak_import and weak attrs behave differently to linux.
-
-    #define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)                        \
-      __attribute__((weak, visibility("default"))) RETURN_TYPE NAME FUNC_SIG { \
-        return (RETURN_TYPE)0;                                                 \
-      }
-
     #define EXT_FUNC_IMPL(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
+      EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)
+
+    // Declare these symbols as weak to allow them to be optionally defined.
+    #define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
       __attribute__((weak, visibility("default"))) RETURN_TYPE NAME FUNC_SIG
 
     // Weakly defined globals

@@ -7,9 +7,13 @@ use core::{
     time::Duration,
 };
 use std::{
+    env,
     ffi::{OsStr, OsString},
     io::{self, prelude::*, ErrorKind},
-    os::unix::{io::RawFd, process::CommandExt},
+    os::{
+        fd::{AsRawFd, BorrowedFd},
+        unix::{io::RawFd, process::CommandExt},
+    },
     path::Path,
     process::{Child, Command, Stdio},
 };
@@ -287,6 +291,14 @@ impl Forkserver {
         debug_output: bool,
         kill_signal: Signal,
     ) -> Result<Self, Error> {
+        if env::var("AFL_MAP_SIZE").is_err() {
+            log::warn!("AFL_MAP_SIZE not set. If it is unset, the forkserver may fail to start up");
+        }
+
+        if env::var("__AFL_SHM_ID").is_err() {
+            log::warn!("__AFL_SHM_ID not set. It is necessary to set this env, otherwise the forkserver cannot communicate with the fuzzer");
+        }
+
         let mut st_pipe = Pipe::new().unwrap();
         let mut ctl_pipe = Pipe::new().unwrap();
 
@@ -439,11 +451,15 @@ impl Forkserver {
             )));
         };
 
+        // # Safety
+        // The FDs are valid as this point in time.
+        let st_read = unsafe { BorrowedFd::borrow_raw(st_read) };
+
         let mut readfds = FdSet::new();
-        readfds.insert(st_read);
+        readfds.insert(&st_read);
         // We'll pass a copied timeout to keep the original timeout intact, because select updates timeout to indicate how much time was left. See select(2)
         let sret = pselect(
-            Some(readfds.highest().unwrap() + 1),
+            Some(readfds.highest().unwrap().as_raw_fd() + 1),
             &mut readfds,
             None,
             None,
@@ -526,9 +542,14 @@ where
         &self.args
     }
 
-    /// The [`Forkserver`] instance.
+    /// Get a reference to the [`Forkserver`] instance.
     pub fn forkserver(&self) -> &Forkserver {
         &self.forkserver
+    }
+
+    /// Get a mutable reference to the [`Forkserver`] instance.
+    pub fn forkserver_mut(&mut self) -> &mut Forkserver {
+        &mut self.forkserver
     }
 
     /// The [`InputFile`] used by this [`Executor`].

@@ -4,7 +4,7 @@ A well-known [`Stage`], for example, is the mutational stage, running multiple [
 Other stages may enrich [`crate::corpus::Testcase`]s with metadata.
 */
 
-use core::{convert::From, marker::PhantomData};
+use core::marker::PhantomData;
 
 pub use calibrate::CalibrationStage;
 pub use colorization::*;

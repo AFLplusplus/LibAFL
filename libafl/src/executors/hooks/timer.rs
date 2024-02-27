@@ -8,7 +8,7 @@ use core::{
 #[cfg(target_os = "linux")]
 use core::{
     mem::zeroed,
-    ptr::{addr_of, null_mut},
+    ptr::{self, addr_of, null_mut},
 };
 
 #[cfg(all(unix, not(target_os = "linux")))]
@@ -299,7 +299,7 @@ impl TimerStruct {
                 let data = addr_of_mut!(GLOBAL_STATE);
                 write_volatile(
                     addr_of_mut!((*data).executor_ptr),
-                    self as *mut _ as *mut c_void,
+                    ptr::from_mut(self) as *mut c_void,
                 );
 
                 if self.executions == 0 {

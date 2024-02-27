@@ -253,8 +253,8 @@ where
                 .match_name::<O>(&self.map_observer_name)
                 .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?;
 
-            let bitmap_size = map.count_bytes();
-
+            let mut bitmap_size = map.count_bytes();
+            bitmap_size = bitmap_size.max(1); // just don't make it 0 because we take log2 of it later.
             let psmeta = state
                 .metadata_map_mut()
                 .get_mut::<SchedulerMetadata>()

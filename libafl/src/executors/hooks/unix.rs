@@ -186,8 +186,8 @@ pub mod unix_signal_handler {
     {
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
         let _context = _context.map(|p| {
-            &mut *(((p as *mut _ as *mut libc::c_void as usize) + 128) as *mut libc::c_void
-                as *mut ucontext_t)
+            &mut *(((core::ptr::from_mut(p) as *mut libc::c_void as usize) + 128)
+                as *mut libc::c_void as *mut ucontext_t)
         });
 
         log::error!("Crashed with {signal}");

@@ -48,7 +48,11 @@ int main(int argc, char **argv) {
     libafl_main();
     return 0;
   }
+  #ifdef FUZZER_DEFINE_RUN_DRIVER
   return LLVMFuzzerRunDriver(&argc, &argv, &LLVMFuzzerTestOneInput);
+  #else
+  return 0;
+  #endif
 }
   #endif
 #endif

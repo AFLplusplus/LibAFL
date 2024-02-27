@@ -1,10 +1,6 @@
 //! LLMP-backed event manager for scalable multi-processed fuzzing
 
-use alloc::{
-    boxed::Box,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{boxed::Box, vec::Vec};
 #[cfg(all(unix, not(miri), feature = "std"))]
 use core::ptr::addr_of_mut;
 #[cfg(feature = "std")]
@@ -208,7 +204,7 @@ where
                         Ok(llmp::LlmpMsgHookResult::ForwardToClients)
                     }
                 } else {
-                    monitor.display("Broker".into(), ClientId(0));
+                    monitor.display("Broker", ClientId(0));
                     Ok(llmp::LlmpMsgHookResult::Handled)
                 }
             },
@@ -254,7 +250,7 @@ where
                     // as a forwarded msg with a lower executions may arrive after a stats msg with an higher executions
                     client.update_executions(*executions as u64, *time);
                 }
-                monitor.display(event.name().to_string(), id);
+                monitor.display(event.name(), id);
                 Ok(BrokerEventResult::Forward)
             }
             Event::UpdateExecStats {
@@ -266,7 +262,7 @@ where
                 monitor.client_stats_insert(client_id);
                 let client = monitor.client_stats_mut_for(client_id);
                 client.update_executions(*executions as u64, *time);
-                monitor.display(event.name().to_string(), client_id);
+                monitor.display(event.name(), client_id);
                 Ok(BrokerEventResult::Handled)
             }
             Event::UpdateUserStats {
@@ -278,7 +274,7 @@ where
                 let client = monitor.client_stats_mut_for(client_id);
                 client.update_user_stats(name.clone(), value.clone());
                 monitor.aggregate(name);
-                monitor.display(event.name().to_string(), client_id);
+                monitor.display(event.name(), client_id);
                 Ok(BrokerEventResult::Handled)
             }
             #[cfg(feature = "introspection")]
@@ -301,7 +297,7 @@ where
                 client.update_introspection_monitor((**introspection_monitor).clone());
 
                 // Display the monitor via `.display` only on core #1
-                monitor.display(event.name().to_string(), client_id);
+                monitor.display(event.name(), client_id);
 
                 // Correctly handled the event
                 Ok(BrokerEventResult::Handled)
@@ -310,7 +306,7 @@ where
                 monitor.client_stats_insert(client_id);
                 let client = monitor.client_stats_mut_for(client_id);
                 client.update_objective_size(*objective_size as u64);
-                monitor.display(event.name().to_string(), client_id);
+                monitor.display(event.name(), client_id);
                 Ok(BrokerEventResult::Handled)
             }
             Event::Log {
@@ -826,7 +822,7 @@ where
 {
     fn add_custom_buf_handler(
         &mut self,
-        handler: Box<dyn FnMut(&mut S, &String, &[u8]) -> Result<CustomBufEventResult, Error>>,
+        handler: Box<dyn FnMut(&mut S, &str, &[u8]) -> Result<CustomBufEventResult, Error>>,
     ) {
         self.custom_buf_handlers.push(handler);
     }

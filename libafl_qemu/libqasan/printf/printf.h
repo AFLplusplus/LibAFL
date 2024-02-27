@@ -94,6 +94,17 @@ int __libqasan_vsnprintf(char *buffer, size_t count, const char *format,
 int __libqasan_vprintf(const char *format, va_list va);
 
 /**
+ * Tiny vasprintf implementation
+ * \param strp This function will write the pointer to the allocated string
+ * \param format A string that specifies the format of the output
+ * \param va A value identifying a variable arguments list
+ * \return The number of characters that are WRITTEN into the buffer, not
+ * counting the terminating null character
+ */
+int __libqasan_vasprintf(char **restrict strp, const char *restrict format,
+                         va_list va);
+
+/**
  * printf with output function
  * You may use this as dynamic alternative to printf() with its fixed _putchar()
  * output \param out An output function which takes one character and an
