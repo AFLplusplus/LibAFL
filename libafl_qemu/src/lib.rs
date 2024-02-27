@@ -103,9 +103,9 @@ pub mod calls;
 pub mod drcov;
 
 pub mod executor;
-pub use executor::QemuExecutor;
 #[cfg(feature = "fork")]
 pub use executor::QemuForkExecutor;
+pub use executor::{QemuExecutor, with_state::QemuExecutorWithState};
 
 pub mod emu;
 pub use emu::*;
