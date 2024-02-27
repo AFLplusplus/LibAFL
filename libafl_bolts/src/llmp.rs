@@ -2256,7 +2256,7 @@ where
     where
         F: FnMut(ClientId, Tag, Flags, &[u8]) -> Result<LlmpMsgHookResult, Error>,
     {
-        #[cfg(feature = "std")]
+        #[cfg(feature = "llmp_client_timeout")]
         let current_time = current_time();
         let mut new_messages = false;
         for i in 0..self.llmp_clients.len() {
@@ -2264,7 +2264,7 @@ where
             match unsafe { self.handle_new_msgs(client_id, on_new_msg) } {
                 Ok(has_messages) => {
                     // See if we need to remove this client, in case no new messages got brokered, and it's not a listener
-                    #[cfg(feature = "std")]
+                    #[cfg(feature = "llmp_client_timeout")]
                     if !has_messages && !self.listeners.iter().any(|&x| x == client_id) {
                         let last_msg_time = self.llmp_clients[i].last_msg_time;
                         if last_msg_time < current_time
@@ -2283,6 +2283,7 @@ where
         }
 
         // After brokering, remove all clients we don't want to keep.
+        #[cfg(feature = "llmp_client_timeout")]
         for i in self.clients_to_remove.iter().rev() {
             log::debug!("Client #{i} disconnected.");
             self.llmp_clients.remove(*i);

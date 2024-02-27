@@ -17,7 +17,7 @@ features = ["document-features"]
 all-features = true
 
 [features]
-default = ["std", "derive", "llmp_compression", "llmp_small_maps", "rand_trait", "prelude", "gzip", "serdeany_autoreg", "alloc", "xxh3"]
+default = ["std", "derive", "llmp_compression", "llmp_small_maps", "rand_trait", "prelude", "gzip", "serdeany_autoreg", "alloc", "xxh3", "llmp_client_timeout"]
 document-features = ["dep:document-features"]
 
 #! # Feature Flags
@@ -80,6 +80,9 @@ llmp_debug = ["alloc"]
 
 ## Reduces the initial map size for llmp
 llmp_small_maps = ["alloc"]
+
+##
+llmp_client_timeout = ["std"]
 
 [build-dependencies]
 rustversion = "1.0"
