@@ -7,7 +7,7 @@ use alloc::string::String;
 use alloc::{borrow::ToOwned, string::ToString, vec::Vec};
 use core::marker::PhantomData;
 
-use super::{Stage, TracingStage};
+use super::{Stage, StageProgress, TracingStage};
 #[cfg(all(feature = "introspection", feature = "concolic_mutation"))]
 use crate::state::HasClientPerfMonitor;
 #[cfg(feature = "concolic_mutation")]
@@ -39,10 +39,10 @@ where
     E: UsesState<State = TE::State>,
     EM: UsesState<State = TE::State>,
     TE: Executor<EM, Z> + HasObservers,
-    TE::State: HasExecutions + HasCorpus,
+    TE::State: HasExecutions + HasCorpus + HasNamedMetadata,
     Z: UsesState<State = TE::State>,
 {
-    type Progress = (); // stage cannot be resumed
+    type Progress = (); // stage internally handles progress
 
     #[inline]
     fn perform(
@@ -58,6 +58,17 @@ where
             ));
         };
 
+        <TracingStage<EM, TE, Z> as Stage<E, EM, Z>>::Progress::initialize_progress(
+            state,
+            &self.inner,
+        )?;
+        if <TracingStage<EM, TE, Z> as Stage<E, EM, Z>>::Progress::should_skip(
+            state,
+            &self.inner,
+            corpus_idx,
+        )? {
+            return Ok(());
+        }
         self.inner.perform(fuzzer, executor, state, manager)?;
         if let Some(observer) = self
             .inner
@@ -74,12 +85,15 @@ where
                 .metadata_map_mut()
                 .insert(metadata);
         }
+        <TracingStage<EM, TE, Z> as Stage<E, EM, Z>>::Progress::clear_progress(state, &self.inner)?;
         Ok(())
     }
 }
 
 impl<EM, TE, Z> ConcolicTracingStage<EM, TE, Z> {
-    /// Creates a new default tracing stage using the given [`Executor`], observing traces from a [`ConcolicObserver`] with the given name.
+    /// Creates a new default tracing stage using the given [`Executor`], observing traces from a
+    /// [`ConcolicObserver`] with the given name. The [`super::RetryingStage::initial_tries`] is
+    /// used from the provided inner stage.
     pub fn new(inner: TracingStage<EM, TE, Z>, observer_name: String) -> Self {
         Self {
             inner,
@@ -92,7 +106,10 @@ use libafl_bolts::tuples::MatchName;
 
 #[cfg(all(feature = "concolic_mutation", feature = "introspection"))]
 use crate::monitors::PerfFeature;
-use crate::{corpus::HasCurrentCorpusIdx, state::UsesState};
+use crate::{
+    corpus::HasCurrentCorpusIdx,
+    state::{HasNamedMetadata, UsesState},
+};
 #[cfg(feature = "concolic_mutation")]
 use crate::{
     inputs::HasBytesVec,

@@ -7,9 +7,9 @@ use crate::{
     executors::{Executor, HasObservers, ShadowExecutor},
     mark_feature_time,
     observers::ObserversTuple,
-    stages::Stage,
+    stages::{LimitedTriesProgress, RetryingStage, Stage},
     start_timer,
-    state::{HasCorpus, HasExecutions, State, UsesState},
+    state::{HasCorpus, HasExecutions, HasNamedMetadata, State, UsesState},
     Error,
 };
 #[cfg(feature = "introspection")]
@@ -19,6 +19,7 @@ use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 #[derive(Clone, Debug)]
 pub struct TracingStage<EM, TE, Z> {
     tracer_executor: TE,
+    initial_tries: usize,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(EM, TE, Z)>,
 }
@@ -34,11 +35,11 @@ impl<E, EM, TE, Z> Stage<E, EM, Z> for TracingStage<EM, TE, Z>
 where
     E: UsesState<State = TE::State>,
     TE: Executor<EM, Z> + HasObservers,
-    TE::State: HasExecutions + HasCorpus,
+    TE::State: HasExecutions + HasCorpus + HasNamedMetadata,
     EM: UsesState<State = TE::State>,
     Z: UsesState<State = TE::State>,
 {
-    type Progress = (); // this stage cannot be resumed
+    type Progress = LimitedTriesProgress;
 
     #[inline]
     fn perform(
@@ -53,6 +54,9 @@ where
                 "state is not currently processing a corpus index",
             ));
         };
+        if Self::Progress::should_skip(state, self, corpus_idx)? {
+            return Ok(());
+        }
 
         start_timer!(state);
         let input = state.corpus().cloned_input_for_id(corpus_idx)?;
@@ -83,13 +87,27 @@ where
     }
 }
 
+impl<EM, TE, Z> RetryingStage for TracingStage<EM, TE, Z> {
+    fn initial_tries(&self) -> usize {
+        self.initial_tries
+    }
+}
+
 impl<EM, TE, Z> TracingStage<EM, TE, Z> {
     /// Creates a new default stage
     pub fn new(tracer_executor: TE) -> Self {
         Self {
             tracer_executor,
+            initial_tries: 10,
             phantom: PhantomData,
         }
+    }
+
+    /// Apply a certain amount of tries that this stage will attempt to trace the input before
+    /// giving up and not processing the input again.
+    pub fn with_tries(mut self, initial_tries: usize) -> Self {
+        self.initial_tries = initial_tries;
+        self
     }
 
     /// Gets the underlying tracer executor
@@ -102,9 +120,11 @@ impl<EM, TE, Z> TracingStage<EM, TE, Z> {
         &mut self.tracer_executor
     }
 }
+
 /// A stage that runs the shadow executor using also the shadow observers
 #[derive(Clone, Debug)]
 pub struct ShadowTracingStage<E, EM, SOT, Z> {
+    initial_tries: usize,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, EM, SOT, Z)>,
 }
@@ -122,9 +142,9 @@ where
     EM: UsesState<State = E::State>,
     SOT: ObserversTuple<E::State>,
     Z: UsesState<State = E::State>,
-    E::State: State + HasExecutions + HasCorpus + Debug,
+    E::State: State + HasExecutions + HasCorpus + HasNamedMetadata + Debug,
 {
-    type Progress = (); // this stage cannot be resumed
+    type Progress = LimitedTriesProgress;
 
     #[inline]
     fn perform(
@@ -139,6 +159,9 @@ where
                 "state is not currently processing a corpus index",
             ));
         };
+        if Self::Progress::should_skip(state, self, corpus_idx)? {
+            return Ok(());
+        }
 
         start_timer!(state);
         let input = state.corpus().cloned_input_for_id(corpus_idx)?;
@@ -171,6 +194,12 @@ where
     }
 }
 
+impl<E, EM, SOT, Z> RetryingStage for ShadowTracingStage<E, EM, SOT, Z> {
+    fn initial_tries(&self) -> usize {
+        self.initial_tries
+    }
+}
+
 impl<E, EM, SOT, Z> ShadowTracingStage<E, EM, SOT, Z>
 where
     E: Executor<EM, Z> + HasObservers,
@@ -182,7 +211,15 @@ where
     /// Creates a new default stage
     pub fn new(_executor: &mut ShadowExecutor<E, SOT>) -> Self {
         Self {
+            initial_tries: 10,
             phantom: PhantomData,
         }
+    }
+
+    /// Apply a certain amount of tries that this stage will attempt to trace the input before
+    /// giving up and not processing the input again.
+    pub fn with_tries(mut self, initial_tries: usize) -> Self {
+        self.initial_tries = initial_tries;
+        self
     }
 }
