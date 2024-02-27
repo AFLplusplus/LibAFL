@@ -236,6 +236,7 @@ pub mod test {
             state: &mut Self::State,
             _mgr: &mut EM,
             input: &Self::Input,
+            _executor_state: &mut (),
         ) -> Result<ExitKind, Error> {
             *state.executions_mut() += 1;
 
