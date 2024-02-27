@@ -902,6 +902,11 @@ pub mod test {
 
     #[test]
     fn test_tries_progress() -> Result<(), Error> {
+        #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
+        unsafe {
+            LimitedTriesProgress::register();
+        }
+
         struct StageWithOneTry;
 
         impl RetryingStage for StageWithOneTry {
