@@ -284,6 +284,7 @@ impl InProcessHooks {
                     EM,
                     OF,
                     Z,
+                    ES,
                 > as *const _;
             let timeout_handler =
                 crate::executors::hooks::windows::windows_exception_handler::inproc_timeout_handler::<
