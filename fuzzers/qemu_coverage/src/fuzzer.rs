@@ -27,9 +27,8 @@ use libafl_bolts::{
     AsSlice,
 };
 use libafl_qemu::{
-    drcov::QemuDrCovHelper, elf::EasyElf, emu::Emulator, executor::QemuExecutorState, ArchExtras,
-    CallingConvention, GuestAddr, GuestReg, MmapPerms, QemuExecutor, QemuHooks,
-    QemuInstrumentationAddressRangeFilter, Regs,
+    drcov::QemuDrCovHelper, elf::EasyElf, emu::Emulator, ArchExtras, CallingConvention, GuestAddr,
+    GuestReg, MmapPerms, QemuExecutor, QemuHooks, QemuInstrumentationAddressRangeFilter, Regs,
 };
 use rangemap::RangeMap;
 
@@ -169,7 +168,7 @@ pub fn fuzz() {
         }
     };
 
-    let mut harness = |input: &BytesInput, _executor_state: &mut QemuExecutorState<_, _>| {
+    let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
         let mut buf = target.as_slice();
         let mut len = buf.len();

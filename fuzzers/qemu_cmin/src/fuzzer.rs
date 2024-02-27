@@ -30,7 +30,6 @@ use libafl_qemu::{
     edges::{QemuEdgeCoverageChildHelper, EDGES_MAP_PTR, EDGES_MAP_SIZE},
     elf::EasyElf,
     emu::Emulator,
-    executor::QemuExecutorState,
     ArchExtras, CallingConvention, GuestAddr, GuestReg, MmapPerms, QemuForkExecutor, QemuHooks,
     Regs,
 };
@@ -191,7 +190,7 @@ pub fn fuzz() -> Result<(), Error> {
     let scheduler = QueueScheduler::new();
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-    let mut harness = |input: &BytesInput, _executor_state: &mut QemuExecutorState<_, _>| {
+    let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
         let mut buf = target.as_slice();
         let mut len = buf.len();
