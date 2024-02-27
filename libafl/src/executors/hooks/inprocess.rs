@@ -257,13 +257,14 @@ impl InProcessHooks {
     /// Create new [`InProcessHooks`].
     #[cfg(windows)]
     #[allow(unused)]
-    pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
+    pub fn new<E, EM, OF, Z, ES>(exec_tmout: Duration) -> Result<Self, Error>
     where
-        E: Executor<EM, Z> + HasObservers + HasInProcessHooks,
+        E: Executor<EM, Z, ES> + HasObservers + HasInProcessHooks,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: State + HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
+        ES: HasExecutorState,
     {
         let ret;
         #[cfg(feature = "std")]
@@ -309,13 +310,14 @@ impl InProcessHooks {
     /// Create a new [`InProcessHooks`]
     #[cfg(all(not(unix), not(windows)))]
     #[allow(unused_variables)]
-    pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
+    pub fn new<E, EM, OF, Z, ES>(exec_tmout: Duration) -> Result<Self, Error>
     where
-        E: Executor<EM, Z> + HasObservers + HasInProcessHooks,
+        E: Executor<EM, Z, ES> + HasObservers + HasInProcessHooks,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
+        ES: HasExecutorState,
     {
         #[cfg_attr(miri, allow(unused_variables))]
         let ret = Self {};

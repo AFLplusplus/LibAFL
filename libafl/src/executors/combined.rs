@@ -1,8 +1,7 @@
 //! A `CombinedExecutor` wraps a primary executor and a secondary one
 //! In comparison to the [`crate::executors::DiffExecutor`] it does not run the secondary executor in `run_target`.
 
-use core::fmt::Debug;
-use std::marker::PhantomData;
+use core::{fmt::Debug, marker::PhantomData};
 
 use crate::{
     executors::{Executor, ExitKind, HasExecutorState, HasObservers},
