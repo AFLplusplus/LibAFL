@@ -15,7 +15,7 @@ pub mod windows_asan_handler {
         events::{EventFirer, EventRestarter},
         executors::{
             hooks::inprocess::GLOBAL_STATE, inprocess::run_observers_and_save_state, Executor,
-            ExitKind, HasObservers,
+            ExitKind, HasObservers, HasExecutorState,
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
@@ -25,13 +25,14 @@ pub mod windows_asan_handler {
 
     /// # Safety
     /// ASAN deatch handler
-    pub unsafe extern "C" fn asan_death_handler<E, EM, OF, Z>()
+    pub unsafe extern "C" fn asan_death_handler<E, EM, OF, Z, ES>()
     where
-        E: Executor<EM, Z> + HasObservers,
+        E: Executor<EM, Z, ES> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
+        ES: HasExecutorState,
     {
         let data = addr_of_mut!(GLOBAL_STATE);
         (*data).set_in_handler(true);
@@ -127,7 +128,7 @@ pub mod windows_exception_handler {
         executors::{
             hooks::inprocess::{HasTimeout, InProcessExecutorHandlerData, GLOBAL_STATE},
             inprocess::{run_observers_and_save_state, HasInProcessHooks},
-            Executor, ExitKind, HasObservers,
+            Executor, ExitKind, HasObservers, HasExecutorState,
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
@@ -299,15 +300,16 @@ pub mod windows_exception_handler {
     /// # Safety
     /// Well, exception handling is not safe
     #[allow(clippy::too_many_lines)]
-    pub unsafe fn inproc_crash_handler<E, EM, OF, Z>(
+    pub unsafe fn inproc_crash_handler<E, EM, OF, Z, ES>(
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: Executor<EM, Z> + HasObservers,
+        E: Executor<EM, Z, ES> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
+        ES: HasExecutorState,
     {
         // Have we set a timer_before?
         if data.ptp_timer.is_some() {
