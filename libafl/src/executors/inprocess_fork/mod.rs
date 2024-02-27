@@ -691,10 +691,11 @@ pub mod child_signal_handlers {
 
 #[cfg(test)]
 mod tests {
+    use std::marker::PhantomData;
     use libafl_bolts::tuples::tuple_list;
 
     use crate::{
-        executors::{inprocess_fork::GenericInProcessForkExecutorInner, ExitKind},
+        executors::ExitKind,
         inputs::NopInput,
     };
 
@@ -758,13 +759,15 @@ mod tests {
             },
         };
         #[cfg(not(target_os = "linux"))]
-        let mut in_process_fork_executor = GenericInProcessForkExecutor::<_, (), (), _, _> {
+        let mut in_process_fork_executor = GenericInProcessForkExecutor {
             harness_fn: &mut harness,
-            shmem_provider: provider,
-            observers: tuple_list!(),
-            hooks: tuple_list!(default),
-            itimerval: itimerspec,
-            phantom: PhantomData,
+            inner: GenericInProcessForkExecutorInner {
+                hooks: tuple_list!(default),
+                shmem_provider: provider,
+                observers: tuple_list!(),
+                itimerval: itimerspec,
+                phantom: PhantomData,
+            },
         };
         let input = NopInput {};
         let mut fuzzer = NopFuzzer::new();
