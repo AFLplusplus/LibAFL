@@ -747,7 +747,7 @@ mod tests {
         let mut harness = |_buf: &NopInput| ExitKind::Ok;
         let default = InChildProcessHooks::nop();
         #[cfg(target_os = "linux")]
-        let mut in_process_fork_executor = GenericInProcessForkExecutor::<_, (), (), _, _> {
+        let mut in_process_fork_executor = GenericInProcessForkExecutor {
             harness_fn: &mut harness,
             inner: GenericInProcessForkExecutorInner {
                 hooks: tuple_list!(default),
