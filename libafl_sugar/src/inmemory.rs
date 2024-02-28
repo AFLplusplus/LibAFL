@@ -57,7 +57,7 @@ where
     /// Dictionary
     #[builder(default = None)]
     tokens_file: Option<PathBuf>,
-    /// Flag if use CmpLog
+    /// Flag if use `CmpLog`
     #[builder(default = None)]
     use_cmplog: Option<bool>,
     /// The port used for communication between this fuzzer node and other fuzzer nodes
