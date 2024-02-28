@@ -3,7 +3,7 @@
 use core::{fmt::Debug, marker::PhantomData};
 
 use crate::{
-    corpus::{Corpus, HasCurrentCorpusIdx},
+    corpus::{Corpus, CorpusId, HasCurrentCorpusIdx},
     executors::{Executor, HasObservers, ShadowExecutor},
     mark_feature_time,
     observers::ObserversTuple,
@@ -29,6 +29,52 @@ where
     TE: UsesState,
 {
     type State = TE::State;
+}
+
+impl<EM, TE, Z> TracingStage<EM, TE, Z>
+where
+    TE: Executor<EM, Z> + HasObservers,
+    TE::State: HasExecutions + HasCorpus + HasNamedMetadata,
+    EM: UsesState<State = TE::State>,
+    Z: UsesState<State = TE::State>,
+{
+    /// Perform tracing on the given [`CorpusId`]. Useful for if wrapping [`TracingStage`] with your
+    /// own stage and you need to manage [`super::StageProgress`] differently; see
+    /// [`super::ConcolicTracingStage`]'s implementation as an example of usage.
+    pub fn trace(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut TE::State,
+        manager: &mut EM,
+        corpus_idx: CorpusId,
+    ) -> Result<(), Error> {
+        start_timer!(state);
+        let input = state.corpus().cloned_input_for_id(corpus_idx)?;
+
+        mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
+
+        start_timer!(state);
+        self.tracer_executor
+            .observers_mut()
+            .pre_exec_all(state, &input)?;
+        mark_feature_time!(state, PerfFeature::PreExecObservers);
+
+        start_timer!(state);
+        let exit_kind = self
+            .tracer_executor
+            .run_target(fuzzer, state, manager, &input)?;
+        mark_feature_time!(state, PerfFeature::TargetExecution);
+
+        *state.executions_mut() += 1;
+
+        start_timer!(state);
+        self.tracer_executor
+            .observers_mut()
+            .post_exec_all(state, &input, &exit_kind)?;
+        mark_feature_time!(state, PerfFeature::PostExecObservers);
+
+        Ok(())
+    }
 }
 
 impl<E, EM, TE, Z> Stage<E, EM, Z> for TracingStage<EM, TE, Z>
@@ -58,30 +104,7 @@ where
             return Ok(());
         }
 
-        start_timer!(state);
-        let input = state.corpus().cloned_input_for_id(corpus_idx)?;
-
-        mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
-
-        start_timer!(state);
-        self.tracer_executor
-            .observers_mut()
-            .pre_exec_all(state, &input)?;
-        mark_feature_time!(state, PerfFeature::PreExecObservers);
-
-        start_timer!(state);
-        let exit_kind = self
-            .tracer_executor
-            .run_target(fuzzer, state, manager, &input)?;
-        mark_feature_time!(state, PerfFeature::TargetExecution);
-
-        *state.executions_mut() += 1;
-
-        start_timer!(state);
-        self.tracer_executor
-            .observers_mut()
-            .post_exec_all(state, &input, &exit_kind)?;
-        mark_feature_time!(state, PerfFeature::PostExecObservers);
+        self.trace(fuzzer, state, manager, corpus_idx)?;
 
         Ok(())
     }

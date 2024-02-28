@@ -7,17 +7,29 @@ use alloc::string::String;
 use alloc::{borrow::ToOwned, string::ToString, vec::Vec};
 use core::marker::PhantomData;
 
-use super::{Stage, StageProgress, TracingStage};
+use libafl_bolts::tuples::MatchName;
+
+use super::{RetryingStage, Stage, TracingStage};
+#[cfg(all(feature = "concolic_mutation", feature = "introspection"))]
+use crate::monitors::PerfFeature;
 #[cfg(all(feature = "introspection", feature = "concolic_mutation"))]
 use crate::state::HasClientPerfMonitor;
 #[cfg(feature = "concolic_mutation")]
 use crate::state::State;
 use crate::{
-    corpus::Corpus,
+    corpus::{Corpus, HasCurrentCorpusIdx},
     executors::{Executor, HasObservers},
     observers::concolic::ConcolicObserver,
-    state::{HasCorpus, HasExecutions, HasMetadata},
+    prelude::LimitedTriesProgress,
+    state::{HasCorpus, HasExecutions, HasMetadata, HasNamedMetadata, UsesState},
     Error,
+};
+#[cfg(feature = "concolic_mutation")]
+use crate::{
+    inputs::HasBytesVec,
+    mark_feature_time,
+    observers::concolic::{ConcolicMetadata, SymExpr, SymExprRef},
+    start_timer, Evaluator,
 };
 
 /// Wraps a [`TracingStage`] to add concolic observing.
@@ -42,13 +54,13 @@ where
     TE::State: HasExecutions + HasCorpus + HasNamedMetadata,
     Z: UsesState<State = TE::State>,
 {
-    type Progress = (); // stage internally handles progress
+    type Progress = LimitedTriesProgress;
 
     #[inline]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
-        executor: &mut E,
+        _executor: &mut E,
         state: &mut TE::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
@@ -57,19 +69,11 @@ where
                 "state is not currently processing a corpus index",
             ));
         };
-
-        <TracingStage<EM, TE, Z> as Stage<E, EM, Z>>::Progress::initialize_progress(
-            state,
-            &self.inner,
-        )?;
-        if <TracingStage<EM, TE, Z> as Stage<E, EM, Z>>::Progress::should_skip(
-            state,
-            &self.inner,
-            corpus_idx,
-        )? {
+        if Self::Progress::should_skip(state, &self.inner, corpus_idx)? {
             return Ok(());
         }
-        self.inner.perform(fuzzer, executor, state, manager)?;
+
+        self.inner.trace(fuzzer, state, manager, corpus_idx)?;
         if let Some(observer) = self
             .inner
             .executor()
@@ -85,14 +89,19 @@ where
                 .metadata_map_mut()
                 .insert(metadata);
         }
-        <TracingStage<EM, TE, Z> as Stage<E, EM, Z>>::Progress::clear_progress(state, &self.inner)?;
         Ok(())
+    }
+}
+
+impl<EM, TE, Z> RetryingStage for ConcolicTracingStage<EM, TE, Z> {
+    fn initial_tries(&self) -> usize {
+        self.inner.initial_tries()
     }
 }
 
 impl<EM, TE, Z> ConcolicTracingStage<EM, TE, Z> {
     /// Creates a new default tracing stage using the given [`Executor`], observing traces from a
-    /// [`ConcolicObserver`] with the given name. The [`super::RetryingStage::initial_tries`] is
+    /// [`ConcolicObserver`] with the given name. The [`RetryingStage::initial_tries`] is
     /// used from the provided inner stage.
     pub fn new(inner: TracingStage<EM, TE, Z>, observer_name: String) -> Self {
         Self {
@@ -101,22 +110,6 @@ impl<EM, TE, Z> ConcolicTracingStage<EM, TE, Z> {
         }
     }
 }
-
-use libafl_bolts::tuples::MatchName;
-
-#[cfg(all(feature = "concolic_mutation", feature = "introspection"))]
-use crate::monitors::PerfFeature;
-use crate::{
-    corpus::HasCurrentCorpusIdx,
-    state::{HasNamedMetadata, UsesState},
-};
-#[cfg(feature = "concolic_mutation")]
-use crate::{
-    inputs::HasBytesVec,
-    mark_feature_time,
-    observers::concolic::{ConcolicMetadata, SymExpr, SymExprRef},
-    start_timer, Evaluator,
-};
 
 #[cfg(feature = "concolic_mutation")]
 #[allow(clippy::too_many_lines)]
