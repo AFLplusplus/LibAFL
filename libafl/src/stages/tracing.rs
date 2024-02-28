@@ -80,7 +80,7 @@ where
 impl<E, EM, TE, Z> Stage<E, EM, Z> for TracingStage<EM, TE, Z>
 where
     E: UsesState<State = TE::State>,
-    TE: Executor<EM, Z> + HasObservers,
+    TE: Executor<EM, Z, NopExecutorState> + HasObservers,
     TE::State: HasExecutions + HasCorpus + HasNamedMetadata,
     EM: UsesState<State = TE::State>,
     Z: UsesState<State = TE::State>,

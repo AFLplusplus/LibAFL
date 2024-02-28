@@ -18,7 +18,7 @@ use crate::state::HasClientPerfMonitor;
 use crate::state::State;
 use crate::{
     corpus::{Corpus, HasCurrentCorpusIdx},
-    executors::{Executor, HasObservers},
+    executors::{Executor, HasObservers, NopExecutorState},
     observers::concolic::ConcolicObserver,
     state::{HasCorpus, HasExecutions, HasMetadata, HasNamedMetadata, UsesState},
     Error,
