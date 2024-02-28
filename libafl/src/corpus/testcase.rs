@@ -60,7 +60,7 @@ where
     cached_len: Option<usize>,
     /// Number of executions done at discovery time
     executions: usize,
-    /// Number of fuzzing iterations of this particular input updated in perform_mutational
+    /// Number of fuzzing iterations of this particular input updated in `perform_mutational`
     scheduled_count: usize,
     /// Parent [`CorpusId`], if known
     parent_id: Option<CorpusId>,
@@ -366,15 +366,15 @@ where
     allow(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
 pub struct SchedulerTestcaseMetadata {
-    /// Number of bits set in bitmap, updated in calibrate_case
+    /// Number of bits set in bitmap, updated in `calibrate_case`
     bitmap_size: u64,
     /// Number of queue cycles behind
     handicap: u64,
-    /// Path depth, initialized in on_add
+    /// Path depth, initialized in `on_add`
     depth: u64,
-    /// Offset in n_fuzz
+    /// Offset in `n_fuzz`
     n_fuzz_entry: usize,
-    /// Cycles used to calibrate this (not really needed if it were not for on_replace and on_remove)
+    /// Cycles used to calibrate this (not really needed if it were not for `on_replace` and `on_remove`)
     cycle_and_time: (Duration, usize),
 }
 

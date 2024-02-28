@@ -282,7 +282,7 @@ pub enum ServedShMemRequest {
     PreFork(),
     /// The client's child re-registers with us after it forked.
     PostForkChildHello(i32),
-    /// The ShMem Service should exit. This is sually sent internally on `drop`, but feel free to do whatever with it?
+    /// The `ShMem` Service should exit. This is sually sent internally on `drop`, but feel free to do whatever with it?
     Exit,
 }
 

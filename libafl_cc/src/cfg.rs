@@ -396,6 +396,6 @@ mod tests {
         assert_eq!(*distances.get(&((41864 >> 1) ^ 26911)).unwrap(), 1);
         assert_eq!(*distances.get(&((26911 >> 1) ^ 52706)).unwrap(), 2);
         assert_eq!(*distances.get(&((26911 >> 1) ^ 41925)).unwrap(), 2);
-        assert!(distances.get(&((41864 >> 1) ^ 52706)).is_none());
+        assert!(!distances.contains_key(&((41864 >> 1) ^ 52706)));
     }
 }
