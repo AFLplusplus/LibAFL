@@ -13,6 +13,7 @@ use crate::{
     feedbacks::MapIndexesMetadata,
     inputs::UsesInput,
     observers::{ObserversTuple, TrackingHinted},
+    require_index_tracking,
     schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
     state::{HasCorpus, HasMetadata, HasRand, UsesState},
     Error,
@@ -256,8 +257,6 @@ where
     CS::State: HasCorpus + HasMetadata + HasRand,
     O: TrackingHinted,
 {
-    const TRACKING_SANITY: () = assert!(O::INDICES, "\nIndex tracking is required by MinimizerScheduler\nhint: call `.with_tracking::<true, ...>()` on the observer you passed to MinimizerScheduler::new\nnote: see the documentation for TrackingHinted for details");
-
     /// Update the [`Corpus`] score using the [`MinimizerScheduler`]
     #[allow(clippy::unused_self)]
     #[allow(clippy::cast_possible_wrap)]
@@ -377,7 +376,7 @@ where
     /// This will remove the metadata `M` when it is no longer needed, after consumption. This might
     /// for example be a `MapIndexesMetadata`.
     pub fn new(_obs: &O, base: CS) -> Self {
-        let _: () = Self::TRACKING_SANITY; // check that tracking is enabled for this map
+        require_index_tracking!("MinimizerScheduler", O);
         Self {
             base,
             skip_non_favored_prob: DEFAULT_SKIP_NON_FAVORED_PROB,

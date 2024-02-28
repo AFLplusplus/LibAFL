@@ -142,6 +142,102 @@ pub trait TrackingHinted {
     ) -> Self::Output<NEW_INDICES, NEW_NOVELTIES>;
 }
 
+/// Use in the constructor of your component which requires index tracking of a [`MapObserver`]. See
+/// [`TrackingHinted`] for details.
+///
+/// As an example, if you are developing the type `MyCustomScheduler<O>` which requires novelty
+/// tracking, use this in your constructor:
+/// ```
+/// # use libafl::observers::TrackingHinted;
+/// # use libafl::require_index_tracking;
+/// #
+/// # struct MyCustomScheduler<O> {
+/// #     phantom: PhantomData<O>,
+/// # }
+///
+/// impl<O> MyCustomScheduler where O: TrackingHinted {
+///     pub fn new() -> Self {
+///         require_index_tracking!("MyCustomScheduler", O);
+///         todo!("Construct your type")
+///     }
+/// }
+/// ```
+#[macro_export]
+macro_rules! require_index_tracking {
+    ($name: literal, $obs: ident) => {
+        struct SanityCheck<O: TrackingHinted> {
+            phantom: PhantomData<O>,
+        }
+
+        impl<O: TrackingHinted> SanityCheck<O> {
+            const TRACKING_SANITY: () = {
+                const LINE_OFFSET: usize = line!().ilog10() as usize + 2;
+                const SPACING: &str = const_format::str_repeat!(" ", LINE_OFFSET);
+                if !O::INDICES {
+                    const_panic::concat_panic!(const_panic::FmtArg::DISPLAY; "\n",
+                        SPACING, "|\n",
+                        SPACING, "= note: index tracking is required by ", $name, "\n",
+                        SPACING, "= note: see the documentation of TrackingHinted for details\n",
+                        SPACING, "|\n",
+                        SPACING, "= hint: call `.with_tracking::<true, ...>()` on the provided observer\n",
+                        SPACING, "|\n",
+                        SPACING, "| ",
+                    );
+                }
+            };
+        }
+        let _: () = SanityCheck::<$obs>::TRACKING_SANITY; // check that tracking is enabled for this map
+    };
+}
+
+/// Use in the constructor of your component which requires novelties tracking of a [`MapObserver`].
+/// See [`TrackingHinted`] for details on the concept.
+///
+/// As an example, if you are developing the type `MyCustomScheduler<O>` which requires novelty
+/// tracking, use this in your constructor:
+/// ```
+/// # use libafl::observers::TrackingHinted;
+/// # use libafl::require_novelties_tracking;
+/// #
+/// # struct MyCustomScheduler<O> {
+/// #     phantom: PhantomData<O>,
+/// # }
+///
+/// impl<O> MyCustomScheduler where O: TrackingHinted {
+///     pub fn new() -> Self {
+///         require_novelties_tracking!("MyCustomScheduler", O);
+///         todo!("Construct your type")
+///     }
+/// }
+/// ```
+#[macro_export]
+macro_rules! require_novelties_tracking {
+    ($name: literal, $obs: ident) => {
+        struct SanityCheck<O: TrackingHinted> {
+            phantom: PhantomData<O>,
+        }
+
+        impl<O: TrackingHinted> SanityCheck<O> {
+            const TRACKING_SANITY: () = {
+                const LINE_OFFSET: usize = line!().ilog10() as usize + 2;
+                const SPACING: &str = const_format::str_repeat!(" ", LINE_OFFSET);
+                if !O::NOVELTIES {
+                    const_panic::concat_panic!(const_panic::FmtArg::DISPLAY; "\n",
+                        SPACING, "|\n",
+                        SPACING, "= note: novelty tracking is required by ", $name, "\n",
+                        SPACING, "= note: see the documentation of TrackingHinted for details\n",
+                        SPACING, "|\n",
+                        SPACING, "= hint: call `.with_tracking::<..., true>()` on the provided observer\n",
+                        SPACING, "|\n",
+                        SPACING, "| ",
+                    );
+                }
+            };
+        }
+        let _: () = SanityCheck::<$obs>::TRACKING_SANITY; // check that tracking is enabled for this map
+    };
+}
+
 /// A [`MapObserver`] observes the static map, as oftentimes used for AFL-like coverage information
 ///
 /// TODO: enforce `iter() -> AssociatedTypeIter` when generic associated types stabilize
