@@ -106,7 +106,7 @@ use crate::{
 
 /// The default timeout in seconds after which a client will be considered stale, and removed.
 #[cfg(feature = "std")]
-const DEFAULT_CLIENT_TIMEOUT_SECS: u64 = 60 * 5;
+const DEFAULT_CLIENT_TIMEOUT_SECS: u64 = 30;
 
 /// The max number of pages a [`client`] may have mapped that were not yet read by the [`broker`]
 /// Usually, this value should not exceed `1`, else the broker cannot keep up with the amount of incoming messages.
@@ -2284,6 +2284,7 @@ where
 
         // After brokering, remove all clients we don't want to keep.
         for i in self.clients_to_remove.iter().rev() {
+            panic!("SHIT0");
             log::debug!("Client #{i} disconnected.");
             self.llmp_clients.remove(*i);
         }
