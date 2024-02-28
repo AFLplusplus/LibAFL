@@ -39,5 +39,5 @@ where
     E::State: HasSolutions + HasCorpus + HasExecutions,
     Z: HasObjective<Objective = OF, State = E::State>,
 {
-    __sanitizer_set_death_callback(asan_death_handler::<E, EM, OF, Z>);
+    __sanitizer_set_death_callback(asan_death_handler::<E, EM, OF, Z, ES>);
 }
