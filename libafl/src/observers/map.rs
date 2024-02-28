@@ -115,8 +115,8 @@ fn hash_slice<T>(slice: &[T]) -> u64 {
 ///
 /// // init the feedback
 /// let mut feedback = MaxMapFeedback::new(&edges_observer);
-///
-/// // init the state
+/// #
+/// # // init the state
 /// # let mut state = StdState::new(
 /// #     StdRand::with_seed(0),
 /// #     InMemoryCorpus::<BytesInput>::new(),
