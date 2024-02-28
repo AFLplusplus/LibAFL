@@ -7,8 +7,6 @@ use core::{
 };
 
 use libafl_bolts::tuples::tuple_list;
-#[cfg(windows)]
-use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
 use crate::{
     events::{EventFirer, EventRestarter},

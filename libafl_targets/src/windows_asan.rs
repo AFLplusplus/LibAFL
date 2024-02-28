@@ -2,7 +2,10 @@
 
 use libafl::{
     events::{EventFirer, EventRestarter},
-    executors::{hooks::windows::windows_asan_handler::asan_death_handler, Executor, HasObservers},
+    executors::{
+        hooks::windows::windows_asan_handler::asan_death_handler, Executor, HasExecutorState,
+        HasObservers,
+    },
     feedbacks::Feedback,
     state::{HasCorpus, HasExecutions, HasSolutions},
     HasObjective,
@@ -27,10 +30,11 @@ extern "C" {
 ///
 /// # Safety
 /// Calls the unsafe `__sanitizer_set_death_callback` symbol, but should be safe to call otherwise.
-pub unsafe fn setup_asan_callback<E, EM, OF, Z>(_executor: &E, _event_mgr: &EM, _fuzzer: &Z)
+pub unsafe fn setup_asan_callback<E, EM, ES, OF, Z>(_executor: &E, _event_mgr: &EM, _fuzzer: &Z)
 where
-    E: Executor<EM, Z> + HasObservers,
+    E: Executor<EM, Z, ES> + HasObservers,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
+    ES: HasExecutorState,
     OF: Feedback<E::State>,
     E::State: HasSolutions + HasCorpus + HasExecutions,
     Z: HasObjective<Objective = OF, State = E::State>,
