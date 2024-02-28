@@ -208,15 +208,14 @@ where
     type State = S;
 }
 
-impl<EM, HT, OT, S, SP, Z, OF> GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
+impl<EM, HT, OT, S, SP, Z> GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
 where
     OT: ObserversTuple<S> + Debug,
     S: State + UsesInput,
     SP: ShMemProvider,
     HT: ExecutorHooksTuple,
     EM: EventFirer<State = S> + EventRestarter<State = S>,
-    Z: HasObjective<Objective = OF, State = S>,
-    OF: Feedback<S>,
+    Z: UsesState<State = S>,
 {
     unsafe fn pre_run_target_child(
         &mut self,
@@ -303,7 +302,7 @@ where
     }
 }
 
-impl<'a, EM, H, HT, OT, S, SP, Z, OF> Executor<EM, Z, NopExecutorState>
+impl<'a, EM, H, HT, OT, S, SP, Z> Executor<EM, Z, NopExecutorState>
     for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, EM, Z>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
@@ -312,8 +311,7 @@ where
     SP: ShMemProvider,
     HT: ExecutorHooksTuple,
     EM: EventFirer<State = S> + EventRestarter<State = S>,
-    Z: HasObjective<Objective = OF, State = S>,
-    OF: Feedback<S>,
+    Z: UsesState<State = S>,
 {
     #[allow(unreachable_code)]
     #[inline]
@@ -347,15 +345,14 @@ where
     }
 }
 
-impl<HT, OT, S, SP, EM, Z, OF> GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
+impl<HT, OT, S, SP, EM, Z> GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
 where
     HT: ExecutorHooksTuple,
     S: State,
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
     EM: EventFirer<State = S> + EventRestarter<State = S>,
-    Z: HasObjective<Objective = OF, State = S>,
-    OF: Feedback<S>,
+    Z: UsesState<State = S>,
 {
     #[inline]
     /// This function marks the boundary between the fuzzer and the target.

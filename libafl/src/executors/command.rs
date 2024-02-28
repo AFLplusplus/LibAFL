@@ -622,7 +622,7 @@ impl CommandExecutorBuilder {
 #[cfg_attr(all(feature = "std", unix), doc = " ```")]
 #[cfg_attr(not(all(feature = "std", unix)), doc = " ```ignore")]
 /// use std::{io::Write, process::{Stdio, Command, Child}, time::Duration};
-/// use libafl::{Error, inputs::{HasTargetBytes, Input, UsesInput}, executors::{Executor, command::CommandConfigurator}, state::{UsesState, HasExecutions}};
+/// use libafl::{Error, inputs::{HasTargetBytes, Input, UsesInput}, executors::{Executor, NopExecutorState, command::CommandConfigurator}, state::{UsesState, HasExecutions}};
 /// use libafl_bolts::AsSlice;
 /// #[derive(Debug)]
 /// struct MyExecutor;
@@ -649,7 +649,7 @@ impl CommandExecutorBuilder {
 ///     }
 /// }
 ///
-/// fn make_executor<EM, Z>() -> impl Executor<EM, Z>
+/// fn make_executor<EM, Z>() -> impl Executor<EM, Z, NopExecutorState>
 /// where
 ///     EM: UsesState,
 ///     Z: UsesState<State = EM::State>,
