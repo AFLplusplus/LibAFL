@@ -95,7 +95,7 @@ fn hash_slice<T>(slice: &[T]) -> u64 {
 /// # use libafl::feedbacks::Feedback;
 /// use libafl::feedbacks::MaxMapFeedback;
 /// # use libafl::inputs::BytesInput;
-/// use libafl::observers::{StdMapObserver, TrackingHint};
+/// use libafl::observers::{StdMapObserver, TrackingHinted};
 /// use libafl::schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler};
 /// # use libafl::state::StdState;
 ///
@@ -157,12 +157,13 @@ pub mod macros {
     /// ```
     /// # use libafl::observers::TrackingHinted;
     /// # use libafl::require_index_tracking;
+    /// # use core::marker::PhantomData;
     /// #
     /// # struct MyCustomScheduler<O> {
     /// #     phantom: PhantomData<O>,
     /// # }
     ///
-    /// impl<O> MyCustomScheduler where O: TrackingHinted {
+    /// impl<O> MyCustomScheduler<O> where O: TrackingHinted {
     ///     pub fn new() -> Self {
     ///         require_index_tracking!("MyCustomScheduler", O);
     ///         todo!("Construct your type")
@@ -207,12 +208,13 @@ pub mod macros {
     /// ```
     /// # use libafl::observers::TrackingHinted;
     /// # use libafl::require_novelties_tracking;
+    /// # use core::marker::PhantomData;
     /// #
     /// # struct MyCustomScheduler<O> {
     /// #     phantom: PhantomData<O>,
     /// # }
     ///
-    /// impl<O> MyCustomScheduler where O: TrackingHinted {
+    /// impl<O> MyCustomScheduler<O> where O: TrackingHinted {
     ///     pub fn new() -> Self {
     ///         require_novelties_tracking!("MyCustomScheduler", O);
     ///         todo!("Construct your type")
