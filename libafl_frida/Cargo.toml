@@ -36,17 +36,17 @@ yaxpeax-x86 = "1.2.2"
 iced-x86 = { version = "1.20.0", features = ["code_asm"], optional = true }
 
 [dependencies]
-libafl = { path = "../libafl", default-features = false, version = "0.11.2", features = [
+libafl = { path = "../libafl", default-features = false, version = "0.12.0", features = [
     "std",
     "derive",
     "frida_cli",
 ] }
-libafl_bolts = { path = "../libafl_bolts", version = "0.11.2", default-features = false, features = [
+libafl_bolts = { path = "../libafl_bolts", version = "0.12.0", default-features = false, features = [
     "std",
     "derive",
     "frida_cli"
 ] }
-libafl_targets = { path = "../libafl_targets", version = "0.11.2", features = [
+libafl_targets = { path = "../libafl_targets", version = "0.12.0", features = [
     "std",
     "sancov_cmplog",
 ] }
