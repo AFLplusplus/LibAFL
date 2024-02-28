@@ -81,11 +81,12 @@ fn hash_slice<T>(slice: &[T]) -> u64 {
 }
 
 /// Trait marker which indicates that this [`MapObserver`] is tracked for indices or novelties.
-/// Implementors of feedbacks similar to [`MapFeedback`] may wish to use this to
+/// Implementors of feedbacks similar to [`crate::feedbacks::MapFeedback`] may wish to use this to
 /// ensure that edge metadata is recorded as is appropriate for the provided observer.
 ///
 /// If you get a type constraint failure for your map due to this type being unfulfilled, you must
-/// call [`TrackingHint::with_tracking`] **at the initialisation site of your map**.
+/// call [`TrackingHinted::with_index_tracking`] or [`TrackingHinted::with_novelty_tracking`] **at
+/// the initialisation site of your map**.
 ///
 /// This trait allows various components which interact with map metadata to ensure that the
 /// information they need is actually recorded by the map feedback.
@@ -153,8 +154,8 @@ pub mod macros {
     pub use const_format::str_repeat;
     pub use const_panic::{concat_panic, FmtArg};
 
-    /// Use in the constructor of your component which requires index tracking of a [`MapObserver`]. See
-    /// [`TrackingHinted`] for details.
+    /// Use in the constructor of your component which requires index tracking of a
+    /// [`super::MapObserver`]. See [`super::TrackingHinted`] for details.
     ///
     /// As an example, if you are developing the type `MyCustomScheduler<O>` which requires novelty
     /// tracking, use this in your constructor:
@@ -204,8 +205,8 @@ pub mod macros {
         };
     }
 
-    /// Use in the constructor of your component which requires novelties tracking of a [`MapObserver`].
-    /// See [`TrackingHinted`] for details on the concept.
+    /// Use in the constructor of your component which requires novelties tracking of a
+    /// [`super::MapObserver`]. See [`super::TrackingHinted`] for details on the concept.
     ///
     /// As an example, if you are developing the type `MyCustomScheduler<O>` which requires novelty
     /// tracking, use this in your constructor:
