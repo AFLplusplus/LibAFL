@@ -285,7 +285,6 @@ pub mod pybind {
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};
 
-    use crate::prelude::NopExecutorState;
     use crate::{
         events::pybind::PythonEventManager,
         executors::{
@@ -294,6 +293,7 @@ pub mod pybind {
         fuzzer::pybind::{PythonStdFuzzer, PythonStdFuzzerWrapper},
         inputs::HasBytesVec,
         observers::{pybind::PythonObserversTuple, UsesObservers},
+        prelude::NopExecutorState,
         state::{
             pybind::{PythonStdState, PythonStdStateWrapper},
             UsesState,
