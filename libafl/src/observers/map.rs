@@ -80,11 +80,15 @@ fn hash_slice<T>(slice: &[T]) -> u64 {
     hasher.finish()
 }
 
-/// Hint to the map feedback as to whether this observer's indices and novelties should be tracked.
+/// Trait marker which indicates that this [`MapObserver`] is tracked for indices or novelties.
+/// Implementors of feedbacks similar to [`MapFeedback`] may wish to use this to
+/// ensure that edge metadata is recorded as is appropriate for the provided observer.
 ///
 /// If you get a type constraint failure for your map due to this type being unfulfilled, you must
 /// call [`TrackingHint::with_tracking`] **at the initialisation site of your map**.
 ///
+/// This trait allows various components which interact with map metadata to ensure that the
+/// information they need is actually recorded by the map feedback.
 /// For example, if you are using [`crate::schedulers::MinimizerScheduler`]:
 /// ```
 /// # use libafl::corpus::InMemoryCorpus;
@@ -101,6 +105,7 @@ fn hash_slice<T>(slice: &[T]) -> u64 {
 /// // initialise your map as necessary
 /// let edges_observer = StdMapObserver::from_ownedref("edges", OwnedMutSlice::from(vec![0u8; 16]));
 /// // inform the feedback to track indices (required by IndexesLenTimeMinimizerScheduler), but not novelties
+/// // this *MUST* be done before it is passed to MaxMapFeedback!
 /// let edges_observer = edges_observer.with_tracking::<true, false>();
 ///
 /// // init the feedback
@@ -121,30 +126,20 @@ fn hash_slice<T>(slice: &[T]) -> u64 {
 /// ```
 ///
 /// [`MapObserver`] implementors: see [`StdMapObserver`] for an example implementation.
-pub trait TrackingHint<const INDICES: bool, const NOVELTIES: bool>: TrackingHinted {
+pub trait TrackingHinted {
     /// The resulting type, including the new tracking hints, after calling
-    /// [`TrackingHint::with_tracking`].
-    type Output<const NEW_INDICES: bool, const NEW_NOVELTIES: bool>: TrackingHint<
-        NEW_INDICES,
-        NEW_NOVELTIES,
-    >;
+    /// [`crate::observers::map::TrackingHint::with_tracking`].
+    type Output<const NEW_INDICES: bool, const NEW_NOVELTIES: bool>: TrackingHinted;
+
+    /// Whether indices should be tracked for this [`MapObserver`].
+    const INDICES: bool;
+    /// Whether novelties should be tracked for this [`MapObserver`].
+    const NOVELTIES: bool;
 
     /// Make this map observer into one with the provided tracking hints.
     fn with_tracking<const NEW_INDICES: bool, const NEW_NOVELTIES: bool>(
         self,
     ) -> Self::Output<NEW_INDICES, NEW_NOVELTIES>;
-}
-
-/// Trait marker which indicates that this [`MapObserver`] includes a sane implementation of
-/// [`TrackingHint`]. Implementors of feedbacks similar to [`MapFeedback`] may wish to use this to
-/// ensure that edge metadata is recorded as is appropriate for the provided observer.
-///
-/// [`MapObserver`] implementors: see [`StdMapObserver`] for an example implementation.
-pub trait TrackingHinted {
-    /// Whether indices should be tracked for this [`MapObserver`].
-    const INDICES: bool;
-    /// Whether novelties should be tracked for this [`MapObserver`].
-    const NOVELTIES: bool;
 }
 
 /// A [`MapObserver`] observes the static map, as oftentimes used for AFL-like coverage information
@@ -767,17 +762,11 @@ impl<'a, T, const DIFFERENTIAL: bool, const ITH: bool, const NTH: bool> Tracking
 where
     T: Copy + Default + Serialize,
 {
-    const INDICES: bool = ITH;
-    const NOVELTIES: bool = NTH;
-}
-
-impl<'a, T, const DIFFERENTIAL: bool, const ITH: bool, const NTH: bool> TrackingHint<ITH, NTH>
-    for StdMapObserver<'a, T, DIFFERENTIAL, ITH, NTH>
-where
-    T: Default + Copy + Serialize,
-{
     type Output<const NEW_INDICES: bool, const NEW_NOVELTIES: bool> =
         StdMapObserver<'a, T, DIFFERENTIAL, NEW_INDICES, NEW_NOVELTIES>;
+
+    const INDICES: bool = ITH;
+    const NOVELTIES: bool = NTH;
 
     fn with_tracking<const NEW_INDICES: bool, const NEW_NOVELTIES: bool>(
         self,

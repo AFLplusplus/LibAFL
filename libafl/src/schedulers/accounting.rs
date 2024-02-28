@@ -11,7 +11,7 @@ use crate::{
     corpus::{Corpus, CorpusId},
     feedbacks::MapIndexesMetadata,
     inputs::UsesInput,
-    observers::{ObserversTuple, TrackingHint},
+    observers::{ObserversTuple, TrackingHinted},
     schedulers::{
         minimizer::{IsFavoredMetadata, MinimizerScheduler, DEFAULT_SKIP_NON_FAVORED_PROB},
         LenTimeMulTestcaseScore, Scheduler,
@@ -106,7 +106,7 @@ impl TopAccountingMetadata {
 
 /// A minimizer scheduler using coverage accounting
 #[derive(Debug)]
-pub struct CoverageAccountingScheduler<'a, CS>
+pub struct CoverageAccountingScheduler<'a, CS, O>
 where
     CS: UsesState,
     CS::State: Debug,
@@ -117,10 +117,11 @@ where
         CS,
         LenTimeMulTestcaseScore<<CS as UsesState>::State>,
         MapIndexesMetadata,
+        O,
     >,
 }
 
-impl<'a, CS> UsesState for CoverageAccountingScheduler<'a, CS>
+impl<'a, CS, O> UsesState for CoverageAccountingScheduler<'a, CS, O>
 where
     CS: UsesState,
     CS::State: Debug,
@@ -128,11 +129,12 @@ where
     type State = CS::State;
 }
 
-impl<'a, CS> Scheduler for CoverageAccountingScheduler<'a, CS>
+impl<'a, CS, O> Scheduler for CoverageAccountingScheduler<'a, CS, O>
 where
     CS: Scheduler,
     CS::State: HasCorpus + HasMetadata + HasRand + Debug,
     <CS::State as UsesInput>::Input: HasLen,
+    O: TrackingHinted,
 {
     fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
         self.update_accounting_score(state, idx)?;
@@ -190,11 +192,12 @@ where
     }
 }
 
-impl<'a, CS> CoverageAccountingScheduler<'a, CS>
+impl<'a, CS, O> CoverageAccountingScheduler<'a, CS, O>
 where
     CS: Scheduler,
     CS::State: HasCorpus + HasMetadata + HasRand + Debug,
     <CS::State as UsesInput>::Input: HasLen,
+    O: TrackingHinted,
 {
     /// Update the `Corpus` score
     #[allow(clippy::unused_self)]
@@ -307,12 +310,7 @@ where
 
     /// Creates a new [`CoverageAccountingScheduler`] that wraps a `base` [`Scheduler`]
     /// and has a default probability to skip non-faved Testcases of [`DEFAULT_SKIP_NON_FAVORED_PROB`].
-    pub fn new<O: TrackingHint<true, NTH>, const NTH: bool>(
-        obs: &O,
-        state: &mut CS::State,
-        base: CS,
-        accounting_map: &'a [u32],
-    ) -> Self {
+    pub fn new(obs: &O, state: &mut CS::State, base: CS, accounting_map: &'a [u32]) -> Self {
         match state.metadata_map().get::<TopAccountingMetadata>() {
             Some(meta) => {
                 if meta.max_accounting.len() != accounting_map.len() {
