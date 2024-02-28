@@ -441,8 +441,7 @@ where
         event_mgr: &mut EM,
         shmem_provider: SP,
         timeout: core::time::Duration,
-    ) -> Result<Self, Error>
-    {
+    ) -> Result<Self, Error> {
         assert!(!QT::HOOKS_DO_SIDE_EFFECTS, "When using QemuForkExecutor, the hooks must not do any side effect as they will happen in the child process and then discarded");
 
         Ok(Self {
@@ -466,9 +465,7 @@ where
         &self.inner
     }
 
-    pub fn inner_mut(
-        &mut self,
-    ) -> &mut InProcessForkExecutor<'a, H, OT, S, SP, EM, Z> {
+    pub fn inner_mut(&mut self) -> &mut InProcessForkExecutor<'a, H, OT, S, SP, EM, Z> {
         &mut self.inner
     }
 
@@ -489,11 +486,7 @@ where
 impl<'a, EM, H, OT, QT, S, Z, SP, OF> Executor<EM, Z, NopExecutorState>
     for QemuForkExecutor<'a, H, OT, QT, S, SP, EM, Z>
 where
-    EM: EventManager<
-        InProcessForkExecutor<'a, H, OT, S, SP, EM, Z>,
-        Z,
-        State = S,
-    >,
+    EM: EventManager<InProcessForkExecutor<'a, H, OT, S, SP, EM, Z>, Z, State = S>,
     H: FnMut(&S::Input) -> ExitKind,
     S: State + HasMetadata + HasExecutions + HasLastReportTime + HasCorpus + HasSolutions,
     OT: ObserversTuple<S> + Debug,
@@ -516,9 +509,7 @@ where
             self.state.first_exec = false;
         }
         self.state.hooks.helpers_mut().pre_exec_all(&emu, input);
-        let mut exit_kind = self
-            .inner
-            .run_target(fuzzer, state, mgr, input, &mut ())?;
+        let mut exit_kind = self.inner.run_target(fuzzer, state, mgr, input, &mut ())?;
         self.state.hooks.helpers_mut().post_exec_all(
             &emu,
             input,
