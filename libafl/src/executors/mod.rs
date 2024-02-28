@@ -540,7 +540,9 @@ pub mod pybind {
             input: &Self::Input,
             _executor_state: &mut (),
         ) -> Result<ExitKind, Error> {
-            unwrap_me_mut!(self.wrapper, e, { e.run_target(fuzzer, state, mgr, input, &mut ()) })
+            unwrap_me_mut!(self.wrapper, e, {
+                e.run_target(fuzzer, state, mgr, input, &mut ())
+            })
         }
     }
 
