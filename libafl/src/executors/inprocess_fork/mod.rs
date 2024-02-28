@@ -691,11 +691,10 @@ pub mod child_signal_handlers {
 
 #[cfg(test)]
 mod tests {
-    use std::marker::PhantomData;
     use libafl_bolts::tuples::tuple_list;
 
     use crate::{
-        executors::{inprocess_fork::GenericInProcessForkExecutorInner, ExitKind},
+        executors::{Executor, inprocess_fork::GenericInProcessForkExecutorInner, ExitKind},
         inputs::NopInput,
     };
 
