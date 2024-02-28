@@ -39,7 +39,7 @@ pub struct SchedulerMetadata {
     cycles: u64,
     /// Size of the observer map
     bitmap_size: u64,
-    /// Sum of log(bitmap_size)
+    /// Sum of `log(bitmap_size`)
     bitmap_size_log: f64,
     /// Number of filled map entries
     bitmap_entries: u64,
@@ -230,7 +230,7 @@ where
         self.last_hash = hash;
     }
 
-    fn map_observer_name(&self) -> &String {
+    fn map_observer_name(&self) -> &str {
         &self.map_observer_name
     }
 }

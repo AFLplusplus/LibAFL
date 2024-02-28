@@ -376,7 +376,7 @@ mod test {
     use crate::{
         inputs::BytesInput,
         mutators::{ByteRandMutator, ScheduledMutator},
-        state::test::NopState,
+        state::NopState,
     };
 
     #[test]

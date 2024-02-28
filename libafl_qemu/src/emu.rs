@@ -1,7 +1,6 @@
 //! Expose QEMU user `LibAFL` C api to Rust
 
 use core::{
-    convert::Into,
     ffi::c_void,
     fmt,
     mem::{transmute, MaybeUninit},
@@ -1700,7 +1699,7 @@ impl Emulator {
     pub fn add_gdb_cmd(&self, callback: Box<dyn FnMut(&Self, &str) -> bool>) {
         unsafe {
             let fat: Box<FatPtr> = Box::new(transmute(callback));
-            libafl_qemu_add_gdb_cmd(gdb_cmd, &*fat as *const _ as *const ());
+            libafl_qemu_add_gdb_cmd(gdb_cmd, core::ptr::from_ref(&*fat) as *const ());
             GDB_COMMANDS.push(fat);
         }
     }
@@ -1763,8 +1762,6 @@ impl ArchExtras for Emulator {
 
 #[cfg(feature = "python")]
 pub mod pybind {
-    use std::convert::TryFrom;
-
     use pyo3::{exceptions::PyValueError, prelude::*, types::PyInt};
 
     use super::{GuestAddr, GuestUsize, MmapPerms, SyscallHookResult};

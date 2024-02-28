@@ -1,12 +1,9 @@
 //! LLVM compiler Wrapper from `LibAFL`
 
 use std::{
-    convert::Into,
     env,
     path::{Path, PathBuf},
     str::FromStr,
-    string::String,
-    vec::Vec,
 };
 
 use crate::{CompilerWrapper, Error, ToolWrapper, LIB_EXT, LIB_PREFIX};
@@ -31,7 +28,7 @@ include!(concat!(env!("OUT_DIR"), "/clang_constants.rs"));
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LLVMPasses {
     //CmpLogIns,
-    /// The CmpLog pass
+    /// The `CmpLog` pass
     CmpLogRtn,
     /// The AFL coverage pass
     AFLCoverage,
@@ -42,7 +39,7 @@ pub enum LLVMPasses {
     /// The dump cfg pass
     DumpCfg,
     #[cfg(unix)]
-    /// The CmpLog Instruction pass
+    /// The `CmpLog` Instruction pass
     CmpLogInstructions,
 }
 

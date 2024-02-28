@@ -14,7 +14,7 @@ use std::{
 };
 
 use libafl_bolts::{
-    rands::Rand,
+    rands::{Rand, StdRand},
     serdeany::{NamedSerdeAnyMap, SerdeAny, SerdeAnyMap},
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -312,7 +312,7 @@ pub struct StdState<I, C, R, SC> {
     metadata: SerdeAnyMap,
     /// Metadata stored with names
     named_metadata: NamedSerdeAnyMap,
-    /// MaxSize testcase size for mutators that appreciate it
+    /// `MaxSize` testcase size for mutators that appreciate it
     max_size: usize,
     /// Performance statistics for this fuzzer
     #[cfg(feature = "introspection")]
@@ -998,149 +998,139 @@ impl<I, C, R, SC> HasScalabilityMonitor for StdState<I, C, R, SC> {
     }
 }
 
+/// A very simple state without any bells or whistles, for testing.
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct NopState<I> {
+    metadata: SerdeAnyMap,
+    execution: usize,
+    rand: StdRand,
+    phantom: PhantomData<I>,
+}
+
+impl<I> NopState<I> {
+    /// Create a new State that does nothing (for tests)
+    #[must_use]
+    pub fn new() -> Self {
+        NopState {
+            metadata: SerdeAnyMap::new(),
+            execution: 0,
+            rand: StdRand::default(),
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<I> UsesInput for NopState<I>
+where
+    I: Input,
+{
+    type Input = I;
+}
+
+impl<I> HasExecutions for NopState<I> {
+    fn executions(&self) -> &usize {
+        &self.execution
+    }
+
+    fn executions_mut(&mut self) -> &mut usize {
+        &mut self.execution
+    }
+}
+
+impl<I> HasLastReportTime for NopState<I> {
+    fn last_report_time(&self) -> &Option<Duration> {
+        unimplemented!();
+    }
+
+    fn last_report_time_mut(&mut self) -> &mut Option<Duration> {
+        unimplemented!();
+    }
+}
+
+impl<I> HasMetadata for NopState<I> {
+    fn metadata_map(&self) -> &SerdeAnyMap {
+        &self.metadata
+    }
+
+    fn metadata_map_mut(&mut self) -> &mut SerdeAnyMap {
+        &mut self.metadata
+    }
+}
+
+impl<I> HasRand for NopState<I> {
+    type Rand = StdRand;
+
+    fn rand(&self) -> &Self::Rand {
+        &self.rand
+    }
+
+    fn rand_mut(&mut self) -> &mut Self::Rand {
+        &mut self.rand
+    }
+}
+
+impl<I> State for NopState<I> where I: Input {}
+
+impl<I> HasCurrentCorpusIdx for NopState<I> {
+    fn set_corpus_idx(&mut self, _idx: CorpusId) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn clear_corpus_idx(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn current_corpus_idx(&self) -> Result<Option<CorpusId>, Error> {
+        Ok(None)
+    }
+}
+
+impl<I> HasCurrentStage for NopState<I> {
+    fn set_stage(&mut self, _idx: usize) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn clear_stage(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn current_stage(&self) -> Result<Option<usize>, Error> {
+        Ok(None)
+    }
+}
+
+#[cfg(feature = "introspection")]
+impl<I> HasClientPerfMonitor for NopState<I> {
+    fn introspection_monitor(&self) -> &ClientPerfMonitor {
+        unimplemented!();
+    }
+
+    fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
+        unimplemented!();
+    }
+}
+
+#[cfg(feature = "scalability_introspection")]
+impl<I> HasScalabilityMonitor for NopState<I> {
+    fn scalability_monitor(&self) -> &ScalabilityMonitor {
+        unimplemented!();
+    }
+
+    fn scalability_monitor_mut(&mut self) -> &mut ScalabilityMonitor {
+        unimplemented!();
+    }
+}
+
 #[cfg(test)]
 pub mod test {
-    use core::{marker::PhantomData, time::Duration};
+    use libafl_bolts::rands::StdRand;
 
-    use libafl_bolts::{rands::StdRand, serdeany::SerdeAnyMap, Error};
-    use serde::{Deserialize, Serialize};
-
+    use super::StdState;
     use crate::{
-        corpus::{CorpusId, HasCurrentCorpusIdx, InMemoryCorpus},
-        inputs::{Input, NopInput, UsesInput},
+        corpus::InMemoryCorpus,
+        inputs::{Input, NopInput},
         stages::test::{test_resume, test_resume_stages},
-        state::{
-            HasCurrentStage, HasExecutions, HasLastReportTime, HasMetadata, HasRand, State,
-            StdState,
-        },
     };
-    #[cfg(feature = "introspection")]
-    use crate::{monitors::ClientPerfMonitor, state::HasClientPerfMonitor};
-    #[cfg(feature = "scalability_introspection")]
-    use crate::{monitors::ScalabilityMonitor, state::HasScalabilityMonitor};
-
-    /// A very simple state without any bells or whistles, for testing.
-    #[derive(Debug, Serialize, Deserialize, Default)]
-    pub struct NopState<I> {
-        metadata: SerdeAnyMap,
-        execution: usize,
-        rand: StdRand,
-        phantom: PhantomData<I>,
-    }
-
-    impl<I> NopState<I> {
-        /// Create a new State that does nothing (for tests)
-        #[must_use]
-        pub fn new() -> Self {
-            NopState {
-                metadata: SerdeAnyMap::new(),
-                execution: 0,
-                rand: StdRand::default(),
-                phantom: PhantomData,
-            }
-        }
-    }
-
-    impl<I> UsesInput for NopState<I>
-    where
-        I: Input,
-    {
-        type Input = I;
-    }
-
-    impl<I> HasExecutions for NopState<I> {
-        fn executions(&self) -> &usize {
-            &self.execution
-        }
-
-        fn executions_mut(&mut self) -> &mut usize {
-            &mut self.execution
-        }
-    }
-
-    impl<I> HasLastReportTime for NopState<I> {
-        fn last_report_time(&self) -> &Option<Duration> {
-            unimplemented!();
-        }
-
-        fn last_report_time_mut(&mut self) -> &mut Option<Duration> {
-            unimplemented!();
-        }
-    }
-
-    impl<I> HasMetadata for NopState<I> {
-        fn metadata_map(&self) -> &SerdeAnyMap {
-            &self.metadata
-        }
-
-        fn metadata_map_mut(&mut self) -> &mut SerdeAnyMap {
-            &mut self.metadata
-        }
-    }
-
-    impl<I> HasRand for NopState<I> {
-        type Rand = StdRand;
-
-        fn rand(&self) -> &Self::Rand {
-            &self.rand
-        }
-
-        fn rand_mut(&mut self) -> &mut Self::Rand {
-            &mut self.rand
-        }
-    }
-
-    impl<I> State for NopState<I> where I: Input {}
-
-    impl<I> HasCurrentCorpusIdx for NopState<I> {
-        fn set_corpus_idx(&mut self, _idx: CorpusId) -> Result<(), Error> {
-            Ok(())
-        }
-
-        fn clear_corpus_idx(&mut self) -> Result<(), Error> {
-            Ok(())
-        }
-
-        fn current_corpus_idx(&self) -> Result<Option<CorpusId>, Error> {
-            Ok(None)
-        }
-    }
-
-    impl<I> HasCurrentStage for NopState<I> {
-        fn set_stage(&mut self, _idx: usize) -> Result<(), Error> {
-            Ok(())
-        }
-
-        fn clear_stage(&mut self) -> Result<(), Error> {
-            Ok(())
-        }
-
-        fn current_stage(&self) -> Result<Option<usize>, Error> {
-            Ok(None)
-        }
-    }
-
-    #[cfg(feature = "introspection")]
-    impl<I> HasClientPerfMonitor for NopState<I> {
-        fn introspection_monitor(&self) -> &ClientPerfMonitor {
-            unimplemented!();
-        }
-
-        fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
-            unimplemented!();
-        }
-    }
-
-    #[cfg(feature = "scalability_introspection")]
-    impl<I> HasScalabilityMonitor for NopState<I> {
-        fn scalability_monitor(&self) -> &ScalabilityMonitor {
-            unimplemented!();
-        }
-
-        fn scalability_monitor_mut(&mut self) -> &mut ScalabilityMonitor {
-            unimplemented!();
-        }
-    }
 
     #[must_use]
     pub fn test_std_state<I: Input>() -> StdState<I, InMemoryCorpus<I>, StdRand, InMemoryCorpus<I>>

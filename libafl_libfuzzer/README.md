@@ -51,6 +51,22 @@ As this branch generally offers the highest performance version of `libafl_libfu
 Remember to `cargo update` often if using the experimental changes, and please [submit an issue]
 if you encounter problems while using `libfuzzer-best`!
 
+#### macOS
+
+On macOS, you will need to add weak linking for some functions in a `build.rs` file:
+
+```rust
+fn main() {
+    for func in [
+        "_libafl_main",
+        "_LLVMFuzzerCustomMutator",
+        "_LLVMFuzzerCustomCrossOver",
+    ] {
+        println!("cargo:rustc-link-arg=-Wl,-U,{func}");
+    }
+}
+```
+
 #### Caveats
 
 Like harnesses built with `libfuzzer-sys`, Rust targets which build other libraries (e.g. C/C++ FFI) may not

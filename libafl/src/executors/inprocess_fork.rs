@@ -3,7 +3,7 @@ use core::{
     ffi::c_void,
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
-    ptr::{addr_of_mut, null_mut, write_volatile},
+    ptr::{self, addr_of_mut, null_mut, write_volatile},
     sync::atomic::{compiler_fence, Ordering},
     time::Duration,
 };
@@ -278,15 +278,15 @@ where
             let data = addr_of_mut!(FORK_EXECUTOR_GLOBAL_DATA);
             write_volatile(
                 addr_of_mut!((*data).executor_ptr),
-                self as *const _ as *const c_void,
+                ptr::from_ref(self) as *const c_void,
             );
             write_volatile(
                 addr_of_mut!((*data).current_input_ptr),
-                input as *const _ as *const c_void,
+                ptr::from_ref(input) as *const c_void,
             );
             write_volatile(
                 addr_of_mut!((*data).state_ptr),
-                state as *mut _ as *mut c_void,
+                ptr::from_mut(state) as *mut c_void,
             );
             compiler_fence(Ordering::SeqCst);
         }
@@ -560,7 +560,7 @@ mod tests {
                 inprocess_fork::GenericInProcessForkExecutor, Executor,
             },
             fuzzer::test::NopFuzzer,
-            state::test::NopState,
+            state::NopState,
         };
 
         let provider = StdShMemProvider::new().unwrap();

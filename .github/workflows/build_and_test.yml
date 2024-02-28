@@ -593,11 +593,11 @@ jobs:
       run: cargo build --verbose
     - name: Build docs
       run: cargo doc
+    - uses: ilammy/msvc-dev-cmd@v1
     - name: Set LIBCLANG_PATH
       run: echo "LIBCLANG_PATH=$((gcm clang).source -replace "clang.exe")" >> $env:GITHUB_ENV
     - name: install cargo-make
       run: cargo install --force cargo-make
-    - uses: ilammy/msvc-dev-cmd@v1
     - name: install cxx bridge
       run: cargo install cxxbridge-cmd
     - name: Build fuzzers/libfuzzer_stb_image

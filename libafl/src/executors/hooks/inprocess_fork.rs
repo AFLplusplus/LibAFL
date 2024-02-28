@@ -101,9 +101,9 @@ pub(crate) struct InProcessForkExecutorGlobalData {
     pub state_ptr: *const c_void,
     /// Stores a pointer to the current input
     pub current_input_ptr: *const c_void,
-    /// Stores a pointer to the crash_handler function
+    /// Stores a pointer to the `crash_handler` function
     pub crash_handler: *const c_void,
-    /// Stores a pointer to the timeout_handler function
+    /// Stores a pointer to the `timeout_handler` function
     pub timeout_handler: *const c_void,
 }
 

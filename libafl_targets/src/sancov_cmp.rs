@@ -34,11 +34,11 @@ extern "C" {
 unsafe extern "C" fn __sanitizer_cov_pcs_init(pcs_beg: *const usize, pcs_end: *const usize) {
     // "The Unsafe Code Guidelines also notably defines that usize and isize are respectively compatible with uintptr_t and intptr_t defined in C."
     assert!(
-        PCS_BEG.is_null(),
+        pcs_beg == PCS_BEG || PCS_BEG.is_null(),
         "__sanitizer_cov_pcs_init can be called only once."
     );
     assert!(
-        PCS_END.is_null(),
+        pcs_end == PCS_END || PCS_END.is_null(),
         "__sanitizer_cov_pcs_init can be called only once."
     );
 
