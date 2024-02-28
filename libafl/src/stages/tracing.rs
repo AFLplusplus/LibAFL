@@ -126,11 +126,11 @@ impl<EM, TE, Z> TracingStage<EM, TE, Z> {
         }
     }
 
-    /// Apply a certain amount of tries that this stage will attempt to trace the input before
-    /// giving up and not processing the input again.
+    /// Specify how many times that this stage will try again to trace the input before giving up
+    /// and not processing the input again. 0 retries means that the trace will be tried only once.
     #[must_use]
-    pub fn with_tries(mut self, initial_tries: usize) -> Self {
-        self.initial_tries = initial_tries;
+    pub fn with_retries(mut self, retries: usize) -> Self {
+        self.initial_tries = retries;
         self
     }
 
@@ -240,11 +240,11 @@ where
         }
     }
 
-    /// Apply a certain amount of tries that this stage will attempt to trace the input before
-    /// giving up and not processing the input again.
+    /// Specify how many times that this stage will try again to trace the input before giving up
+    /// and not processing the input again. 0 retries means that the trace will be tried only once.
     #[must_use]
-    pub fn with_tries(mut self, initial_tries: usize) -> Self {
-        self.initial_tries = initial_tries;
+    pub fn with_retries(mut self, retries: usize) -> Self {
+        self.initial_tries = retries;
         self
     }
 }
