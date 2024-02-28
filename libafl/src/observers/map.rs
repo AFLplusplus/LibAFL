@@ -92,12 +92,16 @@ fn hash_slice<T>(slice: &[T]) -> u64 {
 /// For example, if you are using [`crate::schedulers::MinimizerScheduler`]:
 /// ```
 /// # use libafl::corpus::InMemoryCorpus;
-/// # use libafl::feedbacks::Feedback;
+/// # use libafl::feedbacks::{Feedback, MapFeedbackMetadata};
 /// use libafl::feedbacks::MaxMapFeedback;
 /// # use libafl::inputs::BytesInput;
 /// use libafl::observers::{StdMapObserver, TrackingHinted};
 /// use libafl::schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler};
 /// # use libafl::state::StdState;
+/// # use libafl_bolts::serdeany::RegistryBuilder;
+///
+/// # #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
+/// # unsafe { MapFeedbackMetadata::<u8>::register() }
 ///
 /// use libafl_bolts::ownedref::OwnedMutSlice;
 /// # use libafl_bolts::rands::StdRand;
