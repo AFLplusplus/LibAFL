@@ -54,7 +54,7 @@ where
 {
     /// The monitor
     monitor: MT,
-    /// The events that happened since the last handle_in_broker
+    /// The events that happened since the last `handle_in_broker`
     events: Vec<Event<S::Input>>,
     /// The custom buf handler
     custom_buf_handlers: Vec<Box<CustomBufHandlerFn<S>>>,

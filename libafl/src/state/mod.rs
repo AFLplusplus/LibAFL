@@ -312,7 +312,7 @@ pub struct StdState<I, C, R, SC> {
     metadata: SerdeAnyMap,
     /// Metadata stored with names
     named_metadata: NamedSerdeAnyMap,
-    /// MaxSize testcase size for mutators that appreciate it
+    /// `MaxSize` testcase size for mutators that appreciate it
     max_size: usize,
     /// Performance statistics for this fuzzer
     #[cfg(feature = "introspection")]
