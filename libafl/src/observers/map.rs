@@ -106,7 +106,7 @@ fn hash_slice<T>(slice: &[T]) -> u64 {
 /// let edges_observer = StdMapObserver::from_ownedref("edges", OwnedMutSlice::from(vec![0u8; 16]));
 /// // inform the feedback to track indices (required by IndexesLenTimeMinimizerScheduler), but not novelties
 /// // this *MUST* be done before it is passed to MaxMapFeedback!
-/// let edges_observer = edges_observer.with_tracking::<true, false>();
+/// let edges_observer = edges_observer.with_index_tracking();
 ///
 /// // init the feedback
 /// let mut feedback = MaxMapFeedback::new(&edges_observer);
@@ -127,19 +127,20 @@ fn hash_slice<T>(slice: &[T]) -> u64 {
 ///
 /// [`MapObserver`] implementors: see [`StdMapObserver`] for an example implementation.
 pub trait TrackingHinted {
-    /// The resulting type, including the new tracking hints, after calling
-    /// [`crate::observers::map::TrackingHint::with_tracking`].
-    type Output<const NEW_INDICES: bool, const NEW_NOVELTIES: bool>: TrackingHinted;
+    /// The resulting type of enabling index tracking.
+    type WithIndexTracking: TrackingHinted;
+    /// The resulting type of enabling index tracking.
+    type WithNoveltiesTracking: TrackingHinted;
 
     /// Whether indices should be tracked for this [`MapObserver`].
     const INDICES: bool;
     /// Whether novelties should be tracked for this [`MapObserver`].
     const NOVELTIES: bool;
 
-    /// Make this map observer into one with the provided tracking hints.
-    fn with_tracking<const NEW_INDICES: bool, const NEW_NOVELTIES: bool>(
-        self,
-    ) -> Self::Output<NEW_INDICES, NEW_NOVELTIES>;
+    /// Convert this map observer into one that tracks indices.
+    fn with_index_tracking(self) -> Self::WithIndexTracking;
+    /// Convert this map observer into one that tracks novelties.
+    fn with_novelty_tracking(self) -> Self::WithNoveltiesTracking;
 }
 
 /// Module which holds the necessary functions and types for map-relevant macros, namely
@@ -187,7 +188,7 @@ pub mod macros {
                             SPACING, "= note: index tracking is required by ", $name, "\n",
                             SPACING, "= note: see the documentation of TrackingHinted for details\n",
                             SPACING, "|\n",
-                            SPACING, "= hint: call `.with_tracking::<true, ...>()` on the map observer present in the following error notes\n",
+                            SPACING, "= hint: call `.with_index_tracking()` on the map observer present in the following error notes\n",
                             SPACING, "|\n",
                             SPACING, "| ",
                         );
@@ -237,7 +238,7 @@ pub mod macros {
                             SPACING, "= note: novelty tracking is required by ", $name, "\n",
                             SPACING, "= note: see the documentation of TrackingHinted for details\n",
                             SPACING, "|\n",
-                            SPACING, "= hint: call `.with_tracking::<..., true>()` on the map observer present in the following error notes\n",
+                            SPACING, "= hint: call `.with_novelty_tracking()` on the map observer present in the following error notes\n",
                             SPACING, "|\n",
                             SPACING, "| ",
                         );
@@ -869,16 +870,22 @@ impl<'a, T, const DIFFERENTIAL: bool, const ITH: bool, const NTH: bool> Tracking
 where
     T: Copy + Default + Serialize,
 {
-    type Output<const NEW_INDICES: bool, const NEW_NOVELTIES: bool> =
-        StdMapObserver<'a, T, DIFFERENTIAL, NEW_INDICES, NEW_NOVELTIES>;
+    type WithIndexTracking = StdMapObserver<'a, T, DIFFERENTIAL, true, NTH>;
+    type WithNoveltiesTracking = StdMapObserver<'a, T, DIFFERENTIAL, ITH, true>;
 
     const INDICES: bool = ITH;
     const NOVELTIES: bool = NTH;
 
-    fn with_tracking<const NEW_INDICES: bool, const NEW_NOVELTIES: bool>(
-        self,
-    ) -> Self::Output<NEW_INDICES, NEW_NOVELTIES> {
-        StdMapObserver::<'a, T, DIFFERENTIAL, NEW_INDICES, NEW_NOVELTIES> {
+    fn with_index_tracking(self) -> Self::WithIndexTracking {
+        StdMapObserver::<'a, T, DIFFERENTIAL, true, NTH> {
+            map: self.map,
+            initial: self.initial,
+            name: self.name,
+        }
+    }
+
+    fn with_novelty_tracking(self) -> Self::WithNoveltiesTracking {
+        StdMapObserver::<'a, T, DIFFERENTIAL, ITH, true> {
             map: self.map,
             initial: self.initial,
             name: self.name,
