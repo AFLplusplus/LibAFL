@@ -352,8 +352,13 @@ where
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
 #[allow(clippy::unsafe_derive_deserialize)]
-pub struct StdMapObserver<'a, T, const DIFFERENTIAL: bool, const ITH: bool, const NTH: bool>
-where
+pub struct StdMapObserver<
+    'a,
+    T,
+    const DIFFERENTIAL: bool,
+    const ITH: bool = false,
+    const NTH: bool = false,
+> where
     T: Default + Copy + 'static + Serialize,
 {
     map: OwnedMutSlice<'a, T>,
