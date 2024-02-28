@@ -324,7 +324,7 @@ pub enum TcpResponse {
     },
     /// Notify the client on the other side that it has been accepted.
     LocalClientAccepted {
-        /// The ClientId this client should send messages as.
+        /// The `ClientId` this client should send messages as.
         /// Mainly used for client-side deduplication of incoming messages
         client_id: ClientId,
     },
@@ -792,7 +792,7 @@ pub struct LlmpPage {
     /// (The os may have tidied up the memory when the receiver starts to map)
     pub receivers_joined_count: AtomicU16,
     /// Set to != 1 by the receiver, once it left again after joining.
-    /// It's not safe for the sender to re-map this page before this is equal to receivers_joined_count
+    /// It's not safe for the sender to re-map this page before this is equal to `receivers_joined_count`
     pub receivers_left_count: AtomicU16,
     #[cfg(target_pointer_width = "64")]
     /// The current message ID
@@ -1796,7 +1796,7 @@ where
     SHM: ShMem,
 {
     /// Shmem containg the actual (unsafe) page,
-    /// shared between one LlmpSender and one LlmpReceiver
+    /// shared between one `LlmpSender` and one `LlmpReceiver`
     shmem: SHM,
 }
 
@@ -1962,9 +1962,9 @@ where
     /// The amount of total clients that should have connected and (and disconnected)
     /// after which the broker loop should quit gracefully.
     pub exit_cleanly_after: Option<NonZeroUsize>,
-    /// Clients that should be removed soon, (offset into llmp_clients)
+    /// Clients that should be removed soon, (offset into `llmp_clients`)
     clients_to_remove: Vec<usize>,
-    /// The ShMemProvider to use
+    /// The `ShMemProvider` to use
     shmem_provider: SP,
     #[cfg(feature = "std")]
     /// The timeout after which a client will be considered stale, and removed.

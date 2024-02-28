@@ -45,7 +45,7 @@ pub struct InProcessHooks {
     /// On timeout C function pointer
     #[cfg(feature = "std")]
     pub timeout_handler: *const c_void,
-    /// TImer struct
+    /// `TImer` struct
     #[cfg(feature = "std")]
     pub timer: TimerStruct,
 }

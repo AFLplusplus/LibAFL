@@ -468,10 +468,10 @@ struct cmp_map {
     allow(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
 pub struct AFLppCmpValuesMetadata {
-    /// The first map of AFLppCmpLogVals retrieved by running the un-mutated input
+    /// The first map of `AFLppCmpLogVals` retrieved by running the un-mutated input
     #[serde(skip)]
     pub orig_cmpvals: HashMap<usize, Vec<CmpValues>>,
-    /// The second map of AFLppCmpLogVals retrieved by runnning the mutated input
+    /// The second map of `AFLppCmpLogVals` retrieved by runnning the mutated input
     #[serde(skip)]
     pub new_cmpvals: HashMap<usize, Vec<CmpValues>>,
     /// The list of logged idx and headers retrieved by runnning the mutated input

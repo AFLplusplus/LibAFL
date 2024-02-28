@@ -718,7 +718,7 @@ mod tests {
                 inprocess_fork::GenericInProcessForkExecutor,
             },
             fuzzer::test::NopFuzzer,
-            state::test::NopState,
+            state::NopState,
         };
 
         let provider = StdShMemProvider::new().unwrap();
