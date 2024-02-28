@@ -19,7 +19,7 @@ use libafl::{
         scheduled::{havoc_mutations, StdScheduledMutator},
         token_mutations::I2SRandReplace,
     },
-    observers::{TimeObserver, TrackingHint},
+    observers::{TimeObserver, TrackingHinted},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, StdState},

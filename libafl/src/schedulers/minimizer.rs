@@ -12,7 +12,7 @@ use crate::{
     corpus::{Corpus, CorpusId, Testcase},
     feedbacks::MapIndexesMetadata,
     inputs::UsesInput,
-    observers::{ObserversTuple, TrackingHint},
+    observers::{ObserversTuple, TrackingHinted},
     schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
     state::{HasCorpus, HasMetadata, HasRand, UsesState},
     Error,
@@ -70,26 +70,27 @@ impl Default for TopRatedsMetadata {
 /// corpus that exercise all the requested features (e.g. all the coverage seen so far)
 /// prioritizing [`Testcase`]`s` using [`TestcaseScore`]
 #[derive(Debug, Clone)]
-pub struct MinimizerScheduler<CS, F, M> {
+pub struct MinimizerScheduler<CS, F, M, O> {
     base: CS,
     skip_non_favored_prob: u64,
     remove_metadata: bool,
-    phantom: PhantomData<(F, M)>,
+    phantom: PhantomData<(F, M, O)>,
 }
 
-impl<CS, F, M> UsesState for MinimizerScheduler<CS, F, M>
+impl<CS, F, M, O> UsesState for MinimizerScheduler<CS, F, M, O>
 where
     CS: UsesState,
 {
     type State = CS::State;
 }
 
-impl<CS, F, M> RemovableScheduler for MinimizerScheduler<CS, F, M>
+impl<CS, F, M, O> RemovableScheduler for MinimizerScheduler<CS, F, M, O>
 where
     CS: RemovableScheduler,
     F: TestcaseScore<CS::State>,
     M: AsSlice<Entry = usize> + SerdeAny + HasRefCnt,
     CS::State: HasCorpus + HasMetadata + HasRand,
+    O: TrackingHinted,
 {
     /// Replaces the testcase at the given idx
     fn on_replace(
@@ -191,12 +192,13 @@ where
     }
 }
 
-impl<CS, F, M> Scheduler for MinimizerScheduler<CS, F, M>
+impl<CS, F, M, O> Scheduler for MinimizerScheduler<CS, F, M, O>
 where
     CS: Scheduler,
     F: TestcaseScore<CS::State>,
     M: AsSlice<Entry = usize> + SerdeAny + HasRefCnt,
     CS::State: HasCorpus + HasMetadata + HasRand,
+    O: TrackingHinted,
 {
     /// Called when a [`Testcase`] is added to the corpus
     fn on_add(&mut self, state: &mut CS::State, idx: CorpusId) -> Result<(), Error> {
@@ -246,13 +248,16 @@ where
     }
 }
 
-impl<CS, F, M> MinimizerScheduler<CS, F, M>
+impl<CS, F, M, O> MinimizerScheduler<CS, F, M, O>
 where
     CS: Scheduler,
     F: TestcaseScore<CS::State>,
     M: AsSlice<Entry = usize> + SerdeAny + HasRefCnt,
     CS::State: HasCorpus + HasMetadata + HasRand,
+    O: TrackingHinted,
 {
+    const TRACKING_SANITY: () = assert!(O::INDICES, "\nIndex tracking is required by MinimizerScheduler\nhint: call `.with_tracking::<true, ...>()` on the observer you passed to MinimizerScheduler::new\nnote: see the documentation for TrackingHinted for details");
+
     /// Update the [`Corpus`] score using the [`MinimizerScheduler`]
     #[allow(clippy::unused_self)]
     #[allow(clippy::cast_possible_wrap)]
@@ -371,7 +376,8 @@ where
     /// and has a default probability to skip non-faved [`Testcase`]s of [`DEFAULT_SKIP_NON_FAVORED_PROB`].
     /// This will remove the metadata `M` when it is no longer needed, after consumption. This might
     /// for example be a `MapIndexesMetadata`.
-    pub fn new<O: TrackingHint<true, NTH>, const NTH: bool>(_obs: &O, base: CS) -> Self {
+    pub fn new(_obs: &O, base: CS) -> Self {
+        let _: () = Self::TRACKING_SANITY; // check that tracking is enabled for this map
         Self {
             base,
             skip_non_favored_prob: DEFAULT_SKIP_NON_FAVORED_PROB,
@@ -405,10 +411,14 @@ where
 }
 
 /// A [`MinimizerScheduler`] with [`LenTimeMulTestcaseScore`] to prioritize quick and small [`Testcase`]`s`.
-pub type LenTimeMinimizerScheduler<CS, M> =
-    MinimizerScheduler<CS, LenTimeMulTestcaseScore<<CS as UsesState>::State>, M>;
+pub type LenTimeMinimizerScheduler<CS, M, O> =
+    MinimizerScheduler<CS, LenTimeMulTestcaseScore<<CS as UsesState>::State>, M, O>;
 
 /// A [`MinimizerScheduler`] with [`LenTimeMulTestcaseScore`] to prioritize quick and small [`Testcase`]`s`
 /// that exercise all the entries registered in the [`MapIndexesMetadata`].
-pub type IndexesLenTimeMinimizerScheduler<CS> =
-    MinimizerScheduler<CS, LenTimeMulTestcaseScore<<CS as UsesState>::State>, MapIndexesMetadata>;
+pub type IndexesLenTimeMinimizerScheduler<CS, O> = MinimizerScheduler<
+    CS,
+    LenTimeMulTestcaseScore<<CS as UsesState>::State>,
+    MapIndexesMetadata,
+    O,
+>;
