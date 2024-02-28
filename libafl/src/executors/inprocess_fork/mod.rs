@@ -61,7 +61,7 @@ where
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
     EM: EventFirer<State = S> + EventRestarter<State = S>,
-    OF: State + Feedback<S>,
+    OF: Feedback<S>,
     S: HasSolutions,
     Z: HasObjective<Objective = OF, State = S>,
 {
@@ -479,7 +479,7 @@ where
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
     EM: EventFirer<State = S> + EventRestarter<State = S>,
-    OF: State + Feedback<S>,
+    OF: Feedback<S>,
     S: State + HasSolutions,
     Z: HasObjective<Objective = OF, State = S>,
 {

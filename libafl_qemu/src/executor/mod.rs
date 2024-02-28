@@ -428,7 +428,7 @@ where
     QT: QemuHelperTuple<S>,
     SP: ShMemProvider,
     EM: EventFirer<State = S> + EventRestarter,
-    OF: Feedback<S> + State,
+    OF: Feedback<S>,
     S: HasSolutions,
     Z: HasObjective<Objective = OF, State = S>,
 {
