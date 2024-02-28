@@ -9,7 +9,7 @@ use core::marker::PhantomData;
 
 use libafl_bolts::tuples::MatchName;
 
-use super::{RetryingStage, Stage, TracingStage};
+use super::{LimitedTriesProgress, RetryingStage, Stage, TracingStage};
 #[cfg(all(feature = "concolic_mutation", feature = "introspection"))]
 use crate::monitors::PerfFeature;
 #[cfg(all(feature = "introspection", feature = "concolic_mutation"))]
@@ -20,7 +20,6 @@ use crate::{
     corpus::{Corpus, HasCurrentCorpusIdx},
     executors::{Executor, HasObservers},
     observers::concolic::ConcolicObserver,
-    prelude::LimitedTriesProgress,
     state::{HasCorpus, HasExecutions, HasMetadata, HasNamedMetadata, UsesState},
     Error,
 };
