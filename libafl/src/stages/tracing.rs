@@ -7,7 +7,7 @@ use crate::{
     executors::{Executor, HasObservers, ShadowExecutor},
     mark_feature_time,
     observers::ObserversTuple,
-    stages::{LimitedTriesProgress, RetryingStage, Stage},
+    stages::{RetryProgress, RetryingStage, Stage},
     start_timer,
     state::{HasCorpus, HasExecutions, HasNamedMetadata, State, UsesState},
     Error,
@@ -19,7 +19,7 @@ use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 #[derive(Clone, Debug)]
 pub struct TracingStage<EM, TE, Z> {
     tracer_executor: TE,
-    initial_tries: usize,
+    max_retries: usize,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(EM, TE, Z)>,
 }
@@ -85,7 +85,7 @@ where
     EM: UsesState<State = TE::State>,
     Z: UsesState<State = TE::State>,
 {
-    type Progress = LimitedTriesProgress;
+    type Progress = RetryProgress;
 
     #[inline]
     fn perform(
@@ -111,8 +111,8 @@ where
 }
 
 impl<EM, TE, Z> RetryingStage for TracingStage<EM, TE, Z> {
-    fn initial_tries(&self) -> usize {
-        self.initial_tries
+    fn max_retries(&self) -> usize {
+        self.max_retries
     }
 }
 
@@ -121,7 +121,7 @@ impl<EM, TE, Z> TracingStage<EM, TE, Z> {
     pub fn new(tracer_executor: TE) -> Self {
         Self {
             tracer_executor,
-            initial_tries: 10,
+            max_retries: 10,
             phantom: PhantomData,
         }
     }
@@ -130,7 +130,7 @@ impl<EM, TE, Z> TracingStage<EM, TE, Z> {
     /// and not processing the input again. 0 retries means that the trace will be tried only once.
     #[must_use]
     pub fn with_retries(mut self, retries: usize) -> Self {
-        self.initial_tries = retries;
+        self.max_retries = retries;
         self
     }
 
@@ -148,7 +148,7 @@ impl<EM, TE, Z> TracingStage<EM, TE, Z> {
 /// A stage that runs the shadow executor using also the shadow observers
 #[derive(Clone, Debug)]
 pub struct ShadowTracingStage<E, EM, SOT, Z> {
-    initial_tries: usize,
+    max_retries: usize,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, EM, SOT, Z)>,
 }
@@ -168,7 +168,7 @@ where
     Z: UsesState<State = E::State>,
     E::State: State + HasExecutions + HasCorpus + HasNamedMetadata + Debug,
 {
-    type Progress = LimitedTriesProgress;
+    type Progress = RetryProgress;
 
     #[inline]
     fn perform(
@@ -219,8 +219,8 @@ where
 }
 
 impl<E, EM, SOT, Z> RetryingStage for ShadowTracingStage<E, EM, SOT, Z> {
-    fn initial_tries(&self) -> usize {
-        self.initial_tries
+    fn max_retries(&self) -> usize {
+        self.max_retries
     }
 }
 
@@ -235,7 +235,7 @@ where
     /// Creates a new default stage
     pub fn new(_executor: &mut ShadowExecutor<E, SOT>) -> Self {
         Self {
-            initial_tries: 10,
+            max_retries: 10,
             phantom: PhantomData,
         }
     }
@@ -244,7 +244,7 @@ where
     /// and not processing the input again. 0 retries means that the trace will be tried only once.
     #[must_use]
     pub fn with_retries(mut self, retries: usize) -> Self {
-        self.initial_tries = retries;
+        self.max_retries = retries;
         self
     }
 }

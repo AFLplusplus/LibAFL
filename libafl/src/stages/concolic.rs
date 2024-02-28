@@ -9,7 +9,7 @@ use core::marker::PhantomData;
 
 use libafl_bolts::tuples::MatchName;
 
-use super::{LimitedTriesProgress, RetryingStage, Stage, TracingStage};
+use super::{RetryProgress, RetryingStage, Stage, TracingStage};
 #[cfg(all(feature = "concolic_mutation", feature = "introspection"))]
 use crate::monitors::PerfFeature;
 #[cfg(all(feature = "introspection", feature = "concolic_mutation"))]
@@ -53,7 +53,7 @@ where
     TE::State: HasExecutions + HasCorpus + HasNamedMetadata,
     Z: UsesState<State = TE::State>,
 {
-    type Progress = LimitedTriesProgress;
+    type Progress = RetryProgress;
 
     #[inline]
     fn perform(
@@ -93,14 +93,14 @@ where
 }
 
 impl<EM, TE, Z> RetryingStage for ConcolicTracingStage<EM, TE, Z> {
-    fn initial_tries(&self) -> usize {
-        self.inner.initial_tries()
+    fn max_retries(&self) -> usize {
+        self.inner.max_retries()
     }
 }
 
 impl<EM, TE, Z> ConcolicTracingStage<EM, TE, Z> {
     /// Creates a new default tracing stage using the given [`Executor`], observing traces from a
-    /// [`ConcolicObserver`] with the given name. The [`RetryingStage::initial_tries`] is
+    /// [`ConcolicObserver`] with the given name. The [`RetryingStage::max_retries`] is
     /// used from the provided inner stage.
     pub fn new(inner: TracingStage<EM, TE, Z>, observer_name: String) -> Self {
         Self {

@@ -586,21 +586,21 @@ impl<S, ST> StageProgress<S, ST> for () {
 /// Progress which permits a fixed amount of resumes per round of fuzzing. If this amount is ever
 /// exceeded, the input will no longer be executed by this stage.
 #[derive(Clone, Deserialize, Serialize, Debug)]
-pub struct LimitedTriesProgress {
+pub struct RetryProgress {
     tries_remaining: Option<usize>,
     skipped: HashSet<CorpusId>,
 }
 
-impl_serdeany!(LimitedTriesProgress);
+impl_serdeany!(RetryProgress);
 
-/// Stage which specifies a certain amount of tries over which a scheduled input will be used. To
-/// be used in combination with [`LimitedTriesProgress`].
+/// Stage which specifies a certain amount of retries over which a scheduled input is attempted. To
+/// be used in combination with [`RetryProgress`].
 pub trait RetryingStage {
-    /// The number of tries permitted for each testcase.
-    fn initial_tries(&self) -> usize;
+    /// The number of times each testcase may be retries.
+    fn max_retries(&self) -> usize;
 }
 
-impl<S, ST> StageProgress<S, ST> for LimitedTriesProgress
+impl<S, ST> StageProgress<S, ST> for RetryProgress
 where
     S: HasNamedMetadata,
     ST: RetryingStage,
@@ -614,12 +614,12 @@ where
                     )
                 })?;
             } else {
-                metadata.tries_remaining = Some(stage.initial_tries());
+                metadata.tries_remaining = Some(stage.max_retries() + 1);
             }
         } else {
             state.add_named_metadata(
                 Self {
-                    tries_remaining: Some(stage.initial_tries()),
+                    tries_remaining: Some(stage.max_retries() + 1),
                     skipped: HashSet::new(),
                 },
                 core::any::type_name_of_val(stage),
@@ -643,7 +643,7 @@ where
     }
 }
 
-impl LimitedTriesProgress {
+impl RetryProgress {
     /// Whether we should skip the provided corpus entry.
     pub fn should_skip<S, ST>(
         state: &mut S,
@@ -713,7 +713,7 @@ pub mod test {
         executors::test::NopExecutor,
         fuzzer::test::NopFuzzer,
         inputs::NopInput,
-        stages::{LimitedTriesProgress, RetryingStage, Stage, StageProgress, StagesTuple},
+        stages::{RetryProgress, RetryingStage, Stage, StageProgress, StagesTuple},
         state::{test::test_std_state, HasCorpus, HasMetadata, State, UsesState},
     };
 
@@ -904,14 +904,14 @@ pub mod test {
     fn test_tries_progress() -> Result<(), Error> {
         #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
         unsafe {
-            LimitedTriesProgress::register();
+            RetryProgress::register();
         }
 
         struct StageWithOneTry;
 
         impl RetryingStage for StageWithOneTry {
-            fn initial_tries(&self) -> usize {
-                2
+            fn max_retries(&self) -> usize {
+                1
             }
         }
 
@@ -922,50 +922,36 @@ pub mod test {
 
         for _ in 0..10 {
             // used normally, no retries means we never skip
-            LimitedTriesProgress::initialize_progress(&mut state, &stage)?;
-            assert!(!LimitedTriesProgress::should_skip(
-                &mut state, &stage, corpus_idx
-            )?);
-            LimitedTriesProgress::clear_progress(&mut state, &stage)?;
+            RetryProgress::initialize_progress(&mut state, &stage)?;
+            assert!(!RetryProgress::should_skip(&mut state, &stage, corpus_idx)?);
+            RetryProgress::clear_progress(&mut state, &stage)?;
         }
 
         for _ in 0..10 {
             // used normally, only one retry means we never skip
-            LimitedTriesProgress::initialize_progress(&mut state, &stage)?;
-            assert!(!LimitedTriesProgress::should_skip(
-                &mut state, &stage, corpus_idx
-            )?);
-            LimitedTriesProgress::initialize_progress(&mut state, &stage)?;
-            assert!(!LimitedTriesProgress::should_skip(
-                &mut state, &stage, corpus_idx
-            )?);
-            LimitedTriesProgress::clear_progress(&mut state, &stage)?;
+            RetryProgress::initialize_progress(&mut state, &stage)?;
+            assert!(!RetryProgress::should_skip(&mut state, &stage, corpus_idx)?);
+            RetryProgress::initialize_progress(&mut state, &stage)?;
+            assert!(!RetryProgress::should_skip(&mut state, &stage, corpus_idx)?);
+            RetryProgress::clear_progress(&mut state, &stage)?;
         }
 
-        LimitedTriesProgress::initialize_progress(&mut state, &stage)?;
-        assert!(!LimitedTriesProgress::should_skip(
-            &mut state, &stage, corpus_idx
-        )?);
+        RetryProgress::initialize_progress(&mut state, &stage)?;
+        assert!(!RetryProgress::should_skip(&mut state, &stage, corpus_idx)?);
         // task failed, let's resume
-        LimitedTriesProgress::initialize_progress(&mut state, &stage)?;
+        RetryProgress::initialize_progress(&mut state, &stage)?;
         // we still have one more try!
-        assert!(!LimitedTriesProgress::should_skip(
-            &mut state, &stage, corpus_idx
-        )?);
+        assert!(!RetryProgress::should_skip(&mut state, &stage, corpus_idx)?);
         // task failed, let's resume
-        LimitedTriesProgress::initialize_progress(&mut state, &stage)?;
+        RetryProgress::initialize_progress(&mut state, &stage)?;
         // out of retries, so now we skip
-        assert!(LimitedTriesProgress::should_skip(
-            &mut state, &stage, corpus_idx
-        )?);
-        LimitedTriesProgress::clear_progress(&mut state, &stage)?;
+        assert!(RetryProgress::should_skip(&mut state, &stage, corpus_idx)?);
+        RetryProgress::clear_progress(&mut state, &stage)?;
 
-        LimitedTriesProgress::initialize_progress(&mut state, &stage)?;
+        RetryProgress::initialize_progress(&mut state, &stage)?;
         // we previously exhausted this testcase's retries, so we skip
-        assert!(LimitedTriesProgress::should_skip(
-            &mut state, &stage, corpus_idx
-        )?);
-        LimitedTriesProgress::clear_progress(&mut state, &stage)?;
+        assert!(RetryProgress::should_skip(&mut state, &stage, corpus_idx)?);
+        RetryProgress::clear_progress(&mut state, &stage)?;
 
         Ok(())
     }
