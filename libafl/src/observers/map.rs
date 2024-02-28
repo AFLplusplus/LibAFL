@@ -100,7 +100,7 @@ fn hash_slice<T>(slice: &[T]) -> u64 {
 /// use libafl::schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler};
 /// # use libafl::state::StdState;
 /// # use libafl_bolts::serdeany::RegistryBuilder;
-///
+/// #
 /// # #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
 /// # unsafe { MapFeedbackMetadata::<u8>::register() }
 ///
@@ -167,7 +167,7 @@ pub mod macros {
     /// # struct MyCustomScheduler<O> {
     /// #     phantom: PhantomData<O>,
     /// # }
-    ///
+    /// #
     /// impl<O> MyCustomScheduler<O> where O: TrackingHinted {
     ///     pub fn new() -> Self {
     ///         require_index_tracking!("MyCustomScheduler", O);
@@ -218,7 +218,7 @@ pub mod macros {
     /// # struct MyCustomScheduler<O> {
     /// #     phantom: PhantomData<O>,
     /// # }
-    ///
+    /// #
     /// impl<O> MyCustomScheduler<O> where O: TrackingHinted {
     ///     pub fn new() -> Self {
     ///         require_novelties_tracking!("MyCustomScheduler", O);
