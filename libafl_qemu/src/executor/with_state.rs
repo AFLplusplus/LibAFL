@@ -19,10 +19,7 @@ use libafl::{
 };
 
 use crate::{
-    emu::Emulator,
-    executor::{QemuExecutorState},
-    helper::QemuHelperTuple,
-    hooks::QemuHooks,
+    emu::Emulator, executor::QemuExecutorState, helper::QemuHelperTuple, hooks::QemuHooks,
 };
 
 #[cfg(emulation_mode = "usermode")]
