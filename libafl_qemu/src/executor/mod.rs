@@ -173,14 +173,16 @@ where
         })
     }
 
+    #[must_use]
     pub fn hooks(&self) -> &QemuHooks<QT, S> {
-        &self.hooks
+        self.hooks
     }
 
     pub fn hooks_mut(&mut self) -> &mut QemuHooks<QT, S> {
-        &mut self.hooks
+        self.hooks
     }
 
+    #[must_use]
     pub fn emulator(&self) -> &Emulator {
         self.hooks.emulator()
     }
@@ -281,11 +283,10 @@ where
     S: State + HasExecutions + HasCorpus + HasSolutions,
     QT: QemuHelperTuple<S> + Debug,
 {
-    fn pre_exec<E, EM, OT, OF, Z>(&mut self, input: &E::Input, emu: &Emulator)
+    fn pre_exec<E, EM, OF, Z>(&mut self, input: &E::Input, emu: &Emulator)
     where
         E: Executor<EM, Z, NopExecutorState, State = S>,
         EM: EventFirer<State = S> + EventRestarter<State = S>,
-        OT: ObserversTuple<S>,
         OF: Feedback<S>,
         Z: HasObjective<Objective = OF, State = S>,
     {
@@ -293,7 +294,7 @@ where
             self.hooks.helpers().first_exec_all(self.hooks);
             self.first_exec = false;
         }
-        self.hooks.helpers_mut().pre_exec_all(&emu, input);
+        self.hooks.helpers_mut().pre_exec_all(emu, input);
     }
 
     fn post_exec<E, EM, OT, OF, Z>(
