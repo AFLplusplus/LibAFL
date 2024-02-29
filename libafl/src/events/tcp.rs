@@ -43,7 +43,7 @@ use crate::{
         BrokerEventResult, Event, EventConfig, EventFirer, EventManager, EventManagerId,
         EventProcessor, EventRestarter, HasCustomBufHandlers, HasEventManagerId, ProgressReporter,
     },
-    executors::{Executor, HasObservers},
+    executors::{Executor, HasExecutorState, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, UsesInput},
     monitors::Monitor,
@@ -533,7 +533,7 @@ where
 
     // Handle arriving events in the client
     #[allow(clippy::unused_self)]
-    fn handle_in_client<E, Z>(
+    fn handle_in_client<E, ES, Z>(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
@@ -542,7 +542,8 @@ where
         event: Event<S::Input>,
     ) -> Result<(), Error>
     where
-        E: Executor<Self, Z> + HasObservers<State = S>,
+        E: Executor<Self, Z, ES> + HasObservers<State = S>,
+        ES: HasExecutorState,
         for<'a> E::Observers: Deserialize<'a>,
         Z: ExecutionProcessor<E::Observers, State = S> + EvaluatorObservers<E::Observers>,
     {
@@ -679,10 +680,11 @@ where
     }
 }
 
-impl<E, S, Z> EventProcessor<E, Z> for TcpEventManager<S>
+impl<E, ES, S, Z> EventProcessor<E, Z> for TcpEventManager<S>
 where
     S: State + HasExecutions,
-    E: HasObservers<State = S> + Executor<Self, Z>,
+    E: HasObservers<State = S> + Executor<Self, Z, ES>,
+    ES: HasExecutorState,
     for<'a> E::Observers: Deserialize<'a>,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers, State = S>,
 {
@@ -740,9 +742,10 @@ where
     }
 }
 
-impl<E, S, Z> EventManager<E, Z> for TcpEventManager<S>
+impl<E, ES, S, Z> EventManager<E, Z> for TcpEventManager<S>
 where
-    E: HasObservers<State = S> + Executor<Self, Z>,
+    E: HasObservers<State = S> + Executor<Self, Z, ES>,
+    ES: HasExecutorState,
     for<'a> E::Observers: Deserialize<'a>,
     S: State + HasExecutions + HasMetadata + HasLastReportTime,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers, State = S>,
@@ -870,9 +873,10 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<E, S, SP, Z> EventProcessor<E, Z> for TcpRestartingEventManager<S, SP>
+impl<E, ES, S, SP, Z> EventProcessor<E, Z> for TcpRestartingEventManager<S, SP>
 where
-    E: HasObservers<State = S> + Executor<TcpEventManager<S>, Z>,
+    E: HasObservers<State = S> + Executor<TcpEventManager<S>, Z, ES>,
+    ES: HasExecutorState,
     for<'a> E::Observers: Deserialize<'a>,
     S: State + HasExecutions,
     SP: ShMemProvider + 'static,
@@ -884,9 +888,10 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<E, S, SP, Z> EventManager<E, Z> for TcpRestartingEventManager<S, SP>
+impl<E, ES, S, SP, Z> EventManager<E, Z> for TcpRestartingEventManager<S, SP>
 where
-    E: HasObservers<State = S> + Executor<TcpEventManager<S>, Z>,
+    E: HasObservers<State = S> + Executor<TcpEventManager<S>, Z, ES>,
+    ES: HasExecutorState,
     for<'a> E::Observers: Deserialize<'a>,
     S: State + HasExecutions + HasMetadata + HasLastReportTime,
     SP: ShMemProvider + 'static,
