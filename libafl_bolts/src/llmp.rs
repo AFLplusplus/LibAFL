@@ -2272,7 +2272,7 @@ where
                         {
                             self.clients_to_remove.push(i);
                             #[cfg(feature = "llmp_debug")]
-                            println!("Client #{i} timed out. Removing.");
+                            log::info!("Client #{:#?} timed out. Removing.", client_id);
                         }
                     }
                     new_messages = has_messages;
@@ -2284,7 +2284,8 @@ where
 
         // After brokering, remove all clients we don't want to keep.
         for i in self.clients_to_remove.iter().rev() {
-            log::debug!("Client #{i} disconnected.");
+            let client_id = self.llmp_clients[*i].id;
+            log::info!("Client #{:#?} disconnected.", client_id);
             self.llmp_clients.remove(*i);
         }
         self.clients_to_remove.clear();
