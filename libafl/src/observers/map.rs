@@ -85,7 +85,7 @@ fn hash_slice<T>(slice: &[T]) -> u64 {
 /// ensure that edge metadata is recorded as is appropriate for the provided observer.
 ///
 /// If you get a type constraint failure for your map due to this type being unfulfilled, you must
-/// call [`TrackingHinted::with_index_tracking`] or [`TrackingHinted::with_novelty_tracking`] **at
+/// call [`TrackingHinted::track_indices`] or [`TrackingHinted::track_novelties`] **at
 /// the initialisation site of your map**.
 ///
 /// This trait allows various components which interact with map metadata to ensure that the
@@ -111,7 +111,7 @@ fn hash_slice<T>(slice: &[T]) -> u64 {
 /// let edges_observer = StdMapObserver::from_ownedref("edges", OwnedMutSlice::from(vec![0u8; 16]));
 /// // inform the feedback to track indices (required by IndexesLenTimeMinimizerScheduler), but not novelties
 /// // this *MUST* be done before it is passed to MaxMapFeedback!
-/// let edges_observer = edges_observer.with_index_tracking();
+/// let edges_observer = edges_observer.track_indices();
 ///
 /// // init the feedback
 /// let mut feedback = MaxMapFeedback::new(&edges_observer);
@@ -134,7 +134,7 @@ fn hash_slice<T>(slice: &[T]) -> u64 {
 pub trait TrackingHinted {
     /// The resulting type of enabling index tracking.
     type WithIndexTracking: TrackingHinted;
-    /// The resulting type of enabling index tracking.
+    /// The resulting type of enabling novelty tracking.
     type WithNoveltiesTracking: TrackingHinted;
 
     /// Whether indices should be tracked for this [`MapObserver`].
@@ -143,9 +143,9 @@ pub trait TrackingHinted {
     const NOVELTIES: bool;
 
     /// Convert this map observer into one that tracks indices.
-    fn with_index_tracking(self) -> Self::WithIndexTracking;
+    fn track_indices(self) -> Self::WithIndexTracking;
     /// Convert this map observer into one that tracks novelties.
-    fn with_novelty_tracking(self) -> Self::WithNoveltiesTracking;
+    fn track_novelties(self) -> Self::WithNoveltiesTracking;
 }
 
 /// Struct which wraps [`MapObserver`] instances to explicitly give them tracking data.
@@ -164,11 +164,11 @@ impl<T, const ITH: bool, const NTH: bool> TrackingHinted for ExplicitTracking<T,
     const INDICES: bool = ITH;
     const NOVELTIES: bool = NTH;
 
-    fn with_index_tracking(self) -> Self::WithIndexTracking {
+    fn track_indices(self) -> Self::WithIndexTracking {
         ExplicitTracking::<T, true, NTH>(self.0)
     }
 
-    fn with_novelty_tracking(self) -> Self::WithNoveltiesTracking {
+    fn track_novelties(self) -> Self::WithNoveltiesTracking {
         ExplicitTracking::<T, ITH, true>(self.0)
     }
 }
@@ -292,7 +292,7 @@ pub mod macros {
                             SPACING, "= note: index tracking is required by ", $name, "\n",
                             SPACING, "= note: see the documentation of TrackingHinted for details\n",
                             SPACING, "|\n",
-                            SPACING, "= hint: call `.with_index_tracking()` on the map observer present in the following error notes\n",
+                            SPACING, "= hint: call `.track_indices()` on the map observer present in the following error notes\n",
                             SPACING, "|\n",
                             SPACING, "| ",
                         );
@@ -343,7 +343,7 @@ pub mod macros {
                             SPACING, "= note: novelty tracking is required by ", $name, "\n",
                             SPACING, "= note: see the documentation of TrackingHinted for details\n",
                             SPACING, "|\n",
-                            SPACING, "= hint: call `.with_novelty_tracking()` on the map observer present in the following error notes\n",
+                            SPACING, "= hint: call `.track_novelties()` on the map observer present in the following error notes\n",
                             SPACING, "|\n",
                             SPACING, "| ",
                         );
@@ -402,11 +402,11 @@ where
     const INDICES: bool = false;
     const NOVELTIES: bool = false;
 
-    fn with_index_tracking(self) -> Self::WithIndexTracking {
+    fn track_indices(self) -> Self::WithIndexTracking {
         ExplicitTracking::<Self, true, false>(self)
     }
 
-    fn with_novelty_tracking(self) -> Self::WithNoveltiesTracking {
+    fn track_novelties(self) -> Self::WithNoveltiesTracking {
         ExplicitTracking::<Self, false, true>(self)
     }
 }
