@@ -31,6 +31,7 @@ use libafl_bolts::os::startable_self;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use libafl_bolts::{
     core_affinity::get_core_ids,
+    llmp::DEFAULT_CLIENT_TIMEOUT_SECS,
     os::{dup2, fork, ForkResult},
 };
 use libafl_bolts::{
@@ -78,7 +79,7 @@ where
     SP: ShMemProvider + 'static,
     S: State + 'a,
 {
-    /// The `ShmemProvider` to use
+    /// The ShmemProvider to use
     shmem_provider: SP,
     /// The monitor instance to use
     monitor: MT,
@@ -95,7 +96,7 @@ where
     /// A file name to write all client output to
     #[builder(default = None)]
     stdout_file: Option<&'a str>,
-    /// The actual, opened, `stdout_file` - so that we keep it open until the end
+    /// The actual, opened, stdout_file - so that we keep it open until the end
     #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[builder(setter(skip), default = None)]
     opened_stdout_file: Option<File>,
@@ -103,7 +104,7 @@ where
     /// `stdout_file`.
     #[builder(default = None)]
     stderr_file: Option<&'a str>,
-    /// The actual, opened, `stdout_file` - so that we keep it open until the end
+    /// The actual, opened, stdout_file - so that we keep it open until the end
     #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[builder(setter(skip), default = None)]
     opened_stderr_file: Option<File>,
@@ -117,6 +118,9 @@ where
     /// Then, clients launched by this [`Launcher`] can connect to the original `broker`.
     #[builder(default = true)]
     spawn_broker: bool,
+    /// The timeout duration used for llmp client timeout
+    #[builder(default = DEFAULT_CLIENT_TIMEOUT_SECS)]
+    client_timeout: Duration,
     /// Tell the manager to serialize or not the state on restart
     #[builder(default = true)]
     serialize_state: bool,
@@ -229,6 +233,7 @@ where
                             })
                             .configuration(self.configuration)
                             .serialize_state(self.serialize_state)
+                            .client_timeout(self.client_timeout)
                             .build()
                             .launch()?;
 
@@ -252,6 +257,7 @@ where
                 .exit_cleanly_after(Some(NonZeroUsize::try_from(self.cores.ids.len()).unwrap()))
                 .configuration(self.configuration)
                 .serialize_state(self.serialize_state)
+                .client_timeout(self.client_timeout)
                 .build()
                 .launch()?;
 
@@ -303,6 +309,7 @@ where
                     })
                     .configuration(self.configuration)
                     .serialize_state(self.serialize_state)
+                    .client_timeout(self.client_timeout)
                     .build()
                     .launch()?;
 
@@ -372,6 +379,7 @@ where
                 .exit_cleanly_after(Some(NonZeroUsize::try_from(self.cores.ids.len()).unwrap()))
                 .configuration(self.configuration)
                 .serialize_state(self.serialize_state)
+                .client_timeout(self.client_timeout)
                 .build()
                 .launch()?;
 
@@ -409,7 +417,7 @@ where
     SP: ShMemProvider + 'static,
     S: State + 'a,
 {
-    /// The `ShmemProvider` to use
+    /// The ShmemProvider to use
     shmem_provider: SP,
     /// The monitor instance to use
     monitor: MT,
@@ -429,7 +437,7 @@ where
     /// A file name to write all client output to
     #[builder(default = None)]
     stdout_file: Option<&'a str>,
-    /// The actual, opened, `stdout_file` - so that we keep it open until the end
+    /// The actual, opened, stdout_file - so that we keep it open until the end
     #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[builder(setter(skip), default = None)]
     opened_stdout_file: Option<File>,
@@ -437,7 +445,7 @@ where
     /// `stdout_file`.
     #[builder(default = None)]
     stderr_file: Option<&'a str>,
-    /// The actual, opened, `stdout_file` - so that we keep it open until the end
+    /// The actual, opened, stdout_file - so that we keep it open until the end
     #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[builder(setter(skip), default = None)]
     opened_stderr_file: Option<File>,
@@ -455,6 +463,9 @@ where
     /// Tell the manager to serialize or not the state on restart
     #[builder(default = true)]
     serialize_state: bool,
+    /// The duration for the llmp client timeout
+    #[builder(default = DEFAULT_CLIENT_TIMEOUT_SECS)]
+    client_timeout: Duration,
     #[builder(setter(skip), default = PhantomData)]
     phantom_data: PhantomData<(&'a S, &'a SP)>,
 }
@@ -498,7 +509,8 @@ where
 {
     #[allow(clippy::similar_names)]
     #[allow(clippy::too_many_lines)]
-    fn launch_internal(&mut self, client_timeout: Option<Duration>) -> Result<(), Error> {
+    /// launch the broker and the client and fuzz
+    pub fn launch(&mut self) -> Result<(), Error> {
         if self.cores.ids.is_empty() {
             return Err(Error::illegal_argument(
                 "No cores to spawn on given, cannot launch anything.",
@@ -533,17 +545,19 @@ where
                 self.shmem_provider.post_fork(false)?;
                 handles.push(child.pid);
                 #[cfg(feature = "std")]
-                log::info!("centralized broker spawned");
+                log::info!("PID: {:#?} centralized broker spawned", std::process::id());
             }
             ForkResult::Child => {
                 log::info!("{:?} PostFork", unsafe { libc::getpid() });
+                #[cfg(feature = "std")]
+                log::info!("PID: {:#?} I am centralized broker", std::process::id());
                 self.shmem_provider.post_fork(true)?;
 
                 let mut broker: CentralizedLlmpEventBroker<S::Input, SP> =
                     CentralizedLlmpEventBroker::on_port(
                         self.shmem_provider.clone(),
                         self.centralized_broker_port,
-                        client_timeout,
+                        self.client_timeout,
                     )?;
                 broker.broker_loop()?;
             }
@@ -590,6 +604,7 @@ where
                             })
                             .configuration(self.configuration)
                             .serialize_state(self.serialize_state)
+                            .client_timeout(self.client_timeout)
                             .build()
                             .launch()?;
 
@@ -619,6 +634,7 @@ where
                 .exit_cleanly_after(Some(NonZeroUsize::try_from(self.cores.ids.len()).unwrap()))
                 .configuration(self.configuration)
                 .serialize_state(self.serialize_state)
+                .client_timeout(self.client_timeout)
                 .build()
                 .launch()?;
 
@@ -642,15 +658,5 @@ where
         }
 
         Ok(())
-    }
-
-    /// Launch the broker and the clients and fuzz
-    pub fn launch(&mut self) -> Result<(), Error> {
-        self.launch_internal(None)
-    }
-
-    /// Launch the broker and the clients and fuzz with a given timeout for the clients
-    pub fn launch_with_client_timeout(&mut self, client_timeout: Duration) -> Result<(), Error> {
-        self.launch_internal(Some(client_timeout))
     }
 }

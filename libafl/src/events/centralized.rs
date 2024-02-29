@@ -86,11 +86,7 @@ where
     ///
     /// The port must not be bound yet to have a broker.
     #[cfg(feature = "std")]
-    pub fn on_port(
-        shmem_provider: SP,
-        port: u16,
-        client_timeout: Option<Duration>,
-    ) -> Result<Self, Error> {
+    pub fn on_port(shmem_provider: SP, port: u16, client_timeout: Duration) -> Result<Self, Error> {
         Ok(Self {
             // TODO switch to false after solving the bug
             llmp: LlmpBroker::with_keep_pages_attach_to_tcp(
@@ -289,7 +285,7 @@ where
     ) -> Result<(), Error> {
         if !self.is_main {
             // secondary node
-            let is_nt = match &mut event {
+            let is_nt_or_heartbeat = match &mut event {
                 Event::NewTestcase {
                     input: _,
                     client_config: _,
@@ -303,9 +299,14 @@ where
                     *forward_id = Some(ClientId(self.inner.mgr_id().0 as u32));
                     true
                 }
+                Event::UpdateExecStats {
+                    time: _,
+                    executions: _,
+                    phantom: _,
+                } => true,
                 _ => false,
             };
-            if is_nt {
+            if is_nt_or_heartbeat {
                 return self.forward_to_main(&event);
             }
         }

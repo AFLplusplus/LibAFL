@@ -106,7 +106,7 @@ use crate::{
 
 /// The default timeout in seconds after which a client will be considered stale, and removed.
 #[cfg(feature = "std")]
-const DEFAULT_CLIENT_TIMEOUT_SECS: u64 = 30;
+pub const DEFAULT_CLIENT_TIMEOUT_SECS: Duration = Duration::from_secs(300);
 
 /// The max number of pages a [`client`] may have mapped that were not yet read by the [`broker`]
 /// Usually, this value should not exceed `1`, else the broker cannot keep up with the amount of incoming messages.
@@ -696,11 +696,7 @@ where
 {
     #[cfg(feature = "std")]
     /// Creates either a broker, if the tcp port is not bound, or a client, connected to this port.
-    pub fn on_port(
-        shmem_provider: SP,
-        port: u16,
-        client_timeout: Option<Duration>,
-    ) -> Result<Self, Error> {
+    pub fn on_port(shmem_provider: SP, port: u16, client_timeout: Duration) -> Result<Self, Error> {
         match tcp_bind(port) {
             Ok(listener) => {
                 // We got the port. We are the broker! :)
@@ -729,7 +725,7 @@ where
     pub fn broker_on_port(
         shmem_provider: SP,
         port: u16,
-        client_timeout: Option<Duration>,
+        client_timeout: Duration,
     ) -> Result<Self, Error> {
         Ok(LlmpConnection::IsBroker {
             broker: LlmpBroker::create_attach_to_tcp(shmem_provider, port, client_timeout)?,
@@ -2019,7 +2015,7 @@ where
     /// Create and initialize a new [`LlmpBroker`]
     pub fn new(
         shmem_provider: SP,
-        #[cfg(feature = "std")] client_timeout: Option<Duration>,
+        #[cfg(feature = "std")] client_timeout: Duration,
     ) -> Result<Self, Error> {
         // Broker never cleans up the pages so that new
         // clients may join at any time
@@ -2038,7 +2034,7 @@ where
     pub fn with_keep_pages(
         mut shmem_provider: SP,
         keep_pages_forever: bool,
-        #[cfg(feature = "std")] client_timeout: Option<Duration>,
+        #[cfg(feature = "std")] client_timeout: Duration,
     ) -> Result<Self, Error> {
         Ok(LlmpBroker {
             llmp_out: LlmpSender {
@@ -2060,11 +2056,7 @@ where
             exit_cleanly_after: None,
             num_clients_total: 0,
             #[cfg(feature = "std")]
-            client_timeout: if let Some(to) = client_timeout {
-                to
-            } else {
-                Duration::from_secs(DEFAULT_CLIENT_TIMEOUT_SECS)
-            },
+            client_timeout,
         })
     }
 
@@ -2087,7 +2079,7 @@ where
     pub fn create_attach_to_tcp(
         shmem_provider: SP,
         port: u16,
-        client_timeout: Option<Duration>,
+        client_timeout: Duration,
     ) -> Result<Self, Error> {
         Self::with_keep_pages_attach_to_tcp(shmem_provider, port, true, client_timeout)
     }
@@ -2098,7 +2090,7 @@ where
         shmem_provider: SP,
         port: u16,
         keep_pages_forever: bool,
-        client_timeout: Option<Duration>,
+        client_timeout: Duration,
     ) -> Result<Self, Error> {
         match tcp_bind(port) {
             Ok(listener) => {
@@ -2272,7 +2264,7 @@ where
                         {
                             self.clients_to_remove.push(i);
                             #[cfg(feature = "llmp_debug")]
-                            println!("Client #{i} timed out. Removing.");
+                            log::info!("Client #{:#?} timed out. Removing.", client_id);
                         }
                     }
                     new_messages = has_messages;
@@ -2284,8 +2276,8 @@ where
 
         // After brokering, remove all clients we don't want to keep.
         for i in self.clients_to_remove.iter().rev() {
-            panic!("SHIT0");
-            log::debug!("Client #{i} disconnected.");
+            let client_id = self.llmp_clients[*i].id;
+            log::info!("Client #{:#?} disconnected.", client_id);
             self.llmp_clients.remove(*i);
         }
         self.clients_to_remove.clear();
@@ -3283,7 +3275,7 @@ mod tests {
         LlmpClient,
         LlmpConnection::{self, IsBroker, IsClient},
         LlmpMsgHookResult::ForwardToClients,
-        Tag,
+        Tag, DEFAULT_CLIENT_TIMEOUT_SECS,
     };
     use crate::shmem::{ShMemProvider, StdShMemProvider};
 
@@ -3293,14 +3285,24 @@ mod tests {
     pub fn test_llmp_connection() {
         #[allow(unused_variables)]
         let shmem_provider = StdShMemProvider::new().unwrap();
-        let mut broker = match LlmpConnection::on_port(shmem_provider.clone(), 1337, None).unwrap()
+        let mut broker = match LlmpConnection::on_port(
+            shmem_provider.clone(),
+            1337,
+            DEFAULT_CLIENT_TIMEOUT_SECS,
+        )
+        .unwrap()
         {
             IsClient { client: _ } => panic!("Could not bind to port as broker"),
             IsBroker { broker } => broker,
         };
 
         // Add the first client (2nd, actually, because of the tcp listener client)
-        let mut client = match LlmpConnection::on_port(shmem_provider.clone(), 1337, None).unwrap()
+        let mut client = match LlmpConnection::on_port(
+            shmem_provider.clone(),
+            1337,
+            DEFAULT_CLIENT_TIMEOUT_SECS,
+        )
+        .unwrap()
         {
             IsBroker { broker: _ } => panic!("Second connect should be a client!"),
             IsClient { client } => client,
