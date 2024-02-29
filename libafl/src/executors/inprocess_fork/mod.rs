@@ -129,13 +129,14 @@ where
     OT: ObserversTuple<S> + Debug,
     S: UsesInput,
     SP: ShMemProvider,
-    HT: ExecutorHooksTuple,
+    HT: ExecutorHooksTuple + Debug,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,
 {
     #[cfg(target_os = "linux")]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("GenericInProcessForkExecutorInner")
+            .field("hooks", &self.hooks)
             .field("observers", &self.observers)
             .field("shmem_provider", &self.shmem_provider)
             .field("itimerspec", &self.itimerspec)
@@ -161,7 +162,7 @@ where
     OT: ObserversTuple<S> + Debug,
     S: UsesInput,
     SP: ShMemProvider,
-    HT: ExecutorHooksTuple,
+    HT: ExecutorHooksTuple + Debug,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,
 {
@@ -513,13 +514,13 @@ where {
     /// Retrieve the harness function.
     #[inline]
     pub fn harness(&self) -> &H {
-        &self.harness_fn
+        self.harness_fn
     }
 
     /// Retrieve the harness function for a mutable reference.
     #[inline]
     pub fn harness_mut(&mut self) -> &mut H {
-        &mut self.harness_fn
+        self.harness_fn
     }
 }
 

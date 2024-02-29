@@ -86,7 +86,7 @@ where
     OT: ObserversTuple<S> + Debug,
     S: UsesInput,
     SP: ShMemProvider,
-    HT: ExecutorHooksTuple,
+    HT: ExecutorHooksTuple + Debug,
     ES: HasExecutorState,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,
