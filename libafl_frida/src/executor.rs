@@ -234,7 +234,7 @@ where
 impl<'a, 'b, 'c, H, OT, RT, S> HasInProcessHooks
     for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
-    H: FnMut(&S::Input, &mut ()) -> ExitKind,
+    H: FnMut(&S::Input) -> ExitKind,
     S: State + HasSolutions + HasCorpus + HasExecutions,
     S::Input: HasTargetBytes,
     OT: ObserversTuple<S>,
