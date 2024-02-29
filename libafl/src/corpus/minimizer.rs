@@ -100,7 +100,7 @@ where
         state: &mut E::State,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, Z> + HasObservers,
+        E: Executor<EM, Z, NopExecutorState> + HasObservers,
         CS: Scheduler<State = E::State> + RemovableScheduler,
         EM: EventFirer<State = E::State>,
         Z: HasScheduler<Scheduler = CS, State = E::State>,
