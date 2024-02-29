@@ -6,6 +6,8 @@ Other stages may enrich [`crate::corpus::Testcase`]s with metadata.
 
 use core::marker::PhantomData;
 
+use alloc::boxed::Box;
+use alloc::vec::Vec;
 pub use calibrate::CalibrationStage;
 pub use colorization::*;
 #[cfg(feature = "std")]
@@ -16,6 +18,7 @@ pub use concolic::SimpleConcolicMutationalStage;
 pub use dump::*;
 pub use generalization::GeneralizationStage;
 use hashbrown::HashSet;
+use libafl_bolts::tuples::IntoVec;
 use libafl_bolts::{impl_serdeany, tuples::HasConstLen};
 pub use logics::*;
 pub use mutational::{MutationalStage, StdMutationalStage};
@@ -179,6 +182,41 @@ where
 
         // Execute the remaining stages
         self.1.perform_all(fuzzer, executor, state, manager)
+    }
+}
+
+impl<Head, Tail, E, EM, Z> IntoVec<Box<dyn Stage<E, EM, Z, State = Head::State, Input = Head::Input>>> for (Head, Tail)
+where
+    Head: Stage<E, EM, Z>,
+    Tail: StagesTuple<E, EM, Head::State, Z> + HasConstLen,
+    E: UsesState<State = Head::State>,
+    EM: UsesState<State = Head::State>,
+    Z: UsesState<State = Head::State>,
+    Head::State: HasCurrentStage,
+{
+    fn into_vec(self) -> Vec<Box<dyn Stage<E, EM, Z, State = Head::State, Input = Head::Input>>> {
+        let (head, tail) = self.uncons();
+        let mut ret = tail.into_vec();
+        ret.insert(0, Box::new(head));
+        ret
+    }
+}
+
+impl<E, EM, S, Z> StagesTuple<E, EM, S, Z> for Vec<Box<dyn Stage<E, EM, Z, State = S, Input = S::Input>>>
+where
+    E: UsesState<State = S>,
+    EM: UsesState<State = S>,
+    Z: UsesState<State = S>,
+    S: UsesInput + HasCurrentStage,
+{
+    fn perform_all(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut S,
+        manager: &mut EM,
+    ) -> Result<(), Error> {
+        self.iter_mut().try_for_each(|x| x.perform(fuzzer, executor, state, manager))
     }
 }
 
