@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
     inputs::UsesInput,
-    schedulers::{Scheduler, TestcaseScore, RemovableScheduler},
+    schedulers::{RemovableScheduler, Scheduler, TestcaseScore},
     state::{HasCorpus, HasMetadata, HasRand, State, UsesState},
     Error,
 };
