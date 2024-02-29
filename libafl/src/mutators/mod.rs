@@ -598,8 +598,6 @@ pub mod pybind {
 
 #[cfg(test)]
 mod tests {
-    use alloc::{string::ToString, vec::Vec};
-
     use libafl_bolts::rands::StdRand;
 
     use super::{havoc_mutations, MutatorsTuple};
