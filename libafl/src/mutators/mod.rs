@@ -603,17 +603,19 @@ pub mod pybind {
 
 #[cfg(test)]
 mod tests {
+    use alloc::{boxed::Box, vec::Vec};
+
     use libafl_bolts::{rands::StdRand, tuples::IntoVec};
 
-    use super::{havoc_mutations, MutatorsTuple};
-    use crate::{corpus::CachedOnDiskCorpus, inputs::BytesInput, state::StdState};
+    use crate::{
+        corpus::InMemoryCorpus,
+        inputs::BytesInput,
+        mutators::{havoc_mutations, Mutator, MutatorsTuple},
+        state::StdState,
+    };
 
-    type TestStdStateType = StdState<
-        BytesInput,
-        CachedOnDiskCorpus<BytesInput>,
-        StdRand,
-        CachedOnDiskCorpus<BytesInput>,
-    >;
+    type TestStdStateType =
+        StdState<BytesInput, InMemoryCorpus<BytesInput>, StdRand, InMemoryCorpus<BytesInput>>;
 
     #[test]
     fn test_tuple_into_vec() {
@@ -621,7 +623,7 @@ mod tests {
         let names_before = MutatorsTuple::<BytesInput, TestStdStateType>::names(&mutators);
 
         let mutators = havoc_mutations::<BytesInput>();
-        let mutators_vec = mutators.into_vec();
+        let mutators_vec: Vec<Box<dyn Mutator<BytesInput, TestStdStateType>>> = mutators.into_vec();
         assert_eq!(names_before, mutators_vec.names());
     }
 }

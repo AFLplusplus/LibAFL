@@ -1,5 +1,6 @@
 //! Compiletime lists/tuples used throughout the `LibAFL` universe
 
+use alloc::vec::Vec;
 #[rustversion::not(nightly)]
 use core::any::type_name;
 use core::{
@@ -7,7 +8,6 @@ use core::{
     ptr::{addr_of, addr_of_mut},
 };
 
-use alloc::vec::Vec;
 pub use tuple_list::{tuple_list, tuple_list_type, TupleList};
 
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
