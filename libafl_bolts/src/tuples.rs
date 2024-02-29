@@ -1,5 +1,6 @@
 //! Compiletime lists/tuples used throughout the `LibAFL` universe
 
+#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 #[rustversion::not(nightly)]
 use core::any::type_name;
@@ -91,11 +92,13 @@ where
 
 /// Create a [`Vec`] from a tuple list or similar
 /// (We need this trait since we cannot implement `Into` for foreign types)
+#[cfg(feature = "alloc")]
 pub trait IntoVec<T> {
     /// Convert this into a [`Vec`].
     fn into_vec(self) -> Vec<T>;
 }
 
+#[cfg(feature = "alloc")]
 impl<T> IntoVec<T> for () {
     #[inline]
     fn into_vec(self) -> Vec<T> {
