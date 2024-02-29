@@ -7,6 +7,7 @@ use core::{
     ptr::{addr_of, addr_of_mut},
 };
 
+use alloc::vec::Vec;
 pub use tuple_list::{tuple_list, tuple_list_type, TupleList};
 
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
@@ -85,6 +86,20 @@ where
 
     fn borrow_mut(&'a mut self) -> Self::SplitBorrowMutResult {
         (Some(&mut self.0), self.1.borrow_mut())
+    }
+}
+
+/// Create a [`Vec`] from a tuple list or similar
+/// (We need this trait since we cannot implement `Into` for foreign types)
+pub trait IntoVec<T> {
+    /// Convert this into a [`Vec`].
+    fn into_vec(self) -> Vec<T>;
+}
+
+impl<T> IntoVec<T> for () {
+    #[inline]
+    fn into_vec(self) -> Vec<T> {
+        Vec::new()
     }
 }
 

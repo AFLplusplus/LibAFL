@@ -35,7 +35,7 @@ pub mod nautilus;
 
 use alloc::{boxed::Box, vec::Vec};
 
-use libafl_bolts::{HasLen, Named};
+use libafl_bolts::{tuples::IntoVec, HasLen, Named};
 #[cfg(feature = "nautilus")]
 pub use nautilus::*;
 use tuple_list::NonEmptyTuple;
@@ -173,9 +173,6 @@ pub trait MutatorsTuple<I, S>: HasLen {
 
     /// Gets all names of the wrapped [`Mutator`]`s`.
     fn names(&self) -> Vec<&str>;
-
-    /// Convert the current [`MutatorsTuple`] to a [`Vec`].
-    fn into_vec(self) -> Vec<Box<dyn Mutator<I, S>>>;
 }
 
 impl<I, S> MutatorsTuple<I, S> for () {
@@ -225,16 +222,11 @@ impl<I, S> MutatorsTuple<I, S> for () {
     fn names(&self) -> Vec<&str> {
         Vec::new()
     }
-
-    #[inline]
-    fn into_vec(self) -> Vec<Box<dyn Mutator<I, S>>> {
-        Vec::new()
-    }
 }
 
 impl<Head, Tail, I, S> MutatorsTuple<I, S> for (Head, Tail)
 where
-    Head: Mutator<I, S> + 'static,
+    Head: Mutator<I, S>,
     Tail: MutatorsTuple<I, S>,
 {
     fn mutate_all(
@@ -296,7 +288,13 @@ where
         ret.insert(0, self.0.name());
         ret
     }
+}
 
+impl<Head, Tail, I, S> IntoVec<Box<dyn Mutator<I, S>>> for (Head, Tail)
+where
+    Head: Mutator<I, S> + 'static,
+    Tail: IntoVec<Box<dyn Mutator<I, S>>>,
+{
     fn into_vec(self) -> Vec<Box<dyn Mutator<I, S>>> {
         let (head, tail) = self.uncons();
         let mut ret = tail.into_vec();
@@ -351,7 +349,12 @@ where
     fn names(&self) -> Vec<&str> {
         self.0.names()
     }
+}
 
+impl<Tail, I, S> IntoVec<Box<dyn Mutator<I, S>>> for (Tail,)
+where
+    Tail: IntoVec<Box<dyn Mutator<I, S>>>,
+{
     fn into_vec(self) -> Vec<Box<dyn Mutator<I, S>>> {
         self.0.into_vec()
     }
@@ -415,7 +418,9 @@ impl<I, S> MutatorsTuple<I, S> for Vec<Box<dyn Mutator<I, S>>> {
     fn names(&self) -> Vec<&str> {
         self.iter().map(|x| x.name()).collect()
     }
+}
 
+impl<I, S> IntoVec<Box<dyn Mutator<I, S>>> for Vec<Box<dyn Mutator<I, S>>> {
     fn into_vec(self) -> Vec<Box<dyn Mutator<I, S>>> {
         self
     }
@@ -598,7 +603,7 @@ pub mod pybind {
 
 #[cfg(test)]
 mod tests {
-    use libafl_bolts::rands::StdRand;
+    use libafl_bolts::{rands::StdRand, tuples::IntoVec};
 
     use super::{havoc_mutations, MutatorsTuple};
     use crate::{corpus::CachedOnDiskCorpus, inputs::BytesInput, state::StdState};
@@ -616,7 +621,7 @@ mod tests {
         let names_before = MutatorsTuple::<BytesInput, TestStdStateType>::names(&mutators);
 
         let mutators = havoc_mutations::<BytesInput>();
-        let mutators_vec = MutatorsTuple::<BytesInput, TestStdStateType>::into_vec(mutators);
+        let mutators_vec = mutators.into_vec();
         assert_eq!(names_before, mutators_vec.names());
     }
 }
