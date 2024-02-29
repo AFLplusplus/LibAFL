@@ -737,6 +737,13 @@ pub trait HasLen {
     }
 }
 
+impl<T> HasLen for Vec<T> {
+    #[inline]
+    fn len(&self) -> usize {
+        Vec::<T>::len(self)
+    }
+}
+
 /// Has a ref count
 pub trait HasRefCnt {
     /// The ref count

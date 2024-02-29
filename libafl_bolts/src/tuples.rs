@@ -105,16 +105,30 @@ where
     const LEN: usize = 1 + Tail::LEN;
 }
 
-impl<C> HasLen for C
+impl<Head, Tail> HasLen for (Head, Tail)
 where
-    C: HasConstLen,
+    Tail: HasLen,
 {
+    #[inline]
     fn len(&self) -> usize {
-        Self::LEN
+        self.1.len() + 1
     }
+}
 
-    fn is_empty(&self) -> bool {
-        Self::LEN != 0
+impl<Tail> HasLen for (Tail,)
+where
+    Tail: HasLen,
+{
+    #[inline]
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+impl HasLen for () {
+    #[inline]
+    fn len(&self) -> usize {
+        0
     }
 }
 
