@@ -9,7 +9,6 @@ use core::{
     ptr::{addr_of, addr_of_mut},
 };
 
-use alloc::vec::Vec;
 pub use tuple_list::{tuple_list, tuple_list_type, TupleList};
 
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
