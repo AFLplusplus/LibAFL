@@ -870,10 +870,9 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<E, ES, S, SP, Z> EventProcessor<E, Z> for TcpRestartingEventManager<S, SP>
+impl<E, S, SP, Z> EventProcessor<E, Z> for TcpRestartingEventManager<S, SP>
 where
     E: HasObservers<State = S> + Executor<TcpEventManager<S>, Z, NopExecutorState>,
-    ES: HasExecutorState,
     for<'a> E::Observers: Deserialize<'a>,
     S: State + HasExecutions,
     SP: ShMemProvider + 'static,
@@ -885,10 +884,9 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<E, ES, S, SP, Z> EventManager<E, Z> for TcpRestartingEventManager<S, SP>
+impl<E, S, SP, Z> EventManager<E, Z> for TcpRestartingEventManager<S, SP>
 where
     E: HasObservers<State = S> + Executor<TcpEventManager<S>, Z, NopExecutorState>,
-    ES: HasExecutorState,
     for<'a> E::Observers: Deserialize<'a>,
     S: State + HasExecutions + HasMetadata + HasLastReportTime,
     SP: ShMemProvider + 'static,
