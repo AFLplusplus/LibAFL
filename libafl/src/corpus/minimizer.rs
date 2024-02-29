@@ -15,7 +15,7 @@ use z3::{ast::Bool, Config, Context, Optimize};
 use crate::{
     corpus::Corpus,
     events::{Event, EventFirer, LogSeverity},
-    executors::{Executor, HasObservers},
+    executors::{Executor, HasExecutorState, HasObservers, NopExecutorState},
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
     schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
@@ -25,10 +25,11 @@ use crate::{
 
 /// `CorpusMinimizers` minimize corpora according to internal logic. See various implementations for
 /// details.
-pub trait CorpusMinimizer<E>
+pub trait CorpusMinimizer<E, ES>
 where
     E: UsesState,
     E::State: HasCorpus,
+    ES: HasExecutorState,
 {
     /// Minimize the corpus of the provided state.
     fn minimize<CS, EM, Z>(
@@ -39,7 +40,7 @@ where
         state: &mut E::State,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, Z> + HasObservers,
+        E: Executor<EM, Z, ES> + HasObservers,
         CS: Scheduler<State = E::State> + RemovableScheduler, // schedulers that has on_remove/on_replace only!
         EM: EventFirer<State = E::State>,
         Z: HasScheduler<Scheduler = CS, State = E::State>;
@@ -82,7 +83,7 @@ where
     }
 }
 
-impl<E, O, T, TS> CorpusMinimizer<E> for MapCorpusMinimizer<E, O, T, TS>
+impl<E, O, T, TS> CorpusMinimizer<E, NopExecutorState> for MapCorpusMinimizer<E, O, T, TS>
 where
     E: UsesState,
     for<'a> O: MapObserver<Entry = T> + AsIter<'a, Item = T>,
@@ -137,7 +138,7 @@ where
 
             // Execute the input; we cannot rely on the metadata already being present.
             executor.observers_mut().pre_exec_all(state, &input)?;
-            let kind = executor.run_target(fuzzer, state, manager, &input)?;
+            let kind = executor.run_target(fuzzer, state, manager, &input, &mut ())?;
             executor
                 .observers_mut()
                 .post_exec_all(state, &input, &kind)?;
