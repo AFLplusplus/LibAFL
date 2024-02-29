@@ -134,4 +134,4 @@ COPY fuzzers fuzzers
 
 # RUN ./scripts/test_all_fuzzers.sh --no-fmt
 
-ENTRYPOINT [ "/bin/bash" ]
+ENTRYPOINT [ "/bin/bash", "-c" ]
