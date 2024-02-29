@@ -737,6 +737,7 @@ pub trait HasLen {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<T> HasLen for Vec<T> {
     #[inline]
     fn len(&self) -> usize {
