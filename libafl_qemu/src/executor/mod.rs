@@ -107,7 +107,7 @@ pub unsafe fn inproc_qemu_crash_handler<'a, E, EM, ES, OF, Z, QT, S>(
 }
 
 #[cfg(emulation_mode = "systemmode")]
-static mut BREAK_ON_TMOUT: bool = false;
+pub(crate) static mut BREAK_ON_TMOUT: bool = false;
 
 #[cfg(emulation_mode = "systemmode")]
 extern "C" {
