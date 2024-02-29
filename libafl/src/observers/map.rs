@@ -358,7 +358,8 @@ pub mod macros {
 /// A [`MapObserver`] observes the static map, as oftentimes used for AFL-like coverage information
 ///
 /// TODO: enforce `iter() -> AssociatedTypeIter` when generic associated types stabilize
-pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned
+pub trait MapObserver:
+    HasLen + Named + Serialize + serde::de::DeserializeOwned + AsRef<Self>
 // where
 //     for<'it> &'it Self: IntoIterator<Item = &'it Self::Entry>
 {
@@ -636,6 +637,15 @@ where
     /// Returns a mutable iterator over the map.
     pub fn iter_mut(&mut self) -> IterMut<'_, T> {
         <&mut Self as IntoIterator>::into_iter(self)
+    }
+}
+
+impl<'a, T, const DIFFERENTIAL: bool> AsRef<Self> for StdMapObserver<'a, T, DIFFERENTIAL>
+where
+    T: Default + Copy + 'static + Serialize,
+{
+    fn as_ref(&self) -> &Self {
+        self
     }
 }
 
@@ -1123,6 +1133,15 @@ where
     }
 }
 
+impl<'a, T, const N: usize> AsRef<Self> for ConstMapObserver<'a, T, N>
+where
+    T: Default + Copy + 'static + Serialize,
+{
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
 impl<'a, T, const N: usize> MapObserver for ConstMapObserver<'a, T, N>
 where
     T: Bounded
@@ -1435,6 +1454,15 @@ where
     }
 }
 
+impl<'a, T> AsRef<Self> for VariableMapObserver<'a, T>
+where
+    T: Default + Copy + 'static + Serialize + PartialEq + Bounded,
+{
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
 impl<'a, T> MapObserver for VariableMapObserver<'a, T>
 where
     T: Bounded
@@ -1689,6 +1717,15 @@ where
     }
 }
 
+impl<M> AsRef<Self> for HitcountsMapObserver<M>
+where
+    M: MapObserver<Entry = u8>,
+{
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
 impl<M> MapObserver for HitcountsMapObserver<M>
 where
     M: MapObserver<Entry = u8>,
@@ -1938,6 +1975,16 @@ where
     }
 }
 
+impl<M> AsRef<Self> for HitcountsIterableMapObserver<M>
+where
+    M: MapObserver<Entry = u8>,
+    for<'it> M: AsIterMut<'it, Item = u8>,
+{
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
 impl<M> MapObserver for HitcountsIterableMapObserver<M>
 where
     M: MapObserver<Entry = u8>,
@@ -2180,6 +2227,15 @@ where
     #[inline]
     fn len(&self) -> usize {
         self.len
+    }
+}
+
+impl<'a, T, const DIFFERENTIAL: bool> AsRef<Self> for MultiMapObserver<'a, T, DIFFERENTIAL>
+where
+    T: 'static + Default + Copy + Serialize + Debug,
+{
+    fn as_ref(&self) -> &Self {
+        self
     }
 }
 
@@ -2536,6 +2592,15 @@ where
     /// Returns a mutable iterator over the map.
     pub fn iter_mut(&mut self) -> IterMut<'_, T> {
         <&mut Self as IntoIterator>::into_iter(self)
+    }
+}
+
+impl<T> AsRef<Self> for OwnedMapObserver<T>
+where
+    T: 'static + Default + Copy + Serialize,
+{
+    fn as_ref(&self) -> &Self {
+        self
     }
 }
 
