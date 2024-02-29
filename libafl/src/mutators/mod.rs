@@ -381,7 +381,7 @@ impl<I, S> MutatorsTuple<I, S> for Vec<Box<dyn Mutator<I, S>>> {
         corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
         for mutator in self.iter_mut() {
-            mutator.post_exec(state, stage_idx, corpus_idx)?
+            mutator.post_exec(state, stage_idx, corpus_idx)?;
         }
         Ok(())
     }
