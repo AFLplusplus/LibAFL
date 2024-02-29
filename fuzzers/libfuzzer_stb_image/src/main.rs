@@ -68,7 +68,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     // Create an observation channel using the coverage map
     // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)
-    let edges_observer = unsafe { std_edges_map_observer("edges").with_index_tracking() };
+    let edges_observer = unsafe { std_edges_map_observer("edges").track_indices() };
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
