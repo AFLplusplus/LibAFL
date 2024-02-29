@@ -18,15 +18,13 @@ use libafl::{
     Error,
 };
 
+#[cfg(emulation_mode = "usermode")]
+use crate::executor::inproc_qemu_crash_handler;
+#[cfg(emulation_mode = "systemmode")]
+use crate::executor::{inproc_qemu_timeout_handler, BREAK_ON_TMOUT};
 use crate::{
     emu::Emulator, executor::QemuExecutorState, helper::QemuHelperTuple, hooks::QemuHooks,
 };
-
-#[cfg(emulation_mode = "usermode")]
-use crate::executor::inproc_qemu_crash_handler;
-
-#[cfg(emulation_mode = "systemmode")]
-use crate::executor::{inproc_qemu_timeout_handler, BREAK_ON_TMOUT};
 
 pub struct QemuExecutorWithState<'a, H, OT, QT, S>
 where
