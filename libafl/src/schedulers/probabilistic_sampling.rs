@@ -75,6 +75,10 @@ where
     #[allow(clippy::unused_self)]
     pub fn store_probability(&self, state: &mut S, idx: CorpusId) -> Result<(), Error> {
         let prob = F::compute(state, &mut *state.corpus().get(idx)?.borrow_mut())?;
+        debug_assert!(
+            prob >= 0.0 && prob.is_finite(),
+            "scheduler probability is {prob}; to work correctly it must be >= 0.0 and finite"
+        );
         let meta = state
             .metadata_map_mut()
             .get_mut::<ProbabilityMetadata>()
