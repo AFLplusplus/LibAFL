@@ -336,7 +336,7 @@ where
         _executor_state: &mut (),
     ) -> Result<ExitKind, Error> {
         let emu = Emulator::get().unwrap();
-        self.state.pre_exec::<Self, EM, OT, OF, Z>(input, &emu);
+        self.state.pre_exec::<Self, EM, OF, Z>(input, &emu);
         let mut exit_kind = self.inner.run_target(fuzzer, state, mgr, input, &mut ())?;
         self.state.post_exec::<Self, EM, OT, OF, Z>(
             input,
