@@ -97,7 +97,6 @@ unsafe fn update_ngram(mut pos: usize) -> usize {
         PREV_ARRAY = PREV_ARRAY.rotate_elements_right::<1>();
         PREV_ARRAY.as_mut_array()[0] = pos as u32;
         let reduced = PREV_ARRAY.reduce_xor() as usize;
-        pos ^= reduced;
         pos %= EDGES_MAP_SIZE;
     }
     pos
