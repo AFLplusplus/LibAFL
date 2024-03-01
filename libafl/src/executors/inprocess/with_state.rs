@@ -303,6 +303,7 @@ where
 
     /// Create a new in mem executor with the default timeout and use batch mode(5 sec)
     #[cfg(all(feature = "std", target_os = "linux"))]
+    #[allow(clippy::too_many_arguments)]
     pub fn batched_timeout_generic<EM, OF, Z>(
         user_hooks: HT,
         harness_fn: HB,
