@@ -28,6 +28,9 @@ type Ngram4 = core::simd::u32x4;
 #[cfg(feature = "sancov_ngram4")]
 #[rustversion::nightly]
 pub static mut PREV_ARRAY: Ngram4 = Ngram4::from_array([0, 0, 0, 0]);
+#[cfg(feature = "sancov_ngram4")]
+#[rustversion::nightly]
+pub static SHR: Ngram4 = Ngram4::from_array([1, 1, 1, 1]);
 
 /// The hook to initialize ngram everytime we run the harness
 #[cfg(feature = "sancov_ngram4")]
@@ -96,6 +99,7 @@ unsafe fn update_ngram(mut pos: usize) -> usize {
     {
         PREV_ARRAY = PREV_ARRAY.rotate_elements_right::<1>();
         PREV_ARRAY.as_mut_array()[0] = pos as u32;
+        PREV_ARRAY.shr_assign(SHR);
         let reduced = PREV_ARRAY.reduce_xor() as usize;
         pos %= EDGES_MAP_SIZE;
     }
