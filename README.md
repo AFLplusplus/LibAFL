@@ -140,6 +140,14 @@ If you use LibAFL for your academic work, please cite the following paper:
 }
 ```
 
+## Contact Us
+
+The best way to communicate with us about LibAFL is via [GitHub Discussions](https://github.com/AFLplusplus/LibAFL/discussions).
+This is the best way because it keeps a *searchable record* of conversations about LibAFL, allowing future users to learn from those discussions without needing to ask the same questions again.
+
+We also have a dedicated channel in the [Awesome Fuzzing discord](https://discord.com/invite/QxxTBCw) and have recently created a [Matrix channel](https://matrix.to/#/#libafl:envs.net) as well for more general purpose discussions.
+Again, we recommend sticking to GitHub if you think your questions or feedback could be relevant for future users.
+
 #### License
 
 <sup>
