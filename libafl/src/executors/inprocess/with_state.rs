@@ -338,6 +338,7 @@ where
     /// * `harness_fn` - the harness, executing the function
     /// * `observers` - the observers observing the target during execution
     /// This may return an error on unix, if signal handler setup fails
+    #[allow(clippy::too_many_arguments)]
     pub fn with_timeout_generic<EM, OF, Z>(
         user_hooks: HT,
         harness_fn: HB,
