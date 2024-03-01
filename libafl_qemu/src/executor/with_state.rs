@@ -101,7 +101,6 @@ where
             inner.inprocess_hooks_mut().timeout_handler = inproc_qemu_timeout_handler::<
                 InProcessExecutorWithState<'a, H, OT, S, QemuExecutorState<'a, QT, S>>,
                 EM,
-                QemuExecutorState<'a, QT, S>,
                 OF,
                 Z,
             > as *const c_void;
