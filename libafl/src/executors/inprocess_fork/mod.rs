@@ -769,7 +769,7 @@ mod tests {
         let mut state = NopState::new();
         let mut mgr = SimpleEventManager::printing();
         in_process_fork_executor
-            .run_target(&mut fuzzer, &mut state, &mut mgr, &input, &mut ())
+            .run_target(&mut fuzzer, &mut state, &mut mgr, &input)
             .unwrap();
     }
 }

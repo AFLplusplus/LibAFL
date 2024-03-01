@@ -921,7 +921,7 @@ mod tests {
         .unwrap();
         let input = NopInput {};
         in_process_executor
-            .run_target(&mut fuzzer, &mut state, &mut mgr, &input, &mut ())
+            .run_target(&mut fuzzer, &mut state, &mut mgr, &input)
             .unwrap();
     }
 }
