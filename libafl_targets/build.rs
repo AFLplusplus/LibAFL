@@ -5,8 +5,17 @@ use std::{env, fs::File, io::Write, path::Path};
 const TWO_MB: usize = 2_621_440;
 const SIXTY_FIVE_KB: usize = 65_536;
 
+#[rustversion::nightly]
+fn enable_nightly() {
+    println!("cargo:rustc-cfg=nightly");
+}
+
+#[rustversion::not(nightly)]
+fn enable_nightly() {}
+
 #[allow(clippy::too_many_lines)]
 fn main() {
+    enable_nightly();
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = out_dir.to_string_lossy().to_string();
     //let out_dir_path = Path::new(&out_dir);

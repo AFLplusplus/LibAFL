@@ -44,6 +44,9 @@ use crate::{
 /// The process executor simply calls a target function, as mutable reference to a closure
 pub type InProcessExecutor<'a, H, OT, S> = GenericInProcessExecutor<H, &'a mut H, (), OT, S>;
 
+/// The inprocess executor that allows hooks
+pub type HookableInProcessExecutor<'a, H, HT, OT, S> =
+    GenericInProcessExecutor<H, &'a mut H, HT, OT, S>;
 /// The process executor simply calls a target function, as boxed `FnMut` trait object
 pub type OwnedInProcessExecutor<OT, S> = GenericInProcessExecutor<
     dyn FnMut(&<S as UsesInput>::Input) -> ExitKind,
