@@ -593,7 +593,7 @@ pub mod unix_shmem {
         use std::{io::Write, process};
 
         use libc::{
-            c_int, c_uchar, close, ftruncate, mmap, munmap, perror, shm_open, shm_unlink, shmat,
+            c_int, c_uchar, close, ftruncate, mmap, munmap, shm_open, shm_unlink, shmat,
             shmctl, shmdt, shmget,
         };
 
@@ -648,18 +648,16 @@ pub mod unix_shmem {
                         0o600,
                     );
                     if shm_fd == -1 {
-                        perror(b"shm_open\0".as_ptr() as *const _);
                         return Err(Error::unknown(format!(
-                            "Failed to shm_open map with id {filename_path:?}",
+                            "Failed to shm_open map with id {filename_path:?}, Last OS error :{:?}",std::io::Error::last_os_error(),
                         )));
                     }
 
                     /* configure the size of the shared memory segment */
                     if ftruncate(shm_fd, map_size.try_into()?) != 0 {
-                        perror(b"ftruncate\0".as_ptr() as *const _);
                         shm_unlink(filename_path.as_ptr() as *const _);
                         return Err(Error::unknown(format!(
-                            "setup_shm(): ftruncate() failed for map with id {filename_path:?}",
+                            "setup_shm(): ftruncate() failed for map with id {filename_path:?},Last OS error :{:?}",std::io::Error::last_os_error(),
                         )));
                     }
 
@@ -673,11 +671,10 @@ pub mod unix_shmem {
                         0,
                     );
                     if map == libc::MAP_FAILED || map.is_null() {
-                        perror(b"mmap\0".as_ptr() as *const _);
                         close(shm_fd);
                         shm_unlink(filename_path.as_ptr() as *const _);
                         return Err(Error::unknown(format!(
-                            "mmap() failed for map with id {filename_path:?}",
+                            "mmap() failed for map with id {filename_path:?},Last OS error :{:?}",std::io::Error::last_os_error(),
                         )));
                     }
 
@@ -705,10 +702,9 @@ pub mod unix_shmem {
                         0,
                     );
                     if map == libc::MAP_FAILED || map.is_null() {
-                        perror(b"mmap\0".as_ptr() as *const _);
                         close(shm_fd);
                         return Err(Error::unknown(format!(
-                            "mmap() failed for map with fd {shm_fd:?}"
+                            "mmap() failed for map with fd {shm_fd:?},Last OS error :{:?}",std::io::Error::last_os_error()
                         )));
                     }
 
@@ -852,11 +848,11 @@ pub mod unix_shmem {
                     let map = shmat(os_id, ptr::null(), 0) as *mut c_uchar;
 
                     if map as c_int == -1 || map.is_null() {
-                        perror(b"shmat\0".as_ptr() as *const _);
+
                         shmctl(os_id, libc::IPC_RMID, ptr::null_mut());
-                        return Err(Error::unknown(
-                            "Failed to map the shared mapping".to_string(),
-                        ));
+                        return Err(Error::unknown(format!(
+                            "Failed to map the shared mapping,Last OS error :{:?}",std::io::Error::last_os_error()
+                        )));
                     }
 
                     Ok(Self {
@@ -874,9 +870,8 @@ pub mod unix_shmem {
                     let map = shmat(id_int, ptr::null(), 0) as *mut c_uchar;
 
                     if map.is_null() || map == ptr::null_mut::<c_uchar>().wrapping_sub(1) {
-                        perror(b"shmat\0".as_ptr() as *const _);
                         return Err(Error::unknown(format!(
-                            "Failed to map the shared mapping with id {id_int}"
+                            "Failed to map the shared mapping with id {id_int},Last OS error :{:?}",std::io::Error::last_os_error()
                         )));
                     }
 
