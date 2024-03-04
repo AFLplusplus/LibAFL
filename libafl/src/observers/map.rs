@@ -258,17 +258,17 @@ pub mod macros {
     /// As an example, if you are developing the type `MyCustomScheduler<O>` which requires novelty
     /// tracking, use this in your constructor:
     /// ```
-    /// # use libafl::observers::TrackingHinted;
+    /// # use libafl::observers::{MapObserver, TrackingHinted};
     /// # use libafl::require_index_tracking;
     /// # use core::marker::PhantomData;
     /// #
-    /// # struct MyCustomScheduler<O> {
-    /// #     phantom: PhantomData<O>,
+    /// # struct MyCustomScheduler<O, A> {
+    /// #     phantom: PhantomData<(O, A)>,
     /// # }
     /// #
-    /// impl<O> MyCustomScheduler<O> where O: TrackingHinted {
-    ///     pub fn new() -> Self {
-    ///         require_index_tracking!("MyCustomScheduler", O);
+    /// impl<O, A> MyCustomScheduler<O, A> where O: MapObserver, A: AsRef<O> + TrackingHinted {
+    ///     pub fn new(obs: &A) -> Self {
+    ///         require_index_tracking!("MyCustomScheduler", A);
     ///         todo!("Construct your type")
     ///     }
     /// }
@@ -309,17 +309,17 @@ pub mod macros {
     /// As an example, if you are developing the type `MyCustomScheduler<O>` which requires novelty
     /// tracking, use this in your constructor:
     /// ```
-    /// # use libafl::observers::TrackingHinted;
+    /// # use libafl::observers::{MapObserver, TrackingHinted};
     /// # use libafl::require_novelties_tracking;
     /// # use core::marker::PhantomData;
     /// #
-    /// # struct MyCustomScheduler<O> {
-    /// #     phantom: PhantomData<O>,
+    /// # struct MyCustomScheduler<O, A> {
+    /// #     phantom: PhantomData<(O, A)>,
     /// # }
     /// #
-    /// impl<O> MyCustomScheduler<O> where O: TrackingHinted {
-    ///     pub fn new() -> Self {
-    ///         require_novelties_tracking!("MyCustomScheduler", O);
+    /// impl<O, A> MyCustomScheduler<O, A> where O: MapObserver, A: AsRef<O> + TrackingHinted {
+    ///     pub fn new(obs: &A) -> Self {
+    ///         require_novelties_tracking!("MyCustomScheduler", A);
     ///         todo!("Construct your type")
     ///     }
     /// }
@@ -356,6 +356,14 @@ pub mod macros {
 }
 
 /// A [`MapObserver`] observes the static map, as oftentimes used for AFL-like coverage information
+///
+/// When referring to this type in a constraint (e.g. `O: MapObserver`), ensure that you only refer
+/// to instances of a second type, e.g. `A: AsRef<O>`. Map observer instances are passed around in
+/// a way that may be potentially wrapped by e.g. [`ExplicitTracking`] as a way to encode metadata
+/// into the type. This is an unfortunate additional requirement that we can't get around without
+/// specialization.
+///
+/// See [`crate::require_index_tracking`] for an example of how to do so.
 ///
 /// TODO: enforce `iter() -> AssociatedTypeIter` when generic associated types stabilize
 pub trait MapObserver:
