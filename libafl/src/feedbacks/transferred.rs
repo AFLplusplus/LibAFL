@@ -12,7 +12,7 @@ use crate::{
     state::{HasMetadata, State},
 };
 
-/// Constant name of the [`TransferringMetdata`].
+/// Constant name of the [`TransferringMetadata`].
 pub const TRANSFERRED_FEEDBACK_NAME: &str = "transferred_feedback_internal";
 
 /// Metadata which denotes whether we are currently transferring an input. Implementors of
