@@ -688,7 +688,7 @@ where
 
 impl<E, S, Z> EventProcessor<E, Z> for TcpEventManager<S>
 where
-    S: State + HasExecutions,
+    S: State + HasExecutions + HasMetadata,
     E: HasObservers<State = S> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers, State = S>,
@@ -881,7 +881,7 @@ impl<E, S, SP, Z> EventProcessor<E, Z> for TcpRestartingEventManager<S, SP>
 where
     E: HasObservers<State = S> + Executor<TcpEventManager<S>, Z>,
     for<'a> E::Observers: Deserialize<'a>,
-    S: State + HasExecutions,
+    S: State + HasExecutions + HasMetadata,
     SP: ShMemProvider + 'static,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers>, //CE: CustomEvent<I>,
 {
@@ -985,7 +985,7 @@ pub fn setup_restarting_mgr_tcp<MT, S>(
 ) -> Result<(Option<S>, TcpRestartingEventManager<S, StdShMemProvider>), Error>
 where
     MT: Monitor + Clone,
-    S: State + HasExecutions,
+    S: State + HasExecutions + HasMetadata,
 {
     TcpRestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)
@@ -1046,7 +1046,7 @@ where
 impl<MT, S, SP> TcpRestartingMgr<MT, S, SP>
 where
     SP: ShMemProvider,
-    S: State + HasExecutions,
+    S: State + HasExecutions + HasMetadata,
     MT: Monitor + Clone,
 {
     /// Internal function, returns true when shuttdown is requested by a `SIGINT` signal
