@@ -12,9 +12,10 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
+#[cfg(feature = "std")]
+use libafl_bolts::core_affinity::{CoreId, Cores};
 
 use libafl_bolts::{
-    core_affinity::{CoreId, Cores},
     rands::{Rand, StdRand},
     serdeany::{NamedSerdeAnyMap, SerdeAny, SerdeAnyMap},
 };
