@@ -15,7 +15,7 @@ use libafl::{
         GrimoireRandomDeleteMutator, GrimoireRecursiveReplacementMutator,
         GrimoireStringReplacementMutator, Tokens,
     },
-    observers::StdMapObserver,
+    observers::{StdMapObserver, TrackingHinted},
     schedulers::QueueScheduler,
     stages::{mutational::StdMutationalStage, GeneralizationStage},
     state::{HasMetadata, StdState},
@@ -82,9 +82,9 @@ pub fn main() {
     };
 
     // Create an observation channel using the signals map
-    let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS.len()) };
+    let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS.len()).track_novelties() };
     // Feedback to rate the interestingness of an input
-    let mut feedback = MaxMapFeedback::tracking(&observer, false, true);
+    let mut feedback = MaxMapFeedback::new(&observer);
 
     // A feedback to choose if an input is a solution or not
     let mut objective = CrashFeedback::new();
