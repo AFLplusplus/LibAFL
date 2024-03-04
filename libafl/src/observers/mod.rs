@@ -19,7 +19,6 @@ pub use stacktrace::*;
 pub mod concolic;
 
 pub mod value;
-pub mod transferred;
 
 use alloc::{
     string::{String, ToString},
