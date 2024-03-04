@@ -458,7 +458,7 @@ where
 
 impl<S> TcpEventManager<S>
 where
-    S: State + HasExecutions,
+    S: State + HasExecutions + HasMetadata,
 {
     /// Create a manager from a raw TCP client specifying the client id
     pub fn existing<A: ToSocketAddrs>(
