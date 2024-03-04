@@ -23,6 +23,8 @@ pub use new_hash_feedback::NewHashFeedbackMetadata;
 
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
+pub mod transferred;
+
 use alloc::string::{String, ToString};
 use core::{
     fmt::{self, Debug, Formatter},
