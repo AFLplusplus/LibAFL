@@ -712,7 +712,7 @@ where
         Z: Evaluator<E, EM, State = Self>,
     {
         log::info!("Loading file {:?} ...", &path);
-        let input = loader(fuzzer, self, &path)?;
+        let input = loader(fuzzer, self, path)?;
         if forced {
             let _: CorpusId = fuzzer.add_input(self, executor, manager, input)?;
         } else {
@@ -914,9 +914,9 @@ where
                 .iter()
                 .enumerate()
                 .find(|(_, c)| {
-                    return *c == core_id;
+                    *c == core_id
                 })
-                .expect(&format!("core id {} not in cores list", core_id.0))
+                .unwrap_or_else(|| panic!("core id {} not in cores list", core_id.0))
                 .0;
             let chunk_size = corpus_size.saturating_div(cores.ids.len());
             let mut skip = core_index.saturating_mul(chunk_size);
