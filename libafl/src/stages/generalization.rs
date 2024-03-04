@@ -14,7 +14,8 @@ use crate::{
     feedbacks::map::MapNoveltiesMetadata,
     inputs::{BytesInput, GeneralizedInputMetadata, GeneralizedItem, HasBytesVec, UsesInput},
     mark_feature_time,
-    observers::{MapObserver, ObserversTuple},
+    observers::{MapObserver, ObserversTuple, TrackingHinted},
+    require_novelties_tracking,
     stages::{RetryRestartHelper, Stage},
     start_timer,
     state::{HasCorpus, HasExecutions, UsesState},
@@ -41,19 +42,19 @@ fn find_next_char(list: &[Option<u8>], mut idx: usize, ch: u8) -> usize {
 
 /// A stage that runs a tracer executor
 #[derive(Clone, Debug)]
-pub struct GeneralizationStage<EM, O, OT, Z> {
+pub struct GeneralizationStage<EM, O, OT, Z, A> {
     map_observer_name: String,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(EM, O, OT, Z)>,
+    phantom: PhantomData<(EM, O, OT, Z, A)>,
 }
 
-impl<EM, O, OT, Z> Named for GeneralizationStage<EM, O, OT, Z> {
+impl<EM, O, OT, Z, A> Named for GeneralizationStage<EM, O, OT, Z, A> {
     fn name(&self) -> &str {
         "GeneralizationStage"
     }
 }
 
-impl<EM, O, OT, Z> UsesState for GeneralizationStage<EM, O, OT, Z>
+impl<EM, O, OT, Z, A> UsesState for GeneralizationStage<EM, O, OT, Z, A>
 where
     EM: UsesState,
     EM::State: UsesInput<Input = BytesInput>,
@@ -61,9 +62,10 @@ where
     type State = EM::State;
 }
 
-impl<E, EM, O, Z> Stage<E, EM, Z> for GeneralizationStage<EM, O, E::Observers, Z>
+impl<E, EM, O, Z, A> Stage<E, EM, Z> for GeneralizationStage<EM, O, E::Observers, Z, A>
 where
     O: MapObserver,
+    A: AsRef<O> + TrackingHinted,
     E: Executor<EM, Z> + HasObservers,
     E::Observers: ObserversTuple<E::State>,
     E::State:
@@ -331,18 +333,20 @@ where
     }
 }
 
-impl<EM, O, OT, Z> GeneralizationStage<EM, O, OT, Z>
+impl<EM, O, OT, Z, A> GeneralizationStage<EM, O, OT, Z, A>
 where
     EM: UsesState,
     O: MapObserver,
+    A: AsRef<O> + TrackingHinted,
     OT: ObserversTuple<EM::State>,
     EM::State: UsesInput<Input = BytesInput> + HasExecutions + HasMetadata + HasCorpus,
 {
     /// Create a new [`GeneralizationStage`].
     #[must_use]
-    pub fn new(map_observer: &O) -> Self {
+    pub fn new(map_observer: &A) -> Self {
+        require_novelties_tracking!("GeneralizationStage", A);
         Self {
-            map_observer_name: map_observer.name().to_string(),
+            map_observer_name: map_observer.as_ref().name().to_string(),
             phantom: PhantomData,
         }
     }
@@ -387,8 +391,9 @@ where
 
         let cnt = executor
             .observers()
-            .match_name::<O>(&self.map_observer_name)
+            .match_name::<A>(&self.map_observer_name)
             .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
+            .as_ref()
             .how_many_set(novelties);
 
         Ok(cnt == novelties.len())
