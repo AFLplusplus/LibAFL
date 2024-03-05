@@ -5,6 +5,8 @@
 #![allow(clippy::needless_pass_by_value)]
 
 use alloc::boxed::Box;
+#[cfg(any(unix, feature = "std"))]
+use core::ptr::addr_of_mut;
 use core::{
     borrow::BorrowMut,
     fmt::{self, Debug, Formatter},
@@ -13,8 +15,6 @@ use core::{
 };
 
 use libafl_bolts::tuples::tuple_list;
-#[cfg(any(unix, feature = "std"))]
-use ptr::addr_of_mut;
 
 use crate::{
     corpus::{Corpus, Testcase},
