@@ -272,7 +272,7 @@ where
             GuestAddr,
             GuestAddr,
         ) -> SyscallHookResult,
-    ) -> HookId {
+    ) -> PreSyscallHookId {
         unsafe {
             let data: u64 = data.into().0;
             let callback: extern "C" fn(
@@ -288,7 +288,7 @@ where
                 GuestAddr,
             ) -> libafl_qemu_sys::syshook_ret = core::mem::transmute(callback);
             let num = libafl_qemu_sys::libafl_add_pre_syscall_hook(Some(callback), data);
-            HookId(num)
+            PreSyscallHookId(num)
         }
     }
 
@@ -309,7 +309,7 @@ where
             GuestAddr,
             GuestAddr,
         ) -> GuestAddr,
-    ) -> HookId {
+    ) -> PostSyscallHookId {
         unsafe {
             let data: u64 = data.into().0;
             let callback: extern "C" fn(
@@ -326,7 +326,7 @@ where
                 GuestAddr,
             ) -> GuestAddr = core::mem::transmute(callback);
             let num = libafl_qemu_sys::libafl_add_post_syscall_hook(Some(callback), data);
-            HookId(num)
+            PostSyscallHookId(num)
         }
     }
 
@@ -334,12 +334,12 @@ where
         &self,
         data: T,
         callback: extern "C" fn(T, tid: u32) -> bool,
-    ) -> HookId {
+    ) -> NewThreadHookId {
         unsafe {
             let data: u64 = data.into().0;
             let callback: extern "C" fn(u64, u32) -> bool = core::mem::transmute(callback);
             let num = libafl_qemu_sys::libafl_add_new_thread_hook(Some(callback), data);
-            HookId(num)
+            NewThreadHookId(num)
         }
     }
 
