@@ -152,7 +152,7 @@ impl ToolWrapper for ClangWrapper {
         let mut suppress_linking = 0;
         let mut i = 1;
         while i < args.len() {
-            let arg_as_path = std::path::Path::new(args[i].as_ref());
+            let arg_as_path = Path::new(args[i].as_ref());
 
             if arg_as_path
                 .extension()
