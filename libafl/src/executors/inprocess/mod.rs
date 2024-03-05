@@ -9,11 +9,12 @@ use core::{
     borrow::BorrowMut,
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
-    ptr::addr_of_mut,
     time::Duration,
 };
 
 use libafl_bolts::tuples::tuple_list;
+#[cfg(any(unix, feature = "std"))]
+use ptr::addr_of_mut;
 
 use crate::{
     corpus::{Corpus, Testcase},
