@@ -146,12 +146,12 @@ impl Configuration {
         let output = output.to_str().unwrap();
 
         let new_filename = if let Some((filename, extension)) = output.split_once('.') {
-            if let crate::Configuration::Default = self {
+            if let Configuration::Default = self {
                 format!("{filename}.{extension}")
             } else {
                 format!("{filename}.{self}.{extension}")
             }
-        } else if let crate::Configuration::Default = self {
+        } else if let Configuration::Default = self {
             output.to_string()
         } else {
             format!("{output}.{self}")

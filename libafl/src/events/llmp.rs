@@ -46,6 +46,7 @@ use crate::{
         EventProcessor, EventRestarter, HasCustomBufHandlers, HasEventManagerId, ProgressReporter,
     },
     executors::{Executor, HasObservers},
+    feedbacks::transferred::TransferringMetadata,
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, UsesInput},
     monitors::Monitor,
@@ -590,6 +591,9 @@ where
             } => {
                 log::info!("Received new Testcase from {client_id:?} ({client_config:?}, forward {forward_id:?})");
 
+                if let Ok(meta) = state.metadata_mut::<TransferringMetadata>() {
+                    meta.set_transferring(true);
+                }
                 let res = if client_config.match_with(&self.configuration)
                     && observers_buf.is_some()
                 {
@@ -615,6 +619,9 @@ where
                         state, executor, self, input, false,
                     )?
                 };
+                if let Ok(meta) = state.metadata_mut::<TransferringMetadata>() {
+                    meta.set_transferring(false);
+                }
                 if let Some(item) = res.1 {
                     log::info!("Added received Testcase as item #{item}");
                 }
@@ -1451,7 +1458,7 @@ where
 
 impl<IC, ICB, DI, S, SP> LlmpEventConverter<IC, ICB, DI, S, SP>
 where
-    S: UsesInput + HasExecutions,
+    S: UsesInput + HasExecutions + HasMetadata,
     SP: ShMemProvider + 'static,
     IC: InputConverter<From = S::Input, To = DI>,
     ICB: InputConverter<From = DI, To = S::Input>,
@@ -1568,6 +1575,9 @@ where
                     return Ok(());
                 };
 
+                if let Ok(meta) = state.metadata_mut::<TransferringMetadata>() {
+                    meta.set_transferring(true);
+                }
                 let res = fuzzer.evaluate_input_with_observers::<E, EM>(
                     state,
                     executor,
@@ -1575,6 +1585,10 @@ where
                     converter.convert(input)?,
                     false,
                 )?;
+                if let Ok(meta) = state.metadata_mut::<TransferringMetadata>() {
+                    meta.set_transferring(false);
+                }
+
                 if let Some(item) = res.1 {
                     log::info!("Added received Testcase as item #{item}");
                 }

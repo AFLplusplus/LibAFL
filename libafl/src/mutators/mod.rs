@@ -33,11 +33,12 @@ pub use multi::*;
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
 
-use alloc::vec::Vec;
+use alloc::{boxed::Box, vec::Vec};
 
-use libafl_bolts::{tuples::HasConstLen, Named};
+use libafl_bolts::{tuples::IntoVec, HasLen, Named};
 #[cfg(feature = "nautilus")]
 pub use nautilus::*;
+use tuple_list::NonEmptyTuple;
 
 use crate::{corpus::CorpusId, Error};
 
@@ -135,7 +136,7 @@ pub trait MultiMutator<I, S>: Named {
 }
 
 /// A `Tuple` of `Mutators` that can execute multiple `Mutators` in a row.
-pub trait MutatorsTuple<I, S>: HasConstLen {
+pub trait MutatorsTuple<I, S>: HasLen {
     /// Runs the `mutate` function on all `Mutators` in this `Tuple`.
     fn mutate_all(
         &mut self,
@@ -286,6 +287,142 @@ where
         let mut ret = self.1.names();
         ret.insert(0, self.0.name());
         ret
+    }
+}
+
+impl<Head, Tail, I, S> IntoVec<Box<dyn Mutator<I, S>>> for (Head, Tail)
+where
+    Head: Mutator<I, S> + 'static,
+    Tail: IntoVec<Box<dyn Mutator<I, S>>>,
+{
+    fn into_vec(self) -> Vec<Box<dyn Mutator<I, S>>> {
+        let (head, tail) = self.uncons();
+        let mut ret = tail.into_vec();
+        ret.insert(0, Box::new(head));
+        ret
+    }
+}
+
+impl<Tail, I, S> MutatorsTuple<I, S> for (Tail,)
+where
+    Tail: MutatorsTuple<I, S>,
+{
+    fn mutate_all(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        self.0.mutate_all(state, input, stage_idx)
+    }
+
+    fn post_exec_all(
+        &mut self,
+        state: &mut S,
+        stage_idx: i32,
+        corpus_idx: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        self.0.post_exec_all(state, stage_idx, corpus_idx)
+    }
+
+    fn get_and_mutate(
+        &mut self,
+        index: MutationId,
+        state: &mut S,
+        input: &mut I,
+        stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        self.0.get_and_mutate(index, state, input, stage_idx)
+    }
+
+    fn get_and_post_exec(
+        &mut self,
+        index: usize,
+        state: &mut S,
+        stage_idx: i32,
+        corpus_idx: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        self.0
+            .get_and_post_exec(index, state, stage_idx, corpus_idx)
+    }
+
+    fn names(&self) -> Vec<&str> {
+        self.0.names()
+    }
+}
+
+impl<Tail, I, S> IntoVec<Box<dyn Mutator<I, S>>> for (Tail,)
+where
+    Tail: IntoVec<Box<dyn Mutator<I, S>>>,
+{
+    fn into_vec(self) -> Vec<Box<dyn Mutator<I, S>>> {
+        self.0.into_vec()
+    }
+}
+
+impl<I, S> MutatorsTuple<I, S> for Vec<Box<dyn Mutator<I, S>>> {
+    fn mutate_all(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        self.iter_mut()
+            .try_fold(MutationResult::Skipped, |ret, mutator| {
+                if mutator.mutate(state, input, stage_idx)? == MutationResult::Mutated {
+                    Ok(MutationResult::Mutated)
+                } else {
+                    Ok(ret)
+                }
+            })
+    }
+
+    fn post_exec_all(
+        &mut self,
+        state: &mut S,
+        stage_idx: i32,
+        corpus_idx: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        for mutator in self.iter_mut() {
+            mutator.post_exec(state, stage_idx, corpus_idx)?;
+        }
+        Ok(())
+    }
+
+    fn get_and_mutate(
+        &mut self,
+        index: MutationId,
+        state: &mut S,
+        input: &mut I,
+        stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        let mutator = self
+            .get_mut(index.0)
+            .ok_or_else(|| Error::key_not_found("Mutator with id {index:?} not found."))?;
+        mutator.mutate(state, input, stage_idx)
+    }
+
+    fn get_and_post_exec(
+        &mut self,
+        index: usize,
+        state: &mut S,
+        stage_idx: i32,
+        corpus_idx: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        let mutator = self
+            .get_mut(index)
+            .ok_or_else(|| Error::key_not_found("Mutator with id {index:?} not found."))?;
+        mutator.post_exec(state, stage_idx, corpus_idx)
+    }
+
+    fn names(&self) -> Vec<&str> {
+        self.iter().map(|x| x.name()).collect()
+    }
+}
+
+impl<I, S> IntoVec<Box<dyn Mutator<I, S>>> for Vec<Box<dyn Mutator<I, S>>> {
+    fn into_vec(self) -> Vec<Box<dyn Mutator<I, S>>> {
+        self
     }
 }
 
@@ -461,5 +598,32 @@ pub mod pybind {
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
         m.add_class::<PythonMutator>()?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::{boxed::Box, vec::Vec};
+
+    use libafl_bolts::{rands::StdRand, tuples::IntoVec};
+
+    use crate::{
+        corpus::InMemoryCorpus,
+        inputs::BytesInput,
+        mutators::{havoc_mutations, Mutator, MutatorsTuple},
+        state::StdState,
+    };
+
+    type TestStdStateType =
+        StdState<BytesInput, InMemoryCorpus<BytesInput>, StdRand, InMemoryCorpus<BytesInput>>;
+
+    #[test]
+    fn test_tuple_into_vec() {
+        let mutators = havoc_mutations::<BytesInput>();
+        let names_before = MutatorsTuple::<BytesInput, TestStdStateType>::names(&mutators);
+
+        let mutators = havoc_mutations::<BytesInput>();
+        let mutators_vec: Vec<Box<dyn Mutator<BytesInput, TestStdStateType>>> = mutators.into_vec();
+        assert_eq!(names_before, mutators_vec.names());
     }
 }

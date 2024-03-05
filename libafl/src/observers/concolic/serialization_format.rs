@@ -93,7 +93,7 @@ impl<R: Read> MessageFileReader<R> {
                 Some(Ok((message_id, message)))
             }
             Err(e) => match *e {
-                bincode::ErrorKind::Io(ref io_err) => match io_err.kind() {
+                ErrorKind::Io(ref io_err) => match io_err.kind() {
                     io::ErrorKind::UnexpectedEof => None,
                     _ => Some(Err(e)),
                 },
