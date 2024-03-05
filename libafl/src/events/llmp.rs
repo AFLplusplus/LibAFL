@@ -13,6 +13,8 @@ use std::net::{SocketAddr, ToSocketAddrs};
 use libafl_bolts::core_affinity::CoreId;
 #[cfg(feature = "adaptive_serialization")]
 use libafl_bolts::current_time;
+#[cfg(feature = "std")]
+use libafl_bolts::llmp::DEFAULT_CLIENT_TIMEOUT_SECS;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use libafl_bolts::os::startable_self;
 #[cfg(all(unix, feature = "std", not(miri)))]
@@ -24,10 +26,6 @@ use libafl_bolts::{
     compress::GzipCompressor,
     llmp::{LLMP_FLAG_COMPRESSED, LLMP_FLAG_INITIALIZED},
 };
-
-#[cfg(feature = "std")]
-use libafl_bolts::llmp::DEFAULT_CLIENT_TIMEOUT_SECS;
-
 #[cfg(feature = "std")]
 use libafl_bolts::{llmp::LlmpConnection, shmem::StdShMemProvider, staterestore::StateRestorer};
 use libafl_bolts::{
