@@ -872,7 +872,7 @@ where
         }
         Ok(count)
     }
-    /// Loads initial inputs by dividing the from the passed-in `in_dirs`.
+    /// Loads initial inputs by dividing the from the passed-in `in_dirs`
     /// in a multicore fashion. Divides the corpus in chunks spread across cores.
     pub fn load_initial_inputs_multicore<E, EM, Z>(
         &mut self,
@@ -899,7 +899,7 @@ where
         self.canonicalize_input_dirs(in_dirs)?;
         if cores.ids.len() > corpus_size {
             log::info!(
-                "low intial corpus account ({}), no parallelism required.",
+                "low intial corpus count ({}), no parallelism required.",
                 corpus_size
             );
             return self.continue_loading_initial_inputs_custom(
