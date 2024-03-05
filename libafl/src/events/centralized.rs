@@ -87,11 +87,7 @@ where
     ///
     /// The port must not be bound yet to have a broker.
     #[cfg(feature = "std")]
-    pub fn on_port(
-        shmem_provider: SP,
-        port: u16,
-        client_timeout: Option<Duration>,
-    ) -> Result<Self, Error> {
+    pub fn on_port(shmem_provider: SP, port: u16, client_timeout: Duration) -> Result<Self, Error> {
         Ok(Self {
             // TODO switch to false after solving the bug
             llmp: LlmpBroker::with_keep_pages_attach_to_tcp(
