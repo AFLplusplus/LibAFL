@@ -140,10 +140,11 @@ where
 }
 
 /// Defines the common metadata operations for the AFL-style schedulers
-pub trait HasAFLSchedulerMetadata<O, S>: Scheduler
+pub trait HasAFLSchedulerMetadata<O, S, A>: Scheduler
 where
     Self::State: HasCorpus + HasMetadata + HasTestcase,
     O: MapObserver,
+    A: AsRef<O>,
 {
     /// Return the last hash
     fn last_hash(&self) -> usize;
@@ -191,8 +192,9 @@ where
         OT: ObserversTuple<Self::State>,
     {
         let observer = observers
-            .match_name::<O>(self.map_observer_name())
-            .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?;
+            .match_name::<A>(self.map_observer_name())
+            .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
+            .as_ref();
 
         let mut hash = observer.hash() as usize;
 

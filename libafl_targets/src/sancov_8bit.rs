@@ -159,6 +159,18 @@ mod observers {
         }
     }
 
+    impl<const DIFFERENTIAL: bool> AsRef<Self> for CountersMultiMapObserver<DIFFERENTIAL> {
+        fn as_ref(&self) -> &Self {
+            self
+        }
+    }
+
+    impl<const DIFFERENTIAL: bool> AsMut<Self> for CountersMultiMapObserver<DIFFERENTIAL> {
+        fn as_mut(&mut self) -> &mut Self {
+            self
+        }
+    }
+
     impl<const DIFFERENTIAL: bool> MapObserver for CountersMultiMapObserver<DIFFERENTIAL> {
         type Entry = u8;
 

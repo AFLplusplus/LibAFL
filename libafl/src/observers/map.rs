@@ -246,10 +246,35 @@ where
     }
 }
 
+impl<S, T, OTA, OTB, const ITH: bool, const NTH: bool> DifferentialObserver<OTA, OTB, S>
+    for ExplicitTracking<T, ITH, NTH>
+where
+    OTA: ObserversTuple<S>,
+    OTB: ObserversTuple<S>,
+    S: UsesInput,
+    T: DifferentialObserver<OTA, OTB, S>,
+{
+    fn pre_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
+        self.as_mut().pre_observe_first(observers)
+    }
+
+    fn post_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
+        self.as_mut().post_observe_first(observers)
+    }
+
+    fn pre_observe_second(&mut self, observers: &mut OTB) -> Result<(), Error> {
+        self.as_mut().pre_observe_second(observers)
+    }
+
+    fn post_observe_second(&mut self, observers: &mut OTB) -> Result<(), Error> {
+        self.as_mut().post_observe_second(observers)
+    }
+}
+
 /// Module which holds the necessary functions and types for map-relevant macros, namely
 /// [`crate::require_index_tracking`] and [`crate::require_novelties_tracking`].
 pub mod macros {
-    pub use const_format::str_repeat;
+    pub use const_format::{concatcp, str_repeat};
     pub use const_panic::{concat_panic, FmtArg};
 
     /// Use in the constructor of your component which requires index tracking of a
@@ -281,25 +306,37 @@ pub mod macros {
             }
 
             impl<O: $crate::observers::TrackingHinted> SanityCheck<O> {
-                const TRACKING_SANITY: () = {
+                #[rustfmt::skip]
+                const MESSAGE: &'static str = {
                     const LINE_OFFSET: usize = line!().ilog10() as usize + 2;
                     const SPACING: &str = $crate::observers::map::macros::str_repeat!(" ", LINE_OFFSET);
+                    $crate::observers::map::macros::concatcp!(
+                        "\n",
+                        SPACING, "|\n",
+                        SPACING, "= note: index tracking is required by ", $name, "\n",
+                        SPACING, "= note: see the documentation of TrackingHinted for details\n",
+                        SPACING, "|\n",
+                        SPACING, "= hint: call `.track_indices()` on the map observer passed to ", $name, " at the point where it is defined\n",
+                        SPACING, "|\n",
+                        SPACING, "| ",
+                    )
+                };
+                const TRACKING_SANITY: bool = {
                     if !O::INDICES {
-                        $crate::observers::map::macros::concat_panic!(
-                            $crate::observers::map::macros::FmtArg::DISPLAY;
-                            "\n",
-                            SPACING, "|\n",
-                            SPACING, "= note: index tracking is required by ", $name, "\n",
-                            SPACING, "= note: see the documentation of TrackingHinted for details\n",
-                            SPACING, "|\n",
-                            SPACING, "= hint: call `.track_indices()` on the map observer present in the following error notes\n",
-                            SPACING, "|\n",
-                            SPACING, "| ",
-                        );
+                        panic!("{}", Self::MESSAGE)
+                    } else {
+                        true
                     }
                 };
+
+                #[inline(always)]
+                fn check_sanity() {
+                    if !Self::TRACKING_SANITY {
+                        unreachable!("{}", Self::MESSAGE);
+                    }
+                }
             }
-            let _: () = SanityCheck::<$obs>::TRACKING_SANITY; // check that tracking is enabled for this map
+            SanityCheck::<$obs>::check_sanity(); // check that tracking is enabled for this map
         };
     }
 
@@ -332,25 +369,38 @@ pub mod macros {
             }
 
             impl<O: $crate::observers::TrackingHinted> SanityCheck<O> {
-                const TRACKING_SANITY: () = {
+                #[rustfmt::skip]
+                const MESSAGE: &'static str = {
                     const LINE_OFFSET: usize = line!().ilog10() as usize + 2;
-                    const SPACING: &str = $crate::observers::map::macros::str_repeat!(" ", LINE_OFFSET);
-                    if !O::NOVELTIES {
-                        $crate::observers::map::macros::concat_panic!(
-                            $crate::observers::map::macros::FmtArg::DISPLAY;
-                            "\n",
-                            SPACING, "|\n",
-                            SPACING, "= note: novelty tracking is required by ", $name, "\n",
-                            SPACING, "= note: see the documentation of TrackingHinted for details\n",
-                            SPACING, "|\n",
-                            SPACING, "= hint: call `.track_novelties()` on the map observer present in the following error notes\n",
-                            SPACING, "|\n",
-                            SPACING, "| ",
-                        );
+                    const SPACING: &str =
+                        $crate::observers::map::macros::str_repeat!(" ", LINE_OFFSET);
+                    $crate::observers::map::macros::concatcp!(
+                        "\n",
+                        SPACING, "|\n",
+                        SPACING, "= note: novelty tracking is required by ", $name, "\n",
+                        SPACING, "= note: see the documentation of TrackingHinted for details\n",
+                        SPACING, "|\n",
+                        SPACING, "= hint: call `.track_novelties()` on the map observer passed to ", $name, " at the point where it is defined\n",
+                        SPACING, "|\n",
+                        SPACING, "| ",
+                    )
+                };
+                const TRACKING_SANITY: bool = {
+                    if !O::INDICES {
+                        panic!("{}", Self::MESSAGE)
+                    } else {
+                        true
                     }
                 };
+
+                #[inline(always)]
+                fn check_sanity() {
+                    if !Self::TRACKING_SANITY {
+                        unreachable!("{}", Self::MESSAGE);
+                    }
+                }
             }
-            let _: () = SanityCheck::<$obs>::TRACKING_SANITY; // check that tracking is enabled for this map
+            SanityCheck::<$obs>::check_sanity(); // check that tracking is enabled for this map
         };
     }
 }
@@ -358,16 +408,16 @@ pub mod macros {
 /// A [`MapObserver`] observes the static map, as oftentimes used for AFL-like coverage information
 ///
 /// When referring to this type in a constraint (e.g. `O: MapObserver`), ensure that you only refer
-/// to instances of a second type, e.g. `A: AsRef<O>`. Map observer instances are passed around in
-/// a way that may be potentially wrapped by e.g. [`ExplicitTracking`] as a way to encode metadata
-/// into the type. This is an unfortunate additional requirement that we can't get around without
-/// specialization.
+/// to instances of a second type, e.g. `A: AsRef<O>` or `A: AsMut<O>`. Map observer instances are
+/// passed around in a way that may be potentially wrapped by e.g. [`ExplicitTracking`] as a way to
+/// encode metadata into the type. This is an unfortunate additional requirement that we can't get
+/// around without specialization.
 ///
 /// See [`crate::require_index_tracking`] for an example of how to do so.
 ///
 /// TODO: enforce `iter() -> AssociatedTypeIter` when generic associated types stabilize
 pub trait MapObserver:
-    HasLen + Named + Serialize + serde::de::DeserializeOwned + AsRef<Self>
+    HasLen + Named + Serialize + serde::de::DeserializeOwned + AsRef<Self> + AsMut<Self>
 // where
 //     for<'it> &'it Self: IntoIterator<Item = &'it Self::Entry>
 {
@@ -653,6 +703,15 @@ where
     T: Default + Copy + 'static + Serialize,
 {
     fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
+impl<'a, T, const DIFFERENTIAL: bool> AsMut<Self> for StdMapObserver<'a, T, DIFFERENTIAL>
+where
+    T: Default + Copy + 'static + Serialize,
+{
+    fn as_mut(&mut self) -> &mut Self {
         self
     }
 }
@@ -1150,6 +1209,15 @@ where
     }
 }
 
+impl<'a, T, const N: usize> AsMut<Self> for ConstMapObserver<'a, T, N>
+where
+    T: Default + Copy + 'static + Serialize,
+{
+    fn as_mut(&mut self) -> &mut Self {
+        self
+    }
+}
+
 impl<'a, T, const N: usize> MapObserver for ConstMapObserver<'a, T, N>
 where
     T: Bounded
@@ -1471,6 +1539,15 @@ where
     }
 }
 
+impl<'a, T> AsMut<Self> for VariableMapObserver<'a, T>
+where
+    T: Default + Copy + 'static + Serialize + PartialEq + Bounded,
+{
+    fn as_mut(&mut self) -> &mut Self {
+        self
+    }
+}
+
 impl<'a, T> MapObserver for VariableMapObserver<'a, T>
 where
     T: Bounded
@@ -1634,8 +1711,8 @@ where
 
 /// Map observer with AFL-like hitcounts postprocessing
 ///
-/// [`MapObserver`]s that are not slice-backed,
-/// such as [`MultiMapObserver`], can use [`HitcountsIterableMapObserver`] instead.
+/// [`MapObserver`]s that are not slice-backed, such as [`MultiMapObserver`], can use
+/// [`HitcountsIterableMapObserver`] instead.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "M: serde::de::DeserializeOwned")]
 pub struct HitcountsMapObserver<M>
@@ -1734,6 +1811,15 @@ where
     }
 }
 
+impl<M> AsMut<Self> for HitcountsMapObserver<M>
+where
+    M: MapObserver<Entry = u8>,
+{
+    fn as_mut(&mut self) -> &mut Self {
+        self
+    }
+}
+
 impl<M> MapObserver for HitcountsMapObserver<M>
 where
     M: MapObserver<Entry = u8>,
@@ -1816,7 +1902,7 @@ where
 
 impl<M> HitcountsMapObserver<M>
 where
-    M: Serialize + serde::de::DeserializeOwned,
+    M: MapObserver,
 {
     /// Creates a new [`MapObserver`]
     pub fn new(base: M) -> Self {
@@ -1989,6 +2075,16 @@ where
     for<'it> M: AsIterMut<'it, Item = u8>,
 {
     fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
+impl<M> AsMut<Self> for HitcountsIterableMapObserver<M>
+where
+    M: MapObserver<Entry = u8>,
+    for<'it> M: AsIterMut<'it, Item = u8>,
+{
+    fn as_mut(&mut self) -> &mut Self {
         self
     }
 }
@@ -2243,6 +2339,15 @@ where
     T: 'static + Default + Copy + Serialize + Debug,
 {
     fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
+impl<'a, T, const DIFFERENTIAL: bool> AsMut<Self> for MultiMapObserver<'a, T, DIFFERENTIAL>
+where
+    T: 'static + Default + Copy + Serialize + Debug,
+{
+    fn as_mut(&mut self) -> &mut Self {
         self
     }
 }
@@ -2608,6 +2713,15 @@ where
     T: 'static + Default + Copy + Serialize,
 {
     fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
+impl<T> AsMut<Self> for OwnedMapObserver<T>
+where
+    T: 'static + Default + Copy + Serialize,
+{
+    fn as_mut(&mut self) -> &mut Self {
         self
     }
 }
@@ -3005,6 +3119,18 @@ pub mod pybind {
                 type Entry = $datatype;
                 fn as_mut_slice(&mut self) -> &mut [$datatype] {
                     mapob_unwrap_me_mut!($wrapper_name, self.wrapper, m, { unsafe { std::mem::transmute(m.as_mut_slice()) }} )
+                }
+            }
+
+            impl AsRef<Self> for $struct_name_trait {
+                fn as_ref(&self) -> &Self {
+                    self
+                }
+            }
+
+            impl AsMut<Self> for $struct_name_trait {
+                fn as_mut(&mut self) -> &mut Self {
+                    self
                 }
             }
 
