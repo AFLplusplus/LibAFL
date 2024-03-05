@@ -533,10 +533,12 @@ where
                 self.shmem_provider.post_fork(false)?;
                 handles.push(child.pid);
                 #[cfg(feature = "std")]
-                log::info!("centralized broker spawned");
+                log::info!("PID: {:#?} centralized broker spawned", std::process::id());
             }
             ForkResult::Child => {
                 log::info!("{:?} PostFork", unsafe { libc::getpid() });
+                #[cfg(feature = "std")]
+                log::info!("PID: {:#?} I am centralized broker", std::process::id());
                 self.shmem_provider.post_fork(true)?;
 
                 let mut broker: CentralizedLlmpEventBroker<S::Input, SP> =

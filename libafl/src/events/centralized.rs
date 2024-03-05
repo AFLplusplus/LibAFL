@@ -290,7 +290,7 @@ where
     ) -> Result<(), Error> {
         if !self.is_main {
             // secondary node
-            let is_nt = match &mut event {
+            let is_nt_or_heartbeat = match &mut event {
                 Event::NewTestcase {
                     input: _,
                     client_config: _,
@@ -304,9 +304,14 @@ where
                     *forward_id = Some(ClientId(self.inner.mgr_id().0 as u32));
                     true
                 }
+                Event::UpdateExecStats {
+                    time: _,
+                    executions: _,
+                    phantom: _,
+                } => true,
                 _ => false,
             };
-            if is_nt {
+            if is_nt_or_heartbeat {
                 return self.forward_to_main(&event);
             }
         }
