@@ -18,13 +18,14 @@ use core::marker::PhantomData;
 use core::{
     fmt::{self, Debug, Formatter},
     num::NonZeroUsize,
+    time::Duration,
 };
 #[cfg(feature = "std")]
 use std::net::SocketAddr;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use std::process::Stdio;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
-use std::{fs::File, os::unix::io::AsRawFd, time::Duration};
+use std::{fs::File, os::unix::io::AsRawFd};
 
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use libafl_bolts::os::startable_self;
