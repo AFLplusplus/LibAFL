@@ -109,12 +109,9 @@ struct Opt {
 }
 
 /// The main fn, `no_mangle` as it is a C symbol
-use env_logger::{Builder, Target};
 #[no_mangle]
 pub extern "C" fn libafl_main() {
-    let mut builder = Builder::from_default_env();
-    builder.target(Target::Stdout);
-    builder.init();
+    env_logger::init();
 
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
@@ -204,7 +201,7 @@ pub extern "C" fn libafl_main() {
 
         // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
         #[cfg(target_os = "linux")]
-        let mut executor = InProcessExecutor::with_timeout(
+        let mut executor = InProcessExecutor::batched_timeouts(
             &mut harness,
             tuple_list!(edges_observer, time_observer),
             &mut fuzzer,
@@ -250,7 +247,7 @@ pub extern "C" fn libafl_main() {
         .cores(&cores)
         .broker_port(broker_port)
         .remote_broker_addr(opt.remote_broker_addr)
-        // .stdout_file(Some("/dev/null"))
+        .stdout_file(Some("/dev/null"))
         .build()
         .launch()
     {

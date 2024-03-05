@@ -87,7 +87,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     return 0;
   }
 
-  return 0;
   PngObjectHandler png_handler;
   png_handler.png_ptr = nullptr;
   png_handler.row_ptr = nullptr;
