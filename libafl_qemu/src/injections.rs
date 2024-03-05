@@ -20,8 +20,8 @@ use serde::{Deserialize, Serialize};
 #[cfg(not(cpu_target = "hexagon"))]
 use crate::SYS_execve;
 use crate::{
-    elf::EasyElf, emu::ArchExtras, CallingConvention, Emulator, GuestAddr, Hook, QemuHelper,
-    QemuHelperTuple, QemuHooks, SyscallHookResult,
+    elf::EasyElf, emu::ArchExtras, CallingConvention, Emulator, GuestAddr, Hook, IsEmuExitHandler,
+    QemuHelper, QemuHelperTuple, QemuHooks, SyscallHookResult,
 };
 #[cfg(cpu_target = "hexagon")]
 /// Hexagon syscalls are not currently supported by the `syscalls` crate, so we just paste this here for now.

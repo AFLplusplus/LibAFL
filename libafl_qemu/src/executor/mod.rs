@@ -38,8 +38,9 @@ pub mod stateful;
 
 pub struct QemuExecutorState<'a, QT, S, E>
 where
-    QT: QemuHelperTuple<S>,
+    QT: QemuHelperTuple<S, E>,
     S: State + HasExecutions,
+    E: IsEmuExitHandler,
 {
     hooks: &'a mut QemuHooks<QT, S, E>,
     first_exec: bool,
@@ -148,7 +149,7 @@ where
     {
         #[cfg(emulation_mode = "usermode")]
         {
-            let handler = |hooks: &mut QemuHooks<QT, S>, host_sig| {
+            let handler = |hooks: &mut QemuHooks<QT, S, EH>, host_sig| {
                 eprintln!("Crashed with signal {host_sig}");
                 unsafe {
                     libafl::executors::inprocess::generic_inproc_crash_handler::<E, EM, OF, Z>();
@@ -167,16 +168,16 @@ where
     }
 
     #[must_use]
-    pub fn hooks(&self) -> &QemuHooks<QT, S> {
+    pub fn hooks(&self) -> &QemuHooks<QT, S, EH> {
         self.hooks
     }
 
-    pub fn hooks_mut(&mut self) -> &mut QemuHooks<QT, S> {
+    pub fn hooks_mut(&mut self) -> &mut QemuHooks<QT, S, EH> {
         self.hooks
     }
 
     #[must_use]
-    pub fn emulator(&self) -> &Emulator {
+    pub fn emulator(&self) -> &Emulator<EH> {
         self.hooks.emulator()
     }
 }
@@ -262,7 +263,7 @@ where
     QT: QemuHelperTuple<S, EH> + Debug,
     EH: IsEmuExitHandler,
 {
-    fn pre_exec<E, EM, OF, Z>(&mut self, input: &E::Input, emu: &Emulator)
+    fn pre_exec<E, EM, OF, Z>(&mut self, input: &E::Input, emu: &Emulator<EH>)
     where
         E: Executor<EM, Z, State = S>,
         EM: EventFirer<State = S> + EventRestarter<State = S>,
@@ -505,7 +506,8 @@ where
 }
 
 #[cfg(feature = "fork")]
-impl<'a, H, OT, QT, S, SP, E, EM, Z> UsesObservers for QemuForkExecutor<'a, H, OT, QT, S, SP, E, EM, Z>
+impl<'a, H, OT, QT, S, SP, E, EM, Z> UsesObservers
+    for QemuForkExecutor<'a, H, OT, QT, S, SP, E, EM, Z>
 where
     H: FnMut(&S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
@@ -535,7 +537,8 @@ where
 }
 
 #[cfg(feature = "fork")]
-impl<'a, H, OT, QT, S, SP, E, EM, Z> HasObservers for QemuForkExecutor<'a, H, OT, QT, S, SP, E, EM, Z>
+impl<'a, H, OT, QT, S, SP, E, EM, Z> HasObservers
+    for QemuForkExecutor<'a, H, OT, QT, S, SP, E, EM, Z>
 where
     H: FnMut(&S::Input) -> ExitKind,
     S: State + HasExecutions,

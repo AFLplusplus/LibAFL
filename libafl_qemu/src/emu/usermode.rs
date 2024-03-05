@@ -14,6 +14,7 @@ use crate::{
     sync_backdoor::SyncBackdoorError,
     EmuExitReason, EmuExitReasonError, Emulator, GuestAddr, GuestUsize, HookData, HookId,
     IsEmuExitHandler, MapInfo, MmapPerms, NopEmuExitHandler, SyscallHookResult, VerifyAccess, CPU,
+    PreSyscallHookId, PostSyscallHookId, NewThreadHookId
 };
 
 #[derive(Debug, Clone)]

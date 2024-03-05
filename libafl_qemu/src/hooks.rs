@@ -21,8 +21,8 @@ use crate::{
     emu::{Emulator, FatPtr, MemAccessInfo, SKIP_EXEC_HOOK},
     helper::QemuHelperTuple,
     BackdoorHookId, BlockHookId, CmpHookId, EdgeHookId, GuestAddr, GuestUsize, HookId,
-    InstructionHookId, NewThreadHookId, PostSyscallHookId, PreSyscallHookId, ReadHookId,
-    WriteHookId, IsEmuExitHandler
+    InstructionHookId, IsEmuExitHandler, NewThreadHookId, PostSyscallHookId, PreSyscallHookId,
+    ReadHookId, WriteHookId,
 };
 
 /*
@@ -350,7 +350,7 @@ where
 }
 
 static mut HOOKS_IS_INITIALIZED: bool = false;
-// static mut FIRST_EXEC: bool = true;
+static mut FIRST_EXEC: bool = true;
 
 pub struct QemuHooks<QT, S, E>
 where
@@ -378,18 +378,18 @@ where
 }
 
 impl<I, QT, E> QemuHooks<QT, NopState<I>, E>
-    where
-        QT: QemuHelperTuple<NopState<I>>,
-        NopState<I>: UsesInput<Input = I>,
-        E: IsEmuExitHandler,
+where
+    QT: QemuHelperTuple<NopState<I>, E>,
+    NopState<I>: UsesInput<Input = I>,
+    E: IsEmuExitHandler,
 {
     pub fn reproducer(emulator: Emulator, helpers: QT) -> Box<Self> {
         Self::new(emulator, helpers)
     }
 
     pub fn repro_run<H>(&mut self, harness: &mut H, input: &I) -> ExitKind
-        where
-            H: FnMut(&I) -> ExitKind,
+    where
+        H: FnMut(&I) -> ExitKind,
     {
         unsafe {
             if FIRST_EXEC {
