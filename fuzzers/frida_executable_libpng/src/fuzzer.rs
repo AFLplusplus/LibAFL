@@ -16,7 +16,7 @@ use libafl::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::{I2SRandReplace, Tokens},
     },
-    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
+    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver, TrackingHinted},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, StdState},
@@ -31,11 +31,6 @@ use libafl_bolts::{
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
     AsSlice,
-};
-#[cfg(unix)]
-use libafl_frida::asan::{
-    asan_rt::AsanRuntime,
-    errors::{AsanErrorsFeedback, AsanErrorsObserver},
 };
 #[cfg(unix)]
 use libafl_frida::asan::{
@@ -109,7 +104,11 @@ unsafe fn fuzz(
 
                 let coverage = CoverageRuntime::new();
                 #[cfg(unix)]
+<<<<<<< HEAD
                 let asan = AsanRuntime::new(options);
+=======
+                let asan = AsanRuntime::new(&options);
+>>>>>>> dc36827a (moar porting)
 
                 #[cfg(unix)]
                 let mut frida_helper =
@@ -123,7 +122,8 @@ unsafe fn fuzz(
                     "edges",
                     frida_helper.map_mut_ptr().unwrap(),
                     MAP_SIZE,
-                ));
+                ))
+                .track_indices();
 
                 // Create an observation channel to keep track of the execution time
                 let time_observer = TimeObserver::new("time");
@@ -182,15 +182,24 @@ unsafe fn fuzz(
                 let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
                 // A minimization+queue policy to get testcasess from the corpus
-                let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+                let scheduler =
+                    IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
                 #[cfg(unix)]
+<<<<<<< HEAD
                 let observers = tuple_list!(edges_observer, time_observer, unsafe {
                     AsanErrorsObserver::from_static_asan_errors()
                 });
+=======
+                let observers = tuple_list!(
+                    edges_observer,
+                    time_observer,
+                    AsanErrorsObserver::new(&ASAN_ERRORS)
+                );
+>>>>>>> dc36827a (moar porting)
                 #[cfg(windows)]
                 let observers = tuple_list!(edges_observer, time_observer);
 
@@ -238,7 +247,8 @@ unsafe fn fuzz(
                     "edges",
                     frida_helper.map_mut_ptr().unwrap(),
                     MAP_SIZE,
-                ));
+                ))
+                .track_indices();
 
                 // Create an observation channel to keep track of the execution time
                 let time_observer = TimeObserver::new("time");
@@ -295,15 +305,24 @@ unsafe fn fuzz(
                 let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
                 // A minimization+queue policy to get testcasess from the corpus
-                let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+                let scheduler =
+                    IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
                 #[cfg(unix)]
+<<<<<<< HEAD
                 let observers = tuple_list!(edges_observer, time_observer, unsafe {
                     AsanErrorsObserver::from_static_asan_errors()
                 });
+=======
+                let observers = tuple_list!(
+                    edges_observer,
+                    time_observer,
+                    AsanErrorsObserver::new(&ASAN_ERRORS)
+                );
+>>>>>>> dc36827a (moar porting)
                 #[cfg(windows)]
                 let observers = tuple_list!(edges_observer, time_observer,);
 
@@ -366,7 +385,8 @@ unsafe fn fuzz(
                     "edges",
                     frida_helper.map_mut_ptr().unwrap(),
                     MAP_SIZE,
-                ));
+                ))
+                .track_indices();
 
                 // Create an observation channel to keep track of the execution time
                 let time_observer = TimeObserver::new("time");
@@ -423,15 +443,24 @@ unsafe fn fuzz(
                 let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
                 // A minimization+queue policy to get testcasess from the corpus
-                let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+                let scheduler =
+                    IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
                 #[cfg(unix)]
+<<<<<<< HEAD
                 let observers = tuple_list!(edges_observer, time_observer, unsafe {
                     AsanErrorsObserver::from_static_asan_errors()
                 });
+=======
+                let observers = tuple_list!(
+                    edges_observer,
+                    time_observer,
+                    AsanErrorsObserver::new(&ASAN_ERRORS)
+                );
+>>>>>>> dc36827a (moar porting)
                 #[cfg(windows)]
                 let observers = tuple_list!(edges_observer, time_observer,);
 
