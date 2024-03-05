@@ -28,13 +28,13 @@ pub struct Location(usize);
 
 impl Debug for Location {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        core::fmt::Debug::fmt(&self.0, f)
+        Debug::fmt(&self.0, f)
     }
 }
 
 impl Display for Location {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        core::fmt::Display::fmt(&self.0, f)
+        Display::fmt(&self.0, f)
     }
 }
 
