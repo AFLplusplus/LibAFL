@@ -601,7 +601,7 @@ mod tests {
 /// `SchedulerMutator` Python bindings
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
-#[allow(clippy::unnecessary_fallible_conversions)]
+#[allow(clippy::unnecessary_fallible_conversions, unused_qualifications)]
 pub mod pybind {
     use pyo3::prelude::*;
 

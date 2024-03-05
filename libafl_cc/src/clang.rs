@@ -152,7 +152,7 @@ impl ToolWrapper for ClangWrapper {
         let mut suppress_linking = 0;
         let mut i = 1;
         while i < args.len() {
-            let arg_as_path = std::path::Path::new(args[i].as_ref());
+            let arg_as_path = Path::new(args[i].as_ref());
 
             if arg_as_path
                 .extension()
@@ -329,7 +329,7 @@ impl ToolWrapper for ClangWrapper {
             .base_args
             .iter()
             .map(|r| {
-                let arg_as_path = std::path::PathBuf::from(r);
+                let arg_as_path = PathBuf::from(r);
                 if r.ends_with('.') {
                     r.to_string()
                 } else {
@@ -366,7 +366,7 @@ impl ToolWrapper for ClangWrapper {
             // No output specified, we need to rewrite the single .c file's name into a -o
             // argument.
             for arg in &base_args {
-                let arg_as_path = std::path::PathBuf::from(arg);
+                let arg_as_path = PathBuf::from(arg);
                 if !arg.ends_with('.') && !arg.starts_with('-') {
                     if let Some(extension) = arg_as_path.extension() {
                         let extension = extension.to_str().unwrap();
@@ -376,7 +376,7 @@ impl ToolWrapper for ClangWrapper {
                                 args.push("-o".to_string());
                                 args.push(if self.linking {
                                     configuration
-                                        .replace_extension(&std::path::PathBuf::from("a.out"))
+                                        .replace_extension(&PathBuf::from("a.out"))
                                         .into_os_string()
                                         .into_string()
                                         .unwrap()

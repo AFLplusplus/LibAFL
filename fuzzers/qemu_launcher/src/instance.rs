@@ -1,4 +1,4 @@
-use core::ptr::addr_of_mut;
+use core::{fmt::Debug, ptr::addr_of_mut};
 use std::{marker::PhantomData, process};
 
 #[cfg(feature = "simplemgr")]
@@ -70,7 +70,7 @@ pub struct Instance<'a, M: Monitor, E: IsEmuExitHandler> {
 impl<'a, M: Monitor, EH: IsEmuExitHandler> Instance<'a, M> {
     pub fn run<QT>(&mut self, helpers: QT, state: Option<ClientState>) -> Result<(), Error>
     where
-        QT: QemuHelperTuple<ClientState, EH>,
+        QT: QemuHelperTuple<ClientState, EH> + Debug,
     {
         let mut hooks = QemuHooks::new(self.emu.clone(), helpers);
 

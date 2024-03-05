@@ -1096,7 +1096,7 @@ impl From<bool> for ConstFeedback {
 
 /// `Feedback` Python bindings
 #[cfg(feature = "python")]
-#[allow(clippy::unnecessary_fallible_conversions)]
+#[allow(clippy::unnecessary_fallible_conversions, unused_qualifications)]
 #[allow(missing_docs)]
 pub mod pybind {
     use core::ptr;
