@@ -22,7 +22,6 @@ all-features = true
 
 [features]
 default = [
-    "sancov_value_profile",
     "std",
     "sanitizers_flags",
     "windows_asan",

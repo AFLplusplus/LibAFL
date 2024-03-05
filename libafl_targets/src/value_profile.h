@@ -20,7 +20,7 @@ const uintptr_t kMapSizeInBits = CMP_MAP_SIZE * 8;
 const uintptr_t kBitsInByte = sizeof(uint8_t) * 8;
 
 inline void AddValue(uintptr_t k) {
-  uintptr_t Idx = k % kMapSizeInBits; // adjust it so it fits in map sz
+  uintptr_t Idx = k % kMapSizeInBits;  // adjust it so it fits in map sz
 
   uintptr_t ByteIdx = Idx / kBitsInByte;
   uintptr_t BitIdx = Idx % kBitsInByte;
@@ -35,7 +35,6 @@ inline void AddValue(uintptr_t k) {
 
 static void __libafl_targets_value_profile1(uintptr_t k, uint8_t arg1,
                                             uint8_t arg2) {
-
   AddValue(k + HUMMING_DISTANCE(arg1, arg2));
   AddValue(k + ABSOLUTE_DISTANCE(arg1, arg2));
 }
