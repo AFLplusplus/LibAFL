@@ -44,6 +44,7 @@ use crate::{
         EventProcessor, EventRestarter, HasCustomBufHandlers, HasEventManagerId, ProgressReporter,
     },
     executors::{Executor, HasObservers},
+    feedbacks::transferred::TransferringMetadata,
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, UsesInput},
     monitors::Monitor,
@@ -457,7 +458,7 @@ where
 
 impl<S> TcpEventManager<S>
 where
-    S: State + HasExecutions,
+    S: State + HasExecutions + HasMetadata,
 {
     /// Create a manager from a raw TCP client specifying the client id
     pub fn existing<A: ToSocketAddrs>(
@@ -559,6 +560,9 @@ where
             } => {
                 log::info!("Received new Testcase from {client_id:?} ({client_config:?}, forward {forward_id:?})");
 
+                if let Ok(meta) = state.metadata_mut::<TransferringMetadata>() {
+                    meta.set_transferring(true);
+                }
                 let _res = if client_config.match_with(&self.configuration)
                     && observers_buf.is_some()
                 {
@@ -578,6 +582,9 @@ where
                         state, executor, self, input, false,
                     )?
                 };
+                if let Ok(meta) = state.metadata_mut::<TransferringMetadata>() {
+                    meta.set_transferring(false);
+                }
                 if let Some(item) = _res.1 {
                     log::info!("Added received Testcase as item #{item}");
                 }
@@ -681,7 +688,7 @@ where
 
 impl<E, S, Z> EventProcessor<E, Z> for TcpEventManager<S>
 where
-    S: State + HasExecutions,
+    S: State + HasExecutions + HasMetadata,
     E: HasObservers<State = S> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers, State = S>,
@@ -874,7 +881,7 @@ impl<E, S, SP, Z> EventProcessor<E, Z> for TcpRestartingEventManager<S, SP>
 where
     E: HasObservers<State = S> + Executor<TcpEventManager<S>, Z>,
     for<'a> E::Observers: Deserialize<'a>,
-    S: State + HasExecutions,
+    S: State + HasExecutions + HasMetadata,
     SP: ShMemProvider + 'static,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers>, //CE: CustomEvent<I>,
 {
@@ -978,7 +985,7 @@ pub fn setup_restarting_mgr_tcp<MT, S>(
 ) -> Result<(Option<S>, TcpRestartingEventManager<S, StdShMemProvider>), Error>
 where
     MT: Monitor + Clone,
-    S: State + HasExecutions,
+    S: State + HasExecutions + HasMetadata,
 {
     TcpRestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)
@@ -1039,7 +1046,7 @@ where
 impl<MT, S, SP> TcpRestartingMgr<MT, S, SP>
 where
     SP: ShMemProvider,
-    S: State + HasExecutions,
+    S: State + HasExecutions + HasMetadata,
     MT: Monitor + Clone,
 {
     /// Internal function, returns true when shuttdown is requested by a `SIGINT` signal
