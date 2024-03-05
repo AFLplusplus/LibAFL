@@ -206,7 +206,7 @@ where
                         self.shmem_provider.post_fork(true)?;
 
                         #[cfg(feature = "std")]
-                        std::thread::sleep(std::time::Duration::from_millis(index * 10));
+                        std::thread::sleep(Duration::from_millis(index * 10));
 
                         #[cfg(feature = "std")]
                         if !debug_output {
@@ -549,7 +549,7 @@ where
             }
         }
 
-        std::thread::sleep(std::time::Duration::from_millis(10));
+        std::thread::sleep(Duration::from_millis(10));
 
         // Spawn clients
         let mut index = 0_u64;
@@ -568,7 +568,7 @@ where
                         log::info!("{:?} PostFork", unsafe { libc::getpid() });
                         self.shmem_provider.post_fork(true)?;
 
-                        std::thread::sleep(std::time::Duration::from_millis(index * 10));
+                        std::thread::sleep(Duration::from_millis(index * 10));
 
                         if !debug_output {
                             if let Some(file) = &self.opened_stdout_file {

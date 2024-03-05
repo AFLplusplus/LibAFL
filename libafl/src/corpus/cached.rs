@@ -251,7 +251,7 @@ where
 
 /// ``CachedOnDiskCorpus`` Python bindings
 #[cfg(feature = "python")]
-#[allow(clippy::unnecessary_fallible_conversions)]
+#[allow(clippy::unnecessary_fallible_conversions, unused_qualifications)]
 pub mod pybind {
     use alloc::string::String;
     use std::path::PathBuf;

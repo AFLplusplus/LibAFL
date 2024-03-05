@@ -15,9 +15,7 @@ fuzzing environment or updating their harnesses.
 
 ## Usage
 
-`libafl_libfuzzer` currently has known support for Rust, C, and C++ targets on Linux.
-macOS has experimental support, but requires patching of LibAFL which leads to breaking changes elsewhere (ask in the
-Discord for a patch file -- and [let us know what problems you face](https://github.com/AFLplusplus/LibAFL/issues/1564)).
+`libafl_libfuzzer` currently has known support for Rust, C, and C++ targets on Linux and macOS.
 Windows is not currently supported, as we do not currently test or develop for Windows machines, but [we will happily
 hear what issues you face and patch them as possible](https://github.com/AFLplusplus/LibAFL/issues/1563).
 
