@@ -24,6 +24,8 @@ use libafl_bolts::{
     compress::GzipCompressor,
     llmp::{LLMP_FLAG_COMPRESSED, LLMP_FLAG_INITIALIZED},
 };
+
+#[cfg(feature = "std")]
 use libafl_bolts::llmp::DEFAULT_CLIENT_TIMEOUT_SECS;
 
 #[cfg(feature = "std")]
