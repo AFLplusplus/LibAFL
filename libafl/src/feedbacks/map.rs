@@ -23,7 +23,7 @@ use crate::{
     feedbacks::{Feedback, HasObserverName},
     inputs::UsesInput,
     monitors::{AggregatorOps, UserStats, UserStatsValue},
-    observers::{MapObserver, Observer, ObserversTuple, TrackingHinted UsesObserver},
+    observers::{MapObserver, Observer, ObserversTuple, TrackingHinted, UsesObserver},
     state::State,
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -393,7 +393,6 @@ pub struct MapFeedback<N, O, R, S, T, A> {
 impl<N, O, R, S, T, A> UsesObserver<S> for MapFeedback<N, O, R, S, T, A>
 where
     S: UsesInput,
-    O: Observer<S>,
     A: AsRef<O> + Observer<S>,
 {
     type Observer = A;
@@ -673,12 +672,8 @@ impl<N, O, R, S, T, A> Named for MapFeedback<N, O, R, S, T, A> {
 
 impl<N, O, R, S, T, A> HasObserverName for MapFeedback<N, O, R, S, T, A>
 where
-    T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
-    R: Reducer<T>,
-    N: IsNovel<T>,
-    O: MapObserver<Entry = T>,
-    for<'it> O: AsIter<'it, Item = T>,
-    S: HasNamedMetadata,
+    O: Named,
+    A: AsRef<O>,
 {
     #[inline]
     fn observer_name(&self) -> &str {
