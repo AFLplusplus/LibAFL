@@ -37,8 +37,8 @@ impl<A, B, OTA, OTB, DOT> DiffExecutor<A, B, OTA, OTB, DOT> {
             primary,
             secondary,
             observers: UnsafeCell::new(ProxyObserversTuple {
-                primary: OwnedMutPtr::Ptr(core::ptr::null_mut()),
-                secondary: OwnedMutPtr::Ptr(core::ptr::null_mut()),
+                primary: OwnedMutPtr::Ptr(ptr::null_mut()),
+                secondary: OwnedMutPtr::Ptr(ptr::null_mut()),
                 differential: observers,
             }),
         }

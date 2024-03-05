@@ -404,10 +404,10 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
 
     for pass in &[
         "cmplog-routines-pass.cc",
-        "afl-coverage-pass.cc",
         "autotokens-pass.cc",
         "coverage-accounting-pass.cc",
         "cmplog-instructions-pass.cc",
+        "ctx-pass.cc",
     ] {
         build_pass(
             bindir_path,

@@ -23,6 +23,8 @@ pub use new_hash_feedback::NewHashFeedbackMetadata;
 
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
+pub mod transferred;
+
 use alloc::string::{String, ToString};
 use core::{
     fmt::{self, Debug, Formatter},
@@ -1094,7 +1096,7 @@ impl From<bool> for ConstFeedback {
 
 /// `Feedback` Python bindings
 #[cfg(feature = "python")]
-#[allow(clippy::unnecessary_fallible_conversions)]
+#[allow(clippy::unnecessary_fallible_conversions, unused_qualifications)]
 #[allow(missing_docs)]
 pub mod pybind {
     use core::ptr;

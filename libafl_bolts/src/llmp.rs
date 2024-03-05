@@ -3203,7 +3203,7 @@ where
             Ok(stream) => stream,
             Err(e) => {
                 match e.kind() {
-                    std::io::ErrorKind::ConnectionRefused => {
+                    ErrorKind::ConnectionRefused => {
                         //connection refused. loop till the broker is up
                         loop {
                             match TcpStream::connect((_LLMP_CONNECT_ADDR, port)) {

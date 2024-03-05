@@ -480,7 +480,7 @@ char *strndup(const char *s, size_t n) {
   QASAN_LOAD(s, l + 1);
   void *r = __libqasan_malloc(l + 1);
   __libqasan_memcpy(r, s, l);
-  ((char*)r)[l] = 0;
+  ((char *)r)[l] = 0;
   QASAN_DEBUG("\t\t = %p\n", r);
 
   return r;

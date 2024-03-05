@@ -24,9 +24,6 @@ pub fn main() {
             .parse_args(&args)
             .expect("Failed to parse the command line")
             // Enable libafl's coverage instrumentation
-            .add_pass(LLVMPasses::AFLCoverage)
-            .add_arg("-mllvm")
-            .add_arg("-ctx") // Context sensitive coverage
             // Imitate afl-cc's compile definitions 
             .add_arg("-D__AFL_FUZZ_INIT()=int __afl_sharedmem_fuzzing = 1;extern unsigned int *__afl_fuzz_len;extern unsigned char *__afl_fuzz_ptr;unsigned char __afl_fuzz_alt[1048576];unsigned char *__afl_fuzz_alt_ptr = __afl_fuzz_alt;void libafl_start_forkserver(void)")
             .add_arg("-D__AFL_FUZZ_TESTCASE_BUF=(__afl_fuzz_ptr ? __afl_fuzz_ptr : __afl_fuzz_alt_ptr)")
