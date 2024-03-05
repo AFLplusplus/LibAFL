@@ -80,7 +80,7 @@ where
     SP: ShMemProvider + 'static,
     S: State + 'a,
 {
-    /// The ShmemProvider to use
+    /// The `ShmemProvider` to use
     shmem_provider: SP,
     /// The monitor instance to use
     monitor: MT,
@@ -97,7 +97,7 @@ where
     /// A file name to write all client output to
     #[builder(default = None)]
     stdout_file: Option<&'a str>,
-    /// The actual, opened, stdout_file - so that we keep it open until the end
+    /// The actual, opened, `stdout_file` - so that we keep it open until the end
     #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[builder(setter(skip), default = None)]
     opened_stdout_file: Option<File>,
@@ -105,7 +105,7 @@ where
     /// `stdout_file`.
     #[builder(default = None)]
     stderr_file: Option<&'a str>,
-    /// The actual, opened, stdout_file - so that we keep it open until the end
+    /// The actual, opened, `stdout_file` - so that we keep it open until the end
     #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[builder(setter(skip), default = None)]
     opened_stderr_file: Option<File>,
@@ -418,7 +418,7 @@ where
     SP: ShMemProvider + 'static,
     S: State + 'a,
 {
-    /// The ShmemProvider to use
+    /// The `ShmemProvider` to use
     shmem_provider: SP,
     /// The monitor instance to use
     monitor: MT,
@@ -438,7 +438,7 @@ where
     /// A file name to write all client output to
     #[builder(default = None)]
     stdout_file: Option<&'a str>,
-    /// The actual, opened, stdout_file - so that we keep it open until the end
+    /// The actual, opened, `stdout_file` - so that we keep it open until the end
     #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[builder(setter(skip), default = None)]
     opened_stdout_file: Option<File>,
@@ -446,7 +446,7 @@ where
     /// `stdout_file`.
     #[builder(default = None)]
     stderr_file: Option<&'a str>,
-    /// The actual, opened, stdout_file - so that we keep it open until the end
+    /// The actual, opened, `stdout_file` - so that we keep it open until the end
     #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[builder(setter(skip), default = None)]
     opened_stderr_file: Option<File>,
