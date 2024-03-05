@@ -15,19 +15,8 @@ else
     export PROFILE_DIR=debug
 fi
 
-if [[ -n "${RUN_QEMU_FUZZER}" ]]; then
-    fuzzers=$(echo "$fuzzers" | tr ' ' '\n' | grep "qemu")
-    backtrace_fuzzers=$(echo "$backtrace_fuzzers" | tr ' ' '\n' | grep "qemu")
-elif [[ -n "${RUN_BABY_FUZZER}" ]]; then
-    fuzzers=$(echo "$fuzzers" | tr ' ' '\n' | grep "baby")
-    backtrace_fuzzers=$(echo "$backtrace_fuzzers" | tr ' ' '\n' | grep "baby")
-elif [[ -n "${RUN_LIBPNG_FUZZER}" ]]; then
-    fuzzers=$(echo "$fuzzers" | tr ' ' '\n' | grep "libpng")
-    backtrace_fuzzers=$(echo "$backtrace_fuzzers" | tr ' ' '\n' | grep "libpng")
-else
-    fuzzers=$(echo "$fuzzers" | tr ' ' '\n' | grep -v "qemu" | grep -v "baby" | grep -v "libpng")
-    backtrace_fuzzers=$(echo "$backtrace_fuzzers" | tr ' ' '\n' | grep -v "qemu" | grep -v "baby" | grep -v "libpng")
-fi
+fuzzers=$(echo "$fuzzers" | tr ' ' '\n')
+backtrace_fuzzers=$(echo "$backtrace_fuzzers" | tr ' ' '\n')
 
 libafl=$(pwd)
 
@@ -56,7 +45,7 @@ done
 for fuzzer in $(echo "$fuzzers" "$backtrace_fuzzers");
 do
     # skip nyx test on non-linux platforms
-    if [[ $fuzzer == *"nyx_"* ]] && [[ $(uname -s) != "Linux" ]]; then
+    if [[ $fuzzer == *"nyx_"* ]]; then
         continue
     fi
 

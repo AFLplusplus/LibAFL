@@ -1,9 +1,5 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for libpng.
-use mimalloc::MiMalloc;
-#[global_allocator]
-static GLOBAL: MiMalloc = MiMalloc;
-
 use core::time::Duration;
 #[cfg(feature = "crash")]
 use std::ptr;
@@ -37,6 +33,10 @@ use libafl_bolts::{
     AsSlice,
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
+use mimalloc::MiMalloc;
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 /// The main fn, `no_mangle` as it is a C main
 #[no_mangle]
@@ -88,7 +88,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    let map_feedback = MaxMapFeedback::tracking(&edges_observer, true, false);
+    let map_feedback = MaxMapFeedback::new(&edges_observer);
 
     let calibration = CalibrationStage::new(&map_feedback);
 

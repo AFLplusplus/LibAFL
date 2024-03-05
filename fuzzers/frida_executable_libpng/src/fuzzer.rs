@@ -1,9 +1,5 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for libpng.
-use mimalloc::MiMalloc;
-#[global_allocator]
-static GLOBAL: MiMalloc = MiMalloc;
-
 use std::{path::PathBuf, ptr::null};
 
 use frida_gum::Gum;
@@ -41,6 +37,11 @@ use libafl_frida::asan::{
     asan_rt::AsanRuntime,
     errors::{AsanErrorsFeedback, AsanErrorsObserver},
 };
+#[cfg(unix)]
+use libafl_frida::asan::{
+    asan_rt::AsanRuntime,
+    errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS},
+};
 use libafl_frida::{
     cmplog_rt::CmpLogRuntime,
     coverage_rt::{CoverageRuntime, MAP_SIZE},
@@ -48,6 +49,10 @@ use libafl_frida::{
     helper::FridaInstrumentationHelper,
 };
 use libafl_targets::cmplog::CmpLogObserver;
+use mimalloc::MiMalloc;
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 pub unsafe fn lib(main: extern "C" fn(i32, *const *const u8, *const *const u8) -> i32) {
     color_backtrace::install();
@@ -127,7 +132,7 @@ unsafe fn fuzz(
                 // This one is composed by two Feedbacks in OR
                 let mut feedback = feedback_or!(
                     // New maximization map feedback linked to the edges observer and the feedback state
-                    MaxMapFeedback::tracking(&edges_observer, true, false),
+                    MaxMapFeedback::new(&edges_observer),
                     // Time feedback, this one does not need a feedback state
                     TimeFeedback::with_observer(&time_observer)
                 );
@@ -242,7 +247,7 @@ unsafe fn fuzz(
                 // This one is composed by two Feedbacks in OR
                 let mut feedback = feedback_or!(
                     // New maximization map feedback linked to the edges observer and the feedback state
-                    MaxMapFeedback::tracking(&edges_observer, true, false),
+                    MaxMapFeedback::new(&edges_observer),
                     // Time feedback, this one does not need a feedback state
                     TimeFeedback::with_observer(&time_observer)
                 );
@@ -370,7 +375,7 @@ unsafe fn fuzz(
                 // This one is composed by two Feedbacks in OR
                 let mut feedback = feedback_or!(
                     // New maximization map feedback linked to the edges observer and the feedback state
-                    MaxMapFeedback::tracking(&edges_observer, true, false),
+                    MaxMapFeedback::new(&edges_observer),
                     // Time feedback, this one does not need a feedback state
                     TimeFeedback::with_observer(&time_observer)
                 );

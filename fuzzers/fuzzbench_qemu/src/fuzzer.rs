@@ -53,6 +53,7 @@ use libafl_qemu::{
     elf::EasyElf,
     filter_qemu_args,
     hooks::QemuHooks,
+    Emulator,
     GuestReg,
     //snapshot::QemuSnapshotHelper,
     MmapPerms,
@@ -267,7 +268,7 @@ fn fuzz(
     // Create an observation channel using cmplog map
     let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
-    let map_feedback = MaxMapFeedback::tracking(&edges_observer, true, false);
+    let map_feedback = MaxMapFeedback::new(&edges_observer);
 
     let calibration = CalibrationStage::new(&map_feedback);
 
