@@ -883,7 +883,11 @@ where
         keep_pages_forever: bool,
     ) -> Result<Self, Error> {
         #[cfg(feature = "llmp_debug")]
-        log::info!("PID: {:#?} Initializing LlmpSender {:#?}", std::process::id(), id);
+        log::info!(
+            "PID: {:#?} Initializing LlmpSender {:#?}",
+            std::process::id(),
+            id
+        );
         Ok(Self {
             id,
             last_msg_sent: ptr::null_mut(),
@@ -951,7 +955,11 @@ where
         )?;
         ret.id = Self::client_id_from_env(env_name)?.unwrap_or_default();
         #[cfg(feature = "llmp_debug")]
-        log::info!("PID: {:#?} Initializing LlmpSender from on_existing_from_env {:#?}", std::process::id(), &ret.id);
+        log::info!(
+            "PID: {:#?} Initializing LlmpSender from on_existing_from_env {:#?}",
+            std::process::id(),
+            &ret.id
+        );
         Ok(ret)
     }
 
@@ -1019,9 +1027,13 @@ where
             None => ptr::null_mut(),
         };
 
-        let client_id =  unsafe { (*out_shmem.page()).sender_id };
+        let client_id = unsafe { (*out_shmem.page()).sender_id };
         #[cfg(feature = "llmp_debug")]
-        log::info!("PID: {:#?} Initializing LlmpSender from on_existing_shmem {:#?}", std::process::id(), &client_id);
+        log::info!(
+            "PID: {:#?} Initializing LlmpSender from on_existing_shmem {:#?}",
+            std::process::id(),
+            &client_id
+        );
         Ok(Self {
             id: client_id,
             last_msg_sent,
