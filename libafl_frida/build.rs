@@ -7,10 +7,8 @@ fn main() {
     }
 
     // Force linking against libc++
-    cc::Build::new()
-        .cpp(true)
-        .file("src/stub.cpp")
-        .compile("libcppstub.a");
+    #[cfg(unix)]
+    println!("cargo:rustc-link-lib=dylib=c++");
 
     // Build the test harness
     // clang++ -shared -fPIC -O0 -o test_harness.so test_harness.cpp
