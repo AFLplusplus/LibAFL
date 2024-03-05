@@ -470,6 +470,7 @@ pub mod pybind {
             }
         }
 
+        #[allow(unused_qualifications)]
         fn as_rand(slf: Py<Self>) -> PythonRand {
             PythonRand::new_std(slf)
         }
