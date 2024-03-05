@@ -214,7 +214,7 @@ fn main() {
             .header("src/sanitizer_interfaces.h")
             .use_core()
             .generate_comments(true)
-            .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+            .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
             .generate()
             .expect("Couldn't generate the sanitizer headers!");
 
