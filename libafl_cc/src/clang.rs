@@ -1,12 +1,9 @@
 //! LLVM compiler Wrapper from `LibAFL`
 
 use std::{
-    convert::Into,
     env,
     path::{Path, PathBuf},
     str::FromStr,
-    string::String,
-    vec::Vec,
 };
 
 use crate::{CompilerWrapper, Error, ToolWrapper, LIB_EXT, LIB_PREFIX};
@@ -31,10 +28,8 @@ include!(concat!(env!("OUT_DIR"), "/clang_constants.rs"));
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LLVMPasses {
     //CmpLogIns,
-    /// The CmpLog pass
+    /// The `CmpLog` pass
     CmpLogRtn,
-    /// The AFL coverage pass
-    AFLCoverage,
     /// The Autotoken pass
     AutoTokens,
     /// The Coverage Accouting (BB metric) pass
@@ -42,8 +37,10 @@ pub enum LLVMPasses {
     /// The dump cfg pass
     DumpCfg,
     #[cfg(unix)]
-    /// The CmpLog Instruction pass
+    /// The `CmpLog` Instruction pass
     CmpLogInstructions,
+    /// Instrument caller for sancov coverage
+    Ctx,
 }
 
 impl LLVMPasses {
@@ -53,8 +50,6 @@ impl LLVMPasses {
         match self {
             LLVMPasses::CmpLogRtn => PathBuf::from(env!("OUT_DIR"))
                 .join(format!("cmplog-routines-pass.{}", dll_extension())),
-            LLVMPasses::AFLCoverage => PathBuf::from(env!("OUT_DIR"))
-                .join(format!("afl-coverage-pass.{}", dll_extension())),
             LLVMPasses::AutoTokens => {
                 PathBuf::from(env!("OUT_DIR")).join(format!("autotokens-pass.{}", dll_extension()))
             }
@@ -66,6 +61,9 @@ impl LLVMPasses {
             #[cfg(unix)]
             LLVMPasses::CmpLogInstructions => PathBuf::from(env!("OUT_DIR"))
                 .join(format!("cmplog-instructions-pass.{}", dll_extension())),
+            LLVMPasses::Ctx => {
+                PathBuf::from(env!("OUT_DIR")).join(format!("ctx-pass.{}", dll_extension()))
+            }
         }
     }
 }

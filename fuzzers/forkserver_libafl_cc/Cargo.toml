@@ -22,11 +22,11 @@ which = { version = "4.4" }
 
 [dependencies]
 clap = { version = "4.0", features = ["derive"] }
-nix = "0.26"
+nix = "0.27"
 libafl = { path = "../../libafl/" }
 libafl_bolts = { path = "../../libafl_bolts/" }
 libafl_cc = { path = "../../libafl_cc/" }
-libafl_targets = { path = "../../libafl_targets/" }
+libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_hitcounts", "libfuzzer"] }
 
 [lib]
 name = "libforkserver_libafl_cc"

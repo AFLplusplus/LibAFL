@@ -17,10 +17,16 @@ use hashbrown::HashMap;
 use libafl::{inputs::UsesInput, Error};
 use serde::{Deserialize, Serialize};
 
+#[cfg(not(cpu_target = "hexagon"))]
+use crate::SYS_execve;
 use crate::{
-    elf::EasyElf, emu::ArchExtras, CallingConvention, Emulator, GuestAddr, Hook, IsEmuExitHandler,
-    QemuHelper, QemuHelperTuple, QemuHooks, SYS_execve, SyscallHookResult,
+    elf::EasyElf, emu::ArchExtras, CallingConvention, Emulator, GuestAddr, Hook, QemuHelper,
+    QemuHelperTuple, QemuHooks, SyscallHookResult,
 };
+#[cfg(cpu_target = "hexagon")]
+/// Hexagon syscalls are not currently supported by the `syscalls` crate, so we just paste this here for now.
+/// <https://github.com/qemu/qemu/blob/11be70677c70fdccd452a3233653949b79e97908/linux-user/hexagon/syscall_nr.h#L230>
+const SYS_execve: u8 = 221;
 
 /// Parses `injections.yaml`
 fn parse_yaml<P: AsRef<Path> + Display>(path: P) -> Result<Vec<YamlInjectionEntry>, Error> {
@@ -390,7 +396,7 @@ where
 
 fn find_function<E>(
     emu: &Emulator<E>,
-    file: &String,
+    file: &str,
     function: &str,
     loadaddr: GuestAddr,
 ) -> Result<Option<GuestAddr>, Error>

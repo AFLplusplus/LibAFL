@@ -211,7 +211,6 @@ pub mod launcher {}
 use core::{
     array::TryFromSliceError,
     fmt::{self, Display},
-    iter::Iterator,
     num::{ParseIntError, TryFromIntError},
     time,
 };
@@ -735,6 +734,14 @@ pub trait HasLen {
     /// Returns `true` if it has no elements.
     fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<T> HasLen for Vec<T> {
+    #[inline]
+    fn len(&self) -> usize {
+        Vec::<T>::len(self)
     }
 }
 

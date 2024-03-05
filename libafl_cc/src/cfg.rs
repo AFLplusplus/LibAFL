@@ -96,7 +96,7 @@ where
     #[must_use]
     pub fn new() -> Self {
         let map_size = option_env!("LIBAFL_EDGES_MAP_SIZE")
-            .map_or(Ok(65536), str::parse)
+            .map_or(Ok(2621440), str::parse)
             .expect("Could not parse LIBAFL_EDGES_MAP_SIZE");
         Self {
             edges: (0..map_size).map(|_| None).collect(),
@@ -396,6 +396,6 @@ mod tests {
         assert_eq!(*distances.get(&((41864 >> 1) ^ 26911)).unwrap(), 1);
         assert_eq!(*distances.get(&((26911 >> 1) ^ 52706)).unwrap(), 2);
         assert_eq!(*distances.get(&((26911 >> 1) ^ 41925)).unwrap(), 2);
-        assert!(distances.get(&((41864 >> 1) ^ 52706)).is_none());
+        assert!(!distances.contains_key(&((41864 >> 1) ^ 52706)));
     }
 }

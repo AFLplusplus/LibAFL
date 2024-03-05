@@ -274,7 +274,7 @@ where
         self.last_hash = hash;
     }
 
-    fn map_observer_name(&self) -> &String {
+    fn map_observer_name(&self) -> &str {
         &self.map_observer_name
     }
 }

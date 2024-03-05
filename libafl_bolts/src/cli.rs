@@ -365,9 +365,6 @@ pub fn parse_args() -> FuzzerOptions {
     any(feature = "cli", feature = "qemu_cli", feature = "frida_cli")
 ))]
 mod tests {
-    #[cfg(feature = "frida_cli")]
-    use alloc::string::String;
-
     use super::*;
 
     /// pass a standard option and `--` followed by some options that `FuzzerOptions` doesn't know

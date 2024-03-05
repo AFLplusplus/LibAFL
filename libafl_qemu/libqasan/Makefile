@@ -21,13 +21,13 @@ override LDFLAGS     += -ldl -pthread
 SRC := libqasan.c hooks.c malloc.c string.c uninstrument.c patch.c dlmalloc.c printf/printf.c
 HDR := libqasan.h qasan.h map_macro.h printf/printf.h
 
-all: libqasan.so
+all: $(OUT_DIR)/libqasan.so
 
-libqasan.so: $(HDR) $(SRC)
-	$(CC) $(CFLAGS) -fPIC -shared $(SRC) -o $(OUT_DIR)/$@ $(LDFLAGS)
+$(OUT_DIR)/libqasan.so: $(HDR) $(SRC)
+	$(CC) $(CFLAGS) -fPIC -shared $(SRC) -o $@ $(LDFLAGS)
 
 .NOTPARALLEL: clean
 
 clean:
 	rm -f *.o *.so *~ a.out core core.[1-9][0-9]*
-	rm -f libqasan.so
+	rm -f $(OUT_DIR)/libqasan.so

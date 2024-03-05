@@ -24,6 +24,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *******************************************************************************/
 
 #include "libqasan.h"
+#include "printf/printf.h"
 #include "map_macro.h"
 #include <unistd.h>
 #include <sys/syscall.h>
@@ -470,6 +471,21 @@ char *strdup(const char *s) {
   return r;
 }
 
+char *strndup(const char *s, size_t n) {
+  void *rtv = __builtin_return_address(0);
+
+  QASAN_DEBUG("%14p: strndup(%p, %zu)\n", rtv, s, n);
+  size_t l = __libqasan_strnlen(s, n);
+  if (l > n) { l = n; }
+  QASAN_LOAD(s, l + 1);
+  void *r = __libqasan_malloc(l + 1);
+  __libqasan_memcpy(r, s, l);
+  ((char *)r)[l] = 0;
+  QASAN_DEBUG("\t\t = %p\n", r);
+
+  return r;
+}
+
 size_t strlen(const char *s) {
   void *rtv = __builtin_return_address(0);
 
@@ -592,4 +608,27 @@ int wcscmp(const wchar_t *s1, const wchar_t *s2) {
   QASAN_DEBUG("\t\t = %d\n", r);
 
   return r;
+}
+
+int asprintf(char **restrict strp, const char *restrict fmt, ...) {
+  void *rtv = __builtin_return_address(0);
+
+  QASAN_DEBUG("%14p: asprintf(%p, %p)\n", rtv, strp, fmt);
+  va_list va;
+  va_start(va, fmt);
+  int len = __libqasan_vasprintf(strp, fmt, va);
+  va_end(va);
+  QASAN_DEBUG("\t\t = %d [*strp = %p]\n", len, *strp);
+
+  return len;
+}
+
+int vasprintf(char **restrict strp, const char *restrict fmt, va_list ap) {
+  void *rtv = __builtin_return_address(0);
+
+  QASAN_DEBUG("%14p: vasprintf(%p, %p)\n", rtv, strp, fmt);
+  int len = __libqasan_vasprintf(strp, fmt, ap);
+  QASAN_DEBUG("\t\t = %d [*strp = %p]\n", len, *strp);
+
+  return len;
 }

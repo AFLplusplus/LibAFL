@@ -66,3 +66,5 @@ libafl_nyx/packer
 .gdb_history
 # No llvm IR
 *.ll
+
+*.tar.gz

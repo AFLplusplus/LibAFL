@@ -1,10 +1,8 @@
 //! A very simple event manager, that just supports log outputs, but no multiprocessing
 
-use alloc::{
-    boxed::Box,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{boxed::Box, vec::Vec};
+#[cfg(all(unix, not(miri), feature = "std"))]
+use core::ptr::addr_of_mut;
 use core::{fmt::Debug, marker::PhantomData};
 #[cfg(feature = "std")]
 use core::{
@@ -56,7 +54,7 @@ where
 {
     /// The monitor
     monitor: MT,
-    /// The events that happened since the last handle_in_broker
+    /// The events that happened since the last `handle_in_broker`
     events: Vec<Event<S::Input>>,
     /// The custom buf handler
     custom_buf_handlers: Vec<Box<CustomBufHandlerFn<S>>>,
@@ -144,7 +142,7 @@ where
     fn add_custom_buf_handler(
         &mut self,
         handler: Box<
-            dyn FnMut(&mut Self::State, &String, &[u8]) -> Result<CustomBufEventResult, Error>,
+            dyn FnMut(&mut Self::State, &str, &[u8]) -> Result<CustomBufEventResult, Error>,
         >,
     ) {
         self.custom_buf_handlers.push(handler);
@@ -219,7 +217,7 @@ where
                 monitor
                     .client_stats_mut_for(ClientId(0))
                     .update_executions(*executions as u64, *time);
-                monitor.display(event.name().to_string(), ClientId(0));
+                monitor.display(event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
             Event::UpdateExecStats {
@@ -233,7 +231,7 @@ where
 
                 client.update_executions(*executions as u64, *time);
 
-                monitor.display(event.name().to_string(), ClientId(0));
+                monitor.display(event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
             Event::UpdateUserStats {
@@ -246,7 +244,7 @@ where
                     .client_stats_mut_for(ClientId(0))
                     .update_user_stats(name.clone(), value.clone());
                 monitor.aggregate(name);
-                monitor.display(event.name().to_string(), ClientId(0));
+                monitor.display(event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
             #[cfg(feature = "introspection")]
@@ -261,7 +259,7 @@ where
                 let client = monitor.client_stats_mut_for(ClientId(0));
                 client.update_executions(*executions as u64, *time);
                 client.update_introspection_monitor((**introspection_monitor).clone());
-                monitor.display(event.name().to_string(), ClientId(0));
+                monitor.display(event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
             Event::Objective { objective_size } => {
@@ -269,7 +267,7 @@ where
                 monitor
                     .client_stats_mut_for(ClientId(0))
                     .update_objective_size(*objective_size as u64);
-                monitor.display(event.name().to_string(), ClientId(0));
+                monitor.display(event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
             Event::Log {
@@ -405,7 +403,7 @@ where
 {
     fn add_custom_buf_handler(
         &mut self,
-        handler: Box<dyn FnMut(&mut S, &String, &[u8]) -> Result<CustomBufEventResult, Error>>,
+        handler: Box<dyn FnMut(&mut S, &str, &[u8]) -> Result<CustomBufEventResult, Error>>,
     ) {
         self.simple_event_mgr.add_custom_buf_handler(handler);
     }
@@ -485,7 +483,9 @@ where
 
             // We setup signal handlers to clean up shmem segments used by state restorer
             #[cfg(all(unix, not(miri)))]
-            if let Err(_e) = unsafe { setup_signal_handler(&mut EVENTMGR_SIGHANDLER_STATE) } {
+            if let Err(_e) =
+                unsafe { setup_signal_handler(addr_of_mut!(EVENTMGR_SIGHANDLER_STATE)) }
+            {
                 // We can live without a proper ctrl+c signal handler. Print and ignore.
                 log::error!("Failed to setup signal handlers: {_e}");
             }

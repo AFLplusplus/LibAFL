@@ -101,6 +101,7 @@ pub struct ucontext_t {
 #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
 #[derive(Debug)]
 #[repr(C)]
+#[allow(clippy::pub_underscore_fields)]
 pub struct arm_exception_state64 {
     /// Virtual Fault Address
     pub __far: u64,
@@ -125,6 +126,7 @@ pub struct arm_exception_state64 {
 #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
 #[derive(Debug)]
 #[repr(C)]
+#[allow(clippy::pub_underscore_fields)]
 pub struct arm_thread_state64 {
     /// General purpose registers x0-x28
     pub __x: [u64; 29],
@@ -170,12 +172,13 @@ pub struct arm_neon_state64 {
 #[allow(non_camel_case_types)]
 #[derive(Debug)]
 #[repr(C)]
+#[allow(clippy::pub_underscore_fields)]
 pub struct mcontext64 {
-    /// _STRUCT_ARM_EXCEPTION_STATE64
+    /// `_STRUCT_ARM_EXCEPTION_STATE64`
     pub __es: arm_exception_state64,
-    /// _STRUCT_ARM_THREAD_STATE64
+    /// `_STRUCT_ARM_THREAD_STATE64`
     pub __ss: arm_thread_state64,
-    /// _STRUCT_ARM_NEON_STATE64
+    /// `_STRUCT_ARM_NEON_STATE64`
     pub __ns: arm_neon_state64,
 }
 
@@ -186,7 +189,7 @@ pub struct mcontext64 {
 /// __darwin_size_t ss_size;        /* signal stack length */
 /// int             ss_flags;       /* SA_DISABLE and/or SA_ONSTACK */
 /// };
-/// ````
+/// ```
 #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
 #[derive(Debug)]
 #[allow(non_camel_case_types)]
@@ -196,7 +199,7 @@ pub struct sigaltstack {
     pub ss_sp: *mut c_void,
     /// signal stack length
     pub ss_size: libc::size_t,
-    /// SA_DISABLE and/or SA_ONSTACK
+    /// `SA_DISABLE` and/or `SA_ONSTACK`
     pub ss_flags: c_int,
 }
 
@@ -427,9 +430,10 @@ unsafe fn handle_signal(sig: c_int, info: *mut siginfo_t, void: *mut c_void) {
 /// # Safety
 ///
 /// The signal handlers will be called on any signal. They should (tm) be async safe.
+/// The handler pointer will be dereferenced, and the data the pointer points to may therefore not move.
 /// A lot can go south in signal handling. Be sure you know what you are doing.
 #[cfg(feature = "alloc")]
-pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: &mut T) -> Result<(), Error> {
+pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: *mut T) -> Result<(), Error> {
     // First, set up our own stack to be used during segfault handling. (and specify `SA_ONSTACK` in `sigaction`)
     if SIGNAL_STACK_PTR.is_null() {
         SIGNAL_STACK_PTR = malloc(SIGNAL_STACK_SIZE);
@@ -450,10 +454,10 @@ pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: &mut T) -> Res
     sigaddset(addr_of_mut!(sa.sa_mask), SIGALRM);
     sa.sa_flags = SA_NODEFER | SA_SIGINFO | SA_ONSTACK;
     sa.sa_sigaction = handle_signal as usize;
-    let signals = handler.signals();
+    let signals = unsafe { (*handler).signals() };
     for sig in signals {
         write_volatile(
-            &mut SIGNAL_HANDLERS[sig as usize],
+            addr_of_mut!(SIGNAL_HANDLERS[sig as usize]),
             Some(HandlerHolder {
                 handler: UnsafeCell::new(handler as *mut dyn Handler),
             }),

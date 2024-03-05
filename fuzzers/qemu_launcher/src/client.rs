@@ -2,14 +2,12 @@ use std::{env, ops::Range};
 
 use libafl::{
     corpus::{InMemoryOnDiskCorpus, OnDiskCorpus},
-    events::LlmpRestartingEventManager,
     inputs::BytesInput,
+    monitors::Monitor,
     state::StdState,
     Error,
 };
-use libafl_bolts::{
-    core_affinity::CoreId, rands::StdRand, shmem::StdShMemProvider, tuples::tuple_list,
-};
+use libafl_bolts::{core_affinity::CoreId, rands::StdRand, tuples::tuple_list};
 #[cfg(feature = "injections")]
 use libafl_qemu::injections::QemuInjectionHelper;
 use libafl_qemu::{
@@ -22,7 +20,10 @@ use libafl_qemu::{
     QemuInstrumentationAddressRangeFilter,
 };
 
-use crate::{instance::Instance, options::FuzzerOptions};
+use crate::{
+    instance::{ClientMgr, Instance},
+    options::FuzzerOptions,
+};
 
 #[allow(clippy::module_name_repetitions)]
 pub type ClientState =
@@ -108,10 +109,10 @@ impl<'a> Client<'a> {
         }
     }
 
-    pub fn run(
+    pub fn run<M: Monitor>(
         &self,
         state: Option<ClientState>,
-        mgr: LlmpRestartingEventManager<ClientState, StdShMemProvider>,
+        mgr: ClientMgr<M>,
         core_id: CoreId,
     ) -> Result<(), Error> {
         let mut args = self.args()?;

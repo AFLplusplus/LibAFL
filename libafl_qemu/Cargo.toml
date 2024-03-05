@@ -17,7 +17,7 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
-default = ["fork", "build_libqasan", "serdeany_autoreg"]
+default = ["fork", "build_libqasan", "serdeany_autoreg", "injections"]
 clippy = [] # special feature for clippy, don't use in normal projects§
 document-features = ["dep:document-features"]
 
@@ -56,8 +56,10 @@ systemmode = ["libafl_qemu_sys/systemmode"]
 ## Automatically register all `#[derive(SerdeAny)]` types at startup.
 serdeany_autoreg = ["libafl_bolts/serdeany_autoreg"]
 
-## Automatically register all `#[derive(SerdeAny)]` types at startup.
 slirp = [ "systemmode", "libafl_qemu_sys/slirp" ] # build qemu with host libslirp (for user networking)
+
+# disabled atm, enabled when fixed with dynamic list
+# shared = [ "libafl_qemu_sys/shared" ]
 
 [dependencies]
 libafl = { path = "../libafl", version = "0.11.2", default-features = false, features = ["std", "derive", "regex"] }
@@ -92,6 +94,7 @@ document-features = { version = "0.2", optional = true }
 
 [build-dependencies]
 pyo3-build-config = { version = "0.18", optional = true }
+rustversion = "1.0"
 bindgen = "0.69"
 
 [lib]

@@ -256,7 +256,7 @@ fn main() {
             && llvm_version.is_ok())
     {
         println!(
-            "cargo:warning=Failed to find llvm-config, we will not build LLVM passes. If you need them, set the LLVM_CONFIG environment variable to a recent llvm-config."
+            "cargo:warning=Failed to find llvm-config, we will not build LLVM passes. If you need them, set the LLVM_CONFIG environment variable to a recent llvm-config, else just ignore this message."
         );
 
         write!(
@@ -311,12 +311,12 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     let mut cxxflags: Vec<String> = cxxflags.split_whitespace().map(String::from).collect();
 
     let edges_map_size: usize = option_env!("LIBAFL_EDGES_MAP_SIZE")
-        .map_or(Ok(65536), str::parse)
+        .map_or(Ok(2_621_440), str::parse)
         .expect("Could not parse LIBAFL_EDGES_MAP_SIZE");
     cxxflags.push(format!("-DLIBAFL_EDGES_MAP_SIZE={edges_map_size}"));
 
     let acc_map_size: usize = option_env!("LIBAFL_ACCOUNTING_MAP_SIZE")
-        .map_or(Ok(65536), str::parse)
+        .map_or(Ok(65_536), str::parse)
         .expect("Could not parse LIBAFL_ACCOUNTING_MAP_SIZE");
     cxxflags.push(format!("-DLIBAFL_ACCOUNTING_MAP_SIZE={acc_map_size}"));
 
@@ -404,10 +404,10 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
 
     for pass in &[
         "cmplog-routines-pass.cc",
-        "afl-coverage-pass.cc",
         "autotokens-pass.cc",
         "coverage-accounting-pass.cc",
         "cmplog-instructions-pass.cc",
+        "ctx-pass.cc",
     ] {
         build_pass(
             bindir_path,

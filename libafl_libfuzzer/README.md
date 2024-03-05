@@ -15,9 +15,7 @@ fuzzing environment or updating their harnesses.
 
 ## Usage
 
-`libafl_libfuzzer` currently has known support for Rust, C, and C++ targets on Linux.
-macOS has experimental support, but requires patching of LibAFL which leads to breaking changes elsewhere (ask in the
-Discord for a patch file -- and [let us know what problems you face](https://github.com/AFLplusplus/LibAFL/issues/1564)).
+`libafl_libfuzzer` currently has known support for Rust, C, and C++ targets on Linux and macOS.
 Windows is not currently supported, as we do not currently test or develop for Windows machines, but [we will happily
 hear what issues you face and patch them as possible](https://github.com/AFLplusplus/LibAFL/issues/1563).
 
@@ -50,6 +48,22 @@ libfuzzer-sys = { git = "https://github.com/AFLplusplus/LibAFL.git", branch = "l
 As this branch generally offers the highest performance version of `libafl_libfuzzer`, we recommend the latter.
 Remember to `cargo update` often if using the experimental changes, and please [submit an issue]
 if you encounter problems while using `libfuzzer-best`!
+
+#### macOS
+
+On macOS, you will need to add weak linking for some functions in a `build.rs` file:
+
+```rust
+fn main() {
+    for func in [
+        "_libafl_main",
+        "_LLVMFuzzerCustomMutator",
+        "_LLVMFuzzerCustomCrossOver",
+    ] {
+        println!("cargo:rustc-link-arg=-Wl,-U,{func}");
+    }
+}
+```
 
 #### Caveats
 
@@ -130,6 +144,7 @@ to partial support of libfuzzer flags, `libafl_libfuzzer` offers:
 - `-fork` and `-jobs`
     - in `libafl_libfuzzer`, these are synonymous
 - `-ignore_crashes`, `-ignore_ooms`, and `-ignore_timeouts`
+    - note that setting `-tui=1` enables these flags by default, so you'll need to explicitly mention `-ignore_...=0` to disable them
 - `-rss_limit_mb` and `-malloc_limit_mb`
 - `-ignore_remaining_args`
 - `-shrink`

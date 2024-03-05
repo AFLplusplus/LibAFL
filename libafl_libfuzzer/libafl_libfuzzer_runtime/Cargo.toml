@@ -32,11 +32,11 @@ crate-type = ["staticlib", "rlib"]
 [dependencies]
 libafl = { path = "../../libafl", default-features = false, features = ["std", "derive", "llmp_compression", "rand_trait", "regex", "errors_backtrace", "serdeany_autoreg", "tui_monitor", "unicode"] }
 libafl_bolts = { path = "../../libafl_bolts", default-features = false, features = ["std", "derive", "llmp_compression", "rand_trait", "serdeany_autoreg", "errors_backtrace"] }
-libafl_targets = { path = "../../libafl_targets", features = ["sancov_8bit", "sancov_cmplog", "libfuzzer", "libfuzzer_oom", "libfuzzer_define_run_driver", "libfuzzer_interceptors", "sanitizers_flags", "whole_archive"] }
+libafl_targets = { path = "../../libafl_targets", features = ["sancov_8bit", "sancov_cmplog", "libfuzzer", "libfuzzer_oom", "libfuzzer_define_run_driver", "libfuzzer_interceptors", "sanitizers_flags", "whole_archive", "sanitizer_interfaces"] }
 
 ahash = { version = "0.8.3", default-features = false }
 libc = "0.2.139"
-log = "0.4.17"
+log = "0.4.20"
 mimalloc = { version = "0.1.34", default-features = false }
 num-traits = "0.2.15"
 rand = "0.8.5"
@@ -48,7 +48,7 @@ utf8-chars = "3.0.1"
 env_logger = "0.10"
 
 [build-dependencies]
-bindgen = "0.68.1"
+bindgen = "0.69.4"
 cc = { version = "1.0", features = ["parallel"] }
 
 [workspace]

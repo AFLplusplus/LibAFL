@@ -94,17 +94,17 @@ impl Clone for InputFile {
 
 #[cfg(feature = "std")]
 impl InputFile {
-    /// Creates a new [`InputFile`]
+    /// Creates a new [`InputFile`], or truncates if it already exists
     pub fn create<P>(filename: P) -> Result<Self, Error>
     where
         P: AsRef<Path>,
     {
         let f = OpenOptions::new()
+            .create(true)
             .read(true)
             .write(true)
-            .create(true)
+            .truncate(true)
             .open(&filename)?;
-        f.set_len(0)?;
         Ok(Self {
             path: filename.as_ref().to_owned(),
             file: f,

@@ -1,10 +1,8 @@
 //! LLMP-backed event manager for scalable multi-processed fuzzing
 
-use alloc::{
-    boxed::Box,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{boxed::Box, vec::Vec};
+#[cfg(all(unix, not(miri), feature = "std"))]
+use core::ptr::addr_of_mut;
 #[cfg(feature = "std")]
 use core::sync::atomic::{compiler_fence, Ordering};
 use core::{marker::PhantomData, num::NonZeroUsize, time::Duration};
@@ -48,6 +46,7 @@ use crate::{
         EventProcessor, EventRestarter, HasCustomBufHandlers, HasEventManagerId, ProgressReporter,
     },
     executors::{Executor, HasObservers},
+    feedbacks::transferred::TransferringMetadata,
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, UsesInput},
     monitors::Monitor,
@@ -107,10 +106,15 @@ where
     ///
     /// The port must not be bound yet to have a broker.
     #[cfg(feature = "std")]
-    pub fn on_port(shmem_provider: SP, monitor: MT, port: u16) -> Result<Self, Error> {
+    pub fn on_port(
+        shmem_provider: SP,
+        monitor: MT,
+        port: u16,
+        client_timeout: Option<Duration>,
+    ) -> Result<Self, Error> {
         Ok(Self {
             monitor,
-            llmp: llmp::LlmpBroker::create_attach_to_tcp(shmem_provider, port)?,
+            llmp: llmp::LlmpBroker::create_attach_to_tcp(shmem_provider, port, client_timeout)?,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             phantom: PhantomData,
@@ -201,7 +205,7 @@ where
                         Ok(llmp::LlmpMsgHookResult::ForwardToClients)
                     }
                 } else {
-                    monitor.display("Broker".into(), ClientId(0));
+                    monitor.display("Broker", ClientId(0));
                     Ok(llmp::LlmpMsgHookResult::Handled)
                 }
             },
@@ -247,7 +251,7 @@ where
                     // as a forwarded msg with a lower executions may arrive after a stats msg with an higher executions
                     client.update_executions(*executions as u64, *time);
                 }
-                monitor.display(event.name().to_string(), id);
+                monitor.display(event.name(), id);
                 Ok(BrokerEventResult::Forward)
             }
             Event::UpdateExecStats {
@@ -259,7 +263,7 @@ where
                 monitor.client_stats_insert(client_id);
                 let client = monitor.client_stats_mut_for(client_id);
                 client.update_executions(*executions as u64, *time);
-                monitor.display(event.name().to_string(), client_id);
+                monitor.display(event.name(), client_id);
                 Ok(BrokerEventResult::Handled)
             }
             Event::UpdateUserStats {
@@ -271,7 +275,7 @@ where
                 let client = monitor.client_stats_mut_for(client_id);
                 client.update_user_stats(name.clone(), value.clone());
                 monitor.aggregate(name);
-                monitor.display(event.name().to_string(), client_id);
+                monitor.display(event.name(), client_id);
                 Ok(BrokerEventResult::Handled)
             }
             #[cfg(feature = "introspection")]
@@ -294,7 +298,7 @@ where
                 client.update_introspection_monitor((**introspection_monitor).clone());
 
                 // Display the monitor via `.display` only on core #1
-                monitor.display(event.name().to_string(), client_id);
+                monitor.display(event.name(), client_id);
 
                 // Correctly handled the event
                 Ok(BrokerEventResult::Handled)
@@ -303,7 +307,7 @@ where
                 monitor.client_stats_insert(client_id);
                 let client = monitor.client_stats_mut_for(client_id);
                 client.update_objective_size(*objective_size as u64);
-                monitor.display(event.name().to_string(), client_id);
+                monitor.display(event.name(), client_id);
                 Ok(BrokerEventResult::Handled)
             }
             Event::Log {
@@ -587,6 +591,9 @@ where
             } => {
                 log::info!("Received new Testcase from {client_id:?} ({client_config:?}, forward {forward_id:?})");
 
+                if let Ok(meta) = state.metadata_mut::<TransferringMetadata>() {
+                    meta.set_transferring(true);
+                }
                 let res = if client_config.match_with(&self.configuration)
                     && observers_buf.is_some()
                 {
@@ -612,6 +619,9 @@ where
                         state, executor, self, input, false,
                     )?
                 };
+                if let Ok(meta) = state.metadata_mut::<TransferringMetadata>() {
+                    meta.set_transferring(false);
+                }
                 if let Some(item) = res.1 {
                     log::info!("Added received Testcase as item #{item}");
                 }
@@ -819,7 +829,7 @@ where
 {
     fn add_custom_buf_handler(
         &mut self,
-        handler: Box<dyn FnMut(&mut S, &String, &[u8]) -> Result<CustomBufEventResult, Error>>,
+        handler: Box<dyn FnMut(&mut S, &str, &[u8]) -> Result<CustomBufEventResult, Error>>,
     ) {
         self.custom_buf_handlers.push(handler);
     }
@@ -1170,8 +1180,10 @@ where
         false
     }
 
-    /// Launch the restarting manager
-    pub fn launch(&mut self) -> Result<(Option<S>, LlmpRestartingEventManager<S, SP>), Error> {
+    fn launch_internal(
+        &mut self,
+        client_timeout: Option<Duration>,
+    ) -> Result<(Option<S>, LlmpRestartingEventManager<S, SP>), Error> {
         // We start ourself as child process to actually fuzz
         let (staterestorer, new_shmem_provider, core_id) = if std::env::var(_ENV_FUZZER_SENDER)
             .is_err()
@@ -1193,8 +1205,11 @@ where
             // We get here if we are on Unix, or we are a broker on Windows (or without forks).
             let (mgr, core_id) = match self.kind {
                 ManagerKind::Any => {
-                    let connection =
-                        LlmpConnection::on_port(self.shmem_provider.clone(), self.broker_port)?;
+                    let connection = LlmpConnection::on_port(
+                        self.shmem_provider.clone(),
+                        self.broker_port,
+                        client_timeout,
+                    )?;
                     match connection {
                         LlmpConnection::IsBroker { broker } => {
                             let event_broker = LlmpEventBroker::<S::Input, MT, SP>::new(
@@ -1222,6 +1237,7 @@ where
                         self.shmem_provider.clone(),
                         self.monitor.take().unwrap(),
                         self.broker_port,
+                        client_timeout,
                     )?;
 
                     broker_things(event_broker, self.remote_broker_addr)?;
@@ -1261,7 +1277,9 @@ where
 
             // We setup signal handlers to clean up shmem segments used by state restorer
             #[cfg(all(unix, not(miri)))]
-            if let Err(_e) = unsafe { setup_signal_handler(&mut EVENTMGR_SIGHANDLER_STATE) } {
+            if let Err(_e) =
+                unsafe { setup_signal_handler(addr_of_mut!(EVENTMGR_SIGHANDLER_STATE)) }
+            {
                 // We can live without a proper ctrl+c signal handler. Print and ignore.
                 log::error!("Failed to setup signal handlers: {_e}");
             }
@@ -1382,6 +1400,19 @@ where
 
         Ok((state, mgr))
     }
+
+    /// Launch the restarting manager
+    pub fn launch(&mut self) -> Result<(Option<S>, LlmpRestartingEventManager<S, SP>), Error> {
+        self.launch_internal(None)
+    }
+
+    /// Launch the restarting manager with a custom client timeout
+    pub fn launch_with_client_timeout(
+        &mut self,
+        client_timeout: Duration,
+    ) -> Result<(Option<S>, LlmpRestartingEventManager<S, SP>), Error> {
+        self.launch_internal(Some(client_timeout))
+    }
 }
 
 /// A manager-like llmp client that converts between input types
@@ -1427,7 +1458,7 @@ where
 
 impl<IC, ICB, DI, S, SP> LlmpEventConverter<IC, ICB, DI, S, SP>
 where
-    S: UsesInput + HasExecutions,
+    S: UsesInput + HasExecutions + HasMetadata,
     SP: ShMemProvider + 'static,
     IC: InputConverter<From = S::Input, To = DI>,
     ICB: InputConverter<From = DI, To = S::Input>,
@@ -1544,6 +1575,9 @@ where
                     return Ok(());
                 };
 
+                if let Ok(meta) = state.metadata_mut::<TransferringMetadata>() {
+                    meta.set_transferring(true);
+                }
                 let res = fuzzer.evaluate_input_with_observers::<E, EM>(
                     state,
                     executor,
@@ -1551,6 +1585,10 @@ where
                     converter.convert(input)?,
                     false,
                 )?;
+                if let Ok(meta) = state.metadata_mut::<TransferringMetadata>() {
+                    meta.set_transferring(false);
+                }
+
                 if let Some(item) = res.1 {
                     log::info!("Added received Testcase as item #{item}");
                 }

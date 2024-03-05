@@ -1,10 +1,8 @@
 //! TCP-backed event manager for scalable multi-processed fuzzing
 
-use alloc::{
-    boxed::Box,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{boxed::Box, vec::Vec};
+#[cfg(all(unix, feature = "std", not(miri)))]
+use core::ptr::addr_of_mut;
 use core::{
     marker::PhantomData,
     num::NonZeroUsize,
@@ -46,6 +44,7 @@ use crate::{
         EventProcessor, EventRestarter, HasCustomBufHandlers, HasEventManagerId, ProgressReporter,
     },
     executors::{Executor, HasObservers},
+    feedbacks::transferred::TransferringMetadata,
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, UsesInput},
     monitors::Monitor,
@@ -335,7 +334,7 @@ where
                 let client = monitor.client_stats_mut_for(id);
                 client.update_corpus_size(*corpus_size as u64);
                 client.update_executions(*executions as u64, *time);
-                monitor.display(event.name().to_string(), id);
+                monitor.display(event.name(), id);
                 Ok(BrokerEventResult::Forward)
             }
             Event::UpdateExecStats {
@@ -347,7 +346,7 @@ where
                 monitor.client_stats_insert(client_id);
                 let client = monitor.client_stats_mut_for(client_id);
                 client.update_executions(*executions as u64, *time);
-                monitor.display(event.name().to_string(), client_id);
+                monitor.display(event.name(), client_id);
                 Ok(BrokerEventResult::Handled)
             }
             Event::UpdateUserStats {
@@ -359,7 +358,7 @@ where
                 let client = monitor.client_stats_mut_for(client_id);
                 client.update_user_stats(name.clone(), value.clone());
                 monitor.aggregate(name);
-                monitor.display(event.name().to_string(), client_id);
+                monitor.display(event.name(), client_id);
                 Ok(BrokerEventResult::Handled)
             }
             #[cfg(feature = "introspection")]
@@ -382,7 +381,7 @@ where
                 client.update_introspection_monitor((**introspection_monitor).clone());
 
                 // Display the monitor via `.display` only on core #1
-                monitor.display(event.name().to_string(), client_id);
+                monitor.display(event.name(), client_id);
 
                 // Correctly handled the event
                 Ok(BrokerEventResult::Handled)
@@ -391,7 +390,7 @@ where
                 monitor.client_stats_insert(client_id);
                 let client = monitor.client_stats_mut_for(client_id);
                 client.update_objective_size(*objective_size as u64);
-                monitor.display(event.name().to_string(), client_id);
+                monitor.display(event.name(), client_id);
                 Ok(BrokerEventResult::Handled)
             }
             Event::Log {
@@ -459,7 +458,7 @@ where
 
 impl<S> TcpEventManager<S>
 where
-    S: State + HasExecutions,
+    S: State + HasExecutions + HasMetadata,
 {
     /// Create a manager from a raw TCP client specifying the client id
     pub fn existing<A: ToSocketAddrs>(
@@ -561,6 +560,9 @@ where
             } => {
                 log::info!("Received new Testcase from {client_id:?} ({client_config:?}, forward {forward_id:?})");
 
+                if let Ok(meta) = state.metadata_mut::<TransferringMetadata>() {
+                    meta.set_transferring(true);
+                }
                 let _res = if client_config.match_with(&self.configuration)
                     && observers_buf.is_some()
                 {
@@ -580,6 +582,9 @@ where
                         state, executor, self, input, false,
                     )?
                 };
+                if let Ok(meta) = state.metadata_mut::<TransferringMetadata>() {
+                    meta.set_transferring(false);
+                }
                 if let Some(item) = _res.1 {
                     log::info!("Added received Testcase as item #{item}");
                 }
@@ -683,7 +688,7 @@ where
 
 impl<E, S, Z> EventProcessor<E, Z> for TcpEventManager<S>
 where
-    S: State + HasExecutions,
+    S: State + HasExecutions + HasMetadata,
     E: HasObservers<State = S> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers, State = S>,
@@ -757,7 +762,7 @@ where
 {
     fn add_custom_buf_handler(
         &mut self,
-        handler: Box<dyn FnMut(&mut S, &String, &[u8]) -> Result<CustomBufEventResult, Error>>,
+        handler: Box<dyn FnMut(&mut S, &str, &[u8]) -> Result<CustomBufEventResult, Error>>,
     ) {
         self.custom_buf_handlers.push(handler);
     }
@@ -876,7 +881,7 @@ impl<E, S, SP, Z> EventProcessor<E, Z> for TcpRestartingEventManager<S, SP>
 where
     E: HasObservers<State = S> + Executor<TcpEventManager<S>, Z>,
     for<'a> E::Observers: Deserialize<'a>,
-    S: State + HasExecutions,
+    S: State + HasExecutions + HasMetadata,
     SP: ShMemProvider + 'static,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers>, //CE: CustomEvent<I>,
 {
@@ -980,7 +985,7 @@ pub fn setup_restarting_mgr_tcp<MT, S>(
 ) -> Result<(Option<S>, TcpRestartingEventManager<S, StdShMemProvider>), Error>
 where
     MT: Monitor + Clone,
-    S: State + HasExecutions,
+    S: State + HasExecutions + HasMetadata,
 {
     TcpRestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)
@@ -1041,7 +1046,7 @@ where
 impl<MT, S, SP> TcpRestartingMgr<MT, S, SP>
 where
     SP: ShMemProvider,
-    S: State + HasExecutions,
+    S: State + HasExecutions + HasMetadata,
     MT: Monitor + Clone,
 {
     /// Internal function, returns true when shuttdown is requested by a `SIGINT` signal
@@ -1143,7 +1148,9 @@ where
 
             // We setup signal handlers to clean up shmem segments used by state restorer
             #[cfg(all(unix, not(miri)))]
-            if let Err(_e) = unsafe { setup_signal_handler(&mut EVENTMGR_SIGHANDLER_STATE) } {
+            if let Err(_e) =
+                unsafe { setup_signal_handler(addr_of_mut!(EVENTMGR_SIGHANDLER_STATE)) }
+            {
                 // We can live without a proper ctrl+c signal handler. Print and ignore.
                 log::error!("Failed to setup signal handlers: {_e}");
             }

@@ -693,7 +693,7 @@ mod tests {
         fuzzer::test::NopFuzzer,
         inputs::BytesInput,
         monitors::SimpleMonitor,
-        state::test::NopState,
+        state::NopState,
     };
 
     #[test]

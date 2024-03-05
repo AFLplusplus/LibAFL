@@ -1,5 +1,7 @@
 //! Executors take input, and run it in the target.
 
+#[cfg(unix)]
+use alloc::vec::Vec;
 use core::fmt::Debug;
 
 pub use combined::CombinedExecutor;
@@ -7,14 +9,14 @@ pub use combined::CombinedExecutor;
 pub use command::CommandExecutor;
 pub use differential::DiffExecutor;
 #[cfg(all(feature = "std", feature = "fork", unix))]
-pub use forkserver::{Forkserver, ForkserverExecutor, TimeoutForkserverExecutor};
+pub use forkserver::{Forkserver, ForkserverExecutor};
 pub use inprocess::InProcessExecutor;
 #[cfg(all(feature = "std", feature = "fork", unix))]
-pub use inprocess::InProcessForkExecutor;
+pub use inprocess_fork::InProcessForkExecutor;
+#[cfg(unix)]
+use libafl_bolts::os::unix_signals::Signal;
 use serde::{Deserialize, Serialize};
 pub use shadow::ShadowExecutor;
-#[cfg(any(unix, feature = "std"))]
-pub use timeout::TimeoutExecutor;
 pub use with_observers::WithObservers;
 
 use crate::{
@@ -30,12 +32,17 @@ pub mod differential;
 #[cfg(all(feature = "std", feature = "fork", unix))]
 pub mod forkserver;
 pub mod inprocess;
+
+/// The module for inproc fork executor
+#[cfg(all(feature = "std", unix))]
+pub mod inprocess_fork;
+
 pub mod shadow;
-/// Timeout executor.
-/// Not possible on `no-std` Windows or `no-std`, but works for unix
-#[cfg(any(unix, feature = "std"))]
-pub mod timeout;
+
 pub mod with_observers;
+
+/// The module for all the hooks
+pub mod hooks;
 
 /// How an execution finished.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -135,10 +142,25 @@ where
     {
         WithObservers::new(self, observers)
     }
+}
 
-    /// Custom Reset Handler, e.g., to reset timers
-    #[inline]
-    fn post_run_reset(&mut self) {}
+/// The common signals we want to handle
+#[cfg(unix)]
+#[inline]
+#[must_use]
+pub fn common_signals() -> Vec<Signal> {
+    vec![
+        Signal::SigAlarm,
+        Signal::SigUser2,
+        Signal::SigAbort,
+        Signal::SigBus,
+        #[cfg(feature = "handle_sigpipe")]
+        Signal::SigPipe,
+        Signal::SigFloatingPointException,
+        Signal::SigIllegalInstruction,
+        Signal::SigSegmentationFault,
+        Signal::SigTrap,
+    ]
 }
 
 #[cfg(test)]
@@ -152,7 +174,7 @@ pub mod test {
         executors::{Executor, ExitKind},
         fuzzer::test::NopFuzzer,
         inputs::{BytesInput, HasTargetBytes},
-        state::{test::NopState, HasExecutions, State, UsesState},
+        state::{HasExecutions, NopState, State, UsesState},
     };
 
     /// A simple executor that does nothing.
@@ -475,17 +497,13 @@ pub mod pybind {
     impl HasObservers for PythonExecutor {
         #[inline]
         fn observers(&self) -> &PythonObserversTuple {
-            let ptr = unwrap_me!(self.wrapper, e, {
-                e.observers() as *const PythonObserversTuple
-            });
+            let ptr = unwrap_me!(self.wrapper, e, { core::ptr::from_ref(e.observers()) });
             unsafe { ptr.as_ref().unwrap() }
         }
 
         #[inline]
         fn observers_mut(&mut self) -> &mut PythonObserversTuple {
-            let ptr = unwrap_me_mut!(self.wrapper, e, {
-                e.observers_mut() as *mut PythonObserversTuple
-            });
+            let ptr = unwrap_me_mut!(self.wrapper, e, { core::ptr::from_mut(e.observers_mut()) });
             unsafe { ptr.as_mut().unwrap() }
         }
     }

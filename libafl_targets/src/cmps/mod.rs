@@ -8,6 +8,7 @@ use alloc::{alloc::alloc_zeroed, boxed::Box, vec::Vec};
 use core::{
     alloc::Layout,
     fmt::{self, Debug, Formatter},
+    mem, ptr, slice,
 };
 
 use libafl::{
@@ -480,10 +481,7 @@ impl Serialize for AFLppCmpLogMap {
         S: Serializer,
     {
         let slice = unsafe {
-            core::slice::from_raw_parts(
-                (self as *const Self) as *const u8,
-                core::mem::size_of::<Self>(),
-            )
+            slice::from_raw_parts(ptr::from_ref(self) as *const u8, mem::size_of::<Self>())
         };
         serializer.serialize_bytes(slice)
     }

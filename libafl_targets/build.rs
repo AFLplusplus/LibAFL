@@ -2,30 +2,43 @@
 
 use std::{env, fs::File, io::Write, path::Path};
 
+const TWO_MB: usize = 2_621_440;
+const SIXTY_FIVE_KB: usize = 65_536;
+
+#[rustversion::nightly]
+fn enable_nightly() {
+    println!("cargo:rustc-cfg=nightly");
+}
+
+#[rustversion::not(nightly)]
+fn enable_nightly() {}
+
 #[allow(clippy::too_many_lines)]
 fn main() {
+    enable_nightly();
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = out_dir.to_string_lossy().to_string();
     //let out_dir_path = Path::new(&out_dir);
+    #[allow(unused_variables)]
     let src_dir = Path::new("src");
 
     let dest_path = Path::new(&out_dir).join("constants.rs");
     let mut constants_file = File::create(dest_path).expect("Could not create file");
 
     let edges_map_size: usize = option_env!("LIBAFL_EDGES_MAP_SIZE")
-        .map_or(Ok(65536), str::parse)
+        .map_or(Ok(TWO_MB), str::parse)
         .expect("Could not parse LIBAFL_EDGES_MAP_SIZE");
     let cmp_map_size: usize = option_env!("LIBAFL_CMP_MAP_SIZE")
-        .map_or(Ok(65536), str::parse)
+        .map_or(Ok(SIXTY_FIVE_KB), str::parse)
         .expect("Could not parse LIBAFL_CMP_MAP_SIZE");
     let cmplog_map_w: usize = option_env!("LIBAFL_CMPLOG_MAP_W")
-        .map_or(Ok(65536), str::parse)
+        .map_or(Ok(SIXTY_FIVE_KB), str::parse)
         .expect("Could not parse LIBAFL_CMPLOG_MAP_W");
     let cmplog_map_h: usize = option_env!("LIBAFL_CMPLOG_MAP_H")
         .map_or(Ok(32), str::parse)
         .expect("Could not parse LIBAFL_CMPLOG_MAP_H");
     let acc_map_size: usize = option_env!("LIBAFL_ACCOUNTING_MAP_SIZE")
-        .map_or(Ok(65536), str::parse)
+        .map_or(Ok(SIXTY_FIVE_KB), str::parse)
         .expect("Could not parse LIBAFL_ACCOUNTING_MAP_SIZE");
 
     write!(

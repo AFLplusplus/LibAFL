@@ -5,10 +5,7 @@ use clap::{self, Parser};
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::{
-        forkserver::{ForkserverExecutor, TimeoutForkserverExecutor},
-        HasObservers,
-    },
+    executors::{forkserver::ForkserverExecutor, HasObservers},
     feedback_and_fast, feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -87,7 +84,7 @@ struct Opt {
 
 #[allow(clippy::similar_names)]
 pub fn main() {
-    const MAP_SIZE: usize = 65536;
+    const MAP_SIZE: usize = 2621440;
 
     let opt = Opt::parse();
 
@@ -165,30 +162,25 @@ pub fn main() {
     let args = opt.arguments;
 
     let mut tokens = Tokens::new();
-    let mut forkserver = ForkserverExecutor::builder()
+    let mut executor = ForkserverExecutor::builder()
         .program(opt.executable)
         .debug_child(debug_child)
         .shmem_provider(&mut shmem_provider)
         .autotokens(&mut tokens)
         .parse_afl_cmdline(args)
         .coverage_map_size(MAP_SIZE)
+        .timeout(Duration::from_millis(opt.timeout))
+        .kill_signal(opt.signal)
         .build(tuple_list!(time_observer, edges_observer))
         .unwrap();
 
-    if let Some(dynamic_map_size) = forkserver.coverage_map_size() {
-        forkserver
+    if let Some(dynamic_map_size) = executor.coverage_map_size() {
+        executor
             .observers_mut()
             .match_name_mut::<HitcountsMapObserver<StdMapObserver<'_, u8, false>>>("shared_mem")
             .unwrap()
             .truncate(dynamic_map_size);
     }
-
-    let mut executor = TimeoutForkserverExecutor::with_signal(
-        forkserver,
-        Duration::from_millis(opt.timeout),
-        opt.signal,
-    )
-    .expect("Failed to create the executor.");
 
     // In case the corpus is empty (on first run), reset
     if state.must_load_initial_inputs() {

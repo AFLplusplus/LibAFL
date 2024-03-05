@@ -28,6 +28,7 @@ use crate::{
         EventManagerId, EventProcessor, EventRestarter, HasEventManagerId, LogSeverity,
     },
     executors::{Executor, HasObservers},
+    feedbacks::transferred::TransferringMetadata,
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, UsesInput},
     observers::ObserversTuple,
@@ -86,10 +87,19 @@ where
     ///
     /// The port must not be bound yet to have a broker.
     #[cfg(feature = "std")]
-    pub fn on_port(shmem_provider: SP, port: u16) -> Result<Self, Error> {
+    pub fn on_port(
+        shmem_provider: SP,
+        port: u16,
+        client_timeout: Option<Duration>,
+    ) -> Result<Self, Error> {
         Ok(Self {
             // TODO switch to false after solving the bug
-            llmp: LlmpBroker::with_keep_pages_attach_to_tcp(shmem_provider, port, true)?,
+            llmp: LlmpBroker::with_keep_pages_attach_to_tcp(
+                shmem_provider,
+                port,
+                true,
+                client_timeout,
+            )?,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             phantom: PhantomData,
@@ -437,7 +447,7 @@ where
     fn add_custom_buf_handler(
         &mut self,
         handler: Box<
-            dyn FnMut(&mut Self::State, &String, &[u8]) -> Result<CustomBufEventResult, Error>,
+            dyn FnMut(&mut Self::State, &str, &[u8]) -> Result<CustomBufEventResult, Error>,
         >,
     ) {
         self.inner.add_custom_buf_handler(handler);
@@ -654,6 +664,9 @@ where
             } => {
                 log::info!("Received new Testcase from {client_id:?} ({client_config:?}, forward {forward_id:?})");
 
+                if let Ok(meta) = state.metadata_mut::<TransferringMetadata>() {
+                    meta.set_transferring(true);
+                }
                 let res =
                     if client_config.match_with(&self.configuration()) && observers_buf.is_some() {
                         let observers: E::Observers =
@@ -683,6 +696,10 @@ where
                             false,
                         )?
                     };
+                if let Ok(meta) = state.metadata_mut::<TransferringMetadata>() {
+                    meta.set_transferring(false);
+                }
+
                 if let Some(item) = res.1 {
                     if res.1.is_some() {
                         self.inner.fire(

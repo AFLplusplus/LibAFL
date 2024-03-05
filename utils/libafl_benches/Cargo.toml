@@ -16,7 +16,7 @@ criterion = "0.5" # Benchmarking
 ahash = { version = "0.8", default-features=false } # The hash function already used in hashbrown
 rustc-hash = { version = "1.1", default-features=false } # yet another hash
 xxhash-rust = { version = "0.8.5", features = ["xxh3"] } # xxh3 hashing for rust
-libafl_bolts = { path = "../../libafl_bolts", default-features=false } # libafl_bolts
+libafl_bolts = { path = "../../libafl_bolts", default-features=false, features = ["xxh3", "alloc"] } # libafl_bolts
 
 [[bench]]
 name = "rand_speeds"
