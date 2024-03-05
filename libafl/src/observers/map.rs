@@ -386,7 +386,7 @@ pub mod macros {
                     )
                 };
                 const TRACKING_SANITY: bool = {
-                    if !O::INDICES {
+                    if !O::NOVELTIES {
                         panic!("{}", Self::MESSAGE)
                     } else {
                         true
@@ -825,6 +825,7 @@ where
         self.map.as_slice()
     }
 }
+
 impl<'a, T, const DIFFERENTIAL: bool> AsMutSlice for StdMapObserver<'a, T, DIFFERENTIAL>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
@@ -1310,6 +1311,7 @@ where
         self.map.as_slice()
     }
 }
+
 impl<'a, T, const N: usize> AsMutSlice for ConstMapObserver<'a, T, N>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
@@ -1649,6 +1651,7 @@ where
         &self.map.as_slice()[..cnt]
     }
 }
+
 impl<'a, T> AsMutSlice for VariableMapObserver<'a, T>
 where
     T: 'static
@@ -2158,6 +2161,7 @@ where
         self.base.as_slice()
     }
 }
+
 impl<M> AsMutSlice for HitcountsIterableMapObserver<M>
 where
     M: MapObserver + AsMutSlice,
