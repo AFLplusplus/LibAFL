@@ -55,7 +55,7 @@ use crate::{
 /// Tries to create (synchronously) a [`TcpListener`] that is `nonblocking` (for later use in tokio).
 /// Will error if the port is already in use (or other errors occur)
 fn create_nonblocking_listener<A: ToSocketAddrs>(addr: A) -> Result<TcpListener, Error> {
-    let listener = std::net::TcpListener::bind(addr)?;
+    let listener = TcpListener::bind(addr)?;
     listener.set_nonblocking(true)?;
     Ok(listener)
 }
@@ -1065,8 +1065,7 @@ where
     /// Launch the restarting manager
     pub fn launch(&mut self) -> Result<(Option<S>, TcpRestartingEventManager<S, SP>), Error> {
         // We start ourself as child process to actually fuzz
-        let (staterestorer, _new_shmem_provider, core_id) = if std::env::var(_ENV_FUZZER_SENDER)
-            .is_err()
+        let (staterestorer, _new_shmem_provider, core_id) = if env::var(_ENV_FUZZER_SENDER).is_err()
         {
             let broker_things = |mut broker: TcpEventBroker<S::Input, MT>, _remote_broker_addr| {
                 if let Some(exit_cleanly_after) = self.exit_cleanly_after {

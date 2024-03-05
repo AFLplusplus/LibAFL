@@ -98,6 +98,7 @@ pub mod sanitizer_ifaces {
     #![allow(clippy::unreadable_literal)]
     #![allow(missing_docs)]
     #![allow(missing_debug_implementations)]
+    #![allow(unused_qualifications)]
     include!(concat!(env!("OUT_DIR"), "/sanitizer_interfaces.rs"));
 }
 

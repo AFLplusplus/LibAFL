@@ -435,7 +435,7 @@ mod tests {
 }
 
 #[cfg(feature = "python")]
-#[allow(clippy::unnecessary_fallible_conversions)]
+#[allow(clippy::unnecessary_fallible_conversions, unused_qualifications)]
 #[allow(missing_docs)]
 /// `Rand` Python bindings
 pub mod pybind {
@@ -470,7 +470,6 @@ pub mod pybind {
             }
         }
 
-        #[allow(unused_qualifications)]
         fn as_rand(slf: Py<Self>) -> PythonRand {
             PythonRand::new_std(slf)
         }

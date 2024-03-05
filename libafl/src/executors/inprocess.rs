@@ -661,7 +661,7 @@ mod tests {
 
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
-#[allow(clippy::unnecessary_fallible_conversions)]
+#[allow(clippy::unnecessary_fallible_conversions, unused_qualifications)]
 /// `InProcess` Python bindings
 pub mod pybind {
     use alloc::boxed::Box;
