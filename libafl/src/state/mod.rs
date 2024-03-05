@@ -12,9 +12,9 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
+
 #[cfg(feature = "std")]
 use libafl_bolts::core_affinity::{CoreId, Cores};
-
 use libafl_bolts::{
     rands::{Rand, StdRand},
     serdeany::{NamedSerdeAnyMap, SerdeAny, SerdeAnyMap},
@@ -327,6 +327,10 @@ pub struct StdState<I, C, R, SC> {
     #[cfg(feature = "std")]
     /// Remaining initial inputs to load, if any
     dont_reenter: Option<Vec<PathBuf>>,
+    #[cfg(feature = "std")]
+    /// If inputs have been processed for multicore loading
+    /// relevant only for load_multicore_inputs
+    multicore_inputs_processed: Option<bool>,
     /// The last time we reported progress (if available/used).
     /// This information is used by fuzzer `maybe_report_progress`.
     last_report_time: Option<Duration>,
@@ -888,73 +892,72 @@ where
         EM: EventFirer<State = Self>,
         Z: Evaluator<E, EM, State = Self>,
     {
-        self.canonicalize_input_dirs(in_dirs)?;
-        let corpus_size = self.calculate_corpus_size()?;
-        log::info!(
-            "{} total_corpus_size, {} cores",
-            corpus_size,
-            cores.ids.len()
-        );
-        self.reset_initial_files_state();
-        self.canonicalize_input_dirs(in_dirs)?;
-        if cores.ids.len() > corpus_size {
-            log::info!(
-                "low intial corpus count ({}), no parallelism required.",
-                corpus_size
-            );
-            return self.continue_loading_initial_inputs_custom(
+        if self.multicore_inputs_processed.unwrap_or(false) {
+            self.continue_loading_initial_inputs_custom(
                 fuzzer,
                 executor,
                 manager,
                 false,
                 &mut |_, _, path| I::from_file(path),
-            );
+            )?;
         } else {
-            let core_index = cores
-                .ids
-                .iter()
-                .enumerate()
-                .find(|(_, c)| {
-                    *c == core_id
-                })
-                .unwrap_or_else(|| panic!("core id {} not in cores list", core_id.0))
-                .0;
-            let chunk_size = corpus_size.saturating_div(cores.ids.len());
-            let mut skip = core_index.saturating_mul(chunk_size);
-            let mut inputs_todo = chunk_size;
+            self.canonicalize_input_dirs(in_dirs)?;
+            let corpus_size = self.calculate_corpus_size()?;
             log::info!(
-                "core = {}, core_index = {}, chunk_size = {}, skip = {}",
-                core_id.0,
-                core_index,
-                chunk_size,
-                skip
+                "{} total_corpus_size, {} cores",
+                corpus_size,
+                cores.ids.len()
             );
-            loop {
-                match self.next_file() {
-                    Ok(path) => {
-                        if skip != 0 {
-                            skip = skip.saturating_sub(1);
-                            continue;
+            self.reset_initial_files_state();
+            self.canonicalize_input_dirs(in_dirs)?;
+            if cores.ids.len() > corpus_size {
+                log::info!(
+                    "low intial corpus count ({}), no parallelism required.",
+                    corpus_size
+                );
+            } else {
+                let core_index = cores
+                    .ids
+                    .iter()
+                    .enumerate()
+                    .find(|(_, c)| *c == core_id)
+                    .unwrap_or_else(|| panic!("core id {} not in cores list", core_id.0))
+                    .0;
+                let chunk_size = corpus_size.saturating_div(cores.ids.len());
+                let mut skip = core_index.saturating_mul(chunk_size);
+                let mut inputs_todo = chunk_size;
+                let mut collected_inputs = Vec::new();
+                log::info!(
+                    "core = {}, core_index = {}, chunk_size = {}, skip = {}",
+                    core_id.0,
+                    core_index,
+                    chunk_size,
+                    skip
+                );
+                loop {
+                    match self.next_file() {
+                        Ok(path) => {
+                            if skip != 0 {
+                                skip = skip.saturating_sub(1);
+                                continue;
+                            }
+                            if inputs_todo == 0 {
+                                break;
+                            }
+                            collected_inputs.push(path);
+                            inputs_todo = inputs_todo.saturating_sub(1);
                         }
-                        self.load_file(
-                            &path,
-                            manager,
-                            fuzzer,
-                            executor,
-                            false,
-                            &mut |_, _, path| I::from_file(path),
-                        )?;
-                        if inputs_todo == 0 {
-                            break;
+                        Err(Error::IteratorEnd(_, _)) => break,
+                        Err(e) => {
+                            return Err(e);
                         }
-                        inputs_todo = inputs_todo.saturating_sub(1);
-                    }
-                    Err(Error::IteratorEnd(_, _)) => break,
-                    Err(e) => {
-                        return Err(e);
                     }
                 }
+                self.remaining_initial_files = Some(collected_inputs);
             }
+            self.multicore_inputs_processed = Some(true);
+            return self
+                .load_initial_inputs_multicore(fuzzer, executor, manager, in_dirs, core_id, cores);
         }
         Ok(())
     }
@@ -1077,6 +1080,7 @@ where
             stage_depth: 0,
             stage_idx_stack: Vec::new(),
             phantom: PhantomData,
+            multicore_inputs_processed: None,
         };
         feedback.init_state(&mut state)?;
         objective.init_state(&mut state)?;
