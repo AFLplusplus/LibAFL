@@ -542,7 +542,7 @@ impl AsanRuntime {
     #[allow(clippy::items_after_statements)]
     #[allow(clippy::too_many_lines)]
     fn hook_functions(&mut self, gum: &Gum) {
-        let mut interceptor = frida_gum::interceptor::Interceptor::obtain(gum);
+        let mut interceptor = Interceptor::obtain(gum);
 
         macro_rules! hook_func {
             ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {

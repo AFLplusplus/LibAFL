@@ -105,6 +105,7 @@ mod harness_wrap {
     #![allow(improper_ctypes)]
     #![allow(clippy::unreadable_literal)]
     #![allow(missing_docs)]
+    #![allow(unused_qualifications)]
     include!(concat!(env!("OUT_DIR"), "/harness_wrap.rs"));
 }
 

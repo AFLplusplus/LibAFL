@@ -135,7 +135,7 @@ pub fn generate(
         .allowlist_function("device_list_all")
         .allowlist_function("libafl_.*")
         .blocklist_function("main_loop_wait") // bindgen issue #1313
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks));
+        .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()));
 
     // arch specific functions
     let bindings = if cpu_target == "i386" || cpu_target == "x86_64" {
