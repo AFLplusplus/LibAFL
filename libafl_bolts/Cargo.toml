@@ -76,7 +76,7 @@ llmp_bind_public = ["alloc"]
 llmp_compression = ["alloc", "gzip"]
 
 ## Enables debug output for LLMP (also needs a `logger` installed)
-llmp_debug = ["alloc"]
+llmp_debug = ["alloc", "std"]
 
 ## Reduces the initial map size for llmp
 llmp_small_maps = ["alloc"]
