@@ -41,8 +41,8 @@ use crate::{
     Error,
 };
 
-/// A version of `InProcessExecutor` with a mutable state at runtime, directly in the harness.
-pub mod with_state;
+/// A version of `InProcessExecutor` with a state accessible from the harness.
+pub mod stateful;
 
 /// The process executor simply calls a target function, as mutable reference to a closure.
 pub type InProcessExecutor<'a, H, OT, S> = GenericInProcessExecutor<H, &'a mut H, (), OT, S>;

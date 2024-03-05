@@ -32,7 +32,8 @@ use libafl_bolts::shmem::ShMemProvider;
 
 use crate::{emu::Emulator, helper::QemuHelperTuple, hooks::QemuHooks};
 
-pub mod with_state;
+/// A version of `QemuExecutor` with a state accessible from the harness.
+pub mod stateful;
 
 pub struct QemuExecutorState<'a, QT, S>
 where
