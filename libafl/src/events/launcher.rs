@@ -32,11 +32,11 @@ use libafl_bolts::os::startable_self;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use libafl_bolts::{
     core_affinity::get_core_ids,
-    llmp::DEFAULT_CLIENT_TIMEOUT_SECS,
     os::{dup2, fork, ForkResult},
 };
 use libafl_bolts::{
     core_affinity::{CoreId, Cores},
+    llmp::DEFAULT_CLIENT_TIMEOUT_SECS,
     shmem::ShMemProvider,
 };
 #[cfg(feature = "std")]
