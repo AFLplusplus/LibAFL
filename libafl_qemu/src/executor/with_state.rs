@@ -161,12 +161,14 @@ where
             .exposed_executor_state_mut()
             .pre_exec::<Self, EM, OF, Z>(input, &emu);
         let mut exit_kind = self.inner.run_target(fuzzer, state, mgr, input)?;
-        self.inner.exposed_executor_state.post_exec::<Self, EM, OT, OF, Z>(
-            input,
-            &emu,
-            self.inner.inner.observers_mut(),
-            &mut exit_kind,
-        );
+        self.inner
+            .exposed_executor_state
+            .post_exec::<Self, EM, OT, OF, Z>(
+                input,
+                &emu,
+                self.inner.inner.observers_mut(),
+                &mut exit_kind,
+            );
         Ok(exit_kind)
     }
 }
