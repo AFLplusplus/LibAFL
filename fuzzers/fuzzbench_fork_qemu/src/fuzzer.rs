@@ -1,50 +1,8 @@
 //! A singlethreaded QEMU fuzzer that can auto-restart.
 
-use clap::{Arg, Command};
 use core::cell::RefCell;
-use libafl::{
-    corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
-    Error,
-    events::SimpleRestartingEventManager,
-    executors::{ExitKind, ShadowExecutor},
-    feedback_or,
-    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
-    inputs::{BytesInput, HasTargetBytes},
-    monitors::SimpleMonitor,
-    mutators::{
-        scheduled::havoc_mutations, StdMOptMutator, StdScheduledMutator,
-        token_mutations::I2SRandReplace, Tokens, tokens_mutations,
-    },
-    observers::{ConstMapObserver, HitcountsMapObserver, TimeObserver},
-    schedulers::{
-        IndexesLenTimeMinimizerScheduler, PowerQueueScheduler, powersched::PowerSchedule,
-    },
-    stages::{
-        calibrate::CalibrationStage, power::StdPowerMutationalStage, ShadowTracingStage,
-        StdMutationalStage,
-    },
-    state::{HasCorpus, HasMetadata, StdState},
-};
-use libafl_bolts::{
-    AsMutSlice, AsSlice,
-    current_nanos,
-    current_time,
-    os::dup2,
-    rands::StdRand,
-    shmem::{ShMemProvider, StdShMemProvider}, tuples::{Merge, tuple_list},
-};
-use libafl_qemu::{
-    cmplog::{CmpLogMap, CmpLogObserver, QemuCmpLogChildHelper},
-    edges::{EDGES_MAP_PTR, EDGES_MAP_SIZE, QemuEdgeCoverageChildHelper},
-    elf::EasyElf,
-    emu::Emulator,
-    filter_qemu_args,
-    GuestReg,
-    hooks::QemuHooks, MmapPerms, QemuForkExecutor, Regs,
-};
 #[cfg(unix)]
-use nix::{self, unistd::dup};
+use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::{
     env,
     fs::{self, File, OpenOptions},
@@ -53,8 +11,51 @@ use std::{
     process,
     time::Duration,
 };
+
+use clap::{Arg, Command};
+use libafl::{
+    corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
+    events::SimpleRestartingEventManager,
+    executors::{ExitKind, ShadowExecutor},
+    feedback_or,
+    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
+    fuzzer::{Fuzzer, StdFuzzer},
+    inputs::{BytesInput, HasTargetBytes},
+    monitors::SimpleMonitor,
+    mutators::{
+        scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
+        StdMOptMutator, StdScheduledMutator, Tokens,
+    },
+    observers::{ConstMapObserver, HitcountsMapObserver, TimeObserver},
+    schedulers::{
+        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
+    },
+    stages::{
+        calibrate::CalibrationStage, power::StdPowerMutationalStage, ShadowTracingStage,
+        StdMutationalStage,
+    },
+    state::{HasCorpus, HasMetadata, StdState},
+    Error,
+};
+use libafl_bolts::{
+    current_nanos, current_time,
+    os::dup2,
+    rands::StdRand,
+    shmem::{ShMemProvider, StdShMemProvider},
+    tuples::{tuple_list, Merge},
+    AsMutSlice, AsSlice,
+};
+use libafl_qemu::{
+    cmplog::{CmpLogMap, CmpLogObserver, QemuCmpLogChildHelper},
+    edges::{QemuEdgeCoverageChildHelper, EDGES_MAP_PTR, EDGES_MAP_SIZE},
+    elf::EasyElf,
+    emu::Emulator,
+    filter_qemu_args,
+    hooks::QemuHooks,
+    GuestReg, MmapPerms, QemuForkExecutor, Regs,
+};
 #[cfg(unix)]
-use std::os::unix::io::{AsRawFd, FromRawFd};
+use nix::{self, unistd::dup};
 
 /// The fuzzer main
 pub fn main() {
@@ -184,12 +185,12 @@ fn fuzz(
     );
 
     #[cfg(unix)]
-        let mut stdout_cpy = unsafe {
+    let mut stdout_cpy = unsafe {
         let new_fd = dup(io::stdout().as_raw_fd())?;
         File::from_raw_fd(new_fd)
     };
     #[cfg(unix)]
-        let file_null = File::open("/dev/null")?;
+    let file_null = File::open("/dev/null")?;
 
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let monitor = SimpleMonitor::with_user_monitor(
@@ -214,7 +215,7 @@ fn fuzz(
 
     // Beginning of a page should be properly aligned.
     #[allow(clippy::cast_ptr_alignment)]
-        let cmplog_map_ptr = cmplog.as_mut_ptr().cast::<libafl_qemu::cmplog::CmpLogMap>();
+    let cmplog_map_ptr = cmplog.as_mut_ptr().cast::<libafl_qemu::cmplog::CmpLogMap>();
 
     let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
     {
@@ -276,7 +277,7 @@ fn fuzz(
             // Same for objective feedbacks
             &mut objective,
         )
-            .unwrap()
+        .unwrap()
     });
 
     // Setup a randomic Input2State stage
