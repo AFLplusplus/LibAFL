@@ -105,7 +105,6 @@ use crate::{
 };
 
 /// The default timeout in seconds after which a client will be considered stale, and removed.
-#[cfg(feature = "std")]
 pub const DEFAULT_CLIENT_TIMEOUT_SECS: Duration = Duration::from_secs(300);
 
 /// The max number of pages a [`client`] may have mapped that were not yet read by the [`broker`]
