@@ -22,8 +22,10 @@ use libafl_bolts::os::{fork, ForkResult};
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{
     compress::GzipCompressor,
-    llmp::{DEFAULT_CLIENT_TIMEOUT_SECS, LLMP_FLAG_COMPRESSED, LLMP_FLAG_INITIALIZED},
+    llmp::{LLMP_FLAG_COMPRESSED, LLMP_FLAG_INITIALIZED},
 };
+use libafl_bolts::llmp::DEFAULT_CLIENT_TIMEOUT_SECS;
+
 #[cfg(feature = "std")]
 use libafl_bolts::{llmp::LlmpConnection, shmem::StdShMemProvider, staterestore::StateRestorer};
 use libafl_bolts::{
