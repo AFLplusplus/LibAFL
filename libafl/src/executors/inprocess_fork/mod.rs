@@ -35,9 +35,6 @@ pub(crate) type ForkHandlerFuncPtr = unsafe fn(
     data: *mut InProcessForkExecutorGlobalData,
 );
 
-#[cfg(all(unix, not(target_os = "linux")))]
-use crate::executors::hooks::timer::{setitimer, Itimerval, Timeval, ITIMER_REAL};
-
 /// The inner structure of `InProcessForkExecutor`.
 pub mod inner;
 /// A version of `InProcessForkExecutor` with a state accessible from the harness.

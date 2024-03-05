@@ -17,6 +17,8 @@ use nix::{
     unistd::Pid,
 };
 
+#[cfg(all(unix, not(target_os = "linux")))]
+use crate::executors::hooks::timer::{setitimer, Itimerval, Timeval, ITIMER_REAL};
 use crate::{
     events::{EventFirer, EventRestarter},
     executors::{
@@ -237,7 +239,7 @@ where
         // do nothing
     }
 
-    /// Creates a new [`GenericInProcessForkExecutor`] with custom hooks
+    /// Creates a new [`GenericInProcessForkExecutorInner`] with custom hooks
     #[cfg(target_os = "linux")]
     #[allow(clippy::too_many_arguments)]
     pub fn with_hooks(
