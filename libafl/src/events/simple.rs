@@ -54,7 +54,7 @@ where
 {
     /// The monitor
     monitor: MT,
-    /// The events that happened since the last handle_in_broker
+    /// The events that happened since the last `handle_in_broker`
     events: Vec<Event<S::Input>>,
     /// The custom buf handler
     custom_buf_handlers: Vec<Box<CustomBufHandlerFn<S>>>,
@@ -598,7 +598,7 @@ where
 /// `SimpleEventManager` Python bindings
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
-#[allow(clippy::unnecessary_fallible_conversions)]
+#[allow(clippy::unnecessary_fallible_conversions, unused_qualifications)]
 pub mod pybind {
     use pyo3::prelude::*;
 

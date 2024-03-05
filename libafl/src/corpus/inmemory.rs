@@ -429,7 +429,7 @@ where
 
 /// `InMemoryCorpus` Python bindings
 #[cfg(feature = "python")]
-#[allow(clippy::unnecessary_fallible_conversions)]
+#[allow(clippy::unnecessary_fallible_conversions, unused_qualifications)]
 pub mod pybind {
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};

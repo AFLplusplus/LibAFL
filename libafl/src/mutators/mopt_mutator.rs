@@ -53,9 +53,9 @@ pub struct MOpt {
     pub operator_num: usize,
     /// The number of swarms that we want to employ during the pilot fuzzing mode
     pub swarm_num: usize,
-    /// We'll generate inputs for `period_pilot` times before we call pso_update in pilot fuzzing module
+    /// We'll generate inputs for `period_pilot` times before we call `pso_update` in pilot fuzzing module
     pub period_pilot: usize,
-    /// We'll generate inputs for `period_core` times before we call pso_update in core fuzzing module
+    /// We'll generate inputs for `period_core` times before we call `pso_update` in core fuzzing module
     pub period_core: usize,
     /// The number of testcases generated during this pilot fuzzing mode
     pub pilot_time: usize,
@@ -77,23 +77,23 @@ pub struct MOpt {
     probability_now: Vec<Vec<f64>>,
     /// The fitness for each swarm, we'll calculate the fitness in the pilot fuzzing mode and use the best one in the core fuzzing mode
     pub swarm_fitness: Vec<f64>,
-    /// (Pilot Mode) Finds by each operators. This vector is used in pso_update
+    /// (Pilot Mode) Finds by each operators. This vector is used in `pso_update`
     pub pilot_operator_finds: Vec<Vec<u64>>,
     /// (Pilot Mode) Finds by each operator till now.
     pub pilot_operator_finds_v2: Vec<Vec<u64>>,
-    /// (Pilot Mode) The number of mutation operator used. This vector is used in pso_update
+    /// (Pilot Mode) The number of mutation operator used. This vector is used in `pso_update`
     pub pilot_operator_cycles: Vec<Vec<u64>>,
     /// (Pilot Mode) The number of mutation operator used till now
     pub pilot_operator_cycles_v2: Vec<Vec<u64>>,
     /// (Pilot Mode) The number of mutation operator used till last execution
     pub pilot_operator_cycles_v3: Vec<Vec<u64>>,
-    /// Vector used in pso_update
+    /// Vector used in `pso_update`
     pub operator_finds_puppet: Vec<u64>,
-    /// (Core Mode) Finds by each operators. This vector is used in pso_update
+    /// (Core Mode) Finds by each operators. This vector is used in `pso_update`
     pub core_operator_finds: Vec<u64>,
     /// (Core Mode) Finds by each operator till now.
     pub core_operator_finds_v2: Vec<u64>,
-    /// (Core Mode) The number of mutation operator used. This vector is used in pso_update
+    /// (Core Mode) The number of mutation operator used. This vector is used in `pso_update`
     pub core_operator_cycles: Vec<u64>,
     /// (Core Mode) The number of mutation operator used till now
     pub core_operator_cycles_v2: Vec<u64>,
@@ -392,7 +392,7 @@ where
         write!(
             f,
             "StdMOptMutator with {} mutations for Input type {}",
-            MT::LEN,
+            self.mutations.len(),
             core::any::type_name::<I>()
         )
     }
@@ -547,7 +547,7 @@ where
     ) -> Result<Self, Error> {
         if !state.has_metadata::<MOpt>() {
             let rand_seed = state.rand_mut().next();
-            state.add_metadata::<MOpt>(MOpt::new(MT::LEN, swarm_num, rand_seed)?);
+            state.add_metadata::<MOpt>(MOpt::new(mutations.len(), swarm_num, rand_seed)?);
         }
         Ok(Self {
             name: format!("StdMOptMutator[{}]", mutations.names().join(",")),

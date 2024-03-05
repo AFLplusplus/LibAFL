@@ -135,7 +135,7 @@ where
         write!(
             f,
             "StdScheduledMutator with {} mutations for Input type {}",
-            MT::LEN,
+            self.mutations.len(),
             core::any::type_name::<I>()
         )
     }
@@ -197,8 +197,8 @@ where
 
     /// Get the next mutation to apply
     fn schedule(&self, state: &mut S, _: &I) -> MutationId {
-        debug_assert!(MT::LEN != 0);
-        state.rand_mut().below(MT::LEN as u64).into()
+        debug_assert!(self.mutations.len() != 0);
+        state.rand_mut().below(self.mutations.len() as u64).into()
     }
 }
 
@@ -601,7 +601,7 @@ mod tests {
 /// `SchedulerMutator` Python bindings
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
-#[allow(clippy::unnecessary_fallible_conversions)]
+#[allow(clippy::unnecessary_fallible_conversions, unused_qualifications)]
 pub mod pybind {
     use pyo3::prelude::*;
 

@@ -12,25 +12,25 @@ use crate::{
 #[derive(Debug)]
 pub struct NestedStageProgress;
 
-impl<S> StageProgress<S> for NestedStageProgress
+impl<S, ST> StageProgress<S, ST> for NestedStageProgress
 where
     S: HasNestedStageStatus,
 {
-    fn initialize_progress(state: &mut S) -> Result<(), Error> {
+    fn initialize_progress(state: &mut S, _stage: &ST) -> Result<(), Error> {
         state.enter_inner_stage()?;
         Ok(())
     }
 
-    fn clear_progress(state: &mut S) -> Result<(), Error> {
+    fn clear_progress(state: &mut S, _stage: &ST) -> Result<(), Error> {
         state.exit_inner_stage()?;
         Ok(())
     }
 
-    fn progress(_state: &S) -> Result<&Self, Error> {
+    fn progress<'a>(_state: &'a S, _stage: &ST) -> Result<&'a Self, Error> {
         unimplemented!("NestedStageProgress should not be queried")
     }
 
-    fn progress_mut(_state: &mut S) -> Result<&mut Self, Error> {
+    fn progress_mut<'a>(_state: &'a mut S, _stage: &ST) -> Result<&'a mut Self, Error> {
         unimplemented!("NestedStageProgress should not be queried")
     }
 }

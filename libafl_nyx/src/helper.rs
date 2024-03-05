@@ -11,7 +11,7 @@ use libnyx::{NyxProcess, NyxReturnValue};
 const INIT_TIMEOUT: Duration = Duration::new(2, 0);
 pub struct NyxHelper {
     pub nyx_process: NyxProcess,
-    /// real size of trace_bits
+    /// real size of `trace_bits`
     pub real_map_size: usize,
     // real size of the trace_bits
     pub map_size: usize,

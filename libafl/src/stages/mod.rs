@@ -15,10 +15,12 @@ pub use concolic::SimpleConcolicMutationalStage;
 #[cfg(feature = "std")]
 pub use dump::*;
 pub use generalization::GeneralizationStage;
-use libafl_bolts::tuples::HasConstLen;
+use hashbrown::HashSet;
+use libafl_bolts::{impl_serdeany, tuples::HasConstLen};
 pub use logics::*;
 pub use mutational::{MutationalStage, StdMutationalStage};
 pub use power::{PowerMutationalStage, StdPowerMutationalStage};
+use serde::{Deserialize, Serialize};
 pub use stats::AflStatsStage;
 #[cfg(feature = "unicode")]
 pub use string::*;
@@ -32,13 +34,16 @@ pub use tuneable::*;
 
 use self::push::PushStage;
 use crate::{
-    corpus::HasCurrentCorpusIdx,
+    corpus::{CorpusId, HasCurrentCorpusIdx},
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::{Executor, HasObservers},
     inputs::UsesInput,
     observers::ObserversTuple,
     schedulers::Scheduler,
-    state::{HasCorpus, HasExecutions, HasLastReportTime, HasMetadata, HasRand, UsesState},
+    state::{
+        HasCorpus, HasExecutions, HasLastReportTime, HasMetadata, HasNamedMetadata, HasRand,
+        UsesState,
+    },
     Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasScheduler,
 };
 
@@ -76,7 +81,7 @@ where
     // TODO: see RFC 2532: https://github.com/rust-lang/rust/issues/29661
     // type Status: ResumableStageStatus = ();
     /// The resumption data for this stage. Set to () if resuming is not necessary/possible.
-    type Progress: StageProgress<Self::State>;
+    type Progress: StageProgress<Self::State, Self>;
 
     /// Run the stage
     fn perform(
@@ -152,9 +157,10 @@ where
             }
             Some(idx) if idx == Self::LEN => {
                 // perform the stage, but don't set it
-                Head::Progress::initialize_progress(state)?;
-                self.0.perform(fuzzer, executor, state, manager)?;
-                Head::Progress::clear_progress(state)?;
+                let stage = &mut self.0;
+                Head::Progress::initialize_progress(state, stage)?;
+                stage.perform(fuzzer, executor, state, manager)?;
+                Head::Progress::clear_progress(state, stage)?;
                 state.clear_stage()?;
             }
             Some(idx) if idx > Self::LEN => {
@@ -163,9 +169,10 @@ where
             // this is None, but the match can't deduce that
             _ => {
                 state.set_stage(Self::LEN)?;
-                Head::Progress::initialize_progress(state)?;
-                self.0.perform(fuzzer, executor, state, manager)?;
-                Head::Progress::clear_progress(state)?;
+                let stage = &mut self.0;
+                Head::Progress::initialize_progress(state, stage)?;
+                stage.perform(fuzzer, executor, state, manager)?;
+                Head::Progress::clear_progress(state, stage)?;
                 state.clear_stage()?;
             }
         }
@@ -541,35 +548,125 @@ pub mod pybind {
 }
 
 /// Trait for status tracking of stages which stash data to resume
-pub trait StageProgress<S> {
+pub trait StageProgress<S, ST>
+where
+    ST: ?Sized,
+{
     /// Initialize the current status tracking for this stage, if it is not yet initialised
-    fn initialize_progress(state: &mut S) -> Result<(), Error>;
+    fn initialize_progress(state: &mut S, stage: &ST) -> Result<(), Error>;
 
     /// Clear the current status tracking of the associated stage
-    fn clear_progress(state: &mut S) -> Result<(), Error>;
+    fn clear_progress(state: &mut S, stage: &ST) -> Result<(), Error>;
 
     /// Get the current status tracking of this stage
-    fn progress(state: &S) -> Result<&Self, Error>;
+    fn progress<'a>(state: &'a S, stage: &ST) -> Result<&'a Self, Error>;
 
     /// Get the current status tracking of this stage, mutably
-    fn progress_mut(state: &mut S) -> Result<&mut Self, Error>;
+    fn progress_mut<'a>(state: &'a mut S, stage: &ST) -> Result<&'a mut Self, Error>;
 }
 
-impl<S> StageProgress<S> for () {
-    fn initialize_progress(_state: &mut S) -> Result<(), Error> {
+impl<S, ST> StageProgress<S, ST> for () {
+    fn initialize_progress(_state: &mut S, _stage: &ST) -> Result<(), Error> {
         Ok(())
     }
 
-    fn clear_progress(_state: &mut S) -> Result<(), Error> {
+    fn clear_progress(_state: &mut S, _stage: &ST) -> Result<(), Error> {
         Ok(())
     }
 
-    fn progress(_state: &S) -> Result<&Self, Error> {
+    fn progress<'a>(_state: &'a S, _stage: &ST) -> Result<&'a Self, Error> {
         unimplemented!("The empty tuple resumable stage status should never be queried")
     }
 
-    fn progress_mut(_state: &mut S) -> Result<&mut Self, Error> {
+    fn progress_mut<'a>(_state: &'a mut S, _stage: &ST) -> Result<&'a mut Self, Error> {
         unimplemented!("The empty tuple resumable stage status should never be queried")
+    }
+}
+
+/// Progress which permits a fixed amount of resumes per round of fuzzing. If this amount is ever
+/// exceeded, the input will no longer be executed by this stage.
+#[derive(Clone, Deserialize, Serialize, Debug)]
+pub struct RetryProgress {
+    tries_remaining: Option<usize>,
+    skipped: HashSet<CorpusId>,
+}
+
+impl_serdeany!(RetryProgress);
+
+/// Stage which specifies a certain amount of retries over which a scheduled input is attempted. To
+/// be used in combination with [`RetryProgress`].
+pub trait RetryingStage {
+    /// The number of times each testcase may be retries.
+    fn max_retries(&self) -> usize;
+}
+
+impl<S, ST> StageProgress<S, ST> for RetryProgress
+where
+    S: HasNamedMetadata,
+    ST: RetryingStage,
+{
+    fn initialize_progress(state: &mut S, stage: &ST) -> Result<(), Error> {
+        if let Ok(metadata) = state.named_metadata_mut::<Self>(core::any::type_name_of_val(stage)) {
+            if let Some(ref mut remaining) = metadata.tries_remaining {
+                *remaining = remaining.checked_sub(1).ok_or_else(|| {
+                    Error::illegal_state(
+                        "Attempted further retries after we had already gotten to none remaining.",
+                    )
+                })?;
+            } else {
+                metadata.tries_remaining = Some(stage.max_retries() + 1);
+            }
+        } else {
+            state.add_named_metadata(
+                Self {
+                    tries_remaining: Some(stage.max_retries() + 1),
+                    skipped: HashSet::new(),
+                },
+                core::any::type_name_of_val(stage),
+            );
+        }
+        Ok(())
+    }
+
+    fn clear_progress(state: &mut S, stage: &ST) -> Result<(), Error> {
+        let metadata = state.named_metadata_mut::<Self>(core::any::type_name_of_val(stage))?;
+        metadata.tries_remaining = None;
+        Ok(())
+    }
+
+    fn progress<'a>(state: &'a S, stage: &ST) -> Result<&'a Self, Error> {
+        state.named_metadata::<Self>(core::any::type_name_of_val(stage))
+    }
+
+    fn progress_mut<'a>(state: &'a mut S, stage: &ST) -> Result<&'a mut Self, Error> {
+        state.named_metadata_mut::<Self>(core::any::type_name_of_val(stage))
+    }
+}
+
+impl RetryProgress {
+    /// Whether we should skip the provided corpus entry.
+    pub fn should_skip<S, ST>(
+        state: &mut S,
+        stage: &ST,
+        corpus_idx: CorpusId,
+    ) -> Result<bool, Error>
+    where
+        S: HasNamedMetadata,
+        ST: RetryingStage,
+    {
+        let progress = Self::progress_mut(state, stage)?;
+        if progress.skipped.contains(&corpus_idx) {
+            return Ok(true);
+        }
+        let remaining = progress.tries_remaining.as_mut().ok_or_else(||
+            Error::illegal_state(
+                "Attempted to check if we should skip a testcase without having initialised the number of tries remaining.",
+            ))?;
+        if *remaining == 0 {
+            progress.skipped.insert(corpus_idx);
+            return Ok(true);
+        }
+        Ok(false)
     }
 }
 
@@ -611,11 +708,13 @@ pub mod test {
     use tuple_list::{tuple_list, tuple_list_type};
 
     use crate::{
+        corpus::{Corpus, Testcase},
         events::NopEventManager,
         executors::test::NopExecutor,
         fuzzer::test::NopFuzzer,
-        stages::{Stage, StageProgress, StagesTuple},
-        state::{HasMetadata, State, UsesState},
+        inputs::NopInput,
+        stages::{RetryProgress, RetryingStage, Stage, StageProgress, StagesTuple},
+        state::{test::test_std_state, HasCorpus, HasMetadata, State, UsesState},
     };
 
     #[derive(Debug)]
@@ -636,11 +735,11 @@ pub mod test {
 
     impl_serdeany!(TestProgress);
 
-    impl<S> StageProgress<S> for TestProgress
+    impl<S, ST> StageProgress<S, ST> for TestProgress
     where
         S: HasMetadata,
     {
-        fn initialize_progress(state: &mut S) -> Result<(), Error> {
+        fn initialize_progress(state: &mut S, _stage: &ST) -> Result<(), Error> {
             // check if we're resuming
             if !state.has_metadata::<Self>() {
                 state.add_metadata(Self { count: 0 });
@@ -648,7 +747,7 @@ pub mod test {
             Ok(())
         }
 
-        fn clear_progress(state: &mut S) -> Result<(), Error> {
+        fn clear_progress(state: &mut S, _stage: &ST) -> Result<(), Error> {
             if state.metadata_map_mut().remove::<Self>().is_none() {
                 return Err(Error::illegal_state(
                     "attempted to clear status metadata when none was present",
@@ -657,11 +756,11 @@ pub mod test {
             Ok(())
         }
 
-        fn progress(state: &S) -> Result<&Self, Error> {
+        fn progress<'a>(state: &'a S, _stage: &ST) -> Result<&'a Self, Error> {
             state.metadata()
         }
 
-        fn progress_mut(state: &mut S) -> Result<&mut Self, Error> {
+        fn progress_mut<'a>(state: &'a mut S, _stage: &ST) -> Result<&'a mut Self, Error> {
             state.metadata_mut()
         }
     }
@@ -690,7 +789,7 @@ pub mod test {
             _manager: &mut EM,
         ) -> Result<(), Error> {
             // metadata is attached by the status
-            let meta = Self::Progress::progress_mut(state)?;
+            let meta = Self::Progress::progress_mut(state, self)?;
             meta.count += 1;
             assert!(
                 meta.count == 1,
@@ -725,7 +824,7 @@ pub mod test {
             _manager: &mut EM,
         ) -> Result<(), Error> {
             // metadata is attached by the status
-            let meta = Self::Progress::progress_mut(state)?;
+            let meta = Self::Progress::progress_mut(state, self)?;
             meta.count += 1;
 
             if meta.count == 1 {
@@ -799,5 +898,61 @@ pub mod test {
                 "Test failed; we did not set completed."
             );
         }
+    }
+
+    #[test]
+    fn test_tries_progress() -> Result<(), Error> {
+        #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
+        unsafe {
+            RetryProgress::register();
+        }
+
+        struct StageWithOneTry;
+
+        impl RetryingStage for StageWithOneTry {
+            fn max_retries(&self) -> usize {
+                1
+            }
+        }
+
+        let mut state = test_std_state();
+        let stage = StageWithOneTry;
+
+        let corpus_idx = state.corpus_mut().add(Testcase::new(NopInput {}))?;
+
+        for _ in 0..10 {
+            // used normally, no retries means we never skip
+            RetryProgress::initialize_progress(&mut state, &stage)?;
+            assert!(!RetryProgress::should_skip(&mut state, &stage, corpus_idx)?);
+            RetryProgress::clear_progress(&mut state, &stage)?;
+        }
+
+        for _ in 0..10 {
+            // used normally, only one retry means we never skip
+            RetryProgress::initialize_progress(&mut state, &stage)?;
+            assert!(!RetryProgress::should_skip(&mut state, &stage, corpus_idx)?);
+            RetryProgress::initialize_progress(&mut state, &stage)?;
+            assert!(!RetryProgress::should_skip(&mut state, &stage, corpus_idx)?);
+            RetryProgress::clear_progress(&mut state, &stage)?;
+        }
+
+        RetryProgress::initialize_progress(&mut state, &stage)?;
+        assert!(!RetryProgress::should_skip(&mut state, &stage, corpus_idx)?);
+        // task failed, let's resume
+        RetryProgress::initialize_progress(&mut state, &stage)?;
+        // we still have one more try!
+        assert!(!RetryProgress::should_skip(&mut state, &stage, corpus_idx)?);
+        // task failed, let's resume
+        RetryProgress::initialize_progress(&mut state, &stage)?;
+        // out of retries, so now we skip
+        assert!(RetryProgress::should_skip(&mut state, &stage, corpus_idx)?);
+        RetryProgress::clear_progress(&mut state, &stage)?;
+
+        RetryProgress::initialize_progress(&mut state, &stage)?;
+        // we previously exhausted this testcase's retries, so we skip
+        assert!(RetryProgress::should_skip(&mut state, &stage, corpus_idx)?);
+        RetryProgress::clear_progress(&mut state, &stage)?;
+
+        Ok(())
     }
 }
