@@ -16,14 +16,13 @@ use core::{
 
 use libafl_bolts::tuples::tuple_list;
 
+#[cfg(any(unix, feature = "std"))]
+use crate::executors::hooks::inprocess::GLOBAL_STATE;
 use crate::{
     corpus::{Corpus, Testcase},
     events::{Event, EventFirer, EventRestarter},
     executors::{
-        hooks::{
-            inprocess::{InProcessHooks, GLOBAL_STATE},
-            ExecutorHooksTuple,
-        },
+        hooks::{inprocess::InProcessHooks, ExecutorHooksTuple},
         inprocess::inner::GenericInProcessExecutorInner,
         Executor, ExitKind, HasObservers,
     },
