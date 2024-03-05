@@ -518,7 +518,7 @@ impl TuiMonitor {
                 .map_or("None".to_string(), ToString::to_string);
             let stability = client.get_user_stats("stability").map_or(
                 UserStats::new(UserStatsValue::Ratio(0, 100), AggregatorOps::Avg),
-                core::clone::Clone::clone,
+                Clone::clone,
             );
 
             if afl_stats != "None" {
