@@ -47,7 +47,8 @@ pub(crate) type ForkHandlerFuncPtr = unsafe fn(
 #[cfg(all(unix, not(target_os = "linux")))]
 use crate::executors::hooks::timer::{setitimer, Itimerval, Timeval, ITIMER_REAL};
 
-pub mod with_state;
+/// A version of `InProcessForkExecutor` with a state accessible from the harness.
+pub mod stateful;
 
 /// The `InProcessForkExecutor` with no user hooks
 pub type InProcessForkExecutor<'a, H, OT, S, SP, EM, Z> =

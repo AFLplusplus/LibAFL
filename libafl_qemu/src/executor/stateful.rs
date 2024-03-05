@@ -8,7 +8,7 @@ use core::{
 use libafl::{
     events::{EventFirer, EventRestarter},
     executors::{
-        inprocess::{with_state::StatefulInProcessExecutor, HasInProcessHooks},
+        inprocess::{stateful::StatefulInProcessExecutor, HasInProcessHooks},
         Executor, ExitKind, HasObservers,
     },
     feedbacks::Feedback,
