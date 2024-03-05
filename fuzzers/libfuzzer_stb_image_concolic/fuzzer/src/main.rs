@@ -1,22 +1,12 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for `stb_image`.
-use mimalloc::MiMalloc;
-#[global_allocator]
-static GLOBAL: MiMalloc = MiMalloc;
-
-use std::{
-    env,
-    path::PathBuf,
-    process::{Child, Command, Stdio},
-    time::Duration,
-};
-
 use clap::{self, Parser};
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
-    events::{setup_restarting_mgr_std, EventConfig},
+    Error,
+    events::{EventConfig, setup_restarting_mgr_std},
     executors::{
-        command::CommandConfigurator, inprocess::InProcessExecutor, ExitKind, ShadowExecutor,
+        command::CommandConfigurator, ExitKind, inprocess::InProcessExecutor, ShadowExecutor,
     },
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
@@ -29,8 +19,8 @@ use libafl::{
     },
     observers::{
         concolic::{
-            serialization_format::{DEFAULT_ENV_NAME, DEFAULT_SIZE},
             ConcolicObserver,
+            serialization_format::{DEFAULT_ENV_NAME, DEFAULT_SIZE},
         },
         TimeObserver,
     },
@@ -40,18 +30,28 @@ use libafl::{
         StdMutationalStage, TracingStage,
     },
     state::{HasCorpus, StdState},
-    Error,
 };
 use libafl_bolts::{
+    AsMutSlice,
+    AsSlice,
     current_nanos,
-    rands::StdRand,
-    shmem::{ShMem, ShMemProvider, StdShMemProvider},
-    tuples::tuple_list,
-    AsMutSlice, AsSlice, Named,
+    Named,
+    rands::StdRand, shmem::{ShMem, ShMemProvider, StdShMemProvider}, tuples::tuple_list,
 };
 use libafl_targets::{
-    libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
+    CmpLogObserver, libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer,
 };
+use mimalloc::MiMalloc;
+use std::{
+    env,
+    path::PathBuf,
+    process::{Child, Command, Stdio},
+    time::Duration,
+};
+use std::fs;
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 #[derive(Debug, Parser)]
 struct Opt {
@@ -60,7 +60,6 @@ struct Opt {
     concolic: bool,
 }
 
-use std::fs;
 pub fn main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
@@ -78,7 +77,7 @@ pub fn main() {
         1337,
         opt.concolic,
     )
-    .expect("An error occurred while fuzzing");
+        .expect("An error occurred while fuzzing");
 }
 
 /// The actual fuzzer
@@ -118,7 +117,7 @@ fn fuzz(
     // This one is composed by two Feedbacks in OR
     let mut feedback = feedback_or!(
         // New maximization map feedback linked to the edges observer and the feedback state
-        MaxMapFeedback::tracking(&edges_observer, true, false),
+        MaxMapFeedback::new(&edges_observer),
         // Time feedback, this one does not need a feedback state
         TimeFeedback::with_observer(&time_observer)
     );
@@ -142,7 +141,7 @@ fn fuzz(
             // Same for objective feedbacks
             &mut objective,
         )
-        .unwrap()
+            .unwrap()
     });
 
     println!("We're a client, let's fuzz :)");

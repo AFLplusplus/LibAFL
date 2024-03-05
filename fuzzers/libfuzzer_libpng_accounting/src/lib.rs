@@ -2,44 +2,43 @@
 //! The example harness is built for libpng.
 //! In this example, you will see the use of the `launcher` feature.
 //! The `launcher` will spawn new processes for each cpu core.
-use mimalloc::MiMalloc;
-#[global_allocator]
-static GLOBAL: MiMalloc = MiMalloc;
-
-use core::time::Duration;
-use std::{env, net::SocketAddr, path::PathBuf};
-
 use clap::Parser;
+use core::time::Duration;
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
+    Error,
     events::{EventConfig, Launcher},
-    executors::{inprocess::InProcessExecutor, ExitKind},
-    feedback_or, feedback_or_fast,
+    executors::{ExitKind, inprocess::InProcessExecutor}, feedback_or,
+    feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
     mutators::{
-        scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
+        scheduled::{havoc_mutations, StdScheduledMutator, tokens_mutations},
         token_mutations::Tokens,
     },
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{CoverageAccountingScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, StdState},
-    Error,
 };
 use libafl_bolts::{
+    AsSlice,
     core_affinity::Cores,
     current_nanos,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, Merge},
-    AsSlice,
+    tuples::{Merge, tuple_list},
 };
 use libafl_targets::{
-    libfuzzer_initialize, libfuzzer_test_one_input, ACCOUNTING_MEMOP_MAP, EDGES_MAP, MAX_EDGES_NUM,
+    ACCOUNTING_MEMOP_MAP, EDGES_MAP, libfuzzer_initialize, libfuzzer_test_one_input, MAX_EDGES_NUM,
 };
+use mimalloc::MiMalloc;
+use std::{env, net::SocketAddr, path::PathBuf};
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 /// Parse a millis string to a [`Duration`]. Used for arg parsing.
 fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
@@ -49,26 +48,26 @@ fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
 /// The commandline args this fuzzer accepts
 #[derive(Debug, Parser)]
 #[command(
-    name = "libfuzzer_libpng_launcher",
-    about = "A libfuzzer-like fuzzer for libpng with llmp-multithreading support and a launcher",
-    author = "Andrea Fioraldi <andreafioraldi@gmail.com>, Dominik Maier <domenukk@gmail.com>"
+name = "libfuzzer_libpng_launcher",
+about = "A libfuzzer-like fuzzer for libpng with llmp-multithreading support and a launcher",
+author = "Andrea Fioraldi <andreafioraldi@gmail.com>, Dominik Maier <domenukk@gmail.com>"
 )]
 struct Opt {
     #[arg(
-        short,
-        long,
-        value_parser = Cores::from_cmdline,
-        help = "Spawn a client in each of the provided cores. Broker runs in the 0th core. 'all' to select all available cores. 'none' to run a client without binding to any core. eg: '1,2-4,6' selects the cores 1,2,3,4,6.",
-        name = "CORES"
+    short,
+    long,
+    value_parser = Cores::from_cmdline,
+    help = "Spawn a client in each of the provided cores. Broker runs in the 0th core. 'all' to select all available cores. 'none' to run a client without binding to any core. eg: '1,2-4,6' selects the cores 1,2,3,4,6.",
+    name = "CORES"
     )]
     cores: Cores,
 
     #[arg(
-        short = 'p',
-        long,
-        help = "Choose the broker TCP port, default is 1337",
-        name = "PORT",
-        default_value = "1337"
+    short = 'p',
+    long,
+    help = "Choose the broker TCP port, default is 1337",
+    name = "PORT",
+    default_value = "1337"
     )]
     broker_port: u16,
 
@@ -79,21 +78,21 @@ struct Opt {
     input: Vec<PathBuf>,
 
     #[arg(
-        short,
-        long,
-        help = "Set the output directory, default is ./out",
-        name = "OUTPUT",
-        default_value = "./out"
+    short,
+    long,
+    help = "Set the output directory, default is ./out",
+    name = "OUTPUT",
+    default_value = "./out"
     )]
     output: PathBuf,
 
     #[arg(
-        value_parser = timeout_from_millis_str,
-        short,
-        long,
-        help = "Set the execution timeout in milliseconds, default is 10000",
-        name = "TIMEOUT",
-        default_value = "10000"
+    value_parser = timeout_from_millis_str,
+    short,
+    long,
+    help = "Set the execution timeout in milliseconds, default is 10000",
+    name = "TIMEOUT",
+    default_value = "10000"
     )]
     timeout: Duration,
     /*
@@ -143,7 +142,7 @@ pub extern "C" fn libafl_main() {
         // This one is composed by two Feedbacks in OR
         let mut feedback = feedback_or!(
             // New maximization map feedback linked to the edges observer and the feedback state
-            MaxMapFeedback::tracking(&edges_observer, true, false),
+            MaxMapFeedback::new(&edges_observer),
             // Time feedback, this one does not need a feedback state
             TimeFeedback::with_observer(&time_observer)
         );
@@ -167,7 +166,7 @@ pub extern "C" fn libafl_main() {
                 // Same for objective feedbacks
                 &mut objective,
             )
-            .unwrap()
+                .unwrap()
         });
 
         println!("We're a client, let's fuzz :)");

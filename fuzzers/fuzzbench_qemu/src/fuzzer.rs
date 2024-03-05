@@ -1,19 +1,10 @@
 //! A singlethreaded QEMU fuzzer that can auto-restart.
 
-use core::{cell::RefCell, ptr::addr_of_mut, time::Duration};
-#[cfg(unix)]
-use std::os::unix::io::{AsRawFd, FromRawFd};
-use std::{
-    env,
-    fs::{self, File, OpenOptions},
-    io::{self, Write},
-    path::PathBuf,
-    process,
-};
-
 use clap::{Arg, Command};
+use core::{cell::RefCell, ptr::addr_of_mut, time::Duration};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
+    Error,
     events::SimpleRestartingEventManager,
     executors::{ExitKind, ShadowExecutor},
     feedback_or,
@@ -22,39 +13,38 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::{
-        scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
-        StdMOptMutator, StdScheduledMutator, Tokens,
+        scheduled::havoc_mutations, StdMOptMutator, StdScheduledMutator,
+        token_mutations::I2SRandReplace, Tokens, tokens_mutations,
     },
     observers::{HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{
-        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
+        IndexesLenTimeMinimizerScheduler, PowerQueueScheduler, powersched::PowerSchedule,
     },
     stages::{
         calibrate::CalibrationStage, power::StdPowerMutationalStage, ShadowTracingStage,
         StdMutationalStage,
     },
     state::{HasCorpus, HasMetadata, StdState},
-    Error,
 };
 use libafl_bolts::{
-    current_nanos, current_time,
+    AsSlice, current_nanos,
+    current_time,
     os::dup2,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, Merge},
-    AsSlice,
+    tuples::{Merge, tuple_list},
 };
 use libafl_qemu::{
     // asan::{init_with_asan, QemuAsanHelper},
     cmplog::{CmpLogObserver, QemuCmpLogHelper},
     edges::edges_map_mut_slice,
-    edges::QemuEdgeCoverageHelper,
     edges::MAX_EDGES_NUM,
+    edges::QemuEdgeCoverageHelper,
     elf::EasyElf,
-    filter_qemu_args,
-    hooks::QemuHooks,
     Emulator,
+    filter_qemu_args,
     GuestReg,
+    hooks::QemuHooks,
     //snapshot::QemuSnapshotHelper,
     MmapPerms,
     QemuExecutor,
@@ -62,6 +52,15 @@ use libafl_qemu::{
 };
 #[cfg(unix)]
 use nix::{self, unistd::dup};
+use std::{
+    env,
+    fs::{self, File, OpenOptions},
+    io::{self, Write},
+    path::PathBuf,
+    process,
+};
+#[cfg(unix)]
+use std::os::unix::io::{AsRawFd, FromRawFd};
 
 pub const MAX_INPUT_SIZE: usize = 1048576; // 1MB
 
@@ -212,12 +211,12 @@ fn fuzz(
     );
 
     #[cfg(unix)]
-    let mut stdout_cpy = unsafe {
+        let mut stdout_cpy = unsafe {
         let new_fd = dup(io::stdout().as_raw_fd())?;
         File::from_raw_fd(new_fd)
     };
     #[cfg(unix)]
-    let file_null = File::open("/dev/null")?;
+        let file_null = File::open("/dev/null")?;
 
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let monitor = SimpleMonitor::new(|s| {
@@ -259,7 +258,7 @@ fn fuzz(
     // Create an observation channel using cmplog map
     let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
-    let map_feedback = MaxMapFeedback::tracking(&edges_observer, true, false);
+    let map_feedback = MaxMapFeedback::new(&edges_observer);
 
     let calibration = CalibrationStage::new(&map_feedback);
 
@@ -291,7 +290,7 @@ fn fuzz(
             // Same for objective feedbacks
             &mut objective,
         )
-        .unwrap()
+            .unwrap()
     });
 
     // Setup a randomic Input2State stage

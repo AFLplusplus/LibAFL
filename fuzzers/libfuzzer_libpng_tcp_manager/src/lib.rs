@@ -1,42 +1,41 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for libpng.
-use mimalloc::MiMalloc;
-#[global_allocator]
-static GLOBAL: MiMalloc = MiMalloc;
-
 use core::time::Duration;
-#[cfg(feature = "crash")]
-use std::ptr;
-use std::{env, path::PathBuf};
-
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
-    events::{tcp::setup_restarting_mgr_tcp, EventConfig, EventRestarter},
-    executors::{inprocess::InProcessExecutor, ExitKind},
-    feedback_or, feedback_or_fast,
+    Error,
+    events::{EventConfig, EventRestarter, tcp::setup_restarting_mgr_tcp},
+    executors::{ExitKind, inprocess::InProcessExecutor}, feedback_or,
+    feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
     mutators::{
-        scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
+        scheduled::{havoc_mutations, StdScheduledMutator, tokens_mutations},
         token_mutations::Tokens,
     },
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{
-        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
+        IndexesLenTimeMinimizerScheduler, powersched::PowerSchedule, StdWeightedScheduler,
     },
     stages::{calibrate::CalibrationStage, power::StdPowerMutationalStage},
     state::{HasCorpus, HasMetadata, StdState},
-    Error,
 };
 use libafl_bolts::{
+    AsSlice,
     current_nanos,
     rands::StdRand,
-    tuples::{tuple_list, Merge},
-    AsSlice,
+    tuples::{Merge, tuple_list},
 };
-use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
+use libafl_targets::{EDGES_MAP, libfuzzer_initialize, libfuzzer_test_one_input, MAX_EDGES_NUM};
+use mimalloc::MiMalloc;
+use std::{env, path::PathBuf};
+#[cfg(feature = "crash")]
+use std::ptr;
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 /// The main fn, `no_mangle` as it is a C main
 #[no_mangle]
@@ -54,7 +53,7 @@ pub extern "C" fn libafl_main() {
         PathBuf::from("./crashes"),
         1337,
     )
-    .expect("An error occurred while fuzzing");
+        .expect("An error occurred while fuzzing");
 }
 
 /// The actual fuzzer
@@ -88,7 +87,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    let map_feedback = MaxMapFeedback::tracking(&edges_observer, true, false);
+    let map_feedback = MaxMapFeedback::new(&edges_observer);
 
     let calibration = CalibrationStage::new(&map_feedback);
 
@@ -120,7 +119,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
             // Same for objective feedbacks
             &mut objective,
         )
-        .unwrap()
+            .unwrap()
     });
 
     println!("We're a client, let's fuzz :)");

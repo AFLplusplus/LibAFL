@@ -1,13 +1,12 @@
 //! A fuzzer using qemu in systemmode for binary-only coverage of kernels
 //!
 use core::{ptr::addr_of_mut, time::Duration};
-use std::{env, path::PathBuf, process};
-
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
-    events::{launcher::Launcher, EventConfig},
-    executors::ExitKind,
-    feedback_or, feedback_or_fast,
+    Error,
+    events::{EventConfig, launcher::Launcher},
+    executors::ExitKind, feedback_or,
+    feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
@@ -17,22 +16,22 @@ use libafl::{
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::StdMutationalStage,
     state::{HasCorpus, StdState},
-    Error,
 };
 use libafl_bolts::{
+    AsSlice,
     core_affinity::Cores,
     current_nanos,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
-    AsSlice,
 };
 use libafl_qemu::{
-    edges::{edges_map_mut_slice, QemuEdgeCoverageHelper, MAX_EDGES_NUM},
+    edges::{edges_map_mut_slice, MAX_EDGES_NUM, QemuEdgeCoverageHelper},
     elf::EasyElf,
     emu::Emulator,
     GuestPhysAddr, QemuExecutor, QemuHooks, Regs,
 };
+use std::{env, path::PathBuf, process};
 
 pub static mut MAX_INPUT_SIZE: usize = 50;
 
@@ -55,14 +54,14 @@ pub fn fuzz() {
         env::var("KERNEL").expect("KERNEL env not set"),
         &mut elf_buffer,
     )
-    .unwrap();
+        .unwrap();
 
     let input_addr = GuestPhysAddr::from(
         elf.resolve_symbol(
             &env::var("FUZZ_INPUT").unwrap_or_else(|_| "FUZZ_INPUT".to_owned()),
             0,
         )
-        .expect("Symbol or env FUZZ_INPUT not found"),
+            .expect("Symbol or env FUZZ_INPUT not found"),
     );
     println!("FUZZ_INPUT @ {input_addr:#x}");
 
@@ -161,7 +160,7 @@ pub fn fuzz() {
         // This one is composed by two Feedbacks in OR
         let mut feedback = feedback_or!(
             // New maximization map feedback linked to the edges observer and the feedback state
-            MaxMapFeedback::tracking(&edges_observer, true, true),
+            MaxMapFeedback::new(&edges_observer),
             // Time feedback, this one does not need a feedback state
             TimeFeedback::with_observer(&time_observer)
         );
@@ -185,7 +184,7 @@ pub fn fuzz() {
                 // Same for objective feedbacks
                 &mut objective,
             )
-            .unwrap()
+                .unwrap()
         });
 
         // A minimization+queue policy to get testcasess from the corpus
@@ -206,7 +205,7 @@ pub fn fuzz() {
             &mut mgr,
             timeout,
         )
-        .expect("Failed to create QemuExecutor");
+            .expect("Failed to create QemuExecutor");
 
         // Instead of calling the timeout handler and restart the process, trigger a breakpoint ASAP
         executor.break_on_timeout();

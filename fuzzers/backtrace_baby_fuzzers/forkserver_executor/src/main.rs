@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
@@ -16,17 +14,18 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-#[cfg(not(target_vendor = "apple"))]
-use libafl_bolts::shmem::StdShMemProvider;
-#[cfg(target_vendor = "apple")]
-use libafl_bolts::shmem::UnixShMemProvider;
 use libafl_bolts::{
+    AsMutSlice,
     current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider},
     tuples::tuple_list,
-    AsMutSlice,
 };
+#[cfg(not(target_vendor = "apple"))]
+use libafl_bolts::shmem::StdShMemProvider;
+#[cfg(target_vendor = "apple")]
+use libafl_bolts::shmem::UnixShMemProvider;
+use std::path::PathBuf;
 
 #[allow(clippy::similar_names)]
 pub fn main() {
@@ -34,10 +33,10 @@ pub fn main() {
 
     //Coverage map shared between observer and executor
     #[cfg(target_vendor = "apple")]
-    let mut shmem_provider = UnixShMemProvider::new().unwrap();
+        let mut shmem_provider = UnixShMemProvider::new().unwrap();
 
     #[cfg(not(target_vendor = "apple"))]
-    let mut shmem_provider = StdShMemProvider::new().unwrap();
+        let mut shmem_provider = StdShMemProvider::new().unwrap();
 
     let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
     //let the forkserver know the shmid
@@ -54,7 +53,7 @@ pub fn main() {
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
-    let mut feedback = MaxMapFeedback::tracking(&edges_observer, true, false);
+    let mut feedback = MaxMapFeedback::new(&edges_observer);
 
     // A feedback to choose if an input is a solution or not
     // We want to do the same crash deduplication that AFL does
@@ -75,7 +74,7 @@ pub fn main() {
         // Same for objective feedbacks
         &mut objective,
     )
-    .unwrap();
+        .unwrap();
 
     // The Monitor trait define how the fuzzer stats are reported to the user
     let monitor = SimpleMonitor::new(|s| println!("{s}"));
