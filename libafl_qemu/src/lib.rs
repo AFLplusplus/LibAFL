@@ -114,6 +114,68 @@ pub mod breakpoint;
 pub mod command;
 pub mod sync_backdoor;
 
+/// Safe linking with of extern "C" functions.
+/// This macro makes sure the declared symbol is defined *at link time*, avoiding declaring non-existant symbols
+/// that could be silently ignored during linking if unused.
+///
+/// This macro relies on a nightly feature, and can only be used in this mode
+/// It is (nearly) a drop-in replacement for extern "C" { } blocks containing function and static declarations, and will have the same effect in practice.
+#[macro_export]
+macro_rules! extern_c_checked {
+    () => {};
+
+    ($visibility:vis fn $c_fn:ident($($param_ident:ident : $param_ty:ty),*) $( -> $ret_ty:ty )?; $($tail:tt)*) =>  {
+        paste! {
+            #[cfg_attr(nightly, used(linker))]
+            static [<__ $c_fn:upper __>]: unsafe extern "C" fn($($param_ty),*) $( -> $ret_ty )? = $c_fn;
+        }
+
+        extern "C" {
+            $visibility fn $c_fn($($param_ident : $param_ty),*) $( -> $ret_ty )?;
+        }
+
+        extern_c_checked!($($tail)*);
+    };
+
+    ($visibility:vis static $c_var:ident : $c_var_ty:ty; $($tail:tt)*) => {
+        paste! {
+            #[allow(non_camel_case_types)]
+            #[allow(unused)]
+            struct [<__ $c_var:upper _STRUCT__>] { member: *const $c_var_ty }
+
+            unsafe impl Sync for [<__ $c_var:upper _STRUCT__>] {}
+
+            #[cfg_attr(nightly, used(linker))]
+            static [<__ $c_var:upper __>]: [<__ $c_var:upper _STRUCT__>] = unsafe { [<__ $c_var:upper _STRUCT__>] { member: core::ptr::addr_of!($c_var) } };
+        }
+
+        extern "C" {
+            $visibility static $c_var: $c_var_ty;
+        }
+
+        extern_c_checked!($($tail)*);
+    };
+
+    ($visibility:vis static mut $c_var:ident : $c_var_ty:ty; $($tail:tt)*) => {
+        paste! {
+            #[allow(non_camel_case_types)]
+            #[allow(unused)]
+            struct [<__ $c_var:upper _STRUCT__>] { member: *const $c_var_ty }
+
+            unsafe impl Sync for [<__ $c_var:upper _STRUCT__>] {}
+
+            #[cfg_attr(nightly, used(linker))]
+            static mut [<__ $c_var:upper __>]: [<__ $c_var:upper _STRUCT__>] = unsafe { [<__ $c_var:upper _STRUCT__>] { member: core::ptr::addr_of!($c_var) } };
+        }
+
+        extern "C" {
+            $visibility static mut $c_var: $c_var_ty;
+        }
+
+        extern_c_checked!($($tail)*);
+    };
+}
+
 #[must_use]
 pub fn filter_qemu_args() -> Vec<String> {
     let mut args = vec![env::args().next().unwrap()];

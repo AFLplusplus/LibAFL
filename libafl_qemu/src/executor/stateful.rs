@@ -19,10 +19,13 @@ use libafl::{
 };
 
 #[cfg(emulation_mode = "usermode")]
-use crate::executor::inproc_qemu_crash_handler;
+use crate::{executor::inproc_qemu_crash_handler, NopEmuExitHandler};
 #[cfg(emulation_mode = "systemmode")]
 use crate::executor::{inproc_qemu_timeout_handler, BREAK_ON_TMOUT};
-use crate::{emu::Emulator, executor::QemuExecutorState, helper::QemuHelperTuple, hooks::QemuHooks, IsEmuExitHandler};
+use crate::{
+    emu::Emulator, executor::QemuExecutorState, helper::QemuHelperTuple, hooks::QemuHooks,
+    IsEmuExitHandler
+};
 
 pub struct StatefulQemuExecutor<'a, H, OT, QT, S, E>
 where
@@ -94,6 +97,7 @@ where
                 Z,
                 QT,
                 S,
+                E,
             > as *const c_void;
         }
 
@@ -110,7 +114,9 @@ where
         Ok(Self { inner })
     }
 
-    pub fn inner(&self) -> &StatefulInProcessExecutor<'a, H, OT, S, QemuExecutorState<'a, QT, S, E>> {
+    pub fn inner(
+        &self,
+    ) -> &StatefulInProcessExecutor<'a, H, OT, S, QemuExecutorState<'a, QT, S, E>> {
         &self.inner
     }
 
@@ -158,16 +164,14 @@ where
         mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
-        let emu = Emulator::get().unwrap();
         self.inner
             .exposed_executor_state_mut()
-            .pre_exec::<Self, EM, OF, Z>(input, &emu);
+            .pre_exec::<Self, EM, OF, Z>(input);
         let mut exit_kind = self.inner.run_target(fuzzer, state, mgr, input)?;
         self.inner
             .exposed_executor_state
             .post_exec::<Self, EM, OT, OF, Z>(
                 input,
-                &emu,
                 self.inner.inner.observers_mut(),
                 &mut exit_kind,
             );

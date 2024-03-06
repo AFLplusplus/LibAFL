@@ -635,6 +635,7 @@ impl EmulatorMemoryChunk {
     }
 
     /// Returns the number of bytes effectively written.
+    #[must_use]
     pub fn write<E>(&self, emu: &Emulator<E>, input: &[u8]) -> GuestReg
     where
         E: IsEmuExitHandler,

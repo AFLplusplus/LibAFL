@@ -7,7 +7,12 @@ use core::{
     marker::PhantomData,
     mem::transmute,
     pin::Pin,
-    ptr::{self, addr_of, addr_of_mut},
+    ptr::{self, addr_of},
+};
+
+#[cfg(emulation_mode = "usermode")]
+use core::{
+    ptr::addr_of_mut,
 };
 
 use libafl::{
@@ -21,8 +26,13 @@ use crate::{
     emu::{Emulator, FatPtr, MemAccessInfo, SKIP_EXEC_HOOK},
     helper::QemuHelperTuple,
     BackdoorHookId, BlockHookId, CmpHookId, EdgeHookId, GuestAddr, GuestUsize, HookId,
-    InstructionHookId, IsEmuExitHandler, NewThreadHookId, PostSyscallHookId, PreSyscallHookId,
+    InstructionHookId, IsEmuExitHandler,
     ReadHookId, WriteHookId,
+};
+
+#[cfg(emulation_mode = "usermode")]
+use crate::{
+    NewThreadHookId, PostSyscallHookId, PreSyscallHookId,
 };
 
 /*
@@ -420,7 +430,7 @@ where
     NopState<I>: UsesInput<Input = I>,
     E: IsEmuExitHandler,
 {
-    pub fn reproducer(emulator: Emulator, helpers: QT) -> Box<Self> {
+    pub fn reproducer(emulator: Emulator<E>, helpers: QT) -> Box<Self> {
         Self::new(emulator, helpers)
     }
 

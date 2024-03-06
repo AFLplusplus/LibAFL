@@ -8,10 +8,13 @@ use std::{
 };
 
 use crate::{
+    extern_c_checked,
     emu::{libafl_page_from_addr, IsSnapshotManager},
     CPUStatePtr, EmuExitReason, EmuExitReasonError, Emulator, GuestAddr, GuestPhysAddr,
     GuestVirtAddr, IsEmuExitHandler, MemAccessInfo, SnapshotId, SnapshotManagerError, CPU,
 };
+
+use paste::paste;
 
 impl SnapshotId {
     fn get_fresh_id() -> SnapshotId {
@@ -190,10 +193,6 @@ pub(super) extern "C" fn qemu_cleanup_atexit() {
     unsafe {
         qemu_cleanup();
     }
-}
-
-extern "C" {
-    fn libafl_qemu_current_paging_id(cpu: CPUStatePtr) -> GuestPhysAddr;
 }
 
 impl CPU {

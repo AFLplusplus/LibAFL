@@ -20,11 +20,11 @@ use std::{
 use libafl::{executors::ExitKind, inputs::BytesInput};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use num_traits::Num;
-use paste::paste;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
-use crate::{command::IsCommand, GuestReg, Regs};
+use crate::{command::IsCommand, GuestReg, Regs, extern_c_checked};
+use paste::paste;
 
 #[cfg(emulation_mode = "systemmode")]
 pub mod systemmode;
@@ -35,67 +35,6 @@ pub use systemmode::*;
 pub mod usermode;
 #[cfg(emulation_mode = "usermode")]
 pub use usermode::*;
-
-/// Safe linking with of extern "C" functions.
-/// This macro makes sure the declared symbol is defined *at link time*, avoiding declaring non-existant symbols
-/// that could be silently ignored during linking if unused.
-///
-/// This macro relies on a nightly feature, and can only be used in this mode
-/// It is (nearly) a drop-in replacement for extern "C" { } blocks containing function and static declarations, and will have the same effect in practice.
-macro_rules! extern_c_checked {
-    () => {};
-
-    ($visibility:vis fn $c_fn:ident($($param_ident:ident : $param_ty:ty),*) $( -> $ret_ty:ty )?; $($tail:tt)*) =>  {
-        paste! {
-            #[cfg_attr(nightly, used(linker))]
-            static [<__ $c_fn:upper __>]: unsafe extern "C" fn($($param_ty),*) $( -> $ret_ty )? = $c_fn;
-        }
-
-        extern "C" {
-            $visibility fn $c_fn($($param_ident : $param_ty),*) $( -> $ret_ty )?;
-        }
-
-        extern_c_checked!($($tail)*);
-    };
-
-    ($visibility:vis static $c_var:ident : $c_var_ty:ty; $($tail:tt)*) => {
-        paste! {
-            #[allow(non_camel_case_types)]
-            #[allow(unused)]
-            struct [<__ $c_var:upper _STRUCT__>] { member: *const $c_var_ty }
-
-            unsafe impl Sync for [<__ $c_var:upper _STRUCT__>] {}
-
-            #[cfg_attr(nightly, used(linker))]
-            static [<__ $c_var:upper __>]: [<__ $c_var:upper _STRUCT__>] = unsafe { [<__ $c_var:upper _STRUCT__>] { member: core::ptr::addr_of!($c_var) } };
-        }
-
-        extern "C" {
-            $visibility static $c_var: $c_var_ty;
-        }
-
-        extern_c_checked!($($tail)*);
-    };
-
-    ($visibility:vis static mut $c_var:ident : $c_var_ty:ty; $($tail:tt)*) => {
-        paste! {
-            #[allow(non_camel_case_types)]
-            #[allow(unused)]
-            struct [<__ $c_var:upper _STRUCT__>] { member: *const $c_var_ty }
-
-            unsafe impl Sync for [<__ $c_var:upper _STRUCT__>] {}
-
-            #[cfg_attr(nightly, used(linker))]
-            static mut [<__ $c_var:upper __>]: [<__ $c_var:upper _STRUCT__>] = unsafe { [<__ $c_var:upper _STRUCT__>] { member: core::ptr::addr_of!($c_var) } };
-        }
-
-        extern "C" {
-            $visibility static mut $c_var: $c_var_ty;
-        }
-
-        extern_c_checked!($($tail)*);
-    };
-}
 
 pub type GuestAddr = libafl_qemu_sys::target_ulong;
 pub type GuestUsize = libafl_qemu_sys::target_ulong;
@@ -899,7 +838,7 @@ create_hook_id!(PreSyscall, libafl_qemu_remove_pre_syscall_hook, false);
 create_hook_id!(PostSyscall, libafl_qemu_remove_post_syscall_hook, false);
 create_hook_id!(NewThread, libafl_qemu_remove_new_thread_hook, false);
 
-use std::pin::Pin;
+use std::{pin::Pin, ptr::NonNull};
 
 use libafl_bolts::os::unix_signals::Signal;
 
@@ -1091,6 +1030,7 @@ where
                 libafl_qemu_sys::libafl_exit_reason_kind_BREAKPOINT => unsafe {
                     let bp_addr = exit_reason.data.breakpoint.addr;
                     let bp = emu
+                        .state()
                         .breakpoints
                         .borrow()
                         .get(&bp_addr)
@@ -1134,16 +1074,23 @@ impl From<EmuError> for libafl::Error {
     }
 }
 
+static mut EMULATOR_STATE: *mut () = ptr::null_mut();
 static mut EMULATOR_IS_INITIALIZED: bool = false;
+
+pub struct EmulatorState<E>
+where
+    E: IsEmuExitHandler,
+{
+    exit_handler: RefCell<E>,
+    breakpoints: RefCell<HashSet<Breakpoint>>,
+}
 
 #[derive(Clone, Debug)]
 pub struct Emulator<E>
 where
     E: IsEmuExitHandler,
 {
-    exit_handler: RefCell<E>,
-    breakpoints: RefCell<HashSet<Breakpoint>>,
-    _private: (),
+    state: ptr::NonNull<EmulatorState<E>>,
 }
 
 #[allow(clippy::unused_self)]
@@ -1202,11 +1149,31 @@ where
                 libafl_qemu_sys::syx_snapshot_init(true);
             }
         }
-        Ok(Emulator {
+
+        let emu_state = Box::new(EmulatorState {
             exit_handler: RefCell::new(exit_handler),
             breakpoints: RefCell::new(HashSet::new()),
-            _private: (),
+        });
+
+        let emu_state_ptr = unsafe {
+            let emu_ptr = NonNull::from(emu_state.as_ref());
+            EMULATOR_STATE = emu_ptr.as_ptr() as *mut ();
+            emu_ptr
+        };
+
+        Ok(Emulator {
+            state: emu_state_ptr,
         })
+    }
+
+    #[must_use]
+    pub fn state(&self) -> &EmulatorState<E> {
+        unsafe { self.state.as_ref() }
+    }
+
+    #[must_use]
+    pub fn state_mut(&mut self) -> &mut EmulatorState<E> {
+        unsafe { self.state.as_mut() }
     }
 
     #[must_use]
@@ -1220,7 +1187,7 @@ where
         }
     }
 
-    // Get an empty emulator.
+    /// Get an empty emulator.
     ///
     /// # Safety
     ///
@@ -1229,9 +1196,7 @@ where
     #[must_use]
     pub unsafe fn new_empty() -> Emulator<NopEmuExitHandler> {
         Emulator {
-            exit_handler: RefCell::new(NopEmuExitHandler),
-            breakpoints: RefCell::new(HashSet::new()),
-            _private: (),
+            state: NonNull::dangling(),
         }
     }
 
@@ -1310,13 +1275,13 @@ where
             bp.enable(self);
         }
 
-        self.breakpoints.borrow_mut().insert(bp);
+        self.state().breakpoints.borrow_mut().insert(bp);
     }
 
     pub fn remove_breakpoint(&self, bp: &mut Breakpoint) {
         bp.disable(self);
 
-        self.breakpoints.borrow_mut().remove(bp);
+        self.state().breakpoints.borrow_mut().remove(bp);
     }
 
     pub fn set_breakpoint_addr(&self, addr: GuestAddr) {
@@ -1350,12 +1315,16 @@ where
     /// Of course, the emulated target is not contained securely and can corrupt state or interact with the operating system.
     pub unsafe fn run_handle(&self, input: &BytesInput) -> Result<HandlerResult, HandlerError> {
         loop {
-            self.exit_handler.borrow_mut().try_put_input(self, input);
-            let exit_reason = self.run();
-            let handler_res = self
+            self.state()
                 .exit_handler
                 .borrow_mut()
-                .handle(exit_reason, self, input)?;
+                .try_put_input(self, input);
+            let exit_reason = self.run();
+            let handler_res =
+                self.state()
+                    .exit_handler
+                    .borrow_mut()
+                    .handle(exit_reason, self, input)?;
             match handler_res {
                 InnerHandlerResult::ReturnToHarness(exit_reason) => {
                     return Ok(HandlerResult::UnhandledExit(exit_reason))
