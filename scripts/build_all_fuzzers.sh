@@ -38,7 +38,7 @@ do
     # error: failed to build archive: No such file or directory
     # export CARGO_PROFILE_"$profile"_SPLIT_DEBUGINFO=unpacked # minimize debug info
     # export CARGO_PROFILE_"$profile"_PANIC=abort
-    export CARGO_PROFILE_"$profile"_INCREMENTAL=true
+    # export CARGO_PROFILE_"$profile"_INCREMENTAL=true
 done
 
 # shellcheck disable=SC2116

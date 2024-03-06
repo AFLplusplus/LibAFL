@@ -19,7 +19,7 @@ use libafl::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::Tokens,
     },
-    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
+    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver, TrackingHinted},
     schedulers::{CoverageAccountingScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, StdState},
@@ -140,7 +140,8 @@ pub extern "C" fn libafl_main() {
         // Create an observation channel using the coverage map
         let edges_observer = HitcountsMapObserver::new(unsafe {
             StdMapObserver::from_mut_ptr("edges", EDGES_MAP.as_mut_ptr(), MAX_EDGES_NUM)
-        });
+        })
+        .track_indices();
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
@@ -194,10 +195,12 @@ pub extern "C" fn libafl_main() {
         let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
         // A minimization+queue policy to get testcasess from the corpus
-        let scheduler =
-            CoverageAccountingScheduler::new(&mut state, QueueScheduler::new(), unsafe {
-                &ACCOUNTING_MEMOP_MAP
-            });
+        let scheduler = CoverageAccountingScheduler::new(
+            &edges_observer,
+            &mut state,
+            QueueScheduler::new(),
+            unsafe { &ACCOUNTING_MEMOP_MAP },
+        );
 
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);

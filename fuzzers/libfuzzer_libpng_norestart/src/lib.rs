@@ -6,6 +6,7 @@
 use core::time::Duration;
 use std::{env, net::SocketAddr, path::PathBuf};
 
+use clap::Parser;
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::{
@@ -22,7 +23,7 @@ use libafl::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::Tokens,
     },
-    observers::{HitcountsMapObserver, TimeObserver},
+    observers::{HitcountsMapObserver, TimeObserver, TrackingHinted},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, StdState},
@@ -163,7 +164,8 @@ pub extern "C" fn libafl_main() {
                           mut restarting_mgr: LlmpRestartingEventManager<_, _, _>,
                           core_id| {
         // Create an observation channel using the coverage map
-        let edges_observer = HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") });
+        let edges_observer =
+            HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") }).track_indices();
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
@@ -217,7 +219,8 @@ pub extern "C" fn libafl_main() {
         let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
         // A minimization+queue policy to get testcasess from the corpus
-        let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+        let scheduler =
+            IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
