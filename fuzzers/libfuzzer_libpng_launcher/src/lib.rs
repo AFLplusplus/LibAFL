@@ -2,38 +2,39 @@
 //! The example harness is built for libpng.
 //! In this example, you will see the use of the `launcher` feature.
 //! The `launcher` will spawn new processes for each cpu core.
-use clap::{self, Parser};
 use core::time::Duration;
+use std::{env, net::SocketAddr, path::PathBuf};
+
+use clap::{self, Parser};
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
-    Error,
-    events::{EventConfig, launcher::Launcher},
-    executors::{ExitKind, inprocess::InProcessExecutor}, feedback_or,
-    feedback_or_fast,
+    events::{launcher::Launcher, EventConfig},
+    executors::{inprocess::InProcessExecutor, ExitKind},
+    feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::{MultiMonitor, OnDiskTOMLMonitor},
     mutators::{
-        scheduled::{havoc_mutations, StdScheduledMutator, tokens_mutations},
+        scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::Tokens,
     },
-    observers::{HitcountsMapObserver, TimeObserver},
+    observers::{HitcountsMapObserver, TimeObserver, TrackingHinted},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, StdState},
+    Error,
 };
 use libafl_bolts::{
-    AsSlice,
     core_affinity::Cores,
     current_nanos,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{Merge, tuple_list},
+    tuples::{tuple_list, Merge},
+    AsSlice,
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
 use mimalloc::MiMalloc;
-use std::{env, net::SocketAddr, path::PathBuf};
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -46,9 +47,9 @@ fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
 /// The commandline args this fuzzer accepts
 #[derive(Debug, Parser)]
 #[command(
-name = "libfuzzer_libpng_launcher",
-about = "A libfuzzer-like fuzzer for libpng with llmp-multithreading support and a launcher",
-author = "Andrea Fioraldi <andreafioraldi@gmail.com>, Dominik Maier <domenukk@gmail.com>"
+    name = "libfuzzer_libpng_launcher",
+    about = "A libfuzzer-like fuzzer for libpng with llmp-multithreading support and a launcher",
+    author = "Andrea Fioraldi <andreafioraldi@gmail.com>, Dominik Maier <domenukk@gmail.com>"
 )]
 struct Opt {
     #[arg(
@@ -61,11 +62,11 @@ struct Opt {
     cores: Cores,
 
     #[arg(
-    short = 'p',
-    long,
-    help = "Choose the broker TCP port, default is 1337",
-    name = "PORT",
-    default_value = "1337"
+        short = 'p',
+        long,
+        help = "Choose the broker TCP port, default is 1337",
+        name = "PORT",
+        default_value = "1337"
     )]
     broker_port: u16,
 
@@ -76,11 +77,11 @@ struct Opt {
     input: Vec<PathBuf>,
 
     #[arg(
-    short,
-    long,
-    help = "Set the output directory, default is ./out",
-    name = "OUTPUT",
-    default_value = "./out"
+        short,
+        long,
+        help = "Set the output directory, default is ./out",
+        name = "OUTPUT",
+        default_value = "./out"
     )]
     output: PathBuf,
 
@@ -132,7 +133,8 @@ pub extern "C" fn libafl_main() {
 
     let mut run_client = |state: Option<_>, mut restarting_mgr, _core_id| {
         // Create an observation channel using the coverage map
-        let edges_observer = HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") });
+        let edges_observer =
+            HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") }).track_indices();
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
@@ -165,7 +167,7 @@ pub extern "C" fn libafl_main() {
                 // Same for objective feedbacks
                 &mut objective,
             )
-                .unwrap()
+            .unwrap()
         });
 
         println!("We're a client, let's fuzz :)");
@@ -186,7 +188,8 @@ pub extern "C" fn libafl_main() {
         let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
         // A minimization+queue policy to get testcasess from the corpus
-        let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+        let scheduler =
+            IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -211,7 +214,7 @@ pub extern "C" fn libafl_main() {
         )?;
 
         #[cfg(not(target_os = "linux"))]
-            let mut executor = InProcessExecutor::with_timeout(
+        let mut executor = InProcessExecutor::with_timeout(
             &mut harness,
             tuple_list!(edges_observer, time_observer),
             &mut fuzzer,

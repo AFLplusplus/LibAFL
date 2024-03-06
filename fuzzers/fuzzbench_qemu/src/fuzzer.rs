@@ -1,10 +1,19 @@
 //! A singlethreaded QEMU fuzzer that can auto-restart.
 
-use clap::{Arg, Command};
 use core::{cell::RefCell, ptr::addr_of_mut, time::Duration};
+#[cfg(unix)]
+use std::os::unix::io::{AsRawFd, FromRawFd};
+use std::{
+    env,
+    fs::{self, File, OpenOptions},
+    io::{self, Write},
+    path::PathBuf,
+    process,
+};
+
+use clap::{Arg, Command};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
-    Error,
     events::SimpleRestartingEventManager,
     executors::{ExitKind, ShadowExecutor},
     feedback_or,
@@ -13,38 +22,39 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::{
-        scheduled::havoc_mutations, StdMOptMutator, StdScheduledMutator,
-        token_mutations::I2SRandReplace, Tokens, tokens_mutations,
+        scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
+        StdMOptMutator, StdScheduledMutator, Tokens,
     },
-    observers::{HitcountsMapObserver, TimeObserver, VariableMapObserver},
+    observers::{HitcountsMapObserver, TimeObserver, TrackingHinted, VariableMapObserver},
     schedulers::{
-        IndexesLenTimeMinimizerScheduler, PowerQueueScheduler, powersched::PowerSchedule,
+        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
     },
     stages::{
         calibrate::CalibrationStage, power::StdPowerMutationalStage, ShadowTracingStage,
         StdMutationalStage,
     },
     state::{HasCorpus, HasMetadata, StdState},
+    Error,
 };
 use libafl_bolts::{
-    AsSlice, current_nanos,
-    current_time,
+    current_nanos, current_time,
     os::dup2,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{Merge, tuple_list},
+    tuples::{tuple_list, Merge},
+    AsSlice,
 };
 use libafl_qemu::{
     // asan::{init_with_asan, QemuAsanHelper},
     cmplog::{CmpLogObserver, QemuCmpLogHelper},
     edges::edges_map_mut_slice,
-    edges::MAX_EDGES_NUM,
     edges::QemuEdgeCoverageHelper,
+    edges::MAX_EDGES_NUM,
     elf::EasyElf,
-    Emulator,
     filter_qemu_args,
-    GuestReg,
     hooks::QemuHooks,
+    Emulator,
+    GuestReg,
     //snapshot::QemuSnapshotHelper,
     MmapPerms,
     QemuExecutor,
@@ -52,15 +62,6 @@ use libafl_qemu::{
 };
 #[cfg(unix)]
 use nix::{self, unistd::dup};
-use std::{
-    env,
-    fs::{self, File, OpenOptions},
-    io::{self, Write},
-    path::PathBuf,
-    process,
-};
-#[cfg(unix)]
-use std::os::unix::io::{AsRawFd, FromRawFd};
 
 pub const MAX_INPUT_SIZE: usize = 1048576; // 1MB
 
@@ -211,12 +212,12 @@ fn fuzz(
     );
 
     #[cfg(unix)]
-        let mut stdout_cpy = unsafe {
+    let mut stdout_cpy = unsafe {
         let new_fd = dup(io::stdout().as_raw_fd())?;
         File::from_raw_fd(new_fd)
     };
     #[cfg(unix)]
-        let file_null = File::open("/dev/null")?;
+    let file_null = File::open("/dev/null")?;
 
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let monitor = SimpleMonitor::new(|s| {
@@ -250,6 +251,7 @@ fn fuzz(
             edges_map_mut_slice(),
             addr_of_mut!(MAX_EDGES_NUM),
         ))
+        .track_indices()
     };
 
     // Create an observation channel to keep track of the execution time
@@ -290,7 +292,7 @@ fn fuzz(
             // Same for objective feedbacks
             &mut objective,
         )
-            .unwrap()
+        .unwrap()
     });
 
     // Setup a randomic Input2State stage
@@ -307,11 +309,10 @@ fn fuzz(
     let power = StdPowerMutationalStage::new(mutator);
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerScheduler::new(PowerQueueScheduler::new(
-        &mut state,
+    let scheduler = IndexesLenTimeMinimizerScheduler::new(
         &edges_observer,
-        PowerSchedule::FAST,
-    ));
+        PowerQueueScheduler::new(&mut state, &edges_observer, PowerSchedule::FAST),
+    );
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);

@@ -1,11 +1,12 @@
 //! A libfuzzer-like fuzzer using qemu for binary-only coverage
 //!
-use clap::{builder::Str, Parser};
 #[cfg(feature = "i386")]
 use core::mem::size_of;
+use std::{env, io, path::PathBuf, process};
+
+use clap::{builder::Str, Parser};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, NopCorpus},
-    Error,
     events::{EventRestarter, SimpleRestartingEventManager},
     executors::ExitKind,
     feedbacks::MaxMapFeedback,
@@ -15,23 +16,23 @@ use libafl::{
     observers::{ConstMapObserver, HitcountsMapObserver},
     schedulers::QueueScheduler,
     state::{HasCorpus, StdState},
+    Error,
 };
 use libafl_bolts::{
-    AsMutSlice,
-    AsSlice,
     core_affinity::Cores,
     current_nanos,
     rands::StdRand,
-    shmem::{ShMemProvider, StdShMemProvider}, tuples::tuple_list,
+    shmem::{ShMemProvider, StdShMemProvider},
+    tuples::tuple_list,
+    AsMutSlice, AsSlice,
 };
 use libafl_qemu::{
-    ArchExtras,
-    CallingConvention,
-    edges::{EDGES_MAP_PTR, EDGES_MAP_SIZE, QemuEdgeCoverageChildHelper},
-    elf::EasyElf, emu::Emulator, GuestAddr, GuestReg, MmapPerms, QemuForkExecutor, QemuHooks,
+    edges::{QemuEdgeCoverageChildHelper, EDGES_MAP_PTR, EDGES_MAP_SIZE},
+    elf::EasyElf,
+    emu::Emulator,
+    ArchExtras, CallingConvention, GuestAddr, GuestReg, MmapPerms, QemuForkExecutor, QemuHooks,
     Regs,
 };
-use std::{env, io, path::PathBuf, process};
 
 #[derive(Default)]
 pub struct Version;
@@ -51,9 +52,9 @@ impl From<Version> for Str {
             ("Rustc Commit SHA:", env!("VERGEN_RUSTC_COMMIT_HASH")),
             ("Cargo Target Triple", env!("VERGEN_CARGO_TARGET_TRIPLE")),
         ]
-            .iter()
-            .map(|(k, v)| format!("{k:25}: {v}\n"))
-            .collect::<String>();
+        .iter()
+        .map(|(k, v)| format!("{k:25}: {v}\n"))
+        .collect::<String>();
 
         format!("\n{version:}").into()
     }
@@ -173,7 +174,7 @@ pub fn fuzz() -> Result<(), Error> {
     let mut feedback = MaxMapFeedback::new(&edges_observer);
 
     #[allow(clippy::let_unit_value)]
-        let mut objective = ();
+    let mut objective = ();
 
     let mut state = state.unwrap_or_else(|| {
         StdState::new(
@@ -183,7 +184,7 @@ pub fn fuzz() -> Result<(), Error> {
             &mut feedback,
             &mut objective,
         )
-            .unwrap()
+        .unwrap()
     });
 
     let scheduler = QueueScheduler::new();
