@@ -1418,9 +1418,9 @@ impl Emulator {
     ) -> EdgeHookId {
         unsafe {
             let data: u64 = data.into().0;
-            let gen: Option<unsafe extern "C" fn(u64, GuestAddr, GuestAddr) -> u64> =
+            let gen: Option<extern "C" fn(u64, GuestAddr, GuestAddr) -> u64> =
                 core::mem::transmute(gen);
-            let exec: Option<unsafe extern "C" fn(u64, u64)> = core::mem::transmute(exec);
+            let exec: Option<extern "C" fn(u64, u64)> = core::mem::transmute(exec);
             let num = libafl_qemu_sys::libafl_add_edge_hook(gen, exec, data);
             EdgeHookId(num)
         }
@@ -1435,11 +1435,10 @@ impl Emulator {
     ) -> BlockHookId {
         unsafe {
             let data: u64 = data.into().0;
-            let gen: Option<unsafe extern "C" fn(u64, GuestAddr) -> u64> =
-                core::mem::transmute(gen);
-            let post_gen: Option<unsafe extern "C" fn(u64, GuestAddr, GuestUsize)> =
+            let gen: Option<extern "C" fn(u64, GuestAddr) -> u64> = core::mem::transmute(gen);
+            let post_gen: Option<extern "C" fn(u64, GuestAddr, GuestUsize)> =
                 core::mem::transmute(post_gen);
-            let exec: Option<unsafe extern "C" fn(u64, u64)> = core::mem::transmute(exec);
+            let exec: Option<extern "C" fn(u64, u64)> = core::mem::transmute(exec);
             let num = libafl_qemu_sys::libafl_add_block_hook(gen, post_gen, exec, data);
             BlockHookId(num)
         }
@@ -1457,18 +1456,13 @@ impl Emulator {
     ) -> ReadHookId {
         unsafe {
             let data: u64 = data.into().0;
-            let gen: Option<
-                unsafe extern "C" fn(u64, GuestAddr, libafl_qemu_sys::MemOpIdx) -> u64,
-            > = core::mem::transmute(gen);
-            let exec1: Option<unsafe extern "C" fn(u64, u64, GuestAddr)> =
-                core::mem::transmute(exec1);
-            let exec2: Option<unsafe extern "C" fn(u64, u64, GuestAddr)> =
-                core::mem::transmute(exec2);
-            let exec4: Option<unsafe extern "C" fn(u64, u64, GuestAddr)> =
-                core::mem::transmute(exec4);
-            let exec8: Option<unsafe extern "C" fn(u64, u64, GuestAddr)> =
-                core::mem::transmute(exec8);
-            let exec_n: Option<unsafe extern "C" fn(u64, u64, GuestAddr, usize)> =
+            let gen: Option<extern "C" fn(u64, GuestAddr, libafl_qemu_sys::MemOpIdx) -> u64> =
+                core::mem::transmute(gen);
+            let exec1: Option<extern "C" fn(u64, u64, GuestAddr)> = core::mem::transmute(exec1);
+            let exec2: Option<extern "C" fn(u64, u64, GuestAddr)> = core::mem::transmute(exec2);
+            let exec4: Option<extern "C" fn(u64, u64, GuestAddr)> = core::mem::transmute(exec4);
+            let exec8: Option<extern "C" fn(u64, u64, GuestAddr)> = core::mem::transmute(exec8);
+            let exec_n: Option<extern "C" fn(u64, u64, GuestAddr, usize)> =
                 core::mem::transmute(exec_n);
             let num = libafl_qemu_sys::libafl_add_read_hook(
                 gen, exec1, exec2, exec4, exec8, exec_n, data,
@@ -1490,18 +1484,13 @@ impl Emulator {
     ) -> WriteHookId {
         unsafe {
             let data: u64 = data.into().0;
-            let gen: Option<
-                unsafe extern "C" fn(u64, GuestAddr, libafl_qemu_sys::MemOpIdx) -> u64,
-            > = core::mem::transmute(gen);
-            let exec1: Option<unsafe extern "C" fn(u64, u64, GuestAddr)> =
-                core::mem::transmute(exec1);
-            let exec2: Option<unsafe extern "C" fn(u64, u64, GuestAddr)> =
-                core::mem::transmute(exec2);
-            let exec4: Option<unsafe extern "C" fn(u64, u64, GuestAddr)> =
-                core::mem::transmute(exec4);
-            let exec8: Option<unsafe extern "C" fn(u64, u64, GuestAddr)> =
-                core::mem::transmute(exec8);
-            let exec_n: Option<unsafe extern "C" fn(u64, u64, GuestAddr, usize)> =
+            let gen: Option<extern "C" fn(u64, GuestAddr, libafl_qemu_sys::MemOpIdx) -> u64> =
+                core::mem::transmute(gen);
+            let exec1: Option<extern "C" fn(u64, u64, GuestAddr)> = core::mem::transmute(exec1);
+            let exec2: Option<extern "C" fn(u64, u64, GuestAddr)> = core::mem::transmute(exec2);
+            let exec4: Option<extern "C" fn(u64, u64, GuestAddr)> = core::mem::transmute(exec4);
+            let exec8: Option<extern "C" fn(u64, u64, GuestAddr)> = core::mem::transmute(exec8);
+            let exec_n: Option<extern "C" fn(u64, u64, GuestAddr, usize)> =
                 core::mem::transmute(exec_n);
             let num = libafl_qemu_sys::libafl_add_write_hook(
                 gen, exec1, exec2, exec4, exec8, exec_n, data,
@@ -1521,15 +1510,12 @@ impl Emulator {
     ) -> CmpHookId {
         unsafe {
             let data: u64 = data.into().0;
-            let gen: Option<unsafe extern "C" fn(u64, GuestAddr, usize) -> u64> =
+            let gen: Option<extern "C" fn(u64, GuestAddr, usize) -> u64> =
                 core::mem::transmute(gen);
-            let exec1: Option<unsafe extern "C" fn(u64, u64, u8, u8)> = core::mem::transmute(exec1);
-            let exec2: Option<unsafe extern "C" fn(u64, u64, u16, u16)> =
-                core::mem::transmute(exec2);
-            let exec4: Option<unsafe extern "C" fn(u64, u64, u32, u32)> =
-                core::mem::transmute(exec4);
-            let exec8: Option<unsafe extern "C" fn(u64, u64, u64, u64)> =
-                core::mem::transmute(exec8);
+            let exec1: Option<extern "C" fn(u64, u64, u8, u8)> = core::mem::transmute(exec1);
+            let exec2: Option<extern "C" fn(u64, u64, u16, u16)> = core::mem::transmute(exec2);
+            let exec4: Option<extern "C" fn(u64, u64, u32, u32)> = core::mem::transmute(exec4);
+            let exec8: Option<extern "C" fn(u64, u64, u64, u64)> = core::mem::transmute(exec8);
             let num = libafl_qemu_sys::libafl_add_cmp_hook(gen, exec1, exec2, exec4, exec8, data);
             CmpHookId(num)
         }
