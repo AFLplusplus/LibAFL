@@ -137,7 +137,6 @@ unsafe fn update_ngram(pos: usize) -> usize {
     reduced
 }
 
-#[rustversion::not(nightly)]
 #[cfg(not(any(feature = "sancov_ngram4", feature = "sancov_ngram8")))]
 unsafe fn update_ngram(pos: usize) -> usize {
     pos
