@@ -329,7 +329,7 @@ pub struct StdState<I, C, R, SC> {
     dont_reenter: Option<Vec<PathBuf>>,
     #[cfg(feature = "std")]
     /// If inputs have been processed for multicore loading
-    /// relevant only for load_multicore_inputs
+    /// relevant only for `load_initial_inputs_multicore`
     multicore_inputs_processed: Option<bool>,
     /// The last time we reported progress (if available/used).
     /// This information is used by fuzzer `maybe_report_progress`.
