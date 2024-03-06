@@ -1080,6 +1080,7 @@ where
             stage_depth: 0,
             stage_idx_stack: Vec::new(),
             phantom: PhantomData,
+            #[cfg(feature = "std")]
             multicore_inputs_processed: None,
         };
         feedback.init_state(&mut state)?;
