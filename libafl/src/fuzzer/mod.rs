@@ -169,6 +169,18 @@ where
         manager: &mut EM,
         input: <Self::State as UsesInput>::Input,
     ) -> Result<CorpusId, Error>;
+
+    /// Adds the input to the corpus as disabled a input.
+    /// Used during initial corpus loading.
+    /// Disabled testcases are only used for splicing
+    /// Returns the `index` of the new testcase in the corpus.
+    /// Usually, you want to use [`Evaluator::evaluate_input`], unless you know what you are doing.
+    fn add_disabled_input(
+        &mut self,
+        state: &mut Self::State,
+        executor: &mut E,
+        input: <Self::State as UsesInput>::Input,
+    ) -> Result<CorpusId, Error>;
 }
 
 /// The main fuzzer trait.
@@ -555,7 +567,22 @@ where
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
         self.evaluate_input_with_observers(state, executor, manager, input, send_events)
     }
-
+    fn add_disabled_input(
+        &mut self,
+        state: &mut Self::State,
+        executor: &mut E,
+        input: <Self::State as UsesInput>::Input,
+    ) -> Result<CorpusId, Error> {
+        let observers = executor.observers();
+        let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
+        testcase.set_disabled(true);
+        // Add the disabled input to the main corpus
+        self.feedback_mut()
+            .append_metadata(state, observers, &mut testcase)?;
+        let idx = state.corpus_mut().add(testcase)?;
+        self.scheduler_mut().on_add(state, idx)?;
+        Ok(idx)
+    }
     /// Adds an input, even if it's not considered `interesting` by any of the executors
     fn add_input(
         &mut self,
