@@ -7,13 +7,13 @@
 	// Update the 'dockerFile' property if you aren't using the standard 'Dockerfile' filename.
 	"dockerFile": "../Dockerfile",
 	"customizations": {
-		// Add the IDs of extensions you want installed when the container is created.
 		"vscode": {
-			"extensions": ["matklad.rust-analyzer", "microsoft.Docker"]
-		},
-		// Set *default* container specific settings.json values on container create.
-		"settings": {
-			"rust-analyzer.cargo.noDefaultFeatures": true
+			// Add the IDs of extensions you want installed when the container is created.
+			"extensions": ["matklad.rust-analyzer", "microsoft.Docker"],
+			// Set *default* container specific settings.json values on container create.
+			"settings": {
+				"rust-analyzer.cargo.noDefaultFeatures": true
+			}
 		}
 	},
 	// Install development components that shouldn't be in the main Dockerfile
