@@ -671,7 +671,7 @@ where
                         {
                             state.scalability_monitor_mut().testcase_with_observers += 1;
                         }
-                        fuzzer.process_execution(
+                        fuzzer.execute_and_process(
                             state,
                             self,
                             input.clone(),

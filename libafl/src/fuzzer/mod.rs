@@ -71,7 +71,33 @@ pub trait HasObjective: UsesState {
 /// Evaluates if an input is interesting using the feedback
 pub trait ExecutionProcessor<OT>: UsesState {
     /// Evaluate if a set of observation channels has an interesting state
+    fn execute_with_res<EM>(
+        &mut self,
+        state: &mut Self::State,
+        manager: &mut EM,
+        input: &<Self::State as UsesInput>::Input,
+        observers: &OT,
+        exit_kind: &ExitKind,
+    ) -> Result<ExecuteInputResult, Error>
+    where
+        EM: EventFirer<State = Self::State>;
+
+    /// Process ExecuteInputResult. Add to corpus, solution or ignore
     fn process_execution<EM>(
+        &mut self,
+        state: &mut Self::State,
+        manager: &mut EM,
+        input: <Self::State as UsesInput>::Input,
+        exec_res: &ExecuteInputResult,
+        observers: &OT,
+        exit_kind: &ExitKind,
+        send_events: bool,
+    ) -> Result<Option<CorpusId>, Error>
+    where
+        EM: EventFirer<State = Self::State>;
+
+    /// Evaluate if a set of observation channels has an interesting state
+    fn execute_and_process<EM>(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
@@ -325,16 +351,14 @@ where
     OT: ObserversTuple<CS::State> + Serialize + DeserializeOwned,
     CS::State: HasCorpus + HasSolutions + HasExecutions + HasCorpus + HasImported,
 {
-    /// Evaluate if a set of observation channels has an interesting state
-    fn process_execution<EM>(
+    fn execute_with_res<EM>(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
-        input: <Self::State as UsesInput>::Input,
+        input: &<Self::State as UsesInput>::Input,
         observers: &OT,
         exit_kind: &ExitKind,
-        send_events: bool,
-    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
+    ) -> Result<ExecuteInputResult, Error>
     where
         EM: EventFirer<State = Self::State>,
     {
@@ -354,25 +378,66 @@ where
             res = ExecuteInputResult::Solution;
         } else {
             #[cfg(not(feature = "introspection"))]
-            let is_corpus = self
+            let corpus_worthy = self
                 .feedback_mut()
                 .is_interesting(state, manager, &input, observers, exit_kind)?;
 
             #[cfg(feature = "introspection")]
-            let is_corpus = self
+            let corpus_worthy = self
                 .feedback_mut()
                 .is_interesting_introspection(state, manager, &input, observers, exit_kind)?;
 
-            if is_corpus {
+            if corpus_worthy {
                 res = ExecuteInputResult::Corpus;
             }
         }
+        Ok(res)
+    }
 
-        match res {
+    fn execute_and_process<EM>(
+        &mut self,
+        state: &mut Self::State,
+        manager: &mut EM,
+        input: <Self::State as UsesInput>::Input,
+        observers: &OT,
+        exit_kind: &ExitKind,
+        send_events: bool,
+    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
+    where
+        EM: EventFirer<State = Self::State>,
+    {
+        let exec_res = self.execute_with_res(state, manager, &input, observers, exit_kind)?;
+        let corpus_idx = self.process_execution(
+            state,
+            manager,
+            input,
+            &exec_res,
+            observers,
+            exit_kind,
+            send_events,
+        )?;
+        Ok((exec_res, corpus_idx))
+    }
+
+    /// Evaluate if a set of observation channels has an interesting state
+    fn process_execution<EM>(
+        &mut self,
+        state: &mut Self::State,
+        manager: &mut EM,
+        input: <Self::State as UsesInput>::Input,
+        exec_res: &ExecuteInputResult,
+        observers: &OT,
+        exit_kind: &ExitKind,
+        send_events: bool,
+    ) -> Result<Option<CorpusId>, Error>
+    where
+        EM: EventFirer<State = Self::State>,
+    {
+        match exec_res {
             ExecuteInputResult::None => {
                 self.feedback_mut().discard_metadata(state, &input)?;
                 self.objective_mut().discard_metadata(state, &input)?;
-                Ok((res, None))
+                Ok(None)
             }
             ExecuteInputResult::Corpus => {
                 // Not a solution
@@ -409,7 +474,7 @@ where
                     // This testcase is from the other fuzzers.
                     *state.imported_mut() += 1;
                 }
-                Ok((res, Some(idx)))
+                Ok(Some(idx))
             }
             ExecuteInputResult::Solution => {
                 // Not interesting
@@ -431,7 +496,7 @@ where
                     )?;
                 }
 
-                Ok((res, None))
+                Ok(None)
             }
         }
     }
@@ -464,7 +529,7 @@ where
 
         self.scheduler.on_evaluation(state, &input, observers)?;
 
-        self.process_execution(state, manager, input, observers, &exit_kind, send_events)
+        self.execute_and_process(state, manager, input, observers, &exit_kind, send_events)
     }
 }
 
@@ -535,12 +600,12 @@ where
         // several is_interesting implementations collect some data about the run, later used in
         // append_metadata; we *must* invoke is_interesting here to collect it
         #[cfg(not(feature = "introspection"))]
-        let _is_corpus = self
+        let _corpus_worthy = self
             .feedback_mut()
             .is_interesting(state, manager, &input, observers, &exit_kind)?;
 
         #[cfg(feature = "introspection")]
-        let _is_corpus = self
+        let _corpus_worthy = self
             .feedback_mut()
             .is_interesting_introspection(state, manager, &input, observers, &exit_kind)?;
 
