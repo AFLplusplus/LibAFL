@@ -20,11 +20,11 @@ use std::{
 use libafl::{executors::ExitKind, inputs::BytesInput};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use num_traits::Num;
+use paste::paste;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
-use crate::{command::IsCommand, GuestReg, Regs, extern_c_checked};
-use paste::paste;
+use crate::{command::IsCommand, extern_c_checked, GuestReg, Regs};
 
 #[cfg(emulation_mode = "systemmode")]
 pub mod systemmode;

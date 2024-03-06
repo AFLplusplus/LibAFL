@@ -1,6 +1,8 @@
 //! The high-level hooks
 #![allow(clippy::type_complexity)]
 
+#[cfg(emulation_mode = "usermode")]
+use core::ptr::addr_of_mut;
 use core::{
     ffi::c_void,
     fmt::{self, Debug, Formatter},
@@ -8,11 +10,6 @@ use core::{
     mem::transmute,
     pin::Pin,
     ptr::{self, addr_of},
-};
-
-#[cfg(emulation_mode = "usermode")]
-use core::{
-    ptr::addr_of_mut,
 };
 
 use libafl::{
@@ -26,14 +23,10 @@ use crate::{
     emu::{Emulator, FatPtr, MemAccessInfo, SKIP_EXEC_HOOK},
     helper::QemuHelperTuple,
     BackdoorHookId, BlockHookId, CmpHookId, EdgeHookId, GuestAddr, GuestUsize, HookId,
-    InstructionHookId, IsEmuExitHandler,
-    ReadHookId, WriteHookId,
+    InstructionHookId, IsEmuExitHandler, ReadHookId, WriteHookId,
 };
-
 #[cfg(emulation_mode = "usermode")]
-use crate::{
-    NewThreadHookId, PostSyscallHookId, PreSyscallHookId,
-};
+use crate::{NewThreadHookId, PostSyscallHookId, PreSyscallHookId};
 
 /*
 // all kinds of hooks

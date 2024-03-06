@@ -7,16 +7,14 @@ use core::{
     time::Duration,
 };
 
+#[cfg(all(feature = "fork", emulation_mode = "usermode"))]
+use libafl::inputs::UsesInput;
 #[cfg(feature = "fork")]
 use libafl::{
     events::EventManager,
     executors::InProcessForkExecutor,
     state::{HasLastReportTime, HasMetadata},
 };
-
-#[cfg(all(feature = "fork", emulation_mode = "usermode"))]
-use libafl::inputs::UsesInput;
-
 use libafl::{
     events::{EventFirer, EventRestarter},
     executors::{
@@ -34,15 +32,9 @@ use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Signal};
 #[cfg(feature = "fork")]
 use libafl_bolts::shmem::ShMemProvider;
 
-use crate::{
-    emu::Emulator,
-    helper::QemuHelperTuple,
-    hooks::QemuHooks,
-    IsEmuExitHandler,
-};
-
 #[cfg(emulation_mode = "usermode")]
 use crate::nopemuexithandler;
+use crate::{emu::Emulator, helper::QemuHelperTuple, hooks::QemuHooks, IsEmuExitHandler};
 
 /// A version of `QemuExecutor` with a state accessible from the harness.
 pub mod stateful;

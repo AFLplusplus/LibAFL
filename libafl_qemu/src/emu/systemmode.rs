@@ -7,14 +7,14 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 
-use crate::{
-    extern_c_checked,
-    emu::{libafl_page_from_addr, IsSnapshotManager},
-    CPUStatePtr, EmuExitReason, EmuExitReasonError, Emulator, GuestAddr, GuestPhysAddr,
-    GuestVirtAddr, IsEmuExitHandler, MemAccessInfo, SnapshotId, SnapshotManagerError, CPU,
-};
-
 use paste::paste;
+
+use crate::{
+    emu::{libafl_page_from_addr, IsSnapshotManager},
+    extern_c_checked, CPUStatePtr, EmuExitReason, EmuExitReasonError, Emulator, GuestAddr,
+    GuestPhysAddr, GuestVirtAddr, IsEmuExitHandler, MemAccessInfo, SnapshotId,
+    SnapshotManagerError, CPU,
+};
 
 impl SnapshotId {
     fn get_fresh_id() -> SnapshotId {
