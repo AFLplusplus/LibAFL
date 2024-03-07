@@ -116,6 +116,7 @@ impl ExecutorHook for CtxHook {
 
 #[rustversion::nightly]
 #[allow(unused)]
+#[inline]
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
 unsafe fn update_ngram(pos: usize) -> usize {
     let mut reduced = pos;
@@ -137,7 +138,8 @@ unsafe fn update_ngram(pos: usize) -> usize {
     reduced
 }
 
-#[cfg(not(any(feature = "sancov_ngram4", feature = "sancov_ngram8")))]
+#[rustversion::not(nightly)]
+#[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
 unsafe fn update_ngram(pos: usize) -> usize {
     pos
 }
