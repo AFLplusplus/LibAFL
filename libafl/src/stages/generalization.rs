@@ -8,6 +8,7 @@ use core::{fmt::Debug, marker::PhantomData};
 
 use libafl_bolts::AsSlice;
 
+use super::{RetryProgressHelper, RetryingStage, StageProgressHelper};
 use crate::{
     corpus::{Corpus, HasCurrentCorpusIdx},
     executors::{Executor, HasObservers},
@@ -17,7 +18,7 @@ use crate::{
     observers::{MapObserver, ObserversTuple},
     stages::Stage,
     start_timer,
-    state::{HasCorpus, HasExecutions, HasMetadata, UsesState},
+    state::{HasCorpus, HasExecutions, HasMetadata, HasNamedMetadata, UsesState},
     Error,
 };
 #[cfg(feature = "introspection")]
@@ -60,12 +61,11 @@ where
     O: MapObserver,
     E: Executor<EM, Z> + HasObservers,
     E::Observers: ObserversTuple<E::State>,
-    E::State: UsesInput<Input = BytesInput> + HasExecutions + HasMetadata + HasCorpus,
+    E::State:
+        UsesInput<Input = BytesInput> + HasExecutions + HasMetadata + HasCorpus + HasNamedMetadata,
     EM: UsesState<State = E::State>,
     Z: UsesState<State = E::State>,
 {
-    type Progress = (); // TODO this stage needs a resume
-
     #[inline]
     #[allow(clippy::too_many_lines)]
     fn perform(
@@ -75,6 +75,10 @@ where
         state: &mut E::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
+        if RetryProgressHelper::should_skip(state, self)? {
+            return Ok(());
+        }
+
         let Some(corpus_idx) = state.current_corpus_idx()? else {
             return Err(Error::illegal_state(
                 "state is not currently processing a corpus index",
@@ -311,6 +315,30 @@ where
         }
 
         Ok(())
+    }
+
+    #[inline]
+    fn initialize_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        // TODO: We need to be able to resume better if something crashes or times out
+        RetryProgressHelper::initialize_progress(state, self)
+    }
+
+    #[inline]
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        // TODO: We need to be able to resume better if something crashes or times out
+        RetryProgressHelper::clear_progress(state, self)
+    }
+}
+
+impl<EM, O, OT, Z> RetryingStage for GeneralizationStage<EM, O, OT, Z>
+where
+    O: MapObserver,
+    OT: ObserversTuple<Z::State>,
+    EM: UsesState<State = Z::State>,
+    Z: UsesState,
+{
+    fn max_retries(&self) -> usize {
+        3
     }
 }
 

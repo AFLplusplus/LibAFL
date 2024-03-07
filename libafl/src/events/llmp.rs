@@ -251,7 +251,7 @@ where
                 if id == client_id {
                     // do not update executions for forwarded messages, otherwise we loose the total order
                     // as a forwarded msg with a lower executions may arrive after a stats msg with an higher executions
-                    client.update_executions(*executions as u64, *time);
+                    client.update_executions(*executions, *time);
                 }
                 monitor.display(event.name(), id);
                 Ok(BrokerEventResult::Forward)
@@ -264,7 +264,7 @@ where
                 // TODO: The monitor buffer should be added on client add.
                 monitor.client_stats_insert(client_id);
                 let client = monitor.client_stats_mut_for(client_id);
-                client.update_executions(*executions as u64, *time);
+                client.update_executions(*executions, *time);
                 monitor.display(event.name(), client_id);
                 Ok(BrokerEventResult::Handled)
             }

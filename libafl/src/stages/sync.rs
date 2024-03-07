@@ -67,8 +67,6 @@ where
     Z: Evaluator<E, EM>,
     Z::State: HasCorpus + HasRand + HasMetadata,
 {
-    type Progress = (); // TODO load from directory should be resumed
-
     #[inline]
     fn perform(
         &mut self,
@@ -101,6 +99,18 @@ where
         #[cfg(feature = "introspection")]
         state.introspection_monitor_mut().finish_stage();
 
+        Ok(())
+    }
+
+    #[inline]
+    fn initialize_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        // TODO: Needs proper crash handling
+        Ok(())
+    }
+
+    #[inline]
+    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        // TODO: Needs proper crash handling
         Ok(())
     }
 }
@@ -254,8 +264,6 @@ where
     ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
 {
-    type Progress = (); // TODO this should be resumed in the case that a testcase causes a crash
-
     #[inline]
     fn perform(
         &mut self,
@@ -310,6 +318,18 @@ where
         self.client.process(fuzzer, state, executor, manager)?;
         #[cfg(feature = "introspection")]
         state.introspection_monitor_mut().finish_stage();
+        Ok(())
+    }
+
+    #[inline]
+    fn initialize_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        // Not needed - does not execute the target.
+        Ok(())
+    }
+
+    #[inline]
+    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        // Not needed - does not execute the target.
         Ok(())
     }
 }

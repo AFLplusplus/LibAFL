@@ -4,10 +4,9 @@ A well-known [`Stage`], for example, is the mutational stage, running multiple [
 Other stages may enrich [`crate::corpus::Testcase`]s with metadata.
 */
 
+use alloc::{boxed::Box, vec::Vec};
 use core::marker::PhantomData;
 
-use alloc::boxed::Box;
-use alloc::vec::Vec;
 pub use calibrate::CalibrationStage;
 pub use colorization::*;
 #[cfg(feature = "std")]
@@ -18,8 +17,10 @@ pub use concolic::SimpleConcolicMutationalStage;
 pub use dump::*;
 pub use generalization::GeneralizationStage;
 use hashbrown::HashSet;
-use libafl_bolts::tuples::IntoVec;
-use libafl_bolts::{impl_serdeany, tuples::HasConstLen};
+use libafl_bolts::{
+    impl_serdeany,
+    tuples::{HasConstLen, IntoVec},
+};
 pub use logics::*;
 pub use mutational::{MutationalStage, StdMutationalStage};
 pub use power::{PowerMutationalStage, StdPowerMutationalStage};
@@ -34,8 +35,8 @@ pub use tmin::{
 };
 pub use tracing::{ShadowTracingStage, TracingStage};
 pub use tuneable::*;
+use tuple_list::NonEmptyTuple;
 
-use self::push::PushStage;
 use crate::{
     corpus::{CorpusId, HasCurrentCorpusIdx},
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
@@ -43,8 +44,9 @@ use crate::{
     inputs::UsesInput,
     observers::ObserversTuple,
     schedulers::Scheduler,
+    stages::push::PushStage,
     state::{
-        HasCorpus, HasExecutions, HasLastReportTime, HasMetadata, HasNamedMetadata, HasRand,
+        HasCorpus, HasExecutions, HasLastReportTime, HasMetadata, HasNamedMetadata, HasRand, State,
         UsesState,
     },
     Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasScheduler,
@@ -80,11 +82,11 @@ where
     EM: UsesState<State = Self::State>,
     Z: UsesState<State = Self::State>,
 {
-    // TODO: default this to () when associated_type_defaults is stable
-    // TODO: see RFC 2532: https://github.com/rust-lang/rust/issues/29661
-    // type Status: ResumableStageStatus = ();
-    /// The resumption data for this stage. Set to () if resuming is not necessary/possible.
-    type Progress: StageProgress<Self::State, Self>;
+    /// Initialize the status tracking for this stage, if it is not yet initialised
+    fn initialize_progress(&mut self, state: &mut Self::State) -> Result<(), Error>;
+
+    /// Clear the current status tracking of the associated stage
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error>;
 
     /// Run the stage
     fn perform(
@@ -161,9 +163,11 @@ where
             Some(idx) if idx == Self::LEN => {
                 // perform the stage, but don't set it
                 let stage = &mut self.0;
-                Head::Progress::initialize_progress(state, stage)?;
+
+                stage.initialize_progress(state)?;
                 stage.perform(fuzzer, executor, state, manager)?;
-                Head::Progress::clear_progress(state, stage)?;
+                stage.clear_progress(state)?;
+
                 state.clear_stage()?;
             }
             Some(idx) if idx > Self::LEN => {
@@ -172,10 +176,12 @@ where
             // this is None, but the match can't deduce that
             _ => {
                 state.set_stage(Self::LEN)?;
+
                 let stage = &mut self.0;
-                Head::Progress::initialize_progress(state, stage)?;
+                stage.initialize_progress(state)?;
                 stage.perform(fuzzer, executor, state, manager)?;
-                Head::Progress::clear_progress(state, stage)?;
+                stage.clear_progress(state)?;
+
                 state.clear_stage()?;
             }
         }
@@ -185,10 +191,13 @@ where
     }
 }
 
-impl<Head, Tail, E, EM, Z> IntoVec<Box<dyn Stage<E, EM, Z, State = Head::State, Input = Head::Input>>> for (Head, Tail)
+impl<Head, Tail, E, EM, Z>
+    IntoVec<Box<dyn Stage<E, EM, Z, State = Head::State, Input = Head::Input>>> for (Head, Tail)
 where
-    Head: Stage<E, EM, Z>,
-    Tail: StagesTuple<E, EM, Head::State, Z> + HasConstLen,
+    Head: Stage<E, EM, Z> + 'static,
+    Tail: StagesTuple<E, EM, Head::State, Z>
+        + HasConstLen
+        + IntoVec<Box<dyn Stage<E, EM, Z, State = Head::State, Input = Head::Input>>>,
     E: UsesState<State = Head::State>,
     EM: UsesState<State = Head::State>,
     Z: UsesState<State = Head::State>,
@@ -196,18 +205,44 @@ where
 {
     fn into_vec(self) -> Vec<Box<dyn Stage<E, EM, Z, State = Head::State, Input = Head::Input>>> {
         let (head, tail) = self.uncons();
-        let mut ret = tail.into_vec();
+        let mut ret = tail.0.into_vec();
         ret.insert(0, Box::new(head));
         ret
     }
 }
 
-impl<E, EM, S, Z> StagesTuple<E, EM, S, Z> for Vec<Box<dyn Stage<E, EM, Z, State = S, Input = S::Input>>>
+impl<Tail, E, EM, Z> IntoVec<Box<dyn Stage<E, EM, Z, State = Tail::State, Input = Tail::Input>>>
+    for (Tail,)
+where
+    Tail: UsesState + IntoVec<Box<dyn Stage<E, EM, Z, State = Tail::State, Input = Tail::Input>>>,
+    Z: UsesState<State = Tail::State>,
+    EM: UsesState<State = Tail::State>,
+    E: UsesState<State = Tail::State>,
+{
+    fn into_vec(self) -> Vec<Box<dyn Stage<E, EM, Z, State = Tail::State, Input = Tail::Input>>> {
+        self.0.into_vec()
+    }
+}
+
+impl<E, EM, Z> IntoVec<Box<dyn Stage<E, EM, Z, State = Z::State, Input = Z::Input>>>
+    for Vec<Box<dyn Stage<E, EM, Z, State = Z::State, Input = Z::Input>>>
+where
+    Z: UsesState,
+    EM: UsesState<State = Z::State>,
+    E: UsesState<State = Z::State>,
+{
+    fn into_vec(self) -> Vec<Box<dyn Stage<E, EM, Z, State = Z::State, Input = Z::Input>>> {
+        self
+    }
+}
+
+impl<E, EM, S, Z> StagesTuple<E, EM, S, Z>
+    for Vec<Box<dyn Stage<E, EM, Z, State = S, Input = S::Input>>>
 where
     E: UsesState<State = S>,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,
-    S: UsesInput + HasCurrentStage,
+    S: UsesInput + HasCurrentStage + State,
 {
     fn perform_all(
         &mut self,
@@ -216,7 +251,8 @@ where
         state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        self.iter_mut().try_for_each(|x| x.perform(fuzzer, executor, state, manager))
+        self.iter_mut()
+            .try_for_each(|x| x.perform(fuzzer, executor, state, manager))
     }
 }
 
@@ -246,8 +282,6 @@ where
     EM: UsesState<State = E::State>,
     Z: UsesState<State = E::State>,
 {
-    type Progress = ();
-
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -256,6 +290,16 @@ where
         manager: &mut EM,
     ) -> Result<(), Error> {
         (self.closure)(fuzzer, executor, state, manager)
+    }
+
+    #[inline]
+    fn initialize_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        Ok(())
+    }
+
+    #[inline]
+    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -330,8 +374,6 @@ where
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
 {
-    type Progress = (); // TODO implement resume
-
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -373,6 +415,228 @@ where
 
         self.push_stage
             .deinit(fuzzer, state, event_mgr, executor.observers_mut())
+    }
+
+    #[inline]
+    fn initialize_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        Ok(())
+    }
+
+    #[inline]
+    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+/// Trait for status tracking of stages which stash data to resume
+pub trait StageProgressHelper<S, ST>
+where
+    ST: ?Sized,
+{
+    /// Initialize the current status tracking for this stage, if it is not yet initialised
+    fn initialize_progress(state: &mut S, stage: &ST) -> Result<(), Error>;
+
+    /// Clear the current status tracking of the associated stage
+    fn clear_progress(state: &mut S, stage: &ST) -> Result<(), Error>;
+
+    /// Get the current status tracking of this stage
+    fn progress<'a>(state: &'a S, stage: &ST) -> Result<&'a Self, Error>;
+
+    /// Get the current status tracking of this stage, mutably
+    fn progress_mut<'a>(state: &'a mut S, stage: &ST) -> Result<&'a mut Self, Error>;
+}
+
+/// Progress which permits a fixed amount of resumes per round of fuzzing. If this amount is ever
+/// exceeded, the input will no longer be executed by this stage.
+#[derive(Clone, Deserialize, Serialize, Debug)]
+pub struct RetryProgressHelper {
+    tries_remaining: Option<usize>,
+    skipped: HashSet<CorpusId>,
+}
+
+impl_serdeany!(RetryProgressHelper);
+
+/// Stage which specifies a certain amount of retries over which a scheduled input is attempted. To
+/// be used in combination with [`RetryProgressHelper`].
+pub trait RetryingStage {
+    /// The number of times each testcase may be retries.
+    fn max_retries(&self) -> usize;
+}
+
+impl<S, ST> StageProgressHelper<S, ST> for RetryProgressHelper
+where
+    S: HasNamedMetadata,
+    ST: RetryingStage,
+{
+    fn initialize_progress(state: &mut S, stage: &ST) -> Result<(), Error> {
+        if let Ok(metadata) = state.named_metadata_mut::<Self>(core::any::type_name_of_val(stage)) {
+            if let Some(ref mut remaining) = metadata.tries_remaining {
+                *remaining = remaining.checked_sub(1).ok_or_else(|| {
+                    Error::illegal_state(
+                        "Attempted further retries after we had already gotten to none remaining.",
+                    )
+                })?;
+            } else {
+                metadata.tries_remaining = Some(stage.max_retries() + 1);
+            }
+        } else {
+            state.add_named_metadata(
+                core::any::type_name_of_val(stage),
+                Self {
+                    tries_remaining: Some(stage.max_retries() + 1),
+                    skipped: HashSet::new(),
+                },
+            );
+        }
+        Ok(())
+    }
+
+    fn clear_progress(state: &mut S, stage: &ST) -> Result<(), Error> {
+        let metadata = state.named_metadata_mut::<Self>(core::any::type_name_of_val(stage))?;
+        metadata.tries_remaining = None;
+        Ok(())
+    }
+
+    fn progress<'a>(state: &'a S, stage: &ST) -> Result<&'a Self, Error> {
+        state.named_metadata::<Self>(core::any::type_name_of_val(stage))
+    }
+
+    fn progress_mut<'a>(state: &'a mut S, stage: &ST) -> Result<&'a mut Self, Error> {
+        state.named_metadata_mut::<Self>(core::any::type_name_of_val(stage))
+    }
+}
+
+impl RetryProgressHelper {
+    /// Whether we should skip the provided corpus entry.
+    pub fn should_skip<S, ST>(state: &mut S, stage: &ST) -> Result<bool, Error>
+    where
+        S: HasNamedMetadata + HasCurrentCorpusIdx,
+        ST: RetryingStage,
+    {
+        let corpus_idx = state.current_corpus_idx()?.ok_or_else(|| {
+            Error::illegal_state(
+                "No current_corpus_idx set in State, but called RetryProgressHelper::should_skip",
+            )
+        })?;
+        let progress = Self::progress_mut(state, stage)?;
+        if progress.skipped.contains(&corpus_idx) {
+            return Ok(true);
+        }
+        let remaining = progress.tries_remaining.as_mut().ok_or_else(||
+            Error::illegal_state(
+                "Attempted to check if we should skip a testcase without having initialised the number of tries remaining.",
+            ))?;
+        if *remaining == 0 {
+            progress.skipped.insert(corpus_idx);
+            return Ok(true);
+        }
+        Ok(false)
+    }
+}
+
+/// Trait for types which track the current stage
+pub trait HasCurrentStage {
+    /// Set the current stage; we have started processing this stage
+    fn set_stage(&mut self, idx: usize) -> Result<(), Error>;
+
+    /// Clear the current stage; we are done processing this stage
+    fn clear_stage(&mut self) -> Result<(), Error>;
+
+    /// Fetch the current stage -- typically used after a state recovery or transfer
+    fn current_stage(&self) -> Result<Option<usize>, Error>;
+
+    /// Notify of a reset from which we may recover
+    fn on_restart(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+/// Trait for types which track nested stages. Stages which themselves contain stage tuples should
+/// ensure that they constrain the state with this trait accordingly.
+pub trait HasNestedStageStatus: HasCurrentStage {
+    /// Enter a stage scope, potentially resuming to an inner stage status. Returns Ok(true) if
+    /// resumed.
+    fn enter_inner_stage(&mut self) -> Result<(), Error>;
+
+    /// Exit a stage scope
+    fn exit_inner_stage(&mut self) -> Result<(), Error>;
+}
+
+impl_serdeany!(ExecutionCountProgressHelperMetadata);
+
+/// `SerdeAny` metadata used to keep track of executions since start for a given stage.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExecutionCountProgressHelperMetadata {
+    /// How many executions we had when we started this stage initially (this round)
+    started_at_execs: u64,
+}
+
+/// A tool shed of functions to be used for stages that try to run for `n` iterations.
+///
+/// # Note
+/// This helper assumes resumable mutational stages are not nested.
+/// If you want to nest them, you will have to switch all uses of `metadata` in this helper to `named_metadata` instead.
+#[derive(Debug, Default, Clone)]
+pub struct ExecutionCountProgressHelper {
+    /// At what exec count this Stage was started (cache)
+    /// Only used as cache for the value stored in [`MutationalStageMetadata`].
+    started_at_execs: Option<u64>,
+}
+
+impl ExecutionCountProgressHelper {
+    /// Create a new [`ExecutionCountProgressHelperMetadata`]
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            started_at_execs: None,
+        }
+    }
+
+    /// The execs done since start of this [`Stage`]/helper
+    pub fn execs_since_progress_start<S>(&mut self, state: &mut S) -> Result<u64, Error>
+    where
+        S: HasMetadata + HasExecutions,
+    {
+        let started_at_execs = if let Some(started_at_execs) = self.started_at_execs {
+            started_at_execs
+        } else {
+            state
+                .metadata::<ExecutionCountProgressHelperMetadata>()
+                .map(|x| {
+                    self.started_at_execs = Some(x.started_at_execs);
+                    x.started_at_execs
+                })
+                .map_err(|err| {
+                    Error::illegal_state(format!(
+                        "The ExecutionCountProgressHelperMetadata should have been set at this point - {err}"
+                    ))
+                })?
+        };
+        Ok(state.executions() - started_at_execs)
+    }
+
+    /// Initialize progress for the stage this wrapper wraps.
+    pub fn initialize_progress<S>(&mut self, state: &mut S) -> Result<(), Error>
+    where
+        S: HasMetadata + HasExecutions,
+    {
+        let executions = *state.executions();
+        let metadata = state.or_insert_metadata_with(|| ExecutionCountProgressHelperMetadata {
+            started_at_execs: executions,
+        });
+        self.started_at_execs = Some(metadata.started_at_execs);
+        Ok(())
+    }
+
+    /// Clear progress for the stage this wrapper wraps.
+    pub fn clear_progress<S>(&mut self, state: &mut S) -> Result<(), Error>
+    where
+        S: HasMetadata,
+    {
+        self.started_at_execs = None;
+        let _metadata = state.remove_metadata::<ExecutionCountProgressHelperMetadata>();
+        debug_assert!(_metadata.is_some(), "Called clear_progress, but initialize_progress was not called before (or did mutational stages get nested?)");
+        Ok(())
     }
 }
 
@@ -585,157 +849,6 @@ pub mod pybind {
     }
 }
 
-/// Trait for status tracking of stages which stash data to resume
-pub trait StageProgress<S, ST>
-where
-    ST: ?Sized,
-{
-    /// Initialize the current status tracking for this stage, if it is not yet initialised
-    fn initialize_progress(state: &mut S, stage: &ST) -> Result<(), Error>;
-
-    /// Clear the current status tracking of the associated stage
-    fn clear_progress(state: &mut S, stage: &ST) -> Result<(), Error>;
-
-    /// Get the current status tracking of this stage
-    fn progress<'a>(state: &'a S, stage: &ST) -> Result<&'a Self, Error>;
-
-    /// Get the current status tracking of this stage, mutably
-    fn progress_mut<'a>(state: &'a mut S, stage: &ST) -> Result<&'a mut Self, Error>;
-}
-
-impl<S, ST> StageProgress<S, ST> for () {
-    fn initialize_progress(_state: &mut S, _stage: &ST) -> Result<(), Error> {
-        Ok(())
-    }
-
-    fn clear_progress(_state: &mut S, _stage: &ST) -> Result<(), Error> {
-        Ok(())
-    }
-
-    fn progress<'a>(_state: &'a S, _stage: &ST) -> Result<&'a Self, Error> {
-        unimplemented!("The empty tuple resumable stage status should never be queried")
-    }
-
-    fn progress_mut<'a>(_state: &'a mut S, _stage: &ST) -> Result<&'a mut Self, Error> {
-        unimplemented!("The empty tuple resumable stage status should never be queried")
-    }
-}
-
-/// Progress which permits a fixed amount of resumes per round of fuzzing. If this amount is ever
-/// exceeded, the input will no longer be executed by this stage.
-#[derive(Clone, Deserialize, Serialize, Debug)]
-pub struct RetryProgress {
-    tries_remaining: Option<usize>,
-    skipped: HashSet<CorpusId>,
-}
-
-impl_serdeany!(RetryProgress);
-
-/// Stage which specifies a certain amount of retries over which a scheduled input is attempted. To
-/// be used in combination with [`RetryProgress`].
-pub trait RetryingStage {
-    /// The number of times each testcase may be retries.
-    fn max_retries(&self) -> usize;
-}
-
-impl<S, ST> StageProgress<S, ST> for RetryProgress
-where
-    S: HasNamedMetadata,
-    ST: RetryingStage,
-{
-    fn initialize_progress(state: &mut S, stage: &ST) -> Result<(), Error> {
-        if let Ok(metadata) = state.named_metadata_mut::<Self>(core::any::type_name_of_val(stage)) {
-            if let Some(ref mut remaining) = metadata.tries_remaining {
-                *remaining = remaining.checked_sub(1).ok_or_else(|| {
-                    Error::illegal_state(
-                        "Attempted further retries after we had already gotten to none remaining.",
-                    )
-                })?;
-            } else {
-                metadata.tries_remaining = Some(stage.max_retries() + 1);
-            }
-        } else {
-            state.add_named_metadata(
-                Self {
-                    tries_remaining: Some(stage.max_retries() + 1),
-                    skipped: HashSet::new(),
-                },
-                core::any::type_name_of_val(stage),
-            );
-        }
-        Ok(())
-    }
-
-    fn clear_progress(state: &mut S, stage: &ST) -> Result<(), Error> {
-        let metadata = state.named_metadata_mut::<Self>(core::any::type_name_of_val(stage))?;
-        metadata.tries_remaining = None;
-        Ok(())
-    }
-
-    fn progress<'a>(state: &'a S, stage: &ST) -> Result<&'a Self, Error> {
-        state.named_metadata::<Self>(core::any::type_name_of_val(stage))
-    }
-
-    fn progress_mut<'a>(state: &'a mut S, stage: &ST) -> Result<&'a mut Self, Error> {
-        state.named_metadata_mut::<Self>(core::any::type_name_of_val(stage))
-    }
-}
-
-impl RetryProgress {
-    /// Whether we should skip the provided corpus entry.
-    pub fn should_skip<S, ST>(
-        state: &mut S,
-        stage: &ST,
-        corpus_idx: CorpusId,
-    ) -> Result<bool, Error>
-    where
-        S: HasNamedMetadata,
-        ST: RetryingStage,
-    {
-        let progress = Self::progress_mut(state, stage)?;
-        if progress.skipped.contains(&corpus_idx) {
-            return Ok(true);
-        }
-        let remaining = progress.tries_remaining.as_mut().ok_or_else(||
-            Error::illegal_state(
-                "Attempted to check if we should skip a testcase without having initialised the number of tries remaining.",
-            ))?;
-        if *remaining == 0 {
-            progress.skipped.insert(corpus_idx);
-            return Ok(true);
-        }
-        Ok(false)
-    }
-}
-
-/// Trait for types which track the current stage
-pub trait HasCurrentStage {
-    /// Set the current stage; we have started processing this stage
-    fn set_stage(&mut self, idx: usize) -> Result<(), Error>;
-
-    /// Clear the current stage; we are done processing this stage
-    fn clear_stage(&mut self) -> Result<(), Error>;
-
-    /// Fetch the current stage -- typically used after a state recovery or transfer
-    fn current_stage(&self) -> Result<Option<usize>, Error>;
-
-    /// Notify of a reset from which we may recover
-    fn on_restart(&mut self) -> Result<(), Error> {
-        Ok(())
-    }
-}
-
-/// Trait for types which track nested stages. Stages which themselves contain stage tuples should
-/// ensure that they constrain the state with this trait accordingly.
-pub trait HasNestedStageStatus: HasCurrentStage {
-    /// Enter a stage scope, potentially resuming to an inner stage status. Returns Ok(true) if
-    /// resumed.
-    fn enter_inner_stage(&mut self) -> Result<(), Error>;
-
-    /// Exit a stage scope
-    fn exit_inner_stage(&mut self) -> Result<(), Error>;
-}
-
 #[cfg(test)]
 pub mod test {
     use alloc::rc::Rc;
@@ -746,12 +859,12 @@ pub mod test {
     use tuple_list::{tuple_list, tuple_list_type};
 
     use crate::{
-        corpus::{Corpus, Testcase},
+        corpus::{Corpus, HasCurrentCorpusIdx, Testcase},
         events::NopEventManager,
         executors::test::NopExecutor,
         fuzzer::test::NopFuzzer,
         inputs::NopInput,
-        stages::{RetryProgress, RetryingStage, Stage, StageProgress, StagesTuple},
+        stages::{RetryProgressHelper, RetryingStage, Stage, StageProgressHelper, StagesTuple},
         state::{test::test_std_state, HasCorpus, HasMetadata, State, UsesState},
     };
 
@@ -773,7 +886,7 @@ pub mod test {
 
     impl_serdeany!(TestProgress);
 
-    impl<S, ST> StageProgress<S, ST> for TestProgress
+    impl<S, ST> StageProgressHelper<S, ST> for TestProgress
     where
         S: HasMetadata,
     {
@@ -817,8 +930,6 @@ pub mod test {
         Z: UsesState,
         Z::State: HasMetadata,
     {
-        type Progress = TestProgress;
-
         fn perform(
             &mut self,
             _fuzzer: &mut Z,
@@ -827,7 +938,7 @@ pub mod test {
             _manager: &mut EM,
         ) -> Result<(), Error> {
             // metadata is attached by the status
-            let meta = Self::Progress::progress_mut(state, self)?;
+            let meta = TestProgress::progress_mut(state, self)?;
             meta.count += 1;
             assert!(
                 meta.count == 1,
@@ -835,6 +946,14 @@ pub mod test {
             );
 
             Ok(())
+        }
+
+        fn initialize_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+            TestProgress::initialize_progress(state, self)
+        }
+
+        fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+            TestProgress::clear_progress(state, self)
         }
     }
 
@@ -852,8 +971,6 @@ pub mod test {
         Z: UsesState,
         Z::State: HasMetadata,
     {
-        type Progress = TestProgress;
-
         fn perform(
             &mut self,
             _fuzzer: &mut Z,
@@ -862,7 +979,7 @@ pub mod test {
             _manager: &mut EM,
         ) -> Result<(), Error> {
             // metadata is attached by the status
-            let meta = Self::Progress::progress_mut(state, self)?;
+            let meta = TestProgress::progress_mut(state, self)?;
             meta.count += 1;
 
             if meta.count == 1 {
@@ -874,6 +991,14 @@ pub mod test {
             }
 
             Ok(())
+        }
+
+        fn initialize_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+            TestProgress::initialize_progress(state, self)
+        }
+
+        fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+            TestProgress::clear_progress(state, self)
         }
     }
 
@@ -942,7 +1067,7 @@ pub mod test {
     fn test_tries_progress() -> Result<(), Error> {
         #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
         unsafe {
-            RetryProgress::register();
+            RetryProgressHelper::register();
         }
 
         struct StageWithOneTry;
@@ -958,38 +1083,40 @@ pub mod test {
 
         let corpus_idx = state.corpus_mut().add(Testcase::new(NopInput {}))?;
 
+        state.set_corpus_idx(corpus_idx)?;
+
         for _ in 0..10 {
             // used normally, no retries means we never skip
-            RetryProgress::initialize_progress(&mut state, &stage)?;
-            assert!(!RetryProgress::should_skip(&mut state, &stage, corpus_idx)?);
-            RetryProgress::clear_progress(&mut state, &stage)?;
+            RetryProgressHelper::initialize_progress(&mut state, &stage)?;
+            assert!(!RetryProgressHelper::should_skip(&mut state, &stage)?);
+            RetryProgressHelper::clear_progress(&mut state, &stage)?;
         }
 
         for _ in 0..10 {
             // used normally, only one retry means we never skip
-            RetryProgress::initialize_progress(&mut state, &stage)?;
-            assert!(!RetryProgress::should_skip(&mut state, &stage, corpus_idx)?);
-            RetryProgress::initialize_progress(&mut state, &stage)?;
-            assert!(!RetryProgress::should_skip(&mut state, &stage, corpus_idx)?);
-            RetryProgress::clear_progress(&mut state, &stage)?;
+            RetryProgressHelper::initialize_progress(&mut state, &stage)?;
+            assert!(!RetryProgressHelper::should_skip(&mut state, &stage)?);
+            RetryProgressHelper::initialize_progress(&mut state, &stage)?;
+            assert!(!RetryProgressHelper::should_skip(&mut state, &stage)?);
+            RetryProgressHelper::clear_progress(&mut state, &stage)?;
         }
 
-        RetryProgress::initialize_progress(&mut state, &stage)?;
-        assert!(!RetryProgress::should_skip(&mut state, &stage, corpus_idx)?);
+        RetryProgressHelper::initialize_progress(&mut state, &stage)?;
+        assert!(!RetryProgressHelper::should_skip(&mut state, &stage)?);
         // task failed, let's resume
-        RetryProgress::initialize_progress(&mut state, &stage)?;
+        RetryProgressHelper::initialize_progress(&mut state, &stage)?;
         // we still have one more try!
-        assert!(!RetryProgress::should_skip(&mut state, &stage, corpus_idx)?);
+        assert!(!RetryProgressHelper::should_skip(&mut state, &stage)?);
         // task failed, let's resume
-        RetryProgress::initialize_progress(&mut state, &stage)?;
+        RetryProgressHelper::initialize_progress(&mut state, &stage)?;
         // out of retries, so now we skip
-        assert!(RetryProgress::should_skip(&mut state, &stage, corpus_idx)?);
-        RetryProgress::clear_progress(&mut state, &stage)?;
+        assert!(RetryProgressHelper::should_skip(&mut state, &stage)?);
+        RetryProgressHelper::clear_progress(&mut state, &stage)?;
 
-        RetryProgress::initialize_progress(&mut state, &stage)?;
+        RetryProgressHelper::initialize_progress(&mut state, &stage)?;
         // we previously exhausted this testcase's retries, so we skip
-        assert!(RetryProgress::should_skip(&mut state, &stage, corpus_idx)?);
-        RetryProgress::clear_progress(&mut state, &stage)?;
+        assert!(RetryProgressHelper::should_skip(&mut state, &stage)?);
+        RetryProgressHelper::clear_progress(&mut state, &stage)?;
 
         Ok(())
     }

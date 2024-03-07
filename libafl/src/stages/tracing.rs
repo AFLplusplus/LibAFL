@@ -3,13 +3,12 @@
 use core::{fmt::Debug, marker::PhantomData};
 
 use crate::{
-    corpus::{Corpus, CorpusId, HasCurrentCorpusIdx},
     executors::{Executor, HasObservers, ShadowExecutor},
     mark_feature_time,
     observers::ObserversTuple,
-    stages::{RetryProgress, RetryingStage, Stage},
+    stages::{RetryProgressHelper, RetryingStage, Stage, StageProgressHelper},
     start_timer,
-    state::{HasCorpus, HasExecutions, HasNamedMetadata, State, UsesState},
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasNamedMetadata, State, UsesState},
     Error,
 };
 #[cfg(feature = "introspection")]
@@ -39,17 +38,16 @@ where
     Z: UsesState<State = TE::State>,
 {
     /// Perform tracing on the given [`CorpusId`]. Useful for if wrapping [`TracingStage`] with your
-    /// own stage and you need to manage [`super::StageProgress`] differently; see
+    /// own stage and you need to manage [`super::StageProgressHelper`] differently; see
     /// [`super::ConcolicTracingStage`]'s implementation as an example of usage.
     pub fn trace(
         &mut self,
         fuzzer: &mut Z,
         state: &mut TE::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         start_timer!(state);
-        let input = state.corpus().cloned_input_for_id(corpus_idx)?;
+        let input = state.current_input_cloned()?;
 
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
 
@@ -85,8 +83,6 @@ where
     EM: UsesState<State = TE::State>,
     Z: UsesState<State = TE::State>,
 {
-    type Progress = RetryProgress;
-
     #[inline]
     fn perform(
         &mut self,
@@ -95,18 +91,21 @@ where
         state: &mut TE::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        let Some(corpus_idx) = state.current_corpus_idx()? else {
-            return Err(Error::illegal_state(
-                "state is not currently processing a corpus index",
-            ));
-        };
-        if Self::Progress::should_skip(state, self, corpus_idx)? {
+        if RetryProgressHelper::should_skip(state, self)? {
             return Ok(());
         }
 
-        self.trace(fuzzer, state, manager, corpus_idx)?;
+        self.trace(fuzzer, state, manager)?;
 
         Ok(())
+    }
+
+    fn initialize_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        RetryProgressHelper::initialize_progress(state, self)
+    }
+
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        RetryProgressHelper::clear_progress(state, self)
     }
 }
 
@@ -168,8 +167,6 @@ where
     Z: UsesState<State = E::State>,
     E::State: State + HasExecutions + HasCorpus + HasNamedMetadata + Debug,
 {
-    type Progress = RetryProgress;
-
     #[inline]
     fn perform(
         &mut self,
@@ -178,17 +175,12 @@ where
         state: &mut E::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        let Some(corpus_idx) = state.current_corpus_idx()? else {
-            return Err(Error::illegal_state(
-                "state is not currently processing a corpus index",
-            ));
-        };
-        if Self::Progress::should_skip(state, self, corpus_idx)? {
+        if RetryProgressHelper::should_skip(state, self)? {
             return Ok(());
         }
 
         start_timer!(state);
-        let input = state.corpus().cloned_input_for_id(corpus_idx)?;
+        let input = state.current_input_cloned()?;
 
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
 
@@ -215,6 +207,14 @@ where
         mark_feature_time!(state, PerfFeature::PostExecObservers);
 
         Ok(())
+    }
+
+    fn initialize_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        RetryProgressHelper::initialize_progress(state, self)
+    }
+
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        RetryProgressHelper::clear_progress(state, self)
     }
 }
 

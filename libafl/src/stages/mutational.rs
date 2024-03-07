@@ -5,6 +5,7 @@ use core::marker::PhantomData;
 
 use libafl_bolts::rands::Rand;
 
+use super::ExecutionCountProgressHelper;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusIdx, Testcase},
     fuzzer::Evaluator,
@@ -13,7 +14,7 @@ use crate::{
     mutators::{MultiMutator, MutationResult, Mutator},
     stages::Stage,
     start_timer,
-    state::{HasCorpus, HasRand, UsesState},
+    state::{HasCorpus, HasExecutions, HasMetadata, HasRand, UsesState},
     Error,
 };
 #[cfg(feature = "introspection")]
@@ -104,7 +105,10 @@ where
     fn mutator_mut(&mut self) -> &mut M;
 
     /// Gets the number of iterations this mutator should run for.
-    fn iterations(&self, state: &mut Z::State, corpus_idx: CorpusId) -> Result<u64, Error>;
+    fn iterations(&self, state: &mut Z::State) -> Result<u64, Error>;
+
+    /// Gets the number of executions this mutator already did since it got first called in this fuzz round.
+    fn execs_since_progress_start(&mut self, state: &mut Z::State) -> Result<u64, Error>;
 
     /// Runs this (mutational) stage for the given testcase
     #[allow(clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
@@ -121,7 +125,7 @@ where
             ));
         };
 
-        let num = self.iterations(state, corpus_idx)?;
+        let num = self.iterations(state)? - self.execs_since_progress_start(state)?;
 
         start_timer!(state);
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
@@ -163,8 +167,12 @@ pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: u64 = 128;
 /// The default mutational stage
 #[derive(Clone, Debug)]
 pub struct StdMutationalStage<E, EM, I, M, Z> {
+    /// The mutator(s) to use
     mutator: M,
+    /// The maximum amount of iterations we should do each round
     max_iterations: u64,
+    /// The progress helper for this mutational stage
+    progress_helper: ExecutionCountProgressHelper,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, EM, I, Z)>,
 }
@@ -175,7 +183,7 @@ where
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasCorpus + HasRand,
+    Z::State: HasCorpus + HasRand + HasExecutions + HasMetadata,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
 {
     /// The mutator, added to this stage
@@ -191,8 +199,12 @@ where
     }
 
     /// Gets the number of iterations as a random number
-    fn iterations(&self, state: &mut Z::State, _corpus_idx: CorpusId) -> Result<u64, Error> {
+    fn iterations(&self, state: &mut Z::State) -> Result<u64, Error> {
         Ok(1 + state.rand_mut().below(self.max_iterations))
+    }
+
+    fn execs_since_progress_start(&mut self, state: &mut <Z>::State) -> Result<u64, Error> {
+        self.progress_helper.execs_since_progress_start(state)
     }
 }
 
@@ -213,11 +225,9 @@ where
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasCorpus + HasRand,
+    Z::State: HasCorpus + HasRand + HasMetadata + HasExecutions,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
 {
-    type Progress = (); // TODO should this stage be resumed?
-
     #[inline]
     #[allow(clippy::let_and_return)]
     fn perform(
@@ -233,6 +243,14 @@ where
         state.introspection_monitor_mut().finish_stage();
 
         ret
+    }
+
+    fn initialize_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        self.progress_helper.initialize_progress(state)
+    }
+
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        self.progress_helper.clear_progress(state)
     }
 }
 
@@ -273,12 +291,13 @@ where
         Self {
             mutator,
             max_iterations,
+            progress_helper: ExecutionCountProgressHelper::default(),
             phantom: PhantomData,
         }
     }
 }
 
-/// The default mutational stage
+/// A mutational stage that operates on multiple inputs, as returned by [`MultiMutator::multi_mutate`].
 #[derive(Clone, Debug)]
 pub struct MultiMutationalStage<E, EM, I, M, Z> {
     mutator: M,
@@ -306,7 +325,15 @@ where
     Z::State: HasCorpus + HasRand,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
 {
-    type Progress = (); // TODO implement resume
+    fn initialize_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        // TODO: add crash/timeout handling
+        Ok(())
+    }
+
+    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        // TODO: add crash/timeout handling
+        Ok(())
+    }
 
     #[inline]
     #[allow(clippy::let_and_return)]
@@ -353,7 +380,7 @@ where
     Z: Evaluator<E, EM>,
     Z::State: HasCorpus + HasRand,
 {
-    /// Creates a new default mutational stage
+    /// Creates a new [`MultiMutationalStage`]
     pub fn new(mutator: M) -> Self {
         Self::transforming(mutator)
     }

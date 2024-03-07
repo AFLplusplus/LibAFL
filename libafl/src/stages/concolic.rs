@@ -9,7 +9,7 @@ use core::marker::PhantomData;
 
 use libafl_bolts::tuples::MatchName;
 
-use super::{RetryProgress, RetryingStage, Stage, TracingStage};
+use super::{RetryProgressHelper, RetryingStage, Stage, StageProgressHelper, TracingStage};
 #[cfg(all(feature = "concolic_mutation", feature = "introspection"))]
 use crate::monitors::PerfFeature;
 #[cfg(all(feature = "introspection", feature = "concolic_mutation"))]
@@ -17,10 +17,11 @@ use crate::state::HasClientPerfMonitor;
 #[cfg(feature = "concolic_mutation")]
 use crate::state::State;
 use crate::{
-    corpus::{Corpus, HasCurrentCorpusIdx},
     executors::{Executor, HasObservers},
     observers::concolic::ConcolicObserver,
-    state::{HasCorpus, HasExecutions, HasMetadata, HasNamedMetadata, UsesState},
+    state::{
+        HasCorpus, HasCurrentTestcase, HasExecutions, HasMetadata, HasNamedMetadata, UsesState,
+    },
     Error,
 };
 #[cfg(feature = "concolic_mutation")]
@@ -53,8 +54,6 @@ where
     TE::State: HasExecutions + HasCorpus + HasNamedMetadata,
     Z: UsesState<State = TE::State>,
 {
-    type Progress = RetryProgress;
-
     #[inline]
     fn perform(
         &mut self,
@@ -63,16 +62,11 @@ where
         state: &mut TE::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        let Some(corpus_idx) = state.current_corpus_idx()? else {
-            return Err(Error::illegal_state(
-                "state is not currently processing a corpus index",
-            ));
-        };
-        if Self::Progress::should_skip(state, &self.inner, corpus_idx)? {
+        if RetryProgressHelper::should_skip(state, &self.inner)? {
             return Ok(());
         }
 
-        self.inner.trace(fuzzer, state, manager, corpus_idx)?;
+        self.inner.trace(fuzzer, state, manager)?;
         if let Some(observer) = self
             .inner
             .executor()
@@ -81,14 +75,19 @@ where
         {
             let metadata = observer.create_metadata_from_current_map();
             state
-                .corpus_mut()
-                .get(corpus_idx)
-                .unwrap()
-                .borrow_mut()
+                .current_testcase_mut()?
                 .metadata_map_mut()
                 .insert(metadata);
         }
         Ok(())
+    }
+
+    fn initialize_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        RetryProgressHelper::initialize_progress(state, self)
+    }
+
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        RetryProgressHelper::clear_progress(state, self)
     }
 }
 

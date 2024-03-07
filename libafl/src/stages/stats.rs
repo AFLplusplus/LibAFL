@@ -62,8 +62,6 @@ where
     Z: UsesState<State = E::State>,
     E::State: HasImported + HasCorpus + HasMetadata,
 {
-    type Progress = (); // this stage does not require resume
-
     fn perform(
         &mut self,
         _fuzzer: &mut Z,
@@ -131,6 +129,18 @@ where
             self.last_report_time = cur;
         }
 
+        Ok(())
+    }
+
+    #[inline]
+    fn initialize_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        // Not running the target so we wont't crash/timeout and, hence, don't need to restore anything
+        Ok(())
+    }
+
+    #[inline]
+    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        // Not running the target so we wont't crash/timeout and, hence, don't need to restore anything
         Ok(())
     }
 }

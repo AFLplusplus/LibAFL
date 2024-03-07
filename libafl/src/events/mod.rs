@@ -296,7 +296,7 @@ where
         /// The time of generation of the event
         time: Duration,
         /// The executions of this client
-        executions: usize,
+        executions: u64,
         /// The original sender if, if forwarded
         forward_id: Option<ClientId>,
     },
@@ -305,7 +305,7 @@ where
         /// The time of generation of the [`Event`]
         time: Duration,
         /// The executions of this client
-        executions: usize,
+        executions: u64,
         /// [`PhantomData`]
         phantom: PhantomData<I>,
     },
@@ -324,7 +324,7 @@ where
         /// The time of generation of the event
         time: Duration,
         /// The executions of this client
-        executions: usize,
+        executions: u64,
         /// Current performance statistics
         introspection_monitor: Box<ClientPerfMonitor>,
 

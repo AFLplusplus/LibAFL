@@ -614,12 +614,8 @@ mod tests {
         state::StdState,
     };
 
-    type TestStdStateType = StdState<
-        BytesInput,
-        InMemoryCorpus<BytesInput>,
-        StdRand,
-        InMemoryCorpus<BytesInput>,
-    >;
+    type TestStdStateType =
+        StdState<BytesInput, InMemoryCorpus<BytesInput>, StdRand, InMemoryCorpus<BytesInput>>;
 
     #[test]
     fn test_tuple_into_vec() {

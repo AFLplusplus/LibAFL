@@ -4,12 +4,15 @@ use core::marker::PhantomData;
 #[cfg(feature = "introspection")]
 use libafl::state::HasClientPerfMonitor;
 use libafl::{
-    corpus::{Corpus, HasCurrentCorpusIdx},
     executors::{Executor, HasObservers},
     inputs::{BytesInput, UsesInput},
     observers::ObserversTuple,
-    stages::{colorization::TaintMetadata, Stage},
-    state::{HasCorpus, HasExecutions, HasMetadata, UsesState},
+    stages::{
+        colorization::TaintMetadata, RetryProgressHelper, RetryingStage, Stage, StageProgressHelper,
+    },
+    state::{
+        HasCorpus, HasCurrentTestcase, HasExecutions, HasMetadata, HasNamedMetadata, UsesState,
+    },
     Error,
 };
 use libafl_bolts::tuples::MatchName;
@@ -36,12 +39,11 @@ impl<E, EM, TE, Z> Stage<E, EM, Z> for AFLppCmplogTracingStage<EM, TE, Z>
 where
     E: UsesState<State = TE::State>,
     TE: Executor<EM, Z> + HasObservers,
-    TE::State: HasExecutions + HasCorpus + HasMetadata + UsesInput<Input = BytesInput>,
+    TE::State:
+        HasExecutions + HasCorpus + HasMetadata + UsesInput<Input = BytesInput> + HasNamedMetadata,
     EM: UsesState<State = TE::State>,
     Z: UsesState<State = TE::State>,
 {
-    type Progress = (); // TODO this needs resumption
-
     #[inline]
     fn perform(
         &mut self,
@@ -50,12 +52,13 @@ where
         state: &mut TE::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        // First run with the un-mutated input
-        let corpus_idx = state.current_corpus_idx()?.ok_or_else(|| {
-            Error::illegal_state("state is not currently processing a corpus index")
-        })?;
+        if RetryProgressHelper::should_skip(state, self)? {
+            // early exit if we retried too often
+            return Ok(());
+        }
 
-        let unmutated_input = state.corpus().cloned_input_for_id(corpus_idx)?;
+        // First run with the un-mutated input
+        let unmutated_input = state.current_input_cloned()?;
 
         if let Some(name) = &self.cmplog_observer_name {
             if let Some(ob) = self
@@ -120,6 +123,28 @@ where
             .post_exec_all(state, &mutated_input, &exit_kind)?;
 
         Ok(())
+    }
+
+    fn initialize_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        // TODO: this may need better resumption? (Or is it always used with a forkserver?)
+        RetryProgressHelper::initialize_progress(state, self)
+    }
+
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        // TODO: this may need better resumption? (Or is it always used with a forkserver?)
+        RetryProgressHelper::clear_progress(state, self)
+    }
+}
+
+impl<EM, TE, Z> RetryingStage for AFLppCmplogTracingStage<EM, TE, Z>
+where
+    TE: Executor<EM, Z> + HasObservers,
+    TE::State: HasExecutions + HasCorpus + HasMetadata + UsesInput<Input = BytesInput>,
+    EM: UsesState<State = TE::State>,
+    Z: UsesState<State = TE::State>,
+{
+    fn max_retries(&self) -> usize {
+        3
     }
 }
 

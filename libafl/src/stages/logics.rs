@@ -3,16 +3,16 @@
 use core::marker::PhantomData;
 
 use crate::{
-    stages::{HasCurrentStage, HasNestedStageStatus, Stage, StageProgress, StagesTuple},
+    stages::{HasCurrentStage, HasNestedStageStatus, Stage, StageProgressHelper, StagesTuple},
     state::UsesState,
     Error,
 };
 
 /// Progress for nested stages. This merely enters/exits the inner stage's scope.
 #[derive(Debug)]
-pub struct NestedStageProgress;
+pub struct NestedStageProgressHelper;
 
-impl<S, ST> StageProgress<S, ST> for NestedStageProgress
+impl<S, ST> StageProgressHelper<S, ST> for NestedStageProgressHelper
 where
     S: HasNestedStageStatus,
 {
@@ -27,11 +27,11 @@ where
     }
 
     fn progress<'a>(_state: &'a S, _stage: &ST) -> Result<&'a Self, Error> {
-        unimplemented!("NestedStageProgress should not be queried")
+        unimplemented!("NestedStageProgressHelper should not be queried")
     }
 
     fn progress_mut<'a>(_state: &'a mut S, _stage: &ST) -> Result<&'a mut Self, Error> {
-        unimplemented!("NestedStageProgress should not be queried")
+        unimplemented!("NestedStageProgressHelper should not be queried")
     }
 }
 
@@ -70,8 +70,6 @@ where
     Z: UsesState<State = E::State>,
     E::State: HasNestedStageStatus,
 {
-    type Progress = NestedStageProgress;
-
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -85,6 +83,14 @@ where
         }
 
         Ok(())
+    }
+
+    fn initialize_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        NestedStageProgressHelper::initialize_progress(state, self)
+    }
+
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        NestedStageProgressHelper::clear_progress(state, self)
     }
 }
 
@@ -142,8 +148,6 @@ where
     Z: UsesState<State = E::State>,
     E::State: HasNestedStageStatus,
 {
-    type Progress = NestedStageProgress;
-
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -156,6 +160,14 @@ where
                 .perform_all(fuzzer, executor, state, manager)?;
         }
         Ok(())
+    }
+
+    fn initialize_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        NestedStageProgressHelper::initialize_progress(state, self)
+    }
+
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        NestedStageProgressHelper::clear_progress(state, self)
     }
 }
 
@@ -217,8 +229,6 @@ where
     Z: UsesState<State = E::State>,
     E::State: HasNestedStageStatus,
 {
-    type Progress = NestedStageProgress;
-
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -251,6 +261,14 @@ where
         state.clear_stage()?;
 
         Ok(())
+    }
+
+    fn initialize_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        NestedStageProgressHelper::initialize_progress(state, self)
+    }
+
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        NestedStageProgressHelper::clear_progress(state, self)
     }
 }
 
@@ -305,8 +323,6 @@ where
     Z: UsesState<State = E::State>,
     E::State: HasNestedStageStatus,
 {
-    type Progress = NestedStageProgress;
-
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -319,6 +335,14 @@ where
         } else {
             Ok(())
         }
+    }
+
+    fn initialize_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        NestedStageProgressHelper::initialize_progress(state, self)
+    }
+
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        NestedStageProgressHelper::clear_progress(state, self)
     }
 }
 
@@ -450,8 +474,6 @@ mod test {
         EM: UsesState<State = E::State>,
         Z: UsesState<State = E::State>,
     {
-        type Progress = ();
-
         fn perform(
             &mut self,
             _fuzzer: &mut Z,
@@ -460,6 +482,16 @@ mod test {
             _manager: &mut EM,
         ) -> Result<(), Error> {
             panic!("Test failed; panic stage should never be executed.");
+        }
+
+        #[inline]
+        fn initialize_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+            Ok(())
+        }
+
+        #[inline]
+        fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+            Ok(())
         }
     }
 

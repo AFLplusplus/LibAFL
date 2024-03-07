@@ -401,7 +401,7 @@ where
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         // Initialize `MapFeedbackMetadata` with an empty vector and add it to the state.
         // The `MapFeedbackMetadata` would be resized on-demand in `is_interesting`
-        state.add_named_metadata(MapFeedbackMetadata::<T>::default(), &self.name);
+        state.add_named_metadata(&self.name, MapFeedbackMetadata::<T>::default());
         Ok(())
     }
 
