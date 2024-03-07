@@ -1156,7 +1156,7 @@ where
         });
 
         let emu_state_ptr = unsafe {
-            let emu_ptr = NonNull::from(emu_state.as_ref());
+            let emu_ptr = NonNull::from(Box::leak(emu_state));
             EMULATOR_STATE = emu_ptr.as_ptr() as *mut ();
             emu_ptr
         };
@@ -1314,17 +1314,19 @@ where
     /// Should, in general, be safe to call.
     /// Of course, the emulated target is not contained securely and can corrupt state or interact with the operating system.
     pub unsafe fn run_handle(&self, input: &BytesInput) -> Result<HandlerResult, HandlerError> {
+        let mut exit_handler = self.state().exit_handler.borrow_mut();
+
         loop {
-            self.state()
-                .exit_handler
-                .borrow_mut()
-                .try_put_input(self, input);
+            // Insert input if the location is already known
+            exit_handler.try_put_input(self, input);
+
+            // Run QEMU
             let exit_reason = self.run();
-            let handler_res =
-                self.state()
-                    .exit_handler
-                    .borrow_mut()
-                    .handle(exit_reason, self, input)?;
+
+            // Handle QEMU exit
+            let handler_res = exit_handler.handle(exit_reason, self, input)?;
+
+            // Return to harness
             match handler_res {
                 InnerHandlerResult::ReturnToHarness(exit_reason) => {
                     return Ok(HandlerResult::UnhandledExit(exit_reason))
@@ -1332,7 +1334,9 @@ where
                 InnerHandlerResult::EndOfRun(exit_kind) => {
                     return Ok(HandlerResult::EndOfRun(exit_kind))
                 }
-                InnerHandlerResult::Interrupt => return Ok(HandlerResult::Interrupted),
+                InnerHandlerResult::Interrupt => {
+                    return Ok(HandlerResult::Interrupted)
+                },
                 InnerHandlerResult::Continue => {}
             }
         }

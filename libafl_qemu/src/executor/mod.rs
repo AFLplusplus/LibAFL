@@ -32,8 +32,6 @@ use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Signal};
 #[cfg(feature = "fork")]
 use libafl_bolts::shmem::ShMemProvider;
 
-#[cfg(emulation_mode = "usermode")]
-use crate::nopemuexithandler;
 use crate::{emu::Emulator, helper::QemuHelperTuple, hooks::QemuHooks, IsEmuExitHandler};
 
 /// A version of `QemuExecutor` with a state accessible from the harness.
