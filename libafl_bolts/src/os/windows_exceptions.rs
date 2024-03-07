@@ -463,7 +463,7 @@ pub(crate) unsafe fn setup_ctrl_handler<T: 'static + CtrlHandler>(
 }
 
 unsafe extern "system" fn ctrl_handler(ctrl_type: u32) -> BOOL {
-    let handler = core::ptr::read_volatile(addr_of!(CTRL_HANDLER));
+    let handler = ptr::read_volatile(addr_of!(CTRL_HANDLER));
     match handler {
         Some(handler_holder) => {
             info!("{:?}: Handling ctrl {}", std::process::id(), ctrl_type);
