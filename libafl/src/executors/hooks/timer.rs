@@ -1,7 +1,7 @@
 //! The struct `TimerStruct` will absorb all the difference in timeout implementation in various system.
-use core::time::Duration;
 #[cfg(any(windows, target_os = "linux"))]
 use core::ptr::addr_of_mut;
+use core::time::Duration;
 #[cfg(target_os = "linux")]
 use core::{
     mem::zeroed,
@@ -12,7 +12,11 @@ use core::{
 pub(crate) const ITIMER_REAL: core::ffi::c_int = 0;
 
 #[cfg(windows)]
-use core::sync::atomic::{compiler_fence, Ordering};
+use core::{
+    ffi::c_void,
+    ptr::write_volatile,
+    sync::atomic::{compiler_fence, Ordering},
+};
 
 #[cfg(target_os = "linux")]
 use libafl_bolts::current_time;
@@ -25,6 +29,9 @@ use windows::Win32::{
         PTP_TIMER, TP_CALLBACK_ENVIRON_V3,
     },
 };
+
+#[cfg(windows)]
+use crate::executors::hooks::inprocess::GLOBAL_STATE;
 
 #[repr(C)]
 #[cfg(all(unix, not(target_os = "linux")))]
