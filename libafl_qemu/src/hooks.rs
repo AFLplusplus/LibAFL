@@ -255,27 +255,40 @@ create_wrapper!(backdoor, (pc: GuestAddr));
 #[cfg(emulation_mode = "usermode")]
 static mut PRE_SYSCALL_HOOKS: Vec<Pin<Box<(PreSyscallHookId, FatPtr)>>> = vec![];
 #[cfg(emulation_mode = "usermode")]
-create_wrapper!(pre_syscall, (sys_num: i32,
-    a0: GuestAddr,
-    a1: GuestAddr,
-    a2: GuestAddr,
-    a3: GuestAddr,
-    a4: GuestAddr,
-    a5: GuestAddr,
-    a6: GuestAddr,
-    a7: GuestAddr), SyscallHookResult);
+create_wrapper!(
+    pre_syscall,
+    (
+        sys_num: i32,
+        a0: GuestAddr,
+        a1: GuestAddr,
+        a2: GuestAddr,
+        a3: GuestAddr,
+        a4: GuestAddr,
+        a5: GuestAddr,
+        a6: GuestAddr,
+        a7: GuestAddr
+    ),
+    SyscallHookResult
+);
 #[cfg(emulation_mode = "usermode")]
 static mut POST_SYSCALL_HOOKS: Vec<Pin<Box<(PostSyscallHookId, FatPtr)>>> = vec![];
 #[cfg(emulation_mode = "usermode")]
-create_wrapper!(post_syscall, (res: GuestAddr, sys_num: i32,
-    a0: GuestAddr,
-    a1: GuestAddr,
-    a2: GuestAddr,
-    a3: GuestAddr,
-    a4: GuestAddr,
-    a5: GuestAddr,
-    a6: GuestAddr,
-    a7: GuestAddr), GuestAddr);
+create_wrapper!(
+    post_syscall,
+    (
+        res: GuestAddr,
+        sys_num: i32,
+        a0: GuestAddr,
+        a1: GuestAddr,
+        a2: GuestAddr,
+        a3: GuestAddr,
+        a4: GuestAddr,
+        a5: GuestAddr,
+        a6: GuestAddr,
+        a7: GuestAddr
+    ),
+    GuestAddr
+);
 #[cfg(emulation_mode = "usermode")]
 static mut NEW_THREAD_HOOKS: Vec<Pin<Box<(NewThreadHookId, FatPtr)>>> = vec![];
 #[cfg(emulation_mode = "usermode")]
@@ -291,20 +304,44 @@ create_post_gen_wrapper!(block, (addr: GuestAddr, len: GuestUsize), 1, BlockHook
 create_exec_wrapper!(block, (id: u64), 0, 1, BlockHookId);
 
 static mut READ_HOOKS: Vec<Pin<Box<HookState<5, ReadHookId>>>> = vec![];
-create_gen_wrapper!(read, (pc: GuestAddr, info: MemAccessInfo), u64, 5, ReadHookId);
+create_gen_wrapper!(
+    read,
+    (pc: GuestAddr, info: MemAccessInfo),
+    u64,
+    5,
+    ReadHookId
+);
 create_exec_wrapper!(read, (id: u64, addr: GuestAddr), 0, 5, ReadHookId);
 create_exec_wrapper!(read, (id: u64, addr: GuestAddr), 1, 5, ReadHookId);
 create_exec_wrapper!(read, (id: u64, addr: GuestAddr), 2, 5, ReadHookId);
 create_exec_wrapper!(read, (id: u64, addr: GuestAddr), 3, 5, ReadHookId);
-create_exec_wrapper!(read, (id: u64, addr: GuestAddr, size: usize), 4, 5, ReadHookId);
+create_exec_wrapper!(
+    read,
+    (id: u64, addr: GuestAddr, size: usize),
+    4,
+    5,
+    ReadHookId
+);
 
 static mut WRITE_HOOKS: Vec<Pin<Box<HookState<5, WriteHookId>>>> = vec![];
-create_gen_wrapper!(write, (pc: GuestAddr, info: MemAccessInfo), u64, 5, WriteHookId);
+create_gen_wrapper!(
+    write,
+    (pc: GuestAddr, info: MemAccessInfo),
+    u64,
+    5,
+    WriteHookId
+);
 create_exec_wrapper!(write, (id: u64, addr: GuestAddr), 0, 5, WriteHookId);
 create_exec_wrapper!(write, (id: u64, addr: GuestAddr), 1, 5, WriteHookId);
 create_exec_wrapper!(write, (id: u64, addr: GuestAddr), 2, 5, WriteHookId);
 create_exec_wrapper!(write, (id: u64, addr: GuestAddr), 3, 5, WriteHookId);
-create_exec_wrapper!(write, (id: u64, addr: GuestAddr, size: usize), 4, 5, WriteHookId);
+create_exec_wrapper!(
+    write,
+    (id: u64, addr: GuestAddr, size: usize),
+    4,
+    5,
+    WriteHookId
+);
 
 static mut CMP_HOOKS: Vec<Pin<Box<HookState<4, CmpHookId>>>> = vec![];
 create_gen_wrapper!(cmp, (pc: GuestAddr, size: usize), u64, 4, CmpHookId);
