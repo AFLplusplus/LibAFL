@@ -47,7 +47,6 @@ use crate::{
         EventProcessor, EventRestarter, HasCustomBufHandlers, HasEventManagerId, ProgressReporter,
     },
     executors::{Executor, HasObservers},
-    feedbacks::transferred::TransferringMetadata,
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, UsesInput},
     monitors::Monitor,
@@ -611,8 +610,12 @@ where
         for<'a> E::Observers: Deserialize<'a>,
         Z: ExecutionProcessor<E::Observers, State = S> + EvaluatorObservers<E::Observers>,
     {
-        self.hooks
-            .pre_exec_all(fuzzer, executor, state, client_id, &event)?;
+        if self
+            .hooks
+            .pre_exec_all(fuzzer, executor, state, client_id, &event)?
+        {
+            return Ok(());
+        }
         match event {
             Event::NewTestcase {
                 input,
@@ -626,9 +629,6 @@ where
             } => {
                 log::info!("Received new Testcase from {client_id:?} ({client_config:?}, forward {forward_id:?})");
 
-                if let Ok(meta) = state.metadata_mut::<TransferringMetadata>() {
-                    meta.set_transferring(true);
-                }
                 let res = if client_config.match_with(&self.configuration)
                     && observers_buf.is_some()
                 {
@@ -654,9 +654,6 @@ where
                         state, executor, self, input, false,
                     )?
                 };
-                if let Ok(meta) = state.metadata_mut::<TransferringMetadata>() {
-                    meta.set_transferring(false);
-                }
                 if let Some(item) = res.1 {
                     log::info!("Added received Testcase as item #{item}");
                 }
@@ -1597,7 +1594,7 @@ where
         executor: &mut E,
         state: &mut S,
         manager: &mut EM,
-        _client_id: ClientId,
+        client_id: ClientId,
         event: Event<DI>,
     ) -> Result<(), Error>
     where
@@ -1617,15 +1614,12 @@ where
                 executions: _,
                 forward_id,
             } => {
-                log::info!("Received new Testcase to convert from {_client_id:?} (forward {forward_id:?}, forward {forward_id:?})");
+                log::info!("Received new Testcase to convert from {client_id:?} (forward {forward_id:?}, forward {forward_id:?})");
 
                 let Some(converter) = self.converter_back.as_mut() else {
                     return Ok(());
                 };
 
-                if let Ok(meta) = state.metadata_mut::<TransferringMetadata>() {
-                    meta.set_transferring(true);
-                }
                 let res = fuzzer.evaluate_input_with_observers::<E, EM>(
                     state,
                     executor,
@@ -1633,9 +1627,6 @@ where
                     converter.convert(input)?,
                     false,
                 )?;
-                if let Ok(meta) = state.metadata_mut::<TransferringMetadata>() {
-                    meta.set_transferring(false);
-                }
 
                 if let Some(item) = res.1 {
                     log::info!("Added received Testcase as item #{item}");

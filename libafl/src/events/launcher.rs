@@ -33,12 +33,12 @@ use libafl_bolts::os::startable_self;
 use libafl_bolts::{
     core_affinity::get_core_ids,
     os::{dup2, fork, ForkResult},
-    tuples::tuple_list,
 };
 use libafl_bolts::{
     core_affinity::{CoreId, Cores},
     llmp::DEFAULT_CLIENT_TIMEOUT_SECS,
     shmem::ShMemProvider,
+    tuples::tuple_list,
 };
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
@@ -165,6 +165,13 @@ where
     pub fn launch(&mut self) -> Result<(), Error> {
         Self::launch_with_hooks(self, tuple_list!())
     }
+
+    /// Launch the broker and the clients and fuzz
+    #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
+    #[allow(unused_mut, clippy::match_wild_err_arm)]
+    pub fn launch(&mut self) -> Result<(), Error> {
+        Self::launch_with_hooks(self, tuple_list!())
+    }
 }
 
 #[cfg(feature = "std")]
@@ -270,7 +277,7 @@ where
             log::info!("I am broker!!.");
 
             // TODO we don't want always a broker here, think about using different laucher process to spawn different configurations
-            RestartingMgr::<(), MT, S, SP>::builder()
+            RestartingMgr::<EMH, MT, S, SP>::builder()
                 .shmem_provider(self.shmem_provider.clone())
                 .monitor(Some(self.monitor.clone()))
                 .broker_port(self.broker_port)
@@ -280,7 +287,7 @@ where
                 .configuration(self.configuration)
                 .serialize_state(self.serialize_state)
                 .client_timeout(self.client_timeout)
-                .hooks(tuple_list!())
+                .hooks(hooks)
                 .build()
                 .launch()?;
 
@@ -311,7 +318,7 @@ where
     /// Launch the broker and the clients and fuzz
     #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
     #[allow(unused_mut, clippy::match_wild_err_arm)]
-    pub fn launch(&mut self) -> Result<(), Error> {
+    pub fn launch(&mut self, hooks: EMH) -> Result<(), Error> {
         use libafl_bolts::core_affinity;
 
         let is_client = std::env::var(_AFL_LAUNCHER_CLIENT);
@@ -324,7 +331,7 @@ where
                 // let debug_output = std::env::var(LIBAFL_DEBUG_OUTPUT).is_ok();
 
                 // the actual client. do the fuzzing
-                let (state, mgr) = RestartingMgr::<MT, S, SP>::builder()
+                let (state, mgr) = RestartingMgr::<EMH, MT, S, SP>::builder()
                     .shmem_provider(self.shmem_provider.clone())
                     .broker_port(self.broker_port)
                     .kind(ManagerKind::Client {
@@ -333,6 +340,7 @@ where
                     .configuration(self.configuration)
                     .serialize_state(self.serialize_state)
                     .client_timeout(self.client_timeout)
+                    .hooks(hooks)
                     .build()
                     .launch()?;
 
@@ -393,7 +401,7 @@ where
             #[cfg(feature = "std")]
             log::info!("I am broker!!.");
 
-            RestartingMgr::<MT, S, SP>::builder()
+            RestartingMgr::<EMH, MT, S, SP>::builder()
                 .shmem_provider(self.shmem_provider.clone())
                 .monitor(Some(self.monitor.clone()))
                 .broker_port(self.broker_port)
@@ -403,6 +411,7 @@ where
                 .configuration(self.configuration)
                 .serialize_state(self.serialize_state)
                 .client_timeout(self.client_timeout)
+                .hooks(hooks)
                 .build()
                 .launch()?;
 
