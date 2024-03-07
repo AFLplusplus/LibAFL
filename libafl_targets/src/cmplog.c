@@ -121,7 +121,7 @@ static long area_is_valid(const void *ptr, size_t len) {
     dymmy_initialized = 1;
   }
 
-  valid_len = syscall(SYS_write, dummy_fd[1], ptr, len);
+  valid_len = write(dummy_fd[1], ptr, len);
 
   if (valid_len <= 0 || valid_len > (long)len) { return 0; }
 #endif
