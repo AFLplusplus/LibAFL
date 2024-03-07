@@ -33,6 +33,7 @@ use libafl_bolts::os::startable_self;
 use libafl_bolts::{
     core_affinity::get_core_ids,
     os::{dup2, fork, ForkResult},
+    tuples::tuple_list,
 };
 use libafl_bolts::{
     core_affinity::{CoreId, Cores},
@@ -42,6 +43,7 @@ use libafl_bolts::{
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
+use super::hooks::EventManagerHooksTuple;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use crate::events::{CentralizedEventManager, CentralizedLlmpEventBroker};
 #[cfg(feature = "std")]
@@ -72,9 +74,10 @@ const LIBAFL_DEBUG_OUTPUT: &str = "LIBAFL_DEBUG_OUTPUT";
     clippy::ignored_unit_patterns
 )]
 #[derive(TypedBuilder)]
-pub struct Launcher<'a, CF, MT, S, SP>
+pub struct Launcher<'a, CF, EMH, MT, S, SP>
 where
-    CF: FnOnce(Option<S>, LlmpRestartingEventManager<S, SP>, CoreId) -> Result<(), Error>,
+    CF: FnOnce(Option<S>, LlmpRestartingEventManager<EMH, S, SP>, CoreId) -> Result<(), Error>,
+    EMH: EventManagerHooksTuple<S>,
     S::Input: 'a,
     MT: Monitor,
     SP: ShMemProvider + 'static,
@@ -126,12 +129,13 @@ where
     #[builder(default = true)]
     serialize_state: bool,
     #[builder(setter(skip), default = PhantomData)]
-    phantom_data: PhantomData<(&'a S, &'a SP)>,
+    phantom_data: PhantomData<(&'a S, &'a SP, EMH)>,
 }
 
-impl<CF, MT, S, SP> Debug for Launcher<'_, CF, MT, S, SP>
+impl<CF, EMH, MT, S, SP> Debug for Launcher<'_, CF, EMH, MT, S, SP>
 where
-    CF: FnOnce(Option<S>, LlmpRestartingEventManager<S, SP>, CoreId) -> Result<(), Error>,
+    CF: FnOnce(Option<S>, LlmpRestartingEventManager<EMH, S, SP>, CoreId) -> Result<(), Error>,
+    EMH: EventManagerHooksTuple<S>,
     MT: Monitor + Clone,
     SP: ShMemProvider + 'static,
     S: State,
@@ -149,18 +153,34 @@ where
     }
 }
 
-#[cfg(feature = "std")]
-impl<'a, CF, MT, S, SP> Launcher<'a, CF, MT, S, SP>
+impl<'a, CF, MT, S, SP> Launcher<'a, CF, (), MT, S, SP>
 where
-    CF: FnOnce(Option<S>, LlmpRestartingEventManager<S, SP>, CoreId) -> Result<(), Error>,
+    CF: FnOnce(Option<S>, LlmpRestartingEventManager<(), S, SP>, CoreId) -> Result<(), Error>,
     MT: Monitor + Clone,
     S: State + HasExecutions,
     SP: ShMemProvider + 'static,
 {
     /// Launch the broker and the clients and fuzz
     #[cfg(all(unix, feature = "std", feature = "fork"))]
-    #[allow(clippy::similar_names)]
     pub fn launch(&mut self) -> Result<(), Error> {
+        Self::launch_with_hooks(self, tuple_list!())
+    }
+}
+
+#[cfg(feature = "std")]
+impl<'a, CF, EMH, MT, S, SP> Launcher<'a, CF, EMH, MT, S, SP>
+where
+    CF: FnOnce(Option<S>, LlmpRestartingEventManager<EMH, S, SP>, CoreId) -> Result<(), Error>,
+    EMH: EventManagerHooksTuple<S> + Clone + Copy,
+    MT: Monitor + Clone,
+    S: State + HasExecutions,
+    SP: ShMemProvider + 'static,
+{
+    /// Launch the broker and the clients and fuzz with a user-supplied hook
+    #[cfg(all(unix, feature = "std", feature = "fork"))]
+    #[allow(clippy::similar_names)]
+    #[allow(clippy::too_many_lines)]
+    pub fn launch_with_hooks(&mut self, hooks: EMH) -> Result<(), Error> {
         if self.cores.ids.is_empty() {
             return Err(Error::illegal_argument(
                 "No cores to spawn on given, cannot launch anything.",
@@ -226,7 +246,7 @@ where
                         }
 
                         // Fuzzer client. keeps retrying the connection to broker till the broker starts
-                        let (state, mgr) = RestartingMgr::<MT, S, SP>::builder()
+                        let (state, mgr) = RestartingMgr::<EMH, MT, S, SP>::builder()
                             .shmem_provider(self.shmem_provider.clone())
                             .broker_port(self.broker_port)
                             .kind(ManagerKind::Client {
@@ -235,6 +255,7 @@ where
                             .configuration(self.configuration)
                             .serialize_state(self.serialize_state)
                             .client_timeout(self.client_timeout)
+                            .hooks(hooks)
                             .build()
                             .launch()?;
 
@@ -249,7 +270,7 @@ where
             log::info!("I am broker!!.");
 
             // TODO we don't want always a broker here, think about using different laucher process to spawn different configurations
-            RestartingMgr::<MT, S, SP>::builder()
+            RestartingMgr::<(), MT, S, SP>::builder()
                 .shmem_provider(self.shmem_provider.clone())
                 .monitor(Some(self.monitor.clone()))
                 .broker_port(self.broker_port)
@@ -259,6 +280,7 @@ where
                 .configuration(self.configuration)
                 .serialize_state(self.serialize_state)
                 .client_timeout(self.client_timeout)
+                .hooks(tuple_list!())
                 .build()
                 .launch()?;
 
@@ -410,7 +432,7 @@ pub struct CentralizedLauncher<'a, CF, MT, S, SP>
 where
     CF: FnOnce(
         Option<S>,
-        CentralizedEventManager<LlmpRestartingEventManager<S, SP>, SP>,
+        CentralizedEventManager<LlmpRestartingEventManager<(), S, SP>, SP>, // No hooks for centralized EM
         CoreId,
     ) -> Result<(), Error>,
     S::Input: 'a,
@@ -476,7 +498,7 @@ impl<CF, MT, S, SP> Debug for CentralizedLauncher<'_, CF, MT, S, SP>
 where
     CF: FnOnce(
         Option<S>,
-        CentralizedEventManager<LlmpRestartingEventManager<S, SP>, SP>,
+        CentralizedEventManager<LlmpRestartingEventManager<(), S, SP>, SP>,
         CoreId,
     ) -> Result<(), Error>,
     MT: Monitor + Clone,
@@ -501,7 +523,7 @@ impl<'a, CF, MT, S, SP> CentralizedLauncher<'a, CF, MT, S, SP>
 where
     CF: FnOnce(
         Option<S>,
-        CentralizedEventManager<LlmpRestartingEventManager<S, SP>, SP>,
+        CentralizedEventManager<LlmpRestartingEventManager<(), S, SP>, SP>,
         CoreId,
     ) -> Result<(), Error>,
     MT: Monitor + Clone,
@@ -597,7 +619,7 @@ where
                         }
 
                         // Fuzzer client. keeps retrying the connection to broker till the broker starts
-                        let (state, mgr) = RestartingMgr::<MT, S, SP>::builder()
+                        let (state, mgr) = RestartingMgr::<(), MT, S, SP>::builder()
                             .shmem_provider(self.shmem_provider.clone())
                             .broker_port(self.broker_port)
                             .kind(ManagerKind::Client {
@@ -606,6 +628,7 @@ where
                             .configuration(self.configuration)
                             .serialize_state(self.serialize_state)
                             .client_timeout(self.client_timeout)
+                            .hooks(tuple_list!())
                             .build()
                             .launch()?;
 
@@ -626,7 +649,7 @@ where
             log::info!("I am broker!!.");
 
             // TODO we don't want always a broker here, think about using different laucher process to spawn different configurations
-            RestartingMgr::<MT, S, SP>::builder()
+            RestartingMgr::<(), MT, S, SP>::builder()
                 .shmem_provider(self.shmem_provider.clone())
                 .monitor(Some(self.monitor.clone()))
                 .broker_port(self.broker_port)
@@ -636,6 +659,7 @@ where
                 .configuration(self.configuration)
                 .serialize_state(self.serialize_state)
                 .client_timeout(self.client_timeout)
+                .hooks(tuple_list!())
                 .build()
                 .launch()?;
 

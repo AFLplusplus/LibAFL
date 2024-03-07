@@ -1,4 +1,11 @@
-//! A wrapper manager to implement a main-secondary architecture with point-to-point channels
+//! Centralized event manager is a special event manager that will be used to achieve a more efficient message passing architecture.
+
+// Some technical details..
+// A very standard multi-process fuzzing using centralized event manager will consist of 4 components
+// 1. The "fuzzer clients", the fuzzer that will do the "normal" fuzzing
+// 2. The "centralized broker, the broker that gathers all the testcases from all the fuzzer clients
+// 3. The "main evaluator", the evaluator node that will evaluate all the testcases pass by the centralized event manager to see if the testcases are worth propagating
+// 4. The "main broker", the gathers the stats from the fuzzer clients and broadcast the newly found testcases from the main evaluator.
 
 use alloc::{boxed::Box, string::String, vec::Vec};
 use core::{marker::PhantomData, num::NonZeroUsize, time::Duration};
