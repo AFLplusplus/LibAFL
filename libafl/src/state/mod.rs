@@ -170,7 +170,7 @@ pub trait HasMetadata {
     }
 
     /// Gets metadata, or inserts it using the given construction function `default`
-    fn or_insert_metadata_with<M>(&mut self, default: impl FnOnce() -> M) -> &mut M
+    fn metadata_or_insert_with<M>(&mut self, default: impl FnOnce() -> M) -> &mut M
     where
         M: SerdeAny,
     {
@@ -189,7 +189,7 @@ pub trait HasMetadata {
     /// Check for a metadata
     ///
     /// # Note
-    /// For performance reasons, you likely want to use [`Self::or_insert_metadata_with`] instead
+    /// For performance reasons, you likely want to use [`Self::metadata_or_insert_with`] instead
     #[inline]
     fn has_metadata<M>(&self) -> bool
     where
@@ -247,7 +247,7 @@ pub trait HasNamedMetadata {
     }
 
     /// Gets metadata, or inserts it using the given construction function `default`
-    fn or_insert_named_metadata_with<M>(
+    fn named_metadata_or_insert_with<M>(
         &mut self,
         name: &str,
         default: impl FnOnce() -> M,
@@ -262,7 +262,7 @@ pub trait HasNamedMetadata {
     /// Check for a metadata
     ///
     /// # Note
-    /// You likely want to use [`Self::or_insert_named_metadata_with`] for performance reasons.
+    /// You likely want to use [`Self::named_metadata_or_insert_with`] for performance reasons.
     #[inline]
     fn has_named_metadata<M>(&self, name: &str) -> bool
     where

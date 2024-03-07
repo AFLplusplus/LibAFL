@@ -498,7 +498,7 @@ where
         }
     }
     let state = state.expect("The gen_unique_edge_ids hook works only for in-process fuzzing");
-    let meta = state.or_insert_metadata_with(QemuEdgesMapMetadata::new)
+    let meta = state.metadata_or_insert_with(QemuEdgesMapMetadata::new)
 
     match meta.map.entry((src, dest)) {
         Entry::Occupied(e) => {

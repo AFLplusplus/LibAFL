@@ -621,7 +621,7 @@ impl ExecutionCountProgressHelper {
         S: HasMetadata + HasExecutions,
     {
         let executions = *state.executions();
-        let metadata = state.or_insert_metadata_with(|| ExecutionCountProgressHelperMetadata {
+        let metadata = state.metadata_or_insert_with(|| ExecutionCountProgressHelperMetadata {
             started_at_execs: executions,
         });
         self.started_at_execs = Some(metadata.started_at_execs);
@@ -892,7 +892,7 @@ pub mod test {
     {
         fn initialize_progress(state: &mut S, _stage: &ST) -> Result<(), Error> {
             // check if we're resuming
-            let _ = state.or_insert_metadata_with(|| Self { count: 0 });
+            let _ = state.metadata_or_insert_with(|| Self { count: 0 });
             Ok(())
         }
 

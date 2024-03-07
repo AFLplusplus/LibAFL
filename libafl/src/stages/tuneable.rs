@@ -487,7 +487,7 @@ where
     /// Creates a new tranforming mutational stage
     #[must_use]
     pub fn transforming(state: &mut Z::State, mutator: M, name: &str) -> Self {
-        let _ = state.or_insert_named_metadata_with(name, TuneableMutationalStageMetadata::default);
+        let _ = state.named_metadata_or_insert_with(name, TuneableMutationalStageMetadata::default);
         Self {
             mutator,
             name: name.to_string(),

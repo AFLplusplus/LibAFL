@@ -232,7 +232,7 @@ where
         S: HasMetadata,
     {
         #[allow(clippy::option_if_let_else)] // we can't mutate state in a closure
-        let meta = state.or_insert_metadata_with(|| M::new_metadata());
+        let meta = state.metadata_or_insert_with(|| M::new_metadata());
 
         let usable_count = self.usable_count();
         let cmp_observer_data = self.cmp_observer_data();

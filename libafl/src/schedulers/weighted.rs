@@ -114,8 +114,8 @@ where
     /// Create a new [`WeightedScheduler`]
     #[must_use]
     pub fn with_schedule(state: &mut S, map_observer: &O, strat: Option<PowerSchedule>) -> Self {
-        let _ = state.or_insert_metadata_with(|| SchedulerMetadata::new(strat));
-        let _ = state.or_insert_metadata_with(WeightedScheduleMetadata::new);
+        let _ = state.metadata_or_insert_with(|| SchedulerMetadata::new(strat));
+        let _ = state.metadata_or_insert_with(WeightedScheduleMetadata::new);
 
         Self {
             strat,
