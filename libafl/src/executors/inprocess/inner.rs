@@ -102,13 +102,18 @@ where
     S: State,
 {
     /// This function marks the boundary between the fuzzer and the target
+    ///
+    /// # Safety
+    /// This function sets a bunch of raw pointers in global variables, reused in other parts of
+    /// the code.
     #[inline]
-    pub fn enter_target<EM, Z>(
+    pub unsafe fn enter_target<EM, Z>(
         &mut self,
         fuzzer: &mut Z,
         state: &mut <Self as UsesState>::State,
         mgr: &mut EM,
         input: &<Self as UsesInput>::Input,
+        executor_ptr: *const c_void,
     ) {
         unsafe {
             let data = addr_of_mut!(GLOBAL_STATE);
@@ -116,10 +121,7 @@ where
                 addr_of_mut!((*data).current_input_ptr),
                 ptr::from_ref(input) as *const c_void,
             );
-            write_volatile(
-                addr_of_mut!((*data).executor_ptr),
-                ptr::from_ref(self) as *const c_void,
-            );
+            write_volatile(addr_of_mut!((*data).executor_ptr), executor_ptr);
             // Direct raw pointers access /aliasing is pretty undefined behavior.
             // Since the state and event may have moved in memory, refresh them right before the signal may happen
             write_volatile(
