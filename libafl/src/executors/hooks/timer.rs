@@ -296,12 +296,6 @@ impl TimerStruct {
     pub fn set_timer(&mut self) {
         unsafe {
             if self.batch_mode {
-                let data = addr_of_mut!(GLOBAL_STATE);
-                write_volatile(
-                    addr_of_mut!((*data).executor_ptr),
-                    ptr::from_mut(self) as *mut c_void,
-                );
-
                 if self.executions == 0 {
                     libc::timer_settime(self.timerid, 0, addr_of_mut!(self.itimerspec), null_mut());
                     self.tmout_start_time = current_time();
