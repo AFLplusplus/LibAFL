@@ -892,9 +892,7 @@ pub mod test {
     {
         fn initialize_progress(state: &mut S, _stage: &ST) -> Result<(), Error> {
             // check if we're resuming
-            if !state.has_metadata::<Self>() {
-                state.add_metadata(Self { count: 0 });
-            }
+            let _ = state.or_insert_metadata_with(|| Self { count: 0 });
             Ok(())
         }
 

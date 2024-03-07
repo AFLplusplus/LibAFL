@@ -297,18 +297,16 @@ pub mod serdeany_registry {
         }
 
         /// Gets a value by type, or inserts it using the given construction function `default`
-        pub fn or_insert_with<CB, T>(&mut self, default: CB) -> &mut T
+        pub fn or_insert_with<T>(&mut self, default: impl FnOnce() -> T) -> &mut T
         where
-            CB: FnOnce() -> T,
             T: SerdeAny,
         {
-            self.or_insert_with_boxed::<_, T>(|| Box::new(default()))
+            self.or_insert_with_boxed::<T>(|| Box::new(default()))
         }
 
         /// Gets a value by type, or inserts it using the given construction function `default` (returning a boxed value)
-        pub fn or_insert_with_boxed<CB, T>(&mut self, default: CB) -> &mut T
+        pub fn or_insert_with_boxed<T>(&mut self, default: impl FnOnce() -> Box<T>) -> &mut T
         where
-            CB: FnOnce() -> Box<T>,
             T: SerdeAny + 'static,
         {
             let ret = self.entry::<T>().or_insert_with(|| default());
@@ -627,9 +625,8 @@ pub mod serdeany_registry {
         }
 
         /// Gets a value by name, or inserts it using the given construction function `default`
-        pub fn or_insert_with<CB, T>(&mut self, name: &str, default: CB) -> &mut T
+        pub fn or_insert_with<T>(&mut self, name: &str, default: impl FnOnce() -> T) -> &mut T
         where
-            CB: FnOnce() -> T,
             T: SerdeAny,
         {
             let ret = self.entry::<T>(name).or_insert_with(|| Box::new(default()));
@@ -637,9 +634,8 @@ pub mod serdeany_registry {
         }
 
         /// Gets a value by name, or inserts it using the given construction function `default` (returning a boxed value)
-        pub fn or_insert_with_boxed<CB, T>(&mut self, name: &str, default: CB) -> &mut T
+        pub fn or_insert_with_boxed<T>(&mut self, name: &str, default: impl FnOnce() -> Box<T>) -> &mut T
         where
-            CB: FnOnce() -> Box<T>,
             T: SerdeAny + 'static,
         {
             let ret = self.entry::<T>(name).or_insert_with(|| default());

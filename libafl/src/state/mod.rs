@@ -170,12 +170,11 @@ pub trait HasMetadata {
     }
 
     /// Gets metadata, or inserts it using the given construction function `default`
-    fn or_insert_metadata_with<CB, M>(&mut self, default: CB) -> &mut M
+    fn or_insert_metadata_with<M>(&mut self, default: impl FnOnce() -> M) -> &mut M
     where
-        CB: FnOnce() -> M,
         M: SerdeAny,
     {
-        self.metadata_map_mut().or_insert_with::<CB, M>(default)
+        self.metadata_map_mut().or_insert_with::<M>(default)
     }
 
     /// Remove a metadata from the metadata map
@@ -248,13 +247,16 @@ pub trait HasNamedMetadata {
     }
 
     /// Gets metadata, or inserts it using the given construction function `default`
-    fn or_insert_named_metadata_with<CB, M>(&mut self, name: &str, default: CB) -> &mut M
+    fn or_insert_named_metadata_with<M>(
+        &mut self,
+        name: &str,
+        default: impl FnOnce() -> M,
+    ) -> &mut M
     where
-        CB: FnOnce() -> M,
         M: SerdeAny,
     {
         self.named_metadata_map_mut()
-            .or_insert_with::<CB, M>(name, default)
+            .or_insert_with::<M>(name, default)
     }
 
     /// Check for a metadata
