@@ -215,7 +215,7 @@ pub fn fuzz() {
             &mut fuzzer,
             &mut state,
             &mut mgr,
-            timeout
+            timeout,
         )
         .expect("Failed to create QemuExecutor");
 

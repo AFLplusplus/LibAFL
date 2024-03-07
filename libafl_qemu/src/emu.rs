@@ -1334,9 +1334,7 @@ where
                 InnerHandlerResult::EndOfRun(exit_kind) => {
                     return Ok(HandlerResult::EndOfRun(exit_kind))
                 }
-                InnerHandlerResult::Interrupt => {
-                    return Ok(HandlerResult::Interrupted)
-                },
+                InnerHandlerResult::Interrupt => return Ok(HandlerResult::Interrupted),
                 InnerHandlerResult::Continue => {}
             }
         }
