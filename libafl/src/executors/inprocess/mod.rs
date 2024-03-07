@@ -9,8 +9,10 @@ use alloc::boxed::Box;
 use core::ptr::addr_of_mut;
 use core::{
     borrow::BorrowMut,
+    ffi::c_void,
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
+    ptr,
     time::Duration,
 };
 
@@ -125,7 +127,11 @@ where
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
-        self.inner.enter_target(fuzzer, state, mgr, input);
+        unsafe {
+            let executor_ptr = ptr::from_ref(self) as *const c_void;
+            self.inner
+                .enter_target(fuzzer, state, mgr, input, executor_ptr);
+        }
         self.inner.hooks.pre_exec_all(fuzzer, state, mgr, input);
 
         let ret = (self.harness_fn.borrow_mut())(input);
