@@ -18,9 +18,8 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, UsesInput},
-    prelude::HasNamedMetadata,
     stages::{RetryRestartHelper, Stage},
-    state::{HasCorpus, HasExecutions, HasMetadata, HasRand, State, UsesState},
+    state::{HasCorpus, HasExecutions, HasMetadata, HasNamedMetadata, HasRand, State, UsesState},
     Error,
 };
 

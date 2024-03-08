@@ -11,10 +11,9 @@ use crate::{
     inputs::Input,
     mark_feature_time,
     mutators::{MultiMutator, MutationResult, Mutator},
-    prelude::HasNamedMetadata,
     stages::{ExecutionCountRestartHelper, RetryRestartHelper, Stage},
     start_timer,
-    state::{HasCorpus, HasExecutions, HasMetadata, HasRand, UsesState},
+    state::{HasCorpus, HasExecutions, HasMetadata, HasNamedMetadata, HasRand, UsesState},
     Error,
 };
 #[cfg(feature = "introspection")]
