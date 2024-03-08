@@ -44,10 +44,19 @@ pub type GuestPhysAddr = libafl_qemu_sys::hwaddr;
 
 pub type GuestHwAddrInfo = libafl_qemu_sys::qemu_plugin_hwaddr;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum GuestAddrKind {
     Physical(GuestPhysAddr),
     Virtual(GuestVirtAddr),
+}
+
+impl Debug for GuestAddrKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GuestAddrKind::Physical(paddr) => write!(f, "vaddr {:x}", paddr),
+            GuestAddrKind::Virtual(vaddr) => write!(f, "paddr {:x}", vaddr),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -112,6 +121,38 @@ pub trait IsSnapshotManager: Debug + Clone {
     ) -> Result<(), SnapshotManagerError>
     where
         E: IsEmuExitHandler;
+}
+
+#[derive(Debug, Clone)]
+pub enum SnapshotManager {
+    Qemu(QemuSnapshotManager),
+    Fast(FastSnapshotManager),
+}
+
+impl IsSnapshotManager for SnapshotManager {
+    fn save<E>(&mut self, emu: &Emulator<E>) -> SnapshotId
+    where
+        E: IsEmuExitHandler,
+    {
+        match self {
+            SnapshotManager::Qemu(qemu_sm) => qemu_sm.save(emu),
+            SnapshotManager::Fast(fast_sm) => fast_sm.save(emu),
+        }
+    }
+
+    fn restore<E>(
+        &mut self,
+        snapshot_id: &SnapshotId,
+        emu: &Emulator<E>,
+    ) -> Result<(), SnapshotManagerError>
+    where
+        E: IsEmuExitHandler,
+    {
+        match self {
+            SnapshotManager::Qemu(qemu_sm) => qemu_sm.restore(snapshot_id, emu),
+            SnapshotManager::Fast(fast_sm) => fast_sm.restore(snapshot_id, emu),
+        }
+    }
 }
 
 // TODO: Rework with generics for command handlers?

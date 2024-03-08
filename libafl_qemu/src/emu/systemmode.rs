@@ -35,18 +35,18 @@ impl SnapshotId {
 pub type FastSnapshotPtr = *mut libafl_qemu_sys::SyxSnapshot;
 
 #[derive(Debug, Clone)]
-pub struct FastSnapshotBuilder {
+pub struct FastSnapshotManager {
     snapshots: HashMap<SnapshotId, FastSnapshotPtr>,
     check_memory_consistency: bool,
 }
 
-impl Default for FastSnapshotBuilder {
+impl Default for FastSnapshotManager {
     fn default() -> Self {
         Self::new(false)
     }
 }
 
-impl FastSnapshotBuilder {
+impl FastSnapshotManager {
     pub fn new(check_memory_consistency: bool) -> Self {
         Self {
             snapshots: HashMap::new(),
@@ -60,11 +60,11 @@ impl FastSnapshotBuilder {
 }
 
 #[derive(Debug, Clone)]
-pub struct QemuSnapshotBuilder {
+pub struct QemuSnapshotManager {
     is_sync: bool,
 }
 
-impl QemuSnapshotBuilder {
+impl QemuSnapshotManager {
     pub fn new(is_sync: bool) -> Self {
         Self { is_sync }
     }
@@ -74,7 +74,7 @@ impl QemuSnapshotBuilder {
     }
 }
 
-impl IsSnapshotManager for QemuSnapshotBuilder {
+impl IsSnapshotManager for QemuSnapshotManager {
     fn save<E>(&mut self, emu: &Emulator<E>) -> SnapshotId
     where
         E: IsEmuExitHandler,
@@ -100,7 +100,7 @@ impl IsSnapshotManager for QemuSnapshotBuilder {
     }
 }
 
-impl IsSnapshotManager for FastSnapshotBuilder {
+impl IsSnapshotManager for FastSnapshotManager {
     fn save<E>(&mut self, emu: &Emulator<E>) -> SnapshotId
     where
         E: IsEmuExitHandler,
