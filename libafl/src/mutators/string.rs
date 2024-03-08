@@ -413,14 +413,13 @@ where
         }
 
         let tokens_len = {
-            let meta = state.metadata_map().get::<Tokens>();
-            if meta.is_none() {
+            let Some(meta) = state.metadata_map().get::<Tokens>() else {
+                return Ok(MutationResult::Skipped);
+            };
+            if meta.tokens().is_empty() {
                 return Ok(MutationResult::Skipped);
             }
-            if meta.unwrap().tokens().is_empty() {
-                return Ok(MutationResult::Skipped);
-            }
-            meta.unwrap().tokens().len()
+            meta.tokens().len()
         };
         let token_idx = state.rand_mut().below(tokens_len as u64) as usize;
 
@@ -478,14 +477,13 @@ where
         }
 
         let tokens_len = {
-            let meta = state.metadata_map().get::<Tokens>();
-            if meta.is_none() {
+            let Some(meta) = state.metadata_map().get::<Tokens>() else {
+                return Ok(MutationResult::Skipped);
+            };
+            if meta.tokens().is_empty() {
                 return Ok(MutationResult::Skipped);
             }
-            if meta.unwrap().tokens().is_empty() {
-                return Ok(MutationResult::Skipped);
-            }
-            meta.unwrap().tokens().len()
+            meta.tokens().len()
         };
         let token_idx = state.rand_mut().below(tokens_len as u64) as usize;
 
