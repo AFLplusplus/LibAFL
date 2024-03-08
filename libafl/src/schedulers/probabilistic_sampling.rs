@@ -228,6 +228,8 @@ mod tests {
 
     #[test]
     fn test_prob_sampling() {
+        // # Safety
+        // No concurrency per testcase
         #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
         unsafe {
             super::ProbabilityMetadata::register();

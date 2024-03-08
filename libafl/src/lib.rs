@@ -159,6 +159,8 @@ mod tests {
     #[test]
     #[allow(clippy::similar_names)]
     fn test_fuzzer() {
+        // # Safety
+        // No concurrency per testcase
         #[cfg(miri)]
         unsafe {
             RegistryBuilder::register::<ExecutionCountRestartHelperMetadata>();

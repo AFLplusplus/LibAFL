@@ -970,6 +970,8 @@ pub mod test {
 
     #[test]
     fn test_tries_progress() -> Result<(), Error> {
+        // # Safety
+        // No concurrency per testcase
         #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
         unsafe {
             RetryRestartHelper::register();
