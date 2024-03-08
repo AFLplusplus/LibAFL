@@ -83,11 +83,11 @@ where
     EM: UsesState<State = Self::State>,
     Z: UsesState<State = Self::State>,
 {
-    /// This method will be called before every call to [`perform`].
+    /// This method will be called before every call to [`Stage::perform`].
     /// Initialize the restart tracking for this stage, _if it is not yet initialized_.
     /// On restart, this will be called again.
-    /// As long as [`clear_restart_progress`], all subsequent calls happen on restart.
-    /// Returns `true`, if the stage's [`perform`] method should run, else `false`.
+    /// As long as [`Stage::clear_restart_progress`], all subsequent calls happen on restart.
+    /// Returns `true`, if the stage's [`Stage::perform`] method should run, else `false`.
     fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error>;
 
     /// Clear the current status tracking of the associated stage
@@ -95,9 +95,9 @@ where
 
     /// Run the stage.
     ///
-    /// Before a call to perform, [`restart_progress_should_run`] will be (must be!) called.
-    /// After returning (so non-target crash or timeout in a restarting case), [`clear_restart_progress`] gets called.
-    /// A call to [`perform_restartable`] will do these things implicitly.
+    /// Before a call to perform, [`Stage::restart_progress_should_run`] will be (must be!) called.
+    /// After returning (so non-target crash or timeout in a restarting case), [`Stage::clear_restart_progress`] gets called.
+    /// A call to [`Stage::perform_restartable`] will do these things implicitly.
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -106,7 +106,7 @@ where
         manager: &mut EM,
     ) -> Result<(), Error>;
 
-    /// Run the stage, calling [`restart_progress_should_run`] and [`clear_restart_progress`] appropriately
+    /// Run the stage, calling [`Stage::restart_progress_should_run`] and [`Stage::clear_restart_progress`] appropriately
     fn perform_restartable(
         &mut self,
         fuzzer: &mut Z,
@@ -968,19 +968,6 @@ pub mod test {
         fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
             TestProgress::clear_restart_progress(state, self)
         }
-    }
-
-    #[must_use]
-    #[allow(clippy::type_complexity)]
-    pub fn test_resume_stages<S>() -> (Rc<RefCell<bool>>, tuple_list_type!(ResumeSucceededStage<S>))
-    {
-        let completed = Rc::new(RefCell::new(false));
-        (
-            completed.clone(),
-            tuple_list!(ResumeSucceededStage {
-                phantom: PhantomData
-            },),
-        )
     }
 
     #[test]

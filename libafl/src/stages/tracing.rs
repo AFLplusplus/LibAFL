@@ -40,7 +40,7 @@ where
     Z: UsesState<State = TE::State>,
 {
     /// Perform tracing on the given `CorpusId`. Useful for if wrapping [`TracingStage`] with your
-    /// own stage and you need to manage [`super::StageRestartHelper`] differently; see
+    /// own stage and you need to manage [`super::NestedStageRestartHelper`] differently; see
     /// [`super::ConcolicTracingStage`]'s implementation as an example of usage.
     pub fn trace(
         &mut self,
