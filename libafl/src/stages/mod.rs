@@ -5,7 +5,7 @@ Other stages may enrich [`crate::corpus::Testcase`]s with metadata.
 */
 
 use alloc::{boxed::Box, vec::Vec};
-use core::marker::PhantomData;
+use core::{any, marker::PhantomData};
 
 pub use calibrate::CalibrationStage;
 pub use colorization::*;
@@ -289,12 +289,23 @@ where
     type State = E::State;
 }
 
+impl<CB, E, EM, Z> Named for ClosureStage<CB, E, EM, Z>
+where
+    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<(), Error>,
+    E: UsesState,
+{
+    fn name(&self) -> &str {
+        any::type_name::<Self>()
+    }
+}
+
 impl<CB, E, EM, Z> Stage<E, EM, Z> for ClosureStage<CB, E, EM, Z>
 where
     CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<(), Error>,
     E: UsesState,
     EM: UsesState<State = E::State>,
     Z: UsesState<State = E::State>,
+    E::State: HasNamedMetadata,
 {
     fn perform(
         &mut self,
@@ -307,13 +318,14 @@ where
     }
 
     #[inline]
-    fn handle_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
-        Ok(())
+    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        // Make sure we don't get stuck crashing on a single closure
+        RetryRestartHelper::handle_restart_progress(state, self, 3)
     }
 
     #[inline]
-    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
-        Ok(())
+    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        RetryRestartHelper::clear_restart_progress(state, self)
     }
 }
 
@@ -433,6 +445,7 @@ where
 
     #[inline]
     fn handle_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        // TODO: Proper restart handling - call post_exec at the right time, etc...
         Ok(())
     }
 
@@ -800,6 +813,12 @@ pub mod pybind {
         type State = PythonStdState;
     }
 
+    impl Named for PythonStage {
+        fn name(&self) -> &str {
+            "PythonStage"
+        }
+    }
+
     impl Stage<PythonExecutor, PythonEventManager, PythonStdFuzzer> for PythonStage {
         #[inline]
         #[allow(clippy::let_and_return)]
@@ -816,15 +835,15 @@ pub mod pybind {
         }
 
         #[inline]
-        fn handle_restart_progress(&mut self, _state: &mut PythonStdState) -> Result<(), Error> {
-            // TODO we need to apply MutationalStage-like resumption here
-            Ok(())
+        fn handle_restart_progress(&mut self, state: &mut PythonStdState) -> Result<(), Error> {
+            // TODO we need to apply MutationalStage-like resumption here.
+            // For now, make sure we don't get stuck crashing on a single test
+            RetryRestartHelper::handle_restart_progress(state, self, 3)
         }
 
         #[inline]
-        fn clear_restart_progress(&mut self, _state: &mut PythonStdState) -> Result<(), Error> {
-            // TODO we need to apply MutationalStage-like resumption here
-            Ok(())
+        fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+            RetryRestartHelper::clear_restart_progress(state, self)
         }
     }
 

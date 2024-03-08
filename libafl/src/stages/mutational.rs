@@ -1,18 +1,18 @@
 //| The [`MutationalStage`] is the default stage used during fuzzing.
 //! For the current input, it will perform a range of random mutations, and then run them in the executor.
 
-use core::marker::PhantomData;
+use core::{any::type_name, marker::PhantomData};
 
-use libafl_bolts::rands::Rand;
+use libafl_bolts::{rands::Rand, Named};
 
-use super::ExecutionCountRestartHelper;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusIdx, Testcase},
     fuzzer::Evaluator,
     inputs::Input,
     mark_feature_time,
     mutators::{MultiMutator, MutationResult, Mutator},
-    stages::Stage,
+    prelude::HasNamedMetadata,
+    stages::{ExecutionCountRestartHelper, RetryRestartHelper, Stage},
     start_timer,
     state::{HasCorpus, HasExecutions, HasMetadata, HasRand, UsesState},
     Error,
@@ -316,23 +316,38 @@ where
     type State = Z::State;
 }
 
-impl<E, EM, I, M, Z> Stage<E, EM, Z> for MultiMutationalStage<E, EM, I, M, Z>
+impl<E, EM, I, M, Z> Named for MultiMutationalStage<E, EM, I, M, Z>
 where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
     M: MultiMutator<I, Z::State>,
     Z: Evaluator<E, EM>,
     Z::State: HasCorpus + HasRand,
+{
+    fn name(&self) -> &str {
+        type_name::<Self>()
+    }
+}
+
+impl<E, EM, I, M, Z> Stage<E, EM, Z> for MultiMutationalStage<E, EM, I, M, Z>
+where
+    E: UsesState<State = Z::State>,
+    EM: UsesState<State = Z::State>,
+    M: MultiMutator<I, Z::State>,
+    Z: Evaluator<E, EM>,
+    Z::State: HasCorpus + HasRand + HasNamedMetadata,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
 {
-    fn handle_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
-        // TODO: add crash/timeout handling
-        Ok(())
+    #[inline]
+    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        // TODO: add proper crash/timeout handling
+        // For now, Make sure we don't get stuck crashing on a single testcase
+        RetryRestartHelper::handle_restart_progress(state, self, 3)
     }
 
-    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
-        // TODO: add crash/timeout handling
-        Ok(())
+    #[inline]
+    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        RetryRestartHelper::clear_restart_progress(state, self)
     }
 
     #[inline]

@@ -7,7 +7,7 @@ use std::{
     time::SystemTime,
 };
 
-use libafl_bolts::{current_time, shmem::ShMemProvider};
+use libafl_bolts::{current_time, shmem::ShMemProvider, Named};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "introspection")]
@@ -18,7 +18,8 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, UsesInput},
-    stages::Stage,
+    prelude::HasNamedMetadata,
+    stages::{RetryRestartHelper, Stage},
     state::{HasCorpus, HasExecutions, HasMetadata, HasRand, State, UsesState},
     Error,
 };
@@ -59,13 +60,22 @@ where
     type State = E::State;
 }
 
+impl<CB, E, EM, Z> Named for SyncFromDiskStage<CB, E, EM, Z>
+where
+    E: UsesState,
+{
+    fn name(&self) -> &str {
+        self.sync_dir.to_str().unwrap()
+    }
+}
+
 impl<CB, E, EM, Z> Stage<E, EM, Z> for SyncFromDiskStage<CB, E, EM, Z>
 where
     CB: FnMut(&mut Z, &mut Z::State, &Path) -> Result<<Z::State as UsesInput>::Input, Error>,
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasCorpus + HasRand + HasMetadata,
+    Z::State: HasCorpus + HasRand + HasMetadata + HasNamedMetadata,
 {
     #[inline]
     fn perform(
@@ -103,15 +113,15 @@ where
     }
 
     #[inline]
-    fn handle_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
-        // TODO: Needs proper crash handling
-        Ok(())
+    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        // TODO: Needs proper crash handling for when an imported testcase crashes
+        // For now, Make sure we don't get stuck crashing on this testcase
+        RetryRestartHelper::handle_restart_progress(state, self, 3)
     }
 
     #[inline]
-    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
-        // TODO: Needs proper crash handling
-        Ok(())
+    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        RetryRestartHelper::clear_restart_progress(state, self)
     }
 }
 
