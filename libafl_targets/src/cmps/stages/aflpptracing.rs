@@ -8,7 +8,7 @@ use libafl::{
     inputs::{BytesInput, UsesInput},
     observers::ObserversTuple,
     stages::{
-        colorization::TaintMetadata, RetryProgressHelper, RetryingStage, Stage, StageProgressHelper,
+        colorization::TaintMetadata, RetryRestartHelper, Stage, StageRestartHelper,
     },
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasMetadata, HasNamedMetadata, UsesState,
@@ -52,7 +52,7 @@ where
         state: &mut TE::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        if RetryProgressHelper::should_skip(state, self)? {
+        if RetryRestartHelper::should_skip(state, self)? {
             // early exit if we retried too often
             return Ok(());
         }
@@ -125,26 +125,14 @@ where
         Ok(())
     }
 
-    fn initialize_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
         // TODO: this may need better resumption? (Or is it always used with a forkserver?)
-        RetryProgressHelper::initialize_progress(state, self)
+        RetryRestartHelper::handle_restart_progress(state, self, 3)
     }
 
-    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
         // TODO: this may need better resumption? (Or is it always used with a forkserver?)
-        RetryProgressHelper::clear_progress(state, self)
-    }
-}
-
-impl<EM, TE, Z> RetryingStage for AFLppCmplogTracingStage<EM, TE, Z>
-where
-    TE: Executor<EM, Z> + HasObservers,
-    TE::State: HasExecutions + HasCorpus + HasMetadata + UsesInput<Input = BytesInput>,
-    EM: UsesState<State = TE::State>,
-    Z: UsesState<State = TE::State>,
-{
-    fn max_retries(&self) -> usize {
-        3
+        RetryRestartHelper::clear_restart_progress(state, self)
     }
 }
 

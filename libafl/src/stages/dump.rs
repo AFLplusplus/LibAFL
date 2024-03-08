@@ -115,13 +115,13 @@ where
     }
 
     #[inline]
-    fn initialize_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+    fn handle_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
         // Not executing the target, so restart safety is not needed
         Ok(())
     }
 
     #[inline]
-    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
         // Not executing the target, so restart safety is not needed
         Ok(())
     }

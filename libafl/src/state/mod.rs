@@ -1354,7 +1354,7 @@ pub mod pybind {
             self.inner.as_ref().solutions().clone()
         }
 
-        fn executions(&self) -> usize {
+        fn executions(&self) -> u64 {
             *self.inner.as_ref().executions()
         }
 

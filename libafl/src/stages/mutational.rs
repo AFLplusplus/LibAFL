@@ -5,7 +5,7 @@ use core::marker::PhantomData;
 
 use libafl_bolts::rands::Rand;
 
-use super::ExecutionCountProgressHelper;
+use super::ExecutionCountRestartHelper;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusIdx, Testcase},
     fuzzer::Evaluator,
@@ -172,7 +172,7 @@ pub struct StdMutationalStage<E, EM, I, M, Z> {
     /// The maximum amount of iterations we should do each round
     max_iterations: u64,
     /// The progress helper for this mutational stage
-    progress_helper: ExecutionCountProgressHelper,
+    restart_helper: ExecutionCountRestartHelper,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, EM, I, Z)>,
 }
@@ -204,7 +204,7 @@ where
     }
 
     fn execs_since_progress_start(&mut self, state: &mut <Z>::State) -> Result<u64, Error> {
-        self.progress_helper.execs_since_progress_start(state)
+        self.restart_helper.execs_since_progress_start(state)
     }
 }
 
@@ -245,12 +245,12 @@ where
         ret
     }
 
-    fn initialize_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        self.progress_helper.initialize_progress(state)
+    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        self.restart_helper.handle_restart_progress(state)
     }
 
-    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        self.progress_helper.clear_progress(state)
+    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        self.restart_helper.clear_restart_progress(state)
     }
 }
 
@@ -291,7 +291,7 @@ where
         Self {
             mutator,
             max_iterations,
-            progress_helper: ExecutionCountProgressHelper::default(),
+            restart_helper: ExecutionCountRestartHelper::default(),
             phantom: PhantomData,
         }
     }
@@ -325,12 +325,12 @@ where
     Z::State: HasCorpus + HasRand,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
 {
-    fn initialize_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+    fn handle_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
         // TODO: add crash/timeout handling
         Ok(())
     }
 
-    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
         // TODO: add crash/timeout handling
         Ok(())
     }

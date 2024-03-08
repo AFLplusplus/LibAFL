@@ -103,13 +103,13 @@ where
     }
 
     #[inline]
-    fn initialize_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+    fn handle_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
         // TODO: Needs proper crash handling
         Ok(())
     }
 
     #[inline]
-    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
         // TODO: Needs proper crash handling
         Ok(())
     }
@@ -322,13 +322,13 @@ where
     }
 
     #[inline]
-    fn initialize_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+    fn handle_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
         // Not needed - does not execute the target.
         Ok(())
     }
 
     #[inline]
-    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
         // Not needed - does not execute the target.
         Ok(())
     }

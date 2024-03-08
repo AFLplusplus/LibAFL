@@ -16,7 +16,7 @@ use crate::{
     mutators::{MutationResult, Mutator},
     observers::{MapObserver, ObserversTuple},
     schedulers::{RemovableScheduler, Scheduler},
-    stages::{ExecutionCountProgressHelper, Stage},
+    stages::{ExecutionCountRestartHelper, Stage},
     start_timer,
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasMaxSize, HasMetadata, HasSolutions, State,
@@ -192,7 +192,7 @@ pub struct StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, OT, Z> {
     /// The runs (=iterations) we are supposed to do
     runs: usize,
     /// The progress helper for this stage, keeping track of resumes after timeouts/crashes
-    progress_helper: ExecutionCountProgressHelper,
+    restart_helper: ExecutionCountRestartHelper,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(CS, E, EM, F1, F2, OT, Z)>,
 }
@@ -241,12 +241,12 @@ where
         Ok(())
     }
 
-    fn initialize_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        self.progress_helper.initialize_progress(state)
+    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        self.restart_helper.handle_restart_progress(state)
     }
 
-    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        self.progress_helper.clear_progress(state)
+    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        self.restart_helper.clear_restart_progress(state)
     }
 }
 
@@ -298,7 +298,7 @@ where
     }
 
     fn execs_since_progress_start(&mut self, state: &mut <Z>::State) -> Result<u64, Error> {
-        self.progress_helper.execs_since_progress_start(state)
+        self.restart_helper.execs_since_progress_start(state)
     }
 }
 
@@ -315,7 +315,7 @@ where
             mutator,
             factory,
             runs,
-            progress_helper: ExecutionCountProgressHelper::default(),
+            restart_helper: ExecutionCountRestartHelper::default(),
             phantom: PhantomData,
         }
     }

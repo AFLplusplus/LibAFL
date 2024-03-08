@@ -7,7 +7,7 @@ use crate::{
     fuzzer::Evaluator,
     mutators::Mutator,
     schedulers::{testcase_score::CorpusPowerTestcaseScore, TestcaseScore},
-    stages::{mutational::MutatedTransform, ExecutionCountProgressHelper, MutationalStage, Stage},
+    stages::{mutational::MutatedTransform, ExecutionCountRestartHelper, MutationalStage, Stage},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasMetadata, HasRand, UsesState},
     Error,
 };
@@ -18,7 +18,7 @@ pub struct PowerMutationalStage<E, F, EM, I, M, Z> {
     /// The mutators we use
     mutator: M,
     /// Helper for restarts
-    progress_helper: ExecutionCountProgressHelper,
+    restart_helper: ExecutionCountRestartHelper,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, F, EM, I, Z)>,
 }
@@ -63,7 +63,7 @@ where
     }
 
     fn execs_since_progress_start(&mut self, state: &mut <Z>::State) -> Result<u64, Error> {
-        self.progress_helper.execs_since_progress_start(state)
+        self.restart_helper.execs_since_progress_start(state)
     }
 }
 
@@ -90,12 +90,12 @@ where
         ret
     }
 
-    fn initialize_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        self.progress_helper.initialize_progress(state)
+    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        self.restart_helper.handle_restart_progress(state)
     }
 
-    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        self.progress_helper.clear_progress(state)
+    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        self.restart_helper.clear_restart_progress(state)
     }
 }
 
@@ -128,7 +128,7 @@ where
         Self {
             mutator,
             phantom: PhantomData,
-            progress_helper: ExecutionCountProgressHelper::default(),
+            restart_helper: ExecutionCountRestartHelper::default(),
         }
     }
 }

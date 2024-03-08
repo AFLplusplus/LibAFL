@@ -20,7 +20,7 @@ use crate::{
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple, UsesObserver},
     schedulers::powersched::SchedulerMetadata,
-    stages::{ExecutionCountProgressHelper, Stage},
+    stages::{ExecutionCountRestartHelper, Stage},
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasMetadata, HasNamedMetadata, State,
         UsesState,
@@ -73,7 +73,7 @@ pub struct CalibrationStage<O, OT, S> {
     stage_max: usize,
     /// If we should track stability
     track_stability: bool,
-    progress_helper: ExecutionCountProgressHelper,
+    restart_helper: ExecutionCountRestartHelper,
     phantom: PhantomData<(O, OT, S)>,
 }
 
@@ -160,7 +160,7 @@ where
         let mut has_errors = false;
 
         // If we restarted after a timeout or crash, do less iterations.
-        iter -= usize::try_from(self.progress_helper.execs_since_progress_start(state)?)?;
+        iter -= usize::try_from(self.restart_helper.execs_since_progress_start(state)?)?;
 
         while i < iter {
             let input = state.current_input_cloned()?;
@@ -328,14 +328,14 @@ where
         Ok(())
     }
 
-    fn initialize_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
         // TODO: Make sure this is the correct way / there may be a better way?
-        self.progress_helper.initialize_progress(state)
+        self.restart_helper.handle_restart_progress(state)
     }
 
-    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
         // TODO: Make sure this is the correct way / there may be a better way?
-        self.progress_helper.clear_progress(state)
+        self.restart_helper.clear_restart_progress(state)
     }
 }
 
@@ -357,7 +357,7 @@ where
             map_name: map_feedback.name().to_string(),
             stage_max: CAL_STAGE_START,
             track_stability: true,
-            progress_helper: ExecutionCountProgressHelper::default(),
+            restart_helper: ExecutionCountRestartHelper::default(),
             phantom: PhantomData,
         }
     }
@@ -374,7 +374,7 @@ where
             map_name: map_feedback.name().to_string(),
             stage_max: CAL_STAGE_START,
             track_stability: false,
-            progress_helper: ExecutionCountProgressHelper::default(),
+            restart_helper: ExecutionCountRestartHelper::default(),
             phantom: PhantomData,
         }
     }

@@ -104,8 +104,6 @@ where
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,
 {
-    type Progress = (); // this stage does not need to be resumed
-
     fn perform(
         &mut self,
         _fuzzer: &mut Z,
@@ -130,6 +128,18 @@ where
         let metadata = extract_metadata(bytes);
         tc.add_metadata(metadata);
 
+        Ok(())
+    }
+
+    #[inline]
+    fn handle_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        // Stage does not run the target. No reset helper needed.
+        Ok(())
+    }
+
+    #[inline]
+    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        // Stage does not run the target. No reset helper needed.
         Ok(())
     }
 }

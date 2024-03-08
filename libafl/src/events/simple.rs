@@ -257,7 +257,7 @@ where
                 // TODO: The monitor buffer should be added on client add.
                 monitor.client_stats_insert(ClientId(0));
                 let client = monitor.client_stats_mut_for(ClientId(0));
-                client.update_executions(*executions as u64, *time);
+                client.update_executions(*executions, *time);
                 client.update_introspection_monitor((**introspection_monitor).clone());
                 monitor.display(event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)

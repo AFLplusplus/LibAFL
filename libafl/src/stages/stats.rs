@@ -133,13 +133,13 @@ where
     }
 
     #[inline]
-    fn initialize_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+    fn handle_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
         // Not running the target so we wont't crash/timeout and, hence, don't need to restore anything
         Ok(())
     }
 
     #[inline]
-    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
         // Not running the target so we wont't crash/timeout and, hence, don't need to restore anything
         Ok(())
     }

@@ -12,7 +12,7 @@ use crate::{
     mutators::{MutationResult, Mutator},
     stages::{
         mutational::{MutatedTransform, MutatedTransformPost, DEFAULT_MUTATIONAL_MAX_ITERATIONS},
-        ExecutionCountProgressHelper, MutationalStage, Stage,
+        ExecutionCountRestartHelper, MutationalStage, Stage,
     },
     start_timer,
     state::{HasCorpus, HasExecutions, HasMetadata, HasNamedMetadata, HasRand, UsesState},
@@ -155,7 +155,7 @@ pub struct TuneableMutationalStage<E, EM, I, M, Z> {
     /// The name of this stage
     name: String,
     /// The progress helper we use to keep track of progress across restarts
-    progress_helper: ExecutionCountProgressHelper,
+    restart_helper: ExecutionCountRestartHelper,
     phantom: PhantomData<(E, EM, I, Z)>,
 }
 
@@ -257,7 +257,7 @@ where
     }
 
     fn execs_since_progress_start(&mut self, state: &mut <Z>::State) -> Result<u64, Error> {
-        self.progress_helper.execs_since_progress_start(state)
+        self.restart_helper.execs_since_progress_start(state)
     }
 }
 
@@ -299,12 +299,12 @@ where
         ret
     }
 
-    fn initialize_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        self.progress_helper.initialize_progress(state)
+    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        self.restart_helper.handle_restart_progress(state)
     }
 
-    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        self.progress_helper.clear_progress(state)
+    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        self.restart_helper.clear_restart_progress(state)
     }
 }
 
@@ -491,7 +491,7 @@ where
         Self {
             mutator,
             name: name.to_string(),
-            progress_helper: ExecutionCountProgressHelper::default(),
+            restart_helper: ExecutionCountRestartHelper::default(),
             phantom: PhantomData,
         }
     }

@@ -6,17 +6,16 @@ use alloc::{
 };
 use core::{cmp::Ordering, fmt::Debug, marker::PhantomData, ops::Range};
 
-use libafl_bolts::{rands::Rand, tuples::MatchName};
+use libafl_bolts::{rands::Rand, tuples::MatchName, Named};
 use serde::{Deserialize, Serialize};
 
-use super::{RetryProgressHelper, RetryingStage, StageProgressHelper};
 use crate::{
     events::EventFirer,
     executors::{Executor, HasObservers},
     inputs::HasBytesVec,
     mutators::mutations::buffer_copy,
     observers::{MapObserver, ObserversTuple},
-    stages::Stage,
+    stages::{RetryRestartHelper, Stage},
     state::{HasCorpus, HasCurrentTestcase, HasMetadata, HasNamedMetadata, HasRand, UsesState},
     Error,
 };
@@ -68,6 +67,15 @@ where
     type State = E::State;
 }
 
+impl<EM, O, E, Z> Named for ColorizationStage<EM, O, E, Z>
+where
+    E: UsesState,
+{
+    fn name(&self) -> &str {
+        &self.map_observer_name
+    }
+}
+
 impl<E, EM, O, Z> Stage<E, EM, Z> for ColorizationStage<EM, O, E, Z>
 where
     EM: UsesState<State = E::State> + EventFirer,
@@ -86,7 +94,7 @@ where
         state: &mut E::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        if RetryProgressHelper::should_skip(state, self)? {
+        if RetryRestartHelper::should_skip(state, self)? {
             return Ok(());
         }
 
@@ -96,28 +104,14 @@ where
         Ok(())
     }
 
-    fn initialize_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
         // TODO this stage needs a proper resume
-        RetryProgressHelper::initialize_progress(state, self)
+        RetryRestartHelper::handle_restart_progress(state, self, 3)
     }
 
-    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
         // TODO this stage needs a proper resume
-        RetryProgressHelper::clear_progress(state, self)
-    }
-}
-
-impl<E, EM, O, Z> RetryingStage for ColorizationStage<EM, O, E, Z>
-where
-    EM: UsesState<State = E::State> + EventFirer,
-    E: HasObservers + Executor<EM, Z>,
-    E::State: HasCorpus + HasMetadata + HasRand + HasNamedMetadata,
-    E::Input: HasBytesVec,
-    O: MapObserver,
-    Z: UsesState<State = E::State>,
-{
-    fn max_retries(&self) -> usize {
-        3
+        RetryRestartHelper::clear_restart_progress(state, self)
     }
 }
 

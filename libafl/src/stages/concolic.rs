@@ -4,12 +4,12 @@
 
 use alloc::string::String;
 #[cfg(feature = "concolic_mutation")]
-use alloc::{borrow::ToOwned, string::ToString, vec::Vec};
+use alloc::{string::ToString, vec::Vec};
 use core::marker::PhantomData;
 
-use libafl_bolts::tuples::MatchName;
+use libafl_bolts::{tuples::MatchName, Named};
 
-use super::{RetryProgressHelper, RetryingStage, Stage, StageProgressHelper, TracingStage};
+use super::{ExecutionCountRestartHelper, RetryRestartHelper, Stage, TracingStage};
 #[cfg(all(feature = "concolic_mutation", feature = "introspection"))]
 use crate::monitors::PerfFeature;
 #[cfg(all(feature = "introspection", feature = "concolic_mutation"))]
@@ -46,6 +46,12 @@ where
     type State = TE::State;
 }
 
+impl<EM, TE, Z> Named for ConcolicTracingStage<EM, TE, Z> {
+    fn name(&self) -> &str {
+        "ConcolicTracingStage"
+    }
+}
+
 impl<E, EM, TE, Z> Stage<E, EM, Z> for ConcolicTracingStage<EM, TE, Z>
 where
     E: UsesState<State = TE::State>,
@@ -62,7 +68,7 @@ where
         state: &mut TE::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        if RetryProgressHelper::should_skip(state, &self.inner)? {
+        if RetryRestartHelper::should_skip(state, &self.inner)? {
             return Ok(());
         }
 
@@ -82,25 +88,18 @@ where
         Ok(())
     }
 
-    fn initialize_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RetryProgressHelper::initialize_progress(state, self)
+    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        RetryRestartHelper::handle_restart_progress(state, self, 3)
     }
 
-    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RetryProgressHelper::clear_progress(state, self)
-    }
-}
-
-impl<EM, TE, Z> RetryingStage for ConcolicTracingStage<EM, TE, Z> {
-    fn max_retries(&self) -> usize {
-        self.inner.max_retries()
+    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        RetryRestartHelper::clear_restart_progress(state, self)
     }
 }
 
 impl<EM, TE, Z> ConcolicTracingStage<EM, TE, Z> {
     /// Creates a new default tracing stage using the given [`Executor`], observing traces from a
-    /// [`ConcolicObserver`] with the given name. The [`RetryingStage::max_retries`] is
-    /// used from the provided inner stage.
+    /// [`ConcolicObserver`] with the given name.
     pub fn new(inner: TracingStage<EM, TE, Z>, observer_name: String) -> Self {
         Self {
             inner,
@@ -354,7 +353,9 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
 /// A mutational stage that uses Z3 to solve concolic constraints attached to the [`crate::corpus::Testcase`] by the [`ConcolicTracingStage`].
 #[derive(Clone, Debug)]
 pub struct SimpleConcolicMutationalStage<Z> {
-    _phantom: PhantomData<Z>,
+    /// The helper keeps track of progress for timeouting/restarting targets
+    restart_helper: ExecutionCountRestartHelper,
+    phantom: PhantomData<Z>,
 }
 
 #[cfg(feature = "concolic_mutation")]
@@ -372,10 +373,8 @@ where
     EM: UsesState<State = Z::State>,
     Z: Evaluator<E, EM>,
     Z::Input: HasBytesVec,
-    Z::State: State + HasExecutions + HasCorpus,
+    Z::State: State + HasExecutions + HasCorpus + HasMetadata,
 {
-    type Progress = (); // TODO we need a resume for this type
-
     #[inline]
     fn perform(
         &mut self,
@@ -384,30 +383,25 @@ where
         state: &mut Z::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        let Some(corpus_idx) = state.current_corpus_idx()? else {
-            return Err(Error::illegal_state(
-                "state is not currently processing a corpus index",
-            ));
-        };
+        {
+            start_timer!(state);
+            mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
+        }
+        let testcase = state.current_testcase()?.clone();
 
-        start_timer!(state);
-        let testcase = state.corpus().get(corpus_idx)?.clone();
-        mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
+        let mutations = testcase.metadata::<ConcolicMetadata>().ok().map(|meta| {
+            start_timer!(state);
+            let mutations = { generate_mutations(meta.iter_messages()) };
+            mark_feature_time!(state, PerfFeature::Mutate);
+            mutations
+        });
 
-        let mutations =
-            if let Some(meta) = testcase.borrow().metadata_map().get::<ConcolicMetadata>() {
-                start_timer!(state);
-                let mutations = generate_mutations(meta.iter_messages());
-                mark_feature_time!(state, PerfFeature::Mutate);
-                Some(mutations)
-            } else {
-                None
-            };
+        let post_restart_skip_cnt =
+            usize::try_from(self.restart_helper.execs_since_progress_start(state)?)?;
 
         if let Some(mutations) = mutations {
-            let input = { testcase.borrow().input().as_ref().unwrap().clone() };
-            for mutation in mutations {
-                let mut input_copy = input.to_owned();
+            for mutation in mutations.into_iter().skip(post_restart_skip_cnt) {
+                let mut input_copy = state.current_input_cloned()?;
                 for (index, new_byte) in mutation {
                     input_copy.bytes_mut()[index] = new_byte;
                 }
@@ -417,12 +411,23 @@ where
         }
         Ok(())
     }
+
+    #[inline]
+    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        self.restart_helper.handle_restart_progress(state)
+    }
+
+    #[inline]
+    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        self.restart_helper.clear_restart_progress(state)
+    }
 }
 
 impl<Z> Default for SimpleConcolicMutationalStage<Z> {
     fn default() -> Self {
         Self {
-            _phantom: PhantomData,
+            restart_helper: ExecutionCountRestartHelper::default(),
+            phantom: PhantomData,
         }
     }
 }

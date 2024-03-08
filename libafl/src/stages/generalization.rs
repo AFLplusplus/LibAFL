@@ -6,9 +6,8 @@ use alloc::{
 };
 use core::{fmt::Debug, marker::PhantomData};
 
-use libafl_bolts::AsSlice;
+use libafl_bolts::{AsSlice, Named};
 
-use super::{RetryProgressHelper, RetryingStage, StageProgressHelper};
 use crate::{
     corpus::{Corpus, HasCurrentCorpusIdx},
     executors::{Executor, HasObservers},
@@ -16,7 +15,7 @@ use crate::{
     inputs::{BytesInput, GeneralizedInputMetadata, GeneralizedItem, HasBytesVec, UsesInput},
     mark_feature_time,
     observers::{MapObserver, ObserversTuple},
-    stages::Stage,
+    stages::{RetryRestartHelper, Stage},
     start_timer,
     state::{HasCorpus, HasExecutions, HasMetadata, HasNamedMetadata, UsesState},
     Error,
@@ -48,6 +47,12 @@ pub struct GeneralizationStage<EM, O, OT, Z> {
     phantom: PhantomData<(EM, O, OT, Z)>,
 }
 
+impl<EM, O, OT, Z> Named for GeneralizationStage<EM, O, OT, Z> {
+    fn name(&self) -> &str {
+        "GeneralizationStage"
+    }
+}
+
 impl<EM, O, OT, Z> UsesState for GeneralizationStage<EM, O, OT, Z>
 where
     EM: UsesState,
@@ -75,7 +80,7 @@ where
         state: &mut E::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        if RetryProgressHelper::should_skip(state, self)? {
+        if RetryRestartHelper::should_skip(state, self)? {
             return Ok(());
         }
 
@@ -318,27 +323,15 @@ where
     }
 
     #[inline]
-    fn initialize_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
         // TODO: We need to be able to resume better if something crashes or times out
-        RetryProgressHelper::initialize_progress(state, self)
+        RetryRestartHelper::handle_restart_progress(state, self, 3)
     }
 
     #[inline]
-    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
         // TODO: We need to be able to resume better if something crashes or times out
-        RetryProgressHelper::clear_progress(state, self)
-    }
-}
-
-impl<EM, O, OT, Z> RetryingStage for GeneralizationStage<EM, O, OT, Z>
-where
-    O: MapObserver,
-    OT: ObserversTuple<Z::State>,
-    EM: UsesState<State = Z::State>,
-    Z: UsesState,
-{
-    fn max_retries(&self) -> usize {
-        3
+        RetryRestartHelper::clear_restart_progress(state, self)
     }
 }
 

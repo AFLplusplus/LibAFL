@@ -2,11 +2,13 @@
 
 use core::{fmt::Debug, marker::PhantomData};
 
+use libafl_bolts::Named;
+
 use crate::{
     executors::{Executor, HasObservers, ShadowExecutor},
     mark_feature_time,
     observers::ObserversTuple,
-    stages::{RetryProgressHelper, RetryingStage, Stage, StageProgressHelper},
+    stages::{RetryRestartHelper, Stage},
     start_timer,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasNamedMetadata, State, UsesState},
     Error,
@@ -38,7 +40,7 @@ where
     Z: UsesState<State = TE::State>,
 {
     /// Perform tracing on the given [`CorpusId`]. Useful for if wrapping [`TracingStage`] with your
-    /// own stage and you need to manage [`super::StageProgressHelper`] differently; see
+    /// own stage and you need to manage [`super::StageRestartHelper`] differently; see
     /// [`super::ConcolicTracingStage`]'s implementation as an example of usage.
     pub fn trace(
         &mut self,
@@ -91,7 +93,7 @@ where
         state: &mut TE::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        if RetryProgressHelper::should_skip(state, self)? {
+        if RetryRestartHelper::should_skip(state, self)? {
             return Ok(());
         }
 
@@ -100,18 +102,18 @@ where
         Ok(())
     }
 
-    fn initialize_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RetryProgressHelper::initialize_progress(state, self)
+    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        RetryRestartHelper::handle_restart_progress(state, self, self.max_retries)
     }
 
-    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RetryProgressHelper::clear_progress(state, self)
+    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        RetryRestartHelper::clear_restart_progress(state, self)
     }
 }
 
-impl<EM, TE, Z> RetryingStage for TracingStage<EM, TE, Z> {
-    fn max_retries(&self) -> usize {
-        self.max_retries
+impl<EM, TE, Z> Named for TracingStage<EM, TE, Z> {
+    fn name(&self) -> &str {
+        "TracingStage"
     }
 }
 
@@ -159,6 +161,15 @@ where
     type State = E::State;
 }
 
+impl<E, EM, SOT, Z> Named for ShadowTracingStage<E, EM, SOT, Z>
+where
+    E: UsesState,
+{
+    fn name(&self) -> &str {
+        "ShadowTracingStage"
+    }
+}
+
 impl<E, EM, SOT, Z> Stage<ShadowExecutor<E, SOT>, EM, Z> for ShadowTracingStage<E, EM, SOT, Z>
 where
     E: Executor<EM, Z> + HasObservers,
@@ -175,7 +186,7 @@ where
         state: &mut E::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        if RetryProgressHelper::should_skip(state, self)? {
+        if RetryRestartHelper::should_skip(state, self)? {
             return Ok(());
         }
 
@@ -209,18 +220,12 @@ where
         Ok(())
     }
 
-    fn initialize_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RetryProgressHelper::initialize_progress(state, self)
+    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        RetryRestartHelper::handle_restart_progress(state, self, self.max_retries)
     }
 
-    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RetryProgressHelper::clear_progress(state, self)
-    }
-}
-
-impl<E, EM, SOT, Z> RetryingStage for ShadowTracingStage<E, EM, SOT, Z> {
-    fn max_retries(&self) -> usize {
-        self.max_retries
+    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        RetryRestartHelper::clear_restart_progress(state, self)
     }
 }
 
