@@ -39,6 +39,11 @@ pub extern "C" fn external_current_millis() -> u64 {
 pub fn fuzz() {
     set_panic_hook();
 
+    // We need to register the types as LibAFL doesn't support `SerdeAny`
+    // auto registration in non-standard environments.
+    //
+    // # Safety
+    // No concurrency in WASM so these accesses are not racing.
     unsafe {
         RegistryBuilder::register::<MapFeedbackMetadata<u8>>();
         RegistryBuilder::register::<ExecutionCountRestartHelperMetadata>();
