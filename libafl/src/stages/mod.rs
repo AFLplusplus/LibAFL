@@ -89,7 +89,11 @@ where
     /// Clear the current status tracking of the associated stage
     fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error>;
 
-    /// Run the stage
+    /// Run the stage.
+    ///
+    /// Before a call to perform, [`handle_restart_progress`] will be (must be!) called.
+    /// After returning (so non-target crash or timeout in a restarting case), [`clear_restart_progress`] gets called.
+    /// A call to [`perform_restartable`] will do these things implicitly.
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -97,6 +101,19 @@ where
         state: &mut Self::State,
         manager: &mut EM,
     ) -> Result<(), Error>;
+
+    /// Run the stage, calling [`handle_restart_progress`] and [`clear_restart_progress`] appropriately
+    fn perform_restartable(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut Self::State,
+        manager: &mut EM,
+    ) -> Result<(), Error> {
+        self.handle_restart_progress(state)?;
+        self.perform(fuzzer, executor, state, manager)?;
+        self.clear_restart_progress(state)
+    }
 }
 
 /// A tuple holding all `Stages` used for fuzzing.
@@ -165,9 +182,7 @@ where
                 // perform the stage, but don't set it
                 let stage = &mut self.0;
 
-                stage.handle_restart_progress(state)?;
-                stage.perform(fuzzer, executor, state, manager)?;
-                stage.clear_restart_progress(state)?;
+                stage.perform_restartable(fuzzer, executor, state, manager)?;
 
                 state.clear_stage()?;
             }
@@ -179,9 +194,7 @@ where
                 state.set_stage(Self::LEN)?;
 
                 let stage = &mut self.0;
-                stage.handle_restart_progress(state)?;
-                stage.perform(fuzzer, executor, state, manager)?;
-                stage.clear_restart_progress(state)?;
+                stage.perform_restartable(fuzzer, executor, state, manager)?;
 
                 state.clear_stage()?;
             }
@@ -253,7 +266,7 @@ where
         manager: &mut EM,
     ) -> Result<(), Error> {
         self.iter_mut()
-            .try_for_each(|x| x.perform(fuzzer, executor, state, manager))
+            .try_for_each(|x| x.perform_restartable(fuzzer, executor, state, manager))
     }
 }
 
@@ -798,7 +811,7 @@ pub mod pybind {
             manager: &mut PythonEventManager,
         ) -> Result<(), Error> {
             unwrap_me_mut!(self.wrapper, s, {
-                s.perform(fuzzer, executor, state, manager)
+                s.perform_restartable(fuzzer, executor, state, manager)
             })
         }
 
@@ -856,7 +869,7 @@ pub mod pybind {
                 } else {
                     state.set_stage(i)?;
                 }
-                s.perform(fuzzer, executor, state, manager)?;
+                s.perform_restartable(fuzzer, executor, state, manager)?;
                 state.clear_stage()?;
             }
             Ok(())

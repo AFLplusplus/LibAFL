@@ -11,7 +11,7 @@ use libafl::{
     mutators::{havoc_mutations, StdScheduledMutator},
     observers::StdMapObserver,
     schedulers::QueueScheduler,
-    stages::StdMutationalStage,
+    stages::{ExecutionCountRestartHelperMetadata, StdMutationalStage},
     state::{HasSolutions, StdState},
     Fuzzer, StdFuzzer,
 };
@@ -23,7 +23,7 @@ use web_sys::{Performance, Window};
 
 use crate::utils::set_panic_hook;
 
-// defined for internal use by libafl
+// Defined for internal use by LibAFL
 #[no_mangle]
 #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
 pub extern "C" fn external_current_millis() -> u64 {
@@ -41,6 +41,7 @@ pub fn fuzz() {
 
     unsafe {
         RegistryBuilder::register::<MapFeedbackMetadata<u8>>();
+        RegistryBuilder::register::<ExecutionCountRestartHelperMetadata>();
     }
 
     let mut signals = [0u8; 64];
