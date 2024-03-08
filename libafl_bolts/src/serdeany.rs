@@ -289,7 +289,7 @@ pub mod serdeany_registry {
                                 .get(&id)
                                 .is_some()
                         },
-                        "Type {} was inserted without registration! Call {}::register or use serde_autoreg.",
+                        "Type {} was inserted without registration! Call RegistryBuilder::register::<{}>() or use serde_autoreg.",
                         core::any::type_name::<T>(),
                         core::any::type_name::<T>()
                     );
@@ -614,7 +614,7 @@ pub mod serdeany_registry {
                                 .get(&id)
                                 .is_some()
                         },
-                        "Type {} was inserted without registration! Call {}::register or use serde_autoreg.",
+                        "Type {} was inserted without registration! Call RegistryBuilder::register::<{}>() or use serde_autoreg.",
                         core::any::type_name::<T>(),
                         core::any::type_name::<T>()
                     );
