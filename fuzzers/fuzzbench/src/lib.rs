@@ -44,7 +44,7 @@ use libafl_bolts::{
     os::dup2,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, IntoVec, Merge},
+    tuples::{tuple_list, Merge},
     AsSlice,
 };
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
@@ -295,11 +295,14 @@ fn fuzz(
 
     // Setup a randomic Input2State stage
     let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
-    let mut dyn_mutations = havoc_mutations().into_vec();
-    dyn_mutations.append(&mut tokens_mutations().into_vec());
 
     // Setup a MOPT mutator
-    let mutator = StdMOptMutator::new(&mut state, dyn_mutations, 7, 5)?;
+    let mutator = StdMOptMutator::new(
+        &mut state,
+        havoc_mutations().merge(tokens_mutations()),
+        7,
+        5,
+    )?;
 
     let power = StdPowerMutationalStage::new(mutator);
 

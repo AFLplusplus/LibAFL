@@ -11,7 +11,7 @@ pub use calibrate::CalibrationStage;
 pub use colorization::*;
 #[cfg(feature = "std")]
 pub use concolic::ConcolicTracingStage;
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", feature = "concolic_mutation"))]
 pub use concolic::SimpleConcolicMutationalStage;
 #[cfg(feature = "std")]
 pub use dump::*;

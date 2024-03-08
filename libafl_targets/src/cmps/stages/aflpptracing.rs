@@ -7,15 +7,13 @@ use libafl::{
     executors::{Executor, HasObservers},
     inputs::{BytesInput, UsesInput},
     observers::ObserversTuple,
-    stages::{
-        colorization::TaintMetadata, RetryRestartHelper, Stage, StageRestartHelper,
-    },
+    stages::{colorization::TaintMetadata, RetryRestartHelper, Stage},
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasMetadata, HasNamedMetadata, UsesState,
     },
     Error,
 };
-use libafl_bolts::tuples::MatchName;
+use libafl_bolts::{tuples::MatchName, Named};
 
 use crate::cmps::observers::AFLppCmpLogObserver;
 
@@ -33,6 +31,12 @@ where
     TE: UsesState,
 {
     type State = TE::State;
+}
+
+impl<EM, TE, Z> Named for AFLppCmplogTracingStage<EM, TE, Z> {
+    fn name(&self) -> &str {
+        "AFLppCmplogTracingStage"
+    }
 }
 
 impl<E, EM, TE, Z> Stage<E, EM, Z> for AFLppCmplogTracingStage<EM, TE, Z>

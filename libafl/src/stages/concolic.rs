@@ -5,20 +5,19 @@
 use alloc::string::String;
 #[cfg(feature = "concolic_mutation")]
 use alloc::{string::ToString, vec::Vec};
+#[cfg(feature = "concolic_mutation")]
 use core::marker::PhantomData;
 
 use libafl_bolts::{tuples::MatchName, Named};
 
-use super::{ExecutionCountRestartHelper, RetryRestartHelper, Stage, TracingStage};
 #[cfg(all(feature = "concolic_mutation", feature = "introspection"))]
 use crate::monitors::PerfFeature;
 #[cfg(all(feature = "introspection", feature = "concolic_mutation"))]
 use crate::state::HasClientPerfMonitor;
-#[cfg(feature = "concolic_mutation")]
-use crate::state::State;
 use crate::{
     executors::{Executor, HasObservers},
     observers::concolic::ConcolicObserver,
+    stages::{RetryRestartHelper, Stage, TracingStage},
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasMetadata, HasNamedMetadata, UsesState,
     },
@@ -29,7 +28,10 @@ use crate::{
     inputs::HasBytesVec,
     mark_feature_time,
     observers::concolic::{ConcolicMetadata, SymExpr, SymExprRef},
-    start_timer, Evaluator,
+    stages::ExecutionCountRestartHelper,
+    start_timer,
+    state::State,
+    Evaluator,
 };
 
 /// Wraps a [`TracingStage`] to add concolic observing.
@@ -351,6 +353,7 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
 }
 
 /// A mutational stage that uses Z3 to solve concolic constraints attached to the [`crate::corpus::Testcase`] by the [`ConcolicTracingStage`].
+#[cfg(feature = "concolic_mutation")]
 #[derive(Clone, Debug)]
 pub struct SimpleConcolicMutationalStage<Z> {
     /// The helper keeps track of progress for timeouting/restarting targets
@@ -423,6 +426,7 @@ where
     }
 }
 
+#[cfg(feature = "concolic_mutation")]
 impl<Z> Default for SimpleConcolicMutationalStage<Z> {
     fn default() -> Self {
         Self {

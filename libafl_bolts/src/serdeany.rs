@@ -634,7 +634,11 @@ pub mod serdeany_registry {
         }
 
         /// Gets a value by name, or inserts it using the given construction function `default` (returning a boxed value)
-        pub fn or_insert_with_boxed<T>(&mut self, name: &str, default: impl FnOnce() -> Box<T>) -> &mut T
+        pub fn or_insert_with_boxed<T>(
+            &mut self,
+            name: &str,
+            default: impl FnOnce() -> Box<T>,
+        ) -> &mut T
         where
             T: SerdeAny + 'static,
         {
