@@ -54,7 +54,7 @@ pub type ClientState =
 pub type ClientMgr<M> = SimpleEventManager<M, ClientState>;
 #[cfg(not(feature = "simplemgr"))]
 pub type ClientMgr<M> =
-    MonitorTypedEventManager<LlmpRestartingEventManager<ClientState, StdShMemProvider>, M>;
+    MonitorTypedEventManager<LlmpRestartingEventManager<(), ClientState, StdShMemProvider>, M>;
 
 #[derive(TypedBuilder)]
 pub struct Instance<'a, M: Monitor> {
