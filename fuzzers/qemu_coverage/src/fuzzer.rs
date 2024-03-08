@@ -181,7 +181,7 @@ pub fn fuzz() {
         ExitKind::Ok
     };
 
-    let mut run_client = |state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _>, core_id| {
+    let mut run_client = |state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _, _>, core_id| {
         let core_idx = options
             .cores
             .position(core_id)

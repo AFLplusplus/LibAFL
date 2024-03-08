@@ -318,7 +318,7 @@ where
     /// Launch the broker and the clients and fuzz
     #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
     #[allow(unused_mut, clippy::match_wild_err_arm)]
-    pub fn launch(&mut self, hooks: EMH) -> Result<(), Error> {
+    pub fn launch_with_hooks(&mut self, hooks: EMH) -> Result<(), Error> {
         use libafl_bolts::core_affinity;
 
         let is_client = std::env::var(_AFL_LAUNCHER_CLIENT);
