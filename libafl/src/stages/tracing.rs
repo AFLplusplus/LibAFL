@@ -93,17 +93,11 @@ where
         state: &mut TE::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        if RetryRestartHelper::should_skip(state, self)? {
-            return Ok(());
-        }
-
-        self.trace(fuzzer, state, manager)?;
-
-        Ok(())
+        self.trace(fuzzer, state, manager)
     }
 
-    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RetryRestartHelper::handle_restart_progress(state, self, self.max_retries)
+    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        RetryRestartHelper::restart_progress_should_run(state, self, self.max_retries)
     }
 
     fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
@@ -186,10 +180,6 @@ where
         state: &mut E::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        if RetryRestartHelper::should_skip(state, self)? {
-            return Ok(());
-        }
-
         start_timer!(state);
         let input = state.current_input_cloned()?;
 
@@ -220,8 +210,8 @@ where
         Ok(())
     }
 
-    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RetryRestartHelper::handle_restart_progress(state, self, self.max_retries)
+    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        RetryRestartHelper::restart_progress_should_run(state, self, self.max_retries)
     }
 
     fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {

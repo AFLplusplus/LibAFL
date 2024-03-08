@@ -94,19 +94,15 @@ where
         state: &mut E::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        if RetryRestartHelper::should_skip(state, self)? {
-            return Ok(());
-        }
-
         // Run with the mutated input
         Self::colorize(fuzzer, executor, state, manager, &self.map_observer_name)?;
 
         Ok(())
     }
 
-    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
         // TODO this stage needs a proper resume
-        RetryRestartHelper::handle_restart_progress(state, self, 3)
+        RetryRestartHelper::restart_progress_should_run(state, self, 3)
     }
 
     fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {

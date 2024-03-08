@@ -244,8 +244,8 @@ where
         ret
     }
 
-    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        self.restart_helper.handle_restart_progress(state)
+    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        self.restart_helper.restart_progress_should_run(state)
     }
 
     fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
@@ -338,10 +338,10 @@ where
     I: MutatedTransform<Self::Input, Self::State> + Clone,
 {
     #[inline]
-    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
         // TODO: add proper crash/timeout handling
         // For now, Make sure we don't get stuck crashing on a single testcase
-        RetryRestartHelper::handle_restart_progress(state, self, 3)
+        RetryRestartHelper::restart_progress_should_run(state, self, 3)
     }
 
     #[inline]

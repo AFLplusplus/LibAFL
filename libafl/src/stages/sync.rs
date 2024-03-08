@@ -112,10 +112,10 @@ where
     }
 
     #[inline]
-    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
         // TODO: Needs proper crash handling for when an imported testcase crashes
         // For now, Make sure we don't get stuck crashing on this testcase
-        RetryRestartHelper::handle_restart_progress(state, self, 3)
+        RetryRestartHelper::restart_progress_should_run(state, self, 3)
     }
 
     #[inline]
@@ -331,9 +331,9 @@ where
     }
 
     #[inline]
-    fn handle_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
-        // Not needed - does not execute the target.
-        Ok(())
+    fn restart_progress_should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+        // No restart handling needed - does not execute the target.
+        Ok(true)
     }
 
     #[inline]

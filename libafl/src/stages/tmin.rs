@@ -241,8 +241,8 @@ where
         Ok(())
     }
 
-    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        self.restart_helper.handle_restart_progress(state)
+    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        self.restart_helper.restart_progress_should_run(state)
     }
 
     fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {

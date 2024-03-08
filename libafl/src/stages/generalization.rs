@@ -80,10 +80,6 @@ where
         state: &mut E::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        if RetryRestartHelper::should_skip(state, self)? {
-            return Ok(());
-        }
-
         let Some(corpus_idx) = state.current_corpus_idx()? else {
             return Err(Error::illegal_state(
                 "state is not currently processing a corpus index",
@@ -323,9 +319,9 @@ where
     }
 
     #[inline]
-    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
         // TODO: We need to be able to resume better if something crashes or times out
-        RetryRestartHelper::handle_restart_progress(state, self, 3)
+        RetryRestartHelper::restart_progress_should_run(state, self, 3)
     }
 
     #[inline]

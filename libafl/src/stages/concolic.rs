@@ -70,10 +70,6 @@ where
         state: &mut TE::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        if RetryRestartHelper::should_skip(state, &self.inner)? {
-            return Ok(());
-        }
-
         self.inner.trace(fuzzer, state, manager)?;
         if let Some(observer) = self
             .inner
@@ -90,8 +86,8 @@ where
         Ok(())
     }
 
-    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RetryRestartHelper::handle_restart_progress(state, self, 3)
+    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        RetryRestartHelper::restart_progress_should_run(state, self, 3)
     }
 
     fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
@@ -416,8 +412,8 @@ where
     }
 
     #[inline]
-    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        self.restart_helper.handle_restart_progress(state)
+    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        self.restart_helper.restart_progress_should_run(state)
     }
 
     #[inline]

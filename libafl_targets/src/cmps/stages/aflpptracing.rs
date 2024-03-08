@@ -56,11 +56,6 @@ where
         state: &mut TE::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        if RetryRestartHelper::should_skip(state, self)? {
-            // early exit if we retried too often
-            return Ok(());
-        }
-
         // First run with the un-mutated input
         let unmutated_input = state.current_input_cloned()?;
 
@@ -129,9 +124,9 @@ where
         Ok(())
     }
 
-    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
         // TODO: this may need better resumption? (Or is it always used with a forkserver?)
-        RetryRestartHelper::handle_restart_progress(state, self, 3)
+        RetryRestartHelper::restart_progress_should_run(state, self, 3)
     }
 
     fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {

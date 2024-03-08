@@ -3,7 +3,7 @@
 use core::marker::PhantomData;
 
 use crate::{
-    stages::{HasCurrentStage, HasNestedStageStatus, Stage, StageRestartHelper, StagesTuple},
+    stages::{HasCurrentStage, HasNestedStageStatus, Stage, StagesTuple},
     state::UsesState,
     Error,
 };
@@ -12,26 +12,21 @@ use crate::{
 #[derive(Debug)]
 pub struct NestedStageRestartHelper;
 
-impl<S, ST> StageRestartHelper<S, ST> for NestedStageRestartHelper
-where
-    S: HasNestedStageStatus,
-{
-    fn handle_restart_progress(state: &mut S, _stage: &ST) -> Result<(), Error> {
+impl NestedStageRestartHelper {
+    fn restart_progress_should_run<S, ST>(state: &mut S, _stage: &ST) -> Result<bool, Error>
+    where
+        S: HasNestedStageStatus,
+    {
         state.enter_inner_stage()?;
-        Ok(())
+        Ok(true)
     }
 
-    fn clear_restart_progress(state: &mut S, _stage: &ST) -> Result<(), Error> {
+    fn clear_restart_progress<S, ST>(state: &mut S, _stage: &ST) -> Result<(), Error>
+    where
+        S: HasNestedStageStatus,
+    {
         state.exit_inner_stage()?;
         Ok(())
-    }
-
-    fn progress<'a>(_state: &'a S, _stage: &ST) -> Result<&'a Self, Error> {
-        unimplemented!("NestedStageRestartHelper should not be queried")
-    }
-
-    fn progress_mut<'a>(_state: &'a mut S, _stage: &ST) -> Result<&'a mut Self, Error> {
-        unimplemented!("NestedStageRestartHelper should not be queried")
     }
 }
 
@@ -85,8 +80,8 @@ where
         Ok(())
     }
 
-    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        NestedStageRestartHelper::handle_restart_progress(state, self)
+    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        NestedStageRestartHelper::restart_progress_should_run(state, self)
     }
 
     fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
@@ -162,8 +157,8 @@ where
         Ok(())
     }
 
-    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        NestedStageRestartHelper::handle_restart_progress(state, self)
+    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        NestedStageRestartHelper::restart_progress_should_run(state, self)
     }
 
     fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
@@ -263,8 +258,8 @@ where
         Ok(())
     }
 
-    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        NestedStageRestartHelper::handle_restart_progress(state, self)
+    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        NestedStageRestartHelper::restart_progress_should_run(state, self)
     }
 
     fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
@@ -337,8 +332,8 @@ where
         }
     }
 
-    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        NestedStageRestartHelper::handle_restart_progress(state, self)
+    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        NestedStageRestartHelper::restart_progress_should_run(state, self)
     }
 
     fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
@@ -485,7 +480,7 @@ mod test {
         }
 
         #[inline]
-        fn handle_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        fn restart_progress_should_run(&mut self, _state: &mut Self::State) -> Result<(), Error> {
             Ok(())
         }
 
