@@ -8,7 +8,7 @@ use crate::{
     executors::{Executor, HasObservers, ShadowExecutor},
     mark_feature_time,
     observers::ObserversTuple,
-    stages::{RetryRestartHelper, Stage},
+    stages::{RetryProgressHelper, Stage},
     start_timer,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasNamedMetadata, State, UsesState},
     Error,
@@ -39,8 +39,8 @@ where
     EM: UsesState<State = TE::State>,
     Z: UsesState<State = TE::State>,
 {
-    /// Perform tracing on the given [`CorpusId`]. Useful for if wrapping [`TracingStage`] with your
-    /// own stage and you need to manage [`super::StageRestartHelper`] differently; see
+    /// Perform tracing on the given `CorpusId`. Useful for if wrapping [`TracingStage`] with your
+    /// own stage and you need to manage [`super::StageProgressHelper`] differently; see
     /// [`super::ConcolicTracingStage`]'s implementation as an example of usage.
     pub fn trace(
         &mut self,
@@ -93,7 +93,7 @@ where
         state: &mut TE::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        if RetryRestartHelper::should_skip(state, self)? {
+        if RetryProgressHelper::should_skip(state, self)? {
             return Ok(());
         }
 
@@ -102,12 +102,12 @@ where
         Ok(())
     }
 
-    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RetryRestartHelper::handle_restart_progress(state, self, self.max_retries)
+    fn initialize_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        RetryProgressHelper::initialize_progress(state, self, self.max_retries)
     }
 
-    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RetryRestartHelper::clear_restart_progress(state, self)
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        RetryProgressHelper::clear_progress(state, self)
     }
 }
 
@@ -186,7 +186,7 @@ where
         state: &mut E::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        if RetryRestartHelper::should_skip(state, self)? {
+        if RetryProgressHelper::should_skip(state, self)? {
             return Ok(());
         }
 
@@ -220,12 +220,12 @@ where
         Ok(())
     }
 
-    fn handle_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RetryRestartHelper::handle_restart_progress(state, self, self.max_retries)
+    fn initialize_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        RetryProgressHelper::initialize_progress(state, self, self.max_retries)
     }
 
-    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RetryRestartHelper::clear_restart_progress(state, self)
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        RetryProgressHelper::clear_progress(state, self)
     }
 }
 

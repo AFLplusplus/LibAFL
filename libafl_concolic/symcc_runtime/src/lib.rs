@@ -35,6 +35,7 @@ pub mod tracing;
 // The following exports are used by the `export_runtime` macro. They are therefore exported, but hidden from docs, as they are not supposed to be used directly by the user.
 #[doc(hidden)]
 #[cfg(target_os = "linux")]
+#[allow(clippy::mixed_attributes_style)]
 pub mod cpp_runtime {
     #![allow(non_upper_case_globals)]
     #![allow(non_camel_case_types)]
