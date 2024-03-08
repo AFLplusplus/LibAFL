@@ -880,12 +880,10 @@ pub mod pybind {
 
 #[cfg(test)]
 pub mod test {
-    use alloc::rc::Rc;
-    use core::{cell::RefCell, marker::PhantomData};
+    use core::marker::PhantomData;
 
     use libafl_bolts::{impl_serdeany, Error, Named};
     use serde::{Deserialize, Serialize};
-    use tuple_list::{tuple_list, tuple_list_type};
 
     use crate::{
         corpus::{Corpus, HasCurrentCorpusIdx, Testcase},
