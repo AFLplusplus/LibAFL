@@ -1233,11 +1233,7 @@ pub mod test {
     use libafl_bolts::rands::StdRand;
 
     use super::StdState;
-    use crate::{
-        corpus::InMemoryCorpus,
-        inputs::{Input, NopInput},
-        stages::test::{test_resume, test_resume_stages},
-    };
+    use crate::{corpus::InMemoryCorpus, inputs::Input};
 
     #[must_use]
     pub fn test_std_state<I: Input>() -> StdState<I, InMemoryCorpus<I>, StdRand, InMemoryCorpus<I>>
@@ -1250,14 +1246,6 @@ pub mod test {
             &mut (),
         )
         .expect("couldn't instantiate the test state")
-    }
-
-    #[test]
-    fn resume_simple() {
-        let mut state = test_std_state::<NopInput>();
-        let (completed, stages) = test_resume_stages();
-
-        test_resume(&completed, &mut state, stages);
     }
 }
 

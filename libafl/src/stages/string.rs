@@ -132,9 +132,9 @@ where
     }
 
     #[inline]
-    fn restart_progress_should_run(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+    fn restart_progress_should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
         // Stage does not run the target. No reset helper needed.
-        Ok(())
+        Ok(true)
     }
 
     #[inline]

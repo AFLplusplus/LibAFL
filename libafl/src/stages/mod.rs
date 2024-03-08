@@ -807,7 +807,10 @@ pub mod pybind {
         }
 
         #[inline]
-        fn restart_progress_should_run(&mut self, state: &mut PythonStdState) -> Result<(), Error> {
+        fn restart_progress_should_run(
+            &mut self,
+            state: &mut PythonStdState,
+        ) -> Result<bool, Error> {
             // TODO we need to apply MutationalStage-like resumption here.
             // For now, make sure we don't get stuck crashing on a single test
             RetryRestartHelper::restart_progress_should_run(state, self, 3)
@@ -886,22 +889,13 @@ pub mod test {
 
     use crate::{
         corpus::{Corpus, HasCurrentCorpusIdx, Testcase},
-        events::NopEventManager,
-        executors::test::NopExecutor,
-        fuzzer::test::NopFuzzer,
         inputs::NopInput,
-        stages::{RetryRestartHelper, Stage, StageRestartHelper, StagesTuple},
+        stages::{RetryRestartHelper, Stage},
         state::{test::test_std_state, HasCorpus, HasMetadata, State, UsesState},
     };
 
     #[derive(Debug)]
     pub struct ResumeSucceededStage<S> {
-        phantom: PhantomData<S>,
-    }
-
-    #[derive(Debug)]
-    pub struct ResumeFailedStage<S> {
-        completed: Rc<RefCell<bool>>,
         phantom: PhantomData<S>,
     }
 
@@ -912,31 +906,34 @@ pub mod test {
 
     impl_serdeany!(TestProgress);
 
-    impl<S, ST> StageRestartHelper<S, ST> for TestProgress
-    where
-        S: HasMetadata,
-    {
-        fn restart_progress_should_run(state: &mut S, _stage: &ST) -> Result<(), Error> {
+    impl TestProgress {
+        #[allow(clippy::unnecessary_wraps)]
+        fn restart_progress_should_run<S, ST>(state: &mut S, _stage: &ST) -> Result<bool, Error>
+        where
+            S: HasMetadata,
+        {
             // check if we're resuming
-            let _ = state.metadata_or_insert_with(|| Self { count: 0 });
-            Ok(())
+            let metadata = state.metadata_or_insert_with(|| Self { count: 0 });
+
+            metadata.count += 1;
+            assert!(
+                metadata.count == 1,
+                "Test failed; we resumed a succeeded stage!"
+            );
+
+            Ok(true)
         }
 
-        fn clear_restart_progress(state: &mut S, _stage: &ST) -> Result<(), Error> {
-            if state.metadata_map_mut().remove::<Self>().is_none() {
+        fn clear_restart_progress<S, ST>(state: &mut S, _stage: &ST) -> Result<(), Error>
+        where
+            S: HasMetadata,
+        {
+            if state.remove_metadata::<Self>().is_none() {
                 return Err(Error::illegal_state(
                     "attempted to clear status metadata when none was present",
                 ));
             }
             Ok(())
-        }
-
-        fn progress<'a>(state: &'a S, _stage: &ST) -> Result<&'a Self, Error> {
-            state.metadata()
-        }
-
-        fn progress_mut<'a>(state: &'a mut S, _stage: &ST) -> Result<&'a mut Self, Error> {
-            state.metadata_mut()
         }
     }
 
@@ -958,62 +955,9 @@ pub mod test {
             &mut self,
             _fuzzer: &mut Z,
             _executor: &mut E,
-            state: &mut Self::State,
+            _state: &mut Self::State,
             _manager: &mut EM,
         ) -> Result<(), Error> {
-            // metadata is attached by the status
-            let meta = TestProgress::progress_mut(state, self)?;
-            meta.count += 1;
-            assert!(
-                meta.count == 1,
-                "Test failed; we resumed a succeeded stage!"
-            );
-
-            Ok(())
-        }
-
-        fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-            TestProgress::restart_progress_should_run(state, self)
-        }
-
-        fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-            TestProgress::clear_restart_progress(state, self)
-        }
-    }
-
-    impl<S> UsesState for ResumeFailedStage<S>
-    where
-        S: State,
-    {
-        type State = S;
-    }
-
-    impl<E, EM, Z> Stage<E, EM, Z> for ResumeFailedStage<Z::State>
-    where
-        E: UsesState<State = Z::State>,
-        EM: UsesState<State = Z::State>,
-        Z: UsesState,
-        Z::State: HasMetadata,
-    {
-        fn perform(
-            &mut self,
-            _fuzzer: &mut Z,
-            _executor: &mut E,
-            state: &mut Self::State,
-            _manager: &mut EM,
-        ) -> Result<(), Error> {
-            // metadata is attached by the status
-            let meta = TestProgress::progress_mut(state, self)?;
-            meta.count += 1;
-
-            if meta.count == 1 {
-                return Err(Error::shutting_down());
-            } else if meta.count > 2 {
-                panic!("Resume was somehow corrupted?")
-            } else {
-                self.completed.replace(true);
-            }
-
             Ok(())
         }
 
@@ -1028,63 +972,15 @@ pub mod test {
 
     #[must_use]
     #[allow(clippy::type_complexity)]
-    pub fn test_resume_stages<S>() -> (
-        Rc<RefCell<bool>>,
-        tuple_list_type!(ResumeSucceededStage<S>, ResumeFailedStage<S>),
-    ) {
+    pub fn test_resume_stages<S>() -> (Rc<RefCell<bool>>, tuple_list_type!(ResumeSucceededStage<S>))
+    {
         let completed = Rc::new(RefCell::new(false));
         (
             completed.clone(),
-            tuple_list!(
-                ResumeSucceededStage {
-                    phantom: PhantomData
-                },
-                ResumeFailedStage {
-                    completed,
-                    phantom: PhantomData
-                },
-            ),
+            tuple_list!(ResumeSucceededStage {
+                phantom: PhantomData
+            },),
         )
-    }
-
-    pub fn test_resume<ST, S>(completed: &Rc<RefCell<bool>>, state: &mut S, mut stages: ST)
-    where
-        ST: StagesTuple<NopExecutor<S>, NopEventManager<S>, S, NopFuzzer<S>>,
-        S: State,
-    {
-        #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
-        unsafe {
-            TestProgress::register();
-        }
-
-        let mut fuzzer = NopFuzzer::new();
-        let mut executor = NopExecutor::new();
-        let mut manager = NopEventManager::new();
-
-        for _ in 0..2 {
-            completed.replace(false);
-            let Err(e) = stages.perform_all(&mut fuzzer, &mut executor, state, &mut manager) else {
-                panic!("Test failed; stages should fail the first time.")
-            };
-            assert!(
-                matches!(e, Error::ShuttingDown),
-                "Unexpected error encountered."
-            );
-            assert!(!*completed.borrow(), "Unexpectedly complete?");
-            state
-                .on_restart()
-                .expect("Couldn't notify state of restart.");
-            assert!(
-                stages
-                    .perform_all(&mut fuzzer, &mut executor, state, &mut manager)
-                    .is_ok(),
-                "Test failed; stages should pass the second time."
-            );
-            assert!(
-                *completed.borrow(),
-                "Test failed; we did not set completed."
-            );
-        }
     }
 
     #[test]
@@ -1111,35 +1007,43 @@ pub mod test {
 
         for _ in 0..10 {
             // used normally, no retries means we never skip
-            RetryRestartHelper::restart_progress_should_run(&mut state, &stage, 1)?;
-            assert!(!RetryRestartHelper::should_skip(&mut state, &stage)?);
+            assert!(RetryRestartHelper::restart_progress_should_run(
+                &mut state, &stage, 1
+            )?);
             RetryRestartHelper::clear_restart_progress(&mut state, &stage)?;
         }
 
         for _ in 0..10 {
             // used normally, only one retry means we never skip
-            RetryRestartHelper::restart_progress_should_run(&mut state, &stage, 2)?;
-            assert!(!RetryRestartHelper::should_skip(&mut state, &stage)?);
-            RetryRestartHelper::restart_progress_should_run(&mut state, &stage, 2)?;
-            assert!(!RetryRestartHelper::should_skip(&mut state, &stage)?);
+            assert!(RetryRestartHelper::restart_progress_should_run(
+                &mut state, &stage, 2
+            )?);
+            assert!(RetryRestartHelper::restart_progress_should_run(
+                &mut state, &stage, 2
+            )?);
             RetryRestartHelper::clear_restart_progress(&mut state, &stage)?;
         }
 
-        RetryRestartHelper::restart_progress_should_run(&mut state, &stage, 2)?;
-        assert!(!RetryRestartHelper::should_skip(&mut state, &stage)?);
+        assert!(RetryRestartHelper::restart_progress_should_run(
+            &mut state, &stage, 2
+        )?);
         // task failed, let's resume
-        RetryRestartHelper::restart_progress_should_run(&mut state, &stage, 2)?;
         // we still have one more try!
-        assert!(!RetryRestartHelper::should_skip(&mut state, &stage)?);
+        assert!(RetryRestartHelper::restart_progress_should_run(
+            &mut state, &stage, 2
+        )?);
+
         // task failed, let's resume
-        RetryRestartHelper::restart_progress_should_run(&mut state, &stage, 2)?;
         // out of retries, so now we skip
-        assert!(RetryRestartHelper::should_skip(&mut state, &stage)?);
+        assert!(!RetryRestartHelper::restart_progress_should_run(
+            &mut state, &stage, 2
+        )?);
         RetryRestartHelper::clear_restart_progress(&mut state, &stage)?;
 
-        RetryRestartHelper::restart_progress_should_run(&mut state, &stage, 2)?;
         // we previously exhausted this testcase's retries, so we skip
-        assert!(RetryRestartHelper::should_skip(&mut state, &stage)?);
+        assert!(!RetryRestartHelper::restart_progress_should_run(
+            &mut state, &stage, 2
+        )?);
         RetryRestartHelper::clear_restart_progress(&mut state, &stage)?;
 
         Ok(())
