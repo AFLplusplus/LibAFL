@@ -30,8 +30,7 @@
 #![allow(
     clippy::module_name_repetitions,
     clippy::missing_panics_doc,
-    clippy::pub_underscore_fields,
-    clippy::mixed_attributes_style
+    clippy::pub_underscore_fields
 )]
 
 pub mod filter;
