@@ -9,8 +9,10 @@ use alloc::boxed::Box;
 use core::ptr::addr_of_mut;
 use core::{
     borrow::BorrowMut,
+    ffi::c_void,
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
+    ptr,
     time::Duration,
 };
 
@@ -125,7 +127,11 @@ where
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
-        self.inner.enter_target(fuzzer, state, mgr, input);
+        unsafe {
+            let executor_ptr = ptr::from_ref(self) as *const c_void;
+            self.inner
+                .enter_target(fuzzer, state, mgr, input, executor_ptr);
+        }
         self.inner.hooks.pre_exec_all(fuzzer, state, mgr, input);
 
         let ret = (self.harness_fn.borrow_mut())(input);
@@ -189,7 +195,7 @@ where
 
     /// Create a new in mem executor with the default timeout and use batch mode(5 sec)
     #[cfg(all(feature = "std", target_os = "linux"))]
-    pub fn batched_timeouts<EM, OF, Z>(
+    pub fn batched_timeout<EM, OF, Z>(
         harness_fn: &'a mut H,
         observers: OT,
         fuzzer: &mut Z,
@@ -204,8 +210,13 @@ where
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
     {
-        let inner = GenericInProcessExecutorInner::batched_timeouts::<Self, EM, OF, Z>(
-            observers, fuzzer, state, event_mgr, exec_tmout,
+        let inner = GenericInProcessExecutorInner::batched_timeout_generic::<Self, EM, OF, Z>(
+            tuple_list!(),
+            observers,
+            fuzzer,
+            state,
+            event_mgr,
+            exec_tmout,
         )?;
 
         Ok(Self {
@@ -237,8 +248,13 @@ where
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
     {
-        let inner = GenericInProcessExecutorInner::with_timeout::<Self, EM, OF, Z>(
-            observers, fuzzer, state, event_mgr, timeout,
+        let inner = GenericInProcessExecutorInner::with_timeout_generic::<Self, EM, OF, Z>(
+            tuple_list!(),
+            observers,
+            fuzzer,
+            state,
+            event_mgr,
+            timeout,
         )?;
 
         Ok(Self {

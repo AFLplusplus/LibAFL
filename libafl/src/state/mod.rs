@@ -14,6 +14,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[cfg(feature = "std")]
+use libafl_bolts::core_affinity::{CoreId, Cores};
 use libafl_bolts::{
     rands::{Rand, StdRand},
     serdeany::{NamedSerdeAnyMap, SerdeAny, SerdeAnyMap},
@@ -371,6 +373,10 @@ pub struct StdState<I, C, R, SC> {
     #[cfg(feature = "std")]
     /// Remaining initial inputs to load, if any
     dont_reenter: Option<Vec<PathBuf>>,
+    #[cfg(feature = "std")]
+    /// If inputs have been processed for multicore loading
+    /// relevant only for `load_initial_inputs_multicore`
+    multicore_inputs_processed: Option<bool>,
     /// The last time we reported progress (if available/used).
     /// This information is used by fuzzer `maybe_report_progress`.
     last_report_time: Option<Duration>,
@@ -749,22 +755,14 @@ where
         }
     }
 
-    /// Loads initial inputs from the passed-in `in_dirs`.
-    /// If `forced` is true, will add all testcases, no matter what.
-    fn load_initial_inputs_custom<E, EM, Z>(
-        &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
-        manager: &mut EM,
-        in_dirs: &[PathBuf],
-        forced: bool,
-        loader: &mut dyn FnMut(&mut Z, &mut Self, &Path) -> Result<I, Error>,
-    ) -> Result<(), Error>
-    where
-        E: UsesState<State = Self>,
-        EM: EventFirer<State = Self>,
-        Z: Evaluator<E, EM, State = Self>,
-    {
+    /// Resets the state of initial files.
+    fn reset_initial_files_state(&mut self) {
+        self.remaining_initial_files = None;
+        self.dont_reenter = None;
+    }
+
+    /// Sets canonical paths for provided inputs
+    fn canonicalize_input_dirs(&mut self, in_dirs: &[PathBuf]) -> Result<(), Error> {
         if let Some(remaining) = self.remaining_initial_files.as_ref() {
             // everything was loaded
             if remaining.is_empty() {
@@ -780,8 +778,7 @@ where
             self.dont_reenter = Some(files.clone());
             self.remaining_initial_files = Some(files);
         }
-
-        self.continue_loading_initial_inputs_custom(fuzzer, executor, manager, forced, loader)
+        Ok(())
     }
 
     /// Loads initial inputs from the passed-in `in_dirs`.
@@ -812,7 +809,32 @@ where
 
         self.continue_loading_initial_inputs_custom(fuzzer, executor, manager, forced, loader)
     }
-
+    fn load_file<E, EM, Z>(
+        &mut self,
+        path: &PathBuf,
+        manager: &mut EM,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        forced: bool,
+        loader: &mut dyn FnMut(&mut Z, &mut Self, &Path) -> Result<I, Error>,
+    ) -> Result<(), Error>
+    where
+        E: UsesState<State = Self>,
+        EM: EventFirer<State = Self>,
+        Z: Evaluator<E, EM, State = Self>,
+    {
+        log::info!("Loading file {:?} ...", &path);
+        let input = loader(fuzzer, self, path)?;
+        if forced {
+            let _: CorpusId = fuzzer.add_input(self, executor, manager, input)?;
+        } else {
+            let (res, _) = fuzzer.evaluate_input(self, executor, manager, input)?;
+            if res == ExecuteInputResult::None {
+                log::warn!("File {:?} was not interesting, skipped.", &path);
+            }
+        }
+        Ok(())
+    }
     /// Loads initial inputs from the passed-in `in_dirs`.
     /// If `forced` is true, will add all testcases, no matter what.
     /// This method takes a list of files.
@@ -832,16 +854,7 @@ where
         loop {
             match self.next_file() {
                 Ok(path) => {
-                    log::info!("Loading file {:?} ...", &path);
-                    let input = loader(fuzzer, self, &path)?;
-                    if forced {
-                        let _: CorpusId = fuzzer.add_input(self, executor, manager, input)?;
-                    } else {
-                        let (res, _) = fuzzer.evaluate_input(self, executor, manager, input)?;
-                        if res == ExecuteInputResult::None {
-                            log::warn!("File {:?} was not interesting, skipped.", &path);
-                        }
-                    }
+                    self.load_file(&path, manager, fuzzer, executor, forced, loader)?;
                 }
                 Err(Error::IteratorEnd(_, _)) => break,
                 Err(e) => return Err(e),
@@ -900,16 +913,15 @@ where
         EM: EventFirer<State = Self>,
         Z: Evaluator<E, EM, State = Self>,
     {
-        self.load_initial_inputs_custom(
+        self.canonicalize_input_dirs(in_dirs)?;
+        self.continue_loading_initial_inputs_custom(
             fuzzer,
             executor,
             manager,
-            in_dirs,
             true,
             &mut |_, _, path| I::from_file(path),
         )
     }
-
     /// Loads initial inputs from the passed-in `in_dirs`.
     /// If `forced` is true, will add all testcases, no matter what.
     /// This method takes a list of files, instead of folders.
@@ -948,14 +960,113 @@ where
         EM: EventFirer<State = Self>,
         Z: Evaluator<E, EM, State = Self>,
     {
-        self.load_initial_inputs_custom(
+        self.canonicalize_input_dirs(in_dirs)?;
+        self.continue_loading_initial_inputs_custom(
             fuzzer,
             executor,
             manager,
-            in_dirs,
             false,
             &mut |_, _, path| I::from_file(path),
         )
+    }
+
+    fn calculate_corpus_size(&mut self) -> Result<usize, Error> {
+        let mut count: usize = 0;
+        loop {
+            match self.next_file() {
+                Ok(_) => {
+                    count = count.saturating_add(1);
+                }
+                Err(Error::IteratorEnd(_, _)) => break,
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(count)
+    }
+    /// Loads initial inputs by dividing the from the passed-in `in_dirs`
+    /// in a multicore fashion. Divides the corpus in chunks spread across cores.
+    pub fn load_initial_inputs_multicore<E, EM, Z>(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        manager: &mut EM,
+        in_dirs: &[PathBuf],
+        core_id: &CoreId,
+        cores: &Cores,
+    ) -> Result<(), Error>
+    where
+        E: UsesState<State = Self>,
+        EM: EventFirer<State = Self>,
+        Z: Evaluator<E, EM, State = Self>,
+    {
+        if self.multicore_inputs_processed.unwrap_or(false) {
+            self.continue_loading_initial_inputs_custom(
+                fuzzer,
+                executor,
+                manager,
+                false,
+                &mut |_, _, path| I::from_file(path),
+            )?;
+        } else {
+            self.canonicalize_input_dirs(in_dirs)?;
+            let corpus_size = self.calculate_corpus_size()?;
+            log::info!(
+                "{} total_corpus_size, {} cores",
+                corpus_size,
+                cores.ids.len()
+            );
+            self.reset_initial_files_state();
+            self.canonicalize_input_dirs(in_dirs)?;
+            if cores.ids.len() > corpus_size {
+                log::info!(
+                    "low intial corpus count ({}), no parallelism required.",
+                    corpus_size
+                );
+            } else {
+                let core_index = cores
+                    .ids
+                    .iter()
+                    .enumerate()
+                    .find(|(_, c)| *c == core_id)
+                    .unwrap_or_else(|| panic!("core id {} not in cores list", core_id.0))
+                    .0;
+                let chunk_size = corpus_size.saturating_div(cores.ids.len());
+                let mut skip = core_index.saturating_mul(chunk_size);
+                let mut inputs_todo = chunk_size;
+                let mut collected_inputs = Vec::new();
+                log::info!(
+                    "core = {}, core_index = {}, chunk_size = {}, skip = {}",
+                    core_id.0,
+                    core_index,
+                    chunk_size,
+                    skip
+                );
+                loop {
+                    match self.next_file() {
+                        Ok(path) => {
+                            if skip != 0 {
+                                skip = skip.saturating_sub(1);
+                                continue;
+                            }
+                            if inputs_todo == 0 {
+                                break;
+                            }
+                            collected_inputs.push(path);
+                            inputs_todo = inputs_todo.saturating_sub(1);
+                        }
+                        Err(Error::IteratorEnd(_, _)) => break,
+                        Err(e) => {
+                            return Err(e);
+                        }
+                    }
+                }
+                self.remaining_initial_files = Some(collected_inputs);
+            }
+            self.multicore_inputs_processed = Some(true);
+            return self
+                .load_initial_inputs_multicore(fuzzer, executor, manager, in_dirs, core_id, cores);
+        }
+        Ok(())
     }
 }
 
@@ -1076,6 +1187,8 @@ where
             stage_depth: 0,
             stage_idx_stack: Vec::new(),
             phantom: PhantomData,
+            #[cfg(feature = "std")]
+            multicore_inputs_processed: None,
         };
         feedback.init_state(&mut state)?;
         objective.init_state(&mut state)?;
