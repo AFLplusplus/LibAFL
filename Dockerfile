@@ -4,7 +4,7 @@ LABEL "maintainer"="afl++ team <afl@aflplus.plus>"
 LABEL "about"="LibAFL Docker image"
 
 # install sccache to cache subsequent builds of dependencies
-RUN cargo install sccache
+RUN cargo install --locked sccache
 
 ENV HOME=/root
 ENV SCCACHE_CACHE_SIZE="1G"
