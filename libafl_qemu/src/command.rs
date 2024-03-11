@@ -7,6 +7,7 @@ use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     executors::ExitKind,
     inputs::{BytesInput, HasBytesVec},
+    prelude::{HasExecutions, State},
     state::StdState,
 };
 use libafl_bolts::rands::RomuDuoJrRand;
@@ -15,10 +16,11 @@ use num_enum::TryFromPrimitive;
 #[cfg(emulation_mode = "systemmode")]
 use crate::QemuInstrumentationPagingFilter;
 use crate::{
-    get_qemu_hooks, sync_backdoor::SyncBackdoorError, Emulator, GuestAddrKind, GuestPhysAddr,
-    GuestReg, GuestVirtAddr, HandlerError, HasInstrumentationFilter, InnerHandlerResult,
-    IsEmuExitHandler, IsFilter, IsSnapshotManager, QemuEdgeCoverageHelper, QemuHooks,
-    QemuInstrumentationAddressRangeFilter, Regs, StdEmuExitHandler, CPU,
+    executor::QemuExecutorState, get_qemu_hooks, sync_backdoor::SyncBackdoorError, Emulator,
+    GuestAddrKind, GuestPhysAddr, GuestReg, GuestVirtAddr, HandlerError, HasInstrumentationFilter,
+    InnerHandlerResult, IsEmuExitHandler, IsFilter, IsSnapshotManager, QemuEdgeCoverageHelper,
+    QemuHelperTuple, QemuHooks, QemuInstrumentationAddressRangeFilter, Regs, StdEmuExitHandler,
+    CPU,
 };
 
 pub const VERSION: u64 = bindings::LIBAFL_EXIT_VERSION_NUMBER as u64;
@@ -72,13 +74,17 @@ where
     ///     - `ret_reg`: The register in which the guest return value should be written, if any.
     /// Returns
     ///     - `InnerHandlerResult`: How the high-level handler should behave
-    fn run(
+    fn run<QT, S>(
         &self,
         emu: &Emulator<E>,
         emu_exit_handler: &mut E,
+        qemu_executor_state: &mut QemuExecutorState<QT, S, E>,
         input: &BytesInput,
         ret_reg: Option<Regs>,
-    ) -> Result<InnerHandlerResult, HandlerError>;
+    ) -> Result<InnerHandlerResult, HandlerError>
+    where
+        QT: QemuHelperTuple<S, Self>,
+        S: State + HasExecutions;
 }
 
 #[cfg(emulation_mode = "systemmode")]
@@ -134,18 +140,24 @@ where
         }
     }
 
-    fn run(
+    fn run<QT, S>(
         &self,
         emu: &Emulator<StdEmuExitHandler<SM>>,
         emu_exit_handler: &mut StdEmuExitHandler<SM>,
+        qemu_executor_state: &mut QemuExecutorState<QT, S, StdEmuExitHandler<SM>>,
         input: &BytesInput,
         ret_reg: Option<Regs>,
-    ) -> Result<InnerHandlerResult, HandlerError> {
+    ) -> Result<InnerHandlerResult, HandlerError>
+    where
+        QT: QemuHelperTuple<S, Self>,
+        S: State + HasExecutions,
+    {
         match self {
             Command::SaveCommand(cmd) => <SaveCommand as IsCommand<StdEmuExitHandler<SM>>>::run(
                 cmd,
                 emu,
                 emu_exit_handler,
+                qemu_executor_state,
                 input,
                 ret_reg,
             ),
@@ -153,6 +165,7 @@ where
                 cmd,
                 emu,
                 emu_exit_handler,
+                qemu_executor_state,
                 input,
                 ret_reg,
             ),
@@ -160,6 +173,7 @@ where
                 cmd,
                 emu,
                 emu_exit_handler,
+                qemu_executor_state,
                 input,
                 ret_reg,
             ),
@@ -167,6 +181,7 @@ where
                 cmd,
                 emu,
                 emu_exit_handler,
+                qemu_executor_state,
                 input,
                 ret_reg,
             ),
@@ -174,6 +189,7 @@ where
                 cmd,
                 emu,
                 emu_exit_handler,
+                qemu_executor_state,
                 input,
                 ret_reg,
             ),
@@ -182,21 +198,32 @@ where
                     cmd,
                     emu,
                     emu_exit_handler,
+                    qemu_executor_state,
                     input,
                     ret_reg,
                 )
             }
             #[cfg(emulation_mode = "systemmode")]
-            Command::PagingFilterCommand(cmd) => <PagingFilterCommand as IsCommand<
-                StdEmuExitHandler<SM>,
-            >>::run(
-                cmd, emu, emu_exit_handler, input, ret_reg
-            ),
-            Command::AddressRangeFilterCommand(cmd) => <AddressRangeFilterCommand as IsCommand<
-                StdEmuExitHandler<SM>,
-            >>::run(
-                cmd, emu, emu_exit_handler, input, ret_reg
-            ),
+            Command::PagingFilterCommand(cmd) => {
+                <PagingFilterCommand as IsCommand<StdEmuExitHandler<SM>>>::run(
+                    cmd,
+                    emu,
+                    emu_exit_handler,
+                    qemu_executor_state,
+                    input,
+                    ret_reg,
+                )
+            }
+            Command::AddressRangeFilterCommand(cmd) => {
+                <AddressRangeFilterCommand as IsCommand<StdEmuExitHandler<SM>>>::run(
+                    cmd,
+                    emu,
+                    emu_exit_handler,
+                    qemu_executor_state,
+                    input,
+                    ret_reg,
+                )
+            }
         }
     }
 }
@@ -223,6 +250,7 @@ where
         &self,
         emu: &Emulator<StdEmuExitHandler<SM>>,
         emu_exit_handler: &mut StdEmuExitHandler<SM>,
+        qemu_executor_state: &mut QemuExecutorState<QT, S, StdEmuExitHandler<SM>>,
         _input: &BytesInput,
         _ret_reg: Option<Regs>,
     ) -> Result<InnerHandlerResult, HandlerError> {

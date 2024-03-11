@@ -24,7 +24,7 @@ use paste::paste;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
-use crate::{command::IsCommand, extern_c_checked, GuestReg, Regs};
+use crate::{command::IsCommand, extern_c_checked, GuestReg, QemuHelperTuple, Regs};
 
 #[cfg(emulation_mode = "systemmode")]
 pub mod systemmode;
@@ -127,12 +127,16 @@ pub trait IsSnapshotManager: Debug + Clone {
 pub trait IsEmuExitHandler: Sized + Debug + Clone {
     fn try_put_input(&mut self, emu: &Emulator<Self>, input: &BytesInput);
 
-    fn handle(
+    fn handle<QT, S>(
         &mut self,
         exit_reason: Result<EmuExitReason, EmuExitReasonError>,
         emu: &Emulator<Self>,
+        qemu_executor_state: &mut QemuExecutorState<QT, S, Self>,
         input: &BytesInput,
-    ) -> Result<InnerHandlerResult, HandlerError>;
+    ) -> Result<InnerHandlerResult, HandlerError>
+    where
+        QT: QemuHelperTuple<S, Self>,
+        S: State + HasExecutions;
 }
 
 pub enum InnerHandlerResult {
@@ -148,12 +152,17 @@ pub struct NopEmuExitHandler;
 impl IsEmuExitHandler for NopEmuExitHandler {
     fn try_put_input(&mut self, _: &Emulator<Self>, _: &BytesInput) {}
 
-    fn handle(
+    fn handle<QT, S>(
         &mut self,
         exit_reason: Result<EmuExitReason, EmuExitReasonError>,
         _: &Emulator<Self>,
+        _: &mut QemuExecutorState<QT, S, Self>,
         _: &BytesInput,
-    ) -> Result<InnerHandlerResult, HandlerError> {
+    ) -> Result<InnerHandlerResult, HandlerError>
+    where
+        QT: QemuHelperTuple<S, Self>,
+        S: State + HasExecutions,
+    {
         match exit_reason {
             Ok(reason) => Ok(InnerHandlerResult::ReturnToHarness(reason)),
             Err(error) => Err(error)?,
@@ -217,12 +226,17 @@ where
         }
     }
 
-    fn handle(
+    fn handle<QT, S>(
         &mut self,
         exit_reason: Result<EmuExitReason, EmuExitReasonError>,
         emu: &Emulator<Self>,
+        qemu_executor_state: &mut QemuExecutorState<QT, S, Self>,
         input: &BytesInput,
-    ) -> Result<InnerHandlerResult, HandlerError> {
+    ) -> Result<InnerHandlerResult, HandlerError>
+    where
+        QT: QemuHelperTuple<S, Self>,
+        S: State + HasExecutions,
+    {
         let mut exit_reason = match exit_reason {
             Ok(exit_reason) => exit_reason,
             Err(exit_error) => match exit_error {
@@ -786,11 +800,13 @@ create_hook_id!(NewThread, libafl_qemu_remove_new_thread_hook, false);
 
 use std::{pin::Pin, ptr::NonNull};
 
+use libafl::state::{HasExecutions, State};
 use libafl_bolts::os::unix_signals::Signal;
 
 use crate::{
     breakpoint::Breakpoint,
     command::{Command, EmulatorMemoryChunk, InputCommand},
+    executor::QemuExecutorState,
 };
 
 #[derive(Debug)]
@@ -1259,7 +1275,15 @@ where
     ///
     /// Should, in general, be safe to call.
     /// Of course, the emulated target is not contained securely and can corrupt state or interact with the operating system.
-    pub unsafe fn run_handle(&self, input: &BytesInput) -> Result<HandlerResult, HandlerError> {
+    pub unsafe fn run_handle<QT, S>(
+        &self,
+        input: &BytesInput,
+        executor_state: &mut QemuExecutorState<QT, S, E>,
+    ) -> Result<HandlerResult, HandlerError>
+    where
+        QT: QemuHelperTuple<S, E>,
+        S: State + HasExecutions,
+    {
         let mut exit_handler = self.state().exit_handler.borrow_mut();
 
         loop {
@@ -1270,7 +1294,7 @@ where
             let exit_reason = self.run();
 
             // Handle QEMU exit
-            let handler_res = exit_handler.handle(exit_reason, self, input)?;
+            let handler_res = exit_handler.handle(exit_reason, self, executor_state, input)?;
 
             // Return to harness
             match handler_res {
