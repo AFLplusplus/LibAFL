@@ -333,7 +333,7 @@ where
                 monitor.client_stats_insert(id);
                 let client = monitor.client_stats_mut_for(id);
                 client.update_corpus_size(*corpus_size as u64);
-                client.update_executions(*executions as u64, *time);
+                client.update_executions(*executions, *time);
                 monitor.display(event.name(), id);
                 Ok(BrokerEventResult::Forward)
             }
@@ -345,7 +345,7 @@ where
                 // TODO: The monitor buffer should be added on client add.
                 monitor.client_stats_insert(client_id);
                 let client = monitor.client_stats_mut_for(client_id);
-                client.update_executions(*executions as u64, *time);
+                client.update_executions(*executions, *time);
                 monitor.display(event.name(), client_id);
                 Ok(BrokerEventResult::Handled)
             }
@@ -375,7 +375,7 @@ where
                 let client = monitor.client_stats_mut_for(client_id);
 
                 // Update the normal monitor for this client
-                client.update_executions(*executions as u64, *time);
+                client.update_executions(*executions, *time);
 
                 // Update the performance monitor for this client
                 client.update_introspection_monitor((**introspection_monitor).clone());

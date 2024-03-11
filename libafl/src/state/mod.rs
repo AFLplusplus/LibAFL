@@ -1,7 +1,8 @@
 //! The fuzzer, and state are the core pieces of every good fuzzer
 
-use alloc::vec::Vec;
+use alloc::{boxed::Box, vec::Vec};
 use core::{
+    borrow::BorrowMut,
     cell::{Ref, RefMut},
     fmt::Debug,
     marker::PhantomData,
@@ -170,7 +171,27 @@ pub trait HasMetadata {
         self.metadata_map_mut().insert(meta);
     }
 
+    /// Gets metadata, or inserts it using the given construction function `default`
+    fn metadata_or_insert_with<M>(&mut self, default: impl FnOnce() -> M) -> &mut M
+    where
+        M: SerdeAny,
+    {
+        self.metadata_map_mut().or_insert_with::<M>(default)
+    }
+
+    /// Remove a metadata from the metadata map
+    #[inline]
+    fn remove_metadata<M>(&mut self) -> Option<Box<M>>
+    where
+        M: SerdeAny,
+    {
+        self.metadata_map_mut().remove::<M>()
+    }
+
     /// Check for a metadata
+    ///
+    /// # Note
+    /// For performance reasons, you likely want to use [`Self::metadata_or_insert_with`] instead
     #[inline]
     fn has_metadata<M>(&self) -> bool
     where
@@ -211,14 +232,39 @@ pub trait HasNamedMetadata {
 
     /// Add a metadata to the metadata map
     #[inline]
-    fn add_named_metadata<M>(&mut self, meta: M, name: &str)
+    fn add_named_metadata<M>(&mut self, name: &str, meta: M)
     where
         M: SerdeAny,
     {
-        self.named_metadata_map_mut().insert(meta, name);
+        self.named_metadata_map_mut().insert(name, meta);
+    }
+
+    /// Add a metadata to the metadata map
+    #[inline]
+    fn remove_named_metadata<M>(&mut self, name: &str) -> Option<Box<M>>
+    where
+        M: SerdeAny,
+    {
+        self.named_metadata_map_mut().remove::<M>(name)
+    }
+
+    /// Gets metadata, or inserts it using the given construction function `default`
+    fn named_metadata_or_insert_with<M>(
+        &mut self,
+        name: &str,
+        default: impl FnOnce() -> M,
+    ) -> &mut M
+    where
+        M: SerdeAny,
+    {
+        self.named_metadata_map_mut()
+            .or_insert_with::<M>(name, default)
     }
 
     /// Check for a metadata
+    ///
+    /// # Note
+    /// You likely want to use [`Self::named_metadata_or_insert_with`] for performance reasons.
     #[inline]
     fn has_named_metadata<M>(&self, name: &str) -> bool
     where
@@ -255,10 +301,10 @@ pub trait HasNamedMetadata {
 /// Trait for the execution counter
 pub trait HasExecutions {
     /// The executions counter
-    fn executions(&self) -> &usize;
+    fn executions(&self) -> &u64;
 
     /// The executions counter (mutable)
-    fn executions_mut(&mut self) -> &mut usize;
+    fn executions_mut(&mut self) -> &mut u64;
 }
 
 /// Trait for some stats of AFL
@@ -301,7 +347,7 @@ pub struct StdState<I, C, R, SC> {
     /// RNG instance
     rand: R,
     /// How many times the executor ran the harness/target
-    executions: usize,
+    executions: u64,
     /// At what time the fuzzing started
     start_time: Duration,
     /// the number of new paths that imported from other fuzzers
@@ -406,7 +452,10 @@ where
     R: Rand,
 {
     /// To get the testcase
-    fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<<Self as UsesInput>::Input>>, Error> {
+    fn testcase(
+        &self,
+        id: CorpusId,
+    ) -> Result<Ref<'_, Testcase<<Self as UsesInput>::Input>>, Error> {
         Ok(self.corpus().get(id)?.borrow())
     }
 
@@ -414,7 +463,7 @@ where
     fn testcase_mut(
         &self,
         id: CorpusId,
-    ) -> Result<RefMut<Testcase<<Self as UsesInput>::Input>>, Error> {
+    ) -> Result<RefMut<'_, Testcase<<Self as UsesInput>::Input>>, Error> {
         Ok(self.corpus().get(id)?.borrow_mut())
     }
 }
@@ -470,13 +519,13 @@ impl<I, C, R, SC> HasNamedMetadata for StdState<I, C, R, SC> {
 impl<I, C, R, SC> HasExecutions for StdState<I, C, R, SC> {
     /// The executions counter
     #[inline]
-    fn executions(&self) -> &usize {
+    fn executions(&self) -> &u64 {
         &self.executions
     }
 
     /// The executions counter (mutable)
     #[inline]
-    fn executions_mut(&mut self) -> &mut usize {
+    fn executions_mut(&mut self) -> &mut u64 {
         &mut self.executions
     }
 }
@@ -546,6 +595,64 @@ impl<I, C, R, SC> HasCurrentCorpusIdx for StdState<I, C, R, SC> {
 
     fn current_corpus_idx(&self) -> Result<Option<CorpusId>, Error> {
         Ok(self.corpus_idx)
+    }
+}
+
+/// Has information about the current [`Testcase`] we are fuzzing
+pub trait HasCurrentTestcase<I>
+where
+    I: Input,
+{
+    /// Gets the current [`Testcase`] we are fuzzing
+    ///
+    /// Will return [`Error::key_not_found`] if no `corpus_idx` is currently set.
+    fn current_testcase(&self) -> Result<Ref<'_, Testcase<I>>, Error>;
+    //fn current_testcase(&self) -> Result<&Testcase<I>, Error>;
+
+    /// Gets the current [`Testcase`] we are fuzzing (mut)
+    ///
+    /// Will return [`Error::key_not_found`] if no `corpus_idx` is currently set.
+    fn current_testcase_mut(&self) -> Result<RefMut<'_, Testcase<I>>, Error>;
+    //fn current_testcase_mut(&self) -> Result<&mut Testcase<I>, Error>;
+
+    /// Gets a cloned representation of the current [`Testcase`].
+    ///
+    /// Will return [`Error::key_not_found`] if no `corpus_idx` is currently set.
+    ///
+    /// # Note
+    /// This allocates memory and copies the contents!
+    /// For performance reasons, if you just need to access the testcase, use [`Self::current_testcase`] instead.
+    fn current_input_cloned(&self) -> Result<I, Error>;
+}
+
+impl<I, T> HasCurrentTestcase<I> for T
+where
+    I: Input,
+    T: HasCorpus + HasCurrentCorpusIdx + UsesInput<Input = I>,
+{
+    fn current_testcase(&self) -> Result<Ref<'_, Testcase<I>>, Error> {
+        let Some(corpus_id) = self.current_corpus_idx()? else {
+            return Err(Error::key_not_found(
+                "We are not currently processing a testcase",
+            ));
+        };
+
+        Ok(self.corpus().get(corpus_id)?.borrow())
+    }
+
+    fn current_testcase_mut(&self) -> Result<RefMut<'_, Testcase<I>>, Error> {
+        let Some(corpus_id) = self.current_corpus_idx()? else {
+            return Err(Error::illegal_state(
+                "We are not currently processing a testcase",
+            ));
+        };
+
+        Ok(self.corpus().get(corpus_id)?.borrow_mut())
+    }
+
+    fn current_input_cloned(&self) -> Result<I, Error> {
+        let mut testcase = self.current_testcase_mut()?;
+        Ok(testcase.borrow_mut().load_input(self.corpus())?.clone())
     }
 }
 
@@ -1115,7 +1222,7 @@ impl<I, C, R, SC> HasScalabilityMonitor for StdState<I, C, R, SC> {
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct NopState<I> {
     metadata: SerdeAnyMap,
-    execution: usize,
+    execution: u64,
     rand: StdRand,
     phantom: PhantomData<I>,
 }
@@ -1141,11 +1248,11 @@ where
 }
 
 impl<I> HasExecutions for NopState<I> {
-    fn executions(&self) -> &usize {
+    fn executions(&self) -> &u64 {
         &self.execution
     }
 
-    fn executions_mut(&mut self) -> &mut usize {
+    fn executions_mut(&mut self) -> &mut u64 {
         &mut self.execution
     }
 }
@@ -1239,11 +1346,7 @@ pub mod test {
     use libafl_bolts::rands::StdRand;
 
     use super::StdState;
-    use crate::{
-        corpus::InMemoryCorpus,
-        inputs::{Input, NopInput},
-        stages::test::{test_resume, test_resume_stages},
-    };
+    use crate::{corpus::InMemoryCorpus, inputs::Input};
 
     #[must_use]
     pub fn test_std_state<I: Input>() -> StdState<I, InMemoryCorpus<I>, StdRand, InMemoryCorpus<I>>
@@ -1256,14 +1359,6 @@ pub mod test {
             &mut (),
         )
         .expect("couldn't instantiate the test state")
-    }
-
-    #[test]
-    fn resume_simple() {
-        let mut state = test_std_state::<NopInput>();
-        let (completed, stages) = test_resume_stages();
-
-        test_resume(&completed, &mut state, stages);
     }
 }
 
@@ -1360,7 +1455,7 @@ pub mod pybind {
             self.inner.as_ref().solutions().clone()
         }
 
-        fn executions(&self) -> usize {
+        fn executions(&self) -> u64 {
             *self.inner.as_ref().executions()
         }
 

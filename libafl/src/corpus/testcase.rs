@@ -59,7 +59,7 @@ where
     /// Cached len of the input, if any
     cached_len: Option<usize>,
     /// Number of executions done at discovery time
-    executions: usize,
+    executions: u64,
     /// Number of fuzzing iterations of this particular input updated in `perform_mutational`
     scheduled_count: usize,
     /// Parent [`CorpusId`], if known
@@ -174,13 +174,13 @@ where
 
     /// Get the executions
     #[inline]
-    pub fn executions(&self) -> &usize {
+    pub fn executions(&self) -> &u64 {
         &self.executions
     }
 
     /// Get the executions (mutable)
     #[inline]
-    pub fn executions_mut(&mut self) -> &mut usize {
+    pub fn executions_mut(&mut self) -> &mut u64 {
         &mut self.executions
     }
 
@@ -258,7 +258,7 @@ where
 
     /// Create a new Testcase instance given an [`Input`] and the number of executions
     #[inline]
-    pub fn with_executions(mut input: I, executions: usize) -> Self {
+    pub fn with_executions(mut input: I, executions: u64) -> Self {
         input.wrapped_as_testcase();
         Self {
             input: Some(input),
@@ -541,7 +541,7 @@ pub mod pybind {
         }
 
         #[getter]
-        fn executions(&self) -> usize {
+        fn executions(&self) -> u64 {
             *self.inner.as_ref().executions()
         }
 

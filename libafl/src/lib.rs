@@ -135,8 +135,12 @@ pub unsafe extern "C" fn external_current_millis() -> u64 {
 #[cfg(test)]
 mod tests {
 
+    #[cfg(miri)]
+    use libafl_bolts::serdeany::RegistryBuilder;
     use libafl_bolts::{rands::StdRand, tuples::tuple_list};
 
+    #[cfg(miri)]
+    use crate::stages::ExecutionCountRestartHelperMetadata;
     use crate::{
         corpus::{Corpus, InMemoryCorpus, Testcase},
         events::NopEventManager,
@@ -155,6 +159,13 @@ mod tests {
     #[test]
     #[allow(clippy::similar_names)]
     fn test_fuzzer() {
+        // # Safety
+        // No concurrency per testcase
+        #[cfg(miri)]
+        unsafe {
+            RegistryBuilder::register::<ExecutionCountRestartHelperMetadata>();
+        }
+
         let rand = StdRand::with_seed(0);
 
         let mut corpus = InMemoryCorpus::<BytesInput>::new();

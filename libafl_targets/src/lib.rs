@@ -14,8 +14,7 @@
     clippy::missing_panics_doc,
     clippy::missing_docs_in_private_items,
     clippy::module_name_repetitions,
-    clippy::pub_underscore_fields,
-    clippy::mixed_attributes_style
+    clippy::pub_underscore_fields
 )]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
@@ -90,6 +89,7 @@ pub use sancov_cmp::*;
 
 /// Module containing bindings to the various sanitizer interface headers
 #[cfg(feature = "sanitizer_interfaces")]
+#[allow(clippy::mixed_attributes_style)]
 pub mod sanitizer_ifaces {
     #![allow(non_snake_case)]
     #![allow(non_camel_case_types)]

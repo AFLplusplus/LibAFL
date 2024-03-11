@@ -381,6 +381,8 @@ mod test {
 
     #[test]
     fn test_tuning() {
+        // # Safety
+        // No concurrency per testcase
         #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
         unsafe {
             TuneableScheduledMutatorMetadata::register();
@@ -404,6 +406,8 @@ mod test {
 
     #[test]
     fn test_mutation_distribution() {
+        // # Safety
+        // No concurrency per testcase
         #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
         unsafe {
             TuneableScheduledMutatorMetadata::register();

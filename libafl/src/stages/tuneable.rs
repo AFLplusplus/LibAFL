@@ -7,15 +7,15 @@ use libafl_bolts::{current_time, impl_serdeany, rands::Rand};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, CorpusId, HasCurrentCorpusIdx},
+    corpus::{Corpus, HasCurrentCorpusIdx},
     mark_feature_time,
     mutators::{MutationResult, Mutator},
     stages::{
         mutational::{MutatedTransform, MutatedTransformPost, DEFAULT_MUTATIONAL_MAX_ITERATIONS},
-        MutationalStage, Stage,
+        ExecutionCountRestartHelper, MutationalStage, Stage,
     },
     start_timer,
-    state::{HasCorpus, HasMetadata, HasNamedMetadata, HasRand, UsesState},
+    state::{HasCorpus, HasExecutions, HasMetadata, HasNamedMetadata, HasRand, UsesState},
     Error, Evaluator,
 };
 #[cfg(feature = "introspection")]
@@ -150,8 +150,12 @@ where
 /// A [`crate::stages::MutationalStage`] where the mutator iteration can be tuned at runtime
 #[derive(Clone, Debug)]
 pub struct TuneableMutationalStage<E, EM, I, M, Z> {
+    /// The mutator we use
     mutator: M,
+    /// The name of this stage
     name: String,
+    /// The progress helper we use to keep track of progress across restarts
+    restart_helper: ExecutionCountRestartHelper,
     phantom: PhantomData<(E, EM, I, Z)>,
 }
 
@@ -161,7 +165,7 @@ where
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasCorpus + HasRand + HasNamedMetadata + HasMetadata,
+    Z::State: HasCorpus + HasRand + HasNamedMetadata + HasMetadata + HasExecutions,
     I: MutatedTransform<Z::Input, Z::State> + Clone,
 {
     /// Runs this (mutational) stage for the given `testcase`
@@ -222,7 +226,7 @@ where
             }
             (None, None) => {
                 // fall back to random
-                let iters = self.iterations(state, corpus_idx)?;
+                let iters = self.iterations(state)? - self.execs_since_progress_start(state)?;
                 for i in 1..=iters {
                     self.perform_mutation(fuzzer, executor, state, manager, &input, i)?;
                 }
@@ -245,11 +249,15 @@ where
 
     /// Gets the number of iterations as a random number
     #[allow(clippy::cast_possible_truncation)]
-    fn iterations(&self, state: &mut Z::State, _corpus_idx: CorpusId) -> Result<u64, Error> {
+    fn iterations(&self, state: &mut Z::State) -> Result<u64, Error> {
         Ok(
             // fall back to random
             1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS),
         )
+    }
+
+    fn execs_since_progress_start(&mut self, state: &mut <Z>::State) -> Result<u64, Error> {
+        self.restart_helper.execs_since_progress_start(state)
     }
 }
 
@@ -259,7 +267,7 @@ where
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasCorpus + HasRand,
+    Z::State: HasCorpus + HasRand + HasExecutions,
     I: MutatedTransform<Z::Input, Z::State> + Clone,
 {
     type State = Z::State;
@@ -271,11 +279,9 @@ where
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasCorpus + HasRand + HasNamedMetadata + HasMetadata,
+    Z::State: HasCorpus + HasRand + HasNamedMetadata + HasMetadata + HasExecutions,
     I: MutatedTransform<Z::Input, Z::State> + Clone,
 {
-    type Progress = (); // TODO should this stage be resumed?
-
     #[inline]
     #[allow(clippy::let_and_return)]
     fn perform(
@@ -292,6 +298,14 @@ where
 
         ret
     }
+
+    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        self.restart_helper.restart_progress_should_run(state)
+    }
+
+    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        self.restart_helper.clear_restart_progress(state)
+    }
 }
 
 impl<E, EM, I, M, Z> TuneableMutationalStage<E, EM, I, M, Z>
@@ -300,7 +314,7 @@ where
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasCorpus + HasRand + HasNamedMetadata + HasMetadata,
+    Z::State: HasCorpus + HasRand + HasNamedMetadata + HasMetadata + HasExecutions,
     I: MutatedTransform<Z::Input, Z::State> + Clone,
 {
     /// Creates a new default tuneable mutational stage
@@ -473,12 +487,11 @@ where
     /// Creates a new tranforming mutational stage
     #[must_use]
     pub fn transforming(state: &mut Z::State, mutator: M, name: &str) -> Self {
-        if !state.has_named_metadata::<TuneableMutationalStageMetadata>(name) {
-            state.add_named_metadata(TuneableMutationalStageMetadata::default(), name);
-        }
+        let _ = state.named_metadata_or_insert_with(name, TuneableMutationalStageMetadata::default);
         Self {
             mutator,
             name: name.to_string(),
+            restart_helper: ExecutionCountRestartHelper::default(),
             phantom: PhantomData,
         }
     }

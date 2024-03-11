@@ -198,7 +198,7 @@ impl ExecutorHook for InProcessHooks {
             (*data).timeout_handler = self.timeout_handler;
         }
 
-        #[cfg(feature = "std")]
+        #[cfg(all(feature = "std", not(all(miri, target_vendor = "apple"))))]
         self.timer_mut().set_timer();
     }
 
@@ -212,7 +212,7 @@ impl ExecutorHook for InProcessHooks {
         _input: &I,
     ) {
         // timeout stuff
-        #[cfg(feature = "std")]
+        #[cfg(all(feature = "std", not(all(miri, target_vendor = "apple"))))]
         self.timer_mut().unset_timer();
     }
 }

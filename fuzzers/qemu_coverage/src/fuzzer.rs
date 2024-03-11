@@ -8,12 +8,11 @@ use std::{env, fs::DirEntry, io, path::PathBuf, process};
 use clap::{builder::Str, Parser};
 use libafl::{
     corpus::{Corpus, NopCorpus},
-    events::{launcher::Launcher, EventConfig, EventRestarter},
+    events::{launcher::Launcher, EventConfig, EventRestarter, LlmpRestartingEventManager},
     executors::ExitKind,
     fuzzer::StdFuzzer,
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
-    prelude::LlmpRestartingEventManager,
     schedulers::QueueScheduler,
     state::{HasCorpus, StdState},
     Error,

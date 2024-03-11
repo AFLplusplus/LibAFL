@@ -6,18 +6,17 @@ use alloc::{
 };
 use core::{cmp::Ordering, fmt::Debug, marker::PhantomData, ops::Range};
 
-use libafl_bolts::{rands::Rand, tuples::MatchName};
+use libafl_bolts::{rands::Rand, tuples::MatchName, Named};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, HasCurrentCorpusIdx},
     events::EventFirer,
     executors::{Executor, HasObservers},
     inputs::HasBytesVec,
     mutators::mutations::buffer_copy,
     observers::{MapObserver, ObserversTuple},
-    stages::Stage,
-    state::{HasCorpus, HasMetadata, HasRand, UsesState},
+    stages::{RetryRestartHelper, Stage},
+    state::{HasCorpus, HasCurrentTestcase, HasMetadata, HasNamedMetadata, HasRand, UsesState},
     Error,
 };
 
@@ -68,17 +67,24 @@ where
     type State = E::State;
 }
 
+impl<EM, O, E, Z> Named for ColorizationStage<EM, O, E, Z>
+where
+    E: UsesState,
+{
+    fn name(&self) -> &str {
+        &self.map_observer_name
+    }
+}
+
 impl<E, EM, O, Z> Stage<E, EM, Z> for ColorizationStage<EM, O, E, Z>
 where
     EM: UsesState<State = E::State> + EventFirer,
     E: HasObservers + Executor<EM, Z>,
-    E::State: HasCorpus + HasMetadata + HasRand,
+    E::State: HasCorpus + HasMetadata + HasRand + HasNamedMetadata,
     E::Input: HasBytesVec,
     O: MapObserver,
     Z: UsesState<State = E::State>,
 {
-    type Progress = (); // TODO this stage needs resume
-
     #[inline]
     #[allow(clippy::let_and_return)]
     fn perform(
@@ -92,6 +98,16 @@ where
         Self::colorize(fuzzer, executor, state, manager, &self.map_observer_name)?;
 
         Ok(())
+    }
+
+    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        // TODO this stage needs a proper resume
+        RetryRestartHelper::restart_progress_should_run(state, self, 3)
+    }
+
+    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        // TODO this stage needs a proper resume
+        RetryRestartHelper::clear_restart_progress(state, self)
     }
 }
 
@@ -152,13 +168,7 @@ where
         manager: &mut EM,
         name: &str,
     ) -> Result<E::Input, Error> {
-        let Some(corpus_idx) = state.current_corpus_idx()? else {
-            return Err(Error::illegal_state(
-                "state is not currently processing a corpus index",
-            ));
-        };
-
-        let mut input = state.corpus().cloned_input_for_id(corpus_idx)?;
+        let mut input = state.current_input_cloned()?;
         // The backup of the input
         let backup = input.clone();
         // This is the buffer we'll randomly mutate during type_replace

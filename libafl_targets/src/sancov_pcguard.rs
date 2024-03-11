@@ -7,12 +7,17 @@ use core::simd::num::SimdUint;
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ctx"))]
 use libafl::executors::{hooks::ExecutorHook, HasObservers};
 
+#[cfg(any(
+    feature = "pointer_maps",
+    feature = "sancov_pcguard_edges",
+    feature = "sancov_pcguard_hitcounts"
+))]
+use crate::coverage::EDGES_MAP;
+use crate::coverage::MAX_EDGES_NUM;
 #[cfg(feature = "pointer_maps")]
 use crate::coverage::{EDGES_MAP_PTR, EDGES_MAP_PTR_NUM};
-use crate::{
-    coverage::{EDGES_MAP, MAX_EDGES_NUM},
-    EDGES_MAP_SIZE,
-};
+#[cfg(feature = "sancov_ngram4")]
+use crate::EDGES_MAP_SIZE;
 
 #[cfg(all(feature = "sancov_pcguard_edges", feature = "sancov_pcguard_hitcounts"))]
 #[cfg(not(any(doc, feature = "clippy")))]
@@ -160,6 +165,7 @@ extern "C" {
 #[no_mangle]
 #[allow(unused_assignments)]
 pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
+    #[allow(unused_mut)]
     let mut pos = *guard as usize;
 
     #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]

@@ -442,7 +442,7 @@ impl Display for Error {
                 display_error_backtrace(f, b)
             }
             Self::KeyNotFound(s, b) => {
-                write!(f, "Key `{0}` not in Corpus", &s)?;
+                write!(f, "Key: `{0}` - not found", &s)?;
                 display_error_backtrace(f, b)
             }
             Self::Empty(s, b) => {
