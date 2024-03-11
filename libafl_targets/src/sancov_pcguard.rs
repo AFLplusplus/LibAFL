@@ -36,14 +36,17 @@ type Ngram8 = core::simd::u32x8;
 #[rustversion::nightly]
 pub static mut PREV_ARRAY_4: Ngram4 = Ngram4::from_array([0, 0, 0, 0]);
 
+/// The array holding the previous locs. This is required for NGRAM-4 instrumentation
 #[cfg(feature = "sancov_ngram8")]
 #[rustversion::nightly]
 pub static mut PREV_ARRAY_8: Ngram8 = Ngram8::from_array([0, 0, 0, 0, 0, 0, 0, 0]);
 
+/// We shift each of the values in ngram4 everytime we see new edges
 #[cfg(feature = "sancov_ngram4")]
 #[rustversion::nightly]
 pub static SHR_4: Ngram4 = Ngram4::from_array([1, 1, 1, 1]);
 
+/// We shift each of the values in ngram8 everytime we see new edges
 #[cfg(feature = "sancov_ngram8")]
 #[rustversion::nightly]
 pub static SHR_8: Ngram8 = Ngram8::from_array([1, 1, 1, 1, 1, 1, 1, 1]);
@@ -77,7 +80,7 @@ impl ExecutorHook for NgramHook {
 
         #[cfg(feature = "sancov_ngram8")]
         unsafe {
-            PREV_ARRAY_8 = Ngram8::from_array([0, 0, 0, 0, 0, 0, 0, 0])
+            PREV_ARRAY_8 = Ngram8::from_array([0, 0, 0, 0, 0, 0, 0, 0]);
         }
     }
     fn post_exec<EM, I, S, Z>(
