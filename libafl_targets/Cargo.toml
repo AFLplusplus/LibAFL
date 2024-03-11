@@ -43,6 +43,7 @@ sancov_pcguard_hitcounts = ["coverage"]
 sancov_value_profile = ["common"]
 sancov_8bit = []
 sancov_ngram4 = ["coverage"]
+sancov_ngram8 = ["coverage"]
 sancov_ctx = ["coverage"]
 sancov_cmplog = ["common"] # Defines cmp and __sanitizer_weak_hook functions. Use libfuzzer_interceptors to define interceptors (only compatible with Linux)
 sancov_pcguard = ["sancov_pcguard_hitcounts"]

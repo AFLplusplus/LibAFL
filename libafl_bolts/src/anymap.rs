@@ -47,7 +47,6 @@ macro_rules! impl_asany {
 /// The size changed in later rust versions, see <https://github.com/rust-lang/compiler-team/issues/608>
 #[inline]
 #[must_use]
-#[allow(clippy::cast_ptr_alignment)]
 pub const fn pack_type_id(id: u128) -> TypeId {
     // TypeId size of other sizes is not yet supported"
     assert!(size_of::<TypeId>() == 16, "Unsupported size for TypeId");
@@ -62,7 +61,6 @@ pub const fn pack_type_id(id: u128) -> TypeId {
 /// The size changed in later rust versions, see <https://github.com/rust-lang/compiler-team/issues/608>
 #[inline]
 #[must_use]
-#[allow(clippy::cast_ptr_alignment)]
 pub const fn unpack_type_id(id: TypeId) -> u128 {
     // see any.rs, it's alway u128 hence 16 bytes.
     // TypeId size of other sizes is not yet supported"
