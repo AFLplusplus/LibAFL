@@ -1,4 +1,4 @@
-use core::{convert::Into, ffi::c_void, mem::MaybeUninit, ptr::copy_nonoverlapping};
+use core::{ffi::c_void, mem::MaybeUninit, ptr::copy_nonoverlapping};
 use std::{cell::OnceCell, slice::from_raw_parts, str::from_utf8_unchecked};
 
 use libc::c_int;
@@ -12,9 +12,9 @@ use crate::{
         mmap_next_start, read_self_maps, strlen,
     },
     sync_backdoor::SyncBackdoorError,
-    EmuExitReason, EmuExitReasonError, Emulator, GuestAddr, GuestUsize, HookData, HookId,
-    IsEmuExitHandler, MapInfo, MmapPerms, NewThreadHookId, NopEmuExitHandler, PostSyscallHookId,
-    PreSyscallHookId, SyscallHookResult, VerifyAccess, CPU,
+    EmuExitReason, EmuExitReasonError, Emulator, GuestAddr, GuestUsize, HookData, IsEmuExitHandler,
+    MapInfo, MmapPerms, NewThreadHookId, NopEmuExitHandler, PostSyscallHookId, PreSyscallHookId,
+    SyscallHookResult, VerifyAccess, CPU,
 };
 
 #[derive(Debug, Clone)]

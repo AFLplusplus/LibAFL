@@ -32,6 +32,38 @@ impl SnapshotId {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum SnapshotManager {
+    Qemu(QemuSnapshotManager),
+    Fast(FastSnapshotManager),
+}
+
+impl IsSnapshotManager for SnapshotManager {
+    fn save<E>(&mut self, emu: &Emulator<E>) -> SnapshotId
+    where
+        E: IsEmuExitHandler,
+    {
+        match self {
+            SnapshotManager::Qemu(qemu_sm) => qemu_sm.save(emu),
+            SnapshotManager::Fast(fast_sm) => fast_sm.save(emu),
+        }
+    }
+
+    fn restore<E>(
+        &mut self,
+        snapshot_id: &SnapshotId,
+        emu: &Emulator<E>,
+    ) -> Result<(), SnapshotManagerError>
+    where
+        E: IsEmuExitHandler,
+    {
+        match self {
+            SnapshotManager::Qemu(qemu_sm) => qemu_sm.restore(snapshot_id, emu),
+            SnapshotManager::Fast(fast_sm) => fast_sm.restore(snapshot_id, emu),
+        }
+    }
+}
+
 pub type FastSnapshotPtr = *mut libafl_qemu_sys::SyxSnapshot;
 
 #[derive(Debug, Clone)]

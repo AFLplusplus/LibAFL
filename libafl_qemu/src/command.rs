@@ -37,8 +37,6 @@ mod bindings {
     include!(concat!(env!("OUT_DIR"), "/backdoor_bindings.rs"));
 }
 
-trait IsNativeCommand<const COMMAND_ID: u64> {}
-
 #[derive(Debug, Clone, TryFromPrimitive)]
 #[repr(u64)]
 pub enum NativeBackdoorCommand {

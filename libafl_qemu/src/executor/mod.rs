@@ -7,8 +7,6 @@ use core::{
     time::Duration,
 };
 
-#[cfg(all(feature = "fork", emulation_mode = "usermode"))]
-use libafl::inputs::UsesInput;
 #[cfg(feature = "fork")]
 use libafl::{
     events::EventManager,

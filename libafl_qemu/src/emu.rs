@@ -123,38 +123,6 @@ pub trait IsSnapshotManager: Debug + Clone {
         E: IsEmuExitHandler;
 }
 
-#[derive(Debug, Clone)]
-pub enum SnapshotManager {
-    Qemu(QemuSnapshotManager),
-    Fast(FastSnapshotManager),
-}
-
-impl IsSnapshotManager for SnapshotManager {
-    fn save<E>(&mut self, emu: &Emulator<E>) -> SnapshotId
-    where
-        E: IsEmuExitHandler,
-    {
-        match self {
-            SnapshotManager::Qemu(qemu_sm) => qemu_sm.save(emu),
-            SnapshotManager::Fast(fast_sm) => fast_sm.save(emu),
-        }
-    }
-
-    fn restore<E>(
-        &mut self,
-        snapshot_id: &SnapshotId,
-        emu: &Emulator<E>,
-    ) -> Result<(), SnapshotManagerError>
-    where
-        E: IsEmuExitHandler,
-    {
-        match self {
-            SnapshotManager::Qemu(qemu_sm) => qemu_sm.restore(snapshot_id, emu),
-            SnapshotManager::Fast(fast_sm) => fast_sm.restore(snapshot_id, emu),
-        }
-    }
-}
-
 // TODO: Rework with generics for command handlers?
 pub trait IsEmuExitHandler: Sized + Debug + Clone {
     fn try_put_input(&mut self, emu: &Emulator<Self>, input: &BytesInput);
@@ -583,69 +551,6 @@ extern_c_checked! {
         data: *const ()
     );
     fn libafl_qemu_gdb_reply(buf: *const u8, len: usize);
-}
-
-#[cfg(emulation_mode = "usermode")]
-#[cfg_attr(feature = "python", pyclass(unsendable))]
-pub struct GuestMaps {
-    orig_c_iter: *const c_void,
-    c_iter: *const c_void,
-}
-
-// Consider a private new only for Emulator
-#[cfg(emulation_mode = "usermode")]
-impl GuestMaps {
-    #[must_use]
-    pub(crate) fn new() -> Self {
-        unsafe {
-            let maps = read_self_maps();
-            Self {
-                orig_c_iter: maps,
-                c_iter: maps,
-            }
-        }
-    }
-}
-
-#[cfg(emulation_mode = "usermode")]
-impl Iterator for GuestMaps {
-    type Item = MapInfo;
-
-    #[allow(clippy::uninit_assumed_init)]
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.c_iter.is_null() {
-            return None;
-        }
-        unsafe {
-            let mut ret = MaybeUninit::uninit();
-            self.c_iter = libafl_maps_next(self.c_iter, ret.as_mut_ptr());
-            if self.c_iter.is_null() {
-                None
-            } else {
-                Some(ret.assume_init())
-            }
-        }
-    }
-}
-
-#[cfg(all(emulation_mode = "usermode", feature = "python"))]
-#[pymethods]
-impl GuestMaps {
-    fn __iter__(slf: PyRef<Self>) -> PyRef<Self> {
-        slf
-    }
-    fn __next__(mut slf: PyRefMut<Self>) -> Option<PyObject> {
-        Python::with_gil(|py| slf.next().map(|x| x.into_py(py)))
-    }
-}
-
-#[cfg(emulation_mode = "usermode")]
-impl Drop for GuestMaps {
-    fn drop(&mut self) {
-        unsafe {
-            free_self_maps(self.orig_c_iter);
-        }
-    }
 }
 
 #[repr(C)]
