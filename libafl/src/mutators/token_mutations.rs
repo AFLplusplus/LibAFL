@@ -306,12 +306,7 @@ where
     S: HasMetadata + HasRand + HasMaxSize,
     I: HasBytesVec,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
         let tokens_len = {
             let Some(meta) = state.metadata_map().get::<Tokens>() else {
@@ -373,12 +368,7 @@ where
     S: UsesInput + HasMetadata + HasRand + HasMaxSize,
     I: HasBytesVec,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
         if size == 0 {
             return Ok(MutationResult::Skipped);
@@ -437,12 +427,7 @@ where
     I: HasBytesVec,
 {
     #[allow(clippy::too_many_lines)]
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
         if size == 0 {
             return Ok(MutationResult::Skipped);
@@ -628,7 +613,7 @@ const CMP_ATTRIBUTE_IS_TRANSFORM: u8 = 64;
 pub struct AFLppRedQueen {
     enable_transform: bool,
     enable_arith: bool,
-    text_type: TextType,
+    text_type: Option<TextType>,
 }
 
 impl AFLppRedQueen {
@@ -1104,7 +1089,7 @@ where
         &mut self,
         state: &mut S,
         input: &I,
-        stage_idx: i32,
+
         max_count: Option<usize>,
     ) -> Result<Vec<I>, Error> {
         // TODO
@@ -1144,9 +1129,7 @@ where
         // println!("orig: {:#?} new: {:#?}", orig_cmpvals, new_cmpvals);
 
         // Compute when mutating it for the 1st time.
-        if stage_idx == 0 {
-            self.text_type = check_if_text(orig_bytes, orig_bytes.len());
-        }
+        self.text_type = Some(check_if_text(orig_bytes, orig_bytes.len()));
         // println!("approximate size: {cmp_len} x {input_len}");
         for cmp_idx in 0..cmp_len {
             let (w_idx, header) = headers[cmp_idx];
@@ -1603,7 +1586,8 @@ where
                                 &mut ret,
                             );
 
-                            let is_ascii_or_utf8 = self.text_type.is_ascii_or_utf8();
+                            let is_ascii_or_utf8 =
+                                self.text_type.is_some_and(TextType::is_ascii_or_utf8);
                             let mut v0_len = orig_v0.len();
                             let mut v1_len = orig_v1.len();
                             if v0_len > 0
@@ -1695,7 +1679,7 @@ impl AFLppRedQueen {
         Self {
             enable_transform: false,
             enable_arith: false,
-            text_type: TextType::None,
+            text_type: None,
         }
     }
 
@@ -1705,7 +1689,7 @@ impl AFLppRedQueen {
         Self {
             enable_transform: transform,
             enable_arith: arith,
-            text_type: TextType::None,
+            text_type: None,
         }
     }
 

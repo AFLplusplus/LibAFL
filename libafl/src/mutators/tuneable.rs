@@ -112,13 +112,8 @@ where
     S: HasRand + HasMetadata,
 {
     #[inline]
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        stage_id: i32,
-    ) -> Result<MutationResult, Error> {
-        self.scheduled_mutate(state, input, stage_id)
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        self.scheduled_mutate(state, input)
     }
 }
 
