@@ -1,6 +1,8 @@
 //! An [`EventManager`] manages all events that go to other instances of the fuzzer.
 //! The messages are commonly information about new Testcases as well as stats and other [`Event`]s.
 
+pub mod hooks;
+
 pub mod simple;
 pub use simple::*;
 #[cfg(all(unix, feature = "std"))]
@@ -12,6 +14,8 @@ pub use centralized::*;
 pub mod launcher;
 #[allow(clippy::ignored_unit_patterns)]
 pub mod llmp;
+pub use llmp::*;
+
 #[cfg(feature = "tcp_manager")]
 #[allow(clippy::ignored_unit_patterns)]
 pub mod tcp;
@@ -31,7 +35,6 @@ pub use launcher::*;
 #[cfg(all(unix, feature = "std"))]
 use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
 use libafl_bolts::{current_time, ClientId};
-pub use llmp::*;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use uuid::Uuid;
