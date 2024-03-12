@@ -19,9 +19,15 @@ RUN sh -c 'echo set encoding=utf-8 > /root/.vimrc' \
 RUN rustup component add rustfmt clippy
 RUN rustup default nightly
 
-# Install clang 11, common build tools
-RUN apt update && apt install -y build-essential gdb git wget python3-venv ninja-build lsb-release software-properties-common gnupg
-RUN wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && ./llvm.sh 15
+# Install clang 18, common build tools
+ENV LLVM_VERSION=18
+RUN apt update && apt install -y build-essential gdb git wget python3-venv ninja-build lsb-release software-properties-common gnupg cmake
+# Workaround until https://github.com/llvm/llvm-project/issues/62475 is resolved
+RUN set -ex &&\
+    echo "deb http://apt.llvm.org/bookworm/ llvm-toolchain-bookworm-${LLVM_VERSION} main" > /etc/apt/sources.list.d/apt.llvm.org.list &&\
+    wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key |  tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc &&\
+    apt update &&\
+    apt-get install -y clang-${LLVM_VERSION} lldb-${LLVM_VERSION} lld-${LLVM_VERSION} clangd-${LLVM_VERSION} clang-tidy-${LLVM_VERSION} clang-format-${LLVM_VERSION} clang-tools-${LLVM_VERSION} llvm-${LLVM_VERSION}-dev lld-${LLVM_VERSION} lldb-${LLVM_VERSION} llvm-${LLVM_VERSION}-tools libomp-${LLVM_VERSION}-dev libc++-${LLVM_VERSION}-dev libc++abi-${LLVM_VERSION}-dev libclang-common-${LLVM_VERSION}-dev libclang-${LLVM_VERSION}-dev libclang-cpp${LLVM_VERSION}-dev libunwind-${LLVM_VERSION}-dev libclang-rt-${LLVM_VERSION}-dev libpolly-${LLVM_VERSION}-dev
 
 # Copy a dummy.rs and Cargo.toml first, so that dependencies are cached
 WORKDIR /libafl
@@ -41,13 +47,13 @@ COPY libafl_frida/Cargo.toml libafl_frida/build.rs libafl_frida/
 COPY scripts/dummy.rs libafl_frida/src/lib.rs
 COPY libafl_frida/src/gettls.c libafl_frida/src/gettls.c
 
-COPY libafl_qemu/Cargo.toml libafl_qemu/build.rs libafl_qemu/
+COPY libafl_qemu/Cargo.toml libafl_qemu/build.rs libafl_qemu/build_linux.rs libafl_qemu/
 COPY scripts/dummy.rs libafl_qemu/src/lib.rs
 
 COPY libafl_qemu/libafl_qemu_build/Cargo.toml libafl_qemu/libafl_qemu_build/
 COPY scripts/dummy.rs libafl_qemu/libafl_qemu_build/src/lib.rs
 
-COPY libafl_qemu/libafl_qemu_sys/Cargo.toml libafl_qemu/libafl_qemu_sys/build.rs libafl_qemu/libafl_qemu_sys/
+COPY libafl_qemu/libafl_qemu_sys/Cargo.toml libafl_qemu/libafl_qemu_sys/build.rs libafl_qemu/libafl_qemu_sys/build_linux.rs libafl_qemu/libafl_qemu_sys/
 COPY scripts/dummy.rs libafl_qemu/libafl_qemu_sys/src/lib.rs
 
 COPY libafl_sugar/Cargo.toml libafl_sugar/
