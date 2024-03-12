@@ -99,12 +99,13 @@ pub trait Mutator<I, S>: Named {
     ) -> Result<MutationResult, Error>;
 
     /// Post-process given the outcome of the execution
+    /// `new_corpus_idx` will be `Some` if a new `Testcase` was created this execution.
     #[inline]
     fn post_exec(
         &mut self,
         _state: &mut S,
         _stage_idx: i32,
-        _corpus_idx: Option<CorpusId>,
+        _new_corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -124,12 +125,13 @@ pub trait MultiMutator<I, S>: Named {
     ) -> Result<Vec<I>, Error>;
 
     /// Post-process given the outcome of the execution
+    /// `new_corpus_idx` will be `Some` if a new `Testcase` was created this execution.
     #[inline]
     fn multi_post_exec(
         &mut self,
         _state: &mut S,
         _stage_idx: i32,
-        _corpus_idx: Option<CorpusId>,
+        _new_corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -146,11 +148,12 @@ pub trait MutatorsTuple<I, S>: HasLen {
     ) -> Result<MutationResult, Error>;
 
     /// Runs the `post_exec` function on all `Mutators` in this `Tuple`.
+    /// `new_corpus_idx` will be `Some` if a new `Testcase` was created this execution.
     fn post_exec_all(
         &mut self,
         state: &mut S,
         stage_idx: i32,
-        corpus_idx: Option<CorpusId>,
+        new_corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error>;
 
     /// Gets the [`Mutator`] at the given index and runs the `mutate` function on it.
@@ -163,6 +166,7 @@ pub trait MutatorsTuple<I, S>: HasLen {
     ) -> Result<MutationResult, Error>;
 
     /// Gets the [`Mutator`] at the given index and runs the `post_exec` function on it.
+    /// `new_corpus_idx` will be `Some` if a new `Testcase` was created this execution.
     fn get_and_post_exec(
         &mut self,
         index: usize,
@@ -191,7 +195,7 @@ impl<I, S> MutatorsTuple<I, S> for () {
         &mut self,
         _state: &mut S,
         _stage_idx: i32,
-        _corpus_idx: Option<CorpusId>,
+        _new_corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -213,7 +217,7 @@ impl<I, S> MutatorsTuple<I, S> for () {
         _index: usize,
         _state: &mut S,
         _stage_idx: i32,
-        _corpus_idx: Option<CorpusId>,
+        _new_corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -247,10 +251,10 @@ where
         &mut self,
         state: &mut S,
         stage_idx: i32,
-        corpus_idx: Option<CorpusId>,
+        new_corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
-        self.0.post_exec(state, stage_idx, corpus_idx)?;
-        self.1.post_exec_all(state, stage_idx, corpus_idx)
+        self.0.post_exec(state, stage_idx, new_corpus_idx)?;
+        self.1.post_exec_all(state, stage_idx, new_corpus_idx)
     }
 
     fn get_and_mutate(
@@ -273,13 +277,13 @@ where
         index: usize,
         state: &mut S,
         stage_idx: i32,
-        corpus_idx: Option<CorpusId>,
+        new_corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
         if index == 0 {
-            self.0.post_exec(state, stage_idx, corpus_idx)
+            self.0.post_exec(state, stage_idx, new_corpus_idx)
         } else {
             self.1
-                .get_and_post_exec(index - 1, state, stage_idx, corpus_idx)
+                .get_and_post_exec(index - 1, state, stage_idx, new_corpus_idx)
         }
     }
 
@@ -320,9 +324,9 @@ where
         &mut self,
         state: &mut S,
         stage_idx: i32,
-        corpus_idx: Option<CorpusId>,
+        new_corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
-        self.0.post_exec_all(state, stage_idx, corpus_idx)
+        self.0.post_exec_all(state, stage_idx, new_corpus_idx)
     }
 
     fn get_and_mutate(
@@ -340,10 +344,10 @@ where
         index: usize,
         state: &mut S,
         stage_idx: i32,
-        corpus_idx: Option<CorpusId>,
+        new_corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
         self.0
-            .get_and_post_exec(index, state, stage_idx, corpus_idx)
+            .get_and_post_exec(index, state, stage_idx, new_corpus_idx)
     }
 
     fn names(&self) -> Vec<&str> {
@@ -381,10 +385,10 @@ impl<I, S> MutatorsTuple<I, S> for Vec<Box<dyn Mutator<I, S>>> {
         &mut self,
         state: &mut S,
         stage_idx: i32,
-        corpus_idx: Option<CorpusId>,
+        new_corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
         for mutator in self.iter_mut() {
-            mutator.post_exec(state, stage_idx, corpus_idx)?;
+            mutator.post_exec(state, stage_idx, new_corpus_idx)?;
         }
         Ok(())
     }
@@ -407,12 +411,12 @@ impl<I, S> MutatorsTuple<I, S> for Vec<Box<dyn Mutator<I, S>>> {
         index: usize,
         state: &mut S,
         stage_idx: i32,
-        corpus_idx: Option<CorpusId>,
+        new_corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
         let mutator = self
             .get_mut(index)
             .ok_or_else(|| Error::key_not_found("Mutator with id {index:?} not found."))?;
-        mutator.post_exec(state, stage_idx, corpus_idx)
+        mutator.post_exec(state, stage_idx, new_corpus_idx)
     }
 
     fn names(&self) -> Vec<&str> {

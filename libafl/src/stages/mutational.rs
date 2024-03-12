@@ -33,7 +33,7 @@ pub trait MutatedTransformPost<S>: Sized {
         self,
         state: &mut S,
         stage_idx: i32,
-        corpus_idx: Option<CorpusId>,
+        new_corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
         Ok(())
     }
