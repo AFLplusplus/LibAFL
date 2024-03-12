@@ -34,11 +34,7 @@ where
 {
     type Post = StringIdentificationMetadata;
 
-    fn try_transform_from(
-        base: &mut Testcase<BytesInput>,
-        state: &S,
-        _corpus_idx: CorpusId,
-    ) -> Result<Self, Error> {
+    fn try_transform_from(base: &mut Testcase<BytesInput>, state: &S) -> Result<Self, Error> {
         let input = base.load_input(state.corpus())?.clone();
         let metadata = base.metadata::<StringIdentificationMetadata>().cloned()?;
         Ok((input, metadata))
