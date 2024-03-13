@@ -23,6 +23,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use crate::mutators::str_decode;
 use crate::{
+    corpus::{CorpusId, HasCurrentCorpusIdx},
     inputs::{HasBytesVec, UsesInput},
     mutators::{
         buffer_self_copy, mutations::buffer_copy, MultiMutator, MutationResult, Mutator, Named,
@@ -613,7 +614,10 @@ const CMP_ATTRIBUTE_IS_TRANSFORM: u8 = 64;
 pub struct AFLppRedQueen {
     enable_transform: bool,
     enable_arith: bool,
-    text_type: Option<TextType>,
+    text_type: TextType,
+    /// We use this variable to check if we scheduled a new corpus_idx
+    /// - and, hence, need to recalculate `text_type``
+    last_corpus_idx: Option<CorpusId>,
 }
 
 impl AFLppRedQueen {
@@ -1080,7 +1084,7 @@ impl AFLppRedQueen {
 
 impl<I, S> MultiMutator<I, S> for AFLppRedQueen
 where
-    S: UsesInput + HasMetadata + HasRand + HasMaxSize + HasCorpus,
+    S: UsesInput + HasMetadata + HasRand + HasMaxSize + HasCorpus + HasCurrentCorpusIdx,
     I: HasBytesVec + From<Vec<u8>>,
 {
     #[allow(clippy::needless_range_loop)]
@@ -1129,7 +1133,11 @@ where
         // println!("orig: {:#?} new: {:#?}", orig_cmpvals, new_cmpvals);
 
         // Compute when mutating it for the 1st time.
-        self.text_type = Some(check_if_text(orig_bytes, orig_bytes.len()));
+        let current_corpus_idx = state.current_corpus_idx()?.ok_or_else(|| Error::key_not_found("No corpus-idx is currently being fuzzed, but called AFLppRedQueen::multi_mutated()."))?;
+        if self.last_corpus_idx.is_none() || self.last_corpus_idx.unwrap() != current_corpus_idx {
+            self.text_type = check_if_text(orig_bytes, orig_bytes.len());
+            self.last_corpus_idx = Some(current_corpus_idx);
+        }
         // println!("approximate size: {cmp_len} x {input_len}");
         for cmp_idx in 0..cmp_len {
             let (w_idx, header) = headers[cmp_idx];
@@ -1586,8 +1594,7 @@ where
                                 &mut ret,
                             );
 
-                            let is_ascii_or_utf8 =
-                                self.text_type.is_some_and(TextType::is_ascii_or_utf8);
+                            let is_ascii_or_utf8 = self.text_type.is_ascii_or_utf8();
                             let mut v0_len = orig_v0.len();
                             let mut v1_len = orig_v1.len();
                             if v0_len > 0
@@ -1679,7 +1686,8 @@ impl AFLppRedQueen {
         Self {
             enable_transform: false,
             enable_arith: false,
-            text_type: None,
+            text_type: TextType::None,
+            last_corpus_idx: None,
         }
     }
 
@@ -1689,7 +1697,8 @@ impl AFLppRedQueen {
         Self {
             enable_transform: transform,
             enable_arith: arith,
-            text_type: None,
+            text_type: TextType::None,
+            last_corpus_idx: None,
         }
     }
 
