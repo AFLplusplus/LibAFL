@@ -33,7 +33,7 @@ where
     fn count(&self) -> usize {
         0
     }
-    
+
     /// Returns the number of elements including disabled entries
     #[inline]
     fn count_with_disabled(&self) -> usize {
@@ -45,7 +45,7 @@ where
     fn add(&mut self, _testcase: Testcase<I>) -> Result<CorpusId, Error> {
         Err(Error::unsupported("Unsupported by NopCorpus"))
     }
-    
+
     /// Add a disabled testcase to the corpus and return its index
     #[inline]
     fn add_disabled(&mut self, _testcase: Testcase<I>) -> Result<CorpusId, Error> {

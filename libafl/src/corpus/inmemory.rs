@@ -221,7 +221,9 @@ where
         Self {
             map: Default::default(),
             keys: Vec::default(),
+            #[cfg(not(feature = "corpus_btreemap"))]
             first_idx: None,
+            #[cfg(not(feature = "corpus_btreemap"))]
             last_idx: None,
         }
     }
@@ -285,7 +287,7 @@ where
 
     /// Insert a testcase assigning a `CorpusId` to it
     #[cfg(feature = "corpus_btreemap")]
-    pub fn insert(&mut self, testcase: RefCell<Testcase<I>>) -> CorpusId {
+    pub fn insert(&mut self, testcase: RefCell<Testcase<I>>, is_disabled: bool) -> CorpusId {
         let idx = CorpusId::from(self.progressive_idx);
         self.progressive_idx += 1;
         let corpus = if is_disabled {
@@ -336,7 +338,7 @@ where
     fn count(&self) -> usize {
         self.storage.enabled.map.len()
     }
-    
+
     /// Returns the number of elements including disabled entries
     #[inline]
     fn count_with_disabled(&self) -> usize {
@@ -352,13 +354,11 @@ where
     fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         Ok(self.storage.insert(RefCell::new(testcase), false))
     }
-    
+
     /// Add a disabled testcase to the corpus and return its index
     #[inline]
     fn add_disabled(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
-        Ok(self
-            .storage
-            .insert(RefCell::new(testcase), true))
+        Ok(self.storage.insert(RefCell::new(testcase), true))
     }
 
     /// Replaces the testcase at the given idx
@@ -383,11 +383,9 @@ where
     /// Get by id; will check the disabled corpus if not available in the enabled
     #[inline]
     fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
-        let mut testcase = self.storage
-            .enabled
-            .get(idx);
+        let mut testcase = self.storage.enabled.get(idx);
         if testcase.is_none() {
-            testcase = self.storage.disabled.get(idx); 
+            testcase = self.storage.disabled.get(idx);
         }
         testcase.ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
     }
@@ -429,7 +427,7 @@ where
     fn nth(&self, nth: usize) -> CorpusId {
         let enabled_count = self.count();
         if nth > enabled_count {
-            return self.storage.disabled.keys[nth.saturating_sub(enabled_count)]
+            return self.storage.disabled.keys[nth.saturating_sub(enabled_count)];
         }
         self.storage.enabled.keys[nth]
     }

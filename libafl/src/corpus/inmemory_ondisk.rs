@@ -70,7 +70,7 @@ where
     fn count(&self) -> usize {
         self.inner.count()
     }
-    
+
     /// Returns the number of elements including disabled entries
     #[inline]
     fn count_with_disabled(&self) -> usize {
@@ -86,7 +86,7 @@ where
         *testcase.input_mut() = None;
         Ok(idx)
     }
-    
+
     /// Add a disabled testcase to the corpus and return its index
     #[inline]
     fn add_disabled(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {

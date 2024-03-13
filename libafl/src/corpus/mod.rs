@@ -68,7 +68,7 @@ impl From<CorpusId> for usize {
 macro_rules! random_corpus_id {
     ($corpus:expr, $rand:expr, $incl_disabled:expr) => {{
         let cnt: u64;
-        if $incl_disabled == true { 
+        if $incl_disabled == true {
             cnt = $corpus.count_with_disabled() as u64;
         } else {
             cnt = $corpus.count() as u64;
