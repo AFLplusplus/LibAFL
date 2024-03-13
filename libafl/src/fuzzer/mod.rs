@@ -82,7 +82,7 @@ pub trait ExecutionProcessor<OT>: UsesState {
     where
         EM: EventFirer<State = Self::State>;
 
-    /// Process ExecuteInputResult. Add to corpus, solution or ignore
+    /// Process `ExecuteInputResult`. Add to corpus, solution or ignore
     fn process_execution<EM>(
         &mut self,
         state: &mut Self::State,
@@ -379,7 +379,7 @@ where
         #[cfg(not(feature = "introspection"))]
         let is_solution = self
             .objective_mut()
-            .is_interesting(state, manager, &input, observers, exit_kind)?;
+            .is_interesting(state, manager, input, observers, exit_kind)?;
 
         #[cfg(feature = "introspection")]
         let is_solution = self
@@ -392,7 +392,7 @@ where
             #[cfg(not(feature = "introspection"))]
             let corpus_worthy = self
                 .feedback_mut()
-                .is_interesting(state, manager, &input, observers, exit_kind)?;
+                .is_interesting(state, manager, input, observers, exit_kind)?;
 
             #[cfg(feature = "introspection")]
             let corpus_worthy = self

@@ -201,13 +201,13 @@ where
     /// Get `disabled`
     #[inline]
     pub fn disabled(&mut self) -> bool {
-        return self.disabled;
+        self.disabled
     }
 
     /// Set the testcase as disabled
     #[inline]
     pub fn set_disabled(&mut self, disabled: bool) {
-        self.disabled = disabled
+        self.disabled = disabled;
     }
 
     /// Create a new Testcase instance given an input

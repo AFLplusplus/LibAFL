@@ -828,7 +828,7 @@ where
         if forced {
             let _: CorpusId = fuzzer.add_input(self, executor, manager, input)?;
         } else {
-            let (res, _) = fuzzer.evaluate_input(self, executor, manager, input)?;
+            let (res, _) = fuzzer.evaluate_input(self, executor, manager, input.clone())?;
             if res == ExecuteInputResult::None {
                 fuzzer.add_disabled_input(self, executor, input)?;
                 log::warn!("input {:?} was not interesting, adding as disabled.", &path);

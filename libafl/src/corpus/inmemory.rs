@@ -387,7 +387,7 @@ where
             .enabled
             .get(idx);
         if testcase.is_none() {
-            testcase = self.storage.disabled.get(idx) 
+            testcase = self.storage.disabled.get(idx); 
         }
         testcase.ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
     }
@@ -431,7 +431,7 @@ where
         if nth > enabled_count {
             return self.storage.disabled.keys[nth.saturating_sub(enabled_count)]
         }
-        return self.storage.enabled.keys[nth]
+        self.storage.enabled.keys[nth]
     }
 
     #[inline]
