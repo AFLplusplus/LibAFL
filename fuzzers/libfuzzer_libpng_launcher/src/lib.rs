@@ -202,7 +202,7 @@ pub extern "C" fn libafl_main() {
 
         // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
         #[cfg(target_os = "linux")]
-        let mut executor = InProcessExecutor::batched_timeouts(
+        let mut executor = InProcessExecutor::batched_timeout(
             &mut harness,
             tuple_list!(edges_observer, time_observer),
             &mut fuzzer,

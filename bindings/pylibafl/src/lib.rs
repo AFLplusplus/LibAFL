@@ -1,8 +1,3 @@
-use libafl;
-use libafl_bolts;
-#[cfg(target_os = "linux")]
-use libafl_qemu;
-use libafl_sugar;
 use pyo3::{prelude::*, types::PyDict};
 
 const LIBAFL_CODE: &str = r#"

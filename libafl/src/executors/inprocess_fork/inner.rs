@@ -70,7 +70,7 @@ where
             .field("observers", &self.observers)
             .field("shmem_provider", &self.shmem_provider)
             .field("itimerspec", &self.itimerspec)
-            .finish()
+            .finish_non_exhaustive()
     }
 
     #[cfg(not(target_os = "linux"))]
@@ -81,7 +81,7 @@ where
             .field("observers", &self.observers)
             .field("shmem_provider", &self.shmem_provider)
             .field("itimerval", &self.itimerval)
-            .finish();
+            .finish_non_exhaustive();
     }
 }
 
@@ -278,7 +278,7 @@ where
         })
     }
 
-    /// Creates a new [`GenericInProcessForkExecutor`], non linux
+    /// Creates a new [`GenericInProcessForkExecutorInner`], non linux
     #[cfg(not(target_os = "linux"))]
     #[allow(clippy::too_many_arguments)]
     pub fn with_hooks(

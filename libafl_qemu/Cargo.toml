@@ -12,8 +12,7 @@ edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 [package.metadata.docs.rs]
-features = ["document-features"]
-all-features = true
+features = ["document-features", "default", "python", "x86_64", "usermode"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]

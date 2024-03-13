@@ -12,7 +12,7 @@ use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, HasCurrentCorpusIdx, SchedulerTestcaseMetadata},
+    corpus::{Corpus, SchedulerTestcaseMetadata},
     events::{Event, EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{map::MapFeedbackMetadata, HasObserverName},
@@ -20,8 +20,11 @@ use crate::{
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple, UsesObserver},
     schedulers::powersched::SchedulerMetadata,
-    stages::Stage,
-    state::{HasCorpus, HasExecutions, HasMetadata, HasNamedMetadata, State, UsesState},
+    stages::{ExecutionCountRestartHelper, Stage},
+    state::{
+        HasCorpus, HasCurrentTestcase, HasExecutions, HasMetadata, HasNamedMetadata, State,
+        UsesState,
+    },
     Error,
 };
 
@@ -68,7 +71,9 @@ pub struct CalibrationStage<O, OT, S> {
     map_observer_name: String,
     map_name: String,
     stage_max: usize,
+    /// If we should track stability
     track_stability: bool,
+    restart_helper: ExecutionCountRestartHelper,
     phantom: PhantomData<(O, OT, S)>,
 }
 
@@ -92,8 +97,6 @@ where
     E::State: HasCorpus + HasMetadata + HasNamedMetadata + HasExecutions,
     Z: Evaluator<E, EM, State = E::State>,
 {
-    type Progress = (); // TODO stage may be resumed, but how?
-
     #[inline]
     #[allow(
         clippy::let_and_return,
@@ -107,25 +110,19 @@ where
         state: &mut E::State,
         mgr: &mut EM,
     ) -> Result<(), Error> {
-        let Some(corpus_idx) = state.current_corpus_idx()? else {
-            return Err(Error::illegal_state(
-                "state is not currently processing a corpus index",
-            ));
-        };
-
         // Run this stage only once for each corpus entry and only if we haven't already inspected it
         {
-            let corpus = state.corpus().get(corpus_idx)?.borrow();
+            let testcase = state.current_testcase()?;
             // println!("calibration; corpus.scheduled_count() : {}", corpus.scheduled_count());
 
-            if corpus.scheduled_count() > 0 {
+            if testcase.scheduled_count() > 0 {
                 return Ok(());
             }
         }
 
         let mut iter = self.stage_max;
 
-        let input = state.corpus().cloned_input_for_id(corpus_idx)?;
+        let input = state.current_input_cloned()?;
 
         // Run once to get the initial calibration map
         executor.observers_mut().pre_exec_all(state, &input)?;
@@ -162,8 +159,11 @@ where
         let mut i = 1;
         let mut has_errors = false;
 
+        // If we restarted after a timeout or crash, do less iterations.
+        iter -= usize::try_from(self.restart_helper.execs_since_progress_start(state)?)?;
+
         while i < iter {
-            let input = state.corpus().cloned_input_for_id(corpus_idx)?;
+            let input = state.current_input_cloned()?;
 
             executor.observers_mut().pre_exec_all(state, &input)?;
             start = current_time();
@@ -268,7 +268,7 @@ where
             psmeta.set_bitmap_size_log(psmeta.bitmap_size_log() + libm::log2(bitmap_size as f64));
             psmeta.set_bitmap_entries(psmeta.bitmap_entries() + 1);
 
-            let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
+            let mut testcase = state.current_testcase_mut()?;
 
             testcase.set_exec_time(total_time / (iter as u32));
             // log::trace!("time: {:#?}", testcase.exec_time());
@@ -301,7 +301,7 @@ where
             data.set_handicap(handicap);
         }
 
-        *state.executions_mut() += i;
+        *state.executions_mut() += u64::try_from(i).unwrap();
 
         // Send the stability event to the broker
         if unstable_found {
@@ -327,6 +327,16 @@ where
 
         Ok(())
     }
+
+    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        // TODO: Make sure this is the correct way / there may be a better way?
+        self.restart_helper.restart_progress_should_run(state)
+    }
+
+    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        // TODO: Make sure this is the correct way / there may be a better way?
+        self.restart_helper.clear_restart_progress(state)
+    }
 }
 
 impl<O, OT, S> CalibrationStage<O, OT, S>
@@ -347,6 +357,7 @@ where
             map_name: map_feedback.name().to_string(),
             stage_max: CAL_STAGE_START,
             track_stability: true,
+            restart_helper: ExecutionCountRestartHelper::default(),
             phantom: PhantomData,
         }
     }
@@ -363,6 +374,7 @@ where
             map_name: map_feedback.name().to_string(),
             stage_max: CAL_STAGE_START,
             track_stability: false,
+            restart_helper: ExecutionCountRestartHelper::default(),
             phantom: PhantomData,
         }
     }

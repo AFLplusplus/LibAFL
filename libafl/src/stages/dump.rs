@@ -52,8 +52,6 @@ where
     Z: UsesState,
     Z::State: HasCorpus + HasSolutions + HasRand + HasMetadata,
 {
-    type Progress = (); // if this fails, we have bigger problems
-
     #[inline]
     fn perform(
         &mut self,
@@ -113,6 +111,18 @@ where
             last_solution: state.solutions().last(),
         });
 
+        Ok(())
+    }
+
+    #[inline]
+    fn restart_progress_should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+        // Not executing the target, so restart safety is not needed
+        Ok(true)
+    }
+
+    #[inline]
+    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        // Not executing the target, so restart safety is not needed
         Ok(())
     }
 }
