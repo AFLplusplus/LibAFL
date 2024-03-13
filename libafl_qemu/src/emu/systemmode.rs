@@ -7,13 +7,15 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 
-use paste::paste;
+use libafl_qemu_sys::{
+    libafl_load_qemu_snapshot, libafl_qemu_current_paging_id, libafl_save_qemu_snapshot,
+    qemu_cleanup, qemu_main_loop, vm_start, GuestAddr, GuestPhysAddr, GuestVirtAddr,
+};
 
 use crate::{
     emu::{libafl_page_from_addr, IsSnapshotManager},
-    extern_c_checked, CPUStatePtr, EmuExitReason, EmuExitReasonError, Emulator, GuestAddr,
-    GuestPhysAddr, GuestVirtAddr, IsEmuExitHandler, MemAccessInfo, SnapshotId,
-    SnapshotManagerError, CPU,
+    MemAccessInfo, Qemu, QemuExitReason, QemuExitReasonError, SnapshotId, SnapshotManagerError,
+    CPU,
 };
 
 impl SnapshotId {
@@ -39,27 +41,21 @@ pub enum SnapshotManager {
 }
 
 impl IsSnapshotManager for SnapshotManager {
-    fn save<E>(&mut self, emu: &Emulator<E>) -> SnapshotId
-    where
-        E: IsEmuExitHandler,
-    {
+    fn save(&mut self, qemu: &Qemu) -> SnapshotId {
         match self {
-            SnapshotManager::Qemu(qemu_sm) => qemu_sm.save(emu),
-            SnapshotManager::Fast(fast_sm) => fast_sm.save(emu),
+            SnapshotManager::Qemu(qemu_sm) => qemu_sm.save(qemu),
+            SnapshotManager::Fast(fast_sm) => fast_sm.save(qemu),
         }
     }
 
-    fn restore<E>(
+    fn restore(
         &mut self,
         snapshot_id: &SnapshotId,
-        emu: &Emulator<E>,
-    ) -> Result<(), SnapshotManagerError>
-    where
-        E: IsEmuExitHandler,
-    {
+        qemu: &Qemu,
+    ) -> Result<(), SnapshotManagerError> {
         match self {
-            SnapshotManager::Qemu(qemu_sm) => qemu_sm.restore(snapshot_id, emu),
-            SnapshotManager::Fast(fast_sm) => fast_sm.restore(snapshot_id, emu),
+            SnapshotManager::Qemu(qemu_sm) => qemu_sm.restore(snapshot_id, qemu),
+            SnapshotManager::Fast(fast_sm) => fast_sm.restore(snapshot_id, qemu),
         }
     }
 }
@@ -107,50 +103,38 @@ impl QemuSnapshotManager {
 }
 
 impl IsSnapshotManager for QemuSnapshotManager {
-    fn save<E>(&mut self, emu: &Emulator<E>) -> SnapshotId
-    where
-        E: IsEmuExitHandler,
-    {
+    fn save(&mut self, qemu: &Qemu) -> SnapshotId {
         let snapshot_id = SnapshotId::get_fresh_id();
-        emu.save_snapshot(
+        qemu.save_snapshot(
             self.snapshot_id_to_name(&snapshot_id).as_str(),
             self.is_sync,
         );
         snapshot_id
     }
 
-    fn restore<E>(
+    fn restore(
         &mut self,
         snapshot_id: &SnapshotId,
-        emu: &Emulator<E>,
-    ) -> Result<(), SnapshotManagerError>
-    where
-        E: IsEmuExitHandler,
-    {
-        emu.load_snapshot(self.snapshot_id_to_name(snapshot_id).as_str(), self.is_sync);
+        qemu: &Qemu,
+    ) -> Result<(), SnapshotManagerError> {
+        qemu.load_snapshot(self.snapshot_id_to_name(snapshot_id).as_str(), self.is_sync);
         Ok(())
     }
 }
 
 impl IsSnapshotManager for FastSnapshotManager {
-    fn save<E>(&mut self, emu: &Emulator<E>) -> SnapshotId
-    where
-        E: IsEmuExitHandler,
-    {
+    fn save(&mut self, qemu: &Qemu) -> SnapshotId {
         let snapshot_id = SnapshotId::get_fresh_id();
         self.snapshots
-            .insert(snapshot_id, emu.create_fast_snapshot(true));
+            .insert(snapshot_id, qemu.create_fast_snapshot(true));
         snapshot_id
     }
 
-    fn restore<E>(
+    fn restore(
         &mut self,
         snapshot_id: &SnapshotId,
-        emu: &Emulator<E>,
-    ) -> Result<(), SnapshotManagerError>
-    where
-        E: IsEmuExitHandler,
-    {
+        qemu: &Qemu,
+    ) -> Result<(), SnapshotManagerError> {
         let fast_snapshot_ptr = self
             .snapshots
             .get(snapshot_id)
@@ -159,10 +143,10 @@ impl IsSnapshotManager for FastSnapshotManager {
             ))?
             .clone();
 
-        emu.restore_fast_snapshot(fast_snapshot_ptr);
+        qemu.restore_fast_snapshot(fast_snapshot_ptr);
 
         if self.check_memory_consistency {
-            let nb_inconsistencies = emu.check_fast_snapshot_memory_consistency(fast_snapshot_ptr);
+            let nb_inconsistencies = qemu.check_fast_snapshot_memory_consistency(fast_snapshot_ptr);
 
             if nb_inconsistencies > 0 {
                 return Err(SnapshotManagerError::MemoryInconsistencies(
@@ -206,19 +190,6 @@ impl DeviceSnapshotFilter {
             }
         }
     }
-}
-
-extern_c_checked! {
-    pub(super) fn qemu_init(argc: i32, argv: *const *const u8, envp: *const *const u8);
-
-    fn vm_start();
-    fn qemu_main_loop();
-    fn qemu_cleanup();
-
-    fn libafl_save_qemu_snapshot(name: *const u8, sync: bool);
-    fn libafl_load_qemu_snapshot(name: *const u8, sync: bool);
-
-    fn libafl_qemu_current_paging_id(cpu: CPUStatePtr) -> GuestPhysAddr;
 }
 
 pub(super) extern "C" fn qemu_cleanup_atexit() {
@@ -322,10 +293,7 @@ impl CPU {
     }
 }
 
-impl<E> Emulator<E>
-where
-    E: IsEmuExitHandler,
-{
+impl Qemu {
     /// Write a value to a phsical guest address, including ROM areas.
     pub unsafe fn write_phys_mem(&self, paddr: GuestPhysAddr, buf: &[u8]) {
         libafl_qemu_sys::cpu_physical_memory_rw(
@@ -352,10 +320,11 @@ where
     ///
     /// Should, in general, be safe to call.
     /// Of course, the emulated target is not contained securely and can corrupt state or interact with the operating system.
-    pub unsafe fn run(&self) -> Result<EmuExitReason, EmuExitReasonError> {
+    pub unsafe fn run(&self) -> Result<QemuExitReason, QemuExitReasonError> {
         vm_start();
         qemu_main_loop();
-        EmuExitReason::try_from(self)
+
+        self.post_run()
     }
 
     pub fn save_snapshot(&self, name: &str, sync: bool) {

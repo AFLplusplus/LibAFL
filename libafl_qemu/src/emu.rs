@@ -1,30 +1,36 @@
 //! Expose QEMU user `LibAFL` C api to Rust
 
 use core::{
-    ffi::c_void,
     fmt,
+    marker::PhantomData,
     mem::{transmute, MaybeUninit},
     ptr::{addr_of, copy_nonoverlapping, null},
 };
 use std::{
-    borrow::BorrowMut,
     cell::{OnceCell, RefCell},
     collections::HashSet,
     ffi::CString,
     fmt::{Debug, Display, Formatter},
     ptr,
-    slice::from_raw_parts,
-    str::from_utf8_unchecked,
 };
 
 use libafl::{executors::ExitKind, inputs::BytesInput};
-use num_enum::{IntoPrimitive, TryFromPrimitive};
+#[cfg(emulation_mode = "systemmode")]
+use libafl_qemu_sys::qemu_init;
+#[cfg(emulation_mode = "usermode")]
+use libafl_qemu_sys::{guest_base, qemu_user_init, VerifyAccess};
+use libafl_qemu_sys::{
+    libafl_flush_jit, libafl_get_exit_reason, libafl_page_from_addr, libafl_qemu_add_gdb_cmd,
+    libafl_qemu_cpu_index, libafl_qemu_current_cpu, libafl_qemu_gdb_reply, libafl_qemu_get_cpu,
+    libafl_qemu_num_cpus, libafl_qemu_num_regs, libafl_qemu_read_reg,
+    libafl_qemu_remove_breakpoint, libafl_qemu_set_breakpoint, libafl_qemu_trigger_breakpoint,
+    libafl_qemu_write_reg, CPUStatePtr, FatPtr, GuestAddr, GuestPhysAddr, GuestUsize,
+    GuestVirtAddr,
+};
 use num_traits::Num;
-use paste::paste;
 use strum::IntoEnumIterator;
-use strum_macros::EnumIter;
 
-use crate::{command::IsCommand, extern_c_checked, GuestReg, QemuHelperTuple, Regs};
+use crate::{command::IsCommand, GuestReg, QemuHelperTuple, Regs, StdInstrumentationFilter};
 
 #[cfg(emulation_mode = "systemmode")]
 pub mod systemmode;
@@ -35,14 +41,6 @@ pub use systemmode::*;
 pub mod usermode;
 #[cfg(emulation_mode = "usermode")]
 pub use usermode::*;
-
-pub type GuestAddr = libafl_qemu_sys::target_ulong;
-pub type GuestUsize = libafl_qemu_sys::target_ulong;
-pub type GuestIsize = libafl_qemu_sys::target_long;
-pub type GuestVirtAddr = libafl_qemu_sys::vaddr;
-pub type GuestPhysAddr = libafl_qemu_sys::hwaddr;
-
-pub type GuestHwAddrInfo = libafl_qemu_sys::qemu_plugin_hwaddr;
 
 #[derive(Clone)]
 pub enum GuestAddrKind {
@@ -85,7 +83,7 @@ impl Display for GuestAddrKind {
 
 #[derive(Debug, Clone)]
 pub enum HandlerError {
-    EmuExitReasonError(EmuExitReasonError),
+    QemuExitReasonError(EmuExitReasonError),
     SMError(SnapshotManagerError),
     SyncBackdoorError(SyncBackdoorError),
     MultipleSnapshotDefinition,
@@ -111,32 +109,32 @@ pub struct SnapshotId {
 }
 
 pub trait IsSnapshotManager: Debug + Clone {
-    fn save<E>(&mut self, emu: &Emulator<E>) -> SnapshotId
-    where
-        E: IsEmuExitHandler;
-    fn restore<E>(
+    fn save(&mut self, qemu: &Qemu) -> SnapshotId;
+    fn restore(
         &mut self,
         snapshot_id: &SnapshotId,
-        emu: &Emulator<E>,
-    ) -> Result<(), SnapshotManagerError>
-    where
-        E: IsEmuExitHandler;
+        qemu: &Qemu,
+    ) -> Result<(), SnapshotManagerError>;
 }
 
 // TODO: Rework with generics for command handlers?
-pub trait IsEmuExitHandler: Sized + Debug + Clone {
-    fn try_put_input(&mut self, emu: &Emulator<Self>, input: &BytesInput);
-
-    fn handle<QT, S>(
-        &mut self,
-        exit_reason: Result<EmuExitReason, EmuExitReasonError>,
-        emu: &Emulator<Self>,
-        qemu_executor_state: &mut QemuExecutorState<QT, S, Self>,
+pub trait IsEmuExitHandler<QT, S>: Sized + Debug + Clone
+where
+    QT: QemuHelperTuple<S>,
+    S: State + HasExecutions,
+{
+    fn try_put_input(
+        emu: &Emulator<QT, S, Self>,
+        qemu_executor_state: &mut QemuExecutorState<QT, S>,
         input: &BytesInput,
-    ) -> Result<InnerHandlerResult, HandlerError>
-    where
-        QT: QemuHelperTuple<S, Self>,
-        S: State + HasExecutions;
+    );
+
+    fn handle(
+        emu: &Emulator<QT, S, Self>,
+        exit_reason: Result<EmuExitReason, EmuExitReasonError>,
+        qemu_executor_state: &mut QemuExecutorState<QT, S>,
+        input: &BytesInput,
+    ) -> Result<InnerHandlerResult, HandlerError>;
 }
 
 pub enum InnerHandlerResult {
@@ -146,23 +144,25 @@ pub enum InnerHandlerResult {
     Interrupt,                      // QEMU has been interrupted by user.
 }
 
+/// Special kind of Exit handler with no data embedded.
+/// As a result, it is safe to transmute from any EmuExitHandler to this one,
+/// since it won't use any data which could cause type confusion.
 #[derive(Clone, Debug)]
 pub struct NopEmuExitHandler;
 
-impl IsEmuExitHandler for NopEmuExitHandler {
-    fn try_put_input(&mut self, _: &Emulator<Self>, _: &BytesInput) {}
+impl<QT, S> IsEmuExitHandler<QT, S> for NopEmuExitHandler
+where
+    QT: QemuHelperTuple<S>,
+    S: State + HasExecutions,
+{
+    fn try_put_input(_: &Emulator<QT, S, Self>, _: &mut QemuExecutorState<QT, S>, _: &BytesInput) {}
 
-    fn handle<QT, S>(
-        &mut self,
+    fn handle(
+        _: &Emulator<QT, S, Self>,
         exit_reason: Result<EmuExitReason, EmuExitReasonError>,
-        _: &Emulator<Self>,
-        _: &mut QemuExecutorState<QT, S, Self>,
+        _: &mut QemuExecutorState<QT, S>,
         _: &BytesInput,
-    ) -> Result<InnerHandlerResult, HandlerError>
-    where
-        QT: QemuHelperTuple<S, Self>,
-        S: State + HasExecutions,
-    {
+    ) -> Result<InnerHandlerResult, HandlerError> {
         match exit_reason {
             Ok(reason) => Ok(InnerHandlerResult::ReturnToHarness(reason)),
             Err(error) => Err(error)?,
@@ -176,7 +176,7 @@ pub struct StdEmuExitHandler<SM>
 where
     SM: IsSnapshotManager + Clone,
 {
-    snapshot_manager: SM,
+    snapshot_manager: RefCell<SM>,
     snapshot_id: OnceCell<SnapshotId>,
     input_location: OnceCell<(EmulatorMemoryChunk, Option<Regs>)>,
 }
@@ -187,7 +187,7 @@ where
 {
     pub fn new(snapshot_manager: SM) -> Self {
         Self {
-            snapshot_manager,
+            snapshot_manager: RefCell::new(snapshot_manager),
             snapshot_id: OnceCell::new(),
             input_location: OnceCell::new(),
         }
@@ -205,46 +205,51 @@ where
         &self.snapshot_id
     }
 
-    pub fn snapshot_manager(&self) -> &SM {
+    pub fn snapshot_manager(&self) -> &RefCell<SM> {
         &self.snapshot_manager
-    }
-
-    pub fn snapshot_manager_mut(&mut self) -> &mut SM {
-        &mut self.snapshot_manager
     }
 }
 
 // TODO: replace handlers with generics to permit compile-time customization of handlers
-impl<SM> IsEmuExitHandler for StdEmuExitHandler<SM>
+impl<SM, QT, S> IsEmuExitHandler<QT, S> for StdEmuExitHandler<SM>
 where
     SM: IsSnapshotManager,
+    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
+    S: State + HasExecutions,
 {
-    fn try_put_input(&mut self, emu: &Emulator<Self>, input: &BytesInput) {
-        if let Some((input_location, ret_register)) = self.input_location.get() {
+    fn try_put_input(
+        emu: &Emulator<QT, S, Self>,
+        qemu_executor_state: &mut QemuExecutorState<QT, S>,
+        input: &BytesInput,
+    ) {
+        let exit_handler = emu.state().exit_handler.borrow();
+
+        if let Some((input_location, ret_register)) = exit_handler.input_location.get() {
             let input_command = InputCommand::new(input_location.clone());
-            input_command.run(emu, self, input, *ret_register).unwrap();
+            input_command
+                .run(emu, qemu_executor_state, input, *ret_register)
+                .unwrap();
         }
     }
 
-    fn handle<QT, S>(
-        &mut self,
+    fn handle(
+        emu: &Emulator<QT, S, Self>,
         exit_reason: Result<EmuExitReason, EmuExitReasonError>,
-        emu: &Emulator<Self>,
-        qemu_executor_state: &mut QemuExecutorState<QT, S, Self>,
+        qemu_executor_state: &mut QemuExecutorState<QT, S>,
         input: &BytesInput,
-    ) -> Result<InnerHandlerResult, HandlerError>
-    where
-        QT: QemuHelperTuple<S, Self>,
-        S: State + HasExecutions,
-    {
+    ) -> Result<InnerHandlerResult, HandlerError> {
+        let exit_handler = emu.exit_handler().borrow_mut();
+        let qemu = emu.qemu();
+
         let mut exit_reason = match exit_reason {
             Ok(exit_reason) => exit_reason,
             Err(exit_error) => match exit_error {
                 EmuExitReasonError::UnexpectedExit => {
-                    if let Some(snapshot_id) = self.snapshot_id.get() {
-                        self.snapshot_manager
+                    if let Some(snapshot_id) = exit_handler.snapshot_id.get() {
+                        exit_handler
+                            .snapshot_manager
                             .borrow_mut()
-                            .restore(snapshot_id, emu)?;
+                            .restore(snapshot_id, qemu)?;
                     }
                     return Ok(InnerHandlerResult::EndOfRun(ExitKind::Crash));
                 }
@@ -262,7 +267,7 @@ where
                 }
                 _ => panic!("Unhandled QEMU shutdown cause: {shutdown_cause:?}."),
             },
-            EmuExitReason::Breakpoint(bp) => (bp.trigger(emu).cloned(), None),
+            EmuExitReason::Breakpoint(bp) => (bp.trigger(qemu).cloned(), None),
             EmuExitReason::SyncBackdoor(sync_backdoor) => {
                 let command = sync_backdoor.command().clone();
                 (Some(command), Some(sync_backdoor.ret_reg()))
@@ -270,7 +275,7 @@ where
         };
 
         if let Some(cmd) = command {
-            cmd.run(emu, self, input, ret_reg)
+            cmd.run(emu, qemu_executor_state, input, ret_reg)
         } else {
             Ok(InnerHandlerResult::ReturnToHarness(exit_reason))
         }
@@ -342,75 +347,6 @@ pub use libafl_qemu_sys::{CPUArchState, CPUState};
 
 use crate::sync_backdoor::{SyncBackdoor, SyncBackdoorError};
 
-pub type CPUStatePtr = *mut libafl_qemu_sys::CPUState;
-pub type CPUArchStatePtr = *mut libafl_qemu_sys::CPUArchState;
-
-pub type ExitReasonPtr = *mut libafl_qemu_sys::libafl_exit_reason;
-
-#[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter, PartialEq, Eq)]
-#[repr(i32)]
-pub enum MmapPerms {
-    None = 0,
-    Read = libc::PROT_READ,
-    Write = libc::PROT_WRITE,
-    Execute = libc::PROT_EXEC,
-    ReadWrite = libc::PROT_READ | libc::PROT_WRITE,
-    ReadExecute = libc::PROT_READ | libc::PROT_EXEC,
-    WriteExecute = libc::PROT_WRITE | libc::PROT_EXEC,
-    ReadWriteExecute = libc::PROT_READ | libc::PROT_WRITE | libc::PROT_EXEC,
-}
-
-impl MmapPerms {
-    #[must_use]
-    pub fn is_r(&self) -> bool {
-        matches!(
-            self,
-            MmapPerms::Read
-                | MmapPerms::ReadWrite
-                | MmapPerms::ReadExecute
-                | MmapPerms::ReadWriteExecute
-        )
-    }
-
-    #[must_use]
-    pub fn is_w(&self) -> bool {
-        matches!(
-            self,
-            MmapPerms::Write
-                | MmapPerms::ReadWrite
-                | MmapPerms::WriteExecute
-                | MmapPerms::ReadWriteExecute
-        )
-    }
-
-    #[must_use]
-    pub fn is_x(&self) -> bool {
-        matches!(
-            self,
-            MmapPerms::Execute
-                | MmapPerms::ReadExecute
-                | MmapPerms::WriteExecute
-                | MmapPerms::ReadWriteExecute
-        )
-    }
-}
-
-#[cfg(feature = "python")]
-impl IntoPy<PyObject> for MmapPerms {
-    fn into_py(self, py: Python) -> PyObject {
-        let n: i32 = self.into();
-        n.into_py(py)
-    }
-}
-
-#[cfg(emulation_mode = "usermode")]
-#[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter, PartialEq, Eq)]
-#[repr(i32)]
-pub enum VerifyAccess {
-    Read = libc::PROT_READ,
-    Write = libc::PROT_READ | libc::PROT_WRITE,
-}
-
 // syshook_ret
 #[repr(C)]
 #[cfg_attr(feature = "python", pyclass)]
@@ -456,132 +392,15 @@ impl SyscallHookResult {
     }
 }
 
-#[repr(C)]
-#[cfg_attr(feature = "python", pyclass(unsendable))]
-pub struct MapInfo {
-    start: GuestAddr,
-    end: GuestAddr,
-    offset: GuestAddr,
-    path: *const u8,
-    flags: i32,
-    is_priv: i32,
-}
-
-#[cfg_attr(feature = "python", pymethods)]
-impl MapInfo {
-    #[must_use]
-    pub fn start(&self) -> GuestAddr {
-        self.start
-    }
-
-    #[must_use]
-    pub fn end(&self) -> GuestAddr {
-        self.end
-    }
-
-    #[must_use]
-    pub fn offset(&self) -> GuestAddr {
-        self.offset
-    }
-
-    #[must_use]
-    pub fn path(&self) -> Option<&str> {
-        if self.path.is_null() {
-            None
-        } else {
-            unsafe {
-                Some(from_utf8_unchecked(from_raw_parts(
-                    self.path,
-                    strlen(self.path),
-                )))
-            }
-        }
-    }
-
-    #[must_use]
-    pub fn flags(&self) -> MmapPerms {
-        MmapPerms::try_from(self.flags).unwrap()
-    }
-
-    #[must_use]
-    pub fn is_priv(&self) -> bool {
-        self.is_priv != 0
-    }
-}
-
-#[cfg(emulation_mode = "usermode")]
-extern_c_checked! {
-    fn qemu_user_init(argc: i32, argv: *const *const u8, envp: *const *const u8) -> i32;
-
-    fn libafl_qemu_run() -> i32;
-
-    fn libafl_load_addr() -> u64;
-    fn libafl_get_brk() -> u64;
-    fn libafl_set_brk(brk: u64) -> u64;
-
-    fn read_self_maps() -> *const c_void;
-    fn free_self_maps(map_info: *const c_void);
-
-    fn libafl_maps_next(map_info: *const c_void, ret: *mut MapInfo) -> *const c_void;
-
-    static exec_path: *const u8;
-    static guest_base: usize;
-    static mut mmap_next_start: GuestAddr;
-
-    static mut libafl_dump_core_hook: unsafe extern "C" fn(i32);
-    static mut libafl_force_dfl: i32;
-}
-
-// TODO rely completely on libafl_qemu_sys
-extern_c_checked! {
-    //static libafl_page_size: GuestUsize;
-    fn libafl_page_from_addr(addr: GuestAddr) -> GuestAddr;
-
-    // CPUState* libafl_qemu_get_cpu(int cpu_index);
-    fn libafl_qemu_get_cpu(cpu_index: i32) -> CPUStatePtr;
-    // int libafl_qemu_num_cpus(void);
-    fn libafl_qemu_num_cpus() -> i32;
-    // CPUState* libafl_qemu_current_cpu(void);
-    fn libafl_qemu_current_cpu() -> CPUStatePtr;
-
-    // struct libafl_exit_reason* libafl_get_exit_reason(void);
-    fn libafl_get_exit_reason() -> ExitReasonPtr;
-
-    fn libafl_qemu_cpu_index(cpu: CPUStatePtr) -> i32;
-
-    fn libafl_qemu_write_reg(cpu: CPUStatePtr, reg: i32, val: *const u8) -> i32;
-    fn libafl_qemu_read_reg(cpu: CPUStatePtr, reg: i32, val: *mut u8) -> i32;
-    fn libafl_qemu_num_regs(cpu: CPUStatePtr) -> i32;
-
-    fn libafl_qemu_set_breakpoint(addr: u64) -> i32;
-    fn libafl_qemu_remove_breakpoint(addr: u64) -> i32;
-    fn libafl_flush_jit();
-    fn libafl_qemu_trigger_breakpoint(cpu: CPUStatePtr);
-
-    fn strlen(s: *const u8) -> usize;
-
-    fn libafl_qemu_add_gdb_cmd(
-        callback: extern "C" fn(*const (), *const u8, usize) -> i32,
-        data: *const ()
-    );
-    fn libafl_qemu_gdb_reply(buf: *const u8, len: usize);
-}
-
-#[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct FatPtr(pub *const c_void, pub *const c_void);
-
 #[allow(clippy::vec_box)]
 static mut GDB_COMMANDS: Vec<Box<FatPtr>> = vec![];
 
 extern "C" fn gdb_cmd(data: *const (), buf: *const u8, len: usize) -> i32 {
     unsafe {
-        let closure = &mut *(data as *mut Box<
-            dyn for<'r> FnMut(&Emulator<NopEmuExitHandler>, &'r str) -> bool,
-        >);
+        let closure = &mut *(data as *mut Box<dyn for<'r> FnMut(&Qemu, &'r str) -> bool>);
         let cmd = std::str::from_utf8_unchecked(std::slice::from_raw_parts(buf, len));
-        let emu = Emulator::<NopEmuExitHandler>::new_empty();
-        i32::from(closure(&emu, cmd))
+        let qemu = Qemu::get_unchecked();
+        i32::from(closure(&qemu, cmd))
     }
 }
 
@@ -619,8 +438,8 @@ pub trait ArchExtras {
 #[allow(clippy::unused_self)]
 impl CPU {
     #[must_use]
-    pub fn emulator(&self) -> Emulator<NopEmuExitHandler> {
-        unsafe { Emulator::<NopEmuExitHandler>::new_empty() }
+    pub fn qemu(&self) -> Qemu {
+        unsafe { Qemu::get_unchecked() }
     }
 
     #[must_use]
@@ -886,6 +705,13 @@ pub enum EmuExitReason {
     SyncBackdoor(SyncBackdoor), // Synchronous backdoor: The guest triggered a backdoor and should return to LibAFL.
 }
 
+#[derive(Debug, Clone)]
+pub enum QemuExitReason {
+    End(QemuShutdownCause), // QEMU ended for some reason.
+    Breakpoint(GuestAddr),  // Breakpoint triggered. Contains the address of the trigger.
+    SyncBackdoor, // Synchronous backdoor: The guest triggered a backdoor and should return to LibAFL.
+}
+
 /// High level result when finishing to handle requests
 #[derive(Debug, Clone)]
 pub enum HandlerResult {
@@ -896,7 +722,7 @@ pub enum HandlerResult {
 
 impl From<EmuExitReasonError> for HandlerError {
     fn from(error: EmuExitReasonError) -> Self {
-        HandlerError::EmuExitReasonError(error)
+        HandlerError::QemuExitReasonError(error)
     }
 }
 
@@ -906,16 +732,22 @@ impl From<SyncBackdoorError> for HandlerError {
     }
 }
 
-impl Display for EmuExitReason {
+impl Display for QemuExitReason {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            EmuExitReason::End(shutdown_cause) => write!(f, "End: {shutdown_cause:?}"),
-            EmuExitReason::Breakpoint(bp) => write!(f, "{bp}"),
-            EmuExitReason::SyncBackdoor(sync_backdoor) => {
-                write!(f, "Sync backdoor exit: {sync_backdoor}")
-            }
+            QemuExitReason::End(shutdown_cause) => write!(f, "End: {shutdown_cause:?}"),
+            QemuExitReason::Breakpoint(bp) => write!(f, "{bp}"),
+            QemuExitReason::SyncBackdoor => write!(f, "Sync Backdoor"), // QemuExitReason::SyncBackdoor(sync_backdoor) => {
+                                                                        //     write!(f, "Sync backdoor exit: {sync_backdoor}")
+                                                                        // }
         }
     }
+}
+
+#[derive(Debug, Clone)]
+pub enum QemuExitReasonError {
+    UnknownKind,
+    UnexpectedExit,
 }
 
 #[derive(Debug, Clone)]
@@ -932,15 +764,154 @@ impl From<SyncBackdoorError> for EmuExitReasonError {
     }
 }
 
-impl<E> TryFrom<&Emulator<E>> for EmuExitReason
+impl std::error::Error for EmuError {}
+
+impl Display for EmuError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            EmuError::MultipleInstances => {
+                write!(f, "Only one instance of the QEMU Emulator is permitted")
+            }
+            EmuError::EmptyArgs => {
+                write!(f, "QEMU emulator args cannot be empty")
+            }
+            EmuError::TooManyArgs(n) => {
+                write!(
+                    f,
+                    "Too many arguments passed to QEMU emulator ({n} > i32::MAX)"
+                )
+            }
+        }
+    }
+}
+
+impl From<EmuError> for libafl::Error {
+    fn from(err: EmuError) -> Self {
+        libafl::Error::unknown(format!("{err}"))
+    }
+}
+
+static mut EMULATOR_STATE: *mut () = ptr::null_mut();
+static mut QEMU_IS_INITIALIZED: bool = false;
+
+/// The thin wrapper around QEMU.
+/// It is considered unsafe to use it directly.
+/// Prefer using `Emulator` instead in case of doubt.
+#[derive(Clone, Copy, Debug)]
+pub struct Qemu {
+    _private: (),
+}
+
+pub struct EmulatorState<QT, S, E>
 where
-    E: IsEmuExitHandler,
+    QT: QemuHelperTuple<S>,
+    S: State + HasExecutions,
+    E: IsEmuExitHandler<QT, S>,
 {
-    type Error = EmuExitReasonError;
-    fn try_from(emu: &Emulator<E>) -> Result<Self, Self::Error> {
+    exit_handler: RefCell<E>,
+    breakpoints: RefCell<HashSet<Breakpoint>>,
+    _phantom: PhantomData<(QT, S)>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Emulator<QT, S, E>
+where
+    QT: QemuHelperTuple<S>,
+    S: State + HasExecutions,
+    E: IsEmuExitHandler<QT, S>,
+{
+    state: ptr::NonNull<EmulatorState<QT, S, E>>,
+    qemu: Qemu,
+}
+
+// impl<QT, S, E> EmulatorState<QT, S, E>
+// where
+//     QT: QemuHelperTuple<S>,
+//     S: State + HasExecutions,
+//     E: IsEmuExitHandler<QT, S>,
+// {
+//     pub fn exit_handler(&self) -> &RefCell<E> {
+//         &self.exit_handler
+//     }
+// }
+
+impl Qemu {
+    #[allow(clippy::must_use_candidate, clippy::similar_names)]
+    pub fn init(args: &[String], env: &[(String, String)]) -> Result<Self, EmuError> {
+        if args.is_empty() {
+            return Err(EmuError::EmptyArgs);
+        }
+
+        let argc = args.len();
+        if i32::try_from(argc).is_err() {
+            return Err(EmuError::TooManyArgs(argc));
+        }
+
+        unsafe {
+            if QEMU_IS_INITIALIZED {
+                return Err(EmuError::MultipleInstances);
+            }
+            QEMU_IS_INITIALIZED = true;
+        }
+
+        #[allow(clippy::cast_possible_wrap)]
+        let argc = argc as i32;
+
+        let args: Vec<CString> = args
+            .iter()
+            .map(|x| CString::new(x.clone()).unwrap())
+            .collect();
+        let mut argv: Vec<*const u8> = args.iter().map(|x| x.as_ptr() as *const u8).collect();
+        argv.push(ptr::null()); // argv is always null terminated.
+        let env_strs: Vec<String> = env
+            .iter()
+            .map(|(k, v)| format!("{}={}\0", &k, &v))
+            .collect();
+        let mut envp: Vec<*const u8> = env_strs.iter().map(|x| x.as_bytes().as_ptr()).collect();
+        envp.push(null());
+        unsafe {
+            #[cfg(emulation_mode = "usermode")]
+            qemu_user_init(argc, argv.as_ptr(), envp.as_ptr());
+            #[cfg(emulation_mode = "systemmode")]
+            {
+                qemu_init(
+                    argc,
+                    argv.as_ptr() as *const *const u8,
+                    envp.as_ptr() as *const *const u8,
+                );
+                libc::atexit(qemu_cleanup_atexit);
+                libafl_qemu_sys::syx_snapshot_init(true);
+            }
+        }
+
+        Ok(Qemu { _private: () })
+    }
+
+    /// Get a QEMU object.
+    /// Same as `Qemu::get`, but without checking whether QEMU has been correctly initialized.
+    ///
+    /// # Safety
+    ///
+    /// Should not be used if `Qemu::init` has never been used before (otherwise QEMU will not be initialized, and a crash will occur).
+    /// Prefer `Qemu::get` for a safe version of this method.
+    pub unsafe fn get_unchecked() -> Self {
+        Qemu { _private: () }
+    }
+
+    pub fn get() -> Option<Self> {
+        unsafe {
+            if QEMU_IS_INITIALIZED {
+                Some(Qemu { _private: () })
+            } else {
+                None
+            }
+        }
+    }
+
+    fn post_run(&self) -> Result<QemuExitReason, QemuExitReasonError> {
         let exit_reason = unsafe { libafl_get_exit_reason() };
         if exit_reason.is_null() {
-            Err(EmuExitReasonError::UnexpectedExit)
+            Err(QemuExitReasonError::UnexpectedExit)
         } else {
             let exit_reason: &mut libafl_qemu_sys::libafl_exit_reason =
                 unsafe { transmute(&mut *exit_reason) };
@@ -987,186 +958,18 @@ where
                             _ => panic!("shutdown cause not handled."),
                         };
 
-                    EmuExitReason::End(qemu_shutdown_cause)
+                    QemuExitReason::End(qemu_shutdown_cause)
                 },
                 libafl_qemu_sys::libafl_exit_reason_kind_BREAKPOINT => unsafe {
                     let bp_addr = exit_reason.data.breakpoint.addr;
-                    let bp = emu
-                        .state()
-                        .breakpoints
-                        .borrow()
-                        .get(&bp_addr)
-                        .ok_or(EmuExitReasonError::BreakpointNotFound(bp_addr))?
-                        .clone();
-                    EmuExitReason::Breakpoint(bp)
+                    QemuExitReason::Breakpoint(bp_addr)
                 },
                 libafl_qemu_sys::libafl_exit_reason_kind_SYNC_BACKDOOR => {
-                    EmuExitReason::SyncBackdoor(emu.try_into()?)
+                    QemuExitReason::SyncBackdoor
                 }
-                _ => return Err(EmuExitReasonError::UnknownKind),
+                _ => return Err(QemuExitReasonError::UnknownKind),
             })
         }
-    }
-}
-
-impl std::error::Error for EmuError {}
-
-impl Display for EmuError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            EmuError::MultipleInstances => {
-                write!(f, "Only one instance of the QEMU Emulator is permitted")
-            }
-            EmuError::EmptyArgs => {
-                write!(f, "QEMU emulator args cannot be empty")
-            }
-            EmuError::TooManyArgs(n) => {
-                write!(
-                    f,
-                    "Too many arguments passed to QEMU emulator ({n} > i32::MAX)"
-                )
-            }
-        }
-    }
-}
-
-impl From<EmuError> for libafl::Error {
-    fn from(err: EmuError) -> Self {
-        libafl::Error::unknown(format!("{err}"))
-    }
-}
-
-static mut EMULATOR_STATE: *mut () = ptr::null_mut();
-static mut EMULATOR_IS_INITIALIZED: bool = false;
-
-pub struct EmulatorState<E>
-where
-    E: IsEmuExitHandler,
-{
-    exit_handler: RefCell<E>,
-    breakpoints: RefCell<HashSet<Breakpoint>>,
-}
-
-#[derive(Clone, Debug)]
-pub struct Emulator<E>
-where
-    E: IsEmuExitHandler,
-{
-    state: ptr::NonNull<EmulatorState<E>>,
-}
-
-#[allow(clippy::unused_self)]
-impl<E> Emulator<E>
-where
-    E: IsEmuExitHandler,
-{
-    #[allow(clippy::must_use_candidate, clippy::similar_names)]
-    pub fn new(
-        args: &[String],
-        env: &[(String, String)],
-        exit_handler: E,
-    ) -> Result<Emulator<E>, EmuError> {
-        if args.is_empty() {
-            return Err(EmuError::EmptyArgs);
-        }
-
-        let argc = args.len();
-        if i32::try_from(argc).is_err() {
-            return Err(EmuError::TooManyArgs(argc));
-        }
-
-        unsafe {
-            if EMULATOR_IS_INITIALIZED {
-                return Err(EmuError::MultipleInstances);
-            }
-            EMULATOR_IS_INITIALIZED = true;
-        }
-
-        #[allow(clippy::cast_possible_wrap)]
-        let argc = argc as i32;
-
-        let args: Vec<CString> = args
-            .iter()
-            .map(|x| CString::new(x.clone()).unwrap())
-            .collect();
-        let mut argv: Vec<*const u8> = args.iter().map(|x| x.as_ptr() as *const u8).collect();
-        argv.push(ptr::null()); // argv is always null terminated.
-        let env_strs: Vec<String> = env
-            .iter()
-            .map(|(k, v)| format!("{}={}\0", &k, &v))
-            .collect();
-        let mut envp: Vec<*const u8> = env_strs.iter().map(|x| x.as_bytes().as_ptr()).collect();
-        envp.push(null());
-        unsafe {
-            #[cfg(emulation_mode = "usermode")]
-            qemu_user_init(argc, argv.as_ptr(), envp.as_ptr());
-            #[cfg(emulation_mode = "systemmode")]
-            {
-                systemmode::qemu_init(
-                    argc,
-                    argv.as_ptr() as *const *const u8,
-                    envp.as_ptr() as *const *const u8,
-                );
-                libc::atexit(qemu_cleanup_atexit);
-                libafl_qemu_sys::syx_snapshot_init(true);
-            }
-        }
-
-        let emu_state = Box::new(EmulatorState {
-            exit_handler: RefCell::new(exit_handler),
-            breakpoints: RefCell::new(HashSet::new()),
-        });
-
-        let emu_state_ptr = unsafe {
-            let emu_ptr = NonNull::from(Box::leak(emu_state));
-            EMULATOR_STATE = emu_ptr.as_ptr() as *mut ();
-            emu_ptr
-        };
-
-        Ok(Emulator {
-            state: emu_state_ptr,
-        })
-    }
-
-    #[must_use]
-    pub fn state(&self) -> &EmulatorState<E> {
-        unsafe { self.state.as_ref() }
-    }
-
-    #[must_use]
-    pub fn state_mut(&mut self) -> &mut EmulatorState<E> {
-        unsafe { self.state.as_mut() }
-    }
-
-    #[must_use]
-    pub fn get() -> Option<Emulator<NopEmuExitHandler>> {
-        unsafe {
-            if EMULATOR_IS_INITIALIZED {
-                Some(Emulator::<NopEmuExitHandler>::new_empty())
-            } else {
-                None
-            }
-        }
-    }
-
-    /// Get an empty emulator.
-    ///
-    /// # Safety
-    ///
-    /// Should not be used if `Emulator::new` has never been used before (otherwise QEMU will not be initialized).
-    /// Prefer `Emulator::get` for a safe version of this method.
-    #[must_use]
-    pub unsafe fn new_empty() -> Emulator<NopEmuExitHandler> {
-        Emulator {
-            state: NonNull::dangling(),
-        }
-    }
-
-    #[must_use]
-    #[allow(clippy::cast_possible_wrap)]
-    #[allow(clippy::cast_sign_loss)]
-    pub fn num_cpus(&self) -> usize {
-        unsafe { libafl_qemu_num_cpus() as usize }
     }
 
     #[must_use]
@@ -1190,7 +993,7 @@ where
     }
 
     #[must_use]
-    pub fn page_from_addr(addr: GuestAddr) -> GuestAddr {
+    pub fn page_from_addr(&self, addr: GuestAddr) -> GuestAddr {
         unsafe { libafl_page_from_addr(addr) }
     }
 
@@ -1232,20 +1035,6 @@ where
         self.current_cpu().unwrap().read_reg(reg)
     }
 
-    pub fn add_breakpoint(&self, mut bp: Breakpoint, enable: bool) {
-        if enable {
-            bp.enable(self);
-        }
-
-        self.state().breakpoints.borrow_mut().insert(bp);
-    }
-
-    pub fn remove_breakpoint(&self, bp: &mut Breakpoint) {
-        bp.disable(self);
-
-        self.state().breakpoints.borrow_mut().remove(bp);
-    }
-
     pub fn set_breakpoint_addr(&self, addr: GuestAddr) {
         unsafe {
             libafl_qemu_set_breakpoint(addr.into());
@@ -1255,58 +1044,6 @@ where
     pub fn unset_breakpoint_addr(&self, addr: GuestAddr) {
         unsafe {
             libafl_qemu_remove_breakpoint(addr.into());
-        }
-    }
-
-    pub fn entry_break(&self, addr: GuestAddr) {
-        self.set_breakpoint_addr(addr);
-        unsafe {
-            // TODO: decide what to do with sync exit here: ignore or check for bp exit?
-            let _ = self.run();
-        }
-        self.unset_breakpoint_addr(addr);
-    }
-
-    /// This function will run the emulator until the exit handler decides to stop the execution for
-    /// whatever reason, depending on the choosen handler.
-    /// It is a higher-level abstraction of [`Emulator::run`] that will take care of some part of the runtime logic,
-    /// returning only when something interesting happen.
-    /// # Safety
-    ///
-    /// Should, in general, be safe to call.
-    /// Of course, the emulated target is not contained securely and can corrupt state or interact with the operating system.
-    pub unsafe fn run_handle<QT, S>(
-        &self,
-        input: &BytesInput,
-        executor_state: &mut QemuExecutorState<QT, S, E>,
-    ) -> Result<HandlerResult, HandlerError>
-    where
-        QT: QemuHelperTuple<S, E>,
-        S: State + HasExecutions,
-    {
-        let mut exit_handler = self.state().exit_handler.borrow_mut();
-
-        loop {
-            // Insert input if the location is already known
-            exit_handler.try_put_input(self, input);
-
-            // Run QEMU
-            let exit_reason = self.run();
-
-            // Handle QEMU exit
-            let handler_res = exit_handler.handle(exit_reason, self, executor_state, input)?;
-
-            // Return to harness
-            match handler_res {
-                InnerHandlerResult::ReturnToHarness(exit_reason) => {
-                    return Ok(HandlerResult::UnhandledExit(exit_reason))
-                }
-                InnerHandlerResult::EndOfRun(exit_kind) => {
-                    return Ok(HandlerResult::EndOfRun(exit_kind))
-                }
-                InnerHandlerResult::Interrupt => return Ok(HandlerResult::Interrupted),
-                InnerHandlerResult::Continue => {}
-            }
         }
     }
 
@@ -1487,10 +1224,7 @@ where
     }
 }
 
-impl<E> ArchExtras for Emulator<E>
-where
-    E: IsEmuExitHandler,
-{
+impl ArchExtras for Qemu {
     fn read_return_address<T>(&self) -> Result<T, String>
     where
         T: From<GuestReg>,
@@ -1530,6 +1264,384 @@ where
         self.current_cpu()
             .ok_or("Failed to get current CPU")?
             .write_function_argument::<T>(conv, idx, val)
+    }
+}
+
+#[allow(clippy::unused_self)]
+impl<QT, S, E> Emulator<QT, S, E>
+where
+    QT: QemuHelperTuple<S>,
+    S: State + HasExecutions,
+    E: IsEmuExitHandler<QT, S>,
+{
+    #[allow(clippy::must_use_candidate, clippy::similar_names)]
+    pub fn new(
+        args: &[String],
+        env: &[(String, String)],
+        exit_handler: E,
+    ) -> Result<Self, EmuError> {
+        let qemu = Qemu::init(args, env)?;
+
+        Self::new_with_qemu(qemu, exit_handler)
+    }
+
+    pub fn new_with_qemu(qemu: Qemu, exit_handler: E) -> Result<Self, EmuError> {
+        let emu_state = Box::new(EmulatorState {
+            exit_handler: RefCell::new(exit_handler),
+            breakpoints: RefCell::new(HashSet::new()),
+            _phantom: PhantomData,
+        });
+
+        let emu_state_ptr = unsafe {
+            let emu_ptr = NonNull::from(Box::leak(emu_state));
+            EMULATOR_STATE = emu_ptr.as_ptr() as *mut ();
+            emu_ptr
+        };
+
+        Ok(Emulator {
+            state: emu_state_ptr,
+            qemu,
+        })
+    }
+
+    pub fn qemu(&self) -> &Qemu {
+        &self.qemu
+    }
+
+    #[must_use]
+    pub fn state(&self) -> &EmulatorState<QT, S, E> {
+        unsafe { self.state.as_ref() }
+    }
+
+    #[must_use]
+    pub fn state_mut(&mut self) -> &mut EmulatorState<QT, S, E> {
+        unsafe { self.state.as_mut() }
+    }
+
+    pub fn exit_handler(&self) -> &RefCell<E> {
+        &self.state().exit_handler
+    }
+
+    #[must_use]
+    pub fn get() -> Option<Emulator<QT, S, NopEmuExitHandler>> {
+        unsafe {
+            if QEMU_IS_INITIALIZED {
+                Some(Emulator::<QT, S, NopEmuExitHandler>::get_unchecked())
+            } else {
+                None
+            }
+        }
+    }
+
+    /// Get an empty emulator.
+    /// Same as `Emulator::get`, but without checking whether QEMU has been correctly initialized.
+    ///
+    /// # Safety
+    ///
+    /// Should not be used if `Qemu::init` or `Emulator::new` has never been used before (otherwise QEMU will not be initialized, and a crash will occur).
+    /// Prefer `Emulator::get` for a safe version of this method.
+    #[must_use]
+    pub unsafe fn get_unchecked() -> Emulator<QT, S, NopEmuExitHandler> {
+        Emulator {
+            state: NonNull::dangling(),
+            qemu: Qemu::get_unchecked(),
+        }
+    }
+
+    #[must_use]
+    #[allow(clippy::cast_possible_wrap)]
+    #[allow(clippy::cast_sign_loss)]
+    pub fn num_cpus(&self) -> usize {
+        unsafe { libafl_qemu_num_cpus() as usize }
+    }
+
+    #[must_use]
+    pub fn current_cpu(&self) -> Option<CPU> {
+        self.qemu.current_cpu()
+    }
+
+    #[must_use]
+    #[allow(clippy::cast_possible_wrap)]
+    pub fn cpu_from_index(&self, index: usize) -> CPU {
+        self.qemu.cpu_from_index(index)
+    }
+
+    #[must_use]
+    pub fn page_from_addr(&self, addr: GuestAddr) -> GuestAddr {
+        self.qemu.page_from_addr(addr)
+    }
+
+    //#[must_use]
+    /*pub fn page_size() -> GuestUsize {
+        unsafe { libafl_page_size }
+    }*/
+
+    pub unsafe fn write_mem(&self, addr: GuestAddr, buf: &[u8]) {
+        self.qemu.write_mem(addr, buf)
+    }
+
+    pub unsafe fn read_mem(&self, addr: GuestAddr, buf: &mut [u8]) {
+        self.qemu.read_mem(addr, buf)
+    }
+
+    #[must_use]
+    pub fn num_regs(&self) -> i32 {
+        self.qemu.num_regs()
+    }
+
+    pub fn write_reg<R, T>(&self, reg: R, val: T) -> Result<(), String>
+    where
+        T: Num + PartialOrd + Copy + Into<GuestReg>,
+        R: Into<i32>,
+    {
+        self.qemu.write_reg(reg, val)
+    }
+
+    pub fn read_reg<R, T>(&self, reg: R) -> Result<T, String>
+    where
+        T: Num + PartialOrd + Copy + From<GuestReg>,
+        R: Into<i32>,
+    {
+        self.qemu.read_reg(reg)
+    }
+
+    pub fn add_breakpoint(&self, mut bp: Breakpoint, enable: bool) {
+        if enable {
+            bp.enable(&self.qemu);
+        }
+
+        self.state().breakpoints.borrow_mut().insert(bp);
+    }
+
+    pub fn remove_breakpoint(&self, bp: &mut Breakpoint) {
+        bp.disable(&self.qemu);
+
+        self.state().breakpoints.borrow_mut().remove(bp);
+    }
+
+    pub fn set_breakpoint_addr(&self, addr: GuestAddr) {
+        self.qemu.set_breakpoint_addr(addr)
+    }
+
+    pub fn unset_breakpoint_addr(&self, addr: GuestAddr) {
+        self.qemu.unset_breakpoint_addr(addr)
+    }
+
+    pub fn entry_break(&self, addr: GuestAddr) {
+        self.set_breakpoint_addr(addr);
+        unsafe {
+            // TODO: decide what to do with sync exit here: ignore or check for bp exit?
+            let _ = self.run();
+        }
+        self.unset_breakpoint_addr(addr);
+    }
+
+    /// This function will run the emulator until the next breakpoint, or until finish.
+    /// # Safety
+    ///
+    /// Should, in general, be safe to call.
+    /// Of course, the emulated target is not contained securely and can corrupt state or interact with the operating system.
+    pub unsafe fn run(&self) -> Result<EmuExitReason, EmuExitReasonError> {
+        match self.qemu.run() {
+            Ok(qemu_exit_reason) => Ok(match qemu_exit_reason {
+                QemuExitReason::End(qemu_shutdown_cause) => EmuExitReason::End(qemu_shutdown_cause),
+                QemuExitReason::Breakpoint(bp_addr) => {
+                    let bp = self
+                        .state()
+                        .breakpoints
+                        .borrow()
+                        .get(&bp_addr)
+                        .ok_or(EmuExitReasonError::BreakpointNotFound(bp_addr))?
+                        .clone();
+                    EmuExitReason::Breakpoint(bp)
+                }
+                QemuExitReason::SyncBackdoor => EmuExitReason::SyncBackdoor(self.try_into()?),
+            }),
+            Err(qemu_exit_reason_error) => Err(match qemu_exit_reason_error {
+                QemuExitReasonError::UnexpectedExit => EmuExitReasonError::UnexpectedExit,
+                QemuExitReasonError::UnknownKind => EmuExitReasonError::UnknownKind,
+            }),
+        }
+    }
+
+    /// This function will run the emulator until the exit handler decides to stop the execution for
+    /// whatever reason, depending on the choosen handler.
+    /// It is a higher-level abstraction of [`Emulator::run`] that will take care of some part of the runtime logic,
+    /// returning only when something interesting happen.
+    /// # Safety
+    ///
+    /// Should, in general, be safe to call.
+    /// Of course, the emulated target is not contained securely and can corrupt state or interact with the operating system.
+    pub unsafe fn run_handle(
+        &self,
+        input: &BytesInput,
+        qemu_executor_state: &mut QemuExecutorState<QT, S>,
+    ) -> Result<HandlerResult, HandlerError> {
+        loop {
+            // Insert input if the location is already known
+            E::try_put_input(self, qemu_executor_state, input);
+
+            // Run QEMU
+            let exit_reason = self.run();
+
+            // Handle QEMU exit
+            let handler_res = E::handle(self, exit_reason, qemu_executor_state, input)?;
+
+            // Return to harness
+            match handler_res {
+                InnerHandlerResult::ReturnToHarness(exit_reason) => {
+                    return Ok(HandlerResult::UnhandledExit(exit_reason))
+                }
+                InnerHandlerResult::EndOfRun(exit_kind) => {
+                    return Ok(HandlerResult::EndOfRun(exit_kind))
+                }
+                InnerHandlerResult::Interrupt => return Ok(HandlerResult::Interrupted),
+                InnerHandlerResult::Continue => {}
+            }
+        }
+    }
+
+    pub fn flush_jit(&self) {
+        self.qemu.flush_jit()
+    }
+
+    // TODO set T lifetime to be like Emulator
+    pub fn set_hook<T: Into<HookData>>(
+        &self,
+        data: T,
+        addr: GuestAddr,
+        callback: extern "C" fn(T, GuestAddr),
+        invalidate_block: bool,
+    ) -> InstructionHookId {
+        self.qemu.set_hook(data, addr, callback, invalidate_block)
+    }
+
+    #[must_use]
+    pub fn remove_hook(&self, id: impl HookId, invalidate_block: bool) -> bool {
+        self.qemu.remove_hook(id, invalidate_block)
+    }
+
+    #[must_use]
+    pub fn remove_hooks_at(&self, addr: GuestAddr, invalidate_block: bool) -> usize {
+        self.qemu.remove_hooks_at(addr, invalidate_block)
+    }
+
+    pub fn add_edge_hooks<T: Into<HookData>>(
+        &self,
+        data: T,
+        gen: Option<extern "C" fn(T, GuestAddr, GuestAddr) -> u64>,
+        exec: Option<extern "C" fn(T, u64)>,
+    ) -> EdgeHookId {
+        self.qemu.add_edge_hooks(data, gen, exec)
+    }
+
+    pub fn add_block_hooks<T: Into<HookData>>(
+        &self,
+        data: T,
+        gen: Option<extern "C" fn(T, GuestAddr) -> u64>,
+        post_gen: Option<extern "C" fn(T, GuestAddr, GuestUsize)>,
+        exec: Option<extern "C" fn(T, u64)>,
+    ) -> BlockHookId {
+        self.qemu.add_block_hooks(data, gen, post_gen, exec)
+    }
+
+    pub fn add_read_hooks<T: Into<HookData>>(
+        &self,
+        data: T,
+        gen: Option<extern "C" fn(T, GuestAddr, MemAccessInfo) -> u64>,
+        exec1: Option<extern "C" fn(T, u64, GuestAddr)>,
+        exec2: Option<extern "C" fn(T, u64, GuestAddr)>,
+        exec4: Option<extern "C" fn(T, u64, GuestAddr)>,
+        exec8: Option<extern "C" fn(T, u64, GuestAddr)>,
+        exec_n: Option<extern "C" fn(T, u64, GuestAddr, usize)>,
+    ) -> ReadHookId {
+        self.qemu
+            .add_read_hooks(data, gen, exec1, exec2, exec4, exec8, exec_n)
+    }
+
+    // TODO add MemOp info
+    pub fn add_write_hooks<T: Into<HookData>>(
+        &self,
+        data: T,
+        gen: Option<extern "C" fn(T, GuestAddr, MemAccessInfo) -> u64>,
+        exec1: Option<extern "C" fn(T, u64, GuestAddr)>,
+        exec2: Option<extern "C" fn(T, u64, GuestAddr)>,
+        exec4: Option<extern "C" fn(T, u64, GuestAddr)>,
+        exec8: Option<extern "C" fn(T, u64, GuestAddr)>,
+        exec_n: Option<extern "C" fn(T, u64, GuestAddr, usize)>,
+    ) -> WriteHookId {
+        self.qemu
+            .add_write_hooks(data, gen, exec1, exec2, exec4, exec8, exec_n)
+    }
+
+    pub fn add_cmp_hooks<T: Into<HookData>>(
+        &self,
+        data: T,
+        gen: Option<extern "C" fn(T, GuestAddr, usize) -> u64>,
+        exec1: Option<extern "C" fn(T, u64, u8, u8)>,
+        exec2: Option<extern "C" fn(T, u64, u16, u16)>,
+        exec4: Option<extern "C" fn(T, u64, u32, u32)>,
+        exec8: Option<extern "C" fn(T, u64, u64, u64)>,
+    ) -> CmpHookId {
+        self.qemu
+            .add_cmp_hooks(data, gen, exec1, exec2, exec4, exec8)
+    }
+
+    pub fn add_backdoor_hook<T: Into<HookData>>(
+        &self,
+        data: T,
+        callback: extern "C" fn(T, GuestAddr),
+    ) -> BackdoorHookId {
+        self.qemu.add_backdoor_hook(data, callback)
+    }
+
+    #[allow(clippy::type_complexity)]
+    pub fn add_gdb_cmd(&self, callback: Box<dyn FnMut(&Qemu, &str) -> bool>) {
+        self.qemu.add_gdb_cmd(callback)
+    }
+
+    pub fn gdb_reply(&self, output: &str) {
+        self.qemu.gdb_reply(output)
+    }
+}
+
+impl<QT, S, E> ArchExtras for Emulator<QT, S, E>
+where
+    QT: QemuHelperTuple<S>,
+    S: State + HasExecutions,
+    E: IsEmuExitHandler<QT, S>,
+{
+    fn read_return_address<T>(&self) -> Result<T, String>
+    where
+        T: From<GuestReg>,
+    {
+        self.qemu.read_return_address()
+    }
+
+    fn write_return_address<T>(&self, val: T) -> Result<(), String>
+    where
+        T: Into<GuestReg>,
+    {
+        self.qemu.write_return_address(val)
+    }
+
+    fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, String>
+    where
+        T: From<GuestReg>,
+    {
+        self.qemu.read_function_argument(conv, idx)
+    }
+
+    fn write_function_argument<T>(
+        &self,
+        conv: CallingConvention,
+        idx: i32,
+        val: T,
+    ) -> Result<(), String>
+    where
+        T: Into<GuestReg>,
+    {
+        self.qemu.write_function_argument(conv, idx, val)
     }
 }
 
@@ -1589,7 +1701,7 @@ pub mod pybind {
 
     #[pyclass(unsendable)]
     pub struct Emulator {
-        pub emu: super::Emulator<NopEmuExitHandler>,
+        pub emu: super::Emulator<QT, S, NopEmuExitHandler>,
     }
 
     #[pymethods]

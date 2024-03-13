@@ -4,7 +4,11 @@ use std::{
 };
 
 use enum_map::{enum_map, Enum, EnumMap};
-use libafl::executors::ExitKind;
+use libafl::{
+    executors::ExitKind,
+    state::{HasExecutions, State},
+};
+use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestVirtAddr};
 use num_enum::TryFromPrimitiveError;
 
 use crate::{
@@ -12,8 +16,8 @@ use crate::{
         Command, EmulatorMemoryChunk, EndCommand, FilterCommand, InputCommand, LoadCommand,
         NativeBackdoorCommand, NativeExitKind, SaveCommand, StartCommand, VersionCommand,
     },
-    get_backdoor_arch_regs, Emulator, GuestAddr, GuestPhysAddr, GuestReg, GuestVirtAddr,
-    IsEmuExitHandler, QemuInstrumentationAddressRangeFilter, Regs, CPU,
+    get_backdoor_arch_regs, Emulator, GuestReg, IsEmuExitHandler, QemuHelperTuple,
+    QemuInstrumentationAddressRangeFilter, Regs, CPU,
 };
 
 #[derive(Debug, Clone)]
@@ -77,13 +81,15 @@ impl Display for SyncBackdoor {
     }
 }
 
-impl<E> TryFrom<&Emulator<E>> for SyncBackdoor
+impl<QT, S, E> TryFrom<&Emulator<QT, S, E>> for SyncBackdoor
 where
-    E: IsEmuExitHandler,
+    E: IsEmuExitHandler<QT, S>,
+    QT: QemuHelperTuple<S>,
+    S: State + HasExecutions,
 {
     type Error = SyncBackdoorError;
 
-    fn try_from(emu: &Emulator<E>) -> Result<Self, Self::Error> {
+    fn try_from(emu: &Emulator<QT, S, E>) -> Result<Self, Self::Error> {
         let arch_regs_map: &'static EnumMap<BackdoorArgs, Regs> = get_backdoor_arch_regs();
         let cmd_id: GuestReg = emu.read_reg::<Regs, GuestReg>(arch_regs_map[BackdoorArgs::Cmd])?;
 

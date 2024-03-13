@@ -15,13 +15,14 @@ use std::{ffi::CStr, fmt::Display, fs, os::raw::c_char, path::Path};
 
 use hashbrown::HashMap;
 use libafl::{inputs::UsesInput, Error};
+use libafl_qemu_sys::GuestAddr;
 use serde::{Deserialize, Serialize};
 
 #[cfg(not(cpu_target = "hexagon"))]
 use crate::SYS_execve;
 use crate::{
-    elf::EasyElf, emu::ArchExtras, CallingConvention, Emulator, GuestAddr, Hook, IsEmuExitHandler,
-    QemuHelper, QemuHelperTuple, QemuHooks, SyscallHookResult,
+    elf::EasyElf, emu::ArchExtras, CallingConvention, Hook, Qemu, QemuHelper, QemuHelperTuple,
+    QemuHooks, SyscallHookResult,
 };
 #[cfg(cpu_target = "hexagon")]
 /// Hexagon syscalls are not currently supported by the `syscalls` crate, so we just paste this here for now.
@@ -206,13 +207,13 @@ impl QemuInjectionHelper {
         })
     }
 
-    fn on_call_check<S: UsesInput, QT: QemuHelperTuple<S, E>, E: IsEmuExitHandler>(
-        hooks: &mut QemuHooks<QT, S, E>,
+    fn on_call_check<S: UsesInput, QT: QemuHelperTuple<S>>(
+        hooks: &mut QemuHooks<QT, S>,
         id: usize,
         parameter: u8,
     ) {
-        let emu = hooks.emulator();
-        let reg: GuestAddr = emu
+        let qemu = hooks.qemu();
+        let reg: GuestAddr = qemu
             .current_cpu()
             .unwrap()
             .read_function_argument(CallingConvention::Cdecl, parameter)
@@ -251,26 +252,25 @@ impl QemuInjectionHelper {
     }
 }
 
-impl<S, E> QemuHelper<S, E> for QemuInjectionHelper
+impl<S> QemuHelper<S> for QemuInjectionHelper
 where
     S: UsesInput,
-    E: IsEmuExitHandler,
 {
-    fn init_hooks<QT>(&self, hooks: &QemuHooks<QT, S, E>)
+    fn init_hooks<QT>(&self, hooks: &QemuHooks<QT, S>)
     where
-        QT: QemuHelperTuple<S, E>,
+        QT: QemuHelperTuple<S>,
     {
-        hooks.syscalls(Hook::Function(syscall_hook::<QT, S, E>));
+        hooks.syscalls(Hook::Function(syscall_hook::<QT, S>));
     }
 
-    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S, E>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
     where
-        QT: QemuHelperTuple<S, E>,
+        QT: QemuHelperTuple<S>,
     {
-        let emu = hooks.emulator();
+        let qemu = hooks.qemu();
         let mut libs: Vec<LibInfo> = Vec::new();
 
-        for region in emu.mappings() {
+        for region in qemu.mappings() {
             if let Some(path) = region.path().map(ToOwned::to_owned) {
                 if !path.is_empty() {
                     LibInfo::add_unique(
@@ -301,7 +301,7 @@ where
                     vec![func_pc]
                 } else {
                     libs.iter()
-                        .filter_map(|lib| find_function(emu, &lib.name, name, lib.off).unwrap())
+                        .filter_map(|lib| find_function(qemu, &lib.name, name, lib.off).unwrap())
                         .map(|func_pc| {
                             log::info!("Injections: Function {name} found at {func_pc:#x}",);
                             func_pc
@@ -329,8 +329,8 @@ where
     }
 }
 
-fn syscall_hook<QT, S, E>(
-    hooks: &mut QemuHooks<QT, S, E>, // our instantiated QemuHooks
+fn syscall_hook<QT, S>(
+    hooks: &mut QemuHooks<QT, S>, // our instantiated QemuHooks
     _state: Option<&mut S>,
     syscall: i32,  // syscall number
     x0: GuestAddr, // registers ...
@@ -343,9 +343,8 @@ fn syscall_hook<QT, S, E>(
     _x7: GuestAddr,
 ) -> SyscallHookResult
 where
-    QT: QemuHelperTuple<S, E>,
+    QT: QemuHelperTuple<S>,
     S: UsesInput,
-    E: IsEmuExitHandler,
 {
     log::trace!("syscall_hook {syscall} {SYS_execve}");
     debug_assert!(i32::try_from(SYS_execve).is_ok());
@@ -394,21 +393,18 @@ where
     }
 }
 
-fn find_function<E>(
-    emu: &Emulator<E>,
+fn find_function(
+    qemu: &Qemu,
     file: &str,
     function: &str,
     loadaddr: GuestAddr,
-) -> Result<Option<GuestAddr>, Error>
-where
-    E: IsEmuExitHandler,
-{
+) -> Result<Option<GuestAddr>, Error> {
     let mut elf_buffer = Vec::new();
     let elf = EasyElf::from_file(file, &mut elf_buffer)?;
     let offset = if loadaddr > 0 {
         loadaddr
     } else {
-        emu.load_addr()
+        qemu.load_addr()
     };
     Ok(elf.resolve_symbol(function, offset))
 }

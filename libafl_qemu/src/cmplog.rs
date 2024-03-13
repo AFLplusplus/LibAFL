@@ -2,6 +2,7 @@
 use capstone::{arch::BuildsCapstone, Capstone, InsnDetail};
 use hashbrown::HashMap;
 use libafl::{inputs::UsesInput, state::HasMetadata};
+use libafl_qemu_sys::GuestAddr;
 pub use libafl_targets::{
     cmps::{
         __libafl_targets_cmplog_instructions, __libafl_targets_cmplog_routines, CMPLOG_ENABLED,
@@ -11,18 +12,13 @@ pub use libafl_targets::{
 use serde::{Deserialize, Serialize};
 
 #[cfg(emulation_mode = "usermode")]
-use crate::{
-    capstone,
-    emu::{ArchExtras, Emulator},
-    CallingConvention, NopEmuExitHandler,
-};
+use crate::{capstone, emu::ArchExtras, CallingConvention, Qemu};
 use crate::{
     helper::{
         hash_me, HasInstrumentationFilter, IsFilter, QemuHelper, QemuHelperTuple,
         QemuInstrumentationAddressRangeFilter,
     },
     hooks::{Hook, QemuHooks},
-    GuestAddr, IsEmuExitHandler,
 };
 
 #[cfg_attr(
@@ -80,17 +76,16 @@ impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuCmp
     }
 }
 
-impl<S, E> QemuHelper<S, E> for QemuCmpLogHelper
+impl<S> QemuHelper<S> for QemuCmpLogHelper
 where
     S: UsesInput + HasMetadata,
-    E: IsEmuExitHandler,
 {
-    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S, E>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
     where
-        QT: QemuHelperTuple<S, E>,
+        QT: QemuHelperTuple<S>,
     {
         hooks.cmps(
-            Hook::Function(gen_unique_cmp_ids::<QT, S, E>),
+            Hook::Function(gen_unique_cmp_ids::<QT, S>),
             Hook::Raw(trace_cmp1_cmplog),
             Hook::Raw(trace_cmp2_cmplog),
             Hook::Raw(trace_cmp4_cmplog),
@@ -122,19 +117,19 @@ impl Default for QemuCmpLogChildHelper {
     }
 }
 
-impl<S, E> QemuHelper<S, E> for QemuCmpLogChildHelper
+impl<S> QemuHelper<S> for QemuCmpLogChildHelper
 where
-    S: UsesInput + HasMetadata,
-    E: IsEmuExitHandler,
+    S: UsesInput,
+    S: HasMetadata,
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S, E>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
     where
-        QT: QemuHelperTuple<S, E>,
+        QT: QemuHelperTuple<S>,
     {
         hooks.cmps(
-            Hook::Function(gen_hashed_cmp_ids::<QT, S, E>),
+            Hook::Function(gen_hashed_cmp_ids::<QT, S>),
             Hook::Raw(trace_cmp1_cmplog),
             Hook::Raw(trace_cmp2_cmplog),
             Hook::Raw(trace_cmp4_cmplog),
@@ -143,8 +138,8 @@ where
     }
 }
 
-pub fn gen_unique_cmp_ids<QT, S, E>(
-    hooks: &mut QemuHooks<QT, S, E>,
+pub fn gen_unique_cmp_ids<QT, S>(
+    hooks: &mut QemuHooks<QT, S>,
     state: Option<&mut S>,
     pc: GuestAddr,
     _size: usize,
@@ -152,8 +147,7 @@ pub fn gen_unique_cmp_ids<QT, S, E>(
 where
     S: HasMetadata,
     S: UsesInput,
-    QT: QemuHelperTuple<S, E>,
-    E: IsEmuExitHandler,
+    QT: QemuHelperTuple<S>,
 {
     if let Some(h) = hooks.match_helper_mut::<QemuCmpLogHelper>() {
         if !h.must_instrument(pc) {
@@ -176,8 +170,8 @@ where
     }))
 }
 
-pub fn gen_hashed_cmp_ids<QT, S, E>(
-    hooks: &mut QemuHooks<QT, S, E>,
+pub fn gen_hashed_cmp_ids<QT, S>(
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
     _size: usize,
@@ -185,8 +179,7 @@ pub fn gen_hashed_cmp_ids<QT, S, E>(
 where
     S: HasMetadata,
     S: UsesInput,
-    QT: QemuHelperTuple<S, E>,
-    E: IsEmuExitHandler,
+    QT: QemuHelperTuple<S>,
 {
     if let Some(h) = hooks.match_helper_mut::<QemuCmpLogChildHelper>() {
         if !h.must_instrument(pc) {
@@ -249,12 +242,12 @@ impl QemuCmpLogRoutinesHelper {
             }
         }
 
-        let emu = Emulator::<NopEmuExitHandler>::get().unwrap();
+        let qemu = Qemu::get().unwrap();
 
-        let a0: GuestAddr = emu
+        let a0: GuestAddr = qemu
             .read_function_argument(CallingConvention::Cdecl, 0)
             .unwrap_or(0);
-        let a1: GuestAddr = emu
+        let a1: GuestAddr = qemu
             .read_function_argument(CallingConvention::Cdecl, 1)
             .unwrap_or(0);
 
@@ -265,19 +258,18 @@ impl QemuCmpLogRoutinesHelper {
         // if !emu.access_ok(VerifyAccess::Read, a0, 0x20) || !emu.access_ok(VerifyAccess::Read, a1, 0x20) { return; }
 
         unsafe {
-            __libafl_targets_cmplog_routines(k as usize, emu.g2h(a0), emu.g2h(a1));
+            __libafl_targets_cmplog_routines(k as usize, qemu.g2h(a0), qemu.g2h(a1));
         }
     }
 
-    fn gen_blocks_calls<QT, S, E>(
-        hooks: &mut QemuHooks<QT, S, E>,
+    fn gen_blocks_calls<QT, S>(
+        hooks: &mut QemuHooks<QT, S>,
         _state: Option<&mut S>,
         pc: GuestAddr,
     ) -> Option<u64>
     where
         S: UsesInput,
-        QT: QemuHelperTuple<S, E>,
-        E: IsEmuExitHandler,
+        QT: QemuHelperTuple<S>,
     {
         if let Some(h) = hooks.helpers_mut().match_first_type_mut::<Self>() {
             if !h.must_instrument(pc) {
@@ -293,21 +285,21 @@ impl QemuCmpLogRoutinesHelper {
             .unwrap();
         }
 
-        let emu = hooks.emulator();
+        let qemu = hooks.qemu();
 
         if let Some(h) = hooks.helpers().match_first_type::<Self>() {
             #[allow(unused_mut)]
             let mut code = {
                 #[cfg(emulation_mode = "usermode")]
                 unsafe {
-                    std::slice::from_raw_parts(emu.g2h(pc), 512)
+                    std::slice::from_raw_parts(qemu.g2h(pc), 512)
                 }
                 #[cfg(emulation_mode = "systemmode")]
                 &mut [0; 512]
             };
             #[cfg(emulation_mode = "systemmode")]
             unsafe {
-                emu.read_mem(pc, code)
+                qemu.read_mem(pc, code)
             }; // TODO handle faults
 
             let mut iaddr = pc;
@@ -322,7 +314,7 @@ impl QemuCmpLogRoutinesHelper {
                     match u32::from(detail.0) {
                         capstone::InsnGroupType::CS_GRP_CALL => {
                             let k = (hash_me(pc.into())) & (CMPLOG_MAP_W as u64 - 1);
-                            emu.set_hook(k, insn.address() as GuestAddr, Self::on_call, false);
+                            qemu.set_hook(k, insn.address() as GuestAddr, Self::on_call, false);
                         }
                         capstone::InsnGroupType::CS_GRP_RET
                         | capstone::InsnGroupType::CS_GRP_INVALID
@@ -339,11 +331,11 @@ impl QemuCmpLogRoutinesHelper {
 
                 #[cfg(emulation_mode = "usermode")]
                 unsafe {
-                    code = std::slice::from_raw_parts(emu.g2h(iaddr), 512);
+                    code = std::slice::from_raw_parts(qemu.g2h(iaddr), 512);
                 }
                 #[cfg(emulation_mode = "systemmode")]
                 unsafe {
-                    emu.read_mem(pc, code);
+                    qemu.read_mem(pc, code);
                 } // TODO handle faults
             }
         }
@@ -364,17 +356,16 @@ impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuCmp
 }
 
 #[cfg(emulation_mode = "usermode")]
-impl<S, E> QemuHelper<S, E> for QemuCmpLogRoutinesHelper
+impl<S> QemuHelper<S> for QemuCmpLogRoutinesHelper
 where
     S: UsesInput,
-    E: IsEmuExitHandler,
 {
-    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S, E>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
     where
-        QT: QemuHelperTuple<S, E>,
+        QT: QemuHelperTuple<S>,
     {
         hooks.blocks(
-            Hook::Function(Self::gen_blocks_calls::<QT, S, E>),
+            Hook::Function(Self::gen_blocks_calls::<QT, S>),
             Hook::Empty,
             Hook::Empty,
         );

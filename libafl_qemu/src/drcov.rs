@@ -4,18 +4,18 @@ use hashbrown::{hash_map::Entry, HashMap};
 use libafl::{
     executors::ExitKind, inputs::UsesInput, observers::ObserversTuple, state::HasMetadata,
 };
+use libafl_qemu_sys::{GuestAddr, GuestUsize};
 use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 use rangemap::RangeMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    emu::{GuestAddr, GuestUsize},
     helper::{
         HasInstrumentationFilter, IsFilter, QemuHelper, QemuHelperTuple,
         QemuInstrumentationAddressRangeFilter,
     },
     hooks::{Hook, QemuHooks},
-    Emulator, IsEmuExitHandler,
+    Qemu,
 };
 
 static DRCOV_IDS: Mutex<Option<Vec<u64>>> = Mutex::new(None);
@@ -88,27 +88,26 @@ impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuDrC
     }
 }
 
-impl<S, E> QemuHelper<S, E> for QemuDrCovHelper
+impl<S> QemuHelper<S> for QemuDrCovHelper
 where
     S: UsesInput + HasMetadata,
-    E: IsEmuExitHandler,
 {
-    fn init_hooks<QT>(&self, hooks: &QemuHooks<QT, S, E>)
+    fn init_hooks<QT>(&self, hooks: &QemuHooks<QT, S>)
     where
-        QT: QemuHelperTuple<S, E>,
+        QT: QemuHelperTuple<S>,
     {
         hooks.blocks(
-            Hook::Function(gen_unique_block_ids::<QT, S, E>),
-            Hook::Function(gen_block_lengths::<QT, S, E>),
-            Hook::Function(exec_trace_block::<QT, S, E>),
+            Hook::Function(gen_unique_block_ids::<QT, S>),
+            Hook::Function(gen_block_lengths::<QT, S>),
+            Hook::Function(exec_trace_block::<QT, S>),
         );
     }
 
-    fn pre_exec(&mut self, _emulator: &Emulator<E>, _input: &S::Input) {}
+    fn pre_exec(&mut self, _qemu: &Qemu, _input: &S::Input) {}
 
     fn post_exec<OT>(
         &mut self,
-        _emulator: &Emulator<E>,
+        _qemu: &Qemu,
         _input: &S::Input,
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
@@ -195,15 +194,14 @@ where
     }
 }
 
-pub fn gen_unique_block_ids<QT, S, E>(
-    hooks: &mut QemuHooks<QT, S, E>,
+pub fn gen_unique_block_ids<QT, S>(
+    hooks: &mut QemuHooks<QT, S>,
     state: Option<&mut S>,
     pc: GuestAddr,
 ) -> Option<u64>
 where
     S: UsesInput + HasMetadata,
-    E: IsEmuExitHandler,
-    QT: QemuHelperTuple<S, E>,
+    QT: QemuHelperTuple<S>,
 {
     let drcov_helper = hooks
         .helpers()
@@ -250,15 +248,14 @@ where
     }
 }
 
-pub fn gen_block_lengths<QT, S, E>(
-    hooks: &mut QemuHooks<QT, S, E>,
+pub fn gen_block_lengths<QT, S>(
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
     block_length: GuestUsize,
 ) where
     S: UsesInput + HasMetadata,
-    QT: QemuHelperTuple<S, E>,
-    E: IsEmuExitHandler,
+    QT: QemuHelperTuple<S>,
 {
     let drcov_helper = hooks
         .helpers()
@@ -275,11 +272,10 @@ pub fn gen_block_lengths<QT, S, E>(
         .insert(pc, block_length);
 }
 
-pub fn exec_trace_block<QT, S, E>(hooks: &mut QemuHooks<QT, S, E>, _state: Option<&mut S>, id: u64)
+pub fn exec_trace_block<QT, S>(hooks: &mut QemuHooks<QT, S>, _state: Option<&mut S>, id: u64)
 where
+    QT: QemuHelperTuple<S>,
     S: UsesInput + HasMetadata,
-    QT: QemuHelperTuple<S, E>,
-    E: IsEmuExitHandler,
 {
     if hooks
         .helpers()

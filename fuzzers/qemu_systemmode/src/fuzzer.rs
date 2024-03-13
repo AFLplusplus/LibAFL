@@ -32,7 +32,7 @@ use libafl_qemu::{
     edges::{edges_map_mut_slice, QemuEdgeCoverageHelper, MAX_EDGES_NUM},
     elf::EasyElf,
     emu::Emulator,
-    EmuExitReason, GuestPhysAddr, NopEmuExitHandler, QemuExecutor, QemuHooks, QemuShutdownCause,
+    QemuExitReason, GuestPhysAddr, NopEmuExitHandler, QemuExecutor, QemuHooks, QemuShutdownCause,
     Regs,
 };
 
@@ -120,7 +120,7 @@ pub fn fuzz() {
                 emu.write_phys_mem(input_addr, buf);
 
                 match emu.run() {
-                    Ok(EmuExitReason::End(QemuShutdownCause::HostSignal(Signal::SigInterrupt))) => {
+                    Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(Signal::SigInterrupt))) => {
                         process::exit(0)
                     }
                     _ => {}

@@ -4,7 +4,9 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-use crate::{command::Command, emu::Emulator, GuestAddr, IsEmuExitHandler};
+use libafl_qemu_sys::GuestAddr;
+
+use crate::{command::Command, Qemu};
 
 // TODO: distinguish breakpoints with IDs instead of addresses to avoid collisions.
 #[derive(Debug, Clone)]
@@ -69,23 +71,23 @@ impl Breakpoint {
         self.addr
     }
 
-    pub fn enable<E: IsEmuExitHandler>(&mut self, emu: &Emulator<E>) {
+    pub fn enable(&mut self, qemu: &Qemu) {
         if !self.enabled {
-            emu.set_breakpoint_addr(self.addr);
+            qemu.set_breakpoint_addr(self.addr);
             self.enabled = true;
         }
     }
 
-    pub fn disable<E: IsEmuExitHandler>(&mut self, emu: &Emulator<E>) {
+    pub fn disable(&mut self, qemu: &Qemu) {
         if self.enabled {
-            emu.unset_breakpoint_addr(self.addr.into());
+            qemu.unset_breakpoint_addr(self.addr.into());
             self.enabled = false;
         }
     }
 
-    pub fn trigger<E: IsEmuExitHandler>(&mut self, emu: &Emulator<E>) -> Option<&Command> {
+    pub fn trigger(&mut self, qemu: &Qemu) -> Option<&Command> {
         if self.disable_on_trigger {
-            self.disable(emu);
+            self.disable(qemu);
         }
 
         self.cmd.as_ref()
