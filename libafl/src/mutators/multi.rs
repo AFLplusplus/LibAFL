@@ -55,9 +55,9 @@ where
         &mut self,
         state: &mut S,
         stage_idx: i32,
-        corpus_idx: Option<CorpusId>,
+        new_corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
-        M::post_exec(self, state, stage_idx, corpus_idx)
+        M::post_exec(self, state, stage_idx, new_corpus_idx)
     }
 }
 

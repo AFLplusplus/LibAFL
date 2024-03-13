@@ -419,7 +419,7 @@ where
         &mut self,
         state: &mut S,
         _stage_idx: i32,
-        _corpus_idx: Option<CorpusId>,
+        _new_corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
         let before = self.finds_before;
         let after = state.corpus().count() + state.solutions().count();

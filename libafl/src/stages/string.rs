@@ -11,7 +11,7 @@ use crate::{
     corpus::HasTestcase,
     inputs::{BytesInput, HasBytesVec},
     stages::Stage,
-    state::{HasCorpus, HasMetadata, State, UsesState},
+    state::{HasCorpus, HasCurrentTestcase, HasMetadata, State, UsesState},
 };
 
 /// Metadata which stores the list of pre-computed string-like ranges in the input
@@ -111,13 +111,7 @@ where
         state: &mut Self::State,
         _manager: &mut EM,
     ) -> Result<(), Error> {
-        let Some(corpus_idx) = state.current_corpus_idx()? else {
-            return Err(Error::illegal_state(
-                "state is not currently processing a corpus index",
-            ));
-        };
-
-        let mut tc = state.testcase_mut(corpus_idx)?;
+        let mut tc = state.current_testcase_mut()?;
         if tc.has_metadata::<StringIdentificationMetadata>() {
             return Ok(()); // skip recompute
         }
