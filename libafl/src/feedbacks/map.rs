@@ -432,7 +432,7 @@ where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
-        self.is_interesting_default(state, manager, input, observers, exit_kind)
+        Ok(self.is_interesting_default(state, manager, input, observers, exit_kind))
     }
 
     fn append_metadata<EM, OT>(
