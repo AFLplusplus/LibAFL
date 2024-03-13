@@ -81,10 +81,10 @@ macro_rules! random_corpus_id {
 
 /// Corpus with all current [`Testcase`]s, or solutions
 pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
-    /// Returns the number of elements excluding disabled entries
+    /// Returns the number of all enabled entries
     fn count(&self) -> usize;
 
-    /// Returns the number of elements excluding enabled entries
+    /// Returns the number of all disabled entries
     fn count_disabled(&self) -> usize;
 
     /// Returns the number of elements including disabled entries

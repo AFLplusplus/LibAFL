@@ -71,18 +71,18 @@ impl<I> Corpus for OnDiskCorpus<I>
 where
     I: Input,
 {
-    /// Returns the number of elements excluding disabled entries
+    /// Returns the number of all enabled entries
     #[inline]
     fn count(&self) -> usize {
         self.inner.count()
     }
 
-    /// Returns the number of elements excluding enabled entries
+    /// Returns the number of all disabled entries
     fn count_disabled(&self) -> usize {
         self.inner.count_disabled()
     }
 
-    /// Returns the number of elements including disabled entries
+    /// Returns the number of all entries
     #[inline]
     fn count_all(&self) -> usize {
         self.inner.count_all()
