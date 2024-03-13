@@ -353,10 +353,8 @@ where
     /// Add an entry to the corpus and return its index
     #[inline]
     fn add_disabled(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
-        println!("adding disabled");
         Ok(self
             .storage
-            /*             .ok_or_else(|| Error::empty("No disabled storage for this corpus!"))? */
             .insert(RefCell::new(testcase), true))
     }
 
