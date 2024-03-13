@@ -53,8 +53,8 @@ pub enum GuestAddrKind {
 impl Debug for GuestAddrKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            GuestAddrKind::Physical(paddr) => write!(f, "vaddr {:x}", paddr),
-            GuestAddrKind::Virtual(vaddr) => write!(f, "paddr {:x}", vaddr),
+            GuestAddrKind::Physical(paddr) => write!(f, "vaddr {paddr:x}"),
+            GuestAddrKind::Virtual(vaddr) => write!(f, "paddr {vaddr:x}"),
         }
     }
 }
@@ -147,7 +147,7 @@ pub enum InnerHandlerResult {
 }
 
 /// Special kind of Exit handler with no data embedded.
-/// As a result, it is safe to transmute from any EmuExitHandler to this one,
+/// As a result, it is safe to transmute from any `Emulator` implementing `IsEmuExitHandler` to this one,
 /// since it won't use any data which could cause type confusion.
 #[derive(Clone, Debug)]
 pub struct NopEmuExitHandler;
@@ -911,10 +911,12 @@ impl Qemu {
     ///
     /// Should not be used if `Qemu::init` has never been used before (otherwise QEMU will not be initialized, and a crash will occur).
     /// Prefer `Qemu::get` for a safe version of this method.
+    #[must_use]
     pub unsafe fn get_unchecked() -> Self {
         Qemu { _private: () }
     }
 
+    #[must_use]
     pub fn get() -> Option<Self> {
         unsafe {
             if QEMU_IS_INITIALIZED {
@@ -1337,6 +1339,7 @@ where
         })
     }
 
+    #[must_use]
     pub fn qemu(&self) -> &Qemu {
         &self.qemu
     }
@@ -1351,6 +1354,7 @@ where
         unsafe { self.state.as_mut() }
     }
 
+    #[must_use]
     pub fn exit_handler(&self) -> &RefCell<E> {
         &self.state().exit_handler
     }
@@ -1410,11 +1414,11 @@ where
     }*/
 
     pub unsafe fn write_mem(&self, addr: GuestAddr, buf: &[u8]) {
-        self.qemu.write_mem(addr, buf)
+        self.qemu.write_mem(addr, buf);
     }
 
     pub unsafe fn read_mem(&self, addr: GuestAddr, buf: &mut [u8]) {
-        self.qemu.read_mem(addr, buf)
+        self.qemu.read_mem(addr, buf);
     }
 
     #[must_use]
@@ -1453,15 +1457,15 @@ where
     }
 
     pub fn set_breakpoint_addr(&self, addr: GuestAddr) {
-        self.qemu.set_breakpoint_addr(addr)
+        self.qemu.set_breakpoint_addr(addr);
     }
 
     pub fn unset_breakpoint_addr(&self, addr: GuestAddr) {
-        self.qemu.unset_breakpoint_addr(addr)
+        self.qemu.unset_breakpoint_addr(addr);
     }
 
     pub fn entry_break(&self, addr: GuestAddr) {
-        self.qemu.entry_break(addr)
+        self.qemu.entry_break(addr);
     }
 
     /// This function will run the emulator until the next breakpoint, or until finish.
@@ -1530,7 +1534,7 @@ where
     }
 
     pub fn flush_jit(&self) {
-        self.qemu.flush_jit()
+        self.qemu.flush_jit();
     }
 
     // TODO set T lifetime to be like Emulator
@@ -1625,11 +1629,11 @@ where
 
     #[allow(clippy::type_complexity)]
     pub fn add_gdb_cmd(&self, callback: Box<dyn FnMut(&Qemu, &str) -> bool>) {
-        self.qemu.add_gdb_cmd(callback)
+        self.qemu.add_gdb_cmd(callback);
     }
 
     pub fn gdb_reply(&self, output: &str) {
-        self.qemu.gdb_reply(output)
+        self.qemu.gdb_reply(output);
     }
 }
 

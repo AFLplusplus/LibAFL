@@ -256,7 +256,7 @@ where
     S: State + HasExecutions + HasCorpus + HasSolutions,
     QT: QemuHelperTuple<S> + Debug,
 {
-    fn pre_exec<E, EM, OF, Z>(&mut self, input: &E::Input, qemu: &Qemu)
+    fn pre_exec<E, EM, OF, Z>(&mut self, input: &E::Input, qemu: Qemu)
     where
         E: Executor<EM, Z, State = S>,
         EM: EventFirer<State = S> + EventRestarter<State = S>,
@@ -273,7 +273,7 @@ where
     fn post_exec<E, EM, OT, OF, Z>(
         &mut self,
         input: &E::Input,
-        emu: &Qemu,
+        qemu: Qemu,
         observers: &mut OT,
         exit_kind: &mut ExitKind,
     ) where
@@ -285,7 +285,7 @@ where
     {
         self.hooks
             .helpers_mut()
-            .post_exec_all(emu, input, observers, exit_kind);
+            .post_exec_all(qemu, input, observers, exit_kind);
     }
 }
 
@@ -307,11 +307,11 @@ where
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         let qemu = Qemu::get().unwrap();
-        self.state.pre_exec::<Self, EM, OF, Z>(input, &qemu);
+        self.state.pre_exec::<Self, EM, OF, Z>(input, qemu);
         let mut exit_kind = self.inner.run_target(fuzzer, state, mgr, input)?;
         self.state.post_exec::<Self, EM, OT, OF, Z>(
             input,
-            &qemu,
+            qemu,
             self.inner.observers_mut(),
             &mut exit_kind,
         );
@@ -474,15 +474,15 @@ where
         mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
-        let qemu = self.state.hooks.qemu().clone();
+        let qemu = *self.state.hooks.qemu();
         if self.state.first_exec {
             self.state.hooks.helpers().first_exec_all(self.state.hooks);
             self.state.first_exec = false;
         }
-        self.state.hooks.helpers_mut().pre_exec_all(&qemu, input);
+        self.state.hooks.helpers_mut().pre_exec_all(qemu, input);
         let mut exit_kind = self.inner.run_target(fuzzer, state, mgr, input)?;
         self.state.hooks.helpers_mut().post_exec_all(
-            &qemu,
+            qemu,
             input,
             self.inner.observers_mut(),
             &mut exit_kind,

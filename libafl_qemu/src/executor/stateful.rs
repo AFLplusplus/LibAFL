@@ -157,13 +157,13 @@ where
         let qemu = Qemu::get().unwrap();
         self.inner
             .exposed_executor_state_mut()
-            .pre_exec::<Self, EM, OF, Z>(input, &qemu);
+            .pre_exec::<Self, EM, OF, Z>(input, qemu);
         let mut exit_kind = self.inner.run_target(fuzzer, state, mgr, input)?;
         self.inner
             .exposed_executor_state
             .post_exec::<Self, EM, OT, OF, Z>(
                 input,
-                &qemu,
+                qemu,
                 self.inner.inner.observers_mut(),
                 &mut exit_kind,
             );

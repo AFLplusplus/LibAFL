@@ -27,11 +27,11 @@ where
     {
     }
 
-    fn pre_exec(&mut self, _emulator: &Qemu, _input: &S::Input) {}
+    fn pre_exec(&mut self, _qemu: Qemu, _input: &S::Input) {}
 
     fn post_exec<OT>(
         &mut self,
-        _emulator: &Qemu,
+        _qemu: Qemu,
         _input: &S::Input,
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
@@ -55,11 +55,11 @@ where
     where
         QT: QemuHelperTuple<S>;
 
-    fn pre_exec_all(&mut self, _emulator: &Qemu, input: &S::Input);
+    fn pre_exec_all(&mut self, _qemu: Qemu, input: &S::Input);
 
     fn post_exec_all<OT>(
         &mut self,
-        _emulator: &Qemu,
+        _qemu: Qemu,
         input: &S::Input,
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
@@ -85,11 +85,11 @@ where
     {
     }
 
-    fn pre_exec_all(&mut self, _emulator: &Qemu, _input: &S::Input) {}
+    fn pre_exec_all(&mut self, _qemu: Qemu, _input: &S::Input) {}
 
     fn post_exec_all<OT>(
         &mut self,
-        _emulator: &Qemu,
+        _qemu: Qemu,
         _input: &S::Input,
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
@@ -123,22 +123,22 @@ where
         self.1.first_exec_all(hooks);
     }
 
-    fn pre_exec_all(&mut self, emulator: &Qemu, input: &S::Input) {
-        self.0.pre_exec(emulator, input);
-        self.1.pre_exec_all(emulator, input);
+    fn pre_exec_all(&mut self, qemu: Qemu, input: &S::Input) {
+        self.0.pre_exec(qemu, input);
+        self.1.pre_exec_all(qemu, input);
     }
 
     fn post_exec_all<OT>(
         &mut self,
-        emulator: &Qemu,
+        qemu: Qemu,
         input: &S::Input,
         observers: &mut OT,
         exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
     {
-        self.0.post_exec(emulator, input, observers, exit_kind);
-        self.1.post_exec_all(emulator, input, observers, exit_kind);
+        self.0.post_exec(qemu, input, observers, exit_kind);
+        self.1.post_exec_all(qemu, input, observers, exit_kind);
     }
 }
 

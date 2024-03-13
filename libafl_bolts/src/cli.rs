@@ -34,14 +34,14 @@
 //! use std::env;
 //!
 //! // make sure to add `features = ["qemu_cli"]` to the `libafl` crate in `Cargo.toml`
-//! use libafl_qemu::Emulator;
+//! use libafl_qemu::Qemu;
 //!
 //! fn fuzz_with_qemu(mut options: FuzzerOptions) {
 //!     env::remove_var("LD_LIBRARY_PATH");
 //!
 //!     let env: Vec<(String, String)> = env::vars().collect();
 //!
-//!     let emu = Emulator::new(&mut options.qemu_args.to_vec(), &mut env).unwrap();
+//!     let qemu = Qemu::init(&mut options.qemu_args.to_vec(), &mut env).unwrap();
 //!     // do other stuff...
 //! }
 //!

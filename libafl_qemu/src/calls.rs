@@ -43,7 +43,7 @@ pub trait CallTraceCollector: 'static + Debug {
         QT: QemuHelperTuple<S>;
 
     // Frowarded from the `QemuCallTracerHelper`
-    fn pre_exec<I>(&mut self, _qemu: &Qemu, _input: &I)
+    fn pre_exec<I>(&mut self, _qemu: Qemu, _input: &I)
     where
         I: Input,
     {
@@ -51,7 +51,7 @@ pub trait CallTraceCollector: 'static + Debug {
 
     fn post_exec<OT, S>(
         &mut self,
-        _qemu: &Qemu,
+        _qemu: Qemu,
         _input: &S::Input,
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
@@ -83,13 +83,13 @@ pub trait CallTraceCollectorTuple: 'static + MatchFirstType + Debug {
         S: UsesInput,
         QT: QemuHelperTuple<S>;
 
-    fn pre_exec_all<I>(&mut self, _qemu: &Qemu, input: &I)
+    fn pre_exec_all<I>(&mut self, _qemu: Qemu, input: &I)
     where
         I: Input;
 
     fn post_exec_all<OT, S>(
         &mut self,
-        _qemu: &Qemu,
+        _qemu: Qemu,
         input: &S::Input,
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
@@ -123,7 +123,7 @@ impl CallTraceCollectorTuple for () {
     {
     }
 
-    fn pre_exec_all<I>(&mut self, _qemu: &Qemu, _input: &I)
+    fn pre_exec_all<I>(&mut self, _qemu: Qemu, _input: &I)
     where
         I: Input,
     {
@@ -131,7 +131,7 @@ impl CallTraceCollectorTuple for () {
 
     fn post_exec_all<OT, S>(
         &mut self,
-        _emulator: &Qemu,
+        _emulator: Qemu,
         _input: &S::Input,
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
@@ -191,7 +191,7 @@ where
         self.1.on_ret_all(hooks, state, pc, ret_addr);
     }
 
-    fn pre_exec_all<I>(&mut self, qemu: &Qemu, input: &I)
+    fn pre_exec_all<I>(&mut self, qemu: Qemu, input: &I)
     where
         I: Input,
     {
@@ -201,7 +201,7 @@ where
 
     fn post_exec_all<OT, S>(
         &mut self,
-        qemu: &Qemu,
+        qemu: Qemu,
         input: &S::Input,
         observers: &mut OT,
         exit_kind: &mut ExitKind,
@@ -413,13 +413,13 @@ where
         );
     }
 
-    fn pre_exec(&mut self, qemu: &Qemu, input: &S::Input) {
+    fn pre_exec(&mut self, qemu: Qemu, input: &S::Input) {
         self.collectors.as_mut().unwrap().pre_exec_all(qemu, input);
     }
 
     fn post_exec<OT>(
         &mut self,
-        qemu: &Qemu,
+        qemu: Qemu,
         input: &S::Input,
         observers: &mut OT,
         exit_kind: &mut ExitKind,
@@ -496,7 +496,7 @@ impl CallTraceCollector for OnCrashBacktraceCollector {
         self.callstack_hash ^= ret_addr as u64;
     }
 
-    fn pre_exec<I>(&mut self, _qemu: &Qemu, _input: &I)
+    fn pre_exec<I>(&mut self, _qemu: Qemu, _input: &I)
     where
         I: Input,
     {
@@ -505,7 +505,7 @@ impl CallTraceCollector for OnCrashBacktraceCollector {
 
     fn post_exec<OT, S>(
         &mut self,
-        _qemu: &Qemu,
+        _qemu: Qemu,
         _input: &S::Input,
         observers: &mut OT,
         exit_kind: &mut ExitKind,
@@ -600,7 +600,7 @@ impl CallTraceCollector for FullBacktraceCollector {
         }
     }
 
-    fn pre_exec<I>(&mut self, _qemu: &Qemu, _input: &I)
+    fn pre_exec<I>(&mut self, _qemu: Qemu, _input: &I)
     where
         I: Input,
     {

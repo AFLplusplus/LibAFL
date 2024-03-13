@@ -267,7 +267,7 @@ where
     where
         QT: QemuHelperTuple<S>,
     {
-        let qemu = hooks.qemu();
+        let qemu = *hooks.qemu();
         let mut libs: Vec<LibInfo> = Vec::new();
 
         for region in qemu.mappings() {
@@ -394,7 +394,7 @@ where
 }
 
 fn find_function(
-    qemu: &Qemu,
+    qemu: Qemu,
     file: &str,
     function: &str,
     loadaddr: GuestAddr,

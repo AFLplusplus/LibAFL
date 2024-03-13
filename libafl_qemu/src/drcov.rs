@@ -103,11 +103,11 @@ where
         );
     }
 
-    fn pre_exec(&mut self, _qemu: &Qemu, _input: &S::Input) {}
+    fn pre_exec(&mut self, _qemu: Qemu, _input: &S::Input) {}
 
     fn post_exec<OT>(
         &mut self,
-        _qemu: &Qemu,
+        _qemu: Qemu,
         _input: &S::Input,
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,

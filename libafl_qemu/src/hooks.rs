@@ -426,12 +426,12 @@ where
                 FIRST_EXEC = false;
             }
         }
-        self.helpers.pre_exec_all(&self.qemu, input);
+        self.helpers.pre_exec_all(self.qemu, input);
 
         let mut exit_kind = harness(input);
 
         self.helpers
-            .post_exec_all(&self.qemu, input, &mut (), &mut exit_kind);
+            .post_exec_all(self.qemu, input, &mut (), &mut exit_kind);
 
         exit_kind
     }

@@ -377,7 +377,7 @@ where
     }
 
     pub fn force_dfl(&self) {
-        self.qemu.force_dfl()
+        self.qemu.force_dfl();
     }
 
     #[must_use]
@@ -396,7 +396,7 @@ where
     }
 
     pub fn set_brk(&self, brk: GuestAddr) {
-        self.qemu.set_brk(brk)
+        self.qemu.set_brk(brk);
     }
 
     #[must_use]
@@ -405,7 +405,7 @@ where
     }
 
     pub fn set_mmap_start(&self, start: GuestAddr) {
-        self.qemu.set_mmap_start(start)
+        self.qemu.set_mmap_start(start);
     }
 
     pub fn map_private(
@@ -485,6 +485,6 @@ where
 
     #[allow(clippy::type_complexity)]
     pub fn set_crash_hook(&self, callback: extern "C" fn(i32)) {
-        self.qemu.set_crash_hook(callback)
+        self.qemu.set_crash_hook(callback);
     }
 }

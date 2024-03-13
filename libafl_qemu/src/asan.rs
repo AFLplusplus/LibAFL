@@ -132,7 +132,7 @@ impl core::fmt::Display for AsanError {
     }
 }
 
-pub type AsanErrorCallback = Box<dyn FnMut(&AsanGiovese, &Qemu, GuestAddr, AsanError)>;
+pub type AsanErrorCallback = Box<dyn FnMut(&AsanGiovese, Qemu, GuestAddr, AsanError)>;
 
 #[derive(Debug, Clone)]
 pub struct AllocTreeItem {
@@ -210,7 +210,7 @@ impl AsanGiovese {
     }
 
     #[must_use]
-    fn new(emu: &Qemu) -> Pin<Box<Self>> {
+    fn new(emu: Qemu) -> Pin<Box<Self>> {
         let res = Self {
             alloc_tree: Mutex::new(IntervalTree::new()),
             saved_tree: IntervalTree::new(),
@@ -242,20 +242,20 @@ impl AsanGiovese {
             match QasanAction::try_from(a0).expect("Invalid QASan action number") {
                 QasanAction::Poison => {
                     self.poison(
-                        &qemu,
+                        qemu,
                         a1,
                         a2 as usize,
                         PoisonKind::try_from(a3 as i8).unwrap().into(),
                     );
                 }
                 QasanAction::UserPoison => {
-                    self.poison(&qemu, a1, a2 as usize, PoisonKind::User.into());
+                    self.poison(qemu, a1, a2 as usize, PoisonKind::User.into());
                 }
                 QasanAction::UnPoison => {
-                    Self::unpoison(&qemu, a1, a2 as usize);
+                    Self::unpoison(qemu, a1, a2 as usize);
                 }
                 QasanAction::IsPoison => {
-                    if Self::is_invalid_access(&qemu, a1, a2 as usize) {
+                    if Self::is_invalid_access(qemu, a1, a2 as usize) {
                         r = 1;
                     }
                 }
@@ -265,7 +265,7 @@ impl AsanGiovese {
                 }
                 QasanAction::Dealloc => {
                     let pc: GuestAddr = qemu.read_reg(Regs::Pc).unwrap();
-                    self.deallocation(&qemu, pc, a1);
+                    self.deallocation(qemu, pc, a1);
                 }
                 _ => (),
             }
@@ -285,7 +285,7 @@ impl AsanGiovese {
 
     #[inline]
     #[must_use]
-    pub fn is_invalid_access_1(qemu: &Qemu, addr: GuestAddr) -> bool {
+    pub fn is_invalid_access_1(qemu: Qemu, addr: GuestAddr) -> bool {
         unsafe {
             let h = qemu.g2h::<*const c_void>(addr) as isize;
             let shadow_addr = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
@@ -296,7 +296,7 @@ impl AsanGiovese {
 
     #[inline]
     #[must_use]
-    pub fn is_invalid_access_2(qemu: &Qemu, addr: GuestAddr) -> bool {
+    pub fn is_invalid_access_2(qemu: Qemu, addr: GuestAddr) -> bool {
         unsafe {
             let h = qemu.g2h::<*const c_void>(addr) as isize;
             let shadow_addr = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
@@ -307,7 +307,7 @@ impl AsanGiovese {
 
     #[inline]
     #[must_use]
-    pub fn is_invalid_access_4(qemu: &Qemu, addr: GuestAddr) -> bool {
+    pub fn is_invalid_access_4(qemu: Qemu, addr: GuestAddr) -> bool {
         unsafe {
             let h = qemu.g2h::<*const c_void>(addr) as isize;
             let shadow_addr = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
@@ -318,7 +318,7 @@ impl AsanGiovese {
 
     #[inline]
     #[must_use]
-    pub fn is_invalid_access_8(qemu: &Qemu, addr: GuestAddr) -> bool {
+    pub fn is_invalid_access_8(qemu: Qemu, addr: GuestAddr) -> bool {
         unsafe {
             let h = qemu.g2h::<*const c_void>(addr) as isize;
             let shadow_addr = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
@@ -329,7 +329,7 @@ impl AsanGiovese {
     #[inline]
     #[must_use]
     #[allow(clippy::cast_sign_loss)]
-    pub fn is_invalid_access(qemu: &Qemu, addr: GuestAddr, n: usize) -> bool {
+    pub fn is_invalid_access(qemu: Qemu, addr: GuestAddr, n: usize) -> bool {
         unsafe {
             if n == 0 {
                 return false;
@@ -381,7 +381,7 @@ impl AsanGiovese {
 
     #[inline]
     #[allow(clippy::cast_sign_loss)]
-    pub fn poison(&mut self, qemu: &Qemu, addr: GuestAddr, n: usize, poison_byte: i8) -> bool {
+    pub fn poison(&mut self, qemu: Qemu, addr: GuestAddr, n: usize, poison_byte: i8) -> bool {
         unsafe {
             if n == 0 {
                 return false;
@@ -427,7 +427,7 @@ impl AsanGiovese {
     #[inline]
     #[allow(clippy::must_use_candidate)]
     #[allow(clippy::cast_sign_loss)]
-    pub fn unpoison(qemu: &Qemu, addr: GuestAddr, n: usize) -> bool {
+    pub fn unpoison(qemu: Qemu, addr: GuestAddr, n: usize) -> bool {
         unsafe {
             let n = n as isize;
             let mut start = addr;
@@ -444,7 +444,7 @@ impl AsanGiovese {
     }
 
     #[inline]
-    pub fn unpoison_page(qemu: &Qemu, page: GuestAddr) {
+    pub fn unpoison_page(qemu: Qemu, page: GuestAddr) {
         unsafe {
             let h = qemu.g2h::<*const c_void>(page) as isize;
             let shadow_addr = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
@@ -462,7 +462,7 @@ impl AsanGiovese {
         }
     }
 
-    pub fn report_or_crash(&mut self, qemu: &Qemu, pc: GuestAddr, error: AsanError) {
+    pub fn report_or_crash(&mut self, qemu: Qemu, pc: GuestAddr, error: AsanError) {
         if let Some(mut cb) = self.error_callback.take() {
             (cb)(self, qemu, pc, error);
             self.error_callback = Some(cb);
@@ -471,7 +471,7 @@ impl AsanGiovese {
         }
     }
 
-    pub fn report(&mut self, qemu: &Qemu, pc: GuestAddr, error: AsanError) {
+    pub fn report(&mut self, qemu: Qemu, pc: GuestAddr, error: AsanError) {
         if let Some(mut cb) = self.error_callback.take() {
             (cb)(self, qemu, pc, error);
             self.error_callback = Some(cb);
@@ -503,7 +503,7 @@ impl AsanGiovese {
         }
     }
 
-    pub fn alloc_free(&mut self, qemu: &Qemu, pc: GuestAddr, addr: GuestAddr) {
+    pub fn alloc_free(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr) {
         let mut chunk = None;
         self.alloc_map_mut(addr, |interval, item| {
             chunk = Some(*interval);
@@ -597,16 +597,16 @@ impl AsanGiovese {
         self.alloc_insert(pc, start, end);
     }
 
-    pub fn deallocation(&mut self, qemu: &Qemu, pc: GuestAddr, addr: GuestAddr) {
+    pub fn deallocation(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr) {
         self.alloc_free(qemu, pc, addr);
     }
 
-    pub fn snapshot(&mut self, qemu: &Qemu) {
+    pub fn snapshot(&mut self, qemu: Qemu) {
         if self.snapshot_shadow {
             let set = self.dirty_shadow.lock().unwrap();
 
             for &page in &*set {
-                let data = Self::get_shadow_page(qemu, page).to_vec();
+                let data = Self::get_shadow_page(&qemu, page).to_vec();
                 self.saved_shadow.insert(page, data);
             }
 
@@ -615,7 +615,7 @@ impl AsanGiovese {
         }
     }
 
-    pub fn rollback(&mut self, qemu: &Qemu, detect_leaks: bool) -> AsanRollback {
+    pub fn rollback(&mut self, qemu: Qemu, detect_leaks: bool) -> AsanRollback {
         let mut leaks = vec![];
 
         {
@@ -638,7 +638,7 @@ impl AsanGiovese {
             for &page in &*set {
                 let original = self.saved_shadow.get(&page);
                 if let Some(data) = original {
-                    let cur = Self::get_shadow_page(qemu, page);
+                    let cur = Self::get_shadow_page(&qemu, page);
                     cur.copy_from_slice(data);
                 } else {
                     Self::unpoison_page(qemu, page);
@@ -718,7 +718,7 @@ pub fn init_qemu_with_asan(
     }
 
     let qemu = Qemu::init(args, env)?;
-    let rt = AsanGiovese::new(&qemu);
+    let rt = AsanGiovese::new(qemu);
 
     Ok((qemu, rt))
 }
@@ -826,88 +826,88 @@ impl QemuAsanHelper {
         self.rt.allocation(pc, start, end);
     }
 
-    pub fn dealloc(&mut self, qemu: &Qemu, pc: GuestAddr, addr: GuestAddr) {
+    pub fn dealloc(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr) {
         self.rt.deallocation(qemu, pc, addr);
     }
 
     #[allow(clippy::unused_self)]
     #[must_use]
-    pub fn is_poisoned(&self, qemu: &Qemu, addr: GuestAddr, size: usize) -> bool {
+    pub fn is_poisoned(&self, qemu: Qemu, addr: GuestAddr, size: usize) -> bool {
         AsanGiovese::is_invalid_access(qemu, addr, size)
     }
 
-    pub fn read_1(&mut self, qemu: &Qemu, pc: GuestAddr, addr: GuestAddr) {
+    pub fn read_1(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr) {
         if self.enabled() && AsanGiovese::is_invalid_access_1(qemu, addr) {
             self.rt.report_or_crash(qemu, pc, AsanError::Read(addr, 1));
         }
     }
 
-    pub fn read_2(&mut self, qemu: &Qemu, pc: GuestAddr, addr: GuestAddr) {
+    pub fn read_2(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr) {
         if self.enabled() && AsanGiovese::is_invalid_access_2(qemu, addr) {
             self.rt.report_or_crash(qemu, pc, AsanError::Read(addr, 2));
         }
     }
 
-    pub fn read_4(&mut self, qemu: &Qemu, pc: GuestAddr, addr: GuestAddr) {
+    pub fn read_4(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr) {
         if self.enabled() && AsanGiovese::is_invalid_access_4(qemu, addr) {
             self.rt.report_or_crash(qemu, pc, AsanError::Read(addr, 4));
         }
     }
 
-    pub fn read_8(&mut self, qemu: &Qemu, pc: GuestAddr, addr: GuestAddr) {
+    pub fn read_8(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr) {
         if self.enabled() && AsanGiovese::is_invalid_access_8(qemu, addr) {
             self.rt.report_or_crash(qemu, pc, AsanError::Read(addr, 8));
         }
     }
 
-    pub fn read_n(&mut self, qemu: &Qemu, pc: GuestAddr, addr: GuestAddr, size: usize) {
+    pub fn read_n(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr, size: usize) {
         if self.enabled() && AsanGiovese::is_invalid_access(qemu, addr, size) {
             self.rt
                 .report_or_crash(qemu, pc, AsanError::Read(addr, size));
         }
     }
 
-    pub fn write_1(&mut self, qemu: &Qemu, pc: GuestAddr, addr: GuestAddr) {
+    pub fn write_1(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr) {
         if self.enabled() && AsanGiovese::is_invalid_access_1(qemu, addr) {
             self.rt.report_or_crash(qemu, pc, AsanError::Write(addr, 1));
         }
     }
 
-    pub fn write_2(&mut self, qemu: &Qemu, pc: GuestAddr, addr: GuestAddr) {
+    pub fn write_2(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr) {
         if self.enabled() && AsanGiovese::is_invalid_access_2(qemu, addr) {
             self.rt.report_or_crash(qemu, pc, AsanError::Write(addr, 2));
         }
     }
 
-    pub fn write_4(&mut self, qemu: &Qemu, pc: GuestAddr, addr: GuestAddr) {
+    pub fn write_4(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr) {
         if self.enabled() && AsanGiovese::is_invalid_access_4(qemu, addr) {
             self.rt.report_or_crash(qemu, pc, AsanError::Write(addr, 4));
         }
     }
 
-    pub fn write_8(&mut self, qemu: &Qemu, pc: GuestAddr, addr: GuestAddr) {
+    pub fn write_8(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr) {
         if self.enabled() && AsanGiovese::is_invalid_access_8(qemu, addr) {
             self.rt.report_or_crash(qemu, pc, AsanError::Write(addr, 8));
         }
     }
 
-    pub fn write_n(&mut self, qemu: &Qemu, pc: GuestAddr, addr: GuestAddr, size: usize) {
+    pub fn write_n(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr, size: usize) {
         if self.enabled() && AsanGiovese::is_invalid_access(qemu, addr, size) {
             self.rt
                 .report_or_crash(qemu, pc, AsanError::Write(addr, size));
         }
     }
 
-    pub fn poison(&mut self, qemu: &Qemu, addr: GuestAddr, size: usize, poison: PoisonKind) {
+    pub fn poison(&mut self, qemu: Qemu, addr: GuestAddr, size: usize, poison: PoisonKind) {
         self.rt.poison(qemu, addr, size, poison.into());
     }
 
     #[allow(clippy::unused_self)]
-    pub fn unpoison(&mut self, qemu: &Qemu, addr: GuestAddr, size: usize) {
+    pub fn unpoison(&mut self, qemu: Qemu, addr: GuestAddr, size: usize) {
         AsanGiovese::unpoison(qemu, addr, size);
     }
 
-    pub fn reset(&mut self, qemu: &Qemu) -> AsanRollback {
+    pub fn reset(&mut self, qemu: Qemu) -> AsanRollback {
         self.rt.rollback(qemu, self.detect_leaks)
     }
 }
@@ -974,7 +974,7 @@ where
         }
     }
 
-    fn pre_exec(&mut self, qemu: &Qemu, _input: &S::Input) {
+    fn pre_exec(&mut self, qemu: Qemu, _input: &S::Input) {
         if self.empty {
             self.rt.snapshot(qemu);
             self.empty = false;
@@ -983,7 +983,7 @@ where
 
     fn post_exec<OT>(
         &mut self,
-        qemu: &Qemu,
+        qemu: Qemu,
         _input: &S::Input,
         _observers: &mut OT,
         exit_kind: &mut ExitKind,
@@ -1001,10 +1001,10 @@ where
     S: UsesInput,
     QT: QemuHelperTuple<S>,
 {
-    let qemu = hooks.qemu().clone();
+    let qemu = *hooks.qemu();
     let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
     let pc: GuestAddr = qemu.read_reg(Regs::Pc).unwrap();
-    h.rt.report(&qemu, pc, AsanError::Signal(target_sig));
+    h.rt.report(qemu, pc, AsanError::Signal(target_sig));
 }
 
 pub fn gen_readwrite_asan<QT, S>(
@@ -1034,9 +1034,9 @@ pub fn trace_read1_asan<QT, S>(
     S: UsesInput,
     QT: QemuHelperTuple<S>,
 {
-    let qemu = hooks.qemu().clone();
+    let qemu = *hooks.qemu();
     let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
-    h.read_1(&qemu, id as GuestAddr, addr);
+    h.read_1(qemu, id as GuestAddr, addr);
 }
 
 pub fn trace_read2_asan<QT, S>(
@@ -1048,9 +1048,9 @@ pub fn trace_read2_asan<QT, S>(
     S: UsesInput,
     QT: QemuHelperTuple<S>,
 {
-    let qemu = hooks.qemu().clone();
+    let qemu = *hooks.qemu();
     let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
-    h.read_2(&qemu, id as GuestAddr, addr);
+    h.read_2(qemu, id as GuestAddr, addr);
 }
 
 pub fn trace_read4_asan<QT, S>(
@@ -1062,9 +1062,9 @@ pub fn trace_read4_asan<QT, S>(
     S: UsesInput,
     QT: QemuHelperTuple<S>,
 {
-    let qemu = hooks.qemu().clone();
+    let qemu = *hooks.qemu();
     let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
-    h.read_4(&qemu, id as GuestAddr, addr);
+    h.read_4(qemu, id as GuestAddr, addr);
 }
 
 pub fn trace_read8_asan<QT, S>(
@@ -1076,9 +1076,9 @@ pub fn trace_read8_asan<QT, S>(
     S: UsesInput,
     QT: QemuHelperTuple<S>,
 {
-    let qemu = hooks.qemu().clone();
+    let qemu = *hooks.qemu();
     let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
-    h.read_8(&qemu, id as GuestAddr, addr);
+    h.read_8(qemu, id as GuestAddr, addr);
 }
 
 pub fn trace_read_n_asan<QT, S>(
@@ -1091,9 +1091,9 @@ pub fn trace_read_n_asan<QT, S>(
     S: UsesInput,
     QT: QemuHelperTuple<S>,
 {
-    let qemu = hooks.qemu().clone();
+    let qemu = *hooks.qemu();
     let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
-    h.read_n(&qemu, id as GuestAddr, addr, size);
+    h.read_n(qemu, id as GuestAddr, addr, size);
 }
 
 pub fn trace_write1_asan<QT, S>(
@@ -1105,9 +1105,9 @@ pub fn trace_write1_asan<QT, S>(
     S: UsesInput,
     QT: QemuHelperTuple<S>,
 {
-    let qemu = hooks.qemu().clone();
+    let qemu = *hooks.qemu();
     let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
-    h.write_1(&qemu, id as GuestAddr, addr);
+    h.write_1(qemu, id as GuestAddr, addr);
 }
 
 pub fn trace_write2_asan<QT, S>(
@@ -1119,9 +1119,9 @@ pub fn trace_write2_asan<QT, S>(
     S: UsesInput,
     QT: QemuHelperTuple<S>,
 {
-    let qemu = hooks.qemu().clone();
+    let qemu = *hooks.qemu();
     let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
-    h.write_2(&qemu, id as GuestAddr, addr);
+    h.write_2(qemu, id as GuestAddr, addr);
 }
 
 pub fn trace_write4_asan<QT, S>(
@@ -1133,9 +1133,9 @@ pub fn trace_write4_asan<QT, S>(
     S: UsesInput,
     QT: QemuHelperTuple<S>,
 {
-    let qemu = hooks.qemu().clone();
+    let qemu = *hooks.qemu();
     let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
-    h.write_4(&qemu, id as GuestAddr, addr);
+    h.write_4(qemu, id as GuestAddr, addr);
 }
 
 pub fn trace_write8_asan<QT, S>(
@@ -1147,9 +1147,9 @@ pub fn trace_write8_asan<QT, S>(
     S: UsesInput,
     QT: QemuHelperTuple<S>,
 {
-    let qemu = hooks.qemu().clone();
+    let qemu = *hooks.qemu();
     let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
-    h.write_8(&qemu, id as GuestAddr, addr);
+    h.write_8(qemu, id as GuestAddr, addr);
 }
 
 pub fn trace_write_n_asan<QT, S>(
@@ -1162,9 +1162,9 @@ pub fn trace_write_n_asan<QT, S>(
     S: UsesInput,
     QT: QemuHelperTuple<S>,
 {
-    let qemu = hooks.qemu().clone();
+    let qemu = *hooks.qemu();
     let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
-    h.read_n(&qemu, id as GuestAddr, addr, size);
+    h.read_n(qemu, id as GuestAddr, addr, size);
 }
 
 pub fn gen_write_asan_snapshot<QT, S>(
@@ -1195,9 +1195,9 @@ pub fn trace_write1_asan_snapshot<QT, S>(
     QT: QemuHelperTuple<S>,
 {
     if id != 0 {
-        let qemu = hooks.qemu().clone();
+        let qemu = *hooks.qemu();
         let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
-        h.write_1(&qemu, id as GuestAddr, addr);
+        h.write_1(qemu, id as GuestAddr, addr);
     }
     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
     h.access(addr, 1);
@@ -1213,9 +1213,9 @@ pub fn trace_write2_asan_snapshot<QT, S>(
     QT: QemuHelperTuple<S>,
 {
     if id != 0 {
-        let qemu = hooks.qemu().clone();
+        let qemu = *hooks.qemu();
         let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
-        h.write_2(&qemu, id as GuestAddr, addr);
+        h.write_2(qemu, id as GuestAddr, addr);
     }
     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
     h.access(addr, 2);
@@ -1231,9 +1231,9 @@ pub fn trace_write4_asan_snapshot<QT, S>(
     QT: QemuHelperTuple<S>,
 {
     if id != 0 {
-        let qemu = hooks.qemu().clone();
+        let qemu = *hooks.qemu();
         let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
-        h.write_4(&qemu, id as GuestAddr, addr);
+        h.write_4(qemu, id as GuestAddr, addr);
     }
     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
     h.access(addr, 4);
@@ -1249,9 +1249,9 @@ pub fn trace_write8_asan_snapshot<QT, S>(
     QT: QemuHelperTuple<S>,
 {
     if id != 0 {
-        let qemu = hooks.qemu().clone();
+        let qemu = *hooks.qemu();
         let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
-        h.write_8(&qemu, id as GuestAddr, addr);
+        h.write_8(qemu, id as GuestAddr, addr);
     }
     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
     h.access(addr, 8);
@@ -1268,9 +1268,9 @@ pub fn trace_write_n_asan_snapshot<QT, S>(
     QT: QemuHelperTuple<S>,
 {
     if id != 0 {
-        let qemu = hooks.qemu().clone();
+        let qemu = *hooks.qemu();
         let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
-        h.read_n(&qemu, id as GuestAddr, addr, size);
+        h.read_n(qemu, id as GuestAddr, addr, size);
     }
     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
     h.access(addr, size);
@@ -1295,16 +1295,16 @@ where
     QT: QemuHelperTuple<S>,
 {
     if sys_num == QASAN_FAKESYS_NR {
-        let qemu = hooks.qemu().clone();
+        let qemu = *hooks.qemu();
         let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
         match QasanAction::try_from(a0).expect("Invalid QASan action number") {
             QasanAction::CheckLoad => {
                 let pc: GuestAddr = qemu.read_reg(Regs::Pc).unwrap();
-                h.read_n(&qemu, pc, a1, a2 as usize);
+                h.read_n(qemu, pc, a1, a2 as usize);
             }
             QasanAction::CheckStore => {
                 let pc: GuestAddr = qemu.read_reg(Regs::Pc).unwrap();
-                h.write_n(&qemu, pc, a1, a2 as usize);
+                h.write_n(qemu, pc, a1, a2 as usize);
             }
             QasanAction::Enable => {
                 h.set_enabled(true);
@@ -1345,7 +1345,7 @@ fn load_file_section<'input, 'arena, Endian: addr2line::gimli::Endianity>(
 
 #[allow(clippy::unnecessary_cast)]
 #[allow(clippy::too_many_lines)]
-pub fn asan_report(rt: &AsanGiovese, qemu: &Qemu, pc: GuestAddr, err: AsanError) {
+pub fn asan_report(rt: &AsanGiovese, qemu: Qemu, pc: GuestAddr, err: AsanError) {
     let mut regions = std::collections::HashMap::new();
     for region in qemu.mappings() {
         if let Some(path) = region.path() {
