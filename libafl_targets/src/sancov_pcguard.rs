@@ -87,10 +87,21 @@ where
     S: libafl::inputs::UsesInput,
 {
     /// The constructor for this struct
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
         }
+    }
+}
+
+#[cfg(feature = "sancov_ctx")]
+impl<S> Default for CtxHook<S>
+where
+    S: libafl::inputs::UsesInput,
+{
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -116,15 +127,28 @@ where
 }
 
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
+#[rustversion::nightly]
 impl<S> NgramHook<S>
 where
     S: libafl::inputs::UsesInput,
 {
     /// The constructor for this struct
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
         }
+    }
+}
+
+#[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
+#[rustversion::nightly]
+impl<S> Default for NgramHook<S>
+where
+    S: libafl::inputs::UsesInput,
+{
+    fn default() -> Self {
+        Self::new()
     }
 }
 
