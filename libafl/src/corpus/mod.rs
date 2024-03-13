@@ -84,6 +84,9 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
     /// Returns the number of elements excluding disabled entries
     fn count(&self) -> usize;
 
+    /// Returns the number of elements excluding enabled entries
+    fn count_disabled(&self) -> usize;
+
     /// Returns the number of elements including disabled entries
     fn count_all(&self) -> usize;
 

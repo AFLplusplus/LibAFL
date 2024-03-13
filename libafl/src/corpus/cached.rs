@@ -47,6 +47,11 @@ where
         self.inner.count()
     }
 
+    /// Returns the number of elements excluding enabled entries
+    fn count_disabled(&self) -> usize {
+        self.inner.count_disabled()
+    }
+
     /// Returns the number of elements including disabled entries
     #[inline]
     fn count_all(&self) -> usize {

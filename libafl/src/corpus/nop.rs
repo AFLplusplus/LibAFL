@@ -34,6 +34,11 @@ where
         0
     }
 
+    /// Returns the number of elements excluding enabled entries
+    fn count_disabled(&self) -> usize {
+        0
+    }
+
     /// Returns the number of elements including disabled entries
     #[inline]
     fn count_all(&self) -> usize {
