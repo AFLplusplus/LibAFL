@@ -366,8 +366,6 @@ where
 /// The most common AFL-like feedback type
 #[derive(Clone, Debug)]
 pub struct MapFeedback<N, O, R, S, T> {
-    /// For tracking, always keep indexes and/or novelties, even if the map isn't considered `interesting`.
-    always_track: bool,
     /// Indexes used in the last observation
     indexes: bool,
     /// New indexes observed in the last observation
@@ -418,7 +416,7 @@ where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
-        self.is_interesting_default(state, manager, input, observers, exit_kind)
+        Ok(self.is_interesting_default(state, manager, input, observers, exit_kind))
     }
 
     #[rustversion::not(nightly)]
@@ -437,14 +435,16 @@ where
         self.is_interesting_default(state, manager, input, observers, exit_kind)
     }
 
-    fn append_metadata<OT>(
+    fn append_metadata<EM, OT>(
         &mut self,
         state: &mut S,
+        manager: &mut EM,
         observers: &OT,
         testcase: &mut Testcase<S::Input>,
     ) -> Result<(), Error>
     where
         OT: ObserversTuple<S>,
+        EM: EventFirer<State = S>,
     {
         if let Some(novelties) = self.novelties.as_mut().map(core::mem::take) {
             let meta = MapNoveltiesMetadata::new(novelties);
@@ -462,6 +462,7 @@ where
         }
 
         let history_map = map_state.history_map.as_mut_slice();
+        let mut filled = 0;
         if self.indexes {
             let mut indices = Vec::new();
 
@@ -474,6 +475,7 @@ where
                 history_map[i] = R::reduce(history_map[i], value);
                 indices.push(i);
             }
+            filled = indices.len();
             let meta = MapIndexesMetadata::new(indices);
             testcase.add_metadata(meta);
         } else {
@@ -484,8 +486,33 @@ where
                 .filter(|(_, value)| *value != initial)
             {
                 history_map[i] = R::reduce(history_map[i], value);
+                filled += 1;
             }
         }
+
+        // at this point you are executing this code, the testcase is always interesting
+        let len = history_map.len();
+        // opt: if not tracking optimisations, we technically don't show the *current* history
+        // map but the *last* history map; this is better than walking over and allocating
+        // unnecessarily
+        manager.fire(
+            state,
+            Event::UpdateUserStats {
+                name: self.stats_name.to_string(),
+                value: UserStats::new(
+                    UserStatsValue::Ratio(
+                        self.novelties
+                            .as_ref()
+                            .map_or(filled, |novelties| filled + novelties.len())
+                            as u64,
+                        len as u64,
+                    ),
+                    AggregatorOps::Avg,
+                ),
+                phantom: PhantomData,
+            },
+        )?;
+
         Ok(())
     }
 }
@@ -678,7 +705,6 @@ where
             name: MAPFEEDBACK_PREFIX.to_string() + map_observer.name(),
             observer_name: map_observer.name().to_string(),
             stats_name: create_stats_name(map_observer.name()),
-            always_track: false,
             phantom: PhantomData,
         }
     }
@@ -692,7 +718,6 @@ where
             name: MAPFEEDBACK_PREFIX.to_string() + map_observer.name(),
             observer_name: map_observer.name().to_string(),
             stats_name: create_stats_name(map_observer.name()),
-            always_track: false,
             phantom: PhantomData,
         }
     }
@@ -707,15 +732,7 @@ where
             observer_name: observer_name.to_string(),
             stats_name: create_stats_name(name),
             phantom: PhantomData,
-            always_track: false,
         }
-    }
-
-    /// For tracking, enable `always_track` mode, that also adds `novelties` or `indexes`,
-    /// even if the map is not novel for this feedback.
-    /// This is useful in combination with `load_initial_inputs_forced`, or other feedbacks.
-    pub fn set_always_track(&mut self, always_track: bool) {
-        self.always_track = always_track;
     }
 
     /// Creating a new `MapFeedback` with a specific name. This is usefully whenever the same
@@ -729,7 +746,6 @@ where
             name: name.to_string(),
             observer_name: map_observer.name().to_string(),
             stats_name: create_stats_name(name),
-            always_track: false,
             phantom: PhantomData,
         }
     }
@@ -748,7 +764,6 @@ where
             observer_name: observer_name.to_string(),
             stats_name: create_stats_name(name),
             name: name.to_string(),
-            always_track: false,
             phantom: PhantomData,
         }
     }
@@ -759,11 +774,11 @@ where
     fn is_interesting_default<EM, OT>(
         &mut self,
         state: &mut S,
-        manager: &mut EM,
+        _manager: &mut EM,
         _input: &S::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
+    ) -> bool
     where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
@@ -816,32 +831,7 @@ where
             }
         }
 
-        if interesting || self.always_track {
-            let len = history_map.len();
-            let filled = history_map.iter().filter(|&&i| i != initial).count();
-            // opt: if not tracking optimisations, we technically don't show the *current* history
-            // map but the *last* history map; this is better than walking over and allocating
-            // unnecessarily
-            manager.fire(
-                state,
-                Event::UpdateUserStats {
-                    name: self.stats_name.to_string(),
-                    value: UserStats::new(
-                        UserStatsValue::Ratio(
-                            self.novelties
-                                .as_ref()
-                                .map_or(filled, |novelties| filled + novelties.len())
-                                as u64,
-                            len as u64,
-                        ),
-                        AggregatorOps::Avg,
-                    ),
-                    phantom: PhantomData,
-                },
-            )?;
-        }
-
-        Ok(interesting)
+        interesting
     }
 }
 
@@ -915,9 +905,10 @@ where
         }
     }
 
-    fn append_metadata<OT>(
+    fn append_metadata<EM, OT>(
         &mut self,
         _state: &mut S,
+        _manager: &mut EM,
         _observers: &OT,
         testcase: &mut Testcase<S::Input>,
     ) -> Result<(), Error>

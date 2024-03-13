@@ -381,7 +381,7 @@ where
                 // Add the input to the main corpus
                 let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
                 self.feedback_mut()
-                    .append_metadata(state, observers, &mut testcase)?;
+                    .append_metadata(state, manager, observers, &mut testcase)?;
                 let idx = state.corpus_mut().add(testcase)?;
                 self.scheduler_mut().on_add(state, idx)?;
 
@@ -419,7 +419,7 @@ where
                 let mut testcase = Testcase::with_executions(input, *state.executions());
                 testcase.set_parent_id_optional(*state.corpus().current());
                 self.objective_mut()
-                    .append_metadata(state, observers, &mut testcase)?;
+                    .append_metadata(state, manager, observers, &mut testcase)?;
                 state.solutions_mut().add(testcase)?;
 
                 if send_events {
@@ -517,7 +517,7 @@ where
 
         if is_solution {
             self.objective_mut()
-                .append_metadata(state, observers, &mut testcase)?;
+                .append_metadata(state, manager, observers, &mut testcase)?;
             let idx = state.solutions_mut().add(testcase)?;
 
             manager.fire(
@@ -546,7 +546,7 @@ where
 
         // Add the input to the main corpus
         self.feedback_mut()
-            .append_metadata(state, observers, &mut testcase)?;
+            .append_metadata(state, manager, observers, &mut testcase)?;
         let idx = state.corpus_mut().add(testcase)?;
         self.scheduler_mut().on_add(state, idx)?;
 
