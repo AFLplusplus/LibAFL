@@ -89,6 +89,7 @@ pub use sancov_cmp::*;
 
 /// Module containing bindings to the various sanitizer interface headers
 #[cfg(feature = "sanitizer_interfaces")]
+#[allow(clippy::mixed_attributes_style)]
 pub mod sanitizer_ifaces {
     #![allow(non_snake_case)]
     #![allow(non_camel_case_types)]
@@ -98,6 +99,7 @@ pub mod sanitizer_ifaces {
     #![allow(clippy::unreadable_literal)]
     #![allow(missing_docs)]
     #![allow(missing_debug_implementations)]
+    #![allow(unused_qualifications)]
     include!(concat!(env!("OUT_DIR"), "/sanitizer_interfaces.rs"));
 }
 

@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 use core::{
     cell::UnsafeCell,
     fmt::{self, Display, Formatter},
-    ptr::{self, addr_of_mut, write_volatile},
+    ptr::{self, addr_of, addr_of_mut, write_volatile},
     sync::atomic::{compiler_fence, Ordering},
 };
 use std::os::raw::{c_long, c_void};
@@ -463,7 +463,8 @@ pub(crate) unsafe fn setup_ctrl_handler<T: 'static + CtrlHandler>(
 }
 
 unsafe extern "system" fn ctrl_handler(ctrl_type: u32) -> BOOL {
-    match &CTRL_HANDLER {
+    let handler = ptr::read_volatile(addr_of!(CTRL_HANDLER));
+    match handler {
         Some(handler_holder) => {
             info!("{:?}: Handling ctrl {}", std::process::id(), ctrl_type);
             let handler = &mut *handler_holder.handler.get();

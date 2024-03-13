@@ -1,6 +1,6 @@
 #[cfg(windows)]
 use std::ptr::write_volatile;
-use std::{fs, io::Read, path::PathBuf, ptr::write};
+use std::{fs, io::Read, path::PathBuf};
 
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},

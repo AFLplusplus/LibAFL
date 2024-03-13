@@ -57,7 +57,7 @@ pub fn main() -> Result<(), Error> {
         // RNG
         StdRand::with_seed(current_nanos()),
         // Corpus that will be evolved, we keep it in memory for performance
-        InMemoryOnDiskCorpus::new(&corpus_dir).unwrap(),
+        InMemoryOnDiskCorpus::new(corpus_dir).unwrap(),
         // Corpus in which we store solutions (crashes in this example),
         // on disk so the user can get them after stopping the fuzzer
         OnDiskCorpus::new(&solution_dir).unwrap(),
@@ -138,7 +138,7 @@ pub fn main() -> Result<(), Error> {
 
     state.load_initial_inputs_forced(&mut fuzzer, &mut executor, &mut mgr, &[solution_dir])?;
 
-    state.set_corpus_idx(CorpusId::from(0usize))?;
+    state.set_corpus_idx(CorpusId::from(0_usize))?;
     stages.perform_all(&mut fuzzer, &mut executor, &mut state, &mut mgr)?;
 
     Ok(())

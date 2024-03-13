@@ -67,7 +67,7 @@ where
 pub mod serdeany_registry {
 
     use alloc::boxed::Box;
-    use core::{any::TypeId, fmt};
+    use core::{any::TypeId, fmt, hash::BuildHasherDefault};
 
     use hashbrown::{
         hash_map::{Keys, Values, ValuesMut},
@@ -75,6 +75,7 @@ pub mod serdeany_registry {
     };
     use serde::{Deserialize, Serialize};
 
+    use super::SerdeAny;
     use crate::{
         anymap::{pack_type_id, unpack_type_id},
         hash_std,
@@ -180,7 +181,7 @@ pub mod serdeany_registry {
     #[allow(clippy::unsafe_derive_deserialize)]
     #[derive(Debug, Serialize, Deserialize)]
     pub struct SerdeAnyMap {
-        map: HashMap<u128, Box<dyn crate::serdeany::SerdeAny>>,
+        map: HashMap<u128, Box<dyn SerdeAny>>,
     }
 
     // Cloning by serializing and deserializing. It ain't fast, but it's honest work.
@@ -257,7 +258,24 @@ pub mod serdeany_registry {
 
         /// Insert a boxed element into the map.
         #[inline]
-        pub fn insert_boxed<T>(&mut self, t: Box<T>)
+        pub fn insert_boxed<T>(&mut self, value: Box<T>)
+        where
+            T: crate::serdeany::SerdeAny,
+        {
+            self.entry::<T>().insert(value);
+        }
+
+        /// Get an entry to an element in this map.
+        #[inline]
+        #[allow(unused_qualifications)]
+        pub fn entry<T>(
+            &mut self,
+        ) -> hashbrown::hash_map::Entry<
+            '_,
+            u128,
+            Box<dyn SerdeAny + 'static>,
+            BuildHasherDefault<ahash::AHasher>,
+        >
         where
             T: crate::serdeany::SerdeAny,
         {
@@ -271,11 +289,28 @@ pub mod serdeany_registry {
                                 .get(&id)
                                 .is_some()
                         },
-                        "Type {} was inserted without registration! Call {}::register or use serde_autoreg.",
+                        "Type {} was inserted without registration! Call RegistryBuilder::register::<{}>() or use serde_autoreg.",
                         core::any::type_name::<T>(),
                         core::any::type_name::<T>()
                     );
-            self.map.insert(id, t);
+            self.map.entry(id)
+        }
+
+        /// Gets a value by type, or inserts it using the given construction function `default`
+        pub fn or_insert_with<T>(&mut self, default: impl FnOnce() -> T) -> &mut T
+        where
+            T: SerdeAny,
+        {
+            self.or_insert_with_boxed::<T>(|| Box::new(default()))
+        }
+
+        /// Gets a value by type, or inserts it using the given construction function `default` (returning a boxed value)
+        pub fn or_insert_with_boxed<T>(&mut self, default: impl FnOnce() -> Box<T>) -> &mut T
+        where
+            T: SerdeAny + 'static,
+        {
+            let ret = self.entry::<T>().or_insert_with(|| default());
+            ret.as_mut().as_any_mut().downcast_mut::<T>().unwrap()
         }
 
         /// Returns the count of elements in this map.
@@ -347,6 +382,21 @@ pub mod serdeany_registry {
                 Some(h) => h
                     .get(&hash_std(name.as_bytes()))
                     .map(|x| x.as_any().downcast_ref::<T>().unwrap()),
+            }
+        }
+
+        /// Remove an element by type and name
+        #[must_use]
+        #[inline]
+        pub fn remove<T>(&mut self, name: &str) -> Option<Box<T>>
+        where
+            T: crate::serdeany::SerdeAny,
+        {
+            match self.map.get_mut(&unpack_type_id(TypeId::of::<T>())) {
+                None => None,
+                Some(h) => h
+                    .remove(&hash_std(name.as_bytes()))
+                    .map(|x| x.as_any_boxed().downcast::<T>().unwrap()),
             }
         }
 
@@ -532,7 +582,25 @@ pub mod serdeany_registry {
         /// Insert an element into this map.
         #[inline]
         #[allow(unused_qualifications)]
-        pub fn insert<T>(&mut self, val: T, name: &str)
+        pub fn insert<T>(&mut self, name: &str, val: T)
+        where
+            T: crate::serdeany::SerdeAny,
+        {
+            self.entry::<T>(name).insert(Box::new(val));
+        }
+
+        /// Get an entry to an element into this map.
+        #[inline]
+        #[allow(unused_qualifications)]
+        pub fn entry<T>(
+            &mut self,
+            name: &str,
+        ) -> hashbrown::hash_map::Entry<
+            '_,
+            u64,
+            Box<dyn SerdeAny + 'static>,
+            BuildHasherDefault<ahash::AHasher>,
+        >
         where
             T: crate::serdeany::SerdeAny,
         {
@@ -546,17 +614,36 @@ pub mod serdeany_registry {
                                 .get(&id)
                                 .is_some()
                         },
-                        "Type {} was inserted without registration! Call {}::register or use serde_autoreg.",
+                        "Type {} was inserted without registration! Call RegistryBuilder::register::<{}>() or use serde_autoreg.",
                         core::any::type_name::<T>(),
                         core::any::type_name::<T>()
                     );
-            if !self.map.contains_key(&id) {
-                self.map.insert(id, HashMap::default());
-            }
             self.map
-                .get_mut(&id)
-                .unwrap()
-                .insert(hash_std(name.as_bytes()), Box::new(val));
+                .entry(id)
+                .or_default()
+                .entry(hash_std(name.as_bytes()))
+        }
+
+        /// Gets a value by name, or inserts it using the given construction function `default`
+        pub fn or_insert_with<T>(&mut self, name: &str, default: impl FnOnce() -> T) -> &mut T
+        where
+            T: SerdeAny,
+        {
+            let ret = self.entry::<T>(name).or_insert_with(|| Box::new(default()));
+            ret.as_mut().as_any_mut().downcast_mut::<T>().unwrap()
+        }
+
+        /// Gets a value by name, or inserts it using the given construction function `default` (returning a boxed value)
+        pub fn or_insert_with_boxed<T>(
+            &mut self,
+            name: &str,
+            default: impl FnOnce() -> Box<T>,
+        ) -> &mut T
+        where
+            T: SerdeAny + 'static,
+        {
+            let ret = self.entry::<T>(name).or_insert_with(|| default());
+            ret.as_mut().as_any_mut().downcast_mut::<T>().unwrap()
         }
 
         /// Returns the `len` of this map.

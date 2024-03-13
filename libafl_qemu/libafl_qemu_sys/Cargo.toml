@@ -12,7 +12,7 @@ edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 [package.metadata.docs.rs]
-all-features = true
+features = ["x86_64", "usermode"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
@@ -33,7 +33,7 @@ systemmode = []
 slirp = [ "systemmode", "libafl_qemu_build/slirp" ] # build qemu with host libslirp (for user networking)
 shared = [ "libafl_qemu_build/shared" ]
 
-clippy = [ "libafl_qemu_build/clippy" ] # special feature for clippy, don't use in normal projects§
+clippy = [ "libafl_qemu_build/clippy" ] # special feature for clippy, don't use in normal projects
 
 [dependencies]
 

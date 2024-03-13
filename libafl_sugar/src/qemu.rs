@@ -146,7 +146,7 @@ where
         let monitor = MultiMonitor::new(|s| log::info!("{s}"));
 
         let mut run_client = |state: Option<_>,
-                              mut mgr: LlmpRestartingEventManager<_, _>,
+                              mut mgr: LlmpRestartingEventManager<_, _, _>,
                               _core_id| {
             // Create an observation channel using the coverage map
             let edges_observer = unsafe {

@@ -1,4 +1,4 @@
-use core::ptr::addr_of_mut;
+use core::{fmt::Debug, ptr::addr_of_mut};
 use std::{marker::PhantomData, process};
 
 #[cfg(feature = "simplemgr")]
@@ -54,7 +54,7 @@ pub type ClientState =
 pub type ClientMgr<M> = SimpleEventManager<M, ClientState>;
 #[cfg(not(feature = "simplemgr"))]
 pub type ClientMgr<M> =
-    MonitorTypedEventManager<LlmpRestartingEventManager<ClientState, StdShMemProvider>, M>;
+    MonitorTypedEventManager<LlmpRestartingEventManager<(), ClientState, StdShMemProvider>, M>;
 
 #[derive(TypedBuilder)]
 pub struct Instance<'a, M: Monitor> {
@@ -70,7 +70,7 @@ pub struct Instance<'a, M: Monitor> {
 impl<'a, M: Monitor> Instance<'a, M> {
     pub fn run<QT>(&mut self, helpers: QT, state: Option<ClientState>) -> Result<(), Error>
     where
-        QT: QemuHelperTuple<ClientState>,
+        QT: QemuHelperTuple<ClientState> + Debug,
     {
         let mut hooks = QemuHooks::new(self.emu.clone(), helpers);
 

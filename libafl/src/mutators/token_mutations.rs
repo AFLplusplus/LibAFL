@@ -314,14 +314,13 @@ where
     ) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
         let tokens_len = {
-            let meta = state.metadata_map().get::<Tokens>();
-            if meta.is_none() {
+            let Some(meta) = state.metadata_map().get::<Tokens>() else {
+                return Ok(MutationResult::Skipped);
+            };
+            if meta.tokens().is_empty() {
                 return Ok(MutationResult::Skipped);
             }
-            if meta.unwrap().tokens().is_empty() {
-                return Ok(MutationResult::Skipped);
-            }
-            meta.unwrap().tokens().len()
+            meta.tokens().len()
         };
         let token_idx = state.rand_mut().below(tokens_len as u64) as usize;
 
@@ -386,14 +385,13 @@ where
         }
 
         let tokens_len = {
-            let meta = state.metadata_map().get::<Tokens>();
-            if meta.is_none() {
+            let Some(meta) = state.metadata_map().get::<Tokens>() else {
+                return Ok(MutationResult::Skipped);
+            };
+            if meta.tokens().is_empty() {
                 return Ok(MutationResult::Skipped);
             }
-            if meta.unwrap().tokens().is_empty() {
-                return Ok(MutationResult::Skipped);
-            }
-            meta.unwrap().tokens().len()
+            meta.tokens().len()
         };
         let token_idx = state.rand_mut().below(tokens_len as u64) as usize;
 
@@ -451,15 +449,14 @@ where
         }
 
         let cmps_len = {
-            let meta = state.metadata_map().get::<CmpValuesMetadata>();
+            let Some(meta) = state.metadata_map().get::<CmpValuesMetadata>() else {
+                return Ok(MutationResult::Skipped);
+            };
             log::trace!("meta: {:x?}", meta);
-            if meta.is_none() {
+            if meta.list.is_empty() {
                 return Ok(MutationResult::Skipped);
             }
-            if meta.unwrap().list.is_empty() {
-                return Ok(MutationResult::Skipped);
-            }
-            meta.unwrap().list.len()
+            meta.list.len()
         };
         let idx = state.rand_mut().below(cmps_len as u64) as usize;
 
@@ -1118,17 +1115,18 @@ where
         }
 
         let (cmp_len, cmp_meta, taint_meta) = {
-            let cmp_meta = state.metadata_map().get::<AFLppCmpValuesMetadata>();
-            let taint_meta = state.metadata_map().get::<TaintMetadata>();
-            if cmp_meta.is_none() || taint_meta.is_none() {
+            let (Some(cmp_meta), Some(taint_meta)) = (
+                state.metadata_map().get::<AFLppCmpValuesMetadata>(),
+                state.metadata_map().get::<TaintMetadata>(),
+            ) else {
                 return Ok(vec![]);
-            }
+            };
 
-            let cmp_len = cmp_meta.unwrap().headers().len();
+            let cmp_len = cmp_meta.headers().len();
             if cmp_len == 0 {
                 return Ok(vec![]);
             }
-            (cmp_len, cmp_meta.unwrap(), taint_meta.unwrap())
+            (cmp_len, cmp_meta, taint_meta)
         };
 
         // These idxes must saved in this mutator itself!

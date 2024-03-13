@@ -442,7 +442,7 @@ impl Display for Error {
                 display_error_backtrace(f, b)
             }
             Self::KeyNotFound(s, b) => {
-                write!(f, "Key `{0}` not in Corpus", &s)?;
+                write!(f, "Key: `{0}` - not found", &s)?;
                 display_error_backtrace(f, b)
             }
             Self::Empty(s, b) => {
@@ -737,6 +737,14 @@ pub trait HasLen {
     }
 }
 
+#[cfg(feature = "alloc")]
+impl<T> HasLen for Vec<T> {
+    #[inline]
+    fn len(&self) -> usize {
+        Vec::<T>::len(self)
+    }
+}
+
 /// Has a ref count
 pub trait HasRefCnt {
     /// The ref count
@@ -976,6 +984,7 @@ impl log::Log for SimpleFdLogger {
 /// # Safety
 /// The function is arguably safe, but it might have undesirable side effects since it closes `stdout` and `stderr`.
 #[cfg(all(unix, feature = "std"))]
+#[allow(unused_qualifications)]
 pub unsafe fn dup_and_mute_outputs() -> Result<(RawFd, RawFd), Error> {
     let old_stdout = stdout().as_raw_fd();
     let old_stderr = stderr().as_raw_fd();
@@ -1002,7 +1011,7 @@ pub unsafe fn set_error_print_panic_hook(new_stderr: RawFd) {
         let mut f = unsafe { File::from_raw_fd(new_stderr) };
         writeln!(f, "{panic_info}",)
             .unwrap_or_else(|err| println!("Failed to log to fd {new_stderr}: {err}"));
-        std::mem::forget(f);
+        mem::forget(f);
     }));
 }
 
