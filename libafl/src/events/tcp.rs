@@ -621,10 +621,7 @@ where
         for<'a> E::Observers: Deserialize<'a>,
         Z: ExecutionProcessor<E::Observers, State = S> + EvaluatorObservers<E::Observers>,
     {
-        if !self
-            .hooks
-            .pre_exec_all(fuzzer, executor, state, client_id, &event)?
-        {
+        if !self.hooks.pre_exec_all(state, client_id, &event)? {
             return Ok(());
         }
         match event {
@@ -677,8 +674,7 @@ where
                 )))
             }
         }
-        self.hooks
-            .post_exec_all(fuzzer, executor, state, client_id)?;
+        self.hooks.post_exec_all(state, client_id)?;
         Ok(())
     }
 }
