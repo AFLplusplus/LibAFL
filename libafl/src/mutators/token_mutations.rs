@@ -1093,7 +1093,6 @@ where
         &mut self,
         state: &mut S,
         input: &I,
-
         max_count: Option<usize>,
     ) -> Result<Vec<I>, Error> {
         // TODO

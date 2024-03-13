@@ -114,7 +114,6 @@ pub trait MultiMutator<I, S>: Named {
         &mut self,
         state: &mut S,
         input: &I,
-
         max_count: Option<usize>,
     ) -> Result<Vec<I>, Error>;
 
