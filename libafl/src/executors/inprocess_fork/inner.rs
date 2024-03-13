@@ -291,7 +291,7 @@ where
     ) -> Result<Self, Error> {
         let default_hooks = InChildProcessHooks::new::<Self>()?;
         let mut hooks = tuple_list!(default_hooks).merge(userhooks);
-        hooks.init_all::<Self, S>(state);
+        hooks.init_all::<Self>(state);
 
         let milli_sec = timeout.as_millis();
         let it_value = Timeval {
