@@ -27,12 +27,10 @@ use libafl_bolts::{
     AsMutSlice, AsSlice,
 };
 use libafl_qemu::{
-    breakpoint::Breakpoint,
     edges::{QemuEdgeCoverageChildHelper, EDGES_MAP_PTR, EDGES_MAP_SIZE},
     elf::EasyElf,
-    emu::Emulator,
-    ArchExtras, CallingConvention, EmuExitReasonError, GuestAddr, GuestReg, MmapPerms,
-    NopEmuExitHandler, QemuForkExecutor, QemuHooks, Regs,
+    ArchExtras, CallingConvention, GuestAddr, GuestReg, MmapPerms, Qemu, QemuForkExecutor,
+    QemuHooks, Regs,
 };
 
 #[derive(Default)]
@@ -114,31 +112,31 @@ pub fn fuzz() -> Result<(), Error> {
 
     env::remove_var("LD_LIBRARY_PATH");
     let env: Vec<(String, String)> = env::vars().collect();
-    let emu = Emulator::new(&options.args, &env, NopEmuExitHandler).unwrap();
+    let qemu = Qemu::init(&options.args, &env).unwrap();
 
     let mut elf_buffer = Vec::new();
-    let elf = EasyElf::from_file(emu.binary_path(), &mut elf_buffer).unwrap();
+    let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer).unwrap();
 
     let test_one_input_ptr = elf
-        .resolve_symbol("LLVMFuzzerTestOneInput", emu.load_addr())
+        .resolve_symbol("LLVMFuzzerTestOneInput", qemu.load_addr())
         .expect("Symbol LLVMFuzzerTestOneInput not found");
     log::debug!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
 
-    emu.entry_break(test_one_input_ptr);
+    qemu.entry_break(test_one_input_ptr);
 
-    let pc: GuestReg = emu.read_reg(Regs::Pc).unwrap();
+    let pc: GuestReg = qemu.read_reg(Regs::Pc).unwrap();
     log::debug!("Break at {pc:#x}");
 
-    let ret_addr: GuestAddr = emu.read_return_address().unwrap();
+    let ret_addr: GuestAddr = qemu.read_return_address().unwrap();
     log::debug!("Return address = {ret_addr:#x}");
-    emu.add_breakpoint(Breakpoint::without_command(ret_addr, false), true);
+    qemu.set_breakpoint_addr(ret_addr);
 
-    let input_addr = emu
+    let input_addr = qemu
         .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
         .unwrap();
     log::debug!("Placing input at {input_addr:#x}");
 
-    let stack_ptr: GuestAddr = emu.read_reg(Regs::Sp).unwrap();
+    let stack_ptr: GuestAddr = qemu.read_reg(Regs::Sp).unwrap();
 
     let mut shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
@@ -202,28 +200,21 @@ pub fn fuzz() -> Result<(), Error> {
         let len = len as GuestReg;
 
         unsafe {
-            emu.write_mem(input_addr, buf);
-            emu.write_reg(Regs::Pc, test_one_input_ptr).unwrap();
-            emu.write_reg(Regs::Sp, stack_ptr).unwrap();
-            emu.write_return_address(ret_addr).unwrap();
-            emu.write_function_argument(CallingConvention::Cdecl, 0, input_addr)
+            qemu.write_mem(input_addr, buf);
+            qemu.write_reg(Regs::Pc, test_one_input_ptr).unwrap();
+            qemu.write_reg(Regs::Sp, stack_ptr).unwrap();
+            qemu.write_return_address(ret_addr).unwrap();
+            qemu.write_function_argument(CallingConvention::Cdecl, 0, input_addr)
                 .unwrap();
-            emu.write_function_argument(CallingConvention::Cdecl, 1, len)
+            qemu.write_function_argument(CallingConvention::Cdecl, 1, len)
                 .unwrap();
-            match emu.run() {
-                Ok(_) => {}
-                Err(EmuExitReasonError::BreakpointNotFound(_)) => {}
-                Err(_) => panic!("QEMU unhandled error."),
-            }
+            let _ = qemu.run();
         }
 
         ExitKind::Ok
     };
 
-    let mut hooks = QemuHooks::new(
-        emu.clone(),
-        tuple_list!(QemuEdgeCoverageChildHelper::default(),),
-    );
+    let mut hooks = QemuHooks::new(qemu, tuple_list!(QemuEdgeCoverageChildHelper::default(),));
 
     let mut executor = QemuForkExecutor::new(
         &mut hooks,

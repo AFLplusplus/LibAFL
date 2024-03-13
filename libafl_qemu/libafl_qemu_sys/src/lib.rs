@@ -105,11 +105,13 @@ pub type CPUStatePtr = *mut crate::CPUState;
 pub type CPUArchStatePtr = *mut crate::CPUArchState;
 pub type ExitReasonPtr = *mut crate::libafl_exit_reason;
 
-pub type GuestAddr = crate::target_ulong;
 pub type GuestUsize = crate::target_ulong;
 pub type GuestIsize = crate::target_long;
-pub type GuestVirtAddr = crate::vaddr;
+
+pub type GuestAddr = crate::target_ulong;
 pub type GuestPhysAddr = crate::hwaddr;
+pub type GuestVirtAddr = crate::vaddr;
+
 pub type GuestHwAddrInfo = crate::qemu_plugin_hwaddr;
 
 #[repr(C)]

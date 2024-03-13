@@ -668,7 +668,7 @@ impl AsanGiovese {
 
 static mut ASAN_INITED: bool = false;
 
-pub fn init_with_asan(
+pub fn init_qemu_with_asan(
     args: &mut Vec<String>,
     env: &mut [(String, String)],
 ) -> Result<(Qemu, Pin<Box<AsanGiovese>>), EmuError> {

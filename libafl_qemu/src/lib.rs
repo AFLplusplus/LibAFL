@@ -96,7 +96,7 @@ pub use snapshot::QemuSnapshotHelper;
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
 pub mod asan;
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
-pub use asan::{init_with_asan, QemuAsanHelper};
+pub use asan::{init_qemu_with_asan, QemuAsanHelper};
 
 #[cfg(not(cpu_target = "hexagon"))]
 pub mod calls;

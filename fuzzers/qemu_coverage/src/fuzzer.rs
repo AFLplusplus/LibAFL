@@ -26,9 +26,8 @@ use libafl_bolts::{
     AsSlice,
 };
 use libafl_qemu::{
-    breakpoint::Breakpoint, drcov::QemuDrCovHelper, elf::EasyElf, emu::Emulator, ArchExtras,
-    CallingConvention, GuestAddr, GuestReg, MmapPerms, NopEmuExitHandler, QemuExecutor, QemuHooks,
-    QemuInstrumentationAddressRangeFilter, Regs,
+    drcov::QemuDrCovHelper, elf::EasyElf, ArchExtras, CallingConvention, GuestAddr, GuestReg,
+    MmapPerms, Qemu, QemuExecutor, QemuHooks, QemuInstrumentationAddressRangeFilter, Regs,
 };
 use rangemap::RangeMap;
 
@@ -119,19 +118,19 @@ pub fn fuzz() {
 
     env::remove_var("LD_LIBRARY_PATH");
     let env: Vec<(String, String)> = env::vars().collect();
-    let emu = Emulator::new(&options.args, &env, NopEmuExitHandler).unwrap();
+    let qemu = Qemu::init(&options.args, &env).unwrap();
 
     let mut elf_buffer = Vec::new();
-    let elf = EasyElf::from_file(emu.binary_path(), &mut elf_buffer).unwrap();
+    let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer).unwrap();
 
     let test_one_input_ptr = elf
-        .resolve_symbol("LLVMFuzzerTestOneInput", emu.load_addr())
+        .resolve_symbol("LLVMFuzzerTestOneInput", qemu.load_addr())
         .expect("Symbol LLVMFuzzerTestOneInput not found");
     log::debug!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
 
-    emu.entry_break(test_one_input_ptr);
+    qemu.entry_break(test_one_input_ptr);
 
-    for m in emu.mappings() {
+    for m in qemu.mappings() {
         log::debug!(
             "Mapping: 0x{:016x}-0x{:016x}, {}",
             m.start(),
@@ -140,30 +139,30 @@ pub fn fuzz() {
         );
     }
 
-    let pc: GuestReg = emu.read_reg(Regs::Pc).unwrap();
+    let pc: GuestReg = qemu.read_reg(Regs::Pc).unwrap();
     log::debug!("Break at {pc:#x}");
 
-    let ret_addr: GuestAddr = emu.read_return_address().unwrap();
+    let ret_addr: GuestAddr = qemu.read_return_address().unwrap();
     log::debug!("Return address = {ret_addr:#x}");
 
-    emu.set_breakpoint_addr(ret_addr);
+    qemu.set_breakpoint_addr(ret_addr);
 
-    let input_addr = emu
+    let input_addr = qemu
         .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
         .unwrap();
     log::debug!("Placing input at {input_addr:#x}");
 
-    let stack_ptr: GuestAddr = emu.read_reg(Regs::Sp).unwrap();
+    let stack_ptr: GuestAddr = qemu.read_reg(Regs::Sp).unwrap();
 
     let reset = |buf: &[u8], len: GuestReg| -> Result<(), String> {
         unsafe {
-            emu.write_mem(input_addr, buf);
-            emu.write_reg(Regs::Pc, test_one_input_ptr)?;
-            emu.write_reg(Regs::Sp, stack_ptr)?;
-            emu.write_return_address(ret_addr)?;
-            emu.write_function_argument(CallingConvention::Cdecl, 0, input_addr)?;
-            emu.write_function_argument(CallingConvention::Cdecl, 1, len)?;
-            let _ = emu.run();
+            qemu.write_mem(input_addr, buf);
+            qemu.write_reg(Regs::Pc, test_one_input_ptr)?;
+            qemu.write_reg(Regs::Sp, stack_ptr)?;
+            qemu.write_return_address(ret_addr)?;
+            qemu.write_function_argument(CallingConvention::Cdecl, 0, input_addr)?;
+            qemu.write_function_argument(CallingConvention::Cdecl, 1, len)?;
+            let _ = qemu.run();
             Ok(())
         }
     };
@@ -219,7 +218,7 @@ pub fn fuzz() {
             let scheduler = QueueScheduler::new();
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-            let rangemap = emu
+            let rangemap = qemu
                 .mappings()
                 .filter_map(|m| {
                     m.path()
@@ -242,7 +241,7 @@ pub fn fuzz() {
             coverage.set_file_name(format!("{coverage_name}-{core:03}.{coverage_extension}"));
 
             let mut hooks = QemuHooks::new(
-                emu.clone(),
+                qemu,
                 tuple_list!(QemuDrCovHelper::new(
                     QemuInstrumentationAddressRangeFilter::None,
                     rangemap,

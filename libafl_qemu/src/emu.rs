@@ -24,13 +24,17 @@ use libafl_qemu_sys::{
     libafl_qemu_cpu_index, libafl_qemu_current_cpu, libafl_qemu_gdb_reply, libafl_qemu_get_cpu,
     libafl_qemu_num_cpus, libafl_qemu_num_regs, libafl_qemu_read_reg,
     libafl_qemu_remove_breakpoint, libafl_qemu_set_breakpoint, libafl_qemu_trigger_breakpoint,
-    libafl_qemu_write_reg, CPUStatePtr, FatPtr, GuestAddr, GuestPhysAddr, GuestUsize,
-    GuestVirtAddr,
+    libafl_qemu_write_reg, CPUStatePtr, FatPtr, GuestUsize,
 };
 use num_traits::Num;
 use strum::IntoEnumIterator;
 
 use crate::{command::IsCommand, GuestReg, QemuHelperTuple, Regs, StdInstrumentationFilter};
+
+pub use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestVirtAddr};
+
+#[cfg(emulation_mode = "usermode")]
+pub use libafl_qemu_sys::{MmapPerms, MmapPermsIter};
 
 #[cfg(emulation_mode = "systemmode")]
 pub mod systemmode;
@@ -1054,6 +1058,15 @@ impl Qemu {
         }
     }
 
+    pub fn entry_break(&self, addr: GuestAddr) {
+        self.set_breakpoint_addr(addr);
+        unsafe {
+            // TODO: decide what to do with sync exit here: ignore or check for bp exit?
+            let _ = self.run();
+        }
+        self.unset_breakpoint_addr(addr);
+    }
+
     pub fn flush_jit(&self) {
         unsafe {
             libafl_flush_jit();
@@ -1435,12 +1448,7 @@ where
     }
 
     pub fn entry_break(&self, addr: GuestAddr) {
-        self.set_breakpoint_addr(addr);
-        unsafe {
-            // TODO: decide what to do with sync exit here: ignore or check for bp exit?
-            let _ = self.run();
-        }
-        self.unset_breakpoint_addr(addr);
+        self.qemu.entry_break(addr)
     }
 
     /// This function will run the emulator until the next breakpoint, or until finish.

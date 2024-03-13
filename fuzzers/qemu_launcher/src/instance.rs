@@ -41,7 +41,7 @@ use libafl_qemu::{
     cmplog::CmpLogObserver,
     edges::{edges_map_mut_slice, MAX_EDGES_NUM},
     helper::QemuHelperTuple,
-    Emulator, IsEmuExitHandler, QemuExecutor, QemuHooks,
+    Qemu, QemuExecutor, QemuHooks,
 };
 use typed_builder::TypedBuilder;
 
@@ -57,9 +57,9 @@ pub type ClientMgr<M> =
     MonitorTypedEventManager<LlmpRestartingEventManager<(), ClientState, StdShMemProvider>, M>;
 
 #[derive(TypedBuilder)]
-pub struct Instance<'a, M: Monitor, E: IsEmuExitHandler> {
+pub struct Instance<'a, M: Monitor> {
     options: &'a FuzzerOptions,
-    emu: &'a Emulator<E>,
+    qemu: &'a Qemu,
     mgr: ClientMgr<M>,
     core_id: CoreId,
     extra_tokens: Option<Vec<String>>,
@@ -67,12 +67,12 @@ pub struct Instance<'a, M: Monitor, E: IsEmuExitHandler> {
     phantom: PhantomData<M>,
 }
 
-impl<'a, M: Monitor, EH: IsEmuExitHandler> Instance<'a, M> {
+impl<'a, M: Monitor> Instance<'a, M> {
     pub fn run<QT>(&mut self, helpers: QT, state: Option<ClientState>) -> Result<(), Error>
     where
-        QT: QemuHelperTuple<ClientState, EH> + Debug,
+        QT: QemuHelperTuple<ClientState> + Debug,
     {
-        let mut hooks = QemuHooks::new(self.emu.clone(), helpers);
+        let mut hooks = QemuHooks::new(self.qemu.clone(), helpers);
 
         // Create an observation channel using the coverage map
         let edges_observer = unsafe {
@@ -147,7 +147,7 @@ impl<'a, M: Monitor, EH: IsEmuExitHandler> Instance<'a, M> {
 
         state.add_metadata(tokens);
 
-        let harness = Harness::new(self.emu)?;
+        let harness = Harness::new(self.qemu)?;
         let mut harness = |input: &BytesInput| harness.run(input);
 
         // A fuzzer with feedbacks and a corpus scheduler
