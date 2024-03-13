@@ -351,8 +351,18 @@ pub mod pybind {
         }
 
         #[inline]
+        fn count_with_disabled(&self) -> usize {
+            unwrap_me!(self.wrapper, c, { c.count_with_disabled() })
+        }
+
+        #[inline]
         fn add(&mut self, testcase: Testcase<BytesInput>) -> Result<CorpusId, Error> {
             unwrap_me_mut!(self.wrapper, c, { c.add(testcase) })
+        }
+
+        #[inline]
+        fn add_disabled(&mut self, testcase: Testcase<BytesInput>) -> Result<CorpusId, Error> {
+            unwrap_me_mut!(self.wrapper, c, { c.add_disabled(testcase) })
         }
 
         #[inline]
