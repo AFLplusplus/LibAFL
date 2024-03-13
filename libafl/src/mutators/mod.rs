@@ -175,6 +175,9 @@ pub trait MutatorsTuple<I, S>: HasLen {
         corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error>;
 
+    /// Gets all names of the wrapped [`Mutator`]`s`, reversed.
+    fn names_reversed(&self) -> Vec<&str>;
+
     /// Gets all names of the wrapped [`Mutator`]`s`.
     fn names(&self) -> Vec<&str>;
 }
@@ -220,6 +223,11 @@ impl<I, S> MutatorsTuple<I, S> for () {
         _new_corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
         Ok(())
+    }
+
+    #[inline]
+    fn names_reversed(&self) -> Vec<&str> {
+        Vec::new()
     }
 
     #[inline]
@@ -287,9 +295,15 @@ where
         }
     }
 
+    fn names_reversed(&self) -> Vec<&str> {
+        let mut ret = self.1.names_reversed();
+        ret.push(self.0.name());
+        ret
+    }
+
     fn names(&self) -> Vec<&str> {
-        let mut ret = self.1.names();
-        ret.insert(0, self.0.name());
+        let mut ret = self.names_reversed();
+        ret.reverse();
         ret
     }
 }
@@ -299,10 +313,16 @@ where
     Head: Mutator<I, S> + 'static,
     Tail: IntoVec<Box<dyn Mutator<I, S>>>,
 {
-    fn into_vec(self) -> Vec<Box<dyn Mutator<I, S>>> {
+    fn into_vec_reversed(self) -> Vec<Box<dyn Mutator<I, S>>> {
         let (head, tail) = self.uncons();
         let mut ret = tail.into_vec();
-        ret.insert(0, Box::new(head));
+        ret.push(Box::new(head));
+        ret
+    }
+
+    fn into_vec(self) -> Vec<Box<dyn Mutator<I, S>>> {
+        let mut ret = self.into_vec_reversed();
+        ret.reverse();
         ret
     }
 }
@@ -352,6 +372,10 @@ where
 
     fn names(&self) -> Vec<&str> {
         self.0.names()
+    }
+
+    fn names_reversed(&self) -> Vec<&str> {
+        self.0.names_reversed()
     }
 }
 
@@ -417,6 +441,10 @@ impl<I, S> MutatorsTuple<I, S> for Vec<Box<dyn Mutator<I, S>>> {
             .get_mut(index)
             .ok_or_else(|| Error::key_not_found("Mutator with id {index:?} not found."))?;
         mutator.post_exec(state, stage_idx, new_corpus_idx)
+    }
+
+    fn names_reversed(&self) -> Vec<&str> {
+        self.iter().rev().map(|x| x.name()).collect()
     }
 
     fn names(&self) -> Vec<&str> {
