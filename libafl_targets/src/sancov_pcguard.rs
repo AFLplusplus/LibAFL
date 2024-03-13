@@ -66,7 +66,7 @@ use core::marker::PhantomData;
 /// The hook to initialize ngram everytime we run the harness
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
 #[rustversion::nightly]
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct NgramHook<S>
 where
     S: libafl::inputs::UsesInput,
@@ -76,9 +76,19 @@ where
 
 /// The hook to initialize ctx everytime we run the harness
 #[cfg(feature = "sancov_ctx")]
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct CtxHook<S> {
     phantom: PhantomData<S>,
+}
+
+#[cfg(feature = "sancov_ctx")]
+impl<S> CtxHook<S> {
+    /// The constructor for this struct
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
 }
 
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
@@ -100,6 +110,16 @@ where
         }
     }
     fn post_exec(&mut self, _state: &mut S, _input: &S::Input) {}
+}
+
+#[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
+impl<S> NgramHook<S> {
+    /// The constructor for this struct
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
 }
 
 #[cfg(feature = "sancov_ctx")]

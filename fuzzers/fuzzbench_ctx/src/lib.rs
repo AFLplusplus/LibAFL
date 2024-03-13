@@ -18,7 +18,10 @@ use clap::{Arg, Command};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleRestartingEventManager,
-    executors::{inprocess::HookableInProcessExecutor, ExitKind},
+    executors::{
+        inprocess::{HookableInProcessExecutor, InProcessExecutor},
+        ExitKind,
+    },
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -332,7 +335,7 @@ fn fuzz(
     };
 
     let mut tracing_harness = harness;
-    let ctx_hook = CtxHook::default();
+    let ctx_hook = CtxHook::new();
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let mut executor = HookableInProcessExecutor::with_timeout_generic(
         tuple_list!(ctx_hook),
@@ -346,8 +349,7 @@ fn fuzz(
 
     // Setup a tracing stage in which we log comparisons
     let tracing = TracingStage::new(
-        HookableInProcessExecutor::with_timeout_generic(
-            tuple_list!(ctx_hook),
+        InProcessExecutor::with_timeout(
             &mut tracing_harness,
             tuple_list!(cmplog_observer),
             &mut fuzzer,
