@@ -157,7 +157,7 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<emu::MapInfo>()?;
     m.add_class::<emu::GuestMaps>()?;
     m.add_class::<emu::SyscallHookResult>()?;
-    m.add_class::<emu::pybind::Emulator>()?;
+    m.add_class::<emu::pybind::Qemu>()?;
 
     Ok(())
 }

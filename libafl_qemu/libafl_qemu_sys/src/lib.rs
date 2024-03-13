@@ -98,6 +98,8 @@ macro_rules! extern_c_checked {
 use core::ops::BitAnd;
 use std::{ffi::c_void, slice::from_raw_parts, str::from_utf8_unchecked};
 
+#[cfg(feature = "python")]
+use pyo3::{pyclass, pymethods, IntoPy, PyObject, Python};
 #[cfg(all(feature = "clippy", target_os = "linux"))]
 pub use x86_64_stub_bindings::*;
 

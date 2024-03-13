@@ -26,15 +26,13 @@ use libafl_qemu_sys::{
     libafl_qemu_remove_breakpoint, libafl_qemu_set_breakpoint, libafl_qemu_trigger_breakpoint,
     libafl_qemu_write_reg, CPUStatePtr, FatPtr, GuestUsize,
 };
+pub use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestVirtAddr};
+#[cfg(emulation_mode = "usermode")]
+pub use libafl_qemu_sys::{MapInfo, MmapPerms, MmapPermsIter};
 use num_traits::Num;
 use strum::IntoEnumIterator;
 
 use crate::{command::IsCommand, GuestReg, QemuHelperTuple, Regs, StdInstrumentationFilter};
-
-pub use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestVirtAddr};
-
-#[cfg(emulation_mode = "usermode")]
-pub use libafl_qemu_sys::{MmapPerms, MmapPermsIter};
 
 #[cfg(emulation_mode = "systemmode")]
 pub mod systemmode;
@@ -1665,7 +1663,6 @@ pub mod pybind {
     use pyo3::{exceptions::PyValueError, prelude::*, types::PyInt};
 
     use super::{GuestAddr, GuestUsize, MmapPerms, SyscallHookResult};
-    use crate::NopEmuExitHandler;
 
     static mut PY_SYSCALL_HOOK: Option<PyObject> = None;
     static mut PY_GENERIC_HOOKS: Vec<(GuestAddr, PyObject)> = vec![];
@@ -1715,87 +1712,88 @@ pub mod pybind {
     }
 
     #[pyclass(unsendable)]
-    pub struct Emulator {
-        pub emu: super::Emulator<QT, S, NopEmuExitHandler>,
+    pub struct Qemu {
+        pub qemu: super::Qemu,
     }
 
     #[pymethods]
-    impl Emulator {
+    impl Qemu {
         #[allow(clippy::needless_pass_by_value)]
         #[new]
-        fn new(args: Vec<String>, env: Vec<(String, String)>) -> PyResult<Emulator> {
-            let emu = super::Emulator::new(&args, &env, NopEmuExitHandler)
+        fn new(args: Vec<String>, env: Vec<(String, String)>) -> PyResult<Qemu> {
+            let qemu = super::Qemu::init(&args, &env)
                 .map_err(|e| PyValueError::new_err(format!("{e}")))?;
-            Ok(Emulator { emu })
+
+            Ok(Qemu { qemu })
         }
 
         fn write_mem(&self, addr: GuestAddr, buf: &[u8]) {
             unsafe {
-                self.emu.write_mem(addr, buf);
+                self.qemu.write_mem(addr, buf);
             }
         }
 
         fn read_mem(&self, addr: GuestAddr, size: usize) -> Vec<u8> {
             let mut buf = vec![0; size];
             unsafe {
-                self.emu.read_mem(addr, &mut buf);
+                self.qemu.read_mem(addr, &mut buf);
             }
             buf
         }
 
         fn num_regs(&self) -> i32 {
-            self.emu.num_regs()
+            self.qemu.num_regs()
         }
 
         fn write_reg(&self, reg: i32, val: GuestUsize) -> PyResult<()> {
-            self.emu.write_reg(reg, val).map_err(PyValueError::new_err)
+            self.qemu.write_reg(reg, val).map_err(PyValueError::new_err)
         }
 
         fn read_reg(&self, reg: i32) -> PyResult<GuestUsize> {
-            self.emu.read_reg(reg).map_err(PyValueError::new_err)
+            self.qemu.read_reg(reg).map_err(PyValueError::new_err)
         }
 
         fn set_breakpoint(&self, addr: GuestAddr) {
-            self.emu.set_breakpoint_addr(addr);
+            self.qemu.set_breakpoint_addr(addr);
         }
 
         fn entry_break(&self, addr: GuestAddr) {
-            self.emu.entry_break(addr);
+            self.qemu.entry_break(addr);
         }
 
         fn remove_breakpoint(&self, addr: GuestAddr) {
-            self.emu.unset_breakpoint_addr(addr);
+            self.qemu.unset_breakpoint_addr(addr);
         }
 
         fn run(&self) {
             unsafe {
-                self.emu.run().unwrap();
+                self.qemu.run().unwrap();
             }
         }
 
         fn g2h(&self, addr: GuestAddr) -> u64 {
-            self.emu.g2h::<*const u8>(addr) as u64
+            self.qemu.g2h::<*const u8>(addr) as u64
         }
 
         fn h2g(&self, addr: u64) -> GuestAddr {
-            self.emu.h2g(addr as *const u8)
+            self.qemu.h2g(addr as *const u8)
         }
 
         fn binary_path(&self) -> String {
-            self.emu.binary_path().to_owned()
+            self.qemu.binary_path().to_owned()
         }
 
         fn load_addr(&self) -> GuestAddr {
-            self.emu.load_addr()
+            self.qemu.load_addr()
         }
 
         fn flush_jit(&self) {
-            self.emu.flush_jit();
+            self.qemu.flush_jit();
         }
 
         fn map_private(&self, addr: GuestAddr, size: usize, perms: i32) -> PyResult<GuestAddr> {
             if let Ok(p) = MmapPerms::try_from(perms) {
-                self.emu
+                self.qemu
                     .map_private(addr, size, p)
                     .map_err(PyValueError::new_err)
             } else {
@@ -1805,7 +1803,7 @@ pub mod pybind {
 
         fn map_fixed(&self, addr: GuestAddr, size: usize, perms: i32) -> PyResult<GuestAddr> {
             if let Ok(p) = MmapPerms::try_from(perms) {
-                self.emu
+                self.qemu
                     .map_fixed(addr, size, p)
                     .map_err(PyValueError::new_err)
             } else {
@@ -1815,7 +1813,7 @@ pub mod pybind {
 
         fn mprotect(&self, addr: GuestAddr, size: usize, perms: i32) -> PyResult<()> {
             if let Ok(p) = MmapPerms::try_from(perms) {
-                self.emu
+                self.qemu
                     .mprotect(addr, size, p)
                     .map_err(PyValueError::new_err)
             } else {
@@ -1824,21 +1822,22 @@ pub mod pybind {
         }
 
         fn unmap(&self, addr: GuestAddr, size: usize) -> PyResult<()> {
-            self.emu.unmap(addr, size).map_err(PyValueError::new_err)
+            self.qemu.unmap(addr, size).map_err(PyValueError::new_err)
         }
 
         fn set_syscall_hook(&self, hook: PyObject) {
             unsafe {
                 PY_SYSCALL_HOOK = Some(hook);
             }
-            self.emu.add_pre_syscall_hook(0u64, py_syscall_hook_wrapper);
+            self.qemu
+                .add_pre_syscall_hook(0u64, py_syscall_hook_wrapper);
         }
 
         fn set_hook(&self, addr: GuestAddr, hook: PyObject) {
             unsafe {
                 let idx = PY_GENERIC_HOOKS.len();
                 PY_GENERIC_HOOKS.push((addr, hook));
-                self.emu
+                self.qemu
                     .set_hook(idx as u64, addr, py_generic_hook_wrapper, true);
             }
         }
@@ -1847,7 +1846,7 @@ pub mod pybind {
             unsafe {
                 PY_GENERIC_HOOKS.retain(|(a, _)| *a != addr);
             }
-            self.emu.remove_hooks_at(addr, true)
+            self.qemu.remove_hooks_at(addr, true)
         }
     }
 }
