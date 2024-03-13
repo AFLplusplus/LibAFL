@@ -7,6 +7,7 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 
+use libafl::state::{HasExecutions, State};
 use libafl_qemu_sys::{
     libafl_load_qemu_snapshot, libafl_qemu_current_paging_id, libafl_save_qemu_snapshot,
     qemu_cleanup, qemu_main_loop, vm_start, GuestAddr, GuestPhysAddr, GuestVirtAddr,
@@ -14,8 +15,8 @@ use libafl_qemu_sys::{
 
 use crate::{
     emu::{libafl_page_from_addr, IsSnapshotManager},
-    MemAccessInfo, Qemu, QemuExitReason, QemuExitReasonError, SnapshotId, SnapshotManagerError,
-    CPU,
+    Emulator, IsEmuExitHandler, MemAccessInfo, Qemu, QemuExitReason, QemuExitReasonError,
+    QemuHelperTuple, SnapshotId, SnapshotManagerError, CPU,
 };
 
 impl SnapshotId {
@@ -394,5 +395,56 @@ impl Qemu {
             libc::free(devices as *mut c_void);
             r
         }
+    }
+}
+
+impl<QT, S, E> Emulator<QT, S, E>
+where
+    QT: QemuHelperTuple<S>,
+    S: State + HasExecutions,
+    E: IsEmuExitHandler<QT, S>,
+{
+    /// Write a value to a phsical guest address, including ROM areas.
+    pub unsafe fn write_phys_mem(&self, paddr: GuestPhysAddr, buf: &[u8]) {
+        self.qemu.write_phys_mem(paddr, buf)
+    }
+
+    /// Read a value from a physical guest address.
+    pub unsafe fn read_phys_mem(&self, paddr: GuestPhysAddr, buf: &mut [u8]) {
+        self.qemu.read_phys_mem(paddr, buf)
+    }
+
+    pub fn save_snapshot(&self, name: &str, sync: bool) {
+        self.qemu.save_snapshot(name, sync)
+    }
+
+    pub fn load_snapshot(&self, name: &str, sync: bool) {
+        self.qemu.load_snapshot(name, sync)
+    }
+
+    #[must_use]
+    pub fn create_fast_snapshot(&self, track: bool) -> FastSnapshotPtr {
+        self.qemu.create_fast_snapshot(track)
+    }
+
+    #[must_use]
+    pub fn create_fast_snapshot_filter(
+        &self,
+        track: bool,
+        device_filter: &DeviceSnapshotFilter,
+    ) -> FastSnapshotPtr {
+        self.qemu.create_fast_snapshot_filter(track, device_filter)
+    }
+
+    pub fn restore_fast_snapshot(&self, snapshot: FastSnapshotPtr) {
+        self.qemu.restore_fast_snapshot(snapshot)
+    }
+
+    pub fn check_fast_snapshot_memory_consistency(&self, snapshot: FastSnapshotPtr) -> u64 {
+        self.qemu.check_fast_snapshot_memory_consistency(snapshot)
+    }
+
+    pub fn list_devices(&self) -> Vec<String> {
+        self.qemu.list_devices()
     }
 }

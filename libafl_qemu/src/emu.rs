@@ -276,6 +276,9 @@ where
             }
         };
 
+        // manually drop ref cell here to avoid keeping it alive in cmd.
+        drop(exit_handler);
+
         if let Some(cmd) = command {
             cmd.run(emu, qemu_executor_state, input, ret_reg)
         } else {
@@ -738,10 +741,22 @@ impl Display for QemuExitReason {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             QemuExitReason::End(shutdown_cause) => write!(f, "End: {shutdown_cause:?}"),
-            QemuExitReason::Breakpoint(bp) => write!(f, "{bp}"),
+            QemuExitReason::Breakpoint(bp) => write!(f, "Breakpoint: {bp}"),
             QemuExitReason::SyncBackdoor => write!(f, "Sync Backdoor"), // QemuExitReason::SyncBackdoor(sync_backdoor) => {
                                                                         //     write!(f, "Sync backdoor exit: {sync_backdoor}")
                                                                         // }
+        }
+    }
+}
+
+impl Display for EmuExitReason {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            EmuExitReason::End(shutdown_cause) => write!(f, "End: {shutdown_cause:?}"),
+            EmuExitReason::Breakpoint(bp) => write!(f, "{bp}"),
+            EmuExitReason::SyncBackdoor(sync_backdoor) => {
+                write!(f, "Sync backdoor exit: {sync_backdoor}")
+            }
         }
     }
 }

@@ -219,6 +219,8 @@ pub trait StdInstrumentationFilter:
 {
 }
 
+impl StdInstrumentationFilter for (QemuEdgeCoverageHelper, ()) {}
+
 #[cfg(emulation_mode = "systemmode")]
 impl HasInstrumentationFilter<QemuInstrumentationPagingFilter> for (QemuEdgeCoverageHelper, ()) {
     fn filter(&self) -> &QemuInstrumentationPagingFilter {

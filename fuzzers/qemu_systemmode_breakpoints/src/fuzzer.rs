@@ -32,8 +32,9 @@ use libafl_qemu::{
     edges::{edges_map_mut_slice, QemuEdgeCoverageHelper, MAX_EDGES_NUM},
     elf::EasyElf,
     emu::Emulator,
-    EmuExitReasonError, FastSnapshotBuilder, GuestPhysAddr, GuestReg, HandlerError, HandlerResult,
-    QemuExecutor, QemuHooks, StdEmuExitHandler,
+    executor::{stateful::StatefulQemuExecutor, QemuExecutorState},
+    EmuExitReasonError, FastSnapshotManager, GuestPhysAddr, GuestReg, HandlerError, HandlerResult,
+    QemuHooks, StdEmuExitHandler,
 };
 
 // use libafl_qemu::QemuSnapshotBuilder; // for normal qemu snapshot
@@ -88,7 +89,7 @@ pub fn fuzz() {
 
         // Choose Snapshot Builder
         // let emu_snapshot_manager = QemuSnapshotBuilder::new(true);
-        let emu_snapshot_manager = FastSnapshotBuilder::new(false);
+        let emu_snapshot_manager = FastSnapshotManager::new(false);
 
         // Choose Exit Handler
         let emu_exit_handler = StdEmuExitHandler::new(emu_snapshot_manager);
@@ -122,31 +123,32 @@ pub fn fuzz() {
         println!("Devices = {:?}", devices);
 
         // The wrapped harness function, calling out to the LLVM-style harness
-        let mut harness = |input: &BytesInput| unsafe {
-            match emu.run_handle(input) {
-                Ok(handler_result) => match handler_result {
-                    HandlerResult::UnhandledExit(unhandled_exit) => {
-                        panic!("Unhandled exit: {}", unhandled_exit)
-                    }
-                    HandlerResult::EndOfRun(exit_kind) => return exit_kind,
-                    HandlerResult::Interrupted => {
-                        std::process::exit(0);
-                    }
-                },
-                Err(handler_error) => match handler_error {
-                    HandlerError::EmuExitReasonError(emu_exit_reason_error) => {
-                        match emu_exit_reason_error {
-                            EmuExitReasonError::UnknownKind => panic!("unknown kind"),
-                            EmuExitReasonError::UnexpectedExit => return ExitKind::Crash,
-                            _ => {
-                                panic!("Emu Exit unhandled error: {:?}", emu_exit_reason_error)
+        let mut harness =
+            |input: &BytesInput, qemu_executor_state: &mut QemuExecutorState<_, _>| unsafe {
+                match emu.run_handle(input, qemu_executor_state) {
+                    Ok(handler_result) => match handler_result {
+                        HandlerResult::UnhandledExit(unhandled_exit) => {
+                            panic!("Unhandled exit: {}", unhandled_exit)
+                        }
+                        HandlerResult::EndOfRun(exit_kind) => return exit_kind,
+                        HandlerResult::Interrupted => {
+                            std::process::exit(0);
+                        }
+                    },
+                    Err(handler_error) => match handler_error {
+                        HandlerError::QemuExitReasonError(emu_exit_reason_error) => {
+                            match emu_exit_reason_error {
+                                EmuExitReasonError::UnknownKind => panic!("unknown kind"),
+                                EmuExitReasonError::UnexpectedExit => return ExitKind::Crash,
+                                _ => {
+                                    panic!("Emu Exit unhandled error: {:?}", emu_exit_reason_error)
+                                }
                             }
                         }
-                    }
-                    _ => panic!("Unhandled error: {:?}", handler_error),
-                },
-            }
-        };
+                        _ => panic!("Unhandled error: {:?}", handler_error),
+                    },
+                }
+            };
 
         // Create an observation channel using the coverage map
         let edges_observer = unsafe {
@@ -197,7 +199,10 @@ pub fn fuzz() {
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-        let mut hooks = QemuHooks::new(emu.clone(), tuple_list!(QemuEdgeCoverageHelper::default()));
+        let mut hooks = QemuHooks::new(
+            emu.qemu().clone(),
+            tuple_list!(QemuEdgeCoverageHelper::default()),
+        );
 
         // Setup an havoc mutator with a mutational stage
         let mutator = StdScheduledMutator::new(havoc_mutations());
@@ -208,7 +213,7 @@ pub fn fuzz() {
         );
 
         // Create a QEMU in-process executor
-        let mut executor = QemuExecutor::new(
+        let mut executor = StatefulQemuExecutor::new(
             &mut hooks,
             &mut harness,
             tuple_list!(edges_observer, time_observer),
