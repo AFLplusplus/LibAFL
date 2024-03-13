@@ -973,6 +973,13 @@ impl Qemu {
     }
 
     #[must_use]
+    #[allow(clippy::cast_possible_wrap)]
+    #[allow(clippy::cast_sign_loss)]
+    pub fn num_cpus(&self) -> usize {
+        unsafe { libafl_qemu_num_cpus() as usize }
+    }
+
+    #[must_use]
     pub fn current_cpu(&self) -> Option<CPU> {
         let ptr = unsafe { libafl_qemu_current_cpu() };
         if ptr.is_null() {
@@ -1352,7 +1359,7 @@ where
     #[allow(clippy::cast_possible_wrap)]
     #[allow(clippy::cast_sign_loss)]
     pub fn num_cpus(&self) -> usize {
-        unsafe { libafl_qemu_num_cpus() as usize }
+        self.qemu.num_cpus()
     }
 
     #[must_use]
