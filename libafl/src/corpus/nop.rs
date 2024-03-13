@@ -36,7 +36,7 @@ where
 
     /// Returns the number of elements including disabled entries
     #[inline]
-    fn count_with_disabled(&self) -> usize {
+    fn count_all(&self) -> usize {
         0
     }
 

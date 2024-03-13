@@ -69,7 +69,7 @@ macro_rules! random_corpus_id {
     ($corpus:expr, $rand:expr, $incl_disabled:expr) => {{
         let cnt: u64;
         if $incl_disabled == true {
-            cnt = $corpus.count_with_disabled() as u64;
+            cnt = $corpus.count_all() as u64;
         } else {
             cnt = $corpus.count() as u64;
         }
@@ -85,7 +85,7 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
     fn count(&self) -> usize;
 
     /// Returns the number of elements including disabled entries
-    fn count_with_disabled(&self) -> usize;
+    fn count_all(&self) -> usize;
 
     /// Returns true, if no elements are in this corpus yet
     fn is_empty(&self) -> bool {
@@ -351,8 +351,8 @@ pub mod pybind {
         }
 
         #[inline]
-        fn count_with_disabled(&self) -> usize {
-            unwrap_me!(self.wrapper, c, { c.count_with_disabled() })
+        fn count_all(&self) -> usize {
+            unwrap_me!(self.wrapper, c, { c.count_all() })
         }
 
         #[inline]

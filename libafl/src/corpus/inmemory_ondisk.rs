@@ -73,8 +73,8 @@ where
 
     /// Returns the number of elements including disabled entries
     #[inline]
-    fn count_with_disabled(&self) -> usize {
-        self.inner.count_with_disabled()
+    fn count_all(&self) -> usize {
+        self.inner.count_all()
     }
 
     /// Add an enabled testcase to the corpus and return its index
