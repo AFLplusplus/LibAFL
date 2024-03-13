@@ -7,7 +7,6 @@ use libafl_bolts::{current_time, impl_serdeany, rands::Rand};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, HasCurrentCorpusIdx},
     mark_feature_time,
     mutators::{MutationResult, Mutator},
     stages::{
@@ -15,7 +14,10 @@ use crate::{
         ExecutionCountRestartHelper, MutationalStage, Stage,
     },
     start_timer,
-    state::{HasCorpus, HasExecutions, HasMetadata, HasNamedMetadata, HasRand, UsesState},
+    state::{
+        HasCorpus, HasCurrentTestcase, HasExecutions, HasMetadata, HasNamedMetadata, HasRand,
+        UsesState,
+    },
     Error, Evaluator,
 };
 #[cfg(feature = "introspection")]
@@ -178,18 +180,12 @@ where
         state: &mut Z::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        let Some(corpus_idx) = state.current_corpus_idx()? else {
-            return Err(Error::illegal_state(
-                "state is not currently processing a corpus index",
-            ));
-        };
-
         let fuzz_time = self.seed_fuzz_time(state)?;
         let iters = self.fixed_iters(state)?;
 
         start_timer!(state);
-        let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
-        let Ok(input) = I::try_transform_from(&mut testcase, state, corpus_idx) else {
+        let mut testcase = state.current_testcase_mut()?;
+        let Ok(input) = I::try_transform_from(&mut testcase, state) else {
             return Ok(());
         };
         drop(testcase);

@@ -50,8 +50,8 @@ where
         }
     }
 
-    fn post_exec(&mut self, state: &mut S, corpus_idx: Option<CorpusId>) -> Result<(), Error> {
-        M::post_exec(self, state, corpus_idx)
+    fn post_exec(&mut self, state: &mut S, new_corpus_idx: Option<CorpusId>) -> Result<(), Error> {
+        M::post_exec(self, state, new_corpus_idx)
     }
 }
 

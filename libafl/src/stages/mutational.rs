@@ -6,14 +6,17 @@ use core::{any::type_name, marker::PhantomData};
 use libafl_bolts::{rands::Rand, Named};
 
 use crate::{
-    corpus::{Corpus, CorpusId, HasCurrentCorpusIdx, Testcase},
+    corpus::{Corpus, CorpusId, Testcase},
     fuzzer::Evaluator,
     inputs::Input,
     mark_feature_time,
     mutators::{MultiMutator, MutationResult, Mutator},
     stages::{ExecutionCountRestartHelper, RetryRestartHelper, Stage},
     start_timer,
-    state::{HasCorpus, HasExecutions, HasMetadata, HasNamedMetadata, HasRand, UsesState},
+    state::{
+        HasCorpus, HasCurrentTestcase, HasExecutions, HasMetadata, HasNamedMetadata, HasRand,
+        UsesState,
+    },
     Error,
 };
 #[cfg(feature = "introspection")]
@@ -26,7 +29,7 @@ use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 pub trait MutatedTransformPost<S>: Sized {
     /// Perform any post-execution steps necessary for the transformed input (e.g., updating metadata)
     #[inline]
-    fn post_exec(self, state: &mut S, corpus_idx: Option<CorpusId>) -> Result<(), Error> {
+    fn post_exec(self, state: &mut S, new_corpus_idx: Option<CorpusId>) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -46,11 +49,7 @@ where
     type Post: MutatedTransformPost<S>;
 
     /// Transform the provided testcase into this type
-    fn try_transform_from(
-        base: &mut Testcase<I>,
-        state: &S,
-        corpus_idx: CorpusId,
-    ) -> Result<Self, Error>;
+    fn try_transform_from(base: &mut Testcase<I>, state: &S) -> Result<Self, Error>;
 
     /// Transform this instance back into the original input type
     fn try_transform_into(self, state: &S) -> Result<(I, Self::Post), Error>;
@@ -65,11 +64,7 @@ where
     type Post = ();
 
     #[inline]
-    fn try_transform_from(
-        base: &mut Testcase<I>,
-        state: &S,
-        _corpus_idx: CorpusId,
-    ) -> Result<Self, Error> {
+    fn try_transform_from(base: &mut Testcase<I>, state: &S) -> Result<Self, Error> {
         state.corpus().load_input_into(base)?;
         Ok(base.input().as_ref().unwrap().clone())
     }
@@ -113,17 +108,11 @@ where
         state: &mut Z::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        let Some(corpus_idx) = state.current_corpus_idx()? else {
-            return Err(Error::illegal_state(
-                "state is not currently processing a corpus index",
-            ));
-        };
-
-        let num = self.iterations(state)? - self.execs_since_progress_start(state)?;
-
         start_timer!(state);
-        let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
-        let Ok(input) = I::try_transform_from(&mut testcase, state, corpus_idx) else {
+        let num = self.iterations(state)? - self.execs_since_progress_start(state)?;
+        let mut testcase = state.current_testcase_mut()?;
+
+        let Ok(input) = I::try_transform_from(&mut testcase, state) else {
             return Ok(());
         };
         drop(testcase);
@@ -354,14 +343,8 @@ where
         state: &mut Z::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        let Some(corpus_idx) = state.current_corpus_idx()? else {
-            return Err(Error::illegal_state(
-                "state is not currently processing a corpus index",
-            ));
-        };
-
-        let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
-        let Ok(input) = I::try_transform_from(&mut testcase, state, corpus_idx) else {
+        let mut testcase = state.current_testcase_mut()?;
+        let Ok(input) = I::try_transform_from(&mut testcase, state) else {
             return Ok(());
         };
         drop(testcase);

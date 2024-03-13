@@ -6,7 +6,7 @@ use libafl_bolts::impl_serdeany;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{CorpusId, Testcase},
+    corpus::Testcase,
     inputs::BytesInput,
     stages::mutational::{MutatedTransform, MutatedTransformPost},
     state::{HasCorpus, HasMetadata},
@@ -111,17 +111,13 @@ where
 {
     type Post = Self;
 
-    fn try_transform_from(
-        base: &mut Testcase<BytesInput>,
-        _state: &S,
-        corpus_idx: CorpusId,
-    ) -> Result<Self, Error> {
+    fn try_transform_from(base: &mut Testcase<BytesInput>, _state: &S) -> Result<Self, Error> {
         let meta = base
             .metadata_map()
             .get::<GeneralizedInputMetadata>()
             .ok_or_else(|| {
                 Error::key_not_found(format!(
-                    "Couldn't find the GeneralizedInputMetadata for corpus entry {corpus_idx}",
+                    "Couldn't find the GeneralizedInputMetadata for corpus entry {base:?}",
                 ))
             })
             .cloned()?;
