@@ -49,10 +49,9 @@ use libafl_qemu::{
     cmplog::{CmpLogMap, CmpLogObserver, QemuCmpLogChildHelper},
     edges::{QemuEdgeCoverageChildHelper, EDGES_MAP_PTR, EDGES_MAP_SIZE},
     elf::EasyElf,
-    emu::Emulator,
     filter_qemu_args,
     hooks::QemuHooks,
-    GuestReg, MmapPerms, NopEmuExitHandler, QemuForkExecutor, Regs,
+    GuestReg, MmapPerms, Qemu, QemuForkExecutor, Regs,
 };
 #[cfg(unix)]
 use nix::{self, unistd::dup};
@@ -148,35 +147,38 @@ fn fuzz(
 
     let args: Vec<String> = env::args().collect();
     let env: Vec<(String, String)> = env::vars().collect();
-    let emu = Emulator::new(&args, &env, NopEmuExitHandler)?;
+    let qemu = Qemu::init(&args, &env)?;
 
     let mut elf_buffer = Vec::new();
-    let elf = EasyElf::from_file(emu.binary_path(), &mut elf_buffer)?;
+    let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer)?;
 
     let test_one_input_ptr = elf
-        .resolve_symbol("LLVMFuzzerTestOneInput", emu.load_addr())
+        .resolve_symbol("LLVMFuzzerTestOneInput", qemu.load_addr())
         .expect("Symbol LLVMFuzzerTestOneInput not found");
     println!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
 
-    emu.set_breakpoint_addr(test_one_input_ptr); // LLVMFuzzerTestOneInput
+    qemu.set_breakpoint_addr(test_one_input_ptr); // LLVMFuzzerTestOneInput
     unsafe {
-        let _ = emu.run();
+        let _ = qemu.run();
     }
 
-    println!("Break at {:#x}", emu.read_reg::<_, u64>(Regs::Rip).unwrap());
+    println!(
+        "Break at {:#x}",
+        qemu.read_reg::<_, u64>(Regs::Rip).unwrap()
+    );
 
-    let stack_ptr: u64 = emu.read_reg(Regs::Rsp).unwrap();
+    let stack_ptr: u64 = qemu.read_reg(Regs::Rsp).unwrap();
     let mut ret_addr = [0; 8];
-    unsafe { emu.read_mem(stack_ptr, &mut ret_addr) };
+    unsafe { qemu.read_mem(stack_ptr, &mut ret_addr) };
     let ret_addr = u64::from_le_bytes(ret_addr);
 
     println!("Stack pointer = {stack_ptr:#x}");
     println!("Return address = {ret_addr:#x}");
 
-    emu.unset_breakpoint_addr(test_one_input_ptr); // LLVMFuzzerTestOneInput
-    emu.set_breakpoint_addr(ret_addr); // LLVMFuzzerTestOneInput ret addr
+    qemu.unset_breakpoint_addr(test_one_input_ptr); // LLVMFuzzerTestOneInput
+    qemu.set_breakpoint_addr(ret_addr); // LLVMFuzzerTestOneInput ret addr
 
-    let input_addr = emu.map_private(0, 4096, MmapPerms::ReadWrite).unwrap();
+    let input_addr = qemu.map_private(0, 4096, MmapPerms::ReadWrite).unwrap();
     println!("Placing input at {input_addr:#x}");
 
     let log = RefCell::new(
@@ -316,21 +318,21 @@ fn fuzz(
         }
 
         unsafe {
-            emu.write_mem(input_addr, buf);
+            qemu.write_mem(input_addr, buf);
 
-            emu.write_reg(Regs::Rdi, input_addr).unwrap();
-            emu.write_reg(Regs::Rsi, len as GuestReg).unwrap();
-            emu.write_reg(Regs::Rip, test_one_input_ptr).unwrap();
-            emu.write_reg(Regs::Rsp, stack_ptr).unwrap();
+            qemu.write_reg(Regs::Rdi, input_addr).unwrap();
+            qemu.write_reg(Regs::Rsi, len as GuestReg).unwrap();
+            qemu.write_reg(Regs::Rip, test_one_input_ptr).unwrap();
+            qemu.write_reg(Regs::Rsp, stack_ptr).unwrap();
 
-            let _ = emu.run();
+            let _ = qemu.run();
         }
 
         ExitKind::Ok
     };
 
     let mut hooks = QemuHooks::new(
-        emu.clone(),
+        qemu.clone(),
         tuple_list!(
             QemuEdgeCoverageChildHelper::default(),
             QemuCmpLogChildHelper::default(),
