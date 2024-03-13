@@ -38,11 +38,13 @@ where
         0
     }
 
-    /// Add an entry to the corpus and return its index
+    /// Add an enabled testcase to the corpus and return its index
     #[inline]
     fn add(&mut self, _testcase: Testcase<I>) -> Result<CorpusId, Error> {
         Err(Error::unsupported("Unsupported by NopCorpus"))
     }
+    
+    /// Add a disabled testcase to the corpus and return its index
     #[inline]
     fn add_disabled(&mut self, _testcase: Testcase<I>) -> Result<CorpusId, Error> {
         Err(Error::unsupported("Unsupported by NopCorpus"))

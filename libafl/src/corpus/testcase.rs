@@ -64,7 +64,7 @@ where
     scheduled_count: usize,
     /// Parent [`CorpusId`], if known
     parent_id: Option<CorpusId>,
-    /// If the testcase is considered to be "disabled"
+    /// If the testcase is "disabled"
     disabled: bool,
 }
 

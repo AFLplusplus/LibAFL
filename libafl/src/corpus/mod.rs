@@ -92,10 +92,10 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
         self.count() == 0
     }
 
-    /// Add an entry to the corpus and return its index
+    /// Add an enabled testcase to the corpus and return its index
     fn add(&mut self, testcase: Testcase<Self::Input>) -> Result<CorpusId, Error>;
 
-    /// Returns the number of elements, including disabled entries
+    /// Add a disabled testcase to the corpus and return its index
     fn add_disabled(&mut self, testcase: Testcase<Self::Input>) -> Result<CorpusId, Error>;
 
     /// Replaces the [`Testcase`] at the given idx, returning the existing.

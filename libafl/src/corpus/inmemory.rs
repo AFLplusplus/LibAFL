@@ -345,12 +345,13 @@ where
             .saturating_add(self.storage.disabled.map.len())
     }
 
-    /// Add an entry to the corpus and return its index
+    /// Add an enabled testcase to the corpus and return its index
     #[inline]
     fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         Ok(self.storage.insert(RefCell::new(testcase), false))
     }
-    /// Add an entry to the corpus and return its index
+    
+    /// Add a disabled testcase to the corpus and return its index
     #[inline]
     fn add_disabled(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         Ok(self
