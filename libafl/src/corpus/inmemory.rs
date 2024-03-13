@@ -28,28 +28,19 @@ where
     pub next: Option<CorpusId>,
 }
 
-#[cfg(not(feature = "corpus_btreemap"))]
-/// The map type in which testcases are stored (enable the feature `corpus_btreemap` to use a `BTreeMap` instead of `HashMap`)
-pub type TestcaseStorageMap<I> = hashbrown::HashMap<CorpusId, TestcaseStorageItem<I>>;
-
-#[cfg(feature = "corpus_btreemap")]
 /// The map type in which testcases are stored (disable the feature `corpus_btreemap` to use a `HashMap` instead of `BTreeMap`)
-pub type TestcaseStorageMap<I> =
-    alloc::collections::btree_map::BTreeMap<CorpusId, RefCell<Testcase<I>>>;
-
-/// Storage map for the testcases (used in `Corpus` implementations) with an incremental index
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct TestcaseStorage<I>
+pub struct TestcaseStorageMap<I>
 where
     I: Input,
 {
-    /// The map in which testcases are stored
-    pub map: TestcaseStorageMap<I>,
+    #[cfg(not(feature = "corpus_btreemap"))]
+    map: hashbrown::HashMap<CorpusId, TestcaseStorageItem<I>>,
+    #[cfg(feature = "corpus_btreemap")]
+    map: alloc::collections::btree_map::BTreeMap<CorpusId, RefCell<Testcase<I>>>,
     /// The keys in order (use `Vec::binary_search`)
     pub keys: Vec<CorpusId>,
-    /// The progressive idx
-    progressive_idx: usize,
     /// First inserted idx
     #[cfg(not(feature = "corpus_btreemap"))]
     first_idx: Option<CorpusId>,
@@ -58,14 +49,7 @@ where
     last_idx: Option<CorpusId>,
 }
 
-impl<I> UsesInput for TestcaseStorage<I>
-where
-    I: Input,
-{
-    type Input = I;
-}
-
-impl<I> TestcaseStorage<I>
+impl<I> TestcaseStorageMap<I>
 where
     I: Input,
 {
@@ -81,43 +65,6 @@ where
         if let Ok(idx) = self.keys.binary_search(&id) {
             self.keys.remove(idx);
         }
-    }
-
-    /// Insert a testcase assigning a `CorpusId` to it
-    #[cfg(not(feature = "corpus_btreemap"))]
-    pub fn insert(&mut self, testcase: RefCell<Testcase<I>>) -> CorpusId {
-        let idx = CorpusId::from(self.progressive_idx);
-        self.progressive_idx += 1;
-        let prev = if let Some(last_idx) = self.last_idx {
-            self.map.get_mut(&last_idx).unwrap().next = Some(idx);
-            Some(last_idx)
-        } else {
-            None
-        };
-        if self.first_idx.is_none() {
-            self.first_idx = Some(idx);
-        }
-        self.last_idx = Some(idx);
-        self.insert_key(idx);
-        self.map.insert(
-            idx,
-            TestcaseStorageItem {
-                testcase,
-                prev,
-                next: None,
-            },
-        );
-        idx
-    }
-
-    /// Insert a testcase assigning a `CorpusId` to it
-    #[cfg(feature = "corpus_btreemap")]
-    pub fn insert(&mut self, testcase: RefCell<Testcase<I>>) -> CorpusId {
-        let idx = CorpusId::from(self.progressive_idx);
-        self.progressive_idx += 1;
-        self.insert_key(idx);
-        self.map.insert(idx, testcase);
-        idx
     }
 
     /// Replace a testcase given a `CorpusId`
@@ -270,17 +217,94 @@ where
         self.map.iter().next_back().map(|x| *x.0)
     }
 
+    fn new() -> Self {
+        Self {
+            map: Default::default(),
+            keys: Vec::default(),
+            first_idx: None,
+            last_idx: None,
+        }
+    }
+}
+/// Storage map for the testcases (used in `Corpus` implementations) with an incremental index
+#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+#[serde(bound = "I: serde::de::DeserializeOwned")]
+pub struct TestcaseStorage<I>
+where
+    I: Input,
+{
+    /// The map in which testcases are stored
+    pub enabled: TestcaseStorageMap<I>,
+    pub disabled: TestcaseStorageMap<I>,
+    /// The progressive idx
+    progressive_idx: usize,
+}
+
+impl<I> UsesInput for TestcaseStorage<I>
+where
+    I: Input,
+{
+    type Input = I;
+}
+
+impl<I> TestcaseStorage<I>
+where
+    I: Input,
+{
+    /// Insert a testcase assigning a `CorpusId` to it
+    #[cfg(not(feature = "corpus_btreemap"))]
+    pub fn insert(&mut self, testcase: RefCell<Testcase<I>>, is_disabled: bool) -> CorpusId {
+        let idx = CorpusId::from(self.progressive_idx);
+        self.progressive_idx += 1;
+        let corpus = if is_disabled {
+            &mut self.disabled
+        } else {
+            &mut self.enabled
+        };
+        let prev = if let Some(last_idx) = corpus.last_idx {
+            corpus.map.get_mut(&last_idx).unwrap().next = Some(idx);
+            Some(last_idx)
+        } else {
+            None
+        };
+        if corpus.first_idx.is_none() {
+            corpus.first_idx = Some(idx);
+        }
+        corpus.last_idx = Some(idx);
+        corpus.insert_key(idx);
+        corpus.map.insert(
+            idx,
+            TestcaseStorageItem {
+                testcase,
+                prev,
+                next: None,
+            },
+        );
+        idx
+    }
+
+    /// Insert a testcase assigning a `CorpusId` to it
+    #[cfg(feature = "corpus_btreemap")]
+    pub fn insert(&mut self, testcase: RefCell<Testcase<I>>) -> CorpusId {
+        let idx = CorpusId::from(self.progressive_idx);
+        self.progressive_idx += 1;
+        let corpus = if is_disabled {
+            &mut self.disabled
+        } else {
+            &mut self.enabled
+        };
+        corpus.insert_key(idx);
+        corpus.map.insert(idx, testcase);
+        idx
+    }
+
     /// Create new `TestcaseStorage`
     #[must_use]
     pub fn new() -> Self {
         Self {
-            map: TestcaseStorageMap::default(),
-            keys: vec![],
+            enabled: TestcaseStorageMap::new(),
+            disabled: TestcaseStorageMap::new(),
             progressive_idx: 0,
-            #[cfg(not(feature = "corpus_btreemap"))]
-            first_idx: None,
-            #[cfg(not(feature = "corpus_btreemap"))]
-            last_idx: None,
         }
     }
 }
@@ -310,19 +334,37 @@ where
     /// Returns the number of elements
     #[inline]
     fn count(&self) -> usize {
-        self.storage.map.len()
+        self.storage.enabled.map.len()
+    }
+    #[inline]
+    fn count_with_disabled(&self) -> usize {
+        self.storage
+            .enabled
+            .map
+            .len()
+            .saturating_add(self.storage.disabled.map.len())
     }
 
     /// Add an entry to the corpus and return its index
     #[inline]
     fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
-        Ok(self.storage.insert(RefCell::new(testcase)))
+        Ok(self.storage.insert(RefCell::new(testcase), false))
+    }
+    /// Add an entry to the corpus and return its index
+    #[inline]
+    fn add_disabled(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
+        println!("adding disabled");
+        Ok(self
+            .storage
+            /*             .ok_or_else(|| Error::empty("No disabled storage for this corpus!"))? */
+            .insert(RefCell::new(testcase), true))
     }
 
     /// Replaces the testcase at the given idx
     #[inline]
     fn replace(&mut self, idx: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
         self.storage
+            .enabled
             .replace(idx, testcase)
             .ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
     }
@@ -331,6 +373,7 @@ where
     #[inline]
     fn remove(&mut self, idx: CorpusId) -> Result<Testcase<I>, Error> {
         self.storage
+            .enabled
             .remove(idx)
             .map(|x| x.take())
             .ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
@@ -339,9 +382,13 @@ where
     /// Get by id
     #[inline]
     fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
-        self.storage
-            .get(idx)
-            .ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
+        let mut testcase = self.storage
+            .enabled
+            .get(idx);
+        if testcase.is_none() {
+            testcase = self.storage.disabled.get(idx) 
+        }
+        testcase.ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
     }
 
     /// Current testcase scheduled
@@ -358,27 +405,31 @@ where
 
     #[inline]
     fn next(&self, idx: CorpusId) -> Option<CorpusId> {
-        self.storage.next(idx)
+        self.storage.enabled.next(idx)
     }
 
     #[inline]
     fn prev(&self, idx: CorpusId) -> Option<CorpusId> {
-        self.storage.prev(idx)
+        self.storage.enabled.prev(idx)
     }
 
     #[inline]
     fn first(&self) -> Option<CorpusId> {
-        self.storage.first()
+        self.storage.enabled.first()
     }
 
     #[inline]
     fn last(&self) -> Option<CorpusId> {
-        self.storage.last()
+        self.storage.enabled.last()
     }
 
     #[inline]
     fn nth(&self, nth: usize) -> CorpusId {
-        self.storage.keys[nth]
+        let enabled_count = self.count();
+        if nth > enabled_count {
+            return self.storage.disabled.keys[nth.saturating_sub(enabled_count)]
+        }
+        return self.storage.enabled.keys[nth]
     }
 
     #[inline]

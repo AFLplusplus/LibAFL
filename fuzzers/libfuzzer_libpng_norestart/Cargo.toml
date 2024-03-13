@@ -26,6 +26,7 @@ libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_h
 libafl_cc = { path = "../../libafl_cc/" }
 clap = { version = "4.1", features = ["derive"] }
 mimalloc = { version = "*", default-features = false }
+env_logger = "0.11.3"
 
 [lib]
 name = "libfuzzer_libpng"

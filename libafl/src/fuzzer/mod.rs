@@ -579,7 +579,7 @@ where
         // Add the disabled input to the main corpus
         self.feedback_mut()
             .append_metadata(state, observers, &mut testcase)?;
-        let idx = state.corpus_mut().add(testcase)?;
+        let idx = state.corpus_mut().add_disabled(testcase)?;
         self.scheduler_mut().on_add(state, idx)?;
         Ok(idx)
     }

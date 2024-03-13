@@ -27,7 +27,7 @@ fn extend_with_random_generalized<S>(
 where
     S: HasMetadata + HasRand + HasCorpus,
 {
-    let idx = random_corpus_id!(state.corpus(), state.rand_mut());
+    let idx = random_corpus_id!(state.corpus(), state.rand_mut(), false);
 
     if state.rand_mut().below(100) > CHOOSE_SUBINPUT_PROB {
         if state.rand_mut().below(100) < 50 {

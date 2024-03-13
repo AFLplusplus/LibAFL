@@ -47,10 +47,21 @@ where
         self.inner.count()
     }
 
+    /// Returns the number of elements
+    #[inline]
+    fn count_with_disabled(&self) -> usize {
+        self.inner.count()
+    }
+
     /// Add an entry to the corpus and return its index
     #[inline]
     fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         self.inner.add(testcase)
+    }
+
+    #[inline]
+    fn add_disabled(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
+        self.inner.add_disabled(testcase)
     }
 
     /// Replaces the testcase at the given idx

@@ -70,11 +70,24 @@ where
     fn count(&self) -> usize {
         self.inner.count()
     }
+    #[inline]
+    fn count_with_disabled(&self) -> usize {
+        self.inner.count()
+    }
 
     /// Add an entry to the corpus and return its index
     #[inline]
     fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         let idx = self.inner.add(testcase)?;
+        let testcase = &mut self.get(idx).unwrap().borrow_mut();
+        self.save_testcase(testcase, idx)?;
+        *testcase.input_mut() = None;
+        Ok(idx)
+    }
+    #[inline]
+    fn add_disabled(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
+        // TODO: does this need to be saved since its in seed dir anyways?
+        let idx = self.inner.add_disabled(testcase)?;
         let testcase = &mut self.get(idx).unwrap().borrow_mut();
         self.save_testcase(testcase, idx)?;
         *testcase.input_mut() = None;

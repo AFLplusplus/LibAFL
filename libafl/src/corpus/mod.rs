@@ -66,17 +66,26 @@ impl From<CorpusId> for usize {
 /// Utility macro to call `Corpus::random_id`
 #[macro_export]
 macro_rules! random_corpus_id {
-    ($corpus:expr, $rand:expr) => {{
-        let cnt = $corpus.count() as u64;
+    ($corpus:expr, $rand:expr, $incl_disabled:expr) => {{
+        let cnt: u64;
+        if $incl_disabled == true { 
+            cnt = $corpus.count_with_disabled() as u64;
+        } else {
+            cnt = $corpus.count() as u64;
+        }
         let nth = $rand.below(cnt) as usize;
+
         $corpus.nth(nth)
     }};
 }
 
 /// Corpus with all current [`Testcase`]s, or solutions
 pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
-    /// Returns the number of elements
+    /// Returns the number of elements; ignores disabled entries
     fn count(&self) -> usize;
+
+    /// Returns the number of elements, including disabled entries
+    fn count_with_disabled(&self) -> usize;
 
     /// Returns true, if no elements are in this corpus yet
     fn is_empty(&self) -> bool {
@@ -85,6 +94,9 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
 
     /// Add an entry to the corpus and return its index
     fn add(&mut self, testcase: Testcase<Self::Input>) -> Result<CorpusId, Error>;
+
+    /// Returns the number of elements, including disabled entries
+    fn add_disabled(&mut self, testcase: Testcase<Self::Input>) -> Result<CorpusId, Error>;
 
     /// Replaces the [`Testcase`] at the given idx, returning the existing.
     fn replace(
