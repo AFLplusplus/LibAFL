@@ -52,7 +52,7 @@ do
     cd "$fuzzer" || exit 1
     # Clippy checks
     echo "[*] Checking fmt for $fuzzer"
-    cargo fmt --all || exit 1
+    cargo +nightly fmt --all || exit 1
 
     if [ -e ./Makefile.toml ]; then
         echo "[*] Building $fuzzer"
