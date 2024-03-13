@@ -31,10 +31,10 @@ use libafl_bolts::{
 use libafl_qemu::{
     edges::{edges_map_mut_slice, QemuEdgeCoverageHelper, MAX_EDGES_NUM},
     elf::EasyElf,
-    emu::Emulator,
-    QemuExitReason, GuestPhysAddr, NopEmuExitHandler, QemuExecutor, QemuHooks, QemuShutdownCause,
-    Regs,
+    emu::Qemu,
+    QemuExecutor, QemuExitReason, QemuHooks, QemuShutdownCause, Regs,
 };
+use libafl_qemu_sys::GuestPhysAddr;
 
 pub static mut MAX_INPUT_SIZE: usize = 50;
 
@@ -85,17 +85,17 @@ pub fn fuzz() {
         // Initialize QEMU
         let args: Vec<String> = env::args().collect();
         let env: Vec<(String, String)> = env::vars().collect();
-        let emu = Emulator::new(&args, &env, NopEmuExitHandler).unwrap();
+        let qemu = Qemu::init(&args, &env).unwrap();
 
-        emu.set_breakpoint_addr(main_addr);
+        qemu.set_breakpoint_addr(main_addr);
         unsafe {
-            let _ = emu.run();
+            let _ = qemu.run();
         }
-        emu.unset_breakpoint_addr(main_addr);
+        qemu.unset_breakpoint_addr(main_addr);
 
-        emu.set_breakpoint_addr(breakpoint); // BREAKPOINT
+        qemu.set_breakpoint_addr(breakpoint); // BREAKPOINT
 
-        let devices = emu.list_devices();
+        let devices = qemu.list_devices();
         println!("Devices = {devices:?}");
 
         // let saved_cpu_states: Vec<_> = (0..emu.num_cpus())
@@ -104,7 +104,7 @@ pub fn fuzz() {
 
         // emu.save_snapshot("start", true);
 
-        let snap = emu.create_fast_snapshot(true);
+        let snap = qemu.create_fast_snapshot(true);
 
         // The wrapped harness function, calling out to the LLVM-style harness
         let mut harness = |input: &BytesInput| {
@@ -117,18 +117,18 @@ pub fn fuzz() {
                     // len = MAX_INPUT_SIZE;
                 }
 
-                emu.write_phys_mem(input_addr, buf);
+                qemu.write_phys_mem(input_addr, buf);
 
-                match emu.run() {
-                    Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(Signal::SigInterrupt))) => {
-                        process::exit(0)
-                    }
+                match qemu.run() {
+                    Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(
+                        Signal::SigInterrupt,
+                    ))) => process::exit(0),
                     _ => {}
                 }
 
                 // If the execution stops at any point other then the designated breakpoint (e.g. a breakpoint on a panic method) we consider it a crash
-                let mut pcs = (0..emu.num_cpus())
-                    .map(|i| emu.cpu_from_index(i))
+                let mut pcs = (0..qemu.num_cpus())
+                    .map(|i| qemu.cpu_from_index(i))
                     .map(|cpu| -> Result<u32, String> { cpu.read_reg(Regs::Pc) });
                 let ret = match pcs
                     .find(|pc| (breakpoint..breakpoint + 5).contains(pc.as_ref().unwrap_or(&0)))
@@ -146,7 +146,7 @@ pub fn fuzz() {
                 // emu.load_snapshot("start", true);
 
                 // OPTION 3: restore a fast devices+mem snapshot
-                emu.restore_fast_snapshot(snap);
+                qemu.restore_fast_snapshot(snap);
 
                 ret
             }
@@ -201,7 +201,8 @@ pub fn fuzz() {
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-        let mut hooks = QemuHooks::new(emu.clone(), tuple_list!(QemuEdgeCoverageHelper::default()));
+        let mut hooks =
+            QemuHooks::new(qemu.clone(), tuple_list!(QemuEdgeCoverageHelper::default()));
 
         // Create a QEMU in-process executor
         let mut executor = QemuExecutor::new(
