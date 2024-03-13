@@ -226,7 +226,7 @@ where
         self,
     ) -> Vec<Box<dyn Stage<E, EM, Z, State = Head::State, Input = Head::Input>>> {
         let (head, tail) = self.uncons();
-        let mut ret = tail.0.into_vec();
+        let mut ret = tail.0.into_vec_reversed();
         ret.push(Box::new(head));
         ret
     }

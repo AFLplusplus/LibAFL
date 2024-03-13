@@ -315,7 +315,7 @@ where
 {
     fn into_vec_reversed(self) -> Vec<Box<dyn Mutator<I, S>>> {
         let (head, tail) = self.uncons();
-        let mut ret = tail.into_vec();
+        let mut ret = tail.into_vec_reversed();
         ret.push(Box::new(head));
         ret
     }
