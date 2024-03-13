@@ -113,7 +113,7 @@ pub unsafe fn inproc_qemu_timeout_handler<'a, E, EM, OF, Z>(
     context: Option<&'a mut ucontext_t>,
     data: &'a mut InProcessExecutorHandlerData,
 ) where
-    E: Executor<EM, Z> + HasObservers + HasInProcessHooks<S>,
+    E: Executor<EM, Z> + HasObservers + HasInProcessHooks<E::State>,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
     OF: Feedback<E::State>,
     E::State: HasSolutions + HasCorpus + HasExecutions,
