@@ -122,7 +122,7 @@ pub mod unix_signal_handler {
         _context: Option<&mut ucontext_t>,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: HasObservers + HasInProcessHooks,
+        E: HasObservers + HasInProcessHooks<E::State>,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,

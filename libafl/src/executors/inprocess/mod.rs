@@ -62,7 +62,7 @@ pub struct GenericInProcessExecutor<H, HB, HT, OT, S>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
-    HT: ExecutorHooksTuple,
+    HT: ExecutorHooksTuple<S>,
     OT: ObserversTuple<S>,
     S: State,
 {
@@ -75,7 +75,7 @@ impl<H, HB, HT, OT, S> Debug for GenericInProcessExecutor<H, HB, HT, OT, S>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
-    HT: ExecutorHooksTuple,
+    HT: ExecutorHooksTuple<S>,
     OT: ObserversTuple<S> + Debug,
     S: State,
 {
@@ -91,7 +91,7 @@ impl<H, HB, HT, OT, S> UsesState for GenericInProcessExecutor<H, HB, HT, OT, S>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
-    HT: ExecutorHooksTuple,
+    HT: ExecutorHooksTuple<S>,
     OT: ObserversTuple<S>,
     S: State,
 {
@@ -102,7 +102,7 @@ impl<H, HB, HT, OT, S> UsesObservers for GenericInProcessExecutor<H, HB, HT, OT,
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
-    HT: ExecutorHooksTuple,
+    HT: ExecutorHooksTuple<S>,
     OT: ObserversTuple<S>,
     S: State,
 {
@@ -114,7 +114,7 @@ where
     EM: UsesState<State = S>,
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
-    HT: ExecutorHooksTuple,
+    HT: ExecutorHooksTuple<S>,
     OT: ObserversTuple<S>,
     S: State + HasExecutions,
     Z: UsesState<State = S>,
@@ -132,11 +132,11 @@ where
             self.inner
                 .enter_target(fuzzer, state, mgr, input, executor_ptr);
         }
-        self.inner.hooks.pre_exec_all(fuzzer, state, mgr, input);
+        self.inner.hooks.pre_exec_all(state, input);
 
         let ret = (self.harness_fn.borrow_mut())(input);
 
-        self.inner.hooks.post_exec_all(fuzzer, state, mgr, input);
+        self.inner.hooks.post_exec_all(state, input);
         self.inner.leave_target(fuzzer, state, mgr, input);
         Ok(ret)
     }
@@ -146,7 +146,7 @@ impl<H, HB, HT, OT, S> HasObservers for GenericInProcessExecutor<H, HB, HT, OT, 
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
-    HT: ExecutorHooksTuple,
+    HT: ExecutorHooksTuple<S>,
     OT: ObserversTuple<S>,
     S: State,
 {
@@ -269,7 +269,7 @@ impl<H, HB, HT, OT, S> GenericInProcessExecutor<H, HB, HT, OT, S>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
-    HT: ExecutorHooksTuple,
+    HT: ExecutorHooksTuple<S>,
     OT: ObserversTuple<S>,
     S: State + HasExecutions + HasSolutions + HasCorpus,
 {
@@ -377,43 +377,46 @@ where
 
     /// The inprocess handlers
     #[inline]
-    pub fn hooks(&self) -> &(InProcessHooks, HT) {
+    pub fn hooks(&self) -> &(InProcessHooks<S>, HT) {
         self.inner.hooks()
     }
 
     /// The inprocess handlers (mutable)
     #[inline]
-    pub fn hooks_mut(&mut self) -> &mut (InProcessHooks, HT) {
+    pub fn hooks_mut(&mut self) -> &mut (InProcessHooks<S>, HT) {
         self.inner.hooks_mut()
     }
 }
 
 /// The struct has [`InProcessHooks`].
-pub trait HasInProcessHooks {
+pub trait HasInProcessHooks<S>
+where
+    S: UsesInput,
+{
     /// Get the in-process handlers.
-    fn inprocess_hooks(&self) -> &InProcessHooks;
+    fn inprocess_hooks(&self) -> &InProcessHooks<S>;
 
     /// Get the mut in-process handlers.
-    fn inprocess_hooks_mut(&mut self) -> &mut InProcessHooks;
+    fn inprocess_hooks_mut(&mut self) -> &mut InProcessHooks<S>;
 }
 
-impl<H, HB, HT, OT, S> HasInProcessHooks for GenericInProcessExecutor<H, HB, HT, OT, S>
+impl<H, HB, HT, OT, S> HasInProcessHooks<S> for GenericInProcessExecutor<H, HB, HT, OT, S>
 where
     H: FnMut(&<S as UsesInput>::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
-    HT: ExecutorHooksTuple,
+    HT: ExecutorHooksTuple<S>,
     OT: ObserversTuple<S>,
     S: State + HasExecutions + HasSolutions + HasCorpus,
 {
     /// the timeout handler
     #[inline]
-    fn inprocess_hooks(&self) -> &InProcessHooks {
+    fn inprocess_hooks(&self) -> &InProcessHooks<S> {
         self.inner.inprocess_hooks()
     }
 
     /// the timeout handler
     #[inline]
-    fn inprocess_hooks_mut(&mut self) -> &mut InProcessHooks {
+    fn inprocess_hooks_mut(&mut self) -> &mut InProcessHooks<S> {
         self.inner.inprocess_hooks_mut()
     }
 }
