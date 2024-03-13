@@ -326,7 +326,7 @@ where
         let size = input.codes().len();
 
         // We don't want to use the testcase we're already using for splicing
-        let idx = random_corpus_id!(state.corpus(), state.rand_mut(), false);
+        let idx = random_corpus_id!(state.corpus(), state.rand_mut(), true);
         if let Some(cur) = state.corpus().current() {
             if idx == *cur {
                 return Ok(MutationResult::Skipped);
@@ -403,7 +403,7 @@ where
         }
 
         // We don't want to use the testcase we're already using for splicing
-        let idx = random_corpus_id!(state.corpus(), state.rand_mut(), false);
+        let idx = random_corpus_id!(state.corpus(), state.rand_mut(), true);
         if let Some(cur) = state.corpus().current() {
             if idx == *cur {
                 return Ok(MutationResult::Skipped);
