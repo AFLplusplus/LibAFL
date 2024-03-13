@@ -83,6 +83,7 @@ pub trait ExecutionProcessor<OT>: UsesState {
         EM: EventFirer<State = Self::State>;
 
     /// Process `ExecuteInputResult`. Add to corpus, solution or ignore
+    #[allow(clippy::too_many_arguments)]
     fn process_execution<EM>(
         &mut self,
         state: &mut Self::State,

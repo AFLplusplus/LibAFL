@@ -219,7 +219,10 @@ where
 
     fn new() -> Self {
         Self {
-            map: Default::default(),
+            #[cfg(not(feature = "corpus_btreemap"))]
+            map: hashbrown::HashMap::default(),
+            #[cfg(feature = "corpus_btreemap")]
+            map: alloc::collections::BTreeMap::default(),
             keys: Vec::default(),
             #[cfg(not(feature = "corpus_btreemap"))]
             first_idx: None,
