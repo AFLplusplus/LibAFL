@@ -82,7 +82,10 @@ pub struct CtxHook<S> {
 }
 
 #[cfg(feature = "sancov_ctx")]
-impl<S> CtxHook<S> {
+impl<S> CtxHook<S>
+where
+    S: libafl::inputs::UsesInput,
+{
     /// The constructor for this struct
     pub fn new() -> Self {
         Self {
@@ -113,7 +116,10 @@ where
 }
 
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
-impl<S> NgramHook<S> {
+impl<S> NgramHook<S>
+where
+    S: libafl::inputs::UsesInput,
+{
     /// The constructor for this struct
     pub fn new() -> Self {
         Self {
