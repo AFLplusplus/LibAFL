@@ -80,7 +80,7 @@ where
         Ok(testcase)
     }
 
-    /// Get by id
+    /// Get by id; will check the disabled corpus if not available in the enabled
     #[inline]
     fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
         let testcase = { self.inner.get(idx)? };
@@ -136,6 +136,7 @@ where
         self.inner.last()
     }
 
+    /// will check the disabled corpus if not available in the enabled
     #[inline]
     fn nth(&self, nth: usize) -> CorpusId {
         self.inner.nth(nth)

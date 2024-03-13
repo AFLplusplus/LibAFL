@@ -90,7 +90,6 @@ where
     /// Add a disabled testcase to the corpus and return its index
     #[inline]
     fn add_disabled(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
-        // TODO: does this need to be saved since its in seed dir anyways?
         let idx = self.inner.add_disabled(testcase)?;
         let testcase = &mut self.get(idx).unwrap().borrow_mut();
         self.save_testcase(testcase, idx)?;
@@ -117,7 +116,7 @@ where
         Ok(entry)
     }
 
-    /// Get by id
+    /// Get by id; will check the disabled corpus if not available in the enabled
     #[inline]
     fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
         self.inner.get(idx)
@@ -155,6 +154,7 @@ where
         self.inner.last()
     }
 
+    /// will check the disabled corpus if not available in the enabled
     #[inline]
     fn nth(&self, nth: usize) -> CorpusId {
         self.inner.nth(nth)

@@ -380,7 +380,7 @@ where
             .ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
     }
 
-    /// Get by id
+    /// Get by id; will check the disabled corpus if not available in the enabled
     #[inline]
     fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
         let mut testcase = self.storage
@@ -424,6 +424,7 @@ where
         self.storage.enabled.last()
     }
 
+    /// will check the disabled corpus if not available in the enabled
     #[inline]
     fn nth(&self, nth: usize) -> CorpusId {
         let enabled_count = self.count();

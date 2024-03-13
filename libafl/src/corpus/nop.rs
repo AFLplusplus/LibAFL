@@ -64,7 +64,7 @@ where
         Err(Error::unsupported("Unsupported by NopCorpus"))
     }
 
-    /// Get by id
+    /// Get by id; will check the disabled corpus if not available in the enabled
     #[inline]
     fn get(&self, _idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
         Err(Error::unsupported("Unsupported by NopCorpus"))
@@ -102,6 +102,7 @@ where
         None
     }
 
+    /// will check the disabled corpus if not available in the enabled
     #[inline]
     fn nth(&self, _nth: usize) -> CorpusId {
         CorpusId::from(0_usize)
