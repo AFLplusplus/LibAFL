@@ -133,7 +133,7 @@ pub extern "C" fn libafl_main() {
     // Needed only on no_std
     // unsafe { RegistryBuilder::register::<Tokens>(); }
     let opt = Opt::parse();
-    env_logger::init();
+    
     let broker_port = opt.broker_port;
     let cores = opt.cores;
 
