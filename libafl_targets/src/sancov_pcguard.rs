@@ -56,39 +56,39 @@ pub static SHR_4: Ngram4 = Ngram4::from_array([1, 1, 1, 1]);
 #[rustversion::nightly]
 pub static SHR_8: Ngram8 = Ngram8::from_array([1, 1, 1, 1, 1, 1, 1, 1]);
 
-#[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8", feature = "sancov_ctx"))]
+#[cfg(any(
+    feature = "sancov_ngram4",
+    feature = "sancov_ngram8",
+    feature = "sancov_ctx"
+))]
 use core::marker::PhantomData;
 
 /// The hook to initialize ngram everytime we run the harness
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
 #[rustversion::nightly]
 #[derive(Default, Debug, Clone, Copy)]
-pub struct NgramHook<S> 
+pub struct NgramHook<S>
 where
     S: libafl::inputs::UsesInput,
 {
-    phantom: PhantomData<S>
+    phantom: PhantomData<S>,
 }
 
 /// The hook to initialize ctx everytime we run the harness
 #[cfg(feature = "sancov_ctx")]
 #[derive(Default, Debug, Clone, Copy)]
 pub struct CtxHook<S> {
-    phantom: PhantomData<S>
+    phantom: PhantomData<S>,
 }
 
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
 #[rustversion::nightly]
-impl<S> ExecutorHook<S> for NgramHook<S> 
+impl<S> ExecutorHook<S> for NgramHook<S>
 where
     S: libafl::inputs::UsesInput,
 {
     fn init<E: HasObservers>(&mut self, _state: &mut S) {}
-    fn pre_exec(
-        &mut self,
-        _state: &mut S,
-        _input: &S::Input,
-    ) {
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) {
         #[cfg(feature = "sancov_ngram4")]
         unsafe {
             PREV_ARRAY_4 = Ngram4::from_array([0, 0, 0, 0]);
@@ -99,35 +99,21 @@ where
             PREV_ARRAY_8 = Ngram8::from_array([0, 0, 0, 0, 0, 0, 0, 0]);
         }
     }
-    fn post_exec(
-        &mut self,
-        _state: &mut S,
-        _input: &S::Input,
-    ) {
-    }
+    fn post_exec(&mut self, _state: &mut S, _input: &S::Input) {}
 }
 
 #[cfg(feature = "sancov_ctx")]
-impl<S> ExecutorHook<S> for CtxHook<S> 
+impl<S> ExecutorHook<S> for CtxHook<S>
 where
     S: libafl::inputs::UsesInput,
 {
     fn init<E: HasObservers>(&mut self, _state: &mut S) {}
-    fn pre_exec(
-        &mut self,
-        _state: &mut S,
-        _input: &S::Input,
-    ) {
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) {
         unsafe {
             __afl_prev_ctx = 0;
         }
     }
-    fn post_exec(
-        &mut self,
-        _state: &mut S,
-        _input: &S::Input,
-    ) {
-    }
+    fn post_exec(&mut self, _state: &mut S, _input: &S::Input) {}
 }
 
 #[rustversion::nightly]

@@ -319,7 +319,7 @@ where
     #[allow(unused_variables)]
     pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
     where
-        E: Executor<EM, Z> + HasObservers + HasInProcessHooks,
+        E: Executor<EM, Z> + HasObservers + HasInProcessHooks<E::State>,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
