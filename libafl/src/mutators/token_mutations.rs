@@ -615,8 +615,8 @@ pub struct AFLppRedQueen {
     enable_transform: bool,
     enable_arith: bool,
     text_type: TextType,
-    /// We use this variable to check if we scheduled a new corpus_idx
-    /// - and, hence, need to recalculate `text_type``
+    /// We use this variable to check if we scheduled a new `corpus_idx`
+    /// - and, hence, need to recalculate `text_type`
     last_corpus_idx: Option<CorpusId>,
 }
 
