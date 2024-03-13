@@ -41,13 +41,13 @@ impl<I> Corpus for CachedOnDiskCorpus<I>
 where
     I: Input,
 {
-    /// Returns the number of elements
+    /// Returns the number of elements excluding disabled entries
     #[inline]
     fn count(&self) -> usize {
         self.inner.count()
     }
 
-    /// Returns the number of elements
+    /// Returns the number of elements including disabled entries
     #[inline]
     fn count_with_disabled(&self) -> usize {
         self.inner.count()

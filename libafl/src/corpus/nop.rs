@@ -28,11 +28,13 @@ impl<I> Corpus for NopCorpus<I>
 where
     I: Input,
 {
-    /// Returns the number of elements
+    /// Returns the number of elements excluding disabled entries
     #[inline]
     fn count(&self) -> usize {
         0
     }
+    
+    /// Returns the number of elements including disabled entries
     #[inline]
     fn count_with_disabled(&self) -> usize {
         0

@@ -331,11 +331,13 @@ impl<I> Corpus for InMemoryCorpus<I>
 where
     I: Input,
 {
-    /// Returns the number of elements
+    /// Returns the number of elements excluding disabled entries
     #[inline]
     fn count(&self) -> usize {
         self.storage.enabled.map.len()
     }
+    
+    /// Returns the number of elements including disabled entries
     #[inline]
     fn count_with_disabled(&self) -> usize {
         self.storage
