@@ -122,6 +122,7 @@ impl CPU {
     }
 }
 
+#[allow(clippy::unused_self)]
 impl Qemu {
     #[must_use]
     pub fn mappings(&self) -> GuestMaps {
@@ -190,9 +191,9 @@ impl Qemu {
         unsafe { mmap_next_start = start };
     }
 
-    #[allow(clippy::cast_sign_loss, clippy::unused_self)]
+    #[allow(clippy::cast_sign_loss)]
     fn mmap(
-        &self,
+        self,
         addr: GuestAddr,
         size: usize,
         perms: MmapPerms,

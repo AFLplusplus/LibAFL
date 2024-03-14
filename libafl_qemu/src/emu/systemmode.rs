@@ -294,6 +294,7 @@ impl CPU {
     }
 }
 
+#[allow(clippy::unused_self)]
 impl Qemu {
     /// Write a value to a phsical guest address, including ROM areas.
     pub unsafe fn write_phys_mem(&self, paddr: GuestPhysAddr, buf: &[u8]) {

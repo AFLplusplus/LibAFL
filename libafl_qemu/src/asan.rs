@@ -757,7 +757,7 @@ impl QemuAsanHelper {
         filter: QemuInstrumentationAddressRangeFilter,
         options: QemuAsanOptions,
     ) -> Self {
-        assert!(unsafe { ASAN_INITED }, "The ASan runtime is not initialized, use init_with_asan(...) instead of just Emulator::new(...)");
+        assert!(unsafe { ASAN_INITED }, "The ASan runtime is not initialized, use init_qemu_with_asan(...) instead of just Qemu::init(...)");
         let (snapshot, detect_leaks) = match options {
             QemuAsanOptions::None => (false, false),
             QemuAsanOptions::Snapshot => (true, false),
@@ -781,7 +781,7 @@ impl QemuAsanHelper {
         error_callback: AsanErrorCallback,
         options: QemuAsanOptions,
     ) -> Self {
-        assert!(unsafe { ASAN_INITED }, "The ASan runtime is not initialized, use init_with_asan(...) instead of just Emulator::new(...)");
+        assert!(unsafe { ASAN_INITED },  "The ASan runtime is not initialized, use init_qemu_with_asan(...) instead of just Qemu::init(...)");
         let (snapshot, detect_leaks) = match options {
             QemuAsanOptions::None => (false, false),
             QemuAsanOptions::Snapshot => (true, false),

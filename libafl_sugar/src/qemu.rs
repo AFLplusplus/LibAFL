@@ -214,7 +214,7 @@ where
 
             if self.use_cmplog.unwrap_or(false) {
                 let mut hooks = QemuHooks::new(
-                    qemu.clone(),
+                    *qemu,
                     #[cfg(not(any(feature = "mips", feature = "hexagon")))]
                     tuple_list!(
                         QemuEdgeCoverageHelper::default(),
@@ -326,7 +326,7 @@ where
                 }
             } else {
                 let mut hooks =
-                    QemuHooks::new(qemu.clone(), tuple_list!(QemuEdgeCoverageHelper::default()));
+                    QemuHooks::new(*qemu, tuple_list!(QemuEdgeCoverageHelper::default()));
 
                 let mut executor = QemuExecutor::new(
                     &mut hooks,

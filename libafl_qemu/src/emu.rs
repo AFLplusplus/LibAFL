@@ -841,17 +841,7 @@ where
     qemu: Qemu,
 }
 
-// impl<QT, S, E> EmulatorState<QT, S, E>
-// where
-//     QT: QemuHelperTuple<S>,
-//     S: State + HasExecutions,
-//     E: IsEmuExitHandler<QT, S>,
-// {
-//     pub fn exit_handler(&self) -> &RefCell<E> {
-//         &self.exit_handler
-//     }
-// }
-
+#[allow(clippy::unused_self)]
 impl Qemu {
     #[allow(clippy::must_use_candidate, clippy::similar_names)]
     pub fn init(args: &[String], env: &[(String, String)]) -> Result<Self, EmuError> {
