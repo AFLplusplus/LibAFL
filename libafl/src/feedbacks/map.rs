@@ -318,7 +318,7 @@ where
 {
     /// Contains information about untouched entries
     pub history_map: Vec<T>,
-    /// Tells us how many non-zero entries there are in `history_map`
+    /// Tells us how many non-initial entries there are in `history_map`
     pub num_covered_map_indexes: usize,
 }
 
@@ -653,28 +653,6 @@ where
                     }
                 }
             }
-        }
-
-        let initial = observer.initial();
-        if interesting {
-            let len = history_map.len();
-            let covered = history_map
-                .iter()
-                .fold(0, |acc, x| acc + if *x != initial { 1 } else { 0 });
-            // opt: if not tracking optimisations, we technically don't show the *current* history
-            // map but the *last* history map; this is better than walking over and allocating
-            // unnecessarily
-            manager.fire(
-                state,
-                Event::UpdateUserStats {
-                    name: self.stats_name.to_string(),
-                    value: UserStats::new(
-                        UserStatsValue::Ratio(covered as u64, len as u64),
-                        AggregatorOps::Avg,
-                    ),
-                    phantom: PhantomData,
-                },
-            )?;
         }
 
         Ok(interesting)
