@@ -554,7 +554,7 @@ where
     fn is_interesting<EM, OT>(
         &mut self,
         state: &mut S,
-        manager: &mut EM,
+        _manager: &mut EM,
         _input: &S::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
