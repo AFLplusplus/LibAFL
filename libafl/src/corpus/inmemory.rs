@@ -259,7 +259,18 @@ where
 {
     /// Insert a testcase assigning a `CorpusId` to it
     #[cfg(not(feature = "corpus_btreemap"))]
-    pub fn insert(&mut self, testcase: RefCell<Testcase<I>>, is_disabled: bool) -> CorpusId {
+    pub fn insert(&mut self, testcase: RefCell<Testcase<I>>) -> CorpusId {
+        self.do_insert(testcase, false)
+    }
+
+    /// Insert a testcase assigning a `CorpusId` to it
+    #[cfg(not(feature = "corpus_btreemap"))]
+    pub fn insert_disabled(&mut self, testcase: RefCell<Testcase<I>>) -> CorpusId {
+        self.do_insert(testcase, true)
+    }
+    /// Insert a testcase assigning a `CorpusId` to it
+    #[cfg(not(feature = "corpus_btreemap"))]
+    pub fn do_insert(&mut self, testcase: RefCell<Testcase<I>>, is_disabled: bool) -> CorpusId {
         let idx = CorpusId::from(self.progressive_idx);
         self.progressive_idx += 1;
         let corpus = if is_disabled {
@@ -291,7 +302,7 @@ where
 
     /// Insert a testcase assigning a `CorpusId` to it
     #[cfg(feature = "corpus_btreemap")]
-    pub fn insert(&mut self, testcase: RefCell<Testcase<I>>, is_disabled: bool) -> CorpusId {
+    pub fn do_insert(&mut self, testcase: RefCell<Testcase<I>>, is_disabled: bool) -> CorpusId {
         let idx = CorpusId::from(self.progressive_idx);
         self.progressive_idx += 1;
         let corpus = if is_disabled {
@@ -302,6 +313,18 @@ where
         corpus.insert_key(idx);
         corpus.map.insert(idx, testcase);
         idx
+    }
+
+    /// Insert a testcase assigning a `CorpusId` to it
+    #[cfg(feature = "corpus_btreemap")]
+    pub fn insert(&mut self, testcase: RefCell<Testcase<I>>) -> CorpusId {
+        self.do_insert(testcase, false)
+    }
+
+    /// Insert a testcase assigning a `CorpusId` to it
+    #[cfg(feature = "corpus_btreemap")]
+    pub fn insert_disabled(&mut self, testcase: RefCell<Testcase<I>>) -> CorpusId {
+        self.do_insert(testcase, true)
     }
 
     /// Create new `TestcaseStorage`
@@ -361,13 +384,13 @@ where
     /// Add an enabled testcase to the corpus and return its index
     #[inline]
     fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
-        Ok(self.storage.insert(RefCell::new(testcase), false))
+        Ok(self.storage.insert(RefCell::new(testcase)))
     }
 
     /// Add a disabled testcase to the corpus and return its index
     #[inline]
     fn add_disabled(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
-        Ok(self.storage.insert(RefCell::new(testcase), true))
+        Ok(self.storage.insert_disabled(RefCell::new(testcase)))
     }
 
     /// Replaces the testcase at the given idx
