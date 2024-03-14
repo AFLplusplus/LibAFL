@@ -318,6 +318,8 @@ where
 {
     /// Contains information about untouched entries
     pub history_map: Vec<T>,
+    /// Tells us how many non-zero entries there are in `history_map`
+    pub num_covered_map_indexes: usize,
 }
 
 libafl_bolts::impl_serdeany!(
@@ -327,21 +329,29 @@ libafl_bolts::impl_serdeany!(
 
 impl<T> MapFeedbackMetadata<T>
 where
-    T: Default + Copy + 'static + Serialize + DeserializeOwned,
+    T: Default + Copy + 'static + Serialize + DeserializeOwned + PartialEq,
 {
     /// Create new `MapFeedbackMetadata`
     #[must_use]
     pub fn new(map_size: usize) -> Self {
         Self {
             history_map: vec![T::default(); map_size],
+            num_covered_map_indexes: 0,
         }
     }
 
     /// Create new `MapFeedbackMetadata` using a name and a map.
     /// The map can be shared.
+    /// `initial_elem_value` is used to calculate `Self.num_covered_map_indexes`
     #[must_use]
-    pub fn with_history_map(history_map: Vec<T>) -> Self {
-        Self { history_map }
+    pub fn with_history_map(history_map: Vec<T>, initial_elem_value: T) -> Self {
+        let num_covered_map_indexes = history_map
+            .iter()
+            .fold(0, |acc, x| acc + usize::from(*x != initial_elem_value));
+        Self {
+            history_map,
+            num_covered_map_indexes,
+        }
     }
 
     /// Reset the map
@@ -350,6 +360,7 @@ where
         for i in 0..cnt {
             self.history_map[i] = T::default();
         }
+        self.num_covered_map_indexes = 0;
         Ok(())
     }
 
@@ -359,6 +370,9 @@ where
         for i in 0..cnt {
             self.history_map[i] = value;
         }
+        // assume that resetting the map should indicate no coverage,
+        // regardless of value
+        self.num_covered_map_indexes = 0;
         Ok(())
     }
 }
@@ -462,7 +476,6 @@ where
         }
 
         let history_map = map_state.history_map.as_mut_slice();
-        let mut filled = 0;
         if self.indexes {
             let mut indices = Vec::new();
 
@@ -472,10 +485,12 @@ where
                 .enumerate()
                 .filter(|(_, value)| *value != initial)
             {
+                if history_map[i] == initial {
+                    map_state.num_covered_map_indexes += 1;
+                }
                 history_map[i] = R::reduce(history_map[i], value);
                 indices.push(i);
             }
-            filled = indices.len();
             let meta = MapIndexesMetadata::new(indices);
             testcase.add_metadata(meta);
         } else {
@@ -485,12 +500,27 @@ where
                 .enumerate()
                 .filter(|(_, value)| *value != initial)
             {
+                if history_map[i] == initial {
+                    map_state.num_covered_map_indexes += 1;
+                }
                 history_map[i] = R::reduce(history_map[i], value);
-                filled += 1;
             }
         }
 
+        debug_assert!(
+            history_map
+                .iter()
+                .fold(0, |acc, x| acc + usize::from(*x != initial))
+                == map_state.num_covered_map_indexes,
+            "history_map had {} filled, but map_state.num_covered_map_indexes was {}",
+            history_map
+                .iter()
+                .fold(0, |acc, x| acc + usize::from(*x != initial)),
+            map_state.num_covered_map_indexes,
+        );
+
         // at this point you are executing this code, the testcase is always interesting
+        let covered = map_state.num_covered_map_indexes;
         let len = history_map.len();
         // opt: if not tracking optimisations, we technically don't show the *current* history
         // map but the *last* history map; this is better than walking over and allocating
@@ -500,13 +530,7 @@ where
             Event::UpdateUserStats {
                 name: self.stats_name.to_string(),
                 value: UserStats::new(
-                    UserStatsValue::Ratio(
-                        self.novelties
-                            .as_ref()
-                            .map_or(filled, |novelties| filled + novelties.len())
-                            as u64,
-                        len as u64,
-                    ),
+                    UserStatsValue::Ratio(covered as u64, len as u64),
                     AggregatorOps::Avg,
                 ),
                 phantom: PhantomData,
@@ -634,7 +658,9 @@ where
         let initial = observer.initial();
         if interesting {
             let len = history_map.len();
-            let filled = history_map.iter().filter(|&&i| i != initial).count();
+            let covered = history_map
+                .iter()
+                .fold(0, |acc, x| acc + if *x != initial { 1 } else { 0 });
             // opt: if not tracking optimisations, we technically don't show the *current* history
             // map but the *last* history map; this is better than walking over and allocating
             // unnecessarily
@@ -643,13 +669,7 @@ where
                 Event::UpdateUserStats {
                     name: self.stats_name.to_string(),
                     value: UserStats::new(
-                        UserStatsValue::Ratio(
-                            self.novelties
-                                .as_ref()
-                                .map_or(filled, |novelties| filled + novelties.len())
-                                as u64,
-                            len as u64,
-                        ),
+                        UserStatsValue::Ratio(covered as u64, len as u64),
                         AggregatorOps::Avg,
                     ),
                     phantom: PhantomData,
