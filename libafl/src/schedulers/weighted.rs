@@ -305,7 +305,7 @@ where
         if corpus_counts == 0 {
             Err(Error::empty(String::from("No entries in corpus")))
         } else {
-            let s = random_corpus_id!(state.corpus(), state.rand_mut(), false);
+            let s = random_corpus_id!(state.corpus(), state.rand_mut());
 
             // Choose a random value between 0.000000000 and 1.000000000
             let probability = state.rand_mut().between(0, 1000000000) as f64 / 1000000000_f64;

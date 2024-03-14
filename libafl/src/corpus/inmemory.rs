@@ -238,10 +238,11 @@ pub struct TestcaseStorage<I>
 where
     I: Input,
 {
-    /// The map in which testcases are stored
+    /// The map in which enabled testcases are stored
     pub enabled: TestcaseStorageMap<I>,
+    /// The map in which disabled testcases are stored
     pub disabled: TestcaseStorageMap<I>,
-    /// The progressive idx
+    /// The progressive idx for both maps
     progressive_idx: usize,
 }
 
@@ -388,9 +389,16 @@ where
             .ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
     }
 
-    /// Get by id; will check the disabled corpus if not available in the enabled
+    /// Get by id; considers only enabled testcases
     #[inline]
     fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
+        self.storage
+            .enabled
+            .get(idx)
+            .ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
+    }
+    /// Get by id; considers both enabled and disabled testcases
+    fn get_from_all(&self, idx: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error> {
         let mut testcase = self.storage.enabled.get(idx);
         if testcase.is_none() {
             testcase = self.storage.disabled.get(idx);
@@ -430,9 +438,15 @@ where
         self.storage.enabled.last()
     }
 
-    /// will check the disabled corpus if not available in the enabled
+    /// Get the nth corpus id; considers only enabled testcases
     #[inline]
     fn nth(&self, nth: usize) -> CorpusId {
+        self.storage.enabled.keys[nth]
+    }
+
+    /// Get the nth corpus id; considers both enabled and disabled testcases
+    #[inline]
+    fn nth_from_all(&self, nth: usize) -> CorpusId {
         let enabled_count = self.count();
         if nth > enabled_count {
             return self.storage.disabled.keys[nth.saturating_sub(enabled_count)];

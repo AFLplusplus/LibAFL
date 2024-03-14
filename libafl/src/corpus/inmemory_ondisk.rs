@@ -121,10 +121,16 @@ where
         Ok(entry)
     }
 
-    /// Get by id; will check the disabled corpus if not available in the enabled
+    /// Get by id; considers only enabled testcases
     #[inline]
     fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
         self.inner.get(idx)
+    }
+
+    /// Get by id; considers both enabled and disabled testcases
+    #[inline]
+    fn get_from_all(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
+        self.inner.get_from_all(idx)
     }
 
     /// Current testcase scheduled
@@ -159,10 +165,15 @@ where
         self.inner.last()
     }
 
-    /// will check the disabled corpus if not available in the enabled
+    /// Get the nth corpus id; considers only enabled testcases
     #[inline]
     fn nth(&self, nth: usize) -> CorpusId {
         self.inner.nth(nth)
+    }
+    /// Get the nth corpus id; considers both enabled and disabled testcases
+    #[inline]
+    fn nth_from_all(&self, nth: usize) -> CorpusId {
+        self.inner.nth_from_all(nth)
     }
 
     fn load_input_into(&self, testcase: &mut Testcase<Self::Input>) -> Result<(), Error> {

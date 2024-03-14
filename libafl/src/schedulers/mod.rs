@@ -302,7 +302,7 @@ where
         if state.corpus().count() == 0 {
             Err(Error::empty("No entries in corpus".to_owned()))
         } else {
-            let id = random_corpus_id!(state.corpus(), state.rand_mut(), false);
+            let id = random_corpus_id!(state.corpus(), state.rand_mut());
             self.set_current_scheduled(state, Some(id))?;
             Ok(id)
         }
