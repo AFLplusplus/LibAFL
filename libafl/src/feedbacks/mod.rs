@@ -109,14 +109,16 @@ where
     /// Append to the testcase the generated metadata in case of a new corpus item
     #[inline]
     #[allow(unused_variables)]
-    fn append_metadata<OT>(
+    fn append_metadata<EM, OT>(
         &mut self,
         state: &mut S,
+        manager: &mut EM,
         observers: &OT,
         testcase: &mut Testcase<S::Input>,
     ) -> Result<(), Error>
     where
         OT: ObserversTuple<S>,
+        EM: EventFirer<State = S>,
     {
         Ok(())
     }
@@ -245,17 +247,21 @@ where
     }
 
     #[inline]
-    fn append_metadata<OT>(
+    fn append_metadata<EM, OT>(
         &mut self,
         state: &mut S,
+        manager: &mut EM,
         observers: &OT,
         testcase: &mut Testcase<S::Input>,
     ) -> Result<(), Error>
     where
         OT: ObserversTuple<S>,
+        EM: EventFirer<State = S>,
     {
-        self.first.append_metadata(state, observers, testcase)?;
-        self.second.append_metadata(state, observers, testcase)
+        self.first
+            .append_metadata(state, manager, observers, testcase)?;
+        self.second
+            .append_metadata(state, manager, observers, testcase)
     }
 
     #[inline]
@@ -659,16 +665,19 @@ where
     }
 
     #[inline]
-    fn append_metadata<OT>(
+    fn append_metadata<EM, OT>(
         &mut self,
         state: &mut S,
+        manager: &mut EM,
         observers: &OT,
         testcase: &mut Testcase<S::Input>,
     ) -> Result<(), Error>
     where
         OT: ObserversTuple<S>,
+        EM: EventFirer<State = S>,
     {
-        self.first.append_metadata(state, observers, testcase)
+        self.first
+            .append_metadata(state, manager, observers, testcase)
     }
 
     #[inline]
@@ -915,14 +924,16 @@ where
 
     /// Append to the testcase the generated metadata in case of a new corpus item
     #[inline]
-    fn append_metadata<OT>(
+    fn append_metadata<EM, OT>(
         &mut self,
         _state: &mut S,
+        _manager: &mut EM,
         observers: &OT,
         testcase: &mut Testcase<S::Input>,
     ) -> Result<(), Error>
     where
         OT: ObserversTuple<S>,
+        EM: EventFirer<State = S>,
     {
         let observer = observers.match_name::<TimeObserver>(self.name()).unwrap();
         *testcase.exec_time_mut() = *observer.last_runtime();
@@ -1212,9 +1223,10 @@ pub mod pybind {
             })?)
         }
 
-        fn append_metadata<OT>(
+        fn append_metadata<EM, OT>(
             &mut self,
             state: &mut PythonStdState,
+            _manager: &mut EM,
             observers: &OT,
             testcase: &mut Testcase<BytesInput>,
         ) -> Result<(), Error>
@@ -1655,17 +1667,19 @@ pub mod pybind {
             })
         }
 
-        fn append_metadata<OT>(
+        fn append_metadata<EM, OT>(
             &mut self,
             state: &mut PythonStdState,
+            manager: &mut EM,
             observers: &OT,
             testcase: &mut Testcase<BytesInput>,
         ) -> Result<(), Error>
         where
             OT: ObserversTuple<PythonStdState>,
+            EM: EventFirer<State = PythonStdState>,
         {
             unwrap_me_mut!(self.wrapper, f, {
-                f.append_metadata(state, observers, testcase)
+                f.append_metadata(state, manager, observers, testcase)
             })
         }
 
