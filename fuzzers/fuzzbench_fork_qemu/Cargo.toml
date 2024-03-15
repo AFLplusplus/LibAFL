@@ -14,11 +14,6 @@ codegen-units = 1
 opt-level = 3
 debug = true
 
-[profile.release-fuzzbench]
-inherits = "release"
-debug = false
-strip = true
-
 [dependencies]
 libafl = { path = "../../libafl/" }
 libafl_bolts = { path = "../../libafl_bolts/" }
