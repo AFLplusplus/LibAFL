@@ -295,9 +295,6 @@ pub enum Error {
     /// Compression error
     #[cfg(feature = "gzip")]
     Compression(ErrorBacktrace),
-    /// File related error
-    #[cfg(feature = "std")]
-    File(io::Error, ErrorBacktrace),
     /// Optional val was supposed to be set, but isn't.
     EmptyOptional(String, ErrorBacktrace),
     /// Key not in Map
@@ -316,7 +313,7 @@ pub enum Error {
     Unsupported(String, ErrorBacktrace),
     /// Shutting down, not really an error.
     ShuttingDown,
-    /// OS error from [`std::io::Error::last_os_error`];
+    /// OS error, wrapping a [`std::io::Error`]
     #[cfg(feature = "std")]
     OsError(io::Error, String, ErrorBacktrace),
     /// Something else happened
@@ -337,12 +334,6 @@ impl Error {
     #[must_use]
     pub fn compression() -> Self {
         Error::Compression(ErrorBacktrace::new())
-    }
-    #[cfg(feature = "std")]
-    /// File related error
-    #[must_use]
-    pub fn file(arg: io::Error) -> Self {
-        Error::File(arg, ErrorBacktrace::new())
     }
     /// Optional val was supposed to be set, but isn't.
     #[must_use]
@@ -455,11 +446,6 @@ impl Display for Error {
             #[cfg(feature = "gzip")]
             Self::Compression(b) => {
                 write!(f, "Error in decompression")?;
-                display_error_backtrace(f, b)
-            }
-            #[cfg(feature = "std")]
-            Self::File(err, b) => {
-                write!(f, "File IO failed: {:?}", &err)?;
                 display_error_backtrace(f, b)
             }
             Self::EmptyOptional(s, b) => {

@@ -590,7 +590,7 @@ pub mod unix_shmem {
 
         use alloc::string::ToString;
         use core::{ptr, slice};
-        use std::{io, io::Write, process};
+        use std::{io::Write, process};
 
         use libc::{
             c_int, c_uchar, close, ftruncate, mmap, munmap, shm_open, shm_unlink, shmat, shmctl,
