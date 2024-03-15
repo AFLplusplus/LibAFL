@@ -35,7 +35,6 @@ impl<S> Mutator<NautilusInput, S> for NautilusRandomMutator<'_> {
         &mut self,
         _state: &mut S,
         input: &mut NautilusInput,
-        _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         // TODO get rid of tmp
         let mut tmp = vec![];
@@ -96,7 +95,6 @@ impl<S> Mutator<NautilusInput, S> for NautilusRecursionMutator<'_> {
         &mut self,
         _state: &mut S,
         input: &mut NautilusInput,
-        _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         // TODO don't calc recursions here
         if let Some(ref mut recursions) = input.tree.calc_recursions(self.ctx) {
@@ -162,7 +160,6 @@ where
         &mut self,
         state: &mut S,
         input: &mut NautilusInput,
-        _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let meta = state
             .metadata_map()

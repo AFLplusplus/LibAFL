@@ -316,6 +316,9 @@ pub enum Error {
     Unsupported(String, ErrorBacktrace),
     /// Shutting down, not really an error.
     ShuttingDown,
+    /// OS error from `std::io::Error::last_os_error`;
+    #[cfg(feature = "std")]
+    OSError(io::Error, String, ErrorBacktrace),
     /// Something else happened
     Unknown(String, ErrorBacktrace),
 }
@@ -410,6 +413,15 @@ impl Error {
     {
         Error::Unsupported(arg.into(), ErrorBacktrace::new())
     }
+    #[cfg(feature = "std")]
+    /// OS error from `std::io::Error::last_os_error`;
+    #[must_use]
+    pub fn os_error<S>(err: io::Error, msg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::OSError(err, msg.into(), ErrorBacktrace::new())
+    }
     /// Something else happened
     #[must_use]
     pub fn unknown<S>(arg: S) -> Self
@@ -474,6 +486,11 @@ impl Display for Error {
                 display_error_backtrace(f, b)
             }
             Self::ShuttingDown => write!(f, "Shutting down!"),
+            #[cfg(feature = "std")]
+            Self::OSError(err, s, b) => {
+                write!(f, "OS error: {0}: {1}", &s, err)?;
+                display_error_backtrace(f, b)
+            }
             Self::Unknown(s, b) => {
                 write!(f, "Unknown error: {0}", &s)?;
                 display_error_backtrace(f, b)
