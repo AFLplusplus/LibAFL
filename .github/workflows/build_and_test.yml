@@ -548,6 +548,80 @@ jobs:
       if: runner.os == 'Linux'
       run: RUN_ON_CI=1 RUN_LIBPNG_FUZZER=1 LLVM_CONFIG=llvm-config ./scripts/test_all_fuzzers.sh
 
+  fuzzbench_fuzzers:
+    strategy:
+      matrix:
+          os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+    - name: Free Disk Space (Ubuntu)
+      if: runner.os == 'Linux'
+      uses: jlumbroso/free-disk-space@main
+      with:
+        # this might remove tools that are actually needed,
+        # if set to "true" but frees about 6 GB
+        tool-cache: false
+        
+        # all of these default to true, but feel free to set to
+        # "false" if necessary for your workflow
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: false
+        docker-images: true
+        swap-storage: true
+    - name: Add nightly rustfmt and clippy
+      run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
+    - name: Add no_std toolchain
+      run: rustup toolchain install nightly-x86_64-unknown-linux-gnu ; rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
+    - name: Add wasm target
+      run: rustup target add wasm32-unknown-unknown
+    - name: Install ucd-generate
+      run: cargo install -f ucd-generate
+    - name: Remove obsolete llvm (Linux)
+      if: runner.os == 'Linux'
+      run: sudo apt purge llvm* clang*
+    - name: Install LLVM and Clang
+      uses: KyleMayes/install-llvm-action@v1
+      with:
+        directory: ${{ runner.temp }}/llvm
+        version: 17
+    - name: Install deps
+      run: sudo apt update && sudo apt install nasm ninja-build gcc-arm-linux-gnueabi g++-arm-linux-gnueabi gcc-aarch64-linux-gnu g++-aarch64-linux-gnu gcc-mipsel-linux-gnu g++-mipsel-linux-gnu gcc-powerpc-linux-gnu g++-powerpc-linux-gnu libc6-dev-i386-cross libc6-dev libc6-dev-i386 lib32gcc-11-dev lib32stdc++-11-dev libgtk-3-dev pax-utils libz3-dev
+    - name: pip install
+      run: python3 -m pip install msgpack jinja2 find_libpython
+    # Note that nproc needs to have coreutils installed on macOS, so the order of CI commands matters.
+    - name: enable mult-thread for `make`
+      run: export MAKEFLAGS="-j$(expr $(nproc) \+ 1)"
+    - name: install cargo-make
+      uses: baptiste0928/cargo-install@v1.3.0
+      with:
+        crate: cargo-make
+    - name: install wasm-pack
+      uses: baptiste0928/cargo-install@v1.3.0
+      with:
+        crate: wasm-pack
+    - name: install chrome
+      uses: browser-actions/setup-chrome@v1
+      with:
+        chrome-version: stable
+    - uses: actions/checkout@v3
+      with:
+        submodules: true # recursively checkout submodules
+        fetch-depth: 0 # to diff with origin/main
+    - uses: Swatinem/rust-cache@v2
+    - name: Symlink Headers
+      if: runner.os == 'Linux'
+      # We can't install gcc-multilib which would usually do this for us due to collisions with other packages
+      run: sudo ln -s /usr/include/asm-generic /usr/include/asm
+    - name: Build and run example fuzzers (Linux)
+      if: runner.os == 'Linux'
+      run: RUN_ON_CI=1 RUN_FUZZBENCH_FUZZER=1 LLVM_CONFIG=llvm-config ./scripts/test_all_fuzzers.sh
+
   nostd-build:
     runs-on: ubuntu-latest
     steps:

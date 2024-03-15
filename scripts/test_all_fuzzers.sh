@@ -33,9 +33,6 @@ else
     backtrace_fuzzers=$(echo "$backtrace_fuzzers" | tr ' ' '\n' | grep -v "qemu" | grep -v "baby" | grep -v "libpng" | grep - v "fuzzbench")
 fi
 
-echo $fuzzers $backtrace_fuzzers
-exit 0
-
 libafl=$(pwd)
 
 # build with a shared target dir for all fuzzers. this should speed up
