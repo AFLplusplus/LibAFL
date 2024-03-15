@@ -222,7 +222,9 @@ where
             }
             (None, None) => {
                 // fall back to random
-                let iters = self.iterations(state)?.saturating_sub(self.execs_since_progress_start(state)?);
+                let iters = self
+                    .iterations(state)?
+                    .saturating_sub(self.execs_since_progress_start(state)?);
                 for _ in 1..=iters {
                     self.perform_mutation(fuzzer, executor, state, manager, &input)?;
                 }
