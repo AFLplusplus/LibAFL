@@ -648,21 +648,17 @@ pub mod unix_shmem {
                         0o600,
                     );
                     if shm_fd == -1 {
-                        return Err(Error::os_error(
-                            io::Error::last_os_error(),
-                            format!("Failed to shm_open map with id {filename_path:?}",),
-                        ));
+                        return Err(Error::last_os_error(format!(
+                            "Failed to shm_open map with id {filename_path:?}",
+                        )));
                     }
 
                     /* configure the size of the shared memory segment */
                     if ftruncate(shm_fd, map_size.try_into()?) != 0 {
                         shm_unlink(filename_path.as_ptr() as *const _);
-                        return Err(Error::os_error(
-                            io::Error::last_os_error(),
-                            format!(
-                                "setup_shm(): ftruncate() failed for map with id {filename_path:?}",
-                            ),
-                        ));
+                        return Err(Error::last_os_error(format!(
+                            "setup_shm(): ftruncate() failed for map with id {filename_path:?}",
+                        )));
                     }
 
                     /* map the shared memory segment to the address space of the process */
@@ -677,10 +673,9 @@ pub mod unix_shmem {
                     if map == libc::MAP_FAILED || map.is_null() {
                         close(shm_fd);
                         shm_unlink(filename_path.as_ptr() as *const _);
-                        return Err(Error::os_error(
-                            io::Error::last_os_error(),
-                            format!("mmap() failed for map with id {filename_path:?}",),
-                        ));
+                        return Err(Error::last_os_error(format!(
+                            "mmap() failed for map with id {filename_path:?}",
+                        )));
                     }
 
                     Ok(Self {
@@ -708,10 +703,9 @@ pub mod unix_shmem {
                     );
                     if map == libc::MAP_FAILED || map.is_null() {
                         close(shm_fd);
-                        return Err(Error::os_error(
-                            io::Error::last_os_error(),
-                            format!("mmap() failed for map with fd {shm_fd:?}"),
-                        ));
+                        return Err(Error::last_os_error(format!(
+                            "mmap() failed for map with fd {shm_fd:?}"
+                        )));
                     }
 
                     Ok(Self {
@@ -854,10 +848,7 @@ pub mod unix_shmem {
                     let map = shmat(os_id, ptr::null(), 0) as *mut c_uchar;
 
                     if map as c_int == -1 || map.is_null() {
-                        return Err(Error::os_error(
-                            io::Error::last_os_error(),
-                            "Failed to map the shared mapping",
-                        ));
+                        return Err(Error::last_os_error("Failed to map the shared mapping"));
                     }
 
                     Ok(Self {
@@ -875,10 +866,9 @@ pub mod unix_shmem {
                     let map = shmat(id_int, ptr::null(), 0) as *mut c_uchar;
 
                     if map.is_null() || map == ptr::null_mut::<c_uchar>().wrapping_sub(1) {
-                        return Err(Error::os_error(
-                            io::Error::last_os_error(),
-                            format!("Failed to map the shared mapping with id {id_int}"),
-                        ));
+                        return Err(Error::last_os_error(format!(
+                            "Failed to map the shared mapping with id {id_int}"
+                        )));
                     }
 
                     Ok(Self { id, map, map_size })

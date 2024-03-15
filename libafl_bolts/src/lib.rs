@@ -414,13 +414,26 @@ impl Error {
         Error::Unsupported(arg.into(), ErrorBacktrace::new())
     }
     #[cfg(feature = "std")]
-    /// OS error from `std::io::Error::last_os_error`;
+    /// OS error with additional message
     #[must_use]
     pub fn os_error<S>(err: io::Error, msg: S) -> Self
     where
         S: Into<String>,
     {
         Error::OsError(err, msg.into(), ErrorBacktrace::new())
+    }
+    #[cfg(feature = "std")]
+    /// OS error from [`std::io::Error::last_os_error`] with additional message
+    #[must_use]
+    pub fn last_os_error<S>(msg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::OsError(
+            io::Error::last_os_error(),
+            msg.into(),
+            ErrorBacktrace::new(),
+        )
     }
     /// Something else happened
     #[must_use]
@@ -544,7 +557,7 @@ impl From<nix::Error> for Error {
 #[cfg(feature = "std")]
 impl From<io::Error> for Error {
     fn from(err: io::Error) -> Self {
-        Self::file(err)
+        Self::os_error(err, "io::Error ocurred")
     }
 }
 
