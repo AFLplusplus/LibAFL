@@ -114,7 +114,11 @@ where
         manager: &mut EM,
     ) -> Result<(), Error> {
         start_timer!(state);
-        let num = self.iterations(state)? - self.execs_since_progress_start(state)?;
+
+        // Here saturating_sub is needed as self.iterations() might be actually smaller than the previous value before reset.
+        let num = self
+            .iterations(state)?
+            .saturating_sub(self.execs_since_progress_start(state)?);
         let mut testcase = state.current_testcase_mut()?;
 
         let Ok(input) = I::try_transform_from(&mut testcase, state) else {
