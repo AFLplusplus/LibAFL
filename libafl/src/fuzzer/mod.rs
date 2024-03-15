@@ -415,8 +415,9 @@ where
                 // Not interesting
                 self.feedback_mut().discard_metadata(state, &input)?;
 
+                let executions = *state.executions();
                 // The input is a solution, add it to the respective corpus
-                let mut testcase = Testcase::with_executions(input, *state.executions());
+                let mut testcase = Testcase::with_executions(input, executions);
                 testcase.set_parent_id_optional(*state.corpus().current());
                 self.objective_mut()
                     .append_metadata(state, manager, observers, &mut testcase)?;
@@ -427,6 +428,8 @@ where
                         state,
                         Event::Objective {
                             objective_size: state.solutions().count(),
+                            executions,
+                            time: current_time(),
                         },
                     )?;
                 }
@@ -520,10 +523,13 @@ where
                 .append_metadata(state, manager, observers, &mut testcase)?;
             let idx = state.solutions_mut().add(testcase)?;
 
+            let executions = *state.executions();
             manager.fire(
                 state,
                 Event::Objective {
                     objective_size: state.solutions().count(),
+                    executions,
+                    time: current_time(),
                 },
             )?;
             return Ok(idx);
