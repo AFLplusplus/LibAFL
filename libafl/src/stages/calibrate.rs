@@ -121,6 +121,7 @@ where
         }
 
         let mut iter = self.stage_max;
+        // If we restarted after a timeout or crash, do less iterations.
         iter -= usize::try_from(self.restart_helper.execs_since_progress_start(state)?)?;
 
         let input = state.current_input_cloned()?;
