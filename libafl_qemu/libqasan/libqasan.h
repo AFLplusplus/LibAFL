@@ -43,8 +43,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "printf/printf.h"
 
 #ifdef ASAN_GUEST
-#include <errno.h>
-#include <sys/mman.h>
+  #include <errno.h>
+  #include <sys/mman.h>
 #endif
 
 #define QASAN_LOG(msg...)                     \
