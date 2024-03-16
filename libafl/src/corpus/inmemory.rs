@@ -421,6 +421,7 @@ where
             .ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
     }
     /// Get by id; considers both enabled and disabled testcases
+    #[inline]
     fn get_from_all(&self, idx: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error> {
         let mut testcase = self.storage.enabled.get(idx);
         if testcase.is_none() {

@@ -122,6 +122,7 @@ where
         Ok(testcase)
     }
     /// Get by id; considers both enabled and disabled testcases
+    #[inline]
     fn get_from_all(&self, idx: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error> {
         let testcase = { self.inner.get_from_all(idx)? };
         self.cache_testcase(testcase, idx)?;
