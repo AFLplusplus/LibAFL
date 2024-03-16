@@ -1,7 +1,6 @@
 //! Expose QEMU user `LibAFL` C api to Rust
 
 use core::{
-    convert::Into,
     ffi::{c_char, c_void, CStr},
     fmt::{self, Debug, Formatter},
     mem::{transmute, MaybeUninit},
