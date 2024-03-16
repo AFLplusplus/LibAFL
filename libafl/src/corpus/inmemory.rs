@@ -260,17 +260,17 @@ where
     /// Insert a testcase assigning a `CorpusId` to it
     #[cfg(not(feature = "corpus_btreemap"))]
     pub fn insert(&mut self, testcase: RefCell<Testcase<I>>) -> CorpusId {
-        self.do_insert(testcase, false)
+        self._insert(testcase, false)
     }
 
     /// Insert a testcase assigning a `CorpusId` to it
     #[cfg(not(feature = "corpus_btreemap"))]
     pub fn insert_disabled(&mut self, testcase: RefCell<Testcase<I>>) -> CorpusId {
-        self.do_insert(testcase, true)
+        self._insert(testcase, true)
     }
     /// Insert a testcase assigning a `CorpusId` to it
     #[cfg(not(feature = "corpus_btreemap"))]
-    pub fn do_insert(&mut self, testcase: RefCell<Testcase<I>>, is_disabled: bool) -> CorpusId {
+    fn _insert(&mut self, testcase: RefCell<Testcase<I>>, is_disabled: bool) -> CorpusId {
         let idx = CorpusId::from(self.progressive_idx);
         self.progressive_idx += 1;
         let corpus = if is_disabled {
@@ -302,7 +302,7 @@ where
 
     /// Insert a testcase assigning a `CorpusId` to it
     #[cfg(feature = "corpus_btreemap")]
-    pub fn do_insert(&mut self, testcase: RefCell<Testcase<I>>, is_disabled: bool) -> CorpusId {
+    fn _insert(&mut self, testcase: RefCell<Testcase<I>>, is_disabled: bool) -> CorpusId {
         let idx = CorpusId::from(self.progressive_idx);
         self.progressive_idx += 1;
         let corpus = if is_disabled {
@@ -318,13 +318,13 @@ where
     /// Insert a testcase assigning a `CorpusId` to it
     #[cfg(feature = "corpus_btreemap")]
     pub fn insert(&mut self, testcase: RefCell<Testcase<I>>) -> CorpusId {
-        self.do_insert(testcase, false)
+        self._insert(testcase, false)
     }
 
     /// Insert a testcase assigning a `CorpusId` to it
     #[cfg(feature = "corpus_btreemap")]
     pub fn insert_disabled(&mut self, testcase: RefCell<Testcase<I>>) -> CorpusId {
-        self.do_insert(testcase, true)
+        self._insert(testcase, true)
     }
 
     /// Create new `TestcaseStorage`
