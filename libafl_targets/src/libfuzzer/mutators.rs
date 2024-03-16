@@ -87,7 +87,6 @@ struct MutatorProxy<'a, M, MT, S> {
     /// The result of mutation, to be propagated to the mutational stage
     result: Rc<RefCell<Result<MutationResult, Error>>>,
     /// Stage index, which is used by libafl mutator implementations
-    stage_idx: i32,
     phantom: PhantomData<(&'a mut (), MT)>,
 }
 
@@ -97,13 +96,11 @@ impl<'a, M, MT, S> MutatorProxy<'a, M, MT, S> {
         state: &'a mut S,
         mutator: &Rc<RefCell<M>>,
         result: &Rc<RefCell<Result<MutationResult, Error>>>,
-        stage_idx: i32,
     ) -> Self {
         Self {
             state: Rc::new(RefCell::new(state)),
             mutator: Rc::downgrade(mutator),
             result: result.clone(),
-            stage_idx,
             phantom: PhantomData,
         }
     }
@@ -126,7 +123,6 @@ impl<'a, M, MT, S> MutatorProxy<'a, M, MT, S> {
                 false
             },
             mutator: self.mutator.clone(),
-            stage_idx: self.stage_idx,
             result: self.result.clone(),
             phantom: PhantomData,
         }
@@ -143,7 +139,7 @@ struct WeakMutatorProxy<F, M, MT, S> {
     /// A weak reference to the mutator
     mutator: Weak<RefCell<M>>,
     /// The stage index to provide to the mutator, when executed.
-    stage_idx: i32,
+
     /// The result of mutation, to be propagated to the mutational stage
     result: Rc<RefCell<Result<MutationResult, Error>>>,
     phantom: PhantomData<(MT, S)>,
@@ -165,7 +161,7 @@ where
                         BytesInput::from(unsafe { core::slice::from_raw_parts(data, size) });
                     let old = state.max_size();
                     state.set_max_size(max_size);
-                    let res = mutator.scheduled_mutate(state, &mut intermediary, self.stage_idx);
+                    let res = mutator.scheduled_mutate(state, &mut intermediary);
                     state.set_max_size(old);
                     let succeeded = res.is_ok();
 
@@ -295,13 +291,8 @@ where
     SM: ScheduledMutator<BytesInput, MT, S> + 'static,
 {
     #[inline]
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut S::Input,
-        stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
-        self.scheduled_mutate(state, input, stage_idx)
+    fn mutate(&mut self, state: &mut S, input: &mut S::Input) -> Result<MutationResult, Error> {
+        self.scheduled_mutate(state, input)
     }
 }
 
@@ -325,7 +316,6 @@ where
         &mut self,
         state: &mut S,
         input: &mut S::Input,
-        stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let seed = state.rand_mut().next();
         let target = input.bytes();
@@ -335,7 +325,7 @@ where
 
         // we assume that the fuzzer did not use this mutator, but instead utilised their own
         let result = Rc::new(RefCell::new(Ok(MutationResult::Mutated)));
-        let proxy = MutatorProxy::new(state, &self.mutator, &result, stage_idx);
+        let proxy = MutatorProxy::new(state, &self.mutator, &result);
         let old = MUTATOR.with(|mutator| {
             let mut mutator = mutator.borrow_mut();
             mutator.replace(Box::new(proxy.weak()))
@@ -375,13 +365,8 @@ where
     SM: ScheduledMutator<BytesInput, MT, S> + 'static,
 {
     #[inline]
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut S::Input,
-        stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
-        self.scheduled_mutate(state, input, stage_idx)
+    fn mutate(&mut self, state: &mut S, input: &mut S::Input) -> Result<MutationResult, Error> {
+        self.scheduled_mutate(state, input)
     }
 }
 
@@ -405,7 +390,6 @@ where
         &mut self,
         state: &mut S,
         input: &mut S::Input,
-        stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         // We don't want to use the testcase we're already using for splicing
         let idx = random_corpus_id!(state.corpus(), state.rand_mut());
@@ -426,7 +410,7 @@ where
 
         // we assume that the fuzzer did not use this mutator, but instead utilised their own
         let result = Rc::new(RefCell::new(Ok(MutationResult::Mutated)));
-        let proxy = MutatorProxy::new(state, &self.mutator, &result, stage_idx);
+        let proxy = MutatorProxy::new(state, &self.mutator, &result);
         let old = MUTATOR.with(|mutator| {
             let mut mutator = mutator.borrow_mut();
             mutator.replace(Box::new(proxy.weak()))

@@ -122,7 +122,7 @@ llmp_bind_public = ["libafl_bolts/llmp_bind_public"]
 llmp_compression = ["libafl_bolts/llmp_compression"]
 
 ## Enables debug output for LLMP (also needs a `logger` installed)
-llmp_debug = ["libafl_bolts/llmp_debug"]
+llmp_debug = ["std", "libafl_bolts/llmp_debug"]
 
 ## Reduces the initial map size for llmp
 llmp_small_maps = ["libafl_bolts/llmp_small_maps"] # reduces initial map size for llmp

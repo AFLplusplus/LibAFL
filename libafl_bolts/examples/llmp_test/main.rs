@@ -3,7 +3,7 @@ This shows how llmp can be used directly, without libafl abstractions
 */
 extern crate alloc;
 
-#[cfg(all(feature = "std", not(target_os = "haiku")))]
+#[cfg(not(target_os = "haiku"))]
 use core::time::Duration;
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
 use std::{num::NonZeroUsize, thread, time};
@@ -155,7 +155,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match mode.as_str() {
         "broker" => {
-            let mut broker = llmp::LlmpBroker::new(StdShMemProvider::new()?, None)?;
+            let mut broker =
+                llmp::LlmpBroker::new(StdShMemProvider::new()?, Duration::from_secs(5))?;
             broker.launch_tcp_listener_on(port)?;
             // Exit when we got at least _n_ nodes, and all of them quit.
             broker.set_exit_cleanly_after(NonZeroUsize::new(1_usize).unwrap());
@@ -166,7 +167,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
         }
         "b2b" => {
-            let mut broker = llmp::LlmpBroker::new(StdShMemProvider::new()?, None)?;
+            let mut broker =
+                llmp::LlmpBroker::new(StdShMemProvider::new()?, Duration::from_secs(5))?;
             broker.launch_tcp_listener_on(b2b_port)?;
             // connect back to the main broker.
             broker.connect_b2b(("127.0.0.1", port))?;

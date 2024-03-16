@@ -1808,8 +1808,6 @@ impl ArchExtras for Emulator {
 
 #[cfg(feature = "python")]
 pub mod pybind {
-    use std::convert::TryFrom;
-
     use pyo3::{exceptions::PyValueError, prelude::*, types::PyInt};
 
     use super::{GuestAddr, GuestUsize, MmapPerms, SyscallHookResult};

@@ -34,11 +34,7 @@ where
 {
     type Post = StringIdentificationMetadata;
 
-    fn try_transform_from(
-        base: &mut Testcase<BytesInput>,
-        state: &S,
-        _corpus_idx: CorpusId,
-    ) -> Result<Self, Error> {
+    fn try_transform_from(base: &mut Testcase<BytesInput>, state: &S) -> Result<Self, Error> {
         let input = base.load_input(state.corpus())?.clone();
         let metadata = base.metadata::<StringIdentificationMetadata>().cloned()?;
         Ok((input, metadata))
@@ -53,12 +49,7 @@ impl<S> MutatedTransformPost<S> for StringIdentificationMetadata
 where
     S: HasTestcase,
 {
-    fn post_exec(
-        self,
-        state: &mut S,
-        _stage_idx: i32,
-        corpus_idx: Option<CorpusId>,
-    ) -> Result<(), Error> {
+    fn post_exec(self, state: &mut S, corpus_idx: Option<CorpusId>) -> Result<(), Error> {
         if let Some(corpus_idx) = corpus_idx {
             let mut tc = state.testcase_mut(corpus_idx)?;
             tc.add_metadata(self);
@@ -288,12 +279,7 @@ impl<S> Mutator<UnicodeInput, S> for StringCategoryRandMutator
 where
     S: HasRand + HasMaxSize,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut UnicodeInput,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut UnicodeInput) -> Result<MutationResult, Error> {
         if input.0.bytes().is_empty() {
             return Ok(MutationResult::Skipped);
         }
@@ -351,12 +337,7 @@ impl<S> Mutator<UnicodeInput, S> for StringSubcategoryRandMutator
 where
     S: HasRand + HasMaxSize,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut UnicodeInput,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut UnicodeInput) -> Result<MutationResult, Error> {
         if input.0.bytes().is_empty() {
             return Ok(MutationResult::Skipped);
         }
@@ -402,25 +383,19 @@ impl<S> Mutator<UnicodeInput, S> for StringCategoryTokenReplaceMutator
 where
     S: HasRand + HasMaxSize + HasMetadata,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut UnicodeInput,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut UnicodeInput) -> Result<MutationResult, Error> {
         if input.0.bytes().is_empty() {
             return Ok(MutationResult::Skipped);
         }
 
         let tokens_len = {
-            let meta = state.metadata_map().get::<Tokens>();
-            if meta.is_none() {
+            let Some(meta) = state.metadata_map().get::<Tokens>() else {
+                return Ok(MutationResult::Skipped);
+            };
+            if meta.tokens().is_empty() {
                 return Ok(MutationResult::Skipped);
             }
-            if meta.unwrap().tokens().is_empty() {
-                return Ok(MutationResult::Skipped);
-            }
-            meta.unwrap().tokens().len()
+            meta.tokens().len()
         };
         let token_idx = state.rand_mut().below(tokens_len as u64) as usize;
 
@@ -467,25 +442,19 @@ impl<S> Mutator<UnicodeInput, S> for StringSubcategoryTokenReplaceMutator
 where
     S: HasRand + HasMaxSize + HasMetadata,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut UnicodeInput,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut UnicodeInput) -> Result<MutationResult, Error> {
         if input.0.bytes().is_empty() {
             return Ok(MutationResult::Skipped);
         }
 
         let tokens_len = {
-            let meta = state.metadata_map().get::<Tokens>();
-            if meta.is_none() {
+            let Some(meta) = state.metadata_map().get::<Tokens>() else {
+                return Ok(MutationResult::Skipped);
+            };
+            if meta.tokens().is_empty() {
                 return Ok(MutationResult::Skipped);
             }
-            if meta.unwrap().tokens().is_empty() {
-                return Ok(MutationResult::Skipped);
-            }
-            meta.unwrap().tokens().len()
+            meta.tokens().len()
         };
         let token_idx = state.rand_mut().below(tokens_len as u64) as usize;
 
@@ -520,10 +489,15 @@ where
 
 #[cfg(test)]
 mod test {
-    use libafl_bolts::rands::StdRand;
+    use libafl_bolts::{rands::StdRand, Error};
 
-    use super::*;
-    use crate::{corpus::NopCorpus, stages::extract_metadata, state::StdState};
+    use crate::{
+        corpus::NopCorpus,
+        inputs::{BytesInput, HasBytesVec},
+        mutators::{Mutator, StringCategoryRandMutator, StringSubcategoryRandMutator},
+        stages::extract_metadata,
+        state::StdState,
+    };
 
     // a not-so-useful test for this
     #[test]
@@ -545,7 +519,7 @@ mod test {
             for _ in 0..(1 << 12) {
                 let metadata = extract_metadata(bytes.bytes());
                 let mut input = (bytes, metadata);
-                let _ = mutator.mutate(&mut state, &mut input, 0);
+                let _ = mutator.mutate(&mut state, &mut input);
                 println!("{:?}", core::str::from_utf8(input.0.bytes()).unwrap());
                 bytes = input.0;
             }
@@ -577,7 +551,7 @@ mod test {
             for _ in 0..(1 << 12) {
                 let metadata = extract_metadata(bytes.bytes());
                 let mut input = (bytes, metadata);
-                let _ = mutator.mutate(&mut state, &mut input, 0);
+                let _ = mutator.mutate(&mut state, &mut input);
                 println!("{:?}", core::str::from_utf8(input.0.bytes()).unwrap());
                 bytes = input.0;
             }

@@ -22,7 +22,7 @@ use crossterm::{
 use hashbrown::HashMap;
 use libafl_bolts::{current_time, format_duration_hms, ClientId};
 use ratatui::{backend::CrosstermBackend, Terminal};
-use serde_json::{self, Value};
+use serde_json::Value;
 
 #[cfg(feature = "introspection")]
 use super::{ClientPerfMonitor, PerfFeature};
@@ -357,7 +357,7 @@ impl Monitor for TuiMonitor {
     }
 
     #[allow(clippy::cast_sign_loss)]
-    fn display(&mut self, event_msg: String, sender_id: ClientId) {
+    fn display(&mut self, event_msg: &str, sender_id: ClientId) {
         let cur_time = current_time();
 
         {
@@ -518,7 +518,7 @@ impl TuiMonitor {
                 .map_or("None".to_string(), ToString::to_string);
             let stability = client.get_user_stats("stability").map_or(
                 UserStats::new(UserStatsValue::Ratio(0, 100), AggregatorOps::Avg),
-                core::clone::Clone::clone,
+                Clone::clone,
             );
 
             if afl_stats != "None" {
@@ -616,7 +616,7 @@ fn run_tui_thread<W: Write + Send + Sync + 'static>(
             let timeout = tick_rate
                 .checked_sub(last_tick.elapsed())
                 .unwrap_or_else(|| Duration::from_secs(0));
-            if crossterm::event::poll(timeout)? {
+            if event::poll(timeout)? {
                 if let Event::Key(key) = event::read()? {
                     match key.code {
                         KeyCode::Char(c) => ui.on_key(c),

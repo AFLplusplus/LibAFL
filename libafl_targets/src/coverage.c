@@ -33,7 +33,5 @@ uint8_t *__token_stop = &__stop_libafl_token;
 #endif
 
 // #if defined(__ANDROID__) || defined(__HAIKU__)
-MAYBE_THREAD_LOCAL prev_loc_t __afl_prev_loc[NGRAM_SIZE_MAX];
-MAYBE_THREAD_LOCAL prev_loc_t __afl_prev_caller[CTX_MAX_K];
-MAYBE_THREAD_LOCAL uint32_t   __afl_prev_ctx;
+uint32_t                      __afl_prev_ctx;
 MAYBE_THREAD_LOCAL prev_loc_t __afl_acc_prev_loc;

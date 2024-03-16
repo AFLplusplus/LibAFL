@@ -256,7 +256,7 @@ fn main() {
             && llvm_version.is_ok())
     {
         println!(
-            "cargo:warning=Failed to find llvm-config, we will not build LLVM passes. If you need them, set the LLVM_CONFIG environment variable to a recent llvm-config."
+            "cargo:warning=Failed to find llvm-config, we will not build LLVM passes. If you need them, set the LLVM_CONFIG environment variable to a recent llvm-config, else just ignore this message."
         );
 
         write!(
@@ -404,10 +404,10 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
 
     for pass in &[
         "cmplog-routines-pass.cc",
-        "afl-coverage-pass.cc",
         "autotokens-pass.cc",
         "coverage-accounting-pass.cc",
         "cmplog-instructions-pass.cc",
+        "ctx-pass.cc",
     ] {
         build_pass(
             bindir_path,

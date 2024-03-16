@@ -1,9 +1,6 @@
 //! Schedule the access to the Corpus.
 
-use alloc::{
-    borrow::ToOwned,
-    string::{String, ToString},
-};
+use alloc::{borrow::ToOwned, string::ToString};
 use core::marker::PhantomData;
 
 pub mod testcase_score;
@@ -155,7 +152,7 @@ where
     fn set_last_hash(&mut self, value: usize);
 
     /// Get the observer map observer name
-    fn map_observer_name(&self) -> &String;
+    fn map_observer_name(&self) -> &str;
 
     /// Called when a [`Testcase`] is added to the corpus
     fn on_add_metadata(&self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
@@ -303,7 +300,10 @@ where
     /// Gets the next entry at random
     fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
-            Err(Error::empty("No entries in corpus".to_owned()))
+            Err(Error::empty(
+                "No entries in corpus. This often implies the target is not properly instrumented."
+                    .to_owned(),
+            ))
         } else {
             let id = random_corpus_id!(state.corpus(), state.rand_mut());
             self.set_current_scheduled(state, Some(id))?;

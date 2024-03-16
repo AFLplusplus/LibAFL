@@ -2,7 +2,7 @@
 use core::{debug_assert, fmt::Debug};
 
 #[cfg(feature = "rand_trait")]
-use rand_core::{self, impls::fill_bytes_via_next, RngCore};
+use rand_core::{impls::fill_bytes_via_next, RngCore};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 #[cfg(feature = "std")]
@@ -435,7 +435,7 @@ mod tests {
 }
 
 #[cfg(feature = "python")]
-#[allow(clippy::unnecessary_fallible_conversions)]
+#[allow(clippy::unnecessary_fallible_conversions, unused_qualifications)]
 #[allow(missing_docs)]
 /// `Rand` Python bindings
 pub mod pybind {

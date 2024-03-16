@@ -100,7 +100,7 @@ where
         write!(
             f,
             "TuneableScheduledMutator with {} mutations for Input type {}",
-            MT::LEN,
+            self.mutations.len(),
             core::any::type_name::<I>()
         )
     }
@@ -112,13 +112,8 @@ where
     S: HasRand + HasMetadata,
 {
     #[inline]
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        stage_id: i32,
-    ) -> Result<MutationResult, Error> {
-        self.scheduled_mutate(state, input, stage_id)
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        self.scheduled_mutate(state, input)
     }
 }
 
@@ -186,7 +181,7 @@ where
 
     /// Get the next mutation to apply
     fn schedule(&self, state: &mut S, _: &I) -> MutationId {
-        debug_assert!(MT::LEN != 0);
+        debug_assert!(self.mutations.len() != 0);
         // Assumption: we can not reach this code path without previously adding this metadatum.
         let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
 
@@ -199,7 +194,7 @@ where
                 metadata.next_id = 0.into();
             }
             debug_assert!(
-                MT::LEN > ret.0,
+                self.mutations.len() > ret.0,
                 "TuneableScheduler: next vec may not contain id larger than number of mutations!"
             );
             return ret;
@@ -214,7 +209,7 @@ where
 
             let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
             debug_assert_eq!(
-                MT::LEN,
+                self.mutations.len(),
                 metadata.mutation_probabilities_cumulative.len(),
                 "TuneableScheduler: mutation probabilities do not match with number of mutations"
             );
@@ -230,7 +225,7 @@ where
         }
 
         // fall back to random if no entries in either vec, the scheduling is not tuned.
-        state.rand_mut().below(MT::LEN as u64).into()
+        state.rand_mut().below(self.mutations.len() as u64).into()
     }
 }
 
@@ -376,11 +371,13 @@ mod test {
     use crate::{
         inputs::BytesInput,
         mutators::{ByteRandMutator, ScheduledMutator},
-        state::test::NopState,
+        state::NopState,
     };
 
     #[test]
     fn test_tuning() {
+        // # Safety
+        // No concurrency per testcase
         #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
         unsafe {
             TuneableScheduledMutatorMetadata::register();
@@ -404,6 +401,8 @@ mod test {
 
     #[test]
     fn test_mutation_distribution() {
+        // # Safety
+        // No concurrency per testcase
         #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
         unsafe {
             TuneableScheduledMutatorMetadata::register();

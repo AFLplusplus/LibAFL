@@ -7,7 +7,7 @@ use std::{
     time::SystemTime,
 };
 
-use libafl_bolts::{current_time, shmem::ShMemProvider};
+use libafl_bolts::{current_time, shmem::ShMemProvider, Named};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "introspection")]
@@ -18,8 +18,8 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, UsesInput},
-    stages::Stage,
-    state::{HasCorpus, HasExecutions, HasMetadata, HasRand, State, UsesState},
+    stages::{RetryRestartHelper, Stage},
+    state::{HasCorpus, HasExecutions, HasMetadata, HasNamedMetadata, HasRand, State, UsesState},
     Error,
 };
 
@@ -59,16 +59,23 @@ where
     type State = E::State;
 }
 
+impl<CB, E, EM, Z> Named for SyncFromDiskStage<CB, E, EM, Z>
+where
+    E: UsesState,
+{
+    fn name(&self) -> &str {
+        self.sync_dir.to_str().unwrap()
+    }
+}
+
 impl<CB, E, EM, Z> Stage<E, EM, Z> for SyncFromDiskStage<CB, E, EM, Z>
 where
     CB: FnMut(&mut Z, &mut Z::State, &Path) -> Result<<Z::State as UsesInput>::Input, Error>,
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasCorpus + HasRand + HasMetadata,
+    Z::State: HasCorpus + HasRand + HasMetadata + HasNamedMetadata,
 {
-    type Progress = (); // TODO load from directory should be resumed
-
     #[inline]
     fn perform(
         &mut self,
@@ -102,6 +109,18 @@ where
         state.introspection_monitor_mut().finish_stage();
 
         Ok(())
+    }
+
+    #[inline]
+    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        // TODO: Needs proper crash handling for when an imported testcase crashes
+        // For now, Make sure we don't get stuck crashing on this testcase
+        RetryRestartHelper::restart_progress_should_run(state, self, 3)
+    }
+
+    #[inline]
+    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        RetryRestartHelper::clear_restart_progress(state, self)
     }
 }
 
@@ -254,8 +273,6 @@ where
     ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
 {
-    type Progress = (); // TODO this should be resumed in the case that a testcase causes a crash
-
     #[inline]
     fn perform(
         &mut self,
@@ -310,6 +327,18 @@ where
         self.client.process(fuzzer, state, executor, manager)?;
         #[cfg(feature = "introspection")]
         state.introspection_monitor_mut().finish_stage();
+        Ok(())
+    }
+
+    #[inline]
+    fn restart_progress_should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+        // No restart handling needed - does not execute the target.
+        Ok(true)
+    }
+
+    #[inline]
+    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        // Not needed - does not execute the target.
         Ok(())
     }
 }

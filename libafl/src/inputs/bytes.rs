@@ -4,7 +4,6 @@
 use alloc::{borrow::ToOwned, rc::Rc, string::String, vec::Vec};
 use core::{
     cell::RefCell,
-    convert::From,
     hash::{BuildHasher, Hasher},
 };
 #[cfg(feature = "std")]

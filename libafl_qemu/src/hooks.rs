@@ -10,7 +10,11 @@ use core::{
     ptr::{self, addr_of, addr_of_mut},
 };
 
-use libafl::{executors::hooks::inprocess::inprocess_get_state, inputs::UsesInput};
+use libafl::{
+    executors::{hooks::inprocess::inprocess_get_state, ExitKind},
+    inputs::UsesInput,
+    state::NopState,
+};
 
 pub use crate::emu::SyscallHookResult;
 use crate::{
@@ -252,27 +256,40 @@ create_wrapper!(backdoor, (pc: GuestAddr));
 #[cfg(emulation_mode = "usermode")]
 static mut PRE_SYSCALL_HOOKS: Vec<Pin<Box<(PreSyscallHookId, FatPtr)>>> = vec![];
 #[cfg(emulation_mode = "usermode")]
-create_wrapper!(pre_syscall, (sys_num: i32,
-    a0: GuestAddr,
-    a1: GuestAddr,
-    a2: GuestAddr,
-    a3: GuestAddr,
-    a4: GuestAddr,
-    a5: GuestAddr,
-    a6: GuestAddr,
-    a7: GuestAddr), SyscallHookResult);
+create_wrapper!(
+    pre_syscall,
+    (
+        sys_num: i32,
+        a0: GuestAddr,
+        a1: GuestAddr,
+        a2: GuestAddr,
+        a3: GuestAddr,
+        a4: GuestAddr,
+        a5: GuestAddr,
+        a6: GuestAddr,
+        a7: GuestAddr
+    ),
+    SyscallHookResult
+);
 #[cfg(emulation_mode = "usermode")]
 static mut POST_SYSCALL_HOOKS: Vec<Pin<Box<(PostSyscallHookId, FatPtr)>>> = vec![];
 #[cfg(emulation_mode = "usermode")]
-create_wrapper!(post_syscall, (res: GuestAddr, sys_num: i32,
-    a0: GuestAddr,
-    a1: GuestAddr,
-    a2: GuestAddr,
-    a3: GuestAddr,
-    a4: GuestAddr,
-    a5: GuestAddr,
-    a6: GuestAddr,
-    a7: GuestAddr), GuestAddr);
+create_wrapper!(
+    post_syscall,
+    (
+        res: GuestAddr,
+        sys_num: i32,
+        a0: GuestAddr,
+        a1: GuestAddr,
+        a2: GuestAddr,
+        a3: GuestAddr,
+        a4: GuestAddr,
+        a5: GuestAddr,
+        a6: GuestAddr,
+        a7: GuestAddr
+    ),
+    GuestAddr
+);
 #[cfg(emulation_mode = "usermode")]
 static mut NEW_THREAD_HOOKS: Vec<Pin<Box<(NewThreadHookId, FatPtr)>>> = vec![];
 #[cfg(emulation_mode = "usermode")]
@@ -293,7 +310,13 @@ create_exec_wrapper!(read, (id: u64, addr: GuestAddr), 0, 5, ReadHookId);
 create_exec_wrapper!(read, (id: u64, addr: GuestAddr), 1, 5, ReadHookId);
 create_exec_wrapper!(read, (id: u64, addr: GuestAddr), 2, 5, ReadHookId);
 create_exec_wrapper!(read, (id: u64, addr: GuestAddr), 3, 5, ReadHookId);
-create_exec_wrapper!(read, (id: u64, addr: GuestAddr, size: usize), 4, 5, ReadHookId);
+create_exec_wrapper!(
+    read,
+    (id: u64, addr: GuestAddr, size: usize),
+    4,
+    5,
+    ReadHookId
+);
 
 static mut WRITE_HOOKS: Vec<Pin<Box<HookState<5, WriteHookId>>>> = vec![];
 create_gen_wrapper!(write, (pc: GuestAddr, addr: *mut TCGTemp, info: MemAccessInfo), u64, 5, WriteHookId);
@@ -301,7 +324,13 @@ create_exec_wrapper!(write, (id: u64, addr: GuestAddr), 0, 5, WriteHookId);
 create_exec_wrapper!(write, (id: u64, addr: GuestAddr), 1, 5, WriteHookId);
 create_exec_wrapper!(write, (id: u64, addr: GuestAddr), 2, 5, WriteHookId);
 create_exec_wrapper!(write, (id: u64, addr: GuestAddr), 3, 5, WriteHookId);
-create_exec_wrapper!(write, (id: u64, addr: GuestAddr, size: usize), 4, 5, WriteHookId);
+create_exec_wrapper!(
+    write,
+    (id: u64, addr: GuestAddr, size: usize),
+    4,
+    5,
+    WriteHookId
+);
 
 static mut CMP_HOOKS: Vec<Pin<Box<HookState<4, CmpHookId>>>> = vec![];
 create_gen_wrapper!(cmp, (pc: GuestAddr, size: usize), u64, 4, CmpHookId);
@@ -338,6 +367,7 @@ where
 }
 
 static mut HOOKS_IS_INITIALIZED: bool = false;
+static mut FIRST_EXEC: bool = true;
 
 pub struct QemuHooks<QT, S>
 where
@@ -359,6 +389,36 @@ where
             .field("helpers", &self.helpers)
             .field("emulator", &self.emulator)
             .finish()
+    }
+}
+
+impl<I, QT> QemuHooks<QT, NopState<I>>
+where
+    QT: QemuHelperTuple<NopState<I>>,
+    NopState<I>: UsesInput<Input = I>,
+{
+    pub fn reproducer(emulator: Emulator, helpers: QT) -> Box<Self> {
+        Self::new(emulator, helpers)
+    }
+
+    pub fn repro_run<H>(&mut self, harness: &mut H, input: &I) -> ExitKind
+    where
+        H: FnMut(&I) -> ExitKind,
+    {
+        unsafe {
+            if FIRST_EXEC {
+                self.helpers.first_exec_all(self);
+                FIRST_EXEC = false;
+            }
+        }
+        self.helpers.pre_exec_all(&self.emulator, input);
+
+        let mut exit_kind = harness(input);
+
+        self.helpers
+            .post_exec_all(&self.emulator, input, &mut (), &mut exit_kind);
+
+        exit_kind
     }
 }
 

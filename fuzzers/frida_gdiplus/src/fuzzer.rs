@@ -76,7 +76,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
     let shmem_provider = StdShMemProvider::new()?;
 
-    let mut run_client = |state: Option<_>, mgr: LlmpRestartingEventManager<_, _>, core_id| {
+    let mut run_client = |state: Option<_>, mgr: LlmpRestartingEventManager<_, _, _>, core_id| {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
 
         // println!("{:?}", mgr.mgr_id());
@@ -94,7 +94,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
         };
 
         if options.asan && options.asan_cores.contains(core_id) {
-            (|state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _>, _core_id| {
+            (|state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _, _>, _core_id| {
                 let gum = Gum::obtain();
 
                 let coverage = CoverageRuntime::new();
@@ -215,7 +215,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 Ok(())
             })(state, mgr, core_id)
         } else if options.cmplog && options.cmplog_cores.contains(core_id) {
-            (|state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _>, _core_id| {
+            (|state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _, _>, _core_id| {
                 let gum = Gum::obtain();
 
                 let coverage = CoverageRuntime::new();
@@ -347,7 +347,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 Ok(())
             })(state, mgr, core_id)
         } else {
-            (|state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _>, _core_id| {
+            (|state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _, _>, _core_id| {
                 let gum = Gum::obtain();
 
                 let coverage = CoverageRuntime::new();

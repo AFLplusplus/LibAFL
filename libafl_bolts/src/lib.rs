@@ -211,7 +211,6 @@ pub mod launcher {}
 use core::{
     array::TryFromSliceError,
     fmt::{self, Display},
-    iter::Iterator,
     num::{ParseIntError, TryFromIntError},
     time,
 };
@@ -317,6 +316,9 @@ pub enum Error {
     Unsupported(String, ErrorBacktrace),
     /// Shutting down, not really an error.
     ShuttingDown,
+    /// OS error from `std::io::Error::last_os_error`;
+    #[cfg(feature = "std")]
+    OSError(io::Error, String, ErrorBacktrace),
     /// Something else happened
     Unknown(String, ErrorBacktrace),
 }
@@ -411,6 +413,15 @@ impl Error {
     {
         Error::Unsupported(arg.into(), ErrorBacktrace::new())
     }
+    #[cfg(feature = "std")]
+    /// OS error from `std::io::Error::last_os_error`;
+    #[must_use]
+    pub fn os_error<S>(err: io::Error, msg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::OSError(err, msg.into(), ErrorBacktrace::new())
+    }
     /// Something else happened
     #[must_use]
     pub fn unknown<S>(arg: S) -> Self
@@ -443,7 +454,7 @@ impl Display for Error {
                 display_error_backtrace(f, b)
             }
             Self::KeyNotFound(s, b) => {
-                write!(f, "Key `{0}` not in Corpus", &s)?;
+                write!(f, "Key: `{0}` - not found", &s)?;
                 display_error_backtrace(f, b)
             }
             Self::Empty(s, b) => {
@@ -475,6 +486,11 @@ impl Display for Error {
                 display_error_backtrace(f, b)
             }
             Self::ShuttingDown => write!(f, "Shutting down!"),
+            #[cfg(feature = "std")]
+            Self::OSError(err, s, b) => {
+                write!(f, "OS error: {0}: {1}", &s, err)?;
+                display_error_backtrace(f, b)
+            }
             Self::Unknown(s, b) => {
                 write!(f, "Unknown error: {0}", &s)?;
                 display_error_backtrace(f, b)
@@ -738,6 +754,14 @@ pub trait HasLen {
     }
 }
 
+#[cfg(feature = "alloc")]
+impl<T> HasLen for Vec<T> {
+    #[inline]
+    fn len(&self) -> usize {
+        Vec::<T>::len(self)
+    }
+}
+
 /// Has a ref count
 pub trait HasRefCnt {
     /// The ref count
@@ -977,6 +1001,7 @@ impl log::Log for SimpleFdLogger {
 /// # Safety
 /// The function is arguably safe, but it might have undesirable side effects since it closes `stdout` and `stderr`.
 #[cfg(all(unix, feature = "std"))]
+#[allow(unused_qualifications)]
 pub unsafe fn dup_and_mute_outputs() -> Result<(RawFd, RawFd), Error> {
     let old_stdout = stdout().as_raw_fd();
     let old_stderr = stderr().as_raw_fd();
@@ -1003,7 +1028,7 @@ pub unsafe fn set_error_print_panic_hook(new_stderr: RawFd) {
         let mut f = unsafe { File::from_raw_fd(new_stderr) };
         writeln!(f, "{panic_info}",)
             .unwrap_or_else(|err| println!("Failed to log to fd {new_stderr}: {err}"));
-        std::mem::forget(f);
+        mem::forget(f);
     }));
 }
 

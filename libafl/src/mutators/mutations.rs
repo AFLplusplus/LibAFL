@@ -122,12 +122,7 @@ where
     S: HasRand,
     I: HasBytesVec,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         if input.bytes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
@@ -162,12 +157,7 @@ where
     S: HasRand,
     I: HasBytesVec,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         if input.bytes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
@@ -200,12 +190,7 @@ where
     S: HasRand,
     I: HasBytesVec,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         if input.bytes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
@@ -239,12 +224,7 @@ where
     S: HasRand,
     I: HasBytesVec,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         if input.bytes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
@@ -278,12 +258,7 @@ where
     S: HasRand,
     I: HasBytesVec,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         if input.bytes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
@@ -317,12 +292,7 @@ where
     S: HasRand,
     I: HasBytesVec,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         if input.bytes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
@@ -365,7 +335,7 @@ macro_rules! add_mutator_impl {
                 &mut self,
                 state: &mut S,
                 input: &mut I,
-                _stage_idx: i32,
+
             ) -> Result<MutationResult, Error> {
                 if input.bytes().len() < size_of::<$size>() {
                     Ok(MutationResult::Skipped)
@@ -428,12 +398,7 @@ macro_rules! interesting_mutator_impl {
             I: HasBytesVec,
         {
             #[allow(clippy::cast_sign_loss)]
-            fn mutate(
-                &mut self,
-                state: &mut S,
-                input: &mut I,
-                _stage_idx: i32,
-            ) -> Result<MutationResult, Error> {
+            fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
                 if input.bytes().len() < size_of::<$size>() {
                     Ok(MutationResult::Skipped)
                 } else {
@@ -480,12 +445,7 @@ where
     S: HasRand,
     I: HasBytesVec,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
         if size <= 2 {
             return Ok(MutationResult::Skipped);
@@ -522,12 +482,7 @@ where
     S: HasRand + HasMaxSize,
     I: HasBytesVec,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
         let size = input.bytes().len();
         if size == 0 || size >= max_size {
@@ -573,12 +528,7 @@ where
     S: HasRand + HasMaxSize,
     I: HasBytesVec,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
         let size = input.bytes().len();
         if size == 0 || size >= max_size {
@@ -631,12 +581,7 @@ where
     S: HasRand + HasMaxSize,
     I: HasBytesVec,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
         let size = input.bytes().len();
         if size >= max_size {
@@ -689,12 +634,7 @@ where
     S: HasRand,
     I: HasBytesVec,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
         if size == 0 {
             return Ok(MutationResult::Skipped);
@@ -732,12 +672,7 @@ where
     S: HasRand,
     I: HasBytesVec,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
         if size == 0 {
             return Ok(MutationResult::Skipped);
@@ -775,12 +710,7 @@ where
     S: HasRand,
     I: HasBytesVec,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
         if size <= 1 {
             return Ok(MutationResult::Skipped);
@@ -822,12 +752,7 @@ where
     S: HasRand + HasMaxSize,
     I: HasBytesVec,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
         if size <= 1 || size >= state.max_size() {
             return Ok(MutationResult::Skipped);
@@ -887,12 +812,7 @@ where
     S: HasRand,
     I: HasBytesVec,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
         if size <= 1 {
             return Ok(MutationResult::Skipped);
@@ -1125,12 +1045,7 @@ where
     S: HasCorpus<Input = I> + HasRand + HasMaxSize,
     I: Input + HasBytesVec,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut S::Input,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut S::Input) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
         let max_size = state.max_size();
         if size >= max_size {
@@ -1213,12 +1128,7 @@ where
     S: HasCorpus<Input = I> + HasRand,
     I: Input + HasBytesVec,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut S::Input,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut S::Input) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
         if size == 0 {
             return Ok(MutationResult::Skipped);
@@ -1295,12 +1205,7 @@ where
     S::Input: HasBytesVec,
 {
     #[allow(clippy::cast_sign_loss)]
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut S::Input,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut S::Input) -> Result<MutationResult, Error> {
         // We don't want to use the testcase we're already using for splicing
         let idx = random_corpus_id!(state.corpus(), state.rand_mut());
         if let Some(cur) = state.corpus().current() {
@@ -1401,7 +1306,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        corpus::{Corpus, InMemoryCorpus},
+        corpus::InMemoryCorpus,
         feedbacks::ConstFeedback,
         inputs::BytesInput,
         mutators::MutatorsTuple,
@@ -1508,7 +1413,7 @@ mod tests {
                 for input in &inputs {
                     let mut mutant = input.clone();
                     match mutations
-                        .get_and_mutate(idx.into(), &mut state, &mut mutant, 0)
+                        .get_and_mutate(idx.into(), &mut state, &mut mutant)
                         .unwrap()
                     {
                         MutationResult::Mutated => new_testcases.push(mutant),
@@ -1534,7 +1439,7 @@ mod tests {
 
         for _ in 0..iters {
             let mut mutated = base.clone();
-            if mutator.mutate(&mut state, &mut mutated, 0)? == MutationResult::Skipped {
+            if mutator.mutate(&mut state, &mut mutated)? == MutationResult::Skipped {
                 continue;
             }
             let mut gaps = 0;
@@ -1588,7 +1493,7 @@ mod tests {
 
         for _ in 0..iters {
             let mut mutated = base.clone();
-            if mutator.mutate(&mut state, &mut mutated, 0)? == MutationResult::Skipped {
+            if mutator.mutate(&mut state, &mut mutated)? == MutationResult::Skipped {
                 continue;
             }
             let mut expansion = 0;
@@ -1637,7 +1542,7 @@ mod tests {
 
         for _ in 0..iters {
             let mut mutated = base.clone();
-            if mutator.mutate(&mut state, &mut mutated, 0)? == MutationResult::Skipped {
+            if mutator.mutate(&mut state, &mut mutated)? == MutationResult::Skipped {
                 continue;
             }
             let mut inserted = 0;
@@ -1687,7 +1592,7 @@ mod tests {
 
         for _ in 0..iters {
             let mut mutated = base.clone();
-            if mutator.mutate(&mut state, &mut mutated, 0)? == MutationResult::Skipped {
+            if mutator.mutate(&mut state, &mut mutated)? == MutationResult::Skipped {
                 continue;
             }
             let mut inserted = 10;

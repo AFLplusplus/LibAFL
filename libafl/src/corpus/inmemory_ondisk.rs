@@ -439,7 +439,7 @@ where
 }
 
 #[cfg(feature = "python")]
-#[allow(clippy::unnecessary_fallible_conversions)]
+#[allow(clippy::unnecessary_fallible_conversions, unused_qualifications)]
 /// `InMemoryOnDiskCorpus` Python bindings
 pub mod pybind {
     use alloc::string::String;

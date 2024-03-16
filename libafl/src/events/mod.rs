@@ -1,6 +1,8 @@
 //! An [`EventManager`] manages all events that go to other instances of the fuzzer.
 //! The messages are commonly information about new Testcases as well as stats and other [`Event`]s.
 
+pub mod hooks;
+
 pub mod simple;
 pub use simple::*;
 #[cfg(all(unix, feature = "std"))]
@@ -12,6 +14,8 @@ pub use centralized::*;
 pub mod launcher;
 #[allow(clippy::ignored_unit_patterns)]
 pub mod llmp;
+pub use llmp::*;
+
 #[cfg(feature = "tcp_manager")]
 #[allow(clippy::ignored_unit_patterns)]
 pub mod tcp;
@@ -31,7 +35,6 @@ pub use launcher::*;
 #[cfg(all(unix, feature = "std"))]
 use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
 use libafl_bolts::{current_time, ClientId};
-pub use llmp::*;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use uuid::Uuid;
@@ -296,7 +299,7 @@ where
         /// The time of generation of the event
         time: Duration,
         /// The executions of this client
-        executions: usize,
+        executions: u64,
         /// The original sender if, if forwarded
         forward_id: Option<ClientId>,
     },
@@ -305,7 +308,7 @@ where
         /// The time of generation of the [`Event`]
         time: Duration,
         /// The executions of this client
-        executions: usize,
+        executions: u64,
         /// [`PhantomData`]
         phantom: PhantomData<I>,
     },
@@ -324,7 +327,7 @@ where
         /// The time of generation of the event
         time: Duration,
         /// The executions of this client
-        executions: usize,
+        executions: u64,
         /// Current performance statistics
         introspection_monitor: Box<ClientPerfMonitor>,
 
@@ -335,6 +338,10 @@ where
     Objective {
         /// Objective corpus size
         objective_size: usize,
+        /// The total number of executions when this objective is found
+        executions: u64,
+        /// The time when this event was created
+        time: Duration,
     },
     /// Write a new log
     Log {
@@ -598,8 +605,7 @@ where
 }
 
 /// The handler function for custom buffers exchanged via [`EventManager`]
-type CustomBufHandlerFn<S> =
-    dyn FnMut(&mut S, &String, &[u8]) -> Result<CustomBufEventResult, Error>;
+type CustomBufHandlerFn<S> = dyn FnMut(&mut S, &str, &[u8]) -> Result<CustomBufEventResult, Error>;
 
 /// Supports custom buf handlers to handle `CustomBuf` events.
 pub trait HasCustomBufHandlers: UsesState {
@@ -677,7 +683,7 @@ where
     fn add_custom_buf_handler(
         &mut self,
         _handler: Box<
-            dyn FnMut(&mut Self::State, &String, &[u8]) -> Result<CustomBufEventResult, Error>,
+            dyn FnMut(&mut Self::State, &str, &[u8]) -> Result<CustomBufEventResult, Error>,
         >,
     ) {
     }
@@ -808,7 +814,7 @@ where
     fn add_custom_buf_handler(
         &mut self,
         handler: Box<
-            dyn FnMut(&mut Self::State, &String, &[u8]) -> Result<CustomBufEventResult, Error>,
+            dyn FnMut(&mut Self::State, &str, &[u8]) -> Result<CustomBufEventResult, Error>,
         >,
     ) {
         self.inner.add_custom_buf_handler(handler);
