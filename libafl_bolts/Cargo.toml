@@ -86,6 +86,7 @@ rustversion = "1.0"
 
 [dependencies]
 libafl_derive = { version = "0.11.2", optional = true, path = "../libafl_derive" }
+static_assertions = "1.1.0"
 
 rustversion = "1.0"
 tuple_list = { version = "0.1.3" }

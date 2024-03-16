@@ -49,7 +49,7 @@ macro_rules! impl_asany {
 #[must_use]
 pub const fn pack_type_id(id: u128) -> TypeId {
     // TypeId size of other sizes is not yet supported"
-    assert!(size_of::<TypeId>() == 16, "Unsupported size for TypeId");
+    static_assertions::const_assert!(size_of::<TypeId>() == 16);
     unsafe { *(addr_of!(id) as *const TypeId) }
 }
 
@@ -64,7 +64,7 @@ pub const fn pack_type_id(id: u128) -> TypeId {
 pub const fn unpack_type_id(id: TypeId) -> u128 {
     // see any.rs, it's alway u128 hence 16 bytes.
     // TypeId size of other sizes is not yet supported"
-    assert!(size_of::<TypeId>() == 16, "Unsupported size for TypeId");
+    static_assertions::const_assert!(size_of::<TypeId>() == 16);
     let ret: u128 = unsafe { read_unaligned::<u128>(addr_of!(id) as *const u128) };
     ret
 }
