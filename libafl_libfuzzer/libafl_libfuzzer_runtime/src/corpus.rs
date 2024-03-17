@@ -114,7 +114,7 @@ where
                 let path = self.corpus_dir.join(&name);
 
                 match input.to_file(&path) {
-                    Err(Error::OsError(e, ..) if e.kind() == ErrorKind::AlreadyExists => {
+                    Err(Error::OsError(e, ..)) if e.kind() == ErrorKind::AlreadyExists => {
                         // we do not care if the file already exists; in this case, we assume it is equal
                     }
                     res => res?,

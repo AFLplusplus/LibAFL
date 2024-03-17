@@ -394,11 +394,7 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
             tui: self.tui,
             runs: self.runs,
             close_fd_mask: self.close_fd_mask,
-            unknown: self
-                .unknown
-                .into_iter()
-                .map(ToString::to_string)
-                .collect(),
+            unknown: self.unknown.into_iter().map(ToString::to_string).collect(),
         }
     }
 }
