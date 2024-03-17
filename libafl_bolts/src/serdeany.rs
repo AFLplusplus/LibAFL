@@ -3,6 +3,10 @@
 use alloc::boxed::Box;
 #[cfg(feature = "unsafe_stable_anymap")]
 use alloc::string::{String, ToString};
+#[cfg(feature = "unsafe_stable_anymap")]
+use core::any::type_name;
+#[cfg(not(feature = "unsafe_stable_anymap"))]
+use core::any::TypeId;
 use core::{any::Any, fmt::Debug};
 
 use serde::{de::DeserializeSeed, Deserialize, Deserializer, Serialize, Serializer};
@@ -24,8 +28,6 @@ fn type_repr<T>() -> TypeRepr
 where
     T: 'static,
 {
-    use core::any::TypeId;
-
     unpack_type_id(TypeId::of::<T>())
 }
 
@@ -34,22 +36,16 @@ fn type_repr_owned<T>() -> TypeRepr
 where
     T: 'static,
 {
-    use core::any::TypeId;
-
     unpack_type_id(TypeId::of::<T>())
 }
 
 #[cfg(feature = "unsafe_stable_anymap")]
 fn type_repr_owned<T>() -> TypeRepr {
-    use core::any::type_name;
-
     type_name::<T>().to_string()
 }
 
 #[cfg(feature = "unsafe_stable_anymap")]
 fn type_repr<T>() -> &'static str {
-    use core::any::type_name;
-
     type_name::<T>()
 }
 
@@ -477,7 +473,7 @@ pub mod serdeany_registry {
             }
         }
 
-        /// Get an element of a given type contained in this map by [`TypeId`], as mut.
+        /// Get an element of a given type contained in this map by type `T`, as mut.
         #[must_use]
         #[inline]
         pub fn get_mut<T>(&mut self, name: &str) -> Option<&mut T>
