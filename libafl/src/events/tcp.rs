@@ -1197,7 +1197,7 @@ where
 
                             return Err(Error::shutting_down());
                         }
-                        Err(Error::File(_, _)) => {
+                        Err(Error::OsError(..)) => {
                             // port was likely already bound
                             let mgr = TcpEventManager::<EMH, S>::with_hooks(
                                 &("127.0.0.1", self.broker_port),
