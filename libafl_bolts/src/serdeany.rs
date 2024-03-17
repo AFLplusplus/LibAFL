@@ -20,7 +20,7 @@ pub type TypeRepr = u128;
 pub type TypeRepr = String;
 
 #[cfg(not(feature = "unsafe_stable_anymap"))]
-fn type_repr_of<'a, T>() -> TypeRepr
+fn type_repr_of<T>() -> TypeRepr
 where
     T: 'static,
 {
@@ -30,7 +30,7 @@ where
 }
 
 #[cfg(not(feature = "unsafe_stable_anymap"))]
-fn type_repr_owned<'a, T>() -> TypeRepr
+fn type_repr_owned<T>() -> TypeRepr
 where
     T: 'static,
 {
