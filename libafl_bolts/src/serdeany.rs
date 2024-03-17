@@ -66,18 +66,20 @@ where
 /// Each element needs to be registered so that it can be deserialized.
 pub mod serdeany_registry {
 
-    use alloc::boxed::Box;
-    use core::{any::TypeId, fmt, hash::BuildHasherDefault};
+    use alloc::{
+        boxed::Box,
+        string::{String, ToString},
+    };
+    use core::{any::type_name, fmt, hash::BuildHasherDefault};
 
     use hashbrown::{
-        hash_map::{Keys, Values, ValuesMut},
+        hash_map::{Values, ValuesMut},
         HashMap,
     };
     use serde::{Deserialize, Serialize};
 
     use super::SerdeAny;
     use crate::{
-        anymap::{pack_type_id, unpack_type_id},
         hash_std,
         serdeany::{DeserializeCallback, DeserializeCallbackSeed},
         Error,
@@ -98,7 +100,7 @@ pub mod serdeany_registry {
         where
             V: serde::de::SeqAccess<'de>,
         {
-            let id: u128 = visitor.next_element()?.unwrap();
+            let id: String = visitor.next_element()?.unwrap();
             let cb = unsafe {
                 *REGISTRY
                     .deserializers
@@ -115,7 +117,7 @@ pub mod serdeany_registry {
 
     #[allow(unused_qualifications)]
     struct Registry {
-        deserializers: Option<HashMap<u128, DeserializeCallback<dyn crate::serdeany::SerdeAny>>>,
+        deserializers: Option<HashMap<String, DeserializeCallback<dyn crate::serdeany::SerdeAny>>>,
         finalized: bool,
     }
 
@@ -128,7 +130,7 @@ pub mod serdeany_registry {
             assert!(!self.finalized, "Registry is already finalized!");
 
             let deserializers = self.deserializers.get_or_insert_with(HashMap::default);
-            deserializers.insert(unpack_type_id(TypeId::of::<T>()), |de| {
+            deserializers.insert(type_name::<T>().to_string(), |de| {
                 Ok(Box::new(erased_serde::deserialize::<T>(de)?))
             });
         }
@@ -181,7 +183,7 @@ pub mod serdeany_registry {
     #[allow(clippy::unsafe_derive_deserialize)]
     #[derive(Debug, Serialize, Deserialize)]
     pub struct SerdeAnyMap {
-        map: HashMap<u128, Box<dyn SerdeAny>>,
+        map: HashMap<String, Box<dyn SerdeAny>>,
     }
 
     // Cloning by serializing and deserializing. It ain't fast, but it's honest work.
@@ -219,7 +221,7 @@ pub mod serdeany_registry {
             T: crate::serdeany::SerdeAny,
         {
             self.map
-                .get(&unpack_type_id(TypeId::of::<T>()))
+                .get(type_name::<T>())
                 .map(|x| x.as_ref().as_any().downcast_ref::<T>().unwrap())
         }
 
@@ -231,7 +233,7 @@ pub mod serdeany_registry {
             T: crate::serdeany::SerdeAny,
         {
             self.map
-                .get_mut(&unpack_type_id(TypeId::of::<T>()))
+                .get_mut(type_name::<T>())
                 .map(|x| x.as_mut().as_any_mut().downcast_mut::<T>().unwrap())
         }
 
@@ -243,7 +245,7 @@ pub mod serdeany_registry {
             T: crate::serdeany::SerdeAny,
         {
             self.map
-                .remove(&unpack_type_id(TypeId::of::<T>()))
+                .remove(type_name::<T>())
                 .map(|x| x.as_any_boxed().downcast::<T>().unwrap())
         }
 
@@ -262,38 +264,39 @@ pub mod serdeany_registry {
         where
             T: crate::serdeany::SerdeAny,
         {
-            self.entry::<T>().insert(value);
+            self.raw_entry_mut::<T>()
+                .insert(type_name::<T>().to_string(), value);
         }
 
         /// Get an entry to an element in this map.
         #[inline]
         #[allow(unused_qualifications)]
-        pub fn entry<T>(
+        pub fn raw_entry_mut<T>(
             &mut self,
-        ) -> hashbrown::hash_map::Entry<
+        ) -> hashbrown::hash_map::RawEntryMut<
             '_,
-            u128,
+            String,
             Box<dyn SerdeAny + 'static>,
             BuildHasherDefault<ahash::AHasher>,
         >
         where
             T: crate::serdeany::SerdeAny,
         {
-            let id = unpack_type_id(TypeId::of::<T>());
+            let id = type_name::<T>();
             assert!(
                         unsafe {
                             REGISTRY
                                 .deserializers
                                 .as_ref()
                                 .expect("Empty types registry")
-                                .get(&id)
+                                .get(id)
                                 .is_some()
                         },
                         "Type {} was inserted without registration! Call RegistryBuilder::register::<{}>() or use serde_autoreg.",
                         core::any::type_name::<T>(),
                         core::any::type_name::<T>()
                     );
-            self.map.entry(id)
+            self.map.raw_entry_mut().from_key(id)
         }
 
         /// Gets a value by type, or inserts it using the given construction function `default`
@@ -309,8 +312,10 @@ pub mod serdeany_registry {
         where
             T: SerdeAny + 'static,
         {
-            let ret = self.entry::<T>().or_insert_with(|| default());
-            ret.as_mut().as_any_mut().downcast_mut::<T>().unwrap()
+            let ret = self
+                .raw_entry_mut::<T>()
+                .or_insert_with(|| (type_name::<T>().to_string(), default()));
+            ret.1.as_any_mut().downcast_mut::<T>().unwrap()
         }
 
         /// Returns the count of elements in this map.
@@ -333,7 +338,7 @@ pub mod serdeany_registry {
         where
             T: crate::serdeany::SerdeAny,
         {
-            self.map.contains_key(&unpack_type_id(TypeId::of::<T>()))
+            self.map.contains_key(type_name::<T>())
         }
 
         /// Create a new [`SerdeAnyMap`].
@@ -356,7 +361,7 @@ pub mod serdeany_registry {
     #[allow(unused_qualifications)]
     #[derive(Debug, Serialize, Deserialize)]
     pub struct NamedSerdeAnyMap {
-        map: HashMap<u128, HashMap<u64, Box<dyn crate::serdeany::SerdeAny>>>,
+        map: HashMap<String, HashMap<u64, Box<dyn crate::serdeany::SerdeAny>>>,
     }
 
     // Cloning by serializing and deserializing. It ain't fast, but it's honest work.
@@ -377,7 +382,7 @@ pub mod serdeany_registry {
         where
             T: crate::serdeany::SerdeAny,
         {
-            match self.map.get(&unpack_type_id(TypeId::of::<T>())) {
+            match self.map.get(type_name::<T>()) {
                 None => None,
                 Some(h) => h
                     .get(&hash_std(name.as_bytes()))
@@ -392,26 +397,11 @@ pub mod serdeany_registry {
         where
             T: crate::serdeany::SerdeAny,
         {
-            match self.map.get_mut(&unpack_type_id(TypeId::of::<T>())) {
+            match self.map.get_mut(type_name::<T>()) {
                 None => None,
                 Some(h) => h
                     .remove(&hash_std(name.as_bytes()))
                     .map(|x| x.as_any_boxed().downcast::<T>().unwrap()),
-            }
-        }
-
-        /// Get an element of a given type contained in this map by [`TypeId`].
-        #[must_use]
-        #[allow(unused_qualifications)]
-        #[inline]
-        pub fn by_typeid(
-            &self,
-            name: &str,
-            typeid: &TypeId,
-        ) -> Option<&dyn crate::serdeany::SerdeAny> {
-            match self.map.get(&unpack_type_id(*typeid)) {
-                None => None,
-                Some(h) => h.get(&hash_std(name.as_bytes())).map(AsRef::as_ref),
             }
         }
 
@@ -422,25 +412,11 @@ pub mod serdeany_registry {
         where
             T: crate::serdeany::SerdeAny,
         {
-            match self.map.get_mut(&unpack_type_id(TypeId::of::<T>())) {
+            match self.map.get_mut(type_name::<T>()) {
                 None => None,
                 Some(h) => h
                     .get_mut(&hash_std(name.as_bytes()))
                     .map(|x| x.as_any_mut().downcast_mut::<T>().unwrap()),
-            }
-        }
-
-        /// Get an element of a given type contained in this map by [`TypeId`], as mut.
-        #[must_use]
-        #[inline]
-        pub fn by_typeid_mut(
-            &mut self,
-            name: &str,
-            typeid: &TypeId,
-        ) -> Option<&mut dyn crate::serdeany::SerdeAny> {
-            match self.map.get_mut(&unpack_type_id(*typeid)) {
-                None => None,
-                Some(h) => h.get_mut(&hash_std(name.as_bytes())).map(AsMut::as_mut),
             }
         }
 
@@ -461,30 +437,9 @@ pub mod serdeany_registry {
             T: crate::serdeany::SerdeAny,
         {
             #[allow(clippy::manual_map)]
-            match self.map.get(&unpack_type_id(TypeId::of::<T>())) {
+            match self.map.get(type_name::<T>()) {
                 None => None,
                 Some(h) => Some(h.values().map(|x| x.as_any().downcast_ref::<T>().unwrap())),
-            }
-        }
-
-        /// Get all elements of a given type contained in this map by [`TypeId`].
-        #[must_use]
-        #[allow(unused_qualifications)]
-        #[inline]
-        #[allow(clippy::type_complexity)]
-        pub fn all_by_typeid(
-            &self,
-            typeid: &TypeId,
-        ) -> Option<
-            core::iter::Map<
-                Values<'_, u64, Box<dyn crate::serdeany::SerdeAny>>,
-                fn(&Box<dyn crate::serdeany::SerdeAny>) -> &dyn crate::serdeany::SerdeAny,
-            >,
-        > {
-            #[allow(clippy::manual_map)]
-            match self.map.get(&unpack_type_id(*typeid)) {
-                None => None,
-                Some(h) => Some(h.values().map(|x| x.as_ref())),
             }
         }
 
@@ -504,7 +459,7 @@ pub mod serdeany_registry {
             T: crate::serdeany::SerdeAny,
         {
             #[allow(clippy::manual_map)]
-            match self.map.get_mut(&unpack_type_id(TypeId::of::<T>())) {
+            match self.map.get_mut(type_name::<T>()) {
                 None => None,
                 Some(h) => Some(
                     h.values_mut()
@@ -513,51 +468,18 @@ pub mod serdeany_registry {
             }
         }
 
-        /// Get all [`TypeId`]`s` contained in this map, as mut.
-        #[inline]
-        #[allow(unused_qualifications)]
-        #[allow(clippy::type_complexity)]
-        pub fn all_by_typeid_mut(
-            &mut self,
-            typeid: &TypeId,
-        ) -> Option<
-            core::iter::Map<
-                ValuesMut<'_, u64, Box<dyn crate::serdeany::SerdeAny>>,
-                fn(&mut Box<dyn crate::serdeany::SerdeAny>) -> &mut dyn crate::serdeany::SerdeAny,
-            >,
-        > {
-            #[allow(clippy::manual_map)]
-            match self.map.get_mut(&unpack_type_id(*typeid)) {
-                None => None,
-                Some(h) => Some(h.values_mut().map(|x| x.as_mut())),
-            }
-        }
-
-        /// Get all [`TypeId`]`s` contained in this map.
-        #[inline]
-        #[allow(unused_qualifications)]
-        #[allow(clippy::type_complexity)]
-        pub fn all_typeids(
-            &self,
-        ) -> core::iter::Map<
-            Keys<'_, u128, HashMap<u64, Box<dyn crate::serdeany::SerdeAny>>>,
-            fn(&u128) -> TypeId,
-        > {
-            self.map.keys().map(|x| pack_type_id(*x))
-        }
-
         /// Run `func` for each element in this map.
         #[inline]
         #[allow(unused_qualifications)]
         pub fn for_each<
-            F: FnMut(&TypeId, &Box<dyn crate::serdeany::SerdeAny>) -> Result<(), Error>,
+            F: FnMut(&str, &Box<dyn crate::serdeany::SerdeAny>) -> Result<(), Error>,
         >(
             &self,
             func: &mut F,
         ) -> Result<(), Error> {
             for (id, h) in &self.map {
                 for x in h.values() {
-                    func(&pack_type_id(*id), x)?;
+                    func(id, x)?;
                 }
             }
             Ok(())
@@ -566,14 +488,14 @@ pub mod serdeany_registry {
         /// Run `func` for each element in this map, getting a mutable borrow.
         #[inline]
         pub fn for_each_mut<
-            F: FnMut(&TypeId, &mut Box<dyn crate::serdeany::SerdeAny>) -> Result<(), Error>,
+            F: FnMut(&str, &mut Box<dyn crate::serdeany::SerdeAny>) -> Result<(), Error>,
         >(
             &mut self,
             func: &mut F,
         ) -> Result<(), Error> {
             for (id, h) in &mut self.map {
                 for x in h.values_mut() {
-                    func(&pack_type_id(*id), x)?;
+                    func(id, x)?;
                 }
             }
             Ok(())
@@ -604,14 +526,14 @@ pub mod serdeany_registry {
         where
             T: crate::serdeany::SerdeAny,
         {
-            let id = unpack_type_id(TypeId::of::<T>());
+            let id = type_name::<T>();
             assert!(
                         unsafe {
                             REGISTRY
                                 .deserializers
                                 .as_ref()
                                 .expect("Empty types registry")
-                                .get(&id)
+                                .get(id)
                                 .is_some()
                         },
                         "Type {} was inserted without registration! Call RegistryBuilder::register::<{}>() or use serde_autoreg.",
@@ -619,8 +541,10 @@ pub mod serdeany_registry {
                         core::any::type_name::<T>()
                     );
             self.map
-                .entry(id)
-                .or_default()
+                .raw_entry_mut()
+                .from_key(id)
+                .or_insert_with(|| (id.to_string(), HashMap::default()))
+                .1
                 .entry(hash_std(name.as_bytes()))
         }
 
@@ -666,7 +590,7 @@ pub mod serdeany_registry {
         where
             T: crate::serdeany::SerdeAny,
         {
-            self.map.contains_key(&unpack_type_id(TypeId::of::<T>()))
+            self.map.contains_key(type_name::<T>())
         }
 
         /// Returns if the element by a given `name` is contained in this map.
@@ -676,7 +600,7 @@ pub mod serdeany_registry {
         where
             T: crate::serdeany::SerdeAny,
         {
-            match self.map.get(&unpack_type_id(TypeId::of::<T>())) {
+            match self.map.get(type_name::<T>()) {
                 None => false,
                 Some(h) => h.contains_key(&hash_std(name.as_bytes())),
             }
