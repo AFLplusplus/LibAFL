@@ -404,8 +404,8 @@ impl Error {
     {
         Error::Unsupported(arg.into(), ErrorBacktrace::new())
     }
-    #[cfg(feature = "std")]
     /// OS error with additional message
+    #[cfg(feature = "std")]
     #[must_use]
     pub fn os_error<S>(err: io::Error, msg: S) -> Self
     where
@@ -413,8 +413,8 @@ impl Error {
     {
         Error::OsError(err, msg.into(), ErrorBacktrace::new())
     }
-    #[cfg(feature = "std")]
     /// OS error from [`std::io::Error::last_os_error`] with additional message
+    #[cfg(feature = "std")]
     #[must_use]
     pub fn last_os_error<S>(msg: S) -> Self
     where
