@@ -20,7 +20,7 @@ pub type TypeRepr = u128;
 pub type TypeRepr = String;
 
 #[cfg(not(feature = "unsafe_stable_anymap"))]
-fn type_repr_of<T>() -> TypeRepr
+fn type_repr<T>() -> TypeRepr
 where
     T: 'static,
 {
@@ -47,7 +47,7 @@ fn type_repr_owned<T>() -> TypeRepr {
 }
 
 #[cfg(feature = "unsafe_stable_anymap")]
-fn type_repr_of<T>() -> &'static str {
+fn type_repr<T>() -> &'static str {
     use core::any::type_name;
 
     type_name::<T>()
@@ -125,7 +125,7 @@ pub mod serdeany_registry {
     use super::{SerdeAny, TypeRepr};
     use crate::{
         hash_std,
-        serdeany::{type_repr_of, type_repr_owned, DeserializeCallback, DeserializeCallbackSeed},
+        serdeany::{type_repr, type_repr_owned, DeserializeCallback, DeserializeCallbackSeed},
         Error,
     };
 
@@ -265,7 +265,7 @@ pub mod serdeany_registry {
         where
             T: crate::serdeany::SerdeAny,
         {
-            let type_repr = type_repr_of::<T>();
+            let type_repr = type_repr::<T>();
             #[cfg(not(feature = "unsafe_stable_anymap"))]
             let type_repr = &type_repr;
 
@@ -281,7 +281,7 @@ pub mod serdeany_registry {
         where
             T: crate::serdeany::SerdeAny,
         {
-            let type_repr = type_repr_of::<T>();
+            let type_repr = type_repr::<T>();
             #[cfg(not(feature = "unsafe_stable_anymap"))]
             let type_repr = &type_repr;
 
@@ -297,7 +297,7 @@ pub mod serdeany_registry {
         where
             T: crate::serdeany::SerdeAny,
         {
-            let type_repr = type_repr_of::<T>();
+            let type_repr = type_repr::<T>();
             #[cfg(not(feature = "unsafe_stable_anymap"))]
             let type_repr = &type_repr;
 
@@ -339,7 +339,7 @@ pub mod serdeany_registry {
         where
             T: crate::serdeany::SerdeAny,
         {
-            let type_repr = type_repr_of::<T>();
+            let type_repr = type_repr::<T>();
             #[cfg(not(feature = "unsafe_stable_anymap"))]
             let type_repr = &type_repr;
 
@@ -398,7 +398,7 @@ pub mod serdeany_registry {
         where
             T: crate::serdeany::SerdeAny,
         {
-            let type_repr = type_repr_of::<T>();
+            let type_repr = type_repr::<T>();
             #[cfg(not(feature = "unsafe_stable_anymap"))]
             let type_repr = &type_repr;
 
@@ -446,7 +446,7 @@ pub mod serdeany_registry {
         where
             T: crate::serdeany::SerdeAny,
         {
-            let type_repr = type_repr_of::<T>();
+            let type_repr = type_repr::<T>();
             #[cfg(not(feature = "unsafe_stable_anymap"))]
             let type_repr = &type_repr;
 
@@ -465,7 +465,7 @@ pub mod serdeany_registry {
         where
             T: crate::serdeany::SerdeAny,
         {
-            let type_repr = type_repr_of::<T>();
+            let type_repr = type_repr::<T>();
             #[cfg(not(feature = "unsafe_stable_anymap"))]
             let type_repr = &type_repr;
 
@@ -484,7 +484,7 @@ pub mod serdeany_registry {
         where
             T: crate::serdeany::SerdeAny,
         {
-            let type_repr = type_repr_of::<T>();
+            let type_repr = type_repr::<T>();
             #[cfg(not(feature = "unsafe_stable_anymap"))]
             let type_repr = &type_repr;
 
@@ -512,7 +512,7 @@ pub mod serdeany_registry {
         where
             T: crate::serdeany::SerdeAny,
         {
-            let type_repr = type_repr_of::<T>();
+            let type_repr = type_repr::<T>();
             #[cfg(not(feature = "unsafe_stable_anymap"))]
             let type_repr = &type_repr;
 
@@ -538,7 +538,7 @@ pub mod serdeany_registry {
         where
             T: crate::serdeany::SerdeAny,
         {
-            let type_repr = type_repr_of::<T>();
+            let type_repr = type_repr::<T>();
             #[cfg(not(feature = "unsafe_stable_anymap"))]
             let type_repr = &type_repr;
 
@@ -610,7 +610,7 @@ pub mod serdeany_registry {
         where
             T: crate::serdeany::SerdeAny,
         {
-            let type_repr = type_repr_of::<T>();
+            let type_repr = type_repr::<T>();
             #[cfg(not(feature = "unsafe_stable_anymap"))]
             let type_repr = &type_repr;
 
@@ -677,7 +677,7 @@ pub mod serdeany_registry {
         where
             T: crate::serdeany::SerdeAny,
         {
-            let type_repr = type_repr_of::<T>();
+            let type_repr = type_repr::<T>();
             #[cfg(not(feature = "unsafe_stable_anymap"))]
             let type_repr = &type_repr;
 
@@ -691,7 +691,7 @@ pub mod serdeany_registry {
         where
             T: crate::serdeany::SerdeAny,
         {
-            let type_repr = type_repr_of::<T>();
+            let type_repr = type_repr::<T>();
             #[cfg(not(feature = "unsafe_stable_anymap"))]
             let type_repr = &type_repr;
 
