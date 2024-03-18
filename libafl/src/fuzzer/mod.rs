@@ -576,7 +576,6 @@ where
         testcase.set_disabled(true);
         // Add the disabled input to the main corpus
         let idx = state.corpus_mut().add_disabled(testcase)?;
-        self.scheduler_mut().on_add(state, idx)?;
         Ok(idx)
     }
     /// Adds an input, even if it's not considered `interesting` by any of the executors

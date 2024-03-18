@@ -472,7 +472,7 @@ where
     #[inline]
     fn nth_from_all(&self, nth: usize) -> CorpusId {
         let enabled_count = self.count();
-        if nth > enabled_count {
+        if nth >= enabled_count {
             return self.storage.disabled.keys[nth.saturating_sub(enabled_count)];
         }
         self.storage.enabled.keys[nth]
