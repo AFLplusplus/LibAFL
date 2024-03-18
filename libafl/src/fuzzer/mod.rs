@@ -179,7 +179,6 @@ where
     fn add_disabled_input(
         &mut self,
         state: &mut Self::State,
-        executor: &mut E,
         input: <Self::State as UsesInput>::Input,
     ) -> Result<CorpusId, Error>;
 }
@@ -571,15 +570,11 @@ where
     fn add_disabled_input(
         &mut self,
         state: &mut Self::State,
-        executor: &mut E,
         input: <Self::State as UsesInput>::Input,
     ) -> Result<CorpusId, Error> {
-        let observers = executor.observers();
         let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
         testcase.set_disabled(true);
         // Add the disabled input to the main corpus
-        self.feedback_mut()
-            .append_metadata(state, observers, &mut testcase)?;
         let idx = state.corpus_mut().add_disabled(testcase)?;
         self.scheduler_mut().on_add(state, idx)?;
         Ok(idx)

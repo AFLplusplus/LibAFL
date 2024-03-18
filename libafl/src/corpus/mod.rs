@@ -365,6 +365,11 @@ pub mod pybind {
         }
 
         #[inline]
+        fn count_disabled(&self) -> usize {
+            unwrap_me!(self.wrapper, c, { c.count_disabled() })
+        }
+
+        #[inline]
         fn count_all(&self) -> usize {
             unwrap_me!(self.wrapper, c, { c.count_all() })
         }
@@ -397,6 +402,15 @@ pub mod pybind {
         fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<BytesInput>>, Error> {
             let ptr = unwrap_me!(self.wrapper, c, {
                 c.get(idx)
+                    .map(core::ptr::from_ref::<RefCell<Testcase<BytesInput>>>)
+            })?;
+            Ok(unsafe { ptr.as_ref().unwrap() })
+        }
+
+        #[inline]
+        fn get_from_all(&self, idx: CorpusId) -> Result<&RefCell<Testcase<BytesInput>>, Error> {
+            let ptr = unwrap_me!(self.wrapper, c, {
+                c.get_from_all(idx)
                     .map(core::ptr::from_ref::<RefCell<Testcase<BytesInput>>>)
             })?;
             Ok(unsafe { ptr.as_ref().unwrap() })
@@ -436,6 +450,11 @@ pub mod pybind {
 
         fn store_input_from(&self, testcase: &Testcase<BytesInput>) -> Result<(), Error> {
             unwrap_me!(self.wrapper, c, { c.store_input_from(testcase) })
+        }
+
+        #[inline]
+        fn nth_from_all(&self, nth: usize) -> CorpusId {
+            unwrap_me!(self.wrapper, c, { c.nth_from_all(nth) })
         }
 
         /*fn ids<'a>(&'a self) -> CorpusIdIterator<'a, Self> {
