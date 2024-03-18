@@ -117,7 +117,7 @@ pub fn fuzz() {
 
                 emu.write_phys_mem(input_addr, buf);
 
-                emu.run().unwrap();
+                let _ = emu.run();
 
                 // If the execution stops at any point other then the designated breakpoint (e.g. a breakpoint on a panic method) we consider it a crash
                 let mut pcs = (0..emu.num_cpus())
