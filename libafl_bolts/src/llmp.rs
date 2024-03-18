@@ -705,7 +705,7 @@ where
                 let _listener_thread = broker.launch_listener(Listener::Tcp(listener))?;
                 Ok(LlmpConnection::IsBroker { broker })
             }
-            Err(Error::File(e, _)) if e.kind() == ErrorKind::AddrInUse => {
+            Err(Error::OsError(e, ..)) if e.kind() == ErrorKind::AddrInUse => {
                 // We are the client :)
                 log::info!("We're the client (internal port already bound by broker, {e:#?})");
                 Ok(LlmpConnection::IsClient {
@@ -2623,7 +2623,7 @@ where
                             .expect("B2B: Error forwarding message. Exiting.");
                     }
                     Err(e) => {
-                        if let Error::File(e, _) = e {
+                        if let Error::OsError(e, ..) = e {
                             if e.kind() == ErrorKind::UnexpectedEof {
                                 log::info!(
                                     "Broker {peer_address} seems to have disconnected, exiting"
