@@ -445,10 +445,10 @@ impl Forkserver {
     pub fn read_st_timed(&mut self, timeout: &TimeSpec) -> Result<Option<i32>, Error> {
         let mut buf: [u8; 4] = [0_u8; 4];
         let Some(st_read) = self.st_pipe.read_end() else {
-            return Err(Error::file(io::Error::new(
-                ErrorKind::BrokenPipe,
-                "Read pipe end was already closed",
-            )));
+            return Err(Error::os_error(
+                io::Error::new(ErrorKind::BrokenPipe, "Read pipe end was already closed"),
+                "read_st_timed failed",
+            ));
         };
 
         // # Safety
