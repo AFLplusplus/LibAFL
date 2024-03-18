@@ -114,7 +114,7 @@ where
                 let path = self.corpus_dir.join(&name);
 
                 match input.to_file(&path) {
-                    Err(Error::File(e, _)) if e.kind() == ErrorKind::AlreadyExists => {
+                    Err(Error::OsError(e, ..)) if e.kind() == ErrorKind::AlreadyExists => {
                         // we do not care if the file already exists; in this case, we assume it is equal
                     }
                     res => res?,
@@ -192,7 +192,7 @@ where
             Error::empty("The testcase, when being saved, must have a file path!")
         })?;
         match input.to_file(path) {
-            Err(Error::File(e, _)) if e.kind() == ErrorKind::AlreadyExists => {
+            Err(Error::OsError(e, ..)) if e.kind() == ErrorKind::AlreadyExists => {
                 // we do not care if the file already exists; in this case, we assume it is equal
                 Ok(())
             }
@@ -250,7 +250,7 @@ where
             Error::illegal_state("Should have set the path in the LibfuzzerCrashCauseFeedback.")
         })?;
         match input.to_file(path) {
-            Err(Error::File(e, _)) if e.kind() == ErrorKind::AlreadyExists => {
+            Err(Error::OsError(e, ..)) if e.kind() == ErrorKind::AlreadyExists => {
                 // we do not care if the file already exists; in this case, we assume it is equal
             }
             res => res?,
