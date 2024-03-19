@@ -149,7 +149,7 @@ impl<'a> Client<'a> {
             .read_return_address()
             .map_err(|e| Error::unknown(format!("Failed to read return address: {e:}")))?;
         log::debug!("ret_addr = {ret_addr:#x}");
-        qemu.set_breakpoint_addr(ret_addr);
+        qemu.set_breakpoint(ret_addr);
 
         let is_asan = self.options.is_asan_core(core_id);
         let is_cmplog = self.options.is_cmplog_core(core_id);

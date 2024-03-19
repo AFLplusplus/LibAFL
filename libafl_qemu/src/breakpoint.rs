@@ -73,14 +73,14 @@ impl Breakpoint {
 
     pub fn enable(&mut self, qemu: &Qemu) {
         if !self.enabled {
-            qemu.set_breakpoint_addr(self.addr);
+            qemu.set_breakpoint(self.addr);
             self.enabled = true;
         }
     }
 
     pub fn disable(&mut self, qemu: &Qemu) {
         if self.enabled {
-            qemu.unset_breakpoint_addr(self.addr.into());
+            qemu.remove_breakpoint(self.addr.into());
             self.enabled = false;
         }
     }

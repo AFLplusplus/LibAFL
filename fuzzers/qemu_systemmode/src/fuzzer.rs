@@ -32,7 +32,7 @@ use libafl_qemu::{
     edges::{edges_map_mut_slice, QemuEdgeCoverageHelper, MAX_EDGES_NUM},
     elf::EasyElf,
     emu::Qemu,
-    QemuExecutor, QemuExitReason, QemuHooks, QemuShutdownCause, Regs,
+    QemuExecutor, QemuExitReason, QemuExitReasonError, QemuHooks, QemuShutdownCause, Regs,
 };
 use libafl_qemu_sys::GuestPhysAddr;
 
@@ -87,13 +87,16 @@ pub fn fuzz() {
         let env: Vec<(String, String)> = env::vars().collect();
         let qemu = Qemu::init(&args, &env).unwrap();
 
-        qemu.set_breakpoint_addr(main_addr);
+        qemu.set_breakpoint(main_addr);
         unsafe {
-            let _ = qemu.run();
+            match qemu.run() {
+                Ok(QemuExitReason::Breakpoint(_)) => {}
+                _ => panic!("Unexpected QEMU exit."),
+            }
         }
-        qemu.unset_breakpoint_addr(main_addr);
+        qemu.remove_breakpoint(main_addr);
 
-        qemu.set_breakpoint_addr(breakpoint); // BREAKPOINT
+        qemu.set_breakpoint(breakpoint); // BREAKPOINT
 
         let devices = qemu.list_devices();
         println!("Devices = {devices:?}");
@@ -120,10 +123,12 @@ pub fn fuzz() {
                 qemu.write_phys_mem(input_addr, buf);
 
                 match qemu.run() {
+                    Ok(QemuExitReason::Breakpoint(_)) => {}
                     Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(
                         Signal::SigInterrupt,
                     ))) => process::exit(0),
-                    _ => {}
+                    Err(QemuExitReasonError::UnexpectedExit) => return ExitKind::Crash,
+                    _ => panic!("Unexpected QEMU exit."),
                 }
 
                 // If the execution stops at any point other then the designated breakpoint (e.g. a breakpoint on a panic method) we consider it a crash

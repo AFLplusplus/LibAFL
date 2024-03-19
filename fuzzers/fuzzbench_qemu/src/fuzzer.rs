@@ -38,7 +38,7 @@ use libafl::{
 };
 use libafl_bolts::{
     current_nanos, current_time,
-    os::dup2,
+    os::{dup2, unix_signals::Signal},
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
@@ -58,6 +58,9 @@ use libafl_qemu::{
     MmapPerms,
     Qemu,
     QemuExecutor,
+    QemuExitReason,
+    QemuExitReasonError,
+    QemuShutdownCause,
     Regs,
 };
 #[cfg(unix)]
@@ -183,9 +186,12 @@ fn fuzz(
         .expect("Symbol LLVMFuzzerTestOneInput not found");
     println!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
 
-    qemu.set_breakpoint_addr(test_one_input_ptr); // LLVMFuzzerTestOneInput
+    qemu.set_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
     unsafe {
-        let _ = qemu.run();
+        match qemu.run() {
+            Ok(QemuExitReason::Breakpoint(_)) => {}
+            _ => panic!("Unexpected QEMU exit."),
+        }
     }
 
     println!(
@@ -201,8 +207,8 @@ fn fuzz(
     println!("Stack pointer = {stack_ptr:#x}");
     println!("Return address = {ret_addr:#x}");
 
-    qemu.unset_breakpoint_addr(test_one_input_ptr); // LLVMFuzzerTestOneInput
-    qemu.set_breakpoint_addr(ret_addr); // LLVMFuzzerTestOneInput ret addr
+    qemu.remove_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
+    qemu.set_breakpoint(ret_addr); // LLVMFuzzerTestOneInput ret addr
 
     let input_addr = qemu
         .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
@@ -340,7 +346,14 @@ fn fuzz(
             qemu.write_reg(Regs::Rip, test_one_input_ptr).unwrap();
             qemu.write_reg(Regs::Rsp, stack_ptr).unwrap();
 
-            let _ = qemu.run();
+            match qemu.run() {
+                Ok(QemuExitReason::Breakpoint(_)) => {}
+                Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(Signal::SigInterrupt))) => {
+                    process::exit(0)
+                }
+                Err(QemuExitReasonError::UnexpectedExit) => return ExitKind::Crash,
+                _ => panic!("Unexpected QEMU exit."),
+            }
         }
 
         ExitKind::Ok

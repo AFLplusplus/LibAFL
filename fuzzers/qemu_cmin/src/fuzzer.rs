@@ -21,6 +21,7 @@ use libafl::{
 use libafl_bolts::{
     core_affinity::Cores,
     current_nanos,
+    os::unix_signals::Signal,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
@@ -29,8 +30,8 @@ use libafl_bolts::{
 use libafl_qemu::{
     edges::{QemuEdgeCoverageChildHelper, EDGES_MAP_PTR, EDGES_MAP_SIZE},
     elf::EasyElf,
-    ArchExtras, CallingConvention, GuestAddr, GuestReg, MmapPerms, Qemu, QemuForkExecutor,
-    QemuHooks, Regs,
+    ArchExtras, CallingConvention, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExitReason,
+    QemuExitReasonError, QemuForkExecutor, QemuHooks, QemuShutdownCause, Regs,
 };
 
 #[derive(Default)]
@@ -129,7 +130,7 @@ pub fn fuzz() -> Result<(), Error> {
 
     let ret_addr: GuestAddr = qemu.read_return_address().unwrap();
     log::debug!("Return address = {ret_addr:#x}");
-    qemu.set_breakpoint_addr(ret_addr);
+    qemu.set_breakpoint(ret_addr);
 
     let input_addr = qemu
         .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
@@ -208,7 +209,15 @@ pub fn fuzz() -> Result<(), Error> {
                 .unwrap();
             qemu.write_function_argument(CallingConvention::Cdecl, 1, len)
                 .unwrap();
-            let _ = qemu.run();
+
+            match qemu.run() {
+                Ok(QemuExitReason::Breakpoint(_)) => {}
+                Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(Signal::SigInterrupt))) => {
+                    process::exit(0)
+                }
+                Err(QemuExitReasonError::UnexpectedExit) => return ExitKind::Crash,
+                _ => panic!("Unexpected QEMU exit."),
+            }
         }
 
         ExitKind::Ok

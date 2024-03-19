@@ -763,8 +763,8 @@ impl Display for EmuExitReason {
 
 #[derive(Debug, Clone)]
 pub enum QemuExitReasonError {
-    UnknownKind,
-    UnexpectedExit,
+    UnknownKind, // Exit reason was not NULL, but exit kind is unknown. Should never happen.
+    UnexpectedExit, // Qemu exited without going through an expected exit point. Can be caused by a crash for example.
 }
 
 #[derive(Debug, Clone)]
@@ -1051,25 +1051,27 @@ impl Qemu {
         self.current_cpu().unwrap().read_reg(reg)
     }
 
-    pub fn set_breakpoint_addr(&self, addr: GuestAddr) {
+    pub fn set_breakpoint(&self, addr: GuestAddr) {
         unsafe {
             libafl_qemu_set_breakpoint(addr.into());
         }
     }
 
-    pub fn unset_breakpoint_addr(&self, addr: GuestAddr) {
+    pub fn remove_breakpoint(&self, addr: GuestAddr) {
         unsafe {
             libafl_qemu_remove_breakpoint(addr.into());
         }
     }
 
     pub fn entry_break(&self, addr: GuestAddr) {
-        self.set_breakpoint_addr(addr);
+        self.set_breakpoint(addr);
         unsafe {
-            // TODO: decide what to do with sync exit here: ignore or check for bp exit?
-            let _ = self.run();
+            match self.run() {
+                Ok(QemuExitReason::Breakpoint(_)) => {}
+                _ => panic!("Unexpected QEMU exit."),
+            }
         }
-        self.unset_breakpoint_addr(addr);
+        self.remove_breakpoint(addr);
     }
 
     pub fn flush_jit(&self) {
@@ -1446,14 +1448,6 @@ where
         self.state().breakpoints.borrow_mut().remove(bp);
     }
 
-    pub fn set_breakpoint_addr(&self, addr: GuestAddr) {
-        self.qemu.set_breakpoint_addr(addr);
-    }
-
-    pub fn unset_breakpoint_addr(&self, addr: GuestAddr) {
-        self.qemu.unset_breakpoint_addr(addr);
-    }
-
     pub fn entry_break(&self, addr: GuestAddr) {
         self.qemu.entry_break(addr);
     }
@@ -1763,7 +1757,7 @@ pub mod pybind {
         }
 
         fn set_breakpoint(&self, addr: GuestAddr) {
-            self.qemu.set_breakpoint_addr(addr);
+            self.qemu.set_breakpoint(addr);
         }
 
         fn entry_break(&self, addr: GuestAddr) {
@@ -1771,7 +1765,7 @@ pub mod pybind {
         }
 
         fn remove_breakpoint(&self, addr: GuestAddr) {
-            self.qemu.unset_breakpoint_addr(addr);
+            self.qemu.remove_breakpoint(addr);
         }
 
         fn run(&self) {
