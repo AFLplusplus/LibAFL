@@ -40,11 +40,11 @@ where
     OT: ObserversTuple<S>,
     S: UsesInput,
     SP: ShMemProvider,
-    HT: ExecutorHooksTuple,
+    HT: ExecutorHooksTuple<S>,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,
 {
-    pub(super) hooks: (InChildProcessHooks, HT),
+    pub(super) hooks: (InChildProcessHooks<S>, HT),
     pub(super) shmem_provider: SP,
     pub(super) observers: OT,
     #[cfg(target_os = "linux")]
@@ -59,14 +59,13 @@ where
     OT: ObserversTuple<S> + Debug,
     S: UsesInput,
     SP: ShMemProvider,
-    HT: ExecutorHooksTuple + Debug,
+    HT: ExecutorHooksTuple<S> + Debug,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,
 {
     #[cfg(target_os = "linux")]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("GenericInProcessForkExecutorInner")
-            .field("hooks", &self.hooks)
             .field("observers", &self.observers)
             .field("shmem_provider", &self.shmem_provider)
             .field("itimerspec", &self.itimerspec)
@@ -90,7 +89,7 @@ where
     OT: ObserversTuple<S>,
     S: State,
     SP: ShMemProvider,
-    HT: ExecutorHooksTuple,
+    HT: ExecutorHooksTuple<S>,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,
 {
@@ -102,7 +101,7 @@ where
     OT: ObserversTuple<S> + Debug,
     S: State + UsesInput,
     SP: ShMemProvider,
-    HT: ExecutorHooksTuple,
+    HT: ExecutorHooksTuple<S>,
     EM: EventFirer<State = S> + EventRestarter<State = S>,
     Z: UsesState<State = S>,
 {
@@ -116,7 +115,7 @@ where
         self.shmem_provider.post_fork(true)?;
 
         self.enter_target(fuzzer, state, mgr, input);
-        self.hooks.pre_exec_all(fuzzer, state, mgr, input);
+        self.hooks.pre_exec_all(state, input);
 
         self.observers
             .pre_exec_child_all(state, input)
@@ -152,7 +151,7 @@ where
             .post_exec_child_all(state, input, &ExitKind::Ok)
             .expect("Failed to run post_exec on observers");
 
-        self.hooks.post_exec_all(fuzzer, state, mgr, input);
+        self.hooks.post_exec_all(state, input);
         self.leave_target(fuzzer, state, mgr, input);
 
         libc::_exit(0);
@@ -193,7 +192,7 @@ where
 
 impl<HT, OT, S, SP, EM, Z> GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
 where
-    HT: ExecutorHooksTuple,
+    HT: ExecutorHooksTuple<S>,
     S: State,
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
@@ -253,7 +252,7 @@ where
     ) -> Result<Self, Error> {
         let default_hooks = InChildProcessHooks::new::<Self>()?;
         let mut hooks = tuple_list!(default_hooks).merge(userhooks);
-        hooks.init_all::<Self, S>(state);
+        hooks.init_all::<Self>(state);
 
         let milli_sec = timeout.as_millis();
         let it_value = libc::timespec {
@@ -292,7 +291,7 @@ where
     ) -> Result<Self, Error> {
         let default_hooks = InChildProcessHooks::new::<Self>()?;
         let mut hooks = tuple_list!(default_hooks).merge(userhooks);
-        hooks.init_all::<Self, S>(state);
+        hooks.init_all::<Self>(state);
 
         let milli_sec = timeout.as_millis();
         let it_value = Timeval {
@@ -320,7 +319,7 @@ where
 
 impl<HT, OT, S, SP, EM, Z> UsesObservers for GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
 where
-    HT: ExecutorHooksTuple,
+    HT: ExecutorHooksTuple<S>,
     OT: ObserversTuple<S>,
     S: State,
     SP: ShMemProvider,
@@ -332,7 +331,7 @@ where
 
 impl<HT, OT, S, SP, EM, Z> HasObservers for GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
 where
-    HT: ExecutorHooksTuple,
+    HT: ExecutorHooksTuple<S>,
     S: State,
     OT: ObserversTuple<S>,
     SP: ShMemProvider,

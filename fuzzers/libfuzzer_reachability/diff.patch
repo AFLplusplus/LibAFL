@@ -1,9 +1,0 @@
-15a16,19
-> #define TARGET_SIZE 4
-> 
-> size_t __lafl_dummy_list[TARGET_SIZE] = {0};
-> size_t *__libafl_target_list = __lafl_dummy_list;
-2562a2567
->       __lafl_dummy_list[0] = 1;
-2584a2590
->       __lafl_dummy_list[1] = 1;

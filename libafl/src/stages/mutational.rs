@@ -29,12 +29,7 @@ use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 pub trait MutatedTransformPost<S>: Sized {
     /// Perform any post-execution steps necessary for the transformed input (e.g., updating metadata)
     #[inline]
-    fn post_exec(
-        self,
-        state: &mut S,
-        stage_idx: i32,
-        new_corpus_idx: Option<CorpusId>,
-    ) -> Result<(), Error> {
+    fn post_exec(self, state: &mut S, new_corpus_idx: Option<CorpusId>) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -114,7 +109,11 @@ where
         manager: &mut EM,
     ) -> Result<(), Error> {
         start_timer!(state);
-        let num = self.iterations(state)? - self.execs_since_progress_start(state)?;
+
+        // Here saturating_sub is needed as self.iterations() might be actually smaller than the previous value before reset.
+        let num = self
+            .iterations(state)?
+            .saturating_sub(self.execs_since_progress_start(state)?);
         let mut testcase = state.current_testcase_mut()?;
 
         let Ok(input) = I::try_transform_from(&mut testcase, state) else {
@@ -123,11 +122,11 @@ where
         drop(testcase);
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
 
-        for i in 0..num {
+        for _ in 0..num {
             let mut input = input.clone();
 
             start_timer!(state);
-            let mutated = self.mutator_mut().mutate(state, &mut input, i as i32)?;
+            let mutated = self.mutator_mut().mutate(state, &mut input)?;
             mark_feature_time!(state, PerfFeature::Mutate);
 
             if mutated == MutationResult::Skipped {
@@ -139,8 +138,8 @@ where
             let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
 
             start_timer!(state);
-            self.mutator_mut().post_exec(state, i as i32, corpus_idx)?;
-            post.post_exec(state, i as i32, corpus_idx)?;
+            self.mutator_mut().post_exec(state, corpus_idx)?;
+            post.post_exec(state, corpus_idx)?;
             mark_feature_time!(state, PerfFeature::MutatePostExec);
         }
 
@@ -354,14 +353,14 @@ where
         };
         drop(testcase);
 
-        let generated = self.mutator.multi_mutate(state, &input, 0, None)?;
+        let generated = self.mutator.multi_mutate(state, &input, None)?;
         // println!("Generated {}", generated.len());
-        for (i, new_input) in generated.into_iter().enumerate() {
+        for new_input in generated {
             // Time is measured directly the `evaluate_input` function
             let (untransformed, post) = new_input.try_transform_into(state)?;
             let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
-            self.mutator.multi_post_exec(state, i as i32, corpus_idx)?;
-            post.post_exec(state, i as i32, corpus_idx)?;
+            self.mutator.multi_post_exec(state, corpus_idx)?;
+            post.post_exec(state, corpus_idx)?;
         }
         // println!("Found {}", found);
 

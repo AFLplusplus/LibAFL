@@ -195,36 +195,38 @@ where
             (Some(fuzz_time), Some(iters)) => {
                 // perform n iterations or fuzz for provided time, whichever comes first
                 let start_time = current_time();
-                for i in 1..=iters {
+                for _ in 1..=iters {
                     if current_time() - start_time >= fuzz_time {
                         break;
                     }
 
-                    self.perform_mutation(fuzzer, executor, state, manager, &input, i)?;
+                    self.perform_mutation(fuzzer, executor, state, manager, &input)?;
                 }
             }
             (Some(fuzz_time), None) => {
                 // fuzz for provided time
                 let start_time = current_time();
-                for i in 1.. {
+                for _ in 1.. {
                     if current_time() - start_time >= fuzz_time {
                         break;
                     }
 
-                    self.perform_mutation(fuzzer, executor, state, manager, &input, i)?;
+                    self.perform_mutation(fuzzer, executor, state, manager, &input)?;
                 }
             }
             (None, Some(iters)) => {
                 // perform n iterations
-                for i in 1..=iters {
-                    self.perform_mutation(fuzzer, executor, state, manager, &input, i)?;
+                for _ in 1..=iters {
+                    self.perform_mutation(fuzzer, executor, state, manager, &input)?;
                 }
             }
             (None, None) => {
                 // fall back to random
-                let iters = self.iterations(state)? - self.execs_since_progress_start(state)?;
-                for i in 1..=iters {
-                    self.perform_mutation(fuzzer, executor, state, manager, &input, i)?;
+                let iters = self
+                    .iterations(state)?
+                    .saturating_sub(self.execs_since_progress_start(state)?);
+                for _ in 1..=iters {
+                    self.perform_mutation(fuzzer, executor, state, manager, &input)?;
                 }
             }
         }
@@ -444,14 +446,11 @@ where
         state: &mut Z::State,
         manager: &mut EM,
         input: &I,
-        stage_idx: u64,
     ) -> Result<(), Error> {
         let mut input = input.clone();
 
         start_timer!(state);
-        let mutated = self
-            .mutator_mut()
-            .mutate(state, &mut input, stage_idx as i32)?;
+        let mutated = self.mutator_mut().mutate(state, &mut input)?;
         mark_feature_time!(state, PerfFeature::Mutate);
 
         if mutated == MutationResult::Skipped {
@@ -463,9 +462,8 @@ where
         let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
 
         start_timer!(state);
-        self.mutator_mut()
-            .post_exec(state, stage_idx as i32, corpus_idx)?;
-        post.post_exec(state, stage_idx as i32, corpus_idx)?;
+        self.mutator_mut().post_exec(state, corpus_idx)?;
+        post.post_exec(state, corpus_idx)?;
         mark_feature_time!(state, PerfFeature::MutatePostExec);
 
         Ok(())

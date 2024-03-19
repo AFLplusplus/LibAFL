@@ -26,3 +26,10 @@ do
     cargo +nightly fmt --all
     popd || exit 1
 done
+
+echo "[*] Formatting libafl_libfuzzer_runtime"
+pushd "libafl_libfuzzer/libafl_libfuzzer_runtime" || exit 1
+cargo +nightly fmt --all
+popd || exit 1
+
+echo "[*] Done :)"

@@ -2,6 +2,7 @@
 use alloc::vec::Vec;
 use core::{
     ffi::c_void,
+    marker::PhantomData,
     ptr::{addr_of_mut, null},
     sync::atomic::{compiler_fence, Ordering},
 };
@@ -19,30 +20,29 @@ use crate::{
         inprocess_fork::{child_signal_handlers, ForkHandlerFuncPtr},
         HasObservers,
     },
+    inputs::UsesInput,
     Error,
 };
 
 /// The inmem fork executor's hooks.
 #[derive(Debug)]
-pub struct InChildProcessHooks {
+pub struct InChildProcessHooks<S> {
     /// On crash C function pointer
     pub crash_handler: *const c_void,
     /// On timeout C function pointer
     pub timeout_handler: *const c_void,
+    phantom: PhantomData<S>,
 }
 
-impl ExecutorHook for InChildProcessHooks {
+impl<S> ExecutorHook<S> for InChildProcessHooks<S>
+where
+    S: UsesInput,
+{
     /// Init this hook
-    fn init<E: HasObservers, S>(&mut self, _state: &mut S) {}
+    fn init<E: HasObservers>(&mut self, _state: &mut S) {}
 
     /// Call before running a target.
-    fn pre_exec<EM, I, S, Z>(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
-        _input: &I,
-    ) {
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) {
         unsafe {
             let data = addr_of_mut!(FORK_EXECUTOR_GLOBAL_DATA);
             (*data).crash_handler = self.crash_handler;
@@ -51,17 +51,10 @@ impl ExecutorHook for InChildProcessHooks {
         }
     }
 
-    fn post_exec<EM, I, S, Z>(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
-        _input: &I,
-    ) {
-    }
+    fn post_exec(&mut self, _state: &mut S, _input: &S::Input) {}
 }
 
-impl InChildProcessHooks {
+impl<S> InChildProcessHooks<S> {
     /// Create new [`InChildProcessHooks`].
     pub fn new<E>() -> Result<Self, Error>
     where
@@ -77,6 +70,7 @@ impl InChildProcessHooks {
             Ok(Self {
                 crash_handler: child_signal_handlers::child_crash_handler::<E> as *const c_void,
                 timeout_handler: child_signal_handlers::child_timeout_handler::<E> as *const c_void,
+                phantom: PhantomData,
             })
         }
     }
@@ -87,6 +81,7 @@ impl InChildProcessHooks {
         Self {
             crash_handler: null(),
             timeout_handler: null(),
+            phantom: PhantomData,
         }
     }
 }

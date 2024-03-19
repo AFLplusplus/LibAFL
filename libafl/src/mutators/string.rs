@@ -49,12 +49,7 @@ impl<S> MutatedTransformPost<S> for StringIdentificationMetadata
 where
     S: HasTestcase,
 {
-    fn post_exec(
-        self,
-        state: &mut S,
-        _stage_idx: i32,
-        corpus_idx: Option<CorpusId>,
-    ) -> Result<(), Error> {
+    fn post_exec(self, state: &mut S, corpus_idx: Option<CorpusId>) -> Result<(), Error> {
         if let Some(corpus_idx) = corpus_idx {
             let mut tc = state.testcase_mut(corpus_idx)?;
             tc.add_metadata(self);
@@ -284,12 +279,7 @@ impl<S> Mutator<UnicodeInput, S> for StringCategoryRandMutator
 where
     S: HasRand + HasMaxSize,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut UnicodeInput,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut UnicodeInput) -> Result<MutationResult, Error> {
         if input.0.bytes().is_empty() {
             return Ok(MutationResult::Skipped);
         }
@@ -347,12 +337,7 @@ impl<S> Mutator<UnicodeInput, S> for StringSubcategoryRandMutator
 where
     S: HasRand + HasMaxSize,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut UnicodeInput,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut UnicodeInput) -> Result<MutationResult, Error> {
         if input.0.bytes().is_empty() {
             return Ok(MutationResult::Skipped);
         }
@@ -398,12 +383,7 @@ impl<S> Mutator<UnicodeInput, S> for StringCategoryTokenReplaceMutator
 where
     S: HasRand + HasMaxSize + HasMetadata,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut UnicodeInput,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut UnicodeInput) -> Result<MutationResult, Error> {
         if input.0.bytes().is_empty() {
             return Ok(MutationResult::Skipped);
         }
@@ -462,12 +442,7 @@ impl<S> Mutator<UnicodeInput, S> for StringSubcategoryTokenReplaceMutator
 where
     S: HasRand + HasMaxSize + HasMetadata,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut UnicodeInput,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut UnicodeInput) -> Result<MutationResult, Error> {
         if input.0.bytes().is_empty() {
             return Ok(MutationResult::Skipped);
         }
@@ -544,7 +519,7 @@ mod test {
             for _ in 0..(1 << 12) {
                 let metadata = extract_metadata(bytes.bytes());
                 let mut input = (bytes, metadata);
-                let _ = mutator.mutate(&mut state, &mut input, 0);
+                let _ = mutator.mutate(&mut state, &mut input);
                 println!("{:?}", core::str::from_utf8(input.0.bytes()).unwrap());
                 bytes = input.0;
             }
@@ -576,7 +551,7 @@ mod test {
             for _ in 0..(1 << 12) {
                 let metadata = extract_metadata(bytes.bytes());
                 let mut input = (bytes, metadata);
-                let _ = mutator.mutate(&mut state, &mut input, 0);
+                let _ = mutator.mutate(&mut state, &mut input);
                 println!("{:?}", core::str::from_utf8(input.0.bytes()).unwrap());
                 bytes = input.0;
             }

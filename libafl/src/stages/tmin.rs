@@ -100,7 +100,7 @@ where
             state.set_max_size(before_len);
 
             start_timer!(state);
-            let mutated = self.mutator_mut().mutate(state, &mut input, i as i32)?;
+            let mutated = self.mutator_mut().mutate(state, &mut input)?;
             mark_feature_time!(state, PerfFeature::Mutate);
 
             if mutated == MutationResult::Skipped {
@@ -148,7 +148,7 @@ where
             };
 
             start_timer!(state);
-            self.mutator_mut().post_exec(state, i as i32, corpus_idx)?;
+            self.mutator_mut().post_exec(state, corpus_idx)?;
             mark_feature_time!(state, PerfFeature::MutatePostExec);
 
             i = next_i;
@@ -166,7 +166,7 @@ where
             let mut testcase = Testcase::with_executions(base, *state.executions());
             fuzzer
                 .feedback_mut()
-                .append_metadata(state, observers, &mut testcase)?;
+                .append_metadata(state, manager, observers, &mut testcase)?;
             let prev = state.corpus_mut().replace(base_corpus_idx, testcase)?;
             fuzzer
                 .scheduler_mut()

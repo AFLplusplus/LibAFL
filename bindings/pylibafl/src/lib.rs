@@ -46,9 +46,9 @@ class BaseStage:
         return Stage.new_py(self)
 
 class BaseMutator:
-    def mutate(self, state, input, stage_idx):
+    def mutate(self, state, input):
         pass
-    def post_exec(self, state, stage_idx, corpus_idx):
+    def post_exec(self, state, corpus_idx):
         pass
     def as_mutator(self):
         return Mutator.new_py(self)

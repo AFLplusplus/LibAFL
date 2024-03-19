@@ -262,11 +262,18 @@ where
                 monitor.display(event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
-            Event::Objective { objective_size } => {
+            Event::Objective {
+                objective_size,
+                executions,
+                time,
+            } => {
                 monitor.client_stats_insert(ClientId(0));
                 monitor
                     .client_stats_mut_for(ClientId(0))
                     .update_objective_size(*objective_size as u64);
+                monitor
+                    .client_stats_mut_for(ClientId(0))
+                    .update_executions(*executions, *time);
                 monitor.display(event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }

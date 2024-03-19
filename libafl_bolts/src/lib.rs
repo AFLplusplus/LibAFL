@@ -295,9 +295,6 @@ pub enum Error {
     /// Compression error
     #[cfg(feature = "gzip")]
     Compression(ErrorBacktrace),
-    /// File related error
-    #[cfg(feature = "std")]
-    File(io::Error, ErrorBacktrace),
     /// Optional val was supposed to be set, but isn't.
     EmptyOptional(String, ErrorBacktrace),
     /// Key not in Map
@@ -316,6 +313,9 @@ pub enum Error {
     Unsupported(String, ErrorBacktrace),
     /// Shutting down, not really an error.
     ShuttingDown,
+    /// OS error, wrapping a [`std::io::Error`]
+    #[cfg(feature = "std")]
+    OsError(io::Error, String, ErrorBacktrace),
     /// Something else happened
     Unknown(String, ErrorBacktrace),
 }
@@ -334,12 +334,6 @@ impl Error {
     #[must_use]
     pub fn compression() -> Self {
         Error::Compression(ErrorBacktrace::new())
-    }
-    #[cfg(feature = "std")]
-    /// File related error
-    #[must_use]
-    pub fn file(arg: io::Error) -> Self {
-        Error::File(arg, ErrorBacktrace::new())
     }
     /// Optional val was supposed to be set, but isn't.
     #[must_use]
@@ -410,6 +404,28 @@ impl Error {
     {
         Error::Unsupported(arg.into(), ErrorBacktrace::new())
     }
+    /// OS error with additional message
+    #[cfg(feature = "std")]
+    #[must_use]
+    pub fn os_error<S>(err: io::Error, msg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::OsError(err, msg.into(), ErrorBacktrace::new())
+    }
+    /// OS error from [`std::io::Error::last_os_error`] with additional message
+    #[cfg(feature = "std")]
+    #[must_use]
+    pub fn last_os_error<S>(msg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::OsError(
+            io::Error::last_os_error(),
+            msg.into(),
+            ErrorBacktrace::new(),
+        )
+    }
     /// Something else happened
     #[must_use]
     pub fn unknown<S>(arg: S) -> Self
@@ -430,11 +446,6 @@ impl Display for Error {
             #[cfg(feature = "gzip")]
             Self::Compression(b) => {
                 write!(f, "Error in decompression")?;
-                display_error_backtrace(f, b)
-            }
-            #[cfg(feature = "std")]
-            Self::File(err, b) => {
-                write!(f, "File IO failed: {:?}", &err)?;
                 display_error_backtrace(f, b)
             }
             Self::EmptyOptional(s, b) => {
@@ -474,6 +485,11 @@ impl Display for Error {
                 display_error_backtrace(f, b)
             }
             Self::ShuttingDown => write!(f, "Shutting down!"),
+            #[cfg(feature = "std")]
+            Self::OsError(err, s, b) => {
+                write!(f, "OS error: {0}: {1}", &s, err)?;
+                display_error_backtrace(f, b)
+            }
             Self::Unknown(s, b) => {
                 write!(f, "Unknown error: {0}", &s)?;
                 display_error_backtrace(f, b)
@@ -527,7 +543,7 @@ impl From<nix::Error> for Error {
 #[cfg(feature = "std")]
 impl From<io::Error> for Error {
     fn from(err: io::Error) -> Self {
-        Self::file(err)
+        Self::os_error(err, "io::Error ocurred")
     }
 }
 

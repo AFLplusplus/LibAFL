@@ -121,6 +121,8 @@ where
         }
 
         let mut iter = self.stage_max;
+        // If we restarted after a timeout or crash, do less iterations.
+        iter -= usize::try_from(self.restart_helper.execs_since_progress_start(state)?)?;
 
         let input = state.current_input_cloned()?;
 
@@ -158,9 +160,6 @@ where
         // run is found to be unstable or to crash with CAL_STAGE_MAX total runs.
         let mut i = 1;
         let mut has_errors = false;
-
-        // If we restarted after a timeout or crash, do less iterations.
-        iter -= usize::try_from(self.restart_helper.execs_since_progress_start(state)?)?;
 
         while i < iter {
             let input = state.current_input_cloned()?;
