@@ -5,7 +5,7 @@ use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple};
 use libafl_bolts::tuples::{MatchFirstType, SplitBorrowExtractFirstType};
 use libafl_qemu_sys::{GuestAddr, GuestPhysAddr};
 
-use crate::{hooks::QemuHooks, Qemu, QemuEdgeCoverageHelper};
+use crate::{hooks::QemuHooks, Qemu};
 
 /// A helper for `libafl_qemu`.
 // TODO remove 'static when specialization will be stable
@@ -96,6 +96,21 @@ where
     ) where
         OT: ObserversTuple<S>,
     {
+    }
+}
+
+impl<Head, F, S> HasInstrumentationFilter<F, S> for (Head, ())
+where
+    Head: QemuHelper<S> + HasInstrumentationFilter<F, S>,
+    S: UsesInput,
+    F: IsFilter,
+{
+    fn filter(&self) -> &F {
+        self.0.filter()
+    }
+
+    fn filter_mut(&mut self) -> &mut F {
+        self.0.filter_mut()
     }
 }
 
@@ -192,7 +207,7 @@ impl IsFilter for Vec<Range<GuestAddr>> {
     }
 }
 
-pub trait HasInstrumentationFilter<F>
+pub trait HasInstrumentationFilter<F, S>
 where
     F: IsFilter,
 {
@@ -207,41 +222,34 @@ where
 }
 
 #[cfg(emulation_mode = "usermode")]
-pub trait StdInstrumentationFilter:
-    HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter>
+pub trait StdInstrumentationFilter<S: UsesInput>:
+    HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter, S>
 {
 }
 
 #[cfg(emulation_mode = "systemmode")]
-pub trait StdInstrumentationFilter:
-    HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter>
-    + HasInstrumentationFilter<QemuInstrumentationPagingFilter>
+pub trait StdInstrumentationFilter<S: UsesInput>:
+    HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter, S>
+    + HasInstrumentationFilter<QemuInstrumentationPagingFilter, S>
 {
 }
-
-impl StdInstrumentationFilter for (QemuEdgeCoverageHelper, ()) {}
 
 #[cfg(emulation_mode = "systemmode")]
-impl HasInstrumentationFilter<QemuInstrumentationPagingFilter> for (QemuEdgeCoverageHelper, ()) {
-    fn filter(&self) -> &QemuInstrumentationPagingFilter {
-        self.0.filter()
-    }
-
-    fn filter_mut(&mut self) -> &mut QemuInstrumentationPagingFilter {
-        self.0.filter_mut()
-    }
+impl<Head, S> StdInstrumentationFilter<S> for (Head, ())
+where
+    Head: QemuHelper<S>
+        + HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter, S>
+        + HasInstrumentationFilter<QemuInstrumentationPagingFilter, S>,
+    S: UsesInput,
+{
 }
 
-impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter>
-    for (QemuEdgeCoverageHelper, ())
+#[cfg(emulation_mode = "usermode")]
+impl<Head, S> StdInstrumentationFilter<S> for (Head, ())
+where
+    Head: QemuHelper<S> + HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter, S>,
+    S: UsesInput,
 {
-    fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
-        self.0.filter()
-    }
-
-    fn filter_mut(&mut self) -> &mut QemuInstrumentationAddressRangeFilter {
-        self.0.filter_mut()
-    }
 }
 
 pub trait IsFilter: Debug {

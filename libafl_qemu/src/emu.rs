@@ -216,7 +216,7 @@ where
 impl<SM, QT, S> IsEmuExitHandler<QT, S> for StdEmuExitHandler<SM>
 where
     SM: IsSnapshotManager,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
+    QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
 {
     fn try_put_input(

@@ -384,9 +384,11 @@ where
     }
 }
 
-impl<T> HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuCallTracerHelper<T>
+impl<T, S> HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter, S>
+    for QemuCallTracerHelper<T>
 where
     T: CallTraceCollectorTuple,
+    S: UsesInput,
 {
     fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
         &self.filter

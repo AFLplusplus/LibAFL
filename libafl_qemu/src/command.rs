@@ -104,7 +104,7 @@ pub enum Command {
 impl<SM, QT, S> IsCommand<QT, S, StdEmuExitHandler<SM>> for Command
 where
     SM: IsSnapshotManager,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
+    QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
 {
     fn usable_at_runtime(&self) -> bool {
@@ -231,7 +231,7 @@ pub struct SaveCommand;
 impl<SM, QT, S> IsCommand<QT, S, StdEmuExitHandler<SM>> for SaveCommand
 where
     SM: IsSnapshotManager,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
+    QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
 {
     fn usable_at_runtime(&self) -> bool {
@@ -265,7 +265,7 @@ where
             allowed_paging_ids.insert(current_paging_id);
 
             let paging_filter =
-                HasInstrumentationFilter::<QemuInstrumentationPagingFilter>::filter_mut(
+                HasInstrumentationFilter::<QemuInstrumentationPagingFilter, S>::filter_mut(
                     qemu_helpers,
                 );
 
@@ -282,7 +282,7 @@ pub struct LoadCommand;
 impl<SM, QT, S> IsCommand<QT, S, StdEmuExitHandler<SM>> for LoadCommand
 where
     SM: IsSnapshotManager,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
+    QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
 {
     fn usable_at_runtime(&self) -> bool {
@@ -321,7 +321,7 @@ pub struct InputCommand {
 impl<SM, QT, S> IsCommand<QT, S, StdEmuExitHandler<SM>> for InputCommand
 where
     SM: IsSnapshotManager,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
+    QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
 {
     fn usable_at_runtime(&self) -> bool {
@@ -355,7 +355,7 @@ pub struct StartCommand {
 impl<SM, QT, S> IsCommand<QT, S, StdEmuExitHandler<SM>> for StartCommand
 where
     SM: IsSnapshotManager,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
+    QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
 {
     fn usable_at_runtime(&self) -> bool {
@@ -398,7 +398,7 @@ pub struct EndCommand(Option<ExitKind>);
 impl<SM, QT, S> IsCommand<QT, S, StdEmuExitHandler<SM>> for EndCommand
 where
     SM: IsSnapshotManager,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
+    QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
 {
     fn usable_at_runtime(&self) -> bool {
@@ -434,7 +434,7 @@ pub struct VersionCommand(u64);
 impl<SM, QT, S> IsCommand<QT, S, StdEmuExitHandler<SM>> for VersionCommand
 where
     SM: IsSnapshotManager,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
+    QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
 {
     fn usable_at_runtime(&self) -> bool {
@@ -472,7 +472,7 @@ where
 impl<SM, QT, S> IsCommand<QT, S, StdEmuExitHandler<SM>> for PagingFilterCommand
 where
     SM: IsSnapshotManager,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
+    QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
 {
     fn usable_at_runtime(&self) -> bool {
@@ -489,7 +489,9 @@ where
         let qemu_helpers = qemu_executor_state.hooks_mut().helpers_mut();
 
         let paging_filter =
-            HasInstrumentationFilter::<QemuInstrumentationPagingFilter>::filter_mut(qemu_helpers);
+            HasInstrumentationFilter::<QemuInstrumentationPagingFilter, S>::filter_mut(
+                qemu_helpers,
+            );
 
         *paging_filter = self.filter.clone();
 
@@ -500,7 +502,7 @@ where
 impl<SM, QT, S> IsCommand<QT, S, StdEmuExitHandler<SM>> for AddressRangeFilterCommand
 where
     SM: IsSnapshotManager,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
+    QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
 {
     fn usable_at_runtime(&self) -> bool {
@@ -518,7 +520,7 @@ where
         let qemu_helpers = qemu_executor_state.hooks_mut().helpers_mut();
 
         let addr_range_filter =
-            HasInstrumentationFilter::<QemuInstrumentationAddressRangeFilter>::filter_mut(
+            HasInstrumentationFilter::<QemuInstrumentationAddressRangeFilter, S>::filter_mut(
                 qemu_helpers,
             );
 
