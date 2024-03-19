@@ -462,7 +462,7 @@ impl QemuSnapshotHelper {
                 ));
             }
 
-            for (i, _, _) in found {
+            for (i, ..) in found {
                 new_maps.tree.delete(i);
             }
         }

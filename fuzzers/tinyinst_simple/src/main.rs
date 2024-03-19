@@ -13,7 +13,7 @@ use libafl::{
     state::StdState,
     Fuzzer, StdFuzzer,
 };
-#[cfg(target_vendor = "apple")]
+#[cfg(unix)]
 use libafl_bolts::shmem::UnixShMemProvider;
 #[cfg(windows)]
 use libafl_bolts::shmem::Win32ShMemProvider;
@@ -25,10 +25,10 @@ use libafl_bolts::{
 use libafl_tinyinst::executor::TinyInstExecutorBuilder;
 static mut COVERAGE: Vec<u64> = vec![];
 
-#[cfg(not(any(target_vendor = "apple", windows)))]
+#[cfg(not(any(target_vendor = "apple", windows, target_os = "linux")))]
 fn main() {}
 
-#[cfg(any(target_vendor = "apple", windows))]
+#[cfg(any(target_vendor = "apple", windows, target_os = "linux"))]
 fn main() {
     // Tinyinst things
     let tinyinst_args = vec!["-instrument_module".to_string(), "test.exe".to_string()];
@@ -44,7 +44,7 @@ fn main() {
     #[cfg(windows)]
     let mut shmem_provider = Win32ShMemProvider::new().unwrap();
 
-    #[cfg(target_vendor = "apple")]
+    #[cfg(unix)]
     let mut shmem_provider = UnixShMemProvider::new().unwrap();
 
     let input = BytesInput::new(b"bad".to_vec());
