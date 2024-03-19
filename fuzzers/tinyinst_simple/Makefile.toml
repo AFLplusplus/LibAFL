@@ -16,7 +16,7 @@ windows_alias = "harness_windows"
 
 [tasks.harness_linux]
 script='''
-clang test/test.cpp -g -o test.exe
+clang test/test.cpp -o test.exe
 '''
 
 [tasks.harness_windows]

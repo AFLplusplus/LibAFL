@@ -13,7 +13,7 @@ use libafl::{
     state::StdState,
     Fuzzer, StdFuzzer,
 };
-#[cfg(target_vendor = "apple")]
+#[cfg(unix)]
 use libafl_bolts::shmem::UnixShMemProvider;
 #[cfg(windows)]
 use libafl_bolts::shmem::Win32ShMemProvider;
@@ -34,19 +34,17 @@ fn main() {
     let tinyinst_args = vec!["-instrument_module".to_string(), "test.exe".to_string()];
 
     // use shmem to pass testcases
-    #[cfg(not(target_os = "linux"))]
     let args = vec!["test.exe".to_string(), "-m".to_string(), "@@".to_string()];
 
-    // use file to pass testcases on Linux
-    #[cfg(target_os = "linux")]
-    let args = vec!["test.exe".to_string(), "-f".to_string(), "@@".to_string()];
+    // use file to pass testcases
+    // let args = vec!["test.exe".to_string(), "-f".to_string(), "@@".to_string()];
 
     let observer = unsafe { ListObserver::new("cov", &mut COVERAGE) };
     let mut feedback = ListFeedback::with_observer(&observer);
     #[cfg(windows)]
     let mut shmem_provider = Win32ShMemProvider::new().unwrap();
 
-    #[cfg(target_vendor = "apple")]
+    #[cfg(unix)]
     let mut shmem_provider = UnixShMemProvider::new().unwrap();
 
     let input = BytesInput::new(b"bad".to_vec());
@@ -66,15 +64,15 @@ fn main() {
 
     let mut mgr = SimpleEventManager::new(monitor);
     let mut executor = unsafe {
-        let mut builder = TinyInstExecutorBuilder::new()
+        TinyInstExecutorBuilder::new()
             .tinyinst_args(tinyinst_args)
             .program_args(args)
             .use_shmem()
             .persistent("test.exe".to_string(), "fuzz".to_string(), 1, 10000)
-            .timeout(std::time::Duration::new(5, 0));
-        #[cfg(not(target_os = "linux"))]
-        builder.shmem_provider(&mut shmem_provider);
-        builder.build(&mut COVERAGE, tuple_list!(observer)).unwrap()
+            .timeout(std::time::Duration::new(5, 0))
+            .shmem_provider(&mut shmem_provider)
+            .build(&mut COVERAGE, tuple_list!(observer))
+            .unwrap()
     };
     let mutator = StdScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));

@@ -23,8 +23,9 @@ limitations under the License.
 #include <inttypes.h>
 
 // shared memory stuff
-
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+#if defined(__linux__)
+  #include <sys/shm.h>
+#elif defined(WIN32) || defined(_WIN32) || defined(__WIN32)
   #include <windows.h>
 #else
   #include <sys/mman.h>
@@ -36,7 +37,19 @@ unsigned char *shm_data;
 
 bool use_shared_memory;
 
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+#if defined(__linux__)
+
+int setup_shmem(const char *name) {
+  // map shared memory to process address space
+  shm_data = (unsigned char *)shmat(atoi(name), NULL, 0);
+  if (shm_data == (void *)-1) {
+    perror("Error in shmat");
+    return 0;
+  }
+  return 1;
+}
+
+#elif defined(WIN32) || defined(_WIN32) || defined(__WIN32)
 
 int setup_shmem(const char *name) {
   HANDLE map_file;
@@ -105,7 +118,8 @@ char *crash = NULL;
 #ifdef __cplusplus
 extern "C"
 #endif  // __cplusplus
-void FUZZ_TARGET_MODIFIERS fuzz(char *name) {
+    void FUZZ_TARGET_MODIFIERS
+    fuzz(char *name) {
   char    *sample_bytes = NULL;
   uint32_t sample_size = 0;
 
