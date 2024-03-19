@@ -71,7 +71,7 @@ pub trait HasObjective: UsesState {
 /// Evaluates if an input is interesting using the feedback
 pub trait ExecutionProcessor<OT>: UsesState {
     /// Evaluate if a set of observation channels has an interesting state
-    fn execute_with_res<EM>(
+    fn execute_no_process<EM>(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
@@ -363,7 +363,7 @@ where
     OT: ObserversTuple<CS::State> + Serialize + DeserializeOwned,
     CS::State: HasCorpus + HasSolutions + HasExecutions + HasCorpus + HasImported,
 {
-    fn execute_with_res<EM>(
+    fn execute_no_process<EM>(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
@@ -384,7 +384,7 @@ where
         #[cfg(feature = "introspection")]
         let is_solution = self
             .objective_mut()
-            .is_interesting_introspection(state, manager, &input, observers, exit_kind)?;
+            .is_interesting_introspection(state, manager, input, observers, exit_kind)?;
 
         if is_solution {
             res = ExecuteInputResult::Solution;
@@ -397,7 +397,7 @@ where
             #[cfg(feature = "introspection")]
             let corpus_worthy = self
                 .feedback_mut()
-                .is_interesting_introspection(state, manager, &input, observers, exit_kind)?;
+                .is_interesting_introspection(state, manager, input, observers, exit_kind)?;
 
             if corpus_worthy {
                 res = ExecuteInputResult::Corpus;
@@ -418,7 +418,7 @@ where
     where
         EM: EventFirer<State = Self::State>,
     {
-        let exec_res = self.execute_with_res(state, manager, &input, observers, exit_kind)?;
+        let exec_res = self.execute_no_process(state, manager, &input, observers, exit_kind)?;
         let corpus_idx = self.process_execution(
             state,
             manager,
