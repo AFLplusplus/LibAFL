@@ -25,19 +25,21 @@ use libafl_bolts::{
 use libafl_tinyinst::executor::TinyInstExecutorBuilder;
 static mut COVERAGE: Vec<u64> = vec![];
 
-#[cfg(not(any(target_vendor = "apple", windows)))]
+#[cfg(not(any(target_vendor = "apple", windows, target_os = "linux")))]
 fn main() {}
 
-#[cfg(any(target_vendor = "apple", windows))]
+#[cfg(any(target_vendor = "apple", windows, target_os = "linux"))]
 fn main() {
     // Tinyinst things
     let tinyinst_args = vec!["-instrument_module".to_string(), "test.exe".to_string()];
 
     // use shmem to pass testcases
+    #[cfg(not(target_os = "linux"))]
     let args = vec!["test.exe".to_string(), "-m".to_string(), "@@".to_string()];
 
-    // use file to pass testcases
-    // let args = vec!["test.exe".to_string(), "-f".to_string(), "@@".to_string()];
+    // use file to pass testcases on Linux
+    #[cfg(target_os = "linux")]
+    let args = vec!["test.exe".to_string(), "-f".to_string(), "@@".to_string()];
 
     let observer = unsafe { ListObserver::new("cov", &mut COVERAGE) };
     let mut feedback = ListFeedback::with_observer(&observer);
@@ -64,15 +66,15 @@ fn main() {
 
     let mut mgr = SimpleEventManager::new(monitor);
     let mut executor = unsafe {
-        TinyInstExecutorBuilder::new()
+        let mut builder = TinyInstExecutorBuilder::new()
             .tinyinst_args(tinyinst_args)
             .program_args(args)
             .use_shmem()
             .persistent("test.exe".to_string(), "fuzz".to_string(), 1, 10000)
-            .timeout(std::time::Duration::new(5, 0))
-            .shmem_provider(&mut shmem_provider)
-            .build(&mut COVERAGE, tuple_list!(observer))
-            .unwrap()
+            .timeout(std::time::Duration::new(5, 0));
+        #[cfg(not(target_os = "linux"))]
+        builder.shmem_provider(&mut shmem_provider);
+        builder.build(&mut COVERAGE, tuple_list!(observer)).unwrap()
     };
     let mutator = StdScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));

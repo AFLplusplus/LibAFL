@@ -71,7 +71,7 @@ int setup_shmem(const char *name) {
   // get shared memory file descriptor (NOT a file)
   fd = shm_open(name, O_RDONLY, S_IRUSR | S_IWUSR);
   if (fd == -1) {
-    printf("Error in shm_open\n");
+    perror("Error in shm_open");
     return 0;
   }
 
@@ -79,7 +79,7 @@ int setup_shmem(const char *name) {
   shm_data =
       (unsigned char *)mmap(NULL, SHM_SIZE, PROT_READ, MAP_SHARED, fd, 0);
   if (shm_data == MAP_FAILED) {
-    printf("Error in mmap\n");
+    perror("Error in mmap");
     return 0;
   }
 
@@ -101,6 +101,10 @@ char *crash = NULL;
 
 // actual target function
 
+// Use extern "C" to preserve the function name for instrumentation
+#ifdef __cplusplus
+extern "C"
+#endif  // __cplusplus
 void FUZZ_TARGET_MODIFIERS fuzz(char *name) {
   char    *sample_bytes = NULL;
   uint32_t sample_size = 0;
