@@ -725,7 +725,7 @@ pub mod unix_shmem {
             }
         }
 
-        /// A [`ShMemProvider`] which uses `shmget`/`shmat`/`shmctl` to provide shared memory mappings.
+        /// A [`ShMemProvider`] which uses [`shm_open`] and [`mmap`] to provide shared memory mappings.
         #[cfg(unix)]
         #[derive(Clone, Debug)]
         pub struct MmapShMemProvider {
