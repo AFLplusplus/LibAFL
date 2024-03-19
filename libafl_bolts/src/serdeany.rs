@@ -109,7 +109,10 @@ where
 /// Each element needs to be registered so that it can be deserialized.
 pub mod serdeany_registry {
 
-    use alloc::boxed::Box;
+    use alloc::{
+        boxed::Box,
+        string::{String, ToString},
+    };
     use core::{fmt, hash::BuildHasherDefault};
 
     use hashbrown::{
@@ -118,10 +121,11 @@ pub mod serdeany_registry {
     };
     use serde::{Deserialize, Serialize};
 
-    use super::{SerdeAny, TypeRepr};
     use crate::{
-        hash_std,
-        serdeany::{type_repr, type_repr_owned, DeserializeCallback, DeserializeCallbackSeed},
+        serdeany::{
+            type_repr, type_repr_owned, DeserializeCallback, DeserializeCallbackSeed, SerdeAny,
+            TypeRepr,
+        },
         Error,
     };
 
@@ -421,7 +425,7 @@ pub mod serdeany_registry {
     #[allow(unused_qualifications)]
     #[derive(Debug, Serialize, Deserialize)]
     pub struct NamedSerdeAnyMap {
-        map: HashMap<TypeRepr, HashMap<u64, Box<dyn crate::serdeany::SerdeAny>>>,
+        map: HashMap<TypeRepr, HashMap<String, Box<dyn crate::serdeany::SerdeAny>>>,
     }
 
     // Cloning by serializing and deserializing. It ain't fast, but it's honest work.
@@ -448,9 +452,7 @@ pub mod serdeany_registry {
 
             match self.map.get(type_repr) {
                 None => None,
-                Some(h) => h
-                    .get(&hash_std(name.as_bytes()))
-                    .map(|x| x.as_any().downcast_ref::<T>().unwrap()),
+                Some(h) => h.get(name).map(|x| x.as_any().downcast_ref::<T>().unwrap()),
             }
         }
 
@@ -468,7 +470,7 @@ pub mod serdeany_registry {
             match self.map.get_mut(type_repr) {
                 None => None,
                 Some(h) => h
-                    .remove(&hash_std(name.as_bytes()))
+                    .remove(name)
                     .map(|x| x.as_any_boxed().downcast::<T>().unwrap()),
             }
         }
@@ -487,7 +489,7 @@ pub mod serdeany_registry {
             match self.map.get_mut(type_repr) {
                 None => None,
                 Some(h) => h
-                    .get_mut(&hash_std(name.as_bytes()))
+                    .get_mut(name)
                     .map(|x| x.as_any_mut().downcast_mut::<T>().unwrap()),
             }
         }
@@ -501,7 +503,7 @@ pub mod serdeany_registry {
             &self,
         ) -> Option<
             core::iter::Map<
-                Values<'_, u64, Box<dyn crate::serdeany::SerdeAny>>,
+                Values<'_, String, Box<dyn crate::serdeany::SerdeAny>>,
                 fn(&Box<dyn crate::serdeany::SerdeAny>) -> &T,
             >,
         >
@@ -527,7 +529,7 @@ pub mod serdeany_registry {
             &mut self,
         ) -> Option<
             core::iter::Map<
-                ValuesMut<'_, u64, Box<dyn crate::serdeany::SerdeAny>>,
+                ValuesMut<'_, String, Box<dyn crate::serdeany::SerdeAny>>,
                 fn(&mut Box<dyn crate::serdeany::SerdeAny>) -> &mut T,
             >,
         >
@@ -588,21 +590,15 @@ pub mod serdeany_registry {
         where
             T: crate::serdeany::SerdeAny,
         {
-            self.entry::<T>(name).insert(Box::new(val));
+            self.entry::<T>(name.into()).insert(Box::new(val));
         }
 
-        /// Get an entry to an element into this map.
+        /// Get a reference to the type map.
         #[inline]
         #[allow(unused_qualifications)]
-        pub fn entry<T>(
+        fn outer_map_mut<T>(
             &mut self,
-            name: &str,
-        ) -> hashbrown::hash_map::Entry<
-            '_,
-            u64,
-            Box<dyn SerdeAny + 'static>,
-            BuildHasherDefault<ahash::AHasher>,
-        >
+        ) -> &mut hashbrown::hash_map::HashMap<String, Box<dyn SerdeAny + 'static>>
         where
             T: crate::serdeany::SerdeAny,
         {
@@ -628,7 +624,43 @@ pub mod serdeany_registry {
                 .from_key(type_repr)
                 .or_insert_with(|| (type_repr_owned::<T>(), HashMap::default()))
                 .1
-                .entry(hash_std(name.as_bytes()))
+        }
+
+        /// Get an entry to an element into this map.
+        /// Prefer [`Self::raw_entry_mut`] as it won't need an owned key.
+        #[inline]
+        #[allow(unused_qualifications)]
+        fn entry<T>(
+            &mut self,
+            name: String,
+        ) -> hashbrown::hash_map::Entry<
+            '_,
+            String,
+            Box<dyn SerdeAny + 'static>,
+            BuildHasherDefault<ahash::AHasher>,
+        >
+        where
+            T: crate::serdeany::SerdeAny,
+        {
+            self.outer_map_mut::<T>().entry(name)
+        }
+
+        /// Get a raw entry to an element into this map.
+        #[inline]
+        #[allow(unused_qualifications)]
+        fn raw_entry_mut<T>(
+            &mut self,
+            name: &str,
+        ) -> hashbrown::hash_map::RawEntryMut<
+            '_,
+            String,
+            Box<dyn SerdeAny + 'static>,
+            BuildHasherDefault<ahash::AHasher>,
+        >
+        where
+            T: crate::serdeany::SerdeAny,
+        {
+            self.outer_map_mut::<T>().raw_entry_mut().from_key(name)
         }
 
         /// Gets a value by name, or inserts it using the given construction function `default`
@@ -636,8 +668,10 @@ pub mod serdeany_registry {
         where
             T: SerdeAny,
         {
-            let ret = self.entry::<T>(name).or_insert_with(|| Box::new(default()));
-            ret.as_mut().as_any_mut().downcast_mut::<T>().unwrap()
+            let ret = self
+                .raw_entry_mut::<T>(name)
+                .or_insert_with(|| (name.to_string(), Box::new(default())));
+            ret.1.as_any_mut().downcast_mut::<T>().unwrap()
         }
 
         /// Gets a value by name, or inserts it using the given construction function `default` (returning a boxed value)
@@ -649,8 +683,10 @@ pub mod serdeany_registry {
         where
             T: SerdeAny + 'static,
         {
-            let ret = self.entry::<T>(name).or_insert_with(|| default());
-            ret.as_mut().as_any_mut().downcast_mut::<T>().unwrap()
+            let ret = self
+                .raw_entry_mut::<T>(name)
+                .or_insert_with(|| (name.to_string(), default()));
+            ret.1.as_any_mut().downcast_mut::<T>().unwrap()
         }
 
         /// Returns the `len` of this map.
@@ -693,7 +729,7 @@ pub mod serdeany_registry {
 
             match self.map.get(type_repr) {
                 None => false,
-                Some(h) => h.contains_key(&hash_std(name.as_bytes())),
+                Some(h) => h.contains_key(name),
             }
         }
 
