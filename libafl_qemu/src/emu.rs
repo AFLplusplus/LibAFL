@@ -7,7 +7,7 @@ use core::{
     ptr::{addr_of, copy_nonoverlapping, null},
 };
 use std::{
-    cell::{OnceCell, RefCell},
+    cell::{OnceCell, Ref, RefCell, RefMut},
     collections::HashSet,
     ffi::CString,
     fmt::{Debug, Display, Formatter},
@@ -203,12 +203,20 @@ where
         self.input_location.set((input_location, ret_reg))
     }
 
-    pub fn snapshot_id(&self) -> &OnceCell<SnapshotId> {
-        &self.snapshot_id
+    pub fn set_snapshot_id(&self, snapshot_id: SnapshotId) -> Result<(), SnapshotId> {
+        self.snapshot_id.set(snapshot_id)
     }
 
-    pub fn snapshot_manager(&self) -> &RefCell<SM> {
-        &self.snapshot_manager
+    pub fn snapshot_id(&self) -> Option<SnapshotId> {
+        Some(self.snapshot_id.get()?.clone())
+    }
+
+    pub fn snapshot_manager_borrow(&self) -> Ref<SM> {
+        self.snapshot_manager.borrow()
+    }
+
+    pub fn snapshot_manager_borrow_mut(&self) -> RefMut<SM> {
+        self.snapshot_manager.borrow_mut()
     }
 }
 

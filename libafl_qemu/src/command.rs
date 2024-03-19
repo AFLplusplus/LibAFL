@@ -252,8 +252,10 @@ where
         let qemu = emu.qemu();
         let emu_exit_handler = emu.exit_handler().borrow_mut();
 
-        let snapshot_id = emu_exit_handler.snapshot_manager().borrow_mut().save(qemu);
-        emu_exit_handler.snapshot_id().set(snapshot_id).unwrap();
+        let snapshot_id = emu_exit_handler.snapshot_manager_borrow_mut().save(qemu);
+        emu_exit_handler
+            .set_snapshot_id(snapshot_id)
+            .map_err(|_| HandlerError::MultipleSnapshotDefinition)?;
 
         #[cfg(emulation_mode = "systemmode")]
         {
@@ -299,14 +301,12 @@ where
         let qemu = emu.qemu();
         let emu_exit_handler = emu.exit_handler().borrow_mut();
 
-        let snapshot_id = *emu_exit_handler
+        let snapshot_id = emu_exit_handler
             .snapshot_id()
-            .get()
             .ok_or(HandlerError::SnapshotNotFound)?;
 
         emu_exit_handler
-            .snapshot_manager()
-            .borrow_mut()
+            .snapshot_manager_borrow_mut()
             .restore(&snapshot_id, qemu)?;
 
         Ok(InnerHandlerResult::Continue)
@@ -371,11 +371,10 @@ where
     ) -> Result<InnerHandlerResult, HandlerError> {
         let emu_exit_handler = emu.exit_handler().borrow_mut();
         let qemu = emu.qemu();
-        let snapshot_id = emu_exit_handler.snapshot_manager().borrow_mut().save(qemu);
+        let snapshot_id = emu_exit_handler.snapshot_manager_borrow_mut().save(qemu);
 
         emu_exit_handler
-            .snapshot_id()
-            .set(snapshot_id)
+            .set_snapshot_id(snapshot_id)
             .map_err(|_| HandlerError::MultipleSnapshotDefinition)?;
 
         emu_exit_handler
@@ -414,14 +413,12 @@ where
     ) -> Result<InnerHandlerResult, HandlerError> {
         let emu_exit_handler = emu.exit_handler().borrow_mut();
 
-        let snapshot_id = *emu_exit_handler
+        let snapshot_id = emu_exit_handler
             .snapshot_id()
-            .get()
             .ok_or(HandlerError::SnapshotNotFound)?;
 
         emu_exit_handler
-            .snapshot_manager()
-            .borrow_mut()
+            .snapshot_manager_borrow_mut()
             .restore(&snapshot_id, emu.qemu())?;
 
         Ok(InnerHandlerResult::EndOfRun(self.0.unwrap()))

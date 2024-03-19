@@ -150,7 +150,7 @@ impl QemuSnapshotHelper {
                     private: map.is_priv(),
                     data: None,
                 };
-                if map.flags().is_r() {
+                if map.flags().readable() {
                     // TODO not just for R pages
                     unsafe {
                         info.data = Some(Box::new(core::mem::zeroed()));
@@ -224,7 +224,7 @@ impl QemuSnapshotHelper {
                                 .tree
                                 .query_mut(*page..(page + SNAPSHOT_PAGE_SIZE as GuestAddr))
                             {
-                                if !entry.value.perms.unwrap_or(MmapPerms::None).is_w() {
+                                if !entry.value.perms.unwrap_or(MmapPerms::None).writable() {
                                     drop(qemu.mprotect(
                                         entry.interval.start,
                                         (entry.interval.end - entry.interval.start) as usize,
@@ -260,7 +260,8 @@ impl QemuSnapshotHelper {
                     .tree
                     .query_mut(*page..(page + SNAPSHOT_PAGE_SIZE as GuestAddr))
                 {
-                    if !entry.value.perms.unwrap_or(MmapPerms::None).is_w() && !entry.value.changed
+                    if !entry.value.perms.unwrap_or(MmapPerms::None).writable()
+                        && !entry.value.changed
                     {
                         drop(qemu.mprotect(
                             entry.interval.start,

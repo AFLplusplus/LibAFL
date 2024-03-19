@@ -248,7 +248,7 @@ impl MapInfo {
 
 impl MmapPerms {
     #[must_use]
-    pub fn is_r(&self) -> bool {
+    pub fn readable(&self) -> bool {
         matches!(
             self,
             MmapPerms::Read
@@ -259,7 +259,7 @@ impl MmapPerms {
     }
 
     #[must_use]
-    pub fn is_w(&self) -> bool {
+    pub fn writable(&self) -> bool {
         matches!(
             self,
             MmapPerms::Write
@@ -270,7 +270,7 @@ impl MmapPerms {
     }
 
     #[must_use]
-    pub fn is_x(&self) -> bool {
+    pub fn executable(&self) -> bool {
         matches!(
             self,
             MmapPerms::Execute
