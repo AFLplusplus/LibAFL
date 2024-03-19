@@ -258,13 +258,11 @@ where
     I: Input,
 {
     /// Insert a testcase assigning a `CorpusId` to it
-    #[cfg(not(feature = "corpus_btreemap"))]
     pub fn insert(&mut self, testcase: RefCell<Testcase<I>>) -> CorpusId {
         self._insert(testcase, false)
     }
 
     /// Insert a testcase assigning a `CorpusId` to it
-    #[cfg(not(feature = "corpus_btreemap"))]
     pub fn insert_disabled(&mut self, testcase: RefCell<Testcase<I>>) -> CorpusId {
         self._insert(testcase, true)
     }
@@ -313,18 +311,6 @@ where
         corpus.insert_key(idx);
         corpus.map.insert(idx, testcase);
         idx
-    }
-
-    /// Insert a testcase assigning a `CorpusId` to it
-    #[cfg(feature = "corpus_btreemap")]
-    pub fn insert(&mut self, testcase: RefCell<Testcase<I>>) -> CorpusId {
-        self._insert(testcase, false)
-    }
-
-    /// Insert a testcase assigning a `CorpusId` to it
-    #[cfg(feature = "corpus_btreemap")]
-    pub fn insert_disabled(&mut self, testcase: RefCell<Testcase<I>>) -> CorpusId {
-        self._insert(testcase, true)
     }
 
     /// Create new `TestcaseStorage`
