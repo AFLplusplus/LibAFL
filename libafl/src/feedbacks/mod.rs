@@ -27,8 +27,6 @@ pub mod transferred;
 
 /// The module for list feedback
 pub mod list;
-pub use list::*;
-
 use alloc::string::{String, ToString};
 use core::{
     fmt::{self, Debug, Formatter},
@@ -36,6 +34,7 @@ use core::{
 };
 
 use libafl_bolts::Named;
+pub use list::*;
 #[cfg(feature = "nautilus")]
 pub use nautilus::*;
 use serde::{Deserialize, Serialize};
@@ -975,7 +974,6 @@ impl TimeFeedback {
         }
     }
 }
-
 
 /// The [`ConstFeedback`] reports the same value, always.
 /// It can be used to enable or disable feedback results through composition.
