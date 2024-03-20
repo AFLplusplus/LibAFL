@@ -897,8 +897,9 @@ macro_rules! impl_serdeany {
 
 #[cfg(test)]
 mod tests {
-    use crate::serdeany::RegistryBuilder;
     use serde::{Deserialize, Serialize};
+
+    use crate::serdeany::RegistryBuilder;
 
     #[derive(Debug, Serialize, Deserialize)]
     struct MyType(u32);
