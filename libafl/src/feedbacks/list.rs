@@ -1,0 +1,157 @@
+use alloc::string::{String, ToString};
+use core::{fmt::Debug, hash::Hash, marker::PhantomData};
+
+use hashbrown::HashSet;
+use libafl_bolts::{Error, Named};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+
+use crate::{
+    events::EventFirer,
+    executors::ExitKind,
+    feedbacks::Feedback,
+    observers::{ListObserver, ObserversTuple},
+    prelude::HasNamedMetadata,
+    state::State,
+};
+
+/// The prefix for list metadata's name
+pub const LISTFEEDBACK_PREFIX: &str = "listfeedback_metadata_";
+
+/// The metadata to remember past observed value
+#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+#[serde(bound = "T: DeserializeOwned")]
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)]
+pub struct ListFeedbackMetadata<T>
+where
+    T: Default + Copy + 'static + Serialize + Eq + Hash,
+{
+    /// Contains the information of past observed set of values.
+    pub set: HashSet<T>,
+}
+
+impl<T> ListFeedbackMetadata<T>
+where
+    T: Default + Copy + 'static + Serialize + Eq + Hash,
+{
+    /// The constructor
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            set: HashSet::<T>::new(),
+        }
+    }
+
+    /// Reset the inner hashset
+    pub fn reset(&mut self) -> Result<(), Error> {
+        self.set.clear();
+        Ok(())
+    }
+}
+
+/// Consider interesting a testcase if the list in `ListObserver` is not empty.
+#[derive(Clone, Debug)]
+pub struct ListFeedback<T>
+where
+    T: Debug + Hash + Eq + DeserializeOwned,
+{
+    name: String,
+    novelty: HashSet<T>,
+    phantom: PhantomData<T>,
+}
+
+libafl_bolts::impl_serdeany!(
+    ListFeedbackMetadata<T: Default + Copy + 'static + Serialize + Eq + Hash>,
+    <u8>,<u16>,<u32>,<u64>,<i8>,<i16>,<i32>,<i64>,<f32>,<f64>,<bool>,<char>,<usize>
+);
+
+impl<S, T> Feedback<S> for ListFeedback<T>
+where
+    S: State + HasNamedMetadata,
+    T: Debug + Serialize + Hash + Eq + DeserializeOwned + Default + Copy + 'static,
+{
+    fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
+        state.add_named_metadata(&self.name, ListFeedbackMetadata::<T>::default());
+        Ok(())
+    }
+    #[allow(clippy::wrong_self_convention)]
+    fn is_interesting<EM, OT>(
+        &mut self,
+        state: &mut S,
+        _manager: &mut EM,
+        _input: &S::Input,
+        observers: &OT,
+        _exit_kind: &ExitKind,
+    ) -> Result<bool, Error>
+    where
+        EM: EventFirer<State = S>,
+        OT: ObserversTuple<S>,
+    {
+        // TODO Replace with match_name_type when stable
+        let observer = observers
+            .match_name::<ListObserver<T>>(self.name())
+            .unwrap();
+        // TODO register the list content in a testcase metadata
+        self.novelty.clear();
+        // can't fail
+        let history_set = state
+            .named_metadata_map_mut()
+            .get_mut::<ListFeedbackMetadata<T>>(&self.name)
+            .unwrap();
+        for v in observer.list().iter() {
+            if !history_set.set.contains(v) {
+                self.novelty.insert(*v);
+            }
+        }
+        Ok(self.novelty.len() > 0)
+    }
+
+    fn append_metadata<EM, OT>(
+        &mut self,
+        state: &mut S,
+        _manager: &mut EM,
+        _observers: &OT,
+        _testcase: &mut crate::corpus::Testcase<<S>::Input>,
+    ) -> Result<(), Error>
+    where
+        OT: ObserversTuple<S>,
+        EM: EventFirer<State = S>,
+    {
+        let history_set = state
+            .named_metadata_map_mut()
+            .get_mut::<ListFeedbackMetadata<T>>(&self.name)
+            .unwrap();
+
+        for v in self.novelty.iter() {
+            history_set.set.insert(*v);
+        }
+        Ok(())
+    }
+}
+
+impl<T> Named for ListFeedback<T>
+where
+    T: Debug + Serialize + Hash + Eq + DeserializeOwned,
+{
+    #[inline]
+    fn name(&self) -> &str {
+        self.name.as_str()
+    }
+}
+
+impl<T> ListFeedback<T>
+where
+    T: Debug + Serialize + Hash + Eq + DeserializeOwned,
+{
+    /// Creates a new [`ListFeedback`], deciding if the given [`ListObserver`] value of a run is interesting.
+    #[must_use]
+    pub fn new(observer: &ListObserver<T>) -> Self {
+        Self {
+            name: LISTFEEDBACK_PREFIX.to_string() + observer.name(),
+            novelty: HashSet::<T>::new(),
+            phantom: PhantomData,
+        }
+    }
+}
