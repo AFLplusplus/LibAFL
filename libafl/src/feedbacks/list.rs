@@ -55,16 +55,17 @@ where
 #[derive(Clone, Debug)]
 pub struct ListFeedback<T>
 where
-    T: Debug + Hash + Eq + DeserializeOwned,
+    T: Hash + Eq,
 {
     name: String,
+    observer_name: String,
     novelty: HashSet<T>,
     phantom: PhantomData<T>,
 }
 
 libafl_bolts::impl_serdeany!(
-    ListFeedbackMetadata<T: Default + Copy + 'static + Serialize + Eq + Hash>,
-    <u8>,<u16>,<u32>,<u64>,<i8>,<i16>,<i32>,<i64>,<f32>,<f64>,<bool>,<char>,<usize>
+    ListFeedbackMetadata<T: Debug + Default + Copy + 'static + Serialize + DeserializeOwned + Eq + Hash>,
+    <u8>,<u16>,<u32>,<u64>,<i8>,<i16>,<i32>,<i64>,<bool>,<char>,<usize>
 );
 
 impl<S, T> Feedback<S> for ListFeedback<T>
@@ -73,6 +74,7 @@ where
     T: Debug + Serialize + Hash + Eq + DeserializeOwned + Default + Copy + 'static,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
+        // eprintln!("self.name {:#?}", &self.name);
         state.add_named_metadata(&self.name, ListFeedbackMetadata::<T>::default());
         Ok(())
     }
@@ -91,7 +93,7 @@ where
     {
         // TODO Replace with match_name_type when stable
         let observer = observers
-            .match_name::<ListObserver<T>>(self.name())
+            .match_name::<ListObserver<T>>(&self.observer_name)
             .unwrap();
         // TODO register the list content in a testcase metadata
         self.novelty.clear();
@@ -150,6 +152,7 @@ where
     pub fn new(observer: &ListObserver<T>) -> Self {
         Self {
             name: LISTFEEDBACK_PREFIX.to_string() + observer.name(),
+            observer_name: observer.name().to_string(),
             novelty: HashSet::<T>::new(),
             phantom: PhantomData,
         }
