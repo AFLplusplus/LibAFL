@@ -885,6 +885,7 @@ macro_rules! impl_serdeany {
             ///
             /// # Safety
             /// This may never be called concurrently as it dereferences the `RegistryBuilder` without acquiring a lock.
+            #[allow(unused)]
             pub unsafe fn register() {
                 $crate::serdeany::RegistryBuilder::register::<$struct_name>();
             }
@@ -896,7 +897,7 @@ macro_rules! impl_serdeany {
 
 #[cfg(test)]
 mod tests {
-    use crate::bolts_prelude::RegistryBuilder;
+    use crate::serdeany::RegistryBuilder;
     use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Serialize, Deserialize)]
