@@ -10,7 +10,7 @@ use crate::{
     executors::ExitKind,
     feedbacks::Feedback,
     observers::{ListObserver, ObserversTuple},
-    state::{State, HasNamedMetadata},
+    state::{HasNamedMetadata, State},
 };
 
 /// The prefix for list metadata's name

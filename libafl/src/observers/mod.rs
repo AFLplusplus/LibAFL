@@ -530,6 +530,7 @@ where
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
+    use alloc::vec::Vec;
     use core::ptr;
     use std::cell::UnsafeCell;
 
@@ -540,7 +541,6 @@ pub mod pybind {
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};
 
-    use alloc::vec::Vec;
     use super::{Debug, Observer, ObserversTuple, String};
     use crate::{
         executors::{pybind::PythonExitKind, ExitKind},
