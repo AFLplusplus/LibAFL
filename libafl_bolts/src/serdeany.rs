@@ -893,3 +893,38 @@ macro_rules! impl_serdeany {
         $crate::create_register!($struct_name);
     };
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::bolts_prelude::RegistryBuilder;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Debug, Serialize, Deserialize)]
+    struct MyType(u32);
+    impl_serdeany!(MyType);
+
+    mod inner {
+        use serde::{Deserialize, Serialize};
+
+        #[derive(Debug, Serialize, Deserialize)]
+        pub(super) struct MyType(f32);
+        impl_serdeany!(MyType);
+    }
+
+    #[test]
+    fn test_deserialize_serialize() {
+        unsafe {
+            RegistryBuilder::register::<MyType>();
+            RegistryBuilder::register::<inner::MyType>();
+        }
+
+        let val = MyType(1);
+        let serialized = postcard::to_allocvec(&val).unwrap();
+
+        assert_eq!(
+            postcard::from_bytes::<MyType>(&serialized).unwrap().0,
+            val.0
+        );
+        assert!(postcard::from_bytes::<inner::MyType>(&serialized).is_err());
+    }
+}
