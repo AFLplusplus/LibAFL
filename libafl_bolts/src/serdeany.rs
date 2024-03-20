@@ -129,6 +129,9 @@ pub mod serdeany_registry {
         Error,
     };
 
+    /// A [`HashMap`] that maps from [`TypeRepr`] to a deserializer and its [`TypeId`].
+    type DeserializeCallbackMap = HashMap<TypeRepr, (DeserializeCallback<dyn SerdeAny>, TypeId)>;
+
     /// Visitor object used internally for the [`crate::serdeany::SerdeAny`] registry.
     #[derive(Debug)]
     pub struct BoxDynVisitor {}
@@ -162,8 +165,7 @@ pub mod serdeany_registry {
 
     #[allow(unused_qualifications)]
     struct Registry {
-        deserializers:
-            Option<HashMap<TypeRepr, (DeserializeCallback<dyn crate::serdeany::SerdeAny>, TypeId)>>,
+        deserializers: Option<DeserializeCallbackMap>,
         finalized: bool,
     }
 
@@ -186,7 +188,7 @@ pub mod serdeany_registry {
                 });
 
             #[cfg(feature = "unsafe_stable_anymap")]
-            assert_eq!(_entry.1, TypeId::of::<T>(), "Fatal safety error: TypeId of type {} is not equals to the deserializer's TypeId for this type! Two registered types have the same type_name!");
+            assert_eq!(_entry.1, TypeId::of::<T>(), "Fatal safety error: TypeId of type {} is not equals to the deserializer's TypeId for this type! Two registered types have the same type_name!", type_repr::<T>());
         }
 
         pub fn finalize(&mut self) {
