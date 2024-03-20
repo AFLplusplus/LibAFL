@@ -478,7 +478,7 @@ where
     Z: Evaluator<E, EM>,
     Z::State: HasCorpus + HasRand + HasNamedMetadata,
 {
-    /// Creates a new tranforming mutational stage
+    /// Creates a new transforming mutational stage
     #[must_use]
     pub fn transforming(state: &mut Z::State, mutator: M, name: &str) -> Self {
         let _ = state.named_metadata_or_insert_with(name, TuneableMutationalStageMetadata::default);

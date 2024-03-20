@@ -176,7 +176,7 @@ pub trait HasMetadata {
     where
         M: SerdeAny,
     {
-        self.metadata_map_mut().or_insert_with::<M>(default)
+        self.metadata_map_mut().get_or_insert_with::<M>(default)
     }
 
     /// Remove a metadata from the metadata map
@@ -258,7 +258,7 @@ pub trait HasNamedMetadata {
         M: SerdeAny,
     {
         self.named_metadata_map_mut()
-            .or_insert_with::<M>(name, default)
+            .get_or_insert_with::<M>(name, default)
     }
 
     /// Check for a metadata
