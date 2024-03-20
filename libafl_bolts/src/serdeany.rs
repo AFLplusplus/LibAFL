@@ -113,7 +113,7 @@ pub mod serdeany_registry {
         boxed::Box,
         string::{String, ToString},
     };
-    use core::{fmt, hash::BuildHasherDefault};
+    use core::{any::TypeId, fmt, hash::BuildHasherDefault};
 
     use hashbrown::{
         hash_map::{Values, ValuesMut},
@@ -146,12 +146,13 @@ pub mod serdeany_registry {
         {
             let id: TypeRepr = visitor.next_element()?.unwrap();
             let cb = unsafe {
-                *REGISTRY
+                REGISTRY
                     .deserializers
                     .as_ref()
                     .expect("Empty types registry")
                     .get(&id)
                     .expect("Cannot deserialize an unregistered type")
+                    .0
             };
             let seed = DeserializeCallbackSeed::<dyn crate::serdeany::SerdeAny> { cb };
             let obj: Self::Value = visitor.next_element_seed(seed)?.unwrap();
@@ -162,7 +163,7 @@ pub mod serdeany_registry {
     #[allow(unused_qualifications)]
     struct Registry {
         deserializers:
-            Option<HashMap<TypeRepr, DeserializeCallback<dyn crate::serdeany::SerdeAny>>>,
+            Option<HashMap<TypeRepr, (DeserializeCallback<dyn crate::serdeany::SerdeAny>, TypeId)>>,
         finalized: bool,
     }
 
@@ -175,9 +176,17 @@ pub mod serdeany_registry {
             assert!(!self.finalized, "Registry is already finalized!");
 
             let deserializers = self.deserializers.get_or_insert_with(HashMap::default);
-            deserializers.insert(type_repr_owned::<T>(), |de| {
-                Ok(Box::new(erased_serde::deserialize::<T>(de)?))
-            });
+            let _entry = deserializers
+                .entry(type_repr_owned::<T>())
+                .or_insert_with(|| {
+                    (
+                        |de| Ok(Box::new(erased_serde::deserialize::<T>(de)?)),
+                        TypeId::of::<T>(),
+                    )
+                });
+
+            #[cfg(feature = "unsafe_stable_anymap")]
+            assert_eq!(_entry.1, TypeId::of::<T>(), "Fatal safety error: TypeId of type {} is not equals to the deserializer's TypeId for this type! Two registered types have the same type_name!");
         }
 
         pub fn finalize(&mut self) {
@@ -360,15 +369,15 @@ pub mod serdeany_registry {
         }
 
         /// Gets a value by type, or inserts it using the given construction function `default`
-        pub fn or_insert_with<T>(&mut self, default: impl FnOnce() -> T) -> &mut T
+        pub fn get_or_insert_with<T>(&mut self, default: impl FnOnce() -> T) -> &mut T
         where
             T: SerdeAny,
         {
-            self.or_insert_with_boxed::<T>(|| Box::new(default()))
+            self.get_or_insert_with_boxed::<T>(|| Box::new(default()))
         }
 
         /// Gets a value by type, or inserts it using the given construction function `default` (returning a boxed value)
-        pub fn or_insert_with_boxed<T>(&mut self, default: impl FnOnce() -> Box<T>) -> &mut T
+        pub fn get_or_insert_with_boxed<T>(&mut self, default: impl FnOnce() -> Box<T>) -> &mut T
         where
             T: SerdeAny + 'static,
         {
@@ -664,7 +673,7 @@ pub mod serdeany_registry {
         }
 
         /// Gets a value by name, or inserts it using the given construction function `default`
-        pub fn or_insert_with<T>(&mut self, name: &str, default: impl FnOnce() -> T) -> &mut T
+        pub fn get_or_insert_with<T>(&mut self, name: &str, default: impl FnOnce() -> T) -> &mut T
         where
             T: SerdeAny,
         {
@@ -675,7 +684,7 @@ pub mod serdeany_registry {
         }
 
         /// Gets a value by name, or inserts it using the given construction function `default` (returning a boxed value)
-        pub fn or_insert_with_boxed<T>(
+        pub fn get_or_insert_with_boxed<T>(
             &mut self,
             name: &str,
             default: impl FnOnce() -> Box<T>,
