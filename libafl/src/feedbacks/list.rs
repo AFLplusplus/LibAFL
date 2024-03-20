@@ -10,8 +10,7 @@ use crate::{
     executors::ExitKind,
     feedbacks::Feedback,
     observers::{ListObserver, ObserversTuple},
-    prelude::HasNamedMetadata,
-    state::State,
+    state::{State, HasNamedMetadata},
 };
 
 /// The prefix for list metadata's name
@@ -102,12 +101,12 @@ where
             .named_metadata_map_mut()
             .get_mut::<ListFeedbackMetadata<T>>(&self.name)
             .unwrap();
-        for v in observer.list().iter() {
+        for v in observer.list() {
             if !history_set.set.contains(v) {
                 self.novelty.insert(*v);
             }
         }
-        Ok(self.novelty.len() > 0)
+        Ok(!self.novelty.is_empty())
     }
 
     fn append_metadata<EM, OT>(
@@ -126,7 +125,7 @@ where
             .get_mut::<ListFeedbackMetadata<T>>(&self.name)
             .unwrap();
 
-        for v in self.novelty.iter() {
+        for v in &self.novelty {
             history_set.set.insert(*v);
         }
         Ok(())

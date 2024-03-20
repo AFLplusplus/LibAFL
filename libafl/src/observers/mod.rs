@@ -540,7 +540,8 @@ pub mod pybind {
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};
 
-    use super::{Debug, Observer, ObserversTuple, String, Vec};
+    use alloc::vec::Vec;
+    use super::{Debug, Observer, ObserversTuple, String};
     use crate::{
         executors::{pybind::PythonExitKind, ExitKind},
         inputs::{BytesInput, HasBytesVec},
