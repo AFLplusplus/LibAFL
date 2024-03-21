@@ -14,10 +14,10 @@ use num_enum::TryFromPrimitive;
 #[cfg(emulation_mode = "systemmode")]
 use crate::QemuInstrumentationPagingFilter;
 use crate::{
-    executor::QemuExecutorState, sync_backdoor::SyncBackdoorError, Emulator, GuestAddrKind,
-    GuestReg, HandlerError, HasInstrumentationFilter, InnerHandlerResult, IsEmuExitHandler,
-    IsFilter, SnapshotManager, Qemu, QemuHelperTuple, QemuInstrumentationAddressRangeFilter,
-    Regs, StdEmuExitHandler, StdInstrumentationFilter, CPU,
+    executor::QemuExecutorState, sync_backdoor::SyncBackdoorError, EmuExitHandler, Emulator,
+    GuestAddrKind, GuestReg, HandlerError, HasInstrumentationFilter, InnerHandlerResult, IsFilter,
+    Qemu, QemuHelperTuple, QemuInstrumentationAddressRangeFilter, Regs, SnapshotManager,
+    StdEmuExitHandler, StdInstrumentationFilter, CPU,
 };
 
 pub const VERSION: u64 = bindings::LIBAFL_EXIT_VERSION_NUMBER as u64;
@@ -62,7 +62,7 @@ pub trait IsCommand<QT, S, E>
 where
     QT: QemuHelperTuple<S>,
     S: State + HasExecutions,
-    E: IsEmuExitHandler<QT, S>,
+    E: EmuExitHandler<QT, S>,
 {
     /// Used to know whether the command can be run during a backdoor, or if it is necessary to go out of
     /// the QEMU VM to run the command.

@@ -15,7 +15,7 @@ use libafl_qemu_sys::{
 
 use crate::{
     emu::{libafl_page_from_addr, SnapshotManager},
-    Emulator, IsEmuExitHandler, MemAccessInfo, Qemu, QemuExitReason, QemuExitReasonError,
+    EmuExitHandler, Emulator, MemAccessInfo, Qemu, QemuExitReason, QemuExitReasonError,
     QemuHelperTuple, SnapshotId, SnapshotManagerError, CPU,
 };
 
@@ -403,7 +403,7 @@ impl<QT, S, E> Emulator<QT, S, E>
 where
     QT: QemuHelperTuple<S>,
     S: State + HasExecutions,
-    E: IsEmuExitHandler<QT, S>,
+    E: EmuExitHandler<QT, S>,
 {
     /// Write a value to a phsical guest address, including ROM areas.
     pub unsafe fn write_phys_mem(&self, paddr: GuestPhysAddr, buf: &[u8]) {

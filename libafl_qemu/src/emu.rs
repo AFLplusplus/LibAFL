@@ -120,7 +120,7 @@ pub trait SnapshotManager: Debug + Clone {
 }
 
 // TODO: Rework with generics for command handlers?
-pub trait IsEmuExitHandler<QT, S>: Sized + Debug + Clone
+pub trait EmuExitHandler<QT, S>: Sized + Debug + Clone
 where
     QT: QemuHelperTuple<S>,
     S: State + HasExecutions,
@@ -147,12 +147,12 @@ pub enum InnerHandlerResult {
 }
 
 /// Special kind of Exit handler with no data embedded.
-/// As a result, it is safe to transmute from any `Emulator` implementing `IsEmuExitHandler` to this one,
+/// As a result, it is safe to transmute from any `Emulator` implementing `EmuExitHandler` to this one,
 /// since it won't use any data which could cause type confusion.
 #[derive(Clone, Debug)]
 pub struct NopEmuExitHandler;
 
-impl<QT, S> IsEmuExitHandler<QT, S> for NopEmuExitHandler
+impl<QT, S> EmuExitHandler<QT, S> for NopEmuExitHandler
 where
     QT: QemuHelperTuple<S>,
     S: State + HasExecutions,
@@ -221,7 +221,7 @@ where
 }
 
 // TODO: replace handlers with generics to permit compile-time customization of handlers
-impl<SM, QT, S> IsEmuExitHandler<QT, S> for StdEmuExitHandler<SM>
+impl<SM, QT, S> EmuExitHandler<QT, S> for StdEmuExitHandler<SM>
 where
     SM: SnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
@@ -831,7 +831,7 @@ pub struct EmulatorState<QT, S, E>
 where
     QT: QemuHelperTuple<S>,
     S: State + HasExecutions,
-    E: IsEmuExitHandler<QT, S>,
+    E: EmuExitHandler<QT, S>,
 {
     exit_handler: RefCell<E>,
     breakpoints: RefCell<HashSet<Breakpoint>>,
@@ -843,7 +843,7 @@ pub struct Emulator<QT, S, E>
 where
     QT: QemuHelperTuple<S>,
     S: State + HasExecutions,
-    E: IsEmuExitHandler<QT, S>,
+    E: EmuExitHandler<QT, S>,
 {
     state: ptr::NonNull<EmulatorState<QT, S, E>>,
     qemu: Qemu,
@@ -1307,7 +1307,7 @@ impl<QT, S, E> Emulator<QT, S, E>
 where
     QT: QemuHelperTuple<S>,
     S: State + HasExecutions,
-    E: IsEmuExitHandler<QT, S>,
+    E: EmuExitHandler<QT, S>,
 {
     #[allow(clippy::must_use_candidate, clippy::similar_names)]
     pub fn new(
@@ -1388,30 +1388,34 @@ where
     #[must_use]
     #[allow(clippy::cast_possible_wrap)]
     #[allow(clippy::cast_sign_loss)]
-    #[deprecated(note =
-                 "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`.")]
+    #[deprecated(
+        note = "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`."
+    )]
     pub fn num_cpus(&self) -> usize {
         self.qemu.num_cpus()
     }
 
     #[must_use]
-    #[deprecated(note =
-                 "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`.")]
+    #[deprecated(
+        note = "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`."
+    )]
     pub fn current_cpu(&self) -> Option<CPU> {
         self.qemu.current_cpu()
     }
 
     #[must_use]
     #[allow(clippy::cast_possible_wrap)]
-    #[deprecated(note =
-                 "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`.")]
+    #[deprecated(
+        note = "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`."
+    )]
     pub fn cpu_from_index(&self, index: usize) -> CPU {
         self.qemu.cpu_from_index(index)
     }
 
     #[must_use]
-    #[deprecated(note =
-                 "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`.")]
+    #[deprecated(
+        note = "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`."
+    )]
     pub fn page_from_addr(&self, addr: GuestAddr) -> GuestAddr {
         self.qemu.page_from_addr(addr)
     }
@@ -1421,27 +1425,31 @@ where
         unsafe { libafl_page_size }
     }*/
 
-    #[deprecated(note =
-                 "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`.")]
+    #[deprecated(
+        note = "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`."
+    )]
     pub unsafe fn write_mem(&self, addr: GuestAddr, buf: &[u8]) {
         self.qemu.write_mem(addr, buf);
     }
 
-    #[deprecated(note =
-                 "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`.")]
+    #[deprecated(
+        note = "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`."
+    )]
     pub unsafe fn read_mem(&self, addr: GuestAddr, buf: &mut [u8]) {
         self.qemu.read_mem(addr, buf);
     }
 
     #[must_use]
-    #[deprecated(note =
-                 "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`.")]
+    #[deprecated(
+        note = "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`."
+    )]
     pub fn num_regs(&self) -> i32 {
         self.qemu.num_regs()
     }
 
-    #[deprecated(note =
-                 "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`.")]
+    #[deprecated(
+        note = "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`."
+    )]
     pub fn write_reg<R, T>(&self, reg: R, val: T) -> Result<(), String>
     where
         T: Num + PartialOrd + Copy + Into<GuestReg>,
@@ -1450,8 +1458,9 @@ where
         self.qemu.write_reg(reg, val)
     }
 
-    #[deprecated(note =
-                 "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`.")]
+    #[deprecated(
+        note = "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`."
+    )]
     pub fn read_reg<R, T>(&self, reg: R) -> Result<T, String>
     where
         T: Num + PartialOrd + Copy + From<GuestReg>,
@@ -1474,8 +1483,9 @@ where
         self.state().breakpoints.borrow_mut().remove(bp);
     }
 
-    #[deprecated(note =
-                 "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`.")]
+    #[deprecated(
+        note = "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`."
+    )]
     pub fn entry_break(&self, addr: GuestAddr) {
         self.qemu.entry_break(addr);
     }
@@ -1545,15 +1555,17 @@ where
         }
     }
 
-    #[deprecated(note =
-                 "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`.")]
+    #[deprecated(
+        note = "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`."
+    )]
     pub fn flush_jit(&self) {
         self.qemu.flush_jit();
     }
 
     // TODO set T lifetime to be like Emulator
-    #[deprecated(note =
-                 "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`.")]
+    #[deprecated(
+        note = "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`."
+    )]
     pub fn set_hook<T: Into<HookData>>(
         &self,
         data: T,
@@ -1565,21 +1577,24 @@ where
     }
 
     #[must_use]
-    #[deprecated(note =
-                 "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`.")]
+    #[deprecated(
+        note = "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`."
+    )]
     pub fn remove_hook(&self, id: impl HookId, invalidate_block: bool) -> bool {
         self.qemu.remove_hook(id, invalidate_block)
     }
 
     #[must_use]
-    #[deprecated(note =
-                 "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`.")]
+    #[deprecated(
+        note = "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`."
+    )]
     pub fn remove_hooks_at(&self, addr: GuestAddr, invalidate_block: bool) -> usize {
         self.qemu.remove_hooks_at(addr, invalidate_block)
     }
 
-    #[deprecated(note =
-                 "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`.")]
+    #[deprecated(
+        note = "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`."
+    )]
     pub fn add_edge_hooks<T: Into<HookData>>(
         &self,
         data: T,
@@ -1589,8 +1604,9 @@ where
         self.qemu.add_edge_hooks(data, gen, exec)
     }
 
-    #[deprecated(note =
-                 "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`.")]
+    #[deprecated(
+        note = "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`."
+    )]
     pub fn add_block_hooks<T: Into<HookData>>(
         &self,
         data: T,
@@ -1601,8 +1617,9 @@ where
         self.qemu.add_block_hooks(data, gen, post_gen, exec)
     }
 
-    #[deprecated(note =
-                 "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`.")]
+    #[deprecated(
+        note = "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`."
+    )]
     pub fn add_read_hooks<T: Into<HookData>>(
         &self,
         data: T,
@@ -1618,8 +1635,9 @@ where
     }
 
     // TODO add MemOp info
-    #[deprecated(note =
-                 "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`.")]
+    #[deprecated(
+        note = "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`."
+    )]
     pub fn add_write_hooks<T: Into<HookData>>(
         &self,
         data: T,
@@ -1634,8 +1652,9 @@ where
             .add_write_hooks(data, gen, exec1, exec2, exec4, exec8, exec_n)
     }
 
-    #[deprecated(note =
-                 "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`.")]
+    #[deprecated(
+        note = "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`."
+    )]
     pub fn add_cmp_hooks<T: Into<HookData>>(
         &self,
         data: T,
@@ -1649,8 +1668,9 @@ where
             .add_cmp_hooks(data, gen, exec1, exec2, exec4, exec8)
     }
 
-    #[deprecated(note =
-                 "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`.")]
+    #[deprecated(
+        note = "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`."
+    )]
     pub fn add_backdoor_hook<T: Into<HookData>>(
         &self,
         data: T,
@@ -1660,14 +1680,16 @@ where
     }
 
     #[allow(clippy::type_complexity)]
-    #[deprecated(note =
-                 "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`.")]
+    #[deprecated(
+        note = "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`."
+    )]
     pub fn add_gdb_cmd(&self, callback: Box<dyn FnMut(&Qemu, &str) -> bool>) {
         self.qemu.add_gdb_cmd(callback);
     }
 
-    #[deprecated(note =
-                 "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`.")]
+    #[deprecated(
+        note = "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`."
+    )]
     pub fn gdb_reply(&self, output: &str) {
         self.qemu.gdb_reply(output);
     }
@@ -1677,7 +1699,7 @@ where
 // where
 //     QT: QemuHelperTuple<S>,
 //     S: State + HasExecutions,
-//     E: IsEmuExitHandler<QT, S>,
+//     E: EmuExitHandler<QT, S>,
 // {
 //     fn read_return_address<T>(&self) -> Result<T, String>
 //     where
@@ -1685,21 +1707,21 @@ where
 //     {
 //         self.qemu.read_return_address()
 //     }
-// 
+//
 //     fn write_return_address<T>(&self, val: T) -> Result<(), String>
 //     where
 //         T: Into<GuestReg>,
 //     {
 //         self.qemu.write_return_address(val)
 //     }
-// 
+//
 //     fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, String>
 //     where
 //         T: From<GuestReg>,
 //     {
 //         self.qemu.read_function_argument(conv, idx)
 //     }
-// 
+//
 //     fn write_function_argument<T>(
 //         &self,
 //         conv: CallingConvention,

@@ -13,8 +13,8 @@ use pyo3::prelude::*;
 use crate::{
     emu::{HasExecutions, State},
     sync_backdoor::SyncBackdoorError,
-    Emulator, HookData, IsEmuExitHandler, NewThreadHookId, PostSyscallHookId, PreSyscallHookId,
-    Qemu, QemuExitReason, QemuExitReasonError, QemuHelperTuple, SyscallHookResult, CPU,
+    EmuExitHandler, Emulator, HookData, NewThreadHookId, PostSyscallHookId, PreSyscallHookId, Qemu,
+    QemuExitReason, QemuExitReasonError, QemuHelperTuple, SyscallHookResult, CPU,
 };
 
 #[derive(Debug, Clone)]
@@ -354,7 +354,7 @@ impl<QT, S, E> Emulator<QT, S, E>
 where
     QT: QemuHelperTuple<S>,
     S: State + HasExecutions,
-    E: IsEmuExitHandler<QT, S>,
+    E: EmuExitHandler<QT, S>,
 {
     /// This function gets the memory mappings from the emulator.
     #[must_use]
