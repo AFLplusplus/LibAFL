@@ -50,7 +50,7 @@ where
     }
 }
 
-impl<T> HasRefCnt for ListFeedbackMetadata<T> 
+impl<T> HasRefCnt for ListFeedbackMetadata<T>
 where
     T: Default + Copy + 'static + Serialize + Eq + Hash,
 {
