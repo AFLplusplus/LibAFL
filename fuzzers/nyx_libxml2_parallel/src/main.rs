@@ -37,7 +37,8 @@ fn main() {
             .cpu_id(0)
             .snap_mode(true)
             .parallel_mode(true)
-            .parent_cpu_id(Some(parent_cpu_id.0));
+            .parent_cpu_id(Some(parent_cpu_id.0 as u32))
+            .build();
         let helper = NyxHelper::new("/tmp/nyx_libxml2/", settings).unwrap();
         let observer = unsafe {
             StdMapObserver::from_mut_ptr("trace", helper.bitmap_buffer, helper.bitmap_size)
@@ -55,7 +56,7 @@ fn main() {
         let mut feedback = MaxMapFeedback::new(&observer);
         let mut objective = CrashFeedback::new();
         let scheduler = RandScheduler::new();
-        let mut executor = NyxExecutor::new(helper, tuple_list!(observer)).unwrap();
+        let mut executor = NyxExecutor::new(helper, tuple_list!(observer));
 
         // If not restarting, create a State from scratch
         let mut state = state.unwrap_or_else(|| {
