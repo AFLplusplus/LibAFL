@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus, Testcase},
@@ -25,7 +25,8 @@ fn main() {
         .cpu_id(0)
         .snap_mode(true)
         .parallel_mode(false)
-        .parent_cpu_id(None);
+        .parent_cpu_id(None)
+        .build();
     let helper = NyxHelper::new("/tmp/nyx_libxml2/", settings).unwrap();
     let observer =
         unsafe { StdMapObserver::from_mut_ptr("trace", helper.bitmap_buffer, helper.bitmap_size) };
