@@ -208,7 +208,7 @@ where
     }
 
     pub fn snapshot_id(&self) -> Option<SnapshotId> {
-        Some(self.snapshot_id.get()?.clone())
+        Some(*self.snapshot_id.get()?)
     }
 
     pub fn snapshot_manager_borrow(&self) -> Ref<SM> {
@@ -1492,8 +1492,8 @@ where
     /// whatever reason, depending on the choosen handler.
     /// It is a higher-level abstraction of [`Emulator::run`] that will take care of some part of the runtime logic,
     /// returning only when something interesting happen.
-    /// # Safety
     ///
+    /// # Safety
     /// Should, in general, be safe to call.
     /// Of course, the emulated target is not contained securely and can corrupt state or interact with the operating system.
     pub unsafe fn run_handle(

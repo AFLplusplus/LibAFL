@@ -539,7 +539,7 @@ where
             let paging_id = hooks
                 .qemu()
                 .current_cpu()
-                .map(|cpu| cpu.get_current_paging_id())
+                .map(|cpu| cpu.current_paging_id())
                 .flatten();
 
             if !h.must_instrument(src, paging_id) && !h.must_instrument(dest, paging_id) {
@@ -609,7 +609,7 @@ where
             let paging_id = hooks
                 .qemu()
                 .current_cpu()
-                .map(|cpu| cpu.get_current_paging_id())
+                .map(|cpu| cpu.current_paging_id())
                 .flatten();
 
             if !h.must_instrument(src, paging_id) && !h.must_instrument(dest, paging_id) {
@@ -676,7 +676,7 @@ where
             let paging_id = hooks
                 .qemu()
                 .current_cpu()
-                .map(|cpu| cpu.get_current_paging_id())
+                .map(|cpu| cpu.current_paging_id())
                 .flatten();
 
             if !h.must_instrument(pc, paging_id) {

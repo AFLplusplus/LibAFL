@@ -263,7 +263,7 @@ where
 
             let mut allowed_paging_ids = HashSet::new();
 
-            let current_paging_id = qemu.current_cpu().unwrap().get_current_paging_id().unwrap();
+            let current_paging_id = qemu.current_cpu().unwrap().current_paging_id().unwrap();
             allowed_paging_ids.insert(current_paging_id);
 
             let paging_filter =

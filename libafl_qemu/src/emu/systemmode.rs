@@ -20,7 +20,7 @@ use crate::{
 };
 
 impl SnapshotId {
-    fn get_fresh_id() -> SnapshotId {
+    fn gen_unique_id() -> SnapshotId {
         static UNIQUE_ID: AtomicU64 = AtomicU64::new(0);
 
         let unique_id = UNIQUE_ID.fetch_add(1, Ordering::SeqCst);
@@ -105,7 +105,7 @@ impl QemuSnapshotManager {
 
 impl IsSnapshotManager for QemuSnapshotManager {
     fn save(&mut self, qemu: &Qemu) -> SnapshotId {
-        let snapshot_id = SnapshotId::get_fresh_id();
+        let snapshot_id = SnapshotId::gen_unique_id();
         qemu.save_snapshot(
             self.snapshot_id_to_name(&snapshot_id).as_str(),
             self.is_sync,
@@ -125,7 +125,7 @@ impl IsSnapshotManager for QemuSnapshotManager {
 
 impl IsSnapshotManager for FastSnapshotManager {
     fn save(&mut self, qemu: &Qemu) -> SnapshotId {
-        let snapshot_id = SnapshotId::get_fresh_id();
+        let snapshot_id = SnapshotId::gen_unique_id();
         self.snapshots
             .insert(snapshot_id, qemu.create_fast_snapshot(true));
         snapshot_id
@@ -244,7 +244,7 @@ impl CPU {
     }
 
     #[must_use]
-    pub fn get_current_paging_id(&self) -> Option<GuestPhysAddr> {
+    pub fn current_paging_id(&self) -> Option<GuestPhysAddr> {
         let paging_id = unsafe { libafl_qemu_current_paging_id(self.ptr) };
 
         if paging_id == 0 {
