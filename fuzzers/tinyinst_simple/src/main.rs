@@ -40,7 +40,7 @@ fn main() {
     // let args = vec!["test.exe".to_string(), "-f".to_string(), "@@".to_string()];
 
     let observer = unsafe { ListObserver::new("cov", &mut COVERAGE) };
-    let mut feedback = ListFeedback::with_observer(&observer);
+    let mut feedback = ListFeedback::new(&observer);
     #[cfg(windows)]
     let mut shmem_provider = Win32ShMemProvider::new().unwrap();
 
