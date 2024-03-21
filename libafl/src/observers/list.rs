@@ -35,7 +35,7 @@ where
     pub fn new(name: &'static str, list: OwnedMutPtr<Vec<T>>) -> Self {
         Self {
             name: name.to_string(),
-            list: list,
+            list,
         }
     }
 
