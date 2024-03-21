@@ -91,7 +91,7 @@ where
 
     fn try_from(emu: &Emulator<QT, S, E>) -> Result<Self, Self::Error> {
         let arch_regs_map: &'static EnumMap<BackdoorArgs, Regs> = get_backdoor_arch_regs();
-        let cmd_id: GuestReg = emu.read_reg::<Regs, GuestReg>(arch_regs_map[BackdoorArgs::Cmd])?;
+        let cmd_id: GuestReg = emu.qemu().read_reg::<Regs, GuestReg>(arch_regs_map[BackdoorArgs::Cmd])?;
 
         Ok(match u64::from(cmd_id).try_into()? {
             NativeBackdoorCommand::Save => SyncBackdoor {
@@ -103,33 +103,33 @@ where
                 arch_regs_map,
             },
             NativeBackdoorCommand::InputVirt => {
-                let virt_addr: GuestVirtAddr = emu.read_reg(arch_regs_map[BackdoorArgs::Arg1])?;
-                let max_input_size: GuestReg = emu.read_reg(arch_regs_map[BackdoorArgs::Arg2])?;
+                let virt_addr: GuestVirtAddr = emu.qemu().read_reg(arch_regs_map[BackdoorArgs::Arg1])?;
+                let max_input_size: GuestReg = emu.qemu().read_reg(arch_regs_map[BackdoorArgs::Arg2])?;
 
                 SyncBackdoor {
                     command: Command::InputCommand(InputCommand::new(EmulatorMemoryChunk::virt(
                         virt_addr,
                         max_input_size,
-                        emu.current_cpu().unwrap().clone(),
+                        emu.qemu().current_cpu().unwrap().clone(),
                     ))),
                     arch_regs_map,
                 }
             }
             NativeBackdoorCommand::InputPhys => {
-                let phys_addr: GuestPhysAddr = emu.read_reg(arch_regs_map[BackdoorArgs::Arg1])?;
-                let max_input_size: GuestReg = emu.read_reg(arch_regs_map[BackdoorArgs::Arg2])?;
+                let phys_addr: GuestPhysAddr = emu.qemu().read_reg(arch_regs_map[BackdoorArgs::Arg1])?;
+                let max_input_size: GuestReg = emu.qemu().read_reg(arch_regs_map[BackdoorArgs::Arg2])?;
 
                 SyncBackdoor {
                     command: Command::InputCommand(InputCommand::new(EmulatorMemoryChunk::phys(
                         phys_addr,
                         max_input_size,
-                        Some(emu.current_cpu().unwrap().clone()),
+                        Some(emu.qemu().current_cpu().unwrap().clone()),
                     ))),
                     arch_regs_map,
                 }
             }
             NativeBackdoorCommand::End => {
-                let native_exit_kind: GuestReg = emu.read_reg(arch_regs_map[BackdoorArgs::Arg1])?;
+                let native_exit_kind: GuestReg = emu.qemu().read_reg(arch_regs_map[BackdoorArgs::Arg1])?;
                 let native_exit_kind: Result<NativeExitKind, _> =
                     u64::from(native_exit_kind).try_into();
 
@@ -150,34 +150,34 @@ where
             }
             NativeBackdoorCommand::StartPhys => {
                 let input_phys_addr: GuestPhysAddr =
-                    emu.read_reg(arch_regs_map[BackdoorArgs::Arg1])?;
-                let max_input_size: GuestReg = emu.read_reg(arch_regs_map[BackdoorArgs::Arg2])?;
+                    emu.qemu().read_reg(arch_regs_map[BackdoorArgs::Arg1])?;
+                let max_input_size: GuestReg = emu.qemu().read_reg(arch_regs_map[BackdoorArgs::Arg2])?;
 
                 SyncBackdoor {
                     command: Command::StartCommand(StartCommand::new(EmulatorMemoryChunk::phys(
                         input_phys_addr,
                         max_input_size,
-                        Some(emu.current_cpu().unwrap().clone()),
+                        Some(emu.qemu().current_cpu().unwrap().clone()),
                     ))),
                     arch_regs_map,
                 }
             }
             NativeBackdoorCommand::StartVirt => {
                 let input_virt_addr: GuestVirtAddr =
-                    emu.read_reg(arch_regs_map[BackdoorArgs::Arg1])?;
-                let max_input_size: GuestReg = emu.read_reg(arch_regs_map[BackdoorArgs::Arg2])?;
+                    emu.qemu().read_reg(arch_regs_map[BackdoorArgs::Arg1])?;
+                let max_input_size: GuestReg = emu.qemu().read_reg(arch_regs_map[BackdoorArgs::Arg2])?;
 
                 SyncBackdoor {
                     command: Command::StartCommand(StartCommand::new(EmulatorMemoryChunk::virt(
                         input_virt_addr,
                         max_input_size,
-                        emu.current_cpu().unwrap().clone(),
+                        emu.qemu().current_cpu().unwrap().clone(),
                     ))),
                     arch_regs_map,
                 }
             }
             NativeBackdoorCommand::Version => {
-                let client_version = emu.read_reg(arch_regs_map[BackdoorArgs::Arg1])?;
+                let client_version = emu.qemu().read_reg(arch_regs_map[BackdoorArgs::Arg1])?;
 
                 SyncBackdoor {
                     command: Command::VersionCommand(VersionCommand::new(client_version)),
@@ -185,8 +185,8 @@ where
                 }
             }
             NativeBackdoorCommand::VaddrFilterAllowRange => {
-                let vaddr_start: GuestAddr = emu.read_reg(arch_regs_map[BackdoorArgs::Arg1])?;
-                let vaddr_end: GuestAddr = emu.read_reg(arch_regs_map[BackdoorArgs::Arg2])?;
+                let vaddr_start: GuestAddr = emu.qemu().read_reg(arch_regs_map[BackdoorArgs::Arg1])?;
+                let vaddr_end: GuestAddr = emu.qemu().read_reg(arch_regs_map[BackdoorArgs::Arg2])?;
 
                 SyncBackdoor {
                     command: Command::AddressRangeFilterCommand(FilterCommand::new(
