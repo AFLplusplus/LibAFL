@@ -89,6 +89,7 @@ where
 {
     type Error = SyncBackdoorError;
 
+    #[allow(clippy::too_many_lines)]
     fn try_from(emu: &Emulator<QT, S, E>) -> Result<Self, Self::Error> {
         let arch_regs_map: &'static EnumMap<BackdoorArgs, Regs> = get_backdoor_arch_regs();
         let cmd_id: GuestReg = emu

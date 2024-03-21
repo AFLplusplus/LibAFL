@@ -15,7 +15,7 @@ use libafl_qemu_sys::{
 
 use crate::{
     emu::{libafl_page_from_addr, IsSnapshotManager},
-    Emulator, IsEmuExitHandler, MemAccessInfo, Qemu, QemuExitReason, QemuExitReasonError,
+    Emulator, EmuExitHandler, MemAccessInfo, Qemu, QemuExitReason, QemuExitReasonError,
     QemuHelperTuple, SnapshotId, SnapshotManagerError, CPU,
 };
 
