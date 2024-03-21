@@ -1,6 +1,6 @@
 const DEFAULT_INPUT_BUFFER_SIZE: u32 = 1024 * 1024;
 const DEFAULT_TIMEOUT_SECS: u8 = 2;
-const DEFAULT_TIMEOUT_MICROS_SECS: u32 = 0;
+const DEFAULT_TIMEOUT_MICRO_SECS: u32 = 0;
 
 #[derive(Debug, Clone, Copy)]
 pub struct NyxSettings {
@@ -30,7 +30,7 @@ impl NyxSettings {
             parallel_mode,
             input_buffer_size: DEFAULT_INPUT_BUFFER_SIZE,
             timeout_secs: DEFAULT_TIMEOUT_SECS,
-            timeout_micro_secs: DEFAULT_TIMEOUT_MICROS_SECS,
+            timeout_micro_secs: DEFAULT_TIMEOUT_MICRO_SECS,
         }
     }
 }
