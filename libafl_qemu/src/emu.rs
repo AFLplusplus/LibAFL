@@ -110,7 +110,7 @@ pub struct SnapshotId {
     id: u64,
 }
 
-pub trait IsSnapshotManager: Debug + Clone {
+pub trait SnapshotManager: Debug + Clone {
     fn save(&mut self, qemu: &Qemu) -> SnapshotId;
     fn restore(
         &mut self,
@@ -176,7 +176,7 @@ where
 #[derive(Debug, Clone)]
 pub struct StdEmuExitHandler<SM>
 where
-    SM: IsSnapshotManager + Clone,
+    SM: SnapshotManager + Clone,
 {
     snapshot_manager: RefCell<SM>,
     snapshot_id: OnceCell<SnapshotId>,
@@ -185,7 +185,7 @@ where
 
 impl<SM> StdEmuExitHandler<SM>
 where
-    SM: IsSnapshotManager,
+    SM: SnapshotManager,
 {
     pub fn new(snapshot_manager: SM) -> Self {
         Self {
@@ -223,7 +223,7 @@ where
 // TODO: replace handlers with generics to permit compile-time customization of handlers
 impl<SM, QT, S> IsEmuExitHandler<QT, S> for StdEmuExitHandler<SM>
 where
-    SM: IsSnapshotManager,
+    SM: SnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
 {
