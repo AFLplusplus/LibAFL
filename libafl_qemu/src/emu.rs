@@ -1465,7 +1465,7 @@ where
     ///
     /// Should, in general, be safe to call.
     /// Of course, the emulated target is not contained securely and can corrupt state or interact with the operating system.
-    pub unsafe fn run(&self) -> Result<EmuExitReason, EmuExitReasonError> {
+    unsafe fn run_qemu(&self) -> Result<EmuExitReason, EmuExitReasonError> {
         match self.qemu.run() {
             Ok(qemu_exit_reason) => Ok(match qemu_exit_reason {
                 QemuExitReason::End(qemu_shutdown_cause) => EmuExitReason::End(qemu_shutdown_cause),
@@ -1496,7 +1496,7 @@ where
     /// # Safety
     /// Should, in general, be safe to call.
     /// Of course, the emulated target is not contained securely and can corrupt state or interact with the operating system.
-    pub unsafe fn run_handle(
+    pub unsafe fn run(
         &self,
         input: &BytesInput,
         qemu_executor_state: &mut QemuExecutorState<QT, S>,
@@ -1506,7 +1506,7 @@ where
             E::try_put_input(self, qemu_executor_state, input);
 
             // Run QEMU
-            let exit_reason = self.run();
+            let exit_reason = self.run_qemu();
 
             // Handle QEMU exit
             let handler_res = E::handle(self, exit_reason, qemu_executor_state, input)?;
@@ -1774,12 +1774,6 @@ pub mod pybind {
 
         fn remove_breakpoint(&self, addr: GuestAddr) {
             self.qemu.remove_breakpoint(addr);
-        }
-
-        fn run(&self) {
-            unsafe {
-                self.qemu.run().unwrap();
-            }
         }
 
         fn g2h(&self, addr: GuestAddr) -> u64 {

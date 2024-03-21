@@ -125,7 +125,7 @@ pub fn fuzz() {
         // The wrapped harness function, calling out to the LLVM-style harness
         let mut harness =
             |input: &BytesInput, qemu_executor_state: &mut QemuExecutorState<_, _>| unsafe {
-                match emu.run_handle(input, qemu_executor_state) {
+                match emu.run(input, qemu_executor_state) {
                     Ok(handler_result) => match handler_result {
                         HandlerResult::UnhandledExit(unhandled_exit) => {
                             panic!("Unhandled exit: {}", unhandled_exit)
