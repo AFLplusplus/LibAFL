@@ -18,6 +18,7 @@ use libafl_bolts::shmem::UnixShMemProvider;
 #[cfg(windows)]
 use libafl_bolts::shmem::Win32ShMemProvider;
 use libafl_bolts::{
+    ownedref::OwnedMutPtr,
     rands::{RandomSeed, StdRand},
     shmem::ShMemProvider,
     tuples::tuple_list,
@@ -39,7 +40,8 @@ fn main() {
     // use file to pass testcases
     // let args = vec!["test.exe".to_string(), "-f".to_string(), "@@".to_string()];
 
-    let observer = unsafe { ListObserver::new("cov", &mut COVERAGE) };
+    let coverage = unsafe { OwnedMutPtr::Ptr(core::ptr::addr_of_mut!(COVERAGE)) };
+    let observer = ListObserver::new("cov", coverage);
     let mut feedback = ListFeedback::new(&observer);
     #[cfg(windows)]
     let mut shmem_provider = Win32ShMemProvider::new().unwrap();
