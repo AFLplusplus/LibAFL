@@ -3,20 +3,22 @@
 use core::{fmt::Debug, marker::PhantomData};
 
 use crate::{
-    corpus::{Corpus, CorpusId},
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
     mutators::Mutator,
     schedulers::{testcase_score::CorpusPowerTestcaseScore, TestcaseScore},
-    stages::{mutational::MutatedTransform, MutationalStage, Stage},
-    state::{HasCorpus, HasMetadata, HasRand, UsesState},
+    stages::{mutational::MutatedTransform, ExecutionCountRestartHelper, MutationalStage, Stage},
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasMetadata, HasRand, UsesState},
     Error,
 };
 
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
 pub struct PowerMutationalStage<E, F, EM, I, M, Z> {
+    /// The mutators we use
     mutator: M,
+    /// Helper for restarts
+    restart_helper: ExecutionCountRestartHelper,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, F, EM, I, Z)>,
 }
@@ -34,7 +36,7 @@ where
     EM: UsesState<State = E::State>,
     F: TestcaseScore<E::State>,
     M: Mutator<I, E::State>,
-    E::State: HasCorpus + HasMetadata + HasRand,
+    E::State: HasCorpus + HasMetadata + HasRand + HasExecutions,
     Z: Evaluator<E, EM, State = E::State>,
     I: MutatedTransform<E::Input, E::State> + Clone,
 {
@@ -52,12 +54,16 @@ where
 
     /// Gets the number of iterations as a random number
     #[allow(clippy::cast_sign_loss)]
-    fn iterations(&self, state: &mut E::State, corpus_idx: CorpusId) -> Result<u64, Error> {
+    fn iterations(&self, state: &mut E::State) -> Result<u64, Error> {
         // Update handicap
-        let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
-        let score = F::compute(state, &mut *testcase)? as u64;
+        let mut testcase = state.current_testcase_mut()?;
+        let score = F::compute(state, &mut testcase)? as u64;
 
         Ok(score)
+    }
+
+    fn execs_since_progress_start(&mut self, state: &mut <Z>::State) -> Result<u64, Error> {
+        self.restart_helper.execs_since_progress_start(state)
     }
 }
 
@@ -67,12 +73,10 @@ where
     EM: UsesState<State = E::State>,
     F: TestcaseScore<E::State>,
     M: Mutator<I, E::State>,
-    E::State: HasCorpus + HasMetadata + HasRand,
+    E::State: HasCorpus + HasMetadata + HasRand + HasExecutions,
     Z: Evaluator<E, EM, State = E::State>,
     I: MutatedTransform<E::Input, E::State> + Clone,
 {
-    type Progress = (); // TODO should we resume this stage?
-
     #[inline]
     #[allow(clippy::let_and_return)]
     fn perform(
@@ -84,6 +88,14 @@ where
     ) -> Result<(), Error> {
         let ret = self.perform_mutational(fuzzer, executor, state, manager);
         ret
+    }
+
+    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        self.restart_helper.restart_progress_should_run(state)
+    }
+
+    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        self.restart_helper.clear_restart_progress(state)
     }
 }
 
@@ -116,6 +128,7 @@ where
         Self {
             mutator,
             phantom: PhantomData,
+            restart_helper: ExecutionCountRestartHelper::default(),
         }
     }
 }

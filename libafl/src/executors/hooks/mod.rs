@@ -1,7 +1,7 @@
 //! Hooks for the executors.
 //! These will be executed right before and after the executor's harness run.
 
-use crate::executors::HasObservers;
+use crate::{executors::HasObservers, inputs::UsesInput};
 
 /// windows crash/timeout handler and asan death callback
 #[cfg(windows)]
@@ -23,80 +23,58 @@ pub mod inprocess;
 pub mod timer;
 
 /// The hook that runs before and after the executor runs the target
-pub trait ExecutorHook {
+pub trait ExecutorHook<S>
+where
+    S: UsesInput,
+{
     /// Init this hook
-    fn init<E: HasObservers, S>(&mut self, state: &mut S);
+    fn init<E: HasObservers>(&mut self, state: &mut S);
     /// The hook that runs before runs the target
-    fn pre_exec<EM, I, S, Z>(&mut self, fuzzer: &mut Z, state: &mut S, mgr: &mut EM, input: &I);
+    fn pre_exec(&mut self, state: &mut S, input: &S::Input);
     /// The hook that runs before runs the target
-    fn post_exec<EM, I, S, Z>(&mut self, fuzzer: &mut Z, state: &mut S, mgr: &mut EM, input: &I);
+    fn post_exec(&mut self, state: &mut S, input: &S::Input);
 }
 
 /// The hook that runs before and after the executor runs the target
-pub trait ExecutorHooksTuple {
-    /// Init these hooks
-    fn init_all<E: HasObservers, S>(&mut self, state: &mut S);
-    /// The hooks that runs before runs the target
-    fn pre_exec_all<EM, I, S, Z>(&mut self, fuzzer: &mut Z, state: &mut S, mgr: &mut EM, input: &I);
-    /// The hooks that runs after runs the target
-    fn post_exec_all<EM, I, S, Z>(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
-        input: &I,
-    );
-}
-
-impl ExecutorHooksTuple for () {
-    fn init_all<E, S>(&mut self, _state: &mut S) {}
-    fn pre_exec_all<EM, I, S, Z>(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
-        _input: &I,
-    ) {
-    }
-    fn post_exec_all<EM, I, S, Z>(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
-        _input: &I,
-    ) {
-    }
-}
-
-impl<Head, Tail> ExecutorHooksTuple for (Head, Tail)
+pub trait ExecutorHooksTuple<S>
 where
-    Head: ExecutorHook,
-    Tail: ExecutorHooksTuple,
+    S: UsesInput,
 {
-    fn init_all<E: HasObservers, S>(&mut self, state: &mut S) {
-        self.0.init::<E, S>(state);
-        self.1.init_all::<E, S>(state);
+    /// Init these hooks
+    fn init_all<E: HasObservers>(&mut self, state: &mut S);
+    /// The hooks that runs before runs the target
+    fn pre_exec_all(&mut self, state: &mut S, input: &S::Input);
+    /// The hooks that runs after runs the target
+    fn post_exec_all(&mut self, state: &mut S, input: &S::Input);
+}
+
+impl<S> ExecutorHooksTuple<S> for ()
+where
+    S: UsesInput,
+{
+    fn init_all<E: HasObservers>(&mut self, _state: &mut S) {}
+    fn pre_exec_all(&mut self, _state: &mut S, _input: &S::Input) {}
+    fn post_exec_all(&mut self, _state: &mut S, _input: &S::Input) {}
+}
+
+impl<Head, Tail, S> ExecutorHooksTuple<S> for (Head, Tail)
+where
+    S: UsesInput,
+    Head: ExecutorHook<S>,
+    Tail: ExecutorHooksTuple<S>,
+{
+    fn init_all<E: HasObservers>(&mut self, state: &mut S) {
+        self.0.init::<E>(state);
+        self.1.init_all::<E>(state);
     }
 
-    fn pre_exec_all<EM, I, S, Z>(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
-        input: &I,
-    ) {
-        self.0.pre_exec(fuzzer, state, mgr, input);
-        self.1.pre_exec_all(fuzzer, state, mgr, input);
+    fn pre_exec_all(&mut self, state: &mut S, input: &S::Input) {
+        self.0.pre_exec(state, input);
+        self.1.pre_exec_all(state, input);
     }
 
-    fn post_exec_all<EM, I, S, Z>(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
-        input: &I,
-    ) {
-        self.0.post_exec(fuzzer, state, mgr, input);
-        self.1.post_exec_all(fuzzer, state, mgr, input);
+    fn post_exec_all(&mut self, state: &mut S, input: &S::Input) {
+        self.0.post_exec(state, input);
+        self.1.post_exec_all(state, input);
     }
 }

@@ -52,8 +52,6 @@ where
     Z: UsesState,
     Z::State: HasCorpus + HasSolutions + HasRand + HasMetadata,
 {
-    type Progress = (); // if this fails, we have bigger problems
-
     #[inline]
     fn perform(
         &mut self,
@@ -115,6 +113,18 @@ where
 
         Ok(())
     }
+
+    #[inline]
+    fn restart_progress_should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+        // Not executing the target, so restart safety is not needed
+        Ok(true)
+    }
+
+    #[inline]
+    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        // Not executing the target, so restart safety is not needed
+        Ok(())
+    }
 }
 
 impl<CB, EM, Z> DumpToDiskStage<CB, EM, Z>
@@ -132,13 +142,19 @@ where
         let corpus_dir = corpus_dir.into();
         if let Err(e) = fs::create_dir(&corpus_dir) {
             if !corpus_dir.is_dir() {
-                return Err(Error::file(e));
+                return Err(Error::os_error(
+                    e,
+                    format!("Error creating directory {corpus_dir:?}"),
+                ));
             }
         }
         let solutions_dir = solutions_dir.into();
         if let Err(e) = fs::create_dir(&solutions_dir) {
             if !corpus_dir.is_dir() {
-                return Err(Error::file(e));
+                return Err(Error::os_error(
+                    e,
+                    format!("Error creating directory {solutions_dir:?}"),
+                ));
             }
         }
         Ok(Self {

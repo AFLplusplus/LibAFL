@@ -232,12 +232,7 @@ where
         S: HasMetadata,
     {
         #[allow(clippy::option_if_let_else)] // we can't mutate state in a closure
-        let meta = if let Some(meta) = state.metadata_map_mut().get_mut::<M>() {
-            meta
-        } else {
-            state.add_metadata(M::new_metadata());
-            state.metadata_map_mut().get_mut::<M>().unwrap()
-        };
+        let meta = state.metadata_or_insert_with(|| M::new_metadata());
 
         let usable_count = self.usable_count();
         let cmp_observer_data = self.cmp_observer_data();
@@ -468,10 +463,10 @@ struct cmp_map {
     allow(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
 pub struct AFLppCmpValuesMetadata {
-    /// The first map of AFLppCmpLogVals retrieved by running the un-mutated input
+    /// The first map of `AFLppCmpLogVals` retrieved by running the un-mutated input
     #[serde(skip)]
     pub orig_cmpvals: HashMap<usize, Vec<CmpValues>>,
-    /// The second map of AFLppCmpLogVals retrieved by runnning the mutated input
+    /// The second map of `AFLppCmpLogVals` retrieved by runnning the mutated input
     #[serde(skip)]
     pub new_cmpvals: HashMap<usize, Vec<CmpValues>>,
     /// The list of logged idx and headers retrieved by runnning the mutated input

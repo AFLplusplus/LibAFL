@@ -92,8 +92,8 @@ where
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         state.add_named_metadata(
-            NewHashFeedbackMetadata::with_capacity(self.capacity),
             &self.name,
+            NewHashFeedbackMetadata::with_capacity(self.capacity),
         );
         Ok(())
     }

@@ -93,19 +93,12 @@ where
 
     /// New default implementation for mutate.
     /// Implementations must forward `mutate()` to this method
-    fn scheduled_mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn scheduled_mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let mut r = MutationResult::Skipped;
         let num = self.iterations(state, input);
         for _ in 0..num {
             let idx = self.schedule(state, input);
-            let outcome = self
-                .mutations_mut()
-                .get_and_mutate(idx, state, input, stage_idx)?;
+            let outcome = self.mutations_mut().get_and_mutate(idx, state, input)?;
             if outcome == MutationResult::Mutated {
                 r = MutationResult::Mutated;
             }
@@ -135,7 +128,7 @@ where
         write!(
             f,
             "StdScheduledMutator with {} mutations for Input type {}",
-            MT::LEN,
+            self.mutations.len(),
             core::any::type_name::<I>()
         )
     }
@@ -157,13 +150,8 @@ where
     S: HasRand,
 {
     #[inline]
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
-        self.scheduled_mutate(state, input, stage_idx)
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        self.scheduled_mutate(state, input)
     }
 }
 
@@ -197,8 +185,8 @@ where
 
     /// Get the next mutation to apply
     fn schedule(&self, state: &mut S, _: &I) -> MutationId {
-        debug_assert!(MT::LEN != 0);
-        state.rand_mut().below(MT::LEN as u64).into()
+        debug_assert!(self.mutations.len() != 0);
+        state.rand_mut().below(self.mutations.len() as u64).into()
     }
 }
 
@@ -391,21 +379,11 @@ where
     S: HasRand + HasCorpus,
     SM: ScheduledMutator<I, MT, S>,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
-        self.scheduled_mutate(state, input, stage_idx)
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        self.scheduled_mutate(state, input)
     }
 
-    fn post_exec(
-        &mut self,
-        state: &mut S,
-        _stage_idx: i32,
-        corpus_idx: Option<CorpusId>,
-    ) -> Result<(), Error> {
+    fn post_exec(&mut self, state: &mut S, corpus_idx: Option<CorpusId>) -> Result<(), Error> {
         if let Some(idx) = corpus_idx {
             let mut testcase = (*state.corpus_mut().get(idx)?).borrow_mut();
             let mut log = Vec::<String>::new();
@@ -456,21 +434,14 @@ where
         state.rand_mut().below(MT::LEN as u64).into()
     }
 
-    fn scheduled_mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn scheduled_mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let mut r = MutationResult::Skipped;
         let num = self.iterations(state, input);
         self.mutation_log.clear();
         for _ in 0..num {
             let idx = self.schedule(state, input);
             self.mutation_log.push(idx);
-            let outcome = self
-                .mutations_mut()
-                .get_and_mutate(idx, state, input, stage_idx)?;
+            let outcome = self.mutations_mut().get_and_mutate(idx, state, input)?;
             if outcome == MutationResult::Mutated {
                 r = MutationResult::Mutated;
             }
@@ -542,7 +513,7 @@ mod tests {
         rand.set_seed(5);
 
         let mut splice = SpliceMutator::new();
-        splice.mutate(&mut state, &mut input, 0).unwrap();
+        splice.mutate(&mut state, &mut input).unwrap();
 
         log::trace!("{:?}", input.bytes());
 
@@ -584,8 +555,8 @@ mod tests {
 
         let mut equal_in_a_row = 0;
 
-        for i in 0..42 {
-            havoc.mutate(&mut state, &mut input, i).unwrap();
+        for _ in 0..42 {
+            havoc.mutate(&mut state, &mut input).unwrap();
 
             // Make sure we actually mutate something, at least sometimes
             equal_in_a_row = if input == input_prior {
@@ -601,7 +572,7 @@ mod tests {
 /// `SchedulerMutator` Python bindings
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
-#[allow(clippy::unnecessary_fallible_conversions)]
+#[allow(clippy::unnecessary_fallible_conversions, unused_qualifications)]
 pub mod pybind {
     use pyo3::prelude::*;
 

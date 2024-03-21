@@ -1,5 +1,5 @@
 [package]
-name = "libfuzzer_reachability"
+name = "fuzzbench_ctx"
 version = "0.11.2"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 edition = "2021"
@@ -7,12 +7,18 @@ edition = "2021"
 [features]
 default = ["std"]
 std = []
+no_link_main = ["libafl_targets/libfuzzer_no_link_main"]
 
 [profile.release]
 lto = true
 codegen-units = 1
 opt-level = 3
 debug = true
+
+[profile.release-fuzzbench]
+inherits = "release"
+debug = false
+strip = true
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
@@ -21,11 +27,13 @@ which = "4.4"
 [dependencies]
 libafl = { path = "../../libafl/" }
 libafl_bolts = { path = "../../libafl_bolts/" }
-libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_hitcounts", "libfuzzer"] }
+libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_hitcounts", "sancov_cmplog", "libfuzzer", "sancov_ctx"] }
 # TODO Include it only when building cc
 libafl_cc = { path = "../../libafl_cc/" }
+clap = { version = "4.0", features = ["default"] }
+nix = { version = "0.27", features = ["fs"] }
 mimalloc = { version = "*", default-features = false }
 
 [lib]
-name = "libfuzzer_libpng"
+name = "fuzzbench"
 crate-type = ["staticlib"]

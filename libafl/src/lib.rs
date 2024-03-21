@@ -27,7 +27,9 @@ Welcome to `LibAFL`
     clippy::missing_docs_in_private_items,
     clippy::module_name_repetitions,
     clippy::ptr_cast_constness,
-    clippy::unsafe_derive_deserialize
+    clippy::unsafe_derive_deserialize,
+    clippy::similar_names,
+    clippy::too_many_lines
 )]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
@@ -134,8 +136,12 @@ pub unsafe extern "C" fn external_current_millis() -> u64 {
 #[cfg(test)]
 mod tests {
 
+    #[cfg(miri)]
+    use libafl_bolts::serdeany::RegistryBuilder;
     use libafl_bolts::{rands::StdRand, tuples::tuple_list};
 
+    #[cfg(miri)]
+    use crate::stages::ExecutionCountRestartHelperMetadata;
     use crate::{
         corpus::{Corpus, InMemoryCorpus, Testcase},
         events::NopEventManager,
@@ -154,6 +160,13 @@ mod tests {
     #[test]
     #[allow(clippy::similar_names)]
     fn test_fuzzer() {
+        // # Safety
+        // No concurrency per testcase
+        #[cfg(miri)]
+        unsafe {
+            RegistryBuilder::register::<ExecutionCountRestartHelperMetadata>();
+        }
+
         let rand = StdRand::with_seed(0);
 
         let mut corpus = InMemoryCorpus::<BytesInput>::new();

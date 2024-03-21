@@ -1,21 +1,22 @@
 //! The struct `TimerStruct` will absorb all the difference in timeout implementation in various system.
-use core::time::Duration;
 #[cfg(any(windows, target_os = "linux"))]
-use core::{
-    ffi::c_void,
-    ptr::{addr_of_mut, write_volatile},
-};
+use core::ptr::addr_of_mut;
+use core::time::Duration;
 #[cfg(target_os = "linux")]
 use core::{
     mem::zeroed,
-    ptr::{self, addr_of, null_mut},
+    ptr::{addr_of, null_mut},
 };
 
 #[cfg(all(unix, not(target_os = "linux")))]
 pub(crate) const ITIMER_REAL: core::ffi::c_int = 0;
 
 #[cfg(windows)]
-use core::sync::atomic::{compiler_fence, Ordering};
+use core::{
+    ffi::c_void,
+    ptr::write_volatile,
+    sync::atomic::{compiler_fence, Ordering},
+};
 
 #[cfg(target_os = "linux")]
 use libafl_bolts::current_time;
@@ -29,7 +30,7 @@ use windows::Win32::{
     },
 };
 
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(windows)]
 use crate::executors::hooks::inprocess::GLOBAL_STATE;
 
 #[repr(C)]
@@ -296,12 +297,6 @@ impl TimerStruct {
     pub fn set_timer(&mut self) {
         unsafe {
             if self.batch_mode {
-                let data = addr_of_mut!(GLOBAL_STATE);
-                write_volatile(
-                    addr_of_mut!((*data).executor_ptr),
-                    ptr::from_mut(self) as *mut c_void,
-                );
-
                 if self.executions == 0 {
                     libc::timer_settime(self.timerid, 0, addr_of_mut!(self.itimerspec), null_mut());
                     self.tmout_start_time = current_time();

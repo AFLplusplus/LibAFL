@@ -9,9 +9,9 @@ use libafl_bolts::rands::Rand;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, CorpusId, HasTestcase},
+    corpus::{Corpus, CorpusId, HasTestcase, Testcase},
     inputs::UsesInput,
-    schedulers::{Scheduler, TestcaseScore},
+    schedulers::{RemovableScheduler, Scheduler, TestcaseScore},
     state::{HasCorpus, HasMetadata, HasRand, State, UsesState},
     Error,
 };
@@ -74,20 +74,57 @@ where
     #[allow(clippy::cast_precision_loss)]
     #[allow(clippy::unused_self)]
     pub fn store_probability(&self, state: &mut S, idx: CorpusId) -> Result<(), Error> {
-        let factor = F::compute(state, &mut *state.corpus().get(idx)?.borrow_mut())?;
-        if factor == 0.0 {
-            return Err(Error::illegal_state(
-                "Infinity probability calculated for probabilistic sampling scheduler",
-            ));
-        }
+        let prob = F::compute(state, &mut *state.corpus().get(idx)?.borrow_mut())?;
+        debug_assert!(
+            prob >= 0.0 && prob.is_finite(),
+            "scheduler probability is {prob}; to work correctly it must be >= 0.0 and finite"
+        );
         let meta = state
             .metadata_map_mut()
             .get_mut::<ProbabilityMetadata>()
             .unwrap();
-        let prob = 1.0 / factor;
         meta.map.insert(idx, prob);
         meta.total_probability += prob;
         Ok(())
+    }
+}
+
+impl<F, S> RemovableScheduler for ProbabilitySamplingScheduler<F, S>
+where
+    F: TestcaseScore<S>,
+    S: HasCorpus + HasMetadata + HasRand + HasTestcase + State,
+{
+    fn on_remove(
+        &mut self,
+        state: &mut Self::State,
+        idx: CorpusId,
+        _testcase: &Option<Testcase<<Self::State as UsesInput>::Input>>,
+    ) -> Result<(), Error> {
+        let meta = state
+            .metadata_map_mut()
+            .get_mut::<ProbabilityMetadata>()
+            .unwrap();
+        if let Some(prob) = meta.map.remove(&idx) {
+            meta.total_probability -= prob;
+        }
+        Ok(())
+    }
+
+    fn on_replace(
+        &mut self,
+        state: &mut Self::State,
+        idx: CorpusId,
+        _prev: &Testcase<<Self::State as UsesInput>::Input>,
+    ) -> Result<(), Error> {
+        let meta = state
+            .metadata_map_mut()
+            .get_mut::<ProbabilityMetadata>()
+            .unwrap();
+        if let Some(prob) = meta.map.remove(&idx) {
+            meta.total_probability -= prob;
+        }
+
+        self.store_probability(state, idx)
     }
 }
 
@@ -121,7 +158,9 @@ where
     #[allow(clippy::cast_precision_loss)]
     fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
-            Err(Error::empty(String::from("No entries in corpus")))
+            Err(Error::empty(String::from(
+                "No entries in corpus. This often implies the target is not properly instrumented.",
+            )))
         } else {
             let rand_prob: f64 = (state.rand_mut().below(100) as f64) / 100.0;
             let meta = state.metadata_map().get::<ProbabilityMetadata>().unwrap();
@@ -191,6 +230,8 @@ mod tests {
 
     #[test]
     fn test_prob_sampling() {
+        // # Safety
+        // No concurrency per testcase
         #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
         unsafe {
             super::ProbabilityMetadata::register();

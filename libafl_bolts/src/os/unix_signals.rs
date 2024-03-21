@@ -174,11 +174,11 @@ pub struct arm_neon_state64 {
 #[repr(C)]
 #[allow(clippy::pub_underscore_fields)]
 pub struct mcontext64 {
-    /// _STRUCT_ARM_EXCEPTION_STATE64
+    /// `_STRUCT_ARM_EXCEPTION_STATE64`
     pub __es: arm_exception_state64,
-    /// _STRUCT_ARM_THREAD_STATE64
+    /// `_STRUCT_ARM_THREAD_STATE64`
     pub __ss: arm_thread_state64,
-    /// _STRUCT_ARM_NEON_STATE64
+    /// `_STRUCT_ARM_NEON_STATE64`
     pub __ns: arm_neon_state64,
 }
 
@@ -189,7 +189,7 @@ pub struct mcontext64 {
 /// __darwin_size_t ss_size;        /* signal stack length */
 /// int             ss_flags;       /* SA_DISABLE and/or SA_ONSTACK */
 /// };
-/// ````
+/// ```
 #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
 #[derive(Debug)]
 #[allow(non_camel_case_types)]
@@ -199,7 +199,7 @@ pub struct sigaltstack {
     pub ss_sp: *mut c_void,
     /// signal stack length
     pub ss_size: libc::size_t,
-    /// SA_DISABLE and/or SA_ONSTACK
+    /// `SA_DISABLE` and/or `SA_ONSTACK`
     pub ss_flags: c_int,
 }
 

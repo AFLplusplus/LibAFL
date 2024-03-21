@@ -1211,9 +1211,9 @@ impl ClientPerfMonitor {
 }
 
 #[cfg(feature = "introspection")]
-impl core::fmt::Display for ClientPerfMonitor {
+impl fmt::Display for ClientPerfMonitor {
     #[allow(clippy::cast_precision_loss)]
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         // Calculate the elapsed time from the monitor
         let elapsed: f64 = self.elapsed_cycles() as f64;
 
@@ -1291,7 +1291,7 @@ impl Default for ClientPerfMonitor {
 }
 /// `Monitor` Python bindings
 #[cfg(feature = "python")]
-#[allow(clippy::unnecessary_fallible_conversions)]
+#[allow(clippy::unnecessary_fallible_conversions, unused_qualifications)]
 #[allow(missing_docs)]
 pub mod pybind {
     use alloc::{boxed::Box, vec::Vec};

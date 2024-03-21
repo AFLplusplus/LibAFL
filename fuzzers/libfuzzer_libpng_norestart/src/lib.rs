@@ -151,8 +151,8 @@ pub extern "C" fn libafl_main() {
     );
 
     let mut run_client = |state: Option<_>,
-                          mut restarting_mgr: LlmpRestartingEventManager<_, _>,
-                          _core_id| {
+                          mut restarting_mgr: LlmpRestartingEventManager<_, _, _>,
+                          core_id| {
         // Create an observation channel using the coverage map
         let edges_observer = HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") });
 
@@ -240,7 +240,14 @@ pub extern "C" fn libafl_main() {
         // In case the corpus is empty (on first run), reset
         if state.must_load_initial_inputs() {
             state
-                .load_initial_inputs(&mut fuzzer, &mut executor, &mut restarting_mgr, &opt.input)
+                .load_initial_inputs_multicore(
+                    &mut fuzzer,
+                    &mut executor,
+                    &mut restarting_mgr,
+                    &opt.input,
+                    &core_id,
+                    &cores,
+                )
                 .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &opt.input));
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
