@@ -5,6 +5,7 @@ use libafl::{
     inputs::HasTargetBytes,
     observers::{ObserversTuple, UsesObservers},
     state::{HasExecutions, State, UsesState},
+    Error,
 };
 use libafl_bolts::AsSlice;
 use libnyx::NyxReturnValue;
@@ -49,13 +50,13 @@ where
         state: &mut Self::State,
         _mgr: &mut EM,
         input: &Self::Input,
-    ) -> Result<ExitKind, libafl::Error> {
+    ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
 
         let bytes = input.target_bytes();
         let buffer = bytes.as_slice();
         let size = u32::try_from(buffer.len())
-            .map_err(|_| libafl::Error::unsupported("Inputs larger than 4GB are not supported"))?;
+            .map_err(|_| Error::unsupported("Inputs larger than 4GB are not supported"))?;
 
         self.helper.nyx_process.set_input(buffer, size);
 
@@ -66,23 +67,21 @@ where
             NyxReturnValue::Timeout => Ok(ExitKind::Timeout),
             NyxReturnValue::InvalidWriteToPayload => {
                 self.helper.nyx_process.shutdown();
-                Err(libafl::Error::illegal_state(
+                Err(Error::illegal_state(
                     "FixMe: Nyx InvalidWriteToPayload handler is missing",
                 ))
             }
             NyxReturnValue::Error => {
                 self.helper.nyx_process.shutdown();
-                Err(libafl::Error::illegal_state(
-                    "Nyx runtime error has occurred",
-                ))
+                Err(Error::illegal_state("Nyx runtime error has occurred"))
             }
             NyxReturnValue::IoError => {
                 self.helper.nyx_process.shutdown();
-                Err(libafl::Error::unknown("QEMU-nyx died"))
+                Err(Error::unknown("QEMU-nyx died"))
             }
             NyxReturnValue::Abort => {
                 self.helper.nyx_process.shutdown();
-                Err(libafl::Error::shutting_down())
+                Err(Error::shutting_down())
             }
         }
     }

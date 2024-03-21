@@ -1,6 +1,7 @@
 /// [`NyxHelper`] is used to wrap `NyxProcess`
 use std::{fmt::Debug, path::Path};
 
+use libafl::Error;
 use libnyx::NyxProcess;
 
 use crate::settings::NyxSettings;
@@ -26,20 +27,17 @@ impl NyxHelper {
     /// Create [`NyxProcess`] and do basic settings. It will convert the
     /// instance to a parent or child using `parent_cpu_id` when
     /// `parallel_mode` is set.
-    pub fn new<P>(share_dir: P, settings: NyxSettings) -> Result<Self, libafl::Error>
+    pub fn new<P>(share_dir: P, settings: NyxSettings) -> Result<Self, Error>
     where
         P: AsRef<Path>,
     {
         let work_dir = share_dir.as_ref().join("workdir");
-        let share_dir_str = share_dir
-            .as_ref()
-            .to_str()
-            .ok_or(libafl::Error::illegal_argument(
-                "`share_dir` contains invalid UTF-8",
-            ))?;
-        let work_dir_str = work_dir.to_str().ok_or(libafl::Error::illegal_argument(
-            "`work_dir` contains invalid UTF-8",
+        let share_dir_str = share_dir.as_ref().to_str().ok_or(Error::illegal_argument(
+            "`share_dir` contains invalid UTF-8",
         ))?;
+        let work_dir_str = work_dir
+            .to_str()
+            .ok_or(Error::illegal_argument("`work_dir` contains invalid UTF-8"))?;
 
         let nyx_process_type = match (settings.parallel_mode, settings.parent_cpu_id) {
             (false, _) => NyxProcessType::ALONE,
@@ -49,7 +47,7 @@ impl NyxHelper {
             (true, Some(_)) => NyxProcessType::CHILD,
 
             (true, _) => {
-                return Err(libafl::Error::illegal_argument(
+                return Err(Error::illegal_argument(
                     "`parent_cpu_id` is required in nyx parallel mode",
                 ))
             }
@@ -76,7 +74,7 @@ impl NyxHelper {
                 /* worker_id= */ settings.cpu_id,
             ),
         })
-        .map_err(|e| libafl::Error::illegal_argument(e))?;
+        .map_err(|e| Error::illegal_argument(e))?;
 
         nyx_process.option_set_reload_mode(settings.snap_mode);
         nyx_process.option_set_timeout(settings.timeout_secs, settings.timeout_micro_secs);
