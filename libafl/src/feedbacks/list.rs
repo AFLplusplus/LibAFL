@@ -2,7 +2,7 @@ use alloc::string::{String, ToString};
 use core::{fmt::Debug, hash::Hash, marker::PhantomData};
 
 use hashbrown::HashSet;
-use libafl_bolts::{Error, Named};
+use libafl_bolts::{Error, HasRefCnt, Named};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
@@ -12,9 +12,6 @@ use crate::{
     observers::{ListObserver, ObserversTuple},
     state::{HasNamedMetadata, State},
 };
-
-/// The prefix for list metadata's name
-pub const LISTFEEDBACK_PREFIX: &str = "listfeedback_metadata_";
 
 /// The metadata to remember past observed value
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
@@ -29,6 +26,8 @@ where
 {
     /// Contains the information of past observed set of values.
     pub set: HashSet<T>,
+    /// A refcount used to know when we can remove this metadata
+    pub tcref: isize,
 }
 
 impl<T> ListFeedbackMetadata<T>
@@ -40,6 +39,7 @@ where
     pub fn new() -> Self {
         Self {
             set: HashSet::<T>::new(),
+            tcref: 0,
         }
     }
 
@@ -47,6 +47,19 @@ where
     pub fn reset(&mut self) -> Result<(), Error> {
         self.set.clear();
         Ok(())
+    }
+}
+
+impl<T> HasRefCnt for ListFeedbackMetadata<T> 
+where
+    T: Default + Copy + 'static + Serialize + Eq + Hash,
+{
+    fn refcnt(&self) -> isize {
+        self.tcref
+    }
+
+    fn refcnt_mut(&mut self) -> &mut isize {
+        &mut self.tcref
     }
 }
 
@@ -150,7 +163,7 @@ where
     #[must_use]
     pub fn new(observer: &ListObserver<T>) -> Self {
         Self {
-            name: LISTFEEDBACK_PREFIX.to_string() + observer.name(),
+            name: observer.name().to_string(),
             observer_name: observer.name().to_string(),
             novelty: HashSet::<T>::new(),
             phantom: PhantomData,

@@ -3,7 +3,7 @@ use std::ffi::c_int;
 use libafl::{
     events::{ProgressReporter, SimpleEventManager},
     executors::HasObservers,
-    feedbacks::{MapFeedbackMetadata, MAPFEEDBACK_PREFIX},
+    feedbacks::MapFeedbackMetadata,
     inputs::UsesInput,
     monitors::SimpleMonitor,
     stages::{HasCurrentStage, StagesTuple},
@@ -35,7 +35,7 @@ where
     ST: StagesTuple<E, EM, S, F>,
 {
     let meta = state
-        .named_metadata::<MapFeedbackMetadata<u8>>(&(MAPFEEDBACK_PREFIX.to_string() + "edges"))
+        .named_metadata::<MapFeedbackMetadata<u8>>("edges")
         .unwrap();
     let observed = meta.history_map.iter().filter(|&&e| e != 0).count();
     let total = meta.history_map.len();

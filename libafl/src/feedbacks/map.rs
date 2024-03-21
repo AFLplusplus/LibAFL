@@ -28,9 +28,6 @@ use crate::{
     Error,
 };
 
-/// The prefix of the metadata names
-pub const MAPFEEDBACK_PREFIX: &str = "mapfeedback_metadata_";
-
 /// A [`MapFeedback`] that implements the AFL algorithm using an [`OrReducer`] combining the bits for the history map and the bit from ``HitcountsMapObserver``.
 pub type AflMapFeedback<O, S, T> = MapFeedback<DifferentIsNovel, O, OrReducer, S, T>;
 
@@ -700,7 +697,7 @@ where
         Self {
             indexes: false,
             novelties: None,
-            name: MAPFEEDBACK_PREFIX.to_string() + map_observer.name(),
+            name: map_observer.name().to_string(),
             observer_name: map_observer.name().to_string(),
             stats_name: create_stats_name(map_observer.name()),
             phantom: PhantomData,
@@ -713,7 +710,7 @@ where
         Self {
             indexes: track_indexes,
             novelties: if track_novelties { Some(vec![]) } else { None },
-            name: MAPFEEDBACK_PREFIX.to_string() + map_observer.name(),
+            name: map_observer.name().to_string(),
             observer_name: map_observer.name().to_string(),
             stats_name: create_stats_name(map_observer.name()),
             phantom: PhantomData,
