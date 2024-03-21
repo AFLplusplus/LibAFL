@@ -74,7 +74,7 @@ impl NyxHelper {
                 /* worker_id= */ settings.cpu_id,
             ),
         })
-        .map_err(|e| Error::illegal_argument(e))?;
+        .map_err(Error::illegal_argument)?;
 
         nyx_process.option_set_reload_mode(settings.snap_mode);
         nyx_process.option_set_timeout(settings.timeout_secs, settings.timeout_micro_secs);
