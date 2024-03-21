@@ -13,11 +13,10 @@ use num_enum::TryFromPrimitive;
 
 #[cfg(emulation_mode = "systemmode")]
 use crate::QemuInstrumentationPagingFilter;
-use crate::{
-    executor::QemuExecutorState, sync_backdoor::SyncBackdoorError, EmuExitHandler, Emulator,
-    GuestAddrKind, GuestReg, HandlerError, HasInstrumentationFilter, InnerHandlerResult, IsFilter,
-    Qemu, QemuHelperTuple, QemuInstrumentationAddressRangeFilter, Regs, SnapshotManager,
-    StdEmuExitHandler, StdInstrumentationFilter, CPU,
+    executor::QemuExecutorState, sync_backdoor::SyncBackdoorError, Emulator, GuestAddrKind,
+    GuestReg, HandlerError, HasInstrumentationFilter, InnerHandlerResult, IsEmuExitHandler,
+    IsFilter, IsSnapshotManager, Qemu, QemuHelperTuple, QemuInstrumentationAddressRangeFilter,
+    Regs, StdEmuExitHandler, StdInstrumentationFilter, CPU,
 };
 
 pub const VERSION: u64 = bindings::LIBAFL_EXIT_VERSION_NUMBER as u64;
@@ -103,7 +102,7 @@ pub enum Command {
 // TODO: Replace with enum_dispatch implementation
 impl<SM, QT, S> IsCommand<QT, S, StdEmuExitHandler<SM>> for Command
 where
-    SM: SnapshotManager,
+    SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
 {
@@ -230,7 +229,7 @@ pub struct SaveCommand;
 
 impl<SM, QT, S> IsCommand<QT, S, StdEmuExitHandler<SM>> for SaveCommand
 where
-    SM: SnapshotManager,
+    SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
 {
@@ -283,7 +282,7 @@ pub struct LoadCommand;
 
 impl<SM, QT, S> IsCommand<QT, S, StdEmuExitHandler<SM>> for LoadCommand
 where
-    SM: SnapshotManager,
+    SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
 {
@@ -320,7 +319,7 @@ pub struct InputCommand {
 
 impl<SM, QT, S> IsCommand<QT, S, StdEmuExitHandler<SM>> for InputCommand
 where
-    SM: SnapshotManager,
+    SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
 {
@@ -354,7 +353,7 @@ pub struct StartCommand {
 
 impl<SM, QT, S> IsCommand<QT, S, StdEmuExitHandler<SM>> for StartCommand
 where
-    SM: SnapshotManager,
+    SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
 {
@@ -396,7 +395,7 @@ pub struct EndCommand(Option<ExitKind>);
 
 impl<SM, QT, S> IsCommand<QT, S, StdEmuExitHandler<SM>> for EndCommand
 where
-    SM: SnapshotManager,
+    SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
 {
@@ -430,7 +429,7 @@ pub struct VersionCommand(u64);
 
 impl<SM, QT, S> IsCommand<QT, S, StdEmuExitHandler<SM>> for VersionCommand
 where
-    SM: SnapshotManager,
+    SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
 {
@@ -468,7 +467,7 @@ where
 #[cfg(emulation_mode = "systemmode")]
 impl<SM, QT, S> IsCommand<QT, S, StdEmuExitHandler<SM>> for PagingFilterCommand
 where
-    SM: SnapshotManager,
+    SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
 {
@@ -498,7 +497,7 @@ where
 
 impl<SM, QT, S> IsCommand<QT, S, StdEmuExitHandler<SM>> for AddressRangeFilterCommand
 where
-    SM: SnapshotManager,
+    SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
 {

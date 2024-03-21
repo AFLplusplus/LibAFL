@@ -14,8 +14,8 @@ use libafl_qemu_sys::{
 };
 
 use crate::{
-    emu::{libafl_page_from_addr, SnapshotManager},
-    EmuExitHandler, Emulator, MemAccessInfo, Qemu, QemuExitReason, QemuExitReasonError,
+    emu::{libafl_page_from_addr, IsSnapshotManager},
+    Emulator, IsEmuExitHandler, MemAccessInfo, Qemu, QemuExitReason, QemuExitReasonError,
     QemuHelperTuple, SnapshotId, SnapshotManagerError, CPU,
 };
 
@@ -41,7 +41,7 @@ pub enum SnapshotManager {
     Fast(FastSnapshotManager),
 }
 
-impl SnapshotManager for SnapshotManager {
+impl IsSnapshotManager for SnapshotManager {
     fn save(&mut self, qemu: &Qemu) -> SnapshotId {
         match self {
             SnapshotManager::Qemu(qemu_sm) => qemu_sm.save(qemu),
@@ -103,7 +103,7 @@ impl QemuSnapshotManager {
     }
 }
 
-impl SnapshotManager for QemuSnapshotManager {
+impl IsSnapshotManager for QemuSnapshotManager {
     fn save(&mut self, qemu: &Qemu) -> SnapshotId {
         let snapshot_id = SnapshotId::gen_unique_id();
         qemu.save_snapshot(
@@ -123,7 +123,7 @@ impl SnapshotManager for QemuSnapshotManager {
     }
 }
 
-impl SnapshotManager for FastSnapshotManager {
+impl IsSnapshotManager for FastSnapshotManager {
     fn save(&mut self, qemu: &Qemu) -> SnapshotId {
         let snapshot_id = SnapshotId::gen_unique_id();
         self.snapshots
