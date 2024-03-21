@@ -32,10 +32,10 @@ where
     /// Will dereference the list.
     /// The list may not move in memory.
     #[must_use]
-    pub unsafe fn new(name: &'static str, list: *mut Vec<T>) -> Self {
+    pub fn new(name: &'static str, list: OwnedMutPtr<Vec<T>>) -> Self {
         Self {
             name: name.to_string(),
-            list: OwnedMutPtr::Ptr(list),
+            list,
         }
     }
 
