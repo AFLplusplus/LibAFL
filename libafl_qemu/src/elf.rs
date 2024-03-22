@@ -4,8 +4,7 @@ use std::{fs::File, io::Read, ops::Range, path::Path, str};
 
 use goblin::elf::{header::ET_DYN, Elf};
 use libafl::Error;
-
-use crate::GuestAddr;
+use libafl_qemu_sys::GuestAddr;
 
 pub struct EasyElf<'a> {
     elf: Elf<'a>,

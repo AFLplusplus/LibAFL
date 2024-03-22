@@ -96,7 +96,7 @@ pub use snapshot::QemuSnapshotHelper;
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
 pub mod asan;
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
-pub use asan::{init_with_asan, QemuAsanHelper};
+pub use asan::{init_qemu_with_asan, QemuAsanHelper};
 
 #[cfg(not(cpu_target = "hexagon"))]
 pub mod calls;
@@ -111,6 +111,8 @@ pub use executor::QemuForkExecutor;
 pub mod emu;
 pub use emu::*;
 
+pub mod breakpoint;
+pub mod command;
 pub mod sync_backdoor;
 
 #[must_use]
@@ -155,7 +157,7 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<emu::MapInfo>()?;
     m.add_class::<emu::GuestMaps>()?;
     m.add_class::<emu::SyscallHookResult>()?;
-    m.add_class::<emu::pybind::Emulator>()?;
+    m.add_class::<emu::pybind::Qemu>()?;
 
     Ok(())
 }

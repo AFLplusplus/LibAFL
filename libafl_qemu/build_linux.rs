@@ -1,5 +1,6 @@
-use std::{env, fs, path::Path, process::Command};
+use std::{env, fs, path::{Path, PathBuf}, process::Command};
 
+#[allow(clippy::too_many_lines)]
 pub fn build() {
     // Note: Unique features are checked in libafl_qemu_sys
 
@@ -15,11 +16,15 @@ pub fn build() {
 
     let build_libqasan = cfg!(all(feature = "build_libqasan", not(feature = "hexagon")));
 
+    let exit_hdr_dir = PathBuf::from("runtime");
+    let exit_hdr = exit_hdr_dir.join("libafl_exit.h");
+
     println!("cargo:rustc-cfg=emulation_mode=\"{emulation_mode}\"");
     println!("cargo:rerun-if-env-changed=EMULATION_MODE");
 
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=build_linux.rs");
+    println!("cargo:rerun-if-changed={}", exit_hdr_dir.display());
 
     let cpu_target = if cfg!(feature = "x86_64") {
         "x86_64".to_string()
@@ -62,10 +67,27 @@ pub fn build() {
 
     let out_dir = env::var("OUT_DIR").unwrap();
     let out_dir_path = Path::new(&out_dir);
-    let mut target_dir = out_dir_path.to_path_buf();
+    let out_dir_path_buf = out_dir_path.to_path_buf();
+    let mut target_dir = out_dir_path_buf.clone();
     target_dir.pop();
     target_dir.pop();
     target_dir.pop();
+
+    let binding_file = out_dir_path_buf.join("backdoor_bindings.rs");
+    bindgen::Builder::default()
+        .derive_debug(true)
+        .derive_default(true)
+        .impl_debug(true)
+        .generate_comments(true)
+        .default_enum_style(bindgen::EnumVariation::NewType {
+            is_global: true,
+            is_bitfield: true,
+        })
+        .header(exit_hdr.display().to_string())
+        .generate()
+        .expect("Exit bindings generation failed.")
+        .write_to_file(binding_file)
+        .expect("Could not write bindings.");
 
     if (emulation_mode == "usermode") && build_libqasan {
         let qasan_dir = Path::new("libqasan");

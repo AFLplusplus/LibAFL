@@ -25,7 +25,7 @@ document-features = ["dep:document-features"]
 ## Find injections during fuzzing
 injections = ["serde_yaml", "toml"]
 ## Python bindings support
-python = ["pyo3", "pyo3-build-config"]
+python = ["pyo3", "pyo3-build-config", "libafl_qemu_sys/python"]
 ## Fork support
 fork = ["libafl/fork"]
 ## Build libqasan for address sanitization
@@ -94,6 +94,7 @@ document-features = { version = "0.2", optional = true }
 [build-dependencies]
 pyo3-build-config = { version = "0.18", optional = true }
 rustversion = "1.0"
+bindgen = "0.69"
 
 [lib]
 name = "libafl_qemu"
