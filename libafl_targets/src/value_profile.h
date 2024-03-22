@@ -19,7 +19,7 @@ extern uint8_t libafl_cmp_map[CMP_MAP_SIZE];
 const uintptr_t kMapSizeInBits = CMP_MAP_SIZE * 8;
 const uintptr_t kBitsInByte = sizeof(uint8_t) * 8;
 
-inline void AddValue(uintptr_t k) {
+static inline void AddValue(uintptr_t k) {
   uintptr_t Idx = k % kMapSizeInBits;  // adjust it so it fits in map sz
 
   uintptr_t ByteIdx = Idx / kBitsInByte;
