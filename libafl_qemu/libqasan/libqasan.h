@@ -42,6 +42,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "qasan.h"
 #include "printf/printf.h"
 
+#ifdef ASAN_GUEST
+  #include <errno.h>
+  #include <sys/mman.h>
+#endif
+
 #define QASAN_LOG(msg...)                     \
   do {                                        \
     if (__qasan_log) {                        \
@@ -80,6 +85,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 extern int __qasan_debug;
 extern int __qasan_log;
+
+size_t qasan_align_down(size_t val, size_t align);
+size_t qasan_align_up(size_t val, size_t align);
 
 void __libqasan_init_hooks(void);
 void __libqasan_init_malloc(void);

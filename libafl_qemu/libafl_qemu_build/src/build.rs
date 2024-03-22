@@ -8,7 +8,7 @@ use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "f282d6aef5e28421255293ebbb52d835281f2730";
+const QEMU_REVISION: &str = "fd6a2f3cce4b0de2ad48703f7c93f9813c96b12c";
 
 pub struct BuildResult {
     pub qemu_path: PathBuf,

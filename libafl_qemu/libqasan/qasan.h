@@ -76,27 +76,58 @@ enum {
 
 #include <unistd.h>
 
-#define QASAN_CALL0(action) syscall(QASAN_FAKESYS_NR, action, NULL, NULL, NULL)
-#define QASAN_CALL1(action, arg1) \
-  syscall(QASAN_FAKESYS_NR, action, arg1, NULL, NULL)
-#define QASAN_CALL2(action, arg1, arg2) \
-  syscall(QASAN_FAKESYS_NR, action, arg1, arg2, NULL)
-#define QASAN_CALL3(action, arg1, arg2, arg3) \
-  syscall(QASAN_FAKESYS_NR, action, arg1, arg2, arg3)
+#ifdef ASAN_GUEST
+  #include <stdbool.h>
 
-#define QASAN_LOAD(ptr, len) QASAN_CALL2(QASAN_ACTION_CHECK_LOAD, ptr, len)
-#define QASAN_STORE(ptr, len) QASAN_CALL2(QASAN_ACTION_CHECK_STORE, ptr, len)
+void qasan_load(const char *start, size_t len);
+void qasan_store(const char *start, size_t len);
+void qasan_poison(const char *start, size_t len, char val);
+void qasan_unpoison(const char *start, size_t len);
+bool qasan_is_poison(const char *start, size_t len);
 
-#define QASAN_POISON(ptr, len, poison_byte) \
-  QASAN_CALL3(QASAN_ACTION_POISON, ptr, len, poison_byte)
-#define QASAN_USER_POISON(ptr, len) \
-  QASAN_CALL3(QASAN_ACTION_POISON, ptr, len, ASAN_USER)
-#define QASAN_UNPOISON(ptr, len) QASAN_CALL2(QASAN_ACTION_UNPOISON, ptr, len)
-#define QASAN_IS_POISON(ptr, len) QASAN_CALL2(QASAN_ACTION_IS_POISON, ptr, len)
+void qasan_alloc(const char *start, const char *end);
+void qasan_dealloc(const char *start);
+int  qasan_swap(int state);
 
-#define QASAN_ALLOC(start, end) QASAN_CALL2(QASAN_ACTION_ALLOC, start, end)
-#define QASAN_DEALLOC(ptr) QASAN_CALL1(QASAN_ACTION_DEALLOC, ptr)
+  #define QASAN_LOAD(ptr, len) qasan_load((const char *)(ptr), (size_t)(len))
+  #define QASAN_STORE(ptr, len) qasan_store((const char *)(ptr), (size_t)(len))
+  #define QASAN_POISON(ptr, len, poison_byte) \
+    qasan_poison((const char *)(ptr), (size_t)(len), (char)(poison_byte))
+  #define QASAN_USER_POISON(ptr, len) QASAN_POISON(ptr, len, ASAN_USER)
+  #define QASAN_UNPOISON(ptr, len) \
+    qasan_unpoison((const char *)(ptr), (size_t)(len))
+  #define QASAN_IS_POISON(ptr, len) \
+    qasan_is_poison((const char *)(ptr), (size_t)(len))
+  #define QASAN_ALLOC(start, end) \
+    qasan_alloc((const char *)(start), (const char *)(end))
+  #define QASAN_DEALLOC(ptr) qasan_dealloc((const char *)(ptr))
+  #define QASAN_SWAP(state) qasan_swap((int)(state))
+#else
 
-#define QASAN_SWAP(state) QASAN_CALL1(QASAN_ACTION_SWAP_STATE, state)
+  #define QASAN_CALL0(action) \
+    syscall(QASAN_FAKESYS_NR, action, NULL, NULL, NULL)
+  #define QASAN_CALL1(action, arg1) \
+    syscall(QASAN_FAKESYS_NR, action, arg1, NULL, NULL)
+  #define QASAN_CALL2(action, arg1, arg2) \
+    syscall(QASAN_FAKESYS_NR, action, arg1, arg2, NULL)
+  #define QASAN_CALL3(action, arg1, arg2, arg3) \
+    syscall(QASAN_FAKESYS_NR, action, arg1, arg2, arg3)
+
+  #define QASAN_LOAD(ptr, len) QASAN_CALL2(QASAN_ACTION_CHECK_LOAD, ptr, len)
+  #define QASAN_STORE(ptr, len) QASAN_CALL2(QASAN_ACTION_CHECK_STORE, ptr, len)
+
+  #define QASAN_POISON(ptr, len, poison_byte) \
+    QASAN_CALL3(QASAN_ACTION_POISON, ptr, len, poison_byte)
+  #define QASAN_USER_POISON(ptr, len) \
+    QASAN_CALL3(QASAN_ACTION_POISON, ptr, len, ASAN_USER)
+  #define QASAN_UNPOISON(ptr, len) QASAN_CALL2(QASAN_ACTION_UNPOISON, ptr, len)
+  #define QASAN_IS_POISON(ptr, len) \
+    QASAN_CALL2(QASAN_ACTION_IS_POISON, ptr, len)
+
+  #define QASAN_ALLOC(start, end) QASAN_CALL2(QASAN_ACTION_ALLOC, start, end)
+  #define QASAN_DEALLOC(ptr) QASAN_CALL1(QASAN_ACTION_DEALLOC, ptr)
+
+  #define QASAN_SWAP(state) QASAN_CALL1(QASAN_ACTION_SWAP_STATE, state)
+#endif
 
 #endif
