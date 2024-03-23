@@ -21,12 +21,7 @@ use libafl_nyx::{executor::NyxExecutor, helper::NyxHelper, settings::NyxSettings
 
 fn main() {
     // nyx stuff
-    let settings = NyxSettings::builder()
-        .cpu_id(0)
-        .snap_mode(true)
-        .parallel_mode(false)
-        .parent_cpu_id(None)
-        .build();
+    let settings = NyxSettings::builder().cpu_id(0).parent_cpu_id(None).build();
     let helper = NyxHelper::new("/tmp/nyx_libxml2/", settings).unwrap();
     let observer =
         unsafe { StdMapObserver::from_mut_ptr("trace", helper.bitmap_buffer, helper.bitmap_size) };

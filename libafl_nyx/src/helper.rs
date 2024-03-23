@@ -39,18 +39,10 @@ impl NyxHelper {
             .to_str()
             .ok_or(Error::illegal_argument("`work_dir` contains invalid UTF-8"))?;
 
-        let nyx_process_type = match (settings.parallel_mode, settings.parent_cpu_id) {
-            (false, _) => NyxProcessType::ALONE,
-            (true, Some(parent_cpu_id)) if settings.cpu_id == parent_cpu_id => {
-                NyxProcessType::PARENT
-            }
-            (true, Some(_)) => NyxProcessType::CHILD,
-
-            (true, _) => {
-                return Err(Error::illegal_argument(
-                    "`parent_cpu_id` is required in nyx parallel mode",
-                ))
-            }
+        let nyx_process_type = match settings.parent_cpu_id {
+            None => NyxProcessType::ALONE,
+            Some(parent_cpu_id) if settings.cpu_id == parent_cpu_id => NyxProcessType::PARENT,
+            _ => NyxProcessType::CHILD,
         };
         let mut nyx_process = (match nyx_process_type {
             NyxProcessType::ALONE => NyxProcess::new(
