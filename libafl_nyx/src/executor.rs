@@ -55,6 +55,16 @@ where
 
         let bytes = input.target_bytes();
         let buffer = bytes.as_slice();
+
+        if buffer.len() > self.helper.nyx_process.input_buffer_size() {
+            return Err(Error::illegal_state(format!(
+                "Input does not fit in the Nyx input buffer.\
+                You may want to increase the Nyx input buffer size: {} > {}",
+                buffer.len(),
+                self.helper.nyx_process.input_buffer_size()
+            )));
+        }
+
         let size = u32::try_from(buffer.len())
             .map_err(|_| Error::unsupported("Inputs larger than 4GB are not supported"))?;
 
