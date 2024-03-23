@@ -35,8 +35,6 @@ fn main() {
         // nyx stuff
         let settings = NyxSettings::builder()
             .cpu_id(0)
-            .snap_mode(true)
-            .parallel_mode(true)
             .parent_cpu_id(Some(parent_cpu_id.0 as u32))
             .build();
         let helper = NyxHelper::new("/tmp/nyx_libxml2/", settings).unwrap();
