@@ -101,12 +101,18 @@ class DumpCfgPass : public ModulePass {
  private:
   bool isLLVMIntrinsicFn(StringRef &n) {
     // Not interested in these LLVM's functions
+#if LLVM_VERSION_MAJOR >= 18
     if (n.startswith("llvm.")) {
-      return true;
-    } else {
-      return false;
+#else
+    if (n.start_with("llvm.")) {
+#endif
     }
+    return true;
   }
+  else {
+    return false;
+  }
+}
 };
 
 }  // namespace
