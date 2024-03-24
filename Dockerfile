@@ -121,9 +121,7 @@ RUN touch libafl_qemu/libafl_qemu_build/src/lib.rs
 COPY libafl_qemu/libafl_qemu_build/src libafl_qemu/libafl_qemu_build/src
 RUN touch libafl_qemu/libafl_qemu_sys/src/lib.rs
 COPY libafl_qemu/libafl_qemu_sys/src libafl_qemu/libafl_qemu_sys/src
-RUN touch libafl_qemu/runtime/libafl_exit.h
 COPY libafl_qemu/runtime libafl_qemu/runtime
-RUN touch libafl_qemu/libqasan/libqasan.c
 COPY libafl_qemu/libqasan libafl_qemu/libqasan
 RUN touch libafl_qemu/src/lib.rs
 COPY libafl_qemu/src libafl_qemu/src
