@@ -83,6 +83,8 @@ where
         start_timer!(state);
         let transformed = I::try_transform_from(state.current_testcase_mut()?.borrow_mut(), state)?;
         let mut base = state.current_input_cloned()?;
+        // potential post operation if base is replaced by a shorter input
+        let mut base_post = None;
         let base_hash = RandomState::with_seeds(0, 0, 0, 0).hash_one(&base);
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
 
@@ -140,6 +142,7 @@ where
                     if feedback.is_interesting(state, manager, &input, observers, &exit_kind)? {
                         // we found a reduced corpus entry! use the smaller base
                         base = input;
+                        base_post = Some(post.clone());
 
                         // do more runs! maybe we can minify further
                         next_i = 0;
@@ -178,6 +181,7 @@ where
             fuzzer
                 .scheduler_mut()
                 .on_replace(state, base_corpus_idx, &prev)?;
+            base_post.unwrap().post_exec(state, Some(base_corpus_idx))?;
         }
 
         state.set_max_size(orig_max_size);
