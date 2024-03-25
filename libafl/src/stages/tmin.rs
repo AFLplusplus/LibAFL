@@ -33,7 +33,7 @@ use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 /// Mutational stage which minimizes corpus entries.
 ///
 /// You must provide at least one mutator that actually reduces size.
-pub trait TMinMutationalStage<CS, E, EM, F1, F2, I, M, OT, Z>:
+pub trait TMinMutationalStage<CS, E, EM, F1, F2, I, IP, M, OT, Z>:
     Stage<E, EM, Z> + FeedbackFactory<F2, CS::State, OT>
 where
     Self::State: HasCorpus + HasSolutions + HasExecutions + HasMaxSize,
@@ -49,7 +49,8 @@ where
         + ExecutesInput<E, EM>
         + HasFeedback<Feedback = F1>
         + HasScheduler<Scheduler = CS>,
-    I: MutatedTransform<Self::Input, Self::State> + Clone,
+    IP: MutatedTransformPost<Self::State> + Clone,
+    I: MutatedTransform<Self::Input, Self::State, Post = IP> + Clone,
 {
     /// The mutator registered for this stage
     fn mutator(&self) -> &M;
@@ -195,7 +196,7 @@ where
 
 /// The default corpus entry minimising mutational stage
 #[derive(Clone, Debug)]
-pub struct StdTMinMutationalStage<CS, E, EM, F1, F2, FF, I, M, OT, Z> {
+pub struct StdTMinMutationalStage<CS, E, EM, F1, F2, FF, I, IP, M, OT, Z> {
     /// The mutator(s) this stage uses
     mutator: M,
     /// The factory
@@ -205,23 +206,24 @@ pub struct StdTMinMutationalStage<CS, E, EM, F1, F2, FF, I, M, OT, Z> {
     /// The progress helper for this stage, keeping track of resumes after timeouts/crashes
     restart_helper: ExecutionCountRestartHelper,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(CS, E, EM, F1, F2, I, OT, Z)>,
+    phantom: PhantomData<(CS, E, EM, F1, F2, I, IP, OT, Z)>,
 }
 
-impl<CS, E, EM, F1, F2, FF, I, M, OT, Z> UsesState
-    for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, I, M, OT, Z>
+impl<CS, E, EM, F1, F2, FF, I, IP, M, OT, Z> UsesState
+    for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, I, IP, M, OT, Z>
 where
     CS: Scheduler,
     M: Mutator<I, CS::State>,
     Z: ExecutionProcessor<OT, State = CS::State>,
     CS::State: HasCorpus,
-    I: MutatedTransform<CS::Input, CS::State> + Clone,
+    IP: MutatedTransformPost<CS::State> + Clone,
+    I: MutatedTransform<CS::Input, CS::State, Post = IP> + Clone,
 {
     type State = CS::State;
 }
 
-impl<CS, E, EM, F1, F2, FF, I, M, OT, Z> Stage<E, EM, Z>
-    for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, I, M, OT, Z>
+impl<CS, E, EM, F1, F2, FF, I, IP, M, OT, Z> Stage<E, EM, Z>
+    for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, I, IP, M, OT, Z>
 where
     CS: Scheduler + RemovableScheduler,
     CS::State: HasCorpus + HasSolutions + HasExecutions + HasMaxSize + HasCorpus + HasMetadata,
@@ -237,7 +239,8 @@ where
         + ExecutesInput<E, EM>
         + HasFeedback<Feedback = F1>
         + HasScheduler<Scheduler = CS>,
-    I: MutatedTransform<CS::Input, CS::State> + Clone,
+    IP: MutatedTransformPost<CS::State> + Clone,
+    I: MutatedTransform<CS::Input, CS::State, Post = IP> + Clone,
 {
     fn perform(
         &mut self,
@@ -263,8 +266,8 @@ where
     }
 }
 
-impl<CS, E, EM, F1, F2, FF, I, M, OT, Z> FeedbackFactory<F2, Z::State, OT>
-    for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, I, M, OT, Z>
+impl<CS, E, EM, F1, F2, FF, I, IP, M, OT, Z> FeedbackFactory<F2, Z::State, OT>
+    for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, I, IP, M, OT, Z>
 where
     F2: Feedback<Z::State>,
     FF: FeedbackFactory<F2, Z::State, OT>,
@@ -275,8 +278,8 @@ where
     }
 }
 
-impl<CS, E, EM, F1, F2, FF, I, M, OT, Z> TMinMutationalStage<CS, E, EM, F1, F2, I, M, OT, Z>
-    for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, I, M, OT, Z>
+impl<CS, E, EM, F1, F2, FF, I, IP, M, OT, Z> TMinMutationalStage<CS, E, EM, F1, F2, I, IP, M, OT, Z>
+    for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, I, IP, M, OT, Z>
 where
     CS: Scheduler + RemovableScheduler,
     E: HasObservers<Observers = OT, State = CS::State> + Executor<EM, Z>,
@@ -292,7 +295,8 @@ where
         + ExecutesInput<E, EM>
         + HasFeedback<Feedback = F1>
         + HasScheduler<Scheduler = CS>,
-    I: MutatedTransform<CS::Input, CS::State> + Clone,
+    IP: MutatedTransformPost<CS::State> + Clone,
+    I: MutatedTransform<CS::Input, CS::State, Post = IP> + Clone,
 {
     /// The mutator, added to this stage
     #[inline]
@@ -316,13 +320,15 @@ where
     }
 }
 
-impl<CS, E, EM, F1, F2, FF, I, M, OT, Z> StdTMinMutationalStage<CS, E, EM, F1, F2, FF, I, M, OT, Z>
+impl<CS, E, EM, F1, F2, FF, I, IP, M, OT, Z>
+    StdTMinMutationalStage<CS, E, EM, F1, F2, FF, I, IP, M, OT, Z>
 where
     CS: Scheduler,
     M: Mutator<I, CS::State>,
     Z: ExecutionProcessor<OT, State = CS::State>,
     CS::State: HasCorpus,
-    I: MutatedTransform<CS::Input, CS::State> + Clone,
+    IP: MutatedTransformPost<CS::State> + Clone,
+    I: MutatedTransform<CS::Input, CS::State, Post = IP> + Clone,
 {
     /// Creates a new minimizing mutational stage that will minimize provided corpus entries
     pub fn new(mutator: M, factory: FF, runs: usize) -> Self {
