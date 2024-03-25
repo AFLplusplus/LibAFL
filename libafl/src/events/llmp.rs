@@ -205,7 +205,7 @@ where
                         Ok(llmp::LlmpMsgHookResult::ForwardToClients)
                     }
                 } else {
-                    monitor.display("Broker", ClientId(0));
+                    monitor.display("Broker Heartbeat", ClientId(0));
                     Ok(llmp::LlmpMsgHookResult::Handled)
                 }
             },
@@ -249,6 +249,7 @@ where
                 if id == client_id {
                     // do not update executions for forwarded messages, otherwise we loose the total order
                     // as a forwarded msg with a lower executions may arrive after a stats msg with an higher executions
+                    // this also means when you wrap this event manger with centralized EM, you will **NOT** get executions update with the new tc message
                     client.update_executions(*executions, *time);
                 }
                 monitor.display(event.name(), id);

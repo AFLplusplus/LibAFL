@@ -386,12 +386,12 @@ where
                 time: _,
                 executions: _,
                 phantom: _,
-            }
-            | Event::UpdateUserStats {
+            } => "Client Heartbeat",
+            Event::UpdateUserStats {
                 name: _,
                 value: _,
                 phantom: _,
-            } => "Stats",
+            } => "UserStats",
             #[cfg(feature = "introspection")]
             Event::UpdatePerfMonitor {
                 time: _,
