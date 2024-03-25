@@ -872,8 +872,9 @@ impl log::Log for SimpleStdoutLogger {
 
     fn log(&self, record: &Record) {
         println!(
-            "[{:?}] {}: {}",
+            "[{:?}, {:?}] {}: {}",
             current_time(),
+            std::process::id(),
             record.level(),
             record.args()
         );
@@ -918,8 +919,9 @@ impl log::Log for SimpleStderrLogger {
 
     fn log(&self, record: &Record) {
         eprintln!(
-            "[{:?}] {}: {}",
+            "[{:?}, {:?}] {}: {}",
             current_time(),
+            std::process::id(),
             record.level(),
             record.args()
         );
@@ -982,8 +984,9 @@ impl log::Log for SimpleFdLogger {
         let mut f = unsafe { File::from_raw_fd(self.fd) };
         writeln!(
             f,
-            "[{:?}] {}: {}",
+            "[{:?}, {:#?}] {}: {}",
             current_time(),
+            std::process::id(),
             record.level(),
             record.args()
         )
