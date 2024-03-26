@@ -8,14 +8,6 @@ typedef uint128_t         u128;
 uint8_t *__afl_area_ptr;
 uint8_t *__afl_acc_memop_ptr;
 
-void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape,
-                                          uint64_t arg1, uint64_t arg2) {
-  (void)k;
-  (void)shape;
-  (void)arg1;
-  (void)arg2;
-}
-
 void __cmplog_ins_hook1_extended(uint8_t arg1, uint8_t arg2, uint8_t attr) {
   (void)arg1;
   (void)arg2;
