@@ -109,15 +109,15 @@ extern CmpLogMapExtended *libafl_cmplog_map_extended_ptr;
 extern uint8_t libafl_cmplog_enabled;
 
 // 5 of CMPLOG inner APIs, we static inline everything
-// area_is_valid, __libafl_targets_cmplog_instructions,
-// __libafl_targets_cmplog_instructions_extended,
-// __libafl_targets_cmplog_routines_checked,
-// __libafl_targets_cmplog_routines_checked_extended
+// area_is_valid, cmplog_instructions_checked,
+// cmplog_instructions_extended_checked,
+// cmplog_routines_checked,
+// cmplog_routines_checked_extended
 
-static inline void __libafl_targets_cmplog_instructions(uintptr_t k,
-                                                        uint8_t   shape,
-                                                        uint64_t  arg1,
-                                                        uint64_t  arg2) {
+static inline void cmplog_instructions_checked(uintptr_t k,
+                                                                uint8_t   shape,
+                                                                uint64_t  arg1,
+                                                                uint64_t arg2) {
   if (!libafl_cmplog_enabled) { return; }
   libafl_cmplog_enabled = false;
 
@@ -140,7 +140,7 @@ static inline void __libafl_targets_cmplog_instructions(uintptr_t k,
   libafl_cmplog_enabled = true;
 }
 
-static inline void __libafl_targets_cmplog_instructions_extended(
+static inline void cmplog_instructions_extended_checked(
     uintptr_t k, uint8_t shape, uint64_t arg1, uint64_t arg2, uint8_t attr) {
 #ifdef CMPLOG_EXTENDED
   if (!libafl_cmplog_enabled) { return; }
@@ -176,7 +176,7 @@ static inline void __libafl_targets_cmplog_instructions_extended(
 }
 
 // cmplog routines after area check
-static inline void __libafl_targets_cmplog_routines_checked(uintptr_t      k,
+static inline void cmplog_routines_checked(uintptr_t      k,
                                                             const uint8_t *ptr1,
                                                             const uint8_t *ptr2,
                                                             size_t len) {
@@ -203,7 +203,7 @@ static inline void __libafl_targets_cmplog_routines_checked(uintptr_t      k,
 }
 
 // cmplog routines after area check
-static inline void __libafl_targets_cmplog_routines_checked_extended(
+static inline void cmplog_routines_checked_extended(
     uintptr_t k, const uint8_t *ptr1, const uint8_t *ptr2, size_t len) {
 #ifdef CMPLOG_EXTENDED
   libafl_cmplog_enabled = false;
@@ -239,6 +239,10 @@ static inline void __libafl_targets_cmplog_routines_checked_extended(
 
 // Expose these three APIs so that you can still call into them from outside
 // libafl_targets
+
+void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape,
+                                          uint64_t arg1, uint64_t arg2);
+
 void __libafl_targets_cmplog_routines(uintptr_t k, const uint8_t *ptr1,
                                       const uint8_t *ptr2);
 
