@@ -98,12 +98,11 @@ class CtxPass : public ModulePass {
 #else
     if (n.startswith("llvm.")) {
 #endif
-    return true;
+      return true;
+    } else {
+      return false;
+    }
   }
-  else {
-    return false;
-  }
-}
 };
 
 }  // namespace
