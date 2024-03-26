@@ -108,13 +108,13 @@ extern CmpLogMapExtended *libafl_cmplog_map_extended_ptr;
 
 extern uint8_t libafl_cmplog_enabled;
 
-// 5 of CMPLOG inner APIs, we inline everything
+// 5 of CMPLOG inner APIs, we static inline everything
 // area_is_valid, __libafl_targets_cmplog_instructions,
 // __libafl_targets_cmplog_instructions_extended,
 // __libafl_targets_cmplog_routines_checked,
 // __libafl_targets_cmplog_routines_checked_extended
 
-inline void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape,
+static inline void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape,
                                                  uint64_t arg1, uint64_t arg2) {
   if (!libafl_cmplog_enabled) { return; }
   libafl_cmplog_enabled = false;
@@ -138,7 +138,7 @@ inline void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape,
   libafl_cmplog_enabled = true;
 }
 
-inline void __libafl_targets_cmplog_instructions_extended(
+static inline void __libafl_targets_cmplog_instructions_extended(
     uintptr_t k, uint8_t shape, uint64_t arg1, uint64_t arg2, uint8_t attr) {
 #ifdef CMPLOG_EXTENDED
   if (!libafl_cmplog_enabled) { return; }
@@ -174,7 +174,7 @@ inline void __libafl_targets_cmplog_instructions_extended(
 }
 
 // cmplog routines after area check
-inline void __libafl_targets_cmplog_routines_checked(uintptr_t      k,
+static inline void __libafl_targets_cmplog_routines_checked(uintptr_t      k,
                                                      const uint8_t *ptr1,
                                                      const uint8_t *ptr2,
                                                      size_t         len) {
@@ -201,7 +201,7 @@ inline void __libafl_targets_cmplog_routines_checked(uintptr_t      k,
 }
 
 // cmplog routines after area check
-inline void __libafl_targets_cmplog_routines_checked_extended(
+static inline void __libafl_targets_cmplog_routines_checked_extended(
     uintptr_t k, const uint8_t *ptr1, const uint8_t *ptr2, size_t len) {
 #ifdef CMPLOG_EXTENDED
   libafl_cmplog_enabled = false;
