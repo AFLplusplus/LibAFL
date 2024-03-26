@@ -114,10 +114,8 @@ extern uint8_t libafl_cmplog_enabled;
 // cmplog_routines_checked,
 // cmplog_routines_checked_extended
 
-static inline void cmplog_instructions_checked(uintptr_t k,
-                                                                uint8_t   shape,
-                                                                uint64_t  arg1,
-                                                                uint64_t arg2) {
+static inline void cmplog_instructions_checked(uintptr_t k, uint8_t shape,
+                                               uint64_t arg1, uint64_t arg2) {
   if (!libafl_cmplog_enabled) { return; }
   libafl_cmplog_enabled = false;
 
@@ -176,10 +174,8 @@ static inline void cmplog_instructions_extended_checked(
 }
 
 // cmplog routines after area check
-static inline void cmplog_routines_checked(uintptr_t      k,
-                                                            const uint8_t *ptr1,
-                                                            const uint8_t *ptr2,
-                                                            size_t len) {
+static inline void cmplog_routines_checked(uintptr_t k, const uint8_t *ptr1,
+                                           const uint8_t *ptr2, size_t len) {
   libafl_cmplog_enabled = false;
   uint32_t hits;
 
@@ -203,8 +199,10 @@ static inline void cmplog_routines_checked(uintptr_t      k,
 }
 
 // cmplog routines after area check
-static inline void cmplog_routines_checked_extended(
-    uintptr_t k, const uint8_t *ptr1, const uint8_t *ptr2, size_t len) {
+static inline void cmplog_routines_checked_extended(uintptr_t      k,
+                                                    const uint8_t *ptr1,
+                                                    const uint8_t *ptr2,
+                                                    size_t         len) {
 #ifdef CMPLOG_EXTENDED
   libafl_cmplog_enabled = false;
   uint32_t hits;

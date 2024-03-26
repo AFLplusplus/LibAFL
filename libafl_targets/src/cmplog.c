@@ -192,8 +192,7 @@ void __cmplog_ins_hook16_extended(uint128_t arg1, uint128_t arg2,
   k = (k >> 4) ^ (k << 8);
   k &= CMPLOG_MAP_W - 1;
 
-  cmplog_instructions_extended_checked(k, 15, arg1, arg2,
-                                                        attr);
+  cmplog_instructions_extended_checked(k, 15, arg1, arg2, attr);
 }
 void __cmplog_ins_hook16(uint128_t arg1, uint128_t arg2) {
   uintptr_t k = RETADDR;
@@ -209,8 +208,7 @@ void __cmplog_ins_hookN_extended(uint128_t arg1, uint128_t arg2, uint8_t attr,
   k = (k >> 4) ^ (k << 8);
   k &= CMPLOG_MAP_W - 1;
 
-  cmplog_instructions_extended_checked(k, size - 1, arg1, arg2,
-                                                        attr);
+  cmplog_instructions_extended_checked(k, size - 1, arg1, arg2, attr);
 }
 void __cmplog_ins_hookN(uint128_t arg1, uint128_t arg2, uint8_t size) {
   uintptr_t k = RETADDR;
@@ -432,8 +430,7 @@ void __cmplog_rtn_gcc_stdstring_cstring_extended(const uint8_t *stdstring,
   uintptr_t k = RETADDR;
   k = (k >> 4) ^ (k << 8);
   k &= CMPLOG_MAP_W - 1;
-  cmplog_routines_checked_extended(k, string_ptr, cstring,
-                                                    len);
+  cmplog_routines_checked_extended(k, string_ptr, cstring, len);
 }
 
 void __cmplog_rtn_gcc_stdstring_stdstring(const uint8_t *stdstring1,
@@ -478,8 +475,7 @@ void __cmplog_rtn_gcc_stdstring_stdstring_extended(const uint8_t *stdstring1,
   uintptr_t k = RETADDR;
   k = (k >> 4) ^ (k << 8);
   k &= CMPLOG_MAP_W - 1;
-  cmplog_routines_checked_extended(k, string_ptr1, string_ptr2,
-                                                    len);
+  cmplog_routines_checked_extended(k, string_ptr1, string_ptr2, len);
 }
 
 void __cmplog_rtn_llvm_stdstring_cstring(const uint8_t *stdstring,
@@ -520,8 +516,7 @@ void __cmplog_rtn_llvm_stdstring_cstring_extended(const uint8_t *stdstring,
   uintptr_t k = RETADDR;
   k = (k >> 4) ^ (k << 8);
   k &= CMPLOG_MAP_W - 1;
-  cmplog_routines_checked_extended(k, string_ptr, cstring,
-                                                    len);
+  cmplog_routines_checked_extended(k, string_ptr, cstring, len);
 }
 
 void __cmplog_rtn_llvm_stdstring_stdstring(const uint8_t *stdstring1,
@@ -566,6 +561,5 @@ void __cmplog_rtn_llvm_stdstring_stdstring_extended(const uint8_t *stdstring1,
   uintptr_t k = RETADDR;
   k = (k >> 4) ^ (k << 8);
   k &= CMPLOG_MAP_W - 1;
-  cmplog_routines_checked_extended(k, string_ptr1, string_ptr2,
-                                                    len);
+  cmplog_routines_checked_extended(k, string_ptr1, string_ptr2, len);
 }
