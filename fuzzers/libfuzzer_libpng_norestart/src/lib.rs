@@ -11,7 +11,7 @@ use std::{env, net::SocketAddr, path::PathBuf};
 
 use clap::{self, Parser};
 use libafl::{
-    corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
+    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig, EventRestarter, LlmpRestartingEventManager},
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or, feedback_or_fast,
@@ -183,7 +183,7 @@ pub extern "C" fn libafl_main() {
                 // RNG
                 StdRand::with_seed(current_nanos()),
                 // Corpus that will be evolved, we keep it in memory for performance
-                InMemoryOnDiskCorpus::new(&opt.input[0]).unwrap(),
+                InMemoryCorpus::new(),
                 // Corpus in which we store solutions (crashes in this example),
                 // on disk so the user can get them after stopping the fuzzer
                 OnDiskCorpus::new(&opt.output).unwrap(),

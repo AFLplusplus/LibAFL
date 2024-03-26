@@ -12,7 +12,7 @@ use libafl::{
     mutators::{
         ComposedByMutations, MutationId, MutationResult, Mutator, MutatorsTuple, ScheduledMutator,
     },
-    random_corpus_id,
+    random_corpus_id_with_disabled,
     state::{HasCorpus, HasMaxSize, HasRand},
     Error,
 };
@@ -392,14 +392,14 @@ where
         input: &mut S::Input,
     ) -> Result<MutationResult, Error> {
         // We don't want to use the testcase we're already using for splicing
-        let idx = random_corpus_id!(state.corpus(), state.rand_mut());
+        let idx = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
         if let Some(cur) = state.corpus().current() {
             if idx == *cur {
                 return Ok(MutationResult::Skipped);
             }
         }
 
-        let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+        let mut other_testcase = state.corpus().get_from_all(idx)?.borrow_mut();
         let other = other_testcase.load_input(state.corpus())?;
         let data2 = Vec::from(other.bytes());
         drop(other_testcase);
