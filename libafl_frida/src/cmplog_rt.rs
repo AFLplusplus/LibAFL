@@ -4,29 +4,15 @@
 //! related to the input.
 //! Read the [`RedQueen`](https://www.ndss-symposium.org/ndss-paper/redqueen-fuzzing-with-input-to-state-correspondence/) paper for the general concepts.
 
+#[cfg(target_arch = "aarch64")]
+use core::ffi::c_void;
 #[cfg(all(feature = "cmplog", target_arch = "x86_64"))]
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use dynasmrt::dynasm;
 #[cfg(target_arch = "aarch64")]
 use dynasmrt::{DynasmApi, DynasmLabelApi};
-use libafl::{
-    inputs::{HasTargetBytes, Input},
-    Error,
-};
-use libafl_targets::CMPLOG_MAP_W;
-use rangemap::RangeMap;
-
-use crate::helper::FridaRuntime;
-extern "C" {
-    /// Tracks cmplog instructions
-    pub fn __libafl_targets_cmplog_instructions(k: u64, shape: u8, arg1: u64, arg2: u64);
-}
-
-#[cfg(target_arch = "aarch64")]
-use core::ffi::c_void;
-use std::rc::Rc;
-
 use frida_gum::ModuleMap;
 #[cfg(target_arch = "x86_64")]
 use frida_gum::{instruction_writer::InstructionWriter, stalker::StalkerOutput};
@@ -41,7 +27,14 @@ use iced_x86::{
     BlockEncoder, Code, DecoderOptions, Instruction, InstructionBlock, MemoryOperand, MemorySize,
     OpKind, Register,
 };
+use libafl::{
+    inputs::{HasTargetBytes, Input},
+    Error,
+};
+use libafl_targets::{cmps::__libafl_targets_cmplog_instructions, CMPLOG_MAP_W};
+use rangemap::RangeMap;
 
+use crate::helper::FridaRuntime;
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 use crate::utils::{disas_count, writer_register};
 
@@ -179,7 +172,7 @@ impl CmpLogRuntime {
         k &= (CMPLOG_MAP_W as u64) - 1;
 
         unsafe {
-            __libafl_targets_cmplog_instructions(k, 8, op1, op2);
+            __libafl_targets_cmplog_instructions(k as usize, 8, op1, op2);
         }
     }
 
@@ -195,7 +188,7 @@ impl CmpLogRuntime {
         k &= (CMPLOG_MAP_W as u64) - 1;
 
         unsafe {
-            __libafl_targets_cmplog_instructions(k, size, op1, op2);
+            __libafl_targets_cmplog_instructions(k as usize, size, op1, op2);
         }
     }
 
