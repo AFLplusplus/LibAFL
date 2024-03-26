@@ -73,7 +73,7 @@ struct Opt {
     #[arg(short = 'a', long, help = "Specify a remote broker", name = "REMOTE")]
     remote_broker_addr: Option<SocketAddr>,
 
-    #[arg(short, long, help = "Set an initial corpus directory", name = "INPUT")]
+    #[arg(short, long, help = "Set an initial corpus directory", name = "INPUT", required = ture)]
     input: Vec<PathBuf>,
 
     #[arg(
