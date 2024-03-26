@@ -182,7 +182,11 @@ where
             fuzzer
                 .scheduler_mut()
                 .on_replace(state, base_corpus_idx, &prev)?;
-            base_post.unwrap().post_exec(state, Some(base_corpus_idx))?;
+            // perform the post operation for the new testcase, e.g. to update metadata.
+            // base_post should be updated along with the base (and is no longer None)
+            base_post
+                .ok_or_else(|| Error::empty_optional("Failed to get the MutatedTransformPost"))?
+                .post_exec(state, Some(base_corpus_idx))?;
         }
 
         state.set_max_size(orig_max_size);
