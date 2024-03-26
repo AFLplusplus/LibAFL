@@ -904,7 +904,7 @@ pub enum LlmpSaveState {
 }
 
 impl LlmpSaveState {
-    /// Check if the state must be saved on_restart()
+    /// Check if the state must be saved `on_restart()`
     pub fn on_restart(&self) -> bool {
         matches!(self, LlmpSaveState::Always | LlmpSaveState::OOM)
     }
