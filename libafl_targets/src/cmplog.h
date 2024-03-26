@@ -114,8 +114,10 @@ extern uint8_t libafl_cmplog_enabled;
 // __libafl_targets_cmplog_routines_checked,
 // __libafl_targets_cmplog_routines_checked_extended
 
-static inline void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape,
-                                                 uint64_t arg1, uint64_t arg2) {
+static inline void __libafl_targets_cmplog_instructions(uintptr_t k,
+                                                        uint8_t   shape,
+                                                        uint64_t  arg1,
+                                                        uint64_t  arg2) {
   if (!libafl_cmplog_enabled) { return; }
   libafl_cmplog_enabled = false;
 
@@ -175,9 +177,9 @@ static inline void __libafl_targets_cmplog_instructions_extended(
 
 // cmplog routines after area check
 static inline void __libafl_targets_cmplog_routines_checked(uintptr_t      k,
-                                                     const uint8_t *ptr1,
-                                                     const uint8_t *ptr2,
-                                                     size_t         len) {
+                                                            const uint8_t *ptr1,
+                                                            const uint8_t *ptr2,
+                                                            size_t len) {
   libafl_cmplog_enabled = false;
   uint32_t hits;
 
@@ -235,7 +237,8 @@ static inline void __libafl_targets_cmplog_routines_checked_extended(
 #endif
 }
 
-// Expose these two APIs
+// Expose these three APIs so that you can still call into them from outside
+// libafl_targets
 void __libafl_targets_cmplog_routines(uintptr_t k, const uint8_t *ptr1,
                                       const uint8_t *ptr2);
 
