@@ -98,7 +98,6 @@ class CtxPass : public ModulePass {
 #else
     if (n.start_with("llvm.")) {
 #endif
-    }
     return true;
   }
   else {
