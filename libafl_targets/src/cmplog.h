@@ -109,53 +109,10 @@ extern CmpLogMapExtended *libafl_cmplog_map_extended_ptr;
 extern uint8_t libafl_cmplog_enabled;
 
 // 5 of CMPLOG inner APIs, we inline everything
-// area_is_valid, __libafl_targets_cmplog_instructions, __libafl_targets_cmplog_instructions_extended, __libafl_targets_cmplog_routines_checked, __libafl_targets_cmplog_routines_checked_extended
-
-// POSIX shenanigan to see if an area is mapped.
-// If it is mapped as X-only, we have a problem, so maybe we should add a check
-// to avoid to call it on .text addresses
-inline long area_is_valid(const void *ptr, size_t len) {
-  if (!ptr || __asan_region_is_poisoned(ptr, len)) { return 0; }
-
-  long valid_len;
-
-#if defined(_WIN32)
-  if (IsBadReadPtr(ptr, len)) { return 0; }
-  valid_len = (long)len;
-#elif defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
-  if (!dymmy_initialized) {
-    if ((dummy_fd[1] = open("/dev/urandom", O_WRONLY)) < 0) {
-      if (pipe(dummy_fd) < 0) { dummy_fd[1] = 1; }
-    }
-    dymmy_initialized = 1;
-  }
-
-  valid_len = write(dummy_fd[1], ptr, len);
-
-  if (valid_len <= 0 || valid_len > (long)len) { return 0; }
-#endif
-
-  // even if the write succeed this can be a false positive if we cross
-  // a page boundary. who knows why.
-
-  char *p = (char *)ptr;
-#if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
-  long page_size = sysconf(_SC_PAGE_SIZE);
-#else
-  long page_size = 4096;  // Yolo
-#endif
-  char *page = (char *)((uintptr_t)p & ~(page_size - 1)) + page_size;
-
-  if (page > p + len) {
-    // no, not crossing a page boundary
-    return valid_len;
-  } else {
-    // yes it crosses a boundary, hence we can only return the length of
-    // rest of the first page, we cannot detect if the next page is valid
-    // or not, neither by SYS_write nor msync() :-(
-    return (long)(page - p);
-  }
-}
+// area_is_valid, __libafl_targets_cmplog_instructions,
+// __libafl_targets_cmplog_instructions_extended,
+// __libafl_targets_cmplog_routines_checked,
+// __libafl_targets_cmplog_routines_checked_extended
 
 inline void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape,
                                                  uint64_t arg1, uint64_t arg2) {
