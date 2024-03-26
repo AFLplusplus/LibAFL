@@ -172,7 +172,7 @@ impl CmpLogRuntime {
         k &= (CMPLOG_MAP_W as u64) - 1;
 
         unsafe {
-            __libafl_targets_cmplog_instructions(k, 8, op1, op2);
+            __libafl_targets_cmplog_instructions(k as usize, 8, op1, op2);
         }
     }
 
@@ -188,7 +188,7 @@ impl CmpLogRuntime {
         k &= (CMPLOG_MAP_W as u64) - 1;
 
         unsafe {
-            __libafl_targets_cmplog_instructions(k, size, op1, op2);
+            __libafl_targets_cmplog_instructions(k as usize, size, op1, op2);
         }
     }
 
