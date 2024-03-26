@@ -905,6 +905,7 @@ pub enum LlmpSaveState {
 
 impl LlmpSaveState {
     /// Check if the state must be saved `on_restart()`
+    #[must_use]
     pub fn on_restart(&self) -> bool {
         matches!(self, LlmpSaveState::Always | LlmpSaveState::OOM)
     }
@@ -998,9 +999,9 @@ where
         event: Event<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
         // Check if we are going to crash in the event, in which case we store our current state for the next runner
-        let res = self.llmp_mgr.fire(state, event)?;
+        self.llmp_mgr.fire(state, event)?;
         self.intermediate_save()?;
-        Ok(res)
+        Ok(())
     }
 
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
