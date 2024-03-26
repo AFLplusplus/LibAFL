@@ -94,9 +94,9 @@ class CtxPass : public ModulePass {
   bool isLLVMIntrinsicFn(StringRef &n) {
     // Not interested in these LLVM's functions
 #if LLVM_VERSION_MAJOR >= 18
-    if (n.startswith("llvm.")) {
+    if (n.starts_with("llvm.")) {
 #else
-    if (n.start_with("llvm.")) {
+    if (n.startswith("llvm.")) {
 #endif
     return true;
   }
