@@ -216,7 +216,7 @@ where
                 "objectives": self.base.objective_size(),
                 "executions": self.base.total_execs(),
                 "exec_sec": self.base.execs_per_sec(),
-                "clients": &self.client_stats()[1..]
+                "clients": &self.client_stats().get(1..)
             });
             writeln!(&file, "{line}").expect("Unable to write JSON to file");
         }

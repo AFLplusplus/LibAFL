@@ -14,7 +14,9 @@ categories = ["development-tools::testing", "emulators", "embedded", "os", "no-s
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [target.'cfg(target_os = "linux")'.dependencies]
-libnyx = {git = "https://github.com/nyx-fuzz/libnyx.git",rev = "acaf7f6"}
+libnyx = { git = "https://github.com/nyx-fuzz/libnyx.git", rev = "acaf7f6" }
 libafl = { path = "../libafl", version = "0.11.2", features = ["std", "libafl_derive", "frida_cli" ]}
 libafl_bolts = { path = "../libafl_bolts", version = "0.11.2", features = ["std", "libafl_derive", "frida_cli" ]}
 libafl_targets = { path = "../libafl_targets", version = "0.11.2", features = ["std", "sancov_cmplog"] }
+
+typed-builder = "0.18.1"

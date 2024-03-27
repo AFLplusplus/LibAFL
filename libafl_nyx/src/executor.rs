@@ -1,4 +1,4 @@
-use std::{fmt::Debug, marker::PhantomData};
+use std::marker::PhantomData;
 
 use libafl::{
     executors::{Executor, ExitKind, HasObservers},
@@ -13,31 +13,23 @@ use libnyx::NyxReturnValue;
 use crate::helper::NyxHelper;
 
 /// executor for nyx standalone mode
-pub struct NyxExecutor<'a, S, OT> {
+pub struct NyxExecutor<S, OT> {
     /// implement nyx function
-    pub helper: &'a mut NyxHelper,
+    pub helper: NyxHelper,
     /// observers
     observers: OT,
     /// phantom data to keep generic type <I,S>
     phantom: PhantomData<S>,
 }
 
-impl<'a, S, OT> Debug for NyxExecutor<'a, S, OT> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("NyxInprocessExecutor")
-            .field("helper", &self.helper)
-            .finish()
-    }
-}
-
-impl<'a, S, OT> UsesState for NyxExecutor<'a, S, OT>
+impl<S, OT> UsesState for NyxExecutor<S, OT>
 where
     S: State,
 {
     type State = S;
 }
 
-impl<'a, S, OT> UsesObservers for NyxExecutor<'a, S, OT>
+impl<S, OT> UsesObservers for NyxExecutor<S, OT>
 where
     OT: ObserversTuple<S>,
     S: State,
@@ -45,7 +37,7 @@ where
     type Observers = OT;
 }
 
-impl<'a, EM, S, Z, OT> Executor<EM, Z> for NyxExecutor<'a, S, OT>
+impl<EM, S, Z, OT> Executor<EM, Z> for NyxExecutor<S, OT>
 where
     EM: UsesState<State = S>,
     S: State + HasExecutions,
@@ -60,56 +52,69 @@ where
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
-        let input_owned = input.target_bytes();
-        let input = input_owned.as_slice();
-        self.helper.nyx_process.set_input(
-            input,
-            input
-                .len()
-                .try_into()
-                .expect("Inputs larger than 4GB not supported"),
-        );
+
+        let bytes = input.target_bytes();
+        let buffer = bytes.as_slice();
+
+        if buffer.len() > self.helper.nyx_process.input_buffer_size() {
+            return Err(Error::illegal_state(format!(
+                "Input does not fit in the Nyx input buffer.\
+                You may want to increase the Nyx input buffer size: {} > {}",
+                buffer.len(),
+                self.helper.nyx_process.input_buffer_size()
+            )));
+        }
+
+        let size = u32::try_from(buffer.len())
+            .map_err(|_| Error::unsupported("Inputs larger than 4GB are not supported"))?;
+
+        self.helper.nyx_process.set_input(buffer, size);
 
         // exec will take care of trace_bits, so no need to reset
-        let ret_val = self.helper.nyx_process.exec();
-        match ret_val {
+        match self.helper.nyx_process.exec() {
             NyxReturnValue::Normal => Ok(ExitKind::Ok),
             NyxReturnValue::Crash | NyxReturnValue::Asan => Ok(ExitKind::Crash),
             NyxReturnValue::Timeout => Ok(ExitKind::Timeout),
-            NyxReturnValue::InvalidWriteToPayload => Err(libafl::Error::illegal_state(
-                "FixMe: Nyx InvalidWriteToPayload handler is missing",
-            )),
-            NyxReturnValue::Error => Err(libafl::Error::illegal_state(
-                "Error: Nyx runtime error has occurred...",
-            )),
+            NyxReturnValue::InvalidWriteToPayload => {
+                self.helper.nyx_process.shutdown();
+                Err(Error::illegal_state(
+                    "FixMe: Nyx InvalidWriteToPayload handler is missing",
+                ))
+            }
+            NyxReturnValue::Error => {
+                self.helper.nyx_process.shutdown();
+                Err(Error::illegal_state("Nyx runtime error has occurred"))
+            }
             NyxReturnValue::IoError => {
-                // todo! *stop_soon_p = 0
-                Err(libafl::Error::unknown("Error: QEMU-nyx died..."))
+                self.helper.nyx_process.shutdown();
+                Err(Error::unknown("QEMU-nyx died"))
             }
             NyxReturnValue::Abort => {
                 self.helper.nyx_process.shutdown();
-                Err(libafl::Error::shutting_down())
+                Err(Error::shutting_down())
             }
         }
     }
 }
 
-impl<'a, S, OT> NyxExecutor<'a, S, OT> {
-    pub fn new(helper: &'a mut NyxHelper, observers: OT) -> Result<Self, Error> {
-        Ok(Self {
+impl<S, OT> NyxExecutor<S, OT> {
+    pub fn new(helper: NyxHelper, observers: OT) -> Self {
+        Self {
             helper,
             observers,
             phantom: PhantomData,
-        })
+        }
     }
 
     /// convert `trace_bits` ptr into real trace map
     pub fn trace_bits(self) -> &'static mut [u8] {
-        unsafe { std::slice::from_raw_parts_mut(self.helper.trace_bits, self.helper.real_map_size) }
+        unsafe {
+            std::slice::from_raw_parts_mut(self.helper.bitmap_buffer, self.helper.bitmap_size)
+        }
     }
 }
 
-impl<'a, S, OT> HasObservers for NyxExecutor<'a, S, OT>
+impl<S, OT> HasObservers for NyxExecutor<S, OT>
 where
     S: State,
     OT: ObserversTuple<S>,

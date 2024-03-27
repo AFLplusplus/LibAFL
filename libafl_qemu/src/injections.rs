@@ -15,13 +15,14 @@ use std::{ffi::CStr, fmt::Display, fs, os::raw::c_char, path::Path};
 
 use hashbrown::HashMap;
 use libafl::{inputs::UsesInput, Error};
+use libafl_qemu_sys::GuestAddr;
 use serde::{Deserialize, Serialize};
 
 #[cfg(not(cpu_target = "hexagon"))]
 use crate::SYS_execve;
 use crate::{
-    elf::EasyElf, emu::ArchExtras, CallingConvention, Emulator, GuestAddr, Hook, QemuHelper,
-    QemuHelperTuple, QemuHooks, SyscallHookResult,
+    elf::EasyElf, emu::ArchExtras, CallingConvention, Hook, Qemu, QemuHelper, QemuHelperTuple,
+    QemuHooks, SyscallHookResult,
 };
 #[cfg(cpu_target = "hexagon")]
 /// Hexagon syscalls are not currently supported by the `syscalls` crate, so we just paste this here for now.
@@ -211,8 +212,8 @@ impl QemuInjectionHelper {
         id: usize,
         parameter: u8,
     ) {
-        let emu = hooks.emulator();
-        let reg: GuestAddr = emu
+        let qemu = hooks.qemu();
+        let reg: GuestAddr = qemu
             .current_cpu()
             .unwrap()
             .read_function_argument(CallingConvention::Cdecl, parameter)
@@ -266,10 +267,10 @@ where
     where
         QT: QemuHelperTuple<S>,
     {
-        let emu = hooks.emulator();
+        let qemu = *hooks.qemu();
         let mut libs: Vec<LibInfo> = Vec::new();
 
-        for region in emu.mappings() {
+        for region in qemu.mappings() {
             if let Some(path) = region.path().map(ToOwned::to_owned) {
                 if !path.is_empty() {
                     LibInfo::add_unique(
@@ -300,7 +301,7 @@ where
                     vec![func_pc]
                 } else {
                     libs.iter()
-                        .filter_map(|lib| find_function(emu, &lib.name, name, lib.off).unwrap())
+                        .filter_map(|lib| find_function(qemu, &lib.name, name, lib.off).unwrap())
                         .map(|func_pc| {
                             log::info!("Injections: Function {name} found at {func_pc:#x}",);
                             func_pc
@@ -393,7 +394,7 @@ where
 }
 
 fn find_function(
-    emu: &Emulator,
+    qemu: Qemu,
     file: &str,
     function: &str,
     loadaddr: GuestAddr,
@@ -403,7 +404,7 @@ fn find_function(
     let offset = if loadaddr > 0 {
         loadaddr
     } else {
-        emu.load_addr()
+        qemu.load_addr()
     };
     Ok(elf.resolve_symbol(function, offset))
 }

@@ -11,11 +11,11 @@ use libafl_bolts::{core_affinity::CoreId, rands::StdRand, tuples::tuple_list};
 #[cfg(feature = "injections")]
 use libafl_qemu::injections::QemuInjectionHelper;
 use libafl_qemu::{
-    asan::{init_with_asan, QemuAsanHelper},
+    asan::{init_qemu_with_asan, QemuAsanHelper},
     cmplog::QemuCmpLogHelper,
     edges::QemuEdgeCoverageHelper,
     elf::EasyElf,
-    ArchExtras, Emulator, GuestAddr, QemuInstrumentationAddressRangeFilter,
+    ArchExtras, GuestAddr, Qemu, QemuInstrumentationAddressRangeFilter,
 };
 
 use crate::{
@@ -53,21 +53,18 @@ impl<'a> Client<'a> {
             .collect::<Vec<(String, String)>>()
     }
 
-    fn start_pc(emu: &Emulator) -> Result<GuestAddr, Error> {
+    fn start_pc(qemu: &Qemu) -> Result<GuestAddr, Error> {
         let mut elf_buffer = Vec::new();
-        let elf = EasyElf::from_file(emu.binary_path(), &mut elf_buffer)?;
+        let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer)?;
 
         let start_pc = elf
-            .resolve_symbol("LLVMFuzzerTestOneInput", emu.load_addr())
+            .resolve_symbol("LLVMFuzzerTestOneInput", qemu.load_addr())
             .ok_or_else(|| Error::empty_optional("Symbol LLVMFuzzerTestOneInput not found"))?;
         Ok(start_pc)
     }
 
     #[allow(clippy::similar_names)] // elf != self
-    fn coverage_filter(
-        &self,
-        emu: &Emulator,
-    ) -> Result<QemuInstrumentationAddressRangeFilter, Error> {
+    fn coverage_filter(&self, qemu: &Qemu) -> Result<QemuInstrumentationAddressRangeFilter, Error> {
         /* Conversion is required on 32-bit targets, but not on 64-bit ones */
         if let Some(includes) = &self.options.include {
             #[cfg_attr(target_pointer_width = "64", allow(clippy::useless_conversion))]
@@ -91,9 +88,9 @@ impl<'a> Client<'a> {
             Ok(QemuInstrumentationAddressRangeFilter::DenyList(rules))
         } else {
             let mut elf_buffer = Vec::new();
-            let elf = EasyElf::from_file(emu.binary_path(), &mut elf_buffer)?;
+            let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer)?;
             let range = elf
-                .get_section(".text", emu.load_addr())
+                .get_section(".text", qemu.load_addr())
                 .ok_or_else(|| Error::key_not_found("Failed to find .text section"))?;
             Ok(QemuInstrumentationAddressRangeFilter::AllowList(vec![
                 range,
@@ -113,16 +110,16 @@ impl<'a> Client<'a> {
         let mut env = self.env();
         log::debug!("ENV: {:#?}", env);
 
-        let (emu, mut asan) = {
+        let (qemu, mut asan) = {
             if self.options.is_asan_core(core_id) {
-                let (emu, asan) = init_with_asan(&mut args, &mut env)?;
+                let (emu, asan) = init_qemu_with_asan(&mut args, &mut env)?;
                 (emu, Some(asan))
             } else {
-                (Emulator::new(&args, &env)?, None)
+                (Qemu::init(&args, &env)?, None)
             }
         };
 
-        let start_pc = Self::start_pc(&emu)?;
+        let start_pc = Self::start_pc(&qemu)?;
         log::debug!("start_pc @ {start_pc:#x}");
 
         #[cfg(not(feature = "injections"))]
@@ -146,22 +143,22 @@ impl<'a> Client<'a> {
 
         let extra_tokens = injection_helper.as_ref().map(|h| h.tokens.clone());
 
-        emu.entry_break(start_pc);
+        qemu.entry_break(start_pc);
 
-        let ret_addr: GuestAddr = emu
+        let ret_addr: GuestAddr = qemu
             .read_return_address()
             .map_err(|e| Error::unknown(format!("Failed to read return address: {e:}")))?;
         log::debug!("ret_addr = {ret_addr:#x}");
-        emu.set_breakpoint(ret_addr);
+        qemu.set_breakpoint(ret_addr);
 
         let is_asan = self.options.is_asan_core(core_id);
         let is_cmplog = self.options.is_cmplog_core(core_id);
 
-        let edge_coverage_helper = QemuEdgeCoverageHelper::new(self.coverage_filter(&emu)?);
+        let edge_coverage_helper = QemuEdgeCoverageHelper::new(self.coverage_filter(&qemu)?);
 
         let instance = Instance::builder()
             .options(self.options)
-            .emu(&emu)
+            .qemu(&qemu)
             .mgr(mgr)
             .core_id(core_id)
             .extra_tokens(extra_tokens);

@@ -136,6 +136,7 @@ pub fn generate(
         .allowlist_type("MemOpIdx")
         .allowlist_type("MemOp")
         .allowlist_type("DeviceSnapshotKind")
+        .allowlist_type("ShutdownCause")
         .allowlist_type("libafl_exit_reason")
         .allowlist_type("libafl_exit_reason_kind")
         .allowlist_type("libafl_exit_reason_sync_backdoor")

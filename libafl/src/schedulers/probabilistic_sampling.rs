@@ -158,7 +158,9 @@ where
     #[allow(clippy::cast_precision_loss)]
     fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
-            Err(Error::empty(String::from("No entries in corpus")))
+            Err(Error::empty(String::from(
+                "No entries in corpus. This often implies the target is not properly instrumented.",
+            )))
         } else {
             let rand_prob: f64 = (state.rand_mut().below(100) as f64) / 100.0;
             let meta = state.metadata_map().get::<ProbabilityMetadata>().unwrap();

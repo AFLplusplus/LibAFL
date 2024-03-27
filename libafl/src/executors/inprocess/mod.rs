@@ -450,7 +450,8 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
         .expect("In run_observers_and_save_state objective failure.");
 
     if interesting {
-        let mut new_testcase = Testcase::with_executions(input.clone(), *state.executions());
+        let executions = *state.executions();
+        let mut new_testcase = Testcase::with_executions(input.clone(), executions);
         new_testcase.add_metadata(exitkind);
         new_testcase.set_parent_id_optional(*state.corpus().current());
         fuzzer
@@ -466,6 +467,8 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
                 state,
                 Event::Objective {
                     objective_size: state.solutions().count(),
+                    executions,
+                    time: libafl_bolts::current_time(),
                 },
             )
             .expect("Could not save state in run_observers_and_save_state");

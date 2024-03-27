@@ -44,7 +44,10 @@ where
     /// Gets the next entry in the queue
     fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
-            Err(Error::empty("No entries in corpus".to_owned()))
+            Err(Error::empty(
+                "No entries in corpus. This often implies the target is not properly instrumented."
+                    .to_owned(),
+            ))
         } else {
             let id = state
                 .corpus()
