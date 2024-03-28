@@ -1,0 +1,94 @@
+[env]
+PROFILE = { value = "release", condition = {env_not_set = ["PROFILE"]} }
+
+[tasks.target_dir]
+condition = { files_not_exist = [ "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}" ] }
+script_runner="@shell"
+script='''
+mkdir ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}
+'''
+
+[tasks.image]
+dependencies = ["target_dir"]
+condition = { files_not_exist = [ "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/dummy.qcow2" ] }
+script_runner="@shell"
+script='''
+qemu-img create -f qcow2 ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/dummy.qcow2 32M
+'''
+
+[tasks.target]
+dependencies = ["target_dir"]
+condition = { env_set = [ "TARGET_DEFINE" ] }
+command = "arm-none-eabi-gcc"
+args = [
+    "-ggdb",
+    "-ffreestanding",
+    "-nostartfiles",
+    "-lgcc",
+    "-T", "${CARGO_MAKE_WORKING_DIRECTORY}/example/mps2_m3.ld",
+    "-mcpu=cortex-m3",
+    "${CARGO_MAKE_WORKING_DIRECTORY}/example/main.c",
+    "${CARGO_MAKE_WORKING_DIRECTORY}/example/startup.c",
+    "-D", "${TARGET_DEFINE}",
+    "-I", "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${PROFILE}/include",
+    "-o", "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/example.elf",
+]
+
+[tasks.build]
+condition = { env_set = [ "FEATURE" ] }
+command = "cargo"
+args = [
+    "build",
+    "--profile",
+    "${PROFILE}",
+    "--no-default-features",
+    "--features", "std,${FEATURE}",
+]
+dependencies = ["target", "image"]
+
+[tasks.run_fuzzer]
+condition = { env_set = [ "FEATURE" ] }
+env = { "KERNEL" = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/example.elf" }
+command = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${PROFILE}/qemu_systemmode"
+args = [
+    "-icount", "shift=auto,align=off,sleep=off",
+    "-machine", "mps2-an385",
+    "-monitor", "null",
+    "-kernel", "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/example.elf",
+    "-serial", "null",
+    "-nographic",
+    "-snapshot",
+    "-drive", "if=none,format=qcow2,file=${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/dummy.qcow2",
+    "-S",
+]
+dependencies = ["build"]
+
+[tasks.classic]
+command = "cargo"
+args = [
+    "make",
+    "-e", "FEATURE=classic",
+    "-e", "TARGET_DEFINE=TARGET_CLASSIC",
+    "run_fuzzer",
+]
+
+[tasks.breakpoint]
+command = "cargo"
+args = [
+    "make",
+    "-e", "FEATURE=breakpoint",
+    "-e", "TARGET_DEFINE=TARGET_BREAKPOINT",
+    "run_fuzzer",
+]
+
+[tasks.sync_exit]
+command = "cargo"
+args = [
+    "make",
+    "-e", "FEATURE=sync_exit",
+    "-e", "TARGET_DEFINE=TARGET_SYNC_EXIT",
+    "run_fuzzer",
+]
+
+[tasks.run]
+alias="classic"
