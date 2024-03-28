@@ -131,12 +131,12 @@ libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call2(libafl_word action,
 
   #ifdef __arm__
     #define LIBAFL_DEFINE_FUNCTIONS(name, opcode)                                                   \
-      libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call0(                                     \
+      libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call0(                                 \
           libafl_word action) {                                                                     \
         libafl_word ret;                                                                            \
         __asm__ volatile (                                                                        \
         "mov r0, %1\n"                                                                            \
-        ".word " XSTRINGIFY(LIBAFL_EXIT_OPCODE) "\n"                                              \
+        ".word " XSTRINGIFY(opcode) "\n"                                              \
         "mov %0, r0\n"                                                                            \
         : "=r"(ret)                                                                               \
         : "r"(action)                                                                             \
@@ -145,13 +145,13 @@ libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call2(libafl_word action,
         return ret;                                                                                 \
       }                                                                                             \
                                                                                                     \
-      libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call1(                                     \
+      libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call1(                                 \
           libafl_word action, libafl_word arg1) {                                                   \
         libafl_word ret;                                                                            \
         __asm__ volatile (                                                                      \
         "mov r0, %1\n"                                                                      \
         "mov r1, %2\n"                                                                      \
-        ".word " XSTRINGIFY(LIBAFL_EXIT_OPCODE) "\n"                                        \
+        ".word " XSTRINGIFY(opcode) "\n"                                        \
         "mov %0, r0\n"                                                                      \
         : "=r"(ret)                                                                         \
         : "r"(action), "r"(arg1)                                                            \
@@ -160,14 +160,14 @@ libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call2(libafl_word action,
         return ret;                                                                                 \
       }                                                                                             \
                                                                                                     \
-      libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call2(                                     \
+      libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call2(                                 \
           libafl_word action, libafl_word arg1, libafl_word arg2) {                                 \
         libafl_word ret;                                                                            \
         __asm__ volatile (                                                                      \
         "mov r0, %1\n"                                                                      \
         "mov r1, %2\n"                                                                      \
         "mov r2, %3\n"                                                                      \
-        ".word " XSTRINGIFY(LIBAFL_EXIT_OPCODE) "\n"                                        \
+        ".word " XSTRINGIFY(opcode) "\n"                                        \
         "mov %0, r0\n"                                                                      \
         : "=r"(ret)                                                                         \
         : "r"(action), "r"(arg1), "r"(arg2)                                                 \
