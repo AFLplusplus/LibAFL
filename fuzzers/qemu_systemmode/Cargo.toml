@@ -9,7 +9,7 @@ default = ["std", "classic"]
 std = []
 
 classic = [] # The classic way to interact with LibAFL QEMU, with direct calls to QEMU's functions
-breakpoint = [] # Uses the command system, with breakpoints1
+breakpoint = [] # Uses the command system, with breakpoints
 sync_exit = [] # Uses the command system, with sync exit.
 
 [profile.release]
