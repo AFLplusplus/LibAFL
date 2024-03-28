@@ -17,7 +17,7 @@ pub fn build() {
     let build_libqasan = cfg!(all(feature = "build_libqasan", not(feature = "hexagon")));
 
     let exit_hdr_dir = PathBuf::from("runtime");
-    let exit_hdr = exit_hdr_dir.join("libafl_exit.h");
+    let exit_hdr = exit_hdr_dir.join("libafl_qemu.h");
 
     println!("cargo:rustc-cfg=emulation_mode=\"{emulation_mode}\"");
     println!("cargo:rerun-if-env-changed=EMULATION_MODE");
