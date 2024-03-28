@@ -19,6 +19,9 @@ command = "cargo"
 args = ["build" , "--profile", "${PROFILE}", "--bin", "${FUZZER_NAME}"]
 dependencies = [ "cc" ]
 
+[tasks.build]
+alias = "fuzzer"
+
 # Run the fuzzer
 [tasks.run]
 command = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/${FUZZER_NAME}"

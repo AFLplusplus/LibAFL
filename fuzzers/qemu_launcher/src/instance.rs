@@ -18,7 +18,7 @@ use libafl::{
         scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
         StdMOptMutator, StdScheduledMutator, Tokens,
     },
-    observers::{HitcountsMapObserver, TimeObserver, VariableMapObserver},
+    observers::{HitcountsMapObserver, TimeObserver, TrackingHinted, VariableMapObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
     },
@@ -81,12 +81,13 @@ impl<'a, M: Monitor> Instance<'a, M> {
                 edges_map_mut_slice(),
                 addr_of_mut!(MAX_EDGES_NUM),
             ))
+            .track_indices()
         };
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
 
-        let map_feedback = MaxMapFeedback::tracking(&edges_observer, true, false);
+        let map_feedback = MaxMapFeedback::new(&edges_observer);
 
         let calibration = CalibrationStage::new(&map_feedback);
 
@@ -124,11 +125,10 @@ impl<'a, M: Monitor> Instance<'a, M> {
         };
 
         // A minimization+queue policy to get testcasess from the corpus
-        let scheduler = IndexesLenTimeMinimizerScheduler::new(PowerQueueScheduler::new(
-            &mut state,
+        let scheduler = IndexesLenTimeMinimizerScheduler::new(
             &edges_observer,
-            PowerSchedule::FAST,
-        ));
+            PowerQueueScheduler::new(&mut state, &edges_observer, PowerSchedule::FAST),
+        );
 
         let observers = tuple_list!(edges_observer, time_observer);
 

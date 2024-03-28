@@ -109,7 +109,7 @@ jobs:
     - name: Check pcguard edges
       run: cargo check --features=sancov_pcguard_edges
     - name: Format
-      run: cargo fmt -- --check
+      run: cargo +nightly fmt -- --check
     - name: Cleanup
       run: cargo clean
     - name: Run clang-format style check for C/C++ programs.
@@ -264,6 +264,9 @@ jobs:
       with:
         profile: minimal
         toolchain: stable
+    - name: Remove stale formatters
+      run: rm -f /home/runner/.cargo/bin/rustfmt /home/runner/.cargo/bin/cargo-fmt && rustup update
+
     - name: Free Disk Space (Ubuntu)
       uses: jlumbroso/free-disk-space@main
       with:

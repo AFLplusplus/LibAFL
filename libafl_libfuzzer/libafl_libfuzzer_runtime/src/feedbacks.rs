@@ -171,4 +171,4 @@ where
     }
 }
 
-pub type ShrinkMapFeedback<O, S, T> = MinMapFeedback<MappedEdgeMapObserver<O, T>, S, usize>;
+pub type ShrinkMapFeedback<O, S, T, A> = MinMapFeedback<MappedEdgeMapObserver<O, T>, S, usize, A>;

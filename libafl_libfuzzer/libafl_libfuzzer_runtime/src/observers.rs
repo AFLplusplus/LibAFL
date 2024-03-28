@@ -55,6 +55,18 @@ where
     }
 }
 
+impl<M, O> AsRef<Self> for MappedEdgeMapObserver<M, O> {
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
+impl<M, O> AsMut<Self> for MappedEdgeMapObserver<M, O> {
+    fn as_mut(&mut self) -> &mut Self {
+        self
+    }
+}
+
 impl<M, O> HasLen for MappedEdgeMapObserver<M, O>
 where
     M: HasLen,
