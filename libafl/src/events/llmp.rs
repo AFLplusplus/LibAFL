@@ -1,6 +1,15 @@
 //! LLMP-backed event manager for scalable multi-processed fuzzing
 
 use alloc::{boxed::Box, vec::Vec};
+#[cfg(feature = "std")]
+use std::net::TcpStream;
+
+#[cfg(feature = "std")]
+use std::io::ErrorKind;
+
+#[cfg(feature = "std")]
+use alloc::string::ToString;
+
 #[cfg(all(unix, not(miri), feature = "std"))]
 use core::ptr::addr_of_mut;
 #[cfg(feature = "std")]
@@ -10,7 +19,7 @@ use core::{marker::PhantomData, num::NonZeroUsize, time::Duration};
 use std::net::{SocketAddr, ToSocketAddrs};
 
 #[cfg(feature = "std")]
-use libafl_bolts::core_affinity::CoreId;
+use libafl_bolts::{core_affinity::CoreId, llmp::{LLMP_CONNECT_ADDR, send_tcp_msg, TcpResponse, TcpRequest, recv_tcp_msg}};
 #[cfg(feature = "adaptive_serialization")]
 use libafl_bolts::current_time;
 #[cfg(feature = "std")]
@@ -142,7 +151,7 @@ where
         #[cfg(feature = "llmp_compression")]
         let compressor = &self.compressor;
         self.llmp.loop_forever(
-            &mut |client_id, tag, _flags, msg| {
+            &mut |client_id, sender_pid, tag, _flags, msg| {
                 if tag == LLMP_TAG_EVENT_TO_BOTH {
                     #[cfg(not(feature = "llmp_compression"))]
                     let event_bytes = msg;
@@ -592,6 +601,51 @@ where
     #[cfg(feature = "std")]
     pub fn to_env(&self, env_name: &str) {
         self.llmp.to_env(env_name).unwrap();
+    }
+
+    /// Calling this function will tell the llmp broker that this client is exiting
+    /// This should be called from the restarter not from the actual fuzzer client
+    #[cfg(feature = "std")]
+    fn notify_death(
+        &self,
+        event_restarter_pid: i32,
+        broker_port: u16,
+    ) -> Result<(), Error> {
+        let mut stream = match TcpStream::connect((LLMP_CONNECT_ADDR, broker_port)) {
+            Ok(stream) => stream,
+            Err(e) => {
+                match e.kind() {
+                    ErrorKind::ConnectionRefused => {
+                        //connection refused. loop till the broker is up
+                        loop {
+                            match TcpStream::connect((LLMP_CONNECT_ADDR, broker_port)) {
+                                Ok(stream) => break stream,
+                                Err(_) => {
+                                    log::info!("Connection Refused.. Retrying");
+                                }
+                            }
+                        }
+                    }
+                    _ => return Err(Error::illegal_state(e.to_string())),
+                }
+            }
+        };
+
+        // The broker tells us hello we don't care we just tell him our client died
+        let TcpResponse::BrokerConnectHello {broker_shmem_description: _, hostname: _} = recv_tcp_msg(&mut stream)?.try_into()?
+        else {
+            return Err(Error::illegal_state(
+                "Received unexpected Broker Hello".to_string(),
+            ));
+        };
+
+        let msg = TcpRequest::ClientWantsExit { restarter_id: event_restarter_pid };
+
+        // Send this mesasge off and we are leaving.
+        let _ =send_tcp_msg(&mut stream, &msg);
+        log::info!("Asking he broker to be disconnected");
+
+        Ok(())
     }
 }
 
@@ -1343,6 +1397,7 @@ where
             }
 
             let mut ctr: u64 = 0;
+            let event_restarter_pid = std::process::id();
             // Client->parent loop
             loop {
                 log::info!("Spawning next client (id {ctr})");
@@ -1385,14 +1440,16 @@ where
                     if child_status == 137 {
                         // Out of Memory, see https://tldp.org/LDP/abs/html/exitcodes.html
                         // and https://github.com/AFLplusplus/LibAFL/issues/32 for discussion.
+                        let _ = mgr.notify_death(event_restarter_pid, self.broker_port);
                         panic!("Fuzzer-respawner: The fuzzed target crashed with an out of memory error! Fix your harness, or switch to another executor (for example, a forkserver).");
                     }
-
+                    let _ = mgr.notify_death(event_restarter_pid, self.broker_port);
                     // Storing state in the last round did not work
                     panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! This can happen if the child calls `exit()`, in that case make sure it uses `abort()`, if it got killed unrecoverable (OOM), or if there is a bug in the fuzzer itself. (Child exited with: {child_status})");
                 }
 
                 if staterestorer.wants_to_exit() || Self::is_shutting_down() {
+                    let _ = mgr.notify_death(event_restarter_pid, self.broker_port);
                     return Err(Error::shutting_down());
                 }
 

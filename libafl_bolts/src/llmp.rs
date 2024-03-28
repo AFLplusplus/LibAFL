@@ -155,7 +155,7 @@ const _LLMP_BIND_ADDR: &str = "0.0.0.0";
 const _LLMP_BIND_ADDR: &str = "127.0.0.1";
 
 /// LLMP Client connects to this address
-const _LLMP_CONNECT_ADDR: &str = "127.0.0.1";
+pub const LLMP_CONNECT_ADDR: &str = "127.0.0.1";
 
 /// An env var of this value indicates that the set value was a NULL PTR
 const _NULL_ENV_STR: &str = "_NULL";
@@ -258,11 +258,18 @@ pub enum TcpRequest {
     LocalClientHello {
         /// The sharedmem description of the connecting client.
         shmem_description: ShMemDescription,
+        /// The restarter_id of this client
+        restarter_id: u32,
     },
     /// We would like to establish a b2b connection.
     RemoteBrokerHello {
         /// The hostname of our broker, trying to connect.
         hostname: String,
+    },
+    /// Notify the broker the the othe side is dying so remove this client
+    /// `ancestor_id` is the pid of the very initial client
+    ClientWantsExit {
+        restarter_id: u32,
     },
 }
 
@@ -455,7 +462,7 @@ fn tcp_bind(port: u16) -> Result<TcpListener, Error> {
 
 /// Send one message as `u32` len and `[u8;len]` bytes
 #[cfg(feature = "std")]
-fn send_tcp_msg<T>(stream: &mut TcpStream, msg: &T) -> Result<(), Error>
+pub fn send_tcp_msg<T>(stream: &mut TcpStream, msg: &T) -> Result<(), Error>
 where
     T: Serialize,
 {
@@ -482,7 +489,7 @@ where
 
 /// Receive one message of `u32` len and `[u8; len]` bytes
 #[cfg(feature = "std")]
-fn recv_tcp_msg(stream: &mut TcpStream) -> Result<Vec<u8>, Error> {
+pub fn recv_tcp_msg(stream: &mut TcpStream) -> Result<Vec<u8>, Error> {
     // Always receive one be u32 of size, then the command.
 
     #[cfg(feature = "llmp_debug")]
@@ -832,6 +839,8 @@ struct LlmpPayloadSharedMapInfo {
     pub map_size: usize,
     /// The id of this map, as 0-terminated c string of at most 19 chars
     pub shm_str: [u8; 20],
+    /// The restarter process id of the client
+    pub restarter_id: u32,
 }
 
 /// Sending end on a (unidirectional) sharedmap channel
@@ -2484,6 +2493,7 @@ where
     fn announce_new_client(
         sender: &mut LlmpSender<SP>,
         shmem_description: &ShMemDescription,
+        restarter_id: u32,
     ) -> Result<(), Error> {
         unsafe {
             let msg = sender
@@ -2494,6 +2504,7 @@ where
             let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
             (*pageinfo).shm_str = *shmem_description.id.as_array();
             (*pageinfo).map_size = shmem_description.size;
+            (*pageinfo).restarter_id = restarter_id;
             sender.send(msg, true)
         }
     }
@@ -2659,8 +2670,12 @@ where
         broker_shmem_description: &ShMemDescription,
     ) {
         match request {
-            TcpRequest::LocalClientHello { shmem_description } => {
-                match Self::announce_new_client(sender, shmem_description) {
+            TcpRequest::ClientWantsExit { restarter_id } => {
+                // todo search the ancestor_id and remove it.
+                log::info!("We are removing {:#?}", restarter_id);
+            }
+            TcpRequest::LocalClientHello { shmem_description, restarter_id} => {
+                match Self::announce_new_client(sender, shmem_description, *restarter_id) {
                     Ok(()) => (),
                     Err(e) => log::info!("Error forwarding client on map: {e:?}"),
                 };
@@ -2694,7 +2709,7 @@ where
                 if let Ok(shmem_description) =
                     Self::b2b_thread_on(stream, *current_client_id, broker_shmem_description)
                 {
-                    if Self::announce_new_client(sender, &shmem_description).is_err() {
+                    if Self::announce_new_client(sender, &shmem_description, 0).is_err() {
                         log::info!("B2B: Error announcing client {shmem_description:?}");
                     };
                     current_client_id.0 += 1;
@@ -2779,6 +2794,8 @@ where
                                 continue;
                             }
                         };
+
+                        log::info!("{:#?}", buf);
                         let req = match buf.try_into() {
                             Ok(req) => req,
                             Err(e) => {
@@ -3215,16 +3232,23 @@ where
     }
 
     #[cfg(feature = "std")]
-    /// Create a [`LlmpClient`], getting the ID from a given port
-    pub fn create_attach_to_tcp(mut shmem_provider: SP, port: u16) -> Result<Self, Error> {
-        let mut stream = match TcpStream::connect((_LLMP_CONNECT_ADDR, port)) {
+    /// Create a [`LlmpClient`], getting the ID from a given port, then also tell the restarter's ID so we ask to be removed later
+    pub fn create_attach_to_tcp(shmem_provider: SP, port: u16) -> Result<Self, Error> {
+        Self::with_restarter_id(shmem_provider, port, 0) // default to zero
+    }
+
+    #[cfg(feature = "std")]
+    /// Create a [`LlmpClient`], getting the ID from a given port, then also tell the restarter's ID so we ask to be removed later
+    /// This is called when, for the first time, the restarter attaches to this process.
+    pub fn with_restarter_id(mut shmem_provider: SP, port: u16, restarter_id: u32) -> Result<Self, Error> {
+        let mut stream = match TcpStream::connect((LLMP_CONNECT_ADDR, port)) {
             Ok(stream) => stream,
             Err(e) => {
                 match e.kind() {
                     ErrorKind::ConnectionRefused => {
                         //connection refused. loop till the broker is up
                         loop {
-                            match TcpStream::connect((_LLMP_CONNECT_ADDR, port)) {
+                            match TcpStream::connect((LLMP_CONNECT_ADDR, port)) {
                                 Ok(stream) => break stream,
                                 Err(_) => {
                                     log::info!("Connection Refused.. Retrying");
@@ -3257,6 +3281,7 @@ where
 
         let client_hello_req = TcpRequest::LocalClientHello {
             shmem_description: ret.sender.out_shmems.first().unwrap().shmem.description(),
+            restarter_id,
         };
 
         send_tcp_msg(&mut stream, &client_hello_req)?;

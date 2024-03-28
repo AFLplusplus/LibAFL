@@ -258,7 +258,7 @@ pub mod unix_signal_handler {
                 log::error!("Type QUIT to restart the child");
                 let mut line = String::new();
                 while line.trim() != "QUIT" {
-                    std::io::stdin().read_line(&mut line).unwrap();
+                    let _ = std::io::stdin().read_line(&mut line);
                 }
             }
 
