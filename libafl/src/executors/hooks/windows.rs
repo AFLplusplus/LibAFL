@@ -64,7 +64,7 @@ pub mod windows_asan_handler {
                 log::error!("Type QUIT to restart the child");
                 let mut line = String::new();
                 while line.trim() != "QUIT" {
-                    std::io::stdin().read_line(&mut line).unwrap();
+                    let _ = std::io::stdin().read_line(&mut line);
                 }
             }
 
@@ -370,7 +370,7 @@ pub mod windows_exception_handler {
                 log::error!("Type QUIT to restart the child");
                 let mut line = String::new();
                 while line.trim() != "QUIT" {
-                    std::io::stdin().read_line(&mut line).unwrap();
+                    let _ = std::io::stdin().read_line(&mut line);
                 }
             }
 
