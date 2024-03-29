@@ -333,7 +333,6 @@ where
                     })
                     .configuration(self.configuration)
                     .serialize_state(self.serialize_state)
-                    .client_timeout(self.client_timeout)
                     .hooks(hooks)
                     .build()
                     .launch()?;
@@ -404,7 +403,6 @@ where
                 .exit_cleanly_after(Some(NonZeroUsize::try_from(self.cores.ids.len()).unwrap()))
                 .configuration(self.configuration)
                 .serialize_state(self.serialize_state)
-                .client_timeout(self.client_timeout)
                 .hooks(hooks)
                 .build()
                 .launch()?;
