@@ -205,12 +205,15 @@ pub mod unix_signal_handler {
                 {
                     let mut writer = std::io::BufWriter::new(&mut bsod);
                     let _ = writeln!(writer, "input: {:?}", input.generate_name(0));
-                    let _ = libafl_bolts::minibsod::generate_minibsod(
+                    let bsod = libafl_bolts::minibsod::generate_minibsod(
                         &mut writer,
                         signal,
                         _info,
                         _context.as_deref(),
                     );
+                    if bsod.is_err() {
+                        log::error!("generate_minibsod failed");
+                    }
                     let _ = writer.flush();
                 }
                 if let Ok(r) = std::str::from_utf8(&bsod) {
@@ -242,12 +245,15 @@ pub mod unix_signal_handler {
                     let mut bsod = Vec::new();
                     {
                         let mut writer = std::io::BufWriter::new(&mut bsod);
-                        let _ = libafl_bolts::minibsod::generate_minibsod(
+                        let bsod = libafl_bolts::minibsod::generate_minibsod(
                             &mut writer,
                             signal,
                             _info,
                             _context.as_deref(),
                         );
+                        if bsod.is_err() {
+                            log::error!("generate_minibsod failed");
+                        }
                         let _ = writer.flush();
                     }
                     if let Ok(r) = std::str::from_utf8(&bsod) {
