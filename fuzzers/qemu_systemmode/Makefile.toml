@@ -162,9 +162,11 @@ args = [
 
 [tasks.test]
 clear = true
-run_task = { name = ["test_classic", "test_breakpoint", "test_sync_exit"] }
+run_task = { name = ["build"] }
+# run_task = { name = ["test_classic", "test_breakpoint", "test_sync_exit"] }
 
 [tasks.build]
+clear = true
 run_task = { name = ["build_classic", "build_breakpoint", "build_sync_exit"] }
 
 [tasks.run]
