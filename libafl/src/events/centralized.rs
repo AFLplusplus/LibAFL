@@ -93,15 +93,10 @@ where
     ///
     /// The port must not be bound yet to have a broker.
     #[cfg(feature = "std")]
-    pub fn on_port(shmem_provider: SP, port: u16, client_timeout: Duration) -> Result<Self, Error> {
+    pub fn on_port(shmem_provider: SP, port: u16) -> Result<Self, Error> {
         Ok(Self {
             // TODO switch to false after solving the bug
-            llmp: LlmpBroker::with_keep_pages_attach_to_tcp(
-                shmem_provider,
-                port,
-                true,
-                client_timeout,
-            )?,
+            llmp: LlmpBroker::with_keep_pages_attach_to_tcp(shmem_provider, port, true)?,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             phantom: PhantomData,
@@ -508,10 +503,16 @@ where
     /// If the port is not yet bound, it will act as a broker; otherwise, it
     /// will act as a client.
     #[cfg(feature = "std")]
-    pub fn on_port(inner: EM, shmem_provider: SP, port: u16, is_main: bool) -> Result<Self, Error> {
+    pub fn on_port(
+        inner: EM,
+        shmem_provider: SP,
+        port: u16,
+        is_main: bool,
+        restarter_id: u32,
+    ) -> Result<Self, Error> {
         Ok(Self {
             inner,
-            client: LlmpClient::create_attach_to_tcp(shmem_provider, port)?,
+            client: LlmpClient::create_attach_to_tcp(shmem_provider, port, restarter_id)?,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             is_main,
