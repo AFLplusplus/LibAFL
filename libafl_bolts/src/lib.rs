@@ -31,7 +31,7 @@
     clippy::ptr_cast_constness,
     clippy::negative_feature_names,
     clippy::too_many_lines,
-    clippy::too_many_arguments,
+    clippy::too_many_arguments
 )]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,

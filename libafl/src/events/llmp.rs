@@ -144,7 +144,7 @@ where
         #[cfg(feature = "llmp_compression")]
         let compressor = &self.compressor;
         self.llmp.loop_forever(
-            &mut |client_id, sender_pid, tag, _flags, msg| {
+            &mut |client_id, tag, _flags, msg| {
                 if tag == LLMP_TAG_EVENT_TO_BOTH {
                     #[cfg(not(feature = "llmp_compression"))]
                     let event_bytes = msg;
