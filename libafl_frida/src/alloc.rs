@@ -22,7 +22,8 @@ use mmap_rs::Protection;
         target_os = "android"
     )
 ))]
-use mmap_rs::{MemoryAreas, MmapFlags, MmapMut, MmapOptions, ReservedMut};
+use mmap_rs::{MmapFlags, MmapMut, MmapOptions, ReservedMut};
+use frida_gum::{RangeDetails, PageProtection};
 use rangemap::RangeSet;
 use serde::{Deserialize, Serialize};
 
@@ -517,19 +518,21 @@ impl Allocator {
 
     /// Unpoison all the memory that is currently mapped with read/write permissions.
     pub fn unpoison_all_existing_memory(&mut self) {
-        for area in MemoryAreas::open(None).unwrap() {
-            let area = area.unwrap();
-            if area
-                .protection()
-                .intersects(Protection::READ | Protection::WRITE)
-                && !self.is_managed(area.start() as *mut c_void)
+        RangeDetails::enumerate_with_prot(PageProtection::Read, &mut |range: &RangeDetails| -> bool {
+            let start = range.memory_range().base_address().0 as usize;
+            let end = start + range.memory_range().size();
+            if !self.is_managed(start as *mut c_void)
             {
-                if self.using_pre_allocated_shadow_mapping && area.start() == 1 << self.shadow_bit {
-                    continue;
+                if self.using_pre_allocated_shadow_mapping && start == 1 << self.shadow_bit {
+                    return false; //once we hit the shadow mapping, we're done
                 }
-                self.map_shadow_for_region(area.start(), area.end(), true);
+
+                println!("Mapping: {:#x}", range.memory_range().base_address().0 as usize);
+                self.map_shadow_for_region(start, end, true);
             }
-        }
+
+            return true
+        });
     }
 
     /// Initialize the allocator, making sure a valid shadow bit is selected.
@@ -546,9 +549,12 @@ impl Allocator {
         let mut userspace_max: usize = 0;
 
         // Enumerate memory ranges that are already occupied.
-        for area in MemoryAreas::open(None).unwrap() {
-            let start = area.as_ref().unwrap().start();
-            let end = area.unwrap().end();
+        
+        
+         RangeDetails::enumerate_with_prot(PageProtection::NoAccess, &mut |range: &RangeDetails| -> bool {
+            let start = range.memory_range().base_address().0 as usize;
+            let end = start + range.memory_range().size();
+            println!("Start: {:#x}, end: {:#x}", start, end);
             occupied_ranges.push((start, end));
             let base: usize = 2;
             // On x64, if end > 2**48, then that's in vsyscall or something.
@@ -567,7 +573,9 @@ impl Allocator {
             if end <= base.pow(52) && end > userspace_max {
                 userspace_max = end;
             }
-        }
+
+            return true;
+        });
 
         let mut maxbit = 0;
         for power in 1..64 {
