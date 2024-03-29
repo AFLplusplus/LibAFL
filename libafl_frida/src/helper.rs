@@ -504,9 +504,19 @@ where
                     }
                 }
 
+
+                #[cfg(target_arch = "x86_64")]
                 if let Some(rt) = runtimes.match_first_type_mut::<HookRuntime>() {
                     if let Some((call_target, needs_return)) = rt.is_interesting(decoder, instr) {
                         rt.emit_callout(call_target, &instruction, needs_return, runtimes_unborrowed.clone());
+                        keep_instr = false;
+                    }
+                }
+
+                #[cfg(target_arch = "aarch64")]
+                if let Some(rt) = runtimes.match_first_type_mut::<HookRuntime>() {
+                    if let Some((call_target, needs_return, is_reg)) = rt.is_interesting(decoder, instr) {
+                        rt.emit_callout(call_target, &instruction, needs_return, is_reg, runtimes_unborrowed.clone());
                         keep_instr = false;
                     }
                 }
@@ -517,7 +527,7 @@ where
                     None
                 };
 
-
+                #[cfg(target_arch = "x86_64")]
                 if let Some(details) = res {
                     if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
                         rt.emit_shadow_check(

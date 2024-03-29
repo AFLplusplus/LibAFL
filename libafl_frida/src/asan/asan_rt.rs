@@ -94,7 +94,7 @@ pub const ASAN_SAVE_REGISTER_NAMES: [&str; ASAN_SAVE_REGISTER_COUNT] = [
 #[cfg(target_arch = "aarch64")]
 pub const ASAN_SAVE_REGISTER_COUNT: usize = 32;
 
-#[cfg(target = "aarch64")]
+#[cfg(target_arch = "aarch64")]
 const ASAN_EH_FRAME_DWORD_COUNT: usize = 14;
 #[cfg(target_arch = "aarch64")]
 const ASAN_EH_FRAME_FDE_OFFSET: u32 = 20;
@@ -551,6 +551,39 @@ impl AsanRuntime {
 
     pub fn register_hooks(hook_rt: &mut HookRuntime) {
         macro_rules! hook_func {
+            ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*)) => {
+                paste::paste! {
+                    // extern "system" {
+                    //     fn $name($($param: $param_type),*) -> $return_type;
+                    // }
+                    let address = Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function").0 as usize;
+                    log::trace!("hooking {} at {:x}", stringify!($name), address);
+                    hook_rt.register_hook(address, move |_address, mut _context, _asan_rt| {
+                        let mut index = 0;
+
+                        let asan_rt = _asan_rt.unwrap();
+
+                        #[cfg(target_arch = "x86_64")]
+                        asan_rt.set_pc(_context.rip() as usize);
+
+                        #[cfg(target_arch = "aarch64")]
+                        asan_rt.set_pc(_context.pc() as usize);
+
+                        
+                        log::trace!("hooked {} from {:x}", stringify!($name), asan_rt.pc());
+                        #[allow(trivial_numeric_casts)]
+                        #[allow(unused_assignments)]
+                        asan_rt.[<hook_ $name>]($(_context.arg({
+                            let $param = index;
+                            index += 1;
+                            $param
+                        }) as _),*);
+
+                        asan_rt.unset_pc();
+                    
+                    });
+                };
+            };
             ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
                     // extern "system" {
@@ -562,9 +595,15 @@ impl AsanRuntime {
                         let mut index = 0;
 
                         let asan_rt = _asan_rt.unwrap();
+
+                        #[cfg(target_arch = "x86_64")]
                         asan_rt.set_pc(_context.rip() as usize);
 
-                        log::trace!("hooked {} from {:x}", stringify!($name), _context.rip());
+                        #[cfg(target_arch = "aarch64")]
+                        asan_rt.set_pc(_context.pc() as usize);
+
+                        
+                        log::trace!("hooked {} from {:x}", stringify!($name), asan_rt.pc());
                         #[allow(trivial_numeric_casts)]
                         #[allow(unused_assignments)]
                         _context.set_return_value(asan_rt.[<hook_ $name>]($(_context.arg({
@@ -576,8 +615,11 @@ impl AsanRuntime {
                         asan_rt.unset_pc();
                     });
                 }
-            }
+            };
+            
         }
+        
+
         macro_rules! hook_func_with_alt {
             ($lib:expr, $alt_name:ident, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
@@ -590,9 +632,13 @@ impl AsanRuntime {
                         let mut index = 0;
 
                         let asan_rt = _asan_rt.unwrap();
+                        #[cfg(target_arch = "x86_64")]
                         asan_rt.set_pc(_context.rip() as usize);
 
-                        log::trace!("hooked {} from {:x}", stringify!($alt_name), _context.rip());
+                        #[cfg(target_arch = "aarch64")]
+                        asan_rt.set_pc(_context.pc() as usize);
+
+                        log::trace!("hooked {} from {:x}", stringify!($alt_name), asan_rt.pc());
                         #[allow(trivial_numeric_casts)]
                         #[allow(unused_assignments)]
                         _context.set_return_value(asan_rt.[<hook_ $name>]($(_context.arg({
@@ -616,10 +662,17 @@ impl AsanRuntime {
                     let address = Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function").0 as usize;
                     log::trace!("hooking {} at {:x}", stringify!($name), address);
                     hook_rt.register_hook(address, move |_address, mut _context, _asan_rt| {
-                        log::trace!("hooked {} from {:x}", stringify!($name), _context.rip());
+                        
                         let asan_rt = _asan_rt.unwrap();
                         let mut index = 0;
+
+                        #[cfg(target_arch = "x86_64")]
                         asan_rt.set_pc(_context.rip() as usize);
+
+                        #[cfg(target_arch = "aarch64")]
+                        asan_rt.set_pc(_context.pc() as usize);
+
+                        log::trace!("hooked {} from {:x}", stringify!($name), asan_rt.pc());
                         #[allow(trivial_numeric_casts)]
                         #[allow(unused_assignments)]
                         let result = if asan_rt.[<hook_check_ $name>]($(_context.arg({
@@ -1256,22 +1309,19 @@ impl AsanRuntime {
         hook_func!(
             None,
             memset_pattern4,
-            (s: *mut c_void, c: *const c_void, n: usize),
-            usize
+            (s: *mut c_void, c: *const c_void, n: usize)
         );
         #[cfg(target_vendor = "apple")]
         hook_func!(
             None,
             memset_pattern8,
-            (s: *mut c_void, c: *const c_void, n: usize),
-            usize
+            (s: *mut c_void, c: *const c_void, n: usize)
         );
         #[cfg(target_vendor = "apple")]
         hook_func!(
             None,
             memset_pattern16,
-            (s: *mut c_void, c: *const c_void, n: usize),
-            usize
+            (s: *mut c_void, c: *const c_void, n: usize)
         );
     }
 
