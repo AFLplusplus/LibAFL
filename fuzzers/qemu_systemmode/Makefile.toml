@@ -1,23 +1,24 @@
 [env]
 PROFILE = { value = "release", condition = {env_not_set = ["PROFILE"]} }
+TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${FEATURE}"
 
 [tasks.target_dir]
-condition = { files_not_exist = [ "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}" ] }
+condition = { files_not_exist = [ "${TARGET_DIR}" ] }
 script_runner="@shell"
 script='''
-mkdir ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}
+mkdir -p ${TARGET_DIR}
 '''
 
 [tasks.image]
 dependencies = ["target_dir"]
-condition = { files_not_exist = [ "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/dummy.qcow2" ] }
+condition = { files_not_exist = [ "${TARGET_DIR}/dummy.qcow2" ] }
 script_runner="@shell"
 script='''
-qemu-img create -f qcow2 ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/dummy.qcow2 32M
+qemu-img create -f qcow2 ${TARGET_DIR}/dummy.qcow2 32M
 '''
 
 [tasks.target]
-dependencies = ["target_dir"]
+dependencies = ["target_dir", "build_fuzzer"]
 condition = { env_set = [ "TARGET_DEFINE" ] }
 command = "arm-none-eabi-gcc"
 args = [
@@ -30,11 +31,11 @@ args = [
     "${CARGO_MAKE_WORKING_DIRECTORY}/example/main.c",
     "${CARGO_MAKE_WORKING_DIRECTORY}/example/startup.c",
     "-D", "${TARGET_DEFINE}",
-    "-I", "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${PROFILE}/include",
-    "-o", "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/example.elf",
+    "-I", "${TARGET_DIR}/${PROFILE}/include",
+    "-o", "${TARGET_DIR}/example.elf",
 ]
 
-[tasks.build]
+[tasks.build_fuzzer]
 condition = { env_set = [ "FEATURE" ] }
 command = "cargo"
 args = [
@@ -43,25 +44,94 @@ args = [
     "${PROFILE}",
     "--no-default-features",
     "--features", "std,${FEATURE}",
+    "--target-dir", "${TARGET_DIR}",
+    "-vv",
 ]
-dependencies = ["target", "image"]
+dependencies = ["image"]
 
 [tasks.run_fuzzer]
-condition = { env_set = [ "FEATURE" ] }
-env = { "KERNEL" = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/example.elf" }
-command = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${PROFILE}/qemu_systemmode"
+env = { "KERNEL" = "${TARGET_DIR}/example.elf" }
+command = "${TARGET_DIR}/${PROFILE}/qemu_systemmode"
 args = [
     "-icount", "shift=auto,align=off,sleep=off",
     "-machine", "mps2-an385",
     "-monitor", "null",
-    "-kernel", "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/example.elf",
+    "-kernel", "${TARGET_DIR}/example.elf",
     "-serial", "null",
     "-nographic",
     "-snapshot",
-    "-drive", "if=none,format=qcow2,file=${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/dummy.qcow2",
+    "-drive", "if=none,format=qcow2,file=${TARGET_DIR}/dummy.qcow2",
     "-S",
 ]
-dependencies = ["build"]
+dependencies = ["build_fuzzer", "target"]
+
+[tasks.test_fuzzer]
+condition = { env_set = [ "FEATURE" ] }
+script_runner="@shell"
+script='''
+TMP_DIR=$(mktemp -d)
+
+cargo make build_$FEATURE
+timeout 15s cargo make ${FEATURE} | tee $TMP_DIR/fuzz.log 2>&1 || true
+
+if [ -z "$(grep 'Objective' $TMP_DIR/fuzz.log)" ]; then
+    echo "Fuzzer did not find the objective in $TMP_DIR/fuzz.log"
+    exit 1
+else
+    echo "Objective found."
+fi
+'''
+
+[tasks.build_classic]
+command = "cargo"
+args = [
+    "make",
+    "-e", "FEATURE=classic",
+    "-e", "TARGET_DEFINE=TARGET_CLASSIC",
+    "build_fuzzer",
+]
+
+[tasks.test_classic]
+command = "cargo"
+args = [
+    "make",
+    "-e", "FEATURE=classic",
+    "test_fuzzer",
+]
+
+[tasks.build_breakpoint]
+command = "cargo"
+args = [
+    "make",
+    "-e", "FEATURE=breakpoint",
+    "-e", "TARGET_DEFINE=TARGET_BREAKPOINT",
+    "build_fuzzer",
+]
+
+[tasks.test_breakpoint]
+command = "cargo"
+args = [
+    "make",
+    "-e", "FEATURE=breakpoint",
+    "test_fuzzer",
+]
+
+[tasks.build_sync_exit]
+command = "cargo"
+args = [
+    "make",
+    "-e", "FEATURE=sync_exit",
+    "-e", "TARGET_DEFINE=TARGET_SYNC_EXIT",
+    "build_fuzzer",
+]
+
+[tasks.test_sync_exit]
+command = "cargo"
+args = [
+    "make",
+    "-e", "FEATURE=sync_exit",
+    "test_fuzzer",
+]
 
 [tasks.classic]
 command = "cargo"
@@ -90,5 +160,20 @@ args = [
     "run_fuzzer",
 ]
 
+[tasks.test]
+clear = true
+run_task = { name = ["test_classic", "test_breakpoint", "test_sync_exit"] }
+
+[tasks.build]
+run_task = { name = ["build_classic", "build_breakpoint", "build_sync_exit"] }
+
 [tasks.run]
 alias="classic"
+
+[tasks.clean]
+clear = true
+script_runner="@shell"
+script='''
+rm -rf ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}
+cargo clean
+'''
