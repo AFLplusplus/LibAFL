@@ -12,7 +12,7 @@ fn main() -> anyhow::Result<()> {
         let bindings = bindgen::builder()
             .header("first.h")
             .header("second.h")
-            .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+            .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
             .generate()?;
 
         // Write the generated bindings to an output file.
