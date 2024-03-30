@@ -4,7 +4,8 @@ use std::{
     fs::{rename, File},
     io::Write,
     os::fd::{AsRawFd, FromRawFd},
-    time::{SystemTime, UNIX_EPOCH}, ptr::addr_of_mut,
+    ptr::addr_of_mut,
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use libafl::{

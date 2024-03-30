@@ -9,10 +9,13 @@ static GLOBAL: MiMalloc = MiMalloc;
 use core::time::Duration;
 use std::{env, net::SocketAddr, path::PathBuf};
 
-use clap::{self, Parser};
+use clap::Parser;
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
-    events::{launcher::Launcher, EventConfig, EventRestarter, LlmpRestartingEventManager},
+    events::{
+        launcher::Launcher, llmp::LlmpShouldSaveState, EventConfig, EventRestarter,
+        LlmpRestartingEventManager,
+    },
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -73,7 +76,13 @@ struct Opt {
     #[arg(short = 'a', long, help = "Specify a remote broker", name = "REMOTE")]
     remote_broker_addr: Option<SocketAddr>,
 
-    #[arg(short, long, help = "Set an the corpus directories", name = "INPUT")]
+    #[arg(
+        short,
+        long,
+        help = "Set an the corpus directories",
+        name = "INPUT",
+        required = true
+    )]
     input: Vec<PathBuf>,
 
     #[arg(
@@ -273,7 +282,11 @@ pub extern "C" fn libafl_main() {
         .broker_port(broker_port)
         .remote_broker_addr(opt.remote_broker_addr)
         .stdout_file(Some("/dev/null"))
-        .serialize_state(!opt.reload_corpus)
+        .serialize_state(if opt.reload_corpus {
+            LlmpShouldSaveState::OOMSafeNever
+        } else {
+            LlmpShouldSaveState::OOMSafeOnRestart
+        })
         .build()
         .launch()
     {

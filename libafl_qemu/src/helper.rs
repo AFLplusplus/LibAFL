@@ -1,14 +1,11 @@
 use core::{fmt::Debug, ops::Range};
-use std::{collections::HashSet, hash};
+use std::{collections::HashSet, hash::BuildHasher};
 
 use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple};
 use libafl_bolts::tuples::{MatchFirstType, SplitBorrowExtractFirstType};
+use libafl_qemu_sys::{GuestAddr, GuestPhysAddr};
 
-use crate::{
-    emu::{Emulator, GuestAddr},
-    hooks::QemuHooks,
-    GuestPhysAddr,
-};
+use crate::{hooks::QemuHooks, Qemu};
 
 /// A helper for `libafl_qemu`.
 // TODO remove 'static when specialization will be stable
@@ -30,11 +27,11 @@ where
     {
     }
 
-    fn pre_exec(&mut self, _emulator: &Emulator, _input: &S::Input) {}
+    fn pre_exec(&mut self, _qemu: Qemu, _input: &S::Input) {}
 
     fn post_exec<OT>(
         &mut self,
-        _emulator: &Emulator,
+        _qemu: Qemu,
         _input: &S::Input,
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
@@ -58,11 +55,11 @@ where
     where
         QT: QemuHelperTuple<S>;
 
-    fn pre_exec_all(&mut self, _emulator: &Emulator, input: &S::Input);
+    fn pre_exec_all(&mut self, _qemu: Qemu, input: &S::Input);
 
     fn post_exec_all<OT>(
         &mut self,
-        _emulator: &Emulator,
+        _qemu: Qemu,
         input: &S::Input,
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
@@ -88,17 +85,32 @@ where
     {
     }
 
-    fn pre_exec_all(&mut self, _emulator: &Emulator, _input: &S::Input) {}
+    fn pre_exec_all(&mut self, _qemu: Qemu, _input: &S::Input) {}
 
     fn post_exec_all<OT>(
         &mut self,
-        _emulator: &Emulator,
+        _qemu: Qemu,
         _input: &S::Input,
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
     {
+    }
+}
+
+impl<Head, F, S> HasInstrumentationFilter<F, S> for (Head, ())
+where
+    Head: QemuHelper<S> + HasInstrumentationFilter<F, S>,
+    S: UsesInput,
+    F: IsFilter,
+{
+    fn filter(&self) -> &F {
+        self.0.filter()
+    }
+
+    fn filter_mut(&mut self) -> &mut F {
+        self.0.filter_mut()
     }
 }
 
@@ -126,27 +138,27 @@ where
         self.1.first_exec_all(hooks);
     }
 
-    fn pre_exec_all(&mut self, emulator: &Emulator, input: &S::Input) {
-        self.0.pre_exec(emulator, input);
-        self.1.pre_exec_all(emulator, input);
+    fn pre_exec_all(&mut self, qemu: Qemu, input: &S::Input) {
+        self.0.pre_exec(qemu, input);
+        self.1.pre_exec_all(qemu, input);
     }
 
     fn post_exec_all<OT>(
         &mut self,
-        emulator: &Emulator,
+        qemu: Qemu,
         input: &S::Input,
         observers: &mut OT,
         exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
     {
-        self.0.post_exec(emulator, input, observers, exit_kind);
-        self.1.post_exec_all(emulator, input, observers, exit_kind);
+        self.0.post_exec(qemu, input, observers, exit_kind);
+        self.1.post_exec_all(qemu, input, observers, exit_kind);
     }
 }
 
-#[derive(Debug)]
-pub enum QemuFilterList<T: IsFilter + Debug> {
+#[derive(Debug, Clone)]
+pub enum QemuFilterList<T: IsFilter + Debug + Clone> {
     AllowList(T),
     DenyList(T),
     None,
@@ -154,7 +166,7 @@ pub enum QemuFilterList<T: IsFilter + Debug> {
 
 impl<T> IsFilter for QemuFilterList<T>
 where
-    T: IsFilter,
+    T: IsFilter + Clone,
 {
     type FilterParameter = T::FilterParameter;
 
@@ -169,7 +181,10 @@ where
 
 pub type QemuInstrumentationPagingFilter = QemuFilterList<HashSet<GuestPhysAddr>>;
 
-impl<H: hash::BuildHasher> IsFilter for HashSet<GuestPhysAddr, H> {
+impl<H> IsFilter for HashSet<GuestPhysAddr, H>
+where
+    H: BuildHasher,
+{
     type FilterParameter = Option<GuestPhysAddr>;
 
     fn allowed(&self, paging_id: Self::FilterParameter) -> bool {
@@ -192,7 +207,7 @@ impl IsFilter for Vec<Range<GuestAddr>> {
     }
 }
 
-pub trait HasInstrumentationFilter<F>
+pub trait HasInstrumentationFilter<F, S>
 where
     F: IsFilter,
 {
@@ -200,10 +215,41 @@ where
 
     fn filter_mut(&mut self) -> &mut F;
 
-    fn update_filter(&mut self, filter: F, emu: &Emulator) {
+    fn update_filter(&mut self, filter: F, emu: &Qemu) {
         *self.filter_mut() = filter;
         emu.flush_jit();
     }
+}
+
+#[cfg(emulation_mode = "usermode")]
+pub trait StdInstrumentationFilter<S: UsesInput>:
+    HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter, S>
+{
+}
+
+#[cfg(emulation_mode = "systemmode")]
+pub trait StdInstrumentationFilter<S: UsesInput>:
+    HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter, S>
+    + HasInstrumentationFilter<QemuInstrumentationPagingFilter, S>
+{
+}
+
+#[cfg(emulation_mode = "systemmode")]
+impl<Head, S> StdInstrumentationFilter<S> for (Head, ())
+where
+    Head: QemuHelper<S>
+        + HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter, S>
+        + HasInstrumentationFilter<QemuInstrumentationPagingFilter, S>,
+    S: UsesInput,
+{
+}
+
+#[cfg(emulation_mode = "usermode")]
+impl<Head, S> StdInstrumentationFilter<S> for (Head, ())
+where
+    Head: QemuHelper<S> + HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter, S>,
+    S: UsesInput,
+{
 }
 
 pub trait IsFilter: Debug {

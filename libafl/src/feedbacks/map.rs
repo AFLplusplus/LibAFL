@@ -28,9 +28,6 @@ use crate::{
     Error,
 };
 
-/// The prefix of the metadata names
-pub const MAPFEEDBACK_PREFIX: &str = "mapfeedback_metadata_";
-
 /// A [`MapFeedback`] that implements the AFL algorithm using an [`OrReducer`] combining the bits for the history map and the bit from ``HitcountsMapObserver``.
 pub type AflMapFeedback<O, S, T> = MapFeedback<DifferentIsNovel, O, OrReducer, S, T>;
 
@@ -700,7 +697,7 @@ where
         Self {
             indexes: false,
             novelties: None,
-            name: MAPFEEDBACK_PREFIX.to_string() + map_observer.name(),
+            name: map_observer.name().to_string(),
             observer_name: map_observer.name().to_string(),
             stats_name: create_stats_name(map_observer.name()),
             phantom: PhantomData,
@@ -713,7 +710,7 @@ where
         Self {
             indexes: track_indexes,
             novelties: if track_novelties { Some(vec![]) } else { None },
-            name: MAPFEEDBACK_PREFIX.to_string() + map_observer.name(),
+            name: map_observer.name().to_string(),
             observer_name: map_observer.name().to_string(),
             stats_name: create_stats_name(map_observer.name()),
             phantom: PhantomData,
@@ -830,114 +827,6 @@ where
         }
 
         interesting
-    }
-}
-
-/// A [`ReachabilityFeedback`] reports if a target has been reached.
-#[derive(Clone, Debug)]
-pub struct ReachabilityFeedback<O, S> {
-    name: String,
-    target_idx: Vec<usize>,
-    phantom: PhantomData<(O, S)>,
-}
-
-impl<O, S> ReachabilityFeedback<O, S>
-where
-    O: MapObserver<Entry = usize>,
-    for<'it> O: AsIter<'it, Item = usize>,
-{
-    /// Creates a new [`ReachabilityFeedback`] for a [`MapObserver`].
-    #[must_use]
-    pub fn new(map_observer: &O) -> Self {
-        Self {
-            name: map_observer.name().to_string(),
-            target_idx: vec![],
-            phantom: PhantomData,
-        }
-    }
-
-    /// Creates a new [`ReachabilityFeedback`] for a [`MapObserver`] with the given `name`.
-    #[must_use]
-    pub fn with_name(name: &'static str) -> Self {
-        Self {
-            name: name.to_string(),
-            target_idx: vec![],
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<O, S> Feedback<S> for ReachabilityFeedback<O, S>
-where
-    S: State,
-    O: MapObserver<Entry = usize>,
-    for<'it> O: AsIter<'it, Item = usize>,
-{
-    #[allow(clippy::wrong_self_convention)]
-    fn is_interesting<EM, OT>(
-        &mut self,
-        _state: &mut S,
-        _manager: &mut EM,
-        _input: &S::Input,
-        observers: &OT,
-        _exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
-    {
-        // TODO Replace with match_name_type when stable
-        let observer = observers.match_name::<O>(&self.name).unwrap();
-        let mut hit_target: bool = false;
-        //check if we've hit any targets.
-        for (i, &elem) in observer.as_iter().enumerate() {
-            if elem > 0 {
-                self.target_idx.push(i);
-                hit_target = true;
-            }
-        }
-        if hit_target {
-            Ok(true)
-        } else {
-            Ok(false)
-        }
-    }
-
-    fn append_metadata<EM, OT>(
-        &mut self,
-        _state: &mut S,
-        _manager: &mut EM,
-        _observers: &OT,
-        testcase: &mut Testcase<S::Input>,
-    ) -> Result<(), Error>
-    where
-        OT: ObserversTuple<S>,
-    {
-        if !self.target_idx.is_empty() {
-            let meta = MapIndexesMetadata::new(core::mem::take(self.target_idx.as_mut()));
-            testcase.add_metadata(meta);
-        };
-        Ok(())
-    }
-
-    fn discard_metadata(
-        &mut self,
-        _state: &mut S,
-        _input: &<S as UsesInput>::Input,
-    ) -> Result<(), Error> {
-        self.target_idx.clear();
-        Ok(())
-    }
-}
-
-impl<O, S> Named for ReachabilityFeedback<O, S>
-where
-    O: MapObserver<Entry = usize>,
-    for<'it> O: AsIter<'it, Item = usize>,
-{
-    #[inline]
-    fn name(&self) -> &str {
-        self.name.as_str()
     }
 }
 

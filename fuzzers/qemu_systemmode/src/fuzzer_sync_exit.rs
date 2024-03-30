@@ -10,12 +10,12 @@ use libafl::{
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    inputs::{BytesInput, HasTargetBytes},
+    inputs::BytesInput,
     monitors::MultiMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     observers::{HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
-    stages::StdMutationalStage,
+    stages::{CalibrationStage, StdMutationalStage},
     state::{HasCorpus, StdState},
     Error,
 };
@@ -25,18 +25,17 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
-    AsSlice,
 };
 use libafl_qemu::{
     edges::{edges_map_mut_slice, QemuEdgeCoverageHelper, MAX_EDGES_NUM},
-    elf::EasyElf,
     emu::Emulator,
-    GuestPhysAddr, QemuExecutor, QemuHooks, Regs,
+    executor::{stateful::StatefulQemuExecutor, QemuExecutorState},
+    EmuExitReasonError, FastSnapshotManager, HandlerError, HandlerResult, QemuHooks,
+    StdEmuExitHandler,
 };
 
-pub static mut MAX_INPUT_SIZE: usize = 50;
+// use libafl_qemu::QemuSnapshotBuilder; for normal qemu snapshot
 
-#[allow(clippy::too_many_lines)]
 pub fn fuzz() {
     env_logger::init();
 
@@ -50,100 +49,47 @@ pub fn fuzz() {
     let corpus_dirs = [PathBuf::from("./corpus")];
     let objective_dir = PathBuf::from("./crashes");
 
-    let mut elf_buffer = Vec::new();
-    let elf = EasyElf::from_file(
-        env::var("KERNEL").expect("KERNEL env not set"),
-        &mut elf_buffer,
-    )
-    .unwrap();
-
-    let input_addr = GuestPhysAddr::from(
-        elf.resolve_symbol(
-            &env::var("FUZZ_INPUT").unwrap_or_else(|_| "FUZZ_INPUT".to_owned()),
-            0,
-        )
-        .expect("Symbol or env FUZZ_INPUT not found"),
-    );
-    println!("FUZZ_INPUT @ {input_addr:#x}");
-
-    let main_addr = elf
-        .resolve_symbol("main", 0)
-        .expect("Symbol main not found");
-    println!("main address = {main_addr:#x}");
-
-    let breakpoint = elf
-        .resolve_symbol(
-            &env::var("BREAKPOINT").unwrap_or_else(|_| "BREAKPOINT".to_owned()),
-            0,
-        )
-        .expect("Symbol or env BREAKPOINT not found");
-    println!("Breakpoint address = {breakpoint:#x}");
-
     let mut run_client = |state: Option<_>, mut mgr, _core_id| {
         // Initialize QEMU
         let args: Vec<String> = env::args().collect();
         let env: Vec<(String, String)> = env::vars().collect();
-        let emu = Emulator::new(&args, &env).unwrap();
-
-        emu.set_breakpoint(main_addr);
-        unsafe {
-            emu.run().unwrap();
-        }
-        emu.remove_breakpoint(main_addr);
-
-        emu.set_breakpoint(breakpoint); // BREAKPOINT
+        // let emu_snapshot_manager = QemuSnapshotBuilder::new(true);
+        let emu_snapshot_manager = FastSnapshotManager::new(false); // Create a snapshot manager (normal or fast for now).
+        let emu_exit_handler: StdEmuExitHandler<FastSnapshotManager> =
+            StdEmuExitHandler::new(emu_snapshot_manager); // Create an exit handler: it is the entity taking the decision of what should be done when QEMU returns.
+        let emu = Emulator::new(&args, &env, emu_exit_handler).unwrap(); // Create the emulator
 
         let devices = emu.list_devices();
-        println!("Devices = {devices:?}");
-
-        // let saved_cpu_states: Vec<_> = (0..emu.num_cpus())
-        //     .map(|i| emu.cpu_from_index(i).save_state())
-        //     .collect();
-
-        // emu.save_snapshot("start", true);
-
-        let snap = emu.create_fast_snapshot(true);
+        println!("Devices = {:?}", devices);
 
         // The wrapped harness function, calling out to the LLVM-style harness
-        let mut harness = |input: &BytesInput| {
-            let target = input.target_bytes();
-            let mut buf = target.as_slice();
-            let len = buf.len();
-            unsafe {
-                if len > MAX_INPUT_SIZE {
-                    buf = &buf[0..MAX_INPUT_SIZE];
-                    // len = MAX_INPUT_SIZE;
+        let mut harness =
+            |input: &BytesInput, qemu_executor_state: &mut QemuExecutorState<_, _>| unsafe {
+                match emu.run(input, qemu_executor_state) {
+                    Ok(handler_result) => match handler_result {
+                        HandlerResult::UnhandledExit(unhandled_exit) => {
+                            panic!("Unhandled exit: {}", unhandled_exit)
+                        }
+                        HandlerResult::EndOfRun(exit_kind) => exit_kind,
+                        HandlerResult::Interrupted => {
+                            println!("Interrupted.");
+                            std::process::exit(0);
+                        }
+                    },
+                    Err(handler_error) => match handler_error {
+                        HandlerError::QemuExitReasonError(emu_exit_reason_error) => {
+                            match emu_exit_reason_error {
+                                EmuExitReasonError::UnknownKind => panic!("unknown kind"),
+                                EmuExitReasonError::UnexpectedExit => ExitKind::Crash,
+                                _ => {
+                                    panic!("Emu Exit unhandled error: {:?}", emu_exit_reason_error)
+                                }
+                            }
+                        }
+                        _ => panic!("Unhandled error: {:?}", handler_error),
+                    },
                 }
-
-                emu.write_phys_mem(input_addr, buf);
-
-                emu.run().unwrap();
-
-                // If the execution stops at any point other then the designated breakpoint (e.g. a breakpoint on a panic method) we consider it a crash
-                let mut pcs = (0..emu.num_cpus())
-                    .map(|i| emu.cpu_from_index(i))
-                    .map(|cpu| -> Result<u32, String> { cpu.read_reg(Regs::Pc) });
-                let ret = match pcs
-                    .find(|pc| (breakpoint..breakpoint + 5).contains(pc.as_ref().unwrap_or(&0)))
-                {
-                    Some(_) => ExitKind::Ok,
-                    None => ExitKind::Crash,
-                };
-
-                // OPTION 1: restore only the CPU state (registers et. al)
-                // for (i, s) in saved_cpu_states.iter().enumerate() {
-                //     emu.cpu_from_index(i).restore_state(s);
-                // }
-
-                // OPTION 2: restore a slow vanilla QEMU snapshot
-                // emu.load_snapshot("start", true);
-
-                // OPTION 3: restore a fast devices+mem snapshot
-                emu.restore_fast_snapshot(snap);
-
-                ret
-            }
-        };
+            };
 
         // Create an observation channel using the coverage map
         let edges_observer = unsafe {
@@ -194,10 +140,21 @@ pub fn fuzz() {
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-        let mut hooks = QemuHooks::new(emu.clone(), tuple_list!(QemuEdgeCoverageHelper::default()));
+        let mut hooks = QemuHooks::new(
+            emu.qemu().clone(),
+            tuple_list!(QemuEdgeCoverageHelper::default()),
+        );
+
+        // Setup an havoc mutator with a mutational stage
+        let mutator = StdScheduledMutator::new(havoc_mutations());
+        let calibration_feedback = MaxMapFeedback::tracking(&edges_observer, true, true);
+        let mut stages = tuple_list!(
+            StdMutationalStage::new(mutator),
+            CalibrationStage::new(&calibration_feedback)
+        );
 
         // Create a QEMU in-process executor
-        let mut executor = QemuExecutor::new(
+        let mut executor = StatefulQemuExecutor::new(
             &mut hooks,
             &mut harness,
             tuple_list!(edges_observer, time_observer),
@@ -220,10 +177,6 @@ pub fn fuzz() {
                 });
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
-
-        // Setup an havoc mutator with a mutational stage
-        let mutator = StdScheduledMutator::new(havoc_mutations());
-        let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
         fuzzer
             .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)

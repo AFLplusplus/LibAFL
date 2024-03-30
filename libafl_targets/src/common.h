@@ -82,6 +82,7 @@ typedef uint128_t         u128;
     })
   #define MEMCPY __builtin_memcpy
 #else
+  #include <string.h>  // needed to use memcpy on windows
   #define MAX(a, b) (((a) > (b)) ? (a) : (b))
   #define MIN(a, b) (((a) < (b)) ? (a) : (b))
   #define MEMCPY memcpy
