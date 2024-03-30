@@ -16,10 +16,9 @@ use yaxpeax_arch::LengthedInstruction;
 #[cfg(target_arch = "x86_64")]
 use yaxpeax_x86::long_mode::{InstDecoder, Opcode};
 
+
 #[cfg(target_arch = "aarch64")]
-use yaxpeax_arch::Arch;
-#[cfg(target_arch = "aarch64")]
-use yaxpeax_arm::armv8::a64::{ARMv8, InstDecoder, Opcode, Operand, ShiftStyle, SizeCode};
+use yaxpeax_arm::armv8::a64::{InstDecoder, Opcode, Operand};
 
 
 use crate::{
@@ -292,11 +291,8 @@ impl HookRuntime {
                 if let Some(f) = self.hooks.get_mut(&address) {
                     f(address, context, runtimes.borrow_mut().match_first_type_mut::<AsanRuntime>());
                 } else {
-                    unsafe {
                         let raw_func: extern "C" fn(usize, usize, usize, usize, usize, usize, usize, usize) -> usize = unsafe { std::mem::transmute(address) };
                         context.set_return_value(raw_func(context.arg(0), context.arg(1), context.arg(2), context.arg(3), context.arg(4), context.arg(5), context.arg(6), context.arg(7)));
-                    }
-                   
                 }
             }
         });

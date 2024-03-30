@@ -550,6 +550,7 @@ impl AsanRuntime {
     }
 
     pub fn register_hooks(hook_rt: &mut HookRuntime) {
+        
         macro_rules! hook_func {
             ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*)) => {
                 paste::paste! {
@@ -619,7 +620,7 @@ impl AsanRuntime {
             
         }
         
-
+        #[cfg(target_os = "windows")]
         macro_rules! hook_func_with_alt {
             ($lib:expr, $alt_name:ident, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
@@ -706,6 +707,7 @@ impl AsanRuntime {
             }
         }
 
+        #[cfg(target_os = "windows")]
         macro_rules! hook_func_with_check_with_alt {
             ($lib:expr, $alt_name:ident, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
@@ -970,15 +972,25 @@ impl AsanRuntime {
             }
         }
 
-        #[cfg(not(windows))]
-        for libname in [
+        #[cfg(target_os = "linux")]
+        let cpp_libs = [
             "libc++.so",
             "libc++.so.1",
             "libc++abi.so.1",
             "libc++_shared.so",
             "libstdc++.so",
             "libstdc++.so.6",
-        ] {
+        ];
+
+        #[cfg(target_vendor = "apple")]
+        let cpp_libs = [
+            "libc++.1.dylib",
+            "libc++abi.dylib",
+            "libsystem_c.dylib",
+        ];
+
+        #[cfg(not(windows))]
+        for libname in cpp_libs {
             log::info!("Hooking c++ functions in {}", libname);
             for export in Module::enumerate_exports(libname) {
                 match &export.name[..] {
@@ -1777,27 +1789,33 @@ impl AsanRuntime {
     #[cfg(target_arch = "aarch64")]
     #[allow(clippy::unused_self)]
     fn generate_shadow_check_blob(&mut self, bit: u32) -> Box<[u8]> {
+        //x0 contains the shadow address
+        //x0 and x1 are saved by the asan_check 
         let shadow_bit = self.allocator.shadow_bit();
         macro_rules! shadow_check {
             ($ops:ident, $bit:expr) => {dynasm!($ops
                 ; .arch aarch64
 
                 ; stp x2, x3, [sp, #-0x10]!
-                ; mov x1, #0
+                ; mov x1, xzr
                 // ; add x1, xzr, x1, lsl #shadow_bit
                 ; add x1, x1, x0, lsr #3
                 ; ubfx x1, x1, #0, #(shadow_bit + 1)
                 ; mov x2, #1
                 ; add x1, x1, x2, lsl #shadow_bit
-                ; ldrh w1, [x1, #0]
-                ; and x0, x0, #7
-                ; rev16 w1, w1
+                ; ldr w1, [x1, #0] //w1 contains our shadow check, we have x0, x2, and x3
+                ; and x0, x0, #7 //x0 is the offset for unaligned accesses
+                ; rev32 x1, x1
                 ; rbit w1, w1
-                ; lsr x1, x1, #16
-                ; lsr x1, x1, x0
+               // ; lsr x1, x1, #32 //at this point our shadow check is at the top 32 bits, lsr by 32
+                ; lsr w1, w1, w0 //x1 now contains our shadow value
                 ; ldp x2, x3, [sp], 0x10
-                ; tbnz x1, #$bit, >done
-
+                ; mov w0, #1
+                ; add w0, wzr, w0, LSL #$bit
+                ; sub w0, w0, #1 //x0 now contains our bitmask
+                ; and w1, w0, w1 //and the bitmask and the shadow value
+                ; cmp w0, w1 //our bitmask and shadow & mask must be the same
+                ; b.eq >done
                 ; adr x1, >done
                 ; nop // will be replaced by b to report
                 ; done:
@@ -1807,7 +1825,7 @@ impl AsanRuntime {
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
         shadow_check!(ops, bit);
         let ops_vec = ops.finalize().unwrap();
-        ops_vec[..ops_vec.len() - 4].to_vec().into_boxed_slice()
+        ops_vec[..ops_vec.len() - 4].to_vec().into_boxed_slice() //we don't need the last nop so subtract by 4
     }
 
     #[cfg(target_arch = "aarch64")]
@@ -2052,11 +2070,11 @@ impl AsanRuntime {
 
         self.blob_report = Some(ops_report.finalize().unwrap().into_boxed_slice());
 
-        self.blob_check_mem_byte = Some(self.generate_shadow_check_blob(0));
-        self.blob_check_mem_halfword = Some(self.generate_shadow_check_blob(1));
-        self.blob_check_mem_dword = Some(self.generate_shadow_check_blob(2));
-        self.blob_check_mem_qword = Some(self.generate_shadow_check_blob(3));
-        self.blob_check_mem_16bytes = Some(self.generate_shadow_check_blob(4));
+        self.blob_check_mem_byte = Some(self.generate_shadow_check_blob(1));
+        self.blob_check_mem_halfword = Some(self.generate_shadow_check_blob(2));
+        self.blob_check_mem_dword = Some(self.generate_shadow_check_blob(4));
+        self.blob_check_mem_qword = Some(self.generate_shadow_check_blob(8));
+        self.blob_check_mem_16bytes = Some(self.generate_shadow_check_blob(16));
 
         self.blob_check_mem_3bytes = Some(self.generate_shadow_check_exact_blob(3));
         self.blob_check_mem_6bytes = Some(self.generate_shadow_check_exact_blob(6));
@@ -2647,7 +2665,7 @@ impl AsanRuntime {
                     Aarch64Register::X0,
                     Aarch64Register::X0,
                     u64::from(displacement_lo),
-                ); //sub x0, x0, #[displacement & 4095]
+                ); //sub x0, x0, #[displacement 496]
             }
         } else if displacement > 0 {
             #[allow(clippy::cast_sign_loss)]
@@ -2658,16 +2676,16 @@ impl AsanRuntime {
                     Aarch64Register::X0,
                     Aarch64Register::X0,
                     u64::from(displacement),
-                );
+                ); 
             } else {
                 let displacement_hi = displacement / 4096;
                 let displacement_lo = displacement % 4096;
-                writer.put_bytes(&(0x91400000u32 | (displacement_hi << 10)).to_le_bytes());
+                writer.put_bytes(&(0x91400000u32 | (displacement_hi << 10)).to_le_bytes()); //add x0, x0, #[displacement/4096] LSL#12
                 writer.put_add_reg_reg_imm(
                     Aarch64Register::X0,
                     Aarch64Register::X0,
-                    u64::from(displacement_lo),
-                );
+                    u64::from(displacement_lo), 
+                ); //add x0, x0, #[displacement % 4096]
             }
         }
         // Insert the check_shadow_mem code blob

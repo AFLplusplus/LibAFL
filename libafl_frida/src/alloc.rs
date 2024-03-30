@@ -12,7 +12,6 @@ use std::{collections::BTreeMap, ffi::c_void};
 use backtrace::Backtrace;
 use hashbrown::HashMap;
 use libafl_bolts::cli::FuzzerOptions;
-use mmap_rs::Protection;
 #[cfg(any(
     windows,
     target_os = "linux",
@@ -348,8 +347,9 @@ impl Allocator {
             std::slice::from_raw_parts_mut(start as *mut u8, size / 8).fill(0xff);
 
             let remainder = size % 8;
-            if remainder > 0 {
-                ((start + size / 8) as *mut u8).write((1 << remainder) - 1);
+            if remainder > 0 {                
+
+                ((start + size / 8) as *mut u8).write(0xff << (8-remainder));
             }
         }
     }
@@ -527,7 +527,7 @@ impl Allocator {
                     return false; //once we hit the shadow mapping, we're done
                 }
 
-                println!("Mapping: {:#x}", range.memory_range().base_address().0 as usize);
+                log::trace!("Mapping: {:#x}", range.memory_range().base_address().0 as usize);
                 self.map_shadow_for_region(start, end, true);
             }
 
@@ -554,7 +554,7 @@ impl Allocator {
          RangeDetails::enumerate_with_prot(PageProtection::NoAccess, &mut |range: &RangeDetails| -> bool {
             let start = range.memory_range().base_address().0 as usize;
             let end = start + range.memory_range().size();
-            println!("Start: {:#x}, end: {:#x}", start, end);
+            log::trace!("Start: {:#x}, end: {:#x}", start, end);
             occupied_ranges.push((start, end));
             let base: usize = 2;
             // On x64, if end > 2**48, then that's in vsyscall or something.
