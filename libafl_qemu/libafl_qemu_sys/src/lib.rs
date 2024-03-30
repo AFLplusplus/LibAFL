@@ -116,6 +116,7 @@ pub type GuestVirtAddr = crate::vaddr;
 
 pub type GuestHwAddrInfo = crate::qemu_plugin_hwaddr;
 
+#[derive(Debug)]
 #[repr(C)]
 #[cfg_attr(feature = "python", pyclass(unsendable))]
 pub struct MapInfo {

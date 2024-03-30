@@ -10,7 +10,7 @@ use std::{
 use libafl::{inputs::UsesInput, state::HasMetadata};
 
 use crate::{
-    emu::{EmuError, Emulator, MemAccessInfo},
+    emu::{EmuError, MemAccessInfo, Qemu},
     helper::{
         HasInstrumentationFilter, IsFilter, QemuHelper, QemuHelperTuple,
         QemuInstrumentationAddressRangeFilter,
@@ -22,10 +22,10 @@ use crate::{
 
 static mut ASAN_GUEST_INITED: bool = false;
 
-pub fn init_with_asan_guest(
+pub fn init_qemu_with_asan_guest(
     args: &mut Vec<String>,
     env: &mut [(String, String)],
-) -> Result<(Emulator, String), EmuError> {
+) -> Result<(Qemu, String), EmuError> {
     let current = env::current_exe().unwrap();
     let asan_lib = fs::canonicalize(current)
         .unwrap()
@@ -92,7 +92,7 @@ pub fn init_with_asan_guest(
         ASAN_GUEST_INITED = true;
     }
 
-    let emu = Emulator::new(args, env)?;
+    let emu = Qemu::init(args, env)?;
     Ok((emu, asan_lib))
 }
 
@@ -147,16 +147,12 @@ impl QemuAsanGuestHelper {
 
 impl QemuAsanGuestHelper {
     #[must_use]
-    pub fn default(emu: &Emulator, asan: String) -> Self {
+    pub fn default(emu: &Qemu, asan: String) -> Self {
         Self::new(emu, asan, QemuInstrumentationAddressRangeFilter::None)
     }
 
     #[must_use]
-    pub fn new(
-        emu: &Emulator,
-        asan: String,
-        filter: QemuInstrumentationAddressRangeFilter,
-    ) -> Self {
+    pub fn new(emu: &Qemu, asan: String, filter: QemuInstrumentationAddressRangeFilter) -> Self {
         for mapping in emu.mappings() {
             println!("mapping: {mapping:#?}");
         }
@@ -198,7 +194,9 @@ impl QemuAsanGuestHelper {
     }
 }
 
-impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuAsanGuestHelper {
+impl<S: UsesInput> HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter, S>
+    for QemuAsanGuestHelper
+{
     fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
         &self.filter
     }

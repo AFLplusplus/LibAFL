@@ -1,8 +1,7 @@
 //! Expose QEMU user `LibAFL` C api to Rust
 
 use core::{
-    ffi::{c_char, c_void, CStr},
-    fmt::{self, Debug, Formatter},
+    fmt::{self, Debug, Display, Formatter},
     marker::PhantomData,
     mem::{transmute, MaybeUninit},
     ptr::{addr_of, copy_nonoverlapping, null},
@@ -11,7 +10,6 @@ use std::{
     cell::{OnceCell, Ref, RefCell, RefMut},
     collections::HashSet,
     ffi::CString,
-    fmt::{Debug, Display, Formatter},
     ptr,
 };
 
@@ -33,7 +31,9 @@ pub use libafl_qemu_sys::{MapInfo, MmapPerms, MmapPermsIter};
 use num_traits::Num;
 use strum::IntoEnumIterator;
 
-use crate::{command::IsCommand, sys::TCGTemp, GuestReg, QemuHelperTuple, Regs, StdInstrumentationFilter};
+use crate::{
+    command::IsCommand, sys::TCGTemp, GuestReg, QemuHelperTuple, Regs, StdInstrumentationFilter,
+};
 
 #[cfg(emulation_mode = "systemmode")]
 pub mod systemmode;
@@ -1636,7 +1636,7 @@ where
     pub fn add_read_hooks<T: Into<HookData>>(
         &self,
         data: T,
-        gen: Option<extern "C" fn(T, GuestAddr, MemAccessInfo) -> u64>,
+        gen: Option<extern "C" fn(T, GuestAddr, *mut TCGTemp, MemAccessInfo) -> u64>,
         exec1: Option<extern "C" fn(T, u64, GuestAddr)>,
         exec2: Option<extern "C" fn(T, u64, GuestAddr)>,
         exec4: Option<extern "C" fn(T, u64, GuestAddr)>,
@@ -1654,7 +1654,7 @@ where
     pub fn add_write_hooks<T: Into<HookData>>(
         &self,
         data: T,
-        gen: Option<extern "C" fn(T, GuestAddr, MemAccessInfo) -> u64>,
+        gen: Option<extern "C" fn(T, GuestAddr, *mut TCGTemp, MemAccessInfo) -> u64>,
         exec1: Option<extern "C" fn(T, u64, GuestAddr)>,
         exec2: Option<extern "C" fn(T, u64, GuestAddr)>,
         exec4: Option<extern "C" fn(T, u64, GuestAddr)>,
