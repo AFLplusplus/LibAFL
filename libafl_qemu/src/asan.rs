@@ -11,7 +11,6 @@ use addr2line::object::{Object, ObjectSection};
 use libafl::{
     executors::ExitKind, inputs::UsesInput, observers::ObserversTuple, state::HasMetadata,
 };
-use libafl_qemu_sys::GuestAddr;
 use libc::{
     c_void, MAP_ANON, MAP_FAILED, MAP_FIXED, MAP_NORESERVE, MAP_PRIVATE, PROT_READ, PROT_WRITE,
 };
@@ -28,7 +27,8 @@ use crate::{
     },
     hooks::{Hook, QemuHooks},
     snapshot::QemuSnapshotHelper,
-    Qemu, Regs,
+    sys::TCGTemp,
+    GuestAddr, Qemu, Regs,
 };
 
 // TODO at some point, merge parts with libafl_frida
@@ -1013,6 +1013,7 @@ pub fn gen_readwrite_asan<QT, S>(
     hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
+    _addr: *mut TCGTemp,
     _info: MemAccessInfo,
 ) -> Option<u64>
 where
@@ -1173,6 +1174,7 @@ pub fn gen_write_asan_snapshot<QT, S>(
     hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
+    _addr: *mut TCGTemp,
     _info: MemAccessInfo,
 ) -> Option<u64>
 where

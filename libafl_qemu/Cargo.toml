@@ -16,7 +16,7 @@ features = ["document-features", "default", "python", "x86_64", "usermode"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
-default = ["fork", "build_libqasan", "serdeany_autoreg", "injections"]
+default = ["fork", "build_libgasan", "build_libqasan", "serdeany_autoreg", "injections"]
 clippy = [] # special feature for clippy, don't use in normal projects§
 document-features = ["dep:document-features"]
 
@@ -29,6 +29,7 @@ python = ["pyo3", "pyo3-build-config", "libafl_qemu_sys/python"]
 ## Fork support
 fork = ["libafl/fork"]
 ## Build libqasan for address sanitization
+build_libgasan = []
 build_libqasan = []
 
 #! ## The following architecture features are mutually exclusive.

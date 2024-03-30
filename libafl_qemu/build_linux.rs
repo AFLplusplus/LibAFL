@@ -14,9 +14,11 @@ pub fn build() {
         })
     };
 
-    let libafl_qemu_hdr_name = "libafl_qemu.h";
 
-    let build_libqasan = cfg!(all(feature = "build_libqasan", not(feature = "hexagon")));
+    let qemu_asan_guest = cfg!(all(feature = "build_libgasan", not(feature = "hexagon")));
+    let qemu_asan = cfg!(all(feature = "build_libqasan", not(feature = "hexagon")));
+
+    let libafl_qemu_hdr_name = "libafl_qemu.h";
 
     let exit_hdr_dir = PathBuf::from("runtime");
     let libafl_qemu_hdr = exit_hdr_dir.join(libafl_qemu_hdr_name);
@@ -50,7 +52,7 @@ pub fn build() {
     println!("cargo:rerun-if-env-changed=CPU_TARGET");
     println!("cargo:rustc-cfg=cpu_target=\"{cpu_target}\"");
 
-    let cross_cc = if (emulation_mode == "usermode") && build_libqasan {
+    let cross_cc = if (emulation_mode == "usermode") && (qemu_asan || qemu_asan_guest) {
         // TODO try to autodetect a cross compiler with the arch name (e.g. aarch64-linux-gnu-gcc)
         let cross_cc = env::var("CROSS_CC").unwrap_or_else(|_| {
             println!("cargo:warning=CROSS_CC is not set, default to cc (things can go wrong if the selected cpu target ({cpu_target}) is not the host arch ({}))", env::consts::ARCH);
@@ -96,7 +98,7 @@ pub fn build() {
         .write_to_file(binding_file)
         .expect("Could not write bindings.");
 
-    if (emulation_mode == "usermode") && build_libqasan {
+    if (emulation_mode == "usermode") && (qemu_asan || qemu_asan_guest) {
         let qasan_dir = Path::new("libqasan");
         let qasan_dir = fs::canonicalize(qasan_dir).unwrap();
         println!("cargo:rerun-if-changed={}", qasan_dir.display());
@@ -114,6 +116,5 @@ pub fn build() {
             .status()
             .expect("make failed")
             .success());
-        // println!("cargo:rerun-if-changed={}/libqasan.so", target_dir.display());
     }
 }

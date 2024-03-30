@@ -1,7 +1,7 @@
 //! Expose QEMU user `LibAFL` C api to Rust
 
 use core::{
-    fmt,
+    fmt::{self, Debug, Display, Formatter},
     marker::PhantomData,
     mem::{transmute, MaybeUninit},
     ptr::{addr_of, copy_nonoverlapping, null},
@@ -10,7 +10,6 @@ use std::{
     cell::{OnceCell, Ref, RefCell, RefMut},
     collections::HashSet,
     ffi::CString,
-    fmt::{Debug, Display, Formatter},
     ptr,
 };
 
@@ -32,7 +31,9 @@ pub use libafl_qemu_sys::{MapInfo, MmapPerms, MmapPermsIter};
 use num_traits::Num;
 use strum::IntoEnumIterator;
 
-use crate::{command::IsCommand, GuestReg, QemuHelperTuple, Regs, StdInstrumentationFilter};
+use crate::{
+    command::IsCommand, sys::TCGTemp, GuestReg, QemuHelperTuple, Regs, StdInstrumentationFilter,
+};
 
 #[cfg(emulation_mode = "systemmode")]
 pub mod systemmode;
@@ -1158,7 +1159,7 @@ impl Qemu {
     pub fn add_read_hooks<T: Into<HookData>>(
         &self,
         data: T,
-        gen: Option<extern "C" fn(T, GuestAddr, MemAccessInfo) -> u64>,
+        gen: Option<extern "C" fn(T, GuestAddr, *mut TCGTemp, MemAccessInfo) -> u64>,
         exec1: Option<extern "C" fn(T, u64, GuestAddr)>,
         exec2: Option<extern "C" fn(T, u64, GuestAddr)>,
         exec4: Option<extern "C" fn(T, u64, GuestAddr)>,
@@ -1167,8 +1168,14 @@ impl Qemu {
     ) -> ReadHookId {
         unsafe {
             let data: u64 = data.into().0;
-            let gen: Option<extern "C" fn(u64, GuestAddr, libafl_qemu_sys::MemOpIdx) -> u64> =
-                core::mem::transmute(gen);
+            let gen: Option<
+                unsafe extern "C" fn(
+                    u64,
+                    GuestAddr,
+                    *mut TCGTemp,
+                    libafl_qemu_sys::MemOpIdx,
+                ) -> u64,
+            > = core::mem::transmute(gen);
             let exec1: Option<extern "C" fn(u64, u64, GuestAddr)> = core::mem::transmute(exec1);
             let exec2: Option<extern "C" fn(u64, u64, GuestAddr)> = core::mem::transmute(exec2);
             let exec4: Option<extern "C" fn(u64, u64, GuestAddr)> = core::mem::transmute(exec4);
@@ -1186,7 +1193,7 @@ impl Qemu {
     pub fn add_write_hooks<T: Into<HookData>>(
         &self,
         data: T,
-        gen: Option<extern "C" fn(T, GuestAddr, MemAccessInfo) -> u64>,
+        gen: Option<extern "C" fn(T, GuestAddr, *mut TCGTemp, MemAccessInfo) -> u64>,
         exec1: Option<extern "C" fn(T, u64, GuestAddr)>,
         exec2: Option<extern "C" fn(T, u64, GuestAddr)>,
         exec4: Option<extern "C" fn(T, u64, GuestAddr)>,
@@ -1195,8 +1202,14 @@ impl Qemu {
     ) -> WriteHookId {
         unsafe {
             let data: u64 = data.into().0;
-            let gen: Option<extern "C" fn(u64, GuestAddr, libafl_qemu_sys::MemOpIdx) -> u64> =
-                core::mem::transmute(gen);
+            let gen: Option<
+                unsafe extern "C" fn(
+                    u64,
+                    GuestAddr,
+                    *mut TCGTemp,
+                    libafl_qemu_sys::MemOpIdx,
+                ) -> u64,
+            > = core::mem::transmute(gen);
             let exec1: Option<extern "C" fn(u64, u64, GuestAddr)> = core::mem::transmute(exec1);
             let exec2: Option<extern "C" fn(u64, u64, GuestAddr)> = core::mem::transmute(exec2);
             let exec4: Option<extern "C" fn(u64, u64, GuestAddr)> = core::mem::transmute(exec4);
@@ -1623,7 +1636,7 @@ where
     pub fn add_read_hooks<T: Into<HookData>>(
         &self,
         data: T,
-        gen: Option<extern "C" fn(T, GuestAddr, MemAccessInfo) -> u64>,
+        gen: Option<extern "C" fn(T, GuestAddr, *mut TCGTemp, MemAccessInfo) -> u64>,
         exec1: Option<extern "C" fn(T, u64, GuestAddr)>,
         exec2: Option<extern "C" fn(T, u64, GuestAddr)>,
         exec4: Option<extern "C" fn(T, u64, GuestAddr)>,
@@ -1641,7 +1654,7 @@ where
     pub fn add_write_hooks<T: Into<HookData>>(
         &self,
         data: T,
-        gen: Option<extern "C" fn(T, GuestAddr, MemAccessInfo) -> u64>,
+        gen: Option<extern "C" fn(T, GuestAddr, *mut TCGTemp, MemAccessInfo) -> u64>,
         exec1: Option<extern "C" fn(T, u64, GuestAddr)>,
         exec2: Option<extern "C" fn(T, u64, GuestAddr)>,
         exec4: Option<extern "C" fn(T, u64, GuestAddr)>,
