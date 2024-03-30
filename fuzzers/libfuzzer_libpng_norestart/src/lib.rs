@@ -13,7 +13,7 @@ use clap::Parser;
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::{
-        launcher::Launcher, llmp::LlmpSaveState, EventConfig, EventRestarter,
+        launcher::Launcher, llmp::LlmpShouldSaveState, EventConfig, EventRestarter,
         LlmpRestartingEventManager,
     },
     executors::{inprocess::InProcessExecutor, ExitKind},
@@ -283,9 +283,9 @@ pub extern "C" fn libafl_main() {
         .remote_broker_addr(opt.remote_broker_addr)
         .stdout_file(Some("/dev/null"))
         .serialize_state(if opt.reload_corpus {
-            LlmpSaveState::Never
+            LlmpShouldSaveState::OOMSafeNever
         } else {
-            LlmpSaveState::Always
+            LlmpShouldSaveState::OOMSafeOnRestart
         })
         .build()
         .launch()

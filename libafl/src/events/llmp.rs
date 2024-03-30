@@ -894,20 +894,36 @@ where
 
 /// Specify if the State must be persistent over restarts
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum LlmpSaveState {
-    /// Always save and restore the state (not OOM resistant)
-    Always,
-    /// Never save the state
+pub enum LlmpShouldSaveState {
+    /// Always save and restore the state on restart (not OOM resistant)
+    OnRestart,
+    /// Never save the state (not OOM resistant)
     Never,
-    /// Best-effort save the state if not out-of-memory restart
-    OOM,
+    /// Best-effort save and restore the state on restart (OOM safe)
+    /// This adds additional runtime costs when processing events
+    OOMSafeOnRestart,
+    /// Never save the state (OOM safe)
+    /// This adds additional runtime costs when processing events
+    OOMSafeNever,
 }
 
-impl LlmpSaveState {
+impl LlmpShouldSaveState {
     /// Check if the state must be saved `on_restart()`
     #[must_use]
     pub fn on_restart(&self) -> bool {
-        matches!(self, LlmpSaveState::Always | LlmpSaveState::OOM)
+        matches!(
+            self,
+            LlmpShouldSaveState::OnRestart | LlmpShouldSaveState::OOMSafeOnRestart
+        )
+    }
+
+    /// Check if the policy is OOM safe
+    #[must_use]
+    pub fn oom_safe(&self) -> bool {
+        matches!(
+            self,
+            LlmpShouldSaveState::OOMSafeOnRestart | LlmpShouldSaveState::OOMSafeNever
+        )
     }
 }
 
@@ -925,7 +941,7 @@ where
     /// The staterestorer to serialize the state for the next runner
     staterestorer: StateRestorer<SP>,
     /// Decide if the state restorer must save the serialized state
-    save_state: LlmpSaveState,
+    save_state: LlmpShouldSaveState,
 }
 
 #[cfg(all(feature = "std", feature = "adaptive_serialization"))]
@@ -1116,7 +1132,7 @@ where
         Self {
             llmp_mgr,
             staterestorer,
-            save_state: LlmpSaveState::Always,
+            save_state: LlmpShouldSaveState::OnRestart,
         }
     }
 
@@ -1124,7 +1140,7 @@ where
     pub fn with_save_state(
         llmp_mgr: LlmpEventManager<EMH, S, SP>,
         staterestorer: StateRestorer<SP>,
-        save_state: LlmpSaveState,
+        save_state: LlmpShouldSaveState,
     ) -> Self {
         Self {
             llmp_mgr,
@@ -1146,7 +1162,7 @@ where
     /// Save LLMP state and empty state in staterestorer
     pub fn intermediate_save(&mut self) -> Result<(), Error> {
         // First, reset the page to 0 so the next iteration can read read from the beginning of this page
-        if self.save_state == LlmpSaveState::OOM {
+        if self.save_state.oom_safe() {
             self.staterestorer.reset();
             self.staterestorer
                 .save(&(None::<S>, &self.llmp_mgr.describe()?))?;
@@ -1240,8 +1256,8 @@ where
     #[builder(default = None)]
     exit_cleanly_after: Option<NonZeroUsize>,
     /// Tell the manager to serialize or not the state on restart
-    #[builder(default = LlmpSaveState::Always)]
-    serialize_state: LlmpSaveState,
+    #[builder(default = LlmpShouldSaveState::OnRestart)]
+    serialize_state: LlmpShouldSaveState,
     /// The timeout duration used for llmp client timeout
     #[builder(default = DEFAULT_CLIENT_TIMEOUT_SECS)]
     client_timeout: Duration,
@@ -1418,7 +1434,7 @@ where
                 compiler_fence(Ordering::SeqCst);
 
                 #[allow(clippy::manual_assert)]
-                if !staterestorer.has_content() && self.serialize_state == LlmpSaveState::Always {
+                if !staterestorer.has_content() && !self.serialize_state.oom_safe() {
                     #[cfg(unix)]
                     if child_status == 137 {
                         // Out of Memory, see https://tldp.org/LDP/abs/html/exitcodes.html
@@ -1488,7 +1504,7 @@ where
                 )
             };
         // We reset the staterestorer, the next staterestorer and receiver (after crash) will reuse the page from the initial message.
-        if self.serialize_state == LlmpSaveState::OOM {
+        if self.serialize_state.oom_safe() {
             mgr.intermediate_save()?;
         } else {
             mgr.staterestorer.reset();
