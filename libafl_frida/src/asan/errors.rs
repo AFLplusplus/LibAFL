@@ -579,7 +579,7 @@ impl AsanErrorsObserver {
     /// Creates a new `AsanErrorsObserver`, pointing to a constant `AsanErrors` field
     #[must_use]
     pub fn new(errors: OwnedPtr<Option<AsanErrors>>) -> Self {
-        Self { errors: errors }
+        Self { errors }
     }
 
     /// Creates a new `AsanErrorsObserver`, owning the `AsanErrors`
