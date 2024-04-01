@@ -135,8 +135,12 @@ impl AsanErrors {
     }
 
     /// Get a mutable reference to the global [`struct@AsanErrors`] object
+    ///
+    /// # Safety
+    /// This will borrow the [`ASAN_ERRORS`] object.
+    /// Nothing else may reference it at the same time.
     #[must_use]
-    pub fn get_mut<'a>() -> &'a mut Self {
+    pub unsafe fn get_mut<'a>() -> &'a mut Self {
         unsafe { ASAN_ERRORS.as_mut().unwrap() }
     }
 
