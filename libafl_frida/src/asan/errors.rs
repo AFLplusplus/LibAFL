@@ -1,5 +1,5 @@
 //! Errors that can be caught by the `libafl_frida` address sanitizer.
-use std::{fmt::Debug, io::Write, marker::PhantomData};
+use std::{fmt::Debug, io::Write, marker::PhantomData, ptr::addr_of};
 
 use backtrace::Backtrace;
 use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
@@ -576,10 +576,18 @@ impl Named for AsanErrorsObserver {
 }
 
 impl AsanErrorsObserver {
-    /// Creates a new `AsanErrorsObserver`, pointing to a constant `AsanErrors` field
+    /// Creates a new [`AsanErrorsObserver`], pointing to a constant `AsanErrors` field
     #[must_use]
     pub fn new(errors: OwnedPtr<Option<AsanErrors>>) -> Self {
         Self { errors }
+    }
+
+    /// Creates a new [`AsanErrorsObserver`], pointing to the [`ASAN_ERRORS`] global static field.
+    ///
+    /// # Safety
+    /// The field should not be accessed multiple times at the same time (i.e., from different threads)!
+    pub unsafe fn from_static_asan_errors() -> Self {
+        Self::from_ptr(addr_of!(ASAN_ERRORS))
     }
 
     /// Creates a new `AsanErrorsObserver`, owning the `AsanErrors`

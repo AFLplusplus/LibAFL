@@ -39,7 +39,7 @@ use libafl_bolts::{
 #[cfg(unix)]
 use libafl_frida::asan::{
     asan_rt::AsanRuntime,
-    errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS},
+    errors::{AsanErrorsFeedback, AsanErrorsObserver},
 };
 use libafl_frida::{
     cmplog_rt::CmpLogRuntime,
@@ -174,7 +174,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
                 #[cfg(unix)]
                 let observers = tuple_list!(edges_observer, time_observer, unsafe {
-                    AsanErrorsObserver::from_ptr(core::ptr::addr_of!(ASAN_ERRORS))
+                    AsanErrorsObserver::from_static_asan_errors()
                 });
                 #[cfg(windows)]
                 let observers = tuple_list!(edges_observer, time_observer);
@@ -288,7 +288,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
                 #[cfg(unix)]
                 let observers = tuple_list!(edges_observer, time_observer, unsafe {
-                    AsanErrorsObserver::from_ptr(core::ptr::addr_of!(ASAN_ERRORS))
+                    AsanErrorsObserver::from_static_asan_errors()
                 });
                 #[cfg(windows)]
                 let observers = tuple_list!(edges_observer, time_observer,);
@@ -418,7 +418,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let observers = tuple_list!(
                     edges_observer,
                     time_observer,
-                    AsanErrorsObserver::from_ptr(core::ptr::addr_of!(ASAN_ERRORS))
+                    AsanErrorsObserver::from_static_asan_errors()
                 );
                 #[cfg(windows)]
                 let observers = tuple_list!(edges_observer, time_observer,);

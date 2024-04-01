@@ -370,7 +370,7 @@ mod tests {
     use crate::{
         asan::{
             asan_rt::AsanRuntime,
-            errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS},
+            errors::{AsanErrorsFeedback, AsanErrorsObserver},
         },
         coverage_rt::CoverageRuntime,
         executor::FridaInProcessExecutor,
