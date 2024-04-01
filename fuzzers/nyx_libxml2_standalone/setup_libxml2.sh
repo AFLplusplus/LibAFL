@@ -35,3 +35,5 @@ python3 "../../libafl_nyx/packer/packer/nyx_packer.py" \
     -file "/tmp/input" \
     --fast_reload_mode \
     --purge || exit
+
+python3 ../../libafl_nyx/packer/packer/nyx_config_gen.py /tmp/nyx_libxml2/ Kernel || kernel
