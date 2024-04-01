@@ -479,7 +479,7 @@ impl Allocator {
     /// Checks if any of the allocations has not been freed
     ///
     /// # Safety
-    /// This will borrow the [`ASAN_ERRORS`] object.
+    /// This will borrow [`ASAN_ERRORS`] mutably.
     /// Nothing else may reference it at the same time.
     pub unsafe fn check_for_leaks(&self) {
         for metadata in self.allocations.values() {

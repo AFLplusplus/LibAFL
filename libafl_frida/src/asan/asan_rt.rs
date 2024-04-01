@@ -278,7 +278,9 @@ impl FridaRuntime for AsanRuntime {
         input: &I,
     ) -> Result<(), libafl::Error> {
         if self.check_for_leaks_enabled {
-            self.check_for_leaks();
+            // # Safety
+            // We only run in an single thread here, so no concurrent access will happen.
+            unsafe { self.check_for_leaks() };
         }
 
         let target_bytes = input.target_bytes();
@@ -336,7 +338,11 @@ impl AsanRuntime {
     }
 
     /// Check if the test leaked any memory and report it if so.
-    pub fn check_for_leaks(&mut self) {
+    ///
+    /// # Safety
+    /// This will borrow [`ASAN_ERRORS`] mutably.
+    /// Nothing else may reference it at the same time.
+    pub unsafe fn check_for_leaks(&mut self) {
         self.allocator.check_for_leaks();
     }
 
