@@ -194,7 +194,7 @@ where
             .match_name::<O>(self.map_observer_name())
             .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?;
 
-        let mut hash = observer.hash() as usize;
+        let mut hash = observer.hash_easy() as usize;
 
         let psmeta = state.metadata_mut::<SchedulerMetadata>()?;
 

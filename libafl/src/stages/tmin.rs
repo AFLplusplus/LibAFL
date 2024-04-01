@@ -401,7 +401,7 @@ where
         let obs = observers
             .match_name::<M>(self.observer_name())
             .expect("Should have been provided valid observer name.");
-        Ok(obs.hash() == self.orig_hash)
+        Ok(obs.hash_easy() == self.orig_hash)
     }
 }
 
@@ -444,7 +444,7 @@ where
         MapEqualityFeedback {
             name: "MapEq".to_string(),
             obs_name: self.obs_name.clone(),
-            orig_hash: obs.hash(),
+            orig_hash: obs.hash_easy(),
             phantom: PhantomData,
         }
     }

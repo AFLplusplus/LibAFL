@@ -322,7 +322,7 @@ where
             .match_name::<O>(name)
             .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?;
 
-        let hash = observer.hash() as usize;
+        let hash = observer.hash_easy() as usize;
 
         executor
             .observers_mut()
