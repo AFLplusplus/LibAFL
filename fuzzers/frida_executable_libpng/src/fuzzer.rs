@@ -104,7 +104,7 @@ unsafe fn fuzz(
 
                 let coverage = CoverageRuntime::new();
                 #[cfg(unix)]
-                let asan = AsanRuntime::new(&options);
+                let asan = AsanRuntime::new(options);
 
                 #[cfg(unix)]
                 let mut frida_helper =
@@ -183,11 +183,9 @@ unsafe fn fuzz(
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
                 #[cfg(unix)]
-                let observers = tuple_list!(
-                    edges_observer,
-                    time_observer,
-                    AsanErrorsObserver::new(&ASAN_ERRORS)
-                );
+                let observers = tuple_list!(edges_observer, time_observer, unsafe {
+                    AsanErrorsObserver::from_ptr(core::ptr::addr_of!(ASAN_ERRORS))
+                });
                 #[cfg(windows)]
                 let observers = tuple_list!(edges_observer, time_observer);
 
@@ -298,11 +296,9 @@ unsafe fn fuzz(
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
                 #[cfg(unix)]
-                let observers = tuple_list!(
-                    edges_observer,
-                    time_observer,
-                    AsanErrorsObserver::new(&ASAN_ERRORS)
-                );
+                let observers = tuple_list!(edges_observer, time_observer, unsafe {
+                    AsanErrorsObserver::from_ptr(core::ptr::addr_of!(ASAN_ERRORS))
+                });
                 #[cfg(windows)]
                 let observers = tuple_list!(edges_observer, time_observer,);
 
@@ -428,11 +424,9 @@ unsafe fn fuzz(
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
                 #[cfg(unix)]
-                let observers = tuple_list!(
-                    edges_observer,
-                    time_observer,
-                    AsanErrorsObserver::new(&ASAN_ERRORS)
-                );
+                let observers = tuple_list!(edges_observer, time_observer, unsafe {
+                    AsanErrorsObserver::from_ptr(core::ptr::addr_of!(ASAN_ERRORS))
+                });
                 #[cfg(windows)]
                 let observers = tuple_list!(edges_observer, time_observer,);
 

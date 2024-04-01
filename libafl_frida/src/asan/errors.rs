@@ -578,10 +578,8 @@ impl Named for AsanErrorsObserver {
 impl AsanErrorsObserver {
     /// Creates a new `AsanErrorsObserver`, pointing to a constant `AsanErrors` field
     #[must_use]
-    pub fn new(errors: *const Option<AsanErrors>) -> Self {
-        Self {
-            errors: OwnedPtr::Ptr(errors),
-        }
+    pub fn new(errors: OwnedPtr<Option<AsanErrors>>) -> Self {
+        Self { errors: errors }
     }
 
     /// Creates a new `AsanErrorsObserver`, owning the `AsanErrors`
@@ -593,8 +591,12 @@ impl AsanErrorsObserver {
     }
 
     /// Creates a new `AsanErrorsObserver` from a raw ptr
+    ///
+    /// # Safety
+    /// Will dereference this pointer at a later point in time.
+    /// The pointer *must* outlive this [`AsanErrorsObserver`]'s lifetime.
     #[must_use]
-    pub fn from_mut_ptr(errors: *const Option<AsanErrors>) -> Self {
+    pub unsafe fn from_ptr(errors: *const Option<AsanErrors>) -> Self {
         Self {
             errors: OwnedPtr::Ptr(errors),
         }
