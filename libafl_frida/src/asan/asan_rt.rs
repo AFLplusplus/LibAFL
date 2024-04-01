@@ -1788,12 +1788,16 @@ impl AsanRuntime {
 
     #[cfg(target_arch = "aarch64")]
     #[allow(clippy::unused_self)]
-    fn generate_shadow_check_blob(&mut self, bit: u32) -> Box<[u8]> {
+    fn generate_shadow_check_blob(&mut self, width: u32) -> Box<[u8]> {
         //x0 contains the shadow address
         //x0 and x1 are saved by the asan_check 
+        //The maximum size this supports is up to 25 bytes. This is because we load 4 bytes of the shadow value. And, in the case that we have a misaligned 
+        //with an offset of 7 into the word. Load 25 bytes from 0x1007 - [0x1007,0x101f], then we require the shadow values from 0x1000, 0x1008, 0x1010, and 0x1018
+        
+
         let shadow_bit = self.allocator.shadow_bit();
         macro_rules! shadow_check {
-            ($ops:ident, $bit:expr) => {dynasm!($ops
+            ($ops:ident, $width:expr) => {dynasm!($ops
                 ; .arch aarch64
 
                 ; stp x2, x3, [sp, #-0x10]!
@@ -1803,15 +1807,14 @@ impl AsanRuntime {
                 ; ubfx x1, x1, #0, #(shadow_bit + 1)
                 ; mov x2, #1
                 ; add x1, x1, x2, lsl #shadow_bit
-                ; ldr w1, [x1, #0] //w1 contains our shadow check, we have x0, x2, and x3
+                ; ldr w1, [x1, #0] //w1 contains our shadow check
                 ; and x0, x0, #7 //x0 is the offset for unaligned accesses
                 ; rev32 x1, x1
                 ; rbit w1, w1
-               // ; lsr x1, x1, #32 //at this point our shadow check is at the top 32 bits, lsr by 32
                 ; lsr w1, w1, w0 //x1 now contains our shadow value
                 ; ldp x2, x3, [sp], 0x10
                 ; mov w0, #1
-                ; add w0, wzr, w0, LSL #$bit
+                ; add w0, wzr, w0, LSL #$width
                 ; sub w0, w0, #1 //x0 now contains our bitmask
                 ; and w1, w0, w1 //and the bitmask and the shadow value
                 ; cmp w0, w1 //our bitmask and shadow & mask must be the same
@@ -1823,38 +1826,45 @@ impl AsanRuntime {
         }
 
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
-        shadow_check!(ops, bit);
+        shadow_check!(ops, width);
         let ops_vec = ops.finalize().unwrap();
         ops_vec[..ops_vec.len() - 4].to_vec().into_boxed_slice() //we don't need the last nop so subtract by 4
     }
 
     #[cfg(target_arch = "aarch64")]
     #[allow(clippy::unused_self)]
-    fn generate_shadow_check_exact_blob(&mut self, val: u64) -> Box<[u8]> {
+    fn generate_shadow_check_large_blob(&mut self, width: u32) -> Box<[u8]> {
+        //x0 contains the shadow address
+        //x0 and x1 are saved by the asan_check 
+        //large blobs require 16 byte alignment as they are only possible with vector insns, so just abuse that
+        
+        //This is used for checking shadow blobs that are larger than 25 bytes
+        
+
+        assert!(width <= 64, "width must be <= 64");
+        let shift = 64 - width;
         let shadow_bit = self.allocator.shadow_bit();
         macro_rules! shadow_check_exact {
-            ($ops:ident, $val:expr) => {dynasm!($ops
+            ($ops:ident, $shift:expr) => {dynasm!($ops
                 ; .arch aarch64
 
                 ; stp x2, x3, [sp, #-0x10]!
-                ; mov x1, #0
+                ; mov x1, xzr
                 // ; add x1, xzr, x1, lsl #shadow_bit
                 ; add x1, x1, x0, lsr #3
                 ; ubfx x1, x1, #0, #(shadow_bit + 1)
                 ; mov x2, #1
                 ; add x1, x1, x2, lsl #shadow_bit
-                ; ldrh w1, [x1, #0]
-                ; and x0, x0, #7
-                ; rev16 w1, w1
-                ; rbit w1, w1
-                ; lsr x1, x1, #16
-                ; lsr x1, x1, x0
-                ; .dword -717536768 // 0xd53b4200 //mrs x0, NZCV
-                ; mov x2, $val
-                ; ands x1, x1, x2
+                ; ldr x1, [x1, #0] //x1 contains our shadow check
+                ; rev64 x1, x1
+                ; rbit x1, x1 //x1 now contains our shadow value
                 ; ldp x2, x3, [sp], 0x10
-                ; b.ne >done
-
+                ; mov x0, xzr
+                ; sub x0, x0, #1 //gives us all 1s
+                ; lsr x0, x0, #$shift //x0 now contains our bitmask
+                ; and x1, x0, x1 //and the bitmask and the shadow value and put it in x1
+                ; cmp x0, x1 //our bitmask and shadow & mask must be the same to ensure that the bytes are valid
+                ; b.eq >done 
                 ; adr x1, >done
                 ; nop // will be replaced by b to report
                 ; done:
@@ -1862,7 +1872,7 @@ impl AsanRuntime {
         }
 
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
-        shadow_check_exact!(ops, val);
+        shadow_check_exact!(ops, shift);
         let ops_vec = ops.finalize().unwrap();
         ops_vec[..ops_vec.len() - 4].to_vec().into_boxed_slice()
     }
@@ -2076,13 +2086,13 @@ impl AsanRuntime {
         self.blob_check_mem_qword = Some(self.generate_shadow_check_blob(8));
         self.blob_check_mem_16bytes = Some(self.generate_shadow_check_blob(16));
 
-        self.blob_check_mem_3bytes = Some(self.generate_shadow_check_exact_blob(3));
-        self.blob_check_mem_6bytes = Some(self.generate_shadow_check_exact_blob(6));
-        self.blob_check_mem_12bytes = Some(self.generate_shadow_check_exact_blob(12));
-        self.blob_check_mem_24bytes = Some(self.generate_shadow_check_exact_blob(24));
-        self.blob_check_mem_32bytes = Some(self.generate_shadow_check_exact_blob(32));
-        self.blob_check_mem_48bytes = Some(self.generate_shadow_check_exact_blob(48));
-        self.blob_check_mem_64bytes = Some(self.generate_shadow_check_exact_blob(64));
+        self.blob_check_mem_3bytes = Some(self.generate_shadow_check_blob(3));
+        self.blob_check_mem_6bytes = Some(self.generate_shadow_check_blob(6));
+        self.blob_check_mem_12bytes = Some(self.generate_shadow_check_blob(12));
+        self.blob_check_mem_24bytes = Some(self.generate_shadow_check_blob(24)); 
+        self.blob_check_mem_32bytes = Some(self.generate_shadow_check_large_blob(32)); //this is possible with ldp q0, q1, [sp]. This must at least 16 byte aligned
+        self.blob_check_mem_48bytes = Some(self.generate_shadow_check_large_blob(48));
+        self.blob_check_mem_64bytes = Some(self.generate_shadow_check_large_blob(64)); 
     }
 
     /// Get the blob which implements the report funclet
