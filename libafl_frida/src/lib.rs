@@ -438,7 +438,7 @@ mod tests {
             let mut fuzzer = StdFuzzer::new(StdScheduler::new(), feedback, objective);
 
             let observers = tuple_list!(
-                AsanErrorsObserver::from_ptr(addr_of!(ASAN_ERRORS)) //,
+                AsanErrorsObserver::from_static_asan_errors() //,
             );
 
             {
