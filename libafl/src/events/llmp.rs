@@ -32,7 +32,9 @@ use libafl_bolts::{
     llmp::{recv_tcp_msg, send_tcp_msg, TcpRequest, TcpResponse, LLMP_CONNECT_ADDR},
 };
 #[cfg(feature = "std")]
-use libafl_bolts::{llmp::LlmpConnection, shmem::StdShMemProvider, staterestore::StateRestorer, RestarterId};
+use libafl_bolts::{
+    llmp::LlmpConnection, shmem::StdShMemProvider, staterestore::StateRestorer, RestarterId,
+};
 use libafl_bolts::{
     llmp::{self, LlmpClient, LlmpClientDescription, Tag},
     shmem::ShMemProvider,
