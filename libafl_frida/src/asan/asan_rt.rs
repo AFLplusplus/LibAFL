@@ -1107,8 +1107,8 @@ impl AsanRuntime {
                     actual_pc,
                     (None, None, 0, fault_address),
                     backtrace,
-                )))
-            };
+                )));
+            }
         }
 
         // log::info!("ASAN Error, attach the debugger!");
