@@ -1,5 +1,7 @@
 //! LLMP-backed event manager for scalable multi-processed fuzzing
 
+#[cfg(feature = "std")]
+use alloc::string::ToString;
 use alloc::{boxed::Box, vec::Vec};
 #[cfg(all(unix, not(miri), feature = "std"))]
 use core::ptr::addr_of_mut;
@@ -7,14 +9,12 @@ use core::ptr::addr_of_mut;
 use core::sync::atomic::{compiler_fence, Ordering};
 use core::{marker::PhantomData, num::NonZeroUsize, time::Duration};
 #[cfg(feature = "std")]
+use std::net::TcpStream;
+#[cfg(feature = "std")]
 use std::net::{SocketAddr, ToSocketAddrs};
 
-#[cfg(feature = "std")]
-use libafl_bolts::core_affinity::CoreId;
 #[cfg(feature = "adaptive_serialization")]
 use libafl_bolts::current_time;
-#[cfg(feature = "std")]
-use libafl_bolts::llmp::DEFAULT_CLIENT_TIMEOUT_SECS;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use libafl_bolts::os::startable_self;
 #[cfg(all(unix, feature = "std", not(miri)))]
@@ -27,7 +27,14 @@ use libafl_bolts::{
     llmp::{LLMP_FLAG_COMPRESSED, LLMP_FLAG_INITIALIZED},
 };
 #[cfg(feature = "std")]
-use libafl_bolts::{llmp::LlmpConnection, shmem::StdShMemProvider, staterestore::StateRestorer};
+use libafl_bolts::{
+    core_affinity::CoreId,
+    llmp::{recv_tcp_msg, send_tcp_msg, TcpRequest, TcpResponse, LLMP_CONNECT_ADDR},
+};
+#[cfg(feature = "std")]
+use libafl_bolts::{
+    llmp::LlmpConnection, shmem::StdShMemProvider, staterestore::StateRestorer, RestarterId,
+};
 use libafl_bolts::{
     llmp::{self, LlmpClient, LlmpClientDescription, Tag},
     shmem::ShMemProvider,
@@ -106,15 +113,10 @@ where
     ///
     /// The port must not be bound yet to have a broker.
     #[cfg(feature = "std")]
-    pub fn on_port(
-        shmem_provider: SP,
-        monitor: MT,
-        port: u16,
-        client_timeout: Duration,
-    ) -> Result<Self, Error> {
+    pub fn on_port(shmem_provider: SP, monitor: MT, port: u16) -> Result<Self, Error> {
         Ok(Self {
             monitor,
-            llmp: llmp::LlmpBroker::create_attach_to_tcp(shmem_provider, port, client_timeout)?,
+            llmp: llmp::LlmpBroker::create_attach_to_tcp(shmem_provider, port)?,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             phantom: PhantomData,
@@ -484,8 +486,9 @@ where
         shmem_provider: SP,
         port: u16,
         configuration: EventConfig,
+        restarter_id: u32,
     ) -> Result<LlmpEventManager<(), S, SP>, Error> {
-        let llmp = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
+        let llmp = LlmpClient::create_attach_to_tcp(shmem_provider, port, restarter_id)?;
         Self::new(llmp, configuration)
     }
 
@@ -552,8 +555,10 @@ where
         port: u16,
         configuration: EventConfig,
         hooks: EMH,
+        restarter_id: u32,
     ) -> Result<Self, Error> {
-        let llmp = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
+        log::info!("restarter id ... {}", restarter_id);
+        let llmp = LlmpClient::create_attach_to_tcp(shmem_provider, port, restarter_id)?;
         Self::with_hooks(llmp, configuration, hooks)
     }
 
@@ -592,6 +597,40 @@ where
     #[cfg(feature = "std")]
     pub fn to_env(&self, env_name: &str) {
         self.llmp.to_env(env_name).unwrap();
+    }
+
+    /// Calling this function will tell the llmp broker that this client is exiting
+    /// This should be called from the restarter not from the actual fuzzer client
+    #[cfg(feature = "std")]
+    fn notify_death(&self, event_restarter_pid: u32, broker_port: u16) -> Result<(), Error> {
+        let mut stream = match TcpStream::connect((LLMP_CONNECT_ADDR, broker_port)) {
+            Ok(stream) => stream,
+            Err(_) => {
+                log::error!("Connection refused.");
+                return Ok(());
+            }
+        };
+
+        // The broker tells us hello we don't care we just tell it our client died
+        let TcpResponse::BrokerConnectHello {
+            broker_shmem_description: _,
+            hostname: _,
+        } = recv_tcp_msg(&mut stream)?.try_into()?
+        else {
+            return Err(Error::illegal_state(
+                "Received unexpected Broker Hello".to_string(),
+            ));
+        };
+
+        let msg = TcpRequest::ClientQuit {
+            restarter_id: RestarterId(event_restarter_pid),
+        };
+
+        // Send this mesasge off and we are leaving.
+        let _ = send_tcp_msg(&mut stream, &msg);
+        log::info!("Asking he broker to be disconnected");
+
+        Ok(())
     }
 }
 
@@ -1258,9 +1297,6 @@ where
     /// Tell the manager to serialize or not the state on restart
     #[builder(default = LlmpShouldSaveState::OnRestart)]
     serialize_state: LlmpShouldSaveState,
-    /// The timeout duration used for llmp client timeout
-    #[builder(default = DEFAULT_CLIENT_TIMEOUT_SECS)]
-    client_timeout: Duration,
     /// The hooks passed to event manager:
     hooks: EMH,
     #[builder(setter(skip), default = PhantomData)]
@@ -1310,12 +1346,14 @@ where
             };
 
             // We get here if we are on Unix, or we are a broker on Windows (or without forks).
+            let event_restarter_pid = std::process::id();
+
             let (mgr, core_id) = match self.kind {
                 ManagerKind::Any => {
                     let connection = LlmpConnection::on_port(
                         self.shmem_provider.clone(),
                         self.broker_port,
-                        self.client_timeout,
+                        event_restarter_pid,
                     )?;
                     match connection {
                         LlmpConnection::IsBroker { broker } => {
@@ -1348,7 +1386,6 @@ where
                         self.shmem_provider.clone(),
                         self.monitor.take().unwrap(),
                         self.broker_port,
-                        self.client_timeout,
                     )?;
 
                     broker_things(event_broker, self.remote_broker_addr)?;
@@ -1361,6 +1398,7 @@ where
                         self.broker_port,
                         self.configuration,
                         self.hooks,
+                        event_restarter_pid,
                     )?;
 
                     (mgr, cpu_core)
@@ -1439,17 +1477,19 @@ where
                     if child_status == 137 {
                         // Out of Memory, see https://tldp.org/LDP/abs/html/exitcodes.html
                         // and https://github.com/AFLplusplus/LibAFL/issues/32 for discussion.
+                        let _ = mgr.notify_death(event_restarter_pid, self.broker_port);
                         panic!("Fuzzer-respawner: The fuzzed target crashed with an out of memory error! Fix your harness, or switch to another executor (for example, a forkserver).");
                     }
-
+                    let _ = mgr.notify_death(event_restarter_pid, self.broker_port);
                     // Storing state in the last round did not work
                     panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! This can happen if the child calls `exit()`, in that case make sure it uses `abort()`, if it got killed unrecoverable (OOM), or if there is a bug in the fuzzer itself. (Child exited with: {child_status})");
                 }
 
                 if staterestorer.wants_to_exit() || Self::is_shutting_down() {
+                    // if ctrl-c is pressed the go this branch
+                    let _ = mgr.notify_death(event_restarter_pid, self.broker_port);
                     return Err(Error::shutting_down());
                 }
-
                 ctr = ctr.wrapping_add(1);
             }
         } else {
@@ -1593,9 +1633,10 @@ where
         port: u16,
         converter: Option<IC>,
         converter_back: Option<ICB>,
+        restarter_id: u32,
     ) -> Result<Self, Error> {
         Ok(Self {
-            llmp: LlmpClient::create_attach_to_tcp(shmem_provider, port)?,
+            llmp: LlmpClient::create_attach_to_tcp(shmem_provider, port, restarter_id)?,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             converter,

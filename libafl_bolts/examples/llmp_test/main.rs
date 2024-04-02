@@ -35,8 +35,9 @@ static LOGGER: SimpleStderrLogger = SimpleStderrLogger::new();
 
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
 fn adder_loop(port: u16) -> Result<(), Box<dyn std::error::Error>> {
+    let restarter_id = std::process::id();
     let shmem_provider = StdShMemProvider::new()?;
-    let mut client = llmp::LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
+    let mut client = llmp::LlmpClient::create_attach_to_tcp(shmem_provider, port, restarter_id)?;
     let mut last_result: u32 = 0;
     let mut current_result: u32 = 0;
     loop {
@@ -73,7 +74,7 @@ fn adder_loop(port: u16) -> Result<(), Box<dyn std::error::Error>> {
 
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
 fn large_msg_loop(port: u16) -> Result<(), Box<dyn std::error::Error>> {
-    let mut client = llmp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new()?, port)?;
+    let mut client = llmp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new()?, port, 1337)?;
 
     #[cfg(not(target_vendor = "apple"))]
     let meg_buf = vec![1u8; 1 << 20];
@@ -150,13 +151,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     log::set_logger(&LOGGER).unwrap();
     log::set_max_level(log::LevelFilter::Trace);
-
     println!("Launching in mode {mode} on port {port}");
 
     match mode.as_str() {
         "broker" => {
-            let mut broker =
-                llmp::LlmpBroker::new(StdShMemProvider::new()?, Duration::from_secs(5))?;
+            let mut broker = llmp::LlmpBroker::new(StdShMemProvider::new()?)?;
             broker.launch_tcp_listener_on(port)?;
             // Exit when we got at least _n_ nodes, and all of them quit.
             broker.set_exit_cleanly_after(NonZeroUsize::new(1_usize).unwrap());
@@ -167,8 +166,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
         }
         "b2b" => {
-            let mut broker =
-                llmp::LlmpBroker::new(StdShMemProvider::new()?, Duration::from_secs(5))?;
+            let mut broker = llmp::LlmpBroker::new(StdShMemProvider::new()?)?;
             broker.launch_tcp_listener_on(b2b_port)?;
             // connect back to the main broker.
             broker.connect_b2b(("127.0.0.1", port))?;
@@ -180,7 +178,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         "ctr" => {
             let mut client =
-                llmp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new()?, port)?;
+                llmp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new()?, port, 1337)?;
             let mut counter: u32 = 0;
             loop {
                 counter = counter.wrapping_add(1);
@@ -197,7 +195,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         "exiting" => {
             let mut client =
-                llmp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new()?, port)?;
+                llmp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new()?, port, 1337)?;
             for i in 0..10_u32 {
                 client.send_buf(_TAG_SIMPLE_U32_V1, &i.to_le_bytes())?;
                 println!("Exiting Client writing {i}");

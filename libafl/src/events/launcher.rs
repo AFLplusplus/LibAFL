@@ -36,7 +36,6 @@ use libafl_bolts::{
 };
 use libafl_bolts::{
     core_affinity::{CoreId, Cores},
-    llmp::DEFAULT_CLIENT_TIMEOUT_SECS,
     shmem::ShMemProvider,
     tuples::tuple_list,
 };
@@ -122,9 +121,6 @@ where
     /// Then, clients launched by this [`Launcher`] can connect to the original `broker`.
     #[builder(default = true)]
     spawn_broker: bool,
-    /// The timeout duration used for llmp client timeout
-    #[builder(default = DEFAULT_CLIENT_TIMEOUT_SECS)]
-    client_timeout: Duration,
     /// Tell the manager to serialize or not the state on restart
     #[builder(default = LlmpShouldSaveState::OnRestart)]
     serialize_state: LlmpShouldSaveState,
@@ -261,7 +257,6 @@ where
                             })
                             .configuration(self.configuration)
                             .serialize_state(self.serialize_state)
-                            .client_timeout(self.client_timeout)
                             .hooks(hooks)
                             .build()
                             .launch()?;
@@ -286,7 +281,6 @@ where
                 .exit_cleanly_after(Some(NonZeroUsize::try_from(self.cores.ids.len()).unwrap()))
                 .configuration(self.configuration)
                 .serialize_state(self.serialize_state)
-                .client_timeout(self.client_timeout)
                 .hooks(hooks)
                 .build()
                 .launch()?;
@@ -339,7 +333,6 @@ where
                     })
                     .configuration(self.configuration)
                     .serialize_state(self.serialize_state)
-                    .client_timeout(self.client_timeout)
                     .hooks(hooks)
                     .build()
                     .launch()?;
@@ -410,7 +403,6 @@ where
                 .exit_cleanly_after(Some(NonZeroUsize::try_from(self.cores.ids.len()).unwrap()))
                 .configuration(self.configuration)
                 .serialize_state(self.serialize_state)
-                .client_timeout(self.client_timeout)
                 .hooks(hooks)
                 .build()
                 .launch()?;
@@ -495,9 +487,6 @@ where
     /// Tell the manager to serialize or not the state on restart
     #[builder(default = LlmpShouldSaveState::OnRestart)]
     serialize_state: LlmpShouldSaveState,
-    /// The duration for the llmp client timeout
-    #[builder(default = DEFAULT_CLIENT_TIMEOUT_SECS)]
-    client_timeout: Duration,
     #[builder(setter(skip), default = PhantomData)]
     phantom_data: PhantomData<(&'a S, &'a SP)>,
 }
@@ -589,7 +578,6 @@ where
                     CentralizedLlmpEventBroker::on_port(
                         self.shmem_provider.clone(),
                         self.centralized_broker_port,
-                        self.client_timeout,
                     )?;
                 broker.broker_loop()?;
             }
@@ -627,6 +615,10 @@ where
                             }
                         }
 
+                        // We get the pid here because THIS is the pid of the event restarter
+                        // event restarter will never return from the next launch() only the forked child will do.
+                        let restarter_id = std::process::id();
+
                         // Fuzzer client. keeps retrying the connection to broker till the broker starts
                         let (state, mgr) = RestartingMgr::<(), MT, S, SP>::builder()
                             .shmem_provider(self.shmem_provider.clone())
@@ -636,7 +628,6 @@ where
                             })
                             .configuration(self.configuration)
                             .serialize_state(self.serialize_state)
-                            .client_timeout(self.client_timeout)
                             .hooks(tuple_list!())
                             .build()
                             .launch()?;
@@ -646,6 +637,7 @@ where
                             self.shmem_provider.clone(),
                             self.centralized_broker_port,
                             index == 1,
+                            restarter_id,
                         )?;
 
                         return (self.run_client.take().unwrap())(state, c_mgr, *bind_to);
@@ -667,7 +659,6 @@ where
                 .exit_cleanly_after(Some(NonZeroUsize::try_from(self.cores.ids.len()).unwrap()))
                 .configuration(self.configuration)
                 .serialize_state(self.serialize_state)
-                .client_timeout(self.client_timeout)
                 .hooks(tuple_list!())
                 .build()
                 .launch()?;

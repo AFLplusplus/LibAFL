@@ -29,7 +29,8 @@
     clippy::missing_docs_in_private_items,
     clippy::module_name_repetitions,
     clippy::ptr_cast_constness,
-    clippy::negative_feature_names
+    clippy::negative_feature_names,
+    clippy::too_many_lines
 )]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
@@ -196,6 +197,13 @@ use xxhash_rust::xxh3::xxh3_64;
     Debug, Default, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
 )]
 pub struct ClientId(pub u32);
+
+/// The restarter process's id.
+#[repr(transparent)]
+#[derive(
+    Debug, Default, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
+)]
+pub struct RestarterId(pub u32);
 
 #[cfg(feature = "std")]
 use log::{Metadata, Record};
