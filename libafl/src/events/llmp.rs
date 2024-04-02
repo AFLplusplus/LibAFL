@@ -605,25 +605,13 @@ where
     fn notify_death(&self, event_restarter_pid: u32, broker_port: u16) -> Result<(), Error> {
         let mut stream = match TcpStream::connect((LLMP_CONNECT_ADDR, broker_port)) {
             Ok(stream) => stream,
-            Err(e) => {
-                match e.kind() {
-                    ErrorKind::ConnectionRefused => {
-                        //connection refused. loop till the broker is up
-                        loop {
-                            match TcpStream::connect((LLMP_CONNECT_ADDR, broker_port)) {
-                                Ok(stream) => break stream,
-                                Err(_) => {
-                                    log::info!("Connection Refused.. Retrying");
-                                }
-                            }
-                        }
-                    }
-                    _ => return Err(Error::illegal_state(e.to_string())),
-                }
+            Err(_) => {
+                log::error!("Connection refused.");
+                return Ok(());
             }
         };
 
-        // The broker tells us hello we don't care we just tell him our client died
+        // The broker tells us hello we don't care we just tell it our client died
         let TcpResponse::BrokerConnectHello {
             broker_shmem_description: _,
             hostname: _,
