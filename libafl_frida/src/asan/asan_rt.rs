@@ -10,12 +10,7 @@ use core::{
     fmt::{self, Debug, Formatter},
     ptr::addr_of_mut,
 };
-use std::{
-    ffi::c_void,
-    num::NonZeroUsize,
-    ptr::{addr_of, write_volatile},
-    rc::Rc,
-};
+use std::{ffi::c_void, num::NonZeroUsize, ptr::write_volatile, rc::Rc, sync::MutexGuard};
 
 use backtrace::Backtrace;
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
@@ -171,9 +166,7 @@ impl FridaRuntime for AsanRuntime {
     ) {
         self.allocator.init();
 
-        unsafe {
-            ASAN_ERRORS = Some(AsanErrors::new(self.continue_on_error));
-        }
+        AsanErrors::get_mut_blocking().set_continue_on_error(self.continue_on_error);
 
         self.generate_instrumentation_blobs();
 
@@ -340,10 +333,11 @@ impl AsanRuntime {
         self.allocator.check_for_leaks();
     }
 
-    /// Returns the `AsanErrors` from the recent run
+    /// Returns the `AsanErrors` from the recent run.
+    /// Will block if some other thread holds on to the `ASAN_ERRORS` Mutex.
     #[allow(clippy::unused_self)]
-    pub fn errors(&mut self) -> &Option<AsanErrors> {
-        unsafe { &*addr_of!(ASAN_ERRORS) }
+    pub fn errors(&mut self) -> MutexGuard<'static, AsanErrors> {
+        ASAN_ERRORS.lock().unwrap()
     }
 
     /// Make sure the specified memory is unpoisoned
@@ -1085,11 +1079,11 @@ impl AsanRuntime {
                     backtrace,
                 ))
             };
-            AsanErrors::get_mut().report_error(error);
+            AsanErrors::get_mut_blocking().report_error(error);
 
             // This is not even a mem instruction??
         } else {
-            AsanErrors::get_mut().report_error(AsanError::Unknown((
+            AsanErrors::get_mut_blocking().report_error(AsanError::Unknown((
                 self.regs,
                 actual_pc,
                 (None, None, 0, fault_address),
@@ -1223,7 +1217,7 @@ impl AsanRuntime {
                 backtrace,
             ))
         };
-        AsanErrors::get_mut().report_error(error);
+        AsanErrors::get_mut_blocking().report_error(error);
     }
 
     #[cfg(target_arch = "x86_64")]

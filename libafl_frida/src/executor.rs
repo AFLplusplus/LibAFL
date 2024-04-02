@@ -1,4 +1,6 @@
 use core::fmt::{self, Debug, Formatter};
+#[cfg(all(unix, not(test)))]
+use std::borrow::Borrow;
 use std::{ffi::c_void, marker::PhantomData};
 
 use frida_gum::{
@@ -18,12 +20,12 @@ use libafl::{
     Error,
 };
 
-#[cfg(not(test))]
-#[cfg(unix)]
-use crate::asan::errors::ASAN_ERRORS;
-use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
 #[cfg(windows)]
 use crate::windows_hooks::initialize;
+use crate::{
+    asan::errors::AsanErrors,
+    helper::{FridaInstrumentationHelper, FridaRuntimeTuple},
+};
 
 /// The [`FridaInProcessExecutor`] is an [`Executor`] that executes the target in the same process, usinig [`frida`](https://frida.re/) for binary-only instrumentation.
 pub struct FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
@@ -104,11 +106,10 @@ where
             self.stalker.deactivate();
         }
 
-        #[cfg(not(test))]
-        #[cfg(unix)]
+        #[cfg(all(unix, not(test)))]
         unsafe {
-            if ASAN_ERRORS.is_some() && !ASAN_ERRORS.as_ref().unwrap().is_empty() {
-                log::error!("Crashing target as it had ASAN errors");
+            if AsanErrors::get_mut_blocking().borrow().is_empty() {
+                log::error!("Crashing target as it had ASan errors");
                 libc::raise(libc::SIGABRT);
             }
         }
