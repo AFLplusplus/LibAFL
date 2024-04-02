@@ -198,6 +198,13 @@ use xxhash_rust::xxh3::xxh3_64;
 )]
 pub struct ClientId(pub u32);
 
+/// The restarter process's id.
+#[repr(transparent)]
+#[derive(
+    Debug, Default, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
+)]
+pub struct RestarterId(pub u32);
+
 #[cfg(feature = "std")]
 use log::{Metadata, Record};
 

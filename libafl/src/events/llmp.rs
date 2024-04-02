@@ -9,8 +9,6 @@ use core::ptr::addr_of_mut;
 use core::sync::atomic::{compiler_fence, Ordering};
 use core::{marker::PhantomData, num::NonZeroUsize, time::Duration};
 #[cfg(feature = "std")]
-use std::io::ErrorKind;
-#[cfg(feature = "std")]
 use std::net::TcpStream;
 #[cfg(feature = "std")]
 use std::net::{SocketAddr, ToSocketAddrs};
@@ -34,7 +32,7 @@ use libafl_bolts::{
     llmp::{recv_tcp_msg, send_tcp_msg, TcpRequest, TcpResponse, LLMP_CONNECT_ADDR},
 };
 #[cfg(feature = "std")]
-use libafl_bolts::{llmp::LlmpConnection, shmem::StdShMemProvider, staterestore::StateRestorer};
+use libafl_bolts::{llmp::LlmpConnection, shmem::StdShMemProvider, staterestore::StateRestorer, RestarterId};
 use libafl_bolts::{
     llmp::{self, LlmpClient, LlmpClientDescription, Tag},
     shmem::ShMemProvider,
@@ -622,8 +620,8 @@ where
             ));
         };
 
-        let msg = TcpRequest::ClientWantsExit {
-            restarter_id: event_restarter_pid,
+        let msg = TcpRequest::ClientQuit {
+            restarter_id: RestarterId(event_restarter_pid),
         };
 
         // Send this mesasge off and we are leaving.

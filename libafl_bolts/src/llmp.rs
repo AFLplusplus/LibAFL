@@ -102,7 +102,7 @@ use crate::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
 use crate::os::windows_exceptions::{setup_ctrl_handler, CtrlHandler};
 use crate::{
     shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
-    ClientId, Error,
+    ClientId, Error, RestarterId,
 };
 
 /// The max number of pages a [`client`] may have mapped that were not yet read by the [`broker`]
@@ -258,8 +258,8 @@ pub enum TcpRequest {
     LocalClientHello {
         /// The sharedmem description of the connecting client.
         shmem_description: ShMemDescription,
-        /// The `restarter_id` of this client
-        restarter_id: u32,
+        /// The `restarter_id` of this client. Tell the broker this id so they recognize us later when we quit.
+        restarter_id: RestarterId,
     },
     /// We would like to establish a b2b connection.
     RemoteBrokerHello {
@@ -268,9 +268,9 @@ pub enum TcpRequest {
     },
     /// Notify the broker the the othe side is dying so remove this client
     /// `restarter_id` is the pid of the very initial client
-    ClientWantsExit {
+    ClientQuit {
         /// Tell the broker that remove the client with this `restarter_id`. `restarter_id` is equal to the one of event restarter
-        restarter_id: u32,
+        restarter_id: RestarterId,
     },
 }
 
@@ -840,11 +840,11 @@ struct LlmpPayloadSharedMapInfo {
     pub restarter_id: u32,
 }
 
-/// Message payload when a client got removed */
+/// Message payload when a client got removed
 /// This is an internal message!
 /// [`LLMP_TAG_END_OF_PAGE_V1`]
 #[derive(Copy, Clone, Debug)]
-#[repr(C)]
+#[repr(C, align(8))]
 struct LlmpClientExitInfo {
     /// The restarter process id of the client
     pub restarter_id: u32,
@@ -1976,7 +1976,7 @@ pub struct LlmpBroker<SP>
 where
     SP: ShMemProvider + 'static,
 {
-    restarter_ids: HashMap<u32, u32>,
+    restarter_ids: HashMap<RestarterId, ClientId>,
     /// Broadcast map from broker to all clients
     llmp_out: LlmpSender<SP>,
     /// Users of Llmp can add message handlers in the broker.
@@ -1994,7 +1994,7 @@ where
     /// after which the broker loop should quit gracefully.
     pub exit_cleanly_after: Option<NonZeroUsize>,
     /// Clients that should be removed soon
-    clients_to_remove: Vec<u32>,
+    clients_to_remove: Vec<ClientId>,
     /// The `ShMemProvider` to use
     shmem_provider: SP,
 }
@@ -2149,7 +2149,7 @@ where
     /// Register event restarter id
     /// Each fuzzer client instance could have multiple PID, because they can restart
     /// But they only have one restarter whose PID does not change
-    pub fn register_restarter_id(&mut self, client_id: u32, restarter_id: u32) {
+    pub fn register_restarter_id(&mut self, client_id: ClientId, restarter_id: RestarterId) {
         self.restarter_ids.insert(restarter_id, client_id);
     }
 
@@ -2280,7 +2280,7 @@ where
                 Ok(has_messages) => {
                     new_messages = has_messages;
                 }
-                Err(Error::ShuttingDown) => self.clients_to_remove.push(client_id.0),
+                Err(Error::ShuttingDown) => self.clients_to_remove.push(client_id),
                 Err(err) => return Err(err),
             }
         }
@@ -2289,7 +2289,7 @@ where
         if remove_cnt > 0 {
             // rev() to make it works
             for idx in (0..self.llmp_clients.len()).rev() {
-                let client_id = self.llmp_clients[idx].id.0;
+                let client_id = self.llmp_clients[idx].id;
                 if self.clients_to_remove.contains(&client_id) {
                     log::info!("Client {:#?} wants to exit. Removing.", client_id);
                     self.llmp_clients.remove(idx);
@@ -2675,10 +2675,10 @@ where
         broker_shmem_description: &ShMemDescription,
     ) {
         match request {
-            TcpRequest::ClientWantsExit { restarter_id } => {
+            TcpRequest::ClientQuit { restarter_id } => {
                 // todo search the ancestor_id and remove it.
                 // log::info!("We are removing {:#?}", restarter_id);
-                match Self::announce_client_exit(sender, *restarter_id) {
+                match Self::announce_client_exit(sender, restarter_id.0) {
                     Ok(()) => (),
                     Err(e) => log::info!("Error announcing clinet exit: {e:?}"),
                 }
@@ -2688,7 +2688,7 @@ where
                 restarter_id,
             } => {
                 // log::info!("We are adding {:#?}", restarter_id);
-                match Self::announce_new_client(sender, shmem_description, *restarter_id) {
+                match Self::announce_new_client(sender, shmem_description, restarter_id.0) {
                     Ok(()) => (),
                     Err(e) => log::info!("Error forwarding client on map: {e:?}"),
                 };
@@ -2808,7 +2808,7 @@ where
                             }
                         };
 
-                        log::info!("{:#?}", buf);
+                        // log::info!("{:#?}", buf);
                         let req = match buf.try_into() {
                             Ok(req) => req,
                             Err(e) => {
@@ -2901,8 +2901,8 @@ where
                         )));
                     }
                     let exitinfo = (*msg).buf.as_mut_ptr() as *mut LlmpClientExitInfo;
-                    let restarter_id = (*exitinfo).restarter_id;
-                    log::info!("Client exit message received!, we are removing clients whose restarter_id is {}", restarter_id);
+                    let restarter_id = RestarterId((*exitinfo).restarter_id);
+                    log::info!("Client exit message received!, we are removing clients whose restarter_id is {:#?}", restarter_id);
                     match self.restarter_ids.remove_entry(&restarter_id) {
                         Some((_, v)) => {
                             self.clients_to_remove.push(v);
@@ -2931,7 +2931,7 @@ where
                         )));
                     }
                     let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
-                    let restarter_id = (*pageinfo).restarter_id;
+                    let restarter_id = RestarterId((*pageinfo).restarter_id);
                     match self.shmem_provider.shmem_from_id_and_size(
                         ShMemId::from_array(&(*pageinfo).shm_str),
                         (*pageinfo).map_size,
@@ -2951,7 +2951,7 @@ where
                                 last_msg_time: current_time(),
                             });
 
-                            self.register_restarter_id(new_client.0, restarter_id);
+                            self.register_restarter_id(new_client, restarter_id);
                         }
                         Err(e) => {
                             log::info!("Error adding client! Ignoring: {e:?}");
@@ -3302,7 +3302,7 @@ where
 
         let client_hello_req = TcpRequest::LocalClientHello {
             shmem_description: ret.sender.out_shmems.first().unwrap().shmem.description(),
-            restarter_id,
+            restarter_id: RestarterId(restarter_id),
         };
 
         send_tcp_msg(&mut stream, &client_hello_req)?;
