@@ -14,7 +14,7 @@ use std::{
     ptr,
 };
 
-use libafl::{executors::ExitKind, inputs::BytesInput};
+use libafl::executors::ExitKind;
 #[cfg(emulation_mode = "systemmode")]
 use libafl_qemu_sys::qemu_init;
 #[cfg(emulation_mode = "usermode")]
@@ -128,14 +128,14 @@ where
     fn try_put_input(
         emu: &Emulator<QT, S, Self>,
         qemu_executor_state: &mut QemuExecutorState<QT, S>,
-        input: &BytesInput,
+        input: &S::Input,
     );
 
     fn handle(
         emu: &Emulator<QT, S, Self>,
         exit_reason: Result<EmuExitReason, EmuExitReasonError>,
         qemu_executor_state: &mut QemuExecutorState<QT, S>,
-        input: &BytesInput,
+        input: &S::Input,
     ) -> Result<InnerHandlerResult, HandlerError>;
 }
 
@@ -157,13 +157,13 @@ where
     QT: QemuHelperTuple<S>,
     S: State + HasExecutions,
 {
-    fn try_put_input(_: &Emulator<QT, S, Self>, _: &mut QemuExecutorState<QT, S>, _: &BytesInput) {}
+    fn try_put_input(_: &Emulator<QT, S, Self>, _: &mut QemuExecutorState<QT, S>, _: &S::Input) {}
 
     fn handle(
         _: &Emulator<QT, S, Self>,
         exit_reason: Result<EmuExitReason, EmuExitReasonError>,
         _: &mut QemuExecutorState<QT, S>,
-        _: &BytesInput,
+        _: &S::Input,
     ) -> Result<InnerHandlerResult, HandlerError> {
         match exit_reason {
             Ok(reason) => Ok(InnerHandlerResult::ReturnToHarness(reason)),
@@ -226,11 +226,12 @@ where
     SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
+    S::Input: HasTargetBytes,
 {
     fn try_put_input(
         emu: &Emulator<QT, S, Self>,
         qemu_executor_state: &mut QemuExecutorState<QT, S>,
-        input: &BytesInput,
+        input: &S::Input,
     ) {
         let exit_handler = emu.state().exit_handler.borrow();
 
@@ -246,7 +247,7 @@ where
         emu: &Emulator<QT, S, Self>,
         exit_reason: Result<EmuExitReason, EmuExitReasonError>,
         qemu_executor_state: &mut QemuExecutorState<QT, S>,
-        input: &BytesInput,
+        input: &S::Input,
     ) -> Result<InnerHandlerResult, HandlerError> {
         let exit_handler = emu.exit_handler().borrow_mut();
         let qemu = emu.qemu();
@@ -632,7 +633,10 @@ create_hook_id!(NewThread, libafl_qemu_remove_new_thread_hook, false);
 
 use std::{pin::Pin, ptr::NonNull};
 
-use libafl::state::{HasExecutions, State};
+use libafl::{
+    inputs::HasTargetBytes,
+    state::{HasExecutions, State},
+};
 use libafl_bolts::os::unix_signals::Signal;
 
 use crate::{
@@ -1528,7 +1532,7 @@ where
     /// Of course, the emulated target is not contained securely and can corrupt state or interact with the operating system.
     pub unsafe fn run(
         &self,
-        input: &BytesInput,
+        input: &S::Input,
         qemu_executor_state: &mut QemuExecutorState<QT, S>,
     ) -> Result<HandlerResult, HandlerError> {
         loop {
