@@ -55,12 +55,12 @@ nix = { version = "0.27", features = ["mman"] }
 libc = "0.2"
 hashbrown = "0.14"
 rangemap = "1.3"
-frida-gum-sys = { version = "0.8.1", features = [
+frida-gum-sys = { version = "0.13.6", features = [
     "auto-download",
     "event-sink",
     "invocation-listener",
 ] }
-frida-gum = { version = "0.13.2", features = [
+frida-gum = { version = "0.13.6", features = [
     "auto-download",
     "event-sink",
     "invocation-listener",
