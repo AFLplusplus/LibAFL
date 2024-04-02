@@ -14,10 +14,12 @@ pub fn build() {
         })
     };
 
+    let libafl_qemu_hdr_name = "libafl_qemu.h";
+
     let build_libqasan = cfg!(all(feature = "build_libqasan", not(feature = "hexagon")));
 
     let exit_hdr_dir = PathBuf::from("runtime");
-    let exit_hdr = exit_hdr_dir.join("libafl_exit.h");
+    let libafl_qemu_hdr = exit_hdr_dir.join(libafl_qemu_hdr_name);
 
     println!("cargo:rustc-cfg=emulation_mode=\"{emulation_mode}\"");
     println!("cargo:rerun-if-env-changed=EMULATION_MODE");
@@ -72,6 +74,11 @@ pub fn build() {
     target_dir.pop();
     target_dir.pop();
     target_dir.pop();
+    let include_dir = target_dir.join("include");
+
+    fs::create_dir_all(&include_dir).expect("Could not create include dir");
+
+    fs::copy(libafl_qemu_hdr.clone(), include_dir.join(libafl_qemu_hdr_name)).expect("Could not copy libafl_qemu.h to out directory.");
 
     let binding_file = out_dir_path_buf.join("backdoor_bindings.rs");
     bindgen::Builder::default()
@@ -83,7 +90,7 @@ pub fn build() {
             is_global: true,
             is_bitfield: true,
         })
-        .header(exit_hdr.display().to_string())
+        .header(libafl_qemu_hdr.display().to_string())
         .generate()
         .expect("Exit bindings generation failed.")
         .write_to_file(binding_file)

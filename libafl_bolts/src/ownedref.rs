@@ -761,6 +761,17 @@ pub enum OwnedPtr<T: Sized> {
     Owned(Box<T>),
 }
 
+impl<T: Sized> OwnedPtr<T> {
+    /// Creates a new [`OwnedPtr`] from a raw pointer
+    ///
+    /// # Safety
+    /// The raw pointer will later be dereferenced.
+    /// It must outlive this `OwnedPtr` type and remain valid.
+    pub unsafe fn from_raw(ptr: *const T) -> Self {
+        Self::Ptr(ptr)
+    }
+}
+
 impl<T: Sized + Serialize> Serialize for OwnedPtr<T> {
     fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
     where
@@ -820,6 +831,17 @@ pub enum OwnedMutPtr<T: Sized> {
     Ptr(*mut T),
     /// An owned [`Box`] to the content
     Owned(Box<T>),
+}
+
+impl<T: Sized> OwnedMutPtr<T> {
+    /// Creates a new [`OwnedMutPtr`] from a raw pointer
+    ///
+    /// # Safety
+    /// The raw pointer will later be dereferenced.
+    /// It must outlive this `OwnedPtr` type and remain valid.
+    pub unsafe fn from_raw_mut(ptr: *mut T) -> Self {
+        Self::Ptr(ptr)
+    }
 }
 
 impl<T: Sized + Serialize> Serialize for OwnedMutPtr<T> {

@@ -931,6 +931,41 @@ where
     }
 }
 
+/// Specify if the State must be persistent over restarts
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum LlmpShouldSaveState {
+    /// Always save and restore the state on restart (not OOM resistant)
+    OnRestart,
+    /// Never save the state (not OOM resistant)
+    Never,
+    /// Best-effort save and restore the state on restart (OOM safe)
+    /// This adds additional runtime costs when processing events
+    OOMSafeOnRestart,
+    /// Never save the state (OOM safe)
+    /// This adds additional runtime costs when processing events
+    OOMSafeNever,
+}
+
+impl LlmpShouldSaveState {
+    /// Check if the state must be saved `on_restart()`
+    #[must_use]
+    pub fn on_restart(&self) -> bool {
+        matches!(
+            self,
+            LlmpShouldSaveState::OnRestart | LlmpShouldSaveState::OOMSafeOnRestart
+        )
+    }
+
+    /// Check if the policy is OOM safe
+    #[must_use]
+    pub fn oom_safe(&self) -> bool {
+        matches!(
+            self,
+            LlmpShouldSaveState::OOMSafeOnRestart | LlmpShouldSaveState::OOMSafeNever
+        )
+    }
+}
+
 /// A manager that can restart on the fly, storing states in-between (in `on_restart`)
 #[cfg(feature = "std")]
 #[derive(Debug)]
@@ -945,7 +980,7 @@ where
     /// The staterestorer to serialize the state for the next runner
     staterestorer: StateRestorer<SP>,
     /// Decide if the state restorer must save the serialized state
-    save_state: bool,
+    save_state: LlmpShouldSaveState,
 }
 
 #[cfg(all(feature = "std", feature = "adaptive_serialization"))]
@@ -1019,7 +1054,9 @@ where
         event: Event<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
         // Check if we are going to crash in the event, in which case we store our current state for the next runner
-        self.llmp_mgr.fire(state, event)
+        self.llmp_mgr.fire(state, event)?;
+        self.intermediate_save()?;
+        Ok(())
     }
 
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
@@ -1055,7 +1092,11 @@ where
         // First, reset the page to 0 so the next iteration can read read from the beginning of this page
         self.staterestorer.reset();
         self.staterestorer.save(&(
-            if self.save_state { Some(state) } else { None },
+            if self.save_state.on_restart() {
+                Some(state)
+            } else {
+                None
+            },
             &self.llmp_mgr.describe()?,
         ))?;
 
@@ -1083,7 +1124,9 @@ where
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers>, //CE: CustomEvent<I>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
-        self.llmp_mgr.process(fuzzer, state, executor)
+        let res = self.llmp_mgr.process(fuzzer, state, executor)?;
+        self.intermediate_save()?;
+        Ok(res)
     }
 }
 
@@ -1128,7 +1171,7 @@ where
         Self {
             llmp_mgr,
             staterestorer,
-            save_state: true,
+            save_state: LlmpShouldSaveState::OnRestart,
         }
     }
 
@@ -1136,7 +1179,7 @@ where
     pub fn with_save_state(
         llmp_mgr: LlmpEventManager<EMH, S, SP>,
         staterestorer: StateRestorer<SP>,
-        save_state: bool,
+        save_state: LlmpShouldSaveState,
     ) -> Self {
         Self {
             llmp_mgr,
@@ -1153,6 +1196,17 @@ where
     /// Get the staterestorer (mutable)
     pub fn staterestorer_mut(&mut self) -> &mut StateRestorer<SP> {
         &mut self.staterestorer
+    }
+
+    /// Save LLMP state and empty state in staterestorer
+    pub fn intermediate_save(&mut self) -> Result<(), Error> {
+        // First, reset the page to 0 so the next iteration can read read from the beginning of this page
+        if self.save_state.oom_safe() {
+            self.staterestorer.reset();
+            self.staterestorer
+                .save(&(None::<S>, &self.llmp_mgr.describe()?))?;
+        }
+        Ok(())
     }
 }
 
@@ -1241,8 +1295,8 @@ where
     #[builder(default = None)]
     exit_cleanly_after: Option<NonZeroUsize>,
     /// Tell the manager to serialize or not the state on restart
-    #[builder(default = true)]
-    serialize_state: bool,
+    #[builder(default = LlmpShouldSaveState::OnRestart)]
+    serialize_state: LlmpShouldSaveState,
     /// The hooks passed to event manager:
     hooks: EMH,
     #[builder(setter(skip), default = PhantomData)]
@@ -1418,7 +1472,7 @@ where
                 compiler_fence(Ordering::SeqCst);
 
                 #[allow(clippy::manual_assert)]
-                if !staterestorer.has_content() && self.serialize_state {
+                if !staterestorer.has_content() && !self.serialize_state.oom_safe() {
                     #[cfg(unix)]
                     if child_status == 137 {
                         // Out of Memory, see https://tldp.org/LDP/abs/html/exitcodes.html
@@ -1490,7 +1544,11 @@ where
                 )
             };
         // We reset the staterestorer, the next staterestorer and receiver (after crash) will reuse the page from the initial message.
-        mgr.staterestorer.reset();
+        if self.serialize_state.oom_safe() {
+            mgr.intermediate_save()?;
+        } else {
+            mgr.staterestorer.reset();
+        }
 
         /* TODO: Not sure if this is needed
         // We commit an empty NO_RESTART message to this buf, against infinite loops,

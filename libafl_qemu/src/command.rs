@@ -5,9 +5,10 @@ use std::fmt::{Debug, Display, Formatter};
 use enum_map::Enum;
 use libafl::{
     executors::ExitKind,
-    inputs::{BytesInput, HasBytesVec},
+    inputs::HasTargetBytes,
     state::{HasExecutions, State},
 };
+use libafl_bolts::AsSlice;
 use libafl_qemu_sys::{GuestPhysAddr, GuestVirtAddr};
 use num_enum::TryFromPrimitive;
 
@@ -77,7 +78,7 @@ where
         &self,
         emu: &Emulator<QT, S, E>,
         qemu_executor_state: &mut QemuExecutorState<QT, S>,
-        input: &BytesInput,
+        input: &S::Input,
         ret_reg: Option<Regs>,
     ) -> Result<InnerHandlerResult, HandlerError>;
 }
@@ -106,6 +107,7 @@ where
     SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
+    S::Input: HasTargetBytes,
 {
     fn usable_at_runtime(&self) -> bool {
         match self {
@@ -145,7 +147,7 @@ where
         &self,
         emu: &Emulator<QT, S, StdEmuExitHandler<SM>>,
         qemu_executor_state: &mut QemuExecutorState<QT, S>,
-        input: &BytesInput,
+        input: &S::Input,
         ret_reg: Option<Regs>,
     ) -> Result<InnerHandlerResult, HandlerError> {
         match self {
@@ -233,6 +235,7 @@ where
     SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
+    S::Input: HasTargetBytes,
 {
     fn usable_at_runtime(&self) -> bool {
         false
@@ -246,7 +249,7 @@ where
             QT,
             S,
         >,
-        _input: &BytesInput,
+        _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<InnerHandlerResult, HandlerError> {
         let qemu = emu.qemu();
@@ -286,6 +289,7 @@ where
     SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
+    S::Input: HasTargetBytes,
 {
     fn usable_at_runtime(&self) -> bool {
         false
@@ -295,7 +299,7 @@ where
         &self,
         emu: &Emulator<QT, S, StdEmuExitHandler<SM>>,
         _qemu_executor_state: &mut QemuExecutorState<QT, S>,
-        _input: &BytesInput,
+        _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<InnerHandlerResult, HandlerError> {
         let qemu = emu.qemu();
@@ -323,6 +327,7 @@ where
     SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
+    S::Input: HasTargetBytes,
 {
     fn usable_at_runtime(&self) -> bool {
         true
@@ -332,12 +337,12 @@ where
         &self,
         emu: &Emulator<QT, S, StdEmuExitHandler<SM>>,
         _qemu_executor_state: &mut QemuExecutorState<QT, S>,
-        input: &BytesInput,
+        input: &S::Input,
         ret_reg: Option<Regs>,
     ) -> Result<InnerHandlerResult, HandlerError> {
         let qemu = emu.qemu();
 
-        let ret_value = self.location.write(qemu, input.bytes());
+        let ret_value = self.location.write(qemu, input.target_bytes().as_slice());
 
         if let Some(reg) = ret_reg {
             qemu.write_reg(reg, ret_value).unwrap();
@@ -357,6 +362,7 @@ where
     SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
+    S::Input: HasTargetBytes,
 {
     fn usable_at_runtime(&self) -> bool {
         false
@@ -366,7 +372,7 @@ where
         &self,
         emu: &Emulator<QT, S, StdEmuExitHandler<SM>>,
         _qemu_executor_state: &mut QemuExecutorState<QT, S>,
-        input: &BytesInput,
+        input: &S::Input,
         ret_reg: Option<Regs>,
     ) -> Result<InnerHandlerResult, HandlerError> {
         let emu_exit_handler = emu.exit_handler().borrow_mut();
@@ -381,7 +387,9 @@ where
             .set_input_location(self.input_location.clone(), ret_reg)
             .unwrap();
 
-        let ret_value = self.input_location.write(qemu, input.bytes());
+        let ret_value = self
+            .input_location
+            .write(qemu, input.target_bytes().as_slice());
 
         if let Some(reg) = ret_reg {
             qemu.write_reg(reg, ret_value).unwrap();
@@ -399,6 +407,7 @@ where
     SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
+    S::Input: HasTargetBytes,
 {
     fn usable_at_runtime(&self) -> bool {
         false
@@ -408,7 +417,7 @@ where
         &self,
         emu: &Emulator<QT, S, StdEmuExitHandler<SM>>,
         _qemu_executor_state: &mut QemuExecutorState<QT, S>,
-        _input: &BytesInput,
+        _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<InnerHandlerResult, HandlerError> {
         let emu_exit_handler = emu.exit_handler().borrow_mut();
@@ -433,6 +442,7 @@ where
     SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
+    S::Input: HasTargetBytes,
 {
     fn usable_at_runtime(&self) -> bool {
         true
@@ -442,7 +452,7 @@ where
         &self,
         _emu: &Emulator<QT, S, StdEmuExitHandler<SM>>,
         _qemu_executor_state: &mut QemuExecutorState<QT, S>,
-        _input: &BytesInput,
+        _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<InnerHandlerResult, HandlerError> {
         let guest_version = self.0;
@@ -471,6 +481,7 @@ where
     SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
+    S::Input: HasTargetBytes,
 {
     fn usable_at_runtime(&self) -> bool {
         true
@@ -480,7 +491,7 @@ where
         &self,
         _emu: &Emulator<QT, S, StdEmuExitHandler<SM>>,
         qemu_executor_state: &mut QemuExecutorState<QT, S>,
-        _input: &BytesInput,
+        _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<InnerHandlerResult, HandlerError> {
         let qemu_helpers = qemu_executor_state.hooks_mut().helpers_mut();
@@ -501,6 +512,7 @@ where
     SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
+    S::Input: HasTargetBytes,
 {
     fn usable_at_runtime(&self) -> bool {
         true
@@ -511,7 +523,7 @@ where
         &self,
         _emu: &Emulator<QT, S, StdEmuExitHandler<SM>>,
         qemu_executor_state: &mut QemuExecutorState<QT, S>,
-        _input: &BytesInput,
+        _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<InnerHandlerResult, HandlerError> {
         let qemu_helpers = qemu_executor_state.hooks_mut().helpers_mut();

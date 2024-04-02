@@ -48,7 +48,7 @@ use crate::events::{CentralizedEventManager, CentralizedLlmpEventBroker};
 #[cfg(feature = "std")]
 use crate::{
     events::{
-        llmp::{LlmpRestartingEventManager, ManagerKind, RestartingMgr},
+        llmp::{LlmpRestartingEventManager, LlmpShouldSaveState, ManagerKind, RestartingMgr},
         EventConfig,
     },
     monitors::Monitor,
@@ -122,8 +122,8 @@ where
     #[builder(default = true)]
     spawn_broker: bool,
     /// Tell the manager to serialize or not the state on restart
-    #[builder(default = true)]
-    serialize_state: bool,
+    #[builder(default = LlmpShouldSaveState::OnRestart)]
+    serialize_state: LlmpShouldSaveState,
     #[builder(setter(skip), default = PhantomData)]
     phantom_data: PhantomData<(&'a S, &'a SP, EMH)>,
 }
@@ -485,8 +485,8 @@ where
     #[builder(default = true)]
     spawn_broker: bool,
     /// Tell the manager to serialize or not the state on restart
-    #[builder(default = true)]
-    serialize_state: bool,
+    #[builder(default = LlmpShouldSaveState::OnRestart)]
+    serialize_state: LlmpShouldSaveState,
     #[builder(setter(skip), default = PhantomData)]
     phantom_data: PhantomData<(&'a S, &'a SP)>,
 }
