@@ -1,6 +1,6 @@
-use core::fmt::{self, Debug, Formatter};
 #[cfg(all(unix, not(test)))]
-use std::borrow::Borrow;
+use core::borrow::Borrow;
+use core::fmt::{self, Debug, Formatter};
 use std::{ffi::c_void, marker::PhantomData};
 
 use frida_gum::{
@@ -20,12 +20,11 @@ use libafl::{
     Error,
 };
 
+#[cfg(all(unix, not(test)))]
+use crate::asan::errors::AsanErrors;
+use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
 #[cfg(windows)]
 use crate::windows_hooks::initialize;
-use crate::{
-    asan::errors::AsanErrors,
-    helper::{FridaInstrumentationHelper, FridaRuntimeTuple},
-};
 
 /// The [`FridaInProcessExecutor`] is an [`Executor`] that executes the target in the same process, usinig [`frida`](https://frida.re/) for binary-only instrumentation.
 pub struct FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
