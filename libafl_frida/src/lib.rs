@@ -370,7 +370,7 @@ mod tests {
     use crate::{
         asan::{
             asan_rt::AsanRuntime,
-            errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS},
+            errors::{AsanErrorsFeedback, AsanErrorsObserver},
         },
         coverage_rt::CoverageRuntime,
         executor::FridaInProcessExecutor,
@@ -438,7 +438,7 @@ mod tests {
             let mut fuzzer = StdFuzzer::new(StdScheduler::new(), feedback, objective);
 
             let observers = tuple_list!(
-                AsanErrorsObserver::new(core::ptr::addr_of!(ASAN_ERRORS)) //,
+                AsanErrorsObserver::from_static_asan_errors() //,
             );
 
             {
