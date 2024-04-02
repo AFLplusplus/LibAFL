@@ -18,7 +18,6 @@ use core::marker::PhantomData;
 use core::{
     fmt::{self, Debug, Formatter},
     num::NonZeroUsize,
-    time::Duration,
 };
 #[cfg(feature = "std")]
 use std::net::SocketAddr;

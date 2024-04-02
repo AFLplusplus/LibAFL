@@ -1983,13 +1983,15 @@ where
     /// This allows us to intercept messages right in the broker.
     /// This keeps the out map clean.
     /// The backing values of `llmp_clients` [`ClientId`]s will always be sorted (but not gapless)
-    /// Make sure to always increase `num_clients_total` when pushing a new [`LlmpReceiver`] to  `llmp_clients`!
+    /// Make sure to always increase `num_clients_seen` when pushing a new [`LlmpReceiver`] to  `llmp_clients`!
     llmp_clients: Vec<LlmpReceiver<SP>>,
     /// The own listeners we spawned via `launch_listener` or `crate_attach_to_tcp`.
     /// Listeners will be ignored for `exit_cleanly_after` and they are never considered to have timed out.
     listeners: Vec<ClientId>,
     /// The total amount of clients we had, historically, including those that disconnected, and our listeners.
-    num_clients_total: usize,
+    num_clients_seen: usize,
+    /// The total amount of active clients we have right now. This literally means the current active client that is connected to this broker.
+    num_clients_active: usize,
     /// The amount of total clients that should have connected and (and disconnected)
     /// after which the broker loop should quit gracefully.
     pub exit_cleanly_after: Option<NonZeroUsize>,
@@ -2083,19 +2085,20 @@ where
             shmem_provider,
             listeners: vec![],
             exit_cleanly_after: None,
-            num_clients_total: 0,
+            num_clients_seen: 0,
+            num_clients_active: 0,
         })
     }
 
     /// Gets the [`ClientId`] the next client attaching to this broker will get.
     /// In its current implememtation, the inner value of the next [`ClientId`]
-    /// is equal to `self.num_clients_total`.
+    /// is equal to `self.num_clients_seen`.
     /// Calling `peek_next_client_id` mutliple times (without adding a client) will yield the same value.
     #[must_use]
     #[inline]
     pub fn peek_next_client_id(&self) -> ClientId {
         ClientId(
-            self.num_clients_total
+            self.num_clients_seen
                 .try_into()
                 .expect("More than u32::MAX clients!"),
         )
@@ -2135,14 +2138,16 @@ where
 
     /// Add a client to this broker.
     /// Will set an appropriate [`ClientId`] before pushing the client to the internal vec.
-    /// Will increase `num_clients_total`.
+    /// Will increase `num_clients_seen`.
     /// The backing values of `llmp_clients` [`ClientId`]s will always be sorted (but not gapless)
     /// returns the [`ClientId`] of the new client.
     pub fn add_client(&mut self, mut client_receiver: LlmpReceiver<SP>) -> ClientId {
         let id = self.peek_next_client_id();
         client_receiver.id = id;
+        // log::info!("Adding client number {:#?}", id);
         self.llmp_clients.push(client_receiver);
-        self.num_clients_total += 1;
+        self.num_clients_seen += 1;
+        self.num_clients_active += 1;
         id
     }
 
@@ -2295,8 +2300,9 @@ where
                     self.llmp_clients.remove(idx);
                 }
             }
+            // log::trace!("{:#?}", self.restarter_ids);
         }
-        self.num_clients_total -= remove_cnt;
+        self.num_clients_active -= remove_cnt;
 
         self.clients_to_remove.clear();
         Ok(new_messages)
@@ -2389,12 +2395,12 @@ where
                 // log::trace!(
                 //     "Clients connected: {} && > {} - {} >= {}",
                 //     self.has_clients(),
-                //     self.num_clients_total,
+                //     self.num_clients_seen,
                 //     self.listeners.len(),
                 //     exit_after_count
                 // );
                 if !self.has_clients()
-                    && (self.num_clients_total - self.listeners.len()) >= exit_after_count.into()
+                    && (self.num_clients_seen - self.listeners.len()) >= exit_after_count.into()
                 {
                     // No more clients connected, and the amount of clients we were waiting for was previously connected.
                     // exit cleanly.
@@ -2434,7 +2440,7 @@ where
 
             if let Some(exit_after_count) = self.exit_cleanly_after {
                 if !self.has_clients()
-                    && (self.num_clients_total - self.listeners.len()) > exit_after_count.into()
+                    && (self.num_clients_active - self.listeners.len()) > exit_after_count.into()
                 {
                     // No more clients connected, and the amount of clients we were waiting for was previously connected.
                     // exit cleanly.
@@ -2853,6 +2859,7 @@ where
 
         // TODO: We could memcpy a range of pending messages, instead of one by one.
         loop {
+            // log::trace!("{:#?}", self.llmp_clients);
             let msg = {
                 let pos = if (client_id.0 as usize) < self.llmp_clients.len()
                     && self.llmp_clients[client_id.0 as usize].id == client_id
