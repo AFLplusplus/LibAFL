@@ -346,7 +346,7 @@ impl Default for FridaOptions {
 
 #[cfg(test)]
 mod tests {
-    use std::{ptr::addr_of, sync::OnceLock};
+    use std::sync::OnceLock;
 
     use clap::Parser;
     use frida_gum::Gum;
