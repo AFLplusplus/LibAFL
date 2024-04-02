@@ -140,7 +140,7 @@ impl AsanErrors {
     /// This will borrow the [`ASAN_ERRORS`] object.
     /// Nothing else may reference it at the same time.
     #[must_use]
-    pub unsafe fn get_mut<'a>() -> &'a mut Self {
+    pub unsafe fn get_static_mut<'a>() -> &'a mut Self {
         unsafe { ASAN_ERRORS.as_mut().unwrap() }
     }
 

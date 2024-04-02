@@ -244,14 +244,14 @@ impl Allocator {
         //log::trace!("freeing address: {:?}", ptr);
         let Some(metadata) = self.allocations.get_mut(&(ptr as usize)) else {
             if !ptr.is_null() {
-                AsanErrors::get_mut()
+                AsanErrors::get_static_mut()
                     .report_error(AsanError::UnallocatedFree((ptr as usize, Backtrace::new())));
             }
             return;
         };
 
         if metadata.freed {
-            AsanErrors::get_mut().report_error(AsanError::DoubleFree((
+            AsanErrors::get_static_mut().report_error(AsanError::DoubleFree((
                 ptr as usize,
                 metadata.clone(),
                 Backtrace::new(),
@@ -484,7 +484,7 @@ impl Allocator {
     pub unsafe fn check_for_leaks(&self) {
         for metadata in self.allocations.values() {
             if !metadata.freed {
-                AsanErrors::get_mut()
+                AsanErrors::get_static_mut()
                     .report_error(AsanError::Leak((metadata.address, metadata.clone())));
             }
         }

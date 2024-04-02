@@ -1094,7 +1094,7 @@ impl AsanRuntime {
             // # Safety
             // This will borrow the [`ASAN_ERRORS`] object.
             // Nothing else may reference it at the same time.
-            unsafe { AsanErrors::get_mut().report_error(error) };
+            unsafe { AsanErrors::get_static_mut().report_error(error) };
 
             // This is not even a mem instruction??
         } else {
@@ -1102,7 +1102,7 @@ impl AsanRuntime {
             // This will borrow the [`ASAN_ERRORS`] object.
             // Nothing else may reference it at the same time.
             unsafe {
-                AsanErrors::get_mut().report_error(AsanError::Unknown((
+                AsanErrors::get_static_mut().report_error(AsanError::Unknown((
                     self.regs,
                     actual_pc,
                     (None, None, 0, fault_address),
@@ -1240,7 +1240,7 @@ impl AsanRuntime {
         // # Safety
         // This will borrow the [`ASAN_ERRORS`] object.
         // Nothing else may reference it at the same time.
-        unsafe { AsanErrors::get_mut().report_error(error) };
+        unsafe { AsanErrors::get_static_mut().report_error(error) };
     }
 
     #[cfg(target_arch = "x86_64")]
