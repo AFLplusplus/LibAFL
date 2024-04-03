@@ -1174,6 +1174,12 @@ where
             (*page).size_total
         );
 
+        // For future allocs, keep track of the maximum (aligned) alloc size we used
+        (*page).max_alloc_size = max(
+            (*page).max_alloc_size,
+            size_of::<LlmpMsg>() + buf_len_padded,
+        );
+
         // We need enough space for the current page size_used + payload + padding
         if (*page).size_used + size_of::<LlmpMsg>() + buf_len_padded + EOP_MSG_SIZE
             > (*page).size_total
@@ -1204,12 +1210,6 @@ where
 
         (*_llmp_next_msg_ptr(ret)).tag = LLMP_TAG_UNSET;
         (*ret).tag = LLMP_TAG_UNINITIALIZED;
-
-        // For future allocs, keep track of the maximum (aligned) alloc size we used
-        (*page).max_alloc_size = max(
-            (*page).max_alloc_size,
-            size_of::<LlmpMsg>() + buf_len_padded,
-        );
 
         self.has_unsent_message = true;
 
