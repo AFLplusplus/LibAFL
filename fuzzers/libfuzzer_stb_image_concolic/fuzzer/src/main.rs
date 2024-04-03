@@ -1,12 +1,18 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for `stb_image`.
+use std::{
+    env, fs,
+    path::PathBuf,
+    process::{Child, Command, Stdio},
+    time::Duration,
+};
+
 use clap::{self, Parser};
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
-    Error,
-    events::{EventConfig, setup_restarting_mgr_std},
+    events::{setup_restarting_mgr_std, EventConfig},
     executors::{
-        command::CommandConfigurator, ExitKind, inprocess::InProcessExecutor, ShadowExecutor,
+        command::CommandConfigurator, inprocess::InProcessExecutor, ExitKind, ShadowExecutor,
     },
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
@@ -19,8 +25,8 @@ use libafl::{
     },
     observers::{
         concolic::{
-            ConcolicObserver,
             serialization_format::{DEFAULT_ENV_NAME, DEFAULT_SIZE},
+            ConcolicObserver,
         },
         TimeObserver,
     },
@@ -30,25 +36,19 @@ use libafl::{
         StdMutationalStage, TracingStage,
     },
     state::{HasCorpus, StdState},
+    Error,
 };
 use libafl_bolts::{
-    AsMutSlice,
-    AsSlice,
     current_nanos,
-    Named,
-    rands::StdRand, shmem::{ShMem, ShMemProvider, StdShMemProvider}, tuples::tuple_list,
+    rands::StdRand,
+    shmem::{ShMem, ShMemProvider, StdShMemProvider},
+    tuples::tuple_list,
+    AsMutSlice, AsSlice, Named,
 };
 use libafl_targets::{
-    CmpLogObserver, libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer,
+    libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
 };
 use mimalloc::MiMalloc;
-use std::{
-    env,
-    path::PathBuf,
-    process::{Child, Command, Stdio},
-    time::Duration,
-};
-use std::fs;
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -77,7 +77,7 @@ pub fn main() {
         1337,
         opt.concolic,
     )
-        .expect("An error occurred while fuzzing");
+    .expect("An error occurred while fuzzing");
 }
 
 /// The actual fuzzer
@@ -141,7 +141,7 @@ fn fuzz(
             // Same for objective feedbacks
             &mut objective,
         )
-            .unwrap()
+        .unwrap()
     });
 
     println!("We're a client, let's fuzz :)");
