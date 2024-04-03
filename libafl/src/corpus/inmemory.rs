@@ -36,8 +36,10 @@ where
     I: Input,
 {
     #[cfg(not(feature = "corpus_btreemap"))]
+    /// A map of CorpusId to TestcaseStorageItem
     pub map: hashbrown::HashMap<CorpusId, TestcaseStorageItem<I>>,
     #[cfg(feature = "corpus_btreemap")]
+    /// A map of CorpusId to Testcase.
     pub map: alloc::collections::btree_map::BTreeMap<CorpusId, RefCell<Testcase<I>>>,
     /// The keys in order (use `Vec::binary_search`)
     pub keys: Vec<CorpusId>,
