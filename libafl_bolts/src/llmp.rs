@@ -86,7 +86,7 @@ use std::{
 
 #[cfg(all(debug_assertions, feature = "llmp_debug", feature = "std"))]
 use backtrace::Backtrace;
-use hashbrown::HashMap;
+use hashbrown::HashSet;
 #[cfg(all(unix, feature = "std"))]
 #[cfg(not(any(target_os = "solaris", target_os = "illumos")))]
 use nix::sys::socket::{self, sockopt::ReusePort};
@@ -1976,7 +1976,7 @@ pub struct LlmpBroker<SP>
 where
     SP: ShMemProvider + 'static,
 {
-    restarter_ids: HashMap<RestarterId, ClientId>,
+    restarter_ids: Vec<(RestarterId, ClientId)>,
     /// Broadcast map from broker to all clients
     llmp_out: LlmpSender<SP>,
     /// Users of Llmp can add message handlers in the broker.
@@ -1996,7 +1996,7 @@ where
     /// after which the broker loop should quit gracefully.
     pub exit_cleanly_after: Option<NonZeroUsize>,
     /// Clients that should be removed soon
-    clients_to_remove: Vec<ClientId>,
+    clients_to_remove: HashSet<ClientId>,
     /// The `ShMemProvider` to use
     shmem_provider: SP,
 }
@@ -2067,7 +2067,7 @@ where
         keep_pages_forever: bool,
     ) -> Result<Self, Error> {
         Ok(LlmpBroker {
-            restarter_ids: HashMap::new(),
+            restarter_ids: Vec::new(),
             llmp_out: LlmpSender {
                 id: ClientId(0),
                 last_msg_sent: ptr::null_mut(),
@@ -2081,7 +2081,7 @@ where
                 unused_shmem_cache: vec![],
             },
             llmp_clients: vec![],
-            clients_to_remove: vec![],
+            clients_to_remove: HashSet::new(),
             shmem_provider,
             listeners: vec![],
             exit_cleanly_after: None,
@@ -2144,10 +2144,14 @@ where
     pub fn add_client(&mut self, mut client_receiver: LlmpReceiver<SP>) -> ClientId {
         let id = self.peek_next_client_id();
         client_receiver.id = id;
-        // log::info!("Adding client number {:#?}", id);
         self.llmp_clients.push(client_receiver);
         self.num_clients_seen += 1;
         self.num_clients_active += 1;
+        log::info!(
+            "Adding client number {:#?} {:#?}",
+            id,
+            self.num_clients_active
+        );
         id
     }
 
@@ -2155,7 +2159,7 @@ where
     /// Each fuzzer client instance could have multiple PID, because they can restart
     /// But they only have one restarter whose PID does not change
     pub fn register_restarter_id(&mut self, client_id: ClientId, restarter_id: RestarterId) {
-        self.restarter_ids.insert(restarter_id, client_id);
+        self.restarter_ids.push((restarter_id, client_id));
     }
 
     /// Allocate the next message on the outgoing map
@@ -2285,14 +2289,18 @@ where
                 Ok(has_messages) => {
                     new_messages = has_messages;
                 }
-                Err(Error::ShuttingDown) => self.clients_to_remove.push(client_id),
+                Err(Error::ShuttingDown) => {
+                    self.clients_to_remove.insert(client_id);
+                }
                 Err(err) => return Err(err),
             }
         }
 
         let remove_cnt = self.clients_to_remove.len();
         if remove_cnt > 0 {
+            log::trace!("Removing {:#?}", self.clients_to_remove);
             // rev() to make it works
+            // commit the change to llmp_clients
             for idx in (0..self.llmp_clients.len()).rev() {
                 let client_id = self.llmp_clients[idx].id;
                 if self.clients_to_remove.contains(&client_id) {
@@ -2300,9 +2308,24 @@ where
                     self.llmp_clients.remove(idx);
                 }
             }
+            // commit the change to restarter_ids
+            for idx in (0..self.restarter_ids.len()).rev() {
+                let client_id = self.restarter_ids[idx].1;
+                if self.clients_to_remove.contains(&client_id) {
+                    self.restarter_ids.remove(idx);
+                }
+            }
+            self.num_clients_active -= remove_cnt;
+            log::trace!(
+                "self.llmp_clients {} self.num_clients_active {} remove_cnt {}",
+                self.llmp_clients.len(),
+                self.num_clients_active,
+                remove_cnt
+            );
             // log::trace!("{:#?}", self.restarter_ids);
+            // log::trace!("{:#?}", self.llmp_clients);
+            assert!(self.num_clients_active == self.llmp_clients.len())
         }
-        self.num_clients_active -= remove_cnt;
 
         self.clients_to_remove.clear();
         Ok(new_messages)
@@ -2910,16 +2933,21 @@ where
                     let exitinfo = (*msg).buf.as_mut_ptr() as *mut LlmpClientExitInfo;
                     let restarter_id = RestarterId((*exitinfo).restarter_id);
                     log::info!("Client exit message received!, we are removing clients whose restarter_id is {:#?}", restarter_id);
-                    match self.restarter_ids.remove_entry(&restarter_id) {
-                        Some((_, v)) => {
-                            self.clients_to_remove.push(v);
+
+                    let found = self.restarter_ids.iter().any(|(r, c)| {
+                        if *r == restarter_id {
+                            self.clients_to_remove.insert(*c);
+                            true
+                        } else {
+                            false
                         }
-                        None => {
-                            log::error!(
-                                "No matching client found for event restarter id {:#?}",
-                                self.restarter_ids
-                            );
-                        }
+                    });
+
+                    if !found {
+                        log::info!(
+                            "Could not find client with restarter_id {:#?}",
+                            restarter_id
+                        )
                     }
                 }
                 LLMP_TAG_NEW_SHM_CLIENT => {
