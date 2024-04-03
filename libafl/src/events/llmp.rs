@@ -598,40 +598,6 @@ where
     pub fn to_env(&self, env_name: &str) {
         self.llmp.to_env(env_name).unwrap();
     }
-
-    /// Calling this function will tell the llmp broker that this client is exiting
-    /// This should be called from the restarter not from the actual fuzzer client
-    #[cfg(feature = "std")]
-    fn notify_death(&self, event_restarter_pid: u32, broker_port: u16) -> Result<(), Error> {
-        let mut stream = match TcpStream::connect((LLMP_CONNECT_ADDR, broker_port)) {
-            Ok(stream) => stream,
-            Err(_) => {
-                log::error!("Connection refused.");
-                return Ok(());
-            }
-        };
-
-        // The broker tells us hello we don't care we just tell it our client died
-        let TcpResponse::BrokerConnectHello {
-            broker_shmem_description: _,
-            hostname: _,
-        } = recv_tcp_msg(&mut stream)?.try_into()?
-        else {
-            return Err(Error::illegal_state(
-                "Received unexpected Broker Hello".to_string(),
-            ));
-        };
-
-        let msg = TcpRequest::ClientQuit {
-            restarter_id: RestarterId(event_restarter_pid),
-        };
-
-        // Send this mesasge off and we are leaving.
-        let _ = send_tcp_msg(&mut stream, &msg);
-        log::info!("Asking he broker to be disconnected");
-
-        Ok(())
-    }
 }
 
 impl<EMH, S, SP> LlmpEventManager<EMH, S, SP>
@@ -1312,6 +1278,37 @@ where
     S: State + HasExecutions,
     MT: Monitor + Clone,
 {
+    /// Calling this function will tell the llmp broker that this client is exiting
+    /// This should be called from the restarter not from the actual fuzzer client
+    #[cfg(feature = "std")]
+    fn notify_death(event_restarter_pid: u32, broker_port: u16) -> Result<(), Error> {
+        let Ok(mut stream) = TcpStream::connect((LLMP_CONNECT_ADDR, broker_port)) else {
+            log::error!("Connection refused.");
+            return Ok(());
+        };
+
+        // The broker tells us hello we don't care we just tell it our client died
+        let TcpResponse::BrokerConnectHello {
+            broker_shmem_description: _,
+            hostname: _,
+        } = recv_tcp_msg(&mut stream)?.try_into()?
+        else {
+            return Err(Error::illegal_state(
+                "Received unexpected Broker Hello".to_string(),
+            ));
+        };
+
+        let msg = TcpRequest::ClientQuit {
+            restarter_id: RestarterId(event_restarter_pid),
+        };
+
+        // Send this mesasge off and we are leaving.
+        let _ = send_tcp_msg(&mut stream, &msg);
+        log::info!("Asking he broker to be disconnected");
+
+        Ok(())
+    }
+
     /// Internal function, returns true when shuttdown is requested by a `SIGINT` signal
     #[inline]
     #[allow(clippy::unused_self)]
@@ -1477,17 +1474,17 @@ where
                     if child_status == 137 {
                         // Out of Memory, see https://tldp.org/LDP/abs/html/exitcodes.html
                         // and https://github.com/AFLplusplus/LibAFL/issues/32 for discussion.
-                        let _ = mgr.notify_death(event_restarter_pid, self.broker_port);
+                        let _ = Self::notify_death(event_restarter_pid, self.broker_port);
                         panic!("Fuzzer-respawner: The fuzzed target crashed with an out of memory error! Fix your harness, or switch to another executor (for example, a forkserver).");
                     }
-                    let _ = mgr.notify_death(event_restarter_pid, self.broker_port);
+                    let _ = Self::notify_death(event_restarter_pid, self.broker_port);
                     // Storing state in the last round did not work
                     panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! This can happen if the child calls `exit()`, in that case make sure it uses `abort()`, if it got killed unrecoverable (OOM), or if there is a bug in the fuzzer itself. (Child exited with: {child_status})");
                 }
 
                 if staterestorer.wants_to_exit() || Self::is_shutting_down() {
                     // if ctrl-c is pressed, we end up in this branch
-                    let _ = mgr.notify_death(event_restarter_pid, self.broker_port);
+                    let _ = Self::notify_death(event_restarter_pid, self.broker_port);
                     return Err(Error::shutting_down());
                 }
                 ctr = ctr.wrapping_add(1);
