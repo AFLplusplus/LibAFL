@@ -48,7 +48,8 @@ pub enum NativeBackdoorCommand {
     Save = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_SAVE.0 as u64, // Save the VM
     Load = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_LOAD.0 as u64, // Reload the target without ending the run?
     Version = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_VERSION.0 as u64, // Version of the bindings used in the target
-    VaddrFilterAllowRange = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_VADDR_FILTER_ALLOW.0 as u64, // Allow given address range
+    VaddrFilterAllowRange =
+        bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_VADDR_FILTER_ALLOW.0 as u64, // Allow given address range
 }
 
 #[derive(Debug, Clone, Enum, TryFromPrimitive)]
