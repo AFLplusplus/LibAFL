@@ -21,7 +21,7 @@ use crate::{
     StdEmuExitHandler, StdInstrumentationFilter, CPU,
 };
 
-pub const VERSION: u64 = bindings::LIBAFL_EXIT_VERSION_NUMBER as u64;
+pub const VERSION: u64 = bindings::LIBAFL_QEMU_HDR_VERSION_NUMBER as u64;
 
 mod bindings {
     #![allow(non_upper_case_globals)]
@@ -40,23 +40,24 @@ mod bindings {
 #[derive(Debug, Clone, TryFromPrimitive)]
 #[repr(u64)]
 pub enum NativeBackdoorCommand {
-    StartVirt = bindings::LibaflExit_LIBAFL_EXIT_START_VIRT.0 as u64, // Shortcut for Save + InputVirt
-    StartPhys = bindings::LibaflExit_LIBAFL_EXIT_START_PHYS.0 as u64, // Shortcut for Save + InputPhys
-    InputVirt = bindings::LibaflExit_LIBAFL_EXIT_INPUT_VIRT.0 as u64, // The address is a virtual address using the paging currently running in the VM.
-    InputPhys = bindings::LibaflExit_LIBAFL_EXIT_INPUT_PHYS.0 as u64, // The address is a physical address
-    End = bindings::LibaflExit_LIBAFL_EXIT_END.0 as u64, // Implies reloading of the target. The first argument gives the exit status.
-    Save = bindings::LibaflExit_LIBAFL_EXIT_SAVE.0 as u64, // Save the VM
-    Load = bindings::LibaflExit_LIBAFL_EXIT_LOAD.0 as u64, // Reload the target without ending the run?
-    Version = bindings::LibaflExit_LIBAFL_EXIT_VERSION.0 as u64, // Version of the bindings used in the target
-    VaddrFilterAllowRange = bindings::LibaflExit_LIBAFL_EXIT_VADDR_FILTER_ALLOW.0 as u64, // Allow given address range
+    StartVirt = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_START_VIRT.0 as u64, // Shortcut for Save + InputVirt
+    StartPhys = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_START_PHYS.0 as u64, // Shortcut for Save + InputPhys
+    InputVirt = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_INPUT_VIRT.0 as u64, // The address is a virtual address using the paging currently running in the VM.
+    InputPhys = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_INPUT_PHYS.0 as u64, // The address is a physical address
+    End = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_END.0 as u64, // Implies reloading of the target. The first argument gives the exit status.
+    Save = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_SAVE.0 as u64, // Save the VM
+    Load = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_LOAD.0 as u64, // Reload the target without ending the run?
+    Version = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_VERSION.0 as u64, // Version of the bindings used in the target
+    VaddrFilterAllowRange =
+        bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_VADDR_FILTER_ALLOW.0 as u64, // Allow given address range
 }
 
 #[derive(Debug, Clone, Enum, TryFromPrimitive)]
 #[repr(u64)]
 pub enum NativeExitKind {
-    Unknown = bindings::LibaflExitEndStatus_LIBAFL_EXIT_END_UNKNOWN.0 as u64, // Should not be used
-    Ok = bindings::LibaflExitEndStatus_LIBAFL_EXIT_END_OK.0 as u64,           // Normal exit
-    Crash = bindings::LibaflExitEndStatus_LIBAFL_EXIT_END_CRASH.0 as u64, // Crash reported in the VM
+    Unknown = bindings::LibaflQemuEndStatus_LIBAFL_QEMU_END_UNKNOWN.0 as u64, // Should not be used
+    Ok = bindings::LibaflQemuEndStatus_LIBAFL_QEMU_END_OK.0 as u64,           // Normal exit
+    Crash = bindings::LibaflQemuEndStatus_LIBAFL_QEMU_END_CRASH.0 as u64, // Crash reported in the VM
 }
 
 pub trait IsCommand<QT, S, E>
