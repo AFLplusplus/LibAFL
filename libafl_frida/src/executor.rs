@@ -1,3 +1,5 @@
+#[cfg(all(unix, not(test)))]
+use core::borrow::Borrow;
 use core::fmt::{self, Debug, Formatter};
 use std::{ffi::c_void, marker::PhantomData};
 
@@ -18,9 +20,8 @@ use libafl::{
     Error,
 };
 
-#[cfg(not(test))]
-#[cfg(unix)]
-use crate::asan::errors::ASAN_ERRORS;
+#[cfg(all(unix, not(test)))]
+use crate::asan::errors::AsanErrors;
 use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
 #[cfg(windows)]
 use crate::windows_hooks::initialize;
@@ -104,11 +105,10 @@ where
             self.stalker.deactivate();
         }
 
-        #[cfg(not(test))]
-        #[cfg(unix)]
+        #[cfg(all(unix, not(test)))]
         unsafe {
-            if ASAN_ERRORS.is_some() && !ASAN_ERRORS.as_ref().unwrap().is_empty() {
-                log::error!("Crashing target as it had ASAN errors");
+            if !AsanErrors::get_mut_blocking().borrow().is_empty() {
+                log::error!("Crashing target as it had ASan errors");
                 libc::raise(libc::SIGABRT);
             }
         }
