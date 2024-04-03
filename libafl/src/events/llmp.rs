@@ -1227,10 +1227,10 @@ where
 
 /// Calling this function will tell the llmp broker that this client is exiting
 /// This should be called from the restarter not from the actual fuzzer client
-/// This function serves the same roll as the LlmpClient.send_exiting()
-/// However, from the the event restarter process it is forbidden to call send_exiting()
+/// This function serves the same roll as the `LlmpClient.send_exiting()`
+/// However, from the the event restarter process it is forbidden to call `send_exiting()`
 /// (You can call it and it compiles but you should never do so)
-/// send_exiting is exclusive to the fuzzer client.
+/// `send_exiting()` is exclusive to the fuzzer client.
 #[cfg(feature = "std")]
 pub fn notify_death(client_group_id: u32, broker_port: u16) -> Result<(), Error> {
     let Ok(mut stream) = TcpStream::connect((LLMP_CONNECT_ADDR, broker_port)) else {
