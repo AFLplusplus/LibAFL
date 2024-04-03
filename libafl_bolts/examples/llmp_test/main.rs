@@ -74,7 +74,9 @@ fn adder_loop(port: u16) -> Result<(), Box<dyn std::error::Error>> {
 
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
 fn large_msg_loop(port: u16) -> Result<(), Box<dyn std::error::Error>> {
-    let mut client = llmp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new()?, port, 1337)?;
+    let restarter_id = std::process::id();
+    let mut client =
+        llmp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new()?, port, restarter_id)?;
 
     #[cfg(not(target_vendor = "apple"))]
     let meg_buf = vec![1u8; 1 << 20];
@@ -177,8 +179,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
         }
         "ctr" => {
-            let mut client =
-                llmp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new()?, port, 1337)?;
+            let restarter_id = std::process::id();
+            let mut client = llmp::LlmpClient::create_attach_to_tcp(
+                StdShMemProvider::new()?,
+                port,
+                restarter_id,
+            )?;
             let mut counter: u32 = 0;
             loop {
                 counter = counter.wrapping_add(1);
@@ -194,8 +200,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             large_msg_loop(port)?;
         }
         "exiting" => {
-            let mut client =
-                llmp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new()?, port, 1337)?;
+            let restarter_id = std::process::id();
+            let mut client = llmp::LlmpClient::create_attach_to_tcp(
+                StdShMemProvider::new()?,
+                port,
+                restarter_id,
+            )?;
             for i in 0..10_u32 {
                 client.send_buf(_TAG_SIMPLE_U32_V1, &i.to_le_bytes())?;
                 println!("Exiting Client writing {i}");

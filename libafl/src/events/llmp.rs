@@ -1486,7 +1486,7 @@ where
                 }
 
                 if staterestorer.wants_to_exit() || Self::is_shutting_down() {
-                    // if ctrl-c is pressed the go this branch
+                    // if ctrl-c is pressed, we end up in this branch
                     let _ = mgr.notify_death(event_restarter_pid, self.broker_port);
                     return Err(Error::shutting_down());
                 }
