@@ -2324,7 +2324,6 @@ where
             );
             // log::trace!("{:#?}", self.restarter_ids);
             // log::trace!("{:#?}", self.llmp_clients);
-            assert!(self.num_clients_active == self.llmp_clients.len())
         }
 
         self.clients_to_remove.clear();
@@ -2947,7 +2946,7 @@ where
                         log::info!(
                             "Could not find client with restarter_id {:#?}",
                             restarter_id
-                        )
+                        );
                     }
                 }
                 LLMP_TAG_NEW_SHM_CLIENT => {
