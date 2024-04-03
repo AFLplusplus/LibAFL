@@ -1,6 +1,6 @@
 /*!
-The frida executor is a binary-only mode for `LibAFL`.
-It can report coverage and, on supported architecutres, even reports memory access errors.
+The [`Frida`](https://frida.re) executor is a binary-only mode for `LibAFL`.
+It can report coverage and, on supported architectures, even reports memory access errors.
 
 Additional documentation is available in [the `LibAFL` book](https://aflplus.plus/libafl-book/advanced_features/frida.html).
 */
@@ -346,7 +346,7 @@ impl Default for FridaOptions {
 
 #[cfg(test)]
 mod tests {
-    use std::{ptr::addr_of, sync::OnceLock};
+    use std::sync::OnceLock;
 
     use clap::Parser;
     use frida_gum::Gum;
@@ -370,7 +370,7 @@ mod tests {
     use crate::{
         asan::{
             asan_rt::AsanRuntime,
-            errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS},
+            errors::{AsanErrorsFeedback, AsanErrorsObserver},
         },
         coverage_rt::CoverageRuntime,
         executor::FridaInProcessExecutor,
@@ -438,7 +438,7 @@ mod tests {
             let mut fuzzer = StdFuzzer::new(StdScheduler::new(), feedback, objective);
 
             let observers = tuple_list!(
-                AsanErrorsObserver::new(addr_of!(ASAN_ERRORS)) //,
+                AsanErrorsObserver::from_static_asan_errors() //,
             );
 
             {

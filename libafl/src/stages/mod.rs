@@ -222,10 +222,18 @@ where
     Z: UsesState<State = Head::State>,
     Head::State: HasCurrentStage,
 {
-    fn into_vec(self) -> Vec<Box<dyn Stage<E, EM, Z, State = Head::State, Input = Head::Input>>> {
+    fn into_vec_reversed(
+        self,
+    ) -> Vec<Box<dyn Stage<E, EM, Z, State = Head::State, Input = Head::Input>>> {
         let (head, tail) = self.uncons();
-        let mut ret = tail.0.into_vec();
-        ret.insert(0, Box::new(head));
+        let mut ret = tail.0.into_vec_reversed();
+        ret.push(Box::new(head));
+        ret
+    }
+
+    fn into_vec(self) -> Vec<Box<dyn Stage<E, EM, Z, State = Head::State, Input = Head::Input>>> {
+        let mut ret = self.into_vec_reversed();
+        ret.reverse();
         ret
     }
 }

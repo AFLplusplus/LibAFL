@@ -292,6 +292,7 @@ where
     ) -> Result<(), Error> {
         if !self.is_main {
             // secondary node
+            let mut is_tc = false;
             let is_nt_or_heartbeat = match &mut event {
                 Event::NewTestcase {
                     input: _,
@@ -304,19 +305,26 @@ where
                     forward_id,
                 } => {
                     *forward_id = Some(ClientId(self.inner.mgr_id().0 as u32));
+                    is_tc = true;
                     true
                 }
                 Event::UpdateExecStats {
                     time: _,
                     executions: _,
                     phantom: _,
-                } => true,
+                } => true, // send it but this guy won't be handled. the only purpose is to keep this client alive else the broker thinks it is dead and will dc it
                 _ => false,
             };
+
             if is_nt_or_heartbeat {
-                return self.forward_to_main(&event);
+                self.forward_to_main(&event)?;
+                if is_tc {
+                    // early return here because we only send it to centralized not main broker.
+                    return Ok(());
+                }
             }
         }
+        // now inner llmp manager will process it
         self.inner.fire(state, event)
     }
 

@@ -259,7 +259,9 @@ where
 
     fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
-            Err(Error::empty(String::from("No entries in corpus")))
+            Err(Error::empty(String::from(
+                "No entries in corpus. This often implies the target is not properly instrumented.",
+            )))
         } else {
             let id = match state.corpus().current() {
                 Some(cur) => {

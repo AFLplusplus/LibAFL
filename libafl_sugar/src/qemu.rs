@@ -34,7 +34,7 @@ use libafl_bolts::{
     tuples::{tuple_list, Merge},
     AsSlice,
 };
-pub use libafl_qemu::emu::Emulator;
+pub use libafl_qemu::emu::Qemu;
 #[cfg(not(any(feature = "mips", feature = "hexagon")))]
 use libafl_qemu::QemuCmpLogHelper;
 use libafl_qemu::{edges, QemuEdgeCoverageHelper, QemuExecutor, QemuHooks};
@@ -118,7 +118,7 @@ where
 {
     /// Run the fuzzer
     #[allow(clippy::too_many_lines, clippy::similar_names)]
-    pub fn run(&mut self, emulator: &Emulator) {
+    pub fn run(&mut self, qemu: &Qemu) {
         let conf = match self.configuration.as_ref() {
             Some(name) => EventConfig::from_name(name),
             None => EventConfig::AlwaysUnique,
@@ -214,7 +214,7 @@ where
 
             if self.use_cmplog.unwrap_or(false) {
                 let mut hooks = QemuHooks::new(
-                    emulator.clone(),
+                    *qemu,
                     #[cfg(not(any(feature = "mips", feature = "hexagon")))]
                     tuple_list!(
                         QemuEdgeCoverageHelper::default(),
@@ -325,10 +325,8 @@ where
                     }
                 }
             } else {
-                let mut hooks = QemuHooks::new(
-                    emulator.clone(),
-                    tuple_list!(QemuEdgeCoverageHelper::default()),
-                );
+                let mut hooks =
+                    QemuHooks::new(*qemu, tuple_list!(QemuEdgeCoverageHelper::default()));
 
                 let mut executor = QemuExecutor::new(
                     &mut hooks,
@@ -445,7 +443,7 @@ pub mod pybind {
     use std::path::PathBuf;
 
     use libafl_bolts::core_affinity::Cores;
-    use libafl_qemu::emu::pybind::Emulator;
+    use libafl_qemu::emu::pybind::Qemu;
     use pyo3::{prelude::*, types::PyBytes};
 
     use crate::qemu;
@@ -492,7 +490,7 @@ pub mod pybind {
 
         /// Run the fuzzer
         #[allow(clippy::needless_pass_by_value)]
-        pub fn run(&self, emulator: &Emulator, harness: PyObject) {
+        pub fn run(&self, qemu: &Qemu, harness: PyObject) {
             qemu::QemuBytesCoverageSugar::builder()
                 .input_dirs(&self.input_dirs)
                 .output_dir(self.output_dir.clone())
@@ -511,7 +509,7 @@ pub mod pybind {
                 .tokens_file(self.tokens_file.clone())
                 .iterations(self.iterations)
                 .build()
-                .run(&emulator.emu);
+                .run(&qemu.qemu);
         }
     }
 

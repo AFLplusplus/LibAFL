@@ -94,6 +94,17 @@ where
 /// (We need this trait since we cannot implement `Into` for foreign types)
 #[cfg(feature = "alloc")]
 pub trait IntoVec<T> {
+    /// Convert this into a [`Vec`], reversed.
+    /// (Having this method around makes some implementations more performant)
+    fn into_vec_reversed(self) -> Vec<T>
+    where
+        Self: Sized,
+    {
+        let mut ret = self.into_vec();
+        ret.reverse();
+        ret
+    }
+
     /// Convert this into a [`Vec`].
     fn into_vec(self) -> Vec<T>;
 }

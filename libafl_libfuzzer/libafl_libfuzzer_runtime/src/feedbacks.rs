@@ -131,9 +131,10 @@ where
         Ok(false)
     }
 
-    fn append_metadata<OT>(
+    fn append_metadata<EM, OT>(
         &mut self,
         _state: &mut S,
+        _manager: &mut EM,
         _observers: &OT,
         testcase: &mut Testcase<S::Input>,
     ) -> Result<(), Error>

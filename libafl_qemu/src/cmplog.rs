@@ -2,6 +2,7 @@
 use capstone::{arch::BuildsCapstone, Capstone, InsnDetail};
 use hashbrown::HashMap;
 use libafl::{inputs::UsesInput, state::HasMetadata};
+use libafl_qemu_sys::GuestAddr;
 pub use libafl_targets::{
     cmps::{
         __libafl_targets_cmplog_instructions, __libafl_targets_cmplog_routines, CMPLOG_ENABLED,
@@ -11,18 +12,13 @@ pub use libafl_targets::{
 use serde::{Deserialize, Serialize};
 
 #[cfg(emulation_mode = "usermode")]
-use crate::{
-    capstone,
-    emu::{ArchExtras, Emulator},
-    CallingConvention,
-};
+use crate::{capstone, emu::ArchExtras, CallingConvention, Qemu};
 use crate::{
     helper::{
         hash_me, HasInstrumentationFilter, IsFilter, QemuHelper, QemuHelperTuple,
         QemuInstrumentationAddressRangeFilter,
     },
     hooks::{Hook, QemuHooks},
-    GuestAddr,
 };
 
 #[cfg_attr(
@@ -70,7 +66,9 @@ impl Default for QemuCmpLogHelper {
     }
 }
 
-impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuCmpLogHelper {
+impl<S: UsesInput> HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter, S>
+    for QemuCmpLogHelper
+{
     fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
         &self.filter
     }
@@ -246,12 +244,12 @@ impl QemuCmpLogRoutinesHelper {
             }
         }
 
-        let emu = Emulator::get().unwrap();
+        let qemu = Qemu::get().unwrap();
 
-        let a0: GuestAddr = emu
+        let a0: GuestAddr = qemu
             .read_function_argument(CallingConvention::Cdecl, 0)
             .unwrap_or(0);
-        let a1: GuestAddr = emu
+        let a1: GuestAddr = qemu
             .read_function_argument(CallingConvention::Cdecl, 1)
             .unwrap_or(0);
 
@@ -262,7 +260,7 @@ impl QemuCmpLogRoutinesHelper {
         // if !emu.access_ok(VerifyAccess::Read, a0, 0x20) || !emu.access_ok(VerifyAccess::Read, a1, 0x20) { return; }
 
         unsafe {
-            __libafl_targets_cmplog_routines(k as usize, emu.g2h(a0), emu.g2h(a1));
+            __libafl_targets_cmplog_routines(k as usize, qemu.g2h(a0), qemu.g2h(a1));
         }
     }
 
@@ -289,21 +287,21 @@ impl QemuCmpLogRoutinesHelper {
             .unwrap();
         }
 
-        let emu = hooks.emulator();
+        let qemu = hooks.qemu();
 
         if let Some(h) = hooks.helpers().match_first_type::<Self>() {
             #[allow(unused_mut)]
             let mut code = {
                 #[cfg(emulation_mode = "usermode")]
                 unsafe {
-                    std::slice::from_raw_parts(emu.g2h(pc), 512)
+                    std::slice::from_raw_parts(qemu.g2h(pc), 512)
                 }
                 #[cfg(emulation_mode = "systemmode")]
                 &mut [0; 512]
             };
             #[cfg(emulation_mode = "systemmode")]
             unsafe {
-                emu.read_mem(pc, code)
+                qemu.read_mem(pc, code)
             }; // TODO handle faults
 
             let mut iaddr = pc;
@@ -318,7 +316,7 @@ impl QemuCmpLogRoutinesHelper {
                     match u32::from(detail.0) {
                         capstone::InsnGroupType::CS_GRP_CALL => {
                             let k = (hash_me(pc.into())) & (CMPLOG_MAP_W as u64 - 1);
-                            emu.set_hook(k, insn.address() as GuestAddr, Self::on_call, false);
+                            qemu.set_hook(k, insn.address() as GuestAddr, Self::on_call, false);
                         }
                         capstone::InsnGroupType::CS_GRP_RET
                         | capstone::InsnGroupType::CS_GRP_INVALID
@@ -335,11 +333,11 @@ impl QemuCmpLogRoutinesHelper {
 
                 #[cfg(emulation_mode = "usermode")]
                 unsafe {
-                    code = std::slice::from_raw_parts(emu.g2h(iaddr), 512);
+                    code = std::slice::from_raw_parts(qemu.g2h(iaddr), 512);
                 }
                 #[cfg(emulation_mode = "systemmode")]
                 unsafe {
-                    emu.read_mem(pc, code);
+                    qemu.read_mem(pc, code);
                 } // TODO handle faults
             }
         }
@@ -349,7 +347,9 @@ impl QemuCmpLogRoutinesHelper {
 }
 
 #[cfg(emulation_mode = "usermode")]
-impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuCmpLogRoutinesHelper {
+impl<S: UsesInput> HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter, S>
+    for QemuCmpLogRoutinesHelper
+{
     fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
         &self.filter
     }

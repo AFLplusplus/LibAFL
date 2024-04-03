@@ -8,7 +8,7 @@ use pyo3::prelude::*;
 pub use strum_macros::EnumIter;
 pub use syscall_numbers::x86::*;
 
-use crate::{sync_backdoor::SyncBackdoorArgs, CallingConvention, GuestAddr};
+use crate::{sync_backdoor::BackdoorArgs, CallingConvention, GuestAddr};
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
 #[repr(i32)]
@@ -25,19 +25,19 @@ pub enum Regs {
     Eflags = 9,
 }
 
-static SYNC_BACKDOOR_ARCH_REGS: OnceLock<EnumMap<SyncBackdoorArgs, Regs>> = OnceLock::new();
+static BACKDOOR_ARCH_REGS: OnceLock<EnumMap<BackdoorArgs, Regs>> = OnceLock::new();
 
-pub fn get_sync_backdoor_arch_regs() -> &'static EnumMap<SyncBackdoorArgs, Regs> {
-    SYNC_BACKDOOR_ARCH_REGS.get_or_init(|| {
+pub fn get_backdoor_arch_regs() -> &'static EnumMap<BackdoorArgs, Regs> {
+    BACKDOOR_ARCH_REGS.get_or_init(|| {
         enum_map! {
-            SyncBackdoorArgs::Ret  => Regs::Eax,
-            SyncBackdoorArgs::Cmd  => Regs::Eax,
-            SyncBackdoorArgs::Arg1 => Regs::Edi,
-            SyncBackdoorArgs::Arg2 => Regs::Esi,
-            SyncBackdoorArgs::Arg3 => Regs::Edx,
-            SyncBackdoorArgs::Arg4 => Regs::Ebx,
-            SyncBackdoorArgs::Arg5 => Regs::Ecx,
-            SyncBackdoorArgs::Arg6 => Regs::Ebp,
+            BackdoorArgs::Ret  => Regs::Eax,
+            BackdoorArgs::Cmd  => Regs::Eax,
+            BackdoorArgs::Arg1 => Regs::Edi,
+            BackdoorArgs::Arg2 => Regs::Esi,
+            BackdoorArgs::Arg3 => Regs::Edx,
+            BackdoorArgs::Arg4 => Regs::Ebx,
+            BackdoorArgs::Arg5 => Regs::Ecx,
+            BackdoorArgs::Arg6 => Regs::Ebp,
         }
     })
 }

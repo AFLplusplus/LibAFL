@@ -118,7 +118,7 @@ pub extern "C" fn main(_argc: isize, _argv: *const *const u8) -> isize {
         #[cfg(any(windows, unix))]
         unsafe {
             let s = CString::new(s).unwrap();
-            printf(b"%s\n\0".as_ptr().cast(), s.as_ptr());
+            printf(c"%s\n".as_ptr().cast(), s.as_ptr());
         }
     });
 

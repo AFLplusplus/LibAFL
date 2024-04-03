@@ -25,6 +25,8 @@ pub use new_hash_feedback::NewHashFeedbackMetadata;
 pub mod nautilus;
 pub mod transferred;
 
+/// The module for list feedback
+pub mod list;
 use alloc::string::{String, ToString};
 use core::{
     fmt::{self, Debug, Formatter},
@@ -32,6 +34,7 @@ use core::{
 };
 
 use libafl_bolts::Named;
+pub use list::*;
 #[cfg(feature = "nautilus")]
 pub use nautilus::*;
 use serde::{Deserialize, Serialize};
@@ -40,7 +43,7 @@ use crate::{
     corpus::Testcase,
     events::EventFirer,
     executors::ExitKind,
-    observers::{ListObserver, ObserversTuple, TimeObserver},
+    observers::{ObserversTuple, TimeObserver},
     state::State,
     Error,
 };
@@ -109,14 +112,16 @@ where
     /// Append to the testcase the generated metadata in case of a new corpus item
     #[inline]
     #[allow(unused_variables)]
-    fn append_metadata<OT>(
+    fn append_metadata<EM, OT>(
         &mut self,
         state: &mut S,
+        manager: &mut EM,
         observers: &OT,
         testcase: &mut Testcase<S::Input>,
     ) -> Result<(), Error>
     where
         OT: ObserversTuple<S>,
+        EM: EventFirer<State = S>,
     {
         Ok(())
     }
@@ -245,17 +250,21 @@ where
     }
 
     #[inline]
-    fn append_metadata<OT>(
+    fn append_metadata<EM, OT>(
         &mut self,
         state: &mut S,
+        manager: &mut EM,
         observers: &OT,
         testcase: &mut Testcase<S::Input>,
     ) -> Result<(), Error>
     where
         OT: ObserversTuple<S>,
+        EM: EventFirer<State = S>,
     {
-        self.first.append_metadata(state, observers, testcase)?;
-        self.second.append_metadata(state, observers, testcase)
+        self.first
+            .append_metadata(state, manager, observers, testcase)?;
+        self.second
+            .append_metadata(state, manager, observers, testcase)
     }
 
     #[inline]
@@ -659,16 +668,19 @@ where
     }
 
     #[inline]
-    fn append_metadata<OT>(
+    fn append_metadata<EM, OT>(
         &mut self,
         state: &mut S,
+        manager: &mut EM,
         observers: &OT,
         testcase: &mut Testcase<S::Input>,
     ) -> Result<(), Error>
     where
         OT: ObserversTuple<S>,
+        EM: EventFirer<State = S>,
     {
-        self.first.append_metadata(state, observers, testcase)
+        self.first
+            .append_metadata(state, manager, observers, testcase)
     }
 
     #[inline]
@@ -915,14 +927,16 @@ where
 
     /// Append to the testcase the generated metadata in case of a new corpus item
     #[inline]
-    fn append_metadata<OT>(
+    fn append_metadata<EM, OT>(
         &mut self,
         _state: &mut S,
+        _manager: &mut EM,
         observers: &OT,
         testcase: &mut Testcase<S::Input>,
     ) -> Result<(), Error>
     where
         OT: ObserversTuple<S>,
+        EM: EventFirer<State = S>,
     {
         let observer = observers.match_name::<TimeObserver>(self.name()).unwrap();
         *testcase.exec_time_mut() = *observer.last_runtime();
@@ -957,79 +971,6 @@ impl TimeFeedback {
     pub fn with_observer(observer: &TimeObserver) -> Self {
         Self {
             name: observer.name().to_string(),
-        }
-    }
-}
-
-/// Consider interesting a testcase if the list in `ListObserver` is not empty.
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct ListFeedback<T>
-where
-    T: Debug + Serialize + serde::de::DeserializeOwned,
-{
-    name: String,
-    last_addr: usize,
-    phantom: PhantomData<T>,
-}
-
-impl<S, T> Feedback<S> for ListFeedback<T>
-where
-    S: State,
-    T: Debug + Serialize + serde::de::DeserializeOwned,
-{
-    #[allow(clippy::wrong_self_convention)]
-    fn is_interesting<EM, OT>(
-        &mut self,
-        _state: &mut S,
-        _manager: &mut EM,
-        _input: &S::Input,
-        observers: &OT,
-        _exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
-    {
-        // TODO Replace with match_name_type when stable
-        let observer = observers
-            .match_name::<ListObserver<T>>(self.name())
-            .unwrap();
-        // TODO register the list content in a testcase metadata
-        Ok(!observer.list().is_empty())
-    }
-}
-
-impl<T> Named for ListFeedback<T>
-where
-    T: Debug + Serialize + serde::de::DeserializeOwned,
-{
-    #[inline]
-    fn name(&self) -> &str {
-        self.name.as_str()
-    }
-}
-
-impl<T> ListFeedback<T>
-where
-    T: Debug + Serialize + serde::de::DeserializeOwned,
-{
-    /// Creates a new [`ListFeedback`], deciding if the value of a [`ListObserver`] with the given `name` of a run is interesting.
-    #[must_use]
-    pub fn new(name: &'static str) -> Self {
-        Self {
-            name: name.to_string(),
-            last_addr: 0,
-            phantom: PhantomData,
-        }
-    }
-
-    /// Creates a new [`TimeFeedback`], deciding if the given [`ListObserver`] value of a run is interesting.
-    #[must_use]
-    pub fn with_observer(observer: &ListObserver<T>) -> Self {
-        Self {
-            name: observer.name().to_string(),
-            last_addr: 0,
-            phantom: PhantomData,
         }
     }
 }
@@ -1212,9 +1153,10 @@ pub mod pybind {
             })?)
         }
 
-        fn append_metadata<OT>(
+        fn append_metadata<EM, OT>(
             &mut self,
             state: &mut PythonStdState,
+            _manager: &mut EM,
             observers: &OT,
             testcase: &mut Testcase<BytesInput>,
         ) -> Result<(), Error>
@@ -1655,17 +1597,19 @@ pub mod pybind {
             })
         }
 
-        fn append_metadata<OT>(
+        fn append_metadata<EM, OT>(
             &mut self,
             state: &mut PythonStdState,
+            manager: &mut EM,
             observers: &OT,
             testcase: &mut Testcase<BytesInput>,
         ) -> Result<(), Error>
         where
             OT: ObserversTuple<PythonStdState>,
+            EM: EventFirer<State = PythonStdState>,
         {
             unwrap_me_mut!(self.wrapper, f, {
-                f.append_metadata(state, observers, testcase)
+                f.append_metadata(state, manager, observers, testcase)
             })
         }
 

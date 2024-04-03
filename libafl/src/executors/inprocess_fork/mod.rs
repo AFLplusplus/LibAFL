@@ -86,7 +86,7 @@ where
     OT: ObserversTuple<S>,
     S: UsesInput,
     SP: ShMemProvider,
-    HT: ExecutorHooksTuple,
+    HT: ExecutorHooksTuple<S>,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,
 {
@@ -101,7 +101,7 @@ where
     OT: ObserversTuple<S> + Debug,
     S: UsesInput,
     SP: ShMemProvider,
-    HT: ExecutorHooksTuple + Debug,
+    HT: ExecutorHooksTuple<S> + Debug,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,
 {
@@ -129,7 +129,7 @@ where
     OT: ObserversTuple<S>,
     S: State,
     SP: ShMemProvider,
-    HT: ExecutorHooksTuple,
+    HT: ExecutorHooksTuple<S>,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,
 {
@@ -143,7 +143,7 @@ where
     OT: ObserversTuple<S> + Debug,
     S: State + HasExecutions,
     SP: ShMemProvider,
-    HT: ExecutorHooksTuple,
+    HT: ExecutorHooksTuple<S>,
     EM: EventFirer<State = S> + EventRestarter<State = S>,
     Z: UsesState<State = S>,
 {
@@ -181,7 +181,7 @@ where
 impl<'a, H, HT, OT, S, SP, EM, Z, OF> GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, EM, Z>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    HT: ExecutorHooksTuple,
+    HT: ExecutorHooksTuple<S>,
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
     EM: EventFirer<State = S> + EventRestarter<State = S>,
@@ -233,7 +233,7 @@ impl<'a, H, HT, OT, S, SP, EM, Z> UsesObservers
     for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, EM, Z>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    HT: ExecutorHooksTuple,
+    HT: ExecutorHooksTuple<S>,
     OT: ObserversTuple<S>,
     S: State,
     SP: ShMemProvider,
@@ -247,7 +247,7 @@ impl<'a, H, HT, OT, S, SP, EM, Z> HasObservers
     for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, EM, Z>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    HT: ExecutorHooksTuple,
+    HT: ExecutorHooksTuple<S>,
     S: State,
     OT: ObserversTuple<S>,
     SP: ShMemProvider,

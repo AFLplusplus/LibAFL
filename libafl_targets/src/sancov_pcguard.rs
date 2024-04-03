@@ -56,28 +56,63 @@ pub static SHR_4: Ngram4 = Ngram4::from_array([1, 1, 1, 1]);
 #[rustversion::nightly]
 pub static SHR_8: Ngram8 = Ngram8::from_array([1, 1, 1, 1, 1, 1, 1, 1]);
 
+#[cfg(any(
+    feature = "sancov_ngram4",
+    feature = "sancov_ngram8",
+    feature = "sancov_ctx"
+))]
+use core::marker::PhantomData;
+
 /// The hook to initialize ngram everytime we run the harness
-#[cfg(feature = "sancov_ngram4")]
+#[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
 #[rustversion::nightly]
-#[derive(Default, Debug, Clone, Copy)]
-pub struct NgramHook {}
+#[derive(Debug, Clone, Copy)]
+pub struct NgramHook<S>
+where
+    S: libafl::inputs::UsesInput,
+{
+    phantom: PhantomData<S>,
+}
 
 /// The hook to initialize ctx everytime we run the harness
 #[cfg(feature = "sancov_ctx")]
-#[derive(Default, Debug, Clone, Copy)]
-pub struct CtxHook {}
+#[derive(Debug, Clone, Copy)]
+pub struct CtxHook<S> {
+    phantom: PhantomData<S>,
+}
+
+#[cfg(feature = "sancov_ctx")]
+impl<S> CtxHook<S>
+where
+    S: libafl::inputs::UsesInput,
+{
+    /// The constructor for this struct
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+#[cfg(feature = "sancov_ctx")]
+impl<S> Default for CtxHook<S>
+where
+    S: libafl::inputs::UsesInput,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
 #[rustversion::nightly]
-impl ExecutorHook for NgramHook {
-    fn init<E: HasObservers, S>(&mut self, _state: &mut S) {}
-    fn pre_exec<EM, I, S, Z>(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
-        _input: &I,
-    ) {
+impl<S> ExecutorHook<S> for NgramHook<S>
+where
+    S: libafl::inputs::UsesInput,
+{
+    fn init<E: HasObservers>(&mut self, _state: &mut S) {}
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) {
         #[cfg(feature = "sancov_ngram4")]
         unsafe {
             PREV_ARRAY_4 = Ngram4::from_array([0, 0, 0, 0]);
@@ -88,38 +123,47 @@ impl ExecutorHook for NgramHook {
             PREV_ARRAY_8 = Ngram8::from_array([0, 0, 0, 0, 0, 0, 0, 0]);
         }
     }
-    fn post_exec<EM, I, S, Z>(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
-        _input: &I,
-    ) {
+    fn post_exec(&mut self, _state: &mut S, _input: &S::Input) {}
+}
+
+#[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
+#[rustversion::nightly]
+impl<S> NgramHook<S>
+where
+    S: libafl::inputs::UsesInput,
+{
+    /// The constructor for this struct
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+#[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
+#[rustversion::nightly]
+impl<S> Default for NgramHook<S>
+where
+    S: libafl::inputs::UsesInput,
+{
+    fn default() -> Self {
+        Self::new()
     }
 }
 
 #[cfg(feature = "sancov_ctx")]
-impl ExecutorHook for CtxHook {
-    fn init<E: HasObservers, S>(&mut self, _state: &mut S) {}
-    fn pre_exec<EM, I, S, Z>(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
-        _input: &I,
-    ) {
+impl<S> ExecutorHook<S> for CtxHook<S>
+where
+    S: libafl::inputs::UsesInput,
+{
+    fn init<E: HasObservers>(&mut self, _state: &mut S) {}
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) {
         unsafe {
             __afl_prev_ctx = 0;
         }
     }
-    fn post_exec<EM, I, S, Z>(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
-        _input: &I,
-    ) {
-    }
+    fn post_exec(&mut self, _state: &mut S, _input: &S::Input) {}
 }
 
 #[rustversion::nightly]

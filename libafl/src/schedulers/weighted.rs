@@ -303,7 +303,9 @@ where
     fn next(&mut self, state: &mut S) -> Result<CorpusId, Error> {
         let corpus_counts = state.corpus().count();
         if corpus_counts == 0 {
-            Err(Error::empty(String::from("No entries in corpus")))
+            Err(Error::empty(String::from(
+                "No entries in corpus. This often implies the target is not properly instrumented.",
+            )))
         } else {
             let s = random_corpus_id!(state.corpus(), state.rand_mut());
 

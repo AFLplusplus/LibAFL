@@ -5,6 +5,7 @@ use core::ptr::addr_of_mut;
 use core::sync::atomic::{compiler_fence, Ordering};
 use core::{
     ffi::c_void,
+    marker::PhantomData,
     ptr::{self, null_mut},
     time::Duration,
 };
@@ -30,12 +31,16 @@ use crate::{
     events::{EventFirer, EventRestarter},
     executors::{hooks::ExecutorHook, inprocess::HasInProcessHooks, Executor, HasObservers},
     feedbacks::Feedback,
+    inputs::UsesInput,
     state::{HasCorpus, HasExecutions, HasSolutions},
     Error, HasObjective,
 };
 /// The inmem executor's handlers.
 #[allow(missing_debug_implementations)]
-pub struct InProcessHooks {
+pub struct InProcessHooks<S>
+where
+    S: UsesInput,
+{
     /// On crash C function pointer
     #[cfg(feature = "std")]
     pub crash_handler: *const c_void,
@@ -45,6 +50,7 @@ pub struct InProcessHooks {
     /// `TImer` struct
     #[cfg(feature = "std")]
     pub timer: TimerStruct,
+    phantom: PhantomData<S>,
 }
 
 /// Any hooks that is about timeout
@@ -80,7 +86,10 @@ pub trait HasTimeout {
     fn handle_timeout(&mut self, data: &mut InProcessExecutorHandlerData) -> bool;
 }
 
-impl HasTimeout for InProcessHooks {
+impl<S> HasTimeout for InProcessHooks<S>
+where
+    S: UsesInput,
+{
     #[cfg(feature = "std")]
     fn timer(&self) -> &TimerStruct {
         &self.timer
@@ -184,13 +193,15 @@ impl HasTimeout for InProcessHooks {
     }
 }
 
-impl ExecutorHook for InProcessHooks {
-    fn init<E: HasObservers, S>(&mut self, _state: &mut S) {}
-
+impl<S> ExecutorHook<S> for InProcessHooks<S>
+where
+    S: UsesInput,
+{
+    fn init<E: HasObservers>(&mut self, _state: &mut S) {}
     /// Call before running a target.
     #[allow(clippy::unused_self)]
     #[allow(unused_variables)]
-    fn pre_exec<EM, I, S, Z>(&mut self, fuzzer: &mut Z, state: &mut S, mgr: &mut EM, input: &I) {
+    fn pre_exec(&mut self, state: &mut S, input: &S::Input) {
         #[cfg(feature = "std")]
         unsafe {
             let data = addr_of_mut!(GLOBAL_STATE);
@@ -204,26 +215,23 @@ impl ExecutorHook for InProcessHooks {
 
     /// Call after running a target.
     #[allow(clippy::unused_self)]
-    fn post_exec<EM, I, S, Z>(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
-        _input: &I,
-    ) {
+    fn post_exec(&mut self, _state: &mut S, _input: &S::Input) {
         // timeout stuff
         #[cfg(all(feature = "std", not(all(miri, target_vendor = "apple"))))]
         self.timer_mut().unset_timer();
     }
 }
 
-impl InProcessHooks {
+impl<S> InProcessHooks<S>
+where
+    S: UsesInput,
+{
     /// Create new [`InProcessHooks`].
     #[cfg(unix)]
     #[allow(unused_variables)]
     pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
     where
-        E: Executor<EM, Z> + HasObservers + HasInProcessHooks,
+        E: Executor<EM, Z> + HasObservers + HasInProcessHooks<E::State>,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
@@ -246,6 +254,7 @@ impl InProcessHooks {
                     as *const _,
                 #[cfg(feature = "std")]
                 timer: TimerStruct::new(exec_tmout),
+                phantom: PhantomData,
             })
         }
     }
@@ -255,7 +264,7 @@ impl InProcessHooks {
     #[allow(unused)]
     pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
     where
-        E: Executor<EM, Z> + HasObservers + HasInProcessHooks,
+        E: Executor<EM, Z> + HasObservers + HasInProcessHooks<E::State>,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: State + HasExecutions + HasSolutions + HasCorpus,
@@ -292,11 +301,14 @@ impl InProcessHooks {
                 crash_handler,
                 timeout_handler,
                 timer,
+                phantom: PhantomData,
             });
         }
         #[cfg(not(feature = "std"))]
         {
-            ret = Ok(Self {});
+            ret = Ok(Self {
+                phantom: PhantomData,
+            });
         }
 
         ret
@@ -307,14 +319,16 @@ impl InProcessHooks {
     #[allow(unused_variables)]
     pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
     where
-        E: Executor<EM, Z> + HasObservers + HasInProcessHooks,
+        E: Executor<EM, Z> + HasObservers + HasInProcessHooks<E::State>,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         #[cfg_attr(miri, allow(unused_variables))]
-        let ret = Self {};
+        let ret = Self {
+            phantom: PhantomData,
+        };
         Ok(ret)
     }
 
@@ -329,6 +343,7 @@ impl InProcessHooks {
             timeout_handler: ptr::null(),
             #[cfg(feature = "std")]
             timer: TimerStruct::new(Duration::from_millis(5000)),
+            phantom: PhantomData,
         }
     }
 }

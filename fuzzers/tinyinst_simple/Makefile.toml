@@ -1,6 +1,7 @@
 [env]
 PROFILE = { value = "release", condition = {env_not_set = ["PROFILE"]} }
-PROFILE_DIR = {value = "release", condition = {env_not_set = ["PROFILE_DIR"] }}
+PROFILE_DIR = { value = "release", condition = {env_not_set = ["PROFILE_DIR"] }}
+CARGO_TARGET_DIR = { value = "target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
 
 [tasks.unsupported]
 script_runner="@shell"
@@ -10,9 +11,14 @@ echo "Cargo-make not integrated yet on this"
 
 # Harness
 [tasks.harness]
-linux_alias = "unsupported"
+linux_alias = "harness_linux"
 mac_alias = "unsupported"
 windows_alias = "harness_windows"
+
+[tasks.harness_linux]
+script='''
+clang test/test.cpp -o test.exe
+'''
 
 [tasks.harness_windows]
 script='''
@@ -21,9 +27,14 @@ cl test\test.cpp -o test.exe
 
 # Fuzzer
 [tasks.fuzzer]
-linux_alias = "unsupported"
+linux_alias = "fuzzer_linux"
 mac_alias = "unsupported"
 windows_alias = "fuzzer_windows"
+
+[tasks.fuzzer_linux]
+dependencies = ["harness"]
+command = "cargo"
+args = ["build", "--profile", "${PROFILE}"]
 
 [tasks.fuzzer_windows]
 dependencies = ["harness"]
@@ -32,9 +43,14 @@ args = ["build", "--profile", "${PROFILE}"]
 
 # Run the fuzzer
 [tasks.run]
-linux_alias = "unsupported"
+linux_alias = "run_linux"
 mac_alias = "unsupported"
 windows_alias = "run_windows"
+
+[tasks.run_linux]
+dependencies = ["harness", "fuzzer"]
+command = "cargo"
+args = ["run", "--profile", "${PROFILE}"]
 
 [tasks.run_windows]
 dependencies = ["harness", "fuzzer"]
@@ -44,9 +60,24 @@ args = ["run", "--profile", "${PROFILE}"]
 
 # Run the fuzzer
 [tasks.test]
-linux_alias = "unsupported"
+linux_alias = "test_linux"
 mac_alias = "unsupported"
 windows_alias = "test_windows"
+
+[tasks.test_linux]
+script_runner="@shell"
+script='''
+cp ${CARGO_TARGET_DIR}/${PROFILE_DIR}/tinyinst_simple .
+echo running tests
+timeout 5s ./tinyinst_simple || true
+# corpus_discovered folder exists and is not empty
+if [ -d "corpus_discovered" ] && [ -n "$(ls -A corpus_discovered)" ]; then
+    echo "Fuzzer works!"
+else
+    exit 1
+fi
+'''
+dependencies = ["harness", "fuzzer"]
 
 [tasks.test_windows]
 script_runner = "@shell"
@@ -57,4 +88,4 @@ start "" "tinyinst_simple.exe"
 ping -n 10 127.0.0.1>NUL && taskkill /im tinyinst_simple.exe /F
 >nul 2>nul dir /a-d "corpus_discovered\*" && (echo Files exist) || (exit /b 1337)
 '''
-dependencies = [ "harness", "fuzzer" ]
+dependencies = ["harness", "fuzzer"]
