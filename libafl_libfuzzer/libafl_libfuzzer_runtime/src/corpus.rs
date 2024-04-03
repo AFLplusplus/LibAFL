@@ -98,9 +98,9 @@ where
         is_disabled: bool,
     ) -> Result<CorpusId, Error> {
         let idx = if is_disabled {
-            self.mapping.insert(testcase)
-        } else {
             self.mapping.insert_disabled(testcase)
+        } else {
+            self.mapping.insert(testcase)
         };
         let corpus = if is_disabled {
             &self.mapping.disabled
