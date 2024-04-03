@@ -2686,7 +2686,7 @@ where
                 // log::info!("We are removing {:#?}", restarter_id);
                 match Self::announce_client_exit(sender, restarter_id.0) {
                     Ok(()) => (),
-                    Err(e) => log::info!("Error announcing clinet exit: {e:?}"),
+                    Err(e) => log::info!("Error announcing client exit: {e:?}"),
                 }
             }
             TcpRequest::LocalClientHello {
