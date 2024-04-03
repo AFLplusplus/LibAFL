@@ -126,9 +126,13 @@ pub extern "C" fn libafl_main() {
             port,
             Some(NautilusToBytesInputConverter::new(&context)),
             none_input_converter!(),
+            std::process::id(),
         )
         .unwrap()
     });
+
+    // to disconnect the event coverter from the broker later
+    // call notify_death(std::process::id(), port)
 
     let mut run_client = |state: Option<_>, mut mgr, _core_id| {
         let mut bytes = vec![];

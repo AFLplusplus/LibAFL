@@ -514,7 +514,7 @@ where
     ) -> Result<Self, Error> {
         Ok(Self {
             inner,
-            client: LlmpClient::create_attach_to_tcp(shmem_provider, port, client_group_id)?,
+            client: LlmpClient::(shmem_provider, port, client_group_id)?,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             is_main,
