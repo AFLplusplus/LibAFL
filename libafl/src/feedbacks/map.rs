@@ -12,7 +12,7 @@ use core::{
     ops::{BitAnd, BitOr},
 };
 
-use libafl_bolts::{AsIter, AsMutSlice, AsSlice, HasRefCnt, Named};
+use libafl_bolts::{AsCopyIter, AsMutSlice, AsSlice, HasRefCnt, Named};
 use num_traits::PrimInt;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -407,7 +407,7 @@ where
 impl<C, N, O, R, S, T> Feedback<S> for MapFeedback<C, N, O, R, S, T>
 where
     N: IsNovel<T>,
-    O: MapObserver<Entry = T> + for<'it> AsIter<'it, Item = T>,
+    O: MapObserver<Entry = T> + for<'it> AsCopyIter<'it, Item = T>,
     R: Reducer<T>,
     S: State + HasNamedMetadata,
     T: Default + Copy + Serialize + for<'de> Deserialize<'de> + PartialEq + Debug + 'static,
@@ -486,8 +486,7 @@ where
             let mut indices = Vec::new();
 
             for (i, value) in observer
-                .as_iter()
-                .copied()
+                .as_copy_iter()
                 .enumerate()
                 .filter(|(_, value)| *value != initial)
             {
@@ -501,8 +500,7 @@ where
             testcase.add_metadata(meta);
         } else {
             for (i, value) in observer
-                .as_iter()
-                .copied()
+                .as_copy_iter()
                 .enumerate()
                 .filter(|(_, value)| *value != initial)
             {
@@ -552,7 +550,7 @@ where
 impl<C, O, S> Feedback<S> for MapFeedback<C, DifferentIsNovel, O, MaxReducer, S, u8>
 where
     O: MapObserver<Entry = u8> + AsSlice<Entry = u8>,
-    for<'it> O: AsIter<'it, Item = u8>,
+    for<'it> O: AsCopyIter<'it, Item = u8>,
     S: State + HasNamedMetadata,
     C: CanTrack + AsRef<O>,
 {
@@ -680,6 +678,12 @@ impl<C, N, O, R, S, T> HasObserverName for MapFeedback<C, N, O, R, S, T>
 where
     O: Named,
     C: AsRef<O>,
+    T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
+    R: Reducer<T>,
+    N: IsNovel<T>,
+    O: MapObserver<Entry = T>,
+    for<'it> O: AsCopyIter<'it, Item = T>,
+    S: HasNamedMetadata,
 {
     #[inline]
     fn observer_name(&self) -> &str {
@@ -696,7 +700,7 @@ where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
     O: MapObserver<Entry = T>,
-    for<'it> O: AsIter<'it, Item = T>,
+    for<'it> O: AsCopyIter<'it, Item = T>,
     N: IsNovel<T>,
     S: UsesInput + HasNamedMetadata,
     C: CanTrack + AsRef<O>,
@@ -767,8 +771,7 @@ where
         if let Some(novelties) = self.novelties.as_mut() {
             novelties.clear();
             for (i, item) in observer
-                .as_iter()
-                .copied()
+                .as_copy_iter()
                 .enumerate()
                 .filter(|(_, item)| *item != initial)
             {
@@ -781,8 +784,7 @@ where
             }
         } else {
             for (i, item) in observer
-                .as_iter()
-                .copied()
+                .as_copy_iter()
                 .enumerate()
                 .filter(|(_, item)| *item != initial)
             {

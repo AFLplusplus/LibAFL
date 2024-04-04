@@ -746,6 +746,31 @@ pub trait AsIterMut<'it> {
     fn as_iter_mut(&'it mut self) -> Self::IntoIter;
 }
 
+/// Create an `Iterator` that copies elements from a shared reference
+pub trait AsCopyIter<'it> {
+    /// The item type
+    type Item: 'it;
+    /// The iterator type
+    type IntoIter: Iterator<Item = Self::Item>;
+
+    /// Create an iterator from `&self`
+    fn as_copy_iter(&'it self) -> Self::IntoIter;
+}
+
+impl<'it, T> AsCopyIter<'it> for T
+where
+    T: AsIter<'it>,
+    <T as AsIter<'it>>::Item: Copy,
+{
+    type Item = <T as AsIter<'it>>::Item;
+
+    type IntoIter = core::iter::Copied<<T as AsIter<'it>>::IntoIter>;
+
+    fn as_copy_iter(&'it self) -> Self::IntoIter {
+        self.as_iter().copied()
+    }
+}
+
 /// Has a length field
 pub trait HasLen {
     /// The length
