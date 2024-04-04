@@ -488,25 +488,19 @@ impl TuiMonitor {
     }
 
     fn map_density(&self) -> String {
-        if self.client_stats.len() < 2 {
-            return "0%".to_string();
-        }
-        let mut max_map_density = self
-            .client_stats()
-            .get(1)
-            .unwrap()
-            .get_user_stats("edges")
-            .map_or("0%".to_string(), ToString::to_string);
-
-        for client in self.client_stats().iter().filter(|client| client.enabled) {
-            let client_map_density = client
-                .get_user_stats("edges")
-                .map_or(String::new(), ToString::to_string);
-            if client_map_density > max_map_density {
-                max_map_density = client_map_density;
-            }
-        }
-        max_map_density
+        self.client_stats()
+            .iter()
+            .filter(|client| client.enabled)
+            .fold("0%".to_string(), |max_map_density, client| {
+                let client_map_density = client
+                    .get_user_stats("edges")
+                    .map_or(String::new(), ToString::to_string);
+                if client_map_density > max_map_density {
+                    client_map_density
+                } else {
+                    max_map_density
+                }
+            })
     }
 
     fn item_geometry(&self) -> ItemGeometry {
