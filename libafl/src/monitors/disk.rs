@@ -211,12 +211,11 @@ where
 
             let line = json!({
                 "run_time": current_time() - self.base.start_time(),
-                "clients": self.base.client_stats().len(),
+                "clients": self.client_stats_count(),
                 "corpus": self.base.corpus_size(),
                 "objectives": self.base.objective_size(),
                 "executions": self.base.total_execs(),
                 "exec_sec": self.base.execs_per_sec(),
-                "clients": self.client_stats().iter().filter(|client| client.enabled).collect::<Vec<_>>()
             });
             writeln!(&file, "{line}").expect("Unable to write JSON to file");
         }
