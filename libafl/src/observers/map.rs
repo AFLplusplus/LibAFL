@@ -419,8 +419,8 @@ pub trait MapObserver:
     /// Get the value at `idx`
     fn get(&self, idx: usize) -> Self::Entry;
 
-    /// Get the value at `idx` (mutable)
-    fn get_mut(&mut self, idx: usize) -> &mut Self::Entry;
+    /// Set the value at `idx`
+    fn set(&mut self, idx: usize, val: Self::Entry);
 
     /// Get the number of usable entries in the map (all by default)
     fn usable_count(&self) -> usize;
@@ -491,7 +491,7 @@ where
     }
 }
 
-/// A Simple iterator calling `MapObserver::get_mut`
+/// A Simple iterator calling `MapObserver::get`
 #[derive(Debug)]
 pub struct MapObserverSimpleIteratorMut<'a, O>
 where
@@ -506,7 +506,7 @@ impl<'a, O> Iterator for MapObserverSimpleIteratorMut<'a, O>
 where
     O: 'a + MapObserver,
 {
-    type Item = &'a O::Entry;
+    type Item = O::Entry;
     fn next(&mut self) -> Option<Self::Item> {
         unsafe {
             if self.index >= self.observer.as_ref().unwrap().usable_count() {
@@ -514,7 +514,7 @@ where
             } else {
                 let i = self.index;
                 self.index += 1;
-                Some(self.observer.as_mut().unwrap().get_mut(i))
+                Some(self.observer.as_mut().unwrap().get(i))
             }
         }
     }
@@ -751,9 +751,8 @@ where
         self.as_slice()[pos]
     }
 
-    #[inline]
-    fn get_mut(&mut self, idx: usize) -> &mut T {
-        &mut self.as_mut_slice()[idx]
+    fn set(&mut self, pos: usize, val: T) {
+        self.map.as_mut_slice()[pos] = val;
     }
 
     /// Count the set bytes in the map
@@ -1283,9 +1282,8 @@ where
         self.as_slice()[idx]
     }
 
-    #[inline]
-    fn get_mut(&mut self, idx: usize) -> &mut T {
-        &mut self.as_mut_slice()[idx]
+    fn set(&mut self, idx: usize, val: T) {
+        self.map.as_mut_slice()[idx] = val;
     }
 
     /// Count the set bytes in the map
@@ -1646,8 +1644,8 @@ where
         self.map.as_slice()[idx]
     }
 
-    fn get_mut(&mut self, idx: usize) -> &mut T {
-        &mut self.map.as_mut_slice()[idx]
+    fn set(&mut self, idx: usize, val: T) {
+        self.map.as_mut_slice()[idx] = val;
     }
 
     /// Count the set bytes in the map
@@ -1916,8 +1914,8 @@ where
     }
 
     #[inline]
-    fn get_mut(&mut self, idx: usize) -> &mut u8 {
-        self.base.get_mut(idx)
+    fn set(&mut self, idx: usize, val: u8) {
+        self.base.set(idx, val);
     }
 
     /// Count the set bytes in the map
@@ -2187,8 +2185,8 @@ where
     }
 
     #[inline]
-    fn get_mut(&mut self, idx: usize) -> &mut u8 {
-        self.base.get_mut(idx)
+    fn set(&mut self, idx: usize, val: u8) {
+        self.base.set(idx, val);
     }
 
     /// Count the set bytes in the map
@@ -2468,11 +2466,11 @@ where
     }
 
     #[inline]
-    fn get_mut(&mut self, idx: usize) -> &mut T {
+    fn set(&mut self, idx: usize, val: Self::Entry) {
         let elem = self.intervals.query(idx..=idx).next().unwrap();
         let i = *elem.value;
         let j = idx - elem.interval.start;
-        &mut self.maps[i].as_mut_slice()[j]
+        self.maps[i].as_mut_slice()[j] = val;
     }
 
     #[inline]
@@ -2841,8 +2839,8 @@ where
     }
 
     #[inline]
-    fn get_mut(&mut self, idx: usize) -> &mut T {
-        &mut self.as_mut_slice()[idx]
+    fn set(&mut self, pos: usize, val: Self::Entry) {
+        self.as_mut_slice()[pos] = val;
     }
 
     /// Count the set bytes in the map
