@@ -32,9 +32,7 @@ use libafl_bolts::{
     llmp::{recv_tcp_msg, send_tcp_msg, TcpRequest, TcpResponse, LLMP_CONNECT_ADDR},
 };
 #[cfg(feature = "std")]
-use libafl_bolts::{
-    llmp::LlmpConnection, shmem::StdShMemProvider, staterestore::StateRestorer, RestarterId,
-};
+use libafl_bolts::{llmp::LlmpConnection, shmem::StdShMemProvider, staterestore::StateRestorer};
 use libafl_bolts::{
     llmp::{self, LlmpClient, LlmpClientDescription, Tag},
     shmem::ShMemProvider,
@@ -1247,7 +1245,7 @@ pub fn notify_death(client_id: u32, broker_port: u16) -> Result<(), Error> {
         ));
     };
     let msg = TcpRequest::ClientQuit {
-        client_id: RestarterId(client_id),
+        client_id: ClientId(client_id),
     };
     // Send this mesasge off and we are leaving.
     let _ = send_tcp_msg(&mut stream, &msg);

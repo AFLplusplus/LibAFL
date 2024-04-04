@@ -198,19 +198,6 @@ use xxhash_rust::xxh3::xxh3_64;
 )]
 pub struct ClientId(pub u32);
 
-/// The restarter process's id.
-/// Do not confuse this with the clientid. This id is the process id of the restarting process.
-/// In multiprocess fuzzing every fuzzer client has the accompanying restarter process.
-/// When the fuzzing starts the restarter process tells the broker this ID.
-/// This makes it possible for the fuzzer client to ask for the disconnection from the broker.
-/// On exit, the restarting process sends another TCP message to tell the broker it will disconnect.
-/// Then the broker will receive that message and deletes the llmp client by looking up the `RestarterID` - `ClientID` hashmap.
-#[repr(transparent)]
-#[derive(
-    Debug, Default, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
-)]
-pub struct RestarterId(pub u32);
-
 #[cfg(feature = "std")]
 use log::{Metadata, Record};
 

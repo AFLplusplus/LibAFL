@@ -102,7 +102,7 @@ use crate::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
 use crate::os::windows_exceptions::{setup_ctrl_handler, CtrlHandler};
 use crate::{
     shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
-    ClientId, Error, RestarterId,
+    ClientId, Error,
 };
 
 /// The max number of pages a [`client`] may have mapped that were not yet read by the [`broker`]
@@ -268,7 +268,7 @@ pub enum TcpRequest {
     /// `client_id` is the pid of the very initial client
     ClientQuit {
         /// Tell the broker that remove the client with this `client_id`. `client_id` is equal to the one of event restarter
-        client_id: RestarterId,
+        client_id: ClientId,
     },
 }
 
