@@ -417,7 +417,7 @@ pub trait MapObserver:
     type Entry: Bounded + PartialEq + Default + Copy + Debug + Hash + 'static;
 
     /// Get the value at `idx`
-    fn get(&self, idx: usize) -> &Self::Entry;
+    fn get(&self, idx: usize) -> Self::Entry;
 
     /// Get the value at `idx` (mutable)
     fn get_mut(&mut self, idx: usize) -> &mut Self::Entry;
@@ -477,7 +477,7 @@ impl<'a, O> Iterator for MapObserverSimpleIterator<'a, O>
 where
     O: 'a + MapObserver,
 {
-    type Item = &'a O::Entry;
+    type Item = O::Entry;
     fn next(&mut self) -> Option<Self::Item> {
         unsafe {
             if self.index >= self.observer.as_ref().unwrap().usable_count() {
@@ -747,8 +747,8 @@ where
     type Entry = T;
 
     #[inline]
-    fn get(&self, pos: usize) -> &T {
-        &self.as_slice()[pos]
+    fn get(&self, pos: usize) -> T {
+        self.as_slice()[pos]
     }
 
     #[inline]
@@ -1279,8 +1279,8 @@ where
     }
 
     #[inline]
-    fn get(&self, idx: usize) -> &T {
-        &self.as_slice()[idx]
+    fn get(&self, idx: usize) -> T {
+        self.as_slice()[idx]
     }
 
     #[inline]
@@ -1642,8 +1642,8 @@ where
         *self.size.as_ref()
     }
 
-    fn get(&self, idx: usize) -> &T {
-        &self.map.as_slice()[idx]
+    fn get(&self, idx: usize) -> T {
+        self.map.as_slice()[idx]
     }
 
     fn get_mut(&mut self, idx: usize) -> &mut T {
@@ -1911,7 +1911,7 @@ where
     }
 
     #[inline]
-    fn get(&self, idx: usize) -> &u8 {
+    fn get(&self, idx: usize) -> u8 {
         self.base.get(idx)
     }
 
@@ -2182,7 +2182,7 @@ where
     }
 
     #[inline]
-    fn get(&self, idx: usize) -> &u8 {
+    fn get(&self, idx: usize) -> u8 {
         self.base.get(idx)
     }
 
@@ -2460,11 +2460,11 @@ where
     type Entry = T;
 
     #[inline]
-    fn get(&self, idx: usize) -> &T {
+    fn get(&self, idx: usize) -> T {
         let elem = self.intervals.query(idx..=idx).next().unwrap();
         let i = *elem.value;
         let j = idx - elem.interval.start;
-        &self.maps[i].as_slice()[j]
+        self.maps[i].as_slice()[j]
     }
 
     #[inline]
@@ -2516,7 +2516,7 @@ where
         let cnt = self.usable_count();
         let mut res = Vec::with_capacity(cnt);
         for i in 0..cnt {
-            res.push(*self.get(i));
+            res.push(self.get(i));
         }
         res
     }
@@ -2527,7 +2527,7 @@ where
         let cnt = self.usable_count();
         let mut res = 0;
         for i in indexes {
-            if *i < cnt && *self.get(*i) != initial {
+            if *i < cnt && self.get(*i) != initial {
                 res += 1;
             }
         }
@@ -2836,8 +2836,8 @@ where
     type Entry = T;
 
     #[inline]
-    fn get(&self, pos: usize) -> &T {
-        &self.as_slice()[pos]
+    fn get(&self, pos: usize) -> T {
+        self.as_slice()[pos]
     }
 
     #[inline]

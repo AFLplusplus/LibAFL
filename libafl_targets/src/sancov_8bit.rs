@@ -188,11 +188,11 @@ mod observers {
         type Entry = u8;
 
         #[inline]
-        fn get(&self, idx: usize) -> &u8 {
+        fn get(&self, idx: usize) -> u8 {
             let elem = self.intervals.query(idx..=idx).next().unwrap();
             let i = elem.value;
             let j = idx - elem.interval.start;
-            unsafe { &(*addr_of!(COUNTERS_MAPS[*i])).as_slice()[j] }
+            unsafe { (*addr_of!(COUNTERS_MAPS[*i])).as_slice()[j] }
         }
 
         #[inline]
@@ -244,7 +244,7 @@ mod observers {
             let cnt = self.usable_count();
             let mut res = Vec::with_capacity(cnt);
             for i in 0..cnt {
-                res.push(*self.get(i));
+                res.push(self.get(i));
             }
             res
         }
@@ -255,7 +255,7 @@ mod observers {
             let cnt = self.usable_count();
             let mut res = 0;
             for i in indexes {
-                if *i < cnt && *self.get(*i) != initial {
+                if *i < cnt && self.get(*i) != initial {
                     res += 1;
                 }
             }
