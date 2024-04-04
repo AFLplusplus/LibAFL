@@ -28,7 +28,7 @@ use libafl::{
             serialization_format::{DEFAULT_ENV_NAME, DEFAULT_SIZE},
             ConcolicObserver,
         },
-        TimeObserver,
+        TimeObserver, TrackingHinted,
     },
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{
@@ -106,7 +106,7 @@ fn fuzz(
 
     // Create an observation channel using the coverage map
     // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)
-    let edges_observer = unsafe { std_edges_map_observer("edges") };
+    let edges_observer = unsafe { std_edges_map_observer("edges").track_indices() };
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
@@ -147,7 +147,7 @@ fn fuzz(
     println!("We're a client, let's fuzz :)");
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+    let scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
