@@ -375,7 +375,9 @@ where
     /// and has a default probability to skip non-faved [`Testcase`]s of [`DEFAULT_SKIP_NON_FAVORED_PROB`].
     /// This will remove the metadata `M` when it is no longer needed, after consumption. This might
     /// for example be a `MapIndexesMetadata`.
-    pub fn new(_obs: &O, base: CS) -> Self {
+    ///
+    /// When calling, pass the edges observer which will provided the indexes to minimize over.
+    pub fn new(_observer: &O, base: CS) -> Self {
         require_index_tracking!("MinimizerScheduler", O);
         Self {
             base,
@@ -388,7 +390,10 @@ where
     /// Creates a new [`MinimizerScheduler`] that wraps a `base` [`Scheduler`]
     /// and has a default probability to skip non-faved [`Testcase`]s of [`DEFAULT_SKIP_NON_FAVORED_PROB`].
     /// This method will prevent the metadata `M` from being removed at the end of scoring.
-    pub fn non_metadata_removing(base: CS) -> Self {
+    ///
+    /// When calling, pass the edges observer which will provided the indexes to minimize over.
+    pub fn non_metadata_removing(_observer: &O, base: CS) -> Self {
+        require_index_tracking!("MinimizerScheduler", O);
         Self {
             base,
             skip_non_favored_prob: DEFAULT_SKIP_NON_FAVORED_PROB,
@@ -399,7 +404,10 @@ where
 
     /// Creates a new [`MinimizerScheduler`] that wraps a `base` [`Scheduler`]
     /// and has a non-default probability to skip non-faved [`Testcase`]s using (`skip_non_favored_prob`).
-    pub fn with_skip_prob(base: CS, skip_non_favored_prob: u64) -> Self {
+    ///
+    /// When calling, pass the edges observer which will provided the indexes to minimize over.
+    pub fn with_skip_prob(_observer: &O, base: CS, skip_non_favored_prob: u64) -> Self {
+        require_index_tracking!("MinimizerScheduler", O);
         Self {
             base,
             skip_non_favored_prob,
