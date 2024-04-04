@@ -491,10 +491,9 @@ impl TuiMonitor {
         self.client_stats()
             .iter()
             .filter(|client| client.enabled)
-            .fold("0%".to_string(), |max_map_density, client| {
-                let client_map_density = client
-                    .get_user_stats("edges")
-                    .map_or(String::new(), ToString::to_string);
+            .filter_map(|client| client.get_user_stats("edges"))
+            .map(ToString::to_string)
+            .fold("0%".to_string(), |max_map_density, client_map_density| {
                 if client_map_density > max_map_density {
                     client_map_density
                 } else {
