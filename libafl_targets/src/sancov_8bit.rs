@@ -193,11 +193,11 @@ mod observers {
         }
 
         #[inline]
-        fn get_mut(&mut self, idx: usize) -> &mut u8 {
+        fn set(&mut self, idx: usize, val: u8) {
             let elem = self.intervals.query_mut(idx..=idx).next().unwrap();
             let i = elem.value;
             let j = idx - elem.interval.start;
-            unsafe { &mut (*addr_of_mut!(COUNTERS_MAPS[*i])).as_slice_mut()[j] }
+            unsafe { (*addr_of_mut!(COUNTERS_MAPS[*i])).as_slice_mut()[j] = val };
         }
 
         #[inline]

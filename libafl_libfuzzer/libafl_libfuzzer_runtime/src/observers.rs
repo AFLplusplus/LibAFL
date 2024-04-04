@@ -116,7 +116,7 @@ where
         }
     }
 
-    fn get_mut(&mut self, _idx: usize) -> &mut Self::Entry {
+    fn set(&mut self, _idx: usize, _val: Self::Entry) {
         unimplemented!("Impossible to implement for a proxy map.")
     }
 
