@@ -489,7 +489,7 @@ where
         configuration: EventConfig,
     ) -> Result<LlmpEventManager<(), S, SP>, Error> {
         let llmp = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
-        Ok(Self::new(llmp, configuration)?)
+        Self::new(llmp, configuration)
     }
 
     /// If a client respawns, it may reuse the existing connection, previously
@@ -588,7 +588,7 @@ where
         hooks: EMH,
     ) -> Result<Self, Error> {
         let llmp = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
-        Ok(Self::with_hooks(llmp, configuration, hooks)?)
+        Self::with_hooks(llmp, configuration, hooks)
     }
 
     /// If a client respawns, it may reuse the existing connection, previously
