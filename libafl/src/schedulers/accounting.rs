@@ -310,7 +310,9 @@ where
 
     /// Creates a new [`CoverageAccountingScheduler`] that wraps a `base` [`Scheduler`]
     /// and has a default probability to skip non-faved Testcases of [`DEFAULT_SKIP_NON_FAVORED_PROB`].
-    pub fn new(obs: &O, state: &mut CS::State, base: CS, accounting_map: &'a [u32]) -> Self {
+    ///
+    /// Provide the observer responsible for determining new indexes.
+    pub fn new(observer: &O, state: &mut CS::State, base: CS, accounting_map: &'a [u32]) -> Self {
         match state.metadata_map().get::<TopAccountingMetadata>() {
             Some(meta) => {
                 if meta.max_accounting.len() != accounting_map.len() {
@@ -323,14 +325,17 @@ where
         }
         Self {
             accounting_map,
-            inner: MinimizerScheduler::new(obs, base),
+            inner: MinimizerScheduler::new(observer, base),
             skip_non_favored_prob: DEFAULT_SKIP_NON_FAVORED_PROB,
         }
     }
 
     /// Creates a new [`CoverageAccountingScheduler`] that wraps a `base` [`Scheduler`]
     /// and has a non-default probability to skip non-faved Testcases using (`skip_non_favored_prob`).
+    ///
+    /// Provide the observer responsible for determining new indexes.
     pub fn with_skip_prob(
+        observer: &O,
         state: &mut CS::State,
         base: CS,
         skip_non_favored_prob: u64,
@@ -348,7 +353,7 @@ where
         }
         Self {
             accounting_map,
-            inner: MinimizerScheduler::with_skip_prob(base, skip_non_favored_prob),
+            inner: MinimizerScheduler::with_skip_prob(observer, base, skip_non_favored_prob),
             skip_non_favored_prob,
         }
     }
