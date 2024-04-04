@@ -154,9 +154,6 @@ const _LLMP_BIND_ADDR: &str = "0.0.0.0";
 #[cfg(not(feature = "llmp_bind_public"))]
 const _LLMP_BIND_ADDR: &str = "127.0.0.1";
 
-/// LLMP Client connects to this address
-pub const LLMP_CONNECT_ADDR: &str = "127.0.0.1";
-
 /// An env var of this value indicates that the set value was a NULL PTR
 const _NULL_ENV_STR: &str = "_NULL";
 
@@ -702,8 +699,8 @@ where
     #[cfg(feature = "std")]
     /// Creates either a broker, if the tcp port is not bound, or a client, connected to this port.
     /// This will make a new connection to the broker if it ends up a client
-    /// In that case this function will return the `client_id` too.
-    pub fn on_port(shmem_provider: SP, port: u16) -> Result<(Self, Option<ClientId>), Error> {
+    /// In that case this function will return its new [ClientId], too.
+    pub fn on_port(shmem_provider: SP, port: u16) -> Result<Self, Error> {
         match tcp_bind(port) {
             Ok(listener) => {
                 // We got the port. We are the broker! :)
@@ -711,14 +708,14 @@ where
 
                 let mut broker = LlmpBroker::new(shmem_provider)?;
                 let _listener_thread = broker.launch_listener(Listener::Tcp(listener))?;
-                Ok((LlmpConnection::IsBroker { broker }, None))
+                Ok(LlmpConnection::IsBroker { broker })
             }
             Err(Error::OsError(e, ..)) if e.kind() == ErrorKind::AddrInUse => {
                 // We are the client :)
                 log::info!("We're the client (internal port already bound by broker, {e:#?})");
-                let (client, client_id) = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
+                let client = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
                 let conn = LlmpConnection::IsClient { client };
-                Ok((conn, Some(client_id)))
+                Ok(conn)
             }
             Err(e) => {
                 log::error!("{e:?}");
@@ -737,15 +734,12 @@ where
 
     /// Creates a new client on the given port
     /// This will make a new connection to the broker if it ends up a client
-    /// In that case this function will return the `client_id` too.
+    /// In that case this function will return its new [ClientId], too.
     #[cfg(feature = "std")]
-    pub fn client_on_port(
-        shmem_provider: SP,
-        port: u16,
-    ) -> Result<(Self, Option<ClientId>), Error> {
-        let (client, client_id) = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
+    pub fn client_on_port(shmem_provider: SP, port: u16) -> Result<Self, Error> {
+        let client = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
         let conn = LlmpConnection::IsClient { client };
-        Ok((conn, Some(client_id)))
+        Ok(conn)
     }
 
     /// Describe this in a reproducable fashion, if it's a client
@@ -2148,11 +2142,13 @@ where
         self.llmp_clients.push(client_receiver);
         self.num_clients_seen += 1;
         self.num_clients_active += 1;
+        /*
         log::info!(
             "Adding client number {:#?} {:#?}",
             id,
             self.num_clients_active
         );
+        */
         id
     }
 
@@ -2305,6 +2301,7 @@ where
                 }
             }
             self.num_clients_active -= removed;
+            /*
             log::trace!(
                 "self.llmp_clients {} self.pw {} remove_cnt {}",
                 self.llmp_clients.len(),
@@ -2312,6 +2309,7 @@ where
                 removed
             );
             log::trace!("{:#?}", self.llmp_clients);
+            */
         }
 
         self.clients_to_remove.clear();
@@ -3255,18 +3253,15 @@ where
     #[cfg(feature = "std")]
     /// Create a [`LlmpClient`], getting the ID from a given port, then also tell the restarter's ID so we ask to be removed later
     /// This is called when, for the first time, the restarter attaches to this process.
-    pub fn create_attach_to_tcp(
-        mut shmem_provider: SP,
-        port: u16,
-    ) -> Result<(Self, ClientId), Error> {
-        let mut stream = match TcpStream::connect((LLMP_CONNECT_ADDR, port)) {
+    pub fn create_attach_to_tcp(mut shmem_provider: SP, port: u16) -> Result<Self, Error> {
+        let mut stream = match TcpStream::connect((IP_LOCALHOST, port)) {
             Ok(stream) => stream,
             Err(e) => {
                 match e.kind() {
                     ErrorKind::ConnectionRefused => {
                         //connection refused. loop till the broker is up
                         loop {
-                            match TcpStream::connect((LLMP_CONNECT_ADDR, port)) {
+                            match TcpStream::connect((IP_LOCALHOST, port)) {
                                 Ok(stream) => break stream,
                                 Err(_) => {
                                     log::info!("Connection Refused.. Retrying");
@@ -3319,7 +3314,7 @@ where
             (*ret.sender.out_shmems.first_mut().unwrap().page_mut()).sender_id = client_id;
         }
 
-        Ok((ret, client_id))
+        Ok(ret)
     }
 }
 
@@ -3346,14 +3341,14 @@ mod tests {
         #[allow(unused_variables)]
         let shmem_provider = StdShMemProvider::new().unwrap();
         let mut broker = match LlmpConnection::on_port(shmem_provider.clone(), 1337).unwrap() {
-            (IsClient { client: _ }, _client_id) => panic!("Could not bind to port as broker"),
-            (IsBroker { broker }, _client_id) => broker,
+            IsClient { client: _ } => panic!("Could not bind to port as broker"),
+            IsBroker { broker } => broker,
         };
 
         // Add the first client (2nd, actually, because of the tcp listener client)
         let mut client = match LlmpConnection::on_port(shmem_provider.clone(), 1337).unwrap() {
-            (IsBroker { broker: _ }, _client_id) => panic!("Second connect should be a client!"),
-            (IsClient { client }, _client_id) => client,
+            IsBroker { broker: _ } => panic!("Second connect should be a client!"),
+            IsClient { client } => client,
         };
 
         // Give the (background) tcp thread a few millis to post the message

@@ -227,6 +227,9 @@ use {
     core::str::Utf8Error,
 };
 
+/// Localhost addr, this is used, for example, for LLMP Client, which connects to this address
+pub const IP_LOCALHOST: &str = "127.0.0.1";
+
 /// We need fixed names for many parts of this lib.
 pub trait Named {
     /// Provide the name of this element.

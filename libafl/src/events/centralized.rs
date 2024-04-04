@@ -503,23 +503,15 @@ where
     /// If the port is not yet bound, it will act as a broker; otherwise, it
     /// will act as a client.
     #[cfg(feature = "std")]
-    pub fn on_port(
-        inner: EM,
-        shmem_provider: SP,
-        port: u16,
-        is_main: bool,
-    ) -> Result<(Self, ClientId), Error> {
-        let (client, client_id) = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
-        Ok((
-            Self {
-                inner,
-                client,
-                #[cfg(feature = "llmp_compression")]
-                compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
-                is_main,
-            },
-            client_id,
-        ))
+    pub fn on_port(inner: EM, shmem_provider: SP, port: u16, is_main: bool) -> Result<Self, Error> {
+        let client = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
+        Ok(Self {
+            inner,
+            client,
+            #[cfg(feature = "llmp_compression")]
+            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            is_main,
+        })
     }
 
     /// If a client respawns, it may reuse the existing connection, previously

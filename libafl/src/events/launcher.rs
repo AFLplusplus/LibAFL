@@ -629,7 +629,7 @@ where
                             .build()
                             .launch()?;
 
-                        let (c_mgr, _client_id) = CentralizedEventManager::on_port(
+                        let c_mgr = CentralizedEventManager::on_port(
                             mgr,
                             self.shmem_provider.clone(),
                             self.centralized_broker_port,
