@@ -616,10 +616,6 @@ where
                             }
                         }
 
-                        // We get the pid here because THIS is the pid of the event restarter
-                        // event restarter will never return from the next launch() only the forked child will do.
-                        let client_group_id = std::process::id();
-
                         // Fuzzer client. keeps retrying the connection to broker till the broker starts
                         let (state, mgr) = RestartingMgr::<(), MT, S, SP>::builder()
                             .shmem_provider(self.shmem_provider.clone())
@@ -633,12 +629,11 @@ where
                             .build()
                             .launch()?;
 
-                        let c_mgr = CentralizedEventManager::on_port(
+                        let (c_mgr, _client_id) = CentralizedEventManager::on_port(
                             mgr,
                             self.shmem_provider.clone(),
                             self.centralized_broker_port,
                             index == 1,
-                            client_group_id,
                         )?;
 
                         return (self.run_client.take().unwrap())(state, c_mgr, *bind_to);

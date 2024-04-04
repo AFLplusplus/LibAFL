@@ -481,17 +481,15 @@ where
     ///
     /// If the port is not yet bound, it will act as a broker; otherwise, it
     /// will act as a client.
-    /// `client_group_id` is used for identifying this process. Usually you can pass the pid that spawned this process
-    /// This can be later used to disconnect this client by specifying that id.
+    /// This will make a new connection to the broker so will return the `client_id` too
     #[cfg(feature = "std")]
     pub fn on_port(
         shmem_provider: SP,
         port: u16,
         configuration: EventConfig,
-        client_group_id: u32,
-    ) -> Result<LlmpEventManager<(), S, SP>, Error> {
-        let llmp = LlmpClient::create_attach_to_tcp(shmem_provider, port, client_group_id)?;
-        Self::new(llmp, configuration)
+    ) -> Result<(LlmpEventManager<(), S, SP>, Option<ClientId>), Error> {
+        let (llmp, client_id) = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
+        Ok((Self::new(llmp, configuration)?, Some(client_id)))
     }
 
     /// If a client respawns, it may reuse the existing connection, previously
@@ -551,19 +549,20 @@ where
     ///
     /// If the port is not yet bound, it will act as a broker; otherwise, it
     /// will act as a client.
-    /// `client_group_id` is used for identifying this process. Usually you can pass the pid that spawned this process
-    /// This can be later used to disconnect this client by specifying that id.
+    /// This will make a new connection to the broker so will return the `client_id` too
+
     #[cfg(feature = "std")]
     pub fn on_port_with_hooks(
         shmem_provider: SP,
         port: u16,
         configuration: EventConfig,
         hooks: EMH,
-        client_group_id: u32,
-    ) -> Result<Self, Error> {
-        log::info!("restarter id ... {}", client_group_id);
-        let llmp = LlmpClient::create_attach_to_tcp(shmem_provider, port, client_group_id)?;
-        Self::with_hooks(llmp, configuration, hooks)
+    ) -> Result<(Self, Option<ClientId>), Error> {
+        let (llmp, client_id) = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
+        Ok((
+            Self::with_hooks(llmp, configuration, hooks)?,
+            Some(client_id),
+        ))
     }
 
     /// If a client respawns, it may reuse the existing connection, previously
@@ -1232,7 +1231,7 @@ where
 /// (You can call it and it compiles but you should never do so)
 /// `send_exiting()` is exclusive to the fuzzer client.
 #[cfg(feature = "std")]
-pub fn notify_death(client_group_id: u32, broker_port: u16) -> Result<(), Error> {
+pub fn notify_death(client_id: u32, broker_port: u16) -> Result<(), Error> {
     let Ok(mut stream) = TcpStream::connect((LLMP_CONNECT_ADDR, broker_port)) else {
         log::error!("Connection refused.");
         return Ok(());
@@ -1248,7 +1247,7 @@ pub fn notify_death(client_group_id: u32, broker_port: u16) -> Result<(), Error>
         ));
     };
     let msg = TcpRequest::ClientQuit {
-        client_group_id: RestarterId(client_group_id),
+        client_id: RestarterId(client_id),
     };
     // Send this mesasge off and we are leaving.
     let _ = send_tcp_msg(&mut stream, &msg);
@@ -1346,16 +1345,10 @@ where
                 broker.broker_loop()
             };
 
-            // We get here if we are on Unix, or we are a broker on Windows (or without forks).
-            let client_group_id = std::process::id();
-
-            let (mgr, core_id) = match self.kind {
+            let (mgr, client_id, core_id) = match self.kind {
                 ManagerKind::Any => {
-                    let connection = LlmpConnection::on_port(
-                        self.shmem_provider.clone(),
-                        self.broker_port,
-                        client_group_id,
-                    )?;
+                    let (connection, client_id) =
+                        LlmpConnection::on_port(self.shmem_provider.clone(), self.broker_port)?;
                     match connection {
                         LlmpConnection::IsBroker { broker } => {
                             let event_broker = LlmpEventBroker::<S::Input, MT, SP>::new(
@@ -1378,7 +1371,7 @@ where
                                 self.configuration,
                                 self.hooks,
                             )?;
-                            (mgr, None)
+                            (mgr, client_id, None)
                         }
                     }
                 }
@@ -1394,15 +1387,14 @@ where
                 }
                 ManagerKind::Client { cpu_core } => {
                     // We are a client
-                    let mgr = LlmpEventManager::<EMH, S, SP>::on_port_with_hooks(
+                    let (mgr, client_id) = LlmpEventManager::<EMH, S, SP>::on_port_with_hooks(
                         self.shmem_provider.clone(),
                         self.broker_port,
                         self.configuration,
                         self.hooks,
-                        client_group_id,
                     )?;
 
-                    (mgr, cpu_core)
+                    (mgr, client_id, cpu_core)
                 }
             };
 
@@ -1411,6 +1403,16 @@ where
                 log::info!("Setting core affinity to {core_id:?}");
                 core_id.set_affinity()?;
             }
+
+            let client_id = match client_id {
+                Some(x) => x.0,
+                None => {
+                    // this should never fail because broker will never reach this point
+                    return Err(Error::unknown(
+                        "failed to get the client id from the broker",
+                    ));
+                }
+            };
 
             // We are the fuzzer respawner in a llmp client
             mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);
@@ -1478,17 +1480,17 @@ where
                     if child_status == 137 {
                         // Out of Memory, see https://tldp.org/LDP/abs/html/exitcodes.html
                         // and https://github.com/AFLplusplus/LibAFL/issues/32 for discussion.
-                        let _ = notify_death(client_group_id, self.broker_port);
+                        let _ = notify_death(client_id, self.broker_port);
                         panic!("Fuzzer-respawner: The fuzzed target crashed with an out of memory error! Fix your harness, or switch to another executor (for example, a forkserver).");
                     }
-                    let _ = notify_death(client_group_id, self.broker_port);
+                    let _ = notify_death(client_id, self.broker_port);
                     // Storing state in the last round did not work
                     panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! This can happen if the child calls `exit()`, in that case make sure it uses `abort()`, if it got killed unrecoverable (OOM), or if there is a bug in the fuzzer itself. (Child exited with: {child_status})");
                 }
 
                 if staterestorer.wants_to_exit() || Self::is_shutting_down() {
                     // if ctrl-c is pressed, we end up in this branch
-                    let _ = notify_death(client_group_id, self.broker_port);
+                    let _ = notify_death(client_id, self.broker_port);
                     return Err(Error::shutting_down());
                 }
                 ctr = ctr.wrapping_add(1);
@@ -1628,25 +1630,26 @@ where
     }
 
     /// Create a client from port and the input converters
-    /// `client_group_id` is used for identifying this process. Usually you can pass the pid that spawned this process
-    /// This can be later used to disconnect this client by specifying that id.
     #[cfg(feature = "std")]
     pub fn on_port(
         shmem_provider: SP,
         port: u16,
         converter: Option<IC>,
         converter_back: Option<ICB>,
-        client_group_id: u32,
-    ) -> Result<Self, Error> {
-        Ok(Self {
-            llmp: LlmpClient::create_attach_to_tcp(shmem_provider, port, client_group_id)?,
-            #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
-            converter,
-            converter_back,
-            phantom: PhantomData,
-            custom_buf_handlers: vec![],
-        })
+    ) -> Result<(Self, Option<ClientId>), Error> {
+        let (llmp, client_id) = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
+        Ok((
+            Self {
+                llmp,
+                #[cfg(feature = "llmp_compression")]
+                compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+                converter,
+                converter_back,
+                phantom: PhantomData,
+                custom_buf_handlers: vec![],
+            },
+            Some(client_id),
+        ))
     }
 
     /// If a client respawns, it may reuse the existing connection, previously stored by [`LlmpClient::to_env()`].

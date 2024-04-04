@@ -258,8 +258,6 @@ pub enum TcpRequest {
     LocalClientHello {
         /// The sharedmem description of the connecting client.
         shmem_description: ShMemDescription,
-        /// The `client_group_id` of this client. Tell the broker this id so they recognize us later when we quit.
-        client_group_id: RestarterId,
     },
     /// We would like to establish a b2b connection.
     RemoteBrokerHello {
@@ -267,10 +265,10 @@ pub enum TcpRequest {
         hostname: String,
     },
     /// Notify the broker the the othe side is dying so remove this client
-    /// `client_group_id` is the pid of the very initial client
+    /// `client_id` is the pid of the very initial client
     ClientQuit {
-        /// Tell the broker that remove the client with this `client_group_id`. `client_group_id` is equal to the one of event restarter
-        client_group_id: RestarterId,
+        /// Tell the broker that remove the client with this `client_id`. `client_id` is equal to the one of event restarter
+        client_id: RestarterId,
     },
 }
 
@@ -703,7 +701,9 @@ where
 {
     #[cfg(feature = "std")]
     /// Creates either a broker, if the tcp port is not bound, or a client, connected to this port.
-    pub fn on_port(shmem_provider: SP, port: u16, client_group_id: u32) -> Result<Self, Error> {
+    /// This will make a new connection to the broker if it ends up a client
+    /// In that case this function will return the `client_id` too.
+    pub fn on_port(shmem_provider: SP, port: u16) -> Result<(Self, Option<ClientId>), Error> {
         match tcp_bind(port) {
             Ok(listener) => {
                 // We got the port. We are the broker! :)
@@ -711,18 +711,14 @@ where
 
                 let mut broker = LlmpBroker::new(shmem_provider)?;
                 let _listener_thread = broker.launch_listener(Listener::Tcp(listener))?;
-                Ok(LlmpConnection::IsBroker { broker })
+                Ok((LlmpConnection::IsBroker { broker }, None))
             }
             Err(Error::OsError(e, ..)) if e.kind() == ErrorKind::AddrInUse => {
                 // We are the client :)
                 log::info!("We're the client (internal port already bound by broker, {e:#?})");
-                Ok(LlmpConnection::IsClient {
-                    client: LlmpClient::create_attach_to_tcp(
-                        shmem_provider,
-                        port,
-                        client_group_id,
-                    )?,
-                })
+                let (client, client_id) = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
+                let conn = LlmpConnection::IsClient { client };
+                Ok((conn, Some(client_id)))
             }
             Err(e) => {
                 log::error!("{e:?}");
@@ -740,17 +736,16 @@ where
     }
 
     /// Creates a new client on the given port
-    /// `client_group_id` is used for identifying this process. Usually you can pass the pid that spawned this process
-    /// This can be later used to disconnect this client by specifying that id.
+    /// This will make a new connection to the broker if it ends up a client
+    /// In that case this function will return the `client_id` too.
     #[cfg(feature = "std")]
     pub fn client_on_port(
         shmem_provider: SP,
         port: u16,
-        client_group_id: u32,
-    ) -> Result<Self, Error> {
-        Ok(LlmpConnection::IsClient {
-            client: LlmpClient::create_attach_to_tcp(shmem_provider, port, client_group_id)?,
-        })
+    ) -> Result<(Self, Option<ClientId>), Error> {
+        let (client, client_id) = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
+        let conn = LlmpConnection::IsClient { client };
+        Ok((conn, Some(client_id)))
     }
 
     /// Describe this in a reproducable fashion, if it's a client
@@ -846,8 +841,6 @@ struct LlmpPayloadSharedMapInfo {
     pub map_size: usize,
     /// The id of this map, as 0-terminated c string of at most 19 chars
     pub shm_str: [u8; 20],
-    /// The restarter process id of the client
-    pub client_group_id: u32,
 }
 
 /// Message payload when a client got removed
@@ -857,7 +850,7 @@ struct LlmpPayloadSharedMapInfo {
 #[repr(C, align(8))]
 struct LlmpClientExitInfo {
     /// The restarter process id of the client
-    pub client_group_id: u32,
+    pub client_id: u32,
 }
 
 /// Sending end on a (unidirectional) sharedmap channel
@@ -1986,7 +1979,6 @@ pub struct LlmpBroker<SP>
 where
     SP: ShMemProvider + 'static,
 {
-    client_group_ids: Vec<(RestarterId, ClientId)>,
     /// Broadcast map from broker to all clients
     llmp_out: LlmpSender<SP>,
     /// Users of Llmp can add message handlers in the broker.
@@ -2077,7 +2069,6 @@ where
         keep_pages_forever: bool,
     ) -> Result<Self, Error> {
         Ok(LlmpBroker {
-            client_group_ids: Vec::new(),
             llmp_out: LlmpSender {
                 id: ClientId(0),
                 last_msg_sent: ptr::null_mut(),
@@ -2163,13 +2154,6 @@ where
             self.num_clients_active
         );
         id
-    }
-
-    /// Register event restarter id
-    /// Each fuzzer client instance could have multiple PID, because they can restart
-    /// But they only have one restarter whose PID does not change
-    pub fn register_client_group_id(&mut self, client_id: ClientId, client_group_id: RestarterId) {
-        self.client_group_ids.push((client_group_id, client_id));
     }
 
     /// Allocate the next message on the outgoing map
@@ -2318,13 +2302,6 @@ where
                     self.llmp_clients.remove(idx);
                 }
             }
-            // commit the change to client_group_ids
-            for idx in (0..self.client_group_ids.len()).rev() {
-                let client_id = self.client_group_ids[idx].1;
-                if self.clients_to_remove.contains(&client_id) {
-                    self.client_group_ids.remove(idx);
-                }
-            }
             self.num_clients_active -= remove_cnt;
             log::trace!(
                 "self.llmp_clients {} self.num_clients_active {} remove_cnt {}",
@@ -2332,7 +2309,6 @@ where
                 self.num_clients_active,
                 remove_cnt
             );
-            // log::trace!("{:#?}", self.client_group_ids);
             // log::trace!("{:#?}", self.llmp_clients);
         }
 
@@ -2522,7 +2498,6 @@ where
     fn announce_new_client(
         sender: &mut LlmpSender<SP>,
         shmem_description: &ShMemDescription,
-        client_group_id: u32,
     ) -> Result<(), Error> {
         unsafe {
             let msg = sender
@@ -2533,16 +2508,12 @@ where
             let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
             (*pageinfo).shm_str = *shmem_description.id.as_array();
             (*pageinfo).map_size = shmem_description.size;
-            (*pageinfo).client_group_id = client_group_id;
             sender.send(msg, true)
         }
     }
 
     /// Tell the broker to disconnect this client from it.
-    fn announce_client_exit(
-        sender: &mut LlmpSender<SP>,
-        client_group_id: u32,
-    ) -> Result<(), Error> {
+    fn announce_client_exit(sender: &mut LlmpSender<SP>, client_id: u32) -> Result<(), Error> {
         unsafe {
             let msg = sender
                 .alloc_next(size_of::<LlmpClientExitInfo>())
@@ -2550,7 +2521,7 @@ where
             (*msg).tag = LLMP_TAG_CLIENT_EXIT;
             #[allow(clippy::cast_ptr_alignment)]
             let exitinfo = (*msg).buf.as_mut_ptr() as *mut LlmpClientExitInfo;
-            (*exitinfo).client_group_id = client_group_id;
+            (*exitinfo).client_id = client_id;
             sender.send(msg, true)
         }
     }
@@ -2716,20 +2687,15 @@ where
         broker_shmem_description: &ShMemDescription,
     ) {
         match request {
-            TcpRequest::ClientQuit { client_group_id } => {
+            TcpRequest::ClientQuit { client_id } => {
                 // todo search the ancestor_id and remove it.
-                // log::info!("We are removing {:#?}", client_group_id);
-                match Self::announce_client_exit(sender, client_group_id.0) {
+                match Self::announce_client_exit(sender, client_id.0) {
                     Ok(()) => (),
                     Err(e) => log::info!("Error announcing client exit: {e:?}"),
                 }
             }
-            TcpRequest::LocalClientHello {
-                shmem_description,
-                client_group_id,
-            } => {
-                // log::info!("We are adding {:#?}", client_group_id);
-                match Self::announce_new_client(sender, shmem_description, client_group_id.0) {
+            TcpRequest::LocalClientHello { shmem_description } => {
+                match Self::announce_new_client(sender, shmem_description) {
                     Ok(()) => (),
                     Err(e) => log::info!("Error forwarding client on map: {e:?}"),
                 };
@@ -2763,7 +2729,7 @@ where
                 if let Ok(shmem_description) =
                     Self::b2b_thread_on(stream, *current_client_id, broker_shmem_description)
                 {
-                    if Self::announce_new_client(sender, &shmem_description, 0).is_err() {
+                    if Self::announce_new_client(sender, &shmem_description).is_err() {
                         log::info!("B2B: Error announcing client {shmem_description:?}");
                     };
                     current_client_id.0 += 1;
@@ -2943,24 +2909,10 @@ where
                         )));
                     }
                     let exitinfo = (*msg).buf.as_mut_ptr() as *mut LlmpClientExitInfo;
-                    let client_group_id = RestarterId((*exitinfo).client_group_id);
-                    log::info!("Client exit message received!, we are removing clients whose client_group_id is {:#?}", client_group_id);
+                    let client_id = ClientId((*exitinfo).client_id);
+                    log::info!("Client exit message received!, we are removing clients whose client_group_id is {:#?}", client_id);
 
-                    let found = self.client_group_ids.iter().any(|(r, c)| {
-                        if *r == client_group_id {
-                            self.clients_to_remove.insert(*c);
-                            true
-                        } else {
-                            false
-                        }
-                    });
-
-                    if !found {
-                        log::info!(
-                            "Could not find client with client_group_id {:#?}",
-                            client_group_id
-                        );
-                    }
+                    self.clients_to_remove.insert(client_id);
                 }
                 LLMP_TAG_NEW_SHM_CLIENT => {
                     /* This client informs us about yet another new client
@@ -2978,7 +2930,6 @@ where
                         )));
                     }
                     let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
-                    let client_group_id = RestarterId((*pageinfo).client_group_id);
                     match self.shmem_provider.shmem_from_id_and_size(
                         ShMemId::from_array(&(*pageinfo).shm_str),
                         (*pageinfo).map_size,
@@ -2987,7 +2938,7 @@ where
                             let mut new_page = LlmpSharedMap::existing(new_shmem);
                             new_page.mark_safe_to_unmap();
 
-                            let new_client = self.add_client(LlmpReceiver {
+                            let _new_client = self.add_client(LlmpReceiver {
                                 id: ClientId(0), // will be auto-filled
                                 current_recv_shmem: new_page,
                                 last_msg_recvd: ptr::null_mut(),
@@ -2997,8 +2948,6 @@ where
                                 #[cfg(feature = "std")]
                                 last_msg_time: current_time(),
                             });
-
-                            self.register_client_group_id(new_client, client_group_id);
                         }
                         Err(e) => {
                             log::info!("Error adding client! Ignoring: {e:?}");
@@ -3304,13 +3253,10 @@ where
     #[cfg(feature = "std")]
     /// Create a [`LlmpClient`], getting the ID from a given port, then also tell the restarter's ID so we ask to be removed later
     /// This is called when, for the first time, the restarter attaches to this process.
-    /// `client_group_id` is used for identifying this process. Usually you can pass the pid that spawned this process
-    /// This can be later used to disconnect this client by specifying that id.
     pub fn create_attach_to_tcp(
         mut shmem_provider: SP,
         port: u16,
-        client_group_id: u32,
-    ) -> Result<Self, Error> {
+    ) -> Result<(Self, ClientId), Error> {
         let mut stream = match TcpStream::connect((LLMP_CONNECT_ADDR, port)) {
             Ok(stream) => stream,
             Err(e) => {
@@ -3351,7 +3297,6 @@ where
 
         let client_hello_req = TcpRequest::LocalClientHello {
             shmem_description: ret.sender.out_shmems.first().unwrap().shmem.description(),
-            client_group_id: RestarterId(client_group_id),
         };
 
         send_tcp_msg(&mut stream, &client_hello_req)?;
@@ -3372,7 +3317,7 @@ where
             (*ret.sender.out_shmems.first_mut().unwrap().page_mut()).sender_id = client_id;
         }
 
-        Ok(ret)
+        Ok((ret, client_id))
     }
 }
 
@@ -3398,19 +3343,16 @@ mod tests {
     pub fn test_llmp_connection() {
         #[allow(unused_variables)]
         let shmem_provider = StdShMemProvider::new().unwrap();
-        let client_group_id = std::process::id();
-        let mut broker =
-            match LlmpConnection::on_port(shmem_provider.clone(), 1337, client_group_id).unwrap() {
-                IsClient { client: _ } => panic!("Could not bind to port as broker"),
-                IsBroker { broker } => broker,
-            };
+        let mut broker = match LlmpConnection::on_port(shmem_provider.clone(), 1337).unwrap() {
+            (IsClient { client: _ }, _client_id) => panic!("Could not bind to port as broker"),
+            (IsBroker { broker }, _client_id) => broker,
+        };
 
         // Add the first client (2nd, actually, because of the tcp listener client)
-        let mut client =
-            match LlmpConnection::on_port(shmem_provider.clone(), 1337, client_group_id).unwrap() {
-                IsBroker { broker: _ } => panic!("Second connect should be a client!"),
-                IsClient { client } => client,
-            };
+        let mut client = match LlmpConnection::on_port(shmem_provider.clone(), 1337).unwrap() {
+            (IsBroker { broker: _ }, _client_id) => panic!("Second connect should be a client!"),
+            (IsClient { client }, _client_id) => client,
+        };
 
         // Give the (background) tcp thread a few millis to post the message
         sleep(Duration::from_millis(100));

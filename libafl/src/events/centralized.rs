@@ -502,23 +502,24 @@ where
     ///
     /// If the port is not yet bound, it will act as a broker; otherwise, it
     /// will act as a client.
-    /// `client_group_id` is used for identifying this process. Usually you can pass the pid that spawned this process
-    /// This can be later used to disconnect this client by specifying that id.
     #[cfg(feature = "std")]
     pub fn on_port(
         inner: EM,
         shmem_provider: SP,
         port: u16,
         is_main: bool,
-        client_group_id: u32,
-    ) -> Result<Self, Error> {
-        Ok(Self {
-            inner,
-            client: LlmpClient::create_attach_to_tcp(shmem_provider, port, client_group_id)?,
-            #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
-            is_main,
-        })
+    ) -> Result<(Self, ClientId), Error> {
+        let (client, client_id) = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
+        Ok((
+            Self {
+                inner,
+                client,
+                #[cfg(feature = "llmp_compression")]
+                compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+                is_main,
+            },
+            client_id,
+        ))
     }
 
     /// If a client respawns, it may reuse the existing connection, previously

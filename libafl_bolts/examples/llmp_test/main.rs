@@ -35,9 +35,9 @@ static LOGGER: SimpleStderrLogger = SimpleStderrLogger::new();
 
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
 fn adder_loop(port: u16) -> Result<(), Box<dyn std::error::Error>> {
-    let client_group_id = std::process::id();
     let shmem_provider = StdShMemProvider::new()?;
-    let mut client = llmp::LlmpClient::create_attach_to_tcp(shmem_provider, port, client_group_id)?;
+    let (mut client, mut _client_id) =
+        llmp::LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
     let mut last_result: u32 = 0;
     let mut current_result: u32 = 0;
     loop {
@@ -74,9 +74,8 @@ fn adder_loop(port: u16) -> Result<(), Box<dyn std::error::Error>> {
 
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
 fn large_msg_loop(port: u16) -> Result<(), Box<dyn std::error::Error>> {
-    let client_group_id = std::process::id();
-    let mut client =
-        llmp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new()?, port, client_group_id)?;
+    let (mut client, mut _client_id) =
+        llmp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new()?, port)?;
 
     #[cfg(not(target_vendor = "apple"))]
     let meg_buf = vec![1u8; 1 << 20];
@@ -179,12 +178,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
         }
         "ctr" => {
-            let client_group_id = std::process::id();
-            let mut client = llmp::LlmpClient::create_attach_to_tcp(
-                StdShMemProvider::new()?,
-                port,
-                client_group_id,
-            )?;
+            let (mut client, mut _client_id) =
+                llmp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new()?, port)?;
             let mut counter: u32 = 0;
             loop {
                 counter = counter.wrapping_add(1);
@@ -200,12 +195,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             large_msg_loop(port)?;
         }
         "exiting" => {
-            let client_group_id = std::process::id();
-            let mut client = llmp::LlmpClient::create_attach_to_tcp(
-                StdShMemProvider::new()?,
-                port,
-                client_group_id,
-            )?;
+            let (mut client, mut _client_id) =
+                llmp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new()?, port)?;
             for i in 0..10_u32 {
                 client.send_buf(_TAG_SIMPLE_U32_V1, &i.to_le_bytes())?;
                 println!("Exiting Client writing {i}");
@@ -218,7 +209,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // one is to call client.sender_mut().send_exiting()?;
             // you can disconnet the client in this way as long as this client in an unrecoverable state (like in a crash handler)
             // another way to do this is through the notify_death() call
-            // you can call notify_death(client_group_id, port); to notify the broker that this broker wants to exit
+            // you can call notify_death(client_id, port); to notify the broker that this broker wants to exit
             // This one is usually for the event restarter to cut off the connection when the client has crashed.
             // In that case we don't have access to the llmp client of the client anymore, but we can use notify_death instead
         }
