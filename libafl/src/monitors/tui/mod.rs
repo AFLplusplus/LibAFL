@@ -1,6 +1,7 @@
 //! Monitor based on ratatui
 
 use alloc::{boxed::Box, string::ToString};
+use core::cmp;
 use std::{
     collections::VecDeque,
     fmt::Write as _,
@@ -493,13 +494,7 @@ impl TuiMonitor {
             .filter(|client| client.enabled)
             .filter_map(|client| client.get_user_stats("edges"))
             .map(ToString::to_string)
-            .fold("0%".to_string(), |max_map_density, client_map_density| {
-                if client_map_density > max_map_density {
-                    client_map_density
-                } else {
-                    max_map_density
-                }
-            })
+            .fold("0%".to_string(), cmp::max)
     }
 
     fn item_geometry(&self) -> ItemGeometry {
