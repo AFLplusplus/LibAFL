@@ -62,22 +62,20 @@ impl Aggregator {
 
     /// takes the key and the ref to clients stats then aggregate them all.
     fn aggregate(&mut self, name: &str, client_stats: &[ClientStats]) {
-        let mut gather = vec![];
+        let mut gather = client_stats
+            .iter()
+            .filter_map(|client| client.user_monitor.get(name));
 
-        for client in client_stats {
-            if let Some(x) = client.user_monitor.get(name) {
-                gather.push(x);
-            }
-        }
+        let gather_count = gather.clone().count();
 
-        let (mut init, op) = match gather.first() {
+        let (mut init, op) = match gather.next() {
             Some(x) => (x.value().clone(), x.aggregator_op().clone()),
             _ => {
                 return;
             }
         };
 
-        for item in gather.iter().skip(1) {
+        for item in gather {
             match op {
                 AggregatorOps::None => {
                     // Nothing
@@ -112,7 +110,7 @@ impl Aggregator {
 
         if let AggregatorOps::Avg = op {
             // if avg then divide last.
-            init = match init.stats_div(gather.len()) {
+            init = match init.stats_div(gather_count) {
                 Some(x) => x,
                 _ => {
                     return;
