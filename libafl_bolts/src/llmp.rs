@@ -699,7 +699,7 @@ where
     #[cfg(feature = "std")]
     /// Creates either a broker, if the tcp port is not bound, or a client, connected to this port.
     /// This will make a new connection to the broker if it ends up a client
-    /// In that case this function will return its new [ClientId], too.
+    /// In that case this function will return its new [`ClientId`], too.
     pub fn on_port(shmem_provider: SP, port: u16) -> Result<Self, Error> {
         match tcp_bind(port) {
             Ok(listener) => {
@@ -734,7 +734,7 @@ where
 
     /// Creates a new client on the given port
     /// This will make a new connection to the broker if it ends up a client
-    /// In that case this function will return its new [ClientId], too.
+    /// In that case this function will return its new [`ClientId`], too.
     #[cfg(feature = "std")]
     pub fn client_on_port(shmem_provider: SP, port: u16) -> Result<Self, Error> {
         let client = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;

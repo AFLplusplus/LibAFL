@@ -578,7 +578,7 @@ where
     ///
     /// If the port is not yet bound, it will act as a broker; otherwise, it
     /// will act as a client.
-    /// This will make a new connection to the broker so will return its new [ClientId], too
+    /// This will make a new connection to the broker so will return its new [`ClientId`], too
 
     #[cfg(feature = "std")]
     pub fn on_port_with_hooks(
