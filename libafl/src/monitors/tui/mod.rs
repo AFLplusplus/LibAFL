@@ -423,8 +423,8 @@ impl Monitor for TuiMonitor {
 
         #[cfg(feature = "introspection")]
         {
-            // Print the client performance monitor. Skip the Client 0 which is the broker
-            for (i, client) in self.client_stats.iter().skip(1).enumerate() {
+            // Print the client performance monitor. Skip the Client IDs that have never sent anything.
+            for (i, client) in self.client_stats.iter().filter(|x| x.enabled).enumerate() {
                 self.context
                     .write()
                     .unwrap()
