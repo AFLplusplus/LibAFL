@@ -104,11 +104,7 @@ unsafe fn fuzz(
 
                 let coverage = CoverageRuntime::new();
                 #[cfg(unix)]
-<<<<<<< HEAD
-                let asan = AsanRuntime::new(options);
-=======
                 let asan = AsanRuntime::new(&options);
->>>>>>> dc36827a (moar porting)
 
                 #[cfg(unix)]
                 let mut frida_helper =
@@ -189,17 +185,9 @@ unsafe fn fuzz(
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
                 #[cfg(unix)]
-<<<<<<< HEAD
                 let observers = tuple_list!(edges_observer, time_observer, unsafe {
                     AsanErrorsObserver::from_static_asan_errors()
                 });
-=======
-                let observers = tuple_list!(
-                    edges_observer,
-                    time_observer,
-                    AsanErrorsObserver::new(&ASAN_ERRORS)
-                );
->>>>>>> dc36827a (moar porting)
                 #[cfg(windows)]
                 let observers = tuple_list!(edges_observer, time_observer);
 
@@ -312,17 +300,9 @@ unsafe fn fuzz(
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
                 #[cfg(unix)]
-<<<<<<< HEAD
                 let observers = tuple_list!(edges_observer, time_observer, unsafe {
                     AsanErrorsObserver::from_static_asan_errors()
                 });
-=======
-                let observers = tuple_list!(
-                    edges_observer,
-                    time_observer,
-                    AsanErrorsObserver::new(&ASAN_ERRORS)
-                );
->>>>>>> dc36827a (moar porting)
                 #[cfg(windows)]
                 let observers = tuple_list!(edges_observer, time_observer,);
 
@@ -450,17 +430,9 @@ unsafe fn fuzz(
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
                 #[cfg(unix)]
-<<<<<<< HEAD
                 let observers = tuple_list!(edges_observer, time_observer, unsafe {
                     AsanErrorsObserver::from_static_asan_errors()
                 });
-=======
-                let observers = tuple_list!(
-                    edges_observer,
-                    time_observer,
-                    AsanErrorsObserver::new(&ASAN_ERRORS)
-                );
->>>>>>> dc36827a (moar porting)
                 #[cfg(windows)]
                 let observers = tuple_list!(edges_observer, time_observer,);
 
