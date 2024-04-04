@@ -1461,8 +1461,8 @@ where
 
                 #[allow(clippy::manual_assert)]
                 if !staterestorer.has_content() && !self.serialize_state.oom_safe() {
-                    if mgr.detach_from_broker(self.broker_port).is_err() {
-                        log::error!("Failed to detach from broker");
+                    if let Err(err) = mgr.detach_from_broker(self.broker_port) {
+                        log::error!("Failed to detach from broker: {err}");
                     }
                     #[cfg(unix)]
                     if child_status == 137 {
@@ -1476,8 +1476,8 @@ where
 
                 if staterestorer.wants_to_exit() || Self::is_shutting_down() {
                     // if ctrl-c is pressed, we end up in this branch
-                    if mgr.detach_from_broker(self.broker_port).is_err() {
-                        log::error!("Failed to detach from broker");
+                    if let Err(err) = mgr.detach_from_broker(self.broker_port) {
+                        log::error!("Failed to detach from broker: {err}");
                     }
                     return Err(Error::shutting_down());
                 }
