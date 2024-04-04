@@ -29,7 +29,8 @@ use libafl_bolts::{
 #[cfg(feature = "std")]
 use libafl_bolts::{
     core_affinity::CoreId,
-    llmp::{recv_tcp_msg, send_tcp_msg, TcpRequest, TcpResponse, IP_LOCALHOST},
+    llmp::{recv_tcp_msg, send_tcp_msg, TcpRequest, TcpResponse},
+    IP_LOCALHOST,
 };
 #[cfg(feature = "std")]
 use libafl_bolts::{llmp::LlmpConnection, shmem::StdShMemProvider, staterestore::StateRestorer};
