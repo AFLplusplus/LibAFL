@@ -206,10 +206,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // there is another way to tell that this client wants to exit.
             // one is to call client.sender_mut().send_exiting()?;
             // you can disconnet the client in this way as long as this client in an unrecoverable state (like in a crash handler)
-            // another way to do this is through the notify_death() call
-            // you can call notify_death(client_id, port); to notify the broker that this broker wants to exit
+            // another way to do this is through the detach_from_broker() call
+            // you can call detach_from_broker(port); to notify the broker that this broker wants to exit
             // This one is usually for the event restarter to cut off the connection when the client has crashed.
-            // In that case we don't have access to the llmp client of the client anymore, but we can use notify_death instead
+            // In that case we don't have access to the llmp client of the client anymore, but we can use detach_from_broker instead
         }
         _ => {
             println!("No valid mode supplied");

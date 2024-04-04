@@ -86,7 +86,6 @@ use std::{
 
 #[cfg(all(debug_assertions, feature = "llmp_debug", feature = "std"))]
 use backtrace::Backtrace;
-use hashbrown::HashSet;
 #[cfg(all(unix, feature = "std"))]
 #[cfg(not(any(target_os = "solaris", target_os = "illumos")))]
 use nix::sys::socket::{self, sockopt::ReusePort};
@@ -1986,13 +1985,11 @@ where
     listeners: Vec<ClientId>,
     /// The total amount of clients we had, historically, including those that disconnected, and our listeners.
     num_clients_seen: usize,
-    /// The total amount of active clients we have right now. This literally means the current active client that is connected to this broker.
-    num_clients_active: usize,
     /// The amount of total clients that should have connected and (and disconnected)
     /// after which the broker loop should quit gracefully.
     pub exit_cleanly_after: Option<NonZeroUsize>,
     /// Clients that should be removed soon
-    clients_to_remove: HashSet<ClientId>,
+    clients_to_remove: Vec<ClientId>,
     /// The `ShMemProvider` to use
     shmem_provider: SP,
 }
@@ -2076,12 +2073,11 @@ where
                 unused_shmem_cache: vec![],
             },
             llmp_clients: vec![],
-            clients_to_remove: HashSet::new(),
+            clients_to_remove: Vec::new(),
             shmem_provider,
             listeners: vec![],
             exit_cleanly_after: None,
             num_clients_seen: 0,
-            num_clients_active: 0,
         })
     }
 
@@ -2141,14 +2137,6 @@ where
         client_receiver.id = id;
         self.llmp_clients.push(client_receiver);
         self.num_clients_seen += 1;
-        self.num_clients_active += 1;
-        /*
-        log::info!(
-            "Adding client number {:#?} {:#?}",
-            id,
-            self.num_clients_active
-        );
-        */
         id
     }
 
@@ -2280,7 +2268,7 @@ where
                     new_messages = has_messages;
                 }
                 Err(Error::ShuttingDown) => {
-                    self.clients_to_remove.insert(client_id);
+                    self.clients_to_remove.push(client_id);
                 }
                 Err(err) => return Err(err),
             }
@@ -2288,7 +2276,8 @@ where
 
         let possible_remove = self.clients_to_remove.len();
         if possible_remove > 0 {
-            let mut removed = 0;
+            self.clients_to_remove.sort_unstable();
+            self.clients_to_remove.dedup();
             log::trace!("Removing {:#?}", self.clients_to_remove);
             // rev() to make it works
             // commit the change to llmp_clients
@@ -2297,19 +2286,9 @@ where
                 if self.clients_to_remove.contains(&client_id) {
                     log::info!("Client {:#?} wants to exit. Removing.", client_id);
                     self.llmp_clients.remove(idx);
-                    removed += 1;
                 }
             }
-            self.num_clients_active -= removed;
-            /*
-            log::trace!(
-                "self.llmp_clients {} self.pw {} remove_cnt {}",
-                self.llmp_clients.len(),
-                self.num_clients_active,
-                removed
-            );
-            log::trace!("{:#?}", self.llmp_clients);
-            */
+            // log::trace!("{:#?}", self.llmp_clients);
         }
 
         self.clients_to_remove.clear();
@@ -2448,7 +2427,7 @@ where
 
             if let Some(exit_after_count) = self.exit_cleanly_after {
                 if !self.has_clients()
-                    && (self.num_clients_active - self.listeners.len()) > exit_after_count.into()
+                    && (self.num_clients_seen - self.listeners.len()) > exit_after_count.into()
                 {
                     // No more clients connected, and the amount of clients we were waiting for was previously connected.
                     // exit cleanly.
@@ -2912,7 +2891,7 @@ where
                     let client_id = ClientId((*exitinfo).client_id);
                     log::info!("Client exit message received!, we are removing clients whose client_group_id is {:#?}", client_id);
 
-                    self.clients_to_remove.insert(client_id);
+                    self.clients_to_remove.push(client_id);
                 }
                 LLMP_TAG_NEW_SHM_CLIENT => {
                     /* This client informs us about yet another new client

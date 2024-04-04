@@ -480,9 +480,7 @@ where
     ///
     /// If the port is not yet bound, it will act as a broker; otherwise, it
     /// will act as a client.
-    /// This will make a new connection to the broker so will return its new `ClientId`, too
     #[cfg(feature = "std")]
-    #[allow(clippy::type_complexity)]
     pub fn on_port(
         shmem_provider: SP,
         port: u16,
@@ -527,7 +525,7 @@ where
     /// (You can call it and it compiles but you should never do so)
     /// `send_exiting()` is exclusive to the fuzzer client.
     #[cfg(feature = "std")]
-    pub fn notify_death(&self, broker_port: u16) -> Result<(), Error> {
+    pub fn detach_from_broker(&self, broker_port: u16) -> Result<(), Error> {
         let client_id = self.llmp.sender().id();
         let Ok(mut stream) = TcpStream::connect((IP_LOCALHOST, broker_port)) else {
             log::error!("Connection refused.");
@@ -545,7 +543,10 @@ where
         };
         let msg = TcpRequest::ClientQuit { client_id };
         // Send this mesasge off and we are leaving.
-        let _ = send_tcp_msg(&mut stream, &msg);
+        match send_tcp_msg(&mut stream, &msg) {
+            Ok(_) => (),
+            Err(e) => log::error!("Failed to send tcp message {:#?}", e),
+        }
         log::info!("Asking he broker to be disconnected");
         Ok(())
     }
@@ -579,7 +580,6 @@ where
     /// If the port is not yet bound, it will act as a broker; otherwise, it
     /// will act as a client.
     /// This will make a new connection to the broker so will return its new [`ClientId`], too
-
     #[cfg(feature = "std")]
     pub fn on_port_with_hooks(
         shmem_provider: SP,
@@ -1339,7 +1339,7 @@ where
 
                 broker.broker_loop()
             };
-
+            // We get here if we are on Unix, or we are a broker on Windows (or without forks).
             let (mgr, core_id) = match self.kind {
                 ManagerKind::Any => {
                     let connection =
@@ -1461,7 +1461,9 @@ where
 
                 #[allow(clippy::manual_assert)]
                 if !staterestorer.has_content() && !self.serialize_state.oom_safe() {
-                    let _ = mgr.notify_death(self.broker_port);
+                    if mgr.detach_from_broker(self.broker_port).is_err() {
+                        log::error!("Failed to detach from broker");
+                    }
                     #[cfg(unix)]
                     if child_status == 137 {
                         // Out of Memory, see https://tldp.org/LDP/abs/html/exitcodes.html
@@ -1474,7 +1476,9 @@ where
 
                 if staterestorer.wants_to_exit() || Self::is_shutting_down() {
                     // if ctrl-c is pressed, we end up in this branch
-                    let _ = mgr.notify_death(self.broker_port);
+                    if mgr.detach_from_broker(self.broker_port).is_err() {
+                        log::error!("Failed to detach from broker");
+                    }
                     return Err(Error::shutting_down());
                 }
                 ctr = ctr.wrapping_add(1);
