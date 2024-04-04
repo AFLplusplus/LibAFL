@@ -481,6 +481,7 @@ where
     /// will act as a client.
     /// This will make a new connection to the broker so will return the `client_id` too
     #[cfg(feature = "std")]
+    #[allow(clippy::type_complexity)]
     pub fn on_port(
         shmem_provider: SP,
         port: u16,
