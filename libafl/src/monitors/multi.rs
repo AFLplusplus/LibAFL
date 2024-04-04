@@ -75,7 +75,7 @@ where
             "[{}]  (GLOBAL) run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             head,
             format_duration_hms(&(current_time() - self.start_time)),
-            self.client_stats().len(),
+            self.client_stats_count(),
             self.corpus_size(),
             self.objective_size(),
             self.total_execs(),

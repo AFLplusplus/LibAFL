@@ -336,12 +336,16 @@ pub struct TuiMonitor {
 }
 
 impl Monitor for TuiMonitor {
-    /// the client monitor, mutable
+    /// The client monitor, mutable
+    /// This also includes disabled "padding" clients.
+    /// Results should be filtered by `.enabled`.
     fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
         &mut self.client_stats
     }
 
-    /// the client monitor
+    /// The client monitor
+    /// This also includes disabled "padding" clients.
+    /// Results should be filtered by `.enabled`.
     fn client_stats(&self) -> &[ClientStats] {
         &self.client_stats
     }
@@ -494,7 +498,7 @@ impl TuiMonitor {
             .get_user_stats("edges")
             .map_or("0%".to_string(), ToString::to_string);
 
-        for client in self.client_stats().iter().skip(2) {
+        for client in self.client_stats().iter().filter(|client| client.enabled) {
             let client_map_density = client
                 .get_user_stats("edges")
                 .map_or(String::new(), ToString::to_string);
@@ -512,7 +516,7 @@ impl TuiMonitor {
         }
         let mut ratio_a: u64 = 0;
         let mut ratio_b: u64 = 0;
-        for client in self.client_stats().iter().skip(1) {
+        for client in self.client_stats().iter().filter(|client| client.enabled) {
             let afl_stats = client
                 .get_user_stats("AflStats")
                 .map_or("None".to_string(), ToString::to_string);
@@ -555,7 +559,7 @@ impl TuiMonitor {
         if self.client_stats.len() > 1 {
             let mut new_path_time = Duration::default();
             let mut new_objectives_time = Duration::default();
-            for client in self.client_stats().iter().skip(1) {
+            for client in self.client_stats().iter().filter(|client| client.enabled) {
                 new_path_time = client.last_corpus_time.max(new_path_time);
                 new_objectives_time = client.last_objective_time.max(new_objectives_time);
             }

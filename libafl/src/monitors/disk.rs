@@ -72,7 +72,7 @@ executions = {}
 exec_sec = {}
 ",
                 format_duration_hms(&(cur_time - self.start_time())),
-                self.client_stats().len(),
+                self.client_stats_count(),
                 self.corpus_size(),
                 self.objective_size(),
                 self.total_execs(),
@@ -216,7 +216,7 @@ where
                 "objectives": self.base.objective_size(),
                 "executions": self.base.total_execs(),
                 "exec_sec": self.base.execs_per_sec(),
-                "clients": &self.client_stats().get(1..)
+                "clients": self.client_stats().iter().filter(|client| client.enabled).collect::<Vec<_>>()
             });
             writeln!(&file, "{line}").expect("Unable to write JSON to file");
         }
