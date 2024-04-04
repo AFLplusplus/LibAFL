@@ -131,7 +131,7 @@ pub extern "C" fn libafl_main() {
     });
 
     // to disconnect the event coverter from the broker later
-    // call notify_death(std::process::id(), port)
+    // call detach_from_broker( port)
 
     let mut run_client = |state: Option<_>, mut mgr, _core_id| {
         let mut bytes = vec![];
