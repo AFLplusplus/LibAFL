@@ -92,14 +92,14 @@ use hashbrown::HashSet;
 use nix::sys::socket::{self, sockopt::ReusePort};
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "std")]
-use crate::current_time;
 #[cfg(all(unix, not(miri)))]
 use crate::os::unix_signals::setup_signal_handler;
 #[cfg(unix)]
 use crate::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
 #[cfg(all(windows, feature = "std"))]
 use crate::os::windows_exceptions::{setup_ctrl_handler, CtrlHandler};
+#[cfg(feature = "std")]
+use crate::{current_time, IP_LOCALHOST};
 use crate::{
     shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
     ClientId, Error,
