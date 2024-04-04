@@ -6,7 +6,7 @@ static GLOBAL: MiMalloc = MiMalloc;
 use std::ptr::write_volatile;
 use std::{env, net::SocketAddr, path::PathBuf, time::Duration};
 
-use clap::{self, Parser};
+use clap::Parser;
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::{launcher::Launcher, llmp::LlmpEventConverter, EventConfig},
@@ -121,14 +121,14 @@ pub extern "C" fn libafl_main() {
     let context = NautilusContext::from_file(15, "grammar.json");
 
     let mut event_converter = opt.bytes_broker_port.map(|port| {
-        LlmpEventConverter::on_port(
+        let (converter, _client_id) = LlmpEventConverter::on_port(
             shmem_provider.clone(),
             port,
             Some(NautilusToBytesInputConverter::new(&context)),
             none_input_converter!(),
-            std::process::id(),
         )
-        .unwrap()
+        .unwrap();
+        converter
     });
 
     // to disconnect the event coverter from the broker later

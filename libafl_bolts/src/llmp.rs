@@ -2290,8 +2290,9 @@ where
             }
         }
 
-        let remove_cnt = self.clients_to_remove.len();
-        if remove_cnt > 0 {
+        let possible_remove = self.clients_to_remove.len();
+        if possible_remove > 0 {
+            let mut removed = 0;
             log::trace!("Removing {:#?}", self.clients_to_remove);
             // rev() to make it works
             // commit the change to llmp_clients
@@ -2300,16 +2301,17 @@ where
                 if self.clients_to_remove.contains(&client_id) {
                     log::info!("Client {:#?} wants to exit. Removing.", client_id);
                     self.llmp_clients.remove(idx);
+                    removed += 1;
                 }
             }
-            self.num_clients_active -= remove_cnt;
+            self.num_clients_active -= removed;
             log::trace!(
-                "self.llmp_clients {} self.num_clients_active {} remove_cnt {}",
+                "self.llmp_clients {} self.pw {} remove_cnt {}",
                 self.llmp_clients.len(),
                 self.num_clients_active,
-                remove_cnt
+                removed
             );
-            // log::trace!("{:#?}", self.llmp_clients);
+            log::trace!("{:#?}", self.llmp_clients);
         }
 
         self.clients_to_remove.clear();
