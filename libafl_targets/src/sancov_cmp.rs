@@ -1,6 +1,10 @@
 //! Sanitizer Coverage comparison functions
 
-use core::{ffi::{c_char, c_int, c_void}, cmp, ptr};
+use core::{
+    cmp,
+    ffi::{c_char, c_int, c_void},
+    ptr,
+};
 
 use crate::CMPLOG_MAP_W;
 
@@ -46,12 +50,7 @@ pub unsafe extern "C" fn __sanitizer_weak_hook_memcmp(
         let k: usize = called_pc as usize;
         let k = (k >> 4) ^ (k << 8);
         let k = k & (CMPLOG_MAP_W - 1);
-        __libafl_targets_cmplog_routines_len(
-            k,
-            s1 as *const u8,
-            s2 as *const u8,
-            cmp::min(n, 32),
-        );
+        __libafl_targets_cmplog_routines_len(k, s1 as *const u8, s2 as *const u8, cmp::min(n, 32));
     }
 }
 
