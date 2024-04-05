@@ -31,7 +31,7 @@ extern "C" {
     pub fn __libafl_targets_cmplog_routines_len(k: usize, s1: *const u8, s2: *const u8, len: usize);
 }
 
-/// overriding __sanitizer_weak_hook_memcmp
+/// overriding `__sanitizer_weak_hook_memcmp`
 #[no_mangle]
 pub unsafe extern "C" fn __sanitizer_weak_hook_memcmp(
     called_pc: *const c_void,
@@ -54,7 +54,8 @@ pub unsafe extern "C" fn __sanitizer_weak_hook_memcmp(
 }
 
 #[no_mangle]
-/// overriding __sanitizer_weak_hook_strncmp
+/// overriding `__sanitizer_weak_hook_strncmp`
+/// # Safety this function has raw pointer access
 pub unsafe extern "C" fn __sanitizer_weak_hook_strncmp(
     called_pc: *const c_void,
     s1: *const c_char,
@@ -69,8 +70,8 @@ pub unsafe extern "C" fn __sanitizer_weak_hook_strncmp(
         let k = k & (CMPLOG_MAP_W - 1);
         let mut actual_len = 0;
         while actual_len < n {
-            let c1 = std::ptr::read(s1.offset(actual_len as isize));
-            let c2 = std::ptr::read(s2.offset(actual_len as isize));
+            let c1 = std::ptr::read(s1.add(actual_len));
+            let c2 = std::ptr::read(s2.add(actual_len));
 
             if c1 == 0 || c2 == 0 {
                 break;
@@ -82,7 +83,8 @@ pub unsafe extern "C" fn __sanitizer_weak_hook_strncmp(
 }
 
 #[no_mangle]
-/// overriding __sanitizer_weak_hook_strncasecmps
+/// overriding `__sanitizer_weak_hook_strncasecmps`
+/// # Safety this function has raw pointer access
 pub unsafe extern "C" fn __sanitizer_weak_hook_strncasecmp(
     called_pc: *const c_void,
     s1: *const c_char,
@@ -90,11 +92,12 @@ pub unsafe extern "C" fn __sanitizer_weak_hook_strncasecmp(
     n: usize,
     result: c_int,
 ) {
-    __sanitizer_weak_hook_strncmp(called_pc, s1, s2, n, result)
+    __sanitizer_weak_hook_strncmp(called_pc, s1, s2, n, result);
 }
 
 #[no_mangle]
-/// overriding __sanitizer_weak_hook_strcmp
+/// overriding `__sanitizer_weak_hook_strcmp`
+/// # Safety this function has raw pointer access
 pub unsafe extern "C" fn __sanitizer_weak_hook_strcmp(
     called_pc: *const c_void,
     s1: *const c_char,
@@ -107,8 +110,8 @@ pub unsafe extern "C" fn __sanitizer_weak_hook_strcmp(
         let k = k & (CMPLOG_MAP_W - 1);
         let mut actual_len = 0;
         while actual_len < 32 {
-            let c1 = std::ptr::read(s1.offset(actual_len as isize));
-            let c2 = std::ptr::read(s2.offset(actual_len as isize));
+            let c1 = std::ptr::read(s1.add(actual_len));
+            let c2 = std::ptr::read(s2.add(actual_len));
 
             if c1 == 0 || c2 == 0 {
                 break;
@@ -120,12 +123,13 @@ pub unsafe extern "C" fn __sanitizer_weak_hook_strcmp(
 }
 
 #[no_mangle]
-/// overriding __sanitizer_weak_hook_strcmp
+/// overriding `__sanitizer_weak_hook_strcmp`
+/// # Safety this function has raw pointer access
 pub unsafe extern "C" fn __sanitizer_weak_hook_strcasecmp(
     called_pc: *const c_void,
     s1: *const c_char,
     s2: *const c_char,
     result: c_int,
 ) {
-    __sanitizer_weak_hook_strcmp(called_pc, s1, s2, result)
+    __sanitizer_weak_hook_strcmp(called_pc, s1, s2, result);
 }
