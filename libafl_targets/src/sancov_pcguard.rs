@@ -3,6 +3,7 @@
 #[rustversion::nightly]
 #[cfg(feature = "sancov_ngram4")]
 use core::simd::num::SimdUint;
+use core::{mem, ptr, slice};
 
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ctx"))]
 use libafl::executors::{hooks::ExecutorHook, HasObservers};
