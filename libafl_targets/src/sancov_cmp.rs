@@ -1,6 +1,6 @@
 //! Sanitizer Coverage comparison functions
 
-use core::ffi::{c_char, c_int, c_void};
+use core::{ffi::{c_char, c_int, c_void}, cmp, ptr};
 
 use crate::CMPLOG_MAP_W;
 
@@ -50,7 +50,7 @@ pub unsafe extern "C" fn __sanitizer_weak_hook_memcmp(
             k,
             s1 as *const u8,
             s2 as *const u8,
-            std::cmp::min(n, 32),
+            cmp::min(n, 32),
         );
     }
 }
@@ -67,14 +67,14 @@ pub unsafe extern "C" fn __sanitizer_weak_hook_strncmp(
     result: c_int,
 ) {
     if result != 0 {
-        let n = std::cmp::min(n, 32);
+        let n = cmp::min(n, 32);
         let k: usize = called_pc as usize;
         let k = (k >> 4) ^ (k << 8);
         let k = k & (CMPLOG_MAP_W - 1);
         let mut actual_len = 0;
         while actual_len < n {
-            let c1 = std::ptr::read(s1.add(actual_len));
-            let c2 = std::ptr::read(s2.add(actual_len));
+            let c1 = ptr::read(s1.add(actual_len));
+            let c2 = ptr::read(s2.add(actual_len));
 
             if c1 == 0 || c2 == 0 {
                 break;
@@ -115,8 +115,8 @@ pub unsafe extern "C" fn __sanitizer_weak_hook_strcmp(
         let k = k & (CMPLOG_MAP_W - 1);
         let mut actual_len = 0;
         while actual_len < 32 {
-            let c1 = std::ptr::read(s1.add(actual_len));
-            let c2 = std::ptr::read(s2.add(actual_len));
+            let c1 = ptr::read(s1.add(actual_len));
+            let c2 = ptr::read(s2.add(actual_len));
 
             if c1 == 0 || c2 == 0 {
                 break;
