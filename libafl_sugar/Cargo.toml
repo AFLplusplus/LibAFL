@@ -16,7 +16,6 @@ categories = ["development-tools::testing", "emulators", "embedded", "os", "no-s
 all-features = true
 
 [features]
-python = ["pyo3", "libafl_qemu/python", "pyo3-build-config"]
 default = []
 
 # for libafl_qemu

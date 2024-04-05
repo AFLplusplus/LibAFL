@@ -12,7 +12,7 @@ edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 [package.metadata.docs.rs]
-features = ["document-features", "default", "python", "x86_64", "usermode"]
+features = ["document-features", "default", "x86_64", "usermode"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
@@ -24,8 +24,6 @@ document-features = ["dep:document-features"]
 #! ### General Features
 ## Find injections during fuzzing
 injections = ["serde_yaml", "toml"]
-## Python bindings support
-python = ["pyo3", "pyo3-build-config", "libafl_qemu_sys/python"]
 ## Fork support
 fork = ["libafl/fork"]
 ## Build libqasan for address sanitization

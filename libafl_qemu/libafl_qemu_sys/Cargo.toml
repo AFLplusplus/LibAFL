@@ -30,8 +30,6 @@ be = []
 usermode = []
 systemmode = []
 
-python = ["pyo3", "pyo3-build-config"]
-
 slirp = [ "systemmode", "libafl_qemu_build/slirp" ] # build qemu with host libslirp (for user networking)
 shared = [ "libafl_qemu_build/shared" ]
 

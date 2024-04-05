@@ -7,8 +7,6 @@ use libafl_qemu_sys::{
     read_self_maps, strlen, GuestAddr, GuestUsize, MapInfo, MmapPerms, VerifyAccess,
 };
 use libc::c_int;
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
 
 use crate::{
     emu::{HasExecutions, State},
@@ -22,12 +20,6 @@ pub enum HandlerError {
     EmuExitReasonError(QemuExitReasonError),
     SyncBackdoorError(SyncBackdoorError),
     MultipleInputDefinition,
-}
-
-#[cfg_attr(feature = "python", pyclass(unsendable))]
-pub struct GuestMaps {
-    orig_c_iter: *const c_void,
-    c_iter: *const c_void,
 }
 
 // Consider a private new only for Emulator
@@ -61,17 +53,6 @@ impl Iterator for GuestMaps {
                 Some(ret.assume_init())
             }
         }
-    }
-}
-
-#[cfg(feature = "python")]
-#[pymethods]
-impl GuestMaps {
-    fn __iter__(slf: PyRef<Self>) -> PyRef<Self> {
-        slf
-    }
-    fn __next__(mut slf: PyRefMut<Self>) -> Option<PyObject> {
-        Python::with_gil(|py| slf.next().map(|x| x.into_py(py)))
     }
 }
 

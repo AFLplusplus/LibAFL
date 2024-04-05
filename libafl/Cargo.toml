@@ -32,9 +32,6 @@ introspection = []
 ## Collects stats about scalability
 scalability_introspection = []
 
-## Will build the `pyo3` bindings
-python = ["pyo3", "concat-idents", "libafl_bolts/python"]
-
 ## Expose `libafl::prelude` for access without additional using directives
 prelude = ["libafl_bolts/prelude"]
 

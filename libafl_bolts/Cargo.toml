@@ -35,9 +35,6 @@ derive = ["libafl_derive"]
 ## If set, libafl_bolt's `rand` implementations will implement `rand::Rng`
 rand_trait = ["rand_core"]
 
-## Will build the `pyo3` bindings
-python = ["pyo3", "std"]
-
 ## Expose `libafl::prelude` for direct access to all types without additional `use` directives
 prelude = []
 
