@@ -9,7 +9,7 @@ use std::{
 
 use clap::{Arg, ArgAction, Command};
 use libafl::{
-    corpus::{Corpus, HasCurrentCorpusIdx, InMemoryOnDiskCorpus, OnDiskCorpus},
+    corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::forkserver::ForkserverExecutor,
     feedback_or,
@@ -29,7 +29,7 @@ use libafl::{
         calibrate::CalibrationStage, mutational::MultiMutationalStage,
         power::StdPowerMutationalStage, ColorizationStage, IfStage,
     },
-    state::{HasCorpus, HasMetadata, StdState},
+    state::{HasCorpus, HasCurrentTestcase, HasMetadata, StdState},
     Error,
 };
 use libafl_bolts::{
@@ -373,14 +373,8 @@ fn fuzz(
                   state: &mut StdState<_, InMemoryOnDiskCorpus<_>, _, _>,
                   _event_manager: &mut _|
          -> Result<bool, Error> {
-            let Some(corpus_id) = state.current_corpus_idx()? else {
-                return Err(Error::illegal_state(
-                    "state is not currently processing a corpus index",
-                ));
-            };
-
-            let corpus = state.corpus().get(corpus_id)?.borrow();
-            let res = corpus.scheduled_count() == 1; // let's try on the 2nd trial
+            let testcase = state.current_testcase()?;
+            let res = testcase.scheduled_count() == 1; // let's try on the 2nd trial
 
             Ok(res)
         };

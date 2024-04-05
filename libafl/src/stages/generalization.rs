@@ -6,7 +6,7 @@ use alloc::{
 };
 use core::{fmt::Debug, marker::PhantomData};
 
-use libafl_bolts::AsSlice;
+use libafl_bolts::{AsSlice, Named};
 
 use crate::{
     corpus::{Corpus, HasCurrentCorpusIdx},
@@ -15,9 +15,9 @@ use crate::{
     inputs::{BytesInput, GeneralizedInputMetadata, GeneralizedItem, HasBytesVec, UsesInput},
     mark_feature_time,
     observers::{MapObserver, ObserversTuple},
-    stages::Stage,
+    stages::{RetryRestartHelper, Stage},
     start_timer,
-    state::{HasCorpus, HasExecutions, HasMetadata, UsesState},
+    state::{HasCorpus, HasExecutions, HasMetadata, HasNamedMetadata, UsesState},
     Error,
 };
 #[cfg(feature = "introspection")]
@@ -47,6 +47,12 @@ pub struct GeneralizationStage<EM, O, OT, Z> {
     phantom: PhantomData<(EM, O, OT, Z)>,
 }
 
+impl<EM, O, OT, Z> Named for GeneralizationStage<EM, O, OT, Z> {
+    fn name(&self) -> &str {
+        "GeneralizationStage"
+    }
+}
+
 impl<EM, O, OT, Z> UsesState for GeneralizationStage<EM, O, OT, Z>
 where
     EM: UsesState,
@@ -60,12 +66,11 @@ where
     O: MapObserver,
     E: Executor<EM, Z> + HasObservers,
     E::Observers: ObserversTuple<E::State>,
-    E::State: UsesInput<Input = BytesInput> + HasExecutions + HasMetadata + HasCorpus,
+    E::State:
+        UsesInput<Input = BytesInput> + HasExecutions + HasMetadata + HasCorpus + HasNamedMetadata,
     EM: UsesState<State = E::State>,
     Z: UsesState<State = E::State>,
 {
-    type Progress = (); // TODO this stage needs a resume
-
     #[inline]
     #[allow(clippy::too_many_lines)]
     fn perform(
@@ -311,6 +316,18 @@ where
         }
 
         Ok(())
+    }
+
+    #[inline]
+    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        // TODO: We need to be able to resume better if something crashes or times out
+        RetryRestartHelper::restart_progress_should_run(state, self, 3)
+    }
+
+    #[inline]
+    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        // TODO: We need to be able to resume better if something crashes or times out
+        RetryRestartHelper::clear_restart_progress(state, self)
     }
 }
 

@@ -33,9 +33,6 @@ use typed_builder::TypedBuilder;
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
 
-/// The default coverage map size to use for forkserver targets
-pub const DEFAULT_MAP_SIZE: usize = 65536;
-
 /// Creates a Forkserver-based fuzzer.
 #[derive(Debug, TypedBuilder)]
 pub struct ForkserverBytesCoverageSugar<'a> {
@@ -118,7 +115,7 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
         let monitor = MultiMonitor::new(|s| log::info!("{s}"));
 
         let mut run_client = |state: Option<_>,
-                              mut mgr: LlmpRestartingEventManager<_, _>,
+                              mut mgr: LlmpRestartingEventManager<_, _, _>,
                               _core_id| {
             // Coverage map shared between target and fuzzer
             let mut shmem = shmem_provider_client.new_shmem(MAP_SIZE).unwrap();

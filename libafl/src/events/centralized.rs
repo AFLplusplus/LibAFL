@@ -1,4 +1,11 @@
-//! A wrapper manager to implement a main-secondary architecture with point-to-point channels
+//! Centralized event manager is a special event manager that will be used to achieve a more efficient message passing architecture.
+
+// Some technical details..
+// A very standard multi-process fuzzing using centralized event manager will consist of 4 components
+// 1. The "fuzzer clients", the fuzzer that will do the "normal" fuzzing
+// 2. The "centralized broker, the broker that gathers all the testcases from all the fuzzer clients
+// 3. The "main evaluator", the evaluator node that will evaluate all the testcases pass by the centralized event manager to see if the testcases are worth propagating
+// 4. The "main broker", the gathers the stats from the fuzzer clients and broadcast the newly found testcases from the main evaluator.
 
 use alloc::{boxed::Box, string::String, vec::Vec};
 use core::{marker::PhantomData, num::NonZeroUsize, time::Duration};
@@ -280,7 +287,8 @@ where
     ) -> Result<(), Error> {
         if !self.is_main {
             // secondary node
-            let is_nt = match &mut event {
+            let mut is_tc = false;
+            let is_nt_or_heartbeat = match &mut event {
                 Event::NewTestcase {
                     input: _,
                     client_config: _,
@@ -292,14 +300,26 @@ where
                     forward_id,
                 } => {
                     *forward_id = Some(ClientId(self.inner.mgr_id().0 as u32));
+                    is_tc = true;
                     true
                 }
+                Event::UpdateExecStats {
+                    time: _,
+                    executions: _,
+                    phantom: _,
+                } => true, // send it but this guy won't be handled. the only purpose is to keep this client alive else the broker thinks it is dead and will dc it
                 _ => false,
             };
-            if is_nt {
-                return self.forward_to_main(&event);
+
+            if is_nt_or_heartbeat {
+                self.forward_to_main(&event)?;
+                if is_tc {
+                    // early return here because we only send it to centralized not main broker.
+                    return Ok(());
+                }
             }
         }
+        // now inner llmp manager will process it
         self.inner.fire(state, event)
     }
 
@@ -437,7 +457,7 @@ where
     fn add_custom_buf_handler(
         &mut self,
         handler: Box<
-            dyn FnMut(&mut Self::State, &String, &[u8]) -> Result<CustomBufEventResult, Error>,
+            dyn FnMut(&mut Self::State, &str, &[u8]) -> Result<CustomBufEventResult, Error>,
         >,
     ) {
         self.inner.add_custom_buf_handler(handler);
@@ -484,9 +504,10 @@ where
     /// will act as a client.
     #[cfg(feature = "std")]
     pub fn on_port(inner: EM, shmem_provider: SP, port: u16, is_main: bool) -> Result<Self, Error> {
+        let client = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
         Ok(Self {
             inner,
-            client: LlmpClient::create_attach_to_tcp(shmem_provider, port)?,
+            client,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             is_main,
@@ -683,6 +704,7 @@ where
                             false,
                         )?
                     };
+
                 if let Some(item) = res.1 {
                     if res.1.is_some() {
                         self.inner.fire(

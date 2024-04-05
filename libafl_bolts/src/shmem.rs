@@ -593,8 +593,8 @@ pub mod unix_shmem {
         use std::{io::Write, process};
 
         use libc::{
-            c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, close, ftruncate, mmap, munmap,
-            perror, shm_open, shm_unlink, shmat, shmctl, shmdt, shmget,
+            c_int, c_uchar, close, ftruncate, mmap, munmap, shm_open, shm_unlink, shmat, shmctl,
+            shmdt, shmget,
         };
 
         use crate::{
@@ -602,38 +602,6 @@ pub mod unix_shmem {
             shmem::{ShMem, ShMemId, ShMemProvider},
             AsMutSlice, AsSlice, Error,
         };
-        #[cfg(unix)]
-        #[derive(Copy, Clone)]
-        #[repr(C)]
-        struct ipc_perm {
-            pub __key: c_int,
-            pub uid: c_uint,
-            pub gid: c_uint,
-            pub cuid: c_uint,
-            pub cgid: c_uint,
-            pub mode: c_ushort,
-            pub __pad1: c_ushort,
-            pub __seq: c_ushort,
-            pub __pad2: c_ushort,
-            pub __glibc_reserved1: c_ulong,
-            pub __glibc_reserved2: c_ulong,
-        }
-
-        #[cfg(unix)]
-        #[derive(Copy, Clone)]
-        #[repr(C)]
-        struct shmid_ds {
-            pub shm_perm: ipc_perm,
-            pub shm_segsz: c_ulong,
-            pub shm_atime: c_long,
-            pub shm_dtime: c_long,
-            pub shm_ctime: c_long,
-            pub shm_cpid: c_int,
-            pub shm_lpid: c_int,
-            pub shm_nattch: c_ulong,
-            pub __glibc_reserved4: c_ulong,
-            pub __glibc_reserved5: c_ulong,
-        }
 
         // This is macOS's limit
         // https://stackoverflow.com/questions/38049068/osx-shm-open-returns-enametoolong
@@ -680,17 +648,15 @@ pub mod unix_shmem {
                         0o600,
                     );
                     if shm_fd == -1 {
-                        perror(b"shm_open\0".as_ptr() as *const _);
-                        return Err(Error::unknown(format!(
+                        return Err(Error::last_os_error(format!(
                             "Failed to shm_open map with id {filename_path:?}",
                         )));
                     }
 
                     /* configure the size of the shared memory segment */
                     if ftruncate(shm_fd, map_size.try_into()?) != 0 {
-                        perror(b"ftruncate\0".as_ptr() as *const _);
                         shm_unlink(filename_path.as_ptr() as *const _);
-                        return Err(Error::unknown(format!(
+                        return Err(Error::last_os_error(format!(
                             "setup_shm(): ftruncate() failed for map with id {filename_path:?}",
                         )));
                     }
@@ -705,10 +671,9 @@ pub mod unix_shmem {
                         0,
                     );
                     if map == libc::MAP_FAILED || map.is_null() {
-                        perror(b"mmap\0".as_ptr() as *const _);
                         close(shm_fd);
                         shm_unlink(filename_path.as_ptr() as *const _);
-                        return Err(Error::unknown(format!(
+                        return Err(Error::last_os_error(format!(
                             "mmap() failed for map with id {filename_path:?}",
                         )));
                     }
@@ -737,9 +702,8 @@ pub mod unix_shmem {
                         0,
                     );
                     if map == libc::MAP_FAILED || map.is_null() {
-                        perror(b"mmap\0".as_ptr() as *const _);
                         close(shm_fd);
-                        return Err(Error::unknown(format!(
+                        return Err(Error::last_os_error(format!(
                             "mmap() failed for map with fd {shm_fd:?}"
                         )));
                     }
@@ -761,7 +725,7 @@ pub mod unix_shmem {
             }
         }
 
-        /// A [`ShMemProvider`] which uses `shmget`/`shmat`/`shmctl` to provide shared memory mappings.
+        /// A [`ShMemProvider`] which uses [`shm_open`] and [`mmap`] to provide shared memory mappings.
         #[cfg(unix)]
         #[derive(Clone, Debug)]
         pub struct MmapShMemProvider {
@@ -884,11 +848,7 @@ pub mod unix_shmem {
                     let map = shmat(os_id, ptr::null(), 0) as *mut c_uchar;
 
                     if map as c_int == -1 || map.is_null() {
-                        perror(b"shmat\0".as_ptr() as *const _);
-                        shmctl(os_id, libc::IPC_RMID, ptr::null_mut());
-                        return Err(Error::unknown(
-                            "Failed to map the shared mapping".to_string(),
-                        ));
+                        return Err(Error::last_os_error("Failed to map the shared mapping"));
                     }
 
                     Ok(Self {
@@ -906,8 +866,7 @@ pub mod unix_shmem {
                     let map = shmat(id_int, ptr::null(), 0) as *mut c_uchar;
 
                     if map.is_null() || map == ptr::null_mut::<c_uchar>().wrapping_sub(1) {
-                        perror(b"shmat\0".as_ptr() as *const _);
-                        return Err(Error::unknown(format!(
+                        return Err(Error::last_os_error(format!(
                             "Failed to map the shared mapping with id {id_int}"
                         )));
                     }

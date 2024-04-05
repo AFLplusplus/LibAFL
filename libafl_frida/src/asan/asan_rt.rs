@@ -10,12 +10,7 @@ use core::{
     fmt::{self, Debug, Formatter},
     ptr::addr_of_mut,
 };
-use std::{
-    ffi::c_void,
-    num::NonZeroUsize,
-    ptr::{addr_of, write_volatile},
-    rc::Rc,
-};
+use std::{ffi::c_void, num::NonZeroUsize, ptr::write_volatile, rc::Rc, sync::MutexGuard};
 
 use backtrace::Backtrace;
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
@@ -171,9 +166,7 @@ impl FridaRuntime for AsanRuntime {
     ) {
         self.allocator.init();
 
-        unsafe {
-            ASAN_ERRORS = Some(AsanErrors::new(self.continue_on_error));
-        }
+        AsanErrors::get_mut_blocking().set_continue_on_error(self.continue_on_error);
 
         self.generate_instrumentation_blobs();
 
@@ -340,10 +333,11 @@ impl AsanRuntime {
         self.allocator.check_for_leaks();
     }
 
-    /// Returns the `AsanErrors` from the recent run
+    /// Returns the `AsanErrors` from the recent run.
+    /// Will block if some other thread holds on to the `ASAN_ERRORS` Mutex.
     #[allow(clippy::unused_self)]
-    pub fn errors(&mut self) -> &Option<AsanErrors> {
-        unsafe { &*addr_of!(ASAN_ERRORS) }
+    pub fn errors(&mut self) -> MutexGuard<'static, AsanErrors> {
+        ASAN_ERRORS.lock().unwrap()
     }
 
     /// Make sure the specified memory is unpoisoned
@@ -542,7 +536,7 @@ impl AsanRuntime {
     #[allow(clippy::items_after_statements)]
     #[allow(clippy::too_many_lines)]
     fn hook_functions(&mut self, gum: &Gum) {
-        let mut interceptor = frida_gum::interceptor::Interceptor::obtain(gum);
+        let mut interceptor = Interceptor::obtain(gum);
 
         macro_rules! hook_func {
             ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
@@ -565,7 +559,7 @@ impl AsanRuntime {
                     interceptor.replace(
                         frida_gum::Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function"),
                         NativePointer([<replacement_ $name>] as *mut c_void),
-                        NativePointer(self as *mut _ as *mut c_void)
+                        NativePointer(core::ptr::from_mut(self) as *mut c_void)
                     ).ok();
                 }
             }
@@ -590,7 +584,7 @@ impl AsanRuntime {
                     interceptor.replace(
                         frida_gum::Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function"),
                         NativePointer([<replacement_ $name>] as *mut c_void),
-                        NativePointer(self as *mut _ as *mut c_void)
+                        NativePointer(core::ptr::from_mut(self) as *mut c_void)
                     ).ok();
                 }
             }
@@ -1085,11 +1079,11 @@ impl AsanRuntime {
                     backtrace,
                 ))
             };
-            AsanErrors::get_mut().report_error(error);
+            AsanErrors::get_mut_blocking().report_error(error);
 
             // This is not even a mem instruction??
         } else {
-            AsanErrors::get_mut().report_error(AsanError::Unknown((
+            AsanErrors::get_mut_blocking().report_error(AsanError::Unknown((
                 self.regs,
                 actual_pc,
                 (None, None, 0, fault_address),
@@ -1133,7 +1127,7 @@ impl AsanRuntime {
             .operands
             .iter()
             .position(|item| *item == Operand::Nothing)
-            .unwrap_or_else(|| 4);
+            .unwrap_or(4);
 
         //the memory operand is always the last operand in aarch64
         let (base_reg, index_reg, displacement) = match insn.operands[operands_len - 1] {
@@ -1164,7 +1158,7 @@ impl AsanRuntime {
                     actual_pc,
                     (
                         Some(base_reg),
-                        Some(index_reg.unwrap_or_else(|| 0xffff)),
+                        Some(index_reg.unwrap_or(0xffff)),
                         displacement as usize,
                         fault_address,
                     ),
@@ -1176,7 +1170,7 @@ impl AsanRuntime {
                     actual_pc,
                     (
                         Some(base_reg),
-                        Some(index_reg.unwrap_or_else(|| 0xffff)),
+                        Some(index_reg.unwrap_or(0xffff)),
                         displacement as usize,
                         fault_address,
                     ),
@@ -1192,7 +1186,7 @@ impl AsanRuntime {
                 pc: actual_pc,
                 fault: (
                     Some(base_reg),
-                    Some(index_reg.unwrap_or_else(|| 0xffff)),
+                    Some(index_reg.unwrap_or(0xffff)),
                     displacement as usize,
                     fault_address,
                 ),
@@ -1216,14 +1210,14 @@ impl AsanRuntime {
                 actual_pc,
                 (
                     Some(base_reg),
-                    Some(index_reg.unwrap_or_else(|| 0xffff)),
+                    Some(index_reg.unwrap_or(0xffff)),
                     displacement as usize,
                     fault_address,
                 ),
                 backtrace,
             ))
         };
-        AsanErrors::get_mut().report_error(error);
+        AsanErrors::get_mut_blocking().report_error(error);
     }
 
     #[cfg(target_arch = "x86_64")]
@@ -1404,6 +1398,8 @@ impl AsanRuntime {
     #[allow(clippy::unused_self, clippy::identity_op)]
     #[allow(clippy::too_many_lines)]
     fn generate_shadow_check_function(&mut self) {
+        use std::fs::File;
+
         let shadow_bit = self.allocator.shadow_bit();
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
 
@@ -1526,12 +1522,12 @@ impl AsanRuntime {
             );
         let blob = ops.finalize().unwrap();
         unsafe {
-            let mapping = mmap(
+            let mapping = mmap::<File>(
                 None,
                 NonZeroUsize::new_unchecked(0x1000),
                 ProtFlags::all(),
                 MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE,
-                -1,
+                None,
                 0,
             )
             .unwrap();
@@ -1545,6 +1541,8 @@ impl AsanRuntime {
     // identity_op appears to be a false positive in ubfx
     #[allow(clippy::unused_self, clippy::identity_op, clippy::too_many_lines)]
     fn generate_shadow_check_function(&mut self) {
+        use std::fs::File;
+
         let shadow_bit = self.allocator.shadow_bit();
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
         dynasm!(ops
@@ -1658,12 +1656,12 @@ impl AsanRuntime {
         let map_flags = MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE;
 
         unsafe {
-            let mapping = mmap(
+            let mapping = mmap::<File>(
                 None,
                 NonZeroUsize::try_from(0x1000).unwrap(),
                 ProtFlags::all(),
                 map_flags,
-                -1,
+                None,
                 0,
             )
             .unwrap();
@@ -1938,7 +1936,7 @@ impl AsanRuntime {
             ;->accessed_address:
             ; .dword 0x0
             ; self_addr:
-            ; .qword self as *mut _  as *mut c_void as i64
+            ; .qword core::ptr::from_mut(self) as *mut c_void as i64
             ; self_regs_addr:
             ; .qword addr_of_mut!(self.regs) as i64
             ; trap_func:
@@ -2037,7 +2035,7 @@ impl AsanRuntime {
             ; br x1 // go back to the 'return address'
 
             ; self_addr:
-            ; .qword self as *mut _  as *mut c_void as i64
+            ; .qword core::ptr::from_mut(self) as *mut c_void as i64
             ; self_regs_addr:
             ; .qword addr_of_mut!(self.regs) as i64
             ; trap_func:
@@ -2175,6 +2173,7 @@ impl AsanRuntime {
     #[cfg(target_arch = "aarch64")]
     #[must_use]
     #[inline]
+    #[allow(clippy::similar_names, clippy::type_complexity)]
     pub fn asan_is_interesting_instruction(
         decoder: InstDecoder,
         _address: u64,
@@ -2218,7 +2217,7 @@ impl AsanRuntime {
             .operands
             .iter()
             .position(|item| *item == Operand::Nothing)
-            .unwrap_or_else(|| 4);
+            .unwrap_or(4);
         if operands_len < 2 {
             return None;
         }
@@ -2237,6 +2236,7 @@ impl AsanRuntime {
 
         // println!("{:?} {}", instr, memory_access_size);
         //abuse the fact that the last operand is always the mem operand
+        #[allow(clippy::let_and_return)]
         match instr.operands[operands_len - 1] {
             Operand::RegRegOffset(reg1, reg2, size, shift, shift_size) => {
                 let ret = Some((
@@ -2247,27 +2247,25 @@ impl AsanRuntime {
                     Some((shift, shift_size)),
                 ));
                 // log::trace!("Interesting instruction: {}, {:?}", instr.to_string(), ret);
-                return ret;
+                ret
             }
             Operand::RegPreIndex(reg, disp, _) => {
                 let ret = Some((reg, None, disp, instruction_width(&instr), None));
                 // log::trace!("Interesting instruction: {}, {:?}", instr.to_string(), ret);
-                return ret;
+                ret
             }
             Operand::RegPostIndex(reg, _) => {
                 //in post index the disp is applied after so it doesn't matter for this memory access
                 let ret = Some((reg, None, 0, instruction_width(&instr), None));
                 // log::trace!("Interesting instruction: {}, {:?}", instr.to_string(), ret);
-                return ret;
+                ret
             }
             Operand::RegPostIndexReg(reg, _) => {
                 let ret = Some((reg, None, 0, instruction_width(&instr), None));
                 //  log::trace!("Interesting instruction: {}, {:?}", instr.to_string(), ret);
-                return ret;
+                ret
             }
-            _ => {
-                return None;
-            }
+            _ => None,
         }
     }
 
@@ -2597,9 +2595,9 @@ impl AsanRuntime {
                     _ => -1,
                 };
                 let (shift_encoding, shift_amount): (i32, u32) = match shift_type {
-                    ShiftStyle::LSL => (0b00, amount as u32),
-                    ShiftStyle::LSR => (0b01, amount as u32),
-                    ShiftStyle::ASR => (0b10, amount as u32),
+                    ShiftStyle::LSL => (0b00, u32::from(amount)),
+                    ShiftStyle::LSR => (0b01, u32::from(amount)),
+                    ShiftStyle::ASR => (0b10, u32::from(amount)),
                     _ => (-1, 0),
                 };
 

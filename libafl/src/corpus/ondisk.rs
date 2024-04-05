@@ -42,7 +42,7 @@ pub struct OnDiskMetadata<'a> {
     /// The exec time for this [`Testcase`]
     pub exec_time: &'a Option<Duration>,
     /// The amount of executions for this [`Testcase`]
-    pub executions: &'a usize,
+    pub executions: &'a u64,
 }
 
 /// A corpus able to store [`Testcase`]s to disk, and load them from disk, when they are being used.
@@ -262,7 +262,7 @@ where
 }
 
 #[cfg(feature = "python")]
-#[allow(clippy::unnecessary_fallible_conversions)]
+#[allow(clippy::unnecessary_fallible_conversions, unused_qualifications)]
 /// `OnDiskCorpus` Python bindings
 pub mod pybind {
     use alloc::string::String;

@@ -1,7 +1,7 @@
 //! Libtool Wrapper from `LibAFL`
 // call make passing LIBTOOL=/path/to/target/release/libafl_libtool
 
-use std::{convert::Into, env, path::PathBuf, str::FromStr, string::String, vec::Vec};
+use std::{env, path::PathBuf, str::FromStr};
 
 use crate::{Error, ToolWrapper, LIB_EXT, LIB_PREFIX};
 
@@ -170,7 +170,7 @@ impl ToolWrapper for LibtoolWrapper {
             .base_args
             .iter()
             .map(|r| {
-                let arg_as_path = std::path::PathBuf::from(r);
+                let arg_as_path = PathBuf::from(r);
                 if r.ends_with('.') {
                     r.to_string()
                 } else {
@@ -191,7 +191,7 @@ impl ToolWrapper for LibtoolWrapper {
             })
             .collect::<Vec<_>>();
 
-        let libtool_path = if let Ok(libtool_dir) = std::env::var("LIBTOOL_DIR") {
+        let libtool_path = if let Ok(libtool_dir) = env::var("LIBTOOL_DIR") {
             format!("{libtool_dir}/libtool")
         } else {
             "./libtool".to_string()

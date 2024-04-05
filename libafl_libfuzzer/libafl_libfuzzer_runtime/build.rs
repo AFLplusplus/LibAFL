@@ -10,7 +10,7 @@ fn main() {
     let build = bindgen::builder()
         .header("src/harness_wrap.h")
         .generate_comments(true)
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+        .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         .generate()
         .expect("Couldn't generate the harness wrapper!");
 

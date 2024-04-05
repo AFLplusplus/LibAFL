@@ -1,4 +1,4 @@
-use std::{fs, path::Path};
+use std::{collections::hash_map, fs, hash::Hasher, io::Read, path::Path};
 
 use bindgen::{BindgenError, Bindings};
 
@@ -88,7 +88,31 @@ pub fn generate(
     clang_args: Vec<String>,
 ) -> Result<Bindings, BindgenError> {
     let wrapper_h = build_dir.join("wrapper.h");
-    fs::write(&wrapper_h, WRAPPER_HEADER).expect("Unable to write wrapper.h");
+    let existing_wrapper_h = fs::File::open(&wrapper_h);
+    let mut must_rewrite_wrapper = true;
+
+    // Check if equivalent wrapper file already exists without relying on filesystem timestamp.
+    if let Ok(mut wrapper_file) = existing_wrapper_h {
+        let mut existing_wrapper_content = Vec::with_capacity(WRAPPER_HEADER.len());
+        wrapper_file
+            .read_to_end(existing_wrapper_content.as_mut())
+            .unwrap();
+
+        let mut existing_wrapper_hasher = hash_map::DefaultHasher::new();
+        existing_wrapper_hasher.write(existing_wrapper_content.as_ref());
+
+        let mut wrapper_h_hasher = hash_map::DefaultHasher::new();
+        wrapper_h_hasher.write(WRAPPER_HEADER.as_bytes());
+
+        // Check if wrappers are the same
+        if existing_wrapper_hasher.finish() == wrapper_h_hasher.finish() {
+            must_rewrite_wrapper = false;
+        }
+    }
+
+    if must_rewrite_wrapper {
+        fs::write(&wrapper_h, WRAPPER_HEADER).expect("Unable to write wrapper.h");
+    }
 
     let bindings = bindgen::Builder::default()
         .derive_debug(true)
@@ -112,6 +136,7 @@ pub fn generate(
         .allowlist_type("MemOpIdx")
         .allowlist_type("MemOp")
         .allowlist_type("DeviceSnapshotKind")
+        .allowlist_type("ShutdownCause")
         .allowlist_type("libafl_exit_reason")
         .allowlist_type("libafl_exit_reason_kind")
         .allowlist_type("libafl_exit_reason_sync_backdoor")
@@ -135,7 +160,7 @@ pub fn generate(
         .allowlist_function("device_list_all")
         .allowlist_function("libafl_.*")
         .blocklist_function("main_loop_wait") // bindgen issue #1313
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks));
+        .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()));
 
     // arch specific functions
     let bindings = if cpu_target == "i386" || cpu_target == "x86_64" {

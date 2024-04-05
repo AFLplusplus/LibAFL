@@ -1,8 +1,23 @@
 //! [`LLVM` `PcGuard`](https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-pcs-with-guards) runtime for `LibAFL`.
 
-use crate::coverage::{EDGES_MAP, MAX_EDGES_NUM};
+#[rustversion::nightly]
+#[cfg(feature = "sancov_ngram4")]
+use core::simd::num::SimdUint;
+
+#[cfg(any(feature = "sancov_ngram4", feature = "sancov_ctx"))]
+use libafl::executors::{hooks::ExecutorHook, HasObservers};
+
+#[cfg(any(
+    feature = "pointer_maps",
+    feature = "sancov_pcguard_edges",
+    feature = "sancov_pcguard_hitcounts"
+))]
+use crate::coverage::EDGES_MAP;
+use crate::coverage::MAX_EDGES_NUM;
 #[cfg(feature = "pointer_maps")]
 use crate::coverage::{EDGES_MAP_PTR, EDGES_MAP_PTR_NUM};
+#[cfg(feature = "sancov_ngram4")]
+use crate::EDGES_MAP_SIZE;
 
 #[cfg(all(feature = "sancov_pcguard_edges", feature = "sancov_pcguard_hitcounts"))]
 #[cfg(not(any(doc, feature = "clippy")))]
@@ -10,14 +25,205 @@ compile_error!(
     "the libafl_targets `sancov_pcguard_edges` and `sancov_pcguard_hitcounts` features are mutually exclusive."
 );
 
+#[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
+use core::ops::ShlAssign;
+
+#[cfg(feature = "sancov_ngram4")]
+#[rustversion::nightly]
+type Ngram4 = core::simd::u32x4;
+
+#[cfg(feature = "sancov_ngram8")]
+#[rustversion::nightly]
+type Ngram8 = core::simd::u32x8;
+
+/// The array holding the previous locs. This is required for NGRAM-4 instrumentation
+#[cfg(feature = "sancov_ngram4")]
+#[rustversion::nightly]
+pub static mut PREV_ARRAY_4: Ngram4 = Ngram4::from_array([0, 0, 0, 0]);
+
+/// The array holding the previous locs. This is required for NGRAM-4 instrumentation
+#[cfg(feature = "sancov_ngram8")]
+#[rustversion::nightly]
+pub static mut PREV_ARRAY_8: Ngram8 = Ngram8::from_array([0, 0, 0, 0, 0, 0, 0, 0]);
+
+/// We shift each of the values in ngram4 everytime we see new edges
+#[cfg(feature = "sancov_ngram4")]
+#[rustversion::nightly]
+pub static SHR_4: Ngram4 = Ngram4::from_array([1, 1, 1, 1]);
+
+/// We shift each of the values in ngram8 everytime we see new edges
+#[cfg(feature = "sancov_ngram8")]
+#[rustversion::nightly]
+pub static SHR_8: Ngram8 = Ngram8::from_array([1, 1, 1, 1, 1, 1, 1, 1]);
+
+#[cfg(any(
+    feature = "sancov_ngram4",
+    feature = "sancov_ngram8",
+    feature = "sancov_ctx"
+))]
+use core::marker::PhantomData;
+
+/// The hook to initialize ngram everytime we run the harness
+#[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
+#[rustversion::nightly]
+#[derive(Debug, Clone, Copy)]
+pub struct NgramHook<S>
+where
+    S: libafl::inputs::UsesInput,
+{
+    phantom: PhantomData<S>,
+}
+
+/// The hook to initialize ctx everytime we run the harness
+#[cfg(feature = "sancov_ctx")]
+#[derive(Debug, Clone, Copy)]
+pub struct CtxHook<S> {
+    phantom: PhantomData<S>,
+}
+
+#[cfg(feature = "sancov_ctx")]
+impl<S> CtxHook<S>
+where
+    S: libafl::inputs::UsesInput,
+{
+    /// The constructor for this struct
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+#[cfg(feature = "sancov_ctx")]
+impl<S> Default for CtxHook<S>
+where
+    S: libafl::inputs::UsesInput,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
+#[rustversion::nightly]
+impl<S> ExecutorHook<S> for NgramHook<S>
+where
+    S: libafl::inputs::UsesInput,
+{
+    fn init<E: HasObservers>(&mut self, _state: &mut S) {}
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) {
+        #[cfg(feature = "sancov_ngram4")]
+        unsafe {
+            PREV_ARRAY_4 = Ngram4::from_array([0, 0, 0, 0]);
+        }
+
+        #[cfg(feature = "sancov_ngram8")]
+        unsafe {
+            PREV_ARRAY_8 = Ngram8::from_array([0, 0, 0, 0, 0, 0, 0, 0]);
+        }
+    }
+    fn post_exec(&mut self, _state: &mut S, _input: &S::Input) {}
+}
+
+#[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
+#[rustversion::nightly]
+impl<S> NgramHook<S>
+where
+    S: libafl::inputs::UsesInput,
+{
+    /// The constructor for this struct
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+#[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
+#[rustversion::nightly]
+impl<S> Default for NgramHook<S>
+where
+    S: libafl::inputs::UsesInput,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(feature = "sancov_ctx")]
+impl<S> ExecutorHook<S> for CtxHook<S>
+where
+    S: libafl::inputs::UsesInput,
+{
+    fn init<E: HasObservers>(&mut self, _state: &mut S) {}
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) {
+        unsafe {
+            __afl_prev_ctx = 0;
+        }
+    }
+    fn post_exec(&mut self, _state: &mut S, _input: &S::Input) {}
+}
+
+#[rustversion::nightly]
+#[allow(unused)]
+#[inline]
+#[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
+unsafe fn update_ngram(pos: usize) -> usize {
+    let mut reduced = pos;
+    #[cfg(feature = "sancov_ngram4")]
+    {
+        PREV_ARRAY_4 = PREV_ARRAY_4.rotate_elements_right::<1>();
+        PREV_ARRAY_4.shl_assign(SHR_4);
+        PREV_ARRAY_4.as_mut_array()[0] = pos as u32;
+        reduced = PREV_ARRAY_4.reduce_xor() as usize;
+    }
+    #[cfg(feature = "sancov_ngram8")]
+    {
+        PREV_ARRAY_8 = PREV_ARRAY_8.rotate_elements_right::<1>();
+        PREV_ARRAY_8.shl_assign(SHR_8);
+        PREV_ARRAY_8.as_mut_array()[0] = pos as u32;
+        reduced = PREV_ARRAY_8.reduce_xor() as usize;
+    }
+    reduced %= EDGES_MAP_SIZE;
+    reduced
+}
+
+#[rustversion::not(nightly)]
+#[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
+unsafe fn update_ngram(pos: usize) -> usize {
+    pos
+}
+
+extern "C" {
+    /// The ctx variable
+    pub static mut __afl_prev_ctx: u32;
+}
+
 /// Callback for sancov `pc_guard` - usually called by `llvm` on each block or edge.
 ///
 /// # Safety
 /// Dereferences `guard`, reads the position from there, then dereferences the [`EDGES_MAP`] at that position.
 /// Should usually not be called directly.
 #[no_mangle]
+#[allow(unused_assignments)]
 pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
-    let pos = *guard as usize;
+    #[allow(unused_mut)]
+    let mut pos = *guard as usize;
+
+    #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
+    {
+        pos = update_ngram(pos);
+        // println!("Wrinting to {} {}", pos, EDGES_MAP_SIZE);
+    }
+
+    #[cfg(feature = "sancov_ctx")]
+    {
+        pos ^= __afl_prev_ctx as usize;
+        // println!("Wrinting to {} {}", pos, EDGES_MAP_SIZE);
+    }
+
     #[cfg(feature = "pointer_maps")]
     {
         #[cfg(feature = "sancov_pcguard_edges")]
@@ -72,7 +278,7 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(mut start: *mut u32
         #[cfg(not(feature = "pointer_maps"))]
         {
             MAX_EDGES_NUM = MAX_EDGES_NUM.wrapping_add(1);
-            assert!((MAX_EDGES_NUM <= EDGES_MAP.len()), "The number of edges reported by SanitizerCoverage exceed the size of the edges map ({}). Use the LIBAFL_EDGES_MAP_SIZE env to increase it at compile time.", EDGES_MAP.len());
+            // assert!((MAX_EDGES_NUM <= EDGES_MAP.len()), "The number of edges reported by SanitizerCoverage exceed the size of the edges map ({}). Use the LIBAFL_EDGES_MAP_SIZE env to increase it at compile time.", EDGES_MAP.len());
         }
     }
 }

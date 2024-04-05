@@ -53,7 +53,7 @@ const UNIX_SERVER_NAME: &str = "./libafl_unix_shmem_server";
 /// Env variable. If set, we won't try to spawn the service
 const AFL_SHMEM_SERVICE_STARTED: &str = "AFL_SHMEM_SERVICE_STARTED";
 
-/// Hands out served shared maps, as used on Android.
+///     s out served shared maps, as used on Android.
 #[derive(Debug)]
 pub struct ServedShMemProvider<SP>
 where
@@ -282,7 +282,7 @@ pub enum ServedShMemRequest {
     PreFork(),
     /// The client's child re-registers with us after it forked.
     PostForkChildHello(i32),
-    /// The ShMem Service should exit. This is sually sent internally on `drop`, but feel free to do whatever with it?
+    /// The `ShMem` Service should exit. This is sually sent internally on `drop`, but feel free to do whatever with it?
     Exit,
 }
 
@@ -671,7 +671,7 @@ where
         };
 
         let mut poll_fds: Vec<PollFd> = vec![PollFd::new(
-            listener.as_raw_fd(),
+            &listener,
             PollFlags::POLLIN | PollFlags::POLLRDNORM | PollFlags::POLLRDBAND,
         )];
 
@@ -714,12 +714,20 @@ where
                         };
 
                         log::info!("Received connection from {_addr:?}");
+
                         let pollfd = PollFd::new(
-                            stream.as_raw_fd(),
+                            // # Safety
+                            // This cast will make `PollFd::new` ignore the lifetime of our stream.
+                            // As of nix 0.27, the `PollFd` is safer, in that it checks the lifetime of the given stream.
+                            // We did not develop this server with that new constraint in mind, but it is upheld.
+                            // The `new` function then gets the `raw_fd` from this stream, and operate on that int internally.
+                            unsafe { &*(&stream as *const _) },
                             PollFlags::POLLIN | PollFlags::POLLRDNORM | PollFlags::POLLRDBAND,
                         );
-                        poll_fds.push(pollfd);
+
                         let client = SharedShMemClient::new(stream);
+
+                        poll_fds.push(pollfd);
                         let client_id = client.stream.as_raw_fd();
                         self.clients.insert(client_id, client);
                         match self.handle_client(client_id) {

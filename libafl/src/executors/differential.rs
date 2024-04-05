@@ -2,7 +2,7 @@
 //! It wraps two executors that will be run after each other with the same input.
 //! In comparison to the [`crate::executors::CombinedExecutor`] it also runs the secondary executor in `run_target`.
 //!
-use core::{cell::UnsafeCell, fmt::Debug};
+use core::{cell::UnsafeCell, fmt::Debug, ptr};
 
 use libafl_bolts::{ownedref::OwnedMutPtr, tuples::MatchName};
 use serde::{Deserialize, Serialize};
@@ -37,8 +37,8 @@ impl<A, B, OTA, OTB, DOT> DiffExecutor<A, B, OTA, OTB, DOT> {
             primary,
             secondary,
             observers: UnsafeCell::new(ProxyObserversTuple {
-                primary: OwnedMutPtr::Ptr(core::ptr::null_mut()),
-                secondary: OwnedMutPtr::Ptr(core::ptr::null_mut()),
+                primary: OwnedMutPtr::Ptr(ptr::null_mut()),
+                secondary: OwnedMutPtr::Ptr(ptr::null_mut()),
                 differential: observers,
             }),
         }
@@ -205,8 +205,8 @@ where
 
 impl<A, B, DOT> ProxyObserversTuple<A, B, DOT> {
     fn set(&mut self, primary: &A, secondary: &B) {
-        self.primary = OwnedMutPtr::Ptr(primary as *const A as *mut A);
-        self.secondary = OwnedMutPtr::Ptr(secondary as *const B as *mut B);
+        self.primary = OwnedMutPtr::Ptr(ptr::from_ref(primary) as *mut A);
+        self.secondary = OwnedMutPtr::Ptr(ptr::from_ref(secondary) as *mut B);
     }
 }
 

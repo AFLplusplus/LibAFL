@@ -62,22 +62,20 @@ impl Aggregator {
 
     /// takes the key and the ref to clients stats then aggregate them all.
     fn aggregate(&mut self, name: &str, client_stats: &[ClientStats]) {
-        let mut gather = vec![];
+        let mut gather = client_stats
+            .iter()
+            .filter_map(|client| client.user_monitor.get(name));
 
-        for client in client_stats {
-            if let Some(x) = client.user_monitor.get(name) {
-                gather.push(x);
-            }
-        }
+        let gather_count = gather.clone().count();
 
-        let (mut init, op) = match gather.first() {
+        let (mut init, op) = match gather.next() {
             Some(x) => (x.value().clone(), x.aggregator_op().clone()),
             _ => {
                 return;
             }
         };
 
-        for item in gather.iter().skip(1) {
+        for item in gather {
             match op {
                 AggregatorOps::None => {
                     // Nothing
@@ -112,7 +110,7 @@ impl Aggregator {
 
         if let AggregatorOps::Avg = op {
             // if avg then divide last.
-            init = match init.stats_div(gather.len()) {
+            init = match init.stats_div(gather_count) {
                 Some(x) => x,
                 _ => {
                     return;
@@ -340,6 +338,8 @@ fn prettify_float(value: f64) -> String {
 /// A simple struct to keep track of client monitor
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ClientStats {
+    /// If this client is enabled. This is set to `true` the first time we see this client.
+    pub enabled: bool,
     // monitor (maybe we need a separated struct?)
     /// The corpus size for this client
     pub corpus_size: u64,
@@ -497,13 +497,21 @@ pub trait Monitor {
     fn set_start_time(&mut self, time: Duration);
 
     /// Show the monitor to the user
-    fn display(&mut self, event_msg: String, sender_id: ClientId);
+    fn display(&mut self, event_msg: &str, sender_id: ClientId);
 
     /// Amount of elements in the corpus (combined for all children)
     fn corpus_size(&self) -> u64 {
         self.client_stats()
             .iter()
             .fold(0_u64, |acc, x| acc + x.corpus_size)
+    }
+
+    /// Count the number of enabled client stats
+    fn client_stats_count(&self) -> usize {
+        self.client_stats()
+            .iter()
+            .filter(|client| client.enabled)
+            .count()
     }
 
     /// Amount of elements in the objectives (combined for all children)
@@ -538,13 +546,22 @@ pub trait Monitor {
 
     /// The client monitor for a specific id, creating new if it doesn't exist
     fn client_stats_insert(&mut self, client_id: ClientId) {
-        let client_stat_count = self.client_stats().len();
-        for _ in client_stat_count..(client_id.0 + 1) as usize {
+        let total_client_stat_count = self.client_stats().len();
+        for _ in total_client_stat_count..=(client_id.0) as usize {
             self.client_stats_mut().push(ClientStats {
-                last_window_time: current_time(),
-                start_time: current_time(),
+                enabled: false,
+                last_window_time: Duration::from_secs(0),
+                start_time: Duration::from_secs(0),
                 ..ClientStats::default()
             });
+        }
+        let new_stat = self.client_stats_mut_for(client_id);
+        if !new_stat.enabled {
+            let timestamp = current_time();
+            // I have never seen this man in my life
+            new_stat.start_time = timestamp;
+            new_stat.last_window_time = timestamp;
+            new_stat.enabled = true;
         }
     }
 
@@ -591,7 +608,8 @@ impl Monitor for NopMonitor {
         self.start_time = time;
     }
 
-    fn display(&mut self, _event_msg: String, _sender_id: ClientId) {}
+    #[inline]
+    fn display(&mut self, _event_msg: &str, _sender_id: ClientId) {}
 }
 
 impl NopMonitor {
@@ -660,7 +678,7 @@ impl Monitor for SimplePrintingMonitor {
         self.start_time = time;
     }
 
-    fn display(&mut self, event_msg: String, sender_id: ClientId) {
+    fn display(&mut self, event_msg: &str, sender_id: ClientId) {
         let mut userstats = self.client_stats()[sender_id.0 as usize]
             .user_monitor
             .iter()
@@ -672,7 +690,7 @@ impl Monitor for SimplePrintingMonitor {
             event_msg,
             sender_id.0,
             format_duration_hms(&(current_time() - self.start_time)),
-            self.client_stats().len(),
+            self.client_stats_count(),
             self.corpus_size(),
             self.objective_size(),
             self.total_execs(),
@@ -698,7 +716,7 @@ impl Monitor for SimplePrintingMonitor {
 #[derive(Clone)]
 pub struct SimpleMonitor<F>
 where
-    F: FnMut(String),
+    F: FnMut(&str),
 {
     print_fn: F,
     start_time: Duration,
@@ -708,7 +726,7 @@ where
 
 impl<F> Debug for SimpleMonitor<F>
 where
-    F: FnMut(String),
+    F: FnMut(&str),
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SimpleMonitor")
@@ -720,7 +738,7 @@ where
 
 impl<F> Monitor for SimpleMonitor<F>
 where
-    F: FnMut(String),
+    F: FnMut(&str),
 {
     /// the client monitor, mutable
     fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
@@ -742,13 +760,13 @@ where
         self.start_time = time;
     }
 
-    fn display(&mut self, event_msg: String, sender_id: ClientId) {
+    fn display(&mut self, event_msg: &str, sender_id: ClientId) {
         let mut fmt = format!(
             "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             event_msg,
             sender_id.0,
             format_duration_hms(&(current_time() - self.start_time)),
-            self.client_stats().len(),
+            self.client_stats_count(),
             self.corpus_size(),
             self.objective_size(),
             self.total_execs(),
@@ -763,7 +781,7 @@ where
             }
         }
 
-        (self.print_fn)(fmt);
+        (self.print_fn)(&fmt);
 
         // Only print perf monitor if the feature is enabled
         #[cfg(feature = "introspection")]
@@ -773,17 +791,17 @@ where
                 "Client {:03}:\n{}",
                 sender_id.0, self.client_stats[sender_id.0 as usize].introspection_monitor
             );
-            (self.print_fn)(fmt);
+            (self.print_fn)(&fmt);
 
             // Separate the spacing just a bit
-            (self.print_fn)(String::new());
+            (self.print_fn)("");
         }
     }
 }
 
 impl<F> SimpleMonitor<F>
 where
-    F: FnMut(String),
+    F: FnMut(&str),
 {
     /// Creates the monitor, using the `current_time` as `start_time`.
     pub fn new(print_fn: F) -> Self {
@@ -1210,9 +1228,9 @@ impl ClientPerfMonitor {
 }
 
 #[cfg(feature = "introspection")]
-impl core::fmt::Display for ClientPerfMonitor {
+impl fmt::Display for ClientPerfMonitor {
     #[allow(clippy::cast_precision_loss)]
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         // Calculate the elapsed time from the monitor
         let elapsed: f64 = self.elapsed_cycles() as f64;
 
@@ -1290,10 +1308,10 @@ impl Default for ClientPerfMonitor {
 }
 /// `Monitor` Python bindings
 #[cfg(feature = "python")]
-#[allow(clippy::unnecessary_fallible_conversions)]
+#[allow(clippy::unnecessary_fallible_conversions, unused_qualifications)]
 #[allow(missing_docs)]
 pub mod pybind {
-    use alloc::{boxed::Box, string::String, vec::Vec};
+    use alloc::{boxed::Box, vec::Vec};
     use core::time::Duration;
 
     use libafl_bolts::ClientId;
@@ -1302,13 +1320,16 @@ pub mod pybind {
     use super::ClientStats;
     use crate::monitors::{Monitor, SimpleMonitor};
 
+    /// A [`SimpleMonitor`] type with a boxed `FnMut` for printing
+    pub type SimpleBoxedFnMonitor = SimpleMonitor<Box<dyn FnMut(&str)>>;
+
     // TODO create a PyObjectFnMut to pass, track stabilization of https://github.com/rust-lang/rust/issues/29625
 
     #[pyclass(unsendable, name = "SimpleMonitor")]
     /// Python class for SimpleMonitor
     pub struct PythonSimpleMonitor {
         /// Rust wrapped SimpleMonitor object
-        pub inner: SimpleMonitor<Box<dyn FnMut(String)>>,
+        pub inner: SimpleBoxedFnMonitor,
         print_fn: PyObject,
     }
 
@@ -1323,9 +1344,9 @@ pub mod pybind {
     impl Clone for PythonSimpleMonitor {
         fn clone(&self) -> PythonSimpleMonitor {
             let py_print_fn = self.print_fn.clone();
-            let closure = move |s: String| {
+            let closure = move |s: &str| {
                 Python::with_gil(|py| -> PyResult<()> {
-                    py_print_fn.call1(py, (PyUnicode::new(py, &s),))?;
+                    py_print_fn.call1(py, (PyUnicode::new(py, s),))?;
                     Ok(())
                 })
                 .unwrap();
@@ -1348,9 +1369,9 @@ pub mod pybind {
         #[new]
         fn new(py_print_fn: PyObject) -> Self {
             let py_print_fn1 = py_print_fn.clone();
-            let closure = move |s: String| {
+            let closure = move |s: &str| {
                 Python::with_gil(|py| -> PyResult<()> {
-                    py_print_fn1.call1(py, (PyUnicode::new(py, &s),))?;
+                    py_print_fn1.call1(py, (PyUnicode::new(py, s),))?;
                     Ok(())
                 })
                 .unwrap();
@@ -1407,15 +1428,13 @@ pub mod pybind {
     impl Monitor for PythonMonitor {
         fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
             let ptr = unwrap_me_mut!(self.wrapper, m, {
-                m.client_stats_mut() as *mut Vec<ClientStats>
+                core::ptr::from_mut(m.client_stats_mut())
             });
             unsafe { ptr.as_mut().unwrap() }
         }
 
         fn client_stats(&self) -> &[ClientStats] {
-            let ptr = unwrap_me!(self.wrapper, m, {
-                m.client_stats() as *const [ClientStats]
-            });
+            let ptr = unwrap_me!(self.wrapper, m, { core::ptr::from_ref(m.client_stats()) });
             unsafe { ptr.as_ref().unwrap() }
         }
 
@@ -1429,7 +1448,7 @@ pub mod pybind {
             unwrap_me_mut!(self.wrapper, m, { m.set_start_time(time) });
         }
 
-        fn display(&mut self, event_msg: String, sender_id: ClientId) {
+        fn display(&mut self, event_msg: &str, sender_id: ClientId) {
             unwrap_me_mut!(self.wrapper, m, { m.display(event_msg, sender_id) });
         }
     }

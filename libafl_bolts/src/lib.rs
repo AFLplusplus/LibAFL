@@ -29,7 +29,8 @@
     clippy::missing_docs_in_private_items,
     clippy::module_name_repetitions,
     clippy::ptr_cast_constness,
-    clippy::negative_feature_names
+    clippy::negative_feature_names,
+    clippy::too_many_lines
 )]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
@@ -211,7 +212,6 @@ pub mod launcher {}
 use core::{
     array::TryFromSliceError,
     fmt::{self, Display},
-    iter::Iterator,
     num::{ParseIntError, TryFromIntError},
     time,
 };
@@ -226,6 +226,9 @@ use {
     core::cell::{BorrowError, BorrowMutError},
     core::str::Utf8Error,
 };
+
+/// Localhost addr, this is used, for example, for LLMP Client, which connects to this address
+pub const IP_LOCALHOST: &str = "127.0.0.1";
 
 /// We need fixed names for many parts of this lib.
 pub trait Named {
@@ -296,9 +299,6 @@ pub enum Error {
     /// Compression error
     #[cfg(feature = "gzip")]
     Compression(ErrorBacktrace),
-    /// File related error
-    #[cfg(feature = "std")]
-    File(io::Error, ErrorBacktrace),
     /// Optional val was supposed to be set, but isn't.
     EmptyOptional(String, ErrorBacktrace),
     /// Key not in Map
@@ -317,6 +317,9 @@ pub enum Error {
     Unsupported(String, ErrorBacktrace),
     /// Shutting down, not really an error.
     ShuttingDown,
+    /// OS error, wrapping a [`std::io::Error`]
+    #[cfg(feature = "std")]
+    OsError(io::Error, String, ErrorBacktrace),
     /// Something else happened
     Unknown(String, ErrorBacktrace),
 }
@@ -335,12 +338,6 @@ impl Error {
     #[must_use]
     pub fn compression() -> Self {
         Error::Compression(ErrorBacktrace::new())
-    }
-    #[cfg(feature = "std")]
-    /// File related error
-    #[must_use]
-    pub fn file(arg: io::Error) -> Self {
-        Error::File(arg, ErrorBacktrace::new())
     }
     /// Optional val was supposed to be set, but isn't.
     #[must_use]
@@ -411,6 +408,28 @@ impl Error {
     {
         Error::Unsupported(arg.into(), ErrorBacktrace::new())
     }
+    /// OS error with additional message
+    #[cfg(feature = "std")]
+    #[must_use]
+    pub fn os_error<S>(err: io::Error, msg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::OsError(err, msg.into(), ErrorBacktrace::new())
+    }
+    /// OS error from [`std::io::Error::last_os_error`] with additional message
+    #[cfg(feature = "std")]
+    #[must_use]
+    pub fn last_os_error<S>(msg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::OsError(
+            io::Error::last_os_error(),
+            msg.into(),
+            ErrorBacktrace::new(),
+        )
+    }
     /// Something else happened
     #[must_use]
     pub fn unknown<S>(arg: S) -> Self
@@ -433,17 +452,12 @@ impl Display for Error {
                 write!(f, "Error in decompression")?;
                 display_error_backtrace(f, b)
             }
-            #[cfg(feature = "std")]
-            Self::File(err, b) => {
-                write!(f, "File IO failed: {:?}", &err)?;
-                display_error_backtrace(f, b)
-            }
             Self::EmptyOptional(s, b) => {
                 write!(f, "Optional value `{0}` was not set", &s)?;
                 display_error_backtrace(f, b)
             }
             Self::KeyNotFound(s, b) => {
-                write!(f, "Key `{0}` not in Corpus", &s)?;
+                write!(f, "Key: `{0}` - not found", &s)?;
                 display_error_backtrace(f, b)
             }
             Self::Empty(s, b) => {
@@ -475,6 +489,11 @@ impl Display for Error {
                 display_error_backtrace(f, b)
             }
             Self::ShuttingDown => write!(f, "Shutting down!"),
+            #[cfg(feature = "std")]
+            Self::OsError(err, s, b) => {
+                write!(f, "OS error: {0}: {1}", &s, err)?;
+                display_error_backtrace(f, b)
+            }
             Self::Unknown(s, b) => {
                 write!(f, "Unknown error: {0}", &s)?;
                 display_error_backtrace(f, b)
@@ -528,7 +547,7 @@ impl From<nix::Error> for Error {
 #[cfg(feature = "std")]
 impl From<io::Error> for Error {
     fn from(err: io::Error) -> Self {
-        Self::file(err)
+        Self::os_error(err, "io::Error ocurred")
     }
 }
 
@@ -738,6 +757,14 @@ pub trait HasLen {
     }
 }
 
+#[cfg(feature = "alloc")]
+impl<T> HasLen for Vec<T> {
+    #[inline]
+    fn len(&self) -> usize {
+        Vec::<T>::len(self)
+    }
+}
+
 /// Has a ref count
 pub trait HasRefCnt {
     /// The ref count
@@ -849,8 +876,9 @@ impl log::Log for SimpleStdoutLogger {
 
     fn log(&self, record: &Record) {
         println!(
-            "[{:?}] {}: {}",
+            "[{:?}, {:?}] {}: {}",
             current_time(),
+            std::process::id(),
             record.level(),
             record.args()
         );
@@ -895,8 +923,9 @@ impl log::Log for SimpleStderrLogger {
 
     fn log(&self, record: &Record) {
         eprintln!(
-            "[{:?}] {}: {}",
+            "[{:?}, {:?}] {}: {}",
             current_time(),
+            std::process::id(),
             record.level(),
             record.args()
         );
@@ -959,8 +988,9 @@ impl log::Log for SimpleFdLogger {
         let mut f = unsafe { File::from_raw_fd(self.fd) };
         writeln!(
             f,
-            "[{:?}] {}: {}",
+            "[{:?}, {:#?}] {}: {}",
             current_time(),
+            std::process::id(),
             record.level(),
             record.args()
         )
@@ -977,6 +1007,7 @@ impl log::Log for SimpleFdLogger {
 /// # Safety
 /// The function is arguably safe, but it might have undesirable side effects since it closes `stdout` and `stderr`.
 #[cfg(all(unix, feature = "std"))]
+#[allow(unused_qualifications)]
 pub unsafe fn dup_and_mute_outputs() -> Result<(RawFd, RawFd), Error> {
     let old_stdout = stdout().as_raw_fd();
     let old_stderr = stderr().as_raw_fd();
@@ -1003,7 +1034,7 @@ pub unsafe fn set_error_print_panic_hook(new_stderr: RawFd) {
         let mut f = unsafe { File::from_raw_fd(new_stderr) };
         writeln!(f, "{panic_info}",)
             .unwrap_or_else(|err| println!("Failed to log to fd {new_stderr}: {err}"));
-        std::mem::forget(f);
+        mem::forget(f);
     }));
 }
 

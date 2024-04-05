@@ -12,8 +12,7 @@ edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 [package.metadata.docs.rs]
-features = ["document-features"]
-all-features = true
+features = ["document-features", "default", "python", "x86_64", "usermode"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
@@ -26,7 +25,7 @@ document-features = ["dep:document-features"]
 ## Find injections during fuzzing
 injections = ["serde_yaml", "toml"]
 ## Python bindings support
-python = ["pyo3", "pyo3-build-config"]
+python = ["pyo3", "pyo3-build-config", "libafl_qemu_sys/python"]
 ## Fork support
 fork = ["libafl/fork"]
 ## Build libqasan for address sanitization
@@ -56,8 +55,10 @@ systemmode = ["libafl_qemu_sys/systemmode"]
 ## Automatically register all `#[derive(SerdeAny)]` types at startup.
 serdeany_autoreg = ["libafl_bolts/serdeany_autoreg"]
 
-## Automatically register all `#[derive(SerdeAny)]` types at startup.
 slirp = [ "systemmode", "libafl_qemu_sys/slirp" ] # build qemu with host libslirp (for user networking)
+
+# disabled atm, enabled when fixed with dynamic list
+# shared = [ "libafl_qemu_sys/shared" ]
 
 [dependencies]
 libafl = { path = "../libafl", version = "0.12.0", default-features = false, features = ["std", "derive", "regex"] }
@@ -93,6 +94,7 @@ document-features = { version = "0.2", optional = true }
 [build-dependencies]
 pyo3-build-config = { version = "0.18", optional = true }
 rustversion = "1.0"
+bindgen = "0.69"
 
 [lib]
 name = "libafl_qemu"

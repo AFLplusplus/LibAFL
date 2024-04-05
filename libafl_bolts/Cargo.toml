@@ -63,6 +63,13 @@ xxh3 = ["xxhash-rust"]
 
 #! ### SerdeAny features
 
+## With this feature, the AnyMap uses [`type_name`](https://doc.rust-lang.org/std/any/fn.type_name.html)
+## instead of [`TypeId::of`](https://doc.rust-lang.org/std/any/struct.TypeId.html#method.of) for deserialization.
+## With this feature, stored state may remain deserializable across multiple compilations of LibAFL.
+## This is **unsafe** and may lead to type confusions. Only use when you know what you are doing/ you have tests in place.
+## The rust doc specifically states that "multiple types may map to the same type name"!
+unsafe_stable_anymap = []
+
 ## Automatically register all `#[derive(SerdeAny)]` types at startup.
 serdeany_autoreg = ["ctor"]
 
@@ -76,7 +83,7 @@ llmp_bind_public = ["alloc"]
 llmp_compression = ["alloc", "gzip"]
 
 ## Enables debug output for LLMP (also needs a `logger` installed)
-llmp_debug = ["alloc"]
+llmp_debug = ["alloc", "std"]
 
 ## Reduces the initial map size for llmp
 llmp_small_maps = ["alloc"]
@@ -86,6 +93,7 @@ rustversion = "1.0"
 
 [dependencies]
 libafl_derive = { version = "0.12.0", optional = true, path = "../libafl_derive" }
+static_assertions = "1.1.0"
 
 rustversion = "1.0"
 tuple_list = { version = "0.1.3" }
@@ -103,9 +111,9 @@ serde_json = { version = "1.0", optional = true, default-features = false, featu
 miniz_oxide = { version = "0.7.1", optional = true}
 hostname = { version = "^0.3", optional = true } # Is there really no gethostname in the stdlib?
 rand_core = { version = "0.6", optional = true }
-nix = { version = "0.26", default-features = false, optional = true, features = ["signal", "socket", "poll"] }
+nix = { version = "0.27", default-features = false, optional = true, features = ["signal", "socket", "poll"] }
 uuid = { version = "1.4", optional = true, features = ["serde", "v4"] }
-clap = {version = "4.0", features = ["derive", "wrap_help"], optional = true} # CLI parsing, for libafl_bolts::cli / the `cli` feature
+clap = {version = "4.5", features = ["derive", "wrap_help"], optional = true} # CLI parsing, for libafl_bolts::cli / the `cli` feature
 log = "0.4.20"
 
 pyo3 = { version = "0.18", optional = true, features = ["serde", "macros"] }

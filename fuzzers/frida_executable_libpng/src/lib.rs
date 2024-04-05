@@ -48,7 +48,7 @@ pub unsafe extern "C" fn __libc_start_main(
         ORIG_MAIN = main;
 
         let orig_libc_start_main_addr: *mut c_void =
-            dlsym(RTLD_NEXT, "__libc_start_main\0".as_ptr().cast::<i8>());
+            dlsym(RTLD_NEXT, c"__libc_start_main".as_ptr());
 
         let orig_libc_start_main: LibcStartMainFunc = transmute(orig_libc_start_main_addr);
 

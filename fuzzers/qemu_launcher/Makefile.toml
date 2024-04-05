@@ -163,7 +163,8 @@ mkdir ${TARGET_DIR}/build-png/
 
 cd ${TARGET_DIR}/build-png/ && \
     CC=$CROSS_CC \
-    CFLAGS="${CROSS_CFLAGS} -I"${TARGET_DIR}/build-zlib/zlib/lib"" \
+    CFLAGS="${CROSS_CFLAGS}" \
+    CPPFLAGS="-I${TARGET_DIR}/build-zlib/zlib/include" \
     LDFLAGS=-L"${TARGET_DIR}/build-zlib/zlib/lib" \
     ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/libpng-1.6.37/configure \
         --enable-shared=no \
@@ -212,7 +213,7 @@ ${CROSS_CXX} \
 	"${TARGET_DIR}/build-zlib/libz.a" \
     -I"${TARGET_DIR}/build-png" \
     -I"${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/libpng-1.6.37" \
-	-I"${TARGET_DIR}/build-zlib/zlib/lib" \
+	-I"${TARGET_DIR}/build-zlib/zlib/include" \
 	-L"${TARGET_DIR}/build-zlib/zlib/lib" \
     -o"${TARGET_DIR}/libpng-harness-${CARGO_MAKE_PROFILE}" \
     -lm \

@@ -5,6 +5,7 @@ use std::{
 };
 
 use libafl::{inputs::UsesInput, state::HasMetadata};
+use libafl_qemu_sys::{GuestAddr, MmapPerms};
 use meminterval::{Interval, IntervalTree};
 use thread_local::ThreadLocal;
 
@@ -23,18 +24,18 @@ use crate::SYS_mmap2;
 use crate::SYS_newfstatat;
 use crate::{
     asan::QemuAsanHelper,
-    emu::{Emulator, MmapPerms, SyscallHookResult},
+    emu::SyscallHookResult,
     helper::{QemuHelper, QemuHelperTuple},
     hooks::{Hook, QemuHooks},
-    GuestAddr, SYS_fstat, SYS_fstatfs, SYS_futex, SYS_getrandom, SYS_mprotect, SYS_mremap,
-    SYS_munmap, SYS_pread64, SYS_read, SYS_readlinkat, SYS_statfs,
+    Qemu, SYS_fstat, SYS_fstatfs, SYS_futex, SYS_getrandom, SYS_mprotect, SYS_mremap, SYS_munmap,
+    SYS_pread64, SYS_read, SYS_readlinkat, SYS_statfs,
 };
 
-// TODO use the functions provided by Emulator
+// TODO use the functions provided by Qemu
 pub const SNAPSHOT_PAGE_SIZE: usize = 4096;
 pub const SNAPSHOT_PAGE_MASK: GuestAddr = !(SNAPSHOT_PAGE_SIZE as GuestAddr - 1);
 
-pub type StopExecutionCallback = Box<dyn FnMut(&mut QemuSnapshotHelper, &Emulator)>;
+pub type StopExecutionCallback = Box<dyn FnMut(&mut QemuSnapshotHelper, &Qemu)>;
 
 #[derive(Debug)]
 pub struct SnapshotPageInfo {
@@ -136,11 +137,11 @@ impl QemuSnapshotHelper {
     }
 
     #[allow(clippy::uninit_assumed_init)]
-    pub fn snapshot(&mut self, emulator: &Emulator) {
-        self.brk = emulator.get_brk();
-        self.mmap_start = emulator.get_mmap_start();
+    pub fn snapshot(&mut self, qemu: Qemu) {
+        self.brk = qemu.get_brk();
+        self.mmap_start = qemu.get_mmap_start();
         self.pages.clear();
-        for map in emulator.mappings() {
+        for map in qemu.mappings() {
             let mut addr = map.start();
             while addr < map.end() {
                 let mut info = SnapshotPageInfo {
@@ -149,11 +150,11 @@ impl QemuSnapshotHelper {
                     private: map.is_priv(),
                     data: None,
                 };
-                if map.flags().is_r() {
+                if map.flags().readable() {
                     // TODO not just for R pages
                     unsafe {
                         info.data = Some(Box::new(core::mem::zeroed()));
-                        emulator.read_mem(addr, &mut info.data.as_mut().unwrap()[..]);
+                        qemu.read_mem(addr, &mut info.data.as_mut().unwrap()[..]);
                     }
                 }
                 self.pages.insert(addr, info);
@@ -208,7 +209,7 @@ impl QemuSnapshotHelper {
         }
     }
 
-    pub fn reset(&mut self, emulator: &Emulator) {
+    pub fn reset(&mut self, qemu: Qemu) {
         {
             let new_maps = self.new_maps.get_mut().unwrap();
 
@@ -223,8 +224,8 @@ impl QemuSnapshotHelper {
                                 .tree
                                 .query_mut(*page..(page + SNAPSHOT_PAGE_SIZE as GuestAddr))
                             {
-                                if !entry.value.perms.unwrap_or(MmapPerms::None).is_w() {
-                                    drop(emulator.mprotect(
+                                if !entry.value.perms.unwrap_or(MmapPerms::None).writable() {
+                                    drop(qemu.mprotect(
                                         entry.interval.start,
                                         (entry.interval.end - entry.interval.start) as usize,
                                         MmapPerms::ReadWrite,
@@ -239,7 +240,7 @@ impl QemuSnapshotHelper {
                                 return true; // Restore later
                             }
 
-                            unsafe { emulator.write_mem(*page, &data[..]) };
+                            unsafe { qemu.write_mem(*page, &data[..]) };
                         } else {
                             panic!("Cannot restored a dirty but unsaved page");
                         }
@@ -249,7 +250,7 @@ impl QemuSnapshotHelper {
             }
         }
 
-        self.reset_maps(emulator);
+        self.reset_maps(qemu);
 
         // This one is after that we remapped potential regions mapped at snapshot time but unmapped during execution
         for acc in &mut self.accesses {
@@ -259,9 +260,10 @@ impl QemuSnapshotHelper {
                     .tree
                     .query_mut(*page..(page + SNAPSHOT_PAGE_SIZE as GuestAddr))
                 {
-                    if !entry.value.perms.unwrap_or(MmapPerms::None).is_w() && !entry.value.changed
+                    if !entry.value.perms.unwrap_or(MmapPerms::None).writable()
+                        && !entry.value.changed
                     {
-                        drop(emulator.mprotect(
+                        drop(qemu.mprotect(
                             entry.interval.start,
                             (entry.interval.end - entry.interval.start) as usize,
                             MmapPerms::ReadWrite,
@@ -273,7 +275,7 @@ impl QemuSnapshotHelper {
                 if let Some(info) = self.pages.get_mut(page) {
                     // TODO avoid duplicated memcpy
                     if let Some(data) = info.data.as_ref() {
-                        unsafe { emulator.write_mem(*page, &data[..]) };
+                        unsafe { qemu.write_mem(*page, &data[..]) };
                     } else {
                         panic!("Cannot restored a dirty but unsaved page");
                     }
@@ -284,7 +286,7 @@ impl QemuSnapshotHelper {
 
         for entry in self.maps.tree.query_mut(0..GuestAddr::MAX) {
             if entry.value.changed {
-                drop(emulator.mprotect(
+                drop(qemu.mprotect(
                     entry.interval.start,
                     (entry.interval.end - entry.interval.start) as usize,
                     entry.value.perms.unwrap(),
@@ -293,8 +295,8 @@ impl QemuSnapshotHelper {
             }
         }
 
-        emulator.set_brk(self.brk);
-        emulator.set_mmap_start(self.mmap_start);
+        qemu.set_brk(self.brk);
+        qemu.set_mmap_start(self.mmap_start);
     }
 
     pub fn is_unmap_allowed(&mut self, start: GuestAddr, mut size: usize) -> bool {
@@ -331,8 +333,8 @@ impl QemuSnapshotHelper {
 
         if self.mmap_limit != 0 && total_size > self.mmap_limit {
             let mut cb = self.stop_execution.take().unwrap();
-            let emu = Emulator::get().unwrap();
-            (cb)(self, &emu);
+            let qemu = Qemu::get().unwrap();
+            (cb)(self, &qemu);
             self.stop_execution = Some(cb);
         }
     }
@@ -425,7 +427,7 @@ impl QemuSnapshotHelper {
         }
     }
 
-    pub fn reset_maps(&mut self, emulator: &Emulator) {
+    pub fn reset_maps(&mut self, qemu: Qemu) {
         let new_maps = self.new_maps.get_mut().unwrap();
 
         for entry in self.maps.tree.query(0..GuestAddr::MAX) {
@@ -440,14 +442,14 @@ impl QemuSnapshotHelper {
 
             if found.is_empty() {
                 //panic!("A pre-snapshot memory region was unmapped");
-                drop(emulator.map_fixed(
+                drop(qemu.map_fixed(
                     entry.interval.start,
                     (entry.interval.end - entry.interval.start) as usize,
                     entry.value.perms.unwrap(),
                 ));
             } else if found.len() == 1 && found[0].0 == *entry.interval {
                 if found[0].1 && found[0].2 != entry.value.perms {
-                    drop(emulator.mprotect(
+                    drop(qemu.mprotect(
                         entry.interval.start,
                         (entry.interval.end - entry.interval.start) as usize,
                         entry.value.perms.unwrap(),
@@ -455,20 +457,20 @@ impl QemuSnapshotHelper {
                 }
             } else {
                 //  TODO check for holes
-                drop(emulator.mprotect(
+                drop(qemu.mprotect(
                     entry.interval.start,
                     (entry.interval.end - entry.interval.start) as usize,
                     entry.value.perms.unwrap(),
                 ));
             }
 
-            for (i, _, _) in found {
+            for (i, ..) in found {
                 new_maps.tree.delete(i);
             }
         }
 
         for entry in new_maps.tree.query(0..GuestAddr::MAX) {
-            drop(emulator.unmap(
+            drop(qemu.unmap(
                 entry.interval.start,
                 (entry.interval.end - entry.interval.start) as usize,
             ));
@@ -510,11 +512,11 @@ where
         hooks.after_syscalls(Hook::Function(trace_mmap_snapshot::<QT, S>));
     }
 
-    fn pre_exec(&mut self, emulator: &Emulator, _input: &S::Input) {
+    fn pre_exec(&mut self, qemu: Qemu, _input: &S::Input) {
         if self.empty {
-            self.snapshot(emulator);
+            self.snapshot(qemu);
         } else {
-            self.reset(emulator);
+            self.reset(qemu);
         }
     }
 }

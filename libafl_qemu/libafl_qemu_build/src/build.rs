@@ -8,7 +8,12 @@ use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "51abe6fbcc34a7a8f6a19f4dea219e6a05ccb15f";
+const QEMU_REVISION: &str = "f282d6aef5e28421255293ebbb52d835281f2730";
+
+pub struct BuildResult {
+    pub qemu_path: PathBuf,
+    pub build_dir: PathBuf,
+}
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
@@ -23,7 +28,7 @@ pub fn build(
     is_big_endian: bool,
     is_usermode: bool,
     jobs: Option<u32>,
-) -> (PathBuf, PathBuf) {
+) -> BuildResult {
     let mut cpu_target = cpu_target.to_string();
     // qemu-system-arm supports both big and little endian configurations and so
     // therefore the "be" feature should ignored in this configuration. Also
@@ -120,13 +125,19 @@ pub fn build(
         "softmmu".to_string()
     };
 
-    let output_lib = if is_usermode {
-        build_dir.join(format!("libqemu-{cpu_target}.so"))
+    let (output_lib, output_lib_link) = if is_usermode {
+        (
+            build_dir.join(format!("libqemu-{cpu_target}.so")),
+            format!("qemu-{cpu_target}"),
+        )
     } else {
-        build_dir.join(format!("libqemu-system-{cpu_target}.so"))
+        (
+            build_dir.join(format!("libqemu-system-{cpu_target}.so")),
+            format!("qemu-system-{cpu_target}"),
+        )
     };
 
-    println!("cargo:rerun-if-changed={}", output_lib.to_string_lossy());
+    // println!("cargo:rerun-if-changed={}", output_lib.to_string_lossy());
 
     if !output_lib.is_file() || (custom_qemu_dir.is_some() && !custom_qemu_no_build) {
         /*drop(
@@ -135,168 +146,150 @@ pub fn build(
                 .arg("distclean")
                 .status(),
         );*/
-        if is_usermode && !custom_qemu_no_configure {
-            let mut cmd = Command::new("./configure");
-            cmd.current_dir(&qemu_path)
-                //.arg("--as-static-lib")
-                .env("__LIBAFL_QEMU_BUILD_OUT", build_dir.join("linkinfo.json"))
-                .env("__LIBAFL_QEMU_BUILD_CC", cc_compiler.path())
-                .env("__LIBAFL_QEMU_BUILD_CXX", cpp_compiler.path())
-                .arg(&format!(
-                    "--cc={}",
-                    qemu_path.join("linker_interceptor.py").display()
-                ))
-                .arg(&format!(
-                    "--cxx={}",
-                    qemu_path.join("linker_interceptor++.py").display()
-                ))
-                .arg("--as-shared-lib")
-                .arg(&format!("--target-list={cpu_target}-{target_suffix}"))
-                .args([
-                    "--disable-bsd-user",
-                    "--disable-fdt",
-                    "--disable-system",
-                    "--disable-capstone",
-                ]);
-            if cfg!(feature = "debug_assertions") {
-                cmd.arg("--enable-debug");
-            }
-            cmd.status().expect("Configure failed");
-        } else if !custom_qemu_no_configure {
-            let mut cmd = Command::new("./configure");
-            cmd.current_dir(&qemu_path)
-                //.arg("--as-static-lib")
-                .env("__LIBAFL_QEMU_BUILD_OUT", build_dir.join("linkinfo.json"))
-                .env("__LIBAFL_QEMU_BUILD_CC", cc_compiler.path())
-                .env("__LIBAFL_QEMU_BUILD_CXX", cpp_compiler.path())
-                .arg(&format!(
-                    "--cc={}",
-                    qemu_path.join("linker_interceptor.py").display()
-                ))
-                .arg(&format!(
-                    "--cxx={}",
-                    qemu_path.join("linker_interceptor++.py").display()
-                ))
-                .arg("--as-shared-lib")
-                .arg(&format!("--target-list={cpu_target}-{target_suffix}"))
-                .arg(if cfg!(feature = "slirp") {
-                    "--enable-slirp"
-                } else {
-                    "--disable-slirp"
-                })
-                .arg("--enable-fdt=internal")
-                .arg("--audio-drv-list=")
-                .arg("--disable-alsa")
-                .arg("--disable-attr")
-                .arg("--disable-auth-pam")
-                .arg("--disable-dbus-display")
-                .arg("--disable-bochs")
-                .arg("--disable-bpf")
-                .arg("--disable-brlapi")
-                .arg("--disable-bsd-user")
-                .arg("--disable-bzip2")
-                .arg("--disable-capstone")
-                .arg("--disable-cap-ng")
-                .arg("--disable-canokey")
-                .arg("--disable-cloop")
-                .arg("--disable-cocoa")
-                .arg("--disable-coreaudio")
-                .arg("--disable-curl")
-                .arg("--disable-curses")
-                .arg("--disable-dmg")
-                .arg("--disable-docs")
-                .arg("--disable-dsound")
-                .arg("--disable-fuse")
-                .arg("--disable-fuse-lseek")
-                .arg("--disable-gcrypt")
-                .arg("--disable-gettext")
-                .arg("--disable-gio")
-                .arg("--disable-glusterfs")
-                .arg("--disable-gnutls")
-                .arg("--disable-gtk")
-                .arg("--disable-guest-agent")
-                .arg("--disable-guest-agent-msi")
-                .arg("--disable-hvf")
-                .arg("--disable-iconv")
-                .arg("--disable-jack")
-                .arg("--disable-keyring")
-                .arg("--disable-kvm")
-                .arg("--disable-libdaxctl")
-                .arg("--disable-libiscsi")
-                .arg("--disable-libnfs")
-                .arg("--disable-libpmem")
-                .arg("--disable-libssh")
-                .arg("--disable-libudev")
-                .arg("--disable-libusb")
-                .arg("--disable-linux-aio")
-                .arg("--disable-linux-io-uring")
-                .arg("--disable-linux-user")
-                .arg("--disable-live-block-migration")
-                .arg("--disable-lzfse")
-                .arg("--disable-lzo")
-                .arg("--disable-l2tpv3")
-                .arg("--disable-malloc-trim")
-                .arg("--disable-mpath")
-                .arg("--disable-multiprocess")
-                .arg("--disable-netmap")
-                .arg("--disable-nettle")
-                .arg("--disable-numa")
-                .arg("--disable-nvmm")
-                .arg("--disable-opengl")
-                .arg("--disable-oss")
-                .arg("--disable-pa")
-                .arg("--disable-parallels")
-                .arg("--disable-png")
-                .arg("--disable-pvrdma")
-                .arg("--disable-qcow1")
-                .arg("--disable-qed")
-                .arg("--disable-qga-vss")
-                .arg("--disable-rbd")
-                .arg("--disable-rdma")
-                .arg("--disable-replication")
-                .arg("--disable-sdl")
-                .arg("--disable-sdl-image")
-                .arg("--disable-seccomp")
-                .arg("--disable-selinux")
-                .arg("--disable-slirp-smbd")
-                .arg("--disable-smartcard")
-                .arg("--disable-snappy")
-                .arg("--disable-sndio")
-                .arg("--disable-sparse")
-                .arg("--disable-spice")
-                .arg("--disable-spice-protocol")
-                .arg("--disable-tools")
-                .arg("--disable-tpm")
-                .arg("--disable-usb-redir")
-                .arg("--disable-user")
-                .arg("--disable-u2f")
-                .arg("--disable-vde")
-                .arg("--disable-vdi")
-                .arg("--disable-vduse-blk-export")
-                .arg("--disable-vhost-crypto")
-                .arg("--disable-vhost-kernel")
-                .arg("--disable-vhost-net")
-                .arg("--disable-vhost-user-blk-server")
-                .arg("--disable-vhost-vdpa")
-                .arg("--disable-virglrenderer")
-                .arg("--disable-virtfs")
-                .arg("--disable-vmnet")
-                .arg("--disable-vnc")
-                .arg("--disable-vnc-jpeg")
-                .arg("--disable-vnc-sasl")
-                .arg("--disable-vte")
-                .arg("--disable-vvfat")
-                .arg("--disable-whpx")
-                .arg("--disable-xen")
-                .arg("--disable-xen-pci-passthrough")
-                .arg("--disable-xkbcommon")
-                .arg("--disable-zstd")
-                .arg("--disable-tests");
-            if cfg!(feature = "debug_assertions") {
-                cmd.arg("--enable-debug");
-            }
-            cmd.status().expect("Configure failed");
+        let mut cmd = Command::new("./configure");
+        cmd.current_dir(&qemu_path)
+            //.arg("--as-static-lib")
+            .env("__LIBAFL_QEMU_BUILD_OUT", build_dir.join("linkinfo.json"))
+            .env("__LIBAFL_QEMU_BUILD_CC", cc_compiler.path())
+            .env("__LIBAFL_QEMU_BUILD_CXX", cpp_compiler.path())
+            .arg(&format!(
+                "--cc={}",
+                qemu_path.join("linker_interceptor.py").display()
+            ))
+            .arg(&format!(
+                "--cxx={}",
+                qemu_path.join("linker_interceptor++.py").display()
+            ))
+            .arg("--as-shared-lib")
+            .arg(&format!("--target-list={cpu_target}-{target_suffix}"));
+        if cfg!(feature = "debug_assertions") {
+            cmd.arg("--enable-debug");
         }
+        if is_usermode && !custom_qemu_no_configure {
+            cmd.args([
+                "--disable-bsd-user",
+                "--disable-fdt",
+                "--disable-system",
+                "--disable-capstone",
+            ]);
+        } else if !custom_qemu_no_configure {
+            cmd.arg(if cfg!(feature = "slirp") {
+                "--enable-slirp"
+            } else {
+                "--disable-slirp"
+            })
+            .arg("--enable-fdt=internal")
+            .arg("--audio-drv-list=")
+            .arg("--disable-af-xdp")
+            .arg("--disable-alsa")
+            .arg("--disable-attr")
+            .arg("--disable-auth-pam")
+            .arg("--disable-dbus-display")
+            .arg("--disable-bochs")
+            .arg("--disable-bpf")
+            .arg("--disable-brlapi")
+            .arg("--disable-bsd-user")
+            .arg("--disable-bzip2")
+            .arg("--disable-capstone")
+            .arg("--disable-cap-ng")
+            .arg("--disable-canokey")
+            .arg("--disable-cloop")
+            .arg("--disable-cocoa")
+            .arg("--disable-coreaudio")
+            .arg("--disable-curl")
+            .arg("--disable-curses")
+            .arg("--disable-dmg")
+            .arg("--disable-docs")
+            .arg("--disable-dsound")
+            .arg("--disable-fuse")
+            .arg("--disable-fuse-lseek")
+            .arg("--disable-gcrypt")
+            .arg("--disable-gettext")
+            .arg("--disable-gio")
+            .arg("--disable-glusterfs")
+            .arg("--disable-gnutls")
+            .arg("--disable-gtk")
+            .arg("--disable-guest-agent")
+            .arg("--disable-guest-agent-msi")
+            .arg("--disable-hvf")
+            .arg("--disable-iconv")
+            .arg("--disable-jack")
+            .arg("--disable-keyring")
+            .arg("--disable-kvm")
+            .arg("--disable-libdaxctl")
+            .arg("--disable-libiscsi")
+            .arg("--disable-libnfs")
+            .arg("--disable-libpmem")
+            .arg("--disable-libssh")
+            .arg("--disable-libudev")
+            .arg("--disable-libusb")
+            .arg("--disable-linux-aio")
+            .arg("--disable-linux-io-uring")
+            .arg("--disable-linux-user")
+            .arg("--disable-live-block-migration")
+            .arg("--disable-lzfse")
+            .arg("--disable-lzo")
+            .arg("--disable-l2tpv3")
+            .arg("--disable-malloc-trim")
+            .arg("--disable-mpath")
+            .arg("--disable-multiprocess")
+            .arg("--disable-netmap")
+            .arg("--disable-nettle")
+            .arg("--disable-numa")
+            .arg("--disable-nvmm")
+            .arg("--disable-opengl")
+            .arg("--disable-oss")
+            .arg("--disable-pa")
+            .arg("--disable-parallels")
+            .arg("--disable-png")
+            .arg("--disable-pvrdma")
+            .arg("--disable-qcow1")
+            .arg("--disable-qed")
+            .arg("--disable-qga-vss")
+            .arg("--disable-rbd")
+            .arg("--disable-rdma")
+            .arg("--disable-replication")
+            .arg("--disable-sdl")
+            .arg("--disable-sdl-image")
+            .arg("--disable-seccomp")
+            .arg("--disable-selinux")
+            .arg("--disable-slirp-smbd")
+            .arg("--disable-smartcard")
+            .arg("--disable-snappy")
+            .arg("--disable-sndio")
+            .arg("--disable-sparse")
+            .arg("--disable-spice")
+            .arg("--disable-spice-protocol")
+            .arg("--disable-tools")
+            .arg("--disable-tpm")
+            .arg("--disable-usb-redir")
+            .arg("--disable-user")
+            .arg("--disable-u2f")
+            .arg("--disable-vde")
+            .arg("--disable-vdi")
+            .arg("--disable-vduse-blk-export")
+            .arg("--disable-vhost-crypto")
+            .arg("--disable-vhost-kernel")
+            .arg("--disable-vhost-net")
+            .arg("--disable-vhost-user-blk-server")
+            .arg("--disable-vhost-vdpa")
+            .arg("--disable-virglrenderer")
+            .arg("--disable-virtfs")
+            .arg("--disable-vmnet")
+            .arg("--disable-vnc")
+            .arg("--disable-vnc-jpeg")
+            .arg("--disable-vnc-sasl")
+            .arg("--disable-vte")
+            .arg("--disable-vvfat")
+            .arg("--disable-whpx")
+            .arg("--disable-xen")
+            .arg("--disable-xen-pci-passthrough")
+            .arg("--disable-xkbcommon")
+            .arg("--disable-zstd")
+            .arg("--disable-tests");
+        }
+
+        cmd.status().expect("Configure failed");
         if let Some(j) = jobs {
             Command::new("make")
                 .current_dir(&build_dir)
@@ -337,137 +330,145 @@ pub fn build(
     }
     */
 
-    let compile_commands_string =
-        &fs::read_to_string(build_dir.join("linkinfo.json")).expect("Failed to read linkinfo.json");
-
-    let linkinfo = json::parse(compile_commands_string).expect("Failed to parse linkinfo.json");
-
-    let mut cmd = vec![];
-    for arg in linkinfo["cmd"].members() {
-        cmd.push(
-            arg.as_str()
-                .expect("linkinfo.json `cmd` values must be strings"),
+    if cfg!(feature = "shared") {
+        println!(
+            "cargo:rustc-link-search=native={}",
+            build_dir.to_string_lossy()
         );
-    }
-
-    assert!(cpp_compiler
-        .to_command()
-        .current_dir(&build_dir)
-        .arg("-o")
-        .arg("libqemu-partially-linked.o")
-        .arg("-r")
-        .args(cmd)
-        .status()
-        .expect("Partial linked failure")
-        .success());
-
-    /* // Old manual linking, kept here for reference and debugging
-    if is_usermode {
-        Command::new("ld")
-            .current_dir(out_dir_path)
-            .arg("-o")
-            .arg("libqemu-partially-linked.o")
-            .arg("-r")
-            .args(objects)
-            .arg("--start-group")
-            .arg("--whole-archive")
-            .arg(format!("{}/libhwcore.fa", build_dir.display()))
-            .arg(format!("{}/libqom.fa", build_dir.display()))
-            .arg(format!("{}/libevent-loop-base.a", build_dir.display()))
-            .arg(format!("{}/gdbstub/libgdb_user.fa", build_dir.display()))
-            .arg("--no-whole-archive")
-            .arg(format!("{}/libqemuutil.a", build_dir.display()))
-            .arg(format!("{}/libhwcore.fa", build_dir.display()))
-            .arg(format!("{}/libqom.fa", build_dir.display()))
-            .arg(format!("{}/gdbstub/libgdb_user.fa", build_dir.display()))
-            .arg(format!(
-                "--dynamic-list={}/plugins/qemu-plugins.symbols",
-                qemu_path.display()
-            ))
-            .arg("--end-group")
-            .status()
-            .expect("Partial linked failure");
+        println!("cargo:rustc-link-lib=dylib={output_lib_link}");
     } else {
-        Command::new("ld")
-            .current_dir(out_dir_path)
+        let compile_commands_string = &fs::read_to_string(build_dir.join("linkinfo.json"))
+            .expect("Failed to read linkinfo.json");
+
+        let linkinfo = json::parse(compile_commands_string).expect("Failed to parse linkinfo.json");
+
+        let mut cmd = vec![];
+        for arg in linkinfo["cmd"].members() {
+            cmd.push(
+                arg.as_str()
+                    .expect("linkinfo.json `cmd` values must be strings"),
+            );
+        }
+
+        assert!(cpp_compiler
+            .to_command()
+            .current_dir(&build_dir)
             .arg("-o")
             .arg("libqemu-partially-linked.o")
             .arg("-r")
-            .args(objects)
-            .arg("--start-group")
-            .arg("--whole-archive")
-            .arg(format!("{}/libhwcore.fa", build_dir.display()))
-            .arg(format!("{}/libqom.fa", build_dir.display()))
-            .arg(format!("{}/libevent-loop-base.a", build_dir.display()))
-            .arg(format!("{}/gdbstub/libgdb_softmmu.fa", build_dir.display()))
-            .arg(format!("{}/libio.fa", build_dir.display()))
-            .arg(format!("{}/libcrypto.fa", build_dir.display()))
-            .arg(format!("{}/libauthz.fa", build_dir.display()))
-            .arg(format!("{}/libblockdev.fa", build_dir.display()))
-            .arg(format!("{}/libblock.fa", build_dir.display()))
-            .arg(format!("{}/libchardev.fa", build_dir.display()))
-            .arg(format!("{}/libqmp.fa", build_dir.display()))
-            .arg("--no-whole-archive")
-            .arg(format!("{}/libqemuutil.a", build_dir.display()))
-            .arg(format!(
-                "{}/subprojects/dtc/libfdt/libfdt.a",
-                build_dir.display()
-            ))
-            .arg(format!(
-                "{}/subprojects/libvhost-user/libvhost-user-glib.a",
-                build_dir.display()
-            ))
-            .arg(format!(
-                "{}/subprojects/libvhost-user/libvhost-user.a",
-                build_dir.display()
-            ))
-            .arg(format!(
-                "{}/subprojects/libvduse/libvduse.a",
-                build_dir.display()
-            ))
-            .arg(format!("{}/libmigration.fa", build_dir.display()))
-            .arg(format!("{}/libhwcore.fa", build_dir.display()))
-            .arg(format!("{}/libqom.fa", build_dir.display()))
-            .arg(format!("{}/gdbstub/libgdb_softmmu.fa", build_dir.display()))
-            .arg(format!("{}/libio.fa", build_dir.display()))
-            .arg(format!("{}/libcrypto.fa", build_dir.display()))
-            .arg(format!("{}/libauthz.fa", build_dir.display()))
-            .arg(format!("{}/libblockdev.fa", build_dir.display()))
-            .arg(format!("{}/libblock.fa", build_dir.display()))
-            .arg(format!("{}/libchardev.fa", build_dir.display()))
-            .arg(format!("{}/libqmp.fa", build_dir.display()))
-            .arg(format!(
-                "--dynamic-list={}/plugins/qemu-plugins.symbols",
-                qemu_path.display()
-            ))
-            .arg("--end-group")
+            .args(cmd)
             .status()
-            .expect("Partial linked failure");
-    }*/
+            .expect("Partial linked failure")
+            .success());
 
-    Command::new("ar")
-        .current_dir(out_dir_path)
-        .arg("crs")
-        .arg("libqemu-partially-linked.a")
-        .arg(build_dir.join("libqemu-partially-linked.o"))
-        .status()
-        .expect("Ar creation");
+        /* // Old manual linking, kept here for reference and debugging
+        if is_usermode {
+            Command::new("ld")
+                .current_dir(out_dir_path)
+                .arg("-o")
+                .arg("libqemu-partially-linked.o")
+                .arg("-r")
+                .args(objects)
+                .arg("--start-group")
+                .arg("--whole-archive")
+                .arg(format!("{}/libhwcore.fa", build_dir.display()))
+                .arg(format!("{}/libqom.fa", build_dir.display()))
+                .arg(format!("{}/libevent-loop-base.a", build_dir.display()))
+                .arg(format!("{}/gdbstub/libgdb_user.fa", build_dir.display()))
+                .arg("--no-whole-archive")
+                .arg(format!("{}/libqemuutil.a", build_dir.display()))
+                .arg(format!("{}/libhwcore.fa", build_dir.display()))
+                .arg(format!("{}/libqom.fa", build_dir.display()))
+                .arg(format!("{}/gdbstub/libgdb_user.fa", build_dir.display()))
+                .arg(format!(
+                    "--dynamic-list={}/plugins/qemu-plugins.symbols",
+                    qemu_path.display()
+                ))
+                .arg("--end-group")
+                .status()
+                .expect("Partial linked failure");
+        } else {
+            Command::new("ld")
+                .current_dir(out_dir_path)
+                .arg("-o")
+                .arg("libqemu-partially-linked.o")
+                .arg("-r")
+                .args(objects)
+                .arg("--start-group")
+                .arg("--whole-archive")
+                .arg(format!("{}/libhwcore.fa", build_dir.display()))
+                .arg(format!("{}/libqom.fa", build_dir.display()))
+                .arg(format!("{}/libevent-loop-base.a", build_dir.display()))
+                .arg(format!("{}/gdbstub/libgdb_softmmu.fa", build_dir.display()))
+                .arg(format!("{}/libio.fa", build_dir.display()))
+                .arg(format!("{}/libcrypto.fa", build_dir.display()))
+                .arg(format!("{}/libauthz.fa", build_dir.display()))
+                .arg(format!("{}/libblockdev.fa", build_dir.display()))
+                .arg(format!("{}/libblock.fa", build_dir.display()))
+                .arg(format!("{}/libchardev.fa", build_dir.display()))
+                .arg(format!("{}/libqmp.fa", build_dir.display()))
+                .arg("--no-whole-archive")
+                .arg(format!("{}/libqemuutil.a", build_dir.display()))
+                .arg(format!(
+                    "{}/subprojects/dtc/libfdt/libfdt.a",
+                    build_dir.display()
+                ))
+                .arg(format!(
+                    "{}/subprojects/libvhost-user/libvhost-user-glib.a",
+                    build_dir.display()
+                ))
+                .arg(format!(
+                    "{}/subprojects/libvhost-user/libvhost-user.a",
+                    build_dir.display()
+                ))
+                .arg(format!(
+                    "{}/subprojects/libvduse/libvduse.a",
+                    build_dir.display()
+                ))
+                .arg(format!("{}/libmigration.fa", build_dir.display()))
+                .arg(format!("{}/libhwcore.fa", build_dir.display()))
+                .arg(format!("{}/libqom.fa", build_dir.display()))
+                .arg(format!("{}/gdbstub/libgdb_softmmu.fa", build_dir.display()))
+                .arg(format!("{}/libio.fa", build_dir.display()))
+                .arg(format!("{}/libcrypto.fa", build_dir.display()))
+                .arg(format!("{}/libauthz.fa", build_dir.display()))
+                .arg(format!("{}/libblockdev.fa", build_dir.display()))
+                .arg(format!("{}/libblock.fa", build_dir.display()))
+                .arg(format!("{}/libchardev.fa", build_dir.display()))
+                .arg(format!("{}/libqmp.fa", build_dir.display()))
+                .arg(format!(
+                    "--dynamic-list={}/plugins/qemu-plugins.symbols",
+                    qemu_path.display()
+                ))
+                .arg("--end-group")
+                .status()
+                .expect("Partial linked failure");
+        }*/
 
-    println!("cargo:rustc-link-search=native={out_dir}");
-    println!("cargo:rustc-link-lib=static=qemu-partially-linked");
+        Command::new("ar")
+            .current_dir(out_dir_path)
+            .arg("crs")
+            .arg("libqemu-partially-linked.a")
+            .arg(build_dir.join("libqemu-partially-linked.o"))
+            .status()
+            .expect("Ar creation");
 
-    for arg in linkinfo["search"].members() {
-        let val = arg
-            .as_str()
-            .expect("linkinfo.json `search` values must be strings");
-        println!("cargo:rustc-link-search={val}");
-    }
+        println!("cargo:rustc-link-search=native={out_dir}");
+        println!("cargo:rustc-link-lib=static=qemu-partially-linked");
 
-    for arg in linkinfo["libs"].members() {
-        let val = arg
-            .as_str()
-            .expect("linkinfo.json `libs` values must be strings");
-        println!("cargo:rustc-link-lib={val}");
+        for arg in linkinfo["search"].members() {
+            let val = arg
+                .as_str()
+                .expect("linkinfo.json `search` values must be strings");
+            println!("cargo:rustc-link-search={val}");
+        }
+
+        for arg in linkinfo["libs"].members() {
+            let val = arg
+                .as_str()
+                .expect("linkinfo.json `libs` values must be strings");
+            println!("cargo:rustc-link-lib={val}");
+        }
     }
 
     /*
@@ -500,5 +501,8 @@ pub fn build(
         }
     }
 
-    (qemu_path, build_dir)
+    BuildResult {
+        qemu_path,
+        build_dir,
+    }
 }

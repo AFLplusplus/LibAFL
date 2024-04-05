@@ -9,10 +9,13 @@ static GLOBAL: MiMalloc = MiMalloc;
 use core::time::Duration;
 use std::{env, net::SocketAddr, path::PathBuf};
 
-use clap::{self, Parser};
+use clap::Parser;
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
-    events::{launcher::Launcher, EventConfig, EventRestarter, LlmpRestartingEventManager},
+    events::{
+        launcher::Launcher, llmp::LlmpShouldSaveState, EventConfig, EventRestarter,
+        LlmpRestartingEventManager,
+    },
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -73,7 +76,13 @@ struct Opt {
     #[arg(short = 'a', long, help = "Specify a remote broker", name = "REMOTE")]
     remote_broker_addr: Option<SocketAddr>,
 
-    #[arg(short, long, help = "Set an the corpus directories", name = "INPUT")]
+    #[arg(
+        short,
+        long,
+        help = "Set an the corpus directories",
+        name = "INPUT",
+        required = true
+    )]
     input: Vec<PathBuf>,
 
     #[arg(
@@ -151,8 +160,8 @@ pub extern "C" fn libafl_main() {
     );
 
     let mut run_client = |state: Option<_>,
-                          mut restarting_mgr: LlmpRestartingEventManager<_, _>,
-                          _core_id| {
+                          mut restarting_mgr: LlmpRestartingEventManager<_, _, _>,
+                          core_id| {
         // Create an observation channel using the coverage map
         let edges_observer = HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") });
 
@@ -240,7 +249,14 @@ pub extern "C" fn libafl_main() {
         // In case the corpus is empty (on first run), reset
         if state.must_load_initial_inputs() {
             state
-                .load_initial_inputs(&mut fuzzer, &mut executor, &mut restarting_mgr, &opt.input)
+                .load_initial_inputs_multicore(
+                    &mut fuzzer,
+                    &mut executor,
+                    &mut restarting_mgr,
+                    &opt.input,
+                    &core_id,
+                    &cores,
+                )
                 .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &opt.input));
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
@@ -266,7 +282,11 @@ pub extern "C" fn libafl_main() {
         .broker_port(broker_port)
         .remote_broker_addr(opt.remote_broker_addr)
         .stdout_file(Some("/dev/null"))
-        .serialize_state(!opt.reload_corpus)
+        .serialize_state(if opt.reload_corpus {
+            LlmpShouldSaveState::OOMSafeNever
+        } else {
+            LlmpShouldSaveState::OOMSafeOnRestart
+        })
         .build()
         .launch()
     {

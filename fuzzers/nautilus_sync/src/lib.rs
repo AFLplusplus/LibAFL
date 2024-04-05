@@ -6,7 +6,7 @@ static GLOBAL: MiMalloc = MiMalloc;
 use std::ptr::write_volatile;
 use std::{env, net::SocketAddr, path::PathBuf, time::Duration};
 
-use clap::{self, Parser};
+use clap::Parser;
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::{launcher::Launcher, llmp::LlmpEventConverter, EventConfig},
@@ -129,6 +129,9 @@ pub extern "C" fn libafl_main() {
         )
         .unwrap()
     });
+
+    // to disconnect the event coverter from the broker later
+    // call detach_from_broker( port)
 
     let mut run_client = |state: Option<_>, mut mgr, _core_id| {
         let mut bytes = vec![];

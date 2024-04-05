@@ -1,4 +1,4 @@
-use core::ptr::addr_of_mut;
+use core::{fmt::Debug, ptr::addr_of_mut};
 use std::{marker::PhantomData, process};
 
 #[cfg(feature = "simplemgr")]
@@ -41,7 +41,7 @@ use libafl_qemu::{
     cmplog::CmpLogObserver,
     edges::{edges_map_mut_slice, MAX_EDGES_NUM},
     helper::QemuHelperTuple,
-    Emulator, QemuExecutor, QemuHooks,
+    Qemu, QemuExecutor, QemuHooks,
 };
 use typed_builder::TypedBuilder;
 
@@ -54,12 +54,12 @@ pub type ClientState =
 pub type ClientMgr<M> = SimpleEventManager<M, ClientState>;
 #[cfg(not(feature = "simplemgr"))]
 pub type ClientMgr<M> =
-    MonitorTypedEventManager<LlmpRestartingEventManager<ClientState, StdShMemProvider>, M>;
+    MonitorTypedEventManager<LlmpRestartingEventManager<(), ClientState, StdShMemProvider>, M>;
 
 #[derive(TypedBuilder)]
 pub struct Instance<'a, M: Monitor> {
     options: &'a FuzzerOptions,
-    emu: &'a Emulator,
+    qemu: &'a Qemu,
     mgr: ClientMgr<M>,
     core_id: CoreId,
     extra_tokens: Option<Vec<String>>,
@@ -70,9 +70,9 @@ pub struct Instance<'a, M: Monitor> {
 impl<'a, M: Monitor> Instance<'a, M> {
     pub fn run<QT>(&mut self, helpers: QT, state: Option<ClientState>) -> Result<(), Error>
     where
-        QT: QemuHelperTuple<ClientState>,
+        QT: QemuHelperTuple<ClientState> + Debug,
     {
-        let mut hooks = QemuHooks::new(self.emu.clone(), helpers);
+        let mut hooks = QemuHooks::new(self.qemu.clone(), helpers);
 
         // Create an observation channel using the coverage map
         let edges_observer = unsafe {
@@ -147,7 +147,7 @@ impl<'a, M: Monitor> Instance<'a, M> {
 
         state.add_metadata(tokens);
 
-        let harness = Harness::new(self.emu)?;
+        let harness = Harness::new(self.qemu)?;
         let mut harness = |input: &BytesInput| harness.run(input);
 
         // A fuzzer with feedbacks and a corpus scheduler

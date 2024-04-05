@@ -8,6 +8,7 @@ use alloc::{alloc::alloc_zeroed, boxed::Box, vec::Vec};
 use core::{
     alloc::Layout,
     fmt::{self, Debug, Formatter},
+    mem, ptr, slice,
 };
 
 use libafl::{
@@ -28,13 +29,12 @@ pub const CMPLOG_MAP_SIZE: usize = CMPLOG_MAP_W * CMPLOG_MAP_H;
 pub const CMPLOG_RTN_LEN: usize = 32;
 
 /// The hight of a cmplog routine map
-pub const CMPLOG_MAP_RTN_H: usize = (CMPLOG_MAP_H * core::mem::size_of::<CmpLogInstruction>())
-    / core::mem::size_of::<CmpLogRoutine>();
+pub const CMPLOG_MAP_RTN_H: usize =
+    (CMPLOG_MAP_H * mem::size_of::<CmpLogInstruction>()) / mem::size_of::<CmpLogRoutine>();
 
 /// The height of extended rountine map
-pub const CMPLOG_MAP_RTN_EXTENDED_H: usize = CMPLOG_MAP_H
-    * core::mem::size_of::<AFLppCmpLogOperands>()
-    / core::mem::size_of::<AFLppCmpLogFnOperands>();
+pub const CMPLOG_MAP_RTN_EXTENDED_H: usize =
+    CMPLOG_MAP_H * mem::size_of::<AFLppCmpLogOperands>() / mem::size_of::<AFLppCmpLogFnOperands>();
 
 /// `CmpLog` instruction kind
 pub const CMPLOG_KIND_INS: u8 = 0;
@@ -276,7 +276,7 @@ pub union AFLppCmpLogVals {
 }
 
 impl Debug for AFLppCmpLogVals {
-    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("AFLppCmpLogVals").finish_non_exhaustive()
     }
 }
@@ -323,7 +323,7 @@ pub struct CmpLogMap {
 
 impl Default for CmpLogMap {
     fn default() -> Self {
-        unsafe { core::mem::zeroed() }
+        unsafe { mem::zeroed() }
     }
 }
 
@@ -480,10 +480,7 @@ impl Serialize for AFLppCmpLogMap {
         S: Serializer,
     {
         let slice = unsafe {
-            core::slice::from_raw_parts(
-                (self as *const Self) as *const u8,
-                core::mem::size_of::<Self>(),
-            )
+            slice::from_raw_parts(ptr::from_ref(self) as *const u8, mem::size_of::<Self>())
         };
         serializer.serialize_bytes(slice)
     }
@@ -495,7 +492,7 @@ impl<'de> Deserialize<'de> for AFLppCmpLogMap {
         D: Deserializer<'de>,
     {
         let bytes = Vec::<u8>::deserialize(deserializer)?;
-        let map: Self = unsafe { core::ptr::read(bytes.as_ptr() as *const _) };
+        let map: Self = unsafe { ptr::read(bytes.as_ptr() as *const _) };
         Ok(map)
     }
 }

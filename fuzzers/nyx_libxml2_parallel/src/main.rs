@@ -19,7 +19,7 @@ use libafl_bolts::{
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
 };
-use libafl_nyx::{executor::NyxExecutor, helper::NyxHelper};
+use libafl_nyx::{executor::NyxExecutor, helper::NyxHelper, settings::NyxSettings};
 
 fn main() {
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
@@ -32,21 +32,15 @@ fn main() {
 
     // region: fuzzer start function
     let mut run_client = |state: Option<_>, mut restarting_mgr, core_id: CoreId| {
-        // nyx shared dir, created by nyx-fuzz/packer/packer/nyx_packer.py
-        let share_dir = Path::new("/tmp/nyx_libxml2/");
-        let cpu_id = core_id.0.try_into().unwrap();
-        let parallel_mode = true;
         // nyx stuff
-        let mut helper = NyxHelper::new(
-            share_dir,
-            cpu_id,
-            true,
-            parallel_mode,
-            Some(parent_cpu_id.0.try_into().unwrap()),
-        )
-        .unwrap();
-        let observer =
-            unsafe { StdMapObserver::from_mut_ptr("trace", helper.trace_bits, helper.map_size) };
+        let settings = NyxSettings::builder()
+            .cpu_id(0)
+            .parent_cpu_id(Some(parent_cpu_id.0 as u32))
+            .build();
+        let helper = NyxHelper::new("/tmp/nyx_libxml2/", settings).unwrap();
+        let observer = unsafe {
+            StdMapObserver::from_mut_ptr("trace", helper.bitmap_buffer, helper.bitmap_size)
+        };
 
         let input = BytesInput::new(b"22".to_vec());
         let rand = StdRand::new();
@@ -60,7 +54,7 @@ fn main() {
         let mut feedback = MaxMapFeedback::new(&observer);
         let mut objective = CrashFeedback::new();
         let scheduler = RandScheduler::new();
-        let mut executor = NyxExecutor::new(&mut helper, tuple_list!(observer)).unwrap();
+        let mut executor = NyxExecutor::new(helper, tuple_list!(observer));
 
         // If not restarting, create a State from scratch
         let mut state = state.unwrap_or_else(|| {

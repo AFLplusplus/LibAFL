@@ -114,13 +114,9 @@ where
     /// Create a new [`WeightedScheduler`]
     #[must_use]
     pub fn with_schedule(state: &mut S, map_observer: &O, strat: Option<PowerSchedule>) -> Self {
-        if !state.has_metadata::<SchedulerMetadata>() {
-            state.add_metadata(SchedulerMetadata::new(strat));
-        }
+        let _ = state.metadata_or_insert_with(|| SchedulerMetadata::new(strat));
+        let _ = state.metadata_or_insert_with(WeightedScheduleMetadata::new);
 
-        if !state.has_metadata::<WeightedScheduleMetadata>() {
-            state.add_metadata(WeightedScheduleMetadata::new());
-        }
         Self {
             strat,
             map_observer_name: map_observer.name().to_string(),
@@ -274,7 +270,7 @@ where
         self.last_hash = hash;
     }
 
-    fn map_observer_name(&self) -> &String {
+    fn map_observer_name(&self) -> &str {
         &self.map_observer_name
     }
 }
@@ -307,7 +303,9 @@ where
     fn next(&mut self, state: &mut S) -> Result<CorpusId, Error> {
         let corpus_counts = state.corpus().count();
         if corpus_counts == 0 {
-            Err(Error::empty(String::from("No entries in corpus")))
+            Err(Error::empty(String::from(
+                "No entries in corpus. This often implies the target is not properly instrumented.",
+            )))
         } else {
             let s = random_corpus_id!(state.corpus(), state.rand_mut());
 

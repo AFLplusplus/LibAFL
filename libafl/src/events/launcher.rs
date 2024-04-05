@@ -15,6 +15,8 @@
 use alloc::string::ToString;
 #[cfg(feature = "std")]
 use core::marker::PhantomData;
+#[cfg(all(unix, feature = "std", feature = "fork"))]
+use core::time::Duration;
 use core::{
     fmt::{self, Debug, Formatter},
     num::NonZeroUsize,
@@ -36,16 +38,18 @@ use libafl_bolts::{
 use libafl_bolts::{
     core_affinity::{CoreId, Cores},
     shmem::ShMemProvider,
+    tuples::tuple_list,
 };
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
+use super::hooks::EventManagerHooksTuple;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use crate::events::{CentralizedEventManager, CentralizedLlmpEventBroker};
 #[cfg(feature = "std")]
 use crate::{
     events::{
-        llmp::{LlmpRestartingEventManager, ManagerKind, RestartingMgr},
+        llmp::{LlmpRestartingEventManager, LlmpShouldSaveState, ManagerKind, RestartingMgr},
         EventConfig,
     },
     monitors::Monitor,
@@ -70,15 +74,16 @@ const LIBAFL_DEBUG_OUTPUT: &str = "LIBAFL_DEBUG_OUTPUT";
     clippy::ignored_unit_patterns
 )]
 #[derive(TypedBuilder)]
-pub struct Launcher<'a, CF, MT, S, SP>
+pub struct Launcher<'a, CF, EMH, MT, S, SP>
 where
-    CF: FnOnce(Option<S>, LlmpRestartingEventManager<S, SP>, CoreId) -> Result<(), Error>,
+    CF: FnOnce(Option<S>, LlmpRestartingEventManager<EMH, S, SP>, CoreId) -> Result<(), Error>,
+    EMH: EventManagerHooksTuple<S>,
     S::Input: 'a,
     MT: Monitor,
     SP: ShMemProvider + 'static,
     S: State + 'a,
 {
-    /// The ShmemProvider to use
+    /// The `ShmemProvider` to use
     shmem_provider: SP,
     /// The monitor instance to use
     monitor: MT,
@@ -95,7 +100,7 @@ where
     /// A file name to write all client output to
     #[builder(default = None)]
     stdout_file: Option<&'a str>,
-    /// The actual, opened, stdout_file - so that we keep it open until the end
+    /// The actual, opened, `stdout_file` - so that we keep it open until the end
     #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[builder(setter(skip), default = None)]
     opened_stdout_file: Option<File>,
@@ -103,7 +108,7 @@ where
     /// `stdout_file`.
     #[builder(default = None)]
     stderr_file: Option<&'a str>,
-    /// The actual, opened, stdout_file - so that we keep it open until the end
+    /// The actual, opened, `stdout_file` - so that we keep it open until the end
     #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[builder(setter(skip), default = None)]
     opened_stderr_file: Option<File>,
@@ -118,15 +123,16 @@ where
     #[builder(default = true)]
     spawn_broker: bool,
     /// Tell the manager to serialize or not the state on restart
-    #[builder(default = true)]
-    serialize_state: bool,
+    #[builder(default = LlmpShouldSaveState::OnRestart)]
+    serialize_state: LlmpShouldSaveState,
     #[builder(setter(skip), default = PhantomData)]
-    phantom_data: PhantomData<(&'a S, &'a SP)>,
+    phantom_data: PhantomData<(&'a S, &'a SP, EMH)>,
 }
 
-impl<CF, MT, S, SP> Debug for Launcher<'_, CF, MT, S, SP>
+impl<CF, EMH, MT, S, SP> Debug for Launcher<'_, CF, EMH, MT, S, SP>
 where
-    CF: FnOnce(Option<S>, LlmpRestartingEventManager<S, SP>, CoreId) -> Result<(), Error>,
+    CF: FnOnce(Option<S>, LlmpRestartingEventManager<EMH, S, SP>, CoreId) -> Result<(), Error>,
+    EMH: EventManagerHooksTuple<S>,
     MT: Monitor + Clone,
     SP: ShMemProvider + 'static,
     S: State,
@@ -144,18 +150,41 @@ where
     }
 }
 
-#[cfg(feature = "std")]
-impl<'a, CF, MT, S, SP> Launcher<'a, CF, MT, S, SP>
+impl<'a, CF, MT, S, SP> Launcher<'a, CF, (), MT, S, SP>
 where
-    CF: FnOnce(Option<S>, LlmpRestartingEventManager<S, SP>, CoreId) -> Result<(), Error>,
+    CF: FnOnce(Option<S>, LlmpRestartingEventManager<(), S, SP>, CoreId) -> Result<(), Error>,
     MT: Monitor + Clone,
     S: State + HasExecutions,
     SP: ShMemProvider + 'static,
 {
     /// Launch the broker and the clients and fuzz
     #[cfg(all(unix, feature = "std", feature = "fork"))]
-    #[allow(clippy::similar_names)]
     pub fn launch(&mut self) -> Result<(), Error> {
+        Self::launch_with_hooks(self, tuple_list!())
+    }
+
+    /// Launch the broker and the clients and fuzz
+    #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
+    #[allow(unused_mut, clippy::match_wild_err_arm)]
+    pub fn launch(&mut self) -> Result<(), Error> {
+        Self::launch_with_hooks(self, tuple_list!())
+    }
+}
+
+#[cfg(feature = "std")]
+impl<'a, CF, EMH, MT, S, SP> Launcher<'a, CF, EMH, MT, S, SP>
+where
+    CF: FnOnce(Option<S>, LlmpRestartingEventManager<EMH, S, SP>, CoreId) -> Result<(), Error>,
+    EMH: EventManagerHooksTuple<S> + Clone + Copy,
+    MT: Monitor + Clone,
+    S: State + HasExecutions,
+    SP: ShMemProvider + 'static,
+{
+    /// Launch the broker and the clients and fuzz with a user-supplied hook
+    #[cfg(all(unix, feature = "std", feature = "fork"))]
+    #[allow(clippy::similar_names)]
+    #[allow(clippy::too_many_lines)]
+    pub fn launch_with_hooks(&mut self, hooks: EMH) -> Result<(), Error> {
         if self.cores.ids.is_empty() {
             return Err(Error::illegal_argument(
                 "No cores to spawn on given, cannot launch anything.",
@@ -206,7 +235,7 @@ where
                         self.shmem_provider.post_fork(true)?;
 
                         #[cfg(feature = "std")]
-                        std::thread::sleep(std::time::Duration::from_millis(index * 10));
+                        std::thread::sleep(Duration::from_millis(index * 10));
 
                         #[cfg(feature = "std")]
                         if !debug_output {
@@ -221,7 +250,7 @@ where
                         }
 
                         // Fuzzer client. keeps retrying the connection to broker till the broker starts
-                        let (state, mgr) = RestartingMgr::<MT, S, SP>::builder()
+                        let (state, mgr) = RestartingMgr::<EMH, MT, S, SP>::builder()
                             .shmem_provider(self.shmem_provider.clone())
                             .broker_port(self.broker_port)
                             .kind(ManagerKind::Client {
@@ -229,6 +258,7 @@ where
                             })
                             .configuration(self.configuration)
                             .serialize_state(self.serialize_state)
+                            .hooks(hooks)
                             .build()
                             .launch()?;
 
@@ -243,7 +273,7 @@ where
             log::info!("I am broker!!.");
 
             // TODO we don't want always a broker here, think about using different laucher process to spawn different configurations
-            RestartingMgr::<MT, S, SP>::builder()
+            RestartingMgr::<EMH, MT, S, SP>::builder()
                 .shmem_provider(self.shmem_provider.clone())
                 .monitor(Some(self.monitor.clone()))
                 .broker_port(self.broker_port)
@@ -252,6 +282,7 @@ where
                 .exit_cleanly_after(Some(NonZeroUsize::try_from(self.cores.ids.len()).unwrap()))
                 .configuration(self.configuration)
                 .serialize_state(self.serialize_state)
+                .hooks(hooks)
                 .build()
                 .launch()?;
 
@@ -282,7 +313,7 @@ where
     /// Launch the broker and the clients and fuzz
     #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
     #[allow(unused_mut, clippy::match_wild_err_arm)]
-    pub fn launch(&mut self) -> Result<(), Error> {
+    pub fn launch_with_hooks(&mut self, hooks: EMH) -> Result<(), Error> {
         use libafl_bolts::core_affinity;
 
         let is_client = std::env::var(_AFL_LAUNCHER_CLIENT);
@@ -295,7 +326,7 @@ where
                 // let debug_output = std::env::var(LIBAFL_DEBUG_OUTPUT).is_ok();
 
                 // the actual client. do the fuzzing
-                let (state, mgr) = RestartingMgr::<MT, S, SP>::builder()
+                let (state, mgr) = RestartingMgr::<EMH, MT, S, SP>::builder()
                     .shmem_provider(self.shmem_provider.clone())
                     .broker_port(self.broker_port)
                     .kind(ManagerKind::Client {
@@ -303,6 +334,7 @@ where
                     })
                     .configuration(self.configuration)
                     .serialize_state(self.serialize_state)
+                    .hooks(hooks)
                     .build()
                     .launch()?;
 
@@ -363,7 +395,7 @@ where
             #[cfg(feature = "std")]
             log::info!("I am broker!!.");
 
-            RestartingMgr::<MT, S, SP>::builder()
+            RestartingMgr::<EMH, MT, S, SP>::builder()
                 .shmem_provider(self.shmem_provider.clone())
                 .monitor(Some(self.monitor.clone()))
                 .broker_port(self.broker_port)
@@ -372,6 +404,7 @@ where
                 .exit_cleanly_after(Some(NonZeroUsize::try_from(self.cores.ids.len()).unwrap()))
                 .configuration(self.configuration)
                 .serialize_state(self.serialize_state)
+                .hooks(hooks)
                 .build()
                 .launch()?;
 
@@ -401,7 +434,7 @@ pub struct CentralizedLauncher<'a, CF, MT, S, SP>
 where
     CF: FnOnce(
         Option<S>,
-        CentralizedEventManager<LlmpRestartingEventManager<S, SP>, SP>,
+        CentralizedEventManager<LlmpRestartingEventManager<(), S, SP>, SP>, // No hooks for centralized EM
         CoreId,
     ) -> Result<(), Error>,
     S::Input: 'a,
@@ -409,7 +442,7 @@ where
     SP: ShMemProvider + 'static,
     S: State + 'a,
 {
-    /// The ShmemProvider to use
+    /// The `ShmemProvider` to use
     shmem_provider: SP,
     /// The monitor instance to use
     monitor: MT,
@@ -429,7 +462,7 @@ where
     /// A file name to write all client output to
     #[builder(default = None)]
     stdout_file: Option<&'a str>,
-    /// The actual, opened, stdout_file - so that we keep it open until the end
+    /// The actual, opened, `stdout_file` - so that we keep it open until the end
     #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[builder(setter(skip), default = None)]
     opened_stdout_file: Option<File>,
@@ -437,7 +470,7 @@ where
     /// `stdout_file`.
     #[builder(default = None)]
     stderr_file: Option<&'a str>,
-    /// The actual, opened, stdout_file - so that we keep it open until the end
+    /// The actual, opened, `stdout_file` - so that we keep it open until the end
     #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[builder(setter(skip), default = None)]
     opened_stderr_file: Option<File>,
@@ -453,8 +486,8 @@ where
     #[builder(default = true)]
     spawn_broker: bool,
     /// Tell the manager to serialize or not the state on restart
-    #[builder(default = true)]
-    serialize_state: bool,
+    #[builder(default = LlmpShouldSaveState::OnRestart)]
+    serialize_state: LlmpShouldSaveState,
     #[builder(setter(skip), default = PhantomData)]
     phantom_data: PhantomData<(&'a S, &'a SP)>,
 }
@@ -464,7 +497,7 @@ impl<CF, MT, S, SP> Debug for CentralizedLauncher<'_, CF, MT, S, SP>
 where
     CF: FnOnce(
         Option<S>,
-        CentralizedEventManager<LlmpRestartingEventManager<S, SP>, SP>,
+        CentralizedEventManager<LlmpRestartingEventManager<(), S, SP>, SP>,
         CoreId,
     ) -> Result<(), Error>,
     MT: Monitor + Clone,
@@ -489,16 +522,16 @@ impl<'a, CF, MT, S, SP> CentralizedLauncher<'a, CF, MT, S, SP>
 where
     CF: FnOnce(
         Option<S>,
-        CentralizedEventManager<LlmpRestartingEventManager<S, SP>, SP>,
+        CentralizedEventManager<LlmpRestartingEventManager<(), S, SP>, SP>,
         CoreId,
     ) -> Result<(), Error>,
     MT: Monitor + Clone,
     S: State + HasExecutions,
     SP: ShMemProvider + 'static,
 {
-    /// Launch the broker and the clients and fuzz
     #[allow(clippy::similar_names)]
     #[allow(clippy::too_many_lines)]
+    /// launch the broker and the client and fuzz
     pub fn launch(&mut self) -> Result<(), Error> {
         if self.cores.ids.is_empty() {
             return Err(Error::illegal_argument(
@@ -534,10 +567,12 @@ where
                 self.shmem_provider.post_fork(false)?;
                 handles.push(child.pid);
                 #[cfg(feature = "std")]
-                log::info!("centralized broker spawned");
+                log::info!("PID: {:#?} centralized broker spawned", std::process::id());
             }
             ForkResult::Child => {
                 log::info!("{:?} PostFork", unsafe { libc::getpid() });
+                #[cfg(feature = "std")]
+                log::info!("PID: {:#?} I am centralized broker", std::process::id());
                 self.shmem_provider.post_fork(true)?;
 
                 let mut broker: CentralizedLlmpEventBroker<S::Input, SP> =
@@ -549,7 +584,7 @@ where
             }
         }
 
-        std::thread::sleep(std::time::Duration::from_millis(10));
+        std::thread::sleep(Duration::from_millis(10));
 
         // Spawn clients
         let mut index = 0_u64;
@@ -568,7 +603,7 @@ where
                         log::info!("{:?} PostFork", unsafe { libc::getpid() });
                         self.shmem_provider.post_fork(true)?;
 
-                        std::thread::sleep(std::time::Duration::from_millis(index * 10));
+                        std::thread::sleep(Duration::from_millis(index * 10));
 
                         if !debug_output {
                             if let Some(file) = &self.opened_stdout_file {
@@ -582,7 +617,7 @@ where
                         }
 
                         // Fuzzer client. keeps retrying the connection to broker till the broker starts
-                        let (state, mgr) = RestartingMgr::<MT, S, SP>::builder()
+                        let (state, mgr) = RestartingMgr::<(), MT, S, SP>::builder()
                             .shmem_provider(self.shmem_provider.clone())
                             .broker_port(self.broker_port)
                             .kind(ManagerKind::Client {
@@ -590,6 +625,7 @@ where
                             })
                             .configuration(self.configuration)
                             .serialize_state(self.serialize_state)
+                            .hooks(tuple_list!())
                             .build()
                             .launch()?;
 
@@ -610,7 +646,7 @@ where
             log::info!("I am broker!!.");
 
             // TODO we don't want always a broker here, think about using different laucher process to spawn different configurations
-            RestartingMgr::<MT, S, SP>::builder()
+            RestartingMgr::<(), MT, S, SP>::builder()
                 .shmem_provider(self.shmem_provider.clone())
                 .monitor(Some(self.monitor.clone()))
                 .broker_port(self.broker_port)
@@ -619,6 +655,7 @@ where
                 .exit_cleanly_after(Some(NonZeroUsize::try_from(self.cores.ids.len()).unwrap()))
                 .configuration(self.configuration)
                 .serialize_state(self.serialize_state)
+                .hooks(tuple_list!())
                 .build()
                 .launch()?;
 

@@ -39,7 +39,7 @@ use libafl_bolts::{
 #[cfg(unix)]
 use libafl_frida::asan::{
     asan_rt::AsanRuntime,
-    errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS},
+    errors::{AsanErrorsFeedback, AsanErrorsObserver},
 };
 use libafl_frida::{
     cmplog_rt::CmpLogRuntime,
@@ -71,7 +71,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
     let shmem_provider = StdShMemProvider::new()?;
 
-    let mut run_client = |state: Option<_>, mgr: LlmpRestartingEventManager<_, _>, core_id| {
+    let mut run_client = |state: Option<_>, mgr: LlmpRestartingEventManager<_, _, _>, core_id| {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
 
         // println!("{:?}", mgr.mgr_id());
@@ -89,12 +89,12 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
         };
 
         if options.asan && options.asan_cores.contains(core_id) {
-            (|state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _>, _core_id| {
+            (|state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _, _>, _core_id| {
                 let gum = Gum::obtain();
 
                 let coverage = CoverageRuntime::new();
                 #[cfg(unix)]
-                let asan = AsanRuntime::new(&options);
+                let asan = AsanRuntime::new(options);
 
                 #[cfg(unix)]
                 let mut frida_helper =
@@ -173,11 +173,9 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
                 #[cfg(unix)]
-                let observers = tuple_list!(
-                    edges_observer,
-                    time_observer,
-                    AsanErrorsObserver::new(&ASAN_ERRORS)
-                );
+                let observers = tuple_list!(edges_observer, time_observer, unsafe {
+                    AsanErrorsObserver::from_static_asan_errors()
+                });
                 #[cfg(windows)]
                 let observers = tuple_list!(edges_observer, time_observer);
 
@@ -211,7 +209,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 Ok(())
             })(state, mgr, core_id)
         } else if options.cmplog && options.cmplog_cores.contains(core_id) {
-            (|state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _>, _core_id| {
+            (|state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _, _>, _core_id| {
                 let gum = Gum::obtain();
 
                 let coverage = CoverageRuntime::new();
@@ -289,11 +287,9 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
                 #[cfg(unix)]
-                let observers = tuple_list!(
-                    edges_observer,
-                    time_observer,
-                    AsanErrorsObserver::new(&ASAN_ERRORS)
-                );
+                let observers = tuple_list!(edges_observer, time_observer, unsafe {
+                    AsanErrorsObserver::from_static_asan_errors()
+                });
                 #[cfg(windows)]
                 let observers = tuple_list!(edges_observer, time_observer,);
 
@@ -343,7 +339,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 Ok(())
             })(state, mgr, core_id)
         } else {
-            (|state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _>, _core_id| {
+            (|state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _, _>, _core_id| {
                 let gum = Gum::obtain();
 
                 let coverage = CoverageRuntime::new();
@@ -422,7 +418,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let observers = tuple_list!(
                     edges_observer,
                     time_observer,
-                    AsanErrorsObserver::new(&ASAN_ERRORS)
+                    AsanErrorsObserver::from_static_asan_errors()
                 );
                 #[cfg(windows)]
                 let observers = tuple_list!(edges_observer, time_observer,);

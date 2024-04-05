@@ -180,6 +180,7 @@ where
     ) -> Result<(), Error> {
         let monitor_timeout = STATS_TIMEOUT_DEFAULT;
         loop {
+            // log::info!("Starting another fuzz_loop");
             manager.maybe_report_progress(state, monitor_timeout)?;
             self.fuzz_one(stages, executor, state, manager)?;
         }
@@ -212,6 +213,7 @@ where
         let monitor_timeout = STATS_TIMEOUT_DEFAULT;
 
         for _ in 0..iters {
+            // log::info!("Starting another fuzz_loop");
             manager.maybe_report_progress(state, monitor_timeout)?;
             ret = Some(self.fuzz_one(stages, executor, state, manager)?);
         }
@@ -381,7 +383,7 @@ where
                 // Add the input to the main corpus
                 let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
                 self.feedback_mut()
-                    .append_metadata(state, observers, &mut testcase)?;
+                    .append_metadata(state, manager, observers, &mut testcase)?;
                 let idx = state.corpus_mut().add(testcase)?;
                 self.scheduler_mut().on_add(state, idx)?;
 
@@ -415,11 +417,12 @@ where
                 // Not interesting
                 self.feedback_mut().discard_metadata(state, &input)?;
 
+                let executions = *state.executions();
                 // The input is a solution, add it to the respective corpus
-                let mut testcase = Testcase::with_executions(input, *state.executions());
+                let mut testcase = Testcase::with_executions(input, executions);
                 testcase.set_parent_id_optional(*state.corpus().current());
                 self.objective_mut()
-                    .append_metadata(state, observers, &mut testcase)?;
+                    .append_metadata(state, manager, observers, &mut testcase)?;
                 state.solutions_mut().add(testcase)?;
 
                 if send_events {
@@ -427,6 +430,8 @@ where
                         state,
                         Event::Objective {
                             objective_size: state.solutions().count(),
+                            executions,
+                            time: current_time(),
                         },
                     )?;
                 }
@@ -517,13 +522,16 @@ where
 
         if is_solution {
             self.objective_mut()
-                .append_metadata(state, observers, &mut testcase)?;
+                .append_metadata(state, manager, observers, &mut testcase)?;
             let idx = state.solutions_mut().add(testcase)?;
 
+            let executions = *state.executions();
             manager.fire(
                 state,
                 Event::Objective {
                     objective_size: state.solutions().count(),
+                    executions,
+                    time: current_time(),
                 },
             )?;
             return Ok(idx);
@@ -546,7 +554,7 @@ where
 
         // Add the input to the main corpus
         self.feedback_mut()
-            .append_metadata(state, observers, &mut testcase)?;
+            .append_metadata(state, manager, observers, &mut testcase)?;
         let idx = state.corpus_mut().add(testcase)?;
         self.scheduler_mut().on_add(state, idx)?;
 

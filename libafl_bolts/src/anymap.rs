@@ -4,7 +4,7 @@ use alloc::boxed::Box;
 use core::{
     any::{Any, TypeId},
     mem::size_of,
-    ptr::addr_of,
+    ptr::{addr_of, read_unaligned},
 };
 
 /// Convert to an Any trait object
@@ -39,7 +39,7 @@ macro_rules! impl_asany {
     };
 }
 
-/// Get a `type_id` from its previously unpacked `u64`.
+/// Get a `type_id` from its previously unpacked `u128`.
 /// Opposite of [`unpack_type_id(id)`].
 ///
 /// # Note
@@ -47,26 +47,13 @@ macro_rules! impl_asany {
 /// The size changed in later rust versions, see <https://github.com/rust-lang/compiler-team/issues/608>
 #[inline]
 #[must_use]
-#[allow(clippy::cast_ptr_alignment)]
 pub const fn pack_type_id(id: u128) -> TypeId {
-    match size_of::<TypeId>() {
-        8 => {
-            let id_64 = id as u64;
-            // false positive: this branch only executes on 64 bit `TypeId`s
-            #[allow(clippy::cast_ptr_alignment)]
-            unsafe {
-                *(addr_of!(id_64) as *const TypeId)
-            }
-        }
-        16 => unsafe { *(addr_of!(id) as *const TypeId) },
-        _ => {
-            // TypeId size of this size is not yet supported"
-            panic!("Unsupported size for TypeId");
-        }
-    }
+    // TypeId size of other sizes is not yet supported"
+    static_assertions::const_assert!(size_of::<TypeId>() == 16);
+    unsafe { *(addr_of!(id) as *const TypeId) }
 }
 
-/// Unpack a `type_id` to an `u64`
+/// Unpack a `type_id` to an `u128`
 /// Opposite of [`pack_type_id(id)`].
 ///
 /// # Note
@@ -75,15 +62,11 @@ pub const fn pack_type_id(id: u128) -> TypeId {
 #[inline]
 #[must_use]
 pub const fn unpack_type_id(id: TypeId) -> u128 {
-    #[allow(clippy::cast_ptr_alignment)] // we never actually cast to u128 if the type is u64.
-    match size_of::<TypeId>() {
-        8 => unsafe { *(addr_of!(id) as *const u64) as u128 },
-        16 => unsafe { *(addr_of!(id) as *const u128) },
-        _ => {
-            // TypeId size of this size is not yet supported"
-            panic!("Unsupported size for TypeId");
-        }
-    }
+    // see any.rs, it's alway u128 hence 16 bytes.
+    // TypeId size of other sizes is not yet supported"
+    static_assertions::const_assert!(size_of::<TypeId>() == 16);
+    let ret: u128 = unsafe { read_unaligned::<u128>(addr_of!(id) as *const u128) };
+    ret
 }
 
 #[cfg(test)]

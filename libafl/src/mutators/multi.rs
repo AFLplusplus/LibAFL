@@ -40,24 +40,18 @@ where
         &mut self,
         state: &mut S,
         input: &mut MultipartInput<I>,
-        stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         if input.parts().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
             let selected = state.rand_mut().below(input.parts().len() as u64) as usize;
             let mutated = input.part_mut(selected).unwrap();
-            self.mutate(state, mutated, stage_idx)
+            self.mutate(state, mutated)
         }
     }
 
-    fn post_exec(
-        &mut self,
-        state: &mut S,
-        stage_idx: i32,
-        corpus_idx: Option<CorpusId>,
-    ) -> Result<(), Error> {
-        M::post_exec(self, state, stage_idx, corpus_idx)
+    fn post_exec(&mut self, state: &mut S, new_corpus_idx: Option<CorpusId>) -> Result<(), Error> {
+        M::post_exec(self, state, new_corpus_idx)
     }
 }
 
@@ -129,7 +123,6 @@ where
         &mut self,
         state: &mut S,
         input: &mut MultipartInput<I>,
-        _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         // we can eat the slight bias; number of parts will be small
         let name_choice = state.rand_mut().next() as usize;
@@ -234,7 +227,6 @@ where
         &mut self,
         state: &mut S,
         input: &mut MultipartInput<I>,
-        _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         // we can eat the slight bias; number of parts will be small
         let name_choice = state.rand_mut().next() as usize;

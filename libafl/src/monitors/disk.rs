@@ -52,7 +52,7 @@ where
         self.base.aggregate(name);
     }
 
-    fn display(&mut self, event_msg: String, sender_id: ClientId) {
+    fn display(&mut self, event_msg: &str, sender_id: ClientId) {
         let cur_time = current_time();
 
         if (cur_time - self.last_update).as_secs() >= 60 {
@@ -72,7 +72,7 @@ executions = {}
 exec_sec = {}
 ",
                 format_duration_hms(&(cur_time - self.start_time())),
-                self.client_stats().len(),
+                self.client_stats_count(),
                 self.corpus_size(),
                 self.objective_size(),
                 self.total_execs(),
@@ -201,7 +201,7 @@ where
         self.base.set_start_time(time);
     }
 
-    fn display(&mut self, event_msg: String, sender_id: ClientId) {
+    fn display(&mut self, event_msg: &str, sender_id: ClientId) {
         if (self.log_record)(&mut self.base) {
             let file = OpenOptions::new()
                 .append(true)
@@ -211,12 +211,11 @@ where
 
             let line = json!({
                 "run_time": current_time() - self.base.start_time(),
-                "clients": self.base.client_stats().len(),
+                "clients": self.client_stats_count(),
                 "corpus": self.base.corpus_size(),
                 "objectives": self.base.objective_size(),
                 "executions": self.base.total_execs(),
                 "exec_sec": self.base.execs_per_sec(),
-                "clients": &self.client_stats()[1..]
             });
             writeln!(&file, "{line}").expect("Unable to write JSON to file");
         }

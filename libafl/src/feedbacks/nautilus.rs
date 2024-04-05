@@ -6,7 +6,6 @@ use std::fs::create_dir_all;
 use grammartec::{chunkstore::ChunkStore, context::Context};
 use libafl_bolts::Named;
 use serde::{Deserialize, Serialize};
-use serde_json;
 
 use crate::{
     corpus::{Corpus, Testcase},
@@ -100,9 +99,10 @@ where
         Ok(false)
     }
 
-    fn append_metadata<OT>(
+    fn append_metadata<EM, OT>(
         &mut self,
         state: &mut S,
+        _manager: &mut EM,
         _observers: &OT,
         testcase: &mut Testcase<S::Input>,
     ) -> Result<(), Error>

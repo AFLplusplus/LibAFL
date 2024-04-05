@@ -1,12 +1,9 @@
 //! LLVM compiler Wrapper from `LibAFL`
 
 use std::{
-    convert::Into,
     env,
     path::{Path, PathBuf},
     str::FromStr,
-    string::String,
-    vec::Vec,
 };
 
 use crate::{CompilerWrapper, Error, ToolWrapper, LIB_EXT, LIB_PREFIX};
@@ -31,10 +28,8 @@ include!(concat!(env!("OUT_DIR"), "/clang_constants.rs"));
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LLVMPasses {
     //CmpLogIns,
-    /// The CmpLog pass
+    /// The `CmpLog` pass
     CmpLogRtn,
-    /// The AFL coverage pass
-    AFLCoverage,
     /// The Autotoken pass
     AutoTokens,
     /// The Coverage Accouting (BB metric) pass
@@ -42,8 +37,10 @@ pub enum LLVMPasses {
     /// The dump cfg pass
     DumpCfg,
     #[cfg(unix)]
-    /// The CmpLog Instruction pass
+    /// The `CmpLog` Instruction pass
     CmpLogInstructions,
+    /// Instrument caller for sancov coverage
+    Ctx,
 }
 
 impl LLVMPasses {
@@ -53,8 +50,6 @@ impl LLVMPasses {
         match self {
             LLVMPasses::CmpLogRtn => PathBuf::from(env!("OUT_DIR"))
                 .join(format!("cmplog-routines-pass.{}", dll_extension())),
-            LLVMPasses::AFLCoverage => PathBuf::from(env!("OUT_DIR"))
-                .join(format!("afl-coverage-pass.{}", dll_extension())),
             LLVMPasses::AutoTokens => {
                 PathBuf::from(env!("OUT_DIR")).join(format!("autotokens-pass.{}", dll_extension()))
             }
@@ -66,6 +61,9 @@ impl LLVMPasses {
             #[cfg(unix)]
             LLVMPasses::CmpLogInstructions => PathBuf::from(env!("OUT_DIR"))
                 .join(format!("cmplog-instructions-pass.{}", dll_extension())),
+            LLVMPasses::Ctx => {
+                PathBuf::from(env!("OUT_DIR")).join(format!("ctx-pass.{}", dll_extension()))
+            }
         }
     }
 }
@@ -154,7 +152,7 @@ impl ToolWrapper for ClangWrapper {
         let mut suppress_linking = 0;
         let mut i = 1;
         while i < args.len() {
-            let arg_as_path = std::path::Path::new(args[i].as_ref());
+            let arg_as_path = Path::new(args[i].as_ref());
 
             if arg_as_path
                 .extension()
@@ -331,7 +329,7 @@ impl ToolWrapper for ClangWrapper {
             .base_args
             .iter()
             .map(|r| {
-                let arg_as_path = std::path::PathBuf::from(r);
+                let arg_as_path = PathBuf::from(r);
                 if r.ends_with('.') {
                     r.to_string()
                 } else {
@@ -368,7 +366,7 @@ impl ToolWrapper for ClangWrapper {
             // No output specified, we need to rewrite the single .c file's name into a -o
             // argument.
             for arg in &base_args {
-                let arg_as_path = std::path::PathBuf::from(arg);
+                let arg_as_path = PathBuf::from(arg);
                 if !arg.ends_with('.') && !arg.starts_with('-') {
                     if let Some(extension) = arg_as_path.extension() {
                         let extension = extension.to_str().unwrap();
@@ -378,7 +376,7 @@ impl ToolWrapper for ClangWrapper {
                                 args.push("-o".to_string());
                                 args.push(if self.linking {
                                     configuration
-                                        .replace_extension(&std::path::PathBuf::from("a.out"))
+                                        .replace_extension(&PathBuf::from("a.out"))
                                         .into_os_string()
                                         .into_string()
                                         .unwrap()

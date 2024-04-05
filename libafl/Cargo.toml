@@ -122,7 +122,7 @@ llmp_bind_public = ["libafl_bolts/llmp_bind_public"]
 llmp_compression = ["libafl_bolts/llmp_compression"]
 
 ## Enables debug output for LLMP (also needs a `logger` installed)
-llmp_debug = ["libafl_bolts/llmp_debug"]
+llmp_debug = ["std", "libafl_bolts/llmp_debug"]
 
 ## Reduces the initial map size for llmp
 llmp_small_maps = ["libafl_bolts/llmp_small_maps"] # reduces initial map size for llmp
@@ -163,7 +163,7 @@ backtrace = {version = "0.3", optional = true} # Used to get the stacktrace in S
 typed-builder = { version = "0.16", optional = true } # Implement the builder pattern at compiletime
 
 serde_json = { version = "1.0", optional = true, default-features = false, features = ["alloc"] }
-nix = { version = "0.26", optional = true }
+nix = { version = "0.27", optional = true }
 regex = { version = "1", optional = true }
 uuid = { version = "1.4", optional = true, features = ["serde", "v4"] }
 libm = "0.2.2"

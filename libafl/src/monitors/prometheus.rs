@@ -47,7 +47,7 @@ use crate::monitors::{ClientStats, Monitor, UserStatsValue};
 #[derive(Clone)]
 pub struct PrometheusMonitor<F>
 where
-    F: FnMut(String),
+    F: FnMut(&str),
 {
     print_fn: F,
     start_time: Duration,
@@ -63,7 +63,7 @@ where
 
 impl<F> Debug for PrometheusMonitor<F>
 where
-    F: FnMut(String),
+    F: FnMut(&str),
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("PrometheusMonitor")
@@ -75,7 +75,7 @@ where
 
 impl<F> Monitor for PrometheusMonitor<F>
 where
-    F: FnMut(String),
+    F: FnMut(&str),
 {
     /// the client monitor, mutable
     fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
@@ -98,7 +98,7 @@ where
     }
 
     #[allow(clippy::cast_sign_loss)]
-    fn display(&mut self, event_msg: String, sender_id: ClientId) {
+    fn display(&mut self, event_msg: &str, sender_id: ClientId) {
         // Update the prometheus metrics
         // Label each metric with the sender / client_id
         // The gauges must take signed i64's, with max value of 2^63-1 so it is
@@ -142,7 +142,7 @@ where
                 stat: String::new(),
             })
             .set(run_time.try_into().unwrap()); // run time in seconds, which can be converted to a time format by Grafana or similar
-        let total_clients = self.client_stats().len().try_into().unwrap(); // convert usize to u64 (unlikely that # of clients will be > 2^64 -1...)
+        let total_clients = self.client_stats_count().try_into().unwrap(); // convert usize to u64 (unlikely that # of clients will be > 2^64 -1...)
         self.clients_count
             .get_or_create(&Labels {
                 client: sender_id.0,
@@ -156,13 +156,13 @@ where
             event_msg,
             sender_id.0,
             format_duration_hms(&(current_time() - self.start_time)),
-            self.client_stats().len(),
+            self.client_stats_count(),
             self.corpus_size(),
             self.objective_size(),
             self.total_execs(),
             self.execs_per_sec_pretty()
         );
-        (self.print_fn)(fmt);
+        (self.print_fn)(&fmt);
 
         self.client_stats_insert(sender_id);
         let cur_client = self.client_stats_mut_for(sender_id);
@@ -192,7 +192,7 @@ where
 
 impl<F> PrometheusMonitor<F>
 where
-    F: FnMut(String),
+    F: FnMut(&str),
 {
     pub fn new(listener: String, print_fn: F) -> Self {
         // Gauge's implementation of clone uses Arc
