@@ -75,7 +75,7 @@ where
             "[{}]  (GLOBAL) run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             head,
             format_duration_hms(&(current_time() - self.start_time)),
-            self.client_stats().len(),
+            self.client_stats_count(),
             self.corpus_size(),
             self.objective_size(),
             self.total_execs(),
@@ -106,7 +106,7 @@ where
         #[cfg(feature = "introspection")]
         {
             // Print the client performance monitor. Skip the Client 0 which is the broker
-            for (i, client) in self.client_stats.iter().skip(1).enumerate() {
+            for (i, client) in self.client_stats.iter().filter(|x| x.enabled).enumerate() {
                 let fmt = format!("Client {:03}:\n{}", i + 1, client.introspection_monitor);
                 (self.print_fn)(&fmt);
             }

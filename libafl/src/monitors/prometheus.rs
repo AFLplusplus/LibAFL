@@ -142,7 +142,7 @@ where
                 stat: String::new(),
             })
             .set(run_time.try_into().unwrap()); // run time in seconds, which can be converted to a time format by Grafana or similar
-        let total_clients = self.client_stats().len().try_into().unwrap(); // convert usize to u64 (unlikely that # of clients will be > 2^64 -1...)
+        let total_clients = self.client_stats_count().try_into().unwrap(); // convert usize to u64 (unlikely that # of clients will be > 2^64 -1...)
         self.clients_count
             .get_or_create(&Labels {
                 client: sender_id.0,
@@ -156,7 +156,7 @@ where
             event_msg,
             sender_id.0,
             format_duration_hms(&(current_time() - self.start_time)),
-            self.client_stats().len(),
+            self.client_stats_count(),
             self.corpus_size(),
             self.objective_size(),
             self.total_execs(),

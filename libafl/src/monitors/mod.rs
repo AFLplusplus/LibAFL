@@ -62,22 +62,20 @@ impl Aggregator {
 
     /// takes the key and the ref to clients stats then aggregate them all.
     fn aggregate(&mut self, name: &str, client_stats: &[ClientStats]) {
-        let mut gather = vec![];
+        let mut gather = client_stats
+            .iter()
+            .filter_map(|client| client.user_monitor.get(name));
 
-        for client in client_stats {
-            if let Some(x) = client.user_monitor.get(name) {
-                gather.push(x);
-            }
-        }
+        let gather_count = gather.clone().count();
 
-        let (mut init, op) = match gather.first() {
+        let (mut init, op) = match gather.next() {
             Some(x) => (x.value().clone(), x.aggregator_op().clone()),
             _ => {
                 return;
             }
         };
 
-        for item in gather.iter().skip(1) {
+        for item in gather {
             match op {
                 AggregatorOps::None => {
                     // Nothing
@@ -112,7 +110,7 @@ impl Aggregator {
 
         if let AggregatorOps::Avg = op {
             // if avg then divide last.
-            init = match init.stats_div(gather.len()) {
+            init = match init.stats_div(gather_count) {
                 Some(x) => x,
                 _ => {
                     return;
@@ -340,6 +338,8 @@ fn prettify_float(value: f64) -> String {
 /// A simple struct to keep track of client monitor
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ClientStats {
+    /// If this client is enabled. This is set to `true` the first time we see this client.
+    pub enabled: bool,
     // monitor (maybe we need a separated struct?)
     /// The corpus size for this client
     pub corpus_size: u64,
@@ -506,6 +506,14 @@ pub trait Monitor {
             .fold(0_u64, |acc, x| acc + x.corpus_size)
     }
 
+    /// Count the number of enabled client stats
+    fn client_stats_count(&self) -> usize {
+        self.client_stats()
+            .iter()
+            .filter(|client| client.enabled)
+            .count()
+    }
+
     /// Amount of elements in the objectives (combined for all children)
     fn objective_size(&self) -> u64 {
         self.client_stats()
@@ -538,13 +546,22 @@ pub trait Monitor {
 
     /// The client monitor for a specific id, creating new if it doesn't exist
     fn client_stats_insert(&mut self, client_id: ClientId) {
-        let client_stat_count = self.client_stats().len();
-        for _ in client_stat_count..(client_id.0 + 1) as usize {
+        let total_client_stat_count = self.client_stats().len();
+        for _ in total_client_stat_count..=(client_id.0) as usize {
             self.client_stats_mut().push(ClientStats {
-                last_window_time: current_time(),
-                start_time: current_time(),
+                enabled: false,
+                last_window_time: Duration::from_secs(0),
+                start_time: Duration::from_secs(0),
                 ..ClientStats::default()
             });
+        }
+        let new_stat = self.client_stats_mut_for(client_id);
+        if !new_stat.enabled {
+            let timestamp = current_time();
+            // I have never seen this man in my life
+            new_stat.start_time = timestamp;
+            new_stat.last_window_time = timestamp;
+            new_stat.enabled = true;
         }
     }
 
@@ -673,7 +690,7 @@ impl Monitor for SimplePrintingMonitor {
             event_msg,
             sender_id.0,
             format_duration_hms(&(current_time() - self.start_time)),
-            self.client_stats().len(),
+            self.client_stats_count(),
             self.corpus_size(),
             self.objective_size(),
             self.total_execs(),
@@ -749,7 +766,7 @@ where
             event_msg,
             sender_id.0,
             format_duration_hms(&(current_time() - self.start_time)),
-            self.client_stats().len(),
+            self.client_stats_count(),
             self.corpus_size(),
             self.objective_size(),
             self.total_execs(),
