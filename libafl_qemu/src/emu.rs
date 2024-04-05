@@ -358,6 +358,13 @@ pub use libafl_qemu_sys::{CPUArchState, CPUState};
 
 use crate::sync_backdoor::{SyncBackdoor, SyncBackdoorError};
 
+// syshook_ret
+#[repr(C)]
+pub struct SyscallHookResult {
+    pub retval: GuestAddr,
+    pub skip_syscall: bool,
+}
+
 impl SyscallHookResult {
     #[must_use]
     pub fn new(value: Option<GuestAddr>) -> Self {

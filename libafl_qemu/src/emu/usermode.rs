@@ -22,6 +22,11 @@ pub enum HandlerError {
     MultipleInputDefinition,
 }
 
+pub struct GuestMaps {
+    orig_c_iter: *const c_void,
+    c_iter: *const c_void,
+}
+
 // Consider a private new only for Emulator
 impl GuestMaps {
     #[must_use]
