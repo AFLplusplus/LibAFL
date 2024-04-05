@@ -29,7 +29,8 @@
     clippy::missing_docs_in_private_items,
     clippy::module_name_repetitions,
     clippy::ptr_cast_constness,
-    clippy::negative_feature_names
+    clippy::negative_feature_names,
+    clippy::too_many_lines
 )]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
@@ -225,6 +226,9 @@ use {
     core::cell::{BorrowError, BorrowMutError},
     core::str::Utf8Error,
 };
+
+/// Localhost addr, this is used, for example, for LLMP Client, which connects to this address
+pub const IP_LOCALHOST: &str = "127.0.0.1";
 
 /// We need fixed names for many parts of this lib.
 pub trait Named {
