@@ -32,6 +32,7 @@ extern "C" {
 }
 
 /// overriding `__sanitizer_weak_hook_memcmp`
+/// # Safety this function has raw pointer access
 #[no_mangle]
 pub unsafe extern "C" fn __sanitizer_weak_hook_memcmp(
     called_pc: *const c_void,
