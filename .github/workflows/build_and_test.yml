@@ -231,7 +231,6 @@ jobs:
 
   fuzzers:
     strategy:
-      fail-fast: false
       matrix:
         os: [ubuntu-latest]
         fuzzer:
