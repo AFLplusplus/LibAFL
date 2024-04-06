@@ -261,7 +261,7 @@ jobs:
         fuzzer: [fuzzbench] # List all the fuzzers you want to test
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: ./.github/actions/setup-rust-env
+      - uses: ./.github/workflows/fuzzer-tester-prepare
       - name: Free Disk Space (Ubuntu)
         uses: jlumbroso/free-disk-space@main
         with:
