@@ -258,21 +258,68 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        fuzzer: [fuzzbench] # List all the fuzzers you want to test
+      fuzzer:
+        - ./fuzzers/fuzzbench_fork_qemu
+        - ./fuzzers/libfuzzer_stb_image_sugar
+        - ./fuzzers/nyx_libxml2_standalone
+        - ./fuzzers/baby_fuzzer_gramatron
+        - ./fuzzers/tinyinst_simple
+        - ./fuzzers/baby_fuzzer_with_forkexecutor
+        - ./fuzzers/baby_no_std
+        - ./fuzzers/baby_fuzzer_swap_differential
+        - ./fuzzers/baby_fuzzer_grimoire
+        - ./fuzzers/baby_fuzzer
+        - ./fuzzers/libfuzzer_libpng_launcher
+        - ./fuzzers/libfuzzer_libpng_accounting
+        - ./fuzzers/forkserver_libafl_cc
+        - ./fuzzers/libfuzzer_libpng_tcp_manager
+        - ./fuzzers/backtrace_baby_fuzzers
+        - ./fuzzers/fuzzbench_qemu
+        - ./fuzzers/nyx_libxml2_parallel
+        - ./fuzzers/qemu_launcher
+        - ./fuzzers/frida_gdiplus
+        - ./fuzzers/libfuzzer_stb_image_concolic
+        - ./fuzzers/nautilus_sync
+        - ./fuzzers/qemu_cmin
+        - ./fuzzers/qemu_systemmode
+        - ./fuzzers/push_harness
+        - ./fuzzers/libfuzzer_libpng_centralized
+        - ./fuzzers/baby_fuzzer_nautilus
+        - ./fuzzers/fuzzbench_text
+        - ./fuzzers/python_qemu
+        - ./fuzzers/libfuzzer_libpng_cmin
+        - ./fuzzers/forkserver_simple
+        - ./fuzzers/baby_fuzzer_unicode
+        - ./fuzzers/libfuzzer_libpng_norestart
+        - ./fuzzers/baby_fuzzer_multi
+        - ./fuzzers/libafl_atheris
+        - ./fuzzers/frida_libpng
+        - ./fuzzers/fuzzbench_ctx
+        - ./fuzzers/fuzzbench_forkserver_cmplog
+        - ./fuzzers/push_stage_harness
+        - ./fuzzers/libfuzzer_libmozjpeg
+        - ./fuzzers/libfuzzer_libpng_aflpp_ui
+        - ./fuzzers/libfuzzer_libpng
+        - ./fuzzers/baby_fuzzer_wasm
+        - ./fuzzers/fuzzbench
+        - ./fuzzers/libfuzzer_stb_image
+        - ./fuzzers/fuzzbench_forkserver
+        - ./fuzzers/libfuzzer_windows_asan
+        - ./fuzzers/baby_fuzzer_minimizing
+        - ./fuzzers/qemu_coverage
+        - ./fuzzers/frida_executable_libpng
+        - ./fuzzers/tutorial
+        - ./fuzzers/baby_fuzzer_tokens
+        - ./fuzzers/backtrace_baby_fuzzers/rust_code_with_inprocess_executor
+        - ./fuzzers/backtrace_baby_fuzzers/c_code_with_fork_executor
+        - ./fuzzers/backtrace_baby_fuzzers/command_executor
+        - ./fuzzers/backtrace_baby_fuzzers/forkserver_executor
+        - ./fuzzers/backtrace_baby_fuzzers/c_code_with_inprocess_executor
+        - ./fuzzers/backtrace_baby_fuzzers/rust_code_with_fork_executor
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/workflows/fuzzer-tester-prepare
-      - name: Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: false
-          docker-images: true
-          swap-storage: true
       - name: Symlink Headers
         if: runner.os == 'Linux'
         shell: bash

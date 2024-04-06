@@ -6,15 +6,16 @@ cd "$SCRIPT_DIR/.." || exit 1
 
 
 if [[ -z "${RUN_ON_CI}" ]]; then
-    fuzzer="$1"
+    fuzzer_to_test="$1"
 else
-    fuzzer="$1"
+    fuzzer_to_test="$1"
     export PROFILE=dev
     export PROFILE_DIR=debug
 fi
 
 libafl=$(pwd)
 
+echo "Testing" $fuzzer_to_test
 # build with a shared target dir for all fuzzers. this should speed up
 # compilation a bit, and allows for easier artifact management (caching and
 # cargo clean).
@@ -37,7 +38,7 @@ do
 done
 
 # shellcheck disable=SC2116
-for fuzzer in $(echo "$fuzzers");
+for fuzzer in $(echo "$fuzzer_to_test");
 do
     # skip nyx test on non-linux platforms
     if [[ $fuzzer == *"nyx_"* ]] && [[ $(uname -s) != "Linux" ]]; then
