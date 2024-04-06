@@ -509,15 +509,15 @@ where
                 if let Some(rt) = runtimes.match_first_type_mut::<HookRuntime>() {
                     if let Some((call_target, needs_return)) = rt.is_interesting(decoder, instr) {
                         rt.emit_callout(call_target, &instruction, needs_return, runtimes_unborrowed.clone());
-                        keep_instr = false;
+                        keep_instr = false; 
                     }
                 }
 
                 #[cfg(target_arch = "aarch64")]
                 if let Some(rt) = runtimes.match_first_type_mut::<HookRuntime>() {
-                    if let Some((call_target, needs_return, is_reg)) = rt.is_interesting(decoder, instr) {
-                        rt.emit_callout(call_target, &instruction, needs_return, is_reg, runtimes_unborrowed.clone());
-                        keep_instr = false;
+                    if let Some((call_target, is_reg)) = rt.is_interesting(decoder, instr) {
+                        rt.emit_callout(call_target, &instruction, is_reg, output.writer(), runtimes_unborrowed.clone());
+                        keep_instr = false; //we keep the instruction in the emit if needed
                     }
                 }
 

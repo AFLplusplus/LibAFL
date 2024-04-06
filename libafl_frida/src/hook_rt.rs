@@ -20,6 +20,11 @@ use yaxpeax_x86::long_mode::{InstDecoder, Opcode};
 #[cfg(target_arch = "aarch64")]
 use yaxpeax_arm::armv8::a64::{InstDecoder, Opcode, Operand};
 
+#[cfg(target_arch = "aarch64")]
+use frida_gum::instruction_writer::{Aarch64Register,Aarch64InstructionWriter,IndexMode,InstructionWriter};
+
+#[cfg(target_arch = "aarch64")]
+use std::ptr::addr_of;
 
 use crate::{
     asan::asan_rt::AsanRuntime,
@@ -31,8 +36,15 @@ use crate::{
 use crate::utils::{immediate_value, operand_details};
 
 /// Frida hooks for instrumented code
+#[cfg(target_arch = "x86_64")]
 pub struct HookRuntime {
     hooks: HashMap<usize, Box<dyn FnMut(usize, CpuContext, Option<&mut AsanRuntime>) + 'static>>,
+}
+
+#[cfg(target_arch = "aarch64")]
+pub struct HookRuntime {
+    hooks: HashMap<usize, Box<dyn FnMut(usize, CpuContext, Option<&mut AsanRuntime>) + 'static>>,
+    hooked: u64, //Runtimes are wrapped in a RefCell, so in theory we shouldn't need to pin this
 }
 
 impl Default for HookRuntime {
@@ -79,6 +91,7 @@ impl HookRuntime {
     pub fn new() -> Self {
         Self {
             hooks: HashMap::new(),
+            hooked: 0,
         }
     }
 
@@ -192,9 +205,10 @@ impl HookRuntime {
 
 
 
+
     #[inline]
     #[cfg(target_arch = "aarch64")]
-    pub fn is_interesting(&self, decoder: InstDecoder, instr: &Insn) -> Option<(usize, bool, bool)> {
+    pub fn is_interesting(&self, decoder: InstDecoder, instr: &Insn) -> Option<(usize, bool)> {
         let instruction = frida_to_cs(decoder, instr);
         
         match instruction.opcode{
@@ -206,9 +220,9 @@ impl HookRuntime {
                     panic!("Invalid instruction - opcode: {:?}, operands: {:?}", instruction.opcode, instruction.operands);
                 };
                 
-                let should_chaining_return = instruction.opcode == Opcode::BR;
-
-                return Some((reg_num as usize, should_chaining_return, true)); //the reg should always be checked
+                //we could probably introduce some kind of speculative backpatching as it is unlikely that if it is hooked the first time that it ever hooks again
+                
+                return Some((reg_num as usize, true)); //the reg should always be checked
             },
             Opcode::BL | Opcode::B => {
                 
@@ -221,9 +235,8 @@ impl HookRuntime {
                 if !self.hooks.contains_key(&call_address){
                     return None;
                 }
-                let should_chaining_return = instruction.opcode == Opcode::B;
 
-                return Some((call_address, should_chaining_return, false));
+                return Some((call_address, false));
                 
             },
 
@@ -265,15 +278,18 @@ impl HookRuntime {
         &mut self,
         address_or_reg: usize,
         insn: &Instruction,
-        needs_return: bool,
         is_reg: bool,
+        writer: Aarch64InstructionWriter,
         runtimes: Rc<RefCell<RT>>,
     ) {
+
+        let hooked_address = addr_of!(self.hooked) as u64;
         log::trace!("emit_callout: {:x}", address_or_reg);
-        insn.put_callout(move |mut context| {
+        insn.put_callout(move |context| {
             if !is_reg {
             //if we are not in a register, address_or_reg is the actual address
-                (self.hooks.get_mut(&address_or_reg).unwrap())(
+            //safe to unwrap because we check in is_interesting to see if we should hook
+                (self.hooks.get_mut(&address_or_reg).unwrap())( 
                     address_or_reg,
                     context,
                     runtimes.borrow_mut().match_first_type_mut::<AsanRuntime>(),
@@ -290,17 +306,60 @@ impl HookRuntime {
 
                 if let Some(f) = self.hooks.get_mut(&address) {
                     f(address, context, runtimes.borrow_mut().match_first_type_mut::<AsanRuntime>());
+                    self.hooked = 1;
                 } else {
-                        let raw_func: extern "C" fn(usize, usize, usize, usize, usize, usize, usize, usize) -> usize = unsafe { std::mem::transmute(address) };
-                        context.set_return_value(raw_func(context.arg(0), context.arg(1), context.arg(2), context.arg(3), context.arg(4), context.arg(5), context.arg(6), context.arg(7)));
+                    self.hooked = 0;
                 }
             }
         });
 
-        if needs_return {
-            log::trace!("needs return at {:x}", address_or_reg);
+        if is_reg { //Opcode::BR/Opcode::BLR
+            //write load from self.hooked, cbz to end, 
+            let redzone_size = frida_gum_sys::GUM_RED_ZONE_SIZE as i32;
+            let not_hooked_label_id = insn.instr().address() | 0xfaded; //this is label id for the hooked
+
+            //stp x16, x17, [sp, #-0x90]!
+            writer.put_stp_reg_reg_reg_offset(
+                Aarch64Register::X16,
+                Aarch64Register::X17,
+                Aarch64Register::Sp,
+                i64::from(-(16 + redzone_size)),
+                IndexMode::PreAdjust,
+            );
+            //mov x16, &self->hooked
+            writer.put_ldr_reg_u64(Aarch64Register::X16, hooked_address);
+            //move self->hooked into x16
+            writer.put_ldr_reg_reg(Aarch64Register::X16, Aarch64Register::X16);
+            //if hooked is 0 then we want to continue as if nothing happened
+            writer.put_cbz_reg_label(Aarch64Register::X16, not_hooked_label_id);
+            //this branch we have a hook
+            writer.put_ldp_reg_reg_reg_offset(
+                Aarch64Register::X16,
+                Aarch64Register::X17,
+                Aarch64Register::Sp,
+                16 + i64::from(redzone_size),
+                IndexMode::PostAdjust,
+            );
+            //then we chaining return because we hooked
+            insn.put_chaining_return();
+
+            writer.put_label(not_hooked_label_id);
+
+            writer.put_ldp_reg_reg_reg_offset(
+                Aarch64Register::X16,
+                Aarch64Register::X17,
+                Aarch64Register::Sp,
+                16 + i64::from(redzone_size),
+                IndexMode::PostAdjust,
+            );
+
+            insn.keep(); //the keep will dispatch to the next block
+
+        } else { //Opcode::B/Opcode::BL
             insn.put_chaining_return();
         }
+            //instruction should be kept here
+        
     }
     
 }
