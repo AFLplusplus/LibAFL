@@ -14,6 +14,22 @@ runs:
       with:
         profile: minimal
         toolchain: stable
+    - name: Free Disk Space (Ubuntu)
+      if: runner.os == 'Linux'
+      uses: jlumbroso/free-disk-space@main
+      with:
+        # this might remove tools that are actually needed,
+        # if set to "true" but frees about 6 GB
+        tool-cache: false
+
+        # all of these default to true, but feel free to set to
+        # "false" if necessary for your workflow
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: false
+        docker-images: true
+        swap-storage: true
     - name: Add nightly rustfmt and clippy
       shell: bash
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
