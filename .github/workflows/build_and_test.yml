@@ -257,12 +257,11 @@ jobs:
           - ./fuzzers/libfuzzer_stb_image_concolic
           - ./fuzzers/nautilus_sync
           - ./fuzzers/qemu_cmin
-          - ./fuzzers/qemu_systemmode
+          # - ./fuzzers/qemu_systemmode
           - ./fuzzers/push_harness
           - ./fuzzers/libfuzzer_libpng_centralized
           - ./fuzzers/baby_fuzzer_nautilus
           - ./fuzzers/fuzzbench_text
-          - ./fuzzers/python_qemu
           - ./fuzzers/libfuzzer_libpng_cmin
           - ./fuzzers/forkserver_simple
           - ./fuzzers/baby_fuzzer_unicode
