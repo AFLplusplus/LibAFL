@@ -7,7 +7,7 @@ use libafl_qemu_sys::GuestAddr;
 use libafl_qemu_sys::GuestPhysAddr;
 pub use libafl_targets::{
     edges_map_mut_ptr, edges_map_mut_slice, edges_max_num, std_edges_map_observer, EDGES_MAP,
-    EDGES_MAP_PTR, EDGES_MAP_PTR_NUM, EDGES_MAP_SIZE, MAX_EDGES_NUM,
+    EDGES_MAP_PTR, EDGES_MAP_PTR_NUM, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_NUM,
 };
 use serde::{Deserialize, Serialize};
 
@@ -553,7 +553,7 @@ where
     match meta.map.entry((src, dest)) {
         Entry::Occupied(e) => {
             let id = *e.get();
-            let nxt = (id as usize + 1) & (EDGES_MAP_SIZE - 1);
+            let nxt = (id as usize + 1) & (EDGES_MAP_SIZE_IN_USE - 1);
             unsafe {
                 MAX_EDGES_NUM = max(MAX_EDGES_NUM, nxt);
             }
@@ -562,7 +562,7 @@ where
         Entry::Vacant(e) => {
             let id = meta.current_id;
             e.insert(id);
-            meta.current_id = (id + 1) & (EDGES_MAP_SIZE as u64 - 1);
+            meta.current_id = (id + 1) & (EDGES_MAP_SIZE_IN_USE as u64 - 1);
             unsafe {
                 MAX_EDGES_NUM = meta.current_id as usize;
             }
