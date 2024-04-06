@@ -12,7 +12,7 @@ edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 [package.metadata.docs.rs]
-features = ["document-features", "default", "python", "x86_64", "usermode"]
+features = ["document-features", "default", "x86_64", "usermode"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
@@ -24,8 +24,6 @@ document-features = ["dep:document-features"]
 #! ### General Features
 ## Find injections during fuzzing
 injections = ["serde_yaml", "toml"]
-## Python bindings support
-python = ["pyo3", "pyo3-build-config", "libafl_qemu_sys/python"]
 ## Fork support
 fork = ["libafl/fork"]
 ## Build libqasan for address sanitization
@@ -87,12 +85,10 @@ paste = "1"
 enum-map = "2.7"
 serde_yaml = { version = "0.8", optional = true } # For parsing the injections yaml file
 toml = { version = "0.4.2", optional = true } # For parsing the injections toml file
-pyo3 = { version = "0.18", optional = true }
 # Document all features of this crate (for `cargo doc`)
 document-features = { version = "0.2", optional = true }
 
 [build-dependencies]
-pyo3-build-config = { version = "0.18", optional = true }
 rustversion = "1.0"
 bindgen = "0.69"
 

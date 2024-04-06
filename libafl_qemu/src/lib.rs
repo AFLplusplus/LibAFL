@@ -131,33 +131,3 @@ pub fn filter_qemu_args() -> Vec<String> {
     }
     args
 }
-
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
-
-#[cfg(feature = "python")]
-#[pymodule]
-#[pyo3(name = "libafl_qemu")]
-#[allow(clippy::items_after_statements, clippy::too_many_lines)]
-pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
-    let regsm = PyModule::new(py, "regs")?;
-    for r in Regs::iter() {
-        let v: i32 = r.into();
-        regsm.add(&format!("{r:?}"), v)?;
-    }
-    m.add_submodule(regsm)?;
-
-    let mmapm = PyModule::new(py, "mmap")?;
-    for r in emu::MmapPerms::iter() {
-        let v: i32 = r.into();
-        mmapm.add(&format!("{r:?}"), v)?;
-    }
-    m.add_submodule(mmapm)?;
-
-    m.add_class::<emu::MapInfo>()?;
-    m.add_class::<emu::GuestMaps>()?;
-    m.add_class::<emu::SyscallHookResult>()?;
-    m.add_class::<emu::pybind::Qemu>()?;
-
-    Ok(())
-}
