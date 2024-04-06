@@ -316,7 +316,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     let edges_map_size_allocated: usize = option_env!("LIBAFL_EDGES_MAP_SIZE_ALLOCATED")
         .map_or(Ok(2_621_440), str::parse)
         .expect("Could not parse LIBAFL_EDGES_MAP_SIZE_IN_USE");
-    cxxflags.push(format!("-DLIBAFL_EDGES_MAP_SIZE={edges_map_size_in_use}"));
+    cxxflags.push(format!("-DLIBAFL_EDGES_MAP_SIZE_IN_USE={edges_map_size_in_use}"));
 
     let acc_map_size: usize = option_env!("LIBAFL_ACCOUNTING_MAP_SIZE")
         .map_or(Ok(65_536), str::parse)
