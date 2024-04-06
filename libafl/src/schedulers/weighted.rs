@@ -231,7 +231,7 @@ where
     O: MapObserver,
     S: HasCorpus + HasMetadata + HasRand + HasTestcase + State,
 {
-    /// This will *NOT* neutralize the effect of this removed testcase from the global data such as SchedulerMetadata
+    /// This will *NOT* neutralize the effect of this removed testcase from the global data such as `SchedulerMetadata`
     fn on_remove(
         &mut self,
         _state: &mut Self::State,
@@ -242,7 +242,7 @@ where
         Ok(())
     }
 
-    /// This will *NOT* neutralize the effect of this removed testcase from the global data such as SchedulerMetadata
+    /// This will *NOT* neutralize the effect of this removed testcase from the global data such as `SchedulerMetadata`
     fn on_replace(
         &mut self,
         _state: &mut Self::State,
