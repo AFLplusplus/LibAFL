@@ -272,7 +272,10 @@ where
     fn take<'a, T: 'static>(mut self) -> (Option<&'a T>, Self) {
         if TypeId::of::<T>() == TypeId::of::<Head>() {
             let r = self.0.take();
-            (unsafe { core::mem::transmute::<core::option::Option<&Head>, core::option::Option<&T>>(r) }, self)
+            (
+                unsafe { core::mem::transmute::<Option<&Head>, Option<&T>>(r) },
+                self,
+            )
         } else {
             let (r, tail) = self.1.take::<T>();
             (r, (self.0, tail))
@@ -288,7 +291,10 @@ where
     fn take<'a, T: 'static>(mut self) -> (Option<&'a T>, Self) {
         if TypeId::of::<T>() == TypeId::of::<Head>() {
             let r = self.0.take();
-            (unsafe { core::mem::transmute::<core::option::Option<&mut Head>, core::option::Option<&T>>(r) }, self)
+            (
+                unsafe { core::mem::transmute::<Option<&mut Head>, Option<&T>>(r) },
+                self,
+            )
         } else {
             let (r, tail) = self.1.take::<T>();
             (r, (self.0, tail))
@@ -316,7 +322,10 @@ where
     fn take<'a, T: 'static>(mut self) -> (Option<&'a mut T>, Self) {
         if TypeId::of::<T>() == TypeId::of::<Head>() {
             let r = self.0.take();
-            (unsafe { core::mem::transmute::<core::option::Option<&mut Head>, core::option::Option<&mut T>>(r) }, self)
+            (
+                unsafe { core::mem::transmute::<Option<&mut Head>, Option<&mut T>>(r) },
+                self,
+            )
         } else {
             let (r, tail) = self.1.take::<T>();
             (r, (self.0, tail))
