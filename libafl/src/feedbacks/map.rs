@@ -857,7 +857,7 @@ mod tests {
 
 /// `MapFeedback` Python bindings
 #[cfg(feature = "python")]
-#[allow(missing_docs)]
+#[allow(missing_docs, clippy::missing_transmute_annotations)]
 pub mod pybind {
     use concat_idents::concat_idents;
     use pyo3::prelude::*;

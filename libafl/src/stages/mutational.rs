@@ -406,7 +406,11 @@ where
 
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
-#[allow(clippy::unnecessary_fallible_conversions, unused_qualifications)]
+#[allow(
+    clippy::unnecessary_fallible_conversions,
+    unused_qualifications,
+    clippy::missing_transmute_annotations
+)]
 /// `StdMutationalStage` Python bindings
 pub mod pybind {
     use pyo3::prelude::*;

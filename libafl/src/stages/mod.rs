@@ -646,7 +646,7 @@ impl ExecutionCountRestartHelper {
 
 /// `Stage` Python bindings
 #[cfg(feature = "python")]
-#[allow(missing_docs)]
+#[allow(missing_docs, clippy::missing_transmute_annotations)]
 pub mod pybind {
     use alloc::vec::Vec;
 

@@ -487,7 +487,7 @@ where
 }
 
 #[cfg(feature = "python")]
-#[allow(missing_docs)]
+#[allow(missing_docs, clippy::missing_transmute_annotations)]
 /// `Testcase` Python bindings
 pub mod pybind {
     use alloc::{boxed::Box, vec::Vec};

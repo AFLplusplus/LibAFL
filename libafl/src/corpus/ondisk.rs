@@ -262,7 +262,11 @@ where
 }
 
 #[cfg(feature = "python")]
-#[allow(clippy::unnecessary_fallible_conversions, unused_qualifications)]
+#[allow(
+    clippy::unnecessary_fallible_conversions,
+    unused_qualifications,
+    clippy::missing_transmute_annotations
+)]
 /// `OnDiskCorpus` Python bindings
 pub mod pybind {
     use alloc::string::String;

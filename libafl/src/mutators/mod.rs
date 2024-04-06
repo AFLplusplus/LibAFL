@@ -410,7 +410,7 @@ impl<I, S> IntoVec<Box<dyn Mutator<I, S>>> for Vec<Box<dyn Mutator<I, S>>> {
 
 /// `Mutator` Python bindings
 #[cfg(feature = "python")]
-#[allow(missing_docs)]
+#[allow(missing_docs, clippy::missing_transmute_annotations)]
 pub mod pybind {
     use core::ffi::CStr;
 

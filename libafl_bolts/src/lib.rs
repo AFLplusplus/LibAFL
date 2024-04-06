@@ -1039,7 +1039,7 @@ pub unsafe fn set_error_print_panic_hook(new_stderr: RawFd) {
 }
 
 #[cfg(feature = "python")]
-#[allow(missing_docs)]
+#[allow(missing_docs, clippy::missing_transmute_annotations)]
 pub mod pybind {
 
     use pyo3::{pymodule, types::PyModule, PyResult, Python};

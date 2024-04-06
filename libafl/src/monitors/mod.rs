@@ -1308,7 +1308,11 @@ impl Default for ClientPerfMonitor {
 }
 /// `Monitor` Python bindings
 #[cfg(feature = "python")]
-#[allow(clippy::unnecessary_fallible_conversions, unused_qualifications)]
+#[allow(
+    clippy::unnecessary_fallible_conversions,
+    unused_qualifications,
+    clippy::missing_transmute_annotations
+)]
 #[allow(missing_docs)]
 pub mod pybind {
     use alloc::{boxed::Box, vec::Vec};

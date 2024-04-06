@@ -259,7 +259,7 @@ pub mod test {
 }
 
 #[cfg(feature = "python")]
-#[allow(missing_docs)]
+#[allow(missing_docs, clippy::missing_transmute_annotations)]
 /// `Executor` Python bindings
 pub mod pybind {
     use pyo3::prelude::*;

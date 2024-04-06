@@ -436,7 +436,7 @@ mod tests {
 
 #[cfg(feature = "python")]
 #[allow(clippy::unnecessary_fallible_conversions, unused_qualifications)]
-#[allow(missing_docs)]
+#[allow(missing_docs, clippy::missing_transmute_annotations)]
 /// `Rand` Python bindings
 pub mod pybind {
     use pyo3::prelude::*;
