@@ -8,7 +8,7 @@ typedef uint32_t prev_loc_t;
 /* Maximum K for top-K context sensitivity */
 #define CTX_MAX_K 32U
 
-extern uint8_t __afl_area_ptr_local[EDGES_MAP_SIZE];
+extern uint8_t __afl_area_ptr_local[EDGES_MAP_SIZE_ALLOC];
 uint8_t       *__afl_area_ptr = __afl_area_ptr_local;
 
 extern uint32_t __afl_acc_memop_ptr_local[ACCOUNTING_MAP_SIZE];
