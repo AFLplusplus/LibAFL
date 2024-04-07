@@ -348,8 +348,9 @@ impl Allocator {
 
             let remainder = size % 8;
             if remainder > 0 {                
-
-                ((start + size / 8) as *mut u8).write(0xff << (8-remainder));
+                let mut current_value = ((start + size/8) as *const u8).read();
+                current_value = current_value | (0xff << (8-remainder));
+                ((start + size / 8) as *mut u8).write(current_value);
             }
         }
     }
@@ -362,7 +363,11 @@ impl Allocator {
 
             let remainder = size % 8;
             if remainder > 0 {
-                ((start + size / 8) as *mut u8).write(0x00);
+                let mask = !(0xff << (8-remainder));
+                let mut current_value = ((start + size/8) as *const u8).read();
+
+                current_value = current_value & mask;
+                ((start + size / 8) as *mut u8).write(current_value);
             }
         }
     }

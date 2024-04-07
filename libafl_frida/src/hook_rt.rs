@@ -305,6 +305,7 @@ impl HookRuntime {
                 } as usize;
 
                 if let Some(f) = self.hooks.get_mut(&address) {
+                    //the hook sets the return value for us, so we have nothing to do
                     f(address, context, runtimes.borrow_mut().match_first_type_mut::<AsanRuntime>());
                     self.hooked = 1;
                 } else {
@@ -326,7 +327,7 @@ impl HookRuntime {
                 i64::from(-(16 + redzone_size)),
                 IndexMode::PreAdjust,
             );
-            //mov x16, &self->hooked
+            //mov &self->hooked into x16
             writer.put_ldr_reg_u64(Aarch64Register::X16, hooked_address);
             //move self->hooked into x16
             writer.put_ldr_reg_reg(Aarch64Register::X16, Aarch64Register::X16);
