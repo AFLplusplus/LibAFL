@@ -102,7 +102,7 @@ pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned 
     fn count_bytes(&self) -> u64;
 
     /// Compute the hash of the map without needing to provide a hasher
-    fn hash_easy(&self) -> u64;
+    fn hash_simple(&self) -> u64;
 
     /// Get the initial value for `reset()`
     fn initial(&self) -> Self::Entry;
@@ -403,7 +403,8 @@ where
         self.as_slice().len()
     }
 
-    fn hash_easy(&self) -> u64 {
+    #[inline]
+    fn hash_simple(&self) -> u64 {
         let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
         Hash::hash(self, &mut hasher);
         hasher.finish()
@@ -909,7 +910,8 @@ where
         self.as_slice().len()
     }
 
-    fn hash_easy(&self) -> u64 {
+    #[inline]
+    fn hash_simple(&self) -> u64 {
         let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
         Hash::hash(self, &mut hasher);
         hasher.finish()
@@ -1241,7 +1243,9 @@ where
         }
         res
     }
-    fn hash_easy(&self) -> u64 {
+
+    #[inline]
+    fn hash_simple(&self) -> u64 {
         let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
         Hash::hash(self, &mut hasher);
         hasher.finish()
@@ -1488,8 +1492,9 @@ where
         self.base.reset_map()
     }
 
-    fn hash_easy(&self) -> u64 {
-        self.base.hash_easy()
+    #[inline]
+    fn hash_simple(&self) -> u64 {
+        self.base.hash_simple()
     }
     fn to_vec(&self) -> Vec<u8> {
         self.base.to_vec()
@@ -1738,8 +1743,9 @@ where
         self.base.reset_map()
     }
 
-    fn hash_easy(&self) -> u64 {
-        self.base.hash_easy()
+    #[inline]
+    fn hash_simple(&self) -> u64 {
+        self.base.hash_simple()
     }
     fn to_vec(&self) -> Vec<u8> {
         self.base.to_vec()
@@ -2008,7 +2014,8 @@ where
         res
     }
 
-    fn hash_easy(&self) -> u64 {
+    #[inline]
+    fn hash_simple(&self) -> u64 {
         let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
         Hash::hash(self, &mut hasher);
         hasher.finish()
@@ -2361,7 +2368,8 @@ where
         self.as_slice().len()
     }
 
-    fn hash_easy(&self) -> u64 {
+    #[inline]
+    fn hash_simple(&self) -> u64 {
         let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
         Hash::hash(self, &mut hasher);
         hasher.finish()
@@ -2717,6 +2725,12 @@ pub mod pybind {
                 }
             }
 
+            impl Hash for $struct_name_trait {
+                fn hash<H: Hasher>(&self, hasher: &mut H) {
+                    hash_slice(self.as_slice(), hasher);
+                }
+            }
+
             impl MapObserver for $struct_name_trait {
                 type Entry = $datatype;
 
@@ -2741,8 +2755,8 @@ pub mod pybind {
                     mapob_unwrap_me!($wrapper_name, self.wrapper, m, { m.usable_count() })
                 }
 
-                fn hash_easy(&self) -> u64 {
-                    mapob_unwrap_me!($wrapper_name, self.wrapper, m, { m.hash() })
+                fn hash_simple(&self) -> u64 {
+                    mapob_unwrap_me!($wrapper_name, self.wrapper, m, { m.hash_simple() })
                 }
 
                 #[inline]
