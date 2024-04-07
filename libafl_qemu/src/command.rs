@@ -5,9 +5,10 @@ use std::fmt::{Debug, Display, Formatter};
 use enum_map::Enum;
 use libafl::{
     executors::ExitKind,
-    inputs::{BytesInput, HasBytesVec},
+    inputs::HasTargetBytes,
     state::{HasExecutions, State},
 };
+use libafl_bolts::AsSlice;
 use libafl_qemu_sys::{GuestPhysAddr, GuestVirtAddr};
 use num_enum::TryFromPrimitive;
 
@@ -20,7 +21,7 @@ use crate::{
     StdEmuExitHandler, StdInstrumentationFilter, CPU,
 };
 
-pub const VERSION: u64 = bindings::LIBAFL_EXIT_VERSION_NUMBER as u64;
+pub const VERSION: u64 = bindings::LIBAFL_QEMU_HDR_VERSION_NUMBER as u64;
 
 mod bindings {
     #![allow(non_upper_case_globals)]
@@ -39,23 +40,24 @@ mod bindings {
 #[derive(Debug, Clone, TryFromPrimitive)]
 #[repr(u64)]
 pub enum NativeBackdoorCommand {
-    StartVirt = bindings::LibaflExit_LIBAFL_EXIT_START_VIRT.0 as u64, // Shortcut for Save + InputVirt
-    StartPhys = bindings::LibaflExit_LIBAFL_EXIT_START_PHYS.0 as u64, // Shortcut for Save + InputPhys
-    InputVirt = bindings::LibaflExit_LIBAFL_EXIT_INPUT_VIRT.0 as u64, // The address is a virtual address using the paging currently running in the VM.
-    InputPhys = bindings::LibaflExit_LIBAFL_EXIT_INPUT_PHYS.0 as u64, // The address is a physical address
-    End = bindings::LibaflExit_LIBAFL_EXIT_END.0 as u64, // Implies reloading of the target. The first argument gives the exit status.
-    Save = bindings::LibaflExit_LIBAFL_EXIT_SAVE.0 as u64, // Save the VM
-    Load = bindings::LibaflExit_LIBAFL_EXIT_LOAD.0 as u64, // Reload the target without ending the run?
-    Version = bindings::LibaflExit_LIBAFL_EXIT_VERSION.0 as u64, // Version of the bindings used in the target
-    VaddrFilterAllowRange = bindings::LibaflExit_LIBAFL_EXIT_VADDR_FILTER_ALLOW.0 as u64, // Allow given address range
+    StartVirt = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_START_VIRT.0 as u64, // Shortcut for Save + InputVirt
+    StartPhys = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_START_PHYS.0 as u64, // Shortcut for Save + InputPhys
+    InputVirt = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_INPUT_VIRT.0 as u64, // The address is a virtual address using the paging currently running in the VM.
+    InputPhys = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_INPUT_PHYS.0 as u64, // The address is a physical address
+    End = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_END.0 as u64, // Implies reloading of the target. The first argument gives the exit status.
+    Save = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_SAVE.0 as u64, // Save the VM
+    Load = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_LOAD.0 as u64, // Reload the target without ending the run?
+    Version = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_VERSION.0 as u64, // Version of the bindings used in the target
+    VaddrFilterAllowRange =
+        bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_VADDR_FILTER_ALLOW.0 as u64, // Allow given address range
 }
 
 #[derive(Debug, Clone, Enum, TryFromPrimitive)]
 #[repr(u64)]
 pub enum NativeExitKind {
-    Unknown = bindings::LibaflExitEndStatus_LIBAFL_EXIT_END_UNKNOWN.0 as u64, // Should not be used
-    Ok = bindings::LibaflExitEndStatus_LIBAFL_EXIT_END_OK.0 as u64,           // Normal exit
-    Crash = bindings::LibaflExitEndStatus_LIBAFL_EXIT_END_CRASH.0 as u64, // Crash reported in the VM
+    Unknown = bindings::LibaflQemuEndStatus_LIBAFL_QEMU_END_UNKNOWN.0 as u64, // Should not be used
+    Ok = bindings::LibaflQemuEndStatus_LIBAFL_QEMU_END_OK.0 as u64,           // Normal exit
+    Crash = bindings::LibaflQemuEndStatus_LIBAFL_QEMU_END_CRASH.0 as u64, // Crash reported in the VM
 }
 
 pub trait IsCommand<QT, S, E>
@@ -77,7 +79,7 @@ where
         &self,
         emu: &Emulator<QT, S, E>,
         qemu_executor_state: &mut QemuExecutorState<QT, S>,
-        input: &BytesInput,
+        input: &S::Input,
         ret_reg: Option<Regs>,
     ) -> Result<InnerHandlerResult, HandlerError>;
 }
@@ -106,6 +108,7 @@ where
     SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
+    S::Input: HasTargetBytes,
 {
     fn usable_at_runtime(&self) -> bool {
         match self {
@@ -145,7 +148,7 @@ where
         &self,
         emu: &Emulator<QT, S, StdEmuExitHandler<SM>>,
         qemu_executor_state: &mut QemuExecutorState<QT, S>,
-        input: &BytesInput,
+        input: &S::Input,
         ret_reg: Option<Regs>,
     ) -> Result<InnerHandlerResult, HandlerError> {
         match self {
@@ -233,6 +236,7 @@ where
     SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
+    S::Input: HasTargetBytes,
 {
     fn usable_at_runtime(&self) -> bool {
         false
@@ -246,7 +250,7 @@ where
             QT,
             S,
         >,
-        _input: &BytesInput,
+        _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<InnerHandlerResult, HandlerError> {
         let qemu = emu.qemu();
@@ -286,6 +290,7 @@ where
     SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
+    S::Input: HasTargetBytes,
 {
     fn usable_at_runtime(&self) -> bool {
         false
@@ -295,7 +300,7 @@ where
         &self,
         emu: &Emulator<QT, S, StdEmuExitHandler<SM>>,
         _qemu_executor_state: &mut QemuExecutorState<QT, S>,
-        _input: &BytesInput,
+        _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<InnerHandlerResult, HandlerError> {
         let qemu = emu.qemu();
@@ -323,6 +328,7 @@ where
     SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
+    S::Input: HasTargetBytes,
 {
     fn usable_at_runtime(&self) -> bool {
         true
@@ -332,12 +338,12 @@ where
         &self,
         emu: &Emulator<QT, S, StdEmuExitHandler<SM>>,
         _qemu_executor_state: &mut QemuExecutorState<QT, S>,
-        input: &BytesInput,
+        input: &S::Input,
         ret_reg: Option<Regs>,
     ) -> Result<InnerHandlerResult, HandlerError> {
         let qemu = emu.qemu();
 
-        let ret_value = self.location.write(qemu, input.bytes());
+        let ret_value = self.location.write(qemu, input.target_bytes().as_slice());
 
         if let Some(reg) = ret_reg {
             qemu.write_reg(reg, ret_value).unwrap();
@@ -357,6 +363,7 @@ where
     SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
+    S::Input: HasTargetBytes,
 {
     fn usable_at_runtime(&self) -> bool {
         false
@@ -366,7 +373,7 @@ where
         &self,
         emu: &Emulator<QT, S, StdEmuExitHandler<SM>>,
         _qemu_executor_state: &mut QemuExecutorState<QT, S>,
-        input: &BytesInput,
+        input: &S::Input,
         ret_reg: Option<Regs>,
     ) -> Result<InnerHandlerResult, HandlerError> {
         let emu_exit_handler = emu.exit_handler().borrow_mut();
@@ -381,7 +388,9 @@ where
             .set_input_location(self.input_location.clone(), ret_reg)
             .unwrap();
 
-        let ret_value = self.input_location.write(qemu, input.bytes());
+        let ret_value = self
+            .input_location
+            .write(qemu, input.target_bytes().as_slice());
 
         if let Some(reg) = ret_reg {
             qemu.write_reg(reg, ret_value).unwrap();
@@ -399,6 +408,7 @@ where
     SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
+    S::Input: HasTargetBytes,
 {
     fn usable_at_runtime(&self) -> bool {
         false
@@ -408,7 +418,7 @@ where
         &self,
         emu: &Emulator<QT, S, StdEmuExitHandler<SM>>,
         _qemu_executor_state: &mut QemuExecutorState<QT, S>,
-        _input: &BytesInput,
+        _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<InnerHandlerResult, HandlerError> {
         let emu_exit_handler = emu.exit_handler().borrow_mut();
@@ -433,6 +443,7 @@ where
     SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
+    S::Input: HasTargetBytes,
 {
     fn usable_at_runtime(&self) -> bool {
         true
@@ -442,7 +453,7 @@ where
         &self,
         _emu: &Emulator<QT, S, StdEmuExitHandler<SM>>,
         _qemu_executor_state: &mut QemuExecutorState<QT, S>,
-        _input: &BytesInput,
+        _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<InnerHandlerResult, HandlerError> {
         let guest_version = self.0;
@@ -471,6 +482,7 @@ where
     SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
+    S::Input: HasTargetBytes,
 {
     fn usable_at_runtime(&self) -> bool {
         true
@@ -480,7 +492,7 @@ where
         &self,
         _emu: &Emulator<QT, S, StdEmuExitHandler<SM>>,
         qemu_executor_state: &mut QemuExecutorState<QT, S>,
-        _input: &BytesInput,
+        _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<InnerHandlerResult, HandlerError> {
         let qemu_helpers = qemu_executor_state.hooks_mut().helpers_mut();
@@ -501,6 +513,7 @@ where
     SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
     S: State + HasExecutions,
+    S::Input: HasTargetBytes,
 {
     fn usable_at_runtime(&self) -> bool {
         true
@@ -511,7 +524,7 @@ where
         &self,
         _emu: &Emulator<QT, S, StdEmuExitHandler<SM>>,
         qemu_executor_state: &mut QemuExecutorState<QT, S>,
-        _input: &BytesInput,
+        _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<InnerHandlerResult, HandlerError> {
         let qemu_helpers = qemu_executor_state.hooks_mut().helpers_mut();

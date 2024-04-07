@@ -1,5 +1,5 @@
-#ifndef LIBAFL_EXIT_H
-#define LIBAFL_EXIT_H
+#ifndef LIBAFL_QEMU_H
+#define LIBAFL_QEMU_H
 
 /**
  * LibAFL QEMU header file.
@@ -28,57 +28,56 @@ typedef UINT64 libafl_word;
   #define LIBAFL_CALLING_CONVENTION __fastcall
 
 #else
-  #ifdef __x86_64__
-    #include <stdint.h>
+  #include <stdint.h>
 
-typedef uint64_t libafl_word;
+  #ifdef __x86_64__
+    typedef uint64_t libafl_word;
     #define LIBAFL_CALLING_CONVENTION __attribute__(())
   #endif
 
   #ifdef __arm__
-    #include <stdint.h>
-
-typedef uint32_t libafl_word;
+    typedef uint32_t libafl_word;
     #define LIBAFL_CALLING_CONVENTION __attribute__(())
   #endif
 #endif
 
-#define LIBAFL_EXIT_OPCODE 0x66f23a0f
+#define LIBAFL_SYNC_EXIT_OPCODE 0x66f23a0f
 #define LIBAFL_BACKDOOR_OPCODE 0x44f23a0f
 
-#define LIBAFL_EXIT_VERSION_NUMBER 0111  // TODO: find a nice way to set it.
+#define LIBAFL_QEMU_HDR_VERSION_NUMBER 0111  // TODO: find a nice way to set it.
 
-typedef enum LibaflExit {
-  LIBAFL_EXIT_START_VIRT = 0,
-  LIBAFL_EXIT_START_PHYS = 1,
-  LIBAFL_EXIT_INPUT_VIRT = 2,
-  LIBAFL_EXIT_INPUT_PHYS = 3,
-  LIBAFL_EXIT_END = 4,
-  LIBAFL_EXIT_SAVE = 5,
-  LIBAFL_EXIT_LOAD = 6,
-  LIBAFL_EXIT_VERSION = 7,
-  LIBAFL_EXIT_VADDR_FILTER_ALLOW = 8,
+typedef enum LibaflQemuCommand {
+  LIBAFL_QEMU_COMMAND_START_VIRT = 0,
+  LIBAFL_QEMU_COMMAND_START_PHYS = 1,
+  LIBAFL_QEMU_COMMAND_INPUT_VIRT = 2,
+  LIBAFL_QEMU_COMMAND_INPUT_PHYS = 3,
+  LIBAFL_QEMU_COMMAND_END = 4,
+  LIBAFL_QEMU_COMMAND_SAVE = 5,
+  LIBAFL_QEMU_COMMAND_LOAD = 6,
+  LIBAFL_QEMU_COMMAND_VERSION = 7,
+  LIBAFL_QEMU_COMMAND_VADDR_FILTER_ALLOW = 8,
 } LibaflExit;
 
-typedef enum LibaflExitEndStatus {
-  LIBAFL_EXIT_END_UNKNOWN = 0,
-  LIBAFL_EXIT_END_OK = 1,
-  LIBAFL_EXIT_END_CRASH = 2,
+typedef enum LibaflQemuEndStatus {
+  LIBAFL_QEMU_END_UNKNOWN = 0,
+  LIBAFL_QEMU_END_OK = 1,
+  LIBAFL_QEMU_END_CRASH = 2,
 } LibaflExitEndParams;
 
 #ifdef _WIN32
-  #ifdef __cplusplus
-extern "C" {
-  #endif
-libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call0(libafl_word action);
-libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call1(libafl_word action,
-                                                         libafl_word arg1);
-libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call2(libafl_word action,
-                                                         libafl_word arg1,
-                                                         libafl_word arg2);
-  #ifdef __cplusplus
-}
-  #endif
+    #define LIBAFL_DEFINE_FUNCTIONS(name, _opcode) \
+      #ifdef __cplusplus \
+        extern "C" { \
+      #endif \
+          libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call0(libafl_word action); \
+          libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call1(libafl_word action, \
+                                                        ##name##  libafl_word arg1); \
+          libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call2(libafl_word action, \
+                                                                   libafl_word arg1, \
+                                                                   libafl_word arg2); \
+      #ifdef __cplusplus \
+        } \
+      #endif
 #else
 
   #ifdef __x86_64__
@@ -180,7 +179,7 @@ libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call2(libafl_word action,
 #endif
 
 // Generates sync exit functions
-LIBAFL_DEFINE_FUNCTIONS(exit, LIBAFL_EXIT_OPCODE)
+LIBAFL_DEFINE_FUNCTIONS(sync_exit, LIBAFL_SYNC_EXIT_OPCODE)
 
 // Generates backdoor functions
 LIBAFL_DEFINE_FUNCTIONS(backdoor, LIBAFL_BACKDOOR_OPCODE)
@@ -189,27 +188,27 @@ LIBAFL_DEFINE_FUNCTIONS(backdoor, LIBAFL_BACKDOOR_OPCODE)
 
 /* === The public part starts here === */
 
-/* Commands */
+/* LibAFL QEMU Commands */
 
-#define LIBAFL_EXIT_START_VIRT(buf_vaddr, max_len) \
-  _libafl_exit_call2(LIBAFL_EXIT_START_VIRT, buf_vaddr, max_len)
+#define LIBAFL_QEMU_START_VIRT(buf_vaddr, max_len) \
+  _libafl_sync_exit_call2(LIBAFL_QEMU_COMMAND_START_VIRT, buf_vaddr, max_len)
 
-#define LIBAFL_EXIT_START_PHYS(buf_paddr, max_len) \
-  _libafl_exit_call2(LIBAFL_EXIT_START_PHYS, buf_paddr, max_len)
+#define LIBAFL_QEMU_START_PHYS(buf_paddr, max_len) \
+  _libafl_sync_exit_call2(LIBAFL_QEMU_COMMAND_START_PHYS, buf_paddr, max_len)
 
-#define LIBAFL_EXIT_INPUT_VIRT(buf_vaddr, max_len) \
-  _libafl_exit_call2(LIBAFL_EXIT_INPUT_VIRT, buf_vaddr, max_len)
+#define LIBAFL_QEMU_INPUT_VIRT(buf_vaddr, max_len) \
+  _libafl_sync_exit_call2(LIBAFL_QEMU_COMMAND_INPUT_VIRT, buf_vaddr, max_len)
 
-#define LIBAFL_EXIT_INPUT_PHYS(buf_paddr, max_len) \
-  _libafl_exit_call2(LIBAFL_EXIT_INPUT_PHYS, buf_paddr, max_len)
+#define LIBAFL_QEMU_INPUT_PHYS(buf_paddr, max_len) \
+  _libafl_exit_call2(LIBAFL_QEMU_COMMAND_INPUT_PHYS, buf_paddr, max_len)
 
-#define LIBAFL_EXIT_END(status) _libafl_exit_call1(LIBAFL_EXIT_END, status)
+#define LIBAFL_QEMU_END(status) _libafl_sync_exit_call1(LIBAFL_QEMU_COMMAND_END, status)
 
-#define LIBAFL_EXIT_SAVE() _libafl_exit_call0(LIBAFL_EXIT_SAVE)
+#define LIBAFL_QEMU_SAVE() _libafl_sync_exit_call0(LIBAFL_QEMU_COMMAND_SAVE)
 
-#define LIBAFL_EXIT_LOAD() _libafl_exit_call0(LIBAFL_EXIT_LOAD)
+#define LIBAFL_QEMU_LOAD() _libafl_sync_exit_call0(LIBAFL_QEMU_COMMAND_LOAD)
 
-#define LIBAFL_EXIT_VERSION() _libafl_exit_call0(LIBAFL_EXIT_VERSION_NUMBER)
+#define LIBAFL_QEMU_VERSION() _libafl_sync_exit_call0(LIBAFL_QEMU_COMMAND_VERSION)
 
 /* === The public part ends here === */
 

@@ -159,8 +159,8 @@ const X86_64_REGS: [(RegSpec, X86Register); 34] = [
 ];
 
 /// The writer registers
-/// frida registers: <https://docs.rs/frida-gum/0.4.0/frida_gum/instruction_writer/enum.X86Register.html>
-/// capstone registers: <https://docs.rs/capstone-sys/0.14.0/capstone_sys/x86_reg/index.html>
+/// frida registers: <https://docs.rs/frida-gum/latest/frida_gum/instruction_writer/enum.X86Register.html>
+/// capstone registers: <https://docs.rs/capstone-sys/latest/capstone_sys/x86_reg/index.html>
 #[cfg(target_arch = "x86_64")]
 #[must_use]
 #[inline]

@@ -111,9 +111,12 @@ where
         start_timer!(state);
 
         // Here saturating_sub is needed as self.iterations() might be actually smaller than the previous value before reset.
+        /*
         let num = self
             .iterations(state)?
             .saturating_sub(self.execs_since_progress_start(state)?);
+        */
+        let num = self.iterations(state)?;
         let mut testcase = state.current_testcase_mut()?;
 
         let Ok(input) = I::try_transform_from(&mut testcase, state) else {
@@ -232,12 +235,14 @@ where
         ret
     }
 
-    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        self.restart_helper.restart_progress_should_run(state)
+    fn restart_progress_should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+        Ok(true)
+        // self.restart_helper.restart_progress_should_run(state)
     }
 
-    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        self.restart_helper.clear_restart_progress(state)
+    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        Ok(())
+        // self.restart_helper.clear_restart_progress(state)
     }
 }
 
@@ -396,56 +401,5 @@ where
             mutator,
             phantom: PhantomData,
         }
-    }
-}
-
-#[cfg(feature = "python")]
-#[allow(missing_docs)]
-#[allow(clippy::unnecessary_fallible_conversions, unused_qualifications)]
-/// `StdMutationalStage` Python bindings
-pub mod pybind {
-    use pyo3::prelude::*;
-
-    use crate::{
-        events::pybind::PythonEventManager,
-        executors::pybind::PythonExecutor,
-        fuzzer::pybind::PythonStdFuzzer,
-        inputs::BytesInput,
-        mutators::pybind::PythonMutator,
-        stages::{pybind::PythonStage, StdMutationalStage},
-    };
-
-    #[pyclass(unsendable, name = "StdMutationalStage")]
-    #[derive(Debug)]
-    /// Python class for StdMutationalStage
-    pub struct PythonStdMutationalStage {
-        /// Rust wrapped StdMutationalStage object
-        pub inner: StdMutationalStage<
-            PythonExecutor,
-            PythonEventManager,
-            BytesInput,
-            PythonMutator,
-            PythonStdFuzzer,
-        >,
-    }
-
-    #[pymethods]
-    impl PythonStdMutationalStage {
-        #[new]
-        fn new(mutator: PythonMutator) -> Self {
-            Self {
-                inner: StdMutationalStage::new(mutator),
-            }
-        }
-
-        fn as_stage(slf: Py<Self>) -> PythonStage {
-            PythonStage::new_std_mutational(slf)
-        }
-    }
-
-    /// Register the classes to the python module
-    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
-        m.add_class::<PythonStdMutationalStage>()?;
-        Ok(())
     }
 }

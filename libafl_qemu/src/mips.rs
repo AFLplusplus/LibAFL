@@ -2,8 +2,6 @@ use std::sync::OnceLock;
 
 use enum_map::{enum_map, EnumMap};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
 pub use strum_macros::EnumIter;
 pub use syscall_numbers::mips::*;
 
@@ -70,14 +68,6 @@ pub fn get_backdoor_arch_regs() -> &'static EnumMap<BackdoorArgs, Regs> {
 #[allow(non_upper_case_globals)]
 impl Regs {
     pub const Zero: Regs = Regs::R0;
-}
-
-#[cfg(feature = "python")]
-impl IntoPy<PyObject> for Regs {
-    fn into_py(self, py: Python) -> PyObject {
-        let n: i32 = self.into();
-        n.into_py(py)
-    }
 }
 
 /// Return an MIPS ArchCapstoneBuilder
