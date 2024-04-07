@@ -70,7 +70,7 @@ fn init_count_class_16() {
 }
 
 /// Compute the hash of a slice
-fn hash_slice<T, H: Hasher>(slice: &[T], hasher: &mut H) -> u64 {
+fn hash_helper<T, H: Hasher>(slice: &[T], hasher: &mut H) -> u64 {
     let ptr = slice.as_ptr() as *const u8;
     let map_size = slice.len() / size_of::<T>();
     unsafe {
@@ -357,7 +357,7 @@ where
         + Debug,
 {
     fn hash<H: Hasher>(&self, hasher: &mut H) {
-        hash_slice(self.as_slice(), hasher);
+        hash_helper(self.as_slice(), hasher);
     }
 }
 
@@ -860,7 +860,7 @@ where
         + Debug,
 {
     fn hash<H: Hasher>(&self, hasher: &mut H) {
-        hash_slice(self.as_slice(), hasher);
+        hash_helper(self.as_slice(), hasher);
     }
 }
 
@@ -1193,7 +1193,7 @@ where
         + Bounded,
 {
     fn hash<H: Hasher>(&self, hasher: &mut H) {
-        hash_slice(self.as_slice(), hasher);
+        hash_helper(self.as_slice(), hasher);
     }
 }
 
@@ -2322,7 +2322,7 @@ where
     T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
 {
     fn hash<H: Hasher>(&self, hasher: &mut H) {
-        hash_slice(self.as_slice(), hasher);
+        hash_helper(self.as_slice(), hasher);
     }
 }
 
@@ -2727,7 +2727,7 @@ pub mod pybind {
 
             impl Hash for $struct_name_trait {
                 fn hash<H: Hasher>(&self, hasher: &mut H) {
-                    hash_slice(self.as_slice(), hasher);
+                    hash_helper(self.as_slice(), hasher);
                 }
             }
 
