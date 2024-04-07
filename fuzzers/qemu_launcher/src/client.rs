@@ -118,7 +118,7 @@ impl<'a> Client<'a> {
             Err(Error::empty_optional("Multiple ASAN modes configured"))?;
         }
 
-        let (emu, mut asan, mut asan_lib) = {
+        let (qemu, mut asan, mut asan_lib) = {
             if is_asan {
                 let (emu, asan) = init_qemu_with_asan(&mut args, &mut env)?;
                 (emu, Some(asan), None)
@@ -219,7 +219,7 @@ impl<'a> Client<'a> {
                     tuple_list!(
                         edge_coverage_helper,
                         QemuCmpLogHelper::default(),
-                        QemuAsanGuestHelper::default(&emu, asan_lib.take().unwrap()),
+                        QemuAsanGuestHelper::default(&qemu, asan_lib.take().unwrap()),
                         injection_helper
                     ),
                     state,
@@ -229,7 +229,7 @@ impl<'a> Client<'a> {
                     tuple_list!(
                         edge_coverage_helper,
                         QemuCmpLogHelper::default(),
-                        QemuAsanGuestHelper::default(&emu, asan_lib.take().unwrap()),
+                        QemuAsanGuestHelper::default(&qemu, asan_lib.take().unwrap()),
                     ),
                     state,
                 )
@@ -256,7 +256,7 @@ impl<'a> Client<'a> {
         } else if is_asan_guest {
             let helpers = tuple_list!(
                 edge_coverage_helper,
-                QemuAsanGuestHelper::default(&emu, asan_lib.take().unwrap())
+                QemuAsanGuestHelper::default(&qemu, asan_lib.take().unwrap())
             );
             instance.build().run(helpers, state)
         } else if is_cmplog {
