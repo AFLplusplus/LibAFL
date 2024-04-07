@@ -73,7 +73,7 @@ You can then link this observer to `FridaInProcessExecutor` as follows:
                 tuple_list!(
                     edges_observer,
                     time_observer,
-                    AsanErrorsObserver::new(addr_of!(ASAN_ERRORS))
+                    AsanErrorsObserver::from_static_asan_errors()
                 ),
                 &mut fuzzer,
                 &mut state,

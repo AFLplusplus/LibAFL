@@ -3,8 +3,6 @@ use std::sync::OnceLock;
 use capstone::arch::BuildsCapstone;
 use enum_map::{enum_map, EnumMap};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
 pub use strum_macros::EnumIter;
 pub use syscall_numbers::aarch64::*;
 
@@ -71,14 +69,6 @@ pub fn get_backdoor_arch_regs() -> &'static EnumMap<BackdoorArgs, Regs> {
 impl Regs {
     pub const Fp: Regs = Regs::X29;
     pub const Lr: Regs = Regs::X30;
-}
-
-#[cfg(feature = "python")]
-impl IntoPy<PyObject> for Regs {
-    fn into_py(self, py: Python) -> PyObject {
-        let n: i32 = self.into();
-        n.into_py(py)
-    }
 }
 
 /// Return an ARM64 ArchCapstoneBuilder

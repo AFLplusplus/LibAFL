@@ -150,13 +150,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     log::set_logger(&LOGGER).unwrap();
     log::set_max_level(log::LevelFilter::Trace);
-
     println!("Launching in mode {mode} on port {port}");
 
     match mode.as_str() {
         "broker" => {
-            let mut broker =
-                llmp::LlmpBroker::new(StdShMemProvider::new()?, Duration::from_secs(5))?;
+            let mut broker = llmp::LlmpBroker::new(StdShMemProvider::new()?)?;
             broker.launch_tcp_listener_on(port)?;
             // Exit when we got at least _n_ nodes, and all of them quit.
             broker.set_exit_cleanly_after(NonZeroUsize::new(1_usize).unwrap());
@@ -167,8 +165,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
         }
         "b2b" => {
-            let mut broker =
-                llmp::LlmpBroker::new(StdShMemProvider::new()?, Duration::from_secs(5))?;
+            let mut broker = llmp::LlmpBroker::new(StdShMemProvider::new()?)?;
             broker.launch_tcp_listener_on(b2b_port)?;
             // connect back to the main broker.
             broker.connect_b2b(("127.0.0.1", port))?;
@@ -205,6 +202,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             log::info!("Exiting Client exits");
             client.sender_mut().send_exiting()?;
+
+            // there is another way to tell that this client wants to exit.
+            // one is to call client.sender_mut().send_exiting()?;
+            // you can disconnet the client in this way as long as this client in an unrecoverable state (like in a crash handler)
+            // another way to do this is through the detach_from_broker() call
+            // you can call detach_from_broker(port); to notify the broker that this broker wants to exit
+            // This one is usually for the event restarter to cut off the connection when the client has crashed.
+            // In that case we don't have access to the llmp client of the client anymore, but we can use detach_from_broker instead
         }
         _ => {
             println!("No valid mode supplied");
