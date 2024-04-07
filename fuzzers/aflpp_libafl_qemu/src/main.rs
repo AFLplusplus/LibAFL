@@ -1,7 +1,7 @@
 use libafl::prelude::*;
 use libafl_bolts::prelude::*;
 use libafl_qemu::{
-    asan::{init_with_asan, QemuAsanHelper, QemuAsanOptions},
+    asan::{ QemuAsanHelper, QemuAsanOptions},
     cmplog::{CmpLogObserver, QemuCmpLogHelper, QemuCmpLogRoutinesHelper},
     calls::{QemuCallTracerHelper, FullBacktraceCollector},
     edges::{edges_map_mut_slice, std_edges_map_observer, QemuEdgeCoverageClassicHelper, QemuEdgeCoverageHelper, MAX_EDGES_NUM},
@@ -13,7 +13,50 @@ use libafl_qemu::{
     QemuExecutor, Regs, SYS_close, SYS_faccessat, SYS_lseek, SYS_newfstatat, SYS_openat, SYS_read,
     SYS_rt_sigprocmask, SYS_write, SyscallHookResult,
 };
+use libafl_targets::forkserver::{ForkserverHooks, start_forkserver_with_hooks, map_shared_memory};
 use std::env;
+use nix::unistd::{close, pipe, read, write};
+use nix::libc;
+
+const TSL_FD: std::os::fd::RawFd = 196;
+
+struct TSLHooks {
+    read_end: std::os::fd::RawFd,
+}
+
+impl TSLHooks {
+    fn new() -> Self {
+        Self { read_end: 0 }
+    }
+    
+    fn wait_tsl(&mut self) -> Result<(), ()> {
+        Ok(())
+    }
+}
+
+impl ForkserverHooks for TSLHooks {
+    extern "C" fn pre_fork(&mut self) {
+      // Establish a channel with child to grab translation commands.
+      // We'll  read from the pipe read end, child will write to TSL_FD.
+        let (read_end, write_end) = pipe().expect("Could not create TSL pipe");
+        self.read_end = read_end;
+        dup2(write_end, TSL_FD).expect("Could not dup2 the TSL pipe write end");
+        close(write_end);
+    }
+    extern "C" fn post_fork(&mut self, pid: libc::pid_t) {
+        if pid != 0 {
+            // Parent
+            close(TSL_FD);
+        } else {
+            // Child
+            close(self.read_end);
+        }
+    }
+    extern "C" fn iter_start(&mut self) {
+        self.wait_tsl().expect("Wait for TSL failed");
+    }
+    extern "C" fn iter_end(&mut self, status: i32) {}
+}
 
 fn main() {
     let in_afl = env::var("__AFL_SHM_ID").is_ok();
@@ -48,7 +91,7 @@ fn main() {
         }
     }
     
-    if in_afl { libafl_targets::forkserver::map_shared_memory(); }
+    if in_afl { map_shared_memory(); }
     
     let mut hooks = QemuHooks::reproducer(
             emu.clone(),
@@ -64,7 +107,7 @@ fn main() {
         ExitKind::Ok
     };
 
-    if in_afl { libafl_targets::forkserver::start_forkserver(); }
+    if in_afl { start_forkserver(); }
     
     hooks.repro_run(&mut test_harness, &input);
 }

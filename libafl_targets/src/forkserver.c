@@ -67,8 +67,8 @@ uint8_t        *__afl_fuzz_ptr;
 static uint32_t __afl_fuzz_len_local;
 uint32_t       *__afl_fuzz_len = &__afl_fuzz_len_local;
 
-int already_initialized_shm;
-int already_initialized_forkserver;
+static int already_initialized_shm;
+static int already_initialized_forkserver;
 
 static int child_pid;
 static void (*old_sigterm_handler)(int) = 0;
@@ -210,7 +210,15 @@ static void map_input_shared_memory() {
 
 /* Fork server logic. */
 
-void __afl_start_forkserver(void) {
+struct libafl_forkserver_hooks {
+    void *data;
+    void (*pre_fork_hook)(void* data);
+    void (*post_fork_hook)(void* data, pid_t child_pid);
+    void (*iteration_start_hook)(void* data);
+    void (*iteration_end_hook)(void* data, int status);
+};
+
+void __libafl_start_forkserver(struct libafl_forkserver_hooks* hooks) {
   if (already_initialized_forkserver) return;
   already_initialized_forkserver = 1;
 
@@ -312,12 +320,21 @@ void __afl_start_forkserver(void) {
     }
 
     if (!child_stopped) {
+    
+      if (hooks && hooks->pre_fork_hook) {
+          hooks->pre_fork_hook(hooks->data);
+      }
+    
       /* Once woken up, create a clone of our process. */
 
       child_pid = fork();
       if (child_pid < 0) {
         write_error("fork");
         _exit(1);
+      }
+
+      if (hooks && hooks->post_fork_hook) {
+           hooks->post_fork_hook(hooks->data, child_pid);
       }
 
       /* In child process: close fds, resume execution. */
@@ -347,6 +364,10 @@ void __afl_start_forkserver(void) {
       write_error("write to afl-fuzz");
       _exit(1);
     }
+    
+    if (hooks && hooks->iteration_start_hook) {
+        hooks->iteration_start_hook(hooks->data);
+    }
 
     if (waitpid(child_pid, &status, is_persistent ? WUNTRACED : 0) < 0) {
       write_error("waitpid");
@@ -359,6 +380,10 @@ void __afl_start_forkserver(void) {
 
     if (WIFSTOPPED(status)) child_stopped = 1;
 
+    if (hooks && hooks->iteration_end_hook) {
+         hooks->iteration_end_hook(hooks->data, status);
+    }
+
     /* Relay wait status to pipe, then loop back. */
 
     if (write(FORKSRV_FD + 1, &status, 4) != 4) {
@@ -366,4 +391,8 @@ void __afl_start_forkserver(void) {
       _exit(1);
     }
   }
+}
+
+void __afl_start_forkserver(void) {
+    __libafl_start_forkserver(NULL);
 }
