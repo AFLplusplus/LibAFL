@@ -80,6 +80,36 @@ jobs:
         run: pwd && ls & cd libafl_cc && cargo build --release
 
 
+  ubuntu-doc:
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Remove Dotnet & Haskell
+      run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+    - name: Remove existing clang and LLVM
+      run: sudo apt purge llvm* clang* lld* lldb* opt*
+    - name: Install and cache deps
+      run: sudo apt update && sudo apt install ninja-build shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
+    - name: Add nightly rustfmt and clippy
+      run: rustup toolchain install nightly --component rustfmt --component clippy --component miri --allow-downgrade
+    - name: Install ucd-generate
+      run: cargo install -f ucd-generate
+    - uses: actions/checkout@v3
+    - uses: Swatinem/rust-cache@v2
+    - name: Install LLVM and Clang
+      uses: KyleMayes/install-llvm-action@v1
+      with:
+        directory: ${{ runner.temp }}/llvm
+        version: 17
+    # ---- doc check ----
+    - name: Build Docs
+      run: RUSTFLAGS="--cfg docsrs" cargo +nightly doc --all-features
+    - name: Test Docs
+      run: RUSTFLAGS="--cfg docsrs" cargo +nightly test --doc --all-features
+
   ubuntu:
     runs-on: ubuntu-22.04
     steps:
@@ -116,12 +146,6 @@ jobs:
       run: clang-format -n -Werror --style=file $(find . -type f \( -name '*.cpp' -o -iname '*.hpp' -o -name '*.cc' -o -name '*.cxx' -o -name '*.cc' -o -name '*.h' \) | grep -v '/target/' | grep -v 'libpng-1\.6\.37' | grep -v 'stb_image\.h' | grep -v 'dlmalloc\.c' | grep -v 'QEMU-Nyx')
     - name: run shellcheck
       run: shellcheck ./scripts/*.sh
-
-    # ---- doc check ----
-    - name: Build Docs
-      run: RUSTFLAGS="--cfg docsrs" cargo +nightly doc --all-features
-    - name: Test Docs
-      run: RUSTFLAGS="--cfg docsrs" cargo +nightly test --doc --all-features
     # ---- build normal and examples ----
     - name: Run a normal build
       run: cargo build --verbose
