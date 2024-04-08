@@ -1533,7 +1533,10 @@ impl AsanRuntime {
             .unwrap();
             blob.as_ptr()
                 .copy_to_nonoverlapping(mapping as *mut u8, blob.len());
-            self.shadow_check_func = Some(std::mem::transmute(mapping as *mut u8));
+            self.shadow_check_func = Some(std::mem::transmute::<
+                *mut u8,
+                extern "C" fn(*const c_void, usize) -> bool,
+            >(mapping as *mut u8));
         }
     }
 
@@ -1680,7 +1683,10 @@ impl AsanRuntime {
             {
                 libc::pthread_jit_write_protect_np(1);
             }
-            self.shadow_check_func = Some(std::mem::transmute(mapping as *mut u8));
+            self.shadow_check_func = Some(std::mem::transmute::<
+                *mut u8,
+                extern "C" fn(*const c_void, usize) -> bool,
+            >(mapping as *mut u8));
         }
     }
 

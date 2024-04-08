@@ -18,7 +18,6 @@
 #![allow(clippy::transmute_ptr_to_ptr)]
 #![allow(clippy::ptr_cast_constness)]
 #![allow(clippy::too_many_arguments)]
-#![allow(clippy::missing_transmute_annotations)]
 // Till they fix this buggy lint in clippy
 #![allow(clippy::borrow_as_ptr)]
 #![allow(clippy::borrow_deref_ref)]
