@@ -328,11 +328,11 @@ cd injection_test || exit 1
 make
 mkdir in || true
 echo aaaaaaaaaa > in/a
-timeout 10s "$(find ${TARGET_DIR} -name 'qemu_launcher-${CARGO_MAKE_PROFILE}')" -o out -i in -j ../injections.toml -v -- ./static >/dev/null 2>fuzz.log || true
+timeout 10s "$(find ${TARGET_DIR} -name 'qemu_launcher')" -o out -i in -j ../injections.toml -v -- ./static >/dev/null 2>fuzz.log || true
 if [ -z "$(grep -Ei "found.*injection" fuzz.log)" ]; then
     echo "Fuzzer does not generate any testcases or any crashes"
     echo "Logs:"
-    tail fuzz.log
+    cat fuzz.log
     exit 1
 else
     echo "Fuzzer is working"
