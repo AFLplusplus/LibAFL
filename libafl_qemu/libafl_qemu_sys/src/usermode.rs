@@ -18,7 +18,8 @@ extern_c_checked! {
     pub fn read_self_maps() -> *const c_void;
     pub fn free_self_maps(map_info: *const c_void);
 
-    pub fn libafl_maps_next(map_info: *const c_void, ret: *mut MapInfo) -> *const c_void;
+    pub fn libafl_maps_first(root: *const c_void) -> *const c_void;
+    pub fn libafl_maps_next(node: *const c_void, ret: *mut MapInfo, is_root: bool) -> *const c_void;
 
     pub static exec_path: *const u8;
     pub static guest_base: usize;
