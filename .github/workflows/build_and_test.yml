@@ -316,6 +316,7 @@ jobs:
     container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
     steps:
       - uses: actions/checkout@v3
+      - uses: ./.github/workflows/qemu-fuzzer-tester-prepare
       - uses: ./.github/workflows/fuzzer-tester-prepare
       - name: Symlink Headers
         if: runner.os == 'Linux'

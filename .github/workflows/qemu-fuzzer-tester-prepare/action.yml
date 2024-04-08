@@ -1,0 +1,8 @@
+name: Setup QEMU Fuzzers environment
+description: Sets up the QEMU fuzzers environment
+runs:
+  using: composite
+  steps:
+    - name: Install sudo
+      shell: bash
+      run: apt install sudo wget
