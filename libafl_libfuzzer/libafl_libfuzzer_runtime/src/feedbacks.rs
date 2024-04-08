@@ -9,10 +9,10 @@ use libafl::{
     feedbacks::{Feedback, MinMapFeedback},
     inputs::{BytesInput, Input},
     observers::ObserversTuple,
-    state::{HasMetadata, State},
+    state::State,
     Error,
 };
-use libafl_bolts::{impl_serdeany, Named};
+use libafl_bolts::{impl_serdeany, serdeany::HasMetadata, Named};
 use libafl_targets::OomFeedback;
 use serde::{Deserialize, Serialize};
 

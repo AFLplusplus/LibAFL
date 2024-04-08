@@ -26,7 +26,7 @@ use libafl::{
         calibrate::CalibrationStage, power::StdPowerMutationalStage, ShadowTracingStage,
         StagesTuple, StdMutationalStage,
     },
-    state::{HasCorpus, HasMetadata, StdState, UsesState},
+    state::{HasCorpus, StdState, UsesState},
     Error,
 };
 #[cfg(not(feature = "simplemgr"))]
@@ -35,6 +35,7 @@ use libafl_bolts::{
     core_affinity::CoreId,
     current_nanos,
     rands::StdRand,
+    serdeany::HasMetadata,
     tuples::{tuple_list, Merge},
 };
 use libafl_qemu::{

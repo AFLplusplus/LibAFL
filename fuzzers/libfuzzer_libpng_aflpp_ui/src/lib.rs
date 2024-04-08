@@ -27,12 +27,13 @@ use libafl::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
     stages::{calibrate::CalibrationStage, power::StdPowerMutationalStage, stats::AflStatsStage},
-    state::{HasCorpus, HasMetadata, StdState},
+    state::{HasCorpus, StdState},
     Error,
 };
 use libafl_bolts::{
     current_nanos,
     rands::StdRand,
+    serdeany::HasMetadata,
     tuples::{tuple_list, Merge},
     AsSlice,
 };

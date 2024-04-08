@@ -36,13 +36,14 @@ use libafl::{
         calibrate::CalibrationStage, power::StdPowerMutationalStage, StdMutationalStage,
         TracingStage,
     },
-    state::{HasCorpus, HasMetadata, StdState},
+    state::{HasCorpus, StdState},
     Error,
 };
 use libafl_bolts::{
     current_nanos, current_time,
     os::dup2,
     rands::StdRand,
+    serdeany::HasMetadata,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
     AsSlice,

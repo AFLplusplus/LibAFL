@@ -23,13 +23,14 @@ use libafl::{
     none_input_converter,
     schedulers::QueueScheduler,
     stages::{mutational::StdMutationalStage, sync::SyncFromBrokerStage},
-    state::{HasMetadata, StdState},
+    state::StdState,
     Error,
 };
 use libafl_bolts::{
     core_affinity::Cores,
     current_nanos,
     rands::StdRand,
+    serdeany::HasMetadata,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
 };

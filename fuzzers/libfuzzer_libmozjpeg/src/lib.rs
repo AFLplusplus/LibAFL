@@ -22,12 +22,13 @@ use libafl::{
     observers::StdMapObserver,
     schedulers::RandScheduler,
     stages::mutational::StdMutationalStage,
-    state::{HasCorpus, HasMetadata, StdState},
+    state::{HasCorpus, StdState},
     Error,
 };
 use libafl_bolts::{
     current_nanos,
     rands::StdRand,
+    sredeany::HasMetadata,
     tuples::{tuple_list, Merge},
     AsSlice,
 };

@@ -29,7 +29,7 @@ use libafl::{
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
-    state::{HasCorpus, HasMetadata, StdState},
+    state::{HasCorpus, StdState},
     Error,
 };
 #[cfg(unix)]
@@ -38,6 +38,7 @@ use libafl_bolts::{
     cli::{parse_args, FuzzerOptions},
     current_nanos,
     rands::StdRand,
+    serdeany::HasMetadata,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
     AsSlice,

@@ -23,11 +23,12 @@ use libafl::{
         Monitor, MultiMonitor, SimpleMonitor,
     },
     stages::{HasCurrentStage, StagesTuple},
-    state::{HasExecutions, HasLastReportTime, HasMetadata, HasSolutions, UsesState},
+    state::{HasExecutions, HasLastReportTime, HasSolutions, UsesState},
     Error, Fuzzer,
 };
 use libafl_bolts::{
     core_affinity::Cores,
+    serdeany::HasMetadata,
     shmem::{ShMemProvider, StdShMemProvider},
 };
 

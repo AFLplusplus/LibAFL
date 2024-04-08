@@ -15,11 +15,12 @@ use libafl::{
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
-    state::{HasCorpus, HasMetadata, StdState},
+    state::{HasCorpus, StdState},
 };
 use libafl_bolts::{
     current_nanos,
     rands::StdRand,
+    serdeany::HasMetadata,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, MatchName, Merge},
     AsMutSlice, Truncate,

@@ -5,10 +5,10 @@ use libafl::{
     feedbacks::{Feedback, MapIndexesMetadata},
     observers::ObserversTuple,
     schedulers::{MinimizerScheduler, TestcaseScore},
-    state::{HasCorpus, HasMetadata, State},
+    state::{HasCorpus, State},
     Error,
 };
-use libafl_bolts::{Named, SerdeAny};
+use libafl_bolts::{serdeany::HasMetadata, Named, SerdeAny};
 use serde::{Deserialize, Serialize};
 
 use crate::input::PacketData;
