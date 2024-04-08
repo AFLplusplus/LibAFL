@@ -3,11 +3,12 @@ use std::{cell::OnceCell, slice::from_raw_parts, str::from_utf8_unchecked};
 
 use libafl_qemu_sys::{
     exec_path, free_self_maps, guest_base, libafl_dump_core_hook, libafl_force_dfl, libafl_get_brk,
-    libafl_load_addr, libafl_maps_first, libafl_maps_next, libafl_qemu_run, libafl_set_brk,
-    mmap_next_start, read_self_maps, strlen, GuestAddr, GuestUsize, MapInfo, MmapPerms,
-    VerifyAccess,
+    libafl_load_addr, libafl_maps_next, libafl_qemu_run, libafl_set_brk, mmap_next_start,
+    read_self_maps, strlen, GuestAddr, GuestUsize, MapInfo, MmapPerms, VerifyAccess,
 };
 use libc::c_int;
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
 
 use crate::{
     emu::{HasExecutions, State},
@@ -23,6 +24,7 @@ pub enum HandlerError {
     MultipleInputDefinition,
 }
 
+#[cfg_attr(feature = "python", pyclass(unsendable))]
 pub struct GuestMaps {
     maps_root: *const c_void,
     maps_node: *const c_void,
@@ -56,6 +58,17 @@ impl Iterator for GuestMaps {
             self.maps_node = libafl_maps_next(self.maps_node, ret.as_mut_ptr(), false);
             Some(ret.assume_init())
         }
+    }
+}
+
+#[cfg(feature = "python")]
+#[pymethods]
+impl GuestMaps {
+    fn __iter__(slf: PyRef<Self>) -> PyRef<Self> {
+        slf
+    }
+    fn __next__(mut slf: PyRefMut<Self>) -> Option<PyObject> {
+        Python::with_gil(|py| slf.next().map(|x| x.into_py(py)))
     }
 }
 

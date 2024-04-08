@@ -352,6 +352,9 @@ impl From<libafl_qemu_sys::MemOpIdx> for MemAccessInfo {
     }
 }
 
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
 pub const SKIP_EXEC_HOOK: u64 = u64::MAX;
 
 pub use libafl_qemu_sys::{CPUArchState, CPUState};
@@ -360,11 +363,33 @@ use crate::sync_backdoor::{SyncBackdoor, SyncBackdoorError};
 
 // syshook_ret
 #[repr(C)]
+#[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", derive(FromPyObject))]
 pub struct SyscallHookResult {
     pub retval: GuestAddr,
     pub skip_syscall: bool,
 }
 
+#[cfg(feature = "python")]
+#[pymethods]
+impl SyscallHookResult {
+    #[new]
+    #[must_use]
+    pub fn new(value: Option<GuestAddr>) -> Self {
+        value.map_or(
+            Self {
+                retval: 0,
+                skip_syscall: false,
+            },
+            |v| Self {
+                retval: v,
+                skip_syscall: true,
+            },
+        )
+    }
+}
+
+#[cfg(not(feature = "python"))]
 impl SyscallHookResult {
     #[must_use]
     pub fn new(value: Option<GuestAddr>) -> Self {
@@ -625,25 +650,25 @@ pub struct HookData(u64);
 
 impl<T> From<Pin<&mut T>> for HookData {
     fn from(value: Pin<&mut T>) -> Self {
-        unsafe { HookData(transmute::<Pin<&mut T>, u64>(value)) }
+        unsafe { HookData(core::mem::transmute(value)) }
     }
 }
 
 impl<T> From<Pin<&T>> for HookData {
     fn from(value: Pin<&T>) -> Self {
-        unsafe { HookData(transmute::<Pin<&T>, u64>(value)) }
+        unsafe { HookData(core::mem::transmute(value)) }
     }
 }
 
 impl<T> From<&'static mut T> for HookData {
     fn from(value: &'static mut T) -> Self {
-        unsafe { HookData(transmute::<&mut T, u64>(value)) }
+        unsafe { HookData(core::mem::transmute(value)) }
     }
 }
 
 impl<T> From<&'static T> for HookData {
     fn from(value: &'static T) -> Self {
-        unsafe { HookData(transmute::<&T, u64>(value)) }
+        unsafe { HookData(core::mem::transmute(value)) }
     }
 }
 
@@ -903,7 +928,7 @@ impl Qemu {
             }
         }
     }
-    #[allow(clippy::missing_transmute_annotations)]
+
     fn post_run(&self) -> Result<QemuExitReason, QemuExitReasonError> {
         let exit_reason = unsafe { libafl_get_exit_reason() };
         if exit_reason.is_null() {
@@ -1718,3 +1743,190 @@ where
 //         self.qemu.write_function_argument(conv, idx, val)
 //     }
 // }
+
+#[cfg(feature = "python")]
+pub mod pybind {
+    use pyo3::{exceptions::PyValueError, prelude::*, types::PyInt};
+
+    use super::{GuestAddr, GuestUsize, MmapPerms, SyscallHookResult};
+
+    static mut PY_SYSCALL_HOOK: Option<PyObject> = None;
+    static mut PY_GENERIC_HOOKS: Vec<(GuestAddr, PyObject)> = vec![];
+
+    extern "C" fn py_syscall_hook_wrapper(
+        _data: u64,
+        sys_num: i32,
+        a0: u64,
+        a1: u64,
+        a2: u64,
+        a3: u64,
+        a4: u64,
+        a5: u64,
+        a6: u64,
+        a7: u64,
+    ) -> SyscallHookResult {
+        unsafe { PY_SYSCALL_HOOK.as_ref() }.map_or_else(
+            || SyscallHookResult::new(None),
+            |obj| {
+                let args = (sys_num, a0, a1, a2, a3, a4, a5, a6, a7);
+                Python::with_gil(|py| {
+                    let ret = obj.call1(py, args).expect("Error in the syscall hook");
+                    let any = ret.as_ref(py);
+                    if any.is_none() {
+                        SyscallHookResult::new(None)
+                    } else {
+                        let a: Result<&PyInt, _> = any.downcast();
+                        if let Ok(i) = a {
+                            SyscallHookResult::new(Some(
+                                i.extract().expect("Invalid syscall hook return value"),
+                            ))
+                        } else {
+                            SyscallHookResult::extract(any)
+                                .expect("The syscall hook must return a SyscallHookResult")
+                        }
+                    }
+                })
+            },
+        )
+    }
+
+    extern "C" fn py_generic_hook_wrapper(idx: u64, _pc: GuestAddr) {
+        let obj = unsafe { &PY_GENERIC_HOOKS[idx as usize].1 };
+        Python::with_gil(|py| {
+            obj.call0(py).expect("Error in the hook");
+        });
+    }
+
+    #[pyclass(unsendable)]
+    pub struct Qemu {
+        pub qemu: super::Qemu,
+    }
+
+    #[pymethods]
+    impl Qemu {
+        #[allow(clippy::needless_pass_by_value)]
+        #[new]
+        fn new(args: Vec<String>, env: Vec<(String, String)>) -> PyResult<Qemu> {
+            let qemu = super::Qemu::init(&args, &env)
+                .map_err(|e| PyValueError::new_err(format!("{e}")))?;
+
+            Ok(Qemu { qemu })
+        }
+
+        fn write_mem(&self, addr: GuestAddr, buf: &[u8]) {
+            unsafe {
+                self.qemu.write_mem(addr, buf);
+            }
+        }
+
+        fn read_mem(&self, addr: GuestAddr, size: usize) -> Vec<u8> {
+            let mut buf = vec![0; size];
+            unsafe {
+                self.qemu.read_mem(addr, &mut buf);
+            }
+            buf
+        }
+
+        fn num_regs(&self) -> i32 {
+            self.qemu.num_regs()
+        }
+
+        fn write_reg(&self, reg: i32, val: GuestUsize) -> PyResult<()> {
+            self.qemu.write_reg(reg, val).map_err(PyValueError::new_err)
+        }
+
+        fn read_reg(&self, reg: i32) -> PyResult<GuestUsize> {
+            self.qemu.read_reg(reg).map_err(PyValueError::new_err)
+        }
+
+        fn set_breakpoint(&self, addr: GuestAddr) {
+            self.qemu.set_breakpoint(addr);
+        }
+
+        fn entry_break(&self, addr: GuestAddr) {
+            self.qemu.entry_break(addr);
+        }
+
+        fn remove_breakpoint(&self, addr: GuestAddr) {
+            self.qemu.remove_breakpoint(addr);
+        }
+
+        fn g2h(&self, addr: GuestAddr) -> u64 {
+            self.qemu.g2h::<*const u8>(addr) as u64
+        }
+
+        fn h2g(&self, addr: u64) -> GuestAddr {
+            self.qemu.h2g(addr as *const u8)
+        }
+
+        fn binary_path(&self) -> String {
+            self.qemu.binary_path().to_owned()
+        }
+
+        fn load_addr(&self) -> GuestAddr {
+            self.qemu.load_addr()
+        }
+
+        fn flush_jit(&self) {
+            self.qemu.flush_jit();
+        }
+
+        fn map_private(&self, addr: GuestAddr, size: usize, perms: i32) -> PyResult<GuestAddr> {
+            if let Ok(p) = MmapPerms::try_from(perms) {
+                self.qemu
+                    .map_private(addr, size, p)
+                    .map_err(PyValueError::new_err)
+            } else {
+                Err(PyValueError::new_err("Invalid perms"))
+            }
+        }
+
+        fn map_fixed(&self, addr: GuestAddr, size: usize, perms: i32) -> PyResult<GuestAddr> {
+            if let Ok(p) = MmapPerms::try_from(perms) {
+                self.qemu
+                    .map_fixed(addr, size, p)
+                    .map_err(PyValueError::new_err)
+            } else {
+                Err(PyValueError::new_err("Invalid perms"))
+            }
+        }
+
+        fn mprotect(&self, addr: GuestAddr, size: usize, perms: i32) -> PyResult<()> {
+            if let Ok(p) = MmapPerms::try_from(perms) {
+                self.qemu
+                    .mprotect(addr, size, p)
+                    .map_err(PyValueError::new_err)
+            } else {
+                Err(PyValueError::new_err("Invalid perms"))
+            }
+        }
+
+        fn unmap(&self, addr: GuestAddr, size: usize) -> PyResult<()> {
+            self.qemu.unmap(addr, size).map_err(PyValueError::new_err)
+        }
+
+        fn set_syscall_hook(&self, hook: PyObject) {
+            unsafe {
+                PY_SYSCALL_HOOK = Some(hook);
+            }
+            self.qemu
+                .add_pre_syscall_hook(0u64, py_syscall_hook_wrapper);
+        }
+
+        fn set_hook(&self, addr: GuestAddr, hook: PyObject) {
+            unsafe {
+                let idx = PY_GENERIC_HOOKS.len();
+                PY_GENERIC_HOOKS.push((addr, hook));
+                self.qemu
+                    .set_hook(idx as u64, addr, py_generic_hook_wrapper, true);
+            }
+        }
+
+        fn remove_hooks_at(&self, addr: GuestAddr) -> usize {
+            unsafe {
+                PY_GENERIC_HOOKS.retain(|(a, _)| *a != addr);
+            }
+            self.qemu.remove_hooks_at(addr, true)
+        }
+    }
+}

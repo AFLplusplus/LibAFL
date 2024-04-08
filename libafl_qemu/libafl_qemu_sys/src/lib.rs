@@ -121,6 +121,7 @@ pub type GuestVirtAddr = crate::vaddr;
 pub type GuestHwAddrInfo = crate::qemu_plugin_hwaddr;
 
 #[repr(C)]
+#[cfg_attr(feature = "python", pyclass(unsendable))]
 pub struct MapInfo {
     start: GuestAddr,
     end: GuestAddr,
@@ -207,6 +208,7 @@ extern_c_checked! {
     pub fn libafl_qemu_gdb_reply(buf: *const u8, len: usize);
 }
 
+#[cfg_attr(feature = "python", pymethods)]
 impl MapInfo {
     #[must_use]
     pub fn start(&self) -> GuestAddr {
@@ -280,5 +282,13 @@ impl MmapPerms {
                 | MmapPerms::WriteExecute
                 | MmapPerms::ReadWriteExecute
         )
+    }
+}
+
+#[cfg(feature = "python")]
+impl IntoPy<PyObject> for MmapPerms {
+    fn into_py(self, py: Python) -> PyObject {
+        let n: i32 = self.into();
+        n.into_py(py)
     }
 }
