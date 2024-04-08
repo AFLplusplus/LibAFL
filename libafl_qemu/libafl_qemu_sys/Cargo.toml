@@ -30,8 +30,6 @@ be = []
 usermode = []
 systemmode = []
 
-python = ["pyo3", "pyo3-build-config"]
-
 slirp = [ "systemmode", "libafl_qemu_build/slirp" ] # build qemu with host libslirp (for user networking)
 shared = [ "libafl_qemu_build/shared" ]
 
@@ -43,8 +41,6 @@ num_enum = "0.7"
 libc = "0.2"
 strum = "0.25"
 strum_macros = "0.25"
-pyo3 = { version = "0.18", optional = true }
 
 [build-dependencies]
 libafl_qemu_build = { path = "../libafl_qemu_build", version = "0.11.2" }
-pyo3-build-config = { version = "0.18", optional = true }
