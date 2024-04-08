@@ -6,6 +6,7 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+  merge_group:
 env:
   CARGO_TERM_COLOR: always
 concurrency:
