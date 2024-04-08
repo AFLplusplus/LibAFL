@@ -258,8 +258,6 @@ jobs:
           - ./fuzzers/frida_gdiplus
           - ./fuzzers/libfuzzer_stb_image_concolic
           - ./fuzzers/nautilus_sync
-          # - ./fuzzers/qemu_cmin
-          - ./fuzzers/qemu_systemmode
           - ./fuzzers/push_harness
           - ./fuzzers/libfuzzer_libpng_centralized
           - ./fuzzers/baby_fuzzer_nautilus
@@ -283,7 +281,6 @@ jobs:
           - ./fuzzers/fuzzbench_forkserver
           - ./fuzzers/libfuzzer_windows_asan
           - ./fuzzers/baby_fuzzer_minimizing
-          # - ./fuzzers/qemu_coverage
           - ./fuzzers/frida_executable_libpng
           - ./fuzzers/tutorial
           - ./fuzzers/baby_fuzzer_tokens
