@@ -78,3 +78,23 @@ pub const DEFAULT_TIMEOUT_SECS: u64 = 1200;
 /// Default cache size for the corpus in memory.
 /// Anything else will be on disk.
 pub const CORPUS_CACHE_SIZE: usize = 4096;
+
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
+/// The sugar python module
+#[cfg(feature = "python")]
+#[pymodule]
+#[pyo3(name = "libafl_sugar")]
+pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
+    inmemory::pybind::register(py, m)?;
+    #[cfg(target_os = "linux")]
+    {
+        qemu::pybind::register(py, m)?;
+    }
+    #[cfg(unix)]
+    {
+        forkserver::pybind::register(py, m)?;
+    }
+    Ok(())
+}
