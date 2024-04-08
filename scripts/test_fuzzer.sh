@@ -52,9 +52,9 @@ do
     if [ "$1" != "--no-fmt" ]; then
         
         echo "[*] Checking fmt for $fuzzer"
-        cargo +nightly fmt --all -- --check || exit 1
+        cargo fmt --all -- --check || exit 1
         echo "[*] Running clippy for $fuzzer"
-        cargo +nightly clippy || exit 1
+        cargo clippy || exit 1
     else
         echo "[+] Skipping fmt and clippy for $fuzzer (--no-fmt specified)"
     fi

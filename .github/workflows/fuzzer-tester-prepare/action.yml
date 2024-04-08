@@ -14,6 +14,9 @@ runs:
       with:
         profile: minimal
         toolchain: stable
+    - name: Add stable rustfmt and clippy
+      shell: bash
+      run: rustup toolchain install stable --component rustfmt --component clippy --allow-downgrade
     - name: Add nightly rustfmt and clippy
       shell: bash
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
