@@ -8,8 +8,7 @@ runs:
         submodules: true
         fetch-depth: 0
     - uses: Swatinem/rust-cache@v2
-      with:
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      with: { shared-key: "${{ runner.os }}-shared-fuzzer-cache" }
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal

@@ -40,6 +40,10 @@ jobs:
           crate: mdbook-linkcheck
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
+        with: { shared-key: "ubuntu" }
+        if: runner.os == 'Linux'
+      - uses: Swatinem/rust-cache@v2
+        if: runner.os != 'Linux'
       - name: Check for binary blobs
         if: runner.os == 'Linux'
         run: ./scripts/check_for_blobs.sh
@@ -75,6 +79,7 @@ jobs:
           toolchain: stable
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
+        with: { shared-key: "llvm-tester" }
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
         with:
@@ -102,6 +107,7 @@ jobs:
         run: cargo install -f ucd-generate
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
+        with: { shared-key: "ubuntu" }
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
         with:
@@ -133,6 +139,7 @@ jobs:
         run: cargo install -f ucd-generate
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
+        with: { shared-key: "ubuntu" }
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
         with:
@@ -161,6 +168,7 @@ jobs:
         run: cargo install -f ucd-generate
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
+        with: { shared-key: "ubuntu" }
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
         with:
@@ -199,6 +207,7 @@ jobs:
         run: rustup toolchain install nightly --component clippy --allow-downgrade && rustup default nightly
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
+        with: { shared-key: "ubuntu" }
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
         with:
@@ -248,6 +257,7 @@ jobs:
         run: rustup toolchain install nightly --allow-downgrade
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
+        with: { shared-key: "ubuntu" }
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
         with:
@@ -273,6 +283,7 @@ jobs:
           toolchain: stable
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
+        with: { shared-key: "ubuntu" }
       - name: Install smoke test deps
         run: sudo ./libafl_concolic/test/smoke_test_ubuntu_deps.sh
       - name: Run smoke test
