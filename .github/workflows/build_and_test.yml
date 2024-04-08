@@ -85,6 +85,7 @@ jobs:
 
   ubuntu-doc:
     runs-on: ubuntu-22.04
+    needs: ubuntu
     steps:
     - name: Remove Dotnet & Haskell
       run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
@@ -115,6 +116,7 @@ jobs:
 
   ubuntu-miri:
     runs-on: ubuntu-22.04
+    needs: ubuntu
     steps:
     - name: Remove Dotnet & Haskell
       run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
@@ -185,6 +187,7 @@ jobs:
 
   ubuntu-clippy:
     runs-on: ubuntu-22.04
+    needs: ubuntu
     steps:
     - name: Remove Dotnet & Haskell
       run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
@@ -218,6 +221,7 @@ jobs:
 
   ubuntu-check:
     runs-on: ubuntu-22.04
+    needs: ubuntu
     steps:
     - uses: actions-rs/toolchain@v1
       with:
@@ -281,6 +285,7 @@ jobs:
       run: ./libafl_concolic/test/smoke_test.sh
 
   fuzzers:
+    needs: ubuntu
     strategy:
       matrix:
         os: [ubuntu-latest]
