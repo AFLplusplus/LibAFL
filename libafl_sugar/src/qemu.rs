@@ -30,8 +30,8 @@ use libafl_bolts::{
     core_affinity::Cores,
     current_nanos,
     rands::StdRand,
-    shmem::{ShMemProvider, StdShMemProvider},
     serdeany::HasMetadata,
+    shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
     AsSlice,
 };

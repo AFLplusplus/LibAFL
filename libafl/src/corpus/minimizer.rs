@@ -8,7 +8,7 @@ use alloc::{
 use core::{hash::Hash, marker::PhantomData};
 
 use hashbrown::{HashMap, HashSet};
-use libafl_bolts::{current_time, tuples::MatchName, AsIter, Named, serdeany::HasMetadata};
+use libafl_bolts::{current_time, serdeany::HasMetadata, tuples::MatchName, AsIter, Named};
 use num_traits::ToPrimitive;
 use z3::{ast::Bool, Config, Context, Optimize};
 

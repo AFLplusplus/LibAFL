@@ -4,7 +4,7 @@ use alloc::{collections::VecDeque, rc::Rc, vec::Vec};
 use core::marker::PhantomData;
 
 use bitvec::{bitvec, vec::BitVec};
-use libafl_bolts::{impl_serdeany, Error, serdeany::HasMetadata};
+use libafl_bolts::{impl_serdeany, serdeany::HasMetadata, Error};
 use serde::{Deserialize, Serialize};
 
 use crate::{

@@ -28,9 +28,9 @@ use libafl_bolts::{
     core_affinity::Cores,
     current_nanos,
     rands::StdRand,
+    serdeany::HasMetadata,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
-    serdeany::HasMetadata,
     AsSlice,
 };
 use libafl_targets::{std_edges_map_observer, CmpLogObserver};

@@ -21,7 +21,7 @@ use libafl::{
     state::State,
     Error,
 };
-use libafl_bolts::{ownedref::OwnedPtr, Named, SerdeAny, serdeany::HasMetadata};
+use libafl_bolts::{ownedref::OwnedPtr, serdeany::HasMetadata, Named, SerdeAny};
 use serde::{Deserialize, Serialize};
 use termcolor::{Color, ColorSpec, WriteColor};
 #[cfg(target_arch = "aarch64")]

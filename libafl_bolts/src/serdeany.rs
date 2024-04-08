@@ -3,11 +3,12 @@
 use alloc::boxed::Box;
 #[cfg(feature = "unsafe_stable_anymap")]
 use alloc::string::{String, ToString};
-#[cfg(feature = "unsafe_stable_anymap")]
-use core::any::type_name;
 #[cfg(not(feature = "unsafe_stable_anymap"))]
 use core::any::TypeId;
-use core::{any::Any, fmt::Debug};
+use core::{
+    any::{type_name, Any},
+    fmt::Debug,
+};
 
 use serde::{de::DeserializeSeed, Deserialize, Deserializer, Serialize, Serializer};
 pub use serdeany_registry::*;
@@ -947,9 +948,9 @@ pub trait HasMetadata {
     where
         M: SerdeAny,
     {
-        self.metadata_map().get::<M>().ok_or_else(|| {
-            Error::key_not_found(format!("{} not found", type_name::<M>()))
-        })
+        self.metadata_map()
+            .get::<M>()
+            .ok_or_else(|| Error::key_not_found(format!("{} not found", type_name::<M>())))
     }
 
     /// To get mutable metadata
@@ -958,9 +959,9 @@ pub trait HasMetadata {
     where
         M: SerdeAny,
     {
-        self.metadata_map_mut().get_mut::<M>().ok_or_else(|| {
-            Error::key_not_found(format!("{} not found", type_name::<M>()))
-        })
+        self.metadata_map_mut()
+            .get_mut::<M>()
+            .ok_or_else(|| Error::key_not_found(format!("{} not found", type_name::<M>())))
     }
 }
 
@@ -1020,9 +1021,9 @@ pub trait HasNamedMetadata {
     where
         M: SerdeAny,
     {
-        self.named_metadata_map().get::<M>(name).ok_or_else(|| {
-            Error::key_not_found(format!("{} not found", type_name::<M>()))
-        })
+        self.named_metadata_map()
+            .get::<M>(name)
+            .ok_or_else(|| Error::key_not_found(format!("{} not found", type_name::<M>())))
     }
 
     /// To get mutable named metadata
@@ -1033,9 +1034,7 @@ pub trait HasNamedMetadata {
     {
         self.named_metadata_map_mut()
             .get_mut::<M>(name)
-            .ok_or_else(|| {
-                Error::key_not_found(format!("{} not found", type_name::<M>()))
-            })
+            .ok_or_else(|| Error::key_not_found(format!("{} not found", type_name::<M>())))
     }
 }
 

@@ -25,8 +25,8 @@ use libafl_bolts::{
     core_affinity::Cores,
     current_nanos,
     rands::StdRand,
-    shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     serdeany::HasMetadata,
+    shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Merge},
     AsMutSlice,
 };

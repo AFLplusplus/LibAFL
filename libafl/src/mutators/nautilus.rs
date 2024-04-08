@@ -7,7 +7,7 @@ use grammartec::{
     mutator::Mutator as BackingMutator,
     tree::{Tree, TreeMutation},
 };
-use libafl_bolts::{Named, serdeany::HasMetadata};
+use libafl_bolts::{serdeany::HasMetadata, Named};
 
 use crate::{
     feedbacks::NautilusChunksMetadata,

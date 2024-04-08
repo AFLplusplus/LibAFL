@@ -5,7 +5,7 @@ use core::{
     ops::Range,
 };
 
-use libafl_bolts::{rands::Rand, Error, HasLen, Named, serdeany::HasMetadata};
+use libafl_bolts::{rands::Rand, serdeany::HasMetadata, Error, HasLen, Named};
 
 use crate::{
     corpus::{CorpusId, HasTestcase, Testcase},
