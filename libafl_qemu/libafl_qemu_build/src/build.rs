@@ -10,6 +10,7 @@ const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
 const QEMU_REVISION: &str = "821ad471430360c4eed644d07d59f0d603ef23f6";
 
+#[allow(clippy::module_name_repetitions)]
 pub struct BuildResult {
     pub qemu_path: PathBuf,
     pub build_dir: PathBuf,

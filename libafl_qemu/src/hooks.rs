@@ -1,5 +1,5 @@
 //! The high-level hooks
-#![allow(clippy::type_complexity)]
+#![allow(clippy::type_complexity, clippy::missing_transmute_annotations)]
 
 #[cfg(emulation_mode = "usermode")]
 use core::ptr::addr_of_mut;

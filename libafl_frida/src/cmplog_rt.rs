@@ -746,7 +746,7 @@ impl CmpLogRuntime {
     }
 
     #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
-    #[allow(clippy::similar_names)]
+    #[allow(clippy::similar_names, clippy::type_complexity)]
     #[inline]
     /// Check if the current instruction is cmplog relevant one(any opcode which sets the flags)
     #[must_use]
@@ -765,7 +765,7 @@ impl CmpLogRuntime {
             .operands
             .iter()
             .position(|item| *item == Operand::Nothing)
-            .unwrap_or_else(|| 4);
+            .unwrap_or(4);
         // "cmp" | "ands" | "subs" | "adds" | "negs" | "ngcs" | "sbcs" | "bics" | "cbz"
         //    | "cbnz" | "tbz" | "tbnz" | "adcs" - yaxpeax aliases insns (i.e., cmp -> subs)
         // We only care for compare instructions - aka instructions which set the flags
@@ -846,14 +846,14 @@ impl CmpLogRuntime {
                     None,
                 )),
                 Operand::ImmShift(imm, shift) => {
-                    Some((CmplogOperandType::Imm((imm as u64) << shift), None))
+                    Some((CmplogOperandType::Imm(u64::from(imm) << shift), None))
                 } //precalculate the shift
                 Operand::RegShift(shiftstyle, amount, regsize, reg) => {
                     let reg = CmplogOperandType::Regid(writer_register(reg, regsize, true));
                     let shift = (shiftstyle, amount);
                     Some((reg, Some(shift)))
                 }
-                Operand::Immediate(imm) => Some((CmplogOperandType::Imm(imm as u64), None)),
+                Operand::Immediate(imm) => Some((CmplogOperandType::Imm(u64::from(imm)), None)),
                 _ => panic!("Second argument could not be decoded"),
             }
         };

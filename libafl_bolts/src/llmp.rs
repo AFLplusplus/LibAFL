@@ -2492,6 +2492,7 @@ where
     }
 
     /// Tell the broker to disconnect this client from it.
+    #[cfg(feature = "std")]
     fn announce_client_exit(sender: &mut LlmpSender<SP>, client_id: u32) -> Result<(), Error> {
         unsafe {
             let msg = sender
