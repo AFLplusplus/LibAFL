@@ -650,13 +650,13 @@ pub struct HookData(u64);
 
 impl<T> From<Pin<&mut T>> for HookData {
     fn from(value: Pin<&mut T>) -> Self {
-        unsafe { HookData(transmute::<std::pin::Pin<&mut T>, u64>(value)) }
+        unsafe { HookData(transmute::<Pin<&mut T>, u64>(value)) }
     }
 }
 
 impl<T> From<Pin<&T>> for HookData {
     fn from(value: Pin<&T>) -> Self {
-        unsafe { HookData(transmute::<std::pin::Pin<&T>, u64>(value)) }
+        unsafe { HookData(transmute::<Pin<&T>, u64>(value)) }
     }
 }
 
@@ -928,7 +928,7 @@ impl Qemu {
             }
         }
     }
-
+    #[allow(clippy::missing_transmute_annotations)]
     fn post_run(&self) -> Result<QemuExitReason, QemuExitReasonError> {
         let exit_reason = unsafe { libafl_get_exit_reason() };
         if exit_reason.is_null() {
@@ -1093,6 +1093,7 @@ impl Qemu {
     }
 
     // TODO set T lifetime to be like Emulator
+    #[allow(clippy::missing_transmute_annotations)]
     pub fn set_hook<T: Into<HookData>>(
         &self,
         data: T,
@@ -1125,6 +1126,7 @@ impl Qemu {
         }
     }
 
+    #[allow(clippy::missing_transmute_annotations)]
     pub fn add_edge_hooks<T: Into<HookData>>(
         &self,
         data: T,
@@ -1140,6 +1142,7 @@ impl Qemu {
         }
     }
 
+    #[allow(clippy::missing_transmute_annotations)]
     pub fn add_block_hooks<T: Into<HookData>>(
         &self,
         data: T,
@@ -1157,6 +1160,7 @@ impl Qemu {
         }
     }
 
+    #[allow(clippy::missing_transmute_annotations)]
     pub fn add_read_hooks<T: Into<HookData>>(
         &self,
         data: T,
@@ -1184,6 +1188,7 @@ impl Qemu {
     }
 
     // TODO add MemOp info
+    #[allow(clippy::missing_transmute_annotations)]
     pub fn add_write_hooks<T: Into<HookData>>(
         &self,
         data: T,
@@ -1210,6 +1215,7 @@ impl Qemu {
         }
     }
 
+    #[allow(clippy::missing_transmute_annotations)]
     pub fn add_cmp_hooks<T: Into<HookData>>(
         &self,
         data: T,
@@ -1231,6 +1237,7 @@ impl Qemu {
         }
     }
 
+    #[allow(clippy::missing_transmute_annotations)]
     pub fn add_backdoor_hook<T: Into<HookData>>(
         &self,
         data: T,
