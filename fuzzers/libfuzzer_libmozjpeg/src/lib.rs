@@ -28,7 +28,7 @@ use libafl::{
 use libafl_bolts::{
     current_nanos,
     rands::StdRand,
-    sredeany::HasMetadata,
+    serdeany::HasMetadata,
     tuples::{tuple_list, Merge},
     AsSlice,
 };
