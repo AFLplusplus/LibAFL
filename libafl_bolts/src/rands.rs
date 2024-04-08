@@ -433,3 +433,92 @@ mod tests {
         log::info!("random value: {}", mutator.rng.next_u32());
     }
 }
+
+#[cfg(feature = "python")]
+#[allow(clippy::unnecessary_fallible_conversions, unused_qualifications)]
+#[allow(missing_docs)]
+/// `Rand` Python bindings
+pub mod pybind {
+    use pyo3::prelude::*;
+    use serde::{Deserialize, Serialize};
+
+    use super::Rand;
+    use crate::{current_nanos, rands::StdRand};
+
+    #[pyclass(unsendable, name = "StdRand")]
+    #[allow(clippy::unsafe_derive_deserialize)]
+    #[derive(Serialize, Deserialize, Debug, Clone)]
+    /// Python class for StdRand
+    pub struct PythonStdRand {
+        /// Rust wrapped StdRand object
+        pub inner: StdRand,
+    }
+
+    #[pymethods]
+    impl PythonStdRand {
+        #[staticmethod]
+        fn with_current_nanos() -> Self {
+            Self {
+                inner: StdRand::with_seed(current_nanos()),
+            }
+        }
+
+        #[staticmethod]
+        fn with_seed(seed: u64) -> Self {
+            Self {
+                inner: StdRand::with_seed(seed),
+            }
+        }
+
+        fn as_rand(slf: Py<Self>) -> PythonRand {
+            PythonRand::new_std(slf)
+        }
+    }
+
+    #[derive(Serialize, Deserialize, Debug, Clone)]
+    enum PythonRandWrapper {
+        Std(Py<PythonStdRand>),
+    }
+
+    /// Rand Trait binding
+    #[pyclass(unsendable, name = "Rand")]
+    #[allow(clippy::unsafe_derive_deserialize)]
+    #[derive(Serialize, Deserialize, Debug, Clone)]
+    pub struct PythonRand {
+        wrapper: PythonRandWrapper,
+    }
+
+    macro_rules! unwrap_me_mut {
+        ($wrapper:expr, $name:ident, $body:block) => {
+            crate::unwrap_me_mut_body!($wrapper, $name, $body, PythonRandWrapper, { Std })
+        };
+    }
+
+    #[pymethods]
+    impl PythonRand {
+        #[staticmethod]
+        fn new_std(py_std_rand: Py<PythonStdRand>) -> Self {
+            Self {
+                wrapper: PythonRandWrapper::Std(py_std_rand),
+            }
+        }
+    }
+
+    impl Rand for PythonRand {
+        fn set_seed(&mut self, seed: u64) {
+            unwrap_me_mut!(self.wrapper, r, { r.set_seed(seed) });
+        }
+
+        #[inline]
+        fn next(&mut self) -> u64 {
+            unwrap_me_mut!(self.wrapper, r, { r.next() })
+        }
+    }
+
+    /// Register the classes to the python module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonStdRand>()?;
+        m.add_class::<PythonRand>()?;
+        Ok(())
+    }
+}
