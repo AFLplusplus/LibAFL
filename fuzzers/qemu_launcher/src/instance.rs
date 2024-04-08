@@ -27,7 +27,7 @@ use libafl::{
         StagesTuple, StdMutationalStage,
     },
     state::{HasCorpus, StdState, UsesState},
-    Error,
+    Error, HasMetadata,
 };
 #[cfg(not(feature = "simplemgr"))]
 use libafl_bolts::shmem::StdShMemProvider;
@@ -35,7 +35,6 @@ use libafl_bolts::{
     core_affinity::CoreId,
     current_nanos,
     rands::StdRand,
-    serdeany::HasMetadata,
     tuples::{tuple_list, Merge},
 };
 use libafl_qemu::{

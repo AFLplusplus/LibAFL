@@ -2,7 +2,7 @@
 use alloc::string::{String, ToString};
 use core::marker::PhantomData;
 
-use libafl_bolts::{serdeany::HasMetadata, HasLen, HasRefCnt};
+use libafl_bolts::{HasLen, HasRefCnt};
 
 use crate::{
     corpus::{Corpus, SchedulerTestcaseMetadata, Testcase},
@@ -12,7 +12,7 @@ use crate::{
         powersched::{PowerSchedule, SchedulerMetadata},
     },
     state::HasCorpus,
-    Error,
+    Error, HasMetadata,
 };
 
 /// Compute the favor factor of a [`Testcase`]. Higher is better.

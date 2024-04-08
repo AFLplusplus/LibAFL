@@ -13,7 +13,6 @@ use core::{
     time::Duration,
 };
 
-use libafl_bolts::serdeany::HasMetadata;
 pub use mutational::StdMutationalPushStage;
 
 use crate::{
@@ -24,7 +23,7 @@ use crate::{
     observers::ObserversTuple,
     schedulers::Scheduler,
     state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand},
-    Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
+    Error, EvaluatorObservers, ExecutionProcessor, HasMetadata, HasScheduler,
 };
 
 /// Send a monitor update all 15 (or more) seconds

@@ -1,12 +1,12 @@
 //! Feedbacks and associated metadata for detecting whether a given testcase was transferred from
 //! another node.
 
-use libafl_bolts::{impl_serdeany, serdeany::HasMetadata, Error, Named};
+use libafl_bolts::{impl_serdeany, Error, Named};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     events::EventFirer, executors::ExitKind, feedbacks::Feedback, observers::ObserversTuple,
-    state::State,
+    state::State, HasMetadata,
 };
 
 /// Constant name of the [`TransferringMetadata`].

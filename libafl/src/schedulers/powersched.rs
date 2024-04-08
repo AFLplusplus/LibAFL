@@ -6,7 +6,6 @@ use alloc::{
 };
 use core::{marker::PhantomData, time::Duration};
 
-use libafl_bolts::serdeany::HasMetadata;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -15,7 +14,7 @@ use crate::{
     observers::{MapObserver, ObserversTuple},
     schedulers::{HasAFLSchedulerMetadata, RemovableScheduler, Scheduler},
     state::{HasCorpus, State, UsesState},
-    Error,
+    Error, HasMetadata,
 };
 
 /// The n fuzz size

@@ -2,7 +2,7 @@
 
 use alloc::vec::Vec;
 
-use libafl_bolts::{impl_serdeany, serdeany::HasMetadata};
+use libafl_bolts::impl_serdeany;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -10,7 +10,7 @@ use crate::{
     inputs::BytesInput,
     stages::mutational::{MutatedTransform, MutatedTransformPost},
     state::HasCorpus,
-    Error,
+    Error, HasMetadata,
 };
 
 /// An item of the generalized input

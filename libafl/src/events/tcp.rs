@@ -23,7 +23,7 @@ use libafl_bolts::os::startable_self;
 use libafl_bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(feature = "std", feature = "fork", unix))]
 use libafl_bolts::os::{fork, ForkResult};
-use libafl_bolts::{serdeany::HasMetadata, shmem::ShMemProvider, tuples::tuple_list, ClientId};
+use libafl_bolts::{shmem::ShMemProvider, tuples::tuple_list, ClientId};
 #[cfg(feature = "std")]
 use libafl_bolts::{shmem::StdShMemProvider, staterestore::StateRestorer};
 use serde::{de::DeserializeOwned, Deserialize};
@@ -49,7 +49,7 @@ use crate::{
     inputs::{Input, UsesInput},
     monitors::Monitor,
     state::{HasExecutions, HasLastReportTime, State, UsesState},
-    Error,
+    Error, HasMetadata,
 };
 
 /// Tries to create (synchronously) a [`TcpListener`] that is `nonblocking` (for later use in tokio).

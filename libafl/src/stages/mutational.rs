@@ -3,11 +3,7 @@
 
 use core::{any::type_name, marker::PhantomData};
 
-use libafl_bolts::{
-    rands::Rand,
-    serdeany::{HasMetadata, HasNamedMetadata},
-    Named,
-};
+use libafl_bolts::{rands::Rand, Named};
 
 use crate::{
     corpus::{Corpus, CorpusId, Testcase},
@@ -18,7 +14,7 @@ use crate::{
     stages::{ExecutionCountRestartHelper, RetryRestartHelper, Stage},
     start_timer,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
-    Error,
+    Error, HasMetadata, HasNamedMetadata,
 };
 #[cfg(feature = "introspection")]
 use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};

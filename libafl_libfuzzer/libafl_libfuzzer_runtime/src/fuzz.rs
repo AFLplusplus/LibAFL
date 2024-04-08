@@ -24,11 +24,10 @@ use libafl::{
     },
     stages::{HasCurrentStage, StagesTuple},
     state::{HasExecutions, HasLastReportTime, HasSolutions, UsesState},
-    Error, Fuzzer,
+    Error, Fuzzer, HasMetadata,
 };
 use libafl_bolts::{
     core_affinity::Cores,
-    serdeany::HasMetadata,
     shmem::{ShMemProvider, StdShMemProvider},
 };
 

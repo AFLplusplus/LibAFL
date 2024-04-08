@@ -9,8 +9,7 @@ use core::{
 };
 
 use libafl_bolts::{
-    impl_serdeany, math::calculate_cumulative_distribution_in_place, rands::Rand,
-    serdeany::HasMetadata, Named,
+    impl_serdeany, math::calculate_cumulative_distribution_in_place, rands::Rand, Named,
 };
 use serde::{Deserialize, Serialize};
 
@@ -20,7 +19,7 @@ use crate::{
         ComposedByMutations, MutationId, MutationResult, Mutator, MutatorsTuple, ScheduledMutator,
     },
     state::HasRand,
-    Error,
+    Error, HasMetadata,
 };
 
 /// Metadata in the state, that controls the behavior of the [`TuneableScheduledMutator`] at runtime

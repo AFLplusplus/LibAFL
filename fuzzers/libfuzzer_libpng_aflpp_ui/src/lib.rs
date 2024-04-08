@@ -28,12 +28,11 @@ use libafl::{
     },
     stages::{calibrate::CalibrationStage, power::StdPowerMutationalStage, stats::AflStatsStage},
     state::{HasCorpus, StdState},
-    Error,
+    Error, HasMetadata,
 };
 use libafl_bolts::{
     current_nanos,
     rands::StdRand,
-    serdeany::HasMetadata,
     tuples::{tuple_list, Merge},
     AsSlice,
 };

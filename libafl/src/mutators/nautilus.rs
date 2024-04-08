@@ -7,7 +7,7 @@ use grammartec::{
     mutator::Mutator as BackingMutator,
     tree::{Tree, TreeMutation},
 };
-use libafl_bolts::{serdeany::HasMetadata, Named};
+use libafl_bolts::Named;
 
 use crate::{
     feedbacks::NautilusChunksMetadata,
@@ -15,7 +15,7 @@ use crate::{
     inputs::nautilus::NautilusInput,
     mutators::{MutationResult, Mutator},
     state::HasCorpus,
-    Error,
+    Error, HasMetadata,
 };
 
 /// The randomic mutator for `Nautilus` grammar.

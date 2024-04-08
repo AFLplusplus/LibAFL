@@ -8,14 +8,10 @@ use core::{fmt::Debug, marker::PhantomData};
 
 use c2rust_bitfields::BitfieldStruct;
 use hashbrown::HashMap;
-use libafl_bolts::{
-    ownedref::OwnedRefMut,
-    serdeany::{HasMetadata, SerdeAny},
-    AsMutSlice, AsSlice, Named,
-};
+use libafl_bolts::{ownedref::OwnedRefMut, serdeany::SerdeAny, AsMutSlice, AsSlice, Named};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use crate::{executors::ExitKind, inputs::UsesInput, observers::Observer, Error};
+use crate::{executors::ExitKind, inputs::UsesInput, observers::Observer, Error, HasMetadata};
 
 /// Generic metadata trait for use in a `CmpObserver`, which adds comparisons from a `CmpObserver`
 /// primarily intended for use with `AFLppCmpValuesMetadata` or `CmpValuesMetadata`

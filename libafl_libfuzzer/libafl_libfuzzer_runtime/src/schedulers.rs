@@ -9,9 +9,8 @@ use libafl::{
     inputs::UsesInput,
     schedulers::{RemovableScheduler, Scheduler},
     state::{HasCorpus, State, UsesState},
-    Error,
+    Error, HasMetadata,
 };
-use libafl_bolts::serdeany::HasMetadata;
 
 #[derive(Clone, Debug)]
 pub struct MergeScheduler<S> {

@@ -4,7 +4,7 @@
 use alloc::string::ToString;
 use core::{marker::PhantomData, time::Duration};
 
-use libafl_bolts::{current_time, serdeany::HasMetadata};
+use libafl_bolts::current_time;
 #[cfg(feature = "std")]
 use serde_json::json;
 
@@ -14,7 +14,7 @@ use crate::{
     schedulers::minimizer::IsFavoredMetadata,
     stages::Stage,
     state::{HasCorpus, HasImported, UsesState},
-    Error,
+    Error, HasMetadata,
 };
 #[cfg(feature = "std")]
 use crate::{

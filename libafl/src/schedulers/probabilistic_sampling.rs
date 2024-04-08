@@ -5,7 +5,7 @@ use alloc::string::String;
 use core::marker::PhantomData;
 
 use hashbrown::HashMap;
-use libafl_bolts::{rands::Rand, serdeany::HasMetadata};
+use libafl_bolts::rands::Rand;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -13,7 +13,7 @@ use crate::{
     inputs::UsesInput,
     schedulers::{RemovableScheduler, Scheduler, TestcaseScore},
     state::{HasCorpus, HasRand, State, UsesState},
-    Error,
+    Error, HasMetadata,
 };
 
 /// Conduct reservoir sampling (probabilistic sampling) over all corpus elements.
@@ -195,7 +195,7 @@ where
 mod tests {
     use core::{borrow::BorrowMut, marker::PhantomData};
 
-    use libafl_bolts::{rands::StdRand, serdeany::HasMetadata};
+    use libafl_bolts::rands::StdRand;
 
     use crate::{
         corpus::{Corpus, InMemoryCorpus, Testcase},
@@ -203,7 +203,7 @@ mod tests {
         inputs::{bytes::BytesInput, Input, UsesInput},
         schedulers::{ProbabilitySamplingScheduler, Scheduler, TestcaseScore},
         state::{HasCorpus, StdState},
-        Error,
+        Error, HasMetadata,
     };
 
     const FACTOR: f64 = 1337.0;

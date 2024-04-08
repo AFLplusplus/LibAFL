@@ -16,7 +16,7 @@ use core::{
     time::Duration,
 };
 
-use libafl_bolts::{serdeany::HasMetadata, tuples::tuple_list};
+use libafl_bolts::tuples::tuple_list;
 
 #[cfg(any(unix, feature = "std"))]
 use crate::executors::hooks::inprocess::GLOBAL_STATE;
@@ -33,7 +33,7 @@ use crate::{
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
     state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
-    Error,
+    Error, HasMetadata,
 };
 
 /// The inner structure of `InProcessExecutor`.

@@ -24,7 +24,7 @@ use libafl::{
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, StdState},
-    Error,
+    Error, HasMetadata,
 };
 #[cfg(unix)]
 use libafl::{feedback_and_fast, feedbacks::ConstFeedback};
@@ -32,7 +32,6 @@ use libafl_bolts::{
     cli::{parse_args, FuzzerOptions},
     current_nanos,
     rands::StdRand,
-    serdeany::HasMetadata,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
     AsSlice,

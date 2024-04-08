@@ -1,8 +1,7 @@
 #[cfg(emulation_mode = "usermode")]
 use capstone::{arch::BuildsCapstone, Capstone, InsnDetail};
 use hashbrown::HashMap;
-use libafl::inputs::UsesInput;
-use libafl_bolts::serdeany::HasMetadata;
+use libafl::{inputs::UsesInput, HasMetadata};
 use libafl_qemu_sys::GuestAddr;
 pub use libafl_targets::{
     cmps::{

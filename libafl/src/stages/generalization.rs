@@ -6,10 +6,7 @@ use alloc::{
 };
 use core::{fmt::Debug, marker::PhantomData};
 
-use libafl_bolts::{
-    serdeany::{HasMetadata, HasNamedMetadata},
-    AsSlice, Named,
-};
+use libafl_bolts::{AsSlice, Named};
 
 use crate::{
     corpus::{Corpus, HasCurrentCorpusIdx},
@@ -21,7 +18,7 @@ use crate::{
     stages::{RetryRestartHelper, Stage},
     start_timer,
     state::{HasCorpus, HasExecutions, UsesState},
-    Error,
+    Error, HasMetadata, HasNamedMetadata,
 };
 #[cfg(feature = "introspection")]
 use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};

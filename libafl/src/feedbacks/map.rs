@@ -12,10 +12,7 @@ use core::{
     ops::{BitAnd, BitOr},
 };
 
-use libafl_bolts::{
-    serdeany::{HasMetadata, HasNamedMetadata},
-    AsIter, AsMutSlice, AsSlice, HasRefCnt, Named,
-};
+use libafl_bolts::{AsIter, AsMutSlice, AsSlice, HasRefCnt, Named};
 use num_traits::PrimInt;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -28,7 +25,7 @@ use crate::{
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, Observer, ObserversTuple, UsesObserver},
     state::State,
-    Error,
+    Error, HasMetadata, HasNamedMetadata,
 };
 
 /// A [`MapFeedback`] that implements the AFL algorithm using an [`OrReducer`] combining the bits for the history map and the bit from ``HitcountsMapObserver``.

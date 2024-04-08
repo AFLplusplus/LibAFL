@@ -8,11 +8,7 @@ use alloc::{string::ToString, vec::Vec};
 #[cfg(feature = "concolic_mutation")]
 use core::marker::PhantomData;
 
-use libafl_bolts::{
-    serdeany::{HasMetadata, HasNamedMetadata},
-    tuples::MatchName,
-    Named,
-};
+use libafl_bolts::{tuples::MatchName, Named};
 
 #[cfg(all(feature = "concolic_mutation", feature = "introspection"))]
 use crate::monitors::PerfFeature;
@@ -23,7 +19,7 @@ use crate::{
     observers::concolic::ConcolicObserver,
     stages::{RetryRestartHelper, Stage, TracingStage},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, UsesState},
-    Error,
+    Error, HasMetadata, HasNamedMetadata,
 };
 #[cfg(feature = "concolic_mutation")]
 use crate::{

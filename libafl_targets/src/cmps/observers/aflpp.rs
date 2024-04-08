@@ -11,9 +11,9 @@ use libafl::{
         cmp::{AFLppCmpValuesMetadata, CmpMap, CmpObserver, CmpObserverMetadata, CmpValues},
         Observer,
     },
-    Error,
+    Error, HasMetadata,
 };
-use libafl_bolts::{ownedref::OwnedRefMut, serdeany::HasMetadata, Named};
+use libafl_bolts::{ownedref::OwnedRefMut, Named};
 use serde::{Deserialize, Serialize};
 
 use crate::cmps::AFLppCmpLogMap;

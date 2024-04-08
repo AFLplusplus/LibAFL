@@ -3,7 +3,7 @@
 use alloc::string::ToString;
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
 
-use libafl_bolts::{current_time, serdeany::HasMetadata};
+use libafl_bolts::current_time;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
@@ -18,7 +18,7 @@ use crate::{
     stages::{HasCurrentStage, StagesTuple},
     start_timer,
     state::{HasCorpus, HasExecutions, HasImported, HasLastReportTime, HasSolutions, UsesState},
-    Error,
+    Error, HasMetadata,
 };
 #[cfg(feature = "introspection")]
 use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
@@ -753,14 +753,14 @@ where
 pub mod test {
     use core::marker::PhantomData;
 
-    use libafl_bolts::{serdeany::HasMetadata, Error};
+    use libafl_bolts::Error;
 
     use crate::{
         corpus::CorpusId,
         events::ProgressReporter,
         stages::{HasCurrentStage, StagesTuple},
         state::{HasExecutions, HasLastReportTime, State, UsesState},
-        Fuzzer,
+        Fuzzer, HasMetadata,
     };
 
     #[derive(Clone, Debug)]

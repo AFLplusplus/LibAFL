@@ -19,7 +19,6 @@ pub use generalization::GeneralizationStage;
 use hashbrown::HashSet;
 use libafl_bolts::{
     impl_serdeany,
-    serdeany::{HasMetadata, HasNamedMetadata},
     tuples::{HasConstLen, IntoVec},
     Named,
 };
@@ -48,7 +47,8 @@ use crate::{
     schedulers::Scheduler,
     stages::push::PushStage,
     state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand, State, UsesState},
-    Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasScheduler,
+    Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasMetadata, HasNamedMetadata,
+    HasScheduler,
 };
 
 /// Mutational stage is the normal fuzzing stage.
@@ -646,7 +646,7 @@ impl ExecutionCountRestartHelper {
 pub mod test {
     use core::marker::PhantomData;
 
-    use libafl_bolts::{impl_serdeany, serdeany::HasMetadata, Error, Named};
+    use libafl_bolts::{impl_serdeany, Error, Named};
     use serde::{Deserialize, Serialize};
 
     use crate::{
@@ -654,6 +654,7 @@ pub mod test {
         inputs::NopInput,
         stages::{RetryRestartHelper, Stage},
         state::{test::test_std_state, HasCorpus, State, UsesState},
+        HasMetadata,
     };
 
     #[derive(Debug)]

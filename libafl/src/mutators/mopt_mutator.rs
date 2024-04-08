@@ -10,7 +10,6 @@ use core::{
 
 use libafl_bolts::{
     rands::{Rand, StdRand},
-    serdeany::HasMetadata,
     Named,
 };
 use serde::{Deserialize, Serialize};
@@ -20,7 +19,7 @@ use crate::{
     corpus::{Corpus, CorpusId},
     mutators::{ComposedByMutations, MutationResult, Mutator, MutatorsTuple, ScheduledMutator},
     state::{HasCorpus, HasRand, HasSolutions},
-    Error,
+    Error, HasMetadata,
 };
 
 /// A Struct for managing MOpt-mutator parameters.

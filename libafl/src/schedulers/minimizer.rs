@@ -5,11 +5,7 @@ use alloc::vec::Vec;
 use core::{any::type_name, cmp::Ordering, marker::PhantomData};
 
 use hashbrown::{HashMap, HashSet};
-use libafl_bolts::{
-    rands::Rand,
-    serdeany::{HasMetadata, SerdeAny},
-    AsSlice, HasRefCnt,
-};
+use libafl_bolts::{rands::Rand, serdeany::SerdeAny, AsSlice, HasRefCnt};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -19,7 +15,7 @@ use crate::{
     observers::ObserversTuple,
     schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
     state::{HasCorpus, HasRand, UsesState},
-    Error,
+    Error, HasMetadata,
 };
 
 /// Default probability to skip the non-favored values

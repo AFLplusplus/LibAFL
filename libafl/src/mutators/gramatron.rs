@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use core::cmp::max;
 
 use hashbrown::HashMap;
-use libafl_bolts::{rands::Rand, serdeany::HasMetadata, Named};
+use libafl_bolts::{rands::Rand, Named};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -14,7 +14,7 @@ use crate::{
     mutators::{MutationResult, Mutator},
     random_corpus_id,
     state::{HasCorpus, HasRand},
-    Error,
+    Error, HasMetadata,
 };
 
 const RECUR_THRESHOLD: u64 = 5;

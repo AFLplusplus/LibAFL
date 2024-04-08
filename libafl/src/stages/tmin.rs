@@ -4,7 +4,7 @@ use alloc::string::{String, ToString};
 use core::{borrow::BorrowMut, fmt::Debug, hash::Hash, marker::PhantomData};
 
 use ahash::RandomState;
-use libafl_bolts::{serdeany::HasMetadata, HasLen, Named};
+use libafl_bolts::{HasLen, Named};
 
 use crate::{
     corpus::{Corpus, HasCurrentCorpusIdx, Testcase},
@@ -24,7 +24,7 @@ use crate::{
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasMaxSize, HasSolutions, State, UsesState,
     },
-    Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasScheduler,
+    Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasMetadata, HasScheduler,
 };
 #[cfg(feature = "introspection")]
 use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};

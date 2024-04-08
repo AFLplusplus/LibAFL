@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use core::fmt::Debug;
 
 use hashbrown::HashMap;
-use libafl_bolts::{rands::Rand, serdeany::HasMetadata, AsMutSlice, AsSlice, HasLen, HasRefCnt};
+use libafl_bolts::{rands::Rand, AsMutSlice, AsSlice, HasLen, HasRefCnt};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -17,7 +17,7 @@ use crate::{
         LenTimeMulTestcaseScore, Scheduler,
     },
     state::{HasCorpus, HasRand, UsesState},
-    Error,
+    Error, HasMetadata,
 };
 
 /// A testcase metadata holding a list of indexes of a map

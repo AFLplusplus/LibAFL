@@ -9,17 +9,14 @@ use core::{
 #[cfg(feature = "std")]
 use std::path::PathBuf;
 
-use libafl_bolts::{
-    serdeany::{HasMetadata, SerdeAnyMap},
-    HasLen,
-};
+use libafl_bolts::{serdeany::SerdeAnyMap, HasLen};
 use serde::{Deserialize, Serialize};
 
 use super::Corpus;
 use crate::{
     corpus::CorpusId,
     inputs::{Input, UsesInput},
-    Error,
+    Error, HasMetadata,
 };
 
 /// Shorthand to receive a [`Ref`] or [`RefMut`] to a stored [`Testcase`], by [`CorpusId`].

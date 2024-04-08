@@ -8,7 +8,7 @@ use alloc::{
 use core::{hash::Hash, marker::PhantomData};
 
 use hashbrown::{HashMap, HashSet};
-use libafl_bolts::{current_time, serdeany::HasMetadata, tuples::MatchName, AsIter, Named};
+use libafl_bolts::{current_time, tuples::MatchName, AsIter, Named};
 use num_traits::ToPrimitive;
 use z3::{ast::Bool, Config, Context, Optimize};
 
@@ -20,7 +20,7 @@ use crate::{
     observers::{MapObserver, ObserversTuple},
     schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
     state::{HasCorpus, HasExecutions, UsesState},
-    Error, HasScheduler,
+    Error, HasMetadata, HasScheduler,
 };
 
 /// `CorpusMinimizers` minimize corpora according to internal logic. See various implementations for

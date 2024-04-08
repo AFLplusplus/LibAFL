@@ -19,7 +19,6 @@ use libafl_bolts::{
 };
 use libafl_bolts::{
     llmp::{self, LlmpBroker, LlmpClient, LlmpClientDescription, Tag},
-    serdeany::HasMetadata,
     shmem::ShMemProvider,
     ClientId,
 };
@@ -40,7 +39,7 @@ use crate::{
     inputs::{Input, UsesInput},
     observers::ObserversTuple,
     state::{HasExecutions, HasLastReportTime, UsesState},
-    Error,
+    Error, HasMetadata,
 };
 
 const _LLMP_TAG_TO_MAIN: Tag = Tag(0x3453453);

@@ -7,12 +7,7 @@ use std::{
     time::SystemTime,
 };
 
-use libafl_bolts::{
-    current_time,
-    serdeany::{HasMetadata, HasNamedMetadata},
-    shmem::ShMemProvider,
-    Named,
-};
+use libafl_bolts::{current_time, shmem::ShMemProvider, Named};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "introspection")]
@@ -25,7 +20,7 @@ use crate::{
     inputs::{Input, InputConverter, UsesInput},
     stages::{RetryRestartHelper, Stage},
     state::{HasCorpus, HasExecutions, HasRand, State, UsesState},
-    Error,
+    Error, HasMetadata, HasNamedMetadata,
 };
 
 /// Metadata used to store information about disk sync time

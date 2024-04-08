@@ -19,9 +19,9 @@ use libafl::{
     inputs::{HasTargetBytes, UsesInput},
     observers::{Observer, ObserversTuple},
     state::State,
-    Error,
+    Error, HasMetadata,
 };
-use libafl_bolts::{ownedref::OwnedPtr, serdeany::HasMetadata, Named, SerdeAny};
+use libafl_bolts::{ownedref::OwnedPtr, Named, SerdeAny};
 use serde::{Deserialize, Serialize};
 use termcolor::{Color, ColorSpec, WriteColor};
 #[cfg(target_arch = "aarch64")]

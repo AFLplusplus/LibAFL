@@ -22,13 +22,12 @@ use libafl::{
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, StdState},
-    Error,
+    Error, HasMetadata,
 };
 use libafl_bolts::{
     core_affinity::Cores,
     current_nanos,
     rands::StdRand,
-    serdeany::HasMetadata,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
     AsSlice,

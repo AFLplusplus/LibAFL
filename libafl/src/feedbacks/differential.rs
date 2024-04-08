@@ -7,7 +7,7 @@ use core::{
     marker::PhantomData,
 };
 
-use libafl_bolts::{serdeany::HasMetadata, tuples::MatchName, Named};
+use libafl_bolts::{tuples::MatchName, Named};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -17,7 +17,7 @@ use crate::{
     inputs::Input,
     observers::{Observer, ObserversTuple},
     state::State,
-    Error,
+    Error, HasMetadata,
 };
 
 /// The result of a differential test between two observers.

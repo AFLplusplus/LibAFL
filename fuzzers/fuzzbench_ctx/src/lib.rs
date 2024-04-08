@@ -40,14 +40,13 @@ use libafl::{
         TracingStage,
     },
     state::{HasCorpus, StdState},
-    Error,
+    Error, HasMetadata,
 };
 use libafl_bolts::{
     current_nanos, current_time,
     os::dup2,
     ownedref::OwnedMutSlice,
     rands::StdRand,
-    serdeany::HasMetadata,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
     AsSlice,

@@ -5,7 +5,7 @@ use alloc::string::{String, ToString};
 use core::marker::PhantomData;
 
 use hashbrown::HashMap;
-use libafl_bolts::{rands::Rand, serdeany::HasMetadata};
+use libafl_bolts::rands::Rand;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -19,7 +19,7 @@ use crate::{
         HasAFLSchedulerMetadata, RemovableScheduler, Scheduler,
     },
     state::{HasCorpus, HasRand, State, UsesState},
-    Error,
+    Error, HasMetadata,
 };
 
 /// The Metadata for `WeightedScheduler`

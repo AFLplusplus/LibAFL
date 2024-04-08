@@ -17,7 +17,7 @@ use std::{
 };
 
 use hashbrown::HashSet;
-use libafl_bolts::{rands::Rand, serdeany::HasMetadata, AsSlice};
+use libafl_bolts::{rands::Rand, AsSlice};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
@@ -31,7 +31,7 @@ use crate::{
     observers::cmp::{AFLppCmpValuesMetadata, CmpValues, CmpValuesMetadata},
     stages::TaintMetadata,
     state::{HasCorpus, HasMaxSize, HasRand},
-    Error,
+    Error, HasMetadata,
 };
 
 /// A state metadata holding a list of tokens

@@ -18,7 +18,7 @@ use std::{
 use libafl_bolts::core_affinity::{CoreId, Cores};
 use libafl_bolts::{
     rands::{Rand, StdRand},
-    serdeany::{HasMetadata, HasNamedMetadata, NamedSerdeAnyMap, SerdeAnyMap},
+    serdeany::{NamedSerdeAnyMap, SerdeAnyMap},
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -34,7 +34,7 @@ use crate::{
     generators::Generator,
     inputs::{Input, UsesInput},
     stages::{HasCurrentStage, HasNestedStageStatus},
-    Error,
+    Error, HasMetadata, HasNamedMetadata,
 };
 
 /// The maximum size of a testcase

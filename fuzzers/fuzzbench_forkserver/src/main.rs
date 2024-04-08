@@ -30,13 +30,12 @@ use libafl::{
         TracingStage,
     },
     state::{HasCorpus, StdState},
-    Error,
+    Error, HasMetadata,
 };
 use libafl_bolts::{
     current_nanos, current_time,
     ownedref::OwnedRefMut,
     rands::StdRand,
-    serdeany::HasMetadata,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Merge},
     AsMutSlice,

@@ -7,11 +7,7 @@ use alloc::{
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
 
 use hashbrown::HashSet;
-use libafl_bolts::{
-    current_time, impl_serdeany,
-    serdeany::{HasMetadata, HasNamedMetadata},
-    AsIter, Named,
-};
+use libafl_bolts::{current_time, impl_serdeany, AsIter, Named};
 use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
 
@@ -26,7 +22,7 @@ use crate::{
     schedulers::powersched::SchedulerMetadata,
     stages::{ExecutionCountRestartHelper, Stage},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, State, UsesState},
-    Error,
+    Error, HasMetadata, HasNamedMetadata,
 };
 
 /// The metadata to keep unstable entries

@@ -4,7 +4,7 @@ use alloc::string::{String, ToString};
 use std::{fmt::Debug, marker::PhantomData};
 
 use hashbrown::HashSet;
-use libafl_bolts::{serdeany::HasNamedMetadata, Named};
+use libafl_bolts::Named;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -14,7 +14,7 @@ use crate::{
     inputs::UsesInput,
     observers::{ObserverWithHashField, ObserversTuple},
     state::State,
-    Error,
+    Error, HasNamedMetadata,
 };
 
 /// The prefix of the metadata names

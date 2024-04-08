@@ -8,7 +8,6 @@ use core::{
 
 use libafl_bolts::{
     rands::Rand,
-    serdeany::HasMetadata,
     tuples::{tuple_list, tuple_list_type, Merge, NamedTuple},
     AsMutSlice, AsSlice, Named,
 };
@@ -30,7 +29,7 @@ use crate::{
         MutationResult, Mutator, MutatorsTuple,
     },
     state::{HasCorpus, HasRand},
-    Error,
+    Error, HasMetadata,
 };
 
 /// The metadata placed in a [`crate::corpus::Testcase`] by a [`LoggerScheduledMutator`].

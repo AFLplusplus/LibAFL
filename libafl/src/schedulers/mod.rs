@@ -27,7 +27,7 @@ pub mod weighted;
 pub use weighted::{StdWeightedScheduler, WeightedScheduler};
 
 pub mod tuneable;
-use libafl_bolts::{rands::Rand, serdeany::HasMetadata};
+use libafl_bolts::rands::Rand;
 pub use tuneable::*;
 
 use crate::{
@@ -36,7 +36,7 @@ use crate::{
     observers::{MapObserver, ObserversTuple},
     random_corpus_id,
     state::{HasCorpus, HasRand, State, UsesState},
-    Error,
+    Error, HasMetadata,
 };
 
 /// The scheduler also implements `on_remove` and `on_replace` if it implements this stage.

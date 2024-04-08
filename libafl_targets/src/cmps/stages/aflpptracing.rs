@@ -9,13 +9,9 @@ use libafl::{
     observers::ObserversTuple,
     stages::{colorization::TaintMetadata, RetryRestartHelper, Stage},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, UsesState},
-    Error,
+    Error, HasMetadata, HasNamedMetadata,
 };
-use libafl_bolts::{
-    serdeany::{HasMetadata, HasNamedMetadata},
-    tuples::MatchName,
-    Named,
-};
+use libafl_bolts::{tuples::MatchName, Named};
 
 use crate::cmps::observers::AFLppCmpLogObserver;
 

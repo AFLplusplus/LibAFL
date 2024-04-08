@@ -35,13 +35,12 @@ use libafl::{
         StdMutationalStage,
     },
     state::{HasCorpus, StdState},
-    Error,
+    Error, HasMetadata,
 };
 use libafl_bolts::{
     current_nanos, current_time,
     os::{dup2, unix_signals::Signal},
     rands::StdRand,
-    serdeany::HasMetadata,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
     AsMutSlice, AsSlice,

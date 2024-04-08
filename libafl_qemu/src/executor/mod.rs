@@ -20,14 +20,11 @@ use libafl::{
     fuzzer::HasObjective,
     observers::{ObserversTuple, UsesObservers},
     state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
-    Error,
+    Error, HasMetadata,
 };
+use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Signal};
 #[cfg(feature = "fork")]
 use libafl_bolts::shmem::ShMemProvider;
-use libafl_bolts::{
-    os::unix_signals::{siginfo_t, ucontext_t, Signal},
-    serdeany::HasMetadata,
-};
 
 use crate::{helper::QemuHelperTuple, hooks::QemuHooks, Qemu};
 

@@ -5,7 +5,7 @@ use core::{
     ops::Range,
 };
 
-use libafl_bolts::{rands::Rand, serdeany::HasMetadata, Error, HasLen, Named};
+use libafl_bolts::{rands::Rand, Error, HasLen, Named};
 
 use crate::{
     corpus::{CorpusId, HasTestcase, Testcase},
@@ -17,6 +17,7 @@ use crate::{
         StringIdentificationMetadata,
     },
     state::{HasCorpus, HasMaxSize, HasRand},
+    HasMetadata,
 };
 
 /// Unicode category data, as used by string analysis and mutators.

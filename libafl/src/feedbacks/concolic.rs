@@ -6,7 +6,7 @@
 use alloc::{borrow::ToOwned, string::String};
 use core::{fmt::Debug, marker::PhantomData};
 
-use libafl_bolts::{serdeany::HasMetadata, Named};
+use libafl_bolts::Named;
 
 use crate::{
     corpus::Testcase,
@@ -16,7 +16,7 @@ use crate::{
     inputs::UsesInput,
     observers::{concolic::ConcolicObserver, ObserversTuple},
     state::State,
-    Error,
+    Error, HasMetadata,
 };
 
 /// The concolic feedback. It is used to attach concolic tracing metadata to the testcase.

@@ -19,10 +19,9 @@ use libafl::{
     schedulers::QueueScheduler,
     stages::{mutational::StdMutationalStage, GeneralizationStage},
     state::StdState,
+    HasMetadata,
 };
-use libafl_bolts::{
-    current_nanos, rands::StdRand, serdeany::HasMetadata, tuples::tuple_list, AsSlice,
-};
+use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];

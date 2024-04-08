@@ -4,7 +4,7 @@
 use alloc::vec::Vec;
 use core::cmp::{max, min};
 
-use libafl_bolts::{rands::Rand, serdeany::HasMetadata, Named};
+use libafl_bolts::{rands::Rand, Named};
 
 use crate::{
     corpus::Corpus,
@@ -12,7 +12,7 @@ use crate::{
     mutators::{token_mutations::Tokens, MutationResult, Mutator},
     random_corpus_id,
     state::{HasCorpus, HasRand},
-    Error,
+    Error, HasMetadata,
 };
 
 const RECURSIVE_REPLACEMENT_DEPTH: [usize; 6] = [2, 4, 8, 16, 32, 64];

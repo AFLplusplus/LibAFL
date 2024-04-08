@@ -4,7 +4,7 @@ use alloc::{string::String, vec::Vec};
 use core::{clone::Clone, marker::PhantomData};
 use std::{fs, fs::File, io::Write, path::PathBuf};
 
-use libafl_bolts::{impl_serdeany, serdeany::HasMetadata};
+use libafl_bolts::impl_serdeany;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -12,7 +12,7 @@ use crate::{
     inputs::UsesInput,
     stages::Stage,
     state::{HasCorpus, HasRand, HasSolutions, UsesState},
-    Error,
+    Error, HasMetadata,
 };
 
 /// Metadata used to store information about disk dump indexes for names
