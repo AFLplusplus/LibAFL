@@ -3,8 +3,9 @@ use std::{cell::OnceCell, slice::from_raw_parts, str::from_utf8_unchecked};
 
 use libafl_qemu_sys::{
     exec_path, free_self_maps, guest_base, libafl_dump_core_hook, libafl_force_dfl, libafl_get_brk,
-    libafl_load_addr, libafl_maps_next, libafl_qemu_run, libafl_set_brk, mmap_next_start,
-    read_self_maps, strlen, GuestAddr, GuestUsize, MapInfo, MmapPerms, VerifyAccess,
+    libafl_load_addr, libafl_maps_first, libafl_maps_next, libafl_qemu_run, libafl_set_brk,
+    mmap_next_start, read_self_maps, strlen, GuestAddr, GuestUsize, MapInfo, MmapPerms,
+    VerifyAccess,
 };
 use libc::c_int;
 #[cfg(feature = "python")]

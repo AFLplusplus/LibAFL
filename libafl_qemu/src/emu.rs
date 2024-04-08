@@ -650,25 +650,25 @@ pub struct HookData(u64);
 
 impl<T> From<Pin<&mut T>> for HookData {
     fn from(value: Pin<&mut T>) -> Self {
-        unsafe { HookData(core::mem::transmute(value)) }
+        unsafe { HookData(transmute::<Pin<&mut T>, u64>(value)) }
     }
 }
 
 impl<T> From<Pin<&T>> for HookData {
     fn from(value: Pin<&T>) -> Self {
-        unsafe { HookData(core::mem::transmute(value)) }
+        unsafe { HookData(transmute::<Pin<&T>, u64>(value)) }
     }
 }
 
 impl<T> From<&'static mut T> for HookData {
     fn from(value: &'static mut T) -> Self {
-        unsafe { HookData(core::mem::transmute(value)) }
+        unsafe { HookData(transmute::<&mut T, u64>(value)) }
     }
 }
 
 impl<T> From<&'static T> for HookData {
     fn from(value: &'static T) -> Self {
-        unsafe { HookData(core::mem::transmute(value)) }
+        unsafe { HookData(transmute::<&T, u64>(value)) }
     }
 }
 
