@@ -272,6 +272,7 @@ jobs:
 
   ubuntu-concolic:
     runs-on: ubuntu-latest
+    needs: ubuntu
     steps:
     - uses: actions-rs/toolchain@v1
       with:
