@@ -5,4 +5,4 @@ runs:
   steps:
     - name: Install sudo
       shell: bash
-      run: apt install -y sudo wget
+      run: apt install -y sudo wget qemu-img
