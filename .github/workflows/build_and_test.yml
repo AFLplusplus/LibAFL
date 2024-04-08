@@ -254,7 +254,6 @@ jobs:
           - ./fuzzers/backtrace_baby_fuzzers
           - ./fuzzers/fuzzbench_qemu
           - ./fuzzers/nyx_libxml2_parallel
-          - ./fuzzers/qemu_launcher
           - ./fuzzers/frida_gdiplus
           - ./fuzzers/libfuzzer_stb_image_concolic
           - ./fuzzers/nautilus_sync
@@ -308,9 +307,11 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         fuzzer:
-          # - ./fuzzers/qemu_cmin
+          - ./fuzzers/qemu_cmin
           - ./fuzzers/qemu_systemmode
-          # - ./fuzzers/qemu_coverage
+          - ./fuzzers/qemu_coverage
+          - ./fuzzers/qemu_launcher
+
     runs-on: [ self-hosted, qemu ]
     container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
     steps:
