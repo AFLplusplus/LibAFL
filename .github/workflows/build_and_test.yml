@@ -8,6 +8,9 @@ on:
   workflow_dispatch:
 env:
   CARGO_TERM_COLOR: always
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   common:
