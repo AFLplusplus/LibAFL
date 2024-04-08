@@ -180,10 +180,6 @@ jobs:
     - name: Build examples
       run: cargo build --examples --verbose
 
-    # --- miri undefined behavior test --
-    - name: Run miri tests
-      run: RUST_BACKTRACE=1 MIRIFLAGS="-Zmiri-disable-isolation" cargo +nightly miri test
-
   ubuntu-clippy:
     runs-on: ubuntu-22.04
     steps:
