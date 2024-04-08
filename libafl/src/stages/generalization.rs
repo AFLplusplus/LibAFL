@@ -17,8 +17,8 @@ use crate::{
     observers::{MapObserver, ObserversTuple},
     stages::{RetryRestartHelper, Stage},
     start_timer,
-    state::{HasCorpus, HasExecutions, HasMetadata, HasNamedMetadata, UsesState},
-    Error,
+    state::{HasCorpus, HasExecutions, UsesState},
+    Error, HasMetadata, HasNamedMetadata,
 };
 #[cfg(feature = "introspection")]
 use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};

@@ -16,8 +16,8 @@ use crate::{
         minimizer::{IsFavoredMetadata, MinimizerScheduler, DEFAULT_SKIP_NON_FAVORED_PROB},
         LenTimeMulTestcaseScore, Scheduler,
     },
-    state::{HasCorpus, HasMetadata, HasRand, UsesState},
-    Error,
+    state::{HasCorpus, HasRand, UsesState},
+    Error, HasMetadata,
 };
 
 /// A testcase metadata holding a list of indexes of a map

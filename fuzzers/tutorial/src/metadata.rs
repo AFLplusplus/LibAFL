@@ -5,8 +5,8 @@ use libafl::{
     feedbacks::{Feedback, MapIndexesMetadata},
     observers::ObserversTuple,
     schedulers::{MinimizerScheduler, TestcaseScore},
-    state::{HasCorpus, HasMetadata, State},
-    Error,
+    state::{HasCorpus, State},
+    Error, HasMetadata,
 };
 use libafl_bolts::{Named, SerdeAny};
 use serde::{Deserialize, Serialize};

@@ -38,8 +38,8 @@ use crate::{
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, UsesInput},
     observers::ObserversTuple,
-    state::{HasExecutions, HasLastReportTime, HasMetadata, UsesState},
-    Error,
+    state::{HasExecutions, HasLastReportTime, UsesState},
+    Error, HasMetadata,
 };
 
 const _LLMP_TAG_TO_MAIN: Tag = Tag(0x3453453);

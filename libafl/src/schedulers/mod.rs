@@ -35,8 +35,8 @@ use crate::{
     inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
     random_corpus_id,
-    state::{HasCorpus, HasMetadata, HasRand, State, UsesState},
-    Error,
+    state::{HasCorpus, HasRand, State, UsesState},
+    Error, HasMetadata,
 };
 
 /// The scheduler also implements `on_remove` and `on_replace` if it implements this stage.

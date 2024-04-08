@@ -32,8 +32,8 @@ use crate::{
     fuzzer::HasObjective,
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
-    state::{HasCorpus, HasExecutions, HasMetadata, HasSolutions, State, UsesState},
-    Error,
+    state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
+    Error, HasMetadata,
 };
 
 /// The inner structure of `InProcessExecutor`.

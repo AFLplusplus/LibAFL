@@ -24,8 +24,7 @@ use super::{
 use crate::{
     corpus::{Corpus, CorpusId, InMemoryCorpus, Testcase},
     inputs::{Input, UsesInput},
-    state::HasMetadata,
-    Error,
+    Error, HasMetadata,
 };
 
 /// The [`Testcase`] metadata that'll be stored to disk

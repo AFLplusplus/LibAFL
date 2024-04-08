@@ -11,7 +11,8 @@ use crate::{
     corpus::HasTestcase,
     inputs::{BytesInput, HasBytesVec},
     stages::Stage,
-    state::{HasCorpus, HasCurrentTestcase, HasMetadata, State, UsesState},
+    state::{HasCorpus, HasCurrentTestcase, State, UsesState},
+    HasMetadata,
 };
 
 /// Metadata which stores the list of pre-computed string-like ranges in the input

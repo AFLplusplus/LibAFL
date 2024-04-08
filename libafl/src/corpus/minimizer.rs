@@ -19,8 +19,8 @@ use crate::{
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
     schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
-    state::{HasCorpus, HasExecutions, HasMetadata, UsesState},
-    Error, HasScheduler,
+    state::{HasCorpus, HasExecutions, UsesState},
+    Error, HasMetadata, HasScheduler,
 };
 
 /// `CorpusMinimizers` minimize corpora according to internal logic. See various implementations for

@@ -17,11 +17,8 @@ use crate::{
     schedulers::Scheduler,
     stages::{HasCurrentStage, StagesTuple},
     start_timer,
-    state::{
-        HasCorpus, HasExecutions, HasImported, HasLastReportTime, HasMetadata, HasSolutions,
-        UsesState,
-    },
-    Error,
+    state::{HasCorpus, HasExecutions, HasImported, HasLastReportTime, HasSolutions, UsesState},
+    Error, HasMetadata,
 };
 #[cfg(feature = "introspection")]
 use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
@@ -762,8 +759,8 @@ pub mod test {
         corpus::CorpusId,
         events::ProgressReporter,
         stages::{HasCurrentStage, StagesTuple},
-        state::{HasExecutions, HasLastReportTime, HasMetadata, State, UsesState},
-        Fuzzer,
+        state::{HasExecutions, HasLastReportTime, State, UsesState},
+        Fuzzer, HasMetadata,
     };
 
     #[derive(Clone, Debug)]

@@ -16,8 +16,8 @@ use crate::{
     mutators::mutations::buffer_copy,
     observers::{MapObserver, ObserversTuple},
     stages::{RetryRestartHelper, Stage},
-    state::{HasCorpus, HasCurrentTestcase, HasMetadata, HasNamedMetadata, HasRand, UsesState},
-    Error,
+    state::{HasCorpus, HasCurrentTestcase, HasRand, UsesState},
+    Error, HasMetadata, HasNamedMetadata,
 };
 
 // Bigger range is better

@@ -26,8 +26,8 @@ use libafl::{
         calibrate::CalibrationStage, power::StdPowerMutationalStage, ShadowTracingStage,
         StagesTuple, StdMutationalStage,
     },
-    state::{HasCorpus, HasMetadata, StdState, UsesState},
-    Error,
+    state::{HasCorpus, StdState, UsesState},
+    Error, HasMetadata,
 };
 #[cfg(not(feature = "simplemgr"))]
 use libafl_bolts::shmem::StdShMemProvider;

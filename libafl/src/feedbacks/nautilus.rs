@@ -15,8 +15,8 @@ use crate::{
     generators::NautilusContext,
     inputs::NautilusInput,
     observers::ObserversTuple,
-    state::{HasCorpus, HasMetadata, State},
-    Error,
+    state::{HasCorpus, State},
+    Error, HasMetadata,
 };
 
 /// Metadata for Nautilus grammar mutator chunks
