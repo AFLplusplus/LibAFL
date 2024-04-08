@@ -103,8 +103,6 @@ jobs:
         run: sudo apt update && sudo apt install ninja-build shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
       - name: Add nightly rustfmt and clippy
         run: rustup toolchain install nightly --component rustfmt --component clippy --component miri --allow-downgrade
-      - name: Install ucd-generate
-        run: cargo install -f ucd-generate
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
@@ -135,8 +133,6 @@ jobs:
         run: sudo apt update && sudo apt install ninja-build shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
       - name: Add nightly rustfmt and clippy
         run: rustup toolchain install nightly --component rustfmt --component clippy --component miri --allow-downgrade
-      - name: Install ucd-generate
-        run: cargo install -f ucd-generate
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
@@ -164,8 +160,6 @@ jobs:
         run: sudo apt update && sudo apt install ninja-build shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
       - name: Add nightly rustfmt and clippy
         run: rustup toolchain install nightly --component rustfmt --component clippy --component miri --allow-downgrade
-      - name: Install ucd-generate
-        run: cargo install -f ucd-generate
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
@@ -251,8 +245,6 @@ jobs:
         run: sudo apt update && sudo apt install ninja-build clang-format shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
       - name: Install cargo-hack
         run: curl -LsSf https://github.com/taiki-e/cargo-hack/releases/latest/download/cargo-hack-x86_64-unknown-linux-gnu.tar.gz | tar xzf - -C ~/.cargo/bin
-      - name: Install ucd-generate
-        run: cargo install -f ucd-generate
       - name: Add nightly
         run: rustup toolchain install nightly --allow-downgrade
       - uses: actions/checkout@v3
@@ -486,8 +478,6 @@ jobs:
           toolchain: stable
       - name: Add nightly rustfmt and clippy
         run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade && rustup default nightly
-      - name: Install ucd-generate
-        run: cargo install -f ucd-generate
       - name: Install deps
         run: brew install z3 gtk+3
       - name: Install cxxbridge
@@ -555,7 +545,6 @@ jobs:
             freebsd-version
             . "$HOME/.cargo/env"
             rustup toolchain install nightly
-            cargo install -f ucd-generate
             export LLVM_CONFIG=/usr/local/bin/llvm-config16
             pwd
             ls -lah

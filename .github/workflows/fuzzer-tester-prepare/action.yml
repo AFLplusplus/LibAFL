@@ -22,9 +22,6 @@ runs:
     - name: Add wasm target
       shell: bash
       run: rustup target add wasm32-unknown-unknown
-    - name: Install ucd-generate
-      shell: bash
-      run: cargo install -f ucd-generate
     - name: Remove obsolete llvm (Linux)
       if: runner.os == 'Linux'
       shell: bash
