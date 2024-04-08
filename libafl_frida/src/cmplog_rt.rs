@@ -746,7 +746,7 @@ impl CmpLogRuntime {
     }
 
     #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
-    #[allow(clippy::similar_names)]
+    #[allow(clippy::similar_names, clippy::type_complexity)]
     #[inline]
     /// Check if the current instruction is cmplog relevant one(any opcode which sets the flags)
     #[must_use]

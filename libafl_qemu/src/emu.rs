@@ -637,13 +637,13 @@ impl<T> From<Pin<&T>> for HookData {
 
 impl<T> From<&'static mut T> for HookData {
     fn from(value: &'static mut T) -> Self {
-        unsafe { HookData(transmute::<&mut T, u64>) }
+        unsafe { HookData(transmute::<&mut T, u64>(value)) }
     }
 }
 
 impl<T> From<&'static T> for HookData {
     fn from(value: &'static T) -> Self {
-        unsafe { HookData(transmute::<&T, u64>()) }
+        unsafe { HookData(transmute::<&T, u64>(value)) }
     }
 }
 
@@ -1232,7 +1232,7 @@ impl Qemu {
             let fat: Box<FatPtr> = Box::new(transmute::<
                 Box<dyn for<'a, 'b> FnMut(&'a Qemu, &'b str) -> bool>,
                 FatPtr,
-            >());
+            >(callback));
             libafl_qemu_add_gdb_cmd(gdb_cmd, core::ptr::from_ref(&*fat) as *const ());
             GDB_COMMANDS.push(fat);
         }
