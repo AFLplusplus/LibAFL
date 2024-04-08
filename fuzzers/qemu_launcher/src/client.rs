@@ -194,25 +194,6 @@ impl<'a> Client<'a> {
                     state,
                 )
             }
-        } else if is_asan {
-            if let Some(injection_helper) = injection_helper {
-                instance.build().run(
-                    tuple_list!(
-                        edge_coverage_helper,
-                        QemuAsanHelper::default(asan.take().unwrap()),
-                        injection_helper
-                    ),
-                    state,
-                )
-            } else {
-                instance.build().run(
-                    tuple_list!(
-                        edge_coverage_helper,
-                        QemuAsanHelper::default(asan.take().unwrap()),
-                    ),
-                    state,
-                )
-            }
         } else if is_asan_guest && is_cmplog {
             if let Some(injection_helper) = injection_helper {
                 instance.build().run(
