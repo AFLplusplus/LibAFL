@@ -18,10 +18,10 @@ use libafl::{
     feedbacks::Feedback,
     inputs::{HasTargetBytes, UsesInput},
     observers::{Observer, ObserversTuple},
-    state::{HasMetadata, State},
+    state::State,
     Error,
 };
-use libafl_bolts::{ownedref::OwnedPtr, Named, SerdeAny};
+use libafl_bolts::{ownedref::OwnedPtr, Named, SerdeAny, serdeany::HasMetadata};
 use serde::{Deserialize, Serialize};
 use termcolor::{Color, ColorSpec, WriteColor};
 #[cfg(target_arch = "aarch64")]

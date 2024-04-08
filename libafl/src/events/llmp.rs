@@ -36,6 +36,7 @@ use libafl_bolts::{
 use libafl_bolts::{llmp::LlmpConnection, shmem::StdShMemProvider, staterestore::StateRestorer};
 use libafl_bolts::{
     llmp::{self, LlmpClient, LlmpClientDescription, Tag},
+    serdeany::HasMetadata,
     shmem::ShMemProvider,
     tuples::tuple_list,
     ClientId,
@@ -57,7 +58,7 @@ use crate::{
     inputs::{Input, InputConverter, UsesInput},
     monitors::Monitor,
     observers::ObserversTuple,
-    state::{HasExecutions, HasLastReportTime, HasMetadata, State, UsesState},
+    state::{HasExecutions, HasLastReportTime, State, UsesState},
     Error,
 };
 

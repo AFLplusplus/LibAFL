@@ -7,7 +7,7 @@ use core::{
     fmt::Debug,
 };
 
-use libafl_bolts::rands::Rand;
+use libafl_bolts::{rands::Rand, serdeany::HasMetadata};
 
 use super::{PushStage, PushStageHelper, PushStageSharedState};
 use crate::{
@@ -20,7 +20,7 @@ use crate::{
     observers::ObserversTuple,
     schedulers::Scheduler,
     start_timer,
-    state::{HasCorpus, HasExecutions, HasLastReportTime, HasMetadata, HasRand},
+    state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand},
     Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
 };
 #[cfg(feature = "introspection")]

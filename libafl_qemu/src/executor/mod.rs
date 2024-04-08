@@ -8,11 +8,7 @@ use core::{
 };
 
 #[cfg(feature = "fork")]
-use libafl::{
-    events::EventManager,
-    executors::InProcessForkExecutor,
-    state::{HasLastReportTime, HasMetadata},
-};
+use libafl::{events::EventManager, executors::InProcessForkExecutor, state::HasLastReportTime};
 use libafl::{
     events::{EventFirer, EventRestarter},
     executors::{
@@ -26,9 +22,12 @@ use libafl::{
     state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
     Error,
 };
-use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Signal};
 #[cfg(feature = "fork")]
 use libafl_bolts::shmem::ShMemProvider;
+use libafl_bolts::{
+    os::unix_signals::{siginfo_t, ucontext_t, Signal},
+    serdeany::HasMetadata,
+};
 
 use crate::{helper::QemuHelperTuple, hooks::QemuHooks, Qemu};
 

@@ -2,14 +2,14 @@
 
 use alloc::vec::Vec;
 
-use libafl_bolts::impl_serdeany;
+use libafl_bolts::{impl_serdeany, serdeany::HasMetadata};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::Testcase,
     inputs::BytesInput,
     stages::mutational::{MutatedTransform, MutatedTransformPost},
-    state::{HasCorpus, HasMetadata},
+    state::HasCorpus,
     Error,
 };
 

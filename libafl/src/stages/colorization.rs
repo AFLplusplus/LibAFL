@@ -6,7 +6,12 @@ use alloc::{
 };
 use core::{cmp::Ordering, fmt::Debug, marker::PhantomData, ops::Range};
 
-use libafl_bolts::{rands::Rand, tuples::MatchName, Named};
+use libafl_bolts::{
+    rands::Rand,
+    serdeany::{HasMetadata, HasNamedMetadata},
+    tuples::MatchName,
+    Named,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -16,7 +21,7 @@ use crate::{
     mutators::mutations::buffer_copy,
     observers::{MapObserver, ObserversTuple},
     stages::{RetryRestartHelper, Stage},
-    state::{HasCorpus, HasCurrentTestcase, HasMetadata, HasNamedMetadata, HasRand, UsesState},
+    state::{HasCorpus, HasCurrentTestcase, HasRand, UsesState},
     Error,
 };
 

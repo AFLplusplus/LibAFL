@@ -2,7 +2,7 @@ use alloc::string::{String, ToString};
 use core::{fmt::Debug, hash::Hash, marker::PhantomData};
 
 use hashbrown::HashSet;
-use libafl_bolts::{Error, HasRefCnt, Named};
+use libafl_bolts::{serdeany::HasNamedMetadata, Error, HasRefCnt, Named};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
@@ -10,7 +10,7 @@ use crate::{
     executors::ExitKind,
     feedbacks::Feedback,
     observers::{ListObserver, ObserversTuple},
-    state::{HasNamedMetadata, State},
+    state::State,
 };
 
 /// The metadata to remember past observed value

@@ -19,6 +19,7 @@ use libafl_bolts::{
 };
 use libafl_bolts::{
     llmp::{self, LlmpBroker, LlmpClient, LlmpClientDescription, Tag},
+    serdeany::HasMetadata,
     shmem::ShMemProvider,
     ClientId,
 };
@@ -38,7 +39,7 @@ use crate::{
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, UsesInput},
     observers::ObserversTuple,
-    state::{HasExecutions, HasLastReportTime, HasMetadata, UsesState},
+    state::{HasExecutions, HasLastReportTime, UsesState},
     Error,
 };
 

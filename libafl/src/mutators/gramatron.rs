@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use core::cmp::max;
 
 use hashbrown::HashMap;
-use libafl_bolts::{rands::Rand, Named};
+use libafl_bolts::{rands::Rand, serdeany::HasMetadata, Named};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -13,7 +13,7 @@ use crate::{
     inputs::{GramatronInput, Terminal},
     mutators::{MutationResult, Mutator},
     random_corpus_id,
-    state::{HasCorpus, HasMetadata, HasRand},
+    state::{HasCorpus, HasRand},
     Error,
 };
 

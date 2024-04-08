@@ -7,14 +7,14 @@ use grammartec::{
     mutator::Mutator as BackingMutator,
     tree::{Tree, TreeMutation},
 };
-use libafl_bolts::Named;
+use libafl_bolts::{Named, serdeany::HasMetadata};
 
 use crate::{
     feedbacks::NautilusChunksMetadata,
     generators::nautilus::NautilusContext,
     inputs::nautilus::NautilusInput,
     mutators::{MutationResult, Mutator},
-    state::{HasCorpus, HasMetadata},
+    state::HasCorpus,
     Error,
 };
 

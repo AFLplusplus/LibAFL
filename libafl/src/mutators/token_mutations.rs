@@ -17,7 +17,7 @@ use std::{
 };
 
 use hashbrown::HashSet;
-use libafl_bolts::{rands::Rand, AsSlice};
+use libafl_bolts::{rands::Rand, serdeany::HasMetadata, AsSlice};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
@@ -30,7 +30,7 @@ use crate::{
     },
     observers::cmp::{AFLppCmpValuesMetadata, CmpValues, CmpValuesMetadata},
     stages::TaintMetadata,
-    state::{HasCorpus, HasMaxSize, HasMetadata, HasRand},
+    state::{HasCorpus, HasMaxSize, HasRand},
     Error,
 };
 

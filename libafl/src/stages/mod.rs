@@ -19,6 +19,7 @@ pub use generalization::GeneralizationStage;
 use hashbrown::HashSet;
 use libafl_bolts::{
     impl_serdeany,
+    serdeany::{HasMetadata, HasNamedMetadata},
     tuples::{HasConstLen, IntoVec},
     Named,
 };
@@ -46,10 +47,7 @@ use crate::{
     observers::ObserversTuple,
     schedulers::Scheduler,
     stages::push::PushStage,
-    state::{
-        HasCorpus, HasExecutions, HasLastReportTime, HasMetadata, HasNamedMetadata, HasRand, State,
-        UsesState,
-    },
+    state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand, State, UsesState},
     Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasScheduler,
 };
 
@@ -648,14 +646,14 @@ impl ExecutionCountRestartHelper {
 pub mod test {
     use core::marker::PhantomData;
 
-    use libafl_bolts::{impl_serdeany, Error, Named};
+    use libafl_bolts::{impl_serdeany, serdeany::HasMetadata, Error, Named};
     use serde::{Deserialize, Serialize};
 
     use crate::{
         corpus::{Corpus, HasCurrentCorpusIdx, Testcase},
         inputs::NopInput,
         stages::{RetryRestartHelper, Stage},
-        state::{test::test_std_state, HasCorpus, HasMetadata, State, UsesState},
+        state::{test::test_std_state, HasCorpus, State, UsesState},
     };
 
     #[derive(Debug)]

@@ -6,7 +6,10 @@ use alloc::{
 };
 use core::{fmt::Debug, marker::PhantomData};
 
-use libafl_bolts::{AsSlice, Named};
+use libafl_bolts::{
+    serdeany::{HasMetadata, HasNamedMetadata},
+    AsSlice, Named,
+};
 
 use crate::{
     corpus::{Corpus, HasCurrentCorpusIdx},
@@ -17,7 +20,7 @@ use crate::{
     observers::{MapObserver, ObserversTuple},
     stages::{RetryRestartHelper, Stage},
     start_timer,
-    state::{HasCorpus, HasExecutions, HasMetadata, HasNamedMetadata, UsesState},
+    state::{HasCorpus, HasExecutions, UsesState},
     Error,
 };
 #[cfg(feature = "introspection")]

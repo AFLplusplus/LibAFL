@@ -9,7 +9,8 @@ use core::{
 };
 
 use libafl_bolts::{
-    impl_serdeany, math::calculate_cumulative_distribution_in_place, rands::Rand, Named,
+    impl_serdeany, math::calculate_cumulative_distribution_in_place, rands::Rand,
+    serdeany::HasMetadata, Named,
 };
 use serde::{Deserialize, Serialize};
 
@@ -18,7 +19,7 @@ use crate::{
     mutators::{
         ComposedByMutations, MutationId, MutationResult, Mutator, MutatorsTuple, ScheduledMutator,
     },
-    state::{HasMetadata, HasRand},
+    state::HasRand,
     Error,
 };
 

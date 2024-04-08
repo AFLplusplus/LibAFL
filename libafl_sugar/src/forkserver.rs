@@ -18,7 +18,7 @@ use libafl::{
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::StdMutationalStage,
-    state::{HasCorpus, HasMetadata, StdState},
+    state::{HasCorpus, StdState},
     Error,
 };
 use libafl_bolts::{
@@ -26,6 +26,7 @@ use libafl_bolts::{
     current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
+    serdeany::HasMetadata,
     tuples::{tuple_list, Merge},
     AsMutSlice,
 };

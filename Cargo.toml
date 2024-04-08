@@ -11,7 +11,7 @@ members = [
     "libafl_derive",
     "libafl_frida",
     "libafl_libfuzzer",
-    "libafl_nyx",
+    # "libafl_nyx",
     "libafl_qemu",
     "libafl_sugar",
     "libafl_targets",

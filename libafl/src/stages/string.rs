@@ -4,14 +4,14 @@ use alloc::{collections::VecDeque, rc::Rc, vec::Vec};
 use core::marker::PhantomData;
 
 use bitvec::{bitvec, vec::BitVec};
-use libafl_bolts::{impl_serdeany, Error};
+use libafl_bolts::{impl_serdeany, Error, serdeany::HasMetadata};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::HasTestcase,
     inputs::{BytesInput, HasBytesVec},
     stages::Stage,
-    state::{HasCorpus, HasCurrentTestcase, HasMetadata, State, UsesState},
+    state::{HasCorpus, HasCurrentTestcase, State, UsesState},
 };
 
 /// Metadata which stores the list of pre-computed string-like ranges in the input

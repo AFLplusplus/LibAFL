@@ -27,7 +27,7 @@ pub mod weighted;
 pub use weighted::{StdWeightedScheduler, WeightedScheduler};
 
 pub mod tuneable;
-use libafl_bolts::rands::Rand;
+use libafl_bolts::{rands::Rand, serdeany::HasMetadata};
 pub use tuneable::*;
 
 use crate::{
@@ -35,7 +35,7 @@ use crate::{
     inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
     random_corpus_id,
-    state::{HasCorpus, HasMetadata, HasRand, State, UsesState},
+    state::{HasCorpus, HasRand, State, UsesState},
     Error,
 };
 

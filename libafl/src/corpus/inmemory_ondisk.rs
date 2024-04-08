@@ -14,7 +14,7 @@ use std::{
 
 #[cfg(feature = "gzip")]
 use libafl_bolts::compress::GzipCompressor;
-use libafl_bolts::serdeany::SerdeAnyMap;
+use libafl_bolts::serdeany::{HasMetadata, SerdeAnyMap};
 use serde::{Deserialize, Serialize};
 
 use super::{
@@ -24,7 +24,6 @@ use super::{
 use crate::{
     corpus::{Corpus, CorpusId, InMemoryCorpus, Testcase},
     inputs::{Input, UsesInput},
-    state::HasMetadata,
     Error,
 };
 

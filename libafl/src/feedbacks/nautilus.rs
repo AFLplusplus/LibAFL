@@ -4,7 +4,7 @@ use core::{fmt::Debug, marker::PhantomData};
 use std::fs::create_dir_all;
 
 use grammartec::{chunkstore::ChunkStore, context::Context};
-use libafl_bolts::Named;
+use libafl_bolts::{Named, serdeany::HasMetadata};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -15,7 +15,7 @@ use crate::{
     generators::NautilusContext,
     inputs::NautilusInput,
     observers::ObserversTuple,
-    state::{HasCorpus, HasMetadata, State},
+    state::{HasCorpus, State},
     Error,
 };
 

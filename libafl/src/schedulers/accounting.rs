@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use core::fmt::Debug;
 
 use hashbrown::HashMap;
-use libafl_bolts::{rands::Rand, AsMutSlice, AsSlice, HasLen, HasRefCnt};
+use libafl_bolts::{rands::Rand, serdeany::HasMetadata, AsMutSlice, AsSlice, HasLen, HasRefCnt};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -16,7 +16,7 @@ use crate::{
         minimizer::{IsFavoredMetadata, MinimizerScheduler, DEFAULT_SKIP_NON_FAVORED_PROB},
         LenTimeMulTestcaseScore, Scheduler,
     },
-    state::{HasCorpus, HasMetadata, HasRand, UsesState},
+    state::{HasCorpus, HasRand, UsesState},
     Error,
 };
 

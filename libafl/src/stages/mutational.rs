@@ -3,7 +3,11 @@
 
 use core::{any::type_name, marker::PhantomData};
 
-use libafl_bolts::{rands::Rand, Named};
+use libafl_bolts::{
+    rands::Rand,
+    serdeany::{HasMetadata, HasNamedMetadata},
+    Named,
+};
 
 use crate::{
     corpus::{Corpus, CorpusId, Testcase},
@@ -13,10 +17,7 @@ use crate::{
     mutators::{MultiMutator, MutationResult, Mutator},
     stages::{ExecutionCountRestartHelper, RetryRestartHelper, Stage},
     start_timer,
-    state::{
-        HasCorpus, HasCurrentTestcase, HasExecutions, HasMetadata, HasNamedMetadata, HasRand,
-        UsesState,
-    },
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
     Error,
 };
 #[cfg(feature = "introspection")]

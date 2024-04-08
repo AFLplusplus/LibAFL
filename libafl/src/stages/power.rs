@@ -2,13 +2,15 @@
 
 use core::{fmt::Debug, marker::PhantomData};
 
+use libafl_bolts::serdeany::HasMetadata;
+
 use crate::{
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
     mutators::Mutator,
     schedulers::{testcase_score::CorpusPowerTestcaseScore, TestcaseScore},
     stages::{mutational::MutatedTransform, ExecutionCountRestartHelper, MutationalStage, Stage},
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasMetadata, HasRand, UsesState},
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
     Error,
 };
 

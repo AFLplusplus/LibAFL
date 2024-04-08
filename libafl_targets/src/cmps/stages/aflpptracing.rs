@@ -8,12 +8,14 @@ use libafl::{
     inputs::{BytesInput, UsesInput},
     observers::ObserversTuple,
     stages::{colorization::TaintMetadata, RetryRestartHelper, Stage},
-    state::{
-        HasCorpus, HasCurrentTestcase, HasExecutions, HasMetadata, HasNamedMetadata, UsesState,
-    },
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, UsesState},
     Error,
 };
-use libafl_bolts::{tuples::MatchName, Named};
+use libafl_bolts::{
+    serdeany::{HasMetadata, HasNamedMetadata},
+    tuples::MatchName,
+    Named,
+};
 
 use crate::cmps::observers::AFLppCmpLogObserver;
 

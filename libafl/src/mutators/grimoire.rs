@@ -4,14 +4,14 @@
 use alloc::vec::Vec;
 use core::cmp::{max, min};
 
-use libafl_bolts::{rands::Rand, Named};
+use libafl_bolts::{rands::Rand, serdeany::HasMetadata, Named};
 
 use crate::{
     corpus::Corpus,
     inputs::{GeneralizedInputMetadata, GeneralizedItem},
     mutators::{token_mutations::Tokens, MutationResult, Mutator},
     random_corpus_id,
-    state::{HasCorpus, HasMetadata, HasRand},
+    state::{HasCorpus, HasRand},
     Error,
 };
 

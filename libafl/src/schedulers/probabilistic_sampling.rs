@@ -5,14 +5,14 @@ use alloc::string::String;
 use core::marker::PhantomData;
 
 use hashbrown::HashMap;
-use libafl_bolts::rands::Rand;
+use libafl_bolts::{rands::Rand, serdeany::HasMetadata};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
     inputs::UsesInput,
     schedulers::{RemovableScheduler, Scheduler, TestcaseScore},
-    state::{HasCorpus, HasMetadata, HasRand, State, UsesState},
+    state::{HasCorpus, HasRand, State, UsesState},
     Error,
 };
 
@@ -195,14 +195,14 @@ where
 mod tests {
     use core::{borrow::BorrowMut, marker::PhantomData};
 
-    use libafl_bolts::rands::StdRand;
+    use libafl_bolts::{rands::StdRand, serdeany::HasMetadata};
 
     use crate::{
         corpus::{Corpus, InMemoryCorpus, Testcase},
         feedbacks::ConstFeedback,
         inputs::{bytes::BytesInput, Input, UsesInput},
         schedulers::{ProbabilitySamplingScheduler, Scheduler, TestcaseScore},
-        state::{HasCorpus, HasMetadata, StdState},
+        state::{HasCorpus, StdState},
         Error,
     };
 

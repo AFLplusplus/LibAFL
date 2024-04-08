@@ -5,7 +5,7 @@ use alloc::string::{String, ToString};
 use core::marker::PhantomData;
 
 use hashbrown::HashMap;
-use libafl_bolts::rands::Rand;
+use libafl_bolts::{rands::Rand, serdeany::HasMetadata};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -18,7 +18,7 @@ use crate::{
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
         HasAFLSchedulerMetadata, RemovableScheduler, Scheduler,
     },
-    state::{HasCorpus, HasMetadata, HasRand, State, UsesState},
+    state::{HasCorpus, HasRand, State, UsesState},
     Error,
 };
 

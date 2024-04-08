@@ -16,7 +16,7 @@ use libafl_bolts::os::startable_self;
 use libafl_bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(feature = "std", feature = "fork", unix))]
 use libafl_bolts::os::{fork, ForkResult};
-use libafl_bolts::ClientId;
+use libafl_bolts::{serdeany::HasMetadata, ClientId};
 #[cfg(feature = "std")]
 use libafl_bolts::{shmem::ShMemProvider, staterestore::StateRestorer};
 #[cfg(feature = "std")]
@@ -32,7 +32,7 @@ use crate::{
     },
     inputs::UsesInput,
     monitors::Monitor,
-    state::{HasExecutions, HasLastReportTime, HasMetadata, State, UsesState},
+    state::{HasExecutions, HasLastReportTime, State, UsesState},
     Error,
 };
 #[cfg(feature = "std")]

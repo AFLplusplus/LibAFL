@@ -12,7 +12,10 @@ use core::{
     ops::{BitAnd, BitOr},
 };
 
-use libafl_bolts::{AsIter, AsMutSlice, AsSlice, HasRefCnt, Named};
+use libafl_bolts::{
+    serdeany::{HasMetadata, HasNamedMetadata},
+    AsIter, AsMutSlice, AsSlice, HasRefCnt, Named,
+};
 use num_traits::PrimInt;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -24,7 +27,7 @@ use crate::{
     inputs::UsesInput,
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, Observer, ObserversTuple, UsesObserver},
-    state::{HasMetadata, HasNamedMetadata, State},
+    state::State,
     Error,
 };
 

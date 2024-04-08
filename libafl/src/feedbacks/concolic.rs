@@ -6,7 +6,7 @@
 use alloc::{borrow::ToOwned, string::String};
 use core::{fmt::Debug, marker::PhantomData};
 
-use libafl_bolts::Named;
+use libafl_bolts::{serdeany::HasMetadata, Named};
 
 use crate::{
     corpus::Testcase,
@@ -15,7 +15,7 @@ use crate::{
     feedbacks::Feedback,
     inputs::UsesInput,
     observers::{concolic::ConcolicObserver, ObserversTuple},
-    state::{HasMetadata, State},
+    state::State,
     Error,
 };
 

@@ -2,7 +2,7 @@
 
 use core::{fmt::Debug, marker::PhantomData};
 
-use libafl_bolts::Named;
+use libafl_bolts::{serdeany::HasNamedMetadata, Named};
 
 use crate::{
     executors::{Executor, HasObservers, ShadowExecutor},
@@ -10,7 +10,7 @@ use crate::{
     observers::ObserversTuple,
     stages::{RetryRestartHelper, Stage},
     start_timer,
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasNamedMetadata, State, UsesState},
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, State, UsesState},
     Error,
 };
 #[cfg(feature = "introspection")]

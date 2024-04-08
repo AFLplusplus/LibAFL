@@ -7,7 +7,12 @@ use std::{
     time::SystemTime,
 };
 
-use libafl_bolts::{current_time, shmem::ShMemProvider, Named};
+use libafl_bolts::{
+    current_time,
+    serdeany::{HasMetadata, HasNamedMetadata},
+    shmem::ShMemProvider,
+    Named,
+};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "introspection")]
@@ -19,7 +24,7 @@ use crate::{
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, UsesInput},
     stages::{RetryRestartHelper, Stage},
-    state::{HasCorpus, HasExecutions, HasMetadata, HasNamedMetadata, HasRand, State, UsesState},
+    state::{HasCorpus, HasExecutions, HasRand, State, UsesState},
     Error,
 };
 

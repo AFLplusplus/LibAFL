@@ -4,14 +4,14 @@ use alloc::{string::String, vec::Vec};
 use core::{clone::Clone, marker::PhantomData};
 use std::{fs, fs::File, io::Write, path::PathBuf};
 
-use libafl_bolts::impl_serdeany;
+use libafl_bolts::{impl_serdeany, serdeany::HasMetadata};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, CorpusId},
     inputs::UsesInput,
     stages::Stage,
-    state::{HasCorpus, HasMetadata, HasRand, HasSolutions, UsesState},
+    state::{HasCorpus, HasRand, HasSolutions, UsesState},
     Error,
 };
 

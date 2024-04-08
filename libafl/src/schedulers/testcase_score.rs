@@ -2,7 +2,7 @@
 use alloc::string::{String, ToString};
 use core::marker::PhantomData;
 
-use libafl_bolts::{HasLen, HasRefCnt};
+use libafl_bolts::{serdeany::HasMetadata, HasLen, HasRefCnt};
 
 use crate::{
     corpus::{Corpus, SchedulerTestcaseMetadata, Testcase},
@@ -11,7 +11,7 @@ use crate::{
         minimizer::{IsFavoredMetadata, TopRatedsMetadata},
         powersched::{PowerSchedule, SchedulerMetadata},
     },
-    state::{HasCorpus, HasMetadata},
+    state::HasCorpus,
     Error,
 };
 

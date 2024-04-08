@@ -13,6 +13,7 @@ use core::{
     time::Duration,
 };
 
+use libafl_bolts::serdeany::HasMetadata;
 pub use mutational::StdMutationalPushStage;
 
 use crate::{
@@ -22,7 +23,7 @@ use crate::{
     inputs::UsesInput,
     observers::ObserversTuple,
     schedulers::Scheduler,
-    state::{HasCorpus, HasExecutions, HasLastReportTime, HasMetadata, HasRand},
+    state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand},
     Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
 };
 

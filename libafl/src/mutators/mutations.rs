@@ -1301,16 +1301,14 @@ pub fn str_decode(item: &str) -> Result<Vec<u8>, Error> {
 mod tests {
     use libafl_bolts::{
         rands::StdRand,
+        serdeany::HasMetadata,
         tuples::{tuple_list, tuple_list_type, HasConstLen},
     };
 
     use super::*;
     use crate::{
-        corpus::InMemoryCorpus,
-        feedbacks::ConstFeedback,
-        inputs::BytesInput,
-        mutators::MutatorsTuple,
-        state::{HasMetadata, StdState},
+        corpus::InMemoryCorpus, feedbacks::ConstFeedback, inputs::BytesInput,
+        mutators::MutatorsTuple, state::StdState,
     };
 
     type TestMutatorsTupleType = tuple_list_type!(

@@ -6,6 +6,7 @@ use alloc::{
 };
 use core::{marker::PhantomData, time::Duration};
 
+use libafl_bolts::serdeany::HasMetadata;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -13,7 +14,7 @@ use crate::{
     inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
     schedulers::{HasAFLSchedulerMetadata, RemovableScheduler, Scheduler},
-    state::{HasCorpus, HasMetadata, State, UsesState},
+    state::{HasCorpus, State, UsesState},
     Error,
 };
 

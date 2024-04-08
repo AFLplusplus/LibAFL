@@ -3,7 +3,11 @@
 use alloc::string::{String, ToString};
 use core::{marker::PhantomData, time::Duration};
 
-use libafl_bolts::{current_time, impl_serdeany, rands::Rand};
+use libafl_bolts::{
+    current_time, impl_serdeany,
+    rands::Rand,
+    serdeany::{HasMetadata, HasNamedMetadata},
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -14,10 +18,7 @@ use crate::{
         ExecutionCountRestartHelper, MutationalStage, Stage,
     },
     start_timer,
-    state::{
-        HasCorpus, HasCurrentTestcase, HasExecutions, HasMetadata, HasNamedMetadata, HasRand,
-        UsesState,
-    },
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
     Error, Evaluator,
 };
 #[cfg(feature = "introspection")]

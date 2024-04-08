@@ -24,13 +24,14 @@ use libafl::{
     observers::{HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
-    state::{HasCorpus, HasMetadata, StdState},
+    state::{HasCorpus, StdState},
 };
 use libafl_bolts::{
     core_affinity::Cores,
     current_nanos,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
+    serdeany::HasMetadata,
     tuples::{tuple_list, Merge},
     AsSlice,
 };

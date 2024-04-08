@@ -21,7 +21,7 @@ use libafl::{
     observers::{HitcountsMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
-    state::{HasCorpus, HasMetadata, StdState},
+    state::{HasCorpus, StdState},
     Error,
 };
 use libafl_bolts::{
@@ -30,6 +30,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
+    serdeany::HasMetadata,
     AsSlice,
 };
 use libafl_targets::{std_edges_map_observer, CmpLogObserver};

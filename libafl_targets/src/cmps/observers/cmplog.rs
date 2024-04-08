@@ -9,10 +9,9 @@ use libafl::{
     executors::ExitKind,
     inputs::UsesInput,
     observers::{cmp::CmpValuesMetadata, CmpMap, CmpObserver, Observer},
-    state::HasMetadata,
     Error,
 };
-use libafl_bolts::{ownedref::OwnedMutPtr, Named};
+use libafl_bolts::{ownedref::OwnedMutPtr, serdeany::HasMetadata, Named};
 
 #[cfg(feature = "cmplog")]
 use crate::cmps::libafl_cmplog_map_ptr;

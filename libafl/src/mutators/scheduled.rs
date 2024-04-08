@@ -8,6 +8,7 @@ use core::{
 
 use libafl_bolts::{
     rands::Rand,
+    serdeany::HasMetadata,
     tuples::{tuple_list, tuple_list_type, Merge, NamedTuple},
     AsMutSlice, AsSlice, Named,
 };
@@ -28,7 +29,7 @@ use crate::{
         token_mutations::{TokenInsert, TokenReplace},
         MutationResult, Mutator, MutatorsTuple,
     },
-    state::{HasCorpus, HasMetadata, HasRand},
+    state::{HasCorpus, HasRand},
     Error,
 };
 
