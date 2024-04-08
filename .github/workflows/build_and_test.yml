@@ -259,7 +259,7 @@ jobs:
           - ./fuzzers/libfuzzer_stb_image_concolic
           - ./fuzzers/nautilus_sync
           # - ./fuzzers/qemu_cmin
-          # - ./fuzzers/qemu_systemmode
+          - ./fuzzers/qemu_systemmode
           - ./fuzzers/push_harness
           - ./fuzzers/libfuzzer_libpng_centralized
           - ./fuzzers/baby_fuzzer_nautilus
@@ -304,7 +304,29 @@ jobs:
       - name: Build and run example fuzzers (Linux)
         if: runner.os == 'Linux'
         shell: bash
-        run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config ./scripts/test_all_fuzzers.sh ${{ matrix.fuzzer }}
+        run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
+
+  fuzzers-qemu:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        fuzzer:
+          # - ./fuzzers/qemu_cmin
+          - ./fuzzers/qemu_systemmode
+          # - ./fuzzers/qemu_coverage
+    runs-on: [ self-hosted, qemu ]
+    container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/workflows/fuzzer-tester-prepare
+      - name: Symlink Headers
+        if: runner.os == 'Linux'
+        shell: bash
+        run: sudo ln -s /usr/include/asm-generic /usr/include/asm
+      - name: Build and run example QEMU fuzzers (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
 
   nostd-build:
     runs-on: ubuntu-latest

@@ -4,7 +4,7 @@
 //! is platform independent. Hence, this file contains code for other platforms
 //! but it's only meaningful for Windows because of the `gdiplus` target. If you
 //! going to make it compilable only for Windows, don't forget to modify the
-//! `scripts/test_all_fuzzers.sh` to opt-out this fuzzer from that test.
+//! `scripts/test_fuzzer.sh` to opt-out this fuzzer from that test.
 
 use mimalloc::MiMalloc;
 #[global_allocator]
