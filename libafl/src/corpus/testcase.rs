@@ -63,6 +63,8 @@ where
     scheduled_count: usize,
     /// Parent [`CorpusId`], if known
     parent_id: Option<CorpusId>,
+    /// If the testcase is "disabled"
+    disabled: bool,
 }
 
 impl<I> HasMetadata for Testcase<I>
@@ -195,6 +197,18 @@ where
         self.scheduled_count = scheduled_count;
     }
 
+    /// Get `disabled`
+    #[inline]
+    pub fn disabled(&mut self) -> bool {
+        self.disabled
+    }
+
+    /// Set the testcase as disabled
+    #[inline]
+    pub fn set_disabled(&mut self, disabled: bool) {
+        self.disabled = disabled;
+    }
+
     /// Create a new Testcase instance given an input
     #[inline]
     pub fn new(mut input: I) -> Self {
@@ -212,6 +226,7 @@ where
             executions: 0,
             scheduled_count: 0,
             parent_id: None,
+            disabled: false,
         }
     }
 
@@ -232,6 +247,7 @@ where
             executions: 0,
             scheduled_count: 0,
             parent_id: Some(parent_id),
+            disabled: false,
         }
     }
 
@@ -252,6 +268,7 @@ where
             executions: 0,
             scheduled_count: 0,
             parent_id: None,
+            disabled: false,
         }
     }
 
@@ -272,6 +289,7 @@ where
             executions,
             scheduled_count: 0,
             parent_id: None,
+            disabled: false,
         }
     }
 
@@ -312,6 +330,7 @@ where
             file_path: None,
             #[cfg(feature = "std")]
             metadata_path: None,
+            disabled: false,
         }
     }
 }
