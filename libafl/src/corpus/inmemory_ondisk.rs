@@ -95,7 +95,7 @@ where
     #[inline]
     fn add_disabled(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         let idx = self.inner.add_disabled(testcase)?;
-        let testcase = &mut self.get(idx).unwrap().borrow_mut();
+        let testcase = &mut self.get_from_all(idx).unwrap().borrow_mut();
         self.save_testcase(testcase, idx)?;
         *testcase.input_mut() = None;
         Ok(idx)
