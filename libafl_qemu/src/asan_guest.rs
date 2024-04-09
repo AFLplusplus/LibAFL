@@ -16,9 +16,13 @@ use crate::{
         QemuInstrumentationAddressRangeFilter,
     },
     hooks::{Hook, QemuHooks},
-    sys::{libafl_tcg_gen_asan, TCGTemp},
+    sys::TCGTemp,
     GuestAddr, MapInfo,
 };
+
+#[cfg(not(feature = "clippy"))]
+use crate::sys::libafl_tcg_gen_asan;
+
 
 static mut ASAN_GUEST_INITED: bool = false;
 
@@ -34,12 +38,9 @@ pub fn init_qemu_with_asan_guest(
         .join("libgasan.so");
 
     let asan_lib = env::var_os("CUSTOM_ASAN_PATH")
-        .map(|x| PathBuf::from(x.to_string_lossy().to_string()))
-        .unwrap_or(asan_lib);
+        .map_or(asan_lib, |x| PathBuf::from(x.to_string_lossy().to_string()));
 
-    if !asan_lib.as_path().exists() {
-        panic!("The ASAN library doesn't exist: {asan_lib:#?}")
-    }
+    assert!(asan_lib.as_path().exists(), "The ASAN library doesn't exist: {asan_lib:#?}");
 
     let asan_lib = asan_lib
         .to_str()
@@ -111,7 +112,7 @@ impl Debug for QemuAsanGuestMapping {
 
 impl From<&MapInfo> for QemuAsanGuestMapping {
     fn from(map: &MapInfo) -> QemuAsanGuestMapping {
-        let path = map.path().map(|p| p.to_string()).unwrap_or_default();
+        let path = map.path().map(ToString::to_string).unwrap_or_default();
         let start = map.start();
         let end = map.end();
         QemuAsanGuestMapping { start, end, path }
@@ -162,7 +163,7 @@ impl QemuAsanGuestHelper {
             .map(|m| QemuAsanGuestMapping::from(&m))
             .collect::<Vec<QemuAsanGuestMapping>>();
 
-        for mapping in mappings.iter() {
+        for mapping in &mappings {
             println!("guest mapping: {mapping:#?}");
         }
 
@@ -182,13 +183,14 @@ impl QemuAsanGuestHelper {
             .cloned()
             .collect::<Vec<QemuAsanGuestMapping>>();
 
-        for mapping in mappings.iter() {
+        for mapping in &mappings {
             println!("asan mapping: {mapping:#?}");
         }
 
         Self { filter, mappings }
     }
 
+    #[must_use]
     pub fn must_instrument(&self, addr: GuestAddr) -> bool {
         self.filter.allowed(addr)
     }
@@ -230,9 +232,7 @@ where
     let size = info.size();
 
     /* TODO - If our size is > 8 then do things via a runtime callback */
-    if size > 8 {
-        panic!("I shouldn't be here!");
-    }
+    assert!(size <= 8, "I shouldn't be here!");
 
     unsafe {
         libafl_tcg_gen_asan(addr, size);
@@ -240,6 +240,13 @@ where
 
     None
 }
+
+#[cfg(feature = "clippy")]
+#[allow(unused_variables)]
+unsafe fn libafl_tcg_gen_asan(addr: *mut TCGTemp, size: usize){
+
+}
+
 
 fn guest_trace_error_asan<QT, S>(
     _hooks: &mut QemuHooks<QT, S>,
