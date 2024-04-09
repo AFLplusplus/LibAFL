@@ -12,7 +12,7 @@ use crate::{
     corpus::{Corpus, CorpusId, Testcase},
     feedbacks::MapIndexesMetadata,
     inputs::UsesInput,
-    observers::{ObserversTuple, TrackingHinted},
+    observers::{CanTrack, ObserversTuple},
     require_index_tracking,
     schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
     state::{HasCorpus, HasRand, UsesState},
@@ -91,7 +91,7 @@ where
     F: TestcaseScore<CS::State>,
     M: AsSlice<Entry = usize> + SerdeAny + HasRefCnt,
     CS::State: HasCorpus + HasMetadata + HasRand,
-    O: TrackingHinted,
+    O: CanTrack,
 {
     /// Replaces the testcase at the given idx
     fn on_replace(
@@ -199,7 +199,7 @@ where
     F: TestcaseScore<CS::State>,
     M: AsSlice<Entry = usize> + SerdeAny + HasRefCnt,
     CS::State: HasCorpus + HasMetadata + HasRand,
-    O: TrackingHinted,
+    O: CanTrack,
 {
     /// Called when a [`Testcase`] is added to the corpus
     fn on_add(&mut self, state: &mut CS::State, idx: CorpusId) -> Result<(), Error> {
@@ -255,7 +255,7 @@ where
     F: TestcaseScore<CS::State>,
     M: AsSlice<Entry = usize> + SerdeAny + HasRefCnt,
     CS::State: HasCorpus + HasMetadata + HasRand,
-    O: TrackingHinted,
+    O: CanTrack,
 {
     /// Update the [`Corpus`] score using the [`MinimizerScheduler`]
     #[allow(clippy::unused_self)]

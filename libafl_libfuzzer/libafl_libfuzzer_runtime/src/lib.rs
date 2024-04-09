@@ -168,7 +168,7 @@ macro_rules! fuzz_with {
                 I2SRandReplace, StdScheduledMutator, StringCategoryRandMutator, StringSubcategoryRandMutator,
                 StringCategoryTokenReplaceMutator, StringSubcategoryTokenReplaceMutator, Tokens, tokens_mutations
             },
-            observers::{stacktrace::BacktraceObserver, TimeObserver, TrackingHinted},
+            observers::{stacktrace::BacktraceObserver, TimeObserver, CanTrack},
             schedulers::{
                 IndexesLenTimeMinimizerScheduler, powersched::PowerSchedule, PowerQueueScheduler,
             },

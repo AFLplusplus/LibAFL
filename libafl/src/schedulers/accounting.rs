@@ -11,7 +11,7 @@ use crate::{
     corpus::{Corpus, CorpusId},
     feedbacks::MapIndexesMetadata,
     inputs::UsesInput,
-    observers::{ObserversTuple, TrackingHinted},
+    observers::{CanTrack, ObserversTuple},
     schedulers::{
         minimizer::{IsFavoredMetadata, MinimizerScheduler, DEFAULT_SKIP_NON_FAVORED_PROB},
         LenTimeMulTestcaseScore, Scheduler,
@@ -134,7 +134,7 @@ where
     CS: Scheduler,
     CS::State: HasCorpus + HasMetadata + HasRand + Debug,
     <CS::State as UsesInput>::Input: HasLen,
-    O: TrackingHinted,
+    O: CanTrack,
 {
     fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
         self.update_accounting_score(state, idx)?;
@@ -197,7 +197,7 @@ where
     CS: Scheduler,
     CS::State: HasCorpus + HasMetadata + HasRand + Debug,
     <CS::State as UsesInput>::Input: HasLen,
-    O: TrackingHinted,
+    O: CanTrack,
 {
     /// Update the `Corpus` score
     #[allow(clippy::unused_self)]

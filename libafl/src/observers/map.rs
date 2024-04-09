@@ -85,7 +85,7 @@ fn hash_slice<T>(slice: &[T]) -> u64 {
 /// ensure that edge metadata is recorded as is appropriate for the provided observer.
 ///
 /// If you get a type constraint failure for your map due to this type being unfulfilled, you must
-/// call [`TrackingHinted::track_indices`] or [`TrackingHinted::track_novelties`] **at
+/// call [`CanTrack::track_indices`] or [`CanTrack::track_novelties`] **at
 /// the initialisation site of your map**.
 ///
 /// This trait allows various components which interact with map metadata to ensure that the
@@ -96,7 +96,7 @@ fn hash_slice<T>(slice: &[T]) -> u64 {
 /// # use libafl::feedbacks::{Feedback, MapFeedbackMetadata};
 /// use libafl::feedbacks::MaxMapFeedback;
 /// # use libafl::inputs::BytesInput;
-/// use libafl::observers::{StdMapObserver, TrackingHinted};
+/// use libafl::observers::{StdMapObserver, CanTrack};
 /// use libafl::schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler};
 /// # use libafl::state::StdState;
 /// # use libafl_bolts::serdeany::RegistryBuilder;
@@ -134,11 +134,11 @@ fn hash_slice<T>(slice: &[T]) -> u64 {
 /// ```
 ///
 /// [`MapObserver`] implementors: see [`StdMapObserver`] for an example implementation.
-pub trait TrackingHinted {
+pub trait CanTrack {
     /// The resulting type of enabling index tracking.
-    type WithIndexTracking: TrackingHinted;
+    type WithIndexTracking: CanTrack;
     /// The resulting type of enabling novelty tracking.
-    type WithNoveltiesTracking: TrackingHinted;
+    type WithNoveltiesTracking: CanTrack;
 
     /// Whether indices should be tracked for this [`MapObserver`].
     const INDICES: bool;
@@ -161,7 +161,7 @@ pub trait TrackingHinted {
 #[derive(Copy, Clone, Debug, Deserialize, Serialize)]
 pub struct ExplicitTracking<T, const ITH: bool, const NTH: bool>(T);
 
-impl<T, const ITH: bool, const NTH: bool> TrackingHinted for ExplicitTracking<T, ITH, NTH> {
+impl<T, const ITH: bool, const NTH: bool> CanTrack for ExplicitTracking<T, ITH, NTH> {
     type WithIndexTracking = ExplicitTracking<T, true, NTH>;
     type WithNoveltiesTracking = ExplicitTracking<T, ITH, true>;
     const INDICES: bool = ITH;
@@ -281,12 +281,12 @@ pub mod macros {
     pub use const_panic::{concat_panic, FmtArg};
 
     /// Use in the constructor of your component which requires index tracking of a
-    /// [`super::MapObserver`]. See [`super::TrackingHinted`] for details.
+    /// [`super::MapObserver`]. See [`super::CanTrack`] for details.
     ///
     /// As an example, if you are developing the type `MyCustomScheduler<O>` which requires novelty
     /// tracking, use this in your constructor:
     /// ```
-    /// # use libafl::observers::{MapObserver, TrackingHinted};
+    /// # use libafl::observers::{MapObserver, CanTrack};
     /// # use libafl::require_index_tracking;
     /// # use core::marker::PhantomData;
     /// #
@@ -294,7 +294,7 @@ pub mod macros {
     /// #     phantom: PhantomData<(O, A)>,
     /// # }
     /// #
-    /// impl<O, A> MyCustomScheduler<O, A> where O: MapObserver, A: AsRef<O> + TrackingHinted {
+    /// impl<O, A> MyCustomScheduler<O, A> where O: MapObserver, A: AsRef<O> + CanTrack {
     ///     pub fn new(obs: &A) -> Self {
     ///         require_index_tracking!("MyCustomScheduler", A);
     ///         todo!("Construct your type")
@@ -304,11 +304,11 @@ pub mod macros {
     #[macro_export]
     macro_rules! require_index_tracking {
         ($name: literal, $obs: ident) => {
-            struct SanityCheck<O: $crate::observers::TrackingHinted> {
+            struct SanityCheck<O: $crate::observers::CanTrack> {
                 phantom: ::core::marker::PhantomData<O>,
             }
 
-            impl<O: $crate::observers::TrackingHinted> SanityCheck<O> {
+            impl<O: $crate::observers::CanTrack> SanityCheck<O> {
                 #[rustfmt::skip]
                 const MESSAGE: &'static str = {
                     const LINE_OFFSET: usize = line!().ilog10() as usize + 2;
@@ -317,7 +317,7 @@ pub mod macros {
                         "\n",
                         SPACING, "|\n",
                         SPACING, "= note: index tracking is required by ", $name, "\n",
-                        SPACING, "= note: see the documentation of TrackingHinted for details\n",
+                        SPACING, "= note: see the documentation of CanTrack for details\n",
                         SPACING, "|\n",
                         SPACING, "= hint: call `.track_indices()` on the map observer passed to ", $name, " at the point where it is defined\n",
                         SPACING, "|\n",
@@ -344,12 +344,12 @@ pub mod macros {
     }
 
     /// Use in the constructor of your component which requires novelties tracking of a
-    /// [`super::MapObserver`]. See [`super::TrackingHinted`] for details on the concept.
+    /// [`super::MapObserver`]. See [`super::CanTrack`] for details on the concept.
     ///
     /// As an example, if you are developing the type `MyCustomScheduler<O>` which requires novelty
     /// tracking, use this in your constructor:
     /// ```
-    /// # use libafl::observers::{MapObserver, TrackingHinted};
+    /// # use libafl::observers::{MapObserver, CanTrack};
     /// # use libafl::require_novelties_tracking;
     /// # use core::marker::PhantomData;
     /// #
@@ -357,7 +357,7 @@ pub mod macros {
     /// #     phantom: PhantomData<(O, A)>,
     /// # }
     /// #
-    /// impl<O, A> MyCustomScheduler<O, A> where O: MapObserver, A: AsRef<O> + TrackingHinted {
+    /// impl<O, A> MyCustomScheduler<O, A> where O: MapObserver, A: AsRef<O> + CanTrack {
     ///     pub fn new(obs: &A) -> Self {
     ///         require_novelties_tracking!("MyCustomScheduler", A);
     ///         todo!("Construct your type")
@@ -367,11 +367,11 @@ pub mod macros {
     #[macro_export]
     macro_rules! require_novelties_tracking {
         ($name: literal, $obs: ident) => {
-            struct SanityCheck<O: $crate::observers::TrackingHinted> {
+            struct SanityCheck<O: $crate::observers::CanTrack> {
                 phantom: ::core::marker::PhantomData<O>,
             }
 
-            impl<O: $crate::observers::TrackingHinted> SanityCheck<O> {
+            impl<O: $crate::observers::CanTrack> SanityCheck<O> {
                 #[rustfmt::skip]
                 const MESSAGE: &'static str = {
                     const LINE_OFFSET: usize = line!().ilog10() as usize + 2;
@@ -381,7 +381,7 @@ pub mod macros {
                         "\n",
                         SPACING, "|\n",
                         SPACING, "= note: novelty tracking is required by ", $name, "\n",
-                        SPACING, "= note: see the documentation of TrackingHinted for details\n",
+                        SPACING, "= note: see the documentation of CanTrack for details\n",
                         SPACING, "|\n",
                         SPACING, "= hint: call `.track_novelties()` on the map observer passed to ", $name, " at the point where it is defined\n",
                         SPACING, "|\n",
@@ -455,7 +455,7 @@ pub trait MapObserver:
     fn how_many_set(&self, indexes: &[usize]) -> usize;
 }
 
-impl<M> TrackingHinted for M
+impl<M> CanTrack for M
 where
     M: MapObserver,
 {

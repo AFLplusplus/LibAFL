@@ -14,7 +14,7 @@ use crate::{
     feedbacks::map::MapNoveltiesMetadata,
     inputs::{BytesInput, GeneralizedInputMetadata, GeneralizedItem, HasBytesVec, UsesInput},
     mark_feature_time,
-    observers::{MapObserver, ObserversTuple, TrackingHinted},
+    observers::{CanTrack, MapObserver, ObserversTuple},
     require_novelties_tracking,
     stages::{RetryRestartHelper, Stage},
     start_timer,
@@ -65,7 +65,7 @@ where
 impl<E, EM, O, Z, A> Stage<E, EM, Z> for GeneralizationStage<EM, O, E::Observers, Z, A>
 where
     O: MapObserver,
-    A: AsRef<O> + TrackingHinted,
+    A: AsRef<O> + CanTrack,
     E: Executor<EM, Z> + HasObservers,
     E::Observers: ObserversTuple<E::State>,
     E::State:
@@ -337,7 +337,7 @@ impl<EM, O, OT, Z, A> GeneralizationStage<EM, O, OT, Z, A>
 where
     EM: UsesState,
     O: MapObserver,
-    A: AsRef<O> + TrackingHinted,
+    A: AsRef<O> + CanTrack,
     OT: ObserversTuple<EM::State>,
     EM::State: UsesInput<Input = BytesInput> + HasExecutions + HasMetadata + HasCorpus,
 {

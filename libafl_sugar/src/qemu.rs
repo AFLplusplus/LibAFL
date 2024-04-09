@@ -21,7 +21,7 @@ use libafl::{
         token_mutations::Tokens,
         I2SRandReplace,
     },
-    observers::{HitcountsMapObserver, TimeObserver, TrackingHinted, VariableMapObserver},
+    observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, StdState},

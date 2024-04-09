@@ -15,7 +15,7 @@ use libafl::{
         GrimoireRandomDeleteMutator, GrimoireRecursiveReplacementMutator,
         GrimoireStringReplacementMutator, Tokens,
     },
-    observers::{StdMapObserver, TrackingHinted},
+    observers::{CanTrack, StdMapObserver},
     schedulers::QueueScheduler,
     stages::{mutational::StdMutationalStage, GeneralizationStage},
     state::StdState,

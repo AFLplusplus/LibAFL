@@ -15,7 +15,7 @@ use libafl::{
     fuzzer::StdFuzzer,
     inputs::HasTargetBytes,
     monitors::MultiMonitor,
-    observers::{HitcountsMapObserver, TimeObserver, TrackingHinted},
+    observers::{CanTrack, HitcountsMapObserver, TimeObserver},
     schedulers::{powersched::PowerSchedule, PowerQueueScheduler},
     stages::{calibrate::CalibrationStage, power::StdPowerMutationalStage},
     state::{HasCorpus, StdState},

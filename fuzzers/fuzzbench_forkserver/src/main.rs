@@ -22,7 +22,7 @@ use libafl::{
         StdMOptMutator, StdScheduledMutator, Tokens,
     },
     observers::{
-        HitcountsMapObserver, StdCmpValuesObserver, StdMapObserver, TimeObserver, TrackingHinted,
+        CanTrack, HitcountsMapObserver, StdCmpValuesObserver, StdMapObserver, TimeObserver,
     },
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,

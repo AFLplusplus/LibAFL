@@ -23,12 +23,12 @@ use crate::{
     feedbacks::{Feedback, HasObserverName},
     inputs::UsesInput,
     monitors::{AggregatorOps, UserStats, UserStatsValue},
-    observers::{MapObserver, Observer, ObserversTuple, TrackingHinted, UsesObserver},
+    observers::{CanTrack, MapObserver, Observer, ObserversTuple, UsesObserver},
     state::State,
-    Error, HasMetadata, HasNamedMetadata,
+    Error, HasMetadata, HasNamedMetadata, 
 };
 
-/// A [`MapFeedback`] that implements the AFL algorithm using an [`OrReducer`] combining the bits for the history map and the bit from ``HitcountsMapObserver``.
+/// A [`MapFeedback`] that implements the AFL algorithm using an [`OrReducer`] combining the bits for the history map and the bit from [`HitcountsMapObserver`].
 pub type AflMapFeedback<O, S, T, A> = MapFeedback<DifferentIsNovel, O, OrReducer, S, T, A>;
 
 /// A [`MapFeedback`] that strives to maximize the map contents.
@@ -411,7 +411,7 @@ where
     R: Reducer<T>,
     S: State + HasNamedMetadata,
     T: Default + Copy + Serialize + for<'de> Deserialize<'de> + PartialEq + Debug + 'static,
-    A: AsRef<O> + TrackingHinted,
+    A: AsRef<O> + CanTrack,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         // Initialize `MapFeedbackMetadata` with an empty vector and add it to the state.
@@ -554,7 +554,7 @@ where
     O: MapObserver<Entry = u8> + AsSlice<Entry = u8>,
     for<'it> O: AsIter<'it, Item = u8>,
     S: State + HasNamedMetadata,
-    A: AsRef<O> + TrackingHinted,
+    A: AsRef<O> + CanTrack,
 {
     #[allow(clippy::wrong_self_convention)]
     #[allow(clippy::needless_range_loop)]
@@ -699,7 +699,7 @@ where
     for<'it> O: AsIter<'it, Item = T>,
     N: IsNovel<T>,
     S: UsesInput + HasNamedMetadata,
-    A: AsRef<O> + TrackingHinted,
+    A: AsRef<O> + CanTrack,
 {
     /// Create new `MapFeedback`
     #[must_use]
