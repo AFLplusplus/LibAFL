@@ -7,8 +7,10 @@ use std::{
     path::PathBuf,
 };
 
-use libafl::{inputs::UsesInput, state::HasMetadata};
+use libafl::{inputs::UsesInput, HasMetadata};
 
+#[cfg(not(feature = "clippy"))]
+use crate::sys::libafl_tcg_gen_asan;
 use crate::{
     emu::{EmuError, MemAccessInfo, Qemu},
     helper::{
@@ -19,10 +21,6 @@ use crate::{
     sys::TCGTemp,
     GuestAddr, MapInfo,
 };
-
-#[cfg(not(feature = "clippy"))]
-use crate::sys::libafl_tcg_gen_asan;
-
 
 static mut ASAN_GUEST_INITED: bool = false;
 
@@ -40,7 +38,10 @@ pub fn init_qemu_with_asan_guest(
     let asan_lib = env::var_os("CUSTOM_ASAN_PATH")
         .map_or(asan_lib, |x| PathBuf::from(x.to_string_lossy().to_string()));
 
-    assert!(asan_lib.as_path().exists(), "The ASAN library doesn't exist: {asan_lib:#?}");
+    assert!(
+        asan_lib.as_path().exists(),
+        "The ASAN library doesn't exist: {asan_lib:#?}"
+    );
 
     let asan_lib = asan_lib
         .to_str()
@@ -243,10 +244,7 @@ where
 
 #[cfg(feature = "clippy")]
 #[allow(unused_variables)]
-unsafe fn libafl_tcg_gen_asan(addr: *mut TCGTemp, size: usize){
-
-}
-
+unsafe fn libafl_tcg_gen_asan(addr: *mut TCGTemp, size: usize) {}
 
 fn guest_trace_error_asan<QT, S>(
     _hooks: &mut QemuHooks<QT, S>,
