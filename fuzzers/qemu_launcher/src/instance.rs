@@ -72,7 +72,7 @@ impl<'a, M: Monitor> Instance<'a, M> {
     where
         QT: QemuHelperTuple<ClientState> + Debug,
     {
-        let mut hooks = QemuHooks::new(self.qemu.clone(), helpers);
+        let mut hooks = QemuHooks::new(*self.qemu, helpers);
 
         // Create an observation channel using the coverage map
         let edges_observer = unsafe {
