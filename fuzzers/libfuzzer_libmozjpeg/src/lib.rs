@@ -22,8 +22,8 @@ use libafl::{
     observers::StdMapObserver,
     schedulers::RandScheduler,
     stages::mutational::StdMutationalStage,
-    state::{HasCorpus, HasMetadata, StdState},
-    Error,
+    state::{HasCorpus, StdState},
+    Error, HasMetadata,
 };
 use libafl_bolts::{
     current_nanos,

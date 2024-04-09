@@ -20,8 +20,8 @@ use crate::{
     observers::ObserversTuple,
     schedulers::Scheduler,
     start_timer,
-    state::{HasCorpus, HasExecutions, HasLastReportTime, HasMetadata, HasRand},
-    Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
+    state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand},
+    Error, EvaluatorObservers, ExecutionProcessor, HasMetadata, HasScheduler,
 };
 #[cfg(feature = "introspection")]
 use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};

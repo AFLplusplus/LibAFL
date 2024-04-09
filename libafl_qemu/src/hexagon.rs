@@ -2,6 +2,8 @@ use std::sync::OnceLock;
 
 use enum_map::{enum_map, EnumMap};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
 pub use strum_macros::EnumIter;
 
 use crate::{sync_backdoor::BackdoorArgs, CallingConvention};

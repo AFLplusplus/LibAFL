@@ -14,9 +14,11 @@ __Warning__: The documentation is built by default for `x86_64` in `usermode`. T
 #![allow(clippy::pedantic)]
 
 #[cfg(all(not(feature = "clippy"), target_os = "linux"))]
-include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+mod bindings {
+    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+}
 
-#[cfg(all(feature = "clippy", target_os = "linux"))]
+#[cfg(any(feature = "clippy", not(target_os = "linux")))]
 mod x86_64_stub_bindings;
 
 #[cfg(emulation_mode = "usermode")]
@@ -98,7 +100,11 @@ macro_rules! extern_c_checked {
 use core::ops::BitAnd;
 use std::{ffi::c_void, slice::from_raw_parts, str::from_utf8_unchecked};
 
-#[cfg(all(feature = "clippy", target_os = "linux"))]
+#[cfg(all(not(feature = "clippy"), target_os = "linux"))]
+pub use bindings::*;
+#[cfg(feature = "python")]
+use pyo3::{pyclass, pymethods, IntoPy, PyObject, Python};
+#[cfg(any(feature = "clippy", not(target_os = "linux")))]
 pub use x86_64_stub_bindings::*;
 
 pub type CPUStatePtr = *mut crate::CPUState;
@@ -116,6 +122,7 @@ pub type GuestHwAddrInfo = crate::qemu_plugin_hwaddr;
 
 #[derive(Debug)]
 #[repr(C)]
+#[cfg_attr(feature = "python", pyclass(unsendable))]
 pub struct MapInfo {
     start: GuestAddr,
     end: GuestAddr,
@@ -202,6 +209,7 @@ extern_c_checked! {
     pub fn libafl_qemu_gdb_reply(buf: *const u8, len: usize);
 }
 
+#[cfg_attr(feature = "python", pymethods)]
 impl MapInfo {
     #[must_use]
     pub fn start(&self) -> GuestAddr {
@@ -275,5 +283,13 @@ impl MmapPerms {
                 | MmapPerms::WriteExecute
                 | MmapPerms::ReadWriteExecute
         )
+    }
+}
+
+#[cfg(feature = "python")]
+impl IntoPy<PyObject> for MmapPerms {
+    fn into_py(self, py: Python) -> PyObject {
+        let n: i32 = self.into();
+        n.into_py(py)
     }
 }

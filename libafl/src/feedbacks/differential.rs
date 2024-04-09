@@ -16,8 +16,8 @@ use crate::{
     feedbacks::Feedback,
     inputs::Input,
     observers::{Observer, ObserversTuple},
-    state::{HasMetadata, State},
-    Error,
+    state::State,
+    Error, HasMetadata,
 };
 
 /// The result of a differential test between two observers.

@@ -15,8 +15,8 @@ use crate::{
     feedbacks::Feedback,
     inputs::UsesInput,
     observers::{concolic::ConcolicObserver, ObserversTuple},
-    state::{HasMetadata, State},
-    Error,
+    state::State,
+    Error, HasMetadata,
 };
 
 /// The concolic feedback. It is used to attach concolic tracing metadata to the testcase.

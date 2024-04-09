@@ -46,11 +46,9 @@ use crate::{
     observers::ObserversTuple,
     schedulers::Scheduler,
     stages::push::PushStage,
-    state::{
-        HasCorpus, HasExecutions, HasLastReportTime, HasMetadata, HasNamedMetadata, HasRand, State,
-        UsesState,
-    },
-    Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasScheduler,
+    state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand, State, UsesState},
+    Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasMetadata, HasNamedMetadata,
+    HasScheduler,
 };
 
 /// Mutational stage is the normal fuzzing stage.
@@ -655,7 +653,8 @@ pub mod test {
         corpus::{Corpus, HasCurrentCorpusIdx, Testcase},
         inputs::NopInput,
         stages::{RetryRestartHelper, Stage},
-        state::{test::test_std_state, HasCorpus, HasMetadata, State, UsesState},
+        state::{test::test_std_state, HasCorpus, State, UsesState},
+        HasMetadata,
     };
 
     #[derive(Debug)]

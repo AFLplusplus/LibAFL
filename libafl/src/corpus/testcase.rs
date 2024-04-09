@@ -16,8 +16,7 @@ use super::Corpus;
 use crate::{
     corpus::CorpusId,
     inputs::{Input, UsesInput},
-    state::HasMetadata,
-    Error,
+    Error, HasMetadata,
 };
 
 /// Shorthand to receive a [`Ref`] or [`RefMut`] to a stored [`Testcase`], by [`CorpusId`].

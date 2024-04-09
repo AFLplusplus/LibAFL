@@ -29,8 +29,8 @@ use libafl::{
         calibrate::CalibrationStage, mutational::MultiMutationalStage,
         power::StdPowerMutationalStage, ColorizationStage, IfStage,
     },
-    state::{HasCorpus, HasCurrentTestcase, HasMetadata, StdState},
-    Error,
+    state::{HasCorpus, HasCurrentTestcase, StdState},
+    Error, HasMetadata,
 };
 use libafl_bolts::{
     current_nanos, current_time,

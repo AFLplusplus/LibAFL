@@ -15,7 +15,8 @@ use libafl::{
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
-    state::{HasCorpus, HasMetadata, StdState},
+    state::{HasCorpus, StdState},
+    HasMetadata,
 };
 use libafl_bolts::{
     current_nanos,

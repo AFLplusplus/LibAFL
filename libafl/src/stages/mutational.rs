@@ -13,11 +13,8 @@ use crate::{
     mutators::{MultiMutator, MutationResult, Mutator},
     stages::{ExecutionCountRestartHelper, RetryRestartHelper, Stage},
     start_timer,
-    state::{
-        HasCorpus, HasCurrentTestcase, HasExecutions, HasMetadata, HasNamedMetadata, HasRand,
-        UsesState,
-    },
-    Error,
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
+    Error, HasMetadata, HasNamedMetadata,
 };
 #[cfg(feature = "introspection")]
 use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};

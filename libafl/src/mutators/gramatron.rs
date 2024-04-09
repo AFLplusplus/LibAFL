@@ -13,8 +13,8 @@ use crate::{
     inputs::{GramatronInput, Terminal},
     mutators::{MutationResult, Mutator},
     random_corpus_id,
-    state::{HasCorpus, HasMetadata, HasRand},
-    Error,
+    state::{HasCorpus, HasRand},
+    Error, HasMetadata,
 };
 
 const RECUR_THRESHOLD: u64 = 5;

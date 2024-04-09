@@ -18,8 +18,8 @@ use crate::{
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
         HasAFLSchedulerMetadata, RemovableScheduler, Scheduler,
     },
-    state::{HasCorpus, HasMetadata, HasRand, State, UsesState},
-    Error,
+    state::{HasCorpus, HasRand, State, UsesState},
+    Error, HasMetadata,
 };
 
 /// The Metadata for `WeightedScheduler`

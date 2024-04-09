@@ -18,8 +18,8 @@ use libafl::{
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::StdMutationalStage,
-    state::{HasCorpus, HasMetadata, StdState},
-    Error,
+    state::{HasCorpus, StdState},
+    Error, HasMetadata,
 };
 use libafl_bolts::{
     core_affinity::Cores,
@@ -297,5 +297,82 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
             Err(Error::ShuttingDown) => log::info!("\nFuzzing stopped by user. Good Bye."),
             Err(err) => panic!("Fuzzingg failed {err:?}"),
         }
+    }
+}
+
+/// The python bindings for this sugar
+#[cfg(feature = "python")]
+pub mod pybind {
+    use std::path::PathBuf;
+
+    use libafl_bolts::core_affinity::Cores;
+    use pyo3::prelude::*;
+
+    use crate::forkserver;
+
+    /// Python bindings for the `LibAFL` forkserver sugar
+    #[pyclass(unsendable)]
+    #[derive(Debug)]
+    struct ForkserverBytesCoverageSugar {
+        input_dirs: Vec<PathBuf>,
+        output_dir: PathBuf,
+        broker_port: u16,
+        cores: Cores,
+        use_cmplog: Option<bool>,
+        iterations: Option<u64>,
+        tokens_file: Option<PathBuf>,
+        timeout: Option<u64>,
+    }
+
+    #[pymethods]
+    impl ForkserverBytesCoverageSugar {
+        /// Create a new [`ForkserverBytesCoverageSugar`]
+        #[new]
+        #[allow(clippy::too_many_arguments)]
+        fn new(
+            input_dirs: Vec<PathBuf>,
+            output_dir: PathBuf,
+            broker_port: u16,
+            cores: Vec<usize>,
+            use_cmplog: Option<bool>,
+            iterations: Option<u64>,
+            tokens_file: Option<PathBuf>,
+            timeout: Option<u64>,
+        ) -> Self {
+            Self {
+                input_dirs,
+                output_dir,
+                broker_port,
+                cores: cores.into(),
+                use_cmplog,
+                iterations,
+                tokens_file,
+                timeout,
+            }
+        }
+
+        /// Run the fuzzer
+        #[allow(clippy::needless_pass_by_value)]
+        pub fn run(&self, program: String, arguments: Vec<String>) {
+            forkserver::ForkserverBytesCoverageSugar::builder()
+                .input_dirs(&self.input_dirs)
+                .output_dir(self.output_dir.clone())
+                .broker_port(self.broker_port)
+                .cores(&self.cores)
+                .program(program)
+                .arguments(&arguments)
+                .use_cmplog(self.use_cmplog)
+                .timeout(self.timeout)
+                .tokens_file(self.tokens_file.clone())
+                .iterations(self.iterations)
+                .build()
+                .run();
+        }
+    }
+
+    /// Register the module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<ForkserverBytesCoverageSugar>()?;
+        Ok(())
     }
 }

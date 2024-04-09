@@ -42,8 +42,8 @@ use libafl::{
         calibrate::CalibrationStage, power::StdPowerMutationalStage, GeneralizationStage,
         StdMutationalStage, TracingStage,
     },
-    state::{HasCorpus, HasMetadata, StdState},
-    Error,
+    state::{HasCorpus, StdState},
+    Error, HasMetadata,
 };
 use libafl_bolts::{
     current_nanos, current_time,

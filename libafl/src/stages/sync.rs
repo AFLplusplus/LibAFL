@@ -19,8 +19,8 @@ use crate::{
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, UsesInput},
     stages::{RetryRestartHelper, Stage},
-    state::{HasCorpus, HasExecutions, HasMetadata, HasNamedMetadata, HasRand, State, UsesState},
-    Error,
+    state::{HasCorpus, HasExecutions, HasRand, State, UsesState},
+    Error, HasMetadata, HasNamedMetadata,
 };
 
 /// Metadata used to store information about disk sync time

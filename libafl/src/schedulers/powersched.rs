@@ -13,8 +13,8 @@ use crate::{
     inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
     schedulers::{HasAFLSchedulerMetadata, RemovableScheduler, Scheduler},
-    state::{HasCorpus, HasMetadata, State, UsesState},
-    Error,
+    state::{HasCorpus, State, UsesState},
+    Error, HasMetadata,
 };
 
 /// The n fuzz size
