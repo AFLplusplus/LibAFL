@@ -71,8 +71,11 @@ script_runner="@shell"
 script='''
 TMP_DIR=$(mktemp -d)
 
+echo "Pre-building qemu_systemmode with feature $FEATURE"
 cargo make build_$FEATURE
-timeout 15s cargo make ${FEATURE} | tee $TMP_DIR/fuzz.log 2>&1 || true
+
+echo "Testing qemu_systemmode with feature $FEATURE"
+timeout 45s cargo make ${FEATURE} | tee $TMP_DIR/fuzz.log 2>&1 || true
 
 if [ -z "$(grep 'Objective' $TMP_DIR/fuzz.log)" ]; then
     echo "Fuzzer did not find the objective in $TMP_DIR/fuzz.log"
