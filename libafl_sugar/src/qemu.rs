@@ -209,7 +209,7 @@ where
             let mut harness = |input: &BytesInput| {
                 let target = input.target_bytes();
                 let buf = target.as_slice();
-                (harness_bytes)(buf);
+                harness_bytes(buf);
                 ExitKind::Ok
             };
 
