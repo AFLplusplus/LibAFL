@@ -1826,6 +1826,12 @@ pub mod pybind {
             Ok(Qemu { qemu })
         }
 
+        fn run(&self) {
+            unsafe {
+                self.qemu.run().unwrap();
+            }
+        }
+
         fn write_mem(&self, addr: GuestAddr, buf: &[u8]) {
             unsafe {
                 self.qemu.write_mem(addr, buf);
