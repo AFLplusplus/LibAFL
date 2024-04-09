@@ -1465,7 +1465,7 @@ where
                         log::error!("Failed to detach from broker: {err}");
                     }
                     #[cfg(unix)]
-                    if child_status == 137 {
+                    if child_status == 9 {
                         panic!("Target received SIGKILL!. This could indicate the target crashed due to OOM, user sent SIGKILL, or the target was in an unrecoverable situation and could not save state to restart");
                     }
                     // Storing state in the last round did not work
