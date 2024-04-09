@@ -5,6 +5,8 @@ mod host_specific {
     #[cfg(not(target_os = "linux"))]
     pub fn build() {
         println!("cargo:warning=libafl_qemu only builds on Linux hosts");
+
+        #[cfg(not(target_os = "macos"))]
         std::process::exit(0);
     }
 }
