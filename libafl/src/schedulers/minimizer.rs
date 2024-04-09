@@ -14,8 +14,8 @@ use crate::{
     inputs::UsesInput,
     observers::ObserversTuple,
     schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
-    state::{HasCorpus, HasMetadata, HasRand, UsesState},
-    Error,
+    state::{HasCorpus, HasRand, UsesState},
+    Error, HasMetadata,
 };
 
 /// Default probability to skip the non-favored values

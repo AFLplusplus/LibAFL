@@ -1306,11 +1306,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        corpus::InMemoryCorpus,
-        feedbacks::ConstFeedback,
-        inputs::BytesInput,
-        mutators::MutatorsTuple,
-        state::{HasMetadata, StdState},
+        corpus::InMemoryCorpus, feedbacks::ConstFeedback, inputs::BytesInput,
+        mutators::MutatorsTuple, state::StdState, HasMetadata,
     };
 
     type TestMutatorsTupleType = tuple_list_type!(

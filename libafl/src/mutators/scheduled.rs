@@ -28,8 +28,8 @@ use crate::{
         token_mutations::{TokenInsert, TokenReplace},
         MutationResult, Mutator, MutatorsTuple,
     },
-    state::{HasCorpus, HasMetadata, HasRand},
-    Error,
+    state::{HasCorpus, HasRand},
+    Error, HasMetadata,
 };
 
 /// The metadata placed in a [`crate::corpus::Testcase`] by a [`LoggerScheduledMutator`].
@@ -566,46 +566,5 @@ mod tests {
             };
             assert_ne!(equal_in_a_row, 5);
         }
-    }
-}
-
-/// `SchedulerMutator` Python bindings
-#[cfg(feature = "python")]
-#[allow(missing_docs)]
-#[allow(clippy::unnecessary_fallible_conversions, unused_qualifications)]
-pub mod pybind {
-    use pyo3::prelude::*;
-
-    use super::{havoc_mutations, Debug, HavocMutationsType, StdScheduledMutator};
-    use crate::{
-        inputs::BytesInput, mutators::pybind::PythonMutator, state::pybind::PythonStdState,
-    };
-
-    #[pyclass(unsendable, name = "StdHavocMutator")]
-    #[derive(Debug)]
-    /// Python class for StdHavocMutator
-    pub struct PythonStdHavocMutator {
-        /// Rust wrapped StdHavocMutator object
-        pub inner: StdScheduledMutator<BytesInput, HavocMutationsType<BytesInput>, PythonStdState>,
-    }
-
-    #[pymethods]
-    impl PythonStdHavocMutator {
-        #[new]
-        fn new() -> Self {
-            Self {
-                inner: StdScheduledMutator::new(havoc_mutations()),
-            }
-        }
-
-        fn as_mutator(slf: Py<Self>) -> PythonMutator {
-            PythonMutator::new_std_havoc(slf)
-        }
-    }
-
-    /// Register the classes to the python module
-    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
-        m.add_class::<PythonStdHavocMutator>()?;
-        Ok(())
     }
 }

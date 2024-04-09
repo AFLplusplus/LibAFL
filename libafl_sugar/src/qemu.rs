@@ -24,7 +24,8 @@ use libafl::{
     observers::{HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
-    state::{HasCorpus, HasMetadata, StdState},
+    state::{HasCorpus, StdState},
+    HasMetadata,
 };
 use libafl_bolts::{
     core_affinity::Cores,

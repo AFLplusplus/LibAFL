@@ -4,7 +4,7 @@ use std::{
     sync::Mutex,
 };
 
-use libafl::{inputs::UsesInput, state::HasMetadata};
+use libafl::{inputs::UsesInput, HasMetadata};
 use libafl_qemu_sys::{GuestAddr, MmapPerms};
 use meminterval::{Interval, IntervalTree};
 use thread_local::ThreadLocal;

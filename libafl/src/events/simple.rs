@@ -32,8 +32,8 @@ use crate::{
     },
     inputs::UsesInput,
     monitors::Monitor,
-    state::{HasExecutions, HasLastReportTime, HasMetadata, State, UsesState},
-    Error,
+    state::{HasExecutions, HasLastReportTime, State, UsesState},
+    Error, HasMetadata,
 };
 #[cfg(feature = "std")]
 use crate::{
@@ -599,47 +599,5 @@ where
         */
 
         Ok((state, mgr))
-    }
-}
-
-/// `SimpleEventManager` Python bindings
-#[cfg(feature = "python")]
-#[allow(missing_docs)]
-#[allow(clippy::unnecessary_fallible_conversions, unused_qualifications)]
-pub mod pybind {
-    use pyo3::prelude::*;
-
-    use crate::{
-        events::{pybind::PythonEventManager, SimpleEventManager},
-        monitors::pybind::PythonMonitor,
-        state::pybind::PythonStdState,
-    };
-
-    #[pyclass(unsendable, name = "SimpleEventManager")]
-    #[derive(Debug)]
-    /// Python class for SimpleEventManager
-    pub struct PythonSimpleEventManager {
-        /// Rust wrapped SimpleEventManager object
-        pub inner: SimpleEventManager<PythonMonitor, PythonStdState>,
-    }
-
-    #[pymethods]
-    impl PythonSimpleEventManager {
-        #[new]
-        fn new(py_monitor: PythonMonitor) -> Self {
-            Self {
-                inner: SimpleEventManager::new(py_monitor),
-            }
-        }
-
-        fn as_manager(slf: Py<Self>) -> PythonEventManager {
-            PythonEventManager::new_simple(slf)
-        }
-    }
-
-    /// Register the classes to the python module
-    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
-        m.add_class::<PythonSimpleEventManager>()?;
-        Ok(())
     }
 }

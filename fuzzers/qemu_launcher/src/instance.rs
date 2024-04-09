@@ -26,8 +26,8 @@ use libafl::{
         calibrate::CalibrationStage, power::StdPowerMutationalStage, ShadowTracingStage,
         StagesTuple, StdMutationalStage,
     },
-    state::{HasCorpus, HasMetadata, StdState, UsesState},
-    Error,
+    state::{HasCorpus, StdState, UsesState},
+    Error, HasMetadata,
 };
 #[cfg(not(feature = "simplemgr"))]
 use libafl_bolts::shmem::StdShMemProvider;
@@ -72,7 +72,7 @@ impl<'a, M: Monitor> Instance<'a, M> {
     where
         QT: QemuHelperTuple<ClientState> + Debug,
     {
-        let mut hooks = QemuHooks::new(self.qemu.clone(), helpers);
+        let mut hooks = QemuHooks::new(*self.qemu, helpers);
 
         // Create an observation channel using the coverage map
         let edges_observer = unsafe {

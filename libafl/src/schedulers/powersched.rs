@@ -12,11 +12,9 @@ use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
     inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
-    schedulers::{
-        HasAFLRemovableScheduler, HasAFLSchedulerMetadata, RemovableScheduler, Scheduler,
-    },
-    state::{HasCorpus, HasMetadata, State, UsesState},
-    Error,
+    schedulers::{HasAFLSchedulerMetadata, RemovableScheduler, Scheduler},
+    state::{HasCorpus, State, UsesState},
+    Error, HasMetadata,
 };
 
 /// The n fuzz size
@@ -186,34 +184,29 @@ where
     type State = S;
 }
 
-impl<O, S> HasAFLRemovableScheduler for PowerQueueScheduler<O, S>
+impl<O, S> RemovableScheduler for PowerQueueScheduler<O, S>
 where
     S: State + HasTestcase + HasMetadata + HasCorpus,
     O: MapObserver,
 {
-}
-
-impl<O, S> RemovableScheduler for PowerQueueScheduler<O, S>
-where
-    S: HasCorpus + HasMetadata + HasTestcase + State,
-    O: MapObserver,
-{
+    /// This will *NOT* neutralize the effect of this removed testcase from the global data such as `SchedulerMetadata`
     fn on_remove(
         &mut self,
-        state: &mut Self::State,
-        idx: CorpusId,
-        prev: &Option<Testcase<<Self::State as UsesInput>::Input>>,
+        _state: &mut Self::State,
+        _idx: CorpusId,
+        _prev: &Option<Testcase<<Self::State as UsesInput>::Input>>,
     ) -> Result<(), Error> {
-        self.on_remove_metadata(state, idx, prev)
+        Ok(())
     }
 
+    /// This will *NOT* neutralize the effect of this removed testcase from the global data such as `SchedulerMetadata`
     fn on_replace(
         &mut self,
-        state: &mut Self::State,
-        idx: CorpusId,
-        prev: &Testcase<<Self::State as UsesInput>::Input>,
+        _state: &mut Self::State,
+        _idx: CorpusId,
+        _prev: &Testcase<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
-        self.on_replace_metadata(state, idx, prev)
+        Ok(())
     }
 }
 

@@ -8,9 +8,7 @@ use std::{
 };
 
 use addr2line::object::{Object, ObjectSection};
-use libafl::{
-    executors::ExitKind, inputs::UsesInput, observers::ObserversTuple, state::HasMetadata,
-};
+use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple, HasMetadata};
 use libafl_qemu_sys::GuestAddr;
 use libc::{
     c_void, MAP_ANON, MAP_FAILED, MAP_FIXED, MAP_NORESERVE, MAP_PRIVATE, PROT_READ, PROT_WRITE,

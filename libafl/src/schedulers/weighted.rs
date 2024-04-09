@@ -16,10 +16,10 @@ use crate::{
     schedulers::{
         powersched::{PowerSchedule, SchedulerMetadata},
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
-        HasAFLRemovableScheduler, HasAFLSchedulerMetadata, RemovableScheduler, Scheduler,
+        HasAFLSchedulerMetadata, RemovableScheduler, Scheduler,
     },
-    state::{HasCorpus, HasMetadata, HasRand, State, UsesState},
-    Error,
+    state::{HasCorpus, HasRand, State, UsesState},
+    Error, HasMetadata,
 };
 
 /// The Metadata for `WeightedScheduler`
@@ -93,6 +93,7 @@ libafl_bolts::impl_serdeany!(WeightedScheduleMetadata);
 /// A corpus scheduler using power schedules with weighted queue item selection algo.
 #[derive(Clone, Debug)]
 pub struct WeightedScheduler<F, O, S> {
+    table_invalidated: bool,
     strat: Option<PowerSchedule>,
     map_observer_name: String,
     last_hash: usize,
@@ -121,6 +122,7 @@ where
             strat,
             map_observer_name: map_observer.name().to_string(),
             last_hash: 0,
+            table_invalidated: true,
             phantom: PhantomData,
         }
     }
@@ -223,36 +225,32 @@ where
     type State = S;
 }
 
-impl<F, O, S> HasAFLRemovableScheduler for WeightedScheduler<F, O, S>
-where
-    F: TestcaseScore<S>,
-    S: State + HasTestcase + HasMetadata + HasCorpus + HasRand,
-    O: MapObserver,
-{
-}
-
 impl<F, O, S> RemovableScheduler for WeightedScheduler<F, O, S>
 where
     F: TestcaseScore<S>,
     O: MapObserver,
     S: HasCorpus + HasMetadata + HasRand + HasTestcase + State,
 {
+    /// This will *NOT* neutralize the effect of this removed testcase from the global data such as `SchedulerMetadata`
     fn on_remove(
         &mut self,
-        state: &mut Self::State,
-        idx: CorpusId,
-        prev: &Option<Testcase<<Self::State as UsesInput>::Input>>,
+        _state: &mut Self::State,
+        _idx: CorpusId,
+        _prev: &Option<Testcase<<Self::State as UsesInput>::Input>>,
     ) -> Result<(), Error> {
-        self.on_remove_metadata(state, idx, prev)
+        self.table_invalidated = true;
+        Ok(())
     }
 
+    /// This will *NOT* neutralize the effect of this removed testcase from the global data such as `SchedulerMetadata`
     fn on_replace(
         &mut self,
-        state: &mut Self::State,
-        idx: CorpusId,
-        prev: &Testcase<<Self::State as UsesInput>::Input>,
+        _state: &mut Self::State,
+        _idx: CorpusId,
+        _prev: &Testcase<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
-        self.on_replace_metadata(state, idx, prev)
+        self.table_invalidated = true;
+        Ok(())
     }
 }
 
@@ -284,7 +282,8 @@ where
     /// Called when a [`Testcase`] is added to the corpus
     fn on_add(&mut self, state: &mut S, idx: CorpusId) -> Result<(), Error> {
         self.on_add_metadata(state, idx)?;
-        self.create_alias_table(state)
+        self.table_invalidated = true;
+        Ok(())
     }
 
     fn on_evaluation<OT>(
@@ -301,6 +300,10 @@ where
 
     #[allow(clippy::similar_names, clippy::cast_precision_loss)]
     fn next(&mut self, state: &mut S) -> Result<CorpusId, Error> {
+        if self.table_invalidated {
+            self.create_alias_table(state)?;
+            self.table_invalidated = false;
+        }
         let corpus_counts = state.corpus().count();
         if corpus_counts == 0 {
             Err(Error::empty(String::from(
