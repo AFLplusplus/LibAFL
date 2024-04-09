@@ -45,13 +45,20 @@ where
         &'a self,
         testcase: &'a RefCell<Testcase<I>>,
         idx: CorpusId,
+        is_disabled: bool,
     ) -> Result<(), Error> {
         if testcase.borrow().input().is_none() {
             self.load_input_into(&mut testcase.borrow_mut())?;
             let mut borrowed_num = 0;
             while self.cached_indexes.borrow().len() >= self.cache_max_len {
                 let removed = self.cached_indexes.borrow_mut().pop_front().unwrap();
-                if let Ok(mut borrowed) = self.inner.get(removed)?.try_borrow_mut() {
+                if let Ok(mut borrowed) = if is_disabled {
+                    self.inner.get_from_all(removed)
+                } else {
+                    self.inner.get(removed)
+                }?
+                .try_borrow_mut()
+                {
                     *borrowed.input_mut() = None;
                 } else {
                     self.cached_indexes.borrow_mut().push_back(removed);
@@ -118,14 +125,14 @@ where
     #[inline]
     fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
         let testcase = { self.inner.get(idx)? };
-        self.cache_testcase(testcase, idx)?;
+        self.cache_testcase(testcase, idx, false)?;
         Ok(testcase)
     }
     /// Get by id; considers both enabled and disabled testcases
     #[inline]
     fn get_from_all(&self, idx: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error> {
         let testcase = { self.inner.get_from_all(idx)? };
-        //self.cache_testcase(testcase, idx)?;
+        self.cache_testcase(testcase, idx, true)?;
         Ok(testcase)
     }
 
