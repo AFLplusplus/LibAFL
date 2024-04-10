@@ -307,8 +307,6 @@ pub fn build(
 
         if let Some(j) = jobs {
             cmd.arg(&format!("{j}")).env("V", "1");
-        } else {
-            cmd.arg("-j");
         }
         assert!(
             cmd.status().expect("Invoking Make Failed").success(),
