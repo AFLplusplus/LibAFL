@@ -22,15 +22,15 @@ use libafl_bolts::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::{CustomBufEventResult, HasCustomBufHandlers, ProgressReporter};
 #[cfg(feature = "llmp_compression")]
 use crate::events::llmp::COMPRESS_THRESHOLD;
 #[cfg(feature = "scalability_introspection")]
 use crate::state::HasScalabilityMonitor;
 use crate::{
     events::{
-        llmp::EventStatsCollector, BrokerEventResult, Event, EventConfig, EventFirer, EventManager,
-        EventManagerId, EventProcessor, EventRestarter, HasEventManagerId, LogSeverity,
+        BrokerEventResult, CustomBufEventResult, Event, EventConfig, EventFirer, EventManager,
+        EventManagerId, EventProcessor, EventRestarter, HasAdaptiveSerializer,
+        HasCustomBufHandlers, HasEventManagerId, LogSeverity, ProgressReporter,
     },
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
@@ -233,9 +233,9 @@ where
 }
 
 #[cfg(feature = "adaptive_serialization")]
-impl<EM, SP> EventStatsCollector for CentralizedEventManager<EM, SP>
+impl<EM, SP> HasAdaptiveSerializer for CentralizedEventManager<EM, SP>
 where
-    EM: EventStatsCollector + UsesState,
+    EM: HasAdaptiveSerializer + UsesState,
     SP: ShMemProvider + 'static,
 {
     fn serialization_time(&self) -> Duration {
@@ -266,16 +266,16 @@ where
 }
 
 #[cfg(not(feature = "adaptive_serialization"))]
-impl<EM, SP> EventStatsCollector for CentralizedEventManager<EM, SP>
+impl<EM, SP> HasAdaptiveSerializer for CentralizedEventManager<EM, SP>
 where
-    EM: EventStatsCollector + UsesState,
+    EM: HasAdaptiveSerializer + UsesState,
     SP: ShMemProvider + 'static,
 {
 }
 
 impl<EM, SP> EventFirer for CentralizedEventManager<EM, SP>
 where
-    EM: EventStatsCollector + EventFirer + HasEventManagerId,
+    EM: HasAdaptiveSerializer + EventFirer + HasEventManagerId + HasAdaptiveSerializer,
     SP: ShMemProvider + 'static,
 {
     fn fire(
@@ -330,11 +330,26 @@ where
         self.inner.log(state, severity_level, message)
     }
 
+    #[cfg(not(feature = "adaptive_serialization"))]
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
     where
         OT: ObserversTuple<Self::State> + Serialize,
     {
-        self.inner.serialize_observers(observers)
+        Ok(Some(postcard::to_allocvec(observers)?))
+    }
+
+    #[cfg(feature = "adaptive_serialization")]
+    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
+    where
+        OT: ObserversTuple<Self::State> + Serialize,
+    {
+        const SERIALIZE_TIME_FACTOR: u32 = 4; // twice as much as the normal llmp em's value cuz it does this job twice.
+        const SERIALIZE_PERCENTAGE_THRESHOLD: usize = 80;
+        self.inner.serialize_observers_adaptive(
+            observers,
+            SERIALIZE_TIME_FACTOR,
+            SERIALIZE_PERCENTAGE_THRESHOLD,
+        )
     }
 
     fn configuration(&self) -> EventConfig {
@@ -368,7 +383,7 @@ where
 
 impl<E, EM, SP, Z> EventProcessor<E, Z> for CentralizedEventManager<EM, SP>
 where
-    EM: EventStatsCollector + EventProcessor<E, Z> + EventFirer + HasEventManagerId,
+    EM: HasAdaptiveSerializer + EventProcessor<E, Z> + EventFirer + HasEventManagerId,
     E: HasObservers<State = Self::State> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
     Z: EvaluatorObservers<E::Observers, State = Self::State>
@@ -394,7 +409,7 @@ where
 
 impl<E, EM, SP, Z> EventManager<E, Z> for CentralizedEventManager<EM, SP>
 where
-    EM: EventStatsCollector + EventManager<E, Z>,
+    EM: HasAdaptiveSerializer + EventManager<E, Z>,
     EM::State: HasExecutions + HasMetadata + HasLastReportTime,
     E: HasObservers<State = Self::State> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
@@ -422,7 +437,7 @@ where
 
 impl<EM, SP> ProgressReporter for CentralizedEventManager<EM, SP>
 where
-    EM: EventStatsCollector + ProgressReporter + HasEventManagerId,
+    EM: HasAdaptiveSerializer + ProgressReporter + HasEventManagerId,
     EM::State: HasMetadata + HasExecutions + HasLastReportTime,
     SP: ShMemProvider + 'static,
 {
@@ -524,7 +539,7 @@ where
 
 impl<EM, SP> CentralizedEventManager<EM, SP>
 where
-    EM: UsesState + EventFirer + EventStatsCollector + HasEventManagerId,
+    EM: UsesState + EventFirer + HasAdaptiveSerializer + HasEventManagerId,
     SP: ShMemProvider + 'static,
 {
     #[cfg(feature = "llmp_compression")]
