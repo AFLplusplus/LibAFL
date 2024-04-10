@@ -7,21 +7,10 @@ const DEFAULT_SNAP_MODE: bool = true;
 
 #[derive(Debug, Clone, Copy, TypedBuilder)]
 pub struct NyxSettings {
-    /// The CPU core for the Nyx process.
-    ///
-    /// Depending on the value of `parent_cpu_id`, the created Nyx process
-    /// will be one of the following types:
-    /// * Standalone: `parent_cpu_id.is_none()`.
-    /// * Parent: `parent_cpu_id.is_some_and(|parent_cpu_id| parent_cpu_id == cpu_id)`.
-    /// * Child: `parent_cpu_id.is_some_and(|parent_cpu_id| parent_cpu_id != cpu_id)`.
-    pub cpu_id: u32,
-
-    /// The CPU core for the Nyx parent process. The parent process
-    /// creates the fuzzing snapshot that can then be used by the child
-    /// processes.
-    ///
-    /// Not specifying this will start the Nyx process in standalone mode.
-    pub parent_cpu_id: Option<u32>,
+    /// The CPU core for the Nyx process. The first created process will
+    /// automatically be the parent process, i.e. the process that creates
+    /// the fuzzing snapshot to then be also used by the child processes.
+    pub cpu_id: usize,
 
     /// Reload the VM by using the fuzzing snapshot. You probably want
     /// this to be `true`.
