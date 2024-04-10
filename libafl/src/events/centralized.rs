@@ -10,8 +10,6 @@
 use alloc::{boxed::Box, string::String, vec::Vec};
 use core::{marker::PhantomData, num::NonZeroUsize, time::Duration};
 
-#[cfg(feature = "adaptive_serialization")]
-use libafl_bolts::current_time;
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{
     compress::GzipCompressor,
