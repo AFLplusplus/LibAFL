@@ -299,7 +299,11 @@ pub fn build(
             "Configure didn't finish successfully"
         );
         let mut cmd = Command::new("make");
-        cmd.current_dir(&build_dir).arg("-j");
+        cmd.current_dir(&build_dir)
+            .env("__LIBAFL_QEMU_BUILD_OUT", build_dir.join("linkinfo.json"))
+            .env("__LIBAFL_QEMU_BUILD_CC", cc_compiler.path())
+            .env("__LIBAFL_QEMU_BUILD_CXX", cpp_compiler.path())
+            .arg("-j");
 
         if let Some(j) = jobs {
             cmd.arg(&format!("{j}")).env("V", "1");
