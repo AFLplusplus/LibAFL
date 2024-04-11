@@ -45,13 +45,14 @@ use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
 use super::{hooks::EventManagerHooksTuple, CustomBufEventResult, CustomBufHandlerFn};
+#[cfg(feature = "std")]
+use crate::events::AdaptiveSerializer;
 #[cfg(all(unix, feature = "std"))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
     events::{
         BrokerEventResult, Event, EventConfig, EventFirer, EventManager, EventManagerId,
-        EventProcessor, EventRestarter, HasAdaptiveSerializer, HasCustomBufHandlers,
-        HasEventManagerId, ProgressReporter,
+        EventProcessor, EventRestarter, HasCustomBufHandlers, HasEventManagerId, ProgressReporter,
     },
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
@@ -364,7 +365,7 @@ where
 }
 
 #[cfg(feature = "adaptive_serialization")]
-impl<EMH, S, SP> HasAdaptiveSerializer for LlmpEventManager<EMH, S, SP>
+impl<EMH, S, SP> AdaptiveSerializer for LlmpEventManager<EMH, S, SP>
 where
     SP: ShMemProvider + 'static,
     S: State,
@@ -927,7 +928,7 @@ where
 }
 
 #[cfg(all(feature = "std", feature = "adaptive_serialization"))]
-impl<EMH, S, SP> HasAdaptiveSerializer for LlmpRestartingEventManager<EMH, S, SP>
+impl<EMH, S, SP> AdaptiveSerializer for LlmpRestartingEventManager<EMH, S, SP>
 where
     SP: ShMemProvider + 'static,
     S: State,
@@ -960,7 +961,7 @@ where
 }
 
 #[cfg(all(feature = "std", not(feature = "adaptive_serialization")))]
-impl<EMH, S, SP> HasAdaptiveSerializer for LlmpRestartingEventManager<EMH, S, SP>
+impl<EMH, S, SP> AdaptiveSerializer for LlmpRestartingEventManager<EMH, S, SP>
 where
     SP: ShMemProvider + 'static,
     S: State,

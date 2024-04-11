@@ -854,11 +854,11 @@ where
 
 /// Collected stats to decide if observers must be serialized or not
 #[cfg(not(feature = "adaptive_serialization"))]
-pub trait HasAdaptiveSerializer {}
+pub trait AdaptiveSerializer {}
 
 /// Collected stats to decide if observers must be serialized or not
 #[cfg(feature = "adaptive_serialization")]
-pub trait HasAdaptiveSerializer {
+pub trait AdaptiveSerializer {
     /// Expose the collected observers serialization time
     fn serialization_time(&self) -> Duration;
     /// Expose the collected observers deserialization time
