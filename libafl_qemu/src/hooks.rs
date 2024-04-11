@@ -17,7 +17,7 @@ use libafl::{
     inputs::UsesInput,
     state::NopState,
 };
-use libafl_qemu_sys::{FatPtr, GuestAddr, GuestUsize};
+use libafl_qemu_sys::{CPUArchStatePtr, FatPtr, GuestAddr, GuestUsize};
 
 pub use crate::emu::SyscallHookResult;
 use crate::{
@@ -255,7 +255,7 @@ macro_rules! create_exec_wrapper {
 static mut GENERIC_HOOKS: Vec<Pin<Box<(InstructionHookId, FatPtr)>>> = vec![];
 create_wrapper!(generic, (pc: GuestAddr));
 static mut BACKDOOR_HOOKS: Vec<Pin<Box<(BackdoorHookId, FatPtr)>>> = vec![];
-create_wrapper!(backdoor, (pc: GuestAddr));
+create_wrapper!(backdoor, (cpu: CPUArchStatePtr, pc: GuestAddr));
 
 #[cfg(emulation_mode = "usermode")]
 static mut PRE_SYSCALL_HOOKS: Vec<Pin<Box<(PreSyscallHookId, FatPtr)>>> = vec![];
@@ -987,9 +987,9 @@ where
     pub fn backdoor(
         &self,
         hook: Hook<
-            fn(&mut Self, Option<&mut S>, GuestAddr),
+            fn(&mut Self, Option<&mut S>, cpu: CPUArchStatePtr, GuestAddr),
             Box<dyn for<'a> FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr)>,
-            extern "C" fn(*const (), pc: GuestAddr),
+            extern "C" fn(*const (), cpu: CPUArchStatePtr, pc: GuestAddr),
         >,
     ) -> BackdoorHookId {
         match hook {
@@ -1005,7 +1005,7 @@ where
 
     pub fn backdoor_function(
         &self,
-        hook: fn(&mut Self, Option<&mut S>, pc: GuestAddr),
+        hook: fn(&mut Self, Option<&mut S>, cpu: CPUArchStatePtr, pc: GuestAddr),
     ) -> BackdoorHookId {
         unsafe {
             self.qemu
