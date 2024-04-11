@@ -1,4 +1,8 @@
-use std::{io::Read, marker::PhantomData, os::fd::AsRawFd};
+use std::{
+    io::{Read, Seek},
+    marker::PhantomData,
+    os::fd::AsRawFd,
+};
 
 use libafl::{
     executors::{Executor, ExitKind, HasObservers},
@@ -108,6 +112,7 @@ where
 
         if self.observers.observes_stdout() {
             let mut stdout = Vec::new();
+            self.helper.nyx_stdout.rewind()?;
             self.helper
                 .nyx_stdout
                 .read_to_end(&mut stdout)
