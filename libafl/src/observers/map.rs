@@ -80,6 +80,73 @@ fn hash_slice<T>(slice: &[T]) -> u64 {
     hasher.finish()
 }
 
+/// Hint to the map feedback as to whether this observer's indices and novelties should be tracked.
+///
+/// If you get a type constraint failure for your map due to this type being unfulfilled, you must
+/// call [`TrackingHint::with_tracking`] **at the initialisation site of your map**.
+///
+/// For example, if you are using [`crate::schedulers::MinimizerScheduler`]:
+/// ```
+/// # use libafl::corpus::InMemoryCorpus;
+/// # use libafl::feedbacks::Feedback;
+/// use libafl::feedbacks::MaxMapFeedback;
+/// # use libafl::inputs::BytesInput;
+/// use libafl::observers::{StdMapObserver, TrackingHint};
+/// use libafl::schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler};
+/// # use libafl::state::StdState;
+///
+/// use libafl_bolts::ownedref::OwnedMutSlice;
+/// # use libafl_bolts::rands::StdRand;
+///
+/// // initialise your map as necessary
+/// let edges_observer = StdMapObserver::from_ownedref("edges", OwnedMutSlice::from(vec![0u8; 16]));
+/// // inform the feedback to track indices (required by IndexesLenTimeMinimizerScheduler), but not novelties
+/// let edges_observer = edges_observer.with_tracking::<true, false>();
+///
+/// // init the feedback
+/// let mut feedback = MaxMapFeedback::new(&edges_observer);
+///
+/// // init the state
+/// # let mut state = StdState::new(
+/// #     StdRand::with_seed(0),
+/// #     InMemoryCorpus::<BytesInput>::new(),
+/// #     InMemoryCorpus::new(),
+/// #     &mut feedback,
+/// #     &mut ()
+/// # ).unwrap();
+/// # feedback.init_state(&mut state).unwrap();
+///
+/// let scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
+/// # scheduler.cull(&state).unwrap();
+/// ```
+///
+/// [`MapObserver`] implementors: see [`StdMapObserver`] for an example implementation.
+pub trait TrackingHint<const INDICES: bool, const NOVELTIES: bool>: TrackingHinted {
+    /// The resulting type, including the new tracking hints, after calling
+    /// [`TrackingHint::with_tracking`].
+    type Output<const NEW_INDICES: bool, const NEW_NOVELTIES: bool>: TrackingHint<
+        NEW_INDICES,
+        NEW_NOVELTIES,
+    >;
+
+    /// Make this map observer into one with the provided tracking hints.
+    fn with_tracking<const NEW_INDICES: bool, const NEW_NOVELTIES: bool>(
+        self,
+    ) -> Self::Output<NEW_INDICES, NEW_NOVELTIES>;
+}
+
+/// Trait marker which indicates that this [`MapObserver`] includes a sane implementation of
+/// [`TrackingHint`]. Implementors of feedbacks similar to [`MapFeedback`] may wish to use this to
+/// ensure that edge metadata is recorded as is appropriate for the provided observer.
+///
+/// [`MapObserver`] implementors: see [`StdMapObserver`] for an example implementation.
+pub trait TrackingHinted {
+    /// Whether indices should be tracked for this [`MapObserver`].
+    const INDICES: bool;
+    /// Whether novelties should be tracked for this [`MapObserver`].
+    const NOVELTIES: bool;
+}
+
 /// A [`MapObserver`] observes the static map, as oftentimes used for AFL-like coverage information
 ///
 /// TODO: enforce `iter() -> AssociatedTypeIter` when generic associated types stabilize
@@ -182,7 +249,7 @@ where
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
 #[allow(clippy::unsafe_derive_deserialize)]
-pub struct StdMapObserver<'a, T, const DIFFERENTIAL: bool>
+pub struct StdMapObserver<'a, T, const DIFFERENTIAL: bool, const ITH: bool, const NTH: bool>
 where
     T: Default + Copy + 'static + Serialize,
 {
@@ -191,7 +258,8 @@ where
     name: String,
 }
 
-impl<'a, S, T> Observer<S> for StdMapObserver<'a, T, false>
+impl<'a, S, T, const ITH: bool, const NTH: bool> Observer<S>
+    for StdMapObserver<'a, T, false, ITH, NTH>
 where
     S: UsesInput,
     T: Bounded
@@ -209,7 +277,8 @@ where
     }
 }
 
-impl<'a, S, T> Observer<S> for StdMapObserver<'a, T, true>
+impl<'a, S, T, const ITH: bool, const NTH: bool> Observer<S>
+    for StdMapObserver<'a, T, true, ITH, NTH>
 where
     S: UsesInput,
     T: Bounded
@@ -223,7 +292,8 @@ where
 {
 }
 
-impl<'a, T, const DIFFERENTIAL: bool> Named for StdMapObserver<'a, T, DIFFERENTIAL>
+impl<'a, T, const DIFFERENTIAL: bool, const ITH: bool, const NTH: bool> Named
+    for StdMapObserver<'a, T, DIFFERENTIAL, ITH, NTH>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
@@ -233,7 +303,8 @@ where
     }
 }
 
-impl<'a, T, const DIFFERENTIAL: bool> HasLen for StdMapObserver<'a, T, DIFFERENTIAL>
+impl<'a, T, const DIFFERENTIAL: bool, const ITH: bool, const NTH: bool> HasLen
+    for StdMapObserver<'a, T, DIFFERENTIAL, ITH, NTH>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
@@ -243,7 +314,8 @@ where
     }
 }
 
-impl<'a, 'it, T, const DIFFERENTIAL: bool> AsIter<'it> for StdMapObserver<'a, T, DIFFERENTIAL>
+impl<'a, 'it, T, const DIFFERENTIAL: bool, const ITH: bool, const NTH: bool> AsIter<'it>
+    for StdMapObserver<'a, T, DIFFERENTIAL, ITH, NTH>
 where
     T: Bounded
         + PartialEq
@@ -263,7 +335,8 @@ where
     }
 }
 
-impl<'a, 'it, T, const DIFFERENTIAL: bool> AsIterMut<'it> for StdMapObserver<'a, T, DIFFERENTIAL>
+impl<'a, 'it, T, const DIFFERENTIAL: bool, const ITH: bool, const NTH: bool> AsIterMut<'it>
+    for StdMapObserver<'a, T, DIFFERENTIAL, ITH, NTH>
 where
     T: Bounded
         + PartialEq
@@ -283,7 +356,8 @@ where
     }
 }
 
-impl<'a, 'it, T, const DIFFERENTIAL: bool> IntoIterator for &'it StdMapObserver<'a, T, DIFFERENTIAL>
+impl<'a, 'it, T, const DIFFERENTIAL: bool, const ITH: bool, const NTH: bool> IntoIterator
+    for &'it StdMapObserver<'a, T, DIFFERENTIAL, ITH, NTH>
 where
     T: Bounded
         + PartialEq
@@ -303,8 +377,8 @@ where
     }
 }
 
-impl<'a, 'it, T, const DIFFERENTIAL: bool> IntoIterator
-    for &'it mut StdMapObserver<'a, T, DIFFERENTIAL>
+impl<'a, 'it, T, const DIFFERENTIAL: bool, const ITH: bool, const NTH: bool> IntoIterator
+    for &'it mut StdMapObserver<'a, T, DIFFERENTIAL, ITH, NTH>
 where
     T: Bounded
         + PartialEq
@@ -324,7 +398,8 @@ where
     }
 }
 
-impl<'a, T, const DIFFERENTIAL: bool> StdMapObserver<'a, T, DIFFERENTIAL>
+impl<'a, T, const DIFFERENTIAL: bool, const ITH: bool, const NTH: bool>
+    StdMapObserver<'a, T, DIFFERENTIAL, ITH, NTH>
 where
     T: Bounded
         + PartialEq
@@ -346,7 +421,8 @@ where
     }
 }
 
-impl<'a, T, const DIFFERENTIAL: bool> MapObserver for StdMapObserver<'a, T, DIFFERENTIAL>
+impl<'a, T, const DIFFERENTIAL: bool, const ITH: bool, const NTH: bool> MapObserver
+    for StdMapObserver<'a, T, DIFFERENTIAL, ITH, NTH>
 where
     T: Bounded
         + PartialEq
@@ -428,7 +504,8 @@ where
     }
 }
 
-impl<'a, T, const DIFFERENTIAL: bool> Truncate for StdMapObserver<'a, T, DIFFERENTIAL>
+impl<'a, T, const DIFFERENTIAL: bool, const ITH: bool, const NTH: bool> Truncate
+    for StdMapObserver<'a, T, DIFFERENTIAL, ITH, NTH>
 where
     T: Bounded
         + PartialEq
@@ -444,7 +521,8 @@ where
     }
 }
 
-impl<'a, T, const DIFFERENTIAL: bool> AsSlice for StdMapObserver<'a, T, DIFFERENTIAL>
+impl<'a, T, const DIFFERENTIAL: bool, const ITH: bool, const NTH: bool> AsSlice
+    for StdMapObserver<'a, T, DIFFERENTIAL, ITH, NTH>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
@@ -455,7 +533,8 @@ where
         self.map.as_slice()
     }
 }
-impl<'a, T, const DIFFERENTIAL: bool> AsMutSlice for StdMapObserver<'a, T, DIFFERENTIAL>
+impl<'a, T, const DIFFERENTIAL: bool, const ITH: bool, const NTH: bool> AsMutSlice
+    for StdMapObserver<'a, T, DIFFERENTIAL, ITH, NTH>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
@@ -467,7 +546,7 @@ where
     }
 }
 
-impl<'a, T, const DIFFERENTIAL: bool> StdMapObserver<'a, T, DIFFERENTIAL>
+impl<'a, T, const DIFFERENTIAL: bool> StdMapObserver<'a, T, DIFFERENTIAL, false, false>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
@@ -558,7 +637,7 @@ where
     }
 }
 
-impl<'a, T> StdMapObserver<'a, T, false>
+impl<'a, T> StdMapObserver<'a, T, false, false, false>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
@@ -616,7 +695,7 @@ where
     }
 }
 
-impl<'a, T> StdMapObserver<'a, T, true>
+impl<'a, T> StdMapObserver<'a, T, true, false, false>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
@@ -666,7 +745,8 @@ where
     }
 }
 
-impl<'a, OTA, OTB, S, T> DifferentialObserver<OTA, OTB, S> for StdMapObserver<'a, T, true>
+impl<'a, OTA, OTB, S, T, const ITH: bool, const NTH: bool> DifferentialObserver<OTA, OTB, S>
+    for StdMapObserver<'a, T, true, ITH, NTH>
 where
     OTA: ObserversTuple<S>,
     OTB: ObserversTuple<S>,
@@ -680,6 +760,34 @@ where
         + serde::de::DeserializeOwned
         + Debug,
 {
+}
+
+impl<'a, T, const DIFFERENTIAL: bool, const ITH: bool, const NTH: bool> TrackingHinted
+    for StdMapObserver<'a, T, DIFFERENTIAL, ITH, NTH>
+where
+    T: Copy + Default + Serialize,
+{
+    const INDICES: bool = ITH;
+    const NOVELTIES: bool = NTH;
+}
+
+impl<'a, T, const DIFFERENTIAL: bool, const ITH: bool, const NTH: bool> TrackingHint<ITH, NTH>
+    for StdMapObserver<'a, T, DIFFERENTIAL, ITH, NTH>
+where
+    T: Default + Copy + Serialize,
+{
+    type Output<const NEW_INDICES: bool, const NEW_NOVELTIES: bool> =
+        StdMapObserver<'a, T, DIFFERENTIAL, NEW_INDICES, NEW_NOVELTIES>;
+
+    fn with_tracking<const NEW_INDICES: bool, const NEW_NOVELTIES: bool>(
+        self,
+    ) -> Self::Output<NEW_INDICES, NEW_NOVELTIES> {
+        StdMapObserver::<'a, T, DIFFERENTIAL, NEW_INDICES, NEW_NOVELTIES> {
+            map: self.map,
+            initial: self.initial,
+            name: self.name,
+        }
+    }
 }
 
 /// Use a const size to speedup `Feedback::is_interesting` when the user can

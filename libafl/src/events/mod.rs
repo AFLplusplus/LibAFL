@@ -973,7 +973,7 @@ mod tests {
                 executions: _,
                 forward_id: _,
             } => {
-                let o: tuple_list_type!(StdMapObserver::<u32, false>) =
+                let o: tuple_list_type!(StdMapObserver::<u32, false, false, false>) =
                     postcard::from_bytes(observers_buf.as_ref().unwrap()).unwrap();
                 assert_eq!("test", o.0.name());
             }

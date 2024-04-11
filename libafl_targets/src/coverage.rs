@@ -97,7 +97,7 @@ pub unsafe fn edges_map_mut_slice<'a>() -> OwnedMutSlice<'a, u8> {
 ///
 /// # Safety
 /// This will dereference [`edges_map_mut_ptr`] and crash if it is not a valid address.
-pub unsafe fn std_edges_map_observer<'a, S>(name: S) -> StdMapObserver<'a, u8, false>
+pub unsafe fn std_edges_map_observer<'a, S>(name: S) -> StdMapObserver<'a, u8, false, false, false>
 where
     S: Into<String>,
 {
