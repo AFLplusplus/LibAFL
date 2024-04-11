@@ -45,7 +45,7 @@ use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
 use super::{hooks::EventManagerHooksTuple, CustomBufEventResult, CustomBufHandlerFn};
-#[cfg(feature = "adaptive_serialization")]
+#[cfg(any(feature = "std", feature = "adaptive_serialization"))]
 use crate::events::AdaptiveSerializer;
 #[cfg(all(unix, feature = "std"))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
