@@ -25,7 +25,7 @@ use crate::{
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{CanTrack, MapObserver, Observer, ObserversTuple, UsesObserver},
     state::State,
-    Error, HasMetadata, HasNamedMetadata, 
+    Error, HasMetadata, HasNamedMetadata,
 };
 
 /// A [`MapFeedback`] that implements the AFL algorithm using an [`OrReducer`] combining the bits for the history map and the bit from [`HitcountsMapObserver`].
