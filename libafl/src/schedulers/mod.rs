@@ -66,7 +66,7 @@ where
 }
 
 /// Defines the common metadata operations for the AFL-style schedulers
-pub trait HasAFLSchedulerMetadata<O, S>: Scheduler
+pub trait AflScheduler<O, S>: Scheduler
 where
     Self::State: HasCorpus + HasMetadata + HasTestcase,
     O: MapObserver,
