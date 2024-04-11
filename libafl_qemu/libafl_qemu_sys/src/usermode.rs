@@ -1,10 +1,8 @@
-use core::ffi::c_void;
-
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use paste::paste;
 use strum_macros::EnumIter;
 
-use crate::{extern_c_checked, GuestAddr, MapInfo};
+use crate::{extern_c_checked, GuestAddr};
 
 extern_c_checked! {
     pub fn qemu_user_init(argc: i32, argv: *const *const u8, envp: *const *const u8) -> i32;
@@ -14,12 +12,6 @@ extern_c_checked! {
     pub fn libafl_load_addr() -> u64;
     pub fn libafl_get_brk() -> u64;
     pub fn libafl_set_brk(brk: u64) -> u64;
-
-    pub fn read_self_maps() -> *const c_void;
-    pub fn free_self_maps(map_info: *const c_void);
-
-    pub fn libafl_maps_first(root: *const c_void) -> *const c_void;
-    pub fn libafl_maps_next(node: *const c_void, ret: *mut MapInfo, is_root: bool) -> *const c_void;
 
     pub static exec_path: *const u8;
     pub static guest_base: usize;

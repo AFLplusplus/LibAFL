@@ -127,9 +127,36 @@ pub struct MapInfo {
     start: GuestAddr,
     end: GuestAddr,
     offset: GuestAddr,
-    path: *const u8,
+    path: Option<String>,
     flags: i32,
     is_priv: i32,
+}
+
+impl From<libafl_mapinfo> for MapInfo {
+    fn from(map_info: libafl_mapinfo) -> Self {
+        let path: Option<String> = if map_info.path.is_null() {
+            None
+        } else {
+            unsafe {
+                Some(
+                    from_utf8_unchecked(from_raw_parts(
+                        map_info.path as *const u8,
+                        strlen(map_info.path as *const u8),
+                    ))
+                    .to_string(),
+                )
+            }
+        };
+
+        MapInfo {
+            start: map_info.start,
+            end: map_info.end,
+            offset: map_info.offset,
+            path,
+            flags: map_info.flags,
+            is_priv: map_info.is_priv,
+        }
+    }
 }
 
 #[repr(C)]
@@ -227,17 +254,8 @@ impl MapInfo {
     }
 
     #[must_use]
-    pub fn path(&self) -> Option<&str> {
-        if self.path.is_null() {
-            None
-        } else {
-            unsafe {
-                Some(from_utf8_unchecked(from_raw_parts(
-                    self.path,
-                    strlen(self.path),
-                )))
-            }
-        }
+    pub fn path(&self) -> Option<&String> {
+        self.path.as_ref()
     }
 
     #[must_use]
