@@ -2,7 +2,7 @@
 use std::{fmt::Debug, fs::File, path::Path};
 
 use libafl::Error;
-use libnyx::{NyxConfig, NyxProcess};
+use libnyx::{NyxConfig, NyxProcess, NyxProcessRole};
 
 use crate::settings::NyxSettings;
 
@@ -39,9 +39,16 @@ impl NyxHelper {
         let mut nyx_config = NyxConfig::load(share_dir_str).map_err(|e| {
             Error::illegal_argument(format!("Failed to load Nyx config from share dir: {e}"))
         })?;
+        nyx_config.set_input_buffer_size(settings.input_buffer_size);
+        nyx_config.set_process_role(match settings.parent_cpu_id {
+            None => NyxProcessRole::StandAlone,
+            Some(parent_cpu_id) if parent_cpu_id == settings.cpu_id => NyxProcessRole::Parent,
+            _ => NyxProcessRole::Child,
+        });
+        nyx_config.set_worker_id(settings.cpu_id);
+
         let mut nyx_process = NyxProcess::new(&mut nyx_config, settings.cpu_id)
             .map_err(|e| Error::illegal_state(format!("Failed to create Nyx process: {e}")))?;
-
         nyx_process.option_set_reload_mode(settings.snap_mode);
         nyx_process.option_set_timeout(settings.timeout_secs, settings.timeout_micro_secs);
         nyx_process.option_apply();
