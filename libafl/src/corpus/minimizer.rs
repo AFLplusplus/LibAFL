@@ -49,16 +49,16 @@ where
 ///
 /// Algorithm based on WMOPT: <https://hexhive.epfl.ch/publications/files/21ISSTA2.pdf>
 #[derive(Debug)]
-pub struct MapCorpusMinimizer<E, O, T, TS, A> {
+pub struct MapCorpusMinimizer<A, E, O, T, TS> {
     obs_name: String,
-    phantom: PhantomData<(E, O, T, TS, A)>,
+    phantom: PhantomData<(A, E, O, T, TS)>,
 }
 
 /// Standard corpus minimizer, which weights inputs by length and time.
-pub type StdCorpusMinimizer<E, O, T, A> =
-    MapCorpusMinimizer<E, O, T, LenTimeMulTestcaseScore<<E as UsesState>::State>, A>;
+pub type StdCorpusMinimizer<A, E, O, T> =
+    MapCorpusMinimizer<A, E, O, T, LenTimeMulTestcaseScore<<E as UsesState>::State>>;
 
-impl<E, O, T, TS, A> MapCorpusMinimizer<E, O, T, TS, A>
+impl<A, E, O, T, TS> MapCorpusMinimizer<A, E, O, T, TS>
 where
     E: UsesState,
     E::State: HasCorpus + HasMetadata,
@@ -75,7 +75,7 @@ where
     }
 }
 
-impl<E, O, T, TS, A> CorpusMinimizer<E> for MapCorpusMinimizer<E, O, T, TS, A>
+impl<A, E, O, T, TS> CorpusMinimizer<E> for MapCorpusMinimizer<A, E, O, T, TS>
 where
     E: UsesState,
     for<'a> O: MapObserver<Entry = T> + AsIter<'a, Item = T>,

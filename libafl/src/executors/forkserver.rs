@@ -636,7 +636,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
 
     /// Builds `ForkserverExecutor` downsizing the coverage map to fit exaclty the AFL++ map size.
     #[allow(clippy::pedantic)]
-    pub fn build_dynamic_map<MO, OT, S, A>(
+    pub fn build_dynamic_map<A, MO, OT, S>(
         &mut self,
         mut map_observer: A,
         other_observers: OT,

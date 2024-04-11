@@ -290,11 +290,11 @@ pub mod macros {
     /// # use libafl::require_index_tracking;
     /// # use core::marker::PhantomData;
     /// #
-    /// # struct MyCustomScheduler<O, A> {
-    /// #     phantom: PhantomData<(O, A)>,
+    /// # struct MyCustomScheduler<A, O> {
+    /// #     phantom: PhantomData<(A, O)>,
     /// # }
     /// #
-    /// impl<O, A> MyCustomScheduler<O, A> where O: MapObserver, A: AsRef<O> + CanTrack {
+    /// impl<A, O> MyCustomScheduler<A, O> where O: MapObserver, A: AsRef<O> + CanTrack {
     ///     pub fn new(obs: &A) -> Self {
     ///         require_index_tracking!("MyCustomScheduler", A);
     ///         todo!("Construct your type")
@@ -353,11 +353,11 @@ pub mod macros {
     /// # use libafl::require_novelties_tracking;
     /// # use core::marker::PhantomData;
     /// #
-    /// # struct MyCustomScheduler<O, A> {
+    /// # struct MyCustomScheduler<A, O> {
     /// #     phantom: PhantomData<(O, A)>,
     /// # }
     /// #
-    /// impl<O, A> MyCustomScheduler<O, A> where O: MapObserver, A: AsRef<O> + CanTrack {
+    /// impl<A, O> MyCustomScheduler<A, O> where O: MapObserver, A: AsRef<O> + CanTrack {
     ///     pub fn new(obs: &A) -> Self {
     ///         require_novelties_tracking!("MyCustomScheduler", A);
     ///         todo!("Construct your type")

@@ -64,7 +64,7 @@ impl UnstableEntriesMetadata {
 
 /// The calibration stage will measure the average exec time and the target's stability for this input.
 #[derive(Clone, Debug)]
-pub struct CalibrationStage<O, OT, S, A> {
+pub struct CalibrationStage<A, O, OT, S> {
     map_observer_name: String,
     map_name: String,
     stage_max: usize,
@@ -77,14 +77,14 @@ pub struct CalibrationStage<O, OT, S, A> {
 const CAL_STAGE_START: usize = 4; // AFL++'s CAL_CYCLES_FAST + 1
 const CAL_STAGE_MAX: usize = 8; // AFL++'s CAL_CYCLES + 1
 
-impl<O, OT, S, A> UsesState for CalibrationStage<O, OT, S, A>
+impl<A, O, OT, S> UsesState for CalibrationStage<A, O, OT, S>
 where
     S: State,
 {
     type State = S;
 }
 
-impl<E, EM, O, OT, Z, A> Stage<E, EM, Z> for CalibrationStage<O, OT, E::State, A>
+impl<A, E, EM, O, OT, Z> Stage<E, EM, Z> for CalibrationStage<A, O, OT, E::State>
 where
     E: Executor<EM, Z> + HasObservers<Observers = OT>,
     EM: EventFirer<State = E::State>,
@@ -339,7 +339,7 @@ where
     }
 }
 
-impl<O, OT, S, A> CalibrationStage<O, OT, S, A>
+impl<A, O, OT, S> CalibrationStage<A, O, OT, S>
 where
     O: MapObserver,
     A: AsRef<O>,

@@ -42,19 +42,19 @@ fn find_next_char(list: &[Option<u8>], mut idx: usize, ch: u8) -> usize {
 
 /// A stage that runs a tracer executor
 #[derive(Clone, Debug)]
-pub struct GeneralizationStage<EM, O, OT, Z, A> {
+pub struct GeneralizationStage<A, EM, O, OT, Z> {
     map_observer_name: String,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(EM, O, OT, Z, A)>,
 }
 
-impl<EM, O, OT, Z, A> Named for GeneralizationStage<EM, O, OT, Z, A> {
+impl<A, EM, O, OT, Z> Named for GeneralizationStage<A, EM, O, OT, Z> {
     fn name(&self) -> &str {
         "GeneralizationStage"
     }
 }
 
-impl<EM, O, OT, Z, A> UsesState for GeneralizationStage<EM, O, OT, Z, A>
+impl<A, EM, O, OT, Z> UsesState for GeneralizationStage<A, EM, O, OT, Z>
 where
     EM: UsesState,
     EM::State: UsesInput<Input = BytesInput>,
@@ -62,7 +62,7 @@ where
     type State = EM::State;
 }
 
-impl<E, EM, O, Z, A> Stage<E, EM, Z> for GeneralizationStage<EM, O, E::Observers, Z, A>
+impl<A, E, EM, O, Z> Stage<E, EM, Z> for GeneralizationStage<A, EM, O, E::Observers, Z>
 where
     O: MapObserver,
     A: AsRef<O> + CanTrack,
@@ -333,7 +333,7 @@ where
     }
 }
 
-impl<EM, O, OT, Z, A> GeneralizationStage<EM, O, OT, Z, A>
+impl<A, EM, O, OT, Z> GeneralizationStage<A, EM, O, OT, Z>
 where
     EM: UsesState,
     O: MapObserver,

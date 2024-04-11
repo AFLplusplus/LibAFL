@@ -54,20 +54,20 @@ impl Ord for Earlier {
 
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
-pub struct ColorizationStage<EM, O, E, Z, A> {
+pub struct ColorizationStage<A, E, EM, O, Z> {
     map_observer_name: String,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(EM, O, E, Z, A)>,
+    phantom: PhantomData<(A, E, EM, O, E, Z)>,
 }
 
-impl<EM, O, E, Z, A> UsesState for ColorizationStage<EM, O, E, Z, A>
+impl<A, E, EM, O, Z> UsesState for ColorizationStage<A, E, EM, O, Z>
 where
     E: UsesState,
 {
     type State = E::State;
 }
 
-impl<EM, O, E, Z, A> Named for ColorizationStage<EM, O, E, Z, A>
+impl<A, E, EM, O, Z> Named for ColorizationStage<A, E, EM, O, Z>
 where
     E: UsesState,
 {
@@ -76,7 +76,7 @@ where
     }
 }
 
-impl<E, EM, O, Z, A> Stage<E, EM, Z> for ColorizationStage<EM, O, E, Z, A>
+impl<A, E, EM, O, Z> Stage<E, EM, Z> for ColorizationStage<A, E, EM, O, Z>
 where
     EM: UsesState<State = E::State> + EventFirer,
     E: HasObservers + Executor<EM, Z>,
@@ -151,7 +151,7 @@ impl TaintMetadata {
 
 libafl_bolts::impl_serdeany!(TaintMetadata);
 
-impl<EM, O, E, Z, A> ColorizationStage<EM, O, E, Z, A>
+impl<A, E, EM, O, Z> ColorizationStage<A, E, EM, O, Z>
 where
     EM: UsesState<State = E::State> + EventFirer,
     O: MapObserver,
