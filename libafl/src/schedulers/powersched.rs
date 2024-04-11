@@ -185,7 +185,7 @@ where
     type State = S;
 }
 
-impl<O, S> RemovableScheduler for PowerQueueScheduler<O, S>
+impl<O, S, A> RemovableScheduler for PowerQueueScheduler<O, S, A>
 where
     S: State + HasTestcase + HasMetadata + HasCorpus,
     O: MapObserver,

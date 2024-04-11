@@ -92,7 +92,7 @@ libafl_bolts::impl_serdeany!(WeightedScheduleMetadata);
 
 /// A corpus scheduler using power schedules with weighted queue item selection algo.
 #[derive(Clone, Debug)]
-pub struct WeightedScheduler<F, O, S> {
+pub struct WeightedScheduler<F, O, S, A> {
     table_invalidated: bool,
     strat: Option<PowerSchedule>,
     map_observer_name: String,
@@ -226,7 +226,7 @@ where
     type State = S;
 }
 
-impl<F, O, S> RemovableScheduler for WeightedScheduler<F, O, S>
+impl<F, O, S, A> RemovableScheduler for WeightedScheduler<F, O, S, A>
 where
     F: TestcaseScore<S>,
     O: MapObserver,
