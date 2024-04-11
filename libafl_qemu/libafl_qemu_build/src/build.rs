@@ -8,7 +8,7 @@ use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "f1e48d694ca31045169853ca65b1a5a95e8746e9";
+const QEMU_REVISION: &str = "e99b9da6585504a8333f2846a61de487f94d3476";
 
 #[allow(clippy::module_name_repetitions)]
 pub struct BuildResult {
