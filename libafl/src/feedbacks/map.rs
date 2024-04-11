@@ -29,23 +29,23 @@ use crate::{
 };
 
 /// A [`MapFeedback`] that implements the AFL algorithm using an [`OrReducer`] combining the bits for the history map and the bit from [`HitcountsMapObserver`].
-pub type AflMapFeedback<O, S, T, A> = MapFeedback<DifferentIsNovel, O, OrReducer, S, T, A>;
+pub type AflMapFeedback<A, O, S, T> = MapFeedback<A, DifferentIsNovel, O, OrReducer, S, T>;
 
 /// A [`MapFeedback`] that strives to maximize the map contents.
-pub type MaxMapFeedback<O, S, T, A> = MapFeedback<DifferentIsNovel, O, MaxReducer, S, T, A>;
+pub type MaxMapFeedback<A, O, S, T> = MapFeedback<A, DifferentIsNovel, O, MaxReducer, S, T>;
 /// A [`MapFeedback`] that strives to minimize the map contents.
-pub type MinMapFeedback<O, S, T, A> = MapFeedback<DifferentIsNovel, O, MinReducer, S, T, A>;
+pub type MinMapFeedback<A, O, S, T> = MapFeedback<A, DifferentIsNovel, O, MinReducer, S, T>;
 
 /// A [`MapFeedback`] that always returns `true` for `is_interesting`. Useful for tracing all executions.
-pub type AlwaysInterestingMapFeedback<O, S, T, A> = MapFeedback<AllIsNovel, O, NopReducer, S, T, A>;
+pub type AlwaysInterestingMapFeedback<A, O, S, T> = MapFeedback<A, AllIsNovel, O, NopReducer, S, T>;
 
 /// A [`MapFeedback`] that strives to maximize the map contents,
 /// but only, if a value is larger than `pow2` of the previous.
-pub type MaxMapPow2Feedback<O, S, T, A> = MapFeedback<NextPow2IsNovel, O, MaxReducer, S, T, A>;
+pub type MaxMapPow2Feedback<A, O, S, T> = MapFeedback<A, NextPow2IsNovel, O, MaxReducer, S, T>;
 /// A [`MapFeedback`] that strives to maximize the map contents,
 /// but only, if a value is larger than `pow2` of the previous.
-pub type MaxMapOneOrFilledFeedback<O, S, T, A> =
-    MapFeedback<OneOrFilledIsNovel, O, MaxReducer, S, T, A>;
+pub type MaxMapOneOrFilledFeedback<A, O, S, T> =
+    MapFeedback<A, OneOrFilledIsNovel, O, MaxReducer, S, T>;
 
 /// A `Reducer` function is used to aggregate values for the novelty search
 pub trait Reducer<T>: 'static
@@ -383,7 +383,7 @@ where
 
 /// The most common AFL-like feedback type
 #[derive(Clone, Debug)]
-pub struct MapFeedback<N, O, R, S, T, A> {
+pub struct MapFeedback<A, N, O, R, S, T> {
     /// New indexes observed in the last observation
     novelties: Option<Vec<usize>>,
     /// Name identifier of this instance
@@ -393,10 +393,10 @@ pub struct MapFeedback<N, O, R, S, T, A> {
     /// Name of the feedback as shown in the `UserStats`
     stats_name: String,
     /// Phantom Data of Reducer
-    phantom: PhantomData<(N, O, R, S, T, A)>,
+    phantom: PhantomData<(A, N, O, R, S, T)>,
 }
 
-impl<N, O, R, S, T, A> UsesObserver<S> for MapFeedback<N, O, R, S, T, A>
+impl<A, N, O, R, S, T> UsesObserver<S> for MapFeedback<A, N, O, R, S, T>
 where
     S: UsesInput,
     A: AsRef<O> + Observer<S>,
@@ -404,7 +404,7 @@ where
     type Observer = A;
 }
 
-impl<N, O, R, S, T, A> Feedback<S> for MapFeedback<N, O, R, S, T, A>
+impl<A, N, O, R, S, T> Feedback<S> for MapFeedback<A, N, O, R, S, T>
 where
     N: IsNovel<T>,
     O: MapObserver<Entry = T> + for<'it> AsIter<'it, Item = T>,
@@ -549,7 +549,7 @@ where
 
 /// Specialize for the common coverage map size, maximization of u8s
 #[rustversion::nightly]
-impl<O, S, A> Feedback<S> for MapFeedback<DifferentIsNovel, O, MaxReducer, S, u8, A>
+impl<A, O, S> Feedback<S> for MapFeedback<A, DifferentIsNovel, O, MaxReducer, S, u8>
 where
     O: MapObserver<Entry = u8> + AsSlice<Entry = u8>,
     for<'it> O: AsIter<'it, Item = u8>,
@@ -669,14 +669,14 @@ where
     }
 }
 
-impl<N, O, R, S, T, A> Named for MapFeedback<N, O, R, S, T, A> {
+impl<A, N, O, R, S, T> Named for MapFeedback<A, N, O, R, S, T> {
     #[inline]
     fn name(&self) -> &str {
         self.name.as_str()
     }
 }
 
-impl<N, O, R, S, T, A> HasObserverName for MapFeedback<N, O, R, S, T, A>
+impl<A, N, O, R, S, T> HasObserverName for MapFeedback<A, N, O, R, S, T>
 where
     O: Named,
     A: AsRef<O>,
@@ -691,7 +691,7 @@ fn create_stats_name(name: &str) -> String {
     name.to_lowercase()
 }
 
-impl<N, O, R, S, T, A> MapFeedback<N, O, R, S, T, A>
+impl<A, N, O, R, S, T> MapFeedback<A, N, O, R, S, T>
 where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,

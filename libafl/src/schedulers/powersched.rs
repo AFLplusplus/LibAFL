@@ -171,21 +171,21 @@ pub enum PowerSchedule {
 /// Note that this corpus is merely holding the metadata necessary for the power calculation
 /// and here we DON'T actually calculate the power (we do it in the stage)
 #[derive(Clone, Debug)]
-pub struct PowerQueueScheduler<O, S, A> {
+pub struct PowerQueueScheduler<A, O, S> {
     strat: PowerSchedule,
     map_observer_name: String,
     last_hash: usize,
     phantom: PhantomData<(O, S, A)>,
 }
 
-impl<O, S, A> UsesState for PowerQueueScheduler<O, S, A>
+impl<A, O, S> UsesState for PowerQueueScheduler<A, O, S>
 where
     S: State,
 {
     type State = S;
 }
 
-impl<O, S, A> RemovableScheduler for PowerQueueScheduler<O, S, A>
+impl<A, O, S> RemovableScheduler for PowerQueueScheduler<A, O, S>
 where
     S: State + HasTestcase + HasMetadata + HasCorpus,
     O: MapObserver,
@@ -212,7 +212,7 @@ where
     }
 }
 
-impl<O, S, A> AflScheduler<O, S, A> for PowerQueueScheduler<O, S, A>
+impl<A, O, S> AflScheduler<A, O, S> for PowerQueueScheduler<A, O, S>
 where
     S: HasCorpus + HasMetadata + HasTestcase + State,
     O: MapObserver,
@@ -231,7 +231,7 @@ where
     }
 }
 
-impl<O, S, A> Scheduler for PowerQueueScheduler<O, S, A>
+impl<A, O, S> Scheduler for PowerQueueScheduler<A, O, S>
 where
     S: HasCorpus + HasMetadata + HasTestcase + State,
     O: MapObserver,
@@ -291,7 +291,7 @@ where
     }
 }
 
-impl<O, S, A> PowerQueueScheduler<O, S, A>
+impl<A, O, S> PowerQueueScheduler<A, O, S>
 where
     S: HasMetadata,
     O: MapObserver,

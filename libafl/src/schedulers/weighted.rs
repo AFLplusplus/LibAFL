@@ -1,4 +1,4 @@
-//! The queue corpus scheduler with weighted queue item selection from aflpp (`https://github.com/AFLplusplus/AFLplusplus/blob/1d4f1e48797c064ee71441ba555b29fc3f467983/src/afl-fuzz-queue.c#L32`)
+//! The queue corpus scheduler with weighted queue item selection [from AFL++](https://github.com/AFLplusplus/AFLplusplus/blob/1d4f1e48797c064ee71441ba555b29fc3f467983/src/afl-fuzz-queue.c#L32).
 //! This queue corpus scheduler needs calibration stage.
 
 use alloc::string::{String, ToString};
@@ -92,15 +92,15 @@ libafl_bolts::impl_serdeany!(WeightedScheduleMetadata);
 
 /// A corpus scheduler using power schedules with weighted queue item selection algo.
 #[derive(Clone, Debug)]
-pub struct WeightedScheduler<F, O, S, A> {
+pub struct WeightedScheduler<A, F, O, S> {
     table_invalidated: bool,
     strat: Option<PowerSchedule>,
     map_observer_name: String,
     last_hash: usize,
-    phantom: PhantomData<(F, O, S, A)>,
+    phantom: PhantomData<(A, F, O, S)>,
 }
 
-impl<F, O, S, A> WeightedScheduler<F, O, S, A>
+impl<A, F, O, S> WeightedScheduler<A, F, O, S>
 where
     F: TestcaseScore<S>,
     O: MapObserver,
@@ -219,14 +219,14 @@ where
     }
 }
 
-impl<F, O, S, A> UsesState for WeightedScheduler<F, O, S, A>
+impl<A, F, O, S> UsesState for WeightedScheduler<A, F, O, S>
 where
     S: State,
 {
     type State = S;
 }
 
-impl<F, O, S, A> RemovableScheduler for WeightedScheduler<F, O, S, A>
+impl<A, F, O, S> RemovableScheduler for WeightedScheduler<A, F, O, S>
 where
     F: TestcaseScore<S>,
     O: MapObserver,
@@ -256,7 +256,7 @@ where
     }
 }
 
-impl<F, O, S, A> AflScheduler<O, S, A> for WeightedScheduler<F, O, S, A>
+impl<A, F, O, S> AflScheduler<A, O, S> for WeightedScheduler<A, F, O, S>
 where
     F: TestcaseScore<S>,
     O: MapObserver,
@@ -276,7 +276,7 @@ where
     }
 }
 
-impl<F, O, S, A> Scheduler for WeightedScheduler<F, O, S, A>
+impl<A, F, O, S> Scheduler for WeightedScheduler<A, F, O, S>
 where
     F: TestcaseScore<S>,
     O: MapObserver,
@@ -360,5 +360,5 @@ where
     }
 }
 
-/// The standard corpus weight, same as aflpp
-pub type StdWeightedScheduler<O, S, A> = WeightedScheduler<CorpusWeightTestcaseScore<S>, O, S, A>;
+/// The standard corpus weight, same as in `AFL++`
+pub type StdWeightedScheduler<A, O, S> = WeightedScheduler<A, CorpusWeightTestcaseScore<S>, O, S>;
