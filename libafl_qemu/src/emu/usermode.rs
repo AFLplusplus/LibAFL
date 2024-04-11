@@ -53,11 +53,13 @@ impl Iterator for GuestMaps {
     fn next(&mut self) -> Option<Self::Item> {
         unsafe {
             let mut ret = MaybeUninit::uninit();
+
             self.maps_node = libafl_maps_next(self.maps_node, ret.as_mut_ptr());
-            if !self.maps_node.is_null() {
-                Some(ret.assume_init().into())
-            } else {
+
+            if self.maps_node.is_null() {
                 None
+            } else {
+                Some(ret.assume_init().into())
             }
         }
     }
