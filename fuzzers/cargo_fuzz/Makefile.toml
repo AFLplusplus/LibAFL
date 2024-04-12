@@ -6,6 +6,11 @@ script='''
 echo "Cargo-make not integrated yet on this"
 '''
 
+[tasks.install_llvm_tools]
+command = "rustup"
+args = ["toolchain", "install", "nightly", "--component", "llvm-tools-preview"]
+
+
 [tasks.install_cargo_fuzz]
 command = "cargo"
 args = ["install", "cargo-fuzz"]
@@ -14,7 +19,7 @@ args = ["install", "cargo-fuzz"]
 [tasks.build]
 command = "cargo"
 args = ["+nightly", "fuzz", "run", "fuzz_target_1"]
-dependencies = [ "install_cargo_fuzz"]
+dependencies = [ "install_cargo_fuzz", "install_llvm_tools"]
 
 [tasks.test]
 linux_alias = "test_unix"
