@@ -15,7 +15,7 @@ use crate::{
     Error, HasMetadata,
 };
 
-/// Metadata for `StdOutToMetadataFeedback`.
+/// Metadata for [`StdOutToMetadataFeedback`].
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StdOutMetadata {
     #[allow(missing_docs)]
@@ -114,7 +114,7 @@ impl StdOutToMetadataFeedback {
     }
 }
 
-/// Metadata for `StdErrToMetadataFeedback`.
+/// Metadata for [`StdErrToMetadataFeedback`].
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StdErrMetadata {
     #[allow(missing_docs)]
