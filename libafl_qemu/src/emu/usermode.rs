@@ -1,11 +1,11 @@
-use core::{ffi::c_void, mem::MaybeUninit, ptr::copy_nonoverlapping};
+use core::{mem::MaybeUninit, ptr::copy_nonoverlapping};
 use std::{cell::OnceCell, slice::from_raw_parts, str::from_utf8_unchecked};
 
 use libafl_qemu_sys::{
     exec_path, free_self_maps, guest_base, libafl_dump_core_hook, libafl_force_dfl, libafl_get_brk,
     libafl_load_addr, libafl_maps_first, libafl_maps_next, libafl_qemu_run, libafl_set_brk,
-    mmap_next_start, read_self_maps, strlen, GuestAddr, GuestUsize, MapInfo, MmapPerms,
-    VerifyAccess,
+    mmap_next_start, read_self_maps, strlen, GuestAddr, GuestUsize, IntervalTreeNode,
+    IntervalTreeRoot, MapInfo, MmapPerms, VerifyAccess,
 };
 use libc::c_int;
 #[cfg(feature = "python")]
@@ -27,8 +27,8 @@ pub enum HandlerError {
 
 #[cfg_attr(feature = "python", pyclass(unsendable))]
 pub struct GuestMaps {
-    maps_root: *const c_void,
-    maps_node: *const c_void,
+    maps_root: *mut IntervalTreeRoot,
+    maps_node: *mut IntervalTreeNode,
 }
 
 // Consider a private new only for Emulator
@@ -51,13 +51,16 @@ impl Iterator for GuestMaps {
 
     #[allow(clippy::uninit_assumed_init)]
     fn next(&mut self) -> Option<Self::Item> {
-        if self.maps_node.is_null() {
-            return None;
-        }
         unsafe {
             let mut ret = MaybeUninit::uninit();
-            self.maps_node = libafl_maps_next(self.maps_node, ret.as_mut_ptr(), false);
-            Some(ret.assume_init())
+
+            self.maps_node = libafl_maps_next(self.maps_node, ret.as_mut_ptr());
+
+            if self.maps_node.is_null() {
+                None
+            } else {
+                Some(ret.assume_init().into())
+            }
         }
     }
 }

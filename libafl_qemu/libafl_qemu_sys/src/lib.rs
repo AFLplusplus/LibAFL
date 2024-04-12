@@ -98,7 +98,7 @@ macro_rules! extern_c_checked {
 
 #[cfg(target_os = "linux")]
 use core::ops::BitAnd;
-use std::{ffi::c_void, slice::from_raw_parts, str::from_utf8_unchecked};
+use std::ffi::c_void;
 
 #[cfg(all(not(feature = "clippy"), target_os = "linux"))]
 pub use bindings::*;
@@ -127,7 +127,7 @@ pub struct MapInfo {
     start: GuestAddr,
     end: GuestAddr,
     offset: GuestAddr,
-    path: *const u8,
+    path: Option<String>,
     flags: i32,
     is_priv: i32,
 }
@@ -227,17 +227,8 @@ impl MapInfo {
     }
 
     #[must_use]
-    pub fn path(&self) -> Option<&str> {
-        if self.path.is_null() {
-            None
-        } else {
-            unsafe {
-                Some(from_utf8_unchecked(from_raw_parts(
-                    self.path,
-                    strlen(self.path),
-                )))
-            }
-        }
+    pub fn path(&self) -> Option<&String> {
+        self.path.as_ref()
     }
 
     #[must_use]

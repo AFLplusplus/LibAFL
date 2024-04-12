@@ -45,6 +45,9 @@ const WRAPPER_HEADER: &str = r#"
 #include "user/safe-syscall.h"
 #include "qemu/selfmap.h"
 #include "cpu_loop-common.h"
+#include "qemu/selfmap.h"
+
+#include "libafl/user.h"
 
 #else
 
@@ -55,8 +58,8 @@ const WRAPPER_HEADER: &str = r#"
 #include "sysemu/tcg.h"
 #include "sysemu/replay.h"
 
-#include "libafl_extras/syx-snapshot/device-save.h"
-#include "libafl_extras/syx-snapshot/syx-snapshot.h"
+#include "libafl/syx-snapshot/device-save.h"
+#include "libafl/syx-snapshot/syx-snapshot.h"
 
 #endif
 
@@ -76,9 +79,9 @@ const WRAPPER_HEADER: &str = r#"
 
 #include "qemu/plugin-memory.h"
 
-#include "libafl_extras/exit.h"
-#include "libafl_extras/hook.h"
-#include "libafl_extras/jit.h"
+#include "libafl/exit.h"
+#include "libafl/hook.h"
+#include "libafl/jit.h"
 
 "#;
 
@@ -142,6 +145,8 @@ pub fn generate(
         .allowlist_type("libafl_exit_reason_sync_backdoor")
         .allowlist_type("libafl_exit_reason_breakpoint")
         .allowlist_type("Syx.*")
+        .allowlist_type("libafl_mapinfo")
+        .allowlist_type("IntervalTreeRoot")
         .allowlist_function("qemu_user_init")
         .allowlist_function("target_mmap")
         .allowlist_function("target_mprotect")
@@ -159,6 +164,8 @@ pub fn generate(
         .allowlist_function("syx_.*")
         .allowlist_function("device_list_all")
         .allowlist_function("libafl_.*")
+        .allowlist_function("read_self_maps")
+        .allowlist_function("free_self_maps")
         .blocklist_function("main_loop_wait") // bindgen issue #1313
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()));
 
