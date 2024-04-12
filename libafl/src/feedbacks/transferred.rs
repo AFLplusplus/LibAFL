@@ -5,11 +5,8 @@ use libafl_bolts::{impl_serdeany, Error, Named};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    events::EventFirer,
-    executors::ExitKind,
-    feedbacks::Feedback,
-    observers::ObserversTuple,
-    state::{HasMetadata, State},
+    events::EventFirer, executors::ExitKind, feedbacks::Feedback, observers::ObserversTuple,
+    state::State, HasMetadata,
 };
 
 /// Constant name of the [`TransferringMetadata`].

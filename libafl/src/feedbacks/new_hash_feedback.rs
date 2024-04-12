@@ -13,8 +13,8 @@ use crate::{
     feedbacks::{Feedback, HasObserverName},
     inputs::UsesInput,
     observers::{ObserverWithHashField, ObserversTuple},
-    state::{HasNamedMetadata, State},
-    Error,
+    state::State,
+    Error, HasNamedMetadata,
 };
 
 /// The prefix of the metadata names

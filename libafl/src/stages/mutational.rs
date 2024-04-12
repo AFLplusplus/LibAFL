@@ -13,11 +13,8 @@ use crate::{
     mutators::{MultiMutator, MutationResult, Mutator},
     stages::{ExecutionCountRestartHelper, RetryRestartHelper, Stage},
     start_timer,
-    state::{
-        HasCorpus, HasCurrentTestcase, HasExecutions, HasMetadata, HasNamedMetadata, HasRand,
-        UsesState,
-    },
-    Error,
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
+    Error, HasMetadata, HasNamedMetadata,
 };
 #[cfg(feature = "introspection")]
 use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
@@ -401,56 +398,5 @@ where
             mutator,
             phantom: PhantomData,
         }
-    }
-}
-
-#[cfg(feature = "python")]
-#[allow(missing_docs)]
-#[allow(clippy::unnecessary_fallible_conversions, unused_qualifications)]
-/// `StdMutationalStage` Python bindings
-pub mod pybind {
-    use pyo3::prelude::*;
-
-    use crate::{
-        events::pybind::PythonEventManager,
-        executors::pybind::PythonExecutor,
-        fuzzer::pybind::PythonStdFuzzer,
-        inputs::BytesInput,
-        mutators::pybind::PythonMutator,
-        stages::{pybind::PythonStage, StdMutationalStage},
-    };
-
-    #[pyclass(unsendable, name = "StdMutationalStage")]
-    #[derive(Debug)]
-    /// Python class for StdMutationalStage
-    pub struct PythonStdMutationalStage {
-        /// Rust wrapped StdMutationalStage object
-        pub inner: StdMutationalStage<
-            PythonExecutor,
-            PythonEventManager,
-            BytesInput,
-            PythonMutator,
-            PythonStdFuzzer,
-        >,
-    }
-
-    #[pymethods]
-    impl PythonStdMutationalStage {
-        #[new]
-        fn new(mutator: PythonMutator) -> Self {
-            Self {
-                inner: StdMutationalStage::new(mutator),
-            }
-        }
-
-        fn as_stage(slf: Py<Self>) -> PythonStage {
-            PythonStage::new_std_mutational(slf)
-        }
-    }
-
-    /// Register the classes to the python module
-    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
-        m.add_class::<PythonStdMutationalStage>()?;
-        Ok(())
     }
 }

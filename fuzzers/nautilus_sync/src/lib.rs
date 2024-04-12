@@ -23,8 +23,8 @@ use libafl::{
     none_input_converter,
     schedulers::QueueScheduler,
     stages::{mutational::StdMutationalStage, sync::SyncFromBrokerStage},
-    state::{HasMetadata, StdState},
-    Error,
+    state::StdState,
+    Error, HasMetadata,
 };
 use libafl_bolts::{
     core_affinity::Cores,

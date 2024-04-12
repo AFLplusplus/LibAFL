@@ -35,8 +35,8 @@ use crate::{
     inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
     random_corpus_id,
-    state::{HasCorpus, HasMetadata, HasRand, State, UsesState},
-    Error,
+    state::{HasCorpus, HasRand, State, UsesState},
+    Error, HasMetadata,
 };
 
 /// The scheduler also implements `on_remove` and `on_replace` if it implements this stage.
@@ -65,85 +65,12 @@ where
     }
 }
 
-/// Define the metadata operations when removing testcase from AFL-style scheduler
-pub trait HasAFLRemovableScheduler: RemovableScheduler
-where
-    Self::State: HasCorpus + HasMetadata + HasTestcase,
-{
-    #[allow(clippy::cast_precision_loss)]
-    #[allow(clippy::cast_precision_loss)]
-    /// Adjusting metadata when removing the testcase
-    fn on_remove_metadata(
-        &mut self,
-        state: &mut Self::State,
-        _idx: CorpusId,
-        prev: &Option<Testcase<<Self::State as UsesInput>::Input>>,
-    ) -> Result<(), Error> {
-        let prev = prev.as_ref().ok_or_else(|| {
-            Error::illegal_argument(
-                "Power schedulers must be aware of the removed corpus entry for reweighting.",
-            )
-        })?;
-
-        let prev_meta = prev.metadata::<SchedulerTestcaseMetadata>()?;
-
-        // Use these to adjust `SchedulerMetadata`
-        let (prev_total_time, prev_cycles) = prev_meta.cycle_and_time();
-        let prev_bitmap_size = prev_meta.bitmap_size();
-        let prev_bitmap_size_log = libm::log2(prev_bitmap_size as f64);
-
-        let psmeta = state.metadata_mut::<SchedulerMetadata>()?;
-
-        psmeta.set_exec_time(psmeta.exec_time() - prev_total_time);
-        psmeta.set_cycles(psmeta.cycles() - (prev_cycles as u64));
-        psmeta.set_bitmap_size(psmeta.bitmap_size() - prev_bitmap_size);
-        psmeta.set_bitmap_size_log(psmeta.bitmap_size_log() - prev_bitmap_size_log);
-        psmeta.set_bitmap_entries(psmeta.bitmap_entries() - 1);
-
-        Ok(())
-    }
-
-    #[allow(clippy::cast_precision_loss)]
-    /// Adjusting metadata when replacing the corpus
-    fn on_replace_metadata(
-        &mut self,
-        state: &mut Self::State,
-        idx: CorpusId,
-        prev: &Testcase<<Self::State as UsesInput>::Input>,
-    ) -> Result<(), Error> {
-        let prev_meta = prev.metadata::<SchedulerTestcaseMetadata>()?;
-
-        // Next depth is + 1
-        let prev_depth = prev_meta.depth() + 1;
-
-        // Use these to adjust `SchedulerMetadata`
-        let (prev_total_time, prev_cycles) = prev_meta.cycle_and_time();
-        let prev_bitmap_size = prev_meta.bitmap_size();
-        let prev_bitmap_size_log = libm::log2(prev_bitmap_size as f64);
-
-        let psmeta = state.metadata_mut::<SchedulerMetadata>()?;
-
-        // We won't add new one because it'll get added when it gets executed in calirbation next time.
-        psmeta.set_exec_time(psmeta.exec_time() - prev_total_time);
-        psmeta.set_cycles(psmeta.cycles() - (prev_cycles as u64));
-        psmeta.set_bitmap_size(psmeta.bitmap_size() - prev_bitmap_size);
-        psmeta.set_bitmap_size_log(psmeta.bitmap_size_log() - prev_bitmap_size_log);
-        psmeta.set_bitmap_entries(psmeta.bitmap_entries() - 1);
-
-        state
-            .corpus()
-            .get(idx)?
-            .borrow_mut()
-            .add_metadata(SchedulerTestcaseMetadata::new(prev_depth));
-        Ok(())
-    }
-}
-
 /// Defines the common metadata operations for the AFL-style schedulers
-pub trait HasAFLSchedulerMetadata<O, S>: Scheduler
+pub trait AflScheduler<C, O, S>: Scheduler
 where
     Self::State: HasCorpus + HasMetadata + HasTestcase,
     O: MapObserver,
+    C: AsRef<O>,
 {
     /// Return the last hash
     fn last_hash(&self) -> usize;
@@ -191,8 +118,9 @@ where
         OT: ObserversTuple<Self::State>,
     {
         let observer = observers
-            .match_name::<O>(self.map_observer_name())
-            .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?;
+            .match_name::<C>(self.map_observer_name())
+            .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
+            .as_ref();
 
         let mut hash = observer.hash() as usize;
 

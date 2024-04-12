@@ -12,8 +12,8 @@ use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
     inputs::UsesInput,
     schedulers::{RemovableScheduler, Scheduler, TestcaseScore},
-    state::{HasCorpus, HasMetadata, HasRand, State, UsesState},
-    Error,
+    state::{HasCorpus, HasRand, State, UsesState},
+    Error, HasMetadata,
 };
 
 /// Conduct reservoir sampling (probabilistic sampling) over all corpus elements.
@@ -202,8 +202,8 @@ mod tests {
         feedbacks::ConstFeedback,
         inputs::{bytes::BytesInput, Input, UsesInput},
         schedulers::{ProbabilitySamplingScheduler, Scheduler, TestcaseScore},
-        state::{HasCorpus, HasMetadata, StdState},
-        Error,
+        state::{HasCorpus, StdState},
+        Error, HasMetadata,
     };
 
     const FACTOR: f64 = 1337.0;

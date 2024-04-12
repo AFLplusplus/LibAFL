@@ -18,8 +18,8 @@ use super::MutationId;
 use crate::{
     corpus::{Corpus, CorpusId},
     mutators::{ComposedByMutations, MutationResult, Mutator, MutatorsTuple, ScheduledMutator},
-    state::{HasCorpus, HasMetadata, HasRand, HasSolutions},
-    Error,
+    state::{HasCorpus, HasRand, HasSolutions},
+    Error, HasMetadata,
 };
 
 /// A Struct for managing MOpt-mutator parameters.

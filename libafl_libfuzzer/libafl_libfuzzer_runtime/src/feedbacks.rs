@@ -9,8 +9,8 @@ use libafl::{
     feedbacks::{Feedback, MinMapFeedback},
     inputs::{BytesInput, Input},
     observers::ObserversTuple,
-    state::{HasMetadata, State},
-    Error,
+    state::State,
+    Error, HasMetadata,
 };
 use libafl_bolts::{impl_serdeany, Named};
 use libafl_targets::OomFeedback;
@@ -171,4 +171,4 @@ where
     }
 }
 
-pub type ShrinkMapFeedback<O, S, T> = MinMapFeedback<MappedEdgeMapObserver<O, T>, S, usize>;
+pub type ShrinkMapFeedback<C, O, S, T> = MinMapFeedback<C, MappedEdgeMapObserver<O, T>, S, usize>;

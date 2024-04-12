@@ -11,13 +11,13 @@ use crate::{
     corpus::{Corpus, CorpusId},
     feedbacks::MapIndexesMetadata,
     inputs::UsesInput,
-    observers::ObserversTuple,
+    observers::{CanTrack, ObserversTuple},
     schedulers::{
         minimizer::{IsFavoredMetadata, MinimizerScheduler, DEFAULT_SKIP_NON_FAVORED_PROB},
         LenTimeMulTestcaseScore, Scheduler,
     },
-    state::{HasCorpus, HasMetadata, HasRand, UsesState},
-    Error,
+    state::{HasCorpus, HasRand, UsesState},
+    Error, HasMetadata,
 };
 
 /// A testcase metadata holding a list of indexes of a map
@@ -106,7 +106,7 @@ impl TopAccountingMetadata {
 
 /// A minimizer scheduler using coverage accounting
 #[derive(Debug)]
-pub struct CoverageAccountingScheduler<'a, CS>
+pub struct CoverageAccountingScheduler<'a, CS, O>
 where
     CS: UsesState,
     CS::State: Debug,
@@ -117,10 +117,11 @@ where
         CS,
         LenTimeMulTestcaseScore<<CS as UsesState>::State>,
         MapIndexesMetadata,
+        O,
     >,
 }
 
-impl<'a, CS> UsesState for CoverageAccountingScheduler<'a, CS>
+impl<'a, CS, O> UsesState for CoverageAccountingScheduler<'a, CS, O>
 where
     CS: UsesState,
     CS::State: Debug,
@@ -128,11 +129,12 @@ where
     type State = CS::State;
 }
 
-impl<'a, CS> Scheduler for CoverageAccountingScheduler<'a, CS>
+impl<'a, CS, O> Scheduler for CoverageAccountingScheduler<'a, CS, O>
 where
     CS: Scheduler,
     CS::State: HasCorpus + HasMetadata + HasRand + Debug,
     <CS::State as UsesInput>::Input: HasLen,
+    O: CanTrack,
 {
     fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
         self.update_accounting_score(state, idx)?;
@@ -190,11 +192,12 @@ where
     }
 }
 
-impl<'a, CS> CoverageAccountingScheduler<'a, CS>
+impl<'a, CS, O> CoverageAccountingScheduler<'a, CS, O>
 where
     CS: Scheduler,
     CS::State: HasCorpus + HasMetadata + HasRand + Debug,
     <CS::State as UsesInput>::Input: HasLen,
+    O: CanTrack,
 {
     /// Update the `Corpus` score
     #[allow(clippy::unused_self)]
@@ -307,7 +310,9 @@ where
 
     /// Creates a new [`CoverageAccountingScheduler`] that wraps a `base` [`Scheduler`]
     /// and has a default probability to skip non-faved Testcases of [`DEFAULT_SKIP_NON_FAVORED_PROB`].
-    pub fn new(state: &mut CS::State, base: CS, accounting_map: &'a [u32]) -> Self {
+    ///
+    /// Provide the observer responsible for determining new indexes.
+    pub fn new(observer: &O, state: &mut CS::State, base: CS, accounting_map: &'a [u32]) -> Self {
         match state.metadata_map().get::<TopAccountingMetadata>() {
             Some(meta) => {
                 if meta.max_accounting.len() != accounting_map.len() {
@@ -320,14 +325,17 @@ where
         }
         Self {
             accounting_map,
-            inner: MinimizerScheduler::new(base),
+            inner: MinimizerScheduler::new(observer, base),
             skip_non_favored_prob: DEFAULT_SKIP_NON_FAVORED_PROB,
         }
     }
 
     /// Creates a new [`CoverageAccountingScheduler`] that wraps a `base` [`Scheduler`]
     /// and has a non-default probability to skip non-faved Testcases using (`skip_non_favored_prob`).
+    ///
+    /// Provide the observer responsible for determining new indexes.
     pub fn with_skip_prob(
+        observer: &O,
         state: &mut CS::State,
         base: CS,
         skip_non_favored_prob: u64,
@@ -345,7 +353,7 @@ where
         }
         Self {
             accounting_map,
-            inner: MinimizerScheduler::with_skip_prob(base, skip_non_favored_prob),
+            inner: MinimizerScheduler::with_skip_prob(observer, base, skip_non_favored_prob),
             skip_non_favored_prob,
         }
     }

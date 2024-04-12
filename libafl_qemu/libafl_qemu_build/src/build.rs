@@ -8,8 +8,9 @@ use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "f282d6aef5e28421255293ebbb52d835281f2730";
+const QEMU_REVISION: &str = "50b0c90e0aab07643ccb58cfbbef742bcfb8b7d1";
 
+#[allow(clippy::module_name_repetitions)]
 pub struct BuildResult {
     pub qemu_path: PathBuf,
     pub build_dir: PathBuf,
@@ -83,20 +84,22 @@ pub fn build(
         if !qemu_path.is_dir() {
             println!("cargo:warning=Qemu not found, cloning with git ({QEMU_REVISION})...");
             fs::create_dir_all(&qemu_path).unwrap();
-            Command::new("git")
+            assert!(Command::new("git")
                 .current_dir(&qemu_path)
                 .arg("init")
                 .status()
-                .unwrap();
-            Command::new("git")
+                .unwrap()
+                .success());
+            assert!(Command::new("git")
                 .current_dir(&qemu_path)
                 .arg("remote")
                 .arg("add")
                 .arg("origin")
                 .arg(QEMU_URL)
                 .status()
-                .unwrap();
-            Command::new("git")
+                .unwrap()
+                .success());
+            assert!(Command::new("git")
                 .current_dir(&qemu_path)
                 .arg("fetch")
                 .arg("--depth")
@@ -104,13 +107,15 @@ pub fn build(
                 .arg("origin")
                 .arg(QEMU_REVISION)
                 .status()
-                .unwrap();
-            Command::new("git")
+                .unwrap()
+                .success());
+            assert!(Command::new("git")
                 .current_dir(&qemu_path)
                 .arg("checkout")
                 .arg("FETCH_HEAD")
                 .status()
-                .unwrap();
+                .unwrap()
+                .success());
             fs::write(&qemu_rev, QEMU_REVISION).unwrap();
         }
 
@@ -289,22 +294,24 @@ pub fn build(
             .arg("--disable-tests");
         }
 
-        cmd.status().expect("Configure failed");
+        assert!(
+            cmd.status().expect("Invoking Configure failed").success(),
+            "Configure didn't finish successfully"
+        );
+        let mut cmd = Command::new("make");
+        cmd.current_dir(&build_dir)
+            .env("__LIBAFL_QEMU_BUILD_OUT", build_dir.join("linkinfo.json"))
+            .env("__LIBAFL_QEMU_BUILD_CC", cc_compiler.path())
+            .env("__LIBAFL_QEMU_BUILD_CXX", cpp_compiler.path())
+            .arg("-j");
+
         if let Some(j) = jobs {
-            Command::new("make")
-                .current_dir(&build_dir)
-                .arg("-j")
-                .arg(&format!("{j}"))
-                .env("V", "1")
-                .status()
-                .expect("Make failed");
-        } else {
-            Command::new("make")
-                .current_dir(&build_dir)
-                .arg("-j")
-                .status()
-                .expect("Make failed");
+            cmd.arg(&format!("{j}")).env("V", "1");
         }
+        assert!(
+            cmd.status().expect("Invoking Make Failed").success(),
+            "Make didn't finish successfully"
+        );
     }
 
     /*

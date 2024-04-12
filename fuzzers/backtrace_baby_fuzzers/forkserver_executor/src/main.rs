@@ -30,7 +30,7 @@ use libafl_bolts::{
 
 #[allow(clippy::similar_names)]
 pub fn main() {
-    const MAP_SIZE: usize = 2621440;
+    const MAP_SIZE: usize = 65536;
 
     //Coverage map shared between observer and executor
     #[cfg(target_vendor = "apple")]
@@ -54,7 +54,7 @@ pub fn main() {
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
-    let mut feedback = MaxMapFeedback::tracking(&edges_observer, true, false);
+    let mut feedback = MaxMapFeedback::new(&edges_observer);
 
     // A feedback to choose if an input is a solution or not
     // We want to do the same crash deduplication that AFL does

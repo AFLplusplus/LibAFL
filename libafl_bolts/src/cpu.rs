@@ -1,12 +1,13 @@
 //! Architecture agnostic processor features
 
-#[cfg(target_arch = "aarch64")]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
 use core::arch::asm;
 
 #[cfg(not(any(
     target_arch = "x86_64",
     target_arch = "x86",
     target_arch = "aarch64",
+    target_arch = "arm",
     target_arch = "riscv64",
     target_arsch = "riscv32"
 )))]
@@ -48,6 +49,16 @@ pub fn read_time_counter() -> u64 {
         asm!("mrs {v}, cntvct_el0", v = out(reg) v);
     }
     v
+}
+
+#[cfg(target_arch = "arm")]
+#[must_use]
+pub fn read_time_counter() -> u64 {
+    let mut v: u32;
+    unsafe {
+        asm!("mrc p15, 0, {v}, c9, c13, 0", v = out(reg) v);
+    }
+    u64::from(v)
 }
 
 /// Read a timestamp for measurements
@@ -99,6 +110,7 @@ pub fn read_time_counter() -> u64 {
     target_arch = "x86_64",
     target_arch = "x86",
     target_arch = "aarch64",
+    target_arch = "arm",
     target_arch = "riscv64",
     target_arch = "riscv32"
 )))]

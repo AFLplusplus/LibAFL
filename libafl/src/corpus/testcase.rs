@@ -16,8 +16,7 @@ use super::Corpus;
 use crate::{
     corpus::CorpusId,
     inputs::{Input, UsesInput},
-    state::HasMetadata,
-    Error,
+    Error, HasMetadata,
 };
 
 /// Shorthand to receive a [`Ref`] or [`RefMut`] to a stored [`Testcase`], by [`CorpusId`].
@@ -64,6 +63,8 @@ where
     scheduled_count: usize,
     /// Parent [`CorpusId`], if known
     parent_id: Option<CorpusId>,
+    /// If the testcase is "disabled"
+    disabled: bool,
 }
 
 impl<I> HasMetadata for Testcase<I>
@@ -196,6 +197,18 @@ where
         self.scheduled_count = scheduled_count;
     }
 
+    /// Get `disabled`
+    #[inline]
+    pub fn disabled(&mut self) -> bool {
+        self.disabled
+    }
+
+    /// Set the testcase as disabled
+    #[inline]
+    pub fn set_disabled(&mut self, disabled: bool) {
+        self.disabled = disabled;
+    }
+
     /// Create a new Testcase instance given an input
     #[inline]
     pub fn new(mut input: I) -> Self {
@@ -213,6 +226,7 @@ where
             executions: 0,
             scheduled_count: 0,
             parent_id: None,
+            disabled: false,
         }
     }
 
@@ -233,6 +247,7 @@ where
             executions: 0,
             scheduled_count: 0,
             parent_id: Some(parent_id),
+            disabled: false,
         }
     }
 
@@ -253,6 +268,7 @@ where
             executions: 0,
             scheduled_count: 0,
             parent_id: None,
+            disabled: false,
         }
     }
 
@@ -273,6 +289,7 @@ where
             executions,
             scheduled_count: 0,
             parent_id: None,
+            disabled: false,
         }
     }
 
@@ -313,6 +330,7 @@ where
             file_path: None,
             #[cfg(feature = "std")]
             metadata_path: None,
+            disabled: false,
         }
     }
 }
@@ -483,93 +501,5 @@ where
             path.set_file_name(lockname);
             let _ = std::fs::remove_file(path);
         }
-    }
-}
-
-#[cfg(feature = "python")]
-#[allow(missing_docs)]
-/// `Testcase` Python bindings
-pub mod pybind {
-    use alloc::{boxed::Box, vec::Vec};
-
-    use libafl_bolts::ownedref::OwnedMutPtr;
-    use pyo3::{prelude::*, types::PyDict};
-
-    use super::{HasMetadata, Testcase};
-    use crate::{inputs::BytesInput, pybind::PythonMetadata};
-
-    /// `PythonTestcase` with fixed generics
-    pub type PythonTestcase = Testcase<BytesInput>;
-
-    #[pyclass(unsendable, name = "Testcase")]
-    #[derive(Debug)]
-    /// Python class for Testcase
-    pub struct PythonTestcaseWrapper {
-        /// Rust wrapped Testcase object
-        pub inner: OwnedMutPtr<PythonTestcase>,
-    }
-
-    impl PythonTestcaseWrapper {
-        pub fn wrap(r: &mut PythonTestcase) -> Self {
-            Self {
-                inner: OwnedMutPtr::Ptr(r),
-            }
-        }
-
-        #[must_use]
-        pub fn unwrap(&self) -> &PythonTestcase {
-            self.inner.as_ref()
-        }
-
-        pub fn unwrap_mut(&mut self) -> &mut PythonTestcase {
-            self.inner.as_mut()
-        }
-    }
-
-    #[pymethods]
-    impl PythonTestcaseWrapper {
-        #[new]
-        fn new(input: Vec<u8>) -> Self {
-            Self {
-                inner: OwnedMutPtr::Owned(Box::new(PythonTestcase::new(BytesInput::new(input)))),
-            }
-        }
-
-        #[getter]
-        fn exec_time_ms(&self) -> Option<u128> {
-            self.inner.as_ref().exec_time().map(|t| t.as_millis())
-        }
-
-        #[getter]
-        fn executions(&self) -> u64 {
-            *self.inner.as_ref().executions()
-        }
-
-        #[getter]
-        fn parent_id(&self) -> Option<usize> {
-            self.inner.as_ref().parent_id().map(|x| x.0)
-        }
-
-        #[getter]
-        fn scheduled_count(&self) -> usize {
-            self.inner.as_ref().scheduled_count()
-        }
-
-        fn metadata(&mut self) -> PyObject {
-            let meta = self.inner.as_mut().metadata_map_mut();
-            if !meta.contains::<PythonMetadata>() {
-                Python::with_gil(|py| {
-                    let dict: Py<PyDict> = PyDict::new(py).into();
-                    meta.insert(PythonMetadata::new(dict.to_object(py)));
-                });
-            }
-            meta.get::<PythonMetadata>().unwrap().map.clone()
-        }
-    }
-
-    /// Register the classes to the python module
-    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
-        m.add_class::<PythonTestcaseWrapper>()?;
-        Ok(())
     }
 }

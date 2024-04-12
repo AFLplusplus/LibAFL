@@ -63,7 +63,7 @@ impl From<CorpusId> for usize {
     }
 }
 
-/// Utility macro to call `Corpus::random_id`
+/// Utility macro to call `Corpus::random_id`; fetches only enabled testcases
 #[macro_export]
 macro_rules! random_corpus_id {
     ($corpus:expr, $rand:expr) => {{
@@ -73,18 +73,38 @@ macro_rules! random_corpus_id {
     }};
 }
 
+/// Utility macro to call `Corpus::random_id`; fetches both enabled and disabled testcases
+/// Note: use `Corpus::get_from_all` as disabled entries are inaccessible from `Corpus::get`
+#[macro_export]
+macro_rules! random_corpus_id_with_disabled {
+    ($corpus:expr, $rand:expr) => {{
+        let cnt = $corpus.count_all() as u64;
+        let nth = $rand.below(cnt) as usize;
+        $corpus.nth_from_all(nth)
+    }};
+}
+
 /// Corpus with all current [`Testcase`]s, or solutions
 pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
-    /// Returns the number of elements
+    /// Returns the number of all enabled entries
     fn count(&self) -> usize;
+
+    /// Returns the number of all disabled entries
+    fn count_disabled(&self) -> usize;
+
+    /// Returns the number of elements including disabled entries
+    fn count_all(&self) -> usize;
 
     /// Returns true, if no elements are in this corpus yet
     fn is_empty(&self) -> bool {
         self.count() == 0
     }
 
-    /// Add an entry to the corpus and return its index
+    /// Add an enabled testcase to the corpus and return its index
     fn add(&mut self, testcase: Testcase<Self::Input>) -> Result<CorpusId, Error>;
+
+    /// Add a disabled testcase to the corpus and return its index
+    fn add_disabled(&mut self, testcase: Testcase<Self::Input>) -> Result<CorpusId, Error>;
 
     /// Replaces the [`Testcase`] at the given idx, returning the existing.
     fn replace(
@@ -96,8 +116,11 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
     /// Removes an entry from the corpus, returning it if it was present.
     fn remove(&mut self, id: CorpusId) -> Result<Testcase<Self::Input>, Error>;
 
-    /// Get by id
+    /// Get by id; considers only enabled testcases
     fn get(&self, id: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error>;
+
+    /// Get by id; considers both enabled and disabled testcases
+    fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error>;
 
     /// Current testcase scheduled
     fn current(&self) -> &Option<CorpusId>;
@@ -126,12 +149,15 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
         }
     }
 
-    /// Get the nth corpus id
+    /// Get the nth corpus id; considers only enabled testcases
     fn nth(&self, nth: usize) -> CorpusId {
         self.ids()
             .nth(nth)
             .expect("Failed to get the {nth} CorpusId")
     }
+
+    /// Get the nth corpus id; considers both enabled and disabled testcases
+    fn nth_from_all(&self, nth: usize) -> CorpusId;
 
     /// Method to load the input for this [`Testcase`] from persistent storage,
     /// if necessary, and if was not already loaded (`== Some(input)`).
@@ -198,245 +224,5 @@ where
         } else {
             None
         }
-    }
-}
-
-/// `Corpus` Python bindings
-#[cfg(feature = "python")]
-#[allow(missing_docs)]
-pub mod pybind {
-    use std::cell::RefCell;
-
-    use pyo3::prelude::*;
-    use serde::{Deserialize, Serialize};
-
-    use crate::{
-        corpus::{
-            cached::pybind::PythonCachedOnDiskCorpus, inmemory::pybind::PythonInMemoryCorpus,
-            inmemory_ondisk::pybind::PythonInMemoryOnDiskCorpus,
-            ondisk::pybind::PythonOnDiskCorpus, testcase::pybind::PythonTestcaseWrapper, Corpus,
-            CorpusId, HasTestcase, Testcase,
-        },
-        inputs::{BytesInput, UsesInput},
-        Error,
-    };
-
-    #[derive(Serialize, Deserialize, Debug, Clone)]
-    enum PythonCorpusWrapper {
-        InMemory(Py<PythonInMemoryCorpus>),
-        CachedOnDisk(Py<PythonCachedOnDiskCorpus>),
-        OnDisk(Py<PythonOnDiskCorpus>),
-        InMemoryOnDisk(Py<PythonInMemoryOnDiskCorpus>),
-    }
-
-    /// Corpus Trait binding
-    #[pyclass(unsendable, name = "Corpus")]
-    #[allow(clippy::unsafe_derive_deserialize)]
-    #[derive(Serialize, Deserialize, Debug, Clone)]
-    pub struct PythonCorpus {
-        wrapper: PythonCorpusWrapper,
-    }
-
-    macro_rules! unwrap_me {
-        ($wrapper:expr, $name:ident, $body:block) => {
-            libafl_bolts::unwrap_me_body!(
-                $wrapper,
-                $name,
-                $body,
-                PythonCorpusWrapper,
-                {
-                    InMemory,
-                    InMemoryOnDisk,
-                    CachedOnDisk,
-                    OnDisk
-                }
-            )
-        };
-    }
-
-    macro_rules! unwrap_me_mut {
-        ($wrapper:expr, $name:ident, $body:block) => {
-            libafl_bolts::unwrap_me_mut_body!(
-                $wrapper,
-                $name,
-                $body,
-                PythonCorpusWrapper,
-                {
-                    InMemory,
-                    InMemoryOnDisk,
-                    CachedOnDisk,
-                    OnDisk
-                }
-            )
-        };
-    }
-
-    #[pymethods]
-    impl PythonCorpus {
-        #[staticmethod]
-        #[must_use]
-        pub fn new_in_memory(py_in_memory_corpus: Py<PythonInMemoryCorpus>) -> Self {
-            Self {
-                wrapper: PythonCorpusWrapper::InMemory(py_in_memory_corpus),
-            }
-        }
-
-        #[staticmethod]
-        #[must_use]
-        pub fn new_cached_on_disk(py_cached_on_disk_corpus: Py<PythonCachedOnDiskCorpus>) -> Self {
-            Self {
-                wrapper: PythonCorpusWrapper::CachedOnDisk(py_cached_on_disk_corpus),
-            }
-        }
-
-        #[staticmethod]
-        #[must_use]
-        pub fn new_on_disk(py_on_disk_corpus: Py<PythonOnDiskCorpus>) -> Self {
-            Self {
-                wrapper: PythonCorpusWrapper::OnDisk(py_on_disk_corpus),
-            }
-        }
-
-        #[staticmethod]
-        #[must_use]
-        pub fn new_in_memory_on_disk(
-            py_in_memory_on_disk_corpus: Py<PythonInMemoryOnDiskCorpus>,
-        ) -> Self {
-            Self {
-                wrapper: PythonCorpusWrapper::InMemoryOnDisk(py_in_memory_on_disk_corpus),
-            }
-        }
-
-        #[pyo3(name = "count")]
-        fn pycount(&self) -> usize {
-            self.count()
-        }
-
-        #[pyo3(name = "current")]
-        fn pycurrent(&self) -> Option<usize> {
-            self.current().map(|x| x.0)
-        }
-
-        #[pyo3(name = "get")]
-        fn pyget(&self, idx: usize) -> PythonTestcaseWrapper {
-            let t: &mut Testcase<BytesInput> = unwrap_me!(self.wrapper, c, {
-                c.get(CorpusId::from(idx))
-                    .map(|v| unsafe { v.as_ptr().as_mut().unwrap() })
-                    .expect("PythonCorpus::get failed")
-            });
-            PythonTestcaseWrapper::wrap(t)
-        }
-    }
-
-    impl UsesInput for PythonCorpus {
-        type Input = BytesInput;
-    }
-
-    impl Corpus for PythonCorpus {
-        #[inline]
-        fn count(&self) -> usize {
-            unwrap_me!(self.wrapper, c, { c.count() })
-        }
-
-        #[inline]
-        fn add(&mut self, testcase: Testcase<BytesInput>) -> Result<CorpusId, Error> {
-            unwrap_me_mut!(self.wrapper, c, { c.add(testcase) })
-        }
-
-        #[inline]
-        fn replace(
-            &mut self,
-            idx: CorpusId,
-            testcase: Testcase<BytesInput>,
-        ) -> Result<Testcase<BytesInput>, Error> {
-            unwrap_me_mut!(self.wrapper, c, { c.replace(idx, testcase) })
-        }
-
-        #[inline]
-        fn remove(&mut self, idx: CorpusId) -> Result<Testcase<BytesInput>, Error> {
-            unwrap_me_mut!(self.wrapper, c, { c.remove(idx) })
-        }
-
-        #[inline]
-        fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<BytesInput>>, Error> {
-            let ptr = unwrap_me!(self.wrapper, c, {
-                c.get(idx)
-                    .map(core::ptr::from_ref::<RefCell<Testcase<BytesInput>>>)
-            })?;
-            Ok(unsafe { ptr.as_ref().unwrap() })
-        }
-
-        #[inline]
-        fn current(&self) -> &Option<CorpusId> {
-            let ptr = unwrap_me!(self.wrapper, c, { core::ptr::from_ref(c.current()) });
-            unsafe { ptr.as_ref().unwrap() }
-        }
-
-        #[inline]
-        fn current_mut(&mut self) -> &mut Option<CorpusId> {
-            let ptr = unwrap_me_mut!(self.wrapper, c, { core::ptr::from_mut(c.current_mut()) });
-            unsafe { ptr.as_mut().unwrap() }
-        }
-
-        fn next(&self, idx: CorpusId) -> Option<CorpusId> {
-            unwrap_me!(self.wrapper, c, { c.next(idx) })
-        }
-
-        fn prev(&self, idx: CorpusId) -> Option<CorpusId> {
-            unwrap_me!(self.wrapper, c, { c.prev(idx) })
-        }
-
-        fn first(&self) -> Option<CorpusId> {
-            unwrap_me!(self.wrapper, c, { c.first() })
-        }
-
-        fn last(&self) -> Option<CorpusId> {
-            unwrap_me!(self.wrapper, c, { c.last() })
-        }
-
-        fn load_input_into(&self, testcase: &mut Testcase<BytesInput>) -> Result<(), Error> {
-            unwrap_me!(self.wrapper, c, { c.load_input_into(testcase) })
-        }
-
-        fn store_input_from(&self, testcase: &Testcase<BytesInput>) -> Result<(), Error> {
-            unwrap_me!(self.wrapper, c, { c.store_input_from(testcase) })
-        }
-
-        /*fn ids<'a>(&'a self) -> CorpusIdIterator<'a, Self> {
-            CorpusIdIterator {
-                corpus: self,
-                cur: self.first(),
-                cur_back: self.last(),
-            }
-        }
-
-        fn random_id(&self, next_random: u64) -> CorpusId {
-            let nth = (next_random as usize) % self.count();
-            self.ids()
-                .nth(nth)
-                .expect("Failed to get a random CorpusId")
-        }*/
-    }
-
-    impl HasTestcase for PythonCorpus {
-        fn testcase(
-            &self,
-            id: CorpusId,
-        ) -> Result<core::cell::Ref<Testcase<<Self as UsesInput>::Input>>, Error> {
-            Ok(self.get(id)?.borrow())
-        }
-
-        fn testcase_mut(
-            &self,
-            id: CorpusId,
-        ) -> Result<core::cell::RefMut<Testcase<<Self as UsesInput>::Input>>, Error> {
-            Ok(self.get(id)?.borrow_mut())
-        }
-    }
-
-    /// Register the classes to the python module
-    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
-        m.add_class::<PythonCorpus>()?;
-        Ok(())
     }
 }

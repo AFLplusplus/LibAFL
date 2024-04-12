@@ -18,8 +18,8 @@ use crate::{
     mutators::{
         ComposedByMutations, MutationId, MutationResult, Mutator, MutatorsTuple, ScheduledMutator,
     },
-    state::{HasMetadata, HasRand},
-    Error,
+    state::HasRand,
+    Error, HasMetadata,
 };
 
 /// Metadata in the state, that controls the behavior of the [`TuneableScheduledMutator`] at runtime

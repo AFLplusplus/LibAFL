@@ -24,8 +24,7 @@ use super::{
 use crate::{
     corpus::{Corpus, CorpusId, InMemoryCorpus, Testcase},
     inputs::{Input, UsesInput},
-    state::HasMetadata,
-    Error,
+    Error, HasMetadata,
 };
 
 /// The [`Testcase`] metadata that'll be stored to disk
@@ -65,17 +64,38 @@ impl<I> Corpus for InMemoryOnDiskCorpus<I>
 where
     I: Input,
 {
-    /// Returns the number of elements
+    /// Returns the number of all enabled entries
     #[inline]
     fn count(&self) -> usize {
         self.inner.count()
     }
 
-    /// Add an entry to the corpus and return its index
+    /// Returns the number of all disabled entries
+    fn count_disabled(&self) -> usize {
+        self.inner.count_disabled()
+    }
+
+    /// Returns the number of elements including disabled entries
+    #[inline]
+    fn count_all(&self) -> usize {
+        self.inner.count_all()
+    }
+
+    /// Add an enabled testcase to the corpus and return its index
     #[inline]
     fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         let idx = self.inner.add(testcase)?;
         let testcase = &mut self.get(idx).unwrap().borrow_mut();
+        self.save_testcase(testcase, idx)?;
+        *testcase.input_mut() = None;
+        Ok(idx)
+    }
+
+    /// Add a disabled testcase to the corpus and return its index
+    #[inline]
+    fn add_disabled(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
+        let idx = self.inner.add_disabled(testcase)?;
+        let testcase = &mut self.get_from_all(idx).unwrap().borrow_mut();
         self.save_testcase(testcase, idx)?;
         *testcase.input_mut() = None;
         Ok(idx)
@@ -100,10 +120,16 @@ where
         Ok(entry)
     }
 
-    /// Get by id
+    /// Get by id; considers only enabled testcases
     #[inline]
     fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
         self.inner.get(idx)
+    }
+
+    /// Get by id; considers both enabled and disabled testcases
+    #[inline]
+    fn get_from_all(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
+        self.inner.get_from_all(idx)
     }
 
     /// Current testcase scheduled
@@ -138,9 +164,15 @@ where
         self.inner.last()
     }
 
+    /// Get the nth corpus id; considers only enabled testcases
     #[inline]
     fn nth(&self, nth: usize) -> CorpusId {
         self.inner.nth(nth)
+    }
+    /// Get the nth corpus id; considers both enabled and disabled testcases
+    #[inline]
+    fn nth_from_all(&self, nth: usize) -> CorpusId {
+        self.inner.nth_from_all(nth)
     }
 
     fn load_input_into(&self, testcase: &mut Testcase<Self::Input>) -> Result<(), Error> {
@@ -435,49 +467,5 @@ where
     #[must_use]
     pub fn dir_path(&self) -> &PathBuf {
         &self.dir_path
-    }
-}
-
-#[cfg(feature = "python")]
-#[allow(clippy::unnecessary_fallible_conversions, unused_qualifications)]
-/// `InMemoryOnDiskCorpus` Python bindings
-pub mod pybind {
-    use alloc::string::String;
-    use std::path::PathBuf;
-
-    use pyo3::prelude::*;
-    use serde::{Deserialize, Serialize};
-
-    use crate::{
-        corpus::{pybind::PythonCorpus, InMemoryOnDiskCorpus},
-        inputs::BytesInput,
-    };
-
-    #[pyclass(unsendable, name = "InMemoryOnDiskCorpus")]
-    #[allow(clippy::unsafe_derive_deserialize)]
-    #[derive(Serialize, Deserialize, Debug, Clone)]
-    /// Python class for InMemoryOnDiskCorpus
-    pub struct PythonInMemoryOnDiskCorpus {
-        /// Rust wrapped InMemoryOnDiskCorpus object
-        pub inner: InMemoryOnDiskCorpus<BytesInput>,
-    }
-
-    #[pymethods]
-    impl PythonInMemoryOnDiskCorpus {
-        #[new]
-        fn new(path: String) -> Self {
-            Self {
-                inner: InMemoryOnDiskCorpus::new(PathBuf::from(path)).unwrap(),
-            }
-        }
-
-        fn as_corpus(slf: Py<Self>) -> PythonCorpus {
-            PythonCorpus::new_in_memory_on_disk(slf)
-        }
-    }
-    /// Register the classes to the python module
-    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
-        m.add_class::<PythonInMemoryOnDiskCorpus>()?;
-        Ok(())
     }
 }

@@ -18,8 +18,8 @@ use libafl::{
     feedbacks::Feedback,
     inputs::{HasTargetBytes, UsesInput},
     observers::{Observer, ObserversTuple},
-    state::{HasMetadata, State},
-    Error,
+    state::State,
+    Error, HasMetadata,
 };
 use libafl_bolts::{ownedref::OwnedPtr, Named, SerdeAny};
 use serde::{Deserialize, Serialize};
