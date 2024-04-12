@@ -1,0 +1,28 @@
+[env]
+
+[tasks.unsupported]
+script_runner="@shell"
+script='''
+echo "Cargo-make not integrated yet on this"
+'''
+
+[tasks.install_cargo_fuzz]
+command = "cargo"
+args = ["install", "cargo-fuzz"]
+
+# Fuzzer
+[tasks.build]
+command = "cargo"
+args = ["+nightly", "fuzz", "run", "fuzz_target_1"]
+dependencies = [ "install_cargo_fuzz"]
+
+# Test
+[tasks.test]
+linux_alias = "unsupported"
+mac_alias = "unsupported"
+windows_alias = "unsupported"
+
+# Clean
+[tasks.clean]
+command = "rm "
+args = ["-rf" "fuzz/target"]
