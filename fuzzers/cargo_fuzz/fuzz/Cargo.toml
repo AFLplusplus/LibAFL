@@ -12,7 +12,7 @@ cargo-fuzz = true
 [dependencies]
 
 [dependencies.libfuzzer-sys]
-path = "../../.."
+path = "../../../libafl_libfuzzer"
 package = "libafl_libfuzzer"
 
 [[bin]]
