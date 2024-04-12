@@ -411,7 +411,7 @@ where
     R: Reducer<T>,
     S: State + HasNamedMetadata,
     T: Default + Copy + Serialize + for<'de> Deserialize<'de> + PartialEq + Debug + 'static,
-    C: AsRef<O> + CanTrack,
+    C: CanTrack + AsRef<O>,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         // Initialize `MapFeedbackMetadata` with an empty vector and add it to the state.
@@ -554,7 +554,7 @@ where
     O: MapObserver<Entry = u8> + AsSlice<Entry = u8>,
     for<'it> O: AsIter<'it, Item = u8>,
     S: State + HasNamedMetadata,
-    C: AsRef<O> + CanTrack,
+    C: CanTrack + AsRef<O>,
 {
     #[allow(clippy::wrong_self_convention)]
     #[allow(clippy::needless_range_loop)]
@@ -699,7 +699,7 @@ where
     for<'it> O: AsIter<'it, Item = T>,
     N: IsNovel<T>,
     S: UsesInput + HasNamedMetadata,
-    C: AsRef<O> + CanTrack,
+    C: CanTrack + AsRef<O>,
 {
     /// Create new `MapFeedback`
     #[must_use]

@@ -65,7 +65,7 @@ where
 impl<C, E, EM, O, Z> Stage<E, EM, Z> for GeneralizationStage<C, EM, O, E::Observers, Z>
 where
     O: MapObserver,
-    C: AsRef<O> + CanTrack,
+    C: CanTrack + AsRef<O>,
     E: Executor<EM, Z> + HasObservers,
     E::Observers: ObserversTuple<E::State>,
     E::State:
@@ -337,7 +337,7 @@ impl<C, EM, O, OT, Z> GeneralizationStage<C, EM, O, OT, Z>
 where
     EM: UsesState,
     O: MapObserver,
-    C: AsRef<O> + CanTrack,
+    C: CanTrack + AsRef<O>,
     OT: ObserversTuple<EM::State>,
     EM::State: UsesInput<Input = BytesInput> + HasExecutions + HasMetadata + HasCorpus,
 {
