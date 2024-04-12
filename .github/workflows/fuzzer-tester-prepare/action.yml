@@ -22,10 +22,6 @@ runs:
     - name: Add wasm target
       shell: bash
       run: rustup target add wasm32-unknown-unknown
-    - name: Remove obsolete llvm (Linux)
-      if: runner.os == 'Linux'
-      shell: bash
-      run: sudo apt purge llvm* clang*
     - name: Install LLVM and Clang
       uses: KyleMayes/install-llvm-action@v1
       with:
