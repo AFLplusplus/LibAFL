@@ -12,7 +12,7 @@ use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
     inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
-    schedulers::{HasAFLSchedulerMetadata, RemovableScheduler, Scheduler},
+    schedulers::{AflScheduler, RemovableScheduler, Scheduler},
     state::{HasCorpus, State, UsesState},
     Error, HasMetadata,
 };
@@ -210,7 +210,7 @@ where
     }
 }
 
-impl<O, S> HasAFLSchedulerMetadata<O, S> for PowerQueueScheduler<O, S>
+impl<O, S> AflScheduler<O, S> for PowerQueueScheduler<O, S>
 where
     S: HasCorpus + HasMetadata + HasTestcase + State,
     O: MapObserver,

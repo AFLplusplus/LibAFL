@@ -16,7 +16,7 @@ use crate::{
     schedulers::{
         powersched::{PowerSchedule, SchedulerMetadata},
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
-        HasAFLSchedulerMetadata, RemovableScheduler, Scheduler,
+        AflScheduler, RemovableScheduler, Scheduler,
     },
     state::{HasCorpus, HasRand, State, UsesState},
     Error, HasMetadata,
@@ -254,7 +254,7 @@ where
     }
 }
 
-impl<F, O, S> HasAFLSchedulerMetadata<O, S> for WeightedScheduler<F, O, S>
+impl<F, O, S> AflScheduler<O, S> for WeightedScheduler<F, O, S>
 where
     F: TestcaseScore<S>,
     S: HasCorpus + HasMetadata + HasTestcase + HasRand + State,
