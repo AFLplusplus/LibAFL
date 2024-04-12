@@ -18,7 +18,7 @@ args = ["install", "cargo-fuzz"]
 # Fuzzer
 [tasks.build]
 command = "cargo"
-args = ["+nightly", "fuzz", "run", "fuzz_target_1"]
+args = ["+nightly", "fuzz", "build", "fuzz_target_1"]
 dependencies = [ "install_cargo_fuzz", "install_llvm_tools"]
 
 [tasks.test]
