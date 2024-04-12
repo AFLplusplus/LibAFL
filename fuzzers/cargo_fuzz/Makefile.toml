@@ -25,4 +25,4 @@ windows_alias = "unsupported"
 # Clean
 [tasks.clean]
 command = "rm "
-args = ["-rf" "fuzz/target"]
+args = ["-rf", "fuzz/target"]
