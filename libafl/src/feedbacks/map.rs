@@ -28,7 +28,7 @@ use crate::{
     Error, HasMetadata, HasNamedMetadata,
 };
 
-/// A [`MapFeedback`] that implements the AFL algorithm using an [`OrReducer`] combining the bits for the history map and the bit from [`HitcountsMapObserver`].
+/// A [`MapFeedback`] that implements the AFL algorithm using an [`OrReducer`] combining the bits for the history map and the bit from (`HitcountsMapObserver`)[crate::observers::HitcountsMapObserver].
 pub type AflMapFeedback<C, O, S, T> = MapFeedback<C, DifferentIsNovel, O, OrReducer, S, T>;
 
 /// A [`MapFeedback`] that strives to maximize the map contents.
