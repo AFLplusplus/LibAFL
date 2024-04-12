@@ -295,8 +295,8 @@ pub mod macros {
     /// # }
     /// #
     /// impl<C, O> MyCustomScheduler<C, O> where O: MapObserver, C: AsRef<O> + CanTrack {
-    ///     pub fn new(obs: &A) -> Self {
-    ///         require_index_tracking!("MyCustomScheduler", A);
+    ///     pub fn new(obs: &C) -> Self {
+    ///         require_index_tracking!("MyCustomScheduler", C);
     ///         todo!("Construct your type")
     ///     }
     /// }
