@@ -15,7 +15,7 @@ use crate::{
     Error, HasMetadata,
 };
 
-/// Metadata for `StdOutFeddback`,
+/// Metadata for `StdOutToMetadataFeedback`.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StdOutMetadata {
     #[allow(missing_docs)]
@@ -27,15 +27,16 @@ impl_serdeany!(StdOutMetadata);
 /// Nop feedback that annotates stdout in the new testcase. The testcase
 /// is never interesting (use with an OR).
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct StdOutFeedback {
+pub struct StdOutToMetadataFeedback {
     name: String,
 }
 
-impl<S> Feedback<S> for StdOutFeedback
+impl<S> Feedback<S> for StdOutToMetadataFeedback
 where
     S: State,
 {
     #[allow(clippy::wrong_self_convention)]
+    #[inline]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
@@ -87,15 +88,16 @@ where
     }
 }
 
-impl Named for StdOutFeedback {
+impl Named for StdOutToMetadataFeedback {
     #[inline]
     fn name(&self) -> &str {
         self.name.as_str()
     }
 }
 
-impl StdOutFeedback {
-    /// Creates a new [`StdOutFeedback`].
+impl StdOutToMetadataFeedback {
+    /// Creates a new [`StdOutToMetadataFeedback`]. The provided `name` is
+    /// used to look up the observer.
     #[must_use]
     pub fn new(name: &str) -> Self {
         Self {
@@ -103,7 +105,7 @@ impl StdOutFeedback {
         }
     }
 
-    /// Creates a new [`StdOutFeedback`].
+    /// Creates a new [`StdOutToMetadataFeedback`].
     #[must_use]
     pub fn with_observer(observer: &StdOutObserver) -> Self {
         Self {
@@ -112,7 +114,7 @@ impl StdOutFeedback {
     }
 }
 
-/// Metadata for `StdErrFeedback`.
+/// Metadata for `StdErrToMetadataFeedback`.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StdErrMetadata {
     #[allow(missing_docs)]
@@ -124,15 +126,16 @@ impl_serdeany!(StdErrMetadata);
 /// Nop feedback that annotates stderr in the new testcase. The testcase
 /// is never interesting (use with an OR).
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct StdErrFeedback {
+pub struct StdErrToMetadataFeedback {
     name: String,
 }
 
-impl<S> Feedback<S> for StdErrFeedback
+impl<S> Feedback<S> for StdErrToMetadataFeedback
 where
     S: State,
 {
     #[allow(clippy::wrong_self_convention)]
+    #[inline]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
@@ -184,15 +187,16 @@ where
     }
 }
 
-impl Named for StdErrFeedback {
+impl Named for StdErrToMetadataFeedback {
     #[inline]
     fn name(&self) -> &str {
         self.name.as_str()
     }
 }
 
-impl StdErrFeedback {
-    /// Creates a new [`StdErrFeedback`].
+impl StdErrToMetadataFeedback {
+    /// Creates a new [`StdErrToMetadataFeedback`]. The provided `name` is
+    /// used to look up the observer.
     #[must_use]
     pub fn new(name: &str) -> Self {
         Self {
@@ -200,7 +204,7 @@ impl StdErrFeedback {
         }
     }
 
-    /// Creates a new [`StdErrFeedback`].
+    /// Creates a new [`StdErrToMetadataFeedback`].
     #[must_use]
     pub fn with_observer(observer: &StdErrObserver) -> Self {
         Self {
