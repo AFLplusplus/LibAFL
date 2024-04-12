@@ -2,7 +2,9 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use paste::paste;
 use strum_macros::EnumIter;
 
-use crate::{extern_c_checked, GuestAddr};
+use crate::{extern_c_checked, GuestAddr, libafl_mapinfo, MapInfo, strlen};
+
+use core::{str::from_utf8_unchecked, slice::from_raw_parts};
 
 extern_c_checked! {
     pub fn qemu_user_init(argc: i32, argv: *const *const u8, envp: *const *const u8) -> i32;
@@ -27,3 +29,31 @@ pub enum VerifyAccess {
     Read = libc::PROT_READ,
     Write = libc::PROT_READ | libc::PROT_WRITE,
 }
+
+impl From<libafl_mapinfo> for MapInfo {
+    fn from(map_info: libafl_mapinfo) -> Self {
+        let path: Option<String> = if map_info.path.is_null() {
+            None
+        } else {
+            unsafe {
+                Some(
+                    from_utf8_unchecked(from_raw_parts(
+                        map_info.path as *const u8,
+                        strlen(map_info.path as *const u8),
+                    ))
+                        .to_string(),
+                )
+            }
+        };
+
+        MapInfo {
+            start: map_info.start,
+            end: map_info.end,
+            offset: map_info.offset,
+            path,
+            flags: map_info.flags,
+            is_priv: map_info.is_priv,
+        }
+    }
+}
+
