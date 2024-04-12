@@ -16,11 +16,15 @@ command = "cargo"
 args = ["+nightly", "fuzz", "run", "fuzz_target_1"]
 dependencies = [ "install_cargo_fuzz"]
 
-# Test
 [tasks.test]
-linux_alias = "unsupported"
+linux_alias = "test_unix"
 mac_alias = "unsupported"
 windows_alias = "unsupported"
+
+[tasks.test_unix]
+script='''
+'''
+dependencies = ["build"]
 
 # Clean
 [tasks.clean]
