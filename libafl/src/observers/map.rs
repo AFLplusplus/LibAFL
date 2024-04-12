@@ -354,12 +354,12 @@ pub mod macros {
     /// # use core::marker::PhantomData;
     /// #
     /// # struct MyCustomScheduler<C, O> {
-    /// #     phantom: PhantomData<(O, A)>,
+    /// #     phantom: PhantomData<(C, O)>,
     /// # }
     /// #
     /// impl<C, O> MyCustomScheduler<C, O> where O: MapObserver, C: AsRef<O> + CanTrack {
-    ///     pub fn new(obs: &A) -> Self {
-    ///         require_novelties_tracking!("MyCustomScheduler", A);
+    ///     pub fn new(obs: &C) -> Self {
+    ///         require_novelties_tracking!("MyCustomScheduler", C);
     ///         todo!("Construct your type")
     ///     }
     /// }
