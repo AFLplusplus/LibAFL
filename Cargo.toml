@@ -31,6 +31,8 @@ default-members = [
 exclude = [
     "bindings",
     "fuzzers",
+    "fuzzers/cargo_fuzz",
+    "fuzzers/cargo_fuzz/fuzz",
     "libafl_qemu/libafl_qemu_build",
     "libafl_qemu/libafl_qemu_sys",
     "utils/noaslr",
