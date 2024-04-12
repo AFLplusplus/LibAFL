@@ -98,7 +98,7 @@ macro_rules! extern_c_checked {
 
 #[cfg(target_os = "linux")]
 use core::ops::BitAnd;
-use std::{ffi::c_void};
+use std::ffi::c_void;
 
 #[cfg(all(not(feature = "clippy"), target_os = "linux"))]
 pub use bindings::*;

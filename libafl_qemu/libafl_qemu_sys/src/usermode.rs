@@ -1,10 +1,10 @@
+use core::{slice::from_raw_parts, str::from_utf8_unchecked};
+
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use paste::paste;
 use strum_macros::EnumIter;
 
-use crate::{extern_c_checked, GuestAddr, libafl_mapinfo, MapInfo, strlen};
-
-use core::{str::from_utf8_unchecked, slice::from_raw_parts};
+use crate::{extern_c_checked, libafl_mapinfo, strlen, GuestAddr, MapInfo};
 
 extern_c_checked! {
     pub fn qemu_user_init(argc: i32, argv: *const *const u8, envp: *const *const u8) -> i32;
@@ -41,7 +41,7 @@ impl From<libafl_mapinfo> for MapInfo {
                         map_info.path as *const u8,
                         strlen(map_info.path as *const u8),
                     ))
-                        .to_string(),
+                    .to_string(),
                 )
             }
         };
@@ -56,4 +56,3 @@ impl From<libafl_mapinfo> for MapInfo {
         }
     }
 }
-
