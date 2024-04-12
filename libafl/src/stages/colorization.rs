@@ -54,20 +54,20 @@ impl Ord for Earlier {
 
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
-pub struct ColorizationStage<A, E, EM, O, Z> {
+pub struct ColorizationStage<C, E, EM, O, Z> {
     map_observer_name: String,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(A, E, EM, O, E, Z)>,
+    phantom: PhantomData<(C, E, EM, O, E, Z)>,
 }
 
-impl<A, E, EM, O, Z> UsesState for ColorizationStage<A, E, EM, O, Z>
+impl<C, E, EM, O, Z> UsesState for ColorizationStage<C, E, EM, O, Z>
 where
     E: UsesState,
 {
     type State = E::State;
 }
 
-impl<A, E, EM, O, Z> Named for ColorizationStage<A, E, EM, O, Z>
+impl<C, E, EM, O, Z> Named for ColorizationStage<C, E, EM, O, Z>
 where
     E: UsesState,
 {
@@ -76,14 +76,14 @@ where
     }
 }
 
-impl<A, E, EM, O, Z> Stage<E, EM, Z> for ColorizationStage<A, E, EM, O, Z>
+impl<C, E, EM, O, Z> Stage<E, EM, Z> for ColorizationStage<C, E, EM, O, Z>
 where
     EM: UsesState<State = E::State> + EventFirer,
     E: HasObservers + Executor<EM, Z>,
     E::State: HasCorpus + HasMetadata + HasRand + HasNamedMetadata,
     E::Input: HasBytesVec,
     O: MapObserver,
-    A: AsRef<O> + Named,
+    C: AsRef<O> + Named,
     Z: UsesState<State = E::State>,
 {
     #[inline]
@@ -151,11 +151,11 @@ impl TaintMetadata {
 
 libafl_bolts::impl_serdeany!(TaintMetadata);
 
-impl<A, E, EM, O, Z> ColorizationStage<A, E, EM, O, Z>
+impl<C, E, EM, O, Z> ColorizationStage<C, E, EM, O, Z>
 where
     EM: UsesState<State = E::State> + EventFirer,
     O: MapObserver,
-    A: AsRef<O> + Named,
+    C: AsRef<O> + Named,
     E: HasObservers + Executor<EM, Z>,
     E::State: HasCorpus + HasMetadata + HasRand,
     E::Input: HasBytesVec,
@@ -299,7 +299,7 @@ where
 
     #[must_use]
     /// Creates a new [`ColorizationStage`]
-    pub fn new(map_observer: &A) -> Self {
+    pub fn new(map_observer: &C) -> Self {
         Self {
             map_observer_name: map_observer.name().to_string(),
             phantom: PhantomData,
@@ -321,7 +321,7 @@ where
 
         let observer = executor
             .observers()
-            .match_name::<A>(name)
+            .match_name::<C>(name)
             .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
             .as_ref();
 

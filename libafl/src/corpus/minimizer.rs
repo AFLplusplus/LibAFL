@@ -49,21 +49,21 @@ where
 ///
 /// Algorithm based on WMOPT: <https://hexhive.epfl.ch/publications/files/21ISSTA2.pdf>
 #[derive(Debug)]
-pub struct MapCorpusMinimizer<A, E, O, T, TS> {
+pub struct MapCorpusMinimizer<C, E, O, T, TS> {
     obs_name: String,
-    phantom: PhantomData<(A, E, O, T, TS)>,
+    phantom: PhantomData<(C, E, O, T, TS)>,
 }
 
 /// Standard corpus minimizer, which weights inputs by length and time.
-pub type StdCorpusMinimizer<A, E, O, T> =
-    MapCorpusMinimizer<A, E, O, T, LenTimeMulTestcaseScore<<E as UsesState>::State>>;
+pub type StdCorpusMinimizer<C, E, O, T> =
+    MapCorpusMinimizer<C, E, O, T, LenTimeMulTestcaseScore<<E as UsesState>::State>>;
 
-impl<A, E, O, T, TS> MapCorpusMinimizer<A, E, O, T, TS>
+impl<C, E, O, T, TS> MapCorpusMinimizer<C, E, O, T, TS>
 where
     E: UsesState,
     E::State: HasCorpus + HasMetadata,
     TS: TestcaseScore<E::State>,
-    A: Named,
+    C: Named,
 {
     /// Constructs a new `MapCorpusMinimizer` from a provided observer. This observer will be used
     /// in the future to get observed maps from an executed input.
@@ -75,11 +75,11 @@ where
     }
 }
 
-impl<A, E, O, T, TS> CorpusMinimizer<E> for MapCorpusMinimizer<A, E, O, T, TS>
+impl<C, E, O, T, TS> CorpusMinimizer<E> for MapCorpusMinimizer<C, E, O, T, TS>
 where
     E: UsesState,
     for<'a> O: MapObserver<Entry = T> + AsIter<'a, Item = T>,
-    A: AsRef<O>,
+    C: AsRef<O>,
     E::State: HasMetadata + HasCorpus + HasExecutions,
     T: Copy + Hash + Eq,
     TS: TestcaseScore<E::State>,
@@ -161,7 +161,7 @@ where
             let seed_expr = Bool::fresh_const(&ctx, "seed");
             let obs = executor
                 .observers()
-                .match_name::<A>(&self.obs_name)
+                .match_name::<C>(&self.obs_name)
                 .expect("Observer must be present.")
                 .as_ref();
 

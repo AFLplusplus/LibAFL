@@ -290,11 +290,11 @@ pub mod macros {
     /// # use libafl::require_index_tracking;
     /// # use core::marker::PhantomData;
     /// #
-    /// # struct MyCustomScheduler<A, O> {
-    /// #     phantom: PhantomData<(A, O)>,
+    /// # struct MyCustomScheduler<C, O> {
+    /// #     phantom: PhantomData<(C, O)>,
     /// # }
     /// #
-    /// impl<A, O> MyCustomScheduler<A, O> where O: MapObserver, A: AsRef<O> + CanTrack {
+    /// impl<C, O> MyCustomScheduler<C, O> where O: MapObserver, C: AsRef<O> + CanTrack {
     ///     pub fn new(obs: &A) -> Self {
     ///         require_index_tracking!("MyCustomScheduler", A);
     ///         todo!("Construct your type")
@@ -353,11 +353,11 @@ pub mod macros {
     /// # use libafl::require_novelties_tracking;
     /// # use core::marker::PhantomData;
     /// #
-    /// # struct MyCustomScheduler<A, O> {
+    /// # struct MyCustomScheduler<C, O> {
     /// #     phantom: PhantomData<(O, A)>,
     /// # }
     /// #
-    /// impl<A, O> MyCustomScheduler<A, O> where O: MapObserver, A: AsRef<O> + CanTrack {
+    /// impl<C, O> MyCustomScheduler<C, O> where O: MapObserver, C: AsRef<O> + CanTrack {
     ///     pub fn new(obs: &A) -> Self {
     ///         require_novelties_tracking!("MyCustomScheduler", A);
     ///         todo!("Construct your type")
@@ -411,7 +411,7 @@ pub mod macros {
 /// A [`MapObserver`] observes the static map, as oftentimes used for AFL-like coverage information
 ///
 /// When referring to this type in a constraint (e.g. `O: MapObserver`), ensure that you only refer
-/// to instances of a second type, e.g. `A: AsRef<O>` or `A: AsMut<O>`. Map observer instances are
+/// to instances of a second type, e.g. `C: AsRef<O>` or `A: AsMut<O>`. Map observer instances are
 /// passed around in a way that may be potentially wrapped by e.g. [`ExplicitTracking`] as a way to
 /// encode metadata into the type. This is an unfortunate additional requirement that we can't get
 /// around without specialization.
