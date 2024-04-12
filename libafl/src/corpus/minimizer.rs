@@ -67,7 +67,7 @@ where
 {
     /// Constructs a new `MapCorpusMinimizer` from a provided observer. This observer will be used
     /// in the future to get observed maps from an executed input.
-    pub fn new(obs: &A) -> Self {
+    pub fn new(obs: &C) -> Self {
         Self {
             obs_name: obs.name().to_string(),
             phantom: PhantomData,
