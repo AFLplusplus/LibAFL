@@ -62,11 +62,21 @@ macro_rules! binary_expression_builder {
 }
 
 impl Runtime for TracingRuntime {
+    #[allow(clippy::missing_safety_doc)]
+    #[no_mangle]
+    fn build_integer_from_buffer(
+        &mut self,
+        _buffer: *mut core::ffi::c_void,
+        _num_bits: core::ffi::c_uint,
+    ) -> Option<RSymExpr> {
+        // todo
+        self.write_message(SymExpr::IntegerFromBuffer {})
+    }
+
     expression_builder!(get_input_byte(offset: usize, value: u8) => InputByte);
 
     expression_builder!(build_integer(value: u64, bits: u8) => Integer);
     expression_builder!(build_integer128(high: u64, low: u64) => Integer128);
-    expression_builder!(build_integer_from_buffer(buffer: *mut core::ffi::c_void, num_bits: core::ffi::c_uint) => Integer);
     expression_builder!(build_float(value: f64, is_double: bool) => Float);
     expression_builder!(build_null_pointer() => NullPointer);
     expression_builder!(build_true() => True);

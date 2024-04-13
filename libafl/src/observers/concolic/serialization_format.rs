@@ -117,6 +117,7 @@ impl<R: Read> MessageFileReader<R> {
             SymExpr::InputByte { .. }
             | SymExpr::Integer { .. }
             | SymExpr::Integer128 { .. }
+            | SymExpr::IntegerFromBuffer { .. }
             | SymExpr::Float { .. }
             | SymExpr::NullPointer
             | SymExpr::True
@@ -290,6 +291,7 @@ impl<W: Write + Seek> MessageFileWriter<W> {
             SymExpr::InputByte { .. }
             | SymExpr::Integer { .. }
             | SymExpr::Integer128 { .. }
+            | SymExpr::IntegerFromBuffer { .. }
             | SymExpr::Float { .. }
             | SymExpr::NullPointer
             | SymExpr::True
