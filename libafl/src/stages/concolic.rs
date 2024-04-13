@@ -179,7 +179,7 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
                 Some(BV::from_u64(&ctx, value, u32::from(bits)).into())
             }
             SymExpr::Integer128 { high: _, low: _ } => todo!(),
-            SymExpr::IntegerFromBuffer { } => todo!(),
+            SymExpr::IntegerFromBuffer {} => todo!(),
             SymExpr::NullPointer => Some(BV::from_u64(&ctx, 0, usize::BITS).into()),
             SymExpr::True => Some(Bool::from_bool(&ctx, true).into()),
             SymExpr::False => Some(Bool::from_bool(&ctx, false).into()),
