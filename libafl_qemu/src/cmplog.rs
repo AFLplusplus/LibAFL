@@ -66,9 +66,7 @@ impl Default for QemuCmpLogHelper {
     }
 }
 
-impl<S: UsesInput> HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter, S>
-    for QemuCmpLogHelper
-{
+impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuCmpLogHelper {
     fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
         &self.filter
     }
@@ -347,9 +345,7 @@ impl QemuCmpLogRoutinesHelper {
 }
 
 #[cfg(emulation_mode = "usermode")]
-impl<S: UsesInput> HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter, S>
-    for QemuCmpLogRoutinesHelper
-{
+impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuCmpLogRoutinesHelper {
     fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
         &self.filter
     }

@@ -530,7 +530,7 @@ where
         let qemu_helpers = qemu_executor_state.hooks_mut().helpers_mut();
 
         let addr_range_filter =
-            HasInstrumentationFilter::<QemuInstrumentationAddressRangeFilter, S>::filter_mut(
+            HasInstrumentationFilter::<QemuInstrumentationAddressRangeFilter>::filter_mut(
                 qemu_helpers,
             );
 
