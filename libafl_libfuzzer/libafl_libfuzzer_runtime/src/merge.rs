@@ -105,7 +105,7 @@ pub fn merge(
     let edges_observer =
         MappedEdgeMapObserver::new(edges_observer, SizeTimeValueObserver::new(time));
 
-    let map_feedback = MinMapFeedback::tracking(&edges_observer, false, true);
+    let map_feedback = MinMapFeedback::new(&edges_observer);
 
     // Create an OOM observer to monitor if an OOM has occurred
     let oom_observer = OomObserver::new(options.rss_limit(), options.malloc_limit());

@@ -23,6 +23,8 @@ pub use new_hash_feedback::NewHashFeedbackMetadata;
 
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
+#[cfg(feature = "std")]
+pub mod stdio;
 pub mod transferred;
 
 /// The module for list feedback

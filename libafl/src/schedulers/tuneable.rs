@@ -12,8 +12,8 @@ use super::RemovableScheduler;
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase},
     schedulers::Scheduler,
-    state::{HasCorpus, HasMetadata, State, UsesState},
-    Error,
+    state::{HasCorpus, State, UsesState},
+    Error, HasMetadata,
 };
 
 #[derive(Default, Clone, Copy, Eq, PartialEq, Debug, Serialize, Deserialize)]

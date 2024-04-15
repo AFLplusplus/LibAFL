@@ -1,4 +1,8 @@
-use std::marker::PhantomData;
+use std::{
+    io::{Read, Seek},
+    marker::PhantomData,
+    os::fd::AsRawFd,
+};
 
 use libafl::{
     executors::{Executor, ExitKind, HasObservers},
@@ -43,6 +47,7 @@ where
     S: State + HasExecutions,
     S::Input: HasTargetBytes,
     Z: UsesState<State = S>,
+    OT: ObserversTuple<S>,
 {
     fn run_target(
         &mut self,
@@ -65,35 +70,57 @@ where
             )));
         }
 
+        self.helper
+            .nyx_stdout
+            .set_len(0)
+            .map_err(|e| Error::illegal_state(format!("Failed to clear Nyx stdout: {e}")))?;
+
         let size = u32::try_from(buffer.len())
             .map_err(|_| Error::unsupported("Inputs larger than 4GB are not supported"))?;
+        // Duplicate the file descriptor since QEMU(?) closes it and we
+        // want to keep |self.helper.nyx_stdout| open.
+        let hprintf_fd = nix::unistd::dup(self.helper.nyx_stdout.as_raw_fd())
+            .map_err(|e| Error::illegal_state(format!("Failed to duplicate Nyx stdout fd: {e}")))?;
 
         self.helper.nyx_process.set_input(buffer, size);
+        self.helper.nyx_process.set_hprintf_fd(hprintf_fd);
 
         // exec will take care of trace_bits, so no need to reset
-        match self.helper.nyx_process.exec() {
-            NyxReturnValue::Normal => Ok(ExitKind::Ok),
-            NyxReturnValue::Crash | NyxReturnValue::Asan => Ok(ExitKind::Crash),
-            NyxReturnValue::Timeout => Ok(ExitKind::Timeout),
+        let exit_kind = match self.helper.nyx_process.exec() {
+            NyxReturnValue::Normal => ExitKind::Ok,
+            NyxReturnValue::Crash | NyxReturnValue::Asan => ExitKind::Crash,
+            NyxReturnValue::Timeout => ExitKind::Timeout,
             NyxReturnValue::InvalidWriteToPayload => {
                 self.helper.nyx_process.shutdown();
-                Err(Error::illegal_state(
+                return Err(Error::illegal_state(
                     "FixMe: Nyx InvalidWriteToPayload handler is missing",
-                ))
+                ));
             }
             NyxReturnValue::Error => {
                 self.helper.nyx_process.shutdown();
-                Err(Error::illegal_state("Nyx runtime error has occurred"))
+                return Err(Error::illegal_state("Nyx runtime error has occurred"));
             }
             NyxReturnValue::IoError => {
                 self.helper.nyx_process.shutdown();
-                Err(Error::unknown("QEMU-nyx died"))
+                return Err(Error::unknown("QEMU-nyx died"));
             }
             NyxReturnValue::Abort => {
                 self.helper.nyx_process.shutdown();
-                Err(Error::shutting_down())
+                return Err(Error::shutting_down());
             }
+        };
+
+        if self.observers.observes_stdout() {
+            let mut stdout = Vec::new();
+            self.helper.nyx_stdout.rewind()?;
+            self.helper
+                .nyx_stdout
+                .read_to_end(&mut stdout)
+                .map_err(|e| Error::illegal_state(format!("Failed to read Nyx stdout: {e}")))?;
+            self.observers.observe_stdout(&stdout);
         }
+
+        Ok(exit_kind)
     }
 }
 

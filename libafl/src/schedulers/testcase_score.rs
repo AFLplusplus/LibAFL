@@ -11,8 +11,8 @@ use crate::{
         minimizer::{IsFavoredMetadata, TopRatedsMetadata},
         powersched::{PowerSchedule, SchedulerMetadata},
     },
-    state::{HasCorpus, HasMetadata},
-    Error,
+    state::HasCorpus,
+    Error, HasMetadata,
 };
 
 /// Compute the favor factor of a [`Testcase`]. Higher is better.

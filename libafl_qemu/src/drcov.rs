@@ -1,9 +1,7 @@
 use std::{path::PathBuf, sync::Mutex};
 
 use hashbrown::{hash_map::Entry, HashMap};
-use libafl::{
-    executors::ExitKind, inputs::UsesInput, observers::ObserversTuple, state::HasMetadata,
-};
+use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple, HasMetadata};
 use libafl_qemu_sys::{GuestAddr, GuestUsize};
 use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 use rangemap::RangeMap;

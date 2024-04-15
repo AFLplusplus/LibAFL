@@ -21,10 +21,11 @@ use libafl::{
         token_mutations::Tokens,
         I2SRandReplace,
     },
-    observers::{HitcountsMapObserver, TimeObserver, VariableMapObserver},
+    observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
-    state::{HasCorpus, HasMetadata, StdState},
+    state::{HasCorpus, StdState},
+    HasMetadata,
 };
 use libafl_bolts::{
     core_affinity::Cores,
@@ -155,6 +156,7 @@ where
                     edges_map_mut_slice(),
                     addr_of_mut!(edges::MAX_EDGES_NUM),
                 ))
+                .track_indices()
             };
 
             // Create an observation channel to keep track of the execution time
@@ -167,7 +169,7 @@ where
             // This one is composed by two Feedbacks in OR
             let mut feedback = feedback_or!(
                 // New maximization map feedback linked to the edges observer and the feedback state
-                MaxMapFeedback::tracking(&edges_observer, true, false),
+                MaxMapFeedback::new(&edges_observer),
                 // Time feedback, this one does not need a feedback state
                 TimeFeedback::with_observer(&time_observer)
             );
@@ -199,7 +201,8 @@ where
             }
 
             // A minimization+queue policy to get testcasess from the corpus
-            let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+            let scheduler =
+                IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
             // A fuzzer with feedbacks and a corpus scheduler
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -208,7 +211,7 @@ where
             let mut harness = |input: &BytesInput| {
                 let target = input.target_bytes();
                 let buf = target.as_slice();
-                (harness_bytes)(buf);
+                harness_bytes(buf);
                 ExitKind::Ok
             };
 
@@ -434,5 +437,88 @@ where
         #[cfg(unix)]
         let launcher = launcher.stdout_file(Some("/dev/null"));
         launcher.build().launch().expect("Launcher failed");
+    }
+}
+
+/// python bindings for this sugar
+#[cfg(feature = "python")]
+pub mod pybind {
+    use std::path::PathBuf;
+
+    use libafl_bolts::core_affinity::Cores;
+    use libafl_qemu::emu::pybind::Qemu;
+    use pyo3::{prelude::*, types::PyBytes};
+
+    use crate::qemu;
+
+    #[pyclass(unsendable)]
+    #[derive(Debug)]
+    struct QemuBytesCoverageSugar {
+        input_dirs: Vec<PathBuf>,
+        output_dir: PathBuf,
+        broker_port: u16,
+        cores: Cores,
+        use_cmplog: Option<bool>,
+        iterations: Option<u64>,
+        tokens_file: Option<PathBuf>,
+        timeout: Option<u64>,
+    }
+
+    #[pymethods]
+    impl QemuBytesCoverageSugar {
+        /// Create a new [`QemuBytesCoverageSugar`]
+        #[new]
+        #[allow(clippy::too_many_arguments)]
+        fn new(
+            input_dirs: Vec<PathBuf>,
+            output_dir: PathBuf,
+            broker_port: u16,
+            cores: Vec<usize>,
+            use_cmplog: Option<bool>,
+            iterations: Option<u64>,
+            tokens_file: Option<PathBuf>,
+            timeout: Option<u64>,
+        ) -> Self {
+            Self {
+                input_dirs,
+                output_dir,
+                broker_port,
+                cores: cores.into(),
+                use_cmplog,
+                iterations,
+                tokens_file,
+                timeout,
+            }
+        }
+
+        /// Run the fuzzer
+        #[allow(clippy::needless_pass_by_value)]
+        pub fn run(&self, qemu: &Qemu, harness: PyObject) {
+            qemu::QemuBytesCoverageSugar::builder()
+                .input_dirs(&self.input_dirs)
+                .output_dir(self.output_dir.clone())
+                .broker_port(self.broker_port)
+                .cores(&self.cores)
+                .harness(|buf| {
+                    Python::with_gil(|py| -> PyResult<()> {
+                        let args = (PyBytes::new(py, buf),); // TODO avoid copy
+                        harness.call1(py, args)?;
+                        Ok(())
+                    })
+                    .unwrap();
+                })
+                .use_cmplog(self.use_cmplog)
+                .timeout(self.timeout)
+                .tokens_file(self.tokens_file.clone())
+                .iterations(self.iterations)
+                .build()
+                .run(&qemu.qemu);
+        }
+    }
+
+    /// Register this class
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<QemuBytesCoverageSugar>()?;
+        Ok(())
     }
 }

@@ -10,7 +10,8 @@ use crate::{
     executors::ExitKind,
     feedbacks::Feedback,
     observers::{ListObserver, ObserversTuple},
-    state::{HasNamedMetadata, State},
+    state::State,
+    HasNamedMetadata,
 };
 
 /// The metadata to remember past observed value

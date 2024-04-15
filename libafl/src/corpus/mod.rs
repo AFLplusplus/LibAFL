@@ -63,7 +63,7 @@ impl From<CorpusId> for usize {
     }
 }
 
-/// Utility macro to call `Corpus::random_id`
+/// Utility macro to call `Corpus::random_id`; fetches only enabled testcases
 #[macro_export]
 macro_rules! random_corpus_id {
     ($corpus:expr, $rand:expr) => {{
@@ -73,18 +73,38 @@ macro_rules! random_corpus_id {
     }};
 }
 
+/// Utility macro to call `Corpus::random_id`; fetches both enabled and disabled testcases
+/// Note: use `Corpus::get_from_all` as disabled entries are inaccessible from `Corpus::get`
+#[macro_export]
+macro_rules! random_corpus_id_with_disabled {
+    ($corpus:expr, $rand:expr) => {{
+        let cnt = $corpus.count_all() as u64;
+        let nth = $rand.below(cnt) as usize;
+        $corpus.nth_from_all(nth)
+    }};
+}
+
 /// Corpus with all current [`Testcase`]s, or solutions
 pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
-    /// Returns the number of elements
+    /// Returns the number of all enabled entries
     fn count(&self) -> usize;
+
+    /// Returns the number of all disabled entries
+    fn count_disabled(&self) -> usize;
+
+    /// Returns the number of elements including disabled entries
+    fn count_all(&self) -> usize;
 
     /// Returns true, if no elements are in this corpus yet
     fn is_empty(&self) -> bool {
         self.count() == 0
     }
 
-    /// Add an entry to the corpus and return its index
+    /// Add an enabled testcase to the corpus and return its index
     fn add(&mut self, testcase: Testcase<Self::Input>) -> Result<CorpusId, Error>;
+
+    /// Add a disabled testcase to the corpus and return its index
+    fn add_disabled(&mut self, testcase: Testcase<Self::Input>) -> Result<CorpusId, Error>;
 
     /// Replaces the [`Testcase`] at the given idx, returning the existing.
     fn replace(
@@ -96,8 +116,11 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
     /// Removes an entry from the corpus, returning it if it was present.
     fn remove(&mut self, id: CorpusId) -> Result<Testcase<Self::Input>, Error>;
 
-    /// Get by id
+    /// Get by id; considers only enabled testcases
     fn get(&self, id: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error>;
+
+    /// Get by id; considers both enabled and disabled testcases
+    fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error>;
 
     /// Current testcase scheduled
     fn current(&self) -> &Option<CorpusId>;
@@ -126,12 +149,15 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
         }
     }
 
-    /// Get the nth corpus id
+    /// Get the nth corpus id; considers only enabled testcases
     fn nth(&self, nth: usize) -> CorpusId {
         self.ids()
             .nth(nth)
             .expect("Failed to get the {nth} CorpusId")
     }
+
+    /// Get the nth corpus id; considers both enabled and disabled testcases
+    fn nth_from_all(&self, nth: usize) -> CorpusId;
 
     /// Method to load the input for this [`Testcase`] from persistent storage,
     /// if necessary, and if was not already loaded (`== Some(input)`).

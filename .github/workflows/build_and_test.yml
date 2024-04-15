@@ -2,18 +2,22 @@ name: build and test
 
 on:
   push:
-    branches: [ main, 'pr/**' ]
+    branches: [main, "pr/**"]
   pull_request:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
+  merge_group:
 env:
   CARGO_TERM_COLOR: always
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   common:
     strategy:
       matrix:
-          os: [ubuntu-latest, windows-latest, macOS-latest]
+        os: [ubuntu-latest, windows-latest, macOS-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Install mimetype
@@ -37,6 +41,10 @@ jobs:
           crate: mdbook-linkcheck
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
+        with: { shared-key: "ubuntu" }
+        if: runner.os == 'Linux'
+      - uses: Swatinem/rust-cache@v2
+        if: runner.os != 'Linux'
       - name: Check for binary blobs
         if: runner.os == 'Linux'
         run: ./scripts/check_for_blobs.sh
@@ -72,6 +80,7 @@ jobs:
           toolchain: stable
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
+        with: { shared-key: "llvm-tester" }
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
         with:
@@ -79,86 +88,126 @@ jobs:
       - name: Build and test with llvm-${{ matrix.llvm-version }}
         run: pwd && ls & cd libafl_cc && cargo build --release
 
+  ubuntu-doc:
+    runs-on: ubuntu-22.04
+    needs: ubuntu
+    steps:
+      - name: Remove Dotnet & Haskell
+        run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+      - name: Remove existing clang and LLVM
+        run: sudo apt purge llvm* clang* lld* lldb* opt*
+      - name: Install and cache deps
+        run: sudo apt update && sudo apt install ninja-build shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
+      - name: Add nightly rustfmt and clippy
+        run: rustup toolchain install nightly --component rustfmt --component clippy --component miri --allow-downgrade
+      - uses: actions/checkout@v3
+      - uses: Swatinem/rust-cache@v2
+        with: { shared-key: "ubuntu" }
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v1
+        with:
+          directory: ${{ runner.temp }}/llvm
+          version: 17
+      # ---- doc check ----
+      - name: Build Docs
+        run: RUSTFLAGS="--cfg docsrs" cargo +nightly doc --all-features
+      - name: Test Docs
+        run: RUSTFLAGS="--cfg docsrs" cargo +nightly test --doc --all-features
+
+  ubuntu-miri:
+    runs-on: ubuntu-22.04
+    needs: ubuntu
+    steps:
+      - name: Remove Dotnet & Haskell
+        run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+      - name: Remove existing clang and LLVM
+        run: sudo apt purge llvm* clang* lld* lldb* opt*
+      - name: Install and cache deps
+        run: sudo apt update && sudo apt install ninja-build shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
+      - name: Add nightly rustfmt and clippy
+        run: rustup toolchain install nightly --component rustfmt --component clippy --component miri --allow-downgrade
+      - uses: actions/checkout@v3
+      - uses: Swatinem/rust-cache@v2
+        with: { shared-key: "ubuntu" }
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v1
+        with:
+          directory: ${{ runner.temp }}/llvm
+          version: 17
+      # --- miri undefined behavior test --
+      - name: Run miri tests
+        run: RUST_BACKTRACE=1 MIRIFLAGS="-Zmiri-disable-isolation" cargo +nightly miri test
 
   ubuntu:
     runs-on: ubuntu-22.04
     steps:
-    - name: Remove Dotnet & Haskell
-      run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-    - name: Remove existing clang and LLVM
-      run: sudo apt purge llvm* clang* lld* lldb* opt*
-    - name: Install and cache deps
-      run: sudo apt update && sudo apt install ninja-build shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
-    - name: Add nightly rustfmt and clippy
-      run: rustup toolchain install nightly --component rustfmt --component clippy --component miri --allow-downgrade
-    - name: Install ucd-generate
-      run: cargo install -f ucd-generate
-    - uses: actions/checkout@v3
-    - uses: Swatinem/rust-cache@v2
-    - name: Install LLVM and Clang
-      uses: KyleMayes/install-llvm-action@v1
-      with:
-        directory: ${{ runner.temp }}/llvm
-        version: 17
-    # ---- format check ----
-    # pcguard edges and pcguard hitcounts are not compatible and we need to build them seperately
-    - name: Check pcguard edges
-      run: cargo check --features=sancov_pcguard_edges
-    - name: Format
-      run: cargo fmt -- --check
-    - name: Cleanup
-      run: cargo clean
-    - name: Run clang-format style check for C/C++ programs.
-      run: clang-format -n -Werror --style=file $(find . -type f \( -name '*.cpp' -o -iname '*.hpp' -o -name '*.cc' -o -name '*.cxx' -o -name '*.cc' -o -name '*.h' \) | grep -v '/target/' | grep -v 'libpng-1\.6\.37' | grep -v 'stb_image\.h' | grep -v 'dlmalloc\.c' | grep -v 'QEMU-Nyx')
-    - name: run shellcheck
-      run: shellcheck ./scripts/*.sh
-
-    # ---- doc check ----
-    - name: Build Docs
-      run: RUSTFLAGS="--cfg docsrs" cargo +nightly doc --all-features
-    - name: Test Docs
-      run: RUSTFLAGS="--cfg docsrs" cargo +nightly test --doc --all-features
-    # ---- build normal and examples ----
-    - name: Run a normal build
-      run: cargo build --verbose
-    - name: Build examples
-      run: cargo build --examples --verbose
-
-    # --- miri undefined behavior test --
-    - name: Run miri tests
-      run: RUST_BACKTRACE=1 MIRIFLAGS="-Zmiri-disable-isolation" cargo +nightly miri test
+      - name: Remove Dotnet & Haskell
+        run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+      - name: Remove existing clang and LLVM
+        run: sudo apt purge llvm* clang* lld* lldb* opt*
+      - name: Install and cache deps
+        run: sudo apt update && sudo apt install ninja-build shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
+      - name: Add nightly rustfmt and clippy
+        run: rustup toolchain install nightly --component rustfmt --component clippy --component miri --allow-downgrade
+      - uses: actions/checkout@v3
+      - uses: Swatinem/rust-cache@v2
+        with: { shared-key: "ubuntu" }
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v1
+        with:
+          directory: ${{ runner.temp }}/llvm
+          version: 17
+      # ---- format check ----
+      # pcguard edges and pcguard hitcounts are not compatible and we need to build them seperately
+      - name: Check pcguard edges
+        run: cargo check --features=sancov_pcguard_edges
+      - name: Run clang-format style check for C/C++ programs.
+        run: clang-format -n -Werror --style=file $(find . -type f \( -name '*.cpp' -o -iname '*.hpp' -o -name '*.cc' -o -name '*.cxx' -o -name '*.cc' -o -name '*.h' \) | grep -v '/target/' | grep -v 'libpng-1\.6\.37' | grep -v 'stb_image\.h' | grep -v 'dlmalloc\.c' | grep -v 'QEMU-Nyx')
+      - name: run shellcheck
+        run: shellcheck ./scripts/*.sh
+      # ---- build normal and examples ----
+      - name: Run a normal build
+        run: cargo build --verbose
+      - name: Build examples
+        run: cargo build --examples --verbose
 
   ubuntu-clippy:
     runs-on: ubuntu-22.04
+    needs: ubuntu
     steps:
-    - name: Remove Dotnet & Haskell
-      run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
+      - name: Remove Dotnet & Haskell
+        run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
 
-    - name: Install and cache deps
-      run: sudo apt update && sudo apt install ninja-build shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
-    - name: Add nightly rustfmt and clippy
-      run: rustup toolchain install nightly --component clippy --allow-downgrade && rustup default nightly
-    - uses: actions/checkout@v3
-    - uses: Swatinem/rust-cache@v2
-    - name: Install LLVM and Clang
-      uses: KyleMayes/install-llvm-action@v1
-      with:
-        directory: ${{ runner.temp }}/llvm
-        version: 17
-    - name: Run clippy
-      run: ./scripts/clippy.sh
-
-    # Clean up files to save up disk space
-    - name: Cleanup
-      run: cargo clean
+      - name: Install and cache deps
+        run: sudo apt update && sudo apt install ninja-build shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
+      - name: Add nightly rustfmt and clippy
+        run: rustup toolchain install nightly --component clippy --allow-downgrade && rustup default nightly
+      - uses: actions/checkout@v3
+      - uses: Swatinem/rust-cache@v2
+        with: { shared-key: "ubuntu" }
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v1
+        with:
+          directory: ${{ runner.temp }}/llvm
+          version: 17
+      - name: Run clippy
+        run: ./scripts/clippy.sh
 
     # --- test embedding the libafl_libfuzzer_runtime library
     # Fix me plz
@@ -167,69 +216,110 @@ jobs:
 
   ubuntu-check:
     runs-on: ubuntu-22.04
+    needs: ubuntu
     steps:
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-        components: llvm-tools  
-    - name: Free Disk Space (Ubuntu)
-      uses: jlumbroso/free-disk-space@main
-      with:
-        # this might remove tools that are actually needed,
-        # if set to "true" but frees about 6 GB
-        tool-cache: false
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          components: llvm-tools
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          # this might remove tools that are actually needed,
+          # if set to "true" but frees about 6 GB
+          tool-cache: false
 
-        # all of these default to true, but feel free to set to
-        # "false" if necessary for your workflow
-        android: true
-        dotnet: true
-        haskell: true
-        large-packages: false
-        docker-images: true
-        swap-storage: true
-    - name: Remove existing clang and LLVM
-      run: sudo apt purge llvm* clang*
-    - name: Install and cache deps
-      run: sudo apt update && sudo apt install ninja-build clang-format shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
-    - name: Install cargo-hack
-      run: curl -LsSf https://github.com/taiki-e/cargo-hack/releases/latest/download/cargo-hack-x86_64-unknown-linux-gnu.tar.gz | tar xzf - -C ~/.cargo/bin
-    - name: Install ucd-generate
-      run: cargo install -f ucd-generate
-    - name: Add nightly
-      run: rustup toolchain install nightly --allow-downgrade
-    - uses: actions/checkout@v3
-    - uses: Swatinem/rust-cache@v2
-    - name: Install LLVM and Clang
-      uses: KyleMayes/install-llvm-action@v1
-      with:
-        directory: ${{ runner.temp }}/llvm
-        version: 17
-    # ---- build and feature check ----
-    # cargo-hack's --feature-powerset would be nice here but libafl has a too many knobs
-    - name: Check each feature
-      # Skipping `python` as it has to be built with the `maturin` tool
-      # `agpl`, `nautilus` require nightly
-      # `sancov_pcguard_edges` is tested seperatelyc
-      run: LLVM_CONFIG=llvm-config cargo hack check --workspace --each-feature --clean-per-run --exclude-features=prelude,agpl,nautilus,python,sancov_pcguard_edges,arm,aarch64,i386,be,systemmode,whole_archive --no-dev-deps --exclude libafl_libfuzzer
-    - name: Check nightly features
-      run: cargo +nightly check --features=agpl && cargo +nightly check --features=nautilus
+          # all of these default to true, but feel free to set to
+          # "false" if necessary for your workflow
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: false
+          docker-images: true
+          swap-storage: true
+      - name: Remove existing clang and LLVM
+        run: sudo apt purge llvm* clang*
+      - name: Install and cache deps
+        run: sudo apt update && sudo apt install ninja-build clang-format shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
+      - name: Install cargo-hack
+        run: curl -LsSf https://github.com/taiki-e/cargo-hack/releases/latest/download/cargo-hack-x86_64-unknown-linux-gnu.tar.gz | tar xzf - -C ~/.cargo/bin
+      - name: Add nightly
+        run: rustup toolchain install nightly --allow-downgrade
+      - uses: actions/checkout@v3
+      - uses: Swatinem/rust-cache@v2
+        with: { shared-key: "ubuntu" }
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v1
+        with:
+          directory: ${{ runner.temp }}/llvm
+          version: 17
+      # ---- build and feature check ----
+      # cargo-hack's --feature-powerset would be nice here but libafl has a too many knobs
+      - name: Check each feature
+        # Skipping `python` as it has to be built with the `maturin` tool
+        # `agpl`, `nautilus` require nightly
+        # `sancov_pcguard_edges` is tested seperatelyc
+        run: LLVM_CONFIG=llvm-config cargo hack check --workspace --each-feature --clean-per-run --exclude-features=prelude,agpl,nautilus,python,sancov_pcguard_edges,arm,aarch64,i386,be,systemmode,whole_archive --no-dev-deps --exclude libafl_libfuzzer
+      - name: Check nightly features
+        run: cargo +nightly check --features=agpl && cargo +nightly check --features=nautilus
 
   ubuntu-concolic:
     runs-on: ubuntu-latest
+    needs: ubuntu
     steps:
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-    - uses: actions/checkout@v3
-    - uses: Swatinem/rust-cache@v2
-    - name: Install smoke test deps
-      run: sudo ./libafl_concolic/test/smoke_test_ubuntu_deps.sh
-    - name: Run smoke test
-      run: ./libafl_concolic/test/smoke_test.sh
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+      - uses: actions/checkout@v3
+      - uses: Swatinem/rust-cache@v2
+        with: { shared-key: "ubuntu" }
+      - name: Install smoke test deps
+        run: sudo ./libafl_concolic/test/smoke_test_ubuntu_deps.sh
+      - name: Run smoke test
+        run: ./libafl_concolic/test/smoke_test.sh
+
+  python-bindings:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+      - name: Remove existing clang and LLVM
+        run: sudo apt purge llvm* clang*
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v1
+        with:
+          directory: ${{ runner.temp }}/llvm
+          version: 17
+      - name: Install deps
+        run: sudo apt-get install -y ninja-build python3-dev python3-pip python3-venv libz3-dev
+      - name: Install maturin
+        run: python3 -m pip install maturin
+      - uses: actions/checkout@v3
+      - uses: Swatinem/rust-cache@v2
+      - name: Run a maturin build
+        run: export LLVM_CONFIG=llvm-config-16 && cd ./bindings/pylibafl && python3 -m venv .env && . .env/bin/activate && pip install --upgrade --force-reinstall . && ./test.sh
+      - name: Run python test
+        run: . ./bindings/pylibafl/.env/bin/activate # && cd ./fuzzers/python_qemu/ && python3 fuzzer.py 2>&1 | grep "Bye"
+
+  cargo-fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+          components: rustfmt
+      - uses: actions/checkout@v3
+      - name: Format Check
+        run: cargo fmt -- --check
 
   fuzzers:
+    needs: ubuntu
     strategy:
       matrix:
         os: [ubuntu-latest]
@@ -306,137 +396,135 @@ jobs:
   nostd-build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: nightly
-        override: true
-        components: rustfmt, rust-src
-    - uses: actions/checkout@v3
-    - uses: Swatinem/rust-cache@v2
-    - name: Add targets
-      run: rustup target add arm-linux-androideabi && rustup target add thumbv6m-none-eabi
-    - name: Build aarch64-unknown-none
-      run: cd ./fuzzers/baby_no_std && cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
-    - name: run x86_64 until panic!
-      run: cd ./fuzzers/baby_no_std && cargo +nightly run || test $? -ne 0 || exit 1
-    - name: no_std tests
-      run: cd ./libafl && cargo test --no-default-features
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+          components: rustfmt, rust-src
+      - uses: actions/checkout@v3
+      - uses: Swatinem/rust-cache@v2
+      - name: Add targets
+        run: rustup target add arm-linux-androideabi && rustup target add thumbv6m-none-eabi
+      - name: Build aarch64-unknown-none
+        run: cd ./fuzzers/baby_no_std && cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
+      - name: run x86_64 until panic!
+        run: cd ./fuzzers/baby_no_std && cargo +nightly run || test $? -ne 0 || exit 1
+      - name: no_std tests
+        run: cd ./libafl && cargo test --no-default-features
 
   nostd-clippy:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: nightly
-        override: true
-        components: rustfmt, clippy, rust-src
-    - uses: actions/checkout@v3
-    - uses: Swatinem/rust-cache@v2
-    - name: Add targets
-      run: rustup target add arm-linux-androideabi && rustup target add thumbv6m-none-eabi
-    - name: libafl armv6m-none-eabi (32 bit no_std) clippy
-      run: cd ./libafl && cargo clippy --target thumbv6m-none-eabi --no-default-features
-    - name: Build no_std no_alloc bolts
-      run: cd ./libafl_bolts && cargo +nightly build -Zbuild-std=core --target aarch64-unknown-none --no-default-features -v --release && cd ../
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+          components: rustfmt, clippy, rust-src
+      - uses: actions/checkout@v3
+      - uses: Swatinem/rust-cache@v2
+      - name: Add targets
+        run: rustup target add arm-linux-androideabi && rustup target add thumbv6m-none-eabi
+      - name: libafl armv6m-none-eabi (32 bit no_std) clippy
+        run: cd ./libafl && cargo clippy --target thumbv6m-none-eabi --no-default-features
+      - name: Build no_std no_alloc bolts
+        run: cd ./libafl_bolts && cargo +nightly build -Zbuild-std=core --target aarch64-unknown-none --no-default-features -v --release && cd ../
 
   build-docker:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - name: Build docker
-      run: docker build -t libafl .
+      - uses: actions/checkout@v3
+      - name: Build docker
+        run: docker build -t libafl .
 
   windows:
     runs-on: windows-latest
     steps:
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-    - uses: actions/checkout@v3
-    - uses: Swatinem/rust-cache@v2
-    - name: Windows Build
-      run: cargo build --verbose
-    - name: Build docs
-      run: cargo doc
-    - uses: ilammy/msvc-dev-cmd@v1
-    - name: Set LIBCLANG_PATH
-      run: echo "LIBCLANG_PATH=$((gcm clang).source -replace "clang.exe")" >> $env:GITHUB_ENV
-    - name: install cargo-make
-      run: cargo install --force cargo-make
-    - name: install cxx bridge
-      run: cargo install cxxbridge-cmd
-    - name: Build fuzzers/libfuzzer_stb_image
-      run: cd fuzzers/libfuzzer_stb_image && cargo build --release
-    - name: Build fuzzers/frida_libpng
-      run: cd fuzzers/frida_libpng/ && cargo make test
-    - name: Build fuzzers/frida_gdiplus
-      run: cd fuzzers/frida_gdiplus/ && cargo make test && cargo make test_cmplog
-    - name: Build fuzzers/tinyinst_simple
-      run: cd fuzzers/tinyinst_simple/ && cargo make test
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+      - uses: actions/checkout@v3
+      - uses: Swatinem/rust-cache@v2
+      - name: Windows Build
+        run: cargo build --verbose
+      - name: Build docs
+        run: cargo doc
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Set LIBCLANG_PATH
+        run: echo "LIBCLANG_PATH=$((gcm clang).source -replace "clang.exe")" >> $env:GITHUB_ENV
+      - name: install cargo-make
+        run: cargo install --force cargo-make
+      - name: install cxx bridge
+        run: cargo install cxxbridge-cmd
+      - name: Build fuzzers/libfuzzer_stb_image
+        run: cd fuzzers/libfuzzer_stb_image && cargo build --release
+      - name: Build fuzzers/frida_libpng
+        run: cd fuzzers/frida_libpng/ && cargo make test
+      - name: Build fuzzers/frida_gdiplus
+        run: cd fuzzers/frida_gdiplus/ && cargo make test && cargo make test_cmplog
+      - name: Build fuzzers/tinyinst_simple
+        run: cd fuzzers/tinyinst_simple/ && cargo make test
 
   windows-clippy:
     runs-on: windows-latest
     steps:
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-    - uses: actions/checkout@v3
-    - uses: Swatinem/rust-cache@v2
-    - name: Run clippy
-      uses: actions-rs/cargo@v1
-      with:
-        command: clippy
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+      - uses: actions/checkout@v3
+      - uses: Swatinem/rust-cache@v2
+      - name: Run clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
 
   macos:
     runs-on: macOS-latest
     steps:
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-    - name: Add nightly rustfmt and clippy
-      run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade && rustup default nightly
-    - name: Install ucd-generate
-      run: cargo install -f ucd-generate
-    - name: Install deps
-      run: brew install z3 gtk+3
-    - name: Install cxxbridge
-      run: cargo install cxxbridge-cmd
-    - uses: actions/checkout@v3
-    - uses: Swatinem/rust-cache@v2
-    - name: MacOS Build
-      run: cargo build --verbose
-    - name: Increase map sizes
-      run: ./scripts/shmem_limits_macos.sh
-    - name: Run Tests
-      run: cargo test
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+      - name: Add nightly rustfmt and clippy
+        run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade && rustup default nightly
+      - name: Install deps
+        run: brew install z3 gtk+3
+      - name: Install cxxbridge
+        run: cargo install cxxbridge-cmd
+      - uses: actions/checkout@v3
+      - uses: Swatinem/rust-cache@v2
+      - name: MacOS Build
+        run: cargo build --verbose
+      - name: Increase map sizes
+        run: ./scripts/shmem_limits_macos.sh
+      - name: Run Tests
+        run: cargo test
 
   other_targets:
     runs-on: macOS-latest
     steps:
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-    - uses: nttld/setup-ndk@v1
-      with:
-        ndk-version: r25b
-    - name: install ios
-      run: rustup target add aarch64-apple-ios
-    - name: install android
-      run: rustup target add aarch64-linux-android
-    - name: install cargo ndk
-      run: cargo install cargo-ndk
-    - uses: actions/checkout@v3
-    - uses: Swatinem/rust-cache@v2
-    - name: Build iOS
-      run: cargo build --target aarch64-apple-ios && cd libafl_frida && cargo build --target aarch64-apple-ios && cd ..
-    - name: Build Android
-      run: cargo ndk -t arm64-v8a build --release
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+      - uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r25b
+      - name: install ios
+        run: rustup target add aarch64-apple-ios
+      - name: install android
+        run: rustup target add aarch64-linux-android
+      - name: install cargo ndk
+        run: cargo install cargo-ndk
+      - uses: actions/checkout@v3
+      - uses: Swatinem/rust-cache@v2
+      - name: Build iOS
+        run: cargo build --target aarch64-apple-ios && cd libafl_frida && cargo build --target aarch64-apple-ios && cd ..
+      - name: Build Android
+        run: cargo ndk -t arm64-v8a build --release
     #run: cargo build --target aarch64-linux-android
     # TODO: Figure out how to properly build stuff with clang
     #- name: Add clang path to $PATH env
@@ -451,32 +539,31 @@ jobs:
     runs-on: ubuntu-22.04
     name: Simple build in FreeBSD
     steps:
-    - uses: actions/checkout@v3
-    - name: Test in FreeBSD
-      id: test
-      uses: vmactions/freebsd-vm@v1
-      with:
-        usesh: true
-        sync: rsync
-        copyback: false
-        mem: 2048
-        release: 13.2
-        prepare: |
-          pkg install -y curl bash sudo llvm16
-          curl https://sh.rustup.rs -sSf | sh -s -- -y
+      - uses: actions/checkout@v3
+      - name: Test in FreeBSD
+        id: test
+        uses: vmactions/freebsd-vm@v1
+        with:
+          usesh: true
+          sync: rsync
+          copyback: false
+          mem: 2048
+          release: 13.2
+          prepare: |
+            pkg install -y curl bash sudo llvm16
+            curl https://sh.rustup.rs -sSf | sh -s -- -y
 
-        run: |
-          freebsd-version
-          . "$HOME/.cargo/env"
-          rustup toolchain install nightly
-          cargo install -f ucd-generate
-          export LLVM_CONFIG=/usr/local/bin/llvm-config16
-          pwd
-          ls -lah
-          echo "local/bin"
-          ls -lah /usr/local/bin/
-          which llvm-config
-          chmod +x ./scripts/clippy.sh
-          bash ./scripts/shmem_limits_fbsd.sh
-          bash ./scripts/clippy.sh
-          cargo test
+          run: |
+            freebsd-version
+            . "$HOME/.cargo/env"
+            rustup toolchain install nightly
+            export LLVM_CONFIG=/usr/local/bin/llvm-config16
+            pwd
+            ls -lah
+            echo "local/bin"
+            ls -lah /usr/local/bin/
+            which llvm-config
+            chmod +x ./scripts/clippy.sh
+            bash ./scripts/shmem_limits_fbsd.sh
+            bash ./scripts/clippy.sh
+            cargo test

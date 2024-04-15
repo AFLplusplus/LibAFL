@@ -45,6 +45,8 @@ use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
 use super::{hooks::EventManagerHooksTuple, CustomBufEventResult, CustomBufHandlerFn};
+#[cfg(any(feature = "std", feature = "adaptive_serialization"))]
+use crate::events::AdaptiveSerializer;
 #[cfg(all(unix, feature = "std"))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
@@ -57,8 +59,8 @@ use crate::{
     inputs::{Input, InputConverter, UsesInput},
     monitors::Monitor,
     observers::ObserversTuple,
-    state::{HasExecutions, HasLastReportTime, HasMetadata, State, UsesState},
-    Error,
+    state::{HasExecutions, HasLastReportTime, State, UsesState},
+    Error, HasMetadata,
 };
 
 /// Forward this to the client
@@ -333,32 +335,6 @@ where
     }
 }
 
-/// Collected stats to decide if observers must be serialized or not
-#[cfg(feature = "adaptive_serialization")]
-pub trait EventStatsCollector {
-    /// Expose the collected observers serialization time
-    fn serialization_time(&self) -> Duration;
-    /// Expose the collected observers deserialization time
-    fn deserialization_time(&self) -> Duration;
-    /// How many times observers were serialized
-    fn serializations_cnt(&self) -> usize;
-    /// How many times shoukd have been serialized an observer
-    fn should_serialize_cnt(&self) -> usize;
-
-    /// Expose the collected observers serialization time (mut)
-    fn serialization_time_mut(&mut self) -> &mut Duration;
-    /// Expose the collected observers deserialization time (mut)
-    fn deserialization_time_mut(&mut self) -> &mut Duration;
-    /// How many times observers were serialized (mut)
-    fn serializations_cnt_mut(&mut self) -> &mut usize;
-    /// How many times shoukd have been serialized an observer (mut)
-    fn should_serialize_cnt_mut(&mut self) -> &mut usize;
-}
-
-/// Collected stats to decide if observers must be serialized or not
-#[cfg(not(feature = "adaptive_serialization"))]
-pub trait EventStatsCollector {}
-
 /// An [`EventManager`] that forwards all events to other attached fuzzers on shared maps or via tcp,
 /// using low-level message passing, [`libafl_bolts::llmp`].
 pub struct LlmpEventManager<EMH, S, SP>
@@ -389,7 +365,7 @@ where
 }
 
 #[cfg(feature = "adaptive_serialization")]
-impl<EMH, S, SP> EventStatsCollector for LlmpEventManager<EMH, S, SP>
+impl<EMH, S, SP> AdaptiveSerializer for LlmpEventManager<EMH, S, SP>
 where
     SP: ShMemProvider + 'static,
     S: State,
@@ -681,7 +657,7 @@ where
                     {
                         state.scalability_monitor_mut().testcase_with_observers += 1;
                     }
-                    fuzzer.process_execution(state, self, input, &observers, &exit_kind, false)?
+                    fuzzer.execute_and_process(state, self, input, &observers, &exit_kind, false)?
                 } else {
                     #[cfg(feature = "scalability_introspection")]
                     {
@@ -785,39 +761,12 @@ where
         OT: ObserversTuple<Self::State> + Serialize,
     {
         const SERIALIZE_TIME_FACTOR: u32 = 2;
-        const SERIALIZE_PERCENTAGE_TRESHOLD: usize = 80;
-
-        let exec_time = observers
-            .match_name::<crate::observers::TimeObserver>("time")
-            .map(|o| o.last_runtime().unwrap_or(Duration::ZERO))
-            .unwrap();
-
-        let mut must_ser = (self.serialization_time() + self.deserialization_time())
-            * SERIALIZE_TIME_FACTOR
-            < exec_time;
-        if must_ser {
-            *self.should_serialize_cnt_mut() += 1;
-        }
-
-        if self.serializations_cnt() > 32 {
-            must_ser = (self.should_serialize_cnt() * 100 / self.serializations_cnt())
-                > SERIALIZE_PERCENTAGE_TRESHOLD;
-        }
-
-        if self.serialization_time() == Duration::ZERO
-            || must_ser
-            || self.serializations_cnt().trailing_zeros() >= 8
-        {
-            let start = current_time();
-            let ser = postcard::to_allocvec(observers)?;
-            *self.serialization_time_mut() = current_time() - start;
-
-            *self.serializations_cnt_mut() += 1;
-            Ok(Some(ser))
-        } else {
-            *self.serializations_cnt_mut() += 1;
-            Ok(None)
-        }
+        const SERIALIZE_PERCENTAGE_THRESHOLD: usize = 80;
+        self.serialize_observers_adaptive(
+            observers,
+            SERIALIZE_TIME_FACTOR,
+            SERIALIZE_PERCENTAGE_THRESHOLD,
+        )
     }
 
     fn configuration(&self) -> EventConfig {
@@ -979,7 +928,7 @@ where
 }
 
 #[cfg(all(feature = "std", feature = "adaptive_serialization"))]
-impl<EMH, S, SP> EventStatsCollector for LlmpRestartingEventManager<EMH, S, SP>
+impl<EMH, S, SP> AdaptiveSerializer for LlmpRestartingEventManager<EMH, S, SP>
 where
     SP: ShMemProvider + 'static,
     S: State,
@@ -1012,7 +961,7 @@ where
 }
 
 #[cfg(all(feature = "std", not(feature = "adaptive_serialization")))]
-impl<EMH, S, SP> EventStatsCollector for LlmpRestartingEventManager<EMH, S, SP>
+impl<EMH, S, SP> AdaptiveSerializer for LlmpRestartingEventManager<EMH, S, SP>
 where
     SP: ShMemProvider + 'static,
     S: State,
@@ -1465,10 +1414,8 @@ where
                         log::error!("Failed to detach from broker: {err}");
                     }
                     #[cfg(unix)]
-                    if child_status == 137 {
-                        // Out of Memory, see https://tldp.org/LDP/abs/html/exitcodes.html
-                        // and https://github.com/AFLplusplus/LibAFL/issues/32 for discussion.
-                        panic!("Fuzzer-respawner: The fuzzed target crashed with an out of memory error! Fix your harness, or switch to another executor (for example, a forkserver).");
+                    if child_status == 9 {
+                        panic!("Target received SIGKILL!. This could indicate the target crashed due to OOM, user sent SIGKILL, or the target was in an unrecoverable situation and could not save state to restart");
                     }
                     // Storing state in the last round did not work
                     panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! This can happen if the child calls `exit()`, in that case make sure it uses `abort()`, if it got killed unrecoverable (OOM), or if there is a bug in the fuzzer itself. (Child exited with: {child_status})");
@@ -1552,7 +1499,7 @@ where
 }
 
 /// A manager-like llmp client that converts between input types
-pub struct LlmpEventConverter<IC, ICB, DI, S, SP>
+pub struct LlmpEventConverter<DI, IC, ICB, S, SP>
 where
     S: UsesInput,
     SP: ShMemProvider + 'static,
@@ -1570,7 +1517,7 @@ where
     phantom: PhantomData<S>,
 }
 
-impl<IC, ICB, DI, S, SP> core::fmt::Debug for LlmpEventConverter<IC, ICB, DI, S, SP>
+impl<DI, IC, ICB, S, SP> core::fmt::Debug for LlmpEventConverter<DI, IC, ICB, S, SP>
 where
     SP: ShMemProvider + 'static,
     S: UsesInput,
@@ -1592,7 +1539,7 @@ where
     }
 }
 
-impl<IC, ICB, DI, S, SP> LlmpEventConverter<IC, ICB, DI, S, SP>
+impl<DI, IC, ICB, S, SP> LlmpEventConverter<DI, IC, ICB, S, SP>
 where
     S: UsesInput + HasExecutions + HasMetadata,
     SP: ShMemProvider + 'static,
@@ -1787,7 +1734,7 @@ where
     }
 }
 
-impl<IC, ICB, DI, S, SP> UsesState for LlmpEventConverter<IC, ICB, DI, S, SP>
+impl<DI, IC, ICB, S, SP> UsesState for LlmpEventConverter<DI, IC, ICB, S, SP>
 where
     S: State,
     SP: ShMemProvider,
@@ -1798,7 +1745,7 @@ where
     type State = S;
 }
 
-impl<IC, ICB, DI, S, SP> EventFirer for LlmpEventConverter<IC, ICB, DI, S, SP>
+impl<DI, IC, ICB, S, SP> EventFirer for LlmpEventConverter<DI, IC, ICB, S, SP>
 where
     S: State,
     SP: ShMemProvider,

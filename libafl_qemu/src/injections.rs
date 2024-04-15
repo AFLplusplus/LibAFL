@@ -272,7 +272,8 @@ where
 
         for region in qemu.mappings() {
             if let Some(path) = region.path().map(ToOwned::to_owned) {
-                if !path.is_empty() {
+                // skip [heap], [vdso] and friends
+                if !path.is_empty() && !path.starts_with('[') {
                     LibInfo::add_unique(
                         &mut libs,
                         LibInfo {
