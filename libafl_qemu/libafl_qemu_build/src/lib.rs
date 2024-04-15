@@ -22,9 +22,9 @@ static CARGO_RPATH_SEPARATOR: &str = "|";
 pub fn cargo_add_rpath(rpath: &str) {
     unsafe {
         if let Some(rpaths) = &mut *addr_of_mut!(CARGO_RPATH) {
-            rpaths.push(rpath.to_string())
+            rpaths.push(rpath.to_string());
         } else {
-            CARGO_RPATH = Some(vec![rpath.to_string()])
+            CARGO_RPATH = Some(vec![rpath.to_string()]);
         }
     }
 }
@@ -33,7 +33,7 @@ pub fn cargo_propagate_rpath() {
     unsafe {
         if let Some(cargo_cmds) = &mut *addr_of_mut!(CARGO_RPATH) {
             let rpath = cargo_cmds.join(CARGO_RPATH_SEPARATOR);
-            println!("cargo:rpath={}", rpath);
+            println!("cargo:rpath={rpath}");
         }
     }
 }
@@ -48,7 +48,7 @@ pub fn build_libafl_qemu() {
             .split(CARGO_RPATH_SEPARATOR)
             .collect();
         for rpath in rpaths {
-            println!("cargo:rustc-link-arg-bins=-Wl,-rpath,{}", rpath);
+            println!("cargo:rustc-link-arg-bins=-Wl,-rpath,{rpath}");
         }
     }
 }

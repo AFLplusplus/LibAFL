@@ -44,7 +44,7 @@ fn get_config_signature(config_cmd: &Command) -> String {
         .reduce(|acc, elt| format!("{acc}\n{elt}"))
         .into_iter()
         .collect();
-    signature_string += format!("Environment:\n{}", config_env).as_str();
+    signature_string += format!("Environment:\n{config_env}").as_str();
 
     // Command args
     let config_args: String = config_cmd
@@ -53,16 +53,17 @@ fn get_config_signature(config_cmd: &Command) -> String {
         .reduce(|acc, arg| format!("{acc}\n{arg}"))
         .into_iter()
         .collect();
-    signature_string += format!("\n\nArguments:\n{}", config_args).as_str();
+    signature_string += format!("\n\nArguments:\n{config_args}").as_str();
 
     signature_string
 }
 
+#[allow(clippy::too_many_lines)]
 fn configure_qemu(
     cc_compiler: &cc::Tool,
     cpp_compiler: &cc::Tool,
     qemu_path: &PathBuf,
-    build_dir: &PathBuf,
+    build_dir: &Path,
     is_usermode: bool,
     cpu_target: &String,
     target_suffix: &String,
@@ -70,7 +71,7 @@ fn configure_qemu(
     let mut cmd = Command::new("./configure");
 
     // Set common options for usermode and systemmode
-    cmd.current_dir(&qemu_path)
+    cmd.current_dir(qemu_path)
         .env("__LIBAFL_QEMU_CONFIGURE", "")
         .env("__LIBAFL_QEMU_BUILD_OUT", build_dir.join("linkinfo.json"))
         .env("__LIBAFL_QEMU_BUILD_CC", cc_compiler.path())
@@ -222,7 +223,7 @@ fn build_qemu(
 ) -> Command {
     let mut cmd = Command::new("make");
 
-    cmd.current_dir(&build_dir)
+    cmd.current_dir(build_dir)
         .env("__LIBAFL_QEMU_CONFIGURE", "")
         .env("__LIBAFL_QEMU_BUILD_OUT", build_dir.join("linkinfo.json"))
         .env("__LIBAFL_QEMU_BUILD_CC", cc_compiler.path())
@@ -425,8 +426,8 @@ pub fn build(
 
     if cfg!(feature = "shared") {
         let qemu_build_dir_str = qemu_build_dir.to_str().expect("Could not convert to str");
-        println!("cargo:rustc-link-search=native={}", qemu_build_dir_str);
-        println!("cargo:rustc-link-lib=dylib={}", output_lib_link);
+        println!("cargo:rustc-link-search=native={qemu_build_dir_str}");
+        println!("cargo:rustc-link-lib=dylib={output_lib_link}");
         cargo_add_rpath(qemu_build_dir_str);
     } else {
         let compile_commands_string = &fs::read_to_string(qemu_build_dir.join("linkinfo.json"))
@@ -451,7 +452,7 @@ pub fn build(
             .arg("-r")
             .args(cmd);
 
-        let link_str = format!("{:?}", link_command);
+        let link_str = format!("{link_command:?}");
 
         let output = link_command.output().expect("Partial linked failure");
 
@@ -585,7 +586,6 @@ pub fn build(
                         .to_str()
                         .expect("Could not convert OsStr to str"),
                 );
-            println!("cargo:warning={}", val);
             cargo_add_rpath(&val);
         }
     }
