@@ -89,10 +89,16 @@ impl HookRuntime {
     /// Create a new hook runtime
     #[must_use]
     pub fn new() -> Self {
-        Self {
+        #[cfg(target_arch = "aarch64")]
+        return Self {
             hooks: HashMap::new(),
             hooked: 0,
-        }
+        };
+
+        #[cfg(target_arch = "x86_64")]
+        return Self {
+            hooks: HashMap::new(),
+        };
     }
 
     /// Register a hook with the runtime
@@ -359,7 +365,6 @@ impl HookRuntime {
         } else { //Opcode::B/Opcode::BL
             insn.put_chaining_return();
         }
-            //instruction should be kept here
         
     }
     

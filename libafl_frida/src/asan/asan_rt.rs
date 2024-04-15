@@ -550,7 +550,7 @@ impl AsanRuntime {
     }
 
     pub fn register_hooks(hook_rt: &mut HookRuntime) {
-        
+        #[allow(unused)]
         macro_rules! hook_func {
             ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*)) => {
                 paste::paste! {
@@ -1747,76 +1747,59 @@ impl AsanRuntime {
     */
     #[cfg(target_arch = "x86_64")]
     #[allow(clippy::unused_self)]
-    fn generate_shadow_check_blob(&mut self, bit: u32) -> Box<[u8]> {
+    fn generate_shadow_check_blob(&mut self, size: u32) -> Box<[u8]> {
         let shadow_bit = self.allocator.shadow_bit();
         // Rcx, Rax, Rdi, Rdx, Rsi, R8 are used, so we save them in emit_shadow_check
+        //at this point RDI contains the 
+        let mask_shift = 32 - size;
         macro_rules! shadow_check{
             ($ops:ident, $bit:expr) => {dynasm!($ops
                 ;   .arch x64
-                // ; int3
-                ; mov     cl, BYTE shadow_bit as i8
-                ; mov     edx, 3
-                ; shl     rdx, cl
-                ; mov     eax, 4
-                ; shl     rax, cl
-                ; cmp     rdx, rdi
-                ; ja      >done
-                ; cmp     rax, rdi
-                ; jbe     >done
-                ; mov     eax, 1
-                ; shl     rax, cl
-                ; mov     rdx, rdi
-                ; shr     rdx, 3
-                ; mov     r8d, 2
-                ; shl     r8, cl
-                ; dec     r8
-                ; and     r8, rdx
-                ; movzx   eax, WORD [r8 + rax]
-                ; and     dil, 7
-                ; mov     ecx, edi
-                ; shr     eax, cl
-                ; mov     cl, BYTE bit as i8
-                ; mov     edx, -1
-                ; shl     edx, cl
-                ; not     edx
-                ; not     eax
-                ; test    dl, al
-                ; xor     eax, eax
+                //; int3
+                ; mov     rcx, 1 as i32
+                ; shl     rcx, shadow_bit as i8 //rcx now contains the mask
+                ; shr     rdi, 3 as i8 //rdi now contains the shadow byte offset
+                ; add rdi, rcx 
+                ; mov ecx, [rdi]  
+                ; bswap ecx  //ecx contains shadow byte
+                ; mov edi, -1
+                ; shl edi, mask_shift as i8 //edi now contains mask
+                ; and ecx, edi 
+                ; cmp ecx, edi 
                 ; je      >done
-                ;   lea     rsi, [>done] // leap 10 bytes forward
-                ;   nop // jmp takes 10 bytes at most so we want to allocate 10 bytes buffer (?)
-                ;   nop
-                ;   nop
-                ;   nop
-                ;   nop
-                ;   nop
-                ;   nop
-                ;   nop
-                ;   nop
-                ;   nop
+                ; lea     rsi, [>done] // leap 10 bytes forward
+                ; nop // jmp takes 10 bytes at most so we want to allocate 10 bytes buffer (?)
+                ; nop
+                ; nop
+                ; nop
+                ; nop
+                ; nop
+                ; nop
+                ; nop
+                ; nop
+                ; nop
                 ;done:
             );};
         }
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
         shadow_check!(ops, bit);
         let ops_vec = ops.finalize().unwrap();
-        ops_vec[..ops_vec.len() - 10].to_vec().into_boxed_slice() //????
+        ops_vec[..ops_vec.len() - 10].to_vec().into_boxed_slice() //subtract 10 because 
     }
 
     #[cfg(target_arch = "aarch64")]
     #[allow(clippy::unused_self)]
     fn generate_shadow_check_blob(&mut self, width: u32) -> Box<[u8]> {
-        //x0 contains the shadow address
-        //x0 and x1 are saved by the asan_check 
-        //The maximum size this supports is up to 25 bytes. This is because we load 4 bytes of the shadow value. And, in the case that we have a misaligned 
-        //with an offset of 7 into the word. Load 25 bytes from 0x1007 - [0x1007,0x101f], then we require the shadow values from 0x1000, 0x1008, 0x1010, and 0x1018
+        /*x0 contains the shadow address
+        x0 and x1 are saved by the asan_check 
+        The maximum size this supports is up to 25 bytes. This is because we load 4 bytes of the shadow value. And, in the case that we have a misaligned address with an offset of 7 into the word. For example, if we load 25 bytes from 0x1007 - [0x1007,0x101f], then we require the shadow values from 0x1000, 0x1008, 0x1010, and 0x1018 */
         
 
         let shadow_bit = self.allocator.shadow_bit();
         macro_rules! shadow_check {
             ($ops:ident, $width:expr) => {dynasm!($ops
                 ; .arch aarch64
-
+//              ; brk #0xe
                 ; stp x2, x3, [sp, #-0x10]!
                 ; mov x1, xzr
                 // ; add x1, xzr, x1, lsl #shadow_bit
@@ -1907,7 +1890,7 @@ impl AsanRuntime {
             ; .arch x64
             ; report:
             ; mov rdi, [>self_regs_addr] // load self.regs into rdi
-            ; mov [rdi + 0x80], rsi // return address is loaded into rsi in generate_shadow_check_blob
+            ; mov [rdi + 0x80], rsi // return address is loaded into rsi in generate_shadow_check_blob. rsi is the address of done
             ; mov [rdi + 0x8], rbx
             ; mov [rdi + 0x20], rbp
             ; mov [rdi + 0x28], rsp
@@ -2400,8 +2383,6 @@ impl AsanRuntime {
 
             #[cfg(target_arch = "x86_64")]
             writer.put_jmp_near_label(after_report_impl);
-            #[cfg(target_arch = "aarch64")]
-            writer.put_b_label(after_report_impl);
 
             self.current_report_impl = writer.pc();
             writer.put_bytes(self.blob_report());
