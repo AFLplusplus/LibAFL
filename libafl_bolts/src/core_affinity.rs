@@ -215,27 +215,46 @@ pub fn parse_core_bind_arg(args: &str) -> Result<Vec<usize>, Error> {
 
 // Linux Section
 
-#[cfg(any(target_os = "android", target_os = "linux", target_os = "dragonfly"))]
+#[cfg(any(
+    target_os = "android",
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd"
+))]
 #[inline]
 fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
     linux::get_core_ids()
 }
 
-#[cfg(any(target_os = "android", target_os = "linux", target_os = "dragonfly"))]
+#[cfg(any(
+    target_os = "android",
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd"
+))]
 #[inline]
 fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
     linux::set_for_current(core_id)
 }
 
-#[cfg(any(target_os = "android", target_os = "linux", target_os = "dragonfly"))]
+#[cfg(any(
+    target_os = "android",
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd"
+))]
 mod linux {
     use alloc::{string::ToString, vec::Vec};
     use std::mem;
 
+    #[cfg(not(target_os = "freebsd"))]
+    use libc::cpu_set_t;
+    #[cfg(target_os = "freebsd")]
+    use libc::cpuset_t as cpu_set_t;
     #[cfg(target_os = "dragonfly")]
-    use libc::{cpu_set_t, sched_getaffinity, sched_setaffinity, CPU_ISSET, CPU_SET};
+    use libc::{sched_getaffinity, sched_setaffinity, CPU_ISSET, CPU_SET};
     #[cfg(not(target_os = "dragonfly"))]
-    use libc::{cpu_set_t, sched_getaffinity, sched_setaffinity, CPU_ISSET, CPU_SET, CPU_SETSIZE};
+    use libc::{sched_getaffinity, sched_setaffinity, CPU_ISSET, CPU_SET, CPU_SETSIZE};
     #[cfg(target_os = "dragonfly")]
     const CPU_SETSIZE: libc::c_int = 256;
 
@@ -664,134 +683,6 @@ mod apple {
         }
 
         Ok(())
-    }
-}
-
-// FreeBSD Section
-
-#[cfg(target_os = "freebsd")]
-#[inline]
-fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
-    freebsd::get_core_ids()
-}
-
-#[cfg(target_os = "freebsd")]
-#[inline]
-fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
-    freebsd::set_for_current(core_id)
-}
-
-#[cfg(target_os = "freebsd")]
-mod freebsd {
-    use alloc::vec::Vec;
-    use std::{mem, thread::available_parallelism};
-
-    use libc::{cpuset_setaffinity, cpuset_t, CPU_LEVEL_WHICH, CPU_SET, CPU_WHICH_PID};
-
-    use super::CoreId;
-    use crate::Error;
-
-    #[allow(trivial_numeric_casts)]
-    pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
-        Ok((0..(usize::from(available_parallelism()?)))
-            .map(CoreId)
-            .collect::<Vec<_>>())
-    }
-
-    pub fn set_for_current(core_id: CoreId) -> Result<(), Error> {
-        // Turn `core_id` into a `libc::cpuset_t` with only
-        let mut set = new_cpuset();
-
-        unsafe { CPU_SET(core_id.0, &mut set) };
-
-        // Set the current thread's core affinity.
-        let result = unsafe {
-            cpuset_setaffinity(
-                CPU_LEVEL_WHICH,
-                CPU_WHICH_PID,
-                -1, // Defaults to current thread
-                mem::size_of::<cpuset_t>(),
-                &set,
-            )
-        };
-
-        if result < 0 {
-            Err(Error::unknown("Failed to set_for_current"))
-        } else {
-            Ok(())
-        }
-    }
-
-    #[cfg(test)]
-    fn get_affinity_mask() -> Result<cpuset_t, Error> {
-        let mut set = new_cpuset();
-
-        // Try to get current core affinity mask.
-        let result = unsafe {
-            libc::cpuset_getaffinity(
-                CPU_LEVEL_WHICH,
-                CPU_WHICH_PID,
-                -1, // Defaults to current thread
-                mem::size_of::<cpuset_t>(),
-                &mut set,
-            )
-        };
-
-        if result == 0 {
-            Ok(set)
-        } else {
-            Err(Error::unknown(
-                "Failed to retrieve affinity using cpuset_getaffinity",
-            ))
-        }
-    }
-
-    fn new_cpuset() -> cpuset_t {
-        unsafe { mem::zeroed::<cpuset_t>() }
-    }
-
-    // FIXME: unstable for now on freebsd
-    #[cfg(test)]
-    mod tests {
-        use libc::CPU_ISSET;
-
-        use super::*;
-
-        #[test]
-        #[ignore]
-        fn test_freebsd_get_affinity_mask() {
-            get_affinity_mask().unwrap();
-        }
-
-        #[test]
-        #[ignore]
-        fn test_freebsd_set_for_current() {
-            let ids = get_core_ids().unwrap();
-
-            assert!(!ids.is_empty());
-
-            ids[0].set_affinity().unwrap();
-
-            // Ensure that the system pinned the current thread
-            // to the specified core.
-            let mut core_mask = new_cpuset();
-            unsafe { CPU_SET(ids[0].0, &mut core_mask) };
-
-            let new_mask = get_affinity_mask().unwrap();
-
-            let mut is_equal = true;
-
-            for i in 0..256 {
-                let is_set1 = unsafe { CPU_ISSET(i, &core_mask) };
-                let is_set2 = unsafe { CPU_ISSET(i, &new_mask) };
-
-                if is_set1 != is_set2 {
-                    is_equal = false;
-                }
-            }
-
-            assert!(is_equal);
-        }
     }
 }
 

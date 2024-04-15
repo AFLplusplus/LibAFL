@@ -1499,7 +1499,7 @@ where
 }
 
 /// A manager-like llmp client that converts between input types
-pub struct LlmpEventConverter<IC, ICB, DI, S, SP>
+pub struct LlmpEventConverter<DI, IC, ICB, S, SP>
 where
     S: UsesInput,
     SP: ShMemProvider + 'static,
@@ -1517,7 +1517,7 @@ where
     phantom: PhantomData<S>,
 }
 
-impl<IC, ICB, DI, S, SP> core::fmt::Debug for LlmpEventConverter<IC, ICB, DI, S, SP>
+impl<DI, IC, ICB, S, SP> core::fmt::Debug for LlmpEventConverter<DI, IC, ICB, S, SP>
 where
     SP: ShMemProvider + 'static,
     S: UsesInput,
@@ -1539,7 +1539,7 @@ where
     }
 }
 
-impl<IC, ICB, DI, S, SP> LlmpEventConverter<IC, ICB, DI, S, SP>
+impl<DI, IC, ICB, S, SP> LlmpEventConverter<DI, IC, ICB, S, SP>
 where
     S: UsesInput + HasExecutions + HasMetadata,
     SP: ShMemProvider + 'static,
@@ -1734,7 +1734,7 @@ where
     }
 }
 
-impl<IC, ICB, DI, S, SP> UsesState for LlmpEventConverter<IC, ICB, DI, S, SP>
+impl<DI, IC, ICB, S, SP> UsesState for LlmpEventConverter<DI, IC, ICB, S, SP>
 where
     S: State,
     SP: ShMemProvider,
@@ -1745,7 +1745,7 @@ where
     type State = S;
 }
 
-impl<IC, ICB, DI, S, SP> EventFirer for LlmpEventConverter<IC, ICB, DI, S, SP>
+impl<DI, IC, ICB, S, SP> EventFirer for LlmpEventConverter<DI, IC, ICB, S, SP>
 where
     S: State,
     SP: ShMemProvider,

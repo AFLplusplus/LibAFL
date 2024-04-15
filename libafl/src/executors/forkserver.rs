@@ -636,13 +636,14 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
 
     /// Builds `ForkserverExecutor` downsizing the coverage map to fit exaclty the AFL++ map size.
     #[allow(clippy::pedantic)]
-    pub fn build_dynamic_map<MO, OT, S>(
+    pub fn build_dynamic_map<A, MO, OT, S>(
         &mut self,
-        mut map_observer: MO,
+        mut map_observer: A,
         other_observers: OT,
-    ) -> Result<ForkserverExecutor<(MO, OT), S, SP>, Error>
+    ) -> Result<ForkserverExecutor<(A, OT), S, SP>, Error>
     where
-        MO: Observer<S> + MapObserver + Truncate, // TODO maybe enforce Entry = u8 for the cov map
+        MO: MapObserver + Truncate, // TODO maybe enforce Entry = u8 for the cov map
+        A: Observer<S> + AsRef<MO> + AsMut<MO>,
         OT: ObserversTuple<S> + Prepend<MO, PreprendResult = OT>,
         S: UsesInput,
         S::Input: Input + HasTargetBytes,
@@ -660,10 +661,10 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         );
 
         if let Some(dynamic_map_size) = self.map_size {
-            map_observer.truncate(dynamic_map_size);
+            map_observer.as_mut().truncate(dynamic_map_size);
         }
 
-        let observers: (MO, OT) = other_observers.prepend(map_observer);
+        let observers = (map_observer, other_observers);
 
         if self.uses_shmem_testcase && map.is_none() {
             return Err(Error::illegal_state(
