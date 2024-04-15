@@ -89,8 +89,8 @@ fn configure_qemu(
         .arg("--disable-bsd-user")
         .arg("--disable-capstone");
 
-    if cfg!(feature = "debug_assertions") {
-        cmd.arg("--enable-debug");
+    if cfg!(debug_assertions) {
+        cmd.arg("--enable-debug").arg("--enable-debug-tcg");
     }
 
     if is_usermode {
@@ -372,10 +372,23 @@ pub fn build(
     );
 
     let current_config_signature = get_config_signature(&config_cmd);
-    if libafl_qemu_force_configure
-        || libafl_config_old_signature.is_err()
-        || (libafl_config_old_signature.unwrap() != current_config_signature)
-    {
+    let must_reconfigure = if libafl_qemu_force_configure {
+        // If the user asked to reconfigure, do so
+        true
+    } else if let Ok(libafl_config_old_signature) = libafl_config_old_signature {
+        if libafl_config_old_signature != current_config_signature {
+            println!("cargo:warning=QEMU configuration is outdated. Reconfiguring...");
+            true
+        } else {
+            // Signature match, do not reconfigure
+            false
+        }
+    } else {
+        // In worst scenario, reconfigure
+        true
+    };
+
+    if must_reconfigure {
         assert!(
             config_cmd
                 .status()
@@ -384,7 +397,7 @@ pub fn build(
             "Configure didn't finish successfully"
         );
 
-        // Config succeeded at this point, write the signature file
+        // Config succeeded at this point, (over)write the signature file
         fs::write(config_signature_path, current_config_signature)
             .expect("Couldn't write config signature file.");
     }
