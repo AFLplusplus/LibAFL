@@ -376,12 +376,12 @@ pub fn build(
         // If the user asked to reconfigure, do so
         true
     } else if let Ok(libafl_config_old_signature) = libafl_config_old_signature {
-        if libafl_config_old_signature != current_config_signature {
-            println!("cargo:warning=QEMU configuration is outdated. Reconfiguring...");
-            true
-        } else {
+        if libafl_config_old_signature == current_config_signature {
             // Signature match, do not reconfigure
             false
+        } else {
+            println!("cargo:warning=QEMU configuration is outdated. Reconfiguring...");
+            true
         }
     } else {
         // In worst scenario, reconfigure
