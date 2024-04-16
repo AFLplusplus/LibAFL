@@ -58,8 +58,8 @@ serdeany_autoreg = ["libafl_bolts/serdeany_autoreg"]
 
 slirp = [ "systemmode", "libafl_qemu_sys/slirp" ] # build qemu with host libslirp (for user networking)
 
-# disabled atm, enabled when fixed with dynamic list
-# shared = [ "libafl_qemu_sys/shared" ]
+# Requires the binary's build.rs to call `build_libafl_qemu`
+shared = [ "libafl_qemu_sys/shared" ]
 
 [dependencies]
 libafl = { path = "../libafl", version = "0.12.0", default-features = false, features = ["std", "derive", "regex"] }
