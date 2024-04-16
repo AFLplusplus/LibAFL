@@ -402,6 +402,17 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         ldflags.push(&sdk_path);
     };
 
+    build_pass(
+        bindir_path,
+        out_dir,
+        &cxxflags,
+        &ldflags,
+        src_dir,
+        "ddg-instr.cc",
+        Some(&vec!["ddg-utils.cc"]),
+        false,
+    );
+
     for pass in &[
         "cmplog-routines-pass.cc",
         "autotokens-pass.cc",
