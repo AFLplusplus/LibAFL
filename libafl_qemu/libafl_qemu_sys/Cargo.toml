@@ -10,6 +10,7 @@ license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "qemu", "instrumentation"]
 edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
+links = "qemu"
 
 [package.metadata.docs.rs]
 features = ["x86_64", "usermode"]
