@@ -28,7 +28,7 @@
 #include <tuple>
 #include <fstream>
 
-#include "ddg_utils.h"
+#include "ddg-utils.h"
 
 #define BB_THRESHOLD 16
 

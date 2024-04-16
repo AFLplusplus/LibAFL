@@ -89,7 +89,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "ddg_utils.h"
+#include "ddg-utils.h"
 #include "common-llvm.h"
 
 #define MAX_DEPTH 3

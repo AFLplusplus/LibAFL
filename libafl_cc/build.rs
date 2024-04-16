@@ -408,8 +408,8 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         &cxxflags,
         &ldflags,
         src_dir,
-        "ddg_instr.cc",
-        Some(&vec!["ddg_utils.cc"]),
+        "ddg-instr.cc",
+        Some(&vec!["ddg-utils.cc"]),
         false,
     );
 
