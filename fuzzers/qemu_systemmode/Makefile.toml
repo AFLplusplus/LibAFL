@@ -45,7 +45,6 @@ args = [
     "--no-default-features",
     "--features", "std,${FEATURE}",
     "--target-dir", "${TARGET_DIR}",
-    "-vv",
 ]
 dependencies = ["image"]
 

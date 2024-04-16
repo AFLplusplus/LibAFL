@@ -3,6 +3,7 @@ use std::{
     env, fs,
     path::{Path, PathBuf},
     process::Command,
+    ptr::addr_of_mut,
 };
 
 use regex::Regex;
@@ -14,6 +15,43 @@ mod build;
 pub use build::build;
 
 const LLVM_VERSION_MAX: i32 = 33;
+
+static mut CARGO_RPATH: Option<Vec<String>> = None;
+static CARGO_RPATH_SEPARATOR: &str = "|";
+
+pub fn cargo_add_rpath(rpath: &str) {
+    unsafe {
+        if let Some(rpaths) = &mut *addr_of_mut!(CARGO_RPATH) {
+            rpaths.push(rpath.to_string());
+        } else {
+            CARGO_RPATH = Some(vec![rpath.to_string()]);
+        }
+    }
+}
+
+pub fn cargo_propagate_rpath() {
+    unsafe {
+        if let Some(cargo_cmds) = &mut *addr_of_mut!(CARGO_RPATH) {
+            let rpath = cargo_cmds.join(CARGO_RPATH_SEPARATOR);
+            println!("cargo:rpath={rpath}");
+        }
+    }
+}
+
+/// Must be called from final binary crates
+pub fn build_libafl_qemu() {
+    // Add rpath if there are some
+    if let Some(rpaths) = env::var_os("DEP_QEMU_RPATH") {
+        let rpaths: Vec<&str> = rpaths
+            .to_str()
+            .expect("Cannot convert OsString to str")
+            .split(CARGO_RPATH_SEPARATOR)
+            .collect();
+        for rpath in rpaths {
+            println!("cargo:rustc-link-arg-bins=-Wl,-rpath,{rpath}");
+        }
+    }
+}
 
 pub fn build_with_bindings(
     cpu_target: &str,
@@ -42,6 +80,8 @@ pub fn build_with_bindings(
     let re = Regex::new("(Option<\\s*)unsafe( extern \"C\" fn\\(data: u64)").unwrap();
     let replaced = re.replace_all(&contents, "$1$2");
     fs::write(bindings_file, replaced.as_bytes()).expect("Unable to write file");
+
+    cargo_propagate_rpath();
 }
 
 // For bindgen, the llvm version must be >= of the rust llvm version
