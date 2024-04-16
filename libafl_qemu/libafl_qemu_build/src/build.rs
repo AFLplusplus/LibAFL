@@ -90,7 +90,8 @@ fn configure_qemu(
         .arg("--disable-capstone");
 
     if cfg!(debug_assertions) {
-        cmd.arg("--enable-debug").arg("--enable-debug-tcg");
+        cmd.arg("--enable-debug");
+        // .arg("--enable-debug-tcg");
     }
 
     if is_usermode {
