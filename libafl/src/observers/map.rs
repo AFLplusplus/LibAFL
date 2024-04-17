@@ -69,16 +69,6 @@ fn init_count_class_16() {
     }
 }
 
-/// Compute the hash of a slice
-fn hash_helper<T, H: Hasher>(slice: &[T], hasher: &mut H) -> u64 {
-    let ptr = slice.as_ptr() as *const u8;
-    let map_size = slice.len() / size_of::<T>();
-    unsafe {
-        hasher.write(slice::from_raw_parts(ptr, map_size));
-    }
-    hasher.finish()
-}
-
 /// Trait marker which indicates that this [`MapObserver`] is tracked for indices or novelties.
 /// Implementors of feedbacks similar to [`crate::feedbacks::MapFeedback`] may wish to use this to
 /// ensure that edge metadata is recorded as is appropriate for the provided observer.
@@ -424,7 +414,7 @@ pub trait MapObserver:
 //     for<'it> &'it Self: IntoIterator<Item = &'it Self::Entry>
 {
     /// Type of each entry in this map
-    type Entry: Bounded + PartialEq + Default + Copy + Debug + 'static;
+    type Entry: Bounded + PartialEq + Default + Copy + Debug + Hash + 'static;
 
     /// Get the value at `idx`
     fn get(&self, idx: usize) -> &Self::Entry;
@@ -552,6 +542,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -603,6 +594,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -623,6 +615,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -643,6 +636,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -664,6 +658,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -684,6 +679,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -706,6 +702,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -713,7 +710,7 @@ where
 {
     #[inline]
     fn hash<H: Hasher>(&self, hasher: &mut H) {
-        hash_helper(self.as_slice(), hasher);
+        self.as_slice().hash(hasher);
     }
 }
 
@@ -741,6 +738,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1125,6 +1123,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1145,6 +1144,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1165,6 +1165,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1185,6 +1186,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1205,6 +1207,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1227,6 +1230,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1234,7 +1238,7 @@ where
 {
     #[inline]
     fn hash<H: Hasher>(&self, hasher: &mut H) {
-        hash_helper(self.as_slice(), hasher);
+        self.as_slice().hash(hasher);
     }
 }
 impl<'a, T, const N: usize> AsRef<Self> for ConstMapObserver<'a, T, N>
@@ -1261,6 +1265,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1463,6 +1468,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1485,6 +1491,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1507,6 +1514,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1529,6 +1537,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1551,6 +1560,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1575,6 +1585,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1584,7 +1595,7 @@ where
 {
     #[inline]
     fn hash<H: Hasher>(&self, hasher: &mut H) {
-        hash_helper(self.as_slice(), hasher);
+        self.as_slice().hash(hasher);
     }
 }
 impl<'a, T> AsRef<Self> for VariableMapObserver<'a, T>
@@ -1611,6 +1622,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1694,6 +1706,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1714,6 +1727,7 @@ where
     T: 'static
         + Default
         + Copy
+        + Hash
         + Serialize
         + serde::de::DeserializeOwned
         + Debug
@@ -2438,6 +2452,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + Serialize
         + serde::de::DeserializeOwned
         + Debug,
@@ -2780,11 +2795,11 @@ where
 
 impl<T> Hash for OwnedMapObserver<T>
 where
-    T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
+    T: 'static + Hash + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
 {
     #[inline]
     fn hash<H: Hasher>(&self, hasher: &mut H) {
-        hash_helper(self.as_slice(), hasher);
+        self.as_slice().hash(hasher);
     }
 }
 
@@ -2813,6 +2828,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + Serialize
         + serde::de::DeserializeOwned
         + Debug,
