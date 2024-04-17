@@ -152,7 +152,10 @@ fn main() {
 
         cc::Build::new()
             .file(src_dir.join("coverage.c"))
-            .define("EDGES_MAP_SIZE_IN_USE", Some(&*format!("{edges_map_size_in_use}")))
+            .define(
+                "EDGES_MAP_SIZE_IN_USE",
+                Some(&*format!("{edges_map_size_in_use}")),
+            )
             .define("ACCOUNTING_MAP_SIZE", Some(&*format!("{acc_map_size}")))
             .compile("coverage");
     }
