@@ -6,7 +6,7 @@ use alloc::{
 };
 use core::{
     fmt::Debug,
-    hash::{BuildHasher, Hash, Hasher},
+    hash::{Hash, Hasher},
     iter::Flatten,
     marker::PhantomData,
     mem::size_of,
@@ -711,6 +711,7 @@ where
         + serde::de::DeserializeOwned
         + Debug,
 {
+    #[inline]
     fn hash<H: Hasher>(&self, hasher: &mut H) {
         hash_helper(self.as_slice(), hasher);
     }
@@ -778,9 +779,7 @@ where
 
     #[inline]
     fn hash_simple(&self) -> u64 {
-        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
-        Hash::hash(self, &mut hasher);
-        hasher.finish()
+        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
     }
 
     #[inline]
@@ -1233,6 +1232,7 @@ where
         + serde::de::DeserializeOwned
         + Debug,
 {
+    #[inline]
     fn hash<H: Hasher>(&self, hasher: &mut H) {
         hash_helper(self.as_slice(), hasher);
     }
@@ -1303,9 +1303,7 @@ where
 
     #[inline]
     fn hash_simple(&self) -> u64 {
-        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
-        Hash::hash(self, &mut hasher);
-        hasher.finish()
+        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
     }
 
     /// Reset the map
@@ -1584,6 +1582,7 @@ where
         + PartialEq
         + Bounded,
 {
+    #[inline]
     fn hash<H: Hasher>(&self, hasher: &mut H) {
         hash_helper(self.as_slice(), hasher);
     }
@@ -1655,9 +1654,7 @@ where
 
     #[inline]
     fn hash_simple(&self) -> u64 {
-        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
-        Hash::hash(self, &mut hasher);
-        hasher.finish()
+        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
     }
 
     /// Reset the map
@@ -2483,9 +2480,7 @@ where
 
     #[inline]
     fn hash_simple(&self) -> u64 {
-        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
-        Hash::hash(self, &mut hasher);
-        hasher.finish()
+        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
     }
 
     fn reset_map(&mut self) -> Result<(), Error> {
@@ -2787,6 +2782,7 @@ impl<T> Hash for OwnedMapObserver<T>
 where
     T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
 {
+    #[inline]
     fn hash<H: Hasher>(&self, hasher: &mut H) {
         hash_helper(self.as_slice(), hasher);
     }
@@ -2854,9 +2850,7 @@ where
 
     #[inline]
     fn hash_simple(&self) -> u64 {
-        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
-        Hash::hash(self, &mut hasher);
-        hasher.finish()
+        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
     }
 
     #[inline]
