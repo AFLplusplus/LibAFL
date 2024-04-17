@@ -15,9 +15,9 @@ void *__libafl_asan_region_is_poisoned(void *beg, size_t size) {
   return NULL;
 }
 
-#pragma comment( \
-    linker,      \
-    "/alternatename:__asan_region_is_poisoned=__libafl_asan_region_is_poisoned")
+  #pragma comment( \
+      linker,      \
+      "/alternatename:__asan_region_is_poisoned=__libafl_asan_region_is_poisoned")
 
 #elif defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
 
