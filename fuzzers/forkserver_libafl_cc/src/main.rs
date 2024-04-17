@@ -22,7 +22,7 @@ use libafl_bolts::{
     current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, MatchName, Merge, HasTypeRef, MatchNameRef},
+    tuples::{tuple_list, MatchName, Merge, TypeRefCreator, MatchNameRef},
     AsMutSlice, Truncate,
 };
 use nix::sys::signal::Signal;
