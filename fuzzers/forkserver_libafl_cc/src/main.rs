@@ -168,7 +168,7 @@ pub fn main() {
     // Create the executor for the forkserver
     let args = opt.arguments;
 
-    let observer_ref = edges_observer.make_reference();
+    let observer_ref = edges_observer.get();
 
     let mut tokens = Tokens::new();
     let mut executor = ForkserverExecutor::builder()

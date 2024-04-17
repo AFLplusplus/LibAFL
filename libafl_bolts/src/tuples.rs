@@ -529,7 +529,7 @@ where
 /// You should use this when you want to avoid specifying types using `match_name_type_mut`
 pub trait TypeRefCreator<T> {
     /// Return the `TypeRef`
-    fn make_reference(&self) -> TypeRef<T> {
+    fn get(&self) -> TypeRef<T> {
         TypeRef {
             phantom: PhantomData,
         }
