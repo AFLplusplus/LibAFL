@@ -5,7 +5,7 @@ use alloc::string::String;
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl::{mutators::Tokens, Error};
 
-use crate::{ACCOUNTING_MAP_SIZE, EDGES_MAP_SIZE_MAX, DDG_MAP_SIZE};
+use crate::{ACCOUNTING_MAP_SIZE, DDG_MAP_SIZE, EDGES_MAP_SIZE_MAX};
 
 /// The map for edges.
 #[no_mangle]
