@@ -240,6 +240,7 @@ fn main() {
     println!("cargo:rerun-if-env-changed=LLVM_VERSION");
     println!("cargo:rerun-if-env-changed=LIBAFL_EDGES_MAP_SIZE_IN_USE");
     println!("cargo:rerun-if-env-changed=LIBAFL_ACCOUNTING_MAP_SIZE");
+    println!("cargo:rerun-if-env-changed=LIBAFL_DDG_MAP_SIZE");
     println!("cargo:rerun-if-changed=src/common-llvm.h");
     println!("cargo:rerun-if-changed=build.rs");
 
@@ -317,13 +318,18 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         .map_or(Ok(2_621_440), str::parse)
         .expect("Could not parse LIBAFL_EDGES_MAP_SIZE_IN_USE");
     cxxflags.push(format!(
-        "-DLIBAFL_EDGES_MAP_SIZE_IN_USE={edges_map_size_in_use}"
+        "-DEDGES_MAP_SIZE_IN_USE={edges_map_size_in_use}"
     ));
 
     let acc_map_size: usize = option_env!("LIBAFL_ACCOUNTING_MAP_SIZE")
         .map_or(Ok(65_536), str::parse)
         .expect("Could not parse LIBAFL_ACCOUNTING_MAP_SIZE");
-    cxxflags.push(format!("-DLIBAFL_ACCOUNTING_MAP_SIZE={acc_map_size}"));
+    cxxflags.push(format!("-DACCOUNTING_MAP_SIZE={acc_map_size}"));
+
+    let ddg_map_size: usize = option_env!("LIBAFL_DDG_MAP_SIZE")
+        .map_or(Ok(65_536), str::parse)
+        .expect("Could not parse LIBAFL_DDG_MAP_SIZE");
+    cxxflags.push(format!("-DDDG_MAP_SIZE={ddg_map_size}"));
 
     let llvm_version = find_llvm_version();
 
@@ -349,6 +355,9 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
 
         /// The size of the accounting maps
         pub const ACCOUNTING_MAP_SIZE: usize = {acc_map_size};
+
+        /// The size of the ddg maps
+        pub const DDG_MAP_SIZE: usize = {acc_map_size};
 
         /// The llvm version used to build llvm passes
         pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = {llvm_version:?};

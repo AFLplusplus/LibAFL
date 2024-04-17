@@ -96,7 +96,7 @@
 #define MIN_FCN_SIZE 1
 #define VAR_NAME_LEN 264
 
-#define MAP_SIZE LIBAFL_EDGES_MAP_SIZE_IN_USE
+#define MAP_SIZE DDG_MAP_SIZE
 // #define MAP_SIZE 65536
 #define ALL_BIT_SET (MAP_SIZE - 1)
 // #define MAP_SIZE 255

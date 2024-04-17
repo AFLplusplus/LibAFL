@@ -43,6 +43,10 @@ fn main() {
     let acc_map_size: usize = option_env!("LIBAFL_ACCOUNTING_MAP_SIZE")
         .map_or(Ok(SIXTY_FIVE_KB), str::parse)
         .expect("Could not parse LIBAFL_ACCOUNTING_MAP_SIZE");
+    let ddg_map_size: usize = option_env!("LIBAFL_DDG_MAP_SIZE")
+        .map_or(Ok(SIXTY_FIVE_KB), str::parse)
+        .expect("Could not parse LIBAFL_DDG_MAP_SIZE");
+
 
     write!(
         constants_file,
@@ -60,6 +64,8 @@ fn main() {
         pub const CMPLOG_MAP_H: usize = {cmplog_map_h};
         /// The size of the accounting maps
         pub const ACCOUNTING_MAP_SIZE: usize = {acc_map_size};
+        /// The size of the accounting maps
+        pub const DDG_MAP_SIZE: usize = {ddg_map_size};        
 "
     )
     .expect("Could not write file");
@@ -69,6 +75,7 @@ fn main() {
     println!("cargo:rerun-if-env-changed=LIBAFL_CMPLOG_MAP_W");
     println!("cargo:rerun-if-env-changed=LIBAFL_CMPLOG_MAP_H");
     println!("cargo:rerun-if-env-changed=LIBAFL_ACCOUNTING_MAP_SIZE");
+    println!("cargo:rerun-if-env-changed=LIBAFL_DDG_MAP_SIZE");
 
     #[cfg(feature = "common")]
     {
@@ -153,10 +160,11 @@ fn main() {
         cc::Build::new()
             .file(src_dir.join("coverage.c"))
             .define(
-                "EDGES_MAP_SIZE_IN_USE",
-                Some(&*format!("{edges_map_size_in_use}")),
+                "EDGES_MAP_SIZE_MAX",
+                Some(&*format!("{edges_map_size_max}")),
             )
             .define("ACCOUNTING_MAP_SIZE", Some(&*format!("{acc_map_size}")))
+            .define("DDG_MAP_SIZE", Some(&*format!("{ddg_map_size}")))
             .compile("coverage");
     }
 
