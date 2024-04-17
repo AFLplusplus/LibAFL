@@ -13,6 +13,19 @@ use crate::current_nanos;
 /// Not cryptographically secure (which is not what you want during fuzzing ;) )
 pub type StdRand = RomuDuoJrRand;
 
+/// Faster and almost unbiased alternative to `rand % n`.
+///
+/// For N-bit bound, probability of getting a biased value is 1/2^(64-N).
+/// At least 2^2*(64-N) samples are required to detect this amount of bias.
+///
+/// See: [An optimal algorithm for bounded random integers](https://github.com/apple/swift/pull/39143).
+#[must_use]
+pub fn fast_bound(rand: u64, n: u64) -> u64 {
+    debug_assert_ne!(n, 0);
+    let mul = u128::from(rand).wrapping_mul(u128::from(n));
+    (mul >> 64) as u64
+}
+
 /// Ways to get random around here.
 /// Please note that these are not cryptographically secure.
 /// Or, even if some might be by accident, at least they are not seeded in a cryptographically secure fashion.
@@ -25,24 +38,7 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
 
     /// Gets a value below the given 64 bit val (exclusive)
     fn below(&mut self, upper_bound_excl: u64) -> u64 {
-        if upper_bound_excl <= 1 {
-            return 0;
-        }
-
-        /*
-        Modulo is biased - we don't want our fuzzing to be biased so let's do it
-        right. See
-        https://stackoverflow.com/questions/10984974/why-do-people-say-there-is-modulo-bias-when-using-a-random-number-generator
-        */
-        let mut unbiased_rnd: u64;
-        loop {
-            unbiased_rnd = self.next();
-            if unbiased_rnd < (u64::MAX - (u64::MAX % upper_bound_excl)) {
-                break;
-            }
-        }
-
-        unbiased_rnd % upper_bound_excl
+        fast_bound(self.next(), upper_bound_excl)
     }
 
     /// Gets a value between the given lower bound (inclusive) and upper bound (inclusive)

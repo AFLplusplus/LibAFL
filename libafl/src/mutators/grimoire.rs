@@ -4,7 +4,10 @@
 use alloc::vec::Vec;
 use core::cmp::{max, min};
 
-use libafl_bolts::{rands::Rand, Named};
+use libafl_bolts::{
+    rands::{fast_bound, Rand},
+    Named,
+};
 
 use crate::{
     corpus::Corpus,
@@ -254,7 +257,7 @@ where
         }
 
         let stop_at_first = state.rand_mut().below(100) > 50;
-        let mut rand_idx = state.rand_mut().next() as usize;
+        let rand_idx = state.rand_mut().next();
 
         let meta = state.metadata_map().get::<Tokens>().unwrap();
         let token_1 = &meta.tokens()[token_find];
@@ -263,7 +266,7 @@ where
         let mut mutated = MutationResult::Skipped;
 
         let gen = generalised_meta.generalized_mut();
-        rand_idx %= gen.len();
+        let rand_idx = fast_bound(rand_idx, gen.len() as u64) as usize;
 
         'first: for item in &mut gen[..rand_idx] {
             if let GeneralizedItem::Bytes(bytes) = item {
