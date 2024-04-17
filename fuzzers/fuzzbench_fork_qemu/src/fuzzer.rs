@@ -205,8 +205,7 @@ fn fuzz(
             #[cfg(windows)]
             println!("{s}");
             writeln!(log.borrow_mut(), "{:?} {s}", current_time()).unwrap();
-        },
-        true,
+        }
     );
 
     let mut shmem_provider = StdShMemProvider::new()?;

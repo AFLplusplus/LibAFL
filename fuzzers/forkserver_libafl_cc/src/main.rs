@@ -149,8 +149,7 @@ pub fn main() {
     let monitor = SimpleMonitor::with_user_monitor(
         |s| {
             println!("{s}");
-        },
-        true,
+        }
     );
 
     // The event manager handle the various events generated during the fuzzing loop

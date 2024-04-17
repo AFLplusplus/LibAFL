@@ -145,8 +145,7 @@ pub fn fuzz() -> Result<(), Error> {
     let monitor = SimpleMonitor::with_user_monitor(
         |s| {
             println!("{s}");
-        },
-        true,
+        }
     );
     let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
     {
