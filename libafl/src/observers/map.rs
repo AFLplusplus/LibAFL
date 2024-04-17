@@ -16,7 +16,6 @@ use core::{
 use ahash::RandomState;
 use libafl_bolts::{
     ownedref::{OwnedMutPtr, OwnedMutSlice},
-    tuples::TypeRefCreator,
     AsIter, AsIterMut, AsMutSlice, AsSlice, HasLen, Named, Truncate,
 };
 use meminterval::IntervalTree;
@@ -161,8 +160,6 @@ pub trait CanTrack {
 /// *guaranteed to be safe* by `#[repr(transparent)]`.
 #[derive(Copy, Clone, Debug, Deserialize, Serialize)]
 pub struct ExplicitTracking<T, const ITH: bool, const NTH: bool>(T);
-
-impl<T, const ITH: bool, const NTH: bool> TypeRefCreator<Self> for ExplicitTracking<T, ITH, NTH> {}
 
 impl<T, const ITH: bool, const NTH: bool> CanTrack for ExplicitTracking<T, ITH, NTH> {
     type WithIndexTracking = ExplicitTracking<T, true, NTH>;
@@ -487,8 +484,6 @@ where
     phantom: PhantomData<&'a u8>,
 }
 
-impl<'a, O> TypeRefCreator<Self> for MapObserverSimpleIterator<'a, O> where O: 'a + MapObserver {}
-
 impl<'a, O> Iterator for MapObserverSimpleIterator<'a, O>
 where
     O: 'a + MapObserver,
@@ -517,8 +512,6 @@ where
     observer: *mut O,
     phantom: PhantomData<&'a u8>,
 }
-
-impl<'a, O> TypeRefCreator<Self> for MapObserverSimpleIteratorMut<'a, O> where O: 'a + MapObserver {}
 
 impl<'a, O> Iterator for MapObserverSimpleIteratorMut<'a, O>
 where
@@ -551,11 +544,6 @@ where
     map: OwnedMutSlice<'a, T>,
     initial: T,
     name: String,
-}
-
-impl<'a, T, const DIFFERENTIAL: bool> TypeRefCreator<Self> for StdMapObserver<'a, T, DIFFERENTIAL> where
-    T: Default + Copy + 'static + Serialize
-{
 }
 
 impl<'a, S, T> Observer<S> for StdMapObserver<'a, T, false>
@@ -1082,11 +1070,6 @@ where
     name: String,
 }
 
-impl<'a, T, const N: usize> TypeRefCreator<Self> for ConstMapObserver<'a, T, N> where
-    T: Default + Copy + 'static + Serialize
-{
-}
-
 impl<'a, S, T, const N: usize> Observer<S> for ConstMapObserver<'a, T, N>
 where
     S: UsesInput,
@@ -1399,11 +1382,6 @@ where
     size: OwnedMutPtr<usize>,
     initial: T,
     name: String,
-}
-
-impl<'a, T> TypeRefCreator<Self> for VariableMapObserver<'a, T> where
-    T: Default + Copy + 'static + Serialize + PartialEq + Bounded
-{
 }
 
 impl<'a, S, T> Observer<S> for VariableMapObserver<'a, T>
@@ -1750,7 +1728,6 @@ where
     base: M,
 }
 
-impl<M> TypeRefCreator<Self> for HitcountsMapObserver<M> where M: Serialize {}
 impl<S, M> Observer<S> for HitcountsMapObserver<M>
 where
     M: MapObserver<Entry = u8> + Observer<S> + AsMutSlice<Entry = u8>,
@@ -2051,8 +2028,6 @@ where
     base: M,
 }
 
-impl<M> TypeRefCreator<Self> for HitcountsIterableMapObserver<M> where M: Serialize {}
-
 impl<S, M> Observer<S> for HitcountsIterableMapObserver<M>
 where
     M: MapObserver<Entry = u8> + Observer<S>,
@@ -2323,11 +2298,6 @@ where
     initial: T,
     name: String,
     iter_idx: usize,
-}
-
-impl<'a, T, const DIFFERENTIAL: bool> TypeRefCreator<Self> for MultiMapObserver<'a, T, DIFFERENTIAL> where
-    T: 'static + Default + Copy + Serialize + Debug
-{
 }
 
 impl<'a, S, T> Observer<S> for MultiMapObserver<'a, T, false>
@@ -2648,8 +2618,6 @@ where
     initial: T,
     name: String,
 }
-
-impl<T> TypeRefCreator<Self> for OwnedMapObserver<T> where T: 'static + Default + Copy + Serialize {}
 
 impl<S, T> Observer<S> for OwnedMapObserver<T>
 where

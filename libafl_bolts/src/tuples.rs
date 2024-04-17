@@ -527,18 +527,20 @@ where
 
 /// Structs that has `TypeRef`
 /// You should use this when you want to avoid specifying types using `match_name_type_mut`
-pub trait TypeRefCreator<T> {
+pub trait TypeRefCreator {
     /// Return the `TypeRef`
-    fn type_ref(&self) -> TypeRef<T> {
+    fn type_ref(&self) -> TypeRef<Self> {
         TypeRef {
             phantom: PhantomData,
         }
     }
 }
 
+impl<N> TypeRefCreator for N where N: Named {}
+
 /// Empty object with the type T
 #[derive(Debug, Clone, Copy)]
-pub struct TypeRef<T> {
+pub struct TypeRef<T: ?Sized> {
     phantom: PhantomData<T>,
 }
 
