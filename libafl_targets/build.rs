@@ -25,9 +25,9 @@ fn main() {
     let dest_path = Path::new(&out_dir).join("constants.rs");
     let mut constants_file = File::create(dest_path).expect("Could not create file");
 
-    let edges_map_size_allocated: usize = option_env!("LIBAFL_EDGES_MAP_SIZE_ALLOCATED")
+    let edges_map_size_max: usize = option_env!("LIBAFL_EDGES_MAP_SIZE_MAX")
         .map_or(Ok(TWO_MB), str::parse)
-        .expect("Could not parse LIBAFL_EDGES_MAP_SIZE_ALLOCATED");
+        .expect("Could not parse LIBAFL_EDGES_MAP_SIZE_MAX");
     let edges_map_size_in_use: usize = option_env!("LIBAFL_EDGES_MAP_SIZE_IN_USE")
         .map_or(Ok(TWO_MB), str::parse)
         .expect("Could not parse LIBAFL_EDGES_MAP_SIZE_IN_USE");
@@ -51,7 +51,7 @@ fn main() {
         /// The default size of the edges map the fuzzer uses
         pub const EDGES_MAP_SIZE_IN_USE: usize = {edges_map_size_in_use};
         /// The real allocated size of the edges map
-        pub const EDGES_MAP_SIZE_ALLOC: usize = {edges_map_size_allocated};
+        pub const edges_map_size_max: usize = {edges_map_size_max};
         /// The size of the cmps map
         pub const CMP_MAP_SIZE: usize = {cmp_map_size};
         /// The width of the `CmpLog` map
