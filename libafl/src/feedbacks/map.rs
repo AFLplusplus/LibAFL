@@ -12,7 +12,7 @@ use core::{
     ops::{BitAnd, BitOr},
 };
 
-use libafl_bolts::{AsIter, AsMutSlice, AsSlice, HasRefCnt, Named};
+use libafl_bolts::{AsIter, AsMutSlice, AsSlice, AsSliceIter, HasRefCnt, Named};
 use num_traits::PrimInt;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -551,7 +551,8 @@ where
 #[rustversion::nightly]
 impl<C, O, S> Feedback<S> for MapFeedback<C, DifferentIsNovel, O, MaxReducer, S, u8>
 where
-    O: MapObserver<Entry = u8> + AsSlice<Entry = u8>,
+    O: MapObserver<Entry = u8> + for<'it> AsSliceIter<'it>,
+    for<'it> <O as AsSliceIter<'it>>::Entry: AsSlice<Entry = u8>,
     for<'it> O: AsIter<'it, Item = u8>,
     S: State + HasNamedMetadata,
     C: CanTrack + AsRef<O>,
@@ -590,79 +591,83 @@ where
             map_state.history_map.resize(len, u8::default());
         }
 
-        let map = observer.as_slice();
-        debug_assert!(map.len() >= size);
+        debug_assert!(len >= size);
 
-        let history_map = map_state.history_map.as_slice();
+        let mut offset = 0;
+        for map in observer.as_slice_iter() {
+            let map = map.as_slice();
+            let history_map = &map_state.history_map.as_slice()[offset..];
 
-        // Non vector implementation for reference
-        /*for (i, history) in history_map.iter_mut().enumerate() {
-            let item = map[i];
-            let reduced = MaxReducer::reduce(*history, item);
-            if DifferentIsNovel::is_novel(*history, reduced) {
-                *history = reduced;
-                interesting = true;
-                if self.novelties.is_some() {
-                    self.novelties.as_mut().unwrap().push(i);
-                }
-            }
-        }*/
-
-        let steps = size / VectorType::LEN;
-        let left = size % VectorType::LEN;
-
-        if let Some(novelties) = self.novelties.as_mut() {
-            novelties.clear();
-            for step in 0..steps {
-                let i = step * VectorType::LEN;
-                let history = VectorType::from_slice(&history_map[i..]);
-                let items = VectorType::from_slice(&map[i..]);
-
-                if items.simd_max(history) != history {
+            // Non vector implementation for reference
+            /*for (i, history) in history_map.iter_mut().enumerate() {
+                let item = map[i];
+                let reduced = MaxReducer::reduce(*history, item);
+                if DifferentIsNovel::is_novel(*history, reduced) {
+                    *history = reduced;
                     interesting = true;
-                    unsafe {
-                        for j in i..(i + VectorType::LEN) {
-                            let item = *map.get_unchecked(j);
-                            if item > *history_map.get_unchecked(j) {
-                                novelties.push(j);
+                    if self.novelties.is_some() {
+                        self.novelties.as_mut().unwrap().push(i);
+                    }
+                }
+            }*/
+
+            let steps = size / VectorType::LEN;
+            let left = size % VectorType::LEN;
+
+            if let Some(novelties) = self.novelties.as_mut() {
+                novelties.clear();
+                for step in 0..steps {
+                    let i = step * VectorType::LEN;
+                    let history = VectorType::from_slice(&history_map[i..]);
+                    let items = VectorType::from_slice(&map[i..]);
+
+                    if items.simd_max(history) != history {
+                        interesting = true;
+                        unsafe {
+                            for j in i..(i + VectorType::LEN) {
+                                let item = *map.get_unchecked(j);
+                                if item > *history_map.get_unchecked(j) {
+                                    novelties.push(j + offset);
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            for j in (size - left)..size {
-                unsafe {
-                    let item = *map.get_unchecked(j);
-                    if item > *history_map.get_unchecked(j) {
-                        interesting = true;
-                        novelties.push(j);
-                    }
-                }
-            }
-        } else {
-            for step in 0..steps {
-                let i = step * VectorType::LEN;
-                let history = VectorType::from_slice(&history_map[i..]);
-                let items = VectorType::from_slice(&map[i..]);
-
-                if items.simd_max(history) != history {
-                    interesting = true;
-                    break;
-                }
-            }
-
-            if !interesting {
                 for j in (size - left)..size {
                     unsafe {
                         let item = *map.get_unchecked(j);
                         if item > *history_map.get_unchecked(j) {
                             interesting = true;
-                            break;
+                            novelties.push(j + offset);
+                        }
+                    }
+                }
+            } else {
+                for step in 0..steps {
+                    let i = step * VectorType::LEN;
+                    let history = VectorType::from_slice(&history_map[i..]);
+                    let items = VectorType::from_slice(&map[i..]);
+
+                    if items.simd_max(history) != history {
+                        interesting = true;
+                        break;
+                    }
+                }
+
+                if !interesting {
+                    for j in (size - left)..size {
+                        unsafe {
+                            let item = *map.get_unchecked(j);
+                            if item > *history_map.get_unchecked(j) {
+                                interesting = true;
+                                break;
+                            }
                         }
                     }
                 }
             }
+            offset += map.len();
         }
 
         Ok(interesting)

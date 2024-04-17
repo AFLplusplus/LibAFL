@@ -16,7 +16,7 @@ use core::{
 use ahash::RandomState;
 use libafl_bolts::{
     ownedref::{OwnedMutPtr, OwnedMutSlice},
-    AsIter, AsIterMut, AsMutSlice, AsSlice, HasLen, Named, Truncate,
+    AsIter, AsIterMut, AsMutSlice, AsSlice, AsSliceIter, AsSliceIterMut, HasLen, Named, Truncate,
 };
 use meminterval::IntervalTree;
 use num_traits::Bounded;
@@ -1717,20 +1717,16 @@ where
 
 /// Map observer with AFL-like hitcounts postprocessing
 ///
-/// [`MapObserver`]s that are not slice-backed, such as [`MultiMapObserver`], can use
-/// [`HitcountsIterableMapObserver`] instead.
+/// [`MapObserver`]s that are not slice-backed can use [`HitcountsIterableMapObserver`] instead.
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "M: serde::de::DeserializeOwned")]
-pub struct HitcountsMapObserver<M>
-where
-    M: Serialize,
-{
+pub struct HitcountsMapObserver<M> {
     base: M,
 }
 
 impl<S, M> Observer<S> for HitcountsMapObserver<M>
 where
-    M: MapObserver<Entry = u8> + Observer<S> + AsMutSlice<Entry = u8>,
+    M: MapObserver<Entry = u8> + Observer<S> + for<'it> AsSliceIterMut<'it>,
+    for<'it> <M as AsSliceIterMut<'it>>::Entry: AsMutSlice<Entry = u8>,
     S: UsesInput,
 {
     #[inline]
@@ -1746,44 +1742,45 @@ where
         input: &S::Input,
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
-        let map = self.as_mut_slice();
-        let mut len = map.len();
-        let align_offset = map.as_ptr().align_offset(size_of::<u16>());
+        for map in self.base.as_slice_iter_mut() {
+            let map = map.as_mut_slice();
+            let mut len = map.len();
+            let align_offset = map.as_ptr().align_offset(size_of::<u16>());
 
-        // if len == 1, the next branch will already do this lookup
-        if len > 1 && align_offset != 0 {
-            debug_assert_eq!(
-                align_offset, 1,
-                "Aligning u8 to u16 should always be offset of 1?"
-            );
-            unsafe {
-                *map.get_unchecked_mut(0) =
-                    *COUNT_CLASS_LOOKUP.get_unchecked(*map.get_unchecked(0) as usize);
+            // if len == 1, the next branch will already do this lookup
+            if len > 1 && align_offset != 0 {
+                debug_assert_eq!(
+                    align_offset, 1,
+                    "Aligning u8 to u16 should always be offset of 1?"
+                );
+                unsafe {
+                    *map.get_unchecked_mut(0) =
+                        *COUNT_CLASS_LOOKUP.get_unchecked(*map.get_unchecked(0) as usize);
+                }
+                len -= 1;
             }
-            len -= 1;
-        }
 
-        // Fix the last element
-        if (len & 1) != 0 {
-            unsafe {
-                *map.get_unchecked_mut(len - 1) =
-                    *COUNT_CLASS_LOOKUP.get_unchecked(*map.get_unchecked(len - 1) as usize);
+            // Fix the last element
+            if (len & 1) != 0 {
+                unsafe {
+                    *map.get_unchecked_mut(len - 1) =
+                        *COUNT_CLASS_LOOKUP.get_unchecked(*map.get_unchecked(len - 1) as usize);
+                }
+            }
+
+            let cnt = len / 2;
+
+            let map16 = unsafe {
+                slice::from_raw_parts_mut(map.as_mut_ptr().add(align_offset) as *mut u16, cnt)
+            };
+            // 2022-07: Adding `enumerate` here increases execution speed/register allocation on x86_64.
+            #[allow(clippy::unused_enumerate_index)]
+            for (_i, item) in map16[0..cnt].iter_mut().enumerate() {
+                unsafe {
+                    *item = *COUNT_CLASS_LOOKUP_16.get_unchecked(*item as usize);
+                }
             }
         }
-
-        let cnt = len / 2;
-
-        let map16 = unsafe {
-            slice::from_raw_parts_mut(map.as_mut_ptr().add(align_offset) as *mut u16, cnt)
-        };
-        // 2022-07: Adding `enumerate` here increases execution speed/register allocation on x86_64.
-        #[allow(clippy::unused_enumerate_index)]
-        for (_i, item) in map16[0..cnt].iter_mut().enumerate() {
-            unsafe {
-                *item = *COUNT_CLASS_LOOKUP_16.get_unchecked(*item as usize);
-            }
-        }
-
         self.base.post_exec(state, input, exit_kind)
     }
 }
@@ -1884,25 +1881,27 @@ where
     }
 }
 
-impl<M> AsSlice for HitcountsMapObserver<M>
+impl<'it, M> AsSliceIter<'it> for HitcountsMapObserver<M>
 where
-    M: MapObserver + AsSlice,
+    M: AsSliceIter<'it>,
 {
-    type Entry = <M as AsSlice>::Entry;
-    #[inline]
-    fn as_slice(&self) -> &[Self::Entry] {
-        self.base.as_slice()
+    type Entry = M::Entry;
+    type IntoIter = M::IntoIter;
+
+    fn as_slice_iter(&'it self) -> Self::IntoIter {
+        self.base.as_slice_iter()
     }
 }
 
-impl<M> AsMutSlice for HitcountsMapObserver<M>
+impl<'it, M> AsSliceIterMut<'it> for HitcountsMapObserver<M>
 where
-    M: MapObserver + AsMutSlice,
+    M: AsSliceIterMut<'it>,
 {
-    type Entry = <M as AsMutSlice>::Entry;
-    #[inline]
-    fn as_mut_slice(&mut self) -> &mut [Self::Entry] {
-        self.base.as_mut_slice()
+    type Entry = M::Entry;
+    type IntoIter = M::IntoIter;
+
+    fn as_slice_iter_mut(&'it mut self) -> Self::IntoIter {
+        self.base.as_slice_iter_mut()
     }
 }
 
@@ -1919,7 +1918,7 @@ where
 
 impl<'it, M> AsIter<'it> for HitcountsMapObserver<M>
 where
-    M: Named + Serialize + serde::de::DeserializeOwned + AsIter<'it, Item = u8>,
+    M: AsIter<'it, Item = u8>,
 {
     type Item = u8;
     type IntoIter = <M as AsIter<'it>>::IntoIter;
@@ -1931,7 +1930,7 @@ where
 
 impl<'it, M> AsIterMut<'it> for HitcountsMapObserver<M>
 where
-    M: Named + Serialize + serde::de::DeserializeOwned + AsIterMut<'it, Item = u8>,
+    M: AsIterMut<'it, Item = u8>,
 {
     type Item = u8;
     type IntoIter = <M as AsIterMut<'it>>::IntoIter;
@@ -1943,7 +1942,6 @@ where
 
 impl<'it, M> IntoIterator for &'it HitcountsMapObserver<M>
 where
-    M: Serialize + serde::de::DeserializeOwned,
     &'it M: IntoIterator<Item = &'it u8>,
 {
     type Item = &'it u8;
@@ -2020,11 +2018,7 @@ where
 /// Less optimized version for non-slice iterators.
 /// Slice-backed observers should use a [`HitcountsMapObserver`].
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "M: serde::de::DeserializeOwned")]
-pub struct HitcountsIterableMapObserver<M>
-where
-    M: Serialize,
-{
+pub struct HitcountsIterableMapObserver<M> {
     base: M,
 }
 
@@ -2057,7 +2051,7 @@ where
 
 impl<M> Named for HitcountsIterableMapObserver<M>
 where
-    M: Named + Serialize + serde::de::DeserializeOwned,
+    M: Named,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -2147,39 +2141,14 @@ where
 
 impl<M> Truncate for HitcountsIterableMapObserver<M>
 where
-    M: Named + Serialize + serde::de::DeserializeOwned + Truncate,
+    M: Truncate,
 {
     fn truncate(&mut self, new_len: usize) {
         self.base.truncate(new_len);
     }
 }
 
-impl<M> AsSlice for HitcountsIterableMapObserver<M>
-where
-    M: MapObserver + AsSlice,
-{
-    type Entry = <M as AsSlice>::Entry;
-    #[inline]
-    fn as_slice(&self) -> &[Self::Entry] {
-        self.base.as_slice()
-    }
-}
-
-impl<M> AsMutSlice for HitcountsIterableMapObserver<M>
-where
-    M: MapObserver + AsMutSlice,
-{
-    type Entry = <M as AsMutSlice>::Entry;
-    #[inline]
-    fn as_mut_slice(&mut self) -> &mut [Self::Entry] {
-        self.base.as_mut_slice()
-    }
-}
-
-impl<M> HitcountsIterableMapObserver<M>
-where
-    M: Serialize + serde::de::DeserializeOwned,
-{
+impl<M> HitcountsIterableMapObserver<M> {
     /// Creates a new [`MapObserver`]
     pub fn new(base: M) -> Self {
         init_count_class_16();
@@ -2187,9 +2156,33 @@ where
     }
 }
 
+impl<'it, M> AsSliceIter<'it> for HitcountsIterableMapObserver<M>
+where
+    M: AsSliceIter<'it>,
+{
+    type Entry = M::Entry;
+    type IntoIter = M::IntoIter;
+
+    fn as_slice_iter(&'it self) -> Self::IntoIter {
+        self.base.as_slice_iter()
+    }
+}
+
+impl<'it, M> AsSliceIterMut<'it> for HitcountsIterableMapObserver<M>
+where
+    M: AsSliceIterMut<'it>,
+{
+    type Entry = M::Entry;
+    type IntoIter = M::IntoIter;
+
+    fn as_slice_iter_mut(&'it mut self) -> Self::IntoIter {
+        self.base.as_slice_iter_mut()
+    }
+}
+
 impl<'it, M> AsIter<'it> for HitcountsIterableMapObserver<M>
 where
-    M: Named + Serialize + serde::de::DeserializeOwned + AsIter<'it, Item = u8>,
+    M: AsIter<'it, Item = u8>,
 {
     type Item = u8;
     type IntoIter = <M as AsIter<'it>>::IntoIter;
@@ -2201,7 +2194,7 @@ where
 
 impl<'it, M> AsIterMut<'it> for HitcountsIterableMapObserver<M>
 where
-    M: Named + Serialize + serde::de::DeserializeOwned + AsIterMut<'it, Item = u8>,
+    M: AsIterMut<'it, Item = u8>,
 {
     type Item = u8;
     type IntoIter = <M as AsIterMut<'it>>::IntoIter;
@@ -2388,9 +2381,8 @@ where
         &mut self.maps[i].as_mut_slice()[j]
     }
 
-    #[inline]
-    fn initial(&self) -> T {
-        self.initial
+    fn usable_count(&self) -> usize {
+        self.len()
     }
 
     fn count_bytes(&self) -> u64 {
@@ -2419,6 +2411,11 @@ where
         hasher.finish()
     }
 
+    #[inline]
+    fn initial(&self) -> T {
+        self.initial
+    }
+
     fn reset_map(&mut self) -> Result<(), Error> {
         let initial = self.initial();
         for map in &mut self.maps {
@@ -2427,10 +2424,6 @@ where
             }
         }
         Ok(())
-    }
-
-    fn usable_count(&self) -> usize {
-        self.len()
     }
 
     fn to_vec(&self) -> Vec<Self::Entry> {

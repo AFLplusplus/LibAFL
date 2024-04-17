@@ -169,6 +169,7 @@ use alloc::vec::Vec;
 use core::hash::BuildHasher;
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
 use core::hash::Hasher;
+use core::iter::Once;
 #[cfg(all(unix, feature = "std"))]
 use core::ptr;
 #[cfg(feature = "std")]
@@ -744,6 +745,56 @@ pub trait AsIterMut<'it> {
 
     /// Create an iterator from &mut self
     fn as_iter_mut(&'it mut self) -> Self::IntoIter;
+}
+
+/// Create an `Iterator` of slices from a reference. This specialisation allows for the SIMD
+/// acceleration of non-continuous maps.
+pub trait AsSliceIter<'it> {
+    /// Type of the entries in each slice
+    type Entry: 'it + AsSlice + ?Sized;
+    /// The iterator type
+    type IntoIter: Iterator<Item = &'it Self::Entry>;
+
+    /// Create a slice iterator from &self
+    fn as_slice_iter(&'it self) -> Self::IntoIter;
+}
+
+/// Create an `Iterator` of slices from a mutable reference. This specialisation allows for the SIMD
+/// acceleration of non-continuous maps.
+pub trait AsSliceIterMut<'it> {
+    /// Type of the entries in each slice
+    type Entry: 'it + AsMutSlice + ?Sized;
+    /// The iterator type
+    type IntoIter: Iterator<Item = &'it mut Self::Entry>;
+
+    /// Create a slice iterator from &mut self
+    fn as_slice_iter_mut(&'it mut self) -> Self::IntoIter;
+}
+
+impl<'it, T> AsSliceIter<'it> for T
+where
+    T: AsSlice,
+    <T as AsSlice>::Entry: 'it,
+{
+    type Entry = [<Self as AsSlice>::Entry];
+    type IntoIter = Once<&'it Self::Entry>;
+
+    fn as_slice_iter(&'it self) -> Self::IntoIter {
+        core::iter::once(self.as_slice())
+    }
+}
+
+impl<'it, T> AsSliceIterMut<'it> for T
+where
+    T: AsMutSlice,
+    <T as AsMutSlice>::Entry: 'it,
+{
+    type Entry = [<Self as AsMutSlice>::Entry];
+    type IntoIter = Once<&'it mut Self::Entry>;
+
+    fn as_slice_iter_mut(&'it mut self) -> Self::IntoIter {
+        core::iter::once(self.as_mut_slice())
+    }
 }
 
 /// Has a length field

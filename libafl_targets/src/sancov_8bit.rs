@@ -78,7 +78,8 @@ mod observers {
         Error,
     };
     use libafl_bolts::{
-        ownedref::OwnedMutSlice, AsIter, AsIterMut, AsMutSlice, AsSlice, HasLen, Named,
+        ownedref::OwnedMutSlice, AsIter, AsIterMut, AsMutSlice, AsSlice, AsSliceIter,
+        AsSliceIterMut, HasLen, Named,
     };
     use meminterval::IntervalTree;
     use serde::{Deserialize, Serialize};
@@ -315,6 +316,24 @@ mod observers {
                 initial: u8::default(),
                 iter_idx: 0,
             }
+        }
+    }
+
+    impl<'it, const DIFFERENTIAL: bool> AsSliceIter<'it> for CountersMultiMapObserver<DIFFERENTIAL> {
+        type Entry = OwnedMutSlice<'static, u8>;
+        type IntoIter = Iter<'it, Self::Entry>;
+
+        fn as_slice_iter(&'it self) -> Self::IntoIter {
+            unsafe { COUNTERS_MAPS.iter() }
+        }
+    }
+
+    impl<'it, const DIFFERENTIAL: bool> AsSliceIterMut<'it> for CountersMultiMapObserver<DIFFERENTIAL> {
+        type Entry = OwnedMutSlice<'static, u8>;
+        type IntoIter = IterMut<'it, Self::Entry>;
+
+        fn as_slice_iter_mut(&'it mut self) -> Self::IntoIter {
+            unsafe { COUNTERS_MAPS.iter_mut() }
         }
     }
 
