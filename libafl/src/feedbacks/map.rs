@@ -12,7 +12,9 @@ use core::{
     ops::{BitAnd, BitOr},
 };
 
-use libafl_bolts::{AsIter, AsMutSlice, AsSlice, AsSliceIter, HasRefCnt, Named};
+#[rustversion::nightly]
+use libafl_bolts::AsSliceIter;
+use libafl_bolts::{AsIter, AsMutSlice, AsSlice, HasRefCnt, Named};
 use num_traits::PrimInt;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
