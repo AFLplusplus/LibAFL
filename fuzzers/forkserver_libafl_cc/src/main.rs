@@ -22,7 +22,7 @@ use libafl_bolts::{
     current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, MatchName, Merge},
+    tuples::{tuple_list, MatchName, Merge, HasTypeRef, MatchNameRef},
     AsMutSlice, Truncate,
 };
 use nix::sys::signal::Signal;
@@ -163,6 +163,8 @@ pub fn main() {
     // Create the executor for the forkserver
     let args = opt.arguments;
 
+    let observer_ref = edges_observer.make_reference();
+
     let mut tokens = Tokens::new();
     let mut executor = ForkserverExecutor::builder()
         .program(opt.executable)
@@ -176,11 +178,13 @@ pub fn main() {
         .build(tuple_list!(time_observer, edges_observer))
         .unwrap();
 
+
     if let Some(dynamic_map_size) = executor.coverage_map_size() {
         executor
             .observers_mut()
-            .match_name_mut::<HitcountsMapObserver<StdMapObserver<'_, u8, false>>>("shared_mem")
+            .match_name_by_ref_mut("shared_mem", observer_ref)
             .unwrap()
+            .as_mut()
             .truncate(dynamic_map_size);
     }
 

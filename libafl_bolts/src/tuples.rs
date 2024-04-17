@@ -8,6 +8,7 @@ use core::{
     any::TypeId,
     mem::transmute,
     ptr::{addr_of, addr_of_mut},
+    marker::PhantomData,
 };
 
 pub use tuple_list::{tuple_list, tuple_list_type, TupleList};
@@ -370,6 +371,8 @@ where
     }
 }
 
+
+
 /// Match by type
 pub trait MatchType {
     /// Match by type and call the passed `f` function with a borrow, if found
@@ -521,6 +524,43 @@ where
         } else {
             self.1.match_name_type_mut::<T>(name)
         }
+    }
+}
+
+/// Structs that has `TypeRef`
+/// You should use this when you want to avoid specifying types using `match_name_type_mut`
+pub trait HasTypeRef<T> {
+    /// Return the `TypeRef`
+    fn make_reference(&self) -> TypeRef<T> {
+        TypeRef {
+            phantom: PhantomData,
+        }
+    }
+}
+
+/// Empty object with the type T
+#[derive(Debug, Clone, Copy)]
+pub struct TypeRef<T> {
+
+    phantom: PhantomData<T>
+}
+
+/// Search using `TypeRef`
+pub trait MatchNameRef {
+    /// Search using name and `TypeRef`
+    fn match_name_by_ref<T>(&self, name: &str, rf: TypeRef<T>) -> Option<&T>;
+    
+    /// Search using name and `TypeRef`
+    fn match_name_by_ref_mut<T>(&mut self, name: &str, rf: TypeRef<T>) -> Option<&mut T>;
+}
+
+impl<M> MatchNameRef for M where M: MatchName {
+    fn match_name_by_ref<T>(&self, name: &str, _rf: TypeRef<T>) -> Option<&T> {
+        self.match_name::<T>(name)
+    }
+
+    fn match_name_by_ref_mut<T>(&mut self, name: &str, _rf: TypeRef<T>) -> Option<&mut T> {
+        self.match_name_mut::<T>(name)
     }
 }
 
