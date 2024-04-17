@@ -51,7 +51,7 @@ fn main() {
         /// The default size of the edges map the fuzzer uses
         pub const EDGES_MAP_SIZE_IN_USE: usize = {edges_map_size_in_use};
         /// The real allocated size of the edges map
-        pub const edges_map_size_max: usize = {edges_map_size_max};
+        pub const EDGES_MAP_SIZE_MAX: usize = {edges_map_size_max};
         /// The size of the cmps map
         pub const CMP_MAP_SIZE: usize = {cmp_map_size};
         /// The width of the `CmpLog` map
