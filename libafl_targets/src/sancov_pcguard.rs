@@ -18,7 +18,7 @@ use crate::coverage::MAX_EDGES_NUM;
 #[cfg(feature = "pointer_maps")]
 use crate::coverage::{EDGES_MAP_PTR, EDGES_MAP_PTR_NUM};
 #[cfg(feature = "sancov_ngram4")]
-use crate::EDGES_MAP_SIZE;
+use crate::EDGES_MAP_SIZE_IN_USE;
 
 #[cfg(all(feature = "sancov_pcguard_edges", feature = "sancov_pcguard_hitcounts"))]
 #[cfg(not(any(doc, feature = "clippy")))]
@@ -187,7 +187,7 @@ unsafe fn update_ngram(pos: usize) -> usize {
         PREV_ARRAY_8.as_mut_array()[0] = pos as u32;
         reduced = PREV_ARRAY_8.reduce_xor() as usize;
     }
-    reduced %= EDGES_MAP_SIZE;
+    reduced %= EDGES_MAP_SIZE_IN_USE;
     reduced
 }
 
@@ -216,13 +216,13 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
     #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
     {
         pos = update_ngram(pos);
-        // println!("Wrinting to {} {}", pos, EDGES_MAP_SIZE);
+        // println!("Wrinting to {} {}", pos, EDGES_MAP_SIZE_IN_USE);
     }
 
     #[cfg(feature = "sancov_ctx")]
     {
         pos ^= __afl_prev_ctx as usize;
-        // println!("Wrinting to {} {}", pos, EDGES_MAP_SIZE);
+        // println!("Wrinting to {} {}", pos, EDGES_MAP_SIZE_IN_USE);
     }
 
     #[cfg(feature = "pointer_maps")]
@@ -279,7 +279,7 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(mut start: *mut u32
         #[cfg(not(feature = "pointer_maps"))]
         {
             MAX_EDGES_NUM = MAX_EDGES_NUM.wrapping_add(1);
-            // assert!((MAX_EDGES_NUM <= EDGES_MAP.len()), "The number of edges reported by SanitizerCoverage exceed the size of the edges map ({}). Use the LIBAFL_EDGES_MAP_SIZE env to increase it at compile time.", EDGES_MAP.len());
+            assert!((MAX_EDGES_NUM <= EDGES_MAP.len()), "The number of edges reported by SanitizerCoverage exceed the size of the edges map ({}). Use the LIBAFL_EDGES_MAP_SIZE_IN_USE env to increase it at compile time.", EDGES_MAP.len());
         }
     }
 }
