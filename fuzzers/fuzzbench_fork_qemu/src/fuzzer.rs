@@ -47,7 +47,7 @@ use libafl_bolts::{
 };
 use libafl_qemu::{
     cmplog::{CmpLogMap, CmpLogObserver, QemuCmpLogChildHelper},
-    edges::{QemuEdgeCoverageChildHelper, EDGES_MAP_PTR, EDGES_MAP_SIZE},
+    edges::{QemuEdgeCoverageChildHelper, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},
     elf::EasyElf,
     filter_qemu_args,
     hooks::QemuHooks,
@@ -205,13 +205,12 @@ fn fuzz(
             #[cfg(windows)]
             println!("{s}");
             writeln!(log.borrow_mut(), "{:?} {s}", current_time()).unwrap();
-        },
-        true,
+        }
     );
 
     let mut shmem_provider = StdShMemProvider::new()?;
 
-    let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_SIZE).unwrap();
+    let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_SIZE_IN_USE).unwrap();
     let edges = edges_shmem.as_mut_slice();
     unsafe { EDGES_MAP_PTR = edges.as_mut_ptr() };
 
@@ -238,7 +237,7 @@ fn fuzz(
 
     // Create an observation channel using the coverage map
     let edges_observer = unsafe {
-        HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_SIZE>::from_mut_ptr(
+        HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_SIZE_IN_USE>::from_mut_ptr(
             "edges",
             edges.as_mut_ptr(),
         ))
