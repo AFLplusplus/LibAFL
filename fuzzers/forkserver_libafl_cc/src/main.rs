@@ -22,7 +22,7 @@ use libafl_bolts::{
     current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, MatchName, Merge, TypeRefCreator, MatchNameRef},
+    tuples::{tuple_list, MatchName, MatchNameRef, Merge, TypeRefCreator},
     AsMutSlice, Truncate,
 };
 use libafl_targets::{EDGES_MAP_PTR, EDGES_MAP_SIZE};
@@ -146,11 +146,9 @@ pub fn main() {
     .unwrap();
 
     // The Monitor trait define how the fuzzer stats are reported to the user
-    let monitor = SimpleMonitor::with_user_monitor(
-        |s| {
-            println!("{s}");
-        }
-    );
+    let monitor = SimpleMonitor::with_user_monitor(|s| {
+        println!("{s}");
+    });
 
     // The event manager handle the various events generated during the fuzzing loop
     // such as the notification of the addition of a new item to the corpus
@@ -182,7 +180,6 @@ pub fn main() {
         .kill_signal(opt.signal)
         .build(tuple_list!(time_observer, edges_observer))
         .unwrap();
-
 
     if let Some(dynamic_map_size) = executor.coverage_map_size() {
         executor
