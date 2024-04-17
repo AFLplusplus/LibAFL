@@ -5,7 +5,7 @@ use clap::{self, Parser};
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::{forkserver::ForkserverExecutor, HasObservers},
+    executors::forkserver::ForkserverExecutor,
     feedback_and_fast, feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -22,10 +22,11 @@ use libafl_bolts::{
     current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, MatchName, Merge},
-    AsMutSlice, Truncate,
+    tuples::{tuple_list, Merge},
+    AsMutSlice,
 };
 use nix::sys::signal::Signal;
+use libafl_targets::{EDGES_MAP_SIZE, EDGES_MAP_PTR};
 
 /// The commandline args this fuzzer accepts
 #[derive(Debug, Parser)]
@@ -85,8 +86,7 @@ struct Opt {
 
 #[allow(clippy::similar_names)]
 pub fn main() {
-    const MAP_SIZE: usize = 65536;
-
+    const MAP_SIZE: usize = EDGES_MAP_SIZE; //65536;
     let opt = Opt::parse();
 
     let corpus_dirs: Vec<PathBuf> = [opt.in_dir].to_vec();
@@ -99,6 +99,7 @@ pub fn main() {
     // let the forkserver know the shmid
     shmem.write_to_env("__AFL_SHM_ID").unwrap();
     let shmem_buf = shmem.as_mut_slice();
+    unsafe { EDGES_MAP_PTR = shmem_buf.as_mut_ptr() };
 
     // Create an observation channel using the signals map
     let edges_observer = unsafe {
@@ -176,13 +177,15 @@ pub fn main() {
         .build(tuple_list!(time_observer, edges_observer))
         .unwrap();
 
-    if let Some(dynamic_map_size) = executor.coverage_map_size() {
-        executor
-            .observers_mut()
-            .match_name_mut::<HitcountsMapObserver<StdMapObserver<'_, u8, false>>>("shared_mem")
-            .unwrap()
-            .truncate(dynamic_map_size);
-    }
+    // if let Some(dynamic_map_size) = executor.coverage_map_size() {
+    //     executor
+    //         .observers_mut()
+    //         .match_name_mut::<ExplicitTracking<HitcountsMapObserver<StdMapObserver<'_, u8, false>>, true, false>>("shared_mem")
+    //         // .match_name_mut::<HitcountsMapObserver<StdMapObserver<'_, u8, false>>>("shared_mem")
+    //         .unwrap()
+    //         .as_mut()
+    //         .truncate(dynamic_map_size);
+    // }
 
     // In case the corpus is empty (on first run), reset
     if state.must_load_initial_inputs() {
