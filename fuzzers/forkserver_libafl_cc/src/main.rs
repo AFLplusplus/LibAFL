@@ -5,14 +5,14 @@ use clap::{self, Parser};
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::forkserver::ForkserverExecutor,
+    executors::{forkserver::ForkserverExecutor, HasObservers},
     feedback_and_fast, feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::BytesInput,
     monitors::SimpleMonitor,
     mutators::{scheduled::havoc_mutations, tokens_mutations, StdScheduledMutator, Tokens},
-    observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
+    observers::{CanTrack, ExplicitTracking, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, StdState},
@@ -22,11 +22,11 @@ use libafl_bolts::{
     current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, Merge},
-    AsMutSlice,
+    tuples::{tuple_list, MatchName, Merge},
+    AsMutSlice, Truncate,
 };
+use libafl_targets::{EDGES_MAP_PTR, EDGES_MAP_SIZE};
 use nix::sys::signal::Signal;
-use libafl_targets::{EDGES_MAP_SIZE, EDGES_MAP_PTR};
 
 /// The commandline args this fuzzer accepts
 #[derive(Debug, Parser)]
@@ -182,15 +182,14 @@ pub fn main() {
         .build(tuple_list!(time_observer, edges_observer))
         .unwrap();
 
-    // if let Some(dynamic_map_size) = executor.coverage_map_size() {
-    //     executor
-    //         .observers_mut()
-    //         .match_name_mut::<ExplicitTracking<HitcountsMapObserver<StdMapObserver<'_, u8, false>>, true, false>>("shared_mem")
-    //         // .match_name_mut::<HitcountsMapObserver<StdMapObserver<'_, u8, false>>>("shared_mem")
-    //         .unwrap()
-    //         .as_mut()
-    //         .truncate(dynamic_map_size);
-    // }
+    if let Some(dynamic_map_size) = executor.coverage_map_size() {
+        executor
+            .observers_mut()
+            .match_name_mut::<ExplicitTracking<HitcountsMapObserver<StdMapObserver<'_, u8, false>>, true, false>>("shared_mem")
+            .unwrap()
+            .as_mut()
+            .truncate(dynamic_map_size);
+    }
 
     // In case the corpus is empty (on first run), reset
     if state.must_load_initial_inputs() {
