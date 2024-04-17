@@ -20,3 +20,6 @@ Try running the fuzzer with the `introspection` feature of the `libafl`. This wi
 
 ## Q. I still have problems with my fuzzer.
 Finally, if you really have no idea what is going on, run your fuzzer with logging enabled. (You can use `env_logger`, `SimpleStdoutLogger`, `SimpleStderrLogger` from `libafl_bolts`. `fuzzbench_text` has an example to show how to use it.) (Don't forget to enable stdout and stderr), and you can open an issue or ask us in Discord.
+
+## My fuzzer died of `Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! This can happen if the child calls `exit()`, in that case make sure it uses `abort()`, if it got killed unrecoverable (OOM), or if there is a bug in the fuzzer itself. (Child exited with: 0)`.
+If the exit code is zero, then this is because either your harness exited or you are using fuzzer_loop_for and forgot to add `mgr.on_restart` at the end of the fuzzer. In the first case, you should patch your harness not to exit. (or use `utils/deexit`).

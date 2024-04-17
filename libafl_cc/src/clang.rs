@@ -41,6 +41,8 @@ pub enum LLVMPasses {
     CmpLogInstructions,
     /// Instrument caller for sancov coverage
     Ctx,
+    /// Data dependency instrumentation
+    DDG,
 }
 
 impl LLVMPasses {
@@ -63,6 +65,9 @@ impl LLVMPasses {
                 .join(format!("cmplog-instructions-pass.{}", dll_extension())),
             LLVMPasses::Ctx => {
                 PathBuf::from(env!("OUT_DIR")).join(format!("ctx-pass.{}", dll_extension()))
+            }
+            LLVMPasses::DDG => {
+                PathBuf::from(env!("OUT_DIR")).join(format!("ddg-instr.{}", dll_extension()))
             }
         }
     }
