@@ -13,8 +13,7 @@
     clippy::missing_panics_doc,
     clippy::missing_docs_in_private_items,
     clippy::module_name_repetitions,
-    clippy::unreadable_literal,
-    clippy::missing_transmute_annotations
+    clippy::unreadable_literal
 )]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,

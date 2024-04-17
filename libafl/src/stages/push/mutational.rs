@@ -20,8 +20,8 @@ use crate::{
     observers::ObserversTuple,
     schedulers::Scheduler,
     start_timer,
-    state::{HasCorpus, HasExecutions, HasLastReportTime, HasMetadata, HasRand},
-    Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
+    state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand},
+    Error, EvaluatorObservers, ExecutionProcessor, HasMetadata, HasScheduler,
 };
 #[cfg(feature = "introspection")]
 use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
@@ -169,7 +169,7 @@ where
     ) -> Result<(), Error> {
         // todo: is_interesting, etc.
 
-        fuzzer.process_execution(state, event_mgr, last_input, observers, &exit_kind, true)?;
+        fuzzer.execute_and_process(state, event_mgr, last_input, observers, &exit_kind, true)?;
 
         start_timer!(state);
         self.mutator.post_exec(state, self.current_corpus_idx)?;

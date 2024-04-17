@@ -1,10 +1,10 @@
-use core::ffi::c_void;
+use core::{slice::from_raw_parts, str::from_utf8_unchecked};
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use paste::paste;
 use strum_macros::EnumIter;
 
-use crate::{extern_c_checked, GuestAddr, MapInfo};
+use crate::{extern_c_checked, libafl_mapinfo, strlen, GuestAddr, MapInfo};
 
 extern_c_checked! {
     pub fn qemu_user_init(argc: i32, argv: *const *const u8, envp: *const *const u8) -> i32;
@@ -14,11 +14,6 @@ extern_c_checked! {
     pub fn libafl_load_addr() -> u64;
     pub fn libafl_get_brk() -> u64;
     pub fn libafl_set_brk(brk: u64) -> u64;
-
-    pub fn read_self_maps() -> *const c_void;
-    pub fn free_self_maps(map_info: *const c_void);
-
-    pub fn libafl_maps_next(map_info: *const c_void, ret: *mut MapInfo) -> *const c_void;
 
     pub static exec_path: *const u8;
     pub static guest_base: usize;
@@ -33,4 +28,31 @@ extern_c_checked! {
 pub enum VerifyAccess {
     Read = libc::PROT_READ,
     Write = libc::PROT_READ | libc::PROT_WRITE,
+}
+
+impl From<libafl_mapinfo> for MapInfo {
+    fn from(map_info: libafl_mapinfo) -> Self {
+        let path: Option<String> = if map_info.path.is_null() {
+            None
+        } else {
+            unsafe {
+                Some(
+                    from_utf8_unchecked(from_raw_parts(
+                        map_info.path as *const u8,
+                        strlen(map_info.path as *const u8),
+                    ))
+                    .to_string(),
+                )
+            }
+        };
+
+        MapInfo {
+            start: map_info.start,
+            end: map_info.end,
+            offset: map_info.offset,
+            path,
+            flags: map_info.flags,
+            is_priv: map_info.is_priv,
+        }
+    }
 }

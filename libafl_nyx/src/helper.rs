@@ -1,13 +1,14 @@
 /// [`NyxHelper`] is used to wrap `NyxProcess`
-use std::{fmt::Debug, path::Path};
+use std::{fmt::Debug, fs::File, path::Path};
 
 use libafl::Error;
-use libnyx::NyxProcess;
+use libnyx::{NyxConfig, NyxProcess, NyxProcessRole};
 
 use crate::settings::NyxSettings;
 
 pub struct NyxHelper {
     pub nyx_process: NyxProcess,
+    pub nyx_stdout: File,
 
     pub bitmap_size: usize,
     pub bitmap_buffer: *mut u8,
@@ -31,52 +32,43 @@ impl NyxHelper {
     where
         P: AsRef<Path>,
     {
-        let work_dir = share_dir.as_ref().join("workdir");
         let share_dir_str = share_dir.as_ref().to_str().ok_or(Error::illegal_argument(
             "`share_dir` contains invalid UTF-8",
         ))?;
-        let work_dir_str = work_dir
-            .to_str()
-            .ok_or(Error::illegal_argument("`work_dir` contains invalid UTF-8"))?;
 
-        let nyx_process_type = match settings.parent_cpu_id {
-            None => NyxProcessType::ALONE,
-            Some(parent_cpu_id) if settings.cpu_id == parent_cpu_id => NyxProcessType::PARENT,
-            _ => NyxProcessType::CHILD,
-        };
-        let mut nyx_process = (match nyx_process_type {
-            NyxProcessType::ALONE => NyxProcess::new(
-                share_dir_str,
-                work_dir_str,
-                settings.cpu_id,
-                settings.input_buffer_size,
-                /* input_buffer_write_protection= */ true,
-            ),
-            NyxProcessType::PARENT => NyxProcess::new_parent(
-                share_dir_str,
-                work_dir_str,
-                settings.cpu_id,
-                settings.input_buffer_size,
-                /* input_buffer_write_protection= */ true,
-            ),
-            NyxProcessType::CHILD => NyxProcess::new_child(
-                share_dir_str,
-                work_dir_str,
-                settings.cpu_id,
-                /* worker_id= */ settings.cpu_id,
-            ),
-        })
-        .map_err(Error::illegal_argument)?;
+        let mut nyx_config = NyxConfig::load(share_dir_str).map_err(|e| {
+            Error::illegal_argument(format!("Failed to load Nyx config from share dir: {e}"))
+        })?;
+        nyx_config.set_input_buffer_size(settings.input_buffer_size);
+        nyx_config.set_process_role(match settings.parent_cpu_id {
+            None => NyxProcessRole::StandAlone,
+            Some(parent_cpu_id) if parent_cpu_id == settings.cpu_id => NyxProcessRole::Parent,
+            _ => NyxProcessRole::Child,
+        });
+        nyx_config.set_worker_id(settings.cpu_id);
 
+        let mut nyx_process = NyxProcess::new(&mut nyx_config, settings.cpu_id)
+            .map_err(|e| Error::illegal_state(format!("Failed to create Nyx process: {e}")))?;
         nyx_process.option_set_reload_mode(settings.snap_mode);
         nyx_process.option_set_timeout(settings.timeout_secs, settings.timeout_micro_secs);
         nyx_process.option_apply();
+
+        let path = Path::new(nyx_config.workdir_path())
+            .join(format!("hprintf_{}", nyx_config.worker_id()));
+        let nyx_stdout = File::options()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(path)
+            .map_err(|e| Error::illegal_state(format!("Failed to create Nyx stdout file: {e}")))?;
 
         let bitmap_size = nyx_process.bitmap_buffer_size();
         let bitmap_buffer = nyx_process.bitmap_buffer_mut().as_mut_ptr();
 
         Ok(Self {
             nyx_process,
+            nyx_stdout,
             bitmap_size,
             bitmap_buffer,
         })

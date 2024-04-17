@@ -18,10 +18,8 @@ use crate::{
     executors::{Executor, HasObservers},
     observers::concolic::ConcolicObserver,
     stages::{RetryRestartHelper, Stage, TracingStage},
-    state::{
-        HasCorpus, HasCurrentTestcase, HasExecutions, HasMetadata, HasNamedMetadata, UsesState,
-    },
-    Error,
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, UsesState},
+    Error, HasMetadata, HasNamedMetadata,
 };
 #[cfg(feature = "concolic_mutation")]
 use crate::{

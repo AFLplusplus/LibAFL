@@ -1,6 +1,6 @@
 use typed_builder::TypedBuilder;
 
-const DEFAULT_INPUT_BUFFER_SIZE: u32 = 1024 * 1024;
+const DEFAULT_INPUT_BUFFER_SIZE: usize = 1024 * 1024;
 const DEFAULT_TIMEOUT_SECS: u8 = 2;
 const DEFAULT_TIMEOUT_MICRO_SECS: u32 = 0;
 const DEFAULT_SNAP_MODE: bool = true;
@@ -14,14 +14,14 @@ pub struct NyxSettings {
     /// * Standalone: `parent_cpu_id.is_none()`.
     /// * Parent: `parent_cpu_id.is_some_and(|parent_cpu_id| parent_cpu_id == cpu_id)`.
     /// * Child: `parent_cpu_id.is_some_and(|parent_cpu_id| parent_cpu_id != cpu_id)`.
-    pub cpu_id: u32,
+    pub cpu_id: usize,
 
     /// The CPU core for the Nyx parent process. The parent process
     /// creates the fuzzing snapshot that can then be used by the child
     /// processes.
     ///
     /// Not specifying this will start the Nyx process in standalone mode.
-    pub parent_cpu_id: Option<u32>,
+    pub parent_cpu_id: Option<usize>,
 
     /// Reload the VM by using the fuzzing snapshot. You probably want
     /// this to be `true`.
@@ -33,7 +33,7 @@ pub struct NyxSettings {
     ///
     /// Default is `1MB`.
     #[builder(default = DEFAULT_INPUT_BUFFER_SIZE)]
-    pub input_buffer_size: u32,
+    pub input_buffer_size: usize,
 
     /// The timeout for a single execution in seconds (until the
     /// hypervisor restore snapshot call).

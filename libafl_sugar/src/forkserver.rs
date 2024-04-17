@@ -15,11 +15,11 @@ use libafl::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::Tokens,
     },
-    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
+    observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::StdMutationalStage,
-    state::{HasCorpus, HasMetadata, StdState},
-    Error,
+    state::{HasCorpus, StdState},
+    Error, HasMetadata,
 };
 use libafl_bolts::{
     core_affinity::Cores,
@@ -126,8 +126,10 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
             std::env::set_var("AFL_MAP_SIZE", format!("{MAP_SIZE}"));
 
             // Create an observation channel using the coverage map
-            let edges_observer =
-                unsafe { HitcountsMapObserver::new(StdMapObserver::new("shared_mem", shmem_map)) };
+            let edges_observer = unsafe {
+                HitcountsMapObserver::new(StdMapObserver::new("shared_mem", shmem_map))
+                    .track_indices()
+            };
 
             // Create an observation channel to keep track of the execution time
             let time_observer = TimeObserver::new("time");
@@ -136,7 +138,7 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
             // This one is composed by two Feedbacks in OR
             let mut feedback = feedback_or!(
                 // New maximization map feedback linked to the edges observer and the feedback state
-                MaxMapFeedback::tracking(&edges_observer, true, false),
+                MaxMapFeedback::new(&edges_observer),
                 // Time feedback, this one does not need a feedback state
                 TimeFeedback::with_observer(&time_observer)
             );
@@ -164,7 +166,8 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
             let mut tokens = Tokens::new();
 
             // A minimization+queue policy to get testcasess from the corpus
-            let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+            let scheduler =
+                IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
             // A fuzzer with feedbacks and a corpus scheduler
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -297,5 +300,82 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
             Err(Error::ShuttingDown) => log::info!("\nFuzzing stopped by user. Good Bye."),
             Err(err) => panic!("Fuzzingg failed {err:?}"),
         }
+    }
+}
+
+/// The python bindings for this sugar
+#[cfg(feature = "python")]
+pub mod pybind {
+    use std::path::PathBuf;
+
+    use libafl_bolts::core_affinity::Cores;
+    use pyo3::prelude::*;
+
+    use crate::forkserver;
+
+    /// Python bindings for the `LibAFL` forkserver sugar
+    #[pyclass(unsendable)]
+    #[derive(Debug)]
+    struct ForkserverBytesCoverageSugar {
+        input_dirs: Vec<PathBuf>,
+        output_dir: PathBuf,
+        broker_port: u16,
+        cores: Cores,
+        use_cmplog: Option<bool>,
+        iterations: Option<u64>,
+        tokens_file: Option<PathBuf>,
+        timeout: Option<u64>,
+    }
+
+    #[pymethods]
+    impl ForkserverBytesCoverageSugar {
+        /// Create a new [`ForkserverBytesCoverageSugar`]
+        #[new]
+        #[allow(clippy::too_many_arguments)]
+        fn new(
+            input_dirs: Vec<PathBuf>,
+            output_dir: PathBuf,
+            broker_port: u16,
+            cores: Vec<usize>,
+            use_cmplog: Option<bool>,
+            iterations: Option<u64>,
+            tokens_file: Option<PathBuf>,
+            timeout: Option<u64>,
+        ) -> Self {
+            Self {
+                input_dirs,
+                output_dir,
+                broker_port,
+                cores: cores.into(),
+                use_cmplog,
+                iterations,
+                tokens_file,
+                timeout,
+            }
+        }
+
+        /// Run the fuzzer
+        #[allow(clippy::needless_pass_by_value)]
+        pub fn run(&self, program: String, arguments: Vec<String>) {
+            forkserver::ForkserverBytesCoverageSugar::builder()
+                .input_dirs(&self.input_dirs)
+                .output_dir(self.output_dir.clone())
+                .broker_port(self.broker_port)
+                .cores(&self.cores)
+                .program(program)
+                .arguments(&arguments)
+                .use_cmplog(self.use_cmplog)
+                .timeout(self.timeout)
+                .tokens_file(self.tokens_file.clone())
+                .iterations(self.iterations)
+                .build()
+                .run();
+        }
+    }
+
+    /// Register the module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<ForkserverBytesCoverageSugar>()?;
+        Ok(())
     }
 }

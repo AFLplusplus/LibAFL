@@ -30,8 +30,7 @@
     clippy::module_name_repetitions,
     clippy::ptr_cast_constness,
     clippy::negative_feature_names,
-    clippy::too_many_lines,
-    clippy::missing_transmute_annotations
+    clippy::too_many_lines
 )]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
@@ -612,6 +611,22 @@ impl From<windows::core::Error> for Error {
     }
 }
 
+#[cfg(feature = "python")]
+impl From<pyo3::PyErr> for Error {
+    fn from(err: pyo3::PyErr) -> Self {
+        pyo3::Python::with_gil(|py| {
+            if err.matches(
+                py,
+                pyo3::types::PyType::new::<pyo3::exceptions::PyKeyboardInterrupt>(py),
+            ) {
+                Self::shutting_down()
+            } else {
+                Self::illegal_state(format!("Python exception: {err:?}"))
+            }
+        })
+    }
+}
+
 #[cfg(all(not(nightly), feature = "std"))]
 impl std::error::Error for Error {}
 
@@ -1021,6 +1036,148 @@ pub unsafe fn set_error_print_panic_hook(new_stderr: RawFd) {
             .unwrap_or_else(|err| println!("Failed to log to fd {new_stderr}: {err}"));
         mem::forget(f);
     }));
+}
+
+#[cfg(feature = "python")]
+#[allow(missing_docs)]
+pub mod pybind {
+
+    use pyo3::{pymodule, types::PyModule, PyResult, Python};
+
+    #[macro_export]
+    macro_rules! unwrap_me_body {
+        ($wrapper:expr, $name:ident, $body:block, $wrapper_type:ident, { $($wrapper_option:tt),* }) => {
+            match &$wrapper {
+                $(
+                    $wrapper_type::$wrapper_option(py_wrapper) => {
+                        Python::with_gil(|py| -> PyResult<_> {
+                            let borrowed = py_wrapper.borrow(py);
+                            let $name = &borrowed.inner;
+                            Ok($body)
+                        })
+                        .unwrap()
+                    }
+                )*
+            }
+        };
+        ($wrapper:expr, $name:ident, $body:block, $wrapper_type:ident, { $($wrapper_option:tt),* }, { $($wrapper_optional:tt($pw:ident) => $code_block:block)* }) => {
+            match &$wrapper {
+                $(
+                    $wrapper_type::$wrapper_option(py_wrapper) => {
+                        Python::with_gil(|py| -> PyResult<_> {
+                            let borrowed = py_wrapper.borrow(py);
+                            let $name = &borrowed.inner;
+                            Ok($body)
+                        })
+                        .unwrap()
+                    }
+                )*
+                $($wrapper_type::$wrapper_optional($pw) => { $code_block })*
+            }
+        };
+    }
+
+    #[macro_export]
+    macro_rules! unwrap_me_mut_body {
+        ($wrapper:expr, $name:ident, $body:block, $wrapper_type:ident, { $($wrapper_option:tt),*}) => {
+            match &mut $wrapper {
+                $(
+                    $wrapper_type::$wrapper_option(py_wrapper) => {
+                        Python::with_gil(|py| -> PyResult<_> {
+                            let mut borrowed = py_wrapper.borrow_mut(py);
+                            let $name = &mut borrowed.inner;
+                            Ok($body)
+                        })
+                        .unwrap()
+                    }
+                )*
+            }
+        };
+        ($wrapper:expr, $name:ident, $body:block, $wrapper_type:ident, { $($wrapper_option:tt),*}, { $($wrapper_optional:tt($pw:ident) => $code_block:block)* }) => {
+            match &mut $wrapper {
+                $(
+                    $wrapper_type::$wrapper_option(py_wrapper) => {
+                        Python::with_gil(|py| -> PyResult<_> {
+                            let mut borrowed = py_wrapper.borrow_mut(py);
+                            let $name = &mut borrowed.inner;
+                            Ok($body)
+                        })
+                        .unwrap()
+                    }
+                )*
+                $($wrapper_type::$wrapper_optional($pw) => { $code_block })*
+            }
+        };
+    }
+
+    #[macro_export]
+    macro_rules! impl_serde_pyobjectwrapper {
+        ($struct_name:ident, $inner:tt) => {
+            const _: () = {
+                use alloc::vec::Vec;
+
+                use pyo3::prelude::*;
+                use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+                impl Serialize for $struct_name {
+                    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+                    where
+                        S: Serializer,
+                    {
+                        let buf = Python::with_gil(|py| -> PyResult<Vec<u8>> {
+                            let pickle = PyModule::import(py, "pickle")?;
+                            let buf: Vec<u8> =
+                                pickle.getattr("dumps")?.call1((&self.$inner,))?.extract()?;
+                            Ok(buf)
+                        })
+                        .unwrap();
+                        serializer.serialize_bytes(&buf)
+                    }
+                }
+
+                struct PyObjectVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for PyObjectVisitor {
+                    type Value = $struct_name;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                        formatter
+                            .write_str("Expecting some bytes to deserialize from the Python side")
+                    }
+
+                    fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        let obj = Python::with_gil(|py| -> PyResult<PyObject> {
+                            let pickle = PyModule::import(py, "pickle")?;
+                            let obj = pickle.getattr("loads")?.call1((v,))?.to_object(py);
+                            Ok(obj)
+                        })
+                        .unwrap();
+                        Ok($struct_name::new(obj))
+                    }
+                }
+
+                impl<'de> Deserialize<'de> for $struct_name {
+                    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+                    where
+                        D: Deserializer<'de>,
+                    {
+                        deserializer.deserialize_byte_buf(PyObjectVisitor)
+                    }
+                }
+            };
+        };
+    }
+
+    #[pymodule]
+    #[pyo3(name = "libafl_bolts")]
+    /// Register the classes to the python module
+    pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
+        crate::rands::pybind::register(py, m)?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]

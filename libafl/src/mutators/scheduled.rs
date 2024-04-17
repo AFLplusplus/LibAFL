@@ -28,8 +28,8 @@ use crate::{
         token_mutations::{TokenInsert, TokenReplace},
         MutationResult, Mutator, MutatorsTuple,
     },
-    state::{HasCorpus, HasMetadata, HasRand},
-    Error,
+    state::{HasCorpus, HasRand},
+    Error, HasMetadata,
 };
 
 /// The metadata placed in a [`crate::corpus::Testcase`] by a [`LoggerScheduledMutator`].

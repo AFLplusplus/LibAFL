@@ -78,7 +78,7 @@ fn main() {
 
     assert!(
         command.status().map_or(false, |s| s.success()),
-        "Couldn't build runtime crate! Did you remember to use nightly? (`rustup default nightly` to install) Or, did you remember to install ucd-generate? (`cargo install ucd-generate` to install)"
+        "Couldn't build runtime crate! Did you remember to use nightly? (`rustup default nightly` to install)"
     );
 
     let mut archive_path = custom_lib_dir.join(std::env::var_os("TARGET").unwrap());

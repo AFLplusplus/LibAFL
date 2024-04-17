@@ -34,8 +34,8 @@ fn main() {
     let mut run_client = |state: Option<_>, mut restarting_mgr, core_id: CoreId| {
         // nyx stuff
         let settings = NyxSettings::builder()
-            .cpu_id(0)
-            .parent_cpu_id(Some(parent_cpu_id.0 as u32))
+            .cpu_id(core_id.0)
+            .parent_cpu_id(Some(parent_cpu_id.0))
             .build();
         let helper = NyxHelper::new("/tmp/nyx_libxml2/", settings).unwrap();
         let observer = unsafe {

@@ -48,8 +48,8 @@ use crate::{
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, UsesInput},
     monitors::Monitor,
-    state::{HasExecutions, HasLastReportTime, HasMetadata, State, UsesState},
-    Error,
+    state::{HasExecutions, HasLastReportTime, State, UsesState},
+    Error, HasMetadata,
 };
 
 /// Tries to create (synchronously) a [`TcpListener`] that is `nonblocking` (for later use in tokio).
@@ -651,7 +651,7 @@ where
                     {
                         state.scalability_monitor_mut().testcase_with_observers += 1;
                     }
-                    fuzzer.process_execution(state, self, input, &observers, &exit_kind, false)?
+                    fuzzer.execute_and_process(state, self, input, &observers, &exit_kind, false)?
                 } else {
                     #[cfg(feature = "scalability_introspection")]
                     {

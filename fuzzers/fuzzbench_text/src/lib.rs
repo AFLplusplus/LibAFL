@@ -34,7 +34,7 @@ use libafl::{
         token_mutations::I2SRandReplace,
         tokens_mutations, StdMOptMutator, StdScheduledMutator, Tokens,
     },
-    observers::{HitcountsMapObserver, TimeObserver},
+    observers::{CanTrack, HitcountsMapObserver, TimeObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
@@ -42,8 +42,8 @@ use libafl::{
         calibrate::CalibrationStage, power::StdPowerMutationalStage, GeneralizationStage,
         StdMutationalStage, TracingStage,
     },
-    state::{HasCorpus, HasMetadata, StdState},
-    Error,
+    state::{HasCorpus, StdState},
+    Error, HasMetadata,
 };
 use libafl_bolts::{
     current_nanos, current_time,
@@ -310,14 +310,15 @@ fn fuzz_binary(
 
     // Create an observation channel using the coverage map
     // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)
-    let edges_observer = HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") });
+    let edges_observer =
+        HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") }).track_indices();
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
     let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
-    let map_feedback = MaxMapFeedback::tracking(&edges_observer, true, false);
+    let map_feedback = MaxMapFeedback::new(&edges_observer);
 
     let calibration = CalibrationStage::new(&map_feedback);
 
@@ -374,11 +375,14 @@ fn fuzz_binary(
     let power = StdPowerMutationalStage::new(mutator);
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerScheduler::new(StdWeightedScheduler::with_schedule(
-        &mut state,
+    let scheduler = IndexesLenTimeMinimizerScheduler::new(
         &edges_observer,
-        Some(PowerSchedule::EXPLORE),
-    ));
+        StdWeightedScheduler::with_schedule(
+            &mut state,
+            &edges_observer,
+            Some(PowerSchedule::EXPLORE),
+        ),
+    );
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -516,7 +520,9 @@ fn fuzz_text(
 
     // Create an observation channel using the coverage map
     // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)
-    let edges_observer = HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") });
+    let edges_observer = HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") })
+        .track_indices()
+        .track_novelties();
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
@@ -524,7 +530,7 @@ fn fuzz_text(
     let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
     // New maximization map feedback linked to the edges observer and the feedback state
-    let map_feedback = MaxMapFeedback::tracking(&edges_observer, true, true);
+    let map_feedback = MaxMapFeedback::new(&edges_observer);
 
     let calibration = CalibrationStage::new(&map_feedback);
 
@@ -594,11 +600,14 @@ fn fuzz_text(
     let grimoire = StdMutationalStage::transforming(grimoire_mutator);
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerScheduler::new(StdWeightedScheduler::with_schedule(
-        &mut state,
+    let scheduler = IndexesLenTimeMinimizerScheduler::new(
         &edges_observer,
-        Some(PowerSchedule::EXPLORE),
-    ));
+        StdWeightedScheduler::with_schedule(
+            &mut state,
+            &edges_observer,
+            Some(PowerSchedule::EXPLORE),
+        ),
+    );
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);

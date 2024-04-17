@@ -18,7 +18,8 @@ use libafl::{
     observers::StdMapObserver,
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
-    state::{HasMetadata, StdState},
+    state::StdState,
+    HasMetadata,
 };
 use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list};
 

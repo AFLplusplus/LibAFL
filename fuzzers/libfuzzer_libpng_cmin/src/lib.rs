@@ -1,9 +1,5 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for libpng.
-use mimalloc::MiMalloc;
-#[global_allocator]
-static GLOBAL: MiMalloc = MiMalloc;
-
 use core::time::Duration;
 #[cfg(feature = "crash")]
 use std::ptr;
@@ -25,13 +21,13 @@ use libafl::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::Tokens,
     },
-    observers::{HitcountsMapObserver, TimeObserver},
+    observers::{CanTrack, HitcountsMapObserver, TimeObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
     stages::{calibrate::CalibrationStage, power::StdPowerMutationalStage},
-    state::{HasCorpus, HasMetadata, StdState},
-    Error,
+    state::{HasCorpus, StdState},
+    Error, HasMetadata,
 };
 use libafl_bolts::{
     current_nanos,
@@ -40,6 +36,10 @@ use libafl_bolts::{
     AsSlice,
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
+use mimalloc::MiMalloc;
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 /// The main fn, `no_mangle` as it is a C main
 #[cfg(not(test))]
@@ -82,14 +82,15 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
         };
 
     // Create an observation channel using the coverage map
-    let edges_observer = HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") });
+    let edges_observer =
+        HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") }).track_indices();
 
     let minimizer = StdCorpusMinimizer::new(&edges_observer);
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    let map_feedback = MaxMapFeedback::tracking(&edges_observer, true, false);
+    let map_feedback = MaxMapFeedback::new(&edges_observer);
 
     let calibration = CalibrationStage::new(&map_feedback);
 
@@ -146,11 +147,10 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let mut stages = tuple_list!(calibration, power);
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerScheduler::new(StdWeightedScheduler::with_schedule(
-        &mut state,
+    let scheduler = IndexesLenTimeMinimizerScheduler::new(
         &edges_observer,
-        Some(PowerSchedule::FAST),
-    ));
+        StdWeightedScheduler::with_schedule(&mut state, &edges_observer, Some(PowerSchedule::FAST)),
+    );
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);

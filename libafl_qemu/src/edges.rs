@@ -1,7 +1,7 @@
 use std::{cell::UnsafeCell, cmp::max};
 
 use hashbrown::{hash_map::Entry, HashMap};
-use libafl::{inputs::UsesInput, state::HasMetadata};
+use libafl::{inputs::UsesInput, HasMetadata};
 use libafl_qemu_sys::GuestAddr;
 #[cfg(emulation_mode = "systemmode")]
 use libafl_qemu_sys::GuestPhysAddr;

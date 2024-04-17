@@ -1,9 +1,5 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for libpng.
-use mimalloc::MiMalloc;
-#[global_allocator]
-static GLOBAL: MiMalloc = MiMalloc;
-
 use std::path::PathBuf;
 
 use frida_gum::Gum;
@@ -20,11 +16,11 @@ use libafl::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::{I2SRandReplace, Tokens},
     },
-    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
+    observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
-    state::{HasCorpus, HasMetadata, StdState},
-    Error,
+    state::{HasCorpus, StdState},
+    Error, HasMetadata,
 };
 #[cfg(unix)]
 use libafl::{feedback_and_fast, feedbacks::ConstFeedback};
@@ -39,7 +35,7 @@ use libafl_bolts::{
 #[cfg(unix)]
 use libafl_frida::asan::{
     asan_rt::AsanRuntime,
-    errors::{AsanErrorsFeedback, AsanErrorsObserver},
+    errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS},
 };
 use libafl_frida::{
     cmplog_rt::CmpLogRuntime,
@@ -48,6 +44,10 @@ use libafl_frida::{
     helper::FridaInstrumentationHelper,
 };
 use libafl_targets::cmplog::CmpLogObserver;
+use mimalloc::MiMalloc;
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 /// The main fn, usually parsing parameters, and starting the fuzzer
 pub fn main() {
@@ -108,7 +108,8 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                     "edges",
                     frida_helper.map_mut_ptr().unwrap(),
                     MAP_SIZE,
-                ));
+                ))
+                .track_indices();
 
                 // Create an observation channel to keep track of the execution time
                 let time_observer = TimeObserver::new("time");
@@ -117,7 +118,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // This one is composed by two Feedbacks in OR
                 let mut feedback = feedback_or!(
                     // New maximization map feedback linked to the edges observer and the feedback state
-                    MaxMapFeedback::tracking(&edges_observer, true, false),
+                    MaxMapFeedback::new(&edges_observer),
                     // Time feedback, this one does not need a feedback state
                     TimeFeedback::with_observer(&time_observer)
                 );
@@ -167,7 +168,8 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
                 // A minimization+queue policy to get testcasess from the corpus
-                let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+                let scheduler =
+                    IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -224,7 +226,8 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                     "edges",
                     frida_helper.map_mut_ptr().unwrap(),
                     MAP_SIZE,
-                ));
+                ))
+                .track_indices();
 
                 // Create an observation channel to keep track of the execution time
                 let time_observer = TimeObserver::new("time");
@@ -233,7 +236,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // This one is composed by two Feedbacks in OR
                 let mut feedback = feedback_or!(
                     // New maximization map feedback linked to the edges observer and the feedback state
-                    MaxMapFeedback::tracking(&edges_observer, true, false),
+                    MaxMapFeedback::new(&edges_observer),
                     // Time feedback, this one does not need a feedback state
                     TimeFeedback::with_observer(&time_observer)
                 );
@@ -281,7 +284,8 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
                 // A minimization+queue policy to get testcasess from the corpus
-                let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+                let scheduler =
+                    IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -352,7 +356,8 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                     "edges",
                     frida_helper.map_mut_ptr().unwrap(),
                     MAP_SIZE,
-                ));
+                ))
+                .track_indices();
 
                 // Create an observation channel to keep track of the execution time
                 let time_observer = TimeObserver::new("time");
@@ -361,7 +366,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // This one is composed by two Feedbacks in OR
                 let mut feedback = feedback_or!(
                     // New maximization map feedback linked to the edges observer and the feedback state
-                    MaxMapFeedback::tracking(&edges_observer, true, false),
+                    MaxMapFeedback::new(&edges_observer),
                     // Time feedback, this one does not need a feedback state
                     TimeFeedback::with_observer(&time_observer)
                 );
@@ -409,7 +414,8 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
                 // A minimization+queue policy to get testcasess from the corpus
-                let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+                let scheduler =
+                    IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);

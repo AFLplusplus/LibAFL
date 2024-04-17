@@ -22,10 +22,9 @@ use crate::{
     },
     start_timer,
     state::{
-        HasCorpus, HasCurrentTestcase, HasExecutions, HasMaxSize, HasMetadata, HasSolutions, State,
-        UsesState,
+        HasCorpus, HasCurrentTestcase, HasExecutions, HasMaxSize, HasSolutions, State, UsesState,
     },
-    Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasScheduler,
+    Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasMetadata, HasScheduler,
 };
 #[cfg(feature = "introspection")]
 use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
@@ -127,7 +126,7 @@ where
                 // TODO replace if process_execution adds a return value for solution index
                 let solution_count = state.solutions().count();
                 let corpus_count = state.corpus().count();
-                let (_, corpus_idx) = fuzzer.process_execution(
+                let (_, corpus_idx) = fuzzer.execute_and_process(
                     state,
                     manager,
                     input.clone(),

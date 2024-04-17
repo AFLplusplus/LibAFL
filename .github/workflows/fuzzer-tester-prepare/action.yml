@@ -8,8 +8,7 @@ runs:
         submodules: true
         fetch-depth: 0
     - uses: Swatinem/rust-cache@v2
-      with:
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      with: { shared-key: "${{ runner.os }}-shared-fuzzer-cache" }
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
@@ -23,9 +22,6 @@ runs:
     - name: Add wasm target
       shell: bash
       run: rustup target add wasm32-unknown-unknown
-    - name: Install ucd-generate
-      shell: bash
-      run: cargo install -f ucd-generate
     - name: Remove obsolete llvm (Linux)
       if: runner.os == 'Linux'
       shell: bash

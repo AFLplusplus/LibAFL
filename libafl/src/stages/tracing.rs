@@ -10,8 +10,8 @@ use crate::{
     observers::ObserversTuple,
     stages::{RetryRestartHelper, Stage},
     start_timer,
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasNamedMetadata, State, UsesState},
-    Error,
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, State, UsesState},
+    Error, HasNamedMetadata,
 };
 #[cfg(feature = "introspection")]
 use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};

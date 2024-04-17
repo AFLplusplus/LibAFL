@@ -18,7 +18,6 @@
 #![allow(clippy::transmute_ptr_to_ptr)]
 #![allow(clippy::ptr_cast_constness)]
 #![allow(clippy::too_many_arguments)]
-#![allow(clippy::missing_transmute_annotations)]
 // Till they fix this buggy lint in clippy
 #![allow(clippy::borrow_as_ptr)]
 #![allow(clippy::borrow_deref_ref)]
@@ -99,6 +98,11 @@ pub mod asan;
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
 pub use asan::{init_qemu_with_asan, QemuAsanHelper};
 
+#[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
+pub mod asan_guest;
+#[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
+pub use asan_guest::{init_qemu_with_asan_guest, QemuAsanGuestHelper};
+
 #[cfg(not(cpu_target = "hexagon"))]
 pub mod calls;
 #[cfg(not(cpu_target = "hexagon"))]
@@ -131,4 +135,34 @@ pub fn filter_qemu_args() -> Vec<String> {
         }
     }
     args
+}
+
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
+#[cfg(feature = "python")]
+#[pymodule]
+#[pyo3(name = "libafl_qemu")]
+#[allow(clippy::items_after_statements, clippy::too_many_lines)]
+pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
+    let regsm = PyModule::new(py, "regs")?;
+    for r in Regs::iter() {
+        let v: i32 = r.into();
+        regsm.add(&format!("{r:?}"), v)?;
+    }
+    m.add_submodule(regsm)?;
+
+    let mmapm = PyModule::new(py, "mmap")?;
+    for r in emu::MmapPerms::iter() {
+        let v: i32 = r.into();
+        mmapm.add(&format!("{r:?}"), v)?;
+    }
+    m.add_submodule(mmapm)?;
+
+    m.add_class::<emu::MapInfo>()?;
+    m.add_class::<emu::GuestMaps>()?;
+    m.add_class::<emu::SyscallHookResult>()?;
+    m.add_class::<emu::pybind::Qemu>()?;
+
+    Ok(())
 }

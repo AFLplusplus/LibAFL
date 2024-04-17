@@ -1,12 +1,15 @@
-use core::{ffi::c_void, mem::MaybeUninit, ptr::copy_nonoverlapping};
+use core::{mem::MaybeUninit, ptr::copy_nonoverlapping};
 use std::{cell::OnceCell, slice::from_raw_parts, str::from_utf8_unchecked};
 
 use libafl_qemu_sys::{
     exec_path, free_self_maps, guest_base, libafl_dump_core_hook, libafl_force_dfl, libafl_get_brk,
-    libafl_load_addr, libafl_maps_next, libafl_qemu_run, libafl_set_brk, mmap_next_start,
-    read_self_maps, strlen, GuestAddr, GuestUsize, MapInfo, MmapPerms, VerifyAccess,
+    libafl_load_addr, libafl_maps_first, libafl_maps_next, libafl_qemu_run, libafl_set_brk,
+    mmap_next_start, read_self_maps, strlen, GuestAddr, GuestUsize, IntervalTreeNode,
+    IntervalTreeRoot, MapInfo, MmapPerms, VerifyAccess,
 };
 use libc::c_int;
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
 
 use crate::{
     emu::{HasExecutions, State},
@@ -22,9 +25,10 @@ pub enum HandlerError {
     MultipleInputDefinition,
 }
 
+#[cfg_attr(feature = "python", pyclass(unsendable))]
 pub struct GuestMaps {
-    orig_c_iter: *const c_void,
-    c_iter: *const c_void,
+    maps_root: *mut IntervalTreeRoot,
+    maps_node: *mut IntervalTreeNode,
 }
 
 // Consider a private new only for Emulator
@@ -32,10 +36,11 @@ impl GuestMaps {
     #[must_use]
     pub(crate) fn new() -> Self {
         unsafe {
-            let maps = read_self_maps();
+            let root = read_self_maps();
+            let first = libafl_maps_first(root);
             Self {
-                orig_c_iter: maps,
-                c_iter: maps,
+                maps_root: root,
+                maps_node: first,
             }
         }
     }
@@ -46,25 +51,35 @@ impl Iterator for GuestMaps {
 
     #[allow(clippy::uninit_assumed_init)]
     fn next(&mut self) -> Option<Self::Item> {
-        if self.c_iter.is_null() {
-            return None;
-        }
         unsafe {
             let mut ret = MaybeUninit::uninit();
-            self.c_iter = libafl_maps_next(self.c_iter, ret.as_mut_ptr());
-            if self.c_iter.is_null() {
+
+            self.maps_node = libafl_maps_next(self.maps_node, ret.as_mut_ptr());
+
+            if self.maps_node.is_null() {
                 None
             } else {
-                Some(ret.assume_init())
+                Some(ret.assume_init().into())
             }
         }
+    }
+}
+
+#[cfg(feature = "python")]
+#[pymethods]
+impl GuestMaps {
+    fn __iter__(slf: PyRef<Self>) -> PyRef<Self> {
+        slf
+    }
+    fn __next__(mut slf: PyRefMut<Self>) -> Option<PyObject> {
+        Python::with_gil(|py| slf.next().map(|x| x.into_py(py)))
     }
 }
 
 impl Drop for GuestMaps {
     fn drop(&mut self) {
         unsafe {
-            free_self_maps(self.orig_c_iter);
+            free_self_maps(self.maps_root);
         }
     }
 }
