@@ -181,6 +181,7 @@ pub fn main() {
             .observers_mut()
             .match_name_mut::<ExplicitTracking<HitcountsMapObserver<StdMapObserver<'_, u8, false>>, true, false>>("shared_mem")
             .unwrap()
+            .as_mut()
             .truncate(dynamic_map_size);
     }
 
