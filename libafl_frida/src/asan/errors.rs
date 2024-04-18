@@ -1,5 +1,6 @@
 //! Errors that can be caught by the `libafl_frida` address sanitizer.
 use std::{
+    borrow::Cow,
     fmt::Debug,
     io::Write,
     marker::PhantomData,
@@ -37,6 +38,8 @@ use crate::asan::asan_rt::ASAN_SAVE_REGISTER_NAMES;
 use crate::{
     alloc::AllocationMetadata, asan::asan_rt::ASAN_SAVE_REGISTER_COUNT, utils::disas_count,
 };
+
+static ASAN_ERRORS_NAME: Cow<'static, str> = Cow::Borrowed("AsanErrors");
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct AsanReadWriteError {
@@ -587,8 +590,8 @@ where
 
 impl Named for AsanErrorsObserver {
     #[inline]
-    fn name(&self) -> &str {
-        "AsanErrors"
+    fn name(&self) -> &Cow<'static, str> {
+        &ASAN_ERRORS_NAME
     }
 }
 
@@ -662,7 +665,7 @@ where
         OT: ObserversTuple<S>,
     {
         let observer = observers
-            .match_name::<AsanErrorsObserver>("AsanErrors")
+            .match_name::<AsanErrorsObserver>(&ASAN_ERRORS_NAME)
             .expect("An AsanErrorsFeedback needs an AsanErrorsObserver");
         let errors = observer.errors();
         if errors.is_empty() {
@@ -699,7 +702,7 @@ where
 impl<S> Named for AsanErrorsFeedback<S> {
     #[inline]
     fn name(&self) -> &str {
-        "AsanErrors"
+        &ASAN_ERRORS_NAME
     }
 }
 

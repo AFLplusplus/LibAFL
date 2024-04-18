@@ -19,8 +19,6 @@ pub use llmp::*;
 #[cfg(feature = "tcp_manager")]
 #[allow(clippy::ignored_unit_patterns)]
 pub mod tcp;
-#[cfg(feature = "scalability_introspection")]
-use alloc::string::ToString;
 use alloc::{borrow::Cow, boxed::Box, string::String, vec::Vec};
 use core::{
     fmt,
@@ -534,7 +532,7 @@ where
             self.fire(
                 state,
                 Event::UpdateUserStats {
-                    name: "total imported".to_string(),
+                    name: Cow::from("total imported"),
                     value: UserStats::new(
                         UserStatsValue::Number(
                             (imported_with_observer + imported_without_observer) as u64,

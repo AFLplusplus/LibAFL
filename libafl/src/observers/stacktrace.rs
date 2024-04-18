@@ -1,6 +1,10 @@
 //! the ``StacktraceObserver`` looks up the stacktrace on the execution thread and computes a hash for it for dedupe
 
-use alloc::{borrow::Cow, string::String, vec::Vec};
+use alloc::{
+    borrow::Cow,
+    string::{String, ToString},
+    vec::Vec,
+};
 #[cfg(feature = "casr")]
 use std::{
     collections::hash_map::DefaultHasher,
@@ -80,10 +84,10 @@ pub fn collect_backtrace() -> u64 {
         if symbols.len() > 1 {
             let symbol = &symbols[0];
             if let Some(name) = symbol.name() {
-                strace_entry.function = name.as_str().unwrap_or("").to_string();
+                strace_entry.function = name.as_str().map_or_else(String::new, str::to_string);
             }
             if let Some(file) = symbol.filename() {
-                strace_entry.debug.file = file.to_str().unwrap_or("").to_string();
+                strace_entry.debug.file = file.to_string_lossy().to_string();
             }
             strace_entry.debug.line = u64::from(symbol.lineno().unwrap_or(0));
             strace_entry.debug.column = u64::from(symbol.colno().unwrap_or(0));
@@ -140,14 +144,17 @@ impl<'a> BacktraceObserver<'a> {
     #[cfg(feature = "casr")]
     /// Creates a new [`BacktraceObserver`] with the given name.
     #[must_use]
-    pub fn new(
-        observer_name: &str,
+    pub fn new<S>(
+        observer_name: S,
         backtrace_hash: OwnedRefMut<'a, Option<u64>>,
         harness_type: HarnessType,
-    ) -> Self {
+    ) -> Self
+    where
+        S: Into<Cow<'static, str>>,
+    {
         init_ignored_frames!("rust", "cpp", "go");
         Self {
-            observer_name: observer_name.to_string(),
+            observer_name: observer_name.into(),
             hash: backtrace_hash,
             harness_type,
         }
@@ -287,10 +294,13 @@ impl AsanBacktraceObserver {
     #[cfg(feature = "casr")]
     /// Creates a new [`BacktraceObserver`] with the given name.
     #[must_use]
-    pub fn new(observer_name: &str) -> Self {
+    pub fn new<S>(observer_name: S) -> Self
+    where
+        S: Into<Cow<'static, str>>,
+    {
         init_ignored_frames!("rust", "cpp", "go");
         Self {
-            observer_name: observer_name.to_string(),
+            observer_name: observer_name.into(),
             hash: None,
         }
     }

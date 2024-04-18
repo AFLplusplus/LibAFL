@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use core::{ffi::c_void, fmt::Debug};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
@@ -68,7 +69,7 @@ pub unsafe extern "C" fn __sanitizer_free_hook(ptr: *const c_void) {
     }
 }
 
-const OOM_OBS_NAME: &str = "libfuzzer-like-oom";
+static OOM_OBS_NAME: Cow<'static, str> = Cow::Borrowed("libfuzzer-like-oom");
 
 /// Observer which detects if the target would run out of memory or otherwise violate the permissible usage of malloc
 #[derive(Debug, Serialize, Deserialize)]
@@ -88,8 +89,8 @@ impl OomObserver {
 
 impl Named for OomObserver {
     // strictly one name to prevent two from being registered
-    fn name(&self) -> &str {
-        OOM_OBS_NAME
+    fn name(&self) -> &Cow<'static, str> {
+        &OOM_OBS_NAME
     }
 }
 
@@ -142,8 +143,9 @@ impl OomFeedback {
 }
 
 impl Named for OomFeedback {
-    fn name(&self) -> &str {
-        "oom"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("oom");
+        &NAME
     }
 }
 

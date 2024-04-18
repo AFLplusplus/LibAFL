@@ -60,6 +60,7 @@ pub use self::observers::{counters_maps_observer, CountersMultiMapObserver};
 #[cfg(feature = "observers")]
 mod observers {
     use alloc::{
+        borrow::Cow,
         string::{String, ToString},
         vec::Vec,
     };
@@ -122,7 +123,7 @@ mod observers {
         intervals: IntervalTree<usize, usize>,
         len: usize,
         initial: u8,
-        name: String,
+        name: Cow<'static, str>,
         iter_idx: usize,
     }
 
@@ -147,8 +148,8 @@ mod observers {
 
     impl<const DIFFERENTIAL: bool> Named for CountersMultiMapObserver<DIFFERENTIAL> {
         #[inline]
-        fn name(&self) -> &str {
-            self.name.as_str()
+        fn name(&self) -> &Cow<'static, str> {
+            &self.name
         }
     }
 
@@ -272,7 +273,7 @@ mod observers {
             Self {
                 intervals,
                 len: idx,
-                name: name.to_string(),
+                name: Cow::from(name),
                 initial: u8::default(),
                 iter_idx: 0,
             }
@@ -311,7 +312,7 @@ mod observers {
             Self {
                 intervals,
                 len: idx,
-                name: name.to_string(),
+                name: Cow::from(name),
                 initial: u8::default(),
                 iter_idx: 0,
             }
