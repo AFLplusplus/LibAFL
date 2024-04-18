@@ -701,7 +701,7 @@ where
 
 impl<S> Named for AsanErrorsFeedback<S> {
     #[inline]
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &ASAN_ERRORS_NAME
     }
 }

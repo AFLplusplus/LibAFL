@@ -61,7 +61,6 @@ pub use self::observers::{counters_maps_observer, CountersMultiMapObserver};
 mod observers {
     use alloc::{
         borrow::Cow,
-        string::{String, ToString},
         vec::Vec,
     };
     use core::{
