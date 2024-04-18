@@ -13,6 +13,8 @@ use libafl::executors::{hooks::ExecutorHook, HasObservers};
     feature = "sancov_pcguard_edges",
     feature = "sancov_pcguard_hitcounts",
     feature = "sancov_ctx",
+    feature = "sancov_ngram4",
+    feature = "sancov_ngram8",
 ))]
 use crate::coverage::EDGES_MAP;
 use crate::coverage::MAX_EDGES_NUM;
