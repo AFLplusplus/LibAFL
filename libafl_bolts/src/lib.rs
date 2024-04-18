@@ -231,6 +231,7 @@ use {
 pub const IP_LOCALHOST: &str = "127.0.0.1";
 
 /// We need fixed names for many parts of this lib.
+#[cfg(feature = "alloc")]
 pub trait Named {
     /// Provide the name of this element.
     fn name(&self) -> &Cow<'static, str>;
