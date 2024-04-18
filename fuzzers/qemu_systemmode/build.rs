@@ -1,3 +1,5 @@
+use libafl_qemu_build::build_libafl_qemu;
+
 #[macro_export]
 macro_rules! assert_unique_feature {
     () => {};
@@ -12,4 +14,6 @@ macro_rules! assert_unique_feature {
 
 fn main() {
     assert_unique_feature!("classic", "breakpoint", "sync_exit");
+
+    build_libafl_qemu();
 }
