@@ -1,10 +1,7 @@
 //! Diff Feedback, comparing the content of two observers of the same type.
 //!
 
-use alloc::{
-    borrow::Cow,
-    string::{String, ToString},
-};
+use alloc::borrow::Cow;
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
@@ -155,7 +152,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use alloc::string::{String, ToString};
+    use alloc::borrow::Cow;
     use core::marker::PhantomData;
 
     use libafl_bolts::{tuples::tuple_list, Named};
@@ -171,13 +168,13 @@ mod tests {
 
     #[derive(Debug)]
     struct NopObserver {
-        name: String,
+        name: Cow<'static, str>,
         value: bool,
     }
     impl NopObserver {
-        fn new(name: &str, value: bool) -> Self {
+        fn new(name: &'static str, value: bool) -> Self {
             Self {
-                name: name.to_string(),
+                name: Cow::from(name),
                 value,
             }
         }
@@ -189,7 +186,7 @@ mod tests {
         }
     }
     impl Named for NopObserver {
-        fn name(&self) -> &str {
+        fn name(&self) -> &Cow<'static, str> {
             &self.name
         }
     }

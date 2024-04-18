@@ -1,5 +1,6 @@
 //! Stage to compute/report AFL stats
 
+use alloc::borrow::Cow;
 #[cfg(feature = "std")]
 use alloc::string::ToString;
 use core::{marker::PhantomData, time::Duration};
@@ -109,7 +110,7 @@ where
                 _manager.fire(
                     state,
                     Event::UpdateUserStats {
-                        name: "AflStats".to_string(),
+                        name: Cow::from("AflStats"),
                         value: UserStats::new(
                             UserStatsValue::String(json.to_string()),
                             AggregatorOps::None,

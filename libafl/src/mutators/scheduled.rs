@@ -1,6 +1,6 @@
 //! The `ScheduledMutator` schedules multiple mutations internally.
 
-use alloc::{borrow::Cow, string::String, vec::Vec};
+use alloc::{borrow::Cow, vec::Vec};
 use core::{
     fmt::{self, Debug},
     marker::PhantomData,

@@ -1,9 +1,6 @@
 //! Feedback and metatadata for stderr and stdout.
 
-use alloc::{
-    borrow::Cow,
-    string::{String, ToString},
-};
+use alloc::{borrow::Cow, string::String};
 
 use libafl_bolts::{impl_serdeany, Named};
 use serde::{Deserialize, Serialize};

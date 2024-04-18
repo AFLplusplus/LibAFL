@@ -1,10 +1,6 @@
 //! The `CmpObserver` provides access to the logged values of CMP instructions
 
-use alloc::{
-    borrow::Cow,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{borrow::Cow, vec::Vec};
 use core::{fmt::Debug, marker::PhantomData};
 
 use c2rust_bitfields::BitfieldStruct;

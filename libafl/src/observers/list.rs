@@ -1,8 +1,4 @@
-use alloc::{
-    borrow::Cow,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{borrow::Cow, vec::Vec};
 use core::fmt::Debug;
 
 use libafl_bolts::{ownedref::OwnedMutPtr, Error, Named};

@@ -1,10 +1,6 @@
 //! Map feedback, maximizing or minimizing maps, for example the afl-style map observer.
 
-use alloc::{
-    borrow::Cow,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{borrow::Cow, vec::Vec};
 #[rustversion::nightly]
 use core::simd::prelude::SimdOrd;
 use core::{
@@ -535,7 +531,7 @@ where
         manager.fire(
             state,
             Event::UpdateUserStats {
-                name: self.stats_name.to_string(),
+                name: self.stats_name.clone(),
                 value: UserStats::new(
                     UserStatsValue::Ratio(covered as u64, len as u64),
                     AggregatorOps::Avg,
@@ -688,8 +684,9 @@ where
     }
 }
 
+#[allow(clippy::ptr_arg)]
 fn create_stats_name(name: &Cow<'static, str>) -> Cow<'static, str> {
-    if name.chars().all(|c| c.is_lowercase()) {
+    if name.chars().all(char::is_lowercase) {
         name.clone()
     } else {
         name.to_lowercase().into()

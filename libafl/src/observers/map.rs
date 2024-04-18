@@ -1,10 +1,6 @@
 //! The `MapObserver` provides access a map, usually injected into the target
 
-use alloc::{
-    borrow::Cow,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{borrow::Cow, vec::Vec};
 use core::{
     fmt::Debug,
     hash::{BuildHasher, Hasher},

@@ -1,10 +1,6 @@
 //! A simple observer with a single value.
 
-use alloc::{
-    borrow::Cow,
-    boxed::Box,
-    string::{String, ToString},
-};
+use alloc::{borrow::Cow, boxed::Box};
 use core::{
     cell::{Ref, RefCell},
     fmt::Debug,

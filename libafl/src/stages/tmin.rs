@@ -1,9 +1,6 @@
 //! The [`TMinMutationalStage`] is a stage which will attempt to minimize corpus entries.
 
-use alloc::{
-    borrow::Cow,
-    string::{String, ToString},
-};
+use alloc::borrow::Cow;
 use core::{borrow::BorrowMut, fmt::Debug, hash::Hash, marker::PhantomData};
 
 use ahash::RandomState;

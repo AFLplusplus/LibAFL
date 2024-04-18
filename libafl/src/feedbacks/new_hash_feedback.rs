@@ -1,9 +1,6 @@
 //! The ``NewHashFeedback`` uses the backtrace hash and a hashset to only keep novel cases
 
-use alloc::{
-    borrow::Cow,
-    string::{String, ToString},
-};
+use alloc::{borrow::Cow, string::ToString};
 use std::{fmt::Debug, marker::PhantomData};
 
 use hashbrown::HashSet;

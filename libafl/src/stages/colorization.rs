@@ -1,10 +1,5 @@
 //! The colorization stage from `colorization()` in afl++
-use alloc::{
-    borrow::Cow,
-    collections::binary_heap::BinaryHeap,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{borrow::Cow, collections::binary_heap::BinaryHeap, string::ToString, vec::Vec};
 use core::{cmp::Ordering, fmt::Debug, marker::PhantomData, ops::Range};
 
 use libafl_bolts::{rands::Rand, tuples::MatchName, Named};

@@ -2,7 +2,7 @@
 //! For the current input, it will perform a range of random mutations, and then run them in the executor.
 
 use alloc::borrow::Cow;
-use core::{any::type_name, marker::PhantomData};
+use core::marker::PhantomData;
 
 use libafl_bolts::{rands::Rand, Named};
 

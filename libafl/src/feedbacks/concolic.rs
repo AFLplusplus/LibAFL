@@ -3,10 +3,7 @@
 //! This feedback should be used in combination with another feedback as this feedback always considers testcases
 //! to be not interesting.
 //! Requires a [`ConcolicObserver`] to observe the concolic trace.
-use alloc::{
-    borrow::{Cow, ToOwned},
-    string::String,
-};
+use alloc::borrow::Cow;
 use core::{fmt::Debug, marker::PhantomData};
 
 use libafl_bolts::Named;
@@ -38,7 +35,7 @@ impl<S> ConcolicFeedback<S> {
     #[must_use]
     pub fn from_observer(observer: &ConcolicObserver) -> Self {
         Self {
-            name: observer.name().to_owned(),
+            name: observer.name().clone(),
             phantom: PhantomData,
         }
     }

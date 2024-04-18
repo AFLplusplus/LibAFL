@@ -1,4 +1,4 @@
-use alloc::{borrow::Cow, string::String};
+use alloc::borrow::Cow;
 
 use libafl_bolts::Named;
 use serde::{Deserialize, Serialize};

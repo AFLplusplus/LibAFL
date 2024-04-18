@@ -5,7 +5,7 @@ Other stages may enrich [`crate::corpus::Testcase`]s with metadata.
 */
 
 use alloc::{borrow::Cow, boxed::Box, vec::Vec};
-use core::{any, marker::PhantomData};
+use core::marker::PhantomData;
 
 pub use calibrate::CalibrationStage;
 pub use colorization::*;
@@ -645,6 +645,7 @@ impl ExecutionCountRestartHelper {
 
 #[cfg(test)]
 pub mod test {
+    use alloc::borrow::Cow;
     use core::marker::PhantomData;
 
     use libafl_bolts::{impl_serdeany, Error, Named};
@@ -746,8 +747,9 @@ pub mod test {
         struct StageWithOneTry;
 
         impl Named for StageWithOneTry {
-            fn name(&self) -> &str {
-                "TestStage"
+            fn name(&self) -> &Cow<'static, str> {
+                static NAME: Cow<'static, str> = Cow::Borrowed("TestStage");
+                &NAME
             }
         }
 

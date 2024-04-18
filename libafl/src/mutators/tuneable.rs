@@ -2,7 +2,7 @@
 //! Instead of a random mutator for a random amount of iterations, we can run
 //! a specific mutator for a specified amount of iterations
 
-use alloc::{borrow::Cow, string::String, vec::Vec};
+use alloc::{borrow::Cow, vec::Vec};
 use core::{
     fmt::{self, Debug},
     marker::PhantomData,

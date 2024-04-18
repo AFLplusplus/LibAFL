@@ -33,7 +33,7 @@ pub use multi::*;
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
 
-use alloc::{borrow::Cow, boxed::Box, vec::Vec};
+use alloc::{boxed::Box, vec::Vec};
 
 use libafl_bolts::{tuples::IntoVec, HasLen, Named};
 #[cfg(feature = "nautilus")]
@@ -264,7 +264,7 @@ where
 
     fn names_reversed(&self) -> Vec<&str> {
         let mut ret = self.1.names_reversed();
-        ret.push(&self.0.name());
+        ret.push(self.0.name());
         ret
     }
 

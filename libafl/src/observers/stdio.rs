@@ -2,7 +2,7 @@
 //! The executor must explicitly support these observers.
 //! For example, they are supported on the [`crate::executors::CommandExecutor`].
 
-use alloc::{borrow::Cow, string::String};
+use alloc::borrow::Cow;
 use std::vec::Vec;
 
 use libafl_bolts::Named;
