@@ -25,7 +25,7 @@ use libafl_bolts::{
     tuples::{tuple_list, MatchName, Merge},
     AsMutSlice, Truncate,
 };
-use libafl_targets::{EDGES_MAP_PTR, EDGES_MAP_SIZE};
+use libafl_targets::{EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE};
 use nix::sys::signal::Signal;
 
 /// The commandline args this fuzzer accepts
@@ -86,7 +86,7 @@ struct Opt {
 
 #[allow(clippy::similar_names)]
 pub fn main() {
-    const MAP_SIZE: usize = EDGES_MAP_SIZE; //65536;
+    const MAP_SIZE: usize = EDGES_MAP_SIZE_IN_USE; //65536;
     let opt = Opt::parse();
 
     let corpus_dirs: Vec<PathBuf> = [opt.in_dir].to_vec();
@@ -146,11 +146,9 @@ pub fn main() {
     .unwrap();
 
     // The Monitor trait define how the fuzzer stats are reported to the user
-    let monitor = SimpleMonitor::with_user_monitor(
-        |s| {
-            println!("{s}");
-        }
-    );
+    let monitor = SimpleMonitor::with_user_monitor(|s| {
+        println!("{s}");
+    });
 
     // The event manager handle the various events generated during the fuzzing loop
     // such as the notification of the addition of a new item to the corpus
