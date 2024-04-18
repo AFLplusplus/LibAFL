@@ -2,10 +2,7 @@
 //! The values will then be used in subsequent mutations.
 //!
 
-use alloc::{
-    borrow::Cow,
-    string::{String, ToString},
-};
+use alloc::borrow::Cow;
 use core::fmt::Debug;
 
 use libafl::{

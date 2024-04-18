@@ -1,6 +1,6 @@
 //! Coverage maps as static mut array
 
-use alloc::{borrow::Cow, string::String};
+use alloc::borrow::Cow;
 
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl::{mutators::Tokens, Error};
