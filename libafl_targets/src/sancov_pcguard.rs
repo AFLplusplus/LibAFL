@@ -11,7 +11,8 @@ use libafl::executors::{hooks::ExecutorHook, HasObservers};
 #[cfg(any(
     feature = "pointer_maps",
     feature = "sancov_pcguard_edges",
-    feature = "sancov_pcguard_hitcounts"
+    feature = "sancov_pcguard_hitcounts",
+    feature = "sancov_ctx",
 ))]
 use crate::coverage::EDGES_MAP;
 use crate::coverage::MAX_EDGES_NUM;
