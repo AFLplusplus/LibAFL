@@ -130,6 +130,7 @@ default_rand!(XorShift64Rand);
 default_rand!(Lehmer64Rand);
 default_rand!(RomuTrioRand);
 default_rand!(RomuDuoJrRand);
+default_rand!(Sfc64Rand);
 
 /// Initialize Rand types from a source of randomness.
 ///
@@ -177,6 +178,7 @@ impl_random!(XorShift64Rand);
 impl_random!(Lehmer64Rand);
 impl_random!(RomuTrioRand);
 impl_random!(RomuDuoJrRand);
+impl_random!(Sfc64Rand);
 
 /// xoshiro256++ PRNG: <https://prng.di.unimi.it/>
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
@@ -365,6 +367,53 @@ impl Rand for RomuDuoJrRand {
     }
 }
 
+/// [SFC64][1] algorithm by Chris Doty-Humphrey.
+///
+/// [1]: https://numpy.org/doc/stable/reference/random/bit_generators/sfc64.html
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+pub struct Sfc64Rand {
+    a: u64,
+    b: u64,
+    c: u64,
+    w: u64,
+}
+
+impl Sfc64Rand {
+    /// Creates a new [`Sfc64Rand`] with the given seed.
+    #[must_use]
+    pub fn with_seed(seed: u64) -> Self {
+        let mut s = Sfc64Rand {
+            a: 0,
+            b: 0,
+            c: 0,
+            w: 0,
+        };
+        s.set_seed(seed);
+        s
+    }
+}
+
+impl Rand for Sfc64Rand {
+    fn set_seed(&mut self, seed: u64) {
+        self.a = seed;
+        self.b = seed;
+        self.c = seed;
+        self.w = 1;
+        for _ in 0..12 {
+            self.next();
+        }
+    }
+
+    fn next(&mut self) -> u64 {
+        let out = self.a.wrapping_add(self.b).wrapping_add(self.w);
+        self.w = self.w.wrapping_add(1);
+        self.a = self.b ^ (self.b >> 11);
+        self.b = self.c.wrapping_add(self.c << 3);
+        self.c = self.c.rotate_left(24).wrapping_add(out);
+        out
+    }
+}
+
 /// fake rand, for testing purposes
 #[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
 #[allow(clippy::upper_case_acronyms)]
@@ -402,7 +451,8 @@ impl XkcdRand {
 #[cfg(test)]
 mod tests {
     use crate::rands::{
-        Rand, RomuDuoJrRand, RomuTrioRand, StdRand, XorShift64Rand, Xoshiro256PlusPlusRand,
+        Rand, RomuDuoJrRand, RomuTrioRand, Sfc64Rand, StdRand, XorShift64Rand,
+        Xoshiro256PlusPlusRand,
     };
 
     fn test_single_rand<R: Rand>(rand: &mut R) {
@@ -421,6 +471,7 @@ mod tests {
         test_single_rand(&mut RomuDuoJrRand::with_seed(0));
         test_single_rand(&mut XorShift64Rand::with_seed(0));
         test_single_rand(&mut Xoshiro256PlusPlusRand::with_seed(0));
+        test_single_rand(&mut Sfc64Rand::with_seed(0));
     }
 
     #[cfg(feature = "std")]
@@ -451,6 +502,35 @@ mod tests {
         };
 
         log::info!("random value: {}", mutator.rng.next_u32());
+    }
+
+    #[test]
+    fn test_sfc64_golden_zig() {
+        // https://github.com/ziglang/zig/blob/130fb5cb0fb9039e79450c9db58d6590c5bee3b3/lib/std/Random/Sfc64.zig#L73-L99
+        let golden: [u64; 16] = [
+            0x3acfa029e3cc6041,
+            0xf5b6515bf2ee419c,
+            0x1259635894a29b61,
+            0xb6ae75395f8ebd6,
+            0x225622285ce302e2,
+            0x520d28611395cb21,
+            0xdb909c818901599d,
+            0x8ffd195365216f57,
+            0xe8c4ad5e258ac04a,
+            0x8f8ef2c89fdb63ca,
+            0xf9865b01d98d8e2f,
+            0x46555871a65d08ba,
+            0x66868677c6298fcd,
+            0x2ce15a7e6329f57d,
+            0xb2f1833ca91ca79,
+            0x4b0890ac9bf453ca,
+        ];
+
+        let mut s = Sfc64Rand::with_seed(0);
+        for v in golden {
+            let u = s.next();
+            assert_eq!(v, u);
+        }
     }
 }
 
