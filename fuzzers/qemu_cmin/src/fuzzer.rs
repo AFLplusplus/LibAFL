@@ -142,11 +142,9 @@ pub fn fuzz() -> Result<(), Error> {
 
     let mut shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-    let monitor = SimpleMonitor::with_user_monitor(
-        |s| {
-            println!("{s}");
-        }
-    );
+    let monitor = SimpleMonitor::with_user_monitor(|s| {
+        println!("{s}");
+    });
     let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
     {
         Ok(res) => res,
