@@ -1,7 +1,7 @@
 use core::time::Duration;
 use std::path::PathBuf;
 
-use clap::{self, Parser};
+use clap::Parser;
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
@@ -12,7 +12,7 @@ use libafl::{
     inputs::BytesInput,
     monitors::SimpleMonitor,
     mutators::{scheduled::havoc_mutations, tokens_mutations, StdScheduledMutator, Tokens},
-    observers::{CanTrack, ExplicitTracking, HitcountsMapObserver, StdMapObserver, TimeObserver},
+    observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, StdState},
@@ -22,7 +22,7 @@ use libafl_bolts::{
     current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, MatchName, MatchNameRef, Merge, TypeRefCreator},
+    tuples::{tuple_list, MatchNameRef, Merge, TypeRefCreator},
     AsMutSlice, Truncate,
 };
 use libafl_targets::{EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE};

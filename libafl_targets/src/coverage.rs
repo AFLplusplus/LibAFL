@@ -152,10 +152,7 @@ pub use swap::*;
 
 #[cfg(feature = "pointer_maps")]
 mod swap {
-    use alloc::{
-        borrow::Cow,
-        string::{String, ToString},
-    };
+    use alloc::borrow::Cow;
     use core::fmt::Debug;
 
     use libafl::{

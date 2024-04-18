@@ -1,8 +1,7 @@
 //! Stage to compute/report AFL stats
 
-use alloc::borrow::Cow;
 #[cfg(feature = "std")]
-use alloc::string::ToString;
+use alloc::{borrow::Cow, string::ToString};
 use core::{marker::PhantomData, time::Duration};
 
 use libafl_bolts::current_time;
@@ -112,7 +111,7 @@ where
                     Event::UpdateUserStats {
                         name: Cow::from("AflStats"),
                         value: UserStats::new(
-                            UserStatsValue::String(json.to_string()),
+                            UserStatsValue::String(Cow::from(json.to_string())),
                             AggregatorOps::None,
                         ),
                         phantom: PhantomData,

@@ -158,7 +158,7 @@ pub enum UserStatsValue {
     /// A Float value
     Float(f64),
     /// A `String`
-    String(String),
+    String(Cow<'static, str>),
     /// A ratio of two values
     Ratio(u64, u64),
     /// Percent
