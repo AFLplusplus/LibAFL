@@ -688,8 +688,12 @@ where
     }
 }
 
-fn create_stats_name(name: &str) -> String {
-    name.to_lowercase()
+fn create_stats_name(name: &Cow<'static, str>) -> Cow<'static, str> {
+    if name.chars().all(|c| c.is_lowercase()) {
+        name.clone()
+    } else {
+        name.to_lowercase().into()
+    }
 }
 
 impl<C, N, O, R, S, T> MapFeedback<C, N, O, R, S, T>
@@ -708,8 +712,8 @@ where
         let map_observer = map_observer.as_ref();
         Self {
             novelties: if C::NOVELTIES { Some(vec![]) } else { None },
-            name: map_observer.name().to_string(),
-            observer_name: map_observer.name().to_string(),
+            name: map_observer.name().clone(),
+            observer_name: map_observer.name().clone(),
             stats_name: create_stats_name(map_observer.name()),
             phantom: PhantomData,
         }
@@ -720,12 +724,13 @@ where
     /// same name and therefore also the same history.
     #[must_use]
     pub fn with_name(name: &'static str, map_observer: &C) -> Self {
+        let name = Cow::from(name);
         let map_observer = map_observer.as_ref();
         Self {
             novelties: if C::NOVELTIES { Some(vec![]) } else { None },
-            name: name.to_string(),
-            observer_name: map_observer.name().to_string(),
-            stats_name: create_stats_name(name),
+            observer_name: map_observer.name().clone(),
+            stats_name: create_stats_name(&name),
+            name,
             phantom: PhantomData,
         }
     }

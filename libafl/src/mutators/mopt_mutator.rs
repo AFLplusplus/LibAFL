@@ -541,7 +541,7 @@ where
             state.add_metadata::<MOpt>(MOpt::new(mutations.len(), swarm_num, rand_seed)?);
         }
         Ok(Self {
-            name: format!("StdMOptMutator[{}]", mutations.names().join(",")),
+            name: Cow::from(format!("StdMOptMutator[{}]", mutations.names().join(","))),
             mode: MOptMode::Pilotfuzzing,
             finds_before: 0,
             mutations,

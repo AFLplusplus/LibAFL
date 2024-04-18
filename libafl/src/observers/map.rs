@@ -2638,7 +2638,7 @@ where
 {
     #[inline]
     fn name(&self) -> &Cow<'static, str> {
-        Cow::from(self.name)
+        &self.name
     }
 }
 

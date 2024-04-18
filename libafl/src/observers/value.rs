@@ -1,6 +1,7 @@
 //! A simple observer with a single value.
 
 use alloc::{
+    borrow::Cow,
     boxed::Box,
     string::{String, ToString},
 };
@@ -29,7 +30,7 @@ where
     T: Debug + Serialize,
 {
     /// The name of this observer.
-    name: String,
+    name: Cow<'static, str>,
     /// The value.
     pub value: OwnedRef<'a, T>,
 }
@@ -42,7 +43,7 @@ where
     #[must_use]
     pub fn new(name: &'static str, value: OwnedRef<'a, T>) -> Self {
         Self {
-            name: name.to_string(),
+            name: Cow::from(name),
             value,
         }
     }
@@ -87,7 +88,7 @@ impl<'a, T> Named for ValueObserver<'a, T>
 where
     T: Debug + Serialize + serde::de::DeserializeOwned,
 {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
@@ -109,7 +110,7 @@ where
     T: Debug + Serialize,
 {
     /// The name of this observer.
-    name: String,
+    name: Cow<'static, str>,
     /// The value.
     pub value: OwnedRef<'a, RefCell<T>>,
 }
@@ -122,7 +123,7 @@ where
     #[must_use]
     pub fn new(name: &'static str, value: OwnedRef<'a, RefCell<T>>) -> Self {
         Self {
-            name: name.to_string(),
+            name: Cow::from(name),
             value,
         }
     }
@@ -170,7 +171,7 @@ impl<'a, T> Named for RefCellValueObserver<'a, T>
 where
     T: Debug + Serialize + serde::de::DeserializeOwned,
 {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }

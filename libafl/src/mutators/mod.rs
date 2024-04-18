@@ -33,7 +33,7 @@ pub use multi::*;
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
 
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{borrow::Cow, boxed::Box, vec::Vec};
 
 use libafl_bolts::{tuples::IntoVec, HasLen, Named};
 #[cfg(feature = "nautilus")]
@@ -264,7 +264,7 @@ where
 
     fn names_reversed(&self) -> Vec<&str> {
         let mut ret = self.1.names_reversed();
-        ret.push(self.0.name());
+        ret.push(&self.0.name());
         ret
     }
 
@@ -394,11 +394,11 @@ impl<I, S> MutatorsTuple<I, S> for Vec<Box<dyn Mutator<I, S>>> {
     }
 
     fn names_reversed(&self) -> Vec<&str> {
-        self.iter().rev().map(|x| x.name()).collect()
+        self.iter().rev().map(|x| x.name().as_ref()).collect()
     }
 
     fn names(&self) -> Vec<&str> {
-        self.iter().map(|x| x.name()).collect()
+        self.iter().map(|x| x.name().as_ref()).collect()
     }
 }
 

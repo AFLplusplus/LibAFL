@@ -374,7 +374,8 @@ macro_rules! add_mutator_impl {
 
         impl Named for $name {
             fn name(&self) -> &Cow<'static, str> {
-                stringify!($name)
+                static NAME: Cow<'static, str> = Cow::Borrowed(stringify!($name));
+                &NAME
             }
         }
 
@@ -427,7 +428,8 @@ macro_rules! interesting_mutator_impl {
 
         impl Named for $name {
             fn name(&self) -> &Cow<'static, str> {
-                stringify!($name)
+                static NAME: Cow<'static, str> = Cow::Borrowed(stringify!($name));
+                &NAME
             }
         }
 

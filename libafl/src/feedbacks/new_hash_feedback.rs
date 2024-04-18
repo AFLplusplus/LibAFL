@@ -163,18 +163,6 @@ where
     O: ObserverWithHashField + Named,
 {
     /// Returns a new [`NewHashFeedback`].
-    /// Setting an observer name that doesn't exist would eventually trigger a panic.
-    #[must_use]
-    pub fn with_names(name: &str, observer_name: &str) -> Self {
-        Self {
-            name: name.to_string(),
-            observer_name: observer_name.to_string(),
-            capacity: DEFAULT_CAPACITY,
-            o_type: PhantomData,
-        }
-    }
-
-    /// Returns a new [`NewHashFeedback`].
     #[must_use]
     pub fn new(observer: &O) -> Self {
         Self::with_capacity(observer, DEFAULT_CAPACITY)
@@ -185,8 +173,8 @@ where
     #[must_use]
     pub fn with_capacity(observer: &O, capacity: usize) -> Self {
         Self {
-            name: NEWHASHFEEDBACK_PREFIX.to_string() + observer.name(),
-            observer_name: observer.name().to_string(),
+            name: Cow::from(NEWHASHFEEDBACK_PREFIX.to_string() + observer.name()),
+            observer_name: observer.name().clone(),
             capacity,
             o_type: PhantomData,
         }

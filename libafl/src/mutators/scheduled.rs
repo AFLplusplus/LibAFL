@@ -40,22 +40,22 @@ use crate::{
 )] // for SerdeAny
 pub struct LogMutationMetadata {
     /// A list of logs
-    pub list: Vec<String>,
+    pub list: Vec<Cow<'static, str>>,
 }
 
 libafl_bolts::impl_serdeany!(LogMutationMetadata);
 
 impl AsSlice for LogMutationMetadata {
-    type Entry = String;
+    type Entry = Cow<'static, str>;
     #[must_use]
-    fn as_slice(&self) -> &[String] {
+    fn as_slice(&self) -> &[Cow<'static, str>] {
         self.list.as_slice()
     }
 }
 impl AsMutSlice for LogMutationMetadata {
-    type Entry = String;
+    type Entry = Cow<'static, str>;
     #[must_use]
-    fn as_mut_slice(&mut self) -> &mut [String] {
+    fn as_mut_slice(&mut self) -> &mut [Cow<'static, str>] {
         self.list.as_mut_slice()
     }
 }
@@ -63,7 +63,7 @@ impl AsMutSlice for LogMutationMetadata {
 impl LogMutationMetadata {
     /// Creates new [`struct@LogMutationMetadata`].
     #[must_use]
-    pub fn new(list: Vec<String>) -> Self {
+    pub fn new(list: Vec<Cow<'static, str>>) -> Self {
         Self { list }
     }
 }
@@ -392,9 +392,9 @@ where
     fn post_exec(&mut self, state: &mut S, corpus_idx: Option<CorpusId>) -> Result<(), Error> {
         if let Some(idx) = corpus_idx {
             let mut testcase = (*state.corpus_mut().get(idx)?).borrow_mut();
-            let mut log = Vec::<String>::new();
+            let mut log = Vec::<Cow<'static, str>>::new();
             while let Some(idx) = self.mutation_log.pop() {
-                let name = String::from(self.scheduled.mutations().name(idx.0).unwrap()); // TODO maybe return an Error on None
+                let name = self.scheduled.mutations().name(idx.0).unwrap().clone(); // TODO maybe return an Error on None
                 log.push(name);
             }
             let meta = LogMutationMetadata::new(log);

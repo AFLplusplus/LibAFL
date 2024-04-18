@@ -73,9 +73,9 @@ where
     O2: Named,
 {
     /// Create a new [`DiffFeedback`] using two observers and a test function.
-    pub fn new(name: &str, o1: &O1, o2: &O2, compare_fn: F) -> Result<Self, Error> {
-        let o1_name = o1.name().to_string();
-        let o2_name = o2.name().to_string();
+    pub fn new(name: &'static str, o1: &O1, o2: &O2, compare_fn: F) -> Result<Self, Error> {
+        let o1_name = o1.name().clone();
+        let o2_name = o2.name().clone();
         if o1_name == o2_name {
             Err(Error::illegal_argument(format!(
                 "DiffFeedback: observer names must be different (both were {o1_name})"
@@ -84,7 +84,7 @@ where
             Ok(Self {
                 o1_name,
                 o2_name,
-                name: name.to_string(),
+                name: Cow::from(name),
                 compare_fn,
                 phantomm: PhantomData,
             })

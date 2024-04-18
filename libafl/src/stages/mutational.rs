@@ -1,6 +1,7 @@
 //| The [`MutationalStage`] is the default stage used during fuzzing.
 //! For the current input, it will perform a range of random mutations, and then run them in the executor.
 
+use alloc::borrow::Cow;
 use core::{any::type_name, marker::PhantomData};
 
 use libafl_bolts::{rands::Rand, Named};
@@ -313,8 +314,9 @@ where
     Z: Evaluator<E, EM>,
     Z::State: HasCorpus + HasRand,
 {
-    fn name(&self) -> &str {
-        type_name::<Self>()
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("MultiMutational");
+        &NAME
     }
 }
 

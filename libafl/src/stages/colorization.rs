@@ -1,5 +1,6 @@
 //! The colorization stage from `colorization()` in afl++
 use alloc::{
+    borrow::Cow,
     collections::binary_heap::BinaryHeap,
     string::{String, ToString},
     vec::Vec,
@@ -55,7 +56,7 @@ impl Ord for Earlier {
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
 pub struct ColorizationStage<C, E, EM, O, Z> {
-    map_observer_name: String,
+    map_observer_name: Cow<'static, str>,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(C, E, EM, O, E, Z)>,
 }
@@ -71,7 +72,7 @@ impl<C, E, EM, O, Z> Named for ColorizationStage<C, E, EM, O, Z>
 where
     E: UsesState,
 {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.map_observer_name
     }
 }
@@ -301,7 +302,7 @@ where
     /// Creates a new [`ColorizationStage`]
     pub fn new(map_observer: &C) -> Self {
         Self {
-            map_observer_name: map_observer.name().to_string(),
+            map_observer_name: map_observer.name().clone(),
             phantom: PhantomData,
         }
     }
