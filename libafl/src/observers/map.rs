@@ -1,6 +1,7 @@
 //! The `MapObserver` provides access a map, usually injected into the target
 
 use alloc::{
+    borrow::Cow,
     string::{String, ToString},
     vec::Vec,
 };
@@ -192,7 +193,7 @@ impl<T, const ITH: bool, const NTH: bool> Named for ExplicitTracking<T, ITH, NTH
 where
     T: Named,
 {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         self.0.name()
     }
 }
@@ -543,7 +544,7 @@ where
 {
     map: OwnedMutSlice<'a, T>,
     initial: T,
-    name: String,
+    name: Cow<'static, str>,
 }
 
 impl<'a, S, T> Observer<S> for StdMapObserver<'a, T, false>
@@ -583,8 +584,8 @@ where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
-    fn name(&self) -> &str {
-        self.name.as_str()
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
     }
 }
 
@@ -853,7 +854,7 @@ where
     #[must_use]
     unsafe fn maybe_differential<S>(name: S, map: &'a mut [T]) -> Self
     where
-        S: Into<String>,
+        S: Into<Cow<'static, str>>,
     {
         let len = map.len();
         let ptr = map.as_mut_ptr();
@@ -864,7 +865,7 @@ where
     #[must_use]
     fn maybe_differential_from_mut_slice<S>(name: S, map: OwnedMutSlice<'a, T>) -> Self
     where
-        S: Into<String>,
+        S: Into<Cow<'static, str>>,
     {
         StdMapObserver {
             name: name.into(),
@@ -877,7 +878,7 @@ where
     #[must_use]
     fn maybe_differential_owned<S>(name: S, map: Vec<T>) -> Self
     where
-        S: Into<String>,
+        S: Into<Cow<'static, str>>,
     {
         Self {
             map: OwnedMutSlice::from(map),
@@ -893,7 +894,7 @@ where
     #[must_use]
     fn maybe_differential_from_ownedref<S>(name: S, map: OwnedMutSlice<'a, T>) -> Self
     where
-        S: Into<String>,
+        S: Into<Cow<'static, str>>,
     {
         Self {
             map,
@@ -908,7 +909,7 @@ where
     /// Will dereference the `map_ptr` with up to len elements.
     unsafe fn maybe_differential_from_mut_ptr<S>(name: S, map_ptr: *mut T, len: usize) -> Self
     where
-        S: Into<String>,
+        S: Into<Cow<'static, str>>,
     {
         Self::maybe_differential_from_mut_slice(
             name,
@@ -944,7 +945,7 @@ where
     #[must_use]
     pub unsafe fn new<S>(name: S, map: &'a mut [T]) -> Self
     where
-        S: Into<String>,
+        S: Into<Cow<'static, str>>,
     {
         Self::maybe_differential(name, map)
     }
@@ -952,7 +953,7 @@ where
     /// Creates a new [`MapObserver`] from an [`OwnedMutSlice`]
     pub fn from_mut_slice<S>(name: S, map: OwnedMutSlice<'a, T>) -> Self
     where
-        S: Into<String>,
+        S: Into<Cow<'static, str>>,
     {
         Self::maybe_differential_from_mut_slice(name, map)
     }
@@ -961,7 +962,7 @@ where
     #[must_use]
     pub fn owned<S>(name: S, map: Vec<T>) -> Self
     where
-        S: Into<String>,
+        S: Into<Cow<'static, str>>,
     {
         Self::maybe_differential_owned(name, map)
     }
@@ -973,7 +974,7 @@ where
     #[must_use]
     pub fn from_ownedref<S>(name: S, map: OwnedMutSlice<'a, T>) -> Self
     where
-        S: Into<String>,
+        S: Into<Cow<'static, str>>,
     {
         Self::maybe_differential_from_ownedref(name, map)
     }
@@ -984,7 +985,7 @@ where
     /// Will dereference the `map_ptr` with up to len elements.
     pub unsafe fn from_mut_ptr<S>(name: S, map_ptr: *mut T, len: usize) -> Self
     where
-        S: Into<String>,
+        S: Into<Cow<'static, str>>,
     {
         Self::maybe_differential_from_mut_ptr(name, map_ptr, len)
     }
@@ -1002,7 +1003,7 @@ where
     #[must_use]
     pub unsafe fn differential<S>(name: S, map: &'a mut [T]) -> Self
     where
-        S: Into<String>,
+        S: Into<Cow<'static, str>>,
     {
         Self::maybe_differential(name, map)
     }
@@ -1011,7 +1012,7 @@ where
     #[must_use]
     pub fn differential_owned<S>(name: S, map: Vec<T>) -> Self
     where
-        S: Into<String>,
+        S: Into<Cow<'static, str>>,
     {
         Self::maybe_differential_owned(name, map)
     }
@@ -1023,7 +1024,7 @@ where
     #[must_use]
     pub fn differential_from_ownedref<S>(name: S, map: OwnedMutSlice<'a, T>) -> Self
     where
-        S: Into<String>,
+        S: Into<Cow<'static, str>>,
     {
         Self::maybe_differential_from_ownedref(name, map)
     }
@@ -1034,7 +1035,7 @@ where
     /// Will dereference the `map_ptr` with up to len elements.
     pub unsafe fn differential_from_mut_ptr<S>(name: S, map_ptr: *mut T, len: usize) -> Self
     where
-        S: Into<String>,
+        S: Into<Cow<'static, str>>,
     {
         Self::maybe_differential_from_mut_ptr(name, map_ptr, len)
     }
@@ -1067,7 +1068,7 @@ where
 {
     map: OwnedMutSlice<'a, T>,
     initial: T,
-    name: String,
+    name: Cow<'static, str>,
 }
 
 impl<'a, S, T, const N: usize> Observer<S> for ConstMapObserver<'a, T, N>
@@ -1087,8 +1088,8 @@ where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
-    fn name(&self) -> &str {
-        self.name.as_str()
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
     }
 }
 
@@ -1340,7 +1341,7 @@ where
         assert!(map.len() >= N);
         Self {
             map: OwnedMutSlice::from(map),
-            name: name.to_string(),
+            name: Cow::from(name),
             initial: T::default(),
         }
     }
@@ -1352,7 +1353,7 @@ where
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
             map: OwnedMutSlice::from(map),
-            name: name.to_string(),
+            name: Cow::from(name),
             initial,
         }
     }
@@ -1364,7 +1365,7 @@ where
     pub unsafe fn from_mut_ptr(name: &'static str, map_ptr: *mut T) -> Self {
         ConstMapObserver {
             map: OwnedMutSlice::from_raw_parts_mut(map_ptr, N),
-            name: name.to_string(),
+            name: Cow::from(name),
             initial: T::default(),
         }
     }
@@ -1381,7 +1382,7 @@ where
     map: OwnedMutSlice<'a, T>,
     size: OwnedMutPtr<usize>,
     initial: T,
-    name: String,
+    name: Cow<'static, str>,
 }
 
 impl<'a, S, T> Observer<S> for VariableMapObserver<'a, T>
@@ -1408,8 +1409,8 @@ where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Bounded + PartialEq,
 {
     #[inline]
-    fn name(&self) -> &str {
-        self.name.as_str()
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
     }
 }
 
@@ -1793,7 +1794,7 @@ where
     M: Named + Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         self.base.name()
     }
 }
@@ -2060,7 +2061,7 @@ where
     M: Named + Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         self.base.name()
     }
 }
@@ -2296,7 +2297,7 @@ where
     intervals: IntervalTree<usize, usize>,
     len: usize,
     initial: T,
-    name: String,
+    name: Cow<'static, str>,
     iter_idx: usize,
 }
 
@@ -2326,8 +2327,8 @@ where
     T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
 {
     #[inline]
-    fn name(&self) -> &str {
-        self.name.as_str()
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
     }
 }
 
@@ -2474,7 +2475,7 @@ where
             maps,
             intervals,
             len: idx,
-            name: name.to_string(),
+            name: Cow::from(name),
             initial: T::default(),
             iter_idx: 0,
         }
@@ -2522,7 +2523,7 @@ where
             maps,
             intervals,
             len: idx,
-            name: name.to_string(),
+            name: Cow::from(name),
             initial: T::default(),
             iter_idx: 0,
         }
@@ -2616,7 +2617,7 @@ where
 {
     map: Vec<T>,
     initial: T,
-    name: String,
+    name: Cow<'static, str>,
 }
 
 impl<S, T> Observer<S> for OwnedMapObserver<T>
@@ -2636,8 +2637,8 @@ where
     T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
-    fn name(&self) -> &str {
-        self.name.as_str()
+    fn name(&self) -> &Cow<'static, str> {
+        Cow::from(self.name)
     }
 }
 
@@ -2847,7 +2848,7 @@ where
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
             map,
-            name: name.to_string(),
+            name: Cow::from(name),
             initial,
         }
     }

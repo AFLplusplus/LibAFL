@@ -1,4 +1,5 @@
 use alloc::{
+    borrow::Cow,
     string::{String, ToString},
     vec::Vec,
 };
@@ -17,7 +18,7 @@ pub struct ListObserver<T>
 where
     T: Debug + Serialize,
 {
-    name: String,
+    name: Cow<'static, str>,
     /// The list
     list: OwnedMutPtr<Vec<T>>,
 }
@@ -34,7 +35,7 @@ where
     #[must_use]
     pub fn new(name: &'static str, list: OwnedMutPtr<Vec<T>>) -> Self {
         Self {
-            name: name.to_string(),
+            name: Cow::from(name),
             list,
         }
     }
@@ -67,7 +68,7 @@ impl<T> Named for ListObserver<T>
 where
     T: Debug + Serialize + serde::de::DeserializeOwned,
 {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }

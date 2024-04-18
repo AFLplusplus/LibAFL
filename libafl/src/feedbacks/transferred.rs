@@ -1,6 +1,8 @@
 //! Feedbacks and associated metadata for detecting whether a given testcase was transferred from
 //! another node.
 
+use alloc::borrow::Cow;
+
 use libafl_bolts::{impl_serdeany, Error, Named};
 use serde::{Deserialize, Serialize};
 
@@ -10,7 +12,8 @@ use crate::{
 };
 
 /// Constant name of the [`TransferringMetadata`].
-pub const TRANSFERRED_FEEDBACK_NAME: &str = "transferred_feedback_internal";
+pub const TRANSFERRED_FEEDBACK_NAME: Cow<'static, str> =
+    Cow::Borrowed("transferred_feedback_internal");
 
 /// Metadata which denotes whether we are currently transferring an input. Implementors of
 /// multi-node communication systems (like [`crate::events::LlmpEventManager`]) should wrap any
@@ -37,8 +40,8 @@ impl TransferringMetadata {
 pub struct TransferredFeedback;
 
 impl Named for TransferredFeedback {
-    fn name(&self) -> &str {
-        TRANSFERRED_FEEDBACK_NAME
+    fn name(&self) -> &Cow<'static, str> {
+        &TRANSFERRED_FEEDBACK_NAME
     }
 }
 

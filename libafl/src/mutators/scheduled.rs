@@ -1,6 +1,6 @@
 //! The `ScheduledMutator` schedules multiple mutations internally.
 
-use alloc::{string::String, vec::Vec};
+use alloc::{borrow::Cow, string::String, vec::Vec};
 use core::{
     fmt::{self, Debug},
     marker::PhantomData,
@@ -113,7 +113,7 @@ where
     MT: MutatorsTuple<I, S>,
     S: HasRand,
 {
-    name: String,
+    name: Cow<'static, str>,
     mutations: MT,
     max_stack_pow: u64,
     phantom: PhantomData<(I, S)>,
@@ -139,7 +139,7 @@ where
     MT: MutatorsTuple<I, S>,
     S: HasRand,
 {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
@@ -198,7 +198,10 @@ where
     /// Create a new [`StdScheduledMutator`] instance specifying mutations
     pub fn new(mutations: MT) -> Self {
         StdScheduledMutator {
-            name: format!("StdScheduledMutator[{}]", mutations.names().join(", ")),
+            name: Cow::from(format!(
+                "StdScheduledMutator[{}]",
+                mutations.names().join(", ")
+            )),
             mutations,
             max_stack_pow: 7,
             phantom: PhantomData,
@@ -208,7 +211,10 @@ where
     /// Create a new [`StdScheduledMutator`] instance specifying mutations and the maximun number of iterations
     pub fn with_max_stack_pow(mutations: MT, max_stack_pow: u64) -> Self {
         StdScheduledMutator {
-            name: format!("StdScheduledMutator[{}]", mutations.names().join(", ")),
+            name: Cow::from(format!(
+                "StdScheduledMutator[{}]",
+                mutations.names().join(", ")
+            )),
             mutations,
             max_stack_pow,
             phantom: PhantomData,
@@ -340,7 +346,7 @@ where
     S: HasRand + HasCorpus,
     SM: ScheduledMutator<I, MT, S>,
 {
-    name: String,
+    name: Cow<'static, str>,
     scheduled: SM,
     mutation_log: Vec<MutationId>,
     phantom: PhantomData<(I, MT, S)>,
@@ -368,7 +374,7 @@ where
     S: HasRand + HasCorpus,
     SM: ScheduledMutator<I, MT, S>,
 {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
@@ -460,7 +466,7 @@ where
     /// This mutator logs all mutators.
     pub fn new(scheduled: SM) -> Self {
         Self {
-            name: format!("LoggerScheduledMutator[{}]", scheduled.name()),
+            name: Cow::from(format!("LoggerScheduledMutator[{}]", scheduled.name())),
             scheduled,
             mutation_log: vec![],
             phantom: PhantomData,

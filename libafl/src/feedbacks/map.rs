@@ -1,6 +1,7 @@
 //! Map feedback, maximizing or minimizing maps, for example the afl-style map observer.
 
 use alloc::{
+    borrow::Cow,
     string::{String, ToString},
     vec::Vec,
 };
@@ -387,11 +388,11 @@ pub struct MapFeedback<C, N, O, R, S, T> {
     /// New indexes observed in the last observation
     novelties: Option<Vec<usize>>,
     /// Name identifier of this instance
-    name: String,
+    name: Cow<'static, str>,
     /// Name identifier of the observer
-    observer_name: String,
+    observer_name: Cow<'static, str>,
     /// Name of the feedback as shown in the `UserStats`
-    stats_name: String,
+    stats_name: Cow<'static, str>,
     /// Phantom Data of Reducer
     phantom: PhantomData<(C, N, O, R, S, T)>,
 }
@@ -671,8 +672,8 @@ where
 
 impl<C, N, O, R, S, T> Named for MapFeedback<C, N, O, R, S, T> {
     #[inline]
-    fn name(&self) -> &str {
-        self.name.as_str()
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
     }
 }
 
@@ -682,8 +683,8 @@ where
     C: AsRef<O>,
 {
     #[inline]
-    fn observer_name(&self) -> &str {
-        self.observer_name.as_str()
+    fn observer_name(&self) -> &Cow<'static, str> {
+        &self.observer_name
     }
 }
 

@@ -164,7 +164,7 @@ pub mod bolts_prelude {
 #[cfg(all(unix, feature = "std"))]
 use alloc::boxed::Box;
 #[cfg(feature = "alloc")]
-use alloc::vec::Vec;
+use alloc::{borrow::Cow, vec::Vec};
 #[cfg(all(not(feature = "xxh3"), feature = "alloc"))]
 use core::hash::BuildHasher;
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
@@ -233,7 +233,7 @@ pub const IP_LOCALHOST: &str = "127.0.0.1";
 /// We need fixed names for many parts of this lib.
 pub trait Named {
     /// Provide the name of this element.
-    fn name(&self) -> &str;
+    fn name(&self) -> &Cow<'static, str>;
 }
 
 #[cfg(feature = "errors_backtrace")]

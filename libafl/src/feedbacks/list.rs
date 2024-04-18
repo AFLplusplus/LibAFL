@@ -1,4 +1,7 @@
-use alloc::string::{String, ToString};
+use alloc::{
+    borrow::Cow,
+    string::{String, ToString},
+};
 use core::{fmt::Debug, hash::Hash, marker::PhantomData};
 
 use hashbrown::HashSet;
@@ -70,8 +73,8 @@ pub struct ListFeedback<T>
 where
     T: Hash + Eq,
 {
-    name: String,
-    observer_name: String,
+    name: Cow<'static, str>,
+    observer_name: Cow<'static, str>,
     novelty: HashSet<T>,
     phantom: PhantomData<T>,
 }
@@ -151,8 +154,8 @@ where
     T: Debug + Serialize + Hash + Eq + DeserializeOwned,
 {
     #[inline]
-    fn name(&self) -> &str {
-        self.name.as_str()
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
     }
 }
 
@@ -164,8 +167,8 @@ where
     #[must_use]
     pub fn new(observer: &ListObserver<T>) -> Self {
         Self {
-            name: observer.name().to_string(),
-            observer_name: observer.name().to_string(),
+            name: observer.name().clone(),
+            observer_name: observer.name().clone(),
             novelty: HashSet::<T>::new(),
             phantom: PhantomData,
         }

@@ -2,7 +2,7 @@
 //! The executor must explicitly support these observers.
 //! For example, they are supported on the [`crate::executors::CommandExecutor`].
 
-use alloc::string::String;
+use alloc::{borrow::Cow, string::String};
 use std::vec::Vec;
 
 use libafl_bolts::Named;
@@ -15,7 +15,7 @@ use crate::{inputs::UsesInput, observers::Observer};
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct StdOutObserver {
     /// The name of the observer.
-    pub name: String,
+    pub name: Cow<'static, str>,
     /// The stdout of the target during its last execution.
     pub stdout: Option<Vec<u8>>,
 }
@@ -24,8 +24,11 @@ pub struct StdOutObserver {
 impl StdOutObserver {
     /// Create a new [`StdOutObserver`] with the given name.
     #[must_use]
-    pub fn new(name: String) -> Self {
-        Self { name, stdout: None }
+    pub fn new(name: &'static str) -> Self {
+        Self {
+            name: Cow::from(name),
+            stdout: None,
+        }
     }
 }
 
@@ -45,7 +48,7 @@ where
 }
 
 impl Named for StdOutObserver {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
@@ -55,7 +58,7 @@ impl Named for StdOutObserver {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct StdErrObserver {
     /// The name of the observer.
-    pub name: String,
+    pub name: Cow<'static, str>,
     /// The stderr of the target during its last execution.
     pub stderr: Option<Vec<u8>>,
 }
@@ -64,8 +67,11 @@ pub struct StdErrObserver {
 impl StdErrObserver {
     /// Create a new [`StdErrObserver`] with the given name.
     #[must_use]
-    pub fn new(name: String) -> Self {
-        Self { name, stderr: None }
+    pub fn new(name: &'static str) -> Self {
+        Self {
+            name: Cow::from(name),
+            stderr: None,
+        }
     }
 }
 
@@ -85,7 +91,7 @@ where
 }
 
 impl Named for StdErrObserver {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }

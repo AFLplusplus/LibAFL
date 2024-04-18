@@ -1,7 +1,7 @@
 //! Compiletime lists/tuples used throughout the `LibAFL` universe
 
 #[cfg(feature = "alloc")]
-use alloc::vec::Vec;
+use alloc::{borrow::Cow, vec::Vec};
 #[rustversion::not(nightly)]
 use core::any::type_name;
 use core::{
@@ -411,19 +411,20 @@ where
 /// A named tuple
 pub trait NamedTuple: HasConstLen {
     /// Gets the name of this tuple
-    fn name(&self, index: usize) -> Option<&str>;
+    fn name(&self, index: usize) -> Option<&Cow<'static, str>>;
 }
 
 impl NamedTuple for () {
-    fn name(&self, _index: usize) -> Option<&str> {
+    fn name(&self, _index: usize) -> Option<&Cow<'static, str>> {
         None
     }
 }
 
 impl Named for () {
     #[inline]
-    fn name(&self) -> &str {
-        "Empty"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("Empty");
+        &NAME
     }
 }
 
@@ -432,7 +433,7 @@ where
     Head: Named,
     Tail: NamedTuple,
 {
-    fn name(&self, index: usize) -> Option<&str> {
+    fn name(&self, index: usize) -> Option<&Cow<'static, str>> {
         if index == 0 {
             Some(self.0.name())
         } else {

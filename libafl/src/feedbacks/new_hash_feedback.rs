@@ -1,6 +1,9 @@
 //! The ``NewHashFeedback`` uses the backtrace hash and a hashset to only keep novel cases
 
-use alloc::string::{String, ToString};
+use alloc::{
+    borrow::Cow,
+    string::{String, ToString},
+};
 use std::{fmt::Debug, marker::PhantomData};
 
 use hashbrown::HashSet;
@@ -78,8 +81,8 @@ impl HashSetState<u64> for NewHashFeedbackMetadata {
 /// A [`NewHashFeedback`] maintains a hashset of already seen stacktraces and considers interesting unseen ones
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NewHashFeedback<O, S> {
-    name: String,
-    observer_name: String,
+    name: Cow<'static, str>,
+    observer_name: Cow<'static, str>,
     /// Initial capacity of hash set
     capacity: usize,
     o_type: PhantomData<(O, S)>,
@@ -137,14 +140,14 @@ where
 
 impl<O, S> Named for NewHashFeedback<O, S> {
     #[inline]
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
 impl<O, S> HasObserverName for NewHashFeedback<O, S> {
     #[inline]
-    fn observer_name(&self) -> &str {
+    fn observer_name(&self) -> &Cow<'static, str> {
         &self.observer_name
     }
 }

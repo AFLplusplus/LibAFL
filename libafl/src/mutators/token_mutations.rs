@@ -1,6 +1,6 @@
 //! Tokens are what AFL calls extras or dictionaries.
 //! They may be inserted as part of mutations during fuzzing.
-use alloc::vec::Vec;
+use alloc::{borrow::Cow, vec::Vec};
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use core::slice::from_raw_parts;
 use core::{
@@ -346,8 +346,9 @@ where
 }
 
 impl Named for TokenInsert {
-    fn name(&self) -> &str {
-        "TokenInsert"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("TokenInsert");
+        &NAME
     }
 }
 
@@ -404,8 +405,9 @@ where
 }
 
 impl Named for TokenReplace {
-    fn name(&self) -> &str {
-        "TokenReplace"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("TokenReplace");
+        &NAME
     }
 }
 
@@ -588,8 +590,9 @@ where
 }
 
 impl Named for I2SRandReplace {
-    fn name(&self) -> &str {
-        "I2SRandReplace"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("I2SRandReplace");
+        &NAME
     }
 }
 
@@ -1673,8 +1676,9 @@ where
 }
 
 impl Named for AFLppRedQueen {
-    fn name(&self) -> &str {
-        "AFLppRedQueen"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("AFLppRedQueen");
+        &NAME
     }
 }
 

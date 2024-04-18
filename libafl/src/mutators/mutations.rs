@@ -1,6 +1,9 @@
 //! A wide variety of mutations used during fuzzing.
 
-use alloc::{borrow::ToOwned, vec::Vec};
+use alloc::{
+    borrow::{Cow, ToOwned},
+    vec::Vec,
+};
 use core::{cmp::min, marker::PhantomData, mem::size_of, ops::Range};
 
 use libafl_bolts::{rands::Rand, Named};
@@ -135,8 +138,9 @@ where
 }
 
 impl Named for BitFlipMutator {
-    fn name(&self) -> &str {
-        "BitFlipMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("BitFlipMutator");
+        &NAME
     }
 }
 
@@ -168,8 +172,9 @@ where
 }
 
 impl Named for ByteFlipMutator {
-    fn name(&self) -> &str {
-        "ByteFlipMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("ByteFlipMutator");
+        &NAME
     }
 }
 
@@ -202,8 +207,9 @@ where
 }
 
 impl Named for ByteIncMutator {
-    fn name(&self) -> &str {
-        "ByteIncMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("ByteIncMutator");
+        &NAME
     }
 }
 
@@ -236,8 +242,9 @@ where
 }
 
 impl Named for ByteDecMutator {
-    fn name(&self) -> &str {
-        "ByteDecMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("ByteDecMutator");
+        &NAME
     }
 }
 
@@ -270,8 +277,9 @@ where
 }
 
 impl Named for ByteNegMutator {
-    fn name(&self) -> &str {
-        "ByteNegMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("ByteNegMutator");
+        &NAME
     }
 }
 
@@ -304,8 +312,9 @@ where
 }
 
 impl Named for ByteRandMutator {
-    fn name(&self) -> &str {
-        "ByteRandMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("ByteRandMutator");
+        &NAME
     }
 }
 
@@ -364,7 +373,7 @@ macro_rules! add_mutator_impl {
         }
 
         impl Named for $name {
-            fn name(&self) -> &str {
+            fn name(&self) -> &Cow<'static, str> {
                 stringify!($name)
             }
         }
@@ -417,7 +426,7 @@ macro_rules! interesting_mutator_impl {
         }
 
         impl Named for $name {
-            fn name(&self) -> &str {
+            fn name(&self) -> &Cow<'static, str> {
                 stringify!($name)
             }
         }
@@ -460,8 +469,9 @@ where
 }
 
 impl Named for BytesDeleteMutator {
-    fn name(&self) -> &str {
-        "BytesDeleteMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("BytesDeleteMutator");
+        &NAME
     }
 }
 
@@ -506,8 +516,9 @@ where
 }
 
 impl Named for BytesExpandMutator {
-    fn name(&self) -> &str {
-        "BytesExpandMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("BytesExpandMutator");
+        &NAME
     }
 }
 
@@ -559,8 +570,9 @@ where
 }
 
 impl Named for BytesInsertMutator {
-    fn name(&self) -> &str {
-        "BytesInsertMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("BytesInsertMutator");
+        &NAME
     }
 }
 
@@ -612,8 +624,9 @@ where
 }
 
 impl Named for BytesRandInsertMutator {
-    fn name(&self) -> &str {
-        "BytesRandInsertMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("BytesRandInsertMutator");
+        &NAME
     }
 }
 
@@ -650,8 +663,9 @@ where
 }
 
 impl Named for BytesSetMutator {
-    fn name(&self) -> &str {
-        "BytesSetMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("BytesSetMutator");
+        &NAME
     }
 }
 
@@ -688,8 +702,9 @@ where
 }
 
 impl Named for BytesRandSetMutator {
-    fn name(&self) -> &str {
-        "BytesRandSetMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("BytesRandSetMutator");
+        &NAME
     }
 }
 
@@ -728,8 +743,9 @@ where
 }
 
 impl Named for BytesCopyMutator {
-    fn name(&self) -> &str {
-        "BytesCopyMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("BytesCopyMutator");
+        &NAME
     }
 }
 
@@ -787,8 +803,9 @@ where
 }
 
 impl Named for BytesInsertCopyMutator {
-    fn name(&self) -> &str {
-        "BytesInsertCopyMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("BytesInsertCopyMutator");
+        &NAME
     }
 }
 
@@ -990,8 +1007,9 @@ where
 }
 
 impl Named for BytesSwapMutator {
-    fn name(&self) -> &str {
-        "BytesSwapMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("BytesSwapMutator");
+        &NAME
     }
 }
 
@@ -1082,8 +1100,9 @@ where
 }
 
 impl<I> Named for CrossoverInsertMutator<I> {
-    fn name(&self) -> &str {
-        "CrossoverInsertMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("CrossoverInsertMutator");
+        &NAME
     }
 }
 
@@ -1163,8 +1182,9 @@ where
 }
 
 impl<I> Named for CrossoverReplaceMutator<I> {
-    fn name(&self) -> &str {
-        "CrossoverReplaceMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("CrossoverReplaceMutator");
+        &NAME
     }
 }
 
@@ -1242,8 +1262,9 @@ where
 }
 
 impl Named for SpliceMutator {
-    fn name(&self) -> &str {
-        "SpliceMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("SpliceMutator");
+        &NAME
     }
 }
 

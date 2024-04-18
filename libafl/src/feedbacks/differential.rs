@@ -1,7 +1,10 @@
 //! Diff Feedback, comparing the content of two observers of the same type.
 //!
 
-use alloc::string::{String, ToString};
+use alloc::{
+    borrow::Cow,
+    string::{String, ToString},
+};
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
@@ -53,11 +56,11 @@ where
     F: FnMut(&O1, &O2) -> DiffResult,
 {
     /// This feedback's name
-    name: String,
+    name: Cow<'static, str>,
     /// The first observer to compare against
-    o1_name: String,
+    o1_name: Cow<'static, str>,
     /// The second observer to compare against
-    o2_name: String,
+    o2_name: Cow<'static, str>,
     /// The function used to compare the two observers
     compare_fn: F,
     phantomm: PhantomData<(O1, O2, I, S)>,
@@ -95,7 +98,7 @@ where
     O1: Named,
     O2: Named,
 {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }

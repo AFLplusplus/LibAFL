@@ -1,6 +1,6 @@
 //! Gramatron is the rewritten gramatron fuzzer in rust.
 //! See the original gramatron repo [`Gramatron`](https://github.com/HexHive/Gramatron) for more details.
-use alloc::vec::Vec;
+use alloc::{borrow::Cow, vec::Vec};
 use core::cmp::max;
 
 use hashbrown::HashMap;
@@ -53,8 +53,9 @@ impl<'a, S> Named for GramatronRandomMutator<'a, S>
 where
     S: HasRand + HasMetadata,
 {
-    fn name(&self) -> &str {
-        "GramatronRandomMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("GramatronRandomMutator");
+        &NAME
     }
 }
 
@@ -148,8 +149,9 @@ where
 }
 
 impl Named for GramatronSpliceMutator {
-    fn name(&self) -> &str {
-        "GramatronSpliceMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("GramatronSpliceMutator");
+        &NAME
     }
 }
 
@@ -250,8 +252,9 @@ where
 }
 
 impl Named for GramatronRecursionMutator {
-    fn name(&self) -> &str {
-        "GramatronRecursionMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("GramatronRecursionMutator");
+        &NAME
     }
 }
 
