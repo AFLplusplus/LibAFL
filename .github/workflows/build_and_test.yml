@@ -74,7 +74,7 @@ jobs:
     steps:
       - name: Remove Dotnet & Haskell
         run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
-      - uses: actions-rs/toolchain@v1
+      - uses: actions-rs/toolchain@v2
         with:
           profile: minimal
           toolchain: stable
