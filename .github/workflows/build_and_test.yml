@@ -239,13 +239,26 @@ jobs:
     # Fix me plz
     # - name: Test Build libafl_libfuzzer with embed
     #  run: cargo +nightly test --features=embed-runtime --manifest-path libafl_libfuzzer/Cargo.toml
+  ubuntu-check:
+    runs-on: ubuntu-22.04
+    needs: ubuntu
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/workflows/fuzzer-check-prepare
+      - uses: Swatinem/rust-cache@v2
+        with: { shared-key: "ubuntu" }
+      # ---- build and feature check ----
+      # cargo-hack's --feature-powerset would be nice here but libafl has a too many knobs
+      - name: Check nightly features
+        run: cargo +nightly check --features=agpl && cargo +nightly check --features=nautilus
+
 
   ubuntu-check:
     runs-on: ubuntu-22.04
     needs: ubuntu
     strategy:
       matrix:
-        instance_idx: [ "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15" ]
+        instance_idx: [ "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24" ]
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/workflows/fuzzer-check-prepare
@@ -258,8 +271,6 @@ jobs:
         # `agpl`, `nautilus` require nightly
         # `sancov_pcguard_edges` is tested seperatelyc
         run: python3 ./scripts/parallellize_cargo_check.py ${{ matrix.instance_idx }}
-      - name: Check nightly features
-        run: cargo +nightly check --features=agpl && cargo +nightly check --features=nautilus
 
   ubuntu-concolic:
     runs-on: ubuntu-latest
