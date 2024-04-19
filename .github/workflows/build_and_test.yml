@@ -74,7 +74,7 @@ jobs:
     steps:
       - name: Remove Dotnet & Haskell
         run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
-      - uses: actions-rs/toolchain@v2
+      - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
@@ -82,7 +82,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "llvm-tester" }
       - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v1
+        uses: KyleMayes/install-llvm-action@v2
         with:
           version: "${{matrix.llvm-version}}"
       - name: Build and test with llvm-${{ matrix.llvm-version }}
