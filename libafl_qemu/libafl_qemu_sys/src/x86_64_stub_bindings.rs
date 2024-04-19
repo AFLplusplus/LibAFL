@@ -11650,6 +11650,95 @@ impl Default for RBNode {
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
+pub struct RBRoot {
+    pub rb_node: *mut RBNode,
+}
+#[test]
+fn bindgen_test_layout_RBRoot() {
+    const UNINIT: ::std::mem::MaybeUninit<RBRoot> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<RBRoot>(),
+        8usize,
+        concat!("Size of: ", stringify!(RBRoot))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<RBRoot>(),
+        8usize,
+        concat!("Alignment of ", stringify!(RBRoot))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).rb_node) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(RBRoot),
+            "::",
+            stringify!(rb_node)
+        )
+    );
+}
+impl Default for RBRoot {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct RBRootLeftCached {
+    pub rb_root: RBRoot,
+    pub rb_leftmost: *mut RBNode,
+}
+#[test]
+fn bindgen_test_layout_RBRootLeftCached() {
+    const UNINIT: ::std::mem::MaybeUninit<RBRootLeftCached> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<RBRootLeftCached>(),
+        16usize,
+        concat!("Size of: ", stringify!(RBRootLeftCached))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<RBRootLeftCached>(),
+        8usize,
+        concat!("Alignment of ", stringify!(RBRootLeftCached))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).rb_root) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(RBRootLeftCached),
+            "::",
+            stringify!(rb_root)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).rb_leftmost) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(RBRootLeftCached),
+            "::",
+            stringify!(rb_leftmost)
+        )
+    );
+}
+impl Default for RBRootLeftCached {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct IntervalTreeNode {
     pub rb: RBNode,
     pub start: u64,
@@ -11720,6 +11809,7 @@ impl Default for IntervalTreeNode {
         }
     }
 }
+pub type IntervalTreeRoot = RBRootLeftCached;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct tb_tc {
@@ -11982,6 +12072,14 @@ extern "C" {
 }
 extern "C" {
     pub fn target_munmap(start: abi_ulong, len: abi_ulong) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    #[doc = " read_self_maps:\n\n Read /proc/self/maps and return a tree of MapInfo structures."]
+    pub fn read_self_maps() -> *mut IntervalTreeRoot;
+}
+extern "C" {
+    #[doc = " free_self_maps:\n @info: an interval tree\n\n Free a tree of MapInfo structures."]
+    pub fn free_self_maps(root: *mut IntervalTreeRoot);
 }
 extern "C" {
     pub fn libafl_breakpoint_invalidate(cpu: *mut CPUState, pc: target_ulong);
@@ -12308,6 +12406,109 @@ extern "C" {
 }
 extern "C" {
     pub fn libafl_get_exit_reason() -> *mut libafl_exit_reason;
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct libafl_mapinfo {
+    pub start: target_ulong,
+    pub end: target_ulong,
+    pub offset: target_ulong,
+    pub path: *const ::std::os::raw::c_char,
+    pub flags: ::std::os::raw::c_int,
+    pub is_priv: ::std::os::raw::c_int,
+}
+#[test]
+fn bindgen_test_layout_libafl_mapinfo() {
+    const UNINIT: ::std::mem::MaybeUninit<libafl_mapinfo> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<libafl_mapinfo>(),
+        40usize,
+        concat!("Size of: ", stringify!(libafl_mapinfo))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<libafl_mapinfo>(),
+        8usize,
+        concat!("Alignment of ", stringify!(libafl_mapinfo))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).start) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(libafl_mapinfo),
+            "::",
+            stringify!(start)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).end) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(libafl_mapinfo),
+            "::",
+            stringify!(end)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).offset) as usize - ptr as usize },
+        16usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(libafl_mapinfo),
+            "::",
+            stringify!(offset)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).path) as usize - ptr as usize },
+        24usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(libafl_mapinfo),
+            "::",
+            stringify!(path)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).flags) as usize - ptr as usize },
+        32usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(libafl_mapinfo),
+            "::",
+            stringify!(flags)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).is_priv) as usize - ptr as usize },
+        36usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(libafl_mapinfo),
+            "::",
+            stringify!(is_priv)
+        )
+    );
+}
+impl Default for libafl_mapinfo {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+extern "C" {
+    pub fn libafl_maps_first(map_info: *mut IntervalTreeRoot) -> *mut IntervalTreeNode;
+}
+extern "C" {
+    pub fn libafl_maps_next(
+        node: *mut IntervalTreeNode,
+        ret: *mut libafl_mapinfo,
+    ) -> *mut IntervalTreeNode;
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -13668,6 +13869,9 @@ extern "C" {
 }
 extern "C" {
     pub fn libafl_qemu_remove_new_thread_hook(num: usize) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn libafl_tcg_gen_asan(addr: *mut TCGTemp, size: usize);
 }
 extern "C" {
     pub fn libafl_jit_trace_edge_hitcount(data: u64, id: u64) -> usize;

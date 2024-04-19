@@ -189,9 +189,7 @@ where
         match self._get(id, &self.mapping.enabled) {
             Ok(input) => Ok(input),
             Err(Error::KeyNotFound(..)) => return self._get(id, &self.mapping.disabled),
-            Err(e) => {
-                Err(e)
-            }
+            Err(e) => Err(e),
         }
     }
     fn current(&self) -> &Option<CorpusId> {
@@ -362,7 +360,7 @@ where
     fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error> {
         self.get(id)
     }
-    
+
     // This just calls Self::nth as ArtifactCorpus disregards disabled entries
     fn nth_from_all(&self, nth: usize) -> CorpusId {
         self.nth(nth)

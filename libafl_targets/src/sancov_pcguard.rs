@@ -11,7 +11,10 @@ use libafl::executors::{hooks::ExecutorHook, HasObservers};
 #[cfg(any(
     feature = "pointer_maps",
     feature = "sancov_pcguard_edges",
-    feature = "sancov_pcguard_hitcounts"
+    feature = "sancov_pcguard_hitcounts",
+    feature = "sancov_ctx",
+    feature = "sancov_ngram4",
+    feature = "sancov_ngram8",
 ))]
 use crate::coverage::EDGES_MAP;
 use crate::coverage::MAX_EDGES_NUM;
@@ -279,7 +282,7 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(mut start: *mut u32
         #[cfg(not(feature = "pointer_maps"))]
         {
             MAX_EDGES_NUM = MAX_EDGES_NUM.wrapping_add(1);
-            // assert!((MAX_EDGES_NUM <= EDGES_MAP.len()), "The number of edges reported by SanitizerCoverage exceed the size of the edges map ({}). Use the LIBAFL_EDGES_MAP_SIZE env to increase it at compile time.", EDGES_MAP.len());
+            assert!((MAX_EDGES_NUM <= EDGES_MAP.len()), "The number of edges reported by SanitizerCoverage exceed the size of the edges map ({}). Use the LIBAFL_EDGES_MAP_SIZE env to increase it at compile time.", EDGES_MAP.len());
         }
     }
 }

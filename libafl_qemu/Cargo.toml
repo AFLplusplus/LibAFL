@@ -58,14 +58,14 @@ serdeany_autoreg = ["libafl_bolts/serdeany_autoreg"]
 
 slirp = [ "systemmode", "libafl_qemu_sys/slirp" ] # build qemu with host libslirp (for user networking)
 
-# disabled atm, enabled when fixed with dynamic list
-# shared = [ "libafl_qemu_sys/shared" ]
+# Requires the binary's build.rs to call `build_libafl_qemu`
+shared = [ "libafl_qemu_sys/shared" ]
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.11.2", default-features = false, features = ["std", "derive", "regex"] }
-libafl_bolts = { path = "../libafl_bolts", version = "0.11.2", default-features = false, features = ["std", "derive"] }
-libafl_targets = { path = "../libafl_targets", version = "0.11.2" }
-libafl_qemu_sys = { path = "./libafl_qemu_sys", version = "0.11.2" }
+libafl = { path = "../libafl", version = "0.12.0", default-features = false, features = ["std", "derive", "regex"] }
+libafl_bolts = { path = "../libafl_bolts", version = "0.12.0", default-features = false, features = ["std", "derive"] }
+libafl_targets = { path = "../libafl_targets", version = "0.12.0" }
+libafl_qemu_sys = { path = "./libafl_qemu_sys", version = "0.12.0" }
 
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
 hashbrown =  { version = "0.14", features = ["serde"] } # A faster hashmap, nostd compatible

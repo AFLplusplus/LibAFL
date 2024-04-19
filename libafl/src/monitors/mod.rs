@@ -824,11 +824,11 @@ where
     }
 
     /// Creates the monitor that also prints the user monitor
-    pub fn with_user_monitor(print_fn: F, print_user_monitor: bool) -> Self {
+    pub fn with_user_monitor(print_fn: F) -> Self {
         Self {
             print_fn,
             start_time: current_time(),
-            print_user_monitor,
+            print_user_monitor: true,
             client_stats: vec![],
         }
     }
