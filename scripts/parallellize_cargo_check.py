@@ -4,7 +4,7 @@ import os
 import sys
 import math
 # Current CI Runner
-ci_instances = 8
+ci_instances = 16
 
 if len(sys.argv) != 2:
     exit(1)
@@ -19,8 +19,8 @@ output = subprocess.check_output(command, shell=True, text=True)
 output = output.strip().split('\n')[0:]
 all_task_cnt = len(output) // 2 # by 2 cuz one task has two lines
 task_per_core = math.ceil(all_task_cnt // ci_instances)
-print(task_per_core)
+print(task_per_core, "tasks assigned to this instance")
 
-for task in output[instance_idx * 2 * 30: (instance_idx + 1) * 2 * 30]:
+for task in output[instance_idx * 2 * task_per_core: (instance_idx + 1) * 2 * task_per_core]:
     print("Running ", task)
     cargo_check = subprocess.check_output(task, shell=True, text=True)
