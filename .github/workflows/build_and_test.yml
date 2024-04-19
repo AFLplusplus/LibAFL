@@ -70,7 +70,7 @@ jobs:
     continue-on-error: true
     strategy:
       matrix:
-        llvm-version: [ "11", "12", "13", "14", "16", "17" ]
+        llvm-version: [ "16", "17", "18" ]
     steps:
       - name: Remove Dotnet & Haskell
         run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
