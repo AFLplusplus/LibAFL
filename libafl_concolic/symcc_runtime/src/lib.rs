@@ -166,7 +166,7 @@ macro_rules! export_rust_runtime_fn {
         num_bits: ::std::os::raw::c_uint,) -> RSymExpr,$c_name:ident; $rt_cb:path) => {
         #[allow(clippy::missing_safety_doc)]
         #[no_mangle]
-        pub unsafe extern "C" fn _rsym_build_integer_from_buffer(buffer: *mut ::std::os::raw::c_void, num_bits: ::std::os::raw::c_uint) {
+        pub unsafe extern "C" fn _rsym_build_integer_from_buffer(buffer: *mut ::std::os::raw::c_void, num_bits: ::std::os::raw::c_uint,) {
             $rt_cb(|rt| {
                 rt.build_integer_from_buffer(buffer, num_bits);
             })
