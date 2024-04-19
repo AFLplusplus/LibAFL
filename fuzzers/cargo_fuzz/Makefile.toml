@@ -1,8 +1,8 @@
 [env]
 
 [tasks.unsupported]
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 echo "Cargo-make not integrated yet on this"
 '''
 
@@ -19,7 +19,7 @@ args = ["install", "cargo-fuzz"]
 [tasks.build]
 command = "cargo"
 args = ["+nightly", "fuzz", "build", "fuzz_target_1"]
-dependencies = [ "install_cargo_fuzz", "install_llvm_tools"]
+dependencies = ["install_cargo_fuzz", "install_llvm_tools"]
 
 [tasks.test]
 linux_alias = "test_unix"
@@ -27,8 +27,8 @@ mac_alias = "unsupported"
 windows_alias = "unsupported"
 
 [tasks.test_unix]
-script='''
-timeout 30s cargo fuzz run fuzz_target_1 |& tee fuzz_stdout.log || true
+script = '''
+timeout 30s cargo fuzz run fuzz_target_1 2>&1 | tee fuzz_stdout.log || true
 if grep -qa "objectives: 1" fuzz_stdout.log; then
     echo "Fuzzer is working"
 else
