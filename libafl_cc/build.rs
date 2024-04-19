@@ -238,7 +238,7 @@ fn main() {
     println!("cargo:rerun-if-env-changed=LLVM_CXXFLAGS");
     println!("cargo:rerun-if-env-changed=LLVM_LDFLAGS");
     println!("cargo:rerun-if-env-changed=LLVM_VERSION");
-    println!("cargo:rerun-if-env-changed=LIBAFL_EDGES_MAP_SIZE");
+    println!("cargo:rerun-if-env-changed=LIBAFL_EDGES_MAP_SIZE_IN_USE");
     println!("cargo:rerun-if-env-changed=LIBAFL_ACCOUNTING_MAP_SIZE");
     println!("cargo:rerun-if-env-changed=LIBAFL_DDG_MAP_SIZE");
     println!("cargo:rerun-if-changed=src/common-llvm.h");
@@ -311,10 +311,13 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     };
     let mut cxxflags: Vec<String> = cxxflags.split_whitespace().map(String::from).collect();
 
-    let edges_map_size: usize = option_env!("LIBAFL_EDGES_MAP_SIZE")
+    let edges_map_size_in_use: usize = option_env!("LIBAFL_EDGES_MAP_SIZE_IN_USE")
         .map_or(Ok(65_536), str::parse)
-        .expect("Could not parse LIBAFL_EDGES_MAP_SIZE");
-    cxxflags.push(format!("-DEDGES_MAP_SIZE={edges_map_size}"));
+        .expect("Could not parse LIBAFL_EDGES_MAP_SIZE_IN_USE");
+    let edges_map_size_max: usize = option_env!("LIBAFL_EDGES_MAP_SIZE_MAX")
+        .map_or(Ok(2_621_440), str::parse)
+        .expect("Could not parse LIBAFL_EDGES_MAP_SIZE_IN_USE");
+    cxxflags.push(format!("-DEDGES_MAP_SIZE_IN_USE={edges_map_size_in_use}"));
 
     let acc_map_size: usize = option_env!("LIBAFL_ACCOUNTING_MAP_SIZE")
         .map_or(Ok(65_536), str::parse)
@@ -344,7 +347,9 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         pub const CLANGXX_PATH: &str = {clangcpp:?};
 
         /// The default size of the edges map the fuzzer uses
-        pub const EDGES_MAP_SIZE: usize = {edges_map_size};
+        pub const EDGES_MAP_SIZE_IN_USE: usize = {edges_map_size_in_use};
+        /// The real allocated size of the edges map
+        pub const EDGES_MAP_SIZE_MAX: usize = {edges_map_size_max};
 
         /// The size of the accounting maps
         pub const ACCOUNTING_MAP_SIZE: usize = {acc_map_size};
