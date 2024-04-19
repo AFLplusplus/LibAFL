@@ -5,11 +5,11 @@ use alloc::string::String;
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl::{mutators::Tokens, Error};
 
-use crate::{ACCOUNTING_MAP_SIZE, DDG_MAP_SIZE, EDGES_MAP_SIZE_IN_USE, EDGES_MAP_SIZE_MAX};
+use crate::{ACCOUNTING_MAP_SIZE, DDG_MAP_SIZE, EDGES_MAP_SIZE};
 
 /// The map for edges.
 #[no_mangle]
-pub static mut __afl_area_ptr_local: [u8; EDGES_MAP_SIZE_MAX] = [0; EDGES_MAP_SIZE_MAX];
+pub static mut __afl_area_ptr_local: [u8; EDGES_MAP_SIZE] = [0; EDGES_MAP_SIZE];
 pub use __afl_area_ptr_local as EDGES_MAP;
 
 /// The map for data dependency
@@ -62,7 +62,7 @@ pub fn autotokens() -> Result<Tokens, Error> {
 
 /// The size of the map for edges.
 #[no_mangle]
-pub static mut __afl_map_size: usize = EDGES_MAP_SIZE_IN_USE;
+pub static mut __afl_map_size: usize = EDGES_MAP_SIZE;
 pub use __afl_map_size as EDGES_MAP_PTR_NUM;
 use libafl::observers::StdMapObserver;
 use libafl_bolts::ownedref::OwnedMutSlice;
