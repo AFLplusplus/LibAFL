@@ -587,18 +587,22 @@ where
             .named_metadata_map_mut()
             .get_mut::<MapFeedbackMetadata<u8>>(&self.name)
             .unwrap();
-        let size = observer.usable_count();
+        let total_size = observer.usable_count();
         let len = observer.len();
         if map_state.history_map.len() < len {
             map_state.history_map.resize(len, u8::default());
         }
 
-        debug_assert!(len >= size);
+        debug_assert!(len >= total_size);
 
         let mut offset = 0;
         for map in observer.as_slice_iter() {
             let map = map.as_slice();
             let history_map = &map_state.history_map.as_slice()[offset..];
+
+            // if total_size_remaining is zero, we do not check this, since in most applications
+            // this is guaranteed to be the case
+            let size = core::cmp::min(total_size.saturating_sub(offset), map.len());
 
             // Non vector implementation for reference
             /*for (i, history) in history_map.iter_mut().enumerate() {
@@ -669,7 +673,7 @@ where
                     }
                 }
             }
-            offset += map.len();
+            offset += size;
         }
 
         Ok(interesting)
