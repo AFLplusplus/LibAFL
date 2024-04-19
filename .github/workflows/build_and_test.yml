@@ -92,26 +92,9 @@ jobs:
     runs-on: ubuntu-22.04
     needs: ubuntu
     steps:
-      - name: Remove Dotnet & Haskell
-        run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-      - name: Remove existing clang and LLVM
-        run: sudo apt purge llvm* clang* lld* lldb* opt*
-      - name: Install and cache deps
-        run: sudo apt update && sudo apt install ninja-build shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
-      - name: Add nightly rustfmt and clippy
-        run: rustup toolchain install nightly --component rustfmt --component clippy --component miri --allow-downgrade
       - uses: actions/checkout@v3
+      - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
-        with: { shared-key: "ubuntu" }
-      - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v1
-        with:
-          directory: ${{ runner.temp }}/llvm
-          version: 17
       # ---- doc check ----
       - name: Build Docs
         run: RUSTFLAGS="--cfg docsrs" cargo +nightly doc --all-features --no-deps
@@ -120,26 +103,9 @@ jobs:
     runs-on: ubuntu-22.04
     needs: ubuntu
     steps:
-      - name: Remove Dotnet & Haskell
-        run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-      - name: Remove existing clang and LLVM
-        run: sudo apt purge llvm* clang* lld* lldb* opt*
-      - name: Install and cache deps
-        run: sudo apt update && sudo apt install ninja-build shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
-      - name: Add nightly rustfmt and clippy
-        run: rustup toolchain install nightly --component rustfmt --component clippy --component miri --allow-downgrade
       - uses: actions/checkout@v3
+      - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
-        with: { shared-key: "ubuntu" }
-      - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v1
-        with:
-          directory: ${{ runner.temp }}/llvm
-          version: 17
       # ---- doc check ----
       - name: Test Docs
         run: RUSTFLAGS="--cfg docsrs" cargo +nightly test --doc --all-features
@@ -148,26 +114,9 @@ jobs:
     runs-on: ubuntu-22.04
     needs: ubuntu
     steps:
-      - name: Remove Dotnet & Haskell
-        run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-      - name: Remove existing clang and LLVM
-        run: sudo apt purge llvm* clang* lld* lldb* opt*
-      - name: Install and cache deps
-        run: sudo apt update && sudo apt install ninja-build shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
-      - name: Add nightly rustfmt and clippy
-        run: rustup toolchain install nightly --component rustfmt --component clippy --component miri --allow-downgrade
       - uses: actions/checkout@v3
+      - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
-        with: { shared-key: "ubuntu" }
-      - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v1
-        with:
-          directory: ${{ runner.temp }}/llvm
-          version: 17
       # --- miri undefined behavior test --
       - name: Run miri tests
         run: RUST_BACKTRACE=1 MIRIFLAGS="-Zmiri-disable-isolation" cargo +nightly miri test
@@ -244,7 +193,7 @@ jobs:
     needs: ubuntu
     steps:
       - uses: actions/checkout@v3
-      - uses: ./.github/workflows/fuzzer-check-prepare
+      - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
       # ---- build and feature check ----
@@ -258,7 +207,7 @@ jobs:
     needs: ubuntu
     strategy:
       matrix:
-        instance_idx: [ "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24" ]
+        instance_idx: [ "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23" ]
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/workflows/fuzzer-check-prepare
