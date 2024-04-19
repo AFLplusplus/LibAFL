@@ -25,7 +25,7 @@ use libafl_bolts::{
     tuples::{tuple_list, MatchName, Merge},
     AsMutSlice, Truncate,
 };
-use libafl_targets::{EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE};
+use libafl_targets::{EDGES_MAP_PTR, EDGES_MAP_SIZE};
 use nix::sys::signal::Signal;
 
 /// The commandline args this fuzzer accepts
@@ -86,7 +86,7 @@ struct Opt {
 
 #[allow(clippy::similar_names)]
 pub fn main() {
-    const MAP_SIZE: usize = EDGES_MAP_SIZE_IN_USE; //65536;
+    const MAP_SIZE: usize = EDGES_MAP_SIZE; //65536;
     let opt = Opt::parse();
 
     let corpus_dirs: Vec<PathBuf> = [opt.in_dir].to_vec();
@@ -99,7 +99,8 @@ pub fn main() {
     // let the forkserver know the shmid
     shmem.write_to_env("__AFL_SHM_ID").unwrap();
     let shmem_buf = shmem.as_mut_slice();
-    unsafe { EDGES_MAP_PTR = shmem_buf.as_mut_ptr() };
+    // the next line is not needed
+    // unsafe { EDGES_MAP_PTR = shmem_buf.as_mut_ptr() };
 
     // Create an observation channel using the signals map
     let edges_observer = unsafe {
