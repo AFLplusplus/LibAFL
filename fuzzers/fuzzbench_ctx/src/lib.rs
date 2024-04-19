@@ -54,7 +54,8 @@ use libafl_bolts::{
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl_targets::autotokens;
 use libafl_targets::{
-    edges_map_mut_ptr, libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver, CtxHook, EDGES_MAP_SIZE
+    edges_map_mut_ptr, libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver, CtxHook,
+    EDGES_MAP_SIZE,
 };
 #[cfg(unix)]
 use nix::unistd::dup;
