@@ -19,7 +19,7 @@ members = [
     "utils/build_and_test_fuzzers",
     "utils/deexit",
     "utils/libafl_benches",
-    "utils/gramatron/construct_automata", "fuzzers/cargo_fuzz",
+    "utils/gramatron/construct_automata",
 ]
 default-members = [
     "libafl",
@@ -31,8 +31,6 @@ default-members = [
 exclude = [
     "bindings",
     "fuzzers",
-    "fuzzers/cargo_fuzz",
-    "fuzzers/cargo_fuzz/fuzz",
     "libafl_qemu/libafl_qemu_build",
     "libafl_qemu/libafl_qemu_sys",
     "utils/noaslr",
