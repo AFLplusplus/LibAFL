@@ -248,7 +248,7 @@ jobs:
         instance_idx: [ "0", "1", "2", "3", "4", "5", "6", "7" ]
     steps:
       - uses: actions/checkout@v3
-      - uses: ./.github/workflows/fuzzer-tester-prepare
+      - uses: ./.github/workflows/fuzzer-check-prepare
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
       # ---- build and feature check ----
