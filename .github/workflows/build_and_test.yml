@@ -188,7 +188,7 @@ jobs:
     # Fix me plz
     # - name: Test Build libafl_libfuzzer with embed
     #  run: cargo +nightly test --features=embed-runtime --manifest-path libafl_libfuzzer/Cargo.toml
-  ubuntu-check:
+  ubuntu-check-nightly:
     runs-on: ubuntu-22.04
     needs: ubuntu
     steps:
