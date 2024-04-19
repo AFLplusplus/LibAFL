@@ -116,8 +116,8 @@ jobs:
       - name: Build Docs
         run: RUSTFLAGS="--cfg docsrs" cargo +nightly doc --all-features --no-deps
 
-    ubuntu-doc-test:
-        runs-on: ubuntu-22.04
+  ubuntu-doc-test:
+    runs-on: ubuntu-22.04
     needs: ubuntu
     steps:
       - name: Remove Dotnet & Haskell
