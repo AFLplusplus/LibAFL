@@ -117,6 +117,8 @@ jobs:
       - uses: actions/checkout@v3
       - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
+      - name: Add nightly rustfmt and clippy
+        run: rustup toolchain install nightly --component miri --allow-downgrade
       # --- miri undefined behavior test --
       - name: Run miri tests
         run: RUST_BACKTRACE=1 MIRIFLAGS="-Zmiri-disable-isolation" cargo +nightly miri test
@@ -210,7 +212,7 @@ jobs:
         instance_idx: [ "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23" ]
     steps:
       - uses: actions/checkout@v3
-      - uses: ./.github/workflows/fuzzer-check-prepare
+      - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
       # ---- build and feature check ----
