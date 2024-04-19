@@ -1,5 +1,5 @@
 [package]
-name = "cargo_fuzz"
+name = "cargo_fuzz_test"
 edition = "2021"
 version = "0.0.0"
 description = "test"
