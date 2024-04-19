@@ -747,7 +747,7 @@ pub trait AsIterMut<'it> {
 }
 
 /// Create an `Iterator` that copies elements from a shared reference
-pub trait AsCopyIter<'it> {
+pub trait AsIterCopied<'it> {
     /// The item type
     type Item: 'it;
     /// The iterator type
@@ -757,7 +757,7 @@ pub trait AsCopyIter<'it> {
     fn as_copy_iter(&'it self) -> Self::IntoIter;
 }
 
-impl<'it, T> AsCopyIter<'it> for T
+impl<'it, T> AsIterCopied<'it> for T
 where
     T: AsIter<'it>,
     <T as AsIter<'it>>::Item: Copy,

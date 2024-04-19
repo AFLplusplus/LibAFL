@@ -12,7 +12,7 @@ use core::{
     ops::{BitAnd, BitOr},
 };
 
-use libafl_bolts::{AsCopyIter, AsMutSlice, AsSlice, HasRefCnt, Named};
+use libafl_bolts::{AsIterCopied, AsMutSlice, AsSlice, HasRefCnt, Named};
 use num_traits::PrimInt;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -407,7 +407,7 @@ where
 impl<C, N, O, R, S, T> Feedback<S> for MapFeedback<C, N, O, R, S, T>
 where
     N: IsNovel<T>,
-    O: MapObserver<Entry = T> + for<'it> AsCopyIter<'it, Item = T>,
+    O: MapObserver<Entry = T> + for<'it> AsIterCopied<'it, Item = T>,
     R: Reducer<T>,
     S: State + HasNamedMetadata,
     T: Default + Copy + Serialize + for<'de> Deserialize<'de> + PartialEq + Debug + 'static,
@@ -550,7 +550,7 @@ where
 impl<C, O, S> Feedback<S> for MapFeedback<C, DifferentIsNovel, O, MaxReducer, S, u8>
 where
     O: MapObserver<Entry = u8> + AsSlice<Entry = u8>,
-    for<'it> O: AsCopyIter<'it, Item = u8>,
+    for<'it> O: AsIterCopied<'it, Item = u8>,
     S: State + HasNamedMetadata,
     C: CanTrack + AsRef<O>,
 {
@@ -682,7 +682,7 @@ where
     R: Reducer<T>,
     N: IsNovel<T>,
     O: MapObserver<Entry = T>,
-    for<'it> O: AsCopyIter<'it, Item = T>,
+    for<'it> O: AsIterCopied<'it, Item = T>,
     S: HasNamedMetadata,
 {
     #[inline]
@@ -700,7 +700,7 @@ where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
     O: MapObserver<Entry = T>,
-    for<'it> O: AsCopyIter<'it, Item = T>,
+    for<'it> O: AsIterCopied<'it, Item = T>,
     N: IsNovel<T>,
     S: UsesInput + HasNamedMetadata,
     C: CanTrack + AsRef<O>,
