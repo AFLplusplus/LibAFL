@@ -319,14 +319,15 @@ jobs:
         run: cargo fmt -- --check
 
   fuzzers-preflight:
-    needs: ubuntu
     steps:
       - uses: actions/checkout@v3
       - name: Fuzzer in CI Check
-        run:
+        run: ./scripts/check_tested_fuzzers.sh
 
   fuzzers:
-    needs: fuzzers-preflight
+    needs:
+      - ubuntu
+      - fuzzers-preflight
     strategy:
       matrix:
         os: [ ubuntu-latest ]
