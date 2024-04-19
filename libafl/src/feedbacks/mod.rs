@@ -858,9 +858,6 @@ impl Default for CrashFeedback {
     }
 }
 
-/// A feedback factory for crash feedbacks
-pub type CrashFeedbackFactory = DefaultFeedbackFactory<CrashFeedback>;
-
 impl<S: State, T> FeedbackFactory<CrashFeedback, S, T> for CrashFeedback {
     fn create_feedback(&self, _ctx: &T) -> CrashFeedback {
         CrashFeedback::new()
