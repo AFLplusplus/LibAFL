@@ -257,7 +257,7 @@ jobs:
         # Skipping `python` as it has to be built with the `maturin` tool
         # `agpl`, `nautilus` require nightly
         # `sancov_pcguard_edges` is tested seperatelyc
-        run: python3 ./script/parallellize_cargo_check.py ${{ matrix.instance_idx }}
+        run: python3 ./scripts/parallellize_cargo_check.py ${{ matrix.instance_idx }}
       - name: Check nightly features
         run: cargo +nightly check --features=agpl && cargo +nightly check --features=nautilus
 
