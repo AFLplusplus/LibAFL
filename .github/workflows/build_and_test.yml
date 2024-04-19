@@ -2,9 +2,9 @@ name: build and test
 
 on:
   push:
-    branches: [main, "pr/**"]
+    branches: [ main, "pr/**" ]
   pull_request:
-    branches: [main]
+    branches: [ main ]
   workflow_dispatch:
   merge_group:
 env:
@@ -17,7 +17,7 @@ jobs:
   common:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macOS-latest]
+        os: [ ubuntu-latest, windows-latest, macOS-latest ]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Install mimetype
@@ -70,7 +70,7 @@ jobs:
     continue-on-error: true
     strategy:
       matrix:
-        llvm-version: ["11", "12", "13", "14", "16", "17"]
+        llvm-version: [ "11", "12", "13", "14", "16", "17" ]
     steps:
       - name: Remove Dotnet & Haskell
         run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
@@ -318,12 +318,22 @@ jobs:
       - name: Format Check
         run: cargo fmt -- --check
 
+  fuzzers-preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Fuzzer in CI Check
+        run: ./scripts/check_tested_fuzzers.sh
+
   fuzzers:
-    needs: ubuntu
+    needs:
+      - ubuntu
+      - fuzzers-preflight
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ ubuntu-latest ]
         fuzzer:
+          - ./fuzzers/cargo_fuzz
           - ./fuzzers/fuzzbench_fork_qemu
           - ./fuzzers/libfuzzer_stb_image_sugar
           - ./fuzzers/nyx_libxml2_standalone
