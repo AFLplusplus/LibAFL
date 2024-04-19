@@ -46,11 +46,11 @@ use bindings::{inspect_first, inspect_second};
 
 #[cfg(feature = "multimap")]
 mod multimap {
-    pub use libafl::observers::{HitcountsIterableMapObserver, MultiMapObserver};
+    pub use libafl::observers::{HitcountsMapObserver, MultiMapObserver};
     pub use libafl_bolts::ownedref::OwnedMutSlice;
 }
 #[cfg(feature = "multimap")]
-use multimap::{HitcountsIterableMapObserver, MultiMapObserver, OwnedMutSlice};
+use multimap::{HitcountsMapObserver, MultiMapObserver, OwnedMutSlice};
 
 #[cfg(not(feature = "multimap"))]
 mod slicemap {
@@ -121,7 +121,7 @@ pub fn main() {
         // create a combined map observer, e.g. for calibration
         // we use MultiMapObserver::differential to indicate that we want to use the observer in
         // differential mode
-        let map_observer = HitcountsIterableMapObserver::new(MultiMapObserver::differential(
+        let map_observer = HitcountsMapObserver::new(MultiMapObserver::differential(
             "combined-edges",
             combined_edges,
         ));
