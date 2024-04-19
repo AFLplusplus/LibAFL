@@ -318,8 +318,15 @@ jobs:
       - name: Format Check
         run: cargo fmt -- --check
 
-  fuzzers:
+  fuzzers-preflight:
     needs: ubuntu
+    steps:
+      - uses: actions/checkout@v3
+      - name: Fuzzer in CI Check
+        run:
+
+  fuzzers:
+    needs: fuzzers-preflight
     strategy:
       matrix:
         os: [ ubuntu-latest ]
