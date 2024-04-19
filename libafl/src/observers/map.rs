@@ -2548,6 +2548,34 @@ where
     }
 }
 
+impl<'a, 'it, T, const DIFFERENTIAL: bool> AsSliceIter<'it>
+    for MultiMapObserver<'a, T, DIFFERENTIAL>
+where
+    T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
+    'a: 'it,
+{
+    type Entry = OwnedMutSlice<'a, T>;
+    type IntoIter = Iter<'it, OwnedMutSlice<'a, T>>;
+
+    fn as_slice_iter(&'it self) -> Self::IntoIter {
+        self.maps.iter()
+    }
+}
+
+impl<'a, 'it, T, const DIFFERENTIAL: bool> AsSliceIterMut<'it>
+    for MultiMapObserver<'a, T, DIFFERENTIAL>
+where
+    T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
+    'a: 'it,
+{
+    type Entry = OwnedMutSlice<'a, T>;
+    type IntoIter = IterMut<'it, OwnedMutSlice<'a, T>>;
+
+    fn as_slice_iter_mut(&'it mut self) -> Self::IntoIter {
+        self.maps.iter_mut()
+    }
+}
+
 impl<'a, 'it, T, const DIFFERENTIAL: bool> IntoIterator
     for &'it MultiMapObserver<'a, T, DIFFERENTIAL>
 where

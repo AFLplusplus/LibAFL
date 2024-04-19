@@ -148,7 +148,7 @@ impl CustomMutationStatus {
 }
 
 macro_rules! fuzz_with {
-    ($options:ident, $harness:ident, $operation:expr, $and_then:expr, $edge_maker:expr) => {{
+    ($options:ident, $harness:ident, $operation:expr, $and_then:expr) => {{
         use libafl_bolts::{
                 current_nanos,
                 rands::StdRand,
@@ -168,7 +168,7 @@ macro_rules! fuzz_with {
                 I2SRandReplace, StdScheduledMutator, StringCategoryRandMutator, StringSubcategoryRandMutator,
                 StringCategoryTokenReplaceMutator, StringSubcategoryTokenReplaceMutator, Tokens, tokens_mutations
             },
-            observers::{stacktrace::BacktraceObserver, TimeObserver, CanTrack},
+            observers::{stacktrace::BacktraceObserver, TimeObserver, CanTrack, MultiMapObserver, HitcountsMapObserver},
             schedulers::{
                 IndexesLenTimeMinimizerScheduler, powersched::PowerSchedule, PowerQueueScheduler,
             },
@@ -179,7 +179,7 @@ macro_rules! fuzz_with {
             state::{HasCorpus, StdState},
             StdFuzzer,
         };
-        use libafl_targets::{CmpLogObserver, LLVMCustomMutator, OomFeedback, OomObserver};
+        use libafl_targets::{CmpLogObserver, LLVMCustomMutator, OomFeedback, OomObserver, extra_counters};
         use rand::{thread_rng, RngCore};
         use std::{env::temp_dir, fs::create_dir, path::PathBuf};
 
@@ -191,15 +191,16 @@ macro_rules! fuzz_with {
             observers::{MappedEdgeMapObserver, SizeValueObserver},
         };
 
-        let edge_maker = &$edge_maker;
-
         let closure = |mut state: Option<_>, mut mgr, _cpu_id| {
             let mutator_status = CustomMutationStatus::new();
             let grimoire_metadata = should_use_grimoire(&mut state, &$options, &mutator_status)?;
             let grimoire = grimoire_metadata.should();
 
-            let edges_observer = edge_maker().track_indices().track_novelties();
-            let size_edges_observer = MappedEdgeMapObserver::new(edge_maker(), SizeValueObserver::default());
+            let edges = unsafe { extra_counters() };
+            let edges_observer = HitcountsMapObserver::new(MultiMapObserver::new("edges", edges)).track_indices().track_novelties();
+
+            let edges = unsafe { extra_counters() };
+            let size_edges_observer = MappedEdgeMapObserver::new(MultiMapObserver::new("edges", edges), SizeValueObserver::default());
 
             let keep_observer = LibfuzzerKeepFeedback::new();
             let keep = keep_observer.keep();
@@ -508,32 +509,6 @@ macro_rules! fuzz_with {
 
         #[allow(clippy::redundant_closure_call)]
         $and_then(closure)
-    }};
-
-    ($options:ident, $harness:ident, $operation:expr, $and_then:expr) => {{
-        use libafl::observers::{
-            HitcountsIterableMapObserver, HitcountsMapObserver, MultiMapObserver, StdMapObserver,
-        };
-        use libafl_targets::{COUNTERS_MAPS, extra_counters};
-
-        // Create an observation channel using the coverage map
-        if unsafe { COUNTERS_MAPS.len() } == 1 {
-            fuzz_with!($options, $harness, $operation, $and_then, || {
-                let edges = unsafe { extra_counters() };
-                let edges_observer =
-                    HitcountsMapObserver::new(StdMapObserver::from_mut_slice("edges", edges.into_iter().next().unwrap()));
-                edges_observer
-            })
-        } else if unsafe { COUNTERS_MAPS.len() } > 1 {
-            fuzz_with!($options, $harness, $operation, $and_then, || {
-                let edges = unsafe { extra_counters() };
-                let edges_observer =
-                    HitcountsIterableMapObserver::new(MultiMapObserver::new("edges", edges));
-                edges_observer
-            })
-        } else {
-            panic!("No maps available; cannot fuzz!")
-        }
     }};
 }
 
