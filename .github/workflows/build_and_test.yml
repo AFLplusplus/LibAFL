@@ -319,6 +319,7 @@ jobs:
         run: cargo fmt -- --check
 
   fuzzers-preflight:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - name: Fuzzer in CI Check
