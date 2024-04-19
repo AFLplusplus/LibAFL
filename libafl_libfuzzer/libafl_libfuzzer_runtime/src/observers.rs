@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     fmt::Debug,
     hash::{Hash, Hasher},
 };
@@ -37,7 +38,7 @@ pub trait ValueObserver: for<'de> Deserialize<'de> + Serialize + Debug + Named {
 #[derive(Deserialize, Serialize, Debug)]
 pub struct MappedEdgeMapObserver<M, O> {
     inner: M,
-    name: String,
+    name: Cow<'static, str>,
     value_observer: O,
 }
 
@@ -48,7 +49,7 @@ where
 {
     pub fn new(obs: M, value_obs: O) -> Self {
         Self {
-            name: format!("{}_{}", value_obs.name(), obs.name()),
+            name: Cow::from(format!("{}_{}", value_obs.name(), obs.name())),
             inner: obs,
             value_observer: value_obs,
         }
@@ -77,7 +78,7 @@ where
 }
 
 impl<M, O> Named for MappedEdgeMapObserver<M, O> {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
@@ -241,8 +242,9 @@ impl ValueObserver for SizeValueObserver {
 }
 
 impl Named for SizeValueObserver {
-    fn name(&self) -> &str {
-        "size"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("size");
+        &NAME
     }
 }
 
@@ -285,7 +287,7 @@ impl ValueObserver for TimeValueObserver {
 }
 
 impl Named for TimeValueObserver {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         self.time_obs.name()
     }
 }
@@ -346,8 +348,9 @@ impl ValueObserver for SizeTimeValueObserver {
 }
 
 impl Named for SizeTimeValueObserver {
-    fn name(&self) -> &str {
-        "size_time"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("size_time");
+        &NAME
     }
 }
 

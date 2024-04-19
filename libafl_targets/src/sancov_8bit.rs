@@ -59,10 +59,7 @@ pub use self::observers::{counters_maps_observer, CountersMultiMapObserver};
 
 #[cfg(feature = "observers")]
 mod observers {
-    use alloc::{
-        borrow::Cow,
-        vec::Vec,
-    };
+    use alloc::{borrow::Cow, vec::Vec};
     use core::{
         fmt::Debug,
         hash::{BuildHasher, Hasher},
