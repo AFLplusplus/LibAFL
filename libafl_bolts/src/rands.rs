@@ -13,6 +13,29 @@ use crate::current_nanos;
 /// Not cryptographically secure (which is not what you want during fuzzing ;) )
 pub type StdRand = RomuDuoJrRand;
 
+/// Choose an item at random from the given iterator, sampling uniformly.
+///
+/// Note: the runtime cost is bound by the iterator's [`nth`][`Iterator::nth`] implementation
+///  * For `Vec`, slice, array, this is O(1)
+///  * For `HashMap`, `HashSet`, this is O(n)
+pub fn choose<I>(from: I, rand: u64) -> I::Item
+where
+    I: IntoIterator,
+    I::IntoIter: ExactSizeIterator,
+{
+    // create iterator
+    let mut iter = from.into_iter();
+
+    // make sure there is something to choose from
+    debug_assert!(iter.len() > 0, "choosing from an empty iterator");
+
+    // pick a random, valid index
+    let index = fast_bound(rand, iter.len() as u64) as usize;
+
+    // return the item chosen
+    iter.nth(index).unwrap()
+}
+
 /// Faster and almost unbiased alternative to `rand % n`.
 ///
 /// For N-bit bound, probability of getting a biased value is 1/2^(64-N).
@@ -47,27 +70,13 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
         lower_bound_incl + self.below(upper_bound_incl - lower_bound_incl + 1)
     }
 
-    /// Choose an item at random from the given iterator, sampling uniformly.
-    ///
-    /// Note: the runtime cost is bound by the iterator's [`nth`][`Iterator::nth`] implementation
-    ///  * For `Vec`, slice, array, this is O(1)
-    ///  * For `HashMap`, `HashSet`, this is O(n)
-    fn choose<I, E, T>(&mut self, from: I) -> T
+    /// Convenient variant of [`choose`].
+    fn choose<I>(&mut self, from: I) -> I::Item
     where
-        I: IntoIterator<Item = T, IntoIter = E>,
-        E: ExactSizeIterator + Iterator<Item = T>,
+        I: IntoIterator,
+        I::IntoIter: ExactSizeIterator,
     {
-        // create iterator
-        let mut iter = from.into_iter();
-
-        // make sure there is something to choose from
-        debug_assert!(iter.len() > 0, "choosing from an empty iterator");
-
-        // pick a random, valid index
-        let index = self.below(iter.len() as u64) as usize;
-
-        // return the item chosen
-        iter.nth(index).unwrap()
+        choose(from, self.next())
     }
 }
 

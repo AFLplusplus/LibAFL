@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 use core::cmp::{max, min};
 
 use libafl_bolts::{
-    rands::{fast_bound, Rand},
+    rands::{choose, fast_bound, Rand},
     Named,
 };
 
@@ -34,8 +34,8 @@ where
 
     if state.rand_mut().below(100) > CHOOSE_SUBINPUT_PROB {
         if state.rand_mut().below(100) < 50 {
-            let rand1 = state.rand_mut().next() as usize;
-            let rand2 = state.rand_mut().next() as usize;
+            let rand1 = state.rand_mut().next();
+            let rand2 = state.rand_mut().next();
 
             let other_testcase = state.corpus().get(idx)?.borrow();
             if let Some(other) = other_testcase
@@ -51,8 +51,8 @@ where
                 {
                     gap_indices.push(i);
                 }
-                let min_idx = gap_indices[rand1 % gap_indices.len()];
-                let max_idx = gap_indices[rand2 % gap_indices.len()];
+                let min_idx = *choose(&*gap_indices, rand1);
+                let max_idx = *choose(&*gap_indices, rand2);
                 let (mut min_idx, max_idx) = (min(min_idx, max_idx), max(min_idx, max_idx));
 
                 gap_indices.clear();
@@ -69,11 +69,11 @@ where
             }
         }
 
-        let rand1 = state.rand_mut().next() as usize;
+        let rand1 = state.rand_mut().next();
 
         if let Some(meta) = state.metadata_map().get::<Tokens>() {
             if !meta.tokens().is_empty() {
-                let tok = &meta.tokens()[rand1 % meta.tokens().len()];
+                let tok = choose(meta.tokens(), rand1);
                 if items.last() != Some(&GeneralizedItem::Gap) {
                     items.push(GeneralizedItem::Gap);
                 }
