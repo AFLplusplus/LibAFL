@@ -20,7 +20,7 @@ use crate::{
 
 const RECURSIVE_REPLACEMENT_DEPTH: [usize; 6] = [2, 4, 8, 16, 32, 64];
 const MAX_RECURSIVE_REPLACEMENT_LEN: usize = 64 << 10;
-const CHOOSE_SUBINPUT_PROB: u64 = 50;
+const CHOOSE_SUBINPUT_PROB: f64 = 0.5;
 
 fn extend_with_random_generalized<S>(
     state: &mut S,
@@ -32,8 +32,8 @@ where
 {
     let idx = random_corpus_id!(state.corpus(), state.rand_mut());
 
-    if state.rand_mut().below(100) > CHOOSE_SUBINPUT_PROB {
-        if state.rand_mut().below(100) < 50 {
+    if state.rand_mut().coinflip(CHOOSE_SUBINPUT_PROB) {
+        if state.rand_mut().coinflip(0.5) {
             let rand1 = state.rand_mut().next();
             let rand2 = state.rand_mut().next();
 
@@ -256,7 +256,7 @@ where
             token_replace = state.rand_mut().below(tokens_len as u64) as usize;
         }
 
-        let stop_at_first = state.rand_mut().below(100) > 50;
+        let stop_at_first = state.rand_mut().coinflip(0.5);
         let rand_idx = state.rand_mut().next();
 
         let meta = state.metadata_map().get::<Tokens>().unwrap();

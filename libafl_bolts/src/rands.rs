@@ -69,6 +69,12 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
         u as f64 * MAX_DIV
     }
 
+    /// Returns true with specified probability
+    fn coinflip(&mut self, success_prob: f64) -> bool {
+        debug_assert!((0.0..=1.0).contains(&success_prob));
+        self.next_float() < success_prob
+    }
+
     /// Gets a value below the given 64 bit val (exclusive)
     fn below(&mut self, upper_bound_excl: u64) -> u64 {
         fast_bound(self.next(), upper_bound_excl)
