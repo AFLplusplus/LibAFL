@@ -20,7 +20,7 @@ qemu-img create -f qcow2 ${TARGET_DIR}/dummy.qcow2 32M
 '''
 
 [tasks.target]
-dependencies = ["target_dir", "build_fuzzer"]
+dependencies = ["target_dir"]
 condition = { env_set = [ "TARGET_DEFINE" ] }
 command = "arm-none-eabi-gcc"
 args = [
@@ -63,7 +63,7 @@ args = [
     "-drive", "if=none,format=qcow2,file=${TARGET_DIR}/dummy.qcow2",
     "-S",
 ]
-dependencies = ["build_fuzzer", "target"]
+dependencies = ["target"]
 
 [tasks.test_fuzzer]
 condition = { env_set = [ "FEATURE" ] }

@@ -18,6 +18,12 @@ sudo apt update
 sudo apt -y install qemu-utils gcc-arm-none-eabi
 ```
 
+## Build
+
+```bash
+cargo make build
+```
+
 ## Run
 
 ```bash

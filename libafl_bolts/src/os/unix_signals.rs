@@ -263,7 +263,7 @@ use crate::Error;
 
 extern "C" {
     /// The `libc` `getcontext`
-    /// For some reason, it's not available on MacOS.
+    /// For some reason, it's not available on `MacOS`.
     ///
     fn getcontext(ucp: *mut ucontext_t) -> c_int;
 }

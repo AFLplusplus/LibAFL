@@ -290,7 +290,7 @@ pub fn build(
     let cpp_compiler = cc::Build::new().cpp(true).get_compiler();
 
     let libafl_qemu_dir = if let Some(qemu_dir) = libafl_qemu_dir.as_ref() {
-        if let Some(_) = &libafl_qemu_clone_dir {
+        if libafl_qemu_clone_dir.is_some() {
             println!("cargo:warning=LIBAFL_QEMU_DIR and LIBAFL_QEMU_CLONE_DIR are both set. LIBAFL_QEMU_DIR will be considered in priority");
         }
 
