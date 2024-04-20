@@ -7,8 +7,6 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 #[cfg(feature = "std")]
 use crate::current_nanos;
-#[cfg(any(feature = "xxh3", feature = "alloc"))]
-use crate::hash_std;
 
 /// The standard rand implementation for `LibAFL`.
 /// It is usually the right choice, with very good speed and a reasonable randomness.
@@ -96,9 +94,17 @@ macro_rules! default_rand {
     };
 }
 
+// https://prng.di.unimi.it/splitmix64.c
+fn splitmix64(x: &mut u64) -> u64 {
+    *x = x.wrapping_add(0x9e3779b97f4a7c15);
+    let mut z = *x;
+    z = (z ^ (z >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94d049bb133111eb);
+    z ^ (z >> 31)
+}
+
 // Derive Default by calling `new(DEFAULT_SEED)` on each of the following Rand types.
-#[cfg(any(feature = "xxh3", feature = "alloc"))]
-default_rand!(Xoshiro256StarRand);
+default_rand!(Xoshiro256PlusPlusRand);
 default_rand!(XorShift64Rand);
 default_rand!(Lehmer64Rand);
 default_rand!(RomuTrioRand);
@@ -145,112 +151,107 @@ macro_rules! impl_random {
     };
 }
 
-#[cfg(any(feature = "xxh3", feature = "alloc"))]
-impl_random!(Xoshiro256StarRand);
+impl_random!(Xoshiro256PlusPlusRand);
 impl_random!(XorShift64Rand);
 impl_random!(Lehmer64Rand);
 impl_random!(RomuTrioRand);
 impl_random!(RomuDuoJrRand);
 
-/// XXH3 Based, hopefully speedy, rnd implementation
+/// xoshiro256++ PRNG: <https://prng.di.unimi.it/>
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
-pub struct Xoshiro256StarRand {
-    rand_seed: [u64; 4],
+pub struct Xoshiro256PlusPlusRand {
+    s: [u64; 4],
 }
 
-// TODO: re-enable ahash works without alloc
-#[cfg(any(feature = "xxh3", feature = "alloc"))]
-impl Rand for Xoshiro256StarRand {
-    #[allow(clippy::unreadable_literal)]
-    fn set_seed(&mut self, seed: u64) {
-        self.rand_seed[0] = hash_std(&seed.to_be_bytes());
-        self.rand_seed[1] = self.rand_seed[0] ^ 0x1234567890abcdef;
-        self.rand_seed[2] = self.rand_seed[0] & 0x0123456789abcdef;
-        self.rand_seed[3] = self.rand_seed[0] | 0x01abcde43f567908;
+impl Rand for Xoshiro256PlusPlusRand {
+    fn set_seed(&mut self, mut seed: u64) {
+        self.s[0] = splitmix64(&mut seed);
+        self.s[1] = splitmix64(&mut seed);
+        self.s[2] = splitmix64(&mut seed);
+        self.s[3] = splitmix64(&mut seed);
     }
 
     #[inline]
     fn next(&mut self) -> u64 {
-        let ret: u64 = self.rand_seed[0]
-            .wrapping_add(self.rand_seed[3])
+        let ret: u64 = self.s[0]
+            .wrapping_add(self.s[3])
             .rotate_left(23)
-            .wrapping_add(self.rand_seed[0]);
-        let t: u64 = self.rand_seed[1] << 17;
+            .wrapping_add(self.s[0]);
+        let t: u64 = self.s[1] << 17;
 
-        self.rand_seed[2] ^= self.rand_seed[0];
-        self.rand_seed[3] ^= self.rand_seed[1];
-        self.rand_seed[1] ^= self.rand_seed[2];
-        self.rand_seed[0] ^= self.rand_seed[3];
+        self.s[2] ^= self.s[0];
+        self.s[3] ^= self.s[1];
+        self.s[1] ^= self.s[2];
+        self.s[0] ^= self.s[3];
 
-        self.rand_seed[2] ^= t;
+        self.s[2] ^= t;
 
-        self.rand_seed[3] = self.rand_seed[3].rotate_left(45);
+        self.s[3] = self.s[3].rotate_left(45);
 
         ret
     }
 }
 
-#[cfg(any(feature = "xxh3", feature = "alloc"))]
-impl Xoshiro256StarRand {
-    /// Creates a new Xoshiro rand with the given seed
+impl Xoshiro256PlusPlusRand {
+    /// Creates a new xoshiro256++ rand with the given seed
     #[must_use]
     pub fn with_seed(seed: u64) -> Self {
-        let mut rand = Self { rand_seed: [0; 4] };
-        rand.set_seed(seed); // TODO: Proper random seed?
+        let mut rand = Self { s: [0; 4] };
+        rand.set_seed(seed);
         rand
     }
 }
 
-/// XXH3 Based, hopefully speedy, rnd implementation
+/// Xorshift64 PRNG
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct XorShift64Rand {
-    rand_seed: u64,
+    s: u64,
 }
 
 impl Rand for XorShift64Rand {
-    #[allow(clippy::unreadable_literal)]
-    fn set_seed(&mut self, seed: u64) {
-        self.rand_seed = seed ^ 0x1234567890abcdef;
+    fn set_seed(&mut self, mut seed: u64) {
+        self.s = splitmix64(&mut seed) | 1;
     }
 
     #[inline]
     fn next(&mut self) -> u64 {
-        let mut x = self.rand_seed;
+        let mut x = self.s;
         x ^= x << 13;
         x ^= x >> 7;
         x ^= x << 17;
-        self.rand_seed = x;
+        self.s = x;
         x
     }
 }
 
 impl XorShift64Rand {
-    /// Creates a new Xoshiro rand with the given seed
+    /// Creates a new xorshift64 rand with the given seed
     #[must_use]
     pub fn with_seed(seed: u64) -> Self {
-        let mut ret: Self = Self { rand_seed: 0 };
-        ret.set_seed(seed); // TODO: Proper random seed?
+        let mut ret: Self = Self { s: 0 };
+        ret.set_seed(seed);
         ret
     }
 }
 
-/// XXH3 Based, hopefully speedy, rnd implementation
+/// Lehmer64 PRNG
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct Lehmer64Rand {
-    rand_seed: u128,
+    s: u128,
 }
 
 impl Rand for Lehmer64Rand {
-    #[allow(clippy::unreadable_literal)]
-    fn set_seed(&mut self, seed: u64) {
-        self.rand_seed = u128::from(seed) ^ 0x1234567890abcdef;
+    fn set_seed(&mut self, mut seed: u64) {
+        let hi = splitmix64(&mut seed);
+        let lo = splitmix64(&mut seed) | 1;
+        self.s = u128::from(hi) << 64 | u128::from(lo);
     }
 
     #[inline]
     #[allow(clippy::unreadable_literal)]
     fn next(&mut self) -> u64 {
-        self.rand_seed *= 0xda942042e4dd58b5;
-        (self.rand_seed >> 64) as u64
+        self.s *= 0xda942042e4dd58b5;
+        (self.s >> 64) as u64
     }
 }
 
@@ -258,7 +259,7 @@ impl Lehmer64Rand {
     /// Creates a new Lehmer rand with the given seed
     #[must_use]
     pub fn with_seed(seed: u64) -> Self {
-        let mut ret: Self = Self { rand_seed: 0 };
+        let mut ret: Self = Self { s: 0 };
         ret.set_seed(seed);
         ret
     }
@@ -288,10 +289,10 @@ impl RomuTrioRand {
 }
 
 impl Rand for RomuTrioRand {
-    fn set_seed(&mut self, seed: u64) {
-        self.x_state = seed ^ 0x12345;
-        self.y_state = seed ^ 0x6789A;
-        self.z_state = seed ^ 0xBCDEF;
+    fn set_seed(&mut self, mut seed: u64) {
+        self.x_state = splitmix64(&mut seed);
+        self.y_state = splitmix64(&mut seed);
+        self.z_state = splitmix64(&mut seed);
     }
 
     #[inline]
@@ -328,9 +329,9 @@ impl RomuDuoJrRand {
 }
 
 impl Rand for RomuDuoJrRand {
-    fn set_seed(&mut self, seed: u64) {
-        self.x_state = seed ^ 0x12345;
-        self.y_state = seed ^ 0x6789A;
+    fn set_seed(&mut self, mut seed: u64) {
+        self.x_state = splitmix64(&mut seed);
+        self.y_state = splitmix64(&mut seed);
     }
 
     #[inline]
@@ -351,8 +352,8 @@ pub struct XkcdRand {
 }
 
 impl Rand for XkcdRand {
-    fn set_seed(&mut self, val: u64) {
-        self.val = val;
+    fn set_seed(&mut self, mut seed: u64) {
+        self.val = splitmix64(&mut seed);
     }
 
     fn next(&mut self) -> u64 {
@@ -363,26 +364,25 @@ impl Rand for XkcdRand {
 /// A test rng that will return the same value (chose by fair dice roll) for testing.
 impl XkcdRand {
     /// Creates a new [`XkcdRand`] with the rand of 4, [chosen by fair dice roll, guaranteed to be random](https://xkcd.com/221/).
-    /// Will always return this seed.
     #[must_use]
     pub fn new() -> Self {
-        Self::with_seed(4)
+        Self { val: 4 }
     }
 
-    /// Creates a new [`XkcdRand`] with the given seed. Will always return this seed.
+    /// Creates a new [`XkcdRand`] with the given seed.
     #[must_use]
     pub fn with_seed(seed: u64) -> Self {
-        Self { val: seed }
+        let mut rand = XkcdRand { val: 0 };
+        rand.set_seed(seed);
+        rand
     }
 }
 
 #[cfg(test)]
 mod tests {
-    //use xxhash_rust::xxh3::xxh3_64_with_seed;
-
-    #[cfg(any(feature = "xxh3", feature = "alloc"))]
-    use crate::rands::Xoshiro256StarRand;
-    use crate::rands::{Rand, RomuDuoJrRand, RomuTrioRand, StdRand, XorShift64Rand};
+    use crate::rands::{
+        Rand, RomuDuoJrRand, RomuTrioRand, StdRand, XorShift64Rand, Xoshiro256PlusPlusRand,
+    };
 
     fn test_single_rand<R: Rand>(rand: &mut R) {
         assert_ne!(rand.next(), rand.next());
@@ -399,8 +399,7 @@ mod tests {
         test_single_rand(&mut RomuTrioRand::with_seed(0));
         test_single_rand(&mut RomuDuoJrRand::with_seed(0));
         test_single_rand(&mut XorShift64Rand::with_seed(0));
-        #[cfg(any(feature = "xxh3", feature = "alloc"))]
-        test_single_rand(&mut Xoshiro256StarRand::with_seed(0));
+        test_single_rand(&mut Xoshiro256PlusPlusRand::with_seed(0));
     }
 
     #[cfg(feature = "std")]

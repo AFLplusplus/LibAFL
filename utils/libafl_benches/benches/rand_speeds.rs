@@ -2,12 +2,12 @@
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use libafl_bolts::rands::{
-    Lehmer64Rand, Rand, RomuDuoJrRand, RomuTrioRand, XorShift64Rand, Xoshiro256StarRand,
+    Lehmer64Rand, Rand, RomuDuoJrRand, RomuTrioRand, XorShift64Rand, Xoshiro256PlusPlusRand,
 };
 
 fn criterion_benchmark(c: &mut Criterion) {
     let mut xorshift = XorShift64Rand::with_seed(1);
-    let mut xoshiro = Xoshiro256StarRand::with_seed(1);
+    let mut xoshiro = Xoshiro256PlusPlusRand::with_seed(1);
     let mut romu = RomuDuoJrRand::with_seed(1);
     let mut lehmer = Lehmer64Rand::with_seed(1);
     let mut romu_trio = RomuTrioRand::with_seed(1);
