@@ -70,7 +70,7 @@ jobs:
     continue-on-error: true
     strategy:
       matrix:
-        llvm-version: [ "16", "17", "18" ]
+        llvm-version: [ "16", "17" ] # Add 18 when KyleMayes/install-llvm-action enables it
     steps:
       - name: Remove Dotnet & Haskell
         run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
