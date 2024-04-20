@@ -1,6 +1,8 @@
 [env]
 PROFILE = { value = "release", condition = {env_not_set = ["PROFILE"]} }
 TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${FEATURE}"
+LIBAFL_QEMU_CLONE_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/qemu-libafl-bridge"
+KERNEL = "${TARGET_DIR}/example.elf"
 
 [tasks.target_dir]
 condition = { files_not_exist = [ "${TARGET_DIR}" ] }
@@ -49,7 +51,6 @@ args = [
 dependencies = ["image"]
 
 [tasks.run_fuzzer]
-env = { "KERNEL" = "${TARGET_DIR}/example.elf" }
 command = "${TARGET_DIR}/${PROFILE}/qemu_systemmode"
 args = [
     "-icount", "shift=auto,align=off,sleep=off",
@@ -71,13 +72,14 @@ script='''
 TMP_DIR=$(mktemp -d)
 
 cargo make build_$FEATURE
+# timeout 15s ${TARGET_DIR}/${PROFILE}/qemu_systemmode | tee $TMP_DIR/fuzz.log 2>&1 || true
 timeout 15s cargo make ${FEATURE} | tee $TMP_DIR/fuzz.log 2>&1 || true
 
 if [ -z "$(grep 'Objective' $TMP_DIR/fuzz.log)" ]; then
-    echo "Fuzzer did not find the objective in $TMP_DIR/fuzz.log"
+    echo "qemu_systemmode ${FEATURE}: Fuzzer did not find the objective in $TMP_DIR/fuzz.log"
     exit 1
 else
-    echo "Objective found."
+    echo "qemu_systemmode ${FEATURE}: Objective found."
 fi
 '''
 
@@ -161,8 +163,7 @@ args = [
 
 [tasks.test]
 clear = true
-run_task = { name = ["build"] }
-# run_task = { name = ["test_classic", "test_breakpoint", "test_sync_exit"] }
+run_task = { name = ["test_classic", "test_breakpoint", "test_sync_exit"] }
 
 [tasks.build]
 clear = true
