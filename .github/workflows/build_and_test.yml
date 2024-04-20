@@ -209,7 +209,7 @@ jobs:
     needs: ubuntu
     strategy:
       matrix:
-        instance_idx: [ "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23" ]
+        instance_idx: [ "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31" ]
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/workflows/ubuntu-prepare
@@ -407,36 +407,45 @@ jobs:
       - name: Build docker
         run: docker build -t libafl .
 
-  windows:
+  windows-frida-libpng:
+    needs:
+      - common
     runs-on: windows-latest
-    steps:
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-      - uses: actions/checkout@v3
-      - uses: Swatinem/rust-cache@v2
-      - name: Windows Build
-        run: cargo build --verbose
-      - name: Build docs
-        run: cargo doc
-      - uses: ilammy/msvc-dev-cmd@v1
-      - name: Set LIBCLANG_PATH
-        run: echo "LIBCLANG_PATH=$((gcm clang).source -replace "clang.exe")" >> $env:GITHUB_ENV
-      - name: install cargo-make
-        run: cargo install --force cargo-make
-      - name: install cxx bridge
-        run: cargo install cxxbridge-cmd
-      - name: Build fuzzers/libfuzzer_stb_image
-        run: cd fuzzers/libfuzzer_stb_image && cargo build --release
-      - name: Build fuzzers/frida_libpng
-        run: cd fuzzers/frida_libpng/ && cargo make test
-      - name: Build fuzzers/frida_gdiplus
-        run: cd fuzzers/frida_gdiplus/ && cargo make test && cargo make test_cmplog
-      - name: Build fuzzers/tinyinst_simple
-        run: cd fuzzers/tinyinst_simple/ && cargo make test
+    - uses: actions/checkout@v3
+    - uses: ./.github/workflows/windows-tester-prepare
+    - name: Build fuzzers/frida_libpng
+      run: cd fuzzers/frida_libpng/ && cargo make test
+
+  windows-frida-libfuzzer-stb-image:
+    needs:
+      - common
+    runs-on: windows-latest
+    - uses: actions/checkout@v3
+    - uses: ./.github/workflows/windows-tester-prepare
+    - name: Build fuzzers/libfuzzer_stb_image
+      run: cd fuzzers/libfuzzer_stb_image && cargo build --release
+
+  windows-frida-gdiplus:
+    needs:
+      - common
+    runs-on: windows-latest
+    - uses: actions/checkout@v3
+    - uses: ./.github/workflows/windows-tester-prepare
+    - name: Build fuzzers/frida_gdiplus
+      run: cd fuzzers/frida_gdiplus/ && cargo make test && cargo make test_cmplog
+
+  windows-tinyinst-simple:
+    needs:
+      - common
+    runs-on: windows-latest
+    - uses: actions/checkout@v3
+    - uses: ./.github/workflows/windows-tester-prepare
+    - name: Build fuzzers/tinyinst_simple
+      run: cd fuzzers/tinyinst_simple/ && cargo make test
 
   windows-clippy:
+    needs:
+      - common
     runs-on: windows-latest
     steps:
       - uses: actions-rs/toolchain@v1

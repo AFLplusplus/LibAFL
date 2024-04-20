@@ -4,7 +4,7 @@ import os
 import sys
 import math
 # Current CI Runner
-ci_instances = 24
+ci_instances = 32
 
 if len(sys.argv) != 2:
     exit(1)
