@@ -59,6 +59,16 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
     /// Gets the next 64 bit value
     fn next(&mut self) -> u64;
 
+    /// Gets a value between 0.0 (inclusive) and 1.0 (exclusive)
+    #[allow(clippy::cast_precision_loss)]
+    fn next_float(&mut self) -> f64 {
+        // both 2^53 and 2^-53 can be represented in f64 exactly
+        const MAX: u64 = 1u64 << 53;
+        const MAX_DIV: f64 = 1.0 / (MAX as f64);
+        let u = self.next() & MAX.wrapping_sub(1);
+        u as f64 * MAX_DIV
+    }
+
     /// Gets a value below the given 64 bit val (exclusive)
     fn below(&mut self, upper_bound_excl: u64) -> u64 {
         fast_bound(self.next(), upper_bound_excl)
