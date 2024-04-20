@@ -162,7 +162,6 @@ jobs:
 
   ubuntu-clippy:
     runs-on: ubuntu-22.04
-    needs: ubuntu
     steps:
       - name: Remove Dotnet & Haskell
         run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
