@@ -289,10 +289,14 @@ pub fn build(
     let cc_compiler = cc::Build::new().cpp(false).get_compiler();
     let cpp_compiler = cc::Build::new().cpp(true).get_compiler();
 
+    let mut libafl_qemu_dir_from_env = false;
+
     let libafl_qemu_dir = if let Some(qemu_dir) = libafl_qemu_dir.as_ref() {
         if libafl_qemu_clone_dir.is_some() {
             println!("cargo:warning=LIBAFL_QEMU_DIR and LIBAFL_QEMU_CLONE_DIR are both set. LIBAFL_QEMU_DIR will be considered in priority");
         }
+
+        libafl_qemu_dir_from_env = true;
 
         Path::new(&qemu_dir).to_path_buf()
     } else {
@@ -417,6 +421,29 @@ pub fn build(
     // Always build by default, make will detect if it is necessary to rebuild qemu
     if !libafl_qemu_no_build {
         let mut build_cmd = build_qemu(&cc_compiler, &cpp_compiler, &libafl_qemu_build_dir, jobs);
+
+        // Also let cargo know when to rerun the build for custom qemu directories
+        if libafl_qemu_dir_from_env {
+            let build_files = Command::new("git")
+                .args(["ls-files", "--cached", "--others", "--exclude-standard"])
+                .current_dir(&libafl_qemu_dir)
+                .output()
+                .unwrap();
+
+            String::from_utf8(build_files.stdout)
+                .unwrap()
+                .split('\n')
+                .for_each(|f| {
+                    if f.trim().is_empty() {
+                        return;
+                    }
+
+                    println!(
+                        "cargo:rerun-if-changed={}",
+                        libafl_qemu_dir.join(f).to_str().unwrap()
+                    );
+                });
+        }
 
         assert!(
             build_cmd.status().expect("Invoking Make Failed").success(),
