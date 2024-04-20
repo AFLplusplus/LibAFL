@@ -428,10 +428,10 @@ jobs:
         run: cd fuzzers/libfuzzer_stb_image && cargo build --release
 
   windows-frida-gdiplus:
+    runs-on: windows-latest
     needs:
       - common
     steps:
-      runs-on: windows-latest
       - uses: actions/checkout@v3
       - uses: ./.github/workflows/windows-tester-prepare
       - name: Build fuzzers/frida_gdiplus
