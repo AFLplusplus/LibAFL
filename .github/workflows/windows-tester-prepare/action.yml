@@ -10,15 +10,15 @@ runs:
     - uses: actions/checkout@v3
     - uses: Swatinem/rust-cache@v2
     - name: Windows Build
-      shell: bash
+      shell: pwsh
       run: cargo build --verbose
     - name: Build docs
-      shell: bash
+      shell: pwsh
       run: cargo doc
     - uses: ilammy/msvc-dev-cmd@v1
     - name: Set LIBCLANG_PATH
-      shell: bash
+      shell: pwsh
       run: echo "LIBCLANG_PATH=$((gcm clang).source -replace "clang.exe")" >> $env:GITHUB_ENV
     - name: install cargo-make
-      shell: bash
+      shell: pwsh
       run: cargo install --force cargo-make
