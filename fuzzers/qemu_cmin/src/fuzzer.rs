@@ -28,8 +28,9 @@ use libafl_bolts::{
     AsMutSlice, AsSlice,
 };
 use libafl_qemu::{
-    edges::{QemuEdgeCoverageChildHelper, EDGES_MAP_PTR, EDGES_MAP_SIZE},
+    edges::{QemuEdgeCoverageChildHelper, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},
     elf::EasyElf,
+    emu::Emulator,
     ArchExtras, CallingConvention, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExitReason,
     QemuExitReasonError, QemuForkExecutor, QemuHooks, QemuShutdownCause, Regs,
 };
@@ -63,10 +64,10 @@ impl From<Version> for Str {
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 #[command(
-    name = format!("qemu_cmin-{}",env!("CPU_TARGET")),
-    version = Version::default(),
-    about,
-    long_about = "Tool for generating minimizing corpus using QEMU instrumentation"
+name = format ! ("qemu_cmin-{}", env ! ("CPU_TARGET")),
+version = Version::default(),
+about,
+long_about = "Tool for generating minimizing corpus using QEMU instrumentation"
 )]
 pub struct FuzzerOptions {
     #[arg(long, help = "Output directory")]
@@ -141,12 +142,9 @@ pub fn fuzz() -> Result<(), Error> {
 
     let mut shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-    let monitor = SimpleMonitor::with_user_monitor(
-        |s| {
-            println!("{s}");
-        },
-        true,
-    );
+    let monitor = SimpleMonitor::with_user_monitor(|s| {
+        println!("{s}");
+    });
     let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
     {
         Ok(res) => res,
@@ -160,18 +158,18 @@ pub fn fuzz() -> Result<(), Error> {
         },
     };
 
-    let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_SIZE).unwrap();
+    let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_SIZE_IN_USE).unwrap();
     let edges = edges_shmem.as_mut_slice();
     unsafe { EDGES_MAP_PTR = edges.as_mut_ptr() };
 
     let edges_observer = unsafe {
-        HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_SIZE>::from_mut_ptr(
+        HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_SIZE_IN_USE>::from_mut_ptr(
             "edges",
             edges.as_mut_ptr(),
         ))
     };
 
-    let mut feedback = MaxMapFeedback::tracking(&edges_observer, true, false);
+    let mut feedback = MaxMapFeedback::new(&edges_observer);
 
     #[allow(clippy::let_unit_value)]
     let mut objective = ();

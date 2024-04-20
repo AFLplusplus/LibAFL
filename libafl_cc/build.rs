@@ -238,8 +238,9 @@ fn main() {
     println!("cargo:rerun-if-env-changed=LLVM_CXXFLAGS");
     println!("cargo:rerun-if-env-changed=LLVM_LDFLAGS");
     println!("cargo:rerun-if-env-changed=LLVM_VERSION");
-    println!("cargo:rerun-if-env-changed=LIBAFL_EDGES_MAP_SIZE");
+    println!("cargo:rerun-if-env-changed=LIBAFL_EDGES_MAP_SIZE_IN_USE");
     println!("cargo:rerun-if-env-changed=LIBAFL_ACCOUNTING_MAP_SIZE");
+    println!("cargo:rerun-if-env-changed=LIBAFL_DDG_MAP_SIZE");
     println!("cargo:rerun-if-changed=src/common-llvm.h");
     println!("cargo:rerun-if-changed=build.rs");
 
@@ -310,15 +311,23 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     };
     let mut cxxflags: Vec<String> = cxxflags.split_whitespace().map(String::from).collect();
 
-    let edges_map_size: usize = option_env!("LIBAFL_EDGES_MAP_SIZE")
+    let edges_map_size_in_use: usize = option_env!("LIBAFL_EDGES_MAP_SIZE_IN_USE")
+        .map_or(Ok(65_536), str::parse)
+        .expect("Could not parse LIBAFL_EDGES_MAP_SIZE_IN_USE");
+    let edges_map_size_max: usize = option_env!("LIBAFL_EDGES_MAP_SIZE_MAX")
         .map_or(Ok(2_621_440), str::parse)
-        .expect("Could not parse LIBAFL_EDGES_MAP_SIZE");
-    cxxflags.push(format!("-DLIBAFL_EDGES_MAP_SIZE={edges_map_size}"));
+        .expect("Could not parse LIBAFL_EDGES_MAP_SIZE_IN_USE");
+    cxxflags.push(format!("-DEDGES_MAP_SIZE_IN_USE={edges_map_size_in_use}"));
 
     let acc_map_size: usize = option_env!("LIBAFL_ACCOUNTING_MAP_SIZE")
         .map_or(Ok(65_536), str::parse)
         .expect("Could not parse LIBAFL_ACCOUNTING_MAP_SIZE");
-    cxxflags.push(format!("-DLIBAFL_ACCOUNTING_MAP_SIZE={acc_map_size}"));
+    cxxflags.push(format!("-DACCOUNTING_MAP_SIZE={acc_map_size}"));
+
+    let ddg_map_size: usize = option_env!("LIBAFL_DDG_MAP_SIZE")
+        .map_or(Ok(65_536), str::parse)
+        .expect("Could not parse LIBAFL_DDG_MAP_SIZE");
+    cxxflags.push(format!("-DDDG_MAP_SIZE={ddg_map_size}"));
 
     let llvm_version = find_llvm_version();
 
@@ -337,11 +346,16 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         /// The path to the `clang++` executable
         pub const CLANGXX_PATH: &str = {clangcpp:?};
 
-        /// The size of the edges map
-        pub const EDGES_MAP_SIZE: usize = {edges_map_size};
+        /// The default size of the edges map the fuzzer uses
+        pub const EDGES_MAP_SIZE_IN_USE: usize = {edges_map_size_in_use};
+        /// The real allocated size of the edges map
+        pub const EDGES_MAP_SIZE_MAX: usize = {edges_map_size_max};
 
         /// The size of the accounting maps
         pub const ACCOUNTING_MAP_SIZE: usize = {acc_map_size};
+
+        /// The size of the ddg maps
+        pub const DDG_MAP_SIZE: usize = {acc_map_size};
 
         /// The llvm version used to build llvm passes
         pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = {llvm_version:?};
@@ -401,6 +415,17 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         sdk_path = find_macos_sdk_libs();
         ldflags.push(&sdk_path);
     };
+
+    build_pass(
+        bindir_path,
+        out_dir,
+        &cxxflags,
+        &ldflags,
+        src_dir,
+        "ddg-instr.cc",
+        Some(&vec!["ddg-utils.cc"]),
+        false,
+    );
 
     for pass in &[
         "cmplog-routines-pass.cc",

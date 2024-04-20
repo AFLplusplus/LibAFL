@@ -13,7 +13,7 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    observers::{HitcountsMapObserver, TimeObserver, VariableMapObserver},
+    observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::StdMutationalStage,
     state::{HasCorpus, StdState},
@@ -164,6 +164,7 @@ pub fn fuzz() {
                 edges_map_mut_slice(),
                 addr_of_mut!(MAX_EDGES_NUM),
             ))
+            .track_indices()
         };
 
         // Create an observation channel to keep track of the execution time
@@ -173,7 +174,7 @@ pub fn fuzz() {
         // This one is composed by two Feedbacks in OR
         let mut feedback = feedback_or!(
             // New maximization map feedback linked to the edges observer and the feedback state
-            MaxMapFeedback::tracking(&edges_observer, true, true),
+            MaxMapFeedback::new(&edges_observer),
             // Time feedback, this one does not need a feedback state
             TimeFeedback::with_observer(&time_observer)
         );
@@ -201,7 +202,8 @@ pub fn fuzz() {
         });
 
         // A minimization+queue policy to get testcasess from the corpus
-        let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+        let scheduler =
+            IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);

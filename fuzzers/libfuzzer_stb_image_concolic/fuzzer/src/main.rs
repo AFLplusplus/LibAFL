@@ -1,11 +1,7 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for `stb_image`.
-use mimalloc::MiMalloc;
-#[global_allocator]
-static GLOBAL: MiMalloc = MiMalloc;
-
 use std::{
-    env,
+    env, fs,
     path::PathBuf,
     process::{Child, Command, Stdio},
     time::Duration,
@@ -32,7 +28,7 @@ use libafl::{
             serialization_format::{DEFAULT_ENV_NAME, DEFAULT_SIZE},
             ConcolicObserver,
         },
-        TimeObserver,
+        TimeObserver, CanTrack,
     },
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{
@@ -52,6 +48,10 @@ use libafl_bolts::{
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
 };
+use mimalloc::MiMalloc;
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 #[derive(Debug, Parser)]
 struct Opt {
@@ -60,7 +60,6 @@ struct Opt {
     concolic: bool,
 }
 
-use std::fs;
 pub fn main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
@@ -107,7 +106,7 @@ fn fuzz(
 
     // Create an observation channel using the coverage map
     // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)
-    let edges_observer = unsafe { std_edges_map_observer("edges") };
+    let edges_observer = unsafe { std_edges_map_observer("edges").track_indices() };
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
@@ -118,7 +117,7 @@ fn fuzz(
     // This one is composed by two Feedbacks in OR
     let mut feedback = feedback_or!(
         // New maximization map feedback linked to the edges observer and the feedback state
-        MaxMapFeedback::tracking(&edges_observer, true, false),
+        MaxMapFeedback::new(&edges_observer),
         // Time feedback, this one does not need a feedback state
         TimeFeedback::with_observer(&time_observer)
     );
@@ -148,7 +147,7 @@ fn fuzz(
     println!("We're a client, let's fuzz :)");
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+    let scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);

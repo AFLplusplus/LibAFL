@@ -12,10 +12,11 @@ use libafl::{
     inputs::BytesInput,
     monitors::SimpleMonitor,
     mutators::{scheduled::havoc_mutations, tokens_mutations, StdScheduledMutator, Tokens},
-    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
+    observers::{CanTrack, ExplicitTracking, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
-    state::{HasCorpus, HasMetadata, StdState},
+    state::{HasCorpus, StdState},
+    HasMetadata,
 };
 use libafl_bolts::{
     current_nanos,
@@ -24,6 +25,7 @@ use libafl_bolts::{
     tuples::{tuple_list, MatchName, Merge},
     AsMutSlice, Truncate,
 };
+use libafl_targets::{EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE};
 use nix::sys::signal::Signal;
 
 /// The commandline args this fuzzer accepts
@@ -84,8 +86,7 @@ struct Opt {
 
 #[allow(clippy::similar_names)]
 pub fn main() {
-    const MAP_SIZE: usize = 65536;
-
+    const MAP_SIZE: usize = EDGES_MAP_SIZE_IN_USE; //65536;
     let opt = Opt::parse();
 
     let corpus_dirs: Vec<PathBuf> = [opt.in_dir].to_vec();
@@ -98,10 +99,13 @@ pub fn main() {
     // let the forkserver know the shmid
     shmem.write_to_env("__AFL_SHM_ID").unwrap();
     let shmem_buf = shmem.as_mut_slice();
+    // the next line is not needed
+    // unsafe { EDGES_MAP_PTR = shmem_buf.as_mut_ptr() };
 
     // Create an observation channel using the signals map
-    let edges_observer =
-        unsafe { HitcountsMapObserver::new(StdMapObserver::new("shared_mem", shmem_buf)) };
+    let edges_observer = unsafe {
+        HitcountsMapObserver::new(StdMapObserver::new("shared_mem", shmem_buf)).track_indices()
+    };
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
@@ -110,7 +114,7 @@ pub fn main() {
     // This one is composed by two Feedbacks in OR
     let mut feedback = feedback_or!(
         // New maximization map feedback linked to the edges observer and the feedback state
-        MaxMapFeedback::tracking(&edges_observer, true, false),
+        MaxMapFeedback::new(&edges_observer),
         // Time feedback, this one does not need a feedback state
         TimeFeedback::with_observer(&time_observer)
     );
@@ -143,14 +147,16 @@ pub fn main() {
     .unwrap();
 
     // The Monitor trait define how the fuzzer stats are reported to the user
-    let monitor = SimpleMonitor::new(|s| println!("{s}"));
+    let monitor = SimpleMonitor::with_user_monitor(|s| {
+        println!("{s}");
+    });
 
     // The event manager handle the various events generated during the fuzzing loop
     // such as the notification of the addition of a new item to the corpus
     let mut mgr = SimpleEventManager::new(monitor);
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+    let scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -177,8 +183,9 @@ pub fn main() {
     if let Some(dynamic_map_size) = executor.coverage_map_size() {
         executor
             .observers_mut()
-            .match_name_mut::<HitcountsMapObserver<StdMapObserver<'_, u8, false>>>("shared_mem")
+            .match_name_mut::<ExplicitTracking<HitcountsMapObserver<StdMapObserver<'_, u8, false>>, true, false>>("shared_mem")
             .unwrap()
+            .as_mut()
             .truncate(dynamic_map_size);
     }
 

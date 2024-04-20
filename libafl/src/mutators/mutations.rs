@@ -9,7 +9,7 @@ use crate::{
     corpus::Corpus,
     inputs::{HasBytesVec, Input},
     mutators::{MutationResult, Mutator},
-    random_corpus_id,
+    random_corpus_id_with_disabled,
     state::{HasCorpus, HasMaxSize, HasRand},
     Error,
 };
@@ -1053,7 +1053,7 @@ where
         }
 
         // We don't want to use the testcase we're already using for splicing
-        let idx = random_corpus_id!(state.corpus(), state.rand_mut());
+        let idx = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
 
         if let Some(cur) = state.corpus().current() {
             if idx == *cur {
@@ -1062,7 +1062,7 @@ where
         }
 
         let other_size = {
-            let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+            let mut other_testcase = state.corpus().get_from_all(idx)?.borrow_mut();
             other_testcase.load_input(state.corpus())?.bytes().len()
         };
 
@@ -1073,7 +1073,7 @@ where
         let range = rand_range(state, other_size, min(other_size, max_size - size));
         let target = state.rand_mut().below(size as u64) as usize;
 
-        let other_testcase = state.corpus().get(idx)?.borrow_mut();
+        let other_testcase = state.corpus().get_from_all(idx)?.borrow_mut();
         // No need to load the input again, it'll still be cached.
         let other = other_testcase.input().as_ref().unwrap();
 
@@ -1135,7 +1135,7 @@ where
         }
 
         // We don't want to use the testcase we're already using for splicing
-        let idx = random_corpus_id!(state.corpus(), state.rand_mut());
+        let idx = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
         if let Some(cur) = state.corpus().current() {
             if idx == *cur {
                 return Ok(MutationResult::Skipped);
@@ -1143,7 +1143,7 @@ where
         }
 
         let other_size = {
-            let mut testcase = state.corpus().get(idx)?.borrow_mut();
+            let mut testcase = state.corpus().get_from_all(idx)?.borrow_mut();
             testcase.load_input(state.corpus())?.bytes().len()
         };
 
@@ -1154,7 +1154,7 @@ where
         let target = state.rand_mut().below(size as u64) as usize;
         let range = rand_range(state, other_size, min(other_size, size - target));
 
-        let other_testcase = state.corpus().get(idx)?.borrow_mut();
+        let other_testcase = state.corpus().get_from_all(idx)?.borrow_mut();
         // No need to load the input again, it'll still be cached.
         let other = other_testcase.input().as_ref().unwrap();
 
@@ -1207,7 +1207,7 @@ where
     #[allow(clippy::cast_sign_loss)]
     fn mutate(&mut self, state: &mut S, input: &mut S::Input) -> Result<MutationResult, Error> {
         // We don't want to use the testcase we're already using for splicing
-        let idx = random_corpus_id!(state.corpus(), state.rand_mut());
+        let idx = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
         if let Some(cur) = state.corpus().current() {
             if idx == *cur {
                 return Ok(MutationResult::Skipped);
@@ -1215,7 +1215,7 @@ where
         }
 
         let (first_diff, last_diff) = {
-            let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+            let mut other_testcase = state.corpus().get_from_all(idx)?.borrow_mut();
             let other = other_testcase.load_input(state.corpus())?;
 
             let (f, l) = locate_diffs(input.bytes(), other.bytes());
@@ -1229,7 +1229,7 @@ where
 
         let split_at = state.rand_mut().between(first_diff, last_diff) as usize;
 
-        let other_testcase = state.corpus().get(idx)?.borrow_mut();
+        let other_testcase = state.corpus().get_from_all(idx)?.borrow_mut();
         // Input will already be loaded.
         let other = other_testcase.input().as_ref().unwrap();
 
@@ -1306,11 +1306,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        corpus::InMemoryCorpus,
-        feedbacks::ConstFeedback,
-        inputs::BytesInput,
-        mutators::MutatorsTuple,
-        state::{HasMetadata, StdState},
+        corpus::InMemoryCorpus, feedbacks::ConstFeedback, inputs::BytesInput,
+        mutators::MutatorsTuple, state::StdState, HasMetadata,
     };
 
     type TestMutatorsTupleType = tuple_list_type!(

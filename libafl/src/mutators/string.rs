@@ -16,7 +16,8 @@ use crate::{
         mutational::{MutatedTransform, MutatedTransformPost},
         StringIdentificationMetadata,
     },
-    state::{HasCorpus, HasMaxSize, HasMetadata, HasRand},
+    state::{HasCorpus, HasMaxSize, HasRand},
+    HasMetadata,
 };
 
 /// Unicode category data, as used by string analysis and mutators.

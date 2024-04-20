@@ -25,7 +25,7 @@ use libafl::{
         scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
         StdMOptMutator, StdScheduledMutator, Tokens,
     },
-    observers::{HitcountsMapObserver, TimeObserver, VariableMapObserver},
+    observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
     },
@@ -33,8 +33,8 @@ use libafl::{
         calibrate::CalibrationStage, power::StdPowerMutationalStage, ShadowTracingStage,
         StdMutationalStage,
     },
-    state::{HasCorpus, HasMetadata, StdState},
-    Error,
+    state::{HasCorpus, StdState},
+    Error, HasMetadata,
 };
 use libafl_bolts::{
     current_nanos, current_time,
@@ -53,6 +53,7 @@ use libafl_qemu::{
     elf::EasyElf,
     filter_qemu_args,
     hooks::QemuHooks,
+    Emulator,
     GuestReg,
     //snapshot::QemuSnapshotHelper,
     MmapPerms,
@@ -259,6 +260,7 @@ fn fuzz(
             edges_map_mut_slice(),
             addr_of_mut!(MAX_EDGES_NUM),
         ))
+        .track_indices()
     };
 
     // Create an observation channel to keep track of the execution time
@@ -267,7 +269,7 @@ fn fuzz(
     // Create an observation channel using cmplog map
     let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
-    let map_feedback = MaxMapFeedback::tracking(&edges_observer, true, false);
+    let map_feedback = MaxMapFeedback::new(&edges_observer);
 
     let calibration = CalibrationStage::new(&map_feedback);
 
@@ -316,11 +318,10 @@ fn fuzz(
     let power = StdPowerMutationalStage::new(mutator);
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerScheduler::new(PowerQueueScheduler::new(
-        &mut state,
+    let scheduler = IndexesLenTimeMinimizerScheduler::new(
         &edges_observer,
-        PowerSchedule::FAST,
-    ));
+        PowerQueueScheduler::new(&mut state, &edges_observer, PowerSchedule::FAST),
+    );
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);

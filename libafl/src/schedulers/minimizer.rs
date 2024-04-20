@@ -12,10 +12,11 @@ use crate::{
     corpus::{Corpus, CorpusId, Testcase},
     feedbacks::MapIndexesMetadata,
     inputs::UsesInput,
-    observers::ObserversTuple,
+    observers::{CanTrack, ObserversTuple},
+    require_index_tracking,
     schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
-    state::{HasCorpus, HasMetadata, HasRand, UsesState},
-    Error,
+    state::{HasCorpus, HasRand, UsesState},
+    Error, HasMetadata,
 };
 
 /// Default probability to skip the non-favored values
@@ -70,26 +71,27 @@ impl Default for TopRatedsMetadata {
 /// corpus that exercise all the requested features (e.g. all the coverage seen so far)
 /// prioritizing [`Testcase`]`s` using [`TestcaseScore`]
 #[derive(Debug, Clone)]
-pub struct MinimizerScheduler<CS, F, M> {
+pub struct MinimizerScheduler<CS, F, M, O> {
     base: CS,
     skip_non_favored_prob: u64,
     remove_metadata: bool,
-    phantom: PhantomData<(F, M)>,
+    phantom: PhantomData<(F, M, O)>,
 }
 
-impl<CS, F, M> UsesState for MinimizerScheduler<CS, F, M>
+impl<CS, F, M, O> UsesState for MinimizerScheduler<CS, F, M, O>
 where
     CS: UsesState,
 {
     type State = CS::State;
 }
 
-impl<CS, F, M> RemovableScheduler for MinimizerScheduler<CS, F, M>
+impl<CS, F, M, O> RemovableScheduler for MinimizerScheduler<CS, F, M, O>
 where
     CS: RemovableScheduler,
     F: TestcaseScore<CS::State>,
     M: AsSlice<Entry = usize> + SerdeAny + HasRefCnt,
     CS::State: HasCorpus + HasMetadata + HasRand,
+    O: CanTrack,
 {
     /// Replaces the testcase at the given idx
     fn on_replace(
@@ -191,12 +193,13 @@ where
     }
 }
 
-impl<CS, F, M> Scheduler for MinimizerScheduler<CS, F, M>
+impl<CS, F, M, O> Scheduler for MinimizerScheduler<CS, F, M, O>
 where
     CS: Scheduler,
     F: TestcaseScore<CS::State>,
     M: AsSlice<Entry = usize> + SerdeAny + HasRefCnt,
     CS::State: HasCorpus + HasMetadata + HasRand,
+    O: CanTrack,
 {
     /// Called when a [`Testcase`] is added to the corpus
     fn on_add(&mut self, state: &mut CS::State, idx: CorpusId) -> Result<(), Error> {
@@ -246,12 +249,13 @@ where
     }
 }
 
-impl<CS, F, M> MinimizerScheduler<CS, F, M>
+impl<CS, F, M, O> MinimizerScheduler<CS, F, M, O>
 where
     CS: Scheduler,
     F: TestcaseScore<CS::State>,
     M: AsSlice<Entry = usize> + SerdeAny + HasRefCnt,
     CS::State: HasCorpus + HasMetadata + HasRand,
+    O: CanTrack,
 {
     /// Update the [`Corpus`] score using the [`MinimizerScheduler`]
     #[allow(clippy::unused_self)]
@@ -371,7 +375,10 @@ where
     /// and has a default probability to skip non-faved [`Testcase`]s of [`DEFAULT_SKIP_NON_FAVORED_PROB`].
     /// This will remove the metadata `M` when it is no longer needed, after consumption. This might
     /// for example be a `MapIndexesMetadata`.
-    pub fn new(base: CS) -> Self {
+    ///
+    /// When calling, pass the edges observer which will provided the indexes to minimize over.
+    pub fn new(_observer: &O, base: CS) -> Self {
+        require_index_tracking!("MinimizerScheduler", O);
         Self {
             base,
             skip_non_favored_prob: DEFAULT_SKIP_NON_FAVORED_PROB,
@@ -383,7 +390,10 @@ where
     /// Creates a new [`MinimizerScheduler`] that wraps a `base` [`Scheduler`]
     /// and has a default probability to skip non-faved [`Testcase`]s of [`DEFAULT_SKIP_NON_FAVORED_PROB`].
     /// This method will prevent the metadata `M` from being removed at the end of scoring.
-    pub fn non_metadata_removing(base: CS) -> Self {
+    ///
+    /// When calling, pass the edges observer which will provided the indexes to minimize over.
+    pub fn non_metadata_removing(_observer: &O, base: CS) -> Self {
+        require_index_tracking!("MinimizerScheduler", O);
         Self {
             base,
             skip_non_favored_prob: DEFAULT_SKIP_NON_FAVORED_PROB,
@@ -394,7 +404,10 @@ where
 
     /// Creates a new [`MinimizerScheduler`] that wraps a `base` [`Scheduler`]
     /// and has a non-default probability to skip non-faved [`Testcase`]s using (`skip_non_favored_prob`).
-    pub fn with_skip_prob(base: CS, skip_non_favored_prob: u64) -> Self {
+    ///
+    /// When calling, pass the edges observer which will provided the indexes to minimize over.
+    pub fn with_skip_prob(_observer: &O, base: CS, skip_non_favored_prob: u64) -> Self {
+        require_index_tracking!("MinimizerScheduler", O);
         Self {
             base,
             skip_non_favored_prob,
@@ -405,10 +418,14 @@ where
 }
 
 /// A [`MinimizerScheduler`] with [`LenTimeMulTestcaseScore`] to prioritize quick and small [`Testcase`]`s`.
-pub type LenTimeMinimizerScheduler<CS, M> =
-    MinimizerScheduler<CS, LenTimeMulTestcaseScore<<CS as UsesState>::State>, M>;
+pub type LenTimeMinimizerScheduler<CS, M, O> =
+    MinimizerScheduler<CS, LenTimeMulTestcaseScore<<CS as UsesState>::State>, M, O>;
 
 /// A [`MinimizerScheduler`] with [`LenTimeMulTestcaseScore`] to prioritize quick and small [`Testcase`]`s`
 /// that exercise all the entries registered in the [`MapIndexesMetadata`].
-pub type IndexesLenTimeMinimizerScheduler<CS> =
-    MinimizerScheduler<CS, LenTimeMulTestcaseScore<<CS as UsesState>::State>, MapIndexesMetadata>;
+pub type IndexesLenTimeMinimizerScheduler<CS, O> = MinimizerScheduler<
+    CS,
+    LenTimeMulTestcaseScore<<CS as UsesState>::State>,
+    MapIndexesMetadata,
+    O,
+>;

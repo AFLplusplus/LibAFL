@@ -11,8 +11,8 @@ use crate::{
     corpus::{Corpus, CorpusId},
     inputs::UsesInput,
     stages::Stage,
-    state::{HasCorpus, HasMetadata, HasRand, HasSolutions, UsesState},
-    Error,
+    state::{HasCorpus, HasRand, HasSolutions, UsesState},
+    Error, HasMetadata,
 };
 
 /// Metadata used to store information about disk dump indexes for names

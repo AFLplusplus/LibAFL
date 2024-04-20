@@ -32,9 +32,6 @@ pub fn build() {
     println!("cargo:rustc-cfg=emulation_mode=\"{emulation_mode}\"");
     println!("cargo:rerun-if-env-changed=EMULATION_MODE");
 
-    println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=build_linux.rs");
-
     // Make sure we have at most one architecutre feature set
     // Else, we default to `x86_64` - having a default makes CI easier :)
     assert_unique_feature!("arm", "aarch64", "i386", "i86_64", "mips", "ppc", "hexagon");

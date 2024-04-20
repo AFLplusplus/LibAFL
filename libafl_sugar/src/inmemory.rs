@@ -18,11 +18,11 @@ use libafl::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::{I2SRandReplace, Tokens},
     },
-    observers::{HitcountsMapObserver, TimeObserver},
+    observers::{CanTrack, HitcountsMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
-    state::{HasCorpus, HasMetadata, StdState},
-    Error,
+    state::{HasCorpus, StdState},
+    Error, HasMetadata,
 };
 use libafl_bolts::{
     core_affinity::Cores,
@@ -143,7 +143,8 @@ where
                               _core_id| {
             // Create an observation channel using the coverage map
             let edges_observer =
-                HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") });
+                HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") })
+                    .track_indices();
 
             // Create an observation channel to keep track of the execution time
             let time_observer = TimeObserver::new("time");
@@ -154,7 +155,7 @@ where
             // This one is composed by two Feedbacks in OR
             let mut feedback = feedback_or!(
                 // New maximization map feedback linked to the edges observer and the feedback state
-                MaxMapFeedback::tracking(&edges_observer, true, false),
+                MaxMapFeedback::new(&edges_observer),
                 // Time feedback, this one does not need a feedback state
                 TimeFeedback::with_observer(&time_observer)
             );
@@ -186,7 +187,8 @@ where
             }
 
             // A minimization+queue policy to get testcasess from the corpus
-            let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+            let scheduler =
+                IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
             // A fuzzer with feedbacks and a corpus scheduler
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -346,5 +348,89 @@ where
             Err(Error::ShuttingDown) => log::info!("\nFuzzing stopped by user. Good Bye."),
             Err(err) => panic!("Fuzzingg failed {err:?}"),
         }
+    }
+}
+
+/// Python bindings for this sugar
+#[cfg(feature = "python")]
+pub mod pybind {
+    use std::path::PathBuf;
+
+    use libafl_bolts::core_affinity::Cores;
+    use pyo3::{prelude::*, types::PyBytes};
+
+    use crate::inmemory;
+
+    /// In-Memory fuzzing made easy.
+    /// Use this sugar for scaling `libfuzzer`-style fuzzers.
+    #[pyclass(unsendable)]
+    #[derive(Debug)]
+    struct InMemoryBytesCoverageSugar {
+        input_dirs: Vec<PathBuf>,
+        output_dir: PathBuf,
+        broker_port: u16,
+        cores: Cores,
+        use_cmplog: Option<bool>,
+        iterations: Option<u64>,
+        tokens_file: Option<PathBuf>,
+        timeout: Option<u64>,
+    }
+
+    #[pymethods]
+    impl InMemoryBytesCoverageSugar {
+        /// Create a new [`InMemoryBytesCoverageSugar`]
+        #[new]
+        #[allow(clippy::too_many_arguments)]
+        fn new(
+            input_dirs: Vec<PathBuf>,
+            output_dir: PathBuf,
+            broker_port: u16,
+            cores: Vec<usize>,
+            use_cmplog: Option<bool>,
+            iterations: Option<u64>,
+            tokens_file: Option<PathBuf>,
+            timeout: Option<u64>,
+        ) -> Self {
+            Self {
+                input_dirs,
+                output_dir,
+                broker_port,
+                cores: cores.into(),
+                use_cmplog,
+                iterations,
+                tokens_file,
+                timeout,
+            }
+        }
+
+        /// Run the fuzzer
+        #[allow(clippy::needless_pass_by_value)]
+        pub fn run(&self, harness: PyObject) {
+            inmemory::InMemoryBytesCoverageSugar::builder()
+                .input_dirs(&self.input_dirs)
+                .output_dir(self.output_dir.clone())
+                .broker_port(self.broker_port)
+                .cores(&self.cores)
+                .harness(|buf| {
+                    Python::with_gil(|py| -> PyResult<()> {
+                        let args = (PyBytes::new(py, buf),); // TODO avoid copy
+                        harness.call1(py, args)?;
+                        Ok(())
+                    })
+                    .unwrap();
+                })
+                .use_cmplog(self.use_cmplog)
+                .timeout(self.timeout)
+                .tokens_file(self.tokens_file.clone())
+                .iterations(self.iterations)
+                .build()
+                .run();
+        }
+    }
+
+    /// Register the module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<InMemoryBytesCoverageSugar>()?;
+        Ok(())
     }
 }

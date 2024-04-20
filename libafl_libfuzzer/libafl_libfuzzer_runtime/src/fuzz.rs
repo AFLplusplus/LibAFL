@@ -23,8 +23,8 @@ use libafl::{
         Monitor, MultiMonitor, SimpleMonitor,
     },
     stages::{HasCurrentStage, StagesTuple},
-    state::{HasExecutions, HasLastReportTime, HasMetadata, HasSolutions, UsesState},
-    Error, Fuzzer,
+    state::{HasExecutions, HasLastReportTime, HasSolutions, UsesState},
+    Error, Fuzzer, HasMetadata,
 };
 use libafl_bolts::{
     core_affinity::Cores,

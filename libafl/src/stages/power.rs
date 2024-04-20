@@ -8,8 +8,8 @@ use crate::{
     mutators::Mutator,
     schedulers::{testcase_score::CorpusPowerTestcaseScore, TestcaseScore},
     stages::{mutational::MutatedTransform, ExecutionCountRestartHelper, MutationalStage, Stage},
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasMetadata, HasRand, UsesState},
-    Error,
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
+    Error, HasMetadata,
 };
 
 /// The mutational stage using power schedules

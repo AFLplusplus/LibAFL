@@ -2,9 +2,6 @@
 //! The example harness is built for libpng.
 //! In this example, you will see the use of the `launcher` feature.
 //! The `launcher` will spawn new processes for each cpu core.
-use mimalloc::MiMalloc;
-#[global_allocator]
-static GLOBAL: MiMalloc = MiMalloc;
 
 use core::time::Duration;
 use std::{env, net::SocketAddr, path::PathBuf};
@@ -26,11 +23,11 @@ use libafl::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::Tokens,
     },
-    observers::{HitcountsMapObserver, TimeObserver},
+    observers::{CanTrack, HitcountsMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
-    state::{HasCorpus, HasMetadata, StdState},
-    Error,
+    state::{HasCorpus, StdState},
+    Error, HasMetadata,
 };
 use libafl_bolts::{
     core_affinity::Cores,
@@ -41,6 +38,10 @@ use libafl_bolts::{
     AsSlice,
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
+use mimalloc::MiMalloc;
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 /// Parse a millis string to a [`Duration`]. Used for arg parsing.
 fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
@@ -56,11 +57,11 @@ fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
 )]
 struct Opt {
     #[arg(
-        short,
-        long,
-        value_parser = Cores::from_cmdline,
-        help = "Spawn a client in each of the provided cores. Broker runs in the 0th core. 'all' to select all available cores. 'none' to run a client without binding to any core. eg: '1,2-4,6' selects the cores 1,2,3,4,6.",
-        name = "CORES"
+    short,
+    long,
+    value_parser = Cores::from_cmdline,
+    help = "Spawn a client in each of the provided cores. Broker runs in the 0th core. 'all' to select all available cores. 'none' to run a client without binding to any core. eg: '1,2-4,6' selects the cores 1,2,3,4,6.",
+    name = "CORES"
     )]
     cores: Cores,
 
@@ -95,12 +96,12 @@ struct Opt {
     output: PathBuf,
 
     #[arg(
-        value_parser = timeout_from_millis_str,
-        short,
-        long,
-        help = "Set the exeucution timeout in milliseconds, default is 10000",
-        name = "TIMEOUT",
-        default_value = "10000"
+    value_parser = timeout_from_millis_str,
+    short,
+    long,
+    help = "Set the exeucution timeout in milliseconds, default is 10000",
+    name = "TIMEOUT",
+    default_value = "10000"
     )]
     timeout: Duration,
 
@@ -163,7 +164,8 @@ pub extern "C" fn libafl_main() {
                           mut restarting_mgr: LlmpRestartingEventManager<_, _, _>,
                           core_id| {
         // Create an observation channel using the coverage map
-        let edges_observer = HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") });
+        let edges_observer =
+            HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") }).track_indices();
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
@@ -172,7 +174,7 @@ pub extern "C" fn libafl_main() {
         // This one is composed by two Feedbacks in OR
         let mut feedback = feedback_or!(
             // New maximization map feedback linked to the edges observer and the feedback state
-            MaxMapFeedback::tracking(&edges_observer, true, false),
+            MaxMapFeedback::new(&edges_observer),
             // Time feedback, this one does not need a feedback state
             TimeFeedback::with_observer(&time_observer)
         );
@@ -217,7 +219,8 @@ pub extern "C" fn libafl_main() {
         let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
         // A minimization+queue policy to get testcasess from the corpus
-        let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+        let scheduler =
+            IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);

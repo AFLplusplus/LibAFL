@@ -55,6 +55,18 @@ where
     }
 }
 
+impl<M, O> AsRef<Self> for MappedEdgeMapObserver<M, O> {
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
+impl<M, O> AsMut<Self> for MappedEdgeMapObserver<M, O> {
+    fn as_mut(&mut self) -> &mut Self {
+        self
+    }
+}
+
 impl<M, O> HasLen for MappedEdgeMapObserver<M, O>
 where
     M: HasLen,
@@ -67,6 +79,23 @@ where
 impl<M, O> Named for MappedEdgeMapObserver<M, O> {
     fn name(&self) -> &str {
         &self.name
+    }
+}
+
+impl<M, O> Hash for MappedEdgeMapObserver<M, O>
+where
+    M: MapObserver + for<'it> AsIter<'it, Item = M::Entry>,
+    O: ValueObserver,
+{
+    fn hash<H: Hasher>(&self, hasher: &mut H) {
+        let initial = self.inner.initial();
+        for e in self.inner.as_iter() {
+            if *e == initial {
+                self.value_observer.default_value().hash(hasher);
+            } else {
+                self.value_observer.value().hash(hasher);
+            }
+        }
     }
 }
 
@@ -98,16 +127,9 @@ where
         self.inner.count_bytes()
     }
 
-    fn hash(&self) -> u64 {
+    fn hash_simple(&self) -> u64 {
         let mut hasher = AHasher::default();
-        let initial = self.inner.initial();
-        for e in self.inner.as_iter() {
-            if *e == initial {
-                self.value_observer.default_value().hash(&mut hasher);
-            } else {
-                self.value_observer.value().hash(&mut hasher);
-            }
-        }
+        self.hash(&mut hasher);
         hasher.finish()
     }
 

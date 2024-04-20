@@ -30,8 +30,8 @@ use crate::{
     },
     observers::cmp::{AFLppCmpValuesMetadata, CmpValues, CmpValuesMetadata},
     stages::TaintMetadata,
-    state::{HasCorpus, HasMaxSize, HasMetadata, HasRand},
-    Error,
+    state::{HasCorpus, HasMaxSize, HasRand},
+    Error, HasMetadata,
 };
 
 /// A state metadata holding a list of tokens

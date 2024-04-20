@@ -22,10 +22,9 @@ use crate::{
     },
     start_timer,
     state::{
-        HasCorpus, HasCurrentTestcase, HasExecutions, HasMaxSize, HasMetadata, HasSolutions, State,
-        UsesState,
+        HasCorpus, HasCurrentTestcase, HasExecutions, HasMaxSize, HasSolutions, State, UsesState,
     },
-    Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasScheduler,
+    Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasMetadata, HasScheduler,
 };
 #[cfg(feature = "introspection")]
 use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
@@ -127,7 +126,7 @@ where
                 // TODO replace if process_execution adds a return value for solution index
                 let solution_count = state.solutions().count();
                 let corpus_count = state.corpus().count();
-                let (_, corpus_idx) = fuzzer.process_execution(
+                let (_, corpus_idx) = fuzzer.execute_and_process(
                     state,
                     manager,
                     input.clone(),
@@ -401,7 +400,7 @@ where
         let obs = observers
             .match_name::<M>(self.observer_name())
             .expect("Should have been provided valid observer name.");
-        Ok(obs.hash() == self.orig_hash)
+        Ok(obs.hash_simple() == self.orig_hash)
     }
 }
 
@@ -444,7 +443,7 @@ where
         MapEqualityFeedback {
             name: "MapEq".to_string(),
             obs_name: self.obs_name.clone(),
-            orig_hash: obs.hash(),
+            orig_hash: obs.hash_simple(),
             phantom: PhantomData,
         }
     }

@@ -5,8 +5,8 @@ use libafl::{
     feedbacks::{Feedback, MapIndexesMetadata},
     observers::ObserversTuple,
     schedulers::{MinimizerScheduler, TestcaseScore},
-    state::{HasCorpus, HasMetadata, State},
-    Error,
+    state::{HasCorpus, State},
+    Error, HasMetadata,
 };
 use libafl_bolts::{Named, SerdeAny};
 use serde::{Deserialize, Serialize};
@@ -32,8 +32,8 @@ where
     }
 }
 
-pub type PacketLenMinimizerScheduler<CS> =
-    MinimizerScheduler<CS, PacketLenTestcaseScore, MapIndexesMetadata>;
+pub type PacketLenMinimizerScheduler<CS, O> =
+    MinimizerScheduler<CS, PacketLenTestcaseScore, MapIndexesMetadata, O>;
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug)]
 pub struct PacketLenFeedback {

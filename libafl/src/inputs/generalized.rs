@@ -9,8 +9,8 @@ use crate::{
     corpus::Testcase,
     inputs::BytesInput,
     stages::mutational::{MutatedTransform, MutatedTransformPost},
-    state::{HasCorpus, HasMetadata},
-    Error,
+    state::HasCorpus,
+    Error, HasMetadata,
 };
 
 /// An item of the generalized input

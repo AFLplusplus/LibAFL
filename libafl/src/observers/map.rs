@@ -6,7 +6,7 @@ use alloc::{
 };
 use core::{
     fmt::Debug,
-    hash::{BuildHasher, Hasher},
+    hash::{Hash, Hasher},
     iter::Flatten,
     marker::PhantomData,
     mem::size_of,
@@ -69,26 +69,352 @@ fn init_count_class_16() {
     }
 }
 
-/// Compute the hash of a slice
-fn hash_slice<T>(slice: &[T]) -> u64 {
-    let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
-    let ptr = slice.as_ptr() as *const u8;
-    let map_size = slice.len() / size_of::<T>();
-    unsafe {
-        hasher.write(slice::from_raw_parts(ptr, map_size));
+/// Trait marker which indicates that this [`MapObserver`] is tracked for indices or novelties.
+/// Implementors of feedbacks similar to [`crate::feedbacks::MapFeedback`] may wish to use this to
+/// ensure that edge metadata is recorded as is appropriate for the provided observer.
+///
+/// If you get a type constraint failure for your map due to this type being unfulfilled, you must
+/// call [`CanTrack::track_indices`] or [`CanTrack::track_novelties`] **at
+/// the initialisation site of your map**.
+///
+/// This trait allows various components which interact with map metadata to ensure that the
+/// information they need is actually recorded by the map feedback.
+/// For example, if you are using [`crate::schedulers::MinimizerScheduler`]:
+/// ```
+/// # use libafl::corpus::InMemoryCorpus;
+/// # use libafl::feedbacks::{Feedback, MapFeedbackMetadata};
+/// use libafl::feedbacks::MaxMapFeedback;
+/// # use libafl::inputs::BytesInput;
+/// use libafl::observers::{StdMapObserver, CanTrack};
+/// use libafl::schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler};
+/// # use libafl::state::StdState;
+/// # use libafl_bolts::serdeany::RegistryBuilder;
+/// #
+/// # #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
+/// # unsafe { MapFeedbackMetadata::<u8>::register() }
+/// # #[cfg(not(feature = "std"))]
+/// # #[no_mangle]
+/// # pub extern "C" fn external_current_millis() -> u64 { 0 }
+///
+/// use libafl_bolts::ownedref::OwnedMutSlice;
+/// # use libafl_bolts::rands::StdRand;
+///
+/// // initialise your map as necessary
+/// let edges_observer = StdMapObserver::from_ownedref("edges", OwnedMutSlice::from(vec![0u8; 16]));
+/// // inform the feedback to track indices (required by IndexesLenTimeMinimizerScheduler), but not novelties
+/// // this *MUST* be done before it is passed to MaxMapFeedback!
+/// let edges_observer = edges_observer.track_indices();
+///
+/// // init the feedback
+/// let mut feedback = MaxMapFeedback::new(&edges_observer);
+/// #
+/// # // init the state
+/// # let mut state = StdState::new(
+/// #     StdRand::with_seed(0),
+/// #     InMemoryCorpus::<BytesInput>::new(),
+/// #     InMemoryCorpus::new(),
+/// #     &mut feedback,
+/// #     &mut ()
+/// # ).unwrap();
+/// # feedback.init_state(&mut state).unwrap();
+///
+/// let scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
+/// # scheduler.cull(&state).unwrap();
+/// ```
+///
+/// [`MapObserver`] implementors: see [`StdMapObserver`] for an example implementation.
+pub trait CanTrack {
+    /// The resulting type of enabling index tracking.
+    type WithIndexTracking: CanTrack;
+    /// The resulting type of enabling novelty tracking.
+    type WithNoveltiesTracking: CanTrack;
+
+    /// Whether indices should be tracked for this [`MapObserver`].
+    const INDICES: bool;
+    /// Whether novelties should be tracked for this [`MapObserver`].
+    const NOVELTIES: bool;
+
+    /// Convert this map observer into one that tracks indices.
+    fn track_indices(self) -> Self::WithIndexTracking;
+    /// Convert this map observer into one that tracks novelties.
+    fn track_novelties(self) -> Self::WithNoveltiesTracking;
+}
+
+/// Struct which wraps [`MapObserver`] instances to explicitly give them tracking data.
+///
+/// # Safety
+///
+/// This is a bit of a magic structure. We pass it to the observer tuple as itself, but when its
+/// referred to with `match_name`, there is a cast from this type to its inner type. This is
+/// *guaranteed to be safe* by `#[repr(transparent)]`.
+#[derive(Copy, Clone, Debug, Deserialize, Serialize)]
+pub struct ExplicitTracking<T, const ITH: bool, const NTH: bool>(T);
+
+impl<T, const ITH: bool, const NTH: bool> CanTrack for ExplicitTracking<T, ITH, NTH> {
+    type WithIndexTracking = ExplicitTracking<T, true, NTH>;
+    type WithNoveltiesTracking = ExplicitTracking<T, ITH, true>;
+    const INDICES: bool = ITH;
+    const NOVELTIES: bool = NTH;
+
+    fn track_indices(self) -> Self::WithIndexTracking {
+        ExplicitTracking::<T, true, NTH>(self.0)
     }
-    hasher.finish()
+
+    fn track_novelties(self) -> Self::WithNoveltiesTracking {
+        ExplicitTracking::<T, ITH, true>(self.0)
+    }
+}
+
+impl<T, const ITH: bool, const NTH: bool> AsRef<T> for ExplicitTracking<T, ITH, NTH> {
+    fn as_ref(&self) -> &T {
+        &self.0
+    }
+}
+
+impl<T, const ITH: bool, const NTH: bool> AsMut<T> for ExplicitTracking<T, ITH, NTH> {
+    fn as_mut(&mut self) -> &mut T {
+        &mut self.0
+    }
+}
+
+impl<T, const ITH: bool, const NTH: bool> Named for ExplicitTracking<T, ITH, NTH>
+where
+    T: Named,
+{
+    fn name(&self) -> &str {
+        self.0.name()
+    }
+}
+
+impl<S, T, const ITH: bool, const NTH: bool> Observer<S> for ExplicitTracking<T, ITH, NTH>
+where
+    S: UsesInput,
+    T: Observer<S>,
+{
+    fn flush(&mut self) -> Result<(), Error> {
+        self.0.flush()
+    }
+
+    fn pre_exec(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
+        self.0.pre_exec(state, input)
+    }
+
+    fn post_exec(
+        &mut self,
+        state: &mut S,
+        input: &S::Input,
+        exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
+        self.0.post_exec(state, input, exit_kind)
+    }
+
+    fn pre_exec_child(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
+        self.0.pre_exec_child(state, input)
+    }
+
+    fn post_exec_child(
+        &mut self,
+        state: &mut S,
+        input: &S::Input,
+        exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
+        self.0.post_exec_child(state, input, exit_kind)
+    }
+
+    fn observes_stdout(&self) -> bool {
+        self.0.observes_stdout()
+    }
+
+    fn observes_stderr(&self) -> bool {
+        self.0.observes_stderr()
+    }
+
+    fn observe_stdout(&mut self, stdout: &[u8]) {
+        self.0.observe_stdout(stdout);
+    }
+
+    fn observe_stderr(&mut self, stderr: &[u8]) {
+        self.0.observe_stderr(stderr);
+    }
+}
+
+impl<S, T, OTA, OTB, const ITH: bool, const NTH: bool> DifferentialObserver<OTA, OTB, S>
+    for ExplicitTracking<T, ITH, NTH>
+where
+    OTA: ObserversTuple<S>,
+    OTB: ObserversTuple<S>,
+    S: UsesInput,
+    T: DifferentialObserver<OTA, OTB, S>,
+{
+    fn pre_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
+        self.as_mut().pre_observe_first(observers)
+    }
+
+    fn post_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
+        self.as_mut().post_observe_first(observers)
+    }
+
+    fn pre_observe_second(&mut self, observers: &mut OTB) -> Result<(), Error> {
+        self.as_mut().pre_observe_second(observers)
+    }
+
+    fn post_observe_second(&mut self, observers: &mut OTB) -> Result<(), Error> {
+        self.as_mut().post_observe_second(observers)
+    }
+}
+
+/// Module which holds the necessary functions and types for map-relevant macros, namely
+/// [`crate::require_index_tracking`] and [`crate::require_novelties_tracking`].
+pub mod macros {
+    pub use const_format::{concatcp, str_repeat};
+    pub use const_panic::{concat_panic, FmtArg};
+
+    /// Use in the constructor of your component which requires index tracking of a
+    /// [`super::MapObserver`]. See [`super::CanTrack`] for details.
+    ///
+    /// As an example, if you are developing the type `MyCustomScheduler<O>` which requires novelty
+    /// tracking, use this in your constructor:
+    /// ```
+    /// # use libafl::observers::{MapObserver, CanTrack};
+    /// # use libafl::require_index_tracking;
+    /// # use core::marker::PhantomData;
+    /// #
+    /// # struct MyCustomScheduler<C, O> {
+    /// #     phantom: PhantomData<(C, O)>,
+    /// # }
+    /// #
+    /// impl<C, O> MyCustomScheduler<C, O> where O: MapObserver, C: CanTrack + AsRef<O> {
+    ///     pub fn new(obs: &C) -> Self {
+    ///         require_index_tracking!("MyCustomScheduler", C);
+    ///         todo!("Construct your type")
+    ///     }
+    /// }
+    /// ```
+    #[macro_export]
+    macro_rules! require_index_tracking {
+        ($name: literal, $obs: ident) => {
+            struct SanityCheck<O: $crate::observers::CanTrack> {
+                phantom: ::core::marker::PhantomData<O>,
+            }
+
+            impl<O: $crate::observers::CanTrack> SanityCheck<O> {
+                #[rustfmt::skip]
+                const MESSAGE: &'static str = {
+                    const LINE_OFFSET: usize = line!().ilog10() as usize + 2;
+                    const SPACING: &str = $crate::observers::map::macros::str_repeat!(" ", LINE_OFFSET);
+                    $crate::observers::map::macros::concatcp!(
+                        "\n",
+                        SPACING, "|\n",
+                        SPACING, "= note: index tracking is required by ", $name, "\n",
+                        SPACING, "= note: see the documentation of CanTrack for details\n",
+                        SPACING, "|\n",
+                        SPACING, "= hint: call `.track_indices()` on the map observer passed to ", $name, " at the point where it is defined\n",
+                        SPACING, "|\n",
+                        SPACING, "| ",
+                    )
+                };
+                const TRACKING_SANITY: bool = {
+                    if !O::INDICES {
+                        panic!("{}", Self::MESSAGE)
+                    } else {
+                        true
+                    }
+                };
+
+                #[inline(always)]
+                fn check_sanity() {
+                    if !Self::TRACKING_SANITY {
+                        unreachable!("{}", Self::MESSAGE);
+                    }
+                }
+            }
+            SanityCheck::<$obs>::check_sanity(); // check that tracking is enabled for this map
+        };
+    }
+
+    /// Use in the constructor of your component which requires novelties tracking of a
+    /// [`super::MapObserver`]. See [`super::CanTrack`] for details on the concept.
+    ///
+    /// As an example, if you are developing the type `MyCustomScheduler<O>` which requires novelty
+    /// tracking, use this in your constructor:
+    /// ```
+    /// # use libafl::observers::{MapObserver, CanTrack};
+    /// # use libafl::require_novelties_tracking;
+    /// # use core::marker::PhantomData;
+    /// #
+    /// # struct MyCustomScheduler<C, O> {
+    /// #     phantom: PhantomData<(C, O)>,
+    /// # }
+    /// #
+    /// impl<C, O> MyCustomScheduler<C, O> where O: MapObserver, C: CanTrack + AsRef<O> {
+    ///     pub fn new(obs: &C) -> Self {
+    ///         require_novelties_tracking!("MyCustomScheduler", C);
+    ///         todo!("Construct your type")
+    ///     }
+    /// }
+    /// ```
+    #[macro_export]
+    macro_rules! require_novelties_tracking {
+        ($name: literal, $obs: ident) => {
+            struct SanityCheck<O: $crate::observers::CanTrack> {
+                phantom: ::core::marker::PhantomData<O>,
+            }
+
+            impl<O: $crate::observers::CanTrack> SanityCheck<O> {
+                #[rustfmt::skip]
+                const MESSAGE: &'static str = {
+                    const LINE_OFFSET: usize = line!().ilog10() as usize + 2;
+                    const SPACING: &str =
+                        $crate::observers::map::macros::str_repeat!(" ", LINE_OFFSET);
+                    $crate::observers::map::macros::concatcp!(
+                        "\n",
+                        SPACING, "|\n",
+                        SPACING, "= note: novelty tracking is required by ", $name, "\n",
+                        SPACING, "= note: see the documentation of CanTrack for details\n",
+                        SPACING, "|\n",
+                        SPACING, "= hint: call `.track_novelties()` on the map observer passed to ", $name, " at the point where it is defined\n",
+                        SPACING, "|\n",
+                        SPACING, "| ",
+                    )
+                };
+                const TRACKING_SANITY: bool = {
+                    if !O::NOVELTIES {
+                        panic!("{}", Self::MESSAGE)
+                    } else {
+                        true
+                    }
+                };
+
+                #[inline(always)]
+                fn check_sanity() {
+                    if !Self::TRACKING_SANITY {
+                        unreachable!("{}", Self::MESSAGE);
+                    }
+                }
+            }
+            SanityCheck::<$obs>::check_sanity(); // check that tracking is enabled for this map
+        };
+    }
 }
 
 /// A [`MapObserver`] observes the static map, as oftentimes used for AFL-like coverage information
 ///
+/// When referring to this type in a constraint (e.g. `O: MapObserver`), ensure that you only refer
+/// to instances of a second type, e.g. `C: AsRef<O>` or `A: AsMut<O>`. Map observer instances are
+/// passed around in a way that may be potentially wrapped by e.g. [`ExplicitTracking`] as a way to
+/// encode metadata into the type. This is an unfortunate additional requirement that we can't get
+/// around without specialization.
+///
+/// See [`crate::require_index_tracking`] for an example of how to do so.
+///
 /// TODO: enforce `iter() -> AssociatedTypeIter` when generic associated types stabilize
-pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned
+pub trait MapObserver:
+    HasLen + Named + Serialize + serde::de::DeserializeOwned + AsRef<Self> + AsMut<Self> + Hash
 // where
 //     for<'it> &'it Self: IntoIterator<Item = &'it Self::Entry>
 {
     /// Type of each entry in this map
-    type Entry: Bounded + PartialEq + Default + Copy + Debug + 'static;
+    type Entry: Bounded + PartialEq + Default + Copy + Debug + Hash + 'static;
 
     /// Get the value at `idx`
     fn get(&self, idx: usize) -> &Self::Entry;
@@ -102,8 +428,8 @@ pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned
     /// Count the set bytes in the map
     fn count_bytes(&self) -> u64;
 
-    /// Compute the hash of the map
-    fn hash(&self) -> u64;
+    /// Compute the hash of the map without needing to provide a hasher
+    fn hash_simple(&self) -> u64;
 
     /// Get the initial value for `reset()`
     fn initial(&self) -> Self::Entry;
@@ -116,6 +442,24 @@ pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned
 
     /// Get the number of set entries with the specified indexes
     fn how_many_set(&self, indexes: &[usize]) -> usize;
+}
+
+impl<M> CanTrack for M
+where
+    M: MapObserver,
+{
+    type WithIndexTracking = ExplicitTracking<Self, true, false>;
+    type WithNoveltiesTracking = ExplicitTracking<Self, false, true>;
+    const INDICES: bool = false;
+    const NOVELTIES: bool = false;
+
+    fn track_indices(self) -> Self::WithIndexTracking {
+        ExplicitTracking::<Self, true, false>(self)
+    }
+
+    fn track_novelties(self) -> Self::WithNoveltiesTracking {
+        ExplicitTracking::<Self, false, true>(self)
+    }
 }
 
 /// A Simple iterator calling `MapObserver::get`
@@ -198,6 +542,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -249,6 +594,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -269,6 +615,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -289,6 +636,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -310,6 +658,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -330,6 +679,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -346,12 +696,49 @@ where
     }
 }
 
+impl<'a, T, const DIFFERENTIAL: bool> Hash for StdMapObserver<'a, T, DIFFERENTIAL>
+where
+    T: Bounded
+        + PartialEq
+        + Default
+        + Copy
+        + Hash
+        + 'static
+        + Serialize
+        + serde::de::DeserializeOwned
+        + Debug,
+{
+    #[inline]
+    fn hash<H: Hasher>(&self, hasher: &mut H) {
+        self.as_slice().hash(hasher);
+    }
+}
+
+impl<'a, T, const DIFFERENTIAL: bool> AsRef<Self> for StdMapObserver<'a, T, DIFFERENTIAL>
+where
+    T: Default + Copy + 'static + Serialize,
+{
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
+impl<'a, T, const DIFFERENTIAL: bool> AsMut<Self> for StdMapObserver<'a, T, DIFFERENTIAL>
+where
+    T: Default + Copy + 'static + Serialize,
+{
+    fn as_mut(&mut self) -> &mut Self {
+        self
+    }
+}
+
 impl<'a, T, const DIFFERENTIAL: bool> MapObserver for StdMapObserver<'a, T, DIFFERENTIAL>
 where
     T: Bounded
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -388,8 +775,9 @@ where
         self.as_slice().len()
     }
 
-    fn hash(&self) -> u64 {
-        hash_slice(self.as_slice())
+    #[inline]
+    fn hash_simple(&self) -> u64 {
+        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
     }
 
     #[inline]
@@ -455,6 +843,7 @@ where
         self.map.as_slice()
     }
 }
+
 impl<'a, T, const DIFFERENTIAL: bool> AsMutSlice for StdMapObserver<'a, T, DIFFERENTIAL>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
@@ -734,6 +1123,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -754,6 +1144,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -774,6 +1165,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -794,6 +1186,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -814,6 +1207,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -830,12 +1224,48 @@ where
     }
 }
 
+impl<'a, T, const N: usize> Hash for ConstMapObserver<'a, T, N>
+where
+    T: Bounded
+        + PartialEq
+        + Default
+        + Copy
+        + Hash
+        + 'static
+        + Serialize
+        + serde::de::DeserializeOwned
+        + Debug,
+{
+    #[inline]
+    fn hash<H: Hasher>(&self, hasher: &mut H) {
+        self.as_slice().hash(hasher);
+    }
+}
+impl<'a, T, const N: usize> AsRef<Self> for ConstMapObserver<'a, T, N>
+where
+    T: Default + Copy + 'static + Serialize,
+{
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
+impl<'a, T, const N: usize> AsMut<Self> for ConstMapObserver<'a, T, N>
+where
+    T: Default + Copy + 'static + Serialize,
+{
+    fn as_mut(&mut self) -> &mut Self {
+        self
+    }
+}
+
 impl<'a, T, const N: usize> MapObserver for ConstMapObserver<'a, T, N>
 where
     T: Bounded
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -876,8 +1306,9 @@ where
         self.as_slice().len()
     }
 
-    fn hash(&self) -> u64 {
-        hash_slice(self.as_slice())
+    #[inline]
+    fn hash_simple(&self) -> u64 {
+        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
     }
 
     /// Reset the map
@@ -922,6 +1353,7 @@ where
         self.map.as_slice()
     }
 }
+
 impl<'a, T, const N: usize> AsMutSlice for ConstMapObserver<'a, T, N>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
@@ -1036,6 +1468,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1058,6 +1491,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1080,6 +1514,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1102,6 +1537,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1124,6 +1560,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1142,12 +1579,50 @@ where
     }
 }
 
+impl<'a, T> Hash for VariableMapObserver<'a, T>
+where
+    T: Bounded
+        + PartialEq
+        + Default
+        + Copy
+        + Hash
+        + 'static
+        + Serialize
+        + serde::de::DeserializeOwned
+        + Debug
+        + PartialEq
+        + Bounded,
+{
+    #[inline]
+    fn hash<H: Hasher>(&self, hasher: &mut H) {
+        self.as_slice().hash(hasher);
+    }
+}
+impl<'a, T> AsRef<Self> for VariableMapObserver<'a, T>
+where
+    T: Default + Copy + 'static + Serialize + PartialEq + Bounded,
+{
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
+impl<'a, T> AsMut<Self> for VariableMapObserver<'a, T>
+where
+    T: Default + Copy + 'static + Serialize + PartialEq + Bounded,
+{
+    fn as_mut(&mut self) -> &mut Self {
+        self
+    }
+}
+
 impl<'a, T> MapObserver for VariableMapObserver<'a, T>
 where
     T: Bounded
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1188,8 +1663,10 @@ where
         }
         res
     }
-    fn hash(&self) -> u64 {
-        hash_slice(self.as_slice())
+
+    #[inline]
+    fn hash_simple(&self) -> u64 {
+        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
     }
 
     /// Reset the map
@@ -1229,6 +1706,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1243,11 +1721,13 @@ where
         &self.map.as_slice()[..cnt]
     }
 }
+
 impl<'a, T> AsMutSlice for VariableMapObserver<'a, T>
 where
     T: 'static
         + Default
         + Copy
+        + Hash
         + Serialize
         + serde::de::DeserializeOwned
         + Debug
@@ -1305,9 +1785,9 @@ where
 
 /// Map observer with AFL-like hitcounts postprocessing
 ///
-/// [`MapObserver`]s that are not slice-backed,
-/// such as [`MultiMapObserver`], can use [`HitcountsIterableMapObserver`] instead.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+/// [`MapObserver`]s that are not slice-backed, such as [`MultiMapObserver`], can use
+/// [`HitcountsIterableMapObserver`] instead.
+#[derive(Serialize, Deserialize, Clone, Debug, Hash)]
 #[serde(bound = "M: serde::de::DeserializeOwned")]
 pub struct HitcountsMapObserver<M>
 where
@@ -1396,6 +1876,24 @@ where
     }
 }
 
+impl<M> AsRef<Self> for HitcountsMapObserver<M>
+where
+    M: MapObserver<Entry = u8>,
+{
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
+impl<M> AsMut<Self> for HitcountsMapObserver<M>
+where
+    M: MapObserver<Entry = u8>,
+{
+    fn as_mut(&mut self) -> &mut Self {
+        self
+    }
+}
+
 impl<M> MapObserver for HitcountsMapObserver<M>
 where
     M: MapObserver<Entry = u8>,
@@ -1433,8 +1931,9 @@ where
         self.base.reset_map()
     }
 
-    fn hash(&self) -> u64 {
-        self.base.hash()
+    #[inline]
+    fn hash_simple(&self) -> u64 {
+        self.base.hash_simple()
     }
     fn to_vec(&self) -> Vec<u8> {
         self.base.to_vec()
@@ -1478,7 +1977,7 @@ where
 
 impl<M> HitcountsMapObserver<M>
 where
-    M: Serialize + serde::de::DeserializeOwned,
+    M: MapObserver,
 {
     /// Creates a new [`MapObserver`]
     pub fn new(base: M) -> Self {
@@ -1589,7 +2088,7 @@ where
 /// Map observer with hitcounts postprocessing
 /// Less optimized version for non-slice iterators.
 /// Slice-backed observers should use a [`HitcountsMapObserver`].
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Hash)]
 #[serde(bound = "M: serde::de::DeserializeOwned")]
 pub struct HitcountsIterableMapObserver<M>
 where
@@ -1645,6 +2144,26 @@ where
     }
 }
 
+impl<M> AsRef<Self> for HitcountsIterableMapObserver<M>
+where
+    M: MapObserver<Entry = u8>,
+    for<'it> M: AsIterMut<'it, Item = u8>,
+{
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
+impl<M> AsMut<Self> for HitcountsIterableMapObserver<M>
+where
+    M: MapObserver<Entry = u8>,
+    for<'it> M: AsIterMut<'it, Item = u8>,
+{
+    fn as_mut(&mut self) -> &mut Self {
+        self
+    }
+}
+
 impl<M> MapObserver for HitcountsIterableMapObserver<M>
 where
     M: MapObserver<Entry = u8>,
@@ -1683,8 +2202,9 @@ where
         self.base.reset_map()
     }
 
-    fn hash(&self) -> u64 {
-        self.base.hash()
+    #[inline]
+    fn hash_simple(&self) -> u64 {
+        self.base.hash_simple()
     }
     fn to_vec(&self) -> Vec<u8> {
         self.base.to_vec()
@@ -1714,6 +2234,7 @@ where
         self.base.as_slice()
     }
 }
+
 impl<M> AsMutSlice for HitcountsIterableMapObserver<M>
 where
     M: MapObserver + AsMutSlice,
@@ -1890,6 +2411,40 @@ where
     }
 }
 
+impl<'a, T, const DIFFERENTIAL: bool> Hash for MultiMapObserver<'a, T, DIFFERENTIAL>
+where
+    T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    fn hash<H: Hasher>(&self, hasher: &mut H) {
+        for map in &self.maps {
+            let slice = map.as_slice();
+            let ptr = slice.as_ptr() as *const u8;
+            let map_size = slice.len() / size_of::<T>();
+            unsafe {
+                hasher.write(slice::from_raw_parts(ptr, map_size));
+            }
+        }
+    }
+}
+
+impl<'a, T, const DIFFERENTIAL: bool> AsRef<Self> for MultiMapObserver<'a, T, DIFFERENTIAL>
+where
+    T: 'static + Default + Copy + Serialize + Debug,
+{
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
+impl<'a, T, const DIFFERENTIAL: bool> AsMut<Self> for MultiMapObserver<'a, T, DIFFERENTIAL>
+where
+    T: 'static + Default + Copy + Serialize + Debug,
+{
+    fn as_mut(&mut self) -> &mut Self {
+        self
+    }
+}
+
 impl<'a, T, const DIFFERENTIAL: bool> MapObserver for MultiMapObserver<'a, T, DIFFERENTIAL>
 where
     T: 'static
@@ -1897,6 +2452,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + Serialize
         + serde::de::DeserializeOwned
         + Debug,
@@ -1937,17 +2493,9 @@ where
         res
     }
 
-    fn hash(&self) -> u64 {
-        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
-        for map in &self.maps {
-            let slice = map.as_slice();
-            let ptr = slice.as_ptr() as *const u8;
-            let map_size = slice.len() / size_of::<T>();
-            unsafe {
-                hasher.write(slice::from_raw_parts(ptr, map_size));
-            }
-        }
-        hasher.finish()
+    #[inline]
+    fn hash_simple(&self) -> u64 {
+        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
     }
 
     fn reset_map(&mut self) -> Result<(), Error> {
@@ -2245,6 +2793,34 @@ where
     }
 }
 
+impl<T> Hash for OwnedMapObserver<T>
+where
+    T: 'static + Hash + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    #[inline]
+    fn hash<H: Hasher>(&self, hasher: &mut H) {
+        self.as_slice().hash(hasher);
+    }
+}
+
+impl<T> AsRef<Self> for OwnedMapObserver<T>
+where
+    T: 'static + Default + Copy + Serialize,
+{
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
+impl<T> AsMut<Self> for OwnedMapObserver<T>
+where
+    T: 'static + Default + Copy + Serialize,
+{
+    fn as_mut(&mut self) -> &mut Self {
+        self
+    }
+}
+
 impl<T> MapObserver for OwnedMapObserver<T>
 where
     T: 'static
@@ -2252,6 +2828,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + Serialize
         + serde::de::DeserializeOwned
         + Debug,
@@ -2287,8 +2864,9 @@ where
         self.as_slice().len()
     }
 
-    fn hash(&self) -> u64 {
-        hash_slice(self.as_slice())
+    #[inline]
+    fn hash_simple(&self) -> u64 {
+        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
     }
 
     #[inline]
