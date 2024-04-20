@@ -408,45 +408,51 @@ jobs:
         run: docker build -t libafl .
 
   windows-frida-libpng:
-    needs:
-      - common
     runs-on: windows-latest
-    - uses: actions/checkout@v3
-    - uses: ./.github/workflows/windows-tester-prepare
-    - name: Build fuzzers/frida_libpng
-      run: cd fuzzers/frida_libpng/ && cargo make test
+    needs:
+      - common  
+    steps:  
+      - uses: actions/checkout@v3
+      - uses: ./.github/workflows/windows-tester-prepare
+      - name: Build fuzzers/frida_libpng
+        run: cd fuzzers/frida_libpng/ && cargo make test
 
   windows-frida-libfuzzer-stb-image:
+    runs-on: windows-latest
     needs:
       - common
-    runs-on: windows-latest
-    - uses: actions/checkout@v3
-    - uses: ./.github/workflows/windows-tester-prepare
-    - name: Build fuzzers/libfuzzer_stb_image
-      run: cd fuzzers/libfuzzer_stb_image && cargo build --release
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/workflows/windows-tester-prepare
+      - name: Build fuzzers/libfuzzer_stb_image
+        run: cd fuzzers/libfuzzer_stb_image && cargo build --release
 
   windows-frida-gdiplus:
     needs:
       - common
-    runs-on: windows-latest
-    - uses: actions/checkout@v3
-    - uses: ./.github/workflows/windows-tester-prepare
-    - name: Build fuzzers/frida_gdiplus
-      run: cd fuzzers/frida_gdiplus/ && cargo make test && cargo make test_cmplog
+    steps:
+      runs-on: windows-latest
+      - uses: actions/checkout@v3
+      - uses: ./.github/workflows/windows-tester-prepare
+      - name: Build fuzzers/frida_gdiplus
+        run: cd fuzzers/frida_gdiplus/ && cargo make test && cargo make test_cmplog
 
   windows-tinyinst-simple:
-    needs:
-      - common
     runs-on: windows-latest
-    - uses: actions/checkout@v3
-    - uses: ./.github/workflows/windows-tester-prepare
-    - name: Build fuzzers/tinyinst_simple
-      run: cd fuzzers/tinyinst_simple/ && cargo make test
+    needs:
+      - common 
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/workflows/windows-tester-prepare
+      - name: install cxx bridge
+        run: cargo install cxxbridge-cmd
+      - name: Build fuzzers/tinyinst_simple
+        run: cd fuzzers/tinyinst_simple/ && cargo make test
 
   windows-clippy:
-    needs:
-      - common
     runs-on: windows-latest
+    needs:
+      - common    
     steps:
       - uses: actions-rs/toolchain@v1
         with:
