@@ -266,7 +266,8 @@ pub fn build(
     }
 
     let libafl_qemu_dir = env::var_os("LIBAFL_QEMU_DIR").map(|x| x.to_string_lossy().to_string());
-    let libafl_qemu_clone_dir = env::var_os("LIBAFL_QEMU_CLONE_DIR").map(|x| x.to_string_lossy().to_string());
+    let libafl_qemu_clone_dir =
+        env::var_os("LIBAFL_QEMU_CLONE_DIR").map(|x| x.to_string_lossy().to_string());
     let libafl_qemu_force_configure = env::var("LIBAFL_QEMU_FORCE_CONFIGURE").is_ok();
     let libafl_qemu_no_build = env::var("LIBAFL_QEMU_NO_BUILD").is_ok();
 
@@ -295,7 +296,11 @@ pub fn build(
 
         Path::new(&qemu_dir).to_path_buf()
     } else {
-        let qemu_path = if let Some(clone_dir) = &libafl_qemu_clone_dir { PathBuf::from(clone_dir) } else { target_dir.join(QEMU_DIRNAME) };
+        let qemu_path = if let Some(clone_dir) = &libafl_qemu_clone_dir {
+            PathBuf::from(clone_dir)
+        } else {
+            target_dir.join(QEMU_DIRNAME)
+        };
 
         let qemu_rev = target_dir.join("QEMU_REVISION");
         if qemu_rev.exists()
@@ -445,13 +450,16 @@ pub fn build(
     */
 
     if cfg!(feature = "shared") {
-        let qemu_build_dir_str = libafl_qemu_build_dir.to_str().expect("Could not convert to str");
+        let qemu_build_dir_str = libafl_qemu_build_dir
+            .to_str()
+            .expect("Could not convert to str");
         println!("cargo:rustc-link-search=native={qemu_build_dir_str}");
         println!("cargo:rustc-link-lib=dylib={output_lib_link}");
         cargo_add_rpath(qemu_build_dir_str);
     } else {
-        let compile_commands_string = &fs::read_to_string(libafl_qemu_build_dir.join("linkinfo.json"))
-            .expect("Failed to read linkinfo.json");
+        let compile_commands_string =
+            &fs::read_to_string(libafl_qemu_build_dir.join("linkinfo.json"))
+                .expect("Failed to read linkinfo.json");
 
         let linkinfo = json::parse(compile_commands_string).expect("Failed to parse linkinfo.json");
 
@@ -477,7 +485,8 @@ pub fn build(
         let output = link_command.output().expect("Partial linked failure");
 
         if !output.status.success() {
-            fs::write(libafl_qemu_build_dir.join("link.command"), link_str).expect("Link command failed.");
+            fs::write(libafl_qemu_build_dir.join("link.command"), link_str)
+                .expect("Link command failed.");
             fs::write(libafl_qemu_build_dir.join("link.stdout"), &output.stdout)
                 .expect("Link stdout failed.");
             fs::write(libafl_qemu_build_dir.join("link.stderr"), &output.stderr)
