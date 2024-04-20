@@ -699,7 +699,7 @@ where
     }
     /// Loads initial inputs from the passed-in `in_dirs`.
     /// If `forced` is true, will add all testcases, no matter what.
-    /// If `exit_on_solution` is true, will return a CorpusError if a Solution is found.
+    /// If `exit_on_solution` is true, will return a `CorpusError` if a Solution is found.
     /// This method takes a list of files.
     fn continue_loading_initial_inputs_custom<E, EM, Z>(
         &mut self,
@@ -719,7 +719,7 @@ where
             match self.next_file() {
                 Ok(path) => {
                     let res = self.load_file(&path, manager, fuzzer, executor, forced, loader)?;
-                    if exit_on_solution && matches!(res, ExecuteInputResult::Solution){
+                    if exit_on_solution && matches!(res, ExecuteInputResult::Solution) {
                         return Err(Error::corpus_error(format!(
                             "Input {} resulted in a solution",
                             path.display()
