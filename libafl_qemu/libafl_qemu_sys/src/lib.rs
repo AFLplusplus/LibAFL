@@ -98,7 +98,7 @@ macro_rules! extern_c_checked {
 
 #[cfg(target_os = "linux")]
 use core::ops::BitAnd;
-use std::{ffi::c_void, slice::from_raw_parts, str::from_utf8_unchecked};
+use std::ffi::c_void;
 
 #[cfg(all(not(feature = "clippy"), target_os = "linux"))]
 pub use bindings::*;
@@ -120,12 +120,14 @@ pub type GuestVirtAddr = crate::vaddr;
 
 pub type GuestHwAddrInfo = crate::qemu_plugin_hwaddr;
 
+#[derive(Debug)]
 #[repr(C)]
+#[cfg_attr(feature = "python", pyclass(unsendable))]
 pub struct MapInfo {
     start: GuestAddr,
     end: GuestAddr,
     offset: GuestAddr,
-    path: *const u8,
+    path: Option<String>,
     flags: i32,
     is_priv: i32,
 }
@@ -207,6 +209,7 @@ extern_c_checked! {
     pub fn libafl_qemu_gdb_reply(buf: *const u8, len: usize);
 }
 
+#[cfg_attr(feature = "python", pymethods)]
 impl MapInfo {
     #[must_use]
     pub fn start(&self) -> GuestAddr {
@@ -224,17 +227,8 @@ impl MapInfo {
     }
 
     #[must_use]
-    pub fn path(&self) -> Option<&str> {
-        if self.path.is_null() {
-            None
-        } else {
-            unsafe {
-                Some(from_utf8_unchecked(from_raw_parts(
-                    self.path,
-                    strlen(self.path),
-                )))
-            }
-        }
+    pub fn path(&self) -> Option<&String> {
+        self.path.as_ref()
     }
 
     #[must_use]
@@ -280,5 +274,13 @@ impl MmapPerms {
                 | MmapPerms::WriteExecute
                 | MmapPerms::ReadWriteExecute
         )
+    }
+}
+
+#[cfg(feature = "python")]
+impl IntoPy<PyObject> for MmapPerms {
+    fn into_py(self, py: Python) -> PyObject {
+        let n: i32 = self.into();
+        n.into_py(py)
     }
 }

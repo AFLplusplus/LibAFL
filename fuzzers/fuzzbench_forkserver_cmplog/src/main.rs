@@ -21,7 +21,7 @@ use libafl::{
         scheduled::havoc_mutations, token_mutations::AFLppRedQueen, tokens_mutations,
         StdMOptMutator, Tokens,
     },
-    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
+    observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
@@ -29,8 +29,8 @@ use libafl::{
         calibrate::CalibrationStage, mutational::MultiMutationalStage,
         power::StdPowerMutationalStage, ColorizationStage, IfStage,
     },
-    state::{HasCorpus, HasCurrentTestcase, HasMetadata, StdState},
-    Error,
+    state::{HasCorpus, HasCurrentTestcase, StdState},
+    Error, HasMetadata,
 };
 use libafl_bolts::{
     current_nanos, current_time,
@@ -225,7 +225,7 @@ fn fuzz(
     // a large initial map size that should be enough
     // to house all potential coverage maps for our targets
     // (we will eventually reduce the used size according to the actual map)
-    const MAP_SIZE: usize = 2_621_440;
+    const MAP_SIZE: usize = 65_536;
 
     let log = RefCell::new(OpenOptions::new().append(true).create(true).open(logfile)?);
 
@@ -251,13 +251,14 @@ fn fuzz(
     std::env::set_var("AFL_MAP_SIZE", format!("{MAP_SIZE}"));
 
     // Create an observation channel using the hitcounts map of AFL++
-    let edges_observer =
-        unsafe { HitcountsMapObserver::new(StdMapObserver::new("shared_mem", shmem_buf)) };
+    let edges_observer = unsafe {
+        HitcountsMapObserver::new(StdMapObserver::new("shared_mem", shmem_buf)).track_indices()
+    };
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    let map_feedback = MaxMapFeedback::tracking(&edges_observer, true, false);
+    let map_feedback = MaxMapFeedback::new(&edges_observer);
 
     let calibration = CalibrationStage::new(&map_feedback);
 
@@ -303,11 +304,14 @@ fn fuzz(
     let power = StdPowerMutationalStage::new(mutator);
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerScheduler::new(StdWeightedScheduler::with_schedule(
-        &mut state,
+    let scheduler = IndexesLenTimeMinimizerScheduler::new(
         &edges_observer,
-        Some(PowerSchedule::EXPLORE),
-    ));
+        StdWeightedScheduler::with_schedule(
+            &mut state,
+            &edges_observer,
+            Some(PowerSchedule::EXPLORE),
+        ),
+    );
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);

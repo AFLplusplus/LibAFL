@@ -17,13 +17,13 @@ use crate::{
 
 /// A [`DiffExecutor`] wraps a primary executor, forwarding its methods, and a secondary one
 #[derive(Debug)]
-pub struct DiffExecutor<A, B, OTA, OTB, DOT> {
+pub struct DiffExecutor<A, B, DOT, OTA, OTB> {
     primary: A,
     secondary: B,
     observers: UnsafeCell<ProxyObserversTuple<OTA, OTB, DOT>>,
 }
 
-impl<A, B, OTA, OTB, DOT> DiffExecutor<A, B, OTA, OTB, DOT> {
+impl<A, B, DOT, OTA, OTB> DiffExecutor<A, B, DOT, OTA, OTB> {
     /// Create a new `DiffExecutor`, wrapping the given `executor`s.
     pub fn new(primary: A, secondary: B, observers: DOT) -> Self
     where
@@ -55,7 +55,7 @@ impl<A, B, OTA, OTB, DOT> DiffExecutor<A, B, OTA, OTB, DOT> {
     }
 }
 
-impl<A, B, EM, DOT, Z> Executor<EM, Z> for DiffExecutor<A, B, A::Observers, B::Observers, DOT>
+impl<A, B, DOT, EM, Z> Executor<EM, Z> for DiffExecutor<A, B, DOT, A::Observers, B::Observers>
 where
     A: Executor<EM, Z> + HasObservers,
     B: Executor<EM, Z, State = A::State> + HasObservers,
@@ -210,7 +210,7 @@ impl<A, B, DOT> ProxyObserversTuple<A, B, DOT> {
     }
 }
 
-impl<A, B, OTA, OTB, DOT> UsesObservers for DiffExecutor<A, B, OTA, OTB, DOT>
+impl<A, B, DOT, OTA, OTB> UsesObservers for DiffExecutor<A, B, DOT, OTA, OTB>
 where
     A: HasObservers<Observers = OTA>,
     B: HasObservers<Observers = OTB, State = A::State>,
@@ -221,7 +221,7 @@ where
     type Observers = ProxyObserversTuple<OTA, OTB, DOT>;
 }
 
-impl<A, B, OTA, OTB, DOT> UsesState for DiffExecutor<A, B, OTA, OTB, DOT>
+impl<A, B, DOT, OTA, OTB> UsesState for DiffExecutor<A, B, DOT, OTA, OTB>
 where
     A: UsesState,
     B: UsesState<State = A::State>,
@@ -229,7 +229,7 @@ where
     type State = A::State;
 }
 
-impl<A, B, OTA, OTB, DOT> HasObservers for DiffExecutor<A, B, OTA, OTB, DOT>
+impl<A, B, DOT, OTA, OTB> HasObservers for DiffExecutor<A, B, DOT, OTA, OTB>
 where
     A: HasObservers<Observers = OTA>,
     B: HasObservers<Observers = OTB, State = A::State>,

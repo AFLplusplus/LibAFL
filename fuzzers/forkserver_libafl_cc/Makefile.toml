@@ -101,6 +101,26 @@ taskset -c 1 ${CARGO_TARGET_DIR}/${PROFILE_DIR}/${CARGO_MAKE_PROJECT_NAME} ./${F
 '''
 dependencies = [ "fuzzer_crash" ]
 
+# Test
+[tasks.test]
+linux_alias = "test_unix"
+mac_alias = "test_unix"
+windows_alias = "unsupported"
+
+[tasks.test_unix]
+script_runner = "@shell"
+script='''
+timeout 30s ${CARGO_TARGET_DIR}/${PROFILE_DIR}/${CARGO_MAKE_PROJECT_NAME} ./${FUZZER_NAME} ./corpus/ -t 1000 | tee fuzz_stdout.log || true
+if grep -qa "objectives: 1" fuzz_stdout.log; then
+    echo "Fuzzer is working"
+else
+    echo "Fuzzer does not generate any testcases or any crashes"
+    exit 1
+fi
+
+'''
+dependencies = [ "fuzzer" ]
+
 # Clean up
 [tasks.clean]
 linux_alias = "clean_unix"

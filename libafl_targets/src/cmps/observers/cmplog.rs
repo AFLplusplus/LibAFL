@@ -9,8 +9,7 @@ use libafl::{
     executors::ExitKind,
     inputs::UsesInput,
     observers::{cmp::CmpValuesMetadata, CmpMap, CmpObserver, Observer},
-    state::HasMetadata,
-    Error,
+    Error, HasMetadata,
 };
 use libafl_bolts::{ownedref::OwnedMutPtr, Named};
 

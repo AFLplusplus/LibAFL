@@ -1,6 +1,6 @@
 [package]
 name = "libafl_qemu_sys"
-version = "0.11.2"
+version = "0.12.0"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
 description = "C to Rust bindings for the LibAFL QEMU bridge"
 documentation = "https://docs.rs/libafl_qemu_sys"
@@ -10,6 +10,7 @@ license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "qemu", "instrumentation"]
 edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
+links = "qemu"
 
 [package.metadata.docs.rs]
 features = ["x86_64", "usermode"]
@@ -30,6 +31,8 @@ be = []
 usermode = []
 systemmode = []
 
+python = ["pyo3", "pyo3-build-config"]
+
 slirp = [ "systemmode", "libafl_qemu_build/slirp" ] # build qemu with host libslirp (for user networking)
 shared = [ "libafl_qemu_build/shared" ]
 
@@ -41,6 +44,8 @@ num_enum = "0.7"
 libc = "0.2"
 strum = "0.25"
 strum_macros = "0.25"
+pyo3 = { version = "0.18", optional = true }
 
 [build-dependencies]
-libafl_qemu_build = { path = "../libafl_qemu_build", version = "0.11.2" }
+libafl_qemu_build = { path = "../libafl_qemu_build", version = "0.12.0" }
+pyo3-build-config = { version = "0.18", optional = true }

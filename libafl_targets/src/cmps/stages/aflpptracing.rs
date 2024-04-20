@@ -8,10 +8,8 @@ use libafl::{
     inputs::{BytesInput, UsesInput},
     observers::ObserversTuple,
     stages::{colorization::TaintMetadata, RetryRestartHelper, Stage},
-    state::{
-        HasCorpus, HasCurrentTestcase, HasExecutions, HasMetadata, HasNamedMetadata, UsesState,
-    },
-    Error,
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, UsesState},
+    Error, HasMetadata, HasNamedMetadata,
 };
 use libafl_bolts::{tuples::MatchName, Named};
 

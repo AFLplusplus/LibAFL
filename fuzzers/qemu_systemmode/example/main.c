@@ -1,5 +1,5 @@
 #ifdef TARGET_SYNC_EXIT
-#include "libafl_qemu.h"
+  #include "libafl_qemu.h"
 #endif
 
 int __attribute__((noinline)) BREAKPOINT() {
@@ -8,7 +8,7 @@ int __attribute__((noinline)) BREAKPOINT() {
 
 int LLVMFuzzerTestOneInput(unsigned int *Data, unsigned int Size) {
 #ifdef TARGET_SYNC_EXIT
-  LIBAFL_EXIT_START_PHYS((unsigned int) Data, Size);
+  LIBAFL_EXIT_START_PHYS((unsigned int)Data, Size);
 #endif
   if (Data[3] == 0) {
     while (1) {}

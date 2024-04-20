@@ -11,8 +11,8 @@ use crate::{
     inputs::{GeneralizedInputMetadata, GeneralizedItem},
     mutators::{token_mutations::Tokens, MutationResult, Mutator},
     random_corpus_id,
-    state::{HasCorpus, HasMetadata, HasRand},
-    Error,
+    state::{HasCorpus, HasRand},
+    Error, HasMetadata,
 };
 
 const RECURSIVE_REPLACEMENT_DEPTH: [usize; 6] = [2, 4, 8, 16, 32, 64];

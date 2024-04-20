@@ -46,8 +46,8 @@ use crate::{
     inputs::Input,
     monitors::UserStats,
     observers::ObserversTuple,
-    state::{HasExecutions, HasLastReportTime, HasMetadata, State},
-    Error,
+    state::{HasExecutions, HasLastReportTime, State},
+    Error, HasMetadata,
 };
 #[cfg(feature = "scalability_introspection")]
 use crate::{
@@ -849,6 +849,76 @@ where
     #[inline]
     fn mgr_id(&self) -> EventManagerId {
         self.inner.mgr_id()
+    }
+}
+
+/// Collected stats to decide if observers must be serialized or not
+#[cfg(not(feature = "adaptive_serialization"))]
+pub trait AdaptiveSerializer {}
+
+/// Collected stats to decide if observers must be serialized or not
+#[cfg(feature = "adaptive_serialization")]
+pub trait AdaptiveSerializer {
+    /// Expose the collected observers serialization time
+    fn serialization_time(&self) -> Duration;
+    /// Expose the collected observers deserialization time
+    fn deserialization_time(&self) -> Duration;
+    /// How many times observers were serialized
+    fn serializations_cnt(&self) -> usize;
+    /// How many times shoukd have been serialized an observer
+    fn should_serialize_cnt(&self) -> usize;
+
+    /// Expose the collected observers serialization time (mut)
+    fn serialization_time_mut(&mut self) -> &mut Duration;
+    /// Expose the collected observers deserialization time (mut)
+    fn deserialization_time_mut(&mut self) -> &mut Duration;
+    /// How many times observers were serialized (mut)
+    fn serializations_cnt_mut(&mut self) -> &mut usize;
+    /// How many times shoukd have been serialized an observer (mut)
+    fn should_serialize_cnt_mut(&mut self) -> &mut usize;
+
+    /// Serialize the observer using the `time_factor` and `percentage_threshold`.
+    /// These parameters are unique to each of the different types of `EventManager`
+    fn serialize_observers_adaptive<S, OT>(
+        &mut self,
+        observers: &OT,
+        time_factor: u32,
+        percentage_threshold: usize,
+    ) -> Result<Option<Vec<u8>>, Error>
+    where
+        OT: ObserversTuple<S> + Serialize,
+        S: UsesInput,
+    {
+        let exec_time = observers
+            .match_name::<crate::observers::TimeObserver>("time")
+            .map(|o| o.last_runtime().unwrap_or(Duration::ZERO))
+            .unwrap();
+
+        let mut must_ser =
+            (self.serialization_time() + self.deserialization_time()) * time_factor < exec_time;
+        if must_ser {
+            *self.should_serialize_cnt_mut() += 1;
+        }
+
+        if self.serializations_cnt() > 32 {
+            must_ser = (self.should_serialize_cnt() * 100 / self.serializations_cnt())
+                > percentage_threshold;
+        }
+
+        if self.serialization_time() == Duration::ZERO
+            || must_ser
+            || self.serializations_cnt().trailing_zeros() >= 8
+        {
+            let start = current_time();
+            let ser = postcard::to_allocvec(observers)?;
+            *self.serialization_time_mut() = current_time() - start;
+
+            *self.serializations_cnt_mut() += 1;
+            Ok(Some(ser))
+        } else {
+            *self.serializations_cnt_mut() += 1;
+            Ok(None)
+        }
     }
 }
 

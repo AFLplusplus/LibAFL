@@ -7,7 +7,10 @@ use std::{
 };
 
 use libafl::{
-    corpus::{inmemory::TestcaseStorage, Corpus, CorpusId, Testcase},
+    corpus::{
+        inmemory::{TestcaseStorage, TestcaseStorageMap},
+        Corpus, CorpusId, Testcase,
+    },
     inputs::{Input, UsesInput},
 };
 use libafl_bolts::Error;
@@ -51,7 +54,7 @@ where
     }
 
     /// Touch this index and maybe evict an entry if we have touched an input which was unloaded.
-    fn touch(&self, idx: CorpusId) -> Result<(), Error> {
+    fn touch(&self, idx: CorpusId, corpus: &TestcaseStorageMap<I>) -> Result<(), Error> {
         let mut loaded_mapping = self.loaded_mapping.borrow_mut();
         let mut loaded_entries = self.loaded_entries.borrow_mut();
         match loaded_mapping.entry(idx) {
@@ -71,7 +74,7 @@ where
         }
         if loaded_entries.len() > self.max_len {
             let idx = loaded_entries.pop_first().unwrap().1; // cannot panic
-            let cell = self.mapping.get(idx).ok_or_else(|| {
+            let cell = corpus.get(idx).ok_or_else(|| {
                 Error::key_not_found(format!("Tried to evict non-existent entry {idx}"))
             })?;
             let mut tc = cell.try_borrow_mut()?;
@@ -79,27 +82,32 @@ where
         }
         Ok(())
     }
-}
-
-impl<I> UsesInput for LibfuzzerCorpus<I>
-where
-    I: Input + Serialize + for<'de> Deserialize<'de>,
-{
-    type Input = I;
-}
-
-impl<I> Corpus for LibfuzzerCorpus<I>
-where
-    I: Input + Serialize + for<'de> Deserialize<'de>,
-{
-    fn count(&self) -> usize {
-        self.mapping.map.len()
+    #[inline]
+    fn _get<'a>(
+        &'a self,
+        id: CorpusId,
+        corpus: &'a TestcaseStorageMap<I>,
+    ) -> Result<&RefCell<Testcase<I>>, Error> {
+        self.touch(id, corpus)?;
+        corpus.map.get(&id).map(|item| &item.testcase).ok_or_else(|| Error::illegal_state("Nonexistent corpus entry {id} requested (present in loaded entries, but not the mapping?)"))
     }
 
-    fn add(&mut self, testcase: Testcase<Self::Input>) -> Result<CorpusId, Error> {
-        let idx = self.mapping.insert(RefCell::new(testcase));
-        let mut testcase = self.mapping.get(idx).unwrap().borrow_mut();
-
+    fn _add(
+        &mut self,
+        testcase: RefCell<Testcase<I>>,
+        is_disabled: bool,
+    ) -> Result<CorpusId, Error> {
+        let idx = if is_disabled {
+            self.mapping.insert_disabled(testcase)
+        } else {
+            self.mapping.insert(testcase)
+        };
+        let corpus = if is_disabled {
+            &self.mapping.disabled
+        } else {
+            &self.mapping.enabled
+        };
+        let mut testcase = corpus.get(idx).unwrap().borrow_mut();
         match testcase.file_path() {
             Some(path) if path.canonicalize()?.starts_with(&self.corpus_dir) => {
                 // if it's already in the correct dir, we retain it
@@ -126,9 +134,39 @@ where
                 testcase.file_path_mut().replace(path);
             }
         };
-
-        self.touch(idx)?;
+        self.touch(idx, corpus)?;
         Ok(idx)
+    }
+}
+
+impl<I> UsesInput for LibfuzzerCorpus<I>
+where
+    I: Input + Serialize + for<'de> Deserialize<'de>,
+{
+    type Input = I;
+}
+
+impl<I> Corpus for LibfuzzerCorpus<I>
+where
+    I: Input + Serialize + for<'de> Deserialize<'de>,
+{
+    #[inline]
+    fn count(&self) -> usize {
+        self.mapping.enabled.map.len()
+    }
+    #[inline]
+    fn count_disabled(&self) -> usize {
+        self.mapping.disabled.map.len()
+    }
+    #[inline]
+    fn count_all(&self) -> usize {
+        self.count_disabled().saturating_add(self.count_disabled())
+    }
+    fn add(&mut self, testcase: Testcase<Self::Input>) -> Result<CorpusId, Error> {
+        self._add(RefCell::new(testcase), false)
+    }
+    fn add_disabled(&mut self, testcase: Testcase<Self::Input>) -> Result<CorpusId, Error> {
+        self._add(RefCell::new(testcase), true)
     }
 
     fn replace(
@@ -144,10 +182,16 @@ where
     }
 
     fn get(&self, id: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error> {
-        self.touch(id)?;
-        self.mapping.map.get(&id).map(|item| &item.testcase).ok_or_else(|| Error::illegal_state("Nonexistent corpus entry {id} requested (present in loaded entries, but not the mapping?)"))
+        self._get(id, &self.mapping.enabled)
     }
 
+    fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error> {
+        match self._get(id, &self.mapping.enabled) {
+            Ok(input) => Ok(input),
+            Err(Error::KeyNotFound(..)) => return self._get(id, &self.mapping.disabled),
+            Err(e) => Err(e),
+        }
+    }
     fn current(&self) -> &Option<CorpusId> {
         &self.current
     }
@@ -157,19 +201,29 @@ where
     }
 
     fn next(&self, id: CorpusId) -> Option<CorpusId> {
-        self.mapping.next(id)
+        self.mapping.enabled.next(id)
     }
 
     fn prev(&self, id: CorpusId) -> Option<CorpusId> {
-        self.mapping.prev(id)
+        self.mapping.enabled.prev(id)
     }
 
     fn first(&self) -> Option<CorpusId> {
-        self.mapping.first()
+        self.mapping.enabled.first()
     }
 
     fn last(&self) -> Option<CorpusId> {
-        self.mapping.last()
+        self.mapping.enabled.last()
+    }
+
+    /// Get the nth corpus id; considers both enabled and disabled testcases
+    #[inline]
+    fn nth_from_all(&self, nth: usize) -> CorpusId {
+        let enabled_count = self.count();
+        if nth >= enabled_count {
+            return self.mapping.disabled.keys[nth.saturating_sub(enabled_count)];
+        }
+        self.mapping.enabled.keys[nth]
     }
 
     fn load_input_into(&self, testcase: &mut Testcase<Self::Input>) -> Result<(), Error> {
@@ -239,6 +293,16 @@ where
         self.count
     }
 
+    // ArtifactCorpus disregards disabled entries
+    fn count_disabled(&self) -> usize {
+        0
+    }
+
+    fn count_all(&self) -> usize {
+        // count_disabled will always return 0
+        self.count() + self.count_disabled()
+    }
+
     fn add(&mut self, testcase: Testcase<Self::Input>) -> Result<CorpusId, Error> {
         let idx = self.count;
         self.count += 1;
@@ -260,6 +324,10 @@ where
         self.last = Some(RefCell::new(testcase));
 
         Ok(CorpusId::from(idx))
+    }
+
+    fn add_disabled(&mut self, _testcase: Testcase<Self::Input>) -> Result<CorpusId, Error> {
+        unimplemented!("ArtifactCorpus disregards disabled inputs")
     }
 
     fn replace(
@@ -286,6 +354,16 @@ where
             None
         };
         maybe_last.ok_or_else(|| Error::illegal_argument("Can only get the last corpus ID."))
+    }
+
+    // This just calls Self::get as ArtifactCorpus disregards disabled entries
+    fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error> {
+        self.get(id)
+    }
+
+    // This just calls Self::nth as ArtifactCorpus disregards disabled entries
+    fn nth_from_all(&self, nth: usize) -> CorpusId {
+        self.nth(nth)
     }
 
     fn current(&self) -> &Option<CorpusId> {

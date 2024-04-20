@@ -7,8 +7,8 @@ use libafl::{
     inputs::UsesInput,
     monitors::SimpleMonitor,
     stages::{HasCurrentStage, StagesTuple},
-    state::{HasExecutions, HasLastReportTime, HasMetadata, HasNamedMetadata},
-    Error, Fuzzer,
+    state::{HasExecutions, HasLastReportTime},
+    Error, Fuzzer, HasMetadata, HasNamedMetadata,
 };
 
 use crate::{fuzz_with, options::LibfuzzerOptions};

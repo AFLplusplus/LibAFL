@@ -45,7 +45,8 @@ We highly recommend *not* to use e.g. your Linux distribition package as this is
 Rust directly, instructions can be found [here](https://www.rust-lang.org/tools/install).
 
 - LLVM tools  
-The LLVM tools (including clang, clang++) are needed (newer than LLVM 11.0.0 up to LLVM 17.0.0)
+The LLVM tools (including clang, clang++) are needed (newer than LLVM 15.0.0 up to LLVM 18.1.3)
+If you are using Debian/Ubuntu, again, we highly recommmend that you install the package from [here](https://apt.llvm.org/)
 
 - Cargo-make  
 We use cargo-make to build the fuzzers in `fuzzers/` directory. You can install it with
@@ -117,7 +118,7 @@ For bugs, feel free to open issues or contact us directly. Thank you for your su
 
 Even though we will gladly assist you in finishing up your PR, try to
 - keep all the crates compiling with *stable* rust (hide the eventual non-stable code under [`cfg`s](https://github.com/AFLplusplus/LibAFL/blob/main/libafl/build.rs#L26))
-- run `cargo fmt` on your code before pushing
+- run `cargo +nightly fmt` on your code before pushing
 - check the output of `cargo clippy --all` or `./clippy.sh`
 - run `cargo build --no-default-features` to check for `no_std` compatibility (and possibly add `#[cfg(feature = "std")]`) to hide parts of your code.
 

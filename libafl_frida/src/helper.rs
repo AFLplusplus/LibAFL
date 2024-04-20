@@ -131,7 +131,7 @@ pub enum SkipRange {
     },
 }
 
-/// Builder for [`FridaInstrumentationHelper`](FridaInstrumentationHelper)
+/// Builder for [`FridaInstrumentationHelper`]
 pub struct FridaInstrumentationHelperBuilder {
     stalker_enabled: bool,
     disable_excludes: bool,
@@ -142,14 +142,14 @@ pub struct FridaInstrumentationHelperBuilder {
 }
 
 impl FridaInstrumentationHelperBuilder {
-    /// Create a new `FridaInstrumentationHelperBuilder`
+    /// Create a new [`FridaInstrumentationHelperBuilder`]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Enable or disable the Stalker
+    /// Enable or disable the [`Stalker`](https://frida.re/docs/stalker/)
     ///
-    /// Required for coverage collection, ASAN, and `CmpLog`.
+    /// Required for all instrumentation, such as coverage collection, `ASan`, and `CmpLog`.
     /// Enabled by default.
     #[must_use]
     pub fn enable_stalker(self, enabled: bool) -> Self {
@@ -239,7 +239,7 @@ impl FridaInstrumentationHelperBuilder {
         self
     }
 
-    /// Build a `FridaInstrumentationHelper`
+    /// Build a [`FridaInstrumentationHelper`]
     pub fn build<RT: FridaRuntimeTuple>(
         self,
         gum: &Gum,
@@ -396,9 +396,9 @@ where
 }
 
 impl<'a> FridaInstrumentationHelper<'a, ()> {
-    /// Create a builder to initialize a `FridaInstrumentationHelper`.
+    /// Create a builder to initialize a [`FridaInstrumentationHelper`].
     ///
-    /// See the documentation of [`FridaInstrumentationHelperBuilder`](FridaInstrumentationHelperBuilder)
+    /// See the documentation of [`FridaInstrumentationHelperBuilder`]
     /// for more details.
     pub fn builder() -> FridaInstrumentationHelperBuilder {
         FridaInstrumentationHelperBuilder::default()

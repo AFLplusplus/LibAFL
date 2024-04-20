@@ -21,11 +21,8 @@ use crate::{
     observers::{MapObserver, ObserversTuple, UsesObserver},
     schedulers::powersched::SchedulerMetadata,
     stages::{ExecutionCountRestartHelper, Stage},
-    state::{
-        HasCorpus, HasCurrentTestcase, HasExecutions, HasMetadata, HasNamedMetadata, State,
-        UsesState,
-    },
-    Error,
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, State, UsesState},
+    Error, HasMetadata, HasNamedMetadata,
 };
 
 /// The metadata to keep unstable entries
@@ -67,31 +64,32 @@ impl UnstableEntriesMetadata {
 
 /// The calibration stage will measure the average exec time and the target's stability for this input.
 #[derive(Clone, Debug)]
-pub struct CalibrationStage<O, OT, S> {
+pub struct CalibrationStage<C, O, OT, S> {
     map_observer_name: String,
     map_name: String,
     stage_max: usize,
     /// If we should track stability
     track_stability: bool,
     restart_helper: ExecutionCountRestartHelper,
-    phantom: PhantomData<(O, OT, S)>,
+    phantom: PhantomData<(C, O, OT, S)>,
 }
 
 const CAL_STAGE_START: usize = 4; // AFL++'s CAL_CYCLES_FAST + 1
 const CAL_STAGE_MAX: usize = 8; // AFL++'s CAL_CYCLES + 1
 
-impl<O, OT, S> UsesState for CalibrationStage<O, OT, S>
+impl<C, O, OT, S> UsesState for CalibrationStage<C, O, OT, S>
 where
     S: State,
 {
     type State = S;
 }
 
-impl<E, EM, O, OT, Z> Stage<E, EM, Z> for CalibrationStage<O, OT, E::State>
+impl<C, E, EM, O, OT, Z> Stage<E, EM, Z> for CalibrationStage<C, O, OT, E::State>
 where
     E: Executor<EM, Z> + HasObservers<Observers = OT>,
     EM: EventFirer<State = E::State>,
     O: MapObserver,
+    C: AsRef<O>,
     for<'de> <O as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static,
     OT: ObserversTuple<E::State>,
     E::State: HasCorpus + HasMetadata + HasNamedMetadata + HasExecutions,
@@ -150,8 +148,9 @@ where
 
         let map_first = &executor
             .observers()
-            .match_name::<O>(&self.map_observer_name)
+            .match_name::<C>(&self.map_observer_name)
             .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
+            .as_ref()
             .to_vec();
 
         let mut unstable_entries: Vec<usize> = vec![];
@@ -193,8 +192,9 @@ where
             if self.track_stability {
                 let map = &executor
                     .observers()
-                    .match_name::<O>(&self.map_observer_name)
+                    .match_name::<C>(&self.map_observer_name)
                     .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
+                    .as_ref()
                     .to_vec();
 
                 let history_map = &mut state
@@ -249,8 +249,9 @@ where
         if state.has_metadata::<SchedulerMetadata>() {
             let map = executor
                 .observers()
-                .match_name::<O>(&self.map_observer_name)
-                .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?;
+                .match_name::<C>(&self.map_observer_name)
+                .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
+                .as_ref();
 
             let mut bitmap_size = map.count_bytes();
             assert!(bitmap_size != 0);
@@ -338,9 +339,10 @@ where
     }
 }
 
-impl<O, OT, S> CalibrationStage<O, OT, S>
+impl<C, O, OT, S> CalibrationStage<C, O, OT, S>
 where
     O: MapObserver,
+    C: AsRef<O>,
     OT: ObserversTuple<S>,
     S: HasCorpus + HasMetadata + HasNamedMetadata,
 {
@@ -348,8 +350,9 @@ where
     #[must_use]
     pub fn new<F>(map_feedback: &F) -> Self
     where
-        F: HasObserverName + Named + UsesObserver<S, Observer = O>,
+        F: HasObserverName + Named + UsesObserver<S, Observer = C>,
         for<'it> O: AsIter<'it, Item = O::Entry>,
+        C: AsRef<O>,
     {
         Self {
             map_observer_name: map_feedback.observer_name().to_string(),
@@ -365,8 +368,9 @@ where
     #[must_use]
     pub fn ignore_stability<F>(map_feedback: &F) -> Self
     where
-        F: HasObserverName + Named + UsesObserver<S, Observer = O>,
+        F: HasObserverName + Named + UsesObserver<S, Observer = C>,
         for<'it> O: AsIter<'it, Item = O::Entry>,
+        C: AsRef<O>,
     {
         Self {
             map_observer_name: map_feedback.observer_name().to_string(),
