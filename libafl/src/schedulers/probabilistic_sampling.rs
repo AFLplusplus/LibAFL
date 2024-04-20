@@ -237,8 +237,8 @@ mod tests {
             super::ProbabilityMetadata::register();
         }
 
-        // the first 3 probabilities will be .69, .86, .44
-        let rand = StdRand::with_seed(12);
+        // the first 3 probabilities will be .76, .86, .36
+        let rand = StdRand::with_seed(2);
 
         let mut scheduler = UniformProbabilitySamplingScheduler::new();
 
