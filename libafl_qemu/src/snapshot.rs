@@ -521,7 +521,7 @@ where
     }
 }
 
-pub fn trace_write_snapshot<QT, S, const N: usize>(
+pub fn trace_write_snapshot<QT, S, const SIZE: usize>(
     hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     _id: u64,
@@ -531,7 +531,7 @@ pub fn trace_write_snapshot<QT, S, const N: usize>(
     QT: QemuHelperTuple<S>,
 {
     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
-    h.access(addr, N);
+    h.access(addr, SIZE);
 }
 
 pub fn trace_write_n_snapshot<QT, S>(
