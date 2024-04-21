@@ -1162,6 +1162,12 @@ impl Qemu {
     }
 
     #[allow(clippy::missing_transmute_annotations)]
+    /// `exec` hooks get invoked on every read performed by the guest
+    /// 
+    /// `exec1`-`exec8` special case accesses of width 1-8
+    /// 
+    /// If there is no specialized hook for a given read width, the `exec_n` will be
+    /// called and its last argument will specify the access width
     pub fn add_read_hooks<T: Into<HookData>>(
         &self,
         data: T,
