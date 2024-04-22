@@ -255,7 +255,7 @@ pub fn fuzz() {
                 tuple_list!(QemuDrCovHelper::new(
                     QemuInstrumentationAddressRangeFilter::None,
                     rangemap,
-                    PathBuf::from(coverage),
+                    coverage,
                     false,
                 )),
             );
