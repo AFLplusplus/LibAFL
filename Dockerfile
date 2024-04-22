@@ -140,7 +140,7 @@ RUN cargo build && cargo build --release
 # Copy fuzzers over
 COPY fuzzers fuzzers
 
-# RUN ./scripts/test_all_fuzzers.sh --no-fmt
+# RUN ./scripts/test_fuzzer.sh --no-fmt
 
 ENTRYPOINT [ "/bin/bash", "-c" ]
 CMD ["/bin/bash"]

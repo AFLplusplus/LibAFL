@@ -38,7 +38,6 @@ The tinyinst module for `LibAFL`.
     unused_import_braces,
     unused_qualifications,
     unused_must_use,
-    missing_docs,
     //unused_results
 ))]
 #![cfg_attr(

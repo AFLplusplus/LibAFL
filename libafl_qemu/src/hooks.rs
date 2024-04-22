@@ -117,7 +117,11 @@ macro_rules! create_wrapper {
             {
                 unsafe {
                     let hooks = get_qemu_hooks::<QT, S>();
+<<<<<<< HEAD
                     let func: fn(&mut QemuHooks<QT, S>, Option<&mut S>, $($param_type),*) = transmute(core::ptr::from_mut::<c_void>(hook));
+=======
+                    let func: fn(&mut QemuHooks<QT, S>, Option<&mut S>, $($param_type),*) = transmute(ptr::from_mut::<c_void>(hook));
+>>>>>>> main
                     func(hooks, inprocess_get_state::<S>(), $($param),*);
                 }
             }
@@ -144,7 +148,11 @@ macro_rules! create_wrapper {
             {
                 unsafe {
                     let hooks = get_qemu_hooks::<QT, S>();
+<<<<<<< HEAD
                     let func: fn(&mut QemuHooks<QT, S>, Option<&mut S>, $($param_type),*) -> $ret_type= transmute(core::ptr::from_mut::<c_void>(hook));
+=======
+                    let func: fn(&mut QemuHooks<QT, S>, Option<&mut S>, $($param_type),*) -> $ret_type= transmute(ptr::from_mut::<c_void>(hook));
+>>>>>>> main
                     func(hooks, inprocess_get_state::<S>(), $($param),*)
                 }
             }
