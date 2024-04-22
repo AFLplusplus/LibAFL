@@ -309,7 +309,7 @@ jobs:
           - ./fuzzers/backtrace_baby_fuzzers
           - ./fuzzers/fuzzbench_qemu
           - ./fuzzers/nyx_libxml2_parallel
-          - ./fuzzers/qemu_launcher
+          # - ./fuzzers/qemu_launcher
           - ./fuzzers/frida_gdiplus
           - ./fuzzers/libfuzzer_stb_image_concolic
           - ./fuzzers/nautilus_sync
@@ -359,7 +359,32 @@ jobs:
       - name: Build and run example fuzzers (Linux)
         if: runner.os == 'Linux'
         shell: bash
-        run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config ./scripts/test_all_fuzzers.sh ${{ matrix.fuzzer }}
+        run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
+
+  fuzzers-qemu:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        fuzzer:
+          - ./fuzzers/qemu_cmin
+          - ./fuzzers/qemu_systemmode
+          - ./fuzzers/qemu_coverage
+          - ./fuzzers/qemu_launcher
+
+    runs-on: [ self-hosted, qemu ]
+    container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/workflows/qemu-fuzzer-tester-prepare
+      - uses: ./.github/workflows/fuzzer-tester-prepare
+      - name: Symlink Headers
+        if: runner.os == 'Linux'
+        shell: bash
+        run: sudo ln -s /usr/include/asm-generic /usr/include/asm
+      - name: Build and run example QEMU fuzzers (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
 
   nostd-build:
     runs-on: ubuntu-latest
@@ -409,8 +434,8 @@ jobs:
   windows-frida-libpng:
     runs-on: windows-latest
     needs:
-      - common  
-    steps:  
+      - common
+    steps:
       - uses: actions/checkout@v3
       - uses: ./.github/workflows/windows-tester-prepare
       - name: Build fuzzers/frida_libpng
@@ -439,7 +464,7 @@ jobs:
   windows-tinyinst-simple:
     runs-on: windows-latest
     needs:
-      - common 
+      - common
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/workflows/windows-tester-prepare
@@ -451,7 +476,7 @@ jobs:
   windows-clippy:
     runs-on: windows-latest
     needs:
-      - common    
+      - common
     steps:
       - uses: actions-rs/toolchain@v1
         with:
