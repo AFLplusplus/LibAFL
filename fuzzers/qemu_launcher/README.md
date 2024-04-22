@@ -26,7 +26,8 @@ sudo apt install \
     gcc-mipsel-linux-gnu \
     g++-mipsel-linux-gnu \
     gcc-powerpc-linux-gnu \
-    g++-powerpc-linux-gnu
+    g++-powerpc-linux-gnu \
+    libsqlite3-dev
 ```
 
 ## Run
