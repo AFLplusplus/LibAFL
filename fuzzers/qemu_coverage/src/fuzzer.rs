@@ -137,7 +137,7 @@ pub fn fuzz() {
             "Mapping: 0x{:016x}-0x{:016x}, {}",
             m.start(),
             m.end(),
-            m.path().unwrap_or("<EMPTY>")
+            m.path().unwrap_or(&"<EMPTY>".to_string())
         );
     }
 
