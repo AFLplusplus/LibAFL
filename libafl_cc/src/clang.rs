@@ -278,7 +278,7 @@ impl ToolWrapper for ClangWrapper {
         if linking {
             new_args.push("-lrt".into());
         }
-        // MacOS has odd linker behavior sometimes
+        // `MacOS` has odd linker behavior sometimes
         #[cfg(target_vendor = "apple")]
         if linking || shared {
             new_args.push("-undefined".into());
