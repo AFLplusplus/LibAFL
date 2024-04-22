@@ -1,5 +1,18 @@
+env_scripts = [
+'''
+#!@duckscript
+profile = get_env PROFILE
+
+if eq $profile "dev"
+    set_env PROFILE_DIR debug
+else
+    set_env PROFILE_DIR ${profile}
+end
+'''
+]
+
 [env]
-PROFILE = { value = "release", condition = {env_not_set = ["PROFILE"]} }
+PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
 TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${FEATURE}"
 LIBAFL_QEMU_CLONE_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/qemu-libafl-bridge"
 KERNEL = "${TARGET_DIR}/example.elf"
@@ -33,7 +46,7 @@ args = [
     "${CARGO_MAKE_WORKING_DIRECTORY}/example/main.c",
     "${CARGO_MAKE_WORKING_DIRECTORY}/example/startup.c",
     "-D", "${TARGET_DEFINE}",
-    "-I", "${TARGET_DIR}/${PROFILE}/include",
+    "-I", "${TARGET_DIR}/${PROFILE_DIR}/include",
     "-o", "${TARGET_DIR}/example.elf",
 ]
 
@@ -51,7 +64,7 @@ args = [
 dependencies = ["image"]
 
 [tasks.run_fuzzer]
-command = "${TARGET_DIR}/${PROFILE}/qemu_systemmode"
+command = "${TARGET_DIR}/${PROFILE_DIR}/qemu_systemmode"
 args = [
     "-icount", "shift=auto,align=off,sleep=off",
     "-machine", "mps2-an385",
