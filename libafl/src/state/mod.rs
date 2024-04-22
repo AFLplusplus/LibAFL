@@ -720,7 +720,7 @@ where
                 Ok(path) => {
                     let res = self.load_file(&path, manager, fuzzer, executor, forced, loader)?;
                     if exit_on_solution && matches!(res, ExecuteInputResult::Solution) {
-                        return Err(Error::corpus_error(format!(
+                        return Err(Error::corpus(format!(
                             "Input {} resulted in a solution",
                             path.display()
                         )));
