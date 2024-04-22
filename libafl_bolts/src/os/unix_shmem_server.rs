@@ -179,7 +179,7 @@ where
     /// Connect to the server and return a new [`ServedShMemProvider`]
     /// Will try to spawn a [`ShMemService`]. This will only work for the first try.
     fn new() -> Result<Self, Error> {
-        // Needed for MacOS and Android to get sharedmaps working.
+        // Needed for `MacOS` and Android to get sharedmaps working.
         let service = ShMemService::<SP>::start();
 
         let mut res = Self {
