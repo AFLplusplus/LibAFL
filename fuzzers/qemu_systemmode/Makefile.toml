@@ -3,7 +3,7 @@ env_scripts = [
 #!@duckscript
 profile = get_env PROFILE
 
-if eq $profile "dev"
+if eq ${profile} "dev"
     set_env PROFILE_DIR debug
 else
     set_env PROFILE_DIR ${profile}
