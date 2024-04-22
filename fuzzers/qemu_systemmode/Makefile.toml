@@ -8,6 +8,16 @@ if eq ${profile} "dev"
 else
     set_env PROFILE_DIR ${profile}
 end
+''',
+'''
+#!@duckscript
+runs_on_ci = get_env RUN_ON_CI
+
+if ${runs_on_ci}
+    cargo_target_dir = get_env CARGO_MAKE_CRATE_TARGET_DIRECTORY
+    set_env TARGET_DIR ${cargo_target_dir}
+    set_env KERNEL ${cargo_target_dir}/example.elf
+end
 '''
 ]
 
