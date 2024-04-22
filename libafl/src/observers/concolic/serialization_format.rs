@@ -41,8 +41,6 @@
 //!
 //! ... making for a total of 5 bytes.
 
-#![cfg(feature = "std")]
-
 use std::{
     fmt::{self, Debug, Formatter},
     io::{self, Cursor, Read, Seek, SeekFrom, Write},
