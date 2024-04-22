@@ -1,6 +1,31 @@
+env_scripts = [
+'''
+#!@duckscript
+profile = get_env PROFILE
+
+if eq ${profile} "dev"
+    set_env PROFILE_DIR debug
+else
+    set_env PROFILE_DIR ${profile}
+end
+''',
+'''
+#!@duckscript
+runs_on_ci = get_env RUN_ON_CI
+
+if ${runs_on_ci}
+    cargo_target_dir = get_env CARGO_MAKE_CRATE_TARGET_DIRECTORY
+    set_env TARGET_DIR ${cargo_target_dir}
+    set_env KERNEL ${cargo_target_dir}/example.elf
+end
+'''
+]
+
 [env]
-PROFILE = { value = "release", condition = {env_not_set = ["PROFILE"]} }
+PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
 TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${FEATURE}"
+LIBAFL_QEMU_CLONE_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/qemu-libafl-bridge"
+KERNEL = "${TARGET_DIR}/example.elf"
 
 [tasks.target_dir]
 condition = { files_not_exist = [ "${TARGET_DIR}" ] }
@@ -18,7 +43,7 @@ qemu-img create -f qcow2 ${TARGET_DIR}/dummy.qcow2 32M
 '''
 
 [tasks.target]
-dependencies = ["target_dir", "build_fuzzer"]
+dependencies = ["target_dir"]
 condition = { env_set = [ "TARGET_DEFINE" ] }
 command = "arm-none-eabi-gcc"
 args = [
@@ -31,7 +56,7 @@ args = [
     "${CARGO_MAKE_WORKING_DIRECTORY}/example/main.c",
     "${CARGO_MAKE_WORKING_DIRECTORY}/example/startup.c",
     "-D", "${TARGET_DEFINE}",
-    "-I", "${TARGET_DIR}/${PROFILE}/include",
+    "-I", "${TARGET_DIR}/${PROFILE_DIR}/include",
     "-o", "${TARGET_DIR}/example.elf",
 ]
 
@@ -49,8 +74,7 @@ args = [
 dependencies = ["image"]
 
 [tasks.run_fuzzer]
-env = { "KERNEL" = "${TARGET_DIR}/example.elf" }
-command = "${TARGET_DIR}/${PROFILE}/qemu_systemmode"
+command = "${TARGET_DIR}/${PROFILE_DIR}/qemu_systemmode"
 args = [
     "-icount", "shift=auto,align=off,sleep=off",
     "-machine", "mps2-an385",
@@ -62,7 +86,7 @@ args = [
     "-drive", "if=none,format=qcow2,file=${TARGET_DIR}/dummy.qcow2",
     "-S",
 ]
-dependencies = ["build_fuzzer", "target"]
+dependencies = ["target"]
 
 [tasks.test_fuzzer]
 condition = { env_set = [ "FEATURE" ] }
@@ -74,10 +98,10 @@ cargo make build_$FEATURE
 timeout 15s cargo make ${FEATURE} | tee $TMP_DIR/fuzz.log 2>&1 || true
 
 if [ -z "$(grep 'Objective' $TMP_DIR/fuzz.log)" ]; then
-    echo "Fuzzer did not find the objective in $TMP_DIR/fuzz.log"
+    echo "qemu_systemmode ${FEATURE}: Fuzzer did not find the objective in $TMP_DIR/fuzz.log"
     exit 1
 else
-    echo "Objective found."
+    echo "qemu_systemmode ${FEATURE}: Objective found."
 fi
 '''
 
@@ -161,8 +185,7 @@ args = [
 
 [tasks.test]
 clear = true
-run_task = { name = ["build"] }
-# run_task = { name = ["test_classic", "test_breakpoint", "test_sync_exit"] }
+run_task = { name = ["test_classic", "test_breakpoint", "test_sync_exit"] }
 
 [tasks.build]
 clear = true

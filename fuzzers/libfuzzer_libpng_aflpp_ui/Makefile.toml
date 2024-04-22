@@ -171,7 +171,7 @@ dependencies = [ "fuzzer" ]
 script_runner = "@shell"
 script='''
 rm -rf libafl_unix_shmem_server || true
-(timeout --foreground 11s ./${FUZZER_NAME} >fuzz_stdout.log 2>/dev/null || true) &
+(timeout --foreground 11s ./${FUZZER_NAME} | tee fuzz_stdout.log 2>/dev/null || true) &
 sleep 0.2
 timeout --foreground 10s ./${FUZZER_NAME} >/dev/null 2>/dev/null || true
 '''
