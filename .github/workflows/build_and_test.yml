@@ -361,7 +361,25 @@ jobs:
         shell: bash
         run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
 
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      qemu: ${{ steps.filter.outputs.qemu }}
+    steps:
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            qemu:
+              - 'libafl_qemu/**'
+              - 'fuzzers/*qemu*/**'
+            
+
   fuzzers-qemu:
+    needs: changes
+    if: ${{ needs.changes.outputs.qemu == 'true' }}
     strategy:
       matrix:
         os: [ubuntu-latest]
