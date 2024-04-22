@@ -368,6 +368,7 @@ jobs:
     outputs:
       qemu: ${{ steps.filter.outputs.qemu }}
     steps:
+      - uses: actions/checkout@v3
       - uses: dorny/paths-filter@v3
         id: filter
         with:
