@@ -5,4 +5,4 @@ runs:
   steps:
     - name: Install sudo
       shell: bash
-      run: apt update && apt install -y sudo wget qemu-utils libsqlite3-dev
+      run: apt update && apt install -y sudo wget qemu-utils libsqlite3-dev gcc-arm-none-eabi
