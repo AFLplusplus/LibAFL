@@ -23,7 +23,7 @@ use libafl_bolts::{
     os::{dup2, pipes::Pipe},
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::Prepend,
-    AsMutSlice, AsSlice, Truncate,
+    AsSliceMut, AsSlice, Truncate,
 };
 use nix::{
     sys::{
@@ -714,7 +714,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                 shmem.write_to_env("__AFL_SHM_FUZZ_ID")?;
 
                 let size_in_bytes = (self.max_input_size + SHMEM_FUZZ_HDR_SIZE).to_ne_bytes();
-                shmem.as_mut_slice()[..4].clone_from_slice(&size_in_bytes[..4]);
+                shmem.as_slice_mut()[..4].clone_from_slice(&size_in_bytes[..4]);
                 Some(shmem)
             }
         };
@@ -1122,9 +1122,9 @@ where
             }
             let size_in_bytes = size.to_ne_bytes();
             // The first four bytes tells the size of the shmem.
-            map.as_mut_slice()[..SHMEM_FUZZ_HDR_SIZE]
+            map.as_slice_mut()[..SHMEM_FUZZ_HDR_SIZE]
                 .copy_from_slice(&size_in_bytes[..SHMEM_FUZZ_HDR_SIZE]);
-            map.as_mut_slice()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
+            map.as_slice_mut()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
                 .copy_from_slice(&target_bytes.as_slice()[..size]);
         } else {
             self.input_file.write_buf(input.target_bytes().as_slice())?;
@@ -1228,7 +1228,7 @@ mod tests {
     use libafl_bolts::{
         shmem::{ShMem, ShMemProvider, UnixShMemProvider},
         tuples::tuple_list,
-        AsMutSlice,
+        AsSliceMut,
     };
     use serial_test::serial;
 
@@ -1250,7 +1250,7 @@ mod tests {
 
         let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
         shmem.write_to_env("__AFL_SHM_ID").unwrap();
-        let shmem_buf = shmem.as_mut_slice();
+        let shmem_buf = shmem.as_slice_mut();
 
         let edges_observer = HitcountsMapObserver::new(ConstMapObserver::<_, MAP_SIZE>::new(
             "shared_mem",

@@ -9,7 +9,7 @@ use core::{
     ops::{BitAnd, BitOr},
 };
 
-use libafl_bolts::{AsIter, AsMutSlice, AsSlice, HasRefCnt, Named};
+use libafl_bolts::{AsIter, AsSliceMut, AsSlice, HasRefCnt, Named};
 use num_traits::PrimInt;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -241,11 +241,11 @@ impl AsSlice for MapIndexesMetadata {
     }
 }
 
-impl AsMutSlice for MapIndexesMetadata {
+impl AsSliceMut for MapIndexesMetadata {
     type Entry = usize;
     /// Convert to a slice
-    fn as_mut_slice(&mut self) -> &mut [usize] {
-        self.list.as_mut_slice()
+    fn as_slice_mut(&mut self) -> &mut [usize] {
+        self.list.as_slice_mut()
     }
 }
 
@@ -289,12 +289,12 @@ impl AsSlice for MapNoveltiesMetadata {
     }
 }
 
-impl AsMutSlice for MapNoveltiesMetadata {
+impl AsSliceMut for MapNoveltiesMetadata {
     type Entry = usize;
     /// Convert to a slice
     #[must_use]
-    fn as_mut_slice(&mut self) -> &mut [usize] {
-        self.list.as_mut_slice()
+    fn as_slice_mut(&mut self) -> &mut [usize] {
+        self.list.as_slice_mut()
     }
 }
 
@@ -478,7 +478,7 @@ where
             map_state.history_map.resize(len, observer.initial());
         }
 
-        let history_map = map_state.history_map.as_mut_slice();
+        let history_map = map_state.history_map.as_slice_mut();
         if C::INDICES {
             let mut indices = Vec::new();
 

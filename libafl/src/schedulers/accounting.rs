@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use core::fmt::Debug;
 
 use hashbrown::HashMap;
-use libafl_bolts::{rands::Rand, AsMutSlice, AsSlice, HasLen, HasRefCnt};
+use libafl_bolts::{rands::Rand, AsSliceMut, AsSlice, HasLen, HasRefCnt};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -42,12 +42,12 @@ impl AsSlice for AccountingIndexesMetadata {
         self.list.as_slice()
     }
 }
-impl AsMutSlice for AccountingIndexesMetadata {
+impl AsSliceMut for AccountingIndexesMetadata {
     type Entry = usize;
 
     /// Convert to a slice
-    fn as_mut_slice(&mut self) -> &mut [usize] {
-        self.list.as_mut_slice()
+    fn as_slice_mut(&mut self) -> &mut [usize] {
+        self.list.as_slice_mut()
     }
 }
 

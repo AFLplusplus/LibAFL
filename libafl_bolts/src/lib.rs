@@ -668,11 +668,11 @@ pub trait AsSlice {
 }
 
 /// Can be converted to a mutable slice
-pub trait AsMutSlice {
+pub trait AsSliceMut {
     /// Type of the entries in this mut slice
     type Entry;
     /// Convert to a slice
-    fn as_mut_slice(&mut self) -> &mut [Self::Entry];
+    fn as_slice_mut(&mut self) -> &mut [Self::Entry];
 }
 
 #[cfg(feature = "alloc")]
@@ -685,10 +685,10 @@ impl<T> AsSlice for Vec<T> {
 }
 
 #[cfg(feature = "alloc")]
-impl<T> AsMutSlice for Vec<T> {
+impl<T> AsSliceMut for Vec<T> {
     type Entry = T;
 
-    fn as_mut_slice(&mut self) -> &mut [Self::Entry] {
+    fn as_slice_mut(&mut self) -> &mut [Self::Entry] {
         self
     }
 }
@@ -709,18 +709,18 @@ impl<T> AsSlice for [T] {
     }
 }
 
-impl<T> AsMutSlice for &mut [T] {
+impl<T> AsSliceMut for &mut [T] {
     type Entry = T;
 
-    fn as_mut_slice(&mut self) -> &mut [Self::Entry] {
+    fn as_slice_mut(&mut self) -> &mut [Self::Entry] {
         self
     }
 }
 
-impl<T> AsMutSlice for [T] {
+impl<T> AsSliceMut for [T] {
     type Entry = T;
 
-    fn as_mut_slice(&mut self) -> &mut [Self::Entry] {
+    fn as_slice_mut(&mut self) -> &mut [Self::Entry] {
         self
     }
 }

@@ -160,7 +160,7 @@ mod swap {
         observers::{DifferentialObserver, Observer, ObserversTuple, StdMapObserver},
         Error,
     };
-    use libafl_bolts::{ownedref::OwnedMutSlice, AsMutSlice, Named};
+    use libafl_bolts::{ownedref::OwnedMutSlice, AsSliceMut, Named};
     use serde::{Deserialize, Serialize};
 
     use super::{EDGES_MAP_PTR, EDGES_MAP_PTR_NUM};
@@ -189,11 +189,11 @@ mod swap {
                 second_name: second.name().clone(),
                 name: Cow::from(format!("differential_{}_{}", first.name(), second.name())),
                 first_map: unsafe {
-                    let slice = first.map_mut().as_mut_slice();
+                    let slice = first.map_mut().as_slice_mut();
                     OwnedMutSlice::from_raw_parts_mut(slice.as_mut_ptr(), slice.len())
                 },
                 second_map: unsafe {
-                    let slice = second.map_mut().as_mut_slice();
+                    let slice = second.map_mut().as_slice_mut();
                     OwnedMutSlice::from_raw_parts_mut(slice.as_mut_ptr(), slice.len())
                 },
             }
@@ -240,7 +240,7 @@ mod swap {
         S: UsesInput,
     {
         fn pre_observe_first(&mut self, _: &mut OTA) -> Result<(), Error> {
-            let slice = self.first_map.as_mut_slice();
+            let slice = self.first_map.as_slice_mut();
             unsafe {
                 EDGES_MAP_PTR = slice.as_mut_ptr();
                 EDGES_MAP_PTR_NUM = slice.len();
@@ -249,7 +249,7 @@ mod swap {
         }
 
         fn pre_observe_second(&mut self, _: &mut OTB) -> Result<(), Error> {
-            let slice = self.second_map.as_mut_slice();
+            let slice = self.second_map.as_slice_mut();
             unsafe {
                 EDGES_MAP_PTR = slice.as_mut_ptr();
                 EDGES_MAP_PTR_NUM = slice.len();

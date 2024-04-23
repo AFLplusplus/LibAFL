@@ -5,7 +5,7 @@ use core::{fmt::Debug, marker::PhantomData};
 
 use c2rust_bitfields::BitfieldStruct;
 use hashbrown::HashMap;
-use libafl_bolts::{ownedref::OwnedRefMut, serdeany::SerdeAny, AsMutSlice, AsSlice, Named};
+use libafl_bolts::{ownedref::OwnedRefMut, serdeany::SerdeAny, AsSliceMut, AsSlice, Named};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{executors::ExitKind, inputs::UsesInput, observers::Observer, Error, HasMetadata};
@@ -92,12 +92,12 @@ impl AsSlice for CmpValuesMetadata {
     }
 }
 
-impl AsMutSlice for CmpValuesMetadata {
+impl AsSliceMut for CmpValuesMetadata {
     type Entry = CmpValues;
     /// Convert to a slice
     #[must_use]
-    fn as_mut_slice(&mut self) -> &mut [CmpValues] {
-        self.list.as_mut_slice()
+    fn as_slice_mut(&mut self) -> &mut [CmpValues] {
+        self.list.as_slice_mut()
     }
 }
 

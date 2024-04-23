@@ -2,7 +2,7 @@
 use alloc::vec::Vec;
 use core::ptr::addr_of_mut;
 
-use libafl_bolts::{ownedref::OwnedMutSlice, AsMutSlice, AsSlice};
+use libafl_bolts::{ownedref::OwnedMutSlice, AsSliceMut, AsSlice};
 
 /// A [`Vec`] of `8-bit-counters` maps for multiple modules.
 /// They are initialized by calling [`__sanitizer_cov_8bit_counters_init`](
@@ -32,9 +32,9 @@ pub unsafe fn extra_counters() -> Vec<OwnedMutSlice<'static, u8>> {
 pub extern "C" fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop: *mut u8) {
     unsafe {
         for existing in &mut *addr_of_mut!(COUNTERS_MAPS) {
-            let range = existing.as_mut_slice().as_mut_ptr()
+            let range = existing.as_slice_mut().as_mut_ptr()
                 ..=existing
-                    .as_mut_slice()
+                    .as_slice_mut()
                     .as_mut_ptr()
                     .add(existing.as_slice().len());
             if range.contains(&start) || range.contains(&stop) {
@@ -75,7 +75,7 @@ mod observers {
         Error,
     };
     use libafl_bolts::{
-        ownedref::OwnedMutSlice, AsIter, AsIterMut, AsMutSlice, AsSlice, HasLen, Named,
+        ownedref::OwnedMutSlice, AsIter, AsIterMut, AsSliceMut, AsSlice, HasLen, Named,
     };
     use meminterval::IntervalTree;
     use serde::{Deserialize, Serialize};
@@ -197,7 +197,7 @@ mod observers {
             let elem = self.intervals.query_mut(idx..=idx).next().unwrap();
             let i = elem.value;
             let j = idx - elem.interval.start;
-            unsafe { &mut (*addr_of_mut!(COUNTERS_MAPS[*i])).as_mut_slice()[j] }
+            unsafe { &mut (*addr_of_mut!(COUNTERS_MAPS[*i])).as_slice_mut()[j] }
         }
 
         #[inline]
@@ -226,7 +226,7 @@ mod observers {
         fn reset_map(&mut self) -> Result<(), Error> {
             let initial = self.initial();
             for map in unsafe { &mut *addr_of_mut!(COUNTERS_MAPS) } {
-                for x in map.as_mut_slice() {
+                for x in map.as_slice_mut() {
                     *x = initial;
                 }
             }
@@ -305,7 +305,7 @@ mod observers {
             unsafe { &mut *addr_of_mut!(COUNTERS_MAPS) }
                 .iter_mut()
                 .for_each(|m| {
-                    let l = m.as_mut_slice().len();
+                    let l = m.as_slice_mut().len();
                     intervals.insert(idx..(idx + l), v);
                     idx += l;
                     v += 1;

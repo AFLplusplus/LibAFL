@@ -29,7 +29,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{unix_shmem, ShMem, ShMemId, ShMemProvider},
     tuples::tuple_list,
-    AsMutSlice, AsSlice,
+    AsSliceMut, AsSlice,
 };
 
 #[allow(clippy::similar_names)]
@@ -39,7 +39,7 @@ pub fn main() {
     let shmem_id = signals.id();
 
     // Create an observation channel using the signals map
-    let observer = unsafe { StdMapObserver::new("signals", signals.as_mut_slice()) };
+    let observer = unsafe { StdMapObserver::new("signals", signals.as_slice_mut()) };
     // Create a stacktrace observer
     let bt_observer = AsanBacktraceObserver::new("AsanBacktraceObserver");
 

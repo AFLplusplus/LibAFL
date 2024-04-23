@@ -23,7 +23,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, MatchNameRef, Merge, Referenceable},
-    AsMutSlice, Truncate,
+    AsSliceMut, Truncate,
 };
 use libafl_targets::EDGES_MAP_SIZE_IN_USE;
 use nix::sys::signal::Signal;
@@ -98,7 +98,7 @@ pub fn main() {
     let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
     // let the forkserver know the shmid
     shmem.write_to_env("__AFL_SHM_ID").unwrap();
-    let shmem_buf = shmem.as_mut_slice();
+    let shmem_buf = shmem.as_slice_mut();
     // the next line is not needed
     // unsafe { EDGES_MAP_PTR = shmem_buf.as_mut_ptr() };
 

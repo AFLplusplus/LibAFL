@@ -40,7 +40,7 @@ use uds::{UnixListenerExt, UnixSocketAddr, UnixStreamExt};
 
 use crate::{
     shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
-    AsMutSlice, AsSlice, Error,
+    AsSliceMut, AsSlice, Error,
 };
 
 /// The default server name for our abstract shmem server
@@ -102,13 +102,13 @@ where
         self.inner.as_slice()
     }
 }
-impl<SH> AsMutSlice for ServedShMem<SH>
+impl<SH> AsSliceMut for ServedShMem<SH>
 where
     SH: ShMem,
 {
     type Entry = u8;
-    fn as_mut_slice(&mut self) -> &mut [u8] {
-        self.inner.as_mut_slice()
+    fn as_slice_mut(&mut self) -> &mut [u8] {
+        self.inner.as_slice_mut()
     }
 }
 

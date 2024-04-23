@@ -9,7 +9,7 @@ use core::{
 use libafl_bolts::{
     rands::Rand,
     tuples::{tuple_list, tuple_list_type, Merge, NamedTuple},
-    AsMutSlice, AsSlice, Named,
+    AsSliceMut, AsSlice, Named,
 };
 use serde::{Deserialize, Serialize};
 
@@ -52,11 +52,11 @@ impl AsSlice for LogMutationMetadata {
         self.list.as_slice()
     }
 }
-impl AsMutSlice for LogMutationMetadata {
+impl AsSliceMut for LogMutationMetadata {
     type Entry = Cow<'static, str>;
     #[must_use]
-    fn as_mut_slice(&mut self) -> &mut [Cow<'static, str>] {
-        self.list.as_mut_slice()
+    fn as_slice_mut(&mut self) -> &mut [Cow<'static, str>] {
+        self.list.as_slice_mut()
     }
 }
 
