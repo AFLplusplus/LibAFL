@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     events::EventFirer,
     executors::ExitKind,
-    feedbacks::Feedback,
+    feedbacks::{Feedback, FeedbackFactory},
     inputs::Input,
     observers::{Observer, ObserversTuple},
     state::State,
@@ -85,6 +85,26 @@ where
                 compare_fn,
                 phantomm: PhantomData,
             })
+        }
+    }
+}
+
+impl<F, I, O1, O2, S, T> FeedbackFactory<DiffFeedback<F, I, O1, O2, S>, S, T>
+    for DiffFeedback<F, I, O1, O2, S>
+where
+    F: FnMut(&O1, &O2) -> DiffResult + Clone,
+    I: Input,
+    O1: Observer<S> + Named,
+    O2: Observer<S> + Named,
+    S: HasMetadata + State<Input = I>,
+{
+    fn create_feedback(&self, _ctx: &T) -> DiffFeedback<F, I, O1, O2, S> {
+        Self {
+            name: self.name.clone(),
+            o1_name: self.o1_name.clone(),
+            o2_name: self.o2_name.clone(),
+            compare_fn: self.compare_fn.clone(),
+            phantomm: self.phantomm,
         }
     }
 }
