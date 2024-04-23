@@ -22,7 +22,7 @@ use libafl_bolts::{
     current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, MatchNameRef, Merge, TypeRefCreator},
+    tuples::{tuple_list, MatchNameRef, Merge, Referenceable},
     AsMutSlice, Truncate,
 };
 use libafl_targets::{EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE};
@@ -184,7 +184,7 @@ pub fn main() {
     if let Some(dynamic_map_size) = executor.coverage_map_size() {
         executor
             .observers_mut()
-            .match_name_by_ref_mut("shared_mem", observer_ref)
+            .match_by_ref_mut("shared_mem", observer_ref)
             .unwrap()
             .as_mut()
             .truncate(dynamic_map_size);

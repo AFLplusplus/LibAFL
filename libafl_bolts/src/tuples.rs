@@ -15,7 +15,9 @@ pub use tuple_list::{tuple_list, tuple_list_type, TupleList};
 
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
 use crate::hash_std;
-use crate::{HasLen, Named};
+use crate::HasLen;
+#[cfg(feature = "alloc")]
+use crate::Named;
 
 /// Returns if the type `T` is equal to `U`
 /// From <https://stackoverflow.com/a/60138532/7658998>
@@ -408,18 +410,21 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 /// A named tuple
 pub trait NamedTuple: HasConstLen {
     /// Gets the name of this tuple
     fn name(&self, index: usize) -> Option<&Cow<'static, str>>;
 }
 
+#[cfg(feature = "alloc")]
 impl NamedTuple for () {
     fn name(&self, _index: usize) -> Option<&Cow<'static, str>> {
         None
     }
 }
 
+#[cfg(feature = "alloc")]
 impl Named for () {
     #[inline]
     fn name(&self) -> &Cow<'static, str> {
@@ -428,6 +433,7 @@ impl Named for () {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<Head, Tail> NamedTuple for (Head, Tail)
 where
     Head: Named,
@@ -447,6 +453,7 @@ where
 /// # Note
 /// This operation may not be 100% accurate with Rust stable, see the notes for [`type_eq`]
 /// (in `nightly`, it uses [specialization](https://stackoverflow.com/a/60138532/7658998)).
+#[cfg(feature = "alloc")]
 pub trait MatchName {
     /// Match for a name and return the borrowed value
     fn match_name<T>(&self, name: &str) -> Option<&T>;
@@ -454,6 +461,7 @@ pub trait MatchName {
     fn match_name_mut<T>(&mut self, name: &str) -> Option<&mut T>;
 }
 
+#[cfg(feature = "alloc")]
 impl MatchName for () {
     fn match_name<T>(&self, _name: &str) -> Option<&T> {
         None
@@ -463,6 +471,7 @@ impl MatchName for () {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<Head, Tail> MatchName for (Head, Tail)
 where
     Head: Named,
@@ -486,6 +495,7 @@ where
 }
 
 /// Finds an element of a `type` by the given `name`.
+#[cfg(feature = "alloc")]
 pub trait MatchNameAndType {
     /// Finds an element of a `type` by the given `name`, and returns a borrow, or [`Option::None`].
     fn match_name_type<T: 'static>(&self, name: &str) -> Option<&T>;
@@ -493,6 +503,7 @@ pub trait MatchNameAndType {
     fn match_name_type_mut<T: 'static>(&mut self, name: &str) -> Option<&mut T>;
 }
 
+#[cfg(feature = "alloc")]
 impl MatchNameAndType for () {
     fn match_name_type<T: 'static>(&self, _name: &str) -> Option<&T> {
         None
@@ -502,6 +513,7 @@ impl MatchNameAndType for () {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<Head, Tail> MatchNameAndType for (Head, Tail)
 where
     Head: 'static + Named,
@@ -528,7 +540,8 @@ where
 
 /// Structs that has `TypeRef`
 /// You should use this when you want to avoid specifying types using `match_name_type_mut`
-pub trait TypeRefCreator {
+#[cfg(feature = "alloc")]
+pub trait Referenceable: Named {
     /// Return the `TypeRef`
     fn type_ref(&self) -> TypeRef<Self> {
         TypeRef {
@@ -537,7 +550,8 @@ pub trait TypeRefCreator {
     }
 }
 
-impl<N> TypeRefCreator for N where N: Named {}
+#[cfg(feature = "alloc")]
+impl<N> Referenceable for N where N: Named {}
 
 /// Empty object with the type T
 #[derive(Debug, Clone, Copy)]
@@ -548,21 +562,21 @@ pub struct TypeRef<T: ?Sized> {
 /// Search using `TypeRef`
 pub trait MatchNameRef {
     /// Search using name and `TypeRef`
-    fn match_name_by_ref<T>(&self, name: &str, rf: TypeRef<T>) -> Option<&T>;
+    fn match_by_ref<T>(&self, name: &str, rf: TypeRef<T>) -> Option<&T>;
 
     /// Search using name and `TypeRef`
-    fn match_name_by_ref_mut<T>(&mut self, name: &str, rf: TypeRef<T>) -> Option<&mut T>;
+    fn match_by_ref_mut<T>(&mut self, name: &str, rf: TypeRef<T>) -> Option<&mut T>;
 }
 
 impl<M> MatchNameRef for M
 where
     M: MatchName,
 {
-    fn match_name_by_ref<T>(&self, name: &str, _rf: TypeRef<T>) -> Option<&T> {
+    fn match_by_ref<T>(&self, name: &str, _rf: TypeRef<T>) -> Option<&T> {
         self.match_name::<T>(name)
     }
 
-    fn match_name_by_ref_mut<T>(&mut self, name: &str, _rf: TypeRef<T>) -> Option<&mut T> {
+    fn match_by_ref_mut<T>(&mut self, name: &str, _rf: TypeRef<T>) -> Option<&mut T> {
         self.match_name_mut::<T>(name)
     }
 }
