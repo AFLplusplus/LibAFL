@@ -2,7 +2,7 @@
 //! Instead of a random mutator for a random amount of iterations, we can run
 //! a specific mutator for a specified amount of iterations
 
-use alloc::{string::String, vec::Vec};
+use alloc::{borrow::Cow, vec::Vec};
 use core::{
     fmt::{self, Debug},
     marker::PhantomData,
@@ -85,7 +85,7 @@ where
     MT: MutatorsTuple<I, S>,
     S: HasRand,
 {
-    name: String,
+    name: Cow<'static, str>,
     mutations: MT,
     max_stack_pow: u64,
     phantom: PhantomData<(I, S)>,
@@ -140,7 +140,7 @@ where
     MT: MutatorsTuple<I, S>,
     S: HasRand,
 {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
@@ -238,7 +238,7 @@ where
             state.add_metadata(TuneableScheduledMutatorMetadata::default());
         }
         TuneableScheduledMutator {
-            name: format!("TuneableMutator[{}]", mutations.names().join(", ")),
+            name: Cow::from(format!("TuneableMutator[{}]", mutations.names().join(", "))),
             mutations,
             max_stack_pow: 7,
             phantom: PhantomData,

@@ -25,7 +25,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider},
     tuples::tuple_list,
-    AsMutSlice,
+    AsSliceMut,
 };
 
 #[allow(clippy::similar_names)]
@@ -42,7 +42,7 @@ pub fn main() {
     let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
     //let the forkserver know the shmid
     shmem.write_to_env("__AFL_SHM_ID").unwrap();
-    let shmem_map = shmem.as_mut_slice();
+    let shmem_map = shmem.as_slice_mut();
 
     // Create an observation channel using the signals map
     let edges_observer = HitcountsMapObserver::new(ConstMapObserver::<_, MAP_SIZE>::new(

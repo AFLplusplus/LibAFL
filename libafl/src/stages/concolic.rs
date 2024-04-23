@@ -2,7 +2,7 @@
 //! and use the results for fuzzer input and mutations.
 //!
 
-use alloc::string::String;
+use alloc::{borrow::Cow, string::String};
 #[cfg(feature = "concolic_mutation")]
 use alloc::{string::ToString, vec::Vec};
 #[cfg(feature = "concolic_mutation")]
@@ -47,8 +47,9 @@ where
 }
 
 impl<EM, TE, Z> Named for ConcolicTracingStage<EM, TE, Z> {
-    fn name(&self) -> &str {
-        "ConcolicTracingStage"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("ConcolicTracingStage");
+        &NAME
     }
 }
 

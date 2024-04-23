@@ -1,7 +1,4 @@
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{borrow::Cow, vec::Vec};
 use core::{fmt::Debug, marker::PhantomData};
 
 use libafl::{
@@ -74,7 +71,7 @@ where
 {
     cmp_map: OwnedRefMut<'a, AFLppCmpLogMap>,
     size: Option<OwnedRefMut<'a, usize>>,
-    name: String,
+    name: Cow<'static, str>,
     add_meta: bool,
     original: <AFLppCmpValuesMetadata as CmpObserverMetadata<'a, AFLppCmpLogMap>>::Data,
     phantom: PhantomData<S>,
@@ -183,7 +180,7 @@ impl<'a, S> Named for AFLppCmpLogObserver<'a, S>
 where
     S: UsesInput + HasMetadata,
 {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
@@ -200,7 +197,7 @@ where
         add_meta: bool,
     ) -> Self {
         Self {
-            name: name.to_string(),
+            name: Cow::from(name),
             size: None,
             cmp_map,
             add_meta,
@@ -223,7 +220,7 @@ where
         size: OwnedRefMut<'a, usize>,
     ) -> Self {
         Self {
-            name: name.to_string(),
+            name: Cow::from(name),
             size: Some(size),
             cmp_map,
             add_meta,

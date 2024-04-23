@@ -43,7 +43,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
-    AsMutSlice, AsSlice,
+    AsSlice, AsSliceMut,
 };
 use libafl_qemu::{
     cmplog::{CmpLogMap, CmpLogObserver, QemuCmpLogChildHelper},
@@ -209,11 +209,11 @@ fn fuzz(
     let mut shmem_provider = StdShMemProvider::new()?;
 
     let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_SIZE_IN_USE).unwrap();
-    let edges = edges_shmem.as_mut_slice();
+    let edges = edges_shmem.as_slice_mut();
     unsafe { EDGES_MAP_PTR = edges.as_mut_ptr() };
 
     let mut cmp_shmem = shmem_provider.uninit_on_shmem::<CmpLogMap>().unwrap();
-    let cmplog = cmp_shmem.as_mut_slice();
+    let cmplog = cmp_shmem.as_slice_mut();
 
     // Beginning of a page should be properly aligned.
     #[allow(clippy::cast_ptr_alignment)]

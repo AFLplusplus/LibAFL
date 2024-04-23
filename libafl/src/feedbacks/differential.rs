@@ -1,7 +1,7 @@
 //! Diff Feedback, comparing the content of two observers of the same type.
 //!
 
-use alloc::string::{String, ToString};
+use alloc::borrow::Cow;
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
@@ -53,11 +53,11 @@ where
     F: FnMut(&O1, &O2) -> DiffResult,
 {
     /// This feedback's name
-    name: String,
+    name: Cow<'static, str>,
     /// The first observer to compare against
-    o1_name: String,
+    o1_name: Cow<'static, str>,
     /// The second observer to compare against
-    o2_name: String,
+    o2_name: Cow<'static, str>,
     /// The function used to compare the two observers
     compare_fn: F,
     phantomm: PhantomData<(O1, O2, I, S)>,
@@ -70,9 +70,9 @@ where
     O2: Named,
 {
     /// Create a new [`DiffFeedback`] using two observers and a test function.
-    pub fn new(name: &str, o1: &O1, o2: &O2, compare_fn: F) -> Result<Self, Error> {
-        let o1_name = o1.name().to_string();
-        let o2_name = o2.name().to_string();
+    pub fn new(name: &'static str, o1: &O1, o2: &O2, compare_fn: F) -> Result<Self, Error> {
+        let o1_name = o1.name().clone();
+        let o2_name = o2.name().clone();
         if o1_name == o2_name {
             Err(Error::illegal_argument(format!(
                 "DiffFeedback: observer names must be different (both were {o1_name})"
@@ -81,7 +81,7 @@ where
             Ok(Self {
                 o1_name,
                 o2_name,
-                name: name.to_string(),
+                name: Cow::from(name),
                 compare_fn,
                 phantomm: PhantomData,
             })
@@ -115,7 +115,7 @@ where
     O1: Named,
     O2: Named,
 {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
@@ -172,7 +172,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use alloc::string::{String, ToString};
+    use alloc::borrow::Cow;
     use core::marker::PhantomData;
 
     use libafl_bolts::{tuples::tuple_list, Named};
@@ -188,13 +188,13 @@ mod tests {
 
     #[derive(Debug)]
     struct NopObserver {
-        name: String,
+        name: Cow<'static, str>,
         value: bool,
     }
     impl NopObserver {
-        fn new(name: &str, value: bool) -> Self {
+        fn new(name: &'static str, value: bool) -> Self {
             Self {
-                name: name.to_string(),
+                name: Cow::from(name),
                 value,
             }
         }
@@ -206,7 +206,7 @@ mod tests {
         }
     }
     impl Named for NopObserver {
-        fn name(&self) -> &str {
+        fn name(&self) -> &Cow<'static, str> {
             &self.name
         }
     }

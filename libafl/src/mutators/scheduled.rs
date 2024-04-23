@@ -1,6 +1,6 @@
 //! The `ScheduledMutator` schedules multiple mutations internally.
 
-use alloc::{string::String, vec::Vec};
+use alloc::{borrow::Cow, vec::Vec};
 use core::{
     fmt::{self, Debug},
     marker::PhantomData,
@@ -9,7 +9,7 @@ use core::{
 use libafl_bolts::{
     rands::Rand,
     tuples::{tuple_list, tuple_list_type, Merge, NamedTuple},
-    AsMutSlice, AsSlice, Named,
+    AsSlice, AsSliceMut, Named,
 };
 use serde::{Deserialize, Serialize};
 
@@ -40,30 +40,30 @@ use crate::{
 )] // for SerdeAny
 pub struct LogMutationMetadata {
     /// A list of logs
-    pub list: Vec<String>,
+    pub list: Vec<Cow<'static, str>>,
 }
 
 libafl_bolts::impl_serdeany!(LogMutationMetadata);
 
 impl AsSlice for LogMutationMetadata {
-    type Entry = String;
+    type Entry = Cow<'static, str>;
     #[must_use]
-    fn as_slice(&self) -> &[String] {
+    fn as_slice(&self) -> &[Cow<'static, str>] {
         self.list.as_slice()
     }
 }
-impl AsMutSlice for LogMutationMetadata {
-    type Entry = String;
+impl AsSliceMut for LogMutationMetadata {
+    type Entry = Cow<'static, str>;
     #[must_use]
-    fn as_mut_slice(&mut self) -> &mut [String] {
-        self.list.as_mut_slice()
+    fn as_slice_mut(&mut self) -> &mut [Cow<'static, str>] {
+        self.list.as_slice_mut()
     }
 }
 
 impl LogMutationMetadata {
     /// Creates new [`struct@LogMutationMetadata`].
     #[must_use]
-    pub fn new(list: Vec<String>) -> Self {
+    pub fn new(list: Vec<Cow<'static, str>>) -> Self {
         Self { list }
     }
 }
@@ -113,7 +113,7 @@ where
     MT: MutatorsTuple<I, S>,
     S: HasRand,
 {
-    name: String,
+    name: Cow<'static, str>,
     mutations: MT,
     max_stack_pow: u64,
     phantom: PhantomData<(I, S)>,
@@ -139,7 +139,7 @@ where
     MT: MutatorsTuple<I, S>,
     S: HasRand,
 {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
@@ -198,7 +198,10 @@ where
     /// Create a new [`StdScheduledMutator`] instance specifying mutations
     pub fn new(mutations: MT) -> Self {
         StdScheduledMutator {
-            name: format!("StdScheduledMutator[{}]", mutations.names().join(", ")),
+            name: Cow::from(format!(
+                "StdScheduledMutator[{}]",
+                mutations.names().join(", ")
+            )),
             mutations,
             max_stack_pow: 7,
             phantom: PhantomData,
@@ -208,7 +211,10 @@ where
     /// Create a new [`StdScheduledMutator`] instance specifying mutations and the maximun number of iterations
     pub fn with_max_stack_pow(mutations: MT, max_stack_pow: u64) -> Self {
         StdScheduledMutator {
-            name: format!("StdScheduledMutator[{}]", mutations.names().join(", ")),
+            name: Cow::from(format!(
+                "StdScheduledMutator[{}]",
+                mutations.names().join(", ")
+            )),
             mutations,
             max_stack_pow,
             phantom: PhantomData,
@@ -340,7 +346,7 @@ where
     S: HasRand + HasCorpus,
     SM: ScheduledMutator<I, MT, S>,
 {
-    name: String,
+    name: Cow<'static, str>,
     scheduled: SM,
     mutation_log: Vec<MutationId>,
     phantom: PhantomData<(I, MT, S)>,
@@ -368,7 +374,7 @@ where
     S: HasRand + HasCorpus,
     SM: ScheduledMutator<I, MT, S>,
 {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
@@ -386,9 +392,9 @@ where
     fn post_exec(&mut self, state: &mut S, corpus_idx: Option<CorpusId>) -> Result<(), Error> {
         if let Some(idx) = corpus_idx {
             let mut testcase = (*state.corpus_mut().get(idx)?).borrow_mut();
-            let mut log = Vec::<String>::new();
+            let mut log = Vec::<Cow<'static, str>>::new();
             while let Some(idx) = self.mutation_log.pop() {
-                let name = String::from(self.scheduled.mutations().name(idx.0).unwrap()); // TODO maybe return an Error on None
+                let name = self.scheduled.mutations().name(idx.0).unwrap().clone(); // TODO maybe return an Error on None
                 log.push(name);
             }
             let meta = LogMutationMetadata::new(log);
@@ -460,7 +466,7 @@ where
     /// This mutator logs all mutators.
     pub fn new(scheduled: SM) -> Self {
         Self {
-            name: format!("LoggerScheduledMutator[{}]", scheduled.name()),
+            name: Cow::from(format!("LoggerScheduledMutator[{}]", scheduled.name())),
             scheduled,
             mutation_log: vec![],
             phantom: PhantomData,

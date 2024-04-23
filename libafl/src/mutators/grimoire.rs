@@ -1,7 +1,7 @@
 //! Grimoire is the rewritten grimoire mutator in rust.
 //! See the original repo [`Grimoire`](https://github.com/RUB-SysSec/grimoire) for more details.
 
-use alloc::vec::Vec;
+use alloc::{borrow::Cow, vec::Vec};
 use core::cmp::{max, min};
 
 use libafl_bolts::{
@@ -135,8 +135,9 @@ where
 }
 
 impl Named for GrimoireExtensionMutator {
-    fn name(&self) -> &str {
-        "GrimoireExtensionMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("GrimoireExtensionMutator");
+        &NAME
     }
 }
 
@@ -209,8 +210,9 @@ where
 }
 
 impl Named for GrimoireRecursiveReplacementMutator {
-    fn name(&self) -> &str {
-        "GrimoireRecursiveReplacementMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("GrimoireRecursiveReplacementMutator");
+        &NAME
     }
 }
 
@@ -320,8 +322,9 @@ where
 }
 
 impl Named for GrimoireStringReplacementMutator {
-    fn name(&self) -> &str {
-        "GrimoireStringReplacementMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("GrimoireStringReplacementMutator");
+        &NAME
     }
 }
 
@@ -378,8 +381,9 @@ where
 }
 
 impl Named for GrimoireRandomDeleteMutator {
-    fn name(&self) -> &str {
-        "GrimoireRandomDeleteMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("GrimoireRandomDeleteMutator");
+        &NAME
     }
 }
 

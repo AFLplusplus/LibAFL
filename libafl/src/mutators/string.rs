@@ -1,5 +1,5 @@
 //! Mutators for preserving string categories, which may be useful for certain targets which are primarily string-oriented.
-use alloc::vec::Vec;
+use alloc::{borrow::Cow, vec::Vec};
 use core::{
     cmp::{Ordering, Reverse},
     ops::Range,
@@ -271,8 +271,9 @@ fn rand_replace_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
 pub struct StringCategoryRandMutator;
 
 impl Named for StringCategoryRandMutator {
-    fn name(&self) -> &str {
-        "string-category-rand"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("string-category-rand");
+        &NAME
     }
 }
 
@@ -329,8 +330,9 @@ where
 pub struct StringSubcategoryRandMutator;
 
 impl Named for StringSubcategoryRandMutator {
-    fn name(&self) -> &str {
-        "string-subcategory-rand"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("string-subcategory-rand");
+        &NAME
     }
 }
 
@@ -375,8 +377,9 @@ where
 pub struct StringCategoryTokenReplaceMutator;
 
 impl Named for StringCategoryTokenReplaceMutator {
-    fn name(&self) -> &str {
-        "string-category-token-replace"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("string-category-token-replace");
+        &NAME
     }
 }
 
@@ -434,8 +437,9 @@ where
 pub struct StringSubcategoryTokenReplaceMutator;
 
 impl Named for StringSubcategoryTokenReplaceMutator {
-    fn name(&self) -> &str {
-        "string-subcategory-replace"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("string-subcategory-replace");
+        &NAME
     }
 }
 

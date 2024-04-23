@@ -394,7 +394,7 @@ impl Listener {
 #[inline]
 #[allow(clippy::cast_ptr_alignment)]
 unsafe fn shmem2page_mut<SHM: ShMem>(afl_shmem: &mut SHM) -> *mut LlmpPage {
-    afl_shmem.as_mut_slice().as_mut_ptr() as *mut LlmpPage
+    afl_shmem.as_slice_mut().as_mut_ptr() as *mut LlmpPage
 }
 
 /// Get sharedmem from a page

@@ -1,5 +1,6 @@
 //! Mutators for the `Nautilus` grammmar fuzzer
 
+use alloc::borrow::Cow;
 use core::fmt::Debug;
 
 use grammartec::{
@@ -60,8 +61,9 @@ impl<S> Mutator<NautilusInput, S> for NautilusRandomMutator<'_> {
 }
 
 impl Named for NautilusRandomMutator<'_> {
-    fn name(&self) -> &str {
-        "NautilusRandomMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("NautilusRandomMutator");
+        &NAME
     }
 }
 
@@ -123,8 +125,9 @@ impl<S> Mutator<NautilusInput, S> for NautilusRecursionMutator<'_> {
 }
 
 impl Named for NautilusRecursionMutator<'_> {
-    fn name(&self) -> &str {
-        "NautilusRecursionMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("NautilusRecursionMutator");
+        &NAME
     }
 }
 
@@ -190,8 +193,9 @@ where
 }
 
 impl Named for NautilusSpliceMutator<'_> {
-    fn name(&self) -> &str {
-        "NautilusSpliceMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("NautilusSpliceMutator");
+        &NAME
     }
 }
 

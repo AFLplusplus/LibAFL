@@ -1,8 +1,5 @@
 //! The `MOpt` mutator scheduler, see <https://github.com/puppet-meteor/MOpt-AFL> and <https://www.usenix.org/conference/usenixsecurity19/presentation/lyu>
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{borrow::Cow, string::ToString, vec::Vec};
 use core::{
     fmt::{self, Debug},
     marker::PhantomData,
@@ -367,7 +364,7 @@ where
     MT: MutatorsTuple<I, S>,
     S: HasRand + HasMetadata + HasCorpus + HasSolutions,
 {
-    name: String,
+    name: Cow<'static, str>,
     mode: MOptMode,
     finds_before: usize,
     mutations: MT,
@@ -532,7 +529,7 @@ where
             state.add_metadata::<MOpt>(MOpt::new(mutations.len(), swarm_num, rand_seed)?);
         }
         Ok(Self {
-            name: format!("StdMOptMutator[{}]", mutations.names().join(",")),
+            name: Cow::from(format!("StdMOptMutator[{}]", mutations.names().join(","))),
             mode: MOptMode::Pilotfuzzing,
             finds_before: 0,
             mutations,
@@ -617,7 +614,7 @@ where
     MT: MutatorsTuple<I, S>,
     S: HasRand + HasMetadata + HasCorpus + HasSolutions,
 {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
