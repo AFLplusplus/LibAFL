@@ -112,7 +112,7 @@ where
     CS::State: Debug,
 {
     accounting_map: &'a [u32],
-    skip_non_favored_prob: u64,
+    skip_non_favored_prob: f64,
     inner: MinimizerScheduler<
         CS,
         LenTimeMulTestcaseScore<<CS as UsesState>::State>,
@@ -171,7 +171,7 @@ where
                 .borrow()
                 .has_metadata::<IsFavoredMetadata>();
             has
-        } && state.rand_mut().below(100) < self.skip_non_favored_prob
+        } && state.rand_mut().coinflip(self.skip_non_favored_prob)
         {
             idx = self.inner.base_mut().next(state)?;
         }
@@ -338,7 +338,7 @@ where
         observer: &O,
         state: &mut CS::State,
         base: CS,
-        skip_non_favored_prob: u64,
+        skip_non_favored_prob: f64,
         accounting_map: &'a [u32],
     ) -> Self {
         match state.metadata_map().get::<TopAccountingMetadata>() {

@@ -470,7 +470,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use libafl_bolts::rands::{Rand, StdRand, XkcdRand};
+    use libafl_bolts::rands::{StdRand, XkcdRand};
 
     use crate::{
         corpus::{Corpus, InMemoryCorpus, Testcase},
@@ -486,8 +486,7 @@ mod tests {
 
     #[test]
     fn test_mut_scheduled() {
-        // With the current impl, seed of 1 will result in a split at pos 2.
-        let mut rand = XkcdRand::with_seed(5);
+        let rand = XkcdRand::with_seed(0);
         let mut corpus: InMemoryCorpus<BytesInput> = InMemoryCorpus::new();
         corpus
             .add(Testcase::new(vec![b'a', b'b', b'c'].into()))
@@ -510,21 +509,17 @@ mod tests {
         )
         .unwrap();
 
-        rand.set_seed(5);
-
         let mut splice = SpliceMutator::new();
         splice.mutate(&mut state, &mut input).unwrap();
 
         log::trace!("{:?}", input.bytes());
 
         // The pre-seeded rand should have spliced at position 2.
-        // TODO: Maybe have a fixed rand for this purpose?
         assert_eq!(input.bytes(), &[b'a', b'b', b'f']);
     }
 
     #[test]
     fn test_havoc() {
-        // With the current impl, seed of 1 will result in a split at pos 2.
         let rand = StdRand::with_seed(0x1337);
         let mut corpus: InMemoryCorpus<BytesInput> = InMemoryCorpus::new();
         corpus
