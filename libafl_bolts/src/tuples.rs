@@ -560,6 +560,7 @@ pub struct TypeRef<T: ?Sized> {
 }
 
 /// Search using `TypeRef`
+#[cfg(feature = "alloc")]
 pub trait MatchNameRef {
     /// Search using name and `TypeRef`
     fn match_by_ref<T>(&self, name: &str, rf: TypeRef<T>) -> Option<&T>;
@@ -568,6 +569,7 @@ pub trait MatchNameRef {
     fn match_by_ref_mut<T>(&mut self, name: &str, rf: TypeRef<T>) -> Option<&mut T>;
 }
 
+#[cfg(feature = "alloc")]
 impl<M> MatchNameRef for M
 where
     M: MatchName,
