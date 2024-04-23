@@ -427,6 +427,7 @@ where
 }
 
 /// Provides a Launcher, which can be used to launch a fuzzing run on a specified list of cores with a single main and multiple secondary nodes
+/// This is for centralized, the 4th argument of the closure should mean if this is the main node.
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 #[derive(TypedBuilder)]
 #[allow(clippy::type_complexity, missing_debug_implementations)]
@@ -436,6 +437,7 @@ where
         Option<S>,
         CentralizedEventManager<LlmpRestartingEventManager<(), S, SP>, SP>, // No hooks for centralized EM
         CoreId,
+        bool,
     ) -> Result<(), Error>,
     S::Input: 'a,
     MT: Monitor,
@@ -499,6 +501,7 @@ where
         Option<S>,
         CentralizedEventManager<LlmpRestartingEventManager<(), S, SP>, SP>,
         CoreId,
+        bool,
     ) -> Result<(), Error>,
     MT: Monitor + Clone,
     SP: ShMemProvider + 'static,
@@ -524,6 +527,7 @@ where
         Option<S>,
         CentralizedEventManager<LlmpRestartingEventManager<(), S, SP>, SP>,
         CoreId,
+        bool,
     ) -> Result<(), Error>,
     MT: Monitor + Clone,
     S: State + HasExecutions,
@@ -636,7 +640,12 @@ where
                             index == 1,
                         )?;
 
-                        return (self.run_client.take().unwrap())(state, c_mgr, *bind_to);
+                        return (self.run_client.take().unwrap())(
+                            state,
+                            c_mgr,
+                            *bind_to,
+                            index == 1,
+                        );
                     }
                 };
             }
