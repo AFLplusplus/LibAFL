@@ -21,7 +21,10 @@ use yaxpeax_arm::armv8::a64::{InstDecoder, Opcode, Operand};
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::{Aarch64Register,Aarch64InstructionWriter,IndexMode,InstructionWriter};
 
-use std::ptr::{read_unaligned, addr_of};
+#[cfg(target_arch = "x86_64")]
+use std::ptr::read_unaligned;
+
+use std::ptr::addr_of;
 
 use crate::{
     asan::asan_rt::AsanRuntime,
