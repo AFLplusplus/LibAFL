@@ -16,7 +16,11 @@ In this case, again, what usually should do is to run the fuzzer with gdb and se
 First, verify that your stdout and stderr are not redirected to `/dev/null`. If you get the log, then it should either fall into the previous 2 cases. Either the fuzzer crashed because you didn't have the initial seeds, or the coverage feedback is not working.
 
 ## Q. My fuzzer is slow.
-Try running the fuzzer with the `introspection` feature of the `libafl`. This will show how much time is spent on each module of your fuzzer.
+Try running the fuzzer with the `introspection` feature of the `libafl`. This will show how much time is spent on each module of your fuzzer. Also you might be using a wrong size of the coverage map. If you see `2621440` for the size of the coverage map, you are doing it wrong. One possible mistake is the misuse of `libafl_targets::coverage::EDGES_MAP`
+```
+let map = StdMapObserver::from_mut_ptr("edges", EDGES_MAP.as_mut_ptr(), EDGES_MAP.len());
+```
+You should *never* use the `EDGES_MAP`'s size as this is just the size of the allocated size of the coverage map. Consider using something smaller or our default value `libafl_targets::LIBAFL_EDGES_MAP_SIZE_IN_USE`.
 
 ## Q. I still have problems with my fuzzer.
 Finally, if you really have no idea what is going on, run your fuzzer with logging enabled. (You can use `env_logger`, `SimpleStdoutLogger`, `SimpleStderrLogger` from `libafl_bolts`. `fuzzbench_text` has an example to show how to use it.) (Don't forget to enable stdout and stderr), and you can open an issue or ask us in Discord.
