@@ -25,7 +25,7 @@ use libafl_bolts::{
     tuples::{tuple_list, MatchNameRef, Merge, Referenceable},
     AsMutSlice, Truncate,
 };
-use libafl_targets::{EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE};
+use libafl_targets::EDGES_MAP_SIZE_IN_USE;
 use nix::sys::signal::Signal;
 
 /// The commandline args this fuzzer accepts
@@ -185,7 +185,7 @@ pub fn main() {
     if let Some(dynamic_map_size) = executor.coverage_map_size() {
         executor
             .observers_mut()
-            .match_by_ref_mut("shared_mem", observer_ref)
+            .match_by_ref_mut(observer_ref)
             .unwrap()
             .as_mut()
             .truncate(dynamic_map_size);

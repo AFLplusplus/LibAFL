@@ -545,6 +545,7 @@ pub trait Referenceable: Named {
     /// Return the `TypeRef`
     fn type_ref(&self) -> TypeRef<Self> {
         TypeRef {
+            name: Named::name(self).clone(),
             phantom: PhantomData,
         }
     }
@@ -554,8 +555,9 @@ pub trait Referenceable: Named {
 impl<N> Referenceable for N where N: Named {}
 
 /// Empty object with the type T
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub struct TypeRef<T: ?Sized> {
+    name: Cow<'static, str>,
     phantom: PhantomData<T>,
 }
 
@@ -563,10 +565,10 @@ pub struct TypeRef<T: ?Sized> {
 #[cfg(feature = "alloc")]
 pub trait MatchNameRef {
     /// Search using name and `TypeRef`
-    fn match_by_ref<T>(&self, name: &str, rf: TypeRef<T>) -> Option<&T>;
+    fn match_by_ref<T>(&self, rf: TypeRef<T>) -> Option<&T>;
 
     /// Search using name and `TypeRef`
-    fn match_by_ref_mut<T>(&mut self, name: &str, rf: TypeRef<T>) -> Option<&mut T>;
+    fn match_by_ref_mut<T>(&mut self, rf: TypeRef<T>) -> Option<&mut T>;
 }
 
 #[cfg(feature = "alloc")]
@@ -574,12 +576,12 @@ impl<M> MatchNameRef for M
 where
     M: MatchName,
 {
-    fn match_by_ref<T>(&self, name: &str, _rf: TypeRef<T>) -> Option<&T> {
-        self.match_name::<T>(name)
+    fn match_by_ref<T>(&self, rf: TypeRef<T>) -> Option<&T> {
+        self.match_name::<T>(&rf.name)
     }
 
-    fn match_by_ref_mut<T>(&mut self, name: &str, _rf: TypeRef<T>) -> Option<&mut T> {
-        self.match_name_mut::<T>(name)
+    fn match_by_ref_mut<T>(&mut self, rf: TypeRef<T>) -> Option<&mut T> {
+        self.match_name_mut::<T>(&rf.name)
     }
 }
 
