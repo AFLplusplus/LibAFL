@@ -44,7 +44,7 @@ where
         if input.parts().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
-            let selected = state.rand_mut().below(input.parts().len() as u64) as usize;
+            let selected = state.rand_mut().below(input.parts().len());
             let mutated = input.part_mut(selected).unwrap();
             self.mutate(state, mutated)
         }
@@ -153,7 +153,7 @@ where
                     .map(|(idx, part)| (idx, part.bytes().len()));
 
                 if let Some((part_idx, size)) = maybe_size {
-                    let target = state.rand_mut().below(size as u64) as usize;
+                    let target = state.rand_mut().below(size);
                     let range = rand_range(state, other_size, min(other_size, size - target));
 
                     let [part, chosen] = match part_idx.cmp(&choice) {
@@ -195,7 +195,7 @@ where
             drop(other_testcase);
             let size = part.bytes().len();
 
-            let target = state.rand_mut().below(size as u64) as usize;
+            let target = state.rand_mut().below(size);
             let range = rand_range(state, other_size, min(other_size, size - target));
 
             let other_testcase = state.corpus().get(idx)?.borrow_mut();
@@ -257,7 +257,7 @@ where
                     .map(|(idx, part)| (idx, part.bytes().len()));
 
                 if let Some((part_idx, size)) = maybe_size {
-                    let target = state.rand_mut().below(size as u64) as usize;
+                    let target = state.rand_mut().below(size);
                     let range = rand_range(state, other_size, min(other_size, size - target));
 
                     let [part, chosen] = match part_idx.cmp(&choice) {
@@ -299,7 +299,7 @@ where
             drop(other_testcase);
             let size = part.bytes().len();
 
-            let target = state.rand_mut().below(size as u64) as usize;
+            let target = state.rand_mut().below(size);
             let range = rand_range(state, other_size, min(other_size, size - target));
 
             let other_testcase = state.corpus().get(idx)?.borrow_mut();

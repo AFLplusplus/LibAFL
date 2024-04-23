@@ -318,10 +318,10 @@ where
             }
             meta.tokens().len()
         };
-        let token_idx = state.rand_mut().below(tokens_len as u64) as usize;
+        let token_idx = state.rand_mut().below(tokens_len);
 
         let size = input.bytes().len();
-        let off = state.rand_mut().below((size + 1) as u64) as usize;
+        let off = state.rand_mut().below(size + 1);
 
         let meta = state.metadata_map().get::<Tokens>().unwrap();
         let token = &meta.tokens()[token_idx];
@@ -385,9 +385,9 @@ where
             }
             meta.tokens().len()
         };
-        let token_idx = state.rand_mut().below(tokens_len as u64) as usize;
+        let token_idx = state.rand_mut().below(tokens_len);
 
-        let off = state.rand_mut().below(size as u64) as usize;
+        let off = state.rand_mut().below(size);
 
         let meta = state.metadata_map().get::<Tokens>().unwrap();
         let token = &meta.tokens()[token_idx];
@@ -446,9 +446,9 @@ where
             }
             meta.list.len()
         };
-        let idx = state.rand_mut().below(cmps_len as u64) as usize;
+        let idx = state.rand_mut().below(cmps_len);
 
-        let off = state.rand_mut().below(size as u64) as usize;
+        let off = state.rand_mut().below(size);
         let len = input.bytes().len();
         let bytes = input.bytes_mut();
 

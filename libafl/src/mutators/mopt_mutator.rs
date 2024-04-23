@@ -368,7 +368,7 @@ where
     mode: MOptMode,
     finds_before: usize,
     mutations: MT,
-    max_stack_pow: u64,
+    max_stack_pow: usize,
     phantom: PhantomData<(I, S)>,
 }
 
@@ -521,7 +521,7 @@ where
     pub fn new(
         state: &mut S,
         mutations: MT,
-        max_stack_pow: u64,
+        max_stack_pow: usize,
         swarm_num: usize,
     ) -> Result<Self, Error> {
         if !state.has_metadata::<MOpt>() {

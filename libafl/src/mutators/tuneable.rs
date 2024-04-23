@@ -87,7 +87,7 @@ where
 {
     name: Cow<'static, str>,
     mutations: MT,
-    max_stack_pow: u64,
+    max_stack_pow: usize,
     phantom: PhantomData<(I, S)>,
 }
 
@@ -223,7 +223,7 @@ where
         }
 
         // fall back to random if no entries in either vec, the scheduling is not tuned.
-        state.rand_mut().below(self.mutations.len() as u64).into()
+        state.rand_mut().below(self.mutations.len()).into()
     }
 }
 

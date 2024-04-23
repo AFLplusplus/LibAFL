@@ -54,10 +54,10 @@ where
 
     /// Gets the number of iterations as a random number
     #[allow(clippy::cast_sign_loss)]
-    fn iterations(&self, state: &mut E::State) -> Result<u64, Error> {
+    fn iterations(&self, state: &mut E::State) -> Result<usize, Error> {
         // Update handicap
         let mut testcase = state.current_testcase_mut()?;
-        let score = F::compute(state, &mut testcase)? as u64;
+        let score = F::compute(state, &mut testcase)? as usize;
 
         Ok(score)
     }

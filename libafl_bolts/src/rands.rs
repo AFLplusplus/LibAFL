@@ -30,7 +30,7 @@ where
     debug_assert!(iter.len() > 0, "choosing from an empty iterator");
 
     // pick a random, valid index
-    let index = fast_bound(rand, iter.len() as u64) as usize;
+    let index = fast_bound(rand, iter.len());
 
     // return the item chosen
     iter.nth(index).unwrap()
@@ -44,10 +44,10 @@ where
 /// See: [An optimal algorithm for bounded random integers](https://github.com/apple/swift/pull/39143).
 #[inline]
 #[must_use]
-pub fn fast_bound(rand: u64, n: u64) -> u64 {
+pub fn fast_bound(rand: u64, n: usize) -> usize {
     debug_assert_ne!(n, 0);
-    let mul = u128::from(rand).wrapping_mul(u128::from(n));
-    (mul >> 64) as u64
+    let mul = u128::from(rand).wrapping_mul(u128::from(n as u64));
+    (mul >> 64) as usize
 }
 
 /// Ways to get random around here.
@@ -78,15 +78,15 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
         self.next_float() < success_prob
     }
 
-    /// Gets a value below the given 64 bit val (exclusive)
+    /// Gets a value below the given bound (exclusive)
     #[inline]
-    fn below(&mut self, upper_bound_excl: u64) -> u64 {
+    fn below(&mut self, upper_bound_excl: usize) -> usize {
         fast_bound(self.next(), upper_bound_excl)
     }
 
     /// Gets a value between the given lower bound (inclusive) and upper bound (inclusive)
     #[inline]
-    fn between(&mut self, lower_bound_incl: u64, upper_bound_incl: u64) -> u64 {
+    fn between(&mut self, lower_bound_incl: usize, upper_bound_incl: usize) -> usize {
         debug_assert!(lower_bound_incl <= upper_bound_incl);
         lower_bound_incl + self.below(upper_bound_incl - lower_bound_incl + 1)
     }
