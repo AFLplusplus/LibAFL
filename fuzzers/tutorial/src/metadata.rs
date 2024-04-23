@@ -80,7 +80,7 @@ where
 
 impl Named for PacketLenFeedback {
     #[inline]
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("PacketLenFeedback");
         &NAME
     }

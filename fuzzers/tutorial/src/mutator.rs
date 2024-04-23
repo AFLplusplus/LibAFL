@@ -30,7 +30,7 @@ where
 }
 
 impl Named for LainMutator {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("LainMutator");
         &NAME
     }
