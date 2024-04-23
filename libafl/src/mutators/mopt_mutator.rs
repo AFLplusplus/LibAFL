@@ -199,7 +199,7 @@ impl MOpt {
             let mut total_x_now = 0.0;
             let mut x_sum = 0.0;
             for i in 0..self.operator_num {
-                self.x_now[swarm][i] = (self.rand.below(7000) as f64) * 0.0001 + 0.1;
+                self.x_now[swarm][i] = 0.7 * self.rand.next_float() + 0.1;
                 total_x_now += self.x_now[swarm][i];
                 self.v_now[swarm][i] = 0.1;
                 self.l_best[swarm][i] = 0.5;
@@ -212,12 +212,8 @@ impl MOpt {
 
             for i in 0..self.operator_num {
                 self.v_now[swarm][i] = self.w_now * self.v_now[swarm][i]
-                    + (self.rand.below(1000) as f64)
-                        * 0.001
-                        * (self.l_best[swarm][i] - self.x_now[swarm][i])
-                    + (self.rand.below(1000) as f64)
-                        * 0.001
-                        * (self.g_best[i] - self.x_now[swarm][i]);
+                    + self.rand.next_float() * (self.l_best[swarm][i] - self.x_now[swarm][i])
+                    + self.rand.next_float() * (self.g_best[i] - self.x_now[swarm][i]);
                 self.x_now[swarm][i] += self.v_now[swarm][i];
 
                 self.x_now[swarm][i] = self.x_now[swarm][i].clamp(V_MIN, V_MAX);
@@ -279,12 +275,8 @@ impl MOpt {
             for i in 0..self.operator_num {
                 self.probability_now[swarm][i] = 0.0;
                 self.v_now[swarm][i] = self.w_now * self.v_now[swarm][i]
-                    + (self.rand.below(1000) as f64)
-                        * 0.001
-                        * (self.l_best[swarm][i] - self.x_now[swarm][i])
-                    + (self.rand.below(1000) as f64)
-                        * 0.001
-                        * (self.g_best[i] - self.x_now[swarm][i]);
+                    + self.rand.next_float() * (self.l_best[swarm][i] - self.x_now[swarm][i])
+                    + self.rand.next_float() * (self.g_best[i] - self.x_now[swarm][i]);
                 self.x_now[swarm][i] += self.v_now[swarm][i];
 
                 self.x_now[swarm][i] = self.x_now[swarm][i].clamp(V_MIN, V_MAX);
@@ -325,8 +317,8 @@ impl MOpt {
         let operator_num = self.operator_num;
 
         // Fetch a random sele value
-        let select_prob: f64 = self.probability_now[self.swarm_now][operator_num - 1]
-            * ((self.rand.below(10000) as f64) * 0.0001);
+        let select_prob: f64 =
+            self.probability_now[self.swarm_now][operator_num - 1] * self.rand.next_float();
 
         for i in 0..operator_num {
             if i == 0 {
