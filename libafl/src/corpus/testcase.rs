@@ -65,6 +65,8 @@ where
     parent_id: Option<CorpusId>,
     /// If the testcase is "disabled"
     disabled: bool,
+    /// has found crash or not
+    objectives_found: bool,
 }
 
 impl<I> HasMetadata for Testcase<I>
@@ -227,6 +229,7 @@ where
             scheduled_count: 0,
             parent_id: None,
             disabled: false,
+            objectives_found: false,
         }
     }
 
@@ -248,6 +251,7 @@ where
             scheduled_count: 0,
             parent_id: Some(parent_id),
             disabled: false,
+            objectives_found: false,
         }
     }
 
@@ -269,6 +273,7 @@ where
             scheduled_count: 0,
             parent_id: None,
             disabled: false,
+            objectives_found: false,
         }
     }
 
@@ -290,6 +295,7 @@ where
             scheduled_count: 0,
             parent_id: None,
             disabled: false,
+            objectives_found: false,
         }
     }
 
@@ -307,6 +313,15 @@ where
     /// Sets the id of the parent, that this testcase was derived from
     pub fn set_parent_id_optional(&mut self, parent_id: Option<CorpusId>) {
         self.parent_id = parent_id;
+    }
+
+    pub fn objectives_found(&self) -> bool {
+        self.objectives_found
+    }
+
+    /// set objectives_found. mostly called from crash handler
+    pub fn set_objectives_found(&mut self, found: bool) {
+        self.objectives_found = found;
     }
 }
 
@@ -331,6 +346,7 @@ where
             #[cfg(feature = "std")]
             metadata_path: None,
             disabled: false,
+            objectives_found: false,
         }
     }
 }

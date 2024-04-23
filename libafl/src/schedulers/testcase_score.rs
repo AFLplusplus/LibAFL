@@ -262,6 +262,10 @@ where
             perf_score = HAVOC_MAX_MULT * 100.0;
         }
 
+        if entry.objectives_found() {
+            perf_score *= 0.05;
+        }
+
         Ok(perf_score)
     }
 }
@@ -337,6 +341,10 @@ where
         // was it fuzzed before?
         if entry.scheduled_count() == 0 {
             weight *= 2.0;
+        }
+
+        if entry.objectives_found() {
+            perf_score *= 0.05;
         }
 
         assert!(weight.is_normal());
