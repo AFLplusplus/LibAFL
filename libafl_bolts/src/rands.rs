@@ -42,6 +42,7 @@ where
 /// At least 2^2*(64-N) samples are required to detect this amount of bias.
 ///
 /// See: [An optimal algorithm for bounded random integers](https://github.com/apple/swift/pull/39143).
+#[inline]
 #[must_use]
 pub fn fast_bound(rand: u64, n: u64) -> u64 {
     debug_assert_ne!(n, 0);
@@ -60,6 +61,7 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
     fn next(&mut self) -> u64;
 
     /// Gets a value between 0.0 (inclusive) and 1.0 (exclusive)
+    #[inline]
     #[allow(clippy::cast_precision_loss)]
     fn next_float(&mut self) -> f64 {
         // both 2^53 and 2^-53 can be represented in f64 exactly
@@ -70,17 +72,20 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
     }
 
     /// Returns true with specified probability
+    #[inline]
     fn coinflip(&mut self, success_prob: f64) -> bool {
         debug_assert!((0.0..=1.0).contains(&success_prob));
         self.next_float() < success_prob
     }
 
     /// Gets a value below the given 64 bit val (exclusive)
+    #[inline]
     fn below(&mut self, upper_bound_excl: u64) -> u64 {
         fast_bound(self.next(), upper_bound_excl)
     }
 
     /// Gets a value between the given lower bound (inclusive) and upper bound (inclusive)
+    #[inline]
     fn between(&mut self, lower_bound_incl: u64, upper_bound_incl: u64) -> u64 {
         debug_assert!(lower_bound_incl <= upper_bound_incl);
         lower_bound_incl + self.below(upper_bound_incl - lower_bound_incl + 1)
@@ -404,6 +409,7 @@ impl Rand for Sfc64Rand {
         }
     }
 
+    #[inline]
     fn next(&mut self) -> u64 {
         let out = self.a.wrapping_add(self.b).wrapping_add(self.w);
         self.w = self.w.wrapping_add(1);
