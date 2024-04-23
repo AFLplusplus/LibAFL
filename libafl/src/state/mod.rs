@@ -194,12 +194,17 @@ pub trait HasLastReportTime {
 }
 
 /// Struct that holds the options for input loading
+#[cfg(feature = "std")]
 pub struct LoadConfig<'a, I, S, Z> {
+    /// Load Input even if it was deemed "uninteresting" by the fuzzer
     forced: bool,
+    /// Function to load input from a Path
     loader: &'a mut dyn FnMut(&mut Z, &mut S, &Path) -> Result<I, Error>,
+    /// Error if Input leads to a Solution.
     exit_on_solution: bool,
 }
 
+#[cfg(feature = "std")]
 impl<'a, I, S, Z> Debug for LoadConfig<'a, I, S, Z> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "LoadConfig {{}}")
@@ -726,8 +731,8 @@ where
                 Ok(path) => {
                     let res = self.load_file(&path, manager, fuzzer, executor, &mut config)?;
                     if config.exit_on_solution && matches!(res, ExecuteInputResult::Solution) {
-                        return Err(Error::corpus(format!(
-                            "Input {} resulted in a solution",
+                        return Err(Error::invalid_corpus(format!(
+                            "Input {} resulted in a solution.",
                             path.display()
                         )));
                     }
