@@ -1,7 +1,7 @@
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::Aarch64Register;
 #[cfg(target_arch = "x86_64")]
-use frida_gum::instruction_writer::X86Register;
+use frida_gum::{CpuContext, instruction_writer::X86Register};
 #[cfg(target_arch = "aarch64")]
 use num_traits::cast::FromPrimitive;
 #[cfg(target_arch = "x86_64")]
@@ -157,6 +157,31 @@ const X86_64_REGS: [(RegSpec, X86Register); 34] = [
     (RegSpec::r15(), X86Register::R15),
     (RegSpec::rip(), X86Register::Rip),
 ];
+
+#[cfg(target_arch = "x86_64")]
+pub fn get_register(context: &CpuContext, reg: X86Register) -> u64
+{
+    println!("{:?}", reg);
+    match reg {
+        X86Register::Rax => context.rax(),
+        X86Register::Rbx => context.rbx(),
+        X86Register::Rcx => context.rcx(),
+        X86Register::Rdx => context.rdx(),
+        X86Register::Rdi => context.rdi(),
+        X86Register::Rsi => context.rsi(),
+        X86Register::Rsp => context.rsp(),
+        X86Register::Rbp => context.rbp(),
+        X86Register::R8 => context.r8(),
+        X86Register::R9 => context.r9(),
+        X86Register::R10 => context.r10(),
+        X86Register::R11 => context.r11(),
+        X86Register::R12 => context.r12(),
+        X86Register::R13 => context.r13(),
+        X86Register::R14 => context.r14(),
+        X86Register::R15 => context.r15(),
+        _ => 0
+    }
+}
 
 /// The writer registers
 /// frida registers: <https://docs.rs/frida-gum/0.4.0/frida_gum/instruction_writer/enum.X86Register.html>

@@ -402,7 +402,18 @@ mod tests {
             ("malloc_heap_uaf_read", Some("heap use-after-free read")),
         ];
 
+       
+        
+        //NOTE: RTLD_NOW is required on linux as otherwise the hooks will NOT work
+        
+        #[cfg(target_os = "linux")]
+        let lib = libloading::os::unix::Library::open(Some(options.clone().harness.unwrap()), libloading::os::unix::RTLD_NOW).unwrap(); 
+
+        #[cfg(not(target_os = "linux"))]
         let lib = libloading::Library::new(options.clone().harness.unwrap()).unwrap();
+      
+   
+
 
         let coverage = CoverageRuntime::new();
         let asan = AsanRuntime::new(options);
@@ -451,9 +462,16 @@ mod tests {
             );
 
             {
+                
+                #[cfg(target_os = "linux")]
+                let target_func: libloading::os::unix::Symbol<unsafe extern "C" fn(data: *const u8, size: usize) -> i32> =
+                lib.get(function_name.as_bytes()).unwrap();
+                
+                #[cfg(not(target_os = "linux"))]
                 let target_func: libloading::Symbol<
                     unsafe extern "C" fn(data: *const u8, size: usize) -> i32,
-                > = lib.get(function_name.as_bytes()).unwrap();
+                > = lib.get(function_name.as_bytes()).unwrap(); 
+
 
                 let mut harness = |input: &BytesInput| {
                     let target = input.target_bytes();

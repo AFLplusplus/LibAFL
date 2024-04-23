@@ -1742,7 +1742,7 @@ impl AsanRuntime {
     Much like LLVM ASAN, shadow bytes are qword based. This is to say that each shadow byte maps to one qword. The shadow calculation is as follows:
     (1ULL << shadow_bit) | (address >> 3)
 
-    The format of a shadow bit is a bitmask. Each bit represents if a bit is 
+    The format of a shadow bit is a bitmask. Each bit represents if a byte in the qword is valid starting from the first bit. So, something like 0b11100000 indicates that only the first 3 bytes in the associated qword are valid. 
     
     */
     #[cfg(target_arch = "x86_64")]
@@ -1755,17 +1755,20 @@ impl AsanRuntime {
         macro_rules! shadow_check{
             ($ops:ident, $bit:expr) => {dynasm!($ops
                 ;   .arch x64
-                //; int3
-                ; mov     rcx, 1 as i32
-                ; shl     rcx, shadow_bit as i8 //rcx now contains the mask
-                ; shr     rdi, 3 as i8 //rdi now contains the shadow byte offset
-                ; add rdi, rcx 
-                ; mov ecx, [rdi]  
-                ; bswap ecx  //ecx contains shadow byte
-                ; mov edi, -1
-                ; shl edi, mask_shift as i8 //edi now contains mask
-                ; and ecx, edi 
-                ; cmp ecx, edi 
+//                ; int3
+                ; mov     rdx, 1
+                ; shl     rdx, shadow_bit as i8 //rcx now contains the mask
+                ; mov rcx, rdi //copy address into rdx
+                ; and rcx, 7 //rsi now contains the offset for unaligned accesses
+                ; shr rdi, 3 //rdi now contains the shadow byte offset
+                ; add rdi, rdx //add rdx and rdi to get the address of the shadow byte. rdi now contains the shadow address 
+                ; mov edx, [rdi]  //load 4 shadow bytes. We load 4 just in case of an unaligned access
+                ; bswap edx  //bswap to get it into an acceptable form
+                ; shl edx, cl //this shifts by the unaligned access offset. why does x86 require cl...
+                ; mov edi, -1 //fill edi with all 1s
+                ; shl edi, mask_shift as i8 //edi now contains mask. this shl functionally creates a bitmask with the top `size` bits as 1s
+                ; and edx, edi //and it to see if the top bits are enabled in edx
+                ; cmp edx, edi //if the mask and the and'd value are the same, we're good
                 ; je      >done
                 ; lea     rsi, [>done] // leap 10 bytes forward
                 ; nop // jmp takes 10 bytes at most so we want to allocate 10 bytes buffer (?)

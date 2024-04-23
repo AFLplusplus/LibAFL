@@ -508,7 +508,7 @@ impl Allocator {
     #[inline]
     pub fn is_managed(&self, ptr: *mut c_void) -> bool {
         //self.allocations.contains_key(&(ptr as usize))
-        self.base_mapping_addr <= ptr as usize && (ptr as usize) < self.current_mapping_addr
+        self.shadow_offset <= ptr as usize && (ptr as usize) < self.current_mapping_addr
     }
 
     /// Checks if any of the allocations has not been freed
@@ -523,16 +523,15 @@ impl Allocator {
 
     /// Unpoison all the memory that is currently mapped with read/write permissions.
     pub fn unpoison_all_existing_memory(&mut self) {
+        log::trace!("Shadow Mapping: {:#x}-{:#x}", self.shadow_offset, self.current_mapping_addr);
         RangeDetails::enumerate_with_prot(PageProtection::Read, &mut |range: &RangeDetails| -> bool {
             let start = range.memory_range().base_address().0 as usize;
             let end = start + range.memory_range().size();
+              log::trace!("Mapping: {:#x}-{:#x}, is_managed: {}", start, end, self.is_managed(start as *mut c_void));
+            
             if !self.is_managed(start as *mut c_void)
             {
-                if self.using_pre_allocated_shadow_mapping && start == 1 << self.shadow_bit {
-                    return false; //once we hit the shadow mapping, we're done
-                }
-
-                log::trace!("Mapping: {:#x}", range.memory_range().base_address().0 as usize);
+                log::trace!("Unpoisoning: {:#x}-{:#x}", start, end);
                 self.map_shadow_for_region(start, end, true);
             }
 
