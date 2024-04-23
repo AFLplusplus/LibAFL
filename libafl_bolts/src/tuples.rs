@@ -556,6 +556,7 @@ impl<N> Referenceable for N where N: Named {}
 
 /// Empty object with the type T
 #[derive(Debug)]
+#[cfg(feature = "alloc")]
 pub struct TypeRef<T: ?Sized> {
     name: Cow<'static, str>,
     phantom: PhantomData<T>,
