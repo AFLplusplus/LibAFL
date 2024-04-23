@@ -25,7 +25,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
-    AsSliceMut, AsSlice,
+    AsSlice, AsSliceMut,
 };
 use libafl_qemu::{
     edges::{QemuEdgeCoverageChildHelper, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},

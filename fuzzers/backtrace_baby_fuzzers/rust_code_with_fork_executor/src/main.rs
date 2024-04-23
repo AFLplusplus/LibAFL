@@ -24,7 +24,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{unix_shmem, ShMem, ShMemProvider},
     tuples::tuple_list,
-    AsSliceMut, AsSlice,
+    AsSlice, AsSliceMut,
 };
 
 #[allow(clippy::similar_names)]

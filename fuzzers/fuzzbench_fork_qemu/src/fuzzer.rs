@@ -43,7 +43,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
-    AsSliceMut, AsSlice,
+    AsSlice, AsSliceMut,
 };
 use libafl_qemu::{
     cmplog::{CmpLogMap, CmpLogObserver, QemuCmpLogChildHelper},
