@@ -40,7 +40,7 @@ use uds::{UnixListenerExt, UnixSocketAddr, UnixStreamExt};
 
 use crate::{
     shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
-    AsSliceMut, AsSlice, Error,
+    AsSlice, AsSliceMut, Error,
 };
 
 /// The default server name for our abstract shmem server

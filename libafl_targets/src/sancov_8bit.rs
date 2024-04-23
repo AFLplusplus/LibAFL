@@ -2,7 +2,7 @@
 use alloc::vec::Vec;
 use core::ptr::addr_of_mut;
 
-use libafl_bolts::{ownedref::OwnedMutSlice, AsSliceMut, AsSlice};
+use libafl_bolts::{ownedref::OwnedMutSlice, AsSlice, AsSliceMut};
 
 /// A [`Vec`] of `8-bit-counters` maps for multiple modules.
 /// They are initialized by calling [`__sanitizer_cov_8bit_counters_init`](
@@ -75,7 +75,7 @@ mod observers {
         Error,
     };
     use libafl_bolts::{
-        ownedref::OwnedMutSlice, AsIter, AsIterMut, AsSliceMut, AsSlice, HasLen, Named,
+        ownedref::OwnedMutSlice, AsIter, AsIterMut, AsSlice, AsSliceMut, HasLen, Named,
     };
     use meminterval::IntervalTree;
     use serde::{Deserialize, Serialize};

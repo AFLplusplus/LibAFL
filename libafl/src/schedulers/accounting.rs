@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use core::fmt::Debug;
 
 use hashbrown::HashMap;
-use libafl_bolts::{rands::Rand, AsSliceMut, AsSlice, HasLen, HasRefCnt};
+use libafl_bolts::{rands::Rand, AsSlice, AsSliceMut, HasLen, HasRefCnt};
 use serde::{Deserialize, Serialize};
 
 use crate::{

@@ -5,7 +5,7 @@ use core::{fmt::Debug, marker::PhantomData};
 
 use c2rust_bitfields::BitfieldStruct;
 use hashbrown::HashMap;
-use libafl_bolts::{ownedref::OwnedRefMut, serdeany::SerdeAny, AsSliceMut, AsSlice, Named};
+use libafl_bolts::{ownedref::OwnedRefMut, serdeany::SerdeAny, AsSlice, AsSliceMut, Named};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{executors::ExitKind, inputs::UsesInput, observers::Observer, Error, HasMetadata};

@@ -10,7 +10,7 @@ use core::{clone::Clone, fmt::Debug, slice};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::{shmem::ShMem, AsSliceMut, AsSlice, IntoOwned, Truncate};
+use crate::{shmem::ShMem, AsSlice, AsSliceMut, IntoOwned, Truncate};
 
 /// Private part of the unsafe marker, making sure this cannot be initialized directly.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]

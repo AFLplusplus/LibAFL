@@ -23,7 +23,7 @@ use libafl_bolts::{
     os::{dup2, pipes::Pipe},
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::Prepend,
-    AsSliceMut, AsSlice, Truncate,
+    AsSlice, AsSliceMut, Truncate,
 };
 use nix::{
     sys::{

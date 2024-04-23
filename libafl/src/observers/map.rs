@@ -13,7 +13,7 @@ use core::{
 use ahash::RandomState;
 use libafl_bolts::{
     ownedref::{OwnedMutPtr, OwnedMutSlice},
-    AsIter, AsIterMut, AsSliceMut, AsSlice, HasLen, Named, Truncate,
+    AsIter, AsIterMut, AsSlice, AsSliceMut, HasLen, Named, Truncate,
 };
 use meminterval::IntervalTree;
 use num_traits::Bounded;

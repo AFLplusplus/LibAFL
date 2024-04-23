@@ -31,7 +31,7 @@ pub use win32_shmem::{Win32ShMem, Win32ShMemProvider};
 use crate::os::pipes::Pipe;
 #[cfg(all(feature = "std", unix, not(target_os = "haiku")))]
 pub use crate::os::unix_shmem_server::{ServedShMemProvider, ShMemService};
-use crate::{AsSliceMut, AsSlice, Error};
+use crate::{AsSlice, AsSliceMut, Error};
 
 /// The standard sharedmem provider
 #[cfg(all(windows, feature = "std"))]
@@ -600,7 +600,7 @@ pub mod unix_shmem {
         use crate::{
             rands::{Rand, RandomSeed, StdRand},
             shmem::{ShMem, ShMemId, ShMemProvider},
-            AsSliceMut, AsSlice, Error,
+            AsSlice, AsSliceMut, Error,
         };
 
         // This is macOS's limit
@@ -964,7 +964,7 @@ pub mod unix_shmem {
 
         use crate::{
             shmem::{ShMem, ShMemId, ShMemProvider},
-            AsSliceMut, AsSlice, Error,
+            AsSlice, AsSliceMut, Error,
         };
 
         /// An ashmem based impl for linux/android
@@ -1189,7 +1189,7 @@ pub mod win32_shmem {
 
     use crate::{
         shmem::{ShMem, ShMemId, ShMemProvider},
-        AsSliceMut, AsSlice, Error,
+        AsSlice, AsSliceMut, Error,
     };
 
     const INVALID_HANDLE_VALUE: isize = -1;
@@ -1470,7 +1470,7 @@ mod tests {
 
     use crate::{
         shmem::{ShMemProvider, StdShMemProvider},
-        AsSliceMut, AsSlice,
+        AsSlice, AsSliceMut,
     };
 
     #[test]

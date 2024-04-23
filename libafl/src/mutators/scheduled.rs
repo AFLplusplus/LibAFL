@@ -9,7 +9,7 @@ use core::{
 use libafl_bolts::{
     rands::Rand,
     tuples::{tuple_list, tuple_list_type, Merge, NamedTuple},
-    AsSliceMut, AsSlice, Named,
+    AsSlice, AsSliceMut, Named,
 };
 use serde::{Deserialize, Serialize};
 

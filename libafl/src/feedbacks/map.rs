@@ -9,7 +9,7 @@ use core::{
     ops::{BitAnd, BitOr},
 };
 
-use libafl_bolts::{AsIter, AsSliceMut, AsSlice, HasRefCnt, Named};
+use libafl_bolts::{AsIter, AsSlice, AsSliceMut, HasRefCnt, Named};
 use num_traits::PrimInt;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
