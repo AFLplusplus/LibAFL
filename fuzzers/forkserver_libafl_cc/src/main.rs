@@ -99,7 +99,8 @@ pub fn main() {
     // let the forkserver know the shmid
     shmem.write_to_env("__AFL_SHM_ID").unwrap();
     let shmem_buf = shmem.as_mut_slice();
-    unsafe { EDGES_MAP_PTR = shmem_buf.as_mut_ptr() };
+    // the next line is not needed
+    // unsafe { EDGES_MAP_PTR = shmem_buf.as_mut_ptr() };
 
     // Create an observation channel using the signals map
     let edges_observer = unsafe {

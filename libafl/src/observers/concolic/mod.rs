@@ -60,7 +60,6 @@ pub enum SymExpr {
         offset: usize,
         value: u8,
     },
-
     Integer {
         value: u64,
         bits: u8,
@@ -69,6 +68,7 @@ pub enum SymExpr {
         high: u64,
         low: u64,
     },
+    IntegerFromBuffer {},
     Float {
         value: f64,
         is_double: bool,

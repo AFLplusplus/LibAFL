@@ -29,7 +29,7 @@ fn main() {
         .map_or(Ok(TWO_MB), str::parse)
         .expect("Could not parse LIBAFL_EDGES_MAP_SIZE_MAX");
     let edges_map_size_in_use: usize = option_env!("LIBAFL_EDGES_MAP_SIZE_IN_USE")
-        .map_or(Ok(TWO_MB), str::parse)
+        .map_or(Ok(SIXTY_FIVE_KB), str::parse)
         .expect("Could not parse LIBAFL_EDGES_MAP_SIZE_IN_USE");
     let cmp_map_size: usize = option_env!("LIBAFL_CMP_MAP_SIZE")
         .map_or(Ok(SIXTY_FIVE_KB), str::parse)

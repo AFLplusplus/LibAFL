@@ -62,7 +62,7 @@ mod observers {
     use alloc::{borrow::Cow, vec::Vec};
     use core::{
         fmt::Debug,
-        hash::{BuildHasher, Hasher},
+        hash::{Hash, Hasher},
         iter::Flatten,
         ptr::{addr_of, addr_of_mut},
         slice::{from_raw_parts, Iter, IterMut},
@@ -156,6 +156,19 @@ mod observers {
         }
     }
 
+    impl<const DIFFERENTIAL: bool> Hash for CountersMultiMapObserver<DIFFERENTIAL> {
+        fn hash<H: Hasher>(&self, hasher: &mut H) {
+            for map in unsafe { &*addr_of!(COUNTERS_MAPS) } {
+                let slice = map.as_slice();
+                let ptr = slice.as_ptr();
+                let map_size = slice.len() / core::mem::size_of::<u8>();
+                unsafe {
+                    hasher.write(from_raw_parts(ptr, map_size));
+                }
+            }
+        }
+    }
+
     impl<const DIFFERENTIAL: bool> AsRef<Self> for CountersMultiMapObserver<DIFFERENTIAL> {
         fn as_ref(&self) -> &Self {
             self
@@ -205,17 +218,9 @@ mod observers {
             res
         }
 
-        fn hash(&self) -> u64 {
-            let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
-            for map in unsafe { &*addr_of!(COUNTERS_MAPS) } {
-                let slice = map.as_slice();
-                let ptr = slice.as_ptr();
-                let map_size = slice.len() / core::mem::size_of::<u8>();
-                unsafe {
-                    hasher.write(from_raw_parts(ptr, map_size));
-                }
-            }
-            hasher.finish()
+        #[inline]
+        fn hash_simple(&self) -> u64 {
+            RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
         }
 
         fn reset_map(&mut self) -> Result<(), Error> {

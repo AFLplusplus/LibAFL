@@ -8,7 +8,7 @@ int __attribute__((noinline)) BREAKPOINT() {
 
 int LLVMFuzzerTestOneInput(unsigned int *Data, unsigned int Size) {
 #ifdef TARGET_SYNC_EXIT
-  LIBAFL_EXIT_START_PHYS((unsigned int)Data, Size);
+  LIBAFL_QEMU_START_PHYS((unsigned int)Data, Size);
 #endif
   if (Data[3] == 0) {
     while (1) {}
@@ -27,7 +27,7 @@ int LLVMFuzzerTestOneInput(unsigned int *Data, unsigned int Size) {
     }
   }
 #ifdef TARGET_SYNC_EXIT
-  LIBAFL_EXIT_END(LIBAFL_EXIT_END_OK);
+  LIBAFL_QEMU_END(LIBAFL_QEMU_END_OK);
 #endif
   return BREAKPOINT();
 }
