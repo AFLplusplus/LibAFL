@@ -10,8 +10,16 @@ use crate::{hooks::QemuHooks, Qemu};
 pub mod edges;
 pub use edges::QemuEdgeCoverageHelper;
 
+#[cfg(not(cpu_target = "hexagon"))]
 pub mod calls;
+#[cfg(not(cpu_target = "hexagon"))]
 pub use calls::QemuCallTracerHelper;
+
+#[cfg(not(cpu_target = "hexagon"))]
+pub mod drcov;
+#[cfg(not(cpu_target = "hexagon"))]
+pub use drcov::QemuDrCovHelper;
+
 
 #[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]
 pub mod cmplog;
