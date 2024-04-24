@@ -14,11 +14,13 @@ use crate::{
     inputs::UsesInput,
     mark_feature_time,
     observers::ObserversTuple,
-    prelude::HasCurrentTestcase,
     schedulers::Scheduler,
     stages::{HasCurrentStage, StagesTuple},
     start_timer,
-    state::{HasCorpus, HasExecutions, HasImported, HasLastReportTime, HasSolutions, UsesState},
+    state::{
+        HasCorpus, HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime, HasSolutions,
+        UsesState,
+    },
     Error, HasMetadata,
 };
 #[cfg(feature = "introspection")]

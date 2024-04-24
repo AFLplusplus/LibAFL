@@ -320,7 +320,7 @@ where
         self.found_objectives
     }
 
-    /// Sets objectives_found. mostly called from crash handler
+    /// Sets `objectives_found`. mostly called from crash handler
     pub fn set_found_objectives(&mut self, found: bool) {
         self.found_objectives = found;
     }
