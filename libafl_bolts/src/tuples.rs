@@ -538,13 +538,13 @@ where
     }
 }
 
-/// Structs that has `ReReference `
+/// Structs that has `Reference `
 /// You should use this when you want to avoid specifying types using `match_name_type_mut`
 #[cfg(feature = "alloc")]
 pub trait Referenceable: Named {
-    /// Return the `ReReference `
-    fn type_ref(&self) -> ReReference<Self> {
-        ReReference {
+    /// Return the `Reference `
+    fn type_ref(&self) -> Reference<Self> {
+        Reference {
             name: Named::name(self).clone(),
             phantom: PhantomData,
         }
@@ -557,19 +557,19 @@ impl<N> Referenceable for N where N: Named {}
 /// Empty object with the type T
 #[derive(Debug)]
 #[cfg(feature = "alloc")]
-pub struct ReReference<T: ?Sized> {
+pub struct Reference<T: ?Sized> {
     name: Cow<'static, str>,
     phantom: PhantomData<T>,
 }
 
-/// Search using `ReReference `
+/// Search using `Reference `
 #[cfg(feature = "alloc")]
 pub trait MatchNameRef {
-    /// Search using name and `ReReference `
-    fn match_by_ref<T>(&self, rf: ReReference<T>) -> Option<&T>;
+    /// Search using name and `Reference `
+    fn match_by_ref<T>(&self, rf: Reference<T>) -> Option<&T>;
 
-    /// Search using name and `ReReference `
-    fn match_by_ref_mut<T>(&mut self, rf: ReReference<T>) -> Option<&mut T>;
+    /// Search using name and `Reference `
+    fn match_by_ref_mut<T>(&mut self, rf: Reference<T>) -> Option<&mut T>;
 }
 
 #[cfg(feature = "alloc")]
@@ -577,11 +577,11 @@ impl<M> MatchNameRef for M
 where
     M: MatchName,
 {
-    fn match_by_ref<T>(&self, rf: ReReference<T>) -> Option<&T> {
+    fn match_by_ref<T>(&self, rf: Reference<T>) -> Option<&T> {
         self.match_name::<T>(&rf.name)
     }
 
-    fn match_by_ref_mut<T>(&mut self, rf: ReReference<T>) -> Option<&mut T> {
+    fn match_by_ref_mut<T>(&mut self, rf: Reference<T>) -> Option<&mut T> {
         self.match_name_mut::<T>(&rf.name)
     }
 }
