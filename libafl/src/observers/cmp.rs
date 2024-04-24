@@ -1,14 +1,11 @@
 //! The `CmpObserver` provides access to the logged values of CMP instructions
 
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{borrow::Cow, vec::Vec};
 use core::{fmt::Debug, marker::PhantomData};
 
 use c2rust_bitfields::BitfieldStruct;
 use hashbrown::HashMap;
-use libafl_bolts::{ownedref::OwnedRefMut, serdeany::SerdeAny, AsMutSlice, AsSlice, Named};
+use libafl_bolts::{ownedref::OwnedRefMut, serdeany::SerdeAny, AsSlice, AsSliceMut, Named};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{executors::ExitKind, inputs::UsesInput, observers::Observer, Error, HasMetadata};
@@ -95,12 +92,12 @@ impl AsSlice for CmpValuesMetadata {
     }
 }
 
-impl AsMutSlice for CmpValuesMetadata {
+impl AsSliceMut for CmpValuesMetadata {
     type Entry = CmpValues;
     /// Convert to a slice
     #[must_use]
-    fn as_mut_slice(&mut self) -> &mut [CmpValues] {
-        self.list.as_mut_slice()
+    fn as_slice_mut(&mut self) -> &mut [CmpValues] {
+        self.list.as_slice_mut()
     }
 }
 
@@ -250,7 +247,7 @@ where
 {
     cmp_map: OwnedRefMut<'a, CM>,
     size: Option<OwnedRefMut<'a, usize>>,
-    name: String,
+    name: Cow<'static, str>,
     add_meta: bool,
     data: M::Data,
     phantom: PhantomData<S>,
@@ -313,7 +310,7 @@ where
     S: UsesInput + HasMetadata,
     M: CmpObserverMetadata<'a, CM>,
 {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
@@ -328,7 +325,7 @@ where
     #[must_use]
     pub fn new(name: &'static str, map: OwnedRefMut<'a, CM>, add_meta: bool) -> Self {
         Self {
-            name: name.to_string(),
+            name: Cow::from(name),
             size: None,
             cmp_map: map,
             add_meta,
@@ -347,7 +344,7 @@ where
         data: M::Data,
     ) -> Self {
         Self {
-            name: name.to_string(),
+            name: Cow::from(name),
             size: None,
             cmp_map,
             add_meta,
@@ -365,7 +362,7 @@ where
         size: OwnedRefMut<'a, usize>,
     ) -> Self {
         Self {
-            name: name.to_string(),
+            name: Cow::from(name),
             size: Some(size),
             cmp_map,
             add_meta,
@@ -385,7 +382,7 @@ where
         size: OwnedRefMut<'a, usize>,
     ) -> Self {
         Self {
-            name: name.to_string(),
+            name: Cow::from(name),
             size: Some(size),
             cmp_map,
             add_meta,

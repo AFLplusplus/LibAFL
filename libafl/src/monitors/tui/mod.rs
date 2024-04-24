@@ -1,6 +1,6 @@
 //! Monitor based on ratatui
 
-use alloc::{boxed::Box, string::ToString};
+use alloc::{borrow::Cow, boxed::Box, string::ToString};
 use core::cmp;
 use std::{
     collections::VecDeque,
@@ -211,7 +211,7 @@ pub struct ClientTuiContext {
 
     pub process_timing: ProcessTiming,
     pub item_geometry: ItemGeometry,
-    pub user_stats: HashMap<String, UserStats>,
+    pub user_stats: HashMap<Cow<'static, str>, UserStats>,
 }
 
 impl ClientTuiContext {

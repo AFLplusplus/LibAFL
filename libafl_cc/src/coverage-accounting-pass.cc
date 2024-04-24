@@ -45,7 +45,7 @@
 
 typedef uint32_t prev_loc_t;
 
-#define MAP_SIZE LIBAFL_ACCOUNTING_MAP_SIZE
+#define MAP_SIZE ACCOUNTING_MAP_SIZE
 
 #define SECURITY_SENSITIVE_FUNCS(CF)                          \
   static CF securitySensitiveFunctions[] = {                  \

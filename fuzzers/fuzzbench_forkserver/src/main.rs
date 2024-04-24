@@ -40,7 +40,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Merge},
-    AsMutSlice,
+    AsSliceMut,
 };
 use libafl_targets::cmps::AFLppCmpLogMap;
 use nix::sys::signal::Signal;
@@ -224,7 +224,7 @@ fn fuzz(
     // a large initial map size that should be enough
     // to house all potential coverage maps for our targets
     // (we will eventually reduce the used size according to the actual map)
-    const MAP_SIZE: usize = 2_621_440;
+    const MAP_SIZE: usize = 65_536;
 
     let log = RefCell::new(OpenOptions::new().append(true).create(true).open(logfile)?);
 
@@ -245,7 +245,7 @@ fn fuzz(
     let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
     // let the forkserver know the shmid
     shmem.write_to_env("__AFL_SHM_ID").unwrap();
-    let shmem_buf = shmem.as_mut_slice();
+    let shmem_buf = shmem.as_slice_mut();
     // To let know the AFL++ binary that we have a big map
     std::env::set_var("AFL_MAP_SIZE", format!("{}", MAP_SIZE));
 

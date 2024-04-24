@@ -31,7 +31,7 @@ pub use win32_shmem::{Win32ShMem, Win32ShMemProvider};
 use crate::os::pipes::Pipe;
 #[cfg(all(feature = "std", unix, not(target_os = "haiku")))]
 pub use crate::os::unix_shmem_server::{ServedShMemProvider, ShMemService};
-use crate::{AsMutSlice, AsSlice, Error};
+use crate::{AsSlice, AsSliceMut, Error};
 
 /// The standard sharedmem provider
 #[cfg(all(windows, feature = "std"))]
@@ -192,7 +192,7 @@ impl Display for ShMemId {
 /// A [`ShMem`] is an interface to shared maps.
 /// They are the backbone of [`crate::llmp`] for inter-process communication.
 /// All you need for scaling on a new target is to implement this interface, as well as the respective [`ShMemProvider`].
-pub trait ShMem: Sized + Debug + Clone + AsSlice<Entry = u8> + AsMutSlice<Entry = u8> {
+pub trait ShMem: Sized + Debug + Clone + AsSlice<Entry = u8> + AsSliceMut<Entry = u8> {
     /// Get the id of this shared memory mapping
     fn id(&self) -> ShMemId;
 
@@ -218,7 +218,7 @@ pub trait ShMem: Sized + Debug + Clone + AsSlice<Entry = u8> + AsMutSlice<Entry 
     /// If the map is too small, returns `None`
     fn as_mut_ptr_of<T: Sized>(&mut self) -> Option<*mut T> {
         if self.len() >= mem::size_of::<T>() {
-            Some(self.as_mut_slice().as_mut_ptr() as *mut T)
+            Some(self.as_slice_mut().as_mut_ptr() as *mut T)
         } else {
             None
         }
@@ -357,13 +357,13 @@ where
 }
 
 #[cfg(feature = "alloc")]
-impl<T> AsMutSlice for RcShMem<T>
+impl<T> AsSliceMut for RcShMem<T>
 where
     T: ShMemProvider + Debug,
 {
     type Entry = u8;
-    fn as_mut_slice(&mut self) -> &mut [u8] {
-        self.internal.as_mut_slice()
+    fn as_slice_mut(&mut self) -> &mut [u8] {
+        self.internal.as_slice_mut()
     }
 }
 
@@ -600,7 +600,7 @@ pub mod unix_shmem {
         use crate::{
             rands::{Rand, RandomSeed, StdRand},
             shmem::{ShMem, ShMemId, ShMemProvider},
-            AsMutSlice, AsSlice, Error,
+            AsSlice, AsSliceMut, Error,
         };
 
         // This is macOS's limit
@@ -782,9 +782,9 @@ pub mod unix_shmem {
             }
         }
 
-        impl AsMutSlice for MmapShMem {
+        impl AsSliceMut for MmapShMem {
             type Entry = u8;
-            fn as_mut_slice(&mut self) -> &mut [u8] {
+            fn as_slice_mut(&mut self) -> &mut [u8] {
                 unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
             }
         }
@@ -894,9 +894,9 @@ pub mod unix_shmem {
             }
         }
 
-        impl AsMutSlice for CommonUnixShMem {
+        impl AsSliceMut for CommonUnixShMem {
             type Entry = u8;
-            fn as_mut_slice(&mut self) -> &mut [u8] {
+            fn as_slice_mut(&mut self) -> &mut [u8] {
                 unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
             }
         }
@@ -964,7 +964,7 @@ pub mod unix_shmem {
 
         use crate::{
             shmem::{ShMem, ShMemId, ShMemProvider},
-            AsMutSlice, AsSlice, Error,
+            AsSlice, AsSliceMut, Error,
         };
 
         /// An ashmem based impl for linux/android
@@ -1104,10 +1104,10 @@ pub mod unix_shmem {
             }
         }
 
-        impl AsMutSlice for AshmemShMem {
+        impl AsSliceMut for AshmemShMem {
             type Entry = u8;
 
-            fn as_mut_slice(&mut self) -> &mut [u8] {
+            fn as_slice_mut(&mut self) -> &mut [u8] {
                 unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
             }
         }
@@ -1189,7 +1189,7 @@ pub mod win32_shmem {
 
     use crate::{
         shmem::{ShMem, ShMemId, ShMemProvider},
-        AsMutSlice, AsSlice, Error,
+        AsSlice, AsSliceMut, Error,
     };
 
     const INVALID_HANDLE_VALUE: isize = -1;
@@ -1303,9 +1303,9 @@ pub mod win32_shmem {
             unsafe { slice::from_raw_parts(self.map, self.map_size) }
         }
     }
-    impl AsMutSlice for Win32ShMem {
+    impl AsSliceMut for Win32ShMem {
         type Entry = u8;
-        fn as_mut_slice(&mut self) -> &mut [u8] {
+        fn as_slice_mut(&mut self) -> &mut [u8] {
             unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
         }
     }
@@ -1395,7 +1395,7 @@ impl<T: ShMem> ShMemCursor<T> {
 
     /// Slice from the current location on this map to the end, mutable
     fn empty_slice_mut(&mut self) -> &mut [u8] {
-        &mut (self.inner.as_mut_slice()[self.pos..])
+        &mut (self.inner.as_slice_mut()[self.pos..])
     }
 }
 
@@ -1470,7 +1470,7 @@ mod tests {
 
     use crate::{
         shmem::{ShMemProvider, StdShMemProvider},
-        AsMutSlice, AsSlice,
+        AsSlice, AsSliceMut,
     };
 
     #[test]
@@ -1479,7 +1479,7 @@ mod tests {
     fn test_shmem_service() {
         let mut provider = StdShMemProvider::new().unwrap();
         let mut map = provider.new_shmem(1024).unwrap();
-        map.as_mut_slice()[0] = 1;
+        map.as_slice_mut()[0] = 1;
         assert!(map.as_slice()[0] == 1);
     }
 }

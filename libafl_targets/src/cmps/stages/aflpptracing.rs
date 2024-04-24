@@ -1,4 +1,7 @@
-use alloc::string::{String, ToString};
+use alloc::{
+    borrow::Cow,
+    string::{String, ToString},
+};
 use core::marker::PhantomData;
 
 #[cfg(feature = "introspection")]
@@ -32,8 +35,9 @@ where
 }
 
 impl<EM, TE, Z> Named for AFLppCmplogTracingStage<EM, TE, Z> {
-    fn name(&self) -> &str {
-        "AFLppCmplogTracingStage"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("AFLppCmplogTracingStage");
+        &NAME
     }
 }
 

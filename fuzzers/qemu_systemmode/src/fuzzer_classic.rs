@@ -13,7 +13,7 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    observers::{HitcountsMapObserver, TimeObserver, TrackingHinted, VariableMapObserver},
+    observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::StdMutationalStage,
     state::{HasCorpus, StdState},

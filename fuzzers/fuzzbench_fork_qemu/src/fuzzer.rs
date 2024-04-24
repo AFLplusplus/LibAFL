@@ -43,11 +43,11 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
-    AsMutSlice, AsSlice,
+    AsSlice, AsSliceMut,
 };
 use libafl_qemu::{
     cmplog::{CmpLogMap, CmpLogObserver, QemuCmpLogChildHelper},
-    edges::{QemuEdgeCoverageChildHelper, EDGES_MAP_PTR, EDGES_MAP_SIZE},
+    edges::{QemuEdgeCoverageChildHelper, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},
     elf::EasyElf,
     filter_qemu_args,
     hooks::QemuHooks,
@@ -198,25 +198,22 @@ fn fuzz(
     let file_null = File::open("/dev/null")?;
 
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
-    let monitor = SimpleMonitor::with_user_monitor(
-        |s| {
-            #[cfg(unix)]
-            writeln!(&mut stdout_cpy, "{s}").unwrap();
-            #[cfg(windows)]
-            println!("{s}");
-            writeln!(log.borrow_mut(), "{:?} {s}", current_time()).unwrap();
-        },
-        true,
-    );
+    let monitor = SimpleMonitor::with_user_monitor(|s| {
+        #[cfg(unix)]
+        writeln!(&mut stdout_cpy, "{s}").unwrap();
+        #[cfg(windows)]
+        println!("{s}");
+        writeln!(log.borrow_mut(), "{:?} {s}", current_time()).unwrap();
+    });
 
     let mut shmem_provider = StdShMemProvider::new()?;
 
-    let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_SIZE).unwrap();
-    let edges = edges_shmem.as_mut_slice();
+    let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_SIZE_IN_USE).unwrap();
+    let edges = edges_shmem.as_slice_mut();
     unsafe { EDGES_MAP_PTR = edges.as_mut_ptr() };
 
     let mut cmp_shmem = shmem_provider.uninit_on_shmem::<CmpLogMap>().unwrap();
-    let cmplog = cmp_shmem.as_mut_slice();
+    let cmplog = cmp_shmem.as_slice_mut();
 
     // Beginning of a page should be properly aligned.
     #[allow(clippy::cast_ptr_alignment)]
@@ -238,7 +235,7 @@ fn fuzz(
 
     // Create an observation channel using the coverage map
     let edges_observer = unsafe {
-        HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_SIZE>::from_mut_ptr(
+        HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_SIZE_IN_USE>::from_mut_ptr(
             "edges",
             edges.as_mut_ptr(),
         ))

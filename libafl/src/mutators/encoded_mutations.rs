@@ -1,6 +1,6 @@
 //! Mutations for [`EncodedInput`]s
 //!
-use alloc::vec::Vec;
+use alloc::{borrow::Cow, vec::Vec};
 use core::cmp::{max, min};
 
 use libafl_bolts::{
@@ -37,8 +37,9 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedRandMutator {
 }
 
 impl Named for EncodedRandMutator {
-    fn name(&self) -> &str {
-        "EncodedRandMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("EncodedRandMutator");
+        &NAME
     }
 }
 
@@ -67,8 +68,9 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedIncMutator {
 }
 
 impl Named for EncodedIncMutator {
-    fn name(&self) -> &str {
-        "EncodedIncMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("EncodedIncMutator");
+        &NAME
     }
 }
 
@@ -97,8 +99,9 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedDecMutator {
 }
 
 impl Named for EncodedDecMutator {
-    fn name(&self) -> &str {
-        "EncodedDecMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("EncodedDecMutator");
+        &NAME
     }
 }
 
@@ -131,8 +134,9 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedAddMutator {
 }
 
 impl Named for EncodedAddMutator {
-    fn name(&self) -> &str {
-        "EncodedAddMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("EncodedAddMutator");
+        &NAME
     }
 }
 
@@ -164,8 +168,9 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedDeleteMutator {
 }
 
 impl Named for EncodedDeleteMutator {
-    fn name(&self) -> &str {
-        "EncodedDeleteMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("EncodedDeleteMutator");
+        &NAME
     }
 }
 
@@ -224,8 +229,9 @@ where
 }
 
 impl Named for EncodedInsertCopyMutator {
-    fn name(&self) -> &str {
-        "EncodedInsertCopyMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("EncodedInsertCopyMutator");
+        &NAME
     }
 }
 
@@ -261,8 +267,9 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedCopyMutator {
 }
 
 impl Named for EncodedCopyMutator {
-    fn name(&self) -> &str {
-        "EncodedCopyMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("EncodedCopyMutator");
+        &NAME
     }
 }
 
@@ -330,8 +337,9 @@ where
 }
 
 impl Named for EncodedCrossoverInsertMutator {
-    fn name(&self) -> &str {
-        "EncodedCrossoverInsertMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("EncodedCrossoverInsertMutator");
+        &NAME
     }
 }
 
@@ -392,8 +400,9 @@ where
 }
 
 impl Named for EncodedCrossoverReplaceMutator {
-    fn name(&self) -> &str {
-        "EncodedCrossoverReplaceMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("EncodedCrossoverReplaceMutator");
+        &NAME
     }
 }
 

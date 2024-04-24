@@ -1,6 +1,6 @@
 //! The ``NewHashFeedback`` uses the backtrace hash and a hashset to only keep novel cases
 
-use alloc::string::{String, ToString};
+use alloc::{borrow::Cow, string::ToString};
 use std::{fmt::Debug, marker::PhantomData};
 
 use hashbrown::HashSet;
@@ -78,8 +78,8 @@ impl HashSetState<u64> for NewHashFeedbackMetadata {
 /// A [`NewHashFeedback`] maintains a hashset of already seen stacktraces and considers interesting unseen ones
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NewHashFeedback<O, S> {
-    name: String,
-    observer_name: String,
+    name: Cow<'static, str>,
+    observer_name: Cow<'static, str>,
     /// Initial capacity of hash set
     capacity: usize,
     o_type: PhantomData<(O, S)>,
@@ -137,14 +137,14 @@ where
 
 impl<O, S> Named for NewHashFeedback<O, S> {
     #[inline]
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
 impl<O, S> HasObserverName for NewHashFeedback<O, S> {
     #[inline]
-    fn observer_name(&self) -> &str {
+    fn observer_name(&self) -> &Cow<'static, str> {
         &self.observer_name
     }
 }
@@ -160,18 +160,6 @@ where
     O: ObserverWithHashField + Named,
 {
     /// Returns a new [`NewHashFeedback`].
-    /// Setting an observer name that doesn't exist would eventually trigger a panic.
-    #[must_use]
-    pub fn with_names(name: &str, observer_name: &str) -> Self {
-        Self {
-            name: name.to_string(),
-            observer_name: observer_name.to_string(),
-            capacity: DEFAULT_CAPACITY,
-            o_type: PhantomData,
-        }
-    }
-
-    /// Returns a new [`NewHashFeedback`].
     #[must_use]
     pub fn new(observer: &O) -> Self {
         Self::with_capacity(observer, DEFAULT_CAPACITY)
@@ -182,8 +170,8 @@ where
     #[must_use]
     pub fn with_capacity(observer: &O, capacity: usize) -> Self {
         Self {
-            name: NEWHASHFEEDBACK_PREFIX.to_string() + observer.name(),
-            observer_name: observer.name().to_string(),
+            name: Cow::from(NEWHASHFEEDBACK_PREFIX.to_string() + observer.name()),
+            observer_name: observer.name().clone(),
             capacity,
             o_type: PhantomData,
         }

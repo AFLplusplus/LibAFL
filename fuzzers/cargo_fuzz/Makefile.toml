@@ -1,0 +1,44 @@
+[env]
+
+[tasks.unsupported]
+script_runner = "@shell"
+script = '''
+echo "Cargo-make not integrated yet on this"
+'''
+
+[tasks.install_llvm_tools]
+command = "rustup"
+args = ["toolchain", "install", "nightly", "--component", "llvm-tools-preview"]
+
+
+[tasks.install_cargo_fuzz]
+command = "cargo"
+args = ["install", "cargo-fuzz"]
+
+# Fuzzer
+[tasks.build]
+command = "cargo"
+args = ["+nightly", "fuzz", "build", "fuzz_target_1"]
+dependencies = ["install_cargo_fuzz", "install_llvm_tools"]
+
+[tasks.test]
+linux_alias = "test_unix"
+mac_alias = "unsupported"
+windows_alias = "unsupported"
+
+[tasks.test_unix]
+script = '''
+timeout 30s cargo +nightly fuzz run fuzz_target_1 2>&1 | tee fuzz_stdout.log || true
+if grep -qa "objectives: 1" fuzz_stdout.log; then
+    echo "Fuzzer is working"
+else
+    echo "Fuzzer does not generate any testcases or any crashes"
+    exit 1
+fi
+'''
+dependencies = ["build"]
+
+# Clean
+[tasks.clean]
+command = "rm "
+args = ["-rf", "fuzz/target"]

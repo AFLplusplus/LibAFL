@@ -20,7 +20,7 @@ use crate::{
 };
 
 /// Default probability to skip the non-favored values
-pub const DEFAULT_SKIP_NON_FAVORED_PROB: u64 = 95;
+pub const DEFAULT_SKIP_NON_FAVORED_PROB: f64 = 0.95;
 
 /// A testcase metadata saying if a testcase is favored
 #[derive(Debug, Serialize, Deserialize)]
@@ -73,7 +73,7 @@ impl Default for TopRatedsMetadata {
 #[derive(Debug, Clone)]
 pub struct MinimizerScheduler<CS, F, M, O> {
     base: CS,
-    skip_non_favored_prob: u64,
+    skip_non_favored_prob: f64,
     remove_metadata: bool,
     phantom: PhantomData<(F, M, O)>,
 }
@@ -231,7 +231,7 @@ where
                 .borrow()
                 .has_metadata::<IsFavoredMetadata>();
             has
-        } && state.rand_mut().below(100) < self.skip_non_favored_prob
+        } && state.rand_mut().coinflip(self.skip_non_favored_prob)
         {
             idx = self.base.next(state)?;
         }
@@ -406,7 +406,7 @@ where
     /// and has a non-default probability to skip non-faved [`Testcase`]s using (`skip_non_favored_prob`).
     ///
     /// When calling, pass the edges observer which will provided the indexes to minimize over.
-    pub fn with_skip_prob(_observer: &O, base: CS, skip_non_favored_prob: u64) -> Self {
+    pub fn with_skip_prob(_observer: &O, base: CS, skip_non_favored_prob: f64) -> Self {
         require_index_tracking!("MinimizerScheduler", O);
         Self {
             base,

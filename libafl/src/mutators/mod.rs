@@ -394,11 +394,11 @@ impl<I, S> MutatorsTuple<I, S> for Vec<Box<dyn Mutator<I, S>>> {
     }
 
     fn names_reversed(&self) -> Vec<&str> {
-        self.iter().rev().map(|x| x.name()).collect()
+        self.iter().rev().map(|x| x.name().as_ref()).collect()
     }
 
     fn names(&self) -> Vec<&str> {
-        self.iter().map(|x| x.name()).collect()
+        self.iter().map(|x| x.name().as_ref()).collect()
     }
 }
 

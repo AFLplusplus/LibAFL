@@ -1,6 +1,9 @@
 //! Observers give insights about runs of a target, such as coverage, timing, stack depth, and more.
 
 pub mod map;
+
+use alloc::borrow::Cow;
+
 pub use map::*;
 
 pub mod cmp;
@@ -22,7 +25,6 @@ pub mod value;
 
 /// List observer
 pub mod list;
-use alloc::string::{String, ToString};
 use core::{fmt::Debug, time::Duration};
 #[cfg(feature = "std")]
 use std::time::Instant;
@@ -410,7 +412,7 @@ where
 /// A simple observer, just overlooking the runtime of the target.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TimeObserver {
-    name: String,
+    name: Cow<'static, str>,
 
     #[cfg(feature = "std")]
     #[serde(with = "instant_serializer")]
@@ -453,7 +455,7 @@ impl TimeObserver {
     #[must_use]
     pub fn new(name: &'static str) -> Self {
         Self {
-            name: name.to_string(),
+            name: Cow::from(name),
 
             #[cfg(feature = "std")]
             start_time: Instant::now(),
@@ -513,7 +515,7 @@ where
 }
 
 impl Named for TimeObserver {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }

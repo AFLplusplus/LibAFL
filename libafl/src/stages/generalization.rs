@@ -1,6 +1,7 @@
 //! The tracing stage can trace the target and enrich a [`crate::corpus::Testcase`] with metadata, for example for `CmpLog`.
 
 use alloc::{
+    borrow::Cow,
     string::{String, ToString},
     vec::Vec,
 };
@@ -49,8 +50,9 @@ pub struct GeneralizationStage<C, EM, O, OT, Z> {
 }
 
 impl<C, EM, O, OT, Z> Named for GeneralizationStage<C, EM, O, OT, Z> {
-    fn name(&self) -> &str {
-        "GeneralizationStage"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("GeneralizationStage");
+        &NAME
     }
 }
 
