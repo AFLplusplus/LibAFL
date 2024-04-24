@@ -4,7 +4,7 @@ use std::{cell::OnceCell, slice::from_raw_parts, str::from_utf8_unchecked};
 use libafl_qemu_sys::{
     exec_path, free_self_maps, guest_base, libafl_dump_core_hook, libafl_force_dfl, libafl_get_brk,
     libafl_load_addr, libafl_maps_first, libafl_maps_next, libafl_qemu_run, libafl_set_brk,
-    mmap_next_start, read_self_maps, strlen, GuestAddr, GuestUsize, IntervalTreeNode,
+    mmap_next_start, read_self_maps, pageflags_get_root, strlen, GuestAddr, GuestUsize, IntervalTreeNode,
     IntervalTreeRoot, MapInfo, MmapPerms, VerifyAccess,
 };
 use libc::c_int;
@@ -29,6 +29,7 @@ pub enum HandlerError {
 pub struct GuestMaps {
     maps_root: *mut IntervalTreeRoot,
     maps_node: *mut IntervalTreeNode,
+    pageflags_first_node: *mut IntervalTreeNode,
 }
 
 // Consider a private new only for Emulator
@@ -37,10 +38,13 @@ impl GuestMaps {
     pub(crate) fn new() -> Self {
         unsafe {
             let root = read_self_maps();
+            let pageflags_root = pageflags_get_root();
             let first = libafl_maps_first(root);
+            let pageflags_first = libafl_maps_first(pageflags_root);
             Self {
                 maps_root: root,
                 maps_node: first,
+                pageflags_first_node: pageflags_first,
             }
         }
     }
@@ -54,9 +58,9 @@ impl Iterator for GuestMaps {
         unsafe {
             let mut ret = MaybeUninit::uninit();
 
-            self.maps_node = libafl_maps_next(self.maps_node, ret.as_mut_ptr());
+            self.pageflags_first_node = libafl_maps_next(self.pageflags_first_node, self.maps_root, ret.as_mut_ptr());
 
-            if self.maps_node.is_null() {
+            if self.pageflags_first_node.is_null() {
                 None
             } else {
                 Some(ret.assume_init().into())

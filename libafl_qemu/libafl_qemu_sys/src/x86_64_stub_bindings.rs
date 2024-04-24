@@ -12078,6 +12078,10 @@ extern "C" {
     pub fn read_self_maps() -> *mut IntervalTreeRoot;
 }
 extern "C" {
+    #[doc = " pageflags_get_root:\n\n Return pageflags interval tree root."]
+    pub fn pageflags_get_root() -> *mut IntervalTreeRoot;
+}
+extern "C" {
     #[doc = " free_self_maps:\n @info: an interval tree\n\n Free a tree of MapInfo structures."]
     pub fn free_self_maps(root: *mut IntervalTreeRoot);
 }
@@ -12506,7 +12510,8 @@ extern "C" {
 }
 extern "C" {
     pub fn libafl_maps_next(
-        node: *mut IntervalTreeNode,
+        pageflags_maps_node: *mut IntervalTreeNode,
+        proc_maps_node: *mut IntervalTreeRoot,
         ret: *mut libafl_mapinfo,
     ) -> *mut IntervalTreeNode;
 }
