@@ -12,7 +12,7 @@ pub use libafl_targets::{
 use serde::{Deserialize, Serialize};
 
 #[cfg(emulation_mode = "systemmode")]
-use crate::helper::QemuInstrumentationPagingFilter;
+use crate::helpers::QemuInstrumentationPagingFilter;
 use crate::{
     helpers::{
         hash_me, HasInstrumentationFilter, QemuHelper, QemuHelperTuple,
