@@ -40,7 +40,7 @@ use libafl_bolts::{
 use libafl_qemu::{
     cmplog::CmpLogObserver,
     edges::{edges_map_mut_slice, MAX_EDGES_NUM},
-    helper::QemuHelperTuple,
+    helpers::QemuHelperTuple,
     Qemu, QemuExecutor, QemuHooks,
 };
 use typed_builder::TypedBuilder;
