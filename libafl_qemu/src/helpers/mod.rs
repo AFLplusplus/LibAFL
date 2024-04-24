@@ -20,7 +20,6 @@ pub mod drcov;
 #[cfg(not(cpu_target = "hexagon"))]
 pub use drcov::QemuDrCovHelper;
 
-
 #[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]
 pub mod cmplog;
 #[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]
