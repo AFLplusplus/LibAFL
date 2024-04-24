@@ -1,52 +1,36 @@
 use std::sync::OnceLock;
 
+use capstone::arch::BuildsCapstone;
 use enum_map::{enum_map, EnumMap};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 pub use strum_macros::EnumIter;
-pub use syscall_numbers::mips::*;
+pub use syscall_numbers::arm::*;
 
-use crate::{sync_backdoor::BackdoorArgs, CallingConvention};
+use crate::{sync_exit::BackdoorArgs, CallingConvention};
 
-/// Registers for the MIPS instruction set.
+/// Registers for the ARM instruction set.
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
 #[repr(i32)]
 pub enum Regs {
     R0 = 0,
-    At = 1,
-    V0 = 2,
-    V1 = 3,
-    A0 = 4,
-    A1 = 5,
-    A2 = 6,
-    A3 = 7,
-    T0 = 8,
-    T1 = 9,
-    T2 = 10,
-    T3 = 11,
-    T4 = 12,
-    T5 = 13,
-    T6 = 14,
-    T7 = 15,
-    S0 = 16,
-    S1 = 17,
-    S2 = 18,
-    S3 = 19,
-    S4 = 20,
-    S5 = 21,
-    S6 = 22,
-    S7 = 23,
-    T8 = 24,
-    T9 = 25,
-    K0 = 26,
-    K1 = 27,
-    Gp = 28,
-    Sp = 29,
-    Fp = 30,
-    Ra = 31,
-
-    Pc = 37,
+    R1 = 1,
+    R2 = 2,
+    R3 = 3,
+    R4 = 4,
+    R5 = 5,
+    R6 = 6,
+    R7 = 7,
+    R8 = 8,
+    R9 = 9,
+    R10 = 10,
+    R11 = 11,
+    R12 = 12,
+    R13 = 13,
+    R14 = 14,
+    R15 = 15,
+    R25 = 25,
 }
 
 static BACKDOOR_ARCH_REGS: OnceLock<EnumMap<BackdoorArgs, Regs>> = OnceLock::new();
@@ -54,14 +38,14 @@ static BACKDOOR_ARCH_REGS: OnceLock<EnumMap<BackdoorArgs, Regs>> = OnceLock::new
 pub fn get_backdoor_arch_regs() -> &'static EnumMap<BackdoorArgs, Regs> {
     BACKDOOR_ARCH_REGS.get_or_init(|| {
         enum_map! {
-            BackdoorArgs::Ret  => Regs::V0,
-            BackdoorArgs::Cmd  => Regs::V0,
-            BackdoorArgs::Arg1 => Regs::A0,
-            BackdoorArgs::Arg2 => Regs::A1,
-            BackdoorArgs::Arg3 => Regs::A2,
-            BackdoorArgs::Arg4 => Regs::A3,
-            BackdoorArgs::Arg5 => Regs::T0,
-            BackdoorArgs::Arg6 => Regs::T1,
+            BackdoorArgs::Ret  => Regs::R0,
+            BackdoorArgs::Cmd  => Regs::R0,
+            BackdoorArgs::Arg1 => Regs::R1,
+            BackdoorArgs::Arg2 => Regs::R2,
+            BackdoorArgs::Arg3 => Regs::R3,
+            BackdoorArgs::Arg4 => Regs::R4,
+            BackdoorArgs::Arg5 => Regs::R5,
+            BackdoorArgs::Arg6 => Regs::R6,
         }
     })
 }
@@ -69,7 +53,14 @@ pub fn get_backdoor_arch_regs() -> &'static EnumMap<BackdoorArgs, Regs> {
 /// alias registers
 #[allow(non_upper_case_globals)]
 impl Regs {
-    pub const Zero: Regs = Regs::R0;
+    pub const Sp: Regs = Regs::R13;
+    pub const Lr: Regs = Regs::R14;
+    pub const Pc: Regs = Regs::R15;
+    pub const Sb: Regs = Regs::R9;
+    pub const Sl: Regs = Regs::R10;
+    pub const Fp: Regs = Regs::R11;
+    pub const Ip: Regs = Regs::R12;
+    pub const Cpsr: Regs = Regs::R25;
 }
 
 #[cfg(feature = "python")]
@@ -80,9 +71,18 @@ impl IntoPy<PyObject> for Regs {
     }
 }
 
-/// Return an MIPS ArchCapstoneBuilder
-pub fn capstone() -> capstone::arch::mips::ArchCapstoneBuilder {
-    capstone::Capstone::new().mips()
+/// Return an ARM ArchCapstoneBuilder
+pub fn capstone() -> capstone::arch::arm::ArchCapstoneBuilder {
+    capstone::Capstone::new()
+        .arm()
+        .mode(capstone::arch::arm::ArchMode::Arm)
+}
+
+/// Return an ARM Thumb ArchCapstoneBuilder
+pub fn capstone_thumb() -> capstone::arch::arm::ArchCapstoneBuilder {
+    capstone::Capstone::new()
+        .arm()
+        .mode(capstone::arch::arm::ArchMode::Thumb)
 }
 
 pub type GuestReg = u32;
@@ -92,14 +92,14 @@ impl crate::ArchExtras for crate::CPU {
     where
         T: From<GuestReg>,
     {
-        self.read_reg(Regs::Ra)
+        self.read_reg(Regs::Lr)
     }
 
     fn write_return_address<T>(&self, val: T) -> Result<(), String>
     where
         T: Into<GuestReg>,
     {
-        self.write_reg(Regs::Ra, val)
+        self.write_reg(Regs::Lr, val)
     }
 
     fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, String>
@@ -111,10 +111,10 @@ impl crate::ArchExtras for crate::CPU {
         }
 
         let reg_id = match idx {
-            0 => Regs::A0,
-            1 => Regs::A1,
-            2 => Regs::A2,
-            3 => Regs::A3,
+            0 => Regs::R0,
+            1 => Regs::R1,
+            2 => Regs::R2,
+            3 => Regs::R3,
             // 4.. would be on the stack, let's not do this for now
             r => return Err(format!("Unsupported argument: {r:}")),
         };
@@ -137,8 +137,8 @@ impl crate::ArchExtras for crate::CPU {
 
         let val: GuestReg = val.into();
         match idx {
-            0 => self.write_reg(Regs::A0, val),
-            1 => self.write_reg(Regs::A1, val),
+            0 => self.write_reg(Regs::R0, val),
+            1 => self.write_reg(Regs::R1, val),
             _ => Err(format!("Unsupported argument: {idx:}")),
         }
     }
