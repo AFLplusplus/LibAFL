@@ -360,7 +360,7 @@ pub const SKIP_EXEC_HOOK: u64 = u64::MAX;
 
 pub use libafl_qemu_sys::{CPUArchState, CPUState};
 
-use crate::sync_backdoor::{SyncBackdoor, SyncBackdoorError};
+use crate::sync_exit::{SyncBackdoor, SyncBackdoorError};
 
 // syshook_ret
 #[repr(C)]

@@ -15,7 +15,7 @@ use num_enum::TryFromPrimitive;
 #[cfg(emulation_mode = "systemmode")]
 use crate::QemuInstrumentationPagingFilter;
 use crate::{
-    executor::QemuExecutorState, sync_backdoor::SyncBackdoorError, EmuExitHandler, Emulator,
+    executor::QemuExecutorState, sync_exit::SyncBackdoorError, EmuExitHandler, Emulator,
     GuestAddrKind, GuestReg, HandlerError, HasInstrumentationFilter, InnerHandlerResult, IsFilter,
     IsSnapshotManager, Qemu, QemuHelperTuple, QemuInstrumentationAddressRangeFilter, Regs,
     StdEmuExitHandler, StdInstrumentationFilter, CPU,

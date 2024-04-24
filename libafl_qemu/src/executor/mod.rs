@@ -26,7 +26,7 @@ use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Signal};
 #[cfg(feature = "fork")]
 use libafl_bolts::shmem::ShMemProvider;
 
-use crate::{helper::QemuHelperTuple, hooks::QemuHooks, Qemu};
+use crate::{helpers::QemuHelperTuple, hooks::QemuHooks, Qemu};
 
 /// A version of `QemuExecutor` with a state accessible from the harness.
 pub mod stateful;

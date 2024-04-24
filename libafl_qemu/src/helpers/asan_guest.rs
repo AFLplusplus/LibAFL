@@ -13,7 +13,7 @@ use libafl::{inputs::UsesInput, HasMetadata};
 use crate::sys::libafl_tcg_gen_asan;
 use crate::{
     emu::{EmuError, MemAccessInfo, Qemu},
-    helper::{
+    helpers::{
         HasInstrumentationFilter, IsFilter, QemuHelper, QemuHelperTuple,
         QemuInstrumentationAddressRangeFilter,
     },

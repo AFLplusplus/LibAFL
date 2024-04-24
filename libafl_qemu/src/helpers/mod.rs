@@ -7,6 +7,37 @@ use libafl_qemu_sys::{GuestAddr, GuestPhysAddr};
 
 use crate::{hooks::QemuHooks, Qemu};
 
+pub mod edges;
+pub use edges::QemuEdgeCoverageHelper;
+
+pub mod calls;
+pub use calls::QemuCallTracerHelper;
+
+#[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]
+pub mod cmplog;
+#[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]
+pub use cmplog::QemuCmpLogHelper;
+
+#[cfg(all(emulation_mode = "usermode", feature = "injections"))]
+pub mod injections;
+#[cfg(all(emulation_mode = "usermode", feature = "injections"))]
+pub use injections::QemuInjectionHelper;
+
+#[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
+pub mod snapshot;
+#[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
+pub use snapshot::QemuSnapshotHelper;
+
+#[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
+pub mod asan;
+#[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
+pub use asan::{init_qemu_with_asan, QemuAsanHelper};
+
+#[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
+pub mod asan_guest;
+#[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
+pub use asan_guest::{init_qemu_with_asan_guest, QemuAsanGuestHelper};
+
 /// A helper for `libafl_qemu`.
 // TODO remove 'static when specialization will be stable
 pub trait QemuHelper<S>: 'static + Debug
