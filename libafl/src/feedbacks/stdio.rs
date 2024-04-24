@@ -1,6 +1,6 @@
 //! Feedback and metatadata for stderr and stdout.
 
-use alloc::string::{String, ToString};
+use alloc::{borrow::Cow, string::String};
 
 use libafl_bolts::{impl_serdeany, Named};
 use serde::{Deserialize, Serialize};
@@ -28,7 +28,7 @@ impl_serdeany!(StdOutMetadata);
 /// is never interesting (use with an OR).
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct StdOutToMetadataFeedback {
-    name: String,
+    name: Cow<'static, str>,
 }
 
 impl<S> Feedback<S> for StdOutToMetadataFeedback
@@ -90,8 +90,8 @@ where
 
 impl Named for StdOutToMetadataFeedback {
     #[inline]
-    fn name(&self) -> &str {
-        self.name.as_str()
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
     }
 }
 
@@ -99,9 +99,9 @@ impl StdOutToMetadataFeedback {
     /// Creates a new [`StdOutToMetadataFeedback`]. The provided `name` is
     /// used to look up the observer.
     #[must_use]
-    pub fn new(name: &str) -> Self {
+    pub fn new(name: &'static str) -> Self {
         Self {
-            name: name.to_string(),
+            name: Cow::from(name),
         }
     }
 
@@ -109,7 +109,7 @@ impl StdOutToMetadataFeedback {
     #[must_use]
     pub fn with_observer(observer: &StdOutObserver) -> Self {
         Self {
-            name: observer.name().to_string(),
+            name: observer.name().clone(),
         }
     }
 }
@@ -127,7 +127,7 @@ impl_serdeany!(StdErrMetadata);
 /// is never interesting (use with an OR).
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct StdErrToMetadataFeedback {
-    name: String,
+    name: Cow<'static, str>,
 }
 
 impl<S> Feedback<S> for StdErrToMetadataFeedback
@@ -189,8 +189,8 @@ where
 
 impl Named for StdErrToMetadataFeedback {
     #[inline]
-    fn name(&self) -> &str {
-        self.name.as_str()
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
     }
 }
 
@@ -198,9 +198,9 @@ impl StdErrToMetadataFeedback {
     /// Creates a new [`StdErrToMetadataFeedback`]. The provided `name` is
     /// used to look up the observer.
     #[must_use]
-    pub fn new(name: &str) -> Self {
+    pub fn new(name: &'static str) -> Self {
         Self {
-            name: name.to_string(),
+            name: Cow::from(name),
         }
     }
 
@@ -208,7 +208,7 @@ impl StdErrToMetadataFeedback {
     #[must_use]
     pub fn with_observer(observer: &StdErrObserver) -> Self {
         Self {
-            name: observer.name().to_string(),
+            name: observer.name().clone(),
         }
     }
 }

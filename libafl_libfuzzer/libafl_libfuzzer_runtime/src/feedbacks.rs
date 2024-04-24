@@ -1,5 +1,6 @@
 use alloc::rc::Rc;
 use core::{cell::RefCell, fmt::Debug};
+use std::borrow::Cow;
 
 use libafl::{
     alloc,
@@ -36,8 +37,9 @@ impl LibfuzzerKeepFeedback {
 }
 
 impl Named for LibfuzzerKeepFeedback {
-    fn name(&self) -> &str {
-        "libfuzzer-keep"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("libfuzzer-keep");
+        &NAME
     }
 }
 
@@ -90,8 +92,9 @@ impl LibfuzzerCrashCauseFeedback {
 }
 
 impl Named for LibfuzzerCrashCauseFeedback {
-    fn name(&self) -> &str {
-        "crash-cause"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("crash-cause");
+        &NAME
     }
 }
 

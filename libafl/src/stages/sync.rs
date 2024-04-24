@@ -1,5 +1,6 @@
 //! The [`SyncFromDiskStage`] is a stage that imports inputs from disk for e.g. sync with AFL
 
+use alloc::borrow::Cow;
 use core::marker::PhantomData;
 use std::{
     fs,
@@ -63,8 +64,9 @@ impl<CB, E, EM, Z> Named for SyncFromDiskStage<CB, E, EM, Z>
 where
     E: UsesState,
 {
-    fn name(&self) -> &str {
-        self.sync_dir.to_str().unwrap()
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("SyncFromDiskStage");
+        &NAME
     }
 }
 

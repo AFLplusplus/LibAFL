@@ -101,7 +101,7 @@ impl<T> __IncompleteArrayField<T> {
         ::std::slice::from_raw_parts(self.as_ptr(), len)
     }
     #[inline]
-    pub unsafe fn as_mut_slice(&mut self, len: usize) -> &mut [T] {
+    pub unsafe fn as_slice_mut(&mut self, len: usize) -> &mut [T] {
         ::std::slice::from_raw_parts_mut(self.as_mut_ptr(), len)
     }
 }

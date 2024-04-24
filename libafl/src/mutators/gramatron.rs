@@ -1,10 +1,13 @@
 //! Gramatron is the rewritten gramatron fuzzer in rust.
 //! See the original gramatron repo [`Gramatron`](https://github.com/HexHive/Gramatron) for more details.
-use alloc::vec::Vec;
+use alloc::{borrow::Cow, vec::Vec};
 use core::cmp::max;
 
 use hashbrown::HashMap;
-use libafl_bolts::{rands::Rand, Named};
+use libafl_bolts::{
+    rands::{choose, Rand},
+    Named,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -53,8 +56,9 @@ impl<'a, S> Named for GramatronRandomMutator<'a, S>
 where
     S: HasRand + HasMetadata,
 {
-    fn name(&self) -> &str {
-        "GramatronRandomMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("GramatronRandomMutator");
+        &NAME
     }
 }
 
@@ -117,7 +121,7 @@ where
 
         let insert_at = state.rand_mut().below(input.terminals().len() as u64) as usize;
 
-        let rand_num = state.rand_mut().next() as usize;
+        let rand_num = state.rand_mut().next();
 
         let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
 
@@ -134,7 +138,7 @@ where
         meta.map.get(&input.terminals()[insert_at].state).map_or(
             Ok(MutationResult::Skipped),
             |splice_points| {
-                let from = splice_points[rand_num % splice_points.len()];
+                let from = *choose(splice_points, rand_num);
 
                 input.terminals_mut().truncate(insert_at);
                 input
@@ -148,8 +152,9 @@ where
 }
 
 impl Named for GramatronSpliceMutator {
-    fn name(&self) -> &str {
-        "GramatronSpliceMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("GramatronSpliceMutator");
+        &NAME
     }
 }
 
@@ -250,8 +255,9 @@ where
 }
 
 impl Named for GramatronRecursionMutator {
-    fn name(&self) -> &str {
-        "GramatronRecursionMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("GramatronRecursionMutator");
+        &NAME
     }
 }
 

@@ -1,6 +1,6 @@
 //! The [`TMinMutationalStage`] is a stage which will attempt to minimize corpus entries.
 
-use alloc::string::{String, ToString};
+use alloc::borrow::Cow;
 use core::{borrow::BorrowMut, fmt::Debug, hash::Hash, marker::PhantomData};
 
 use ahash::RandomState;
@@ -349,33 +349,20 @@ where
 /// provided
 #[derive(Clone, Debug)]
 pub struct MapEqualityFeedback<M, S> {
-    name: String,
-    obs_name: String,
+    name: Cow<'static, str>,
+    obs_name: Cow<'static, str>,
     orig_hash: u64,
     phantom: PhantomData<(M, S)>,
 }
 
-impl<M, S> MapEqualityFeedback<M, S> {
-    /// Create a new map equality feedback -- can be used with feedback logic
-    #[must_use]
-    pub fn new(name: &str, obs_name: &str, orig_hash: u64) -> Self {
-        MapEqualityFeedback {
-            name: name.to_string(),
-            obs_name: obs_name.to_string(),
-            orig_hash,
-            phantom: PhantomData,
-        }
-    }
-}
-
 impl<M, S> Named for MapEqualityFeedback<M, S> {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
 impl<M, S> HasObserverName for MapEqualityFeedback<M, S> {
-    fn observer_name(&self) -> &str {
+    fn observer_name(&self) -> &Cow<'static, str> {
         &self.obs_name
     }
 }
@@ -407,7 +394,7 @@ where
 /// A feedback factory for ensuring that the maps for minimized inputs are the same
 #[derive(Debug, Clone)]
 pub struct MapEqualityFactory<M, S> {
-    obs_name: String,
+    obs_name: Cow<'static, str>,
     phantom: PhantomData<(M, S)>,
 }
 
@@ -418,14 +405,14 @@ where
     /// Creates a new map equality feedback for the given observer
     pub fn with_observer(obs: &M) -> Self {
         Self {
-            obs_name: obs.name().to_string(),
+            obs_name: obs.name().clone(),
             phantom: PhantomData,
         }
     }
 }
 
 impl<M, S> HasObserverName for MapEqualityFactory<M, S> {
-    fn observer_name(&self) -> &str {
+    fn observer_name(&self) -> &Cow<'static, str> {
         &self.obs_name
     }
 }
@@ -441,7 +428,7 @@ where
             .match_name::<M>(self.observer_name())
             .expect("Should have been provided valid observer name.");
         MapEqualityFeedback {
-            name: "MapEq".to_string(),
+            name: Cow::from("MapEq"),
             obs_name: self.obs_name.clone(),
             orig_hash: obs.hash_simple(),
             phantom: PhantomData,

@@ -68,3 +68,10 @@ libafl_nyx/packer
 *.ll
 
 *.tar.gz
+
+# common harness names
+harness
+program
+fuzzer
+fuzzer_libpng*
+forkserver_simple

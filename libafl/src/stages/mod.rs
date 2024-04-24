@@ -4,8 +4,8 @@ A well-known [`Stage`], for example, is the mutational stage, running multiple [
 Other stages may enrich [`crate::corpus::Testcase`]s with metadata.
 */
 
-use alloc::{boxed::Box, vec::Vec};
-use core::{any, marker::PhantomData};
+use alloc::{borrow::Cow, boxed::Box, vec::Vec};
+use core::marker::PhantomData;
 
 pub use calibrate::CalibrationStage;
 pub use colorization::*;
@@ -305,8 +305,9 @@ where
     CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<(), Error>,
     E: UsesState,
 {
-    fn name(&self) -> &str {
-        any::type_name::<Self>()
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("<unnamed fn>");
+        &NAME
     }
 }
 
@@ -644,6 +645,7 @@ impl ExecutionCountRestartHelper {
 
 #[cfg(test)]
 pub mod test {
+    use alloc::borrow::Cow;
     use core::marker::PhantomData;
 
     use libafl_bolts::{impl_serdeany, Error, Named};
@@ -745,8 +747,9 @@ pub mod test {
         struct StageWithOneTry;
 
         impl Named for StageWithOneTry {
-            fn name(&self) -> &str {
-                "TestStage"
+            fn name(&self) -> &Cow<'static, str> {
+                static NAME: Cow<'static, str> = Cow::Borrowed("TestStage");
+                &NAME
             }
         }
 

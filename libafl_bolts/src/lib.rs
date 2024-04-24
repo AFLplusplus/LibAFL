@@ -164,7 +164,7 @@ pub mod bolts_prelude {
 #[cfg(all(unix, feature = "std"))]
 use alloc::boxed::Box;
 #[cfg(feature = "alloc")]
-use alloc::vec::Vec;
+use alloc::{borrow::Cow, vec::Vec};
 #[cfg(all(not(feature = "xxh3"), feature = "alloc"))]
 use core::hash::BuildHasher;
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
@@ -231,9 +231,10 @@ use {
 pub const IP_LOCALHOST: &str = "127.0.0.1";
 
 /// We need fixed names for many parts of this lib.
+#[cfg(feature = "alloc")]
 pub trait Named {
     /// Provide the name of this element.
-    fn name(&self) -> &str;
+    fn name(&self) -> &Cow<'static, str>;
 }
 
 #[cfg(feature = "errors_backtrace")]
@@ -322,6 +323,8 @@ pub enum Error {
     OsError(io::Error, String, ErrorBacktrace),
     /// Something else happened
     Unknown(String, ErrorBacktrace),
+    /// Error with the corpora
+    InvalidCorpus(String, ErrorBacktrace),
 }
 
 impl Error {
@@ -438,6 +441,14 @@ impl Error {
     {
         Error::Unknown(arg.into(), ErrorBacktrace::new())
     }
+    /// Error with corpora
+    #[must_use]
+    pub fn invalid_corpus<S>(arg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::InvalidCorpus(arg.into(), ErrorBacktrace::new())
+    }
 }
 
 impl Display for Error {
@@ -496,6 +507,10 @@ impl Display for Error {
             }
             Self::Unknown(s, b) => {
                 write!(f, "Unknown error: {0}", &s)?;
+                display_error_backtrace(f, b)
+            }
+            Self::InvalidCorpus(s, b) => {
+                write!(f, "Invalid corpus: {0}", &s)?;
                 display_error_backtrace(f, b)
             }
         }
@@ -667,11 +682,11 @@ pub trait AsSlice {
 }
 
 /// Can be converted to a mutable slice
-pub trait AsMutSlice {
+pub trait AsSliceMut {
     /// Type of the entries in this mut slice
     type Entry;
     /// Convert to a slice
-    fn as_mut_slice(&mut self) -> &mut [Self::Entry];
+    fn as_slice_mut(&mut self) -> &mut [Self::Entry];
 }
 
 #[cfg(feature = "alloc")]
@@ -684,10 +699,10 @@ impl<T> AsSlice for Vec<T> {
 }
 
 #[cfg(feature = "alloc")]
-impl<T> AsMutSlice for Vec<T> {
+impl<T> AsSliceMut for Vec<T> {
     type Entry = T;
 
-    fn as_mut_slice(&mut self) -> &mut [Self::Entry] {
+    fn as_slice_mut(&mut self) -> &mut [Self::Entry] {
         self
     }
 }
@@ -708,18 +723,18 @@ impl<T> AsSlice for [T] {
     }
 }
 
-impl<T> AsMutSlice for &mut [T] {
+impl<T> AsSliceMut for &mut [T] {
     type Entry = T;
 
-    fn as_mut_slice(&mut self) -> &mut [Self::Entry] {
+    fn as_slice_mut(&mut self) -> &mut [Self::Entry] {
         self
     }
 }
 
-impl<T> AsMutSlice for [T] {
+impl<T> AsSliceMut for [T] {
     type Entry = T;
 
-    fn as_mut_slice(&mut self) -> &mut [Self::Entry] {
+    fn as_slice_mut(&mut self) -> &mut [Self::Entry] {
         self
     }
 }

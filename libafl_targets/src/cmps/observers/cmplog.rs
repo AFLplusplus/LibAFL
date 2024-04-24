@@ -2,7 +2,7 @@
 //! The values will then be used in subsequent mutations.
 //!
 
-use alloc::string::{String, ToString};
+use alloc::borrow::Cow;
 use core::fmt::Debug;
 
 use libafl::{
@@ -22,7 +22,7 @@ pub struct CmpLogObserver {
     map: OwnedMutPtr<CmpLogMap>,
     size: Option<OwnedMutPtr<usize>>,
     add_meta: bool,
-    name: String,
+    name: Cow<'static, str>,
 }
 
 impl<'a, S> CmpObserver<'a, CmpLogMap, S, CmpValuesMetadata> for CmpLogObserver
@@ -78,7 +78,7 @@ where
 }
 
 impl Named for CmpLogObserver {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
@@ -91,7 +91,7 @@ impl CmpLogObserver {
     #[must_use]
     pub unsafe fn with_map_ptr(name: &'static str, map: *mut CmpLogMap, add_meta: bool) -> Self {
         Self {
-            name: name.to_string(),
+            name: Cow::from(name),
             size: None,
             add_meta,
             map: OwnedMutPtr::Ptr(map),

@@ -124,7 +124,7 @@ pub fn main() -> Result<(), Error> {
     let minimizer = StdScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(StdTMinMutationalStage::new(
         minimizer,
-        CrashFeedbackFactory::default(),
+        CrashFeedback::new(),
         1 << 10
     ));
 

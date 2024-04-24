@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use lain::traits::Mutatable;
 use libafl::{
     mutators::{MutationResult, Mutator},
@@ -28,8 +30,9 @@ where
 }
 
 impl Named for LainMutator {
-    fn name(&self) -> &str {
-        "LainMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("LainMutator");
+        &NAME
     }
 }
 
