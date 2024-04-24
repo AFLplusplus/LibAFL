@@ -252,10 +252,10 @@ where
             }
         };
 
-        let token_find = state.rand_mut().below(tokens_len as u64) as usize;
-        let mut token_replace = state.rand_mut().below(tokens_len as u64) as usize;
+        let token_find = state.rand_mut().below(tokens_len);
+        let mut token_replace = state.rand_mut().below(tokens_len);
         if token_find == token_replace {
-            token_replace = state.rand_mut().below(tokens_len as u64) as usize;
+            token_replace = state.rand_mut().below(tokens_len);
         }
 
         let stop_at_first = state.rand_mut().coinflip(0.5);
@@ -268,7 +268,7 @@ where
         let mut mutated = MutationResult::Skipped;
 
         let gen = generalised_meta.generalized_mut();
-        let rand_idx = fast_bound(rand_idx, gen.len() as u64) as usize;
+        let rand_idx = fast_bound(rand_idx, gen.len());
 
         'first: for item in &mut gen[..rand_idx] {
             if let GeneralizedItem::Bytes(bytes) = item {
@@ -360,10 +360,8 @@ where
         {
             self.gap_indices.push(i);
         }
-        let min_idx =
-            self.gap_indices[state.rand_mut().below(self.gap_indices.len() as u64) as usize];
-        let max_idx =
-            self.gap_indices[state.rand_mut().below(self.gap_indices.len() as u64) as usize];
+        let min_idx = self.gap_indices[state.rand_mut().below(self.gap_indices.len())];
+        let max_idx = self.gap_indices[state.rand_mut().below(self.gap_indices.len())];
 
         let (min_idx, max_idx) = (min(min_idx, max_idx), max(min_idx, max_idx));
 

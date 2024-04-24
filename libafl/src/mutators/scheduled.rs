@@ -115,7 +115,7 @@ where
 {
     name: Cow<'static, str>,
     mutations: MT,
-    max_stack_pow: u64,
+    max_stack_pow: usize,
     phantom: PhantomData<(I, S)>,
 }
 
@@ -186,7 +186,7 @@ where
     /// Get the next mutation to apply
     fn schedule(&self, state: &mut S, _: &I) -> MutationId {
         debug_assert!(self.mutations.len() != 0);
-        state.rand_mut().below(self.mutations.len() as u64).into()
+        state.rand_mut().below(self.mutations.len()).into()
     }
 }
 
@@ -209,7 +209,7 @@ where
     }
 
     /// Create a new [`StdScheduledMutator`] instance specifying mutations and the maximun number of iterations
-    pub fn with_max_stack_pow(mutations: MT, max_stack_pow: u64) -> Self {
+    pub fn with_max_stack_pow(mutations: MT, max_stack_pow: usize) -> Self {
         StdScheduledMutator {
             name: Cow::from(format!(
                 "StdScheduledMutator[{}]",
@@ -437,7 +437,7 @@ where
     /// Get the next mutation to apply
     fn schedule(&self, state: &mut S, _: &I) -> MutationId {
         debug_assert!(MT::LEN != 0);
-        state.rand_mut().below(MT::LEN as u64).into()
+        state.rand_mut().below(MT::LEN).into()
     }
 
     fn scheduled_mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {

@@ -159,8 +159,8 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedDeleteMutator {
             return Ok(MutationResult::Skipped);
         }
 
-        let off = state.rand_mut().below(size as u64) as usize;
-        let len = state.rand_mut().below((size - off) as u64) as usize;
+        let off = state.rand_mut().below(size);
+        let len = state.rand_mut().below(size - off);
         input.codes_mut().drain(off..off + len);
 
         Ok(MutationResult::Mutated)
@@ -198,8 +198,8 @@ where
         if size == 0 {
             return Ok(MutationResult::Skipped);
         }
-        let off = state.rand_mut().below((size + 1) as u64) as usize;
-        let mut len = 1 + state.rand_mut().below(min(16, size as u64)) as usize;
+        let off = state.rand_mut().below(size + 1);
+        let mut len = 1 + state.rand_mut().below(min(16, size));
 
         if size + len > max_size {
             if max_size > size {
@@ -212,7 +212,7 @@ where
         let from = if size == len {
             0
         } else {
-            state.rand_mut().below((size - len) as u64) as usize
+            state.rand_mut().below(size - len)
         };
 
         input.codes_mut().resize(size + len, 0);
@@ -254,9 +254,9 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedCopyMutator {
             return Ok(MutationResult::Skipped);
         }
 
-        let from = state.rand_mut().below(size as u64) as usize;
-        let to = state.rand_mut().below(size as u64) as usize;
-        let len = 1 + state.rand_mut().below((size - max(from, to)) as u64) as usize;
+        let from = state.rand_mut().below(size);
+        let to = state.rand_mut().below(size);
+        let len = 1 + state.rand_mut().below(size - max(from, to));
 
         unsafe {
             buffer_self_copy(input.codes_mut(), from, to, len);
@@ -310,9 +310,9 @@ where
         }
 
         let max_size = state.max_size();
-        let from = state.rand_mut().below(other_size as u64) as usize;
-        let to = state.rand_mut().below(size as u64) as usize;
-        let mut len = 1 + state.rand_mut().below((other_size - from) as u64) as usize;
+        let from = state.rand_mut().below(other_size);
+        let to = state.rand_mut().below(size);
+        let mut len = 1 + state.rand_mut().below(other_size - from);
 
         if size + len > max_size {
             if max_size > size {
@@ -383,9 +383,9 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let from = state.rand_mut().below(other_size as u64) as usize;
-        let len = state.rand_mut().below(min(other_size - from, size) as u64) as usize;
-        let to = state.rand_mut().below((size - len) as u64) as usize;
+        let from = state.rand_mut().below(other_size);
+        let len = state.rand_mut().below(min(other_size - from, size));
+        let to = state.rand_mut().below(size - len);
 
         let other_testcase = state.corpus().get_from_all(idx)?.borrow_mut();
         // no need to load the input again, it'll already be present at this point.
