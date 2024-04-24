@@ -455,13 +455,8 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
         new_testcase.add_metadata(exitkind);
         new_testcase.set_parent_id_optional(*state.corpus().current());
 
-        match state.current_testcase_mut() {
-            Ok(mut tc) => {
-                tc.set_objectives_found(true);
-            }
-            Err(_) => {
-                // just do nothing, we are about to die. returning error makes no sense
-            }
+        if let Ok(mut tc) = state.current_testcase_mut() {
+            tc.set_found_objectives(true);
         }
 
         fuzzer

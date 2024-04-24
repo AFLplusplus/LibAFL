@@ -262,7 +262,7 @@ where
             perf_score = HAVOC_MAX_MULT * 100.0;
         }
 
-        if entry.objectives_found() {
+        if entry.found_objectives() {
             perf_score *= 0.05;
         }
 
@@ -343,8 +343,8 @@ where
             weight *= 2.0;
         }
 
-        if entry.objectives_found() {
-            perf_score *= 0.05;
+        if entry.found_objectives() {
+            weight *= 0.05;
         }
 
         assert!(weight.is_normal());

@@ -65,8 +65,8 @@ where
     parent_id: Option<CorpusId>,
     /// If the testcase is "disabled"
     disabled: bool,
-    /// has found crash or not
-    objectives_found: bool,
+    /// has found crash (or timeout) or not
+    found_objectives: bool,
 }
 
 impl<I> HasMetadata for Testcase<I>
@@ -229,7 +229,7 @@ where
             scheduled_count: 0,
             parent_id: None,
             disabled: false,
-            objectives_found: false,
+            found_objectives: false,
         }
     }
 
@@ -251,7 +251,7 @@ where
             scheduled_count: 0,
             parent_id: Some(parent_id),
             disabled: false,
-            objectives_found: false,
+            found_objectives: false,
         }
     }
 
@@ -273,7 +273,7 @@ where
             scheduled_count: 0,
             parent_id: None,
             disabled: false,
-            objectives_found: false,
+            found_objectives: false,
         }
     }
 
@@ -295,7 +295,7 @@ where
             scheduled_count: 0,
             parent_id: None,
             disabled: false,
-            objectives_found: false,
+            found_objectives: false,
         }
     }
 
@@ -315,13 +315,14 @@ where
         self.parent_id = parent_id;
     }
 
-    pub fn objectives_found(&self) -> bool {
-        self.objectives_found
+    /// Gets if this testcase has generated any objectives or not
+    pub fn found_objectives(&self) -> bool {
+        self.found_objectives
     }
 
-    /// set objectives_found. mostly called from crash handler
-    pub fn set_objectives_found(&mut self, found: bool) {
-        self.objectives_found = found;
+    /// Sets objectives_found. mostly called from crash handler
+    pub fn set_found_objectives(&mut self, found: bool) {
+        self.found_objectives = found;
     }
 }
 
@@ -346,7 +347,7 @@ where
             #[cfg(feature = "std")]
             metadata_path: None,
             disabled: false,
-            objectives_found: false,
+            found_objectives: false,
         }
     }
 }
