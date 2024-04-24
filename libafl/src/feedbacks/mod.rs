@@ -283,6 +283,22 @@ where
     }
 }
 
+impl<A, B, FL, S, T> FeedbackFactory<CombinedFeedback<A, B, FL, S>, S, T>
+    for CombinedFeedback<A, B, FL, S>
+where
+    A: Feedback<S> + FeedbackFactory<A, S, T>,
+    B: Feedback<S> + FeedbackFactory<B, S, T>,
+    FL: FeedbackLogic<A, B, S>,
+    S: State,
+{
+    fn create_feedback(&self, ctx: &T) -> CombinedFeedback<A, B, FL, S> {
+        CombinedFeedback::new(
+            self.first.create_feedback(ctx),
+            self.second.create_feedback(ctx),
+        )
+    }
+}
+
 /// Logical combination of two feedbacks
 pub trait FeedbackLogic<A, B, S>: 'static
 where
@@ -850,8 +866,11 @@ impl Default for CrashFeedback {
     }
 }
 
-/// A feedback factory for crash feedbacks
-pub type CrashFeedbackFactory = DefaultFeedbackFactory<CrashFeedback>;
+impl<S: State, T> FeedbackFactory<CrashFeedback, S, T> for CrashFeedback {
+    fn create_feedback(&self, _ctx: &T) -> CrashFeedback {
+        CrashFeedback::new()
+    }
+}
 
 /// A [`TimeoutFeedback`] reduces the timeout value of a run.
 #[derive(Serialize, Deserialize, Clone, Debug)]
