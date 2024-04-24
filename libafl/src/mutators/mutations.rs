@@ -65,9 +65,9 @@ pub fn buffer_set<T: Clone>(data: &mut [T], from: usize, len: usize, val: T) {
 /// This problem corresponds to: <https://oeis.org/A059036>
 #[inline]
 pub fn rand_range<S: HasRand>(state: &mut S, upper: usize, max_len: usize) -> Range<usize> {
-    let len = 1 + state.rand_mut().below(max_len as u64) as usize;
+    let len = 1 + state.rand_mut().below(max_len);
     // sample from [1..upper + len]
-    let mut offset2 = 1 + state.rand_mut().below((upper + len - 1) as u64) as usize;
+    let mut offset2 = 1 + state.rand_mut().below(upper + len - 1);
     let offset1 = offset2.saturating_sub(len);
     if offset2 > upper {
         offset2 = upper;
@@ -77,7 +77,7 @@ pub fn rand_range<S: HasRand>(state: &mut S, upper: usize, max_len: usize) -> Ra
 }
 
 /// The max value that will be added or subtracted during add mutations
-pub const ARITH_MAX: u64 = 35;
+pub const ARITH_MAX: usize = 35;
 
 /// Interesting 8-bit values from AFL
 pub const INTERESTING_8: [i8; 9] = [-128, -1, 0, 1, 16, 32, 64, 100, 127];
@@ -413,8 +413,8 @@ macro_rules! interesting_mutator_impl {
                     Ok(MutationResult::Skipped)
                 } else {
                     let bytes = input.bytes_mut();
-                    let upper_bound = (bytes.len() + 1 - size_of::<$size>()) as u64;
-                    let idx = state.rand_mut().below(upper_bound) as usize;
+                    let upper_bound = (bytes.len() + 1 - size_of::<$size>());
+                    let idx = state.rand_mut().below(upper_bound);
                     let val = *state.rand_mut().choose(&$interesting) as $size;
                     let new_bytes = match state.rand_mut().choose(&[0, 1]) {
                         0 => val.to_be_bytes(),
@@ -548,8 +548,8 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let mut amount = 1 + state.rand_mut().below(16) as usize;
-        let offset = state.rand_mut().below(size as u64 + 1) as usize;
+        let mut amount = 1 + state.rand_mut().below(16);
+        let offset = state.rand_mut().below(size + 1);
 
         if size + amount > max_size {
             if max_size > size {
@@ -559,7 +559,7 @@ where
             }
         }
 
-        let val = input.bytes()[state.rand_mut().below(size as u64) as usize];
+        let val = input.bytes()[state.rand_mut().below(size)];
 
         input.bytes_mut().resize(size + amount, 0);
         unsafe {
@@ -602,8 +602,8 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let mut amount = 1 + state.rand_mut().below(16) as usize;
-        let offset = state.rand_mut().below(size as u64 + 1) as usize;
+        let mut amount = 1 + state.rand_mut().below(16);
+        let offset = state.rand_mut().below(size + 1);
 
         if size + amount > max_size {
             if max_size > size {
@@ -733,7 +733,7 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let target = state.rand_mut().below(size as u64) as usize;
+        let target = state.rand_mut().below(size);
         let range = rand_range(state, size, size - target);
 
         unsafe {
@@ -776,7 +776,7 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let target = state.rand_mut().below(size as u64) as usize;
+        let target = state.rand_mut().below(size);
         // make sure that the sampled range is both in bounds and of an acceptable size
         let max_insert_len = min(size - target, state.max_size() - size);
         let range = rand_range(state, size, min(16, max_insert_len));
@@ -1091,7 +1091,7 @@ where
         }
 
         let range = rand_range(state, other_size, min(other_size, max_size - size));
-        let target = state.rand_mut().below(size as u64) as usize;
+        let target = state.rand_mut().below(size);
 
         let other_testcase = state.corpus().get_from_all(idx)?.borrow_mut();
         // No need to load the input again, it'll still be cached.
@@ -1172,7 +1172,7 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let target = state.rand_mut().below(size as u64) as usize;
+        let target = state.rand_mut().below(size);
         let range = rand_range(state, other_size, min(other_size, size - target));
 
         let other_testcase = state.corpus().get_from_all(idx)?.borrow_mut();
@@ -1243,13 +1243,13 @@ where
             let (f, l) = locate_diffs(input.bytes(), other.bytes());
 
             if f != l && f >= 0 && l >= 2 {
-                (f as u64, l as u64)
+                (f as usize, l as usize)
             } else {
                 return Ok(MutationResult::Skipped);
             }
         };
 
-        let split_at = state.rand_mut().between(first_diff, last_diff) as usize;
+        let split_at = state.rand_mut().between(first_diff, last_diff);
 
         let other_testcase = state.corpus().get_from_all(idx)?.borrow_mut();
         // Input will already be loaded.
