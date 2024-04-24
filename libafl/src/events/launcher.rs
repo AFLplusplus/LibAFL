@@ -657,9 +657,8 @@ where
 
                         if index == 1 {
                             return (self.main_run_client.take().unwrap())(state, c_mgr, *bind_to);
-                        } else {
-                            return (self.run_client.take().unwrap())(state, c_mgr, *bind_to);
                         }
+                        return (self.run_client.take().unwrap())(state, c_mgr, *bind_to);
                     }
                 };
             }
