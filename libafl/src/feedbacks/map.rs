@@ -1,9 +1,6 @@
 //! Map feedback, maximizing or minimizing maps, for example the afl-style map observer.
 
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{borrow::Cow, vec::Vec};
 #[rustversion::nightly]
 use core::simd::prelude::SimdOrd;
 use core::{
@@ -12,7 +9,7 @@ use core::{
     ops::{BitAnd, BitOr},
 };
 
-use libafl_bolts::{AsIter, AsMutSlice, AsSlice, HasRefCnt, Named};
+use libafl_bolts::{AsIter, AsSlice, AsSliceMut, HasRefCnt, Named};
 use num_traits::PrimInt;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -244,11 +241,11 @@ impl AsSlice for MapIndexesMetadata {
     }
 }
 
-impl AsMutSlice for MapIndexesMetadata {
+impl AsSliceMut for MapIndexesMetadata {
     type Entry = usize;
     /// Convert to a slice
-    fn as_mut_slice(&mut self) -> &mut [usize] {
-        self.list.as_mut_slice()
+    fn as_slice_mut(&mut self) -> &mut [usize] {
+        self.list.as_slice_mut()
     }
 }
 
@@ -292,12 +289,12 @@ impl AsSlice for MapNoveltiesMetadata {
     }
 }
 
-impl AsMutSlice for MapNoveltiesMetadata {
+impl AsSliceMut for MapNoveltiesMetadata {
     type Entry = usize;
     /// Convert to a slice
     #[must_use]
-    fn as_mut_slice(&mut self) -> &mut [usize] {
-        self.list.as_mut_slice()
+    fn as_slice_mut(&mut self) -> &mut [usize] {
+        self.list.as_slice_mut()
     }
 }
 
@@ -387,11 +384,11 @@ pub struct MapFeedback<C, N, O, R, S, T> {
     /// New indexes observed in the last observation
     novelties: Option<Vec<usize>>,
     /// Name identifier of this instance
-    name: String,
+    name: Cow<'static, str>,
     /// Name identifier of the observer
-    observer_name: String,
+    observer_name: Cow<'static, str>,
     /// Name of the feedback as shown in the `UserStats`
-    stats_name: String,
+    stats_name: Cow<'static, str>,
     /// Phantom Data of Reducer
     phantom: PhantomData<(C, N, O, R, S, T)>,
 }
@@ -481,7 +478,7 @@ where
             map_state.history_map.resize(len, observer.initial());
         }
 
-        let history_map = map_state.history_map.as_mut_slice();
+        let history_map = map_state.history_map.as_slice_mut();
         if C::INDICES {
             let mut indices = Vec::new();
 
@@ -534,7 +531,7 @@ where
         manager.fire(
             state,
             Event::UpdateUserStats {
-                name: self.stats_name.to_string(),
+                name: self.stats_name.clone(),
                 value: UserStats::new(
                     UserStatsValue::Ratio(covered as u64, len as u64),
                     AggregatorOps::Avg,
@@ -671,8 +668,8 @@ where
 
 impl<C, N, O, R, S, T> Named for MapFeedback<C, N, O, R, S, T> {
     #[inline]
-    fn name(&self) -> &str {
-        self.name.as_str()
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
     }
 }
 
@@ -682,13 +679,18 @@ where
     C: AsRef<O>,
 {
     #[inline]
-    fn observer_name(&self) -> &str {
-        self.observer_name.as_str()
+    fn observer_name(&self) -> &Cow<'static, str> {
+        &self.observer_name
     }
 }
 
-fn create_stats_name(name: &str) -> String {
-    name.to_lowercase()
+#[allow(clippy::ptr_arg)]
+fn create_stats_name(name: &Cow<'static, str>) -> Cow<'static, str> {
+    if name.chars().all(char::is_lowercase) {
+        name.clone()
+    } else {
+        name.to_lowercase().into()
+    }
 }
 
 impl<C, N, O, R, S, T> MapFeedback<C, N, O, R, S, T>
@@ -707,8 +709,8 @@ where
         let map_observer = map_observer.as_ref();
         Self {
             novelties: if C::NOVELTIES { Some(vec![]) } else { None },
-            name: map_observer.name().to_string(),
-            observer_name: map_observer.name().to_string(),
+            name: map_observer.name().clone(),
+            observer_name: map_observer.name().clone(),
             stats_name: create_stats_name(map_observer.name()),
             phantom: PhantomData,
         }
@@ -719,12 +721,13 @@ where
     /// same name and therefore also the same history.
     #[must_use]
     pub fn with_name(name: &'static str, map_observer: &C) -> Self {
+        let name = Cow::from(name);
         let map_observer = map_observer.as_ref();
         Self {
             novelties: if C::NOVELTIES { Some(vec![]) } else { None },
-            name: name.to_string(),
-            observer_name: map_observer.name().to_string(),
-            stats_name: create_stats_name(name),
+            observer_name: map_observer.name().clone(),
+            stats_name: create_stats_name(&name),
+            name,
             phantom: PhantomData,
         }
     }

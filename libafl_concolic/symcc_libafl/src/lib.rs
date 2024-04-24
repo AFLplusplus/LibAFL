@@ -5,7 +5,7 @@
 /// The URL of the `LibAFL` `SymCC` fork.
 pub const SYMCC_REPO_URL: &str = "https://github.com/AFLplusplus/symcc.git";
 /// The commit of the `LibAFL` `SymCC` fork.
-pub const SYMCC_REPO_COMMIT: &str = "6010402596f02da6de1c2dc88794f339d7c4dfe7";
+pub const SYMCC_REPO_COMMIT: &str = "1330e29d28bce706d9f7c0864da3b0a5ae218e03";
 
 #[cfg(feature = "clone")]
 mod clone {

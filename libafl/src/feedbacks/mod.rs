@@ -5,6 +5,9 @@
 // TODO: make S of Feedback<S> an associated type when specialisation + AT is stable
 
 pub mod map;
+
+use alloc::borrow::Cow;
+
 pub use map::*;
 
 pub mod differential;
@@ -29,7 +32,6 @@ pub mod transferred;
 
 /// The module for list feedback
 pub mod list;
-use alloc::string::{String, ToString};
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
@@ -138,7 +140,7 @@ where
 /// Has an associated observer name (mostly used to retrieve the observer with `MatchName` from an `ObserverTuple`)
 pub trait HasObserverName {
     /// The name associated with the observer
-    fn observer_name(&self) -> &str;
+    fn observer_name(&self) -> &Cow<'static, str>;
 }
 
 /// A combined feedback consisting of multiple [`Feedback`]s
@@ -154,7 +156,7 @@ where
     pub first: A,
     /// Second [`Feedback`]
     pub second: B,
-    name: String,
+    name: Cow<'static, str>,
     phantom: PhantomData<(S, FL)>,
 }
 
@@ -165,8 +167,8 @@ where
     FL: FeedbackLogic<A, B, S>,
     S: State,
 {
-    fn name(&self) -> &str {
-        self.name.as_ref()
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
     }
 }
 
@@ -179,7 +181,12 @@ where
 {
     /// Create a new combined feedback
     pub fn new(first: A, second: B) -> Self {
-        let name = format!("{} ({},{})", FL::name(), first.name(), second.name());
+        let name = Cow::from(format!(
+            "{} ({},{})",
+            FL::name(),
+            first.name(),
+            second.name()
+        ));
         Self {
             first,
             second,
@@ -273,6 +280,22 @@ where
     fn discard_metadata(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
         self.first.discard_metadata(state, input)?;
         self.second.discard_metadata(state, input)
+    }
+}
+
+impl<A, B, FL, S, T> FeedbackFactory<CombinedFeedback<A, B, FL, S>, S, T>
+    for CombinedFeedback<A, B, FL, S>
+where
+    A: Feedback<S> + FeedbackFactory<A, S, T>,
+    B: Feedback<S> + FeedbackFactory<B, S, T>,
+    FL: FeedbackLogic<A, B, S>,
+    S: State,
+{
+    fn create_feedback(&self, ctx: &T) -> CombinedFeedback<A, B, FL, S> {
+        CombinedFeedback::new(
+            self.first.create_feedback(ctx),
+            self.second.create_feedback(ctx),
+        )
     }
 }
 
@@ -625,7 +648,7 @@ where
     /// The feedback to invert
     pub first: A,
     /// The name
-    name: String,
+    name: Cow<'static, str>,
     phantom: PhantomData<S>,
 }
 
@@ -697,7 +720,7 @@ where
     S: State,
 {
     #[inline]
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
@@ -709,7 +732,7 @@ where
 {
     /// Creates a new [`NotFeedback`].
     pub fn new(first: A) -> Self {
-        let name = format!("Not({})", first.name());
+        let name = Cow::from(format!("Not({})", first.name()));
         Self {
             first,
             name,
@@ -823,8 +846,9 @@ where
 
 impl Named for CrashFeedback {
     #[inline]
-    fn name(&self) -> &str {
-        "CrashFeedback"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("CrashFeedback");
+        &NAME
     }
 }
 
@@ -842,8 +866,11 @@ impl Default for CrashFeedback {
     }
 }
 
-/// A feedback factory for crash feedbacks
-pub type CrashFeedbackFactory = DefaultFeedbackFactory<CrashFeedback>;
+impl<S: State, T> FeedbackFactory<CrashFeedback, S, T> for CrashFeedback {
+    fn create_feedback(&self, _ctx: &T) -> CrashFeedback {
+        CrashFeedback::new()
+    }
+}
 
 /// A [`TimeoutFeedback`] reduces the timeout value of a run.
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -876,8 +903,9 @@ where
 
 impl Named for TimeoutFeedback {
     #[inline]
-    fn name(&self) -> &str {
-        "TimeoutFeedback"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("TimeoutFeedback");
+        &NAME
     }
 }
 
@@ -903,7 +931,7 @@ pub type TimeoutFeedbackFactory = DefaultFeedbackFactory<TimeoutFeedback>;
 /// It decides, if the given [`TimeObserver`] value of a run is interesting.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TimeFeedback {
-    name: String,
+    name: Cow<'static, str>,
 }
 
 impl<S> Feedback<S> for TimeFeedback
@@ -954,8 +982,8 @@ where
 
 impl Named for TimeFeedback {
     #[inline]
-    fn name(&self) -> &str {
-        self.name.as_str()
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
     }
 }
 
@@ -964,7 +992,7 @@ impl TimeFeedback {
     #[must_use]
     pub fn new(name: &'static str) -> Self {
         Self {
-            name: name.to_string(),
+            name: Cow::from(name),
         }
     }
 
@@ -972,7 +1000,7 @@ impl TimeFeedback {
     #[must_use]
     pub fn with_observer(observer: &TimeObserver) -> Self {
         Self {
-            name: observer.name().to_string(),
+            name: observer.name().clone(),
         }
     }
 }
@@ -1014,8 +1042,9 @@ where
 
 impl Named for ConstFeedback {
     #[inline]
-    fn name(&self) -> &str {
-        "ConstFeedback"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("ConstFeedback");
+        &NAME
     }
 }
 

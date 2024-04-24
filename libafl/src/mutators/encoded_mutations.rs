@@ -1,6 +1,6 @@
 //! Mutations for [`EncodedInput`]s
 //!
-use alloc::vec::Vec;
+use alloc::{borrow::Cow, vec::Vec};
 use core::cmp::{max, min};
 
 use libafl_bolts::{
@@ -37,8 +37,9 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedRandMutator {
 }
 
 impl Named for EncodedRandMutator {
-    fn name(&self) -> &str {
-        "EncodedRandMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("EncodedRandMutator");
+        &NAME
     }
 }
 
@@ -67,8 +68,9 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedIncMutator {
 }
 
 impl Named for EncodedIncMutator {
-    fn name(&self) -> &str {
-        "EncodedIncMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("EncodedIncMutator");
+        &NAME
     }
 }
 
@@ -97,8 +99,9 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedDecMutator {
 }
 
 impl Named for EncodedDecMutator {
-    fn name(&self) -> &str {
-        "EncodedDecMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("EncodedDecMutator");
+        &NAME
     }
 }
 
@@ -131,8 +134,9 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedAddMutator {
 }
 
 impl Named for EncodedAddMutator {
-    fn name(&self) -> &str {
-        "EncodedAddMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("EncodedAddMutator");
+        &NAME
     }
 }
 
@@ -155,8 +159,8 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedDeleteMutator {
             return Ok(MutationResult::Skipped);
         }
 
-        let off = state.rand_mut().below(size as u64) as usize;
-        let len = state.rand_mut().below((size - off) as u64) as usize;
+        let off = state.rand_mut().below(size);
+        let len = state.rand_mut().below(size - off);
         input.codes_mut().drain(off..off + len);
 
         Ok(MutationResult::Mutated)
@@ -164,8 +168,9 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedDeleteMutator {
 }
 
 impl Named for EncodedDeleteMutator {
-    fn name(&self) -> &str {
-        "EncodedDeleteMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("EncodedDeleteMutator");
+        &NAME
     }
 }
 
@@ -193,8 +198,8 @@ where
         if size == 0 {
             return Ok(MutationResult::Skipped);
         }
-        let off = state.rand_mut().below((size + 1) as u64) as usize;
-        let mut len = 1 + state.rand_mut().below(min(16, size as u64)) as usize;
+        let off = state.rand_mut().below(size + 1);
+        let mut len = 1 + state.rand_mut().below(min(16, size));
 
         if size + len > max_size {
             if max_size > size {
@@ -207,7 +212,7 @@ where
         let from = if size == len {
             0
         } else {
-            state.rand_mut().below((size - len) as u64) as usize
+            state.rand_mut().below(size - len)
         };
 
         input.codes_mut().resize(size + len, 0);
@@ -224,8 +229,9 @@ where
 }
 
 impl Named for EncodedInsertCopyMutator {
-    fn name(&self) -> &str {
-        "EncodedInsertCopyMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("EncodedInsertCopyMutator");
+        &NAME
     }
 }
 
@@ -248,9 +254,9 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedCopyMutator {
             return Ok(MutationResult::Skipped);
         }
 
-        let from = state.rand_mut().below(size as u64) as usize;
-        let to = state.rand_mut().below(size as u64) as usize;
-        let len = 1 + state.rand_mut().below((size - max(from, to)) as u64) as usize;
+        let from = state.rand_mut().below(size);
+        let to = state.rand_mut().below(size);
+        let len = 1 + state.rand_mut().below(size - max(from, to));
 
         unsafe {
             buffer_self_copy(input.codes_mut(), from, to, len);
@@ -261,8 +267,9 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedCopyMutator {
 }
 
 impl Named for EncodedCopyMutator {
-    fn name(&self) -> &str {
-        "EncodedCopyMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("EncodedCopyMutator");
+        &NAME
     }
 }
 
@@ -303,9 +310,9 @@ where
         }
 
         let max_size = state.max_size();
-        let from = state.rand_mut().below(other_size as u64) as usize;
-        let to = state.rand_mut().below(size as u64) as usize;
-        let mut len = 1 + state.rand_mut().below((other_size - from) as u64) as usize;
+        let from = state.rand_mut().below(other_size);
+        let to = state.rand_mut().below(size);
+        let mut len = 1 + state.rand_mut().below(other_size - from);
 
         if size + len > max_size {
             if max_size > size {
@@ -330,8 +337,9 @@ where
 }
 
 impl Named for EncodedCrossoverInsertMutator {
-    fn name(&self) -> &str {
-        "EncodedCrossoverInsertMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("EncodedCrossoverInsertMutator");
+        &NAME
     }
 }
 
@@ -375,9 +383,9 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let from = state.rand_mut().below(other_size as u64) as usize;
-        let len = state.rand_mut().below(min(other_size - from, size) as u64) as usize;
-        let to = state.rand_mut().below((size - len) as u64) as usize;
+        let from = state.rand_mut().below(other_size);
+        let len = state.rand_mut().below(min(other_size - from, size));
+        let to = state.rand_mut().below(size - len);
 
         let other_testcase = state.corpus().get_from_all(idx)?.borrow_mut();
         // no need to load the input again, it'll already be present at this point.
@@ -392,8 +400,9 @@ where
 }
 
 impl Named for EncodedCrossoverReplaceMutator {
-    fn name(&self) -> &str {
-        "EncodedCrossoverReplaceMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("EncodedCrossoverReplaceMutator");
+        &NAME
     }
 }
 

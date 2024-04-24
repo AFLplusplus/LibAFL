@@ -1,10 +1,13 @@
 //! Grimoire is the rewritten grimoire mutator in rust.
 //! See the original repo [`Grimoire`](https://github.com/RUB-SysSec/grimoire) for more details.
 
-use alloc::vec::Vec;
+use alloc::{borrow::Cow, vec::Vec};
 use core::cmp::{max, min};
 
-use libafl_bolts::{rands::Rand, Named};
+use libafl_bolts::{
+    rands::{choose, fast_bound, Rand},
+    Named,
+};
 
 use crate::{
     corpus::Corpus,
@@ -17,7 +20,7 @@ use crate::{
 
 const RECURSIVE_REPLACEMENT_DEPTH: [usize; 6] = [2, 4, 8, 16, 32, 64];
 const MAX_RECURSIVE_REPLACEMENT_LEN: usize = 64 << 10;
-const CHOOSE_SUBINPUT_PROB: u64 = 50;
+const CHOOSE_SUBINPUT_PROB: f64 = 0.5;
 
 fn extend_with_random_generalized<S>(
     state: &mut S,
@@ -29,10 +32,10 @@ where
 {
     let idx = random_corpus_id!(state.corpus(), state.rand_mut());
 
-    if state.rand_mut().below(100) > CHOOSE_SUBINPUT_PROB {
-        if state.rand_mut().below(100) < 50 {
-            let rand1 = state.rand_mut().next() as usize;
-            let rand2 = state.rand_mut().next() as usize;
+    if state.rand_mut().coinflip(CHOOSE_SUBINPUT_PROB) {
+        if state.rand_mut().coinflip(0.5) {
+            let rand1 = state.rand_mut().next();
+            let rand2 = state.rand_mut().next();
 
             let other_testcase = state.corpus().get(idx)?.borrow();
             if let Some(other) = other_testcase
@@ -48,8 +51,8 @@ where
                 {
                     gap_indices.push(i);
                 }
-                let min_idx = gap_indices[rand1 % gap_indices.len()];
-                let max_idx = gap_indices[rand2 % gap_indices.len()];
+                let min_idx = *choose(&*gap_indices, rand1);
+                let max_idx = *choose(&*gap_indices, rand2);
                 let (mut min_idx, max_idx) = (min(min_idx, max_idx), max(min_idx, max_idx));
 
                 gap_indices.clear();
@@ -66,11 +69,11 @@ where
             }
         }
 
-        let rand1 = state.rand_mut().next() as usize;
+        let rand1 = state.rand_mut().next();
 
         if let Some(meta) = state.metadata_map().get::<Tokens>() {
             if !meta.tokens().is_empty() {
-                let tok = &meta.tokens()[rand1 % meta.tokens().len()];
+                let tok = choose(meta.tokens(), rand1);
                 if items.last() != Some(&GeneralizedItem::Gap) {
                     items.push(GeneralizedItem::Gap);
                 }
@@ -132,8 +135,9 @@ where
 }
 
 impl Named for GrimoireExtensionMutator {
-    fn name(&self) -> &str {
-        "GrimoireExtensionMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("GrimoireExtensionMutator");
+        &NAME
     }
 }
 
@@ -206,8 +210,9 @@ where
 }
 
 impl Named for GrimoireRecursiveReplacementMutator {
-    fn name(&self) -> &str {
-        "GrimoireRecursiveReplacementMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("GrimoireRecursiveReplacementMutator");
+        &NAME
     }
 }
 
@@ -247,14 +252,14 @@ where
             }
         };
 
-        let token_find = state.rand_mut().below(tokens_len as u64) as usize;
-        let mut token_replace = state.rand_mut().below(tokens_len as u64) as usize;
+        let token_find = state.rand_mut().below(tokens_len);
+        let mut token_replace = state.rand_mut().below(tokens_len);
         if token_find == token_replace {
-            token_replace = state.rand_mut().below(tokens_len as u64) as usize;
+            token_replace = state.rand_mut().below(tokens_len);
         }
 
-        let stop_at_first = state.rand_mut().below(100) > 50;
-        let mut rand_idx = state.rand_mut().next() as usize;
+        let stop_at_first = state.rand_mut().coinflip(0.5);
+        let rand_idx = state.rand_mut().next();
 
         let meta = state.metadata_map().get::<Tokens>().unwrap();
         let token_1 = &meta.tokens()[token_find];
@@ -263,7 +268,7 @@ where
         let mut mutated = MutationResult::Skipped;
 
         let gen = generalised_meta.generalized_mut();
-        rand_idx %= gen.len();
+        let rand_idx = fast_bound(rand_idx, gen.len());
 
         'first: for item in &mut gen[..rand_idx] {
             if let GeneralizedItem::Bytes(bytes) = item {
@@ -317,8 +322,9 @@ where
 }
 
 impl Named for GrimoireStringReplacementMutator {
-    fn name(&self) -> &str {
-        "GrimoireStringReplacementMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("GrimoireStringReplacementMutator");
+        &NAME
     }
 }
 
@@ -354,10 +360,8 @@ where
         {
             self.gap_indices.push(i);
         }
-        let min_idx =
-            self.gap_indices[state.rand_mut().below(self.gap_indices.len() as u64) as usize];
-        let max_idx =
-            self.gap_indices[state.rand_mut().below(self.gap_indices.len() as u64) as usize];
+        let min_idx = self.gap_indices[state.rand_mut().below(self.gap_indices.len())];
+        let max_idx = self.gap_indices[state.rand_mut().below(self.gap_indices.len())];
 
         let (min_idx, max_idx) = (min(min_idx, max_idx), max(min_idx, max_idx));
 
@@ -375,8 +379,9 @@ where
 }
 
 impl Named for GrimoireRandomDeleteMutator {
-    fn name(&self) -> &str {
-        "GrimoireRandomDeleteMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("GrimoireRandomDeleteMutator");
+        &NAME
     }
 }
 

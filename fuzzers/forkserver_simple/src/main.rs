@@ -1,7 +1,7 @@
 use core::time::Duration;
 use std::path::PathBuf;
 
-use clap::{self, Parser};
+use clap::Parser;
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
@@ -12,7 +12,7 @@ use libafl::{
     inputs::BytesInput,
     monitors::SimpleMonitor,
     mutators::{scheduled::havoc_mutations, tokens_mutations, StdScheduledMutator, Tokens},
-    observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
+    observers::{CanTrack, ExplicitTracking, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, StdState},
@@ -23,7 +23,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, MatchName, Merge},
-    AsMutSlice, Truncate,
+    AsSliceMut, Truncate,
 };
 use nix::sys::signal::Signal;
 
@@ -98,7 +98,7 @@ pub fn main() {
     let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
     // let the forkserver know the shmid
     shmem.write_to_env("__AFL_SHM_ID").unwrap();
-    let shmem_buf = shmem.as_mut_slice();
+    let shmem_buf = shmem.as_slice_mut();
 
     // Create an observation channel using the signals map
     let edges_observer = unsafe {
@@ -179,8 +179,9 @@ pub fn main() {
     if let Some(dynamic_map_size) = executor.coverage_map_size() {
         executor
             .observers_mut()
-            .match_name_mut::<HitcountsMapObserver<StdMapObserver<'_, u8, false>>>("shared_mem")
+            .match_name_mut::<ExplicitTracking<HitcountsMapObserver<StdMapObserver<'_, u8, false>>, true, false>>("shared_mem")
             .unwrap()
+            .as_mut()
             .truncate(dynamic_map_size);
     }
 

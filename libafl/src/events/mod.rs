@@ -19,9 +19,7 @@ pub use llmp::*;
 #[cfg(feature = "tcp_manager")]
 #[allow(clippy::ignored_unit_patterns)]
 pub mod tcp;
-#[cfg(feature = "scalability_introspection")]
-use alloc::string::ToString;
-use alloc::{boxed::Box, string::String, vec::Vec};
+use alloc::{borrow::Cow, boxed::Box, string::String, vec::Vec};
 use core::{
     fmt,
     hash::{BuildHasher, Hasher},
@@ -315,7 +313,7 @@ where
     /// New user stats event to monitor.
     UpdateUserStats {
         /// Custom user monitor name
-        name: String,
+        name: Cow<'static, str>,
         /// Custom user monitor value
         value: UserStats,
         /// [`PhantomData`]
@@ -534,7 +532,7 @@ where
             self.fire(
                 state,
                 Event::UpdateUserStats {
-                    name: "total imported".to_string(),
+                    name: Cow::from("total imported"),
                     value: UserStats::new(
                         UserStatsValue::Number(
                             (imported_with_observer + imported_without_observer) as u64,

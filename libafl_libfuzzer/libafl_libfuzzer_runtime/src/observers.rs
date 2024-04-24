@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     fmt::Debug,
     hash::{Hash, Hasher},
 };
@@ -37,7 +38,7 @@ pub trait ValueObserver: for<'de> Deserialize<'de> + Serialize + Debug + Named {
 #[derive(Deserialize, Serialize, Debug)]
 pub struct MappedEdgeMapObserver<M, O> {
     inner: M,
-    name: String,
+    name: Cow<'static, str>,
     value_observer: O,
 }
 
@@ -48,7 +49,7 @@ where
 {
     pub fn new(obs: M, value_obs: O) -> Self {
         Self {
-            name: format!("{}_{}", value_obs.name(), obs.name()),
+            name: Cow::from(format!("{}_{}", value_obs.name(), obs.name())),
             inner: obs,
             value_observer: value_obs,
         }
@@ -77,8 +78,25 @@ where
 }
 
 impl<M, O> Named for MappedEdgeMapObserver<M, O> {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
+    }
+}
+
+impl<M, O> Hash for MappedEdgeMapObserver<M, O>
+where
+    M: MapObserver + for<'it> AsIter<'it, Item = M::Entry>,
+    O: ValueObserver,
+{
+    fn hash<H: Hasher>(&self, hasher: &mut H) {
+        let initial = self.inner.initial();
+        for e in self.inner.as_iter() {
+            if *e == initial {
+                self.value_observer.default_value().hash(hasher);
+            } else {
+                self.value_observer.value().hash(hasher);
+            }
+        }
     }
 }
 
@@ -110,16 +128,9 @@ where
         self.inner.count_bytes()
     }
 
-    fn hash(&self) -> u64 {
+    fn hash_simple(&self) -> u64 {
         let mut hasher = AHasher::default();
-        let initial = self.inner.initial();
-        for e in self.inner.as_iter() {
-            if *e == initial {
-                self.value_observer.default_value().hash(&mut hasher);
-            } else {
-                self.value_observer.value().hash(&mut hasher);
-            }
-        }
+        self.hash(&mut hasher);
         hasher.finish()
     }
 
@@ -241,8 +252,9 @@ impl ValueObserver for SizeValueObserver {
 }
 
 impl Named for SizeValueObserver {
-    fn name(&self) -> &str {
-        "size"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("size");
+        &NAME
     }
 }
 
@@ -285,7 +297,7 @@ impl ValueObserver for TimeValueObserver {
 }
 
 impl Named for TimeValueObserver {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         self.time_obs.name()
     }
 }
@@ -346,8 +358,9 @@ impl ValueObserver for SizeTimeValueObserver {
 }
 
 impl Named for SizeTimeValueObserver {
-    fn name(&self) -> &str {
-        "size_time"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("size_time");
+        &NAME
     }
 }
 

@@ -1,12 +1,9 @@
 //! The `MapObserver` provides access a map, usually injected into the target
 
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{borrow::Cow, vec::Vec};
 use core::{
     fmt::Debug,
-    hash::{BuildHasher, Hasher},
+    hash::{Hash, Hasher},
     iter::Flatten,
     marker::PhantomData,
     mem::size_of,
@@ -16,7 +13,7 @@ use core::{
 use ahash::RandomState;
 use libafl_bolts::{
     ownedref::{OwnedMutPtr, OwnedMutSlice},
-    AsIter, AsIterMut, AsMutSlice, AsSlice, HasLen, Named, Truncate,
+    AsIter, AsIterMut, AsSlice, AsSliceMut, HasLen, Named, Truncate,
 };
 use meminterval::IntervalTree;
 use num_traits::Bounded;
@@ -67,17 +64,6 @@ fn init_count_class_16() {
             }
         }
     }
-}
-
-/// Compute the hash of a slice
-fn hash_slice<T>(slice: &[T]) -> u64 {
-    let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
-    let ptr = slice.as_ptr() as *const u8;
-    let map_size = slice.len() / size_of::<T>();
-    unsafe {
-        hasher.write(slice::from_raw_parts(ptr, map_size));
-    }
-    hasher.finish()
 }
 
 /// Trait marker which indicates that this [`MapObserver`] is tracked for indices or novelties.
@@ -192,7 +178,7 @@ impl<T, const ITH: bool, const NTH: bool> Named for ExplicitTracking<T, ITH, NTH
 where
     T: Named,
 {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         self.0.name()
     }
 }
@@ -420,12 +406,12 @@ pub mod macros {
 ///
 /// TODO: enforce `iter() -> AssociatedTypeIter` when generic associated types stabilize
 pub trait MapObserver:
-    HasLen + Named + Serialize + serde::de::DeserializeOwned + AsRef<Self> + AsMut<Self>
+    HasLen + Named + Serialize + serde::de::DeserializeOwned + AsRef<Self> + AsMut<Self> + Hash
 // where
 //     for<'it> &'it Self: IntoIterator<Item = &'it Self::Entry>
 {
     /// Type of each entry in this map
-    type Entry: Bounded + PartialEq + Default + Copy + Debug + 'static;
+    type Entry: Bounded + PartialEq + Default + Copy + Debug + Hash + 'static;
 
     /// Get the value at `idx`
     fn get(&self, idx: usize) -> &Self::Entry;
@@ -439,8 +425,8 @@ pub trait MapObserver:
     /// Count the set bytes in the map
     fn count_bytes(&self) -> u64;
 
-    /// Compute the hash of the map
-    fn hash(&self) -> u64;
+    /// Compute the hash of the map without needing to provide a hasher
+    fn hash_simple(&self) -> u64;
 
     /// Get the initial value for `reset()`
     fn initial(&self) -> Self::Entry;
@@ -543,7 +529,7 @@ where
 {
     map: OwnedMutSlice<'a, T>,
     initial: T,
-    name: String,
+    name: Cow<'static, str>,
 }
 
 impl<'a, S, T> Observer<S> for StdMapObserver<'a, T, false>
@@ -553,6 +539,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -583,8 +570,8 @@ where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
-    fn name(&self) -> &str {
-        self.name.as_str()
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
     }
 }
 
@@ -604,6 +591,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -624,6 +612,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -634,7 +623,7 @@ where
 
     fn as_iter_mut(&'it mut self) -> Self::IntoIter {
         let cnt = self.usable_count();
-        self.as_mut_slice()[..cnt].iter_mut()
+        self.as_slice_mut()[..cnt].iter_mut()
     }
 }
 
@@ -644,6 +633,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -665,6 +655,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -675,7 +666,7 @@ where
 
     fn into_iter(self) -> Self::IntoIter {
         let cnt = self.usable_count();
-        self.as_mut_slice()[..cnt].iter_mut()
+        self.as_slice_mut()[..cnt].iter_mut()
     }
 }
 
@@ -685,6 +676,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -698,6 +690,24 @@ where
     /// Returns a mutable iterator over the map.
     pub fn iter_mut(&mut self) -> IterMut<'_, T> {
         <&mut Self as IntoIterator>::into_iter(self)
+    }
+}
+
+impl<'a, T, const DIFFERENTIAL: bool> Hash for StdMapObserver<'a, T, DIFFERENTIAL>
+where
+    T: Bounded
+        + PartialEq
+        + Default
+        + Copy
+        + Hash
+        + 'static
+        + Serialize
+        + serde::de::DeserializeOwned
+        + Debug,
+{
+    #[inline]
+    fn hash<H: Hasher>(&self, hasher: &mut H) {
+        self.as_slice().hash(hasher);
     }
 }
 
@@ -725,6 +735,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -739,7 +750,7 @@ where
 
     #[inline]
     fn get_mut(&mut self, idx: usize) -> &mut T {
-        &mut self.as_mut_slice()[idx]
+        &mut self.as_slice_mut()[idx]
     }
 
     /// Count the set bytes in the map
@@ -761,8 +772,9 @@ where
         self.as_slice().len()
     }
 
-    fn hash(&self) -> u64 {
-        hash_slice(self.as_slice())
+    #[inline]
+    fn hash_simple(&self) -> u64 {
+        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
     }
 
     #[inline]
@@ -780,7 +792,7 @@ where
         // Normal memset, see https://rust.godbolt.org/z/Trs5hv
         let initial = self.initial();
         let cnt = self.usable_count();
-        let map = self.as_mut_slice();
+        let map = self.as_slice_mut();
         for x in &mut map[0..cnt] {
             *x = initial;
         }
@@ -829,15 +841,15 @@ where
     }
 }
 
-impl<'a, T, const DIFFERENTIAL: bool> AsMutSlice for StdMapObserver<'a, T, DIFFERENTIAL>
+impl<'a, T, const DIFFERENTIAL: bool> AsSliceMut for StdMapObserver<'a, T, DIFFERENTIAL>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
     type Entry = T;
     #[must_use]
     #[inline]
-    fn as_mut_slice(&mut self) -> &mut [T] {
-        self.map.as_mut_slice()
+    fn as_slice_mut(&mut self) -> &mut [T] {
+        self.map.as_slice_mut()
     }
 }
 
@@ -853,7 +865,7 @@ where
     #[must_use]
     unsafe fn maybe_differential<S>(name: S, map: &'a mut [T]) -> Self
     where
-        S: Into<String>,
+        S: Into<Cow<'static, str>>,
     {
         let len = map.len();
         let ptr = map.as_mut_ptr();
@@ -864,7 +876,7 @@ where
     #[must_use]
     fn maybe_differential_from_mut_slice<S>(name: S, map: OwnedMutSlice<'a, T>) -> Self
     where
-        S: Into<String>,
+        S: Into<Cow<'static, str>>,
     {
         StdMapObserver {
             name: name.into(),
@@ -877,7 +889,7 @@ where
     #[must_use]
     fn maybe_differential_owned<S>(name: S, map: Vec<T>) -> Self
     where
-        S: Into<String>,
+        S: Into<Cow<'static, str>>,
     {
         Self {
             map: OwnedMutSlice::from(map),
@@ -893,7 +905,7 @@ where
     #[must_use]
     fn maybe_differential_from_ownedref<S>(name: S, map: OwnedMutSlice<'a, T>) -> Self
     where
-        S: Into<String>,
+        S: Into<Cow<'static, str>>,
     {
         Self {
             map,
@@ -908,7 +920,7 @@ where
     /// Will dereference the `map_ptr` with up to len elements.
     unsafe fn maybe_differential_from_mut_ptr<S>(name: S, map_ptr: *mut T, len: usize) -> Self
     where
-        S: Into<String>,
+        S: Into<Cow<'static, str>>,
     {
         Self::maybe_differential_from_mut_slice(
             name,
@@ -944,7 +956,7 @@ where
     #[must_use]
     pub unsafe fn new<S>(name: S, map: &'a mut [T]) -> Self
     where
-        S: Into<String>,
+        S: Into<Cow<'static, str>>,
     {
         Self::maybe_differential(name, map)
     }
@@ -952,7 +964,7 @@ where
     /// Creates a new [`MapObserver`] from an [`OwnedMutSlice`]
     pub fn from_mut_slice<S>(name: S, map: OwnedMutSlice<'a, T>) -> Self
     where
-        S: Into<String>,
+        S: Into<Cow<'static, str>>,
     {
         Self::maybe_differential_from_mut_slice(name, map)
     }
@@ -961,7 +973,7 @@ where
     #[must_use]
     pub fn owned<S>(name: S, map: Vec<T>) -> Self
     where
-        S: Into<String>,
+        S: Into<Cow<'static, str>>,
     {
         Self::maybe_differential_owned(name, map)
     }
@@ -973,7 +985,7 @@ where
     #[must_use]
     pub fn from_ownedref<S>(name: S, map: OwnedMutSlice<'a, T>) -> Self
     where
-        S: Into<String>,
+        S: Into<Cow<'static, str>>,
     {
         Self::maybe_differential_from_ownedref(name, map)
     }
@@ -984,7 +996,7 @@ where
     /// Will dereference the `map_ptr` with up to len elements.
     pub unsafe fn from_mut_ptr<S>(name: S, map_ptr: *mut T, len: usize) -> Self
     where
-        S: Into<String>,
+        S: Into<Cow<'static, str>>,
     {
         Self::maybe_differential_from_mut_ptr(name, map_ptr, len)
     }
@@ -1002,7 +1014,7 @@ where
     #[must_use]
     pub unsafe fn differential<S>(name: S, map: &'a mut [T]) -> Self
     where
-        S: Into<String>,
+        S: Into<Cow<'static, str>>,
     {
         Self::maybe_differential(name, map)
     }
@@ -1011,7 +1023,7 @@ where
     #[must_use]
     pub fn differential_owned<S>(name: S, map: Vec<T>) -> Self
     where
-        S: Into<String>,
+        S: Into<Cow<'static, str>>,
     {
         Self::maybe_differential_owned(name, map)
     }
@@ -1023,7 +1035,7 @@ where
     #[must_use]
     pub fn differential_from_ownedref<S>(name: S, map: OwnedMutSlice<'a, T>) -> Self
     where
-        S: Into<String>,
+        S: Into<Cow<'static, str>>,
     {
         Self::maybe_differential_from_ownedref(name, map)
     }
@@ -1034,7 +1046,7 @@ where
     /// Will dereference the `map_ptr` with up to len elements.
     pub unsafe fn differential_from_mut_ptr<S>(name: S, map_ptr: *mut T, len: usize) -> Self
     where
-        S: Into<String>,
+        S: Into<Cow<'static, str>>,
     {
         Self::maybe_differential_from_mut_ptr(name, map_ptr, len)
     }
@@ -1067,7 +1079,7 @@ where
 {
     map: OwnedMutSlice<'a, T>,
     initial: T,
-    name: String,
+    name: Cow<'static, str>,
 }
 
 impl<'a, S, T, const N: usize> Observer<S> for ConstMapObserver<'a, T, N>
@@ -1087,8 +1099,8 @@ where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
-    fn name(&self) -> &str {
-        self.name.as_str()
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
     }
 }
 
@@ -1108,6 +1120,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1128,6 +1141,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1138,7 +1152,7 @@ where
 
     fn as_iter_mut(&'it mut self) -> Self::IntoIter {
         let cnt = self.usable_count();
-        self.as_mut_slice()[..cnt].iter_mut()
+        self.as_slice_mut()[..cnt].iter_mut()
     }
 }
 
@@ -1148,6 +1162,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1168,6 +1183,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1178,7 +1194,7 @@ where
 
     fn into_iter(self) -> Self::IntoIter {
         let cnt = self.usable_count();
-        self.as_mut_slice()[..cnt].iter_mut()
+        self.as_slice_mut()[..cnt].iter_mut()
     }
 }
 
@@ -1188,6 +1204,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1204,6 +1221,23 @@ where
     }
 }
 
+impl<'a, T, const N: usize> Hash for ConstMapObserver<'a, T, N>
+where
+    T: Bounded
+        + PartialEq
+        + Default
+        + Copy
+        + Hash
+        + 'static
+        + Serialize
+        + serde::de::DeserializeOwned
+        + Debug,
+{
+    #[inline]
+    fn hash<H: Hasher>(&self, hasher: &mut H) {
+        self.as_slice().hash(hasher);
+    }
+}
 impl<'a, T, const N: usize> AsRef<Self> for ConstMapObserver<'a, T, N>
 where
     T: Default + Copy + 'static + Serialize,
@@ -1228,6 +1262,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1247,7 +1282,7 @@ where
 
     #[inline]
     fn get_mut(&mut self, idx: usize) -> &mut T {
-        &mut self.as_mut_slice()[idx]
+        &mut self.as_slice_mut()[idx]
     }
 
     /// Count the set bytes in the map
@@ -1268,8 +1303,9 @@ where
         self.as_slice().len()
     }
 
-    fn hash(&self) -> u64 {
-        hash_slice(self.as_slice())
+    #[inline]
+    fn hash_simple(&self) -> u64 {
+        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
     }
 
     /// Reset the map
@@ -1278,7 +1314,7 @@ where
         // Normal memset, see https://rust.godbolt.org/z/Trs5hv
         let initial = self.initial();
         let cnt = self.usable_count();
-        let map = self.as_mut_slice();
+        let map = self.as_slice_mut();
         for x in &mut map[0..cnt] {
             *x = initial;
         }
@@ -1315,14 +1351,14 @@ where
     }
 }
 
-impl<'a, T, const N: usize> AsMutSlice for ConstMapObserver<'a, T, N>
+impl<'a, T, const N: usize> AsSliceMut for ConstMapObserver<'a, T, N>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
     type Entry = T;
     #[inline]
-    fn as_mut_slice(&mut self) -> &mut [T] {
-        self.map.as_mut_slice()
+    fn as_slice_mut(&mut self) -> &mut [T] {
+        self.map.as_slice_mut()
     }
 }
 
@@ -1340,7 +1376,7 @@ where
         assert!(map.len() >= N);
         Self {
             map: OwnedMutSlice::from(map),
-            name: name.to_string(),
+            name: Cow::from(name),
             initial: T::default(),
         }
     }
@@ -1352,7 +1388,7 @@ where
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
             map: OwnedMutSlice::from(map),
-            name: name.to_string(),
+            name: Cow::from(name),
             initial,
         }
     }
@@ -1364,7 +1400,7 @@ where
     pub unsafe fn from_mut_ptr(name: &'static str, map_ptr: *mut T) -> Self {
         ConstMapObserver {
             map: OwnedMutSlice::from_raw_parts_mut(map_ptr, N),
-            name: name.to_string(),
+            name: Cow::from(name),
             initial: T::default(),
         }
     }
@@ -1381,7 +1417,7 @@ where
     map: OwnedMutSlice<'a, T>,
     size: OwnedMutPtr<usize>,
     initial: T,
-    name: String,
+    name: Cow<'static, str>,
 }
 
 impl<'a, S, T> Observer<S> for VariableMapObserver<'a, T>
@@ -1408,8 +1444,8 @@ where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Bounded + PartialEq,
 {
     #[inline]
-    fn name(&self) -> &str {
-        self.name.as_str()
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
     }
 }
 
@@ -1429,6 +1465,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1451,6 +1488,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1463,7 +1501,7 @@ where
 
     fn as_iter_mut(&'it mut self) -> Self::IntoIter {
         let cnt = self.usable_count();
-        self.as_mut_slice()[..cnt].iter_mut()
+        self.as_slice_mut()[..cnt].iter_mut()
     }
 }
 
@@ -1473,6 +1511,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1495,6 +1534,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1507,7 +1547,7 @@ where
 
     fn into_iter(self) -> Self::IntoIter {
         let cnt = self.usable_count();
-        self.as_mut_slice()[..cnt].iter_mut()
+        self.as_slice_mut()[..cnt].iter_mut()
     }
 }
 
@@ -1517,6 +1557,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1535,6 +1576,25 @@ where
     }
 }
 
+impl<'a, T> Hash for VariableMapObserver<'a, T>
+where
+    T: Bounded
+        + PartialEq
+        + Default
+        + Copy
+        + Hash
+        + 'static
+        + Serialize
+        + serde::de::DeserializeOwned
+        + Debug
+        + PartialEq
+        + Bounded,
+{
+    #[inline]
+    fn hash<H: Hasher>(&self, hasher: &mut H) {
+        self.as_slice().hash(hasher);
+    }
+}
 impl<'a, T> AsRef<Self> for VariableMapObserver<'a, T>
 where
     T: Default + Copy + 'static + Serialize + PartialEq + Bounded,
@@ -1559,6 +1619,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1583,7 +1644,7 @@ where
     }
 
     fn get_mut(&mut self, idx: usize) -> &mut T {
-        &mut self.map.as_mut_slice()[idx]
+        &mut self.map.as_slice_mut()[idx]
     }
 
     /// Count the set bytes in the map
@@ -1599,8 +1660,10 @@ where
         }
         res
     }
-    fn hash(&self) -> u64 {
-        hash_slice(self.as_slice())
+
+    #[inline]
+    fn hash_simple(&self) -> u64 {
+        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
     }
 
     /// Reset the map
@@ -1609,7 +1672,7 @@ where
         // Normal memset, see https://rust.godbolt.org/z/Trs5hv
         let initial = self.initial();
         let cnt = self.usable_count();
-        let map = self.as_mut_slice();
+        let map = self.as_slice_mut();
         for x in &mut map[0..cnt] {
             *x = initial;
         }
@@ -1640,6 +1703,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
@@ -1655,11 +1719,12 @@ where
     }
 }
 
-impl<'a, T> AsMutSlice for VariableMapObserver<'a, T>
+impl<'a, T> AsSliceMut for VariableMapObserver<'a, T>
 where
     T: 'static
         + Default
         + Copy
+        + Hash
         + Serialize
         + serde::de::DeserializeOwned
         + Debug
@@ -1668,9 +1733,9 @@ where
 {
     type Entry = T;
     #[inline]
-    fn as_mut_slice(&mut self) -> &mut [T] {
+    fn as_slice_mut(&mut self) -> &mut [T] {
         let cnt = self.usable_count();
-        &mut self.map.as_mut_slice()[..cnt]
+        &mut self.map.as_slice_mut()[..cnt]
     }
 }
 
@@ -1719,7 +1784,7 @@ where
 ///
 /// [`MapObserver`]s that are not slice-backed, such as [`MultiMapObserver`], can use
 /// [`HitcountsIterableMapObserver`] instead.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Hash)]
 #[serde(bound = "M: serde::de::DeserializeOwned")]
 pub struct HitcountsMapObserver<M>
 where
@@ -1730,7 +1795,7 @@ where
 
 impl<S, M> Observer<S> for HitcountsMapObserver<M>
 where
-    M: MapObserver<Entry = u8> + Observer<S> + AsMutSlice<Entry = u8>,
+    M: MapObserver<Entry = u8> + Observer<S> + AsSliceMut<Entry = u8>,
     S: UsesInput,
 {
     #[inline]
@@ -1746,7 +1811,7 @@ where
         input: &S::Input,
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
-        let map = self.as_mut_slice();
+        let map = self.as_slice_mut();
         let mut len = map.len();
         let align_offset = map.as_ptr().align_offset(size_of::<u16>());
 
@@ -1793,7 +1858,7 @@ where
     M: Named + Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         self.base.name()
     }
 }
@@ -1863,8 +1928,9 @@ where
         self.base.reset_map()
     }
 
-    fn hash(&self) -> u64 {
-        self.base.hash()
+    #[inline]
+    fn hash_simple(&self) -> u64 {
+        self.base.hash_simple()
     }
     fn to_vec(&self) -> Vec<u8> {
         self.base.to_vec()
@@ -1895,14 +1961,14 @@ where
     }
 }
 
-impl<M> AsMutSlice for HitcountsMapObserver<M>
+impl<M> AsSliceMut for HitcountsMapObserver<M>
 where
-    M: MapObserver + AsMutSlice,
+    M: MapObserver + AsSliceMut,
 {
-    type Entry = <M as AsMutSlice>::Entry;
+    type Entry = <M as AsSliceMut>::Entry;
     #[inline]
-    fn as_mut_slice(&mut self) -> &mut [Self::Entry] {
-        self.base.as_mut_slice()
+    fn as_slice_mut(&mut self) -> &mut [Self::Entry] {
+        self.base.as_slice_mut()
     }
 }
 
@@ -1994,7 +2060,7 @@ where
     M: DifferentialObserver<OTA, OTB, S>
         + MapObserver<Entry = u8>
         + Serialize
-        + AsMutSlice<Entry = u8>,
+        + AsSliceMut<Entry = u8>,
     OTA: ObserversTuple<S>,
     OTB: ObserversTuple<S>,
     S: UsesInput,
@@ -2019,7 +2085,7 @@ where
 /// Map observer with hitcounts postprocessing
 /// Less optimized version for non-slice iterators.
 /// Slice-backed observers should use a [`HitcountsMapObserver`].
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Hash)]
 #[serde(bound = "M: serde::de::DeserializeOwned")]
 pub struct HitcountsIterableMapObserver<M>
 where
@@ -2060,7 +2126,7 @@ where
     M: Named + Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         self.base.name()
     }
 }
@@ -2133,8 +2199,9 @@ where
         self.base.reset_map()
     }
 
-    fn hash(&self) -> u64 {
-        self.base.hash()
+    #[inline]
+    fn hash_simple(&self) -> u64 {
+        self.base.hash_simple()
     }
     fn to_vec(&self) -> Vec<u8> {
         self.base.to_vec()
@@ -2165,14 +2232,14 @@ where
     }
 }
 
-impl<M> AsMutSlice for HitcountsIterableMapObserver<M>
+impl<M> AsSliceMut for HitcountsIterableMapObserver<M>
 where
-    M: MapObserver + AsMutSlice,
+    M: MapObserver + AsSliceMut,
 {
-    type Entry = <M as AsMutSlice>::Entry;
+    type Entry = <M as AsSliceMut>::Entry;
     #[inline]
-    fn as_mut_slice(&mut self) -> &mut [Self::Entry] {
-        self.base.as_mut_slice()
+    fn as_slice_mut(&mut self) -> &mut [Self::Entry] {
+        self.base.as_slice_mut()
     }
 }
 
@@ -2296,7 +2363,7 @@ where
     intervals: IntervalTree<usize, usize>,
     len: usize,
     initial: T,
-    name: String,
+    name: Cow<'static, str>,
     iter_idx: usize,
 }
 
@@ -2326,8 +2393,8 @@ where
     T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
 {
     #[inline]
-    fn name(&self) -> &str {
-        self.name.as_str()
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
     }
 }
 
@@ -2338,6 +2405,22 @@ where
     #[inline]
     fn len(&self) -> usize {
         self.len
+    }
+}
+
+impl<'a, T, const DIFFERENTIAL: bool> Hash for MultiMapObserver<'a, T, DIFFERENTIAL>
+where
+    T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    fn hash<H: Hasher>(&self, hasher: &mut H) {
+        for map in &self.maps {
+            let slice = map.as_slice();
+            let ptr = slice.as_ptr() as *const u8;
+            let map_size = slice.len() / size_of::<T>();
+            unsafe {
+                hasher.write(slice::from_raw_parts(ptr, map_size));
+            }
+        }
     }
 }
 
@@ -2366,6 +2449,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + Serialize
         + serde::de::DeserializeOwned
         + Debug,
@@ -2385,7 +2469,7 @@ where
         let elem = self.intervals.query(idx..=idx).next().unwrap();
         let i = *elem.value;
         let j = idx - elem.interval.start;
-        &mut self.maps[i].as_mut_slice()[j]
+        &mut self.maps[i].as_slice_mut()[j]
     }
 
     #[inline]
@@ -2406,23 +2490,15 @@ where
         res
     }
 
-    fn hash(&self) -> u64 {
-        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
-        for map in &self.maps {
-            let slice = map.as_slice();
-            let ptr = slice.as_ptr() as *const u8;
-            let map_size = slice.len() / size_of::<T>();
-            unsafe {
-                hasher.write(slice::from_raw_parts(ptr, map_size));
-            }
-        }
-        hasher.finish()
+    #[inline]
+    fn hash_simple(&self) -> u64 {
+        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
     }
 
     fn reset_map(&mut self) -> Result<(), Error> {
         let initial = self.initial();
         for map in &mut self.maps {
-            for x in map.as_mut_slice() {
+            for x in map.as_slice_mut() {
                 *x = initial;
             }
         }
@@ -2474,7 +2550,7 @@ where
             maps,
             intervals,
             len: idx,
-            name: name.to_string(),
+            name: Cow::from(name),
             initial: T::default(),
             iter_idx: 0,
         }
@@ -2522,7 +2598,7 @@ where
             maps,
             intervals,
             len: idx,
-            name: name.to_string(),
+            name: Cow::from(name),
             initial: T::default(),
             iter_idx: 0,
         }
@@ -2616,7 +2692,7 @@ where
 {
     map: Vec<T>,
     initial: T,
-    name: String,
+    name: Cow<'static, str>,
 }
 
 impl<S, T> Observer<S> for OwnedMapObserver<T>
@@ -2636,8 +2712,8 @@ where
     T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
-    fn name(&self) -> &str {
-        self.name.as_str()
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
     }
 }
 
@@ -2671,7 +2747,7 @@ where
     type IntoIter = IterMut<'it, T>;
 
     fn as_iter_mut(&'it mut self) -> Self::IntoIter {
-        self.as_mut_slice().iter_mut()
+        self.as_slice_mut().iter_mut()
     }
 }
 
@@ -2695,7 +2771,7 @@ where
     type IntoIter = IterMut<'it, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.as_mut_slice().iter_mut()
+        self.as_slice_mut().iter_mut()
     }
 }
 
@@ -2711,6 +2787,16 @@ where
     /// Returns a mutable iterator over the map.
     pub fn iter_mut(&mut self) -> IterMut<'_, T> {
         <&mut Self as IntoIterator>::into_iter(self)
+    }
+}
+
+impl<T> Hash for OwnedMapObserver<T>
+where
+    T: 'static + Hash + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    #[inline]
+    fn hash<H: Hasher>(&self, hasher: &mut H) {
+        self.as_slice().hash(hasher);
     }
 }
 
@@ -2739,6 +2825,7 @@ where
         + PartialEq
         + Default
         + Copy
+        + Hash
         + Serialize
         + serde::de::DeserializeOwned
         + Debug,
@@ -2752,7 +2839,7 @@ where
 
     #[inline]
     fn get_mut(&mut self, idx: usize) -> &mut T {
-        &mut self.as_mut_slice()[idx]
+        &mut self.as_slice_mut()[idx]
     }
 
     /// Count the set bytes in the map
@@ -2774,8 +2861,9 @@ where
         self.as_slice().len()
     }
 
-    fn hash(&self) -> u64 {
-        hash_slice(self.as_slice())
+    #[inline]
+    fn hash_simple(&self) -> u64 {
+        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
     }
 
     #[inline]
@@ -2789,7 +2877,7 @@ where
         // Normal memset, see https://rust.godbolt.org/z/Trs5hv
         let initial = self.initial();
         let cnt = self.usable_count();
-        let map = self.as_mut_slice();
+        let map = self.as_slice_mut();
         for x in &mut map[0..cnt] {
             *x = initial;
         }
@@ -2825,15 +2913,15 @@ where
     }
 }
 
-impl<T> AsMutSlice for OwnedMapObserver<T>
+impl<T> AsSliceMut for OwnedMapObserver<T>
 where
     T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
 {
     type Entry = T;
     #[must_use]
     #[inline]
-    fn as_mut_slice(&mut self) -> &mut [T] {
-        self.map.as_mut_slice()
+    fn as_slice_mut(&mut self) -> &mut [T] {
+        self.map.as_slice_mut()
     }
 }
 
@@ -2847,7 +2935,7 @@ where
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
             map,
-            name: name.to_string(),
+            name: Cow::from(name),
             initial,
         }
     }

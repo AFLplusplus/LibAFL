@@ -1161,6 +1161,18 @@ impl Qemu {
         }
     }
 
+    /// `data` can be used to pass data that can be accessed as the first argument in the `gen` and the `exec` functions
+    ///
+    /// `gen` gets passed the current programm counter, mutable access to a `TCGTemp` and information about the memory
+    /// access being performed.
+    ///  The `u64` return value is an id that gets passed to the `exec` functions as their second argument.
+    ///
+    /// `exec` hooks get invoked on every read performed by the guest
+    ///
+    /// `exec1`-`exec8` special case accesses of width 1-8
+    ///
+    /// If there is no specialized hook for a given read width, the `exec_n` will be
+    /// called and its last argument will specify the access width
     #[allow(clippy::missing_transmute_annotations)]
     pub fn add_read_hooks<T: Into<HookData>>(
         &self,

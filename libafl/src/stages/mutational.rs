@@ -1,7 +1,8 @@
 //| The [`MutationalStage`] is the default stage used during fuzzing.
 //! For the current input, it will perform a range of random mutations, and then run them in the executor.
 
-use core::{any::type_name, marker::PhantomData};
+use alloc::borrow::Cow;
+use core::marker::PhantomData;
 
 use libafl_bolts::{rands::Rand, Named};
 
@@ -91,7 +92,7 @@ where
     fn mutator_mut(&mut self) -> &mut M;
 
     /// Gets the number of iterations this mutator should run for.
-    fn iterations(&self, state: &mut Z::State) -> Result<u64, Error>;
+    fn iterations(&self, state: &mut Z::State) -> Result<usize, Error>;
 
     /// Gets the number of executions this mutator already did since it got first called in this fuzz round.
     fn execs_since_progress_start(&mut self, state: &mut Z::State) -> Result<u64, Error>;
@@ -149,7 +150,7 @@ where
 
 /// Default value, how many iterations each stage gets, as an upper bound.
 /// It may randomly continue earlier.
-pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: u64 = 128;
+pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: usize = 128;
 
 /// The default mutational stage
 #[derive(Clone, Debug)]
@@ -157,7 +158,7 @@ pub struct StdMutationalStage<E, EM, I, M, Z> {
     /// The mutator(s) to use
     mutator: M,
     /// The maximum amount of iterations we should do each round
-    max_iterations: u64,
+    max_iterations: usize,
     /// The progress helper for this mutational stage
     restart_helper: ExecutionCountRestartHelper,
     #[allow(clippy::type_complexity)]
@@ -186,7 +187,7 @@ where
     }
 
     /// Gets the number of iterations as a random number
-    fn iterations(&self, state: &mut Z::State) -> Result<u64, Error> {
+    fn iterations(&self, state: &mut Z::State) -> Result<usize, Error> {
         Ok(1 + state.rand_mut().below(self.max_iterations))
     }
 
@@ -257,7 +258,7 @@ where
     }
 
     /// Creates a new mutational stage with the given max iterations
-    pub fn with_max_iterations(mutator: M, max_iterations: u64) -> Self {
+    pub fn with_max_iterations(mutator: M, max_iterations: usize) -> Self {
         Self::transforming_with_max_iterations(mutator, max_iterations)
     }
 }
@@ -276,7 +277,7 @@ where
     }
 
     /// Creates a new transforming mutational stage with the given max iterations
-    pub fn transforming_with_max_iterations(mutator: M, max_iterations: u64) -> Self {
+    pub fn transforming_with_max_iterations(mutator: M, max_iterations: usize) -> Self {
         Self {
             mutator,
             max_iterations,
@@ -313,8 +314,9 @@ where
     Z: Evaluator<E, EM>,
     Z::State: HasCorpus + HasRand,
 {
-    fn name(&self) -> &str {
-        type_name::<Self>()
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("MultiMutational");
+        &NAME
     }
 }
 

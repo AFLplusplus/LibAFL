@@ -67,8 +67,8 @@ impl From<CorpusId> for usize {
 #[macro_export]
 macro_rules! random_corpus_id {
     ($corpus:expr, $rand:expr) => {{
-        let cnt = $corpus.count() as u64;
-        let nth = $rand.below(cnt) as usize;
+        let cnt = $corpus.count();
+        let nth = $rand.below(cnt);
         $corpus.nth(nth)
     }};
 }
@@ -78,8 +78,8 @@ macro_rules! random_corpus_id {
 #[macro_export]
 macro_rules! random_corpus_id_with_disabled {
     ($corpus:expr, $rand:expr) => {{
-        let cnt = $corpus.count_all() as u64;
-        let nth = $rand.below(cnt) as usize;
+        let cnt = $corpus.count_all();
+        let nth = $rand.below(cnt);
         $corpus.nth_from_all(nth)
     }};
 }
