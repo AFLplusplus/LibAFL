@@ -562,6 +562,13 @@ pub struct Reference<T: ?Sized> {
     phantom: PhantomData<T>,
 }
 
+#[cfg(feature = "alloc")]
+impl<T> Named for Reference<T> {
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
+    }
+}
+
 /// Search using `Reference `
 #[cfg(feature = "alloc")]
 pub trait MatchNameRef {
