@@ -10,7 +10,7 @@ use core::{
 use libafl_bolts::{
     os::unix_signals::Signal,
     shmem::ShMemProvider,
-    tuples::{tuple_list, Merge, RefIndexable, RefIndexableMut},
+    tuples::{tuple_list, Merge, RefIndexable},
 };
 use nix::{
     sys::wait::{waitpid, WaitStatus},
@@ -339,12 +339,12 @@ where
     Z: UsesState<State = S>,
 {
     #[inline]
-    fn observers(&self) -> RefIndexable<OT> {
+    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         RefIndexable::from(&self.observers)
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> RefIndexableMut<OT> {
-        RefIndexableMut::from(&mut self.observers)
+    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
+        RefIndexable::from(&mut self.observers)
     }
 }

@@ -6,7 +6,7 @@ use core::{cell::UnsafeCell, fmt::Debug, ptr};
 
 use libafl_bolts::{
     ownedref::OwnedMutPtr,
-    tuples::{MatchName, RefIndexable, RefIndexableMut},
+    tuples::{MatchName, RefIndexable},
 };
 use serde::{Deserialize, Serialize};
 
@@ -244,7 +244,7 @@ where
     DOT: DifferentialObserversTuple<OTA, OTB, A::State>,
 {
     #[inline]
-    fn observers(&self) -> RefIndexable<ProxyObserversTuple<OTA, OTB, DOT>> {
+    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         unsafe {
             self.observers
                 .get()
@@ -256,13 +256,13 @@ where
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> RefIndexableMut<ProxyObserversTuple<OTA, OTB, DOT>> {
+    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
         unsafe {
             self.observers.get().as_mut().unwrap().set(
                 &*self.primary.observers_mut(),
                 &*self.secondary.observers_mut(),
             );
-            RefIndexableMut::from(self.observers.get().as_mut().unwrap())
+            RefIndexable::from(self.observers.get().as_mut().unwrap())
         }
     }
 }

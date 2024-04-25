@@ -587,62 +587,45 @@ where
 #[cfg(feature = "alloc")]
 #[derive(Copy, Clone, Debug)]
 #[repr(transparent)]
-pub struct RefIndexable<'a, M>(&'a M);
+pub struct RefIndexable<RM, M>(RM, PhantomData<M>);
 
 #[cfg(feature = "alloc")]
-impl<'a, M> From<&'a M> for RefIndexable<'a, M>
+impl<RM, M> From<RM> for RefIndexable<RM, M>
 where
+    RM: Deref<Target = M>,
     M: MatchName,
 {
-    fn from(value: &'a M) -> Self {
-        RefIndexable(value)
+    fn from(value: RM) -> Self {
+        RefIndexable(value, PhantomData)
     }
 }
 
-/// A wrapper type to enable the mutable indexing of [`MatchName`] implementors with `[]`.
 #[cfg(feature = "alloc")]
-#[derive(Debug)]
-#[repr(transparent)]
-pub struct RefIndexableMut<'a, M>(&'a mut M);
-
-#[cfg(feature = "alloc")]
-impl<'a, M> From<&'a mut M> for RefIndexableMut<'a, M>
+impl<RM, M> Deref for RefIndexable<RM, M>
 where
-    M: MatchName,
+    RM: Deref<Target = M>,
 {
-    fn from(value: &'a mut M) -> Self {
-        RefIndexableMut(value)
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl<'a, M> Deref for RefIndexable<'a, M> {
-    type Target = M;
+    type Target = RM::Target;
 
     fn deref(&self) -> &Self::Target {
-        self.0
+        self.0.deref()
     }
 }
 
 #[cfg(feature = "alloc")]
-impl<'a, M> Deref for RefIndexableMut<'a, M> {
-    type Target = M;
-
-    fn deref(&self) -> &Self::Target {
-        self.0
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl<'a, M> DerefMut for RefIndexableMut<'a, M> {
+impl<RM, M> DerefMut for RefIndexable<RM, M>
+where
+    RM: DerefMut<Target = M>,
+{
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.0
+        self.0.deref_mut()
     }
 }
 
 #[cfg(feature = "alloc")]
-impl<'a, T, M> Index<&Reference<T>> for RefIndexable<'a, M>
+impl<T, RM, M> Index<&Reference<T>> for RefIndexable<RM, M>
 where
+    RM: Deref<Target = M>,
     M: MatchName,
 {
     type Output = T;
@@ -656,23 +639,9 @@ where
 }
 
 #[cfg(feature = "alloc")]
-impl<'a, T, M> Index<&Reference<T>> for RefIndexableMut<'a, M>
+impl<T, RM, M> IndexMut<&Reference<T>> for RefIndexable<RM, M>
 where
-    M: MatchName,
-{
-    type Output = T;
-
-    fn index(&self, index: &Reference<T>) -> &Self::Output {
-        let Some(e) = self.get(index) else {
-            panic!("Could not find entry matching {:?}", index)
-        };
-        e
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl<'a, T, M> IndexMut<&Reference<T>> for RefIndexableMut<'a, M>
-where
+    RM: DerefMut<Target = M>,
     M: MatchName,
 {
     fn index_mut(&mut self, index: &Reference<T>) -> &mut Self::Output {

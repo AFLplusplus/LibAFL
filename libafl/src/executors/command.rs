@@ -18,7 +18,7 @@ use std::{
 
 use libafl_bolts::{
     fs::{get_unique_std_input_file, InputFile},
-    tuples::{MatchName, RefIndexable, RefIndexableMut},
+    tuples::{MatchName, RefIndexable},
     AsSlice,
 };
 
@@ -397,12 +397,12 @@ where
     T: Debug,
     OT: ObserversTuple<S>,
 {
-    fn observers(&self) -> RefIndexable<OT> {
+    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         RefIndexable::from(&self.observers)
     }
 
-    fn observers_mut(&mut self) -> RefIndexableMut<OT> {
-        RefIndexableMut::from(&mut self.observers)
+    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
+        RefIndexable::from(&mut self.observers)
     }
 }
 

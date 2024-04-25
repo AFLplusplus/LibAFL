@@ -7,7 +7,7 @@ use core::{
 use libafl_bolts::{
     os::unix_signals::{ucontext_t, Signal},
     shmem::ShMemProvider,
-    tuples::{tuple_list, RefIndexable, RefIndexableMut},
+    tuples::{tuple_list, RefIndexable},
 };
 use libc::siginfo_t;
 use nix::unistd::{fork, ForkResult};
@@ -255,12 +255,12 @@ where
     Z: UsesState<State = S>,
 {
     #[inline]
-    fn observers(&self) -> RefIndexable<OT> {
+    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         self.inner.observers()
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> RefIndexableMut<OT> {
+    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
         self.inner.observers_mut()
     }
 }

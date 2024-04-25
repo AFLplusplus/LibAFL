@@ -22,7 +22,7 @@ use libafl_bolts::{
     fs::{get_unique_std_input_file, InputFile},
     os::{dup2, pipes::Pipe},
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{MatchNameRef, Prepend, RefIndexable, RefIndexableMut, Reference, Referenceable},
+    tuples::{MatchNameRef, Prepend, RefIndexable, Reference, Referenceable},
     AsSlice, AsSliceMut, Truncate,
 };
 use nix::{
@@ -1222,13 +1222,13 @@ where
     SP: ShMemProvider,
 {
     #[inline]
-    fn observers(&self) -> RefIndexable<OT> {
+    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         RefIndexable::from(&self.observers)
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> RefIndexableMut<OT> {
-        RefIndexableMut::from(&mut self.observers)
+    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
+        RefIndexable::from(&mut self.observers)
     }
 }
 

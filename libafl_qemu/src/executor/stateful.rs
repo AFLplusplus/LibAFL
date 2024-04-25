@@ -17,7 +17,7 @@ use libafl::{
     state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
     Error,
 };
-use libafl_bolts::tuples::{RefIndexable, RefIndexableMut};
+use libafl_bolts::tuples::RefIndexable;
 
 #[cfg(emulation_mode = "usermode")]
 use crate::executor::inproc_qemu_crash_handler;
@@ -200,12 +200,12 @@ where
     QT: QemuHelperTuple<S>,
 {
     #[inline]
-    fn observers(&self) -> RefIndexable<OT> {
+    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         self.inner.observers()
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> RefIndexableMut<OT> {
+    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
         self.inner.observers_mut()
     }
 }

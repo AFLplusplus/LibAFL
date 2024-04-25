@@ -15,7 +15,7 @@ pub use inprocess::InProcessExecutor;
 pub use inprocess_fork::InProcessForkExecutor;
 #[cfg(unix)]
 use libafl_bolts::os::unix_signals::Signal;
-use libafl_bolts::tuples::{RefIndexable, RefIndexableMut};
+use libafl_bolts::tuples::RefIndexable;
 use serde::{Deserialize, Serialize};
 pub use shadow::ShadowExecutor;
 pub use with_observers::WithObservers;
@@ -111,10 +111,10 @@ libafl_bolts::impl_serdeany!(DiffExitKind);
 /// Holds a tuple of Observers
 pub trait HasObservers: UsesObservers {
     /// Get the linked observers
-    fn observers(&self) -> RefIndexable<Self::Observers>;
+    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers>;
 
     /// Get the linked observers (mutable)
-    fn observers_mut(&mut self) -> RefIndexableMut<Self::Observers>;
+    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers>;
 }
 
 /// An executor takes the given inputs, and runs the harness/target.

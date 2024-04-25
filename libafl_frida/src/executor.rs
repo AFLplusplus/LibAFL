@@ -19,7 +19,7 @@ use libafl::{
     state::{HasExecutions, State, UsesState},
     Error,
 };
-use libafl_bolts::tuples::{RefIndexable, RefIndexableMut};
+use libafl_bolts::tuples::RefIndexable;
 
 #[cfg(all(unix, not(test)))]
 use crate::asan::errors::AsanErrors;
@@ -146,12 +146,12 @@ where
     OT: ObserversTuple<S>,
 {
     #[inline]
-    fn observers(&self) -> RefIndexable<OT> {
+    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         self.base.observers()
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> RefIndexableMut<OT> {
+    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
         self.base.observers_mut()
     }
 }

@@ -26,7 +26,7 @@ use libafl::{
 use libafl_bolts::shmem::ShMemProvider;
 use libafl_bolts::{
     os::unix_signals::{siginfo_t, ucontext_t, Signal},
-    tuples::{RefIndexable, RefIndexableMut},
+    tuples::RefIndexable,
 };
 
 use crate::{helpers::QemuHelperTuple, hooks::QemuHooks, Qemu};
@@ -346,12 +346,12 @@ where
     QT: QemuHelperTuple<S>,
 {
     #[inline]
-    fn observers(&self) -> RefIndexable<OT> {
+    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         self.inner.observers()
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> RefIndexableMut<OT> {
+    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
         self.inner.observers_mut()
     }
 }
@@ -530,12 +530,12 @@ where
     Z: UsesState<State = S>,
 {
     #[inline]
-    fn observers(&self) -> RefIndexable<OT> {
+    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         self.inner.observers()
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> RefIndexableMut<OT> {
+    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
         self.inner.observers_mut()
     }
 }
