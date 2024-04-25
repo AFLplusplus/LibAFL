@@ -247,8 +247,8 @@ where
                 .get()
                 .as_mut()
                 .unwrap()
-                .set(self.primary.observers().0, self.secondary.observers().0);
-            RefIndexable(self.observers.get().as_ref().unwrap())
+                .set(&*self.primary.observers(), &*self.secondary.observers());
+            RefIndexable::from(self.observers.get().as_ref().unwrap())
         }
     }
 
@@ -256,10 +256,10 @@ where
     fn observers_mut(&mut self) -> RefIndexableMut<ProxyObserversTuple<OTA, OTB, DOT>> {
         unsafe {
             self.observers.get().as_mut().unwrap().set(
-                self.primary.observers_mut().0,
-                self.secondary.observers_mut().0,
+                &mut *self.primary.observers_mut(),
+                &mut *self.secondary.observers_mut(),
             );
-            RefIndexableMut(self.observers.get().as_mut().unwrap())
+            RefIndexableMut::from(self.observers.get().as_mut().unwrap())
         }
     }
 }

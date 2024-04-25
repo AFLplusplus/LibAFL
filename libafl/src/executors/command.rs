@@ -398,11 +398,11 @@ where
     OT: ObserversTuple<S>,
 {
     fn observers(&self) -> RefIndexable<OT> {
-        RefIndexable(&self.observers)
+        RefIndexable::from(&self.observers)
     }
 
     fn observers_mut(&mut self) -> RefIndexableMut<OT> {
-        RefIndexableMut(&mut self.observers)
+        RefIndexableMut::from(&mut self.observers)
     }
 }
 

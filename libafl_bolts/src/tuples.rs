@@ -600,7 +600,7 @@ where
 #[cfg(feature = "alloc")]
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct RefIndexable<'a, M>(pub &'a M);
+pub struct RefIndexable<'a, M>(&'a M);
 
 #[cfg(feature = "alloc")]
 impl<'a, M> From<&'a M> for RefIndexable<'a, M>
@@ -616,7 +616,7 @@ where
 #[cfg(feature = "alloc")]
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct RefIndexableMut<'a, M>(pub &'a mut M);
+pub struct RefIndexableMut<'a, M>(&'a mut M);
 
 #[cfg(feature = "alloc")]
 impl<'a, M> From<&'a mut M> for RefIndexableMut<'a, M>

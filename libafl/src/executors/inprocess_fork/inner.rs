@@ -340,11 +340,11 @@ where
 {
     #[inline]
     fn observers(&self) -> RefIndexable<OT> {
-        RefIndexable(&self.observers)
+        RefIndexable::from(&self.observers)
     }
 
     #[inline]
     fn observers_mut(&mut self) -> RefIndexableMut<OT> {
-        RefIndexableMut(&mut self.observers)
+        RefIndexableMut::from(&mut self.observers)
     }
 }
