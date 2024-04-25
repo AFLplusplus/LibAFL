@@ -17,6 +17,7 @@ use libafl::{
     state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
     Error,
 };
+use libafl_bolts::tuples::{RefIndexable, RefIndexableMut};
 
 #[cfg(emulation_mode = "usermode")]
 use crate::executor::inproc_qemu_crash_handler;
@@ -164,7 +165,7 @@ where
             .post_exec::<Self, EM, OT, OF, Z>(
                 input,
                 qemu,
-                self.inner.inner.observers_mut(),
+                &mut *self.inner.inner.observers_mut(),
                 &mut exit_kind,
             );
         Ok(exit_kind)

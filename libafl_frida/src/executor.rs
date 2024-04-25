@@ -19,6 +19,7 @@ use libafl::{
     state::{HasExecutions, State, UsesState},
     Error,
 };
+use libafl_bolts::tuples::{RefIndexable, RefIndexableMut};
 
 #[cfg(all(unix, not(test)))]
 use crate::asan::errors::AsanErrors;
