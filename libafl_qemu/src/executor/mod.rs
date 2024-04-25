@@ -22,9 +22,12 @@ use libafl::{
     state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
     Error, HasMetadata,
 };
-use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Signal};
 #[cfg(feature = "fork")]
 use libafl_bolts::shmem::ShMemProvider;
+use libafl_bolts::{
+    os::unix_signals::{siginfo_t, ucontext_t, Signal},
+    tuples::{RefIndexable, RefIndexableMut},
+};
 
 use crate::{helpers::QemuHelperTuple, hooks::QemuHooks, Qemu};
 
@@ -308,7 +311,7 @@ where
         self.state.post_exec::<Self, EM, OT, OF, Z>(
             input,
             qemu,
-            self.inner.observers_mut(),
+            &mut *self.inner.observers_mut(),
             &mut exit_kind,
         );
         Ok(exit_kind)
@@ -480,7 +483,7 @@ where
         self.state.hooks.helpers_mut().post_exec_all(
             qemu,
             input,
-            self.inner.observers_mut(),
+            &mut *self.inner.observers_mut(),
             &mut exit_kind,
         );
         Ok(exit_kind)
