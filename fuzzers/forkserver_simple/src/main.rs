@@ -163,6 +163,8 @@ pub fn main() {
     // Create the executor for the forkserver
     let args = opt.arguments;
 
+    let observer_ref = edges_observer.type_ref();
+
     let mut tokens = Tokens::new();
     let mut executor = ForkserverExecutor::builder()
         .program(opt.executable)
@@ -177,10 +179,7 @@ pub fn main() {
         .unwrap();
 
     if let Some(dynamic_map_size) = executor.coverage_map_size() {
-        executor
-            .observers_mut()
-            .match_name_mut::<ExplicitTracking<HitcountsMapObserver<StdMapObserver<'_, u8, false>>, true, false>>("shared_mem")
-            .unwrap()
+        executor.observers_mut()[&observer_ref]
             .as_mut()
             .truncate(dynamic_map_size);
     }

@@ -154,6 +154,6 @@ where
     }
 
     fn observers_mut(&mut self) -> RefIndexableMut<OT> {
-        RefIndexableMut::new(&mut self.observers)
+        RefIndexableMut::from(&mut self.observers)
     }
 }
