@@ -1775,6 +1775,21 @@ where
         }
     }
 
+    /// Receive the buffer, also reading the LLMP internal message flags
+    #[allow(clippy::type_complexity)]
+    #[inline]
+    pub fn recv_buf_blocking_with_flags(&mut self) -> Result<(ClientId, Tag, Flags, &[u8]), Error> {
+        unsafe {
+            let msg = self.recv_blocking()?;
+            Ok((
+                (*msg).sender,
+                (*msg).tag,
+                (*msg).flags,
+                (*msg).try_as_slice(&mut self.current_recv_shmem)?,
+            ))
+        }
+    }
+
     /// Returns the next sender, tag, buf, looping until it becomes available
     #[inline]
     pub fn recv_buf_blocking(&mut self) -> Result<(ClientId, Tag, &[u8]), Error> {
@@ -3220,6 +3235,12 @@ where
     #[allow(clippy::type_complexity)]
     pub fn recv_buf_with_flags(&mut self) -> Result<Option<(ClientId, Tag, Flags, &[u8])>, Error> {
         self.receiver.recv_buf_with_flags()
+    }
+
+    /// Receive a `buf` from the broker, including the `flags` used during transmission.
+    #[allow(clippy::type_complexity)]
+    pub fn recv_buf_blocking_with_flags(&mut self) -> Result<(ClientId, Tag, Flags, &[u8]), Error> {
+        self.receiver.recv_buf_blocking_with_flags()
     }
 
     #[cfg(feature = "std")]

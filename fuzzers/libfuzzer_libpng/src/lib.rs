@@ -141,7 +141,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     // Setup a basic mutator with a mutational stage
 
-    let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
+    let mutator = StdScheduledMutator::with_max_stack_pow(havoc_mutations().merge(tokens_mutations()), 1);
 
     let power = StdPowerMutationalStage::new(mutator);
 
