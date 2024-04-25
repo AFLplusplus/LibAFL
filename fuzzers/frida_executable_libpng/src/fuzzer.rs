@@ -130,7 +130,7 @@ unsafe fn fuzz(
                     // New maximization map feedback linked to the edges observer and the feedback state
                     MaxMapFeedback::new(&edges_observer),
                     // Time feedback, this one does not need a feedback state
-                    TimeFeedback::with_observer(&time_observer)
+                    TimeFeedback::new(&time_observer)
                 );
 
                 // Feedbacks to recognize an input as solution
@@ -247,7 +247,7 @@ unsafe fn fuzz(
                     // New maximization map feedback linked to the edges observer and the feedback state
                     MaxMapFeedback::new(&edges_observer),
                     // Time feedback, this one does not need a feedback state
-                    TimeFeedback::with_observer(&time_observer)
+                    TimeFeedback::new(&time_observer)
                 );
 
                 #[cfg(unix)]
@@ -377,7 +377,7 @@ unsafe fn fuzz(
                     // New maximization map feedback linked to the edges observer and the feedback state
                     MaxMapFeedback::new(&edges_observer),
                     // Time feedback, this one does not need a feedback state
-                    TimeFeedback::with_observer(&time_observer)
+                    TimeFeedback::new(&time_observer)
                 );
 
                 #[cfg(unix)]

@@ -2,12 +2,10 @@
 
 #[cfg(feature = "alloc")]
 use alloc::{borrow::Cow, vec::Vec};
-#[rustversion::not(nightly)]
-use core::any::type_name;
 #[cfg(feature = "alloc")]
 use core::ops::{Deref, DerefMut};
 use core::{
-    any::TypeId,
+    any::{type_name, TypeId},
     fmt::{Debug, Formatter},
     marker::PhantomData,
     mem::transmute,
@@ -554,7 +552,7 @@ impl<T> Debug for Reference<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("Reference")
             .field("name", self.name())
-            .field("type", &core::any::type_name::<T>())
+            .field("type", &type_name::<T>())
             .finish()
     }
 }

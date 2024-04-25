@@ -4,7 +4,11 @@
 use core::marker::PhantomData;
 
 use hashbrown::HashMap;
-use libafl_bolts::{bolts_prelude::Reference, rands::Rand, tuples::Referenceable, Named};
+use libafl_bolts::{
+    rands::Rand,
+    tuples::{Reference, Referenceable},
+    Named,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
