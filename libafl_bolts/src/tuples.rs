@@ -219,9 +219,9 @@ where
 
 /// Returns the first element with the given type
 pub trait MatchFirstType {
-    /// Returns the first element with the given type as borrow, or [`Option::None`]
+    /// Returns the first element with the given type as borrow, or [`None`]
     fn match_first_type<T: 'static>(&self) -> Option<&T>;
-    /// Returns the first element with the given type as mutable borrow, or [`Option::None`]
+    /// Returns the first element with the given type as mutable borrow, or [`None`]
     fn match_first_type_mut<T: 'static>(&mut self) -> Option<&mut T>;
 }
 
@@ -554,7 +554,7 @@ pub trait Referenceable: Named {
 #[cfg(feature = "alloc")]
 impl<N> Referenceable for N where N: Named {}
 
-/// Empty object with the type T
+/// Object with the type T and the name associated with its concrete value
 #[derive(Debug)]
 #[cfg(feature = "alloc")]
 pub struct Reference<T: ?Sized> {
@@ -573,10 +573,10 @@ impl<T> Named for Reference<T> {
 #[cfg(feature = "alloc")]
 pub trait MatchNameRef {
     /// Search using name and `Reference `
-    fn match_by_ref<T>(&self, rf: &Reference<T>) -> Option<&T>;
+    fn get<T>(&self, rf: &Reference<T>) -> Option<&T>;
 
     /// Search using name and `Reference `
-    fn match_by_ref_mut<T>(&mut self, rf: &Reference<T>) -> Option<&mut T>;
+    fn get_mut<T>(&mut self, rf: &Reference<T>) -> Option<&mut T>;
 }
 
 #[cfg(feature = "alloc")]
@@ -584,14 +584,31 @@ impl<M> MatchNameRef for M
 where
     M: MatchName,
 {
-    fn match_by_ref<T>(&self, rf: &Reference<T>) -> Option<&T> {
+    fn get<T>(&self, rf: &Reference<T>) -> Option<&T> {
         self.match_name::<T>(&rf.name)
     }
 
-    fn match_by_ref_mut<T>(&mut self, rf: &Reference<T>) -> Option<&mut T> {
+    fn get_mut<T>(&mut self, rf: &Reference<T>) -> Option<&mut T> {
         self.match_name_mut::<T>(&rf.name)
     }
 }
+
+// This is the dream, but sadly doesn't work
+// https://rust-lang.github.io/rfcs/2451-re-rebalancing-coherence.html#concrete-orphan-rules
+// #[cfg(feature = "alloc")]
+// impl<T, M> Index<&Reference<T>> for M
+// where
+//     M: MatchName,
+// {
+//     type Output = T;
+//
+//     fn index(&self, index: &Reference<T>) -> &Self::Output {
+//         let Some(e) = self.get(index) else {
+//             panic!("{} not found in sequence", index.name)
+//         };
+//         e
+//     }
+// }
 
 /// Allows prepending of values to a tuple
 pub trait Prepend<T> {

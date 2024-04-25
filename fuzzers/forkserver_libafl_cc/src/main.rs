@@ -185,7 +185,7 @@ pub fn main() {
     if let Some(dynamic_map_size) = executor.coverage_map_size() {
         executor
             .observers_mut()
-            .match_by_ref_mut(&observer_ref)
+            .get_mut(&observer_ref)
             .unwrap()
             .as_mut()
             .truncate(dynamic_map_size);
