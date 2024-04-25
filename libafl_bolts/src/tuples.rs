@@ -4,6 +4,8 @@
 use alloc::{borrow::Cow, vec::Vec};
 #[rustversion::not(nightly)]
 use core::any::type_name;
+#[cfg(feature = "alloc")]
+use core::ops::{Deref, DerefMut};
 use core::{
     any::TypeId,
     marker::PhantomData,
@@ -11,7 +13,6 @@ use core::{
     ops::{Index, IndexMut},
     ptr::{addr_of, addr_of_mut},
 };
-use std::ops::{Deref, DerefMut};
 
 pub use tuple_list::{tuple_list, tuple_list_type, TupleList};
 
