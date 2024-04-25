@@ -11,7 +11,10 @@ use libafl::{
     state::{HasExecutions, State, UsesState},
     Error,
 };
-use libafl_bolts::AsSlice;
+use libafl_bolts::{
+    tuples::{RefIndexable, RefIndexableMut},
+    AsSlice,
+};
 use libnyx::NyxReturnValue;
 
 use crate::helper::NyxHelper;
@@ -147,10 +150,10 @@ where
     OT: ObserversTuple<S>,
 {
     fn observers(&self) -> RefIndexable<OT> {
-        &self.observers
+        RefIndexable::from(&self.observers)
     }
 
     fn observers_mut(&mut self) -> RefIndexableMut<OT> {
-        &mut self.observers
+        RefIndexableMut::new(&mut self.observers)
     }
 }
