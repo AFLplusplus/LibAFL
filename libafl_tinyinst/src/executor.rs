@@ -11,6 +11,7 @@ use libafl::{
 use libafl_bolts::{
     fs::{InputFile, INPUTFILE_STD},
     shmem::{ShMem, ShMemProvider, StdShMemProvider},
+    tuples::{RefIndexable, RefIndexableMut},
     AsSlice, AsSliceMut,
 };
 use tinyinst::tinyinst::{litecov::RunResult, TinyInst};

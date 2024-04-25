@@ -160,8 +160,8 @@ where
             )?;
 
             let seed_expr = Bool::fresh_const(&ctx, "seed");
-            let obs = executor
-                .observers()
+            let observers = executor.observers();
+            let obs = observers
                 .match_name::<C>(&self.obs_name)
                 .expect("Observer must be present.")
                 .as_ref();
