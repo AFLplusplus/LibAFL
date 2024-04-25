@@ -532,6 +532,7 @@ impl<T: ?Sized> Reference<T> {
     ///
     /// We explicitly do *not* implement [`Named`], as this could potentially lead to confusion
     /// where we make a [`Reference`] of a [`Reference`] as [`Named`] is blanket implemented.
+    #[must_use]
     pub fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
