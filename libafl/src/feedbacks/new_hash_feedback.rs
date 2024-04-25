@@ -4,13 +4,16 @@ use alloc::{borrow::Cow, string::ToString};
 use std::{fmt::Debug, marker::PhantomData};
 
 use hashbrown::HashSet;
-use libafl_bolts::Named;
+use libafl_bolts::{
+    tuples::{MatchNameRef, Reference, Referenceable},
+    Named,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     events::EventFirer,
     executors::ExitKind,
-    feedbacks::{Feedback, HasObserverName},
+    feedbacks::{Feedback, HasObserverReference},
     inputs::UsesInput,
     observers::{ObserverWithHashField, ObserversTuple},
     state::State,
@@ -79,10 +82,10 @@ impl HashSetState<u64> for NewHashFeedbackMetadata {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NewHashFeedback<O, S> {
     name: Cow<'static, str>,
-    observer_name: Cow<'static, str>,
+    o_ref: Reference<O>,
     /// Initial capacity of hash set
     capacity: usize,
-    o_type: PhantomData<(O, S)>,
+    phantom: PhantomData<S>,
 }
 
 impl<O, S> Feedback<S> for NewHashFeedback<O, S>
@@ -112,7 +115,7 @@ where
         OT: ObserversTuple<S>,
     {
         let observer = observers
-            .match_name::<O>(&self.observer_name)
+            .get(&self.o_ref)
             .expect("A NewHashFeedback needs a BacktraceObserver");
 
         let backtrace_state = state
@@ -142,10 +145,12 @@ impl<O, S> Named for NewHashFeedback<O, S> {
     }
 }
 
-impl<O, S> HasObserverName for NewHashFeedback<O, S> {
+impl<O, S> HasObserverReference for NewHashFeedback<O, S> {
+    type Observer = O;
+
     #[inline]
-    fn observer_name(&self) -> &Cow<'static, str> {
-        &self.observer_name
+    fn observer_ref(&self) -> &Reference<O> {
+        &self.o_ref
     }
 }
 
@@ -171,9 +176,9 @@ where
     pub fn with_capacity(observer: &O, capacity: usize) -> Self {
         Self {
             name: Cow::from(NEWHASHFEEDBACK_PREFIX.to_string() + observer.name()),
-            observer_name: observer.name().clone(),
+            o_ref: observer.type_ref(),
             capacity,
-            o_type: PhantomData,
+            phantom: PhantomData,
         }
     }
 }

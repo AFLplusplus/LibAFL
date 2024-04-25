@@ -9,7 +9,10 @@ use core::{
     ops::{BitAnd, BitOr},
 };
 
-use libafl_bolts::{AsIter, AsSlice, AsSliceMut, HasRefCnt, Named};
+use libafl_bolts::{
+    tuples::{MatchNameRef, Reference, Referenceable},
+    AsIter, AsSlice, AsSliceMut, HasRefCnt, Named,
+};
 use num_traits::PrimInt;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -17,10 +20,10 @@ use crate::{
     corpus::Testcase,
     events::{Event, EventFirer},
     executors::ExitKind,
-    feedbacks::{Feedback, HasObserverName},
+    feedbacks::{Feedback, HasObserverReference},
     inputs::UsesInput,
     monitors::{AggregatorOps, UserStats, UserStatsValue},
-    observers::{CanTrack, MapObserver, Observer, ObserversTuple, UsesObserver},
+    observers::{CanTrack, MapObserver, ObserversTuple},
     state::State,
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -386,19 +389,11 @@ pub struct MapFeedback<C, N, O, R, S, T> {
     /// Name identifier of this instance
     name: Cow<'static, str>,
     /// Name identifier of the observer
-    observer_name: Cow<'static, str>,
+    map_ref: Reference<C>,
     /// Name of the feedback as shown in the `UserStats`
     stats_name: Cow<'static, str>,
     /// Phantom Data of Reducer
     phantom: PhantomData<(C, N, O, R, S, T)>,
-}
-
-impl<C, N, O, R, S, T> UsesObserver<S> for MapFeedback<C, N, O, R, S, T>
-where
-    S: UsesInput,
-    C: AsRef<O> + Observer<S>,
-{
-    type Observer = C;
 }
 
 impl<C, N, O, R, S, T> Feedback<S> for MapFeedback<C, N, O, R, S, T>
@@ -408,7 +403,7 @@ where
     R: Reducer<T>,
     S: State + HasNamedMetadata,
     T: Default + Copy + Serialize + for<'de> Deserialize<'de> + PartialEq + Debug + 'static,
-    C: CanTrack + AsRef<O>,
+    C: CanTrack + AsRef<O> + Named,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         // Initialize `MapFeedbackMetadata` with an empty vector and add it to the state.
@@ -464,10 +459,7 @@ where
             let meta = MapNoveltiesMetadata::new(novelties);
             testcase.add_metadata(meta);
         }
-        let observer = observers
-            .match_name::<C>(&self.observer_name)
-            .unwrap()
-            .as_ref();
+        let observer = observers.get(&self.map_ref).unwrap().as_ref();
         let initial = observer.initial();
         let map_state = state
             .named_metadata_map_mut()
@@ -551,7 +543,7 @@ where
     O: MapObserver<Entry = u8> + AsSlice<Entry = u8>,
     for<'it> O: AsIter<'it, Item = u8>,
     S: State + HasNamedMetadata,
-    C: CanTrack + AsRef<O>,
+    C: CanTrack + AsRef<O> + Named,
 {
     #[allow(clippy::wrong_self_convention)]
     #[allow(clippy::needless_range_loop)]
@@ -572,10 +564,7 @@ where
 
         let mut interesting = false;
         // TODO Replace with match_name_type when stable
-        let observer = observers
-            .match_name::<C>(&self.observer_name)
-            .unwrap()
-            .as_ref();
+        let observer = observers.get(&self.map_ref).unwrap().as_ref();
 
         let map_state = state
             .named_metadata_map_mut()
@@ -673,14 +662,16 @@ impl<C, N, O, R, S, T> Named for MapFeedback<C, N, O, R, S, T> {
     }
 }
 
-impl<C, N, O, R, S, T> HasObserverName for MapFeedback<C, N, O, R, S, T>
+impl<C, N, O, R, S, T> HasObserverReference for MapFeedback<C, N, O, R, S, T>
 where
     O: Named,
     C: AsRef<O>,
 {
+    type Observer = C;
+
     #[inline]
-    fn observer_name(&self) -> &Cow<'static, str> {
-        &self.observer_name
+    fn observer_ref(&self) -> &Reference<C> {
+        &self.map_ref
     }
 }
 
@@ -701,16 +692,15 @@ where
     for<'it> O: AsIter<'it, Item = T>,
     N: IsNovel<T>,
     S: UsesInput + HasNamedMetadata,
-    C: CanTrack + AsRef<O>,
+    C: CanTrack + AsRef<O> + Named,
 {
     /// Create new `MapFeedback`
     #[must_use]
     pub fn new(map_observer: &C) -> Self {
-        let map_observer = map_observer.as_ref();
         Self {
             novelties: if C::NOVELTIES { Some(vec![]) } else { None },
             name: map_observer.name().clone(),
-            observer_name: map_observer.name().clone(),
+            map_ref: map_observer.type_ref(),
             stats_name: create_stats_name(map_observer.name()),
             phantom: PhantomData,
         }
@@ -722,10 +712,9 @@ where
     #[must_use]
     pub fn with_name(name: &'static str, map_observer: &C) -> Self {
         let name = Cow::from(name);
-        let map_observer = map_observer.as_ref();
         Self {
             novelties: if C::NOVELTIES { Some(vec![]) } else { None },
-            observer_name: map_observer.name().clone(),
+            map_ref: map_observer.type_ref(),
             stats_name: create_stats_name(&name),
             name,
             phantom: PhantomData,
@@ -749,10 +738,7 @@ where
     {
         let mut interesting = false;
         // TODO Replace with match_name_type when stable
-        let observer = observers
-            .match_name::<C>(&self.observer_name)
-            .unwrap()
-            .as_ref();
+        let observer = observers.get(&self.map_ref).unwrap().as_ref();
 
         let map_state = state
             .named_metadata_map_mut()

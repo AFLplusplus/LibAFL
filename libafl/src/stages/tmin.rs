@@ -4,13 +4,16 @@ use alloc::borrow::Cow;
 use core::{borrow::BorrowMut, fmt::Debug, hash::Hash, marker::PhantomData};
 
 use ahash::RandomState;
-use libafl_bolts::{HasLen, Named};
+use libafl_bolts::{
+    tuples::{MatchNameRef, Reference, Referenceable},
+    HasLen, Named,
+};
 
 use crate::{
     corpus::{Corpus, HasCurrentCorpusIdx, Testcase},
     events::EventFirer,
     executors::{Executor, ExitKind, HasObservers},
-    feedbacks::{Feedback, FeedbackFactory, HasObserverName},
+    feedbacks::{Feedback, FeedbackFactory, HasObserverReference},
     inputs::UsesInput,
     mark_feature_time,
     mutators::{MutationResult, Mutator},
@@ -348,28 +351,31 @@ where
 /// A feedback which checks if the hash of the currently observed map is equal to the original hash
 /// provided
 #[derive(Clone, Debug)]
-pub struct MapEqualityFeedback<M, S> {
+pub struct MapEqualityFeedback<C, M, S> {
     name: Cow<'static, str>,
-    obs_name: Cow<'static, str>,
+    map_ref: Reference<C>,
     orig_hash: u64,
     phantom: PhantomData<(M, S)>,
 }
 
-impl<M, S> Named for MapEqualityFeedback<M, S> {
+impl<C, M, S> Named for MapEqualityFeedback<C, M, S> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<M, S> HasObserverName for MapEqualityFeedback<M, S> {
-    fn observer_name(&self) -> &Cow<'static, str> {
-        &self.obs_name
+impl<C, M, S> HasObserverReference for MapEqualityFeedback<C, M, S> {
+    type Observer = C;
+
+    fn observer_ref(&self) -> &Reference<Self::Observer> {
+        &self.map_ref
     }
 }
 
-impl<M, S> Feedback<S> for MapEqualityFeedback<M, S>
+impl<C, M, S> Feedback<S> for MapEqualityFeedback<C, M, S>
 where
     M: MapObserver,
+    C: AsRef<M>,
     S: State,
 {
     fn is_interesting<EM, OT>(
@@ -385,52 +391,52 @@ where
         OT: ObserversTuple<S>,
     {
         let obs = observers
-            .match_name::<M>(self.observer_name())
+            .get(self.observer_ref())
             .expect("Should have been provided valid observer name.");
-        Ok(obs.hash_simple() == self.orig_hash)
+        Ok(obs.as_ref().hash_simple() == self.orig_hash)
     }
 }
 
 /// A feedback factory for ensuring that the maps for minimized inputs are the same
 #[derive(Debug, Clone)]
-pub struct MapEqualityFactory<M, S> {
-    obs_name: Cow<'static, str>,
-    phantom: PhantomData<(M, S)>,
+pub struct MapEqualityFactory<C, M, S> {
+    map_ref: Reference<C>,
+    phantom: PhantomData<(C, M, S)>,
 }
 
-impl<M, S> MapEqualityFactory<M, S>
+impl<C, M, S> MapEqualityFactory<C, M, S>
 where
     M: MapObserver,
+    C: AsRef<M> + Referenceable,
 {
     /// Creates a new map equality feedback for the given observer
-    pub fn with_observer(obs: &M) -> Self {
+    pub fn with_observer(obs: &C) -> Self {
         Self {
-            obs_name: obs.name().clone(),
+            map_ref: obs.type_ref(),
             phantom: PhantomData,
         }
     }
 }
 
-impl<M, S> HasObserverName for MapEqualityFactory<M, S> {
-    fn observer_name(&self) -> &Cow<'static, str> {
-        &self.obs_name
+impl<C, M, S> HasObserverReference for MapEqualityFactory<C, M, S> {
+    type Observer = C;
+
+    fn observer_ref(&self) -> &Reference<C> {
+        &self.map_ref
     }
 }
 
-impl<M, OT, S> FeedbackFactory<MapEqualityFeedback<M, S>, S, OT> for MapEqualityFactory<M, S>
+impl<C, M, S> FeedbackFactory<MapEqualityFeedback<C, M, S>, S, C> for MapEqualityFactory<C, M, S>
 where
     M: MapObserver,
-    OT: ObserversTuple<S>,
+    C: AsRef<M> + Referenceable,
     S: State + Debug,
 {
-    fn create_feedback(&self, observers: &OT) -> MapEqualityFeedback<M, S> {
-        let obs = observers
-            .match_name::<M>(self.observer_name())
-            .expect("Should have been provided valid observer name.");
+    fn create_feedback(&self, obs: &C) -> MapEqualityFeedback<C, M, S> {
         MapEqualityFeedback {
             name: Cow::from("MapEq"),
-            obs_name: self.obs_name.clone(),
-            orig_hash: obs.hash_simple(),
+            map_ref: obs.type_ref(),
+            orig_hash: obs.as_ref().hash_simple(),
             phantom: PhantomData,
         }
     }
