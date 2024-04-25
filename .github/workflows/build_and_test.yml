@@ -529,7 +529,7 @@ jobs:
       - name: Run Tests
         run: cargo test
 
-  other_targets:
+  ios:
     runs-on: macOS-latest
     steps:
       - uses: actions-rs/toolchain@v1
@@ -551,6 +551,26 @@ jobs:
         run: cargo build --target aarch64-apple-ios && cd libafl_frida && cargo build --target aarch64-apple-ios && cd ..
       - name: Build Android
         run: cargo ndk -t arm64-v8a build --release
+
+  android:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+      - uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r25b
+      - name: install android
+        run: rustup target add aarch64-linux-android
+      - name: install cargo ndk
+        run: cargo install cargo-ndk
+      - uses: actions/checkout@v3
+      - uses: Swatinem/rust-cache@v2
+      - name: Build Android
+        run: cargo ndk -t arm64-v8a build --release
+
     #run: cargo build --target aarch64-linux-android
     # TODO: Figure out how to properly build stuff with clang
     #- name: Add clang path to $PATH env
