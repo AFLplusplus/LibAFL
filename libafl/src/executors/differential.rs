@@ -256,8 +256,8 @@ where
     fn observers_mut(&mut self) -> RefIndexableMut<ProxyObserversTuple<OTA, OTB, DOT>> {
         unsafe {
             self.observers.get().as_mut().unwrap().set(
-                &mut *self.primary.observers_mut(),
-                &mut *self.secondary.observers_mut(),
+                &*self.primary.observers_mut(),
+                &*self.secondary.observers_mut(),
             );
             RefIndexableMut::from(self.observers.get().as_mut().unwrap())
         }
