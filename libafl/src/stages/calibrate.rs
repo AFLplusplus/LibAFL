@@ -248,8 +248,8 @@ where
 
         // If weighted scheduler or powerscheduler is used, update it
         if state.has_metadata::<SchedulerMetadata>() {
-            let map = executor
-                .observers()
+            let observers = executor.observers();
+            let map = observers
                 .match_name::<C>(&self.map_observer_name)
                 .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
                 .as_ref();

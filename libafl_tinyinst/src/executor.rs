@@ -300,11 +300,11 @@ where
     SP: ShMemProvider,
     OT: ObserversTuple<S>,
 {
-    fn observers(&self) -> &OT {
+    fn observers(&self) -> RefIndexable<OT> {
         &self.observers
     }
 
-    fn observers_mut(&mut self) -> &mut OT {
+    fn observers_mut(&mut self) -> RefIndexableMut<OT> {
         &mut self.observers
     }
 }

@@ -145,12 +145,12 @@ where
     OT: ObserversTuple<S>,
 {
     #[inline]
-    fn observers(&self) -> &OT {
+    fn observers(&self) -> RefIndexable<OT> {
         self.base.observers()
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
+    fn observers_mut(&mut self) -> RefIndexableMut<OT> {
         self.base.observers_mut()
     }
 }

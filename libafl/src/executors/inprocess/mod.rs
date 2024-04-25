@@ -16,7 +16,7 @@ use core::{
     time::Duration,
 };
 
-use libafl_bolts::tuples::tuple_list;
+use libafl_bolts::tuples::{tuple_list, RefIndexable, RefIndexableMut};
 
 #[cfg(any(unix, feature = "std"))]
 use crate::executors::hooks::inprocess::GLOBAL_STATE;
@@ -151,12 +151,12 @@ where
     S: State,
 {
     #[inline]
-    fn observers(&self) -> &OT {
+    fn observers(&self) -> RefIndexable<OT> {
         self.inner.observers()
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
+    fn observers_mut(&mut self) -> RefIndexableMut<OT> {
         self.inner.observers_mut()
     }
 }
@@ -438,7 +438,7 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
     E::State: HasExecutions + HasSolutions + HasCorpus,
     Z: HasObjective<Objective = OF, State = E::State>,
 {
-    let observers = executor.observers_mut();
+    let mut observers = executor.observers_mut();
 
     observers
         .post_exec_all(state, input, &exitkind)
@@ -446,7 +446,7 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
 
     let interesting = fuzzer
         .objective_mut()
-        .is_interesting(state, event_mgr, input, observers, &exitkind)
+        .is_interesting(state, event_mgr, input, &*observers, &exitkind)
         .expect("In run_observers_and_save_state objective failure.");
 
     if interesting {
@@ -456,7 +456,7 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
         new_testcase.set_parent_id_optional(*state.corpus().current());
         fuzzer
             .objective_mut()
-            .append_metadata(state, event_mgr, observers, &mut new_testcase)
+            .append_metadata(state, event_mgr, &*observers, &mut new_testcase)
             .expect("Failed adding metadata");
         state
             .solutions_mut()

@@ -8,7 +8,7 @@ use core::{
     time::Duration,
 };
 
-use libafl_bolts::tuples::tuple_list;
+use libafl_bolts::tuples::{tuple_list, RefIndexable, RefIndexableMut};
 
 use crate::{
     events::{EventFirer, EventRestarter},
@@ -142,12 +142,12 @@ where
     S: State,
 {
     #[inline]
-    fn observers(&self) -> &OT {
+    fn observers(&self) -> RefIndexable<OT> {
         self.inner.observers()
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
+    fn observers_mut(&mut self) -> RefIndexableMut<OT> {
         self.inner.observers_mut()
     }
 }

@@ -199,12 +199,12 @@ where
     QT: QemuHelperTuple<S>,
 {
     #[inline]
-    fn observers(&self) -> &OT {
+    fn observers(&self) -> RefIndexable<OT> {
         self.inner.observers()
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
+    fn observers_mut(&mut self) -> RefIndexableMut<OT> {
         self.inner.observers_mut()
     }
 }

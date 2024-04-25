@@ -7,7 +7,7 @@ use core::{
     time::Duration,
 };
 
-use libafl_bolts::tuples::{tuple_list, Merge};
+use libafl_bolts::tuples::{tuple_list, Merge, RefIndexable, RefIndexableMut};
 #[cfg(windows)]
 use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
@@ -85,13 +85,13 @@ where
     S: State,
 {
     #[inline]
-    fn observers(&self) -> &OT {
-        &self.observers
+    fn observers(&self) -> RefIndexable<OT> {
+        RefIndexable(&self.observers)
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
-        &mut self.observers
+    fn observers_mut(&mut self) -> RefIndexableMut<OT> {
+        RefIndexableMut(&mut self.observers)
     }
 }
 

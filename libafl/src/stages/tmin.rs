@@ -91,7 +91,7 @@ where
         fuzzer.execute_input(state, executor, manager, &base)?;
         let observers = executor.observers();
 
-        let mut feedback = self.create_feedback(observers);
+        let mut feedback = self.create_feedback(&*observers);
 
         let mut i = 0;
         loop {
@@ -130,7 +130,7 @@ where
                     state,
                     manager,
                     input.clone(),
-                    observers,
+                    &*observers,
                     &exit_kind,
                     false,
                 )?;
@@ -139,7 +139,7 @@ where
                     && state.solutions().count() == solution_count
                 {
                     // we do not care about interesting inputs!
-                    if feedback.is_interesting(state, manager, &input, observers, &exit_kind)? {
+                    if feedback.is_interesting(state, manager, &input, &*observers, &exit_kind)? {
                         // we found a reduced corpus entry! use the smaller base
                         base = input;
                         base_post = Some(post.clone());
@@ -172,11 +172,11 @@ where
             // marked as interesting above; similarly, it should not trigger objectives
             fuzzer
                 .feedback_mut()
-                .is_interesting(state, manager, &base, observers, &exit_kind)?;
+                .is_interesting(state, manager, &base, &*observers, &exit_kind)?;
             let mut testcase = Testcase::with_executions(base, *state.executions());
             fuzzer
                 .feedback_mut()
-                .append_metadata(state, manager, observers, &mut testcase)?;
+                .append_metadata(state, manager, &*observers, &mut testcase)?;
             let prev = state.corpus_mut().replace(base_corpus_idx, testcase)?;
             fuzzer
                 .scheduler_mut()

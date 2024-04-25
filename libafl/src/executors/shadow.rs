@@ -2,6 +2,8 @@
 
 use core::fmt::{self, Debug, Formatter};
 
+use libafl_bolts::tuples::{RefIndexable, RefIndexableMut};
+
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
     observers::{ObserversTuple, UsesObservers},
@@ -94,12 +96,12 @@ where
     SOT: ObserversTuple<E::State>,
 {
     #[inline]
-    fn observers(&self) -> &Self::Observers {
+    fn observers(&self) -> RefIndexable<Self::Observers> {
         self.executor.observers()
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut Self::Observers {
+    fn observers_mut(&mut self) -> RefIndexableMut<Self::Observers> {
         self.executor.observers_mut()
     }
 }

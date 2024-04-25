@@ -315,8 +315,8 @@ where
 
         let exit_kind = executor.run_target(fuzzer, state, manager, &input)?;
 
-        let observer = executor
-            .observers()
+        let observers = executor.observers();
+        let observer = observers
             .match_name::<C>(name)
             .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
             .as_ref();

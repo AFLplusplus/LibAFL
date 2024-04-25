@@ -8,8 +8,10 @@ use core::{
     any::TypeId,
     marker::PhantomData,
     mem::transmute,
+    ops::{Index, IndexMut},
     ptr::{addr_of, addr_of_mut},
 };
+use std::ops::{Deref, DerefMut};
 
 pub use tuple_list::{tuple_list, tuple_list_type, TupleList};
 
@@ -593,22 +595,95 @@ where
     }
 }
 
-// This is the dream, but sadly doesn't work
-// https://rust-lang.github.io/rfcs/2451-re-rebalancing-coherence.html#concrete-orphan-rules
-// #[cfg(feature = "alloc")]
-// impl<T, M> Index<&Reference<T>> for M
-// where
-//     M: MatchName,
-// {
-//     type Output = T;
-//
-//     fn index(&self, index: &Reference<T>) -> &Self::Output {
-//         let Some(e) = self.get(index) else {
-//             panic!("{} not found in sequence", index.name)
-//         };
-//         e
-//     }
-// }
+#[cfg(feature = "alloc")]
+#[derive(Debug)]
+pub struct RefIndexable<'a, M>(pub &'a M);
+
+impl<'a, M> From<&'a M> for RefIndexable<'a, M>
+where
+    M: MatchName,
+{
+    fn from(value: &'a M) -> Self {
+        RefIndexable(value)
+    }
+}
+
+#[cfg(feature = "alloc")]
+#[derive(Debug)]
+pub struct RefIndexableMut<'a, M>(pub &'a mut M);
+
+impl<'a, M> From<&'a mut M> for RefIndexableMut<'a, M>
+where
+    M: MatchName,
+{
+    fn from(value: &'a mut M) -> Self {
+        RefIndexableMut(value)
+    }
+}
+
+impl<'a, M> Deref for RefIndexable<'a, M> {
+    type Target = M;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl<'a, M> Deref for RefIndexableMut<'a, M> {
+    type Target = M;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'a, M> DerefMut for RefIndexableMut<'a, M> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'a, T, M> Index<&Reference<T>> for RefIndexable<'a, M>
+where
+    M: MatchName,
+{
+    type Output = T;
+
+    fn index(&self, index: &Reference<T>) -> &Self::Output {
+        let Some(e) = self.get(index) else {
+            panic!("{} not found in sequence", index.name)
+        };
+        e
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'a, T, M> Index<&Reference<T>> for RefIndexableMut<'a, M>
+where
+    M: MatchName,
+{
+    type Output = T;
+
+    fn index(&self, index: &Reference<T>) -> &Self::Output {
+        let Some(e) = self.get(index) else {
+            panic!("{} not found in sequence", index.name)
+        };
+        e
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'a, T, M> IndexMut<&Reference<T>> for RefIndexableMut<'a, M>
+where
+    M: MatchName,
+{
+    fn index_mut(&mut self, index: &Reference<T>) -> &mut Self::Output {
+        let Some(e) = self.get_mut(index) else {
+            panic!("{} not found in sequence", index.name)
+        };
+        e
+    }
+}
 
 /// Allows prepending of values to a tuple
 pub trait Prepend<T> {

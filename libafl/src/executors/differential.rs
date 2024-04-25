@@ -4,7 +4,10 @@
 //!
 use core::{cell::UnsafeCell, fmt::Debug, ptr};
 
-use libafl_bolts::{ownedref::OwnedMutPtr, tuples::MatchName};
+use libafl_bolts::{
+    ownedref::OwnedMutPtr,
+    tuples::{MatchName, RefIndexable, RefIndexableMut},
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -238,26 +241,25 @@ where
     DOT: DifferentialObserversTuple<OTA, OTB, A::State>,
 {
     #[inline]
-    fn observers(&self) -> &ProxyObserversTuple<OTA, OTB, DOT> {
+    fn observers(&self) -> RefIndexable<ProxyObserversTuple<OTA, OTB, DOT>> {
         unsafe {
             self.observers
                 .get()
                 .as_mut()
                 .unwrap()
-                .set(self.primary.observers(), self.secondary.observers());
-            self.observers.get().as_ref().unwrap()
+                .set(self.primary.observers().0, self.secondary.observers().0);
+            RefIndexable(self.observers.get().as_ref().unwrap())
         }
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut ProxyObserversTuple<OTA, OTB, DOT> {
+    fn observers_mut(&mut self) -> RefIndexableMut<ProxyObserversTuple<OTA, OTB, DOT>> {
         unsafe {
-            self.observers
-                .get()
-                .as_mut()
-                .unwrap()
-                .set(self.primary.observers(), self.secondary.observers());
-            self.observers.get().as_mut().unwrap()
+            self.observers.get().as_mut().unwrap().set(
+                self.primary.observers_mut().0,
+                self.secondary.observers_mut().0,
+            );
+            RefIndexableMut(self.observers.get().as_mut().unwrap())
         }
     }
 }

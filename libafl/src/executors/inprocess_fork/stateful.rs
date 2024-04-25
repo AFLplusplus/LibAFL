@@ -5,7 +5,10 @@ use core::{
     time::Duration,
 };
 
-use libafl_bolts::{shmem::ShMemProvider, tuples::tuple_list};
+use libafl_bolts::{
+    shmem::ShMemProvider,
+    tuples::{tuple_list, RefIndexable, RefIndexableMut},
+};
 use nix::unistd::{fork, ForkResult};
 
 use super::super::hooks::ExecutorHooksTuple;
@@ -245,12 +248,12 @@ where
     Z: UsesState<State = S>,
 {
     #[inline]
-    fn observers(&self) -> &OT {
+    fn observers(&self) -> RefIndexable<OT> {
         self.inner.observers()
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
+    fn observers_mut(&mut self) -> RefIndexableMut<OT> {
         self.inner.observers_mut()
     }
 }

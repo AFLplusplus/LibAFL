@@ -7,7 +7,7 @@ use core::{
 use libafl_bolts::{
     os::unix_signals::{ucontext_t, Signal},
     shmem::ShMemProvider,
-    tuples::tuple_list,
+    tuples::{tuple_list, RefIndexable, RefIndexableMut},
 };
 use libc::siginfo_t;
 use nix::unistd::{fork, ForkResult};
@@ -255,12 +255,12 @@ where
     Z: UsesState<State = S>,
 {
     #[inline]
-    fn observers(&self) -> &OT {
+    fn observers(&self) -> RefIndexable<OT> {
         self.inner.observers()
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
+    fn observers_mut(&mut self) -> RefIndexableMut<OT> {
         self.inner.observers_mut()
     }
 }
@@ -295,7 +295,7 @@ pub mod child_signal_handlers {
             let data = addr_of_mut!(FORK_EXECUTOR_GLOBAL_DATA);
             if !data.is_null() && (*data).is_valid() {
                 let executor = (*data).executor_mut::<E>();
-                let observers = executor.observers_mut();
+                let mut observers = executor.observers_mut();
                 let state = (*data).state_mut::<E::State>();
                 // Invalidate data to not execute again the observer hooks in the crash handler
                 let input = (*data).take_current_input::<<E::State as UsesInput>::Input>();
@@ -326,7 +326,7 @@ pub mod child_signal_handlers {
     {
         if data.is_valid() {
             let executor = data.executor_mut::<E>();
-            let observers = executor.observers_mut();
+            let mut observers = executor.observers_mut();
             let state = data.state_mut::<E::State>();
             let input = data.take_current_input::<<E::State as UsesInput>::Input>();
             observers
@@ -349,7 +349,7 @@ pub mod child_signal_handlers {
     {
         if data.is_valid() {
             let executor = data.executor_mut::<E>();
-            let observers = executor.observers_mut();
+            let mut observers = executor.observers_mut();
             let state = data.state_mut::<E::State>();
             let input = data.take_current_input::<<E::State as UsesInput>::Input>();
             observers

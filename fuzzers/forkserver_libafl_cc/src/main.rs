@@ -183,10 +183,7 @@ pub fn main() {
         .unwrap();
 
     if let Some(dynamic_map_size) = executor.coverage_map_size() {
-        executor
-            .observers_mut()
-            .get_mut(&observer_ref)
-            .unwrap()
+        executor.observers_mut()[&observer_ref]
             .as_mut()
             .truncate(dynamic_map_size);
     }
