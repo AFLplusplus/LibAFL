@@ -459,8 +459,10 @@ where
 #[cfg(feature = "alloc")]
 pub trait MatchName {
     /// Match for a name and return the borrowed value
+    #[deprecated = "Use `.type_ref` and either `.get` (fallible access) or `[]` (infallible access) instead"]
     fn match_name<T>(&self, name: &str) -> Option<&T>;
     /// Match for a name and return the mut borrowed value
+    #[deprecated = "Use `.type_ref` and either `.get` (fallible access) or `[]` (infallible access) instead"]
     fn match_name_mut<T>(&mut self, name: &str) -> Option<&mut T>;
 }
 
@@ -484,6 +486,7 @@ where
         if type_eq::<Head, T>() && name == self.0.name() {
             unsafe { (addr_of!(self.0) as *const T).as_ref() }
         } else {
+            #[allow(deprecated)]
             self.1.match_name::<T>(name)
         }
     }
@@ -492,6 +495,7 @@ where
         if type_eq::<Head, T>() && name == self.0.name() {
             unsafe { (addr_of_mut!(self.0) as *mut T).as_mut() }
         } else {
+            #[allow(deprecated)]
             self.1.match_name_mut::<T>(name)
         }
     }
@@ -558,7 +562,7 @@ pub trait Referenceable: Named {
 impl<N> Referenceable for N where N: Named {}
 
 /// Object with the type T and the name associated with its concrete value
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 #[cfg(feature = "alloc")]
 pub struct Reference<T: ?Sized> {
     name: Cow<'static, str>,
@@ -588,10 +592,12 @@ where
     M: MatchName,
 {
     fn get<T>(&self, rf: &Reference<T>) -> Option<&T> {
+        #[allow(deprecated)]
         self.match_name::<T>(&rf.name)
     }
 
     fn get_mut<T>(&mut self, rf: &Reference<T>) -> Option<&mut T> {
+        #[allow(deprecated)]
         self.match_name_mut::<T>(&rf.name)
     }
 }

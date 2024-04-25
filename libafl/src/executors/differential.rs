@@ -186,6 +186,7 @@ where
     B: MatchName,
     DOT: MatchName,
 {
+    #[allow(deprecated)]
     fn match_name<T>(&self, name: &str) -> Option<&T> {
         if let Some(t) = self.primary.as_ref().match_name::<T>(name) {
             Some(t)
@@ -195,6 +196,8 @@ where
             self.differential.match_name::<T>(name)
         }
     }
+
+    #[allow(deprecated)]
     fn match_name_mut<T>(&mut self, name: &str) -> Option<&mut T> {
         if let Some(t) = self.primary.as_mut().match_name_mut::<T>(name) {
             Some(t)

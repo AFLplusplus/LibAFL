@@ -22,7 +22,7 @@ use libafl_bolts::{
     fs::{get_unique_std_input_file, InputFile},
     os::{dup2, pipes::Pipe},
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{Prepend, RefIndexable, RefIndexableMut},
+    tuples::{MatchNameRef, Prepend, RefIndexable, RefIndexableMut, Reference, Referenceable},
     AsSlice, AsSliceMut, Truncate,
 };
 use nix::{
@@ -497,6 +497,8 @@ where
     map: Option<SP::ShMem>,
     phantom: PhantomData<S>,
     map_size: Option<usize>,
+    #[cfg(feature = "regex")]
+    asan_obs: Reference<AsanBacktraceObserver>,
     timeout: TimeSpec,
 }
 
@@ -583,6 +585,8 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
     real_map_size: i32,
     kill_signal: Option<Signal>,
     timeout: Option<Duration>,
+    #[cfg(feature = "regex")]
+    asan_obs: Option<Reference<AsanBacktraceObserver>>,
 }
 
 impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
@@ -631,6 +635,10 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             phantom: PhantomData,
             map_size: self.map_size,
             timeout,
+            asan_obs: self
+                .asan_obs
+                .clone()
+                .unwrap_or(AsanBacktraceObserver::default().type_ref()),
         })
     }
 
@@ -688,6 +696,10 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             phantom: PhantomData,
             map_size: self.map_size,
             timeout,
+            asan_obs: self
+                .asan_obs
+                .clone()
+                .unwrap_or(AsanBacktraceObserver::default().type_ref()),
         })
     }
 
@@ -1047,6 +1059,7 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             max_input_size: MAX_INPUT_SIZE_DEFAULT,
             kill_signal: None,
             timeout: None,
+            asan_obs: None,
         }
     }
 
@@ -1072,6 +1085,7 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             max_input_size: MAX_INPUT_SIZE_DEFAULT,
             kill_signal: None,
             timeout: None,
+            asan_obs: None,
         }
     }
 }
@@ -1160,10 +1174,7 @@ where
             if libc::WIFSIGNALED(self.forkserver().status()) {
                 exit_kind = ExitKind::Crash;
                 #[cfg(feature = "regex")]
-                if let Some(asan_observer) = self
-                    .observers_mut()
-                    .match_name_mut::<AsanBacktraceObserver>("AsanBacktraceObserver")
-                {
+                if let Some(asan_observer) = self.observers.get_mut(&self.asan_obs) {
                     asan_observer.parse_asan_output_from_asan_log_file(pid)?;
                 }
             }
