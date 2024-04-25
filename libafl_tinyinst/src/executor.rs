@@ -302,11 +302,11 @@ where
     OT: ObserversTuple<S>,
 {
     fn observers(&self) -> RefIndexable<OT> {
-        &self.observers
+        RefIndexable::from(&self.observers)
     }
 
     fn observers_mut(&mut self) -> RefIndexableMut<OT> {
-        &mut self.observers
+        RefIndexableMut::from(&mut self.observers)
     }
 }
 impl<'a, S, SP, OT> UsesState for TinyInstExecutor<'a, S, SP, OT>
