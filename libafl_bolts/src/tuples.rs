@@ -596,8 +596,10 @@ where
     }
 }
 
+/// A wrapper type to enable the indexing of [`MatchName`] implementors with `[]`.
 #[cfg(feature = "alloc")]
 #[derive(Debug)]
+#[repr(transparent)]
 pub struct RefIndexable<'a, M>(pub &'a M);
 
 impl<'a, M> From<&'a M> for RefIndexable<'a, M>
@@ -609,8 +611,10 @@ where
     }
 }
 
+/// A wrapper type to enable the mutable indexing of [`MatchName`] implementors with `[]`.
 #[cfg(feature = "alloc")]
 #[derive(Debug)]
+#[repr(transparent)]
 pub struct RefIndexableMut<'a, M>(pub &'a mut M);
 
 impl<'a, M> From<&'a mut M> for RefIndexableMut<'a, M>
@@ -626,20 +630,20 @@ impl<'a, M> Deref for RefIndexable<'a, M> {
     type Target = M;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        self.0
     }
 }
 impl<'a, M> Deref for RefIndexableMut<'a, M> {
     type Target = M;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        self.0
     }
 }
 
 impl<'a, M> DerefMut for RefIndexableMut<'a, M> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        self.0
     }
 }
 
