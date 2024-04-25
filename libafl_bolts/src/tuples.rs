@@ -566,10 +566,10 @@ pub struct Reference<T: ?Sized> {
 #[cfg(feature = "alloc")]
 pub trait MatchNameRef {
     /// Search using name and `Reference `
-    fn match_by_ref<T>(&self, rf: Reference<T>) -> Option<&T>;
+    fn match_by_ref<T>(&self, rf: &Reference<T>) -> Option<&T>;
 
     /// Search using name and `Reference `
-    fn match_by_ref_mut<T>(&mut self, rf: Reference<T>) -> Option<&mut T>;
+    fn match_by_ref_mut<T>(&mut self, rf: &Reference<T>) -> Option<&mut T>;
 }
 
 #[cfg(feature = "alloc")]
@@ -577,11 +577,11 @@ impl<M> MatchNameRef for M
 where
     M: MatchName,
 {
-    fn match_by_ref<T>(&self, rf: Reference<T>) -> Option<&T> {
+    fn match_by_ref<T>(&self, rf: &Reference<T>) -> Option<&T> {
         self.match_name::<T>(&rf.name)
     }
 
-    fn match_by_ref_mut<T>(&mut self, rf: Reference<T>) -> Option<&mut T> {
+    fn match_by_ref_mut<T>(&mut self, rf: &Reference<T>) -> Option<&mut T> {
         self.match_name_mut::<T>(&rf.name)
     }
 }
