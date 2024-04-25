@@ -602,6 +602,7 @@ where
 #[repr(transparent)]
 pub struct RefIndexable<'a, M>(pub &'a M);
 
+#[cfg(feature = "alloc")]
 impl<'a, M> From<&'a M> for RefIndexable<'a, M>
 where
     M: MatchName,
@@ -617,6 +618,7 @@ where
 #[repr(transparent)]
 pub struct RefIndexableMut<'a, M>(pub &'a mut M);
 
+#[cfg(feature = "alloc")]
 impl<'a, M> From<&'a mut M> for RefIndexableMut<'a, M>
 where
     M: MatchName,
@@ -626,6 +628,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<'a, M> Deref for RefIndexable<'a, M> {
     type Target = M;
 
@@ -633,6 +636,8 @@ impl<'a, M> Deref for RefIndexable<'a, M> {
         self.0
     }
 }
+
+#[cfg(feature = "alloc")]
 impl<'a, M> Deref for RefIndexableMut<'a, M> {
     type Target = M;
 
@@ -641,6 +646,7 @@ impl<'a, M> Deref for RefIndexableMut<'a, M> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<'a, M> DerefMut for RefIndexableMut<'a, M> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.0
