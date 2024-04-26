@@ -159,6 +159,12 @@ pub fn edges_map_mut_ptr() -> *mut u8 {
 }
 
 /// Gets the current maximum number of edges tracked.
+#[cfg(any(
+    feature = "sancov_pcguard_edges",
+    feature = "sancov_pcguard_hitcounts",
+    feature = "sancov_ngram4",
+    feature = "sancov_ctx"
+))]
 #[must_use]
 pub fn edges_max_num() -> usize {
     unsafe {
