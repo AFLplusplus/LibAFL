@@ -12,7 +12,7 @@ use libafl::{
     Error, HasMetadata, HasNamedMetadata,
 };
 use libafl_bolts::{
-    tuples::{MatchNameRef, Reference, Referenceable},
+    tuples::{MatchNameRef, Reference},
     Named,
 };
 
@@ -151,10 +151,10 @@ where
     /// With cmplog observer
     pub fn with_cmplog_observer(
         tracer_executor: TE,
-        obs: &AFLppCmpLogObserver<'a, TE::State>,
+        obs_ref: Reference<AFLppCmpLogObserver<'a, TE::State>>,
     ) -> Self {
         Self {
-            cmplog_observer_ref: Some(obs.type_ref()),
+            cmplog_observer_ref: Some(obs_ref),
             tracer_executor,
             phantom: PhantomData,
         }
