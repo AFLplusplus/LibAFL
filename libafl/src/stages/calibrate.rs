@@ -14,6 +14,7 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{map::MapFeedbackMetadata, HasObserverReference},
     fuzzer::Evaluator,
+    inputs::UsesInput,
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
     schedulers::powersched::SchedulerMetadata,
@@ -330,17 +331,16 @@ where
 impl<C, O, OT, S> CalibrationStage<C, O, OT, S>
 where
     O: MapObserver,
+    for<'it> O: AsIter<'it, Item = O::Entry>,
     C: AsRef<O>,
     OT: ObserversTuple<S>,
-    S: HasCorpus + HasMetadata + HasNamedMetadata,
+    S: UsesInput + HasNamedMetadata,
 {
     /// Create a new [`CalibrationStage`].
     #[must_use]
     pub fn new<F>(map_feedback: &F) -> Self
     where
         F: HasObserverReference<Observer = C> + Named,
-        for<'it> O: AsIter<'it, Item = O::Entry>,
-        C: AsRef<O>,
     {
         Self {
             map_observer_ref: map_feedback.observer_ref().clone(),
@@ -357,8 +357,6 @@ where
     pub fn ignore_stability<F>(map_feedback: &F) -> Self
     where
         F: HasObserverReference<Observer = C> + Named,
-        for<'it> O: AsIter<'it, Item = O::Entry>,
-        C: AsRef<O>,
     {
         Self {
             map_observer_ref: map_feedback.observer_ref().clone(),

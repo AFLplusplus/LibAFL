@@ -23,29 +23,28 @@ use crate::{
     feedbacks::{Feedback, HasObserverReference},
     inputs::UsesInput,
     monitors::{AggregatorOps, UserStats, UserStatsValue},
-    observers::{CanTrack, MapObserver, ObserversTuple},
+    observers::{CanTrack, MapObserver, Observer, ObserversTuple},
     state::State,
     Error, HasMetadata, HasNamedMetadata,
 };
 
 /// A [`MapFeedback`] that implements the AFL algorithm using an [`OrReducer`] combining the bits for the history map and the bit from (`HitcountsMapObserver`)[`crate::observers::HitcountsMapObserver`].
-pub type AflMapFeedback<C, O, S, T> = MapFeedback<C, DifferentIsNovel, O, OrReducer, S, T>;
+pub type AflMapFeedback<C, O, T> = MapFeedback<C, DifferentIsNovel, O, OrReducer, T>;
 
 /// A [`MapFeedback`] that strives to maximize the map contents.
-pub type MaxMapFeedback<C, O, S, T> = MapFeedback<C, DifferentIsNovel, O, MaxReducer, S, T>;
+pub type MaxMapFeedback<C, O, T> = MapFeedback<C, DifferentIsNovel, O, MaxReducer, T>;
 /// A [`MapFeedback`] that strives to minimize the map contents.
-pub type MinMapFeedback<C, O, S, T> = MapFeedback<C, DifferentIsNovel, O, MinReducer, S, T>;
+pub type MinMapFeedback<C, O, T> = MapFeedback<C, DifferentIsNovel, O, MinReducer, T>;
 
 /// A [`MapFeedback`] that always returns `true` for `is_interesting`. Useful for tracing all executions.
-pub type AlwaysInterestingMapFeedback<C, O, S, T> = MapFeedback<C, AllIsNovel, O, NopReducer, S, T>;
+pub type AlwaysInterestingMapFeedback<C, O, T> = MapFeedback<C, AllIsNovel, O, NopReducer, T>;
 
 /// A [`MapFeedback`] that strives to maximize the map contents,
 /// but only, if a value is larger than `pow2` of the previous.
-pub type MaxMapPow2Feedback<C, O, S, T> = MapFeedback<C, NextPow2IsNovel, O, MaxReducer, S, T>;
+pub type MaxMapPow2Feedback<C, O, T> = MapFeedback<C, NextPow2IsNovel, O, MaxReducer, T>;
 /// A [`MapFeedback`] that strives to maximize the map contents,
 /// but only, if a value is larger than `pow2` of the previous.
-pub type MaxMapOneOrFilledFeedback<C, O, S, T> =
-    MapFeedback<C, OneOrFilledIsNovel, O, MaxReducer, S, T>;
+pub type MaxMapOneOrFilledFeedback<C, O, T> = MapFeedback<C, OneOrFilledIsNovel, O, MaxReducer, T>;
 
 /// A `Reducer` function is used to aggregate values for the novelty search
 pub trait Reducer<T>: 'static
@@ -383,7 +382,7 @@ where
 
 /// The most common AFL-like feedback type
 #[derive(Clone, Debug)]
-pub struct MapFeedback<C, N, O, R, S, T> {
+pub struct MapFeedback<C, N, O, R, T> {
     /// New indexes observed in the last observation
     novelties: Option<Vec<usize>>,
     /// Name identifier of this instance
@@ -393,17 +392,17 @@ pub struct MapFeedback<C, N, O, R, S, T> {
     /// Name of the feedback as shown in the `UserStats`
     stats_name: Cow<'static, str>,
     /// Phantom Data of Reducer
-    phantom: PhantomData<(C, N, O, R, S, T)>,
+    phantom: PhantomData<(C, N, O, R, T)>,
 }
 
-impl<C, N, O, R, S, T> Feedback<S> for MapFeedback<C, N, O, R, S, T>
+impl<C, N, O, R, S, T> Feedback<S> for MapFeedback<C, N, O, R, T>
 where
     N: IsNovel<T>,
     O: MapObserver<Entry = T> + for<'it> AsIter<'it, Item = T>,
     R: Reducer<T>,
     S: State + HasNamedMetadata,
     T: Default + Copy + Serialize + for<'de> Deserialize<'de> + PartialEq + Debug + 'static,
-    C: CanTrack + AsRef<O> + Named,
+    C: CanTrack + AsRef<O> + Observer<S>,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         // Initialize `MapFeedbackMetadata` with an empty vector and add it to the state.
@@ -538,12 +537,12 @@ where
 
 /// Specialize for the common coverage map size, maximization of u8s
 #[rustversion::nightly]
-impl<C, O, S> Feedback<S> for MapFeedback<C, DifferentIsNovel, O, MaxReducer, S, u8>
+impl<C, O, S> Feedback<S> for MapFeedback<C, DifferentIsNovel, O, MaxReducer, u8>
 where
     O: MapObserver<Entry = u8> + AsSlice<Entry = u8>,
     for<'it> O: AsIter<'it, Item = u8>,
     S: State + HasNamedMetadata,
-    C: CanTrack + AsRef<O> + Named,
+    C: CanTrack + AsRef<O> + Observer<S>,
 {
     #[allow(clippy::wrong_self_convention)]
     #[allow(clippy::needless_range_loop)]
@@ -655,14 +654,14 @@ where
     }
 }
 
-impl<C, N, O, R, S, T> Named for MapFeedback<C, N, O, R, S, T> {
+impl<C, N, O, R, T> Named for MapFeedback<C, N, O, R, T> {
     #[inline]
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<C, N, O, R, S, T> HasObserverReference for MapFeedback<C, N, O, R, S, T>
+impl<C, N, O, R, T> HasObserverReference for MapFeedback<C, N, O, R, T>
 where
     O: Named,
     C: AsRef<O>,
@@ -684,14 +683,13 @@ fn create_stats_name(name: &Cow<'static, str>) -> Cow<'static, str> {
     }
 }
 
-impl<C, N, O, R, S, T> MapFeedback<C, N, O, R, S, T>
+impl<C, N, O, R, T> MapFeedback<C, N, O, R, T>
 where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
     O: MapObserver<Entry = T>,
     for<'it> O: AsIter<'it, Item = T>,
     N: IsNovel<T>,
-    S: UsesInput + HasNamedMetadata,
     C: CanTrack + AsRef<O> + Named,
 {
     /// Create new `MapFeedback`
@@ -724,7 +722,7 @@ where
     #[allow(clippy::wrong_self_convention)]
     #[allow(clippy::needless_range_loop)]
     #[allow(clippy::trivially_copy_pass_by_ref)]
-    fn is_interesting_default<EM, OT>(
+    fn is_interesting_default<EM, S, OT>(
         &mut self,
         state: &mut S,
         _manager: &mut EM,
@@ -735,6 +733,7 @@ where
     where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
+        S: UsesInput + HasNamedMetadata,
     {
         let mut interesting = false;
         // TODO Replace with match_name_type when stable
