@@ -42,8 +42,8 @@ use libafl_bolts::{
     current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, StdShMemProvider},
-    tuples::tuple_list,
-    AsSliceMut, AsSlice, Named,
+    tuples::{tuple_list, Referenceable},
+    AsSliceMut, AsSlice
 };
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
@@ -207,8 +207,7 @@ fn fuzz(
 
         // The concolic observer observers the concolic shared memory map.
         let concolic_observer = ConcolicObserver::new("concolic", concolic_shmem.as_slice_mut());
-
-        let concolic_observer_name = concolic_observer.name().to_string();
+        let concolic_ref = concolic_observer.type_ref();
 
         // The order of the stages matter!
         let mut stages = tuple_list!(
@@ -217,7 +216,7 @@ fn fuzz(
                 TracingStage::new(
                     MyCommandConfigurator.into_executor(tuple_list!(concolic_observer))
                 ),
-                concolic_observer_name,
+                concolic_ref,
             ),
             // Use the concolic trace for z3-based solving
             SimpleConcolicMutationalStage::default(),
