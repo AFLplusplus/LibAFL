@@ -498,7 +498,7 @@ where
     phantom: PhantomData<S>,
     map_size: Option<usize>,
     timeout: TimeSpec,
-    crash_exitcode: Option<i32>,
+    crash_exitcode: Option<i8>,
 }
 
 impl<OT, S, SP> Debug for ForkserverExecutor<OT, S, SP>
@@ -584,7 +584,7 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
     real_map_size: i32,
     kill_signal: Option<Signal>,
     timeout: Option<Duration>,
-    crash_exitcode: Option<i32>,
+    crash_exitcode: Option<i8>,
 }
 
 impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
@@ -1005,7 +1005,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
 
     /// Treats an execution as a crash if the provided exitcode is returned
     #[must_use]
-    pub fn crash_exitcode(mut self, exitcode: i32) -> Self {
+    pub fn crash_exitcode(mut self, exitcode: i8) -> Self {
         self.crash_exitcode = Some(exitcode);
         self
     }
@@ -1171,7 +1171,7 @@ where
         if let Some(status) = self.forkserver.read_st_timed(&self.timeout)? {
             self.forkserver.set_status(status);
             let exitcode_is_crash = if let Some(crash_exitcode) = self.crash_exitcode {
-                libc::WSTOPSIG(self.forkserver().status()) == crash_exitcode
+                (libc::WEXITSTATUS(self.forkserver().status()) as i8) == crash_exitcode
             } else {
                 false
             };
