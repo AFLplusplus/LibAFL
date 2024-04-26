@@ -553,7 +553,7 @@ where
     match meta.map.entry((src, dest)) {
         Entry::Occupied(e) => {
             let id = *e.get();
-            let nxt = (id as usize + 1) & (EDGES_MAP_SIZE_IN_USE - 1);
+            let nxt = (id as usize + 1) & (EDGES_MAP_SIZE_MAX - 1);
             unsafe {
                 MAX_EDGES_NUM = max(MAX_EDGES_NUM, nxt);
             }
@@ -562,7 +562,7 @@ where
         Entry::Vacant(e) => {
             let id = meta.current_id;
             e.insert(id);
-            meta.current_id = (id + 1) & (EDGES_MAP_SIZE_IN_USE as u64 - 1);
+            meta.current_id = (id + 1) & (EDGES_MAP_SIZE_MAX as u64 - 1);
             unsafe {
                 MAX_EDGES_NUM = meta.current_id as usize;
             }

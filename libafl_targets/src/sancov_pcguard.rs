@@ -16,11 +16,11 @@ use libafl::executors::{hooks::ExecutorHook, HasObservers};
     feature = "sancov_ngram4",
 ))]
 use crate::coverage::EDGES_MAP;
-#[cfg(feature = "pointer_maps")]
-use crate::{coverage::EDGES_MAP_PTR, EDGES_MAP_SIZE_MAX};
+use crate::coverage::MAX_EDGES_NUM;
 #[cfg(feature = "sancov_ngram4")]
 use crate::EDGES_MAP_SIZE_IN_USE;
-use crate::coverage::MAX_EDGES_NUM;
+#[cfg(feature = "pointer_maps")]
+use crate::{coverage::EDGES_MAP_PTR, EDGES_MAP_SIZE_MAX};
 
 #[cfg(all(feature = "sancov_pcguard_edges", feature = "sancov_pcguard_hitcounts"))]
 #[cfg(not(any(doc, feature = "clippy")))]
