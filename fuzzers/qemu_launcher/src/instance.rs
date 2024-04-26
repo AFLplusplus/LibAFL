@@ -34,12 +34,13 @@ use libafl_bolts::shmem::StdShMemProvider;
 use libafl_bolts::{
     core_affinity::CoreId,
     current_nanos,
+    ownedref::OwnedMutSlice,
     rands::StdRand,
     tuples::{tuple_list, Merge},
 };
 use libafl_qemu::{
     cmplog::CmpLogObserver,
-    edges::{edges_map_mut_slice, MAX_EDGES_NUM},
+    edges::{edges_map_mut_ptr, MAX_EDGES_NUM},
     helpers::QemuHelperTuple,
     Qemu, QemuExecutor, QemuHooks,
 };
@@ -78,7 +79,7 @@ impl<'a, M: Monitor> Instance<'a, M> {
         let edges_observer = unsafe {
             HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
                 "edges",
-                edges_map_mut_slice(),
+                OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), MAX_EDGES_NUM),
                 addr_of_mut!(MAX_EDGES_NUM),
             ))
             .track_indices()
