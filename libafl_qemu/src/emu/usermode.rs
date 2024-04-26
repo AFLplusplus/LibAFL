@@ -4,7 +4,7 @@ use std::{cell::OnceCell, slice::from_raw_parts, str::from_utf8_unchecked};
 use libafl_qemu_sys::{
     exec_path, free_self_maps, guest_base, libafl_dump_core_hook, libafl_force_dfl, libafl_get_brk,
     libafl_load_addr, libafl_maps_first, libafl_maps_next, libafl_qemu_run, libafl_set_brk,
-    mmap_next_start, read_self_maps, strlen, GuestAddr, GuestUsize, IntervalTreeNode,
+    mmap_next_start, pageflags_get_root, read_self_maps, strlen, GuestAddr, GuestUsize, IntervalTreeNode,
     IntervalTreeRoot, MapInfo, MmapPerms, VerifyAccess,
 };
 use libc::c_int;
@@ -27,8 +27,8 @@ pub enum HandlerError {
 
 #[cfg_attr(feature = "python", pyclass(unsendable))]
 pub struct GuestMaps {
-    maps_root: *mut IntervalTreeRoot,
-    maps_node: *mut IntervalTreeNode,
+    self_maps_root: *mut IntervalTreeRoot,
+    pageflags_node: *mut IntervalTreeNode,
 }
 
 // Consider a private new only for Emulator
@@ -36,11 +36,12 @@ impl GuestMaps {
     #[must_use]
     pub(crate) fn new() -> Self {
         unsafe {
-            let root = read_self_maps();
-            let first = libafl_maps_first(root);
+            let pageflags_root = pageflags_get_root();
+            let self_maps_root = read_self_maps();
+            let pageflags_first = libafl_maps_first(pageflags_root);
             Self {
-                maps_root: root,
-                maps_node: first,
+                self_maps_root,
+                pageflags_node: pageflags_first,
             }
         }
     }
@@ -54,7 +55,7 @@ impl Iterator for GuestMaps {
         unsafe {
             let mut ret = MaybeUninit::uninit();
 
-            self.maps_node = libafl_maps_next(self.maps_node, ret.as_mut_ptr());
+            self.pageflags_node = libafl_maps_next(self.pageflags_node, self.self_maps_root, ret.as_mut_ptr());
 
             let ret = ret.assume_init();
 
@@ -81,7 +82,7 @@ impl GuestMaps {
 impl Drop for GuestMaps {
     fn drop(&mut self) {
         unsafe {
-            free_self_maps(self.maps_root);
+            free_self_maps(self.self_maps_root);
         }
     }
 }

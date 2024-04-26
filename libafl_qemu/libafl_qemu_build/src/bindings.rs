@@ -166,6 +166,7 @@ pub fn generate(
         .allowlist_function("libafl_.*")
         .allowlist_function("read_self_maps")
         .allowlist_function("free_self_maps")
+        .allowlist_function("pageflags_get_root")
         .blocklist_function("main_loop_wait") // bindgen issue #1313
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()));
 
