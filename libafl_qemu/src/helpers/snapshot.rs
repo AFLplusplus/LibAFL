@@ -269,7 +269,7 @@ impl QemuSnapshotHelper {
                                 offsets.iter().fold(String::new(), |acc, offset| format!(
                                     "{}, 0x{:x}",
                                     acc,
-                                    addr + *offset as u64
+                                    addr + *offset as GuestAddr
                                 ))
                             );
                             content_mismatch = true;
