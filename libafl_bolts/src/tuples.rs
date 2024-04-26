@@ -608,7 +608,7 @@ where
     type Target = RM::Target;
 
     fn deref(&self) -> &Self::Target {
-        self.0.deref()
+        &self.0
     }
 }
 
@@ -618,7 +618,7 @@ where
     RM: DerefMut<Target = M>,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.0.deref_mut()
+        &mut self.0
     }
 }
 
@@ -632,7 +632,7 @@ where
 
     fn index(&self, index: &Reference<T>) -> &Self::Output {
         let Some(e) = self.get(index) else {
-            panic!("Could not find entry matching {:?}", index)
+            panic!("Could not find entry matching {index:?}")
         };
         e
     }
@@ -646,7 +646,7 @@ where
 {
     fn index_mut(&mut self, index: &Reference<T>) -> &mut Self::Output {
         let Some(e) = self.get_mut(index) else {
-            panic!("Could not find entry matching {:?}", index)
+            panic!("Could not find entry matching {index:?}")
         };
         e
     }

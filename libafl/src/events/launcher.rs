@@ -30,6 +30,8 @@ use std::{fs::File, os::unix::io::AsRawFd};
 
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use libafl_bolts::os::startable_self;
+#[cfg(feature = "adaptive_serialization")]
+use libafl_bolts::tuples::{Reference, Referenceable};
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use libafl_bolts::{
     core_affinity::get_core_ids,
@@ -46,6 +48,8 @@ use typed_builder::TypedBuilder;
 use super::hooks::EventManagerHooksTuple;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use crate::events::{CentralizedEventManager, CentralizedLlmpEventBroker};
+#[cfg(feature = "adaptive_serialization")]
+use crate::observers::TimeObserver;
 #[cfg(feature = "std")]
 use crate::{
     events::{
@@ -116,6 +120,8 @@ where
     /// clusters.
     #[builder(default = None)]
     remote_broker_addr: Option<SocketAddr>,
+    #[cfg(feature = "adaptive_serialization")]
+    time_ref: Reference<TimeObserver>,
     /// If this launcher should spawn a new `broker` on `[Self::broker_port]` (default).
     /// The reason you may not want this is, if you already have a [`Launcher`]
     /// with a different configuration (for the same target) running on this machine.
@@ -250,7 +256,7 @@ where
                         }
 
                         // Fuzzer client. keeps retrying the connection to broker till the broker starts
-                        let (state, mgr) = RestartingMgr::<EMH, MT, S, SP>::builder()
+                        let builder = RestartingMgr::<EMH, MT, S, SP>::builder()
                             .shmem_provider(self.shmem_provider.clone())
                             .broker_port(self.broker_port)
                             .kind(ManagerKind::Client {
@@ -258,9 +264,10 @@ where
                             })
                             .configuration(self.configuration)
                             .serialize_state(self.serialize_state)
-                            .hooks(hooks)
-                            .build()
-                            .launch()?;
+                            .hooks(hooks);
+                        #[cfg(feature = "adaptive_serialization")]
+                        let builder = builder.time_ref(self.time_ref.clone());
+                        let (state, mgr) = builder.build().launch()?;
 
                         return (self.run_client.take().unwrap())(state, mgr, *bind_to);
                     }
@@ -273,7 +280,7 @@ where
             log::info!("I am broker!!.");
 
             // TODO we don't want always a broker here, think about using different laucher process to spawn different configurations
-            RestartingMgr::<EMH, MT, S, SP>::builder()
+            let builder = RestartingMgr::<EMH, MT, S, SP>::builder()
                 .shmem_provider(self.shmem_provider.clone())
                 .monitor(Some(self.monitor.clone()))
                 .broker_port(self.broker_port)
@@ -282,9 +289,12 @@ where
                 .exit_cleanly_after(Some(NonZeroUsize::try_from(self.cores.ids.len()).unwrap()))
                 .configuration(self.configuration)
                 .serialize_state(self.serialize_state)
-                .hooks(hooks)
-                .build()
-                .launch()?;
+                .hooks(hooks);
+
+            #[cfg(feature = "adaptive_serialization")]
+            let builder = builder.time_ref(self.time_ref.clone());
+
+            builder.build().launch()?;
 
             // Broker exited. kill all clients.
             for handle in &handles {
@@ -457,6 +467,9 @@ where
     /// The centralized broker port to use (or to attach to, in case [`Self::spawn_broker`] is `false`)
     #[builder(default = 1338_u16)]
     centralized_broker_port: u16,
+    /// The time observer by which to adaptively serialize
+    #[cfg(feature = "adaptive_serialization")]
+    time_obs: &'a TimeObserver,
     /// The list of cores to run on
     cores: &'a Cores,
     /// A file name to write all client output to
@@ -617,7 +630,7 @@ where
                         }
 
                         // Fuzzer client. keeps retrying the connection to broker till the broker starts
-                        let (state, mgr) = RestartingMgr::<(), MT, S, SP>::builder()
+                        let builder = RestartingMgr::<(), MT, S, SP>::builder()
                             .shmem_provider(self.shmem_provider.clone())
                             .broker_port(self.broker_port)
                             .kind(ManagerKind::Client {
@@ -625,15 +638,25 @@ where
                             })
                             .configuration(self.configuration)
                             .serialize_state(self.serialize_state)
-                            .hooks(tuple_list!())
-                            .build()
-                            .launch()?;
+                            .hooks(tuple_list!());
+                        #[cfg(feature = "adaptive_serialization")]
+                        let builder = builder.time_ref(self.time_obs.type_ref());
+                        let (state, mgr) = builder.build().launch()?;
 
+                        #[cfg(not(feature = "adaptive_serialization"))]
                         let c_mgr = CentralizedEventManager::on_port(
                             mgr,
                             self.shmem_provider.clone(),
                             self.centralized_broker_port,
                             index == 1,
+                        )?;
+                        #[cfg(feature = "adaptive_serialization")]
+                        let c_mgr = CentralizedEventManager::on_port(
+                            mgr,
+                            self.shmem_provider.clone(),
+                            self.centralized_broker_port,
+                            index == 1,
+                            self.time_obs,
                         )?;
 
                         return (self.run_client.take().unwrap())(state, c_mgr, *bind_to);
@@ -646,7 +669,7 @@ where
             log::info!("I am broker!!.");
 
             // TODO we don't want always a broker here, think about using different laucher process to spawn different configurations
-            RestartingMgr::<(), MT, S, SP>::builder()
+            let builder = RestartingMgr::<(), MT, S, SP>::builder()
                 .shmem_provider(self.shmem_provider.clone())
                 .monitor(Some(self.monitor.clone()))
                 .broker_port(self.broker_port)
@@ -655,9 +678,12 @@ where
                 .exit_cleanly_after(Some(NonZeroUsize::try_from(self.cores.ids.len()).unwrap()))
                 .configuration(self.configuration)
                 .serialize_state(self.serialize_state)
-                .hooks(tuple_list!())
-                .build()
-                .launch()?;
+                .hooks(tuple_list!());
+
+            #[cfg(feature = "adaptive_serialization")]
+            let builder = builder.time_ref(self.time_obs.type_ref());
+
+            builder.build().launch()?;
 
             // Broker exited. kill all clients.
             for handle in &handles {

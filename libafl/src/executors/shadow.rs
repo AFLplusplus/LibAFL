@@ -47,14 +47,14 @@ where
 
     /// The shadow observers are not considered by the feedbacks and the manager, mutable
     #[inline]
-    pub fn shadow_observers(&self) -> &SOT {
-        &self.shadow_observers
+    pub fn shadow_observers(&self) -> RefIndexable<&SOT, SOT> {
+        RefIndexable::from(&self.shadow_observers)
     }
 
     /// The shadow observers are not considered by the feedbacks and the manager, mutable
     #[inline]
-    pub fn shadow_observers_mut(&mut self) -> &mut SOT {
-        &mut self.shadow_observers
+    pub fn shadow_observers_mut(&mut self) -> RefIndexable<&mut SOT, SOT> {
+        RefIndexable::from(&mut self.shadow_observers)
     }
 }
 
