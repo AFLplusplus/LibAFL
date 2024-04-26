@@ -92,7 +92,6 @@ toml = { version = "0.4.2", optional = true } # For parsing the injections toml 
 pyo3 = { version = "0.18", optional = true }
 # Document all features of this crate (for `cargo doc`)
 document-features = { version = "0.2", optional = true }
-device_query = "2.0"
 
 [build-dependencies]
 pyo3-build-config = { version = "0.18", optional = true }

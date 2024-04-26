@@ -3,16 +3,11 @@ use std::{
     collections::{HashMap, HashSet},
     mem::MaybeUninit,
     sync::Mutex,
-    thread::sleep,
-    time::Duration,
 };
 
-use addr2line::fallible_iterator::FallibleIterator;
-use device_query::{DeviceQuery, DeviceState, Keycode};
 use libafl::{inputs::UsesInput, HasMetadata};
 use libafl_qemu_sys::{GuestAddr, MmapPerms};
 use meminterval::{Interval, IntervalTree};
-use serde::__private::de::missing_field;
 use thread_local::ThreadLocal;
 
 #[cfg(any(cpu_target = "arm", cpu_target = "i386", cpu_target = "mips"))]
@@ -232,7 +227,7 @@ impl QemuSnapshotHelper {
                 if let Some(saved_page) = saved_pages_list.remove(&addr) {
                     if saved_page.perms.readable() {
                         let mut current_page_content: MaybeUninit<[u8; SNAPSHOT_PAGE_SIZE]> =
-                            unsafe { MaybeUninit::uninit() };
+                            MaybeUninit::uninit();
 
                         if saved_page.perms != map.flags() {
                             perm_errors.push((addr, saved_page.perms, map.flags()));
@@ -274,7 +269,7 @@ impl QemuSnapshotHelper {
                                 offsets.iter().fold(String::new(), |acc, offset| format!(
                                     "{}, 0x{:x}",
                                     acc,
-                                    addr + offset.clone() as u64
+                                    addr + *offset as u64
                                 ))
                             );
                             content_mismatch = true;
@@ -322,9 +317,7 @@ impl QemuSnapshotHelper {
             content_mismatch = true;
         }
 
-        if content_mismatch {
-            panic!("Error found, stopping...")
-        }
+        assert!(!content_mismatch, "Error found, stopping...");
 
         log::info!("Snapshot check OK");
     }

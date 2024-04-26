@@ -1,6 +1,10 @@
 #![allow(clippy::missing_panics_doc)]
 use std::{
+    collections::hash_map,
     env, fs,
+    fs::File,
+    hash::Hasher,
+    io::{Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
     process::Command,
     ptr::addr_of_mut,
@@ -241,5 +245,48 @@ fn include_path(build_dir: &Path, path: &str) -> String {
     } else {
         // make include path absolute
         build_dir.join(include_path).display().to_string()
+    }
+}
+
+pub fn store_generated_content_if_different(file_to_update: &PathBuf, fresh_content: &[u8]) {
+    let mut must_rewrite_file = true;
+
+    // Check if equivalent file already exists without relying on filesystem timestamp.
+    let mut file_to_check =
+        if let Ok(mut wrapper_file) = File::options().read(true).write(true).open(file_to_update) {
+            let mut existing_file_content = Vec::with_capacity(fresh_content.len());
+            wrapper_file
+                .read_to_end(existing_file_content.as_mut())
+                .unwrap();
+
+            let mut existing_wrapper_hasher = hash_map::DefaultHasher::new();
+            existing_wrapper_hasher.write(existing_file_content.as_ref());
+
+            let mut wrapper_h_hasher = hash_map::DefaultHasher::new();
+            wrapper_h_hasher.write(fresh_content);
+
+            // Check if wrappers are the same
+            if existing_wrapper_hasher.finish() == wrapper_h_hasher.finish() {
+                must_rewrite_file = false;
+            }
+
+            // Reset file cursor if it's going to be rewritten
+            if must_rewrite_file {
+                wrapper_file.set_len(0).expect("Could not set file len");
+                wrapper_file
+                    .seek(SeekFrom::Start(0))
+                    .expect("Could not seek file to beginning");
+            }
+
+            wrapper_file
+        } else {
+            File::create(file_to_update)
+                .unwrap_or_else(|_| panic!("Could not create {}", file_to_update.display()))
+        };
+
+    if must_rewrite_file {
+        file_to_check
+            .write_all(fresh_content)
+            .unwrap_or_else(|_| panic!("Unable to write in {}", file_to_update.display()));
     }
 }
