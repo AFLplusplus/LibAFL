@@ -332,9 +332,9 @@ mod observers {
 
     impl<'it, const DIFFERENTIAL: bool> AsIterMut<'it> for CountersMultiMapObserver<DIFFERENTIAL> {
         type Item = u8;
-        type IntoIter = Flatten<IterMut<'it, OwnedMutSlice<'static, u8>>>;
+        type IntoIterMut = Flatten<IterMut<'it, OwnedMutSlice<'static, u8>>>;
 
-        fn as_iter_mut(&'it mut self) -> Self::IntoIter {
+        fn as_iter_mut(&'it mut self) -> Self::IntoIterMut {
             unsafe { COUNTERS_MAPS.iter_mut().flatten() }
         }
     }

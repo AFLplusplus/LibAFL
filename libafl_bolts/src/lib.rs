@@ -213,7 +213,7 @@ use core::{
     array::TryFromSliceError,
     fmt::{self, Display},
     num::{ParseIntError, TryFromIntError},
-    ops::Deref,
+    ops::{Deref, DerefMut},
     time,
 };
 #[cfg(feature = "std")]
@@ -754,14 +754,14 @@ pub trait AsIter<'it> {
 }
 
 /// Create an `Iterator` from a mutable reference
-pub trait AsIterMut<'it> {
-    /// The item type
-    type Item: 'it;
+pub trait AsIterMut<'it>: AsIter<'it> {
+    /// The ref type
+    type RefMut: DerefMut<Target = Self::Item>;
     /// The iterator type
-    type IntoIter: Iterator<Item = &'it mut Self::Item>;
+    type IntoIterMut: Iterator<Item = Self::RefMut>;
 
     /// Create an iterator from &mut self
-    fn as_iter_mut(&'it mut self) -> Self::IntoIter;
+    fn as_iter_mut(&'it mut self) -> Self::IntoIterMut;
 }
 
 /// Has a length field

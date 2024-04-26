@@ -619,10 +619,10 @@ where
         + serde::de::DeserializeOwned
         + Debug,
 {
-    type Item = T;
-    type IntoIter = IterMut<'it, T>;
+    type RefMut = &'it mut T;
+    type IntoIterMut = IterMut<'it, T>;
 
-    fn as_iter_mut(&'it mut self) -> Self::IntoIter {
+    fn as_iter_mut(&'it mut self) -> Self::IntoIterMut {
         let cnt = self.usable_count();
         self.as_slice_mut()[..cnt].iter_mut()
     }
@@ -1148,10 +1148,10 @@ where
         + serde::de::DeserializeOwned
         + Debug,
 {
-    type Item = T;
-    type IntoIter = IterMut<'it, T>;
+    type RefMut = &'it mut T;
+    type IntoIterMut = IterMut<'it, T>;
 
-    fn as_iter_mut(&'it mut self) -> Self::IntoIter {
+    fn as_iter_mut(&'it mut self) -> Self::IntoIterMut {
         let cnt = self.usable_count();
         self.as_slice_mut()[..cnt].iter_mut()
     }
@@ -1498,10 +1498,10 @@ where
         + PartialEq
         + Bounded,
 {
-    type Item = T;
-    type IntoIter = IterMut<'it, T>;
+    type RefMut = &'it mut T;
+    type IntoIterMut = IterMut<'it, T>;
 
-    fn as_iter_mut(&'it mut self) -> Self::IntoIter {
+    fn as_iter_mut(&'it mut self) -> Self::IntoIterMut {
         let cnt = self.usable_count();
         self.as_slice_mut()[..cnt].iter_mut()
     }
@@ -2002,10 +2002,10 @@ impl<'it, M> AsIterMut<'it> for HitcountsMapObserver<M>
 where
     M: Named + Serialize + serde::de::DeserializeOwned + AsIterMut<'it, Item = u8>,
 {
-    type Item = u8;
-    type IntoIter = <M as AsIterMut<'it>>::IntoIter;
+    type RefMut = <M as AsIterMut<'it>>::RefMut;
+    type IntoIterMut = <M as AsIterMut<'it>>::IntoIterMut;
 
-    fn as_iter_mut(&'it mut self) -> Self::IntoIter {
+    fn as_iter_mut(&'it mut self) -> Self::IntoIterMut {
         self.base.as_iter_mut()
     }
 }
@@ -2116,7 +2116,7 @@ where
         input: &S::Input,
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
-        for item in self.as_iter_mut() {
+        for mut item in self.as_iter_mut() {
             *item = unsafe { *COUNT_CLASS_LOOKUP.get_unchecked((*item) as usize) };
         }
 
@@ -2274,10 +2274,10 @@ impl<'it, M> AsIterMut<'it> for HitcountsIterableMapObserver<M>
 where
     M: Named + Serialize + serde::de::DeserializeOwned + AsIterMut<'it, Item = u8>,
 {
-    type Item = u8;
-    type IntoIter = <M as AsIterMut<'it>>::IntoIter;
+    type RefMut = <M as AsIterMut<'it>>::RefMut;
+    type IntoIterMut = <M as AsIterMut<'it>>::IntoIterMut;
 
-    fn as_iter_mut(&'it mut self) -> Self::IntoIter {
+    fn as_iter_mut(&'it mut self) -> Self::IntoIterMut {
         self.base.as_iter_mut()
     }
 }
@@ -2628,10 +2628,10 @@ where
     T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
     'a: 'it,
 {
-    type Item = T;
-    type IntoIter = Flatten<IterMut<'it, OwnedMutSlice<'a, T>>>;
+    type RefMut = &'it mut T;
+    type IntoIterMut = Flatten<IterMut<'it, OwnedMutSlice<'a, T>>>;
 
-    fn as_iter_mut(&'it mut self) -> Self::IntoIter {
+    fn as_iter_mut(&'it mut self) -> Self::IntoIterMut {
         self.maps.iter_mut().flatten()
     }
 }
@@ -2749,10 +2749,10 @@ impl<'it, T> AsIterMut<'it> for OwnedMapObserver<T>
 where
     T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
 {
-    type Item = T;
-    type IntoIter = IterMut<'it, T>;
+    type RefMut = &'it mut T;
+    type IntoIterMut = IterMut<'it, T>;
 
-    fn as_iter_mut(&'it mut self) -> Self::IntoIter {
+    fn as_iter_mut(&'it mut self) -> Self::IntoIterMut {
         self.as_slice_mut().iter_mut()
     }
 }

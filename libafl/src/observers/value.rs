@@ -9,7 +9,7 @@ use core::{
 };
 
 use ahash::RandomState;
-use libafl_bolts::{ownedref::OwnedRef, AsIter, Named};
+use libafl_bolts::{ownedref::OwnedRef, AsIter, AsIterMut, Named};
 use serde::{Deserialize, Serialize};
 
 use super::Observer;
@@ -225,6 +225,47 @@ impl<'it, T: 'it> Iterator for RefCellValueObserverIter<'it, T> {
         let (next, remainder) = Ref::map_split(cloned, |v| (&v[0], &v[1..]));
         self.v = remainder;
         Some(next)
+    }
+}
+
+/// [`Iterator`] over [`RefCellValueObserver`] of a [`DerefMut`] to `[T]`.
+#[derive(Debug)]
+pub struct RefCellValueObserverIterMut<'it, T> {
+    v: Option<RefMut<'it, [T]>>,
+}
+
+impl<'it, T: 'it, A: Debug + DerefMut<Target = [T]> + Serialize> AsIterMut<'it>
+    for RefCellValueObserver<'_, A>
+{
+    type RefMut = RefMut<'it, T>;
+    type IntoIterMut = RefCellValueObserverIterMut<'it, T>;
+
+    fn as_iter_mut(&'it mut self) -> Self::IntoIterMut {
+        Self::IntoIterMut {
+            v: Some(RefMut::map(
+                self.value.as_ref().borrow_mut(),
+                DerefMut::deref_mut,
+            )),
+        }
+    }
+}
+
+impl<'it, T: 'it> Iterator for RefCellValueObserverIterMut<'it, T> {
+    type Item = RefMut<'it, T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(v) = self.v.take() {
+            let next_slice = if v.len() > 1 {
+                let (next, remainder) = RefMut::map_split(v, |v| v.split_at_mut(1));
+                self.v = Some(remainder);
+                next
+            } else {
+                v
+            };
+            Some(RefMut::map(next_slice, |v| &mut v[0]))
+        } else {
+            None
+        }
     }
 }
 
