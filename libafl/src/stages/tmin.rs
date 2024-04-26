@@ -248,6 +248,14 @@ where
     IP: MutatedTransformPost<CS::State> + Clone,
     I: MutatedTransform<CS::Input, CS::State, Post = IP> + Clone,
 {
+    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        self.restart_helper.restart_progress_should_run(state)
+    }
+
+    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        self.restart_helper.clear_restart_progress(state)
+    }
+
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -261,14 +269,6 @@ where
         state.introspection_monitor_mut().finish_stage();
 
         Ok(())
-    }
-
-    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        self.restart_helper.restart_progress_should_run(state)
-    }
-
-    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        self.restart_helper.clear_restart_progress(state)
     }
 }
 
@@ -426,13 +426,18 @@ impl<C, M, S> HasObserverReference for MapEqualityFactory<C, M, S> {
     }
 }
 
-impl<C, M, S> FeedbackFactory<MapEqualityFeedback<C, M, S>, S, C> for MapEqualityFactory<C, M, S>
+impl<C, M, OT, S> FeedbackFactory<MapEqualityFeedback<C, M, S>, S, OT>
+    for MapEqualityFactory<C, M, S>
 where
     M: MapObserver,
     C: AsRef<M> + Referenceable,
+    OT: ObserversTuple<S>,
     S: State + Debug,
 {
-    fn create_feedback(&self, obs: &C) -> MapEqualityFeedback<C, M, S> {
+    fn create_feedback(&self, observers: &OT) -> MapEqualityFeedback<C, M, S> {
+        let obs = observers
+            .get(self.observer_ref())
+            .expect("Should have been provided valid observer name.");
         MapEqualityFeedback {
             name: Cow::from("MapEq"),
             map_ref: obs.type_ref(),
