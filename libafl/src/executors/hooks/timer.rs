@@ -338,8 +338,7 @@ impl TimerStruct {
                         self.executions = 0;
                     }
                     // readjust K
-                    if elapsed_since_signal > self.exec_tmout * self.avg_mul_k
-                        && self.avg_mul_k > 1
+                    if elapsed_since_signal > self.exec_tmout * self.avg_mul_k && self.avg_mul_k > 1
                     {
                         self.avg_mul_k -= 1;
                     }
