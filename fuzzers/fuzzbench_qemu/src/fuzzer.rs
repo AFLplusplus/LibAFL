@@ -65,7 +65,7 @@ use libafl_qemu::{
     Regs,
 };
 #[cfg(unix)]
-use nix::{self, unistd::dup};
+use nix::unistd::dup;
 
 pub const MAX_INPUT_SIZE: usize = 1048576; // 1MB
 
