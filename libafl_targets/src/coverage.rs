@@ -1,7 +1,5 @@
 //! Coverage maps as static mut array
 
-use alloc::borrow::Cow;
-
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl::{mutators::Tokens, Error};
 
@@ -64,6 +62,12 @@ pub fn autotokens() -> Result<Tokens, Error> {
 #[no_mangle]
 pub static mut __afl_map_size: usize = EDGES_MAP_SIZE_IN_USE;
 pub use __afl_map_size as EDGES_MAP_PTR_NUM;
+#[cfg(any(
+    feature = "sancov_pcguard_edges",
+    feature = "sancov_pcguard_hitcounts",
+    feature = "sancov_ngram4",
+    feature = "sancov_ctx"
+))]
 use libafl::observers::StdMapObserver;
 use libafl_bolts::ownedref::OwnedMutSlice;
 
