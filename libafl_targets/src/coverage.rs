@@ -1,5 +1,13 @@
 //! Coverage maps as static mut array
 
+#[cfg(any(
+    feature = "sancov_pcguard_edges",
+    feature = "sancov_pcguard_hitcounts",
+    feature = "sancov_ngram4",
+    feature = "sancov_ctx"
+))]
+use alloc::borrow::Cow;
+
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl::{mutators::Tokens, Error};
 
