@@ -35,7 +35,7 @@ use libafl_bolts::{
 #[cfg(unix)]
 use libafl_frida::asan::{
     asan_rt::AsanRuntime,
-    errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS},
+    errors::{AsanErrorsFeedback, AsanErrorsObserver},
 };
 use libafl_frida::{
     cmplog_rt::CmpLogRuntime,
@@ -123,6 +123,8 @@ unsafe fn fuzz(
 
                 // Create an observation channel to keep track of the execution time
                 let time_observer = TimeObserver::new("time");
+                #[cfg(unix)]
+                let asan_observer = AsanErrorsObserver::from_static_asan_errors();
 
                 // Feedback to rate the interestingness of an input
                 // This one is composed by two Feedbacks in OR
@@ -139,7 +141,10 @@ unsafe fn fuzz(
                     CrashFeedback::new(),
                     TimeoutFeedback::new(),
                     // true enables the AsanErrorFeedback
-                    feedback_and_fast!(ConstFeedback::from(true), AsanErrorsFeedback::new())
+                    feedback_and_fast!(
+                        ConstFeedback::from(true),
+                        AsanErrorsFeedback::new(&asan_observer)
+                    )
                 );
                 #[cfg(windows)]
                 let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
@@ -185,9 +190,7 @@ unsafe fn fuzz(
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
                 #[cfg(unix)]
-                let observers = tuple_list!(edges_observer, time_observer, unsafe {
-                    AsanErrorsObserver::from_static_asan_errors()
-                });
+                let observers = tuple_list!(edges_observer, time_observer, asan_observer);
                 #[cfg(windows)]
                 let observers = tuple_list!(edges_observer, time_observer);
 
@@ -240,6 +243,8 @@ unsafe fn fuzz(
 
                 // Create an observation channel to keep track of the execution time
                 let time_observer = TimeObserver::new("time");
+                #[cfg(unix)]
+                let asan_observer = AsanErrorsObserver::from_static_asan_errors();
 
                 // Feedback to rate the interestingness of an input
                 // This one is composed by two Feedbacks in OR
@@ -254,7 +259,10 @@ unsafe fn fuzz(
                 let mut objective = feedback_or_fast!(
                     CrashFeedback::new(),
                     TimeoutFeedback::new(),
-                    feedback_and_fast!(ConstFeedback::from(false), AsanErrorsFeedback::new())
+                    feedback_and_fast!(
+                        ConstFeedback::from(false),
+                        AsanErrorsFeedback::new(&asan_observer)
+                    )
                 );
                 #[cfg(windows)]
                 let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
@@ -300,11 +308,9 @@ unsafe fn fuzz(
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
                 #[cfg(unix)]
-                let observers = tuple_list!(edges_observer, time_observer, unsafe {
-                    AsanErrorsObserver::from_static_asan_errors()
-                });
+                let observers = tuple_list!(edges_observer, time_observer, asan_observer);
                 #[cfg(windows)]
-                let observers = tuple_list!(edges_observer, time_observer,);
+                let observers = tuple_list!(edges_observer, time_observer);
 
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
@@ -370,6 +376,8 @@ unsafe fn fuzz(
 
                 // Create an observation channel to keep track of the execution time
                 let time_observer = TimeObserver::new("time");
+                #[cfg(unix)]
+                let asan_observer = AsanErrorsObserver::from_static_asan_errors();
 
                 // Feedback to rate the interestingness of an input
                 // This one is composed by two Feedbacks in OR
@@ -384,7 +392,10 @@ unsafe fn fuzz(
                 let mut objective = feedback_or_fast!(
                     CrashFeedback::new(),
                     TimeoutFeedback::new(),
-                    feedback_and_fast!(ConstFeedback::from(false), AsanErrorsFeedback::new())
+                    feedback_and_fast!(
+                        ConstFeedback::from(false),
+                        AsanErrorsFeedback::new(&asan_observer)
+                    )
                 );
                 #[cfg(windows)]
                 let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
@@ -430,11 +441,9 @@ unsafe fn fuzz(
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
                 #[cfg(unix)]
-                let observers = tuple_list!(edges_observer, time_observer, unsafe {
-                    AsanErrorsObserver::from_static_asan_errors()
-                });
+                let observers = tuple_list!(edges_observer, time_observer, asan_observer);
                 #[cfg(windows)]
-                let observers = tuple_list!(edges_observer, time_observer,);
+                let observers = tuple_list!(edges_observer, time_observer);
 
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
