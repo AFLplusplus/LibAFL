@@ -19,6 +19,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 default = ["fork", "build_libgasan", "build_libqasan", "serdeany_autoreg", "injections"]
 clippy = [] # special feature for clippy, don't use in normal projects§
 document-features = ["dep:document-features"]
+paranoid_debug = ["libafl_qemu_sys/paranoid_debug"] # Will perform as many checks as possible. The target will be greatly slowed down.
 
 #! # Feature Flags
 #! ### General Features
@@ -91,6 +92,7 @@ toml = { version = "0.4.2", optional = true } # For parsing the injections toml 
 pyo3 = { version = "0.18", optional = true }
 # Document all features of this crate (for `cargo doc`)
 document-features = { version = "0.2", optional = true }
+device_query = "2.0"
 
 [build-dependencies]
 pyo3-build-config = { version = "0.18", optional = true }

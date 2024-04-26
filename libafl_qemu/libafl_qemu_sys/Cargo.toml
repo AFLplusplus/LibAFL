@@ -38,6 +38,8 @@ shared = [ "libafl_qemu_build/shared" ]
 
 clippy = [ "libafl_qemu_build/clippy" ] # special feature for clippy, don't use in normal projects
 
+paranoid_debug = ["libafl_qemu_build/paranoid_debug"] # Will perform as many checks as possible. The target will be greatly slowed down.
+
 [dependencies]
 paste = "1"
 num_enum = "0.7"

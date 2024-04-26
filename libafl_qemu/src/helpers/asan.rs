@@ -461,7 +461,7 @@ impl AsanGiovese {
 
     pub fn report_or_crash(&mut self, qemu: Qemu, pc: GuestAddr, error: AsanError) {
         if let Some(mut cb) = self.error_callback.take() {
-            (cb)(self, qemu, pc, error);
+            cb(self, qemu, pc, error);
             self.error_callback = Some(cb);
         } else {
             std::process::abort();
@@ -470,7 +470,7 @@ impl AsanGiovese {
 
     pub fn report(&mut self, qemu: Qemu, pc: GuestAddr, error: AsanError) {
         if let Some(mut cb) = self.error_callback.take() {
-            (cb)(self, qemu, pc, error);
+            cb(self, qemu, pc, error);
             self.error_callback = Some(cb);
         }
     }
