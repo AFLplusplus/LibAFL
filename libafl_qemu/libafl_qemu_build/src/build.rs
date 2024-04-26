@@ -2,8 +2,8 @@ use std::{
     env, fs,
     path::{Path, PathBuf},
     process::Command,
+    str::FromStr,
 };
-use std::str::FromStr;
 
 use which::which;
 
@@ -75,7 +75,10 @@ fn configure_qemu(
     let linker_interceptor_plus_plus = qemu_path.join("linker_interceptor++.py");
 
     println!("cargo:rerun-if-changed={}", linker_interceptor.display());
-    println!("cargo:rerun-if-changed={}", linker_interceptor_plus_plus.display());
+    println!(
+        "cargo:rerun-if-changed={}",
+        linker_interceptor_plus_plus.display()
+    );
 
     // Set common options for usermode and systemmode
     cmd.current_dir(qemu_path)
@@ -83,12 +86,8 @@ fn configure_qemu(
         .env("__LIBAFL_QEMU_BUILD_OUT", build_dir.join("linkinfo.json"))
         .env("__LIBAFL_QEMU_BUILD_CC", cc_compiler.path())
         .env("__LIBAFL_QEMU_BUILD_CXX", cpp_compiler.path())
-        .arg(&format!(
-            "--cc={}", linker_interceptor.display()
-        ))
-        .arg(&format!(
-            "--cxx={}", linker_interceptor_plus_plus.display()
-        ))
+        .arg(&format!("--cc={}", linker_interceptor.display()))
+        .arg(&format!("--cxx={}", linker_interceptor_plus_plus.display()))
         .arg("--as-shared-lib")
         .arg(&format!("--target-list={cpu_target}-{target_suffix}"))
         // .arg("--disable-capstone")
@@ -636,7 +635,6 @@ pub fn build(
             cargo_add_rpath(&val);
         }
     }
-
 
     if cfg!(feature = "paranoid_debug") {
         println!("cargo:rustc-link-lib=ubsan");

@@ -1,14 +1,14 @@
 use std::{
     cell::UnsafeCell,
     collections::{HashMap, HashSet},
+    mem::MaybeUninit,
     sync::Mutex,
+    thread::sleep,
+    time::Duration,
 };
-use std::mem::MaybeUninit;
-use std::thread::sleep;
-use std::time::Duration;
+
 use addr2line::fallible_iterator::FallibleIterator;
 use device_query::{DeviceQuery, DeviceState, Keycode};
-
 use libafl::{inputs::UsesInput, HasMetadata};
 use libafl_qemu_sys::{GuestAddr, MmapPerms};
 use meminterval::{Interval, IntervalTree};
@@ -219,9 +219,9 @@ impl QemuSnapshotHelper {
 
     pub fn check_snapshot(&self, qemu: Qemu) {
         let mut saved_pages_list = self.pages.clone();
-        
+
         log::info!("Checking snapshot correctness");
-        
+
         let mut perm_errors: Vec<(GuestAddr, MmapPerms, MmapPerms)> = Vec::new();
         let mut content_mismatch = false;
 
@@ -231,27 +231,52 @@ impl QemuSnapshotHelper {
             while addr < map.end() {
                 if let Some(saved_page) = saved_pages_list.remove(&addr) {
                     if saved_page.perms.readable() {
-                        let mut current_page_content: MaybeUninit<[u8; SNAPSHOT_PAGE_SIZE]> = unsafe { MaybeUninit::uninit() };
+                        let mut current_page_content: MaybeUninit<[u8; SNAPSHOT_PAGE_SIZE]> =
+                            unsafe { MaybeUninit::uninit() };
 
                         if saved_page.perms != map.flags() {
                             perm_errors.push((addr, saved_page.perms, map.flags()));
-                            log::warn!("\t0x{:x}: Flags do not match: saved is {:?} and current is {:?}", addr, saved_page.perms, map.flags());
+                            log::warn!(
+                                "\t0x{:x}: Flags do not match: saved is {:?} and current is {:?}",
+                                addr,
+                                saved_page.perms,
+                                map.flags()
+                            );
                         }
 
                         unsafe {
-                            qemu.read_mem(addr, current_page_content.as_mut_ptr().as_mut().unwrap());
+                            qemu.read_mem(
+                                addr,
+                                current_page_content.as_mut_ptr().as_mut().unwrap(),
+                            );
                         }
 
-                        let current_page_content: &mut [u8; SNAPSHOT_PAGE_SIZE] = unsafe { &mut current_page_content.assume_init() };
+                        let current_page_content: &mut [u8; SNAPSHOT_PAGE_SIZE] =
+                            unsafe { &mut current_page_content.assume_init() };
 
-                        if saved_page.data.as_ref().unwrap().as_ref() != current_page_content.as_ref() {
+                        if saved_page.data.as_ref().unwrap().as_ref()
+                            != current_page_content.as_ref()
+                        {
                             let mut offsets = Vec::new();
-                            for (i, (saved_page_byte, current_page_byte)) in saved_page.data.unwrap().iter().zip(current_page_content.iter()).enumerate() {
+                            for (i, (saved_page_byte, current_page_byte)) in saved_page
+                                .data
+                                .unwrap()
+                                .iter()
+                                .zip(current_page_content.iter())
+                                .enumerate()
+                            {
                                 if saved_page_byte != current_page_byte {
                                     offsets.push(i);
                                 }
                             }
-                            log::warn!("Faulty restore at {}", offsets.iter().fold(String::new(), |acc, offset| format!("{}, 0x{:x}", acc, addr + offset.clone() as u64)));
+                            log::warn!(
+                                "Faulty restore at {}",
+                                offsets.iter().fold(String::new(), |acc, offset| format!(
+                                    "{}, 0x{:x}",
+                                    acc,
+                                    addr + offset.clone() as u64
+                                ))
+                            );
                             content_mismatch = true;
                         }
                     }
@@ -264,13 +289,17 @@ impl QemuSnapshotHelper {
         }
 
         assert!(saved_pages_list.is_empty());
-        
+
         if !perm_errors.is_empty() {
-            let mut perm_error_ranges: Vec<(GuestAddr, GuestAddr, MmapPerms, MmapPerms)> = Vec::new();
-            
+            let mut perm_error_ranges: Vec<(GuestAddr, GuestAddr, MmapPerms, MmapPerms)> =
+                Vec::new();
+
             for error in perm_errors {
                 if let Some(last_range) = perm_error_ranges.last_mut() {
-                    if last_range.1 + SNAPSHOT_PAGE_SIZE as GuestAddr == error.0 as GuestAddr && error.1 == last_range.2 && error.2 == last_range.3 {
+                    if last_range.1 + SNAPSHOT_PAGE_SIZE as GuestAddr == error.0 as GuestAddr
+                        && error.1 == last_range.2
+                        && error.2 == last_range.3
+                    {
                         last_range.1 += SNAPSHOT_PAGE_SIZE as GuestAddr;
                     } else {
                         perm_error_ranges.push((error.0, error.0, error.1, error.2));
@@ -279,18 +308,24 @@ impl QemuSnapshotHelper {
                     perm_error_ranges.push((error.0, error.0, error.1, error.2));
                 }
             }
-            
+
             for error_range in perm_error_ranges {
-                log::error!("0x{:x} -> 0x{:x}: saved is {:?} but current is {:?}", error_range.0, error_range.1, error_range.2, error_range.3);
+                log::error!(
+                    "0x{:x} -> 0x{:x}: saved is {:?} but current is {:?}",
+                    error_range.0,
+                    error_range.1,
+                    error_range.2,
+                    error_range.3
+                );
             }
-            
+
             content_mismatch = true;
         }
-        
+
         if content_mismatch {
             panic!("Error found, stopping...")
         }
-        
+
         log::info!("Snapshot check OK");
     }
 
