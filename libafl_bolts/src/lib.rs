@@ -213,6 +213,7 @@ use core::{
     array::TryFromSliceError,
     fmt::{self, Display},
     num::{ParseIntError, TryFromIntError},
+    ops::Deref,
     time,
 };
 #[cfg(feature = "std")]
@@ -743,8 +744,10 @@ impl<T> AsSliceMut for [T] {
 pub trait AsIter<'it> {
     /// The item type
     type Item: 'it;
+    /// The ref type
+    type Ref: Deref<Target = Self::Item>;
     /// The iterator type
-    type IntoIter: Iterator<Item = &'it Self::Item>;
+    type IntoIter: Iterator<Item = Self::Ref>;
 
     /// Create an iterator from &self
     fn as_iter(&'it self) -> Self::IntoIter;

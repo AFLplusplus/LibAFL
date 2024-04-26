@@ -598,6 +598,7 @@ where
         + Debug,
 {
     type Item = T;
+    type Ref = &'it T;
     type IntoIter = Iter<'it, T>;
 
     fn as_iter(&'it self) -> Self::IntoIter {
@@ -1127,6 +1128,7 @@ where
         + Debug,
 {
     type Item = T;
+    type Ref = &'it Self::Item;
     type IntoIter = Iter<'it, T>;
 
     fn as_iter(&'it self) -> Self::IntoIter {
@@ -1474,6 +1476,7 @@ where
         + Bounded,
 {
     type Item = T;
+    type Ref = &'it Self::Item;
     type IntoIter = Iter<'it, T>;
 
     fn as_iter(&'it self) -> Self::IntoIter {
@@ -1988,6 +1991,7 @@ where
     M: Named + Serialize + serde::de::DeserializeOwned + AsIter<'it, Item = u8>,
 {
     type Item = u8;
+    type Ref = <M as AsIter<'it>>::Ref;
     type IntoIter = <M as AsIter<'it>>::IntoIter;
 
     fn as_iter(&'it self) -> Self::IntoIter {
@@ -2259,6 +2263,7 @@ where
     M: Named + Serialize + serde::de::DeserializeOwned + AsIter<'it, Item = u8>,
 {
     type Item = u8;
+    type Ref = <M as AsIter<'it>>::Ref;
     type IntoIter = <M as AsIter<'it>>::IntoIter;
 
     fn as_iter(&'it self) -> Self::IntoIter {
@@ -2611,6 +2616,7 @@ where
     'a: 'it,
 {
     type Item = T;
+    type Ref = &'it T;
     type IntoIter = Flatten<Iter<'it, OwnedMutSlice<'a, T>>>;
 
     fn as_iter(&'it self) -> Self::IntoIter {
@@ -2732,6 +2738,7 @@ where
     T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
 {
     type Item = T;
+    type Ref = &'it T;
     type IntoIter = Iter<'it, T>;
 
     fn as_iter(&'it self) -> Self::IntoIter {

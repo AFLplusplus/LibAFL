@@ -322,6 +322,7 @@ mod observers {
 
     impl<'it, const DIFFERENTIAL: bool> AsIter<'it> for CountersMultiMapObserver<DIFFERENTIAL> {
         type Item = u8;
+        type Ref = &'it Self::Item;
         type IntoIter = Flatten<Iter<'it, OwnedMutSlice<'static, u8>>>;
 
         fn as_iter(&'it self) -> Self::IntoIter {

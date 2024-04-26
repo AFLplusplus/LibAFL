@@ -484,7 +484,7 @@ where
 
             for (i, value) in observer
                 .as_iter()
-                .copied()
+                .map(|x| *x)
                 .enumerate()
                 .filter(|(_, value)| *value != initial)
             {
@@ -499,7 +499,7 @@ where
         } else {
             for (i, value) in observer
                 .as_iter()
-                .copied()
+                .map(|x| *x)
                 .enumerate()
                 .filter(|(_, value)| *value != initial)
             {
@@ -771,7 +771,7 @@ where
             novelties.clear();
             for (i, item) in observer
                 .as_iter()
-                .copied()
+                .map(|x| *x)
                 .enumerate()
                 .filter(|(_, item)| *item != initial)
             {
@@ -785,7 +785,7 @@ where
         } else {
             for (i, item) in observer
                 .as_iter()
-                .copied()
+                .map(|x| *x)
                 .enumerate()
                 .filter(|(_, item)| *item != initial)
             {

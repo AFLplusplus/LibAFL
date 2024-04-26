@@ -148,7 +148,7 @@ where
         let value = *self.value_observer.value();
         self.inner
             .as_iter()
-            .map(|&e| if e == initial { default } else { value })
+            .map(|e| if *e == initial { default } else { value })
             .collect()
     }
 
@@ -225,6 +225,7 @@ where
     O: ValueObserver + 'it,
 {
     type Item = O::ValueType;
+    type Ref = <M as AsIter<'it>>::Ref;
     type IntoIter = MappedEdgeMapIter<'it, <M as AsIter<'it>>::IntoIter, O, M::Entry>;
 
     fn as_iter(&'it self) -> Self::IntoIter {

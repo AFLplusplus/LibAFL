@@ -9,7 +9,7 @@ use core::{
 };
 
 use ahash::RandomState;
-use libafl_bolts::{ownedref::OwnedRef, Named};
+use libafl_bolts::{ownedref::OwnedRef, AsIter, Named};
 use serde::{Deserialize, Serialize};
 
 use super::Observer;
@@ -178,5 +178,39 @@ where
 {
     fn hash(&self) -> Option<u64> {
         Some(RandomState::with_seeds(1, 2, 3, 4).hash_one(&*self.value.as_ref().borrow()))
+    }
+}
+
+/// [`Iterator`] over [`RefCellValueObserver`] of a [`Deref`] to `[T]`.
+#[derive(Debug)]
+pub struct RefCellValueObserverIter<'it, T> {
+    v: Ref<'it, [T]>,
+}
+
+impl<'it, T: 'it, A: Debug + Deref<Target = [T]> + Serialize> AsIter<'it>
+    for RefCellValueObserver<'_, A>
+{
+    type Item = T;
+    type Ref = Ref<'it, Self::Item>;
+    type IntoIter = RefCellValueObserverIter<'it, T>;
+
+    fn as_iter(&'it self) -> Self::IntoIter {
+        Self::IntoIter {
+            v: Ref::map(self.value.as_ref().borrow(), Deref::deref),
+        }
+    }
+}
+
+impl<'it, T: 'it> Iterator for RefCellValueObserverIter<'it, T> {
+    type Item = Ref<'it, T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.v.is_empty() {
+            return None;
+        }
+        let cloned = Ref::clone(&self.v);
+        let (next, remainder) = Ref::map_split(cloned, |v| (&v[0], &v[1..]));
+        self.v = remainder;
+        Some(next)
     }
 }

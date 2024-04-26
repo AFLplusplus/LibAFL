@@ -168,7 +168,7 @@ where
 
             // Store coverage, mapping coverage map indices to hit counts (if present) and the
             // associated seeds for the map indices with those hit counts.
-            for (i, e) in obs.as_iter().copied().enumerate() {
+            for (i, e) in obs.as_iter().map(|x| *x).enumerate() {
                 if e != obs.initial() {
                     cov_map
                         .entry(i)
