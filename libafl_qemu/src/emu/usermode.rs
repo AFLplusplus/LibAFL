@@ -56,10 +56,12 @@ impl Iterator for GuestMaps {
 
             self.maps_node = libafl_maps_next(self.maps_node, ret.as_mut_ptr());
 
-            if self.maps_node.is_null() {
-                None
+            let ret = ret.assume_init();
+
+            if ret.is_valid {
+                Some(ret.into())
             } else {
-                Some(ret.assume_init().into())
+                None
             }
         }
     }
