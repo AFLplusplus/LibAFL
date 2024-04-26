@@ -22,7 +22,7 @@ use libafl::{
 use crate::executor::inproc_qemu_crash_handler;
 #[cfg(emulation_mode = "systemmode")]
 use crate::executor::{inproc_qemu_timeout_handler, BREAK_ON_TMOUT};
-use crate::{executor::QemuExecutorState, helper::QemuHelperTuple, hooks::QemuHooks, Qemu};
+use crate::{executor::QemuExecutorState, helpers::QemuHelperTuple, hooks::QemuHooks, Qemu};
 
 pub struct StatefulQemuExecutor<'a, H, OT, QT, S>
 where

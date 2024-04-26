@@ -8,7 +8,7 @@ use rangemap::RangeMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    helper::{
+    helpers::{
         HasInstrumentationFilter, IsFilter, QemuHelper, QemuHelperTuple,
         QemuInstrumentationAddressRangeFilter,
     },
