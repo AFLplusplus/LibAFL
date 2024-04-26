@@ -410,7 +410,7 @@ where
     C: AsRef<M> + Referenceable,
 {
     /// Creates a new map equality feedback for the given observer
-    pub fn with_observer(obs: &C) -> Self {
+    pub fn new(obs: &C) -> Self {
         Self {
             map_ref: obs.type_ref(),
             phantom: PhantomData,
