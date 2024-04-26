@@ -1,11 +1,11 @@
 //! A simple observer with a single value.
 
-use alloc::{borrow::Cow, boxed::Box};
+use alloc::{borrow::Cow, boxed::Box, vec::Vec};
 use core::{
     cell::{Ref, RefCell, RefMut},
     fmt::Debug,
-    hash::Hash,
-    ops::Deref,
+    hash::{Hash, Hasher},
+    ops::{Deref, DerefMut},
 };
 
 use ahash::RandomState;
@@ -225,5 +225,138 @@ impl<'it, T: 'it> Iterator for RefCellValueObserverIter<'it, T> {
         let (next, remainder) = Ref::map_split(cloned, |v| (&v[0], &v[1..]));
         self.v = remainder;
         Some(next)
+    }
+}
+
+impl<'a, T: Hash, A> Hash for RefCellValueObserver<'a, A>
+where
+    T: Debug,
+    A: Debug + Deref<Target = [T]> + Serialize + serde::de::DeserializeOwned,
+{
+    /// Panics if the contained value is already mutably borrowed (calls
+    /// [`RefCell::borrow`]).
+    #[inline]
+    fn hash<H: Hasher>(&self, hasher: &mut H) {
+        (*self.get_ref()).hash(hasher);
+    }
+}
+
+/// Panics if the contained value is already mutably borrowed (calls
+/// [`RefCell::borrow`]).
+impl<T, A> libafl_bolts::HasLen for RefCellValueObserver<'_, A>
+where
+    T: Debug,
+    A: Debug + Deref<Target = [T]> + Serialize + serde::de::DeserializeOwned,
+{
+    /// Panics if the contained value is already mutably borrowed (calls
+    /// [`RefCell::borrow`]).
+    fn len(&self) -> usize {
+        self.get_ref().len()
+    }
+
+    /// Panics if the contained value is already mutably borrowed (calls
+    /// [`RefCell::borrow`]).
+    fn is_empty(&self) -> bool {
+        self.get_ref().is_empty()
+    }
+}
+
+impl<T: Debug + Serialize + serde::de::DeserializeOwned> AsMut<Self>
+    for RefCellValueObserver<'_, T>
+{
+    fn as_mut(&mut self) -> &mut Self {
+        self
+    }
+}
+
+impl<T: Debug + Serialize + serde::de::DeserializeOwned> AsRef<Self>
+    for RefCellValueObserver<'_, T>
+{
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
+impl<T, A> crate::observers::MapObserver for RefCellValueObserver<'_, A>
+where
+    T: Copy + Debug + Default + Eq + Hash + num_traits::bounds::Bounded + 'static,
+    A: Debug
+        + Default
+        + Deref<Target = [T]>
+        + DerefMut<Target = [T]>
+        + serde::de::DeserializeOwned
+        + Serialize
+        + 'static,
+{
+    type Entry = T;
+
+    /// Panics if the contained value is already mutably borrowed (calls
+    /// [`RefCell::borrow`]).
+    fn get(&self, idx: usize) -> Self::Entry {
+        self.get_ref()[idx]
+    }
+
+    /// Panics if the contained value is already borrowed (calls
+    /// [`RefCell::borrow_mut`]).
+    fn set(&mut self, idx: usize, val: Self::Entry) {
+        self.get_ref_mut()[idx] = val;
+    }
+
+    /// Panics if the contained value is already mutably borrowed (calls
+    /// [`RefCell::borrow`]).
+    fn hash_simple(&self) -> u64 {
+        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
+    }
+
+    /// Panics if the contained value is already mutably borrowed (calls
+    /// [`RefCell::borrow`]).
+    fn usable_count(&self) -> usize {
+        self.get_ref().len()
+    }
+
+    /// Panics if the contained value is already mutably borrowed (calls
+    /// [`RefCell::borrow`]).
+    fn count_bytes(&self) -> u64 {
+        let default = Self::Entry::default();
+        let mut count = 0;
+        for entry in self.get_ref().iter() {
+            if entry != &default {
+                count += 1;
+            }
+        }
+        count
+    }
+
+    /// Panics if the contained value is already borrowed (calls
+    /// [`RefCell::borrow_mut`]).
+    fn reset_map(&mut self) -> Result<(), Error> {
+        // This is less than optimal for `Vec`, for which we could use
+        // `.clear()`. However, it makes the `impl` more general. Worth it?
+        *self.get_ref_mut() = A::default();
+        Ok(())
+    }
+
+    /// Panics if the contained value is already mutably borrowed (calls
+    /// [`RefCell::borrow`]).
+    fn to_vec(&self) -> Vec<Self::Entry> {
+        (*self.get_ref()).to_vec()
+    }
+
+    /// Panics if the contained value is already mutably borrowed (calls
+    /// [`RefCell::borrow`]).
+    fn how_many_set(&self, indexes: &[usize]) -> usize {
+        let default = Self::Entry::default();
+        let mut count = 0;
+        let arr = self.get_ref();
+        for idx in indexes {
+            if arr[*idx] != default {
+                count += 1;
+            }
+        }
+        count
+    }
+
+    fn initial(&self) -> Self::Entry {
+        Self::Entry::default()
     }
 }
