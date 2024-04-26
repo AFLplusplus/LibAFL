@@ -130,16 +130,12 @@ pub fn edges_map_mut_ptr() -> *mut u8 {
 
 /// Gets the current maximum number of edges tracked.
 #[must_use]
+#[cfg(not(feature = "pointer_maps"))]
 pub fn edges_max_num() -> usize {
     unsafe {
         if MAX_EDGES_NUM > 0 {
             MAX_EDGES_NUM
         } else {
-            #[cfg(feature = "pointer_maps")]
-            {
-                EDGES_MAP_PTR_NUM
-            }
-            #[cfg(not(feature = "pointer_maps"))]
             {
                 EDGES_MAP.len()
             }
