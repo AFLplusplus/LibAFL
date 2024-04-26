@@ -65,10 +65,7 @@ struct cmp_map {
 
 /// A [`CmpObserver`] observer for AFL++ redqueen
 #[derive(Serialize, Deserialize, Debug)]
-pub struct AFLppCmpLogObserver<'a, S>
-where
-    S: UsesInput + HasMetadata,
-{
+pub struct AFLppCmpLogObserver<'a, S> {
     cmp_map: OwnedRefMut<'a, AFLppCmpLogMap>,
     size: Option<OwnedRefMut<'a, usize>>,
     name: Cow<'static, str>,
@@ -80,7 +77,7 @@ where
 impl<'a, S> CmpObserver<'a, AFLppCmpLogMap, S, AFLppCmpValuesMetadata>
     for AFLppCmpLogObserver<'a, S>
 where
-    S: UsesInput + Debug + HasMetadata,
+    S: UsesInput + HasMetadata,
 {
     /// Get the number of usable cmps (all by default)
     fn usable_count(&self) -> usize {
@@ -142,7 +139,7 @@ where
 
 impl<'a, S> Observer<S> for AFLppCmpLogObserver<'a, S>
 where
-    S: UsesInput + Debug + HasMetadata,
+    S: UsesInput + HasMetadata,
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         #[cfg(feature = "cmplog_extended_instrumentation")]
@@ -176,19 +173,13 @@ where
     }
 }
 
-impl<'a, S> Named for AFLppCmpLogObserver<'a, S>
-where
-    S: UsesInput + HasMetadata,
-{
+impl<'a, S> Named for AFLppCmpLogObserver<'a, S> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<'a, S> AFLppCmpLogObserver<'a, S>
-where
-    S: UsesInput + HasMetadata,
-{
+impl<'a, S> AFLppCmpLogObserver<'a, S> {
     /// Creates a new [`AFLppCmpLogObserver`] with the given name and map.
     #[must_use]
     pub fn new(

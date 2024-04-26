@@ -32,7 +32,7 @@ use libafl_bolts::{
     current_nanos,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, Merge},
+    tuples::{tuple_list, Merge, Referenceable},
     AsSlice,
 };
 pub use libafl_qemu::emu::Qemu;
@@ -146,9 +146,15 @@ where
 
         let monitor = MultiMonitor::new(|s| log::info!("{s}"));
 
+        // Create an observation channel to keep track of the execution time
+        let time_observer = TimeObserver::new("time");
+        let time_ref = time_observer.type_ref();
+
         let mut run_client = |state: Option<_>,
                               mut mgr: LlmpRestartingEventManager<_, _, _>,
                               _core_id| {
+            let time_observer = time_observer.clone();
+
             // Create an observation channel using the coverage map
             let edges_observer = unsafe {
                 HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
@@ -158,9 +164,6 @@ where
                 ))
                 .track_indices()
             };
-
-            // Create an observation channel to keep track of the execution time
-            let time_observer = TimeObserver::new("time");
 
             // Keep tracks of CMPs
             let cmplog_observer = CmpLogObserver::new("cmplog", true);
@@ -433,9 +436,11 @@ where
             .run_client(&mut run_client)
             .cores(self.cores)
             .broker_port(self.broker_port)
-            .remote_broker_addr(self.remote_broker_addr);
+            .remote_broker_addr(self.remote_broker_addr)
+            .time_ref(time_ref);
         #[cfg(unix)]
         let launcher = launcher.stdout_file(Some("/dev/null"));
+
         launcher.build().launch().expect("Launcher failed");
     }
 }

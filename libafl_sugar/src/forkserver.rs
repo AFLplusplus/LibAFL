@@ -26,7 +26,7 @@ use libafl_bolts::{
     current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, Merge},
+    tuples::{tuple_list, Merge, Referenceable},
     AsSliceMut,
 };
 use typed_builder::TypedBuilder;
@@ -114,9 +114,15 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
 
         let monitor = MultiMonitor::new(|s| log::info!("{s}"));
 
+        // Create an observation channel to keep track of the execution time
+        let time_observer = TimeObserver::new("time");
+        let time_ref = time_observer.type_ref();
+
         let mut run_client = |state: Option<_>,
                               mut mgr: LlmpRestartingEventManager<_, _, _>,
                               _core_id| {
+            let time_observer = time_observer.clone();
+
             // Coverage map shared between target and fuzzer
             let mut shmem = shmem_provider_client.new_shmem(MAP_SIZE).unwrap();
             shmem.write_to_env("__AFL_SHM_ID").unwrap();
@@ -130,9 +136,6 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
                 HitcountsMapObserver::new(StdMapObserver::new("shared_mem", shmem_map))
                     .track_indices()
             };
-
-            // Create an observation channel to keep track of the execution time
-            let time_observer = TimeObserver::new("time");
 
             // Feedback to rate the interestingness of an input
             // This one is composed by two Feedbacks in OR
@@ -292,7 +295,8 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
             .run_client(&mut run_client)
             .cores(self.cores)
             .broker_port(self.broker_port)
-            .remote_broker_addr(self.remote_broker_addr);
+            .remote_broker_addr(self.remote_broker_addr)
+            .time_ref(time_ref);
         #[cfg(unix)]
         let launcher = launcher.stdout_file(Some("/dev/null"));
         match launcher.build().launch() {

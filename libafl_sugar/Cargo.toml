@@ -17,7 +17,7 @@ all-features = true
 
 [features]
 python = ["pyo3", "libafl_qemu/python", "pyo3-build-config"]
-default = []
+default = ["libafl/adaptive_serialization"]
 
 # for libafl_qemu
 # The following architecture features are mutually exclusive.
