@@ -24,7 +24,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{unix_shmem, ShMem, ShMemProvider},
     tuples::tuple_list,
-    AsMutSlice, AsSlice,
+    AsSlice, AsSliceMut,
 };
 
 #[allow(clippy::similar_names)]
@@ -32,7 +32,7 @@ pub fn main() {
     let mut shmem_provider = unix_shmem::UnixShMemProvider::new().unwrap();
     let mut signals = shmem_provider.new_shmem(16).unwrap();
     let signals_len = signals.len();
-    let signals_ptr = signals.as_mut_slice().as_mut_ptr();
+    let signals_ptr = signals.as_slice_mut().as_mut_ptr();
     let mut bt = shmem_provider.new_on_shmem::<Option<u64>>(None).unwrap();
 
     let signals_set = |idx: usize| {

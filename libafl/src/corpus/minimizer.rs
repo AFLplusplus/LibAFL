@@ -2,6 +2,7 @@
 //! of your corpus.
 
 use alloc::{
+    borrow::Cow,
     string::{String, ToString},
     vec::Vec,
 };
@@ -143,7 +144,7 @@ where
             manager.fire(
                 state,
                 Event::UpdateUserStats {
-                    name: "minimisation exec pass".to_string(),
+                    name: Cow::from("minimisation exec pass"),
                     value: UserStats::new(UserStatsValue::Ratio(curr, total), AggregatorOps::None),
                     phantom: PhantomData,
                 },

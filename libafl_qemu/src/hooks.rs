@@ -22,7 +22,7 @@ use libafl_qemu_sys::{CPUArchStatePtr, FatPtr, GuestAddr, GuestUsize};
 pub use crate::emu::SyscallHookResult;
 use crate::{
     emu::{MemAccessInfo, Qemu, SKIP_EXEC_HOOK},
-    helper::QemuHelperTuple,
+    helpers::QemuHelperTuple,
     sys::TCGTemp,
     BackdoorHookId, BlockHookId, CmpHookId, EdgeHookId, HookId, InstructionHookId, ReadHookId,
     WriteHookId,
@@ -117,7 +117,7 @@ macro_rules! create_wrapper {
             {
                 unsafe {
                     let hooks = get_qemu_hooks::<QT, S>();
-                    let func: fn(&mut QemuHooks<QT, S>, Option<&mut S>, $($param_type),*) = transmute(hook as *mut c_void);
+                    let func: fn(&mut QemuHooks<QT, S>, Option<&mut S>, $($param_type),*) = transmute(ptr::from_mut::<c_void>(hook));
                     func(hooks, inprocess_get_state::<S>(), $($param),*);
                 }
             }
@@ -144,7 +144,7 @@ macro_rules! create_wrapper {
             {
                 unsafe {
                     let hooks = get_qemu_hooks::<QT, S>();
-                    let func: fn(&mut QemuHooks<QT, S>, Option<&mut S>, $($param_type),*) -> $ret_type= transmute(hook as *mut c_void);
+                    let func: fn(&mut QemuHooks<QT, S>, Option<&mut S>, $($param_type),*) -> $ret_type= transmute(ptr::from_mut::<c_void>(hook));
                     func(hooks, inprocess_get_state::<S>(), $($param),*)
                 }
             }

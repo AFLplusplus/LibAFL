@@ -25,7 +25,7 @@ use crate::SYS_newfstatat;
 use crate::{
     asan::QemuAsanHelper,
     emu::SyscallHookResult,
-    helper::{QemuHelper, QemuHelperTuple},
+    helpers::{QemuHelper, QemuHelperTuple},
     hooks::{Hook, QemuHooks},
     Qemu, SYS_fstat, SYS_fstatfs, SYS_futex, SYS_getrandom, SYS_mprotect, SYS_mremap, SYS_munmap,
     SYS_pread64, SYS_read, SYS_readlinkat, SYS_statfs,
@@ -498,10 +498,10 @@ where
             // The ASan helper, if present, will call the tracer hook for the snapshot helper as opt
             hooks.writes(
                 Hook::Empty,
-                Hook::Function(trace_write1_snapshot::<QT, S>),
-                Hook::Function(trace_write2_snapshot::<QT, S>),
-                Hook::Function(trace_write4_snapshot::<QT, S>),
-                Hook::Function(trace_write8_snapshot::<QT, S>),
+                Hook::Function(trace_write_snapshot::<QT, S, 1>),
+                Hook::Function(trace_write_snapshot::<QT, S, 2>),
+                Hook::Function(trace_write_snapshot::<QT, S, 4>),
+                Hook::Function(trace_write_snapshot::<QT, S, 8>),
                 Hook::Function(trace_write_n_snapshot::<QT, S>),
             );
         }
@@ -521,7 +521,7 @@ where
     }
 }
 
-pub fn trace_write1_snapshot<QT, S>(
+pub fn trace_write_snapshot<QT, S, const SIZE: usize>(
     hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     _id: u64,
@@ -531,46 +531,7 @@ pub fn trace_write1_snapshot<QT, S>(
     QT: QemuHelperTuple<S>,
 {
     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
-    h.access(addr, 1);
-}
-
-pub fn trace_write2_snapshot<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
-    _state: Option<&mut S>,
-    _id: u64,
-    addr: GuestAddr,
-) where
-    S: UsesInput,
-    QT: QemuHelperTuple<S>,
-{
-    let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
-    h.access(addr, 2);
-}
-
-pub fn trace_write4_snapshot<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
-    _state: Option<&mut S>,
-    _id: u64,
-    addr: GuestAddr,
-) where
-    S: UsesInput,
-    QT: QemuHelperTuple<S>,
-{
-    let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
-    h.access(addr, 4);
-}
-
-pub fn trace_write8_snapshot<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
-    _state: Option<&mut S>,
-    _id: u64,
-    addr: GuestAddr,
-) where
-    S: UsesInput,
-    QT: QemuHelperTuple<S>,
-{
-    let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
-    h.access(addr, 8);
+    h.access(addr, SIZE);
 }
 
 pub fn trace_write_n_snapshot<QT, S>(

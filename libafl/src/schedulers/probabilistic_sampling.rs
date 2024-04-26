@@ -162,7 +162,7 @@ where
                 "No entries in corpus. This often implies the target is not properly instrumented.",
             )))
         } else {
-            let rand_prob: f64 = (state.rand_mut().below(100) as f64) / 100.0;
+            let rand_prob: f64 = state.rand_mut().next_float();
             let meta = state.metadata_map().get::<ProbabilityMetadata>().unwrap();
             let threshold = meta.total_probability * rand_prob;
             let mut k: f64 = 0.0;
@@ -237,8 +237,8 @@ mod tests {
             super::ProbabilityMetadata::register();
         }
 
-        // the first 3 probabilities will be .69, .86, .44
-        let rand = StdRand::with_seed(12);
+        // the first 3 probabilities will be .76, .86, .36
+        let rand = StdRand::with_seed(2);
 
         let mut scheduler = UniformProbabilitySamplingScheduler::new();
 

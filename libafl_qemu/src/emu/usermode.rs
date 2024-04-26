@@ -13,7 +13,7 @@ use pyo3::prelude::*;
 
 use crate::{
     emu::{HasExecutions, State},
-    sync_backdoor::SyncBackdoorError,
+    sync_exit::SyncBackdoorError,
     EmuExitHandler, Emulator, HookData, NewThreadHookId, PostSyscallHookId, PreSyscallHookId, Qemu,
     QemuExitReason, QemuExitReasonError, QemuHelperTuple, SyscallHookResult, CPU,
 };

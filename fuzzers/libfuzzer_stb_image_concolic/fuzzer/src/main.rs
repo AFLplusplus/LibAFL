@@ -28,7 +28,7 @@ use libafl::{
             serialization_format::{DEFAULT_ENV_NAME, DEFAULT_SIZE},
             ConcolicObserver,
         },
-        TimeObserver, CanTrack,
+        CanTrack, TimeObserver,
     },
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{
@@ -43,7 +43,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
-    AsMutSlice, AsSlice, Named,
+    AsSliceMut, AsSlice, Named,
 };
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
@@ -206,8 +206,7 @@ fn fuzz(
         concolic_shmem.write_to_env(DEFAULT_ENV_NAME).unwrap();
 
         // The concolic observer observers the concolic shared memory map.
-        let concolic_observer =
-            ConcolicObserver::new("concolic".to_string(), concolic_shmem.as_mut_slice());
+        let concolic_observer = ConcolicObserver::new("concolic", concolic_shmem.as_slice_mut());
 
         let concolic_observer_name = concolic_observer.name().to_string();
 

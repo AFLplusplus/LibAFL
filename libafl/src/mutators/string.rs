@@ -1,5 +1,5 @@
 //! Mutators for preserving string categories, which may be useful for certain targets which are primarily string-oriented.
-use alloc::vec::Vec;
+use alloc::{borrow::Cow, vec::Vec};
 use core::{
     cmp::{Ordering, Reverse},
     ops::Range,
@@ -66,7 +66,7 @@ fn choose_start<R: Rand>(
     bytes: &[u8],
     meta: &StringIdentificationMetadata,
 ) -> Option<(usize, usize)> {
-    let idx = rand.below(bytes.len() as u64) as usize;
+    let idx = rand.below(bytes.len());
     let mut options = Vec::new();
     for (start, range) in meta.ranges() {
         if idx
@@ -83,9 +83,9 @@ fn choose_start<R: Rand>(
         _ => {
             // bias towards longer strings
             options.sort_by_cached_key(|(_, entries)| entries.count_ones());
-            let selected = libafl_bolts::math::integer_sqrt(
-                rand.below((options.len() * options.len()) as u64),
-            ) as usize;
+            let selected =
+                libafl_bolts::math::integer_sqrt(rand.below(options.len() * options.len()) as u64)
+                    as usize;
             Some((options[selected].0, options[selected].1.len()))
         }
     }
@@ -133,7 +133,7 @@ fn choose_category_range<R: Rand>(
     string: &str,
 ) -> (Range<usize>, &'static [(u32, u32)]) {
     let chars = string.char_indices().collect::<Vec<_>>();
-    let idx = rand.below(chars.len() as u64) as usize;
+    let idx = rand.below(chars.len());
     let c = chars[idx].1;
 
     // figure out the categories for this char
@@ -160,7 +160,7 @@ fn choose_category_range<R: Rand>(
         )
     });
     let options = categories.len() * categories.len();
-    let selected_idx = libafl_bolts::math::integer_sqrt(rand.below(options as u64)) as usize;
+    let selected_idx = libafl_bolts::math::integer_sqrt(rand.below(options) as u64) as usize;
 
     let selected = categories[selected_idx];
 
@@ -177,7 +177,7 @@ fn choose_category_range<R: Rand>(
 
 fn choose_subcategory_range<R: Rand>(rand: &mut R, string: &str) -> (Range<usize>, (u32, u32)) {
     let chars = string.char_indices().collect::<Vec<_>>();
-    let idx = rand.below(chars.len() as u64) as usize;
+    let idx = rand.below(chars.len());
     let c = chars[idx].1;
 
     // figure out the categories for this char
@@ -197,7 +197,7 @@ fn choose_subcategory_range<R: Rand>(rand: &mut R, string: &str) -> (Range<usize
 
     subcategories.sort_by_key(|&(min, max)| Reverse(max - min + 1));
     let options = subcategories.len() * subcategories.len();
-    let selected_idx = libafl_bolts::math::integer_sqrt(rand.below(options as u64)) as usize;
+    let selected_idx = libafl_bolts::math::integer_sqrt(rand.below(options) as u64) as usize;
     let selected = subcategories[selected_idx];
 
     #[cfg(test)]
@@ -238,7 +238,7 @@ fn rand_replace_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
         return MutationResult::Skipped;
     }
 
-    let replace_len = state.rand_mut().below(MAX_CHARS as u64) as usize;
+    let replace_len = state.rand_mut().below(MAX_CHARS);
     let orig_len = range.end - range.start;
     if input.0.len() - orig_len + replace_len > state.max_size() {
         return MutationResult::Skipped;
@@ -271,8 +271,9 @@ fn rand_replace_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
 pub struct StringCategoryRandMutator;
 
 impl Named for StringCategoryRandMutator {
-    fn name(&self) -> &str {
-        "string-category-rand"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("string-category-rand");
+        &NAME
     }
 }
 
@@ -297,15 +298,15 @@ where
                 core::str::from_utf8(&bytes[range.clone()])
             );
 
-            let options: u64 = category
+            let options: usize = category
                 .iter()
-                .map(|&(start, end)| u64::from(end) - u64::from(start) + 1)
+                .map(|&(start, end)| end as usize - start as usize + 1)
                 .sum();
             let char_gen = |state: &mut S| loop {
                 let mut selected = state.rand_mut().below(options);
                 for &(min, max) in category {
                     if let Some(next_selected) =
-                        selected.checked_sub(u64::from(max) - u64::from(min) + 1)
+                        selected.checked_sub(max as usize - min as usize + 1)
                     {
                         selected = next_selected;
                     } else if let Some(new_c) = char::from_u32(selected as u32 + min) {
@@ -329,8 +330,9 @@ where
 pub struct StringSubcategoryRandMutator;
 
 impl Named for StringSubcategoryRandMutator {
-    fn name(&self) -> &str {
-        "string-subcategory-rand"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("string-subcategory-rand");
+        &NAME
     }
 }
 
@@ -355,7 +357,7 @@ where
                 core::str::from_utf8(&bytes[range.clone()])
             );
 
-            let options: u64 = u64::from(subcategory.1) - u64::from(subcategory.0) + 1;
+            let options = subcategory.1 as usize - subcategory.0 as usize + 1;
             let char_gen = |state: &mut S| loop {
                 let selected = state.rand_mut().below(options);
                 if let Some(new_c) = char::from_u32(selected as u32 + subcategory.0) {
@@ -375,8 +377,9 @@ where
 pub struct StringCategoryTokenReplaceMutator;
 
 impl Named for StringCategoryTokenReplaceMutator {
-    fn name(&self) -> &str {
-        "string-category-token-replace"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("string-category-token-replace");
+        &NAME
     }
 }
 
@@ -398,7 +401,7 @@ where
             }
             meta.tokens().len()
         };
-        let token_idx = state.rand_mut().below(tokens_len as u64) as usize;
+        let token_idx = state.rand_mut().below(tokens_len);
 
         let bytes = input.0.bytes();
         let meta = &input.1;
@@ -434,8 +437,9 @@ where
 pub struct StringSubcategoryTokenReplaceMutator;
 
 impl Named for StringSubcategoryTokenReplaceMutator {
-    fn name(&self) -> &str {
-        "string-subcategory-replace"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("string-subcategory-replace");
+        &NAME
     }
 }
 
@@ -457,7 +461,7 @@ where
             }
             meta.tokens().len()
         };
-        let token_idx = state.rand_mut().below(tokens_len as u64) as usize;
+        let token_idx = state.rand_mut().below(tokens_len);
 
         let bytes = input.0.bytes();
         let meta = &input.1;

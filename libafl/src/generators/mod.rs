@@ -101,7 +101,7 @@ where
     S: HasRand,
 {
     fn generate(&mut self, state: &mut S) -> Result<BytesInput, Error> {
-        let mut size = state.rand_mut().below(self.max_size as u64);
+        let mut size = state.rand_mut().below(self.max_size);
         if size == 0 {
             size = 1;
         }
@@ -141,7 +141,7 @@ where
     S: HasRand,
 {
     fn generate(&mut self, state: &mut S) -> Result<BytesInput, Error> {
-        let mut size = state.rand_mut().below(self.max_size as u64);
+        let mut size = state.rand_mut().below(self.max_size);
         if size == 0 {
             size = 1;
         }

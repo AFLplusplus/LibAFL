@@ -1,5 +1,5 @@
 //! Nautilus grammar mutator, see <https://github.com/nautilus-fuzz/nautilus>
-use alloc::string::String;
+use alloc::{borrow::Cow, string::String};
 use core::{fmt::Debug, marker::PhantomData};
 use std::fs::create_dir_all;
 
@@ -74,8 +74,9 @@ impl<'a, S> NautilusFeedback<'a, S> {
 }
 
 impl<'a, S> Named for NautilusFeedback<'a, S> {
-    fn name(&self) -> &str {
-        "NautilusFeedback"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("NautilusFeedback");
+        &NAME
     }
 }
 

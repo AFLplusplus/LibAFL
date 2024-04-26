@@ -2,7 +2,7 @@
 use alloc::vec::Vec;
 use core::ptr::addr_of_mut;
 
-use libafl_bolts::{ownedref::OwnedMutSlice, AsMutSlice, AsSlice};
+use libafl_bolts::{ownedref::OwnedMutSlice, AsSlice, AsSliceMut};
 
 /// A [`Vec`] of `8-bit-counters` maps for multiple modules.
 /// They are initialized by calling [`__sanitizer_cov_8bit_counters_init`](
@@ -32,9 +32,9 @@ pub unsafe fn extra_counters() -> Vec<OwnedMutSlice<'static, u8>> {
 pub extern "C" fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop: *mut u8) {
     unsafe {
         for existing in &mut *addr_of_mut!(COUNTERS_MAPS) {
-            let range = existing.as_mut_slice().as_mut_ptr()
+            let range = existing.as_slice_mut().as_mut_ptr()
                 ..=existing
-                    .as_mut_slice()
+                    .as_slice_mut()
                     .as_mut_ptr()
                     .add(existing.as_slice().len());
             if range.contains(&start) || range.contains(&stop) {
@@ -59,10 +59,7 @@ pub use self::observers::{counters_maps_observer, CountersMultiMapObserver};
 
 #[cfg(feature = "observers")]
 mod observers {
-    use alloc::{
-        string::{String, ToString},
-        vec::Vec,
-    };
+    use alloc::{borrow::Cow, vec::Vec};
     use core::{
         fmt::Debug,
         hash::{Hash, Hasher},
@@ -78,7 +75,7 @@ mod observers {
         Error,
     };
     use libafl_bolts::{
-        ownedref::OwnedMutSlice, AsIter, AsIterMut, AsMutSlice, AsSlice, HasLen, Named,
+        ownedref::OwnedMutSlice, AsIter, AsIterMut, AsSlice, AsSliceMut, HasLen, Named,
     };
     use meminterval::IntervalTree;
     use serde::{Deserialize, Serialize};
@@ -122,7 +119,7 @@ mod observers {
         intervals: IntervalTree<usize, usize>,
         len: usize,
         initial: u8,
-        name: String,
+        name: Cow<'static, str>,
         iter_idx: usize,
     }
 
@@ -147,8 +144,8 @@ mod observers {
 
     impl<const DIFFERENTIAL: bool> Named for CountersMultiMapObserver<DIFFERENTIAL> {
         #[inline]
-        fn name(&self) -> &str {
-            self.name.as_str()
+        fn name(&self) -> &Cow<'static, str> {
+            &self.name
         }
     }
 
@@ -200,7 +197,7 @@ mod observers {
             let elem = self.intervals.query_mut(idx..=idx).next().unwrap();
             let i = elem.value;
             let j = idx - elem.interval.start;
-            unsafe { &mut (*addr_of_mut!(COUNTERS_MAPS[*i])).as_mut_slice()[j] }
+            unsafe { &mut (*addr_of_mut!(COUNTERS_MAPS[*i])).as_slice_mut()[j] }
         }
 
         #[inline]
@@ -229,7 +226,7 @@ mod observers {
         fn reset_map(&mut self) -> Result<(), Error> {
             let initial = self.initial();
             for map in unsafe { &mut *addr_of_mut!(COUNTERS_MAPS) } {
-                for x in map.as_mut_slice() {
+                for x in map.as_slice_mut() {
                     *x = initial;
                 }
             }
@@ -277,7 +274,7 @@ mod observers {
             Self {
                 intervals,
                 len: idx,
-                name: name.to_string(),
+                name: Cow::from(name),
                 initial: u8::default(),
                 iter_idx: 0,
             }
@@ -308,7 +305,7 @@ mod observers {
             unsafe { &mut *addr_of_mut!(COUNTERS_MAPS) }
                 .iter_mut()
                 .for_each(|m| {
-                    let l = m.as_mut_slice().len();
+                    let l = m.as_slice_mut().len();
                     intervals.insert(idx..(idx + l), v);
                     idx += l;
                     v += 1;
@@ -316,7 +313,7 @@ mod observers {
             Self {
                 intervals,
                 len: idx,
-                name: name.to_string(),
+                name: Cow::from(name),
                 initial: u8::default(),
                 iter_idx: 0,
             }

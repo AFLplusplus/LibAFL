@@ -193,6 +193,24 @@ pub trait HasLastReportTime {
     fn last_report_time_mut(&mut self) -> &mut Option<Duration>;
 }
 
+/// Struct that holds the options for input loading
+#[cfg(feature = "std")]
+pub struct LoadConfig<'a, I, S, Z> {
+    /// Load Input even if it was deemed "uninteresting" by the fuzzer
+    forced: bool,
+    /// Function to load input from a Path
+    loader: &'a mut dyn FnMut(&mut Z, &mut S, &Path) -> Result<I, Error>,
+    /// Error if Input leads to a Solution.
+    exit_on_solution: bool,
+}
+
+#[cfg(feature = "std")]
+impl<'a, I, S, Z> Debug for LoadConfig<'a, I, S, Z> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "LoadConfig {{}}")
+    }
+}
+
 /// The state a fuzz run.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "
@@ -647,8 +665,7 @@ where
         executor: &mut E,
         manager: &mut EM,
         file_list: &[PathBuf],
-        forced: bool,
-        loader: &mut dyn FnMut(&mut Z, &mut Self, &Path) -> Result<I, Error>,
+        load_config: LoadConfig<I, Self, Z>,
     ) -> Result<(), Error>
     where
         E: UsesState<State = Self>,
@@ -664,45 +681,45 @@ where
             self.remaining_initial_files = Some(file_list.to_vec());
         }
 
-        self.continue_loading_initial_inputs_custom(fuzzer, executor, manager, forced, loader)
+        self.continue_loading_initial_inputs_custom(fuzzer, executor, manager, load_config)
     }
+
     fn load_file<E, EM, Z>(
         &mut self,
         path: &PathBuf,
         manager: &mut EM,
         fuzzer: &mut Z,
         executor: &mut E,
-        forced: bool,
-        loader: &mut dyn FnMut(&mut Z, &mut Self, &Path) -> Result<I, Error>,
-    ) -> Result<(), Error>
+        config: &mut LoadConfig<I, Self, Z>,
+    ) -> Result<ExecuteInputResult, Error>
     where
         E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         Z: Evaluator<E, EM, State = Self>,
     {
         log::info!("Loading file {:?} ...", &path);
-        let input = loader(fuzzer, self, path)?;
-        if forced {
+        let input = (config.loader)(fuzzer, self, path)?;
+        if config.forced {
             let _: CorpusId = fuzzer.add_input(self, executor, manager, input)?;
+            Ok(ExecuteInputResult::Corpus)
         } else {
             let (res, _) = fuzzer.evaluate_input(self, executor, manager, input.clone())?;
             if res == ExecuteInputResult::None {
                 fuzzer.add_disabled_input(self, input)?;
                 log::warn!("input {:?} was not interesting, adding as disabled.", &path);
             }
+            Ok(res)
         }
-        Ok(())
     }
     /// Loads initial inputs from the passed-in `in_dirs`.
-    /// If `forced` is true, will add all testcases, no matter what.
-    /// This method takes a list of files.
+    /// This method takes a list of files and a `LoadConfig`
+    /// which specifies the special handling of initial inputs
     fn continue_loading_initial_inputs_custom<E, EM, Z>(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
         manager: &mut EM,
-        forced: bool,
-        loader: &mut dyn FnMut(&mut Z, &mut Self, &Path) -> Result<I, Error>,
+        mut config: LoadConfig<I, Self, Z>,
     ) -> Result<(), Error>
     where
         E: UsesState<State = Self>,
@@ -712,7 +729,13 @@ where
         loop {
             match self.next_file() {
                 Ok(path) => {
-                    self.load_file(&path, manager, fuzzer, executor, forced, loader)?;
+                    let res = self.load_file(&path, manager, fuzzer, executor, &mut config)?;
+                    if config.exit_on_solution && matches!(res, ExecuteInputResult::Solution) {
+                        return Err(Error::invalid_corpus(format!(
+                            "Input {} resulted in a solution.",
+                            path.display()
+                        )));
+                    }
                 }
                 Err(Error::IteratorEnd(_, _)) => break,
                 Err(e) => return Err(e),
@@ -751,8 +774,11 @@ where
             executor,
             manager,
             file_list,
-            false,
-            &mut |_, _, path| I::from_file(path),
+            LoadConfig {
+                loader: &mut |_, _, path| I::from_file(path),
+                forced: false,
+                exit_on_solution: false,
+            },
         )
     }
 
@@ -776,8 +802,11 @@ where
             fuzzer,
             executor,
             manager,
-            true,
-            &mut |_, _, path| I::from_file(path),
+            LoadConfig {
+                loader: &mut |_, _, path| I::from_file(path),
+                forced: true,
+                exit_on_solution: false,
+            },
         )
     }
     /// Loads initial inputs from the passed-in `in_dirs`.
@@ -800,8 +829,11 @@ where
             executor,
             manager,
             file_list,
-            true,
-            &mut |_, _, path| I::from_file(path),
+            LoadConfig {
+                loader: &mut |_, _, path| I::from_file(path),
+                forced: true,
+                exit_on_solution: false,
+            },
         )
     }
 
@@ -823,8 +855,38 @@ where
             fuzzer,
             executor,
             manager,
-            false,
-            &mut |_, _, path| I::from_file(path),
+            LoadConfig {
+                loader: &mut |_, _, path| I::from_file(path),
+                forced: false,
+                exit_on_solution: false,
+            },
+        )
+    }
+
+    /// Loads initial inputs from the passed-in `in_dirs`.
+    /// Will return a `CorpusError` if a solution is found
+    pub fn load_initial_inputs_disallow_solution<E, EM, Z>(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        manager: &mut EM,
+        in_dirs: &[PathBuf],
+    ) -> Result<(), Error>
+    where
+        E: UsesState<State = Self>,
+        EM: EventFirer<State = Self>,
+        Z: Evaluator<E, EM, State = Self>,
+    {
+        self.canonicalize_input_dirs(in_dirs)?;
+        self.continue_loading_initial_inputs_custom(
+            fuzzer,
+            executor,
+            manager,
+            LoadConfig {
+                loader: &mut |_, _, path| I::from_file(path),
+                forced: false,
+                exit_on_solution: true,
+            },
         )
     }
 
@@ -862,8 +924,11 @@ where
                 fuzzer,
                 executor,
                 manager,
-                false,
-                &mut |_, _, path| I::from_file(path),
+                LoadConfig {
+                    loader: &mut |_, _, path| I::from_file(path),
+                    forced: false,
+                    exit_on_solution: false,
+                },
             )?;
         } else {
             self.canonicalize_input_dirs(in_dirs)?;

@@ -10,7 +10,7 @@ use core::{clone::Clone, fmt::Debug, slice};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::{shmem::ShMem, AsMutSlice, AsSlice, IntoOwned, Truncate};
+use crate::{shmem::ShMem, AsSlice, AsSliceMut, IntoOwned, Truncate};
 
 /// Private part of the unsafe marker, making sure this cannot be initialized directly.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -562,7 +562,7 @@ impl<'a, 'it, T> IntoIterator for &'it mut OwnedMutSlice<'a, T> {
     type IntoIter = IterMut<'it, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.as_mut_slice().iter_mut()
+        self.as_slice_mut().iter_mut()
     }
 }
 
@@ -651,17 +651,17 @@ impl<'a, T: Sized> AsSlice for OwnedMutSlice<'a, T> {
         }
     }
 }
-impl<'a, T: Sized> AsMutSlice for OwnedMutSlice<'a, T> {
+impl<'a, T: Sized> AsSliceMut for OwnedMutSlice<'a, T> {
     type Entry = T;
     /// Get the value as mut slice
     #[must_use]
-    fn as_mut_slice(&mut self) -> &mut [T] {
+    fn as_slice_mut(&mut self) -> &mut [T] {
         match &mut self.inner {
             OwnedMutSliceInner::RefRaw(rr, len, _) => unsafe {
                 slice::from_raw_parts_mut(*rr, *len)
             },
             OwnedMutSliceInner::Ref(r) => r,
-            OwnedMutSliceInner::Owned(v) => v.as_mut_slice(),
+            OwnedMutSliceInner::Owned(v) => v.as_slice_mut(),
         }
     }
 }

@@ -1,6 +1,7 @@
 //! The calibration stage. The fuzzer measures the average exec time and the bitmap size.
 
 use alloc::{
+    borrow::Cow,
     string::{String, ToString},
     vec::Vec,
 };
@@ -311,7 +312,7 @@ where
                 mgr.fire(
                     state,
                     Event::UpdateUserStats {
-                        name: "stability".to_string(),
+                        name: Cow::from("stability"),
                         value: UserStats::new(
                             UserStatsValue::Ratio(
                                 (map_len - unstable_entries) as u64,

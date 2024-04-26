@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use core::fmt::Debug;
 
 use hashbrown::HashMap;
-use libafl_bolts::{rands::Rand, AsMutSlice, AsSlice, HasLen, HasRefCnt};
+use libafl_bolts::{rands::Rand, AsSlice, AsSliceMut, HasLen, HasRefCnt};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -42,12 +42,12 @@ impl AsSlice for AccountingIndexesMetadata {
         self.list.as_slice()
     }
 }
-impl AsMutSlice for AccountingIndexesMetadata {
+impl AsSliceMut for AccountingIndexesMetadata {
     type Entry = usize;
 
     /// Convert to a slice
-    fn as_mut_slice(&mut self) -> &mut [usize] {
-        self.list.as_mut_slice()
+    fn as_slice_mut(&mut self) -> &mut [usize] {
+        self.list.as_slice_mut()
     }
 }
 
@@ -112,7 +112,7 @@ where
     CS::State: Debug,
 {
     accounting_map: &'a [u32],
-    skip_non_favored_prob: u64,
+    skip_non_favored_prob: f64,
     inner: MinimizerScheduler<
         CS,
         LenTimeMulTestcaseScore<<CS as UsesState>::State>,
@@ -171,7 +171,7 @@ where
                 .borrow()
                 .has_metadata::<IsFavoredMetadata>();
             has
-        } && state.rand_mut().below(100) < self.skip_non_favored_prob
+        } && state.rand_mut().coinflip(self.skip_non_favored_prob)
         {
             idx = self.inner.base_mut().next(state)?;
         }
@@ -338,7 +338,7 @@ where
         observer: &O,
         state: &mut CS::State,
         base: CS,
-        skip_non_favored_prob: u64,
+        skip_non_favored_prob: f64,
         accounting_map: &'a [u32],
     ) -> Self {
         match state.metadata_map().get::<TopAccountingMetadata>() {

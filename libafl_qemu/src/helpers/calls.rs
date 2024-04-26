@@ -13,7 +13,7 @@ use thread_local::ThreadLocal;
 use crate::{
     capstone,
     emu::ArchExtras,
-    helper::{
+    helpers::{
         HasInstrumentationFilter, IsFilter, QemuHelper, QemuHelperTuple,
         QemuInstrumentationAddressRangeFilter,
     },
