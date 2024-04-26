@@ -6,8 +6,8 @@ use libafl_qemu_sys::GuestAddr;
 #[cfg(emulation_mode = "systemmode")]
 use libafl_qemu_sys::GuestPhysAddr;
 pub use libafl_targets::{
-    edges_map_mut_ptr, edges_map_mut_slice, edges_max_num, EDGES_MAP, EDGES_MAP_PTR,
-    EDGES_MAP_PTR_NUM, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_NUM,
+    edges_map_mut_ptr, EDGES_MAP, EDGES_MAP_PTR, EDGES_MAP_PTR_NUM, EDGES_MAP_SIZE_IN_USE,
+    MAX_EDGES_NUM,
 };
 use serde::{Deserialize, Serialize};
 
