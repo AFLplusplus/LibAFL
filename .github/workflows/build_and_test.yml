@@ -90,7 +90,6 @@ jobs:
 
   ubuntu-doc-build:
     runs-on: ubuntu-22.04
-    needs: ubuntu
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/workflows/ubuntu-prepare
@@ -101,7 +100,6 @@ jobs:
 
   ubuntu-doc-test:
     runs-on: ubuntu-22.04
-    needs: ubuntu
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/workflows/ubuntu-prepare

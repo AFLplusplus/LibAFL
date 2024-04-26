@@ -500,6 +500,7 @@ where
     #[cfg(feature = "regex")]
     asan_obs: Reference<AsanBacktraceObserver>,
     timeout: TimeSpec,
+    crash_exitcode: Option<i8>,
 }
 
 impl<OT, S, SP> Debug for ForkserverExecutor<OT, S, SP>
@@ -587,6 +588,7 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
     timeout: Option<Duration>,
     #[cfg(feature = "regex")]
     asan_obs: Option<Reference<AsanBacktraceObserver>>,
+    crash_exitcode: Option<i8>,
 }
 
 impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
@@ -639,6 +641,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                 .asan_obs
                 .clone()
                 .unwrap_or(AsanBacktraceObserver::default().type_ref()),
+            crash_exitcode: self.crash_exitcode,
         })
     }
 
@@ -700,6 +703,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                 .asan_obs
                 .clone()
                 .unwrap_or(AsanBacktraceObserver::default().type_ref()),
+            crash_exitcode: self.crash_exitcode,
         })
     }
 
@@ -1011,6 +1015,13 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         self
     }
 
+    /// Treats an execution as a crash if the provided exitcode is returned
+    #[must_use]
+    pub fn crash_exitcode(mut self, exitcode: i8) -> Self {
+        self.crash_exitcode = Some(exitcode);
+        self
+    }
+
     /// Call this if the harness uses deferred forkserver mode; default is false
     #[must_use]
     pub fn is_deferred_frksrv(mut self, is_deferred_frksrv: bool) -> Self {
@@ -1060,6 +1071,7 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             kill_signal: None,
             timeout: None,
             asan_obs: None,
+            crash_exitcode: None,
         }
     }
 
@@ -1086,6 +1098,7 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             kill_signal: None,
             timeout: None,
             asan_obs: None,
+            crash_exitcode: None,
         }
     }
 }
@@ -1171,7 +1184,12 @@ where
 
         if let Some(status) = self.forkserver.read_st_timed(&self.timeout)? {
             self.forkserver.set_status(status);
-            if libc::WIFSIGNALED(self.forkserver().status()) {
+            let exitcode_is_crash = if let Some(crash_exitcode) = self.crash_exitcode {
+                (libc::WEXITSTATUS(self.forkserver().status()) as i8) == crash_exitcode
+            } else {
+                false
+            };
+            if libc::WIFSIGNALED(self.forkserver().status()) || exitcode_is_crash {
                 exit_kind = ExitKind::Crash;
                 #[cfg(feature = "regex")]
                 if let Some(asan_observer) = self.observers.get_mut(&self.asan_obs) {
