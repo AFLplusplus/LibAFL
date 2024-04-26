@@ -2,7 +2,7 @@
 
 use alloc::{borrow::Cow, boxed::Box};
 use core::{
-    cell::{Ref, RefCell},
+    cell::{Ref, RefCell, RefMut},
     fmt::Debug,
     hash::Hash,
     ops::Deref,
@@ -125,12 +125,25 @@ where
     }
 
     /// Get a reference to the underlying value.
+    ///
+    /// Panics if it can't borrow.
     #[must_use]
     pub fn get_ref<'b>(&'b self) -> Ref<'a, T>
     where
         'b: 'a,
     {
         self.value.as_ref().borrow()
+    }
+
+    /// Get a mutable reference to the underlying value.
+    ///
+    /// Panics if it can't borrow.
+    #[must_use]
+    pub fn get_ref_mut<'b>(&'b self) -> RefMut<'a, T>
+    where
+        'b: 'a,
+    {
+        self.value.as_ref().borrow_mut()
     }
 
     /// Set the value.
