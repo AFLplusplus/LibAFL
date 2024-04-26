@@ -24,7 +24,7 @@ use libafl::{
     state::{HasSolutions, StdState},
 };
 use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
-use libafl_targets::{DifferentialAFLMapSwapObserver, edges_max_num};
+use libafl_targets::{edges_max_num, DifferentialAFLMapSwapObserver};
 #[cfg(not(miri))]
 use mimalloc::MiMalloc;
 

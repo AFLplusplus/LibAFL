@@ -66,7 +66,8 @@ pub fn autotokens() -> Result<Tokens, Error> {
     }
 }
 
-/// The size of the map for edges.
+/// The actual size we use for the map of edges.
+/// This is used for forkserver backend
 #[no_mangle]
 pub static mut __afl_map_size: usize = EDGES_MAP_SIZE_IN_USE;
 
