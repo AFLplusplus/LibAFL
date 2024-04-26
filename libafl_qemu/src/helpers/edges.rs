@@ -6,7 +6,7 @@ use libafl_qemu_sys::GuestAddr;
 #[cfg(emulation_mode = "systemmode")]
 use libafl_qemu_sys::GuestPhysAddr;
 pub use libafl_targets::{
-    edges_map_mut_ptr, EDGES_MAP, EDGES_MAP_PTR, EDGES_MAP_PTR_NUM, EDGES_MAP_SIZE_IN_USE,
+    edges_map_mut_ptr, EDGES_MAP, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE, EDGES_MAP_SIZE_MAX,
     MAX_EDGES_NUM,
 };
 use serde::{Deserialize, Serialize};
@@ -619,7 +619,7 @@ where
     }
     // GuestAddress is u32 for 32 bit guests
     #[allow(clippy::unnecessary_cast)]
-    Some((hash_me(src as u64) ^ hash_me(dest as u64)) & (unsafe { EDGES_MAP_PTR_NUM } as u64 - 1))
+    Some((hash_me(src as u64) ^ hash_me(dest as u64)) & (EDGES_MAP_SIZE_MAX as u64 - 1))
 }
 
 pub extern "C" fn trace_edge_hitcount_ptr(_: *const (), id: u64) {
@@ -692,7 +692,7 @@ where
 pub extern "C" fn trace_block_transition_hitcount(_: *const (), id: u64) {
     unsafe {
         PREV_LOC.with(|prev_loc| {
-            let x = ((*prev_loc.get() ^ id) as usize) & (EDGES_MAP_PTR_NUM - 1);
+            let x = ((*prev_loc.get() ^ id) as usize) & (EDGES_MAP_SIZE_MAX - 1);
             let entry = EDGES_MAP_PTR.add(x);
             *entry = (*entry).wrapping_add(1);
             *prev_loc.get() = id.overflowing_shr(1).0;
@@ -703,7 +703,7 @@ pub extern "C" fn trace_block_transition_hitcount(_: *const (), id: u64) {
 pub extern "C" fn trace_block_transition_single(_: *const (), id: u64) {
     unsafe {
         PREV_LOC.with(|prev_loc| {
-            let x = ((*prev_loc.get() ^ id) as usize) & (EDGES_MAP_PTR_NUM - 1);
+            let x = ((*prev_loc.get() ^ id) as usize) & (EDGES_MAP_SIZE_MAX - 1);
             let entry = EDGES_MAP_PTR.add(x);
             *entry = 1;
             *prev_loc.get() = id.overflowing_shr(1).0;

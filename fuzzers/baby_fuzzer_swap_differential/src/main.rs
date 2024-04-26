@@ -24,7 +24,7 @@ use libafl::{
     state::{HasSolutions, StdState},
 };
 use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
-use libafl_targets::{edges_max_num, DifferentialAFLMapSwapObserver};
+use libafl_targets::{DifferentialAFLMapSwapObserver, edges_max_num};
 #[cfg(not(miri))]
 use mimalloc::MiMalloc;
 
@@ -84,7 +84,7 @@ pub fn main() {
         }
     };
 
-    let num_edges: usize = edges_max_num();
+    let num_edges: usize = edges_max_num(); // upper bound
 
     #[cfg(feature = "multimap")]
     let (
@@ -202,7 +202,7 @@ pub fn main() {
 
     // The Monitor trait define how the fuzzer stats are displayed to the user
     #[cfg(not(feature = "tui"))]
-    let mon = SimpleMonitor::new(|s| println!("{s}"));
+    let mon = SimpleMonitor::with_user_monitor(|s| println!("{s}"));
     #[cfg(feature = "tui")]
     let ui = TuiUI::new(String::from("Baby Fuzzer"), false);
     #[cfg(feature = "tui")]
