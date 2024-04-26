@@ -55,7 +55,7 @@ use libafl_qemu::{
     QemuShutdownCause, Regs,
 };
 #[cfg(unix)]
-use nix::{self, unistd::dup};
+use nix::unistd::dup;
 
 /// The fuzzer main
 pub fn main() {
