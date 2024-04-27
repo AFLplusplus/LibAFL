@@ -2,15 +2,19 @@
 
 #[cfg(feature = "alloc")]
 use alloc::{borrow::Cow, vec::Vec};
-#[rustversion::not(nightly)]
-use core::any::type_name;
+#[cfg(feature = "alloc")]
+use core::ops::{Deref, DerefMut};
 use core::{
-    any::TypeId,
+    any::{type_name, TypeId},
+    fmt::{Debug, Formatter},
     marker::PhantomData,
     mem::transmute,
+    ops::{Index, IndexMut},
     ptr::{addr_of, addr_of_mut},
 };
 
+#[cfg(feature = "alloc")]
+use serde::{Deserialize, Serialize};
 pub use tuple_list::{tuple_list, tuple_list_type, TupleList};
 
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
@@ -219,9 +223,9 @@ where
 
 /// Returns the first element with the given type
 pub trait MatchFirstType {
-    /// Returns the first element with the given type as borrow, or [`Option::None`]
+    /// Returns the first element with the given type as borrow, or [`None`]
     fn match_first_type<T: 'static>(&self) -> Option<&T>;
-    /// Returns the first element with the given type as mutable borrow, or [`Option::None`]
+    /// Returns the first element with the given type as mutable borrow, or [`None`]
     fn match_first_type_mut<T: 'static>(&mut self) -> Option<&mut T>;
 }
 
@@ -258,7 +262,7 @@ where
 
 /// Returns the first element with the given type (dereference mut version)
 pub trait ExtractFirstRefType {
-    /// Returns the first element with the given type as borrow, or [`Option::None`]
+    /// Returns the first element with the given type as borrow, or [`None`]
     fn take<'a, T: 'static>(self) -> (Option<&'a T>, Self);
 }
 
@@ -305,7 +309,7 @@ where
 
 /// Returns the first element with the given type (dereference mut version)
 pub trait ExtractFirstRefMutType {
-    /// Returns the first element with the given type as borrow, or [`Option::None`]
+    /// Returns the first element with the given type as borrow, or [`None`]
     fn take<'a, T: 'static>(self) -> (Option<&'a mut T>, Self);
 }
 
@@ -456,8 +460,10 @@ where
 #[cfg(feature = "alloc")]
 pub trait MatchName {
     /// Match for a name and return the borrowed value
+    #[deprecated = "Use `.reference` and either `.get` (fallible access) or `[]` (infallible access) instead"]
     fn match_name<T>(&self, name: &str) -> Option<&T>;
     /// Match for a name and return the mut borrowed value
+    #[deprecated = "Use `.reference` and either `.get` (fallible access) or `[]` (infallible access) instead"]
     fn match_name_mut<T>(&mut self, name: &str) -> Option<&mut T>;
 }
 
@@ -472,6 +478,7 @@ impl MatchName for () {
 }
 
 #[cfg(feature = "alloc")]
+#[allow(deprecated)]
 impl<Head, Tail> MatchName for (Head, Tail)
 where
     Head: Named,
@@ -494,56 +501,12 @@ where
     }
 }
 
-/// Finds an element of a `type` by the given `name`.
-#[cfg(feature = "alloc")]
-pub trait MatchNameAndType {
-    /// Finds an element of a `type` by the given `name`, and returns a borrow, or [`Option::None`].
-    fn match_name_type<T: 'static>(&self, name: &str) -> Option<&T>;
-    /// Finds an element of a `type` by the given `name`, and returns a mut borrow, or [`Option::None`].
-    fn match_name_type_mut<T: 'static>(&mut self, name: &str) -> Option<&mut T>;
-}
-
-#[cfg(feature = "alloc")]
-impl MatchNameAndType for () {
-    fn match_name_type<T: 'static>(&self, _name: &str) -> Option<&T> {
-        None
-    }
-    fn match_name_type_mut<T: 'static>(&mut self, _name: &str) -> Option<&mut T> {
-        None
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl<Head, Tail> MatchNameAndType for (Head, Tail)
-where
-    Head: 'static + Named,
-    Tail: MatchNameAndType,
-{
-    fn match_name_type<T: 'static>(&self, name: &str) -> Option<&T> {
-        // Switch this check to https://stackoverflow.com/a/60138532/7658998 when in stable and remove 'static
-        if TypeId::of::<T>() == TypeId::of::<Head>() && name == self.0.name() {
-            unsafe { (addr_of!(self.0) as *const T).as_ref() }
-        } else {
-            self.1.match_name_type::<T>(name)
-        }
-    }
-
-    fn match_name_type_mut<T: 'static>(&mut self, name: &str) -> Option<&mut T> {
-        // Switch this check to https://stackoverflow.com/a/60138532/7658998 when in stable and remove 'static
-        if TypeId::of::<T>() == TypeId::of::<Head>() && name == self.0.name() {
-            unsafe { (addr_of_mut!(self.0) as *mut T).as_mut() }
-        } else {
-            self.1.match_name_type_mut::<T>(name)
-        }
-    }
-}
-
 /// Structs that has `Reference `
 /// You should use this when you want to avoid specifying types using `match_name_type_mut`
 #[cfg(feature = "alloc")]
 pub trait Referenceable: Named {
     /// Return the `Reference `
-    fn type_ref(&self) -> Reference<Self> {
+    fn reference(&self) -> Reference<Self> {
         Reference {
             name: Named::name(self).clone(),
             phantom: PhantomData,
@@ -554,35 +517,138 @@ pub trait Referenceable: Named {
 #[cfg(feature = "alloc")]
 impl<N> Referenceable for N where N: Named {}
 
-/// Empty object with the type T
-#[derive(Debug)]
+/// Object with the type T and the name associated with its concrete value
+#[derive(Serialize, Deserialize)]
 #[cfg(feature = "alloc")]
 pub struct Reference<T: ?Sized> {
     name: Cow<'static, str>,
+    #[serde(skip)]
     phantom: PhantomData<T>,
+}
+
+#[cfg(feature = "alloc")]
+impl<T: ?Sized> Reference<T> {
+    /// Fetch the name of the referenced instance.
+    ///
+    /// We explicitly do *not* implement [`Named`], as this could potentially lead to confusion
+    /// where we make a [`Reference`] of a [`Reference`] as [`Named`] is blanket implemented.
+    #[must_use]
+    pub fn name(&self) -> &Cow<'static, str> {
+        &self.name
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<T> Clone for Reference<T> {
+    fn clone(&self) -> Self {
+        Self {
+            name: self.name.clone(),
+            phantom: PhantomData,
+        }
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<T> Debug for Reference<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Reference")
+            .field("name", self.name())
+            .field("type", &type_name::<T>())
+            .finish()
+    }
 }
 
 /// Search using `Reference `
 #[cfg(feature = "alloc")]
 pub trait MatchNameRef {
     /// Search using name and `Reference `
-    fn match_by_ref<T>(&self, rf: Reference<T>) -> Option<&T>;
+    fn get<T>(&self, rf: &Reference<T>) -> Option<&T>;
 
     /// Search using name and `Reference `
-    fn match_by_ref_mut<T>(&mut self, rf: Reference<T>) -> Option<&mut T>;
+    fn get_mut<T>(&mut self, rf: &Reference<T>) -> Option<&mut T>;
 }
 
 #[cfg(feature = "alloc")]
+#[allow(deprecated)]
 impl<M> MatchNameRef for M
 where
     M: MatchName,
 {
-    fn match_by_ref<T>(&self, rf: Reference<T>) -> Option<&T> {
+    fn get<T>(&self, rf: &Reference<T>) -> Option<&T> {
         self.match_name::<T>(&rf.name)
     }
 
-    fn match_by_ref_mut<T>(&mut self, rf: Reference<T>) -> Option<&mut T> {
+    fn get_mut<T>(&mut self, rf: &Reference<T>) -> Option<&mut T> {
         self.match_name_mut::<T>(&rf.name)
+    }
+}
+
+/// A wrapper type to enable the indexing of [`MatchName`] implementors with `[]`.
+#[cfg(feature = "alloc")]
+#[derive(Copy, Clone, Debug)]
+#[repr(transparent)]
+pub struct RefIndexable<RM, M>(RM, PhantomData<M>);
+
+#[cfg(feature = "alloc")]
+impl<RM, M> From<RM> for RefIndexable<RM, M>
+where
+    RM: Deref<Target = M>,
+    M: MatchName,
+{
+    fn from(value: RM) -> Self {
+        RefIndexable(value, PhantomData)
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<RM, M> Deref for RefIndexable<RM, M>
+where
+    RM: Deref<Target = M>,
+{
+    type Target = RM::Target;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<RM, M> DerefMut for RefIndexable<RM, M>
+where
+    RM: DerefMut<Target = M>,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<T, RM, M> Index<&Reference<T>> for RefIndexable<RM, M>
+where
+    RM: Deref<Target = M>,
+    M: MatchName,
+{
+    type Output = T;
+
+    fn index(&self, index: &Reference<T>) -> &Self::Output {
+        let Some(e) = self.get(index) else {
+            panic!("Could not find entry matching {index:?}")
+        };
+        e
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<T, RM, M> IndexMut<&Reference<T>> for RefIndexable<RM, M>
+where
+    RM: DerefMut<Target = M>,
+    M: MatchName,
+{
+    fn index_mut(&mut self, index: &Reference<T>) -> &mut Self::Output {
+        let Some(e) = self.get_mut(index) else {
+            panic!("Could not find entry matching {index:?}")
+        };
+        e
     }
 }
 

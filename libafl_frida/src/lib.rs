@@ -416,10 +416,15 @@ mod tests {
 
             let mut feedback = ConstFeedback::new(false);
 
+            let asan_obs = AsanErrorsObserver::from_static_asan_errors();
+
             // Feedbacks to recognize an input as solution
             let mut objective = feedback_or_fast!(
                 // true enables the AsanErrorFeedback
-                feedback_and_fast!(ConstFeedback::from(true), AsanErrorsFeedback::new())
+                feedback_and_fast!(
+                    ConstFeedback::from(true),
+                    AsanErrorsFeedback::new(&asan_obs)
+                )
             );
 
             let mut state = StdState::new(
@@ -436,7 +441,7 @@ mod tests {
             let mut fuzzer = StdFuzzer::new(StdScheduler::new(), feedback, objective);
 
             let observers = tuple_list!(
-                AsanErrorsObserver::from_static_asan_errors() //,
+                asan_obs //,
             );
 
             {

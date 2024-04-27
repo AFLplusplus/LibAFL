@@ -429,11 +429,12 @@ where
 
         push_stage.set_current_corpus_idx(corpus_idx);
 
-        push_stage.init(fuzzer, state, event_mgr, executor.observers_mut())?;
+        push_stage.init(fuzzer, state, event_mgr, &mut *executor.observers_mut())?;
 
         loop {
             let input =
-                match push_stage.pre_exec(fuzzer, state, event_mgr, executor.observers_mut()) {
+                match push_stage.pre_exec(fuzzer, state, event_mgr, &mut *executor.observers_mut())
+                {
                     Some(Ok(next_input)) => next_input,
                     Some(Err(err)) => return Err(err),
                     None => break,
@@ -445,14 +446,14 @@ where
                 fuzzer,
                 state,
                 event_mgr,
-                executor.observers_mut(),
+                &mut *executor.observers_mut(),
                 input,
                 exit_kind,
             )?;
         }
 
         self.push_stage
-            .deinit(fuzzer, state, event_mgr, executor.observers_mut())
+            .deinit(fuzzer, state, event_mgr, &mut *executor.observers_mut())
     }
 
     #[inline]
