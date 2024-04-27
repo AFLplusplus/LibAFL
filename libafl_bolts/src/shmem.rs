@@ -35,7 +35,7 @@ pub use win32_shmem::{Win32ShMem, Win32ShMemProvider};
 use crate::os::pipes::Pipe;
 #[cfg(all(feature = "std", unix, not(target_os = "haiku")))]
 pub use crate::os::unix_shmem_server::{ServedShMemProvider, ShMemService};
-use crate::{AsSlice, AsSliceMut, Error};
+use crate::Error;
 
 /// The standard sharedmem provider
 #[cfg(all(windows, feature = "std"))]
@@ -1374,6 +1374,7 @@ impl<T: ShMem> ShMemCursor<T> {
 
     /// Slice from the current location on this map to the end, mutable
     fn empty_slice_mut(&mut self) -> &mut [u8] {
+        use crate::AsSliceMut;
         &mut (self.inner.as_slice_mut()[self.pos..])
     }
 }
@@ -1421,6 +1422,7 @@ impl<T: ShMem> std::io::Seek for ShMemCursor<T> {
         let effective_new_pos = match pos {
             std::io::SeekFrom::Start(s) => s,
             std::io::SeekFrom::End(offset) => {
+                use crate::AsSlice;
                 let map_len = self.inner.as_slice().len();
                 let signed_pos = i64::try_from(map_len).unwrap();
                 let effective = signed_pos.checked_add(offset).unwrap();
