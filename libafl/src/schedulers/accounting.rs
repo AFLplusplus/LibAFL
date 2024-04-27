@@ -1,8 +1,10 @@
 //! Coverage accounting corpus scheduler, more details at <https://www.ndss-symposium.org/wp-content/uploads/2020/02/24422-paper.pdf>
 
 use alloc::vec::Vec;
-use core::fmt::Debug;
-use std::ops::{Deref, DerefMut};
+use core::{
+    fmt::Debug,
+    ops::{Deref, DerefMut},
+};
 
 use hashbrown::HashMap;
 use libafl_bolts::{rands::Rand, HasLen, HasRefCnt};
