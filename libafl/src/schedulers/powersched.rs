@@ -305,7 +305,7 @@ where
         }
         PowerQueueScheduler {
             strat,
-            map_observer_ref: map_observer.type_ref(),
+            map_observer_ref: map_observer.reference(),
             last_hash: 0,
             phantom: PhantomData,
         }

@@ -70,7 +70,7 @@ where
     /// in the future to get observed maps from an executed input.
     pub fn new(obs: &C) -> Self {
         Self {
-            obs_ref: obs.type_ref(),
+            obs_ref: obs.reference(),
             phantom: PhantomData,
         }
     }

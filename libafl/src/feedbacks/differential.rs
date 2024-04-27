@@ -74,8 +74,8 @@ where
 {
     /// Create a new [`DiffFeedback`] using two observers and a test function.
     pub fn new(name: &'static str, o1: &O1, o2: &O2, compare_fn: F) -> Result<Self, Error> {
-        let o1_ref = o1.type_ref();
-        let o2_ref = o2.type_ref();
+        let o1_ref = o1.reference();
+        let o2_ref = o2.reference();
         if o1_ref.name() == o2_ref.name() {
             Err(Error::illegal_argument(format!(
                 "DiffFeedback: observer names must be different (both were {})",

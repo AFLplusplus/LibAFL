@@ -347,7 +347,7 @@ where
     pub fn new(map_observer: &C) -> Self {
         require_novelties_tracking!("GeneralizationStage", C);
         Self {
-            map_observer_ref: map_observer.type_ref(),
+            map_observer_ref: map_observer.reference(),
             phantom: PhantomData,
         }
     }

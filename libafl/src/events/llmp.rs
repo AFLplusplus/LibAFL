@@ -1362,7 +1362,7 @@ where
         .broker_port(broker_port)
         .configuration(configuration)
         .hooks(tuple_list!())
-        .time_ref(time_obs.type_ref())
+        .time_ref(time_obs.reference())
         .build()
         .launch()
 }
@@ -2095,7 +2095,7 @@ mod tests {
 
         let time = TimeObserver::new("time");
         #[cfg(feature = "adaptive_serialization")]
-        let time_ref = time.type_ref();
+        let time_ref = time.reference();
 
         let mut corpus = InMemoryCorpus::<BytesInput>::new();
         let testcase = Testcase::new(vec![0; 4].into());

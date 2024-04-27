@@ -995,7 +995,7 @@ impl TimeFeedback {
     #[must_use]
     pub fn new(observer: &TimeObserver) -> Self {
         Self {
-            obs_ref: observer.type_ref(),
+            obs_ref: observer.reference(),
         }
     }
 }

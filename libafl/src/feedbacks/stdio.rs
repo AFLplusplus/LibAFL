@@ -104,7 +104,7 @@ impl StdOutToMetadataFeedback {
     #[must_use]
     pub fn new(observer: &StdOutObserver) -> Self {
         Self {
-            o_ref: observer.type_ref(),
+            o_ref: observer.reference(),
         }
     }
 }
@@ -194,7 +194,7 @@ impl StdErrToMetadataFeedback {
     #[must_use]
     pub fn new(observer: &StdErrObserver) -> Self {
         Self {
-            o_ref: observer.type_ref(),
+            o_ref: observer.reference(),
         }
     }
 }

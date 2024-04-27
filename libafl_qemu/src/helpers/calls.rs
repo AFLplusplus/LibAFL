@@ -447,7 +447,7 @@ impl<'a> OnCrashBacktraceCollector<'a> {
     pub fn new(observer: &BacktraceObserver<'a>) -> Self {
         Self {
             callstack_hash: 0,
-            obs_ref: observer.type_ref(),
+            obs_ref: observer.reference(),
         }
     }
 

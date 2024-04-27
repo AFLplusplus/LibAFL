@@ -116,7 +116,7 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
-        let time_ref = time_observer.type_ref();
+        let time_ref = time_observer.reference();
 
         let mut run_client = |state: Option<_>,
                               mut mgr: LlmpRestartingEventManager<_, _, _>,

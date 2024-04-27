@@ -493,7 +493,7 @@ where
             client,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
-            time_ref: time_obs.type_ref(),
+            time_ref: time_obs.reference(),
             is_main,
         })
     }
@@ -532,7 +532,7 @@ where
             client,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
-            time_ref: time_obs.type_ref(),
+            time_ref: time_obs.reference(),
             is_main,
         })
     }
@@ -570,7 +570,7 @@ where
             client: LlmpClient::on_existing_from_env(shmem_provider, env_name)?,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
-            time_ref: time_obs.type_ref(),
+            time_ref: time_obs.reference(),
             is_main,
         })
     }
@@ -606,7 +606,7 @@ where
             client: LlmpClient::existing_client_from_description(shmem_provider, description)?,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
-            time_ref: time_obs.type_ref(),
+            time_ref: time_obs.reference(),
             is_main,
         })
     }

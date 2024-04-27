@@ -301,7 +301,7 @@ where
     /// Creates a new [`ColorizationStage`]
     pub fn new(map_observer: &C) -> Self {
         Self {
-            map_observer_ref: map_observer.type_ref(),
+            map_observer_ref: map_observer.reference(),
             phantom: PhantomData,
         }
     }

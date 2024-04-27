@@ -640,7 +640,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             asan_obs: self
                 .asan_obs
                 .clone()
-                .unwrap_or(AsanBacktraceObserver::default().type_ref()),
+                .unwrap_or(AsanBacktraceObserver::default().reference()),
             crash_exitcode: self.crash_exitcode,
         })
     }
@@ -702,7 +702,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             asan_obs: self
                 .asan_obs
                 .clone()
-                .unwrap_or(AsanBacktraceObserver::default().type_ref()),
+                .unwrap_or(AsanBacktraceObserver::default().reference()),
             crash_exitcode: self.crash_exitcode,
         })
     }

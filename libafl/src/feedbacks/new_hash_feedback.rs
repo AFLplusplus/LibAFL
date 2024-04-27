@@ -176,7 +176,7 @@ where
     pub fn with_capacity(observer: &O, capacity: usize) -> Self {
         Self {
             name: Cow::from(NEWHASHFEEDBACK_PREFIX.to_string() + observer.name()),
-            o_ref: observer.type_ref(),
+            o_ref: observer.reference(),
             capacity,
             phantom: PhantomData,
         }

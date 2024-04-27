@@ -163,7 +163,7 @@ where
     #[must_use]
     pub fn new(observer: &ListObserver<T>) -> Self {
         Self {
-            obs_ref: observer.type_ref(),
+            obs_ref: observer.reference(),
             novelty: HashSet::<T>::new(),
         }
     }

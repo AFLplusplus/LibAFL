@@ -207,7 +207,7 @@ fn fuzz(
 
         // The concolic observer observers the concolic shared memory map.
         let concolic_observer = ConcolicObserver::new("concolic", concolic_shmem.as_slice_mut());
-        let concolic_ref = concolic_observer.type_ref();
+        let concolic_ref = concolic_observer.reference();
 
         // The order of the stages matter!
         let mut stages = tuple_list!(

@@ -38,7 +38,7 @@ impl<'map, S> ConcolicFeedback<'map, S> {
     #[must_use]
     pub fn from_observer(observer: &ConcolicObserver<'map>) -> Self {
         Self {
-            obs_ref: observer.type_ref(),
+            obs_ref: observer.reference(),
             phantom: PhantomData,
         }
     }

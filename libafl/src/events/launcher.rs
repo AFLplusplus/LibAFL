@@ -640,7 +640,7 @@ where
                             .serialize_state(self.serialize_state)
                             .hooks(tuple_list!());
                         #[cfg(feature = "adaptive_serialization")]
-                        let builder = builder.time_ref(self.time_obs.type_ref());
+                        let builder = builder.time_ref(self.time_obs.reference());
                         let (state, mgr) = builder.build().launch()?;
 
                         #[cfg(not(feature = "adaptive_serialization"))]
@@ -681,7 +681,7 @@ where
                 .hooks(tuple_list!());
 
             #[cfg(feature = "adaptive_serialization")]
-            let builder = builder.time_ref(self.time_obs.type_ref());
+            let builder = builder.time_ref(self.time_obs.reference());
 
             builder.build().launch()?;
 

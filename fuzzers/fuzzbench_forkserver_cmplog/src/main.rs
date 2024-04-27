@@ -355,7 +355,7 @@ fn fuzz(
         let cmpmap = unsafe { OwnedRefMut::from_shmem(&mut cmplog_shmem) };
 
         let cmplog_observer = AFLppCmpLogObserver::new("cmplog", cmpmap, true);
-        let cmplog_ref = cmplog_observer.type_ref();
+        let cmplog_ref = cmplog_observer.reference();
 
         let cmplog_executor = ForkserverExecutor::builder()
             .program(exec)

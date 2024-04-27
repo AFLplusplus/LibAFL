@@ -716,7 +716,7 @@ impl<S> AsanErrorsFeedback<S> {
     pub fn new(obs: &AsanErrorsObserver) -> Self {
         Self {
             errors: None,
-            obs_ref: obs.type_ref(),
+            obs_ref: obs.reference(),
             phantom: PhantomData,
         }
     }

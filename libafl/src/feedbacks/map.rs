@@ -698,7 +698,7 @@ where
         Self {
             novelties: if C::NOVELTIES { Some(vec![]) } else { None },
             name: map_observer.name().clone(),
-            map_ref: map_observer.type_ref(),
+            map_ref: map_observer.reference(),
             stats_name: create_stats_name(map_observer.name()),
             phantom: PhantomData,
         }
@@ -712,7 +712,7 @@ where
         let name = Cow::from(name);
         Self {
             novelties: if C::NOVELTIES { Some(vec![]) } else { None },
-            map_ref: map_observer.type_ref(),
+            map_ref: map_observer.reference(),
             stats_name: create_stats_name(&name),
             name,
             phantom: PhantomData,

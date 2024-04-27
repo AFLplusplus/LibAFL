@@ -412,7 +412,7 @@ where
     /// Creates a new map equality feedback for the given observer
     pub fn new(obs: &C) -> Self {
         Self {
-            map_ref: obs.type_ref(),
+            map_ref: obs.reference(),
             phantom: PhantomData,
         }
     }
@@ -440,7 +440,7 @@ where
             .expect("Should have been provided valid observer name.");
         MapEqualityFeedback {
             name: Cow::from("MapEq"),
-            map_ref: obs.type_ref(),
+            map_ref: obs.reference(),
             orig_hash: obs.as_ref().hash_simple(),
             phantom: PhantomData,
         }
