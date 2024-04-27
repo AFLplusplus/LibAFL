@@ -22,7 +22,11 @@ use libafl::{
     state::State,
     Error, HasMetadata,
 };
-use libafl_bolts::{ownedref::OwnedPtr, Named, SerdeAny};
+use libafl_bolts::{
+    ownedref::OwnedPtr,
+    tuples::{MatchNameRef, Reference, Referenceable},
+    Named, SerdeAny,
+};
 use serde::{Deserialize, Serialize};
 use termcolor::{Color, ColorSpec, WriteColor};
 #[cfg(target_arch = "aarch64")]
@@ -38,8 +42,6 @@ use crate::asan::asan_rt::ASAN_SAVE_REGISTER_NAMES;
 use crate::{
     alloc::AllocationMetadata, asan::asan_rt::ASAN_SAVE_REGISTER_COUNT, utils::disas_count,
 };
-
-static ASAN_ERRORS_NAME: Cow<'static, str> = Cow::Borrowed("AsanErrors");
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct AsanReadWriteError {
@@ -591,6 +593,7 @@ where
 impl Named for AsanErrorsObserver {
     #[inline]
     fn name(&self) -> &Cow<'static, str> {
+        static ASAN_ERRORS_NAME: Cow<'static, str> = Cow::Borrowed("AsanErrors");
         &ASAN_ERRORS_NAME
     }
 }
@@ -643,6 +646,7 @@ impl AsanErrorsObserver {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AsanErrorsFeedback<S> {
     errors: Option<AsanErrors>,
+    obs_ref: Reference<AsanErrorsObserver>,
     phantom: PhantomData<S>,
 }
 
@@ -665,7 +669,7 @@ where
         OT: ObserversTuple<S>,
     {
         let observer = observers
-            .match_name::<AsanErrorsObserver>(&ASAN_ERRORS_NAME)
+            .get(&self.obs_ref)
             .expect("An AsanErrorsFeedback needs an AsanErrorsObserver");
         let errors = observer.errors();
         if errors.is_empty() {
@@ -702,23 +706,18 @@ where
 impl<S> Named for AsanErrorsFeedback<S> {
     #[inline]
     fn name(&self) -> &Cow<'static, str> {
-        &ASAN_ERRORS_NAME
+        self.obs_ref.name()
     }
 }
 
 impl<S> AsanErrorsFeedback<S> {
     /// Create a new `AsanErrorsFeedback`
     #[must_use]
-    pub fn new() -> Self {
+    pub fn new(obs: &AsanErrorsObserver) -> Self {
         Self {
             errors: None,
+            obs_ref: obs.reference(),
             phantom: PhantomData,
         }
-    }
-}
-
-impl<S> Default for AsanErrorsFeedback<S> {
-    fn default() -> Self {
-        Self::new()
     }
 }

@@ -2,13 +2,16 @@
 //! and use the results for fuzzer input and mutations.
 //!
 
-use alloc::{borrow::Cow, string::String};
+use alloc::borrow::Cow;
 #[cfg(feature = "concolic_mutation")]
 use alloc::{string::ToString, vec::Vec};
 #[cfg(feature = "concolic_mutation")]
 use core::marker::PhantomData;
 
-use libafl_bolts::{tuples::MatchName, Named};
+use libafl_bolts::{
+    tuples::{MatchNameRef, Reference},
+    Named,
+};
 
 #[cfg(all(feature = "concolic_mutation", feature = "introspection"))]
 use crate::monitors::PerfFeature;
@@ -34,26 +37,26 @@ use crate::{
 
 /// Wraps a [`TracingStage`] to add concolic observing.
 #[derive(Clone, Debug)]
-pub struct ConcolicTracingStage<EM, TE, Z> {
+pub struct ConcolicTracingStage<'a, EM, TE, Z> {
     inner: TracingStage<EM, TE, Z>,
-    observer_name: String,
+    obs_ref: Reference<ConcolicObserver<'a>>,
 }
 
-impl<EM, TE, Z> UsesState for ConcolicTracingStage<EM, TE, Z>
+impl<EM, TE, Z> UsesState for ConcolicTracingStage<'_, EM, TE, Z>
 where
     TE: UsesState,
 {
     type State = TE::State;
 }
 
-impl<EM, TE, Z> Named for ConcolicTracingStage<EM, TE, Z> {
+impl<EM, TE, Z> Named for ConcolicTracingStage<'_, EM, TE, Z> {
     fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("ConcolicTracingStage");
         &NAME
     }
 }
 
-impl<E, EM, TE, Z> Stage<E, EM, Z> for ConcolicTracingStage<EM, TE, Z>
+impl<E, EM, TE, Z> Stage<E, EM, Z> for ConcolicTracingStage<'_, EM, TE, Z>
 where
     E: UsesState<State = TE::State>,
     EM: UsesState<State = TE::State>,
@@ -70,12 +73,7 @@ where
         manager: &mut EM,
     ) -> Result<(), Error> {
         self.inner.trace(fuzzer, state, manager)?;
-        if let Some(observer) = self
-            .inner
-            .executor()
-            .observers()
-            .match_name::<ConcolicObserver>(&self.observer_name)
-        {
+        if let Some(observer) = self.inner.executor().observers().get(&self.obs_ref) {
             let metadata = observer.create_metadata_from_current_map();
             state
                 .current_testcase_mut()?
@@ -94,14 +92,11 @@ where
     }
 }
 
-impl<EM, TE, Z> ConcolicTracingStage<EM, TE, Z> {
+impl<'a, EM, TE, Z> ConcolicTracingStage<'a, EM, TE, Z> {
     /// Creates a new default tracing stage using the given [`Executor`], observing traces from a
     /// [`ConcolicObserver`] with the given name.
-    pub fn new(inner: TracingStage<EM, TE, Z>, observer_name: String) -> Self {
-        Self {
-            inner,
-            observer_name,
-        }
+    pub fn new(inner: TracingStage<EM, TE, Z>, obs_ref: Reference<ConcolicObserver<'a>>) -> Self {
+        Self { inner, obs_ref }
     }
 }
 

@@ -4,7 +4,10 @@
 //!
 use core::{cell::UnsafeCell, fmt::Debug, ptr};
 
-use libafl_bolts::{ownedref::OwnedMutPtr, tuples::MatchName};
+use libafl_bolts::{
+    ownedref::OwnedMutPtr,
+    tuples::{MatchName, RefIndexable},
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -183,6 +186,7 @@ where
     B: MatchName,
     DOT: MatchName,
 {
+    #[allow(deprecated)]
     fn match_name<T>(&self, name: &str) -> Option<&T> {
         if let Some(t) = self.primary.as_ref().match_name::<T>(name) {
             Some(t)
@@ -192,6 +196,8 @@ where
             self.differential.match_name::<T>(name)
         }
     }
+
+    #[allow(deprecated)]
     fn match_name_mut<T>(&mut self, name: &str) -> Option<&mut T> {
         if let Some(t) = self.primary.as_mut().match_name_mut::<T>(name) {
             Some(t)
@@ -238,26 +244,25 @@ where
     DOT: DifferentialObserversTuple<OTA, OTB, A::State>,
 {
     #[inline]
-    fn observers(&self) -> &ProxyObserversTuple<OTA, OTB, DOT> {
+    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         unsafe {
             self.observers
                 .get()
                 .as_mut()
                 .unwrap()
-                .set(self.primary.observers(), self.secondary.observers());
-            self.observers.get().as_ref().unwrap()
+                .set(&*self.primary.observers(), &*self.secondary.observers());
+            RefIndexable::from(self.observers.get().as_ref().unwrap())
         }
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut ProxyObserversTuple<OTA, OTB, DOT> {
+    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
         unsafe {
-            self.observers
-                .get()
-                .as_mut()
-                .unwrap()
-                .set(self.primary.observers(), self.secondary.observers());
-            self.observers.get().as_mut().unwrap()
+            self.observers.get().as_mut().unwrap().set(
+                &*self.primary.observers_mut(),
+                &*self.secondary.observers_mut(),
+            );
+            RefIndexable::from(self.observers.get().as_mut().unwrap())
         }
     }
 }

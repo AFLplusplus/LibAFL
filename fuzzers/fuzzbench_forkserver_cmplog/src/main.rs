@@ -37,7 +37,7 @@ use libafl_bolts::{
     ownedref::OwnedRefMut,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, Merge},
+    tuples::{tuple_list, Merge, Referenceable},
     AsSliceMut,
 };
 use libafl_targets::{
@@ -268,7 +268,7 @@ fn fuzz(
         // New maximization map feedback linked to the edges observer and the feedback state
         map_feedback,
         // Time feedback, this one does not need a feedback state
-        TimeFeedback::with_observer(&time_observer)
+        TimeFeedback::new(&time_observer)
     );
 
     // A feedback to choose if an input is a solution or not
@@ -355,6 +355,7 @@ fn fuzz(
         let cmpmap = unsafe { OwnedRefMut::from_shmem(&mut cmplog_shmem) };
 
         let cmplog_observer = AFLppCmpLogObserver::new("cmplog", cmpmap, true);
+        let cmplog_ref = cmplog_observer.reference();
 
         let cmplog_executor = ForkserverExecutor::builder()
             .program(exec)
@@ -367,7 +368,7 @@ fn fuzz(
             .build(tuple_list!(cmplog_observer))
             .unwrap();
 
-        let tracing = AFLppCmplogTracingStage::with_cmplog_observer_name(cmplog_executor, "cmplog");
+        let tracing = AFLppCmplogTracingStage::with_cmplog_observer(cmplog_executor, cmplog_ref);
 
         // Setup a randomic Input2State stage
         let rq = MultiMutationalStage::new(AFLppRedQueen::with_cmplog_options(true, true));

@@ -97,7 +97,7 @@ impl<'a, M: Monitor> Instance<'a, M> {
             // New maximization map feedback linked to the edges observer and the feedback state
             map_feedback,
             // Time feedback, this one does not need a feedback state
-            TimeFeedback::with_observer(&time_observer)
+            TimeFeedback::new(&time_observer)
         );
 
         // A feedback to choose if an input is a solution or not

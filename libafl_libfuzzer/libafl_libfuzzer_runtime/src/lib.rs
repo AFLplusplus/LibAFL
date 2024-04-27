@@ -244,7 +244,7 @@ macro_rules! fuzz_with {
                     map_feedback,
                     feedback_and_fast!(ConstFeedback::new($options.shrink()), shrinking_map_feedback),
                     // Time feedback, this one does not need a feedback state
-                    TimeFeedback::with_observer(&time_observer)
+                    TimeFeedback::new(&time_observer)
                 )
             );
 
