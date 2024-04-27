@@ -196,7 +196,6 @@ where
             // The index is modulo by the length, therefore it is always in bounds
             let len = self.hitcounts_map.len();
             self.hitcounts_map
-                .as_slice_mut()
                 .get_unchecked_mut(hash % len)
         };
         *val = val.saturating_add(1);
