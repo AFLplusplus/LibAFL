@@ -9,7 +9,9 @@ use core::{
     ops::{BitAnd, BitOr, Deref, DerefMut},
 };
 
-use libafl_bolts::{AsIter, AsSlice, AsSliceMut, HasRefCnt, Named};
+#[rustversion::nightly]
+use libafl_bolts::AsSlice;
+use libafl_bolts::{AsIter, HasRefCnt, Named};
 use num_traits::PrimInt;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -237,14 +239,14 @@ impl Deref for MapIndexesMetadata {
     type Target = [usize];
     /// Convert to a slice
     fn deref(&self) -> &[usize] {
-        self.list.as_slice()
+        &self.list
     }
 }
 
 impl DerefMut for MapIndexesMetadata {
     /// Convert to a slice
     fn deref_mut(&mut self) -> &mut [usize] {
-        self.list.as_slice_mut()
+        &mut self.list
     }
 }
 
