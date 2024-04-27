@@ -10,7 +10,11 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{mem::ManuallyDrop, ptr::addr_of};
+use core::{
+    mem::ManuallyDrop,
+    ops::{Deref, DerefMut},
+    ptr::addr_of,
+};
 #[cfg(target_vendor = "apple")]
 use std::fs;
 use std::{
@@ -40,7 +44,7 @@ use uds::{UnixListenerExt, UnixSocketAddr, UnixStreamExt};
 
 use crate::{
     shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
-    AsSlice, AsSliceMut, Error,
+    Error,
 };
 
 /// The default server name for our abstract shmem server
@@ -79,6 +83,26 @@ where
     server_fd: i32,
 }
 
+impl<SH> Deref for ServedShMem<SH>
+where
+    SH: ShMem,
+{
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<SH> DerefMut for ServedShMem<SH>
+where
+    SH: ShMem,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
 impl<SH> ShMem for ServedShMem<SH>
 where
     SH: ShMem,
@@ -86,29 +110,6 @@ where
     fn id(&self) -> ShMemId {
         let client_id = self.inner.id();
         ShMemId::from_string(&format!("{}:{client_id}", self.server_fd))
-    }
-
-    fn len(&self) -> usize {
-        self.inner.len()
-    }
-}
-
-impl<SH> AsSlice for ServedShMem<SH>
-where
-    SH: ShMem,
-{
-    type Entry = u8;
-    fn as_slice(&self) -> &[u8] {
-        self.inner.as_slice()
-    }
-}
-impl<SH> AsSliceMut for ServedShMem<SH>
-where
-    SH: ShMem,
-{
-    type Entry = u8;
-    fn as_slice_mut(&mut self) -> &mut [u8] {
-        self.inner.as_slice_mut()
     }
 }
 

@@ -5,11 +5,12 @@ use core::{
     fmt::{self, Debug},
     marker::PhantomData,
 };
+use std::ops::{Deref, DerefMut};
 
 use libafl_bolts::{
     rands::Rand,
     tuples::{tuple_list, tuple_list_type, Merge, NamedTuple},
-    AsSlice, AsSliceMut, Named,
+    Named,
 };
 use serde::{Deserialize, Serialize};
 
@@ -45,18 +46,16 @@ pub struct LogMutationMetadata {
 
 libafl_bolts::impl_serdeany!(LogMutationMetadata);
 
-impl AsSlice for LogMutationMetadata {
-    type Entry = Cow<'static, str>;
-    #[must_use]
-    fn as_slice(&self) -> &[Cow<'static, str>] {
-        self.list.as_slice()
+impl Deref for LogMutationMetadata {
+    type Target = [Cow<'static, str>];
+    fn deref(&self) -> &[Cow<'static, str>] {
+        &self.list
     }
 }
-impl AsSliceMut for LogMutationMetadata {
-    type Entry = Cow<'static, str>;
+impl DerefMut for LogMutationMetadata {
     #[must_use]
-    fn as_slice_mut(&mut self) -> &mut [Cow<'static, str>] {
-        self.list.as_slice_mut()
+    fn deref_mut(&mut self) -> &mut [Cow<'static, str>] {
+        &mut self.list
     }
 }
 

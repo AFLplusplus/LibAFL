@@ -6,7 +6,7 @@ use core::simd::prelude::SimdOrd;
 use core::{
     fmt::Debug,
     marker::PhantomData,
-    ops::{BitAnd, BitOr},
+    ops::{BitAnd, BitOr, Deref, DerefMut},
 };
 
 use libafl_bolts::{AsIter, AsSlice, AsSliceMut, HasRefCnt, Named};
@@ -233,18 +233,17 @@ pub struct MapIndexesMetadata {
 
 libafl_bolts::impl_serdeany!(MapIndexesMetadata);
 
-impl AsSlice for MapIndexesMetadata {
-    type Entry = usize;
+impl Deref for MapIndexesMetadata {
+    type Target = [usize];
     /// Convert to a slice
-    fn as_slice(&self) -> &[usize] {
+    fn deref(&self) -> &[usize] {
         self.list.as_slice()
     }
 }
 
-impl AsSliceMut for MapIndexesMetadata {
-    type Entry = usize;
+impl DerefMut for MapIndexesMetadata {
     /// Convert to a slice
-    fn as_slice_mut(&mut self) -> &mut [usize] {
+    fn deref_mut(&mut self) -> &mut [usize] {
         self.list.as_slice_mut()
     }
 }
@@ -280,21 +279,20 @@ pub struct MapNoveltiesMetadata {
 
 libafl_bolts::impl_serdeany!(MapNoveltiesMetadata);
 
-impl AsSlice for MapNoveltiesMetadata {
-    type Entry = usize;
+impl Deref for MapNoveltiesMetadata {
+    type Target = [usize];
     /// Convert to a slice
     #[must_use]
-    fn as_slice(&self) -> &[usize] {
-        self.list.as_slice()
+    fn deref(&self) -> &[usize] {
+        &self.list
     }
 }
 
-impl AsSliceMut for MapNoveltiesMetadata {
-    type Entry = usize;
+impl DerefMut for MapNoveltiesMetadata {
     /// Convert to a slice
     #[must_use]
-    fn as_slice_mut(&mut self) -> &mut [usize] {
-        self.list.as_slice_mut()
+    fn deref_mut(&mut self) -> &mut [usize] {
+        &mut self.list
     }
 }
 
@@ -548,8 +546,7 @@ where
 #[rustversion::nightly]
 impl<C, O, S> Feedback<S> for MapFeedback<C, DifferentIsNovel, O, MaxReducer, S, u8>
 where
-    O: MapObserver<Entry = u8> + AsSlice<Entry = u8>,
-    for<'it> O: AsIter<'it, Item = u8>,
+    O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
     S: State + HasNamedMetadata,
     C: CanTrack + AsRef<O>,
 {

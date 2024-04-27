@@ -394,14 +394,14 @@ impl Listener {
 #[inline]
 #[allow(clippy::cast_ptr_alignment)]
 unsafe fn shmem2page_mut<SHM: ShMem>(afl_shmem: &mut SHM) -> *mut LlmpPage {
-    afl_shmem.as_slice_mut().as_mut_ptr() as *mut LlmpPage
+    afl_shmem.as_mut_ptr() as *mut LlmpPage
 }
 
 /// Get sharedmem from a page
 #[inline]
 #[allow(clippy::cast_ptr_alignment)]
 unsafe fn shmem2page<SHM: ShMem>(afl_shmem: &SHM) -> *const LlmpPage {
-    afl_shmem.as_slice().as_ptr() as *const LlmpPage
+    afl_shmem.as_ptr() as *const LlmpPage
 }
 
 /// Return, if a msg is contained in the current page
@@ -564,7 +564,7 @@ unsafe fn llmp_next_msg_ptr_checked<SHM: ShMem>(
     alloc_size: usize,
 ) -> Result<*mut LlmpMsg, Error> {
     let page = map.page_mut();
-    let map_size = map.shmem.as_slice().len();
+    let map_size = map.shmem.len();
     let msg_begin_min = (page as *const u8).add(size_of::<LlmpPage>());
     // We still need space for this msg (alloc_size).
     let msg_begin_max = (page as *const u8).add(map_size - alloc_size);
@@ -662,7 +662,7 @@ impl LlmpMsg {
     /// Returns `true`, if the pointer is, indeed, in the page of this shared map.
     #[inline]
     pub fn in_shmem<SHM: ShMem>(&self, map: &mut LlmpSharedMap<SHM>) -> bool {
-        let map_size = map.shmem.as_slice().len();
+        let map_size = map.shmem.len();
         let buf_ptr = self.buf.as_ptr();
         let len = self.buf_len_padded as usize + size_of::<LlmpMsg>();
         unsafe {
@@ -1970,7 +1970,7 @@ where
         let offset = offset as usize;
 
         let page = unsafe { self.page_mut() };
-        let page_size = self.shmem.as_slice().len() - size_of::<LlmpPage>();
+        let page_size = self.shmem.len() - size_of::<LlmpPage>();
         if offset > page_size {
             Err(Error::illegal_argument(format!(
                 "Msg offset out of bounds (size: {page_size}, requested offset: {offset})"
