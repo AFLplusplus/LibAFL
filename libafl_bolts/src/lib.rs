@@ -679,7 +679,7 @@ pub trait AsSlice<'a> {
     /// Type of the entries of this slice
     type Entry: 'a;
     /// Type of the reference to this slice
-    type SliceRef: Deref<Target = [Self::Entry]> + AsRef<[Self::Entry]>;
+    type SliceRef: Deref<Target = [Self::Entry]>;
 
     /// Convert to a slice
     fn as_slice(&'a self) -> Self::SliceRef;
@@ -701,7 +701,7 @@ where
 /// Can be converted to a mutable slice
 pub trait AsSliceMut<'a>: AsSlice<'a> {
     /// Type of the mutable reference to this slice
-    type SliceRefMut: DerefMut<Target = [Self::Entry]> + AsMut<[Self::Entry]>;
+    type SliceRefMut: DerefMut<Target = [Self::Entry]>;
 
     /// Convert to a slice
     fn as_slice_mut(&'a mut self) -> Self::SliceRefMut;

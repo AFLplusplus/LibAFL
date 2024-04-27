@@ -9,7 +9,7 @@ use core::{
 };
 
 use ahash::RandomState;
-use libafl_bolts::{ownedref::OwnedRef, AsIter, AsIterMut, Named};
+use libafl_bolts::{ownedref::OwnedRef, AsIter, AsIterMut, AsSlice, AsSliceMut, Named};
 use serde::{Deserialize, Serialize};
 
 use super::Observer;
@@ -100,21 +100,15 @@ where
 
 /// A simple observer with a single [`RefCell`]'d value.
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(bound = "T: serde::de::DeserializeOwned")]
-pub struct RefCellValueObserver<'a, T>
-where
-    T: Debug + Serialize,
-{
+#[serde(bound = "T: serde::de::DeserializeOwned + serde::Serialize")]
+pub struct RefCellValueObserver<'a, T> {
     /// The name of this observer.
     name: Cow<'static, str>,
     /// The value.
     pub value: OwnedRef<'a, RefCell<T>>,
 }
 
-impl<'a, T> RefCellValueObserver<'a, T>
-where
-    T: Debug + Serialize + serde::de::DeserializeOwned,
-{
+impl<'a, T> RefCellValueObserver<'a, T> {
     /// Creates a new [`RefCellValueObserver`] with the given name.
     #[must_use]
     pub fn new(name: &'static str, value: OwnedRef<'a, RefCell<T>>) -> Self {
@@ -169,25 +163,21 @@ where
 impl<'a, S, T> Observer<S> for RefCellValueObserver<'a, T>
 where
     S: UsesInput,
-    T: Debug + Serialize + serde::de::DeserializeOwned,
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         Ok(())
     }
 }
 
-impl<'a, T> Named for RefCellValueObserver<'a, T>
-where
-    T: Debug + Serialize + serde::de::DeserializeOwned,
-{
+impl<'a, T> Named for RefCellValueObserver<'a, T> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<'a, T: Hash> ObserverWithHashField for RefCellValueObserver<'a, T>
+impl<'a, T> ObserverWithHashField for RefCellValueObserver<'a, T>
 where
-    T: Debug + Serialize + serde::de::DeserializeOwned,
+    T: Hash,
 {
     fn hash(&self) -> Option<u64> {
         Some(RandomState::with_seeds(1, 2, 3, 4).hash_one(&*self.value.as_ref().borrow()))
@@ -200,9 +190,24 @@ pub struct RefCellValueObserverIter<'it, T> {
     v: Ref<'it, [T]>,
 }
 
-impl<'it, T: 'it, A: Debug + Deref<Target = [T]> + Serialize> AsIter<'it>
-    for RefCellValueObserver<'_, A>
-{
+impl<'it, T: 'it, A: Deref<Target = [T]>> AsSlice<'it> for RefCellValueObserver<'_, A> {
+    type Entry = T;
+    type SliceRef = Ref<'it, [T]>;
+
+    fn as_slice(&'it self) -> Self::SliceRef {
+        Ref::map(self.value.as_ref().borrow(), |s| &**s)
+    }
+}
+
+impl<'it, T: 'it, A: DerefMut<Target = [T]>> AsSliceMut<'it> for RefCellValueObserver<'_, A> {
+    type SliceRefMut = RefMut<'it, [T]>;
+
+    fn as_slice_mut(&'it mut self) -> Self::SliceRefMut {
+        RefMut::map(self.value.as_ref().borrow_mut(), |s| &mut **s)
+    }
+}
+
+impl<'it, T: 'it, A: Deref<Target = [T]>> AsIter<'it> for RefCellValueObserver<'_, A> {
     type Item = T;
     type Ref = Ref<'it, Self::Item>;
     type IntoIter = RefCellValueObserverIter<'it, T>;
