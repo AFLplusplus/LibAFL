@@ -6,12 +6,14 @@ use core::simd::prelude::SimdOrd;
 use core::{
     fmt::Debug,
     marker::PhantomData,
-    ops::{BitAnd, BitOr},
+    ops::{BitAnd, BitOr, Deref, DerefMut},
 };
 
+#[rustversion::nightly]
+use libafl_bolts::AsSlice;
 use libafl_bolts::{
     tuples::{MatchNameRef, Reference, Referenceable},
-    AsIter, AsSlice, AsSliceMut, HasRefCnt, Named,
+    AsIter, HasRefCnt, Named,
 };
 use num_traits::PrimInt;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -235,19 +237,18 @@ pub struct MapIndexesMetadata {
 
 libafl_bolts::impl_serdeany!(MapIndexesMetadata);
 
-impl AsSlice for MapIndexesMetadata {
-    type Entry = usize;
+impl Deref for MapIndexesMetadata {
+    type Target = [usize];
     /// Convert to a slice
-    fn as_slice(&self) -> &[usize] {
-        self.list.as_slice()
+    fn deref(&self) -> &[usize] {
+        &self.list
     }
 }
 
-impl AsSliceMut for MapIndexesMetadata {
-    type Entry = usize;
+impl DerefMut for MapIndexesMetadata {
     /// Convert to a slice
-    fn as_slice_mut(&mut self) -> &mut [usize] {
-        self.list.as_slice_mut()
+    fn deref_mut(&mut self) -> &mut [usize] {
+        &mut self.list
     }
 }
 
@@ -282,21 +283,20 @@ pub struct MapNoveltiesMetadata {
 
 libafl_bolts::impl_serdeany!(MapNoveltiesMetadata);
 
-impl AsSlice for MapNoveltiesMetadata {
-    type Entry = usize;
+impl Deref for MapNoveltiesMetadata {
+    type Target = [usize];
     /// Convert to a slice
     #[must_use]
-    fn as_slice(&self) -> &[usize] {
-        self.list.as_slice()
+    fn deref(&self) -> &[usize] {
+        &self.list
     }
 }
 
-impl AsSliceMut for MapNoveltiesMetadata {
-    type Entry = usize;
+impl DerefMut for MapNoveltiesMetadata {
     /// Convert to a slice
     #[must_use]
-    fn as_slice_mut(&mut self) -> &mut [usize] {
-        self.list.as_slice_mut()
+    fn deref_mut(&mut self) -> &mut [usize] {
+        &mut self.list
     }
 }
 
@@ -469,13 +469,13 @@ where
             map_state.history_map.resize(len, observer.initial());
         }
 
-        let history_map = map_state.history_map.as_slice_mut();
+        let history_map = &mut map_state.history_map;
         if C::INDICES {
             let mut indices = Vec::new();
 
             for (i, value) in observer
                 .as_iter()
-                .copied()
+                .map(|x| *x)
                 .enumerate()
                 .filter(|(_, value)| *value != initial)
             {
@@ -490,7 +490,7 @@ where
         } else {
             for (i, value) in observer
                 .as_iter()
-                .copied()
+                .map(|x| *x)
                 .enumerate()
                 .filter(|(_, value)| *value != initial)
             {
@@ -539,8 +539,7 @@ where
 #[rustversion::nightly]
 impl<C, O, S> Feedback<S> for MapFeedback<C, DifferentIsNovel, O, MaxReducer, u8>
 where
-    O: MapObserver<Entry = u8> + AsSlice<Entry = u8>,
-    for<'it> O: AsIter<'it, Item = u8>,
+    O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
     S: State + HasNamedMetadata,
     C: CanTrack + AsRef<O> + Observer<S>,
 {
@@ -756,7 +755,7 @@ where
             novelties.clear();
             for (i, item) in observer
                 .as_iter()
-                .copied()
+                .map(|x| *x)
                 .enumerate()
                 .filter(|(_, item)| *item != initial)
             {
@@ -770,7 +769,7 @@ where
         } else {
             for (i, item) in observer
                 .as_iter()
-                .copied()
+                .map(|x| *x)
                 .enumerate()
                 .filter(|(_, item)| *item != initial)
             {
