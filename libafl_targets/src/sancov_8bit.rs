@@ -331,7 +331,7 @@ mod observers {
     }
 
     impl<'it, const DIFFERENTIAL: bool> AsIterMut<'it> for CountersMultiMapObserver<DIFFERENTIAL> {
-        type Item = u8;
+        type RefMut = &'it mut Self::Item;
         type IntoIterMut = Flatten<IterMut<'it, OwnedMutSlice<'static, u8>>>;
 
         fn as_iter_mut(&'it mut self) -> Self::IntoIterMut {

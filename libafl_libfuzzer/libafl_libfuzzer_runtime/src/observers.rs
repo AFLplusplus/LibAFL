@@ -2,6 +2,7 @@ use std::{
     borrow::Cow,
     fmt::Debug,
     hash::{Hash, Hasher},
+    ops::Deref,
 };
 
 use ahash::AHasher;
@@ -202,9 +203,10 @@ impl<'it, I, O, T> MappedEdgeMapIter<'it, I, O, T> {
     }
 }
 
-impl<'it, I, O, T> Iterator for MappedEdgeMapIter<'it, I, O, T>
+impl<'it, I, O, R, T> Iterator for MappedEdgeMapIter<'it, I, O, T>
 where
-    I: Iterator<Item = &'it T>,
+    I: Iterator<Item = R>,
+    R: Deref<Target = T>,
     T: PartialEq + 'it,
     O: ValueObserver,
 {
@@ -225,7 +227,7 @@ where
     O: ValueObserver + 'it,
 {
     type Item = O::ValueType;
-    type Ref = <M as AsIter<'it>>::Ref;
+    type Ref = &'it Self::Item;
     type IntoIter = MappedEdgeMapIter<'it, <M as AsIter<'it>>::IntoIter, O, M::Entry>;
 
     fn as_iter(&'it self) -> Self::IntoIter {

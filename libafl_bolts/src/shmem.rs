@@ -1166,6 +1166,7 @@ pub mod win32_shmem {
     use core::{
         ffi::c_void,
         fmt::{self, Debug, Formatter},
+        ops::{Deref, DerefMut},
         slice,
     };
 
@@ -1183,7 +1184,7 @@ pub mod win32_shmem {
 
     use crate::{
         shmem::{ShMem, ShMemId, ShMemProvider},
-        AsSlice, AsSliceMut, Error,
+        Error,
     };
 
     const INVALID_HANDLE_VALUE: isize = -1;
@@ -1274,21 +1275,16 @@ pub mod win32_shmem {
         fn id(&self) -> ShMemId {
             self.id
         }
-
-        fn len(&self) -> usize {
-            self.map_size
-        }
     }
 
-    impl AsSlice for Win32ShMem {
-        type Entry = u8;
-        fn as_slice(&self) -> &[u8] {
+    impl Deref for Win32ShMem {
+        type Target = [u8];
+        fn deref(&self) -> &[u8] {
             unsafe { slice::from_raw_parts(self.map, self.map_size) }
         }
     }
-    impl AsSliceMut for Win32ShMem {
-        type Entry = u8;
-        fn as_slice_mut(&mut self) -> &mut [u8] {
+    impl DerefMut for Win32ShMem {
+        fn deref_mut(&mut self) -> &mut [u8] {
             unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
         }
     }
