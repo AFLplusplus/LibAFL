@@ -9,7 +9,9 @@ use core::{
     ops::{BitAnd, BitOr, Deref, DerefMut},
 };
 
-use libafl_bolts::{AsIter, AsSlice, AsSliceMut, HasRefCnt, Named};
+#[rustversion::nightly]
+use libafl_bolts::AsSlice;
+use libafl_bolts::{AsIter, HasRefCnt, Named};
 use num_traits::PrimInt;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -476,7 +478,7 @@ where
             map_state.history_map.resize(len, observer.initial());
         }
 
-        let history_map = map_state.history_map.as_slice_mut();
+        let history_map = &mut map_state.history_map;
         if C::INDICES {
             let mut indices = Vec::new();
 
