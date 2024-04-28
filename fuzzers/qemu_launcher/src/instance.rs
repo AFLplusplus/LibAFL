@@ -33,7 +33,6 @@ use libafl::{
 use libafl_bolts::shmem::StdShMemProvider;
 use libafl_bolts::{
     core_affinity::CoreId,
-    current_nanos,
     ownedref::OwnedMutSlice,
     rands::StdRand,
     tuples::{tuple_list, Merge},
@@ -110,7 +109,7 @@ impl<'a, M: Monitor> Instance<'a, M> {
             None => {
                 StdState::new(
                     // RNG
-                    StdRand::with_seed(current_nanos()),
+                    StdRand::new(),
                     // Corpus that will be evolved, we keep it in memory for performance
                     InMemoryOnDiskCorpus::no_meta(self.options.queue_dir(self.core_id))?,
                     // Corpus in which we store solutions (crashes in this example),
