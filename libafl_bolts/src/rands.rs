@@ -1,8 +1,6 @@
 //! The random number generators of `LibAFL`
 use core::{debug_assert, fmt::Debug};
 
-#[cfg(feature = "rand_trait")]
-use rand_core::{impls::fill_bytes_via_next, RngCore};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 #[cfg(feature = "std")]
@@ -158,7 +156,7 @@ macro_rules! impl_random {
         }
 
         #[cfg(feature = "rand_trait")]
-        impl RngCore for $rand {
+        impl rand_core::RngCore for $rand {
             fn next_u32(&mut self) -> u32 {
                 self.next() as u32
             }
@@ -168,7 +166,7 @@ macro_rules! impl_random {
             }
 
             fn fill_bytes(&mut self, dest: &mut [u8]) {
-                fill_bytes_via_next(self, dest)
+                rand_core::impls::fill_bytes_via_next(self, dest)
             }
 
             fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
@@ -491,23 +489,6 @@ mod tests {
         // The seed should be reasonably random so these never fail
         assert_ne!(rand.next(), rand_fixed.next());
         test_single_rand(&mut rand);
-    }
-
-    #[test]
-    #[cfg(feature = "rand_trait")]
-    fn test_rgn_core_support() {
-        use rand_core::RngCore;
-
-        use crate::rands::StdRand;
-        pub struct Mutator<R: RngCore> {
-            rng: R,
-        }
-
-        let mut mutator = Mutator {
-            rng: StdRand::with_seed(0),
-        };
-
-        log::info!("random value: {}", mutator.rng.next_u32());
     }
 
     #[test]
