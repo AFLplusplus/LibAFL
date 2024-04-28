@@ -497,21 +497,75 @@ mod tests {
         test_single_rand(&mut Sfc64Rand::with_seed(0));
     }
 
-    #[cfg(feature = "std")]
     #[test]
-    fn test_random_seed() {
-        use crate::rands::RandomSeed;
+    fn test_romutrio_golden() {
+        // https://github.com/ziglang/zig/blob/130fb5cb0fb9039e79450c9db58d6590c5bee3b3/lib/std/Random/RomuTrio.zig#L75-L95
+        let golden: [u64; 10] = [
+            16294208416658607535,
+            13964609475759908645,
+            4703697494102998476,
+            3425221541186733346,
+            2285772463536419399,
+            9454187757529463048,
+            13695907680080547496,
+            8328236714879408626,
+            12323357569716880909,
+            12375466223337721820,
+        ];
 
-        let mut rand_fixed = StdRand::with_seed(0);
-        let mut rand = StdRand::new();
-
-        // The seed should be reasonably random so these never fail
-        assert_ne!(rand.next(), rand_fixed.next());
-        test_single_rand(&mut rand);
+        let mut s = RomuTrioRand::with_seed(0);
+        for v in golden {
+            let u = s.next();
+            assert_eq!(v, u);
+        }
     }
 
     #[test]
-    fn test_sfc64_golden_zig() {
+    fn test_romuduojr_golden() {
+        // https://github.com/eqv/rand_romu/blob/c0379dc3c21ffac8440197e2f8fe95c226c44bfe/src/lib.rs#L65-L79
+        let golden: [u64; 9] = [
+            0x3c91b13ee3913664,
+            0xdc1980b78df3115,
+            0x1c163b704996d2ad,
+            0xa000c594bb28313b,
+            0xfb6c42e69a523526,
+            0x1fcebd6988ab21d8,
+            0x5e0a8abf025f8f02,
+            0x29554b00ffab0263,
+            0xff5b6bb1551cf66,
+        ];
+
+        let mut s = RomuDuoJrRand {
+            x_state: 0x3c91b13ee3913664u64,
+            y_state: 0x863f0e37c2637d1fu64,
+        };
+        for v in golden {
+            let u = s.next();
+            assert_eq!(v, u);
+        }
+    }
+
+    #[test]
+    fn test_xoshiro256pp_golden() {
+        // https://github.com/ziglang/zig/blob/130fb5cb0fb9039e79450c9db58d6590c5bee3b3/lib/std/Random/Xoshiro256.zig#L96-L103
+        let golden: [u64; 6] = [
+            0x53175d61490b23df,
+            0x61da6f3dc380d507,
+            0x5c0fdf91ec9a7bfc,
+            0x02eebf8c3bbe5e1a,
+            0x7eca04ebaf4a5eea,
+            0x0543c37757f08d9a,
+        ];
+
+        let mut s = Xoshiro256PlusPlusRand::with_seed(0);
+        for v in golden {
+            let u = s.next();
+            assert_eq!(v, u);
+        }
+    }
+
+    #[test]
+    fn test_sfc64_golden() {
         // https://github.com/ziglang/zig/blob/130fb5cb0fb9039e79450c9db58d6590c5bee3b3/lib/std/Random/Sfc64.zig#L73-L99
         let golden: [u64; 16] = [
             0x3acfa029e3cc6041,
