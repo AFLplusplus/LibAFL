@@ -1,10 +1,52 @@
 //! The random number generators of `LibAFL`
-use core::{debug_assert, fmt::Debug};
+
+use core::{
+    debug_assert,
+    fmt::Debug,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
+/// Return a pseudo-random seed. For `no_std` environments, a single deterministic sequence is used.
+#[must_use]
+#[allow(unreachable_code)]
+pub fn random_seed() -> u64 {
+    #[cfg(feature = "std")]
+    return random_seed_from_random_state();
+    #[cfg(all(not(feature = "std"), target_has_atomic = "ptr"))]
+    return random_seed_deterministic();
+    // no_std and no atomics; https://xkcd.com/221/
+    4
+}
+
+static SEED_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+#[allow(dead_code)]
+#[cfg(target_has_atomic = "ptr")]
+fn random_seed_deterministic() -> u64 {
+    let mut seed = SEED_COUNTER.fetch_add(1, Ordering::Relaxed) as u64;
+    splitmix64(&mut seed)
+}
+
+#[allow(dead_code)]
 #[cfg(feature = "std")]
-use crate::current_nanos;
+fn random_seed_from_random_state() -> u64 {
+    use std::{
+        collections::hash_map::RandomState,
+        hash::{BuildHasher, Hasher},
+    };
+    RandomState::new().build_hasher().finish()
+}
+
+// https://prng.di.unimi.it/splitmix64.c
+fn splitmix64(x: &mut u64) -> u64 {
+    *x = x.wrapping_add(0x9e3779b97f4a7c15);
+    let mut z = *x;
+    z = (z ^ (z >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94d049bb133111eb);
+    z ^ (z >> 31)
+}
 
 /// The standard rand implementation for `LibAFL`.
 /// It is usually the right choice, with very good speed and a reasonable randomness.
@@ -99,62 +141,39 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
     }
 }
 
-// helper macro for deriving Default
-macro_rules! default_rand {
-    ($rand: ty) => {
-        /// A default RNG will usually produce a nondeterministic stream of random numbers.
-        /// As we do not have any way to get random seeds for `no_std`, they have to be reproducible there.
-        /// Use [`$rand::with_seed`] to generate a reproducible RNG.
-        impl Default for $rand {
-            #[cfg(feature = "std")]
-            fn default() -> Self {
-                Self::new()
-            }
-            #[cfg(not(feature = "std"))]
-            fn default() -> Self {
-                Self::with_seed(0xAF1)
-            }
-        }
-    };
-}
-
-// https://prng.di.unimi.it/splitmix64.c
-fn splitmix64(x: &mut u64) -> u64 {
-    *x = x.wrapping_add(0x9e3779b97f4a7c15);
-    let mut z = *x;
-    z = (z ^ (z >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
-    z = (z ^ (z >> 27)).wrapping_mul(0x94d049bb133111eb);
-    z ^ (z >> 31)
-}
-
-// Derive Default by calling `new(DEFAULT_SEED)` on each of the following Rand types.
-default_rand!(Xoshiro256PlusPlusRand);
-default_rand!(XorShift64Rand);
-default_rand!(Lehmer64Rand);
-default_rand!(RomuTrioRand);
-default_rand!(RomuDuoJrRand);
-default_rand!(Sfc64Rand);
-
 /// Initialize Rand types from a source of randomness.
-///
-/// Default implementations are provided with the "std" feature enabled, using system time in
-/// nanoseconds as the initial seed.
 pub trait RandomSeed: Rand + Default {
     /// Creates a new [`RandomSeed`].
     fn new() -> Self;
 }
 
-// helper macro to impl RandomSeed
-macro_rules! impl_random {
+macro_rules! impl_default_seed {
     ($rand: ty) => {
-        #[cfg(feature = "std")]
-        impl RandomSeed for $rand {
-            /// Creates a rand instance, pre-seeded with the current time in nanoseconds.
-            fn new() -> Self {
-                Self::with_seed(current_nanos())
+        impl Default for $rand {
+            /// Creates a generator seeded with [`random_seed`].
+            fn default() -> Self {
+                Self::with_seed(random_seed())
             }
         }
 
+        impl RandomSeed for $rand {
+            /// Creates a generator seeded with [`random_seed`].
+            fn new() -> Self {
+                Self::with_seed(random_seed())
+            }
+        }
+    };
+}
+
+impl_default_seed!(Xoshiro256PlusPlusRand);
+impl_default_seed!(XorShift64Rand);
+impl_default_seed!(Lehmer64Rand);
+impl_default_seed!(RomuTrioRand);
+impl_default_seed!(RomuDuoJrRand);
+impl_default_seed!(Sfc64Rand);
+
+macro_rules! impl_rng_core {
+    ($rand: ty) => {
         #[cfg(feature = "rand_trait")]
         impl rand_core::RngCore for $rand {
             fn next_u32(&mut self) -> u32 {
@@ -176,12 +195,12 @@ macro_rules! impl_random {
     };
 }
 
-impl_random!(Xoshiro256PlusPlusRand);
-impl_random!(XorShift64Rand);
-impl_random!(Lehmer64Rand);
-impl_random!(RomuTrioRand);
-impl_random!(RomuDuoJrRand);
-impl_random!(Sfc64Rand);
+impl_rng_core!(Xoshiro256PlusPlusRand);
+impl_rng_core!(XorShift64Rand);
+impl_rng_core!(Lehmer64Rand);
+impl_rng_core!(RomuTrioRand);
+impl_rng_core!(RomuDuoJrRand);
+impl_rng_core!(Sfc64Rand);
 
 /// xoshiro256++ PRNG: <https://prng.di.unimi.it/>
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
@@ -529,8 +548,7 @@ pub mod pybind {
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};
 
-    use super::Rand;
-    use crate::{current_nanos, rands::StdRand};
+    use super::{random_seed, Rand, StdRand};
 
     #[pyclass(unsendable, name = "StdRand")]
     #[allow(clippy::unsafe_derive_deserialize)]
@@ -544,9 +562,9 @@ pub mod pybind {
     #[pymethods]
     impl PythonStdRand {
         #[staticmethod]
-        fn with_current_nanos() -> Self {
+        fn with_random_seed() -> Self {
             Self {
-                inner: StdRand::with_seed(current_nanos()),
+                inner: StdRand::with_seed(random_seed()),
             }
         }
 
