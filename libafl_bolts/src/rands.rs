@@ -141,13 +141,7 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
     }
 }
 
-/// Initialize Rand types from a source of randomness.
-pub trait RandomSeed: Rand + Default {
-    /// Creates a new [`RandomSeed`].
-    fn new() -> Self;
-}
-
-macro_rules! impl_default_seed {
+macro_rules! impl_default_new {
     ($rand: ty) => {
         impl Default for $rand {
             /// Creates a generator seeded with [`random_seed`].
@@ -156,21 +150,22 @@ macro_rules! impl_default_seed {
             }
         }
 
-        impl RandomSeed for $rand {
+        impl $rand {
             /// Creates a generator seeded with [`random_seed`].
-            fn new() -> Self {
+            #[must_use]
+            pub fn new() -> Self {
                 Self::with_seed(random_seed())
             }
         }
     };
 }
 
-impl_default_seed!(Xoshiro256PlusPlusRand);
-impl_default_seed!(XorShift64Rand);
-impl_default_seed!(Lehmer64Rand);
-impl_default_seed!(RomuTrioRand);
-impl_default_seed!(RomuDuoJrRand);
-impl_default_seed!(Sfc64Rand);
+impl_default_new!(Xoshiro256PlusPlusRand);
+impl_default_new!(XorShift64Rand);
+impl_default_new!(Lehmer64Rand);
+impl_default_new!(RomuTrioRand);
+impl_default_new!(RomuDuoJrRand);
+impl_default_new!(Sfc64Rand);
 
 macro_rules! impl_rng_core {
     ($rand: ty) => {

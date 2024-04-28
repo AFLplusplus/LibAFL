@@ -593,7 +593,7 @@ pub mod unix_shmem {
         };
 
         use crate::{
-            rands::{Rand, RandomSeed, StdRand},
+            rands::{Rand, StdRand},
             shmem::{ShMem, ShMemId, ShMemProvider},
             Error,
         };

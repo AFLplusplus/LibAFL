@@ -16,7 +16,7 @@ use libafl::{
     Error, Fuzzer, StdFuzzer,
 };
 use libafl_bolts::{
-    rands::{RandomSeed, RomuDuoJrRand, StdRand},
+    rands::{RomuDuoJrRand, StdRand},
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
     AsSlice, HasLen,
