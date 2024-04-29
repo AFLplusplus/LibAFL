@@ -39,6 +39,7 @@ use libafl::{
 use libafl_bolts::{
     current_nanos, current_time,
     os::{dup2, unix_signals::Signal},
+    ownedref::OwnedMutSlice,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
@@ -47,9 +48,9 @@ use libafl_bolts::{
 use libafl_qemu::{
     // asan::{init_with_asan, QemuAsanHelper},
     cmplog::{CmpLogObserver, QemuCmpLogHelper},
-    edges::edges_map_mut_slice,
+    edges::edges_map_mut_ptr,
     edges::QemuEdgeCoverageHelper,
-    edges::MAX_EDGES_NUM,
+    edges::{EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND},
     elf::EasyElf,
     filter_qemu_args,
     hooks::QemuHooks,
@@ -257,8 +258,8 @@ fn fuzz(
     let edges_observer = unsafe {
         HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
             "edges",
-            edges_map_mut_slice(),
-            addr_of_mut!(MAX_EDGES_NUM),
+            OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_SIZE_IN_USE),
+            addr_of_mut!(MAX_EDGES_FOUND),
         ))
         .track_indices()
     };

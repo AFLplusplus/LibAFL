@@ -30,6 +30,7 @@ use libafl::{
 use libafl_bolts::{
     core_affinity::Cores,
     current_nanos,
+    ownedref::OwnedMutSlice,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge, Referenceable},
@@ -39,7 +40,7 @@ pub use libafl_qemu::emu::Qemu;
 #[cfg(not(any(feature = "mips", feature = "hexagon")))]
 use libafl_qemu::QemuCmpLogHelper;
 use libafl_qemu::{edges, QemuEdgeCoverageHelper, QemuExecutor, QemuHooks};
-use libafl_targets::{edges_map_mut_slice, CmpLogObserver};
+use libafl_targets::{edges_map_mut_ptr, CmpLogObserver};
 use typed_builder::TypedBuilder;
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
@@ -159,8 +160,11 @@ where
             let edges_observer = unsafe {
                 HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
                     "edges",
-                    edges_map_mut_slice(),
-                    addr_of_mut!(edges::MAX_EDGES_NUM),
+                    OwnedMutSlice::from_raw_parts_mut(
+                        edges_map_mut_ptr(),
+                        edges::EDGES_MAP_SIZE_IN_USE,
+                    ),
+                    addr_of_mut!(edges::MAX_EDGES_FOUND),
                 ))
                 .track_indices()
             };

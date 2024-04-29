@@ -32,7 +32,7 @@ use libafl_bolts::{
     tuples::{tuple_list, Merge},
     AsSlice,
 };
-use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
+use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_FOUND};
 use mimalloc::MiMalloc;
 
 #[global_allocator]
@@ -83,7 +83,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
         HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
             "edges",
             EDGES_MAP.as_mut_ptr(),
-            MAX_EDGES_NUM,
+            MAX_EDGES_FOUND,
         ))
         .track_indices()
     };
