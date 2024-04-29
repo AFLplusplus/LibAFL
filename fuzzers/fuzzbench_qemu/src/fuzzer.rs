@@ -50,7 +50,7 @@ use libafl_qemu::{
     cmplog::{CmpLogObserver, QemuCmpLogHelper},
     edges::edges_map_mut_ptr,
     edges::QemuEdgeCoverageHelper,
-    edges::MAX_EDGES_FOUND,
+    edges::{MAX_EDGES_FOUND, EDGES_MAP_SIZE_IN_USE},
     elf::EasyElf,
     filter_qemu_args,
     hooks::QemuHooks,
@@ -65,7 +65,6 @@ use libafl_qemu::{
     QemuShutdownCause,
     Regs,
 };
-use libafl_targets::EDGES_MAP_SIZE_IN_USE;
 #[cfg(unix)]
 use nix::unistd::dup;
 

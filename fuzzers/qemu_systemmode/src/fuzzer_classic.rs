@@ -30,13 +30,12 @@ use libafl_bolts::{
     AsSlice,
 };
 use libafl_qemu::{
-    edges::{edges_map_mut_ptr, QemuEdgeCoverageHelper, MAX_EDGES_FOUND},
+    edges::{edges_map_mut_ptr, QemuEdgeCoverageHelper, MAX_EDGES_FOUND, EDGES_MAP_SIZE_IN_USE},
     elf::EasyElf,
     emu::Qemu,
     QemuExecutor, QemuExitReason, QemuExitReasonError, QemuHooks, QemuShutdownCause, Regs,
 };
 use libafl_qemu_sys::GuestPhysAddr;
-use libafl_targets::EDGES_MAP_SIZE_IN_USE;
 
 pub static mut MAX_INPUT_SIZE: usize = 50;
 

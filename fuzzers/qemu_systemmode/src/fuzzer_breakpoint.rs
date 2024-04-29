@@ -30,14 +30,13 @@ use libafl_bolts::{
 use libafl_qemu::{
     breakpoint::Breakpoint,
     command::{Command, EmulatorMemoryChunk, EndCommand, StartCommand},
-    edges::{edges_map_mut_ptr, QemuEdgeCoverageHelper, MAX_EDGES_FOUND},
+    edges::{edges_map_mut_ptr, QemuEdgeCoverageHelper, MAX_EDGES_FOUND, EDGES_MAP_SIZE_IN_USE},
     elf::EasyElf,
     emu::Emulator,
     executor::{stateful::StatefulQemuExecutor, QemuExecutorState},
     EmuExitReasonError, FastSnapshotManager, GuestPhysAddr, GuestReg, HandlerError, HandlerResult,
     QemuHooks, StdEmuExitHandler,
 };
-use libafl_targets::EDGES_MAP_SIZE_IN_USE;
 
 // use libafl_qemu::QemuSnapshotBuilder; // for normal qemu snapshot
 
