@@ -1569,16 +1569,16 @@ where
                     }
                 };
 
-                // println!("child_status {}", child_status);
-                #[cfg(all(unix, not(feature = "fork")))]
+                // If this guy wants to fork, then ignore sigit
+                #[cfg(any(windows, not(feature = "fork")))]
                 unsafe {
-                    EVENTMGR_SIGHANDLER_STATE.set_exit_from_main();
+                    libc::signal(libc::SIGINT, libc::SIG_IGN);
                 }
 
                 // On Windows (or in any case without fork), we spawn ourself again
                 #[cfg(any(windows, not(feature = "fork")))]
                 let child_status = startable_self()?.status()?;
-                #[cfg(all(unix, not(feature = "fork")))]
+                #[cfg(any(windows, not(feature = "fork")))]
                 let child_status = child_status.code().unwrap_or_default();
 
                 compiler_fence(Ordering::SeqCst);

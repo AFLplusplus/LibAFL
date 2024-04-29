@@ -76,9 +76,9 @@ impl Handler for ShutdownSignalData {
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
     ) {
-        println!("in handler! {}", std::process::id());
+        // println!("in handler! {}", std::process::id());
         unsafe {
-            println!("Exiting from the handler....");
+            // println!("Exiting from the handler....");
 
             #[cfg(unix)]
             libc::_exit(100);
