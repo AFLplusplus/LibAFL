@@ -6,7 +6,7 @@ use core::slice::from_raw_parts;
 use core::{
     fmt::Debug,
     mem::size_of,
-    ops::{Add, AddAssign},
+    ops::{Add, AddAssign, Deref},
     slice::Iter,
 };
 #[cfg(feature = "std")]
@@ -272,9 +272,9 @@ where
     }
 }
 
-impl AsSlice for Tokens {
-    type Entry = Vec<u8>;
-    fn as_slice(&self) -> &[Vec<u8>] {
+impl Deref for Tokens {
+    type Target = [Vec<u8>];
+    fn deref(&self) -> &[Vec<u8>] {
         self.tokens()
     }
 }

@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 use core::{any::type_name, cmp::Ordering, marker::PhantomData};
 
 use hashbrown::{HashMap, HashSet};
-use libafl_bolts::{rands::Rand, serdeany::SerdeAny, AsSlice, HasRefCnt};
+use libafl_bolts::{rands::Rand, serdeany::SerdeAny, AsIter, HasRefCnt};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -89,7 +89,7 @@ impl<CS, F, M, O> RemovableScheduler for MinimizerScheduler<CS, F, M, O>
 where
     CS: RemovableScheduler,
     F: TestcaseScore<CS::State>,
-    M: AsSlice<Entry = usize> + SerdeAny + HasRefCnt,
+    M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
     CS::State: HasCorpus + HasMetadata + HasRand,
     O: CanTrack,
 {
@@ -130,13 +130,13 @@ where
             let factor = F::compute(state, &mut *old)?;
             if let Some(old_map) = old.metadata_map_mut().get_mut::<M>() {
                 let mut e_iter = entries.iter();
-                let mut map_iter = old_map.as_slice().iter(); // ASSERTION: guaranteed to be in order?
+                let mut map_iter = old_map.as_iter(); // ASSERTION: guaranteed to be in order?
 
                 // manual set intersection
                 let mut entry = e_iter.next();
                 let mut map_entry = map_iter.next();
                 while let Some(e) = entry {
-                    if let Some(me) = map_entry {
+                    if let Some(ref me) = map_entry {
                         match e.cmp(me) {
                             Ordering::Less => {
                                 entry = e_iter.next();
@@ -197,7 +197,7 @@ impl<CS, F, M, O> Scheduler for MinimizerScheduler<CS, F, M, O>
 where
     CS: Scheduler,
     F: TestcaseScore<CS::State>,
-    M: AsSlice<Entry = usize> + SerdeAny + HasRefCnt,
+    M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
     CS::State: HasCorpus + HasMetadata + HasRand,
     O: CanTrack,
 {
@@ -253,7 +253,7 @@ impl<CS, F, M, O> MinimizerScheduler<CS, F, M, O>
 where
     CS: Scheduler,
     F: TestcaseScore<CS::State>,
-    M: AsSlice<Entry = usize> + SerdeAny + HasRefCnt,
+    M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
     CS::State: HasCorpus + HasMetadata + HasRand,
     O: CanTrack,
 {
@@ -276,8 +276,8 @@ where
                 ))
             })?;
             let top_rateds = state.metadata_map().get::<TopRatedsMetadata>().unwrap();
-            for elem in meta.as_slice() {
-                if let Some(old_idx) = top_rateds.map.get(elem) {
+            for elem in meta.as_iter() {
+                if let Some(old_idx) = top_rateds.map.get(&*elem) {
                     if *old_idx == idx {
                         new_favoreds.push(*elem); // always retain current; we'll drop it later otherwise
                         continue;
@@ -350,7 +350,7 @@ where
                         type_name::<M>()
                     ))
                 })?;
-                for elem in meta.as_slice() {
+                for elem in meta.as_iter() {
                     acc.insert(*elem);
                 }
 

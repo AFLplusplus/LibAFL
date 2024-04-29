@@ -32,6 +32,8 @@ use ahash::RandomState;
 pub use launcher::*;
 #[cfg(all(unix, feature = "std"))]
 use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
+#[cfg(feature = "adaptive_serialization")]
+use libafl_bolts::tuples::{MatchNameRef, Reference};
 use libafl_bolts::{current_time, ClientId};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
@@ -119,7 +121,7 @@ impl Handler for ShutdownSignalData {
 }
 
 /// A per-fuzzer unique `ID`, usually starting with `0` and increasing
-/// by `1` in multiprocessed [`EventManager`]s, such as [`self::llmp::LlmpEventManager`].
+/// by `1` in multiprocessed [`EventManager`]s, such as [`LlmpEventManager`].
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct EventManagerId(
@@ -129,6 +131,8 @@ pub struct EventManagerId(
 
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
+#[cfg(feature = "adaptive_serialization")]
+use crate::observers::TimeObserver;
 use crate::{inputs::UsesInput, stages::HasCurrentStage, state::UsesState};
 
 /// The log event severity
@@ -415,7 +419,7 @@ where
 pub trait EventFirer: UsesState {
     /// Send off an [`Event`] to the broker
     ///
-    /// For multi-processed managers, such as [`llmp::LlmpEventManager`],
+    /// For multi-processed managers, such as [`LlmpEventManager`],
     /// this serializes the [`Event`] and commits it to the [`llmp`] page.
     /// In this case, if you `fire` faster than the broker can consume
     /// (for example for each [`Input`], on multiple cores)
@@ -466,7 +470,7 @@ where
 {
     /// Given the last time, if `monitor_timeout` seconds passed, send off an info/monitor/heartbeat message to the broker.
     /// Returns the new `last` time (so the old one, unless `monitor_timeout` time has passed and monitor have been sent)
-    /// Will return an [`crate::Error`], if the stats could not be sent.
+    /// Will return an [`Error`], if the stats could not be sent.
     fn maybe_report_progress(
         &mut self,
         state: &mut Self::State,
@@ -487,7 +491,7 @@ where
     }
 
     /// Send off an info/monitor/heartbeat message to the broker.
-    /// Will return an [`crate::Error`], if the stats could not be sent.
+    /// Will return an [`Error`], if the stats could not be sent.
     fn report_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
         let executions = *state.executions();
         let cur = current_time();
@@ -875,6 +879,9 @@ pub trait AdaptiveSerializer {
     /// How many times shoukd have been serialized an observer (mut)
     fn should_serialize_cnt_mut(&mut self) -> &mut usize;
 
+    /// A [`Reference`] to the time observer to determine the `time_factor`
+    fn time_ref(&self) -> &Reference<TimeObserver>;
+
     /// Serialize the observer using the `time_factor` and `percentage_threshold`.
     /// These parameters are unique to each of the different types of `EventManager`
     fn serialize_observers_adaptive<S, OT>(
@@ -888,7 +895,7 @@ pub trait AdaptiveSerializer {
         S: UsesInput,
     {
         let exec_time = observers
-            .match_name::<crate::observers::TimeObserver>("time")
+            .get(self.time_ref())
             .map(|o| o.last_runtime().unwrap_or(Duration::ZERO))
             .unwrap();
 

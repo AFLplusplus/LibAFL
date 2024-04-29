@@ -22,7 +22,7 @@ use libafl_bolts::{
     fs::{get_unique_std_input_file, InputFile},
     os::{dup2, pipes::Pipe},
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::Prepend,
+    tuples::{MatchNameRef, Prepend, RefIndexable, Reference, Referenceable},
     AsSlice, AsSliceMut, Truncate,
 };
 use nix::{
@@ -497,7 +497,10 @@ where
     map: Option<SP::ShMem>,
     phantom: PhantomData<S>,
     map_size: Option<usize>,
+    #[cfg(feature = "regex")]
+    asan_obs: Reference<AsanBacktraceObserver>,
     timeout: TimeSpec,
+    crash_exitcode: Option<i8>,
 }
 
 impl<OT, S, SP> Debug for ForkserverExecutor<OT, S, SP>
@@ -583,6 +586,9 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
     real_map_size: i32,
     kill_signal: Option<Signal>,
     timeout: Option<Duration>,
+    #[cfg(feature = "regex")]
+    asan_obs: Option<Reference<AsanBacktraceObserver>>,
+    crash_exitcode: Option<i8>,
 }
 
 impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
@@ -631,6 +637,11 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             phantom: PhantomData,
             map_size: self.map_size,
             timeout,
+            asan_obs: self
+                .asan_obs
+                .clone()
+                .unwrap_or(AsanBacktraceObserver::default().reference()),
+            crash_exitcode: self.crash_exitcode,
         })
     }
 
@@ -688,6 +699,11 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             phantom: PhantomData,
             map_size: self.map_size,
             timeout,
+            asan_obs: self
+                .asan_obs
+                .clone()
+                .unwrap_or(AsanBacktraceObserver::default().reference()),
+            crash_exitcode: self.crash_exitcode,
         })
     }
 
@@ -999,6 +1015,13 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         self
     }
 
+    /// Treats an execution as a crash if the provided exitcode is returned
+    #[must_use]
+    pub fn crash_exitcode(mut self, exitcode: i8) -> Self {
+        self.crash_exitcode = Some(exitcode);
+        self
+    }
+
     /// Call this if the harness uses deferred forkserver mode; default is false
     #[must_use]
     pub fn is_deferred_frksrv(mut self, is_deferred_frksrv: bool) -> Self {
@@ -1047,6 +1070,8 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             max_input_size: MAX_INPUT_SIZE_DEFAULT,
             kill_signal: None,
             timeout: None,
+            asan_obs: None,
+            crash_exitcode: None,
         }
     }
 
@@ -1072,6 +1097,8 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             max_input_size: MAX_INPUT_SIZE_DEFAULT,
             kill_signal: None,
             timeout: None,
+            asan_obs: None,
+            crash_exitcode: None,
         }
     }
 }
@@ -1157,13 +1184,15 @@ where
 
         if let Some(status) = self.forkserver.read_st_timed(&self.timeout)? {
             self.forkserver.set_status(status);
-            if libc::WIFSIGNALED(self.forkserver().status()) {
+            let exitcode_is_crash = if let Some(crash_exitcode) = self.crash_exitcode {
+                (libc::WEXITSTATUS(self.forkserver().status()) as i8) == crash_exitcode
+            } else {
+                false
+            };
+            if libc::WIFSIGNALED(self.forkserver().status()) || exitcode_is_crash {
                 exit_kind = ExitKind::Crash;
                 #[cfg(feature = "regex")]
-                if let Some(asan_observer) = self
-                    .observers_mut()
-                    .match_name_mut::<AsanBacktraceObserver>("AsanBacktraceObserver")
-                {
+                if let Some(asan_observer) = self.observers.get_mut(&self.asan_obs) {
                     asan_observer.parse_asan_output_from_asan_log_file(pid)?;
                 }
             }
@@ -1211,13 +1240,13 @@ where
     SP: ShMemProvider,
 {
     #[inline]
-    fn observers(&self) -> &OT {
-        &self.observers
+    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
+        RefIndexable::from(&self.observers)
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
-        &mut self.observers
+    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
+        RefIndexable::from(&mut self.observers)
     }
 }
 

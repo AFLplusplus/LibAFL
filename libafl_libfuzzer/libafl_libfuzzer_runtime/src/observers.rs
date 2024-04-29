@@ -2,6 +2,7 @@ use std::{
     borrow::Cow,
     fmt::Debug,
     hash::{Hash, Hasher},
+    ops::Deref,
 };
 
 use ahash::AHasher;
@@ -107,16 +108,16 @@ where
 {
     type Entry = O::ValueType;
 
-    fn get(&self, idx: usize) -> &Self::Entry {
+    fn get(&self, idx: usize) -> Self::Entry {
         let initial = self.inner.initial();
-        if *self.inner.get(idx) == initial {
-            self.value_observer.default_value()
+        if self.inner.get(idx) == initial {
+            *self.value_observer.default_value()
         } else {
-            self.value_observer.value()
+            *self.value_observer.value()
         }
     }
 
-    fn get_mut(&mut self, _idx: usize) -> &mut Self::Entry {
+    fn set(&mut self, _idx: usize, _val: Self::Entry) {
         unimplemented!("Impossible to implement for a proxy map.")
     }
 
@@ -148,7 +149,7 @@ where
         let value = *self.value_observer.value();
         self.inner
             .as_iter()
-            .map(|&e| if e == initial { default } else { value })
+            .map(|e| if *e == initial { default } else { value })
             .collect()
     }
 
@@ -202,9 +203,10 @@ impl<'it, I, O, T> MappedEdgeMapIter<'it, I, O, T> {
     }
 }
 
-impl<'it, I, O, T> Iterator for MappedEdgeMapIter<'it, I, O, T>
+impl<'it, I, O, R, T> Iterator for MappedEdgeMapIter<'it, I, O, T>
 where
-    I: Iterator<Item = &'it T>,
+    I: Iterator<Item = R>,
+    R: Deref<Target = T>,
     T: PartialEq + 'it,
     O: ValueObserver,
 {
@@ -225,6 +227,7 @@ where
     O: ValueObserver + 'it,
 {
     type Item = O::ValueType;
+    type Ref = &'it Self::Item;
     type IntoIter = MappedEdgeMapIter<'it, <M as AsIter<'it>>::IntoIter, O, M::Entry>;
 
     fn as_iter(&'it self) -> Self::IntoIter {

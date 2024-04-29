@@ -1,10 +1,13 @@
 //! Coverage accounting corpus scheduler, more details at <https://www.ndss-symposium.org/wp-content/uploads/2020/02/24422-paper.pdf>
 
 use alloc::vec::Vec;
-use core::fmt::Debug;
+use core::{
+    fmt::Debug,
+    ops::{Deref, DerefMut},
+};
 
 use hashbrown::HashMap;
-use libafl_bolts::{rands::Rand, AsSlice, AsSliceMut, HasLen, HasRefCnt};
+use libafl_bolts::{rands::Rand, HasLen, HasRefCnt};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -35,19 +38,15 @@ pub struct AccountingIndexesMetadata {
 
 libafl_bolts::impl_serdeany!(AccountingIndexesMetadata);
 
-impl AsSlice for AccountingIndexesMetadata {
-    type Entry = usize;
-    /// Convert to a slice
-    fn as_slice(&self) -> &[usize] {
-        self.list.as_slice()
+impl Deref for AccountingIndexesMetadata {
+    type Target = [usize];
+    fn deref(&self) -> &[usize] {
+        &self.list
     }
 }
-impl AsSliceMut for AccountingIndexesMetadata {
-    type Entry = usize;
-
-    /// Convert to a slice
-    fn as_slice_mut(&mut self) -> &mut [usize] {
-        self.list.as_slice_mut()
+impl DerefMut for AccountingIndexesMetadata {
+    fn deref_mut(&mut self) -> &mut [usize] {
+        &mut self.list
     }
 }
 

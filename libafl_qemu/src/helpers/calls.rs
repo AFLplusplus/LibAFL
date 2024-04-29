@@ -6,7 +6,7 @@ use libafl::{
     inputs::{Input, UsesInput},
     observers::{stacktrace::BacktraceObserver, ObserversTuple},
 };
-use libafl_bolts::{tuples::MatchFirstType, Named};
+use libafl_bolts::tuples::{MatchFirstType, MatchNameRef, Reference, Referenceable};
 use libafl_qemu_sys::GuestAddr;
 use thread_local::ThreadLocal;
 
@@ -21,7 +21,7 @@ use crate::{
     Qemu,
 };
 
-pub trait CallTraceCollector: 'static + Debug {
+pub trait CallTraceCollector: 'static {
     fn on_call<QT, S>(
         &mut self,
         hooks: &mut QemuHooks<QT, S>,
@@ -62,7 +62,7 @@ pub trait CallTraceCollector: 'static + Debug {
     }
 }
 
-pub trait CallTraceCollectorTuple: 'static + MatchFirstType + Debug {
+pub trait CallTraceCollectorTuple: 'static + MatchFirstType {
     fn on_call_all<QT, S>(
         &mut self,
         hooks: &mut QemuHooks<QT, S>,
@@ -402,7 +402,7 @@ where
 impl<S, T> QemuHelper<S> for QemuCallTracerHelper<T>
 where
     S: UsesInput,
-    T: CallTraceCollectorTuple,
+    T: CallTraceCollectorTuple + Debug,
 {
     fn init_hooks<QT>(&self, hooks: &QemuHooks<QT, S>)
     where
@@ -437,25 +437,17 @@ where
 
 // TODO support multiple threads with thread local callstack
 #[derive(Debug)]
-pub struct OnCrashBacktraceCollector {
+pub struct OnCrashBacktraceCollector<'a> {
     callstack_hash: u64,
-    observer_name: String,
+    obs_ref: Reference<BacktraceObserver<'a>>,
 }
 
-impl OnCrashBacktraceCollector {
+impl<'a> OnCrashBacktraceCollector<'a> {
     #[must_use]
-    pub fn new(observer: &BacktraceObserver<'_>) -> Self {
+    pub fn new(observer: &BacktraceObserver<'a>) -> Self {
         Self {
             callstack_hash: 0,
-            observer_name: observer.name().to_string(),
-        }
-    }
-
-    #[must_use]
-    pub fn with_name(observer_name: String) -> Self {
-        Self {
-            callstack_hash: 0,
-            observer_name,
+            obs_ref: observer.reference(),
         }
     }
 
@@ -469,7 +461,10 @@ impl OnCrashBacktraceCollector {
     }
 }
 
-impl CallTraceCollector for OnCrashBacktraceCollector {
+impl<'a> CallTraceCollector for OnCrashBacktraceCollector<'a>
+where
+    'a: 'static,
+{
     #[allow(clippy::unnecessary_cast)]
     fn on_call<QT, S>(
         &mut self,
@@ -516,7 +511,7 @@ impl CallTraceCollector for OnCrashBacktraceCollector {
         S: UsesInput,
     {
         let observer = observers
-            .match_name_mut::<BacktraceObserver<'_>>(&self.observer_name)
+            .get_mut(&self.obs_ref)
             .expect("A OnCrashBacktraceCollector needs a BacktraceObserver");
         observer.fill_external(self.callstack_hash, exit_kind);
     }
