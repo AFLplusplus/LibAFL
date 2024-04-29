@@ -30,7 +30,7 @@ use libafl_bolts::{
     AsSlice,
 };
 use libafl_qemu::{
-    edges::{edges_map_mut_ptr, QemuEdgeCoverageHelper, MAX_EDGES_FOUND, EDGES_MAP_SIZE_IN_USE},
+    edges::{edges_map_mut_ptr, QemuEdgeCoverageHelper, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND},
     elf::EasyElf,
     emu::Qemu,
     QemuExecutor, QemuExitReason, QemuExitReasonError, QemuHooks, QemuShutdownCause, Regs,

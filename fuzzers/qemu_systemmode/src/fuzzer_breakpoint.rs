@@ -30,7 +30,7 @@ use libafl_bolts::{
 use libafl_qemu::{
     breakpoint::Breakpoint,
     command::{Command, EmulatorMemoryChunk, EndCommand, StartCommand},
-    edges::{edges_map_mut_ptr, QemuEdgeCoverageHelper, MAX_EDGES_FOUND, EDGES_MAP_SIZE_IN_USE},
+    edges::{edges_map_mut_ptr, QemuEdgeCoverageHelper, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND},
     elf::EasyElf,
     emu::Emulator,
     executor::{stateful::StatefulQemuExecutor, QemuExecutorState},

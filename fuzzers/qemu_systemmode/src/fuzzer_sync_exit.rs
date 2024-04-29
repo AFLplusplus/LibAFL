@@ -28,7 +28,7 @@ use libafl_bolts::{
     tuples::tuple_list,
 };
 use libafl_qemu::{
-    edges::{edges_map_mut_ptr, QemuEdgeCoverageHelper, MAX_EDGES_FOUND, EDGES_MAP_SIZE_IN_USE},
+    edges::{edges_map_mut_ptr, QemuEdgeCoverageHelper, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND},
     emu::Emulator,
     executor::{stateful::StatefulQemuExecutor, QemuExecutorState},
     EmuExitReasonError, FastSnapshotManager, HandlerError, HandlerResult, QemuHooks,
