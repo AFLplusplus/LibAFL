@@ -1,6 +1,6 @@
 [package]
 name = "libfuzzer_stb_image_sugar"
-version = "0.10.1"
+version = "0.12.0"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 edition = "2021"
 build = "build.rs"
@@ -18,6 +18,7 @@ debug = true
 
 [dependencies]
 libafl = { path = "../../libafl/" }
+libafl_bolts = { path = "../../libafl_bolts/" }
 libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_edges", "sancov_cmplog", "libfuzzer"] }
 libafl_sugar = { path = "../../libafl_sugar/" }
 mimalloc = { version = "*", default-features = false }

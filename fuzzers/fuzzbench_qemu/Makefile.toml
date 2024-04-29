@@ -2,6 +2,8 @@
 [env]
 FUZZER_NAME='libpng_harness'
 PROJECT_DIR = { script = ["pwd"] }
+PROFILE = { value = "release", condition = {env_not_set = ["PROFILE"]} }
+PROFILE_DIR = {value = "release", condition = {env_not_set = ["PROFILE_DIR"] }}
 
 [tasks.unsupported]
 script_runner="@shell"
@@ -19,8 +21,8 @@ windows_alias = "unsupported"
 condition = { files_not_exist = [ "./libpng-1.6.37" ] }
 script_runner="@shell"
 script='''
-wget https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.xz
-tar -xvf libpng-1.6.37.tar.xz
+wget https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
+tar -xvf v1.6.37.tar.gz
 '''
 
 # fuzzer
@@ -31,7 +33,7 @@ windows_alias = "unsupported"
 
 [tasks.fuzzer_unix]
 command = "cargo"
-args = ["build", "--release"]
+args = ["build", "--profile", "${PROFILE}"]
 
 # Harness
 [tasks.harness]
@@ -65,7 +67,7 @@ windows_alias = "unsupported"
 
 [tasks.run_unix]
 command = "cargo"
-args = ["run", "--release", "./${FUZZER_NAME}", "--", "--libafl-in", "../libfuzzer_libpng/corpus", "--libafl-out", "./out", "./${FUZZER_NAME}"]
+args = ["run", "--profile", "${PROFILE}", "./${FUZZER_NAME}", "--", "--libafl-in", "../libfuzzer_libpng/corpus", "--libafl-out", "./out", "./${FUZZER_NAME}"]
 dependencies = [ "harness", "fuzzer" ]
 
 # Run the fuzzer

@@ -2,16 +2,17 @@ use core::marker::PhantomData;
 use std::time::Duration;
 
 use libafl::{
-    bolts::{
-        fs::{InputFile, INPUTFILE_STD},
-        shmem::{ShMem, ShMemProvider, StdShMemProvider},
-        AsMutSlice, AsSlice,
-    },
     executors::{Executor, ExitKind, HasObservers},
-    inputs::{HasTargetBytes, UsesInput},
+    inputs::HasTargetBytes,
     observers::{ObserversTuple, UsesObservers},
-    state::{State, UsesState},
+    state::{HasExecutions, State, UsesState},
     Error,
+};
+use libafl_bolts::{
+    fs::{InputFile, INPUTFILE_STD},
+    shmem::{ShMem, ShMemProvider, StdShMemProvider},
+    tuples::RefIndexable,
+    AsSlice, AsSliceMut,
 };
 use tinyinst::tinyinst::{litecov::RunResult, TinyInst};
 
@@ -43,7 +44,7 @@ where
 impl<'a, EM, S, SP, OT, Z> Executor<EM, Z> for TinyInstExecutor<'a, S, SP, OT>
 where
     EM: UsesState<State = S>,
-    S: UsesInput,
+    S: State + HasExecutions,
     S::Input: HasTargetBytes,
     SP: ShMemProvider,
     Z: UsesState<State = S>,
@@ -52,10 +53,11 @@ where
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
-        _state: &mut Self::State,
+        state: &mut Self::State,
         _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
+        *state.executions_mut() += 1;
         match &self.map {
             Some(_) => {
                 // use shmem to pass testcase
@@ -64,9 +66,9 @@ where
                 let size = target_bytes.as_slice().len();
                 let size_in_bytes = size.to_ne_bytes();
                 // The first four bytes tells the size of the shmem.
-                shmem.as_mut_slice()[..SHMEM_FUZZ_HDR_SIZE]
+                shmem.as_slice_mut()[..SHMEM_FUZZ_HDR_SIZE]
                     .copy_from_slice(&size_in_bytes[..SHMEM_FUZZ_HDR_SIZE]);
-                shmem.as_mut_slice()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
+                shmem.as_slice_mut()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
                     .copy_from_slice(target_bytes.as_slice());
             }
             None => {
@@ -239,7 +241,7 @@ where
                 // shmem.write_to_env("__TINY_SHM_FUZZ_ID")?;
 
                 let size_in_bytes = (MAX_FILE + SHMEM_FUZZ_HDR_SIZE).to_ne_bytes();
-                shmem.as_mut_slice()[..4].clone_from_slice(&size_in_bytes[..4]);
+                shmem.as_slice_mut()[..4].clone_from_slice(&size_in_bytes[..4]);
 
                 (Some(shmem), Some(shmem_id))
             }
@@ -299,17 +301,17 @@ where
     SP: ShMemProvider,
     OT: ObserversTuple<S>,
 {
-    fn observers(&self) -> &OT {
-        &self.observers
+    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
+        RefIndexable::from(&self.observers)
     }
 
-    fn observers_mut(&mut self) -> &mut OT {
-        &mut self.observers
+    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
+        RefIndexable::from(&mut self.observers)
     }
 }
 impl<'a, S, SP, OT> UsesState for TinyInstExecutor<'a, S, SP, OT>
 where
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider,
 {
     type State = S;
@@ -317,7 +319,7 @@ where
 impl<'a, S, SP, OT> UsesObservers for TinyInstExecutor<'a, S, SP, OT>
 where
     OT: ObserversTuple<S>,
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider,
 {
     type Observers = OT;

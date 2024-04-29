@@ -3,6 +3,7 @@ use std::ptr::write_volatile;
 use std::{path::PathBuf, ptr::write};
 
 use libafl::prelude::*;
+use libafl_bolts::prelude::*;
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
@@ -35,7 +36,7 @@ pub fn main() -> Result<(), Error> {
     // Create an observation channel using the signals map
     let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS.len()) };
 
-    let factory = MapEqualityFactory::with_observer(&observer);
+    let factory = MapEqualityFactory::new(&observer);
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);
@@ -56,7 +57,7 @@ pub fn main() -> Result<(), Error> {
         // RNG
         StdRand::with_seed(current_nanos()),
         // Corpus that will be evolved, we keep it in memory for performance
-        InMemoryOnDiskCorpus::new(&corpus_dir).unwrap(),
+        InMemoryOnDiskCorpus::new(corpus_dir).unwrap(),
         // Corpus in which we store solutions (crashes in this example),
         // on disk so the user can get them after stopping the fuzzer
         OnDiskCorpus::new(&solution_dir).unwrap(),
@@ -108,7 +109,7 @@ pub fn main() -> Result<(), Error> {
 
     let mut state = StdState::new(
         StdRand::with_seed(current_nanos()),
-        InMemoryOnDiskCorpus::new(&minimized_dir).unwrap(),
+        InMemoryOnDiskCorpus::new(minimized_dir).unwrap(),
         InMemoryCorpus::new(),
         &mut (),
         &mut (),
@@ -123,7 +124,7 @@ pub fn main() -> Result<(), Error> {
     let minimizer = StdScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(StdTMinMutationalStage::new(
         minimizer,
-        CrashFeedbackFactory::default(),
+        CrashFeedback::new(),
         1 << 10
     ));
 
@@ -136,13 +137,9 @@ pub fn main() -> Result<(), Error> {
     let mut executor = InProcessExecutor::new(&mut harness, (), &mut fuzzer, &mut state, &mut mgr)?;
 
     state.load_initial_inputs_forced(&mut fuzzer, &mut executor, &mut mgr, &[solution_dir])?;
-    stages.perform_all(
-        &mut fuzzer,
-        &mut executor,
-        &mut state,
-        &mut mgr,
-        CorpusId::from(0_usize),
-    )?;
+
+    state.set_corpus_idx(CorpusId::from(0_usize))?;
+    stages.perform_all(&mut fuzzer, &mut executor, &mut state, &mut mgr)?;
 
     Ok(())
 }

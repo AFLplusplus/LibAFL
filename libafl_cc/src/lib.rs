@@ -27,14 +27,12 @@
 ))]
 #![cfg_attr(test, deny(
     missing_debug_implementations,
-    missing_docs,
     //trivial_casts,
     trivial_numeric_casts,
     unused_extern_crates,
     unused_import_braces,
     unused_qualifications,
     unused_must_use,
-    missing_docs,
     //unused_results
 ))]
 #![cfg_attr(
@@ -48,7 +46,6 @@
         overflowing_literals,
         path_statements,
         patterns_in_fns_without_body,
-        private_in_public,
         unconditional_recursion,
         unused,
         unused_allocation,
@@ -58,7 +55,7 @@
     )
 )]
 
-use std::{convert::Into, path::Path, process::Command, string::String, vec::Vec};
+use std::{path::Path, process::Command};
 
 pub mod ar;
 pub use ar::ArWrapper;
@@ -104,6 +101,16 @@ impl Configuration {
     pub fn to_flags(&self) -> Result<Vec<String>, Error> {
         Ok(match self {
             Configuration::Default => vec![],
+            // hardware asan is more memory efficient than asan on arm64
+            #[cfg(all(
+                any(target_os = "linux", target_os = "android"),
+                target_arch = "aarch64"
+            ))]
+            Configuration::AddressSanitizer => vec!["-fsanitize=hwaddress".to_string()],
+            #[cfg(not(all(
+                any(target_os = "linux", target_os = "android"),
+                target_arch = "aarch64"
+            )))]
             Configuration::AddressSanitizer => vec!["-fsanitize=address".to_string()],
             Configuration::UndefinedBehaviorSanitizer => vec!["-fsanitize=undefined".to_string()],
             Configuration::GenerateCoverageMap => {
@@ -137,12 +144,12 @@ impl Configuration {
         let output = output.to_str().unwrap();
 
         let new_filename = if let Some((filename, extension)) = output.split_once('.') {
-            if let crate::Configuration::Default = self {
+            if let Configuration::Default = self {
                 format!("{filename}.{extension}")
             } else {
                 format!("{filename}.{self}.{extension}")
             }
-        } else if let crate::Configuration::Default = self {
+        } else if let Configuration::Default = self {
             output.to_string()
         } else {
             format!("{output}.{self}")

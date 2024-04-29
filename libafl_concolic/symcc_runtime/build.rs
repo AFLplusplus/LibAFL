@@ -1,4 +1,5 @@
 use std::{
+    cell::RefCell,
     env,
     fs::File,
     io::Write,
@@ -6,18 +7,17 @@ use std::{
     process::exit,
 };
 
-use lazy_static::lazy_static;
 use regex::{Regex, RegexBuilder};
 use symcc_libafl::clone_symcc;
 
 const SYMCC_RUNTIME_FUNCTION_NAME_PREFIX: &str = "_cpp_";
 
-lazy_static! {
-    static ref FUNCTION_NAME_REGEX: Regex = Regex::new(r"pub fn (\w+)").unwrap();
-    static ref EXPORTED_FUNCTION_REGEX: Regex = RegexBuilder::new(r"(pub fn \w+\([^\)]*\)[^;]*);")
+thread_local! {
+    static FUNCTION_NAME_REGEX: RefCell<Regex> = RefCell::new(Regex::new(r"pub fn (\w+)").unwrap());
+    static EXPORTED_FUNCTION_REGEX: RefCell<Regex> = RefCell::new(RegexBuilder::new(r"(pub fn \w+\s*\([^\)]*\)[^;]*);")
         .multi_line(true)
         .build()
-        .unwrap();
+        .unwrap());
 }
 
 fn main() {
@@ -88,16 +88,18 @@ fn write_cpp_function_export_macro(out_path: &Path, cpp_bindings: &bindgen::Bind
             () => {{",
     )
     .unwrap();
-    EXPORTED_FUNCTION_REGEX
-        .captures_iter(&cpp_bindings.to_string())
-        .for_each(|captures| {
-            writeln!(
-                macro_file,
-                "    symcc_runtime::export_c_symbol!({});",
-                &captures[1]
-            )
-            .unwrap();
-        });
+    EXPORTED_FUNCTION_REGEX.with(|x| {
+        x.borrow()
+            .captures_iter(&cpp_bindings.to_string())
+            .for_each(|captures| {
+                writeln!(
+                    macro_file,
+                    "    symcc_runtime::export_c_symbol!({});",
+                    &captures[1]
+                )
+                .unwrap();
+            });
+    });
     writeln!(
         macro_file,
         " }};
@@ -156,17 +158,21 @@ fn write_rust_runtime_macro_file(out_path: &Path, symcc_src_path: &Path) {
             ($macro:path; $($extra_ident:path),*) => {{",
     )
     .unwrap();
-    EXPORTED_FUNCTION_REGEX
-        .captures_iter(&rust_bindings.to_string())
-        .for_each(|captures| {
-            writeln!(
-                rust_runtime_macro,
-                "    $macro!({},{}; $($extra_ident),*);",
-                &captures[1].replace("_rsym_", ""),
-                &FUNCTION_NAME_REGEX.captures(&captures[1]).unwrap()[1]
-            )
-            .unwrap();
-        });
+    EXPORTED_FUNCTION_REGEX.with(|x| {
+        x.borrow()
+            .captures_iter(&rust_bindings.to_string())
+            .for_each(|captures| {
+                writeln!(
+                    rust_runtime_macro,
+                    "    $macro!({},{}; $($extra_ident),*);",
+                    &captures[1].replace("_rsym_", ""),
+                    &FUNCTION_NAME_REGEX
+                        .with(|x| x.borrow().captures(&captures[1]))
+                        .unwrap()[1]
+                )
+                .unwrap();
+            });
+    });
     writeln!(
         rust_runtime_macro,
         " }};
@@ -178,7 +184,7 @@ fn write_rust_runtime_macro_file(out_path: &Path, symcc_src_path: &Path) {
 fn write_symcc_runtime_bindings_file(out_path: &Path, cpp_bindings: &bindgen::Bindings) {
     let mut bindings_file = File::create(out_path.join("bindings.rs")).unwrap();
     cpp_bindings.to_string().lines().for_each(|l| {
-        if let Some(captures) = FUNCTION_NAME_REGEX.captures(l) {
+        if let Some(captures) = FUNCTION_NAME_REGEX.with(|x| x.borrow().captures(l)) {
             let function_name = &captures[1];
             writeln!(
                 bindings_file,
@@ -202,7 +208,7 @@ fn write_symcc_rename_header(rename_header_path: &Path, cpp_bindings: &bindgen::
     cpp_bindings
         .to_string()
         .lines()
-        .filter_map(|l| FUNCTION_NAME_REGEX.captures(l))
+        .filter_map(|l| FUNCTION_NAME_REGEX.with(|x| x.borrow().captures(l)))
         .map(|captures| captures[1].to_string())
         .for_each(|val| {
             writeln!(

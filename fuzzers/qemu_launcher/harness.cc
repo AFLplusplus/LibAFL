@@ -150,7 +150,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   if (width && height > 100000000 / width) {
     PNG_CLEANUP
 #ifdef HAS_DUMMY_CRASH
-  #ifdef __aarch64__
+  #if defined(__aarch64__) || defined(__arm__)
     asm volatile(".word 0xf7f0a000\n");
   #else
     asm("ud2");

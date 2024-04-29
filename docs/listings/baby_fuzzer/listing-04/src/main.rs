@@ -1,8 +1,10 @@
 /* ANCHOR: use */
 extern crate libafl;
+extern crate libafl_bolts;
+
+use std::path::PathBuf;
 
 use libafl::{
-    bolts::{current_nanos, rands::StdRand, AsSlice},
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
@@ -13,7 +15,7 @@ use libafl::{
     schedulers::QueueScheduler,
     state::StdState,
 };
-use std::path::PathBuf;
+use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
 /* ANCHOR_END: use */
 
 fn main() {
@@ -60,7 +62,7 @@ fn main() {
     /* ANCHOR_END: event_manager */
 
     /* ANCHOR: scheduler_fuzzer */
-    // A queue policy to get testcasess from the corpus
+    // A queue policy to get testcases from the corpus
     let scheduler = QueueScheduler::new();
 
     // A fuzzer with feedbacks and a corpus scheduler
@@ -69,8 +71,14 @@ fn main() {
 
     /* ANCHOR: executor */
     // Create the executor for an in-process function
-    let mut executor = InProcessExecutor::new(&mut harness, (), &mut fuzzer, &mut state, &mut mgr)
-        .expect("Failed to create the Executor");
+    let mut executor = InProcessExecutor::new(
+        &mut harness,
+        (),
+        &mut fuzzer,
+        &mut state,
+        &mut mgr,
+    )
+    .expect("Failed to create the Executor");
     /* ANCHOR_END: executor */
 
     /* ANCHOR: generator */

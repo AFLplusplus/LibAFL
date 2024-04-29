@@ -1,29 +1,34 @@
 //! The queue corpus scheduler for power schedules.
 
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::vec::Vec;
 use core::{marker::PhantomData, time::Duration};
 
+use libafl_bolts::{
+    tuples::{Reference, Referenceable},
+    Named,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, CorpusId, HasTestcase, SchedulerTestcaseMetadata, Testcase},
+    corpus::{Corpus, CorpusId, HasTestcase, Testcase},
     inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
-    schedulers::{RemovableScheduler, Scheduler},
-    state::{HasCorpus, HasMetadata, UsesState},
-    Error,
+    schedulers::{AflScheduler, RemovableScheduler, Scheduler},
+    state::{HasCorpus, State, UsesState},
+    Error, HasMetadata,
 };
 
 /// The n fuzz size
 pub const N_FUZZ_SIZE: usize = 1 << 21;
 
-crate::impl_serdeany!(SchedulerMetadata);
+libafl_bolts::impl_serdeany!(SchedulerMetadata);
 
 /// The metadata used for power schedules
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 pub struct SchedulerMetadata {
     /// Powerschedule strategy
     strat: Option<PowerSchedule>,
@@ -33,7 +38,7 @@ pub struct SchedulerMetadata {
     cycles: u64,
     /// Size of the observer map
     bitmap_size: u64,
-    /// Sum of log(bitmap_size)
+    /// Sum of `log(bitmap_size`)
     bitmap_size_log: f64,
     /// Number of filled map entries
     bitmap_entries: u64,
@@ -163,150 +168,97 @@ pub enum PowerSchedule {
 }
 
 /// A corpus scheduler using power schedules
+/// Note that this corpus is merely holding the metadata necessary for the power calculation
+/// and here we DON'T actually calculate the power (we do it in the stage)
 #[derive(Clone, Debug)]
-pub struct PowerQueueScheduler<O, S> {
+pub struct PowerQueueScheduler<C, O, S> {
     strat: PowerSchedule,
-    map_observer_name: String,
+    map_observer_ref: Reference<C>,
     last_hash: usize,
     phantom: PhantomData<(O, S)>,
 }
 
-impl<O, S> UsesState for PowerQueueScheduler<O, S>
+impl<C, O, S> UsesState for PowerQueueScheduler<C, O, S>
 where
-    S: UsesInput,
+    S: State,
 {
     type State = S;
 }
 
-impl<O, S> RemovableScheduler for PowerQueueScheduler<O, S>
+impl<C, O, S> RemovableScheduler for PowerQueueScheduler<C, O, S>
 where
-    S: HasCorpus + HasMetadata + HasTestcase,
+    S: State + HasTestcase + HasMetadata + HasCorpus,
     O: MapObserver,
+    C: AsRef<O>,
 {
-    #[allow(clippy::cast_precision_loss)]
-    fn on_replace(
+    /// This will *NOT* neutralize the effect of this removed testcase from the global data such as `SchedulerMetadata`
+    fn on_remove(
         &mut self,
-        state: &mut Self::State,
-        idx: CorpusId,
-        prev: &Testcase<<Self::State as UsesInput>::Input>,
+        _state: &mut Self::State,
+        _idx: CorpusId,
+        _prev: &Option<Testcase<<Self::State as UsesInput>::Input>>,
     ) -> Result<(), Error> {
-        let prev_meta = prev.metadata::<SchedulerTestcaseMetadata>()?;
-
-        // Next depth is + 1
-        let prev_depth = prev_meta.depth() + 1;
-
-        // Use these to adjust `SchedulerMetadata`
-        let (prev_total_time, prev_cycles) = prev_meta.cycle_and_time();
-        let prev_bitmap_size = prev_meta.bitmap_size();
-        let prev_bitmap_size_log = libm::log2(prev_bitmap_size as f64);
-
-        let psmeta = state.metadata_mut::<SchedulerMetadata>()?;
-
-        // We won't add new one because it'll get added when it gets executed in calirbation next time.
-        psmeta.set_exec_time(psmeta.exec_time() - prev_total_time);
-        psmeta.set_cycles(psmeta.cycles() - (prev_cycles as u64));
-        psmeta.set_bitmap_size(psmeta.bitmap_size() - prev_bitmap_size);
-        psmeta.set_bitmap_size_log(psmeta.bitmap_size_log() - prev_bitmap_size_log);
-        psmeta.set_bitmap_entries(psmeta.bitmap_entries() - 1);
-
-        state
-            .testcase_mut(idx)?
-            .add_metadata(SchedulerTestcaseMetadata::new(prev_depth));
         Ok(())
     }
 
-    #[allow(clippy::cast_precision_loss)]
-    fn on_remove(
+    /// This will *NOT* neutralize the effect of this removed testcase from the global data such as `SchedulerMetadata`
+    fn on_replace(
         &mut self,
-        state: &mut Self::State,
+        _state: &mut Self::State,
         _idx: CorpusId,
-        prev: &Option<Testcase<<Self::State as UsesInput>::Input>>,
+        _prev: &Testcase<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
-        let prev = prev.as_ref().ok_or_else(|| {
-            Error::illegal_argument(
-                "Power schedulers must be aware of the removed corpus entry for reweighting.",
-            )
-        })?;
-
-        let prev_meta = prev.metadata::<SchedulerTestcaseMetadata>()?;
-
-        // Use these to adjust `SchedulerMetadata`
-        let (prev_total_time, prev_cycles) = prev_meta.cycle_and_time();
-        let prev_bitmap_size = prev_meta.bitmap_size();
-        let prev_bitmap_size_log = libm::log2(prev_bitmap_size as f64);
-
-        let psmeta = state.metadata_mut::<SchedulerMetadata>()?;
-
-        psmeta.set_exec_time(psmeta.exec_time() - prev_total_time);
-        psmeta.set_cycles(psmeta.cycles() - (prev_cycles as u64));
-        psmeta.set_bitmap_size(psmeta.bitmap_size() - prev_bitmap_size);
-        psmeta.set_bitmap_size_log(psmeta.bitmap_size_log() - prev_bitmap_size_log);
-        psmeta.set_bitmap_entries(psmeta.bitmap_entries() - 1);
-
         Ok(())
     }
 }
 
-impl<O, S> Scheduler for PowerQueueScheduler<O, S>
+impl<C, O, S> AflScheduler<C, O, S> for PowerQueueScheduler<C, O, S>
 where
-    S: HasCorpus + HasMetadata + HasTestcase,
+    S: HasCorpus + HasMetadata + HasTestcase + State,
     O: MapObserver,
+    C: AsRef<O>,
 {
-    /// Add an entry to the corpus and return its index
+    fn last_hash(&self) -> usize {
+        self.last_hash
+    }
+
+    fn set_last_hash(&mut self, hash: usize) {
+        self.last_hash = hash;
+    }
+
+    fn map_observer_ref(&self) -> &Reference<C> {
+        &self.map_observer_ref
+    }
+}
+
+impl<C, O, S> Scheduler for PowerQueueScheduler<C, O, S>
+where
+    S: HasCorpus + HasMetadata + HasTestcase + State,
+    O: MapObserver,
+    C: AsRef<O>,
+{
+    /// Called when a [`Testcase`] is added to the corpus
     fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
-        let current_idx = *state.corpus().current();
-
-        let mut depth = match current_idx {
-            Some(parent_idx) => state
-                .testcase(parent_idx)?
-                .metadata::<SchedulerTestcaseMetadata>()?
-                .depth(),
-            None => 0,
-        };
-
-        // TODO increase perf_score when finding new things like in AFL
-        // https://github.com/google/AFL/blob/master/afl-fuzz.c#L6547
-
-        // Attach a `SchedulerTestcaseMetadata` to the queue entry.
-        depth += 1;
-        let mut testcase = state.testcase_mut(idx)?;
-        testcase.add_metadata(SchedulerTestcaseMetadata::with_n_fuzz_entry(
-            depth,
-            self.last_hash,
-        ));
-        testcase.set_parent_id_optional(current_idx);
-        Ok(())
+        self.on_add_metadata(state, idx)
     }
 
     fn on_evaluation<OT>(
         &mut self,
         state: &mut Self::State,
-        _input: &<Self::State as UsesInput>::Input,
+        input: &<Self::State as UsesInput>::Input,
         observers: &OT,
     ) -> Result<(), Error>
     where
         OT: ObserversTuple<Self::State>,
     {
-        let observer = observers
-            .match_name::<O>(&self.map_observer_name)
-            .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?;
-
-        let mut hash = observer.hash() as usize;
-
-        let psmeta = state.metadata_mut::<SchedulerMetadata>()?;
-
-        hash %= psmeta.n_fuzz().len();
-        // Update the path frequency
-        psmeta.n_fuzz_mut()[hash] = psmeta.n_fuzz()[hash].saturating_add(1);
-
-        self.last_hash = hash;
-
-        Ok(())
+        self.on_evaluation_metadata(state, input, observers)
     }
 
     fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
-            Err(Error::empty(String::from("No entries in corpus")))
+            Err(Error::empty(
+                "No entries in corpus. This often implies the target is not properly instrumented.",
+            ))
         } else {
             let id = match state.corpus().current() {
                 Some(cur) => {
@@ -332,38 +284,28 @@ where
         state: &mut Self::State,
         next_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
-        let current_idx = *state.corpus().current();
-
-        if let Some(idx) = current_idx {
-            let mut testcase = state.testcase_mut(idx)?;
-            let tcmeta = testcase.metadata_mut::<SchedulerTestcaseMetadata>()?;
-
-            if tcmeta.handicap() >= 4 {
-                tcmeta.set_handicap(tcmeta.handicap() - 4);
-            } else if tcmeta.handicap() > 0 {
-                tcmeta.set_handicap(tcmeta.handicap() - 1);
-            }
-        }
+        self.on_next_metadata(state, next_idx)?;
 
         *state.corpus_mut().current_mut() = next_idx;
         Ok(())
     }
 }
 
-impl<O, S> PowerQueueScheduler<O, S>
+impl<C, O, S> PowerQueueScheduler<C, O, S>
 where
     S: HasMetadata,
     O: MapObserver,
+    C: AsRef<O> + Named,
 {
     /// Create a new [`PowerQueueScheduler`]
     #[must_use]
-    pub fn new(state: &mut S, map_observer: &O, strat: PowerSchedule) -> Self {
+    pub fn new(state: &mut S, map_observer: &C, strat: PowerSchedule) -> Self {
         if !state.has_metadata::<SchedulerMetadata>() {
             state.add_metadata::<SchedulerMetadata>(SchedulerMetadata::new(Some(strat)));
         }
         PowerQueueScheduler {
             strat,
-            map_observer_name: map_observer.name().to_string(),
+            map_observer_ref: map_observer.reference(),
             last_hash: 0,
             phantom: PhantomData,
         }

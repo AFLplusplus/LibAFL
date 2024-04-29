@@ -1,6 +1,6 @@
 // Based on the example of setting hooks: Https://github.com/frida/frida-rust/blob/main/examples/gum/hook_open/src/lib.rs
 use frida_gum::{interceptor::Interceptor, Gum, Module, NativePointer};
-use libafl::bolts::os::windows_exceptions::{
+use libafl_bolts::os::windows_exceptions::{
     handle_exception, IsProcessorFeaturePresent, UnhandledExceptionFilter, EXCEPTION_POINTERS,
     PROCESSOR_FEATURE_ID,
 };

@@ -7,8 +7,7 @@ macro_rules! assert_unique_feature {
     () => {};
     ($first:tt $(,$rest:tt)*) => {
         $(
-            #[cfg(not(feature = "clippy"))] // ignore multiple definition for clippy
-            #[cfg(all(feature = $first, feature = $rest))]
+            #[cfg(all(not(any(docsrs, feature = "clippy")), feature = $first, feature = $rest))]
             compile_error!(concat!("features \"", $first, "\" and \"", $rest, "\" cannot be used together"));
         )*
         assert_unique_feature!($($rest),*);
@@ -33,17 +32,14 @@ pub fn build() {
     println!("cargo:rustc-cfg=emulation_mode=\"{emulation_mode}\"");
     println!("cargo:rerun-if-env-changed=EMULATION_MODE");
 
-    println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=build_linux.rs");
-
     // Make sure we have at most one architecutre feature set
     // Else, we default to `x86_64` - having a default makes CI easier :)
-    assert_unique_feature!("arm", "aarch64", "i386", "i86_64", "mips", "ppc");
+    assert_unique_feature!("arm", "aarch64", "i386", "i86_64", "mips", "ppc", "hexagon");
 
     // Make sure that we don't have BE set for any architecture other than arm and mips
     // Sure aarch64 may support BE, but its not in common usage and we don't
     // need it yet and so haven't tested it
-    assert_unique_feature!("be", "aarch64", "i386", "i86_64");
+    assert_unique_feature!("be", "aarch64", "i386", "i86_64", "hexagon");
 
     let cpu_target = if cfg!(feature = "x86_64") {
         "x86_64".to_string()
@@ -57,6 +53,8 @@ pub fn build() {
         "mips".to_string()
     } else if cfg!(feature = "ppc") {
         "ppc".to_string()
+    } else if cfg!(feature = "hexagon") {
+        "hexagon".to_string()
     } else {
         env::var("CPU_TARGET").unwrap_or_else(|_| {
             println!(

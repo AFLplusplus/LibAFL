@@ -1,23 +1,26 @@
 //! Gramatron is the rewritten gramatron fuzzer in rust.
 //! See the original gramatron repo [`Gramatron`](https://github.com/HexHive/Gramatron) for more details.
-use alloc::vec::Vec;
+use alloc::{borrow::Cow, vec::Vec};
 use core::cmp::max;
 
 use hashbrown::HashMap;
+use libafl_bolts::{
+    rands::{choose, Rand},
+    Named,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::{rands::Rand, tuples::Named},
     corpus::{Corpus, HasTestcase},
     generators::GramatronGenerator,
     inputs::{GramatronInput, Terminal},
     mutators::{MutationResult, Mutator},
     random_corpus_id,
-    state::{HasCorpus, HasMetadata, HasRand},
-    Error,
+    state::{HasCorpus, HasRand},
+    Error, HasMetadata,
 };
 
-const RECUR_THRESHOLD: u64 = 5;
+const RECUR_THRESHOLD: usize = 5;
 
 /// A random mutator for grammar fuzzing
 #[derive(Debug)]
@@ -36,10 +39,9 @@ where
         &mut self,
         state: &mut S,
         input: &mut GramatronInput,
-        _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         if !input.terminals().is_empty() {
-            let size = state.rand_mut().below(input.terminals().len() as u64 + 1) as usize;
+            let size = state.rand_mut().below(input.terminals().len() + 1);
             input.terminals_mut().truncate(size);
         }
         if self.generator.append_generated_terminals(input, state) > 0 {
@@ -54,8 +56,9 @@ impl<'a, S> Named for GramatronRandomMutator<'a, S>
 where
     S: HasRand + HasMetadata,
 {
-    fn name(&self) -> &str {
-        "GramatronRandomMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("GramatronRandomMutator");
+        &NAME
     }
 }
 
@@ -72,12 +75,16 @@ where
 
 /// The metadata used for `gramatron`
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 pub struct GramatronIdxMapMetadata {
     /// The map containing a vec for each terminal
     pub map: HashMap<usize, Vec<usize>>,
 }
 
-crate::impl_serdeany!(GramatronIdxMapMetadata);
+libafl_bolts::impl_serdeany!(GramatronIdxMapMetadata);
 
 impl GramatronIdxMapMetadata {
     /// Creates a new [`struct@GramatronIdxMapMetadata`].
@@ -105,7 +112,6 @@ where
         &mut self,
         state: &mut S,
         input: &mut GramatronInput,
-        _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         if input.terminals().is_empty() {
             return Ok(MutationResult::Skipped);
@@ -113,9 +119,9 @@ where
 
         let idx = random_corpus_id!(state.corpus(), state.rand_mut());
 
-        let insert_at = state.rand_mut().below(input.terminals().len() as u64) as usize;
+        let insert_at = state.rand_mut().below(input.terminals().len());
 
-        let rand_num = state.rand_mut().next() as usize;
+        let rand_num = state.rand_mut().next();
 
         let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
 
@@ -132,7 +138,7 @@ where
         meta.map.get(&input.terminals()[insert_at].state).map_or(
             Ok(MutationResult::Skipped),
             |splice_points| {
-                let from = splice_points[rand_num % splice_points.len()];
+                let from = *choose(splice_points, rand_num);
 
                 input.terminals_mut().truncate(insert_at);
                 input
@@ -146,8 +152,9 @@ where
 }
 
 impl Named for GramatronSpliceMutator {
-    fn name(&self) -> &str {
-        "GramatronSpliceMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("GramatronSpliceMutator");
+        &NAME
     }
 }
 
@@ -176,7 +183,6 @@ where
         &mut self,
         state: &mut S,
         input: &mut GramatronInput,
-        _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         if input.terminals().is_empty() {
             return Ok(MutationResult::Skipped);
@@ -206,11 +212,11 @@ where
         let chosen_nums = self.counters.get(&chosen).unwrap().0;
 
         #[allow(clippy::cast_sign_loss, clippy::pedantic)]
-        let mut first = state.rand_mut().below(chosen_nums as u64 - 1) as i64;
+        let mut first = state.rand_mut().below(chosen_nums - 1) as i64;
         #[allow(clippy::cast_sign_loss, clippy::pedantic)]
         let mut second = state
             .rand_mut()
-            .between(first as u64 + 1, chosen_nums as u64 - 1) as i64;
+            .between(first as usize + 1, chosen_nums - 1) as i64;
 
         let mut idx_1 = 0;
         let mut idx_2 = 0;
@@ -249,8 +255,9 @@ where
 }
 
 impl Named for GramatronRecursionMutator {
-    fn name(&self) -> &str {
-        "GramatronRecursionMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("GramatronRecursionMutator");
+        &NAME
     }
 }
 

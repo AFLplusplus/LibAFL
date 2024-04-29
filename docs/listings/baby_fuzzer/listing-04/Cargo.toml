@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 libafl = { path = "path/to/libafl/" }
+libafl_bolts = { path = "path/to/libafl_bolts/" }
 
 [profile.dev]
 panic = "abort"

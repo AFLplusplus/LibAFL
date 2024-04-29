@@ -3,13 +3,6 @@ use std::ptr::write_volatile;
 use std::{path::PathBuf, ptr::write};
 
 use libafl::{
-    bolts::{
-        current_nanos,
-        rands::StdRand,
-        shmem::{unix_shmem, ShMem, ShMemProvider},
-        tuples::tuple_list,
-        AsMutSlice, AsSlice,
-    },
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{ExitKind, InProcessForkExecutor},
@@ -25,14 +18,22 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
+use libafl_bolts::{
+    current_nanos,
+    ownedref::OwnedRefMut,
+    rands::StdRand,
+    shmem::{unix_shmem, ShMem, ShMemProvider},
+    tuples::tuple_list,
+    AsSlice, AsSliceMut,
+};
 
 #[allow(clippy::similar_names)]
 pub fn main() {
     let mut shmem_provider = unix_shmem::UnixShMemProvider::new().unwrap();
     let mut signals = shmem_provider.new_shmem(16).unwrap();
     let signals_len = signals.len();
-    let signals_ptr = signals.as_mut_slice().as_mut_ptr();
-    let mut bt = shmem_provider.new_shmem_object::<Option<u64>>().unwrap();
+    let signals_ptr = signals.as_slice_mut().as_mut_ptr();
+    let mut bt = shmem_provider.new_on_shmem::<Option<u64>>(None).unwrap();
 
     let signals_set = |idx: usize| {
         unsafe { write(signals_ptr.add(idx), 1) };
@@ -69,7 +70,7 @@ pub fn main() {
     // Create a stacktrace observer
     let bt_observer = BacktraceObserver::new(
         "BacktraceObserver",
-        unsafe { bt.as_object_mut::<Option<u64>>() },
+        unsafe { OwnedRefMut::from_shmem(&mut bt) },
         libafl::observers::HarnessType::Child,
     );
 
@@ -116,6 +117,7 @@ pub fn main() {
         &mut fuzzer,
         &mut state,
         &mut mgr,
+        core::time::Duration::from_millis(5000),
         shmem_provider,
     )
     .expect("Failed to create the Executor");

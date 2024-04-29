@@ -13,12 +13,17 @@ categories = ["development-tools::testing", "emulators", "embedded", "os", "no-s
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[package.metadata.docs.rs]
+all-features = true
+
 [features]
 default = ["build", "clone"]
-build = ["which", "cmake"] # common functionality to build symcc
-clone = ["which"] # common functionality to check out the symcc repo using git
+## common functionality to build symcc
+build = ["which", "cmake"]
+## common functionality to check out the symcc repo using git
+clone = ["which"]
 
 [dependencies]
-which = { version = "4.2", optional = true }
+which = { version = "4.4", optional = true }
 cmake = { version = "0.1", optional = true }
-log = "0.4.17"
+log = "0.4.20"

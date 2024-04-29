@@ -1,5 +1,6 @@
-use std::{env, fs, path::Path, process::Command};
+use std::{env, fs, path::{Path, PathBuf}, process::Command};
 
+#[allow(clippy::too_many_lines)]
 pub fn build() {
     // Note: Unique features are checked in libafl_qemu_sys
 
@@ -12,11 +13,22 @@ pub fn build() {
             "usermode".to_string()
         })
     };
+
+
+    let qemu_asan_guest = cfg!(all(feature = "build_libgasan", not(feature = "hexagon")));
+    let qemu_asan = cfg!(all(feature = "build_libqasan", not(feature = "hexagon")));
+
+    let libafl_qemu_hdr_name = "libafl_qemu.h";
+
+    let exit_hdr_dir = PathBuf::from("runtime");
+    let libafl_qemu_hdr = exit_hdr_dir.join(libafl_qemu_hdr_name);
+
     println!("cargo:rustc-cfg=emulation_mode=\"{emulation_mode}\"");
     println!("cargo:rerun-if-env-changed=EMULATION_MODE");
 
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=build_linux.rs");
+    println!("cargo:rerun-if-changed={}", exit_hdr_dir.display());
 
     let cpu_target = if cfg!(feature = "x86_64") {
         "x86_64".to_string()
@@ -30,6 +42,8 @@ pub fn build() {
         "mips".to_string()
     } else if cfg!(feature = "ppc") {
         "ppc".to_string()
+    } else if cfg!(feature = "hexagon") {
+        "hexagon".to_string()
     } else {
         env::var("CPU_TARGET").unwrap_or_else(|_| {
             "x86_64".to_string()
@@ -38,7 +52,7 @@ pub fn build() {
     println!("cargo:rerun-if-env-changed=CPU_TARGET");
     println!("cargo:rustc-cfg=cpu_target=\"{cpu_target}\"");
 
-    let cross_cc = if emulation_mode == "usermode" {
+    let cross_cc = if (emulation_mode == "usermode") && (qemu_asan || qemu_asan_guest) {
         // TODO try to autodetect a cross compiler with the arch name (e.g. aarch64-linux-gnu-gcc)
         let cross_cc = env::var("CROSS_CC").unwrap_or_else(|_| {
             println!("cargo:warning=CROSS_CC is not set, default to cc (things can go wrong if the selected cpu target ({cpu_target}) is not the host arch ({}))", env::consts::ARCH);
@@ -57,26 +71,43 @@ pub fn build() {
 
     let out_dir = env::var("OUT_DIR").unwrap();
     let out_dir_path = Path::new(&out_dir);
-    let mut target_dir = out_dir_path.to_path_buf();
+    let out_dir_path_buf = out_dir_path.to_path_buf();
+    let mut target_dir = out_dir_path_buf.clone();
     target_dir.pop();
     target_dir.pop();
     target_dir.pop();
+    let include_dir = target_dir.join("include");
 
-    if emulation_mode == "usermode" {
+    fs::create_dir_all(&include_dir).expect("Could not create include dir");
+
+    fs::copy(libafl_qemu_hdr.clone(), include_dir.join(libafl_qemu_hdr_name)).expect("Could not copy libafl_qemu.h to out directory.");
+
+    let binding_file = out_dir_path_buf.join("backdoor_bindings.rs");
+    bindgen::Builder::default()
+        .derive_debug(true)
+        .derive_default(true)
+        .impl_debug(true)
+        .generate_comments(true)
+        .default_enum_style(bindgen::EnumVariation::NewType {
+            is_global: true,
+            is_bitfield: true,
+        })
+        .header(libafl_qemu_hdr.display().to_string())
+        .generate()
+        .expect("Exit bindings generation failed.")
+        .write_to_file(binding_file)
+        .expect("Could not write bindings.");
+
+    if (emulation_mode == "usermode") && (qemu_asan || qemu_asan_guest) {
         let qasan_dir = Path::new("libqasan");
         let qasan_dir = fs::canonicalize(qasan_dir).unwrap();
+        println!("cargo:rerun-if-changed={}", qasan_dir.display());
 
-        assert!(Command::new("make")
-            .current_dir(out_dir_path)
-            .env("CC", &cross_cc)
-            .env("OUT_DIR", &target_dir)
-            .arg("-C")
-            .arg(&qasan_dir)
-            .arg("clean")
-            .status()
-            .expect("make failed")
-            .success());
-        assert!(Command::new("make")
+        let mut make = Command::new("make");
+        if cfg!(debug_assertions) {
+            make.env("CFLAGS", "-DDEBUG=1");
+        }
+        assert!(make
             .current_dir(out_dir_path)
             .env("CC", &cross_cc)
             .env("OUT_DIR", &target_dir)

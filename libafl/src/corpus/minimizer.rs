@@ -1,27 +1,27 @@
 //! Whole corpus minimizers, for reducing the number of samples/the total size/the average runtime
 //! of your corpus.
 
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{borrow::Cow, string::ToString, vec::Vec};
 use core::{hash::Hash, marker::PhantomData};
 
 use hashbrown::{HashMap, HashSet};
+use libafl_bolts::{
+    current_time,
+    tuples::{Reference, Referenceable},
+    AsIter, Named,
+};
 use num_traits::ToPrimitive;
 use z3::{ast::Bool, Config, Context, Optimize};
 
 use crate::{
-    bolts::{
-        tuples::{MatchName, Named},
-        AsIter,
-    },
     corpus::Corpus,
+    events::{Event, EventFirer, LogSeverity},
     executors::{Executor, HasObservers},
+    monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
     schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
-    state::{HasCorpus, HasMetadata, UsesState},
-    Error, HasScheduler,
+    state::{HasCorpus, HasExecutions, UsesState},
+    Error, HasMetadata, HasScheduler,
 };
 
 /// `CorpusMinimizers` minimize corpora according to internal logic. See various implementations for
@@ -42,7 +42,7 @@ where
     where
         E: Executor<EM, Z> + HasObservers,
         CS: Scheduler<State = E::State> + RemovableScheduler, // schedulers that has on_remove/on_replace only!
-        EM: UsesState<State = E::State>,
+        EM: EventFirer<State = E::State>,
         Z: HasScheduler<Scheduler = CS, State = E::State>;
 }
 
@@ -50,47 +50,42 @@ where
 ///
 /// Algorithm based on WMOPT: <https://hexhive.epfl.ch/publications/files/21ISSTA2.pdf>
 #[derive(Debug)]
-pub struct MapCorpusMinimizer<E, O, T, TS>
-where
-    E: UsesState,
-    E::State: HasCorpus + HasMetadata,
-    TS: TestcaseScore<E::State>,
-{
-    obs_name: String,
+pub struct MapCorpusMinimizer<C, E, O, T, TS> {
+    obs_ref: Reference<C>,
     phantom: PhantomData<(E, O, T, TS)>,
 }
 
 /// Standard corpus minimizer, which weights inputs by length and time.
-pub type StdCorpusMinimizer<E, O, T> =
-    MapCorpusMinimizer<E, O, T, LenTimeMulTestcaseScore<<E as UsesState>::State>>;
+pub type StdCorpusMinimizer<C, E, O, T> =
+    MapCorpusMinimizer<C, E, O, T, LenTimeMulTestcaseScore<<E as UsesState>::State>>;
 
-impl<E, O, T, TS> MapCorpusMinimizer<E, O, T, TS>
+impl<C, E, O, T, TS> MapCorpusMinimizer<C, E, O, T, TS>
 where
     E: UsesState,
     E::State: HasCorpus + HasMetadata,
     TS: TestcaseScore<E::State>,
+    C: Named,
 {
     /// Constructs a new `MapCorpusMinimizer` from a provided observer. This observer will be used
     /// in the future to get observed maps from an executed input.
-    pub fn new(obs: &O) -> Self
-    where
-        O: Named,
-    {
+    pub fn new(obs: &C) -> Self {
         Self {
-            obs_name: obs.name().to_string(),
+            obs_ref: obs.reference(),
             phantom: PhantomData,
         }
     }
 }
 
-impl<E, O, T, TS> CorpusMinimizer<E> for MapCorpusMinimizer<E, O, T, TS>
+impl<C, E, O, T, TS> CorpusMinimizer<E> for MapCorpusMinimizer<C, E, O, T, TS>
 where
     E: UsesState,
     for<'a> O: MapObserver<Entry = T> + AsIter<'a, Item = T>,
-    E::State: HasMetadata + HasCorpus,
+    C: AsRef<O>,
+    E::State: HasMetadata + HasCorpus + HasExecutions,
     T: Copy + Hash + Eq,
     TS: TestcaseScore<E::State>,
 {
+    #[allow(clippy::too_many_lines)]
     fn minimize<CS, EM, Z>(
         &self,
         fuzzer: &mut Z,
@@ -101,7 +96,7 @@ where
     where
         E: Executor<EM, Z> + HasObservers,
         CS: Scheduler<State = E::State> + RemovableScheduler,
-        EM: UsesState<State = E::State>,
+        EM: EventFirer<State = E::State>,
         Z: HasScheduler<Scheduler = CS, State = E::State>,
     {
         let cfg = Config::default();
@@ -112,6 +107,15 @@ where
         let mut cov_map = HashMap::new();
 
         let mut cur_id = state.corpus().first();
+
+        manager.log(
+            state,
+            LogSeverity::Info,
+            "Executing each input...".to_string(),
+        )?;
+
+        let total = state.corpus().count() as u64;
+        let mut curr = 0;
         while let Some(idx) = cur_id {
             let (weight, input) = {
                 let mut testcase = state.corpus().get(idx)?.borrow_mut();
@@ -133,15 +137,35 @@ where
                 .observers_mut()
                 .post_exec_all(state, &input, &kind)?;
 
+            let executions = *state.executions();
+
+            curr += 1;
+
+            manager.fire(
+                state,
+                Event::UpdateUserStats {
+                    name: Cow::from("minimisation exec pass"),
+                    value: UserStats::new(UserStatsValue::Ratio(curr, total), AggregatorOps::None),
+                    phantom: PhantomData,
+                },
+            )?;
+
+            manager.fire(
+                state,
+                Event::UpdateExecStats {
+                    time: current_time(),
+                    phantom: PhantomData,
+                    executions,
+                },
+            )?;
+
             let seed_expr = Bool::fresh_const(&ctx, "seed");
-            let obs: &O = executor
-                .observers()
-                .match_name::<O>(&self.obs_name)
-                .expect("Observer must be present.");
+            let observers = executor.observers();
+            let obs = observers[&self.obs_ref].as_ref();
 
             // Store coverage, mapping coverage map indices to hit counts (if present) and the
             // associated seeds for the map indices with those hit counts.
-            for (i, e) in obs.as_iter().copied().enumerate() {
+            for (i, e) in obs.as_iter().map(|x| *x).enumerate() {
                 if e != obs.initial() {
                     cov_map
                         .entry(i)
@@ -157,6 +181,12 @@ where
 
             cur_id = state.corpus().next(idx);
         }
+
+        manager.log(
+            state,
+            LogSeverity::Info,
+            "Preparing Z3 assertions...".to_string(),
+        )?;
 
         for (_, cov) in cov_map {
             for (_, seeds) in cov {
@@ -179,6 +209,7 @@ where
             opt.assert_soft(&!seed, *weight, None);
         }
 
+        manager.log(state, LogSeverity::Info, "Performing MaxSAT...".to_string())?;
         // Perform the optimization!
         opt.check(&[]);
 

@@ -6,6 +6,11 @@
 #define true 1
 #define false 0
 
+#if !defined(_WIN32) && defined(__SIZEOF_INT128__)
+typedef unsigned __int128 uint128_t;
+typedef uint128_t         u128;
+#endif
+
 #define STATIC_ASSERT(pred) \
   switch (0) {              \
     case 0:                 \
@@ -46,6 +51,22 @@
   #define EXPORT_FN
 #endif
 
+#if __GNUC__ < 6
+  #ifndef likely
+    #define likely(_x) (_x)
+  #endif
+  #ifndef unlikely
+    #define unlikely(_x) (_x)
+  #endif
+#else
+  #ifndef likely
+    #define likely(_x) __builtin_expect(!!(_x), 1)
+  #endif
+  #ifndef unlikely
+    #define unlikely(_x) __builtin_expect(!!(_x), 0)
+  #endif
+#endif
+
 #ifdef __GNUC__
   #define MAX(a, b)           \
     ({                        \
@@ -61,6 +82,7 @@
     })
   #define MEMCPY __builtin_memcpy
 #else
+  #include <string.h>  // needed to use memcpy on windows
   #define MAX(a, b) (((a) > (b)) ? (a) : (b))
   #define MIN(a, b) (((a) < (b)) ? (a) : (b))
   #define MEMCPY memcpy
@@ -119,14 +141,11 @@
 #else
 
   #if defined(__APPLE__)
-    // On Apple, weak_import and weak attrs behave differently to linux.
-
-    #define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)                        \
-      __attribute__((weak, visibility("default"))) RETURN_TYPE NAME FUNC_SIG { \
-        return (RETURN_TYPE)0;                                                 \
-      }
-
     #define EXT_FUNC_IMPL(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
+      EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)
+
+    // Declare these symbols as weak to allow them to be optionally defined.
+    #define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
       __attribute__((weak, visibility("default"))) RETURN_TYPE NAME FUNC_SIG
 
     // Weakly defined globals

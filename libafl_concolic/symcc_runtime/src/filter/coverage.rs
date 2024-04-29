@@ -4,7 +4,7 @@ use std::{
     marker::PhantomData,
 };
 
-use libafl::bolts::shmem::ShMem;
+use libafl_bolts::shmem::ShMem;
 
 use super::Filter;
 
@@ -189,15 +189,13 @@ where
     }
 
     fn register_location_on_hitmap(&mut self, location: usize) {
-        let mut hasher = self.build_hasher.build_hasher();
-        location.hash(&mut hasher);
-        let hash = (hasher.finish() % usize::MAX as u64) as usize;
+        #[allow(clippy::cast_possible_truncation)] // we cannot have more than usize elements..
+        let hash = (self.build_hasher.hash_one(location) % usize::MAX as u64) as usize;
         let val = unsafe {
-            // SAFETY: the index is modulo by the length, therefore it is always in bounds
+            // # Safety
+            // The index is modulo by the length, therefore it is always in bounds
             let len = self.hitcounts_map.len();
-            self.hitcounts_map
-                .as_mut_slice()
-                .get_unchecked_mut(hash % len)
+            self.hitcounts_map.get_unchecked_mut(hash % len)
         };
         *val = val.saturating_add(1);
     }

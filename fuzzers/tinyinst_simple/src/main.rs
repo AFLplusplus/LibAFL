@@ -1,15 +1,6 @@
 use std::path::PathBuf;
 
-#[cfg(target_vendor = "apple")]
-use libafl::bolts::shmem::UnixShMemProvider;
-#[cfg(windows)]
-use libafl::bolts::shmem::Win32ShMemProvider;
 use libafl::{
-    bolts::{
-        rands::{RandomSeed, StdRand},
-        shmem::ShMemProvider,
-        tuples::tuple_list,
-    },
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus, Testcase},
     events::SimpleEventManager,
     feedbacks::{CrashFeedback, ListFeedback},
@@ -22,13 +13,23 @@ use libafl::{
     state::StdState,
     Fuzzer, StdFuzzer,
 };
+#[cfg(unix)]
+use libafl_bolts::shmem::UnixShMemProvider;
+#[cfg(windows)]
+use libafl_bolts::shmem::Win32ShMemProvider;
+use libafl_bolts::{
+    ownedref::OwnedMutPtr,
+    rands::{RandomSeed, StdRand},
+    shmem::ShMemProvider,
+    tuples::tuple_list,
+};
 use libafl_tinyinst::executor::TinyInstExecutorBuilder;
 static mut COVERAGE: Vec<u64> = vec![];
 
-#[cfg(not(any(target_vendor = "apple", windows)))]
+#[cfg(not(any(target_vendor = "apple", windows, target_os = "linux")))]
 fn main() {}
 
-#[cfg(any(target_vendor = "apple", windows))]
+#[cfg(any(target_vendor = "apple", windows, target_os = "linux"))]
 fn main() {
     // Tinyinst things
     let tinyinst_args = vec!["-instrument_module".to_string(), "test.exe".to_string()];
@@ -39,12 +40,13 @@ fn main() {
     // use file to pass testcases
     // let args = vec!["test.exe".to_string(), "-f".to_string(), "@@".to_string()];
 
-    let observer = unsafe { ListObserver::new("cov", &mut COVERAGE) };
-    let mut feedback = ListFeedback::with_observer(&observer);
+    let coverage = unsafe { OwnedMutPtr::Ptr(core::ptr::addr_of_mut!(COVERAGE)) };
+    let observer = ListObserver::new("cov", coverage);
+    let mut feedback = ListFeedback::new(&observer);
     #[cfg(windows)]
     let mut shmem_provider = Win32ShMemProvider::new().unwrap();
 
-    #[cfg(target_vendor = "apple")]
+    #[cfg(unix)]
     let mut shmem_provider = UnixShMemProvider::new().unwrap();
 
     let input = BytesInput::new(b"bad".to_vec());

@@ -1,8 +1,8 @@
 /* ANCHOR: use */
 extern crate libafl;
+extern crate libafl_bolts;
 
 use libafl::{
-    bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
@@ -17,6 +17,7 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
+use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
 use std::path::PathBuf;
 /* ANCHOR_END: use */
 

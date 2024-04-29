@@ -1,9 +1,8 @@
 #[cfg(windows)]
 use std::ptr::write_volatile;
-use std::{fs, io::Read, path::PathBuf, ptr::write};
+use std::{fs, io::Read, path::PathBuf};
 
 use libafl::{
-    bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
@@ -17,6 +16,7 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
+use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];

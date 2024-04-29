@@ -11,51 +11,91 @@ keywords = ["fuzzing", "qemu", "instrumentation"]
 edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
-[features]
-default = ["fork"]
-python = ["pyo3", "pyo3-build-config"]
-fork = ["libafl/fork"]
+[package.metadata.docs.rs]
+features = ["document-features", "default", "python", "x86_64", "usermode"]
+rustdoc-args = ["--cfg", "docsrs"]
 
-# The following architecture features are mutually exclusive.
-x86_64 = ["libafl_qemu_sys/x86_64"] # build qemu for x86_64 (default)
+[features]
+default = ["fork", "build_libgasan", "build_libqasan", "serdeany_autoreg", "injections"]
+clippy = [] # special feature for clippy, don't use in normal projects§
+document-features = ["dep:document-features"]
+
+#! # Feature Flags
+#! ### General Features
+## Find injections during fuzzing
+injections = ["serde_yaml", "toml"]
+## Python bindings support
+python = ["pyo3", "pyo3-build-config", "libafl_qemu_sys/python"]
+## Fork support
+fork = ["libafl/fork"]
+## Build libqasan for address sanitization
+build_libgasan = []
+build_libqasan = []
+
+#! ## The following architecture features are mutually exclusive.
+
+## build qemu for x86_64 (default)
+x86_64 = ["libafl_qemu_sys/x86_64"]
 i386 = ["libafl_qemu_sys/i386"] # build qemu for i386
 arm = ["libafl_qemu_sys/arm"] # build qemu for arm
 aarch64 = ["libafl_qemu_sys/aarch64"] # build qemu for aarch64
 mips = ["libafl_qemu_sys/mips"] # build qemu for mips (el, use with the 'be' feature of mips be)
 ppc = ["libafl_qemu_sys/ppc"] # build qemu for powerpc
+hexagon = ["libafl_qemu_sys/hexagon"] # build qemu for hexagon
 
+## Big Endian mode
 be = ["libafl_qemu_sys/be"]
 
+## Usermode (mutually exclusive to Systemmode)
 usermode = ["libafl_qemu_sys/usermode"]
+## Systemmode (mutually exclusive to Usermode)
 systemmode = ["libafl_qemu_sys/systemmode"]
+
+#! ## SerdeAny features
+
+## Automatically register all `#[derive(SerdeAny)]` types at startup.
+serdeany_autoreg = ["libafl_bolts/serdeany_autoreg"]
 
 slirp = [ "systemmode", "libafl_qemu_sys/slirp" ] # build qemu with host libslirp (for user networking)
 
-clippy = [] # special feature for clippy, don't use in normal projects§
+# Requires the binary's build.rs to call `build_libafl_qemu`
+shared = [ "libafl_qemu_sys/shared" ]
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.10.1", default-features = false, features = ["std", "derive", "regex"] }
-libafl_targets = { path = "../libafl_targets", version = "0.10.1" }
-libafl_qemu_sys = { path = "./libafl_qemu_sys", version = "0.10.1" }
+libafl = { path = "../libafl", version = "0.12.0", default-features = false, features = ["std", "derive", "regex"] }
+libafl_bolts = { path = "../libafl_bolts", version = "0.12.0", default-features = false, features = ["std", "derive"] }
+libafl_targets = { path = "../libafl_targets", version = "0.12.0" }
+libafl_qemu_sys = { path = "./libafl_qemu_sys", version = "0.12.0" }
 
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
-hashbrown =  { version = "0.13", features = ["serde"] } # A faster hashmap, nostd compatible
+hashbrown =  { version = "0.14", features = ["serde"] } # A faster hashmap, nostd compatible
 num-traits = "0.2"
-num_enum = "0.5.7"
-goblin = "0.6"
+num-derive = "0.4"
+num_enum = "0.7"
+goblin = "0.7"
 libc = "0.2"
-strum = "0.24"
-strum_macros = "0.24"
+strum = "0.25"
+strum_macros = "0.25"
 syscall-numbers = "3.0"
-meminterval = "0.3"
+meminterval = "0.4"
 thread_local = "1.1.4"
 capstone = "0.11.0"
-pyo3 = { version = "0.18.3", optional = true }
-rangemap = "1.0"
-log = "0.4.17"
+rangemap = "1.3"
+log = "0.4.20"
+addr2line = "0.21"
+typed-arena = "2.0"
+paste = "1"
+enum-map = "2.7"
+serde_yaml = { version = "0.8", optional = true } # For parsing the injections yaml file
+toml = { version = "0.4.2", optional = true } # For parsing the injections toml file
+pyo3 = { version = "0.18", optional = true }
+# Document all features of this crate (for `cargo doc`)
+document-features = { version = "0.2", optional = true }
 
 [build-dependencies]
-pyo3-build-config = { version = "0.15", optional = true }
+pyo3-build-config = { version = "0.18", optional = true }
+rustversion = "1.0"
+bindgen = "0.69"
 
 [lib]
 name = "libafl_qemu"

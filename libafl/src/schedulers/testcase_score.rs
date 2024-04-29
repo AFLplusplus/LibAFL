@@ -2,24 +2,25 @@
 use alloc::string::{String, ToString};
 use core::marker::PhantomData;
 
+use libafl_bolts::{HasLen, HasRefCnt};
+
 use crate::{
-    bolts::{HasLen, HasRefCnt},
     corpus::{Corpus, SchedulerTestcaseMetadata, Testcase},
     feedbacks::MapIndexesMetadata,
     schedulers::{
         minimizer::{IsFavoredMetadata, TopRatedsMetadata},
         powersched::{PowerSchedule, SchedulerMetadata},
     },
-    state::{HasCorpus, HasMetadata},
-    Error,
+    state::HasCorpus,
+    Error, HasMetadata,
 };
 
-/// Compute the favor factor of a [`Testcase`]. Lower is better.
+/// Compute the favor factor of a [`Testcase`]. Higher is better.
 pub trait TestcaseScore<S>
 where
     S: HasMetadata + HasCorpus,
 {
-    /// Computes the favor factor of a [`Testcase`]. Lower is better.
+    /// Computes the favor factor of a [`Testcase`]. Higher is better.
     fn compute(state: &S, entry: &mut Testcase<S::Input>) -> Result<f64, Error>;
 }
 
@@ -111,7 +112,11 @@ where
             .as_nanos() as f64;
 
         let avg_exec_us = psmeta.exec_time().as_nanos() as f64 / psmeta.cycles() as f64;
-        let avg_bitmap_size = psmeta.bitmap_size() / psmeta.bitmap_entries();
+        let avg_bitmap_size = if psmeta.bitmap_entries() == 0 {
+            1
+        } else {
+            psmeta.bitmap_size() / psmeta.bitmap_entries()
+        };
 
         let favored = entry.has_metadata::<IsFavoredMetadata>();
         let tcmeta = entry.metadata::<SchedulerTestcaseMetadata>()?;

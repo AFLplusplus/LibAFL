@@ -41,8 +41,6 @@
 //!
 //! ... making for a total of 5 bytes.
 
-#![cfg(feature = "std")]
-
 use std::{
     fmt::{self, Debug, Formatter},
     io::{self, Cursor, Read, Seek, SeekFrom, Write},
@@ -93,7 +91,7 @@ impl<R: Read> MessageFileReader<R> {
                 Some(Ok((message_id, message)))
             }
             Err(e) => match *e {
-                bincode::ErrorKind::Io(ref io_err) => match io_err.kind() {
+                ErrorKind::Io(ref io_err) => match io_err.kind() {
                     io::ErrorKind::UnexpectedEof => None,
                     _ => Some(Err(e)),
                 },
@@ -110,12 +108,14 @@ impl<R: Read> MessageFileReader<R> {
 
     /// This transforms the given message from it's serialized form into its in-memory form, making relative references
     /// absolute and counting the `SymExprRef`s.
+    #[allow(clippy::too_many_lines)]
     fn transform_message(&mut self, message: &mut SymExpr) -> SymExprRef {
         let ret = self.current_id;
         match message {
             SymExpr::InputByte { .. }
             | SymExpr::Integer { .. }
             | SymExpr::Integer128 { .. }
+            | SymExpr::IntegerFromBuffer { .. }
             | SymExpr::Float { .. }
             | SymExpr::NullPointer
             | SymExpr::True
@@ -125,6 +125,7 @@ impl<R: Read> MessageFileReader<R> {
             }
             SymExpr::Neg { op }
             | SymExpr::FloatAbs { op }
+            | SymExpr::FloatNeg { op }
             | SymExpr::Not { op }
             | SymExpr::Sext { op, .. }
             | SymExpr::Zext { op, .. }
@@ -204,6 +205,12 @@ impl<R: Read> MessageFileReader<R> {
                 }
             }
             SymExpr::Call { .. } | SymExpr::Return { .. } | SymExpr::BasicBlock { .. } => {}
+            SymExpr::Ite { cond, a, b } => {
+                *cond = self.make_absolute(*cond);
+                *a = self.make_absolute(*a);
+                *b = self.make_absolute(*b);
+                self.current_id += 1;
+            }
         }
         SymExprRef::new(ret).unwrap()
     }
@@ -282,6 +289,7 @@ impl<W: Write + Seek> MessageFileWriter<W> {
             SymExpr::InputByte { .. }
             | SymExpr::Integer { .. }
             | SymExpr::Integer128 { .. }
+            | SymExpr::IntegerFromBuffer { .. }
             | SymExpr::Float { .. }
             | SymExpr::NullPointer
             | SymExpr::True
@@ -291,6 +299,7 @@ impl<W: Write + Seek> MessageFileWriter<W> {
             }
             SymExpr::Neg { op }
             | SymExpr::FloatAbs { op }
+            | SymExpr::FloatNeg { op }
             | SymExpr::Not { op }
             | SymExpr::Sext { op, .. }
             | SymExpr::Zext { op, .. }
@@ -370,6 +379,11 @@ impl<W: Write + Seek> MessageFileWriter<W> {
                 }
             }
             SymExpr::Call { .. } | SymExpr::Return { .. } | SymExpr::BasicBlock { .. } => {}
+            SymExpr::Ite { cond, a, b } => {
+                *cond = self.make_relative(*cond);
+                *a = self.make_relative(*a);
+                *b = self.make_relative(*b);
+            }
         }
         self.serialization_options
             .serialize_into(&mut self.writer, &message)?;
@@ -381,67 +395,7 @@ impl<W: Write + Seek> MessageFileWriter<W> {
     }
 }
 
-#[cfg(test)]
-mod serialization_tests {
-    use alloc::vec::Vec;
-    use std::io::Cursor;
-
-    use super::{MessageFileReader, MessageFileWriter, SymExpr};
-
-    /// This test intends to ensure that the serialization format can efficiently encode the required information.
-    /// This is mainly useful to fail if any changes should be made in the future that (inadvertently) reduce
-    /// serialization efficiency.
-    #[test]
-    fn efficient_serialization() {
-        let mut buf = Vec::new();
-        {
-            let mut cursor = Cursor::new(&mut buf);
-            let mut writer = MessageFileWriter::from_writer(&mut cursor).unwrap();
-            let a = writer.write_message(SymExpr::True).unwrap();
-            let b = writer.write_message(SymExpr::True).unwrap();
-            writer.write_message(SymExpr::And { a, b }).unwrap();
-            writer.update_trace_header().unwrap();
-        }
-        let expected_size = 8 + // the header takes 8 bytes to encode the length of the trace
-                            1 + // tag to create SymExpr::True (a)
-                            1 + // tag to create SymExpr::True (b)
-                            1 + // tag to create SymExpr::And
-                            1 + // reference to a
-                            1; // reference to b
-        assert_eq!(buf.len(), expected_size);
-    }
-
-    /// This test intends to verify that a trace written by [`MessageFileWriter`] can indeed be read back by
-    /// [`MessageFileReader`].
-    #[test]
-    fn serialization_roundtrip() {
-        let mut buf = Vec::new();
-        {
-            let mut cursor = Cursor::new(&mut buf);
-            let mut writer = MessageFileWriter::from_writer(&mut cursor).unwrap();
-            let a = writer.write_message(SymExpr::True).unwrap();
-            let b = writer.write_message(SymExpr::True).unwrap();
-            writer.write_message(SymExpr::And { a, b }).unwrap();
-            writer.update_trace_header().unwrap();
-        }
-        let mut reader = MessageFileReader::from_length_prefixed_buffer(&buf).unwrap();
-        let (first_bool_id, first_bool) = reader.next_message().unwrap().unwrap();
-        assert_eq!(first_bool, SymExpr::True);
-        let (second_bool_id, second_bool) = reader.next_message().unwrap().unwrap();
-        assert_eq!(second_bool, SymExpr::True);
-        let (_, and) = reader.next_message().unwrap().unwrap();
-        assert_eq!(
-            and,
-            SymExpr::And {
-                a: first_bool_id,
-                b: second_bool_id
-            }
-        );
-        assert!(reader.next_message().is_none());
-    }
-}
-
-use crate::bolts::shmem::{ShMem, ShMemCursor, ShMemProvider, StdShMemProvider};
+use libafl_bolts::shmem::{ShMem, ShMemCursor, ShMemProvider, StdShMemProvider};
 
 /// The default environment variable name to use for the shared memory used by the concolic tracing
 pub const DEFAULT_ENV_NAME: &str = "SHARED_MEMORY_MESSAGES";
@@ -511,3 +465,63 @@ impl MessageFileWriter<ShMemCursor<<StdShMemProvider as ShMemProvider>::ShMem>> 
 /// A writer that will write messages to a shared memory buffer.
 pub type StdShMemMessageFileWriter =
     MessageFileWriter<ShMemCursor<<StdShMemProvider as ShMemProvider>::ShMem>>;
+
+#[cfg(test)]
+mod serialization_tests {
+    use alloc::vec::Vec;
+    use std::io::Cursor;
+
+    use super::{MessageFileReader, MessageFileWriter, SymExpr};
+
+    /// This test intends to ensure that the serialization format can efficiently encode the required information.
+    /// This is mainly useful to fail if any changes should be made in the future that (inadvertently) reduce
+    /// serialization efficiency.
+    #[test]
+    fn efficient_serialization() {
+        let mut buf = Vec::new();
+        {
+            let mut cursor = Cursor::new(&mut buf);
+            let mut writer = MessageFileWriter::from_writer(&mut cursor).unwrap();
+            let a = writer.write_message(SymExpr::True).unwrap();
+            let b = writer.write_message(SymExpr::True).unwrap();
+            writer.write_message(SymExpr::And { a, b }).unwrap();
+            writer.update_trace_header().unwrap();
+        }
+        let expected_size = 8 + // the header takes 8 bytes to encode the length of the trace
+                            1 + // tag to create SymExpr::True (a)
+                            1 + // tag to create SymExpr::True (b)
+                            1 + // tag to create SymExpr::And
+                            1 + // reference to a
+                            1; // reference to b
+        assert_eq!(buf.len(), expected_size);
+    }
+
+    /// This test intends to verify that a trace written by [`MessageFileWriter`] can indeed be read back by
+    /// [`MessageFileReader`].
+    #[test]
+    fn serialization_roundtrip() {
+        let mut buf = Vec::new();
+        {
+            let mut cursor = Cursor::new(&mut buf);
+            let mut writer = MessageFileWriter::from_writer(&mut cursor).unwrap();
+            let a = writer.write_message(SymExpr::True).unwrap();
+            let b = writer.write_message(SymExpr::True).unwrap();
+            writer.write_message(SymExpr::And { a, b }).unwrap();
+            writer.update_trace_header().unwrap();
+        }
+        let mut reader = MessageFileReader::from_length_prefixed_buffer(&buf).unwrap();
+        let (first_bool_id, first_bool) = reader.next_message().unwrap().unwrap();
+        assert_eq!(first_bool, SymExpr::True);
+        let (second_bool_id, second_bool) = reader.next_message().unwrap().unwrap();
+        assert_eq!(second_bool, SymExpr::True);
+        let (_, and) = reader.next_message().unwrap().unwrap();
+        assert_eq!(
+            and,
+            SymExpr::And {
+                a: first_bool_id,
+                b: second_bool_id
+            }
+        );
+        assert!(reader.next_message().is_none());
+    }
+}

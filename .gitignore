@@ -22,6 +22,7 @@ vendor
 
 .cur_input
 .cur_input_*
+cur_input
 .venv
 
 crashes
@@ -32,6 +33,8 @@ perf.data.old
 
 .vscode
 test.dict
+
+.idea/
 
 # Ignore all built fuzzers
 fuzzer_*
@@ -56,3 +59,19 @@ __pycache__
 
 libafl_nyx/QEMU-Nyx
 libafl_nyx/packer
+
+.z3-trace
+
+# No gdb history
+.gdb_history
+# No llvm IR
+*.ll
+
+*.tar.gz
+
+# common harness names
+harness
+program
+fuzzer
+fuzzer_libpng*
+forkserver_simple

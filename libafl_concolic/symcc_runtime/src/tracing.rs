@@ -62,6 +62,17 @@ macro_rules! binary_expression_builder {
 }
 
 impl Runtime for TracingRuntime {
+    #[allow(clippy::missing_safety_doc)]
+    #[no_mangle]
+    fn build_integer_from_buffer(
+        &mut self,
+        _buffer: *mut core::ffi::c_void,
+        _num_bits: core::ffi::c_uint,
+    ) -> Option<RSymExpr> {
+        // todo
+        self.write_message(SymExpr::IntegerFromBuffer {})
+    }
+
     expression_builder!(get_input_byte(offset: usize, value: u8) => InputByte);
 
     expression_builder!(build_integer(value: u64, bits: u8) => Integer);
@@ -127,6 +138,7 @@ impl Runtime for TracingRuntime {
     binary_expression_builder!(build_fp_rem, FloatRem);
 
     unary_expression_builder!(build_fp_abs, FloatAbs);
+    unary_expression_builder!(build_fp_neg, FloatNeg);
 
     unary_expression_builder!(build_not, Not);
     binary_expression_builder!(build_equal, Equal);
@@ -135,6 +147,7 @@ impl Runtime for TracingRuntime {
     binary_expression_builder!(build_bool_or, BoolOr);
     binary_expression_builder!(build_bool_xor, BoolXor);
 
+    expression_builder!(build_ite(cond: RSymExpr, a: RSymExpr, b: RSymExpr) => Ite);
     expression_builder!(build_sext(op: RSymExpr, bits: u8) => Sext);
     expression_builder!(build_zext(op: RSymExpr, bits: u8) => Zext);
     expression_builder!(build_trunc(op: RSymExpr, bits: u8) => Trunc);

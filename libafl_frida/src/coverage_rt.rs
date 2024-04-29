@@ -5,8 +5,8 @@ use std::{cell::RefCell, marker::PhantomPinned, pin::Pin, rc::Rc};
 #[cfg(target_arch = "aarch64")]
 use dynasmrt::DynasmLabelApi;
 use dynasmrt::{dynasm, DynasmApi};
-use frida_gum::{instruction_writer::InstructionWriter, stalker::StalkerOutput};
-use libafl::bolts::xxh3_rrmxmx_mixer;
+use frida_gum::{instruction_writer::InstructionWriter, stalker::StalkerOutput, ModuleMap};
+use libafl_bolts::hash_std;
 use rangemap::RangeMap;
 
 use crate::helper::FridaRuntime;
@@ -38,7 +38,7 @@ impl FridaRuntime for CoverageRuntime {
         &mut self,
         _gum: &frida_gum::Gum,
         _ranges: &RangeMap<usize, (u16, String)>,
-        _modules_to_instrument: &[&str],
+        _module_map: &Rc<ModuleMap>,
     ) {
     }
 
@@ -150,7 +150,7 @@ impl CoverageRuntime {
             ; mov    QWORD [rsp-0x98], rbx
 
             // Load the previous_pc
-            ; mov rax, QWORD prev_loc_ptr as *mut u64 as _
+            ; mov rax, QWORD prev_loc_ptr as _
             ; mov rax, QWORD [rax]
 
             // Calculate the edge id
@@ -158,7 +158,7 @@ impl CoverageRuntime {
             ; xor rax, rbx
 
             // Load the map byte address
-            ; mov rbx, QWORD map_addr_ptr as *mut [u8; MAP_SIZE] as _
+            ; mov rbx, QWORD map_addr_ptr as _
             ; add rax, rbx
 
             // Update the map byte
@@ -168,7 +168,7 @@ impl CoverageRuntime {
             ; mov BYTE [rax],bl
 
             // Update the previous_pc value
-            ; mov rax, QWORD prev_loc_ptr as *mut u64 as _
+            ; mov rax, QWORD prev_loc_ptr as _
             ; mov ebx, WORD (h64 >> 1) as i32
             ; mov QWORD [rax], rbx
 
@@ -186,7 +186,7 @@ impl CoverageRuntime {
     /// Emits coverage mapping into the current basic block.
     #[inline]
     pub fn emit_coverage_mapping(&mut self, address: u64, output: &StalkerOutput) {
-        let h64 = xxh3_rrmxmx_mixer(address);
+        let h64 = hash_std(&address.to_le_bytes());
         let writer = output.writer();
 
         // Since the AARCH64 instruction set requires that a register be used if

@@ -5,18 +5,9 @@ use core::fmt::{self, Debug, Formatter};
 use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
 
 use libafl::{
-    bolts::{
-        core_affinity::Cores,
-        current_nanos,
-        launcher::Launcher,
-        rands::StdRand,
-        shmem::{ShMemProvider, StdShMemProvider},
-        tuples::{tuple_list, Merge},
-        AsSlice,
-    },
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
-    events::{EventConfig, EventRestarter, LlmpRestartingEventManager},
-    executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor, TimeoutExecutor},
+    events::{launcher::Launcher, EventConfig, EventRestarter, LlmpRestartingEventManager},
+    executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -27,11 +18,19 @@ use libafl::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::{I2SRandReplace, Tokens},
     },
-    observers::{HitcountsMapObserver, TimeObserver},
+    observers::{CanTrack, HitcountsMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
-    state::{HasCorpus, HasMetadata, StdState},
-    Error,
+    state::{HasCorpus, StdState},
+    Error, HasMetadata,
+};
+use libafl_bolts::{
+    core_affinity::Cores,
+    current_nanos,
+    rands::StdRand,
+    shmem::{ShMemProvider, StdShMemProvider},
+    tuples::{tuple_list, Merge, Referenceable},
+    AsSlice,
 };
 use libafl_targets::{std_edges_map_observer, CmpLogObserver};
 use typed_builder::TypedBuilder;
@@ -58,7 +57,7 @@ where
     /// Dictionary
     #[builder(default = None)]
     tokens_file: Option<PathBuf>,
-    /// Flag if use CmpLog
+    /// Flag if use `CmpLog`
     #[builder(default = None)]
     use_cmplog: Option<bool>,
     /// The port used for communication between this fuzzer node and other fuzzer nodes
@@ -139,15 +138,19 @@ where
 
         let monitor = MultiMonitor::new(|s| println!("{s}"));
 
+        // Create an observation channel to keep track of the execution time
+        let time_observer = TimeObserver::new("time");
+        let time_ref = time_observer.reference();
+
         let mut run_client = |state: Option<_>,
-                              mut mgr: LlmpRestartingEventManager<_, _>,
+                              mut mgr: LlmpRestartingEventManager<_, _, _>,
                               _core_id| {
+            let time_observer = time_observer.clone();
+
             // Create an observation channel using the coverage map
             let edges_observer =
-                HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") });
-
-            // Create an observation channel to keep track of the execution time
-            let time_observer = TimeObserver::new("time");
+                HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") })
+                    .track_indices();
 
             let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
@@ -155,9 +158,9 @@ where
             // This one is composed by two Feedbacks in OR
             let mut feedback = feedback_or!(
                 // New maximization map feedback linked to the edges observer and the feedback state
-                MaxMapFeedback::tracking(&edges_observer, true, false),
+                MaxMapFeedback::new(&edges_observer),
                 // Time feedback, this one does not need a feedback state
-                TimeFeedback::with_observer(&time_observer)
+                TimeFeedback::new(&time_observer)
             );
 
             // A feedback to choose if an input is a solution or not
@@ -187,7 +190,8 @@ where
             }
 
             // A minimization+queue policy to get testcasess from the corpus
-            let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+            let scheduler =
+                IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
             // A fuzzer with feedbacks and a corpus scheduler
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -202,16 +206,14 @@ where
 
             // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
             let mut executor = ShadowExecutor::new(
-                TimeoutExecutor::new(
-                    InProcessExecutor::new(
-                        &mut harness,
-                        tuple_list!(edges_observer, time_observer),
-                        &mut fuzzer,
-                        &mut state,
-                        &mut mgr,
-                    )?,
+                InProcessExecutor::with_timeout(
+                    &mut harness,
+                    tuple_list!(edges_observer, time_observer),
+                    &mut fuzzer,
+                    &mut state,
+                    &mut mgr,
                     timeout,
-                ),
+                )?,
                 tuple_list!(cmplog_observer),
             );
 
@@ -341,7 +343,8 @@ where
             .run_client(&mut run_client)
             .cores(self.cores)
             .broker_port(self.broker_port)
-            .remote_broker_addr(self.remote_broker_addr);
+            .remote_broker_addr(self.remote_broker_addr)
+            .time_ref(time_ref);
         #[cfg(unix)]
         let launcher = launcher.stdout_file(Some("/dev/null"));
         match launcher.build().launch() {
@@ -357,7 +360,7 @@ where
 pub mod pybind {
     use std::path::PathBuf;
 
-    use libafl::bolts::core_affinity::Cores;
+    use libafl_bolts::core_affinity::Cores;
     use pyo3::{prelude::*, types::PyBytes};
 
     use crate::inmemory;

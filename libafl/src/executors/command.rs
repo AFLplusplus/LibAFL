@@ -16,22 +16,23 @@ use std::{
     time::Duration,
 };
 
+use libafl_bolts::{
+    fs::{get_unique_std_input_file, InputFile},
+    tuples::{MatchName, RefIndexable},
+    AsSlice,
+};
+
 use super::HasObservers;
 #[cfg(all(feature = "std", unix))]
 use crate::executors::{Executor, ExitKind};
-use crate::{
-    bolts::{
-        fs::{get_unique_std_input_file, InputFile},
-        tuples::MatchName,
-        AsSlice,
-    },
-    inputs::{HasTargetBytes, UsesInput},
-    observers::{ObserversTuple, UsesObservers},
-    state::UsesState,
-    std::borrow::ToOwned,
-};
 #[cfg(feature = "std")]
 use crate::{inputs::Input, Error};
+use crate::{
+    inputs::{HasTargetBytes, UsesInput},
+    observers::{ObserversTuple, UsesObservers},
+    state::{HasExecutions, State, UsesState},
+    std::borrow::ToOwned,
+};
 
 /// How to deliver input to an external program
 /// `StdIn`: The target reads from stdin
@@ -214,7 +215,7 @@ where
 
 impl<OT, S> CommandExecutor<OT, S, StdCommandConfigurator>
 where
-    OT: MatchName + Debug + ObserversTuple<S>,
+    OT: MatchName + ObserversTuple<S>,
     S: UsesInput,
 {
     /// Creates a new `CommandExecutor`.
@@ -312,22 +313,24 @@ where
 impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<OT, S, T>
 where
     EM: UsesState<State = S>,
-    S: UsesInput,
+    S: State + HasExecutions,
     S::Input: HasTargetBytes,
-    T: CommandConfigurator + Debug,
+    T: CommandConfigurator,
     OT: Debug + MatchName + ObserversTuple<S>,
     Z: UsesState<State = S>,
 {
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
-        _state: &mut Self::State,
+        state: &mut Self::State,
         _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         use std::os::unix::prelude::ExitStatusExt;
 
         use wait_timeout::ChildExt;
+
+        *state.executions_mut() += 1;
 
         let mut child = self.configurer.spawn_child(input)?;
 
@@ -375,7 +378,7 @@ where
 
 impl<OT, S, T> UsesState for CommandExecutor<OT, S, T>
 where
-    S: UsesInput,
+    S: State,
 {
     type State = S;
 }
@@ -383,23 +386,23 @@ where
 impl<OT, S, T> UsesObservers for CommandExecutor<OT, S, T>
 where
     OT: ObserversTuple<S>,
-    S: UsesInput,
+    S: State,
 {
     type Observers = OT;
 }
 
 impl<OT, S, T> HasObservers for CommandExecutor<OT, S, T>
 where
-    S: UsesInput,
+    S: State,
     T: Debug,
     OT: ObserversTuple<S>,
 {
-    fn observers(&self) -> &OT {
-        &self.observers
+    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
+        RefIndexable::from(&self.observers)
     }
 
-    fn observers_mut(&mut self) -> &mut OT {
-        &mut self.observers
+    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
+        RefIndexable::from(&mut self.observers)
     }
 }
 
@@ -562,13 +565,13 @@ impl CommandExecutorBuilder {
         observers: OT,
     ) -> Result<CommandExecutor<OT, S, StdCommandConfigurator>, Error>
     where
-        OT: Debug + MatchName + ObserversTuple<S>,
+        OT: MatchName + ObserversTuple<S>,
         S: UsesInput,
     {
         let Some(program) = &self.program else {
-             return Err(Error::illegal_argument(
+            return Err(Error::illegal_argument(
                 "CommandExecutor::builder: no program set!",
-           ));
+            ));
         };
 
         let mut command = Command::new(program);
@@ -618,7 +621,8 @@ impl CommandExecutorBuilder {
 #[cfg_attr(all(feature = "std", unix), doc = " ```")]
 #[cfg_attr(not(all(feature = "std", unix)), doc = " ```ignore")]
 /// use std::{io::Write, process::{Stdio, Command, Child}, time::Duration};
-/// use libafl::{Error, bolts::AsSlice, inputs::{HasTargetBytes, Input, UsesInput}, executors::{Executor, command::CommandConfigurator}, state::UsesState};
+/// use libafl::{Error, inputs::{HasTargetBytes, Input, UsesInput}, executors::{Executor, command::CommandConfigurator}, state::{UsesState, HasExecutions}};
+/// use libafl_bolts::AsSlice;
 /// #[derive(Debug)]
 /// struct MyExecutor;
 ///
@@ -648,7 +652,7 @@ impl CommandExecutorBuilder {
 /// where
 ///     EM: UsesState,
 ///     Z: UsesState<State = EM::State>,
-///     EM::State: UsesInput,
+///     EM::State: UsesInput + HasExecutions,
 ///     EM::Input: HasTargetBytes
 /// {
 ///     MyExecutor.into_executor(())
@@ -656,7 +660,7 @@ impl CommandExecutorBuilder {
 /// ```
 
 #[cfg(all(feature = "std", any(unix, doc)))]
-pub trait CommandConfigurator: Sized + Debug {
+pub trait CommandConfigurator: Sized {
     /// Spawns a new process with the given configuration.
     fn spawn_child<I>(&mut self, input: &I) -> Result<Child, Error>
     where
@@ -668,7 +672,7 @@ pub trait CommandConfigurator: Sized + Debug {
     /// Create an `Executor` from this `CommandConfigurator`.
     fn into_executor<OT, S>(self, observers: OT) -> CommandExecutor<OT, S, Self>
     where
-        OT: Debug + MatchName,
+        OT: MatchName,
     {
         CommandExecutor {
             observers,
@@ -686,10 +690,10 @@ mod tests {
             command::{CommandExecutor, InputLocation},
             Executor,
         },
+        fuzzer::test::NopFuzzer,
         inputs::BytesInput,
         monitors::SimpleMonitor,
         state::NopState,
-        NopFuzzer,
     };
 
     #[test]

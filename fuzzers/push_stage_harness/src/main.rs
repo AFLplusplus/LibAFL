@@ -8,7 +8,6 @@ use core::cell::{Cell, RefCell};
 use std::{path::PathBuf, rc::Rc};
 
 use libafl::{
-    bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, Testcase},
     events::SimpleEventManager,
     executors::ExitKind,
@@ -22,6 +21,7 @@ use libafl::{
     stages::push::{PushStageSharedState, StdMutationalPushStage},
     state::{HasCorpus, StdState},
 };
+use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
@@ -31,10 +31,11 @@ fn signals_set(idx: usize) {
     unsafe { SIGNALS[idx] = 1 };
 }
 
-#[allow(clippy::similar_names)]
+#[allow(clippy::similar_names, clippy::manual_assert)]
 pub fn main() {
     // Create an observation channel using the signals map
-    let observer = unsafe { StdMapObserver::new("signals", &mut SIGNALS) };
+    let observer =
+        unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS.as_mut_ptr(), SIGNALS.len()) };
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);
@@ -70,7 +71,7 @@ pub fn main() {
     let mut scheduler = QueueScheduler::new();
 
     // Create the executor for an in-process function with just one observer
-    //let mut executor = InProcessExecutor::new(&mut harness, &mut fuzzer, &mut state, &mut mgr)
+    //let mut executor = InProcessExecutor::new(tuple_list!(), &mut harness, &mut fuzzer, &mut state, &mut mgr)
     //    .expect("Failed to create the Executor");
 
     let testcase = Testcase::new(BytesInput::new(b"aaaa".to_vec()));
@@ -90,8 +91,6 @@ pub fn main() {
 
     let exit_kind = Rc::new(Cell::new(None));
 
-    let stage_idx = 0;
-
     let observers = tuple_list!(observer);
 
     let shared_state = PushStageSharedState::new(fuzzer, state, observers, mgr);
@@ -101,7 +100,6 @@ pub fn main() {
         mutator,
         Rc::new(RefCell::new(Some(shared_state))),
         exit_kind.clone(),
-        stage_idx,
     );
 
     // Loop, the input, getting a new entry from the push stage each iteration.

@@ -1,13 +1,6 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Duration};
 
 use libafl::{
-    bolts::{
-        current_nanos,
-        rands::StdRand,
-        shmem::{ShMem, ShMemProvider, StdShMemProvider},
-        tuples::tuple_list,
-        AsSlice,
-    },
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::InProcessForkExecutor,
@@ -22,6 +15,14 @@ use libafl::{
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::StdState,
+};
+use libafl_bolts::{
+    current_nanos,
+    ownedref::OwnedRefMut,
+    rands::StdRand,
+    shmem::{ShMemProvider, StdShMemProvider},
+    tuples::tuple_list,
+    AsSlice,
 };
 use libc::{c_int, c_uchar};
 extern crate libc;
@@ -47,10 +48,10 @@ pub fn main() {
     // Create an observation channel using the signals map
     let observer = unsafe { ConstMapObserver::<u8, 3>::from_mut_ptr("signals", map_ptr) };
     // Create a stacktrace observer
-    let mut bt = shmem_provider.new_shmem_object::<Option<u64>>().unwrap();
+    let mut bt = shmem_provider.new_on_shmem::<Option<u64>>(None).unwrap();
     let bt_observer = BacktraceObserver::new(
         "BacktraceObserver",
-        unsafe { bt.as_object_mut::<Option<u64>>() },
+        unsafe { OwnedRefMut::from_shmem(&mut bt) },
         libafl::observers::HarnessType::Child,
     );
 
@@ -97,6 +98,7 @@ pub fn main() {
         &mut fuzzer,
         &mut state,
         &mut mgr,
+        Duration::from_millis(5000),
         shmem_provider,
     )
     .expect("Failed to create the Executor");

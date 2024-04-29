@@ -21,3 +21,4 @@ debug = true
 
 [dependencies]
 libafl = { path = "../../libafl/" }
+libafl_bolts = { path = "../../libafl_bolts/" }

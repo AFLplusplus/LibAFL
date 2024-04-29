@@ -1,6 +1,8 @@
 [env]
 FUZZER_NAME="fuzzer"
 PROJECT_DIR = { script = ["pwd"] }
+PROFILE = { value = "release", condition = {env_not_set = ["PROFILE"]} }
+PROFILE_DIR = {value = "release", condition = {env_not_set = ["PROFILE_DIR"] }}
 
 [tasks.unsupported]
 script_runner="@shell"
@@ -11,7 +13,7 @@ echo "Cargo-make not integrated yet on this"
 # Fuzzer
 [tasks.build]
 command = "cargo"
-args = ["build", "--release", "-Zbuild-std=core,alloc", "--target", "x86_64-unknown-linux-gnu"]
+args = ["build", "--profile", "${PROFILE}", "-Zbuild-std=core,alloc", "--target", "x86_64-unknown-linux-gnu"]
 
 # Test
 [tasks.test]
@@ -26,7 +28,7 @@ cargo run -Zbuild-std=core,alloc --target x86_64-unknown-linux-gnu || true
 dependencies = ["build"]
 
 [tasks.build_aarch]
-script = "cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release"
+script = "cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --profile ${PROFILE}"
 
 # Clean
 [tasks.clean]

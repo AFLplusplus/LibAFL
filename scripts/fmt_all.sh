@@ -11,9 +11,7 @@ cargo +nightly fmt
 
 echo "[*] Formatting C(pp) files"
 # shellcheck disable=SC2046
-clang-format-13 -i --style=file $(find . -type f \( -name '*.cpp' -o -iname '*.hpp' -o -name '*.cc' -o -name '*.cxx' -o -name '*.cc' -o -name '*.h' \) | grep -v '/target/' | grep -v 'libpng-1\.6\.37' | grep -v 'stb_image\.h' | grep -v 'dlmalloc\.c')
-
-
+clang-format-18 -i --style=file $(find . -type f \( -name '*.cpp' -o -iname '*.hpp' -o -name '*.cc' -o -name '*.cxx' -o -name '*.cc' -o -name '*.c' -o -name '*.h' \) | grep -v '/target/' | grep -v 'libpng-1\.6\.37' | grep -v 'stb_image\.h' | grep -v 'dlmalloc\.c')
 
 fuzzers=$(find ./fuzzers -maxdepth 1 -type d)
 backtrace_fuzzers=$(find ./fuzzers/backtrace_baby_fuzzers -maxdepth 1 -type d)
@@ -26,3 +24,10 @@ do
     cargo +nightly fmt --all
     popd || exit 1
 done
+
+echo "[*] Formatting libafl_libfuzzer_runtime"
+pushd "libafl_libfuzzer/libafl_libfuzzer_runtime" || exit 1
+cargo +nightly fmt --all
+popd || exit 1
+
+echo "[*] Done :)"

@@ -1,7 +1,7 @@
 //! Ar Wrapper from `LibAFL`
 // pass to e.g. cmake with -DCMAKE_AR=/path/to/fuzzer/target/release/libafl_ar
 
-use std::{convert::Into, env, path::PathBuf, str::FromStr, string::String, vec::Vec};
+use std::{env, path::PathBuf, str::FromStr};
 
 use crate::{Error, ToolWrapper, LIB_EXT, LIB_PREFIX};
 
@@ -162,7 +162,7 @@ impl ToolWrapper for ArWrapper {
             .base_args
             .iter()
             .map(|r| {
-                let arg_as_path = std::path::PathBuf::from(r);
+                let arg_as_path = PathBuf::from(r);
                 if r.ends_with('.') {
                     r.to_string()
                 } else {
@@ -170,7 +170,7 @@ impl ToolWrapper for ArWrapper {
                         let extension = extension.to_str().unwrap();
                         let extension_lowercase = extension.to_lowercase();
                         match &extension_lowercase[..] {
-                            "o" | "lo" | "a" | "la" | "so" => {
+                            "o" | "lo" | "a" | "la" | "so" | "ao" | "c.o" | "pch" => {
                                 configuration.replace_extension(&arg_as_path)
                             }
                             _ => arg_as_path,
@@ -185,7 +185,7 @@ impl ToolWrapper for ArWrapper {
             })
             .collect::<Vec<_>>();
 
-        let Ok(ar_path) = std::env::var("LLVM_AR_PATH") else {
+        let Ok(ar_path) = env::var("LLVM_AR_PATH") else {
             panic!("Couldn't find llvm-ar. Specify the `LLVM_AR_PATH` environment variable");
         };
 

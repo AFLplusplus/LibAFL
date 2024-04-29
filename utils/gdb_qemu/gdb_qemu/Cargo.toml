@@ -1,0 +1,16 @@
+[package]
+name = "gdb_qemu"
+version = "0.1.0"
+edition = "2021"
+
+[build-dependencies]
+vergen = { version = "8.1.1", features = ["build", "cargo", "git", "gitcl", "rustc", "si"] }
+
+[dependencies]
+anyhow = { version = "1.0", default-features = false }
+clap = { version = "4.5", default-features = false, features = ["derive", "string", "std", "help", "derive", "error-context", "usage"] }
+libc = {version = "0.2", default-features = false }
+log = { version = "0.4.20", default-features = false }
+nix = { version = "0.27", default-features = false, features = ["signal", "fs"] }
+readonly = { version = "0.2.8", default-features = false }
+simplelog = { version = "0.12.1", default-features = false }

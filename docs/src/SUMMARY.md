@@ -25,6 +25,7 @@
   - [Architecture](./design/architecture.md)
   - [Metadata](./design/metadata.md)
   - [Migrating from LibAFL <0.9 to 0.9](./design/migration-0.9.md)
+  - [Migrating from LibAFL <0.11 to 0.11](./design/migration-0.11.md)
 
 - [Message Passing](./message_passing/message_passing.md)
   - [Spawning Instances](./message_passing/spawn_instances.md)

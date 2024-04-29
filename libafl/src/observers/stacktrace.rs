@@ -1,13 +1,11 @@
 //! the ``StacktraceObserver`` looks up the stacktrace on the execution thread and computes a hash for it for dedupe
 
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{borrow::Cow, string::String, vec::Vec};
 #[cfg(feature = "casr")]
 use std::{
     collections::hash_map::DefaultHasher,
     hash::{Hash, Hasher},
+    string::ToString,
 };
 use std::{
     fmt::Debug,
@@ -18,13 +16,16 @@ use std::{
 };
 
 use backtrace::Backtrace;
+use libafl_bolts::{ownedref::OwnedRefMut, Named};
+#[allow(unused_imports)]
 #[cfg(feature = "casr")]
 use libcasr::{
     asan::AsanStacktrace,
     constants::{
         STACK_FRAME_FILEPATH_IGNORE_REGEXES_CPP, STACK_FRAME_FILEPATH_IGNORE_REGEXES_GO,
-        STACK_FRAME_FILEPATH_IGNORE_REGEXES_PYTHON, STACK_FRAME_FILEPATH_IGNORE_REGEXES_RUST,
-        STACK_FRAME_FUNCTION_IGNORE_REGEXES_CPP, STACK_FRAME_FUNCTION_IGNORE_REGEXES_GO,
+        STACK_FRAME_FILEPATH_IGNORE_REGEXES_JAVA, STACK_FRAME_FILEPATH_IGNORE_REGEXES_PYTHON,
+        STACK_FRAME_FILEPATH_IGNORE_REGEXES_RUST, STACK_FRAME_FUNCTION_IGNORE_REGEXES_CPP,
+        STACK_FRAME_FUNCTION_IGNORE_REGEXES_GO, STACK_FRAME_FUNCTION_IGNORE_REGEXES_JAVA,
         STACK_FRAME_FUNCTION_IGNORE_REGEXES_PYTHON, STACK_FRAME_FUNCTION_IGNORE_REGEXES_RUST,
     },
     init_ignored_frames,
@@ -38,13 +39,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use super::ObserverWithHashField;
-use crate::{
-    bolts::{ownedref::OwnedRefMut, tuples::Named},
-    executors::ExitKind,
-    inputs::UsesInput,
-    observers::Observer,
-    Error,
-};
+use crate::{executors::ExitKind, inputs::UsesInput, observers::Observer, Error};
 
 #[cfg(not(feature = "casr"))]
 /// Collects the backtrace via [`Backtrace`] and [`Debug`]
@@ -86,10 +81,10 @@ pub fn collect_backtrace() -> u64 {
         if symbols.len() > 1 {
             let symbol = &symbols[0];
             if let Some(name) = symbol.name() {
-                strace_entry.function = name.as_str().unwrap_or("").to_string();
+                strace_entry.function = name.as_str().map_or_else(String::new, str::to_string);
             }
             if let Some(file) = symbol.filename() {
-                strace_entry.debug.file = file.to_str().unwrap_or("").to_string();
+                strace_entry.debug.file = file.to_string_lossy().to_string();
             }
             strace_entry.debug.line = u64::from(symbol.lineno().unwrap_or(0));
             strace_entry.debug.column = u64::from(symbol.colno().unwrap_or(0));
@@ -119,7 +114,7 @@ pub enum HarnessType {
 #[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BacktraceObserver<'a> {
-    observer_name: String,
+    observer_name: Cow<'static, str>,
     hash: OwnedRefMut<'a, Option<u64>>,
     harness_type: HarnessType,
 }
@@ -128,14 +123,17 @@ impl<'a> BacktraceObserver<'a> {
     #[cfg(not(feature = "casr"))]
     /// Creates a new [`BacktraceObserver`] with the given name.
     #[must_use]
-    pub fn new(
-        observer_name: &str,
-        backtrace_hash: &'a mut Option<u64>,
+    pub fn new<S>(
+        observer_name: S,
+        backtrace_hash: OwnedRefMut<'a, Option<u64>>,
         harness_type: HarnessType,
-    ) -> Self {
+    ) -> Self
+    where
+        S: Into<Cow<'static, str>>,
+    {
         Self {
-            observer_name: observer_name.to_string(),
-            hash: OwnedRefMut::Ref(backtrace_hash),
+            observer_name: observer_name.into(),
+            hash: backtrace_hash,
             harness_type,
         }
     }
@@ -143,17 +141,29 @@ impl<'a> BacktraceObserver<'a> {
     #[cfg(feature = "casr")]
     /// Creates a new [`BacktraceObserver`] with the given name.
     #[must_use]
-    pub fn new(
-        observer_name: &str,
-        backtrace_hash: &'a mut Option<u64>,
+    pub fn new<S>(
+        observer_name: S,
+        backtrace_hash: OwnedRefMut<'a, Option<u64>>,
         harness_type: HarnessType,
-    ) -> Self {
+    ) -> Self
+    where
+        S: Into<Cow<'static, str>>,
+    {
         init_ignored_frames!("rust", "cpp", "go");
         Self {
-            observer_name: observer_name.to_string(),
-            hash: OwnedRefMut::Ref(backtrace_hash),
+            observer_name: observer_name.into(),
+            hash: backtrace_hash,
             harness_type,
         }
+    }
+
+    /// Creates a new [`BacktraceObserver`] with the given name, owning a new `backtrace_hash` variable.
+    #[must_use]
+    pub fn owned<S>(observer_name: S, harness_type: HarnessType) -> Self
+    where
+        S: Into<Cow<'static, str>>,
+    {
+        Self::new(observer_name, OwnedRefMut::owned(None), harness_type)
     }
 
     /// Updates the hash value of this observer.
@@ -224,7 +234,7 @@ where
 }
 
 impl<'a> Named for BacktraceObserver<'a> {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.observer_name
     }
 }
@@ -244,7 +254,7 @@ pub fn get_asan_runtime_flags_with_log_path() -> String {
 /// returns the recommended ASAN runtime flags to capture the backtrace correctly
 #[must_use]
 pub fn get_asan_runtime_flags() -> String {
-    let flags = vec![
+    let flags = [
         "exitcode=0",
         "abort_on_error=1",
         "handle_abort=1",
@@ -260,7 +270,7 @@ pub fn get_asan_runtime_flags() -> String {
 /// An observer looking at the backtrace of target command using ASAN output
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AsanBacktraceObserver {
-    observer_name: String,
+    observer_name: Cow<'static, str>,
     hash: Option<u64>,
 }
 
@@ -268,9 +278,12 @@ impl AsanBacktraceObserver {
     #[cfg(not(feature = "casr"))]
     /// Creates a new [`BacktraceObserver`] with the given name.
     #[must_use]
-    pub fn new(observer_name: &str) -> Self {
+    pub fn new<S>(observer_name: S) -> Self
+    where
+        S: Into<Cow<'static, str>>,
+    {
         Self {
-            observer_name: observer_name.to_string(),
+            observer_name: observer_name.into(),
             hash: None,
         }
     }
@@ -278,10 +291,13 @@ impl AsanBacktraceObserver {
     #[cfg(feature = "casr")]
     /// Creates a new [`BacktraceObserver`] with the given name.
     #[must_use]
-    pub fn new(observer_name: &str) -> Self {
+    pub fn new<S>(observer_name: S) -> Self
+    where
+        S: Into<Cow<'static, str>>,
+    {
         init_ignored_frames!("rust", "cpp", "go");
         Self {
-            observer_name: observer_name.to_string(),
+            observer_name: observer_name.into(),
             hash: None,
         }
     }
@@ -387,7 +403,7 @@ where
 }
 
 impl Named for AsanBacktraceObserver {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.observer_name
     }
 }

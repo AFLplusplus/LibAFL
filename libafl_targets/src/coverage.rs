@@ -1,16 +1,21 @@
 //! Coverage maps as static mut array
 
-use alloc::string::String;
+use alloc::borrow::Cow;
 
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl::{mutators::Tokens, Error};
 
-use crate::{ACCOUNTING_MAP_SIZE, EDGES_MAP_SIZE};
+use crate::{ACCOUNTING_MAP_SIZE, DDG_MAP_SIZE, EDGES_MAP_SIZE_IN_USE, EDGES_MAP_SIZE_MAX};
 
 /// The map for edges.
 #[no_mangle]
-pub static mut __afl_area_ptr_local: [u8; EDGES_MAP_SIZE] = [0; EDGES_MAP_SIZE];
+pub static mut __afl_area_ptr_local: [u8; EDGES_MAP_SIZE_MAX] = [0; EDGES_MAP_SIZE_MAX];
 pub use __afl_area_ptr_local as EDGES_MAP;
+
+/// The map for data dependency
+#[no_mangle]
+pub static mut __ddg_area_ptr_local: [u8; DDG_MAP_SIZE] = [0; DDG_MAP_SIZE];
+pub use __ddg_area_ptr_local as DDG_MAP;
 
 /// The map for accounting mem writes.
 #[no_mangle]
@@ -23,6 +28,9 @@ pub static mut MAX_EDGES_NUM: usize = 0;
 extern "C" {
     /// The area pointer points to the edges map.
     pub static mut __afl_area_ptr: *mut u8;
+
+    /// The area pointer points to the data flow map
+    pub static mut __ddg_area_ptr: *mut u8;
 
     /// The area pointer points to the accounting mem operations map.
     pub static mut __afl_acc_memop_ptr: *mut u32;
@@ -37,6 +45,7 @@ extern "C" {
 }
 pub use __afl_acc_memop_ptr as ACCOUNTING_MEMOP_MAP_PTR;
 pub use __afl_area_ptr as EDGES_MAP_PTR;
+pub use __ddg_area_ptr as DDG_MAP_PTR;
 
 /// Return Tokens from the compile-time token section
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
@@ -53,9 +62,10 @@ pub fn autotokens() -> Result<Tokens, Error> {
 
 /// The size of the map for edges.
 #[no_mangle]
-pub static mut __afl_map_size: usize = EDGES_MAP_SIZE;
+pub static mut __afl_map_size: usize = EDGES_MAP_SIZE_IN_USE;
 pub use __afl_map_size as EDGES_MAP_PTR_NUM;
-use libafl::{bolts::ownedref::OwnedMutSlice, observers::StdMapObserver};
+use libafl::observers::StdMapObserver;
+use libafl_bolts::ownedref::OwnedMutSlice;
 
 /// Gets the edges map from the `EDGES_MAP_PTR` raw pointer.
 /// Assumes a `len` of `EDGES_MAP_PTR_NUM`.
@@ -98,7 +108,7 @@ pub unsafe fn edges_map_mut_slice<'a>() -> OwnedMutSlice<'a, u8> {
 /// This will dereference [`edges_map_mut_ptr`] and crash if it is not a valid address.
 pub unsafe fn std_edges_map_observer<'a, S>(name: S) -> StdMapObserver<'a, u8, false>
 where
-    S: Into<String>,
+    S: Into<Cow<'static, str>>,
 {
     StdMapObserver::from_mut_slice(name, edges_map_mut_slice())
 }
@@ -142,15 +152,15 @@ pub use swap::*;
 
 #[cfg(feature = "pointer_maps")]
 mod swap {
-    use alloc::string::{String, ToString};
+    use alloc::borrow::Cow;
     use core::fmt::Debug;
 
     use libafl::{
-        bolts::{ownedref::OwnedMutSlice, tuples::Named, AsMutSlice},
         inputs::UsesInput,
         observers::{DifferentialObserver, Observer, ObserversTuple, StdMapObserver},
         Error,
     };
+    use libafl_bolts::{ownedref::OwnedMutSlice, AsSliceMut, Named};
     use serde::{Deserialize, Serialize};
 
     use super::{EDGES_MAP_PTR, EDGES_MAP_PTR_NUM};
@@ -163,9 +173,9 @@ mod swap {
     pub struct DifferentialAFLMapSwapObserver<'a, 'b> {
         first_map: OwnedMutSlice<'a, u8>,
         second_map: OwnedMutSlice<'b, u8>,
-        first_name: String,
-        second_name: String,
-        name: String,
+        first_name: Cow<'static, str>,
+        second_name: Cow<'static, str>,
+        name: Cow<'static, str>,
     }
 
     impl<'a, 'b> DifferentialAFLMapSwapObserver<'a, 'b> {
@@ -175,15 +185,15 @@ mod swap {
             second: &mut StdMapObserver<'b, u8, D2>,
         ) -> Self {
             Self {
-                first_name: first.name().to_string(),
-                second_name: second.name().to_string(),
-                name: format!("differential_{}_{}", first.name(), second.name()),
+                first_name: first.name().clone(),
+                second_name: second.name().clone(),
+                name: Cow::from(format!("differential_{}_{}", first.name(), second.name())),
                 first_map: unsafe {
-                    let slice = first.map_mut().as_mut_slice();
+                    let slice = first.map_mut().as_slice_mut();
                     OwnedMutSlice::from_raw_parts_mut(slice.as_mut_ptr(), slice.len())
                 },
                 second_map: unsafe {
-                    let slice = second.map_mut().as_mut_slice();
+                    let slice = second.map_mut().as_slice_mut();
                     OwnedMutSlice::from_raw_parts_mut(slice.as_mut_ptr(), slice.len())
                 },
             }
@@ -215,7 +225,7 @@ mod swap {
     }
 
     impl<'a, 'b> Named for DifferentialAFLMapSwapObserver<'a, 'b> {
-        fn name(&self) -> &str {
+        fn name(&self) -> &Cow<'static, str> {
             &self.name
         }
     }
@@ -230,7 +240,7 @@ mod swap {
         S: UsesInput,
     {
         fn pre_observe_first(&mut self, _: &mut OTA) -> Result<(), Error> {
-            let slice = self.first_map.as_mut_slice();
+            let slice = self.first_map.as_slice_mut();
             unsafe {
                 EDGES_MAP_PTR = slice.as_mut_ptr();
                 EDGES_MAP_PTR_NUM = slice.len();
@@ -239,7 +249,7 @@ mod swap {
         }
 
         fn pre_observe_second(&mut self, _: &mut OTB) -> Result<(), Error> {
-            let slice = self.second_map.as_mut_slice();
+            let slice = self.second_map.as_slice_mut();
             unsafe {
                 EDGES_MAP_PTR = slice.as_mut_ptr();
                 EDGES_MAP_PTR_NUM = slice.len();

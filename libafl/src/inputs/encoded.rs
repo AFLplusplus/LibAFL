@@ -9,17 +9,17 @@ use alloc::{borrow::ToOwned, rc::Rc, string::String, vec::Vec};
 use core::str::from_utf8;
 use core::{
     cell::RefCell,
-    convert::From,
     hash::{BuildHasher, Hasher},
 };
 
 use ahash::RandomState;
 use hashbrown::HashMap;
+use libafl_bolts::{Error, HasLen};
 #[cfg(feature = "regex")]
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::{bolts::HasLen, inputs::Input, Error};
+use crate::inputs::Input;
 
 /// Trait to encode bytes to an [`EncodedInput`] using the given [`Tokenizer`]
 pub trait InputEncoder<T>
@@ -270,6 +270,7 @@ mod tests {
     };
 
     #[test]
+    #[cfg_attr(all(miri, target_arch = "aarch64", target_vendor = "apple"), ignore)] // Regex miri fails on M1
     fn test_input() {
         let mut t = NaiveTokenizer::default();
         let mut ed = TokenInputEncoderDecoder::new();

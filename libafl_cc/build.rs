@@ -26,7 +26,7 @@ fn dll_extension<'a>() -> &'a str {
             return "dylib";
         }
     }
-    let family = env::var("CARGO_CFG_TARGET_FAMILY").unwrap();
+    let family = env::var("CARGO_CFG_TARGET_FAMILY").unwrap_or_else(|_| "unknown".into());
     match family.as_str() {
         "windows" => "dll",
         "unix" => "so",
@@ -45,7 +45,7 @@ fn find_llvm_config_brew() -> Result<PathBuf, String> {
                 return Err("Empty return from brew --cellar".to_string());
             }
             let location_suffix = "*/bin/llvm-config";
-            let cellar_glob = vec![
+            let cellar_glob = [
                 // location for explicitly versioned brew formulae
                 format!("{brew_cellar_location}/llvm@*/{location_suffix}"),
                 // location for current release brew formulae
@@ -82,7 +82,15 @@ fn find_llvm_config() -> Result<String, String> {
         }
     };
 
-    #[cfg(not(target_vendor = "apple"))]
+    #[cfg(any(target_os = "solaris", target_os = "illumos"))]
+    for version in (LLVM_VERSION_MIN..=LLVM_VERSION_MAX).rev() {
+        let llvm_config_name: String = format!("/usr/clang/{version}.0/bin/llvm-config");
+        if Path::new(&llvm_config_name).exists() {
+            return Ok(llvm_config_name);
+        }
+    }
+
+    #[cfg(not(any(target_vendor = "apple", target_os = "solaris", target_os = "illumos")))]
     for version in (LLVM_VERSION_MIN..=LLVM_VERSION_MAX).rev() {
         let llvm_config_name: String = format!("llvm-config-{version}");
         if which(&llvm_config_name).is_ok() {
@@ -159,6 +167,7 @@ fn build_pass(
     let r = if cfg!(unix) {
         let r = Command::new(bindir_path.join("clang++"))
             .arg("-v")
+            .arg(format!("--target={}", env::var("HOST").unwrap()))
             .args(cxxflags)
             .arg(src_dir.join(src_file))
             .args(additionals)
@@ -171,6 +180,7 @@ fn build_pass(
     } else if cfg!(windows) {
         let r = Command::new(bindir_path.join("clang-cl.exe"))
             .arg("-v")
+            .arg(format!("--target={}", env::var("HOST").unwrap()))
             .args(cxxflags)
             .arg(src_dir.join(src_file))
             .args(additionals)
@@ -228,8 +238,9 @@ fn main() {
     println!("cargo:rerun-if-env-changed=LLVM_CXXFLAGS");
     println!("cargo:rerun-if-env-changed=LLVM_LDFLAGS");
     println!("cargo:rerun-if-env-changed=LLVM_VERSION");
-    println!("cargo:rerun-if-env-changed=LIBAFL_EDGES_MAP_SIZE");
+    println!("cargo:rerun-if-env-changed=LIBAFL_EDGES_MAP_SIZE_IN_USE");
     println!("cargo:rerun-if-env-changed=LIBAFL_ACCOUNTING_MAP_SIZE");
+    println!("cargo:rerun-if-env-changed=LIBAFL_DDG_MAP_SIZE");
     println!("cargo:rerun-if-changed=src/common-llvm.h");
     println!("cargo:rerun-if-changed=build.rs");
 
@@ -246,7 +257,7 @@ fn main() {
             && llvm_version.is_ok())
     {
         println!(
-            "cargo:warning=Failed to find llvm-config, we will not build LLVM passes. If you need them, set the LLVM_CONFIG environment variable to a recent llvm-config."
+            "cargo:warning=Failed to find llvm-config, we will not build LLVM passes. If you need them, set the LLVM_CONFIG environment variable to a recent llvm-config, else just ignore this message."
         );
 
         write!(
@@ -300,15 +311,23 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     };
     let mut cxxflags: Vec<String> = cxxflags.split_whitespace().map(String::from).collect();
 
-    let edges_map_size: usize = option_env!("LIBAFL_EDGES_MAP_SIZE")
-        .map_or(Ok(65536), str::parse)
-        .expect("Could not parse LIBAFL_EDGES_MAP_SIZE");
-    cxxflags.push(format!("-DLIBAFL_EDGES_MAP_SIZE={edges_map_size}"));
+    let edges_map_size_in_use: usize = option_env!("LIBAFL_EDGES_MAP_SIZE_IN_USE")
+        .map_or(Ok(65_536), str::parse)
+        .expect("Could not parse LIBAFL_EDGES_MAP_SIZE_IN_USE");
+    let edges_map_size_max: usize = option_env!("LIBAFL_EDGES_MAP_SIZE_MAX")
+        .map_or(Ok(2_621_440), str::parse)
+        .expect("Could not parse LIBAFL_EDGES_MAP_SIZE_IN_USE");
+    cxxflags.push(format!("-DEDGES_MAP_SIZE_IN_USE={edges_map_size_in_use}"));
 
     let acc_map_size: usize = option_env!("LIBAFL_ACCOUNTING_MAP_SIZE")
-        .map_or(Ok(65536), str::parse)
+        .map_or(Ok(65_536), str::parse)
         .expect("Could not parse LIBAFL_ACCOUNTING_MAP_SIZE");
-    cxxflags.push(format!("-DLIBAFL_ACCOUNTING_MAP_SIZE={acc_map_size}"));
+    cxxflags.push(format!("-DACCOUNTING_MAP_SIZE={acc_map_size}"));
+
+    let ddg_map_size: usize = option_env!("LIBAFL_DDG_MAP_SIZE")
+        .map_or(Ok(65_536), str::parse)
+        .expect("Could not parse LIBAFL_DDG_MAP_SIZE");
+    cxxflags.push(format!("-DDDG_MAP_SIZE={ddg_map_size}"));
 
     let llvm_version = find_llvm_version();
 
@@ -327,11 +346,16 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         /// The path to the `clang++` executable
         pub const CLANGXX_PATH: &str = {clangcpp:?};
 
-        /// The size of the edges map
-        pub const EDGES_MAP_SIZE: usize = {edges_map_size};
+        /// The default size of the edges map the fuzzer uses
+        pub const EDGES_MAP_SIZE_IN_USE: usize = {edges_map_size_in_use};
+        /// The real allocated size of the edges map
+        pub const EDGES_MAP_SIZE_MAX: usize = {edges_map_size_max};
 
         /// The size of the accounting maps
         pub const ACCOUNTING_MAP_SIZE: usize = {acc_map_size};
+
+        /// The size of the ddg maps
+        pub const DDG_MAP_SIZE: usize = {acc_map_size};
 
         /// The llvm version used to build llvm passes
         pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = {llvm_version:?};
@@ -392,11 +416,23 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         ldflags.push(&sdk_path);
     };
 
+    build_pass(
+        bindir_path,
+        out_dir,
+        &cxxflags,
+        &ldflags,
+        src_dir,
+        "ddg-instr.cc",
+        Some(&vec!["ddg-utils.cc"]),
+        false,
+    );
+
     for pass in &[
         "cmplog-routines-pass.cc",
-        "afl-coverage-pass.cc",
         "autotokens-pass.cc",
         "coverage-accounting-pass.cc",
+        "cmplog-instructions-pass.cc",
+        "ctx-pass.cc",
     ] {
         build_pass(
             bindir_path,

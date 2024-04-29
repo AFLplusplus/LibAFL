@@ -7,39 +7,39 @@ use core::time::Duration;
 use std::{env, path::PathBuf};
 
 use libafl::{
-    bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{setup_restarting_mgr_std, EventConfig, EventRestarter},
-    executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
+    executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::StdFuzzer,
     inputs::HasTargetBytes,
     monitors::MultiMonitor,
-    observers::{HitcountsMapObserver, TimeObserver},
+    observers::{CanTrack, HitcountsMapObserver, TimeObserver},
     schedulers::{powersched::PowerSchedule, PowerQueueScheduler},
     stages::{calibrate::CalibrationStage, power::StdPowerMutationalStage},
     state::{HasCorpus, StdState},
     Error, Fuzzer,
 };
+use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
 
 mod input;
-use input::*;
+use input::PacketData;
 
 mod mutator;
-use mutator::*;
+use mutator::LainMutator;
 
 mod metadata;
-use metadata::*;
+use metadata::{PacketLenFeedback, PacketLenMinimizerScheduler};
 
 /// The main fn, `no_mangle` as it is a C main
 #[cfg(not(test))]
 #[no_mangle]
-pub fn libafl_main() {
+pub extern "C" fn libafl_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
-    //RegistryBuilder::register::<Tokens>();
+    // unsafe { RegistryBuilder::register::<Tokens>(); }
 
     println!(
         "Workdir: {:?}",
@@ -81,12 +81,13 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
         };
 
     // Create an observation channel using the coverage map
-    let edges_observer = HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") });
+    let edges_observer =
+        HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") }).track_indices();
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    let map_feedback = MaxMapFeedback::tracking(&edges_observer, true, false);
+    let map_feedback = MaxMapFeedback::new(&edges_observer);
 
     let calibration = CalibrationStage::new(&map_feedback);
 
@@ -96,7 +97,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
         // New maximization map feedback linked to the edges observer and the feedback state
         map_feedback,
         // Time feedback, this one does not need a feedback state
-        TimeFeedback::with_observer(&time_observer),
+        TimeFeedback::new(&time_observer),
         PacketLenFeedback::new()
     );
 
@@ -132,27 +133,23 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let mut stages = tuple_list!(calibration, power);
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = PacketLenMinimizerScheduler::new(PowerQueueScheduler::new(
-        &mut state,
+    let scheduler = PacketLenMinimizerScheduler::new(
         &edges_observer,
-        PowerSchedule::FAST,
-    ));
+        PowerQueueScheduler::new(&mut state, &edges_observer, PowerSchedule::FAST),
+    );
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let mut executor = TimeoutExecutor::new(
-        InProcessExecutor::new(
-            &mut harness,
-            tuple_list!(edges_observer, time_observer),
-            &mut fuzzer,
-            &mut state,
-            &mut restarting_mgr,
-        )?,
-        // 10 seconds timeout
+    let mut executor = InProcessExecutor::with_timeout(
+        &mut harness,
+        tuple_list!(edges_observer, time_observer),
+        &mut fuzzer,
+        &mut state,
+        &mut restarting_mgr,
         Duration::new(10, 0),
-    );
+    )?;
 
     // The actual target run starts here.
     // Call LLVMFUzzerInitialize() if present.

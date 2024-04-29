@@ -8,13 +8,6 @@ use std::{
 };
 
 use libafl::{
-    bolts::{
-        current_nanos,
-        rands::StdRand,
-        shmem::{unix_shmem, ShMem, ShMemId, ShMemProvider},
-        tuples::tuple_list,
-        AsMutSlice, AsSlice,
-    },
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::command::CommandConfigurator,
@@ -31,6 +24,13 @@ use libafl::{
     state::StdState,
     Error,
 };
+use libafl_bolts::{
+    current_nanos,
+    rands::StdRand,
+    shmem::{unix_shmem, ShMem, ShMemId, ShMemProvider},
+    tuples::tuple_list,
+    AsSlice, AsSliceMut,
+};
 
 #[allow(clippy::similar_names)]
 pub fn main() {
@@ -39,7 +39,7 @@ pub fn main() {
     let shmem_id = signals.id();
 
     // Create an observation channel using the signals map
-    let observer = unsafe { StdMapObserver::new("signals", signals.as_mut_slice()) };
+    let observer = unsafe { StdMapObserver::new("signals", signals.as_slice_mut()) };
     // Create a stacktrace observer
     let bt_observer = AsanBacktraceObserver::new("AsanBacktraceObserver");
 

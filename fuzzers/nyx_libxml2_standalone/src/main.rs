@@ -1,10 +1,6 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use libafl::{
-    bolts::{
-        rands::{RandomSeed, StdRand},
-        tuples::tuple_list,
-    },
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus, Testcase},
     events::SimpleEventManager,
     feedbacks::{CrashFeedback, MaxMapFeedback},
@@ -17,17 +13,18 @@ use libafl::{
     state::StdState,
     Fuzzer, StdFuzzer,
 };
-use libafl_nyx::{executor::NyxExecutor, helper::NyxHelper};
+use libafl_bolts::{
+    rands::{RandomSeed, StdRand},
+    tuples::tuple_list,
+};
+use libafl_nyx::{executor::NyxExecutor, helper::NyxHelper, settings::NyxSettings};
 
 fn main() {
-    let share_dir = Path::new("/tmp/nyx_libxml2/");
-    let cpu_id = 0;
-    let parallel_mode = false;
-
     // nyx stuff
-    let mut helper = NyxHelper::new(share_dir, cpu_id, true, parallel_mode, None).unwrap();
+    let settings = NyxSettings::builder().cpu_id(0).parent_cpu_id(None).build();
+    let helper = NyxHelper::new("/tmp/nyx_libxml2/", settings).unwrap();
     let observer =
-        unsafe { StdMapObserver::from_mut_ptr("trace", helper.trace_bits, helper.map_size) };
+        unsafe { StdMapObserver::from_mut_ptr("trace", helper.bitmap_buffer, helper.bitmap_size) };
 
     let input = BytesInput::new(b"22".to_vec());
     let rand = StdRand::new();
@@ -50,7 +47,7 @@ fn main() {
     let monitor = TuiMonitor::new(ui);
 
     let mut mgr = SimpleEventManager::new(monitor);
-    let mut executor = NyxExecutor::new(&mut helper, tuple_list!(observer)).unwrap();
+    let mut executor = NyxExecutor::new(helper, tuple_list!(observer));
     let mutator = StdScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 

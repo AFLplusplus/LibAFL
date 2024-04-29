@@ -2,27 +2,32 @@
 //! Instead of a random mutator for a random amount of iterations, we can run
 //! a specific mutator for a specified amount of iterations
 
-use alloc::vec::Vec;
+use alloc::{borrow::Cow, vec::Vec};
 use core::{
     fmt::{self, Debug},
     marker::PhantomData,
 };
 
+use libafl_bolts::{
+    impl_serdeany, math::calculate_cumulative_distribution_in_place, rands::Rand, Named,
+};
 use serde::{Deserialize, Serialize};
 
 pub use crate::mutators::{mutations::*, token_mutations::*};
 use crate::{
-    bolts::{calculate_cumulative_sum_in_place, rands::Rand},
-    impl_serdeany,
     mutators::{
         ComposedByMutations, MutationId, MutationResult, Mutator, MutatorsTuple, ScheduledMutator,
     },
-    state::{HasMetadata, HasRand},
-    Error,
+    state::HasRand,
+    Error, HasMetadata,
 };
 
 /// Metadata in the state, that controls the behavior of the [`TuneableScheduledMutator`] at runtime
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 pub struct TuneableScheduledMutatorMetadata {
     /// The offsets of mutators to run, in order. Clear to fall back to random,
     /// or use `mutation_probabilities`
@@ -40,6 +45,8 @@ pub struct TuneableScheduledMutatorMetadata {
     /// The probability of each number of mutations to stack.
     pub iter_probabilities_pow_cumulative: Vec<f32>,
 }
+
+impl_serdeany!(TuneableScheduledMutatorMetadata);
 
 impl Default for TuneableScheduledMutatorMetadata {
     fn default() -> Self {
@@ -71,8 +78,6 @@ impl TuneableScheduledMutatorMetadata {
     }
 }
 
-impl_serdeany!(TuneableScheduledMutatorMetadata);
-
 /// A [`Mutator`] that schedules one of the embedded mutations on each call.
 /// The index of the next mutation can be set.
 pub struct TuneableScheduledMutator<I, MT, S>
@@ -80,8 +85,9 @@ where
     MT: MutatorsTuple<I, S>,
     S: HasRand,
 {
+    name: Cow<'static, str>,
     mutations: MT,
-    max_stack_pow: u64,
+    max_stack_pow: usize,
     phantom: PhantomData<(I, S)>,
 }
 
@@ -106,13 +112,8 @@ where
     S: HasRand + HasMetadata,
 {
     #[inline]
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        stage_id: i32,
-    ) -> Result<MutationResult, Error> {
-        self.scheduled_mutate(state, input, stage_id)
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        self.scheduled_mutate(state, input)
     }
 }
 
@@ -131,6 +132,16 @@ where
     #[inline]
     fn mutations_mut(&mut self) -> &mut MT {
         &mut self.mutations
+    }
+}
+
+impl<I, MT, S> Named for TuneableScheduledMutator<I, MT, S>
+where
+    MT: MutatorsTuple<I, S>,
+    S: HasRand,
+{
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
     }
 }
 
@@ -154,29 +165,27 @@ where
             // We will sample using the mutation probabilities.
             // Doing this outside of the original if branch to make the borrow checker happy.
             #[allow(clippy::cast_precision_loss)]
-            let coin = state.rand_mut().next() as f32 / u64::MAX as f32;
+            let coin = state.rand_mut().next_float() as f32;
 
             let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
-            1 << (1 + metadata
+            let power = metadata
                 .iter_probabilities_pow_cumulative
                 .iter()
                 .position(|i| *i >= coin)
-                .unwrap())
+                .unwrap();
+
+            1 << (1 + power)
         }
     }
 
     /// Get the next mutation to apply
     fn schedule(&self, state: &mut S, _: &I) -> MutationId {
-        debug_assert!(!self.mutations().is_empty());
+        debug_assert!(self.mutations.len() != 0);
         // Assumption: we can not reach this code path without previously adding this metadatum.
         let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
+
         #[allow(clippy::cast_possible_truncation)]
-        if metadata.mutation_ids.is_empty() {
-            if metadata.mutation_probabilities_cumulative.is_empty() {
-                // fall back to random if no entries in either vec, the scheduling is not tuned.
-                return state.rand_mut().below(self.mutations().len() as u64).into();
-            }
-        } else {
+        if !metadata.mutation_ids.is_empty() {
             // using pre-set ids.
             let ret = metadata.mutation_ids[metadata.next_id.0];
             metadata.next_id.0 += 1_usize;
@@ -184,23 +193,37 @@ where
                 metadata.next_id = 0.into();
             }
             debug_assert!(
-                self.mutations().len() > ret.0,
+                self.mutations.len() > ret.0,
                 "TuneableScheduler: next vec may not contain id larger than number of mutations!"
             );
             return ret;
         }
 
-        // We will sample using the mutation probabilities.
-        // Doing this outside of the original if branch to make the borrow checker happy.
-        #[allow(clippy::cast_precision_loss)]
-        let coin = state.rand_mut().next() as f32 / u64::MAX as f32;
-        let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
-        metadata
-            .mutation_probabilities_cumulative
-            .iter()
-            .position(|i| *i >= coin)
-            .unwrap()
-            .into()
+        if !metadata.mutation_probabilities_cumulative.is_empty() {
+            // We will sample using the mutation probabilities.
+            // Doing this outside of the original if branch to make the borrow checker happy.
+            #[allow(clippy::cast_precision_loss)]
+            let coin = state.rand_mut().next_float() as f32;
+
+            let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
+            debug_assert_eq!(
+                self.mutations.len(),
+                metadata.mutation_probabilities_cumulative.len(),
+                "TuneableScheduler: mutation probabilities do not match with number of mutations"
+            );
+
+            let mutation_id = metadata
+                .mutation_probabilities_cumulative
+                .iter()
+                .position(|i| *i >= coin)
+                .unwrap()
+                .into();
+
+            return mutation_id;
+        }
+
+        // fall back to random if no entries in either vec, the scheduling is not tuned.
+        state.rand_mut().below(self.mutations.len()).into()
     }
 }
 
@@ -215,6 +238,7 @@ where
             state.add_metadata(TuneableScheduledMutatorMetadata::default());
         }
         TuneableScheduledMutator {
+            name: Cow::from(format!("TuneableMutator[{}]", mutations.names().join(", "))),
             mutations,
             max_stack_pow: 7,
             phantom: PhantomData,
@@ -255,20 +279,28 @@ where
     /// i.e., how many times the mutation is likely to get mutated.
     ///
     /// So, setting the `iter_probabilities` to `vec![0.1, 0.7, 0.2]`
-    /// would apply 2^one mutation with the likelihood of 10%, 2^2 mutations with the
+    /// would apply 2^1 mutation with the likelihood of 10%, 2^2 mutations with the
     /// a probability of 70% (0.7), and 2^3 mutations with the likelihood of 20%.
     /// These will be applied for each call of this `mutate` function.
     ///
     /// Setting this function will unset everything previously set in `set_iters`.
-    pub fn set_iter_probabilities_pow(state: &mut S, iter_probabilities_pow: Vec<f32>) {
+    pub fn set_iter_probabilities_pow(
+        state: &mut S,
+        mut iter_probabilities_pow: Vec<f32>,
+    ) -> Result<(), Error> {
+        if iter_probabilities_pow.len() >= 32 {
+            return Err(Error::illegal_argument(
+                "Cannot stack more than 2^32 mutations",
+            ));
+        }
         let metadata = Self::metadata_mut(state);
         metadata.iters = None;
 
         // we precalculate the cumulative probability to be faster when sampling later.
-        let mut iter_probabilities_pow_cumulative = iter_probabilities_pow;
-        calculate_cumulative_sum_in_place(&mut iter_probabilities_pow_cumulative);
+        calculate_cumulative_distribution_in_place(&mut iter_probabilities_pow)?;
+        metadata.iter_probabilities_pow_cumulative = iter_probabilities_pow;
 
-        metadata.iter_probabilities_pow_cumulative = iter_probabilities_pow_cumulative;
+        Ok(())
     }
 
     /// Gets the set amount of iterations
@@ -285,18 +317,21 @@ where
     }
 
     /// Sets the mutation probabilities.
-    /// The `Vec` should ideally contain one value per [`MutationId`].
+    /// The `Vec` contains a probability per [`MutationId`]: between 0 and 1, and they have to add
+    /// up to 1.
     /// Setting the probabilities will remove the value set through `set_mutation_ids`.
-    pub fn set_mutation_probabilities(state: &mut S, mutation_probabilities: Vec<f32>) {
+    pub fn set_mutation_probabilities(
+        state: &mut S,
+        mut mutation_probabilities: Vec<f32>,
+    ) -> Result<(), Error> {
         let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
         metadata.mutation_ids.clear();
         metadata.next_id = 0.into();
 
         // we precalculate the cumulative probability to be faster when sampling later.
-        let mut mutation_probabilities_cumulative = mutation_probabilities;
-        calculate_cumulative_sum_in_place(&mut mutation_probabilities_cumulative);
-
-        metadata.mutation_probabilities_cumulative = mutation_probabilities_cumulative;
+        calculate_cumulative_distribution_in_place(&mut mutation_probabilities)?;
+        metadata.mutation_probabilities_cumulative = mutation_probabilities;
+        Ok(())
     }
 
     /// mutation ids and iterations
@@ -319,16 +354,19 @@ where
         metadata.mutation_ids.clear();
         metadata.next_id = 0.into();
         metadata.iters = None;
+        metadata.mutation_probabilities_cumulative.clear();
+        metadata.iter_probabilities_pow_cumulative.clear();
     }
 }
 
 #[cfg(test)]
 mod test {
+    use libafl_bolts::tuples::tuple_list;
+
     use super::{
         BitFlipMutator, ByteDecMutator, TuneableScheduledMutator, TuneableScheduledMutatorMetadata,
     };
     use crate::{
-        bolts::tuples::tuple_list,
         inputs::BytesInput,
         mutators::{ByteRandMutator, ScheduledMutator},
         state::NopState,
@@ -336,6 +374,13 @@ mod test {
 
     #[test]
     fn test_tuning() {
+        // # Safety
+        // No concurrency per testcase
+        #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
+        unsafe {
+            TuneableScheduledMutatorMetadata::register();
+        }
+
         let mut state: NopState<BytesInput> = NopState::new();
         let mutators = tuple_list!(
             BitFlipMutator::new(),
@@ -350,5 +395,65 @@ mod test {
         assert_eq!(tuneable.schedule(&mut state, &input), 1.into());
         assert_eq!(tuneable.schedule(&mut state, &input), 2.into());
         assert_eq!(tuneable.schedule(&mut state, &input), 1.into());
+    }
+
+    #[test]
+    fn test_mutation_distribution() {
+        // # Safety
+        // No concurrency per testcase
+        #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
+        unsafe {
+            TuneableScheduledMutatorMetadata::register();
+        }
+
+        let mut state: NopState<BytesInput> = NopState::new();
+        let mutators = tuple_list!(
+            BitFlipMutator::new(),
+            ByteDecMutator::new(),
+            ByteRandMutator::new()
+        );
+        let tuneable = TuneableScheduledMutator::new(&mut state, mutators);
+        let input = BytesInput::new(vec![42]);
+
+        // Basic tests over the probability distribution.
+        assert!(
+            TuneableScheduledMutator::set_mutation_probabilities(&mut state, vec![0.0]).is_err()
+        );
+        assert!(
+            TuneableScheduledMutator::set_mutation_probabilities(&mut state, vec![1.0; 3]).is_err()
+        );
+        assert!(TuneableScheduledMutator::set_mutation_probabilities(
+            &mut state,
+            vec![-1.0, 1.0, 1.0]
+        )
+        .is_err());
+        assert!(TuneableScheduledMutator::set_mutation_probabilities(&mut state, vec![]).is_err());
+
+        assert!(TuneableScheduledMutator::set_mutation_probabilities(
+            &mut state,
+            vec![0.0, 0.0, 1.0]
+        )
+        .is_ok());
+        assert_eq!(tuneable.schedule(&mut state, &input), 2.into());
+        assert!(TuneableScheduledMutator::set_mutation_probabilities(
+            &mut state,
+            vec![0.0, 1.0, 0.0]
+        )
+        .is_ok());
+        assert_eq!(tuneable.schedule(&mut state, &input), 1.into());
+        assert!(TuneableScheduledMutator::set_mutation_probabilities(
+            &mut state,
+            vec![1.0, 0.0, 0.0]
+        )
+        .is_ok());
+        assert_eq!(tuneable.schedule(&mut state, &input), 0.into());
+
+        // We should not choose a mutation with p=0.
+        assert!(TuneableScheduledMutator::set_mutation_probabilities(
+            &mut state,
+            vec![0.5, 0.0, 0.5]
+        )
+        .is_ok());
+        assert!(tuneable.schedule(&mut state, &input) != 1.into());
     }
 }

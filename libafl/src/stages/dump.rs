@@ -4,24 +4,29 @@ use alloc::{string::String, vec::Vec};
 use core::{clone::Clone, marker::PhantomData};
 use std::{fs, fs::File, io::Write, path::PathBuf};
 
+use libafl_bolts::impl_serdeany;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, CorpusId},
     inputs::UsesInput,
     stages::Stage,
-    state::{HasCorpus, HasMetadata, HasRand, HasSolutions, UsesState},
-    Error,
+    state::{HasCorpus, HasRand, HasSolutions, UsesState},
+    Error, HasMetadata,
 };
 
 /// Metadata used to store information about disk dump indexes for names
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 pub struct DumpToDiskMetadata {
     last_corpus: Option<CorpusId>,
     last_solution: Option<CorpusId>,
 }
 
-crate::impl_serdeany!(DumpToDiskMetadata);
+impl_serdeany!(DumpToDiskMetadata);
 
 /// The [`DumpToDiskStage`] is a stage that dumps the corpus and the solutions to disk
 #[derive(Debug)]
@@ -54,7 +59,6 @@ where
         _executor: &mut E,
         state: &mut Z::State,
         _manager: &mut EM,
-        _corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         let (mut corpus_idx, mut solutions_idx) =
             if let Some(meta) = state.metadata_map().get::<DumpToDiskMetadata>() {
@@ -109,6 +113,18 @@ where
 
         Ok(())
     }
+
+    #[inline]
+    fn restart_progress_should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+        // Not executing the target, so restart safety is not needed
+        Ok(true)
+    }
+
+    #[inline]
+    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        // Not executing the target, so restart safety is not needed
+        Ok(())
+    }
 }
 
 impl<CB, EM, Z> DumpToDiskStage<CB, EM, Z>
@@ -126,13 +142,19 @@ where
         let corpus_dir = corpus_dir.into();
         if let Err(e) = fs::create_dir(&corpus_dir) {
             if !corpus_dir.is_dir() {
-                return Err(Error::file(e));
+                return Err(Error::os_error(
+                    e,
+                    format!("Error creating directory {corpus_dir:?}"),
+                ));
             }
         }
         let solutions_dir = solutions_dir.into();
         if let Err(e) = fs::create_dir(&solutions_dir) {
             if !corpus_dir.is_dir() {
-                return Err(Error::file(e));
+                return Err(Error::os_error(
+                    e,
+                    format!("Error creating directory {solutions_dir:?}"),
+                ));
             }
         }
         Ok(Self {

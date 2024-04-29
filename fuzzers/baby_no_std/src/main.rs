@@ -11,7 +11,6 @@ use core::panic::PanicInfo;
 use core::ptr::write;
 
 use libafl::{
-    bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
     corpus::InMemoryCorpus,
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
@@ -26,6 +25,7 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
+use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
 #[cfg(any(windows, unix))]
 use libc::{abort, printf};
 use static_alloc::Bump;
@@ -118,7 +118,7 @@ pub extern "C" fn main(_argc: isize, _argv: *const *const u8) -> isize {
         #[cfg(any(windows, unix))]
         unsafe {
             let s = CString::new(s).unwrap();
-            printf(b"%s\n\0".as_ptr().cast(), s.as_ptr());
+            printf(c"%s\n".as_ptr().cast(), s.as_ptr());
         }
     });
 

@@ -13,17 +13,9 @@ use std::{
 
 use clap::{Arg, Command};
 use libafl::{
-    bolts::{
-        current_nanos, current_time,
-        os::dup2,
-        rands::StdRand,
-        shmem::{ShMemProvider, StdShMemProvider},
-        tuples::{tuple_list, Merge},
-        AsSlice,
-    },
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleRestartingEventManager,
-    executors::{ExitKind, ShadowExecutor, TimeoutExecutor},
+    executors::{ExitKind, ShadowExecutor},
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -33,7 +25,7 @@ use libafl::{
         scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
         StdMOptMutator, StdScheduledMutator, Tokens,
     },
-    observers::{HitcountsMapObserver, TimeObserver, VariableMapObserver},
+    observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
     },
@@ -41,26 +33,39 @@ use libafl::{
         calibrate::CalibrationStage, power::StdPowerMutationalStage, ShadowTracingStage,
         StdMutationalStage,
     },
-    state::{HasCorpus, HasMetadata, StdState},
-    Error,
+    state::{HasCorpus, StdState},
+    Error, HasMetadata,
+};
+use libafl_bolts::{
+    current_nanos, current_time,
+    os::{dup2, unix_signals::Signal},
+    rands::StdRand,
+    shmem::{ShMemProvider, StdShMemProvider},
+    tuples::{tuple_list, Merge},
+    AsSlice,
 };
 use libafl_qemu::{
+    // asan::{init_with_asan, QemuAsanHelper},
     cmplog::{CmpLogObserver, QemuCmpLogHelper},
-    //asan::{init_with_asan, QemuAsanHelper},
     edges::edges_map_mut_slice,
     edges::QemuEdgeCoverageHelper,
     edges::MAX_EDGES_NUM,
     elf::EasyElf,
-    emu::Emulator,
     filter_qemu_args,
     hooks::QemuHooks,
+    Emulator,
+    GuestReg,
     //snapshot::QemuSnapshotHelper,
     MmapPerms,
+    Qemu,
     QemuExecutor,
+    QemuExitReason,
+    QemuExitReasonError,
+    QemuShutdownCause,
     Regs,
 };
 #[cfg(unix)]
-use nix::{self, unistd::dup};
+use nix::unistd::dup;
 
 pub const MAX_INPUT_SIZE: usize = 1048576; // 1MB
 
@@ -68,7 +73,7 @@ pub const MAX_INPUT_SIZE: usize = 1048576; // 1MB
 pub fn main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
-    //RegistryBuilder::register::<Tokens>();
+    // unsafe { RegistryBuilder::register::<Tokens>(); }
 
     let res = match Command::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
@@ -171,34 +176,39 @@ fn fuzz(
 
     let args: Vec<String> = env::args().collect();
     let env: Vec<(String, String)> = env::vars().collect();
-    let emu = Emulator::new(&args, &env).unwrap();
-    //let emu = init_with_asan(&mut args, &mut env);
+    let qemu = Qemu::init(&args, &env).unwrap();
+    // let (emu, asan) = init_with_asan(&mut args, &mut env).unwrap();
 
     let mut elf_buffer = Vec::new();
-    let elf = EasyElf::from_file(emu.binary_path(), &mut elf_buffer)?;
+    let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer)?;
 
     let test_one_input_ptr = elf
-        .resolve_symbol("LLVMFuzzerTestOneInput", emu.load_addr())
+        .resolve_symbol("LLVMFuzzerTestOneInput", qemu.load_addr())
         .expect("Symbol LLVMFuzzerTestOneInput not found");
     println!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
 
-    emu.set_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
-    unsafe { emu.run() };
+    qemu.set_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
+    unsafe {
+        match qemu.run() {
+            Ok(QemuExitReason::Breakpoint(_)) => {}
+            _ => panic!("Unexpected QEMU exit."),
+        }
+    }
 
-    println!("Break at {:#x}", emu.read_reg::<_, u64>(Regs::Rip).unwrap());
+    println!("Break at {:#x}", qemu.read_reg::<_, u64>(Regs::Pc).unwrap());
 
-    let stack_ptr: u64 = emu.read_reg(Regs::Rsp).unwrap();
+    let stack_ptr: u64 = qemu.read_reg(Regs::Sp).unwrap();
     let mut ret_addr = [0; 8];
-    unsafe { emu.read_mem(stack_ptr, &mut ret_addr) };
+    unsafe { qemu.read_mem(stack_ptr, &mut ret_addr) };
     let ret_addr = u64::from_le_bytes(ret_addr);
 
     println!("Stack pointer = {stack_ptr:#x}");
     println!("Return address = {ret_addr:#x}");
 
-    emu.remove_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
-    emu.set_breakpoint(ret_addr); // LLVMFuzzerTestOneInput ret addr
+    qemu.remove_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
+    qemu.set_breakpoint(ret_addr); // LLVMFuzzerTestOneInput ret addr
 
-    let input_addr = emu
+    let input_addr = qemu
         .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
         .unwrap();
     println!("Placing input at {input_addr:#x}");
@@ -250,6 +260,7 @@ fn fuzz(
             edges_map_mut_slice(),
             addr_of_mut!(MAX_EDGES_NUM),
         ))
+        .track_indices()
     };
 
     // Create an observation channel to keep track of the execution time
@@ -258,7 +269,7 @@ fn fuzz(
     // Create an observation channel using cmplog map
     let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
-    let map_feedback = MaxMapFeedback::tracking(&edges_observer, true, false);
+    let map_feedback = MaxMapFeedback::new(&edges_observer);
 
     let calibration = CalibrationStage::new(&map_feedback);
 
@@ -268,7 +279,7 @@ fn fuzz(
         // New maximization map feedback linked to the edges observer and the feedback state
         map_feedback,
         // Time feedback, this one does not need a feedback state
-        TimeFeedback::with_observer(&time_observer)
+        TimeFeedback::new(&time_observer)
     );
 
     // A feedback to choose if an input is a solution or not
@@ -307,11 +318,10 @@ fn fuzz(
     let power = StdPowerMutationalStage::new(mutator);
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerScheduler::new(PowerQueueScheduler::new(
-        &mut state,
+    let scheduler = IndexesLenTimeMinimizerScheduler::new(
         &edges_observer,
-        PowerSchedule::FAST,
-    ));
+        PowerQueueScheduler::new(&mut state, &edges_observer, PowerSchedule::FAST),
+    );
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -327,29 +337,37 @@ fn fuzz(
         }
 
         unsafe {
-            emu.write_mem(input_addr, buf);
+            qemu.write_mem(input_addr, buf);
 
-            emu.write_reg(Regs::Rdi, input_addr).unwrap();
-            emu.write_reg(Regs::Rsi, len).unwrap();
-            emu.write_reg(Regs::Rip, test_one_input_ptr).unwrap();
-            emu.write_reg(Regs::Rsp, stack_ptr).unwrap();
+            qemu.write_reg(Regs::Rdi, input_addr).unwrap();
+            qemu.write_reg(Regs::Rsi, len as GuestReg).unwrap();
+            qemu.write_reg(Regs::Rip, test_one_input_ptr).unwrap();
+            qemu.write_reg(Regs::Rsp, stack_ptr).unwrap();
 
-            emu.run();
+            match qemu.run() {
+                Ok(QemuExitReason::Breakpoint(_)) => {}
+                Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(Signal::SigInterrupt))) => {
+                    process::exit(0)
+                }
+                Err(QemuExitReasonError::UnexpectedExit) => return ExitKind::Crash,
+                _ => panic!("Unexpected QEMU exit."),
+            }
         }
 
         ExitKind::Ok
     };
 
     let mut hooks = QemuHooks::new(
-        &emu,
+        qemu.clone(),
         tuple_list!(
             QemuEdgeCoverageHelper::default(),
             QemuCmpLogHelper::default(),
-            //QemuAsanHelper::default(),
+            // QemuAsanHelper::default(asan),
             //QemuSnapshotHelper::new()
         ),
     );
 
+    // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let executor = QemuExecutor::new(
         &mut hooks,
         &mut harness,
@@ -357,10 +375,9 @@ fn fuzz(
         &mut fuzzer,
         &mut state,
         &mut mgr,
+        timeout,
     )?;
 
-    // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let executor = TimeoutExecutor::new(executor, timeout);
     // Show the cmplog observer
     let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
 
@@ -386,7 +403,7 @@ fn fuzz(
     // The order of the stages matter!
     let mut stages = tuple_list!(calibration, tracing, i2s, power);
 
-    // Remove target ouput (logs still survive)
+    // Remove target output (logs still survive)
     #[cfg(unix)]
     {
         let null_fd = file_null.as_raw_fd();

@@ -1,27 +1,29 @@
 mod utils;
 
 use libafl::{
-    bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
     corpus::{Corpus, InMemoryCorpus},
     events::SimpleEventManager,
     executors::{ExitKind, InProcessExecutor},
-    feedbacks::{CrashFeedback, MaxMapFeedback},
+    feedbacks::{CrashFeedback, MapFeedbackMetadata, MaxMapFeedback},
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::{havoc_mutations, StdScheduledMutator},
     observers::StdMapObserver,
     schedulers::QueueScheduler,
-    stages::StdMutationalStage,
+    stages::{ExecutionCountRestartHelperMetadata, StdMutationalStage},
     state::{HasSolutions, StdState},
     Fuzzer, StdFuzzer,
+};
+use libafl_bolts::{
+    current_nanos, rands::StdRand, serdeany::RegistryBuilder, tuples::tuple_list, AsSlice,
 };
 use wasm_bindgen::prelude::*;
 use web_sys::{Performance, Window};
 
 use crate::utils::set_panic_hook;
 
-// defined for internal use by libafl
+// Defined for internal use by LibAFL
 #[no_mangle]
 #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
 pub extern "C" fn external_current_millis() -> u64 {
@@ -36,6 +38,16 @@ pub extern "C" fn external_current_millis() -> u64 {
 #[wasm_bindgen]
 pub fn fuzz() {
     set_panic_hook();
+
+    // We need to register the types as LibAFL doesn't support `SerdeAny`
+    // auto registration in non-standard environments.
+    //
+    // # Safety
+    // No concurrency in WASM so these accesses are not racing.
+    unsafe {
+        RegistryBuilder::register::<MapFeedbackMetadata<u8>>();
+        RegistryBuilder::register::<ExecutionCountRestartHelperMetadata>();
+    }
 
     let mut signals = [0u8; 64];
     let signals_ptr = signals.as_mut_ptr();

@@ -7,40 +7,39 @@ use std::{env, fs::DirEntry, io, path::PathBuf, process};
 
 use clap::{builder::Str, Parser};
 use libafl::{
-    bolts::{
-        core_affinity::Cores,
-        current_nanos,
-        launcher::Launcher,
-        rands::StdRand,
-        shmem::{ShMemProvider, StdShMemProvider},
-        tuples::tuple_list,
-        AsSlice,
-    },
     corpus::{Corpus, NopCorpus},
-    events::{EventConfig, EventRestarter},
-    executors::{ExitKind, TimeoutExecutor},
+    events::{launcher::Launcher, EventConfig, EventRestarter, LlmpRestartingEventManager},
+    executors::ExitKind,
     fuzzer::StdFuzzer,
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
-    prelude::LlmpRestartingEventManager,
     schedulers::QueueScheduler,
     state::{HasCorpus, StdState},
     Error,
 };
+use libafl_bolts::{
+    core_affinity::Cores,
+    current_nanos,
+    os::unix_signals::Signal,
+    rands::StdRand,
+    shmem::{ShMemProvider, StdShMemProvider},
+    tuples::tuple_list,
+    AsSlice,
+};
 use libafl_qemu::{
-    drcov::QemuDrCovHelper, elf::EasyElf, emu::Emulator, MmapPerms, QemuExecutor, QemuHooks,
-    QemuInstrumentationFilter, Regs,
+    drcov::QemuDrCovHelper, elf::EasyElf, ArchExtras, CallingConvention, GuestAddr, GuestReg,
+    MmapPerms, Qemu, QemuExecutor, QemuExitReason, QemuHooks,
+    QemuInstrumentationAddressRangeFilter, QemuShutdownCause, Regs,
 };
 use rangemap::RangeMap;
 
-#[cfg(feature = "64bit")]
-type GuestReg = u64;
-
-#[cfg(not(feature = "64bit"))]
-type GuestReg = u32;
-
 #[derive(Default)]
 pub struct Version;
+
+/// Parse a millis string to a [`Duration`]. Used for arg parsing.
+fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
+    Ok(Duration::from_millis(time.parse()?))
+}
 
 impl From<Version> for Str {
     fn from(_: Version) -> Str {
@@ -68,7 +67,7 @@ impl From<Version> for Str {
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 #[command(
-    name = format!("qemu-coverage-{}",env!("CPU_TARGET")),
+    name = format!("qemu_coverage-{}",env!("CPU_TARGET")),
     version = Version::default(),
     about,
     long_about = "Tool for generating DrCov coverage data using QEMU instrumentation"
@@ -80,8 +79,8 @@ pub struct FuzzerOptions {
     #[arg(long, help = "Input directory")]
     input: String,
 
-    #[arg(long, help = "Timeout in seconds", default_value_t = 1_u64)]
-    timeout: u64,
+    #[arg(long, help = "Timeout in seconds", default_value = "5000", value_parser = timeout_from_millis_str)]
+    timeout: Duration,
 
     #[arg(long = "port", help = "Broker port", default_value_t = 1337_u16)]
     port: u16,
@@ -95,6 +94,8 @@ pub struct FuzzerOptions {
     #[arg(last = true, help = "Arguments passed to the target")]
     args: Vec<String>,
 }
+
+pub const MAX_INPUT_SIZE: usize = 1048576; // 1MB
 
 pub fn fuzz() {
     let mut options = FuzzerOptions::parse();
@@ -112,257 +113,179 @@ pub fn fuzz() {
     let files_per_core = (num_files as f64 / num_cores as f64).ceil() as usize;
 
     let program = env::args().next().unwrap();
-    println!("Program: {program:}");
+    log::debug!("Program: {program:}");
 
     options.args.insert(0, program);
-    println!("ARGS: {:#?}", options.args);
+    log::debug!("ARGS: {:#?}", options.args);
 
     env::remove_var("LD_LIBRARY_PATH");
     let env: Vec<(String, String)> = env::vars().collect();
-    let emu = Emulator::new(&options.args, &env).unwrap();
+    let qemu = Qemu::init(&options.args, &env).unwrap();
 
     let mut elf_buffer = Vec::new();
-    let elf = EasyElf::from_file(emu.binary_path(), &mut elf_buffer).unwrap();
+    let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer).unwrap();
 
     let test_one_input_ptr = elf
-        .resolve_symbol("LLVMFuzzerTestOneInput", emu.load_addr())
+        .resolve_symbol("LLVMFuzzerTestOneInput", qemu.load_addr())
         .expect("Symbol LLVMFuzzerTestOneInput not found");
-    println!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
+    log::debug!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
 
-    emu.set_breakpoint(test_one_input_ptr);
-    unsafe { emu.run() };
+    qemu.entry_break(test_one_input_ptr);
 
-    for m in emu.mappings() {
-        println!(
+    for m in qemu.mappings() {
+        log::debug!(
             "Mapping: 0x{:016x}-0x{:016x}, {}",
             m.start(),
             m.end(),
-            m.path().unwrap_or("<EMPTY>")
+            m.path().unwrap_or(&"<EMPTY>".to_string())
         );
     }
 
-    let read_reg = |emu: &Emulator, reg: Regs| -> GuestReg {
-        let val: GuestReg = emu.read_reg(reg).unwrap();
+    let pc: GuestReg = qemu.read_reg(Regs::Pc).unwrap();
+    log::debug!("Break at {pc:#x}");
 
-        #[cfg(feature = "be")]
-        return GuestReg::from_be(val);
+    let ret_addr: GuestAddr = qemu.read_return_address().unwrap();
+    log::debug!("Return address = {ret_addr:#x}");
 
-        #[cfg(not(feature = "be"))]
-        return GuestReg::from_le(val);
+    qemu.set_breakpoint(ret_addr);
+
+    let input_addr = qemu
+        .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
+        .unwrap();
+    log::debug!("Placing input at {input_addr:#x}");
+
+    let stack_ptr: GuestAddr = qemu.read_reg(Regs::Sp).unwrap();
+
+    let reset = |buf: &[u8], len: GuestReg| -> Result<(), String> {
+        unsafe {
+            qemu.write_mem(input_addr, buf);
+            qemu.write_reg(Regs::Pc, test_one_input_ptr)?;
+            qemu.write_reg(Regs::Sp, stack_ptr)?;
+            qemu.write_return_address(ret_addr)?;
+            qemu.write_function_argument(CallingConvention::Cdecl, 0, input_addr)?;
+            qemu.write_function_argument(CallingConvention::Cdecl, 1, len)?;
+
+            match qemu.run() {
+                Ok(QemuExitReason::Breakpoint(_)) => {}
+                Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(Signal::SigInterrupt))) => {
+                    process::exit(0)
+                }
+                _ => panic!("Unexpected QEMU exit."),
+            }
+
+            Ok(())
+        }
     };
-
-    let write_reg = |emu: &Emulator, reg: Regs, val: GuestReg| {
-        #[cfg(feature = "be")]
-        let val = GuestReg::to_be(val);
-
-        #[cfg(not(feature = "be"))]
-        let val = GuestReg::to_le(val);
-
-        emu.write_reg(reg, val).unwrap();
-    };
-
-    println!("Break at {:#x}", read_reg(&emu, Regs::Pc));
-
-    #[cfg(feature = "arm")]
-    let ret_addr: u32 = read_reg(&emu, Regs::Lr);
-
-    #[cfg(feature = "aarch64")]
-    let ret_addr: u64 = read_reg(&emu, Regs::Lr);
-
-    #[cfg(feature = "x86_64")]
-    let stack_ptr: u64 = read_reg(&emu, Regs::Rsp);
-
-    #[cfg(feature = "x86_64")]
-    let ret_addr: u64 = {
-        let mut ret_addr = [0; 8];
-        unsafe { emu.read_mem(stack_ptr, &mut ret_addr) };
-        u64::from_le_bytes(ret_addr)
-    };
-
-    #[cfg(feature = "i386")]
-    let stack_ptr: u32 = read_reg(&emu, Regs::Esp);
-
-    #[cfg(feature = "i386")]
-    let ret_addr: u32 = {
-        let mut ret_addr = [0; 4];
-        unsafe { emu.read_mem(stack_ptr, &mut ret_addr) };
-        u32::from_le_bytes(ret_addr)
-    };
-
-    #[cfg(feature = "mips")]
-    let ret_addr: u32 = read_reg(&emu, Regs::Ra);
-
-    #[cfg(feature = "ppc")]
-    let ret_addr: u32 = read_reg(&emu, Regs::Lr);
-
-    println!("Return address = {ret_addr:#x}");
-
-    emu.remove_breakpoint(test_one_input_ptr);
-    emu.set_breakpoint(ret_addr);
-
-    let input_addr = emu.map_private(0, 4096, MmapPerms::ReadWrite).unwrap();
-    println!("Placing input at {input_addr:#x}");
 
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target
-            .as_slice()
-            .chunks(4096)
-            .next()
-            .expect("Failed to get chunk");
-        let len = buf.len() as GuestReg;
-
-        unsafe {
-            emu.write_mem(input_addr, buf);
-
-            #[cfg(feature = "arm")]
-            {
-                write_reg(&emu, Regs::R0, input_addr);
-                write_reg(&emu, Regs::R1, len);
-                write_reg(&emu, Regs::Pc, test_one_input_ptr);
-                write_reg(&emu, Regs::Lr, ret_addr);
-            }
-
-            #[cfg(feature = "aarch64")]
-            {
-                write_reg(&emu, Regs::X0, input_addr);
-                write_reg(&emu, Regs::X1, len);
-                write_reg(&emu, Regs::Pc, test_one_input_ptr);
-                write_reg(&emu, Regs::Lr, ret_addr);
-            }
-
-            #[cfg(feature = "x86_64")]
-            {
-                write_reg(&emu, Regs::Rdi, input_addr);
-                write_reg(&emu, Regs::Rsi, len);
-                write_reg(&emu, Regs::Rip, test_one_input_ptr);
-                write_reg(&emu, Regs::Rsp, stack_ptr);
-            }
-
-            #[cfg(feature = "i386")]
-            {
-                let input_addr_bytes = input_addr.to_le_bytes();
-                emu.write_mem(stack_ptr + (size_of::<u32>() as u32), &input_addr_bytes);
-
-                let len_bytes = len.to_le_bytes();
-                emu.write_mem(stack_ptr + ((2 * size_of::<u32>()) as u32), &len_bytes);
-
-                write_reg(&emu, Regs::Eip, test_one_input_ptr);
-                write_reg(&emu, Regs::Esp, stack_ptr);
-            }
-
-            #[cfg(feature = "mips")]
-            {
-                write_reg(&emu, Regs::A0, input_addr);
-                write_reg(&emu, Regs::A1, len);
-                write_reg(&emu, Regs::Pc, test_one_input_ptr);
-                write_reg(&emu, Regs::Ra, ret_addr);
-            }
-
-            #[cfg(feature = "ppc")]
-            {
-                write_reg(&emu, Regs::R3, input_addr);
-                write_reg(&emu, Regs::R4, len);
-                write_reg(&emu, Regs::Pc, test_one_input_ptr);
-                write_reg(&emu, Regs::Lr, ret_addr);
-            }
-
-            emu.run();
+        let mut buf = target.as_slice();
+        let mut len = buf.len();
+        if len > MAX_INPUT_SIZE {
+            buf = &buf[0..MAX_INPUT_SIZE];
+            len = MAX_INPUT_SIZE;
         }
-
+        let len = len as GuestReg;
+        reset(buf, len).unwrap();
         ExitKind::Ok
     };
 
-    let mut run_client = |state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _>, core_id| {
-        let core_idx = options
-            .cores
-            .position(core_id)
-            .expect("Failed to get core index");
-        let files = corpus_files
-            .iter()
-            .skip(files_per_core * core_idx)
-            .take(files_per_core)
-            .map(|x| x.path())
-            .collect::<Vec<PathBuf>>();
+    let mut run_client =
+        |state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _, _>, core_id| {
+            let core_idx = options
+                .cores
+                .position(core_id)
+                .expect("Failed to get core index");
+            let files = corpus_files
+                .iter()
+                .skip(files_per_core * core_idx)
+                .take(files_per_core)
+                .map(|x| x.path())
+                .collect::<Vec<PathBuf>>();
 
-        if files.is_empty() {
-            mgr.send_exiting()?;
-            Err(Error::ShuttingDown)?
-        }
+            if files.is_empty() {
+                mgr.send_exiting()?;
+                Err(Error::ShuttingDown)?
+            }
 
-        #[allow(clippy::let_unit_value)]
-        let mut feedback = ();
+            #[allow(clippy::let_unit_value)]
+            let mut feedback = ();
 
-        #[allow(clippy::let_unit_value)]
-        let mut objective = ();
+            #[allow(clippy::let_unit_value)]
+            let mut objective = ();
 
-        let mut state = state.unwrap_or_else(|| {
-            StdState::new(
-                StdRand::with_seed(current_nanos()),
-                NopCorpus::new(),
-                NopCorpus::new(),
-                &mut feedback,
-                &mut objective,
-            )
-            .unwrap()
-        });
+            let mut state = state.unwrap_or_else(|| {
+                StdState::new(
+                    StdRand::with_seed(current_nanos()),
+                    NopCorpus::new(),
+                    NopCorpus::new(),
+                    &mut feedback,
+                    &mut objective,
+                )
+                .unwrap()
+            });
 
-        let scheduler = QueueScheduler::new();
-        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+            let scheduler = QueueScheduler::new();
+            let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-        let rangemap = emu
-            .mappings()
-            .filter_map(|m| {
-                m.path()
-                    .map(|p| ((m.start() as usize)..(m.end() as usize), p.to_string()))
-                    .filter(|(_, p)| !p.is_empty())
-            })
-            .enumerate()
-            .fold(
-                RangeMap::<usize, (u16, String)>::new(),
-                |mut rm, (i, (r, p))| {
-                    rm.insert(r, (i as u16, p));
-                    rm
-                },
+            let rangemap = qemu
+                .mappings()
+                .filter_map(|m| {
+                    m.path()
+                        .map(|p| ((m.start() as usize)..(m.end() as usize), p.to_string()))
+                        .filter(|(_, p)| !p.is_empty())
+                })
+                .enumerate()
+                .fold(
+                    RangeMap::<usize, (u16, String)>::new(),
+                    |mut rm, (i, (r, p))| {
+                        rm.insert(r, (i as u16, p));
+                        rm
+                    },
+                );
+
+            let mut coverage = PathBuf::from(&options.coverage);
+            let coverage_name = coverage.file_stem().unwrap().to_str().unwrap();
+            let coverage_extension = coverage.extension().unwrap_or_default().to_str().unwrap();
+            let core = core_id.0;
+            coverage.set_file_name(format!("{coverage_name}-{core:03}.{coverage_extension}"));
+
+            let mut hooks = QemuHooks::new(
+                qemu,
+                tuple_list!(QemuDrCovHelper::new(
+                    QemuInstrumentationAddressRangeFilter::None,
+                    rangemap,
+                    coverage,
+                    false,
+                )),
             );
 
-        let mut hooks = QemuHooks::new(
-            &emu,
-            tuple_list!(QemuDrCovHelper::new(
-                QemuInstrumentationFilter::None,
-                rangemap,
-                PathBuf::from(&options.coverage),
-                false,
-            )),
-        );
+            let mut executor = QemuExecutor::new(
+                &mut hooks,
+                &mut harness,
+                (),
+                &mut fuzzer,
+                &mut state,
+                &mut mgr,
+                options.timeout,
+            )
+            .expect("Failed to create QemuExecutor");
 
-        let executor = QemuExecutor::new(
-            &mut hooks,
-            &mut harness,
-            (),
-            &mut fuzzer,
-            &mut state,
-            &mut mgr,
-        )
-        .expect("Failed to create QemuExecutor");
+            if state.must_load_initial_inputs() {
+                state
+                    .load_initial_inputs_by_filenames(&mut fuzzer, &mut executor, &mut mgr, &files)
+                    .unwrap_or_else(|_| {
+                        println!("Failed to load initial corpus at {:?}", &corpus_dir);
+                        process::exit(0);
+                    });
+                log::debug!("We imported {} inputs from disk.", state.corpus().count());
+            }
 
-        let mut executor = TimeoutExecutor::new(executor, Duration::from_secs(options.timeout));
+            log::debug!("Processed {} inputs from disk.", files.len());
 
-        if state.must_load_initial_inputs() {
-            state
-                .load_initial_inputs_by_filenames(&mut fuzzer, &mut executor, &mut mgr, &files)
-                .unwrap_or_else(|_| {
-                    println!("Failed to load initial corpus at {:?}", &corpus_dir);
-                    process::exit(0);
-                });
-            println!("We imported {} inputs from disk.", state.corpus().count());
-        }
-
-        println!("Processed {} inputs from disk.", files.len());
-
-        mgr.send_exiting()?;
-        Err(Error::ShuttingDown)?
-    };
+            mgr.send_exiting()?;
+            Err(Error::ShuttingDown)?
+        };
 
     match Launcher::builder()
         .shmem_provider(StdShMemProvider::new().expect("Failed to init shared memory"))

@@ -3,19 +3,23 @@
 //! This feedback should be used in combination with another feedback as this feedback always considers testcases
 //! to be not interesting.
 //! Requires a [`ConcolicObserver`] to observe the concolic trace.
-use alloc::{borrow::ToOwned, string::String};
+use alloc::borrow::Cow;
 use core::{fmt::Debug, marker::PhantomData};
 
+use libafl_bolts::{
+    tuples::{MatchNameRef, Reference, Referenceable},
+    Named,
+};
+
 use crate::{
-    bolts::tuples::Named,
     corpus::Testcase,
     events::EventFirer,
     executors::ExitKind,
     feedbacks::Feedback,
     inputs::UsesInput,
     observers::{concolic::ConcolicObserver, ObserversTuple},
-    state::{HasClientPerfMonitor, HasMetadata},
-    Error,
+    state::State,
+    Error, HasMetadata,
 };
 
 /// The concolic feedback. It is used to attach concolic tracing metadata to the testcase.
@@ -23,32 +27,32 @@ use crate::{
 /// to be not interesting.
 /// Requires a [`ConcolicObserver`] to observe the concolic trace.
 #[derive(Debug)]
-pub struct ConcolicFeedback<S> {
-    name: String,
+pub struct ConcolicFeedback<'map, S> {
+    obs_ref: Reference<ConcolicObserver<'map>>,
     phantom: PhantomData<S>,
 }
 
-impl<S> ConcolicFeedback<S> {
+impl<'map, S> ConcolicFeedback<'map, S> {
     /// Creates a concolic feedback from an observer
     #[allow(unused)]
     #[must_use]
-    pub fn from_observer(observer: &ConcolicObserver) -> Self {
+    pub fn from_observer(observer: &ConcolicObserver<'map>) -> Self {
         Self {
-            name: observer.name().to_owned(),
+            obs_ref: observer.reference(),
             phantom: PhantomData,
         }
     }
 }
 
-impl<S> Named for ConcolicFeedback<S> {
-    fn name(&self) -> &str {
-        &self.name
+impl<S> Named for ConcolicFeedback<'_, S> {
+    fn name(&self) -> &Cow<'static, str> {
+        self.obs_ref.name()
     }
 }
 
-impl<S> Feedback<S> for ConcolicFeedback<S>
+impl<S> Feedback<S> for ConcolicFeedback<'_, S>
 where
-    S: UsesInput + Debug + HasClientPerfMonitor,
+    S: State,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
@@ -66,17 +70,19 @@ where
         Ok(false)
     }
 
-    fn append_metadata<OT>(
+    fn append_metadata<EM, OT>(
         &mut self,
         _state: &mut S,
+        _manager: &mut EM,
         observers: &OT,
         testcase: &mut Testcase<S::Input>,
     ) -> Result<(), Error>
     where
         OT: ObserversTuple<S>,
+        EM: EventFirer<State = S>,
     {
         if let Some(metadata) = observers
-            .match_name::<ConcolicObserver>(&self.name)
+            .get(&self.obs_ref)
             .map(ConcolicObserver::create_metadata_from_current_map)
         {
             testcase.metadata_map_mut().insert(metadata);

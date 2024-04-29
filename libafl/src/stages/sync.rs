@@ -1,5 +1,6 @@
 //! The [`SyncFromDiskStage`] is a stage that imports inputs from disk for e.g. sync with AFL
 
+use alloc::borrow::Cow;
 use core::marker::PhantomData;
 use std::{
     fs,
@@ -7,28 +8,34 @@ use std::{
     time::SystemTime,
 };
 
+use libafl_bolts::{current_time, shmem::ShMemProvider, Named};
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "introspection")]
+use crate::state::HasClientPerfMonitor;
 use crate::{
-    bolts::{current_time, shmem::ShMemProvider},
     corpus::{Corpus, CorpusId, HasTestcase},
     events::{llmp::LlmpEventConverter, Event, EventConfig, EventFirer},
     executors::{Executor, ExitKind, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, UsesInput},
-    stages::Stage,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasRand, UsesState},
-    Error,
+    stages::{RetryRestartHelper, Stage},
+    state::{HasCorpus, HasExecutions, HasRand, State, UsesState},
+    Error, HasMetadata, HasNamedMetadata,
 };
 
 /// Metadata used to store information about disk sync time
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SyncFromDiskMetadata {
     /// The last time the sync was done
     pub last_time: SystemTime,
 }
 
-crate::impl_serdeany!(SyncFromDiskMetadata);
+libafl_bolts::impl_serdeany!(SyncFromDiskMetadata);
 
 impl SyncFromDiskMetadata {
     /// Create a new [`struct@SyncFromDiskMetadata`]
@@ -53,13 +60,23 @@ where
     type State = E::State;
 }
 
+impl<CB, E, EM, Z> Named for SyncFromDiskStage<CB, E, EM, Z>
+where
+    E: UsesState,
+{
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("SyncFromDiskStage");
+        &NAME
+    }
+}
+
 impl<CB, E, EM, Z> Stage<E, EM, Z> for SyncFromDiskStage<CB, E, EM, Z>
 where
     CB: FnMut(&mut Z, &mut Z::State, &Path) -> Result<<Z::State as UsesInput>::Input, Error>,
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
+    Z::State: HasCorpus + HasRand + HasMetadata + HasNamedMetadata,
 {
     #[inline]
     fn perform(
@@ -68,7 +85,6 @@ where
         executor: &mut E,
         state: &mut Z::State,
         manager: &mut EM,
-        _corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         let last = state
             .metadata_map()
@@ -96,6 +112,18 @@ where
 
         Ok(())
     }
+
+    #[inline]
+    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        // TODO: Needs proper crash handling for when an imported testcase crashes
+        // For now, Make sure we don't get stuck crashing on this testcase
+        RetryRestartHelper::restart_progress_should_run(state, self, 3)
+    }
+
+    #[inline]
+    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        RetryRestartHelper::clear_restart_progress(state, self)
+    }
 }
 
 impl<CB, E, EM, Z> SyncFromDiskStage<CB, E, EM, Z>
@@ -104,7 +132,7 @@ where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
+    Z::State: HasCorpus + HasRand + HasMetadata,
 {
     /// Creates a new [`SyncFromDiskStage`]
     #[must_use]
@@ -170,7 +198,7 @@ where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
+    Z::State: HasCorpus + HasRand + HasMetadata,
 {
     /// Creates a new [`SyncFromDiskStage`] invoking `Input::from_file` to load inputs
     #[must_use]
@@ -191,13 +219,17 @@ where
 }
 
 /// Metadata used to store information about the last sent testcase with `SyncFromBrokerStage`
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SyncFromBrokerMetadata {
     /// The `CorpusId` of the last sent testcase
     pub last_id: Option<CorpusId>,
 }
 
-crate::impl_serdeany!(SyncFromBrokerMetadata);
+libafl_bolts::impl_serdeany!(SyncFromBrokerMetadata);
 
 impl SyncFromBrokerMetadata {
     /// Create a new [`struct@SyncFromBrokerMetadata`]
@@ -209,7 +241,7 @@ impl SyncFromBrokerMetadata {
 
 /// A stage that loads testcases from disk to sync with other fuzzers such as AFL++
 #[derive(Debug)]
-pub struct SyncFromBrokerStage<IC, ICB, DI, S, SP>
+pub struct SyncFromBrokerStage<DI, IC, ICB, S, SP>
 where
     SP: ShMemProvider + 'static,
     S: UsesInput,
@@ -217,13 +249,13 @@ where
     ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
 {
-    client: LlmpEventConverter<IC, ICB, DI, S, SP>,
+    client: LlmpEventConverter<DI, IC, ICB, S, SP>,
 }
 
-impl<IC, ICB, DI, S, SP> UsesState for SyncFromBrokerStage<IC, ICB, DI, S, SP>
+impl<DI, IC, ICB, S, SP> UsesState for SyncFromBrokerStage<DI, IC, ICB, S, SP>
 where
     SP: ShMemProvider + 'static,
-    S: UsesInput,
+    S: State,
     IC: InputConverter<From = S::Input, To = DI>,
     ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
@@ -231,16 +263,10 @@ where
     type State = S;
 }
 
-impl<E, EM, IC, ICB, DI, S, SP, Z> Stage<E, EM, Z> for SyncFromBrokerStage<IC, ICB, DI, S, SP>
+impl<E, EM, IC, ICB, DI, S, SP, Z> Stage<E, EM, Z> for SyncFromBrokerStage<DI, IC, ICB, S, SP>
 where
     EM: UsesState<State = S> + EventFirer,
-    S: UsesInput
-        + HasClientPerfMonitor
-        + HasExecutions
-        + HasCorpus
-        + HasRand
-        + HasMetadata
-        + HasTestcase,
+    S: State + HasExecutions + HasCorpus + HasRand + HasMetadata + HasTestcase,
     SP: ShMemProvider,
     E: HasObservers<State = S> + Executor<EM, Z>,
     for<'a> E::Observers: Deserialize<'a>,
@@ -256,7 +282,6 @@ where
         executor: &mut E,
         state: &mut Z::State,
         manager: &mut EM,
-        _corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         if self.client.can_convert() {
             let last_id = state
@@ -306,9 +331,21 @@ where
         state.introspection_monitor_mut().finish_stage();
         Ok(())
     }
+
+    #[inline]
+    fn restart_progress_should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+        // No restart handling needed - does not execute the target.
+        Ok(true)
+    }
+
+    #[inline]
+    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        // Not needed - does not execute the target.
+        Ok(())
+    }
 }
 
-impl<IC, ICB, DI, S, SP> SyncFromBrokerStage<IC, ICB, DI, S, SP>
+impl<DI, IC, ICB, S, SP> SyncFromBrokerStage<DI, IC, ICB, S, SP>
 where
     SP: ShMemProvider + 'static,
     S: UsesInput,
@@ -318,7 +355,7 @@ where
 {
     /// Creates a new [`SyncFromBrokerStage`]
     #[must_use]
-    pub fn new(client: LlmpEventConverter<IC, ICB, DI, S, SP>) -> Self {
+    pub fn new(client: LlmpEventConverter<DI, IC, ICB, S, SP>) -> Self {
         Self { client }
     }
 }

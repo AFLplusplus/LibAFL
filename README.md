@@ -45,36 +45,39 @@ We highly recommend *not* to use e.g. your Linux distribition package as this is
 Rust directly, instructions can be found [here](https://www.rust-lang.org/tools/install).
 
 - LLVM tools  
-The LLVM tools (including clang, clang++) are needed (newer than LLVM 11.0.0 but older than LLVM 15.0.0)
+The LLVM tools (including clang, clang++) are needed (newer than LLVM 15.0.0 up to LLVM 18.1.3)
+If you are using Debian/Ubuntu, again, we highly recommmend that you install the package from [here](https://apt.llvm.org/)
+
+(In `libafl_concolic`, we only support LLVM version newer than 18)
 
 - Cargo-make  
 We use cargo-make to build the fuzzers in `fuzzers/` directory. You can install it with
 
-```
+```sh
 cargo install cargo-make
 ```
 
 2. Clone the LibAFL repository with
 
-```
+```sh
 git clone https://github.com/AFLplusplus/LibAFL
 ```
 
 3. Build the library using
 
-```
+```sh
 cargo build --release
 ```
 
 4. Build the API documentation with
 
-```
+```sh
 cargo doc
 ```
 
 5. Browse the LibAFL book (WIP!) with (requires [mdbook](https://rust-lang.github.io/mdBook/index.html))
 
-```
+```sh
 cd docs && mdbook serve
 ```
 
@@ -82,9 +85,11 @@ We collect all example fuzzers in [`./fuzzers`](./fuzzers/).
 Be sure to read their documentation (and source), this is *the natural way to get started!*
 
 You can run each example fuzzer with
-```
+
+```sh
 cargo make run
 ```
+
 as long as the fuzzer directory has `Makefile.toml` file.
 
 The best-tested fuzzer is [`./fuzzers/libfuzzer_libpng`](./fuzzers/libfuzzer_libpng), a multicore libfuzzer-like fuzzer using LibAFL for a libpng harness.
@@ -107,13 +112,15 @@ The best-tested fuzzer is [`./fuzzers/libfuzzer_libpng`](./fuzzers/libfuzzer_lib
 
 + Blogpost on binary-only fuzzing lib libaf_qemu, [Hacking TMNF - Fuzzing the game server](https://blog.bricked.tech/posts/tmnf/part1/), by [RickdeJager](https://github.com/RickdeJager).
 
++ [A LibAFL Introductory Workshop](https://www.atredis.com/blog/2023/12/4/a-libafl-introductory-workshop), by [Jordan Whitehead](https://github.com/jordan9001)
+
 ## Contributing
 
 For bugs, feel free to open issues or contact us directly. Thank you for your support. <3
 
 Even though we will gladly assist you in finishing up your PR, try to
 - keep all the crates compiling with *stable* rust (hide the eventual non-stable code under [`cfg`s](https://github.com/AFLplusplus/LibAFL/blob/main/libafl/build.rs#L26))
-- run `cargo fmt` on your code before pushing
+- run `cargo +nightly fmt` on your code before pushing
 - check the output of `cargo clippy --all` or `./clippy.sh`
 - run `cargo build --no-default-features` to check for `no_std` compatibility (and possibly add `#[cfg(feature = "std")]`) to hide parts of your code.
 

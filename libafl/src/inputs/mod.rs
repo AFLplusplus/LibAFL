@@ -12,8 +12,14 @@ pub use gramatron::*;
 pub mod generalized;
 pub use generalized::*;
 
+#[cfg(feature = "multipart_inputs")]
+pub mod multi;
+#[cfg(feature = "multipart_inputs")]
+pub use multi::*;
+
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
+
 use alloc::{
     boxed::Box,
     string::{String, ToString},
@@ -23,13 +29,12 @@ use core::{clone::Clone, fmt::Debug, marker::PhantomData};
 #[cfg(feature = "std")]
 use std::{fs::File, hash::Hash, io::Read, path::Path};
 
+#[cfg(feature = "std")]
+use libafl_bolts::fs::write_file_atomic;
+use libafl_bolts::{ownedref::OwnedSlice, Error};
 #[cfg(feature = "nautilus")]
 pub use nautilus::*;
 use serde::{Deserialize, Serialize};
-
-#[cfg(feature = "std")]
-use crate::bolts::fs::write_file_atomic;
-use crate::{bolts::ownedref::OwnedSlice, Error};
 
 /// An input for the target
 #[cfg(not(feature = "std"))]

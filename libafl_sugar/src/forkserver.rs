@@ -3,18 +3,9 @@
 use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
 
 use libafl::{
-    bolts::{
-        core_affinity::Cores,
-        current_nanos,
-        launcher::Launcher,
-        rands::StdRand,
-        shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-        tuples::{tuple_list, Merge},
-        AsMutSlice,
-    },
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
-    events::{EventConfig, EventRestarter, LlmpRestartingEventManager},
-    executors::{forkserver::ForkserverExecutorBuilder, TimeoutForkserverExecutor},
+    events::{launcher::Launcher, EventConfig, EventRestarter, LlmpRestartingEventManager},
+    executors::forkserver::ForkserverExecutorBuilder,
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -24,22 +15,27 @@ use libafl::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::Tokens,
     },
-    observers::{ConstMapObserver, HitcountsMapObserver, TimeObserver},
+    observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::StdMutationalStage,
-    state::{HasCorpus, HasMetadata, StdState},
-    Error,
+    state::{HasCorpus, StdState},
+    Error, HasMetadata,
+};
+use libafl_bolts::{
+    core_affinity::Cores,
+    current_nanos,
+    rands::StdRand,
+    shmem::{ShMem, ShMemProvider, UnixShMemProvider},
+    tuples::{tuple_list, Merge, Referenceable},
+    AsSliceMut,
 };
 use typed_builder::TypedBuilder;
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
 
-/// The default coverage map size to use for forkserver targets
-pub const DEFAULT_MAP_SIZE: usize = 65536;
-
 /// Creates a Forkserver-based fuzzer.
 #[derive(Debug, TypedBuilder)]
-pub struct ForkserverBytesCoverageSugar<'a, const MAP_SIZE: usize> {
+pub struct ForkserverBytesCoverageSugar<'a> {
     /// Laucher configuration (default is random)
     #[builder(default = None, setter(strip_option))]
     configuration: Option<String>,
@@ -80,10 +76,15 @@ pub struct ForkserverBytesCoverageSugar<'a, const MAP_SIZE: usize> {
 }
 
 #[allow(clippy::similar_names)]
-impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
+impl<'a> ForkserverBytesCoverageSugar<'a> {
     /// Runs the fuzzer.
     #[allow(clippy::too_many_lines, clippy::similar_names)]
     pub fn run(&mut self) {
+        // a large initial map size that should be enough
+        // to house all potential coverage maps for our targets
+        // (we will eventually reduce the used size according to the actual map)
+        const MAP_SIZE: usize = 65_536;
+
         let conf = match self.configuration.as_ref() {
             Some(name) => EventConfig::from_name(name),
             None => EventConfig::AlwaysUnique,
@@ -113,32 +114,36 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
 
         let monitor = MultiMonitor::new(|s| log::info!("{s}"));
 
+        // Create an observation channel to keep track of the execution time
+        let time_observer = TimeObserver::new("time");
+        let time_ref = time_observer.reference();
+
         let mut run_client = |state: Option<_>,
-                              mut mgr: LlmpRestartingEventManager<_, _>,
+                              mut mgr: LlmpRestartingEventManager<_, _, _>,
                               _core_id| {
+            let time_observer = time_observer.clone();
+
             // Coverage map shared between target and fuzzer
             let mut shmem = shmem_provider_client.new_shmem(MAP_SIZE).unwrap();
             shmem.write_to_env("__AFL_SHM_ID").unwrap();
-            let shmem_map = shmem.as_mut_slice();
+            let shmem_map = shmem.as_slice_mut();
+
+            // To let know the AFL++ binary that we have a big map
+            std::env::set_var("AFL_MAP_SIZE", format!("{MAP_SIZE}"));
 
             // Create an observation channel using the coverage map
             let edges_observer = unsafe {
-                HitcountsMapObserver::new(ConstMapObserver::<_, MAP_SIZE>::from_mut_ptr(
-                    "shared_mem",
-                    shmem_map.as_mut_ptr(),
-                ))
+                HitcountsMapObserver::new(StdMapObserver::new("shared_mem", shmem_map))
+                    .track_indices()
             };
-
-            // Create an observation channel to keep track of the execution time
-            let time_observer = TimeObserver::new("time");
 
             // Feedback to rate the interestingness of an input
             // This one is composed by two Feedbacks in OR
             let mut feedback = feedback_or!(
                 // New maximization map feedback linked to the edges observer and the feedback state
-                MaxMapFeedback::tracking(&edges_observer, true, false),
+                MaxMapFeedback::new(&edges_observer),
                 // Time feedback, this one does not need a feedback state
-                TimeFeedback::with_observer(&time_observer)
+                TimeFeedback::new(&time_observer)
             );
 
             // A feedback to choose if an input is a solution or not
@@ -160,15 +165,12 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
                 .unwrap()
             });
 
-            // Create a dictionary if not existing
-            if let Some(tokens_file) = &self.tokens_file {
-                if state.metadata_map().get::<Tokens>().is_none() {
-                    state.add_metadata(Tokens::from_file(tokens_file)?);
-                }
-            }
+            // Create an empty set of tokens, first populated by the target program
+            let mut tokens = Tokens::new();
 
             // A minimization+queue policy to get testcasess from the corpus
-            let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+            let scheduler =
+                IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
             // A fuzzer with feedbacks and a corpus scheduler
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -176,24 +178,36 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
             let forkserver = if self.shmem_testcase {
                 ForkserverExecutorBuilder::new()
                     .program(self.program.clone())
-                    .args(self.arguments)
+                    .parse_afl_cmdline(self.arguments)
+                    .is_persistent(true)
+                    .autotokens(&mut tokens)
+                    .coverage_map_size(MAP_SIZE)
+                    .timeout(timeout)
                     .debug_child(self.debug_output)
                     .shmem_provider(&mut shmem_provider_client)
-                    .build(tuple_list!(edges_observer, time_observer))
+                    .build_dynamic_map(edges_observer, tuple_list!(time_observer))
             } else {
                 ForkserverExecutorBuilder::new()
                     .program(self.program.clone())
-                    .args(self.arguments)
+                    .parse_afl_cmdline(self.arguments)
+                    .is_persistent(true)
+                    .autotokens(&mut tokens)
+                    .coverage_map_size(MAP_SIZE)
+                    .timeout(timeout)
                     .debug_child(self.debug_output)
-                    .build(tuple_list!(edges_observer, time_observer))
+                    .build_dynamic_map(edges_observer, tuple_list!(time_observer))
             };
 
-            // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-            let mut executor = TimeoutForkserverExecutor::new(
-                forkserver.expect("Failed to create the executor."),
-                timeout,
-            )
-            .expect("Failed to create the executor.");
+            let mut executor = forkserver.unwrap();
+            if let Some(tokens_file) = &self.tokens_file {
+                // if a token file is provided, load it into our set of tokens
+                tokens.add_from_file(tokens_file)?;
+            }
+
+            if !tokens.is_empty() {
+                // add any known tokens to the state
+                state.add_metadata(tokens);
+            }
 
             // In case the corpus is empty (on first run), reset
             if state.must_load_initial_inputs() {
@@ -281,7 +295,8 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
             .run_client(&mut run_client)
             .cores(self.cores)
             .broker_port(self.broker_port)
-            .remote_broker_addr(self.remote_broker_addr);
+            .remote_broker_addr(self.remote_broker_addr)
+            .time_ref(time_ref);
         #[cfg(unix)]
         let launcher = launcher.stdout_file(Some("/dev/null"));
         match launcher.build().launch() {
@@ -297,7 +312,7 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
 pub mod pybind {
     use std::path::PathBuf;
 
-    use libafl::bolts::core_affinity::Cores;
+    use libafl_bolts::core_affinity::Cores;
     use pyo3::prelude::*;
 
     use crate::forkserver;
@@ -346,7 +361,7 @@ pub mod pybind {
         /// Run the fuzzer
         #[allow(clippy::needless_pass_by_value)]
         pub fn run(&self, program: String, arguments: Vec<String>) {
-            forkserver::ForkserverBytesCoverageSugar::<{ forkserver::DEFAULT_MAP_SIZE }>::builder()
+            forkserver::ForkserverBytesCoverageSugar::builder()
                 .input_dirs(&self.input_dirs)
                 .output_dir(self.output_dir.clone())
                 .broker_port(self.broker_port)

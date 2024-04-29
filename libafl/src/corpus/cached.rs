@@ -1,6 +1,6 @@
 //! The [`CachedOnDiskCorpus`] stores [`Testcase`]s to disk, keeping a subset of them in memory/cache, evicting in a FIFO manner.
 
-use alloc::collections::vec_deque::VecDeque;
+use alloc::{collections::vec_deque::VecDeque, string::String};
 use core::cell::RefCell;
 use std::path::Path;
 
@@ -37,20 +37,67 @@ where
     type Input = I;
 }
 
+impl<I> CachedOnDiskCorpus<I>
+where
+    I: Input,
+{
+    fn cache_testcase<'a>(
+        &'a self,
+        testcase: &'a RefCell<Testcase<I>>,
+        idx: CorpusId,
+    ) -> Result<(), Error> {
+        if testcase.borrow().input().is_none() {
+            self.load_input_into(&mut testcase.borrow_mut())?;
+            let mut borrowed_num = 0;
+            while self.cached_indexes.borrow().len() >= self.cache_max_len {
+                let removed = self.cached_indexes.borrow_mut().pop_front().unwrap();
+
+                if let Ok(mut borrowed) = self.inner.get_from_all(removed)?.try_borrow_mut() {
+                    *borrowed.input_mut() = None;
+                } else {
+                    self.cached_indexes.borrow_mut().push_back(removed);
+                    borrowed_num += 1;
+                    if self.cache_max_len == borrowed_num {
+                        break;
+                    }
+                }
+            }
+            self.cached_indexes.borrow_mut().push_back(idx);
+        }
+        Ok(())
+    }
+}
 impl<I> Corpus for CachedOnDiskCorpus<I>
 where
     I: Input,
 {
-    /// Returns the number of elements
+    /// Returns the number of all enabled entries
     #[inline]
     fn count(&self) -> usize {
         self.inner.count()
     }
 
-    /// Add an entry to the corpus and return its index
+    /// Returns the number of all disabled entries
+    fn count_disabled(&self) -> usize {
+        self.inner.count_disabled()
+    }
+
+    /// Returns the number of elements including disabled entries
+    #[inline]
+    fn count_all(&self) -> usize {
+        self.inner.count_all()
+    }
+
+    /// Add an enabled testcase to the corpus and return its index
     #[inline]
     fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         self.inner.add(testcase)
+    }
+
+    /// Add a disabled testcase to the corpus and return its index
+    #[inline]
+    fn add_disabled(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
+        self.inner.add_disabled(testcase)
     }
 
     /// Replaces the testcase at the given idx
@@ -68,27 +115,18 @@ where
         Ok(testcase)
     }
 
-    /// Get by id
+    /// Get by id; considers only enabled testcases
     #[inline]
     fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
         let testcase = { self.inner.get(idx)? };
-        if testcase.borrow().input().is_none() {
-            self.load_input_into(&mut testcase.borrow_mut())?;
-            let mut borrowed_num = 0;
-            while self.cached_indexes.borrow().len() >= self.cache_max_len {
-                let removed = self.cached_indexes.borrow_mut().pop_front().unwrap();
-                if let Ok(mut borrowed) = self.inner.get(removed)?.try_borrow_mut() {
-                    *borrowed.input_mut() = None;
-                } else {
-                    self.cached_indexes.borrow_mut().push_back(removed);
-                    borrowed_num += 1;
-                    if self.cache_max_len == borrowed_num {
-                        break;
-                    }
-                }
-            }
-            self.cached_indexes.borrow_mut().push_back(idx);
-        }
+        self.cache_testcase(testcase, idx)?;
+        Ok(testcase)
+    }
+    /// Get by id; considers both enabled and disabled testcases
+    #[inline]
+    fn get_from_all(&self, idx: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error> {
+        let testcase = { self.inner.get_from_all(idx)? };
+        self.cache_testcase(testcase, idx)?;
         Ok(testcase)
     }
 
@@ -124,9 +162,15 @@ where
         self.inner.last()
     }
 
+    /// Get the nth corpus id; considers only enabled testcases
     #[inline]
     fn nth(&self, nth: usize) -> CorpusId {
         self.inner.nth(nth)
+    }
+    /// Get the nth corpus id; considers both enabled and disabled testcases
+    #[inline]
+    fn nth_from_all(&self, nth: usize) -> CorpusId {
+        self.inner.nth_from_all(nth)
     }
 
     #[inline]
@@ -193,13 +237,38 @@ where
     pub fn with_meta_format<P>(
         dir_path: P,
         cache_max_len: usize,
-        meta_format: OnDiskMetadataFormat,
+        meta_format: Option<OnDiskMetadataFormat>,
     ) -> Result<Self, Error>
     where
         P: AsRef<Path>,
     {
         Self::_new(
             InMemoryOnDiskCorpus::with_meta_format(dir_path, meta_format)?,
+            cache_max_len,
+        )
+    }
+
+    /// Creates the [`CachedOnDiskCorpus`] specifying the metadata format and the prefix to prepend
+    /// to each testcase.
+    ///
+    /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
+    pub fn with_meta_format_and_prefix<P>(
+        dir_path: P,
+        cache_max_len: usize,
+        meta_format: Option<OnDiskMetadataFormat>,
+        prefix: Option<String>,
+        locking: bool,
+    ) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+    {
+        Self::_new(
+            InMemoryOnDiskCorpus::with_meta_format_and_prefix(
+                dir_path,
+                meta_format,
+                prefix,
+                locking,
+            )?,
             cache_max_len,
         )
     }
@@ -217,47 +286,9 @@ where
             cache_max_len,
         })
     }
-}
 
-/// ``CachedOnDiskCorpus`` Python bindings
-#[cfg(feature = "python")]
-pub mod pybind {
-    use alloc::string::String;
-    use std::path::PathBuf;
-
-    use pyo3::prelude::*;
-    use serde::{Deserialize, Serialize};
-
-    use crate::{
-        corpus::{pybind::PythonCorpus, CachedOnDiskCorpus},
-        inputs::BytesInput,
-    };
-
-    #[pyclass(unsendable, name = "CachedOnDiskCorpus")]
-    #[allow(clippy::unsafe_derive_deserialize)]
-    #[derive(Serialize, Deserialize, Debug, Clone)]
-    /// Python class for CachedOnDiskCorpus
-    pub struct PythonCachedOnDiskCorpus {
-        /// Rust wrapped CachedOnDiskCorpus object
-        pub inner: CachedOnDiskCorpus<BytesInput>,
-    }
-
-    #[pymethods]
-    impl PythonCachedOnDiskCorpus {
-        #[new]
-        fn new(path: String, cache_max_len: usize) -> Self {
-            Self {
-                inner: CachedOnDiskCorpus::new(PathBuf::from(path), cache_max_len).unwrap(),
-            }
-        }
-
-        fn as_corpus(slf: Py<Self>) -> PythonCorpus {
-            PythonCorpus::new_cached_on_disk(slf)
-        }
-    }
-    /// Register the classes to the python module
-    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
-        m.add_class::<PythonCachedOnDiskCorpus>()?;
-        Ok(())
+    /// Fetch the inner corpus
+    pub fn inner(&self) -> &InMemoryOnDiskCorpus<I> {
+        &self.inner
     }
 }

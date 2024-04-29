@@ -2,28 +2,14 @@
 //! The example harness is built for libpng.
 //! In this example, you will see the use of the `launcher` feature.
 //! The `launcher` will spawn new processes for each cpu core.
-use mimalloc::MiMalloc;
-#[global_allocator]
-static GLOBAL: MiMalloc = MiMalloc;
-
 use core::time::Duration;
 use std::{env, net::SocketAddr, path::PathBuf};
 
 use clap::{self, Parser};
 use libafl::{
-    bolts::{
-        core_affinity::{CoreId, Cores},
-        current_nanos,
-        launcher::Launcher,
-        llmp::{LlmpReceiver, LlmpSender},
-        rands::StdRand,
-        shmem::{ShMemProvider, StdShMemProvider},
-        tuples::{tuple_list, Merge},
-        AsSlice, ClientId,
-    },
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
-    events::{CentralizedEventManager, EventConfig},
-    executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
+    events::{launcher::CentralizedLauncher, EventConfig},
+    executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -33,13 +19,25 @@ use libafl::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::Tokens,
     },
-    observers::{HitcountsMapObserver, TimeObserver},
+    observers::{CanTrack, HitcountsMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
-    state::{HasCorpus, HasMetadata, StdState},
-    Error,
+    state::{HasCorpus, StdState},
+    Error, HasMetadata,
+};
+use libafl_bolts::{
+    core_affinity::{CoreId, Cores},
+    current_nanos,
+    rands::StdRand,
+    shmem::{ShMemProvider, StdShMemProvider},
+    tuples::{tuple_list, Merge},
+    AsSlice,
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
+use mimalloc::MiMalloc;
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 /// Parse a millis string to a [`Duration`]. Used for arg parsing.
 fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
@@ -55,11 +53,11 @@ fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
 )]
 struct Opt {
     #[arg(
-        short,
-        long,
-        value_parser = Cores::from_cmdline,
-        help = "Spawn a client in each of the provided cores. Broker runs in the 0th core. 'all' to select all available cores. 'none' to run a client without binding to any core. eg: '1,2-4,6' selects the cores 1,2,3,4,6.",
-        name = "CORES"
+    short,
+    long,
+    value_parser = Cores::from_cmdline,
+    help = "Spawn a client in each of the provided cores. Broker runs in the 0th core. 'all' to select all available cores. 'none' to run a client without binding to any core. eg: '1,2-4,6' selects the cores 1,2,3,4,6.",
+    name = "CORES"
     )]
     cores: Cores,
 
@@ -75,7 +73,13 @@ struct Opt {
     #[arg(short = 'a', long, help = "Specify a remote broker", name = "REMOTE")]
     remote_broker_addr: Option<SocketAddr>,
 
-    #[arg(short, long, help = "Set an initial corpus directory", name = "INPUT")]
+    #[arg(
+        short,
+        long,
+        help = "Set an initial corpus directory",
+        name = "INPUT",
+        required = true
+    )]
     input: Vec<PathBuf>,
 
     #[arg(
@@ -88,12 +92,12 @@ struct Opt {
     output: PathBuf,
 
     #[arg(
-        value_parser = timeout_from_millis_str,
-        short,
-        long,
-        help = "Set the exeucution timeout in milliseconds, default is 10000",
-        name = "TIMEOUT",
-        default_value = "10000"
+    value_parser = timeout_from_millis_str,
+    short,
+    long,
+    help = "Set the exeucution timeout in milliseconds, default is 10000",
+    name = "TIMEOUT",
+    default_value = "10000"
     )]
     timeout: Duration,
     /*
@@ -112,12 +116,12 @@ struct Opt {
 
 /// The main fn, `no_mangle` as it is a C symbol
 #[no_mangle]
-pub fn libafl_main() {
+pub extern "C" fn libafl_main() {
     env_logger::init();
 
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
-    //RegistryBuilder::register::<Tokens>();
+    // unsafe { RegistryBuilder::register::<Tokens>(); }
     let opt = Opt::parse();
 
     let broker_port = opt.broker_port;
@@ -130,38 +134,12 @@ pub fn libafl_main() {
 
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-    let mut senders = vec![];
-    let mut receivers = vec![];
-    let mut main_core_id = None;
-    let mut core_id_map = std::collections::HashMap::<CoreId, usize>::default();
-    for core_id in &cores.ids {
-        if main_core_id.is_none() {
-            main_core_id = Some(core_id.clone());
-            continue;
-        }
-        let sender =
-            LlmpSender::new(shmem_provider.clone(), ClientId(core_id.0 as u32), false).unwrap();
-        let receiver = LlmpReceiver::on_existing_shmem(
-            shmem_provider.clone(),
-            sender.out_shmems[0].shmem.clone(),
-            None,
-        )
-        .unwrap();
-
-        core_id_map.insert(core_id.clone(), senders.len());
-        senders.push(Some(sender));
-        receivers.push(receiver);
-    }
-
-    eprintln!("Main is {main_core_id:?}");
-
-    let mut receivers = Some(receivers);
-
     let monitor = MultiMonitor::new(|s| println!("{s}"));
 
-    let mut run_client = |state: Option<_>, restarting_mgr, core_id: CoreId| {
+    let mut run_client = |state: Option<_>, mut mgr, _core_id: CoreId| {
         // Create an observation channel using the coverage map
-        let edges_observer = HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") });
+        let edges_observer =
+            HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") }).track_indices();
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
@@ -170,9 +148,9 @@ pub fn libafl_main() {
         // This one is composed by two Feedbacks in OR
         let mut feedback = feedback_or!(
             // New maximization map feedback linked to the edges observer and the feedback state
-            MaxMapFeedback::tracking(&edges_observer, true, false),
+            MaxMapFeedback::new(&edges_observer),
             // Time feedback, this one does not need a feedback state
-            TimeFeedback::with_observer(&time_observer)
+            TimeFeedback::new(&time_observer)
         );
 
         // A feedback to choose if an input is a solution or not
@@ -197,15 +175,6 @@ pub fn libafl_main() {
             .unwrap()
         });
 
-        let mut mgr = if main_core_id.unwrap() == core_id {
-            CentralizedEventManager::new_main(restarting_mgr, receivers.take().unwrap())
-        } else {
-            let idx = *core_id_map.get(&core_id).unwrap();
-            CentralizedEventManager::new_secondary(restarting_mgr, senders[idx].take().unwrap())
-        };
-
-        // let mut mgr = restarting_mgr;
-
         println!("We're a client, let's fuzz :)");
 
         // Create a PNG dictionary if not existing
@@ -224,7 +193,8 @@ pub fn libafl_main() {
         let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
         // A minimization+queue policy to get testcasess from the corpus
-        let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+        let scheduler =
+            IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -238,21 +208,25 @@ pub fn libafl_main() {
         };
 
         // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-        let executor = InProcessExecutor::new(
+        #[cfg(target_os = "linux")]
+        let mut executor = InProcessExecutor::batched_timeout(
             &mut harness,
             tuple_list!(edges_observer, time_observer),
             &mut fuzzer,
             &mut state,
             &mut mgr,
+            opt.timeout,
         )?;
 
-        // Wrap the executor with a timeout
-        #[cfg(target_os = "linux")]
-        let mut executor = TimeoutExecutor::batch_mode(executor, opt.timeout);
-
-        // Wrap the executor with a timeout
         #[cfg(not(target_os = "linux"))]
-        let mut executor = TimeoutExecutor::new(executor, opt.timeout);
+        let mut executor = InProcessExecutor::with_timeout(
+            &mut harness,
+            tuple_list!(edges_observer, time_observer),
+            &mut fuzzer,
+            &mut state,
+            &mut mgr,
+            opt.timeout,
+        )?;
 
         // The actual target run starts here.
         // Call LLVMFUzzerInitialize() if present.
@@ -273,7 +247,7 @@ pub fn libafl_main() {
         Ok(())
     };
 
-    match Launcher::builder()
+    match CentralizedLauncher::builder()
         .shmem_provider(shmem_provider)
         .configuration(EventConfig::from_name("default"))
         .monitor(monitor)

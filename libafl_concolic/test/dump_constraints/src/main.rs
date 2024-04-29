@@ -8,19 +8,16 @@ use std::{
     io::{BufWriter, Write},
     path::PathBuf,
     process::{exit, Command},
-    string::ToString,
 };
 
-use clap::{self, Parser};
-use libafl::{
-    bolts::{
-        shmem::{ShMem, ShMemProvider, StdShMemProvider},
-        AsSlice,
-    },
-    observers::concolic::{
-        serialization_format::{MessageFileReader, MessageFileWriter, DEFAULT_ENV_NAME},
-        EXPRESSION_PRUNING, HITMAP_ENV_NAME, NO_FLOAT_ENV_NAME, SELECTIVE_SYMBOLICATION_ENV_NAME,
-    },
+use clap::Parser;
+use libafl::observers::concolic::{
+    serialization_format::{MessageFileReader, MessageFileWriter, DEFAULT_ENV_NAME},
+    EXPRESSION_PRUNING, HITMAP_ENV_NAME, NO_FLOAT_ENV_NAME, SELECTIVE_SYMBOLICATION_ENV_NAME,
+};
+use libafl_bolts::{
+    shmem::{ShMem, ShMemProvider, StdShMemProvider},
+    AsSlice,
 };
 
 #[derive(Debug, Parser)]

@@ -1,0 +1,49 @@
+[package]
+name = "libafl_libfuzzer"
+version.workspace = true
+description = "libFuzzer shim which uses LibAFL with common defaults"
+repository = "https://github.com/AFLplusplus/LibAFL/"
+readme = "../README.md"
+license = "MIT OR Apache-2.0"
+keywords = ["fuzzing", "testing", "security"]
+edition = "2021"
+categories = ["development-tools::testing", "fuzzing"]
+
+include = [
+  "/src",
+  "/Cargo.toml",
+  "/build.rs",
+  "/libafl_libfuzzer_runtime",
+  "!/libafl_libfuzzer_runtime/target",
+]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[build-dependencies]
+cc = "1.0"
+rustversion = "1.0"
+
+[features]
+#! ## Feature Flags
+
+## Enables the derive macros for the arbitrary dependency, transparently forwarded from libfuzzer-sys
+arbitrary-derive = ["libfuzzer-sys/arbitrary-derive"]
+## Enables fuzzer introspection with LibAFL's `introspection` feature
+introspection = []
+## Embeds the built libafl_libfuzzer_runtime library into the crate with include_bytes! for use
+## in downstream cases like libafl_cc linking the runtime with:
+## `-fsanitize=fuzzer-no-link -l:libafl_libfuzzer_runtime.a`
+embed-runtime = []
+
+## 🐇
+rabbit = []
+
+[dependencies]
+libfuzzer-sys = { version = "0.4.7", default-features = false }
+document-features = { version = "0.2" }
+
+[package.metadata.docs.rs]
+features = ["document-features"]
+all-features = true
+
+rustdoc-args = ["--cfg", "docsrs"]

@@ -3,22 +3,22 @@
 use core::{fmt::Debug, marker::PhantomData};
 
 use crate::{
-    corpus::{Corpus, CorpusId},
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
     mutators::Mutator,
-    schedulers::{
-        ecofuzz::EcoTestcaseScore, testcase_score::CorpusPowerTestcaseScore, TestcaseScore,
-    },
-    stages::{mutational::MutatedTransform, MutationalStage, Stage},
-    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand, UsesState},
-    Error,
+    schedulers::{testcase_score::CorpusPowerTestcaseScore, TestcaseScore},
+    stages::{mutational::MutatedTransform, ExecutionCountRestartHelper, MutationalStage, Stage},
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
+    Error, HasMetadata,
 };
 
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
 pub struct PowerMutationalStage<E, F, EM, I, M, Z> {
+    /// The mutators we use
     mutator: M,
+    /// Helper for restarts
+    restart_helper: ExecutionCountRestartHelper,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, F, EM, I, Z)>,
 }
@@ -36,7 +36,7 @@ where
     EM: UsesState<State = E::State>,
     F: TestcaseScore<E::State>,
     M: Mutator<I, E::State>,
-    E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
+    E::State: HasCorpus + HasMetadata + HasRand + HasExecutions,
     Z: Evaluator<E, EM, State = E::State>,
     I: MutatedTransform<E::Input, E::State> + Clone,
 {
@@ -54,12 +54,16 @@ where
 
     /// Gets the number of iterations as a random number
     #[allow(clippy::cast_sign_loss)]
-    fn iterations(&self, state: &mut E::State, corpus_idx: CorpusId) -> Result<u64, Error> {
+    fn iterations(&self, state: &mut E::State) -> Result<usize, Error> {
         // Update handicap
-        let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
-        let score = F::compute(state, &mut *testcase)? as u64;
+        let mut testcase = state.current_testcase_mut()?;
+        let score = F::compute(state, &mut testcase)? as usize;
 
         Ok(score)
+    }
+
+    fn execs_since_progress_start(&mut self, state: &mut <Z>::State) -> Result<u64, Error> {
+        self.restart_helper.execs_since_progress_start(state)
     }
 }
 
@@ -69,7 +73,7 @@ where
     EM: UsesState<State = E::State>,
     F: TestcaseScore<E::State>,
     M: Mutator<I, E::State>,
-    E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
+    E::State: HasCorpus + HasMetadata + HasRand + HasExecutions,
     Z: Evaluator<E, EM, State = E::State>,
     I: MutatedTransform<E::Input, E::State> + Clone,
 {
@@ -81,10 +85,19 @@ where
         executor: &mut E,
         state: &mut E::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        let ret = self.perform_mutational(fuzzer, executor, state, manager, corpus_idx);
+        let ret = self.perform_mutational(fuzzer, executor, state, manager);
         ret
+    }
+
+    fn restart_progress_should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+        Ok(true)
+        // self.restart_helper.restart_progress_should_run(state)
+    }
+
+    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        Ok(())
+        // self.restart_helper.clear_restart_progress(state)
     }
 }
 
@@ -94,7 +107,7 @@ where
     EM: UsesState<State = E::State>,
     F: TestcaseScore<E::State>,
     M: Mutator<E::Input, E::State>,
-    E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
+    E::State: HasCorpus + HasMetadata + HasRand,
     Z: Evaluator<E, EM, State = E::State>,
 {
     /// Creates a new [`PowerMutationalStage`]
@@ -109,7 +122,7 @@ where
     EM: UsesState<State = E::State>,
     F: TestcaseScore<E::State>,
     M: Mutator<I, E::State>,
-    E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
+    E::State: HasCorpus + HasMetadata + HasRand,
     Z: Evaluator<E, EM, State = E::State>,
 {
     /// Creates a new transforming [`PowerMutationalStage`]
@@ -117,6 +130,7 @@ where
         Self {
             mutator,
             phantom: PhantomData,
+            restart_helper: ExecutionCountRestartHelper::default(),
         }
     }
 }
@@ -124,7 +138,3 @@ where
 /// The standard powerscheduling stage
 pub type StdPowerMutationalStage<E, EM, I, M, Z> =
     PowerMutationalStage<E, CorpusPowerTestcaseScore<<E as UsesState>::State>, EM, I, M, Z>;
-
-/// Ecofuzz scheduling stage
-pub type EcoPowerMutationalStage<E, EM, I, M, Z> =
-    PowerMutationalStage<E, EcoTestcaseScore<<E as UsesState>::State>, EM, I, M, Z>;

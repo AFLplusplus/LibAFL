@@ -4,21 +4,18 @@
 use alloc::{borrow::ToOwned, rc::Rc, string::String, vec::Vec};
 use core::{
     cell::RefCell,
-    convert::From,
     hash::{BuildHasher, Hasher},
 };
 #[cfg(feature = "std")]
 use std::{fs::File, io::Read, path::Path};
 
 use ahash::RandomState;
+#[cfg(feature = "std")]
+use libafl_bolts::{fs::write_file_atomic, Error};
+use libafl_bolts::{ownedref::OwnedSlice, HasLen};
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "std")]
-use crate::{bolts::fs::write_file_atomic, Error};
-use crate::{
-    bolts::{ownedref::OwnedSlice, HasLen},
-    inputs::{HasBytesVec, HasTargetBytes, Input},
-};
+use crate::inputs::{HasBytesVec, HasTargetBytes, Input};
 
 /// A bytes input is the basic input
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -111,7 +108,7 @@ impl From<BytesInput> for Vec<u8> {
 impl BytesInput {
     /// Creates a new bytes input using the given bytes
     #[must_use]
-    pub fn new(bytes: Vec<u8>) -> Self {
+    pub const fn new(bytes: Vec<u8>) -> Self {
         Self { bytes }
     }
 }

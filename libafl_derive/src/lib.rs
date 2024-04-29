@@ -28,14 +28,12 @@
 ))]
 #![cfg_attr(test, deny(
     missing_debug_implementations,
-    missing_docs,
     //trivial_casts,
     trivial_numeric_casts,
     unused_extern_crates,
     unused_import_braces,
     unused_qualifications,
     unused_must_use,
-    missing_docs,
     //unused_results
 ))]
 #![cfg_attr(
@@ -49,7 +47,6 @@
         overflowing_literals,
         path_statements,
         patterns_in_fns_without_body,
-        private_in_public,
         unconditional_recursion,
         unused,
         unused_allocation,
@@ -68,6 +65,6 @@ use syn::{parse_macro_input, DeriveInput};
 pub fn libafl_serdeany_derive(input: TokenStream) -> TokenStream {
     let name = parse_macro_input!(input as DeriveInput).ident;
     TokenStream::from(quote! {
-        libafl::impl_serdeany!(#name);
+        libafl_bolts::impl_serdeany!(#name);
     })
 }

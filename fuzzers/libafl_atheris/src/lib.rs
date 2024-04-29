@@ -3,7 +3,7 @@
 //! This is the drop-in replacement for libfuzzer, to be used together with [`Atheris`](https://github.com/google/atheris)
 //! for python instrumentation and fuzzing.
 
-use core::{convert::TryInto, ffi::c_void, slice, time::Duration};
+use core::time::Duration;
 use std::{
     env,
     os::raw::{c_char, c_int},
@@ -12,18 +12,9 @@ use std::{
 
 use clap::{Arg, ArgAction, Command};
 use libafl::{
-    bolts::{
-        core_affinity::Cores,
-        current_nanos,
-        launcher::Launcher,
-        rands::StdRand,
-        shmem::{ShMemProvider, StdShMemProvider},
-        tuples::{tuple_list, Merge},
-        AsSlice,
-    },
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
-    events::EventConfig,
-    executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
+    events::{launcher::Launcher, EventConfig},
+    executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -34,69 +25,21 @@ use libafl::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::{I2SRandReplace, Tokens},
     },
-    observers::{HitcountsMapObserver, TimeObserver},
+    observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{StdMutationalStage, TracingStage},
-    state::{HasCorpus, HasMetadata, StdState},
-    Error,
+    state::{HasCorpus, StdState},
+    Error, HasMetadata,
 };
-use libafl_targets::{
-    CmpLogObserver, __sanitizer_cov_trace_cmp1, __sanitizer_cov_trace_cmp2,
-    __sanitizer_cov_trace_cmp4, __sanitizer_cov_trace_cmp8, std_edges_map_observer, EDGES_MAP_PTR,
-    MAX_EDGES_NUM,
+use libafl_bolts::{
+    core_affinity::Cores,
+    current_nanos,
+    rands::StdRand,
+    shmem::{ShMemProvider, StdShMemProvider},
+    tuples::{tuple_list, Merge},
+    AsSlice,
 };
-
-/// Set up our coverage map.
-#[no_mangle]
-pub fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop: *mut u8) {
-    unsafe {
-        EDGES_MAP_PTR = start;
-        MAX_EDGES_NUM = (stop as usize - start as usize) / 8;
-    }
-}
-
-/// `pcs` tables seem to be unused by `Atheris`, so we can ignore this setup function,
-/// but the symbol is still being called and, hence, required.
-#[no_mangle]
-pub fn __sanitizer_cov_pcs_init(_pcs_beg: *mut u8, _pcs_end: *mut u8) {
-    // noop
-}
-
-/// Allow the python code to use `cmplog`.
-/// This is a PoC implementation and could be improved.
-/// For example, it only takes up to 8 bytes into consideration.
-#[no_mangle]
-pub fn __sanitizer_weak_hook_memcmp(
-    _caller_pc: *const c_void,
-    s1: *const c_void,
-    s2: *const c_void,
-    n: usize,
-    _result: c_int,
-) {
-    unsafe {
-        let s1 = slice::from_raw_parts(s1.cast::<u8>(), n);
-        let s2 = slice::from_raw_parts(s2.cast::<u8>(), n);
-        match n {
-            0 => (),
-            1 => __sanitizer_cov_trace_cmp1(
-                u8::from_ne_bytes(s1.try_into().unwrap()),
-                u8::from_ne_bytes(s2.try_into().unwrap()),
-            ),
-            2..=3 => __sanitizer_cov_trace_cmp2(
-                u16::from_ne_bytes(s1.try_into().unwrap()),
-                u16::from_ne_bytes(s2.try_into().unwrap()),
-            ),
-            4..=7 => __sanitizer_cov_trace_cmp4(
-                u32::from_ne_bytes(s1.try_into().unwrap()),
-                u32::from_ne_bytes(s2.try_into().unwrap()),
-            ),
-            _ => __sanitizer_cov_trace_cmp8(
-                u64::from_ne_bytes(s1.try_into().unwrap()),
-                u64::from_ne_bytes(s2.try_into().unwrap()),
-            ),
-        }
-    }
-}
+use libafl_targets::{extra_counters, CmpLogObserver};
 
 /// It's called by Atheris after the fuzzer has been initialized.
 /// The main entrypoint to our fuzzer, which will be called by `Atheris` when fuzzing starts.
@@ -104,22 +47,17 @@ pub fn __sanitizer_weak_hook_memcmp(
 /// and jumps back into `Atheris'` instrumented python code.
 #[no_mangle]
 #[allow(non_snake_case)]
-pub fn LLVMFuzzerRunDriver(
+pub extern "C" fn LLVMFuzzerRunDriver(
     _argc: *const c_int,
     _argv: *const *const c_char,
     harness_fn: Option<extern "C" fn(*const u8, usize) -> c_int>,
 ) {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
-    //RegistryBuilder::register::<Tokens>();
+    // unsafe { RegistryBuilder::register::<Tokens>(); }
 
     assert!(harness_fn.is_some(), "No harness callback provided");
     let harness_fn = harness_fn.unwrap();
-
-    assert!(
-        !unsafe { EDGES_MAP_PTR.is_null() },
-        "Edges map was never initialized - __sanitizer_cov_8bit_counters_init never got called"
-    );
 
     println!("Args: {:?}", std::env::args());
 
@@ -157,10 +95,7 @@ pub fn LLVMFuzzerRunDriver(
         .get_matches();
 
     let workdir = env::current_dir().unwrap();
-    println!(
-        "Workdir: {:?}",
-        env::current_dir().unwrap().to_string_lossy().to_string()
-    );
+    println!("{}", env::current_dir().unwrap().to_string_lossy());
 
     let cores = Cores::from_cmdline(matches.get_one::<String>("cores").unwrap())
         .expect("No valid core count given!");
@@ -171,7 +106,7 @@ pub fn LLVMFuzzerRunDriver(
         .get_one::<String>("remote_broker_addr")
         .map(|s| s.parse().expect("Invalid broker address"));
     let input_dirs: Vec<PathBuf> = matches
-        .get_many::<PathBuf>("input")
+        .get_many::<String>("input")
         .map(|v| v.map(PathBuf::from).collect())
         .unwrap_or_default();
     let output_dir = matches
@@ -196,7 +131,13 @@ pub fn LLVMFuzzerRunDriver(
 
     let mut run_client = |state: Option<_>, mut mgr, _core_id| {
         // Create an observation channel using the coverage map
-        let edges_observer = unsafe { HitcountsMapObserver::new(std_edges_map_observer("edges")) };
+        let edges = unsafe { extra_counters() };
+        println!("edges: {:?}", edges);
+        let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_slice(
+            "edges",
+            edges.into_iter().next().unwrap(),
+        ))
+        .track_indices();
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
@@ -208,9 +149,9 @@ pub fn LLVMFuzzerRunDriver(
         // This one is composed by two Feedbacks in OR
         let mut feedback = feedback_or!(
             // New maximization map feedback linked to the edges observer and the feedback state
-            MaxMapFeedback::tracking(&edges_observer, true, false),
+            MaxMapFeedback::new(&edges_observer),
             // Time feedback, this one does not need a feedback state
-            TimeFeedback::with_observer(&time_observer)
+            TimeFeedback::new(&time_observer)
         );
 
         // A feedback to choose if an input is a solution or not
@@ -243,7 +184,8 @@ pub fn LLVMFuzzerRunDriver(
         }
 
         // A minimization+queue policy to get testcasess from the corpus
-        let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+        let scheduler =
+            IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -257,16 +199,14 @@ pub fn LLVMFuzzerRunDriver(
         };
 
         // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-        let mut executor = TimeoutExecutor::new(
-            InProcessExecutor::new(
-                &mut harness,
-                tuple_list!(edges_observer, time_observer),
-                &mut fuzzer,
-                &mut state,
-                &mut mgr,
-            )?,
+        let mut executor = InProcessExecutor::with_timeout(
+            &mut harness,
+            tuple_list!(edges_observer, time_observer),
+            &mut fuzzer,
+            &mut state,
+            &mut mgr,
             Duration::from_millis(timeout_ms),
-        );
+        )?;
 
         // Secondary harness due to mut ownership
         let mut harness = |input: &BytesInput| {
@@ -319,7 +259,7 @@ pub fn LLVMFuzzerRunDriver(
             } else {
                 println!("Loading from {:?}", &input_dirs);
                 // Load from disk
-                // we used _forced since some Atheris testcases don't touch the map at all, hence, wolud not load any data.
+                // we used _forced since some Atheris testcases don't touch the map at all, hence, would not load any data.
                 state
                     .load_initial_inputs_forced(&mut fuzzer, &mut executor, &mut mgr, &input_dirs)
                     .unwrap_or_else(|_| {
@@ -342,8 +282,8 @@ pub fn LLVMFuzzerRunDriver(
         .cores(&cores)
         .broker_port(broker_port)
         .remote_broker_addr(remote_broker_addr)
-        // remove this comment to sience the target.
-        //.stdout_file(Some("/dev/null"))
+        // remove this comment to silence the target.
+        // .stdout_file(Some("/dev/null"))
         .build()
         .launch()
     {

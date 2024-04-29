@@ -1,7 +1,8 @@
 # Variables
 [env]
 CARGO_TARGET_DIR = { value = "target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
-
+PROFILE = { value = "release", condition = {env_not_set = ["PROFILE"]} }
+PROFILE_DIR = {value = "release", condition = {env_not_set = ["PROFILE_DIR"] }}
 
 [tasks.unsupported]
 script_runner="@shell"
@@ -19,8 +20,8 @@ windows_alias = "unsupported"
 condition = { files_not_exist = ["./libpng-1.6.37"]}
 script_runner="@shell"
 script='''
-wget https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.xz
-tar -xvf libpng-1.6.37.tar.xz
+wget https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
+tar -xvf v1.6.37.tar.gz
 '''
 
 # Library
@@ -61,7 +62,7 @@ windows_alias = "unsupported"
 [tasks.fuzzer_unix]
 script_runner="@shell"
 script='''
-cargo build --release
+cargo build --profile ${PROFILE}
 '''
 
 # Run the fuzzer
@@ -73,7 +74,7 @@ windows_alias = "unsupported"
 [tasks.run_unix]
 script_runner = "@shell"
 script='''
-LD_PRELOAD=$CARGO_TARGET_DIR/release/libfrida_executable_fuzzer.so ./libpng-harness -i corpus -o out -H ./libpng-harness
+LD_PRELOAD=$CARGO_TARGET_DIR/${PROFILE_DIR}/libfrida_executable_fuzzer.so ./libpng-harness -i corpus -o out -H ./libpng-harness
 '''
 dependencies = [ "fuzzer", "harness" ]
 
@@ -87,13 +88,13 @@ windows_alias = "unsupported"
 script_runner = "@shell"
 script='''
 rm -rf libafl_unix_shmem_server || true
-LD_PRELOAD=$CARGO_TARGET_DIR/release/libfrida_executable_fuzzer.so ./libpng-harness -i corpus -o out -H ./libpng-harness > fuzz_stdout.log &
+LD_PRELOAD=$CARGO_TARGET_DIR/${PROFILE_DIR}/libfrida_executable_fuzzer.so ./libpng-harness -i corpus -o out -H ./libpng-harness > fuzz_stdout.log &
 sleep 10s && pkill libpng-harness
-if [ -z "$(grep "corpus: 30" fuzz_stdout.log)" ]; then
+if grep -qa "corpus: 30" fuzz_stdout.log; then
+    echo "Fuzzer is working"
+else
     echo "Fuzzer does not generate any testcases or any crashes"
     exit 1
-else
-    echo "Fuzzer is working"
 fi
 '''
 dependencies = [ "fuzzer", "harness" ]

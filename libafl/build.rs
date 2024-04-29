@@ -1,14 +1,20 @@
+use std::error::Error;
+
 #[rustversion::nightly]
-fn main() {
+#[allow(clippy::unnecessary_wraps)]
+fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rustc-cfg=unstable_feature");
+    println!("cargo:rustc-cfg=nightly");
+    Ok(())
 }
 
 #[rustversion::not(nightly)]
-fn main() {
+#[allow(clippy::unnecessary_wraps)]
+fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=build.rs");
     assert!(
-        cfg!(not(feature = "nautilus")),
+        cfg!(all(not(docrs), not(feature = "nautilus"))),
         "The 'nautilus' feature of libafl requires a nightly compiler"
     );
+    Ok(())
 }

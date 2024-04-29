@@ -17,7 +17,8 @@ The tinyinst module for `LibAFL`.
     clippy::missing_panics_doc,
     clippy::missing_docs_in_private_items,
     clippy::module_name_repetitions,
-    clippy::unreadable_literal
+    clippy::unreadable_literal,
+    clippy::negative_feature_names
 )]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
@@ -31,14 +32,12 @@ The tinyinst module for `LibAFL`.
 ))]
 #![cfg_attr(test, deny(
     missing_debug_implementations,
-    missing_docs,
     //trivial_casts,
     trivial_numeric_casts,
     unused_extern_crates,
     unused_import_braces,
     unused_qualifications,
     unused_must_use,
-    missing_docs,
     //unused_results
 ))]
 #![cfg_attr(
@@ -52,7 +51,6 @@ The tinyinst module for `LibAFL`.
         overflowing_literals,
         path_statements,
         patterns_in_fns_without_body,
-        private_in_public,
         unconditional_recursion,
         unused,
         unused_allocation,

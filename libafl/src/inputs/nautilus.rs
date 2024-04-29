@@ -5,7 +5,7 @@
 //use core::hash::Hasher;
 
 use alloc::{rc::Rc, string::String, vec::Vec};
-use core::{cell::RefCell, convert::From};
+use core::cell::RefCell;
 use std::hash::{Hash, Hasher};
 
 use grammartec::{
@@ -13,10 +13,10 @@ use grammartec::{
     rule::RuleIDOrCustom,
     tree::{Tree, TreeLike},
 };
+use libafl_bolts::HasLen;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::HasLen,
     generators::nautilus::NautilusContext,
     inputs::{BytesInput, Input, InputConverter},
     Error,
