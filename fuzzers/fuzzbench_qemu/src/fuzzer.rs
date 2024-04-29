@@ -50,7 +50,7 @@ use libafl_qemu::{
     cmplog::{CmpLogObserver, QemuCmpLogHelper},
     edges::edges_map_mut_ptr,
     edges::QemuEdgeCoverageHelper,
-    edges::MAX_EDGES_NUM,
+    edges::MAX_EDGES_FOUND,
     elf::EasyElf,
     filter_qemu_args,
     hooks::QemuHooks,
@@ -65,6 +65,7 @@ use libafl_qemu::{
     QemuShutdownCause,
     Regs,
 };
+use libafl_targets::EDGES_MAP_SIZE_IN_USE;
 #[cfg(unix)]
 use nix::unistd::dup;
 
@@ -258,8 +259,8 @@ fn fuzz(
     let edges_observer = unsafe {
         HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
             "edges",
-            OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), MAX_EDGES_NUM),
-            addr_of_mut!(MAX_EDGES_NUM),
+            OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_SIZE_IN_USE),
+            addr_of_mut!(MAX_EDGES_FOUND),
         ))
         .track_indices()
     };

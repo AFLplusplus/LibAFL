@@ -7,7 +7,7 @@ use libafl_qemu_sys::GuestAddr;
 use libafl_qemu_sys::GuestPhysAddr;
 pub use libafl_targets::{
     edges_map_mut_ptr, EDGES_MAP, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE, EDGES_MAP_SIZE_MAX,
-    MAX_EDGES_NUM,
+    MAX_EDGES_FOUND,
 };
 use serde::{Deserialize, Serialize};
 
@@ -555,7 +555,7 @@ where
             let id = *e.get();
             let nxt = (id as usize + 1) & (EDGES_MAP_SIZE_MAX - 1);
             unsafe {
-                MAX_EDGES_NUM = max(MAX_EDGES_NUM, nxt);
+                MAX_EDGES_FOUND = max(MAX_EDGES_FOUND, nxt);
             }
             Some(id)
         }
@@ -564,7 +564,7 @@ where
             e.insert(id);
             meta.current_id = (id + 1) & (EDGES_MAP_SIZE_MAX as u64 - 1);
             unsafe {
-                MAX_EDGES_NUM = meta.current_id as usize;
+                MAX_EDGES_FOUND = meta.current_id as usize;
             }
             // GuestAddress is u32 for 32 bit guests
             #[allow(clippy::unnecessary_cast)]

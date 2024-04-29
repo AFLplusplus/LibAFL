@@ -28,8 +28,10 @@ pub use __ddg_area_ptr_local as DDG_MAP;
 pub static mut __afl_acc_memop_ptr_local: [u32; ACCOUNTING_MAP_SIZE] = [0; ACCOUNTING_MAP_SIZE];
 pub use __afl_acc_memop_ptr_local as ACCOUNTING_MEMOP_MAP;
 
-/// The max count of edges tracked.
-pub static mut MAX_EDGES_NUM: usize = 0;
+/// The max count of edges found.
+/// This is either computed during the compilation time or at runtime (in this case this is used to shrink the map).
+/// You can use this for the initial map size for the observer only if you compute this time at compilation time.
+pub static mut MAX_EDGES_FOUND: usize = 0;
 
 extern "C" {
     /// The area pointer points to the edges map.
@@ -109,11 +111,11 @@ pub unsafe fn edges_map_mut_slice<'a>() -> OwnedMutSlice<'a, u8> {
 ///
 /// ```rust,ignore
 /// use libafl::observers::StdMapObserver;
-/// use libafl_targets::{EDGES_MAP, MAX_EDGES_NUM};
+/// use libafl_targets::{EDGES_MAP, EDGES_MAP_SIZE_IN_USE};
 ///
 /// #[cfg(not(feature = "pointer_maps"))]
 /// let observer = unsafe {
-///     StdMapObserver::from_mut_ptr("edges", EDGES_MAP.as_mut_ptr(), MAX_EDGES_NUM)
+///     StdMapObserver::from_mut_ptr("edges", EDGES_MAP.as_mut_ptr(), EDGES_MAP_SIZE_IN_USE)
 /// };
 /// ```
 ///
@@ -169,8 +171,8 @@ pub fn edges_map_mut_ptr() -> *mut u8 {
 #[must_use]
 pub fn edges_max_num() -> usize {
     unsafe {
-        if MAX_EDGES_NUM > 0 {
-            MAX_EDGES_NUM
+        if MAX_EDGES_FOUND > 0 {
+            MAX_EDGES_FOUND
         } else {
             #[cfg(feature = "pointer_maps")]
             {

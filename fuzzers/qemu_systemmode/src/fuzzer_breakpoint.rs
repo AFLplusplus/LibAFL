@@ -30,13 +30,14 @@ use libafl_bolts::{
 use libafl_qemu::{
     breakpoint::Breakpoint,
     command::{Command, EmulatorMemoryChunk, EndCommand, StartCommand},
-    edges::{edges_map_mut_ptr, QemuEdgeCoverageHelper, MAX_EDGES_NUM},
+    edges::{edges_map_mut_ptr, QemuEdgeCoverageHelper, MAX_EDGES_FOUND},
     elf::EasyElf,
     emu::Emulator,
     executor::{stateful::StatefulQemuExecutor, QemuExecutorState},
     EmuExitReasonError, FastSnapshotManager, GuestPhysAddr, GuestReg, HandlerError, HandlerResult,
     QemuHooks, StdEmuExitHandler,
 };
+use libafl_targets::EDGES_MAP_SIZE_IN_USE;
 
 // use libafl_qemu::QemuSnapshotBuilder; // for normal qemu snapshot
 
@@ -155,8 +156,8 @@ pub fn fuzz() {
         let edges_observer = unsafe {
             HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
                 "edges",
-                OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), MAX_EDGES_NUM),
-                addr_of_mut!(MAX_EDGES_NUM),
+                OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_SIZE_IN_USE),
+                addr_of_mut!(MAX_EDGES_FOUND),
             ))
             .track_indices()
         };

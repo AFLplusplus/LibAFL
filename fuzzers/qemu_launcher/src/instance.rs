@@ -40,7 +40,7 @@ use libafl_bolts::{
 };
 use libafl_qemu::{
     cmplog::CmpLogObserver,
-    edges::{edges_map_mut_ptr, MAX_EDGES_NUM},
+    edges::{edges_map_mut_ptr, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND},
     helpers::QemuHelperTuple,
     Qemu, QemuExecutor, QemuHooks,
 };
@@ -79,8 +79,8 @@ impl<'a, M: Monitor> Instance<'a, M> {
         let edges_observer = unsafe {
             HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
                 "edges",
-                OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), MAX_EDGES_NUM),
-                addr_of_mut!(MAX_EDGES_NUM),
+                OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_SIZE_IN_USE),
+                addr_of_mut!(MAX_EDGES_FOUND),
             ))
             .track_indices()
         };

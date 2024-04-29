@@ -30,12 +30,13 @@ use libafl_bolts::{
     AsSlice,
 };
 use libafl_qemu::{
-    edges::{edges_map_mut_ptr, QemuEdgeCoverageHelper, MAX_EDGES_NUM},
+    edges::{edges_map_mut_ptr, QemuEdgeCoverageHelper, MAX_EDGES_FOUND},
     elf::EasyElf,
     emu::Qemu,
     QemuExecutor, QemuExitReason, QemuExitReasonError, QemuHooks, QemuShutdownCause, Regs,
 };
 use libafl_qemu_sys::GuestPhysAddr;
+use libafl_targets::EDGES_MAP_SIZE_IN_USE;
 
 pub static mut MAX_INPUT_SIZE: usize = 50;
 
@@ -162,8 +163,8 @@ pub fn fuzz() {
         let edges_observer = unsafe {
             HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
                 "edges",
-                OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), MAX_EDGES_NUM),
-                addr_of_mut!(MAX_EDGES_NUM),
+                OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_SIZE_IN_USE),
+                addr_of_mut!(MAX_EDGES_FOUND),
             ))
             .track_indices()
         };
