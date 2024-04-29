@@ -20,7 +20,7 @@ use crate::{
     Error, HasMetadata,
 };
 
-const RECUR_THRESHOLD: u64 = 5;
+const RECUR_THRESHOLD: usize = 5;
 
 /// A random mutator for grammar fuzzing
 #[derive(Debug)]
@@ -41,7 +41,7 @@ where
         input: &mut GramatronInput,
     ) -> Result<MutationResult, Error> {
         if !input.terminals().is_empty() {
-            let size = state.rand_mut().below(input.terminals().len() as u64 + 1) as usize;
+            let size = state.rand_mut().below(input.terminals().len() + 1);
             input.terminals_mut().truncate(size);
         }
         if self.generator.append_generated_terminals(input, state) > 0 {
@@ -119,7 +119,7 @@ where
 
         let idx = random_corpus_id!(state.corpus(), state.rand_mut());
 
-        let insert_at = state.rand_mut().below(input.terminals().len() as u64) as usize;
+        let insert_at = state.rand_mut().below(input.terminals().len());
 
         let rand_num = state.rand_mut().next();
 
@@ -212,11 +212,11 @@ where
         let chosen_nums = self.counters.get(&chosen).unwrap().0;
 
         #[allow(clippy::cast_sign_loss, clippy::pedantic)]
-        let mut first = state.rand_mut().below(chosen_nums as u64 - 1) as i64;
+        let mut first = state.rand_mut().below(chosen_nums - 1) as i64;
         #[allow(clippy::cast_sign_loss, clippy::pedantic)]
         let mut second = state
             .rand_mut()
-            .between(first as u64 + 1, chosen_nums as u64 - 1) as i64;
+            .between(first as usize + 1, chosen_nums - 1) as i64;
 
         let mut idx_1 = 0;
         let mut idx_2 = 0;

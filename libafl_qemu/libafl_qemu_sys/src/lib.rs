@@ -17,6 +17,8 @@ __Warning__: The documentation is built by default for `x86_64` in `usermode`. T
 mod bindings {
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
+#[cfg(all(not(feature = "clippy"), target_os = "linux"))]
+pub use bindings::*;
 
 #[cfg(any(feature = "clippy", not(target_os = "linux")))]
 mod x86_64_stub_bindings;
@@ -100,8 +102,6 @@ macro_rules! extern_c_checked {
 use core::ops::BitAnd;
 use std::ffi::c_void;
 
-#[cfg(all(not(feature = "clippy"), target_os = "linux"))]
-pub use bindings::*;
 #[cfg(feature = "python")]
 use pyo3::{pyclass, pymethods, IntoPy, PyObject, Python};
 #[cfg(any(feature = "clippy", not(target_os = "linux")))]

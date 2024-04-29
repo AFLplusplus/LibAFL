@@ -213,6 +213,7 @@ use core::{
     array::TryFromSliceError,
     fmt::{self, Display},
     num::{ParseIntError, TryFromIntError},
+    ops::{Deref, DerefMut},
     time,
 };
 #[cfg(feature = "std")]
@@ -674,68 +675,47 @@ pub trait IntoOwned {
 }
 
 /// Can be converted to a slice
-pub trait AsSlice {
-    /// Type of the entries in this slice
-    type Entry;
+pub trait AsSlice<'a> {
+    /// Type of the entries of this slice
+    type Entry: 'a;
+    /// Type of the reference to this slice
+    type SliceRef: Deref<Target = [Self::Entry]>;
+
     /// Convert to a slice
-    fn as_slice(&self) -> &[Self::Entry];
+    fn as_slice(&'a self) -> Self::SliceRef;
+}
+
+impl<'a, T, R> AsSlice<'a> for R
+where
+    T: 'a,
+    R: Deref<Target = [T]>,
+{
+    type Entry = T;
+    type SliceRef = &'a [T];
+
+    fn as_slice(&'a self) -> Self::SliceRef {
+        &*self
+    }
 }
 
 /// Can be converted to a mutable slice
-pub trait AsSliceMut {
-    /// Type of the entries in this mut slice
-    type Entry;
+pub trait AsSliceMut<'a>: AsSlice<'a> {
+    /// Type of the mutable reference to this slice
+    type SliceRefMut: DerefMut<Target = [Self::Entry]>;
+
     /// Convert to a slice
-    fn as_slice_mut(&mut self) -> &mut [Self::Entry];
+    fn as_slice_mut(&'a mut self) -> Self::SliceRefMut;
 }
 
-#[cfg(feature = "alloc")]
-impl<T> AsSlice for Vec<T> {
-    type Entry = T;
+impl<'a, T, R> AsSliceMut<'a> for R
+where
+    T: 'a,
+    R: DerefMut<Target = [T]>,
+{
+    type SliceRefMut = &'a mut [T];
 
-    fn as_slice(&self) -> &[Self::Entry] {
-        self
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl<T> AsSliceMut for Vec<T> {
-    type Entry = T;
-
-    fn as_slice_mut(&mut self) -> &mut [Self::Entry] {
-        self
-    }
-}
-
-impl<T> AsSlice for &[T] {
-    type Entry = T;
-
-    fn as_slice(&self) -> &[Self::Entry] {
-        self
-    }
-}
-
-impl<T> AsSlice for [T] {
-    type Entry = T;
-
-    fn as_slice(&self) -> &[Self::Entry] {
-        self
-    }
-}
-
-impl<T> AsSliceMut for &mut [T] {
-    type Entry = T;
-
-    fn as_slice_mut(&mut self) -> &mut [Self::Entry] {
-        self
-    }
-}
-
-impl<T> AsSliceMut for [T] {
-    type Entry = T;
-
-    fn as_slice_mut(&mut self) -> &mut [Self::Entry] {
-        self
+    fn as_slice_mut(&'a mut self) -> Self::SliceRefMut {
+        &mut *self
     }
 }
 
@@ -743,22 +723,51 @@ impl<T> AsSliceMut for [T] {
 pub trait AsIter<'it> {
     /// The item type
     type Item: 'it;
+    /// The ref type
+    type Ref: Deref<Target = Self::Item>;
     /// The iterator type
-    type IntoIter: Iterator<Item = &'it Self::Item>;
+    type IntoIter: Iterator<Item = Self::Ref>;
 
     /// Create an iterator from &self
     fn as_iter(&'it self) -> Self::IntoIter;
 }
 
+impl<'it, S, T> AsIter<'it> for S
+where
+    S: AsSlice<'it, Entry = T, SliceRef = &'it [T]>,
+    T: 'it,
+{
+    type Item = S::Entry;
+    type Ref = &'it Self::Item;
+    type IntoIter = core::slice::Iter<'it, Self::Item>;
+
+    fn as_iter(&'it self) -> Self::IntoIter {
+        self.as_slice().iter()
+    }
+}
+
 /// Create an `Iterator` from a mutable reference
-pub trait AsIterMut<'it> {
-    /// The item type
-    type Item: 'it;
+pub trait AsIterMut<'it>: AsIter<'it> {
+    /// The ref type
+    type RefMut: DerefMut<Target = Self::Item>;
     /// The iterator type
-    type IntoIter: Iterator<Item = &'it mut Self::Item>;
+    type IntoIterMut: Iterator<Item = Self::RefMut>;
 
     /// Create an iterator from &mut self
-    fn as_iter_mut(&'it mut self) -> Self::IntoIter;
+    fn as_iter_mut(&'it mut self) -> Self::IntoIterMut;
+}
+
+impl<'it, S, T> AsIterMut<'it> for S
+where
+    S: AsSliceMut<'it, Entry = T, SliceRef = &'it [T], SliceRefMut = &'it mut [T]>,
+    T: 'it,
+{
+    type RefMut = &'it mut Self::Item;
+    type IntoIterMut = core::slice::IterMut<'it, Self::Item>;
+
+    fn as_iter_mut(&'it mut self) -> Self::IntoIterMut {
+        self.as_slice_mut().iter_mut()
+    }
 }
 
 /// Has a length field

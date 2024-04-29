@@ -169,7 +169,6 @@ where
 {
     /// Runs this (mutational) stage for the given `testcase`
     /// Exactly the same functionality as [`MutationalStage::perform_mutational`], but with added timeout support.
-    #[allow(clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
     fn perform_mutational(
         &mut self,
         fuzzer: &mut Z,
@@ -221,7 +220,7 @@ where
                 // fall back to random
                 let iters = self
                     .iterations(state)?
-                    .saturating_sub(self.execs_since_progress_start(state)?);
+                    .saturating_sub(self.execs_since_progress_start(state)? as usize);
                 for _ in 1..=iters {
                     self.perform_mutation(fuzzer, executor, state, manager, &input)?;
                 }
@@ -243,8 +242,7 @@ where
     }
 
     /// Gets the number of iterations as a random number
-    #[allow(clippy::cast_possible_truncation)]
-    fn iterations(&self, state: &mut Z::State) -> Result<u64, Error> {
+    fn iterations(&self, state: &mut Z::State) -> Result<usize, Error> {
         Ok(
             // fall back to random
             1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS),

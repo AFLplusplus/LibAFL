@@ -27,7 +27,7 @@ use crate::{
 use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 
 /// The default maximum number of mutations to perform per input.
-pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: u64 = 128;
+pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: usize = 128;
 /// A Mutational push stage is the stage in a fuzzing run that mutates inputs.
 /// Mutational push stages will usually have a range of mutations that are
 /// being applied to the input one by one, between executions.
@@ -72,7 +72,7 @@ where
     /// Gets the number of iterations as a random number
     #[allow(clippy::unused_self, clippy::unnecessary_wraps)] // TODO: we should put this function into a trait later
     fn iterations(&self, state: &mut CS::State, _corpus_idx: CorpusId) -> Result<usize, Error> {
-        Ok(1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize)
+        Ok(1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS))
     }
 
     /// Sets the current corpus index

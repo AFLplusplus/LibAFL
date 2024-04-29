@@ -59,7 +59,7 @@ use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
 };
 #[cfg(unix)]
-use nix::{self, unistd::dup};
+use nix::unistd::dup;
 
 /// The fuzzer main (as `no_mangle` C function)
 #[no_mangle]
@@ -328,7 +328,7 @@ fn fuzz_binary(
         // New maximization map feedback linked to the edges observer and the feedback state
         map_feedback,
         // Time feedback, this one does not need a feedback state
-        TimeFeedback::with_observer(&time_observer)
+        TimeFeedback::new(&time_observer)
     );
     // A feedback to choose if an input is a solution or not
     let mut objective = CrashFeedback::new();
@@ -539,7 +539,7 @@ fn fuzz_text(
     let mut feedback = feedback_or!(
         map_feedback,
         // Time feedback, this one does not need a feedback state
-        TimeFeedback::with_observer(&time_observer)
+        TimeFeedback::new(&time_observer)
     );
 
     // A feedback to choose if an input is a solution or not

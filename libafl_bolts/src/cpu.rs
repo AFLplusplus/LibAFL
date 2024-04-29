@@ -51,6 +51,7 @@ pub fn read_time_counter() -> u64 {
     v
 }
 
+/// Read a timestamp for measurements
 #[cfg(target_arch = "arm")]
 #[must_use]
 pub fn read_time_counter() -> u64 {

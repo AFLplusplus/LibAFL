@@ -8,12 +8,9 @@ use crate::{inputs::UsesInput, observers::Observer};
 
 /// A simple observer with a list of things.
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(bound = "T: serde::de::DeserializeOwned")]
+#[serde(bound = "T: serde::de::DeserializeOwned + serde::Serialize")]
 #[allow(clippy::unsafe_derive_deserialize)]
-pub struct ListObserver<T>
-where
-    T: Debug + Serialize,
-{
+pub struct ListObserver<T> {
     name: Cow<'static, str>,
     /// The list
     list: OwnedMutPtr<Vec<T>>,

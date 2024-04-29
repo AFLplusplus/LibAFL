@@ -99,7 +99,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
                 let coverage = CoverageRuntime::new();
                 #[cfg(unix)]
-                let asan = AsanRuntime::new(&options);
+                let asan = AsanRuntime::new(options);
 
                 #[cfg(unix)]
                 let mut frida_helper =
@@ -119,13 +119,16 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // Create an observation channel to keep track of the execution time
                 let time_observer = TimeObserver::new("time");
 
+                #[cfg(unix)]
+                let asan_observer = AsanErrorsObserver::from_static_asan_errors();
+
                 // Feedback to rate the interestingness of an input
                 // This one is composed by two Feedbacks in OR
                 let mut feedback = feedback_or!(
                     // New maximization map feedback linked to the edges observer and the feedback state
                     MaxMapFeedback::new(&edges_observer),
                     // Time feedback, this one does not need a feedback state
-                    TimeFeedback::with_observer(&time_observer)
+                    TimeFeedback::new(&time_observer)
                 );
 
                 // Feedbacks to recognize an input as solution
@@ -134,7 +137,10 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                     CrashFeedback::new(),
                     TimeoutFeedback::new(),
                     // true enables the AsanErrorFeedback
-                    feedback_and_fast!(ConstFeedback::from(true), AsanErrorsFeedback::new())
+                    feedback_and_fast!(
+                        ConstFeedback::from(true),
+                        AsanErrorsFeedback::new(&asan_observer)
+                    )
                 );
                 #[cfg(windows)]
                 let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
@@ -179,9 +185,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
                 #[cfg(unix)]
-                let observers = tuple_list!(edges_observer, time_observer, unsafe {
-                    AsanErrorsObserver::from_static_asan_errors()
-                });
+                let observers = tuple_list!(edges_observer, time_observer, asan_observer);
                 #[cfg(windows)]
                 let observers = tuple_list!(edges_observer, time_observer);
 
@@ -234,6 +238,8 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
                 // Create an observation channel to keep track of the execution time
                 let time_observer = TimeObserver::new("time");
+                #[cfg(unix)]
+                let asan_observer = AsanErrorsObserver::from_static_asan_errors();
 
                 // Feedback to rate the interestingness of an input
                 // This one is composed by two Feedbacks in OR
@@ -241,14 +247,17 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                     // New maximization map feedback linked to the edges observer and the feedback state
                     MaxMapFeedback::new(&edges_observer),
                     // Time feedback, this one does not need a feedback state
-                    TimeFeedback::with_observer(&time_observer)
+                    TimeFeedback::new(&time_observer)
                 );
 
                 #[cfg(unix)]
                 let mut objective = feedback_or_fast!(
                     CrashFeedback::new(),
                     TimeoutFeedback::new(),
-                    feedback_and_fast!(ConstFeedback::from(false), AsanErrorsFeedback::new())
+                    feedback_and_fast!(
+                        ConstFeedback::from(false),
+                        AsanErrorsFeedback::new(&asan_observer)
+                    )
                 );
                 #[cfg(windows)]
                 let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
@@ -294,9 +303,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
                 #[cfg(unix)]
-                let observers = tuple_list!(edges_observer, time_observer, unsafe {
-                    AsanErrorsObserver::from_static_asan_errors()
-                });
+                let observers = tuple_list!(edges_observer, time_observer, asan_observer);
                 #[cfg(windows)]
                 let observers = tuple_list!(edges_observer, time_observer,);
 
@@ -366,20 +373,26 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // Create an observation channel to keep track of the execution time
                 let time_observer = TimeObserver::new("time");
 
+                #[cfg(unix)]
+                let asan_observer = AsanErrorsObserver::from_static_asan_errors();
+
                 // Feedback to rate the interestingness of an input
                 // This one is composed by two Feedbacks in OR
                 let mut feedback = feedback_or!(
                     // New maximization map feedback linked to the edges observer and the feedback state
                     MaxMapFeedback::new(&edges_observer),
                     // Time feedback, this one does not need a feedback state
-                    TimeFeedback::with_observer(&time_observer)
+                    TimeFeedback::new(&time_observer)
                 );
 
                 #[cfg(unix)]
                 let mut objective = feedback_or_fast!(
                     CrashFeedback::new(),
                     TimeoutFeedback::new(),
-                    feedback_and_fast!(ConstFeedback::from(false), AsanErrorsFeedback::new())
+                    feedback_and_fast!(
+                        ConstFeedback::from(false),
+                        AsanErrorsFeedback::new(&asan_observer)
+                    )
                 );
                 #[cfg(windows)]
                 let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
@@ -425,11 +438,9 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
                 #[cfg(unix)]
-                let observers = tuple_list!(edges_observer, time_observer, unsafe {
-                    AsanErrorsObserver::from_static_asan_errors()
-                });
+                let observers = tuple_list!(edges_observer, time_observer, asan_observer);
                 #[cfg(windows)]
-                let observers = tuple_list!(edges_observer, time_observer,);
+                let observers = tuple_list!(edges_observer, time_observer);
 
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(

@@ -1,4 +1,4 @@
-use std::sync::OnceLock;
+use std::{mem::size_of, sync::OnceLock};
 
 use capstone::arch::BuildsCapstone;
 use enum_map::{enum_map, EnumMap};
@@ -6,22 +6,21 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 pub use strum_macros::EnumIter;
-pub use syscall_numbers::arm::*;
+pub use syscall_numbers::x86_64::*;
 
-use crate::{sync_backdoor::BackdoorArgs, CallingConvention};
+use crate::{sync_exit::BackdoorArgs, CallingConvention};
 
-/// Registers for the ARM instruction set.
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
 #[repr(i32)]
 pub enum Regs {
-    R0 = 0,
-    R1 = 1,
-    R2 = 2,
-    R3 = 3,
-    R4 = 4,
-    R5 = 5,
-    R6 = 6,
-    R7 = 7,
+    Rax = 0,
+    Rbx = 1,
+    Rcx = 2,
+    Rdx = 3,
+    Rsi = 4,
+    Rdi = 5,
+    Rbp = 6,
+    Rsp = 7,
     R8 = 8,
     R9 = 9,
     R10 = 10,
@@ -30,7 +29,8 @@ pub enum Regs {
     R13 = 13,
     R14 = 14,
     R15 = 15,
-    R25 = 25,
+    Rip = 16,
+    Rflags = 17,
 }
 
 static BACKDOOR_ARCH_REGS: OnceLock<EnumMap<BackdoorArgs, Regs>> = OnceLock::new();
@@ -38,14 +38,14 @@ static BACKDOOR_ARCH_REGS: OnceLock<EnumMap<BackdoorArgs, Regs>> = OnceLock::new
 pub fn get_backdoor_arch_regs() -> &'static EnumMap<BackdoorArgs, Regs> {
     BACKDOOR_ARCH_REGS.get_or_init(|| {
         enum_map! {
-            BackdoorArgs::Ret  => Regs::R0,
-            BackdoorArgs::Cmd  => Regs::R0,
-            BackdoorArgs::Arg1 => Regs::R1,
-            BackdoorArgs::Arg2 => Regs::R2,
-            BackdoorArgs::Arg3 => Regs::R3,
-            BackdoorArgs::Arg4 => Regs::R4,
-            BackdoorArgs::Arg5 => Regs::R5,
-            BackdoorArgs::Arg6 => Regs::R6,
+            BackdoorArgs::Ret  => Regs::Rax,
+            BackdoorArgs::Cmd  => Regs::Rax,
+            BackdoorArgs::Arg1 => Regs::Rdi,
+            BackdoorArgs::Arg2 => Regs::Rsi,
+            BackdoorArgs::Arg3 => Regs::Rdx,
+            BackdoorArgs::Arg4 => Regs::R10,
+            BackdoorArgs::Arg5 => Regs::R8,
+            BackdoorArgs::Arg6 => Regs::R9,
         }
     })
 }
@@ -53,14 +53,8 @@ pub fn get_backdoor_arch_regs() -> &'static EnumMap<BackdoorArgs, Regs> {
 /// alias registers
 #[allow(non_upper_case_globals)]
 impl Regs {
-    pub const Sp: Regs = Regs::R13;
-    pub const Lr: Regs = Regs::R14;
-    pub const Pc: Regs = Regs::R15;
-    pub const Sb: Regs = Regs::R9;
-    pub const Sl: Regs = Regs::R10;
-    pub const Fp: Regs = Regs::R11;
-    pub const Ip: Regs = Regs::R12;
-    pub const Cpsr: Regs = Regs::R25;
+    pub const Sp: Regs = Regs::Rsp;
+    pub const Pc: Regs = Regs::Rip;
 }
 
 #[cfg(feature = "python")]
@@ -71,35 +65,36 @@ impl IntoPy<PyObject> for Regs {
     }
 }
 
-/// Return an ARM ArchCapstoneBuilder
-pub fn capstone() -> capstone::arch::arm::ArchCapstoneBuilder {
+/// Return an X86 `ArchCapstoneBuilder`
+#[must_use]
+pub fn capstone() -> capstone::arch::x86::ArchCapstoneBuilder {
     capstone::Capstone::new()
-        .arm()
-        .mode(capstone::arch::arm::ArchMode::Arm)
+        .x86()
+        .mode(capstone::arch::x86::ArchMode::Mode64)
 }
 
-/// Return an ARM Thumb ArchCapstoneBuilder
-pub fn capstone_thumb() -> capstone::arch::arm::ArchCapstoneBuilder {
-    capstone::Capstone::new()
-        .arm()
-        .mode(capstone::arch::arm::ArchMode::Thumb)
-}
-
-pub type GuestReg = u32;
+pub type GuestReg = u64;
 
 impl crate::ArchExtras for crate::CPU {
     fn read_return_address<T>(&self) -> Result<T, String>
     where
         T: From<GuestReg>,
     {
-        self.read_reg(Regs::Lr)
+        let stack_ptr: GuestReg = self.read_reg(Regs::Rsp)?;
+        let mut ret_addr = [0; size_of::<GuestReg>()];
+        unsafe { self.read_mem(stack_ptr, &mut ret_addr) };
+        Ok(GuestReg::from_le_bytes(ret_addr).into())
     }
 
     fn write_return_address<T>(&self, val: T) -> Result<(), String>
     where
         T: Into<GuestReg>,
     {
-        self.write_reg(Regs::Lr, val)
+        let stack_ptr: GuestReg = self.read_reg(Regs::Rsp)?;
+        let val: GuestReg = val.into();
+        let ret_addr = val.to_le_bytes();
+        unsafe { self.write_mem(stack_ptr, &ret_addr) };
+        Ok(())
     }
 
     fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, String>
@@ -111,11 +106,12 @@ impl crate::ArchExtras for crate::CPU {
         }
 
         let reg_id = match idx {
-            0 => Regs::R0,
-            1 => Regs::R1,
-            2 => Regs::R2,
-            3 => Regs::R3,
-            // 4.. would be on the stack, let's not do this for now
+            0 => Regs::Rdi,
+            1 => Regs::Rsi,
+            2 => Regs::Rdx,
+            3 => Regs::Rcx,
+            4 => Regs::R8,
+            5 => Regs::R9,
             r => return Err(format!("Unsupported argument: {r:}")),
         };
 
@@ -137,8 +133,8 @@ impl crate::ArchExtras for crate::CPU {
 
         let val: GuestReg = val.into();
         match idx {
-            0 => self.write_reg(Regs::R0, val),
-            1 => self.write_reg(Regs::R1, val),
+            0 => self.write_reg(Regs::Rdi, val),
+            1 => self.write_reg(Regs::Rsi, val),
             _ => Err(format!("Unsupported argument: {idx:}")),
         }
     }
