@@ -36,7 +36,6 @@ use libafl::{
 use libafl::{feedback_and_fast, feedbacks::ConstFeedback};
 use libafl_bolts::{
     cli::{parse_args, FuzzerOptions},
-    current_nanos,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
@@ -149,7 +148,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let mut state = state.unwrap_or_else(|| {
                     StdState::new(
                         // RNG
-                        StdRand::with_seed(current_nanos()),
+                        StdRand::new(),
                         // Corpus that will be evolved, we keep it in memory for performance
                         CachedOnDiskCorpus::new(PathBuf::from("./corpus_discovered"), 64).unwrap(),
                         // Corpus in which we store solutions (crashes in this example),
@@ -266,7 +265,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let mut state = state.unwrap_or_else(|| {
                     StdState::new(
                         // RNG
-                        StdRand::with_seed(current_nanos()),
+                        StdRand::new(),
                         // Corpus that will be evolved, we keep it in memory for performance
                         CachedOnDiskCorpus::no_meta(PathBuf::from("./corpus_discovered"), 64)
                             .unwrap(),
@@ -401,7 +400,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let mut state = state.unwrap_or_else(|| {
                     StdState::new(
                         // RNG
-                        StdRand::with_seed(current_nanos()),
+                        StdRand::new(),
                         // Corpus that will be evolved, we keep it in memory for performance
                         CachedOnDiskCorpus::no_meta(PathBuf::from("./corpus_discovered"), 64)
                             .unwrap(),
