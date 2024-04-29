@@ -453,19 +453,6 @@ where
         }
     }
 
-    /// Internal function, returns true when shuttdown is requested by a `SIGINT` signal
-    #[inline]
-    #[allow(clippy::unused_self)]
-    fn is_shutting_down() -> bool {
-        #[cfg(unix)]
-        unsafe {
-            core::ptr::read_volatile(core::ptr::addr_of!(EVENTMGR_SIGHANDLER_STATE.shutting_down))
-        }
-
-        #[cfg(windows)]
-        false
-    }
-
     /// Launch the simple restarting manager.
     /// This [`EventManager`] is simple and single threaded,
     /// but can still used shared maps to recover from crashes and timeouts.
@@ -488,15 +475,6 @@ where
             //let staterestorer = { LlmpSender::new(shmem_provider.clone(), 0, false)? };
             staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
 
-            // We setup signal handlers to clean up shmem segments used by state restorer
-            #[cfg(all(unix, not(miri)))]
-            if let Err(_e) =
-                unsafe { setup_signal_handler(addr_of_mut!(EVENTMGR_SIGHANDLER_STATE)) }
-            {
-                // We can live without a proper ctrl+c signal handler. Print and ignore.
-                log::error!("Failed to setup signal handlers: {_e}");
-            }
-
             let mut ctr: u64 = 0;
             // Client->parent loop
             loop {
@@ -509,14 +487,20 @@ where
                     match unsafe { fork() }? {
                         ForkResult::Parent(handle) => {
                             unsafe {
-                                // The parent will later exit through is_shutting down below
-                                // if the process exits gracefully, it cleans up the shmem.
-                                EVENTMGR_SIGHANDLER_STATE.set_exit_from_main();
+                                libc::signal(libc::SIGINT, libc::SIG_IGN);
                             }
                             shmem_provider.post_fork(false)?;
                             handle.status()
                         }
                         ForkResult::Child => {
+                            // We setup signal handlers to clean up shmem segments used by state restorer
+                            #[cfg(all(unix, not(miri)))]
+                            if let Err(_e) = unsafe {
+                                setup_signal_handler(addr_of_mut!(EVENTMGR_SIGHANDLER_STATE))
+                            } {
+                                // We can live without a proper ctrl+c signal handler. Print and ignore.
+                                log::error!("Failed to setup signal handlers: {_e}");
+                            }
                             shmem_provider.post_fork(true)?;
                             break staterestorer;
                         }
@@ -539,7 +523,7 @@ where
 
                 compiler_fence(Ordering::SeqCst);
 
-                if staterestorer.wants_to_exit() || Self::is_shutting_down() {
+                if staterestorer.wants_to_exit() || child_status == 100 {
                     return Err(Error::shutting_down());
                 }
 
