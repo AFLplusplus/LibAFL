@@ -129,11 +129,7 @@ where
     where
         P: Into<PathBuf>,
     {
-        Self::with_update_interval(
-            filename,
-            base,
-            Duration::from_secs(60)
-        )
+        Self::with_update_interval(filename, base, Duration::from_secs(60))
     }
 
     /// Create new [`OnDiskTOMLMonitor`] with custom update interval
