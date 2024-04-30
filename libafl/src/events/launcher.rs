@@ -102,6 +102,7 @@ where
     /// The list of cores to run on
     cores: &'a Cores,
     /// A file name to write all client output to
+    #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[builder(default = None)]
     stdout_file: Option<&'a str>,
     /// The actual, opened, `stdout_file` - so that we keep it open until the end
@@ -110,6 +111,7 @@ where
     opened_stdout_file: Option<File>,
     /// A file name to write all client stderr output to. If not specified, output is sent to
     /// `stdout_file`.
+    #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[builder(default = None)]
     stderr_file: Option<&'a str>,
     /// The actual, opened, `stdout_file` - so that we keep it open until the end
