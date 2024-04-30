@@ -329,7 +329,7 @@ pub mod windows_exception_handler {
         let mut is_crash = true;
         #[cfg(feature = "std")]
         if let Some(exception_pointers) = exception_pointers.as_mut() {
-            let code = ExceptionCode::try_from(
+            let code = From::from(
                 exception_pointers
                     .ExceptionRecord
                     .as_mut()
