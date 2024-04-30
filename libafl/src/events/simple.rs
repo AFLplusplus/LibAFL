@@ -23,7 +23,7 @@ use libafl_bolts::{shmem::ShMemProvider, staterestore::StateRestorer};
 use serde::{de::DeserializeOwned, Serialize};
 
 use super::{CustomBufEventResult, CustomBufHandlerFn, HasCustomBufHandlers, ProgressReporter};
-#[cfg(all(unix, feature = "std"))]
+#[cfg(all(unix, feature = "std", not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
     events::{

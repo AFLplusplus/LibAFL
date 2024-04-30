@@ -496,18 +496,18 @@ pub unsafe extern "system" fn handle_exception(
         .as_mut()
         .unwrap()
         .ExceptionCode;
-    let exception_code = match ExceptionCode::try_from(code.0) {
-        Ok(x) => x,
-        Err(_) => ExceptionCode::Others,
-    };
+    let exception_code = ExceptionCode::from(code.0);
     log::info!("Received exception; code: {}", exception_code);
     internal_handle_exception(exception_code, exception_pointers)
 }
 
-/// Return sig_ign this is 1 (when represented as u64)
+/// Return `SIGIGN` this is 1 (when represented as u64)
+/// Check https://github.com/ziglang/zig/blob/956f53beb09c07925970453d4c178c6feb53ba70/lib/libc/include/any-windows-any/signal.h#L51
+/// # Safety
+/// It is just casting into another type, nothing unsafe.
+#[must_use]
 pub const unsafe fn sig_ign() -> NativeSignalHandlerType {
-    let r = core::mem::transmute(1u64);
-    r
+    core::mem::transmute(1u64)
 }
 
 type NativeSignalHandlerType = unsafe extern "C" fn(i32);
