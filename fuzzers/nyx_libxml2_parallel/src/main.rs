@@ -15,7 +15,7 @@ use libafl::{
 };
 use libafl_bolts::{
     core_affinity::{CoreId, Cores},
-    rands::{RandomSeed, StdRand},
+    rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
 };

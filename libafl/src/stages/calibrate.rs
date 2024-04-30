@@ -1,14 +1,10 @@
 //! The calibration stage. The fuzzer measures the average exec time and the bitmap size.
 
-use alloc::{
-    borrow::Cow,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{borrow::Cow, vec::Vec};
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
 
 use hashbrown::HashSet;
-use libafl_bolts::{current_time, impl_serdeany, AsIter, Named};
+use libafl_bolts::{current_time, impl_serdeany, tuples::Reference, AsIter, Named};
 use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
 
@@ -16,10 +12,11 @@ use crate::{
     corpus::{Corpus, SchedulerTestcaseMetadata},
     events::{Event, EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
-    feedbacks::{map::MapFeedbackMetadata, HasObserverName},
+    feedbacks::{map::MapFeedbackMetadata, HasObserverReference},
     fuzzer::Evaluator,
+    inputs::UsesInput,
     monitors::{AggregatorOps, UserStats, UserStatsValue},
-    observers::{MapObserver, ObserversTuple, UsesObserver},
+    observers::{MapObserver, ObserversTuple},
     schedulers::powersched::SchedulerMetadata,
     stages::{ExecutionCountRestartHelper, Stage},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, State, UsesState},
@@ -66,13 +63,13 @@ impl UnstableEntriesMetadata {
 /// The calibration stage will measure the average exec time and the target's stability for this input.
 #[derive(Clone, Debug)]
 pub struct CalibrationStage<C, O, OT, S> {
-    map_observer_name: String,
-    map_name: String,
+    map_observer_ref: Reference<C>,
+    map_name: Cow<'static, str>,
     stage_max: usize,
     /// If we should track stability
     track_stability: bool,
     restart_helper: ExecutionCountRestartHelper,
-    phantom: PhantomData<(C, O, OT, S)>,
+    phantom: PhantomData<(O, OT, S)>,
 }
 
 const CAL_STAGE_START: usize = 4; // AFL++'s CAL_CYCLES_FAST + 1
@@ -147,10 +144,7 @@ where
             .observers_mut()
             .post_exec_all(state, &input, &exit_kind)?;
 
-        let map_first = &executor
-            .observers()
-            .match_name::<C>(&self.map_observer_name)
-            .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
+        let map_first = &executor.observers()[&self.map_observer_ref]
             .as_ref()
             .to_vec();
 
@@ -191,10 +185,7 @@ where
                 .post_exec_all(state, &input, &exit_kind)?;
 
             if self.track_stability {
-                let map = &executor
-                    .observers()
-                    .match_name::<C>(&self.map_observer_name)
-                    .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
+                let map = &executor.observers()[&self.map_observer_ref]
                     .as_ref()
                     .to_vec();
 
@@ -248,11 +239,8 @@ where
 
         // If weighted scheduler or powerscheduler is used, update it
         if state.has_metadata::<SchedulerMetadata>() {
-            let map = executor
-                .observers()
-                .match_name::<C>(&self.map_observer_name)
-                .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
-                .as_ref();
+            let observers = executor.observers();
+            let map = observers[&self.map_observer_ref].as_ref();
 
             let mut bitmap_size = map.count_bytes();
             assert!(bitmap_size != 0);
@@ -343,21 +331,20 @@ where
 impl<C, O, OT, S> CalibrationStage<C, O, OT, S>
 where
     O: MapObserver,
+    for<'it> O: AsIter<'it, Item = O::Entry>,
     C: AsRef<O>,
     OT: ObserversTuple<S>,
-    S: HasCorpus + HasMetadata + HasNamedMetadata,
+    S: UsesInput + HasNamedMetadata,
 {
     /// Create a new [`CalibrationStage`].
     #[must_use]
     pub fn new<F>(map_feedback: &F) -> Self
     where
-        F: HasObserverName + Named + UsesObserver<S, Observer = C>,
-        for<'it> O: AsIter<'it, Item = O::Entry>,
-        C: AsRef<O>,
+        F: HasObserverReference<Observer = C> + Named,
     {
         Self {
-            map_observer_name: map_feedback.observer_name().to_string(),
-            map_name: map_feedback.name().to_string(),
+            map_observer_ref: map_feedback.observer_ref().clone(),
+            map_name: map_feedback.name().clone(),
             stage_max: CAL_STAGE_START,
             track_stability: true,
             restart_helper: ExecutionCountRestartHelper::default(),
@@ -369,13 +356,11 @@ where
     #[must_use]
     pub fn ignore_stability<F>(map_feedback: &F) -> Self
     where
-        F: HasObserverName + Named + UsesObserver<S, Observer = C>,
-        for<'it> O: AsIter<'it, Item = O::Entry>,
-        C: AsRef<O>,
+        F: HasObserverReference<Observer = C> + Named,
     {
         Self {
-            map_observer_name: map_feedback.observer_name().to_string(),
-            map_name: map_feedback.name().to_string(),
+            map_observer_ref: map_feedback.observer_ref().clone(),
+            map_name: map_feedback.name().clone(),
             stage_max: CAL_STAGE_START,
             track_stability: false,
             restart_helper: ExecutionCountRestartHelper::default(),

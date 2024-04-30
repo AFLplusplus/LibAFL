@@ -1,5 +1,11 @@
 //! Coverage maps as static mut array
 
+#[cfg(any(
+    feature = "sancov_pcguard_edges",
+    feature = "sancov_pcguard_hitcounts",
+    feature = "sancov_ngram4",
+    feature = "sancov_ctx"
+))]
 use alloc::borrow::Cow;
 
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
@@ -22,8 +28,10 @@ pub use __ddg_area_ptr_local as DDG_MAP;
 pub static mut __afl_acc_memop_ptr_local: [u32; ACCOUNTING_MAP_SIZE] = [0; ACCOUNTING_MAP_SIZE];
 pub use __afl_acc_memop_ptr_local as ACCOUNTING_MEMOP_MAP;
 
-/// The max count of edges tracked.
-pub static mut MAX_EDGES_NUM: usize = 0;
+/// The max count of edges found.
+/// This is either computed during the compilation time or at runtime (in this case this is used to shrink the map).
+/// You can use this for the initial map size for the observer only if you compute this time at compilation time.
+pub static mut MAX_EDGES_FOUND: usize = 0;
 
 extern "C" {
     /// The area pointer points to the edges map.
@@ -60,21 +68,40 @@ pub fn autotokens() -> Result<Tokens, Error> {
     }
 }
 
-/// The size of the map for edges.
+/// The actual size we use for the map of edges.
+/// This is used for forkserver backend
 #[no_mangle]
 pub static mut __afl_map_size: usize = EDGES_MAP_SIZE_IN_USE;
-pub use __afl_map_size as EDGES_MAP_PTR_NUM;
+
+#[cfg(any(
+    feature = "sancov_pcguard_edges",
+    feature = "sancov_pcguard_hitcounts",
+    feature = "sancov_ngram4",
+    feature = "sancov_ctx"
+))]
 use libafl::observers::StdMapObserver;
+#[cfg(any(
+    feature = "sancov_pcguard_edges",
+    feature = "sancov_pcguard_hitcounts",
+    feature = "sancov_ngram4",
+    feature = "sancov_ctx"
+))]
 use libafl_bolts::ownedref::OwnedMutSlice;
 
 /// Gets the edges map from the `EDGES_MAP_PTR` raw pointer.
-/// Assumes a `len` of `EDGES_MAP_PTR_NUM`.
+/// Assumes a `len` of at least `EDGES_MAP_PTR_MAX`.
 ///
 /// # Safety
 ///
 /// This function will crash if `edges_map_mut_ptr` is not a valid pointer.
 /// The [`edges_max_num`] needs to be smaller than, or equal to the size of the map.
 #[must_use]
+#[cfg(any(
+    feature = "sancov_pcguard_edges",
+    feature = "sancov_pcguard_hitcounts",
+    feature = "sancov_ngram4",
+    feature = "sancov_ctx"
+))]
 pub unsafe fn edges_map_mut_slice<'a>() -> OwnedMutSlice<'a, u8> {
     OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), edges_max_num())
 }
@@ -84,11 +111,11 @@ pub unsafe fn edges_map_mut_slice<'a>() -> OwnedMutSlice<'a, u8> {
 ///
 /// ```rust,ignore
 /// use libafl::observers::StdMapObserver;
-/// use libafl_targets::{EDGES_MAP, MAX_EDGES_NUM};
+/// use libafl_targets::{EDGES_MAP, EDGES_MAP_SIZE_IN_USE};
 ///
 /// #[cfg(not(feature = "pointer_maps"))]
 /// let observer = unsafe {
-///     StdMapObserver::from_mut_ptr("edges", EDGES_MAP.as_mut_ptr(), MAX_EDGES_NUM)
+///     StdMapObserver::from_mut_ptr("edges", EDGES_MAP.as_mut_ptr(), EDGES_MAP_SIZE_IN_USE)
 /// };
 /// ```
 ///
@@ -106,6 +133,12 @@ pub unsafe fn edges_map_mut_slice<'a>() -> OwnedMutSlice<'a, u8> {
 ///
 /// # Safety
 /// This will dereference [`edges_map_mut_ptr`] and crash if it is not a valid address.
+#[cfg(any(
+    feature = "sancov_pcguard_edges",
+    feature = "sancov_pcguard_hitcounts",
+    feature = "sancov_ngram4",
+    feature = "sancov_ctx"
+))]
 pub unsafe fn std_edges_map_observer<'a, S>(name: S) -> StdMapObserver<'a, u8, false>
 where
     S: Into<Cow<'static, str>>,
@@ -129,15 +162,21 @@ pub fn edges_map_mut_ptr() -> *mut u8 {
 }
 
 /// Gets the current maximum number of edges tracked.
+#[cfg(any(
+    feature = "sancov_pcguard_edges",
+    feature = "sancov_pcguard_hitcounts",
+    feature = "sancov_ngram4",
+    feature = "sancov_ctx"
+))]
 #[must_use]
 pub fn edges_max_num() -> usize {
     unsafe {
-        if MAX_EDGES_NUM > 0 {
-            MAX_EDGES_NUM
+        if MAX_EDGES_FOUND > 0 {
+            MAX_EDGES_FOUND
         } else {
             #[cfg(feature = "pointer_maps")]
             {
-                EDGES_MAP_PTR_NUM
+                EDGES_MAP_SIZE_MAX // the upper bound
             }
             #[cfg(not(feature = "pointer_maps"))]
             {
@@ -163,7 +202,7 @@ mod swap {
     use libafl_bolts::{ownedref::OwnedMutSlice, AsSliceMut, Named};
     use serde::{Deserialize, Serialize};
 
-    use super::{EDGES_MAP_PTR, EDGES_MAP_PTR_NUM};
+    use super::EDGES_MAP_PTR;
 
     /// Observer to be used with `DiffExecutor`s when executing a differential target that shares
     /// the AFL map in order to swap out the maps (and thus allow for map observing the two targets
@@ -243,7 +282,6 @@ mod swap {
             let slice = self.first_map.as_slice_mut();
             unsafe {
                 EDGES_MAP_PTR = slice.as_mut_ptr();
-                EDGES_MAP_PTR_NUM = slice.len();
             }
             Ok(())
         }
@@ -252,7 +290,6 @@ mod swap {
             let slice = self.second_map.as_slice_mut();
             unsafe {
                 EDGES_MAP_PTR = slice.as_mut_ptr();
-                EDGES_MAP_PTR_NUM = slice.len();
             }
             Ok(())
         }

@@ -150,7 +150,6 @@ impl CustomMutationStatus {
 macro_rules! fuzz_with {
     ($options:ident, $harness:ident, $operation:expr, $and_then:expr, $edge_maker:expr) => {{
         use libafl_bolts::{
-                current_nanos,
                 rands::StdRand,
                 tuples::{Merge, tuple_list},
                 AsSlice,
@@ -244,7 +243,7 @@ macro_rules! fuzz_with {
                     map_feedback,
                     feedback_and_fast!(ConstFeedback::new($options.shrink()), shrinking_map_feedback),
                     // Time feedback, this one does not need a feedback state
-                    TimeFeedback::with_observer(&time_observer)
+                    TimeFeedback::new(&time_observer)
                 )
             );
 
@@ -282,7 +281,7 @@ macro_rules! fuzz_with {
             let mut state = state.unwrap_or_else(|| {
                 StdState::new(
                     // RNG
-                    StdRand::with_seed(current_nanos()),
+                    StdRand::new(),
                     // Corpus that will be evolved, we keep it in memory for performance
                     LibfuzzerCorpus::new(corpus_dir.clone(), 4096),
                     // Corpus in which we store solutions (crashes in this example),

@@ -23,7 +23,7 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::{HasSolutions, StdState},
 };
-use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
+use libafl_bolts::{rands::StdRand, tuples::tuple_list, AsSlice};
 use libafl_targets::{edges_max_num, DifferentialAFLMapSwapObserver};
 #[cfg(not(miri))]
 use mimalloc::MiMalloc;
@@ -84,7 +84,7 @@ pub fn main() {
         }
     };
 
-    let num_edges: usize = edges_max_num();
+    let num_edges: usize = edges_max_num(); // upper bound
 
     #[cfg(feature = "multimap")]
     let (
@@ -186,7 +186,7 @@ pub fn main() {
     // create a State from scratch
     let mut state = StdState::new(
         // RNG
-        StdRand::with_seed(current_nanos()),
+        StdRand::new(),
         // Corpus that will be evolved, we keep it in memory for performance
         InMemoryCorpus::new(),
         // Corpus in which we store solutions (crashes in this example),
@@ -202,7 +202,7 @@ pub fn main() {
 
     // The Monitor trait define how the fuzzer stats are displayed to the user
     #[cfg(not(feature = "tui"))]
-    let mon = SimpleMonitor::new(|s| println!("{s}"));
+    let mon = SimpleMonitor::with_user_monitor(|s| println!("{s}"));
     #[cfg(feature = "tui")]
     let ui = TuiUI::new(String::from("Baby Fuzzer"), false);
     #[cfg(feature = "tui")]

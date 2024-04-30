@@ -541,9 +541,9 @@ where
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
         let observers = executor.observers();
 
-        self.scheduler.on_evaluation(state, &input, observers)?;
+        self.scheduler.on_evaluation(state, &input, &*observers)?;
 
-        self.execute_and_process(state, manager, input, observers, &exit_kind, send_events)
+        self.execute_and_process(state, manager, input, &*observers, &exit_kind, send_events)
     }
 }
 
@@ -595,18 +595,22 @@ where
 
         // Maybe a solution
         #[cfg(not(feature = "introspection"))]
-        let is_solution = self
-            .objective_mut()
-            .is_interesting(state, manager, &input, observers, &exit_kind)?;
+        let is_solution =
+            self.objective_mut()
+                .is_interesting(state, manager, &input, &*observers, &exit_kind)?;
 
         #[cfg(feature = "introspection")]
-        let is_solution = self
-            .objective_mut()
-            .is_interesting_introspection(state, manager, &input, observers, &exit_kind)?;
+        let is_solution = self.objective_mut().is_interesting_introspection(
+            state,
+            manager,
+            &input,
+            &*observers,
+            &exit_kind,
+        )?;
 
         if is_solution {
             self.objective_mut()
-                .append_metadata(state, manager, observers, &mut testcase)?;
+                .append_metadata(state, manager, &*observers, &mut testcase)?;
             let idx = state.solutions_mut().add(testcase)?;
 
             let executions = *state.executions();
@@ -627,25 +631,29 @@ where
         // several is_interesting implementations collect some data about the run, later used in
         // append_metadata; we *must* invoke is_interesting here to collect it
         #[cfg(not(feature = "introspection"))]
-        let _corpus_worthy = self
-            .feedback_mut()
-            .is_interesting(state, manager, &input, observers, &exit_kind)?;
+        let _corpus_worthy =
+            self.feedback_mut()
+                .is_interesting(state, manager, &input, &*observers, &exit_kind)?;
 
         #[cfg(feature = "introspection")]
-        let _corpus_worthy = self
-            .feedback_mut()
-            .is_interesting_introspection(state, manager, &input, observers, &exit_kind)?;
+        let _corpus_worthy = self.feedback_mut().is_interesting_introspection(
+            state,
+            manager,
+            &input,
+            &*observers,
+            &exit_kind,
+        )?;
 
         // Add the input to the main corpus
         self.feedback_mut()
-            .append_metadata(state, manager, observers, &mut testcase)?;
+            .append_metadata(state, manager, &*observers, &mut testcase)?;
         let idx = state.corpus_mut().add(testcase)?;
         self.scheduler_mut().on_add(state, idx)?;
 
         let observers_buf = if manager.configuration() == EventConfig::AlwaysUnique {
             None
         } else {
-            manager.serialize_observers::<OT>(observers)?
+            manager.serialize_observers::<OT>(&*observers)?
         };
         manager.fire(
             state,

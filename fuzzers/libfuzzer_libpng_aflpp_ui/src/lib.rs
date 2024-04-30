@@ -27,12 +27,11 @@ use libafl::{
     Error, HasMetadata,
 };
 use libafl_bolts::{
-    current_nanos,
     rands::StdRand,
     tuples::{tuple_list, Merge},
     AsSlice,
 };
-use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
+use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_FOUND};
 use mimalloc::MiMalloc;
 
 #[global_allocator]
@@ -97,7 +96,7 @@ fn fuzz(
         HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
             "edges",
             EDGES_MAP.as_mut_ptr(),
-            MAX_EDGES_NUM,
+            MAX_EDGES_FOUND,
         ))
         .track_indices()
     };
@@ -115,7 +114,7 @@ fn fuzz(
         // New maximization map feedback linked to the edges observer and the feedback state
         map_feedback,
         // Time feedback, this one does not need a feedback state
-        TimeFeedback::with_observer(&time_observer)
+        TimeFeedback::new(&time_observer)
     );
 
     // A feedback to choose if an input is a solution or not
@@ -125,7 +124,7 @@ fn fuzz(
     let mut state = state.unwrap_or_else(|| {
         StdState::new(
             // RNG
-            StdRand::with_seed(current_nanos()),
+            StdRand::new(),
             // Corpus that will be evolved, we keep it in memory for performance
             InMemoryOnDiskCorpus::new(corpus_dir).unwrap(),
             // Corpus in which we store solutions (crashes in this example),
