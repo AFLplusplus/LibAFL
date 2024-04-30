@@ -502,7 +502,7 @@ pub unsafe extern "system" fn handle_exception(
 }
 
 /// Return `SIGIGN` this is 1 (when represented as u64)
-/// Check https://github.com/ziglang/zig/blob/956f53beb09c07925970453d4c178c6feb53ba70/lib/libc/include/any-windows-any/signal.h#L51
+/// Check `https://github.com/ziglang/zig/blob/956f53beb09c07925970453d4c178c6feb53ba70/lib/libc/include/any-windows-any/signal.h#L51`
 /// # Safety
 /// It is just casting into another type, nothing unsafe.
 #[must_use]

@@ -50,7 +50,7 @@ use typed_builder::TypedBuilder;
 use super::{hooks::EventManagerHooksTuple, CustomBufEventResult, CustomBufHandlerFn};
 #[cfg(any(feature = "std", feature = "adaptive_serialization"))]
 use crate::events::AdaptiveSerializer;
-#[cfg(all(unix, feature = "std"))]
+#[cfg(all(unix, feature = "std", not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 #[cfg(feature = "adaptive_serialization")]
 use crate::observers::TimeObserver;
