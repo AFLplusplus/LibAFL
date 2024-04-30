@@ -93,7 +93,7 @@ objectives = {}
 executions = {}
 exec_sec = {}
 ",
-                    i + 1,
+                    i,
                     client.corpus_size,
                     client.objective_size,
                     client.executions,
