@@ -1280,6 +1280,13 @@ where
                 // If this guy wants to fork, then ignore sigit
                 #[cfg(any(windows, not(feature = "fork")))]
                 unsafe {
+                    #[cfg(windows)]
+                    libafl_bolts::os::windows_exceptions::signal(
+                        libafl_bolts::os::windows_exceptions::SIGINT,
+                        libafl_bolts::os::windows_exceptions::sig_ign(),
+                    );
+
+                    #[cfg(unix)]
                     libc::signal(libc::SIGINT, libc::SIG_IGN);
                 }
 
@@ -1291,7 +1298,7 @@ where
 
                 compiler_fence(Ordering::SeqCst);
 
-                if child_status == 100 || staterestorer.wants_to_exit() {
+                if child_status == crate::events::CTRL_C_EXIT || staterestorer.wants_to_exit() {
                     return Err(Error::shutting_down());
                 }
 
