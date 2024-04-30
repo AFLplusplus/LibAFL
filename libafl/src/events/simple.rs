@@ -23,7 +23,7 @@ use libafl_bolts::{shmem::ShMemProvider, staterestore::StateRestorer};
 use serde::{de::DeserializeOwned, Serialize};
 
 use super::{CustomBufEventResult, CustomBufHandlerFn, HasCustomBufHandlers, ProgressReporter};
-#[cfg(all(unix, feature = "std"))]
+#[cfg(all(unix, feature = "std", not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
     events::{
@@ -453,19 +453,6 @@ where
         }
     }
 
-    /// Internal function, returns true when shuttdown is requested by a `SIGINT` signal
-    #[inline]
-    #[allow(clippy::unused_self)]
-    fn is_shutting_down() -> bool {
-        #[cfg(unix)]
-        unsafe {
-            core::ptr::read_volatile(core::ptr::addr_of!(EVENTMGR_SIGHANDLER_STATE.shutting_down))
-        }
-
-        #[cfg(windows)]
-        false
-    }
-
     /// Launch the simple restarting manager.
     /// This [`EventManager`] is simple and single threaded,
     /// but can still used shared maps to recover from crashes and timeouts.
@@ -488,15 +475,6 @@ where
             //let staterestorer = { LlmpSender::new(shmem_provider.clone(), 0, false)? };
             staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
 
-            // We setup signal handlers to clean up shmem segments used by state restorer
-            #[cfg(all(unix, not(miri)))]
-            if let Err(_e) =
-                unsafe { setup_signal_handler(addr_of_mut!(EVENTMGR_SIGHANDLER_STATE)) }
-            {
-                // We can live without a proper ctrl+c signal handler. Print and ignore.
-                log::error!("Failed to setup signal handlers: {_e}");
-            }
-
             let mut ctr: u64 = 0;
             // Client->parent loop
             loop {
@@ -509,37 +487,48 @@ where
                     match unsafe { fork() }? {
                         ForkResult::Parent(handle) => {
                             unsafe {
-                                // The parent will later exit through is_shutting down below
-                                // if the process exits gracefully, it cleans up the shmem.
-                                EVENTMGR_SIGHANDLER_STATE.set_exit_from_main();
+                                libc::signal(libc::SIGINT, libc::SIG_IGN);
                             }
                             shmem_provider.post_fork(false)?;
                             handle.status()
                         }
                         ForkResult::Child => {
+                            // We setup signal handlers to clean up shmem segments used by state restorer
+                            #[cfg(all(unix, not(miri)))]
+                            if let Err(_e) = unsafe {
+                                setup_signal_handler(addr_of_mut!(EVENTMGR_SIGHANDLER_STATE))
+                            } {
+                                // We can live without a proper ctrl+c signal handler. Print and ignore.
+                                log::error!("Failed to setup signal handlers: {_e}");
+                            }
                             shmem_provider.post_fork(true)?;
                             break staterestorer;
                         }
                     }
                 };
 
-                // Same, as fork version, mark this main thread as the shmem allocator
-                // then it will not call exit or exitprocess in the sigint handler
-                // so that it exits after cleaning up the shmem segments
-                #[cfg(all(unix, not(feature = "fork")))]
+                // If this guy wants to fork, then ignore sigit
+                #[cfg(any(windows, not(feature = "fork")))]
                 unsafe {
-                    EVENTMGR_SIGHANDLER_STATE.set_exit_from_main();
+                    #[cfg(windows)]
+                    libafl_bolts::os::windows_exceptions::signal(
+                        libafl_bolts::os::windows_exceptions::SIGINT,
+                        libafl_bolts::os::windows_exceptions::sig_ign(),
+                    );
+
+                    #[cfg(unix)]
+                    libc::signal(libc::SIGINT, libc::SIG_IGN);
                 }
 
                 // On Windows (or in any case without forks), we spawn ourself again
                 #[cfg(any(windows, not(feature = "fork")))]
                 let child_status = startable_self()?.status()?;
-                #[cfg(all(unix, not(feature = "fork")))]
+                #[cfg(any(windows, not(feature = "fork")))]
                 let child_status = child_status.code().unwrap_or_default();
 
                 compiler_fence(Ordering::SeqCst);
 
-                if staterestorer.wants_to_exit() || Self::is_shutting_down() {
+                if child_status == crate::events::CTRL_C_EXIT || staterestorer.wants_to_exit() {
                     return Err(Error::shutting_down());
                 }
 

@@ -23,7 +23,6 @@ use libafl::{
 };
 use libafl_bolts::{
     core_affinity::Cores,
-    current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Merge, Referenceable},
@@ -153,7 +152,7 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
             let mut state = state.unwrap_or_else(|| {
                 StdState::new(
                     // RNG
-                    StdRand::with_seed(current_nanos()),
+                    StdRand::new(),
                     // Corpus that will be evolved, we keep a part in memory for performance
                     CachedOnDiskCorpus::new(out_dir.clone(), CORPUS_CACHE_SIZE).unwrap(),
                     // Corpus in which we store solutions (crashes in this example),

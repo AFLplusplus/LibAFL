@@ -27,7 +27,6 @@ use libafl::{
     Error, HasMetadata,
 };
 use libafl_bolts::{
-    current_nanos,
     rands::StdRand,
     tuples::{tuple_list, Merge},
     AsSlice,
@@ -125,7 +124,7 @@ fn fuzz(
     let mut state = state.unwrap_or_else(|| {
         StdState::new(
             // RNG
-            StdRand::with_seed(current_nanos()),
+            StdRand::new(),
             // Corpus that will be evolved, we keep it in memory for performance
             InMemoryOnDiskCorpus::new(corpus_dir).unwrap(),
             // Corpus in which we store solutions (crashes in this example),

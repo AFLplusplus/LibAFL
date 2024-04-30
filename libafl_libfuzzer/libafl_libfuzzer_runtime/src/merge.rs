@@ -22,7 +22,7 @@ use libafl::{
     Error, HasScheduler, StdFuzzer,
 };
 use libafl_bolts::{
-    rands::{Rand, RandomSeed, StdRand},
+    rands::{Rand, StdRand},
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
     AsSlice,

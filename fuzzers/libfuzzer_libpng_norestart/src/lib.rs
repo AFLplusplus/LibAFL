@@ -31,7 +31,6 @@ use libafl::{
 };
 use libafl_bolts::{
     core_affinity::Cores,
-    current_nanos,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
@@ -186,7 +185,7 @@ pub extern "C" fn libafl_main() {
         let mut state = state.unwrap_or_else(|| {
             StdState::new(
                 // RNG
-                StdRand::with_seed(current_nanos()),
+                StdRand::new(),
                 // Corpus that will be evolved, we keep it in memory for performance
                 InMemoryOnDiskCorpus::new(&opt.input[0]).unwrap(),
                 // Corpus in which we store solutions (crashes in this example),
