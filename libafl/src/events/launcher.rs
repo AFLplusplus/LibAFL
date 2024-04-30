@@ -25,17 +25,19 @@ use core::{
 use std::net::SocketAddr;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use std::process::Stdio;
-#[cfg(all(unix, feature = "std", feature = "fork"))]
+#[cfg(all(unix, feature = "std"))]
 use std::{fs::File, os::unix::io::AsRawFd};
 
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use libafl_bolts::os::startable_self;
 #[cfg(feature = "adaptive_serialization")]
 use libafl_bolts::tuples::{Reference, Referenceable};
+#[cfg(all(unix, feature = "std"))]
+use libafl_bolts::os::dup2;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use libafl_bolts::{
     core_affinity::get_core_ids,
-    os::{dup2, fork, ForkResult},
+    os::{fork, ForkResult},
 };
 use libafl_bolts::{
     core_affinity::{CoreId, Cores},
@@ -102,7 +104,7 @@ where
     /// The list of cores to run on
     cores: &'a Cores,
     /// A file name to write all client output to
-    #[cfg(all(unix, feature = "std", feature = "fork"))]
+    #[cfg(all(unix, feature = "std"))]
     #[builder(default = None)]
     stdout_file: Option<&'a str>,
     /// The actual, opened, `stdout_file` - so that we keep it open until the end
@@ -111,7 +113,7 @@ where
     opened_stdout_file: Option<File>,
     /// A file name to write all client stderr output to. If not specified, output is sent to
     /// `stdout_file`.
-    #[cfg(all(unix, feature = "std", feature = "fork"))]
+    #[cfg(all(unix, feature = "std"))]
     #[builder(default = None)]
     stderr_file: Option<&'a str>,
     /// The actual, opened, `stdout_file` - so that we keep it open until the end
@@ -146,15 +148,19 @@ where
     S: State,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Launcher")
+        let mut dbg_struct = f.debug_struct("Launcher");
+        dbg_struct
             .field("configuration", &self.configuration)
             .field("broker_port", &self.broker_port)
             .field("core", &self.cores)
             .field("spawn_broker", &self.spawn_broker)
-            .field("remote_broker_addr", &self.remote_broker_addr)
-            .field("stdout_file", &self.stdout_file)
-            .field("stderr_file", &self.stderr_file)
-            .finish_non_exhaustive()
+            .field("remote_broker_addr", &self.remote_broker_addr);
+        if cfg!(all(unix, feature = "std")) {
+            dbg_struct
+                .field("stdout_file", &self.stdout_file)
+                .field("stderr_file", &self.stderr_file);
+        }
+        dbg_struct.finish_non_exhaustive()
     }
 }
 
@@ -333,10 +339,6 @@ where
         let mut handles = match is_client {
             Ok(core_conf) => {
                 let core_id = core_conf.parse()?;
-
-                // TODO: silence stdout and stderr for clients
-                // let debug_output = std::env::var(LIBAFL_DEBUG_OUTPUT).is_ok();
-
                 // the actual client. do the fuzzing
                 let (state, mgr) = RestartingMgr::<EMH, MT, S, SP>::builder()
                     .shmem_provider(self.shmem_provider.clone())
@@ -356,11 +358,6 @@ where
                 // I am a broker
                 // before going to the broker loop, spawn n clients
 
-                #[cfg(windows)]
-                if self.stdout_file.is_some() {
-                    log::info!("Child process file stdio is not supported on Windows yet. Dumping to stdout instead...");
-                }
-
                 let core_ids = core_affinity::get_core_ids().unwrap();
                 let num_cores = core_ids.len();
                 let mut handles = vec![];
@@ -368,14 +365,31 @@ where
                 log::info!("spawning on cores: {:?}", self.cores);
 
                 let debug_output = std::env::var("LIBAFL_DEBUG_OUTPUT").is_ok();
-
+                // Set own stdio and stderr as set by the user
+                if cfg!(all(unix, feature = "std")) && !debug_output {
+                    let opened_stdout_file = self
+                        .stdout_file
+                        .map(|filename| File::create(filename).unwrap());
+                    let opened_stderr_file = self
+                        .stderr_file
+                        .map(|filename| File::create(filename).unwrap());
+                    if let Some(file) = opened_stdout_file {
+                        dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
+                        if let Some(stderr) = opened_stderr_file {
+                            dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
+                        } else {
+                            dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
+                        }
+                    }
+                }
                 //spawn clients
                 for (id, _) in core_ids.iter().enumerate().take(num_cores) {
                     if self.cores.ids.iter().any(|&x| x == id.into()) {
-                        let stdio = if self.stdout_file.is_some() {
-                            Stdio::inherit()
+                        // tuple because `Stdio` isn't clone
+                        let (stdout,stderr) = if self.stdout_file.is_some() || self.stderr_file.is_some() {
+                            (Stdio::inherit(),Stdio::inherit())
                         } else {
-                            Stdio::null()
+                            (Stdio::null(),Stdio::null())
                         };
 
                         std::env::set_var(_AFL_LAUNCHER_CLIENT, id.to_string());
@@ -383,7 +397,8 @@ where
                         let child = (if debug_output {
                             &mut child
                         } else {
-                            child.stdout(stdio)
+                            child.stdout(stdout);
+                            child.stderr(stderr)
                         })
                         .spawn()?;
                         handles.push(child);
