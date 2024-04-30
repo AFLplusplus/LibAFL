@@ -329,15 +329,14 @@ pub mod windows_exception_handler {
         let mut is_crash = true;
         #[cfg(feature = "std")]
         if let Some(exception_pointers) = exception_pointers.as_mut() {
-            let code = From::from(
+            let code: ExceptionCode = ExceptionCode::from(
                 exception_pointers
                     .ExceptionRecord
                     .as_mut()
                     .unwrap()
                     .ExceptionCode
                     .0,
-            )
-            .unwrap();
+            );
 
             let exception_list = data.exceptions();
             if exception_list.contains(&code) {
