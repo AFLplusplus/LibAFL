@@ -437,12 +437,18 @@ where
 }
 
 /// Provides a Launcher, which can be used to launch a fuzzing run on a specified list of cores with a single main and multiple secondary nodes
+/// This is for centralized, the 4th argument of the closure should mean if this is the main node.
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 #[derive(TypedBuilder)]
 #[allow(clippy::type_complexity, missing_debug_implementations)]
-pub struct CentralizedLauncher<'a, CF, MT, S, SP>
+pub struct CentralizedLauncher<'a, CF, MF, MT, S, SP>
 where
     CF: FnOnce(
+        Option<S>,
+        CentralizedEventManager<LlmpRestartingEventManager<(), S, SP>, SP>, // No hooks for centralized EM
+        CoreId,
+    ) -> Result<(), Error>,
+    MF: FnOnce(
         Option<S>,
         CentralizedEventManager<LlmpRestartingEventManager<(), S, SP>, SP>, // No hooks for centralized EM
         CoreId,
@@ -461,6 +467,9 @@ where
     /// The 'main' function to run for each client forked. This probably shouldn't return
     #[builder(default, setter(strip_option))]
     run_client: Option<CF>,
+    /// The 'main' function to run for the main evaluator noed
+    #[builder(default, setter(strip_option))]
+    main_run_client: Option<MF>,
     /// The broker port to use (or to attach to, in case [`Self::spawn_broker`] is `false`)
     #[builder(default = 1337_u16)]
     broker_port: u16,
@@ -506,11 +515,16 @@ where
 }
 
 #[cfg(all(unix, feature = "std", feature = "fork"))]
-impl<CF, MT, S, SP> Debug for CentralizedLauncher<'_, CF, MT, S, SP>
+impl<CF, MF, MT, S, SP> Debug for CentralizedLauncher<'_, CF, MF, MT, S, SP>
 where
     CF: FnOnce(
         Option<S>,
         CentralizedEventManager<LlmpRestartingEventManager<(), S, SP>, SP>,
+        CoreId,
+    ) -> Result<(), Error>,
+    MF: FnOnce(
+        Option<S>,
+        CentralizedEventManager<LlmpRestartingEventManager<(), S, SP>, SP>, // No hooks for centralized EM
         CoreId,
     ) -> Result<(), Error>,
     MT: Monitor + Clone,
@@ -531,11 +545,16 @@ where
 }
 
 #[cfg(all(unix, feature = "std", feature = "fork"))]
-impl<'a, CF, MT, S, SP> CentralizedLauncher<'a, CF, MT, S, SP>
+impl<'a, CF, MF, MT, S, SP> CentralizedLauncher<'a, CF, MF, MT, S, SP>
 where
     CF: FnOnce(
         Option<S>,
         CentralizedEventManager<LlmpRestartingEventManager<(), S, SP>, SP>,
+        CoreId,
+    ) -> Result<(), Error>,
+    MF: FnOnce(
+        Option<S>,
+        CentralizedEventManager<LlmpRestartingEventManager<(), S, SP>, SP>, // No hooks for centralized EM
         CoreId,
     ) -> Result<(), Error>,
     MT: Monitor + Clone,
@@ -659,6 +678,9 @@ where
                             self.time_obs,
                         )?;
 
+                        if index == 1 {
+                            return (self.main_run_client.take().unwrap())(state, c_mgr, *bind_to);
+                        }
                         return (self.run_client.take().unwrap())(state, c_mgr, *bind_to);
                     }
                 };

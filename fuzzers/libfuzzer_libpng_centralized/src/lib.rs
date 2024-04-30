@@ -8,7 +8,7 @@ use std::{env, net::SocketAddr, path::PathBuf};
 use clap::{self, Parser};
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
-    events::{launcher::CentralizedLauncher, EventConfig},
+    events::{centralized::CentralizedEventManager, launcher::CentralizedLauncher, EventConfig},
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -135,7 +135,9 @@ pub extern "C" fn libafl_main() {
 
     let monitor = MultiMonitor::new(|s| println!("{s}"));
 
-    let mut run_client = |state: Option<_>, mut mgr, _core_id: CoreId| {
+    let mut run_client = |state: Option<_>,
+                          mut mgr: CentralizedEventManager<_, _>,
+                          _core_id: CoreId| {
         // Create an observation channel using the coverage map
         let edges_observer =
             HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") }).track_indices();
@@ -241,16 +243,23 @@ pub extern "C" fn libafl_main() {
                 .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &opt.input));
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
-
-        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+        if !mgr.is_main() {
+            fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+        } else {
+            let mut empty_stages = tuple_list!();
+            fuzzer.fuzz_loop(&mut empty_stages, &mut executor, &mut state, &mut mgr)?;
+        }
         Ok(())
     };
+
+    let mut main_run_client = run_client.clone(); // clone it just for borrow checker
 
     match CentralizedLauncher::builder()
         .shmem_provider(shmem_provider)
         .configuration(EventConfig::from_name("default"))
         .monitor(monitor)
         .run_client(&mut run_client)
+        .main_run_client(&mut main_run_client)
         .cores(&cores)
         .broker_port(broker_port)
         .remote_broker_addr(opt.remote_broker_addr)
