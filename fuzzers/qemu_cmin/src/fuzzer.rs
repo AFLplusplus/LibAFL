@@ -20,7 +20,6 @@ use libafl::{
 };
 use libafl_bolts::{
     core_affinity::Cores,
-    current_nanos,
     os::unix_signals::Signal,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
@@ -176,7 +175,7 @@ pub fn fuzz() -> Result<(), Error> {
 
     let mut state = state.unwrap_or_else(|| {
         StdState::new(
-            StdRand::with_seed(current_nanos()),
+            StdRand::new(),
             InMemoryOnDiskCorpus::new(PathBuf::from(options.output)).unwrap(),
             NopCorpus::new(),
             &mut feedback,

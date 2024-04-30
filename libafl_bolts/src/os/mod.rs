@@ -53,7 +53,7 @@ impl ChildHandle {
         unsafe {
             libc::waitpid(self.pid, &mut status, 0);
         }
-        status
+        libc::WEXITSTATUS(status)
     }
 }
 
