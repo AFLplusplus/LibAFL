@@ -81,7 +81,7 @@ exec_sec = {}
             )
             .expect("Failed to write to the TOML file");
 
-            for (i, client) in self.client_stats_mut().iter_mut().skip(1).enumerate() {
+            for (i, client) in self.client_stats_mut().iter_mut().enumerate() {
                 let exec_sec = client.execs_per_sec(cur_time);
 
                 write!(
