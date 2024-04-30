@@ -181,6 +181,7 @@ pub struct InputLocation {
 }
 
 impl InputLocation {
+    #[must_use]
     pub fn new(mem_chunk: EmulatorMemoryChunk, cpu: CPU, ret_register: Option<Regs>) -> Self {
         Self {
             mem_chunk,
