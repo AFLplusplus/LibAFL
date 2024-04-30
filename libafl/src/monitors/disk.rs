@@ -22,6 +22,7 @@ where
     base: M,
     filename: PathBuf,
     last_update: Duration,
+    update_interval: Duration,
 }
 
 impl<M> Monitor for OnDiskTOMLMonitor<M>
@@ -55,7 +56,7 @@ where
     fn display(&mut self, event_msg: &str, sender_id: ClientId) {
         let cur_time = current_time();
 
-        if (cur_time - self.last_update).as_secs() >= 60 {
+        if cur_time - self.last_update >= self.update_interval {
             self.last_update = cur_time;
 
             let mut file = File::create(&self.filename).expect("Failed to open the TOML file");
@@ -132,6 +133,21 @@ where
             base,
             filename: filename.into(),
             last_update: current_time(),
+            update_interval: Duration::from_secs(60),
+        }
+    }
+
+    /// Create new [`OnDiskTOMLMonitor`] with custom update interval
+    #[must_use]
+    pub fn with_update_interval<P>(filename: P, base: M, update_interval: Duration) -> Self
+    where
+        P: Into<PathBuf>,
+    {
+        Self {
+            base,
+            filename: filename.into(),
+            last_update: current_time(),
+            update_interval,
         }
     }
 }
