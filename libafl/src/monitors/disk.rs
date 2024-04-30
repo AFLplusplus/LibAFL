@@ -145,7 +145,7 @@ where
         Self {
             base,
             filename: filename.into(),
-            last_update: current_time(),
+            last_update: current_time() - update_interval,
             update_interval,
         }
     }
