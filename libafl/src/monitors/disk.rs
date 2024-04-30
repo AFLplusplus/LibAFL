@@ -93,11 +93,7 @@ objectives = {}
 executions = {}
 exec_sec = {}
 ",
-                    i,
-                    client.corpus_size,
-                    client.objective_size,
-                    client.executions,
-                    exec_sec
+                    i, client.corpus_size, client.objective_size, client.executions, exec_sec
                 )
                 .expect("Failed to write to the TOML file");
 
