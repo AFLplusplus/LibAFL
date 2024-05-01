@@ -43,7 +43,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Referenceable},
-    AsSliceMut, AsSlice
+    AsSlice, AsSliceMut,
 };
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
@@ -237,8 +237,8 @@ fn fuzz(
 #[derive(Default, Debug)]
 pub struct MyCommandConfigurator;
 
-impl CommandConfigurator for MyCommandConfigurator {
-    fn spawn_child<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<Child, Error> {
+impl CommandConfigurator<BytesInput> for MyCommandConfigurator {
+    fn spawn_child(&mut self, input: &BytesInput) -> Result<Child, Error> {
         input.to_file("cur_input")?;
 
         Ok(Command::new("./target_symcc.out")

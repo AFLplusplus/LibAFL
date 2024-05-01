@@ -15,7 +15,7 @@ use libafl::{
     feedbacks::{CrashFeedback, MaxMapFeedback, NewHashFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
-    inputs::{HasTargetBytes, Input},
+    inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     observers::{get_asan_runtime_flags, AsanBacktraceObserver, StdMapObserver},
@@ -85,8 +85,8 @@ pub fn main() {
         shmem_id: ShMemId,
     }
 
-    impl CommandConfigurator for MyExecutor {
-        fn spawn_child<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<Child, Error> {
+    impl CommandConfigurator<BytesInput> for MyExecutor {
+        fn spawn_child(&mut self, input: &BytesInput) -> Result<Child, Error> {
             let mut command = Command::new("./test_command");
 
             let command = command
