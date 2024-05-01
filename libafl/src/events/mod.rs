@@ -55,31 +55,23 @@ use crate::{
     state::HasScalabilityMonitor,
 };
 
+/// The special exit code when the target exited throught ctrl-c
+#[cfg(unix)]
+pub const CTRL_C_EXIT: i32 = 100;
+/// The special exit code when the target exited throught ctrl-c
+#[cfg(windows)]
+pub const CTRL_C_EXIT: i32 = -1073741510;
+
 /// Check if ctrl-c is sent with this struct
 #[cfg(all(unix, feature = "std"))]
-pub static mut EVENTMGR_SIGHANDLER_STATE: ShutdownSignalData = ShutdownSignalData {
-    shutting_down: false,
-    exit_from_main: false,
-};
+pub static mut EVENTMGR_SIGHANDLER_STATE: ShutdownSignalData = ShutdownSignalData {};
 
-/// A signal handler for releasing `StateRestore` `ShMem`
-/// This struct holds a pointer to `StateRestore` and clean up the `ShMem` segment used by it.
+/// A signal handler for catching ctrl-c.
+/// The purpose of this signal handler is solely for calling `exit()` with a specific exit code 100
+/// In this way, the restarting manager can tell that we really want to exit
 #[cfg(all(unix, feature = "std"))]
 #[derive(Debug, Clone)]
-pub struct ShutdownSignalData {
-    shutting_down: bool,
-    exit_from_main: bool,
-}
-
-#[cfg(all(unix, feature = "std"))]
-impl ShutdownSignalData {
-    /// Set the flag to true, indicating that this process has allocated shmem
-    pub fn set_exit_from_main(&mut self) {
-        unsafe {
-            core::ptr::write_volatile(core::ptr::addr_of_mut!(self.exit_from_main), true);
-        }
-    }
-}
+pub struct ShutdownSignalData {}
 
 /// Shutdown handler. `SigTerm`, `SigInterrupt`, `SigQuit` call this
 /// We can't handle SIGKILL in the signal handler, this means that you shouldn't kill your fuzzer with `kill -9` because then the shmem segments are never freed
@@ -91,27 +83,15 @@ impl Handler for ShutdownSignalData {
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
     ) {
-        /*
-        println!(
-            "in handler! {} {}",
-            self.exit_from_main,
-            std::process::id()
-        );
-        */
-        // if this process has not allocated any shmem. then simply exit()
-        if !self.exit_from_main {
-            unsafe {
-                #[cfg(unix)]
-                libc::_exit(0);
-
-                #[cfg(windows)]
-                windows::Win32::System::Threading::ExitProcess(1);
-            }
-        }
-
-        // else wait till the next is_shutting_down() is called. then the process will exit throught main().
+        // println!("in handler! {}", std::process::id());
         unsafe {
-            core::ptr::write_volatile(core::ptr::addr_of_mut!(self.shutting_down), true);
+            // println!("Exiting from the handler....");
+
+            #[cfg(unix)]
+            libc::_exit(100);
+
+            #[cfg(windows)]
+            windows::Win32::System::Threading::ExitProcess(100);
         }
     }
 
