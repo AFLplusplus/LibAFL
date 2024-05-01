@@ -22,7 +22,6 @@ macro_rules! assert_unique_feature {
 #[rustversion::nightly]
 fn maybe_generate_stub_bindings(cpu_target: &str, emulation_mode: &str, stub_bindings_file: &PathBuf, bindings_file: &PathBuf) {
     if cpu_target == "x86_64" && emulation_mode == "usermode" {
-        println!("cargo:warning=generate stub...");
         store_generated_content_if_different(stub_bindings_file, fs::read(bindings_file).expect("Could not read generated bindings file").as_slice());
     }
 }
