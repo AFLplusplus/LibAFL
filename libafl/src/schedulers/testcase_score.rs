@@ -262,6 +262,10 @@ where
             perf_score = HAVOC_MAX_MULT * 100.0;
         }
 
+        if entry.objectives_found() > 2 {
+            perf_score *= 0.09;
+        }
+
         Ok(perf_score)
     }
 }
@@ -340,6 +344,10 @@ where
         }
 
         assert!(weight.is_normal());
+
+        if entry.objectives_found() > 2 {
+            weight *= 0.09;
+        }
 
         Ok(weight)
     }
