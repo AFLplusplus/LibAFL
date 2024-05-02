@@ -5,7 +5,7 @@ use std::{env, path::PathBuf, process};
 
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
-    events::{launcher::Launcher, EventConfig},
+    events::{launcher::Launcher, EventConfig, CTRL_C_EXIT},
     executors::ExitKind,
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -127,7 +127,7 @@ pub fn fuzz() {
                     Ok(QemuExitReason::Breakpoint(_)) => {}
                     Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(
                         Signal::SigInterrupt,
-                    ))) => process::exit(0),
+                    ))) => process::exit(CTRL_C_EXIT),
                     Err(QemuExitReasonError::UnexpectedExit) => return ExitKind::Crash,
                     _ => panic!("Unexpected QEMU exit."),
                 }
