@@ -456,7 +456,7 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
         new_testcase.set_parent_id_optional(*state.corpus().current());
 
         if let Ok(mut tc) = state.current_testcase_mut() {
-            tc.found_objective;
+            tc.found_objective();
         }
 
         fuzzer
