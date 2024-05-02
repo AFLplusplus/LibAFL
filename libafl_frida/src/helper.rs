@@ -486,9 +486,7 @@ where
             let address = instr.address();
             let mut keep_instr = true;
             // log::trace!("x - block @ {:x} transformed to {:x}", address, output.writer().pc());
-
-
-            //the ASAN check needs to be done before the hook_rt check due to x86 insns such as 
+            //the ASAN check needs to be done before the hook_rt check due to x86 insns such as call [mem]
             if ranges.borrow().contains_key(&(address as usize)) {
                 let mut runtimes = (*runtimes_unborrowed).borrow_mut();
                 if first {
@@ -516,7 +514,14 @@ where
                 if let Some(details) = res {
                     if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
                         rt.emit_shadow_check(
-                            address, output, instr.bytes().len(), details.0, details.1, details.2, details.3, details.4,
+                            address,
+                            output,
+                            instr.bytes().len(),
+                            details.0,
+                            details.1,
+                            details.2,
+                            details.3,
+                            details.4,
                         );
                     }
                 }
@@ -536,23 +541,32 @@ where
                     }
                 }
 
-
                 #[cfg(target_arch = "x86_64")]
                 if let Some(rt) = runtimes.match_first_type_mut::<HookRuntime>() {
                     if let Some(call_target) = rt.is_interesting(decoder, instr) {
-                        rt.emit_callout(call_target, &instruction, output.writer(), runtimes_unborrowed.clone());
-                        keep_instr = false; 
+                        rt.emit_callout(
+                            call_target,
+                            &instruction,
+                            output.writer(),
+                            runtimes_unborrowed.clone(),
+                        );
+                        keep_instr = false;
                     }
                 }
 
                 #[cfg(target_arch = "aarch64")]
                 if let Some(rt) = runtimes.match_first_type_mut::<HookRuntime>() {
                     if let Some((call_target, is_reg)) = rt.is_interesting(decoder, instr) {
-                        rt.emit_callout(call_target, &instruction, is_reg, output.writer(), runtimes_unborrowed.clone());
+                        rt.emit_callout(
+                            call_target,
+                            &instruction,
+                            is_reg,
+                            output.writer(),
+                            runtimes_unborrowed.clone(),
+                        );
                         keep_instr = false; //we keep the instruction in the emit if needed
                     }
                 }
-
 
                 #[cfg(all(
                     feature = "cmplog",

@@ -570,7 +570,7 @@ impl AsanRuntime {
                         #[cfg(target_arch = "aarch64")]
                         asan_rt.set_pc(_context.pc() as usize);
 
-                        
+
                         log::trace!("hooked {} from {:x}", stringify!($name), asan_rt.pc());
                         #[allow(trivial_numeric_casts)]
                         #[allow(unused_assignments)]
@@ -581,7 +581,7 @@ impl AsanRuntime {
                         }) as _),*);
 
                         asan_rt.unset_pc();
-                    
+
                     });
                 };
             };
@@ -603,7 +603,7 @@ impl AsanRuntime {
                         #[cfg(target_arch = "aarch64")]
                         asan_rt.set_pc(_context.pc() as usize);
 
-                        
+
                         log::trace!("hooked {} from {:x}", stringify!($name), asan_rt.pc());
                         #[allow(trivial_numeric_casts)]
                         #[allow(unused_assignments)]
@@ -617,9 +617,9 @@ impl AsanRuntime {
                     });
                 }
             };
-            
+
         }
-        
+
         #[cfg(target_os = "windows")]
         macro_rules! hook_func_with_alt {
             ($lib:expr, $alt_name:ident, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
@@ -663,7 +663,7 @@ impl AsanRuntime {
                     let address = Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function").0 as usize;
                     log::trace!("hooking {} at {:x}", stringify!($name), address);
                     hook_rt.register_hook(address, move |_address, mut _context, _asan_rt| {
-                        
+
                         let asan_rt = _asan_rt.unwrap();
                         let mut index = 0;
 
@@ -983,11 +983,7 @@ impl AsanRuntime {
         ];
 
         #[cfg(target_vendor = "apple")]
-        let cpp_libs = [
-            "libc++.1.dylib",
-            "libc++abi.dylib",
-            "libsystem_c.dylib",
-        ];
+        let cpp_libs = ["libc++.1.dylib", "libc++abi.dylib", "libsystem_c.dylib"];
 
         #[cfg(not(windows))]
         for libname in cpp_libs {
@@ -1710,7 +1706,7 @@ impl AsanRuntime {
 
         uint64_t addr = 0;
         addr = addr + (start >> 3);
-        uint64_t mask = (1ULL << (shadow_bit + 1)) - 1;        
+        uint64_t mask = (1ULL << (shadow_bit + 1)) - 1;
 
         addr = addr & mask;
         addr = addr + (1ULL << shadow_bit);
@@ -1725,7 +1721,7 @@ impl AsanRuntime {
             handle_trap(true_rip);
         }
         return 0;
-        
+
     }
     */
 
@@ -1733,24 +1729,24 @@ impl AsanRuntime {
 
     FRIDA ASAN IMPLEMENTATION DETAILS
 
-    The format of Frida's ASAN is signficantly different from LLVM ASAN. 
-    
-    In Frida ASAN, we attempt to find the lowest possible bit such that there is no mapping with that bit. That is to say, for some bit x, there is no mapping greater than 
-    1 << x. This is our shadow base and is similar to Ultra compact shadow in LLVM ASAN. Unlike ASAN where 0 represents a poisoned byte and 1 represents an unpoisoned byte. 
-    The reasoning for this is that new pages are zeroed, so, by default, every qword is poisoned and we must explicitly unpoison any byte. 
+    The format of Frida's ASAN is signficantly different from LLVM ASAN.
+
+    In Frida ASAN, we attempt to find the lowest possible bit such that there is no mapping with that bit. That is to say, for some bit x, there is no mapping greater than
+    1 << x. This is our shadow base and is similar to Ultra compact shadow in LLVM ASAN. Unlike ASAN where 0 represents a poisoned byte and 1 represents an unpoisoned byte.
+    The reasoning for this is that new pages are zeroed, so, by default, every qword is poisoned and we must explicitly unpoison any byte.
 
     Much like LLVM ASAN, shadow bytes are qword based. This is to say that each shadow byte maps to one qword. The shadow calculation is as follows:
     (1ULL << shadow_bit) | (address >> 3)
 
-    The format of a shadow bit is a bitmask. Each bit represents if a byte in the qword is valid starting from the first bit. So, something like 0b11100000 indicates that only the first 3 bytes in the associated qword are valid. 
-    
+    The format of a shadow bit is a bitmask. Each bit represents if a byte in the qword is valid starting from the first bit. So, something like 0b11100000 indicates that only the first 3 bytes in the associated qword are valid.
+
     */
     #[cfg(target_arch = "x86_64")]
     #[allow(clippy::unused_self)]
     fn generate_shadow_check_blob(&mut self, size: u32) -> Box<[u8]> {
         let shadow_bit = self.allocator.shadow_bit();
         // Rcx, Rax, Rdi, Rdx, Rsi, R8 are used, so we save them in emit_shadow_check
-        //at this point RDI contains the 
+        //at this point RDI contains the
         let mask_shift = 32 - size;
         macro_rules! shadow_check{
             ($ops:ident, $bit:expr) => {dynasm!($ops
@@ -1761,7 +1757,7 @@ impl AsanRuntime {
                 ; mov rcx, rdi //copy address into rdx
                 ; and rcx, 7 //rsi now contains the offset for unaligned accesses
                 ; shr rdi, 3 //rdi now contains the shadow byte offset
-                ; add rdi, rdx //add rdx and rdi to get the address of the shadow byte. rdi now contains the shadow address 
+                ; add rdi, rdx //add rdx and rdi to get the address of the shadow byte. rdi now contains the shadow address
                 ; mov edx, [rdi]  //load 4 shadow bytes. We load 4 just in case of an unaligned access
                 ; bswap edx  //bswap to get it into an acceptable form
                 ; shl edx, cl //this shifts by the unaligned access offset. why does x86 require cl...
@@ -1787,16 +1783,15 @@ impl AsanRuntime {
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
         shadow_check!(ops, bit);
         let ops_vec = ops.finalize().unwrap();
-        ops_vec[..ops_vec.len() - 10].to_vec().into_boxed_slice() //subtract 10 because 
+        ops_vec[..ops_vec.len() - 10].to_vec().into_boxed_slice() //subtract 10 because
     }
 
     #[cfg(target_arch = "aarch64")]
     #[allow(clippy::unused_self)]
     fn generate_shadow_check_blob(&mut self, width: u32) -> Box<[u8]> {
         /*x0 contains the shadow address
-        x0 and x1 are saved by the asan_check 
+        x0 and x1 are saved by the asan_check
         The maximum size this supports is up to 25 bytes. This is because we load 4 bytes of the shadow value. And, in the case that we have a misaligned address with an offset of 7 into the word. For example, if we load 25 bytes from 0x1007 - [0x1007,0x101f], then we require the shadow values from 0x1000, 0x1008, 0x1010, and 0x1018 */
-        
 
         let shadow_bit = self.allocator.shadow_bit();
         macro_rules! shadow_check {
@@ -1838,11 +1833,10 @@ impl AsanRuntime {
     #[allow(clippy::unused_self)]
     fn generate_shadow_check_large_blob(&mut self, width: u32) -> Box<[u8]> {
         //x0 contains the shadow address
-        //x0 and x1 are saved by the asan_check 
+        //x0 and x1 are saved by the asan_check
         //large blobs require 16 byte alignment as they are only possible with vector insns, so just abuse that
-        
+
         //This is used for checking shadow blobs that are larger than 25 bytes
-        
 
         assert!(width <= 64, "width must be <= 64");
         let shift = 64 - width;
@@ -1867,7 +1861,7 @@ impl AsanRuntime {
                 ; lsr x0, x0, #$shift //x0 now contains our bitmask
                 ; and x1, x0, x1 //and the bitmask and the shadow value and put it in x1
                 ; cmp x0, x1 //our bitmask and shadow & mask must be the same to ensure that the bytes are valid
-                ; b.eq >done 
+                ; b.eq >done
                 ; adr x1, >done
                 ; nop // will be replaced by b to report
                 ; done:
@@ -2092,10 +2086,10 @@ impl AsanRuntime {
         self.blob_check_mem_3bytes = Some(self.generate_shadow_check_blob(3));
         self.blob_check_mem_6bytes = Some(self.generate_shadow_check_blob(6));
         self.blob_check_mem_12bytes = Some(self.generate_shadow_check_blob(12));
-        self.blob_check_mem_24bytes = Some(self.generate_shadow_check_blob(24)); 
+        self.blob_check_mem_24bytes = Some(self.generate_shadow_check_blob(24));
         self.blob_check_mem_32bytes = Some(self.generate_shadow_check_large_blob(32)); //this is possible with ldp q0, q1, [sp]. This must at least 16 byte aligned
         self.blob_check_mem_48bytes = Some(self.generate_shadow_check_large_blob(48));
-        self.blob_check_mem_64bytes = Some(self.generate_shadow_check_large_blob(64)); 
+        self.blob_check_mem_64bytes = Some(self.generate_shadow_check_large_blob(64));
     }
 
     /// Get the blob which implements the report funclet
@@ -2299,7 +2293,15 @@ impl AsanRuntime {
         _address: u64,
         instr: &Insn,
     ) -> Option<(u8, X86Register, X86Register, u8, i32)> {
-        let cs_instr = frida_to_cs(decoder, instr);
+        let result = frida_to_cs(decoder, instr);
+
+        if let Err(e) = result {
+            log::error!("{}", e);
+            return None;
+        }
+
+        let cs_instr = result.unwrap();
+
         let mut operands = vec![];
         for operand_idx in 0..cs_instr.operand_count() {
             operands.push(cs_instr.operand(operand_idx));
@@ -2687,7 +2689,7 @@ impl AsanRuntime {
                     Aarch64Register::X0,
                     Aarch64Register::X0,
                     u64::from(displacement),
-                ); 
+                );
             } else {
                 let displacement_hi = displacement / 4096;
                 let displacement_lo = displacement % 4096;
@@ -2695,7 +2697,7 @@ impl AsanRuntime {
                 writer.put_add_reg_reg_imm(
                     Aarch64Register::X0,
                     Aarch64Register::X0,
-                    u64::from(displacement_lo), 
+                    u64::from(displacement_lo),
                 ); //add x0, x0, #[displacement % 4096]
             }
         }

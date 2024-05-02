@@ -1,8 +1,6 @@
 use core::fmt::{self, Debug, Formatter};
-
 #[cfg(windows)]
 use std::process::abort;
-
 use std::{ffi::c_void, marker::PhantomData};
 
 use frida_gum::{
