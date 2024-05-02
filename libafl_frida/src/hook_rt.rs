@@ -22,10 +22,6 @@ use yaxpeax_arm::armv8::a64::{InstDecoder, Opcode, Operand};
 #[cfg(target_arch = "x86_64")]
 use yaxpeax_x86::long_mode::{InstDecoder, Opcode, Operand};
 
-<<<<<<< HEAD
-#[cfg(target_arch = "x86_64")]
-use crate::utils::{get_register, operand_details, writer_register};
-=======
 
 #[cfg(target_arch = "aarch64")]
 use yaxpeax_arm::armv8::a64::{InstDecoder, Opcode, Operand};
@@ -38,7 +34,6 @@ use std::ptr::read_unaligned;
 
 use std::ptr::addr_of;
 
->>>>>>> f255a826b667a7b54564c5490ee07c9957087da6
 use crate::{
     asan::asan_rt::AsanRuntime,
     helper::{FridaRuntime, FridaRuntimeTuple},

@@ -1729,20 +1729,12 @@ impl AsanRuntime {
 
     FRIDA ASAN IMPLEMENTATION DETAILS
 
-<<<<<<< HEAD
-    The format of Frida's ASAN is signficantly different from LLVM ASAN.
-
-    In Frida ASAN, we attempt to find the lowest possible bit such that there is no mapping with that bit. That is to say, for some bit x, there is no mapping greater than
-    1 << x. This is our shadow base and is similar to Ultra compact shadow in LLVM ASAN. Unlike ASAN where 0 represents a poisoned byte and 1 represents an unpoisoned byte.
-    The reasoning for this is that new pages are zeroed, so, by default, every qword is poisoned and we must explicitly unpoison any byte.
-=======
     The format of Frida's ASAN is signficantly different from LLVM ASAN. 
     
     In Frida ASAN, we attempt to find the lowest possible bit such that there is no mapping with that bit. That is to say, for some bit x, there is no mapping greater than 
     1 << x. This is our shadow base and is similar to Ultra compact shadow in LLVM ASAN. Unlike ASAN where 0 represents a poisoned byte and 1 represents an unpoisoned byte, in Frida-ASAN
     
     The reasoning for this is that new pages are zeroed, so, by default, every qword is poisoned and we must explicitly unpoison any byte. 
->>>>>>> f255a826b667a7b54564c5490ee07c9957087da6
 
     Much like LLVM ASAN, shadow bytes are qword based. This is to say that each shadow byte maps to one qword. The shadow calculation is as follows:
     (1ULL << shadow_bit) | (address >> 3)
