@@ -2,7 +2,7 @@
 use std::{
     cell::RefCell,
     collections::HashMap,
-    ptr::{addr_of, read_unaligned},
+    ptr::addr_of,
     rc::Rc,
 };
 
@@ -29,6 +29,9 @@ use crate::{
     helper::{FridaRuntime, FridaRuntimeTuple},
     utils::frida_to_cs,
 };
+
+#[cfg(target_arch = "x86_64")]
+use std::ptr::read_unaligned;
 
 /*
 LibAFL hook_rt design:
