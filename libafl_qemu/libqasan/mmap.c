@@ -25,7 +25,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *******************************************************************************/
 
 /*
-Mmap hooks for libqasan by Alessandro "cube" De Vito <alessandro.devito@stackbits.eu>
+Mmap hooks for libqasan by Alessandro "cube" De Vito
+<alessandro.devito@stackbits.eu>
 
 */
 
@@ -55,7 +56,7 @@ typedef struct {
 #ifdef USE_LIBC_ALLOC
 
 void *(*__lq_libc_mmap)(void *, size_t, int, int, int, off_t);
-int   (*__lq_libc_munmap)(void *, size_t);
+int (*__lq_libc_munmap)(void *, size_t);
 
 #else
 
@@ -79,10 +80,11 @@ void __libqasan_init_mmap(void) {
   QASAN_LOG("\n");
 }
 
-void *__libqasan_mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset) {
+void *__libqasan_mmap(void *addr, size_t length, int prot, int flags, int fd,
+                      off_t offset) {
   __libqasan_init_mmap();
 
-  int state = QASAN_SWAP(QASAN_DISABLED);  // disable qasan for this thread
+  int   state = QASAN_SWAP(QASAN_DISABLED);  // disable qasan for this thread
   void *p = __lq_libc_mmap(addr, length, prot, flags, fd, offset);
   QASAN_SWAP(state);
 
@@ -106,7 +108,8 @@ int __libqasan_munmap(void *addr, size_t length) {
 
   if (ret == -1) return -1;
 
-  // Omitting memory poisoning for unmapped regions as accessing them would result in an error anyway.
+  // Omitting memory poisoning for unmapped regions as accessing them would
+  // result in an error anyway.
 
   // TODO: add a syscall to deallocate addr->addr + length
   QASAN_DEALLOC(addr);

@@ -633,10 +633,11 @@ int vasprintf(char **restrict strp, const char *restrict fmt, va_list ap) {
   return len;
 }
 
-void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset) {
+void *mmap(void *addr, size_t length, int prot, int flags, int fd,
+           off_t offset) {
   void *rtv = __builtin_return_address(0);
-  QASAN_DEBUG("%14p: mmap(%p, %zu, %d, %d, %d, %ld)\n", rtv, addr, length,
-              prot, flags, fd, offset);
+  QASAN_DEBUG("%14p: mmap(%p, %zu, %d, %d, %d, %ld)\n", rtv, addr, length, prot,
+              flags, fd, offset);
   void *r = __libqasan_mmap(addr, length, prot, flags, fd, offset);
   QASAN_DEBUG("\t\t = %p\n", r);
 
