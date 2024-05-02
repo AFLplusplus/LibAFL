@@ -1263,14 +1263,6 @@ where
                             handle.status()
                         }
                         ForkResult::Child => {
-                            // We setup signal handlers to clean up shmem segments used by state restorer
-                            #[cfg(all(unix, not(miri)))]
-                            if let Err(_e) = unsafe {
-                                setup_signal_handler(addr_of_mut!(EVENTMGR_SIGHANDLER_STATE))
-                            } {
-                                // We can live without a proper ctrl+c signal handler. Print and ignore.
-                                log::error!("Failed to setup signal handlers: {_e}");
-                            }
                             self.shmem_provider.post_fork(true)?;
                             break (staterestorer, self.shmem_provider.clone(), core_id);
                         }
@@ -1318,6 +1310,16 @@ where
                 ctr = ctr.wrapping_add(1);
             }
         } else {
+            // At this point we are the fuzzer *NOT* the restarter.
+            // We setup signal handlers to clean up shmem segments used by state restorer
+            #[cfg(all(unix, not(miri)))]
+            if let Err(_e) = unsafe {
+                setup_signal_handler(addr_of_mut!(EVENTMGR_SIGHANDLER_STATE))
+            } {
+                // We can live without a proper ctrl+c signal handler. Print and ignore.
+                log::error!("Failed to setup signal handlers: {_e}");
+            }
+
             // We are the newly started fuzzing instance (i.e. on Windows), first, connect to our own restore map.
             // We get here *only on Windows*, if we were started by a restarting fuzzer.
             // A staterestorer and a receiver for single communication
