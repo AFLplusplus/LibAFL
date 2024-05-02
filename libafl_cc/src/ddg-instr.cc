@@ -738,7 +738,7 @@ class DDGInstrModulePass : public PassInfoMixin<DDGInstrModulePass> {
         }
         if (HashedLoc == nullptr) continue;
 
-        HashedLoc = IRB.CreateZExt(HashedLoc, IRB.getInt32Ty());
+        HashedLoc = IRB.CreateZExt(HashedLoc, IRB.getInt16Ty());
 
         LoadInst *MapPtr =
             IRB.CreateLoad(PointerType::get(Int8Ty, 0), DDGMapPtr);
