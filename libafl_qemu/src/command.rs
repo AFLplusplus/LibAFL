@@ -34,7 +34,7 @@ mod bindings {
     #![allow(clippy::all)]
     #![allow(clippy::pedantic)]
 
-    include!(concat!(env!("OUT_DIR"), "/backdoor_bindings.rs"));
+    include!(concat!(env!("OUT_DIR"), "/libafl_qemu_bindings.rs"));
 }
 
 #[derive(Debug, Clone, TryFromPrimitive)]
