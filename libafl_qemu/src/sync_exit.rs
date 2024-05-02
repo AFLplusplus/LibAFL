@@ -112,11 +112,14 @@ where
                     emu.qemu().read_reg(arch_regs_map[BackdoorArgs::Arg2])?;
 
                 SyncBackdoor {
-                    command: Command::InputCommand(InputCommand::new(EmulatorMemoryChunk::virt(
-                        virt_addr,
-                        max_input_size,
-                        emu.qemu().current_cpu().unwrap().clone(),
-                    ))),
+                    command: Command::InputCommand(InputCommand::new(
+                        EmulatorMemoryChunk::virt(
+                            virt_addr,
+                            max_input_size,
+                            emu.qemu().current_cpu().unwrap().clone(),
+                        ),
+                        emu.qemu().current_cpu().unwrap(),
+                    )),
                     arch_regs_map,
                 }
             }
@@ -127,11 +130,14 @@ where
                     emu.qemu().read_reg(arch_regs_map[BackdoorArgs::Arg2])?;
 
                 SyncBackdoor {
-                    command: Command::InputCommand(InputCommand::new(EmulatorMemoryChunk::phys(
-                        phys_addr,
-                        max_input_size,
-                        Some(emu.qemu().current_cpu().unwrap().clone()),
-                    ))),
+                    command: Command::InputCommand(InputCommand::new(
+                        EmulatorMemoryChunk::phys(
+                            phys_addr,
+                            max_input_size,
+                            Some(emu.qemu().current_cpu().unwrap().clone()),
+                        ),
+                        emu.qemu().current_cpu().unwrap(),
+                    )),
                     arch_regs_map,
                 }
             }

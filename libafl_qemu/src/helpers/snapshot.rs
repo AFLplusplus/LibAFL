@@ -1,6 +1,7 @@
 use std::{
     cell::UnsafeCell,
     collections::{HashMap, HashSet},
+    mem::MaybeUninit,
     sync::Mutex,
 };
 
@@ -37,7 +38,7 @@ pub const SNAPSHOT_PAGE_MASK: GuestAddr = !(SNAPSHOT_PAGE_SIZE as GuestAddr - 1)
 
 pub type StopExecutionCallback = Box<dyn FnMut(&mut QemuSnapshotHelper, &Qemu)>;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct SnapshotPageInfo {
     pub addr: GuestAddr,
     pub perms: MmapPerms,
@@ -138,6 +139,7 @@ impl QemuSnapshotHelper {
 
     #[allow(clippy::uninit_assumed_init)]
     pub fn snapshot(&mut self, qemu: Qemu) {
+        log::info!("Start snapshot");
         self.brk = qemu.get_brk();
         self.mmap_start = qemu.get_mmap_start();
         self.pages.clear();
@@ -172,6 +174,7 @@ impl QemuSnapshotHelper {
         }
         self.empty = false;
         *self.new_maps.lock().unwrap() = self.maps.clone();
+        log::info!("End snapshot");
     }
 
     pub fn page_access(&mut self, page: GuestAddr) {
@@ -200,7 +203,7 @@ impl QemuSnapshotHelper {
 
     pub fn access(&mut self, addr: GuestAddr, size: usize) {
         // ASSUMPTION: the access can only cross 2 pages
-        debug_assert!(size > 0);
+        debug_assert!(size > 0 && size < SNAPSHOT_PAGE_SIZE);
         let page = addr & SNAPSHOT_PAGE_MASK;
         self.page_access(page);
         let second_page = (addr + size as GuestAddr - 1) & SNAPSHOT_PAGE_MASK;
@@ -209,9 +212,121 @@ impl QemuSnapshotHelper {
         }
     }
 
+    pub fn check_snapshot(&self, qemu: Qemu) {
+        let mut saved_pages_list = self.pages.clone();
+
+        log::info!("Checking snapshot correctness");
+
+        let mut perm_errors: Vec<(GuestAddr, MmapPerms, MmapPerms)> = Vec::new();
+        let mut content_mismatch = false;
+
+        for map in qemu.mappings() {
+            let mut addr = map.start();
+            // assert_eq!(addr & SNAPSHOT_PAGE_MASK, 0);
+            while addr < map.end() {
+                if let Some(saved_page) = saved_pages_list.remove(&addr) {
+                    if saved_page.perms.readable() {
+                        let mut current_page_content: MaybeUninit<[u8; SNAPSHOT_PAGE_SIZE]> =
+                            MaybeUninit::uninit();
+
+                        if saved_page.perms != map.flags() {
+                            perm_errors.push((addr, saved_page.perms, map.flags()));
+                            log::warn!(
+                                "\t0x{:x}: Flags do not match: saved is {:?} and current is {:?}",
+                                addr,
+                                saved_page.perms,
+                                map.flags()
+                            );
+                        }
+
+                        unsafe {
+                            qemu.read_mem(
+                                addr,
+                                current_page_content.as_mut_ptr().as_mut().unwrap(),
+                            );
+                        }
+
+                        let current_page_content: &mut [u8; SNAPSHOT_PAGE_SIZE] =
+                            unsafe { &mut current_page_content.assume_init() };
+
+                        if saved_page.data.as_ref().unwrap().as_ref()
+                            != current_page_content.as_ref()
+                        {
+                            let mut offsets = Vec::new();
+                            for (i, (saved_page_byte, current_page_byte)) in saved_page
+                                .data
+                                .unwrap()
+                                .iter()
+                                .zip(current_page_content.iter())
+                                .enumerate()
+                            {
+                                if saved_page_byte != current_page_byte {
+                                    offsets.push(i);
+                                }
+                            }
+                            log::warn!(
+                                "Faulty restore at {}",
+                                offsets.iter().fold(String::new(), |acc, offset| format!(
+                                    "{}, 0x{:x}",
+                                    acc,
+                                    addr + *offset as GuestAddr
+                                ))
+                            );
+                            content_mismatch = true;
+                        }
+                    }
+                } else {
+                    log::warn!("\tpage not found @addr 0x{:x}", addr);
+                }
+
+                addr += SNAPSHOT_PAGE_SIZE as GuestAddr;
+            }
+        }
+
+        assert!(saved_pages_list.is_empty());
+
+        if !perm_errors.is_empty() {
+            let mut perm_error_ranges: Vec<(GuestAddr, GuestAddr, MmapPerms, MmapPerms)> =
+                Vec::new();
+
+            for error in perm_errors {
+                if let Some(last_range) = perm_error_ranges.last_mut() {
+                    if last_range.1 + SNAPSHOT_PAGE_SIZE as GuestAddr == error.0 as GuestAddr
+                        && error.1 == last_range.2
+                        && error.2 == last_range.3
+                    {
+                        last_range.1 += SNAPSHOT_PAGE_SIZE as GuestAddr;
+                    } else {
+                        perm_error_ranges.push((error.0, error.0, error.1, error.2));
+                    }
+                } else {
+                    perm_error_ranges.push((error.0, error.0, error.1, error.2));
+                }
+            }
+
+            for error_range in perm_error_ranges {
+                log::error!(
+                    "0x{:x} -> 0x{:x}: saved is {:?} but current is {:?}",
+                    error_range.0,
+                    error_range.1,
+                    error_range.2,
+                    error_range.3
+                );
+            }
+
+            content_mismatch = true;
+        }
+
+        assert!(!content_mismatch, "Error found, stopping...");
+
+        log::info!("Snapshot check OK");
+    }
+
     pub fn reset(&mut self, qemu: Qemu) {
         {
             let new_maps = self.new_maps.get_mut().unwrap();
+
+            log::info!("Start restore");
 
             for acc in &mut self.accesses {
                 unsafe { &mut (*acc.get()) }.dirty.retain(|page| {
@@ -297,6 +412,11 @@ impl QemuSnapshotHelper {
 
         qemu.set_brk(self.brk);
         qemu.set_mmap_start(self.mmap_start);
+
+        #[cfg(feature = "paranoid_debug")]
+        self.check_snapshot(qemu);
+
+        log::info!("End restore");
     }
 
     pub fn is_unmap_allowed(&mut self, start: GuestAddr, mut size: usize) -> bool {
@@ -334,7 +454,7 @@ impl QemuSnapshotHelper {
         if self.mmap_limit != 0 && total_size > self.mmap_limit {
             let mut cb = self.stop_execution.take().unwrap();
             let qemu = Qemu::get().unwrap();
-            (cb)(self, &qemu);
+            cb(self, &qemu);
             self.stop_execution = Some(cb);
         }
     }
@@ -464,8 +584,8 @@ impl QemuSnapshotHelper {
                 ));
             }
 
-            for (i, ..) in found {
-                new_maps.tree.delete(i);
+            for (interval, ..) in found {
+                new_maps.tree.delete(interval);
             }
         }
 
@@ -671,7 +791,7 @@ where
             } else if sys_const == SYS_mprotect {
                 if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
                     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
-                    h.add_mapped(a0, a1 as usize, Some(prot));
+                    h.change_mapped(a0, a1 as usize, Some(prot));
                 }
             } else if sys_const == SYS_munmap {
                 let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();

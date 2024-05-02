@@ -21,6 +21,7 @@ mod bindings {
 pub use bindings::*;
 
 #[cfg(any(feature = "clippy", not(target_os = "linux")))]
+#[rustfmt::skip]
 mod x86_64_stub_bindings;
 
 #[cfg(emulation_mode = "usermode")]

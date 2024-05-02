@@ -16,9 +16,9 @@ use num_enum::TryFromPrimitive;
 use crate::QemuInstrumentationPagingFilter;
 use crate::{
     executor::QemuExecutorState, sync_exit::SyncBackdoorError, EmuExitHandler, Emulator,
-    GuestAddrKind, GuestReg, HandlerError, HasInstrumentationFilter, InnerHandlerResult, IsFilter,
-    IsSnapshotManager, Qemu, QemuHelperTuple, QemuInstrumentationAddressRangeFilter, Regs,
-    StdEmuExitHandler, StdInstrumentationFilter, CPU,
+    GuestAddrKind, GuestReg, HandlerError, HasInstrumentationFilter, InnerHandlerResult,
+    InputLocation, IsFilter, IsSnapshotManager, Qemu, QemuHelperTuple,
+    QemuInstrumentationAddressRangeFilter, Regs, StdEmuExitHandler, StdInstrumentationFilter, CPU,
 };
 
 pub const VERSION: u64 = bindings::LIBAFL_QEMU_HDR_VERSION_NUMBER as u64;
@@ -321,6 +321,7 @@ where
 #[derive(Debug, Clone)]
 pub struct InputCommand {
     location: EmulatorMemoryChunk,
+    cpu: CPU,
 }
 
 impl<SM, QT, S> IsCommand<QT, S, StdEmuExitHandler<SM>> for InputCommand
@@ -346,7 +347,7 @@ where
         let ret_value = self.location.write(qemu, input.target_bytes().as_slice());
 
         if let Some(reg) = ret_reg {
-            qemu.write_reg(reg, ret_value).unwrap();
+            self.cpu.write_reg(reg, ret_value).unwrap();
         }
 
         Ok(InnerHandlerResult::Continue)
@@ -385,7 +386,11 @@ where
             .map_err(|_| HandlerError::MultipleSnapshotDefinition)?;
 
         emu_exit_handler
-            .set_input_location(self.input_location.clone(), ret_reg)
+            .set_input_location(InputLocation::new(
+                self.input_location.clone(),
+                qemu.current_cpu().unwrap(),
+                ret_reg,
+            ))
             .unwrap();
 
         let ret_value = self
@@ -603,8 +608,8 @@ impl EndCommand {
 
 impl InputCommand {
     #[must_use]
-    pub fn new(location: EmulatorMemoryChunk) -> Self {
-        Self { location }
+    pub fn new(location: EmulatorMemoryChunk, cpu: CPU) -> Self {
+        Self { location, cpu }
     }
 }
 
