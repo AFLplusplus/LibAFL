@@ -1,7 +1,7 @@
 use core::time::Duration;
 use std::path::PathBuf;
 
-use clap::{self, Parser};
+use clap::Parser;
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
@@ -12,20 +12,19 @@ use libafl::{
     inputs::BytesInput,
     monitors::SimpleMonitor,
     mutators::{scheduled::havoc_mutations, tokens_mutations, StdScheduledMutator, Tokens},
-    observers::{CanTrack, ExplicitTracking, HitcountsMapObserver, StdMapObserver, TimeObserver},
+    observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, StdState},
     HasMetadata,
 };
 use libafl_bolts::{
-    current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, MatchName, Merge},
-    AsMutSlice, Truncate,
+    tuples::{tuple_list, MatchNameRef, Merge, Referenceable},
+    AsSliceMut, Truncate,
 };
-use libafl_targets::{EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE};
+use libafl_targets::EDGES_MAP_SIZE_IN_USE;
 use nix::sys::signal::Signal;
 
 /// The commandline args this fuzzer accepts
@@ -98,7 +97,7 @@ pub fn main() {
     let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
     // let the forkserver know the shmid
     shmem.write_to_env("__AFL_SHM_ID").unwrap();
-    let shmem_buf = shmem.as_mut_slice();
+    let shmem_buf = shmem.as_slice_mut();
     // the next line is not needed
     // unsafe { EDGES_MAP_PTR = shmem_buf.as_mut_ptr() };
 
@@ -116,7 +115,7 @@ pub fn main() {
         // New maximization map feedback linked to the edges observer and the feedback state
         MaxMapFeedback::new(&edges_observer),
         // Time feedback, this one does not need a feedback state
-        TimeFeedback::with_observer(&time_observer)
+        TimeFeedback::new(&time_observer)
     );
 
     // A feedback to choose if an input is a solution or not
@@ -132,7 +131,7 @@ pub fn main() {
     // create a State from scratch
     let mut state = StdState::new(
         // RNG
-        StdRand::with_seed(current_nanos()),
+        StdRand::new(),
         // Corpus that will be evolved, we keep it in memory for performance
         InMemoryCorpus::<BytesInput>::new(),
         // Corpus in which we store solutions (crashes in this example),
@@ -167,6 +166,8 @@ pub fn main() {
     // Create the executor for the forkserver
     let args = opt.arguments;
 
+    let observer_ref = edges_observer.reference();
+
     let mut tokens = Tokens::new();
     let mut executor = ForkserverExecutor::builder()
         .program(opt.executable)
@@ -181,10 +182,7 @@ pub fn main() {
         .unwrap();
 
     if let Some(dynamic_map_size) = executor.coverage_map_size() {
-        executor
-            .observers_mut()
-            .match_name_mut::<ExplicitTracking<HitcountsMapObserver<StdMapObserver<'_, u8, false>>, true, false>>("shared_mem")
-            .unwrap()
+        executor.observers_mut()[&observer_ref]
             .as_mut()
             .truncate(dynamic_map_size);
     }

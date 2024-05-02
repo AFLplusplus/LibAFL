@@ -1,6 +1,8 @@
 use std::{
+    borrow::Cow,
     fmt::Debug,
     hash::{Hash, Hasher},
+    ops::Deref,
 };
 
 use ahash::AHasher;
@@ -37,7 +39,7 @@ pub trait ValueObserver: for<'de> Deserialize<'de> + Serialize + Debug + Named {
 #[derive(Deserialize, Serialize, Debug)]
 pub struct MappedEdgeMapObserver<M, O> {
     inner: M,
-    name: String,
+    name: Cow<'static, str>,
     value_observer: O,
 }
 
@@ -48,7 +50,7 @@ where
 {
     pub fn new(obs: M, value_obs: O) -> Self {
         Self {
-            name: format!("{}_{}", value_obs.name(), obs.name()),
+            name: Cow::from(format!("{}_{}", value_obs.name(), obs.name())),
             inner: obs,
             value_observer: value_obs,
         }
@@ -77,7 +79,7 @@ where
 }
 
 impl<M, O> Named for MappedEdgeMapObserver<M, O> {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
@@ -106,16 +108,16 @@ where
 {
     type Entry = O::ValueType;
 
-    fn get(&self, idx: usize) -> &Self::Entry {
+    fn get(&self, idx: usize) -> Self::Entry {
         let initial = self.inner.initial();
-        if *self.inner.get(idx) == initial {
-            self.value_observer.default_value()
+        if self.inner.get(idx) == initial {
+            *self.value_observer.default_value()
         } else {
-            self.value_observer.value()
+            *self.value_observer.value()
         }
     }
 
-    fn get_mut(&mut self, _idx: usize) -> &mut Self::Entry {
+    fn set(&mut self, _idx: usize, _val: Self::Entry) {
         unimplemented!("Impossible to implement for a proxy map.")
     }
 
@@ -147,7 +149,7 @@ where
         let value = *self.value_observer.value();
         self.inner
             .as_iter()
-            .map(|&e| if e == initial { default } else { value })
+            .map(|e| if *e == initial { default } else { value })
             .collect()
     }
 
@@ -201,9 +203,10 @@ impl<'it, I, O, T> MappedEdgeMapIter<'it, I, O, T> {
     }
 }
 
-impl<'it, I, O, T> Iterator for MappedEdgeMapIter<'it, I, O, T>
+impl<'it, I, O, R, T> Iterator for MappedEdgeMapIter<'it, I, O, T>
 where
-    I: Iterator<Item = &'it T>,
+    I: Iterator<Item = R>,
+    R: Deref<Target = T>,
     T: PartialEq + 'it,
     O: ValueObserver,
 {
@@ -224,6 +227,7 @@ where
     O: ValueObserver + 'it,
 {
     type Item = O::ValueType;
+    type Ref = &'it Self::Item;
     type IntoIter = MappedEdgeMapIter<'it, <M as AsIter<'it>>::IntoIter, O, M::Entry>;
 
     fn as_iter(&'it self) -> Self::IntoIter {
@@ -251,8 +255,9 @@ impl ValueObserver for SizeValueObserver {
 }
 
 impl Named for SizeValueObserver {
-    fn name(&self) -> &str {
-        "size"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("size");
+        &NAME
     }
 }
 
@@ -295,7 +300,7 @@ impl ValueObserver for TimeValueObserver {
 }
 
 impl Named for TimeValueObserver {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         self.time_obs.name()
     }
 }
@@ -356,8 +361,9 @@ impl ValueObserver for SizeTimeValueObserver {
 }
 
 impl Named for SizeTimeValueObserver {
-    fn name(&self) -> &str {
-        "size_time"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("size_time");
+        &NAME
     }
 }
 

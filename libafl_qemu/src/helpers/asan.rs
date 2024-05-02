@@ -17,11 +17,10 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use rangemap::RangeMap;
 
 use crate::{
-    calls::FullBacktraceCollector,
     emu::{EmuError, MemAccessInfo, SyscallHookResult},
-    helper::{
-        HasInstrumentationFilter, IsFilter, QemuHelper, QemuHelperTuple,
-        QemuInstrumentationAddressRangeFilter,
+    helpers::{
+        calls::FullBacktraceCollector, HasInstrumentationFilter, IsFilter, QemuHelper,
+        QemuHelperTuple, QemuInstrumentationAddressRangeFilter,
     },
     hooks::{Hook, QemuHooks},
     snapshot::QemuSnapshotHelper,
@@ -462,7 +461,7 @@ impl AsanGiovese {
 
     pub fn report_or_crash(&mut self, qemu: Qemu, pc: GuestAddr, error: AsanError) {
         if let Some(mut cb) = self.error_callback.take() {
-            (cb)(self, qemu, pc, error);
+            cb(self, qemu, pc, error);
             self.error_callback = Some(cb);
         } else {
             std::process::abort();
@@ -471,7 +470,7 @@ impl AsanGiovese {
 
     pub fn report(&mut self, qemu: Qemu, pc: GuestAddr, error: AsanError) {
         if let Some(mut cb) = self.error_callback.take() {
-            (cb)(self, qemu, pc, error);
+            cb(self, qemu, pc, error);
             self.error_callback = Some(cb);
         }
     }

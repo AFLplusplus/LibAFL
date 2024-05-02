@@ -125,5 +125,8 @@ char    *__libqasan_strrchr(const char *s, int c);
 size_t   __libqasan_wcslen(const wchar_t *s);
 wchar_t *__libqasan_wcscpy(wchar_t *d, const wchar_t *s);
 int      __libqasan_wcscmp(const wchar_t *s1, const wchar_t *s2);
+void    *__libqasan_mmap(void *addr, size_t length, int prot, int flags, int fd,
+                         off_t offset);
+int      __libqasan_munmap(void *addr, size_t length);
 
 #endif

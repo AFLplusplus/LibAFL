@@ -21,11 +21,10 @@ use libafl_bolts::shmem::StdShMemProvider;
 #[cfg(target_vendor = "apple")]
 use libafl_bolts::shmem::UnixShMemProvider;
 use libafl_bolts::{
-    current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider},
     tuples::tuple_list,
-    AsMutSlice,
+    AsSliceMut,
 };
 
 #[allow(clippy::similar_names)]
@@ -42,7 +41,7 @@ pub fn main() {
     let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
     //let the forkserver know the shmid
     shmem.write_to_env("__AFL_SHM_ID").unwrap();
-    let shmem_map = shmem.as_mut_slice();
+    let shmem_map = shmem.as_slice_mut();
 
     // Create an observation channel using the signals map
     let edges_observer = HitcountsMapObserver::new(ConstMapObserver::<_, MAP_SIZE>::new(
@@ -63,7 +62,7 @@ pub fn main() {
     // create a State from scratch
     let mut state = StdState::new(
         // RNG
-        StdRand::with_seed(current_nanos()),
+        StdRand::new(),
         // Corpus that will be evolved, we keep it in memory for performance
         InMemoryCorpus::<BytesInput>::new(),
         // Corpus in which we store solutions (crashes in this example),

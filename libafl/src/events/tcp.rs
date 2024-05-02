@@ -36,7 +36,7 @@ use tokio::{
 use typed_builder::TypedBuilder;
 
 use super::{CustomBufEventResult, CustomBufHandlerFn};
-#[cfg(all(unix, feature = "std"))]
+#[cfg(all(unix, feature = "std", not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
     events::{
@@ -1156,19 +1156,6 @@ where
     S: State + HasExecutions + HasMetadata,
     MT: Monitor + Clone,
 {
-    /// Internal function, returns true when shuttdown is requested by a `SIGINT` signal
-    #[inline]
-    #[allow(clippy::unused_self)]
-    fn is_shutting_down() -> bool {
-        #[cfg(unix)]
-        unsafe {
-            core::ptr::read_volatile(core::ptr::addr_of!(EVENTMGR_SIGHANDLER_STATE.shutting_down))
-        }
-
-        #[cfg(windows)]
-        false
-    }
-
     /// Launch the restarting manager
     pub fn launch(&mut self) -> Result<(Option<S>, TcpRestartingEventManager<EMH, S, SP>), Error> {
         // We start ourself as child process to actually fuzz
@@ -1257,15 +1244,6 @@ where
             // Store the information to a map.
             staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
 
-            // We setup signal handlers to clean up shmem segments used by state restorer
-            #[cfg(all(unix, not(miri)))]
-            if let Err(_e) =
-                unsafe { setup_signal_handler(addr_of_mut!(EVENTMGR_SIGHANDLER_STATE)) }
-            {
-                // We can live without a proper ctrl+c signal handler. Print and ignore.
-                log::error!("Failed to setup signal handlers: {_e}");
-            }
-
             let mut ctr: u64 = 0;
             // Client->parent loop
             loop {
@@ -1279,30 +1257,50 @@ where
                     match unsafe { fork() }? {
                         ForkResult::Parent(handle) => {
                             unsafe {
-                                EVENTMGR_SIGHANDLER_STATE.set_exit_from_main();
+                                libc::signal(libc::SIGINT, libc::SIG_IGN);
                             }
                             self.shmem_provider.post_fork(false)?;
                             handle.status()
                         }
                         ForkResult::Child => {
+                            // We setup signal handlers to clean up shmem segments used by state restorer
+                            #[cfg(all(unix, not(miri)))]
+                            if let Err(_e) = unsafe {
+                                setup_signal_handler(addr_of_mut!(EVENTMGR_SIGHANDLER_STATE))
+                            } {
+                                // We can live without a proper ctrl+c signal handler. Print and ignore.
+                                log::error!("Failed to setup signal handlers: {_e}");
+                            }
                             self.shmem_provider.post_fork(true)?;
                             break (staterestorer, self.shmem_provider.clone(), core_id);
                         }
                     }
                 };
 
-                #[cfg(all(unix, not(feature = "fork")))]
+                // If this guy wants to fork, then ignore sigit
+                #[cfg(any(windows, not(feature = "fork")))]
                 unsafe {
-                    EVENTMGR_SIGHANDLER_STATE.set_exit_from_main();
+                    #[cfg(windows)]
+                    libafl_bolts::os::windows_exceptions::signal(
+                        libafl_bolts::os::windows_exceptions::SIGINT,
+                        libafl_bolts::os::windows_exceptions::sig_ign(),
+                    );
+
+                    #[cfg(unix)]
+                    libc::signal(libc::SIGINT, libc::SIG_IGN);
                 }
 
                 // On Windows (or in any case without fork), we spawn ourself again
                 #[cfg(any(windows, not(feature = "fork")))]
                 let child_status = startable_self()?.status()?;
-                #[cfg(all(unix, not(feature = "fork")))]
+                #[cfg(any(windows, not(feature = "fork")))]
                 let child_status = child_status.code().unwrap_or_default();
 
                 compiler_fence(Ordering::SeqCst);
+
+                if child_status == crate::events::CTRL_C_EXIT || staterestorer.wants_to_exit() {
+                    return Err(Error::shutting_down());
+                }
 
                 #[allow(clippy::manual_assert)]
                 if !staterestorer.has_content() && self.serialize_state {
@@ -1315,10 +1313,6 @@ where
 
                     // Storing state in the last round did not work
                     panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! This can happen if the child calls `exit()`, in that case make sure it uses `abort()`, if it got killed unrecoverable (OOM), or if there is a bug in the fuzzer itself. (Child exited with: {child_status})");
-                }
-
-                if staterestorer.wants_to_exit() || Self::is_shutting_down() {
-                    return Err(Error::shutting_down());
                 }
 
                 ctr = ctr.wrapping_add(1);

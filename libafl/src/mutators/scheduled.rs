@@ -1,15 +1,16 @@
 //! The `ScheduledMutator` schedules multiple mutations internally.
 
-use alloc::{string::String, vec::Vec};
+use alloc::{borrow::Cow, vec::Vec};
 use core::{
     fmt::{self, Debug},
     marker::PhantomData,
+    ops::{Deref, DerefMut},
 };
 
 use libafl_bolts::{
     rands::Rand,
     tuples::{tuple_list, tuple_list_type, Merge, NamedTuple},
-    AsMutSlice, AsSlice, Named,
+    Named,
 };
 use serde::{Deserialize, Serialize};
 
@@ -40,30 +41,28 @@ use crate::{
 )] // for SerdeAny
 pub struct LogMutationMetadata {
     /// A list of logs
-    pub list: Vec<String>,
+    pub list: Vec<Cow<'static, str>>,
 }
 
 libafl_bolts::impl_serdeany!(LogMutationMetadata);
 
-impl AsSlice for LogMutationMetadata {
-    type Entry = String;
-    #[must_use]
-    fn as_slice(&self) -> &[String] {
-        self.list.as_slice()
+impl Deref for LogMutationMetadata {
+    type Target = [Cow<'static, str>];
+    fn deref(&self) -> &[Cow<'static, str>] {
+        &self.list
     }
 }
-impl AsMutSlice for LogMutationMetadata {
-    type Entry = String;
+impl DerefMut for LogMutationMetadata {
     #[must_use]
-    fn as_mut_slice(&mut self) -> &mut [String] {
-        self.list.as_mut_slice()
+    fn deref_mut(&mut self) -> &mut [Cow<'static, str>] {
+        &mut self.list
     }
 }
 
 impl LogMutationMetadata {
     /// Creates new [`struct@LogMutationMetadata`].
     #[must_use]
-    pub fn new(list: Vec<String>) -> Self {
+    pub fn new(list: Vec<Cow<'static, str>>) -> Self {
         Self { list }
     }
 }
@@ -113,9 +112,9 @@ where
     MT: MutatorsTuple<I, S>,
     S: HasRand,
 {
-    name: String,
+    name: Cow<'static, str>,
     mutations: MT,
-    max_stack_pow: u64,
+    max_stack_pow: usize,
     phantom: PhantomData<(I, S)>,
 }
 
@@ -139,7 +138,7 @@ where
     MT: MutatorsTuple<I, S>,
     S: HasRand,
 {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
@@ -186,7 +185,7 @@ where
     /// Get the next mutation to apply
     fn schedule(&self, state: &mut S, _: &I) -> MutationId {
         debug_assert!(self.mutations.len() != 0);
-        state.rand_mut().below(self.mutations.len() as u64).into()
+        state.rand_mut().below(self.mutations.len()).into()
     }
 }
 
@@ -198,7 +197,10 @@ where
     /// Create a new [`StdScheduledMutator`] instance specifying mutations
     pub fn new(mutations: MT) -> Self {
         StdScheduledMutator {
-            name: format!("StdScheduledMutator[{}]", mutations.names().join(", ")),
+            name: Cow::from(format!(
+                "StdScheduledMutator[{}]",
+                mutations.names().join(", ")
+            )),
             mutations,
             max_stack_pow: 7,
             phantom: PhantomData,
@@ -206,9 +208,12 @@ where
     }
 
     /// Create a new [`StdScheduledMutator`] instance specifying mutations and the maximun number of iterations
-    pub fn with_max_stack_pow(mutations: MT, max_stack_pow: u64) -> Self {
+    pub fn with_max_stack_pow(mutations: MT, max_stack_pow: usize) -> Self {
         StdScheduledMutator {
-            name: format!("StdScheduledMutator[{}]", mutations.names().join(", ")),
+            name: Cow::from(format!(
+                "StdScheduledMutator[{}]",
+                mutations.names().join(", ")
+            )),
             mutations,
             max_stack_pow,
             phantom: PhantomData,
@@ -340,7 +345,7 @@ where
     S: HasRand + HasCorpus,
     SM: ScheduledMutator<I, MT, S>,
 {
-    name: String,
+    name: Cow<'static, str>,
     scheduled: SM,
     mutation_log: Vec<MutationId>,
     phantom: PhantomData<(I, MT, S)>,
@@ -368,7 +373,7 @@ where
     S: HasRand + HasCorpus,
     SM: ScheduledMutator<I, MT, S>,
 {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
@@ -386,9 +391,9 @@ where
     fn post_exec(&mut self, state: &mut S, corpus_idx: Option<CorpusId>) -> Result<(), Error> {
         if let Some(idx) = corpus_idx {
             let mut testcase = (*state.corpus_mut().get(idx)?).borrow_mut();
-            let mut log = Vec::<String>::new();
+            let mut log = Vec::<Cow<'static, str>>::new();
             while let Some(idx) = self.mutation_log.pop() {
-                let name = String::from(self.scheduled.mutations().name(idx.0).unwrap()); // TODO maybe return an Error on None
+                let name = self.scheduled.mutations().name(idx.0).unwrap().clone(); // TODO maybe return an Error on None
                 log.push(name);
             }
             let meta = LogMutationMetadata::new(log);
@@ -431,7 +436,7 @@ where
     /// Get the next mutation to apply
     fn schedule(&self, state: &mut S, _: &I) -> MutationId {
         debug_assert!(MT::LEN != 0);
-        state.rand_mut().below(MT::LEN as u64).into()
+        state.rand_mut().below(MT::LEN).into()
     }
 
     fn scheduled_mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
@@ -460,7 +465,7 @@ where
     /// This mutator logs all mutators.
     pub fn new(scheduled: SM) -> Self {
         Self {
-            name: format!("LoggerScheduledMutator[{}]", scheduled.name()),
+            name: Cow::from(format!("LoggerScheduledMutator[{}]", scheduled.name())),
             scheduled,
             mutation_log: vec![],
             phantom: PhantomData,
@@ -470,7 +475,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use libafl_bolts::rands::{Rand, StdRand, XkcdRand};
+    use libafl_bolts::rands::{StdRand, XkcdRand};
 
     use crate::{
         corpus::{Corpus, InMemoryCorpus, Testcase},
@@ -486,8 +491,7 @@ mod tests {
 
     #[test]
     fn test_mut_scheduled() {
-        // With the current impl, seed of 1 will result in a split at pos 2.
-        let mut rand = XkcdRand::with_seed(5);
+        let rand = XkcdRand::with_seed(0);
         let mut corpus: InMemoryCorpus<BytesInput> = InMemoryCorpus::new();
         corpus
             .add(Testcase::new(vec![b'a', b'b', b'c'].into()))
@@ -510,21 +514,17 @@ mod tests {
         )
         .unwrap();
 
-        rand.set_seed(5);
-
         let mut splice = SpliceMutator::new();
         splice.mutate(&mut state, &mut input).unwrap();
 
         log::trace!("{:?}", input.bytes());
 
         // The pre-seeded rand should have spliced at position 2.
-        // TODO: Maybe have a fixed rand for this purpose?
         assert_eq!(input.bytes(), &[b'a', b'b', b'f']);
     }
 
     #[test]
     fn test_havoc() {
-        // With the current impl, seed of 1 will result in a split at pos 2.
         let rand = StdRand::with_seed(0x1337);
         let mut corpus: InMemoryCorpus<BytesInput> = InMemoryCorpus::new();
         corpus

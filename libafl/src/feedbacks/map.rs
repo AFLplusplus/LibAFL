@@ -1,18 +1,20 @@
 //! Map feedback, maximizing or minimizing maps, for example the afl-style map observer.
 
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{borrow::Cow, vec::Vec};
 #[rustversion::nightly]
 use core::simd::prelude::SimdOrd;
 use core::{
     fmt::Debug,
     marker::PhantomData,
-    ops::{BitAnd, BitOr},
+    ops::{BitAnd, BitOr, Deref, DerefMut},
 };
 
-use libafl_bolts::{AsIter, AsMutSlice, AsSlice, HasRefCnt, Named};
+#[rustversion::nightly]
+use libafl_bolts::AsSlice;
+use libafl_bolts::{
+    tuples::{MatchNameRef, Reference, Referenceable},
+    AsIter, HasRefCnt, Named,
+};
 use num_traits::PrimInt;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -20,32 +22,31 @@ use crate::{
     corpus::Testcase,
     events::{Event, EventFirer},
     executors::ExitKind,
-    feedbacks::{Feedback, HasObserverName},
+    feedbacks::{Feedback, HasObserverReference},
     inputs::UsesInput,
     monitors::{AggregatorOps, UserStats, UserStatsValue},
-    observers::{CanTrack, MapObserver, Observer, ObserversTuple, UsesObserver},
+    observers::{CanTrack, MapObserver, Observer, ObserversTuple},
     state::State,
     Error, HasMetadata, HasNamedMetadata,
 };
 
 /// A [`MapFeedback`] that implements the AFL algorithm using an [`OrReducer`] combining the bits for the history map and the bit from (`HitcountsMapObserver`)[`crate::observers::HitcountsMapObserver`].
-pub type AflMapFeedback<C, O, S, T> = MapFeedback<C, DifferentIsNovel, O, OrReducer, S, T>;
+pub type AflMapFeedback<C, O, T> = MapFeedback<C, DifferentIsNovel, O, OrReducer, T>;
 
 /// A [`MapFeedback`] that strives to maximize the map contents.
-pub type MaxMapFeedback<C, O, S, T> = MapFeedback<C, DifferentIsNovel, O, MaxReducer, S, T>;
+pub type MaxMapFeedback<C, O, T> = MapFeedback<C, DifferentIsNovel, O, MaxReducer, T>;
 /// A [`MapFeedback`] that strives to minimize the map contents.
-pub type MinMapFeedback<C, O, S, T> = MapFeedback<C, DifferentIsNovel, O, MinReducer, S, T>;
+pub type MinMapFeedback<C, O, T> = MapFeedback<C, DifferentIsNovel, O, MinReducer, T>;
 
 /// A [`MapFeedback`] that always returns `true` for `is_interesting`. Useful for tracing all executions.
-pub type AlwaysInterestingMapFeedback<C, O, S, T> = MapFeedback<C, AllIsNovel, O, NopReducer, S, T>;
+pub type AlwaysInterestingMapFeedback<C, O, T> = MapFeedback<C, AllIsNovel, O, NopReducer, T>;
 
 /// A [`MapFeedback`] that strives to maximize the map contents,
 /// but only, if a value is larger than `pow2` of the previous.
-pub type MaxMapPow2Feedback<C, O, S, T> = MapFeedback<C, NextPow2IsNovel, O, MaxReducer, S, T>;
+pub type MaxMapPow2Feedback<C, O, T> = MapFeedback<C, NextPow2IsNovel, O, MaxReducer, T>;
 /// A [`MapFeedback`] that strives to maximize the map contents,
 /// but only, if a value is larger than `pow2` of the previous.
-pub type MaxMapOneOrFilledFeedback<C, O, S, T> =
-    MapFeedback<C, OneOrFilledIsNovel, O, MaxReducer, S, T>;
+pub type MaxMapOneOrFilledFeedback<C, O, T> = MapFeedback<C, OneOrFilledIsNovel, O, MaxReducer, T>;
 
 /// A `Reducer` function is used to aggregate values for the novelty search
 pub trait Reducer<T>: 'static
@@ -236,19 +237,18 @@ pub struct MapIndexesMetadata {
 
 libafl_bolts::impl_serdeany!(MapIndexesMetadata);
 
-impl AsSlice for MapIndexesMetadata {
-    type Entry = usize;
+impl Deref for MapIndexesMetadata {
+    type Target = [usize];
     /// Convert to a slice
-    fn as_slice(&self) -> &[usize] {
-        self.list.as_slice()
+    fn deref(&self) -> &[usize] {
+        &self.list
     }
 }
 
-impl AsMutSlice for MapIndexesMetadata {
-    type Entry = usize;
+impl DerefMut for MapIndexesMetadata {
     /// Convert to a slice
-    fn as_mut_slice(&mut self) -> &mut [usize] {
-        self.list.as_mut_slice()
+    fn deref_mut(&mut self) -> &mut [usize] {
+        &mut self.list
     }
 }
 
@@ -283,21 +283,20 @@ pub struct MapNoveltiesMetadata {
 
 libafl_bolts::impl_serdeany!(MapNoveltiesMetadata);
 
-impl AsSlice for MapNoveltiesMetadata {
-    type Entry = usize;
+impl Deref for MapNoveltiesMetadata {
+    type Target = [usize];
     /// Convert to a slice
     #[must_use]
-    fn as_slice(&self) -> &[usize] {
-        self.list.as_slice()
+    fn deref(&self) -> &[usize] {
+        &self.list
     }
 }
 
-impl AsMutSlice for MapNoveltiesMetadata {
-    type Entry = usize;
+impl DerefMut for MapNoveltiesMetadata {
     /// Convert to a slice
     #[must_use]
-    fn as_mut_slice(&mut self) -> &mut [usize] {
-        self.list.as_mut_slice()
+    fn deref_mut(&mut self) -> &mut [usize] {
+        &mut self.list
     }
 }
 
@@ -383,35 +382,27 @@ where
 
 /// The most common AFL-like feedback type
 #[derive(Clone, Debug)]
-pub struct MapFeedback<C, N, O, R, S, T> {
+pub struct MapFeedback<C, N, O, R, T> {
     /// New indexes observed in the last observation
     novelties: Option<Vec<usize>>,
     /// Name identifier of this instance
-    name: String,
+    name: Cow<'static, str>,
     /// Name identifier of the observer
-    observer_name: String,
+    map_ref: Reference<C>,
     /// Name of the feedback as shown in the `UserStats`
-    stats_name: String,
+    stats_name: Cow<'static, str>,
     /// Phantom Data of Reducer
-    phantom: PhantomData<(C, N, O, R, S, T)>,
+    phantom: PhantomData<(C, N, O, R, T)>,
 }
 
-impl<C, N, O, R, S, T> UsesObserver<S> for MapFeedback<C, N, O, R, S, T>
-where
-    S: UsesInput,
-    C: AsRef<O> + Observer<S>,
-{
-    type Observer = C;
-}
-
-impl<C, N, O, R, S, T> Feedback<S> for MapFeedback<C, N, O, R, S, T>
+impl<C, N, O, R, S, T> Feedback<S> for MapFeedback<C, N, O, R, T>
 where
     N: IsNovel<T>,
     O: MapObserver<Entry = T> + for<'it> AsIter<'it, Item = T>,
     R: Reducer<T>,
     S: State + HasNamedMetadata,
     T: Default + Copy + Serialize + for<'de> Deserialize<'de> + PartialEq + Debug + 'static,
-    C: CanTrack + AsRef<O>,
+    C: CanTrack + AsRef<O> + Observer<S>,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         // Initialize `MapFeedbackMetadata` with an empty vector and add it to the state.
@@ -467,10 +458,7 @@ where
             let meta = MapNoveltiesMetadata::new(novelties);
             testcase.add_metadata(meta);
         }
-        let observer = observers
-            .match_name::<C>(&self.observer_name)
-            .unwrap()
-            .as_ref();
+        let observer = observers.get(&self.map_ref).unwrap().as_ref();
         let initial = observer.initial();
         let map_state = state
             .named_metadata_map_mut()
@@ -481,13 +469,13 @@ where
             map_state.history_map.resize(len, observer.initial());
         }
 
-        let history_map = map_state.history_map.as_mut_slice();
+        let history_map = &mut map_state.history_map;
         if C::INDICES {
             let mut indices = Vec::new();
 
             for (i, value) in observer
                 .as_iter()
-                .copied()
+                .map(|x| *x)
                 .enumerate()
                 .filter(|(_, value)| *value != initial)
             {
@@ -502,7 +490,7 @@ where
         } else {
             for (i, value) in observer
                 .as_iter()
-                .copied()
+                .map(|x| *x)
                 .enumerate()
                 .filter(|(_, value)| *value != initial)
             {
@@ -534,7 +522,7 @@ where
         manager.fire(
             state,
             Event::UpdateUserStats {
-                name: self.stats_name.to_string(),
+                name: self.stats_name.clone(),
                 value: UserStats::new(
                     UserStatsValue::Ratio(covered as u64, len as u64),
                     AggregatorOps::Avg,
@@ -549,12 +537,11 @@ where
 
 /// Specialize for the common coverage map size, maximization of u8s
 #[rustversion::nightly]
-impl<C, O, S> Feedback<S> for MapFeedback<C, DifferentIsNovel, O, MaxReducer, S, u8>
+impl<C, O, S> Feedback<S> for MapFeedback<C, DifferentIsNovel, O, MaxReducer, u8>
 where
-    O: MapObserver<Entry = u8> + AsSlice<Entry = u8>,
-    for<'it> O: AsIter<'it, Item = u8>,
+    O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
     S: State + HasNamedMetadata,
-    C: CanTrack + AsRef<O>,
+    C: CanTrack + AsRef<O> + Observer<S>,
 {
     #[allow(clippy::wrong_self_convention)]
     #[allow(clippy::needless_range_loop)]
@@ -575,10 +562,7 @@ where
 
         let mut interesting = false;
         // TODO Replace with match_name_type when stable
-        let observer = observers
-            .match_name::<C>(&self.observer_name)
-            .unwrap()
-            .as_ref();
+        let observer = observers.get(&self.map_ref).unwrap().as_ref();
 
         let map_state = state
             .named_metadata_map_mut()
@@ -669,46 +653,51 @@ where
     }
 }
 
-impl<C, N, O, R, S, T> Named for MapFeedback<C, N, O, R, S, T> {
+impl<C, N, O, R, T> Named for MapFeedback<C, N, O, R, T> {
     #[inline]
-    fn name(&self) -> &str {
-        self.name.as_str()
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
     }
 }
 
-impl<C, N, O, R, S, T> HasObserverName for MapFeedback<C, N, O, R, S, T>
+impl<C, N, O, R, T> HasObserverReference for MapFeedback<C, N, O, R, T>
 where
     O: Named,
     C: AsRef<O>,
 {
+    type Observer = C;
+
     #[inline]
-    fn observer_name(&self) -> &str {
-        self.observer_name.as_str()
+    fn observer_ref(&self) -> &Reference<C> {
+        &self.map_ref
     }
 }
 
-fn create_stats_name(name: &str) -> String {
-    name.to_lowercase()
+#[allow(clippy::ptr_arg)]
+fn create_stats_name(name: &Cow<'static, str>) -> Cow<'static, str> {
+    if name.chars().all(char::is_lowercase) {
+        name.clone()
+    } else {
+        name.to_lowercase().into()
+    }
 }
 
-impl<C, N, O, R, S, T> MapFeedback<C, N, O, R, S, T>
+impl<C, N, O, R, T> MapFeedback<C, N, O, R, T>
 where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
     O: MapObserver<Entry = T>,
     for<'it> O: AsIter<'it, Item = T>,
     N: IsNovel<T>,
-    S: UsesInput + HasNamedMetadata,
-    C: CanTrack + AsRef<O>,
+    C: CanTrack + AsRef<O> + Named,
 {
     /// Create new `MapFeedback`
     #[must_use]
     pub fn new(map_observer: &C) -> Self {
-        let map_observer = map_observer.as_ref();
         Self {
             novelties: if C::NOVELTIES { Some(vec![]) } else { None },
-            name: map_observer.name().to_string(),
-            observer_name: map_observer.name().to_string(),
+            name: map_observer.name().clone(),
+            map_ref: map_observer.reference(),
             stats_name: create_stats_name(map_observer.name()),
             phantom: PhantomData,
         }
@@ -719,12 +708,12 @@ where
     /// same name and therefore also the same history.
     #[must_use]
     pub fn with_name(name: &'static str, map_observer: &C) -> Self {
-        let map_observer = map_observer.as_ref();
+        let name = Cow::from(name);
         Self {
             novelties: if C::NOVELTIES { Some(vec![]) } else { None },
-            name: name.to_string(),
-            observer_name: map_observer.name().to_string(),
-            stats_name: create_stats_name(name),
+            map_ref: map_observer.reference(),
+            stats_name: create_stats_name(&name),
+            name,
             phantom: PhantomData,
         }
     }
@@ -732,7 +721,7 @@ where
     #[allow(clippy::wrong_self_convention)]
     #[allow(clippy::needless_range_loop)]
     #[allow(clippy::trivially_copy_pass_by_ref)]
-    fn is_interesting_default<EM, OT>(
+    fn is_interesting_default<EM, S, OT>(
         &mut self,
         state: &mut S,
         _manager: &mut EM,
@@ -743,13 +732,11 @@ where
     where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
+        S: UsesInput + HasNamedMetadata,
     {
         let mut interesting = false;
         // TODO Replace with match_name_type when stable
-        let observer = observers
-            .match_name::<C>(&self.observer_name)
-            .unwrap()
-            .as_ref();
+        let observer = observers.get(&self.map_ref).unwrap().as_ref();
 
         let map_state = state
             .named_metadata_map_mut()
@@ -768,7 +755,7 @@ where
             novelties.clear();
             for (i, item) in observer
                 .as_iter()
-                .copied()
+                .map(|x| *x)
                 .enumerate()
                 .filter(|(_, item)| *item != initial)
             {
@@ -782,7 +769,7 @@ where
         } else {
             for (i, item) in observer
                 .as_iter()
-                .copied()
+                .map(|x| *x)
                 .enumerate()
                 .filter(|(_, item)| *item != initial)
             {

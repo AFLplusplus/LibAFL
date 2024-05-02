@@ -1,12 +1,12 @@
 //! The tracing stage can trace the target and enrich a [`crate::corpus::Testcase`] with metadata, for example for `CmpLog`.
 
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{borrow::Cow, vec::Vec};
 use core::{fmt::Debug, marker::PhantomData};
 
-use libafl_bolts::{AsSlice, Named};
+use libafl_bolts::{
+    tuples::{Reference, Referenceable},
+    AsSlice, Named,
+};
 
 use crate::{
     corpus::{Corpus, HasCurrentCorpusIdx},
@@ -43,14 +43,15 @@ fn find_next_char(list: &[Option<u8>], mut idx: usize, ch: u8) -> usize {
 /// A stage that runs a tracer executor
 #[derive(Clone, Debug)]
 pub struct GeneralizationStage<C, EM, O, OT, Z> {
-    map_observer_name: String,
+    map_observer_ref: Reference<C>,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(C, EM, O, OT, Z)>,
+    phantom: PhantomData<(EM, O, OT, Z)>,
 }
 
 impl<C, EM, O, OT, Z> Named for GeneralizationStage<C, EM, O, OT, Z> {
-    fn name(&self) -> &str {
-        "GeneralizationStage"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("GeneralizationStage");
+        &NAME
     }
 }
 
@@ -65,7 +66,7 @@ where
 impl<C, E, EM, O, Z> Stage<E, EM, Z> for GeneralizationStage<C, EM, O, E::Observers, Z>
 where
     O: MapObserver,
-    C: CanTrack + AsRef<O>,
+    C: CanTrack + AsRef<O> + Named,
     E: Executor<EM, Z> + HasObservers,
     E::Observers: ObserversTuple<E::State>,
     E::State:
@@ -337,7 +338,7 @@ impl<C, EM, O, OT, Z> GeneralizationStage<C, EM, O, OT, Z>
 where
     EM: UsesState,
     O: MapObserver,
-    C: CanTrack + AsRef<O>,
+    C: CanTrack + AsRef<O> + Named,
     OT: ObserversTuple<EM::State>,
     EM::State: UsesInput<Input = BytesInput> + HasExecutions + HasMetadata + HasCorpus,
 {
@@ -346,16 +347,7 @@ where
     pub fn new(map_observer: &C) -> Self {
         require_novelties_tracking!("GeneralizationStage", C);
         Self {
-            map_observer_name: map_observer.as_ref().name().to_string(),
-            phantom: PhantomData,
-        }
-    }
-
-    /// Create a new [`GeneralizationStage`] from name
-    #[must_use]
-    pub fn from_name(map_observer_name: &str) -> Self {
-        Self {
-            map_observer_name: map_observer_name.to_string(),
+            map_observer_ref: map_observer.reference(),
             phantom: PhantomData,
         }
     }
@@ -389,10 +381,7 @@ where
             .post_exec_all(state, input, &exit_kind)?;
         mark_feature_time!(state, PerfFeature::PostExecObservers);
 
-        let cnt = executor
-            .observers()
-            .match_name::<C>(&self.map_observer_name)
-            .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
+        let cnt = executor.observers()[&self.map_observer_ref]
             .as_ref()
             .how_many_set(novelties);
 

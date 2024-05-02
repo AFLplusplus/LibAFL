@@ -1,6 +1,9 @@
 //! A wide variety of mutations used during fuzzing.
 
-use alloc::{borrow::ToOwned, vec::Vec};
+use alloc::{
+    borrow::{Cow, ToOwned},
+    vec::Vec,
+};
 use core::{cmp::min, marker::PhantomData, mem::size_of, ops::Range};
 
 use libafl_bolts::{rands::Rand, Named};
@@ -62,9 +65,9 @@ pub fn buffer_set<T: Clone>(data: &mut [T], from: usize, len: usize, val: T) {
 /// This problem corresponds to: <https://oeis.org/A059036>
 #[inline]
 pub fn rand_range<S: HasRand>(state: &mut S, upper: usize, max_len: usize) -> Range<usize> {
-    let len = 1 + state.rand_mut().below(max_len as u64) as usize;
+    let len = 1 + state.rand_mut().below(max_len);
     // sample from [1..upper + len]
-    let mut offset2 = 1 + state.rand_mut().below((upper + len - 1) as u64) as usize;
+    let mut offset2 = 1 + state.rand_mut().below(upper + len - 1);
     let offset1 = offset2.saturating_sub(len);
     if offset2 > upper {
         offset2 = upper;
@@ -74,7 +77,7 @@ pub fn rand_range<S: HasRand>(state: &mut S, upper: usize, max_len: usize) -> Ra
 }
 
 /// The max value that will be added or subtracted during add mutations
-pub const ARITH_MAX: u64 = 35;
+pub const ARITH_MAX: usize = 35;
 
 /// Interesting 8-bit values from AFL
 pub const INTERESTING_8: [i8; 9] = [-128, -1, 0, 1, 16, 32, 64, 100, 127];
@@ -135,8 +138,9 @@ where
 }
 
 impl Named for BitFlipMutator {
-    fn name(&self) -> &str {
-        "BitFlipMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("BitFlipMutator");
+        &NAME
     }
 }
 
@@ -168,8 +172,9 @@ where
 }
 
 impl Named for ByteFlipMutator {
-    fn name(&self) -> &str {
-        "ByteFlipMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("ByteFlipMutator");
+        &NAME
     }
 }
 
@@ -202,8 +207,9 @@ where
 }
 
 impl Named for ByteIncMutator {
-    fn name(&self) -> &str {
-        "ByteIncMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("ByteIncMutator");
+        &NAME
     }
 }
 
@@ -236,8 +242,9 @@ where
 }
 
 impl Named for ByteDecMutator {
-    fn name(&self) -> &str {
-        "ByteDecMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("ByteDecMutator");
+        &NAME
     }
 }
 
@@ -270,8 +277,9 @@ where
 }
 
 impl Named for ByteNegMutator {
-    fn name(&self) -> &str {
-        "ByteNegMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("ByteNegMutator");
+        &NAME
     }
 }
 
@@ -304,8 +312,9 @@ where
 }
 
 impl Named for ByteRandMutator {
-    fn name(&self) -> &str {
-        "ByteRandMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("ByteRandMutator");
+        &NAME
     }
 }
 
@@ -364,8 +373,9 @@ macro_rules! add_mutator_impl {
         }
 
         impl Named for $name {
-            fn name(&self) -> &str {
-                stringify!($name)
+            fn name(&self) -> &Cow<'static, str> {
+                static NAME: Cow<'static, str> = Cow::Borrowed(stringify!($name));
+                &NAME
             }
         }
 
@@ -403,8 +413,8 @@ macro_rules! interesting_mutator_impl {
                     Ok(MutationResult::Skipped)
                 } else {
                     let bytes = input.bytes_mut();
-                    let upper_bound = (bytes.len() + 1 - size_of::<$size>()) as u64;
-                    let idx = state.rand_mut().below(upper_bound) as usize;
+                    let upper_bound = (bytes.len() + 1 - size_of::<$size>());
+                    let idx = state.rand_mut().below(upper_bound);
                     let val = *state.rand_mut().choose(&$interesting) as $size;
                     let new_bytes = match state.rand_mut().choose(&[0, 1]) {
                         0 => val.to_be_bytes(),
@@ -417,8 +427,9 @@ macro_rules! interesting_mutator_impl {
         }
 
         impl Named for $name {
-            fn name(&self) -> &str {
-                stringify!($name)
+            fn name(&self) -> &Cow<'static, str> {
+                static NAME: Cow<'static, str> = Cow::Borrowed(stringify!($name));
+                &NAME
             }
         }
 
@@ -460,8 +471,9 @@ where
 }
 
 impl Named for BytesDeleteMutator {
-    fn name(&self) -> &str {
-        "BytesDeleteMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("BytesDeleteMutator");
+        &NAME
     }
 }
 
@@ -506,8 +518,9 @@ where
 }
 
 impl Named for BytesExpandMutator {
-    fn name(&self) -> &str {
-        "BytesExpandMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("BytesExpandMutator");
+        &NAME
     }
 }
 
@@ -535,8 +548,8 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let mut amount = 1 + state.rand_mut().below(16) as usize;
-        let offset = state.rand_mut().below(size as u64 + 1) as usize;
+        let mut amount = 1 + state.rand_mut().below(16);
+        let offset = state.rand_mut().below(size + 1);
 
         if size + amount > max_size {
             if max_size > size {
@@ -546,7 +559,7 @@ where
             }
         }
 
-        let val = input.bytes()[state.rand_mut().below(size as u64) as usize];
+        let val = input.bytes()[state.rand_mut().below(size)];
 
         input.bytes_mut().resize(size + amount, 0);
         unsafe {
@@ -559,8 +572,9 @@ where
 }
 
 impl Named for BytesInsertMutator {
-    fn name(&self) -> &str {
-        "BytesInsertMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("BytesInsertMutator");
+        &NAME
     }
 }
 
@@ -588,8 +602,8 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let mut amount = 1 + state.rand_mut().below(16) as usize;
-        let offset = state.rand_mut().below(size as u64 + 1) as usize;
+        let mut amount = 1 + state.rand_mut().below(16);
+        let offset = state.rand_mut().below(size + 1);
 
         if size + amount > max_size {
             if max_size > size {
@@ -612,8 +626,9 @@ where
 }
 
 impl Named for BytesRandInsertMutator {
-    fn name(&self) -> &str {
-        "BytesRandInsertMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("BytesRandInsertMutator");
+        &NAME
     }
 }
 
@@ -650,8 +665,9 @@ where
 }
 
 impl Named for BytesSetMutator {
-    fn name(&self) -> &str {
-        "BytesSetMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("BytesSetMutator");
+        &NAME
     }
 }
 
@@ -688,8 +704,9 @@ where
 }
 
 impl Named for BytesRandSetMutator {
-    fn name(&self) -> &str {
-        "BytesRandSetMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("BytesRandSetMutator");
+        &NAME
     }
 }
 
@@ -716,7 +733,7 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let target = state.rand_mut().below(size as u64) as usize;
+        let target = state.rand_mut().below(size);
         let range = rand_range(state, size, size - target);
 
         unsafe {
@@ -728,8 +745,9 @@ where
 }
 
 impl Named for BytesCopyMutator {
-    fn name(&self) -> &str {
-        "BytesCopyMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("BytesCopyMutator");
+        &NAME
     }
 }
 
@@ -758,7 +776,7 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let target = state.rand_mut().below(size as u64) as usize;
+        let target = state.rand_mut().below(size);
         // make sure that the sampled range is both in bounds and of an acceptable size
         let max_insert_len = min(size - target, state.max_size() - size);
         let range = rand_range(state, size, min(16, max_insert_len));
@@ -787,8 +805,9 @@ where
 }
 
 impl Named for BytesInsertCopyMutator {
-    fn name(&self) -> &str {
-        "BytesInsertCopyMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("BytesInsertCopyMutator");
+        &NAME
     }
 }
 
@@ -990,8 +1009,9 @@ where
 }
 
 impl Named for BytesSwapMutator {
-    fn name(&self) -> &str {
-        "BytesSwapMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("BytesSwapMutator");
+        &NAME
     }
 }
 
@@ -1071,7 +1091,7 @@ where
         }
 
         let range = rand_range(state, other_size, min(other_size, max_size - size));
-        let target = state.rand_mut().below(size as u64) as usize;
+        let target = state.rand_mut().below(size);
 
         let other_testcase = state.corpus().get_from_all(idx)?.borrow_mut();
         // No need to load the input again, it'll still be cached.
@@ -1082,8 +1102,9 @@ where
 }
 
 impl<I> Named for CrossoverInsertMutator<I> {
-    fn name(&self) -> &str {
-        "CrossoverInsertMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("CrossoverInsertMutator");
+        &NAME
     }
 }
 
@@ -1151,7 +1172,7 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let target = state.rand_mut().below(size as u64) as usize;
+        let target = state.rand_mut().below(size);
         let range = rand_range(state, other_size, min(other_size, size - target));
 
         let other_testcase = state.corpus().get_from_all(idx)?.borrow_mut();
@@ -1163,8 +1184,9 @@ where
 }
 
 impl<I> Named for CrossoverReplaceMutator<I> {
-    fn name(&self) -> &str {
-        "CrossoverReplaceMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("CrossoverReplaceMutator");
+        &NAME
     }
 }
 
@@ -1221,13 +1243,13 @@ where
             let (f, l) = locate_diffs(input.bytes(), other.bytes());
 
             if f != l && f >= 0 && l >= 2 {
-                (f as u64, l as u64)
+                (f as usize, l as usize)
             } else {
                 return Ok(MutationResult::Skipped);
             }
         };
 
-        let split_at = state.rand_mut().between(first_diff, last_diff) as usize;
+        let split_at = state.rand_mut().between(first_diff, last_diff);
 
         let other_testcase = state.corpus().get_from_all(idx)?.borrow_mut();
         // Input will already be loaded.
@@ -1242,8 +1264,9 @@ where
 }
 
 impl Named for SpliceMutator {
-    fn name(&self) -> &str {
-        "SpliceMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("SpliceMutator");
+        &NAME
     }
 }
 

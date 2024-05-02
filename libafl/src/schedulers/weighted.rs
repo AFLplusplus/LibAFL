@@ -1,11 +1,14 @@
 //! The queue corpus scheduler with weighted queue item selection [from AFL++](https://github.com/AFLplusplus/AFLplusplus/blob/1d4f1e48797c064ee71441ba555b29fc3f467983/src/afl-fuzz-queue.c#L32).
 //! This queue corpus scheduler needs calibration stage.
 
-use alloc::string::{String, ToString};
 use core::marker::PhantomData;
 
 use hashbrown::HashMap;
-use libafl_bolts::{rands::Rand, Named};
+use libafl_bolts::{
+    rands::Rand,
+    tuples::{Reference, Referenceable},
+    Named,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -95,9 +98,9 @@ libafl_bolts::impl_serdeany!(WeightedScheduleMetadata);
 pub struct WeightedScheduler<C, F, O, S> {
     table_invalidated: bool,
     strat: Option<PowerSchedule>,
-    map_observer_name: String,
+    map_observer_ref: Reference<C>,
     last_hash: usize,
-    phantom: PhantomData<(C, F, O, S)>,
+    phantom: PhantomData<(F, O, S)>,
 }
 
 impl<C, F, O, S> WeightedScheduler<C, F, O, S>
@@ -121,7 +124,7 @@ where
 
         Self {
             strat,
-            map_observer_name: map_observer.name().to_string(),
+            map_observer_ref: map_observer.reference(),
             last_hash: 0,
             table_invalidated: true,
             phantom: PhantomData,
@@ -271,8 +274,8 @@ where
         self.last_hash = hash;
     }
 
-    fn map_observer_name(&self) -> &str {
-        &self.map_observer_name
+    fn map_observer_ref(&self) -> &Reference<C> {
+        &self.map_observer_ref
     }
 }
 
@@ -310,14 +313,14 @@ where
         }
         let corpus_counts = state.corpus().count();
         if corpus_counts == 0 {
-            Err(Error::empty(String::from(
+            Err(Error::empty(
                 "No entries in corpus. This often implies the target is not properly instrumented.",
-            )))
+            ))
         } else {
             let s = random_corpus_id!(state.corpus(), state.rand_mut());
 
-            // Choose a random value between 0.000000000 and 1.000000000
-            let probability = state.rand_mut().between(0, 1000000000) as f64 / 1000000000_f64;
+            // Choose a random value between 0.0 and 1.0
+            let probability = state.rand_mut().next_float();
 
             let wsmeta = state.metadata_mut::<WeightedScheduleMetadata>()?;
 

@@ -19,7 +19,6 @@ use libafl::{
 };
 use libafl_bolts::{
     core_affinity::Cores,
-    current_nanos,
     os::unix_signals::Signal,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
@@ -216,7 +215,7 @@ pub fn fuzz() {
 
             let mut state = state.unwrap_or_else(|| {
                 StdState::new(
-                    StdRand::with_seed(current_nanos()),
+                    StdRand::new(),
                     NopCorpus::new(),
                     NopCorpus::new(),
                     &mut feedback,

@@ -16,7 +16,7 @@ use alloc::string::ToString;
 pub use prometheus::PrometheusMonitor;
 #[cfg(feature = "std")]
 pub mod disk;
-use alloc::{fmt::Debug, string::String, vec::Vec};
+use alloc::{borrow::Cow, fmt::Debug, string::String, vec::Vec};
 use core::{fmt, fmt::Write, time::Duration};
 
 #[cfg(feature = "std")]
@@ -158,7 +158,7 @@ pub enum UserStatsValue {
     /// A Float value
     Float(f64),
     /// A `String`
-    String(String),
+    String(Cow<'static, str>),
     /// A ratio of two values
     Ratio(u64, u64),
     /// Percent
@@ -364,7 +364,7 @@ pub struct ClientStats {
     /// the start time of the client
     pub start_time: Duration,
     /// User-defined monitor
-    pub user_monitor: HashMap<String, UserStats>,
+    pub user_monitor: HashMap<Cow<'static, str>, UserStats>,
     /// Client performance statistics
     #[cfg(feature = "introspection")]
     pub introspection_monitor: ClientPerfMonitor,
@@ -465,7 +465,11 @@ impl ClientStats {
     }
 
     /// Update the user-defined stat with name and value
-    pub fn update_user_stats(&mut self, name: String, value: UserStats) -> Option<UserStats> {
+    pub fn update_user_stats(
+        &mut self,
+        name: Cow<'static, str>,
+        value: UserStats,
+    ) -> Option<UserStats> {
         self.user_monitor.insert(name, value)
     }
 

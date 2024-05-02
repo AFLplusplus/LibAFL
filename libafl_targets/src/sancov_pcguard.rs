@@ -16,11 +16,11 @@ use libafl::executors::{hooks::ExecutorHook, HasObservers};
     feature = "sancov_ngram4",
 ))]
 use crate::coverage::EDGES_MAP;
-use crate::coverage::MAX_EDGES_NUM;
-#[cfg(feature = "pointer_maps")]
-use crate::coverage::{EDGES_MAP_PTR, EDGES_MAP_PTR_NUM};
+use crate::coverage::MAX_EDGES_FOUND;
 #[cfg(feature = "sancov_ngram4")]
 use crate::EDGES_MAP_SIZE_IN_USE;
+#[cfg(feature = "pointer_maps")]
+use crate::{coverage::EDGES_MAP_PTR, EDGES_MAP_SIZE_MAX};
 
 #[cfg(all(feature = "sancov_pcguard_edges", feature = "sancov_pcguard_hitcounts"))]
 #[cfg(not(any(doc, feature = "clippy")))]
@@ -263,7 +263,6 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(mut start: *mut u32
     #[cfg(feature = "pointer_maps")]
     if EDGES_MAP_PTR.is_null() {
         EDGES_MAP_PTR = EDGES_MAP.as_mut_ptr();
-        EDGES_MAP_PTR_NUM = EDGES_MAP.len();
     }
 
     if start == stop || *start != 0 {
@@ -271,17 +270,17 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(mut start: *mut u32
     }
 
     while start < stop {
-        *start = MAX_EDGES_NUM as u32;
+        *start = MAX_EDGES_FOUND as u32;
         start = start.offset(1);
 
         #[cfg(feature = "pointer_maps")]
         {
-            MAX_EDGES_NUM = MAX_EDGES_NUM.wrapping_add(1) % EDGES_MAP_PTR_NUM;
+            MAX_EDGES_FOUND = MAX_EDGES_FOUND.wrapping_add(1) % EDGES_MAP_SIZE_MAX;
         }
         #[cfg(not(feature = "pointer_maps"))]
         {
-            MAX_EDGES_NUM = MAX_EDGES_NUM.wrapping_add(1);
-            assert!((MAX_EDGES_NUM <= EDGES_MAP.len()), "The number of edges reported by SanitizerCoverage exceed the size of the edges map ({}). Use the LIBAFL_EDGES_MAP_SIZE_IN_USE env to increase it at compile time.", EDGES_MAP.len());
+            MAX_EDGES_FOUND = MAX_EDGES_FOUND.wrapping_add(1);
+            assert!((MAX_EDGES_FOUND <= EDGES_MAP.len()), "The number of edges reported by SanitizerCoverage exceed the size of the edges map ({}). Use the LIBAFL_EDGES_MAP_SIZE_IN_USE env to increase it at compile time.", EDGES_MAP.len());
         }
     }
 }

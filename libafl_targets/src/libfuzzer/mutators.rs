@@ -1,4 +1,7 @@
-use alloc::rc::{Rc, Weak};
+use alloc::{
+    borrow::Cow,
+    rc::{Rc, Weak},
+};
 use std::{
     cell::RefCell,
     marker::PhantomData,
@@ -279,8 +282,9 @@ where
 }
 
 impl<MT, SM> Named for LLVMCustomMutator<MT, SM, false> {
-    fn name(&self) -> &str {
-        "LLVMCustomMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("LLVMCustomMutator");
+        &NAME
     }
 }
 
@@ -353,8 +357,9 @@ where
 }
 
 impl<MT, SM> Named for LLVMCustomMutator<MT, SM, true> {
-    fn name(&self) -> &str {
-        "LLVMCustomCrossover"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("LLVMCustomCrossover");
+        &NAME
     }
 }
 

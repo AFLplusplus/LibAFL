@@ -1,10 +1,13 @@
 //! Coverage accounting corpus scheduler, more details at <https://www.ndss-symposium.org/wp-content/uploads/2020/02/24422-paper.pdf>
 
 use alloc::vec::Vec;
-use core::fmt::Debug;
+use core::{
+    fmt::Debug,
+    ops::{Deref, DerefMut},
+};
 
 use hashbrown::HashMap;
-use libafl_bolts::{rands::Rand, AsMutSlice, AsSlice, HasLen, HasRefCnt};
+use libafl_bolts::{rands::Rand, HasLen, HasRefCnt};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -35,19 +38,15 @@ pub struct AccountingIndexesMetadata {
 
 libafl_bolts::impl_serdeany!(AccountingIndexesMetadata);
 
-impl AsSlice for AccountingIndexesMetadata {
-    type Entry = usize;
-    /// Convert to a slice
-    fn as_slice(&self) -> &[usize] {
-        self.list.as_slice()
+impl Deref for AccountingIndexesMetadata {
+    type Target = [usize];
+    fn deref(&self) -> &[usize] {
+        &self.list
     }
 }
-impl AsMutSlice for AccountingIndexesMetadata {
-    type Entry = usize;
-
-    /// Convert to a slice
-    fn as_mut_slice(&mut self) -> &mut [usize] {
-        self.list.as_mut_slice()
+impl DerefMut for AccountingIndexesMetadata {
+    fn deref_mut(&mut self) -> &mut [usize] {
+        &mut self.list
     }
 }
 
@@ -112,7 +111,7 @@ where
     CS::State: Debug,
 {
     accounting_map: &'a [u32],
-    skip_non_favored_prob: u64,
+    skip_non_favored_prob: f64,
     inner: MinimizerScheduler<
         CS,
         LenTimeMulTestcaseScore<<CS as UsesState>::State>,
@@ -171,7 +170,7 @@ where
                 .borrow()
                 .has_metadata::<IsFavoredMetadata>();
             has
-        } && state.rand_mut().below(100) < self.skip_non_favored_prob
+        } && state.rand_mut().coinflip(self.skip_non_favored_prob)
         {
             idx = self.inner.base_mut().next(state)?;
         }
@@ -338,7 +337,7 @@ where
         observer: &O,
         state: &mut CS::State,
         base: CS,
-        skip_non_favored_prob: u64,
+        skip_non_favored_prob: f64,
         accounting_map: &'a [u32],
     ) -> Self {
         match state.metadata_map().get::<TopAccountingMetadata>() {

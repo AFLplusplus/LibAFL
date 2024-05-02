@@ -1,8 +1,11 @@
-use alloc::string::{String, ToString};
-use core::{fmt::Debug, hash::Hash, marker::PhantomData};
+use alloc::borrow::Cow;
+use core::{fmt::Debug, hash::Hash};
 
 use hashbrown::HashSet;
-use libafl_bolts::{Error, HasRefCnt, Named};
+use libafl_bolts::{
+    tuples::{MatchNameRef, Reference, Referenceable},
+    Error, HasRefCnt, Named,
+};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
@@ -70,10 +73,8 @@ pub struct ListFeedback<T>
 where
     T: Hash + Eq,
 {
-    name: String,
-    observer_name: String,
+    obs_ref: Reference<ListObserver<T>>,
     novelty: HashSet<T>,
-    phantom: PhantomData<T>,
 }
 
 libafl_bolts::impl_serdeany!(
@@ -88,7 +89,7 @@ where
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         // eprintln!("self.name {:#?}", &self.name);
-        state.add_named_metadata(&self.name, ListFeedbackMetadata::<T>::default());
+        state.add_named_metadata(self.name(), ListFeedbackMetadata::<T>::default());
         Ok(())
     }
     #[allow(clippy::wrong_self_convention)]
@@ -105,15 +106,13 @@ where
         OT: ObserversTuple<S>,
     {
         // TODO Replace with match_name_type when stable
-        let observer = observers
-            .match_name::<ListObserver<T>>(&self.observer_name)
-            .unwrap();
+        let observer = observers.get(&self.obs_ref).unwrap();
         // TODO register the list content in a testcase metadata
         self.novelty.clear();
         // can't fail
         let history_set = state
             .named_metadata_map_mut()
-            .get_mut::<ListFeedbackMetadata<T>>(&self.name)
+            .get_mut::<ListFeedbackMetadata<T>>(self.name())
             .unwrap();
         for v in observer.list() {
             if !history_set.set.contains(v) {
@@ -136,7 +135,7 @@ where
     {
         let history_set = state
             .named_metadata_map_mut()
-            .get_mut::<ListFeedbackMetadata<T>>(&self.name)
+            .get_mut::<ListFeedbackMetadata<T>>(self.name())
             .unwrap();
 
         for v in &self.novelty {
@@ -151,8 +150,8 @@ where
     T: Debug + Serialize + Hash + Eq + DeserializeOwned,
 {
     #[inline]
-    fn name(&self) -> &str {
-        self.name.as_str()
+    fn name(&self) -> &Cow<'static, str> {
+        self.obs_ref.name()
     }
 }
 
@@ -164,10 +163,8 @@ where
     #[must_use]
     pub fn new(observer: &ListObserver<T>) -> Self {
         Self {
-            name: observer.name().to_string(),
-            observer_name: observer.name().to_string(),
+            obs_ref: observer.reference(),
             novelty: HashSet::<T>::new(),
-            phantom: PhantomData,
         }
     }
 }

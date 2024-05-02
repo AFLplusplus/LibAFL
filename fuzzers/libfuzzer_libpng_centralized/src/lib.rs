@@ -8,7 +8,7 @@ use std::{env, net::SocketAddr, path::PathBuf};
 use clap::{self, Parser};
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
-    events::{launcher::CentralizedLauncher, EventConfig},
+    events::{centralized::CentralizedEventManager, launcher::CentralizedLauncher, EventConfig},
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -27,7 +27,6 @@ use libafl::{
 };
 use libafl_bolts::{
     core_affinity::{CoreId, Cores},
-    current_nanos,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
@@ -136,7 +135,9 @@ pub extern "C" fn libafl_main() {
 
     let monitor = MultiMonitor::new(|s| println!("{s}"));
 
-    let mut run_client = |state: Option<_>, mut mgr, _core_id: CoreId| {
+    let mut run_client = |state: Option<_>,
+                          mut mgr: CentralizedEventManager<_, _>,
+                          _core_id: CoreId| {
         // Create an observation channel using the coverage map
         let edges_observer =
             HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") }).track_indices();
@@ -150,7 +151,7 @@ pub extern "C" fn libafl_main() {
             // New maximization map feedback linked to the edges observer and the feedback state
             MaxMapFeedback::new(&edges_observer),
             // Time feedback, this one does not need a feedback state
-            TimeFeedback::with_observer(&time_observer)
+            TimeFeedback::new(&time_observer)
         );
 
         // A feedback to choose if an input is a solution or not
@@ -160,7 +161,7 @@ pub extern "C" fn libafl_main() {
         let mut state = state.unwrap_or_else(|| {
             StdState::new(
                 // RNG
-                StdRand::with_seed(current_nanos()),
+                StdRand::new(),
                 // Corpus that will be evolved, we keep it in memory for performance
                 InMemoryCorpus::new(),
                 // Corpus in which we store solutions (crashes in this example),
@@ -242,16 +243,23 @@ pub extern "C" fn libafl_main() {
                 .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &opt.input));
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
-
-        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+        if !mgr.is_main() {
+            fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+        } else {
+            let mut empty_stages = tuple_list!();
+            fuzzer.fuzz_loop(&mut empty_stages, &mut executor, &mut state, &mut mgr)?;
+        }
         Ok(())
     };
+
+    let mut main_run_client = run_client.clone(); // clone it just for borrow checker
 
     match CentralizedLauncher::builder()
         .shmem_provider(shmem_provider)
         .configuration(EventConfig::from_name("default"))
         .monitor(monitor)
         .run_client(&mut run_client)
+        .main_run_client(&mut main_run_client)
         .cores(&cores)
         .broker_port(broker_port)
         .remote_broker_addr(opt.remote_broker_addr)

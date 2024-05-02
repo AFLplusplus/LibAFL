@@ -18,10 +18,7 @@ use libafl_bolts::shmem::UnixShMemProvider;
 #[cfg(windows)]
 use libafl_bolts::shmem::Win32ShMemProvider;
 use libafl_bolts::{
-    ownedref::OwnedMutPtr,
-    rands::{RandomSeed, StdRand},
-    shmem::ShMemProvider,
-    tuples::tuple_list,
+    ownedref::OwnedMutPtr, rands::StdRand, shmem::ShMemProvider, tuples::tuple_list,
 };
 use libafl_tinyinst::executor::TinyInstExecutorBuilder;
 static mut COVERAGE: Vec<u64> = vec![];

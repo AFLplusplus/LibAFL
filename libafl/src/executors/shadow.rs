@@ -2,6 +2,8 @@
 
 use core::fmt::{self, Debug, Formatter};
 
+use libafl_bolts::tuples::RefIndexable;
+
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
     observers::{ObserversTuple, UsesObservers},
@@ -45,14 +47,14 @@ where
 
     /// The shadow observers are not considered by the feedbacks and the manager, mutable
     #[inline]
-    pub fn shadow_observers(&self) -> &SOT {
-        &self.shadow_observers
+    pub fn shadow_observers(&self) -> RefIndexable<&SOT, SOT> {
+        RefIndexable::from(&self.shadow_observers)
     }
 
     /// The shadow observers are not considered by the feedbacks and the manager, mutable
     #[inline]
-    pub fn shadow_observers_mut(&mut self) -> &mut SOT {
-        &mut self.shadow_observers
+    pub fn shadow_observers_mut(&mut self) -> RefIndexable<&mut SOT, SOT> {
+        RefIndexable::from(&mut self.shadow_observers)
     }
 }
 
@@ -94,12 +96,12 @@ where
     SOT: ObserversTuple<E::State>,
 {
     #[inline]
-    fn observers(&self) -> &Self::Observers {
+    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         self.executor.observers()
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut Self::Observers {
+    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
         self.executor.observers_mut()
     }
 }

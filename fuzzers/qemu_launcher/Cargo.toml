@@ -38,7 +38,7 @@ vergen = { version = "8.2.1", features = ["build", "cargo", "git", "gitcl", "rus
 [dependencies]
 clap = { version = "4.3.0", features = ["derive", "string"]}
 libafl = { path = "../../libafl/" }
-libafl_bolts = { path = "../../libafl_bolts/" }
+libafl_bolts = { path = "../../libafl_bolts/", features = ["errors_backtrace"] }
 libafl_qemu = { path = "../../libafl_qemu/", features = ["usermode"] }
 log = {version = "0.4.20" }
 nix = { version = "0.27", features = ["fs"] }

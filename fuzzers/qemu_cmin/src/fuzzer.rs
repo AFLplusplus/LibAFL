@@ -20,17 +20,15 @@ use libafl::{
 };
 use libafl_bolts::{
     core_affinity::Cores,
-    current_nanos,
     os::unix_signals::Signal,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
-    AsMutSlice, AsSlice,
+    AsSlice, AsSliceMut,
 };
 use libafl_qemu::{
     edges::{QemuEdgeCoverageChildHelper, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},
     elf::EasyElf,
-    emu::Emulator,
     ArchExtras, CallingConvention, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExitReason,
     QemuExitReasonError, QemuForkExecutor, QemuHooks, QemuShutdownCause, Regs,
 };
@@ -159,7 +157,7 @@ pub fn fuzz() -> Result<(), Error> {
     };
 
     let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_SIZE_IN_USE).unwrap();
-    let edges = edges_shmem.as_mut_slice();
+    let edges = edges_shmem.as_slice_mut();
     unsafe { EDGES_MAP_PTR = edges.as_mut_ptr() };
 
     let edges_observer = unsafe {
@@ -176,7 +174,7 @@ pub fn fuzz() -> Result<(), Error> {
 
     let mut state = state.unwrap_or_else(|| {
         StdState::new(
-            StdRand::with_seed(current_nanos()),
+            StdRand::new(),
             InMemoryOnDiskCorpus::new(PathBuf::from(options.output)).unwrap(),
             NopCorpus::new(),
             &mut feedback,

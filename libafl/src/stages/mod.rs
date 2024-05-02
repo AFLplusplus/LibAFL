@@ -4,8 +4,8 @@ A well-known [`Stage`], for example, is the mutational stage, running multiple [
 Other stages may enrich [`crate::corpus::Testcase`]s with metadata.
 */
 
-use alloc::{boxed::Box, vec::Vec};
-use core::{any, marker::PhantomData};
+use alloc::{borrow::Cow, boxed::Box, vec::Vec};
+use core::marker::PhantomData;
 
 pub use calibrate::CalibrationStage;
 pub use colorization::*;
@@ -305,8 +305,9 @@ where
     CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<(), Error>,
     E: UsesState,
 {
-    fn name(&self) -> &str {
-        any::type_name::<Self>()
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("<unnamed fn>");
+        &NAME
     }
 }
 
@@ -428,11 +429,12 @@ where
 
         push_stage.set_current_corpus_idx(corpus_idx);
 
-        push_stage.init(fuzzer, state, event_mgr, executor.observers_mut())?;
+        push_stage.init(fuzzer, state, event_mgr, &mut *executor.observers_mut())?;
 
         loop {
             let input =
-                match push_stage.pre_exec(fuzzer, state, event_mgr, executor.observers_mut()) {
+                match push_stage.pre_exec(fuzzer, state, event_mgr, &mut *executor.observers_mut())
+                {
                     Some(Ok(next_input)) => next_input,
                     Some(Err(err)) => return Err(err),
                     None => break,
@@ -444,14 +446,14 @@ where
                 fuzzer,
                 state,
                 event_mgr,
-                executor.observers_mut(),
+                &mut *executor.observers_mut(),
                 input,
                 exit_kind,
             )?;
         }
 
         self.push_stage
-            .deinit(fuzzer, state, event_mgr, executor.observers_mut())
+            .deinit(fuzzer, state, event_mgr, &mut *executor.observers_mut())
     }
 
     #[inline]
@@ -644,6 +646,7 @@ impl ExecutionCountRestartHelper {
 
 #[cfg(test)]
 pub mod test {
+    use alloc::borrow::Cow;
     use core::marker::PhantomData;
 
     use libafl_bolts::{impl_serdeany, Error, Named};
@@ -745,8 +748,9 @@ pub mod test {
         struct StageWithOneTry;
 
         impl Named for StageWithOneTry {
-            fn name(&self) -> &str {
-                "TestStage"
+            fn name(&self) -> &Cow<'static, str> {
+                static NAME: Cow<'static, str> = Cow::Borrowed("TestStage");
+                &NAME
             }
         }
 

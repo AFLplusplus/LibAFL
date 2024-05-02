@@ -173,6 +173,24 @@ where
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct InputLocation {
+    mem_chunk: EmulatorMemoryChunk,
+    cpu: CPU,
+    ret_register: Option<Regs>,
+}
+
+impl InputLocation {
+    #[must_use]
+    pub fn new(mem_chunk: EmulatorMemoryChunk, cpu: CPU, ret_register: Option<Regs>) -> Self {
+        Self {
+            mem_chunk,
+            cpu,
+            ret_register,
+        }
+    }
+}
+
 /// Synchronous Exit handler maintaining only one snapshot.
 #[derive(Debug, Clone)]
 pub struct StdEmuExitHandler<SM>
@@ -181,7 +199,7 @@ where
 {
     snapshot_manager: RefCell<SM>,
     snapshot_id: OnceCell<SnapshotId>,
-    input_location: OnceCell<(EmulatorMemoryChunk, Option<Regs>)>,
+    input_location: OnceCell<InputLocation>,
 }
 
 impl<SM> StdEmuExitHandler<SM>
@@ -196,12 +214,8 @@ where
         }
     }
 
-    pub fn set_input_location(
-        &self,
-        input_location: EmulatorMemoryChunk,
-        ret_reg: Option<Regs>,
-    ) -> Result<(), (EmulatorMemoryChunk, Option<Regs>)> {
-        self.input_location.set((input_location, ret_reg))
+    pub fn set_input_location(&self, input_location: InputLocation) -> Result<(), InputLocation> {
+        self.input_location.set(input_location)
     }
 
     pub fn set_snapshot_id(&self, snapshot_id: SnapshotId) -> Result<(), SnapshotId> {
@@ -236,10 +250,11 @@ where
     ) {
         let exit_handler = emu.state().exit_handler.borrow();
 
-        if let Some((input_location, ret_register)) = exit_handler.input_location.get() {
-            let input_command = InputCommand::new(input_location.clone());
+        if let Some(input_location) = exit_handler.input_location.get() {
+            let input_command =
+                InputCommand::new(input_location.mem_chunk.clone(), input_location.cpu.clone());
             input_command
-                .run(emu, qemu_executor_state, input, *ret_register)
+                .run(emu, qemu_executor_state, input, input_location.ret_register)
                 .unwrap();
         }
     }
@@ -360,7 +375,7 @@ pub const SKIP_EXEC_HOOK: u64 = u64::MAX;
 
 pub use libafl_qemu_sys::{CPUArchState, CPUState};
 
-use crate::sync_backdoor::{SyncBackdoor, SyncBackdoorError};
+use crate::sync_exit::{SyncBackdoor, SyncBackdoorError};
 
 // syshook_ret
 #[repr(C)]
@@ -1161,6 +1176,18 @@ impl Qemu {
         }
     }
 
+    /// `data` can be used to pass data that can be accessed as the first argument in the `gen` and the `exec` functions
+    ///
+    /// `gen` gets passed the current programm counter, mutable access to a `TCGTemp` and information about the memory
+    /// access being performed.
+    ///  The `u64` return value is an id that gets passed to the `exec` functions as their second argument.
+    ///
+    /// `exec` hooks get invoked on every read performed by the guest
+    ///
+    /// `exec1`-`exec8` special case accesses of width 1-8
+    ///
+    /// If there is no specialized hook for a given read width, the `exec_n` will be
+    /// called and its last argument will specify the access width
     #[allow(clippy::missing_transmute_annotations)]
     pub fn add_read_hooks<T: Into<HookData>>(
         &self,

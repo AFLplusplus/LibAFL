@@ -25,11 +25,10 @@ use libafl::{
     Error,
 };
 use libafl_bolts::{
-    current_nanos,
     rands::StdRand,
     shmem::{unix_shmem, ShMem, ShMemId, ShMemProvider},
     tuples::tuple_list,
-    AsMutSlice, AsSlice,
+    AsSlice, AsSliceMut,
 };
 
 #[allow(clippy::similar_names)]
@@ -39,7 +38,7 @@ pub fn main() {
     let shmem_id = signals.id();
 
     // Create an observation channel using the signals map
-    let observer = unsafe { StdMapObserver::new("signals", signals.as_mut_slice()) };
+    let observer = unsafe { StdMapObserver::new("signals", signals.as_slice_mut()) };
     // Create a stacktrace observer
     let bt_observer = AsanBacktraceObserver::new("AsanBacktraceObserver");
 
@@ -53,7 +52,7 @@ pub fn main() {
     // create a State from scratch
     let mut state = StdState::new(
         // RNG
-        StdRand::with_seed(current_nanos()),
+        StdRand::new(),
         // Corpus that will be evolved, we keep it in memory for performance
         InMemoryCorpus::new(),
         // Corpus in which we store solutions (crashes in this example),

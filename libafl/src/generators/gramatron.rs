@@ -76,13 +76,13 @@ where
                 .last()
                 .map_or(self.automaton.init_state, |last| {
                     let triggers = &self.automaton.pda[last.state];
-                    let idx = state.rand_mut().below(triggers.len() as u64) as usize;
+                    let idx = state.rand_mut().below(triggers.len());
                     triggers[idx].dest
                 });
 
         while current_state != final_state {
             let triggers = &self.automaton.pda[current_state];
-            let idx = state.rand_mut().below(triggers.len() as u64) as usize;
+            let idx = state.rand_mut().below(triggers.len());
             let trigger = &triggers[idx];
             input
                 .terminals_mut()

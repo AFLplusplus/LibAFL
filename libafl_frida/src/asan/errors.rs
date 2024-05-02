@@ -1,5 +1,6 @@
 //! Errors that can be caught by the `libafl_frida` address sanitizer.
 use std::{
+    borrow::Cow,
     fmt::Debug,
     io::Write,
     marker::PhantomData,
@@ -21,7 +22,11 @@ use libafl::{
     state::State,
     Error, HasMetadata,
 };
-use libafl_bolts::{ownedref::OwnedPtr, Named, SerdeAny};
+use libafl_bolts::{
+    ownedref::OwnedPtr,
+    tuples::{MatchNameRef, Reference, Referenceable},
+    Named, SerdeAny,
+};
 use serde::{Deserialize, Serialize};
 use termcolor::{Color, ColorSpec, WriteColor};
 #[cfg(target_arch = "aarch64")]
@@ -587,8 +592,9 @@ where
 
 impl Named for AsanErrorsObserver {
     #[inline]
-    fn name(&self) -> &str {
-        "AsanErrors"
+    fn name(&self) -> &Cow<'static, str> {
+        static ASAN_ERRORS_NAME: Cow<'static, str> = Cow::Borrowed("AsanErrors");
+        &ASAN_ERRORS_NAME
     }
 }
 
@@ -640,6 +646,7 @@ impl AsanErrorsObserver {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AsanErrorsFeedback<S> {
     errors: Option<AsanErrors>,
+    obs_ref: Reference<AsanErrorsObserver>,
     phantom: PhantomData<S>,
 }
 
@@ -662,7 +669,7 @@ where
         OT: ObserversTuple<S>,
     {
         let observer = observers
-            .match_name::<AsanErrorsObserver>("AsanErrors")
+            .get(&self.obs_ref)
             .expect("An AsanErrorsFeedback needs an AsanErrorsObserver");
         let errors = observer.errors();
         if errors.is_empty() {
@@ -698,24 +705,19 @@ where
 
 impl<S> Named for AsanErrorsFeedback<S> {
     #[inline]
-    fn name(&self) -> &str {
-        "AsanErrors"
+    fn name(&self) -> &Cow<'static, str> {
+        self.obs_ref.name()
     }
 }
 
 impl<S> AsanErrorsFeedback<S> {
     /// Create a new `AsanErrorsFeedback`
     #[must_use]
-    pub fn new() -> Self {
+    pub fn new(obs: &AsanErrorsObserver) -> Self {
         Self {
             errors: None,
+            obs_ref: obs.reference(),
             phantom: PhantomData,
         }
-    }
-}
-
-impl<S> Default for AsanErrorsFeedback<S> {
-    fn default() -> Self {
-        Self::new()
     }
 }

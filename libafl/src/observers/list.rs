@@ -1,7 +1,4 @@
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{borrow::Cow, vec::Vec};
 use core::fmt::Debug;
 
 use libafl_bolts::{ownedref::OwnedMutPtr, Error, Named};
@@ -11,13 +8,10 @@ use crate::{inputs::UsesInput, observers::Observer};
 
 /// A simple observer with a list of things.
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(bound = "T: serde::de::DeserializeOwned")]
+#[serde(bound = "T: serde::de::DeserializeOwned + serde::Serialize")]
 #[allow(clippy::unsafe_derive_deserialize)]
-pub struct ListObserver<T>
-where
-    T: Debug + Serialize,
-{
-    name: String,
+pub struct ListObserver<T> {
+    name: Cow<'static, str>,
     /// The list
     list: OwnedMutPtr<Vec<T>>,
 }
@@ -34,7 +28,7 @@ where
     #[must_use]
     pub fn new(name: &'static str, list: OwnedMutPtr<Vec<T>>) -> Self {
         Self {
-            name: name.to_string(),
+            name: Cow::from(name),
             list,
         }
     }
@@ -67,7 +61,7 @@ impl<T> Named for ListObserver<T>
 where
     T: Debug + Serialize + serde::de::DeserializeOwned,
 {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }

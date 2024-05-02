@@ -1,7 +1,4 @@
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{borrow::Cow, vec::Vec};
 use core::{fmt::Debug, marker::PhantomData};
 
 use libafl::{
@@ -68,13 +65,10 @@ struct cmp_map {
 
 /// A [`CmpObserver`] observer for AFL++ redqueen
 #[derive(Serialize, Deserialize, Debug)]
-pub struct AFLppCmpLogObserver<'a, S>
-where
-    S: UsesInput + HasMetadata,
-{
+pub struct AFLppCmpLogObserver<'a, S> {
     cmp_map: OwnedRefMut<'a, AFLppCmpLogMap>,
     size: Option<OwnedRefMut<'a, usize>>,
-    name: String,
+    name: Cow<'static, str>,
     add_meta: bool,
     original: <AFLppCmpValuesMetadata as CmpObserverMetadata<'a, AFLppCmpLogMap>>::Data,
     phantom: PhantomData<S>,
@@ -83,7 +77,7 @@ where
 impl<'a, S> CmpObserver<'a, AFLppCmpLogMap, S, AFLppCmpValuesMetadata>
     for AFLppCmpLogObserver<'a, S>
 where
-    S: UsesInput + Debug + HasMetadata,
+    S: UsesInput + HasMetadata,
 {
     /// Get the number of usable cmps (all by default)
     fn usable_count(&self) -> usize {
@@ -145,7 +139,7 @@ where
 
 impl<'a, S> Observer<S> for AFLppCmpLogObserver<'a, S>
 where
-    S: UsesInput + Debug + HasMetadata,
+    S: UsesInput + HasMetadata,
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         #[cfg(feature = "cmplog_extended_instrumentation")]
@@ -179,19 +173,13 @@ where
     }
 }
 
-impl<'a, S> Named for AFLppCmpLogObserver<'a, S>
-where
-    S: UsesInput + HasMetadata,
-{
-    fn name(&self) -> &str {
+impl<'a, S> Named for AFLppCmpLogObserver<'a, S> {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<'a, S> AFLppCmpLogObserver<'a, S>
-where
-    S: UsesInput + HasMetadata,
-{
+impl<'a, S> AFLppCmpLogObserver<'a, S> {
     /// Creates a new [`AFLppCmpLogObserver`] with the given name and map.
     #[must_use]
     pub fn new(
@@ -200,7 +188,7 @@ where
         add_meta: bool,
     ) -> Self {
         Self {
-            name: name.to_string(),
+            name: Cow::from(name),
             size: None,
             cmp_map,
             add_meta,
@@ -223,7 +211,7 @@ where
         size: OwnedRefMut<'a, usize>,
     ) -> Self {
         Self {
-            name: name.to_string(),
+            name: Cow::from(name),
             size: Some(size),
             cmp_map,
             add_meta,
