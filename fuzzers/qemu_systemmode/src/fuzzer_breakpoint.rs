@@ -5,7 +5,7 @@ use std::{env, path::PathBuf, process};
 
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
-    events::{launcher::Launcher, EventConfig},
+    events::{launcher::Launcher, EventConfig, CTRL_C_EXIT},
     executors::ExitKind,
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -133,7 +133,7 @@ pub fn fuzz() {
                         }
                         HandlerResult::EndOfRun(exit_kind) => return exit_kind,
                         HandlerResult::Interrupted => {
-                            std::process::exit(0);
+                            std::process::exit(CTRL_C_EXIT);
                         }
                     },
                     Err(handler_error) => match handler_error {
