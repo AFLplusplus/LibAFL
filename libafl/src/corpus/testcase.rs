@@ -66,7 +66,7 @@ where
     /// If the testcase is "disabled"
     disabled: bool,
     /// has found crash (or timeout) or not
-    found_objectives: bool,
+    objectives_found: usize,
 }
 
 impl<I> HasMetadata for Testcase<I>
@@ -229,7 +229,7 @@ where
             scheduled_count: 0,
             parent_id: None,
             disabled: false,
-            found_objectives: false,
+            objectives_found: 0,
         }
     }
 
@@ -251,7 +251,7 @@ where
             scheduled_count: 0,
             parent_id: Some(parent_id),
             disabled: false,
-            found_objectives: false,
+            objectives_found: 0,
         }
     }
 
@@ -273,7 +273,7 @@ where
             scheduled_count: 0,
             parent_id: None,
             disabled: false,
-            found_objectives: false,
+            objectives_found: 0,
         }
     }
 
@@ -295,7 +295,7 @@ where
             scheduled_count: 0,
             parent_id: None,
             disabled: false,
-            found_objectives: false,
+            objectives_found: 0,
         }
     }
 
@@ -315,14 +315,14 @@ where
         self.parent_id = parent_id;
     }
 
-    /// Gets if this testcase has generated any objectives or not
-    pub fn found_objectives(&self) -> bool {
-        self.found_objectives
+    /// Gets how many objectives were found by mutating this testcase
+    pub fn objectives_found(&self) -> usize {
+        self.objectives_found
     }
 
-    /// Sets `objectives_found`. mostly called from crash handler
-    pub fn set_found_objectives(&mut self, found: bool) {
-        self.found_objectives = found;
+    /// Adds one objectives to the `objectives_found` counter. Mostly called from crash handler or executor.
+    pub fn found_objective(&mut self) {
+        self.objectives_found.saturating_add(1);
     }
 }
 
@@ -347,7 +347,7 @@ where
             #[cfg(feature = "std")]
             metadata_path: None,
             disabled: false,
-            found_objectives: false,
+            objectives_found: 0,
         }
     }
 }
