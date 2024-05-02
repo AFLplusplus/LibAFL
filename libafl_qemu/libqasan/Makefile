@@ -18,7 +18,7 @@ OUT_DIR     ?= .
 override CFLAGS      += -Wno-int-to-void-pointer-cast -ggdb -O1 -fno-builtin -Wno-unused-result
 override LDFLAGS     += -ldl -pthread
 
-SRC := libqasan.c hooks.c malloc.c string.c uninstrument.c patch.c dlmalloc.c printf/printf.c
+SRC := libqasan.c hooks.c malloc.c mmap.c string.c uninstrument.c patch.c dlmalloc.c printf/printf.c
 HDR := libqasan.h qasan.h map_macro.h printf/printf.h
 
 all: $(OUT_DIR)/libgasan.so $(OUT_DIR)/libqasan.so
