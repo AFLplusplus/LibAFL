@@ -159,9 +159,16 @@ const X86_64_REGS: [(RegSpec, X86Register); 34] = [
     (RegSpec::rip(), X86Register::Rip),
 ];
 
+
+/// Get the value of a register given a context
 #[cfg(target_arch = "x86_64")]
+<<<<<<< HEAD
 pub fn get_register(context: &CpuContext, reg: X86Register) -> u64 {
     println!("{:?}", reg);
+=======
+pub fn get_register(context: &CpuContext, reg: X86Register) -> u64
+{
+>>>>>>> f255a826b667a7b54564c5490ee07c9957087da6
     match reg {
         X86Register::Rax => context.rax(),
         X86Register::Rbx => context.rbx(),
