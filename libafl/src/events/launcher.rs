@@ -28,12 +28,12 @@ use std::process::Stdio;
 #[cfg(all(unix, feature = "std"))]
 use std::{fs::File, os::unix::io::AsRawFd};
 
+#[cfg(all(unix, feature = "std"))]
+use libafl_bolts::os::dup2;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use libafl_bolts::os::startable_self;
 #[cfg(feature = "adaptive_serialization")]
 use libafl_bolts::tuples::{Reference, Referenceable};
-#[cfg(all(unix, feature = "std"))]
-use libafl_bolts::os::dup2;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use libafl_bolts::{
     core_affinity::get_core_ids,
@@ -155,11 +155,13 @@ where
             .field("core", &self.cores)
             .field("spawn_broker", &self.spawn_broker)
             .field("remote_broker_addr", &self.remote_broker_addr);
-        if cfg!(all(unix, feature = "std")) {
+        #[cfg(all(unix, feature = "std"))]
+        {
             dbg_struct
                 .field("stdout_file", &self.stdout_file)
                 .field("stderr_file", &self.stderr_file);
         }
+
         dbg_struct.finish_non_exhaustive()
     }
 }
@@ -365,33 +367,38 @@ where
                 log::info!("spawning on cores: {:?}", self.cores);
 
                 let debug_output = std::env::var("LIBAFL_DEBUG_OUTPUT").is_ok();
-                // Set own stdio and stderr as set by the user
-                if cfg!(all(unix, feature = "std")) && !debug_output {
-                    let opened_stdout_file = self
-                        .stdout_file
-                        .map(|filename| File::create(filename).unwrap());
-                    let opened_stderr_file = self
-                        .stderr_file
-                        .map(|filename| File::create(filename).unwrap());
-                    if let Some(file) = opened_stdout_file {
-                        dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
-                        if let Some(stderr) = opened_stderr_file {
-                            dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
-                        } else {
-                            dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
+                #[cfg(all(feature = "std", unix))]
+                {
+                    // Set own stdout and stderr as set by the user
+                    if !debug_output {
+                        let opened_stdout_file = self
+                            .stdout_file
+                            .map(|filename| File::create(filename).unwrap());
+                        let opened_stderr_file = self
+                            .stderr_file
+                            .map(|filename| File::create(filename).unwrap());
+                        if let Some(file) = opened_stdout_file {
+                            dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
+                            if let Some(stderr) = opened_stderr_file {
+                                dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
+                            } else {
+                                dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
+                            }
                         }
                     }
                 }
                 //spawn clients
                 for (id, _) in core_ids.iter().enumerate().take(num_cores) {
                     if self.cores.ids.iter().any(|&x| x == id.into()) {
-                        // tuple because `Stdio` isn't clone
-                        let (stdout,stderr) = if self.stdout_file.is_some() || self.stderr_file.is_some() {
-                            (Stdio::inherit(),Stdio::inherit())
-                        } else {
-                            (Stdio::null(),Stdio::null())
-                        };
-
+                        // Forward own stdio to child processes, if requested by user
+                        let (mut stdout, mut stderr) = (Stdio::null(), Stdio::null());
+                        #[cfg(all(feature = "std", unix))]
+                        {
+                            if self.stdout_file.is_some() || self.stderr_file.is_some() {
+                                stdout = Stdio::inherit();
+                                stderr = Stdio::inherit();
+                            };
+                        }
                         std::env::set_var(_AFL_LAUNCHER_CLIENT, id.to_string());
                         let mut child = startable_self()?;
                         let child = (if debug_output {
