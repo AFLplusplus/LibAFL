@@ -473,15 +473,22 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
         }
     };
 
-    Launcher::builder()
+    let builder = Launcher::builder()
         .configuration(EventConfig::AlwaysUnique)
         .shmem_provider(shmem_provider)
         .monitor(monitor)
         .run_client(&mut run_client)
         .cores(&options.cores)
         .broker_port(options.broker_port)
-        .stdout_file(Some(&options.stdout))
-        .remote_broker_addr(options.remote_broker_addr)
-        .build()
-        .launch()
+        .remote_broker_addr(options.remote_broker_addr);
+
+    #[cfg(all(unix, feature = "std"))]
+    {
+        return builder.stdout_file(Some(&options.stdout)).build().launch();
+    }
+
+    #[cfg(not(all(unix, feature = "std")))]
+    {
+        return builder.build().launch();
+    }
 }
