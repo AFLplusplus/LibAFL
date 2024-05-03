@@ -334,11 +334,47 @@ where
 
         let mut child = self.configurer.spawn_child(input)?;
 
-        let res = match child
+        let res = child
             .wait_timeout(self.configurer.exec_timeout())
-            .expect("waiting on child failed")
-            .map(|status| status.signal())
-        {
+            .expect("waiting on child failed");
+
+        if self.observers.observes_stderr() {
+            let mut stderr = Vec::new();
+            child.stderr.as_mut().ok_or_else(|| {
+                Error::illegal_state(
+                    "Observer tries to read stderr, but stderr was not `Stdio::pipe` in CommandExecutor",
+                )
+            })?.read_to_end(&mut stderr)?;
+            self.observers.observe_stderr(&stderr);
+        }
+
+        if self.observers.observes_stdout() {
+            let mut stdout = Vec::new();
+            child.stdout.as_mut().ok_or_else(|| {
+                Error::illegal_state(
+                    "Observer tries to read stdout, but stdout was not `Stdio::pipe` in CommandExecutor",
+                )
+            })?.read_to_end(&mut stdout)?;
+            self.observers.observe_stdout(&stdout);
+        }
+
+        if self.observers.observes_exit_code() {
+            if let Some(r) = res {
+                if let Some(exit_code) = r.code() {
+                    self.observers.observe_exit_code(exit_code);
+                }
+            }
+        }
+
+        if self.observers.observes_exit_signal() {
+            if let Some(r) = res {
+                if let Some(exit_signal) = r.signal() {
+                    self.observers.observe_exit_signal(exit_signal);
+                }
+            }
+        }
+
+        match res.map(|status| status.signal()) {
             // for reference: https://www.man7.org/linux/man-pages/man7/signal.7.html
             Some(Some(9)) => Ok(ExitKind::Oom),
             Some(Some(_)) => Ok(ExitKind::Crash),
@@ -351,28 +387,7 @@ where
                 drop(child.wait());
                 Ok(ExitKind::Timeout)
             }
-        };
-
-        if self.observers.observes_stderr() {
-            let mut stderr = Vec::new();
-            child.stderr.as_mut().ok_or_else(|| {
-                Error::illegal_state(
-                    "Observer tries to read stderr, but stderr was not `Stdio::pipe` in CommandExecutor",
-                )
-            })?.read_to_end(&mut stderr)?;
-            self.observers.observe_stderr(&stderr);
         }
-        if self.observers.observes_stdout() {
-            let mut stdout = Vec::new();
-            child.stdout.as_mut().ok_or_else(|| {
-                Error::illegal_state(
-                    "Observer tries to read stdout, but stdout was not `Stdio::pipe` in CommandExecutor",
-                )
-            })?.read_to_end(&mut stdout)?;
-            self.observers.observe_stdout(&stdout);
-        }
-
-        res
     }
 }
 
