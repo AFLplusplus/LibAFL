@@ -32,7 +32,7 @@ use crate::{
     fuzzer::HasObjective,
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
-    state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions, State, UsesState},
     Error, HasMetadata,
 };
 
@@ -454,6 +454,11 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
         let mut new_testcase = Testcase::with_executions(input.clone(), executions);
         new_testcase.add_metadata(exitkind);
         new_testcase.set_parent_id_optional(*state.corpus().current());
+
+        if let Ok(mut tc) = state.current_testcase_mut() {
+            tc.found_objective();
+        }
+
         fuzzer
             .objective_mut()
             .append_metadata(state, event_mgr, &*observers, &mut new_testcase)

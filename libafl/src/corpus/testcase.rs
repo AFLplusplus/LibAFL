@@ -65,6 +65,8 @@ where
     parent_id: Option<CorpusId>,
     /// If the testcase is "disabled"
     disabled: bool,
+    /// has found crash (or timeout) or not
+    objectives_found: usize,
 }
 
 impl<I> HasMetadata for Testcase<I>
@@ -227,6 +229,7 @@ where
             scheduled_count: 0,
             parent_id: None,
             disabled: false,
+            objectives_found: 0,
         }
     }
 
@@ -248,6 +251,7 @@ where
             scheduled_count: 0,
             parent_id: Some(parent_id),
             disabled: false,
+            objectives_found: 0,
         }
     }
 
@@ -269,6 +273,7 @@ where
             scheduled_count: 0,
             parent_id: None,
             disabled: false,
+            objectives_found: 0,
         }
     }
 
@@ -290,6 +295,7 @@ where
             scheduled_count: 0,
             parent_id: None,
             disabled: false,
+            objectives_found: 0,
         }
     }
 
@@ -307,6 +313,16 @@ where
     /// Sets the id of the parent, that this testcase was derived from
     pub fn set_parent_id_optional(&mut self, parent_id: Option<CorpusId>) {
         self.parent_id = parent_id;
+    }
+
+    /// Gets how many objectives were found by mutating this testcase
+    pub fn objectives_found(&self) -> usize {
+        self.objectives_found
+    }
+
+    /// Adds one objectives to the `objectives_found` counter. Mostly called from crash handler or executor.
+    pub fn found_objective(&mut self) {
+        let _ = self.objectives_found.saturating_add(1);
     }
 }
 
@@ -331,6 +347,7 @@ where
             #[cfg(feature = "std")]
             metadata_path: None,
             disabled: false,
+            objectives_found: 0,
         }
     }
 }
