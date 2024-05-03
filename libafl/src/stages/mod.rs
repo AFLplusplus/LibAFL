@@ -62,6 +62,8 @@ pub mod colorization;
 pub mod concolic;
 #[cfg(feature = "std")]
 pub mod dump;
+/// The [`GenStage`] generates a single input and evaluates it.
+pub mod gen;
 pub mod generalization;
 pub mod logics;
 pub mod power;

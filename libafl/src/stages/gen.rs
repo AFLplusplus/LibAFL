@@ -1,0 +1,74 @@
+//! A [`Stage`] that generates a single input via a [`Generator`] and evaluates
+//! it using the fuzzer, possibly adding it to the corpus.
+
+use core::marker::PhantomData;
+
+use crate::{
+    generators::Generator,
+    inputs::UsesInput,
+    stages::Stage,
+    state::{HasCorpus, HasRand, UsesState},
+    Error, Evaluator,
+};
+
+/// A [`Stage`] that generates a single input via a [`Generator`] and evaluates
+/// it using the fuzzer, possibly adding it to the corpus.
+///
+/// This stage can be used to construct black-box (e.g., grammar-based) fuzzers.
+#[derive(Debug)]
+pub struct GenStage<Z, G>(G, PhantomData<Z>)
+where
+    Z: UsesState,
+    G: Generator<<<Z as UsesState>::State as UsesInput>::Input, Z::State>;
+
+impl<Z, G> GenStage<Z, G>
+where
+    Z: UsesState,
+    G: Generator<<<Z as UsesState>::State as UsesInput>::Input, Z::State>,
+{
+    /// Create a new [`GenStage`].
+    ///
+    /// The `Z` parameter is the fuzzer, and is not used: it only exists to
+    /// give type inference a helping hand.
+    pub fn new(g: G, _z: &Z) -> Self {
+        Self(g, PhantomData)
+    }
+}
+
+impl<Z, G> UsesState for GenStage<Z, G>
+where
+    Z: UsesState,
+    G: Generator<<<Z as UsesState>::State as UsesInput>::Input, Z::State>,
+{
+    type State = Z::State;
+}
+
+impl<E, EM, Z, G> Stage<E, EM, Z> for GenStage<Z, G>
+where
+    E: UsesState<State = Z::State>,
+    EM: UsesState<State = Z::State>,
+    Z: Evaluator<E, EM>,
+    Z::State: HasCorpus + HasRand,
+    G: Generator<<<Z as UsesState>::State as UsesInput>::Input, Z::State>,
+{
+    #[inline]
+    fn perform(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut Z::State,
+        manager: &mut EM,
+    ) -> Result<(), Error> {
+        let input = self.0.generate(state)?;
+        fuzzer.evaluate_input(state, executor, manager, input)?;
+        Ok(())
+    }
+
+    fn restart_progress_should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+        Ok(true)
+    }
+
+    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        Ok(())
+    }
+}
