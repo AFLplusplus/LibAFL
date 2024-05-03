@@ -322,7 +322,7 @@ where
 
     /// Adds one objectives to the `objectives_found` counter. Mostly called from crash handler or executor.
     pub fn found_objective(&mut self) {
-        self.objectives_found.saturating_add(1);
+        let _ = self.objectives_found.saturating_add(1);
     }
 }
 

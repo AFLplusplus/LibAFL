@@ -505,7 +505,7 @@ where
                 let mut testcase = Testcase::with_executions(input, executions);
                 testcase.set_parent_id_optional(*state.corpus().current());
                 if let Ok(mut tc) = state.current_testcase_mut() {
-                    tc.set_found_objectives(true);
+                    tc.found_objective();
                 }
                 self.objective_mut()
                     .append_metadata(state, manager, observers, &mut testcase)?;
