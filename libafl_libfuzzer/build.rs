@@ -93,8 +93,8 @@ fn main() {
         let target_libdir = String::from_utf8(target_libdir.stdout).unwrap();
         let target_libdir = Path::new(target_libdir.trim());
 
-        let rust_objcopy = target_libdir.join("../bin/llvm-objcopy"); // NOTE: depends on llvm-tools
         // NOTE: depends on llvm-tools
+        let rust_objcopy = target_libdir.join("../bin/llvm-objcopy"); 
         let nm = target_libdir.join("../bin/llvm-nm");
 
         let redefined_archive_path = custom_lib_dir.join("libFuzzer.a");
