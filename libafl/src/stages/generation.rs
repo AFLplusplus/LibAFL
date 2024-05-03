@@ -1,5 +1,6 @@
-//! A [`Stage`] that generates a single input via a [`Generator`] and evaluates
-//! it using the fuzzer, possibly adding it to the corpus.
+//! A [`Stage`] that generates a single input via a
+//! [`crate::generators::Generator`] and evaluates it using the fuzzer, possibly
+//! adding it to the corpus.
 
 use core::marker::PhantomData;
 
