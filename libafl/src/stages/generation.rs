@@ -16,26 +16,23 @@ use crate::{
 ///
 /// This stage can be used to construct black-box (e.g., grammar-based) fuzzers.
 #[derive(Debug)]
-pub struct GenStage<Z, G>(G, PhantomData<Z>)
+pub struct GenStage<G, Z>(G, PhantomData<Z>)
 where
     Z: UsesState,
     G: Generator<<<Z as UsesState>::State as UsesInput>::Input, Z::State>;
 
-impl<Z, G> GenStage<Z, G>
+impl<G, Z> GenStage<G, Z>
 where
     Z: UsesState,
     G: Generator<<<Z as UsesState>::State as UsesInput>::Input, Z::State>,
 {
     /// Create a new [`GenStage`].
-    ///
-    /// The `Z` parameter is the fuzzer, and is not used: it only exists to
-    /// give type inference a helping hand.
-    pub fn new(g: G, _z: &Z) -> Self {
+    pub fn new(g: G) -> Self {
         Self(g, PhantomData)
     }
 }
 
-impl<Z, G> UsesState for GenStage<Z, G>
+impl<G, Z> UsesState for GenStage<G, Z>
 where
     Z: UsesState,
     G: Generator<<<Z as UsesState>::State as UsesInput>::Input, Z::State>,
@@ -43,7 +40,7 @@ where
     type State = Z::State;
 }
 
-impl<E, EM, Z, G> Stage<E, EM, Z> for GenStage<Z, G>
+impl<E, EM, Z, G> Stage<E, EM, Z> for GenStage<G, Z>
 where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
