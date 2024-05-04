@@ -28,8 +28,8 @@ use crate::{
     emu::SyscallHookResult,
     helpers::{QemuHelper, QemuHelperTuple, Range},
     hooks::{Hook, QemuHooks},
-    Qemu, SYS_fstat, SYS_fstatfs, SYS_futex, SYS_getrandom, SYS_mprotect, SYS_mremap, SYS_munmap,
-    SYS_pread64, SYS_read, SYS_readlinkat, SYS_statfs, SYS_brk,
+    Qemu, SYS_brk, SYS_fstat, SYS_fstatfs, SYS_futex, SYS_getrandom, SYS_mprotect, SYS_mremap,
+    SYS_munmap, SYS_pread64, SYS_read, SYS_readlinkat, SYS_statfs,
 };
 
 // TODO use the functions provided by Qemu
@@ -644,17 +644,10 @@ impl QemuSnapshotHelper {
 
         let mut to_unmap = vec![];
         for entry in new_maps.tree.query(0..GuestAddr::MAX) {
-            to_unmap.push((
-                *entry.interval,
-                entry.value.changed,
-                entry.value.perms,
-            ));
+            to_unmap.push((*entry.interval, entry.value.changed, entry.value.perms));
         }
         for (i, ..) in to_unmap {
-            drop(qemu.unmap(
-                i.start,
-                (i.end - i.start) as usize,
-            ));
+            drop(qemu.unmap(i.start, (i.end - i.start) as usize));
             new_maps.tree.delete(i);
         }
 

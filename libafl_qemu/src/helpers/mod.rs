@@ -33,9 +33,9 @@ pub use injections::QemuInjectionHelper;
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
 pub mod snapshot;
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
-pub use snapshot::QemuSnapshotHelper;
-#[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
 pub use snapshot::IntervalSnapshotFilter;
+#[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
+pub use snapshot::QemuSnapshotHelper;
 
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
 pub mod asan;
