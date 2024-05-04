@@ -12,7 +12,7 @@ use libafl::{
     Error, HasMetadata, HasNamedMetadata,
 };
 use libafl_bolts::{
-    tuples::{MatchNameRef, Reference},
+    tuples::{Handle, MatchNameRef},
     Named,
 };
 
@@ -25,7 +25,7 @@ where
     TE: UsesState,
 {
     tracer_executor: TE,
-    cmplog_observer_ref: Option<Reference<AFLppCmpLogObserver<'a, TE::State>>>,
+    cmplog_observer_ref: Option<Handle<AFLppCmpLogObserver<'a, TE::State>>>,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(EM, TE, Z)>,
 }
@@ -151,7 +151,7 @@ where
     /// With cmplog observer
     pub fn with_cmplog_observer(
         tracer_executor: TE,
-        obs_ref: Reference<AFLppCmpLogObserver<'a, TE::State>>,
+        obs_ref: Handle<AFLppCmpLogObserver<'a, TE::State>>,
     ) -> Self {
         Self {
             cmplog_observer_ref: Some(obs_ref),

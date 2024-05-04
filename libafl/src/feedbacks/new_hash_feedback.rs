@@ -5,7 +5,7 @@ use std::{fmt::Debug, marker::PhantomData};
 
 use hashbrown::HashSet;
 use libafl_bolts::{
-    tuples::{MatchNameRef, Reference, Referenceable},
+    tuples::{Handle, Handler, MatchNameRef},
     Named,
 };
 use serde::{Deserialize, Serialize};
@@ -82,7 +82,7 @@ impl HashSetState<u64> for NewHashFeedbackMetadata {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NewHashFeedback<O, S> {
     name: Cow<'static, str>,
-    o_ref: Reference<O>,
+    o_ref: Handle<O>,
     /// Initial capacity of hash set
     capacity: usize,
     phantom: PhantomData<S>,
@@ -149,7 +149,7 @@ impl<O, S> HasObserverReference for NewHashFeedback<O, S> {
     type Observer = O;
 
     #[inline]
-    fn observer_ref(&self) -> &Reference<O> {
+    fn observer_ref(&self) -> &Handle<O> {
         &self.o_ref
     }
 }
@@ -176,7 +176,7 @@ where
     pub fn with_capacity(observer: &O, capacity: usize) -> Self {
         Self {
             name: Cow::from(NEWHASHFEEDBACK_PREFIX.to_string() + observer.name()),
-            o_ref: observer.reference(),
+            o_ref: observer.handle(),
             capacity,
             phantom: PhantomData,
         }

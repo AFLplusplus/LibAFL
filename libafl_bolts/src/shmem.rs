@@ -318,7 +318,7 @@ pub trait ShMemProvider: Clone + Default + Debug {
     }
 }
 
-/// A Reference Counted shared map,
+/// A Handle Counted shared map,
 /// that can use internal mutability.
 /// Useful if the `ShMemProvider` needs to keep local state.
 #[cfg(feature = "alloc")]
@@ -367,7 +367,7 @@ impl<T: ShMemProvider> Drop for RcShMem<T> {
     }
 }
 
-/// A Reference Counted `ShMemProvider`,
+/// A Handle Counted `ShMemProvider`,
 /// that can use internal mutability.
 /// Useful if the `ShMemProvider` needs to keep local state.
 #[derive(Debug, Clone)]

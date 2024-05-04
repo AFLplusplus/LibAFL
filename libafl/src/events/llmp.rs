@@ -33,7 +33,7 @@ use libafl_bolts::{
 #[cfg(feature = "adaptive_serialization")]
 use libafl_bolts::{
     current_time,
-    tuples::{Reference, Referenceable},
+    tuples::{Handle, Handler},
 };
 #[cfg(feature = "std")]
 use libafl_bolts::{llmp::LlmpConnection, shmem::StdShMemProvider, staterestore::StateRestorer};
@@ -367,7 +367,7 @@ where
     #[cfg(feature = "adaptive_serialization")]
     should_serialize_cnt: usize,
     #[cfg(feature = "adaptive_serialization")]
-    time_ref: Reference<TimeObserver>,
+    time_ref: Handle<TimeObserver>,
     phantom: PhantomData<S>,
 }
 
@@ -403,7 +403,7 @@ where
         &mut self.should_serialize_cnt
     }
 
-    fn time_ref(&self) -> &Reference<TimeObserver> {
+    fn time_ref(&self) -> &Handle<TimeObserver> {
         &self.time_ref
     }
 }
@@ -498,7 +498,7 @@ where
     pub fn new(
         llmp: LlmpClient<SP>,
         configuration: EventConfig,
-        time_ref: Reference<TimeObserver>,
+        time_ref: Handle<TimeObserver>,
     ) -> Result<Self, Error> {
         Ok(LlmpEventManager {
             hooks: tuple_list!(),
@@ -525,7 +525,7 @@ where
         shmem_provider: SP,
         port: u16,
         configuration: EventConfig,
-        time_ref: Reference<TimeObserver>,
+        time_ref: Handle<TimeObserver>,
     ) -> Result<LlmpEventManager<(), S, SP>, Error> {
         let llmp = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
         Self::new(llmp, configuration, time_ref)
@@ -538,7 +538,7 @@ where
         shmem_provider: SP,
         env_name: &str,
         configuration: EventConfig,
-        time_ref: Reference<TimeObserver>,
+        time_ref: Handle<TimeObserver>,
     ) -> Result<LlmpEventManager<(), S, SP>, Error> {
         let llmp = LlmpClient::on_existing_from_env(shmem_provider, env_name)?;
         Self::new(llmp, configuration, time_ref)
@@ -550,7 +550,7 @@ where
         shmem_provider: SP,
         description: &LlmpClientDescription,
         configuration: EventConfig,
-        time_ref: Reference<TimeObserver>,
+        time_ref: Handle<TimeObserver>,
     ) -> Result<LlmpEventManager<(), S, SP>, Error> {
         let llmp = LlmpClient::existing_client_from_description(shmem_provider, description)?;
         Self::new(llmp, configuration, time_ref)
@@ -628,7 +628,7 @@ where
         llmp: LlmpClient<SP>,
         configuration: EventConfig,
         hooks: EMH,
-        time_ref: Reference<TimeObserver>,
+        time_ref: Handle<TimeObserver>,
     ) -> Result<Self, Error> {
         Ok(Self {
             hooks,
@@ -657,7 +657,7 @@ where
         port: u16,
         configuration: EventConfig,
         hooks: EMH,
-        time_ref: Reference<TimeObserver>,
+        time_ref: Handle<TimeObserver>,
     ) -> Result<Self, Error> {
         let llmp = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
         Self::with_hooks(llmp, configuration, hooks, time_ref)
@@ -672,7 +672,7 @@ where
         env_name: &str,
         configuration: EventConfig,
         hooks: EMH,
-        time_ref: Reference<TimeObserver>,
+        time_ref: Handle<TimeObserver>,
     ) -> Result<Self, Error> {
         let llmp = LlmpClient::on_existing_from_env(shmem_provider, env_name)?;
         Self::with_hooks(llmp, configuration, hooks, time_ref)
@@ -685,7 +685,7 @@ where
         description: &LlmpClientDescription,
         configuration: EventConfig,
         hooks: EMH,
-        time_ref: Reference<TimeObserver>,
+        time_ref: Handle<TimeObserver>,
     ) -> Result<Self, Error> {
         let llmp = LlmpClient::existing_client_from_description(shmem_provider, description)?;
         Self::with_hooks(llmp, configuration, hooks, time_ref)
@@ -1091,7 +1091,7 @@ where
         self.llmp_mgr.should_serialize_cnt_mut()
     }
 
-    fn time_ref(&self) -> &Reference<TimeObserver> {
+    fn time_ref(&self) -> &Handle<TimeObserver> {
         &self.llmp_mgr.time_ref
     }
 }
@@ -1362,7 +1362,7 @@ where
         .broker_port(broker_port)
         .configuration(configuration)
         .hooks(tuple_list!())
-        .time_ref(time_obs.reference())
+        .time_ref(time_obs.handle())
         .build()
         .launch()
 }
@@ -1412,7 +1412,7 @@ where
     /// The hooks passed to event manager:
     hooks: EMH,
     #[cfg(feature = "adaptive_serialization")]
-    time_ref: Reference<TimeObserver>,
+    time_ref: Handle<TimeObserver>,
     #[builder(setter(skip), default = PhantomData)]
     phantom_data: PhantomData<(EMH, S)>,
 }
@@ -2058,7 +2058,7 @@ mod tests {
     use core::sync::atomic::{compiler_fence, Ordering};
 
     #[cfg(feature = "adaptive_serialization")]
-    use libafl_bolts::tuples::Referenceable;
+    use libafl_bolts::tuples::Handler;
     use libafl_bolts::{
         llmp::{LlmpClient, LlmpSharedMap},
         rands::StdRand,
@@ -2092,7 +2092,7 @@ mod tests {
 
         let time = TimeObserver::new("time");
         #[cfg(feature = "adaptive_serialization")]
-        let time_ref = time.reference();
+        let time_ref = time.handle();
 
         let mut corpus = InMemoryCorpus::<BytesInput>::new();
         let testcase = Testcase::new(vec![0; 4].into());

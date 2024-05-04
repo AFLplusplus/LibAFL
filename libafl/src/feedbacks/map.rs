@@ -12,7 +12,7 @@ use core::{
 #[rustversion::nightly]
 use libafl_bolts::AsSlice;
 use libafl_bolts::{
-    tuples::{MatchNameRef, Reference, Referenceable},
+    tuples::{Handle, Handler, MatchNameRef},
     AsIter, HasRefCnt, Named,
 };
 use num_traits::PrimInt;
@@ -388,7 +388,7 @@ pub struct MapFeedback<C, N, O, R, T> {
     /// Name identifier of this instance
     name: Cow<'static, str>,
     /// Name identifier of the observer
-    map_ref: Reference<C>,
+    map_ref: Handle<C>,
     /// Name of the feedback as shown in the `UserStats`
     stats_name: Cow<'static, str>,
     /// Phantom Data of Reducer
@@ -668,7 +668,7 @@ where
     type Observer = C;
 
     #[inline]
-    fn observer_ref(&self) -> &Reference<C> {
+    fn observer_ref(&self) -> &Handle<C> {
         &self.map_ref
     }
 }
@@ -697,7 +697,7 @@ where
         Self {
             novelties: if C::NOVELTIES { Some(vec![]) } else { None },
             name: map_observer.name().clone(),
-            map_ref: map_observer.reference(),
+            map_ref: map_observer.handle(),
             stats_name: create_stats_name(map_observer.name()),
             phantom: PhantomData,
         }
@@ -711,7 +711,7 @@ where
         let name = Cow::from(name);
         Self {
             novelties: if C::NOVELTIES { Some(vec![]) } else { None },
-            map_ref: map_observer.reference(),
+            map_ref: map_observer.handle(),
             stats_name: create_stats_name(&name),
             name,
             phantom: PhantomData,

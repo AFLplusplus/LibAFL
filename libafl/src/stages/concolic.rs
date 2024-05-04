@@ -9,7 +9,7 @@ use alloc::{string::ToString, vec::Vec};
 use core::marker::PhantomData;
 
 use libafl_bolts::{
-    tuples::{MatchNameRef, Reference},
+    tuples::{Handle, MatchNameRef},
     Named,
 };
 
@@ -39,7 +39,7 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct ConcolicTracingStage<'a, EM, TE, Z> {
     inner: TracingStage<EM, TE, Z>,
-    obs_ref: Reference<ConcolicObserver<'a>>,
+    obs_ref: Handle<ConcolicObserver<'a>>,
 }
 
 impl<EM, TE, Z> UsesState for ConcolicTracingStage<'_, EM, TE, Z>
@@ -95,7 +95,7 @@ where
 impl<'a, EM, TE, Z> ConcolicTracingStage<'a, EM, TE, Z> {
     /// Creates a new default tracing stage using the given [`Executor`], observing traces from a
     /// [`ConcolicObserver`] with the given name.
-    pub fn new(inner: TracingStage<EM, TE, Z>, obs_ref: Reference<ConcolicObserver<'a>>) -> Self {
+    pub fn new(inner: TracingStage<EM, TE, Z>, obs_ref: Handle<ConcolicObserver<'a>>) -> Self {
         Self { inner, obs_ref }
     }
 }

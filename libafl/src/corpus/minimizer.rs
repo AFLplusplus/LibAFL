@@ -7,7 +7,7 @@ use core::{hash::Hash, marker::PhantomData};
 use hashbrown::{HashMap, HashSet};
 use libafl_bolts::{
     current_time,
-    tuples::{Reference, Referenceable},
+    tuples::{Handle, Handler},
     AsIter, Named,
 };
 use num_traits::ToPrimitive;
@@ -51,7 +51,7 @@ where
 /// Algorithm based on WMOPT: <https://hexhive.epfl.ch/publications/files/21ISSTA2.pdf>
 #[derive(Debug)]
 pub struct MapCorpusMinimizer<C, E, O, T, TS> {
-    obs_ref: Reference<C>,
+    obs_ref: Handle<C>,
     phantom: PhantomData<(E, O, T, TS)>,
 }
 
@@ -70,7 +70,7 @@ where
     /// in the future to get observed maps from an executed input.
     pub fn new(obs: &C) -> Self {
         Self {
-            obs_ref: obs.reference(),
+            obs_ref: obs.handle(),
             phantom: PhantomData,
         }
     }

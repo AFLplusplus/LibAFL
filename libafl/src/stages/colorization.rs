@@ -4,7 +4,7 @@ use core::{cmp::Ordering, fmt::Debug, marker::PhantomData, ops::Range};
 
 use libafl_bolts::{
     rands::Rand,
-    tuples::{Reference, Referenceable},
+    tuples::{Handle, Handler},
     Named,
 };
 use serde::{Deserialize, Serialize};
@@ -55,7 +55,7 @@ impl Ord for Earlier {
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
 pub struct ColorizationStage<C, E, EM, O, Z> {
-    map_observer_ref: Reference<C>,
+    map_observer_ref: Handle<C>,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, EM, O, E, Z)>,
 }
@@ -168,7 +168,7 @@ where
         executor: &mut E,
         state: &mut E::State,
         manager: &mut EM,
-        obs_ref: &Reference<C>,
+        obs_ref: &Handle<C>,
     ) -> Result<E::Input, Error> {
         let mut input = state.current_input_cloned()?;
         // The backup of the input
@@ -301,7 +301,7 @@ where
     /// Creates a new [`ColorizationStage`]
     pub fn new(map_observer: &C) -> Self {
         Self {
-            map_observer_ref: map_observer.reference(),
+            map_observer_ref: map_observer.handle(),
             phantom: PhantomData,
         }
     }
@@ -313,7 +313,7 @@ where
         state: &mut E::State,
         manager: &mut EM,
         input: E::Input,
-        obs_ref: &Reference<C>,
+        obs_ref: &Handle<C>,
     ) -> Result<usize, Error> {
         executor.observers_mut().pre_exec_all(state, &input)?;
 

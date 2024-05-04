@@ -11,7 +11,7 @@ use alloc::{boxed::Box, string::String, vec::Vec};
 use core::{marker::PhantomData, num::NonZeroUsize, time::Duration};
 
 #[cfg(feature = "adaptive_serialization")]
-use libafl_bolts::tuples::{Reference, Referenceable};
+use libafl_bolts::tuples::{Handle, Handler};
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{
     compress::GzipCompressor,
@@ -226,7 +226,7 @@ where
     #[cfg(feature = "llmp_compression")]
     compressor: GzipCompressor,
     #[cfg(feature = "adaptive_serialization")]
-    time_ref: Reference<TimeObserver>,
+    time_ref: Handle<TimeObserver>,
     is_main: bool,
 }
 
@@ -270,7 +270,7 @@ where
         self.inner.should_serialize_cnt_mut()
     }
 
-    fn time_ref(&self) -> &Reference<TimeObserver> {
+    fn time_ref(&self) -> &Handle<TimeObserver> {
         &self.time_ref
     }
 }
@@ -493,7 +493,7 @@ where
             client,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
-            time_ref: time_obs.reference(),
+            time_ref: time_obs.handle(),
             is_main,
         })
     }
@@ -532,7 +532,7 @@ where
             client,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
-            time_ref: time_obs.reference(),
+            time_ref: time_obs.handle(),
             is_main,
         })
     }
@@ -570,7 +570,7 @@ where
             client: LlmpClient::on_existing_from_env(shmem_provider, env_name)?,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
-            time_ref: time_obs.reference(),
+            time_ref: time_obs.handle(),
             is_main,
         })
     }
@@ -606,7 +606,7 @@ where
             client: LlmpClient::existing_client_from_description(shmem_provider, description)?,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
-            time_ref: time_obs.reference(),
+            time_ref: time_obs.handle(),
             is_main,
         })
     }
