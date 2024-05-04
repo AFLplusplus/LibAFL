@@ -54,7 +54,7 @@ fn init_count_class_16() {
 
 /// Map observer with AFL-like hitcounts postprocessing
 ///
-/// [`MapObserver`]s that are not slice-backed, such as [`MultiMapObserver`], can use
+/// [`MapObserver`]s that are not slice-backed, such as `MultiMapObserver`, can use
 /// [`HitcountsIterableMapObserver`] instead.
 #[derive(Serialize, Deserialize, Clone, Debug, Hash)]
 #[serde(bound = "M: serde::de::DeserializeOwned")]
