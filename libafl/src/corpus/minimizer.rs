@@ -7,7 +7,7 @@ use core::{hash::Hash, marker::PhantomData};
 use hashbrown::{HashMap, HashSet};
 use libafl_bolts::{
     current_time,
-    tuples::{Handle, Handleable},
+    tuples::{Handle, Handler},
     AsIter, Named,
 };
 use num_traits::ToPrimitive;

@@ -4,7 +4,7 @@ use core::{cmp::Ordering, fmt::Debug, marker::PhantomData, ops::Range};
 
 use libafl_bolts::{
     rands::Rand,
-    tuples::{Handle, Handleable},
+    tuples::{Handle, Handler},
     Named,
 };
 use serde::{Deserialize, Serialize};

@@ -5,7 +5,7 @@ use std::{fmt::Debug, marker::PhantomData};
 
 use hashbrown::HashSet;
 use libafl_bolts::{
-    tuples::{Handle, Handleable, MatchNameRef},
+    tuples::{Handle, Handler, MatchNameRef},
     Named,
 };
 use serde::{Deserialize, Serialize};

@@ -37,7 +37,7 @@ use libafl_bolts::{
     ownedref::OwnedRefMut,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, Merge, Handleable},
+    tuples::{tuple_list, Merge, Handler},
     AsSliceMut,
 };
 use libafl_targets::{

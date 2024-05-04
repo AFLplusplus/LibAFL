@@ -33,7 +33,7 @@ use libafl_bolts::{
 #[cfg(feature = "adaptive_serialization")]
 use libafl_bolts::{
     current_time,
-    tuples::{Handle, Handleable},
+    tuples::{Handle, Handler},
 };
 #[cfg(feature = "std")]
 use libafl_bolts::{llmp::LlmpConnection, shmem::StdShMemProvider, staterestore::StateRestorer};
@@ -2058,7 +2058,7 @@ mod tests {
     use core::sync::atomic::{compiler_fence, Ordering};
 
     #[cfg(feature = "adaptive_serialization")]
-    use libafl_bolts::tuples::Handleable;
+    use libafl_bolts::tuples::Handler;
     use libafl_bolts::{
         llmp::{LlmpClient, LlmpSharedMap},
         rands::StdRand,

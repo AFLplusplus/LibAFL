@@ -12,7 +12,7 @@ use core::{
 #[rustversion::nightly]
 use libafl_bolts::AsSlice;
 use libafl_bolts::{
-    tuples::{Handle, Handleable, MatchNameRef},
+    tuples::{Handle, Handler, MatchNameRef},
     AsIter, HasRefCnt, Named,
 };
 use num_traits::PrimInt;

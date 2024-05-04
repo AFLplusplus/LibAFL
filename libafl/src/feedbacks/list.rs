@@ -3,7 +3,7 @@ use core::{fmt::Debug, hash::Hash};
 
 use hashbrown::HashSet;
 use libafl_bolts::{
-    tuples::{Handle, Handleable, MatchNameRef},
+    tuples::{Handle, Handler, MatchNameRef},
     Error, HasRefCnt, Named,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};

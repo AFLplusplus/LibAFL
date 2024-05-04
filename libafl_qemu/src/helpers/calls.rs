@@ -6,7 +6,7 @@ use libafl::{
     inputs::{Input, UsesInput},
     observers::{stacktrace::BacktraceObserver, ObserversTuple},
 };
-use libafl_bolts::tuples::{Handle, Handleable, MatchFirstType, MatchNameRef};
+use libafl_bolts::tuples::{Handle, Handler, MatchFirstType, MatchNameRef};
 use libafl_qemu_sys::GuestAddr;
 use thread_local::ThreadLocal;
 

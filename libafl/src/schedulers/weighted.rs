@@ -6,7 +6,7 @@ use core::marker::PhantomData;
 use hashbrown::HashMap;
 use libafl_bolts::{
     rands::Rand,
-    tuples::{Handle, Handleable},
+    tuples::{Handle, Handler},
     Named,
 };
 use serde::{Deserialize, Serialize};

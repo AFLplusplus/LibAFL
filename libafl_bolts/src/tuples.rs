@@ -504,7 +504,7 @@ where
 /// Structs that has `Handle `
 /// You should use this when you want to avoid specifying types using `match_name_type_mut`
 #[cfg(feature = "alloc")]
-pub trait Handleable: Named {
+pub trait Handler: Named {
     /// Return the `Handle `
     fn handle(&self) -> Handle<Self> {
         Handle {
@@ -515,7 +515,7 @@ pub trait Handleable: Named {
 }
 
 #[cfg(feature = "alloc")]
-impl<N> Handleable for N where N: Named {}
+impl<N> Handler for N where N: Named {}
 
 /// Object with the type T and the name associated with its concrete value
 #[derive(Serialize, Deserialize)]

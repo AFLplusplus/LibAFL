@@ -4,7 +4,7 @@ use alloc::{borrow::Cow, vec::Vec};
 use core::{fmt::Debug, marker::PhantomData};
 
 use libafl_bolts::{
-    tuples::{Handle, Handleable},
+    tuples::{Handle, Handler},
     AsSlice, Named,
 };
 
