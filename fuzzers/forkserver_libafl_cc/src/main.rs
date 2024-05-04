@@ -21,7 +21,7 @@ use libafl::{
 use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, MatchNameRef, Merge, Handler},
+    tuples::{tuple_list, Handler, MatchNameRef, Merge},
     AsSliceMut, Truncate,
 };
 use libafl_targets::EDGES_MAP_SIZE_IN_USE;
