@@ -7,7 +7,7 @@ use alloc::borrow::Cow;
 use core::{fmt::Debug, marker::PhantomData};
 
 use libafl_bolts::{
-    tuples::{MatchNameRef, Reference, Referenceable},
+    tuples::{Handle, Handleable, MatchNameRef},
     Named,
 };
 
@@ -28,7 +28,7 @@ use crate::{
 /// Requires a [`ConcolicObserver`] to observe the concolic trace.
 #[derive(Debug)]
 pub struct ConcolicFeedback<'map, S> {
-    obs_ref: Reference<ConcolicObserver<'map>>,
+    obs_ref: Handle<ConcolicObserver<'map>>,
     phantom: PhantomData<S>,
 }
 
@@ -38,7 +38,7 @@ impl<'map, S> ConcolicFeedback<'map, S> {
     #[must_use]
     pub fn from_observer(observer: &ConcolicObserver<'map>) -> Self {
         Self {
-            obs_ref: observer.reference(),
+            obs_ref: observer.handle(),
             phantom: PhantomData,
         }
     }

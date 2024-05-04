@@ -4,7 +4,7 @@ use alloc::{borrow::Cow, vec::Vec};
 use core::{fmt::Debug, marker::PhantomData};
 
 use libafl_bolts::{
-    tuples::{Reference, Referenceable},
+    tuples::{Handle, Handleable},
     AsSlice, Named,
 };
 
@@ -43,7 +43,7 @@ fn find_next_char(list: &[Option<u8>], mut idx: usize, ch: u8) -> usize {
 /// A stage that runs a tracer executor
 #[derive(Clone, Debug)]
 pub struct GeneralizationStage<C, EM, O, OT, Z> {
-    map_observer_ref: Reference<C>,
+    map_observer_ref: Handle<C>,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(EM, O, OT, Z)>,
 }
@@ -347,7 +347,7 @@ where
     pub fn new(map_observer: &C) -> Self {
         require_novelties_tracking!("GeneralizationStage", C);
         Self {
-            map_observer_ref: map_observer.reference(),
+            map_observer_ref: map_observer.handle(),
             phantom: PhantomData,
         }
     }

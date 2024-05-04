@@ -6,7 +6,7 @@ use core::marker::PhantomData;
 use hashbrown::HashMap;
 use libafl_bolts::{
     rands::Rand,
-    tuples::{Reference, Referenceable},
+    tuples::{Handle, Handleable},
     Named,
 };
 use serde::{Deserialize, Serialize};
@@ -98,7 +98,7 @@ libafl_bolts::impl_serdeany!(WeightedScheduleMetadata);
 pub struct WeightedScheduler<C, F, O, S> {
     table_invalidated: bool,
     strat: Option<PowerSchedule>,
-    map_observer_ref: Reference<C>,
+    map_observer_ref: Handle<C>,
     last_hash: usize,
     phantom: PhantomData<(F, O, S)>,
 }
@@ -124,7 +124,7 @@ where
 
         Self {
             strat,
-            map_observer_ref: map_observer.reference(),
+            map_observer_ref: map_observer.handle(),
             last_hash: 0,
             table_invalidated: true,
             phantom: PhantomData,
@@ -274,7 +274,7 @@ where
         self.last_hash = hash;
     }
 
-    fn map_observer_ref(&self) -> &Reference<C> {
+    fn map_observer_ref(&self) -> &Handle<C> {
         &self.map_observer_ref
     }
 }

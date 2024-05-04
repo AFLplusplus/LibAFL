@@ -4,7 +4,7 @@ use alloc::{borrow::Cow, vec::Vec};
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
 
 use hashbrown::HashSet;
-use libafl_bolts::{current_time, impl_serdeany, tuples::Reference, AsIter, Named};
+use libafl_bolts::{current_time, impl_serdeany, tuples::Handle, AsIter, Named};
 use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
 
@@ -63,7 +63,7 @@ impl UnstableEntriesMetadata {
 /// The calibration stage will measure the average exec time and the target's stability for this input.
 #[derive(Clone, Debug)]
 pub struct CalibrationStage<C, O, OT, S> {
-    map_observer_ref: Reference<C>,
+    map_observer_ref: Handle<C>,
     map_name: Cow<'static, str>,
     stage_max: usize,
     /// If we should track stability

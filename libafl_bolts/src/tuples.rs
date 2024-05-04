@@ -501,13 +501,13 @@ where
     }
 }
 
-/// Structs that has `Reference `
+/// Structs that has `Handle `
 /// You should use this when you want to avoid specifying types using `match_name_type_mut`
 #[cfg(feature = "alloc")]
-pub trait Referenceable: Named {
-    /// Return the `Reference `
-    fn reference(&self) -> Reference<Self> {
-        Reference {
+pub trait Handleable: Named {
+    /// Return the `Handle `
+    fn handle(&self) -> Handle<Self> {
+        Handle {
             name: Named::name(self).clone(),
             phantom: PhantomData,
         }
@@ -515,23 +515,23 @@ pub trait Referenceable: Named {
 }
 
 #[cfg(feature = "alloc")]
-impl<N> Referenceable for N where N: Named {}
+impl<N> Handleable for N where N: Named {}
 
 /// Object with the type T and the name associated with its concrete value
 #[derive(Serialize, Deserialize)]
 #[cfg(feature = "alloc")]
-pub struct Reference<T: ?Sized> {
+pub struct Handle<T: ?Sized> {
     name: Cow<'static, str>,
     #[serde(skip)]
     phantom: PhantomData<T>,
 }
 
 #[cfg(feature = "alloc")]
-impl<T: ?Sized> Reference<T> {
+impl<T: ?Sized> Handle<T> {
     /// Fetch the name of the referenced instance.
     ///
     /// We explicitly do *not* implement [`Named`], as this could potentially lead to confusion
-    /// where we make a [`Reference`] of a [`Reference`] as [`Named`] is blanket implemented.
+    /// where we make a [`Handle`] of a [`Handle`] as [`Named`] is blanket implemented.
     #[must_use]
     pub fn name(&self) -> &Cow<'static, str> {
         &self.name
@@ -539,7 +539,7 @@ impl<T: ?Sized> Reference<T> {
 }
 
 #[cfg(feature = "alloc")]
-impl<T> Clone for Reference<T> {
+impl<T> Clone for Handle<T> {
     fn clone(&self) -> Self {
         Self {
             name: self.name.clone(),
@@ -549,23 +549,23 @@ impl<T> Clone for Reference<T> {
 }
 
 #[cfg(feature = "alloc")]
-impl<T> Debug for Reference<T> {
+impl<T> Debug for Handle<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("Reference")
+        f.debug_struct("Handle")
             .field("name", self.name())
             .field("type", &type_name::<T>())
             .finish()
     }
 }
 
-/// Search using `Reference `
+/// Search using `Handle `
 #[cfg(feature = "alloc")]
 pub trait MatchNameRef {
-    /// Search using name and `Reference `
-    fn get<T>(&self, rf: &Reference<T>) -> Option<&T>;
+    /// Search using name and `Handle `
+    fn get<T>(&self, rf: &Handle<T>) -> Option<&T>;
 
-    /// Search using name and `Reference `
-    fn get_mut<T>(&mut self, rf: &Reference<T>) -> Option<&mut T>;
+    /// Search using name and `Handle `
+    fn get_mut<T>(&mut self, rf: &Handle<T>) -> Option<&mut T>;
 }
 
 #[cfg(feature = "alloc")]
@@ -574,11 +574,11 @@ impl<M> MatchNameRef for M
 where
     M: MatchName,
 {
-    fn get<T>(&self, rf: &Reference<T>) -> Option<&T> {
+    fn get<T>(&self, rf: &Handle<T>) -> Option<&T> {
         self.match_name::<T>(&rf.name)
     }
 
-    fn get_mut<T>(&mut self, rf: &Reference<T>) -> Option<&mut T> {
+    fn get_mut<T>(&mut self, rf: &Handle<T>) -> Option<&mut T> {
         self.match_name_mut::<T>(&rf.name)
     }
 }
@@ -623,14 +623,14 @@ where
 }
 
 #[cfg(feature = "alloc")]
-impl<T, RM, M> Index<&Reference<T>> for RefIndexable<RM, M>
+impl<T, RM, M> Index<&Handle<T>> for RefIndexable<RM, M>
 where
     RM: Deref<Target = M>,
     M: MatchName,
 {
     type Output = T;
 
-    fn index(&self, index: &Reference<T>) -> &Self::Output {
+    fn index(&self, index: &Handle<T>) -> &Self::Output {
         let Some(e) = self.get(index) else {
             panic!("Could not find entry matching {index:?}")
         };
@@ -639,12 +639,12 @@ where
 }
 
 #[cfg(feature = "alloc")]
-impl<T, RM, M> IndexMut<&Reference<T>> for RefIndexable<RM, M>
+impl<T, RM, M> IndexMut<&Handle<T>> for RefIndexable<RM, M>
 where
     RM: DerefMut<Target = M>,
     M: MatchName,
 {
-    fn index_mut(&mut self, index: &Reference<T>) -> &mut Self::Output {
+    fn index_mut(&mut self, index: &Handle<T>) -> &mut Self::Output {
         let Some(e) = self.get_mut(index) else {
             panic!("Could not find entry matching {index:?}")
         };
