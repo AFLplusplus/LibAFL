@@ -651,9 +651,9 @@ impl QemuSnapshotHelper {
             new_maps.tree.delete(i);
         }
 
-        (*new_maps).tree.clear();
-        (*new_maps).tree = self.maps.tree.clone();
-        (*new_maps).size = self.maps.size;
+        new_maps.tree.clear();
+        new_maps.tree = self.maps.tree.clone();
+        new_maps.size = self.maps.size;
     }
 }
 

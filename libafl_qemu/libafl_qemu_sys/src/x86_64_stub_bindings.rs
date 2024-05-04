@@ -1380,6 +1380,11 @@ pub struct RAMBlock {
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
+pub struct TCGCPUOps {
+    _unused: [u8; 0],
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct Visitor {
     _unused: [u8; 0],
 }
@@ -1467,8 +1472,6 @@ extern "C" {
 #[derive(Copy, Clone)]
 pub struct QemuMutex {
     pub lock: pthread_mutex_t,
-    pub file: *const ::std::os::raw::c_char,
-    pub line: ::std::os::raw::c_int,
     pub initialized: bool,
 }
 #[test]
@@ -1477,7 +1480,7 @@ fn bindgen_test_layout_QemuMutex() {
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<QemuMutex>(),
-        56usize,
+        48usize,
         concat!("Size of: ", stringify!(QemuMutex))
     );
     assert_eq!(
@@ -1496,28 +1499,8 @@ fn bindgen_test_layout_QemuMutex() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).file) as usize - ptr as usize },
-        40usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(QemuMutex),
-            "::",
-            stringify!(file)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).line) as usize - ptr as usize },
-        48usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(QemuMutex),
-            "::",
-            stringify!(line)
-        )
-    );
-    assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).initialized) as usize - ptr as usize },
-        52usize,
+        40usize,
         concat!(
             "Offset of field: ",
             stringify!(QemuMutex),
@@ -1539,8 +1522,8 @@ impl ::std::fmt::Debug for QemuMutex {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
         write!(
             f,
-            "QemuMutex {{ lock: {:?}, file: {:?}, line: {:?}, initialized: {:?} }}",
-            self.lock, self.file, self.line, self.initialized
+            "QemuMutex {{ lock: {:?}, initialized: {:?} }}",
+            self.lock, self.initialized
         )
     }
 }
@@ -1698,7 +1681,7 @@ fn bindgen_test_layout_QemuLockCnt() {
 #[derive(Debug, Default, Copy, Clone)]
 pub struct MemTxAttrs {
     pub _bitfield_align_1: [u16; 0],
-    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 4usize]>,
+    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 3usize]>,
 }
 #[test]
 fn bindgen_test_layout_MemTxAttrs() {
@@ -1781,50 +1764,6 @@ impl MemTxAttrs {
         }
     }
     #[inline]
-    pub fn byte_swap(&self) -> ::std::os::raw::c_uint {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(22usize, 1u8) as u32) }
-    }
-    #[inline]
-    pub fn set_byte_swap(&mut self, val: ::std::os::raw::c_uint) {
-        unsafe {
-            let val: u32 = ::std::mem::transmute(val);
-            self._bitfield_1.set(22usize, 1u8, val as u64)
-        }
-    }
-    #[inline]
-    pub fn target_tlb_bit0(&self) -> ::std::os::raw::c_uint {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(23usize, 1u8) as u32) }
-    }
-    #[inline]
-    pub fn set_target_tlb_bit0(&mut self, val: ::std::os::raw::c_uint) {
-        unsafe {
-            let val: u32 = ::std::mem::transmute(val);
-            self._bitfield_1.set(23usize, 1u8, val as u64)
-        }
-    }
-    #[inline]
-    pub fn target_tlb_bit1(&self) -> ::std::os::raw::c_uint {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(24usize, 1u8) as u32) }
-    }
-    #[inline]
-    pub fn set_target_tlb_bit1(&mut self, val: ::std::os::raw::c_uint) {
-        unsafe {
-            let val: u32 = ::std::mem::transmute(val);
-            self._bitfield_1.set(24usize, 1u8, val as u64)
-        }
-    }
-    #[inline]
-    pub fn target_tlb_bit2(&self) -> ::std::os::raw::c_uint {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(25usize, 1u8) as u32) }
-    }
-    #[inline]
-    pub fn set_target_tlb_bit2(&mut self, val: ::std::os::raw::c_uint) {
-        unsafe {
-            let val: u32 = ::std::mem::transmute(val);
-            self._bitfield_1.set(25usize, 1u8, val as u64)
-        }
-    }
-    #[inline]
     pub fn new_bitfield_1(
         unspecified: ::std::os::raw::c_uint,
         secure: ::std::os::raw::c_uint,
@@ -1832,12 +1771,8 @@ impl MemTxAttrs {
         user: ::std::os::raw::c_uint,
         memory: ::std::os::raw::c_uint,
         requester_id: ::std::os::raw::c_uint,
-        byte_swap: ::std::os::raw::c_uint,
-        target_tlb_bit0: ::std::os::raw::c_uint,
-        target_tlb_bit1: ::std::os::raw::c_uint,
-        target_tlb_bit2: ::std::os::raw::c_uint,
-    ) -> __BindgenBitfieldUnit<[u8; 4usize]> {
-        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> = Default::default();
+    ) -> __BindgenBitfieldUnit<[u8; 3usize]> {
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 3usize]> = Default::default();
         __bindgen_bitfield_unit.set(0usize, 1u8, {
             let unspecified: u32 = unsafe { ::std::mem::transmute(unspecified) };
             unspecified as u64
@@ -1861,22 +1796,6 @@ impl MemTxAttrs {
         __bindgen_bitfield_unit.set(6usize, 16u8, {
             let requester_id: u32 = unsafe { ::std::mem::transmute(requester_id) };
             requester_id as u64
-        });
-        __bindgen_bitfield_unit.set(22usize, 1u8, {
-            let byte_swap: u32 = unsafe { ::std::mem::transmute(byte_swap) };
-            byte_swap as u64
-        });
-        __bindgen_bitfield_unit.set(23usize, 1u8, {
-            let target_tlb_bit0: u32 = unsafe { ::std::mem::transmute(target_tlb_bit0) };
-            target_tlb_bit0 as u64
-        });
-        __bindgen_bitfield_unit.set(24usize, 1u8, {
-            let target_tlb_bit1: u32 = unsafe { ::std::mem::transmute(target_tlb_bit1) };
-            target_tlb_bit1 as u64
-        });
-        __bindgen_bitfield_unit.set(25usize, 1u8, {
-            let target_tlb_bit2: u32 = unsafe { ::std::mem::transmute(target_tlb_bit2) };
-            target_tlb_bit2 as u64
         });
         __bindgen_bitfield_unit
     }
@@ -4110,6 +4029,7 @@ pub struct disassemble_info {
     pub target: bfd_vma,
     pub target2: bfd_vma,
     pub disassembler_options: *mut ::std::os::raw::c_char,
+    pub show_opcodes: bool,
     pub target_info: *mut ::std::os::raw::c_void,
     pub cap_arch: ::std::os::raw::c_int,
     pub cap_mode: ::std::os::raw::c_int,
@@ -4122,7 +4042,7 @@ fn bindgen_test_layout_disassemble_info() {
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<disassemble_info>(),
-        208usize,
+        216usize,
         concat!("Size of: ", stringify!(disassemble_info))
     );
     assert_eq!(
@@ -4421,8 +4341,18 @@ fn bindgen_test_layout_disassemble_info() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).target_info) as usize - ptr as usize },
+        unsafe { ::std::ptr::addr_of!((*ptr).show_opcodes) as usize - ptr as usize },
         184usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(disassemble_info),
+            "::",
+            stringify!(show_opcodes)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).target_info) as usize - ptr as usize },
+        192usize,
         concat!(
             "Offset of field: ",
             stringify!(disassemble_info),
@@ -4432,7 +4362,7 @@ fn bindgen_test_layout_disassemble_info() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).cap_arch) as usize - ptr as usize },
-        192usize,
+        200usize,
         concat!(
             "Offset of field: ",
             stringify!(disassemble_info),
@@ -4442,7 +4372,7 @@ fn bindgen_test_layout_disassemble_info() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).cap_mode) as usize - ptr as usize },
-        196usize,
+        204usize,
         concat!(
             "Offset of field: ",
             stringify!(disassemble_info),
@@ -4452,7 +4382,7 @@ fn bindgen_test_layout_disassemble_info() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).cap_insn_unit) as usize - ptr as usize },
-        200usize,
+        208usize,
         concat!(
             "Offset of field: ",
             stringify!(disassemble_info),
@@ -4462,7 +4392,7 @@ fn bindgen_test_layout_disassemble_info() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).cap_insn_split) as usize - ptr as usize },
-        204usize,
+        212usize,
         concat!(
             "Offset of field: ",
             stringify!(disassemble_info),
@@ -4480,18 +4410,9 @@ impl Default for disassemble_info {
         }
     }
 }
+pub type hwaddr = u64;
 #[doc = " vaddr:\n Type wide enough to contain any #target_ulong virtual address."]
 pub type vaddr = u64;
-extern "C" {
-    pub fn cpu_memory_rw_debug(
-        cpu: *mut CPUState,
-        addr: vaddr,
-        ptr: *mut ::std::os::raw::c_void,
-        len: usize,
-        is_write: bool,
-    ) -> ::std::os::raw::c_int;
-}
-pub type hwaddr = u64;
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union CPUTLBEntry {
@@ -4694,15 +4615,10 @@ impl ::std::ops::BitAndAssign for ShutdownCause {
 pub struct ShutdownCause(pub ::std::os::raw::c_uint);
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct TCGCPUOps {
-    _unused: [u8; 0],
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
 pub struct SysemuCPUOps {
     _unused: [u8; 0],
 }
-#[doc = " CPUClass:\n @class_by_name: Callback to map -cpu command line model name to an\n                 instantiatable CPU type.\n @parse_features: Callback to parse command line arguments.\n @reset_dump_flags: #CPUDumpFlags to use for reset logging.\n @has_work: Callback for checking if there is work to do.\n @memory_rw_debug: Callback for GDB memory access.\n @dump_state: Callback for dumping state.\n @query_cpu_fast:\n       Fill in target specific information for the \"query-cpus-fast\"\n       QAPI call.\n @get_arch_id: Callback for getting architecture-dependent CPU ID.\n @set_pc: Callback for setting the Program Counter register. This\n       should have the semantics used by the target architecture when\n       setting the PC from a source such as an ELF file entry point;\n       for example on Arm it will also set the Thumb mode bit based\n       on the least significant bit of the new PC value.\n       If the target behaviour here is anything other than \"set\n       the PC register to the value passed in\" then the target must\n       also implement the synchronize_from_tb hook.\n @get_pc: Callback for getting the Program Counter register.\n       As above, with the semantics of the target architecture.\n @gdb_read_register: Callback for letting GDB read a register.\n @gdb_write_register: Callback for letting GDB write a register.\n @gdb_adjust_breakpoint: Callback for adjusting the address of a\n       breakpoint.  Used by AVR to handle a gdb mis-feature with\n       its Harvard architecture split code and data.\n @gdb_num_core_regs: Number of core registers accessible to GDB.\n @gdb_core_xml_file: File name for core registers GDB XML description.\n @gdb_stop_before_watchpoint: Indicates whether GDB expects the CPU to stop\n           before the insn which triggers a watchpoint rather than after it.\n @gdb_arch_name: Optional callback that returns the architecture name known\n to GDB. The caller must free the returned string with g_free.\n @gdb_get_dynamic_xml: Callback to return dynamically generated XML for the\n   gdb stub. Returns a pointer to the XML contents for the specified XML file\n   or NULL if the CPU doesn't have a dynamically generated content for it.\n @disas_set_info: Setup architecture specific components of disassembly info\n @adjust_watchpoint_address: Perform a target-specific adjustment to an\n address before attempting to match it against watchpoints.\n @deprecation_note: If this CPUClass is deprecated, this field provides\n                    related information.\n\n Represents a CPU family or model."]
+#[doc = " CPUClass:\n @class_by_name: Callback to map -cpu command line model name to an\n                 instantiatable CPU type.\n @parse_features: Callback to parse command line arguments.\n @reset_dump_flags: #CPUDumpFlags to use for reset logging.\n @has_work: Callback for checking if there is work to do.\n @mmu_index: Callback for choosing softmmu mmu index;\n       may be used internally by memory_rw_debug without TCG.\n @memory_rw_debug: Callback for GDB memory access.\n @dump_state: Callback for dumping state.\n @query_cpu_fast:\n       Fill in target specific information for the \"query-cpus-fast\"\n       QAPI call.\n @get_arch_id: Callback for getting architecture-dependent CPU ID.\n @set_pc: Callback for setting the Program Counter register. This\n       should have the semantics used by the target architecture when\n       setting the PC from a source such as an ELF file entry point;\n       for example on Arm it will also set the Thumb mode bit based\n       on the least significant bit of the new PC value.\n       If the target behaviour here is anything other than \"set\n       the PC register to the value passed in\" then the target must\n       also implement the synchronize_from_tb hook.\n @get_pc: Callback for getting the Program Counter register.\n       As above, with the semantics of the target architecture.\n @gdb_read_register: Callback for letting GDB read a register.\n @gdb_write_register: Callback for letting GDB write a register.\n @gdb_adjust_breakpoint: Callback for adjusting the address of a\n       breakpoint.  Used by AVR to handle a gdb mis-feature with\n       its Harvard architecture split code and data.\n @gdb_num_core_regs: Number of core registers accessible to GDB or 0 to infer\n                     from @gdb_core_xml_file.\n @gdb_core_xml_file: File name for core registers GDB XML description.\n @gdb_stop_before_watchpoint: Indicates whether GDB expects the CPU to stop\n           before the insn which triggers a watchpoint rather than after it.\n @gdb_arch_name: Optional callback that returns the architecture name known\n to GDB. The caller must free the returned string with g_free.\n @disas_set_info: Setup architecture specific components of disassembly info\n @adjust_watchpoint_address: Perform a target-specific adjustment to an\n address before attempting to match it against watchpoints.\n @deprecation_note: If this CPUClass is deprecated, this field provides\n                    related information.\n\n Represents a CPU family or model."]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct CPUClass {
@@ -4718,6 +4634,9 @@ pub struct CPUClass {
         ),
     >,
     pub has_work: ::std::option::Option<unsafe extern "C" fn(cpu: *mut CPUState) -> bool>,
+    pub mmu_index: ::std::option::Option<
+        unsafe extern "C" fn(cpu: *mut CPUState, ifetch: bool) -> ::std::os::raw::c_int,
+    >,
     pub memory_rw_debug: ::std::option::Option<
         unsafe extern "C" fn(
             cpu: *mut CPUState,
@@ -4754,12 +4673,6 @@ pub struct CPUClass {
     pub gdb_core_xml_file: *const ::std::os::raw::c_char,
     pub gdb_arch_name:
         ::std::option::Option<unsafe extern "C" fn(cpu: *mut CPUState) -> *const gchar>,
-    pub gdb_get_dynamic_xml: ::std::option::Option<
-        unsafe extern "C" fn(
-            cpu: *mut CPUState,
-            xmlname: *const ::std::os::raw::c_char,
-        ) -> *const ::std::os::raw::c_char,
-    >,
     pub disas_set_info: ::std::option::Option<
         unsafe extern "C" fn(cpu: *mut CPUState, info: *mut disassemble_info),
     >,
@@ -4829,8 +4742,18 @@ fn bindgen_test_layout_CPUClass() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).memory_rw_debug) as usize - ptr as usize },
+        unsafe { ::std::ptr::addr_of!((*ptr).mmu_index) as usize - ptr as usize },
         200usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUClass),
+            "::",
+            stringify!(mmu_index)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).memory_rw_debug) as usize - ptr as usize },
+        208usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUClass),
@@ -4840,7 +4763,7 @@ fn bindgen_test_layout_CPUClass() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).dump_state) as usize - ptr as usize },
-        208usize,
+        216usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUClass),
@@ -4850,7 +4773,7 @@ fn bindgen_test_layout_CPUClass() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).query_cpu_fast) as usize - ptr as usize },
-        216usize,
+        224usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUClass),
@@ -4860,7 +4783,7 @@ fn bindgen_test_layout_CPUClass() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).get_arch_id) as usize - ptr as usize },
-        224usize,
+        232usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUClass),
@@ -4870,7 +4793,7 @@ fn bindgen_test_layout_CPUClass() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).set_pc) as usize - ptr as usize },
-        232usize,
+        240usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUClass),
@@ -4880,7 +4803,7 @@ fn bindgen_test_layout_CPUClass() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).get_pc) as usize - ptr as usize },
-        240usize,
+        248usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUClass),
@@ -4890,7 +4813,7 @@ fn bindgen_test_layout_CPUClass() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).gdb_read_register) as usize - ptr as usize },
-        248usize,
+        256usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUClass),
@@ -4900,7 +4823,7 @@ fn bindgen_test_layout_CPUClass() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).gdb_write_register) as usize - ptr as usize },
-        256usize,
+        264usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUClass),
@@ -4910,7 +4833,7 @@ fn bindgen_test_layout_CPUClass() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).gdb_adjust_breakpoint) as usize - ptr as usize },
-        264usize,
+        272usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUClass),
@@ -4920,7 +4843,7 @@ fn bindgen_test_layout_CPUClass() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).gdb_core_xml_file) as usize - ptr as usize },
-        272usize,
+        280usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUClass),
@@ -4930,22 +4853,12 @@ fn bindgen_test_layout_CPUClass() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).gdb_arch_name) as usize - ptr as usize },
-        280usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUClass),
-            "::",
-            stringify!(gdb_arch_name)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).gdb_get_dynamic_xml) as usize - ptr as usize },
         288usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUClass),
             "::",
-            stringify!(gdb_get_dynamic_xml)
+            stringify!(gdb_arch_name)
         )
     );
     assert_eq!(
@@ -5056,6 +4969,7 @@ pub struct CPUTLBEntryFull {
     pub attrs: MemTxAttrs,
     pub prot: u8,
     pub lg_page_size: u8,
+    pub tlb_fill_flags: u8,
     pub slow_flags: [u8; 3usize],
     pub extra: CPUTLBEntryFull__bindgen_ty_1,
 }
@@ -5228,8 +5142,18 @@ fn bindgen_test_layout_CPUTLBEntryFull() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).slow_flags) as usize - ptr as usize },
+        unsafe { ::std::ptr::addr_of!((*ptr).tlb_fill_flags) as usize - ptr as usize },
         22usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUTLBEntryFull),
+            "::",
+            stringify!(tlb_fill_flags)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).slow_flags) as usize - ptr as usize },
+        23usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUTLBEntryFull),
@@ -5239,7 +5163,7 @@ fn bindgen_test_layout_CPUTLBEntryFull() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).extra) as usize - ptr as usize },
-        25usize,
+        26usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUTLBEntryFull),
@@ -6001,7 +5925,7 @@ pub struct kvm_run {
 pub struct qemu_work_item {
     _unused: [u8; 0],
 }
-#[doc = " CPUState:\n @cpu_index: CPU index (informative).\n @cluster_index: Identifies which cluster this CPU is in.\n   For boards which don't define clusters or for \"loose\" CPUs not assigned\n   to a cluster this will be UNASSIGNED_CLUSTER_INDEX; otherwise it will\n   be the same as the cluster-id property of the CPU object's TYPE_CPU_CLUSTER\n   QOM parent.\n   Under TCG this value is propagated to @tcg_cflags.\n   See TranslationBlock::TCG CF_CLUSTER_MASK.\n @tcg_cflags: Pre-computed cflags for this cpu.\n @nr_cores: Number of cores within this CPU package.\n @nr_threads: Number of threads within this CPU core.\n @running: #true if CPU is currently running (lockless).\n @has_waiter: #true if a CPU is currently waiting for the cpu_exec_end;\n valid under cpu_list_lock.\n @created: Indicates whether the CPU thread has been successfully created.\n @interrupt_request: Indicates a pending interrupt request.\n @halted: Nonzero if the CPU is in suspended state.\n @stop: Indicates a pending stop request.\n @stopped: Indicates the CPU has been artificially stopped.\n @unplug: Indicates a pending CPU unplug request.\n @crash_occurred: Indicates the OS reported a crash (panic) for this CPU\n @singlestep_enabled: Flags for single-stepping.\n @icount_extra: Instructions until next timer event.\n @neg.can_do_io: True if memory-mapped IO is allowed.\n @cpu_ases: Pointer to array of CPUAddressSpaces (which define the\n            AddressSpaces this CPU has)\n @num_ases: number of CPUAddressSpaces in @cpu_ases\n @as: Pointer to the first AddressSpace, for the convenience of targets which\n      only have a single AddressSpace\n @gdb_regs: Additional GDB registers.\n @gdb_num_regs: Number of total registers accessible to GDB.\n @gdb_num_g_regs: Number of registers in GDB 'g' packets.\n @next_cpu: Next CPU sharing TB cache.\n @opaque: User data.\n @mem_io_pc: Host Program Counter at which the memory was accessed.\n @accel: Pointer to accelerator specific state.\n @kvm_fd: vCPU file descriptor for KVM.\n @work_mutex: Lock to prevent multiple access to @work_list.\n @work_list: List of pending asynchronous work.\n @trace_dstate_delayed: Delayed changes to trace_dstate (includes all changes\n                        to @trace_dstate).\n @trace_dstate: Dynamic tracing state of events for this vCPU (bitmask).\n @plugin_mask: Plugin event bitmap. Modified only via async work.\n @ignore_memory_transaction_failures: Cached copy of the MachineState\n    flag of the same name: allows the board to suppress calling of the\n    CPU do_transaction_failed hook function.\n @kvm_dirty_gfns: Points to the KVM dirty ring for this CPU when KVM dirty\n    ring is enabled.\n @kvm_fetch_index: Keeps the index that we last fetched from the per-vCPU\n    dirty ring structure.\n\n State of one CPU core or thread.\n\n Align, in order to match possible alignment required by CPUArchState,\n and eliminate a hole between CPUState and CPUArchState within ArchCPU."]
+#[doc = " CPUState:\n @cpu_index: CPU index (informative).\n @cluster_index: Identifies which cluster this CPU is in.\n   For boards which don't define clusters or for \"loose\" CPUs not assigned\n   to a cluster this will be UNASSIGNED_CLUSTER_INDEX; otherwise it will\n   be the same as the cluster-id property of the CPU object's TYPE_CPU_CLUSTER\n   QOM parent.\n   Under TCG this value is propagated to @tcg_cflags.\n   See TranslationBlock::TCG CF_CLUSTER_MASK.\n @tcg_cflags: Pre-computed cflags for this cpu.\n @nr_cores: Number of cores within this CPU package.\n @nr_threads: Number of threads within this CPU core.\n @running: #true if CPU is currently running (lockless).\n @has_waiter: #true if a CPU is currently waiting for the cpu_exec_end;\n valid under cpu_list_lock.\n @created: Indicates whether the CPU thread has been successfully created.\n @interrupt_request: Indicates a pending interrupt request.\n @halted: Nonzero if the CPU is in suspended state.\n @stop: Indicates a pending stop request.\n @stopped: Indicates the CPU has been artificially stopped.\n @unplug: Indicates a pending CPU unplug request.\n @crash_occurred: Indicates the OS reported a crash (panic) for this CPU\n @singlestep_enabled: Flags for single-stepping.\n @icount_extra: Instructions until next timer event.\n @neg.can_do_io: True if memory-mapped IO is allowed.\n @cpu_ases: Pointer to array of CPUAddressSpaces (which define the\n            AddressSpaces this CPU has)\n @num_ases: number of CPUAddressSpaces in @cpu_ases\n @as: Pointer to the first AddressSpace, for the convenience of targets which\n      only have a single AddressSpace\n @gdb_regs: Additional GDB registers.\n @gdb_num_regs: Number of total registers accessible to GDB.\n @gdb_num_g_regs: Number of registers in GDB 'g' packets.\n @node: QTAILQ of CPUs sharing TB cache.\n @opaque: User data.\n @mem_io_pc: Host Program Counter at which the memory was accessed.\n @accel: Pointer to accelerator specific state.\n @kvm_fd: vCPU file descriptor for KVM.\n @work_mutex: Lock to prevent multiple access to @work_list.\n @work_list: List of pending asynchronous work.\n @plugin_mem_cbs: active plugin memory callbacks\n @plugin_state: per-CPU plugin state\n @ignore_memory_transaction_failures: Cached copy of the MachineState\n    flag of the same name: allows the board to suppress calling of the\n    CPU do_transaction_failed hook function.\n @kvm_dirty_gfns: Points to the KVM dirty ring for this CPU when KVM dirty\n    ring is enabled.\n @kvm_fetch_index: Keeps the index that we last fetched from the per-vCPU\n    dirty ring structure.\n\n State of one CPU core or thread.\n\n Align, in order to match possible alignment required by CPUArchState,\n and eliminate a hole between CPUState and CPUArchState within ArchCPU."]
 #[repr(C)]
 #[repr(align(16))]
 pub struct CPUState {
@@ -6054,8 +5978,8 @@ pub struct CPUState {
     pub dirty_pages: u64,
     pub kvm_vcpu_stats_fd: ::std::os::raw::c_int,
     pub in_ioctl_lock: QemuLockCnt,
-    pub plugin_mask: [::std::os::raw::c_ulong; 1usize],
     pub plugin_mem_cbs: *mut GArray,
+    pub plugin_state: *mut CPUPluginState,
     pub cpu_index: ::std::os::raw::c_int,
     pub cluster_index: ::std::os::raw::c_int,
     pub tcg_cflags: u32,
@@ -6068,6 +5992,7 @@ pub struct CPUState {
     pub ignore_memory_transaction_failures: bool,
     pub prctl_unalign_sigbus: bool,
     pub iommu_notifiers: *mut GArray,
+    pub __bindgen_padding_0: [u8; 8usize],
     pub neg_align: __IncompleteArrayField<::std::os::raw::c_char>,
     pub neg: CPUNegativeOffsetState,
 }
@@ -6566,7 +6491,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).work_list) as usize - ptr as usize },
-        504usize,
+        496usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6576,7 +6501,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).cpu_ases) as usize - ptr as usize },
-        520usize,
+        512usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6586,7 +6511,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).num_ases) as usize - ptr as usize },
-        528usize,
+        520usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6596,7 +6521,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).as_) as usize - ptr as usize },
-        536usize,
+        528usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6606,7 +6531,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).memory) as usize - ptr as usize },
-        544usize,
+        536usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6616,7 +6541,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).tb_jmp_cache) as usize - ptr as usize },
-        552usize,
+        544usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6626,7 +6551,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).gdb_regs) as usize - ptr as usize },
-        560usize,
+        552usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6636,7 +6561,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).gdb_num_regs) as usize - ptr as usize },
-        568usize,
+        560usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6646,7 +6571,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).gdb_num_g_regs) as usize - ptr as usize },
-        572usize,
+        564usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6656,7 +6581,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).node) as usize - ptr as usize },
-        576usize,
+        568usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6666,7 +6591,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).breakpoints) as usize - ptr as usize },
-        592usize,
+        584usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6676,7 +6601,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).watchpoints) as usize - ptr as usize },
-        608usize,
+        600usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6686,7 +6611,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).watchpoint_hit) as usize - ptr as usize },
-        624usize,
+        616usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6696,7 +6621,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).opaque) as usize - ptr as usize },
-        632usize,
+        624usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6706,7 +6631,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).mem_io_pc) as usize - ptr as usize },
-        640usize,
+        632usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6716,7 +6641,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).kvm_fd) as usize - ptr as usize },
-        648usize,
+        640usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6726,7 +6651,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).kvm_state) as usize - ptr as usize },
-        656usize,
+        648usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6736,7 +6661,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).kvm_run) as usize - ptr as usize },
-        664usize,
+        656usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6746,7 +6671,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).kvm_dirty_gfns) as usize - ptr as usize },
-        672usize,
+        664usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6756,7 +6681,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).kvm_fetch_index) as usize - ptr as usize },
-        680usize,
+        672usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6766,7 +6691,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).dirty_pages) as usize - ptr as usize },
-        688usize,
+        680usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6776,7 +6701,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).kvm_vcpu_stats_fd) as usize - ptr as usize },
-        696usize,
+        688usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6786,7 +6711,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).in_ioctl_lock) as usize - ptr as usize },
-        700usize,
+        692usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6795,18 +6720,8 @@ fn bindgen_test_layout_CPUState() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).plugin_mask) as usize - ptr as usize },
-        704usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUState),
-            "::",
-            stringify!(plugin_mask)
-        )
-    );
-    assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).plugin_mem_cbs) as usize - ptr as usize },
-        712usize,
+        696usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6815,8 +6730,18 @@ fn bindgen_test_layout_CPUState() {
         )
     );
     assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).plugin_state) as usize - ptr as usize },
+        704usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUState),
+            "::",
+            stringify!(plugin_state)
+        )
+    );
+    assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).cpu_index) as usize - ptr as usize },
-        720usize,
+        712usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6826,7 +6751,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).cluster_index) as usize - ptr as usize },
-        724usize,
+        716usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6836,7 +6761,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).tcg_cflags) as usize - ptr as usize },
-        728usize,
+        720usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6846,7 +6771,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).halted) as usize - ptr as usize },
-        732usize,
+        724usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6856,7 +6781,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).exception_index) as usize - ptr as usize },
-        736usize,
+        728usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6866,7 +6791,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).accel) as usize - ptr as usize },
-        744usize,
+        736usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6876,7 +6801,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).vcpu_dirty) as usize - ptr as usize },
-        752usize,
+        744usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6886,7 +6811,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).throttle_thread_scheduled) as usize - ptr as usize },
-        753usize,
+        745usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6896,7 +6821,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).throttle_us_per_full) as usize - ptr as usize },
-        760usize,
+        752usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6908,7 +6833,7 @@ fn bindgen_test_layout_CPUState() {
         unsafe {
             ::std::ptr::addr_of!((*ptr).ignore_memory_transaction_failures) as usize - ptr as usize
         },
-        768usize,
+        760usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6918,7 +6843,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).prctl_unalign_sigbus) as usize - ptr as usize },
-        769usize,
+        761usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6928,7 +6853,7 @@ fn bindgen_test_layout_CPUState() {
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).iommu_notifiers) as usize - ptr as usize },
-        776usize,
+        768usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUState),
@@ -6968,7 +6893,7 @@ impl Default for CPUState {
 }
 impl ::std::fmt::Debug for CPUState {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write ! (f , "CPUState {{ parent_obj: {:?}, cc: {:?}, nr_cores: {:?}, nr_threads: {:?}, thread: {:?}, thread_id: {:?}, running: {:?}, has_waiter: {:?}, halt_cond: {:?}, thread_kicked: {:?}, created: {:?}, stop: {:?}, stopped: {:?}, start_powered_off: {:?}, unplug: {:?}, crash_occurred: {:?}, exit_request: {:?}, exclusive_context_count: {:?}, singlestep_enabled: {:?}, jmp_env: {:?}, work_mutex: {:?}, work_list: {:?}, cpu_ases: {:?}, num_ases: {:?}, as: {:?}, memory: {:?}, tb_jmp_cache: {:?}, gdb_regs: {:?}, gdb_num_regs: {:?}, gdb_num_g_regs: {:?}, node: {:?}, breakpoints: {:?}, watchpoints: {:?}, watchpoint_hit: {:?}, opaque: {:?}, kvm_fd: {:?}, kvm_state: {:?}, kvm_run: {:?}, kvm_dirty_gfns: {:?}, kvm_vcpu_stats_fd: {:?}, in_ioctl_lock: {:?}, plugin_mask: {:?}, plugin_mem_cbs: {:?}, cpu_index: {:?}, cluster_index: {:?}, accel: {:?}, vcpu_dirty: {:?}, throttle_thread_scheduled: {:?}, ignore_memory_transaction_failures: {:?}, prctl_unalign_sigbus: {:?}, iommu_notifiers: {:?}, neg_align: {:?}, neg: {:?} }}" , self . parent_obj , self . cc , self . nr_cores , self . nr_threads , self . thread , self . thread_id , self . running , self . has_waiter , self . halt_cond , self . thread_kicked , self . created , self . stop , self . stopped , self . start_powered_off , self . unplug , self . crash_occurred , self . exit_request , self . exclusive_context_count , self . singlestep_enabled , self . jmp_env , self . work_mutex , self . work_list , self . cpu_ases , self . num_ases , self . as_ , self . memory , self . tb_jmp_cache , self . gdb_regs , self . gdb_num_regs , self . gdb_num_g_regs , self . node , self . breakpoints , self . watchpoints , self . watchpoint_hit , self . opaque , self . kvm_fd , self . kvm_state , self . kvm_run , self . kvm_dirty_gfns , self . kvm_vcpu_stats_fd , self . in_ioctl_lock , self . plugin_mask , self . plugin_mem_cbs , self . cpu_index , self . cluster_index , self . accel , self . vcpu_dirty , self . throttle_thread_scheduled , self . ignore_memory_transaction_failures , self . prctl_unalign_sigbus , self . iommu_notifiers , self . neg_align , self . neg)
+        write ! (f , "CPUState {{ parent_obj: {:?}, cc: {:?}, nr_cores: {:?}, nr_threads: {:?}, thread: {:?}, thread_id: {:?}, running: {:?}, has_waiter: {:?}, halt_cond: {:?}, thread_kicked: {:?}, created: {:?}, stop: {:?}, stopped: {:?}, start_powered_off: {:?}, unplug: {:?}, crash_occurred: {:?}, exit_request: {:?}, exclusive_context_count: {:?}, singlestep_enabled: {:?}, jmp_env: {:?}, work_mutex: {:?}, work_list: {:?}, cpu_ases: {:?}, num_ases: {:?}, as: {:?}, memory: {:?}, tb_jmp_cache: {:?}, gdb_regs: {:?}, gdb_num_regs: {:?}, gdb_num_g_regs: {:?}, node: {:?}, breakpoints: {:?}, watchpoints: {:?}, watchpoint_hit: {:?}, opaque: {:?}, kvm_fd: {:?}, kvm_state: {:?}, kvm_run: {:?}, kvm_dirty_gfns: {:?}, kvm_vcpu_stats_fd: {:?}, in_ioctl_lock: {:?}, plugin_mem_cbs: {:?}, plugin_state: {:?}, cpu_index: {:?}, cluster_index: {:?}, accel: {:?}, vcpu_dirty: {:?}, throttle_thread_scheduled: {:?}, ignore_memory_transaction_failures: {:?}, prctl_unalign_sigbus: {:?}, iommu_notifiers: {:?}, neg_align: {:?}, neg: {:?} }}" , self . parent_obj , self . cc , self . nr_cores , self . nr_threads , self . thread , self . thread_id , self . running , self . has_waiter , self . halt_cond , self . thread_kicked , self . created , self . stop , self . stopped , self . start_powered_off , self . unplug , self . crash_occurred , self . exit_request , self . exclusive_context_count , self . singlestep_enabled , self . jmp_env , self . work_mutex , self . work_list , self . cpu_ases , self . num_ases , self . as_ , self . memory , self . tb_jmp_cache , self . gdb_regs , self . gdb_num_regs , self . gdb_num_g_regs , self . node , self . breakpoints , self . watchpoints , self . watchpoint_hit , self . opaque , self . kvm_fd , self . kvm_state , self . kvm_run , self . kvm_dirty_gfns , self . kvm_vcpu_stats_fd , self . in_ioctl_lock , self . plugin_mem_cbs , self . plugin_state , self . cpu_index , self . cluster_index , self . accel , self . vcpu_dirty , self . throttle_thread_scheduled , self . ignore_memory_transaction_failures , self . prctl_unalign_sigbus , self . iommu_notifiers , self . neg_align , self . neg)
     }
 }
 extern "C" {
@@ -11593,6 +11518,15 @@ impl ::std::fmt::Debug for ArchCPU {
         write ! (f , "ArchCPU {{ parent_obj: {:?}, env: {:?}, vmsentry: {:?}, hyperv_vendor: {:?}, hyperv_synic_kvm_only: {:?}, hyperv_passthrough: {:?}, hyperv_no_nonarch_cs: {:?}, hyperv_vendor_id: {:?}, hyperv_interface_id: {:?}, hyperv_limits: {:?}, hyperv_enforce_cpuid: {:?}, check_cpuid: {:?}, enforce_cpuid: {:?}, force_features: {:?}, expose_kvm: {:?}, expose_tcg: {:?}, migratable: {:?}, migrate_smi_count: {:?}, max_features: {:?}, vmware_cpuid_freq: {:?}, cache_info_passthrough: {:?}, mwait: {:?}, filtered_features: {:?}, enable_pmu: {:?}, enable_lmce: {:?}, enable_l3_cache: {:?}, legacy_cache: {:?}, enable_cpuid_0xb: {:?}, full_cpuid_auto_level: {:?}, vendor_cpuid_only: {:?}, intel_pt_auto_level: {:?}, fill_mtrr_mask: {:?}, host_phys_bits: {:?}, kvm_no_smi_migration: {:?}, kvm_pv_enforce_cpuid: {:?}, apic_state: {:?}, cpu_as_root: {:?}, cpu_as_mem: {:?}, smram: {:?}, machine_done: {:?}, kvm_msr_buf: {:?}, xen_vapic: {:?} }}" , self . parent_obj , self . env , self . vmsentry , self . hyperv_vendor , self . hyperv_synic_kvm_only , self . hyperv_passthrough , self . hyperv_no_nonarch_cs , self . hyperv_vendor_id , self . hyperv_interface_id , self . hyperv_limits , self . hyperv_enforce_cpuid , self . check_cpuid , self . enforce_cpuid , self . force_features , self . expose_kvm , self . expose_tcg , self . migratable , self . migrate_smi_count , self . max_features , self . vmware_cpuid_freq , self . cache_info_passthrough , self . mwait , self . filtered_features , self . enable_pmu , self . enable_lmce , self . enable_l3_cache , self . legacy_cache , self . enable_cpuid_0xb , self . full_cpuid_auto_level , self . vendor_cpuid_only , self . intel_pt_auto_level , self . fill_mtrr_mask , self . host_phys_bits , self . kvm_no_smi_migration , self . kvm_pv_enforce_cpuid , self . apic_state , self . cpu_as_root , self . cpu_as_mem , self . smram , self . machine_done , self . kvm_msr_buf , self . xen_vapic)
     }
 }
+extern "C" {
+    pub fn cpu_memory_rw_debug(
+        cpu: *mut CPUState,
+        addr: vaddr,
+        ptr: *mut ::std::os::raw::c_void,
+        len: usize,
+        is_write: bool,
+    ) -> ::std::os::raw::c_int;
+}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct RBNode {
@@ -11819,6 +11753,7 @@ pub type IntervalTreeRoot = RBRootLeftCached;
 pub type abi_ulong = target_ulong;
 pub type abi_long = target_long;
 extern "C" {
+    #[doc = " --- Begin LibAFL code ---"]
     pub fn pageflags_get_root() -> *mut IntervalTreeRoot;
 }
 extern "C" {
@@ -12751,6 +12686,37 @@ extern "C" {
 extern "C" {
     #[doc = " qemu_plugin_hwaddr_phys_addr() - query physical address for memory operation\n @haddr: address handle from qemu_plugin_get_hwaddr()\n\n Returns the physical address associated with the memory operation\n\n Note that the returned physical address may not be unique if you are dealing\n with multiple address spaces."]
     pub fn qemu_plugin_hwaddr_phys_addr(haddr: *const qemu_plugin_hwaddr) -> u64;
+}
+#[doc = " struct CPUPluginState - per-CPU state for plugins\n @event_mask: plugin event bitmap. Modified only via async work."]
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct CPUPluginState {
+    pub event_mask: [::std::os::raw::c_ulong; 1usize],
+}
+#[test]
+fn bindgen_test_layout_CPUPluginState() {
+    const UNINIT: ::std::mem::MaybeUninit<CPUPluginState> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<CPUPluginState>(),
+        8usize,
+        concat!("Size of: ", stringify!(CPUPluginState))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<CPUPluginState>(),
+        8usize,
+        concat!("Alignment of ", stringify!(CPUPluginState))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).event_mask) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUPluginState),
+            "::",
+            stringify!(event_mask)
+        )
+    );
 }
 pub const TCGReg_TCG_REG_EAX: TCGReg = TCGReg(0);
 pub const TCGReg_TCG_REG_ECX: TCGReg = TCGReg(1);
