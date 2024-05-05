@@ -1,10 +1,5 @@
 //! Observers give insights about runs of a target, such as coverage, timing, stack depth, and more.
-
-pub mod map;
-
 use alloc::borrow::Cow;
-
-pub use map::*;
 
 pub mod cmp;
 pub use cmp::*;
@@ -20,6 +15,8 @@ pub mod stacktrace;
 pub use stacktrace::*;
 
 pub mod concolic;
+pub mod map;
+pub use map::*;
 
 pub mod value;
 
