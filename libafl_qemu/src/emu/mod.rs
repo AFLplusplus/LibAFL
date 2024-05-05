@@ -13,7 +13,7 @@ use std::{
     ptr,
 };
 
-use libafl::executors::ExitKind;
+use libafl::{events::CTRL_C_EXIT, executors::ExitKind};
 #[cfg(emulation_mode = "systemmode")]
 use libafl_qemu_sys::qemu_init;
 #[cfg(emulation_mode = "usermode")]
@@ -30,7 +30,6 @@ pub use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestVirtAddr};
 pub use libafl_qemu_sys::{MapInfo, MmapPerms, MmapPermsIter};
 use num_traits::Num;
 use strum::IntoEnumIterator;
-use libafl::events::CTRL_C_EXIT;
 
 use crate::{
     command::IsCommand, sys::TCGTemp, GuestReg, QemuHelperTuple, Regs, StdInstrumentationFilter,
