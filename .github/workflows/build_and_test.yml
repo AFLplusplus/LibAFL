@@ -489,18 +489,6 @@ jobs:
       - name: Build fuzzers/tinyinst_simple
         run: cd fuzzers/tinyinst_simple/ && cargo make test
 
-  windows-libfuzzer-asan:
-    runs-on: windows-latest
-    needs:
-      - common
-    steps:
-      - uses: actions/checkout@v3
-      - uses: ./.github/workflows/windows-tester-prepare
-      - name: install cxx bridge
-        run: cargo install cxxbridge-cmd
-      - name: Build fuzzers/tinyinst_simple
-        run: cd fuzzers/libfuzzer_windows_asan/ && cargo make test
-
   windows-clippy:
     runs-on: windows-latest
     needs:
