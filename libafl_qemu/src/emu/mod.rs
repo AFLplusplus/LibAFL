@@ -30,6 +30,7 @@ pub use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestVirtAddr};
 pub use libafl_qemu_sys::{MapInfo, MmapPerms, MmapPermsIter};
 use num_traits::Num;
 use strum::IntoEnumIterator;
+use libafl::events::CTRL_C_EXIT;
 
 use crate::{
     command::IsCommand, sys::TCGTemp, GuestReg, QemuHelperTuple, Regs, StdInstrumentationFilter,
@@ -287,7 +288,7 @@ where
         let (command, ret_reg): (Option<Command>, Option<Regs>) = match &mut exit_reason {
             EmuExitReason::End(shutdown_cause) => match shutdown_cause {
                 QemuShutdownCause::HostSignal(Signal::SigInterrupt) => {
-                    return Ok(InnerHandlerResult::Interrupt)
+                    std::process::exit(CTRL_C_EXIT);
                 }
                 QemuShutdownCause::GuestPanic => {
                     return Ok(InnerHandlerResult::EndOfRun(ExitKind::Crash))
