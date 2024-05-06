@@ -88,7 +88,7 @@ impl Handler for ShutdownSignalData {
             // println!("Exiting from the handler....");
 
             #[cfg(unix)]
-            libc::_exit(100);
+            libc::_exit(CTRL_C_EXIT);
 
             #[cfg(windows)]
             windows::Win32::System::Threading::ExitProcess(100);

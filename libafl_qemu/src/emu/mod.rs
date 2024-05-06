@@ -13,7 +13,7 @@ use std::{
     ptr,
 };
 
-use libafl::executors::ExitKind;
+use libafl::{events::CTRL_C_EXIT, executors::ExitKind};
 #[cfg(emulation_mode = "systemmode")]
 use libafl_qemu_sys::qemu_init;
 #[cfg(emulation_mode = "usermode")]
@@ -287,7 +287,7 @@ where
         let (command, ret_reg): (Option<Command>, Option<Regs>) = match &mut exit_reason {
             EmuExitReason::End(shutdown_cause) => match shutdown_cause {
                 QemuShutdownCause::HostSignal(Signal::SigInterrupt) => {
-                    return Ok(InnerHandlerResult::Interrupt)
+                    std::process::exit(CTRL_C_EXIT);
                 }
                 QemuShutdownCause::GuestPanic => {
                     return Ok(InnerHandlerResult::EndOfRun(ExitKind::Crash))
