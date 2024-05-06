@@ -1,6 +1,5 @@
-use pyo3::{pymethods, PyObject, PyResult};
-use pyo3::exceptions::PyValueError;
 use libafl_qemu_sys::{GuestAddr, MmapPerms, VerifyAccess};
+use pyo3::{exceptions::PyValueError, pymethods, PyObject, PyResult};
 
 use crate::{
     emu::{HasExecutions, State},
@@ -150,10 +149,8 @@ where
 
 #[cfg(feature = "python")]
 pub mod pybind {
-    use pyo3::{pymethods, PyObject, PyResult, Python};
-    use pyo3::exceptions::PyValueError;
-    use pyo3::types::PyInt;
     use libafl_qemu_sys::{GuestAddr, MmapPerms};
+    use pyo3::{exceptions::PyValueError, pymethods, types::PyInt, PyObject, PyResult, Python};
 
     static mut PY_SYSCALL_HOOK: Option<PyObject> = None;
 

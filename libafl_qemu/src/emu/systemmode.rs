@@ -18,9 +18,7 @@ impl SnapshotId {
 
         let unique_id = UNIQUE_ID.fetch_add(1, Ordering::SeqCst);
 
-        SnapshotId {
-            id: unique_id,
-        }
+        SnapshotId { id: unique_id }
     }
 
     fn inner(&self) -> u64 {
@@ -132,16 +130,15 @@ impl IsSnapshotManager for FastSnapshotManager {
         let fast_snapshot_ptr = *self
             .snapshots
             .get(snapshot_id)
-            .ok_or(SnapshotManagerError::SnapshotIdNotFound(
-                *snapshot_id,
-            ))?;
+            .ok_or(SnapshotManagerError::SnapshotIdNotFound(*snapshot_id))?;
 
         unsafe {
             qemu.restore_fast_snapshot(fast_snapshot_ptr);
         }
 
         if self.check_memory_consistency {
-            let nb_inconsistencies = unsafe { qemu.check_fast_snapshot_memory_consistency(fast_snapshot_ptr) };
+            let nb_inconsistencies =
+                unsafe { qemu.check_fast_snapshot_memory_consistency(fast_snapshot_ptr) };
 
             if nb_inconsistencies > 0 {
                 return Err(SnapshotManagerError::MemoryInconsistencies(

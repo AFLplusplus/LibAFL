@@ -530,11 +530,7 @@ impl Qemu {
             qemu_user_init(argc, argv.as_ptr(), envp.as_ptr());
             #[cfg(emulation_mode = "systemmode")]
             {
-                qemu_init(
-                    argc,
-                    argv.as_ptr(),
-                    envp.as_ptr(),
-                );
+                qemu_init(argc, argv.as_ptr(), envp.as_ptr());
                 libc::atexit(qemu_cleanup_atexit);
                 libafl_qemu_sys::syx_snapshot_init(true);
             }
