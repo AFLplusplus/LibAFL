@@ -46,7 +46,7 @@ pub fn build() {
             "usermode".to_string()
         })
     };
-    println!("cargo::rustc-check-cfg=cfg(emulation_mode, values(\"{}\", \"{}\"))", "usermode", "systemmode");
+    println!("cargo::rustc-check-cfg=cfg(emulation_mode, values(\"usermode\", \"systemmode\"))");
     println!("cargo:rustc-cfg=emulation_mode=\"{emulation_mode}\"");
     println!("cargo:rerun-if-env-changed=EMULATION_MODE");
 
@@ -83,14 +83,7 @@ pub fn build() {
     };
     println!("cargo:rerun-if-env-changed=CPU_TARGET");
     println!("cargo:rustc-cfg=cpu_target=\"{cpu_target}\"");
-    println!("cargo::rustc-check-cfg=cfg(cpu_target, values(\"{}\", \"{}\", \"{}\", \"{}\", \"{}\", \"{}\", \"{}\"))",
-             "x86_64",
-             "arm",
-             "aarch64",
-             "i386",
-             "mips",
-             "ppc",
-             "hexagon");
+    println!("cargo::rustc-check-cfg=cfg(cpu_target, values(\"x86_64\", \"arm\", \"aarch64\", \"i386\", \"mips\", \"ppc\", \"hexagon\"))");
 
     let jobs = env::var("NUM_JOBS")
         .ok()
