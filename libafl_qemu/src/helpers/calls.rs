@@ -12,12 +12,12 @@ use thread_local::ThreadLocal;
 
 use crate::{
     capstone,
-    emu::ArchExtras,
     helpers::{
         HasInstrumentationFilter, IsFilter, QemuHelper, QemuHelperTuple,
         QemuInstrumentationAddressRangeFilter,
     },
     hooks::{Hook, QemuHooks},
+    qemu::ArchExtras,
     Qemu,
 };
 

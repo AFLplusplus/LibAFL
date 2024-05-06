@@ -49,6 +49,9 @@ pub use executor::QemuExecutor;
 #[cfg(feature = "fork")]
 pub use executor::QemuForkExecutor;
 
+pub mod qemu;
+pub use qemu::*;
+
 pub mod emu;
 pub use emu::*;
 
