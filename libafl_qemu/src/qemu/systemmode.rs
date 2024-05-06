@@ -77,6 +77,7 @@ impl DeviceSnapshotFilter {
                 for name in l {
                     v.push(name.as_bytes().as_ptr() as *mut i8);
                 }
+                v.push(core::ptr::null_mut());
                 v.as_mut_ptr()
             }
         }
