@@ -51,7 +51,7 @@ use libafl_qemu::{
     elf::EasyElf,
     filter_qemu_args,
     hooks::QemuHooks,
-    GuestReg, MmapPerms, Qemu, QemuExitReason, QemuExitReasonError, QemuForkExecutor,
+    GuestReg, MmapPerms, Qemu, QemuExitReason, QemuExitError, QemuForkExecutor,
     QemuShutdownCause, Regs,
 };
 #[cfg(unix)]
@@ -328,7 +328,7 @@ fn fuzz(
                 Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(Signal::SigInterrupt))) => {
                     process::exit(0)
                 }
-                Err(QemuExitReasonError::UnexpectedExit) => return ExitKind::Crash,
+                Err(QemuExitError::UnexpectedExit) => return ExitKind::Crash,
                 _ => panic!("Unexpected QEMU exit."),
             }
         }

@@ -30,7 +30,7 @@ use libafl_qemu::{
     edges::{QemuEdgeCoverageChildHelper, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},
     elf::EasyElf,
     ArchExtras, CallingConvention, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExitReason,
-    QemuExitReasonError, QemuForkExecutor, QemuHooks, QemuShutdownCause, Regs,
+    QemuExitError, QemuForkExecutor, QemuHooks, QemuShutdownCause, Regs,
 };
 
 #[derive(Default)]
@@ -211,7 +211,7 @@ pub fn fuzz() -> Result<(), Error> {
                 Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(Signal::SigInterrupt))) => {
                     process::exit(0)
                 }
-                Err(QemuExitReasonError::UnexpectedExit) => return ExitKind::Crash,
+                Err(QemuExitError::UnexpectedExit) => return ExitKind::Crash,
                 _ => panic!("Unexpected QEMU exit."),
             }
         }
