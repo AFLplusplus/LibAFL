@@ -1,5 +1,4 @@
 use libafl_qemu_sys::{GuestAddr, MmapPerms, VerifyAccess};
-use pyo3::{exceptions::PyValueError, pymethods, PyObject, PyResult};
 
 use crate::{
     emu::{HasExecutions, State},

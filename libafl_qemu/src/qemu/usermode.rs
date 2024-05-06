@@ -10,7 +10,6 @@ use libafl_qemu_sys::{
     IntervalTreeNode, IntervalTreeRoot, MapInfo, MmapPerms, VerifyAccess,
 };
 use libc::c_int;
-use pyo3::{exceptions::PyValueError, PyResult};
 #[cfg(feature = "python")]
 use pyo3::{pyclass, pymethods, IntoPy, PyObject, PyRef, PyRefMut, Python};
 
