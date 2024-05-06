@@ -17,6 +17,7 @@ use libafl::{
     inputs::HasTargetBytes,
     state::{HasExecutions, State},
 };
+use libafl_bolts::os::unix_signals::Signal;
 use libafl_qemu_sys::{CPUArchStatePtr, GuestUsize};
 pub use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestVirtAddr};
 #[cfg(emulation_mode = "usermode")]
@@ -76,6 +77,7 @@ pub enum ExitHandlerError {
     QemuExitReasonError(EmulatorExitError),
     SMError(SnapshotManagerError),
     CommandError(CommandError),
+    UnhandledSignal(Signal),
     MultipleSnapshotDefinition,
     MultipleInputDefinition,
     SnapshotNotFound,
@@ -310,7 +312,7 @@ where
             EmulatorExitResult::QemuExit(shutdown_cause) => match shutdown_cause {
                 QemuShutdownCause::HostSignal(signal) => {
                     signal.handle();
-                    return Ok(None); // Ignore unhandled signals by default
+                    return Err(ExitHandlerError::UnhandledSignal(*signal)); // Ignore unhandled signals by default
                 }
                 QemuShutdownCause::GuestPanic => {
                     return Ok(Some(ExitHandlerResult::EndOfRun(ExitKind::Crash)))

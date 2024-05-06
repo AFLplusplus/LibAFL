@@ -32,9 +32,11 @@ use ahash::RandomState;
 pub use launcher::*;
 #[cfg(all(unix, feature = "std"))]
 use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
+#[cfg(unix)]
+use libafl_bolts::os::CTRL_C_EXIT;
 #[cfg(feature = "adaptive_serialization")]
 use libafl_bolts::tuples::{Handle, MatchNameRef};
-use libafl_bolts::{current_time, os::CTRL_C_EXIT, ClientId};
+use libafl_bolts::{current_time, ClientId};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use uuid::Uuid;

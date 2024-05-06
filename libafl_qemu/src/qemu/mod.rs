@@ -971,103 +971,6 @@ impl ArchExtras for Qemu {
     }
 }
 
-#[cfg(feature = "python")]
-pub mod pybind {
-    use pyo3::{exceptions::PyValueError, prelude::*};
-
-    use super::{GuestAddr, GuestUsize};
-
-    static mut PY_GENERIC_HOOKS: Vec<(GuestAddr, PyObject)> = vec![];
-
-    extern "C" fn py_generic_hook_wrapper(idx: u64, _pc: GuestAddr) {
-        let obj = unsafe { &PY_GENERIC_HOOKS[idx as usize].1 };
-        Python::with_gil(|py| {
-            obj.call0(py).expect("Error in the hook");
-        });
-    }
-
-    #[pyclass(unsendable)]
-    pub struct Qemu {
-        pub qemu: super::Qemu,
-    }
-
-    #[pymethods]
-    impl Qemu {
-        #[allow(clippy::needless_pass_by_value)]
-        #[new]
-        fn new(args: Vec<String>, env: Vec<(String, String)>) -> PyResult<Qemu> {
-            let qemu = super::Qemu::init(&args, &env)
-                .map_err(|e| PyValueError::new_err(format!("{e}")))?;
-
-            Ok(Qemu { qemu })
-        }
-
-        fn run(&self) {
-            unsafe {
-                self.qemu.run().unwrap();
-            }
-        }
-
-        fn write_mem(&self, addr: GuestAddr, buf: &[u8]) {
-            unsafe {
-                self.qemu.write_mem(addr, buf);
-            }
-        }
-
-        fn read_mem(&self, addr: GuestAddr, size: usize) -> Vec<u8> {
-            let mut buf = vec![0; size];
-            unsafe {
-                self.qemu.read_mem(addr, &mut buf);
-            }
-            buf
-        }
-
-        fn num_regs(&self) -> i32 {
-            self.qemu.num_regs()
-        }
-
-        fn write_reg(&self, reg: i32, val: GuestUsize) -> PyResult<()> {
-            self.qemu.write_reg(reg, val).map_err(PyValueError::new_err)
-        }
-
-        fn read_reg(&self, reg: i32) -> PyResult<GuestUsize> {
-            self.qemu.read_reg(reg).map_err(PyValueError::new_err)
-        }
-
-        fn set_breakpoint(&self, addr: GuestAddr) {
-            self.qemu.set_breakpoint(addr);
-        }
-
-        fn entry_break(&self, addr: GuestAddr) {
-            self.qemu.entry_break(addr);
-        }
-
-        fn remove_breakpoint(&self, addr: GuestAddr) {
-            self.qemu.remove_breakpoint(addr);
-        }
-
-        fn flush_jit(&self) {
-            self.qemu.flush_jit();
-        }
-
-        fn set_hook(&self, addr: GuestAddr, hook: PyObject) {
-            unsafe {
-                let idx = PY_GENERIC_HOOKS.len();
-                PY_GENERIC_HOOKS.push((addr, hook));
-                self.qemu
-                    .set_hook(idx as u64, addr, py_generic_hook_wrapper, true);
-            }
-        }
-
-        fn remove_hooks_at(&self, addr: GuestAddr) -> usize {
-            unsafe {
-                PY_GENERIC_HOOKS.retain(|(a, _)| *a != addr);
-            }
-            self.qemu.remove_hooks_at(addr, true)
-        }
-    }
-}
-
 // TODO: maybe include QEMU in the memory chunk to enable address translation and a more accurate implementation
 impl PartialEq<Self> for GuestAddrKind {
     fn eq(&self, other: &Self) -> bool {
@@ -1208,5 +1111,103 @@ impl SyscallHookResult {
                 skip_syscall: true,
             },
         )
+    }
+}
+
+#[cfg(feature = "python")]
+pub mod pybind {
+    use libafl_qemu_sys::MmapPerms;
+    use pyo3::{exceptions::PyValueError, prelude::*, types::PyInt};
+
+    use super::{GuestAddr, GuestUsize};
+
+    static mut PY_GENERIC_HOOKS: Vec<(GuestAddr, PyObject)> = vec![];
+
+    extern "C" fn py_generic_hook_wrapper(idx: u64, _pc: GuestAddr) {
+        let obj = unsafe { &PY_GENERIC_HOOKS[idx as usize].1 };
+        Python::with_gil(|py| {
+            obj.call0(py).expect("Error in the hook");
+        });
+    }
+
+    #[pyclass(unsendable)]
+    pub struct Qemu {
+        pub qemu: super::Qemu,
+    }
+
+    #[pymethods]
+    impl Qemu {
+        #[allow(clippy::needless_pass_by_value)]
+        #[new]
+        fn new(args: Vec<String>, env: Vec<(String, String)>) -> PyResult<Qemu> {
+            let qemu = super::Qemu::init(&args, &env)
+                .map_err(|e| PyValueError::new_err(format!("{e}")))?;
+
+            Ok(Qemu { qemu })
+        }
+
+        fn run(&self) {
+            unsafe {
+                self.qemu.run().unwrap();
+            }
+        }
+
+        fn write_mem(&self, addr: GuestAddr, buf: &[u8]) {
+            unsafe {
+                self.qemu.write_mem(addr, buf);
+            }
+        }
+
+        fn read_mem(&self, addr: GuestAddr, size: usize) -> Vec<u8> {
+            let mut buf = vec![0; size];
+            unsafe {
+                self.qemu.read_mem(addr, &mut buf);
+            }
+            buf
+        }
+
+        fn num_regs(&self) -> i32 {
+            self.qemu.num_regs()
+        }
+
+        fn write_reg(&self, reg: i32, val: GuestUsize) -> PyResult<()> {
+            self.qemu.write_reg(reg, val).map_err(PyValueError::new_err)
+        }
+
+        fn read_reg(&self, reg: i32) -> PyResult<GuestUsize> {
+            self.qemu.read_reg(reg).map_err(PyValueError::new_err)
+        }
+
+        fn set_breakpoint(&self, addr: GuestAddr) {
+            self.qemu.set_breakpoint(addr);
+        }
+
+        fn entry_break(&self, addr: GuestAddr) {
+            self.qemu.entry_break(addr);
+        }
+
+        fn remove_breakpoint(&self, addr: GuestAddr) {
+            self.qemu.remove_breakpoint(addr);
+        }
+
+        fn flush_jit(&self) {
+            self.qemu.flush_jit();
+        }
+
+        fn set_hook(&self, addr: GuestAddr, hook: PyObject) {
+            unsafe {
+                let idx = PY_GENERIC_HOOKS.len();
+                PY_GENERIC_HOOKS.push((addr, hook));
+                self.qemu
+                    .set_hook(idx as u64, addr, py_generic_hook_wrapper, true);
+            }
+        }
+
+        fn remove_hooks_at(&self, addr: GuestAddr) -> usize {
+            unsafe {
+                PY_GENERIC_HOOKS.retain(|(a, _)| *a != addr);
+            }
+            self.qemu.remove_hooks_at(addr, true)
+        }
     }
 }
