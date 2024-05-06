@@ -19,7 +19,7 @@ impl SnapshotId {
         let unique_id = UNIQUE_ID.fetch_add(1, Ordering::SeqCst);
 
         SnapshotId {
-            id: unique_id.clone(),
+            id: unique_id,
         }
     }
 
@@ -77,7 +77,7 @@ impl FastSnapshotManager {
     }
 
     pub unsafe fn get(&self, id: &SnapshotId) -> FastSnapshotPtr {
-        self.snapshots.get(id).unwrap().clone()
+        *self.snapshots.get(id).unwrap()
     }
 }
 
@@ -129,18 +129,19 @@ impl IsSnapshotManager for FastSnapshotManager {
         snapshot_id: &SnapshotId,
         qemu: &Qemu,
     ) -> Result<(), SnapshotManagerError> {
-        let fast_snapshot_ptr = self
+        let fast_snapshot_ptr = *self
             .snapshots
             .get(snapshot_id)
             .ok_or(SnapshotManagerError::SnapshotIdNotFound(
-                snapshot_id.clone(),
-            ))?
-            .clone();
+                *snapshot_id,
+            ))?;
 
-        qemu.restore_fast_snapshot(fast_snapshot_ptr);
+        unsafe {
+            qemu.restore_fast_snapshot(fast_snapshot_ptr);
+        }
 
         if self.check_memory_consistency {
-            let nb_inconsistencies = qemu.check_fast_snapshot_memory_consistency(fast_snapshot_ptr);
+            let nb_inconsistencies = unsafe { qemu.check_fast_snapshot_memory_consistency(fast_snapshot_ptr) };
 
             if nb_inconsistencies > 0 {
                 return Err(SnapshotManagerError::MemoryInconsistencies(
@@ -191,11 +192,11 @@ where
         self.qemu.create_fast_snapshot_filter(track, device_filter)
     }
 
-    pub fn restore_fast_snapshot(&self, snapshot: FastSnapshotPtr) {
+    pub unsafe fn restore_fast_snapshot(&self, snapshot: FastSnapshotPtr) {
         self.qemu.restore_fast_snapshot(snapshot)
     }
 
-    pub fn check_fast_snapshot_memory_consistency(&self, snapshot: FastSnapshotPtr) -> u64 {
+    pub unsafe fn check_fast_snapshot_memory_consistency(&self, snapshot: FastSnapshotPtr) -> u64 {
         self.qemu.check_fast_snapshot_memory_consistency(snapshot)
     }
 

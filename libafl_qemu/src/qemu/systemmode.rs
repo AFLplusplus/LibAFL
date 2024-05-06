@@ -251,12 +251,12 @@ impl Qemu {
         }
     }
 
-    pub fn restore_fast_snapshot(&self, snapshot: FastSnapshotPtr) {
-        unsafe { libafl_qemu_sys::syx_snapshot_root_restore(snapshot) }
+    pub unsafe fn restore_fast_snapshot(&self, snapshot: FastSnapshotPtr) {
+        libafl_qemu_sys::syx_snapshot_root_restore(snapshot)
     }
 
-    pub fn check_fast_snapshot_memory_consistency(&self, snapshot: FastSnapshotPtr) -> u64 {
-        unsafe { libafl_qemu_sys::syx_snapshot_check_memory_consistency(snapshot) }
+    pub unsafe fn check_fast_snapshot_memory_consistency(&self, snapshot: FastSnapshotPtr) -> u64 {
+        libafl_qemu_sys::syx_snapshot_check_memory_consistency(snapshot)
     }
 
     pub fn list_devices(&self) -> Vec<String> {
@@ -376,7 +376,7 @@ impl<'a> Iterator for HostMemoryIter<'a> {
     }
 }
 
-impl<'a> Iterator for PhysMemoryIter {
+impl Iterator for PhysMemoryIter {
     type Item = PhysMemoryChunk;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -392,7 +392,7 @@ impl<'a> Iterator for PhysMemoryIter {
                     return Some(PhysMemoryChunk::new(*paddr, sz, self.qemu, self.cpu));
                 }
             };
-            let start_phys_addr: GuestPhysAddr = self.cpu.get_phys_addr(vaddr.clone())?;
+            let start_phys_addr: GuestPhysAddr = self.cpu.get_phys_addr(*vaddr)?;
             let phys_page_size = self.qemu.guest_page_size();
 
             // TODO: Turn this into a generic function

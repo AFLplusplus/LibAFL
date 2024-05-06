@@ -20,7 +20,7 @@ use libafl::{
     fuzzer::HasObjective,
     observers::{ObserversTuple, UsesObservers},
     state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
-    Error, HasMetadata,
+    Error,
 };
 #[cfg(feature = "fork")]
 use libafl_bolts::shmem::ShMemProvider;

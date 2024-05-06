@@ -11,7 +11,7 @@ use libafl_qemu_sys::{
 };
 use libc::c_int;
 #[cfg(feature = "python")]
-use pyo3::{pyclass, pymethods, PyObject, PyRef, PyRefMut, Python};
+use pyo3::{pyclass, pymethods, IntoPy, PyObject, PyRef, PyRefMut, Python};
 
 use crate::{
     HookData, NewThreadHookId, PostSyscallHookId, PreSyscallHookId, Qemu, QemuExitError,

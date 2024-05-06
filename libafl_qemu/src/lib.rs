@@ -92,16 +92,19 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_submodule(regsm)?;
 
     let mmapm = PyModule::new(py, "mmap")?;
-    for r in emu::MmapPerms::iter() {
+    for r in sys::MmapPerms::iter() {
         let v: i32 = r.into();
         mmapm.add(&format!("{r:?}"), v)?;
     }
     m.add_submodule(mmapm)?;
 
-    m.add_class::<emu::MapInfo>()?;
-    m.add_class::<emu::GuestMaps>()?;
-    m.add_class::<emu::SyscallHookResult>()?;
-    m.add_class::<emu::pybind::Qemu>()?;
+    m.add_class::<sys::MapInfo>()?;
+
+    #[cfg(emulation_mode = "usermode")]
+    m.add_class::<qemu::GuestMaps>()?;
+
+    m.add_class::<qemu::SyscallHookResult>()?;
+    m.add_class::<qemu::pybind::Qemu>()?;
 
     Ok(())
 }
