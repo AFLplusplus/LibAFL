@@ -4,7 +4,7 @@
 //! is platform independent. Hence, this file contains code for other platforms
 //! but it's only meaningful for Windows because of the `gdiplus` target. If you
 //! going to make it compilable only for Windows, don't forget to modify the
-//! `scripts/test_all_fuzzers.sh` to opt-out this fuzzer from that test.
+//! `scripts/test_fuzzer.sh` to opt-out this fuzzer from that test.
 
 #[cfg(unix)]
 use mimalloc::MiMalloc;
@@ -28,20 +28,26 @@ use libafl::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::{I2SRandReplace, Tokens},
     },
-    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
+    observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
-    state::{HasCorpus, HasMetadata, StdState},
-    Error,
+    state::{HasCorpus, StdState},
+    Error, HasMetadata,
 };
 use libafl_bolts::{
     cli::{parse_args, FuzzerOptions},
-    current_nanos,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
     AsSlice,
 };
+<<<<<<< HEAD
+=======
+#[cfg(unix)]
+use libafl_frida::asan::asan_rt::AsanRuntime;
+#[cfg(unix)]
+use libafl_frida::asan::errors::{AsanErrorsFeedback, AsanErrorsObserver};
+>>>>>>> main
 use libafl_frida::{
     asan::{
         asan_rt::AsanRuntime,
@@ -77,7 +83,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
     let shmem_provider = StdShMemProvider::new()?;
 
-    let mut run_client = |state: Option<_>, mgr: LlmpRestartingEventManager<_, _>, core_id| {
+    let mut run_client = |state: Option<_>, mgr: LlmpRestartingEventManager<_, _, _>, core_id| {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
 
         // println!("{:?}", mgr.mgr_id());
@@ -95,13 +101,20 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
         };
 
         if options.asan && options.asan_cores.contains(core_id) {
-            (|state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _>, _core_id| {
+            (|state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _, _>, _core_id| {
                 let gum = Gum::obtain();
 
                 let coverage = CoverageRuntime::new();
+<<<<<<< HEAD
                 let asan = AsanRuntime::new(&options);
                 let hooks = HookRuntime::new();
                     
+=======
+                #[cfg(unix)]
+                let asan = AsanRuntime::new(options);
+
+                #[cfg(unix)]
+>>>>>>> main
                 let mut frida_helper =
                     FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage, asan, hooks));
                 //
@@ -110,18 +123,22 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                     "edges",
                     frida_helper.map_mut_ptr().unwrap(),
                     MAP_SIZE,
-                ));
+                ))
+                .track_indices();
 
                 // Create an observation channel to keep track of the execution time
                 let time_observer = TimeObserver::new("time");
+
+                #[cfg(unix)]
+                let asan_observer = AsanErrorsObserver::from_static_asan_errors();
 
                 // Feedback to rate the interestingness of an input
                 // This one is composed by two Feedbacks in OR
                 let mut feedback = feedback_or!(
                     // New maximization map feedback linked to the edges observer and the feedback state
-                    MaxMapFeedback::tracking(&edges_observer, true, false),
+                    MaxMapFeedback::new(&edges_observer),
                     // Time feedback, this one does not need a feedback state
-                    TimeFeedback::with_observer(&time_observer)
+                    TimeFeedback::new(&time_observer)
                 );
 
                 // Feedbacks to recognize an input as solution
@@ -129,14 +146,17 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                     CrashFeedback::new(),
                     // TimeoutFeedback::new(),
                     // true enables the AsanErrorFeedback
-                    feedback_and_fast!(ConstFeedback::from(true), AsanErrorsFeedback::new())
+                    feedback_and_fast!(
+                        ConstFeedback::from(true),
+                        AsanErrorsFeedback::new(&asan_observer)
+                    )
                 );
 
                 // If not restarting, create a State from scratch
                 let mut state = state.unwrap_or_else(|| {
                     StdState::new(
                         // RNG
-                        StdRand::with_seed(current_nanos()),
+                        StdRand::new(),
                         // Corpus that will be evolved, we keep it in memory for performance
                         CachedOnDiskCorpus::new(PathBuf::from("./corpus_discovered"), 64).unwrap(),
                         // Corpus in which we store solutions (crashes in this example),
@@ -165,16 +185,24 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
                 // A minimization+queue policy to get testcasess from the corpus
-                let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+                let scheduler =
+                    IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
+<<<<<<< HEAD
                 let observers = tuple_list!(
                     edges_observer,
                     time_observer,
                     AsanErrorsObserver::new(&ASAN_ERRORS)
                 );
+=======
+                #[cfg(unix)]
+                let observers = tuple_list!(edges_observer, time_observer, asan_observer);
+                #[cfg(windows)]
+                let observers = tuple_list!(edges_observer, time_observer);
+>>>>>>> main
 
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
@@ -207,7 +235,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 Ok(())
             })(state, mgr, core_id)
         } else if options.cmplog && options.cmplog_cores.contains(core_id) {
-            (|state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _>, _core_id| {
+            (|state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _, _>, _core_id| {
                 let gum = Gum::obtain();
 
                 let coverage = CoverageRuntime::new();
@@ -222,31 +250,42 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                     "edges",
                     frida_helper.map_mut_ptr().unwrap(),
                     MAP_SIZE,
-                ));
+                ))
+                .track_indices();
 
                 // Create an observation channel to keep track of the execution time
                 let time_observer = TimeObserver::new("time");
+                #[cfg(unix)]
+                let asan_observer = AsanErrorsObserver::from_static_asan_errors();
 
                 // Feedback to rate the interestingness of an input
                 // This one is composed by two Feedbacks in OR
                 let mut feedback = feedback_or!(
                     // New maximization map feedback linked to the edges observer and the feedback state
-                    MaxMapFeedback::tracking(&edges_observer, true, false),
+                    MaxMapFeedback::new(&edges_observer),
                     // Time feedback, this one does not need a feedback state
-                    TimeFeedback::with_observer(&time_observer)
+                    TimeFeedback::new(&time_observer)
                 );
 
                 let mut objective = feedback_or_fast!(
                     CrashFeedback::new(),
+<<<<<<< HEAD
                     // TimeoutFeedback::new(),
                     feedback_and_fast!(ConstFeedback::from(false), AsanErrorsFeedback::new())
+=======
+                    TimeoutFeedback::new(),
+                    feedback_and_fast!(
+                        ConstFeedback::from(false),
+                        AsanErrorsFeedback::new(&asan_observer)
+                    )
+>>>>>>> main
                 );
 
                 // If not restarting, create a State from scratch
                 let mut state = state.unwrap_or_else(|| {
                     StdState::new(
                         // RNG
-                        StdRand::with_seed(current_nanos()),
+                        StdRand::new(),
                         // Corpus that will be evolved, we keep it in memory for performance
                         CachedOnDiskCorpus::no_meta(PathBuf::from("./corpus_discovered"), 64)
                             .unwrap(),
@@ -276,16 +315,24 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
                 // A minimization+queue policy to get testcasess from the corpus
-                let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+                let scheduler =
+                    IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
+<<<<<<< HEAD
                 let observers = tuple_list!(
                     edges_observer,
                     time_observer,
                     AsanErrorsObserver::new(&ASAN_ERRORS)
                 );
+=======
+                #[cfg(unix)]
+                let observers = tuple_list!(edges_observer, time_observer, asan_observer);
+                #[cfg(windows)]
+                let observers = tuple_list!(edges_observer, time_observer,);
+>>>>>>> main
 
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
@@ -334,7 +381,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 Ok(())
             })(state, mgr, core_id)
         } else {
-            (|state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _>, _core_id| {
+            (|state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _, _>, _core_id| {
                 let gum = Gum::obtain();
 
                 let coverage = CoverageRuntime::new();
@@ -347,31 +394,43 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                     "edges",
                     frida_helper.map_mut_ptr().unwrap(),
                     MAP_SIZE,
-                ));
+                ))
+                .track_indices();
 
                 // Create an observation channel to keep track of the execution time
                 let time_observer = TimeObserver::new("time");
+
+                #[cfg(unix)]
+                let asan_observer = AsanErrorsObserver::from_static_asan_errors();
 
                 // Feedback to rate the interestingness of an input
                 // This one is composed by two Feedbacks in OR
                 let mut feedback = feedback_or!(
                     // New maximization map feedback linked to the edges observer and the feedback state
-                    MaxMapFeedback::tracking(&edges_observer, true, false),
+                    MaxMapFeedback::new(&edges_observer),
                     // Time feedback, this one does not need a feedback state
-                    TimeFeedback::with_observer(&time_observer)
+                    TimeFeedback::new(&time_observer)
                 );
 
                 let mut objective = feedback_or_fast!(
                     CrashFeedback::new(),
+<<<<<<< HEAD
                     // TimeoutFeedback::new(),
                     feedback_and_fast!(ConstFeedback::from(false), AsanErrorsFeedback::new())
+=======
+                    TimeoutFeedback::new(),
+                    feedback_and_fast!(
+                        ConstFeedback::from(false),
+                        AsanErrorsFeedback::new(&asan_observer)
+                    )
+>>>>>>> main
                 );
 
                 // If not restarting, create a State from scratch
                 let mut state = state.unwrap_or_else(|| {
                     StdState::new(
                         // RNG
-                        StdRand::with_seed(current_nanos()),
+                        StdRand::new(),
                         // Corpus that will be evolved, we keep it in memory for performance
                         CachedOnDiskCorpus::no_meta(PathBuf::from("./corpus_discovered"), 64)
                             .unwrap(),
@@ -401,16 +460,24 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
                 // A minimization+queue policy to get testcasess from the corpus
-                let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+                let scheduler =
+                    IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
+<<<<<<< HEAD
                 let observers = tuple_list!(
                     edges_observer,
                     time_observer,
                     AsanErrorsObserver::new(&ASAN_ERRORS)
                 );
+=======
+                #[cfg(unix)]
+                let observers = tuple_list!(edges_observer, time_observer, asan_observer);
+                #[cfg(windows)]
+                let observers = tuple_list!(edges_observer, time_observer);
+>>>>>>> main
 
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
@@ -445,15 +512,22 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
         }
     };
 
-    Launcher::builder()
+    let builder = Launcher::builder()
         .configuration(EventConfig::AlwaysUnique)
         .shmem_provider(shmem_provider)
         .monitor(monitor)
         .run_client(&mut run_client)
         .cores(&options.cores)
         .broker_port(options.broker_port)
-        .stdout_file(Some(&options.stdout))
-        .remote_broker_addr(options.remote_broker_addr)
-        .build()
-        .launch()
+        .remote_broker_addr(options.remote_broker_addr);
+
+    #[cfg(all(unix, feature = "std"))]
+    {
+        return builder.stdout_file(Some(&options.stdout)).build().launch();
+    }
+
+    #[cfg(not(all(unix, feature = "std")))]
+    {
+        return builder.build().launch();
+    }
 }

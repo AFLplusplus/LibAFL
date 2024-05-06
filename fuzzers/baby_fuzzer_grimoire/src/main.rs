@@ -15,12 +15,13 @@ use libafl::{
         GrimoireRandomDeleteMutator, GrimoireRecursiveReplacementMutator,
         GrimoireStringReplacementMutator, Tokens,
     },
-    observers::StdMapObserver,
+    observers::{CanTrack, StdMapObserver},
     schedulers::QueueScheduler,
     stages::{mutational::StdMutationalStage, GeneralizationStage},
-    state::{HasMetadata, StdState},
+    state::StdState,
+    HasMetadata,
 };
-use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
+use libafl_bolts::{rands::StdRand, tuples::tuple_list, AsSlice};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
@@ -82,9 +83,11 @@ pub fn main() {
     };
 
     // Create an observation channel using the signals map
-    let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS.len()) };
+    let observer = unsafe {
+        StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS.len()).track_novelties()
+    };
     // Feedback to rate the interestingness of an input
-    let mut feedback = MaxMapFeedback::tracking(&observer, false, true);
+    let mut feedback = MaxMapFeedback::new(&observer);
 
     // A feedback to choose if an input is a solution or not
     let mut objective = CrashFeedback::new();
@@ -92,7 +95,7 @@ pub fn main() {
     // create a State from scratch
     let mut state = StdState::new(
         // RNG
-        StdRand::with_seed(current_nanos()),
+        StdRand::new(),
         // Corpus that will be evolved, we keep it in memory for performance
         InMemoryCorpus::new(),
         // Corpus in which we store solutions (crashes in this example),

@@ -1,7 +1,7 @@
 //! Stage to compute/report AFL stats
 
 #[cfg(feature = "std")]
-use alloc::string::ToString;
+use alloc::{borrow::Cow, string::ToString};
 use core::{marker::PhantomData, time::Duration};
 
 use libafl_bolts::current_time;
@@ -13,8 +13,8 @@ use crate::{
     events::EventFirer,
     schedulers::minimizer::IsFavoredMetadata,
     stages::Stage,
-    state::{HasCorpus, HasImported, HasMetadata, UsesState},
-    Error,
+    state::{HasCorpus, HasImported, UsesState},
+    Error, HasMetadata,
 };
 #[cfg(feature = "std")]
 use crate::{
@@ -62,8 +62,6 @@ where
     Z: UsesState<State = E::State>,
     E::State: HasImported + HasCorpus + HasMetadata,
 {
-    type Progress = (); // this stage does not require resume
-
     fn perform(
         &mut self,
         _fuzzer: &mut Z,
@@ -111,9 +109,9 @@ where
                 _manager.fire(
                     state,
                     Event::UpdateUserStats {
-                        name: "AflStats".to_string(),
+                        name: Cow::from("AflStats"),
                         value: UserStats::new(
-                            UserStatsValue::String(json.to_string()),
+                            UserStatsValue::String(Cow::from(json.to_string())),
                             AggregatorOps::None,
                         ),
                         phantom: PhantomData,
@@ -131,6 +129,18 @@ where
             self.last_report_time = cur;
         }
 
+        Ok(())
+    }
+
+    #[inline]
+    fn restart_progress_should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+        // Not running the target so we wont't crash/timeout and, hence, don't need to restore anything
+        Ok(true)
+    }
+
+    #[inline]
+    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        // Not running the target so we wont't crash/timeout and, hence, don't need to restore anything
         Ok(())
     }
 }

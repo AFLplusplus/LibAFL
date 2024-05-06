@@ -8,27 +8,27 @@ use std::{env, fs::DirEntry, io, path::PathBuf, process};
 use clap::{builder::Str, Parser};
 use libafl::{
     corpus::{Corpus, NopCorpus},
-    events::{launcher::Launcher, EventConfig, EventRestarter},
+    events::{launcher::Launcher, EventConfig, EventRestarter, LlmpRestartingEventManager},
     executors::ExitKind,
     fuzzer::StdFuzzer,
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
-    prelude::LlmpRestartingEventManager,
     schedulers::QueueScheduler,
     state::{HasCorpus, StdState},
     Error,
 };
 use libafl_bolts::{
     core_affinity::Cores,
-    current_nanos,
+    os::unix_signals::Signal,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
     AsSlice,
 };
 use libafl_qemu::{
-    drcov::QemuDrCovHelper, elf::EasyElf, emu::Emulator, ArchExtras, CallingConvention, GuestAddr,
-    GuestReg, MmapPerms, QemuExecutor, QemuHooks, QemuInstrumentationAddressRangeFilter, Regs,
+    drcov::QemuDrCovHelper, elf::EasyElf, ArchExtras, CallingConvention, GuestAddr, GuestReg,
+    MmapPerms, Qemu, QemuExecutor, QemuExitReason, QemuHooks,
+    QemuInstrumentationAddressRangeFilter, QemuShutdownCause, Regs,
 };
 use rangemap::RangeMap;
 
@@ -119,51 +119,59 @@ pub fn fuzz() {
 
     env::remove_var("LD_LIBRARY_PATH");
     let env: Vec<(String, String)> = env::vars().collect();
-    let emu = Emulator::new(&options.args, &env).unwrap();
+    let qemu = Qemu::init(&options.args, &env).unwrap();
 
     let mut elf_buffer = Vec::new();
-    let elf = EasyElf::from_file(emu.binary_path(), &mut elf_buffer).unwrap();
+    let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer).unwrap();
 
     let test_one_input_ptr = elf
-        .resolve_symbol("LLVMFuzzerTestOneInput", emu.load_addr())
+        .resolve_symbol("LLVMFuzzerTestOneInput", qemu.load_addr())
         .expect("Symbol LLVMFuzzerTestOneInput not found");
     log::debug!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
 
-    emu.entry_break(test_one_input_ptr);
+    qemu.entry_break(test_one_input_ptr);
 
-    for m in emu.mappings() {
+    for m in qemu.mappings() {
         log::debug!(
             "Mapping: 0x{:016x}-0x{:016x}, {}",
             m.start(),
             m.end(),
-            m.path().unwrap_or("<EMPTY>")
+            m.path().unwrap_or(&"<EMPTY>".to_string())
         );
     }
 
-    let pc: GuestReg = emu.read_reg(Regs::Pc).unwrap();
+    let pc: GuestReg = qemu.read_reg(Regs::Pc).unwrap();
     log::debug!("Break at {pc:#x}");
 
-    let ret_addr: GuestAddr = emu.read_return_address().unwrap();
+    let ret_addr: GuestAddr = qemu.read_return_address().unwrap();
     log::debug!("Return address = {ret_addr:#x}");
 
-    emu.set_breakpoint(ret_addr);
+    qemu.set_breakpoint(ret_addr);
 
-    let input_addr = emu
+    let input_addr = qemu
         .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
         .unwrap();
     log::debug!("Placing input at {input_addr:#x}");
 
-    let stack_ptr: GuestAddr = emu.read_reg(Regs::Sp).unwrap();
+    let stack_ptr: GuestAddr = qemu.read_reg(Regs::Sp).unwrap();
 
     let reset = |buf: &[u8], len: GuestReg| -> Result<(), String> {
         unsafe {
-            emu.write_mem(input_addr, buf);
-            emu.write_reg(Regs::Pc, test_one_input_ptr)?;
-            emu.write_reg(Regs::Sp, stack_ptr)?;
-            emu.write_return_address(ret_addr)?;
-            emu.write_function_argument(CallingConvention::Cdecl, 0, input_addr)?;
-            emu.write_function_argument(CallingConvention::Cdecl, 1, len)?;
-            emu.run();
+            qemu.write_mem(input_addr, buf);
+            qemu.write_reg(Regs::Pc, test_one_input_ptr)?;
+            qemu.write_reg(Regs::Sp, stack_ptr)?;
+            qemu.write_return_address(ret_addr)?;
+            qemu.write_function_argument(CallingConvention::Cdecl, 0, input_addr)?;
+            qemu.write_function_argument(CallingConvention::Cdecl, 1, len)?;
+
+            match qemu.run() {
+                Ok(QemuExitReason::Breakpoint(_)) => {}
+                Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(Signal::SigInterrupt))) => {
+                    process::exit(0)
+                }
+                _ => panic!("Unexpected QEMU exit."),
+            }
+
             Ok(())
         }
     };
@@ -181,101 +189,102 @@ pub fn fuzz() {
         ExitKind::Ok
     };
 
-    let mut run_client = |state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _>, core_id| {
-        let core_idx = options
-            .cores
-            .position(core_id)
-            .expect("Failed to get core index");
-        let files = corpus_files
-            .iter()
-            .skip(files_per_core * core_idx)
-            .take(files_per_core)
-            .map(|x| x.path())
-            .collect::<Vec<PathBuf>>();
+    let mut run_client =
+        |state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _, _>, core_id| {
+            let core_idx = options
+                .cores
+                .position(core_id)
+                .expect("Failed to get core index");
+            let files = corpus_files
+                .iter()
+                .skip(files_per_core * core_idx)
+                .take(files_per_core)
+                .map(|x| x.path())
+                .collect::<Vec<PathBuf>>();
 
-        if files.is_empty() {
-            mgr.send_exiting()?;
-            Err(Error::ShuttingDown)?
-        }
+            if files.is_empty() {
+                mgr.send_exiting()?;
+                Err(Error::ShuttingDown)?
+            }
 
-        #[allow(clippy::let_unit_value)]
-        let mut feedback = ();
+            #[allow(clippy::let_unit_value)]
+            let mut feedback = ();
 
-        #[allow(clippy::let_unit_value)]
-        let mut objective = ();
+            #[allow(clippy::let_unit_value)]
+            let mut objective = ();
 
-        let mut state = state.unwrap_or_else(|| {
-            StdState::new(
-                StdRand::with_seed(current_nanos()),
-                NopCorpus::new(),
-                NopCorpus::new(),
-                &mut feedback,
-                &mut objective,
-            )
-            .unwrap()
-        });
+            let mut state = state.unwrap_or_else(|| {
+                StdState::new(
+                    StdRand::new(),
+                    NopCorpus::new(),
+                    NopCorpus::new(),
+                    &mut feedback,
+                    &mut objective,
+                )
+                .unwrap()
+            });
 
-        let scheduler = QueueScheduler::new();
-        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+            let scheduler = QueueScheduler::new();
+            let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-        let rangemap = emu
-            .mappings()
-            .filter_map(|m| {
-                m.path()
-                    .map(|p| ((m.start() as usize)..(m.end() as usize), p.to_string()))
-                    .filter(|(_, p)| !p.is_empty())
-            })
-            .enumerate()
-            .fold(
-                RangeMap::<usize, (u16, String)>::new(),
-                |mut rm, (i, (r, p))| {
-                    rm.insert(r, (i as u16, p));
-                    rm
-                },
+            let rangemap = qemu
+                .mappings()
+                .filter_map(|m| {
+                    m.path()
+                        .map(|p| ((m.start() as usize)..(m.end() as usize), p.to_string()))
+                        .filter(|(_, p)| !p.is_empty())
+                })
+                .enumerate()
+                .fold(
+                    RangeMap::<usize, (u16, String)>::new(),
+                    |mut rm, (i, (r, p))| {
+                        rm.insert(r, (i as u16, p));
+                        rm
+                    },
+                );
+
+            let mut coverage = PathBuf::from(&options.coverage);
+            let coverage_name = coverage.file_stem().unwrap().to_str().unwrap();
+            let coverage_extension = coverage.extension().unwrap_or_default().to_str().unwrap();
+            let core = core_id.0;
+            coverage.set_file_name(format!("{coverage_name}-{core:03}.{coverage_extension}"));
+
+            let mut hooks = QemuHooks::new(
+                qemu,
+                tuple_list!(QemuDrCovHelper::new(
+                    QemuInstrumentationAddressRangeFilter::None,
+                    rangemap,
+                    coverage,
+                    false,
+                )),
             );
 
-        let mut coverage = PathBuf::from(&options.coverage);
-        let coverage_name = coverage.file_stem().unwrap().to_str().unwrap();
-        let coverage_extension = coverage.extension().unwrap_or_default().to_str().unwrap();
-        let core = core_id.0;
-        coverage.set_file_name(format!("{coverage_name}-{core:03}.{coverage_extension}"));
+            let mut executor = QemuExecutor::new(
+                &mut hooks,
+                &mut harness,
+                (),
+                &mut fuzzer,
+                &mut state,
+                &mut mgr,
+                options.timeout,
+            )
+            .expect("Failed to create QemuExecutor");
 
-        let mut hooks = QemuHooks::new(
-            emu.clone(),
-            tuple_list!(QemuDrCovHelper::new(
-                QemuInstrumentationAddressRangeFilter::None,
-                rangemap,
-                PathBuf::from(coverage),
-                false,
-            )),
-        );
+            if state.must_load_initial_inputs() {
+                state
+                    .load_initial_inputs_by_filenames(&mut fuzzer, &mut executor, &mut mgr, &files)
+                    .unwrap_or_else(|_| {
+                        println!("Failed to load initial corpus at {:?}", &corpus_dir);
+                        process::exit(0);
+                    });
+                log::debug!("We imported {} inputs from disk.", state.corpus().count());
+            }
 
-        let mut executor = QemuExecutor::new(
-            &mut hooks,
-            &mut harness,
-            (),
-            &mut fuzzer,
-            &mut state,
-            &mut mgr,
-            options.timeout,
-        )
-        .expect("Failed to create QemuExecutor");
+            log::debug!("Processed {} inputs from disk.", files.len());
 
-        if state.must_load_initial_inputs() {
-            state
-                .load_initial_inputs_by_filenames(&mut fuzzer, &mut executor, &mut mgr, &files)
-                .unwrap_or_else(|_| {
-                    println!("Failed to load initial corpus at {:?}", &corpus_dir);
-                    process::exit(0);
-                });
-            log::debug!("We imported {} inputs from disk.", state.corpus().count());
-        }
-
-        log::debug!("Processed {} inputs from disk.", files.len());
-
-        mgr.send_exiting()?;
-        Err(Error::ShuttingDown)?
-    };
+            mgr.send_exiting()?;
+            Err(Error::ShuttingDown)?
+        };
 
     match Launcher::builder()
         .shmem_provider(StdShMemProvider::new().expect("Failed to init shared memory"))

@@ -20,18 +20,17 @@ use libafl::{
 };
 use libafl_bolts::{
     core_affinity::Cores,
-    current_nanos,
+    os::unix_signals::Signal,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
-    AsMutSlice, AsSlice,
+    AsSlice, AsSliceMut,
 };
 use libafl_qemu::{
-    edges::{QemuEdgeCoverageChildHelper, EDGES_MAP_PTR, EDGES_MAP_SIZE},
+    edges::{QemuEdgeCoverageChildHelper, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},
     elf::EasyElf,
-    emu::Emulator,
-    ArchExtras, CallingConvention, GuestAddr, GuestReg, MmapPerms, QemuForkExecutor, QemuHooks,
-    Regs,
+    ArchExtras, CallingConvention, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExitReason,
+    QemuExitReasonError, QemuForkExecutor, QemuHooks, QemuShutdownCause, Regs,
 };
 
 #[derive(Default)]
@@ -63,10 +62,10 @@ impl From<Version> for Str {
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 #[command(
-    name = format!("qemu_cmin-{}",env!("CPU_TARGET")),
-    version = Version::default(),
-    about,
-    long_about = "Tool for generating minimizing corpus using QEMU instrumentation"
+name = format ! ("qemu_cmin-{}", env ! ("CPU_TARGET")),
+version = Version::default(),
+about,
+long_about = "Tool for generating minimizing corpus using QEMU instrumentation"
 )]
 pub struct FuzzerOptions {
     #[arg(long, help = "Output directory")]
@@ -113,40 +112,37 @@ pub fn fuzz() -> Result<(), Error> {
 
     env::remove_var("LD_LIBRARY_PATH");
     let env: Vec<(String, String)> = env::vars().collect();
-    let emu = Emulator::new(&options.args, &env).unwrap();
+    let qemu = Qemu::init(&options.args, &env).unwrap();
 
     let mut elf_buffer = Vec::new();
-    let elf = EasyElf::from_file(emu.binary_path(), &mut elf_buffer).unwrap();
+    let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer).unwrap();
 
     let test_one_input_ptr = elf
-        .resolve_symbol("LLVMFuzzerTestOneInput", emu.load_addr())
+        .resolve_symbol("LLVMFuzzerTestOneInput", qemu.load_addr())
         .expect("Symbol LLVMFuzzerTestOneInput not found");
     log::debug!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
 
-    emu.entry_break(test_one_input_ptr);
+    qemu.entry_break(test_one_input_ptr);
 
-    let pc: GuestReg = emu.read_reg(Regs::Pc).unwrap();
+    let pc: GuestReg = qemu.read_reg(Regs::Pc).unwrap();
     log::debug!("Break at {pc:#x}");
 
-    let ret_addr: GuestAddr = emu.read_return_address().unwrap();
+    let ret_addr: GuestAddr = qemu.read_return_address().unwrap();
     log::debug!("Return address = {ret_addr:#x}");
-    emu.set_breakpoint(ret_addr);
+    qemu.set_breakpoint(ret_addr);
 
-    let input_addr = emu
+    let input_addr = qemu
         .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
         .unwrap();
     log::debug!("Placing input at {input_addr:#x}");
 
-    let stack_ptr: GuestAddr = emu.read_reg(Regs::Sp).unwrap();
+    let stack_ptr: GuestAddr = qemu.read_reg(Regs::Sp).unwrap();
 
     let mut shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-    let monitor = SimpleMonitor::with_user_monitor(
-        |s| {
-            println!("{s}");
-        },
-        true,
-    );
+    let monitor = SimpleMonitor::with_user_monitor(|s| {
+        println!("{s}");
+    });
     let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
     {
         Ok(res) => res,
@@ -160,25 +156,25 @@ pub fn fuzz() -> Result<(), Error> {
         },
     };
 
-    let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_SIZE).unwrap();
-    let edges = edges_shmem.as_mut_slice();
+    let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_SIZE_IN_USE).unwrap();
+    let edges = edges_shmem.as_slice_mut();
     unsafe { EDGES_MAP_PTR = edges.as_mut_ptr() };
 
     let edges_observer = unsafe {
-        HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_SIZE>::from_mut_ptr(
+        HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_SIZE_IN_USE>::from_mut_ptr(
             "edges",
             edges.as_mut_ptr(),
         ))
     };
 
-    let mut feedback = MaxMapFeedback::tracking(&edges_observer, true, false);
+    let mut feedback = MaxMapFeedback::new(&edges_observer);
 
     #[allow(clippy::let_unit_value)]
     let mut objective = ();
 
     let mut state = state.unwrap_or_else(|| {
         StdState::new(
-            StdRand::with_seed(current_nanos()),
+            StdRand::new(),
             InMemoryOnDiskCorpus::new(PathBuf::from(options.output)).unwrap(),
             NopCorpus::new(),
             &mut feedback,
@@ -201,24 +197,29 @@ pub fn fuzz() -> Result<(), Error> {
         let len = len as GuestReg;
 
         unsafe {
-            emu.write_mem(input_addr, buf);
-            emu.write_reg(Regs::Pc, test_one_input_ptr).unwrap();
-            emu.write_reg(Regs::Sp, stack_ptr).unwrap();
-            emu.write_return_address(ret_addr).unwrap();
-            emu.write_function_argument(CallingConvention::Cdecl, 0, input_addr)
+            qemu.write_mem(input_addr, buf);
+            qemu.write_reg(Regs::Pc, test_one_input_ptr).unwrap();
+            qemu.write_reg(Regs::Sp, stack_ptr).unwrap();
+            qemu.write_return_address(ret_addr).unwrap();
+            qemu.write_function_argument(CallingConvention::Cdecl, 0, input_addr)
                 .unwrap();
-            emu.write_function_argument(CallingConvention::Cdecl, 1, len)
+            qemu.write_function_argument(CallingConvention::Cdecl, 1, len)
                 .unwrap();
-            emu.run();
+
+            match qemu.run() {
+                Ok(QemuExitReason::Breakpoint(_)) => {}
+                Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(Signal::SigInterrupt))) => {
+                    process::exit(0)
+                }
+                Err(QemuExitReasonError::UnexpectedExit) => return ExitKind::Crash,
+                _ => panic!("Unexpected QEMU exit."),
+            }
         }
 
         ExitKind::Ok
     };
 
-    let mut hooks = QemuHooks::new(
-        emu.clone(),
-        tuple_list!(QemuEdgeCoverageChildHelper::default(),),
-    );
+    let mut hooks = QemuHooks::new(qemu, tuple_list!(QemuEdgeCoverageChildHelper::default(),));
 
     let mut executor = QemuForkExecutor::new(
         &mut hooks,

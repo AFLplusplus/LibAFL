@@ -18,7 +18,7 @@ use std::{
 
 use libafl_bolts::{
     fs::{get_unique_std_input_file, InputFile},
-    tuples::MatchName,
+    tuples::{MatchName, RefIndexable},
     AsSlice,
 };
 
@@ -87,11 +87,11 @@ pub struct StdCommandConfigurator {
     command: Command,
 }
 
-impl CommandConfigurator for StdCommandConfigurator {
-    fn spawn_child<I>(&mut self, input: &I) -> Result<Child, Error>
-    where
-        I: Input + HasTargetBytes,
-    {
+impl<I> CommandConfigurator<I> for StdCommandConfigurator
+where
+    I: HasTargetBytes,
+{
+    fn spawn_child(&mut self, input: &I) -> Result<Child, Error> {
         match &mut self.input_location {
             InputLocation::Arg { argnum } => {
                 let args = self.command.get_args();
@@ -217,6 +217,7 @@ impl<OT, S> CommandExecutor<OT, S, StdCommandConfigurator>
 where
     OT: MatchName + ObserversTuple<S>,
     S: UsesInput,
+    S::Input: HasTargetBytes,
 {
     /// Creates a new `CommandExecutor`.
     /// Instead of parsing the Command for `@@`, it will
@@ -314,8 +315,7 @@ impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<OT, S, T>
 where
     EM: UsesState<State = S>,
     S: State + HasExecutions,
-    S::Input: HasTargetBytes,
-    T: CommandConfigurator,
+    T: CommandConfigurator<S::Input>,
     OT: Debug + MatchName + ObserversTuple<S>,
     Z: UsesState<State = S>,
 {
@@ -397,12 +397,12 @@ where
     T: Debug,
     OT: ObserversTuple<S>,
 {
-    fn observers(&self) -> &OT {
-        &self.observers
+    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
+        RefIndexable::from(&self.observers)
     }
 
-    fn observers_mut(&mut self) -> &mut OT {
-        &mut self.observers
+    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
+        RefIndexable::from(&mut self.observers)
     }
 }
 
@@ -567,6 +567,7 @@ impl CommandExecutorBuilder {
     where
         OT: MatchName + ObserversTuple<S>,
         S: UsesInput,
+        S::Input: Input + HasTargetBytes,
     {
         let Some(program) = &self.program else {
             return Err(Error::illegal_argument(
@@ -612,7 +613,12 @@ impl CommandExecutorBuilder {
             timeout: self.timeout,
             command,
         };
-        Ok(configurator.into_executor::<OT, S>(observers))
+        Ok(
+            <StdCommandConfigurator as CommandConfigurator<S::Input>>::into_executor::<OT, S>(
+                configurator,
+                observers,
+            ),
+        )
     }
 }
 
@@ -621,15 +627,15 @@ impl CommandExecutorBuilder {
 #[cfg_attr(all(feature = "std", unix), doc = " ```")]
 #[cfg_attr(not(all(feature = "std", unix)), doc = " ```ignore")]
 /// use std::{io::Write, process::{Stdio, Command, Child}, time::Duration};
-/// use libafl::{Error, inputs::{HasTargetBytes, Input, UsesInput}, executors::{Executor, command::CommandConfigurator}, state::{UsesState, HasExecutions}};
+/// use libafl::{Error, inputs::{BytesInput, HasTargetBytes, Input, UsesInput}, executors::{Executor, command::CommandConfigurator}, state::{UsesState, HasExecutions}};
 /// use libafl_bolts::AsSlice;
 /// #[derive(Debug)]
 /// struct MyExecutor;
 ///
-/// impl CommandConfigurator for MyExecutor {
-///     fn spawn_child<I: HasTargetBytes>(
+/// impl CommandConfigurator<BytesInput> for MyExecutor {
+///     fn spawn_child(
 ///        &mut self,
-///        input: &I,
+///        input: &BytesInput,
 ///     ) -> Result<Child, Error> {
 ///         let mut command = Command::new("../if");
 ///         command
@@ -652,19 +658,16 @@ impl CommandExecutorBuilder {
 /// where
 ///     EM: UsesState,
 ///     Z: UsesState<State = EM::State>,
-///     EM::State: UsesInput + HasExecutions,
-///     EM::Input: HasTargetBytes
+///     EM::State: UsesInput<Input = BytesInput> + HasExecutions,
 /// {
 ///     MyExecutor.into_executor(())
 /// }
 /// ```
 
 #[cfg(all(feature = "std", any(unix, doc)))]
-pub trait CommandConfigurator: Sized {
+pub trait CommandConfigurator<I>: Sized {
     /// Spawns a new process with the given configuration.
-    fn spawn_child<I>(&mut self, input: &I) -> Result<Child, Error>
-    where
-        I: Input + HasTargetBytes;
+    fn spawn_child(&mut self, input: &I) -> Result<Child, Error>;
 
     /// Provides timeout duration for execution of the child process.
     fn exec_timeout(&self) -> Duration;
@@ -693,7 +696,7 @@ mod tests {
         fuzzer::test::NopFuzzer,
         inputs::BytesInput,
         monitors::SimpleMonitor,
-        state::test::NopState,
+        state::NopState,
     };
 
     #[test]

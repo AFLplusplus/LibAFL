@@ -1,7 +1,8 @@
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::Aarch64Register;
 #[cfg(target_arch = "x86_64")]
-use frida_gum::{CpuContext, instruction_writer::X86Register};
+use frida_gum::{instruction_writer::X86Register, CpuContext};
+use libafl::Error;
 #[cfg(target_arch = "aarch64")]
 use num_traits::cast::FromPrimitive;
 #[cfg(target_arch = "x86_64")]
@@ -180,13 +181,13 @@ pub fn get_register(context: &CpuContext, reg: X86Register) -> u64
         X86Register::R13 => context.r13(),
         X86Register::R14 => context.r14(),
         X86Register::R15 => context.r15(),
-        _ => 0
+        _ => 0,
     }
 }
 
 /// The writer registers
-/// frida registers: <https://docs.rs/frida-gum/0.4.0/frida_gum/instruction_writer/enum.X86Register.html>
-/// capstone registers: <https://docs.rs/capstone-sys/0.14.0/capstone_sys/x86_reg/index.html>
+/// frida registers: <https://docs.rs/frida-gum/latest/frida_gum/instruction_writer/enum.X86Register.html>
+/// capstone registers: <https://docs.rs/capstone-sys/latest/capstone_sys/x86_reg/index.html>
 #[cfg(target_arch = "x86_64")]
 #[must_use]
 #[inline]
@@ -203,28 +204,44 @@ pub fn writer_register(reg: RegSpec) -> X86Register {
 
 /// Translates a frida instruction to a disassembled instruction.
 #[cfg(all(target_arch = "x86_64"))]
-pub(crate) fn frida_to_cs(decoder: InstDecoder, frida_insn: &frida_gum_sys::Insn) -> Instruction {
+pub(crate) fn frida_to_cs(
+    decoder: InstDecoder,
+    frida_insn: &frida_gum_sys::Insn,
+) -> Result<Instruction, Error> {
     match decoder.decode_slice(frida_insn.bytes()) {
-        Ok(result) => return result,
+        Ok(result) => return Ok(result),
         Err(error) => {
-        log::error!("{:?}: {:x}: {:?}", error, frida_insn.address(), frida_insn.bytes());
-        panic!("FAILED");
+            log::error!(
+                "{:?}: {:x}: {:?}",
+                error,
+                frida_insn.address(),
+                frida_insn.bytes()
+            );
+            return Err(Error::illegal_state(
+                "Instruction did not diassemble properly",
+            ));
         }
-
     };
 }
 
 #[cfg(all(target_arch = "aarch64"))]
-pub(crate) fn frida_to_cs(decoder: InstDecoder, frida_insn: &frida_gum_sys::Insn) -> Instruction {
+pub(crate) fn frida_to_cs(
+    decoder: InstDecoder,
+    frida_insn: &frida_gum_sys::Insn,
+) -> Result<Instruction, Error> {
     let insn = disas_count(&decoder, frida_insn.bytes(), 4);
 
-    if insn.len() < 1{
-        log::error!("Failed to disassemble: {:#x}: {:?}", frida_insn.address(), frida_insn.bytes());
-        panic!("FAILED");
+    if insn.len() < 1 {
+        log::error!(
+            "Failed to disassemble: {:#x}: {:?}",
+            frida_insn.address(),
+            frida_insn.bytes()
+        );
+        return Err(Error::illegal_state(
+            "Instruction did not diassemble properly",
+        ));
     }
-    return insn[0];
-    
-
+    return Ok(insn[0]);
 }
 
 #[cfg(target_arch = "x86_64")]

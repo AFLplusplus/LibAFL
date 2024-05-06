@@ -22,8 +22,8 @@ use crate::{
     inputs::UsesInput,
     observers::ObserversTuple,
     schedulers::Scheduler,
-    state::{HasCorpus, HasExecutions, HasLastReportTime, HasMetadata, HasRand},
-    Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
+    state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand},
+    Error, EvaluatorObservers, ExecutionProcessor, HasMetadata, HasScheduler,
 };
 
 /// Send a monitor update all 15 (or more) seconds

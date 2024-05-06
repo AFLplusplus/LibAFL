@@ -1,11 +1,7 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for `stb_image`.
-use mimalloc::MiMalloc;
-#[global_allocator]
-static GLOBAL: MiMalloc = MiMalloc;
-
 use std::{
-    env,
+    env, fs,
     path::PathBuf,
     process::{Child, Command, Stdio},
     time::Duration,
@@ -32,7 +28,7 @@ use libafl::{
             serialization_format::{DEFAULT_ENV_NAME, DEFAULT_SIZE},
             ConcolicObserver,
         },
-        TimeObserver,
+        CanTrack, TimeObserver,
     },
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{
@@ -46,12 +42,16 @@ use libafl_bolts::{
     current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, StdShMemProvider},
-    tuples::tuple_list,
-    AsMutSlice, AsSlice, Named,
+    tuples::{tuple_list, Handler},
+    AsSlice, AsSliceMut,
 };
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
 };
+use mimalloc::MiMalloc;
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 #[derive(Debug, Parser)]
 struct Opt {
@@ -60,7 +60,6 @@ struct Opt {
     concolic: bool,
 }
 
-use std::fs;
 pub fn main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
@@ -107,7 +106,7 @@ fn fuzz(
 
     // Create an observation channel using the coverage map
     // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)
-    let edges_observer = unsafe { std_edges_map_observer("edges") };
+    let edges_observer = unsafe { std_edges_map_observer("edges").track_indices() };
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
@@ -118,9 +117,9 @@ fn fuzz(
     // This one is composed by two Feedbacks in OR
     let mut feedback = feedback_or!(
         // New maximization map feedback linked to the edges observer and the feedback state
-        MaxMapFeedback::tracking(&edges_observer, true, false),
+        MaxMapFeedback::new(&edges_observer),
         // Time feedback, this one does not need a feedback state
-        TimeFeedback::with_observer(&time_observer)
+        TimeFeedback::new(&time_observer)
     );
 
     // A feedback to choose if an input is a solution or not
@@ -148,7 +147,7 @@ fn fuzz(
     println!("We're a client, let's fuzz :)");
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+    let scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -207,10 +206,8 @@ fn fuzz(
         concolic_shmem.write_to_env(DEFAULT_ENV_NAME).unwrap();
 
         // The concolic observer observers the concolic shared memory map.
-        let concolic_observer =
-            ConcolicObserver::new("concolic".to_string(), concolic_shmem.as_mut_slice());
-
-        let concolic_observer_name = concolic_observer.name().to_string();
+        let concolic_observer = ConcolicObserver::new("concolic", concolic_shmem.as_slice_mut());
+        let concolic_ref = concolic_observer.handle();
 
         // The order of the stages matter!
         let mut stages = tuple_list!(
@@ -219,7 +216,7 @@ fn fuzz(
                 TracingStage::new(
                     MyCommandConfigurator.into_executor(tuple_list!(concolic_observer))
                 ),
-                concolic_observer_name,
+                concolic_ref,
             ),
             // Use the concolic trace for z3-based solving
             SimpleConcolicMutationalStage::default(),
@@ -240,8 +237,8 @@ fn fuzz(
 #[derive(Default, Debug)]
 pub struct MyCommandConfigurator;
 
-impl CommandConfigurator for MyCommandConfigurator {
-    fn spawn_child<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<Child, Error> {
+impl CommandConfigurator<BytesInput> for MyCommandConfigurator {
+    fn spawn_child(&mut self, input: &BytesInput) -> Result<Child, Error> {
         input.to_file("cur_input")?;
 
         Ok(Command::new("./target_symcc.out")

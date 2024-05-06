@@ -105,6 +105,7 @@ mod harness_wrap {
     #![allow(improper_ctypes)]
     #![allow(clippy::unreadable_literal)]
     #![allow(missing_docs)]
+    #![allow(unused_qualifications)]
     include!(concat!(env!("OUT_DIR"), "/harness_wrap.rs"));
 }
 
@@ -149,7 +150,6 @@ impl CustomMutationStatus {
 macro_rules! fuzz_with {
     ($options:ident, $harness:ident, $operation:expr, $and_then:expr, $edge_maker:expr) => {{
         use libafl_bolts::{
-                current_nanos,
                 rands::StdRand,
                 tuples::{Merge, tuple_list},
                 AsSlice,
@@ -167,7 +167,7 @@ macro_rules! fuzz_with {
                 I2SRandReplace, StdScheduledMutator, StringCategoryRandMutator, StringSubcategoryRandMutator,
                 StringCategoryTokenReplaceMutator, StringSubcategoryTokenReplaceMutator, Tokens, tokens_mutations
             },
-            observers::{stacktrace::BacktraceObserver, TimeObserver},
+            observers::{stacktrace::BacktraceObserver, TimeObserver, CanTrack},
             schedulers::{
                 IndexesLenTimeMinimizerScheduler, powersched::PowerSchedule, PowerQueueScheduler,
             },
@@ -197,7 +197,7 @@ macro_rules! fuzz_with {
             let grimoire_metadata = should_use_grimoire(&mut state, &$options, &mutator_status)?;
             let grimoire = grimoire_metadata.should();
 
-            let edges_observer = edge_maker();
+            let edges_observer = edge_maker().track_indices().track_novelties();
             let size_edges_observer = MappedEdgeMapObserver::new(edge_maker(), SizeValueObserver::default());
 
             let keep_observer = LibfuzzerKeepFeedback::new();
@@ -219,8 +219,8 @@ macro_rules! fuzz_with {
             );
 
             // New maximization map feedback linked to the edges observer
-            let map_feedback = MaxMapFeedback::tracking(&edges_observer, true, true);
-            let shrinking_map_feedback = ShrinkMapFeedback::tracking(&size_edges_observer, false, false);
+            let map_feedback = MaxMapFeedback::new(&edges_observer);
+            let shrinking_map_feedback = ShrinkMapFeedback::new(&size_edges_observer);
 
             // Set up a generalization stage for grimoire
             let generalization = GeneralizationStage::new(&edges_observer);
@@ -243,7 +243,7 @@ macro_rules! fuzz_with {
                     map_feedback,
                     feedback_and_fast!(ConstFeedback::new($options.shrink()), shrinking_map_feedback),
                     // Time feedback, this one does not need a feedback state
-                    TimeFeedback::with_observer(&time_observer)
+                    TimeFeedback::new(&time_observer)
                 )
             );
 
@@ -281,7 +281,7 @@ macro_rules! fuzz_with {
             let mut state = state.unwrap_or_else(|| {
                 StdState::new(
                     // RNG
-                    StdRand::with_seed(current_nanos()),
+                    StdRand::new(),
                     // Corpus that will be evolved, we keep it in memory for performance
                     LibfuzzerCorpus::new(corpus_dir.clone(), 4096),
                     // Corpus in which we store solutions (crashes in this example),
@@ -411,7 +411,7 @@ macro_rules! fuzz_with {
             let grimoire = IfStage::new(|_, _, _, _| Ok(grimoire.into()), (StdMutationalStage::transforming(grimoire_mutator), ()));
 
             // A minimization+queue policy to get testcasess from the corpus
-            let scheduler = IndexesLenTimeMinimizerScheduler::new(PowerQueueScheduler::new(&mut state, &edges_observer, PowerSchedule::FAST));
+            let scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, PowerQueueScheduler::new(&mut state, &edges_observer, PowerSchedule::FAST));
 
             // A fuzzer with feedbacks and a corpus scheduler
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);

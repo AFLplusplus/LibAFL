@@ -25,15 +25,14 @@ use libafl::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::{I2SRandReplace, Tokens},
     },
-    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
+    observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{StdMutationalStage, TracingStage},
-    state::{HasCorpus, HasMetadata, StdState},
-    Error,
+    state::{HasCorpus, StdState},
+    Error, HasMetadata,
 };
 use libafl_bolts::{
     core_affinity::Cores,
-    current_nanos,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
@@ -136,7 +135,8 @@ pub extern "C" fn LLVMFuzzerRunDriver(
         let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_slice(
             "edges",
             edges.into_iter().next().unwrap(),
-        ));
+        ))
+        .track_indices();
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
@@ -148,9 +148,9 @@ pub extern "C" fn LLVMFuzzerRunDriver(
         // This one is composed by two Feedbacks in OR
         let mut feedback = feedback_or!(
             // New maximization map feedback linked to the edges observer and the feedback state
-            MaxMapFeedback::tracking(&edges_observer, true, false),
+            MaxMapFeedback::new(&edges_observer),
             // Time feedback, this one does not need a feedback state
-            TimeFeedback::with_observer(&time_observer)
+            TimeFeedback::new(&time_observer)
         );
 
         // A feedback to choose if an input is a solution or not
@@ -160,7 +160,7 @@ pub extern "C" fn LLVMFuzzerRunDriver(
         let mut state = state.unwrap_or_else(|| {
             StdState::new(
                 // RNG
-                StdRand::with_seed(current_nanos()),
+                StdRand::new(),
                 // Corpus that will be evolved, we keep it in memory for performance
                 InMemoryCorpus::new(),
                 // Corpus in which we store solutions (crashes in this example),
@@ -183,7 +183,8 @@ pub extern "C" fn LLVMFuzzerRunDriver(
         }
 
         // A minimization+queue policy to get testcasess from the corpus
-        let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+        let scheduler =
+            IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);

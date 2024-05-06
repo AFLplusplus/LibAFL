@@ -23,8 +23,8 @@ use libafl::{
         Monitor, MultiMonitor, SimpleMonitor,
     },
     stages::{HasCurrentStage, StagesTuple},
-    state::{HasExecutions, HasLastReportTime, HasMetadata, HasSolutions, UsesState},
-    Error, Fuzzer,
+    state::{HasExecutions, HasLastReportTime, HasSolutions, UsesState},
+    Error, Fuzzer, HasMetadata,
 };
 use libafl_bolts::{
     core_affinity::Cores,
@@ -175,7 +175,7 @@ where
     })
 }
 
-fn create_monitor_closure() -> impl Fn(String) + Clone {
+fn create_monitor_closure() -> impl Fn(&str) + Clone {
     #[cfg(unix)]
     let stderr_fd =
         std::os::fd::RawFd::from_str(&std::env::var(crate::STDERR_FD_VAR).unwrap()).unwrap(); // set in main

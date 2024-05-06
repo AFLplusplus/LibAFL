@@ -22,11 +22,10 @@ use libafl::{
     observers::StdMapObserver,
     schedulers::RandScheduler,
     stages::mutational::StdMutationalStage,
-    state::{HasCorpus, HasMetadata, StdState},
-    Error,
+    state::{HasCorpus, StdState},
+    Error, HasMetadata,
 };
 use libafl_bolts::{
-    current_nanos,
     rands::StdRand,
     tuples::{tuple_list, Merge},
     AsSlice,
@@ -100,7 +99,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let mut state = state.unwrap_or_else(|| {
         StdState::new(
             // RNG
-            StdRand::with_seed(current_nanos()),
+            StdRand::new(),
             // Corpus that will be evolved, we keep it in memory for performance
             InMemoryCorpus::new(),
             // Corpus in which we store solutions (crashes in this example),

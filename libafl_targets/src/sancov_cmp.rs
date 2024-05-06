@@ -1,9 +1,12 @@
 //! Sanitizer Coverage comparison functions
 
-use core::{mem, ptr, slice};
+use core::{
+    cmp,
+    ffi::{c_char, c_int, c_void},
+    ptr,
+};
 
-static mut PCS_BEG: *const usize = ptr::null();
-static mut PCS_END: *const usize = ptr::null();
+use crate::CMPLOG_MAP_W;
 
 extern "C" {
 
@@ -28,73 +31,110 @@ extern "C" {
     /// Trace a switch statement
     pub fn __sanitizer_cov_trace_switch(val: u64, cases: *const u64);
 
+    /// cmplog internal api
+    pub fn __libafl_targets_cmplog_routines_len(k: usize, s1: *const u8, s2: *const u8, len: usize);
+}
+
+/// overriding `__sanitizer_weak_hook_memcmp`
+/// # Safety
+/// this function has raw pointer access
+#[no_mangle]
+pub unsafe extern "C" fn __sanitizer_weak_hook_memcmp(
+    called_pc: *const c_void,
+    s1: *const c_void,
+    s2: *const c_void,
+    n: usize,
+    result: c_int,
+) {
+    if result != 0 {
+        let k: usize = called_pc as usize;
+        let k = (k >> 4) ^ (k << 8);
+        let k = k & (CMPLOG_MAP_W - 1);
+        __libafl_targets_cmplog_routines_len(k, s1 as *const u8, s2 as *const u8, cmp::min(n, 32));
+    }
 }
 
 #[no_mangle]
-unsafe extern "C" fn __sanitizer_cov_pcs_init(pcs_beg: *const usize, pcs_end: *const usize) {
-    // "The Unsafe Code Guidelines also notably defines that usize and isize are respectively compatible with uintptr_t and intptr_t defined in C."
-    assert!(
-        PCS_BEG.is_null(),
-        "__sanitizer_cov_pcs_init can be called only once."
-    );
-    assert!(
-        PCS_END.is_null(),
-        "__sanitizer_cov_pcs_init can be called only once."
-    );
+/// overriding `__sanitizer_weak_hook_strncmp`
+/// # Safety
+/// this function has raw pointer access
+pub unsafe extern "C" fn __sanitizer_weak_hook_strncmp(
+    called_pc: *const c_void,
+    s1: *const c_char,
+    s2: *const c_char,
+    n: usize,
+    result: c_int,
+) {
+    if result != 0 {
+        let n = cmp::min(n, 32);
+        let k: usize = called_pc as usize;
+        let k = (k >> 4) ^ (k << 8);
+        let k = k & (CMPLOG_MAP_W - 1);
+        let mut actual_len = 0;
+        while actual_len < n {
+            let c1 = ptr::read(s1.add(actual_len));
+            let c2 = ptr::read(s2.add(actual_len));
 
-    PCS_BEG = pcs_beg;
-    PCS_END = pcs_end;
-}
-
-/// An entry to the `sanitizer_cov` `pc_table`
-#[repr(C, packed)]
-#[derive(Debug, PartialEq, Eq)]
-pub struct PcTableEntry {
-    addr: usize,
-    flags: usize,
-}
-
-impl PcTableEntry {
-    /// Returns whether the PC corresponds to a function entry point.
-    #[must_use]
-    pub fn is_function_entry(&self) -> bool {
-        self.flags == 0x1
-    }
-
-    /// Returns the address associated with this PC.
-    #[must_use]
-    pub fn addr(&self) -> usize {
-        self.addr
-    }
-}
-
-/// Returns a slice containing the PC table.
-#[must_use]
-pub fn sanitizer_cov_pc_table() -> Option<&'static [PcTableEntry]> {
-    // SAFETY: Once PCS_BEG and PCS_END have been initialized, will not be written to again. So
-    // there's no TOCTOU issue.
-    unsafe {
-        if PCS_BEG.is_null() || PCS_END.is_null() {
-            return None;
+            if c1 == 0 || c2 == 0 {
+                break;
+            }
+            actual_len += 1;
         }
-        let len = PCS_END.offset_from(PCS_BEG);
-        assert!(
-            len > 0,
-            "Invalid PC Table bounds - start: {PCS_BEG:x?} end: {PCS_END:x?}"
-        );
-        assert_eq!(
-            len % 2,
-            0,
-            "PC Table size is not evens - start: {PCS_BEG:x?} end: {PCS_END:x?}"
-        );
-        assert_eq!(
-            (PCS_BEG as usize) % mem::align_of::<PcTableEntry>(),
-            0,
-            "Unaligned PC Table - start: {PCS_BEG:x?} end: {PCS_END:x?}"
-        );
-        Some(slice::from_raw_parts(
-            PCS_BEG as *const PcTableEntry,
-            (len / 2).try_into().unwrap(),
-        ))
+        __libafl_targets_cmplog_routines_len(k, s1 as *const u8, s2 as *const u8, actual_len);
     }
+}
+
+#[no_mangle]
+/// overriding `__sanitizer_weak_hook_strncasecmps`
+/// # Safety
+/// this function has raw pointer access
+pub unsafe extern "C" fn __sanitizer_weak_hook_strncasecmp(
+    called_pc: *const c_void,
+    s1: *const c_char,
+    s2: *const c_char,
+    n: usize,
+    result: c_int,
+) {
+    __sanitizer_weak_hook_strncmp(called_pc, s1, s2, n, result);
+}
+
+#[no_mangle]
+/// overriding `__sanitizer_weak_hook_strcmp`
+/// # Safety
+/// this function has raw pointer access
+pub unsafe extern "C" fn __sanitizer_weak_hook_strcmp(
+    called_pc: *const c_void,
+    s1: *const c_char,
+    s2: *const c_char,
+    result: c_int,
+) {
+    if result != 0 {
+        let k: usize = called_pc as usize;
+        let k = (k >> 4) ^ (k << 8);
+        let k = k & (CMPLOG_MAP_W - 1);
+        let mut actual_len = 0;
+        while actual_len < 32 {
+            let c1 = ptr::read(s1.add(actual_len));
+            let c2 = ptr::read(s2.add(actual_len));
+
+            if c1 == 0 || c2 == 0 {
+                break;
+            }
+            actual_len += 1;
+        }
+        __libafl_targets_cmplog_routines_len(k, s1 as *const u8, s2 as *const u8, actual_len);
+    }
+}
+
+#[no_mangle]
+/// overriding `__sanitizer_weak_hook_strcmp`
+/// # Safety
+/// this function has raw pointer access
+pub unsafe extern "C" fn __sanitizer_weak_hook_strcasecmp(
+    called_pc: *const c_void,
+    s1: *const c_char,
+    s2: *const c_char,
+    result: c_int,
+) {
+    __sanitizer_weak_hook_strcmp(called_pc, s1, s2, result);
 }

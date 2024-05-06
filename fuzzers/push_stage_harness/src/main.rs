@@ -31,10 +31,11 @@ fn signals_set(idx: usize) {
     unsafe { SIGNALS[idx] = 1 };
 }
 
-#[allow(clippy::similar_names)]
+#[allow(clippy::similar_names, clippy::manual_assert)]
 pub fn main() {
     // Create an observation channel using the signals map
-    let observer = unsafe { StdMapObserver::new("signals", &mut SIGNALS) };
+    let observer =
+        unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS.as_mut_ptr(), SIGNALS.len()) };
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);
@@ -90,8 +91,6 @@ pub fn main() {
 
     let exit_kind = Rc::new(Cell::new(None));
 
-    let stage_idx = 0;
-
     let observers = tuple_list!(observer);
 
     let shared_state = PushStageSharedState::new(fuzzer, state, observers, mgr);
@@ -101,7 +100,6 @@ pub fn main() {
         mutator,
         Rc::new(RefCell::new(Some(shared_state))),
         exit_kind.clone(),
-        stage_idx,
     );
 
     // Loop, the input, getting a new entry from the push stage each iteration.

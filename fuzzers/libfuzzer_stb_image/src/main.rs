@@ -19,13 +19,13 @@ use libafl::{
         scheduled::{havoc_mutations, StdScheduledMutator},
         token_mutations::I2SRandReplace,
     },
-    observers::TimeObserver,
+    observers::{CanTrack, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, StdState},
     Error,
 };
-use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
+use libafl_bolts::{rands::StdRand, tuples::tuple_list, AsSlice};
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
 };
@@ -68,7 +68,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     // Create an observation channel using the coverage map
     // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)
-    let edges_observer = unsafe { std_edges_map_observer("edges") };
+    let edges_observer = unsafe { std_edges_map_observer("edges").track_indices() };
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
@@ -79,9 +79,9 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // This one is composed by two Feedbacks in OR
     let mut feedback = feedback_or!(
         // New maximization map feedback linked to the edges observer and the feedback state
-        MaxMapFeedback::tracking(&edges_observer, true, false),
+        MaxMapFeedback::new(&edges_observer),
         // Time feedback, this one does not need a feedback state
-        TimeFeedback::with_observer(&time_observer)
+        TimeFeedback::new(&time_observer)
     );
 
     // A feedback to choose if an input is a solution or not
@@ -91,7 +91,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let mut state = state.unwrap_or_else(|| {
         StdState::new(
             // RNG
-            StdRand::with_seed(current_nanos()),
+            StdRand::new(),
             // Corpus that will be evolved, we keep it in memory for performance
             InMemoryCorpus::new(),
             // Corpus in which we store solutions (crashes in this example),
@@ -109,7 +109,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     println!("We're a client, let's fuzz :)");
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+    let scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);

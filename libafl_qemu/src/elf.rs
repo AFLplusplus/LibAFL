@@ -1,11 +1,10 @@
 //! Utilities to parse and process ELFs
 
-use std::{convert::AsRef, fs::File, io::Read, ops::Range, path::Path, str};
+use std::{fs::File, io::Read, ops::Range, path::Path, str};
 
 use goblin::elf::{header::ET_DYN, Elf};
 use libafl::Error;
-
-use crate::GuestAddr;
+use libafl_qemu_sys::GuestAddr;
 
 pub struct EasyElf<'a> {
     elf: Elf<'a>,

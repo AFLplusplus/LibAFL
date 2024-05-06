@@ -122,7 +122,7 @@ pub mod unix_signal_handler {
         _context: Option<&mut ucontext_t>,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: HasObservers + HasInProcessHooks,
+        E: HasObservers + HasInProcessHooks<E::State>,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
@@ -185,8 +185,8 @@ pub mod unix_signal_handler {
     {
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
         let _context = _context.map(|p| {
-            &mut *(((p as *mut _ as *mut libc::c_void as usize) + 128) as *mut libc::c_void
-                as *mut ucontext_t)
+            &mut *(((core::ptr::from_mut(p) as *mut libc::c_void as usize) + 128)
+                as *mut libc::c_void as *mut ucontext_t)
         });
 
         log::error!("Crashed with {signal}");
@@ -204,17 +204,21 @@ pub mod unix_signal_handler {
                 let mut bsod = Vec::new();
                 {
                     let mut writer = std::io::BufWriter::new(&mut bsod);
-                    writeln!(writer, "input: {:?}", input.generate_name(0)).unwrap();
-                    libafl_bolts::minibsod::generate_minibsod(
+                    let _ = writeln!(writer, "input: {:?}", input.generate_name(0));
+                    let bsod = libafl_bolts::minibsod::generate_minibsod(
                         &mut writer,
                         signal,
                         _info,
                         _context.as_deref(),
-                    )
-                    .unwrap();
-                    writer.flush().unwrap();
+                    );
+                    if bsod.is_err() {
+                        log::error!("generate_minibsod failed");
+                    }
+                    let _ = writer.flush();
                 }
-                log::error!("{}", std::str::from_utf8(&bsod).unwrap());
+                if let Ok(r) = std::str::from_utf8(&bsod) {
+                    log::error!("{}", r);
+                }
             }
 
             run_observers_and_save_state::<E, EM, OF, Z>(
@@ -241,16 +245,20 @@ pub mod unix_signal_handler {
                     let mut bsod = Vec::new();
                     {
                         let mut writer = std::io::BufWriter::new(&mut bsod);
-                        libafl_bolts::minibsod::generate_minibsod(
+                        let bsod = libafl_bolts::minibsod::generate_minibsod(
                             &mut writer,
                             signal,
                             _info,
                             _context.as_deref(),
-                        )
-                        .unwrap();
-                        writer.flush().unwrap();
+                        );
+                        if bsod.is_err() {
+                            log::error!("generate_minibsod failed");
+                        }
+                        let _ = writer.flush();
                     }
-                    log::error!("{}", std::str::from_utf8(&bsod).unwrap());
+                    if let Ok(r) = std::str::from_utf8(&bsod) {
+                        log::error!("{}", r);
+                    }
                 }
             }
 
@@ -258,7 +266,7 @@ pub mod unix_signal_handler {
                 log::error!("Type QUIT to restart the child");
                 let mut line = String::new();
                 while line.trim() != "QUIT" {
-                    std::io::stdin().read_line(&mut line).unwrap();
+                    let _ = std::io::stdin().read_line(&mut line);
                 }
             }
 

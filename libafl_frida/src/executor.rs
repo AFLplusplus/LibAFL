@@ -1,8 +1,8 @@
+#[cfg(all(unix, not(test)))]
+use core::borrow::Borrow;
 use core::fmt::{self, Debug, Formatter};
-
 #[cfg(windows)]
 use std::process::abort;
-
 use std::{ffi::c_void, marker::PhantomData};
 
 use frida_gum::{
@@ -21,9 +21,10 @@ use libafl::{
     state::{HasExecutions, State, UsesState},
     Error,
 };
+use libafl_bolts::tuples::RefIndexable;
 
 #[cfg(not(test))]
-use crate::asan::errors::ASAN_ERRORS;
+use crate::asan::errors::AsanErrors;
 use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
 #[cfg(windows)]
 use crate::windows_hooks::initialize;
@@ -107,11 +108,10 @@ where
             self.stalker.deactivate();
         }
 
-        #[cfg(not(test))]
+        #[cfg(all(unix, not(test)))]
         unsafe {
-            if ASAN_ERRORS.is_some() && !ASAN_ERRORS.as_ref().unwrap().is_empty() {
-                log::error!("Crashing target as it had ASAN errors");
-                #[cfg(unix)]
+            if !AsanErrors::get_mut_blocking().borrow().is_empty() {
+                log::error!("Crashing target as it had ASan errors");
                 libc::raise(libc::SIGABRT);
                 #[cfg(windows)]
                 abort();
@@ -150,12 +150,12 @@ where
     OT: ObserversTuple<S>,
 {
     #[inline]
-    fn observers(&self) -> &OT {
+    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         self.base.observers()
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
+    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
         self.base.observers_mut()
     }
 }
@@ -236,7 +236,7 @@ where
 }
 
 #[cfg(windows)]
-impl<'a, 'b, 'c, H, OT, RT, S> HasInProcessHooks
+impl<'a, 'b, 'c, H, OT, RT, S> HasInProcessHooks<S>
     for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
@@ -247,13 +247,13 @@ where
 {
     /// the timeout handler
     #[inline]
-    fn inprocess_hooks(&self) -> &InProcessHooks {
+    fn inprocess_hooks(&self) -> &InProcessHooks<S> {
         &self.base.hooks().0
     }
 
     /// the timeout handler
     #[inline]
-    fn inprocess_hooks_mut(&mut self) -> &mut InProcessHooks {
+    fn inprocess_hooks_mut(&mut self) -> &mut InProcessHooks<S> {
         &mut self.base.hooks_mut().0
     }
 }

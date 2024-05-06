@@ -131,7 +131,7 @@ impl LibfuzzerOptions {
         let name = if let Some(executable) = std::env::current_exe().ok().and_then(|path| {
             path.file_name()
                 .and_then(std::ffi::OsStr::to_str)
-                .map(std::string::ToString::to_string)
+                .map(ToString::to_string)
         }) {
             executable
         } else {
@@ -394,11 +394,7 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
             tui: self.tui,
             runs: self.runs,
             close_fd_mask: self.close_fd_mask,
-            unknown: self
-                .unknown
-                .into_iter()
-                .map(std::string::ToString::to_string)
-                .collect(),
+            unknown: self.unknown.into_iter().map(ToString::to_string).collect(),
         }
     }
 }

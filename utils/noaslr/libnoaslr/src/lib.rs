@@ -65,7 +65,7 @@ fn libnoaslr() -> Result<()> {
             libc::P_PID,
             0,
             libc::PROC_ASLR_CTL,
-            &mut status as *mut i32 as *mut libc::c_void,
+            &mut core::ptr::from_mut(status) as *mut libc::c_void,
         ) < 0
         {
             return Err(anyhow!("Failed to set aslr control"));
