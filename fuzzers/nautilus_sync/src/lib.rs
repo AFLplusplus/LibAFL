@@ -6,7 +6,7 @@ static GLOBAL: MiMalloc = MiMalloc;
 use std::ptr::write_volatile;
 use std::{env, net::SocketAddr, path::PathBuf, time::Duration};
 
-use clap::{self, Parser};
+use clap::Parser;
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::{launcher::Launcher, llmp::LlmpEventConverter, EventConfig},
@@ -23,12 +23,11 @@ use libafl::{
     none_input_converter,
     schedulers::QueueScheduler,
     stages::{mutational::StdMutationalStage, sync::SyncFromBrokerStage},
-    state::{HasMetadata, StdState},
-    Error,
+    state::StdState,
+    Error, HasMetadata,
 };
 use libafl_bolts::{
     core_affinity::Cores,
-    current_nanos,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
@@ -130,6 +129,9 @@ pub extern "C" fn libafl_main() {
         .unwrap()
     });
 
+    // to disconnect the event coverter from the broker later
+    // call detach_from_broker( port)
+
     let mut run_client = |state: Option<_>, mut mgr, _core_id| {
         let mut bytes = vec![];
 
@@ -156,7 +158,7 @@ pub extern "C" fn libafl_main() {
         let mut state = state.unwrap_or_else(|| {
             StdState::new(
                 // RNG
-                StdRand::with_seed(current_nanos()),
+                StdRand::new(),
                 // Corpus that will be evolved, we keep it in memory for performance
                 InMemoryCorpus::new(),
                 // Corpus in which we store solutions (crashes in this example),

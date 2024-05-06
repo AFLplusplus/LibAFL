@@ -1,8 +1,15 @@
+#ifdef TARGET_SYNC_EXIT
+  #include "libafl_qemu.h"
+#endif
+
 int __attribute__((noinline)) BREAKPOINT() {
   for (;;) {}
 }
 
 int LLVMFuzzerTestOneInput(unsigned int *Data, unsigned int Size) {
+#ifdef TARGET_SYNC_EXIT
+  LIBAFL_QEMU_START_PHYS((unsigned int)Data, Size);
+#endif
   if (Data[3] == 0) {
     while (1) {}
   }  // cause a timeout
@@ -19,6 +26,9 @@ int LLVMFuzzerTestOneInput(unsigned int *Data, unsigned int Size) {
       }
     }
   }
+#ifdef TARGET_SYNC_EXIT
+  LIBAFL_QEMU_END(LIBAFL_QEMU_END_OK);
+#endif
   return BREAKPOINT();
 }
 unsigned int FUZZ_INPUT[] = {

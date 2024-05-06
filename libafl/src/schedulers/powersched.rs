@@ -1,22 +1,21 @@
 //! The queue corpus scheduler for power schedules.
 
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::vec::Vec;
 use core::{marker::PhantomData, time::Duration};
 
+use libafl_bolts::{
+    tuples::{Handle, Handler},
+    Named,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
     inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
-    schedulers::{
-        HasAFLRemovableScheduler, HasAFLSchedulerMetadata, RemovableScheduler, Scheduler,
-    },
-    state::{HasCorpus, HasMetadata, State, UsesState},
-    Error,
+    schedulers::{AflScheduler, RemovableScheduler, Scheduler},
+    state::{HasCorpus, State, UsesState},
+    Error, HasMetadata,
 };
 
 /// The n fuzz size
@@ -39,7 +38,7 @@ pub struct SchedulerMetadata {
     cycles: u64,
     /// Size of the observer map
     bitmap_size: u64,
-    /// Sum of log(bitmap_size)
+    /// Sum of `log(bitmap_size`)
     bitmap_size_log: f64,
     /// Number of filled map entries
     bitmap_entries: u64,
@@ -172,55 +171,52 @@ pub enum PowerSchedule {
 /// Note that this corpus is merely holding the metadata necessary for the power calculation
 /// and here we DON'T actually calculate the power (we do it in the stage)
 #[derive(Clone, Debug)]
-pub struct PowerQueueScheduler<O, S> {
+pub struct PowerQueueScheduler<C, O, S> {
     strat: PowerSchedule,
-    map_observer_name: String,
+    map_observer_ref: Handle<C>,
     last_hash: usize,
     phantom: PhantomData<(O, S)>,
 }
 
-impl<O, S> UsesState for PowerQueueScheduler<O, S>
+impl<C, O, S> UsesState for PowerQueueScheduler<C, O, S>
 where
     S: State,
 {
     type State = S;
 }
 
-impl<O, S> HasAFLRemovableScheduler for PowerQueueScheduler<O, S>
+impl<C, O, S> RemovableScheduler for PowerQueueScheduler<C, O, S>
 where
     S: State + HasTestcase + HasMetadata + HasCorpus,
     O: MapObserver,
+    C: AsRef<O>,
 {
-}
-
-impl<O, S> RemovableScheduler for PowerQueueScheduler<O, S>
-where
-    S: HasCorpus + HasMetadata + HasTestcase + State,
-    O: MapObserver,
-{
+    /// This will *NOT* neutralize the effect of this removed testcase from the global data such as `SchedulerMetadata`
     fn on_remove(
         &mut self,
-        state: &mut Self::State,
-        idx: CorpusId,
-        prev: &Option<Testcase<<Self::State as UsesInput>::Input>>,
+        _state: &mut Self::State,
+        _idx: CorpusId,
+        _prev: &Option<Testcase<<Self::State as UsesInput>::Input>>,
     ) -> Result<(), Error> {
-        self.on_remove_metadata(state, idx, prev)
+        Ok(())
     }
 
+    /// This will *NOT* neutralize the effect of this removed testcase from the global data such as `SchedulerMetadata`
     fn on_replace(
         &mut self,
-        state: &mut Self::State,
-        idx: CorpusId,
-        prev: &Testcase<<Self::State as UsesInput>::Input>,
+        _state: &mut Self::State,
+        _idx: CorpusId,
+        _prev: &Testcase<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
-        self.on_replace_metadata(state, idx, prev)
+        Ok(())
     }
 }
 
-impl<O, S> HasAFLSchedulerMetadata<O, S> for PowerQueueScheduler<O, S>
+impl<C, O, S> AflScheduler<C, O, S> for PowerQueueScheduler<C, O, S>
 where
     S: HasCorpus + HasMetadata + HasTestcase + State,
     O: MapObserver,
+    C: AsRef<O>,
 {
     fn last_hash(&self) -> usize {
         self.last_hash
@@ -230,15 +226,16 @@ where
         self.last_hash = hash;
     }
 
-    fn map_observer_name(&self) -> &String {
-        &self.map_observer_name
+    fn map_observer_ref(&self) -> &Handle<C> {
+        &self.map_observer_ref
     }
 }
 
-impl<O, S> Scheduler for PowerQueueScheduler<O, S>
+impl<C, O, S> Scheduler for PowerQueueScheduler<C, O, S>
 where
     S: HasCorpus + HasMetadata + HasTestcase + State,
     O: MapObserver,
+    C: AsRef<O>,
 {
     /// Called when a [`Testcase`] is added to the corpus
     fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
@@ -259,7 +256,9 @@ where
 
     fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
-            Err(Error::empty(String::from("No entries in corpus")))
+            Err(Error::empty(
+                "No entries in corpus. This often implies the target is not properly instrumented.",
+            ))
         } else {
             let id = match state.corpus().current() {
                 Some(cur) => {
@@ -292,20 +291,21 @@ where
     }
 }
 
-impl<O, S> PowerQueueScheduler<O, S>
+impl<C, O, S> PowerQueueScheduler<C, O, S>
 where
     S: HasMetadata,
     O: MapObserver,
+    C: AsRef<O> + Named,
 {
     /// Create a new [`PowerQueueScheduler`]
     #[must_use]
-    pub fn new(state: &mut S, map_observer: &O, strat: PowerSchedule) -> Self {
+    pub fn new(state: &mut S, map_observer: &C, strat: PowerSchedule) -> Self {
         if !state.has_metadata::<SchedulerMetadata>() {
             state.add_metadata::<SchedulerMetadata>(SchedulerMetadata::new(Some(strat)));
         }
         PowerQueueScheduler {
             strat,
-            map_observer_name: map_observer.name().to_string(),
+            map_observer_ref: map_observer.handle(),
             last_hash: 0,
             phantom: PhantomData,
         }

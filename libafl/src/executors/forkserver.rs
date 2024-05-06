@@ -7,6 +7,7 @@ use core::{
     time::Duration,
 };
 use std::{
+    env,
     ffi::{OsStr, OsString},
     io::{self, prelude::*, ErrorKind},
     os::{
@@ -21,8 +22,8 @@ use libafl_bolts::{
     fs::{get_unique_std_input_file, InputFile},
     os::{dup2, pipes::Pipe},
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::Prepend,
-    AsMutSlice, AsSlice, Truncate,
+    tuples::{Handle, Handler, MatchNameRef, Prepend, RefIndexable},
+    AsSlice, AsSliceMut, Truncate,
 };
 use nix::{
     sys::{
@@ -290,6 +291,14 @@ impl Forkserver {
         debug_output: bool,
         kill_signal: Signal,
     ) -> Result<Self, Error> {
+        if env::var("AFL_MAP_SIZE").is_err() {
+            log::warn!("AFL_MAP_SIZE not set. If it is unset, the forkserver may fail to start up");
+        }
+
+        if env::var("__AFL_SHM_ID").is_err() {
+            log::warn!("__AFL_SHM_ID not set. It is necessary to set this env, otherwise the forkserver cannot communicate with the fuzzer");
+        }
+
         let mut st_pipe = Pipe::new().unwrap();
         let mut ctl_pipe = Pipe::new().unwrap();
 
@@ -436,10 +445,10 @@ impl Forkserver {
     pub fn read_st_timed(&mut self, timeout: &TimeSpec) -> Result<Option<i32>, Error> {
         let mut buf: [u8; 4] = [0_u8; 4];
         let Some(st_read) = self.st_pipe.read_end() else {
-            return Err(Error::file(io::Error::new(
-                ErrorKind::BrokenPipe,
-                "Read pipe end was already closed",
-            )));
+            return Err(Error::os_error(
+                io::Error::new(ErrorKind::BrokenPipe, "Read pipe end was already closed"),
+                "read_st_timed failed",
+            ));
         };
 
         // # Safety
@@ -488,7 +497,10 @@ where
     map: Option<SP::ShMem>,
     phantom: PhantomData<S>,
     map_size: Option<usize>,
+    #[cfg(feature = "regex")]
+    asan_obs: Handle<AsanBacktraceObserver>,
     timeout: TimeSpec,
+    crash_exitcode: Option<i8>,
 }
 
 impl<OT, S, SP> Debug for ForkserverExecutor<OT, S, SP>
@@ -574,6 +586,9 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
     real_map_size: i32,
     kill_signal: Option<Signal>,
     timeout: Option<Duration>,
+    #[cfg(feature = "regex")]
+    asan_obs: Option<Handle<AsanBacktraceObserver>>,
+    crash_exitcode: Option<i8>,
 }
 
 impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
@@ -622,18 +637,24 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             phantom: PhantomData,
             map_size: self.map_size,
             timeout,
+            asan_obs: self
+                .asan_obs
+                .clone()
+                .unwrap_or(AsanBacktraceObserver::default().handle()),
+            crash_exitcode: self.crash_exitcode,
         })
     }
 
     /// Builds `ForkserverExecutor` downsizing the coverage map to fit exaclty the AFL++ map size.
     #[allow(clippy::pedantic)]
-    pub fn build_dynamic_map<MO, OT, S>(
+    pub fn build_dynamic_map<A, MO, OT, S>(
         &mut self,
-        mut map_observer: MO,
+        mut map_observer: A,
         other_observers: OT,
-    ) -> Result<ForkserverExecutor<(MO, OT), S, SP>, Error>
+    ) -> Result<ForkserverExecutor<(A, OT), S, SP>, Error>
     where
-        MO: Observer<S> + MapObserver + Truncate, // TODO maybe enforce Entry = u8 for the cov map
+        MO: MapObserver + Truncate, // TODO maybe enforce Entry = u8 for the cov map
+        A: Observer<S> + AsRef<MO> + AsMut<MO>,
         OT: ObserversTuple<S> + Prepend<MO, PreprendResult = OT>,
         S: UsesInput,
         S::Input: Input + HasTargetBytes,
@@ -651,10 +672,10 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         );
 
         if let Some(dynamic_map_size) = self.map_size {
-            map_observer.truncate(dynamic_map_size);
+            map_observer.as_mut().truncate(dynamic_map_size);
         }
 
-        let observers: (MO, OT) = other_observers.prepend(map_observer);
+        let observers = (map_observer, other_observers);
 
         if self.uses_shmem_testcase && map.is_none() {
             return Err(Error::illegal_state(
@@ -678,6 +699,11 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             phantom: PhantomData,
             map_size: self.map_size,
             timeout,
+            asan_obs: self
+                .asan_obs
+                .clone()
+                .unwrap_or(AsanBacktraceObserver::default().handle()),
+            crash_exitcode: self.crash_exitcode,
         })
     }
 
@@ -704,7 +730,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                 shmem.write_to_env("__AFL_SHM_FUZZ_ID")?;
 
                 let size_in_bytes = (self.max_input_size + SHMEM_FUZZ_HDR_SIZE).to_ne_bytes();
-                shmem.as_mut_slice()[..4].clone_from_slice(&size_in_bytes[..4]);
+                shmem.as_slice_mut()[..4].clone_from_slice(&size_in_bytes[..4]);
                 Some(shmem)
             }
         };
@@ -989,6 +1015,13 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         self
     }
 
+    /// Treats an execution as a crash if the provided exitcode is returned
+    #[must_use]
+    pub fn crash_exitcode(mut self, exitcode: i8) -> Self {
+        self.crash_exitcode = Some(exitcode);
+        self
+    }
+
     /// Call this if the harness uses deferred forkserver mode; default is false
     #[must_use]
     pub fn is_deferred_frksrv(mut self, is_deferred_frksrv: bool) -> Self {
@@ -1037,6 +1070,8 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             max_input_size: MAX_INPUT_SIZE_DEFAULT,
             kill_signal: None,
             timeout: None,
+            asan_obs: None,
+            crash_exitcode: None,
         }
     }
 
@@ -1062,6 +1097,8 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             max_input_size: MAX_INPUT_SIZE_DEFAULT,
             kill_signal: None,
             timeout: None,
+            asan_obs: None,
+            crash_exitcode: None,
         }
     }
 }
@@ -1112,9 +1149,9 @@ where
             }
             let size_in_bytes = size.to_ne_bytes();
             // The first four bytes tells the size of the shmem.
-            map.as_mut_slice()[..SHMEM_FUZZ_HDR_SIZE]
+            map.as_slice_mut()[..SHMEM_FUZZ_HDR_SIZE]
                 .copy_from_slice(&size_in_bytes[..SHMEM_FUZZ_HDR_SIZE]);
-            map.as_mut_slice()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
+            map.as_slice_mut()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
                 .copy_from_slice(&target_bytes.as_slice()[..size]);
         } else {
             self.input_file.write_buf(input.target_bytes().as_slice())?;
@@ -1147,13 +1184,15 @@ where
 
         if let Some(status) = self.forkserver.read_st_timed(&self.timeout)? {
             self.forkserver.set_status(status);
-            if libc::WIFSIGNALED(self.forkserver().status()) {
+            let exitcode_is_crash = if let Some(crash_exitcode) = self.crash_exitcode {
+                (libc::WEXITSTATUS(self.forkserver().status()) as i8) == crash_exitcode
+            } else {
+                false
+            };
+            if libc::WIFSIGNALED(self.forkserver().status()) || exitcode_is_crash {
                 exit_kind = ExitKind::Crash;
                 #[cfg(feature = "regex")]
-                if let Some(asan_observer) = self
-                    .observers_mut()
-                    .match_name_mut::<AsanBacktraceObserver>("AsanBacktraceObserver")
-                {
+                if let Some(asan_observer) = self.observers.get_mut(&self.asan_obs) {
                     asan_observer.parse_asan_output_from_asan_log_file(pid)?;
                 }
             }
@@ -1201,13 +1240,13 @@ where
     SP: ShMemProvider,
 {
     #[inline]
-    fn observers(&self) -> &OT {
-        &self.observers
+    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
+        RefIndexable::from(&self.observers)
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
-        &mut self.observers
+    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
+        RefIndexable::from(&mut self.observers)
     }
 }
 
@@ -1218,7 +1257,7 @@ mod tests {
     use libafl_bolts::{
         shmem::{ShMem, ShMemProvider, UnixShMemProvider},
         tuples::tuple_list,
-        AsMutSlice,
+        AsSliceMut,
     };
     use serial_test::serial;
 
@@ -1240,7 +1279,7 @@ mod tests {
 
         let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
         shmem.write_to_env("__AFL_SHM_ID").unwrap();
-        let shmem_buf = shmem.as_mut_slice();
+        let shmem_buf = shmem.as_slice_mut();
 
         let edges_observer = HitcountsMapObserver::new(ConstMapObserver::<_, MAP_SIZE>::new(
             "shared_mem",

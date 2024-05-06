@@ -1,5 +1,5 @@
 //! Mutators for preserving string categories, which may be useful for certain targets which are primarily string-oriented.
-use alloc::vec::Vec;
+use alloc::{borrow::Cow, vec::Vec};
 use core::{
     cmp::{Ordering, Reverse},
     ops::Range,
@@ -16,7 +16,8 @@ use crate::{
         mutational::{MutatedTransform, MutatedTransformPost},
         StringIdentificationMetadata,
     },
-    state::{HasCorpus, HasMaxSize, HasMetadata, HasRand},
+    state::{HasCorpus, HasMaxSize, HasRand},
+    HasMetadata,
 };
 
 /// Unicode category data, as used by string analysis and mutators.
@@ -34,11 +35,7 @@ where
 {
     type Post = StringIdentificationMetadata;
 
-    fn try_transform_from(
-        base: &mut Testcase<BytesInput>,
-        state: &S,
-        _corpus_idx: CorpusId,
-    ) -> Result<Self, Error> {
+    fn try_transform_from(base: &mut Testcase<BytesInput>, state: &S) -> Result<Self, Error> {
         let input = base.load_input(state.corpus())?.clone();
         let metadata = base.metadata::<StringIdentificationMetadata>().cloned()?;
         Ok((input, metadata))
@@ -53,12 +50,7 @@ impl<S> MutatedTransformPost<S> for StringIdentificationMetadata
 where
     S: HasTestcase,
 {
-    fn post_exec(
-        self,
-        state: &mut S,
-        _stage_idx: i32,
-        corpus_idx: Option<CorpusId>,
-    ) -> Result<(), Error> {
+    fn post_exec(self, state: &mut S, corpus_idx: Option<CorpusId>) -> Result<(), Error> {
         if let Some(corpus_idx) = corpus_idx {
             let mut tc = state.testcase_mut(corpus_idx)?;
             tc.add_metadata(self);
@@ -74,7 +66,7 @@ fn choose_start<R: Rand>(
     bytes: &[u8],
     meta: &StringIdentificationMetadata,
 ) -> Option<(usize, usize)> {
-    let idx = rand.below(bytes.len() as u64) as usize;
+    let idx = rand.below(bytes.len());
     let mut options = Vec::new();
     for (start, range) in meta.ranges() {
         if idx
@@ -91,9 +83,9 @@ fn choose_start<R: Rand>(
         _ => {
             // bias towards longer strings
             options.sort_by_cached_key(|(_, entries)| entries.count_ones());
-            let selected = libafl_bolts::math::integer_sqrt(
-                rand.below((options.len() * options.len()) as u64),
-            ) as usize;
+            let selected =
+                libafl_bolts::math::integer_sqrt(rand.below(options.len() * options.len()) as u64)
+                    as usize;
             Some((options[selected].0, options[selected].1.len()))
         }
     }
@@ -141,7 +133,7 @@ fn choose_category_range<R: Rand>(
     string: &str,
 ) -> (Range<usize>, &'static [(u32, u32)]) {
     let chars = string.char_indices().collect::<Vec<_>>();
-    let idx = rand.below(chars.len() as u64) as usize;
+    let idx = rand.below(chars.len());
     let c = chars[idx].1;
 
     // figure out the categories for this char
@@ -168,7 +160,7 @@ fn choose_category_range<R: Rand>(
         )
     });
     let options = categories.len() * categories.len();
-    let selected_idx = libafl_bolts::math::integer_sqrt(rand.below(options as u64)) as usize;
+    let selected_idx = libafl_bolts::math::integer_sqrt(rand.below(options) as u64) as usize;
 
     let selected = categories[selected_idx];
 
@@ -185,7 +177,7 @@ fn choose_category_range<R: Rand>(
 
 fn choose_subcategory_range<R: Rand>(rand: &mut R, string: &str) -> (Range<usize>, (u32, u32)) {
     let chars = string.char_indices().collect::<Vec<_>>();
-    let idx = rand.below(chars.len() as u64) as usize;
+    let idx = rand.below(chars.len());
     let c = chars[idx].1;
 
     // figure out the categories for this char
@@ -205,7 +197,7 @@ fn choose_subcategory_range<R: Rand>(rand: &mut R, string: &str) -> (Range<usize
 
     subcategories.sort_by_key(|&(min, max)| Reverse(max - min + 1));
     let options = subcategories.len() * subcategories.len();
-    let selected_idx = libafl_bolts::math::integer_sqrt(rand.below(options as u64)) as usize;
+    let selected_idx = libafl_bolts::math::integer_sqrt(rand.below(options) as u64) as usize;
     let selected = subcategories[selected_idx];
 
     #[cfg(test)]
@@ -246,7 +238,7 @@ fn rand_replace_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
         return MutationResult::Skipped;
     }
 
-    let replace_len = state.rand_mut().below(MAX_CHARS as u64) as usize;
+    let replace_len = state.rand_mut().below(MAX_CHARS);
     let orig_len = range.end - range.start;
     if input.0.len() - orig_len + replace_len > state.max_size() {
         return MutationResult::Skipped;
@@ -279,8 +271,9 @@ fn rand_replace_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
 pub struct StringCategoryRandMutator;
 
 impl Named for StringCategoryRandMutator {
-    fn name(&self) -> &str {
-        "string-category-rand"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("string-category-rand");
+        &NAME
     }
 }
 
@@ -288,12 +281,7 @@ impl<S> Mutator<UnicodeInput, S> for StringCategoryRandMutator
 where
     S: HasRand + HasMaxSize,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut UnicodeInput,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut UnicodeInput) -> Result<MutationResult, Error> {
         if input.0.bytes().is_empty() {
             return Ok(MutationResult::Skipped);
         }
@@ -310,15 +298,15 @@ where
                 core::str::from_utf8(&bytes[range.clone()])
             );
 
-            let options: u64 = category
+            let options: usize = category
                 .iter()
-                .map(|&(start, end)| u64::from(end) - u64::from(start) + 1)
+                .map(|&(start, end)| end as usize - start as usize + 1)
                 .sum();
             let char_gen = |state: &mut S| loop {
                 let mut selected = state.rand_mut().below(options);
                 for &(min, max) in category {
                     if let Some(next_selected) =
-                        selected.checked_sub(u64::from(max) - u64::from(min) + 1)
+                        selected.checked_sub(max as usize - min as usize + 1)
                     {
                         selected = next_selected;
                     } else if let Some(new_c) = char::from_u32(selected as u32 + min) {
@@ -342,8 +330,9 @@ where
 pub struct StringSubcategoryRandMutator;
 
 impl Named for StringSubcategoryRandMutator {
-    fn name(&self) -> &str {
-        "string-subcategory-rand"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("string-subcategory-rand");
+        &NAME
     }
 }
 
@@ -351,12 +340,7 @@ impl<S> Mutator<UnicodeInput, S> for StringSubcategoryRandMutator
 where
     S: HasRand + HasMaxSize,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut UnicodeInput,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut UnicodeInput) -> Result<MutationResult, Error> {
         if input.0.bytes().is_empty() {
             return Ok(MutationResult::Skipped);
         }
@@ -373,7 +357,7 @@ where
                 core::str::from_utf8(&bytes[range.clone()])
             );
 
-            let options: u64 = u64::from(subcategory.1) - u64::from(subcategory.0) + 1;
+            let options = subcategory.1 as usize - subcategory.0 as usize + 1;
             let char_gen = |state: &mut S| loop {
                 let selected = state.rand_mut().below(options);
                 if let Some(new_c) = char::from_u32(selected as u32 + subcategory.0) {
@@ -393,8 +377,9 @@ where
 pub struct StringCategoryTokenReplaceMutator;
 
 impl Named for StringCategoryTokenReplaceMutator {
-    fn name(&self) -> &str {
-        "string-category-token-replace"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("string-category-token-replace");
+        &NAME
     }
 }
 
@@ -402,27 +387,21 @@ impl<S> Mutator<UnicodeInput, S> for StringCategoryTokenReplaceMutator
 where
     S: HasRand + HasMaxSize + HasMetadata,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut UnicodeInput,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut UnicodeInput) -> Result<MutationResult, Error> {
         if input.0.bytes().is_empty() {
             return Ok(MutationResult::Skipped);
         }
 
         let tokens_len = {
-            let meta = state.metadata_map().get::<Tokens>();
-            if meta.is_none() {
+            let Some(meta) = state.metadata_map().get::<Tokens>() else {
+                return Ok(MutationResult::Skipped);
+            };
+            if meta.tokens().is_empty() {
                 return Ok(MutationResult::Skipped);
             }
-            if meta.unwrap().tokens().is_empty() {
-                return Ok(MutationResult::Skipped);
-            }
-            meta.unwrap().tokens().len()
+            meta.tokens().len()
         };
-        let token_idx = state.rand_mut().below(tokens_len as u64) as usize;
+        let token_idx = state.rand_mut().below(tokens_len);
 
         let bytes = input.0.bytes();
         let meta = &input.1;
@@ -458,8 +437,9 @@ where
 pub struct StringSubcategoryTokenReplaceMutator;
 
 impl Named for StringSubcategoryTokenReplaceMutator {
-    fn name(&self) -> &str {
-        "string-subcategory-replace"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("string-subcategory-replace");
+        &NAME
     }
 }
 
@@ -467,27 +447,21 @@ impl<S> Mutator<UnicodeInput, S> for StringSubcategoryTokenReplaceMutator
 where
     S: HasRand + HasMaxSize + HasMetadata,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut UnicodeInput,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut UnicodeInput) -> Result<MutationResult, Error> {
         if input.0.bytes().is_empty() {
             return Ok(MutationResult::Skipped);
         }
 
         let tokens_len = {
-            let meta = state.metadata_map().get::<Tokens>();
-            if meta.is_none() {
+            let Some(meta) = state.metadata_map().get::<Tokens>() else {
+                return Ok(MutationResult::Skipped);
+            };
+            if meta.tokens().is_empty() {
                 return Ok(MutationResult::Skipped);
             }
-            if meta.unwrap().tokens().is_empty() {
-                return Ok(MutationResult::Skipped);
-            }
-            meta.unwrap().tokens().len()
+            meta.tokens().len()
         };
-        let token_idx = state.rand_mut().below(tokens_len as u64) as usize;
+        let token_idx = state.rand_mut().below(tokens_len);
 
         let bytes = input.0.bytes();
         let meta = &input.1;
@@ -520,10 +494,15 @@ where
 
 #[cfg(test)]
 mod test {
-    use libafl_bolts::rands::StdRand;
+    use libafl_bolts::{rands::StdRand, Error};
 
-    use super::*;
-    use crate::{corpus::NopCorpus, stages::extract_metadata, state::StdState};
+    use crate::{
+        corpus::NopCorpus,
+        inputs::{BytesInput, HasBytesVec},
+        mutators::{Mutator, StringCategoryRandMutator, StringSubcategoryRandMutator},
+        stages::extract_metadata,
+        state::StdState,
+    };
 
     // a not-so-useful test for this
     #[test]
@@ -545,7 +524,7 @@ mod test {
             for _ in 0..(1 << 12) {
                 let metadata = extract_metadata(bytes.bytes());
                 let mut input = (bytes, metadata);
-                let _ = mutator.mutate(&mut state, &mut input, 0);
+                let _ = mutator.mutate(&mut state, &mut input);
                 println!("{:?}", core::str::from_utf8(input.0.bytes()).unwrap());
                 bytes = input.0;
             }
@@ -577,7 +556,7 @@ mod test {
             for _ in 0..(1 << 12) {
                 let metadata = extract_metadata(bytes.bytes());
                 let mut input = (bytes, metadata);
-                let _ = mutator.mutate(&mut state, &mut input, 0);
+                let _ = mutator.mutate(&mut state, &mut input);
                 println!("{:?}", core::str::from_utf8(input.0.bytes()).unwrap());
                 bytes = input.0;
             }

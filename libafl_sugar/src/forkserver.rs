@@ -15,26 +15,22 @@ use libafl::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::Tokens,
     },
-    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
+    observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::StdMutationalStage,
-    state::{HasCorpus, HasMetadata, StdState},
-    Error,
+    state::{HasCorpus, StdState},
+    Error, HasMetadata,
 };
 use libafl_bolts::{
     core_affinity::Cores,
-    current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, Merge},
-    AsMutSlice,
+    tuples::{tuple_list, Handler, Merge},
+    AsSliceMut,
 };
 use typed_builder::TypedBuilder;
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
-
-/// The default coverage map size to use for forkserver targets
-pub const DEFAULT_MAP_SIZE: usize = 65536;
 
 /// Creates a Forkserver-based fuzzer.
 #[derive(Debug, TypedBuilder)]
@@ -86,7 +82,7 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
         // a large initial map size that should be enough
         // to house all potential coverage maps for our targets
         // (we will eventually reduce the used size according to the actual map)
-        const MAP_SIZE: usize = 2_621_440;
+        const MAP_SIZE: usize = 65_536;
 
         let conf = match self.configuration.as_ref() {
             Some(name) => EventConfig::from_name(name),
@@ -117,31 +113,36 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
 
         let monitor = MultiMonitor::new(|s| log::info!("{s}"));
 
+        // Create an observation channel to keep track of the execution time
+        let time_observer = TimeObserver::new("time");
+        let time_ref = time_observer.handle();
+
         let mut run_client = |state: Option<_>,
-                              mut mgr: LlmpRestartingEventManager<_, _>,
+                              mut mgr: LlmpRestartingEventManager<_, _, _>,
                               _core_id| {
+            let time_observer = time_observer.clone();
+
             // Coverage map shared between target and fuzzer
             let mut shmem = shmem_provider_client.new_shmem(MAP_SIZE).unwrap();
             shmem.write_to_env("__AFL_SHM_ID").unwrap();
-            let shmem_map = shmem.as_mut_slice();
+            let shmem_map = shmem.as_slice_mut();
 
             // To let know the AFL++ binary that we have a big map
             std::env::set_var("AFL_MAP_SIZE", format!("{MAP_SIZE}"));
 
             // Create an observation channel using the coverage map
-            let edges_observer =
-                unsafe { HitcountsMapObserver::new(StdMapObserver::new("shared_mem", shmem_map)) };
-
-            // Create an observation channel to keep track of the execution time
-            let time_observer = TimeObserver::new("time");
+            let edges_observer = unsafe {
+                HitcountsMapObserver::new(StdMapObserver::new("shared_mem", shmem_map))
+                    .track_indices()
+            };
 
             // Feedback to rate the interestingness of an input
             // This one is composed by two Feedbacks in OR
             let mut feedback = feedback_or!(
                 // New maximization map feedback linked to the edges observer and the feedback state
-                MaxMapFeedback::tracking(&edges_observer, true, false),
+                MaxMapFeedback::new(&edges_observer),
                 // Time feedback, this one does not need a feedback state
-                TimeFeedback::with_observer(&time_observer)
+                TimeFeedback::new(&time_observer)
             );
 
             // A feedback to choose if an input is a solution or not
@@ -151,7 +152,7 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
             let mut state = state.unwrap_or_else(|| {
                 StdState::new(
                     // RNG
-                    StdRand::with_seed(current_nanos()),
+                    StdRand::new(),
                     // Corpus that will be evolved, we keep a part in memory for performance
                     CachedOnDiskCorpus::new(out_dir.clone(), CORPUS_CACHE_SIZE).unwrap(),
                     // Corpus in which we store solutions (crashes in this example),
@@ -167,7 +168,8 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
             let mut tokens = Tokens::new();
 
             // A minimization+queue policy to get testcasess from the corpus
-            let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+            let scheduler =
+                IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
             // A fuzzer with feedbacks and a corpus scheduler
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -292,7 +294,8 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
             .run_client(&mut run_client)
             .cores(self.cores)
             .broker_port(self.broker_port)
-            .remote_broker_addr(self.remote_broker_addr);
+            .remote_broker_addr(self.remote_broker_addr)
+            .time_ref(time_ref);
         #[cfg(unix)]
         let launcher = launcher.stdout_file(Some("/dev/null"));
         match launcher.build().launch() {

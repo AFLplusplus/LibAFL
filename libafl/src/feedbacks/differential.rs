@@ -1,23 +1,26 @@
 //! Diff Feedback, comparing the content of two observers of the same type.
 //!
 
-use alloc::string::{String, ToString};
+use alloc::borrow::Cow;
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
 };
 
-use libafl_bolts::{tuples::MatchName, Named};
+use libafl_bolts::{
+    tuples::{Handle, Handler, MatchName, MatchNameRef},
+    Named,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     events::EventFirer,
     executors::ExitKind,
-    feedbacks::Feedback,
+    feedbacks::{Feedback, FeedbackFactory},
     inputs::Input,
     observers::{Observer, ObserversTuple},
-    state::{HasMetadata, State},
-    Error,
+    state::State,
+    Error, HasMetadata,
 };
 
 /// The result of a differential test between two observers.
@@ -53,14 +56,14 @@ where
     F: FnMut(&O1, &O2) -> DiffResult,
 {
     /// This feedback's name
-    name: String,
+    name: Cow<'static, str>,
     /// The first observer to compare against
-    o1_name: String,
+    o1_ref: Handle<O1>,
     /// The second observer to compare against
-    o2_name: String,
+    o2_ref: Handle<O2>,
     /// The function used to compare the two observers
     compare_fn: F,
-    phantomm: PhantomData<(O1, O2, I, S)>,
+    phantomm: PhantomData<(I, S)>,
 }
 
 impl<F, I, O1, O2, S> DiffFeedback<F, I, O1, O2, S>
@@ -70,21 +73,42 @@ where
     O2: Named,
 {
     /// Create a new [`DiffFeedback`] using two observers and a test function.
-    pub fn new(name: &str, o1: &O1, o2: &O2, compare_fn: F) -> Result<Self, Error> {
-        let o1_name = o1.name().to_string();
-        let o2_name = o2.name().to_string();
-        if o1_name == o2_name {
+    pub fn new(name: &'static str, o1: &O1, o2: &O2, compare_fn: F) -> Result<Self, Error> {
+        let o1_ref = o1.handle();
+        let o2_ref = o2.handle();
+        if o1_ref.name() == o2_ref.name() {
             Err(Error::illegal_argument(format!(
-                "DiffFeedback: observer names must be different (both were {o1_name})"
+                "DiffFeedback: observer names must be different (both were {})",
+                o1_ref.name()
             )))
         } else {
             Ok(Self {
-                o1_name,
-                o2_name,
-                name: name.to_string(),
+                o1_ref,
+                o2_ref,
+                name: Cow::from(name),
                 compare_fn,
                 phantomm: PhantomData,
             })
+        }
+    }
+}
+
+impl<F, I, O1, O2, S, T> FeedbackFactory<DiffFeedback<F, I, O1, O2, S>, S, T>
+    for DiffFeedback<F, I, O1, O2, S>
+where
+    F: FnMut(&O1, &O2) -> DiffResult + Clone,
+    I: Input,
+    O1: Observer<S> + Named,
+    O2: Observer<S> + Named,
+    S: HasMetadata + State<Input = I>,
+{
+    fn create_feedback(&self, _ctx: &T) -> DiffFeedback<F, I, O1, O2, S> {
+        Self {
+            name: self.name.clone(),
+            o1_ref: self.o1_ref.clone(),
+            o2_ref: self.o2_ref.clone(),
+            compare_fn: self.compare_fn.clone(),
+            phantomm: self.phantomm,
         }
     }
 }
@@ -95,7 +119,7 @@ where
     O1: Named,
     O2: Named,
 {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
@@ -107,11 +131,11 @@ where
     O2: Named,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "DiffFeedback {{ name: {}, o1: {}, o2: {} }}",
-            self.name, self.o1_name, self.o2_name
-        )
+        f.debug_struct("DiffFeedback")
+            .field("name", self.name())
+            .field("o1", &self.o1_ref)
+            .field("o2", &self.o2_ref)
+            .finish_non_exhaustive()
     }
 }
 
@@ -140,11 +164,11 @@ where
             Error::illegal_argument(format!("DiffFeedback: observer {name} not found"))
         }
         let o1: &O1 = observers
-            .match_name(&self.o1_name)
-            .ok_or_else(|| err(&self.o1_name))?;
+            .get(&self.o1_ref)
+            .ok_or_else(|| err(self.o1_ref.name()))?;
         let o2: &O2 = observers
-            .match_name(&self.o2_name)
-            .ok_or_else(|| err(&self.o2_name))?;
+            .get(&self.o2_ref)
+            .ok_or_else(|| err(self.o2_ref.name()))?;
 
         Ok((self.compare_fn)(o1, o2) == DiffResult::Diff)
     }
@@ -152,7 +176,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use alloc::string::{String, ToString};
+    use alloc::borrow::Cow;
     use core::marker::PhantomData;
 
     use libafl_bolts::{tuples::tuple_list, Named};
@@ -163,18 +187,18 @@ mod tests {
         feedbacks::{differential::DiffResult, DiffFeedback, Feedback},
         inputs::{BytesInput, UsesInput},
         observers::Observer,
-        state::{test::NopState, State, UsesState},
+        state::{NopState, State, UsesState},
     };
 
     #[derive(Debug)]
     struct NopObserver {
-        name: String,
+        name: Cow<'static, str>,
         value: bool,
     }
     impl NopObserver {
-        fn new(name: &str, value: bool) -> Self {
+        fn new(name: &'static str, value: bool) -> Self {
             Self {
-                name: name.to_string(),
+                name: Cow::from(name),
                 value,
             }
         }
@@ -186,7 +210,7 @@ mod tests {
         }
     }
     impl Named for NopObserver {
-        fn name(&self) -> &str {
+        fn name(&self) -> &Cow<'static, str> {
             &self.name
         }
     }

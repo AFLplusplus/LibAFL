@@ -1,11 +1,5 @@
-use std::{
-    convert::{TryFrom, TryInto},
-    sync::RwLock,
-};
-
 /// Rust bindings for Apple's [`pthread_introspection`](https://opensource.apple.com/source/libpthread/libpthread-218.20.1/pthread/introspection.h.auto.html) hooks.
-use libc;
-
+use std::sync::RwLock;
 const PTHREAD_INTROSPECTION_THREAD_CREATE: libc::c_uint = 1;
 const PTHREAD_INTROSPECTION_THREAD_START: libc::c_uint = 2;
 const PTHREAD_INTROSPECTION_THREAD_TERMINATE: libc::c_uint = 3;

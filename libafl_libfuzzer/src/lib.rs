@@ -97,14 +97,14 @@ extern "C" {
     target_family = "unix",
     // Disable when building with clippy, as it will complain about the missing environment
     // variable which is set by the build script, which is not run under clippy.
-    not(feature = "cargo-clippy")
+    not(clippy)
 ))]
 pub const LIBAFL_LIBFUZZER_RUNTIME_LIBRARY: &'static [u8] =
     include_bytes!(env!("LIBAFL_LIBFUZZER_RUNTIME_PATH"));
 
 #[cfg(test)]
 mod tests {
-    #[cfg(all(feature = "embed-runtime", not(feature = "cargo-clippy")))]
+    #[cfg(all(feature = "embed-runtime", not(clippy)))]
     #[test]
     fn test_embed_runtime_sized() {
         use crate::LIBAFL_LIBFUZZER_RUNTIME_LIBRARY;

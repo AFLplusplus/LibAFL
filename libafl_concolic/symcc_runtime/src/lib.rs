@@ -27,14 +27,19 @@
 //! # SymCC and SymQEMU expect to runtime file to be called `libSymRuntime.so`. Setting the name to `SymRuntime` achieves this.
 //! name = "SymRuntime"
 //! ```
-#![allow(clippy::module_name_repetitions, clippy::missing_panics_doc)]
-#![allow(clippy::pub_underscore_fields)]
+#![allow(
+    clippy::module_name_repetitions,
+    clippy::missing_panics_doc,
+    clippy::pub_underscore_fields
+)]
+
 pub mod filter;
 pub mod tracing;
 
 // The following exports are used by the `export_runtime` macro. They are therefore exported, but hidden from docs, as they are not supposed to be used directly by the user.
 #[doc(hidden)]
 #[cfg(target_os = "linux")]
+#[allow(clippy::mixed_attributes_style)]
 pub mod cpp_runtime {
     #![allow(non_upper_case_globals)]
     #![allow(non_camel_case_types)]
@@ -153,6 +158,18 @@ macro_rules! export_rust_runtime_fn {
                     rt.push_path_constraint(constraint, taken, site_id);
                 })
             }
+        }
+    };
+    // special case for build_integer_from_buffer cuz the next one just doesn't work!!!!!!!
+    (pub fn build_integer_from_buffer(
+        buffer: *mut ::std::os::raw::c_void,
+        num_bits: ::std::os::raw::c_uint,) -> RSymExpr,$c_name:ident; $rt_cb:path) => {
+        #[allow(clippy::missing_safety_doc)]
+        #[no_mangle]
+        pub unsafe extern "C" fn _rsym_build_integer_from_buffer(buffer: *mut ::std::os::raw::c_void, num_bits: ::std::os::raw::c_uint) {
+            $rt_cb(|rt| {
+                rt.build_integer_from_buffer(buffer, num_bits);
+            })
         }
     };
     // all other methods are handled by this

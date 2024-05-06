@@ -15,7 +15,7 @@ use libafl::{
     feedbacks::{CrashFeedback, MaxMapFeedback, NewHashFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
-    inputs::{HasTargetBytes, Input},
+    inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     observers::{get_asan_runtime_flags, AsanBacktraceObserver, StdMapObserver},
@@ -25,11 +25,10 @@ use libafl::{
     Error,
 };
 use libafl_bolts::{
-    current_nanos,
     rands::StdRand,
     shmem::{unix_shmem, ShMem, ShMemId, ShMemProvider},
     tuples::tuple_list,
-    AsMutSlice, AsSlice,
+    AsSlice, AsSliceMut,
 };
 
 #[allow(clippy::similar_names)]
@@ -39,7 +38,7 @@ pub fn main() {
     let shmem_id = signals.id();
 
     // Create an observation channel using the signals map
-    let observer = unsafe { StdMapObserver::new("signals", signals.as_mut_slice()) };
+    let observer = unsafe { StdMapObserver::new("signals", signals.as_slice_mut()) };
     // Create a stacktrace observer
     let bt_observer = AsanBacktraceObserver::new("AsanBacktraceObserver");
 
@@ -53,7 +52,7 @@ pub fn main() {
     // create a State from scratch
     let mut state = StdState::new(
         // RNG
-        StdRand::with_seed(current_nanos()),
+        StdRand::new(),
         // Corpus that will be evolved, we keep it in memory for performance
         InMemoryCorpus::new(),
         // Corpus in which we store solutions (crashes in this example),
@@ -86,8 +85,8 @@ pub fn main() {
         shmem_id: ShMemId,
     }
 
-    impl CommandConfigurator for MyExecutor {
-        fn spawn_child<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<Child, Error> {
+    impl CommandConfigurator<BytesInput> for MyExecutor {
+        fn spawn_child(&mut self, input: &BytesInput) -> Result<Child, Error> {
             let mut command = Command::new("./test_command");
 
             let command = command

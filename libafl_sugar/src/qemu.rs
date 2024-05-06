@@ -21,24 +21,25 @@ use libafl::{
         token_mutations::Tokens,
         I2SRandReplace,
     },
-    observers::{HitcountsMapObserver, TimeObserver, VariableMapObserver},
+    observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
-    state::{HasCorpus, HasMetadata, StdState},
+    state::{HasCorpus, StdState},
+    HasMetadata,
 };
 use libafl_bolts::{
     core_affinity::Cores,
-    current_nanos,
+    ownedref::OwnedMutSlice,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, Merge},
+    tuples::{tuple_list, Handler, Merge},
     AsSlice,
 };
-pub use libafl_qemu::emu::Emulator;
+pub use libafl_qemu::emu::Qemu;
 #[cfg(not(any(feature = "mips", feature = "hexagon")))]
 use libafl_qemu::QemuCmpLogHelper;
 use libafl_qemu::{edges, QemuEdgeCoverageHelper, QemuExecutor, QemuHooks};
-use libafl_targets::{edges_map_mut_slice, CmpLogObserver};
+use libafl_targets::{edges_map_mut_ptr, CmpLogObserver};
 use typed_builder::TypedBuilder;
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
@@ -63,7 +64,7 @@ where
     /// Dictionary
     #[builder(default = None)]
     tokens_file: Option<PathBuf>,
-    /// Flag if use CmpLog
+    /// Flag if use `CmpLog`
     #[builder(default = None)]
     use_cmplog: Option<bool>,
     /// The port the fuzzing nodes communicate over
@@ -118,7 +119,7 @@ where
 {
     /// Run the fuzzer
     #[allow(clippy::too_many_lines, clippy::similar_names)]
-    pub fn run(&mut self, emulator: &Emulator) {
+    pub fn run(&mut self, qemu: &Qemu) {
         let conf = match self.configuration.as_ref() {
             Some(name) => EventConfig::from_name(name),
             None => EventConfig::AlwaysUnique,
@@ -145,20 +146,27 @@ where
 
         let monitor = MultiMonitor::new(|s| log::info!("{s}"));
 
+        // Create an observation channel to keep track of the execution time
+        let time_observer = TimeObserver::new("time");
+        let time_ref = time_observer.handle();
+
         let mut run_client = |state: Option<_>,
-                              mut mgr: LlmpRestartingEventManager<_, _>,
+                              mut mgr: LlmpRestartingEventManager<_, _, _>,
                               _core_id| {
+            let time_observer = time_observer.clone();
+
             // Create an observation channel using the coverage map
             let edges_observer = unsafe {
                 HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
                     "edges",
-                    edges_map_mut_slice(),
-                    addr_of_mut!(edges::MAX_EDGES_NUM),
+                    OwnedMutSlice::from_raw_parts_mut(
+                        edges_map_mut_ptr(),
+                        edges::EDGES_MAP_SIZE_IN_USE,
+                    ),
+                    addr_of_mut!(edges::MAX_EDGES_FOUND),
                 ))
+                .track_indices()
             };
-
-            // Create an observation channel to keep track of the execution time
-            let time_observer = TimeObserver::new("time");
 
             // Keep tracks of CMPs
             let cmplog_observer = CmpLogObserver::new("cmplog", true);
@@ -167,9 +175,9 @@ where
             // This one is composed by two Feedbacks in OR
             let mut feedback = feedback_or!(
                 // New maximization map feedback linked to the edges observer and the feedback state
-                MaxMapFeedback::tracking(&edges_observer, true, false),
+                MaxMapFeedback::new(&edges_observer),
                 // Time feedback, this one does not need a feedback state
-                TimeFeedback::with_observer(&time_observer)
+                TimeFeedback::new(&time_observer)
             );
 
             // A feedback to choose if an input is a solution or not
@@ -179,7 +187,7 @@ where
             let mut state = state.unwrap_or_else(|| {
                 StdState::new(
                     // RNG
-                    StdRand::with_seed(current_nanos()),
+                    StdRand::new(),
                     // Corpus that will be evolved, we keep a part in memory for performance
                     CachedOnDiskCorpus::new(out_dir.clone(), CORPUS_CACHE_SIZE).unwrap(),
                     // Corpus in which we store solutions (crashes in this example),
@@ -199,7 +207,8 @@ where
             }
 
             // A minimization+queue policy to get testcasess from the corpus
-            let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+            let scheduler =
+                IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
             // A fuzzer with feedbacks and a corpus scheduler
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -208,13 +217,13 @@ where
             let mut harness = |input: &BytesInput| {
                 let target = input.target_bytes();
                 let buf = target.as_slice();
-                (harness_bytes)(buf);
+                harness_bytes(buf);
                 ExitKind::Ok
             };
 
             if self.use_cmplog.unwrap_or(false) {
                 let mut hooks = QemuHooks::new(
-                    emulator.clone(),
+                    *qemu,
                     #[cfg(not(any(feature = "mips", feature = "hexagon")))]
                     tuple_list!(
                         QemuEdgeCoverageHelper::default(),
@@ -325,10 +334,8 @@ where
                     }
                 }
             } else {
-                let mut hooks = QemuHooks::new(
-                    emulator.clone(),
-                    tuple_list!(QemuEdgeCoverageHelper::default()),
-                );
+                let mut hooks =
+                    QemuHooks::new(*qemu, tuple_list!(QemuEdgeCoverageHelper::default()));
 
                 let mut executor = QemuExecutor::new(
                     &mut hooks,
@@ -432,9 +439,11 @@ where
             .run_client(&mut run_client)
             .cores(self.cores)
             .broker_port(self.broker_port)
-            .remote_broker_addr(self.remote_broker_addr);
+            .remote_broker_addr(self.remote_broker_addr)
+            .time_ref(time_ref);
         #[cfg(unix)]
         let launcher = launcher.stdout_file(Some("/dev/null"));
+
         launcher.build().launch().expect("Launcher failed");
     }
 }
@@ -445,7 +454,7 @@ pub mod pybind {
     use std::path::PathBuf;
 
     use libafl_bolts::core_affinity::Cores;
-    use libafl_qemu::emu::pybind::Emulator;
+    use libafl_qemu::emu::pybind::Qemu;
     use pyo3::{prelude::*, types::PyBytes};
 
     use crate::qemu;
@@ -492,7 +501,7 @@ pub mod pybind {
 
         /// Run the fuzzer
         #[allow(clippy::needless_pass_by_value)]
-        pub fn run(&self, emulator: &Emulator, harness: PyObject) {
+        pub fn run(&self, qemu: &Qemu, harness: PyObject) {
             qemu::QemuBytesCoverageSugar::builder()
                 .input_dirs(&self.input_dirs)
                 .output_dir(self.output_dir.clone())
@@ -511,7 +520,7 @@ pub mod pybind {
                 .tokens_file(self.tokens_file.clone())
                 .iterations(self.iterations)
                 .build()
-                .run(&emulator.emu);
+                .run(&qemu.qemu);
         }
     }
 

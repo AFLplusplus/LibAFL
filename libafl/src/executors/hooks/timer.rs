@@ -1,10 +1,7 @@
 //! The struct `TimerStruct` will absorb all the difference in timeout implementation in various system.
-use core::time::Duration;
 #[cfg(any(windows, target_os = "linux"))]
-use core::{
-    ffi::c_void,
-    ptr::{addr_of_mut, write_volatile},
-};
+use core::ptr::addr_of_mut;
+use core::time::Duration;
 #[cfg(target_os = "linux")]
 use core::{
     mem::zeroed,
@@ -15,7 +12,11 @@ use core::{
 pub(crate) const ITIMER_REAL: core::ffi::c_int = 0;
 
 #[cfg(windows)]
-use core::sync::atomic::{compiler_fence, Ordering};
+use core::{
+    ffi::c_void,
+    ptr::write_volatile,
+    sync::atomic::{compiler_fence, Ordering},
+};
 
 #[cfg(target_os = "linux")]
 use libafl_bolts::current_time;
@@ -29,7 +30,7 @@ use windows::Win32::{
     },
 };
 
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(windows)]
 use crate::executors::hooks::inprocess::GLOBAL_STATE;
 
 #[repr(C)]
@@ -296,12 +297,6 @@ impl TimerStruct {
     pub fn set_timer(&mut self) {
         unsafe {
             if self.batch_mode {
-                let data = addr_of_mut!(GLOBAL_STATE);
-                write_volatile(
-                    addr_of_mut!((*data).executor_ptr),
-                    core::ptr::from_mut(self) as *mut c_void,
-                );
-
                 if self.executions == 0 {
                     libc::timer_settime(self.timerid, 0, addr_of_mut!(self.itimerspec), null_mut());
                     self.tmout_start_time = current_time();
@@ -329,10 +324,11 @@ impl TimerStruct {
     pub fn unset_timer(&mut self) {
         if self.batch_mode {
             unsafe {
-                let elapsed = current_time() - self.tmout_start_time;
+                let elapsed = current_time().saturating_sub(self.tmout_start_time);
+                let elapsed_since_signal = current_time().saturating_sub(self.tmout_start_time);
                 // elapsed may be > than tmout in case of received but ingored signal
                 if elapsed > self.exec_tmout
-                    || self.exec_tmout - elapsed < self.avg_exec_time * self.avg_mul_k
+                    || self.exec_tmout.saturating_sub(elapsed) < self.avg_exec_time * self.avg_mul_k
                 {
                     let disarmed: libc::itimerspec = zeroed();
                     libc::timer_settime(self.timerid, 0, addr_of!(disarmed), null_mut());
@@ -342,8 +338,7 @@ impl TimerStruct {
                         self.executions = 0;
                     }
                     // readjust K
-                    if self.last_signal_time > self.exec_tmout * self.avg_mul_k
-                        && self.avg_mul_k > 1
+                    if elapsed_since_signal > self.exec_tmout * self.avg_mul_k && self.avg_mul_k > 1
                     {
                         self.avg_mul_k -= 1;
                     }

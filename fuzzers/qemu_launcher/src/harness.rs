@@ -4,10 +4,10 @@ use libafl::{
     Error,
 };
 use libafl_bolts::AsSlice;
-use libafl_qemu::{ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms, Regs};
+use libafl_qemu::{ArchExtras, CallingConvention, GuestAddr, GuestReg, MmapPerms, Qemu, Regs};
 
 pub struct Harness<'a> {
-    emu: &'a Emulator,
+    qemu: &'a Qemu,
     input_addr: GuestAddr,
     pc: GuestAddr,
     stack_ptr: GuestAddr,
@@ -17,25 +17,25 @@ pub struct Harness<'a> {
 pub const MAX_INPUT_SIZE: usize = 1_048_576; // 1MB
 
 impl<'a> Harness<'a> {
-    pub fn new(emu: &Emulator) -> Result<Harness, Error> {
-        let input_addr = emu
+    pub fn new(qemu: &Qemu) -> Result<Harness, Error> {
+        let input_addr = qemu
             .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
             .map_err(|e| Error::unknown(format!("Failed to map input buffer: {e:}")))?;
 
-        let pc: GuestReg = emu
+        let pc: GuestReg = qemu
             .read_reg(Regs::Pc)
             .map_err(|e| Error::unknown(format!("Failed to read PC: {e:}")))?;
 
-        let stack_ptr: GuestAddr = emu
+        let stack_ptr: GuestAddr = qemu
             .read_reg(Regs::Sp)
             .map_err(|e| Error::unknown(format!("Failed to read stack pointer: {e:}")))?;
 
-        let ret_addr: GuestAddr = emu
+        let ret_addr: GuestAddr = qemu
             .read_return_address()
             .map_err(|e| Error::unknown(format!("Failed to read return address: {e:}")))?;
 
         Ok(Harness {
-            emu,
+            qemu,
             input_addr,
             pc,
             stack_ptr,
@@ -58,29 +58,29 @@ impl<'a> Harness<'a> {
         }
         let len = len as GuestReg;
 
-        unsafe { self.emu.write_mem(self.input_addr, buf) };
+        unsafe { self.qemu.write_mem(self.input_addr, buf) };
 
-        self.emu
+        self.qemu
             .write_reg(Regs::Pc, self.pc)
             .map_err(|e| Error::unknown(format!("Failed to write PC: {e:}")))?;
 
-        self.emu
+        self.qemu
             .write_reg(Regs::Sp, self.stack_ptr)
             .map_err(|e| Error::unknown(format!("Failed to write SP: {e:}")))?;
 
-        self.emu
+        self.qemu
             .write_return_address(self.ret_addr)
             .map_err(|e| Error::unknown(format!("Failed to write return address: {e:}")))?;
 
-        self.emu
+        self.qemu
             .write_function_argument(CallingConvention::Cdecl, 0, self.input_addr)
             .map_err(|e| Error::unknown(format!("Failed to write argument 0: {e:}")))?;
 
-        self.emu
+        self.qemu
             .write_function_argument(CallingConvention::Cdecl, 1, len)
             .map_err(|e| Error::unknown(format!("Failed to write argument 1: {e:}")))?;
         unsafe {
-            let _ = self.emu.run();
+            let _ = self.qemu.run();
         };
         Ok(())
     }

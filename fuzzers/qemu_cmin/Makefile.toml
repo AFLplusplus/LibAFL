@@ -8,6 +8,7 @@ TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/x86_64"
 LIBPNG_ARCH = "x86_64"
 LIBPNG_OPTIMIZATIONS = "yes"
 FEATURE = "x86_64"
+LIBAFL_QEMU_CLONE_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/qemu-libafl-bridge"
 #LIBAFL_DEBUG_OUTPUT = "1"
 #CUSTOM_QEMU_DIR= "~/qemu-libafl-bridge"
 
@@ -19,6 +20,7 @@ TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/arm"
 LIBPNG_ARCH = "arm"
 LIBPNG_OPTIMIZATIONS = "yes"
 FEATURE = "arm"
+LIBAFL_QEMU_CLONE_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/qemu-libafl-bridge"
 
 [env.aarch64]
 CROSS_CC = "aarch64-linux-gnu-gcc"
@@ -28,6 +30,7 @@ TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/aarch64"
 LIBPNG_ARCH = "aarch64"
 LIBPNG_OPTIMIZATIONS = "yes"
 FEATURE = "aarch64"
+LIBAFL_QEMU_CLONE_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/qemu-libafl-bridge"
 
 [env.x86_64]
 CROSS_CC = "x86_64-linux-gnu-gcc"
@@ -37,6 +40,7 @@ TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/x86_64"
 LIBPNG_ARCH = "x86_64"
 LIBPNG_OPTIMIZATIONS = "yes"
 FEATURE = "x86_64"
+LIBAFL_QEMU_CLONE_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/qemu-libafl-bridge"
 
 [env.i386]
 CROSS_CC = "x86_64-linux-gnu-gcc"
@@ -46,6 +50,7 @@ TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/i386"
 LIBPNG_ARCH = "i386"
 LIBPNG_OPTIMIZATIONS = "yes"
 FEATURE = "i386"
+LIBAFL_QEMU_CLONE_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/qemu-libafl-bridge"
 
 [env.mips]
 CROSS_CC = "mipsel-linux-gnu-gcc"
@@ -55,6 +60,7 @@ TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/mips"
 LIBPNG_ARCH = "mips"
 LIBPNG_OPTIMIZATIONS = "yes"
 FEATURE = "mips"
+LIBAFL_QEMU_CLONE_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/qemu-libafl-bridge"
 
 [env.ppc]
 CROSS_CC = "powerpc-linux-gnu-gcc"
@@ -64,6 +70,7 @@ TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/ppc"
 LIBPNG_ARCH = "ppc"
 LIBPNG_OPTIMIZATIONS = "no"
 FEATURE = "ppc"
+LIBAFL_QEMU_CLONE_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/qemu-libafl-bridge"
 
 [tasks.unsupported]
 script_runner="@shell"
@@ -242,6 +249,20 @@ mac_alias = "unsupported"
 windows_alias = "unsupported"
 
 [tasks.test_unix]
+dependencies = [ "lightweight" ]
+# Tidy up after we've run our tests so we don't hog all the disk space
+command = "cargo"
+args = [
+    "make",
+    "clean",
+]
+
+[tasks.test_full]
+linux_alias = "test_unix_full"
+mac_alias = "unsupported"
+windows_alias = "unsupported"
+
+[tasks.test_unix_full]
 dependencies = [ "all" ]
 # Tidy up after we've run our tests so we don't hog all the disk space
 command = "cargo"
@@ -320,4 +341,10 @@ dependencies = [
     "i386",
     "mips",
     "ppc"
+]
+
+[tasks.lightweight]
+dependencies = [
+    "arm",
+    "x86_64",
 ]

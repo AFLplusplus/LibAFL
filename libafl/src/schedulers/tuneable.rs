@@ -12,8 +12,8 @@ use super::RemovableScheduler;
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase},
     schedulers::Scheduler,
-    state::{HasCorpus, HasMetadata, State, UsesState},
-    Error,
+    state::{HasCorpus, State, UsesState},
+    Error, HasMetadata,
 };
 
 #[derive(Default, Clone, Copy, Eq, PartialEq, Debug, Serialize, Deserialize)]
@@ -119,7 +119,10 @@ where
     /// Gets the next entry in the queue
     fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
-            return Err(Error::empty("No entries in corpus".to_owned()));
+            return Err(Error::empty(
+                "No entries in corpus. This often implies the target is not properly instrumented."
+                    .to_owned(),
+            ));
         }
         let id = if let Some(next) = Self::get_next(state) {
             // next was set

@@ -216,8 +216,7 @@ ${CROSS_CXX} \
 	-I"${TARGET_DIR}/build-zlib/zlib/include" \
 	-L"${TARGET_DIR}/build-zlib/zlib/lib" \
     -o"${TARGET_DIR}/libpng-harness-${CARGO_MAKE_PROFILE}" \
-    -lm \
-	-static
+    -lm
 '''
 dependencies = [ "libpng" ]
 
@@ -280,6 +279,42 @@ args = [
 ]
 dependencies = [ "harness", "fuzzer" ]
 
+[tasks.asan]
+linux_alias = "asan_unix"
+mac_alias = "unsupported"
+windows_alias = "unsupported"
+
+[tasks.asan_unix]
+command = "${TARGET_DIR}/${PROFILE_DIR}/qemu_launcher-${CARGO_MAKE_PROFILE}"
+args = [
+    "--input", "./corpus",
+    "--output", "${TARGET_DIR}/output/",
+    "--log", "${TARGET_DIR}/output/log.txt",
+    "--cores", "0",
+    "--asan-cores", "0",
+    "--",
+    "${TARGET_DIR}/libpng-harness-${CARGO_MAKE_PROFILE}",
+]
+dependencies = [ "harness", "fuzzer" ]
+
+[tasks.asan_guest]
+linux_alias = "asan_guest_unix"
+mac_alias = "unsupported"
+windows_alias = "unsupported"
+
+[tasks.asan_guest_unix]
+command = "${TARGET_DIR}/${PROFILE_DIR}/qemu_launcher-${CARGO_MAKE_PROFILE}"
+args = [
+    "--input", "./corpus",
+    "--output", "${TARGET_DIR}/output/",
+    "--log", "${TARGET_DIR}/output/log.txt",
+    "--cores", "0",
+    "--asan-guest-cores", "0",
+    "--",
+    "${TARGET_DIR}/libpng-harness-${CARGO_MAKE_PROFILE}",
+]
+dependencies = [ "harness", "fuzzer" ]
+
 [tasks.test]
 linux_alias = "test_unix"
 mac_alias = "unsupported"
@@ -297,7 +332,7 @@ timeout 10s "$(find ${TARGET_DIR} -name 'qemu_launcher')" -o out -i in -j ../inj
 if [ -z "$(grep -Ei "found.*injection" fuzz.log)" ]; then
     echo "Fuzzer does not generate any testcases or any crashes"
     echo "Logs:"
-    tail fuzz.log
+    cat fuzz.log
     exit 1
 else
     echo "Fuzzer is working"

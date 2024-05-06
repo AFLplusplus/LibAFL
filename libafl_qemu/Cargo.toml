@@ -12,24 +12,25 @@ edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 [package.metadata.docs.rs]
-features = ["document-features"]
-all-features = true
+features = ["document-features", "default", "python", "x86_64", "usermode"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
-default = ["fork", "build_libqasan", "serdeany_autoreg", "injections"]
+default = ["fork", "build_libgasan", "build_libqasan", "serdeany_autoreg", "injections"]
 clippy = [] # special feature for clippy, don't use in normal projects§
 document-features = ["dep:document-features"]
+paranoid_debug = ["libafl_qemu_sys/paranoid_debug"] # Will perform as many checks as possible. The target will be greatly slowed down.
 
 #! # Feature Flags
 #! ### General Features
 ## Find injections during fuzzing
 injections = ["serde_yaml", "toml"]
 ## Python bindings support
-python = ["pyo3", "pyo3-build-config"]
+python = ["pyo3", "pyo3-build-config", "libafl_qemu_sys/python"]
 ## Fork support
 fork = ["libafl/fork"]
 ## Build libqasan for address sanitization
+build_libgasan = []
 build_libqasan = []
 
 #! ## The following architecture features are mutually exclusive.
@@ -58,14 +59,14 @@ serdeany_autoreg = ["libafl_bolts/serdeany_autoreg"]
 
 slirp = [ "systemmode", "libafl_qemu_sys/slirp" ] # build qemu with host libslirp (for user networking)
 
-# disabled atm, enabled when fixed with dynamic list
-# shared = [ "libafl_qemu_sys/shared" ]
+# Requires the binary's build.rs to call `build_libafl_qemu`
+shared = [ "libafl_qemu_sys/shared" ]
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.11.2", default-features = false, features = ["std", "derive", "regex"] }
-libafl_bolts = { path = "../libafl_bolts", version = "0.11.2", default-features = false, features = ["std", "derive"] }
-libafl_targets = { path = "../libafl_targets", version = "0.11.2" }
-libafl_qemu_sys = { path = "./libafl_qemu_sys", version = "0.11.2" }
+libafl = { path = "../libafl", version = "0.12.0", default-features = false, features = ["std", "derive", "regex"] }
+libafl_bolts = { path = "../libafl_bolts", version = "0.12.0", default-features = false, features = ["std", "derive"] }
+libafl_targets = { path = "../libafl_targets", version = "0.12.0" }
+libafl_qemu_sys = { path = "./libafl_qemu_sys", version = "0.12.0" }
 
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
 hashbrown =  { version = "0.14", features = ["serde"] } # A faster hashmap, nostd compatible
@@ -93,8 +94,10 @@ pyo3 = { version = "0.18", optional = true }
 document-features = { version = "0.2", optional = true }
 
 [build-dependencies]
+libafl_qemu_build = { path = "./libafl_qemu_build", version = "0.12.0" }
 pyo3-build-config = { version = "0.18", optional = true }
 rustversion = "1.0"
+bindgen = "0.69"
 
 [lib]
 name = "libafl_qemu"

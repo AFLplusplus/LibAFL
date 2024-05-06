@@ -1,11 +1,14 @@
-//! The queue corpus scheduler with weighted queue item selection from aflpp (`https://github.com/AFLplusplus/AFLplusplus/blob/1d4f1e48797c064ee71441ba555b29fc3f467983/src/afl-fuzz-queue.c#L32`)
+//! The queue corpus scheduler with weighted queue item selection [from AFL++](https://github.com/AFLplusplus/AFLplusplus/blob/1d4f1e48797c064ee71441ba555b29fc3f467983/src/afl-fuzz-queue.c#L32).
 //! This queue corpus scheduler needs calibration stage.
 
-use alloc::string::{String, ToString};
 use core::marker::PhantomData;
 
 use hashbrown::HashMap;
-use libafl_bolts::rands::Rand;
+use libafl_bolts::{
+    rands::Rand,
+    tuples::{Handle, Handler},
+    Named,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -16,10 +19,10 @@ use crate::{
     schedulers::{
         powersched::{PowerSchedule, SchedulerMetadata},
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
-        HasAFLRemovableScheduler, HasAFLSchedulerMetadata, RemovableScheduler, Scheduler,
+        AflScheduler, RemovableScheduler, Scheduler,
     },
-    state::{HasCorpus, HasMetadata, HasRand, State, UsesState},
-    Error,
+    state::{HasCorpus, HasRand, State, UsesState},
+    Error, HasMetadata,
 };
 
 /// The Metadata for `WeightedScheduler`
@@ -92,39 +95,38 @@ libafl_bolts::impl_serdeany!(WeightedScheduleMetadata);
 
 /// A corpus scheduler using power schedules with weighted queue item selection algo.
 #[derive(Clone, Debug)]
-pub struct WeightedScheduler<F, O, S> {
+pub struct WeightedScheduler<C, F, O, S> {
+    table_invalidated: bool,
     strat: Option<PowerSchedule>,
-    map_observer_name: String,
+    map_observer_ref: Handle<C>,
     last_hash: usize,
     phantom: PhantomData<(F, O, S)>,
 }
 
-impl<F, O, S> WeightedScheduler<F, O, S>
+impl<C, F, O, S> WeightedScheduler<C, F, O, S>
 where
     F: TestcaseScore<S>,
     O: MapObserver,
     S: HasCorpus + HasMetadata + HasRand,
+    C: AsRef<O> + Named,
 {
     /// Create a new [`WeightedScheduler`] without any power schedule
     #[must_use]
-    pub fn new(state: &mut S, map_observer: &O) -> Self {
+    pub fn new(state: &mut S, map_observer: &C) -> Self {
         Self::with_schedule(state, map_observer, None)
     }
 
     /// Create a new [`WeightedScheduler`]
     #[must_use]
-    pub fn with_schedule(state: &mut S, map_observer: &O, strat: Option<PowerSchedule>) -> Self {
-        if !state.has_metadata::<SchedulerMetadata>() {
-            state.add_metadata(SchedulerMetadata::new(strat));
-        }
+    pub fn with_schedule(state: &mut S, map_observer: &C, strat: Option<PowerSchedule>) -> Self {
+        let _ = state.metadata_or_insert_with(|| SchedulerMetadata::new(strat));
+        let _ = state.metadata_or_insert_with(WeightedScheduleMetadata::new);
 
-        if !state.has_metadata::<WeightedScheduleMetadata>() {
-            state.add_metadata(WeightedScheduleMetadata::new());
-        }
         Self {
             strat,
-            map_observer_name: map_observer.name().to_string(),
+            map_observer_ref: map_observer.handle(),
             last_hash: 0,
+            table_invalidated: true,
             phantom: PhantomData,
         }
     }
@@ -220,51 +222,49 @@ where
     }
 }
 
-impl<F, O, S> UsesState for WeightedScheduler<F, O, S>
+impl<C, F, O, S> UsesState for WeightedScheduler<C, F, O, S>
 where
     S: State,
 {
     type State = S;
 }
 
-impl<F, O, S> HasAFLRemovableScheduler for WeightedScheduler<F, O, S>
-where
-    F: TestcaseScore<S>,
-    S: State + HasTestcase + HasMetadata + HasCorpus + HasRand,
-    O: MapObserver,
-{
-}
-
-impl<F, O, S> RemovableScheduler for WeightedScheduler<F, O, S>
+impl<C, F, O, S> RemovableScheduler for WeightedScheduler<C, F, O, S>
 where
     F: TestcaseScore<S>,
     O: MapObserver,
     S: HasCorpus + HasMetadata + HasRand + HasTestcase + State,
+    C: AsRef<O> + Named,
 {
+    /// This will *NOT* neutralize the effect of this removed testcase from the global data such as `SchedulerMetadata`
     fn on_remove(
         &mut self,
-        state: &mut Self::State,
-        idx: CorpusId,
-        prev: &Option<Testcase<<Self::State as UsesInput>::Input>>,
+        _state: &mut Self::State,
+        _idx: CorpusId,
+        _prev: &Option<Testcase<<Self::State as UsesInput>::Input>>,
     ) -> Result<(), Error> {
-        self.on_remove_metadata(state, idx, prev)
+        self.table_invalidated = true;
+        Ok(())
     }
 
+    /// This will *NOT* neutralize the effect of this removed testcase from the global data such as `SchedulerMetadata`
     fn on_replace(
         &mut self,
-        state: &mut Self::State,
-        idx: CorpusId,
-        prev: &Testcase<<Self::State as UsesInput>::Input>,
+        _state: &mut Self::State,
+        _idx: CorpusId,
+        _prev: &Testcase<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
-        self.on_replace_metadata(state, idx, prev)
+        self.table_invalidated = true;
+        Ok(())
     }
 }
 
-impl<F, O, S> HasAFLSchedulerMetadata<O, S> for WeightedScheduler<F, O, S>
+impl<C, F, O, S> AflScheduler<C, O, S> for WeightedScheduler<C, F, O, S>
 where
     F: TestcaseScore<S>,
-    S: HasCorpus + HasMetadata + HasTestcase + HasRand + State,
     O: MapObserver,
+    S: HasCorpus + HasMetadata + HasTestcase + HasRand + State,
+    C: AsRef<O> + Named,
 {
     fn last_hash(&self) -> usize {
         self.last_hash
@@ -274,21 +274,23 @@ where
         self.last_hash = hash;
     }
 
-    fn map_observer_name(&self) -> &String {
-        &self.map_observer_name
+    fn map_observer_ref(&self) -> &Handle<C> {
+        &self.map_observer_ref
     }
 }
 
-impl<F, O, S> Scheduler for WeightedScheduler<F, O, S>
+impl<C, F, O, S> Scheduler for WeightedScheduler<C, F, O, S>
 where
     F: TestcaseScore<S>,
     O: MapObserver,
     S: HasCorpus + HasMetadata + HasRand + HasTestcase + State,
+    C: AsRef<O> + Named,
 {
     /// Called when a [`Testcase`] is added to the corpus
     fn on_add(&mut self, state: &mut S, idx: CorpusId) -> Result<(), Error> {
         self.on_add_metadata(state, idx)?;
-        self.create_alias_table(state)
+        self.table_invalidated = true;
+        Ok(())
     }
 
     fn on_evaluation<OT>(
@@ -305,14 +307,20 @@ where
 
     #[allow(clippy::similar_names, clippy::cast_precision_loss)]
     fn next(&mut self, state: &mut S) -> Result<CorpusId, Error> {
+        if self.table_invalidated {
+            self.create_alias_table(state)?;
+            self.table_invalidated = false;
+        }
         let corpus_counts = state.corpus().count();
         if corpus_counts == 0 {
-            Err(Error::empty(String::from("No entries in corpus")))
+            Err(Error::empty(
+                "No entries in corpus. This often implies the target is not properly instrumented.",
+            ))
         } else {
             let s = random_corpus_id!(state.corpus(), state.rand_mut());
 
-            // Choose a random value between 0.000000000 and 1.000000000
-            let probability = state.rand_mut().between(0, 1000000000) as f64 / 1000000000_f64;
+            // Choose a random value between 0.0 and 1.0
+            let probability = state.rand_mut().next_float();
 
             let wsmeta = state.metadata_mut::<WeightedScheduleMetadata>()?;
 
@@ -355,5 +363,5 @@ where
     }
 }
 
-/// The standard corpus weight, same as aflpp
-pub type StdWeightedScheduler<O, S> = WeightedScheduler<CorpusWeightTestcaseScore<S>, O, S>;
+/// The standard corpus weight, same as in `AFL++`
+pub type StdWeightedScheduler<C, O, S> = WeightedScheduler<C, CorpusWeightTestcaseScore<S>, O, S>;

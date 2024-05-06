@@ -28,13 +28,13 @@ pub struct Location(usize);
 
 impl Debug for Location {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        core::fmt::Debug::fmt(&self.0, f)
+        Debug::fmt(&self.0, f)
     }
 }
 
 impl Display for Location {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        core::fmt::Display::fmt(&self.0, f)
+        Display::fmt(&self.0, f)
     }
 }
 
@@ -60,7 +60,6 @@ pub enum SymExpr {
         offset: usize,
         value: u8,
     },
-
     Integer {
         value: u64,
         bits: u8,
@@ -69,6 +68,7 @@ pub enum SymExpr {
         high: u64,
         low: u64,
     },
+    IntegerFromBuffer {},
     Float {
         value: f64,
         is_double: bool,

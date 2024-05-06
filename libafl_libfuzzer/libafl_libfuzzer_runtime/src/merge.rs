@@ -4,7 +4,8 @@ use std::{
     fs::{rename, File},
     io::Write,
     os::fd::{AsRawFd, FromRawFd},
-    time::{SystemTime, UNIX_EPOCH}, ptr::addr_of_mut,
+    ptr::addr_of_mut,
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use libafl::{
@@ -21,7 +22,7 @@ use libafl::{
     Error, HasScheduler, StdFuzzer,
 };
 use libafl_bolts::{
-    rands::{Rand, RandomSeed, StdRand},
+    rands::{Rand, StdRand},
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
     AsSlice,
@@ -104,7 +105,7 @@ pub fn merge(
     let edges_observer =
         MappedEdgeMapObserver::new(edges_observer, SizeTimeValueObserver::new(time));
 
-    let map_feedback = MinMapFeedback::tracking(&edges_observer, false, true);
+    let map_feedback = MinMapFeedback::new(&edges_observer);
 
     // Create an OOM observer to monitor if an OOM has occurred
     let oom_observer = OomObserver::new(options.rss_limit(), options.malloc_limit());

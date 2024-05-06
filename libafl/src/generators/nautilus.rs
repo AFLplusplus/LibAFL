@@ -39,6 +39,47 @@ impl NautilusContext {
         Self { ctx }
     }
 
+    /// Returns a new [`NautilusContext`] with support for non UTF-8 rules.
+    ///
+    /// - This has the same behaviour as [`NautilusContext::new`] but returns `None` if the `rules` are empty.
+    /// - The starting rule is `rules[0]`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use libafl::generators::nautilus::NautilusContext;
+    ///
+    /// // Create a simple grammar for a series of null-terminated data.
+    /// let null = vec![0];
+    /// let mut rules = vec![
+    ///     // rules[0] is considered the starting rule
+    ///     ("SERIES", "{DATA}{NULL}".as_bytes()),
+    ///     ("SERIES", "{SERIES}{SERIES}".as_bytes()),
+    ///     ("DATA", "".as_bytes()),
+    ///     ("DATA", "{BYTE}{DATA}".as_bytes()),
+    ///     ("NULL", &null),
+    /// ];
+    ///
+    /// let bytes: Vec<u8> = (1..=u8::MAX).collect();
+    /// for i in 0..bytes.len() {
+    ///     rules.push(("BYTE", &bytes[i..=i]));
+    /// }
+    ///
+    /// let context = NautilusContext::with_rules(100, &rules).unwrap();
+    /// ```
+    #[must_use]
+    pub fn with_rules(tree_depth: usize, rules: &[(&str, &[u8])]) -> Option<Self> {
+        let mut ctx = Context::new();
+        for (symbol, rule) in rules {
+            ctx.add_rule(symbol, rule);
+        }
+
+        let root = format!("{{{}}}", rules.first()?.0);
+        ctx.add_rule("START", root.as_bytes());
+        ctx.initialize(tree_depth);
+        Some(Self { ctx })
+    }
+
     /// Create a new [`NautilusContext`] from a file
     #[must_use]
     pub fn from_file<P: AsRef<Path>>(tree_depth: usize, grammar_file: P) -> Self {

@@ -1,6 +1,6 @@
 /*!
-The frida executor is a binary-only mode for `LibAFL`.
-It can report coverage and, on supported architecutres, even reports memory access errors.
+The [`Frida`](https://frida.re) executor is a binary-only mode for `LibAFL`.
+It can report coverage and, on supported architectures, even reports memory access errors.
 
 Additional documentation is available in [the `LibAFL` book](https://aflplus.plus/libafl-book/advanced_features/frida.html).
 */
@@ -34,14 +34,12 @@ Additional documentation is available in [the `LibAFL` book](https://aflplus.plu
 ))]
 #![cfg_attr(test, deny(
     missing_debug_implementations,
-    missing_docs,
     //trivial_casts,
     trivial_numeric_casts,
     unused_extern_crates,
     unused_import_braces,
     unused_qualifications,
     unused_must_use,
-    missing_docs,
     //unused_results
 ))]
 #![cfg_attr(
@@ -347,7 +345,7 @@ impl Default for FridaOptions {
 
 #[cfg(test)]
 mod tests {
-    use std::{ptr::addr_of, sync::OnceLock};
+    use std::sync::OnceLock;
 
     use clap::Parser;
     use frida_gum::Gum;
@@ -371,7 +369,7 @@ mod tests {
     use crate::{
         asan::{
             asan_rt::AsanRuntime,
-            errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS},
+            errors::{AsanErrorsFeedback, AsanErrorsObserver, AsanErrors},
         },
         coverage_rt::CoverageRuntime,
         executor::FridaInProcessExecutor,
@@ -455,10 +453,15 @@ mod tests {
 
             let mut feedback = ConstFeedback::new(true);
 
+            let asan_obs = AsanErrorsObserver::from_static_asan_errors();
+
             // Feedbacks to recognize an input as solution
             let mut objective = feedback_or_fast!(
                 // true enables the AsanErrorFeedback
-                feedback_and_fast!(ConstFeedback::from(true), AsanErrorsFeedback::new())
+                feedback_and_fast!(
+                    ConstFeedback::from(true),
+                    AsanErrorsFeedback::new(&asan_obs)
+                )
             );
 
             let mut state = StdState::new(
@@ -475,7 +478,7 @@ mod tests {
             let mut fuzzer = StdFuzzer::new(StdScheduler::new(), feedback, objective);
 
             let observers = tuple_list!(
-                AsanErrorsObserver::new(addr_of!(ASAN_ERRORS)) //,
+                asan_obs //,
             );
 
             {
@@ -520,7 +523,7 @@ mod tests {
                 log::info!("Done fuzzing! Got {} solutions", state.solutions().count());
                 if let Some(expected_error) = expected_error {
                     assert_eq!(state.solutions().count(), 1);
-                    if let Some(error) = unsafe { ASAN_ERRORS.as_ref().unwrap() }.errors.first() {
+                    if let Some(error) = AsanErrors::get_mut_blocking().errors.first() {
                         assert_eq!(error.description(), expected_error);
                     }
                 } else {
