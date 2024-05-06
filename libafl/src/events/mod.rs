@@ -34,7 +34,7 @@ pub use launcher::*;
 use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
 #[cfg(feature = "adaptive_serialization")]
 use libafl_bolts::tuples::{Handle, MatchNameRef};
-use libafl_bolts::{current_time, ClientId};
+use libafl_bolts::{current_time, os::CTRL_C_EXIT, ClientId};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use uuid::Uuid;
@@ -54,13 +54,6 @@ use crate::{
     monitors::{AggregatorOps, UserStatsValue},
     state::HasScalabilityMonitor,
 };
-
-/// The special exit code when the target exited throught ctrl-c
-#[cfg(unix)]
-pub const CTRL_C_EXIT: i32 = 100;
-/// The special exit code when the target exited throught ctrl-c
-#[cfg(windows)]
-pub const CTRL_C_EXIT: i32 = -1073741510;
 
 /// Check if ctrl-c is sent with this struct
 #[cfg(all(unix, feature = "std"))]

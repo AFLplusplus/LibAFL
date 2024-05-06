@@ -39,6 +39,7 @@ use libafl_bolts::{
 use libafl_bolts::{llmp::LlmpConnection, shmem::StdShMemProvider, staterestore::StateRestorer};
 use libafl_bolts::{
     llmp::{self, LlmpClient, LlmpClientDescription, Tag},
+    os::CTRL_C_EXIT,
     shmem::ShMemProvider,
     tuples::tuple_list,
     ClientId,
@@ -1581,7 +1582,7 @@ where
 
                 compiler_fence(Ordering::SeqCst);
 
-                if child_status == crate::events::CTRL_C_EXIT || staterestorer.wants_to_exit() {
+                if child_status == CTRL_C_EXIT || staterestorer.wants_to_exit() {
                     // if ctrl-c is pressed, we end up in this branch
                     if let Err(err) = mgr.detach_from_broker(self.broker_port) {
                         log::error!("Failed to detach from broker: {err}");

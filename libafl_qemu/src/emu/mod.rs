@@ -13,12 +13,10 @@ use std::{
 };
 
 use libafl::{
-    events::CTRL_C_EXIT,
     executors::ExitKind,
     inputs::HasTargetBytes,
     state::{HasExecutions, State},
 };
-use libafl_bolts::os::unix_signals::Signal;
 use libafl_qemu_sys::{CPUArchStatePtr, GuestUsize};
 pub use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestVirtAddr};
 #[cfg(emulation_mode = "usermode")]
@@ -71,7 +69,6 @@ pub enum EmulatorExitError {
 pub enum ExitHandlerResult {
     ReturnToHarness(EmulatorExitResult), // Return to the harness immediately. Can happen at any point of the run when the handler is not supposed to handle a request.
     EndOfRun(ExitKind), // The run is over and the emulator is ready for the next iteration.
-    Interrupted,        // QEMU has been interrupted by user.
 }
 
 #[derive(Debug, Clone)]
@@ -99,9 +96,6 @@ impl TryInto<ExitKind> for ExitHandlerResult {
                 Err(format!("Unhandled QEMU exit: {:?}", &unhandled_qemu_exit))
             }
             ExitHandlerResult::EndOfRun(exit_kind) => Ok(exit_kind),
-            ExitHandlerResult::Interrupted => {
-                std::process::exit(CTRL_C_EXIT);
-            }
         }
     }
 }
@@ -314,9 +308,9 @@ where
 
         let (command, ret_reg): (Option<Command>, Option<Regs>) = match &mut exit_reason {
             EmulatorExitResult::QemuExit(shutdown_cause) => match shutdown_cause {
-                QemuShutdownCause::HostSignal(Signal::SigInterrupt)
-                | QemuShutdownCause::HostSignal(Signal::SigTerm) => {
-                    return Ok(Some(ExitHandlerResult::Interrupted))
+                QemuShutdownCause::HostSignal(signal) => {
+                    signal.handle();
+                    return Ok(None); // Ignore unhandled signals by default
                 }
                 QemuShutdownCause::GuestPanic => {
                     return Ok(Some(ExitHandlerResult::EndOfRun(ExitKind::Crash)))
