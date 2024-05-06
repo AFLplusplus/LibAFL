@@ -312,7 +312,7 @@ where
             EmulatorExitResult::QemuExit(shutdown_cause) => match shutdown_cause {
                 QemuShutdownCause::HostSignal(signal) => {
                     signal.handle();
-                    return Err(ExitHandlerError::UnhandledSignal(*signal)); // Ignore unhandled signals by default
+                    return Err(ExitHandlerError::UnhandledSignal(*signal));
                 }
                 QemuShutdownCause::GuestPanic => {
                     return Ok(Some(ExitHandlerResult::EndOfRun(ExitKind::Crash)))
