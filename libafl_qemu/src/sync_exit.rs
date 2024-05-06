@@ -22,6 +22,7 @@ pub struct SyncExit {
 }
 
 impl SyncExit {
+    #[must_use]
     pub fn new(command: Command) -> Self {
         Self { command }
     }

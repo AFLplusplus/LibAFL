@@ -16,9 +16,9 @@ use libafl_bolts::os::startable_self;
 use libafl_bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(feature = "std", feature = "fork", unix))]
 use libafl_bolts::os::{fork, ForkResult};
-use libafl_bolts::{os::CTRL_C_EXIT, ClientId};
+use libafl_bolts::ClientId;
 #[cfg(feature = "std")]
-use libafl_bolts::{shmem::ShMemProvider, staterestore::StateRestorer};
+use libafl_bolts::{os::CTRL_C_EXIT, shmem::ShMemProvider, staterestore::StateRestorer};
 #[cfg(feature = "std")]
 use serde::{de::DeserializeOwned, Serialize};
 

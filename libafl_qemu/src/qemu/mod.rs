@@ -1002,10 +1002,12 @@ impl PartialOrd for GuestAddrKind {
 }
 
 impl EmulatorMemoryChunk {
+    #[must_use]
     pub fn addr(&self) -> GuestAddrKind {
         self.addr
     }
 
+    #[must_use]
     pub fn size(&self) -> GuestReg {
         self.size
     }
@@ -1028,6 +1030,7 @@ impl EmulatorMemoryChunk {
         }
     }
 
+    #[must_use]
     pub fn get_slice(&self, range: &Range<GuestAddr>) -> Option<EmulatorMemoryChunk> {
         let new_addr = self.addr + range.start;
         let slice_size = range.clone().count();

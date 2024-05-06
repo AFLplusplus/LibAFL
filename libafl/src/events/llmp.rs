@@ -36,10 +36,11 @@ use libafl_bolts::{
     tuples::{Handle, Handler},
 };
 #[cfg(feature = "std")]
-use libafl_bolts::{llmp::LlmpConnection, shmem::StdShMemProvider, staterestore::StateRestorer};
+use libafl_bolts::{
+    llmp::LlmpConnection, os::CTRL_C_EXIT, shmem::StdShMemProvider, staterestore::StateRestorer,
+};
 use libafl_bolts::{
     llmp::{self, LlmpClient, LlmpClientDescription, Tag},
-    os::CTRL_C_EXIT,
     shmem::ShMemProvider,
     tuples::tuple_list,
     ClientId,

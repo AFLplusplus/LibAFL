@@ -31,9 +31,7 @@ use ahash::RandomState;
 #[cfg(feature = "std")]
 pub use launcher::*;
 #[cfg(all(unix, feature = "std"))]
-use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
-#[cfg(unix)]
-use libafl_bolts::os::CTRL_C_EXIT;
+use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal, CTRL_C_EXIT};
 #[cfg(feature = "adaptive_serialization")]
 use libafl_bolts::tuples::{Handle, MatchNameRef};
 use libafl_bolts::{current_time, ClientId};
