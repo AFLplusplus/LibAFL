@@ -17,7 +17,10 @@ use crate::{
     schedulers::Scheduler,
     stages::{HasCurrentStage, StagesTuple},
     start_timer,
-    state::{HasCorpus, HasExecutions, HasImported, HasLastReportTime, HasSolutions, UsesState},
+    state::{
+        HasCorpus, HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime, HasSolutions,
+        UsesState,
+    },
     Error, HasMetadata,
 };
 #[cfg(feature = "introspection")]
@@ -360,7 +363,13 @@ where
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
     OT: ObserversTuple<CS::State> + Serialize + DeserializeOwned,
-    CS::State: HasCorpus + HasSolutions + HasExecutions + HasCorpus + HasImported,
+    CS::State: HasCorpus
+        + HasSolutions
+        + HasExecutions
+        + HasCorpus
+        + HasImported
+        + HasCurrentTestcase<<Self::State as UsesInput>::Input>
+        + HasCurrentCorpusIdx,
 {
     fn execute_no_process<EM>(
         &mut self,
@@ -495,6 +504,9 @@ where
                 // The input is a solution, add it to the respective corpus
                 let mut testcase = Testcase::with_executions(input, executions);
                 testcase.set_parent_id_optional(*state.corpus().current());
+                if let Ok(mut tc) = state.current_testcase_mut() {
+                    tc.found_objective();
+                }
                 self.objective_mut()
                     .append_metadata(state, manager, observers, &mut testcase)?;
                 state.solutions_mut().add(testcase)?;

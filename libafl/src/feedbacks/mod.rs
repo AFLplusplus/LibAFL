@@ -14,7 +14,7 @@ use core::{
 pub use concolic::ConcolicFeedback;
 pub use differential::DiffFeedback;
 use libafl_bolts::{
-    tuples::{MatchNameRef, Reference, Referenceable},
+    tuples::{Handle, Handler, MatchNameRef},
     Named,
 };
 pub use list::*;
@@ -143,7 +143,7 @@ pub trait HasObserverReference {
     type Observer: ?Sized;
 
     /// The name associated with the observer
-    fn observer_ref(&self) -> &Reference<Self::Observer>;
+    fn observer_ref(&self) -> &Handle<Self::Observer>;
 }
 
 /// A combined feedback consisting of multiple [`Feedback`]s
@@ -934,7 +934,7 @@ pub type TimeoutFeedbackFactory = DefaultFeedbackFactory<TimeoutFeedback>;
 /// It decides, if the given [`TimeObserver`] value of a run is interesting.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TimeFeedback {
-    obs_ref: Reference<TimeObserver>,
+    obs_ref: Handle<TimeObserver>,
 }
 
 impl<S> Feedback<S> for TimeFeedback
@@ -995,7 +995,7 @@ impl TimeFeedback {
     #[must_use]
     pub fn new(observer: &TimeObserver) -> Self {
         Self {
-            obs_ref: observer.reference(),
+            obs_ref: observer.handle(),
         }
     }
 }

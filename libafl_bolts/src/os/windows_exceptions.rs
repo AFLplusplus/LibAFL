@@ -435,12 +435,14 @@ struct HandlerHolder {
     handler: UnsafeCell<*mut dyn Handler>,
 }
 
-pub const EXCEPTION_HANDLERS_SIZE: usize = 64;
+pub const EXCEPTION_HANDLERS_SIZE: usize = 96;
 
 unsafe impl Send for HandlerHolder {}
 
 /// Keep track of which handler is registered for which exception
 static mut EXCEPTION_HANDLERS: [Option<HandlerHolder>; EXCEPTION_HANDLERS_SIZE] = [
+    None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+    None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
     None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
     None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
     None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,

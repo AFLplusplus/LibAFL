@@ -33,7 +33,7 @@ pub use launcher::*;
 #[cfg(all(unix, feature = "std"))]
 use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
 #[cfg(feature = "adaptive_serialization")]
-use libafl_bolts::tuples::{MatchNameRef, Reference};
+use libafl_bolts::tuples::{Handle, MatchNameRef};
 use libafl_bolts::{current_time, ClientId};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
@@ -88,7 +88,7 @@ impl Handler for ShutdownSignalData {
             // println!("Exiting from the handler....");
 
             #[cfg(unix)]
-            libc::_exit(100);
+            libc::_exit(CTRL_C_EXIT);
 
             #[cfg(windows)]
             windows::Win32::System::Threading::ExitProcess(100);
@@ -859,8 +859,8 @@ pub trait AdaptiveSerializer {
     /// How many times shoukd have been serialized an observer (mut)
     fn should_serialize_cnt_mut(&mut self) -> &mut usize;
 
-    /// A [`Reference`] to the time observer to determine the `time_factor`
-    fn time_ref(&self) -> &Reference<TimeObserver>;
+    /// A [`Handle`] to the time observer to determine the `time_factor`
+    fn time_ref(&self) -> &Handle<TimeObserver>;
 
     /// Serialize the observer using the `time_factor` and `percentage_threshold`.
     /// These parameters are unique to each of the different types of `EventManager`

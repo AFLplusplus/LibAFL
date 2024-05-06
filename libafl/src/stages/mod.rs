@@ -63,6 +63,8 @@ pub mod concolic;
 #[cfg(feature = "std")]
 pub mod dump;
 pub mod generalization;
+/// The [`generation::GenStage`] generates a single input and evaluates it.
+pub mod generation;
 pub mod logics;
 pub mod power;
 pub mod stats;

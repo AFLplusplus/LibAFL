@@ -21,7 +21,7 @@ use libafl::{
 use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, MatchNameRef, Merge, Referenceable},
+    tuples::{tuple_list, Handler, MatchNameRef, Merge},
     AsSliceMut, Truncate,
 };
 use libafl_targets::EDGES_MAP_SIZE_IN_USE;
@@ -166,7 +166,7 @@ pub fn main() {
     // Create the executor for the forkserver
     let args = opt.arguments;
 
-    let observer_ref = edges_observer.reference();
+    let observer_ref = edges_observer.handle();
 
     let mut tokens = Tokens::new();
     let mut executor = ForkserverExecutor::builder()

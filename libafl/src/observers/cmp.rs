@@ -390,7 +390,7 @@ where
         }
     }
 
-    /// Reference the stored auxiliary data associated with the [`CmpObserverMetadata`]
+    /// Handle the stored auxiliary data associated with the [`CmpObserverMetadata`]
     pub fn data(&self) -> &M::Data {
         &self.data
     }
