@@ -60,8 +60,8 @@ use libafl_qemu::{
     MmapPerms,
     Qemu,
     QemuExecutor,
-    QemuExitReason,
     QemuExitError,
+    QemuExitReason,
     QemuShutdownCause,
     Regs,
 };

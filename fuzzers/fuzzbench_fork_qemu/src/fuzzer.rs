@@ -51,8 +51,8 @@ use libafl_qemu::{
     elf::EasyElf,
     filter_qemu_args,
     hooks::QemuHooks,
-    GuestReg, MmapPerms, Qemu, QemuExitReason, QemuExitError, QemuForkExecutor,
-    QemuShutdownCause, Regs,
+    GuestReg, MmapPerms, Qemu, QemuExitError, QemuExitReason, QemuForkExecutor, QemuShutdownCause,
+    Regs,
 };
 #[cfg(unix)]
 use nix::unistd::dup;
