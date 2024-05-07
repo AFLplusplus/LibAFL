@@ -412,7 +412,8 @@ impl HookRuntime {
                 //if we do a linked branch (i.e. BLR) then put the return address into x30 and return
                 writer.put_ldr_reg_u64(Aarch64Register::Lr, next_insn);
             }
-            
+
+            //if we don't have a link then we can just chaining return as it is a tail call            
             insn.put_chaining_return();
 
             writer.put_label(not_hooked_label_id);
@@ -432,6 +433,8 @@ impl HookRuntime {
                 //if we do a linked branch (i.e. BL) then put the return address into x30 and return
                 writer.put_ldr_reg_u64(Aarch64Register::Lr, next_insn);
             }
+
+            //if we don't have a link then we can just chaining return as it is a tail call
             insn.put_chaining_return();
         }
     }
