@@ -543,9 +543,10 @@ where
 
                 #[cfg(target_arch = "x86_64")]
                 if let Some(rt) = runtimes.match_first_type_mut::<HookRuntime>() {
-                    if let Some(call_target) = rt.is_interesting(decoder, instr) {
+                    if let Some((call_target, needs_chaining_return)) = rt.is_interesting(decoder, instr) {
                         rt.emit_callout(
                             call_target,
+                            needs_chaining_return,
                             &instruction,
                             output.writer(),
                             runtimes_unborrowed.clone(),
