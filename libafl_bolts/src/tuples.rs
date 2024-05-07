@@ -6,6 +6,7 @@ use alloc::{borrow::Cow, vec::Vec};
 use core::ops::{Deref, DerefMut};
 use core::{
     any::{type_name, TypeId},
+    cell::Cell,
     fmt::{Debug, Formatter},
     marker::PhantomData,
     mem::transmute,
@@ -23,40 +24,23 @@ use crate::HasLen;
 #[cfg(feature = "alloc")]
 use crate::Named;
 
-/// Returns if the type `T` is equal to `U`
-/// From <https://stackoverflow.com/a/60138532/7658998>
-#[rustversion::nightly]
-#[inline]
-#[must_use]
-pub const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
-    // Helper trait. `VALUE` is false, except for the specialization of the
-    // case where `T == U`.
-    trait TypeEq<U: ?Sized> {
-        const VALUE: bool;
-    }
-
-    // Default implementation.
-    impl<T: ?Sized, U: ?Sized> TypeEq<U> for T {
-        default const VALUE: bool = false;
-    }
-
-    // Specialization for `T == U`.
-    impl<T: ?Sized> TypeEq<T> for T {
-        const VALUE: bool = true;
-    }
-
-    <T as TypeEq<U>>::VALUE
-}
-
-/// Returns if the type `T` is equal to `U`
-/// As this relies on [`type_name`](https://doc.rust-lang.org/std/any/fn.type_name.html#note) internally,
-/// there is a chance for collisions.
-/// Use `nightly` if you need a perfect match at all times.
-#[rustversion::not(nightly)]
-#[inline]
+/// Returns if the type `T` is equal to `U`, ignoring lifetimes.
 #[must_use]
 pub fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
-    type_name::<T>() == type_name::<U>()
+    struct W<'a, T: ?Sized, U: ?Sized>(&'a Cell<bool>, PhantomData<fn() -> (&'a T, &'a U)>);
+
+    impl<'a, T: ?Sized, U: ?Sized> Clone for W<'a, T, U> {
+        fn clone(&self) -> Self {
+            self.0.set(false);
+            W(self.0, self.1)
+        }
+    }
+
+    impl<'a, T: ?Sized> Copy for W<'a, T, T> {}
+
+    let detected = Cell::new(true);
+    let res = [W::<T, U>(&detected, PhantomData)].clone();
+    res[0].0.get()
 }
 
 /// Borrow each member of the tuple
