@@ -27,7 +27,9 @@ Welcome to `LibAFL`
     clippy::missing_docs_in_private_items,
     clippy::module_name_repetitions,
     clippy::ptr_cast_constness,
-    clippy::unsafe_derive_deserialize
+    clippy::unsafe_derive_deserialize,
+    clippy::similar_names,
+    clippy::too_many_lines
 )]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
@@ -96,6 +98,8 @@ pub mod bolts {}
 #[doc(hidden)]
 pub use libafl_derive::*;
 
+pub mod common;
+pub use common::*;
 pub mod corpus;
 pub mod events;
 pub mod executors;
@@ -134,8 +138,12 @@ pub unsafe extern "C" fn external_current_millis() -> u64 {
 #[cfg(test)]
 mod tests {
 
+    #[cfg(miri)]
+    use libafl_bolts::serdeany::RegistryBuilder;
     use libafl_bolts::{rands::StdRand, tuples::tuple_list};
 
+    #[cfg(miri)]
+    use crate::stages::ExecutionCountRestartHelperMetadata;
     use crate::{
         corpus::{Corpus, InMemoryCorpus, Testcase},
         events::NopEventManager,
@@ -154,6 +162,13 @@ mod tests {
     #[test]
     #[allow(clippy::similar_names)]
     fn test_fuzzer() {
+        // # Safety
+        // No concurrency per testcase
+        #[cfg(miri)]
+        unsafe {
+            RegistryBuilder::register::<ExecutionCountRestartHelperMetadata>();
+        }
+
         let rand = StdRand::with_seed(0);
 
         let mut corpus = InMemoryCorpus::<BytesInput>::new();
@@ -218,60 +233,5 @@ mod tests {
         let corpus_deserialized: InMemoryCorpus<BytesInput> =
             postcard::from_bytes(corpus_serialized.as_slice()).unwrap();
         assert_eq!(state.corpus().count(), corpus_deserialized.count());
-    }
-}
-
-#[cfg(feature = "python")]
-#[allow(missing_docs)]
-pub mod pybind {
-    use pyo3::prelude::*;
-
-    use super::{
-        corpus, events, executors, feedbacks, fuzzer, generators, monitors, mutators, observers,
-        stages, state,
-    };
-
-    #[derive(Debug, Clone)]
-    pub struct PythonMetadata {
-        pub map: PyObject,
-    }
-
-    libafl_bolts::impl_serde_pyobjectwrapper!(PythonMetadata, map);
-    libafl_bolts::impl_serdeany!(PythonMetadata);
-
-    impl PythonMetadata {
-        #[must_use]
-        pub fn new(map: PyObject) -> Self {
-            Self { map }
-        }
-    }
-
-    #[pymodule]
-    #[pyo3(name = "libafl")]
-    /// Register the classes to the python module
-    pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
-        libafl_bolts::rands::pybind::register(py, m)?;
-        observers::map::pybind::register(py, m)?;
-        observers::pybind::register(py, m)?;
-        feedbacks::map::pybind::register(py, m)?;
-        feedbacks::pybind::register(py, m)?;
-        state::pybind::register(py, m)?;
-        monitors::pybind::register(py, m)?;
-        events::pybind::register(py, m)?;
-        events::simple::pybind::register(py, m)?;
-        fuzzer::pybind::register(py, m)?;
-        executors::pybind::register(py, m)?;
-        executors::inprocess::pybind::register(py, m)?;
-        generators::pybind::register(py, m)?;
-        mutators::pybind::register(py, m)?;
-        mutators::scheduled::pybind::register(py, m)?;
-        corpus::pybind::register(py, m)?;
-        corpus::testcase::pybind::register(py, m)?;
-        corpus::ondisk::pybind::register(py, m)?;
-        corpus::inmemory::pybind::register(py, m)?;
-        corpus::cached::pybind::register(py, m)?;
-        stages::pybind::register(py, m)?;
-        stages::mutational::pybind::register(py, m)?;
-        Ok(())
     }
 }

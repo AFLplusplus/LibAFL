@@ -41,8 +41,6 @@
 //!
 //! ... making for a total of 5 bytes.
 
-#![cfg(feature = "std")]
-
 use std::{
     fmt::{self, Debug, Formatter},
     io::{self, Cursor, Read, Seek, SeekFrom, Write},
@@ -93,7 +91,7 @@ impl<R: Read> MessageFileReader<R> {
                 Some(Ok((message_id, message)))
             }
             Err(e) => match *e {
-                bincode::ErrorKind::Io(ref io_err) => match io_err.kind() {
+                ErrorKind::Io(ref io_err) => match io_err.kind() {
                     io::ErrorKind::UnexpectedEof => None,
                     _ => Some(Err(e)),
                 },
@@ -117,6 +115,7 @@ impl<R: Read> MessageFileReader<R> {
             SymExpr::InputByte { .. }
             | SymExpr::Integer { .. }
             | SymExpr::Integer128 { .. }
+            | SymExpr::IntegerFromBuffer { .. }
             | SymExpr::Float { .. }
             | SymExpr::NullPointer
             | SymExpr::True
@@ -290,6 +289,7 @@ impl<W: Write + Seek> MessageFileWriter<W> {
             SymExpr::InputByte { .. }
             | SymExpr::Integer { .. }
             | SymExpr::Integer128 { .. }
+            | SymExpr::IntegerFromBuffer { .. }
             | SymExpr::Float { .. }
             | SymExpr::NullPointer
             | SymExpr::True

@@ -28,7 +28,7 @@ For bugs, feel free to open issues or contact us directly. Thank you for your su
 
 Even though we will gladly assist you in finishing up your PR, try to
 - keep all the crates compiling with *stable* rust (hide the eventual non-stable code under [`cfg`s](https://github.com/AFLplusplus/LibAFL/blob/main/libafl/build.rs#L26))
-- run `cargo fmt` on your code before pushing
+- run `cargo nightly fmt` on your code before pushing
 - check the output of `cargo clippy --all` or `./clippy.sh`
 - run `cargo build --no-default-features` to check for `no_std` compatibility (and possibly add `#[cfg(feature = "std")]`) to hide parts of your code.
 

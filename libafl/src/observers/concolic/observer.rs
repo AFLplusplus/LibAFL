@@ -1,4 +1,4 @@
-use alloc::string::String;
+use alloc::borrow::Cow;
 
 use libafl_bolts::Named;
 use serde::{Deserialize, Serialize};
@@ -16,7 +16,7 @@ use crate::{
 pub struct ConcolicObserver<'map> {
     #[serde(skip)]
     map: &'map [u8],
-    name: String,
+    name: Cow<'static, str>,
 }
 
 impl<'map, S> Observer<S> for ConcolicObserver<'map> where S: UsesInput {}
@@ -32,7 +32,7 @@ impl<'map> ConcolicObserver<'map> {
 }
 
 impl<'map> Named for ConcolicObserver<'map> {
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
@@ -40,7 +40,10 @@ impl<'map> Named for ConcolicObserver<'map> {
 impl<'map> ConcolicObserver<'map> {
     /// Creates a new [`ConcolicObserver`] with the given name and memory buffer.
     #[must_use]
-    pub fn new(name: String, map: &'map [u8]) -> Self {
-        Self { map, name }
+    pub fn new(name: &'static str, map: &'map [u8]) -> Self {
+        Self {
+            map,
+            name: Cow::from(name),
+        }
     }
 }

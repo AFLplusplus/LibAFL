@@ -53,7 +53,7 @@ impl ChildHandle {
         unsafe {
             libc::waitpid(self.pid, &mut status, 0);
         }
-        status
+        libc::WEXITSTATUS(status)
     }
 }
 
@@ -107,7 +107,7 @@ pub fn startable_self() -> Result<Command, Error> {
 #[cfg(all(unix, feature = "std"))]
 pub fn dup(fd: RawFd) -> Result<RawFd, Error> {
     match unsafe { libc::dup(fd) } {
-        -1 => Err(Error::file(std::io::Error::last_os_error())),
+        -1 => Err(Error::last_os_error(format!("Error calling dup({fd})"))),
         new_fd => Ok(new_fd),
     }
 }
@@ -119,7 +119,9 @@ pub fn dup(fd: RawFd) -> Result<RawFd, Error> {
 #[cfg(all(unix, feature = "std"))]
 pub fn dup2(fd: RawFd, device: RawFd) -> Result<(), Error> {
     match unsafe { libc::dup2(fd, device) } {
-        -1 => Err(Error::file(std::io::Error::last_os_error())),
+        -1 => Err(Error::last_os_error(format!(
+            "Error calling dup2({fd}, {device})"
+        ))),
         _ => Ok(()),
     }
 }

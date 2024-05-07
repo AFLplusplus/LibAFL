@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use libafl::{
     corpus::Testcase,
     events::EventFirer,
@@ -5,8 +7,8 @@ use libafl::{
     feedbacks::{Feedback, MapIndexesMetadata},
     observers::ObserversTuple,
     schedulers::{MinimizerScheduler, TestcaseScore},
-    state::{HasCorpus, HasMetadata, State},
-    Error,
+    state::{HasCorpus, State},
+    Error, HasMetadata,
 };
 use libafl_bolts::{Named, SerdeAny};
 use serde::{Deserialize, Serialize};
@@ -32,8 +34,8 @@ where
     }
 }
 
-pub type PacketLenMinimizerScheduler<CS> =
-    MinimizerScheduler<CS, PacketLenTestcaseScore, MapIndexesMetadata>;
+pub type PacketLenMinimizerScheduler<CS, O> =
+    MinimizerScheduler<CS, PacketLenTestcaseScore, MapIndexesMetadata, O>;
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug)]
 pub struct PacketLenFeedback {
@@ -62,9 +64,10 @@ where
     }
 
     #[inline]
-    fn append_metadata<OT>(
+    fn append_metadata<EM, OT>(
         &mut self,
         _state: &mut S,
+        _manager: &mut EM,
         _observers: &OT,
         testcase: &mut Testcase<PacketData>,
     ) -> Result<(), Error> {
@@ -77,8 +80,9 @@ where
 
 impl Named for PacketLenFeedback {
     #[inline]
-    fn name(&self) -> &str {
-        "PacketLenFeedback"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("PacketLenFeedback");
+        &NAME
     }
 }
 

@@ -2,25 +2,44 @@
 
 This folder contains an example fuzzer for the qemu systemmode, using LLMP for fast multi-process fuzzing and crash detection.
 
-## Build
+It comes in three flavours (can be set through features):
 
-To build this example, run
+-`classic`: The low-level way to interact with QEMU.
+-`breakpoint`: Interaction with QEMU using the command system, leveraging breakpoints.
+-`sync_exit`: Interaction with QEMU using the command system, leveraging sync exits.
 
+## Prerequisite
+
+You will need to have `qemu-img` and `arm-none-eabi-gcc` installed.
+
+On Ubuntu and Debian, you will need to run
 ```bash
-cargo build --release
-cd example; sh build.sh; cd ..
+sudo apt update
+sudo apt -y install qemu-utils gcc-arm-none-eabi
 ```
 
-This will build the the fuzzer (src/fuzzer.rs) and a small example binary based on FreeRTOS, which can run under a qemu emulation target.
+## Build
+
+```bash
+cargo make build
+```
 
 ## Run
 
-Since the instrumentation is based on snapshtos QEMU needs a virtual drive (even if it is unused...).
-Create on and then run the fuzzer:
 ```bash
-# create an image
-qemu-img create -f qcow2 dummy.qcow2 32M
-# run the fuzzer
-KERNEL=./example/example.elf target/release/qemu_systemmode -icount shift=auto,align=off,sleep=off -machine mps2-an385 -monitor null -kernel ./example/example.elf -serial null -nographic -snapshot -drive if=none,format=qcow2,file=dummy.qcow2 -S
+cargo make run
 ```
-Currently the ``KERNEL`` variable is needed because the fuzzer does not parse QEMUs arguments to find the binary.
+
+It is also possible to run the fuzzer with the other features:
+
+```bash
+cargo make <feature>
+```
+
+With feature being `classic`, `breakpoint` or `sync_exit`.
+
+This will build the desired fuzzer (src/fuzzer_<feature>.rs) and a small example binary based on FreeRTOS, which can run under a qemu emulation target.
+Since the instrumentation is based on snapshots, QEMU needs a virtual drive (even if it is unused...).
+Thus, the makefile creates a dummy QCOW2 image `dummy.qcow2` (can be found in the `target directory`).
+Currently, the ``KERNEL`` variable is needed because the fuzzer does not parse QEMUs arguments to find the binary.
+It is automatically set in the build script.

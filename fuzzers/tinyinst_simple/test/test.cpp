@@ -23,8 +23,9 @@ limitations under the License.
 #include <inttypes.h>
 
 // shared memory stuff
-
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+#if defined(__linux__)
+  #include <sys/shm.h>
+#elif defined(WIN32) || defined(_WIN32) || defined(__WIN32)
   #include <windows.h>
 #else
   #include <sys/mman.h>
@@ -36,7 +37,19 @@ unsigned char *shm_data;
 
 bool use_shared_memory;
 
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
+#if defined(__linux__)
+
+int setup_shmem(const char *name) {
+  // map shared memory to process address space
+  shm_data = (unsigned char *)shmat(atoi(name), NULL, 0);
+  if (shm_data == (void *)-1) {
+    perror("Error in shmat");
+    return 0;
+  }
+  return 1;
+}
+
+#elif defined(WIN32) || defined(_WIN32) || defined(__WIN32)
 
 int setup_shmem(const char *name) {
   HANDLE map_file;
@@ -71,7 +84,7 @@ int setup_shmem(const char *name) {
   // get shared memory file descriptor (NOT a file)
   fd = shm_open(name, O_RDONLY, S_IRUSR | S_IWUSR);
   if (fd == -1) {
-    printf("Error in shm_open\n");
+    perror("Error in shm_open");
     return 0;
   }
 
@@ -79,7 +92,7 @@ int setup_shmem(const char *name) {
   shm_data =
       (unsigned char *)mmap(NULL, SHM_SIZE, PROT_READ, MAP_SHARED, fd, 0);
   if (shm_data == MAP_FAILED) {
-    printf("Error in mmap\n");
+    perror("Error in mmap");
     return 0;
   }
 
@@ -101,7 +114,12 @@ char *crash = NULL;
 
 // actual target function
 
-void FUZZ_TARGET_MODIFIERS fuzz(char *name) {
+// Use extern "C" to preserve the function name for instrumentation
+#ifdef __cplusplus
+extern "C"
+#endif  // __cplusplus
+    void FUZZ_TARGET_MODIFIERS
+    fuzz(char *name) {
   char    *sample_bytes = NULL;
   uint32_t sample_size = 0;
 

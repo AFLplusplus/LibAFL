@@ -18,10 +18,10 @@ use crate::{
     stages::{HasCurrentStage, StagesTuple},
     start_timer,
     state::{
-        HasCorpus, HasExecutions, HasImported, HasLastReportTime, HasMetadata, HasSolutions,
+        HasCorpus, HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime, HasSolutions,
         UsesState,
     },
-    Error,
+    Error, HasMetadata,
 };
 #[cfg(feature = "introspection")]
 use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
@@ -71,7 +71,34 @@ pub trait HasObjective: UsesState {
 /// Evaluates if an input is interesting using the feedback
 pub trait ExecutionProcessor<OT>: UsesState {
     /// Evaluate if a set of observation channels has an interesting state
+    fn execute_no_process<EM>(
+        &mut self,
+        state: &mut Self::State,
+        manager: &mut EM,
+        input: &<Self::State as UsesInput>::Input,
+        observers: &OT,
+        exit_kind: &ExitKind,
+    ) -> Result<ExecuteInputResult, Error>
+    where
+        EM: EventFirer<State = Self::State>;
+
+    /// Process `ExecuteInputResult`. Add to corpus, solution or ignore
+    #[allow(clippy::too_many_arguments)]
     fn process_execution<EM>(
+        &mut self,
+        state: &mut Self::State,
+        manager: &mut EM,
+        input: <Self::State as UsesInput>::Input,
+        exec_res: &ExecuteInputResult,
+        observers: &OT,
+        exit_kind: &ExitKind,
+        send_events: bool,
+    ) -> Result<Option<CorpusId>, Error>
+    where
+        EM: EventFirer<State = Self::State>;
+
+    /// Evaluate if a set of observation channels has an interesting state
+    fn execute_and_process<EM>(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
@@ -143,6 +170,17 @@ where
         manager: &mut EM,
         input: <Self::State as UsesInput>::Input,
     ) -> Result<CorpusId, Error>;
+
+    /// Adds the input to the corpus as disabled a input.
+    /// Used during initial corpus loading.
+    /// Disabled testcases are only used for splicing
+    /// Returns the `index` of the new testcase in the corpus.
+    /// Usually, you want to use [`Evaluator::evaluate_input`], unless you know what you are doing.
+    fn add_disabled_input(
+        &mut self,
+        state: &mut Self::State,
+        input: <Self::State as UsesInput>::Input,
+    ) -> Result<CorpusId, Error>;
 }
 
 /// The main fuzzer trait.
@@ -180,6 +218,7 @@ where
     ) -> Result<(), Error> {
         let monitor_timeout = STATS_TIMEOUT_DEFAULT;
         loop {
+            // log::info!("Starting another fuzz_loop");
             manager.maybe_report_progress(state, monitor_timeout)?;
             self.fuzz_one(stages, executor, state, manager)?;
         }
@@ -212,6 +251,7 @@ where
         let monitor_timeout = STATS_TIMEOUT_DEFAULT;
 
         for _ in 0..iters {
+            // log::info!("Starting another fuzz_loop");
             manager.maybe_report_progress(state, monitor_timeout)?;
             ret = Some(self.fuzz_one(stages, executor, state, manager)?);
         }
@@ -323,10 +363,58 @@ where
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
     OT: ObserversTuple<CS::State> + Serialize + DeserializeOwned,
-    CS::State: HasCorpus + HasSolutions + HasExecutions + HasCorpus + HasImported,
+    CS::State: HasCorpus
+        + HasSolutions
+        + HasExecutions
+        + HasCorpus
+        + HasImported
+        + HasCurrentTestcase<<Self::State as UsesInput>::Input>
+        + HasCurrentCorpusIdx,
 {
-    /// Evaluate if a set of observation channels has an interesting state
-    fn process_execution<EM>(
+    fn execute_no_process<EM>(
+        &mut self,
+        state: &mut Self::State,
+        manager: &mut EM,
+        input: &<Self::State as UsesInput>::Input,
+        observers: &OT,
+        exit_kind: &ExitKind,
+    ) -> Result<ExecuteInputResult, Error>
+    where
+        EM: EventFirer<State = Self::State>,
+    {
+        let mut res = ExecuteInputResult::None;
+
+        #[cfg(not(feature = "introspection"))]
+        let is_solution = self
+            .objective_mut()
+            .is_interesting(state, manager, input, observers, exit_kind)?;
+
+        #[cfg(feature = "introspection")]
+        let is_solution = self
+            .objective_mut()
+            .is_interesting_introspection(state, manager, input, observers, exit_kind)?;
+
+        if is_solution {
+            res = ExecuteInputResult::Solution;
+        } else {
+            #[cfg(not(feature = "introspection"))]
+            let corpus_worthy = self
+                .feedback_mut()
+                .is_interesting(state, manager, input, observers, exit_kind)?;
+
+            #[cfg(feature = "introspection")]
+            let corpus_worthy = self
+                .feedback_mut()
+                .is_interesting_introspection(state, manager, input, observers, exit_kind)?;
+
+            if corpus_worthy {
+                res = ExecuteInputResult::Corpus;
+            }
+        }
+        Ok(res)
+    }
+
+    fn execute_and_process<EM>(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
@@ -338,41 +426,38 @@ where
     where
         EM: EventFirer<State = Self::State>,
     {
-        let mut res = ExecuteInputResult::None;
+        let exec_res = self.execute_no_process(state, manager, &input, observers, exit_kind)?;
+        let corpus_idx = self.process_execution(
+            state,
+            manager,
+            input,
+            &exec_res,
+            observers,
+            exit_kind,
+            send_events,
+        )?;
+        Ok((exec_res, corpus_idx))
+    }
 
-        #[cfg(not(feature = "introspection"))]
-        let is_solution = self
-            .objective_mut()
-            .is_interesting(state, manager, &input, observers, exit_kind)?;
-
-        #[cfg(feature = "introspection")]
-        let is_solution = self
-            .objective_mut()
-            .is_interesting_introspection(state, manager, &input, observers, exit_kind)?;
-
-        if is_solution {
-            res = ExecuteInputResult::Solution;
-        } else {
-            #[cfg(not(feature = "introspection"))]
-            let is_corpus = self
-                .feedback_mut()
-                .is_interesting(state, manager, &input, observers, exit_kind)?;
-
-            #[cfg(feature = "introspection")]
-            let is_corpus = self
-                .feedback_mut()
-                .is_interesting_introspection(state, manager, &input, observers, exit_kind)?;
-
-            if is_corpus {
-                res = ExecuteInputResult::Corpus;
-            }
-        }
-
-        match res {
+    /// Evaluate if a set of observation channels has an interesting state
+    fn process_execution<EM>(
+        &mut self,
+        state: &mut Self::State,
+        manager: &mut EM,
+        input: <Self::State as UsesInput>::Input,
+        exec_res: &ExecuteInputResult,
+        observers: &OT,
+        exit_kind: &ExitKind,
+        send_events: bool,
+    ) -> Result<Option<CorpusId>, Error>
+    where
+        EM: EventFirer<State = Self::State>,
+    {
+        match exec_res {
             ExecuteInputResult::None => {
                 self.feedback_mut().discard_metadata(state, &input)?;
                 self.objective_mut().discard_metadata(state, &input)?;
-                Ok((res, None))
+                Ok(None)
             }
             ExecuteInputResult::Corpus => {
                 // Not a solution
@@ -381,7 +466,7 @@ where
                 // Add the input to the main corpus
                 let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
                 self.feedback_mut()
-                    .append_metadata(state, observers, &mut testcase)?;
+                    .append_metadata(state, manager, observers, &mut testcase)?;
                 let idx = state.corpus_mut().add(testcase)?;
                 self.scheduler_mut().on_add(state, idx)?;
 
@@ -409,17 +494,21 @@ where
                     // This testcase is from the other fuzzers.
                     *state.imported_mut() += 1;
                 }
-                Ok((res, Some(idx)))
+                Ok(Some(idx))
             }
             ExecuteInputResult::Solution => {
                 // Not interesting
                 self.feedback_mut().discard_metadata(state, &input)?;
 
+                let executions = *state.executions();
                 // The input is a solution, add it to the respective corpus
-                let mut testcase = Testcase::with_executions(input, *state.executions());
+                let mut testcase = Testcase::with_executions(input, executions);
                 testcase.set_parent_id_optional(*state.corpus().current());
+                if let Ok(mut tc) = state.current_testcase_mut() {
+                    tc.found_objective();
+                }
                 self.objective_mut()
-                    .append_metadata(state, observers, &mut testcase)?;
+                    .append_metadata(state, manager, observers, &mut testcase)?;
                 state.solutions_mut().add(testcase)?;
 
                 if send_events {
@@ -427,11 +516,13 @@ where
                         state,
                         Event::Objective {
                             objective_size: state.solutions().count(),
+                            executions,
+                            time: current_time(),
                         },
                     )?;
                 }
 
-                Ok((res, None))
+                Ok(None)
             }
         }
     }
@@ -462,9 +553,9 @@ where
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
         let observers = executor.observers();
 
-        self.scheduler.on_evaluation(state, &input, observers)?;
+        self.scheduler.on_evaluation(state, &input, &*observers)?;
 
-        self.process_execution(state, manager, input, observers, &exit_kind, send_events)
+        self.execute_and_process(state, manager, input, &*observers, &exit_kind, send_events)
     }
 }
 
@@ -490,7 +581,17 @@ where
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
         self.evaluate_input_with_observers(state, executor, manager, input, send_events)
     }
-
+    fn add_disabled_input(
+        &mut self,
+        state: &mut Self::State,
+        input: <Self::State as UsesInput>::Input,
+    ) -> Result<CorpusId, Error> {
+        let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
+        testcase.set_disabled(true);
+        // Add the disabled input to the main corpus
+        let idx = state.corpus_mut().add_disabled(testcase)?;
+        Ok(idx)
+    }
     /// Adds an input, even if it's not considered `interesting` by any of the executors
     fn add_input(
         &mut self,
@@ -506,24 +607,31 @@ where
 
         // Maybe a solution
         #[cfg(not(feature = "introspection"))]
-        let is_solution = self
-            .objective_mut()
-            .is_interesting(state, manager, &input, observers, &exit_kind)?;
+        let is_solution =
+            self.objective_mut()
+                .is_interesting(state, manager, &input, &*observers, &exit_kind)?;
 
         #[cfg(feature = "introspection")]
-        let is_solution = self
-            .objective_mut()
-            .is_interesting_introspection(state, manager, &input, observers, &exit_kind)?;
+        let is_solution = self.objective_mut().is_interesting_introspection(
+            state,
+            manager,
+            &input,
+            &*observers,
+            &exit_kind,
+        )?;
 
         if is_solution {
             self.objective_mut()
-                .append_metadata(state, observers, &mut testcase)?;
+                .append_metadata(state, manager, &*observers, &mut testcase)?;
             let idx = state.solutions_mut().add(testcase)?;
 
+            let executions = *state.executions();
             manager.fire(
                 state,
                 Event::Objective {
                     objective_size: state.solutions().count(),
+                    executions,
+                    time: current_time(),
                 },
             )?;
             return Ok(idx);
@@ -535,25 +643,29 @@ where
         // several is_interesting implementations collect some data about the run, later used in
         // append_metadata; we *must* invoke is_interesting here to collect it
         #[cfg(not(feature = "introspection"))]
-        let _is_corpus = self
-            .feedback_mut()
-            .is_interesting(state, manager, &input, observers, &exit_kind)?;
+        let _corpus_worthy =
+            self.feedback_mut()
+                .is_interesting(state, manager, &input, &*observers, &exit_kind)?;
 
         #[cfg(feature = "introspection")]
-        let _is_corpus = self
-            .feedback_mut()
-            .is_interesting_introspection(state, manager, &input, observers, &exit_kind)?;
+        let _corpus_worthy = self.feedback_mut().is_interesting_introspection(
+            state,
+            manager,
+            &input,
+            &*observers,
+            &exit_kind,
+        )?;
 
         // Add the input to the main corpus
         self.feedback_mut()
-            .append_metadata(state, observers, &mut testcase)?;
+            .append_metadata(state, manager, &*observers, &mut testcase)?;
         let idx = state.corpus_mut().add(testcase)?;
         self.scheduler_mut().on_add(state, idx)?;
 
         let observers_buf = if manager.configuration() == EventConfig::AlwaysUnique {
             None
         } else {
-            manager.serialize_observers::<OT>(observers)?
+            manager.serialize_observers::<OT>(&*observers)?
         };
         manager.fire(
             state,
@@ -754,8 +866,8 @@ pub mod test {
         corpus::CorpusId,
         events::ProgressReporter,
         stages::{HasCurrentStage, StagesTuple},
-        state::{HasExecutions, HasLastReportTime, HasMetadata, State, UsesState},
-        Fuzzer,
+        state::{HasExecutions, HasLastReportTime, State, UsesState},
+        Fuzzer, HasMetadata,
     };
 
     #[derive(Clone, Debug)]
@@ -801,112 +913,5 @@ pub mod test {
         ) -> Result<CorpusId, Error> {
             unimplemented!()
         }
-    }
-}
-
-#[cfg(feature = "python")]
-#[allow(missing_docs)]
-/// `Fuzzer` Python bindings
-pub mod pybind {
-    use alloc::{boxed::Box, vec::Vec};
-
-    use libafl_bolts::ownedref::OwnedMutPtr;
-    use pyo3::prelude::*;
-
-    use crate::{
-        events::pybind::PythonEventManager,
-        executors::pybind::PythonExecutor,
-        feedbacks::pybind::PythonFeedback,
-        fuzzer::{Evaluator, Fuzzer, StdFuzzer},
-        inputs::BytesInput,
-        observers::pybind::PythonObserversTuple,
-        schedulers::QueueScheduler,
-        stages::pybind::PythonStagesTuple,
-        state::pybind::{PythonStdState, PythonStdStateWrapper},
-    };
-
-    /// `StdFuzzer` with fixed generics
-    pub type PythonStdFuzzer = StdFuzzer<
-        QueueScheduler<PythonStdState>,
-        PythonFeedback,
-        PythonFeedback,
-        PythonObserversTuple,
-    >;
-
-    /// Python class for StdFuzzer
-    #[pyclass(unsendable, name = "StdFuzzer")]
-    #[derive(Debug)]
-    pub struct PythonStdFuzzerWrapper {
-        /// Rust wrapped StdFuzzer object
-        pub inner: OwnedMutPtr<PythonStdFuzzer>,
-    }
-
-    impl PythonStdFuzzerWrapper {
-        pub fn wrap(r: &mut PythonStdFuzzer) -> Self {
-            Self {
-                inner: OwnedMutPtr::Ptr(r),
-            }
-        }
-
-        #[must_use]
-        pub fn unwrap(&self) -> &PythonStdFuzzer {
-            self.inner.as_ref()
-        }
-
-        pub fn unwrap_mut(&mut self) -> &mut PythonStdFuzzer {
-            self.inner.as_mut()
-        }
-    }
-
-    #[pymethods]
-    impl PythonStdFuzzerWrapper {
-        #[new]
-        fn new(py_feedback: PythonFeedback, py_objective: PythonFeedback) -> Self {
-            Self {
-                inner: OwnedMutPtr::Owned(Box::new(StdFuzzer::new(
-                    QueueScheduler::new(),
-                    py_feedback,
-                    py_objective,
-                ))),
-            }
-        }
-
-        fn add_input(
-            &mut self,
-            py_state: &mut PythonStdStateWrapper,
-            py_executor: &mut PythonExecutor,
-            py_mgr: &mut PythonEventManager,
-            input: Vec<u8>,
-        ) -> usize {
-            self.inner
-                .as_mut()
-                .add_input(
-                    py_state.unwrap_mut(),
-                    py_executor,
-                    py_mgr,
-                    BytesInput::new(input),
-                )
-                .expect("Failed to add input")
-                .0
-        }
-
-        fn fuzz_loop(
-            &mut self,
-            py_executor: &mut PythonExecutor,
-            py_state: &mut PythonStdStateWrapper,
-            py_mgr: &mut PythonEventManager,
-            stages_tuple: &mut PythonStagesTuple,
-        ) {
-            self.inner
-                .as_mut()
-                .fuzz_loop(stages_tuple, py_executor, py_state.unwrap_mut(), py_mgr)
-                .expect("Failed to generate the initial corpus");
-        }
-    }
-
-    /// Register the classes to the python module
-    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
-        m.add_class::<PythonStdFuzzerWrapper>()?;
-        Ok(())
     }
 }

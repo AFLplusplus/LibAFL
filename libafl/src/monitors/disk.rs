@@ -22,6 +22,7 @@ where
     base: M,
     filename: PathBuf,
     last_update: Duration,
+    update_interval: Duration,
 }
 
 impl<M> Monitor for OnDiskTOMLMonitor<M>
@@ -52,10 +53,10 @@ where
         self.base.aggregate(name);
     }
 
-    fn display(&mut self, event_msg: String, sender_id: ClientId) {
+    fn display(&mut self, event_msg: &str, sender_id: ClientId) {
         let cur_time = current_time();
 
-        if (cur_time - self.last_update).as_secs() >= 60 {
+        if cur_time - self.last_update >= self.update_interval {
             self.last_update = cur_time;
 
             let mut file = File::create(&self.filename).expect("Failed to open the TOML file");
@@ -72,7 +73,7 @@ executions = {}
 exec_sec = {}
 ",
                 format_duration_hms(&(cur_time - self.start_time())),
-                self.client_stats().len(),
+                self.client_stats_count(),
                 self.corpus_size(),
                 self.objective_size(),
                 self.total_execs(),
@@ -80,7 +81,7 @@ exec_sec = {}
             )
             .expect("Failed to write to the TOML file");
 
-            for (i, client) in self.client_stats_mut().iter_mut().skip(1).enumerate() {
+            for (i, client) in self.client_stats_mut().iter_mut().enumerate() {
                 let exec_sec = client.execs_per_sec(cur_time);
 
                 write!(
@@ -92,11 +93,7 @@ objectives = {}
 executions = {}
 exec_sec = {}
 ",
-                    i + 1,
-                    client.corpus_size,
-                    client.objective_size,
-                    client.executions,
-                    exec_sec
+                    i, client.corpus_size, client.objective_size, client.executions, exec_sec
                 )
                 .expect("Failed to write to the TOML file");
 
@@ -128,10 +125,20 @@ where
     where
         P: Into<PathBuf>,
     {
+        Self::with_update_interval(filename, base, Duration::from_secs(60))
+    }
+
+    /// Create new [`OnDiskTOMLMonitor`] with custom update interval
+    #[must_use]
+    pub fn with_update_interval<P>(filename: P, base: M, update_interval: Duration) -> Self
+    where
+        P: Into<PathBuf>,
+    {
         Self {
             base,
             filename: filename.into(),
-            last_update: current_time(),
+            last_update: current_time() - update_interval,
+            update_interval,
         }
     }
 }
@@ -201,7 +208,7 @@ where
         self.base.set_start_time(time);
     }
 
-    fn display(&mut self, event_msg: String, sender_id: ClientId) {
+    fn display(&mut self, event_msg: &str, sender_id: ClientId) {
         if (self.log_record)(&mut self.base) {
             let file = OpenOptions::new()
                 .append(true)
@@ -211,12 +218,11 @@ where
 
             let line = json!({
                 "run_time": current_time() - self.base.start_time(),
-                "clients": self.base.client_stats().len(),
+                "clients": self.client_stats_count(),
                 "corpus": self.base.corpus_size(),
                 "objectives": self.base.objective_size(),
                 "executions": self.base.total_execs(),
                 "exec_sec": self.base.execs_per_sec(),
-                "clients": &self.client_stats()[1..]
             });
             writeln!(&file, "{line}").expect("Unable to write JSON to file");
         }

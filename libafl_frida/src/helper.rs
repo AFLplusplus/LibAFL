@@ -131,7 +131,7 @@ pub enum SkipRange {
     },
 }
 
-/// Builder for [`FridaInstrumentationHelper`](FridaInstrumentationHelper)
+/// Builder for [`FridaInstrumentationHelper`]
 pub struct FridaInstrumentationHelperBuilder {
     stalker_enabled: bool,
     disable_excludes: bool,
@@ -142,14 +142,14 @@ pub struct FridaInstrumentationHelperBuilder {
 }
 
 impl FridaInstrumentationHelperBuilder {
-    /// Create a new `FridaInstrumentationHelperBuilder`
+    /// Create a new [`FridaInstrumentationHelperBuilder`]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Enable or disable the Stalker
+    /// Enable or disable the [`Stalker`](https://frida.re/docs/stalker/)
     ///
-    /// Required for coverage collection, ASAN, and `CmpLog`.
+    /// Required for all instrumentation, such as coverage collection, `ASan`, and `CmpLog`.
     /// Enabled by default.
     #[must_use]
     pub fn enable_stalker(self, enabled: bool) -> Self {
@@ -239,7 +239,7 @@ impl FridaInstrumentationHelperBuilder {
         self
     }
 
-    /// Build a `FridaInstrumentationHelper`
+    /// Build a [`FridaInstrumentationHelper`]
     pub fn build<RT: FridaRuntimeTuple>(
         self,
         gum: &Gum,
@@ -411,9 +411,9 @@ where
 }
 
 impl<'a> FridaInstrumentationHelper<'a, ()> {
-    /// Create a builder to initialize a `FridaInstrumentationHelper`.
+    /// Create a builder to initialize a [`FridaInstrumentationHelper`].
     ///
-    /// See the documentation of [`FridaInstrumentationHelperBuilder`](FridaInstrumentationHelperBuilder)
+    /// See the documentation of [`FridaInstrumentationHelperBuilder`]
     /// for more details.
     pub fn builder() -> FridaInstrumentationHelperBuilder {
         FridaInstrumentationHelperBuilder::default()
@@ -486,7 +486,7 @@ where
             let address = instr.address();
             let mut keep_instr = true;
             // log::trace!("x - block @ {:x} transformed to {:x}", address, output.writer().pc());
-
+            //the ASAN check needs to be done before the hook_rt check due to x86 insns such as call [mem]
             if ranges.borrow().contains_key(&(address as usize)) {
                 let mut runtimes = (*runtimes_unborrowed).borrow_mut();
                 if first {
@@ -504,24 +504,24 @@ where
                     }
                 }
 
-                if let Some(rt) = runtimes.match_first_type_mut::<HookRuntime>() {
-                    if let Some((call_target, needs_return)) = rt.is_interesting(decoder, instr) {
-                        rt.emit_callout(call_target, &instruction, needs_return, runtimes_unborrowed.clone());
-                        keep_instr = false;
-                    }
-                }
-
                 let res = if let Some(_rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
                     AsanRuntime::asan_is_interesting_instruction(decoder, address, instr)
                 } else {
                     None
                 };
 
-
+                #[cfg(target_arch = "x86_64")]
                 if let Some(details) = res {
                     if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
                         rt.emit_shadow_check(
-                            address, output, instr.bytes().len(), details.0, details.1, details.2, details.3, details.4,
+                            address,
+                            output,
+                            instr.bytes().len(),
+                            details.0,
+                            details.1,
+                            details.2,
+                            details.3,
+                            details.4,
                         );
                     }
                 }
@@ -538,6 +538,33 @@ where
                             width,
                             shift,
                         );
+                    }
+                }
+
+                #[cfg(target_arch = "x86_64")]
+                if let Some(rt) = runtimes.match_first_type_mut::<HookRuntime>() {
+                    if let Some(call_target) = rt.is_interesting(decoder, instr) {
+                        rt.emit_callout(
+                            call_target,
+                            &instruction,
+                            output.writer(),
+                            runtimes_unborrowed.clone(),
+                        );
+                        keep_instr = false;
+                    }
+                }
+
+                #[cfg(target_arch = "aarch64")]
+                if let Some(rt) = runtimes.match_first_type_mut::<HookRuntime>() {
+                    if let Some((call_target, is_reg)) = rt.is_interesting(decoder, instr) {
+                        rt.emit_callout(
+                            call_target,
+                            &instruction,
+                            is_reg,
+                            output.writer(),
+                            runtimes_unborrowed.clone(),
+                        );
+                        keep_instr = false; //we keep the instruction in the emit if needed
                     }
                 }
 

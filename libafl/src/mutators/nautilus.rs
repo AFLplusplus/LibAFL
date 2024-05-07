@@ -1,5 +1,6 @@
 //! Mutators for the `Nautilus` grammmar fuzzer
 
+use alloc::borrow::Cow;
 use core::fmt::Debug;
 
 use grammartec::{
@@ -14,8 +15,8 @@ use crate::{
     generators::nautilus::NautilusContext,
     inputs::nautilus::NautilusInput,
     mutators::{MutationResult, Mutator},
-    state::{HasCorpus, HasMetadata},
-    Error,
+    state::HasCorpus,
+    Error, HasMetadata,
 };
 
 /// The randomic mutator for `Nautilus` grammar.
@@ -35,7 +36,6 @@ impl<S> Mutator<NautilusInput, S> for NautilusRandomMutator<'_> {
         &mut self,
         _state: &mut S,
         input: &mut NautilusInput,
-        _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         // TODO get rid of tmp
         let mut tmp = vec![];
@@ -61,8 +61,9 @@ impl<S> Mutator<NautilusInput, S> for NautilusRandomMutator<'_> {
 }
 
 impl Named for NautilusRandomMutator<'_> {
-    fn name(&self) -> &str {
-        "NautilusRandomMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("NautilusRandomMutator");
+        &NAME
     }
 }
 
@@ -96,7 +97,6 @@ impl<S> Mutator<NautilusInput, S> for NautilusRecursionMutator<'_> {
         &mut self,
         _state: &mut S,
         input: &mut NautilusInput,
-        _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         // TODO don't calc recursions here
         if let Some(ref mut recursions) = input.tree.calc_recursions(self.ctx) {
@@ -125,8 +125,9 @@ impl<S> Mutator<NautilusInput, S> for NautilusRecursionMutator<'_> {
 }
 
 impl Named for NautilusRecursionMutator<'_> {
-    fn name(&self) -> &str {
-        "NautilusRecursionMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("NautilusRecursionMutator");
+        &NAME
     }
 }
 
@@ -162,7 +163,6 @@ where
         &mut self,
         state: &mut S,
         input: &mut NautilusInput,
-        _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let meta = state
             .metadata_map()
@@ -193,8 +193,9 @@ where
 }
 
 impl Named for NautilusSpliceMutator<'_> {
-    fn name(&self) -> &str {
-        "NautilusSpliceMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("NautilusSpliceMutator");
+        &NAME
     }
 }
 

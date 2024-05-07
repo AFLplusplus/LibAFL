@@ -12,10 +12,13 @@ use core::{
 };
 use std::{
     ffi::c_void,
-    // num::NonZeroUsize,
-    ptr::{addr_of, write_volatile},
+     num::NonZeroUsize,
+    ptr::write_volatile,
     rc::Rc,
+    sync::MutexGuard,
 };
+
+use nix::sys::mman::{ProtFlags, mmap, MapFlags};
 
 use backtrace::Backtrace;
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
@@ -94,7 +97,7 @@ pub const ASAN_SAVE_REGISTER_NAMES: [&str; ASAN_SAVE_REGISTER_COUNT] = [
 #[cfg(target_arch = "aarch64")]
 pub const ASAN_SAVE_REGISTER_COUNT: usize = 32;
 
-#[cfg(target = "aarch64")]
+#[cfg(target_arch = "aarch64")]
 const ASAN_EH_FRAME_DWORD_COUNT: usize = 14;
 #[cfg(target_arch = "aarch64")]
 const ASAN_EH_FRAME_FDE_OFFSET: u32 = 20;
@@ -161,9 +164,9 @@ impl FridaRuntime for AsanRuntime {
     ) {
         self.allocator.init();
 
-        unsafe {
-            ASAN_ERRORS = Some(AsanErrors::new(self.continue_on_error));
-        }
+        AsanErrors::get_mut_blocking().set_continue_on_error(self.continue_on_error);
+
+        self.generate_shadow_check_function();
 
         self.generate_instrumentation_blobs();
 
@@ -329,10 +332,11 @@ impl AsanRuntime {
         self.allocator.check_for_leaks();
     }
 
-    /// Returns the `AsanErrors` from the recent run
+    /// Returns the `AsanErrors` from the recent run.
+    /// Will block if some other thread holds on to the `ASAN_ERRORS` Mutex.
     #[allow(clippy::unused_self)]
-    pub fn errors(&mut self) -> &Option<AsanErrors> {
-        unsafe { &*addr_of!(ASAN_ERRORS) }
+    pub fn errors(&mut self) -> MutexGuard<'static, AsanErrors> {
+        ASAN_ERRORS.lock().unwrap()
     }
 
     /// Make sure the specified memory is unpoisoned
@@ -550,7 +554,41 @@ impl AsanRuntime {
     }
 
     pub fn register_hooks(hook_rt: &mut HookRuntime) {
+        #[allow(unused)]
         macro_rules! hook_func {
+            ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*)) => {
+                paste::paste! {
+                    // extern "system" {
+                    //     fn $name($($param: $param_type),*) -> $return_type;
+                    // }
+                    let address = Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function").0 as usize;
+                    log::trace!("hooking {} at {:x}", stringify!($name), address);
+                    hook_rt.register_hook(address, move |_address, mut _context, _asan_rt| {
+                        let mut index = 0;
+
+                        let asan_rt = _asan_rt.unwrap();
+
+                        #[cfg(target_arch = "x86_64")]
+                        asan_rt.set_pc(_context.rip() as usize);
+
+                        #[cfg(target_arch = "aarch64")]
+                        asan_rt.set_pc(_context.pc() as usize);
+
+
+                        log::trace!("hooked {} from {:x}", stringify!($name), asan_rt.pc());
+                        #[allow(trivial_numeric_casts)]
+                        #[allow(unused_assignments)]
+                        asan_rt.[<hook_ $name>]($(_context.arg({
+                            let $param = index;
+                            index += 1;
+                            $param
+                        }) as _),*);
+
+                        asan_rt.unset_pc();
+
+                    });
+                };
+            };
             ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
                     // extern "system" {
@@ -562,9 +600,15 @@ impl AsanRuntime {
                         let mut index = 0;
 
                         let asan_rt = _asan_rt.unwrap();
+
+                        #[cfg(target_arch = "x86_64")]
                         asan_rt.set_pc(_context.rip() as usize);
 
-                        log::trace!("hooked {} from {:x}", stringify!($name), _context.rip());
+                        #[cfg(target_arch = "aarch64")]
+                        asan_rt.set_pc(_context.pc() as usize);
+
+
+                        log::trace!("hooked {} from {:x}", stringify!($name), asan_rt.pc());
                         #[allow(trivial_numeric_casts)]
                         #[allow(unused_assignments)]
                         _context.set_return_value(asan_rt.[<hook_ $name>]($(_context.arg({
@@ -576,8 +620,11 @@ impl AsanRuntime {
                         asan_rt.unset_pc();
                     });
                 }
-            }
+            };
+
         }
+
+        #[cfg(target_os = "windows")]
         macro_rules! hook_func_with_alt {
             ($lib:expr, $alt_name:ident, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
@@ -590,9 +637,13 @@ impl AsanRuntime {
                         let mut index = 0;
 
                         let asan_rt = _asan_rt.unwrap();
+                        #[cfg(target_arch = "x86_64")]
                         asan_rt.set_pc(_context.rip() as usize);
 
-                        log::trace!("hooked {} from {:x}", stringify!($alt_name), _context.rip());
+                        #[cfg(target_arch = "aarch64")]
+                        asan_rt.set_pc(_context.pc() as usize);
+
+                        log::trace!("hooked {} from {:x}", stringify!($alt_name), asan_rt.pc());
                         #[allow(trivial_numeric_casts)]
                         #[allow(unused_assignments)]
                         _context.set_return_value(asan_rt.[<hook_ $name>]($(_context.arg({
@@ -616,10 +667,17 @@ impl AsanRuntime {
                     let address = Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function").0 as usize;
                     log::trace!("hooking {} at {:x}", stringify!($name), address);
                     hook_rt.register_hook(address, move |_address, mut _context, _asan_rt| {
-                        log::trace!("hooked {} from {:x}", stringify!($name), _context.rip());
+
                         let asan_rt = _asan_rt.unwrap();
                         let mut index = 0;
+
+                        #[cfg(target_arch = "x86_64")]
                         asan_rt.set_pc(_context.rip() as usize);
+
+                        #[cfg(target_arch = "aarch64")]
+                        asan_rt.set_pc(_context.pc() as usize);
+
+                        log::trace!("hooked {} from {:x}", stringify!($name), asan_rt.pc());
                         #[allow(trivial_numeric_casts)]
                         #[allow(unused_assignments)]
                         let result = if asan_rt.[<hook_check_ $name>]($(_context.arg({
@@ -653,6 +711,7 @@ impl AsanRuntime {
             }
         }
 
+        #[cfg(target_os = "windows")]
         macro_rules! hook_func_with_check_with_alt {
             ($lib:expr, $alt_name:ident, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
@@ -917,15 +976,21 @@ impl AsanRuntime {
             }
         }
 
-        #[cfg(not(windows))]
-        for libname in [
+        #[cfg(target_os = "linux")]
+        let cpp_libs = [
             "libc++.so",
             "libc++.so.1",
             "libc++abi.so.1",
             "libc++_shared.so",
             "libstdc++.so",
             "libstdc++.so.6",
-        ] {
+        ];
+
+        #[cfg(target_vendor = "apple")]
+        let cpp_libs = ["libc++.1.dylib", "libc++abi.dylib", "libsystem_c.dylib"];
+
+        #[cfg(not(windows))]
+        for libname in cpp_libs {
             log::info!("Hooking c++ functions in {}", libname);
             for export in Module::enumerate_exports(libname) {
                 match &export.name[..] {
@@ -1256,22 +1321,19 @@ impl AsanRuntime {
         hook_func!(
             None,
             memset_pattern4,
-            (s: *mut c_void, c: *const c_void, n: usize),
-            usize
+            (s: *mut c_void, c: *const c_void, n: usize)
         );
         #[cfg(target_vendor = "apple")]
         hook_func!(
             None,
             memset_pattern8,
-            (s: *mut c_void, c: *const c_void, n: usize),
-            usize
+            (s: *mut c_void, c: *const c_void, n: usize)
         );
         #[cfg(target_vendor = "apple")]
         hook_func!(
             None,
             memset_pattern16,
-            (s: *mut c_void, c: *const c_void, n: usize),
-            usize
+            (s: *mut c_void, c: *const c_void, n: usize)
         );
     }
 
@@ -1421,11 +1483,11 @@ impl AsanRuntime {
                     backtrace,
                 ))
             };
-            AsanErrors::get_mut().report_error(error);
+            AsanErrors::get_mut_blocking().report_error(error);
 
             // This is not even a mem instruction??
         } else {
-            AsanErrors::get_mut().report_error(AsanError::Unknown((
+            AsanErrors::get_mut_blocking().report_error(AsanError::Unknown((
                 self.regs,
                 actual_pc,
                 (None, None, 0, fault_address),
@@ -1559,7 +1621,7 @@ impl AsanRuntime {
                 backtrace,
             ))
         };
-        AsanErrors::get_mut().report_error(error);
+        AsanErrors::get_mut_blocking().report_error(error);
     }
 
     #[cfg(target_arch = "x86_64")]
@@ -1634,6 +1696,414 @@ impl AsanRuntime {
     }
 
     // https://godbolt.org/z/EvWPzqjeK
+    
+
+    // https://godbolt.org/z/oajhcP5sv
+    /*
+    #include <stdio.h>
+    #include <stdint.h>
+    uint8_t shadow_bit = 44;
+
+    uint64_t generate_shadow_check_function(uint64_t start, uint64_t size){
+        // calculate the shadow address
+        uint64_t addr = 0;
+        addr = addr + (start >> 3);
+        uint64_t mask = (1ULL << (shadow_bit + 1)) - 1;
+        addr = addr & mask;
+        addr = addr + (1ULL << shadow_bit);
+
+        if(size == 0){
+            // goto return_success
+            return 1;
+        }
+        else{
+            // check if the ptr is not aligned to 8 bytes
+            uint8_t remainder = start & 0b111;
+            if(remainder != 0){
+                // we need to test the high bits from the first shadow byte
+                uint8_t shift;
+                if(size < 8){
+                    shift = size;
+                }
+                else{
+                    shift = 8 - remainder;
+                }
+                // goto check_bits
+                uint8_t mask = (1 << shift) - 1;
+
+                // bitwise reverse for amd64 :<
+                // https://gist.github.com/yantonov/4359090
+                // we need 16bit number here, (not 8bit)
+                uint16_t val = *(uint16_t *)addr;
+                val = (val & 0xff00) >> 8 | (val & 0x00ff) << 8;
+                val = (val & 0xf0f0) >> 4 | (val & 0x0f0f) << 4;
+                val = (val & 0xcccc) >> 2 | (val & 0x3333) << 2;
+                val = (val & 0xaaaa) >> 1 | (val & 0x5555) << 1;
+                val = (val >> 8) | (val << 8); // swap the byte
+                val = (val >> remainder);
+                if((val & mask) != mask){
+                    // goto return failure
+                    return 0;
+                }
+
+                size = size - shift;
+                addr += 1;
+            }
+
+            // no_start_offset
+            uint64_t num_shadow_bytes = size >> 3;
+            uint64_t mask = -1;
+
+            while(true){
+                if(num_shadow_bytes < 8){
+                    // goto less_than_8_shadow_bytes_remaining
+                    break;
+                }
+                else{
+                    uint64_t val = *(uint64_t *)addr;
+                    addr += 8;
+                    if(val != mask){
+                        // goto return failure
+                        return 0;
+                    }
+                    num_shadow_bytes -= 8;
+                    size -= 64;
+                }
+            }
+
+            while(true){
+                if(num_shadow_bytes < 1){
+                    // goto check_trailing_bits
+                    break;
+                }
+                else{
+                    uint8_t val = *(uint8_t *)addr;
+                    addr += 1;
+                    if(val != 0xff){
+                        // goto return failure
+                        return 0;
+                    }
+                    num_shadow_bytes -= 1;
+                    size -= 8;
+                }
+            }
+
+            if(size == 0){
+                // goto return success
+                return 1;
+            }
+
+            uint8_t mask2 = ((1 << (size & 0b111)) - 1);
+            uint8_t val = *(uint8_t *)addr;
+            val = (val & 0xf0) >> 4 | (val & 0x0f) << 4;
+            val = (val & 0xff) >> 2 | (val & 0x33) << 2;
+            val = (val & 0xaa) >> 1 | (val & 0x55) << 1;
+
+            if((val & mask2) != mask2){
+                // goto return failure
+                return 0;
+            }
+            return 1;
+        }
+    }
+        */
+    #[cfg(target_arch = "x86_64")]
+    #[allow(clippy::unused_self, clippy::identity_op)]
+    #[allow(clippy::too_many_lines)]
+    fn generate_shadow_check_function(&mut self) {
+        use std::fs::File;
+
+        let shadow_bit = self.allocator.shadow_bit();
+        let mut ops = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
+
+        // Rdi start, Rsi size
+        dynasm!(ops
+        ;       .arch x64
+        ;        mov     cl, BYTE shadow_bit as i8
+        ;        mov     r10, -2
+        ;        shl     r10, cl
+        ;        mov     eax, 1
+        ;        mov     edx, 1
+        ;        shl     rdx, cl
+        ;        test    rsi, rsi
+        ;        je      >LBB0_15
+        ;        mov     rcx, rdi
+        ;        shr     rcx, 3
+        ;        not     r10
+        ;        and     r10, rcx
+        ;        add     r10, rdx
+        ;        and     edi, 7
+        ;        je      >LBB0_4
+        ;        mov     cl, 8
+        ;        sub     cl, dil
+        ;        cmp     rsi, 8
+        ;        movzx   ecx, cl
+        ;        mov     r8d, esi
+        ;        cmovae  r8d, ecx
+        ;        mov     r9d, -1
+        ;        mov     ecx, r8d
+        ;        shl     r9d, cl
+        ;        movzx   ecx, WORD [r10]
+        ;        rol     cx, 8
+        ;        mov     edx, ecx
+        ;        shr     edx, 4
+        ;        and     edx, 3855
+        ;        shl     ecx, 4
+        ;        and     ecx, -3856
+        ;        or      ecx, edx
+        ;        mov     edx, ecx
+        ;        shr     edx, 2
+        ;        and     edx, 13107
+        ;        and     ecx, -3277
+        ;        lea     ecx, [rdx + 4*rcx]
+        ;        mov     edx, ecx
+        ;        shr     edx, 1
+        ;        and     edx, 21845
+        ;        and     ecx, -10923
+        ;        lea     ecx, [rdx + 2*rcx]
+        ;        rol     cx, 8
+        ;        movzx   edx, cx
+        ;        mov     ecx, edi
+        ;        shr     edx, cl
+        ;        not     r9d
+        ;        movzx   ecx, r9b
+        ;        and     edx, ecx
+        ;        cmp     edx, ecx
+        ;        jne     >LBB0_11
+        ;        movzx   ecx, r8b
+        ;        sub     rsi, rcx
+        ;        add     r10, 1
+        ;LBB0_4:
+        ;        mov     r8, rsi
+        ;        shr     r8, 3
+        ;        mov     r9, r8
+        ;        and     r9, -8
+        ;        mov     edi, r8d
+        ;        and     edi, 7
+        ;        add     r9, r10
+        ;        and     esi, 63
+        ;        mov     rdx, r8
+        ;        mov     rcx, r10
+        ;LBB0_5:
+        ;        cmp     rdx, 7
+        ;        jbe     >LBB0_8
+        ;        add     rdx, -8
+        ;        cmp     QWORD [rcx], -1
+        ;        lea     rcx, [rcx + 8]
+        ;        je      <LBB0_5
+        ;        jmp     >LBB0_11
+        ;LBB0_8:
+        ;        lea     rcx, [8*rdi]
+        ;        sub     rsi, rcx
+        ;LBB0_9:
+        ;        test    rdi, rdi
+        ;        je      >LBB0_13
+        ;        add     rdi, -1
+        ;        cmp     BYTE [r9], -1
+        ;        lea     r9, [r9 + 1]
+        ;        je      <LBB0_9
+        ;LBB0_11:
+        ;        xor     eax, eax
+        ;        ret
+        ;LBB0_13:
+        ;        test    rsi, rsi
+        ;        je      >LBB0_15
+        ;        and     sil, 7
+        ;        mov     dl, -1
+        ;        mov     ecx, esi
+        ;        shl     dl, cl
+        ;        not     dl
+        ;        mov     cl, BYTE [r8 + r10]
+        ;        rol     cl, 4
+        ;        mov     eax, ecx
+        ;        shr     al, 2
+        ;        shl     cl, 2
+        ;        and     cl, -52
+        ;        or      cl, al
+        ;        mov     eax, ecx
+        ;        shr     al, 1
+        ;        and     al, 85
+        ;        add     cl, cl
+        ;        and     cl, -86
+        ;        or      cl, al
+        ;        and     cl, dl
+        ;        xor     eax, eax
+        ;        cmp     cl, dl
+        ;        sete    al
+        ;LBB0_15:
+        ;       ret
+            );
+        let blob = ops.finalize().unwrap();
+        unsafe {
+            let mapping = mmap::<File>(
+                None,
+                NonZeroUsize::new_unchecked(0x1000),
+                ProtFlags::all(),
+                MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE,
+                None,
+                0,
+            )
+            .unwrap();
+            blob.as_ptr()
+                .copy_to_nonoverlapping(mapping as *mut u8, blob.len());
+            self.shadow_check_func = Some(std::mem::transmute::<
+                *mut u8,
+                extern "C" fn(*const c_void, usize) -> bool,
+            >(mapping as *mut u8));
+        }
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    // identity_op appears to be a false positive in ubfx
+    #[allow(clippy::unused_self, clippy::identity_op, clippy::too_many_lines)]
+    fn generate_shadow_check_function(&mut self) {
+        use std::fs::File;
+
+        let shadow_bit = self.allocator.shadow_bit();
+        let mut ops = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
+        dynasm!(ops
+            ; .arch aarch64
+
+            // calculate the shadow address
+            ; mov x5, #0
+            // ; add x5, xzr, x5, lsl #shadow_bit
+            ; add x5, x5, x0, lsr #3
+            ; ubfx x5, x5, #0, #(shadow_bit + 1)
+            ; mov x6, #1
+            ; add x5, x5, x6, lsl #shadow_bit
+
+            ; cmp x1, #0
+            ; b.eq >return_success
+            // check if the ptr is not aligned to 8 bytes
+            ; ands x6, x0, #7
+            ; b.eq >no_start_offset
+
+            // we need to test the high bits from the first shadow byte
+            ; ldrh w7, [x5, #0]
+            ; rev16 w7, w7
+            ; rbit w7, w7
+            ; lsr x7, x7, #16
+            ; lsr x7, x7, x6
+
+            ; cmp x1, #8
+            ; b.lt >dont_fill_to_8
+            ; mov x2, #8
+            ; sub x6, x2, x6
+            ; b >check_bits
+            ; dont_fill_to_8:
+            ; mov x6, x1
+            ; check_bits:
+            ; mov x2, #1
+            ; lsl x2, x2, x6
+            ; sub x4, x2, #1
+
+            // if shadow_bits & size_to_test != size_to_test: fail
+            ; and x7, x7, x4
+            ; cmp x7, x4
+            ; b.ne >return_failure
+
+            // size -= size_to_test
+            ; sub x1, x1, x6
+            // shadow_addr += 1 (we consumed the initial byte in the above test)
+            ; add x5, x5, 1
+
+            ; no_start_offset:
+            // num_shadow_bytes = size / 8
+            ; lsr x4, x1, #3
+            ; eor x3, x3, x3
+            ; sub x3, x3, #1
+
+            // if num_shadow_bytes < 8; then goto check_bytes; else check_8_shadow_bytes
+            ; check_8_shadow_bytes:
+            ; cmp x4, #0x8
+            ; b.lt >less_than_8_shadow_bytes_remaining
+            ; ldr x7, [x5], #8
+            ; cmp x7, x3
+            ; b.ne >return_failure
+            ; sub x4, x4, #8
+            ; sub x1, x1, #64
+            ; b <check_8_shadow_bytes
+
+            ; less_than_8_shadow_bytes_remaining:
+            ; cmp x4, #1
+            ; b.lt >check_trailing_bits
+            ; ldrb w7, [x5], #1
+            ; cmp w7, #0xff
+            ; b.ne >return_failure
+            ; sub x4, x4, #1
+            ; sub x1, x1, #8
+            ; b <less_than_8_shadow_bytes_remaining
+
+            ; check_trailing_bits:
+            ; cmp x1, #0x0
+            ; b.eq >return_success
+
+            ; and x4, x1, #7
+            ; mov x2, #1
+            ; lsl x2, x2, x4
+            ; sub x4, x2, #1
+
+            ; ldrh w7, [x5, #0]
+            ; rev16 w7, w7
+            ; rbit w7, w7
+            ; lsr x7, x7, #16
+            ; and x7, x7, x4
+            ; cmp x7, x4
+            ; b.ne >return_failure
+
+            ; return_success:
+            ; mov x0, #1
+            ; b >prologue
+
+            ; return_failure:
+            ; mov x0, #0
+
+
+            ; prologue:
+            ; ret
+        );
+
+        let blob = ops.finalize().unwrap();
+
+        // apple aarch64 requires MAP_JIT to allocates WX pages
+        #[cfg(target_vendor = "apple")]
+        let map_flags = MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE | MapFlags::MAP_JIT;
+        #[cfg(not(target_vendor = "apple"))]
+        let map_flags = MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE;
+
+        unsafe {
+            let mapping = mmap::<File>(
+                None,
+                NonZeroUsize::try_from(0x1000).unwrap(),
+                ProtFlags::all(),
+                map_flags,
+                None,
+                0,
+            )
+            .unwrap();
+
+            // on apple aarch64, WX pages can't be both writable and executable at the same time.
+            // pthread_jit_write_protect_np flips them from executable (1) to writable (0)
+            #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
+            {
+                libc::pthread_jit_write_protect_np(0);
+            }
+
+            blob.as_ptr()
+                .copy_to_nonoverlapping(mapping as *mut u8, blob.len());
+
+            #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
+            {
+                libc::pthread_jit_write_protect_np(1);
+            }
+            self.shadow_check_func = Some(std::mem::transmute::<
+                *mut u8,
+                extern "C" fn(*const c_void, usize) -> bool,
+            >(mapping as *mut u8));
+        }
+    }
+
+    // https://godbolt.org/z/ah8vG8sWo
     /*
     #include <stdio.h>
     #include <stdint.h>
@@ -1648,7 +2118,7 @@ impl AsanRuntime {
 
         uint64_t addr = 0;
         addr = addr + (start >> 3);
-        uint64_t mask = (1ULL << (shadow_bit + 1)) - 1;        
+        uint64_t mask = (1ULL << (shadow_bit + 1)) - 1;
 
         addr = addr & mask;
         addr = addr + (1ULL << shadow_bit);
@@ -1663,91 +2133,103 @@ impl AsanRuntime {
             handle_trap(true_rip);
         }
         return 0;
-        
+
     }
+    */
+
+    /*
+
+    FRIDA ASAN IMPLEMENTATION DETAILS
+
+    The format of Frida's ASAN is signficantly different from LLVM ASAN. 
+    
+    In Frida ASAN, we attempt to find the lowest possible bit such that there is no mapping with that bit. That is to say, for some bit x, there is no mapping greater than 
+    1 << x. This is our shadow base and is similar to Ultra compact shadow in LLVM ASAN. Unlike ASAN where 0 represents a poisoned byte and 1 represents an unpoisoned byte, in Frida-ASAN
+    
+    The reasoning for this is that new pages are zeroed, so, by default, every qword is poisoned and we must explicitly unpoison any byte. 
+
+    Much like LLVM ASAN, shadow bytes are qword based. This is to say that each shadow byte maps to one qword. The shadow calculation is as follows:
+    (1ULL << shadow_bit) | (address >> 3)
+
+    The format of a shadow bit is a bitmask. Each bit represents if a byte in the qword is valid starting from the first bit. So, something like 0b11100000 indicates that only the first 3 bytes in the associated qword are valid.
+
     */
     #[cfg(target_arch = "x86_64")]
     #[allow(clippy::unused_self)]
-    fn generate_shadow_check_blob(&mut self, bit: u32) -> Box<[u8]> {
+    fn generate_shadow_check_blob(&mut self, size: u32) -> Box<[u8]> {
         let shadow_bit = self.allocator.shadow_bit();
         // Rcx, Rax, Rdi, Rdx, Rsi, R8 are used, so we save them in emit_shadow_check
+        //at this point RDI contains the
+        let mask_shift = 32 - size;
         macro_rules! shadow_check{
             ($ops:ident, $bit:expr) => {dynasm!($ops
                 ;   .arch x64
-                // ; int3
-                ; mov     cl, BYTE shadow_bit as i8
-                ; mov     edx, 3
-                ; shl     rdx, cl
-                ; mov     eax, 4
-                ; shl     rax, cl
-                ; cmp     rdx, rdi
-                ; ja      >done
-                ; cmp     rax, rdi
-                ; jbe     >done
-                ; mov     eax, 1
-                ; shl     rax, cl
-                ; mov     rdx, rdi
-                ; shr     rdx, 3
-                ; mov     r8d, 2
-                ; shl     r8, cl
-                ; dec     r8
-                ; and     r8, rdx
-                ; movzx   eax, WORD [r8 + rax]
-                ; and     dil, 7
-                ; mov     ecx, edi
-                ; shr     eax, cl
-                ; mov     cl, BYTE bit as i8
-                ; mov     edx, -1
-                ; shl     edx, cl
-                ; not     edx
-                ; not     eax
-                ; test    dl, al
-                ; xor     eax, eax
+//                ; int3
+                ; mov     rdx, 1
+                ; shl     rdx, shadow_bit as i8 //rcx now contains the mask
+                ; mov rcx, rdi //copy address into rdx
+                ; and rcx, 7 //rsi now contains the offset for unaligned accesses
+                ; shr rdi, 3 //rdi now contains the shadow byte offset
+                ; add rdi, rdx //add rdx and rdi to get the address of the shadow byte. rdi now contains the shadow address
+                ; mov edx, [rdi]  //load 4 shadow bytes. We load 4 just in case of an unaligned access
+                ; bswap edx  //bswap to get it into an acceptable form
+                ; shl edx, cl //this shifts by the unaligned access offset. why does x86 require cl...
+                ; mov edi, -1 //fill edi with all 1s
+                ; shl edi, mask_shift as i8 //edi now contains mask. this shl functionally creates a bitmask with the top `size` bits as 1s
+                ; and edx, edi //and it to see if the top bits are enabled in edx
+                ; cmp edx, edi //if the mask and the and'd value are the same, we're good
                 ; je      >done
-                ;   lea     rsi, [>done] // leap 10 bytes forward
-                ;   nop // jmp takes 10 bytes at most so we want to allocate 10 bytes buffer (?)
-                ;   nop
-                ;   nop
-                ;   nop
-                ;   nop
-                ;   nop
-                ;   nop
-                ;   nop
-                ;   nop
-                ;   nop
+                ; lea     rsi, [>done] // leap 10 bytes forward
+                ; nop // jmp takes 10 bytes at most so we want to allocate 10 bytes buffer (?)
+                ; nop
+                ; nop
+                ; nop
+                ; nop
+                ; nop
+                ; nop
+                ; nop
+                ; nop
+                ; nop
                 ;done:
             );};
         }
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
         shadow_check!(ops, bit);
         let ops_vec = ops.finalize().unwrap();
-        ops_vec[..ops_vec.len() - 10].to_vec().into_boxed_slice() //????
+        ops_vec[..ops_vec.len() - 10].to_vec().into_boxed_slice() //subtract 10 because
     }
 
     #[cfg(target_arch = "aarch64")]
     #[allow(clippy::unused_self)]
-    fn generate_shadow_check_blob(&mut self, bit: u32) -> Box<[u8]> {
+    fn generate_shadow_check_blob(&mut self, width: u32) -> Box<[u8]> {
+        /*x0 contains the shadow address
+        x0 and x1 are saved by the asan_check
+        The maximum size this supports is up to 25 bytes. This is because we load 4 bytes of the shadow value. And, in the case that we have a misaligned address with an offset of 7 into the word. For example, if we load 25 bytes from 0x1007 - [0x1007,0x101f], then we require the shadow values from 0x1000, 0x1008, 0x1010, and 0x1018 */
+
         let shadow_bit = self.allocator.shadow_bit();
         macro_rules! shadow_check {
-            ($ops:ident, $bit:expr) => {dynasm!($ops
+            ($ops:ident, $width:expr) => {dynasm!($ops
                 ; .arch aarch64
-
+//              ; brk #0xe
                 ; stp x2, x3, [sp, #-0x10]!
-                ; mov x1, #0
+                ; mov x1, xzr
                 // ; add x1, xzr, x1, lsl #shadow_bit
                 ; add x1, x1, x0, lsr #3
                 ; ubfx x1, x1, #0, #(shadow_bit + 1)
                 ; mov x2, #1
                 ; add x1, x1, x2, lsl #shadow_bit
-                ; ldrh w1, [x1, #0]
-                ; and x0, x0, #7
-                ; rev16 w1, w1
+                ; ldr w1, [x1, #0] //w1 contains our shadow check
+                ; and x0, x0, #7 //x0 is the offset for unaligned accesses
+                ; rev32 x1, x1
                 ; rbit w1, w1
-                ; lsr x1, x1, #16
-                ; lsr x1, x1, x0
+                ; lsr w1, w1, w0 //x1 now contains our shadow value
                 ; ldp x2, x3, [sp], 0x10
-                ; tbnz x1, #$bit, >done
-
+                ; mov w0, #1
+                ; add w0, wzr, w0, LSL #$width
+                ; sub w0, w0, #1 //x0 now contains our bitmask
+                ; and w1, w0, w1 //and the bitmask and the shadow value
+                ; cmp w0, w1 //our bitmask and shadow & mask must be the same
+                ; b.eq >done
                 ; adr x1, >done
                 ; nop // will be replaced by b to report
                 ; done:
@@ -1755,38 +2237,44 @@ impl AsanRuntime {
         }
 
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
-        shadow_check!(ops, bit);
+        shadow_check!(ops, width);
         let ops_vec = ops.finalize().unwrap();
-        ops_vec[..ops_vec.len() - 4].to_vec().into_boxed_slice()
+        ops_vec[..ops_vec.len() - 4].to_vec().into_boxed_slice() //we don't need the last nop so subtract by 4
     }
 
     #[cfg(target_arch = "aarch64")]
     #[allow(clippy::unused_self)]
-    fn generate_shadow_check_exact_blob(&mut self, val: u64) -> Box<[u8]> {
+    fn generate_shadow_check_large_blob(&mut self, width: u32) -> Box<[u8]> {
+        //x0 contains the shadow address
+        //x0 and x1 are saved by the asan_check
+        //large blobs require 16 byte alignment as they are only possible with vector insns, so just abuse that
+
+        //This is used for checking shadow blobs that are larger than 25 bytes
+
+        assert!(width <= 64, "width must be <= 64");
+        let shift = 64 - width;
         let shadow_bit = self.allocator.shadow_bit();
         macro_rules! shadow_check_exact {
-            ($ops:ident, $val:expr) => {dynasm!($ops
+            ($ops:ident, $shift:expr) => {dynasm!($ops
                 ; .arch aarch64
 
                 ; stp x2, x3, [sp, #-0x10]!
-                ; mov x1, #0
+                ; mov x1, xzr
                 // ; add x1, xzr, x1, lsl #shadow_bit
                 ; add x1, x1, x0, lsr #3
                 ; ubfx x1, x1, #0, #(shadow_bit + 1)
                 ; mov x2, #1
                 ; add x1, x1, x2, lsl #shadow_bit
-                ; ldrh w1, [x1, #0]
-                ; and x0, x0, #7
-                ; rev16 w1, w1
-                ; rbit w1, w1
-                ; lsr x1, x1, #16
-                ; lsr x1, x1, x0
-                ; .dword -717536768 // 0xd53b4200 //mrs x0, NZCV
-                ; mov x2, $val
-                ; ands x1, x1, x2
+                ; ldr x1, [x1, #0] //x1 contains our shadow check
+                ; rev64 x1, x1
+                ; rbit x1, x1 //x1 now contains our shadow value
                 ; ldp x2, x3, [sp], 0x10
-                ; b.ne >done
-
+                ; mov x0, xzr
+                ; sub x0, x0, #1 //gives us all 1s
+                ; lsr x0, x0, #$shift //x0 now contains our bitmask
+                ; and x1, x0, x1 //and the bitmask and the shadow value and put it in x1
+                ; cmp x0, x1 //our bitmask and shadow & mask must be the same to ensure that the bytes are valid
+                ; b.eq >done
                 ; adr x1, >done
                 ; nop // will be replaced by b to report
                 ; done:
@@ -1794,7 +2282,7 @@ impl AsanRuntime {
         }
 
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
-        shadow_check_exact!(ops, val);
+        shadow_check_exact!(ops, shift);
         let ops_vec = ops.finalize().unwrap();
         ops_vec[..ops_vec.len() - 4].to_vec().into_boxed_slice()
     }
@@ -1812,7 +2300,7 @@ impl AsanRuntime {
             ; .arch x64
             ; report:
             ; mov rdi, [>self_regs_addr] // load self.regs into rdi
-            ; mov [rdi + 0x80], rsi // return address is loaded into rsi in generate_shadow_check_blob
+            ; mov [rdi + 0x80], rsi // return address is loaded into rsi in generate_shadow_check_blob. rsi is the address of done
             ; mov [rdi + 0x8], rbx
             ; mov [rdi + 0x20], rbp
             ; mov [rdi + 0x28], rsp
@@ -1875,7 +2363,7 @@ impl AsanRuntime {
             ;->accessed_address:
             ; .dword 0x0
             ; self_addr:
-            ; .qword core::ptr::from_mut(self)  as *mut c_void as i64
+            ; .qword core::ptr::from_mut(self) as *mut c_void as i64
             ; self_regs_addr:
             ; .qword addr_of_mut!(self.regs) as i64
             ; trap_func:
@@ -1974,7 +2462,7 @@ impl AsanRuntime {
             ; br x1 // go back to the 'return address'
 
             ; self_addr:
-            ; .qword self as *mut _  as *mut c_void as i64
+            ; .qword core::ptr::from_mut(self) as *mut c_void as i64
             ; self_regs_addr:
             ; .qword addr_of_mut!(self.regs) as i64
             ; trap_func:
@@ -2002,19 +2490,19 @@ impl AsanRuntime {
 
         self.blob_report = Some(ops_report.finalize().unwrap().into_boxed_slice());
 
-        self.blob_check_mem_byte = Some(self.generate_shadow_check_blob(0));
-        self.blob_check_mem_halfword = Some(self.generate_shadow_check_blob(1));
-        self.blob_check_mem_dword = Some(self.generate_shadow_check_blob(2));
-        self.blob_check_mem_qword = Some(self.generate_shadow_check_blob(3));
-        self.blob_check_mem_16bytes = Some(self.generate_shadow_check_blob(4));
+        self.blob_check_mem_byte = Some(self.generate_shadow_check_blob(1));
+        self.blob_check_mem_halfword = Some(self.generate_shadow_check_blob(2));
+        self.blob_check_mem_dword = Some(self.generate_shadow_check_blob(4));
+        self.blob_check_mem_qword = Some(self.generate_shadow_check_blob(8));
+        self.blob_check_mem_16bytes = Some(self.generate_shadow_check_blob(16));
 
-        self.blob_check_mem_3bytes = Some(self.generate_shadow_check_exact_blob(3));
-        self.blob_check_mem_6bytes = Some(self.generate_shadow_check_exact_blob(6));
-        self.blob_check_mem_12bytes = Some(self.generate_shadow_check_exact_blob(12));
-        self.blob_check_mem_24bytes = Some(self.generate_shadow_check_exact_blob(24));
-        self.blob_check_mem_32bytes = Some(self.generate_shadow_check_exact_blob(32));
-        self.blob_check_mem_48bytes = Some(self.generate_shadow_check_exact_blob(48));
-        self.blob_check_mem_64bytes = Some(self.generate_shadow_check_exact_blob(64));
+        self.blob_check_mem_3bytes = Some(self.generate_shadow_check_blob(3));  //the below are all possible with vector intrinsics
+        self.blob_check_mem_6bytes = Some(self.generate_shadow_check_blob(6));
+        self.blob_check_mem_12bytes = Some(self.generate_shadow_check_blob(12));
+        self.blob_check_mem_24bytes = Some(self.generate_shadow_check_blob(24));
+        self.blob_check_mem_32bytes = Some(self.generate_shadow_check_large_blob(32)); //this is possible with ldp q0, q1, [sp]. This must at least 16 byte aligned
+        self.blob_check_mem_48bytes = Some(self.generate_shadow_check_large_blob(48));
+        self.blob_check_mem_64bytes = Some(self.generate_shadow_check_large_blob(64));
     }
 
     /// Get the blob which implements the report funclet
@@ -2218,7 +2706,15 @@ impl AsanRuntime {
         _address: u64,
         instr: &Insn,
     ) -> Option<(u8, X86Register, X86Register, u8, i32)> {
-        let cs_instr = frida_to_cs(decoder, instr);
+        let result = frida_to_cs(decoder, instr);
+
+        if let Err(e) = result {
+            log::error!("{}", e);
+            return None;
+        }
+
+        let cs_instr = result.unwrap();
+
         let mut operands = vec![];
         for operand_idx in 0..cs_instr.operand_count() {
             operands.push(cs_instr.operand(operand_idx));
@@ -2305,8 +2801,6 @@ impl AsanRuntime {
 
             #[cfg(target_arch = "x86_64")]
             writer.put_jmp_near_label(after_report_impl);
-            #[cfg(target_arch = "aarch64")]
-            writer.put_b_label(after_report_impl);
 
             self.current_report_impl = writer.pc();
             writer.put_bytes(self.blob_report());
@@ -2597,7 +3091,7 @@ impl AsanRuntime {
                     Aarch64Register::X0,
                     Aarch64Register::X0,
                     u64::from(displacement_lo),
-                ); //sub x0, x0, #[displacement & 4095]
+                ); //sub x0, x0, #[displacement 496]
             }
         } else if displacement > 0 {
             #[allow(clippy::cast_sign_loss)]
@@ -2612,12 +3106,12 @@ impl AsanRuntime {
             } else {
                 let displacement_hi = displacement / 4096;
                 let displacement_lo = displacement % 4096;
-                writer.put_bytes(&(0x91400000u32 | (displacement_hi << 10)).to_le_bytes());
+                writer.put_bytes(&(0x91400000u32 | (displacement_hi << 10)).to_le_bytes()); //add x0, x0, #[displacement/4096] LSL#12
                 writer.put_add_reg_reg_imm(
                     Aarch64Register::X0,
                     Aarch64Register::X0,
                     u64::from(displacement_lo),
-                );
+                ); //add x0, x0, #[displacement % 4096]
             }
         }
         // Insert the check_shadow_mem code blob

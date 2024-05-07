@@ -2,17 +2,17 @@
 //! The example harness is built for libpng.
 //! In this example, you will see the use of the `launcher` feature.
 //! The `launcher` will spawn new processes for each cpu core.
-use mimalloc::MiMalloc;
-#[global_allocator]
-static GLOBAL: MiMalloc = MiMalloc;
 
 use core::time::Duration;
 use std::{env, net::SocketAddr, path::PathBuf};
 
-use clap::{self, Parser};
+use clap::Parser;
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
-    events::{launcher::Launcher, EventConfig, EventRestarter, LlmpRestartingEventManager},
+    events::{
+        launcher::Launcher, llmp::LlmpShouldSaveState, EventConfig, EventRestarter,
+        LlmpRestartingEventManager,
+    },
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -23,21 +23,24 @@ use libafl::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::Tokens,
     },
-    observers::{HitcountsMapObserver, TimeObserver},
+    observers::{CanTrack, HitcountsMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
-    state::{HasCorpus, HasMetadata, StdState},
-    Error,
+    state::{HasCorpus, StdState},
+    Error, HasMetadata,
 };
 use libafl_bolts::{
     core_affinity::Cores,
-    current_nanos,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
     AsSlice,
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
+use mimalloc::MiMalloc;
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 /// Parse a millis string to a [`Duration`]. Used for arg parsing.
 fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
@@ -53,11 +56,11 @@ fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
 )]
 struct Opt {
     #[arg(
-        short,
-        long,
-        value_parser = Cores::from_cmdline,
-        help = "Spawn a client in each of the provided cores. Broker runs in the 0th core. 'all' to select all available cores. 'none' to run a client without binding to any core. eg: '1,2-4,6' selects the cores 1,2,3,4,6.",
-        name = "CORES"
+    short,
+    long,
+    value_parser = Cores::from_cmdline,
+    help = "Spawn a client in each of the provided cores. Broker runs in the 0th core. 'all' to select all available cores. 'none' to run a client without binding to any core. eg: '1,2-4,6' selects the cores 1,2,3,4,6.",
+    name = "CORES"
     )]
     cores: Cores,
 
@@ -73,7 +76,13 @@ struct Opt {
     #[arg(short = 'a', long, help = "Specify a remote broker", name = "REMOTE")]
     remote_broker_addr: Option<SocketAddr>,
 
-    #[arg(short, long, help = "Set an the corpus directories", name = "INPUT")]
+    #[arg(
+        short,
+        long,
+        help = "Set an the corpus directories",
+        name = "INPUT",
+        required = true
+    )]
     input: Vec<PathBuf>,
 
     #[arg(
@@ -86,12 +95,12 @@ struct Opt {
     output: PathBuf,
 
     #[arg(
-        value_parser = timeout_from_millis_str,
-        short,
-        long,
-        help = "Set the exeucution timeout in milliseconds, default is 10000",
-        name = "TIMEOUT",
-        default_value = "10000"
+    value_parser = timeout_from_millis_str,
+    short,
+    long,
+    help = "Set the exeucution timeout in milliseconds, default is 10000",
+    name = "TIMEOUT",
+    default_value = "10000"
     )]
     timeout: Duration,
 
@@ -151,10 +160,11 @@ pub extern "C" fn libafl_main() {
     );
 
     let mut run_client = |state: Option<_>,
-                          mut restarting_mgr: LlmpRestartingEventManager<_, _>,
-                          _core_id| {
+                          mut restarting_mgr: LlmpRestartingEventManager<_, _, _>,
+                          core_id| {
         // Create an observation channel using the coverage map
-        let edges_observer = HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") });
+        let edges_observer =
+            HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") }).track_indices();
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
@@ -163,9 +173,9 @@ pub extern "C" fn libafl_main() {
         // This one is composed by two Feedbacks in OR
         let mut feedback = feedback_or!(
             // New maximization map feedback linked to the edges observer and the feedback state
-            MaxMapFeedback::tracking(&edges_observer, true, false),
+            MaxMapFeedback::new(&edges_observer),
             // Time feedback, this one does not need a feedback state
-            TimeFeedback::with_observer(&time_observer)
+            TimeFeedback::new(&time_observer)
         );
 
         // A feedback to choose if an input is a solution or not
@@ -175,7 +185,7 @@ pub extern "C" fn libafl_main() {
         let mut state = state.unwrap_or_else(|| {
             StdState::new(
                 // RNG
-                StdRand::with_seed(current_nanos()),
+                StdRand::new(),
                 // Corpus that will be evolved, we keep it in memory for performance
                 InMemoryOnDiskCorpus::new(&opt.input[0]).unwrap(),
                 // Corpus in which we store solutions (crashes in this example),
@@ -208,7 +218,8 @@ pub extern "C" fn libafl_main() {
         let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
         // A minimization+queue policy to get testcasess from the corpus
-        let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+        let scheduler =
+            IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -240,7 +251,14 @@ pub extern "C" fn libafl_main() {
         // In case the corpus is empty (on first run), reset
         if state.must_load_initial_inputs() {
             state
-                .load_initial_inputs(&mut fuzzer, &mut executor, &mut restarting_mgr, &opt.input)
+                .load_initial_inputs_multicore(
+                    &mut fuzzer,
+                    &mut executor,
+                    &mut restarting_mgr,
+                    &opt.input,
+                    &core_id,
+                    &cores,
+                )
                 .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &opt.input));
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
@@ -266,7 +284,11 @@ pub extern "C" fn libafl_main() {
         .broker_port(broker_port)
         .remote_broker_addr(opt.remote_broker_addr)
         .stdout_file(Some("/dev/null"))
-        .serialize_state(!opt.reload_corpus)
+        .serialize_state(if opt.reload_corpus {
+            LlmpShouldSaveState::OOMSafeNever
+        } else {
+            LlmpShouldSaveState::OOMSafeOnRestart
+        })
         .build()
         .launch()
     {

@@ -1,24 +1,23 @@
 //! The colorization stage from `colorization()` in afl++
-use alloc::{
-    collections::binary_heap::BinaryHeap,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{borrow::Cow, collections::binary_heap::BinaryHeap, vec::Vec};
 use core::{cmp::Ordering, fmt::Debug, marker::PhantomData, ops::Range};
 
-use libafl_bolts::{rands::Rand, tuples::MatchName};
+use libafl_bolts::{
+    rands::Rand,
+    tuples::{Handle, Handler},
+    Named,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, HasCurrentCorpusIdx},
     events::EventFirer,
     executors::{Executor, HasObservers},
     inputs::HasBytesVec,
     mutators::mutations::buffer_copy,
     observers::{MapObserver, ObserversTuple},
-    stages::Stage,
-    state::{HasCorpus, HasMetadata, HasRand, UsesState},
-    Error,
+    stages::{RetryRestartHelper, Stage},
+    state::{HasCorpus, HasCurrentTestcase, HasRand, UsesState},
+    Error, HasMetadata, HasNamedMetadata,
 };
 
 // Bigger range is better
@@ -55,30 +54,38 @@ impl Ord for Earlier {
 
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
-pub struct ColorizationStage<EM, O, E, Z> {
-    map_observer_name: String,
+pub struct ColorizationStage<C, E, EM, O, Z> {
+    map_observer_ref: Handle<C>,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(E, EM, O, Z)>,
+    phantom: PhantomData<(E, EM, O, E, Z)>,
 }
 
-impl<EM, O, E, Z> UsesState for ColorizationStage<EM, O, E, Z>
+impl<C, E, EM, O, Z> UsesState for ColorizationStage<C, E, EM, O, Z>
 where
     E: UsesState,
 {
     type State = E::State;
 }
 
-impl<E, EM, O, Z> Stage<E, EM, Z> for ColorizationStage<EM, O, E, Z>
+impl<C, E, EM, O, Z> Named for ColorizationStage<C, E, EM, O, Z>
+where
+    E: UsesState,
+{
+    fn name(&self) -> &Cow<'static, str> {
+        self.map_observer_ref.name()
+    }
+}
+
+impl<C, E, EM, O, Z> Stage<E, EM, Z> for ColorizationStage<C, E, EM, O, Z>
 where
     EM: UsesState<State = E::State> + EventFirer,
     E: HasObservers + Executor<EM, Z>,
-    E::State: HasCorpus + HasMetadata + HasRand,
+    E::State: HasCorpus + HasMetadata + HasRand + HasNamedMetadata,
     E::Input: HasBytesVec,
     O: MapObserver,
+    C: AsRef<O> + Named,
     Z: UsesState<State = E::State>,
 {
-    type Progress = (); // TODO this stage needs resume
-
     #[inline]
     #[allow(clippy::let_and_return)]
     fn perform(
@@ -89,9 +96,19 @@ where
         manager: &mut EM,
     ) -> Result<(), Error> {
         // Run with the mutated input
-        Self::colorize(fuzzer, executor, state, manager, &self.map_observer_name)?;
+        Self::colorize(fuzzer, executor, state, manager, &self.map_observer_ref)?;
 
         Ok(())
+    }
+
+    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        // TODO this stage needs a proper resume
+        RetryRestartHelper::restart_progress_should_run(state, self, 3)
+    }
+
+    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        // TODO this stage needs a proper resume
+        RetryRestartHelper::clear_restart_progress(state, self)
     }
 }
 
@@ -134,10 +151,11 @@ impl TaintMetadata {
 
 libafl_bolts::impl_serdeany!(TaintMetadata);
 
-impl<EM, O, E, Z> ColorizationStage<EM, O, E, Z>
+impl<C, E, EM, O, Z> ColorizationStage<C, E, EM, O, Z>
 where
     EM: UsesState<State = E::State> + EventFirer,
     O: MapObserver,
+    C: AsRef<O> + Named,
     E: HasObservers + Executor<EM, Z>,
     E::State: HasCorpus + HasMetadata + HasRand,
     E::Input: HasBytesVec,
@@ -150,15 +168,9 @@ where
         executor: &mut E,
         state: &mut E::State,
         manager: &mut EM,
-        name: &str,
+        obs_ref: &Handle<C>,
     ) -> Result<E::Input, Error> {
-        let Some(corpus_idx) = state.current_corpus_idx()? else {
-            return Err(Error::illegal_state(
-                "state is not currently processing a corpus index",
-            ));
-        };
-
-        let mut input = state.corpus().cloned_input_for_id(corpus_idx)?;
+        let mut input = state.current_input_cloned()?;
         // The backup of the input
         let backup = input.clone();
         // This is the buffer we'll randomly mutate during type_replace
@@ -171,7 +183,7 @@ where
 
         // Idea: No need to do this every time
         let orig_hash =
-            Self::get_raw_map_hash_run(fuzzer, executor, state, manager, consumed_input, name)?;
+            Self::get_raw_map_hash_run(fuzzer, executor, state, manager, consumed_input, obs_ref)?;
         let changed_bytes = changed.bytes_mut();
         let input_len = changed_bytes.len();
 
@@ -216,7 +228,7 @@ where
                     state,
                     manager,
                     consumed_input,
-                    name,
+                    obs_ref,
                 )?;
 
                 if orig_hash == changed_hash {
@@ -287,9 +299,9 @@ where
 
     #[must_use]
     /// Creates a new [`ColorizationStage`]
-    pub fn new(map_observer_name: &O) -> Self {
+    pub fn new(map_observer: &C) -> Self {
         Self {
-            map_observer_name: map_observer_name.name().to_string(),
+            map_observer_ref: map_observer.handle(),
             phantom: PhantomData,
         }
     }
@@ -301,18 +313,16 @@ where
         state: &mut E::State,
         manager: &mut EM,
         input: E::Input,
-        name: &str,
+        obs_ref: &Handle<C>,
     ) -> Result<usize, Error> {
         executor.observers_mut().pre_exec_all(state, &input)?;
 
         let exit_kind = executor.run_target(fuzzer, state, manager, &input)?;
 
-        let observer = executor
-            .observers()
-            .match_name::<O>(name)
-            .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?;
+        let observers = executor.observers();
+        let observer = observers[obs_ref].as_ref();
 
-        let hash = observer.hash() as usize;
+        let hash = observer.hash_simple() as usize;
 
         executor
             .observers_mut()

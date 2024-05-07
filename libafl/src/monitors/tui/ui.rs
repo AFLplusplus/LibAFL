@@ -111,8 +111,8 @@ impl TuiUI {
                     .as_ref()
                 } else {
                     [
-                        Constraint::Percentage(41),
-                        Constraint::Percentage(27),
+                        Constraint::Percentage(20),
+                        Constraint::Percentage(48),
                         Constraint::Percentage(32),
                     ]
                     .as_ref()
@@ -264,16 +264,20 @@ impl TuiUI {
                     .add_modifier(Modifier::BOLD),
             ))
             .borders(Borders::ALL);
-        let client_area = client_block.inner(area);
+
+        #[allow(unused_mut)]
+        let mut client_area = client_block.inner(area);
         f.render_widget(client_block, area);
 
         #[cfg(feature = "introspection")]
         {
-            let introspection_layout = Layout::default()
+            let client_layout = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([Constraint::Length(11), Constraint::Min(0)].as_ref())
-                .split(client_area)[1];
-            self.draw_introspection_text(f, app, introspection_layout);
+                .constraints([Constraint::Min(11), Constraint::Percentage(50)].as_ref())
+                .split(client_area);
+            client_area = client_layout[0];
+            let instrospection_layout = client_layout[1];
+            self.draw_introspection_text(f, app, instrospection_layout);
         }
 
         let left_layout = Layout::default()
@@ -579,33 +583,27 @@ impl TuiUI {
     ) where
         B: Backend,
     {
-        let items = vec![
-            Row::new(vec![
-                Cell::from(Span::raw("clients")),
-                Cell::from(Span::raw(format!("{}", self.clients))),
-                Cell::from(Span::raw("total execs")),
-                Cell::from(Span::raw(format!("{}", app.read().unwrap().total_execs))),
-                Cell::from(Span::raw("map density")),
-                Cell::from(Span::raw(app.read().unwrap().total_map_density.to_string())),
-            ]),
-            Row::new(vec![
-                Cell::from(Span::raw("solutions")),
-                Cell::from(Span::raw(format!(
-                    "{}",
-                    app.read().unwrap().total_solutions
-                ))),
-                Cell::from(Span::raw("cycle done")),
-                Cell::from(Span::raw(format!(
-                    "{}",
-                    app.read().unwrap().total_cycles_done
-                ))),
-                Cell::from(Span::raw("corpus count")),
-                Cell::from(Span::raw(format!(
-                    "{}",
-                    app.read().unwrap().total_corpus_count
-                ))),
-            ]),
-        ];
+        let items = {
+            let app = app.read().unwrap();
+            vec![
+                Row::new(vec![
+                    Cell::from(Span::raw("clients")),
+                    Cell::from(Span::raw(format!("{}", self.clients))),
+                    Cell::from(Span::raw("total execs")),
+                    Cell::from(Span::raw(format!("{}", app.total_execs))),
+                    Cell::from(Span::raw("map density")),
+                    Cell::from(Span::raw(app.total_map_density.to_string())),
+                ]),
+                Row::new(vec![
+                    Cell::from(Span::raw("solutions")),
+                    Cell::from(Span::raw(format!("{}", app.total_solutions))),
+                    Cell::from(Span::raw("cycle done")),
+                    Cell::from(Span::raw(format!("{}", app.total_cycles_done))),
+                    Cell::from(Span::raw("corpus count")),
+                    Cell::from(Span::raw(format!("{}", app.total_corpus_count))),
+                ]),
+            ]
+        };
 
         let chunks = Layout::default()
             .constraints([Constraint::Percentage(100)].as_ref())
@@ -641,30 +639,29 @@ impl TuiUI {
     ) where
         B: Backend,
     {
-        let items = vec![
-            Row::new(vec![
-                Cell::from(Span::raw("cycles done")),
-                Cell::from(Span::raw(format!(
-                    "{}",
-                    app.read()
-                        .unwrap()
-                        .clients
-                        .get(&self.clients_idx)
-                        .map_or(0, |x| x.cycles_done)
-                ))),
-            ]),
-            Row::new(vec![
-                Cell::from(Span::raw("solutions")),
-                Cell::from(Span::raw(format!(
-                    "{}",
-                    app.read()
-                        .unwrap()
-                        .clients
-                        .get(&self.clients_idx)
-                        .map_or(0, |x| x.objectives)
-                ))),
-            ]),
-        ];
+        let items = {
+            let app = app.read().unwrap();
+            vec![
+                Row::new(vec![
+                    Cell::from(Span::raw("cycles done")),
+                    Cell::from(Span::raw(format!(
+                        "{}",
+                        app.clients
+                            .get(&self.clients_idx)
+                            .map_or(0, |x| x.cycles_done)
+                    ))),
+                ]),
+                Row::new(vec![
+                    Cell::from(Span::raw("solutions")),
+                    Cell::from(Span::raw(format!(
+                        "{}",
+                        app.clients
+                            .get(&self.clients_idx)
+                            .map_or(0, |x| x.objectives)
+                    ))),
+                ]),
+            ]
+        };
 
         let chunks = Layout::default()
             .constraints([Constraint::Percentage(100)].as_ref())
@@ -693,40 +690,35 @@ impl TuiUI {
     ) where
         B: Backend,
     {
-        let items = vec![
-            Row::new(vec![
-                Cell::from(Span::raw("corpus count")),
-                Cell::from(Span::raw(format!(
-                    "{}",
-                    app.read()
-                        .unwrap()
-                        .clients
-                        .get(&self.clients_idx)
-                        .map_or(0, |x| x.corpus)
-                ))),
-            ]),
-            Row::new(vec![
-                Cell::from(Span::raw("total execs")),
-                Cell::from(Span::raw(format!(
-                    "{}",
-                    app.read()
-                        .unwrap()
-                        .clients
-                        .get(&self.clients_idx)
-                        .map_or(0, |x| x.executions)
-                ))),
-            ]),
-            Row::new(vec![
-                Cell::from(Span::raw("map density")),
-                Cell::from(Span::raw(
-                    app.read()
-                        .unwrap()
-                        .clients
-                        .get(&self.clients_idx)
-                        .map_or("0%".to_string(), |x| x.map_density.to_string()),
-                )),
-            ]),
-        ];
+        let items = {
+            let app = app.read().unwrap();
+            vec![
+                Row::new(vec![
+                    Cell::from(Span::raw("corpus count")),
+                    Cell::from(Span::raw(format!(
+                        "{}",
+                        app.clients.get(&self.clients_idx).map_or(0, |x| x.corpus)
+                    ))),
+                ]),
+                Row::new(vec![
+                    Cell::from(Span::raw("total execs")),
+                    Cell::from(Span::raw(format!(
+                        "{}",
+                        app.clients
+                            .get(&self.clients_idx)
+                            .map_or(0, |x| x.executions)
+                    ))),
+                ]),
+                Row::new(vec![
+                    Cell::from(Span::raw("map density")),
+                    Cell::from(Span::raw(
+                        app.clients
+                            .get(&self.clients_idx)
+                            .map_or("0%".to_string(), |x| x.map_density.to_string()),
+                    )),
+                ]),
+            ]
+        };
 
         let chunks = Layout::default()
             .constraints([Constraint::Percentage(100)].as_ref())

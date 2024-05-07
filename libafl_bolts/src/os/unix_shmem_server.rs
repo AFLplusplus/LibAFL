@@ -10,7 +10,11 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{mem::ManuallyDrop, ptr::addr_of};
+use core::{
+    mem::ManuallyDrop,
+    ops::{Deref, DerefMut},
+    ptr::addr_of,
+};
 #[cfg(target_vendor = "apple")]
 use std::fs;
 use std::{
@@ -40,7 +44,7 @@ use uds::{UnixListenerExt, UnixSocketAddr, UnixStreamExt};
 
 use crate::{
     shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
-    AsMutSlice, AsSlice, Error,
+    Error,
 };
 
 /// The default server name for our abstract shmem server
@@ -79,6 +83,26 @@ where
     server_fd: i32,
 }
 
+impl<SH> Deref for ServedShMem<SH>
+where
+    SH: ShMem,
+{
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<SH> DerefMut for ServedShMem<SH>
+where
+    SH: ShMem,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
 impl<SH> ShMem for ServedShMem<SH>
 where
     SH: ShMem,
@@ -86,29 +110,6 @@ where
     fn id(&self) -> ShMemId {
         let client_id = self.inner.id();
         ShMemId::from_string(&format!("{}:{client_id}", self.server_fd))
-    }
-
-    fn len(&self) -> usize {
-        self.inner.len()
-    }
-}
-
-impl<SH> AsSlice for ServedShMem<SH>
-where
-    SH: ShMem,
-{
-    type Entry = u8;
-    fn as_slice(&self) -> &[u8] {
-        self.inner.as_slice()
-    }
-}
-impl<SH> AsMutSlice for ServedShMem<SH>
-where
-    SH: ShMem,
-{
-    type Entry = u8;
-    fn as_mut_slice(&mut self) -> &mut [u8] {
-        self.inner.as_mut_slice()
     }
 }
 
@@ -179,7 +180,7 @@ where
     /// Connect to the server and return a new [`ServedShMemProvider`]
     /// Will try to spawn a [`ShMemService`]. This will only work for the first try.
     fn new() -> Result<Self, Error> {
-        // Needed for MacOS and Android to get sharedmaps working.
+        // Needed for `MacOS` and Android to get sharedmaps working.
         let service = ShMemService::<SP>::start();
 
         let mut res = Self {
@@ -282,7 +283,7 @@ pub enum ServedShMemRequest {
     PreFork(),
     /// The client's child re-registers with us after it forked.
     PostForkChildHello(i32),
-    /// The ShMem Service should exit. This is sually sent internally on `drop`, but feel free to do whatever with it?
+    /// The `ShMem` Service should exit. This is sually sent internally on `drop`, but feel free to do whatever with it?
     Exit,
 }
 

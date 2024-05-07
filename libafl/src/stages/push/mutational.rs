@@ -20,14 +20,14 @@ use crate::{
     observers::ObserversTuple,
     schedulers::Scheduler,
     start_timer,
-    state::{HasCorpus, HasExecutions, HasLastReportTime, HasMetadata, HasRand},
-    Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
+    state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand},
+    Error, EvaluatorObservers, ExecutionProcessor, HasMetadata, HasScheduler,
 };
 #[cfg(feature = "introspection")]
 use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 
 /// The default maximum number of mutations to perform per input.
-pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: u64 = 128;
+pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: usize = 128;
 /// A Mutational push stage is the stage in a fuzzing run that mutates inputs.
 /// Mutational push stages will usually have a range of mutations that are
 /// being applied to the input one by one, between executions.
@@ -53,8 +53,6 @@ where
     testcases_to_do: usize,
     testcases_done: usize,
 
-    stage_idx: i32,
-
     mutator: M,
 
     psh: PushStageHelper<CS, EM, OT, Z>,
@@ -74,7 +72,7 @@ where
     /// Gets the number of iterations as a random number
     #[allow(clippy::unused_self, clippy::unnecessary_wraps)] // TODO: we should put this function into a trait later
     fn iterations(&self, state: &mut CS::State, _corpus_idx: CorpusId) -> Result<usize, Error> {
-        Ok(1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize)
+        Ok(1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS))
     }
 
     /// Sets the current corpus index
@@ -150,9 +148,7 @@ where
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
 
         start_timer!(state);
-        self.mutator
-            .mutate(state, &mut input, self.stage_idx)
-            .unwrap();
+        self.mutator.mutate(state, &mut input).unwrap();
         mark_feature_time!(state, PerfFeature::Mutate);
 
         self.push_stage_helper_mut()
@@ -173,11 +169,10 @@ where
     ) -> Result<(), Error> {
         // todo: is_interesting, etc.
 
-        fuzzer.process_execution(state, event_mgr, last_input, observers, &exit_kind, true)?;
+        fuzzer.execute_and_process(state, event_mgr, last_input, observers, &exit_kind, true)?;
 
         start_timer!(state);
-        self.mutator
-            .post_exec(state, self.stage_idx, self.current_corpus_idx)?;
+        self.mutator.post_exec(state, self.current_corpus_idx)?;
         mark_feature_time!(state, PerfFeature::MutatePostExec);
         self.testcases_done += 1;
 
@@ -234,7 +229,6 @@ where
         mutator: M,
         shared_state: Rc<RefCell<Option<PushStageSharedState<CS, EM, OT, Z>>>>,
         exit_kind: Rc<Cell<Option<ExitKind>>>,
-        stage_idx: i32,
     ) -> Self {
         Self {
             mutator,
@@ -242,7 +236,6 @@ where
             current_corpus_idx: None, // todo
             testcases_to_do: 0,
             testcases_done: 0,
-            stage_idx,
         }
     }
 }

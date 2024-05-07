@@ -28,7 +28,7 @@ reqwest = { version = "0.11.4", features = ["blocking"] }
 [dependencies]
 libafl = { path = "../../libafl/", features = [ "std", "llmp_compression", "llmp_bind_public", "frida_cli" ] } #,  "llmp_small_maps", "llmp_debug"]}
 libafl_bolts = { path = "../../libafl_bolts/" }
-frida-gum = { version = "0.13.2", features = [ "auto-download", "event-sink", "invocation-listener"] }
+frida-gum = { version = "0.13.6", features = [ "auto-download", "event-sink", "invocation-listener"] }
 libafl_frida = { path = "../../libafl_frida", features = ["cmplog"] }
 libafl_targets = { path = "../../libafl_targets", features = ["sancov_cmplog"] }
 libc = "0.2"

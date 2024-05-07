@@ -6,7 +6,7 @@ import lief
 MAX_SIZE = 0x100
 BINARY_PATH = './a.out'
 
-emu = qemu.Emulator(['qemu-x86_64', BINARY_PATH], [])
+emu = qemu.Qemu(['qemu-x86_64', BINARY_PATH], [])
 
 elf = lief.parse(BINARY_PATH)
 test_one_input = elf.get_function_address("LLVMFuzzerTestOneInput")

@@ -1,6 +1,7 @@
 //! Monitor based on ratatui
 
-use alloc::{boxed::Box, string::ToString};
+use alloc::{borrow::Cow, boxed::Box, string::ToString};
+use core::cmp;
 use std::{
     collections::VecDeque,
     fmt::Write as _,
@@ -22,7 +23,7 @@ use crossterm::{
 use hashbrown::HashMap;
 use libafl_bolts::{current_time, format_duration_hms, ClientId};
 use ratatui::{backend::CrosstermBackend, Terminal};
-use serde_json::{self, Value};
+use serde_json::Value;
 
 #[cfg(feature = "introspection")]
 use super::{ClientPerfMonitor, PerfFeature};
@@ -210,7 +211,7 @@ pub struct ClientTuiContext {
 
     pub process_timing: ProcessTiming,
     pub item_geometry: ItemGeometry,
-    pub user_stats: HashMap<String, UserStats>,
+    pub user_stats: HashMap<Cow<'static, str>, UserStats>,
 }
 
 impl ClientTuiContext {
@@ -336,12 +337,16 @@ pub struct TuiMonitor {
 }
 
 impl Monitor for TuiMonitor {
-    /// the client monitor, mutable
+    /// The client monitor, mutable
+    /// This also includes disabled "padding" clients.
+    /// Results should be filtered by `.enabled`.
     fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
         &mut self.client_stats
     }
 
-    /// the client monitor
+    /// The client monitor
+    /// This also includes disabled "padding" clients.
+    /// Results should be filtered by `.enabled`.
     fn client_stats(&self) -> &[ClientStats] {
         &self.client_stats
     }
@@ -357,7 +362,7 @@ impl Monitor for TuiMonitor {
     }
 
     #[allow(clippy::cast_sign_loss)]
-    fn display(&mut self, event_msg: String, sender_id: ClientId) {
+    fn display(&mut self, event_msg: &str, sender_id: ClientId) {
         let cur_time = current_time();
 
         {
@@ -419,8 +424,8 @@ impl Monitor for TuiMonitor {
 
         #[cfg(feature = "introspection")]
         {
-            // Print the client performance monitor. Skip the Client 0 which is the broker
-            for (i, client) in self.client_stats.iter().skip(1).enumerate() {
+            // Print the client performance monitor. Skip the Client IDs that have never sent anything.
+            for (i, client) in self.client_stats.iter().filter(|x| x.enabled).enumerate() {
                 self.context
                     .write()
                     .unwrap()
@@ -484,25 +489,12 @@ impl TuiMonitor {
     }
 
     fn map_density(&self) -> String {
-        if self.client_stats.len() < 2 {
-            return "0%".to_string();
-        }
-        let mut max_map_density = self
-            .client_stats()
-            .get(1)
-            .unwrap()
-            .get_user_stats("edges")
-            .map_or("0%".to_string(), ToString::to_string);
-
-        for client in self.client_stats().iter().skip(2) {
-            let client_map_density = client
-                .get_user_stats("edges")
-                .map_or(String::new(), ToString::to_string);
-            if client_map_density > max_map_density {
-                max_map_density = client_map_density;
-            }
-        }
-        max_map_density
+        self.client_stats()
+            .iter()
+            .filter(|client| client.enabled)
+            .filter_map(|client| client.get_user_stats("edges"))
+            .map(ToString::to_string)
+            .fold("0%".to_string(), cmp::max)
     }
 
     fn item_geometry(&self) -> ItemGeometry {
@@ -512,13 +504,13 @@ impl TuiMonitor {
         }
         let mut ratio_a: u64 = 0;
         let mut ratio_b: u64 = 0;
-        for client in self.client_stats().iter().skip(1) {
+        for client in self.client_stats().iter().filter(|client| client.enabled) {
             let afl_stats = client
                 .get_user_stats("AflStats")
                 .map_or("None".to_string(), ToString::to_string);
             let stability = client.get_user_stats("stability").map_or(
                 UserStats::new(UserStatsValue::Ratio(0, 100), AggregatorOps::Avg),
-                core::clone::Clone::clone,
+                Clone::clone,
             );
 
             if afl_stats != "None" {
@@ -555,7 +547,7 @@ impl TuiMonitor {
         if self.client_stats.len() > 1 {
             let mut new_path_time = Duration::default();
             let mut new_objectives_time = Duration::default();
-            for client in self.client_stats().iter().skip(1) {
+            for client in self.client_stats().iter().filter(|client| client.enabled) {
                 new_path_time = client.last_corpus_time.max(new_path_time);
                 new_objectives_time = client.last_objective_time.max(new_objectives_time);
             }
@@ -616,7 +608,7 @@ fn run_tui_thread<W: Write + Send + Sync + 'static>(
             let timeout = tick_rate
                 .checked_sub(last_tick.elapsed())
                 .unwrap_or_else(|| Duration::from_secs(0));
-            if crossterm::event::poll(timeout)? {
+            if event::poll(timeout)? {
                 if let Event::Key(key) = event::read()? {
                     match key.code {
                         KeyCode::Char(c) => ui.on_key(c),

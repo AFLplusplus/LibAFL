@@ -1,8 +1,13 @@
 #![allow(clippy::missing_panics_doc)]
 use std::{
+    collections::hash_map,
     env, fs,
+    fs::File,
+    hash::Hasher,
+    io::{Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
     process::Command,
+    ptr::addr_of_mut,
 };
 
 use regex::Regex;
@@ -14,6 +19,43 @@ mod build;
 pub use build::build;
 
 const LLVM_VERSION_MAX: i32 = 33;
+
+static mut CARGO_RPATH: Option<Vec<String>> = None;
+static CARGO_RPATH_SEPARATOR: &str = "|";
+
+pub fn cargo_add_rpath(rpath: &str) {
+    unsafe {
+        if let Some(rpaths) = &mut *addr_of_mut!(CARGO_RPATH) {
+            rpaths.push(rpath.to_string());
+        } else {
+            CARGO_RPATH = Some(vec![rpath.to_string()]);
+        }
+    }
+}
+
+pub fn cargo_propagate_rpath() {
+    unsafe {
+        if let Some(cargo_cmds) = &mut *addr_of_mut!(CARGO_RPATH) {
+            let rpath = cargo_cmds.join(CARGO_RPATH_SEPARATOR);
+            println!("cargo:rpath={rpath}");
+        }
+    }
+}
+
+/// Must be called from final binary crates
+pub fn build_libafl_qemu() {
+    // Add rpath if there are some
+    if let Some(rpaths) = env::var_os("DEP_QEMU_RPATH") {
+        let rpaths: Vec<&str> = rpaths
+            .to_str()
+            .expect("Cannot convert OsString to str")
+            .split(CARGO_RPATH_SEPARATOR)
+            .collect();
+        for rpath in rpaths {
+            println!("cargo:rustc-link-arg-bins=-Wl,-rpath,{rpath}");
+        }
+    }
+}
 
 pub fn build_with_bindings(
     cpu_target: &str,
@@ -42,6 +84,8 @@ pub fn build_with_bindings(
     let re = Regex::new("(Option<\\s*)unsafe( extern \"C\" fn\\(data: u64)").unwrap();
     let replaced = re.replace_all(&contents, "$1$2");
     fs::write(bindings_file, replaced.as_bytes()).expect("Unable to write file");
+
+    cargo_propagate_rpath();
 }
 
 // For bindgen, the llvm version must be >= of the rust llvm version
@@ -201,5 +245,48 @@ fn include_path(build_dir: &Path, path: &str) -> String {
     } else {
         // make include path absolute
         build_dir.join(include_path).display().to_string()
+    }
+}
+
+pub fn store_generated_content_if_different(file_to_update: &PathBuf, fresh_content: &[u8]) {
+    let mut must_rewrite_file = true;
+
+    // Check if equivalent file already exists without relying on filesystem timestamp.
+    let mut file_to_check =
+        if let Ok(mut wrapper_file) = File::options().read(true).write(true).open(file_to_update) {
+            let mut existing_file_content = Vec::with_capacity(fresh_content.len());
+            wrapper_file
+                .read_to_end(existing_file_content.as_mut())
+                .unwrap();
+
+            let mut existing_wrapper_hasher = hash_map::DefaultHasher::new();
+            existing_wrapper_hasher.write(existing_file_content.as_ref());
+
+            let mut wrapper_h_hasher = hash_map::DefaultHasher::new();
+            wrapper_h_hasher.write(fresh_content);
+
+            // Check if wrappers are the same
+            if existing_wrapper_hasher.finish() == wrapper_h_hasher.finish() {
+                must_rewrite_file = false;
+            }
+
+            // Reset file cursor if it's going to be rewritten
+            if must_rewrite_file {
+                wrapper_file.set_len(0).expect("Could not set file len");
+                wrapper_file
+                    .seek(SeekFrom::Start(0))
+                    .expect("Could not seek file to beginning");
+            }
+
+            wrapper_file
+        } else {
+            File::create(file_to_update)
+                .unwrap_or_else(|_| panic!("Could not create {}", file_to_update.display()))
+        };
+
+    if must_rewrite_file {
+        file_to_check
+            .write_all(fresh_content)
+            .unwrap_or_else(|_| panic!("Unable to write in {}", file_to_update.display()));
     }
 }

@@ -1,12 +1,12 @@
 //! Tokens are what AFL calls extras or dictionaries.
 //! They may be inserted as part of mutations during fuzzing.
-use alloc::vec::Vec;
+use alloc::{borrow::Cow, vec::Vec};
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use core::slice::from_raw_parts;
 use core::{
     fmt::Debug,
     mem::size_of,
-    ops::{Add, AddAssign},
+    ops::{Add, AddAssign, Deref},
     slice::Iter,
 };
 #[cfg(feature = "std")]
@@ -23,14 +23,15 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use crate::mutators::str_decode;
 use crate::{
+    corpus::{CorpusId, HasCurrentCorpusIdx},
     inputs::{HasBytesVec, UsesInput},
     mutators::{
         buffer_self_copy, mutations::buffer_copy, MultiMutator, MutationResult, Mutator, Named,
     },
     observers::cmp::{AFLppCmpValuesMetadata, CmpValues, CmpValuesMetadata},
     stages::TaintMetadata,
-    state::{HasCorpus, HasMaxSize, HasMetadata, HasRand},
-    Error,
+    state::{HasCorpus, HasMaxSize, HasRand},
+    Error, HasMetadata,
 };
 
 /// A state metadata holding a list of tokens
@@ -271,9 +272,9 @@ where
     }
 }
 
-impl AsSlice for Tokens {
-    type Entry = Vec<u8>;
-    fn as_slice(&self) -> &[Vec<u8>] {
+impl Deref for Tokens {
+    type Target = [Vec<u8>];
+    fn deref(&self) -> &[Vec<u8>] {
         self.tokens()
     }
 }
@@ -306,27 +307,21 @@ where
     S: HasMetadata + HasRand + HasMaxSize,
     I: HasBytesVec,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
         let tokens_len = {
-            let meta = state.metadata_map().get::<Tokens>();
-            if meta.is_none() {
+            let Some(meta) = state.metadata_map().get::<Tokens>() else {
+                return Ok(MutationResult::Skipped);
+            };
+            if meta.tokens().is_empty() {
                 return Ok(MutationResult::Skipped);
             }
-            if meta.unwrap().tokens().is_empty() {
-                return Ok(MutationResult::Skipped);
-            }
-            meta.unwrap().tokens().len()
+            meta.tokens().len()
         };
-        let token_idx = state.rand_mut().below(tokens_len as u64) as usize;
+        let token_idx = state.rand_mut().below(tokens_len);
 
         let size = input.bytes().len();
-        let off = state.rand_mut().below((size + 1) as u64) as usize;
+        let off = state.rand_mut().below(size + 1);
 
         let meta = state.metadata_map().get::<Tokens>().unwrap();
         let token = &meta.tokens()[token_idx];
@@ -351,8 +346,9 @@ where
 }
 
 impl Named for TokenInsert {
-    fn name(&self) -> &str {
-        "TokenInsert"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("TokenInsert");
+        &NAME
     }
 }
 
@@ -374,30 +370,24 @@ where
     S: UsesInput + HasMetadata + HasRand + HasMaxSize,
     I: HasBytesVec,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
         if size == 0 {
             return Ok(MutationResult::Skipped);
         }
 
         let tokens_len = {
-            let meta = state.metadata_map().get::<Tokens>();
-            if meta.is_none() {
+            let Some(meta) = state.metadata_map().get::<Tokens>() else {
+                return Ok(MutationResult::Skipped);
+            };
+            if meta.tokens().is_empty() {
                 return Ok(MutationResult::Skipped);
             }
-            if meta.unwrap().tokens().is_empty() {
-                return Ok(MutationResult::Skipped);
-            }
-            meta.unwrap().tokens().len()
+            meta.tokens().len()
         };
-        let token_idx = state.rand_mut().below(tokens_len as u64) as usize;
+        let token_idx = state.rand_mut().below(tokens_len);
 
-        let off = state.rand_mut().below(size as u64) as usize;
+        let off = state.rand_mut().below(size);
 
         let meta = state.metadata_map().get::<Tokens>().unwrap();
         let token = &meta.tokens()[token_idx];
@@ -415,8 +405,9 @@ where
 }
 
 impl Named for TokenReplace {
-    fn name(&self) -> &str {
-        "TokenReplace"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("TokenReplace");
+        &NAME
     }
 }
 
@@ -439,31 +430,25 @@ where
     I: HasBytesVec,
 {
     #[allow(clippy::too_many_lines)]
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
         if size == 0 {
             return Ok(MutationResult::Skipped);
         }
 
         let cmps_len = {
-            let meta = state.metadata_map().get::<CmpValuesMetadata>();
+            let Some(meta) = state.metadata_map().get::<CmpValuesMetadata>() else {
+                return Ok(MutationResult::Skipped);
+            };
             log::trace!("meta: {:x?}", meta);
-            if meta.is_none() {
+            if meta.list.is_empty() {
                 return Ok(MutationResult::Skipped);
             }
-            if meta.unwrap().list.is_empty() {
-                return Ok(MutationResult::Skipped);
-            }
-            meta.unwrap().list.len()
+            meta.list.len()
         };
-        let idx = state.rand_mut().below(cmps_len as u64) as usize;
+        let idx = state.rand_mut().below(cmps_len);
 
-        let off = state.rand_mut().below(size as u64) as usize;
+        let off = state.rand_mut().below(size);
         let len = input.bytes().len();
         let bytes = input.bytes_mut();
 
@@ -605,8 +590,9 @@ where
 }
 
 impl Named for I2SRandReplace {
-    fn name(&self) -> &str {
-        "I2SRandReplace"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("I2SRandReplace");
+        &NAME
     }
 }
 
@@ -632,6 +618,9 @@ pub struct AFLppRedQueen {
     enable_transform: bool,
     enable_arith: bool,
     text_type: TextType,
+    /// We use this variable to check if we scheduled a new `corpus_idx`
+    /// - and, hence, need to recalculate `text_type`
+    last_corpus_idx: Option<CorpusId>,
 }
 
 impl AFLppRedQueen {
@@ -1098,7 +1087,7 @@ impl AFLppRedQueen {
 
 impl<I, S> MultiMutator<I, S> for AFLppRedQueen
 where
-    S: UsesInput + HasMetadata + HasRand + HasMaxSize + HasCorpus,
+    S: UsesInput + HasMetadata + HasRand + HasMaxSize + HasCorpus + HasCurrentCorpusIdx,
     I: HasBytesVec + From<Vec<u8>>,
 {
     #[allow(clippy::needless_range_loop)]
@@ -1107,7 +1096,6 @@ where
         &mut self,
         state: &mut S,
         input: &I,
-        stage_idx: i32,
         max_count: Option<usize>,
     ) -> Result<Vec<I>, Error> {
         // TODO
@@ -1118,17 +1106,18 @@ where
         }
 
         let (cmp_len, cmp_meta, taint_meta) = {
-            let cmp_meta = state.metadata_map().get::<AFLppCmpValuesMetadata>();
-            let taint_meta = state.metadata_map().get::<TaintMetadata>();
-            if cmp_meta.is_none() || taint_meta.is_none() {
+            let (Some(cmp_meta), Some(taint_meta)) = (
+                state.metadata_map().get::<AFLppCmpValuesMetadata>(),
+                state.metadata_map().get::<TaintMetadata>(),
+            ) else {
                 return Ok(vec![]);
-            }
+            };
 
-            let cmp_len = cmp_meta.unwrap().headers().len();
+            let cmp_len = cmp_meta.headers().len();
             if cmp_len == 0 {
                 return Ok(vec![]);
             }
-            (cmp_len, cmp_meta.unwrap(), taint_meta.unwrap())
+            (cmp_len, cmp_meta, taint_meta)
         };
 
         // These idxes must saved in this mutator itself!
@@ -1146,8 +1135,10 @@ where
         // println!("orig: {:#?} new: {:#?}", orig_cmpvals, new_cmpvals);
 
         // Compute when mutating it for the 1st time.
-        if stage_idx == 0 {
+        let current_corpus_idx = state.current_corpus_idx()?.ok_or_else(|| Error::key_not_found("No corpus-idx is currently being fuzzed, but called AFLppRedQueen::multi_mutated()."))?;
+        if self.last_corpus_idx.is_none() || self.last_corpus_idx.unwrap() != current_corpus_idx {
             self.text_type = check_if_text(orig_bytes, orig_bytes.len());
+            self.last_corpus_idx = Some(current_corpus_idx);
         }
         // println!("approximate size: {cmp_len} x {input_len}");
         for cmp_idx in 0..cmp_len {
@@ -1685,8 +1676,9 @@ where
 }
 
 impl Named for AFLppRedQueen {
-    fn name(&self) -> &str {
-        "AFLppRedQueen"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("AFLppRedQueen");
+        &NAME
     }
 }
 
@@ -1698,6 +1690,7 @@ impl AFLppRedQueen {
             enable_transform: false,
             enable_arith: false,
             text_type: TextType::None,
+            last_corpus_idx: None,
         }
     }
 
@@ -1708,6 +1701,7 @@ impl AFLppRedQueen {
             enable_transform: transform,
             enable_arith: arith,
             text_type: TextType::None,
+            last_corpus_idx: None,
         }
     }
 
