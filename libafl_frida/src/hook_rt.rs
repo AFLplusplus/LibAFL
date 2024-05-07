@@ -36,13 +36,21 @@ use std::ptr::read_unaligned;
 /*
 LibAFL hook_rt design:
 
-The objective of this runtime is to move away from using Interceptor for hooking and move to something that hooks during the stalk. The way this does this is different for direct and indirect branches.
+The objective of this runtime is to move away from using Interceptor for hooking and move to
+something that hooks during the stalk. The way this does this is different for direct and indirect
+branches.
 
-For direct branches, the hooking is easy. We simply check if the branch target is hooked. If it is, run the hooked function. If it is not, then continue as per normal. If it is hooked, we chaining return to return the caller.
+For direct branches, the hooking is easy. We simply check if the branch target is hooked. If it is,
+run the hooked function. If it is not, then continue as per normal. If it is hooked, we chaining
+return to return the caller.
 
-For indirect branches (i.e., jmp rax/blr x16), it is harder as the branch target is difficult to know at block-compile time. In the case of indirect branches, we check the register during runtime. If the value of the register is a hooked function then run the hooked function in the callout and set HookRuntime::hooked = 1. If it is not then set HookRuntime::hooked = 0.
+For indirect branches (i.e., jmp rax/blr x16), it is harder as the branch target is difficult to
+know at block-compile time. In the case of indirect branches, we check the register during runtime.
+If the value of the register is a hooked function then run the hooked function in the callout and
+set HookRuntime::hooked = 1. If it is not then set HookRuntime::hooked = 0.
 
-From here, we either chaining return if HookRuntime::hooked == 1 or continue on to the next block via a keeping the instruction if HookRuntime::hooked = 0
+From here, we either chaining return if HookRuntime::hooked == 1 or continue on to the next block
+via a keeping the instruction if HookRuntime::hooked = 0
 
 */
 
@@ -90,11 +98,15 @@ impl FridaRuntime for HookRuntime {
     }
 }
 
+/// The type of a call instruction
 #[derive(Debug)]
 #[cfg(target_arch = "x86_64")]
 pub enum CallType {
+    /// Call an immediate address
     Imm(usize),
+    /// Call through a register
     Reg(X86Register),
+    /// Call through a memory dereference
     Mem((X86Register, X86Register, u8, i32)), //this is the return type from operand_details
 }
 

@@ -41,17 +41,11 @@ use libafl_bolts::{
     tuples::{tuple_list, Merge},
     AsSlice,
 };
-<<<<<<< HEAD
-=======
-#[cfg(unix)]
-use libafl_frida::asan::asan_rt::AsanRuntime;
-#[cfg(unix)]
-use libafl_frida::asan::errors::{AsanErrorsFeedback, AsanErrorsObserver};
->>>>>>> main
+
 use libafl_frida::{
     asan::{
         asan_rt::AsanRuntime,
-        errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS},
+        errors::{AsanErrorsFeedback, AsanErrorsObserver},
     },
     cmplog_rt::CmpLogRuntime,
     coverage_rt::{CoverageRuntime, MAP_SIZE},
@@ -105,16 +99,9 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let gum = Gum::obtain();
 
                 let coverage = CoverageRuntime::new();
-<<<<<<< HEAD
                 let asan = AsanRuntime::new(&options);
                 let hooks = HookRuntime::new();
                     
-=======
-                #[cfg(unix)]
-                let asan = AsanRuntime::new(options);
-
-                #[cfg(unix)]
->>>>>>> main
                 let mut frida_helper =
                     FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage, asan, hooks));
                 //
@@ -129,7 +116,6 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // Create an observation channel to keep track of the execution time
                 let time_observer = TimeObserver::new("time");
 
-                #[cfg(unix)]
                 let asan_observer = AsanErrorsObserver::from_static_asan_errors();
 
                 // Feedback to rate the interestingness of an input
@@ -191,18 +177,11 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-<<<<<<< HEAD
                 let observers = tuple_list!(
                     edges_observer,
                     time_observer,
-                    AsanErrorsObserver::new(&ASAN_ERRORS)
+                    asan_observer,
                 );
-=======
-                #[cfg(unix)]
-                let observers = tuple_list!(edges_observer, time_observer, asan_observer);
-                #[cfg(windows)]
-                let observers = tuple_list!(edges_observer, time_observer);
->>>>>>> main
 
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
@@ -255,7 +234,6 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
                 // Create an observation channel to keep track of the execution time
                 let time_observer = TimeObserver::new("time");
-                #[cfg(unix)]
                 let asan_observer = AsanErrorsObserver::from_static_asan_errors();
 
                 // Feedback to rate the interestingness of an input
@@ -269,16 +247,11 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
                 let mut objective = feedback_or_fast!(
                     CrashFeedback::new(),
-<<<<<<< HEAD
-                    // TimeoutFeedback::new(),
-                    feedback_and_fast!(ConstFeedback::from(false), AsanErrorsFeedback::new())
-=======
                     TimeoutFeedback::new(),
                     feedback_and_fast!(
                         ConstFeedback::from(false),
                         AsanErrorsFeedback::new(&asan_observer)
                     )
->>>>>>> main
                 );
 
                 // If not restarting, create a State from scratch
@@ -321,18 +294,11 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-<<<<<<< HEAD
                 let observers = tuple_list!(
                     edges_observer,
                     time_observer,
-                    AsanErrorsObserver::new(&ASAN_ERRORS)
+                    asan_observer
                 );
-=======
-                #[cfg(unix)]
-                let observers = tuple_list!(edges_observer, time_observer, asan_observer);
-                #[cfg(windows)]
-                let observers = tuple_list!(edges_observer, time_observer,);
->>>>>>> main
 
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
@@ -400,7 +366,6 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // Create an observation channel to keep track of the execution time
                 let time_observer = TimeObserver::new("time");
 
-                #[cfg(unix)]
                 let asan_observer = AsanErrorsObserver::from_static_asan_errors();
 
                 // Feedback to rate the interestingness of an input
@@ -414,16 +379,8 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
                 let mut objective = feedback_or_fast!(
                     CrashFeedback::new(),
-<<<<<<< HEAD
                     // TimeoutFeedback::new(),
-                    feedback_and_fast!(ConstFeedback::from(false), AsanErrorsFeedback::new())
-=======
-                    TimeoutFeedback::new(),
-                    feedback_and_fast!(
-                        ConstFeedback::from(false),
-                        AsanErrorsFeedback::new(&asan_observer)
-                    )
->>>>>>> main
+                    feedback_and_fast!(ConstFeedback::from(false), AsanErrorsFeedback::new(&asan_observer))
                 );
 
                 // If not restarting, create a State from scratch
@@ -466,18 +423,11 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-<<<<<<< HEAD
                 let observers = tuple_list!(
                     edges_observer,
                     time_observer,
-                    AsanErrorsObserver::new(&ASAN_ERRORS)
+                    asan_observer
                 );
-=======
-                #[cfg(unix)]
-                let observers = tuple_list!(edges_observer, time_observer, asan_observer);
-                #[cfg(windows)]
-                let observers = tuple_list!(edges_observer, time_observer);
->>>>>>> main
 
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(

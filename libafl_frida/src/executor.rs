@@ -108,9 +108,9 @@ where
             self.stalker.deactivate();
         }
 
-        #[cfg(all(unix, not(test)))]
+        #[cfg(not(test))]
         unsafe {
-            if !AsanErrors::get_mut_blocking().borrow().is_empty() {
+            if !AsanErrors::get_mut_blocking().is_empty() {
                 log::error!("Crashing target as it had ASan errors");
                 libc::raise(libc::SIGABRT);
                 #[cfg(windows)]
