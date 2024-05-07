@@ -884,7 +884,7 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
     Ok(())
 }
 
-#[cfg(target_vendor = "apple")]
+#[cfg(target_os = "macos")]
 fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Error> {
     let ptask = std::mem::MaybeUninit::<libc::mach_task_t>::uninit();
     // We start by the lowest virtual address from the userland' standpoint
