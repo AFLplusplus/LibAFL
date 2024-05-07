@@ -543,10 +543,10 @@ where
 
                 #[cfg(target_arch = "x86_64")]
                 if let Some(rt) = runtimes.match_first_type_mut::<HookRuntime>() {
-                    if let Some((call_target, needs_chaining_return)) = rt.is_interesting(decoder, instr) {
+                    if let Some((call_target, is_jmp)) = rt.is_interesting(decoder, instr) {
                         rt.emit_callout(
                             call_target,
-                            needs_chaining_return,
+                            is_jmp,
                             &instruction,
                             output.writer(),
                             runtimes_unborrowed.clone(),
@@ -557,11 +557,11 @@ where
 
                 #[cfg(target_arch = "aarch64")]
                 if let Some(rt) = runtimes.match_first_type_mut::<HookRuntime>() {
-                    if let Some((call_target, is_reg)) = rt.is_interesting(decoder, instr) {
+                    if let Some((call_target, opcode)) = rt.is_interesting(decoder, instr) {
                         rt.emit_callout(
                             call_target,
                             &instruction,
-                            is_reg,
+                            opcode,
                             output.writer(),
                             runtimes_unborrowed.clone(),
                         );
