@@ -5,7 +5,7 @@ use std::{fmt::Debug, marker::PhantomData};
 
 use hashbrown::HashSet;
 use libafl_bolts::{
-    tuples::{Handle, Handler, MatchNameRef},
+    tuples::{Handle, Handled, MatchNameRef},
     Named,
 };
 use serde::{Deserialize, Serialize};
@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     events::EventFirer,
     executors::ExitKind,
-    feedbacks::{Feedback, HasObserverReference},
+    feedbacks::{Feedback, HasObserverHandle},
     inputs::UsesInput,
     observers::{ObserverWithHashField, ObserversTuple},
     state::State,
@@ -145,11 +145,11 @@ impl<O, S> Named for NewHashFeedback<O, S> {
     }
 }
 
-impl<O, S> HasObserverReference for NewHashFeedback<O, S> {
+impl<O, S> HasObserverHandle for NewHashFeedback<O, S> {
     type Observer = O;
 
     #[inline]
-    fn observer_ref(&self) -> &Handle<O> {
+    fn observer_handle(&self) -> &Handle<O> {
         &self.o_ref
     }
 }

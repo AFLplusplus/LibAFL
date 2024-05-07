@@ -6,7 +6,7 @@ use libafl::{
     inputs::{Input, UsesInput},
     observers::{stacktrace::BacktraceObserver, ObserversTuple},
 };
-use libafl_bolts::tuples::{Handle, Handler, MatchFirstType, MatchNameRef};
+use libafl_bolts::tuples::{Handle, Handled, MatchFirstType, MatchNameRef};
 use libafl_qemu_sys::GuestAddr;
 use thread_local::ThreadLocal;
 
@@ -439,7 +439,7 @@ where
 #[derive(Debug)]
 pub struct OnCrashBacktraceCollector<'a> {
     callstack_hash: u64,
-    obs_ref: Handle<BacktraceObserver<'a>>,
+    observer_handle: Handle<BacktraceObserver<'a>>,
 }
 
 impl<'a> OnCrashBacktraceCollector<'a> {
@@ -447,7 +447,7 @@ impl<'a> OnCrashBacktraceCollector<'a> {
     pub fn new(observer: &BacktraceObserver<'a>) -> Self {
         Self {
             callstack_hash: 0,
-            obs_ref: observer.handle(),
+            observer_handle: observer.handle(),
         }
     }
 
@@ -511,7 +511,7 @@ where
         S: UsesInput,
     {
         let observer = observers
-            .get_mut(&self.obs_ref)
+            .get_mut(&self.observer_handle)
             .expect("A OnCrashBacktraceCollector needs a BacktraceObserver");
         observer.fill_external(self.callstack_hash, exit_kind);
     }

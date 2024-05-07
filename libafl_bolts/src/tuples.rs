@@ -495,11 +495,11 @@ where
     }
 }
 
-/// Structs that has `Handle `
-/// You should use this when you want to avoid specifying types using `match_name_type_mut`
+/// Structs that have a [`Handle`] to reference this element by, in maps.
+/// You should use this when you want to avoid specifying types.
 #[cfg(feature = "alloc")]
-pub trait Handler: Named {
-    /// Return the `Handle `
+pub trait Handled: Named {
+    /// Return the [`Handle`]
     fn handle(&self) -> Handle<Self> {
         Handle {
             name: Named::name(self).clone(),
@@ -509,7 +509,7 @@ pub trait Handler: Named {
 }
 
 #[cfg(feature = "alloc")]
-impl<N> Handler for N where N: Named {}
+impl<N> Handled for N where N: Named {}
 
 /// Object with the type T and the name associated with its concrete value
 #[derive(Serialize, Deserialize)]
