@@ -30,7 +30,7 @@ typedef UINT64 libafl_word;
 #else
   #include <stdint.h>
 
-  #ifdef __x86_64__
+  #if defined(__x86_64__) || defined(__aarch64__)
     typedef uint64_t libafl_word;
     #define LIBAFL_CALLING_CONVENTION __attribute__(())
   #endif
@@ -171,6 +171,54 @@ typedef enum LibaflQemuEndStatus {
         : "=r"(ret)                                                                         \
         : "r"(action), "r"(arg1), "r"(arg2)                                                 \
         : "r0", "r1", "r2"                                                                  \
+    );   \
+        return ret;                                                                                 \
+      }
+  #endif
+
+  #ifdef __aarch64__
+    #define LIBAFL_DEFINE_FUNCTIONS(name, opcode)                                                   \
+      libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call0(                                 \
+          libafl_word action) {                                                                     \
+        libafl_word ret;                                                                            \
+        __asm__ volatile (                                                                        \
+        "mov x0, %1\n"                                                                            \
+        ".word " XSTRINGIFY(opcode) "\n"                                              \
+        "mov %0, x0\n"                                                                            \
+        : "=r"(ret)                                                                               \
+        : "r"(action)                                                                             \
+        : "x0"                                                                                    \
+    ); \
+        return ret;                                                                                 \
+      }                                                                                             \
+                                                                                                    \
+      libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call1(                                 \
+          libafl_word action, libafl_word arg1) {                                                   \
+        libafl_word ret;                                                                            \
+        __asm__ volatile (                                                                      \
+        "mov x0, %1\n"                                                                      \
+        "mov x1, %2\n"                                                                      \
+        ".word " XSTRINGIFY(opcode) "\n"                                        \
+        "mov %0, x0\n"                                                                      \
+        : "=r"(ret)                                                                         \
+        : "r"(action), "r"(arg1)                                                            \
+        : "x0", "x1"                                                                        \
+    );   \
+        return ret;                                                                                 \
+      }                                                                                             \
+                                                                                                    \
+      libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call2(                                 \
+          libafl_word action, libafl_word arg1, libafl_word arg2) {                                 \
+        libafl_word ret;                                                                            \
+        __asm__ volatile (                                                                      \
+        "mov x0, %1\n"                                                                      \
+        "mov x1, %2\n"                                                                      \
+        "mov x2, %3\n"                                                                      \
+        ".word " XSTRINGIFY(opcode) "\n"                                        \
+        "mov %0, x0\n"                                                                      \
+        : "=r"(ret)                                                                         \
+        : "r"(action), "r"(arg1), "r"(arg2)                                                 \
+        : "x0", "x1", "x2"                                                                  \
     );   \
         return ret;                                                                                 \
       }
