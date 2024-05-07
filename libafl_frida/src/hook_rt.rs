@@ -121,7 +121,7 @@ impl HookRuntime {
     /// Determine if this instruction is interesting for the purposes of hooking
     #[inline]
     #[cfg(target_arch = "x86_64")]
-    pub fn is_interesting(&self, decoder: InstDecoder, instr: &Insn) -> Option<CallType> {
+    pub fn is_interesting(&self, decoder: InstDecoder, instr: &Insn) -> Option<(CallType, bool)> {
         let result = frida_to_cs(decoder, instr);
 
         if let Err(e) = result {
@@ -141,20 +141,20 @@ impl HookRuntime {
 
                 if let Some((reg, index_reg, scale, disp)) = mem_details {
                     if reg == X86Register::Rip {
-                        //rip relative loads are from the end of the instruction
-                        return Some(CallType::Mem((
+                        //rip relative loads are from the end of the instruction, so add the instruction size to disp
+                        return Some((CallType::Mem((
                             reg,
                             index_reg,
                             scale,
                             disp + instr.len() as i32,
-                        )));
+                        )), instruction.opcode() == Opcode::JMP));
                     }
-                    return Some(CallType::Mem((reg, index_reg, scale, disp)));
+                    return Some((CallType::Mem((reg, index_reg, scale, disp)), instruction.opcode() == Opcode::JMP));
                 }
             } else {
                 match instruction.operand(0) {
                     Operand::Register(reg_spec) => {
-                        return Some(CallType::Reg(writer_register(reg_spec)));
+                        return Some((CallType::Reg(writer_register(reg_spec)), instruction.opcode() == Opcode::JMP));
                     }
                     Operand::ImmediateI32(imm) => {
                         //https://www.felixcloutier.com/x86/call
@@ -162,7 +162,7 @@ impl HookRuntime {
                         if !self.hooks.contains_key(&target) {
                             return None;
                         }
-                        return Some(CallType::Imm(target));
+                        return Some((CallType::Imm(target), instruction.opcode() == Opcode::JMP));
                     }
                     _ => panic!("Invalid call/jmp instructions"),
                 }
@@ -173,7 +173,7 @@ impl HookRuntime {
 
     #[inline]
     #[cfg(target_arch = "aarch64")]
-    pub fn is_interesting(&self, decoder: InstDecoder, instr: &Insn) -> Option<(usize, bool)> {
+    pub fn is_interesting(&self, decoder: InstDecoder, instr: &Insn) -> Option<(usize, bool, bool)> {
         let result = frida_to_cs(decoder, instr);
 
         if let Err(e) = result {
@@ -196,8 +196,8 @@ impl HookRuntime {
                 };
 
                 //we could probably introduce some kind of speculative backpatching as it is unlikely that if it is hooked the first time that it ever hooks again
-
-                return Some((reg_num as usize, true)); //the reg should always be checked
+                //we only need chaining return if its a branch register
+                return Some((reg_num as usize, true, instruction.opcode == Opcode::BR)); //the reg should always be checked
             }
             Opcode::BL | Opcode::B => {
                 let call_address = if let Operand::PCOffset(off) = instruction.operands[0] {
@@ -206,14 +206,14 @@ impl HookRuntime {
                     panic!(
                         "Invalid instruction - opcode: {:?}, operands: {:?}",
                         instruction.opcode, instruction.operands
-                    ); //impossible to have b/bl with a PCOffset
+                    ); //impossible to have b/bl without a PCOffset
                 };
 
                 if !self.hooks.contains_key(&call_address) {
                     return None;
                 }
-
-                return Some((call_address, false));
+                //we only need chaining return if its a branch
+                return Some((call_address, false, instruction.opcode == Opcode::B));
             }
 
             _ => {
@@ -228,6 +228,7 @@ impl HookRuntime {
     pub fn emit_callout<RT: FridaRuntimeTuple>(
         &mut self,
         call_type: CallType,
+        is_jmp: bool,
         insn: &Instruction,
         writer: X86InstructionWriter,
         runtimes: Rc<RefCell<RT>>,
@@ -236,6 +237,7 @@ impl HookRuntime {
         log::trace!("call: {:?}", call_type);
         let hooked_address = addr_of!(self.hooked) as u64;
         let rip = insn.instr().address();
+        let next_insn = rip + insn.instr().len() as u64;
         let is_imm = if let CallType::Imm(_) = call_type {
             //log::trace!("needs return at {:x}", address);
             true
@@ -296,7 +298,18 @@ impl HookRuntime {
             //if we are here we did not hook
             writer.put_pop_reg(X86Register::Rdi);
             writer.put_add_reg_imm(X86Register::Rsp, frida_gum_sys::GUM_RED_ZONE_SIZE as isize);
-            insn.put_chaining_return(); //we hooked, run the chaining return
+            if !is_jmp {  
+                //if its a call return to the previous block
+                //this is super hacky but works because we just emulate a call/ret by pushing our address of the next insn on to the stack
+                //rcx is caller saved on both unix and windows
+                writer.put_mov_reg_address(X86Register::Rcx, next_insn);
+                writer.put_push_reg(X86Register::Rcx);
+            } 
+
+            // if its a jmp then its a tail call.
+            // in the case of a tail call, we can just chaining return because the first address on the stack (i.e., at rsp) should be the return address. 
+
+            insn.put_chaining_return();
 
             writer.put_label(not_hooked_label_id);
             //we did not hook, normally run the function
@@ -305,6 +318,14 @@ impl HookRuntime {
 
             insn.keep();
         } else {
+            if !is_jmp {  
+                //if its a call return to the previous block
+                //this is super hacky but works because we just emulate a call/ret by pushing our address of the next insn on to the stack
+                //rcx is caller saved on both unix and windows
+                writer.put_mov_reg_address(X86Register::Rcx, next_insn);
+                writer.put_push_reg(X86Register::Rcx);
+            } 
+
             insn.put_chaining_return();
         }
     }
@@ -316,10 +337,12 @@ impl HookRuntime {
         address_or_reg: usize,
         insn: &Instruction,
         is_reg: bool,
+        no_link: bool,
         writer: Aarch64InstructionWriter,
         runtimes: Rc<RefCell<RT>>,
     ) {
         let hooked_address = addr_of!(self.hooked) as u64;
+        let next_insn = insn.instr().address() + insn.instr().len();
         log::trace!("emit_callout: {:x}", address_or_reg);
         insn.put_callout(move |context| {
             if !is_reg {
@@ -383,7 +406,13 @@ impl HookRuntime {
                 16 + i64::from(redzone_size),
                 IndexMode::PostAdjust,
             );
-            //then we chaining return because we hooked
+            
+
+            if !no_link {
+                //if we do a linked branch (i.e. BLR) then put the return address into x30 and return
+                writer.put_ldr_reg_u64(Aarch64Register::X30, next_insn);
+            }
+            
             insn.put_chaining_return();
 
             writer.put_label(not_hooked_label_id);
@@ -399,6 +428,10 @@ impl HookRuntime {
             insn.keep(); //the keep will dispatch to the next block
         } else {
             //Opcode::B/Opcode::BL
+            if !no_link {
+                //if we do a linked branch (i.e. BL) then put the return address into x30 and return
+                writer.put_ldr_reg_u64(Aarch64Register::X30, next_insn);
+            }
             insn.put_chaining_return();
         }
     }
