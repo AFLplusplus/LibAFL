@@ -1,5 +1,6 @@
 // this is required to be allowed to call the final executable what we want (and need) in Cargo.toml
 #![allow(non_snake_case)]
+#![forbid(unexpected_cfgs)]
 //! Just a small runtime to be used in the smoke test.
 
 use symcc_runtime::{

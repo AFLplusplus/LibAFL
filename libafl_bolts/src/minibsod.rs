@@ -130,7 +130,7 @@ pub fn dump_registers<W: Write>(
 }
 
 /// Write the content of all important registers
-#[cfg(all(target_vendor = "freebsd", target_arch = "aarch64"))]
+#[cfg(all(target_os = "freebsd", target_arch = "aarch64"))]
 #[allow(clippy::similar_names)]
 pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
@@ -884,7 +884,7 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
     Ok(())
 }
 
-#[cfg(target_env = "apple")]
+#[cfg(target_vendor = "apple")]
 fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Error> {
     let ptask = std::mem::MaybeUninit::<libc::mach_task_t>::uninit();
     // We start by the lowest virtual address from the userland' standpoint
@@ -970,7 +970,7 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
     target_os = "openbsd",
     target_os = "netbsd",
     target_os = "haiku",
-    target_env = "apple",
+    target_vendor = "apple",
     any(target_os = "linux", target_os = "android"),
     any(target_os = "solaris", target_os = "illumos"),
 )))]

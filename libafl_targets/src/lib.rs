@@ -3,7 +3,7 @@
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
-#![cfg_attr(nightly, feature(portable_simd))]
+#![forbid(unexpected_cfgs)]
 #![allow(
     clippy::unreadable_literal,
     clippy::type_repetition_in_bounds,
