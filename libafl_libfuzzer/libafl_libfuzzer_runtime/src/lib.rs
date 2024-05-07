@@ -1,6 +1,7 @@
 //! The `LibAFL` `LibFuzzer` runtime, exposing the same functions as the original [`LibFuzzer`](https://llvm.org/docs/LibFuzzer.html).
 
 #![forbid(unexpected_cfgs)]
+#![allow(clippy::unsafe_derive_deserialize)]
 
 use core::ffi::{c_char, c_int, CStr};
 use std::{fs::File, io::stderr, os::fd::RawFd};

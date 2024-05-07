@@ -427,8 +427,6 @@ where
     client_id: ClientId,
     /// The custom buf handler
     custom_buf_handlers: Vec<Box<CustomBufHandlerFn<S>>>,
-    #[cfg(feature = "tcp_compression")]
-    compressor: GzipCompressor,
     /// The configuration defines this specific fuzzer.
     /// A node will not re-use the observer values sent over TCP
     /// from nodes with other configurations.
@@ -445,8 +443,6 @@ where
         let mut debug_struct = f.debug_struct("TcpEventManager");
         let debug = debug_struct.field("tcp", &self.tcp);
         //.field("custom_buf_handlers", &self.custom_buf_handlers)
-        #[cfg(feature = "tcp_compression")]
-        let debug = debug.field("compressor", &self.compressor);
         debug
             .field("configuration", &self.configuration)
             .field("phantom", &self.phantom)
@@ -550,8 +546,6 @@ where
             hooks,
             tcp,
             client_id,
-            #[cfg(feature = "tcp_compression")]
-            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             configuration,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
@@ -712,31 +706,6 @@ where
     EMH: EventManagerHooksTuple<S>,
     S: State,
 {
-    #[cfg(feature = "tcp_compression")]
-    fn fire(
-        &mut self,
-        _state: &mut Self::State,
-        event: Event<<Self::State as UsesInput>::Input>,
-    ) -> Result<(), Error> {
-        let serialized = postcard::to_allocvec(&event)?;
-        let flags = TCP_FLAG_INITIALIZED;
-
-        match self.compressor.compress(&serialized)? {
-            Some(comp_buf) => {
-                self.tcp.send_buf_with_flags(
-                    TCP_TAG_EVENT_TO_BOTH,
-                    flags | TCP_FLAG_COMPRESSED,
-                    &comp_buf,
-                )?;
-            }
-            None => {
-                self.tcp.send_buf(TCP_TAG_EVENT_TO_BOTH, &serialized)?;
-            }
-        }
-        Ok(())
-    }
-
-    #[cfg(not(feature = "tcp_compression"))]
     fn fire(
         &mut self,
         _state: &mut Self::State,

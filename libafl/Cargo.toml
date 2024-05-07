@@ -65,7 +65,7 @@ tcp_manager = ["tokio", "std"]
 tcp_debug = ["tcp_manager"]
 
 ## Enables compression for the TCP manager
-tcp_compression = ["tcp_manager"]
+tcp_compression = ["tcp_manager", "libafl_bolts/gzip"]
 
 ## Enables the `NaiveTokenizer` and `StacktraceObserver`
 regex = ["std", "dep:regex"]

@@ -4,6 +4,8 @@
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
 #![forbid(unexpected_cfgs)]
+// For `std::simd`
+#![cfg_attr(nightly, feature(portable_simd))]
 #![allow(
     clippy::unreadable_literal,
     clippy::type_repetition_in_bounds,

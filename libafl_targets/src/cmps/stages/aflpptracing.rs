@@ -1,8 +1,6 @@
 use alloc::borrow::Cow;
 use core::marker::PhantomData;
 
-#[cfg(feature = "introspection")]
-use libafl::state::HasClientPerfMonitor;
 use libafl::{
     executors::{Executor, HasObservers},
     inputs::{BytesInput, UsesInput},
