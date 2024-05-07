@@ -11,7 +11,7 @@ use crate::cargo_add_rpath;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "538e6b02c36838e0de469b39dd03fef05678444f";
+const QEMU_REVISION: &str = "9f3e2399ee9b106dfbb8c3afcdfdf30e235fc88f";
 
 #[allow(clippy::module_name_repetitions)]
 pub struct BuildResult {

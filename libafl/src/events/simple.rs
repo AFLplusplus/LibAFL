@@ -18,7 +18,7 @@ use libafl_bolts::os::unix_signals::setup_signal_handler;
 use libafl_bolts::os::{fork, ForkResult};
 use libafl_bolts::ClientId;
 #[cfg(feature = "std")]
-use libafl_bolts::{shmem::ShMemProvider, staterestore::StateRestorer};
+use libafl_bolts::{os::CTRL_C_EXIT, shmem::ShMemProvider, staterestore::StateRestorer};
 #[cfg(feature = "std")]
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -520,7 +520,7 @@ where
 
                 compiler_fence(Ordering::SeqCst);
 
-                if child_status == crate::events::CTRL_C_EXIT || staterestorer.wants_to_exit() {
+                if child_status == CTRL_C_EXIT || staterestorer.wants_to_exit() {
                     return Err(Error::shutting_down());
                 }
 

@@ -60,8 +60,8 @@ use libafl_qemu::{
     MmapPerms,
     Qemu,
     QemuExecutor,
+    QemuExitError,
     QemuExitReason,
-    QemuExitReasonError,
     QemuShutdownCause,
     Regs,
 };
@@ -350,7 +350,7 @@ fn fuzz(
                 Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(Signal::SigInterrupt))) => {
                     process::exit(0)
                 }
-                Err(QemuExitReasonError::UnexpectedExit) => return ExitKind::Crash,
+                Err(QemuExitError::UnexpectedExit) => return ExitKind::Crash,
                 _ => panic!("Unexpected QEMU exit."),
             }
         }

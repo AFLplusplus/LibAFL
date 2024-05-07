@@ -25,6 +25,9 @@ pub use windows::Win32::{
 
 use crate::Error;
 
+/// The special exit code when the target exited through ctrl-c
+pub const CTRL_C_EXIT: i32 = -1073741510;
+
 // For VEH
 const EXCEPTION_CONTINUE_EXECUTION: c_long = -1;
 
