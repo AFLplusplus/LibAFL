@@ -92,11 +92,6 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let gum = Gum::obtain();
 
                 let coverage = CoverageRuntime::new();
-<<<<<<< HEAD
-=======
-                #[cfg(unix)]
-                let asan = AsanRuntime::new(options);
->>>>>>> main
 
                 let asan = AsanRuntime::new(options);
 
@@ -114,10 +109,6 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
                 // Create an observation channel to keep track of the execution time
                 let time_observer = TimeObserver::new("time");
-<<<<<<< HEAD
-=======
-                #[cfg(unix)]
->>>>>>> main
                 let asan_observer = AsanErrorsObserver::from_static_asan_errors();
 
                 // Feedback to rate the interestingness of an input
@@ -134,14 +125,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                     CrashFeedback::new(),
                     TimeoutFeedback::new(),
                     // true enables the AsanErrorFeedback
-<<<<<<< HEAD
                     AsanErrorsFeedback::new(&asan_observer)
-=======
-                    feedback_and_fast!(
-                        ConstFeedback::from(true),
-                        AsanErrorsFeedback::new(&asan_observer)
-                    )
->>>>>>> main
                 );
                 #[cfg(windows)]
                 let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
@@ -186,15 +170,8 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-<<<<<<< HEAD
                 let observers = tuple_list!(edges_observer, time_observer, asan_observer);
 
-=======
-                #[cfg(unix)]
-                let observers = tuple_list!(edges_observer, time_observer, asan_observer);
-                #[cfg(windows)]
-                let observers = tuple_list!(edges_observer, time_observer);
->>>>>>> main
 
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
@@ -246,10 +223,6 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
                 // Create an observation channel to keep track of the execution time
                 let time_observer = TimeObserver::new("time");
-<<<<<<< HEAD
-=======
-                #[cfg(unix)]
->>>>>>> main
                 let asan_observer = AsanErrorsObserver::from_static_asan_errors();
 
                 // Feedback to rate the interestingness of an input
@@ -265,11 +238,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                     CrashFeedback::new(),
                     TimeoutFeedback::new(),
                     feedback_and_fast!(
-<<<<<<< HEAD
                         ConstFeedback::from(true),
-=======
-                        ConstFeedback::from(false),
->>>>>>> main
                         AsanErrorsFeedback::new(&asan_observer)
                     )
                 );
@@ -316,15 +285,8 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-<<<<<<< HEAD
 
                 let observers = tuple_list!(edges_observer, time_observer, asan_observer);
-=======
-                #[cfg(unix)]
-                let observers = tuple_list!(edges_observer, time_observer, asan_observer);
-                #[cfg(windows)]
-                let observers = tuple_list!(edges_observer, time_observer);
->>>>>>> main
 
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
@@ -390,10 +352,6 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
                 // Create an observation channel to keep track of the execution time
                 let time_observer = TimeObserver::new("time");
-<<<<<<< HEAD
-=======
-                #[cfg(unix)]
->>>>>>> main
                 let asan_observer = AsanErrorsObserver::from_static_asan_errors();
 
                 // Feedback to rate the interestingness of an input
@@ -408,14 +366,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let mut objective = feedback_or_fast!(
                     CrashFeedback::new(),
                     TimeoutFeedback::new(),
-<<<<<<< HEAD
                     AsanErrorsFeedback::new(&asan_observer)
-=======
-                    feedback_and_fast!(
-                        ConstFeedback::from(false),
-                        AsanErrorsFeedback::new(&asan_observer)
-                    )
->>>>>>> main
                 );
                 #[cfg(windows)]
                 let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
