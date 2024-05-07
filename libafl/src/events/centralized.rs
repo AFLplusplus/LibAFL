@@ -11,7 +11,7 @@ use alloc::{boxed::Box, string::String, vec::Vec};
 use core::{marker::PhantomData, num::NonZeroUsize, time::Duration};
 
 #[cfg(feature = "adaptive_serialization")]
-use libafl_bolts::tuples::{CanBeHandled, Handle};
+use libafl_bolts::tuples::{Handle, Handled};
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{
     compress::GzipCompressor,

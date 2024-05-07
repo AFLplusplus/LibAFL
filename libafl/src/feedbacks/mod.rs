@@ -14,7 +14,7 @@ use core::{
 pub use concolic::ConcolicFeedback;
 pub use differential::DiffFeedback;
 use libafl_bolts::{
-    tuples::{CanBeHandled, Handle, MatchNameRef},
+    tuples::{Handle, Handled, MatchNameRef},
     Named,
 };
 pub use list::*;

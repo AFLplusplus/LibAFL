@@ -25,7 +25,7 @@ use libafl_bolts::{
     core_affinity::Cores,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, CanBeHandled, Merge},
+    tuples::{tuple_list, Handled, Merge},
     AsSliceMut,
 };
 use typed_builder::TypedBuilder;

@@ -5,7 +5,7 @@ use core::{borrow::BorrowMut, fmt::Debug, hash::Hash, marker::PhantomData};
 
 use ahash::RandomState;
 use libafl_bolts::{
-    tuples::{CanBeHandled, Handle, MatchNameRef},
+    tuples::{Handle, Handled, MatchNameRef},
     HasLen, Named,
 };
 
@@ -407,7 +407,7 @@ pub struct MapEqualityFactory<C, M, S> {
 impl<C, M, S> MapEqualityFactory<C, M, S>
 where
     M: MapObserver,
-    C: AsRef<M> + CanBeHandled,
+    C: AsRef<M> + Handled,
 {
     /// Creates a new map equality feedback for the given observer
     pub fn new(obs: &C) -> Self {
@@ -430,7 +430,7 @@ impl<C, M, OT, S> FeedbackFactory<MapEqualityFeedback<C, M, S>, S, OT>
     for MapEqualityFactory<C, M, S>
 where
     M: MapObserver,
-    C: AsRef<M> + CanBeHandled,
+    C: AsRef<M> + Handled,
     OT: ObserversTuple<S>,
     S: State + Debug,
 {

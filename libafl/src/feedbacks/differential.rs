@@ -8,7 +8,7 @@ use core::{
 };
 
 use libafl_bolts::{
-    tuples::{CanBeHandled, Handle, MatchName, MatchNameRef},
+    tuples::{Handle, Handled, MatchName, MatchNameRef},
     Named,
 };
 use serde::{Deserialize, Serialize};

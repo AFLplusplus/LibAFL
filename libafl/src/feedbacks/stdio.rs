@@ -4,7 +4,7 @@ use alloc::{borrow::Cow, string::String};
 
 use libafl_bolts::{
     impl_serdeany,
-    tuples::{CanBeHandled, Handle, MatchNameRef},
+    tuples::{Handle, Handled, MatchNameRef},
     Named,
 };
 use serde::{Deserialize, Serialize};
