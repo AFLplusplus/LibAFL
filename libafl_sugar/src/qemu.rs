@@ -32,7 +32,7 @@ use libafl_bolts::{
     ownedref::OwnedMutSlice,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, Handler, Merge},
+    tuples::{tuple_list, Handled, Merge},
     AsSlice,
 };
 pub use libafl_qemu::emu::Qemu;
