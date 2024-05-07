@@ -353,7 +353,7 @@ mod tests {
         corpus::{Corpus, InMemoryCorpus, Testcase},
         events::NopEventManager,
         executors::{ExitKind, InProcessExecutor},
-        feedback_and_fast, feedback_or_fast,
+        feedback_or_fast,
         feedbacks::ConstFeedback,
         inputs::{BytesInput, HasTargetBytes},
         mutators::{mutations::BitFlipMutator, StdScheduledMutator},
@@ -458,10 +458,10 @@ mod tests {
             // Feedbacks to recognize an input as solution
             let mut objective = feedback_or_fast!(
                 // true enables the AsanErrorFeedback
-                feedback_and_fast!(
-                    ConstFeedback::from(true),
+            //    feedback_and_fast!(
+            //        ConstFeedback::from(true),
                     AsanErrorsFeedback::new(&asan_obs)
-                )
+            //    )
             );
 
             let mut state = StdState::new(

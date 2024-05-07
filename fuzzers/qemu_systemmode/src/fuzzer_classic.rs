@@ -5,7 +5,7 @@ use std::{env, path::PathBuf, process};
 
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
-    events::{launcher::Launcher, EventConfig, CTRL_C_EXIT},
+    events::{launcher::Launcher, EventConfig},
     executors::ExitKind,
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -22,7 +22,7 @@ use libafl::{
 use libafl_bolts::{
     core_affinity::Cores,
     current_nanos,
-    os::unix_signals::Signal,
+    os::unix_signals::{Signal, CTRL_C_EXIT},
     ownedref::OwnedMutSlice,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
@@ -32,8 +32,7 @@ use libafl_bolts::{
 use libafl_qemu::{
     edges::{edges_map_mut_ptr, QemuEdgeCoverageHelper, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND},
     elf::EasyElf,
-    emu::Qemu,
-    QemuExecutor, QemuExitReason, QemuExitReasonError, QemuHooks, QemuShutdownCause, Regs,
+    Qemu, QemuExecutor, QemuExitError, QemuExitReason, QemuHooks, QemuShutdownCause, Regs,
 };
 use libafl_qemu_sys::GuestPhysAddr;
 
@@ -128,7 +127,7 @@ pub fn fuzz() {
                     Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(
                         Signal::SigInterrupt,
                     ))) => process::exit(CTRL_C_EXIT),
-                    Err(QemuExitReasonError::UnexpectedExit) => return ExitKind::Crash,
+                    Err(QemuExitError::UnexpectedExit) => return ExitKind::Crash,
                     _ => panic!("Unexpected QEMU exit."),
                 }
 

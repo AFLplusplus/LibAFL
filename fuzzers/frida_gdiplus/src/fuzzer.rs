@@ -41,9 +41,7 @@ use libafl_bolts::{
     tuples::{tuple_list, Merge},
     AsSlice,
 };
-#[cfg(unix)]
 use libafl_frida::asan::asan_rt::AsanRuntime;
-#[cfg(unix)]
 use libafl_frida::asan::errors::{AsanErrorsFeedback, AsanErrorsObserver};
 use libafl_frida::{
     asan::{
@@ -123,7 +121,6 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // Create an observation channel to keep track of the execution time
                 let time_observer = TimeObserver::new("time");
 
-                #[cfg(unix)]
                 let asan_observer = AsanErrorsObserver::from_static_asan_errors();
 
                 // Feedback to rate the interestingness of an input
@@ -185,11 +182,9 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-                let observers = tuple_list!(
-                    edges_observer,
-                    time_observer,
-                    AsanErrorsObserver::new(&ASAN_ERRORS)
-                );
+                
+                let observers = tuple_list!(edges_observer, time_observer, asan_observer);
+
 
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
@@ -245,7 +240,6 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
                 // Create an observation channel to keep track of the execution time
                 let time_observer = TimeObserver::new("time");
-                #[cfg(unix)]
                 let asan_observer = AsanErrorsObserver::from_static_asan_errors();
 
                 // Feedback to rate the interestingness of an input
@@ -259,8 +253,11 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
                 let mut objective = feedback_or_fast!(
                     CrashFeedback::new(),
-                    // TimeoutFeedback::new(),
-                    feedback_and_fast!(ConstFeedback::from(false), AsanErrorsFeedback::new())
+                    TimeoutFeedback::new(),
+                    feedback_and_fast!(
+                        ConstFeedback::from(false),
+                        AsanErrorsFeedback::new(&asan_observer)
+                    )
                 );
 
                 // If not restarting, create a State from scratch
@@ -303,11 +300,9 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-                let observers = tuple_list!(
-                    edges_observer,
-                    time_observer,
-                    AsanErrorsObserver::new(&ASAN_ERRORS)
-                );
+                
+                let observers = tuple_list!(edges_observer, time_observer, asan_observer);
+
 
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
@@ -375,7 +370,6 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // Create an observation channel to keep track of the execution time
                 let time_observer = TimeObserver::new("time");
 
-                #[cfg(unix)]
                 let asan_observer = AsanErrorsObserver::from_static_asan_errors();
 
                 // Feedback to rate the interestingness of an input
@@ -389,8 +383,8 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
                 let mut objective = feedback_or_fast!(
                     CrashFeedback::new(),
-                    // TimeoutFeedback::new(),
-                    feedback_and_fast!(ConstFeedback::from(false), AsanErrorsFeedback::new())
+                    TimeoutFeedback::new(),
+                    AsanErrorsFeedback::new(&asan_observer)
                 );
 
                 // If not restarting, create a State from scratch
@@ -433,11 +427,9 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-                let observers = tuple_list!(
-                    edges_observer,
-                    time_observer,
-                    AsanErrorsObserver::new(&ASAN_ERRORS)
-                );
+
+
+                let observers = tuple_list!(edges_observer, time_observer);
 
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(

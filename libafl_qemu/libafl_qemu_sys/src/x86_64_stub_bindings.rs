@@ -12055,8 +12055,7 @@ extern "C" {
 }
 pub const libafl_exit_reason_kind_INTERNAL: libafl_exit_reason_kind = libafl_exit_reason_kind(0);
 pub const libafl_exit_reason_kind_BREAKPOINT: libafl_exit_reason_kind = libafl_exit_reason_kind(1);
-pub const libafl_exit_reason_kind_SYNC_BACKDOOR: libafl_exit_reason_kind =
-    libafl_exit_reason_kind(2);
+pub const libafl_exit_reason_kind_SYNC_EXIT: libafl_exit_reason_kind = libafl_exit_reason_kind(2);
 impl ::std::ops::BitOr<libafl_exit_reason_kind> for libafl_exit_reason_kind {
     type Output = Self;
     #[inline]
@@ -12119,21 +12118,18 @@ fn bindgen_test_layout_libafl_exit_reason_breakpoint() {
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
-pub struct libafl_exit_reason_sync_backdoor {}
+pub struct libafl_exit_reason_sync_exit {}
 #[test]
-fn bindgen_test_layout_libafl_exit_reason_sync_backdoor() {
+fn bindgen_test_layout_libafl_exit_reason_sync_exit() {
     assert_eq!(
-        ::std::mem::size_of::<libafl_exit_reason_sync_backdoor>(),
+        ::std::mem::size_of::<libafl_exit_reason_sync_exit>(),
         0usize,
-        concat!("Size of: ", stringify!(libafl_exit_reason_sync_backdoor))
+        concat!("Size of: ", stringify!(libafl_exit_reason_sync_exit))
     );
     assert_eq!(
-        ::std::mem::align_of::<libafl_exit_reason_sync_backdoor>(),
+        ::std::mem::align_of::<libafl_exit_reason_sync_exit>(),
         1usize,
-        concat!(
-            "Alignment of ",
-            stringify!(libafl_exit_reason_sync_backdoor)
-        )
+        concat!("Alignment of ", stringify!(libafl_exit_reason_sync_exit))
     );
 }
 #[repr(C)]
@@ -12200,7 +12196,7 @@ pub struct libafl_exit_reason {
 pub union libafl_exit_reason__bindgen_ty_1 {
     pub internal: libafl_exit_reason_internal,
     pub breakpoint: libafl_exit_reason_breakpoint,
-    pub backdoor: libafl_exit_reason_sync_backdoor,
+    pub sync_exit: libafl_exit_reason_sync_exit,
 }
 #[test]
 fn bindgen_test_layout_libafl_exit_reason__bindgen_ty_1() {
@@ -12241,13 +12237,13 @@ fn bindgen_test_layout_libafl_exit_reason__bindgen_ty_1() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).backdoor) as usize - ptr as usize },
+        unsafe { ::std::ptr::addr_of!((*ptr).sync_exit) as usize - ptr as usize },
         0usize,
         concat!(
             "Offset of field: ",
             stringify!(libafl_exit_reason__bindgen_ty_1),
             "::",
-            stringify!(backdoor)
+            stringify!(sync_exit)
         )
     );
 }
@@ -13889,6 +13885,9 @@ extern "C" {
 }
 extern "C" {
     pub fn libafl_jit_trace_block_single(data: u64, id: u64) -> usize;
+}
+extern "C" {
+    pub fn libafl_qemu_host_page_size() -> usize;
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
