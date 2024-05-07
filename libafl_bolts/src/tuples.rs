@@ -34,6 +34,7 @@ pub fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
 
     // default implementation: if the types are unequal, we will use the clone implementation
     impl<'a, T: ?Sized, U: ?Sized> Clone for W<'a, T, U> {
+        #[inline]
         fn clone(&self) -> Self {
             // indicate that the types are unequal
             // unfortunately, use of interior mutability (Cell) makes this not const-compatible
