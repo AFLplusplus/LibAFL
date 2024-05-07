@@ -557,11 +557,12 @@ where
 
                 #[cfg(target_arch = "aarch64")]
                 if let Some(rt) = runtimes.match_first_type_mut::<HookRuntime>() {
-                    if let Some((call_target, opcode)) = rt.is_interesting(decoder, instr) {
+                    if let Some((call_target, is_reg, no_link)) = rt.is_interesting(decoder, instr) {
                         rt.emit_callout(
                             call_target,
                             &instruction,
-                            opcode,
+                            is_reg,
+                            no_link,
                             output.writer(),
                             runtimes_unborrowed.clone(),
                         );

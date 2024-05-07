@@ -342,7 +342,7 @@ impl HookRuntime {
         runtimes: Rc<RefCell<RT>>,
     ) {
         let hooked_address = addr_of!(self.hooked) as u64;
-        let next_insn = insn.instr().address() + insn.instr().len();
+        let next_insn = insn.instr().address() + insn.instr().len() as u64;
         log::trace!("emit_callout: {:x}", address_or_reg);
         insn.put_callout(move |context| {
             if !is_reg {
@@ -410,7 +410,7 @@ impl HookRuntime {
 
             if !no_link {
                 //if we do a linked branch (i.e. BLR) then put the return address into x30 and return
-                writer.put_ldr_reg_u64(Aarch64Register::X30, next_insn);
+                writer.put_ldr_reg_u64(Aarch64Register::Lr, next_insn);
             }
             
             insn.put_chaining_return();
@@ -430,7 +430,7 @@ impl HookRuntime {
             //Opcode::B/Opcode::BL
             if !no_link {
                 //if we do a linked branch (i.e. BL) then put the return address into x30 and return
-                writer.put_ldr_reg_u64(Aarch64Register::X30, next_insn);
+                writer.put_ldr_reg_u64(Aarch64Register::Lr, next_insn);
             }
             insn.put_chaining_return();
         }
