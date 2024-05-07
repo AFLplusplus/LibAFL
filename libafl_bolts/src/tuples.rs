@@ -438,10 +438,6 @@ where
 }
 
 /// Match for a name and return the value
-///
-/// # Note
-/// This operation may not be 100% accurate with Rust stable, see the notes for [`type_eq`]
-/// (in `nightly`, it uses [specialization](https://stackoverflow.com/a/60138532/7658998)).
 #[cfg(feature = "alloc")]
 pub trait MatchName {
     /// Match for a name and return the borrowed value
