@@ -36,6 +36,7 @@ pub fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
         }
     }
 
+    #[allow(clippy::mismatching_type_param_order)]
     impl<'a, T: ?Sized> Copy for W<'a, T, T> {}
 
     let detected = Cell::new(true);
