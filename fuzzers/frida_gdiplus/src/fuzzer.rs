@@ -46,7 +46,7 @@ use libafl_frida::asan::errors::{AsanErrorsFeedback, AsanErrorsObserver};
 use libafl_frida::{
     asan::{
         asan_rt::AsanRuntime,
-        errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS},
+        errors::{AsanErrorsFeedback, AsanErrorsObserver},
     },
     cmplog_rt::CmpLogRuntime,
     coverage_rt::{CoverageRuntime, MAP_SIZE},

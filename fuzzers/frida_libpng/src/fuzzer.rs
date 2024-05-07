@@ -127,8 +127,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                     // true enables the AsanErrorFeedback
                     AsanErrorsFeedback::new(&asan_observer)
                 );
-                #[cfg(windows)]
-                let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
+
 
                 // If not restarting, create a State from scratch
                 let mut state = state.unwrap_or_else(|| {
@@ -237,13 +236,9 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let mut objective = feedback_or_fast!(
                     CrashFeedback::new(),
                     TimeoutFeedback::new(),
-                    feedback_and_fast!(
-                        ConstFeedback::from(true),
-                        AsanErrorsFeedback::new(&asan_observer)
-                    )
+                    AsanErrorsFeedback::new(&asan_observer)
                 );
-                #[cfg(windows)]
-                let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
+               
 
                 // If not restarting, create a State from scratch
                 let mut state = state.unwrap_or_else(|| {
@@ -368,8 +363,6 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                     TimeoutFeedback::new(),
                     AsanErrorsFeedback::new(&asan_observer)
                 );
-                #[cfg(windows)]
-                let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
 
                 // If not restarting, create a State from scratch
                 let mut state = state.unwrap_or_else(|| {
@@ -411,10 +404,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-                #[cfg(unix)]
                 let observers = tuple_list!(edges_observer, time_observer, asan_observer);
-                #[cfg(windows)]
-                let observers = tuple_list!(edges_observer, time_observer);
 
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(

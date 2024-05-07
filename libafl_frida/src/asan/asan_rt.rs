@@ -10,15 +10,7 @@ use core::{
     fmt::{self, Debug, Formatter},
     ptr::addr_of_mut,
 };
-use std::{
-    ffi::c_void,
-     num::NonZeroUsize,
-    ptr::write_volatile,
-    rc::Rc,
-    sync::MutexGuard,
-};
-
-use nix::sys::mman::{ProtFlags, mmap, MapFlags};
+use std::{ffi::c_void, num::NonZeroUsize, ptr::write_volatile, rc::Rc, sync::MutexGuard};
 
 use backtrace::Backtrace;
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
@@ -33,6 +25,7 @@ use frida_gum::{
 use frida_gum_sys::Insn;
 use hashbrown::HashMap;
 use libafl_bolts::{cli::FuzzerOptions, AsSlice};
+use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 use rangemap::RangeMap;
 #[cfg(target_arch = "aarch64")]
 use yaxpeax_arch::Arch;
@@ -132,7 +125,6 @@ pub struct AsanRuntime {
     suppressed_addresses: Vec<usize>,
     skip_ranges: Vec<SkipRange>,
     continue_on_error: bool,
-    shadow_check_func: Option<extern "C" fn(*const c_void, usize) -> bool>,
     pub(crate) hooks_enabled: bool,
     pc: Option<usize>,
 
@@ -182,73 +174,6 @@ impl FridaRuntime for AsanRuntime {
                     lib_start + range.start
                 }
             }));
-
-        /* unsafe {
-            let mem = self.allocator.alloc(0xac + 2, 8);
-            log::info!("Test0");
-            /*
-            0x555555916ce9 <libafl_frida::asan_rt::AsanRuntime::init+13033>    je     libafl_frida::asan_rt::AsanRuntime::init+14852 <libafl_frida::asan_rt::AsanRuntime::init+14852>
-            0x555555916cef <libafl_frida::asan_rt::AsanRuntime::init+13039>    mov    rdi, r15 <0x555558392338>
-            */
-            assert!((self.shadow_check_func.unwrap())(
-                (mem as usize) as *const c_void,
-                0x00
-            ));
-            log::info!("Test1");
-            assert!((self.shadow_check_func.unwrap())(
-                (mem as usize) as *const c_void,
-                0xac
-            ));
-            log::info!("Test2");
-            assert!((self.shadow_check_func.unwrap())(
-                ((mem as usize) + 2) as *const c_void,
-                0xac
-            ));
-            log::info!("Test3");
-            assert!(!(self.shadow_check_func.unwrap())(
-                ((mem as usize) + 3) as *const c_void,
-                0xac
-            ));
-            log::info!("Test4");
-            assert!(!(self.shadow_check_func.unwrap())(
-                ((mem as isize) + -1) as *const c_void,
-                0xac
-            ));
-            log::info!("Test5");
-            assert!((self.shadow_check_func.unwrap())(
-                ((mem as usize) + 2 + 0xa4) as *const c_void,
-                8
-            ));
-            log::info!("Test6");
-            assert!((self.shadow_check_func.unwrap())(
-                ((mem as usize) + 2 + 0xa6) as *const c_void,
-                6
-            ));
-            log::info!("Test7");
-            assert!(!(self.shadow_check_func.unwrap())(
-                ((mem as usize) + 2 + 0xa8) as *const c_void,
-                6
-            ));
-            log::info!("Test8");
-            assert!(!(self.shadow_check_func.unwrap())(
-                ((mem as usize) + 2 + 0xa8) as *const c_void,
-                0xac
-            ));
-            log::info!("Test9");
-            assert!((self.shadow_check_func.unwrap())(
-                ((mem as usize) + 4 + 0xa8) as *const c_void,
-                0x1
-            ));
-            log::info!("FIN");
-
-            for i in 0..0xad {
-                assert!((self.shadow_check_func.unwrap())(
-                    ((mem as usize) + i) as *const c_void,
-                    0x01
-                ));
-            }
-            // assert!((self.shadow_check_func.unwrap())(((mem2 as usize) + 8875) as *const c_void, 4));
-        }*/
 
         self.register_thread();
     }
@@ -319,12 +244,6 @@ impl AsanRuntime {
     /// Gets the allocator (mutable)
     pub fn allocator_mut(&mut self) -> &mut Allocator {
         &mut self.allocator
-    }
-
-    /// The function that checks the shadow byte
-    #[must_use]
-    pub fn shadow_check_func(&self) -> &Option<extern "C" fn(*const c_void, usize) -> bool> {
-        &self.shadow_check_func
     }
 
     /// Check if the test leaked any memory and report it if so.
@@ -546,13 +465,16 @@ impl AsanRuntime {
         }
     }
 
+    /// Set the current program counter at hook time
     pub fn set_pc(&mut self, pc: usize) {
         self.pc = Some(pc);
     }
+    /// Unset the current program counter
     pub fn unset_pc(&mut self) {
         self.pc = None;
     }
 
+    /// Register the required hooks with the [`HookRuntime`]
     pub fn register_hooks(hook_rt: &mut HookRuntime) {
         #[allow(unused)]
         macro_rules! hook_func {
@@ -869,20 +791,6 @@ impl AsanRuntime {
                             *mut c_void
                         );
                     }
-                    "HeapReAlloc" => {
-                        hook_func!(
-                            Some(libname),
-                            RtlReAllocateHeap,
-                            (
-                                handle: *mut c_void,
-                                flags: u32,
-                                ptr: *mut c_void,
-                                size: usize
-                            ),
-                            *mut c_void
-                        );
-                    }
-
                     "LocalAlloc" => {
                         hook_func!(Some(libname), LocalAlloc, (flags: u32, size: usize), *mut c_void);
                     }
@@ -1696,7 +1604,6 @@ impl AsanRuntime {
     }
 
     // https://godbolt.org/z/EvWPzqjeK
-    
 
     // https://godbolt.org/z/oajhcP5sv
     /*
@@ -2141,12 +2048,12 @@ impl AsanRuntime {
 
     FRIDA ASAN IMPLEMENTATION DETAILS
 
-    The format of Frida's ASAN is signficantly different from LLVM ASAN. 
-    
-    In Frida ASAN, we attempt to find the lowest possible bit such that there is no mapping with that bit. That is to say, for some bit x, there is no mapping greater than 
+    The format of Frida's ASAN is signficantly different from LLVM ASAN.
+
+    In Frida ASAN, we attempt to find the lowest possible bit such that there is no mapping with that bit. That is to say, for some bit x, there is no mapping greater than
     1 << x. This is our shadow base and is similar to Ultra compact shadow in LLVM ASAN. Unlike ASAN where 0 represents a poisoned byte and 1 represents an unpoisoned byte, in Frida-ASAN
-    
-    The reasoning for this is that new pages are zeroed, so, by default, every qword is poisoned and we must explicitly unpoison any byte. 
+
+    The reasoning for this is that new pages are zeroed, so, by default, every qword is poisoned and we must explicitly unpoison any byte.
 
     Much like LLVM ASAN, shadow bytes are qword based. This is to say that each shadow byte maps to one qword. The shadow calculation is as follows:
     (1ULL << shadow_bit) | (address >> 3)
@@ -2496,7 +2403,7 @@ impl AsanRuntime {
         self.blob_check_mem_qword = Some(self.generate_shadow_check_blob(8));
         self.blob_check_mem_16bytes = Some(self.generate_shadow_check_blob(16));
 
-        self.blob_check_mem_3bytes = Some(self.generate_shadow_check_blob(3));  //the below are all possible with vector intrinsics
+        self.blob_check_mem_3bytes = Some(self.generate_shadow_check_blob(3)); //the below are all possible with vector intrinsics
         self.blob_check_mem_6bytes = Some(self.generate_shadow_check_blob(6));
         self.blob_check_mem_12bytes = Some(self.generate_shadow_check_blob(12));
         self.blob_check_mem_24bytes = Some(self.generate_shadow_check_blob(24));
@@ -3180,7 +3087,6 @@ impl Default for AsanRuntime {
             suppressed_addresses: Vec::new(),
             skip_ranges: Vec::new(),
             continue_on_error: false,
-            shadow_check_func: None,
             hooks_enabled: false,
             #[cfg(target_arch = "aarch64")]
             eh_frame: [0; ASAN_EH_FRAME_DWORD_COUNT],

@@ -60,8 +60,8 @@ frida-gum-sys = { path = "../../frida-rust/frida-gum-sys/", version = "0.13.6", 
     "event-sink",
     "invocation-listener",
 ] }
-frida-gum = { path = "../../frida-rust/frida-gum/", version = "0.13.4", features = [
-    "auto-download",
+frida-gum = { path = "../../frida-rust/frida-gum/", version = "0.13.6", features = [
+    # "auto-download",
     "event-sink",
     "invocation-listener",
     "module-names",

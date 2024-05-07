@@ -369,7 +369,7 @@ mod tests {
     use crate::{
         asan::{
             asan_rt::AsanRuntime,
-            errors::{AsanErrorsFeedback, AsanErrorsObserver, AsanErrors},
+            errors::{AsanErrors, AsanErrorsFeedback, AsanErrorsObserver},
         },
         coverage_rt::CoverageRuntime,
         executor::FridaInProcessExecutor,
@@ -458,13 +458,7 @@ mod tests {
             let asan_obs = AsanErrorsObserver::from_static_asan_errors();
 
             // Feedbacks to recognize an input as solution
-            let mut objective = feedback_or_fast!(
-                // true enables the AsanErrorFeedback
-            //    feedback_and_fast!(
-            //        ConstFeedback::from(true),
-                    AsanErrorsFeedback::new(&asan_obs)
-            //    )
-            );
+            let mut objective = feedback_or_fast!(AsanErrorsFeedback::new(&asan_obs));
 
             let mut state = StdState::new(
                 rand,
