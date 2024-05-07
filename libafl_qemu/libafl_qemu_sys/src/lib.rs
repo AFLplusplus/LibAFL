@@ -1,4 +1,3 @@
-#![cfg_attr(nightly, feature(used_with_arg))]
 /*!
 `libafl_qemu_sys` is the crate exporting C symbols from QEMU.
 Have a look at `libafl_qemu` for higher-level abstractions.
