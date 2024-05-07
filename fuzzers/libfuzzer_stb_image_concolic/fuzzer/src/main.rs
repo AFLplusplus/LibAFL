@@ -42,7 +42,7 @@ use libafl_bolts::{
     current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, Handler},
+    tuples::{tuple_list, Handled},
     AsSlice, AsSliceMut,
 };
 use libafl_targets::{
