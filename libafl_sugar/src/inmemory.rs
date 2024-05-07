@@ -29,7 +29,7 @@ use libafl_bolts::{
     ownedref::OwnedMutSlice,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, Handler, Merge},
+    tuples::{tuple_list, Handleable, Merge},
     AsSlice,
 };
 use libafl_targets::{edges_map_mut_ptr, CmpLogObserver};

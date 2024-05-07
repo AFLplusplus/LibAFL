@@ -5,7 +5,7 @@ use core::{borrow::BorrowMut, fmt::Debug, hash::Hash, marker::PhantomData};
 
 use ahash::RandomState;
 use libafl_bolts::{
-    tuples::{Handle, Handler, MatchNameRef},
+    tuples::{Handle, Handleable, MatchNameRef},
     HasLen, Named,
 };
 
@@ -13,7 +13,7 @@ use crate::{
     corpus::{Corpus, HasCurrentCorpusIdx, Testcase},
     events::EventFirer,
     executors::{Executor, ExitKind, HasObservers},
-    feedbacks::{Feedback, FeedbackFactory, HasObserverReference},
+    feedbacks::{Feedback, FeedbackFactory, HasObserverHandle},
     inputs::UsesInput,
     mark_feature_time,
     mutators::{MutationResult, Mutator},
@@ -364,10 +364,10 @@ impl<C, M, S> Named for MapEqualityFeedback<C, M, S> {
     }
 }
 
-impl<C, M, S> HasObserverReference for MapEqualityFeedback<C, M, S> {
+impl<C, M, S> HasObserverHandle for MapEqualityFeedback<C, M, S> {
     type Observer = C;
 
-    fn observer_ref(&self) -> &Handle<Self::Observer> {
+    fn observer_handle(&self) -> &Handle<Self::Observer> {
         &self.map_ref
     }
 }
@@ -391,7 +391,7 @@ where
         OT: ObserversTuple<S>,
     {
         let obs = observers
-            .get(self.observer_ref())
+            .get(self.observer_handle())
             .expect("Should have been provided valid observer name.");
         Ok(obs.as_ref().hash_simple() == self.orig_hash)
     }
@@ -407,7 +407,7 @@ pub struct MapEqualityFactory<C, M, S> {
 impl<C, M, S> MapEqualityFactory<C, M, S>
 where
     M: MapObserver,
-    C: AsRef<M> + Handler,
+    C: AsRef<M> + Handleable,
 {
     /// Creates a new map equality feedback for the given observer
     pub fn new(obs: &C) -> Self {
@@ -418,10 +418,10 @@ where
     }
 }
 
-impl<C, M, S> HasObserverReference for MapEqualityFactory<C, M, S> {
+impl<C, M, S> HasObserverHandle for MapEqualityFactory<C, M, S> {
     type Observer = C;
 
-    fn observer_ref(&self) -> &Handle<C> {
+    fn observer_handle(&self) -> &Handle<C> {
         &self.map_ref
     }
 }
@@ -430,13 +430,13 @@ impl<C, M, OT, S> FeedbackFactory<MapEqualityFeedback<C, M, S>, S, OT>
     for MapEqualityFactory<C, M, S>
 where
     M: MapObserver,
-    C: AsRef<M> + Handler,
+    C: AsRef<M> + Handleable,
     OT: ObserversTuple<S>,
     S: State + Debug,
 {
     fn create_feedback(&self, observers: &OT) -> MapEqualityFeedback<C, M, S> {
         let obs = observers
-            .get(self.observer_ref())
+            .get(self.observer_handle())
             .expect("Should have been provided valid observer name.");
         MapEqualityFeedback {
             name: Cow::from("MapEq"),

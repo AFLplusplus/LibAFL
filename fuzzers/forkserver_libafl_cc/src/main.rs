@@ -166,7 +166,7 @@ pub fn main() {
     // Create the executor for the forkserver
     let args = opt.arguments;
 
-    let observer_ref = edges_observer.handle();
+    let observer_handle = edges_observer.handle();
 
     let mut tokens = Tokens::new();
     let mut executor = ForkserverExecutor::builder()
@@ -182,7 +182,7 @@ pub fn main() {
         .unwrap();
 
     if let Some(dynamic_map_size) = executor.coverage_map_size() {
-        executor.observers_mut()[&observer_ref]
+        executor.observers_mut()[&observer_handle]
             .as_mut()
             .truncate(dynamic_map_size);
     }
