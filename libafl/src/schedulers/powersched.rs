@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use core::{marker::PhantomData, time::Duration};
 
 use libafl_bolts::{
-    tuples::{Handle, Handleable},
+    tuples::{CanBeHandled, Handle},
     Named,
 };
 use serde::{Deserialize, Serialize};

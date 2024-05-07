@@ -7,7 +7,7 @@ use alloc::borrow::Cow;
 use core::{fmt::Debug, marker::PhantomData};
 
 use libafl_bolts::{
-    tuples::{Handle, Handleable, MatchNameRef},
+    tuples::{CanBeHandled, Handle, MatchNameRef},
     Named,
 };
 

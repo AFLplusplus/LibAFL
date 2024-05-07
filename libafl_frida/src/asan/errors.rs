@@ -24,7 +24,7 @@ use libafl::{
 };
 use libafl_bolts::{
     ownedref::OwnedPtr,
-    tuples::{Handle, Handleable, MatchNameRef},
+    tuples::{CanBeHandled, Handle, MatchNameRef},
     Named, SerdeAny,
 };
 use serde::{Deserialize, Serialize};

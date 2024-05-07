@@ -504,7 +504,7 @@ where
 /// Structs that have a [`Handle`] to reference this element by, in maps.
 /// You should use this when you want to avoid specifying types.
 #[cfg(feature = "alloc")]
-pub trait Handleable: Named {
+pub trait CanBeHandled: Named {
     /// Return the [`Handle`]
     fn handle(&self) -> Handle<Self> {
         Handle {
@@ -515,7 +515,7 @@ pub trait Handleable: Named {
 }
 
 #[cfg(feature = "alloc")]
-impl<N> Handleable for N where N: Named {}
+impl<N> CanBeHandled for N where N: Named {}
 
 /// Object with the type T and the name associated with its concrete value
 #[derive(Serialize, Deserialize)]
