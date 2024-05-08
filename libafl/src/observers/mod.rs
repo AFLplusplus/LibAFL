@@ -499,6 +499,7 @@ where
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         self.last_runtime = current_time().checked_sub(self.start_time);
+        Ok(())
     }
 }
 
