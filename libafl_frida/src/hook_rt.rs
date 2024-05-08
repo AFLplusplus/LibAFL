@@ -27,7 +27,7 @@ use crate::utils::{get_register, operand_details, writer_register};
 use crate::{
     asan::asan_rt::AsanRuntime,
     helper::{FridaRuntime, FridaRuntimeTuple},
-    utils::frida_to_cs,
+    utils::{frida_to_cs, immediate_value},
 };
 
 #[cfg(target_arch = "x86_64")]
@@ -133,7 +133,8 @@ impl HookRuntime {
     /// Determine if this instruction is interesting for the purposes of hooking
     #[inline]
     #[cfg(target_arch = "x86_64")]
-    pub fn is_interesting(&self, decoder: InstDecoder, instr: &Insn) -> Option<CallType> {
+    pub fn is_interesting(&self, decoder: InstDecoder, instr: &Insn) -> Option<(CallType, bool)> {
+
         let result = frida_to_cs(decoder, instr);
 
         if let Err(e) = result {
@@ -143,40 +144,44 @@ impl HookRuntime {
 
         let instruction = result.unwrap();
 
+        // log::trace!("{instruction:}");
         //there are 3 seperate cases we need to handle: loads, immediates, and registers
         //we need to deal with all cases in case of dlsym
         if instruction.opcode() == Opcode::CALL || instruction.opcode() == Opcode::JMP {
             //if its a memory op, we can't resolve it yet as it may not be resolved yet
             if instruction.operand(0).is_memory() {
-                log::trace!("{:x}: instruction: {}", instr.address(), instruction);
+                // log::trace!("{:x}: instruction: {}", instr.address(), instruction);
                 let mem_details = operand_details(&instruction.operand(0));
 
                 if let Some((reg, index_reg, scale, disp)) = mem_details {
                     if reg == X86Register::Rip {
-                        //rip relative loads are from the end of the instruction
-                        return Some(CallType::Mem((
+                        //rip relative loads are from the end of the instruction, so add the
+                        //instruction length to the displacement
+                        return Some((CallType::Mem((
                             reg,
                             index_reg,
                             scale,
                             disp + instr.len() as i32,
-                        )));
+                        )), instruction.opcode() == Opcode::JMP));
                     }
-                    return Some(CallType::Mem((reg, index_reg, scale, disp)));
+                    return Some((CallType::Mem((reg, index_reg, scale, disp)), instruction.opcode() == Opcode::JMP));
                 }
             } else {
-                match instruction.operand(0) {
-                    Operand::Register(reg_spec) => {
-                        return Some(CallType::Reg(writer_register(reg_spec)));
-                    }
-                    Operand::ImmediateI32(imm) => {
-                        //https://www.felixcloutier.com/x86/call
-                        let target = (instr.address() as i64 + imm as i64) as usize;
+                if let Some(imm) = immediate_value(&instruction.operand(0)) {
+                        let target = (instr.address() as i64 + imm) as usize;
                         if !self.hooks.contains_key(&target) {
                             return None;
                         }
-                        return Some(CallType::Imm(target));
+                        return Some((CallType::Imm(target), instruction.opcode() == Opcode::JMP));
+                    
+                } else {
+
+                match instruction.operand(0) {
+                    Operand::Register(reg_spec) => {
+                        return Some((CallType::Reg(writer_register(reg_spec)), instruction.opcode() == Opcode::JMP));
                     }
                     _ => panic!("Invalid call/jmp instructions"),
+                }
                 }
             }
         }
@@ -240,14 +245,16 @@ impl HookRuntime {
     pub fn emit_callout<RT: FridaRuntimeTuple>(
         &mut self,
         call_type: CallType,
+        is_jmp: bool,
         insn: &Instruction,
         writer: X86InstructionWriter,
         runtimes: Rc<RefCell<RT>>,
     ) {
         log::trace!("emit_callout: {:#x}", insn.instr().address());
-        log::trace!("call: {:?}", call_type);
+        // log::trace!("call: {:?}", call_type);
         let hooked_address = addr_of!(self.hooked) as u64;
         let rip = insn.instr().address();
+        let next_instruction_address = rip + insn.instr().len() as u64;
         let is_imm = if let CallType::Imm(_) = call_type {
             //log::trace!("needs return at {:x}", address);
             true
@@ -255,7 +262,7 @@ impl HookRuntime {
             false
         };
 
-        //        writer.put_bytes(&[0xcc]); //put int3
+               // writer.put_bytes(&[0xcc]); //put int3
 
         insn.put_callout(move |context| {
             let address = match call_type {
@@ -270,10 +277,10 @@ impl HookRuntime {
                     let addr = (base.wrapping_add(index.wrapping_mul(scale as u64)) as i64
                         + disp as i64) as *const u64; //disp already has the offset applied if we are doing an rip relative load
 
-                    log::trace!("Call dereference address: {:#x}", addr as u64);
+                    // log::trace!("Call dereference address: {:#x}", addr as u64);
 
                     let value = unsafe { read_unaligned(addr) };
-                    log::trace!("call value: {:#x}", value);
+                    // log::trace!("call value: {:#x}", value);
                     value as usize
                 }
                 CallType::Imm(address) => address,
@@ -295,6 +302,7 @@ impl HookRuntime {
 
         if !is_imm {
             let not_hooked_label_id = insn.instr().address() | 0xfaded; //this is label id for the hooked
+            // writer.put_bytes(&[0xcc]);
             writer.put_sub_reg_imm(X86Register::Rsp, frida_gum_sys::GUM_RED_ZONE_SIZE as isize);
             writer.put_push_reg(X86Register::Rdi);
             writer.put_mov_reg_u64(X86Register::Rdi, hooked_address); //hooked address is in RDI
@@ -302,22 +310,33 @@ impl HookRuntime {
 
             //sub is the same as cmp. rdi is 0 if we hooked
             writer.put_sub_reg_imm(X86Register::Rdi, 1);
-            //jne is the same as jnz. if the result is not 0 then we did not hook
+
             writer.put_jcc_near_label(X86BranchCondition::Jne, not_hooked_label_id, 0);
 
-            //if we are here we did not hook
             writer.put_pop_reg(X86Register::Rdi);
             writer.put_add_reg_imm(X86Register::Rsp, frida_gum_sys::GUM_RED_ZONE_SIZE as isize);
-            insn.put_chaining_return(); //we hooked, run the chaining return
+
+            // we hooked the function, continue execution at the next block
+            // if it is a jmp, then we just chaining return. If it is a call, we need to make the
+            // chaining return return to the previous block. This is accomplished by temporarily
+            // pushing a fake return address onto the stack, then continuing to the chaining
+            // return.
+            if !is_jmp {
+                writer.put_mov_reg_address(X86Register::Rcx, next_instruction_address);
+                writer.put_push_reg(X86Register::Rcx);
+
+            }
+            insn.put_chaining_return();
 
             writer.put_label(not_hooked_label_id);
-            //we did not hook, normally run the function
+
             writer.put_pop_reg(X86Register::Rdi);
             writer.put_add_reg_imm(X86Register::Rsp, frida_gum_sys::GUM_RED_ZONE_SIZE as isize);
-
+            // we did not hook the function, execute the original call/jmp instruction
             insn.keep();
+
         } else {
-            insn.put_chaining_return();
+            // insn.put_chaining_return();
         }
     }
 
