@@ -34,10 +34,10 @@ impl GzipCompressor {
 }
 
 impl Default for GzipCompressor {
-fn default() -> Self {
-         Self::new()
-     }
- }
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl GzipCompressor {
     /// Compression.

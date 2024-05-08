@@ -946,7 +946,10 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
 
     loop {
         let mut pvminfo = std::mem::MaybeUninit::<vm_region_submap_info_64>::uninit();
-        _cnt = mach_msg_type_number_t::try_from(size_of::<vm_region_submap_info_64>() / size_of::<natural_t>()).unwrap();
+        _cnt = mach_msg_type_number_t::try_from(
+            size_of::<vm_region_submap_info_64>() / size_of::<natural_t>(),
+        )
+        .unwrap();
         r = unsafe {
             mach_vm_region_recurse(
                 task,
