@@ -92,6 +92,16 @@ where
     fn observes_stderr(&self) -> bool {
         false
     }
+    /// If this observer observes exit codes
+    #[inline]
+    fn observes_exit_code(&self) -> bool {
+        false
+    }
+    /// If this observer observes exit signals
+    #[inline]
+    fn observes_exit_signal(&self) -> bool {
+        false
+    }
 
     /// React to new `stdout`
     /// To use this, always return `true` from `observes_stdout`
@@ -104,6 +114,17 @@ where
     #[inline]
     #[allow(unused_variables)]
     fn observe_stderr(&mut self, stderr: &[u8]) {}
+
+    /// React to new exit code
+    /// To use this, always return `true` from `observes_exit_code`
+    #[inline]
+    #[allow(unused_variables)]
+    fn observe_exit_code(&mut self, exit_code: i32) {}
+    /// React to new exit signal
+    /// To use this, always return `true` from `observes_exit_signal`
+    #[inline]
+    #[allow(unused_variables)]
+    fn observe_exit_signal(&mut self, exit_signal: i32) {}
 }
 
 /// Defines the observer type shared across traits of the type.
@@ -144,11 +165,19 @@ where
     fn observes_stdout(&self) -> bool;
     /// Returns true if a `stderr` observer was added to the list
     fn observes_stderr(&self) -> bool;
+    /// Returns true if an exit code observer was added to the list
+    fn observes_exit_code(&self) -> bool;
+    /// Returns true if an exit signal observer was added to the list
+    fn observes_exit_signal(&self) -> bool;
 
     /// Runs `observe_stdout` for all stdout observers in the list
     fn observe_stdout(&mut self, stdout: &[u8]);
     /// Runs `observe_stderr` for all stderr observers in the list
     fn observe_stderr(&mut self, stderr: &[u8]);
+    /// Runs `observe_exit_code` for all exit code observers in the list
+    fn observe_exit_code(&mut self, exit_code: i32);
+    /// Runs `observe_exit_signal` for all exit signal observers in the list
+    fn observe_exit_signal(&mut self, exit_signal: i32);
 }
 
 impl<S> ObserversTuple<S> for ()
@@ -193,6 +222,18 @@ where
         false
     }
 
+    /// Returns true if an exit code observer was added to the list
+    #[inline]
+    fn observes_exit_code(&self) -> bool {
+        false
+    }
+
+    /// Returns true if an exit signal observer was added to the list
+    #[inline]
+    fn observes_exit_signal(&self) -> bool {
+        false
+    }
+
     /// Runs `observe_stdout` for all stdout observers in the list
     #[inline]
     #[allow(unused_variables)]
@@ -202,6 +243,16 @@ where
     #[inline]
     #[allow(unused_variables)]
     fn observe_stderr(&mut self, stderr: &[u8]) {}
+
+    /// Runs `observe_exit_code` for all exit code observers in the list
+    #[inline]
+    #[allow(unused_variables)]
+    fn observe_exit_code(&mut self, exit_code: i32) {}
+
+    /// Runs `observe_exit_signal` for all exit signal observers in the list
+    #[inline]
+    #[allow(unused_variables)]
+    fn observe_exit_signal(&mut self, exit_signal: i32) {}
 }
 
 impl<Head, Tail, S> ObserversTuple<S> for (Head, Tail)
@@ -252,6 +303,18 @@ where
         self.0.observes_stderr() || self.1.observes_stderr()
     }
 
+    /// Returns true if an exit code observer was added to the list
+    #[inline]
+    fn observes_exit_code(&self) -> bool {
+        self.0.observes_exit_code() || self.1.observes_exit_code()
+    }
+
+    /// Returns true if an exit signal observer was added to the list
+    #[inline]
+    fn observes_exit_signal(&self) -> bool {
+        self.0.observes_exit_signal() || self.1.observes_exit_signal()
+    }
+
     /// Runs `observe_stdout` for all stdout observers in the list
     #[inline]
     fn observe_stdout(&mut self, stdout: &[u8]) {
@@ -264,6 +327,20 @@ where
     fn observe_stderr(&mut self, stderr: &[u8]) {
         self.0.observe_stderr(stderr);
         self.1.observe_stderr(stderr);
+    }
+
+    /// Runs `observe_exit_code` for all exit code observers in the list
+    #[inline]
+    fn observe_exit_code(&mut self, exit_code: i32) {
+        self.0.observe_exit_code(exit_code);
+        self.1.observe_exit_code(exit_code);
+    }
+
+    /// Runs `observe_exit_signal` for all exit signal observers in the list
+    #[inline]
+    fn observe_exit_signal(&mut self, exit_signal: i32) {
+        self.0.observe_exit_signal(exit_signal);
+        self.1.observe_exit_signal(exit_signal);
     }
 }
 

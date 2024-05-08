@@ -334,24 +334,9 @@ where
 
         let mut child = self.configurer.spawn_child(input)?;
 
-        let res = match child
+        let res = child
             .wait_timeout(self.configurer.exec_timeout())
-            .expect("waiting on child failed")
-            .map(|status| status.signal())
-        {
-            // for reference: https://www.man7.org/linux/man-pages/man7/signal.7.html
-            Some(Some(9)) => Ok(ExitKind::Oom),
-            Some(Some(_)) => Ok(ExitKind::Crash),
-            Some(None) => Ok(ExitKind::Ok),
-            None => {
-                // if this fails, there is not much we can do. let's hope it failed because the process finished
-                // in the meantime.
-                drop(child.kill());
-                // finally, try to wait to properly clean up system resources.
-                drop(child.wait());
-                Ok(ExitKind::Timeout)
-            }
-        };
+            .expect("waiting on child failed");
 
         if self.observers.observes_stderr() {
             let mut stderr = Vec::new();
@@ -362,6 +347,7 @@ where
             })?.read_to_end(&mut stderr)?;
             self.observers.observe_stderr(&stderr);
         }
+
         if self.observers.observes_stdout() {
             let mut stdout = Vec::new();
             child.stdout.as_mut().ok_or_else(|| {
@@ -372,7 +358,43 @@ where
             self.observers.observe_stdout(&stdout);
         }
 
-        res
+        if self.observers.observes_exit_code() {
+            if let Some(r) = res {
+                if let Some(exit_code) = r.code() {
+                    self.observers.observe_exit_code(exit_code);
+                }
+            }
+        }
+
+        if self.observers.observes_exit_signal() {
+            if let Some(r) = res {
+                if let Some(exit_signal) = r.signal() {
+                    self.observers.observe_exit_signal(exit_signal);
+                }
+            }
+        }
+
+        #[allow(clippy::match_same_arms)]
+        // to make different signals leading to an ExitKind::Interrupted explicit
+        match res.map(|status| status.signal()) {
+            // for reference: https://www.man7.org/linux/man-pages/man7/signal.7.html
+            Some(Some(2)) => Ok(ExitKind::Interrupted), // SIGINT
+            Some(Some(10)) => Ok(ExitKind::Interrupted), // SIGUSR1
+            Some(Some(12)) => Ok(ExitKind::Interrupted), // SIGUSR2
+            Some(Some(14)) => Ok(ExitKind::Interrupted), // SIGALRM
+            Some(Some(15)) => Ok(ExitKind::Interrupted), // SIGTERM
+            Some(Some(18)) => Ok(ExitKind::Interrupted), // SIGCONT
+            Some(Some(_)) => Ok(ExitKind::Crash),
+            Some(None) => Ok(ExitKind::Ok),
+            None => {
+                // if this fails, there is not much we can do. let's hope it failed because the process finished
+                // in the meantime.
+                drop(child.kill());
+                // finally, try to wait to properly clean up system resources.
+                drop(child.wait());
+                Ok(ExitKind::Timeout)
+            }
+        }
     }
 }
 
