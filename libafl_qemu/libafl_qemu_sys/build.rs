@@ -1,3 +1,5 @@
+#![forbid(unexpected_cfgs)]
+
 mod host_specific {
     #[cfg(target_os = "linux")]
     include!("build_linux.rs");
@@ -9,14 +11,15 @@ mod host_specific {
 }
 
 #[rustversion::nightly]
-fn main() {
+fn nightly() {
     println!("cargo:rustc-cfg=nightly");
-    println!("cargo::rustc-check-cfg=cfg(nightly)");
-    host_specific::build();
 }
 
 #[rustversion::not(nightly)]
+fn nightly() {}
+
 fn main() {
-    println!("cargo::rustc-check-cfg=cfg(nightly)");
+    println!("cargo:rustc-check-cfg=cfg(nightly)");
+    nightly();
     host_specific::build();
 }

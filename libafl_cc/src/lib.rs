@@ -3,6 +3,7 @@
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
+#![forbid(unexpected_cfgs)]
 #![allow(
     clippy::unreadable_literal,
     clippy::type_repetition_in_bounds,

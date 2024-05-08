@@ -1,4 +1,6 @@
+#![forbid(unexpected_cfgs)]
 #![allow(clippy::missing_panics_doc)]
+
 use std::{
     collections::hash_map,
     env, fs,

@@ -1119,8 +1119,7 @@ impl SyscallHookResult {
 
 #[cfg(feature = "python")]
 pub mod pybind {
-    use libafl_qemu_sys::MmapPerms;
-    use pyo3::{exceptions::PyValueError, prelude::*, types::PyInt};
+    use pyo3::{exceptions::PyValueError, prelude::*};
 
     use super::{GuestAddr, GuestUsize};
 

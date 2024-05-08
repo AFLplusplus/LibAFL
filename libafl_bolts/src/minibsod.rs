@@ -130,7 +130,7 @@ pub fn dump_registers<W: Write>(
 }
 
 /// Write the content of all important registers
-#[cfg(all(target_vendor = "freebsd", target_arch = "aarch64"))]
+#[cfg(all(target_os = "freebsd", target_arch = "aarch64"))]
 #[allow(clippy::similar_names)]
 pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
@@ -776,7 +776,7 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
         libc::VM_PROC,
         libc::VM_PROC_MAP,
         -1,
-        std::mem::size_of::<libc::kinfo_vmentry>()
+        size_of::<libc::kinfo_vmentry>()
             .try_into()
             .expect("Invalid libc::kinfo_vmentry size"),
     ];
@@ -809,7 +809,7 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
                         .try_into()
                         .expect("invalid kve_structsize value");
                     #[cfg(target_os = "netbsd")]
-                    let sz = std::mem::size_of::<libc::kinfo_vmentry>();
+                    let sz = size_of::<libc::kinfo_vmentry>();
                     if sz == 0 {
                         break;
                     }
@@ -838,7 +838,7 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
 #[cfg(target_os = "openbsd")]
 fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Error> {
     let mut pentry = std::mem::MaybeUninit::<libc::kinfo_vmentry>::uninit();
-    let mut s = std::mem::size_of::<libc::kinfo_vmentry>();
+    let mut s = size_of::<libc::kinfo_vmentry>();
     let arr = &[libc::CTL_KERN, libc::KERN_PROC_VMMAP, unsafe {
         libc::getpid()
     }];
@@ -887,6 +887,8 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
 #[cfg(target_vendor = "apple")]
 #[allow(non_camel_case_types)]
 fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Error> {
+    use core::mem::size_of;
+
     type vm_region_recurse_info_t = *mut libc::c_int;
     type mach_vm_address_t = u64;
     type mach_vm_size_t = u64;
@@ -944,8 +946,10 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
 
     loop {
         let mut pvminfo = std::mem::MaybeUninit::<vm_region_submap_info_64>::uninit();
-        _cnt = (std::mem::size_of::<vm_region_submap_info_64>() / std::mem::size_of::<natural_t>())
-            as mach_msg_type_number_t;
+        _cnt = mach_msg_type_number_t::try_from(
+            size_of::<vm_region_submap_info_64>() / size_of::<natural_t>(),
+        )
+        .unwrap();
         r = unsafe {
             mach_vm_region_recurse(
                 task,
@@ -964,9 +968,9 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
         // We are only interested by the first level of the maps
         if vminfo.is_submap == 0 {
             let i = format!("{}-{}\n", addr, addr + sz);
-            writer.write(&i.into_bytes())?;
+            writer.write_all(&i.into_bytes())?;
         }
-        addr = addr + sz;
+        addr += sz;
     }
 
     Ok(())

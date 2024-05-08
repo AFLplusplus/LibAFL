@@ -26,7 +26,7 @@ use core::{fmt::Debug, time::Duration};
 #[cfg(feature = "std")]
 use std::time::Instant;
 
-#[cfg(feature = "no_std")]
+#[cfg(not(feature = "std"))]
 use libafl_bolts::current_time;
 use libafl_bolts::{tuples::MatchName, Named};
 pub use list::*;
@@ -406,7 +406,7 @@ pub struct TimeObserver {
     #[serde(with = "instant_serializer")]
     start_time: Instant,
 
-    #[cfg(feature = "no_std")]
+    #[cfg(not(feature = "std"))]
     start_time: Duration,
 
     last_runtime: Option<Duration>,
@@ -448,7 +448,7 @@ impl TimeObserver {
             #[cfg(feature = "std")]
             start_time: Instant::now(),
 
-            #[cfg(feature = "no_std")]
+            #[cfg(not(feature = "std"))]
             start_time: Duration::from_secs(0),
 
             last_runtime: None,
@@ -473,7 +473,7 @@ where
         Ok(())
     }
 
-    #[cfg(feature = "no_std")]
+    #[cfg(not(feature = "std"))]
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         self.last_runtime = None;
         self.start_time = current_time();
@@ -491,7 +491,7 @@ where
         Ok(())
     }
 
-    #[cfg(feature = "no_std")]
+    #[cfg(not(feature = "std"))]
     fn post_exec(
         &mut self,
         _state: &mut S,
@@ -499,6 +499,7 @@ where
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         self.last_runtime = current_time().checked_sub(self.start_time);
+        Ok(())
     }
 }
 

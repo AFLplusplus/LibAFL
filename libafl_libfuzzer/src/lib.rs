@@ -75,6 +75,7 @@
 //! to the runtime (e.g., to prevent coverage being collected on the runtime).
 //!
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
+#![forbid(unexpected_cfgs)]
 
 use std::ffi::{c_char, c_int};
 
