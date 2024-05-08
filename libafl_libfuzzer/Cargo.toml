@@ -35,7 +35,7 @@ arbitrary-derive = ["libfuzzer-sys/arbitrary-derive"]
 ## Enables fuzzer introspection with LibAFL's `introspection` feature
 introspection = []
 
-## Enables forking in the fuzzer runtime for restarting managers (on by default)
+## Enables forking in the fuzzer runtime for restarting managers for Unix systems (on by default)
 fork = []
 
 ## Embeds the built libafl_libfuzzer_runtime library into the crate with include_bytes! for use
