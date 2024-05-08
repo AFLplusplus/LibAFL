@@ -288,8 +288,8 @@ where
             let event_bytes = GzipCompressor::new().decompress(event_bytes)?;
 
             #[allow(clippy::needless_borrow)] // make decompressed vec and slice compatible
-            let event: Event<I> = postcard::from_bytes(&event_bytes).unwrap();
-            match Self::handle_in_broker(&mut self.monitor, client_id, &event).unwrap() {
+            let event: Event<I> = postcard::from_bytes(&event_bytes)?;
+            match Self::handle_in_broker(&mut self.monitor, client_id, &event)? {
                 BrokerEventResult::Forward => {
                     tx_bc.send(buf).expect("Could not send");
                 }
@@ -721,7 +721,7 @@ where
         #[cfg(feature = "tcp_compression")]
         let serialized = self.compressor.compress(&serialized);
 
-        let size = u32::try_from(serialized.len()).unwrap();
+        let size = u32::try_from(serialized.len())?;
         self.tcp.write_all(&size.to_le_bytes())?;
         self.tcp.write_all(&self.client_id.0.to_le_bytes())?;
         self.tcp.write_all(&serialized)?;
@@ -774,7 +774,7 @@ where
                     self.tcp.set_nonblocking(false).expect("set to blocking");
                     let len = u32::from_le_bytes(len_buf);
                     let mut buf = vec![0_u8; len as usize + 4_usize];
-                    self.tcp.read_exact(&mut buf).unwrap();
+                    self.tcp.read_exact(&mut buf)?;
 
                     let mut client_id_buf = [0_u8; 4];
                     client_id_buf.copy_from_slice(&buf[..4]);
