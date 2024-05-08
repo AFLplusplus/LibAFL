@@ -15,6 +15,10 @@ __Warning__: The documentation is built by default for `x86_64` in `usermode`. T
 #![allow(clippy::pedantic)]
 #![cfg_attr(nightly, feature(used_with_arg))]
 
+use num_enum::{IntoPrimitive, TryFromPrimitive};
+use paste::paste;
+use strum_macros::EnumIter;
+
 #[cfg(all(not(feature = "clippy"), target_os = "linux"))]
 mod bindings {
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
@@ -33,9 +37,6 @@ pub use usermode::*;
 
 #[cfg(emulation_mode = "systemmode")]
 mod systemmode;
-use num_enum::{IntoPrimitive, TryFromPrimitive};
-use paste::paste;
-use strum_macros::EnumIter;
 #[cfg(emulation_mode = "systemmode")]
 pub use systemmode::*;
 

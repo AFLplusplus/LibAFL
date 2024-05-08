@@ -37,9 +37,13 @@ use crate::{
 
 #[cfg(emulation_mode = "usermode")]
 mod usermode;
+#[cfg(emulation_mode = "usermode")]
+pub use usermode::*;
 
 #[cfg(emulation_mode = "systemmode")]
 mod systemmode;
+#[cfg(emulation_mode = "systemmode")]
+pub use systemmode::*;
 
 #[derive(Clone, Copy)]
 pub enum GuestAddrKind {
