@@ -184,8 +184,7 @@ where
                         // we forward the sender id as well, so we add 4 bytes to the message length
                         len += 4;
 
-                        #[cfg(feature = "tcp_debug")]
-                        println!("len +4 = {len:?}");
+                        log::debug!("TCP Manager - len +4 = {len:?}");
 
                         let mut buf = vec![0; len as usize];
 
@@ -200,8 +199,7 @@ where
                             return;
                         }
 
-                        #[cfg(feature = "tcp_debug")]
-                        println!("len: {len:?} - {buf:?}");
+                        log::debug!("TCP Manager - len: {len:?} - {buf:?}");
                         tx_inner.send(buf).await.expect("Could not send");
                     }
                 };
@@ -234,8 +232,7 @@ where
                             _ => panic!("Could not receive"),
                         };
 
-                        #[cfg(feature = "tcp_debug")]
-                        println!("{buf:?}");
+                        log::debug!("TCP Manager - {buf:?}");
 
                         if buf.len() <= 4 {
                             log::warn!("We got no contents (or only the length) in a broadcast");
@@ -243,9 +240,7 @@ where
                         }
 
                         if buf[..4] == this_client_id_bytes {
-                            #[cfg(feature = "tcp_debug")]
-                            eprintln!(
-                            "Not forwarding message from this very client ({this_client_id:?})."
+                            log::debug!("TCP Manager - Not forwarding message from this very client ({this_client_id:?})."
                         );
                             continue;
                         }
@@ -305,9 +300,7 @@ where
                 break;
             }
         }
-
-        #[cfg(feature = "tcp_debug")]
-        println!("The last client quit. Exiting.");
+        log::info!("TCP Manager - The last client quit. Exiting.");
 
         Err(Error::shutting_down())
     }
