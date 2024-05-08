@@ -166,17 +166,6 @@ where
     fn observes_stderr(&self) -> bool {
         self.primary.as_ref().observes_stderr() || self.secondary.as_ref().observes_stderr()
     }
-    /// Returns true if an exit code observer was added to the list
-    #[inline]
-    fn observes_exit_code(&self) -> bool {
-        self.primary.as_ref().observes_exit_code() || self.secondary.as_ref().observes_exit_code()
-    }
-    /// Returns true if an exit signal observer was added to the list
-    #[inline]
-    fn observes_exit_signal(&self) -> bool {
-        self.primary.as_ref().observes_exit_signal()
-            || self.secondary.as_ref().observes_exit_signal()
-    }
 
     /// Runs `observe_stdout` for all stdout observers in the list
     fn observe_stdout(&mut self, stdout: &[u8]) {
@@ -188,20 +177,6 @@ where
     fn observe_stderr(&mut self, stderr: &[u8]) {
         self.primary.as_mut().observe_stderr(stderr);
         self.secondary.as_mut().observe_stderr(stderr);
-        self.primary.as_mut().observe_stderr(stderr);
-        self.secondary.as_mut().observe_stderr(stderr);
-    }
-
-    /// Runs `observe_exit_code` for all exit code observers in the list
-    fn observe_exit_code(&mut self, exit_code: i32) {
-        self.primary.as_mut().observe_exit_code(exit_code);
-        self.secondary.as_mut().observe_exit_code(exit_code);
-    }
-
-    /// Runs `observe_exit_signal` for all exit signal observers in the list
-    fn observe_exit_signal(&mut self, exit_signal: i32) {
-        self.primary.as_mut().observe_exit_signal(exit_signal);
-        self.secondary.as_mut().observe_exit_signal(exit_signal);
     }
 }
 
