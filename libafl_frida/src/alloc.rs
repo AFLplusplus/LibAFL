@@ -237,8 +237,9 @@ impl Allocator {
         let address = (metadata.address + self.page_size) as *mut c_void;
 
         self.allocations.insert(address as usize, metadata);
-        // log::trace!("serving address: {:?}, size: {:x}", address, size);
+        log::trace!("serving address: {:?}, size: {:x}", address, size);
         address
+        // 0x4141414141414141 as *mut c_void
     }
 
     /// Releases the allocation at the given address.
@@ -460,7 +461,7 @@ impl Allocator {
         // if we are not aligned to 8 bytes, we need to check the high bits of the shadow
         if offset != 0 {
             let val = (unsafe { (shadow_addr as *const u16).read() }) >> offset;
-            let mask = (1 << (size % 9)) - 1;
+            let mask = ((1 << (size % 9)) - 1) as u16;
             if val & mask != mask {
                 return false;
             }
@@ -478,7 +479,7 @@ impl Allocator {
             {
                 if size % 8 != 0 {
                     let val = unsafe { ((shadow_addr + shadow_size) as *mut u8).read() };
-                    let mask = (1 << (size % 8)) - 1;
+                    let mask = (((1 << (size % 8)) - 1) as u8).rotate_left(8 - (size % 8) as u32);
                     if val & mask != mask {
                         return false;
                     }
@@ -488,12 +489,12 @@ impl Allocator {
         }
         if size % 8 != 0 {
             let val = unsafe { ((shadow_addr + shadow_size) as *mut u8).read() };
-            let mask = (1 << (size % 8)) - 1;
-            if val & mask != mask {
-                return false;
+            let mask = (((1 << (size % 8)) - 1) as u8).rotate_left(8 - (size % 8) as u32);
+            if val & mask == mask {
+                return true;
             }
         }
-        return true;
+        return false;
     }
     /// Maps the address to a shadow address
     #[inline]
@@ -564,11 +565,16 @@ impl Allocator {
         // Enumerate memory ranges that are already occupied.
 
         RangeDetails::enumerate_with_prot(
-            PageProtection::NoAccess,
+            PageProtection::Read,
             &mut |range: &RangeDetails| -> bool {
                 let start = range.memory_range().base_address().0 as usize;
                 let end = start + range.memory_range().size();
-                log::trace!("Start: {:#x}, end: {:#x}", start, end);
+                log::trace!(
+                    "Start: {:#x}, end: {:#x}, prot: {:?}",
+                    start,
+                    end,
+                    range.protection()
+                );
                 occupied_ranges.push((start, end));
                 let base: usize = 2;
                 // On x64, if end > 2**48, then that's in vsyscall or something.
@@ -576,11 +582,11 @@ impl Allocator {
                 if end <= base.pow(48) && end > userspace_max {
                     userspace_max = end;
                 }
-
-                #[cfg(all(not(unix), target_arch = "x86_64"))]
-                if (end >> 3) <= base.pow(44) && (end >> 3) > userspace_max {
-                    userspace_max = end >> 3;
-                }
+                //
+                // #[cfg(all(not(unix), target_arch = "x86_64"))]
+                // if end <= base.pow(64) && end > userspace_max {
+                //     userspace_max = end;
+                // }
 
                 // On aarch64, if end > 2**52, then range is not in userspace
                 #[cfg(target_arch = "aarch64")]
@@ -592,7 +598,8 @@ impl Allocator {
             },
         );
 
-        let mut maxbit = 0;
+        let mut maxbit = 63;
+        #[cfg(unix)]
         for power in 1..64 {
             let base: usize = 2;
             if base.pow(power) > userspace_max {
@@ -602,7 +609,7 @@ impl Allocator {
         }
 
         {
-            for try_shadow_bit in &[maxbit, maxbit - 4, maxbit - 3, maxbit - 2] {
+            for try_shadow_bit in 44..maxbit {
                 let addr: usize = 1 << try_shadow_bit;
                 let shadow_start = addr;
                 let shadow_end = addr + addr + addr;
@@ -614,8 +621,8 @@ impl Allocator {
                     //     shadow_start + ((end >> 3) & ((1 << (try_shadow_bit + 1)) - 1))
                     // );
                     if (shadow_start <= *end) && (*start <= shadow_end) {
-                        // log::trace!("{:x} {:x}, {:x} {:x}", shadow_start, shadow_end, start, end);
-                        log::warn!("shadow_bit {try_shadow_bit:x} is not suitable");
+                        log::trace!("{:x} {:x}, {:x} {:x}", shadow_start, shadow_end, start, end);
+                        log::warn!("shadow_bit {try_shadow_bit:} is not suitable");
                         good_candidate = false;
                         break;
                     }
@@ -626,7 +633,7 @@ impl Allocator {
                             > shadow_end)
                     {
                         log::warn!(
-                            "shadow_bit {try_shadow_bit:x} is not suitable (shadow out of range)"
+                            "shadow_bit {try_shadow_bit:} is not suitable (shadow out of range)"
                         );
                         good_candidate = false;
                         break;
@@ -635,26 +642,26 @@ impl Allocator {
 
                 if good_candidate {
                     // We reserve the shadow memory space of size addr*2, but don't commit it.
-                    if let Ok(mapping) = MmapOptions::new(1 << (*try_shadow_bit + 1))
+                    if let Ok(mapping) = MmapOptions::new(1 << (try_shadow_bit + 1))
                         .unwrap()
                         .with_flags(MmapFlags::NO_RESERVE)
                         .with_address(addr)
                         .reserve_mut()
                     {
-                        shadow_bit = (*try_shadow_bit).try_into().unwrap();
+                        shadow_bit = (try_shadow_bit).try_into().unwrap();
 
-                        log::warn!("shadow_bit {shadow_bit:x} is suitable");
+                        log::warn!("shadow_bit {shadow_bit:} is suitable");
                         self.pre_allocated_shadow_mappings.push(mapping);
                         self.using_pre_allocated_shadow_mapping = true;
                         break;
                     }
-                    log::warn!("shadow_bit {try_shadow_bit:x} is not suitable - failed to allocate shadow memory");
+                    log::warn!("shadow_bit {try_shadow_bit:} is not suitable - failed to allocate shadow memory");
                 }
             }
         }
 
-        // assert!(shadow_bit != 0);
-        // attempt to pre-map the entire shadow-memory space
+        log::warn!("shadow_bit: {shadow_bit}");
+        assert!(shadow_bit != 0);
 
         let addr: usize = 1 << shadow_bit;
 
@@ -736,4 +743,14 @@ fn check_shadow() {
     assert!(allocator.check_shadow(unsafe { allocation.offset(1) }, 8) == false);
     assert!(allocator.check_shadow(unsafe { allocation.offset(2) }, 8) == false);
     assert!(allocator.check_shadow(unsafe { allocation.offset(3) }, 8) == false);
+    let allocation = unsafe { allocator.alloc(4, 0) };
+    assert!(allocator.check_shadow(allocation, 1) == true);
+    assert!(allocator.check_shadow(allocation, 2) == true);
+    assert!(allocator.check_shadow(allocation, 3) == true);
+    assert!(allocator.check_shadow(allocation, 4) == true);
+    assert!(allocator.check_shadow(allocation, 5) == false);
+    assert!(allocator.check_shadow(allocation, 6) == false);
+    assert!(allocator.check_shadow(allocation, 7) == false);
+    assert!(allocator.check_shadow(allocation, 8) == false);
+    assert!(!allocation.is_null());
 }
