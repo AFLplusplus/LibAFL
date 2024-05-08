@@ -509,7 +509,35 @@ where
                 } else {
                     None
                 };
+                #[cfg(target_arch = "x86_64")]
+                if let Some(rt) = runtimes.match_first_type_mut::<HookRuntime>() {
+                    if let Some((call_target, is_jmp)) = rt.is_interesting(decoder, instr) {
+                        rt.emit_callout(
+                            call_target,
+                            is_jmp,
+                            &instruction,
+                            output.writer(),
+                            runtimes_unborrowed.clone(),
+                        );
+                        keep_instr = false;
+                    }
+                }
 
+                #[cfg(target_arch = "aarch64")]
+                if let Some(rt) = runtimes.match_first_type_mut::<HookRuntime>() {
+                    if let Some((call_target, is_reg)) = rt.is_interesting(decoder, instr) {
+                        rt.emit_callout(
+                            call_target,
+                            &instruction,
+                            is_reg,
+                            output.writer(),
+                            runtimes_unborrowed.clone(),
+                        );
+                        keep_instr = false; //we keep the instruction in the emit if needed
+                    }
+                }
+
+                if keep_instr {
                 #[cfg(target_arch = "x86_64")]
                 if let Some(details) = res {
                     if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
@@ -540,33 +568,8 @@ where
                         );
                     }
                 }
-
-                #[cfg(target_arch = "x86_64")]
-                if let Some(rt) = runtimes.match_first_type_mut::<HookRuntime>() {
-                    if let Some(call_target) = rt.is_interesting(decoder, instr) {
-                        rt.emit_callout(
-                            call_target,
-                            &instruction,
-                            output.writer(),
-                            runtimes_unborrowed.clone(),
-                        );
-                        keep_instr = false;
-                    }
                 }
 
-                #[cfg(target_arch = "aarch64")]
-                if let Some(rt) = runtimes.match_first_type_mut::<HookRuntime>() {
-                    if let Some((call_target, is_reg)) = rt.is_interesting(decoder, instr) {
-                        rt.emit_callout(
-                            call_target,
-                            &instruction,
-                            is_reg,
-                            output.writer(),
-                            runtimes_unborrowed.clone(),
-                        );
-                        keep_instr = false; //we keep the instruction in the emit if needed
-                    }
-                }
 
                 #[cfg(all(
                     feature = "cmplog",
