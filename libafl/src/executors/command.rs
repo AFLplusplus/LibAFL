@@ -374,9 +374,16 @@ where
             }
         }
 
+        #[allow(clippy::match_same_arms)]
+        // to make different signals leading to an ExitKind::Interrupted explicit
         match res.map(|status| status.signal()) {
             // for reference: https://www.man7.org/linux/man-pages/man7/signal.7.html
-            Some(Some(9)) => Ok(ExitKind::Oom),
+            Some(Some(2)) => Ok(ExitKind::Interrupted), // SIGINT
+            Some(Some(10)) => Ok(ExitKind::Interrupted), // SIGUSR1
+            Some(Some(12)) => Ok(ExitKind::Interrupted), // SIGUSR2
+            Some(Some(14)) => Ok(ExitKind::Interrupted), // SIGALRM
+            Some(Some(15)) => Ok(ExitKind::Interrupted), // SIGTERM
+            Some(Some(18)) => Ok(ExitKind::Interrupted), // SIGCONT
             Some(Some(_)) => Ok(ExitKind::Crash),
             Some(None) => Ok(ExitKind::Ok),
             None => {

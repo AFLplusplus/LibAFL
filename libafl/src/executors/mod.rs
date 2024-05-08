@@ -57,9 +57,14 @@ pub enum ExitKind {
     /// The run resulted in a target crash.
     Crash,
     /// The run hit an out of memory error.
+    /// Only applicable when using `libafl_libfuzzer`
     Oom,
     /// The run timed out
     Timeout,
+    /// The process was interrupted, likely not because of a crash but because of user interaction.
+    /// Only applicable for certain executors (like [`CommandExecutor`]).
+    /// Check their source code for the actual conditions that lead to this.
+    Interrupted,
     /// Special case for [`DiffExecutor`] when both exitkinds don't match
     Diff {
         /// The exitkind of the primary executor
@@ -72,6 +77,8 @@ pub enum ExitKind {
 }
 
 /// How one of the diffing executions finished.
+///
+/// Refer to the definitions in [`ExitKind`] for disclaimers about applicability
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
@@ -80,6 +87,8 @@ pub enum ExitKind {
 pub enum DiffExitKind {
     /// The run exited normally.
     Ok,
+    /// The run was interrupted by a signal likely not tied to a crash
+    Interrupted,
     /// The run resulted in a target crash.
     Crash,
     /// The run hit an out of memory error.
@@ -98,6 +107,7 @@ impl From<ExitKind> for DiffExitKind {
     fn from(exitkind: ExitKind) -> Self {
         match exitkind {
             ExitKind::Ok => DiffExitKind::Ok,
+            ExitKind::Interrupted => DiffExitKind::Interrupted,
             ExitKind::Crash => DiffExitKind::Crash,
             ExitKind::Oom => DiffExitKind::Oom,
             ExitKind::Timeout => DiffExitKind::Timeout,
