@@ -290,7 +290,7 @@ where
             let event_bytes = &buf[4..];
 
             #[cfg(feature = "tcp_compression")]
-            let event_bytes = self.compressor.decompress(event_bytes)?;
+            let event_bytes = GzipCompressor::new().decompress(event_bytes)?;
 
             let event: Event<I> = postcard::from_bytes(event_bytes).unwrap();
             match Self::handle_in_broker(&mut self.monitor, client_id, &event).unwrap() {
