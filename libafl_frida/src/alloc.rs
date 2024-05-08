@@ -467,16 +467,17 @@ impl Allocator {
     pub fn check_shadow(&mut self, address: *const c_void, size: usize) -> bool {
         //the algorithm for check_shadow is as follows:
         //1. we first check if its managed. if is not then exit
-        //2. we check if it is aligned. this should be 99% of accesses. If it is do an aligned check
-        //3. if it is not split the check into 3 parts: the pre-aligment, the aligned portion, and the post alignment
-        //3. For the prealignment (i.e., the qword before the aligned checks)
-
+        //2. we check if it is aligned. this should be 99% of accesses. If it is do an aligned check and leave
+        //3. if it is not split the check into 3 parts: the pre-aligment bytes, the aligned portion, and the post alignment posts
+        //3. The prealignment bytes are the unaligned bytes (if any) located in the qword preceding the aligned portion. Perform a specialied check to ensure that the bytes from [start, align(start, 8)) are valid. In this case align(start,8) aligns start to the next 8 byte boundary.
+        //4. The aligned check is where the address and the size is 8 byte aligned. Use check_shadow_aligned to check it
+        //5. The post-alignment is the same as pre-alignment except it is the qword following the aligned portion. Use a specialized check to ensure that [end & ~7, end) is valid. 
 
         if size == 0 || !self.is_managed(address as *mut c_void) {
             return true;
         }
 
-        println!(
+        log::trace!(
             "check_shadow: {:x}, {:x}",
             address as usize,
             size
@@ -492,6 +493,7 @@ impl Allocator {
         let end_address = start_address + size;
         
         //8 byte align the start/end so we can use check_shadow_aligned for the majority of it
+        //in the case of subqword accesses (i.e,, the entire access is located within 1 qword), aligned_start > aligned_end naturally
         let aligned_start = (start_address + 7) & !7;
         let aligned_end = end_address & !7;
 
