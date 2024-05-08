@@ -551,7 +551,7 @@ where
                             output.writer(),
                             runtimes_unborrowed.clone(),
                         );
-                        keep_instr = false;
+                        keep_instr = false; //we keep the instruction in the emit if needed
                     }
                 }
 
@@ -564,8 +564,10 @@ where
                             &instruction,
                             is_reg,
                             no_link,
+                            output.writer(),
                             runtimes_unborrowed.clone(),
                         );
+                        keep_instr = false; //we keep the instruction in the emit if needed
                     }
                 }
 

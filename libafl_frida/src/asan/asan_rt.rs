@@ -125,6 +125,7 @@ pub struct AsanRuntime {
     suppressed_addresses: Vec<usize>,
     skip_ranges: Vec<SkipRange>,
     continue_on_error: bool,
+    shadow_check_func: Option<extern "C" fn(*const c_void, usize) -> bool>,
     pub(crate) hooks_enabled: bool,
     pc: Option<usize>,
 
@@ -244,6 +245,11 @@ impl AsanRuntime {
     /// Gets the allocator (mutable)
     pub fn allocator_mut(&mut self) -> &mut Allocator {
         &mut self.allocator
+    }
+
+    #[must_use]
+    pub fn shadow_check_func(&self) -> &Option<extern "C" fn(*const c_void, usize) -> bool> {
+        &self.shadow_check_func
     }
 
     /// Check if the test leaked any memory and report it if so.
@@ -3087,6 +3093,7 @@ impl Default for AsanRuntime {
             suppressed_addresses: Vec::new(),
             skip_ranges: Vec::new(),
             continue_on_error: false,
+            shadow_check_func: None,
             hooks_enabled: false,
             #[cfg(target_arch = "aarch64")]
             eh_frame: [0; ASAN_EH_FRAME_DWORD_COUNT],
