@@ -112,7 +112,7 @@ where
             monitor,
             llmp,
             #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
             phantom: PhantomData,
         })
     }
@@ -126,7 +126,7 @@ where
             monitor,
             llmp: llmp::LlmpBroker::create_attach_to_tcp(shmem_provider, port)?,
             #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
             phantom: PhantomData,
         })
     }
@@ -451,7 +451,7 @@ where
             hooks: tuple_list!(),
             llmp,
             #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
             configuration,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
@@ -506,7 +506,7 @@ where
             hooks: tuple_list!(),
             llmp,
             #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
             configuration,
             serialization_time: Duration::ZERO,
             deserialization_time: Duration::ZERO,
@@ -575,7 +575,7 @@ where
             hooks,
             llmp,
             #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
             configuration,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
@@ -636,7 +636,7 @@ where
             hooks,
             llmp,
             #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
             configuration,
             serialization_time: Duration::ZERO,
             deserialization_time: Duration::ZERO,
@@ -855,7 +855,7 @@ where
         let serialized = postcard::to_allocvec(&event)?;
         let flags = LLMP_FLAG_INITIALIZED;
 
-        match self.compressor.compress(&serialized)? {
+        match self.compressor.maybe_compress(&serialized) {
             Some(comp_buf) => {
                 self.llmp.send_buf_with_flags(
                     LLMP_TAG_EVENT_TO_BOTH,
@@ -1761,7 +1761,7 @@ where
         Ok(Self {
             llmp,
             #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
             converter,
             converter_back,
             phantom: PhantomData,
@@ -1781,7 +1781,7 @@ where
         Ok(Self {
             llmp,
             #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
             converter,
             converter_back,
             phantom: PhantomData,
@@ -1800,7 +1800,7 @@ where
         Ok(Self {
             llmp: LlmpClient::on_existing_from_env(shmem_provider, env_name)?,
             #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
             phantom: PhantomData,
             converter,
             converter_back,
@@ -1997,7 +1997,7 @@ where
         let serialized = postcard::to_allocvec(&converted_event)?;
         let flags = LLMP_FLAG_INITIALIZED;
 
-        match self.compressor.compress(&serialized)? {
+        match self.compressor.maybe_compress(&serialized) {
             Some(comp_buf) => {
                 self.llmp.send_buf_with_flags(
                     LLMP_TAG_EVENT_TO_BOTH,

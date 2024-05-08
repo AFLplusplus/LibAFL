@@ -15,6 +15,8 @@ use std::{
     sync::Arc,
 };
 
+#[cfg(feature = "tcp_compression")]
+use libafl_bolts::compress::GzipCompressor;
 #[cfg(feature = "std")]
 use libafl_bolts::core_affinity::CoreId;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
@@ -287,6 +289,9 @@ where
             // cut off the ID.
             let event_bytes = &buf[4..];
 
+            #[cfg(feature = "tcp_compression")]
+            let event_bytes = self.compressor.decompress(event_bytes)?;
+
             let event: Event<I> = postcard::from_bytes(event_bytes).unwrap();
             match Self::handle_in_broker(&mut self.monitor, client_id, &event).unwrap() {
                 BrokerEventResult::Forward => {
@@ -427,6 +432,8 @@ where
     client_id: ClientId,
     /// The custom buf handler
     custom_buf_handlers: Vec<Box<CustomBufHandlerFn<S>>>,
+    #[cfg(feature = "tcp_compression")]
+    compressor: GzipCompressor,
     /// The configuration defines this specific fuzzer.
     /// A node will not re-use the observer values sent over TCP
     /// from nodes with other configurations.
@@ -443,6 +450,8 @@ where
         let mut debug_struct = f.debug_struct("TcpEventManager");
         let debug = debug_struct.field("tcp", &self.tcp);
         //.field("custom_buf_handlers", &self.custom_buf_handlers)
+        #[cfg(feature = "tcp_compression")]
+        let debug = debug.field("compressor", &self.compressor);
         debug
             .field("configuration", &self.configuration)
             .field("phantom", &self.phantom)
@@ -546,6 +555,8 @@ where
             hooks,
             tcp,
             client_id,
+            #[cfg(feature = "tcp_compression")]
+            compressor: GzipCompressor::new(),
             configuration,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
@@ -712,6 +723,10 @@ where
         event: Event<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(&event)?;
+
+        #[cfg(feature = "tcp_compression")]
+        let serialized = self.compressor.compress(&serialized);
+
         let size = u32::try_from(serialized.len()).unwrap();
         self.tcp.write_all(&size.to_le_bytes())?;
         self.tcp.write_all(&self.client_id.0.to_le_bytes())?;
@@ -778,7 +793,11 @@ where
                     } else {
                         log::info!("{self_id:?} (from {other_client_id:?}) Received: {buf:?}");
 
-                        let event = postcard::from_bytes(&buf[4..])?;
+                        let buf = &buf[4..];
+                        #[cfg(feature = "tcp_compression")]
+                        let buf = self.compressor.decompress(buf)?;
+
+                        let event = postcard::from_bytes(&buf)?;
                         self.handle_in_client(fuzzer, executor, state, other_client_id, event)?;
                         count += 1;
                     }
