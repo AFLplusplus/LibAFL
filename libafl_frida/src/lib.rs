@@ -372,7 +372,6 @@ mod tests {
         coverage_rt::CoverageRuntime,
         executor::FridaInProcessExecutor,
         helper::FridaInstrumentationHelper,
-        hook_rt::HookRuntime,
     };
 
     static GUM: OnceLock<Gum> = OnceLock::new();

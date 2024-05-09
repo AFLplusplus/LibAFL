@@ -201,7 +201,7 @@ pub fn writer_register(reg: RegSpec) -> X86Register {
 }
 
 /// Translates a frida instruction to a disassembled instruction.
-#[cfg(all(target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 pub(crate) fn frida_to_cs(
     decoder: InstDecoder,
     frida_insn: &frida_gum_sys::Insn,
@@ -222,7 +222,7 @@ pub(crate) fn frida_to_cs(
     };
 }
 
-#[cfg(all(target_arch = "aarch64"))]
+#[cfg(target_arch = "aarch64")]
 pub(crate) fn frida_to_cs(
     decoder: InstDecoder,
     frida_insn: &frida_gum_sys::Insn,
