@@ -510,7 +510,7 @@ where
             inner,
             client,
             #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
             time_ref: time_obs.handle(),
             is_main,
         })
