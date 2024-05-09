@@ -46,9 +46,7 @@ fn main() {
                 std::env::var("HOME").unwrap()
             ));
         cmd.arg("/dll").arg("/OUT:test_harness.dll");
-
-        println!("cargo:warning={:?}", cmd);
-        println!("cargo:warning={:?}", cmd.output());
+        cmd.status().expect("Failed to link test_harness.dll");
     } else {
         let compiler = cc::Build::new()
             .cpp(true)
