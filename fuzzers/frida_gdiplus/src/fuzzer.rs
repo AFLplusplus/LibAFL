@@ -105,11 +105,8 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let coverage = CoverageRuntime::new();
                 let asan = AsanRuntime::new(&options);
 
-                let mut frida_helper = FridaInstrumentationHelper::new(
-                    &gum,
-                    options,
-                    tuple_list!(coverage, asan),
-                );
+                let mut frida_helper =
+                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage, asan));
                 //
                 // Create an observation channel using the coverage map
                 let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
@@ -222,11 +219,8 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let coverage = CoverageRuntime::new();
                 let cmplog = CmpLogRuntime::new();
 
-                let mut frida_helper = FridaInstrumentationHelper::new(
-                    &gum,
-                    options,
-                    tuple_list!(coverage, cmplog),
-                );
+                let mut frida_helper =
+                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage, cmplog));
 
                 // Create an observation channel using the coverage map
                 let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(

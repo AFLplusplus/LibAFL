@@ -1116,7 +1116,11 @@ pub fn generate_minibsod<W: Write>(
 
 /// Generates a mini-BSOD given an `EXCEPTION_POINTERS` structure.
 #[cfg(windows)]
-#[allow(clippy::non_ascii_literal, clippy::too_many_lines, clippy:not_unsafe_ptr_arg_deref)]
+#[allow(
+    clippy::non_ascii_literal,
+    clippy::too_many_lines,
+    clippy::not_unsafe_ptr_arg_deref
+)]
 pub fn generate_minibsod<W: Write>(
     writer: &mut BufWriter<W>,
     exception_pointers: *mut EXCEPTION_POINTERS,
