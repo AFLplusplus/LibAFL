@@ -25,9 +25,9 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
       LoadLibraryA("gdi32full.dll");
       LoadLibraryA("WindowsCodecs.dll");
       LoadLibraryA("shcore.dll");
-    GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
-        LoadLibraryA("gdi32.dll");
-        // DebugBreak();
+      GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
+      LoadLibraryA("gdi32.dll");
+      // DebugBreak();
       break;
   }
   return TRUE;
@@ -37,7 +37,7 @@ extern "C" __declspec(dllexport) int LLVMFuzzerTestOneInput(const uint8_t *data,
                                                             size_t size) {
   static DWORD init = 0;
   // if (!init) {
-    // init = 1;
+  // init = 1;
   // }
 
   HGLOBAL m_hBuffer = ::GlobalAlloc(GMEM_MOVEABLE, size);
