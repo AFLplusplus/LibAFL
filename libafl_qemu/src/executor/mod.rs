@@ -9,7 +9,7 @@ use core::{
 
 #[cfg(feature = "fork")]
 use libafl::{
-    events::EventManager, executors::InProcessForkExecutor, state::HasLastReportTime, HasMetadata,
+    events::EventManager, executors::InProcessForkExecutor, state::HasLastReportTime,
 };
 use libafl::{
     events::{EventFirer, EventRestarter},

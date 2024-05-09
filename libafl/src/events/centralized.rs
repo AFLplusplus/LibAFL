@@ -498,24 +498,6 @@ where
         })
     }
 
-    /// Creates a new [`CentralizedEventManager`].
-    #[cfg(feature = "adaptive_serialization")]
-    pub fn new(
-        inner: EM,
-        client: LlmpClient<SP>,
-        is_main: bool,
-        time_obs: &TimeObserver,
-    ) -> Result<Self, Error> {
-        Ok(Self {
-            inner,
-            client,
-            #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
-            time_ref: time_obs.handle(),
-            is_main,
-        })
-    }
-
     /// Create a centralized event manager on a port
     ///
     /// If the port is not yet bound, it will act as a broker; otherwise, it
