@@ -26,9 +26,13 @@ fn main() {
             .file("test_harness.a")
             .get_compiler();
         let mut cmd = std::process::Command::new(compiler.path());
-        cmd.args(compiler.args())
+        let cmd = cmd
+            .args(compiler.args())
             .arg("test_harness.cpp")
-            .arg("/link")
+            .arg("/link");
+
+        #[cfg(unix)]
+        let cmd = cmd
             .arg(format!(
                 "/libpath:{}/.cache/cargo-xwin/xwin/crt/lib/x86_64/",
                 std::env::var("HOME").unwrap()
@@ -40,9 +44,8 @@ fn main() {
             .arg(format!(
                 "/libpath:{}/.cache/cargo-xwin/xwin/sdk/lib/um/x86_64/",
                 std::env::var("HOME").unwrap()
-            ))
-            .arg("/dll")
-            .arg("/OUT:test_harness.dll");
+            ));
+        cmd.arg("/dll").arg("/OUT:test_harness.dll");
 
         println!("cargo:warning={:?}", cmd);
         println!("cargo:warning={:?}", cmd.output());
