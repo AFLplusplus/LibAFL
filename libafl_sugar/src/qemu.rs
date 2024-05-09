@@ -454,11 +454,7 @@ pub mod pybind {
     use std::path::PathBuf;
 
     use libafl_bolts::core_affinity::Cores;
-<<<<<<< HEAD
-    use libafl_qemu::emu::pybind::Qemu;
-=======
     use libafl_qemu::qemu::pybind::Qemu;
->>>>>>> main
     use pyo3::{prelude::*, types::PyBytes};
 
     use crate::qemu;

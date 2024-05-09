@@ -29,9 +29,7 @@ use yaxpeax_x86::amd64::InstDecoder;
 
 #[cfg(feature = "cmplog")]
 use crate::cmplog_rt::CmpLogRuntime;
-use crate::{
-    asan::asan_rt::AsanRuntime, coverage_rt::CoverageRuntime, drcov_rt::DrCovRuntime,
-};
+use crate::{asan::asan_rt::AsanRuntime, coverage_rt::CoverageRuntime, drcov_rt::DrCovRuntime};
 
 #[cfg(target_vendor = "apple")]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
@@ -300,7 +298,6 @@ impl FridaInstrumentationHelperBuilder {
             runtimes
                 .borrow_mut()
                 .init_all(gum, &ranges.borrow(), &module_map);
-
         }
 
         let transformer = FridaInstrumentationHelper::build_transformer(gum, &ranges, &runtimes);
@@ -530,7 +527,6 @@ where
                     }
                 }
 
-
                 #[cfg(all(
                     feature = "cmplog",
                     any(target_arch = "aarch64", target_arch = "x86_64")
@@ -563,7 +559,7 @@ where
                     basic_block_size += instr_size;
                 }
             }
-                instruction.keep();
+            instruction.keep();
         }
         if basic_block_size != 0 {
             if let Some(rt) = runtimes_unborrowed

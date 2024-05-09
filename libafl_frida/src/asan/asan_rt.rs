@@ -11,13 +11,11 @@ use core::{
     ptr::addr_of_mut,
 };
 use std::{
-    ffi::{c_void, c_char},
+    ffi::{c_char, c_void},
     ptr::write_volatile,
     rc::Rc,
     sync::MutexGuard,
 };
-
-use libc::wchar_t;
 
 use backtrace::Backtrace;
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
@@ -26,12 +24,13 @@ use frida_gum::instruction_writer::X86Register;
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 use frida_gum::{
-    interceptor::Interceptor,
-    instruction_writer::InstructionWriter, stalker::StalkerOutput, Gum, Module, ModuleDetails, ModuleMap, NativePointer, PageProtection, RangeDetails
+    instruction_writer::InstructionWriter, interceptor::Interceptor, stalker::StalkerOutput, Gum,
+    Module, ModuleDetails, ModuleMap, NativePointer, PageProtection, RangeDetails,
 };
 use frida_gum_sys::Insn;
 use hashbrown::HashMap;
 use libafl_bolts::{cli::FuzzerOptions, AsSlice};
+use libc::wchar_t;
 use rangemap::RangeMap;
 #[cfg(target_arch = "aarch64")]
 use yaxpeax_arch::Arch;
@@ -52,7 +51,6 @@ use crate::{
     helper::{FridaRuntime, SkipRange},
     utils::disas_count,
 };
-
 
 extern "C" {
     fn __register_frame(begin: *mut c_void);
@@ -485,11 +483,11 @@ impl AsanRuntime {
     pub fn register_hooks(&mut self, gum: &Gum) {
         let mut interceptor = Interceptor::obtain(gum);
 
-    macro_rules! hook_func {
+        macro_rules! hook_func {
             ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
                     log::trace!("Hooking {}", stringify!($name));
-                    
+
                     let target_function = frida_gum::Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function");
                     self.hooks.insert(stringify!($name).to_string(), target_function);
 
@@ -557,7 +555,7 @@ impl AsanRuntime {
             }
         }
         // Hook the memory allocator functions
-        
+
         #[cfg(not(windows))]
         hook_func!(None, malloc, (size: usize), *mut c_void);
         #[cfg(not(windows))]
@@ -767,23 +765,21 @@ impl AsanRuntime {
                         hook_func_with_check!(Some(libname), _o_free, (ptr: *mut c_void), usize);
                     }
                     "_write" => {
-
-        hook_func!(
-            Some(libname),
-            _write,
-            (fd: i32, buf: *const c_void, count: usize),
-            usize
-        );
-                        }
-                        "_read" => {
-
-        hook_func!(
-            Some(libname),
-            _read,
-            (fd: i32, buf: *mut c_void, count: usize),
-            usize
-        );
-                        }
+                        hook_func!(
+                            Some(libname),
+                            _write,
+                            (fd: i32, buf: *const c_void, count: usize),
+                            usize
+                        );
+                    }
+                    "_read" => {
+                        hook_func!(
+                            Some(libname),
+                            _read,
+                            (fd: i32, buf: *mut c_void, count: usize),
+                            usize
+                        );
+                    }
                     _ => (),
                 }
             }
@@ -1498,7 +1494,6 @@ impl AsanRuntime {
         }
     }
 
-
     // https://godbolt.org/z/ah8vG8sWo
     /*
     #include <stdio.h>
@@ -1537,12 +1532,12 @@ impl AsanRuntime {
 
     FRIDA ASAN IMPLEMENTATION DETAILS
 
-    The format of Frida's ASAN is signficantly different from LLVM ASAN. 
-    
-    In Frida ASAN, we attempt to find the lowest possible bit such that there is no mapping with that bit. That is to say, for some bit x, there is no mapping greater than 
+    The format of Frida's ASAN is signficantly different from LLVM ASAN.
+
+    In Frida ASAN, we attempt to find the lowest possible bit such that there is no mapping with that bit. That is to say, for some bit x, there is no mapping greater than
     1 << x. This is our shadow base and is similar to Ultra compact shadow in LLVM ASAN. Unlike ASAN where 0 represents a poisoned byte and 1 represents an unpoisoned byte, in Frida-ASAN
-    
-    The reasoning for this is that new pages are zeroed, so, by default, every qword is poisoned and we must explicitly unpoison any byte. 
+
+    The reasoning for this is that new pages are zeroed, so, by default, every qword is poisoned and we must explicitly unpoison any byte.
 
     Much like LLVM ASAN, shadow bytes are qword based. This is to say that each shadow byte maps to one qword. The shadow calculation is as follows:
     (1ULL << shadow_bit) | (address >> 3)
@@ -1892,7 +1887,7 @@ impl AsanRuntime {
         self.blob_check_mem_qword = Some(self.generate_shadow_check_blob(8));
         self.blob_check_mem_16bytes = Some(self.generate_shadow_check_blob(16));
 
-        self.blob_check_mem_3bytes = Some(self.generate_shadow_check_blob(3));  //the below are all possible with vector intrinsics
+        self.blob_check_mem_3bytes = Some(self.generate_shadow_check_blob(3)); //the below are all possible with vector intrinsics
         self.blob_check_mem_6bytes = Some(self.generate_shadow_check_blob(6));
         self.blob_check_mem_12bytes = Some(self.generate_shadow_check_blob(12));
         self.blob_check_mem_24bytes = Some(self.generate_shadow_check_blob(24));
@@ -2130,7 +2125,6 @@ impl AsanRuntime {
         if cs_instr.prefixes.rep_any() {
             return None;
         }
-
 
         for operand in operands {
             if operand.is_memory() {

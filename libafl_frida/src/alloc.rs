@@ -423,17 +423,24 @@ impl Allocator {
     #[inline]
     #[must_use]
     fn check_shadow_aligned(&mut self, address: *const c_void, size: usize) -> bool {
-        assert_eq!((address as usize) & 7, 0, "check_shadow_aligned used when address is not aligned. Use check_shadow");
-        assert_eq!(size & 7, 0, "check_shadow_aligned used when size is not aligned. Use check_shadow");
+        assert_eq!(
+            (address as usize) & 7,
+            0,
+            "check_shadow_aligned used when address is not aligned. Use check_shadow"
+        );
+        assert_eq!(
+            size & 7,
+            0,
+            "check_shadow_aligned used when size is not aligned. Use check_shadow"
+        );
 
         if size == 0 {
             return true;
         }
 
         let shadow_addr = map_to_shadow!(self, (address as usize));
-        let shadow_size = size>>3;
-        let buf =
-            unsafe { std::slice::from_raw_parts_mut(shadow_addr as *mut u8, shadow_size) };
+        let shadow_size = size >> 3;
+        let buf = unsafe { std::slice::from_raw_parts_mut(shadow_addr as *mut u8, shadow_size) };
         let (prefix, aligned, suffix) = unsafe { buf.align_to::<u128>() };
         if !prefix.iter().all(|&x| x == 0xff)
             || !suffix.iter().all(|&x| x == 0xff)
@@ -457,21 +464,23 @@ impl Allocator {
         //3. if it is not split the check into 3 parts: the pre-aligment bytes, the aligned portion, and the post alignment posts
         //3. The prealignment bytes are the unaligned bytes (if any) located in the qword preceding the aligned portion. Perform a specialied check to ensure that the bytes from [start, align(start, 8)) are valid. In this case align(start,8) aligns start to the next 8 byte boundary.
         //4. The aligned check is where the address and the size is 8 byte aligned. Use check_shadow_aligned to check it
-        //5. The post-alignment is the same as pre-alignment except it is the qword following the aligned portion. Use a specialized check to ensure that [end & ~7, end) is valid. 
+        //5. The post-alignment is the same as pre-alignment except it is the qword following the aligned portion. Use a specialized check to ensure that [end & ~7, end) is valid.
 
-        if size == 0 /*|| !self.is_managed(address as *mut c_void)*/ {
+        if size == 0
+        /*|| !self.is_managed(address as *mut c_void)*/
+        {
             return true;
         }
 
         //fast path. most buffers are likely 8 byte aligned in size and address
         if (address as usize) & 7 == 0 && size & 7 == 0 {
-            return self.check_shadow_aligned(address, size); 
+            return self.check_shadow_aligned(address, size);
         }
 
         //slow path. check everything
         let start_address = address as usize;
         let end_address = start_address + size;
-        
+
         //8 byte align the start/end so we can use check_shadow_aligned for the majority of it
         //in the case of subqword accesses (i.e,, the entire access is located within 1 qword), aligned_start > aligned_end naturally
         let aligned_start = (start_address + 7) & !7;
@@ -480,12 +489,11 @@ impl Allocator {
         let start_offset = start_address & 7;
         let end_offset = end_address & 7;
 
-
         //if the start is unaligned
         if start_address != aligned_start {
             let start_shadow = map_to_shadow!(self, start_address);
-        
-            let start_mask: u8 = 0xff << (8-start_offset);
+
+            let start_mask: u8 = 0xff << (8 - start_offset);
             if unsafe { (start_shadow as *const u8).read() } & start_mask != start_mask {
                 return false;
             }
@@ -493,24 +501,23 @@ impl Allocator {
 
         //if this is not true then it must be a subqword access as the start will be larger than the end
         if aligned_start <= aligned_end {
-            if !self.check_shadow_aligned(aligned_start as *const c_void, aligned_end-aligned_start) {
+            if !self
+                .check_shadow_aligned(aligned_start as *const c_void, aligned_end - aligned_start)
+            {
                 return false;
             }
 
             if end_address != aligned_end {
                 let end_shadow = map_to_shadow!(self, end_address);
-            
+
                 let end_mask = 0xff << (8 - end_offset); //we want to check from the beginning of the qword to the offset
                 if unsafe { (end_shadow as *const u8).read() } & end_mask != end_mask {
                     return false;
                 }
             }
-
-
         }
         // self.map_shadow_for_region(address, address + size, false);
 
-        
         return true;
     }
     /// Maps the address to a shadow address
@@ -742,16 +749,16 @@ fn check_shadow() {
     assert!(allocator.check_shadow(unsafe { allocation.offset(2) }, 8) == false);
     assert!(allocator.check_shadow(unsafe { allocation.offset(3) }, 8) == false);
     let allocation = unsafe { allocator.alloc(0xc, 0) };
-    assert!(allocator.check_shadow(unsafe { allocation.offset(4)}, 8) == true);
+    assert!(allocator.check_shadow(unsafe { allocation.offset(4) }, 8) == true);
     //subqword access
-    assert!(allocator.check_shadow(unsafe { allocation.offset(3)}, 2) == true);
+    assert!(allocator.check_shadow(unsafe { allocation.offset(3) }, 2) == true);
     //unaligned access
-    assert!(allocator.check_shadow(unsafe { allocation.offset(3)}, 8) == true);
+    assert!(allocator.check_shadow(unsafe { allocation.offset(3) }, 8) == true);
     let allocation = unsafe { allocator.alloc(0x20, 0) };
     //access with unaligned parts at the beginning and end
-    assert!(allocator.check_shadow(unsafe { allocation.offset(10)}, 21) == true);
+    assert!(allocator.check_shadow(unsafe { allocation.offset(10) }, 21) == true);
     //invalid, unaligned access
-    assert!(allocator.check_shadow(unsafe { allocation.offset(10)}, 29) == false);
+    assert!(allocator.check_shadow(unsafe { allocation.offset(10) }, 29) == false);
     let allocation = unsafe { allocator.alloc(4, 0) };
     assert!(!allocation.is_null());
     assert!(allocator.check_shadow(allocation, 1) == true);
@@ -763,7 +770,7 @@ fn check_shadow() {
     assert!(allocator.check_shadow(allocation, 7) == false);
     assert!(allocator.check_shadow(allocation, 8) == false);
     let allocation = unsafe { allocator.alloc(0xc, 0) };
-    assert!(allocator.check_shadow(unsafe { allocation.offset(4)}, 8) == true);
+    assert!(allocator.check_shadow(unsafe { allocation.offset(4) }, 8) == true);
     let allocation = unsafe { allocator.alloc(0x3c, 0) };
-    assert!(allocator.check_shadow(unsafe { allocation.offset(0x3a)}, 2) == true);
+    assert!(allocator.check_shadow(unsafe { allocation.offset(0x3a) }, 2) == true);
 }
