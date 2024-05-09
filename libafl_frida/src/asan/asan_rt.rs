@@ -11,11 +11,13 @@ use core::{
     ptr::addr_of_mut,
 };
 use std::{
-    ffi::c_void,
+    ffi::{c_void, c_char},
     ptr::write_volatile,
     rc::Rc,
     sync::MutexGuard,
 };
+
+use libc::wchar_t;
 
 use backtrace::Backtrace;
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
@@ -24,8 +26,8 @@ use frida_gum::instruction_writer::X86Register;
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 use frida_gum::{
-    instruction_writer::InstructionWriter, stalker::StalkerOutput, Gum, Module, ModuleDetails,
-    ModuleMap, PageProtection, RangeDetails,
+    interceptor::Interceptor,
+    instruction_writer::InstructionWriter, stalker::StalkerOutput, Gum, Module, ModuleDetails, ModuleMap, NativePointer, PageProtection, RangeDetails
 };
 use frida_gum_sys::Insn;
 use hashbrown::HashMap;
@@ -48,9 +50,9 @@ use crate::{
     alloc::Allocator,
     asan::errors::{AsanError, AsanErrors, AsanReadWriteError, ASAN_ERRORS},
     helper::{FridaRuntime, SkipRange},
-    hook_rt::HookRuntime,
     utils::disas_count,
 };
+
 
 extern "C" {
     fn __register_frame(begin: *mut c_void);
@@ -129,6 +131,7 @@ pub struct AsanRuntime {
     suppressed_addresses: Vec<usize>,
     skip_ranges: Vec<SkipRange>,
     continue_on_error: bool,
+    hooks: HashMap<String, NativePointer>,
     pub(crate) hooks_enabled: bool,
     pc: Option<usize>,
 
@@ -154,13 +157,15 @@ impl FridaRuntime for AsanRuntime {
     /// invalid!
     fn init(
         &mut self,
-        _gum: &Gum,
+        gum: &Gum,
         _ranges: &RangeMap<usize, (u16, String)>,
         module_map: &Rc<ModuleMap>,
     ) {
         self.allocator.init();
 
         AsanErrors::get_mut_blocking().set_continue_on_error(self.continue_on_error);
+
+        self.register_hooks(gum);
 
         self.generate_instrumentation_blobs();
 
@@ -477,107 +482,42 @@ impl AsanRuntime {
     }
 
     /// Register the required hooks with the [`HookRuntime`]
-    pub fn register_hooks(hook_rt: &mut HookRuntime) {
-        #[allow(unused)]
-        macro_rules! hook_func {
-            ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*)) => {
-                paste::paste! {
-                    // extern "system" {
-                    //     fn $name($($param: $param_type),*) -> $return_type;
-                    // }
-                    let address = Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function").0 as usize;
-                    log::trace!("hooking {} at {:x}", stringify!($name), address);
-                    hook_rt.register_hook(address, move |_address, mut _context, _asan_rt| {
-                        let mut index = 0;
+    pub fn register_hooks(&mut self, gum: &Gum) {
+        let mut interceptor = Interceptor::obtain(gum);
 
-                        let asan_rt = _asan_rt.unwrap();
-
-                        #[cfg(target_arch = "x86_64")]
-                        asan_rt.set_pc(_context.rip() as usize);
-
-                        #[cfg(target_arch = "aarch64")]
-                        asan_rt.set_pc(_context.pc() as usize);
-
-
-                        log::trace!("hooked {} from {:x}", stringify!($name), asan_rt.pc());
-                        #[allow(trivial_numeric_casts)]
-                        #[allow(unused_assignments)]
-                        asan_rt.[<hook_ $name>]($(_context.arg({
-                            let $param = index;
-                            index += 1;
-                            $param
-                        }) as _),*);
-
-                        asan_rt.unset_pc();
-
-                    });
-                };
-            };
+    macro_rules! hook_func {
             ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
-                    // extern "system" {
-                    //     fn $name($($param: $param_type),*) -> $return_type;
-                    // }
-                    let address = Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function").0 as usize;
-                    log::trace!("hooking {} at {:x}", stringify!($name), address);
-                    hook_rt.register_hook(address, move |_address, mut _context, _asan_rt| {
-                        let mut index = 0;
+                    log::trace!("Hooking {}", stringify!($name));
+                    
+                    let target_function = frida_gum::Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function");
+                    self.hooks.insert(stringify!($name).to_string(), target_function);
 
-                        let asan_rt = _asan_rt.unwrap();
-
-                        #[cfg(target_arch = "x86_64")]
-                        asan_rt.set_pc(_context.rip() as usize);
-
-                        #[cfg(target_arch = "aarch64")]
-                        asan_rt.set_pc(_context.pc() as usize);
-
-
-                        log::trace!("hooked {} from {:x}", stringify!($name), asan_rt.pc());
-                        #[allow(trivial_numeric_casts)]
-                        #[allow(unused_assignments)]
-                        _context.set_return_value(asan_rt.[<hook_ $name>]($(_context.arg({
-                            let $param = index;
-                            index += 1;
-                            $param
-                        }) as _),*) as usize);
-
-                        asan_rt.unset_pc();
-                    });
-                }
-            };
-
-        }
-
-        #[cfg(target_os = "windows")]
-        macro_rules! hook_func_with_alt {
-            ($lib:expr, $alt_name:ident, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
-                paste::paste! {
-                    // extern "system" {
-                    //     fn $name($($param: $param_type),*) -> $return_type;
-                    // }
-                    let address = Module::find_export_by_name($lib, stringify!($alt_name)).expect("Failed to find function").0 as usize;
-                    log::trace!("hooking {} at {:x}", stringify!($alt_name), address);
-                    hook_rt.register_hook(address, move |_address, mut _context, _asan_rt| {
-                        let mut index = 0;
-
-                        let asan_rt = _asan_rt.unwrap();
-                        #[cfg(target_arch = "x86_64")]
-                        asan_rt.set_pc(_context.rip() as usize);
-
-                        #[cfg(target_arch = "aarch64")]
-                        asan_rt.set_pc(_context.pc() as usize);
-
-                        log::trace!("hooked {} from {:x}", stringify!($alt_name), asan_rt.pc());
-                        #[allow(trivial_numeric_casts)]
-                        #[allow(unused_assignments)]
-                        _context.set_return_value(asan_rt.[<hook_ $name>]($(_context.arg({
-                            let $param = index;
-                            index += 1;
-                            $param
-                        }) as _),*) as usize);
-
-                        asan_rt.unset_pc();
-                    });
+                    #[allow(non_snake_case)]
+                    unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
+                        let mut invocation = Interceptor::current_invocation();
+                        let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
+                        // let real_address = this.real_address_for_stalked(invocation.return_addr());
+                        if this.hooks_enabled {
+                            let previous_hook_state = this.hooks_enabled;
+                            this.hooks_enabled = false;
+                            let ret = this.[<hook_ $name>]($($param),*);
+                            this.hooks_enabled = previous_hook_state;
+                            ret
+                        } else {
+                            let original = std::mem::transmute::<*const c_void, extern "C" fn($($param: $param_type),*) -> $return_type>(this.hooks.get(&stringify!($name).to_string()).unwrap().0);
+                            let previous_hook_state = this.hooks_enabled;
+                            this.hooks_enabled = false;
+                            let ret = (original)($($param),*);
+                            this.hooks_enabled = previous_hook_state;
+                            ret
+                        }
+                    }
+                    let _ = interceptor.replace(
+                        target_function,
+                        NativePointer([<replacement_ $name>] as *mut c_void),
+                        NativePointer(core::ptr::from_mut(self) as *mut c_void)
+                    );
                 }
             }
         }
@@ -585,107 +525,46 @@ impl AsanRuntime {
         macro_rules! hook_func_with_check {
             ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
-                    extern "system" {
-                        fn $name($($param: $param_type),*) -> $return_type;
-                    }
-                    let address = Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function").0 as usize;
-                    log::trace!("hooking {} at {:x}", stringify!($name), address);
-                    hook_rt.register_hook(address, move |_address, mut _context, _asan_rt| {
+                    log::trace!("Hooking {}", stringify!($name));
+                    let target_function = frida_gum::Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function");
+                    self.hooks.insert(stringify!($name).to_string(), target_function);
 
-                        let asan_rt = _asan_rt.unwrap();
-                        let mut index = 0;
-
-                        #[cfg(target_arch = "x86_64")]
-                        asan_rt.set_pc(_context.rip() as usize);
-
-                        #[cfg(target_arch = "aarch64")]
-                        asan_rt.set_pc(_context.pc() as usize);
-
-                        log::trace!("hooked {} from {:x}", stringify!($name), asan_rt.pc());
-                        #[allow(trivial_numeric_casts)]
-                        #[allow(unused_assignments)]
-                        let result = if asan_rt.[<hook_check_ $name>]($(_context.arg({
-                            let $param = index;
-                            index += 1;
-                            $param
-                        }) as _),*) {
-                            let mut index = 0;
-                            #[allow(trivial_numeric_casts)]
-                            #[allow(unused_assignments)]
-                            asan_rt.[<hook_ $name>]($(_context.arg({
-                                let $param = index;
-                                index += 1;
-                                $param
-                            }) as _),*)
+                    #[allow(non_snake_case)]
+                    unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
+                        let mut invocation = Interceptor::current_invocation();
+                        let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
+                        if this.hooks_enabled && this.[<hook_check_ $name>]($($param),*) {
+                            let previous_hook_state = this.hooks_enabled;
+                            this.hooks_enabled = false;
+                            let ret = this.[<hook_ $name>]($($param),*);
+                            this.hooks_enabled = previous_hook_state;
+                            ret
                         } else {
-                            let mut index = 0;
-                            #[allow(trivial_numeric_casts)]
-                            #[allow(unused_assignments)]
-                            unsafe { $name($(_context.arg({
-                                let $param = index;
-                                index += 1;
-                                $param
-                            }) as _),*) }
-                        };
-                        #[allow(trivial_numeric_casts)]
-                        _context.set_return_value(result as usize);
-                        asan_rt.unset_pc();
-                    })
+                            let original = std::mem::transmute::<*const c_void, extern "C" fn($($param: $param_type),*) -> $return_type>(this.hooks.get(&stringify!($name).to_string()).unwrap().0);
+                            let previous_hook_state = this.hooks_enabled;
+                            this.hooks_enabled = false;
+                            let ret = (original)($($param),*);
+                            this.hooks_enabled = previous_hook_state;
+                            ret
+                        }
+                    }
+                    let _ = interceptor.replace(
+                        target_function,
+                        NativePointer([<replacement_ $name>] as *mut c_void),
+                        NativePointer(core::ptr::from_mut(self) as *mut c_void)
+                    );
                 }
             }
         }
-
-        #[cfg(target_os = "windows")]
-        macro_rules! hook_func_with_check_with_alt {
-            ($lib:expr, $alt_name:ident, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
-                paste::paste! {
-                    extern "system" {
-                        fn $name($($param: $param_type),*) -> $return_type;
-                    }
-                    let address = Module::find_export_by_name($lib, stringify!($alt_name)).expect("Failed to find function").0 as usize;
-                    log::trace!("hooking {} at {:x}", stringify!($alt_name), address);
-                    hook_rt.register_hook(address, move |_address, mut _context, _asan_rt| {
-                        log::trace!("hooked {} from {:x}", stringify!($alt_name), _context.rip());
-                        let asan_rt = _asan_rt.unwrap();
-                        let mut index = 0;
-                        asan_rt.set_pc(_context.rip() as usize);
-                        #[allow(trivial_numeric_casts)]
-                        #[allow(unused_assignments)]
-                        let result = if asan_rt.[<hook_check_ $name>]($(_context.arg({
-                            let $param = index;
-                            index += 1;
-                            $param
-                        }) as _),*) {
-                            let mut index = 0;
-                            #[allow(trivial_numeric_casts)]
-                            #[allow(unused_assignments)]
-                            asan_rt.[<hook_ $name>]($(_context.arg({
-                                let $param = index;
-                                index += 1;
-                                $param
-                            }) as _),*)
-                        } else {
-                            let mut index = 0;
-                            #[allow(trivial_numeric_casts)]
-                            #[allow(unused_assignments)]
-                            unsafe { $name($(_context.arg({
-                                let $param = index;
-                                index += 1;
-                                $param
-                            }) as _),*) }
-                        };
-                        #[allow(trivial_numeric_casts)]
-                        _context.set_return_value(result as usize);
-                        asan_rt.unset_pc();
-                    })
-                }
-            }
-        }
-
         // Hook the memory allocator functions
+        
+        #[cfg(not(windows))]
         hook_func!(None, malloc, (size: usize), *mut c_void);
+        #[cfg(not(windows))]
         hook_func!(None, calloc, (nmemb: usize, size: usize), *mut c_void);
+        #[cfg(not(windows))]
         hook_func!(None, realloc, (ptr: *mut c_void, size: usize), *mut c_void);
+        #[cfg(not(windows))]
         hook_func_with_check!(None, free, (ptr: *mut c_void), usize);
         #[cfg(not(any(target_vendor = "apple", windows)))]
         hook_func!(None, memalign, (size: usize, alignment: usize), *mut c_void);
@@ -705,13 +584,6 @@ impl AsanRuntime {
         //     (base_address: *const c_void, reason: usize, context: usize, entry_point: usize),
         //     usize
         // );
-        #[cfg(windows)]
-        hook_func!(
-            None,
-            LdrLoadDll,
-            (path: *const c_void, file: usize, flags: usize, x: usize),
-            usize
-        );
         // #[cfg(windows)]
         // hook_func!(
         //     None,
@@ -741,12 +613,13 @@ impl AsanRuntime {
             "ucrtbase",
             "kernelbase",
             "kernel32",
-            "vcruntime140",
             "msvcrt",
             "api-ms-win-crt-private-l1-1-0",
+            "api-ms-win-crt-private-l1-1-0.dll",
             "api-ms-win-core-heap-l1-1-0",
             "api-ms-win-core-heap-l2-1-0",
             "api-ms-win-core-heap-obsolete-l1-1-0",
+            // "vcruntime140",
         ] {
             log::info!("Hooking allocator functions in {}", libname);
             for export in Module::enumerate_exports(libname) {
@@ -762,28 +635,40 @@ impl AsanRuntime {
                         hook_func!(Some(libname), RtlDestroyHeap, (handle: *const c_void), *mut c_void);
                     }
                     "HeapAlloc" => {
-                        hook_func_with_alt!(Some(libname), HeapAlloc, RtlAllocateHeap, (handle: *mut c_void, flags: u32, bytes: usize), *mut c_void);
+                        hook_func!(Some(libname), HeapAlloc, (handle: *mut c_void, flags: u32, bytes: usize), *mut c_void);
                     }
                     "RtlAllocateHeap" => {
                         hook_func!(Some(libname), RtlAllocateHeap, (handle: *mut c_void, flags: u32, bytes: usize), *mut c_void);
                     }
                     "HeapFree" => {
-                        hook_func_with_check!(Some(libname), HeapFree, (handle: *mut c_void, flags: u32, mem: *const c_void), bool);
+                        hook_func_with_check!(Some(libname), HeapFree, (handle: *mut c_void, flags: u32, mem: *mut c_void), bool);
                     }
                     "RtlFreeHeap" => {
-                        hook_func_with_check!(Some(libname), RtlFreeHeap, (handle: *mut c_void, flags: u32, mem: *const c_void), usize);
+                        hook_func_with_check!(Some(libname), RtlFreeHeap, (handle: *mut c_void, flags: u32, mem: *mut c_void), usize);
                     }
                     "HeapSize" => {
-                        hook_func_with_check_with_alt!(Some(libname), HeapSize, RtlSizeHeap , (handle: *mut c_void, flags: u32, mem: *const c_void), usize);
+                        hook_func_with_check!(Some(libname), HeapSize, (handle: *mut c_void, flags: u32, mem: *mut c_void), usize);
                     }
                     "RtlSizeHeap" => {
-                        hook_func_with_check!(Some(libname), RtlSizeHeap , (handle: *mut c_void, flags: u32, mem: *const c_void), usize);
+                        hook_func_with_check!(Some(libname), RtlSizeHeap , (handle: *mut c_void, flags: u32, mem: *mut c_void), usize);
+                    }
+                    "RtlReAllocateHeap" => {
+                        hook_func!(
+                            Some(libname),
+                            RtlReAllocateHeap,
+                            (
+                                handle: *mut c_void,
+                                flags: u32,
+                                ptr: *mut c_void,
+                                size: usize
+                            ),
+                            *mut c_void
+                        );
                     }
                     "HeapReAlloc" => {
-                        hook_func_with_alt!(
+                        hook_func!(
                             Some(libname),
                             HeapReAlloc,
-                            RtlReAllocateHeap,
                             (
                                 handle: *mut c_void,
                                 flags: u32,
@@ -797,7 +682,7 @@ impl AsanRuntime {
                         hook_func!(Some(libname), LocalAlloc, (flags: u32, size: usize), *mut c_void);
                     }
                     "LocalReAlloc" => {
-                        hook_func!(Some(libname), LocalReAlloc, (mem: *mut c_void, flags: u32, size: usize), *mut c_void);
+                        hook_func!(Some(libname), LocalReAlloc, (mem: *mut c_void, size: usize, flags: u32), *mut c_void);
                     }
                     "LocalHandle" => {
                         hook_func_with_check!(Some(libname), LocalHandle, (mem: *mut c_void), *mut c_void);
@@ -861,26 +746,44 @@ impl AsanRuntime {
                         hook_func!(Some(libname), malloc, (size: usize), *mut c_void);
                     }
                     "_o_malloc" | "o_malloc" => {
-                        hook_func_with_alt!(Some(libname), _o_malloc, malloc, (size: usize), *mut c_void);
+                        hook_func!(Some(libname), _o_malloc, (size: usize), *mut c_void);
                     }
                     "calloc" => {
                         hook_func!(Some(libname), calloc, (nmemb: usize, size: usize), *mut c_void);
                     }
                     "_o_calloc" | "o_calloc" => {
-                        hook_func_with_alt!(Some(libname), _o_calloc, calloc, (nmemb: usize, size: usize), *mut c_void);
+                        hook_func!(Some(libname), _o_calloc, (nmemb: usize, size: usize), *mut c_void);
                     }
                     "realloc" => {
                         hook_func!(Some(libname), realloc, (ptr: *mut c_void, size: usize), *mut c_void);
                     }
                     "_o_realloc" | "o_realloc" => {
-                        hook_func_with_alt!(Some(libname), _o_realloc, realloc, (ptr: *mut c_void, size: usize), *mut c_void);
+                        hook_func!(Some(libname), _o_realloc, (ptr: *mut c_void, size: usize), *mut c_void);
                     }
                     "free" => {
                         hook_func_with_check!(Some(libname), free, (ptr: *mut c_void), usize);
                     }
                     "_o_free" | "o_free" => {
-                        hook_func_with_check_with_alt!(Some(libname), _o_free, free, (ptr: *mut c_void), usize);
+                        hook_func_with_check!(Some(libname), _o_free, (ptr: *mut c_void), usize);
                     }
+                    "_write" => {
+
+        hook_func!(
+            Some(libname),
+            _write,
+            (fd: i32, buf: *const c_void, count: usize),
+            usize
+        );
+                        }
+                        "_read" => {
+
+        hook_func!(
+            Some(libname),
+            _read,
+            (fd: i32, buf: *mut c_void, count: usize),
+            usize
+        );
+                        }
                     _ => (),
                 }
             }
@@ -905,7 +808,6 @@ impl AsanRuntime {
             for export in Module::enumerate_exports(libname) {
                 match &export.name[..] {
                     "_Znam" => {
-                        log::info!("hooking new");
                         hook_func!(Some(libname), _Znam, (size: usize), *mut c_void);
                     }
                     "_ZnamRKSt9nothrow_t" => {
@@ -1064,17 +966,8 @@ impl AsanRuntime {
             (fd: i32, buf: *const c_void, count: usize),
             usize
         );
-        #[cfg(windows)]
-        hook_func!(
-            None,
-            _write,
-            (fd: i32, buf: *const c_void, count: usize),
-            usize
-        );
         #[cfg(not(windows))]
         hook_func!(None, read, (fd: i32, buf: *mut c_void, count: usize), usize);
-        #[cfg(windows)]
-        hook_func!(None, _read, (fd: i32, buf: *mut c_void, count: usize), usize);
         hook_func!(
             None,
             fgets,
@@ -1667,7 +1560,7 @@ impl AsanRuntime {
         macro_rules! shadow_check{
             ($ops:ident, $bit:expr) => {dynasm!($ops
                 ;   .arch x64
-//                ; int3
+               // ; int3
                 ; mov     rdx, 1
                 ; shl     rdx, shadow_bit as i8 //rcx now contains the mask
                 ; mov rcx, rdi //copy address into rdx
@@ -2238,9 +2131,10 @@ impl AsanRuntime {
             return None;
         }
 
+
         for operand in operands {
             if operand.is_memory() {
-                // log::trace!("{:#?}", operand)
+                // log::trace!("{:#?}", operand);
                 // if we reach this point
                 // because in x64 there's no mem to mem inst, just return the first memory operand
 
@@ -2302,7 +2196,6 @@ impl AsanRuntime {
         {
             let after_report_impl = writer.code_offset() + 2;
 
-            #[cfg(target_arch = "x86_64")]
             writer.put_jmp_near_label(after_report_impl);
 
             self.current_report_impl = writer.pc();
@@ -2310,6 +2203,10 @@ impl AsanRuntime {
 
             writer.put_label(after_report_impl);
         }
+        // if disp == 0x102 {
+        //     log::trace!("BREAKING!");
+        //     writer.put_bytes(&[0xcc]);
+        // }
 
         /* Save registers that we'll use later in shadow_check_blob
                                         | addr  | rip   |
@@ -2683,6 +2580,7 @@ impl Default for AsanRuntime {
             suppressed_addresses: Vec::new(),
             skip_ranges: Vec::new(),
             continue_on_error: false,
+            hooks: HashMap::new(),
             hooks_enabled: false,
             #[cfg(target_arch = "aarch64")]
             eh_frame: [0; ASAN_EH_FRAME_DWORD_COUNT],

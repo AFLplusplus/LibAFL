@@ -129,7 +129,6 @@ impl AsanRuntime {
         extern "system" {
             fn LoadLibraryExW(path: *const c_void, file: usize, flags: i32) -> usize;
         }
-        log::warn!("LoadLibraryW");
         let result = unsafe { LoadLibraryExW(path, file, flags) };
         self.allocator_mut().unpoison_all_existing_memory();
         result
@@ -159,13 +158,12 @@ impl AsanRuntime {
     #[inline]
     #[allow(non_snake_case)]
     #[cfg(windows)]
-    pub fn hook_RtlAllocateHeap(
+    pub fn hook_HeapAlloc(
         &mut self,
         _handle: *mut c_void,
         flags: u32,
         size: usize,
     ) -> *mut c_void {
-        log::trace!("HeapAlloc!!! {}", size);
         let allocator = self.allocator_mut();
         let ret = unsafe { allocator.alloc(size, 8) };
 
@@ -185,6 +183,79 @@ impl AsanRuntime {
     #[inline]
     #[allow(non_snake_case)]
     #[cfg(windows)]
+    pub fn hook_RtlAllocateHeap(
+        &mut self,
+        _handle: *mut c_void,
+        flags: u32,
+        size: usize,
+    ) -> *mut c_void {
+        let allocator = self.allocator_mut();
+        let ret = unsafe { allocator.alloc(size, 8) };
+
+        if flags & 8 == 8 {
+            extern "system" {
+                fn memset(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
+            }
+            unsafe {
+                memset(ret, 0, size);
+            }
+        }
+        if flags & 4 == 4 && ret == std::ptr::null_mut() {
+            unimplemented!();
+        }
+        ret
+    }
+    #[inline]
+    #[allow(non_snake_case)]
+    #[cfg(windows)]
+    pub fn hook_HeapReAlloc(
+        &mut self,
+        handle: *mut c_void,
+        flags: u32,
+        ptr: *mut c_void,
+        size: usize,
+    ) -> *mut c_void {
+        let allocator = self.allocator_mut();
+        if !allocator.is_managed(ptr) {
+            extern "system" {
+                fn HeapReAlloc(
+                    handle: *mut c_void,
+                    flags: u32,
+                    ptr: *mut c_void,
+                    size: usize,
+                ) -> *mut c_void;
+            }
+            return unsafe { HeapReAlloc(handle, flags, ptr, size) };
+        }
+        let ret = unsafe {
+            let ret = allocator.alloc(size, 8);
+            extern "system" {
+                fn memcpy(dst: *mut c_void, src: *const c_void, size: usize) -> *mut c_void;
+            }
+            memcpy(ret as *mut c_void, ptr, allocator.get_usable_size(ptr));
+            allocator.release(ptr);
+            ret
+        };
+
+        if flags & 8 == 8 {
+            extern "system" {
+                fn memset(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
+            }
+            unsafe {
+                memset(ret, 0, size);
+            }
+        }
+        if flags & 4 == 4 && ret == std::ptr::null_mut() {
+            unimplemented!();
+        }
+        if flags & 0x10 == 0x10 && ret != ptr {
+            unimplemented!();
+        }
+        ret
+    }
+    #[inline]
+    #[allow(non_snake_case)]
+    #[cfg(windows)]
     pub fn hook_RtlReAllocateHeap(
         &mut self,
         handle: *mut c_void,
@@ -192,8 +263,8 @@ impl AsanRuntime {
         ptr: *mut c_void,
         size: usize,
     ) -> *mut c_void {
-        // log::trace!("{:?}: HeapReAlloc({:?}, {:}, {:?}, {:x})", std::thread::current().id(), handle, flags, ptr, size);
         let allocator = self.allocator_mut();
+        log::trace!("RtlReAllocateHeap({ptr:?}, {size:x})");
         if !allocator.is_managed(ptr) {
             extern "system" {
                 fn HeapReAlloc(
@@ -251,13 +322,6 @@ impl AsanRuntime {
         _flags: u32,
         ptr: *mut c_void,
     ) -> usize {
-        log::trace!(
-            "{:?}: RtlFreeHeap({:?}, {:}, {:?})",
-            std::thread::current().id(),
-            _handle,
-            _flags,
-            ptr
-        );
         unsafe { self.allocator_mut().release(ptr) };
         0
     }
@@ -278,6 +342,28 @@ impl AsanRuntime {
     pub fn hook_HeapFree(&mut self, _handle: *mut c_void, _flags: u32, ptr: *mut c_void) -> bool {
         unsafe { self.allocator_mut().release(ptr) };
         true
+    }
+    #[inline]
+    #[allow(non_snake_case)]
+    #[cfg(windows)]
+    pub fn hook_check_HeapSize(
+        &mut self,
+        _handle: *mut c_void,
+        _flags: u32,
+        ptr: *mut c_void,
+    ) -> bool {
+        self.allocator_mut().is_managed(ptr)
+    }
+
+    #[allow(non_snake_case)]
+    #[cfg(windows)]
+    pub fn hook_HeapSize(
+        &mut self,
+        _handle: *mut c_void,
+        _flags: u32,
+        ptr: *mut c_void,
+    ) -> usize {
+        self.allocator().get_usable_size(ptr)
     }
     #[inline]
     #[allow(non_snake_case)]
@@ -327,7 +413,6 @@ impl AsanRuntime {
     #[allow(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_LocalAlloc(&mut self, flags: u32, size: usize) -> *mut c_void {
-        log::trace!("LocalAlloc({:x})", size);
         let ret = unsafe { self.allocator_mut().alloc(size, 8) };
 
         if flags & 0x40 == 0x40 {
@@ -342,7 +427,7 @@ impl AsanRuntime {
     }
     #[allow(non_snake_case)]
     #[cfg(windows)]
-    pub fn hook_LocalReAlloc(&mut self, mem: *mut c_void, _flags: u32, size: usize) -> *mut c_void {
+    pub fn hook_LocalReAlloc(&mut self, mem: *mut c_void, size: usize, _flags: u32) -> *mut c_void {
         unsafe {
             let ret = self.allocator_mut().alloc(size, 0x8);
             if mem != std::ptr::null_mut() && ret != std::ptr::null_mut() {
@@ -358,14 +443,12 @@ impl AsanRuntime {
     #[cfg(windows)]
     pub fn hook_check_LocalFree(&mut self, mem: *mut c_void) -> bool {
         let res = self.allocator_mut().is_managed(mem);
-        log::warn!("LocalFree({:?}) = {}", mem, res);
         res
     }
 
     #[allow(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_LocalFree(&mut self, mem: *mut c_void) -> *mut c_void {
-        log::warn!("actual LocalFree");
         unsafe { self.allocator_mut().release(mem) };
         mem
     }
@@ -373,50 +456,42 @@ impl AsanRuntime {
     #[allow(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_check_LocalHandle(&mut self, mem: *mut c_void) -> bool {
-        log::trace!("LocalHandle({:?})", mem);
         self.allocator_mut().is_managed(mem)
     }
     #[allow(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_LocalHandle(&mut self, mem: *mut c_void) -> *mut c_void {
-        log::trace!("LocalHandle");
         mem
     }
     #[allow(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_check_LocalLock(&mut self, mem: *mut c_void) -> bool {
-        log::trace!("LocalLock({:?})", mem);
         self.allocator_mut().is_managed(mem)
     }
 
     #[allow(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_LocalLock(&mut self, mem: *mut c_void) -> *mut c_void {
-        log::trace!("LocalLock");
         mem
     }
     #[allow(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_check_LocalUnlock(&mut self, mem: *mut c_void) -> bool {
-        log::trace!("LocalUnlock({:?})", mem);
         self.allocator_mut().is_managed(mem)
     }
     #[allow(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_LocalUnlock(&mut self, _mem: *mut c_void) -> bool {
-        log::trace!("LocalUnlock");
         false
     }
     #[allow(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_check_LocalSize(&mut self, mem: *mut c_void) -> bool {
-        log::trace!("LocalSize({:?})", mem);
         self.allocator_mut().is_managed(mem)
     }
     #[allow(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_LocalSize(&mut self, mem: *mut c_void) -> usize {
-        log::trace!("LocalSize");
         self.allocator_mut().get_usable_size(mem) 
     }
     #[allow(non_snake_case)]
@@ -433,7 +508,6 @@ impl AsanRuntime {
     #[allow(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_GlobalAlloc(&mut self, flags: u32, size: usize) -> *mut c_void {
-        log::trace!("GlobalAlloc({:x})", size);
         let ret = unsafe { self.allocator_mut().alloc(size, 8) };
 
         if flags & 0x40 == 0x40 {
@@ -463,13 +537,11 @@ impl AsanRuntime {
     #[allow(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_check_GlobalFree(&mut self, mem: *mut c_void) -> bool {
-        log::trace!("GlobalFree({:?})", mem);
         self.allocator_mut().is_managed(mem)
     }
     #[allow(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_GlobalFree(&mut self, mem: *mut c_void) -> *mut c_void {
-        log::trace!("GlobalFree");
         unsafe { self.allocator_mut().release(mem) };
         mem
     }
@@ -477,50 +549,42 @@ impl AsanRuntime {
     #[allow(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_check_GlobalHandle(&mut self, mem: *mut c_void) -> bool {
-        log::trace!("GlobalHandle({:?})", mem);
         self.allocator_mut().is_managed(mem)
     }
     #[allow(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_GlobalHandle(&mut self, mem: *mut c_void) -> *mut c_void {
-        log::trace!("GlobalHandle");
         mem
     }
     #[allow(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_check_GlobalLock(&mut self, mem: *mut c_void) -> bool {
-        log::trace!("GlobalLock({:?})", mem);
         self.allocator_mut().is_managed(mem)
     }
 
     #[allow(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_GlobalLock(&mut self, mem: *mut c_void) -> *mut c_void {
-        log::trace!("GlobalLock");
         mem
     }
     #[allow(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_check_GlobalUnlock(&mut self, mem: *mut c_void) -> bool {
-        log::trace!("GlobalUnlock({:?})", mem);
         self.allocator_mut().is_managed(mem)
     }
     #[allow(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_GlobalUnlock(&mut self, _mem: *mut c_void) -> bool {
-        log::trace!("GlobalUnlock");
         false
     }
     #[allow(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_check_GlobalSize(&mut self, mem: *mut c_void) -> bool {
-        log::trace!("GlobalSize({:?})", mem);
         self.allocator_mut().is_managed(mem)
     }
     #[allow(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_GlobalSize(&mut self, mem: *mut c_void) -> usize {
-        log::trace!("GlobalSize");
          self.allocator_mut().get_usable_size(mem)
     }
     #[allow(non_snake_case)]
@@ -536,7 +600,6 @@ impl AsanRuntime {
 
     #[inline]
     pub fn hook_malloc(&mut self, size: usize) -> *mut c_void {
-        log::trace!("hook: malloc({:x})", size);
         unsafe { self.allocator_mut().alloc(size, 8) }
     }
 
@@ -548,7 +611,6 @@ impl AsanRuntime {
     #[allow(non_snake_case)]
     #[inline]
     pub fn hook__Znam(&mut self, size: usize) -> *mut c_void {
-        log::trace!("hook: new({:x})", size);
         unsafe { self.allocator_mut().alloc(size, 8) }
     }
 
@@ -634,6 +696,14 @@ impl AsanRuntime {
         unsafe { self.allocator_mut().alloc(size, alignment) }
     }
 
+    #[allow(non_snake_case)]
+    #[inline]
+    pub fn hook__o_malloc(
+        &mut self,
+        size: usize,
+    ) -> *mut c_void {
+        unsafe { self.allocator_mut().alloc(size, 8) }
+    }
     #[inline]
     pub fn hook_calloc(&mut self, nmemb: usize, size: usize) -> *mut c_void {
         extern "system" {
@@ -646,8 +716,9 @@ impl AsanRuntime {
         ret
     }
 
+    #[allow(non_snake_case)]
     #[inline]
-    pub fn hook_o_calloc(&mut self, nmemb: usize, size: usize) -> *mut c_void {
+    pub fn hook__o_calloc(&mut self, nmemb: usize, size: usize) -> *mut c_void {
         extern "system" {
             fn memset(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
         }
@@ -658,6 +729,7 @@ impl AsanRuntime {
         ret
     }
 
+    #[allow(non_snake_case)]
     #[inline]
     #[allow(clippy::cmp_null)]
     pub fn hook_realloc(&mut self, ptr: *mut c_void, size: usize) -> *mut c_void {
@@ -673,9 +745,10 @@ impl AsanRuntime {
         }
     }
 
+    #[allow(non_snake_case)]
     #[inline]
     #[allow(clippy::cmp_null)]
-    pub fn hook_o_realloc(&mut self, ptr: *mut c_void, size: usize) -> *mut c_void {
+    pub fn hook__o_realloc(&mut self, ptr: *mut c_void, size: usize) -> *mut c_void {
         unsafe {
             let ret = self.allocator_mut().alloc(size, 0x8);
             if ptr != std::ptr::null_mut() && ret != std::ptr::null_mut() {
@@ -688,14 +761,16 @@ impl AsanRuntime {
         }
     }
 
+    #[allow(non_snake_case)]
     #[inline]
-    pub fn hook_check_o_free(&mut self, ptr: *mut c_void) -> bool {
+    pub fn hook_check__o_free(&mut self, ptr: *mut c_void) -> bool {
         self.allocator_mut().is_managed(ptr)
     }
 
+    #[allow(non_snake_case)]
     #[inline]
     #[allow(clippy::cmp_null)]
-    pub fn hook_o_free(&mut self, ptr: *mut c_void) -> usize {
+    pub fn hook__o_free(&mut self, ptr: *mut c_void) -> usize {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator_mut().release(ptr) }
         }
@@ -703,7 +778,6 @@ impl AsanRuntime {
     }
     #[inline]
     pub fn hook_check_free(&mut self, ptr: *mut c_void) -> bool {
-        log::trace!("hook: free({:x})", ptr as usize);
         self.allocator_mut().is_managed(ptr)
     }
 
@@ -1092,9 +1166,7 @@ impl AsanRuntime {
                 Backtrace::new(),
             )));
         }
-        log::trace!("calling original memmove!");
         let ret = unsafe { memmove(dest, src, n) };
-        log::trace!("back from original memmove!");
         ret
     }
 

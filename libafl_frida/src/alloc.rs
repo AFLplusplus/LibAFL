@@ -160,7 +160,6 @@ impl Allocator {
     pub unsafe fn alloc(&mut self, size: usize, _alignment: usize) -> *mut c_void {
         let mut is_malloc_zero = false;
         let size = if size == 0 {
-            // log::warn!("zero-sized allocation!");
             is_malloc_zero = true;
             16
         } else {
@@ -182,7 +181,6 @@ impl Allocator {
         self.total_allocation_size += rounded_up_size;
 
         let metadata = if let Some(mut metadata) = self.find_smallest_fit(rounded_up_size) {
-            //log::trace!("reusing allocation at {:x}, (actual mapping starts at {:x}) size {:x}", metadata.address, metadata.address - self.page_size, size);
             metadata.is_malloc_zero = is_malloc_zero;
             metadata.size = size;
             if self.allocation_backtraces {
@@ -237,15 +235,13 @@ impl Allocator {
         let address = (metadata.address + self.page_size) as *mut c_void;
 
         self.allocations.insert(address as usize, metadata);
-        log::trace!("serving address: {:?}, size: {:x}", address, size);
+        // log::trace!("serving address: {:?}, size: {:x}", address, size);
         address
-        // 0x4141414141414141 as *mut c_void
     }
 
     /// Releases the allocation at the given address.
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn release(&mut self, ptr: *mut c_void) {
-        //log::trace!("freeing address: {:?}", ptr);
         let Some(metadata) = self.allocations.get_mut(&(ptr as usize)) else {
             if !ptr.is_null() {
                 AsanErrors::get_mut_blocking()
@@ -343,7 +339,6 @@ impl Allocator {
     }
 
     fn unpoison(start: usize, size: usize) {
-        // log::trace!("unpoisoning {:x} for {:x}", start, size / 8);
         unsafe {
             std::slice::from_raw_parts_mut(start as *mut u8, size / 8).fill(0xff);
 
@@ -358,7 +353,6 @@ impl Allocator {
 
     /// Poisonn an area in memory
     pub fn poison(start: usize, size: usize) {
-        // log::trace!("poisoning {:x} for {:x}", start, size / 8 + 1);
         unsafe {
             std::slice::from_raw_parts_mut(start as *mut u8, size / 8).fill(0x0);
 
@@ -385,14 +379,6 @@ impl Allocator {
         let shadow_start = self.round_down_to_page(shadow_mapping_start);
         let shadow_end = self.round_up_to_page((end - start) / 8 + self.page_size + shadow_start);
         if self.using_pre_allocated_shadow_mapping {
-            log::trace!(
-                "map_shadow_for_region start: {:x}, end {:x}, size {:x}, shadow {:x}-{:x}",
-                start,
-                end,
-                end - start,
-                shadow_start,
-                shadow_end
-            );
             let mut newly_committed_regions = Vec::new();
             for gap in self.shadow_pages.gaps(&(shadow_start..shadow_end)) {
                 let mut new_reserved_region = None;
@@ -473,15 +459,9 @@ impl Allocator {
         //4. The aligned check is where the address and the size is 8 byte aligned. Use check_shadow_aligned to check it
         //5. The post-alignment is the same as pre-alignment except it is the qword following the aligned portion. Use a specialized check to ensure that [end & ~7, end) is valid. 
 
-        if size == 0 || !self.is_managed(address as *mut c_void) {
+        if size == 0 /*|| !self.is_managed(address as *mut c_void)*/ {
             return true;
         }
-
-        log::trace!(
-            "check_shadow: {:x}, {:x}",
-            address as usize,
-            size
-        );
 
         //fast path. most buffers are likely 8 byte aligned in size and address
         if (address as usize) & 7 == 0 && size & 7 == 0 {
@@ -504,11 +484,8 @@ impl Allocator {
         //if the start is unaligned
         if start_address != aligned_start {
             let start_shadow = map_to_shadow!(self, start_address);
-            //the purpose of the min is to account for sub-qword accesses. If the access is subqword then size will be less than the distance to the end of the qword
-            
         
-            let start_mask: u8 = 0xff << std::cmp::min(size, 8-start_offset);
-
+            let start_mask: u8 = 0xff << (8-start_offset);
             if unsafe { (start_shadow as *const u8).read() } & start_mask != start_mask {
                 return false;
             }
@@ -562,25 +539,13 @@ impl Allocator {
 
     /// Unpoison all the memory that is currently mapped with read/write permissions.
     pub fn unpoison_all_existing_memory(&mut self) {
-        log::trace!(
-            "Shadow Mapping: {:#x}-{:#x}",
-            self.shadow_offset,
-            self.current_mapping_addr
-        );
         RangeDetails::enumerate_with_prot(
             PageProtection::Read,
             &mut |range: &RangeDetails| -> bool {
                 let start = range.memory_range().base_address().0 as usize;
                 let end = start + range.memory_range().size();
-                log::trace!(
-                    "Mapping: {:#x}-{:#x}, is_managed: {}",
-                    start,
-                    end,
-                    self.is_managed(start as *mut c_void)
-                );
 
                 if !self.is_managed(start as *mut c_void) {
-                    log::trace!("Unpoisoning: {:#x}-{:#x}", start, end);
                     self.map_shadow_for_region(start, end, true);
                 }
 
@@ -600,6 +565,7 @@ impl Allocator {
 
         let mut occupied_ranges: Vec<(usize, usize)> = vec![];
         // max(userspace address) this is usually 0x8_0000_0000_0000 - 1 on x64 linux.
+        #[cfg(unix)]
         let mut userspace_max: usize = 0;
 
         // Enumerate memory ranges that are already occupied.
@@ -609,16 +575,10 @@ impl Allocator {
             &mut |range: &RangeDetails| -> bool {
                 let start = range.memory_range().base_address().0 as usize;
                 let end = start + range.memory_range().size();
-                log::trace!(
-                    "Start: {:#x}, end: {:#x}",
-                    start,
-                    end,
-                );
                 occupied_ranges.push((start, end));
-                let base: usize = 2;
                 // On x64, if end > 2**48, then that's in vsyscall or something.
                 #[cfg(all(unix, target_arch = "x86_64"))]
-                if end <= base.pow(48) && end > userspace_max {
+                if end <= 2.pow(48) && end > userspace_max {
                     userspace_max = end;
                 }
                 //
@@ -637,7 +597,10 @@ impl Allocator {
             },
         );
 
+        #[cfg(unix)]
         let mut maxbit = 63;
+        #[cfg(windows)]
+        let maxbit = 63;
         #[cfg(unix)]
         for power in 1..64 {
             let base: usize = 2;
@@ -655,10 +618,6 @@ impl Allocator {
                 let mut good_candidate = true;
                 // check if the proposed shadow bit overlaps with occupied ranges.
                 for (start, end) in &occupied_ranges {
-                    // log::trace!("{:x} {:x}, {:x} {:x} -> {:x} - {:x}", shadow_start, shadow_end, start, end,
-                    //     shadow_start + ((start >> 3) & ((1 << (try_shadow_bit + 1)) - 1)),
-                    //     shadow_start + ((end >> 3) & ((1 << (try_shadow_bit + 1)) - 1))
-                    // );
                     if (shadow_start <= *end) && (*start <= shadow_end) {
                         log::trace!("{:x} {:x}, {:x} {:x}", shadow_start, shadow_end, start, end);
                         log::warn!("shadow_bit {try_shadow_bit:} is not suitable");
@@ -794,6 +753,7 @@ fn check_shadow() {
     //invalid, unaligned access
     assert!(allocator.check_shadow(unsafe { allocation.offset(10)}, 29) == false);
     let allocation = unsafe { allocator.alloc(4, 0) };
+    assert!(!allocation.is_null());
     assert!(allocator.check_shadow(allocation, 1) == true);
     assert!(allocator.check_shadow(allocation, 2) == true);
     assert!(allocator.check_shadow(allocation, 3) == true);
@@ -802,5 +762,8 @@ fn check_shadow() {
     assert!(allocator.check_shadow(allocation, 6) == false);
     assert!(allocator.check_shadow(allocation, 7) == false);
     assert!(allocator.check_shadow(allocation, 8) == false);
-    assert!(!allocation.is_null());
+    let allocation = unsafe { allocator.alloc(0xc, 0) };
+    assert!(allocator.check_shadow(unsafe { allocation.offset(4)}, 8) == true);
+    let allocation = unsafe { allocator.alloc(0x3c, 0) };
+    assert!(allocator.check_shadow(unsafe { allocation.offset(0x3a)}, 2) == true);
 }

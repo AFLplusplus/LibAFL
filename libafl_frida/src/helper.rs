@@ -31,7 +31,6 @@ use yaxpeax_x86::amd64::InstDecoder;
 use crate::cmplog_rt::CmpLogRuntime;
 use crate::{
     asan::asan_rt::AsanRuntime, coverage_rt::CoverageRuntime, drcov_rt::DrCovRuntime,
-    hook_rt::HookRuntime,
 };
 
 #[cfg(target_vendor = "apple")]
@@ -302,15 +301,6 @@ impl FridaInstrumentationHelperBuilder {
                 .borrow_mut()
                 .init_all(gum, &ranges.borrow(), &module_map);
 
-            let mut borrowed_runtimes = runtimes.borrow_mut();
-
-            if let Some(_asan_rt) = borrowed_runtimes.match_first_type::<AsanRuntime>() {
-                if let Some(hook_rt) = borrowed_runtimes.match_first_type_mut::<HookRuntime>() {
-                    AsanRuntime::register_hooks(hook_rt);
-                } else {
-                    panic!("AsanRuntime requires that HookRuntime also be provided");
-                }
-            }
         }
 
         let transformer = FridaInstrumentationHelper::build_transformer(gum, &ranges, &runtimes);
@@ -484,18 +474,17 @@ where
             let instr = instruction.instr();
             let instr_size = instr.bytes().len();
             let address = instr.address();
-            let mut keep_instr = true;
             // log::trace!("x - block @ {:x} transformed to {:x}", address, output.writer().pc());
             //the ASAN check needs to be done before the hook_rt check due to x86 insns such as call [mem]
             if ranges.borrow().contains_key(&(address as usize)) {
                 let mut runtimes = (*runtimes_unborrowed).borrow_mut();
                 if first {
                     first = false;
-                    log::info!(
-                        "block @ {:x} transformed to {:x}",
-                        address,
-                        output.writer().pc()
-                    );
+                    // log::info!(
+                    //     "block @ {:x} transformed to {:x}",
+                    //     address,
+                    //     output.writer().pc()
+                    // );
                     if let Some(rt) = runtimes.match_first_type_mut::<CoverageRuntime>() {
                         rt.emit_coverage_mapping(address, output);
                     }
@@ -509,35 +498,7 @@ where
                 } else {
                     None
                 };
-                #[cfg(target_arch = "x86_64")]
-                if let Some(rt) = runtimes.match_first_type_mut::<HookRuntime>() {
-                    if let Some((call_target, is_jmp)) = rt.is_interesting(decoder, instr) {
-                        rt.emit_callout(
-                            call_target,
-                            is_jmp,
-                            &instruction,
-                            output.writer(),
-                            runtimes_unborrowed.clone(),
-                        );
-                        keep_instr = false;
-                    }
-                }
 
-                #[cfg(target_arch = "aarch64")]
-                if let Some(rt) = runtimes.match_first_type_mut::<HookRuntime>() {
-                    if let Some((call_target, is_reg)) = rt.is_interesting(decoder, instr) {
-                        rt.emit_callout(
-                            call_target,
-                            &instruction,
-                            is_reg,
-                            output.writer(),
-                            runtimes_unborrowed.clone(),
-                        );
-                        keep_instr = false; //we keep the instruction in the emit if needed
-                    }
-                }
-
-                if keep_instr {
                 #[cfg(target_arch = "x86_64")]
                 if let Some(details) = res {
                     if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
@@ -567,7 +528,6 @@ where
                             shift,
                         );
                     }
-                }
                 }
 
 
@@ -603,9 +563,7 @@ where
                     basic_block_size += instr_size;
                 }
             }
-            if keep_instr {
                 instruction.keep();
-            }
         }
         if basic_block_size != 0 {
             if let Some(rt) = runtimes_unborrowed
