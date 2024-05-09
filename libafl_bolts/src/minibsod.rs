@@ -134,7 +134,7 @@ pub fn dump_registers<W: Write>(
 }
 
 /// Write the content of all important registers
-#[cfg(all(target_vendor = "freebsd", target_arch = "aarch64"))]
+#[cfg(all(target_os = "freebsd", target_arch = "aarch64"))]
 #[allow(clippy::similar_names)]
 pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
@@ -837,7 +837,7 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
         libc::VM_PROC,
         libc::VM_PROC_MAP,
         -1,
-        std::mem::size_of::<libc::kinfo_vmentry>()
+        size_of::<libc::kinfo_vmentry>()
             .try_into()
             .expect("Invalid libc::kinfo_vmentry size"),
     ];
@@ -870,7 +870,7 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
                         .try_into()
                         .expect("invalid kve_structsize value");
                     #[cfg(target_os = "netbsd")]
-                    let sz = std::mem::size_of::<libc::kinfo_vmentry>();
+                    let sz = size_of::<libc::kinfo_vmentry>();
                     if sz == 0 {
                         break;
                     }
@@ -899,7 +899,7 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
 #[cfg(target_os = "openbsd")]
 fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Error> {
     let mut pentry = std::mem::MaybeUninit::<libc::kinfo_vmentry>::uninit();
-    let mut s = std::mem::size_of::<libc::kinfo_vmentry>();
+    let mut s = size_of::<libc::kinfo_vmentry>();
     let arr = &[libc::CTL_KERN, libc::KERN_PROC_VMMAP, unsafe {
         libc::getpid()
     }];
@@ -945,45 +945,93 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
     Ok(())
 }
 
-#[cfg(target_env = "apple")]
+#[cfg(target_vendor = "apple")]
+#[allow(non_camel_case_types)]
 fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Error> {
-    let ptask = std::mem::MaybeUninit::<libc::mach_task_t>::uninit();
-    // We start by the lowest virtual address from the userland' standpoint
-    let mut addr = libc::mach_vm_address_t = libc::MACH_VM_MIN_ADDRESS;
-    let mut cnt: libc::mach_msg_type_number_t = 0;
-    let mut sz: libc::mach_vm_size_t = 0;
-    let mut reg: libc::natural_t = 1;
+    use core::mem::size_of;
 
-    let mut r =
-        unsafe { libc::task_for_pid(libc::mach_task_self(), libc::getpid(), ptask.as_mut_ptr()) };
+    type vm_region_recurse_info_t = *mut libc::c_int;
+    type mach_vm_address_t = u64;
+    type mach_vm_size_t = u64;
+    type mach_msg_type_number_t = i32;
+    type mach_port_t = u32;
+    type natural_t = i32;
+
+    #[repr(C)]
+    struct vm_region_submap_info_64 {
+        pub protection: libc::vm_prot_t,
+        pub max_protection: libc::vm_prot_t,
+        pub inheritance: libc::vm_inherit_t,
+        pub offset: u64,
+        pub user_tag: libc::c_uint,
+        pub pages_resident: libc::c_uint,
+        pub pages_shared_now_private: libc::c_uint,
+        pub pages_dirtied: libc::c_uint,
+        pub ref_count: libc::c_uint,
+        pub shadow_depth: libc::c_short,
+        pub external_pager: libc::c_uchar,
+        pub share_mode: libc::c_uchar,
+        pub is_submap: libc::boolean_t,
+        pub behavior: libc::c_int,
+        pub object_id: u32,
+        pub user_wired_count: libc::c_ushort,
+        pub pages_reusable: libc::c_uint,
+        pub object_id_full: libc::c_ulonglong,
+    }
+
+    extern "C" {
+        fn mach_task_self() -> mach_port_t;
+        fn mach_vm_region_recurse(
+            t: mach_port_t,
+            addr: *mut mach_vm_address_t,
+            size: *mut mach_vm_size_t,
+            depth: *mut natural_t,
+            info: vm_region_recurse_info_t,
+            cnt: *mut mach_msg_type_number_t,
+        ) -> libc::kern_return_t;
+    }
+
+    let mut ptask = std::mem::MaybeUninit::<mach_port_t>::uninit();
+    // We start by the lowest virtual address from the userland' standpoint
+    let mut addr: mach_vm_address_t = 0;
+    let mut _cnt: mach_msg_type_number_t = 0;
+    let mut sz: mach_vm_size_t = 0;
+    let mut reg: natural_t = 1;
+
+    let mut r = unsafe { libc::task_for_pid(mach_task_self(), libc::getpid(), ptask.as_mut_ptr()) };
     if r != libc::KERN_SUCCESS {
         return Err(std::io::Error::last_os_error());
     }
 
-    let task = ptask.assume_init();
+    let task = unsafe { ptask.assume_init() };
 
     loop {
-        let pvminfo = std::mem::MaybeUninit::<libc::vm_regions_submap_info_64>::uninit();
-        cnt = libc::VM_REGION_SUBMAP_INFO_COUNT_64;
-        r = libc::mach_vm_region_recurse(
-            task,
-            &mut addr,
-            &mut sz,
-            &mut reg,
-            pvminfo.as_mut_ptr() as *mut libc::vm_region_recurse_info_t,
-            &cnt,
-        );
+        let mut pvminfo = std::mem::MaybeUninit::<vm_region_submap_info_64>::uninit();
+        _cnt = mach_msg_type_number_t::try_from(
+            size_of::<vm_region_submap_info_64>() / size_of::<natural_t>(),
+        )
+        .unwrap();
+        r = unsafe {
+            mach_vm_region_recurse(
+                task,
+                &mut addr,
+                &mut sz,
+                &mut reg,
+                pvminfo.as_mut_ptr() as vm_region_recurse_info_t,
+                &mut _cnt,
+            )
+        };
         if r != libc::KERN_SUCCESS {
             break;
         }
 
-        let vminfo = pvminfo.assume_init();
+        let vminfo = unsafe { pvminfo.assume_init() };
         // We are only interested by the first level of the maps
-        if !vminfo.is_submap {
+        if vminfo.is_submap == 0 {
             let i = format!("{}-{}\n", addr, addr + sz);
-            writer.write(&i.into_bytes())?;
+            writer.write_all(&i.into_bytes())?;
         }
-        addr = addr + sz;
+        addr += sz;
     }
 
     Ok(())
@@ -1031,7 +1079,7 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
     target_os = "openbsd",
     target_os = "netbsd",
     target_os = "haiku",
-    target_env = "apple",
+    target_vendor = "apple",
     any(target_os = "linux", target_os = "android"),
     any(target_os = "solaris", target_os = "illumos"),
 )))]

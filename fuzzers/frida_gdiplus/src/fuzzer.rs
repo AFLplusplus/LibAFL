@@ -46,7 +46,6 @@ use libafl_bolts::{
     tuples::{tuple_list, Merge},
     AsSlice,
 };
-
 use libafl_frida::{
     asan::{
         asan_rt::AsanRuntime,
@@ -384,8 +383,11 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
                 let mut objective = feedback_or_fast!(
                     CrashFeedback::new(),
-                    // TimeoutFeedback::new(),
-                    feedback_and_fast!(ConstFeedback::from(false), AsanErrorsFeedback::new(&asan_observer))
+                    TimeoutFeedback::new(),
+                    feedback_and_fast!(
+                        ConstFeedback::from(false),
+                        AsanErrorsFeedback::new(&asan_observer)
+                    )
                 );
 
                 // If not restarting, create a State from scratch

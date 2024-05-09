@@ -9,12 +9,15 @@ mod host_specific {
 }
 
 #[rustversion::nightly]
-fn main() {
+fn nightly() {
     println!("cargo:rustc-cfg=nightly");
-    host_specific::build();
 }
 
 #[rustversion::not(nightly)]
+fn nightly() {}
+
 fn main() {
+    println!("cargo:rustc-check-cfg=cfg(nightly)");
+    nightly();
     host_specific::build();
 }

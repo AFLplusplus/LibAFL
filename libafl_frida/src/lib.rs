@@ -5,6 +5,7 @@ It can report coverage and, on supported architectures, even reports memory acce
 Additional documentation is available in [the `LibAFL` book](https://aflplus.plus/libafl-book/advanced_features/frida.html).
 */
 
+#![forbid(unexpected_cfgs)]
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
@@ -452,6 +453,8 @@ mod tests {
             let rand = StdRand::with_seed(0);
 
             let mut feedback = ConstFeedback::new(true);
+
+            let asan_obs = AsanErrorsObserver::from_static_asan_errors();
 
             let asan_obs = AsanErrorsObserver::from_static_asan_errors();
 

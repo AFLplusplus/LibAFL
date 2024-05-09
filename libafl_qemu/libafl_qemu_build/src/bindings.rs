@@ -84,6 +84,7 @@ const WRAPPER_HEADER: &str = r#"
 #include "libafl/exit.h"
 #include "libafl/hook.h"
 #include "libafl/jit.h"
+#include "libafl/utils.h"
 
 "#;
 

@@ -25,9 +25,9 @@ use crate::SYS_mmap2;
 use crate::SYS_newfstatat;
 use crate::{
     asan::QemuAsanHelper,
-    emu::SyscallHookResult,
     helpers::{QemuHelper, QemuHelperTuple},
     hooks::{Hook, QemuHooks},
+    qemu::SyscallHookResult,
     Qemu, SYS_fstat, SYS_fstatfs, SYS_futex, SYS_getrandom, SYS_mprotect, SYS_mremap, SYS_munmap,
     SYS_pread64, SYS_read, SYS_readlinkat, SYS_statfs,
 };

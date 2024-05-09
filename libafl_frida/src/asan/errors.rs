@@ -24,7 +24,7 @@ use libafl::{
 };
 use libafl_bolts::{
     ownedref::OwnedPtr,
-    tuples::{Handle, Handler, MatchNameRef},
+    tuples::{Handle, Handled, MatchNameRef},
     Named, SerdeAny,
 };
 use serde::{Deserialize, Serialize};
@@ -646,7 +646,7 @@ impl AsanErrorsObserver {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AsanErrorsFeedback<S> {
     errors: Option<AsanErrors>,
-    obs_ref: Handle<AsanErrorsObserver>,
+    observer_handle: Handle<AsanErrorsObserver>,
     phantom: PhantomData<S>,
 }
 
@@ -669,7 +669,7 @@ where
         OT: ObserversTuple<S>,
     {
         let observer = observers
-            .get(&self.obs_ref)
+            .get(&self.observer_handle)
             .expect("An AsanErrorsFeedback needs an AsanErrorsObserver");
         let errors = observer.errors();
         if errors.is_empty() {
@@ -706,7 +706,7 @@ where
 impl<S> Named for AsanErrorsFeedback<S> {
     #[inline]
     fn name(&self) -> &Cow<'static, str> {
-        self.obs_ref.name()
+        self.observer_handle.name()
     }
 }
 
@@ -716,7 +716,7 @@ impl<S> AsanErrorsFeedback<S> {
     pub fn new(obs: &AsanErrorsObserver) -> Self {
         Self {
             errors: None,
-            obs_ref: obs.handle(),
+            observer_handle: obs.handle(),
             phantom: PhantomData,
         }
     }

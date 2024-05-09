@@ -13,7 +13,7 @@ const NAMESPACE_LEN: usize = NAMESPACE.as_bytes().len();
 
 #[allow(clippy::too_many_lines)]
 fn main() {
-    if cfg!(any(feature = "cargo-clippy", docsrs)) {
+    if cfg!(any(clippy, docsrs)) {
         return; // skip when clippy or docs is running
     }
 
@@ -93,14 +93,9 @@ fn main() {
         let target_libdir = String::from_utf8(target_libdir.stdout).unwrap();
         let target_libdir = Path::new(target_libdir.trim());
 
-        let rust_objcopy = target_libdir.join("../bin/llvm-objcopy"); // NOTE: depends on llvm-tools
-        let nm = if cfg!(target_os = "macos") {
-            // NOTE: depends on llvm-tools
-            target_libdir.join("../bin/llvm-nm")
-        } else {
-            // NOTE: we use system nm on linux because llvm-nm doesn't respect the encoding?
-            PathBuf::from("nm")
-        };
+        // NOTE: depends on llvm-tools
+        let rust_objcopy = target_libdir.join("../bin/llvm-objcopy");
+        let nm = target_libdir.join("../bin/llvm-nm");
 
         let redefined_archive_path = custom_lib_dir.join("libFuzzer.a");
         let redefined_symbols = custom_lib_dir.join("redefs.txt");

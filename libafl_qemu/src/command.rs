@@ -1,24 +1,28 @@
 #[cfg(emulation_mode = "systemmode")]
 use std::collections::HashSet;
-use std::fmt::{Debug, Display, Formatter};
+use std::{
+    fmt::{Debug, Display, Formatter},
+    sync::OnceLock,
+};
 
-use enum_map::Enum;
+use enum_map::{enum_map, Enum, EnumMap};
 use libafl::{
     executors::ExitKind,
     inputs::HasTargetBytes,
     state::{HasExecutions, State},
 };
 use libafl_bolts::AsSlice;
-use libafl_qemu_sys::{GuestPhysAddr, GuestVirtAddr};
-use num_enum::TryFromPrimitive;
+use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestVirtAddr};
+use num_enum::{TryFromPrimitive, TryFromPrimitiveError};
 
 #[cfg(emulation_mode = "systemmode")]
 use crate::QemuInstrumentationPagingFilter;
 use crate::{
-    executor::QemuExecutorState, sync_exit::SyncBackdoorError, EmuExitHandler, Emulator,
-    GuestAddrKind, GuestReg, HandlerError, HasInstrumentationFilter, InnerHandlerResult,
-    InputLocation, IsFilter, IsSnapshotManager, Qemu, QemuHelperTuple,
-    QemuInstrumentationAddressRangeFilter, Regs, StdEmuExitHandler, StdInstrumentationFilter, CPU,
+    executor::QemuExecutorState, get_exit_arch_regs, sync_exit::ExitArgs, Emulator,
+    EmulatorExitHandler, EmulatorMemoryChunk, ExitHandlerError, ExitHandlerResult, GuestReg,
+    HasInstrumentationFilter, InputLocation, IsFilter, IsSnapshotManager, Qemu, QemuHelperTuple,
+    QemuInstrumentationAddressRangeFilter, Regs, StdEmulatorExitHandler, StdInstrumentationFilter,
+    CPU,
 };
 
 pub const VERSION: u64 = bindings::LIBAFL_QEMU_HDR_VERSION_NUMBER as u64;
@@ -39,7 +43,7 @@ mod bindings {
 
 #[derive(Debug, Clone, TryFromPrimitive)]
 #[repr(u64)]
-pub enum NativeBackdoorCommand {
+pub enum NativeCommand {
     StartVirt = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_START_VIRT.0 as u64, // Shortcut for Save + InputVirt
     StartPhys = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_START_PHYS.0 as u64, // Shortcut for Save + InputPhys
     InputVirt = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_INPUT_VIRT.0 as u64, // The address is a virtual address using the paging currently running in the VM.
@@ -64,7 +68,7 @@ pub trait IsCommand<QT, S, E>
 where
     QT: QemuHelperTuple<S>,
     S: State + HasExecutions,
-    E: EmuExitHandler<QT, S>,
+    E: EmulatorExitHandler<QT, S>,
 {
     /// Used to know whether the command can be run during a backdoor, or if it is necessary to go out of
     /// the QEMU VM to run the command.
@@ -81,7 +85,7 @@ where
         qemu_executor_state: &mut QemuExecutorState<QT, S>,
         input: &S::Input,
         ret_reg: Option<Regs>,
-    ) -> Result<InnerHandlerResult, HandlerError>;
+    ) -> Result<Option<ExitHandlerResult>, ExitHandlerError>;
 }
 
 #[cfg(emulation_mode = "systemmode")]
@@ -102,8 +106,123 @@ pub enum Command {
     AddressRangeFilterCommand(AddressRangeFilterCommand),
 }
 
+pub static EMU_EXIT_KIND_MAP: OnceLock<EnumMap<NativeExitKind, Option<ExitKind>>> = OnceLock::new();
+
+#[derive(Debug, Clone)]
+pub enum CommandError {
+    UnknownCommand(GuestReg),
+    RegError(String),
+    VersionDifference(u64),
+}
+
+impl From<TryFromPrimitiveError<NativeCommand>> for CommandError {
+    fn from(error: TryFromPrimitiveError<NativeCommand>) -> Self {
+        CommandError::UnknownCommand(error.number.try_into().unwrap())
+    }
+}
+
+impl From<String> for CommandError {
+    fn from(error_string: String) -> Self {
+        CommandError::RegError(error_string)
+    }
+}
+
+impl TryFrom<Qemu> for Command {
+    type Error = CommandError;
+
+    #[allow(clippy::too_many_lines)]
+    fn try_from(qemu: Qemu) -> Result<Self, Self::Error> {
+        let arch_regs_map: &'static EnumMap<ExitArgs, Regs> = get_exit_arch_regs();
+        let cmd_id: GuestReg = qemu.read_reg::<Regs, GuestReg>(arch_regs_map[ExitArgs::Cmd])?;
+
+        Ok(match u64::from(cmd_id).try_into()? {
+            NativeCommand::Save => Command::SaveCommand(SaveCommand),
+            NativeCommand::Load => Command::LoadCommand(LoadCommand),
+            NativeCommand::InputVirt => {
+                let virt_addr: GuestVirtAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
+                let max_input_size: GuestReg = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])?;
+
+                Command::InputCommand(InputCommand::new(
+                    EmulatorMemoryChunk::virt(
+                        virt_addr,
+                        max_input_size,
+                        qemu.current_cpu().unwrap(),
+                    ),
+                    qemu.current_cpu().unwrap(),
+                ))
+            }
+            NativeCommand::InputPhys => {
+                let phys_addr: GuestPhysAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
+                let max_input_size: GuestReg = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])?;
+
+                Command::InputCommand(InputCommand::new(
+                    EmulatorMemoryChunk::phys(
+                        phys_addr,
+                        max_input_size,
+                        Some(qemu.current_cpu().unwrap()),
+                    ),
+                    qemu.current_cpu().unwrap(),
+                ))
+            }
+            NativeCommand::End => {
+                let native_exit_kind: GuestReg = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
+                let native_exit_kind: Result<NativeExitKind, _> =
+                    u64::from(native_exit_kind).try_into();
+
+                let exit_kind = native_exit_kind.ok().and_then(|k| {
+                    EMU_EXIT_KIND_MAP.get_or_init(|| {
+                        enum_map! {
+                            NativeExitKind::Unknown => None,
+                            NativeExitKind::Ok      => Some(ExitKind::Ok),
+                            NativeExitKind::Crash   => Some(ExitKind::Crash)
+                        }
+                    })[k]
+                });
+
+                Command::EndCommand(EndCommand::new(exit_kind))
+            }
+            NativeCommand::StartPhys => {
+                let input_phys_addr: GuestPhysAddr =
+                    qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
+                let max_input_size: GuestReg = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])?;
+
+                Command::StartCommand(StartCommand::new(EmulatorMemoryChunk::phys(
+                    input_phys_addr,
+                    max_input_size,
+                    Some(qemu.current_cpu().unwrap()),
+                )))
+            }
+            NativeCommand::StartVirt => {
+                let input_virt_addr: GuestVirtAddr =
+                    qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
+                let max_input_size: GuestReg = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])?;
+
+                Command::StartCommand(StartCommand::new(EmulatorMemoryChunk::virt(
+                    input_virt_addr,
+                    max_input_size,
+                    qemu.current_cpu().unwrap(),
+                )))
+            }
+            NativeCommand::Version => {
+                let client_version = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
+
+                Command::VersionCommand(VersionCommand::new(client_version))
+            }
+            NativeCommand::VaddrFilterAllowRange => {
+                let vaddr_start: GuestAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
+                let vaddr_end: GuestAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])?;
+
+                Command::AddressRangeFilterCommand(FilterCommand::new(
+                    #[allow(clippy::single_range_in_vec_init)]
+                    QemuInstrumentationAddressRangeFilter::AllowList(vec![vaddr_start..vaddr_end]),
+                ))
+            }
+        })
+    }
+}
+
 // TODO: Replace with enum_dispatch implementation
-impl<SM, QT, S> IsCommand<QT, S, StdEmuExitHandler<SM>> for Command
+impl<SM, QT, S> IsCommand<QT, S, StdEmulatorExitHandler<SM>> for Command
 where
     SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
@@ -113,90 +232,94 @@ where
     fn usable_at_runtime(&self) -> bool {
         match self {
             Command::SaveCommand(cmd) => {
-                <SaveCommand as IsCommand<QT, S, StdEmuExitHandler<SM>>>::usable_at_runtime(cmd)
-            }
-            Command::LoadCommand(cmd) => {
-                <LoadCommand as IsCommand<QT, S, StdEmuExitHandler<SM>>>::usable_at_runtime(cmd)
-            }
-            Command::InputCommand(cmd) => {
-                <InputCommand as IsCommand<QT, S, StdEmuExitHandler<SM>>>::usable_at_runtime(cmd)
-            }
-            Command::StartCommand(cmd) => {
-                <StartCommand as IsCommand<QT, S, StdEmuExitHandler<SM>>>::usable_at_runtime(cmd)
-            }
-            Command::EndCommand(cmd) => {
-                <EndCommand as IsCommand<QT, S, StdEmuExitHandler<SM>>>::usable_at_runtime(cmd)
-            }
-            Command::VersionCommand(cmd) => {
-                <VersionCommand as IsCommand<QT, S, StdEmuExitHandler<SM>>>::usable_at_runtime(cmd)
-            }
-            #[cfg(emulation_mode = "systemmode")]
-            Command::PagingFilterCommand(cmd) => {
-                <PagingFilterCommand as IsCommand<QT, S, StdEmuExitHandler<SM>>>::usable_at_runtime(
+                <SaveCommand as IsCommand<QT, S, StdEmulatorExitHandler<SM>>>::usable_at_runtime(
                     cmd,
                 )
             }
+            Command::LoadCommand(cmd) => {
+                <LoadCommand as IsCommand<QT, S, StdEmulatorExitHandler<SM>>>::usable_at_runtime(
+                    cmd,
+                )
+            }
+            Command::InputCommand(cmd) => {
+                <InputCommand as IsCommand<QT, S, StdEmulatorExitHandler<SM>>>::usable_at_runtime(
+                    cmd,
+                )
+            }
+            Command::StartCommand(cmd) => {
+                <StartCommand as IsCommand<QT, S, StdEmulatorExitHandler<SM>>>::usable_at_runtime(
+                    cmd,
+                )
+            }
+            Command::EndCommand(cmd) => {
+                <EndCommand as IsCommand<QT, S, StdEmulatorExitHandler<SM>>>::usable_at_runtime(cmd)
+            }
+            Command::VersionCommand(cmd) => {
+                <VersionCommand as IsCommand<QT, S, StdEmulatorExitHandler<SM>>>::usable_at_runtime(
+                    cmd,
+                )
+            }
+            #[cfg(emulation_mode = "systemmode")]
+            Command::PagingFilterCommand(cmd) => <PagingFilterCommand as IsCommand<
+                QT,
+                S,
+                StdEmulatorExitHandler<SM>,
+            >>::usable_at_runtime(cmd),
             Command::AddressRangeFilterCommand(cmd) => <AddressRangeFilterCommand as IsCommand<
                 QT,
                 S,
-                StdEmuExitHandler<SM>,
+                StdEmulatorExitHandler<SM>,
             >>::usable_at_runtime(cmd),
         }
     }
 
     fn run(
         &self,
-        emu: &Emulator<QT, S, StdEmuExitHandler<SM>>,
+        emu: &Emulator<QT, S, StdEmulatorExitHandler<SM>>,
         qemu_executor_state: &mut QemuExecutorState<QT, S>,
         input: &S::Input,
         ret_reg: Option<Regs>,
-    ) -> Result<InnerHandlerResult, HandlerError> {
+    ) -> Result<Option<ExitHandlerResult>, ExitHandlerError> {
         match self {
-            Command::SaveCommand(cmd) => {
-                <SaveCommand as IsCommand<QT, S, StdEmuExitHandler<SM>>>::run(
-                    cmd,
-                    emu,
-                    qemu_executor_state,
-                    input,
-                    ret_reg,
-                )
-            }
-            Command::LoadCommand(cmd) => {
-                <LoadCommand as IsCommand<QT, S, StdEmuExitHandler<SM>>>::run(
-                    cmd,
-                    emu,
-                    qemu_executor_state,
-                    input,
-                    ret_reg,
-                )
-            }
+            Command::SaveCommand(cmd) => <SaveCommand as IsCommand<
+                QT,
+                S,
+                StdEmulatorExitHandler<SM>,
+            >>::run(
+                cmd, emu, qemu_executor_state, input, ret_reg
+            ),
+            Command::LoadCommand(cmd) => <LoadCommand as IsCommand<
+                QT,
+                S,
+                StdEmulatorExitHandler<SM>,
+            >>::run(
+                cmd, emu, qemu_executor_state, input, ret_reg
+            ),
             Command::InputCommand(cmd) => <InputCommand as IsCommand<
                 QT,
                 S,
-                StdEmuExitHandler<SM>,
+                StdEmulatorExitHandler<SM>,
             >>::run(
                 cmd, emu, qemu_executor_state, input, ret_reg
             ),
             Command::StartCommand(cmd) => <StartCommand as IsCommand<
                 QT,
                 S,
-                StdEmuExitHandler<SM>,
+                StdEmulatorExitHandler<SM>,
             >>::run(
                 cmd, emu, qemu_executor_state, input, ret_reg
             ),
-            Command::EndCommand(cmd) => {
-                <EndCommand as IsCommand<QT, S, StdEmuExitHandler<SM>>>::run(
-                    cmd,
-                    emu,
-                    qemu_executor_state,
-                    input,
-                    ret_reg,
-                )
-            }
+            Command::EndCommand(cmd) => <EndCommand as IsCommand<
+                QT,
+                S,
+                StdEmulatorExitHandler<SM>,
+            >>::run(
+                cmd, emu, qemu_executor_state, input, ret_reg
+            ),
             Command::VersionCommand(cmd) => <VersionCommand as IsCommand<
                 QT,
                 S,
-                StdEmuExitHandler<SM>,
+                StdEmulatorExitHandler<SM>,
             >>::run(
                 cmd, emu, qemu_executor_state, input, ret_reg
             ),
@@ -204,12 +327,12 @@ where
             Command::PagingFilterCommand(cmd) => <PagingFilterCommand as IsCommand<
                 QT,
                 S,
-                StdEmuExitHandler<SM>,
+                StdEmulatorExitHandler<SM>,
             >>::run(
                 cmd, emu, qemu_executor_state, input, ret_reg
             ),
             Command::AddressRangeFilterCommand(cmd) => {
-                <AddressRangeFilterCommand as IsCommand<QT, S, StdEmuExitHandler<SM>>>::run(
+                <AddressRangeFilterCommand as IsCommand<QT, S, StdEmulatorExitHandler<SM>>>::run(
                     cmd,
                     emu,
                     qemu_executor_state,
@@ -222,16 +345,9 @@ where
 }
 
 #[derive(Debug, Clone)]
-pub struct EmulatorMemoryChunk {
-    addr: GuestAddrKind,
-    size: GuestReg,
-    cpu: Option<CPU>,
-}
-
-#[derive(Debug, Clone)]
 pub struct SaveCommand;
 
-impl<SM, QT, S> IsCommand<QT, S, StdEmuExitHandler<SM>> for SaveCommand
+impl<SM, QT, S> IsCommand<QT, S, StdEmulatorExitHandler<SM>> for SaveCommand
 where
     SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
@@ -244,7 +360,7 @@ where
 
     fn run(
         &self,
-        emu: &Emulator<QT, S, StdEmuExitHandler<SM>>,
+        emu: &Emulator<QT, S, StdEmulatorExitHandler<SM>>,
         #[cfg(emulation_mode = "systemmode")] qemu_executor_state: &mut QemuExecutorState<QT, S>,
         #[cfg(not(emulation_mode = "systemmode"))] _qemu_executor_state: &mut QemuExecutorState<
             QT,
@@ -252,14 +368,14 @@ where
         >,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
-    ) -> Result<InnerHandlerResult, HandlerError> {
+    ) -> Result<Option<ExitHandlerResult>, ExitHandlerError> {
         let qemu = emu.qemu();
         let emu_exit_handler = emu.exit_handler().borrow_mut();
 
         let snapshot_id = emu_exit_handler.snapshot_manager_borrow_mut().save(qemu);
         emu_exit_handler
             .set_snapshot_id(snapshot_id)
-            .map_err(|_| HandlerError::MultipleSnapshotDefinition)?;
+            .map_err(|_| ExitHandlerError::MultipleSnapshotDefinition)?;
 
         #[cfg(emulation_mode = "systemmode")]
         {
@@ -278,14 +394,14 @@ where
             *paging_filter = QemuInstrumentationPagingFilter::AllowList(allowed_paging_ids);
         }
 
-        Ok(InnerHandlerResult::Continue)
+        Ok(None)
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct LoadCommand;
 
-impl<SM, QT, S> IsCommand<QT, S, StdEmuExitHandler<SM>> for LoadCommand
+impl<SM, QT, S> IsCommand<QT, S, StdEmulatorExitHandler<SM>> for LoadCommand
 where
     SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
@@ -298,23 +414,23 @@ where
 
     fn run(
         &self,
-        emu: &Emulator<QT, S, StdEmuExitHandler<SM>>,
+        emu: &Emulator<QT, S, StdEmulatorExitHandler<SM>>,
         _qemu_executor_state: &mut QemuExecutorState<QT, S>,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
-    ) -> Result<InnerHandlerResult, HandlerError> {
+    ) -> Result<Option<ExitHandlerResult>, ExitHandlerError> {
         let qemu = emu.qemu();
         let emu_exit_handler = emu.exit_handler().borrow_mut();
 
         let snapshot_id = emu_exit_handler
             .snapshot_id()
-            .ok_or(HandlerError::SnapshotNotFound)?;
+            .ok_or(ExitHandlerError::SnapshotNotFound)?;
 
         emu_exit_handler
             .snapshot_manager_borrow_mut()
             .restore(&snapshot_id, qemu)?;
 
-        Ok(InnerHandlerResult::Continue)
+        Ok(None)
     }
 }
 
@@ -324,7 +440,7 @@ pub struct InputCommand {
     cpu: CPU,
 }
 
-impl<SM, QT, S> IsCommand<QT, S, StdEmuExitHandler<SM>> for InputCommand
+impl<SM, QT, S> IsCommand<QT, S, StdEmulatorExitHandler<SM>> for InputCommand
 where
     SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
@@ -337,11 +453,11 @@ where
 
     fn run(
         &self,
-        emu: &Emulator<QT, S, StdEmuExitHandler<SM>>,
+        emu: &Emulator<QT, S, StdEmulatorExitHandler<SM>>,
         _qemu_executor_state: &mut QemuExecutorState<QT, S>,
         input: &S::Input,
         ret_reg: Option<Regs>,
-    ) -> Result<InnerHandlerResult, HandlerError> {
+    ) -> Result<Option<ExitHandlerResult>, ExitHandlerError> {
         let qemu = emu.qemu();
 
         let ret_value = self.location.write(qemu, input.target_bytes().as_slice());
@@ -350,7 +466,7 @@ where
             self.cpu.write_reg(reg, ret_value).unwrap();
         }
 
-        Ok(InnerHandlerResult::Continue)
+        Ok(None)
     }
 }
 
@@ -359,7 +475,7 @@ pub struct StartCommand {
     input_location: EmulatorMemoryChunk,
 }
 
-impl<SM, QT, S> IsCommand<QT, S, StdEmuExitHandler<SM>> for StartCommand
+impl<SM, QT, S> IsCommand<QT, S, StdEmulatorExitHandler<SM>> for StartCommand
 where
     SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
@@ -372,18 +488,18 @@ where
 
     fn run(
         &self,
-        emu: &Emulator<QT, S, StdEmuExitHandler<SM>>,
+        emu: &Emulator<QT, S, StdEmulatorExitHandler<SM>>,
         _qemu_executor_state: &mut QemuExecutorState<QT, S>,
         input: &S::Input,
         ret_reg: Option<Regs>,
-    ) -> Result<InnerHandlerResult, HandlerError> {
+    ) -> Result<Option<ExitHandlerResult>, ExitHandlerError> {
         let emu_exit_handler = emu.exit_handler().borrow_mut();
         let qemu = emu.qemu();
         let snapshot_id = emu_exit_handler.snapshot_manager_borrow_mut().save(qemu);
 
         emu_exit_handler
             .set_snapshot_id(snapshot_id)
-            .map_err(|_| HandlerError::MultipleSnapshotDefinition)?;
+            .map_err(|_| ExitHandlerError::MultipleSnapshotDefinition)?;
 
         emu_exit_handler
             .set_input_location(InputLocation::new(
@@ -401,14 +517,14 @@ where
             qemu.write_reg(reg, ret_value).unwrap();
         }
 
-        Ok(InnerHandlerResult::Continue)
+        Ok(None)
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct EndCommand(Option<ExitKind>);
 
-impl<SM, QT, S> IsCommand<QT, S, StdEmuExitHandler<SM>> for EndCommand
+impl<SM, QT, S> IsCommand<QT, S, StdEmulatorExitHandler<SM>> for EndCommand
 where
     SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
@@ -421,29 +537,29 @@ where
 
     fn run(
         &self,
-        emu: &Emulator<QT, S, StdEmuExitHandler<SM>>,
+        emu: &Emulator<QT, S, StdEmulatorExitHandler<SM>>,
         _qemu_executor_state: &mut QemuExecutorState<QT, S>,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
-    ) -> Result<InnerHandlerResult, HandlerError> {
+    ) -> Result<Option<ExitHandlerResult>, ExitHandlerError> {
         let emu_exit_handler = emu.exit_handler().borrow_mut();
 
         let snapshot_id = emu_exit_handler
             .snapshot_id()
-            .ok_or(HandlerError::SnapshotNotFound)?;
+            .ok_or(ExitHandlerError::SnapshotNotFound)?;
 
         emu_exit_handler
             .snapshot_manager_borrow_mut()
             .restore(&snapshot_id, emu.qemu())?;
 
-        Ok(InnerHandlerResult::EndOfRun(self.0.unwrap()))
+        Ok(Some(ExitHandlerResult::EndOfRun(self.0.unwrap())))
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct VersionCommand(u64);
 
-impl<SM, QT, S> IsCommand<QT, S, StdEmuExitHandler<SM>> for VersionCommand
+impl<SM, QT, S> IsCommand<QT, S, StdEmulatorExitHandler<SM>> for VersionCommand
 where
     SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
@@ -456,18 +572,18 @@ where
 
     fn run(
         &self,
-        _emu: &Emulator<QT, S, StdEmuExitHandler<SM>>,
+        _emu: &Emulator<QT, S, StdEmulatorExitHandler<SM>>,
         _qemu_executor_state: &mut QemuExecutorState<QT, S>,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
-    ) -> Result<InnerHandlerResult, HandlerError> {
+    ) -> Result<Option<ExitHandlerResult>, ExitHandlerError> {
         let guest_version = self.0;
 
         if VERSION == guest_version {
-            Ok(InnerHandlerResult::Continue)
+            Ok(None)
         } else {
-            Err(HandlerError::SyncBackdoorError(
-                SyncBackdoorError::VersionDifference(guest_version),
+            Err(ExitHandlerError::CommandError(
+                CommandError::VersionDifference(guest_version),
             ))
         }
     }
@@ -482,7 +598,7 @@ where
 }
 
 #[cfg(emulation_mode = "systemmode")]
-impl<SM, QT, S> IsCommand<QT, S, StdEmuExitHandler<SM>> for PagingFilterCommand
+impl<SM, QT, S> IsCommand<QT, S, StdEmulatorExitHandler<SM>> for PagingFilterCommand
 where
     SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
@@ -495,11 +611,11 @@ where
 
     fn run(
         &self,
-        _emu: &Emulator<QT, S, StdEmuExitHandler<SM>>,
+        _emu: &Emulator<QT, S, StdEmulatorExitHandler<SM>>,
         qemu_executor_state: &mut QemuExecutorState<QT, S>,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
-    ) -> Result<InnerHandlerResult, HandlerError> {
+    ) -> Result<Option<ExitHandlerResult>, ExitHandlerError> {
         let qemu_helpers = qemu_executor_state.hooks_mut().helpers_mut();
 
         let paging_filter =
@@ -509,11 +625,11 @@ where
 
         *paging_filter = self.filter.clone();
 
-        Ok(InnerHandlerResult::Continue)
+        Ok(None)
     }
 }
 
-impl<SM, QT, S> IsCommand<QT, S, StdEmuExitHandler<SM>> for AddressRangeFilterCommand
+impl<SM, QT, S> IsCommand<QT, S, StdEmulatorExitHandler<SM>> for AddressRangeFilterCommand
 where
     SM: IsSnapshotManager,
     QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
@@ -527,11 +643,11 @@ where
     #[allow(clippy::type_complexity)] // TODO: refactor with correct type.
     fn run(
         &self,
-        _emu: &Emulator<QT, S, StdEmuExitHandler<SM>>,
+        _emu: &Emulator<QT, S, StdEmulatorExitHandler<SM>>,
         qemu_executor_state: &mut QemuExecutorState<QT, S>,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
-    ) -> Result<InnerHandlerResult, HandlerError> {
+    ) -> Result<Option<ExitHandlerResult>, ExitHandlerError> {
         let qemu_helpers = qemu_executor_state.hooks_mut().helpers_mut();
 
         let addr_range_filter =
@@ -541,7 +657,7 @@ where
 
         *addr_range_filter = self.filter.clone();
 
-        Ok(InnerHandlerResult::Continue)
+        Ok(None)
     }
 }
 
@@ -568,13 +684,13 @@ impl Display for Command {
             Command::SaveCommand(_) => write!(f, "Save VM"),
             Command::LoadCommand(_) => write!(f, "Reload VM"),
             Command::InputCommand(input_command) => {
-                write!(f, "Set fuzzing input @{}", input_command.location.addr)
+                write!(f, "Set fuzzing input @{}", input_command.location.addr())
             }
             Command::StartCommand(start_command) => {
                 write!(
                     f,
                     "Start fuzzing with input @{}",
-                    start_command.input_location.addr
+                    start_command.input_location.addr()
                 )
             }
             Command::EndCommand(end_command) => write!(f, "Exit of kind {:?}", end_command.0),
@@ -613,66 +729,13 @@ impl InputCommand {
     }
 }
 
-impl EmulatorMemoryChunk {
-    #[must_use]
-    pub fn phys(addr: GuestPhysAddr, size: GuestReg, cpu: Option<CPU>) -> Self {
-        Self {
-            addr: GuestAddrKind::Physical(addr),
-            size,
-            cpu,
-        }
-    }
-
-    #[must_use]
-    pub fn virt(addr: GuestVirtAddr, size: GuestReg, cpu: CPU) -> Self {
-        Self {
-            addr: GuestAddrKind::Virtual(addr),
-            size,
-            cpu: Some(cpu),
-        }
-    }
-
-    /// Returns the number of bytes effectively written.
-    #[must_use]
-    pub fn write(&self, qemu: &Qemu, input: &[u8]) -> GuestReg {
-        let max_len: usize = self.size.try_into().unwrap();
-
-        let input_sliced = if input.len() > max_len {
-            &input[0..max_len]
-        } else {
-            input
-        };
-
-        match self.addr {
-            GuestAddrKind::Physical(hwaddr) => unsafe {
-                #[cfg(emulation_mode = "usermode")]
-                {
-                    // For now the default behaviour is to fall back to virtual addresses
-                    qemu.write_mem(hwaddr.try_into().unwrap(), input_sliced);
-                }
-                #[cfg(emulation_mode = "systemmode")]
-                {
-                    qemu.write_phys_mem(hwaddr, input_sliced);
-                }
-            },
-            GuestAddrKind::Virtual(vaddr) => unsafe {
-                self.cpu
-                    .as_ref()
-                    .unwrap()
-                    .write_mem(vaddr.try_into().unwrap(), input_sliced);
-            },
-        };
-
-        input_sliced.len().try_into().unwrap()
-    }
-}
-
 impl Display for InputCommand {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "{} (0x{:x} max nb bytes)",
-            self.location.addr, self.location.size
+            self.location.addr(),
+            self.location.size()
         )
     }
 }

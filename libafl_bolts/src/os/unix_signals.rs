@@ -20,6 +20,9 @@ pub use libc::c_ulong;
 #[cfg(feature = "std")]
 use nix::errno::{errno, Errno};
 
+/// The special exit code when the target exited through ctrl-c
+pub const CTRL_C_EXIT: i32 = 100;
+
 /// ARMv7-specific representation of a saved context
 #[cfg(target_arch = "arm")]
 #[derive(Debug)]
@@ -300,6 +303,19 @@ pub enum Signal {
     SigInterrupt = SIGINT,
     /// `SIGTRAP` signal id
     SigTrap = SIGTRAP,
+}
+
+#[cfg(feature = "std")]
+impl Signal {
+    /// Handle an incoming signal
+    pub fn handle(&self) {
+        match self {
+            Signal::SigInterrupt | Signal::SigQuit | Signal::SigTerm => {
+                std::process::exit(CTRL_C_EXIT)
+            }
+            _ => {}
+        }
+    }
 }
 
 impl TryFrom<&str> for Signal {

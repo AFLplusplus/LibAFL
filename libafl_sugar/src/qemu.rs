@@ -32,10 +32,10 @@ use libafl_bolts::{
     ownedref::OwnedMutSlice,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, Handler, Merge},
+    tuples::{tuple_list, Handled, Merge},
     AsSlice,
 };
-pub use libafl_qemu::emu::Qemu;
+pub use libafl_qemu::qemu::Qemu;
 #[cfg(not(any(feature = "mips", feature = "hexagon")))]
 use libafl_qemu::QemuCmpLogHelper;
 use libafl_qemu::{edges, QemuEdgeCoverageHelper, QemuExecutor, QemuHooks};
@@ -454,7 +454,11 @@ pub mod pybind {
     use std::path::PathBuf;
 
     use libafl_bolts::core_affinity::Cores;
+<<<<<<< HEAD
     use libafl_qemu::emu::pybind::Qemu;
+=======
+    use libafl_qemu::qemu::pybind::Qemu;
+>>>>>>> main
     use pyo3::{prelude::*, types::PyBytes};
 
     use crate::qemu;

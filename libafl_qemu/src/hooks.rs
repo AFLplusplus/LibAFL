@@ -19,10 +19,10 @@ use libafl::{
 };
 use libafl_qemu_sys::{CPUArchStatePtr, FatPtr, GuestAddr, GuestUsize};
 
-pub use crate::emu::SyscallHookResult;
+pub use crate::qemu::SyscallHookResult;
 use crate::{
-    emu::{MemAccessInfo, Qemu, SKIP_EXEC_HOOK},
     helpers::QemuHelperTuple,
+    qemu::{MemAccessInfo, Qemu, SKIP_EXEC_HOOK},
     sys::TCGTemp,
     BackdoorHookId, BlockHookId, CmpHookId, EdgeHookId, HookId, InstructionHookId, ReadHookId,
     WriteHookId,

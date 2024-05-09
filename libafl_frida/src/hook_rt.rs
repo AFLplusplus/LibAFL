@@ -326,7 +326,7 @@ impl HookRuntime {
                 writer.put_push_reg(X86Register::Rcx);
 
             }
-            insn.put_chaining_return();
+            // insn.put_chaining_return();
 
             writer.put_label(not_hooked_label_id);
 
