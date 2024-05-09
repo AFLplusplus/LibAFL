@@ -129,7 +129,7 @@ pub struct AsanRuntime {
     suppressed_addresses: Vec<usize>,
     skip_ranges: Vec<SkipRange>,
     continue_on_error: bool,
-    hooks: HashMap<String, NativePointer>,
+    pub(crate) hooks: HashMap<String, NativePointer>,
     pub(crate) hooks_enabled: bool,
     pc: Option<usize>,
 
@@ -778,6 +778,14 @@ impl AsanRuntime {
                             _read,
                             (fd: i32, buf: *mut c_void, count: usize),
                             usize
+                        );
+                    }
+                    "MapViewOfFile" => {
+                        hook_func!(
+                            Some(libname),
+                            MapViewOfFile,
+                            (handle: *const c_void, desired_access: u32, file_offset_high: u32, file_offset_low: u32, size: usize),
+                            *const c_void
                         );
                     }
                     _ => (),
@@ -2284,6 +2292,11 @@ impl AsanRuntime {
 
         // Scale
         if scale > 0 {
+            // if scale == 3 {
+            //     if let Some(X86Register::R8) = indexreg {
+            //         writer.put_bytes(&[0xcc]);
+            //     }
+            // }kernel
             writer.put_shl_reg_u8(X86Register::Rsi, scale);
         }
 
