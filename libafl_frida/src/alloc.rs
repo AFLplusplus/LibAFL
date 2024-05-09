@@ -578,7 +578,7 @@ impl Allocator {
                 occupied_ranges.push((start, end));
                 // On x64, if end > 2**48, then that's in vsyscall or something.
                 #[cfg(all(unix, target_arch = "x86_64"))]
-                if end <= 2.pow(48) && end > userspace_max {
+                if end <= 2_usize.pow(48) && end > userspace_max {
                     userspace_max = end;
                 }
                 //

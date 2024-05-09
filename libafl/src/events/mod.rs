@@ -55,13 +55,6 @@ use crate::{
     state::HasScalabilityMonitor,
 };
 
-/// The special exit code when the target exited throught ctrl-c
-#[cfg(unix)]
-pub const CTRL_C_EXIT: i32 = 100;
-/// The special exit code when the target exited throught ctrl-c
-#[cfg(windows)]
-pub const CTRL_C_EXIT: i32 = -1073741510;
-
 /// Check if ctrl-c is sent with this struct
 #[cfg(all(unix, feature = "std"))]
 pub static mut EVENTMGR_SIGHANDLER_STATE: ShutdownSignalData = ShutdownSignalData {};
