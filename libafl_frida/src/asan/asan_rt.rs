@@ -1120,19 +1120,22 @@ impl AsanRuntime {
         hook_func!(
             None,
             memset_pattern4,
-            (s: *mut c_void, c: *const c_void, n: usize)
+            (s: *mut c_void, c: *const c_void, n: usize),
+            ()
         );
         #[cfg(target_vendor = "apple")]
         hook_func!(
             None,
             memset_pattern8,
-            (s: *mut c_void, c: *const c_void, n: usize)
+            (s: *mut c_void, c: *const c_void, n: usize),
+            ()
         );
         #[cfg(target_vendor = "apple")]
         hook_func!(
             None,
             memset_pattern16,
-            (s: *mut c_void, c: *const c_void, n: usize)
+            (s: *mut c_void, c: *const c_void, n: usize),
+            ()
         );
     }
 

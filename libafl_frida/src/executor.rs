@@ -1,5 +1,3 @@
-#[cfg(all(unix, not(test)))]
-use core::borrow::Borrow;
 use core::fmt::{self, Debug, Formatter};
 #[cfg(windows)]
 use std::process::abort;

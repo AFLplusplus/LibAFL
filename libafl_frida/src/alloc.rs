@@ -590,13 +590,13 @@ impl Allocator {
                 }
                 //
                 // #[cfg(all(not(unix), target_arch = "x86_64"))]
-                // if end <= base.pow(64) && end > userspace_max {
+                // if end <= 2_usize.pow(64) && end > userspace_max {
                 //     userspace_max = end;
                 // }
 
                 // On aarch64, if end > 2**52, then range is not in userspace
                 #[cfg(target_arch = "aarch64")]
-                if end <= base.pow(52) && end > userspace_max {
+                if end <= 2_usize.pow(52) && end > userspace_max {
                     userspace_max = end;
                 }
 
@@ -610,8 +610,7 @@ impl Allocator {
         let maxbit = 63;
         #[cfg(unix)]
         for power in 1..64 {
-            let base: usize = 2;
-            if base.pow(power) > userspace_max {
+            if 2_usize.pow(power) > userspace_max {
                 maxbit = power;
                 break;
             }
