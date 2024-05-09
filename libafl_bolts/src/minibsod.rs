@@ -1,7 +1,5 @@
 //! Implements a mini-bsod generator.
 //! It dumps all important registers and prints a stacktrace.
-//! You may use the [`crate::os::unix_signals::ucontext`]
-//! function to get a [`ucontext_t`].
 
 use std::io::{BufWriter, Write};
 #[cfg(any(target_os = "solaris", target_os = "illumos"))]
