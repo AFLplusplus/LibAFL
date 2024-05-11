@@ -6,6 +6,8 @@
 use std::io::{BufWriter, Write};
 #[cfg(any(target_os = "solaris", target_os = "illumos"))]
 use std::process::Command;
+#[cfg(target_vendor = "apple")]
+extern crate mach;
 
 use libc::siginfo_t;
 
@@ -889,46 +891,7 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
 fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Error> {
     use core::mem::size_of;
 
-    type vm_region_recurse_info_t = *mut libc::c_int;
-    type mach_vm_address_t = u64;
-    type mach_vm_size_t = u64;
-    type mach_msg_type_number_t = i32;
-    type mach_port_t = u32;
-    type natural_t = i32;
-
-    #[repr(C)]
-    struct vm_region_submap_info_64 {
-        pub protection: libc::vm_prot_t,
-        pub max_protection: libc::vm_prot_t,
-        pub inheritance: libc::vm_inherit_t,
-        pub offset: u64,
-        pub user_tag: libc::c_uint,
-        pub pages_resident: libc::c_uint,
-        pub pages_shared_now_private: libc::c_uint,
-        pub pages_dirtied: libc::c_uint,
-        pub ref_count: libc::c_uint,
-        pub shadow_depth: libc::c_short,
-        pub external_pager: libc::c_uchar,
-        pub share_mode: libc::c_uchar,
-        pub is_submap: libc::boolean_t,
-        pub behavior: libc::c_int,
-        pub object_id: u32,
-        pub user_wired_count: libc::c_ushort,
-        pub pages_reusable: libc::c_uint,
-        pub object_id_full: libc::c_ulonglong,
-    }
-
-    extern "C" {
-        fn mach_task_self() -> mach_port_t;
-        fn mach_vm_region_recurse(
-            t: mach_port_t,
-            addr: *mut mach_vm_address_t,
-            size: *mut mach_vm_size_t,
-            depth: *mut natural_t,
-            info: vm_region_recurse_info_t,
-            cnt: *mut mach_msg_type_number_t,
-        ) -> libc::kern_return_t;
-    }
+    use mach::{message::*, port::*, traps::*, vm::*, vm_region::*, vm_types::*};
 
     let mut ptask = std::mem::MaybeUninit::<mach_port_t>::uninit();
     // We start by the lowest virtual address from the userland' standpoint
