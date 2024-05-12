@@ -432,7 +432,7 @@ mod tests {
         let mut frida_helper = FridaInstrumentationHelper::new(
             GUM.get().expect("Gum uninitialized"),
             options,
-            tuple_list!(coverage, asan, HookRuntime::new()),
+            tuple_list!(coverage, asan),
         );
 
         // Run the tests for each function
