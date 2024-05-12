@@ -83,7 +83,8 @@ pub fn build_with_bindings(
     let bind_str = std::str::from_utf8(&bind_buf).expect("Could not convert bindings to UTF-8");
 
     // """Fix""" the bindings here
-    let re = Regex::new(r#"(Option\s*<\s*)unsafe(\s+extern\s+"C"\s+fn\s*\(\s*data\s*:\s*u64)"#).unwrap();
+    let re =
+        Regex::new(r#"(Option\s*<\s*)unsafe(\s+extern\s+"C"\s+fn\s*\(\s*data\s*:\s*u64)"#).unwrap();
     let replaced = re.replace_all(bind_str, "$1$2");
 
     // Write the final bindings
