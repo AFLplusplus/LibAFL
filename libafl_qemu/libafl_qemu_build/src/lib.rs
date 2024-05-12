@@ -77,14 +77,16 @@ pub fn build_with_bindings(
 
     let bind = bindings::generate(&build_result.build_dir, cpu_target, clang_args)
         .expect("Failed to generate the bindings");
-    bind.write_to_file(bindings_file)
-        .expect("Faield to write to the bindings file");
+    let mut bind_buf: Vec<u8> = Vec::new();
+    bind.write(Box::new(&mut bind_buf))
+        .expect("Failed to write to the bindings buffer");
+    let bind_str = std::str::from_utf8(&bind_buf).expect("Could not convert bindings to UTF-8");
 
     // """Fix""" the bindings here
-    let contents =
-        fs::read_to_string(bindings_file).expect("Should have been able to read the file");
-    let re = Regex::new("(Option<\\s*)unsafe( extern \"C\" fn\\(data: u64)").unwrap();
-    let replaced = re.replace_all(&contents, "$1$2");
+    let re = Regex::new(r#"(Option\s*<\s*)unsafe(\s+extern\s+"C"\s+fn\s*\(\s*data\s*:\s*u64)"#).unwrap();
+    let replaced = re.replace_all(&bind_str, "$1$2");
+
+    // Write the final bindings
     fs::write(bindings_file, replaced.as_bytes()).expect("Unable to write file");
 
     cargo_propagate_rpath();

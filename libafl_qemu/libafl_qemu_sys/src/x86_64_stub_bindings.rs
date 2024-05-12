@@ -2340,7 +2340,6 @@ pub type DeviceReset = ::std::option::Option<unsafe extern "C" fn(dev: *mut Devi
 #[derive(Debug, Copy, Clone)]
 pub struct DeviceClass {
     pub parent_class: ObjectClass,
-    #[doc = " @categories: device categories device belongs to"]
     pub categories: [::std::os::raw::c_ulong; 1usize],
     #[doc = " @fw_name: name used to identify device to firmware interfaces"]
     pub fw_name: *const ::std::os::raw::c_char,
@@ -13703,7 +13702,7 @@ extern "C" {
 extern "C" {
     pub fn libafl_add_read_hook(
         gen: ::std::option::Option<
-            unsafe extern "C" fn(
+             extern "C" fn(
                 data: u64,
                 pc: target_ulong,
                 addr: *mut TCGTemp,
@@ -13723,7 +13722,7 @@ extern "C" {
 extern "C" {
     pub fn libafl_add_write_hook(
         gen: ::std::option::Option<
-            unsafe extern "C" fn(
+             extern "C" fn(
                 data: u64,
                 pc: target_ulong,
                 addr: *mut TCGTemp,
@@ -13820,7 +13819,7 @@ fn bindgen_test_layout_syshook_ret() {
 extern "C" {
     pub fn libafl_add_pre_syscall_hook(
         callback: ::std::option::Option<
-            unsafe extern "C" fn(
+             extern "C" fn(
                 data: u64,
                 sys_num: ::std::os::raw::c_int,
                 arg0: target_ulong,
@@ -13839,7 +13838,7 @@ extern "C" {
 extern "C" {
     pub fn libafl_add_post_syscall_hook(
         callback: ::std::option::Option<
-            unsafe extern "C" fn(
+             extern "C" fn(
                 data: u64,
                 ret: target_ulong,
                 sys_num: ::std::os::raw::c_int,

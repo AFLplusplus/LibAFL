@@ -817,7 +817,7 @@ impl Qemu {
         unsafe {
             let data: u64 = data.into().0;
             let gen: Option<
-                unsafe extern "C" fn(
+                extern "C" fn(
                     u64,
                     GuestAddr,
                     *mut TCGTemp,
@@ -851,7 +851,7 @@ impl Qemu {
         unsafe {
             let data: u64 = data.into().0;
             let gen: Option<
-                unsafe extern "C" fn(
+                extern "C" fn(
                     u64,
                     GuestAddr,
                     *mut TCGTemp,
