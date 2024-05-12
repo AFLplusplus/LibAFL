@@ -817,12 +817,7 @@ impl Qemu {
         unsafe {
             let data: u64 = data.into().0;
             let gen: Option<
-                extern "C" fn(
-                    u64,
-                    GuestAddr,
-                    *mut TCGTemp,
-                    libafl_qemu_sys::MemOpIdx,
-                ) -> u64,
+                extern "C" fn(u64, GuestAddr, *mut TCGTemp, libafl_qemu_sys::MemOpIdx) -> u64,
             > = transmute(gen);
             let exec1: Option<extern "C" fn(u64, u64, GuestAddr)> = transmute(exec1);
             let exec2: Option<extern "C" fn(u64, u64, GuestAddr)> = transmute(exec2);
@@ -851,12 +846,7 @@ impl Qemu {
         unsafe {
             let data: u64 = data.into().0;
             let gen: Option<
-                extern "C" fn(
-                    u64,
-                    GuestAddr,
-                    *mut TCGTemp,
-                    libafl_qemu_sys::MemOpIdx,
-                ) -> u64,
+                extern "C" fn(u64, GuestAddr, *mut TCGTemp, libafl_qemu_sys::MemOpIdx) -> u64,
             > = transmute(gen);
             let exec1: Option<extern "C" fn(u64, u64, GuestAddr)> = transmute(exec1);
             let exec2: Option<extern "C" fn(u64, u64, GuestAddr)> = transmute(exec2);
