@@ -80,7 +80,7 @@ typedef enum LibaflQemuEndStatus {
       #endif
 #else
 
-  #ifdef __x86_64__
+  #if defined(__x86_64__)
     #define LIBAFL_DEFINE_FUNCTIONS(name, opcode)                                                   \
       libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call0(                                 \
           libafl_word action) {                                                                     \
@@ -126,9 +126,8 @@ typedef enum LibaflQemuEndStatus {
         ); \
         return ret;                                                                                 \
       }
-  #endif
 
-  #ifdef __arm__
+  #elif defined(__arm__)
     #define LIBAFL_DEFINE_FUNCTIONS(name, opcode)                                                   \
       libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call0(                                 \
           libafl_word action) {                                                                     \
@@ -174,9 +173,8 @@ typedef enum LibaflQemuEndStatus {
     );   \
         return ret;                                                                                 \
       }
-  #endif
 
-  #ifdef __aarch64__
+  #elif defined(__aarch64__)
     #define LIBAFL_DEFINE_FUNCTIONS(name, opcode)                                                   \
       libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call0(                                 \
           libafl_word action) {                                                                     \
@@ -222,6 +220,8 @@ typedef enum LibaflQemuEndStatus {
     );   \
         return ret;                                                                                 \
       }
+  #else
+    #warning "LibAFL QEMU Runtime does not support your architecture yet, please leave an issue."
   #endif
 
 #endif

@@ -2340,7 +2340,6 @@ pub type DeviceReset = ::std::option::Option<unsafe extern "C" fn(dev: *mut Devi
 #[derive(Debug, Copy, Clone)]
 pub struct DeviceClass {
     pub parent_class: ObjectClass,
-    #[doc = " @categories: device categories device belongs to"]
     pub categories: [::std::os::raw::c_ulong; 1usize],
     #[doc = " @fw_name: name used to identify device to firmware interfaces"]
     pub fw_name: *const ::std::os::raw::c_char,
