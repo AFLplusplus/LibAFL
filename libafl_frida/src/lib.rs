@@ -452,8 +452,6 @@ mod tests {
 
             let asan_obs = AsanErrorsObserver::from_static_asan_errors();
 
-            let asan_obs = AsanErrorsObserver::from_static_asan_errors();
-
             // Feedbacks to recognize an input as solution
             let mut objective = feedback_or_fast!(
                 // true enables the AsanErrorFeedback

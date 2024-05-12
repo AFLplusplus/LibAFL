@@ -43,7 +43,7 @@ pub struct Allocator {
     shadow_bit: usize,
     /// The reserved (pre-allocated) shadow mapping
     pre_allocated_shadow_mappings: Vec<ReservedMut>,
-    /// Whether we've pre_allocated a shadow mapping:
+    /// Whether we've pre allocated a shadow mapping:
     using_pre_allocated_shadow_mapping: bool,
     /// All tracked allocations
     allocations: HashMap<usize, AllocationMetadata>,
@@ -235,7 +235,7 @@ impl Allocator {
         let address = (metadata.address + self.page_size) as *mut c_void;
 
         self.allocations.insert(address as usize, metadata);
-        // log::trace!("serving address: {:?}, size: {:x}", address, size);
+        log::trace!("serving address: {:?}, size: {:x}", address, size);
         address
     }
 
@@ -345,7 +345,7 @@ impl Allocator {
             let remainder = size % 8;
             if remainder > 0 {
                 let mut current_value = ((start + size / 8) as *const u8).read();
-                current_value = current_value | (0xff << (8 - remainder));
+                current_value |= 0xff << (8 - remainder);
                 ((start + size / 8) as *mut u8).write(current_value);
             }
         }
@@ -361,7 +361,7 @@ impl Allocator {
                 let mask = !(0xff << (8 - remainder));
                 let mut current_value = ((start + size / 8) as *const u8).read();
 
-                current_value = current_value & mask;
+                current_value &= mask;
                 ((start + size / 8) as *mut u8).write(current_value);
             }
         }
@@ -451,7 +451,7 @@ impl Allocator {
             return false;
         }
 
-        return true;
+        true
     }
     /// Checks whether the given address up till size is valid unpoisoned shadow memory.
     /// TODO: check edge cases
@@ -469,6 +469,11 @@ impl Allocator {
         if size == 0
         /*|| !self.is_managed(address as *mut c_void)*/
         {
+            return true;
+        }
+
+        if !self.is_managed(address as *mut c_void) {
+            log::trace!("unmanaged address to check_shadow: {:?}, {size:x}", address);
             return true;
         }
 
@@ -518,7 +523,7 @@ impl Allocator {
         }
         // self.map_shadow_for_region(address, address + size, false);
 
-        return true;
+        true
     }
     /// Maps the address to a shadow address
     #[inline]
@@ -556,7 +561,7 @@ impl Allocator {
                     self.map_shadow_for_region(start, end, true);
                 }
 
-                return true;
+                true
             },
         );
     }
@@ -600,7 +605,7 @@ impl Allocator {
                     userspace_max = end;
                 }
 
-                return true;
+                true
             },
         );
 
@@ -723,53 +728,53 @@ fn check_shadow() {
 
     let allocation = unsafe { allocator.alloc(8, 8) };
     assert!(!allocation.is_null());
-    assert!(allocator.check_shadow(allocation, 1) == true);
-    assert!(allocator.check_shadow(allocation, 2) == true);
-    assert!(allocator.check_shadow(allocation, 3) == true);
-    assert!(allocator.check_shadow(allocation, 4) == true);
-    assert!(allocator.check_shadow(allocation, 5) == true);
-    assert!(allocator.check_shadow(allocation, 6) == true);
-    assert!(allocator.check_shadow(allocation, 7) == true);
-    assert!(allocator.check_shadow(allocation, 8) == true);
-    assert!(allocator.check_shadow(allocation, 9) == false);
-    assert!(allocator.check_shadow(allocation, 10) == false);
-    assert!(allocator.check_shadow(unsafe { allocation.offset(1) }, 7) == true);
-    assert!(allocator.check_shadow(unsafe { allocation.offset(2) }, 6) == true);
-    assert!(allocator.check_shadow(unsafe { allocation.offset(3) }, 5) == true);
-    assert!(allocator.check_shadow(unsafe { allocation.offset(4) }, 4) == true);
-    assert!(allocator.check_shadow(unsafe { allocation.offset(5) }, 3) == true);
-    assert!(allocator.check_shadow(unsafe { allocation.offset(6) }, 2) == true);
-    assert!(allocator.check_shadow(unsafe { allocation.offset(7) }, 1) == true);
-    assert!(allocator.check_shadow(unsafe { allocation.offset(8) }, 0) == true);
-    assert!(allocator.check_shadow(unsafe { allocation.offset(9) }, 1) == false);
-    assert!(allocator.check_shadow(unsafe { allocation.offset(9) }, 8) == false);
-    assert!(allocator.check_shadow(unsafe { allocation.offset(1) }, 9) == false);
-    assert!(allocator.check_shadow(unsafe { allocation.offset(1) }, 8) == false);
-    assert!(allocator.check_shadow(unsafe { allocation.offset(2) }, 8) == false);
-    assert!(allocator.check_shadow(unsafe { allocation.offset(3) }, 8) == false);
+    assert!(allocator.check_shadow(allocation, 1));
+    assert!(allocator.check_shadow(allocation, 2));
+    assert!(allocator.check_shadow(allocation, 3));
+    assert!(allocator.check_shadow(allocation, 4));
+    assert!(allocator.check_shadow(allocation, 5))
+    assert!(allocator.check_shadow(allocation, 6));
+    assert!(allocator.check_shadow(allocation, 7));
+    assert!(allocator.check_shadow(allocation, 8));
+    assert!(!allocator.check_shadow(allocation, 9));
+    assert!(!allocator.check_shadow(allocation, 10));
+    assert!(allocator.check_shadow(unsafe { allocation.offset(1) }, 7));
+    assert!(allocator.check_shadow(unsafe { allocation.offset(2) }, 6));
+    assert!(allocator.check_shadow(unsafe { allocation.offset(3) }, 5));
+    assert!(allocator.check_shadow(unsafe { allocation.offset(4) }, 4));
+    assert!(allocator.check_shadow(unsafe { allocation.offset(5) }, 3));
+    assert!(allocator.check_shadow(unsafe { allocation.offset(6) }, 2));
+    assert!(allocator.check_shadow(unsafe { allocation.offset(7) }, 1));
+    assert!(allocator.check_shadow(unsafe { allocation.offset(8) }, 0));
+    assert!(!allocator.check_shadow(unsafe { allocation.offset(9) }, 1));
+    assert!(!allocator.check_shadow(unsafe { allocation.offset(9) }, 8));
+    assert!(!allocator.check_shadow(unsafe { allocation.offset(1) }, 9));
+    assert!(!allocator.check_shadow(unsafe { allocation.offset(1) }, 8));
+    assert!(!allocator.check_shadow(unsafe { allocation.offset(2) }, 8));
+    assert!(!allocator.check_shadow(unsafe { allocation.offset(3) }, 8));
     let allocation = unsafe { allocator.alloc(0xc, 0) };
-    assert!(allocator.check_shadow(unsafe { allocation.offset(4) }, 8) == true);
+    assert!(allocator.check_shadow(unsafe { allocation.offset(4) }, 8));
     //subqword access
-    assert!(allocator.check_shadow(unsafe { allocation.offset(3) }, 2) == true);
+    assert!(allocator.check_shadow(unsafe { allocation.offset(3) }, 2));
     //unaligned access
-    assert!(allocator.check_shadow(unsafe { allocation.offset(3) }, 8) == true);
+    assert!(allocator.check_shadow(unsafe { allocation.offset(3) }, 8));
     let allocation = unsafe { allocator.alloc(0x20, 0) };
     //access with unaligned parts at the beginning and end
-    assert!(allocator.check_shadow(unsafe { allocation.offset(10) }, 21) == true);
+    assert!(allocator.check_shadow(unsafe { allocation.offset(10) }, 21));
     //invalid, unaligned access
-    assert!(allocator.check_shadow(unsafe { allocation.offset(10) }, 29) == false);
+    assert!(!allocator.check_shadow(unsafe { allocation.offset(10) }, 29));
     let allocation = unsafe { allocator.alloc(4, 0) };
     assert!(!allocation.is_null());
-    assert!(allocator.check_shadow(allocation, 1) == true);
-    assert!(allocator.check_shadow(allocation, 2) == true);
-    assert!(allocator.check_shadow(allocation, 3) == true);
-    assert!(allocator.check_shadow(allocation, 4) == true);
-    assert!(allocator.check_shadow(allocation, 5) == false);
-    assert!(allocator.check_shadow(allocation, 6) == false);
-    assert!(allocator.check_shadow(allocation, 7) == false);
-    assert!(allocator.check_shadow(allocation, 8) == false);
+    assert!(allocator.check_shadow(allocation, 1));
+    assert!(allocator.check_shadow(allocation, 2));
+    assert!(allocator.check_shadow(allocation, 3));
+    assert!(allocator.check_shadow(allocation, 4));
+    assert!(!allocator.check_shadow(allocation, 5));
+    assert!(!allocator.check_shadow(allocation, 6));
+    assert!(!allocator.check_shadow(allocation, 7));
+    assert!(!allocator.check_shadow(allocation, 8));
     let allocation = unsafe { allocator.alloc(0xc, 0) };
-    assert!(allocator.check_shadow(unsafe { allocation.offset(4) }, 8) == true);
+    assert!(allocator.check_shadow(unsafe { allocation.offset(4) }, 8);
     let allocation = unsafe { allocator.alloc(0x3c, 0) };
-    assert!(allocator.check_shadow(unsafe { allocation.offset(0x3a) }, 2) == true);
+    assert!(allocator.check_shadow(unsafe { allocation.offset(0x3a) }, 2));
 }

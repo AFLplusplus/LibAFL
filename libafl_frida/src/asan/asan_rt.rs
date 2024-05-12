@@ -405,7 +405,7 @@ impl AsanRuntime {
         for area in mmap_rs::MemoryAreas::open(None).unwrap() {
             let area_ref = area.as_ref().unwrap();
             if area_ref.start() <= stack_address && stack_address <= area_ref.end() {
-                range = Some((area_ref.end() - 1 * 1024 * 1024, area_ref.end()));
+                range = Some((area_ref.end() - 1024 * 1024, area_ref.end()));
                 break;
             }
         }
@@ -786,6 +786,22 @@ impl AsanRuntime {
                             MapViewOfFile,
                             (handle: *const c_void, desired_access: u32, file_offset_high: u32, file_offset_low: u32, size: usize),
                             *const c_void
+                        );
+                    }
+                    "LoadLibraryExW" => {
+                        hook_func!(
+                            Some(libname),
+                            LoadLibraryExW,
+                            (path: *const c_void, file: usize, flags: i32),
+                            usize
+                        );
+                    }
+                    "LdrLoadDll" => {
+                        hook_func!(
+                            Some(libname),
+                            LdrLoadDll,
+                            (search_path: *const c_void, charecteristics: *const u32, dll_name: *const c_void, base_address: *mut *const c_void),
+                            usize
                         );
                     }
                     _ => (),

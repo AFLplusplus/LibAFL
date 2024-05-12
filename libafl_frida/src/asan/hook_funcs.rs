@@ -93,16 +93,17 @@ impl AsanRuntime {
     #[cfg(windows)]
     pub fn hook_LdrLoadDll(
         &mut self,
-        path: *const c_void,
-        file: usize,
-        flags: usize,
-        x: usize,
+        search_path: *const c_void,
+        charecteristics: *const u32,
+        dll_name: *const c_void,
+        base_address: *mut *const c_void,
     ) -> usize {
         extern "system" {
-            fn LdrLoadDll(path: *const c_void, file: usize, flags: usize, x: usize) -> usize;
+            fn LdrLoadDll(search_path: *const c_void,charecteristics: *const u32, dll_name: *const c_void, base_address: *mut *const c_void) -> usize;
         }
         winsafe::OutputDebugString("LdrLoadDll");
-        let result = unsafe { LdrLoadDll(path, file, flags, x) };
+        log::trace!("LdrLoadDll");
+        let result = unsafe { LdrLoadDll(search_path, charecteristics, dll_name, base_address) };
         self.allocator_mut().unpoison_all_existing_memory();
         result
     }
@@ -126,6 +127,7 @@ impl AsanRuntime {
     #[allow(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_LoadLibraryExW(&mut self, path: *const c_void, file: usize, flags: i32) -> usize {
+        log::trace!("Loaded library!");
         extern "system" {
             fn LoadLibraryExW(path: *const c_void, file: usize, flags: i32) -> usize;
         }
@@ -1182,8 +1184,8 @@ impl AsanRuntime {
                 Backtrace::new(),
             )));
         }
-        let ret = unsafe { memmove(dest, src, n) };
-        ret
+        
+        unsafe { memmove(dest, src, n) }
     }
 
     #[inline]
