@@ -774,7 +774,7 @@ fn check_shadow() {
     assert!(!allocator.check_shadow(allocation, 7));
     assert!(!allocator.check_shadow(allocation, 8));
     let allocation = unsafe { allocator.alloc(0xc, 0) };
-    assert!(allocator.check_shadow(unsafe { allocation.offset(4) }, 8);
+    assert!(allocator.check_shadow(unsafe { allocation.offset(4) }, 8));
     let allocation = unsafe { allocator.alloc(0x3c, 0) };
     assert!(allocator.check_shadow(unsafe { allocation.offset(0x3a) }, 2));
 }
