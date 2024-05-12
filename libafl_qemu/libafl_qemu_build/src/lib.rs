@@ -84,7 +84,7 @@ pub fn build_with_bindings(
 
     // """Fix""" the bindings here
     let re = Regex::new(r#"(Option\s*<\s*)unsafe(\s+extern\s+"C"\s+fn\s*\(\s*data\s*:\s*u64)"#).unwrap();
-    let replaced = re.replace_all(&bind_str, "$1$2");
+    let replaced = re.replace_all(bind_str, "$1$2");
 
     // Write the final bindings
     fs::write(bindings_file, replaced.as_bytes()).expect("Unable to write file");
