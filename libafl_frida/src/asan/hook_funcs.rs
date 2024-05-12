@@ -99,7 +99,12 @@ impl AsanRuntime {
         base_address: *mut *const c_void,
     ) -> usize {
         extern "system" {
-            fn LdrLoadDll(search_path: *const c_void,charecteristics: *const u32, dll_name: *const c_void, base_address: *mut *const c_void) -> usize;
+            fn LdrLoadDll(
+                search_path: *const c_void,
+                charecteristics: *const u32,
+                dll_name: *const c_void,
+                base_address: *mut *const c_void,
+            ) -> usize;
         }
         winsafe::OutputDebugString("LdrLoadDll");
         log::trace!("LdrLoadDll");
@@ -1184,7 +1189,7 @@ impl AsanRuntime {
                 Backtrace::new(),
             )));
         }
-        
+
         unsafe { memmove(dest, src, n) }
     }
 
