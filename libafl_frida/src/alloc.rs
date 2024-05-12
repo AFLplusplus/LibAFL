@@ -732,7 +732,7 @@ fn check_shadow() {
     assert!(allocator.check_shadow(allocation, 2));
     assert!(allocator.check_shadow(allocation, 3));
     assert!(allocator.check_shadow(allocation, 4));
-    assert!(allocator.check_shadow(allocation, 5))
+    assert!(allocator.check_shadow(allocation, 5));
     assert!(allocator.check_shadow(allocation, 6));
     assert!(allocator.check_shadow(allocation, 7));
     assert!(allocator.check_shadow(allocation, 8));
