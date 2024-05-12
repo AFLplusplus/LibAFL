@@ -297,7 +297,7 @@ pub fn immediate_value(operand: &Operand) -> Option<i64> {
         Operand::ImmediateU16(v) => Some(i64::from(*v)),
         Operand::ImmediateU32(v) => Some(i64::from(*v)),
         Operand::ImmediateI64(v) => Some(*v),
-        Operand::ImmediateU64(v) => Some(*v),
+        Operand::ImmediateU64(v) => Some(*v as i64),
         _ => None,
     }
 }
