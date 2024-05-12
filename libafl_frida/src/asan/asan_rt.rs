@@ -479,7 +479,8 @@ impl AsanRuntime {
         self.pc = None;
     }
 
-    /// Register the required hooks with the [`HookRuntime`]
+    // Register the required hooks
+    #[allow(clippy::too_many_lines)]
     pub fn register_hooks(&mut self, gum: &Gum) {
         let mut interceptor = Interceptor::obtain(gum);
 

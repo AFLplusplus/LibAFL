@@ -478,7 +478,7 @@ impl Allocator {
         }
 
         //fast path. most buffers are likely 8 byte aligned in size and address
-        if (address as usize) & 7 == 0 && size & 7 == 0 {
+        if (address as usize).trailing_zeros() >= 3 && size.trailing_zeros() >= 3 {
             return self.check_shadow_aligned(address, size);
         }
 
