@@ -207,7 +207,7 @@ pub(crate) fn frida_to_cs(
     frida_insn: &frida_gum_sys::Insn,
 ) -> Result<Instruction, Error> {
     match decoder.decode_slice(frida_insn.bytes()) {
-        Ok(result) => return Ok(result),
+        Ok(result) => Ok(result),
         Err(error) => {
             log::error!(
                 "{:?}: {:x}: {:?}",
@@ -215,11 +215,11 @@ pub(crate) fn frida_to_cs(
                 frida_insn.address(),
                 frida_insn.bytes()
             );
-            return Err(Error::illegal_state(
+            Err(Error::illegal_state(
                 "Instruction did not diassemble properly",
-            ));
+            ))
         }
-    };
+    }
 }
 
 #[cfg(target_arch = "aarch64")]
@@ -290,12 +290,12 @@ pub fn operand_details(operand: &Operand) -> Option<(X86Register, X86Register, u
 /// Get the immediate value of the operand
 pub fn immediate_value(operand: &Operand) -> Option<i64> {
     match operand {
-        Operand::ImmediateI8(v) => Some(*v as i64),
-        Operand::ImmediateU8(v) => Some(*v as i64),
-        Operand::ImmediateI16(v) => Some(*v as i64),
-        Operand::ImmediateI32(v) => Some(*v as i64),
-        Operand::ImmediateU16(v) => Some(*v as i64),
-        Operand::ImmediateU32(v) => Some(*v as i64),
+        Operand::ImmediateI8(v) => Some(i64::from(*v)),
+        Operand::ImmediateU8(v) => Some(i64::from(*v)),
+        Operand::ImmediateI16(v) => Some(i64::from(*v)),
+        Operand::ImmediateI32(v) => Some(i64::from(*v)),
+        Operand::ImmediateU16(v) => Some(i64::from(*v)),
+        Operand::ImmediateU32(v) => Some(i64::from(*v)),
         Operand::ImmediateI64(v) => Some(*v),
         Operand::ImmediateU64(v) => Some(*v as i64),
         _ => None,
