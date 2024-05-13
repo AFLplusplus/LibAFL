@@ -84,6 +84,6 @@ mmap-rs = "0.6.0"
 yaxpeax-arch = "0.2.7"
 
 [dev-dependencies]
-serial_test = { version = "2", default-features = false, features = ["logging"] }
+serial_test = { version = "3", default-features = false, features = ["logging"] }
 clap = {version = "4.5", features = ["derive"]}
 libloading = "0.7"
