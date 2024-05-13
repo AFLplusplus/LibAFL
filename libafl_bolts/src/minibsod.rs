@@ -9,9 +9,6 @@ use std::process::Command;
 
 #[cfg(unix)]
 use libc::siginfo_t;
-#[cfg(windows)]
-use windows::Win32::System::Diagnostics::Debug::{CONTEXT, EXCEPTION_POINTERS};
-
 #[cfg(target_vendor = "apple")]
 use mach::{
     message::mach_msg_type_number_t,
@@ -21,6 +18,8 @@ use mach::{
     vm_region::{vm_region_recurse_info_t, vm_region_submap_info_64},
     vm_types::{mach_vm_address_t, mach_vm_size_t, natural_t},
 };
+#[cfg(windows)]
+use windows::Win32::System::Diagnostics::Debug::{CONTEXT, EXCEPTION_POINTERS};
 
 #[cfg(unix)]
 use crate::os::unix_signals::{ucontext_t, Signal};
