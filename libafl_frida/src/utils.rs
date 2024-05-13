@@ -222,26 +222,6 @@ pub(crate) fn frida_to_cs(
     }
 }
 
-#[cfg(target_arch = "aarch64")]
-pub(crate) fn frida_to_cs(
-    decoder: InstDecoder,
-    frida_insn: &frida_gum_sys::Insn,
-) -> Result<Instruction, Error> {
-    let insn = disas_count(&decoder, frida_insn.bytes(), 4);
-
-    if insn.len() < 1 {
-        log::error!(
-            "Failed to disassemble: {:#x}: {:?}",
-            frida_insn.address(),
-            frida_insn.bytes()
-        );
-        return Err(Error::illegal_state(
-            "Instruction did not disassemble properly",
-        ));
-    }
-    return Ok(insn[0]);
-}
-
 #[cfg(target_arch = "x86_64")]
 /// Get the base, idx, scale, disp for each operand
 pub fn operand_details(operand: &Operand) -> Option<(X86Register, X86Register, u8, i32)> {
