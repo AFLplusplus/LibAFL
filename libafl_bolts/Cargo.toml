@@ -118,7 +118,7 @@ log = "0.4.20"
 pyo3 = { version = "0.18", optional = true, features = ["serde", "macros"] }
 
 # optional-dev deps (change when target.'cfg(accessible(::std))'.test-dependencies will be stable)
-serial_test = { version = "2", optional = true, default-features = false, features = ["logging"] }
+serial_test = { version = "3", optional = true, default-features = false, features = ["logging"] }
 
 # Document all features of this crate (for `cargo doc`)
 document-features = { version = "0.2", optional = true }
