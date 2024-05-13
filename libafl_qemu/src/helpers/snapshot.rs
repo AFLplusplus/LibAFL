@@ -28,8 +28,8 @@ use crate::{
     helpers::{QemuHelper, QemuHelperTuple, Range},
     hooks::{Hook, QemuHooks},
     qemu::SyscallHookResult,
-    Qemu, SYS_brk, SYS_fstat, SYS_fstatfs, SYS_futex, SYS_getrandom, SYS_mprotect, SYS_mremap, SYS_munmap,
-    SYS_pread64, SYS_read, SYS_readlinkat, SYS_statfs,
+    Qemu, SYS_brk, SYS_fstat, SYS_fstatfs, SYS_futex, SYS_getrandom, SYS_mprotect, SYS_mremap,
+    SYS_munmap, SYS_pread64, SYS_read, SYS_readlinkat, SYS_statfs,
 };
 
 // TODO use the functions provided by Qemu
