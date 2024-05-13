@@ -12,7 +12,6 @@ use std::{
     ptr::addr_of_mut,
 };
 
-use regex::Regex;
 use which::which;
 
 mod bindings;
@@ -77,18 +76,9 @@ pub fn build_with_bindings(
 
     let bind = bindings::generate(&build_result.build_dir, cpu_target, clang_args)
         .expect("Failed to generate the bindings");
-    let mut bind_buf: Vec<u8> = Vec::new();
-    bind.write(Box::new(&mut bind_buf))
-        .expect("Failed to write to the bindings buffer");
-    let bind_str = std::str::from_utf8(&bind_buf).expect("Could not convert bindings to UTF-8");
-
-    // """Fix""" the bindings here
-    let re =
-        Regex::new(r#"(Option\s*<\s*)unsafe(\s+extern\s+"C"\s+fn\s*\(\s*data\s*:\s*u64)"#).unwrap();
-    let replaced = re.replace_all(bind_str, "$1$2");
 
     // Write the final bindings
-    fs::write(bindings_file, replaced.as_bytes()).expect("Unable to write file");
+    fs::write(bindings_file, bind.to_string()).expect("Unable to write file");
 
     cargo_propagate_rpath();
 }

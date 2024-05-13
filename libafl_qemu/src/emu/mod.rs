@@ -650,8 +650,8 @@ where
     pub fn add_edge_hooks<T: Into<HookData>>(
         &self,
         data: T,
-        gen: Option<extern "C" fn(T, GuestAddr, GuestAddr) -> u64>,
-        exec: Option<extern "C" fn(T, u64)>,
+        gen: Option<unsafe extern "C" fn(T, GuestAddr, GuestAddr) -> u64>,
+        exec: Option<unsafe extern "C" fn(T, u64)>,
     ) -> EdgeHookId {
         self.qemu.add_edge_hooks(data, gen, exec)
     }
@@ -662,9 +662,9 @@ where
     pub fn add_block_hooks<T: Into<HookData>>(
         &self,
         data: T,
-        gen: Option<extern "C" fn(T, GuestAddr) -> u64>,
-        post_gen: Option<extern "C" fn(T, GuestAddr, GuestUsize)>,
-        exec: Option<extern "C" fn(T, u64)>,
+        gen: Option<unsafe extern "C" fn(T, GuestAddr) -> u64>,
+        post_gen: Option<unsafe extern "C" fn(T, GuestAddr, GuestUsize)>,
+        exec: Option<unsafe extern "C" fn(T, u64)>,
     ) -> BlockHookId {
         self.qemu.add_block_hooks(data, gen, post_gen, exec)
     }
@@ -675,12 +675,12 @@ where
     pub fn add_read_hooks<T: Into<HookData>>(
         &self,
         data: T,
-        gen: Option<extern "C" fn(T, GuestAddr, *mut TCGTemp, MemAccessInfo) -> u64>,
-        exec1: Option<extern "C" fn(T, u64, GuestAddr)>,
-        exec2: Option<extern "C" fn(T, u64, GuestAddr)>,
-        exec4: Option<extern "C" fn(T, u64, GuestAddr)>,
-        exec8: Option<extern "C" fn(T, u64, GuestAddr)>,
-        exec_n: Option<extern "C" fn(T, u64, GuestAddr, usize)>,
+        gen: Option<unsafe extern "C" fn(T, GuestAddr, *mut TCGTemp, MemAccessInfo) -> u64>,
+        exec1: Option<unsafe extern "C" fn(T, u64, GuestAddr)>,
+        exec2: Option<unsafe extern "C" fn(T, u64, GuestAddr)>,
+        exec4: Option<unsafe extern "C" fn(T, u64, GuestAddr)>,
+        exec8: Option<unsafe extern "C" fn(T, u64, GuestAddr)>,
+        exec_n: Option<unsafe extern "C" fn(T, u64, GuestAddr, usize)>,
     ) -> ReadHookId {
         self.qemu
             .add_read_hooks(data, gen, exec1, exec2, exec4, exec8, exec_n)
@@ -693,12 +693,12 @@ where
     pub fn add_write_hooks<T: Into<HookData>>(
         &self,
         data: T,
-        gen: Option<extern "C" fn(T, GuestAddr, *mut TCGTemp, MemAccessInfo) -> u64>,
-        exec1: Option<extern "C" fn(T, u64, GuestAddr)>,
-        exec2: Option<extern "C" fn(T, u64, GuestAddr)>,
-        exec4: Option<extern "C" fn(T, u64, GuestAddr)>,
-        exec8: Option<extern "C" fn(T, u64, GuestAddr)>,
-        exec_n: Option<extern "C" fn(T, u64, GuestAddr, usize)>,
+        gen: Option<unsafe extern "C" fn(T, GuestAddr, *mut TCGTemp, MemAccessInfo) -> u64>,
+        exec1: Option<unsafe extern "C" fn(T, u64, GuestAddr)>,
+        exec2: Option<unsafe extern "C" fn(T, u64, GuestAddr)>,
+        exec4: Option<unsafe extern "C" fn(T, u64, GuestAddr)>,
+        exec8: Option<unsafe extern "C" fn(T, u64, GuestAddr)>,
+        exec_n: Option<unsafe extern "C" fn(T, u64, GuestAddr, usize)>,
     ) -> WriteHookId {
         self.qemu
             .add_write_hooks(data, gen, exec1, exec2, exec4, exec8, exec_n)
@@ -710,11 +710,11 @@ where
     pub fn add_cmp_hooks<T: Into<HookData>>(
         &self,
         data: T,
-        gen: Option<extern "C" fn(T, GuestAddr, usize) -> u64>,
-        exec1: Option<extern "C" fn(T, u64, u8, u8)>,
-        exec2: Option<extern "C" fn(T, u64, u16, u16)>,
-        exec4: Option<extern "C" fn(T, u64, u32, u32)>,
-        exec8: Option<extern "C" fn(T, u64, u64, u64)>,
+        gen: Option<unsafe extern "C" fn(T, GuestAddr, usize) -> u64>,
+        exec1: Option<unsafe extern "C" fn(T, u64, u8, u8)>,
+        exec2: Option<unsafe extern "C" fn(T, u64, u16, u16)>,
+        exec4: Option<unsafe extern "C" fn(T, u64, u32, u32)>,
+        exec8: Option<unsafe extern "C" fn(T, u64, u64, u64)>,
     ) -> CmpHookId {
         self.qemu
             .add_cmp_hooks(data, gen, exec1, exec2, exec4, exec8)
