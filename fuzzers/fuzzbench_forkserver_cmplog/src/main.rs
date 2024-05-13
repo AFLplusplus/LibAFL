@@ -37,7 +37,7 @@ use libafl_bolts::{
     ownedref::OwnedRefMut,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, Merge, Referenceable},
+    tuples::{tuple_list, Handled, Merge},
     AsSliceMut,
 };
 use libafl_targets::{
@@ -355,7 +355,7 @@ fn fuzz(
         let cmpmap = unsafe { OwnedRefMut::from_shmem(&mut cmplog_shmem) };
 
         let cmplog_observer = AFLppCmpLogObserver::new("cmplog", cmpmap, true);
-        let cmplog_ref = cmplog_observer.reference();
+        let cmplog_ref = cmplog_observer.handle();
 
         let cmplog_executor = ForkserverExecutor::builder()
             .program(exec)

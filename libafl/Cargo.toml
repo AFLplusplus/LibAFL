@@ -61,6 +61,9 @@ handle_sigpipe = []
 ## Enables `TcpEventManager`, a simple EventManager proxying everything via TCP. This uses `tokio`.
 tcp_manager = ["tokio", "std"]
 
+## Enables compression for the TCP manager
+tcp_compression = ["tcp_manager", "libafl_bolts/gzip"]
+
 ## Enables the `NaiveTokenizer` and `StacktraceObserver`
 regex = ["std", "dep:regex"]
 

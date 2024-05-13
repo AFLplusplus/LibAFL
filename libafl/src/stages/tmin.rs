@@ -5,7 +5,7 @@ use core::{borrow::BorrowMut, fmt::Debug, hash::Hash, marker::PhantomData};
 
 use ahash::RandomState;
 use libafl_bolts::{
-    tuples::{MatchNameRef, Reference, Referenceable},
+    tuples::{Handle, Handled, MatchNameRef},
     HasLen, Named,
 };
 
@@ -13,7 +13,7 @@ use crate::{
     corpus::{Corpus, HasCurrentCorpusIdx, Testcase},
     events::EventFirer,
     executors::{Executor, ExitKind, HasObservers},
-    feedbacks::{Feedback, FeedbackFactory, HasObserverReference},
+    feedbacks::{Feedback, FeedbackFactory, HasObserverHandle},
     inputs::UsesInput,
     mark_feature_time,
     mutators::{MutationResult, Mutator},
@@ -353,7 +353,7 @@ where
 #[derive(Clone, Debug)]
 pub struct MapEqualityFeedback<C, M, S> {
     name: Cow<'static, str>,
-    map_ref: Reference<C>,
+    map_ref: Handle<C>,
     orig_hash: u64,
     phantom: PhantomData<(M, S)>,
 }
@@ -364,10 +364,10 @@ impl<C, M, S> Named for MapEqualityFeedback<C, M, S> {
     }
 }
 
-impl<C, M, S> HasObserverReference for MapEqualityFeedback<C, M, S> {
+impl<C, M, S> HasObserverHandle for MapEqualityFeedback<C, M, S> {
     type Observer = C;
 
-    fn observer_ref(&self) -> &Reference<Self::Observer> {
+    fn observer_handle(&self) -> &Handle<Self::Observer> {
         &self.map_ref
     }
 }
@@ -391,7 +391,7 @@ where
         OT: ObserversTuple<S>,
     {
         let obs = observers
-            .get(self.observer_ref())
+            .get(self.observer_handle())
             .expect("Should have been provided valid observer name.");
         Ok(obs.as_ref().hash_simple() == self.orig_hash)
     }
@@ -400,28 +400,28 @@ where
 /// A feedback factory for ensuring that the maps for minimized inputs are the same
 #[derive(Debug, Clone)]
 pub struct MapEqualityFactory<C, M, S> {
-    map_ref: Reference<C>,
+    map_ref: Handle<C>,
     phantom: PhantomData<(C, M, S)>,
 }
 
 impl<C, M, S> MapEqualityFactory<C, M, S>
 where
     M: MapObserver,
-    C: AsRef<M> + Referenceable,
+    C: AsRef<M> + Handled,
 {
     /// Creates a new map equality feedback for the given observer
     pub fn new(obs: &C) -> Self {
         Self {
-            map_ref: obs.reference(),
+            map_ref: obs.handle(),
             phantom: PhantomData,
         }
     }
 }
 
-impl<C, M, S> HasObserverReference for MapEqualityFactory<C, M, S> {
+impl<C, M, S> HasObserverHandle for MapEqualityFactory<C, M, S> {
     type Observer = C;
 
-    fn observer_ref(&self) -> &Reference<C> {
+    fn observer_handle(&self) -> &Handle<C> {
         &self.map_ref
     }
 }
@@ -430,17 +430,17 @@ impl<C, M, OT, S> FeedbackFactory<MapEqualityFeedback<C, M, S>, S, OT>
     for MapEqualityFactory<C, M, S>
 where
     M: MapObserver,
-    C: AsRef<M> + Referenceable,
+    C: AsRef<M> + Handled,
     OT: ObserversTuple<S>,
     S: State + Debug,
 {
     fn create_feedback(&self, observers: &OT) -> MapEqualityFeedback<C, M, S> {
         let obs = observers
-            .get(self.observer_ref())
+            .get(self.observer_handle())
             .expect("Should have been provided valid observer name.");
         MapEqualityFeedback {
             name: Cow::from("MapEq"),
-            map_ref: obs.reference(),
+            map_ref: obs.handle(),
             orig_hash: obs.as_ref().hash_simple(),
             phantom: PhantomData,
         }

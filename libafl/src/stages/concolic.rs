@@ -9,7 +9,7 @@ use alloc::{string::ToString, vec::Vec};
 use core::marker::PhantomData;
 
 use libafl_bolts::{
-    tuples::{MatchNameRef, Reference},
+    tuples::{Handle, MatchNameRef},
     Named,
 };
 
@@ -39,7 +39,7 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct ConcolicTracingStage<'a, EM, TE, Z> {
     inner: TracingStage<EM, TE, Z>,
-    obs_ref: Reference<ConcolicObserver<'a>>,
+    observer_handle: Handle<ConcolicObserver<'a>>,
 }
 
 impl<EM, TE, Z> UsesState for ConcolicTracingStage<'_, EM, TE, Z>
@@ -73,7 +73,7 @@ where
         manager: &mut EM,
     ) -> Result<(), Error> {
         self.inner.trace(fuzzer, state, manager)?;
-        if let Some(observer) = self.inner.executor().observers().get(&self.obs_ref) {
+        if let Some(observer) = self.inner.executor().observers().get(&self.observer_handle) {
             let metadata = observer.create_metadata_from_current_map();
             state
                 .current_testcase_mut()?
@@ -95,8 +95,14 @@ where
 impl<'a, EM, TE, Z> ConcolicTracingStage<'a, EM, TE, Z> {
     /// Creates a new default tracing stage using the given [`Executor`], observing traces from a
     /// [`ConcolicObserver`] with the given name.
-    pub fn new(inner: TracingStage<EM, TE, Z>, obs_ref: Reference<ConcolicObserver<'a>>) -> Self {
-        Self { inner, obs_ref }
+    pub fn new(
+        inner: TracingStage<EM, TE, Z>,
+        observer_handle: Handle<ConcolicObserver<'a>>,
+    ) -> Self {
+        Self {
+            inner,
+            observer_handle,
+        }
     }
 }
 

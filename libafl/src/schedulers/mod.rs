@@ -29,7 +29,7 @@ pub use weighted::{StdWeightedScheduler, WeightedScheduler};
 pub mod tuneable;
 use libafl_bolts::{
     rands::Rand,
-    tuples::{MatchNameRef, Reference},
+    tuples::{Handle, MatchNameRef},
 };
 pub use tuneable::*;
 
@@ -82,7 +82,7 @@ where
     fn set_last_hash(&mut self, value: usize);
 
     /// Get the observer map observer name
-    fn map_observer_ref(&self) -> &Reference<C>;
+    fn map_observer_handle(&self) -> &Handle<C>;
 
     /// Called when a [`Testcase`] is added to the corpus
     fn on_add_metadata(&self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
@@ -121,7 +121,7 @@ where
         OT: ObserversTuple<Self::State>,
     {
         let observer = observers
-            .get(self.map_observer_ref())
+            .get(self.map_observer_handle())
             .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
             .as_ref();
 

@@ -8,7 +8,7 @@ use pyo3::prelude::*;
 pub use strum_macros::EnumIter;
 pub use syscall_numbers::x86_64::*;
 
-use crate::{sync_exit::BackdoorArgs, CallingConvention};
+use crate::{sync_exit::ExitArgs, CallingConvention};
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
 #[repr(i32)]
@@ -33,19 +33,19 @@ pub enum Regs {
     Rflags = 17,
 }
 
-static BACKDOOR_ARCH_REGS: OnceLock<EnumMap<BackdoorArgs, Regs>> = OnceLock::new();
+static EXIT_ARCH_REGS: OnceLock<EnumMap<ExitArgs, Regs>> = OnceLock::new();
 
-pub fn get_backdoor_arch_regs() -> &'static EnumMap<BackdoorArgs, Regs> {
-    BACKDOOR_ARCH_REGS.get_or_init(|| {
+pub fn get_exit_arch_regs() -> &'static EnumMap<ExitArgs, Regs> {
+    EXIT_ARCH_REGS.get_or_init(|| {
         enum_map! {
-            BackdoorArgs::Ret  => Regs::Rax,
-            BackdoorArgs::Cmd  => Regs::Rax,
-            BackdoorArgs::Arg1 => Regs::Rdi,
-            BackdoorArgs::Arg2 => Regs::Rsi,
-            BackdoorArgs::Arg3 => Regs::Rdx,
-            BackdoorArgs::Arg4 => Regs::R10,
-            BackdoorArgs::Arg5 => Regs::R8,
-            BackdoorArgs::Arg6 => Regs::R9,
+            ExitArgs::Ret  => Regs::Rax,
+            ExitArgs::Cmd  => Regs::Rax,
+            ExitArgs::Arg1 => Regs::Rdi,
+            ExitArgs::Arg2 => Regs::Rsi,
+            ExitArgs::Arg3 => Regs::Rdx,
+            ExitArgs::Arg4 => Regs::R10,
+            ExitArgs::Arg5 => Regs::R8,
+            ExitArgs::Arg6 => Regs::R9,
         }
     })
 }

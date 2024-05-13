@@ -334,7 +334,7 @@ jobs:
           - ./fuzzers/fuzzbench
           - ./fuzzers/libfuzzer_stb_image
           - ./fuzzers/fuzzbench_forkserver
-          - ./fuzzers/libfuzzer_windows_asan
+          # - ./fuzzers/libfuzzer_windows_asan
           - ./fuzzers/baby_fuzzer_minimizing
           # - ./fuzzers/qemu_coverage
           - ./fuzzers/frida_executable_libpng

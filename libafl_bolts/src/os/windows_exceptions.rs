@@ -25,6 +25,9 @@ pub use windows::Win32::{
 
 use crate::Error;
 
+/// The special exit code when the target exited through ctrl-c
+pub const CTRL_C_EXIT: i32 = -1073741510;
+
 // For VEH
 const EXCEPTION_CONTINUE_EXECUTION: c_long = -1;
 
@@ -435,12 +438,14 @@ struct HandlerHolder {
     handler: UnsafeCell<*mut dyn Handler>,
 }
 
-pub const EXCEPTION_HANDLERS_SIZE: usize = 64;
+pub const EXCEPTION_HANDLERS_SIZE: usize = 96;
 
 unsafe impl Send for HandlerHolder {}
 
 /// Keep track of which handler is registered for which exception
 static mut EXCEPTION_HANDLERS: [Option<HandlerHolder>; EXCEPTION_HANDLERS_SIZE] = [
+    None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+    None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
     None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
     None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
     None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,

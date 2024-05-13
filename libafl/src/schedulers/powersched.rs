@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use core::{marker::PhantomData, time::Duration};
 
 use libafl_bolts::{
-    tuples::{Reference, Referenceable},
+    tuples::{Handle, Handled},
     Named,
 };
 use serde::{Deserialize, Serialize};
@@ -173,7 +173,7 @@ pub enum PowerSchedule {
 #[derive(Clone, Debug)]
 pub struct PowerQueueScheduler<C, O, S> {
     strat: PowerSchedule,
-    map_observer_ref: Reference<C>,
+    map_observer_handle: Handle<C>,
     last_hash: usize,
     phantom: PhantomData<(O, S)>,
 }
@@ -226,8 +226,8 @@ where
         self.last_hash = hash;
     }
 
-    fn map_observer_ref(&self) -> &Reference<C> {
-        &self.map_observer_ref
+    fn map_observer_handle(&self) -> &Handle<C> {
+        &self.map_observer_handle
     }
 }
 
@@ -305,7 +305,7 @@ where
         }
         PowerQueueScheduler {
             strat,
-            map_observer_ref: map_observer.reference(),
+            map_observer_handle: map_observer.handle(),
             last_hash: 0,
             phantom: PhantomData,
         }

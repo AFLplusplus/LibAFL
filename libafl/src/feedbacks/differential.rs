@@ -8,7 +8,7 @@ use core::{
 };
 
 use libafl_bolts::{
-    tuples::{MatchName, MatchNameRef, Reference, Referenceable},
+    tuples::{Handle, Handled, MatchName, MatchNameRef},
     Named,
 };
 use serde::{Deserialize, Serialize};
@@ -58,9 +58,9 @@ where
     /// This feedback's name
     name: Cow<'static, str>,
     /// The first observer to compare against
-    o1_ref: Reference<O1>,
+    o1_ref: Handle<O1>,
     /// The second observer to compare against
-    o2_ref: Reference<O2>,
+    o2_ref: Handle<O2>,
     /// The function used to compare the two observers
     compare_fn: F,
     phantomm: PhantomData<(I, S)>,
@@ -74,8 +74,8 @@ where
 {
     /// Create a new [`DiffFeedback`] using two observers and a test function.
     pub fn new(name: &'static str, o1: &O1, o2: &O2, compare_fn: F) -> Result<Self, Error> {
-        let o1_ref = o1.reference();
-        let o2_ref = o2.reference();
+        let o1_ref = o1.handle();
+        let o2_ref = o2.handle();
         if o1_ref.name() == o2_ref.name() {
             Err(Error::illegal_argument(format!(
                 "DiffFeedback: observer names must be different (both were {})",

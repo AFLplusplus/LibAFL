@@ -3,7 +3,7 @@ use core::{fmt::Debug, hash::Hash};
 
 use hashbrown::HashSet;
 use libafl_bolts::{
-    tuples::{MatchNameRef, Reference, Referenceable},
+    tuples::{Handle, Handled, MatchNameRef},
     Error, HasRefCnt, Named,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -73,7 +73,7 @@ pub struct ListFeedback<T>
 where
     T: Hash + Eq,
 {
-    obs_ref: Reference<ListObserver<T>>,
+    observer_handle: Handle<ListObserver<T>>,
     novelty: HashSet<T>,
 }
 
@@ -106,7 +106,7 @@ where
         OT: ObserversTuple<S>,
     {
         // TODO Replace with match_name_type when stable
-        let observer = observers.get(&self.obs_ref).unwrap();
+        let observer = observers.get(&self.observer_handle).unwrap();
         // TODO register the list content in a testcase metadata
         self.novelty.clear();
         // can't fail
@@ -151,7 +151,7 @@ where
 {
     #[inline]
     fn name(&self) -> &Cow<'static, str> {
-        self.obs_ref.name()
+        self.observer_handle.name()
     }
 }
 
@@ -163,7 +163,7 @@ where
     #[must_use]
     pub fn new(observer: &ListObserver<T>) -> Self {
         Self {
-            obs_ref: observer.reference(),
+            observer_handle: observer.handle(),
             novelty: HashSet::<T>::new(),
         }
     }

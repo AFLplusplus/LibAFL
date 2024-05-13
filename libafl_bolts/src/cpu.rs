@@ -9,7 +9,7 @@ use core::arch::asm;
     target_arch = "aarch64",
     target_arch = "arm",
     target_arch = "riscv64",
-    target_arsch = "riscv32"
+    target_arch = "riscv32"
 )))]
 use crate::current_nanos;
 

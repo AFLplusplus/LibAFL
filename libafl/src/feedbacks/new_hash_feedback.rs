@@ -5,7 +5,7 @@ use std::{fmt::Debug, marker::PhantomData};
 
 use hashbrown::HashSet;
 use libafl_bolts::{
-    tuples::{MatchNameRef, Reference, Referenceable},
+    tuples::{Handle, Handled, MatchNameRef},
     Named,
 };
 use serde::{Deserialize, Serialize};
@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     events::EventFirer,
     executors::ExitKind,
-    feedbacks::{Feedback, HasObserverReference},
+    feedbacks::{Feedback, HasObserverHandle},
     inputs::UsesInput,
     observers::{ObserverWithHashField, ObserversTuple},
     state::State,
@@ -82,7 +82,7 @@ impl HashSetState<u64> for NewHashFeedbackMetadata {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NewHashFeedback<O, S> {
     name: Cow<'static, str>,
-    o_ref: Reference<O>,
+    o_ref: Handle<O>,
     /// Initial capacity of hash set
     capacity: usize,
     phantom: PhantomData<S>,
@@ -145,11 +145,11 @@ impl<O, S> Named for NewHashFeedback<O, S> {
     }
 }
 
-impl<O, S> HasObserverReference for NewHashFeedback<O, S> {
+impl<O, S> HasObserverHandle for NewHashFeedback<O, S> {
     type Observer = O;
 
     #[inline]
-    fn observer_ref(&self) -> &Reference<O> {
+    fn observer_handle(&self) -> &Handle<O> {
         &self.o_ref
     }
 }
@@ -176,7 +176,7 @@ where
     pub fn with_capacity(observer: &O, capacity: usize) -> Self {
         Self {
             name: Cow::from(NEWHASHFEEDBACK_PREFIX.to_string() + observer.name()),
-            o_ref: observer.reference(),
+            o_ref: observer.handle(),
             capacity,
             phantom: PhantomData,
         }

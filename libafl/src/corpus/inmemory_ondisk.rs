@@ -435,9 +435,9 @@ where
                 OnDiskMetadataFormat::Json => serde_json::to_vec(&ondisk_meta)?,
                 OnDiskMetadataFormat::JsonPretty => serde_json::to_vec_pretty(&ondisk_meta)?,
                 #[cfg(feature = "gzip")]
-                OnDiskMetadataFormat::JsonGzip => GzipCompressor::new(0)
-                    .compress(&serde_json::to_vec_pretty(&ondisk_meta)?)?
-                    .unwrap(),
+                OnDiskMetadataFormat::JsonGzip => {
+                    GzipCompressor::new().compress(&serde_json::to_vec_pretty(&ondisk_meta)?)
+                }
             };
             tmpfile.write_all(&serialized)?;
             fs::rename(&tmpfile_path, &metafile_path)?;

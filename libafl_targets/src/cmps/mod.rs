@@ -283,7 +283,7 @@ impl Debug for AFLppCmpLogVals {
 
 impl AFLppCmpLogVals {
     #[must_use]
-    /// Reference comparison values as comparison operands
+    /// Handle comparison values as comparison operands
     pub fn operands(&self) -> &[[AFLppCmpLogOperands; CMPLOG_MAP_H]; CMPLOG_MAP_W] {
         unsafe { &self.operands }
     }
@@ -295,7 +295,7 @@ impl AFLppCmpLogVals {
     }
 
     #[must_use]
-    /// Reference comparison values as comparison function operands
+    /// Handle comparison values as comparison function operands
     pub fn fn_operands(
         &self,
     ) -> &[[AFLppCmpLogFnOperands; CMPLOG_MAP_RTN_EXTENDED_H]; CMPLOG_MAP_W] {
@@ -450,7 +450,7 @@ impl AFLppCmpLogMap {
     }
 
     #[must_use]
-    /// Reference the headers for the map
+    /// Handle the headers for the map
     pub fn headers(&self) -> &[AFLppCmpLogHeader] {
         &self.headers
     }
@@ -462,7 +462,7 @@ impl AFLppCmpLogMap {
     }
 
     #[must_use]
-    /// Reference the values for the map
+    /// Handle the values for the map
     pub fn values(&self) -> &AFLppCmpLogVals {
         &self.vals
     }

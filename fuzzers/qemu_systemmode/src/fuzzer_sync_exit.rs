@@ -5,8 +5,7 @@ use std::{env, path::PathBuf, process};
 
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
-    events::{launcher::Launcher, EventConfig, CTRL_C_EXIT},
-    executors::ExitKind,
+    events::{launcher::Launcher, EventConfig},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -31,8 +30,7 @@ use libafl_qemu::{
     edges::{edges_map_mut_ptr, QemuEdgeCoverageHelper, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND},
     emu::Emulator,
     executor::{stateful::StatefulQemuExecutor, QemuExecutorState},
-    EmuExitReasonError, FastSnapshotManager, HandlerError, HandlerResult, QemuHooks,
-    StdEmuExitHandler,
+    FastSnapshotManager, QemuHooks, StdEmulatorExitHandler,
 };
 
 // use libafl_qemu::QemuSnapshotBuilder; for normal qemu snapshot
@@ -56,8 +54,8 @@ pub fn fuzz() {
         let env: Vec<(String, String)> = env::vars().collect();
         // let emu_snapshot_manager = QemuSnapshotBuilder::new(true);
         let emu_snapshot_manager = FastSnapshotManager::new(false); // Create a snapshot manager (normal or fast for now).
-        let emu_exit_handler: StdEmuExitHandler<FastSnapshotManager> =
-            StdEmuExitHandler::new(emu_snapshot_manager); // Create an exit handler: it is the entity taking the decision of what should be done when QEMU returns.
+        let emu_exit_handler: StdEmulatorExitHandler<FastSnapshotManager> =
+            StdEmulatorExitHandler::new(emu_snapshot_manager); // Create an exit handler: it is the entity taking the decision of what should be done when QEMU returns.
         let emu = Emulator::new(&args, &env, emu_exit_handler).unwrap(); // Create the emulator
 
         let devices = emu.list_devices();
@@ -66,30 +64,10 @@ pub fn fuzz() {
         // The wrapped harness function, calling out to the LLVM-style harness
         let mut harness =
             |input: &BytesInput, qemu_executor_state: &mut QemuExecutorState<_, _>| unsafe {
-                match emu.run(input, qemu_executor_state) {
-                    Ok(handler_result) => match handler_result {
-                        HandlerResult::UnhandledExit(unhandled_exit) => {
-                            panic!("Unhandled exit: {}", unhandled_exit)
-                        }
-                        HandlerResult::EndOfRun(exit_kind) => exit_kind,
-                        HandlerResult::Interrupted => {
-                            println!("Interrupted.");
-                            std::process::exit(CTRL_C_EXIT);
-                        }
-                    },
-                    Err(handler_error) => match handler_error {
-                        HandlerError::QemuExitReasonError(emu_exit_reason_error) => {
-                            match emu_exit_reason_error {
-                                EmuExitReasonError::UnknownKind => panic!("unknown kind"),
-                                EmuExitReasonError::UnexpectedExit => ExitKind::Crash,
-                                _ => {
-                                    panic!("Emu Exit unhandled error: {:?}", emu_exit_reason_error)
-                                }
-                            }
-                        }
-                        _ => panic!("Unhandled error: {:?}", handler_error),
-                    },
-                }
+                emu.run(input, qemu_executor_state)
+                    .unwrap()
+                    .try_into()
+                    .unwrap()
             };
 
         // Create an observation channel using the coverage map

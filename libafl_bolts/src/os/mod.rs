@@ -9,6 +9,8 @@ pub mod unix_shmem_server;
 
 #[cfg(unix)]
 pub mod unix_signals;
+#[cfg(unix)]
+pub use unix_signals::CTRL_C_EXIT;
 
 #[cfg(all(unix, feature = "std"))]
 pub mod pipes;
@@ -28,9 +30,10 @@ use std::{fs::File, os::fd::AsRawFd, sync::OnceLock};
 #[cfg(all(windows, feature = "std"))]
 #[allow(missing_docs, overflowing_literals)]
 pub mod windows_exceptions;
-
 #[cfg(unix)]
 use libc::pid_t;
+#[cfg(all(windows, feature = "std"))]
+pub use windows_exceptions::CTRL_C_EXIT;
 
 /// A file that we keep open, pointing to /dev/null
 #[cfg(all(feature = "std", unix))]
