@@ -581,7 +581,7 @@ impl CommandExecutorBuilder {
 ///     Z: UsesState<State = EM::State>,
 ///     EM::State: UsesInput<Input = BytesInput> + HasExecutions,
 /// {
-///     MyExecutor.into_executor(None, None)
+///     MyExecutor.into_executor(())
 /// }
 /// ```
 
