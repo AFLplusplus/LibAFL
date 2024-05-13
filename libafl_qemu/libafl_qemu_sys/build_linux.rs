@@ -79,7 +79,7 @@ pub fn build() {
     let out_dir = env::var("OUT_DIR").unwrap();
     let out_dir = PathBuf::from(out_dir);
     let bindings_file = out_dir.join("bindings.rs");
-    
+
     let src_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let src_dir = PathBuf::from(src_dir);
     let stub_bindings_file = src_dir.join("src/x86_64_stub_bindings.rs");
