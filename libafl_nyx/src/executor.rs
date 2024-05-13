@@ -7,7 +7,7 @@ use std::{
 use libafl::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::HasTargetBytes,
-    observers::{ObserversTuple, UsesObservers},
+    observers::{ObserversTuple, StdErrObserver, StdOutObserver, UsesObservers},
     state::{HasExecutions, State, UsesState},
     Error,
 };
@@ -20,6 +20,10 @@ use crate::helper::NyxHelper;
 pub struct NyxExecutor<S, OT> {
     /// implement nyx function
     pub helper: NyxHelper,
+    /// stdout
+    stdout: Option<StdOutObserver>,
+    /// stderr
+    // stderr: Option<StdErrObserver>,
     /// observers
     observers: OT,
     /// phantom data to keep generic type <I,S>
@@ -110,14 +114,18 @@ where
             }
         };
 
-        if self.observers.observes_stdout() {
-            let mut stdout = Vec::new();
-            self.helper.nyx_stdout.rewind()?;
-            self.helper
-                .nyx_stdout
-                .read_to_end(&mut stdout)
-                .map_err(|e| Error::illegal_state(format!("Failed to read Nyx stdout: {e}")))?;
-            self.observers.observe_stdout(&stdout);
+        match self.stdout.as_mut() {
+            Some(ob) => {
+                let mut stdout = Vec::new();
+                self.helper.nyx_stdout.rewind()?;
+                self.helper
+                    .nyx_stdout
+                    .read_to_end(&mut stdout)
+                    .map_err(|e| Error::illegal_state(format!("Failed to read Nyx stdout: {e}")))?;
+
+                ob.observe_stdout(&stdout);
+            }
+            None => (),
         }
 
         Ok(exit_kind)
@@ -125,18 +133,46 @@ where
 }
 
 impl<S, OT> NyxExecutor<S, OT> {
-    pub fn new(helper: NyxHelper, observers: OT) -> Self {
-        Self {
-            helper,
-            observers,
-            phantom: PhantomData,
-        }
-    }
-
     /// convert `trace_bits` ptr into real trace map
     pub fn trace_bits(self) -> &'static mut [u8] {
         unsafe {
             std::slice::from_raw_parts_mut(self.helper.bitmap_buffer, self.helper.bitmap_size)
+        }
+    }
+}
+
+pub struct NyxExecutorBuilder {
+    stdout: Option<StdOutObserver>,
+    // stderr: Option<StdErrObserver>,
+}
+
+impl NyxExecutorBuilder {
+    pub fn new() -> Self {
+        Self {
+            stdout: None,
+            // stderr: None,
+        }
+    }
+
+    pub fn stdout(&mut self, stdout: StdOutObserver) -> &mut Self {
+        self.stdout = Some(stdout);
+        self
+    }
+
+    /*
+    pub fn stderr(&mut self, stderr: StdErrObserver) -> &mut Self {
+        self.stderr = Some(stderr);
+        self
+    }
+    */
+
+    pub fn build<S, OT>(&self, helper: NyxHelper, observers: OT) -> NyxExecutor<S, OT> {
+        NyxExecutor {
+            helper,
+            stdout: self.stdout.clone(),
+            // stderr: self.stderr.clone(),
+            observers,
+            phantom: PhantomData,
         }
     }
 }
