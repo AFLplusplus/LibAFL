@@ -14,7 +14,7 @@ use libafl::{
     Fuzzer, StdFuzzer,
 };
 use libafl_bolts::{rands::StdRand, tuples::tuple_list};
-use libafl_nyx::{executor::NyxExecutor, helper::NyxHelper, settings::NyxSettings};
+use libafl_nyx::{executor::NyxExecutorBuilder, helper::NyxHelper, settings::NyxSettings};
 
 fn main() {
     // nyx stuff
@@ -44,7 +44,7 @@ fn main() {
     let monitor = TuiMonitor::new(ui);
 
     let mut mgr = SimpleEventManager::new(monitor);
-    let mut executor = NyxExecutor::new(helper, tuple_list!(observer));
+    let mut executor = NyxExecutorBuilder::new().build(helper, tuple_list!(observer));
     let mutator = StdScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
