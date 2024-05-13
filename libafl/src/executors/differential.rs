@@ -155,29 +155,6 @@ where
         self.differential
             .post_exec_child_all(state, input, exit_kind)
     }
-
-    /// Returns true if a `stdout` observer was added to the list
-    #[inline]
-    fn observes_stdout(&self) -> bool {
-        self.primary.as_ref().observes_stdout() || self.secondary.as_ref().observes_stdout()
-    }
-    /// Returns true if a `stderr` observer was added to the list
-    #[inline]
-    fn observes_stderr(&self) -> bool {
-        self.primary.as_ref().observes_stderr() || self.secondary.as_ref().observes_stderr()
-    }
-
-    /// Runs `observe_stdout` for all stdout observers in the list
-    fn observe_stdout(&mut self, stdout: &[u8]) {
-        self.primary.as_mut().observe_stderr(stdout);
-        self.secondary.as_mut().observe_stderr(stdout);
-    }
-
-    /// Runs `observe_stderr` for all stderr observers in the list
-    fn observe_stderr(&mut self, stderr: &[u8]) {
-        self.primary.as_mut().observe_stderr(stderr);
-        self.secondary.as_mut().observe_stderr(stderr);
-    }
 }
 
 impl<A, B, DOT> MatchName for ProxyObserversTuple<A, B, DOT>

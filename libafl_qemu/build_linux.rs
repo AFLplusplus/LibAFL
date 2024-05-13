@@ -4,6 +4,8 @@ use std::{
     process::Command,
 };
 
+use libafl_qemu_build::maybe_generate_stub_bindings;
+
 #[allow(clippy::too_many_lines)]
 pub fn build() {
     // Note: Unique features are checked in libafl_qemu_sys
@@ -114,11 +116,11 @@ pub fn build() {
         .write_to_file(&runtime_bindings_file)
         .expect("Could not write bindings.");
 
-    libafl_qemu_build::store_generated_content_if_different(
+    maybe_generate_stub_bindings(
+        &cpu_target,
+        &emulation_mode,
         &stub_runtime_bindings_file,
-        fs::read(&runtime_bindings_file)
-            .expect("Could not read generated bindings file")
-            .as_slice(),
+        &runtime_bindings_file
     );
 
     if (emulation_mode == "usermode") && (qemu_asan || qemu_asan_guest) {

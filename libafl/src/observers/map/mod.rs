@@ -186,22 +186,6 @@ where
     ) -> Result<(), Error> {
         self.0.post_exec_child(state, input, exit_kind)
     }
-
-    fn observes_stdout(&self) -> bool {
-        self.0.observes_stdout()
-    }
-
-    fn observes_stderr(&self) -> bool {
-        self.0.observes_stderr()
-    }
-
-    fn observe_stdout(&mut self, stdout: &[u8]) {
-        self.0.observe_stdout(stdout);
-    }
-
-    fn observe_stderr(&mut self, stderr: &[u8]) {
-        self.0.observe_stderr(stderr);
-    }
 }
 
 impl<S, T, OTA, OTB, const ITH: bool, const NTH: bool> DifferentialObserver<OTA, OTB, S>
