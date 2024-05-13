@@ -3,13 +3,22 @@
 //! You may use the [`crate::os::unix_signals::ucontext`]
 //! function to get a [`ucontext_t`].
 
+#[cfg(target_vendor = "apple")]
+use core::mem::size_of;
 use std::io::{BufWriter, Write};
 #[cfg(any(target_os = "solaris", target_os = "illumos"))]
 use std::process::Command;
-#[cfg(target_vendor = "apple")]
-extern crate mach;
 
 use libc::siginfo_t;
+#[cfg(target_vendor = "apple")]
+use mach::{
+    message::mach_msg_type_number_t,
+    port::mach_port_t,
+    traps::mach_task_self,
+    vm::mach_vm_region_recurse,
+    vm_region::{vm_region_recurse_info_t, vm_region_submap_info_64},
+    vm_types::{mach_vm_address_t, mach_vm_size_t, natural_t},
+};
 
 use crate::os::unix_signals::{ucontext_t, Signal};
 
@@ -889,10 +898,6 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
 #[cfg(target_vendor = "apple")]
 #[allow(non_camel_case_types)]
 fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Error> {
-    use core::mem::size_of;
-
-    use mach::{message::*, port::*, traps::*, vm::*, vm_region::*, vm_types::*};
-
     let mut ptask = std::mem::MaybeUninit::<mach_port_t>::uninit();
     // We start by the lowest virtual address from the userland' standpoint
     let mut addr: mach_vm_address_t = 0;
