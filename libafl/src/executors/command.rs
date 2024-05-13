@@ -18,19 +18,21 @@ use std::{
 
 use libafl_bolts::{
     fs::{get_unique_std_input_file, InputFile},
+    tuples::{MatchName, RefIndexable},
     AsSlice,
 };
 
 #[cfg(all(feature = "std", unix))]
 use crate::executors::{Executor, ExitKind};
-#[cfg(feature = "std")]
-use crate::{inputs::Input, Error};
 use crate::{
+    executors::HasObservers,
     inputs::{HasTargetBytes, UsesInput},
-    observers::{StdErrObserver, StdOutObserver},
+    observers::{ObserversTuple, StdErrObserver, StdOutObserver, UsesObservers},
     state::{HasExecutions, State, UsesState},
     std::borrow::ToOwned,
 };
+#[cfg(feature = "std")]
+use crate::{inputs::Input, Error};
 
 /// How to deliver input to an external program
 /// `StdIn`: The target reads from stdin
@@ -61,8 +63,8 @@ pub struct StdCommandConfigurator {
     /// If set to true, the child output will remain visible
     /// By default, the child output is hidden to increase execution speed
     debug_child: bool,
-    has_stdout_observer: bool,
-    has_stderr_observer: bool,
+    stdout_observer: Option<StdOutObserver>,
+    stderr_observer: Option<StdErrObserver>,
     timeout: Duration,
     /// true: input gets delivered via stdink
     input_location: InputLocation,
@@ -74,6 +76,22 @@ impl<I> CommandConfigurator<I> for StdCommandConfigurator
 where
     I: HasTargetBytes,
 {
+    fn stdout_observer(&self) -> Option<&StdOutObserver> {
+        self.stdout_observer.as_ref()
+    }
+
+    fn stdout_observer_mut(&mut self) -> Option<&mut StdOutObserver> {
+        self.stdout_observer.as_mut()
+    }
+
+    fn stderr_observer(&self) -> Option<&StdErrObserver> {
+        self.stderr_observer.as_ref()
+    }
+
+    fn stderr_observer_mut(&mut self) -> Option<&mut StdErrObserver> {
+        self.stderr_observer.as_mut()
+    }
+
     fn spawn_child(&mut self, input: &I) -> Result<Child, Error> {
         match &mut self.input_location {
             InputLocation::Arg { argnum } => {
@@ -85,10 +103,10 @@ where
                     cmd.stderr(Stdio::null());
                 }
 
-                if self.has_stdout_observer {
+                if self.stdout_observer.is_some() {
                     cmd.stdout(Stdio::piped());
                 }
-                if self.has_stderr_observer {
+                if self.stderr_observer.is_some() {
                     cmd.stderr(Stdio::piped());
                 }
 
@@ -145,16 +163,15 @@ where
 /// A `CommandExecutor` is a wrapper around [`std::process::Command`] to execute a target as a child process.
 /// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] on it.
 /// Instead, you can use [`CommandExecutor::builder()`] to construct a [`CommandExecutor`] backed by a [`StdCommandConfigurator`].
-pub struct CommandExecutor<S, T> {
+pub struct CommandExecutor<OT, S, T> {
     /// The wrapped command configurer
     configurer: T,
     /// The observers used by this executor
-    stdout: Option<StdOutObserver>,
-    stderr: Option<StdErrObserver>,
+    observers: OT,
     phantom: PhantomData<S>,
 }
 
-impl CommandExecutor<(), ()> {
+impl CommandExecutor<(), (), ()> {
     /// Creates a builder for a new [`CommandExecutor`],
     /// backed by a [`StdCommandConfigurator`]
     /// This is usually the easiest way to construct a [`CommandExecutor`].
@@ -173,22 +190,23 @@ impl CommandExecutor<(), ()> {
     }
 }
 
-impl<S, T> Debug for CommandExecutor<S, T>
+impl<OT, S, T> Debug for CommandExecutor<OT, S, T>
 where
     T: Debug,
+    OT: Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("CommandExecutor")
             .field("inner", &self.configurer)
-            .field("stdout", &self.stdout)
-            .field("stderr", &self.stderr)
+            .field("observers", &self.observers)
             .finish()
     }
 }
 
-impl<S, T> CommandExecutor<S, T>
+impl<OT, S, T> CommandExecutor<OT, S, T>
 where
     T: Debug,
+    OT: Debug,
 {
     /// Accesses the inner value
     pub fn inner(&mut self) -> &mut T {
@@ -198,11 +216,12 @@ where
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
 #[cfg(all(feature = "std", unix))]
-impl<EM, S, T, Z> Executor<EM, Z> for CommandExecutor<S, T>
+impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<OT, S, T>
 where
     EM: UsesState<State = S>,
     S: State + HasExecutions,
     T: CommandConfigurator<S::Input>,
+    OT: Debug + MatchName + ObserversTuple<S>,
     Z: UsesState<State = S>,
 {
     fn run_target(
@@ -239,7 +258,7 @@ where
             }
         };
 
-        if let Some(ref mut ob) = &mut self.stdout {
+        if let Some(ref mut ob) = &mut self.configurer.stdout_observer_mut() {
             let mut stdout = Vec::new();
             child.stdout.as_mut().ok_or_else(|| {
                  Error::illegal_state(
@@ -248,7 +267,7 @@ where
              })?.read_to_end(&mut stdout)?;
             ob.observe_stdout(&stdout);
         }
-        if let Some(ref mut ob) = &mut self.stderr {
+        if let Some(ref mut ob) = &mut self.configurer.stderr_observer_mut() {
             let mut stderr = Vec::new();
             child.stderr.as_mut().ok_or_else(|| {
                  Error::illegal_state(
@@ -261,11 +280,34 @@ where
     }
 }
 
-impl<S, T> UsesState for CommandExecutor<S, T>
+impl<OT, S, T> UsesState for CommandExecutor<OT, S, T>
 where
     S: State,
 {
     type State = S;
+}
+
+impl<OT, S, T> UsesObservers for CommandExecutor<OT, S, T>
+where
+    OT: ObserversTuple<S>,
+    S: State,
+{
+    type Observers = OT;
+}
+
+impl<OT, S, T> HasObservers for CommandExecutor<OT, S, T>
+where
+    S: State,
+    T: Debug,
+    OT: ObserversTuple<S>,
+{
+    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
+        RefIndexable::from(&self.observers)
+    }
+
+    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
+        RefIndexable::from(&mut self.observers)
+    }
 }
 
 /// The builder for a default [`CommandExecutor`] that should fit most use-cases.
@@ -438,8 +480,12 @@ impl CommandExecutorBuilder {
     }
 
     /// Builds the `CommandExecutor`
-    pub fn build<S>(&self) -> Result<CommandExecutor<S, StdCommandConfigurator>, Error>
+    pub fn build<OT, S>(
+        &self,
+        observers: OT,
+    ) -> Result<CommandExecutor<OT, S, StdCommandConfigurator>, Error>
     where
+        OT: MatchName + ObserversTuple<S>,
         S: UsesInput,
         S::Input: Input + HasTargetBytes,
     {
@@ -472,31 +518,26 @@ impl CommandExecutorBuilder {
             command.stderr(Stdio::null());
         }
 
-        let mut has_stdout_observer = false;
         if self.stdout.is_some() {
             command.stdout(Stdio::piped());
-            has_stdout_observer = true;
         }
 
-        let mut has_stderr_observer = false;
         if self.stderr.is_some() {
             command.stderr(Stdio::piped());
-            has_stderr_observer = true;
         }
 
         let configurator = StdCommandConfigurator {
             debug_child: self.debug_child,
-            has_stdout_observer,
-            has_stderr_observer,
+            stdout_observer: self.stdout.clone(),
+            stderr_observer: self.stderr.clone(),
             input_location: self.input_location.clone(),
             timeout: self.timeout,
             command,
         };
         Ok(
-            <StdCommandConfigurator as CommandConfigurator<S::Input>>::into_executor::<S>(
+            <StdCommandConfigurator as CommandConfigurator<S::Input>>::into_executor::<OT, S>(
                 configurator,
-                self.stdout.clone(),
-                self.stderr.clone(),
+                observers,
             ),
         )
     }
@@ -540,12 +581,30 @@ impl CommandExecutorBuilder {
 ///     Z: UsesState<State = EM::State>,
 ///     EM::State: UsesInput<Input = BytesInput> + HasExecutions,
 /// {
-///     MyExecutor.into_executor(())
+///     MyExecutor.into_executor(None, None)
 /// }
 /// ```
 
 #[cfg(all(feature = "std", any(unix, doc)))]
 pub trait CommandConfigurator<I>: Sized {
+    /// Get the stdout
+    fn stdout_observer(&self) -> Option<&StdOutObserver> {
+        None
+    }
+    /// Get the mut stdout
+    fn stdout_observer_mut(&mut self) -> Option<&mut StdOutObserver> {
+        None
+    }
+
+    /// Get the stderr
+    fn stderr_observer(&self) -> Option<&StdErrObserver> {
+        None
+    }
+    /// Get the mut stderr
+    fn stderr_observer_mut(&mut self) -> Option<&mut StdErrObserver> {
+        None
+    }
+
     /// Spawns a new process with the given configuration.
     fn spawn_child(&mut self, input: &I) -> Result<Child, Error>;
 
@@ -553,15 +612,13 @@ pub trait CommandConfigurator<I>: Sized {
     fn exec_timeout(&self) -> Duration;
 
     /// Create an `Executor` from this `CommandConfigurator`.
-    fn into_executor<S>(
-        self,
-        stdout: Option<StdOutObserver>,
-        stderr: Option<StdErrObserver>,
-    ) -> CommandExecutor<S, Self> {
+    fn into_executor<OT, S>(self, observers: OT) -> CommandExecutor<OT, S, Self>
+    where
+        OT: MatchName,
+    {
         CommandExecutor {
-            stdout,
-            stderr,
             configurer: self,
+            observers,
             phantom: PhantomData,
         }
     }
@@ -593,7 +650,7 @@ mod tests {
         executor
             .program("ls")
             .input(InputLocation::Arg { argnum: 0 });
-        let executor = executor.build();
+        let executor = executor.build(());
         let mut executor = executor.unwrap();
 
         executor
