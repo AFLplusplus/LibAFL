@@ -216,7 +216,7 @@ pub(crate) fn frida_to_cs(
                 frida_insn.bytes()
             );
             Err(Error::illegal_state(
-                "Instruction did not diassemble properly",
+                "Instruction did not disassemble properly",
             ))
         }
     }
