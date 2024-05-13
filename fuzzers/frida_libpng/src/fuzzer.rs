@@ -52,8 +52,6 @@ static GLOBAL: MiMalloc = MiMalloc;
 pub fn main() {
     env_logger::init();
     color_backtrace::install();
-    log::info!("hello!");
-
     let options = parse_args();
 
     unsafe {
@@ -67,6 +65,8 @@ pub fn main() {
 /// The actual fuzzer
 #[allow(clippy::too_many_lines, clippy::too_many_arguments)]
 unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
+    log::info!("Frida fuzzer starting up.");
+
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let monitor = MultiMonitor::new(|s| println!("{s}"));
 
