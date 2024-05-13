@@ -155,7 +155,7 @@ pub fn generate(
         bindings
             .allowlist_type("CPUX86State")
             .allowlist_type("X86CPU")
-    } else if cpu_target == "arssssm" {
+    } else if cpu_target == "arm" {
         bindings
             .allowlist_type("ARMCPU")
             .allowlist_type("ARMv7MState")
