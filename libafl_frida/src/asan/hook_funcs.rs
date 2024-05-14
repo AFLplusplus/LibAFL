@@ -826,16 +826,24 @@ impl AsanRuntime {
         size: usize,
     ) -> *const c_void {
         extern "system" {
-            fn MapViewOfFile(handle: *const c_void, _desired_access: u32, _file_offset_high: u32, _file_offset_low: u32, size: usize) -> *const c_void;
+            fn MapViewOfFile(
+                handle: *const c_void,
+                _desired_access: u32,
+                _file_offset_high: u32,
+                _file_offset_low: u32,
+                size: usize,
+            ) -> *const c_void;
         }
-        
-        let ret = MapViewOfFile(
-            _handle,
-            _desired_access,
-            _file_offset_high,
-            _file_offset_low,
-            size,
-        );
+
+        let ret = unsafe {
+            MapViewOfFile(
+                _handle,
+                _desired_access,
+                _file_offset_high,
+                _file_offset_low,
+                size,
+            )
+        };
         self.unpoison(ret as usize, size);
         ret
     }
