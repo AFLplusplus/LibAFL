@@ -825,9 +825,11 @@ impl AsanRuntime {
         _file_offset_low: u32,
         size: usize,
     ) -> *const c_void {
-        let original: extern "C" fn(*const c_void, u32, u32, u32, usize) -> *const c_void =
-            unsafe { std::mem::transmute(self.hooks.get(&"MapViewOfFile".to_string()).unwrap().0) };
-        let ret = (original)(
+        extern "system" {
+            fn MapViewOfFile(handle: *const c_void, _desired_access: u32, _file_offset_high: u32, _file_offset_low: u32, size: usize) -> *const c_void;
+        }
+        
+        let ret = MapViewOfFile(
             _handle,
             _desired_access,
             _file_offset_high,

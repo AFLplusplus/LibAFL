@@ -619,8 +619,6 @@ impl Allocator {
             },
         );
 
-        log::trace!("userspace max: {:#x}", userspace_max);
-
         #[cfg(unix)]
         let mut maxbit = 63;
         #[cfg(windows)]
