@@ -64,7 +64,7 @@ pub trait FridaRuntimeTuple: MatchFirstType + Debug {
         ranges: &RangeMap<usize, (u16, String)>,
         module_map: &Rc<ModuleMap>,
     );
-    
+
     /// Deinitialization
     fn deinit_all(&mut self, gum: &Gum);
 
@@ -83,7 +83,7 @@ impl FridaRuntimeTuple for () {
         _module_map: &Rc<ModuleMap>,
     ) {
     }
-    fn deinit_all(&mut self, _gum: &Gum){}
+    fn deinit_all(&mut self, _gum: &Gum) {}
 
     fn pre_exec_all<I: Input + HasTargetBytes>(&mut self, _input: &I) -> Result<(), Error> {
         Ok(())
@@ -325,7 +325,6 @@ impl FridaInstrumentationHelperBuilder {
             disable_excludes,
         }
     }
-
 }
 
 impl Debug for FridaInstrumentationHelperBuilder {

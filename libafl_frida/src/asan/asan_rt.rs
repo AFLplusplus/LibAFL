@@ -161,7 +161,6 @@ impl FridaRuntime for AsanRuntime {
 
         AsanErrors::get_mut_blocking().set_continue_on_error(self.continue_on_error);
 
-
         self.module_map = Some(module_map.clone());
         self.suppressed_addresses
             .extend(self.skip_ranges.iter().map(|skip| match skip {
@@ -172,7 +171,6 @@ impl FridaRuntime for AsanRuntime {
                     lib_start + range.start
                 }
             }));
-        
 
         self.register_hooks(gum);
         self.generate_instrumentation_blobs();
@@ -471,8 +469,6 @@ impl AsanRuntime {
         self.pc = None;
     }
 
-
-
     /// Register the required hooks
     #[allow(clippy::too_many_lines)]
     pub fn register_hooks(&mut self, gum: &Gum) {
@@ -483,7 +479,7 @@ impl AsanRuntime {
                     log::trace!("Hooking {}", stringify!($name));
 
                     let target_function = frida_gum::Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function");
-                    
+
                     extern "system" { fn $name($($param: $param_type),*) -> $return_type; }
 
                     #[allow(non_snake_case)]
@@ -1148,16 +1144,15 @@ impl AsanRuntime {
             (s: *mut c_void, c: *const c_void, n: usize),
             ()
         );
-
     }
 
     /// Deregister all the hooks
     fn deregister_hooks(&mut self, gum: &Gum) {
-        /*This is terrible code and should be replaced as soon as possible. 
-        
-        This is basically a bandaid solution that happens to work because 2 different Interceptor::obtains will return the same interceptor. 
-        
-        Ideally the interceptor should be stored in AsanRuntime, but because FridaRuntime has a 'sttaic bound it becomes difficult to introduce that. 
+        /*This is terrible code and should be replaced as soon as possible.
+
+        This is basically a bandaid solution that happens to work because 2 different Interceptor::obtains will return the same interceptor.
+
+        Ideally the interceptor should be stored in AsanRuntime, but because FridaRuntime has a 'sttaic bound it becomes difficult to introduce that.
         */
         let mut interceptor = Interceptor::obtain(gum);
         for hook in &self.hooks {

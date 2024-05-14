@@ -574,7 +574,5 @@ mod tests {
         ];
         let options: FuzzerOptions = FuzzerOptions::try_parse_from(simulated_args).unwrap();
         unsafe { test_asan(&options) }
-
-
     }
 }
