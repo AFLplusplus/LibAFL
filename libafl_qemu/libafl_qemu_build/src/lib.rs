@@ -245,7 +245,7 @@ fn include_path(build_dir: &Path, path: &str) -> String {
     }
 }
 
-/// If fresh_content != content_file_to_update (the file is read directly if content_file_to_update is None), update the file. prefix is not considered for comparison.
+/// If `fresh_content` != `content_file_to_update` (the file is read directly if `content_file_to_update` is None), update the file. prefix is not considered for comparison.
 /// If a prefix is given, it will be added as the first line of the file.
 pub fn store_generated_content_if_different(
     file_to_update: &PathBuf,
@@ -294,7 +294,7 @@ pub fn store_generated_content_if_different(
 
     if must_rewrite_file {
         if let Some(prefix) = first_line_prefix {
-            writeln!(&file_to_check, "{}", prefix).expect("Could not write prefix");
+            writeln!(&file_to_check, "{prefix}").expect("Could not write prefix");
         }
 
         file_to_check
@@ -312,7 +312,7 @@ pub fn maybe_generate_stub_bindings(
     if cpu_target == "x86_64" && emulation_mode == "usermode" {
         let current_rustc_version =
             rustc_version::version().expect("Could not get current rustc version");
-        let semver_re = Regex::new(r#"/\* (.*) \*/"#).unwrap();
+        let semver_re = Regex::new(r"/\* (.*) \*/").unwrap();
 
         // We only try to store the stub if the current rustc version is strictly bigger than the one used to generate
         // the versioned stub.
@@ -365,7 +365,7 @@ pub fn maybe_generate_stub_bindings(
                 (true, true, None)
             };
 
-        let header = format!("/* {} */", current_rustc_version);
+        let header = format!("/* {current_rustc_version} */");
 
         if try_generate {
             store_generated_content_if_different(
