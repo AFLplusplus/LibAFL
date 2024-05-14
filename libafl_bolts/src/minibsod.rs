@@ -1,7 +1,5 @@
 //! Implements a mini-bsod generator.
 //! It dumps all important registers and prints a stacktrace.
-//! You may use the [`crate::os::unix_signals::ucontext`]
-//! function to get a [`ucontext_t`].
 
 #[cfg(target_vendor = "apple")]
 use core::mem::size_of;
@@ -9,6 +7,7 @@ use std::io::{BufWriter, Write};
 #[cfg(any(target_os = "solaris", target_os = "illumos"))]
 use std::process::Command;
 
+#[cfg(unix)]
 use libc::siginfo_t;
 #[cfg(target_vendor = "apple")]
 use mach::{
@@ -19,7 +18,10 @@ use mach::{
     vm_region::{vm_region_recurse_info_t, vm_region_submap_info_64},
     vm_types::{mach_vm_address_t, mach_vm_size_t, natural_t},
 };
+#[cfg(windows)]
+use windows::Win32::System::Diagnostics::Debug::{CONTEXT, EXCEPTION_POINTERS};
 
+#[cfg(unix)]
 use crate::os::unix_signals::{ucontext_t, Signal};
 
 /// Write the content of all important registers
@@ -391,7 +393,7 @@ pub fn dump_registers<W: Write>(
     write!(writer, "cs : {:#016x}, ", ucontext.sc_cs)?;
     Ok(())
 }
-///
+
 /// Write the content of all important registers
 #[cfg(all(target_os = "openbsd", target_arch = "aarch64"))]
 #[allow(clippy::similar_names)]
@@ -452,6 +454,34 @@ pub fn dump_registers<W: Write>(
 }
 
 /// Write the content of all important registers
+#[cfg(windows)]
+#[allow(clippy::similar_names)]
+pub fn dump_registers<W: Write>(
+    writer: &mut BufWriter<W>,
+    context: &CONTEXT,
+) -> Result<(), std::io::Error> {
+    write!(writer, "r8 : {:#016x}, ", context.R8)?;
+    write!(writer, "r9 : {:#016x}, ", context.R9)?;
+    write!(writer, "r10: {:#016x}, ", context.R10)?;
+    writeln!(writer, "r11: {:#016x}, ", context.R11)?;
+    write!(writer, "r12: {:#016x}, ", context.R12)?;
+    write!(writer, "r13: {:#016x}, ", context.R13)?;
+    write!(writer, "r14: {:#016x}, ", context.R14)?;
+    writeln!(writer, "r15: {:#016x}, ", context.R15)?;
+    write!(writer, "rdi: {:#016x}, ", context.Rdi)?;
+    write!(writer, "rsi: {:#016x}, ", context.Rsi)?;
+    write!(writer, "rbp: {:#016x}, ", context.Rbp)?;
+    writeln!(writer, "rbx: {:#016x}, ", context.Rbx)?;
+    write!(writer, "rdx: {:#016x}, ", context.Rdx)?;
+    write!(writer, "rax: {:#016x}, ", context.Rax)?;
+    write!(writer, "rcx: {:#016x}, ", context.Rcx)?;
+    writeln!(writer, "rsp: {:#016x}, ", context.Rsp)?;
+    write!(writer, "rip: {:#016x}, ", context.Rip)?;
+    writeln!(writer, "efl: {:#016x}, ", context.EFlags)?;
+
+    Ok(())
+}
+
 #[cfg(all(target_os = "haiku", target_arch = "x86_64"))]
 #[allow(clippy::similar_names)]
 pub fn dump_registers<W: Write>(
@@ -489,6 +519,7 @@ pub fn dump_registers<W: Write>(
     target_os = "dragonfly",
     target_os = "netbsd",
     target_os = "openbsd",
+    windows,
     target_os = "haiku",
     any(target_os = "solaris", target_os = "illumos"),
 )))]
@@ -751,6 +782,7 @@ fn write_crash<W: Write>(
     target_os = "dragonfly",
     target_os = "openbsd",
     target_os = "netbsd",
+    windows,
     target_os = "haiku",
     any(target_os = "solaris", target_os = "illumos"),
 )))]
@@ -761,6 +793,33 @@ fn write_crash<W: Write>(
 ) -> Result<(), std::io::Error> {
     // TODO add fault addr for other platforms.
     writeln!(writer, "Received signal {signal}")?;
+
+    Ok(())
+}
+
+#[cfg(windows)]
+fn write_crash<W: Write>(
+    writer: &mut BufWriter<W>,
+    exception_pointers: *mut EXCEPTION_POINTERS,
+) -> Result<(), std::io::Error> {
+    // TODO add fault addr for other platforms.
+    unsafe {
+        writeln!(
+            writer,
+            "Received exception {:0x} at address {:x}",
+            (*exception_pointers)
+                .ExceptionRecord
+                .as_mut()
+                .unwrap()
+                .ExceptionCode
+                .0,
+            (*exception_pointers)
+                .ExceptionRecord
+                .as_mut()
+                .unwrap()
+                .ExceptionAddress as usize
+        )
+    }?;
 
     Ok(())
 }
@@ -1023,6 +1082,30 @@ pub fn generate_minibsod<W: Write>(
     write_minibsod(writer)
 }
 
+/// Generates a mini-BSOD given an `EXCEPTION_POINTERS` structure.
+#[cfg(windows)]
+#[allow(
+    clippy::non_ascii_literal,
+    clippy::too_many_lines,
+    clippy::not_unsafe_ptr_arg_deref
+)]
+pub fn generate_minibsod<W: Write>(
+    writer: &mut BufWriter<W>,
+    exception_pointers: *mut EXCEPTION_POINTERS,
+) -> Result<(), std::io::Error> {
+    writeln!(writer, "{:━^100}", " CRASH ")?;
+    write_crash(writer, exception_pointers)?;
+    writeln!(writer, "{:━^100}", " REGISTERS ")?;
+    dump_registers(writer, unsafe {
+        (*exception_pointers).ContextRecord.as_mut().unwrap()
+    })?;
+    writeln!(writer, "{:━^100}", " BACKTRACE ")?;
+    writeln!(writer, "{:?}", backtrace::Backtrace::new())?;
+    writeln!(writer, "{:━^100}", " MAPS ")?;
+    write_minibsod(writer)
+}
+
+#[cfg(unix)]
 #[cfg(test)]
 mod tests {
 
