@@ -551,17 +551,22 @@ impl Allocator {
 
     /// Unpoison all the memory that is currently mapped with read/write permissions.
     pub fn unpoison_all_existing_memory(&mut self) {
+
         RangeDetails::enumerate_with_prot(
             PageProtection::Read,
             &mut |range: &RangeDetails| -> bool {
                 let start = range.memory_range().base_address().0 as usize;
                 let end = start + range.memory_range().size();
-
+                //the poisoned region should be the highest valid userspace region
                 if !self.is_managed(start as *mut c_void) {
+                    log::trace!("Unpoisoning: {:#x}-{:#x}", start,end);
                     self.map_shadow_for_region(start, end, true);
+                    true
+                } else {
+                    false
                 }
 
-                true
+                
             },
         );
     }
@@ -587,6 +592,13 @@ impl Allocator {
             &mut |range: &RangeDetails| -> bool {
                 let start = range.memory_range().base_address().0 as usize;
                 let end = start + range.memory_range().size();
+                log::trace!("New range: {:#x}-{:#x}", start,end);
+
+                #[cfg(target_vendor = "apple")]
+                if start >= 0x600000000000 { //this is the MALLOC_NANO region. There is no point in poisoning this as we replace malloc.
+                    return false;
+                }
+
                 occupied_ranges.push((start, end));
                 // On x64, if end > 2**48, then that's in vsyscall or something.
                 #[cfg(all(unix, target_arch = "x86_64"))]
@@ -599,6 +611,7 @@ impl Allocator {
                 //     userspace_max = end;
                 // }
 
+
                 // On aarch64, if end > 2**52, then range is not in userspace
                 #[cfg(target_arch = "aarch64")]
                 if end <= 2_usize.pow(52) && end > userspace_max {
@@ -609,20 +622,24 @@ impl Allocator {
             },
         );
 
+        log::trace!("userspace max: {:#x}", userspace_max);
+
         #[cfg(unix)]
         let mut maxbit = 63;
         #[cfg(windows)]
         let maxbit = 63;
         #[cfg(unix)]
-        for power in 1..64 {
+        for power in 44..64 {
             if 2_usize.pow(power) > userspace_max {
                 maxbit = power;
                 break;
             }
         }
 
+        log::trace!("max bit: {}", maxbit);
+
         {
-            for try_shadow_bit in 44..maxbit {
+            for try_shadow_bit in 44..maxbit+1 {
                 let addr: usize = 1 << try_shadow_bit;
                 let shadow_start = addr;
                 let shadow_end = addr + addr + addr;
