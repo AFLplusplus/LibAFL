@@ -129,10 +129,7 @@ pub struct AsanRuntime {
     suppressed_addresses: Vec<usize>,
     skip_ranges: Vec<SkipRange>,
     continue_on_error: bool,
-    pub(crate) hooks: HashMap<String, NativePointer>,
-    pub(crate) hooks_enabled: bool,
     pc: Option<usize>,
-
     #[cfg(target_arch = "aarch64")]
     eh_frame: [u32; ASAN_EH_FRAME_DWORD_COUNT],
 }
@@ -163,11 +160,6 @@ impl FridaRuntime for AsanRuntime {
 
         AsanErrors::get_mut_blocking().set_continue_on_error(self.continue_on_error);
 
-        self.register_hooks(gum);
-
-        self.generate_instrumentation_blobs();
-
-        self.unpoison_all_existing_memory();
 
         self.module_map = Some(module_map.clone());
         self.suppressed_addresses
@@ -179,6 +171,11 @@ impl FridaRuntime for AsanRuntime {
                     lib_start + range.start
                 }
             }));
+        
+
+        self.register_hooks(gum);
+        self.generate_instrumentation_blobs();
+        self.unpoison_all_existing_memory();
 
         self.register_thread();
     }
@@ -190,7 +187,6 @@ impl FridaRuntime for AsanRuntime {
         let slice = target_bytes.as_slice();
 
         self.unpoison(slice.as_ptr() as usize, slice.len());
-        self.enable_hooks();
         Ok(())
     }
 
@@ -198,7 +194,6 @@ impl FridaRuntime for AsanRuntime {
         &mut self,
         input: &I,
     ) -> Result<(), libafl::Error> {
-        self.disable_hooks();
         if self.check_for_leaks_enabled {
             self.check_for_leaks();
         }
@@ -294,15 +289,6 @@ impl AsanRuntime {
     #[allow(clippy::unused_self)]
     pub fn unpoison_all_existing_memory(&mut self) {
         self.allocator.unpoison_all_existing_memory();
-    }
-
-    /// Enable all function hooks
-    pub fn enable_hooks(&mut self) {
-        self.hooks_enabled = true;
-    }
-    /// Disable all function hooks
-    pub fn disable_hooks(&mut self) {
-        self.hooks_enabled = false;
     }
 
     /// Register the current thread with the runtime, implementing shadow memory for its stack and
@@ -483,40 +469,36 @@ impl AsanRuntime {
     #[allow(clippy::too_many_lines)]
     pub fn register_hooks(&mut self, gum: &Gum) {
         let mut interceptor = Interceptor::obtain(gum);
-
         macro_rules! hook_func {
             ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
                     log::trace!("Hooking {}", stringify!($name));
 
                     let target_function = frida_gum::Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function");
-                    self.hooks.insert(stringify!($name).to_string(), target_function);
+                    
+                    extern "system" { fn $name($($param: $param_type),*) -> $return_type; }
 
                     #[allow(non_snake_case)]
                     unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
-                        // let real_address = this.real_address_for_stalked(invocation.return_addr());
-                        if this.hooks_enabled {
-                            let previous_hook_state = this.hooks_enabled;
-                            this.hooks_enabled = false;
-                            let ret = this.[<hook_ $name>]($($param),*);
-                            this.hooks_enabled = previous_hook_state;
-                            ret
+                        //is this necessary? The stalked return address will always be the real return address
+                        let real_address = this.real_address_for_stalked(invocation.return_addr());
+                        if !this.suppressed_addresses.contains(&real_address) && this.module_map.as_ref().unwrap().find(real_address as u64).is_some() {
+                            this.[<hook_ $name>]($($param),*)
                         } else {
-                            let original = std::mem::transmute::<*const c_void, extern "C" fn($($param: $param_type),*) -> $return_type>(this.hooks.get(&stringify!($name).to_string()).unwrap().0);
-                            let previous_hook_state = this.hooks_enabled;
-                            this.hooks_enabled = false;
-                            let ret = (original)($($param),*);
-                            this.hooks_enabled = previous_hook_state;
-                            ret
+                            $name($($param),*)
                         }
                     }
+
+                    let self_ptr = core::ptr::from_ref(self) as usize;
                     let _ = interceptor.replace(
                         target_function,
                         NativePointer([<replacement_ $name>] as *mut c_void),
-                        NativePointer(core::ptr::from_mut(self) as *mut c_void)
+                        NativePointer(self_ptr as *mut c_void)
                     );
+
+
                 }
             }
         }
@@ -526,31 +508,26 @@ impl AsanRuntime {
                 paste::paste! {
                     log::trace!("Hooking {}", stringify!($name));
                     let target_function = frida_gum::Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function");
-                    self.hooks.insert(stringify!($name).to_string(), target_function);
+                    extern "system" { fn $name($($param: $param_type),*) -> $return_type; }
+
 
                     #[allow(non_snake_case)]
                     unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
-                        if this.hooks_enabled && this.[<hook_check_ $name>]($($param),*) {
-                            let previous_hook_state = this.hooks_enabled;
-                            this.hooks_enabled = false;
-                            let ret = this.[<hook_ $name>]($($param),*);
-                            this.hooks_enabled = previous_hook_state;
-                            ret
+                        if this.[<hook_check_ $name>]($($param),*) {
+                            this.[<hook_ $name>]($($param),*)
                         } else {
-                            let original = std::mem::transmute::<*const c_void, extern "C" fn($($param: $param_type),*) -> $return_type>(this.hooks.get(&stringify!($name).to_string()).unwrap().0);
-                            let previous_hook_state = this.hooks_enabled;
-                            this.hooks_enabled = false;
-                            let ret = (original)($($param),*);
-                            this.hooks_enabled = previous_hook_state;
-                            ret
+                            $name($($param),*)
                         }
+
                     }
+
+                    let self_ptr = core::ptr::from_ref(self) as usize;
                     let _ = interceptor.replace(
                         target_function,
                         NativePointer([<replacement_ $name>] as *mut c_void),
-                        NativePointer(core::ptr::from_mut(self) as *mut c_void)
+                        NativePointer(self_ptr as *mut c_void)
                     );
                 }
             }
@@ -1162,13 +1139,13 @@ impl AsanRuntime {
             (s: *mut c_void, c: *const c_void, n: usize),
             ()
         );
+
     }
 
     #[cfg(target_arch = "x86_64")]
     #[allow(clippy::cast_sign_loss)]
     #[allow(clippy::too_many_lines)]
     extern "system" fn handle_trap(&mut self) {
-        self.hooks_enabled = false;
         self.dump_registers();
 
         let fault_address = self.regs[17];
@@ -2607,8 +2584,6 @@ impl Default for AsanRuntime {
             suppressed_addresses: Vec::new(),
             skip_ranges: Vec::new(),
             continue_on_error: false,
-            hooks: HashMap::new(),
-            hooks_enabled: false,
             #[cfg(target_arch = "aarch64")]
             eh_frame: [0; ASAN_EH_FRAME_DWORD_COUNT],
             pc: None,
