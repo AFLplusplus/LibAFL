@@ -200,10 +200,11 @@ fn main() {
         }
     }
 
+    let target_family = std::env::var("CARGO_CFG_TARGET_FAMILY").unwrap();
+
     #[cfg(feature = "forkserver")]
     {
-        #[cfg(unix)]
-        {
+        if target_family == "unix" {
             println!("cargo:rerun-if-changed=src/forkserver.c");
 
             cc::Build::new()
@@ -212,8 +213,8 @@ fn main() {
         }
     }
 
-    #[cfg(all(feature = "windows_asan", windows))]
-    {
+    #[cfg(feature = "windows_asan")]
+    if target_family == "windows" {
         println!("cargo:rerun-if-changed=src/windows_asan.c");
 
         cc::Build::new()

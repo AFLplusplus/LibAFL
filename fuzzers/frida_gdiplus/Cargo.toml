@@ -24,12 +24,15 @@ tar = "0.4.37"
 reqwest = { version = "0.11.4", features = ["blocking"] }
 
 [dependencies]
-libafl = { path = "../../libafl/", features = [ "std", "llmp_compression", "llmp_bind_public", "frida_cli" ] } #,  "llmp_small_maps", "llmp_debug"]}
+libafl = { path = "../../libafl/", features = [ "std", "llmp_compression",
+    "llmp_bind_public", "frida_cli", "errors_backtrace" ] } #,  "llmp_small_maps", "llmp_debug"]}
 libafl_bolts = { path = "../../libafl_bolts/" }
 frida-gum = { version = "0.13.6", features = [ "auto-download", "event-sink", "invocation-listener"] }
 libafl_frida = { path = "../../libafl_frida", features = ["cmplog"] }
 libafl_targets = { path = "../../libafl_targets", features = ["sancov_cmplog"] }
 libloading = "0.7"
 mimalloc = { version = "*", default-features = false }
+dlmalloc ={version = "0.2.6", features = ["global"]}
 color-backtrace = "0.5"
+env_logger = "0.10.0"
 iced-x86 = { version = "1.20.0", features = ["code_asm"] }
