@@ -130,6 +130,7 @@ pub struct AsanRuntime {
     skip_ranges: Vec<SkipRange>,
     continue_on_error: bool,
     pc: Option<usize>,
+    hooks: Vec<NativePointer>,
     #[cfg(target_arch = "aarch64")]
     eh_frame: [u32; ASAN_EH_FRAME_DWORD_COUNT],
 }
@@ -179,6 +180,11 @@ impl FridaRuntime for AsanRuntime {
 
         self.register_thread();
     }
+
+    fn deinit(&mut self, gum: &Gum) {
+        self.deregister_hooks(gum);
+    }
+
     fn pre_exec<I: libafl::inputs::Input + libafl::inputs::HasTargetBytes>(
         &mut self,
         input: &I,
@@ -465,6 +471,8 @@ impl AsanRuntime {
         self.pc = None;
     }
 
+
+
     /// Register the required hooks
     #[allow(clippy::too_many_lines)]
     pub fn register_hooks(&mut self, gum: &Gum) {
@@ -498,7 +506,7 @@ impl AsanRuntime {
                         NativePointer(self_ptr as *mut c_void)
                     );
 
-
+                    self.hooks.push(target_function);
                 }
             }
         }
@@ -529,6 +537,7 @@ impl AsanRuntime {
                         NativePointer([<replacement_ $name>] as *mut c_void),
                         NativePointer(self_ptr as *mut c_void)
                     );
+                    self.hooks.push(target_function);
                 }
             }
         }
@@ -1140,6 +1149,20 @@ impl AsanRuntime {
             ()
         );
 
+    }
+
+    /// Deregister all the hooks
+    fn deregister_hooks(&mut self, gum: &Gum) {
+        /*This is terrible code and should be replaced as soon as possible. 
+        
+        This is basically a bandaid solution that happens to work because 2 different Interceptor::obtains will return the same interceptor. 
+        
+        Ideally the interceptor should be stored in AsanRuntime, but because FridaRuntime has a 'sttaic bound it becomes difficult to introduce that. 
+        */
+        let mut interceptor = Interceptor::obtain(gum);
+        for hook in &self.hooks {
+            interceptor.revert(*hook);
+        }
     }
 
     #[cfg(target_arch = "x86_64")]
@@ -2587,6 +2610,7 @@ impl Default for AsanRuntime {
             #[cfg(target_arch = "aarch64")]
             eh_frame: [0; ASAN_EH_FRAME_DWORD_COUNT],
             pc: None,
+            hooks: Vec::new(),
         }
     }
 }

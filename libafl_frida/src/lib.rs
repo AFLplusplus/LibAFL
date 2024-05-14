@@ -529,6 +529,8 @@ mod tests {
                 }
             }
         }
+
+        frida_helper.deinit(GUM.get().expect("Gum uninitialized"));
     }
 
     #[test]
@@ -572,5 +574,7 @@ mod tests {
         ];
         let options: FuzzerOptions = FuzzerOptions::try_parse_from(simulated_args).unwrap();
         unsafe { test_asan(&options) }
+
+
     }
 }
