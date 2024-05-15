@@ -44,6 +44,7 @@ static GLOBAL: MiMalloc = MiMalloc;
 #[cfg(not(test))]
 #[no_mangle]
 pub extern "C" fn libafl_main() {
+    env_logger::init();
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     // unsafe { RegistryBuilder::register::<Tokens>(); }
