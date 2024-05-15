@@ -87,7 +87,7 @@ addr2line = "0.21"
 typed-arena = "2.0"
 paste = "1"
 enum-map = "2.7"
-serde_yaml = { version = "0.8", optional = true } # For parsing the injections yaml file
+serde_yaml = { version = "0.9", optional = true } # For parsing the injections yaml file
 toml = { version = "0.4.2", optional = true } # For parsing the injections toml file
 pyo3 = { version = "0.18", optional = true , features = ["multiple-pymethods"]}
 bytes-utils = "0.1"
