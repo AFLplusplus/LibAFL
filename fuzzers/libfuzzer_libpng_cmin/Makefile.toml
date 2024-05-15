@@ -104,7 +104,7 @@ windows_alias = "unsupported"
 
 [tasks.fuzzer_unix]
 command = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cxx"
-args = ["${PROJECT_DIR}/harness.cc", "${PROJECT_DIR}/libpng-1.6.37/.libs/libpng16.a", "-I", "${PROJECT_DIR}/libpng-1.6.37/", "-o", "${FUZZER_NAME}", "-lm", "-lz"]
+args = ["${PROJECT_DIR}/harness.cc", "${PROJECT_DIR}/libpng-1.6.37/.libs/libpng16.a", "-I", "${PROJECT_DIR}/libpng-1.6.37/", "-o", "${FUZZER_NAME}", "-lm", "-lz", "-lz3"]
 dependencies = [ "lib", "cxx", "cc" ]
 
 # Crashing Harness
@@ -115,7 +115,7 @@ windows_alias = "unsupported"
 
 [tasks.fuzzer_crash_unix]
 command = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cxx"
-args = ["${PROJECT_DIR}/harness.cc", "${PROJECT_DIR}/libpng-1.6.37/.libs/libpng16.a", "-I", "${PROJECT_DIR}/libpng-1.6.37/", "-o", "${FUZZER_NAME}_crash", "-lm", "-lz"]
+args = ["${PROJECT_DIR}/harness.cc", "${PROJECT_DIR}/libpng-1.6.37/.libs/libpng16.a", "-I", "${PROJECT_DIR}/libpng-1.6.37/", "-o", "${FUZZER_NAME}_crash", "-lm", "-lz", "-lz3"]
 dependencies = [ "crash_lib", "crash_cxx", "crash_cc" ]
 
 # Run the fuzzer
