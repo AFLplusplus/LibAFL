@@ -1,3 +1,21 @@
+/*
+   LibAFL - Profiling LLVM pass
+   --------------------------------------------------
+
+   Written by Dongjia Zhang <toka@aflplus.plus>
+
+   Copyright 2022-2023 AFLplusplus Project. All rights reserved.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at:
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+*/
+
+// This llvm pass is for conducting static analysis on the source code and dump its analyzed data as a json format.
+
 #include <cstdint>
 #include <stdio.h>
 #include <stdlib.h>
