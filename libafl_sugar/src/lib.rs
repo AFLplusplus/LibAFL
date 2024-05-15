@@ -1,4 +1,4 @@
-//! Sugar API to simplify the life of the naive user of `LibAFL`
+//! Sugar API to simplify the life of users of `LibAFL` that just want to fuzz.
 /*! */
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
 
