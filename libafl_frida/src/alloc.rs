@@ -557,12 +557,12 @@ impl Allocator {
                 let start = range.memory_range().base_address().0 as usize;
                 let end = start + range.memory_range().size();
                 //the poisoned region should be the highest valid userspace region
-                if !self.is_managed(start as *mut c_void) {
+                if self.is_managed(start as *mut c_void) {
+                    false
+                } else {
                     log::trace!("Unpoisoning: {:#x}-{:#x}", start, end);
                     self.map_shadow_for_region(start, end, true);
                     true
-                } else {
-                    false
                 }
             },
         );
@@ -634,7 +634,7 @@ impl Allocator {
         log::trace!("max bit: {}", maxbit);
 
         {
-            for try_shadow_bit in 44..maxbit + 1 {
+            for try_shadow_bit in 44..=maxbit {
                 let addr: usize = 1 << try_shadow_bit;
                 let shadow_start = addr;
                 let shadow_end = addr + addr + addr;
