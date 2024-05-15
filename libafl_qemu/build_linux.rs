@@ -1,17 +1,25 @@
-use std::{env, fs, path::{Path, PathBuf}, process::Command};
+use std::{
+    env, fs,
+    path::{Path, PathBuf},
+    process::Command,
+};
+
+use libafl_qemu_build::maybe_generate_stub_bindings;
 
 #[allow(clippy::too_many_lines)]
 pub fn build() {
     // Note: Unique features are checked in libafl_qemu_sys
+    println!(r#"cargo::rustc-check-cfg=cfg(emulation_mode, values("usermode", "systemmode"))"#);
+    println!(
+        r#"cargo::rustc-check-cfg=cfg(cpu_target, values("arm", "aarch64", "hexagon", "i386", "mips", "ppc", "x86_64"))"#
+    );
 
     let emulation_mode = if cfg!(feature = "usermode") {
         "usermode".to_string()
     } else if cfg!(feature = "systemmode") {
         "systemmode".to_string()
     } else {
-        env::var("EMULATION_MODE").unwrap_or_else(|_| {
-            "usermode".to_string()
-        })
+        env::var("EMULATION_MODE").unwrap_or_else(|_| "usermode".to_string())
     };
 
     let src_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
@@ -37,6 +45,7 @@ pub fn build() {
     let runtime_bindings_file = out_dir.join("libafl_qemu_bindings.rs");
     let stub_runtime_bindings_file = src_dir.join("runtime/libafl_qemu_stub_bindings.rs");
 
+    println!("cargo::rustc-check-cfg=cfg(emulation_mode, values(\"usermode\", \"systemmode\"))");
     println!("cargo:rustc-cfg=emulation_mode=\"{emulation_mode}\"");
     println!("cargo:rerun-if-env-changed=EMULATION_MODE");
 
@@ -59,12 +68,11 @@ pub fn build() {
     } else if cfg!(feature = "hexagon") {
         "hexagon".to_string()
     } else {
-        env::var("CPU_TARGET").unwrap_or_else(|_| {
-            "x86_64".to_string()
-        })
+        env::var("CPU_TARGET").unwrap_or_else(|_| "x86_64".to_string())
     };
     println!("cargo:rerun-if-env-changed=CPU_TARGET");
     println!("cargo:rustc-cfg=cpu_target=\"{cpu_target}\"");
+    println!("cargo::rustc-check-cfg=cfg(cpu_target, values(\"x86_64\", \"arm\", \"aarch64\", \"i386\", \"mips\", \"ppc\", \"hexagon\"))");
 
     let cross_cc = if (emulation_mode == "usermode") && (qemu_asan || qemu_asan_guest) {
         // TODO try to autodetect a cross compiler with the arch name (e.g. aarch64-linux-gnu-gcc)
@@ -80,13 +88,18 @@ pub fn build() {
     };
 
     if env::var("DOCS_RS").is_ok() || cfg!(feature = "clippy") {
-        fs::copy(&stub_runtime_bindings_file, &runtime_bindings_file).expect("Could not copy stub bindings file");
+        fs::copy(&stub_runtime_bindings_file, &runtime_bindings_file)
+            .expect("Could not copy stub bindings file");
         return; // only build when we're not generating docs
     }
 
     fs::create_dir_all(&include_dir).expect("Could not create include dir");
 
-    fs::copy(libafl_qemu_hdr.clone(), include_dir.join(libafl_qemu_hdr_name)).expect("Could not copy libafl_qemu.h to out directory.");
+    fs::copy(
+        libafl_qemu_hdr.clone(),
+        include_dir.join(libafl_qemu_hdr_name),
+    )
+    .expect("Could not copy libafl_qemu.h to out directory.");
 
     bindgen::Builder::default()
         .derive_debug(true)
@@ -103,7 +116,12 @@ pub fn build() {
         .write_to_file(&runtime_bindings_file)
         .expect("Could not write bindings.");
 
-    libafl_qemu_build::store_generated_content_if_different(&stub_runtime_bindings_file, fs::read(&runtime_bindings_file).expect("Could not read generated bindings file").as_slice());
+    maybe_generate_stub_bindings(
+        &cpu_target,
+        &emulation_mode,
+        &stub_runtime_bindings_file,
+        &runtime_bindings_file
+    );
 
     if (emulation_mode == "usermode") && (qemu_asan || qemu_asan_guest) {
         let qasan_dir = Path::new("libqasan");

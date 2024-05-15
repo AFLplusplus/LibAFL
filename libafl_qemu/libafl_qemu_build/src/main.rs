@@ -1,3 +1,5 @@
+#![forbid(unexpected_cfgs)]
+
 use std::path::PathBuf;
 
 use libafl_qemu_build::build_with_bindings;

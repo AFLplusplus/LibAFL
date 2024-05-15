@@ -25,6 +25,9 @@ pub use windows::Win32::{
 
 use crate::Error;
 
+/// The special exit code when the target exited through ctrl-c
+pub const CTRL_C_EXIT: i32 = -1073741510;
+
 // For VEH
 const EXCEPTION_CONTINUE_EXECUTION: c_long = -1;
 
@@ -32,7 +35,7 @@ const EXCEPTION_CONTINUE_EXECUTION: c_long = -1;
 const EXCEPTION_CONTINUE_SEARCH: c_long = 0;
 
 // For SEH
-//const EXCEPTION_EXECUTE_HANDLER: c_long = 1;
+// const EXCEPTION_EXECUTE_HANDLER: c_long = 1;
 
 // From https://github.com/Alexpux/mingw-w64/blob/master/mingw-w64-headers/crt/signal.h
 pub const SIGINT: i32 = 2;

@@ -33,10 +33,12 @@ use libafl_bolts::{
 #[cfg(feature = "adaptive_serialization")]
 use libafl_bolts::{
     current_time,
-    tuples::{Handle, Handler},
+    tuples::{Handle, Handled},
 };
 #[cfg(feature = "std")]
-use libafl_bolts::{llmp::LlmpConnection, shmem::StdShMemProvider, staterestore::StateRestorer};
+use libafl_bolts::{
+    llmp::LlmpConnection, os::CTRL_C_EXIT, shmem::StdShMemProvider, staterestore::StateRestorer,
+};
 use libafl_bolts::{
     llmp::{self, LlmpClient, LlmpClientDescription, Tag},
     shmem::ShMemProvider,
@@ -79,7 +81,7 @@ const _LLMP_TAG_RESTART: Tag = Tag(0x8357A87);
 const _LLMP_TAG_NO_RESTART: Tag = Tag(0x57A7EE71);
 
 /// The minimum buffer size at which to compress LLMP IPC messages.
-#[cfg(feature = "llmp_compression")]
+#[cfg(any(feature = "llmp_compression", feature = "tcp_compression"))]
 pub const COMPRESS_THRESHOLD: usize = 1024;
 
 /// An LLMP-backed event manager for scalable multi-processed fuzzing
@@ -110,7 +112,7 @@ where
             monitor,
             llmp,
             #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
             phantom: PhantomData,
         })
     }
@@ -124,7 +126,7 @@ where
             monitor,
             llmp: llmp::LlmpBroker::create_attach_to_tcp(shmem_provider, port)?,
             #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
             phantom: PhantomData,
         })
     }
@@ -449,7 +451,7 @@ where
             hooks: tuple_list!(),
             llmp,
             #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
             configuration,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
@@ -504,7 +506,7 @@ where
             hooks: tuple_list!(),
             llmp,
             #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
             configuration,
             serialization_time: Duration::ZERO,
             deserialization_time: Duration::ZERO,
@@ -573,7 +575,7 @@ where
             hooks,
             llmp,
             #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
             configuration,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
@@ -634,7 +636,7 @@ where
             hooks,
             llmp,
             #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
             configuration,
             serialization_time: Duration::ZERO,
             deserialization_time: Duration::ZERO,
@@ -853,7 +855,7 @@ where
         let serialized = postcard::to_allocvec(&event)?;
         let flags = LLMP_FLAG_INITIALIZED;
 
-        match self.compressor.compress(&serialized)? {
+        match self.compressor.maybe_compress(&serialized) {
             Some(comp_buf) => {
                 self.llmp.send_buf_with_flags(
                     LLMP_TAG_EVENT_TO_BOTH,
@@ -1581,7 +1583,7 @@ where
 
                 compiler_fence(Ordering::SeqCst);
 
-                if child_status == crate::events::CTRL_C_EXIT || staterestorer.wants_to_exit() {
+                if child_status == CTRL_C_EXIT || staterestorer.wants_to_exit() {
                     // if ctrl-c is pressed, we end up in this branch
                     if let Err(err) = mgr.detach_from_broker(self.broker_port) {
                         log::error!("Failed to detach from broker: {err}");
@@ -1759,7 +1761,7 @@ where
         Ok(Self {
             llmp,
             #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
             converter,
             converter_back,
             phantom: PhantomData,
@@ -1779,7 +1781,7 @@ where
         Ok(Self {
             llmp,
             #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
             converter,
             converter_back,
             phantom: PhantomData,
@@ -1798,7 +1800,7 @@ where
         Ok(Self {
             llmp: LlmpClient::on_existing_from_env(shmem_provider, env_name)?,
             #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
             phantom: PhantomData,
             converter,
             converter_back,
@@ -1995,7 +1997,7 @@ where
         let serialized = postcard::to_allocvec(&converted_event)?;
         let flags = LLMP_FLAG_INITIALIZED;
 
-        match self.compressor.compress(&serialized)? {
+        match self.compressor.maybe_compress(&serialized) {
             Some(comp_buf) => {
                 self.llmp.send_buf_with_flags(
                     LLMP_TAG_EVENT_TO_BOTH,
@@ -2058,7 +2060,7 @@ mod tests {
     use core::sync::atomic::{compiler_fence, Ordering};
 
     #[cfg(feature = "adaptive_serialization")]
-    use libafl_bolts::tuples::Handler;
+    use libafl_bolts::tuples::Handled;
     use libafl_bolts::{
         llmp::{LlmpClient, LlmpSharedMap},
         rands::StdRand,

@@ -1,5 +1,5 @@
 use core::{fmt::Debug, ops::Range};
-use std::{collections::HashSet, hash::BuildHasher};
+use std::{cell::UnsafeCell, collections::HashSet, hash::BuildHasher};
 
 use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple};
 use libafl_bolts::tuples::{MatchFirstType, SplitBorrowExtractFirstType};
@@ -134,6 +134,19 @@ where
     ) where
         OT: ObserversTuple<S>,
     {
+    }
+}
+
+impl<S> HasInstrumentationFilter<(), S> for ()
+where
+    S: UsesInput,
+{
+    fn filter(&self) -> &() {
+        self
+    }
+
+    fn filter_mut(&mut self) -> &mut () {
+        self
     }
 }
 
@@ -272,6 +285,31 @@ pub trait StdInstrumentationFilter<S: UsesInput>:
 {
 }
 
+static mut EMPTY_ADDRESS_FILTER: UnsafeCell<QemuInstrumentationAddressRangeFilter> =
+    UnsafeCell::new(QemuFilterList::None);
+static mut EMPTY_PAGING_FILTER: UnsafeCell<QemuInstrumentationPagingFilter> =
+    UnsafeCell::new(QemuFilterList::None);
+
+impl<S> HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter, S> for () {
+    fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
+        &QemuFilterList::None
+    }
+
+    fn filter_mut(&mut self) -> &mut QemuInstrumentationAddressRangeFilter {
+        unsafe { EMPTY_ADDRESS_FILTER.get_mut() }
+    }
+}
+
+impl<S> HasInstrumentationFilter<QemuInstrumentationPagingFilter, S> for () {
+    fn filter(&self) -> &QemuInstrumentationPagingFilter {
+        &QemuFilterList::None
+    }
+
+    fn filter_mut(&mut self) -> &mut QemuInstrumentationPagingFilter {
+        unsafe { EMPTY_PAGING_FILTER.get_mut() }
+    }
+}
+
 #[cfg(emulation_mode = "systemmode")]
 impl<Head, S> StdInstrumentationFilter<S> for (Head, ())
 where
@@ -290,10 +328,24 @@ where
 {
 }
 
+#[cfg(emulation_mode = "systemmode")]
+impl<S> StdInstrumentationFilter<S> for () where S: UsesInput {}
+
+#[cfg(emulation_mode = "usermode")]
+impl<S> StdInstrumentationFilter<S> for () where S: UsesInput {}
+
 pub trait IsFilter: Debug {
     type FilterParameter;
 
     fn allowed(&self, filter_parameter: Self::FilterParameter) -> bool;
+}
+
+impl IsFilter for () {
+    type FilterParameter = ();
+
+    fn allowed(&self, _filter_parameter: Self::FilterParameter) -> bool {
+        true
+    }
 }
 
 pub trait IsAddressFilter: IsFilter<FilterParameter = GuestAddr> {}

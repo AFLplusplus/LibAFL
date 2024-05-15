@@ -3,6 +3,8 @@
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
+#![forbid(unexpected_cfgs)]
+// For `std::simd`
 #![cfg_attr(nightly, feature(portable_simd))]
 #![allow(
     clippy::unreadable_literal,

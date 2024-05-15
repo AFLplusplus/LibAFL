@@ -31,7 +31,7 @@ use ahash::RandomState;
 #[cfg(feature = "std")]
 pub use launcher::*;
 #[cfg(all(unix, feature = "std"))]
-use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
+use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal, CTRL_C_EXIT};
 #[cfg(feature = "adaptive_serialization")]
 use libafl_bolts::tuples::{Handle, MatchNameRef};
 use libafl_bolts::{current_time, ClientId};
@@ -54,13 +54,6 @@ use crate::{
     monitors::{AggregatorOps, UserStatsValue},
     state::HasScalabilityMonitor,
 };
-
-/// The special exit code when the target exited throught ctrl-c
-#[cfg(unix)]
-pub const CTRL_C_EXIT: i32 = 100;
-/// The special exit code when the target exited throught ctrl-c
-#[cfg(windows)]
-pub const CTRL_C_EXIT: i32 = -1073741510;
 
 /// Check if ctrl-c is sent with this struct
 #[cfg(all(unix, feature = "std"))]
@@ -88,7 +81,7 @@ impl Handler for ShutdownSignalData {
             // println!("Exiting from the handler....");
 
             #[cfg(unix)]
-            libc::_exit(100);
+            libc::_exit(CTRL_C_EXIT);
 
             #[cfg(windows)]
             windows::Win32::System::Threading::ExitProcess(100);

@@ -12,7 +12,7 @@ use core::{
 #[rustversion::nightly]
 use libafl_bolts::AsSlice;
 use libafl_bolts::{
-    tuples::{Handle, Handler, MatchNameRef},
+    tuples::{Handle, Handled, MatchNameRef},
     AsIter, HasRefCnt, Named,
 };
 use num_traits::PrimInt;
@@ -22,7 +22,7 @@ use crate::{
     corpus::Testcase,
     events::{Event, EventFirer},
     executors::ExitKind,
-    feedbacks::{Feedback, HasObserverReference},
+    feedbacks::{Feedback, HasObserverHandle},
     inputs::UsesInput,
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{CanTrack, MapObserver, Observer, ObserversTuple},
@@ -660,7 +660,7 @@ impl<C, N, O, R, T> Named for MapFeedback<C, N, O, R, T> {
     }
 }
 
-impl<C, N, O, R, T> HasObserverReference for MapFeedback<C, N, O, R, T>
+impl<C, N, O, R, T> HasObserverHandle for MapFeedback<C, N, O, R, T>
 where
     O: Named,
     C: AsRef<O>,
@@ -668,7 +668,7 @@ where
     type Observer = C;
 
     #[inline]
-    fn observer_ref(&self) -> &Handle<C> {
+    fn observer_handle(&self) -> &Handle<C> {
         &self.map_ref
     }
 }

@@ -5,6 +5,7 @@ It can report coverage and, on supported architectures, even reports memory acce
 Additional documentation is available in [the `LibAFL` book](https://aflplus.plus/libafl-book/advanced_features/frida.html).
 */
 
+#![forbid(unexpected_cfgs)]
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
@@ -63,10 +64,8 @@ Additional documentation is available in [the `LibAFL` book](https://aflplus.plu
 )]
 
 /// The frida-asan allocator
-#[cfg(unix)]
 pub mod alloc;
 
-#[cfg(unix)]
 pub mod asan;
 
 #[cfg(windows)]
@@ -368,7 +367,7 @@ mod tests {
     use crate::{
         asan::{
             asan_rt::AsanRuntime,
-            errors::{AsanErrorsFeedback, AsanErrorsObserver},
+            errors::{AsanErrors, AsanErrorsFeedback, AsanErrorsObserver},
         },
         coverage_rt::CoverageRuntime,
         executor::FridaInProcessExecutor,
@@ -377,20 +376,56 @@ mod tests {
 
     static GUM: OnceLock<Gum> = OnceLock::new();
 
+    #[allow(clippy::too_many_lines)]
     unsafe fn test_asan(options: &FuzzerOptions) {
         // The names of the functions to run
         let tests = vec![
-            ("LLVMFuzzerTestOneInput", 0),
-            ("heap_oob_read", 1),
-            ("heap_oob_write", 1),
-            ("heap_uaf_write", 1),
-            ("heap_uaf_read", 1),
-            ("malloc_heap_oob_read", 1),
-            ("malloc_heap_oob_write", 1),
-            ("malloc_heap_uaf_write", 1),
-            ("malloc_heap_uaf_read", 1),
+            ("LLVMFuzzerTestOneInput", None),
+            ("heap_oob_read", Some("heap out-of-bounds read")),
+            ("heap_oob_write", Some("heap out-of-bounds write")),
+            ("heap_uaf_write", Some("heap use-after-free write")),
+            ("heap_uaf_read", Some("heap use-after-free read")),
+            ("malloc_heap_oob_read", Some("heap out-of-bounds read")),
+            ("malloc_heap_oob_write", Some("heap out-of-bounds write")),
+            (
+                "malloc_heap_oob_write_0x12",
+                Some("heap out-of-bounds write"),
+            ),
+            (
+                "malloc_heap_oob_write_0x14",
+                Some("heap out-of-bounds write"),
+            ),
+            (
+                "malloc_heap_oob_write_0x17",
+                Some("heap out-of-bounds write"),
+            ),
+            (
+                "malloc_heap_oob_write_0x17_int_at_0x16",
+                Some("heap out-of-bounds write"),
+            ),
+            (
+                "malloc_heap_oob_write_0x17_int_at_0x15",
+                Some("heap out-of-bounds write"),
+            ),
+            ("malloc_heap_oob_write_0x17_int_at_0x13", None),
+            (
+                "malloc_heap_oob_write_0x17_int_at_0x14",
+                Some("heap out-of-bounds write"),
+            ),
+            ("malloc_heap_uaf_write", Some("heap use-after-free write")),
+            ("malloc_heap_uaf_read", Some("heap use-after-free read")),
         ];
 
+        //NOTE: RTLD_NOW is required on linux as otherwise the hooks will NOT work
+
+        #[cfg(target_os = "linux")]
+        let lib = libloading::os::unix::Library::open(
+            Some(options.clone().harness.unwrap()),
+            libloading::os::unix::RTLD_NOW,
+        )
+        .unwrap();
+
+        #[cfg(not(target_os = "linux"))]
         let lib = libloading::Library::new(options.clone().harness.unwrap()).unwrap();
 
         let coverage = CoverageRuntime::new();
@@ -403,7 +438,7 @@ mod tests {
 
         // Run the tests for each function
         for test in tests {
-            let (function_name, err_cnt) = test;
+            let (function_name, expected_error) = test;
             log::info!("Testing with harness function {}", function_name);
 
             let mut corpus = InMemoryCorpus::<BytesInput>::new();
@@ -414,7 +449,7 @@ mod tests {
 
             let rand = StdRand::with_seed(0);
 
-            let mut feedback = ConstFeedback::new(false);
+            let mut feedback = ConstFeedback::new(true);
 
             let asan_obs = AsanErrorsObserver::from_static_asan_errors();
 
@@ -445,6 +480,12 @@ mod tests {
             );
 
             {
+                #[cfg(target_os = "linux")]
+                let target_func: libloading::os::unix::Symbol<
+                    unsafe extern "C" fn(data: *const u8, size: usize) -> i32,
+                > = lib.get(function_name.as_bytes()).unwrap();
+
+                #[cfg(not(target_os = "linux"))]
                 let target_func: libloading::Symbol<
                     unsafe extern "C" fn(data: *const u8, size: usize) -> i32,
                 > = lib.get(function_name.as_bytes()).unwrap();
@@ -472,19 +513,25 @@ mod tests {
                 let mutator = StdScheduledMutator::new(tuple_list!(BitFlipMutator::new()));
                 let mut stages = tuple_list!(StdMutationalStage::with_max_iterations(mutator, 1));
 
-                // log::info!("Starting fuzzing!");
+                log::info!("Starting fuzzing!");
                 fuzzer
                     .fuzz_one(&mut stages, &mut executor, &mut state, &mut event_manager)
                     .unwrap_or_else(|_| panic!("Error in fuzz_one"));
 
                 log::info!("Done fuzzing! Got {} solutions", state.solutions().count());
+                if let Some(expected_error) = expected_error {
+                    assert_eq!(state.solutions().count(), 1);
+                    if let Some(error) = AsanErrors::get_mut_blocking().errors.first() {
+                        assert_eq!(error.description(), expected_error);
+                    }
+                } else {
+                    assert_eq!(state.solutions().count(), 0);
+                }
             }
-            assert_eq!(state.solutions().count(), err_cnt);
         }
     }
 
     #[test]
-    #[cfg(unix)]
     fn run_test_asan() {
         // Read RUST_LOG from the environment and set the log level accordingly (not using env_logger)
         // Note that in cargo test, the output of successfull tests is suppressed by default,
@@ -504,7 +551,10 @@ mod tests {
         SimpleStdoutLogger::set_logger().unwrap();
 
         // Check if the harness dynamic library is present, if not - skip the test
-        let test_harness = "test_harness.so";
+        #[cfg(unix)]
+        let test_harness = "./test_harness.so";
+        #[cfg(windows)]
+        let test_harness = ".\\test_harness.dll";
         assert!(
             std::path::Path::new(test_harness).exists(),
             "Skipping test, {test_harness} not found"

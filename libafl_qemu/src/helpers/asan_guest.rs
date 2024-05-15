@@ -12,12 +12,12 @@ use libafl::{inputs::UsesInput, HasMetadata};
 #[cfg(not(feature = "clippy"))]
 use crate::sys::libafl_tcg_gen_asan;
 use crate::{
-    emu::{EmuError, MemAccessInfo, Qemu},
     helpers::{
         HasInstrumentationFilter, IsFilter, QemuHelper, QemuHelperTuple,
         QemuInstrumentationAddressRangeFilter,
     },
     hooks::{Hook, QemuHooks},
+    qemu::{MemAccessInfo, Qemu, QemuInitError},
     sys::TCGTemp,
     GuestAddr, MapInfo,
 };
@@ -27,7 +27,7 @@ static mut ASAN_GUEST_INITED: bool = false;
 pub fn init_qemu_with_asan_guest(
     args: &mut Vec<String>,
     env: &mut [(String, String)],
-) -> Result<(Qemu, String), EmuError> {
+) -> Result<(Qemu, String), QemuInitError> {
     let current = env::current_exe().unwrap();
     let asan_lib = fs::canonicalize(current)
         .unwrap()
