@@ -14,7 +14,7 @@
 
 */
 
-// This llvm pass is for conducting static analysis on the source code and dump its analyzed data as a json format.
+// This llvm pass is for conducting static analysis.
 
 #include <cstdint>
 #include <stdio.h>
