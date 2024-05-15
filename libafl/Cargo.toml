@@ -160,7 +160,7 @@ c2rust-bitfields = { version = "0.18", features = ["no_std"] }
 ahash = { version = "0.8", default-features = false } # The hash function already used in hashbrown
 meminterval = { version = "0.4", features = ["serde"] }
 backtrace = { version = "0.3", optional = true } # Used to get the stacktrace in StacktraceObserver
-typed-builder = { version = "0.16", optional = true } # Implement the builder pattern at compiletime
+typed-builder = { version = "0.18", optional = true } # Implement the builder pattern at compiletime
 
 serde_json = { version = "1.0", optional = true, default-features = false, features = ["alloc"] }
 nix = { version = "0.27", optional = true }
