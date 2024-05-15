@@ -90,4 +90,4 @@ winsafe = {version = "0.0.18", features = ["kernel"]}
 [dev-dependencies]
 serial_test = { version = "3", default-features = false, features = ["logging"] }
 clap = {version = "4.5", features = ["derive"]}
-libloading = "0.7"
+libloading = "0.8"
