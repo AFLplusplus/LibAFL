@@ -8,8 +8,6 @@ use std::vec::Vec;
 use libafl_bolts::Named;
 use serde::{Deserialize, Serialize};
 
-use crate::{inputs::UsesInput, observers::Observer};
-
 /// An observer that captures stdout of a target.
 /// Only works for supported executors.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -30,19 +28,9 @@ impl StdOutObserver {
             stdout: None,
         }
     }
-}
-
-impl<S> Observer<S> for StdOutObserver
-where
-    S: UsesInput,
-{
-    #[inline]
-    fn observes_stdout(&self) -> bool {
-        true
-    }
 
     /// React to new `stdout`
-    fn observe_stdout(&mut self, stdout: &[u8]) {
+    pub fn observe_stdout(&mut self, stdout: &[u8]) {
         self.stdout = Some(stdout.into());
     }
 }
@@ -73,19 +61,9 @@ impl StdErrObserver {
             stderr: None,
         }
     }
-}
-
-impl<S> Observer<S> for StdErrObserver
-where
-    S: UsesInput,
-{
-    #[inline]
-    fn observes_stderr(&self) -> bool {
-        true
-    }
 
     /// React to new `stderr`
-    fn observe_stderr(&mut self, stderr: &[u8]) {
+    pub fn observe_stderr(&mut self, stderr: &[u8]) {
         self.stderr = Some(stderr.into());
     }
 }

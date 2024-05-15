@@ -7,7 +7,7 @@ use core::{hash::Hash, marker::PhantomData};
 use hashbrown::{HashMap, HashSet};
 use libafl_bolts::{
     current_time,
-    tuples::{Reference, Referenceable},
+    tuples::{Handle, Handled},
     AsIter, Named,
 };
 use num_traits::ToPrimitive;
@@ -51,7 +51,7 @@ where
 /// Algorithm based on WMOPT: <https://hexhive.epfl.ch/publications/files/21ISSTA2.pdf>
 #[derive(Debug)]
 pub struct MapCorpusMinimizer<C, E, O, T, TS> {
-    obs_ref: Reference<C>,
+    observer_handle: Handle<C>,
     phantom: PhantomData<(E, O, T, TS)>,
 }
 
@@ -70,7 +70,7 @@ where
     /// in the future to get observed maps from an executed input.
     pub fn new(obs: &C) -> Self {
         Self {
-            obs_ref: obs.reference(),
+            observer_handle: obs.handle(),
             phantom: PhantomData,
         }
     }
@@ -161,7 +161,7 @@ where
 
             let seed_expr = Bool::fresh_const(&ctx, "seed");
             let observers = executor.observers();
-            let obs = observers[&self.obs_ref].as_ref();
+            let obs = observers[&self.observer_handle].as_ref();
 
             // Store coverage, mapping coverage map indices to hit counts (if present) and the
             // associated seeds for the map indices with those hit counts.

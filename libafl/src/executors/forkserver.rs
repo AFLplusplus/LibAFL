@@ -22,7 +22,7 @@ use libafl_bolts::{
     fs::{get_unique_std_input_file, InputFile},
     os::{dup2, pipes::Pipe},
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{MatchNameRef, Prepend, RefIndexable, Reference, Referenceable},
+    tuples::{Handle, Handled, MatchNameRef, Prepend, RefIndexable},
     AsSlice, AsSliceMut, Truncate,
 };
 use nix::{
@@ -498,7 +498,7 @@ where
     phantom: PhantomData<S>,
     map_size: Option<usize>,
     #[cfg(feature = "regex")]
-    asan_obs: Reference<AsanBacktraceObserver>,
+    asan_obs: Handle<AsanBacktraceObserver>,
     timeout: TimeSpec,
     crash_exitcode: Option<i8>,
 }
@@ -587,7 +587,7 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
     kill_signal: Option<Signal>,
     timeout: Option<Duration>,
     #[cfg(feature = "regex")]
-    asan_obs: Option<Reference<AsanBacktraceObserver>>,
+    asan_obs: Option<Handle<AsanBacktraceObserver>>,
     crash_exitcode: Option<i8>,
 }
 
@@ -640,7 +640,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             asan_obs: self
                 .asan_obs
                 .clone()
-                .unwrap_or(AsanBacktraceObserver::default().reference()),
+                .unwrap_or(AsanBacktraceObserver::default().handle()),
             crash_exitcode: self.crash_exitcode,
         })
     }
@@ -702,7 +702,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             asan_obs: self
                 .asan_obs
                 .clone()
-                .unwrap_or(AsanBacktraceObserver::default().reference()),
+                .unwrap_or(AsanBacktraceObserver::default().handle()),
             crash_exitcode: self.crash_exitcode,
         })
     }

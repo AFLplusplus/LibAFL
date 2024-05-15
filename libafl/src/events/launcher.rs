@@ -33,7 +33,7 @@ use libafl_bolts::os::dup2;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use libafl_bolts::os::startable_self;
 #[cfg(feature = "adaptive_serialization")]
-use libafl_bolts::tuples::{Reference, Referenceable};
+use libafl_bolts::tuples::{Handle, Handled};
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use libafl_bolts::{
     core_affinity::get_core_ids,
@@ -125,7 +125,7 @@ where
     #[builder(default = None)]
     remote_broker_addr: Option<SocketAddr>,
     #[cfg(feature = "adaptive_serialization")]
-    time_ref: Reference<TimeObserver>,
+    time_ref: Handle<TimeObserver>,
     /// If this launcher should spawn a new `broker` on `[Self::broker_port]` (default).
     /// The reason you may not want this is, if you already have a [`Launcher`]
     /// with a different configuration (for the same target) running on this machine.
@@ -683,7 +683,7 @@ where
                             .serialize_state(self.serialize_state)
                             .hooks(tuple_list!());
                         #[cfg(feature = "adaptive_serialization")]
-                        let builder = builder.time_ref(self.time_obs.reference());
+                        let builder = builder.time_ref(self.time_obs.handle());
                         let (state, mgr) = builder.build().launch()?;
 
                         #[cfg(not(feature = "adaptive_serialization"))]
@@ -727,7 +727,7 @@ where
                 .hooks(tuple_list!());
 
             #[cfg(feature = "adaptive_serialization")]
-            let builder = builder.time_ref(self.time_obs.reference());
+            let builder = builder.time_ref(self.time_obs.handle());
 
             builder.build().launch()?;
 

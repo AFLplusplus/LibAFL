@@ -113,6 +113,8 @@ pub mod windows_exception_handler {
         sync::atomic::{compiler_fence, Ordering},
     };
     #[cfg(feature = "std")]
+    use std::io::Write;
+    #[cfg(feature = "std")]
     use std::panic;
 
     use libafl_bolts::os::windows_exceptions::{
@@ -131,7 +133,7 @@ pub mod windows_exception_handler {
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
-        inputs::UsesInput,
+        inputs::{Input, UsesInput},
         state::{HasCorpus, HasExecutions, HasSolutions, State},
     };
 
@@ -394,7 +396,17 @@ pub mod windows_exception_handler {
             // Make sure we don't crash in the crash handler forever.
             if is_crash {
                 let input = data.take_current_input::<<E::State as UsesInput>::Input>();
-
+                {
+                    let mut bsod = Vec::new();
+                    {
+                        let mut writer = std::io::BufWriter::new(&mut bsod);
+                        writeln!(writer, "input: {:?}", input.generate_name(0)).unwrap();
+                        libafl_bolts::minibsod::generate_minibsod(&mut writer, exception_pointers)
+                            .unwrap();
+                        writer.flush().unwrap();
+                    }
+                    log::error!("{}", std::str::from_utf8(&bsod).unwrap());
+                }
                 run_observers_and_save_state::<E, EM, OF, Z>(
                     executor,
                     state,

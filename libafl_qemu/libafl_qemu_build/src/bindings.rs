@@ -84,6 +84,7 @@ const WRAPPER_HEADER: &str = r#"
 #include "libafl/exit.h"
 #include "libafl/hook.h"
 #include "libafl/jit.h"
+#include "libafl/utils.h"
 
 "#;
 
@@ -94,7 +95,7 @@ pub fn generate(
 ) -> Result<Bindings, BindgenError> {
     let wrapper_h = build_dir.join("wrapper.h");
 
-    store_generated_content_if_different(&wrapper_h, WRAPPER_HEADER.as_bytes());
+    store_generated_content_if_different(&wrapper_h, WRAPPER_HEADER.as_bytes(), None, None, false);
 
     let bindings = bindgen::Builder::default()
         .derive_debug(true)
@@ -154,7 +155,7 @@ pub fn generate(
         bindings
             .allowlist_type("CPUX86State")
             .allowlist_type("X86CPU")
-    } else if cpu_target == "arssssm" {
+    } else if cpu_target == "arm" {
         bindings
             .allowlist_type("ARMCPU")
             .allowlist_type("ARMv7MState")

@@ -4,6 +4,7 @@ Welcome to `LibAFL`
 #![doc = include_str!("../README.md")]
 /*! */
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
+#![forbid(unexpected_cfgs)]
 #![allow(incomplete_features)]
 #![no_std]
 // For `type_eq`

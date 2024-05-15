@@ -1,8 +1,6 @@
 use alloc::borrow::Cow;
 use core::marker::PhantomData;
 
-#[cfg(feature = "introspection")]
-use libafl::state::HasClientPerfMonitor;
 use libafl::{
     executors::{Executor, HasObservers},
     inputs::{BytesInput, UsesInput},
@@ -12,7 +10,7 @@ use libafl::{
     Error, HasMetadata, HasNamedMetadata,
 };
 use libafl_bolts::{
-    tuples::{MatchNameRef, Reference},
+    tuples::{Handle, MatchNameRef},
     Named,
 };
 
@@ -25,7 +23,7 @@ where
     TE: UsesState,
 {
     tracer_executor: TE,
-    cmplog_observer_ref: Option<Reference<AFLppCmpLogObserver<'a, TE::State>>>,
+    cmplog_observer_handle: Option<Handle<AFLppCmpLogObserver<'a, TE::State>>>,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(EM, TE, Z)>,
 }
@@ -67,8 +65,12 @@ where
         // First run with the un-mutated input
         let unmutated_input = state.current_input_cloned()?;
 
-        if let Some(obs_ref) = &self.cmplog_observer_ref {
-            if let Some(ob) = self.tracer_executor.observers_mut().get_mut(obs_ref) {
+        if let Some(observer_handle) = &self.cmplog_observer_handle {
+            if let Some(ob) = self
+                .tracer_executor
+                .observers_mut()
+                .get_mut(observer_handle)
+            {
                 // This is not the original input,
                 // Set it to false
                 ob.set_original(true);
@@ -97,8 +99,12 @@ where
             None => return Err(Error::unknown("No metadata found")),
         };
 
-        if let Some(obs_ref) = &self.cmplog_observer_ref {
-            if let Some(ob) = self.tracer_executor.observers_mut().get_mut(obs_ref) {
+        if let Some(observer_handle) = &self.cmplog_observer_handle {
+            if let Some(ob) = self
+                .tracer_executor
+                .observers_mut()
+                .get_mut(observer_handle)
+            {
                 // This is not the original input,
                 // Set it to false
                 ob.set_original(false);
@@ -142,7 +148,7 @@ where
     /// Creates a new default stage
     pub fn new(tracer_executor: TE) -> Self {
         Self {
-            cmplog_observer_ref: None,
+            cmplog_observer_handle: None,
             tracer_executor,
             phantom: PhantomData,
         }
@@ -151,10 +157,10 @@ where
     /// With cmplog observer
     pub fn with_cmplog_observer(
         tracer_executor: TE,
-        obs_ref: Reference<AFLppCmpLogObserver<'a, TE::State>>,
+        observer_handle: Handle<AFLppCmpLogObserver<'a, TE::State>>,
     ) -> Self {
         Self {
-            cmplog_observer_ref: Some(obs_ref),
+            cmplog_observer_handle: Some(observer_handle),
             tracer_executor,
             phantom: PhantomData,
         }

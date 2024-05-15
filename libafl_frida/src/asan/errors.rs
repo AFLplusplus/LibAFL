@@ -24,7 +24,7 @@ use libafl::{
 };
 use libafl_bolts::{
     ownedref::OwnedPtr,
-    tuples::{MatchNameRef, Reference, Referenceable},
+    tuples::{Handle, Handled, MatchNameRef},
     Named, SerdeAny,
 };
 use serde::{Deserialize, Serialize};
@@ -91,7 +91,7 @@ pub(crate) enum AsanError {
 }
 
 impl AsanError {
-    fn description(&self) -> &str {
+    pub fn description(&self) -> &str {
         match self {
             AsanError::OobRead(_) => "heap out-of-bounds read",
             AsanError::OobWrite(_) => "heap out-of-bounds write",
@@ -114,7 +114,7 @@ impl AsanError {
 #[derive(Debug, Clone, Serialize, Deserialize, SerdeAny)]
 pub struct AsanErrors {
     continue_on_error: bool,
-    errors: Vec<AsanError>,
+    pub(crate) errors: Vec<AsanError>,
 }
 
 impl AsanErrors {
@@ -646,7 +646,7 @@ impl AsanErrorsObserver {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AsanErrorsFeedback<S> {
     errors: Option<AsanErrors>,
-    obs_ref: Reference<AsanErrorsObserver>,
+    observer_handle: Handle<AsanErrorsObserver>,
     phantom: PhantomData<S>,
 }
 
@@ -669,7 +669,7 @@ where
         OT: ObserversTuple<S>,
     {
         let observer = observers
-            .get(&self.obs_ref)
+            .get(&self.observer_handle)
             .expect("An AsanErrorsFeedback needs an AsanErrorsObserver");
         let errors = observer.errors();
         if errors.is_empty() {
@@ -706,7 +706,7 @@ where
 impl<S> Named for AsanErrorsFeedback<S> {
     #[inline]
     fn name(&self) -> &Cow<'static, str> {
-        self.obs_ref.name()
+        self.observer_handle.name()
     }
 }
 
@@ -716,7 +716,7 @@ impl<S> AsanErrorsFeedback<S> {
     pub fn new(obs: &AsanErrorsObserver) -> Self {
         Self {
             errors: None,
-            obs_ref: obs.reference(),
+            observer_handle: obs.handle(),
             phantom: PhantomData,
         }
     }

@@ -389,17 +389,6 @@ where
     ) -> Result<(), Error> {
         Ok(())
     }
-
-    /// Do nothing on new `stderr`
-    #[inline]
-    fn observes_stderr(&self) -> bool {
-        true
-    }
-
-    /// Do nothing on new `stderr`
-    fn observe_stderr(&mut self, stderr: &[u8]) {
-        self.parse_asan_output(&String::from_utf8_lossy(stderr));
-    }
 }
 
 impl Named for AsanBacktraceObserver {

@@ -21,6 +21,7 @@ cc = { version = "1.0", features = ["parallel"] }
 which = "4.4"
 
 [dependencies]
+env_logger = "0.10"
 libafl = { path = "../../libafl/", features = ["default", "cmin"] }
 # libafl = { path = "../../libafl/", features = ["default"] }
 libafl_bolts = { path = "../../libafl_bolts/" }

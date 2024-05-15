@@ -1,16 +1,19 @@
+#![forbid(unexpected_cfgs)]
 #![allow(clippy::missing_panics_doc)]
+
 use std::{
     collections::hash_map,
     env, fs,
     fs::File,
     hash::Hasher,
-    io::{Read, Seek, SeekFrom, Write},
+    io::{BufRead, BufReader, Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
     process::Command,
     ptr::addr_of_mut,
 };
 
 use regex::Regex;
+use rustc_version::Version;
 use which::which;
 
 mod bindings;
@@ -75,15 +78,9 @@ pub fn build_with_bindings(
 
     let bind = bindings::generate(&build_result.build_dir, cpu_target, clang_args)
         .expect("Failed to generate the bindings");
-    bind.write_to_file(bindings_file)
-        .expect("Faield to write to the bindings file");
 
-    // """Fix""" the bindings here
-    let contents =
-        fs::read_to_string(bindings_file).expect("Should have been able to read the file");
-    let re = Regex::new("(Option<\\s*)unsafe( extern \"C\" fn\\(data: u64)").unwrap();
-    let replaced = re.replace_all(&contents, "$1$2");
-    fs::write(bindings_file, replaced.as_bytes()).expect("Unable to write file");
+    // Write the final bindings
+    fs::write(bindings_file, bind.to_string()).expect("Unable to write file");
 
     cargo_propagate_rpath();
 }
@@ -248,26 +245,37 @@ fn include_path(build_dir: &Path, path: &str) -> String {
     }
 }
 
-pub fn store_generated_content_if_different(file_to_update: &PathBuf, fresh_content: &[u8]) {
+/// If `fresh_content` != `content_file_to_update` (the file is read directly if `content_file_to_update` is None), update the file. prefix is not considered for comparison.
+/// If a prefix is given, it will be added as the first line of the file.
+pub fn store_generated_content_if_different(
+    file_to_update: &PathBuf,
+    fresh_content: &[u8],
+    content_file_to_update: Option<Vec<u8>>,
+    first_line_prefix: Option<&str>,
+    force_regeneration: bool,
+) {
     let mut must_rewrite_file = true;
 
     // Check if equivalent file already exists without relying on filesystem timestamp.
     let mut file_to_check =
         if let Ok(mut wrapper_file) = File::options().read(true).write(true).open(file_to_update) {
-            let mut existing_file_content = Vec::with_capacity(fresh_content.len());
-            wrapper_file
-                .read_to_end(existing_file_content.as_mut())
-                .unwrap();
+            let existing_file_content = content_file_to_update.unwrap_or_else(|| {
+                let mut content = Vec::with_capacity(fresh_content.len());
+                wrapper_file.read_to_end(content.as_mut()).unwrap();
+                content
+            });
 
-            let mut existing_wrapper_hasher = hash_map::DefaultHasher::new();
-            existing_wrapper_hasher.write(existing_file_content.as_ref());
+            if !force_regeneration {
+                let mut existing_wrapper_hasher = hash_map::DefaultHasher::new();
+                existing_wrapper_hasher.write(existing_file_content.as_ref());
 
-            let mut wrapper_h_hasher = hash_map::DefaultHasher::new();
-            wrapper_h_hasher.write(fresh_content);
+                let mut wrapper_h_hasher = hash_map::DefaultHasher::new();
+                wrapper_h_hasher.write(fresh_content);
 
-            // Check if wrappers are the same
-            if existing_wrapper_hasher.finish() == wrapper_h_hasher.finish() {
-                must_rewrite_file = false;
+                // Check if wrappers are the same
+                if existing_wrapper_hasher.finish() == wrapper_h_hasher.finish() {
+                    must_rewrite_file = false;
+                }
             }
 
             // Reset file cursor if it's going to be rewritten
@@ -285,8 +293,100 @@ pub fn store_generated_content_if_different(file_to_update: &PathBuf, fresh_cont
         };
 
     if must_rewrite_file {
+        if let Some(prefix) = first_line_prefix {
+            writeln!(&file_to_check, "{prefix}").expect("Could not write prefix");
+        }
+
         file_to_check
             .write_all(fresh_content)
             .unwrap_or_else(|_| panic!("Unable to write in {}", file_to_update.display()));
     }
+}
+#[rustversion::nightly]
+pub fn maybe_generate_stub_bindings(
+    cpu_target: &str,
+    emulation_mode: &str,
+    stub_bindings_file: &PathBuf,
+    bindings_file: &PathBuf,
+) {
+    if cpu_target == "x86_64" && emulation_mode == "usermode" {
+        let current_rustc_version =
+            rustc_version::version().expect("Could not get current rustc version");
+        let semver_re = Regex::new(r"/\* (.*) \*/").unwrap();
+
+        // We only try to store the stub if the current rustc version is strictly bigger than the one used to generate
+        // the versioned stub.
+        let (try_generate, force_regeneration, stub_content): (bool, bool, Option<Vec<u8>>) =
+            if let Ok(stub_file) = File::open(stub_bindings_file) {
+                let mut stub_rdr = BufReader::new(stub_file);
+
+                let mut first_line = String::new();
+                let mut stub_content = Vec::<u8>::new();
+                assert!(
+                    stub_rdr
+                        .read_line(&mut first_line)
+                        .expect("Could not read first line")
+                        > 0,
+                    "Error while reading first line."
+                );
+
+                if let Some((_, [version_str])) = semver_re
+                    .captures_iter(&first_line)
+                    .next()
+                    .map(|caps| caps.extract())
+                {
+                    // The first line matches the regex
+
+                    if let Ok(version) = Version::parse(version_str) {
+                        // The first line contains a version
+
+                        stub_rdr
+                            .read_to_end(&mut stub_content)
+                            .expect("could not read stub content");
+                        (current_rustc_version > version, false, Some(stub_content))
+                    } else {
+                        stub_rdr.seek(SeekFrom::Start(0)).unwrap();
+                        stub_rdr
+                            .read_to_end(&mut stub_content)
+                            .expect("could not read stub content");
+
+                        (true, true, Some(stub_content))
+                    }
+                } else {
+                    stub_rdr.seek(SeekFrom::Start(0)).unwrap();
+                    stub_rdr
+                        .read_to_end(&mut stub_content)
+                        .expect("could not read stub content");
+
+                    (true, true, Some(stub_content))
+                }
+            } else {
+                // No stub file stored
+                (true, true, None)
+            };
+
+        let header = format!("/* {current_rustc_version} */");
+
+        if try_generate {
+            store_generated_content_if_different(
+                stub_bindings_file,
+                fs::read(bindings_file)
+                    .expect("Could not read generated bindings file")
+                    .as_slice(),
+                stub_content,
+                Some(header.as_str()),
+                force_regeneration,
+            );
+        }
+    }
+}
+
+#[rustversion::not(nightly)]
+pub fn maybe_generate_stub_bindings(
+    _cpu_target: &str,
+    _emulation_mode: &str,
+    _stub_bindings_file: &PathBuf,
+    _bindings_file: &PathBuf,
+) {
+    // Do nothing
 }

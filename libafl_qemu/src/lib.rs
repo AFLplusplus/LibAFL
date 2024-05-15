@@ -1,10 +1,10 @@
-#![cfg_attr(nightly, feature(used_with_arg))]
 //! Welcome to `LibAFL` QEMU
 //!
 //! __Warning__: The documentation is built by default for `x86_64` in `usermode`. To access the documentation of other architectures or `systemmode`, the documentation must be rebuilt with the right features.
 #![doc = include_str!("../../README.md")]
 /*! */
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
+#![forbid(unexpected_cfgs)]
 // libafl_qemu only supports Linux currently
 #![cfg(target_os = "linux")]
 // This lint triggers too often on the current GuestAddr type when emulating 64-bit targets because
@@ -49,6 +49,9 @@ pub use executor::QemuExecutor;
 #[cfg(feature = "fork")]
 pub use executor::QemuForkExecutor;
 
+pub mod qemu;
+pub use qemu::*;
+
 pub mod emu;
 pub use emu::*;
 
@@ -89,16 +92,19 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_submodule(regsm)?;
 
     let mmapm = PyModule::new(py, "mmap")?;
-    for r in emu::MmapPerms::iter() {
+    for r in sys::MmapPerms::iter() {
         let v: i32 = r.into();
         mmapm.add(&format!("{r:?}"), v)?;
     }
     m.add_submodule(mmapm)?;
 
-    m.add_class::<emu::MapInfo>()?;
-    m.add_class::<emu::GuestMaps>()?;
-    m.add_class::<emu::SyscallHookResult>()?;
-    m.add_class::<emu::pybind::Qemu>()?;
+    m.add_class::<sys::MapInfo>()?;
+
+    #[cfg(emulation_mode = "usermode")]
+    m.add_class::<qemu::GuestMaps>()?;
+
+    m.add_class::<qemu::SyscallHookResult>()?;
+    m.add_class::<qemu::pybind::Qemu>()?;
 
     Ok(())
 }

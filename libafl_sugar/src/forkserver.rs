@@ -25,7 +25,7 @@ use libafl_bolts::{
     core_affinity::Cores,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, Merge, Referenceable},
+    tuples::{tuple_list, Handled, Merge},
     AsSliceMut,
 };
 use typed_builder::TypedBuilder;
@@ -115,7 +115,7 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
-        let time_ref = time_observer.reference();
+        let time_ref = time_observer.handle();
 
         let mut run_client = |state: Option<_>,
                               mut mgr: LlmpRestartingEventManager<_, _, _>,

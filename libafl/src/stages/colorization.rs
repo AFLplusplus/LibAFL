@@ -4,7 +4,7 @@ use core::{cmp::Ordering, fmt::Debug, marker::PhantomData, ops::Range};
 
 use libafl_bolts::{
     rands::Rand,
-    tuples::{Reference, Referenceable},
+    tuples::{Handle, Handled},
     Named,
 };
 use serde::{Deserialize, Serialize};
@@ -55,7 +55,7 @@ impl Ord for Earlier {
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
 pub struct ColorizationStage<C, E, EM, O, Z> {
-    map_observer_ref: Reference<C>,
+    map_observer_handle: Handle<C>,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, EM, O, E, Z)>,
 }
@@ -72,7 +72,7 @@ where
     E: UsesState,
 {
     fn name(&self) -> &Cow<'static, str> {
-        self.map_observer_ref.name()
+        self.map_observer_handle.name()
     }
 }
 
@@ -96,7 +96,7 @@ where
         manager: &mut EM,
     ) -> Result<(), Error> {
         // Run with the mutated input
-        Self::colorize(fuzzer, executor, state, manager, &self.map_observer_ref)?;
+        Self::colorize(fuzzer, executor, state, manager, &self.map_observer_handle)?;
 
         Ok(())
     }
@@ -168,7 +168,7 @@ where
         executor: &mut E,
         state: &mut E::State,
         manager: &mut EM,
-        obs_ref: &Reference<C>,
+        observer_handle: &Handle<C>,
     ) -> Result<E::Input, Error> {
         let mut input = state.current_input_cloned()?;
         // The backup of the input
@@ -182,8 +182,14 @@ where
         // First, run orig_input once and get the original hash
 
         // Idea: No need to do this every time
-        let orig_hash =
-            Self::get_raw_map_hash_run(fuzzer, executor, state, manager, consumed_input, obs_ref)?;
+        let orig_hash = Self::get_raw_map_hash_run(
+            fuzzer,
+            executor,
+            state,
+            manager,
+            consumed_input,
+            observer_handle,
+        )?;
         let changed_bytes = changed.bytes_mut();
         let input_len = changed_bytes.len();
 
@@ -228,7 +234,7 @@ where
                     state,
                     manager,
                     consumed_input,
-                    obs_ref,
+                    observer_handle,
                 )?;
 
                 if orig_hash == changed_hash {
@@ -301,7 +307,7 @@ where
     /// Creates a new [`ColorizationStage`]
     pub fn new(map_observer: &C) -> Self {
         Self {
-            map_observer_ref: map_observer.reference(),
+            map_observer_handle: map_observer.handle(),
             phantom: PhantomData,
         }
     }
@@ -313,14 +319,14 @@ where
         state: &mut E::State,
         manager: &mut EM,
         input: E::Input,
-        obs_ref: &Reference<C>,
+        observer_handle: &Handle<C>,
     ) -> Result<usize, Error> {
         executor.observers_mut().pre_exec_all(state, &input)?;
 
         let exit_kind = executor.run_target(fuzzer, state, manager, &input)?;
 
         let observers = executor.observers();
-        let observer = observers[obs_ref].as_ref();
+        let observer = observers[observer_handle].as_ref();
 
         let hash = observer.hash_simple() as usize;
 

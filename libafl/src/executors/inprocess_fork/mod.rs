@@ -363,6 +363,7 @@ pub mod child_signal_handlers {
 #[cfg(test)]
 mod tests {
     use libafl_bolts::tuples::tuple_list;
+    use serial_test::serial;
 
     use crate::{
         executors::{inprocess_fork::GenericInProcessForkExecutorInner, Executor, ExitKind},
@@ -370,6 +371,7 @@ mod tests {
     };
 
     #[test]
+    #[serial]
     #[cfg_attr(miri, ignore)]
     #[cfg(all(feature = "std", feature = "fork", unix))]
     fn test_inprocessfork_exec() {

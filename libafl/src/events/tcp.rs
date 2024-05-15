@@ -15,6 +15,8 @@ use std::{
     sync::Arc,
 };
 
+#[cfg(feature = "tcp_compression")]
+use libafl_bolts::compress::GzipCompressor;
 #[cfg(feature = "std")]
 use libafl_bolts::core_affinity::CoreId;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
@@ -182,8 +184,7 @@ where
                         // we forward the sender id as well, so we add 4 bytes to the message length
                         len += 4;
 
-                        #[cfg(feature = "tcp_debug")]
-                        println!("len +4 = {len:?}");
+                        log::debug!("TCP Manager - len +4 = {len:?}");
 
                         let mut buf = vec![0; len as usize];
 
@@ -198,8 +199,7 @@ where
                             return;
                         }
 
-                        #[cfg(feature = "tcp_debug")]
-                        println!("len: {len:?} - {buf:?}");
+                        log::debug!("TCP Manager - len: {len:?} - {buf:?}");
                         tx_inner.send(buf).await.expect("Could not send");
                     }
                 };
@@ -232,8 +232,7 @@ where
                             _ => panic!("Could not receive"),
                         };
 
-                        #[cfg(feature = "tcp_debug")]
-                        println!("{buf:?}");
+                        log::debug!("TCP Manager - {buf:?}");
 
                         if buf.len() <= 4 {
                             log::warn!("We got no contents (or only the length) in a broadcast");
@@ -241,9 +240,7 @@ where
                         }
 
                         if buf[..4] == this_client_id_bytes {
-                            #[cfg(feature = "tcp_debug")]
-                            eprintln!(
-                            "Not forwarding message from this very client ({this_client_id:?})."
+                            log::debug!("TCP Manager - Not forwarding message from this very client ({this_client_id:?})."
                         );
                             continue;
                         }
@@ -287,8 +284,12 @@ where
             // cut off the ID.
             let event_bytes = &buf[4..];
 
-            let event: Event<I> = postcard::from_bytes(event_bytes).unwrap();
-            match Self::handle_in_broker(&mut self.monitor, client_id, &event).unwrap() {
+            #[cfg(feature = "tcp_compression")]
+            let event_bytes = GzipCompressor::new().decompress(event_bytes)?;
+
+            #[allow(clippy::needless_borrow)] // make decompressed vec and slice compatible
+            let event: Event<I> = postcard::from_bytes(&event_bytes)?;
+            match Self::handle_in_broker(&mut self.monitor, client_id, &event)? {
                 BrokerEventResult::Forward => {
                     tx_bc.send(buf).expect("Could not send");
                 }
@@ -300,9 +301,7 @@ where
                 break;
             }
         }
-
-        #[cfg(feature = "tcp_debug")]
-        println!("The last client quit. Exiting.");
+        log::info!("TCP Manager - The last client quit. Exiting.");
 
         Err(Error::shutting_down())
     }
@@ -551,7 +550,7 @@ where
             tcp,
             client_id,
             #[cfg(feature = "tcp_compression")]
-            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            compressor: GzipCompressor::new(),
             configuration,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
@@ -712,38 +711,17 @@ where
     EMH: EventManagerHooksTuple<S>,
     S: State,
 {
-    #[cfg(feature = "tcp_compression")]
     fn fire(
         &mut self,
         _state: &mut Self::State,
         event: Event<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(&event)?;
-        let flags = TCP_FLAG_INITIALIZED;
 
-        match self.compressor.compress(&serialized)? {
-            Some(comp_buf) => {
-                self.tcp.send_buf_with_flags(
-                    TCP_TAG_EVENT_TO_BOTH,
-                    flags | TCP_FLAG_COMPRESSED,
-                    &comp_buf,
-                )?;
-            }
-            None => {
-                self.tcp.send_buf(TCP_TAG_EVENT_TO_BOTH, &serialized)?;
-            }
-        }
-        Ok(())
-    }
+        #[cfg(feature = "tcp_compression")]
+        let serialized = self.compressor.compress(&serialized);
 
-    #[cfg(not(feature = "tcp_compression"))]
-    fn fire(
-        &mut self,
-        _state: &mut Self::State,
-        event: Event<<Self::State as UsesInput>::Input>,
-    ) -> Result<(), Error> {
-        let serialized = postcard::to_allocvec(&event)?;
-        let size = u32::try_from(serialized.len()).unwrap();
+        let size = u32::try_from(serialized.len())?;
         self.tcp.write_all(&size.to_le_bytes())?;
         self.tcp.write_all(&self.client_id.0.to_le_bytes())?;
         self.tcp.write_all(&serialized)?;
@@ -796,7 +774,7 @@ where
                     self.tcp.set_nonblocking(false).expect("set to blocking");
                     let len = u32::from_le_bytes(len_buf);
                     let mut buf = vec![0_u8; len as usize + 4_usize];
-                    self.tcp.read_exact(&mut buf).unwrap();
+                    self.tcp.read_exact(&mut buf)?;
 
                     let mut client_id_buf = [0_u8; 4];
                     client_id_buf.copy_from_slice(&buf[..4]);
@@ -809,7 +787,14 @@ where
                     } else {
                         log::info!("{self_id:?} (from {other_client_id:?}) Received: {buf:?}");
 
-                        let event = postcard::from_bytes(&buf[4..])?;
+                        let buf = &buf[4..];
+                        #[cfg(feature = "tcp_compression")]
+                        let buf = self.compressor.decompress(buf)?;
+
+                        // make decompressed vec and slice compatible
+                        #[allow(clippy::needless_borrow)]
+                        let event = postcard::from_bytes(&buf)?;
+
                         self.handle_in_client(fuzzer, executor, state, other_client_id, event)?;
                         count += 1;
                     }

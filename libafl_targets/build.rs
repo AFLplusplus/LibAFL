@@ -15,6 +15,7 @@ fn enable_nightly() {}
 
 #[allow(clippy::too_many_lines)]
 fn main() {
+    println!("cargo:rustc-check-cfg=cfg(nightly)");
     enable_nightly();
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = out_dir.to_string_lossy().to_string();
@@ -199,10 +200,11 @@ fn main() {
         }
     }
 
+    let target_family = std::env::var("CARGO_CFG_TARGET_FAMILY").unwrap();
+
     #[cfg(feature = "forkserver")]
     {
-        #[cfg(unix)]
-        {
+        if target_family == "unix" {
             println!("cargo:rerun-if-changed=src/forkserver.c");
 
             cc::Build::new()
@@ -211,8 +213,8 @@ fn main() {
         }
     }
 
-    #[cfg(all(feature = "windows_asan", windows))]
-    {
+    #[cfg(feature = "windows_asan")]
+    if target_family == "windows" {
         println!("cargo:rerun-if-changed=src/windows_asan.c");
 
         cc::Build::new()

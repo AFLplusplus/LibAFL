@@ -14,7 +14,7 @@ use core::{
 pub use concolic::ConcolicFeedback;
 pub use differential::DiffFeedback;
 use libafl_bolts::{
-    tuples::{MatchNameRef, Reference, Referenceable},
+    tuples::{Handle, Handled, MatchNameRef},
     Named,
 };
 pub use list::*;
@@ -138,12 +138,12 @@ where
 }
 
 /// Has an associated observer name (mostly used to retrieve the observer with `MatchName` from an `ObserverTuple`)
-pub trait HasObserverReference {
+pub trait HasObserverHandle {
     /// The observer for which we hold a reference
     type Observer: ?Sized;
 
     /// The name associated with the observer
-    fn observer_ref(&self) -> &Reference<Self::Observer>;
+    fn observer_handle(&self) -> &Handle<Self::Observer>;
 }
 
 /// A combined feedback consisting of multiple [`Feedback`]s
@@ -934,7 +934,7 @@ pub type TimeoutFeedbackFactory = DefaultFeedbackFactory<TimeoutFeedback>;
 /// It decides, if the given [`TimeObserver`] value of a run is interesting.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TimeFeedback {
-    obs_ref: Reference<TimeObserver>,
+    observer_handle: Handle<TimeObserver>,
 }
 
 impl<S> Feedback<S> for TimeFeedback
@@ -971,7 +971,7 @@ where
         OT: ObserversTuple<S>,
         EM: EventFirer<State = S>,
     {
-        let observer = observers.get(&self.obs_ref).unwrap();
+        let observer = observers.get(&self.observer_handle).unwrap();
         *testcase.exec_time_mut() = *observer.last_runtime();
         Ok(())
     }
@@ -986,7 +986,7 @@ where
 impl Named for TimeFeedback {
     #[inline]
     fn name(&self) -> &Cow<'static, str> {
-        self.obs_ref.name()
+        self.observer_handle.name()
     }
 }
 
@@ -995,7 +995,7 @@ impl TimeFeedback {
     #[must_use]
     pub fn new(observer: &TimeObserver) -> Self {
         Self {
-            obs_ref: observer.reference(),
+            observer_handle: observer.handle(),
         }
     }
 }

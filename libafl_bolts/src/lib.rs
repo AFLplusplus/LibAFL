@@ -4,6 +4,7 @@
 #![doc = include_str!("../README.md")]
 /*! */
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
+#![forbid(unexpected_cfgs)]
 #![allow(incomplete_features)]
 #![no_std]
 // For `type_eq`
@@ -121,7 +122,7 @@ pub mod fs;
 #[cfg(feature = "alloc")]
 pub mod llmp;
 pub mod math;
-#[cfg(all(feature = "std", unix))]
+#[cfg(feature = "std")]
 pub mod minibsod;
 pub mod os;
 #[cfg(feature = "alloc")]

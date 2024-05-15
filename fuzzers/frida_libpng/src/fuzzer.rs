@@ -50,8 +50,8 @@ static GLOBAL: MiMalloc = MiMalloc;
 
 /// The main fn, usually parsing parameters, and starting the fuzzer
 pub fn main() {
+    env_logger::init();
     color_backtrace::install();
-
     let options = parse_args();
 
     unsafe {
@@ -65,6 +65,8 @@ pub fn main() {
 /// The actual fuzzer
 #[allow(clippy::too_many_lines, clippy::too_many_arguments)]
 unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
+    log::info!("Frida fuzzer starting up.");
+
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let monitor = MultiMonitor::new(|s| println!("{s}"));
 
@@ -97,7 +99,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
                 #[cfg(unix)]
                 let mut frida_helper =
-                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage, asan));
+                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(asan, coverage));
                 #[cfg(windows)]
                 let mut frida_helper =
                     FridaInstrumentationHelper::new(&gum, &options, tuple_list!(coverage));

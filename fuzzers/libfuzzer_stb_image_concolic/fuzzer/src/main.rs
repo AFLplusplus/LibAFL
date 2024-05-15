@@ -42,7 +42,7 @@ use libafl_bolts::{
     current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, Referenceable},
+    tuples::{tuple_list, Handled},
     AsSlice, AsSliceMut,
 };
 use libafl_targets::{
@@ -207,7 +207,7 @@ fn fuzz(
 
         // The concolic observer observers the concolic shared memory map.
         let concolic_observer = ConcolicObserver::new("concolic", concolic_shmem.as_slice_mut());
-        let concolic_ref = concolic_observer.reference();
+        let concolic_ref = concolic_observer.handle();
 
         // The order of the stages matter!
         let mut stages = tuple_list!(

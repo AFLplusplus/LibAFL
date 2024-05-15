@@ -6,6 +6,7 @@ use alloc::{borrow::Cow, vec::Vec};
 use core::ops::{Deref, DerefMut};
 use core::{
     any::{type_name, TypeId},
+    cell::Cell,
     fmt::{Debug, Formatter},
     marker::PhantomData,
     mem::transmute,
@@ -23,40 +24,37 @@ use crate::HasLen;
 #[cfg(feature = "alloc")]
 use crate::Named;
 
-/// Returns if the type `T` is equal to `U`
-/// From <https://stackoverflow.com/a/60138532/7658998>
-#[rustversion::nightly]
-#[inline]
-#[must_use]
-pub const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
-    // Helper trait. `VALUE` is false, except for the specialization of the
-    // case where `T == U`.
-    trait TypeEq<U: ?Sized> {
-        const VALUE: bool;
-    }
-
-    // Default implementation.
-    impl<T: ?Sized, U: ?Sized> TypeEq<U> for T {
-        default const VALUE: bool = false;
-    }
-
-    // Specialization for `T == U`.
-    impl<T: ?Sized> TypeEq<T> for T {
-        const VALUE: bool = true;
-    }
-
-    <T as TypeEq<U>>::VALUE
-}
-
-/// Returns if the type `T` is equal to `U`
-/// As this relies on [`type_name`](https://doc.rust-lang.org/std/any/fn.type_name.html#note) internally,
-/// there is a chance for collisions.
-/// Use `nightly` if you need a perfect match at all times.
-#[rustversion::not(nightly)]
-#[inline]
+/// Returns if the type `T` is equal to `U`, ignoring lifetimes.
+#[inline] // this entire call gets optimized away :)
 #[must_use]
 pub fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
-    type_name::<T>() == type_name::<U>()
+    // decider struct: hold a cell (which we will update if the types are unequal) and some
+    // phantom data using a function pointer to allow for Copy to be implemented
+    struct W<'a, T: ?Sized, U: ?Sized>(&'a Cell<bool>, PhantomData<fn() -> (&'a T, &'a U)>);
+
+    // default implementation: if the types are unequal, we will use the clone implementation
+    impl<'a, T: ?Sized, U: ?Sized> Clone for W<'a, T, U> {
+        #[inline]
+        fn clone(&self) -> Self {
+            // indicate that the types are unequal
+            // unfortunately, use of interior mutability (Cell) makes this not const-compatible
+            // not really possible to get around at this time
+            self.0.set(false);
+            W(self.0, self.1)
+        }
+    }
+
+    // specialized implementation: Copy is only implemented if the types are the same
+    #[allow(clippy::mismatching_type_param_order)]
+    impl<'a, T: ?Sized> Copy for W<'a, T, T> {}
+
+    let detected = Cell::new(true);
+    // [].clone() is *specialized* in core.
+    // Types which implement copy will have their copy implementations used, falling back to clone.
+    // If the types are the same, then our clone implementation (which sets our Cell to false)
+    // will never be called, meaning that our Cell's content remains true.
+    let res = [W::<T, U>(&detected, PhantomData)].clone();
+    res[0].0.get()
 }
 
 /// Borrow each member of the tuple
@@ -453,10 +451,6 @@ where
 }
 
 /// Match for a name and return the value
-///
-/// # Note
-/// This operation may not be 100% accurate with Rust stable, see the notes for [`type_eq`]
-/// (in `nightly`, it uses [specialization](https://stackoverflow.com/a/60138532/7658998)).
 #[cfg(feature = "alloc")]
 pub trait MatchName {
     /// Match for a name and return the borrowed value
@@ -501,13 +495,13 @@ where
     }
 }
 
-/// Structs that has `Reference `
-/// You should use this when you want to avoid specifying types using `match_name_type_mut`
+/// Structs that have a [`Handle`] to reference this element by, in maps.
+/// You should use this when you want to avoid specifying types.
 #[cfg(feature = "alloc")]
-pub trait Referenceable: Named {
-    /// Return the `Reference `
-    fn reference(&self) -> Reference<Self> {
-        Reference {
+pub trait Handled: Named {
+    /// Return the [`Handle`]
+    fn handle(&self) -> Handle<Self> {
+        Handle {
             name: Named::name(self).clone(),
             phantom: PhantomData,
         }
@@ -515,23 +509,23 @@ pub trait Referenceable: Named {
 }
 
 #[cfg(feature = "alloc")]
-impl<N> Referenceable for N where N: Named {}
+impl<N> Handled for N where N: Named {}
 
 /// Object with the type T and the name associated with its concrete value
 #[derive(Serialize, Deserialize)]
 #[cfg(feature = "alloc")]
-pub struct Reference<T: ?Sized> {
+pub struct Handle<T: ?Sized> {
     name: Cow<'static, str>,
     #[serde(skip)]
     phantom: PhantomData<T>,
 }
 
 #[cfg(feature = "alloc")]
-impl<T: ?Sized> Reference<T> {
+impl<T: ?Sized> Handle<T> {
     /// Fetch the name of the referenced instance.
     ///
     /// We explicitly do *not* implement [`Named`], as this could potentially lead to confusion
-    /// where we make a [`Reference`] of a [`Reference`] as [`Named`] is blanket implemented.
+    /// where we make a [`Handle`] of a [`Handle`] as [`Named`] is blanket implemented.
     #[must_use]
     pub fn name(&self) -> &Cow<'static, str> {
         &self.name
@@ -539,7 +533,7 @@ impl<T: ?Sized> Reference<T> {
 }
 
 #[cfg(feature = "alloc")]
-impl<T> Clone for Reference<T> {
+impl<T> Clone for Handle<T> {
     fn clone(&self) -> Self {
         Self {
             name: self.name.clone(),
@@ -549,23 +543,23 @@ impl<T> Clone for Reference<T> {
 }
 
 #[cfg(feature = "alloc")]
-impl<T> Debug for Reference<T> {
+impl<T> Debug for Handle<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("Reference")
+        f.debug_struct("Handle")
             .field("name", self.name())
             .field("type", &type_name::<T>())
             .finish()
     }
 }
 
-/// Search using `Reference `
+/// Search using `Handle `
 #[cfg(feature = "alloc")]
 pub trait MatchNameRef {
-    /// Search using name and `Reference `
-    fn get<T>(&self, rf: &Reference<T>) -> Option<&T>;
+    /// Search using name and `Handle `
+    fn get<T>(&self, rf: &Handle<T>) -> Option<&T>;
 
-    /// Search using name and `Reference `
-    fn get_mut<T>(&mut self, rf: &Reference<T>) -> Option<&mut T>;
+    /// Search using name and `Handle `
+    fn get_mut<T>(&mut self, rf: &Handle<T>) -> Option<&mut T>;
 }
 
 #[cfg(feature = "alloc")]
@@ -574,11 +568,11 @@ impl<M> MatchNameRef for M
 where
     M: MatchName,
 {
-    fn get<T>(&self, rf: &Reference<T>) -> Option<&T> {
+    fn get<T>(&self, rf: &Handle<T>) -> Option<&T> {
         self.match_name::<T>(&rf.name)
     }
 
-    fn get_mut<T>(&mut self, rf: &Reference<T>) -> Option<&mut T> {
+    fn get_mut<T>(&mut self, rf: &Handle<T>) -> Option<&mut T> {
         self.match_name_mut::<T>(&rf.name)
     }
 }
@@ -623,14 +617,14 @@ where
 }
 
 #[cfg(feature = "alloc")]
-impl<T, RM, M> Index<&Reference<T>> for RefIndexable<RM, M>
+impl<T, RM, M> Index<&Handle<T>> for RefIndexable<RM, M>
 where
     RM: Deref<Target = M>,
     M: MatchName,
 {
     type Output = T;
 
-    fn index(&self, index: &Reference<T>) -> &Self::Output {
+    fn index(&self, index: &Handle<T>) -> &Self::Output {
         let Some(e) = self.get(index) else {
             panic!("Could not find entry matching {index:?}")
         };
@@ -639,12 +633,12 @@ where
 }
 
 #[cfg(feature = "alloc")]
-impl<T, RM, M> IndexMut<&Reference<T>> for RefIndexable<RM, M>
+impl<T, RM, M> IndexMut<&Handle<T>> for RefIndexable<RM, M>
 where
     RM: DerefMut<Target = M>,
     M: MatchName,
 {
-    fn index_mut(&mut self, index: &Reference<T>) -> &mut Self::Output {
+    fn index_mut(&mut self, index: &Handle<T>) -> &mut Self::Output {
         let Some(e) = self.get_mut(index) else {
             panic!("Could not find entry matching {index:?}")
         };

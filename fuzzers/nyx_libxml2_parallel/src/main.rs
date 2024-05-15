@@ -19,7 +19,7 @@ use libafl_bolts::{
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
 };
-use libafl_nyx::{executor::NyxExecutor, helper::NyxHelper, settings::NyxSettings};
+use libafl_nyx::{executor::NyxExecutorBuilder, helper::NyxHelper, settings::NyxSettings};
 
 fn main() {
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
@@ -54,7 +54,7 @@ fn main() {
         let mut feedback = MaxMapFeedback::new(&observer);
         let mut objective = CrashFeedback::new();
         let scheduler = RandScheduler::new();
-        let mut executor = NyxExecutor::new(helper, tuple_list!(observer));
+        let mut executor = NyxExecutorBuilder::new().build(helper, tuple_list!(observer));
 
         // If not restarting, create a State from scratch
         let mut state = state.unwrap_or_else(|| {
