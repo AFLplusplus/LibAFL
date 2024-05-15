@@ -816,7 +816,7 @@ where
         }
         SYS_brk => {
             let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
-            if h.brk != result {
+            if h.brk != result && result != 0 {
                 /* brk has changed. we change mapping from the snapshotted brk address to the new target_brk
                  * If no brk mapping has been made until now, change_mapped won't change anything and just create a new mapping.
                  * It is safe to assume RW perms here
