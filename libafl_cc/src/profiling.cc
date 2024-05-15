@@ -79,10 +79,10 @@ class AnalysisPass : public ModulePass {
 #endif
 
  protected:
-  DenseMap<BasicBlock *, uint32_t>               bb_to_cur_loc;
-  DenseMap<StringRef, BasicBlock *>              entry_bb;
-  DenseMap<BasicBlock *, std::vector<StringRef>> calls_in_bb;
-  DenseMap<StringRef, std::vector<StringRef>>    structLinks;
+  DenseMap<BasicBlock *, uint32_t>                  bb_to_cur_loc;
+  DenseMap<StringRef, BasicBlock *>                 entry_bb;
+  DenseMap<BasicBlock *, std::vector<StringRef>>    calls_in_bb;
+  DenseMap<StringRef, std::vector<StringRef>>       structLinks;
   DenseMap<StringRef, std::unordered_map<int, int>> structDesc;
   // The type name is not in the memory, so create std::strign impromptu
 
@@ -427,10 +427,7 @@ bool AnalysisPass::runOnModule(Module &M) {
     nlohmann::json res;
 
     for (auto &F : M) {
-
-      if (F.isDeclaration()) {
-        continue;
-      }
+      if (F.isDeclaration()) { continue; }
 
       DenseMap<StringRef, u_int32_t>            APIcalls;
       DenseMap<StringRef, uint32_t>             heapAPIs;
@@ -512,9 +509,7 @@ bool AnalysisPass::runOnModule(Module &M) {
                 heapAPIs["delete"]++;
               }
 
-              if (isMemorySensitiveFn(name)) { 
-                memoryAPIs[name]++; 
-              }
+              if (isMemorySensitiveFn(name)) { memoryAPIs[name]++; }
 
               if (isMemCmp(M, callBase)) {
                 cmpComplexity["mem cmp"]++;
@@ -555,8 +550,8 @@ bool AnalysisPass::runOnModule(Module &M) {
             }
             auto typ = cmpInst->getOperand(0)->getType();
 
-            auto op0 = cmpInst->getOperand(0);
-            auto op1 = cmpInst->getOperand(1);
+            auto     op0 = cmpInst->getOperand(0);
+            auto     op1 = cmpInst->getOperand(1);
             uint32_t num_constants = 0;
             uint32_t non_zero_constants = 0;
 
@@ -564,16 +559,12 @@ bool AnalysisPass::runOnModule(Module &M) {
             Constant *c2 = nullptr;
 
             if ((c1 = dyn_cast<Constant>(op0))) {
-              if (!c1->isZeroValue())  {
-                non_zero_constants++;
-              }
+              if (!c1->isZeroValue()) { non_zero_constants++; }
               num_constants++;
             }
 
             if ((c2 = dyn_cast<Constant>(op1))) {
-              if (c2->isZeroValue())  {
-                non_zero_constants++;
-              }
+              if (c2->isZeroValue()) { non_zero_constants++; }
               num_constants++;
             }
 
@@ -781,7 +772,8 @@ bool AnalysisPass::runOnModule(Module &M) {
       // outs() << "\n";
     }
 
-    for (auto record = structDesc.begin(); record != structDesc.end(); record++) {
+    for (auto record = structDesc.begin(); record != structDesc.end();
+         record++) {
       auto key = record->getFirst();
       struct_links[moduleName][std::string(key)]["desc"] = record->second;
     }
