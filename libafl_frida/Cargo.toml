@@ -84,7 +84,7 @@ bit_reverse = "0.1.8"
 yaxpeax-arch = "0.2.7"
 
 [target.'cfg(windows)'.dependencies]
-winsafe = {version = "0.0.18", features = ["kernel"]}
+winsafe = {version = "0.0.20", features = ["kernel"]}
 
 
 [dev-dependencies]
