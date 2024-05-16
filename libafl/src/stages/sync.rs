@@ -19,7 +19,7 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, UsesInput},
-    stages::{RetryRestartHelper, Stage},
+    stages::{HashSet, RetryRestartHelper, Stage},
     state::{HasCorpus, HasExecutions, HasRand, State, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -50,6 +50,7 @@ impl SyncFromDiskMetadata {
 pub struct SyncFromDiskStage<CB, E, EM, Z> {
     sync_dir: PathBuf,
     load_callback: CB,
+    to_sync: HashSet<PathBuf>,
     phantom: PhantomData<(E, EM, Z)>,
 }
 
@@ -91,8 +92,10 @@ where
             .get::<SyncFromDiskMetadata>()
             .map(|m| m.last_time);
         let path = self.sync_dir.clone();
+        // Tracks new files to sync based on `last_time`. Files are added to `self.to_sync` and
+        // removed before evaluation to ensure each file is processed exactly once.
         if let Some(max_time) =
-            self.load_from_directory(&path, &last, fuzzer, executor, state, manager)?
+            self.load_from_directory(&path, &last)?
         {
             if last.is_none() {
                 state
@@ -104,6 +107,19 @@ where
                     .get_mut::<SyncFromDiskMetadata>()
                     .unwrap()
                     .last_time = max_time;
+            }
+            // Iterate over the paths of files left to sync.
+            // By keeping track of these files, we ensure that no file is missed during synchronization,
+            // even in the event of a target restart.
+            let to_sync = self.to_sync.clone();
+            for path in to_sync {
+                let input = (self.load_callback)(fuzzer, state, &path)?;
+                // Removing each path from the `to_sync` HashSet after processing
+                // prevents duplicate processing and ensures that each file is evaluated only once. This approach helps
+                // avoid potential infinite loops that may occur if a file is an objective, as SyncFromDiskStage can safely
+                // resume syncing from the remaining files.
+                self.to_sync.remove(&path);
+                fuzzer.evaluate_input(state, executor, manager, input)?;
             }
         }
 
@@ -140,6 +156,7 @@ where
         Self {
             sync_dir,
             load_callback,
+            to_sync: HashSet::default(),
             phantom: PhantomData,
         }
     }
@@ -148,12 +165,9 @@ where
         &mut self,
         in_dir: &Path,
         last: &Option<SystemTime>,
-        fuzzer: &mut Z,
-        executor: &mut E,
-        state: &mut Z::State,
-        manager: &mut EM,
     ) -> Result<Option<SystemTime>, Error> {
         let mut max_time = None;
+
         for entry in fs::read_dir(in_dir)? {
             let entry = entry?;
             let path = entry.path();
@@ -168,17 +182,17 @@ where
             if attr.is_file() && attr.len() > 0 {
                 if let Ok(time) = attr.modified() {
                     if let Some(l) = last {
-                        if time.duration_since(*l).is_err() {
+                        if time.duration_since(*l).is_err() || time == *l {
                             continue;
                         }
                     }
                     max_time = Some(max_time.map_or(time, |t: SystemTime| t.max(time)));
-                    let input = (self.load_callback)(fuzzer, state, &path)?;
-                    fuzzer.evaluate_input(state, executor, manager, input)?;
+                    log::info!("Syncing file: {:?}", path);
+                    self.to_sync.insert(path.clone());
                 }
             } else if attr.is_dir() {
                 let dir_max_time =
-                    self.load_from_directory(&path, last, fuzzer, executor, state, manager)?;
+                    self.load_from_directory(&path, last)?;
                 if let Some(time) = dir_max_time {
                     max_time = Some(max_time.map_or(time, |t: SystemTime| t.max(time)));
                 }
@@ -213,6 +227,7 @@ where
         Self {
             sync_dir,
             load_callback: load_callback::<_, _>,
+            to_sync: HashSet::default(),
             phantom: PhantomData,
         }
     }
