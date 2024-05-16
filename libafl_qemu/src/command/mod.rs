@@ -76,7 +76,7 @@ macro_rules! define_std_command_manager {
                     vec![$(Box::new($native_command_parser)
                         as Box<
                             dyn NativeCommandParser<
-                                StdCommandManager<QT, S, SM>,
+                                Self,
                                 StdEmulatorExitHandler<SM>,
                                 QT,
                                 S,
