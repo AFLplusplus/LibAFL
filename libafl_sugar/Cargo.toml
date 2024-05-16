@@ -16,18 +16,33 @@ categories = ["development-tools::testing", "emulators", "embedded", "os", "no-s
 all-features = true
 
 [features]
-python = ["pyo3", "libafl_qemu/python", "pyo3-build-config"]
 default = []
+document-features = ["dep:document-features"]
+clippy = [ "libafl_qemu/clippy" ] # special feature for clippy, don't use in normal projects
 
-# for libafl_qemu
-# The following architecture features are mutually exclusive.
-x86_64 = ["libafl_qemu/x86_64"] # build qemu for x86_64 (default)
-i386 = ["libafl_qemu/i386"] # build qemu for i386
-arm = ["libafl_qemu/arm"] # build qemu for arm
-aarch64 = ["libafl_qemu/aarch64"] # build qemu for aarch64
-mips = ["libafl_qemu/mips"] # build qemu for mips (el, use with the 'be' feature of mips be)
-ppc = ["libafl_qemu/ppc"] # build qemu for powerpc
-hexagon = ["libafl_qemu/hexagon"] # build qemu for hexagon
+#! # Feature Flags
+#! ## General Features
+
+## Build python bindings
+python = ["pyo3", "libafl_qemu/python", "pyo3-build-config"]
+
+#! ## Features for `libafl_qemu` (Linux only)
+#! The following architecture features are mutually exclusive.
+
+## build qemu for x86_64 (default)
+x86_64 = ["libafl_qemu/x86_64"]
+## build qemu for i386
+i386 = ["libafl_qemu/i386"]
+## build qemu for arm
+arm = ["libafl_qemu/arm"]
+## build qemu for aarch64
+aarch64 = ["libafl_qemu/aarch64"]
+## build qemu for mips (el, use with the 'be' feature of mips be)
+mips = ["libafl_qemu/mips"]
+## build qemu for powerpc
+ppc = ["libafl_qemu/ppc"]
+## build qemu for hexagon
+hexagon = ["libafl_qemu/hexagon"]
 
 [build-dependencies]
 pyo3-build-config = { version = "0.18", optional = true }
@@ -36,6 +51,9 @@ pyo3-build-config = { version = "0.18", optional = true }
 libafl = { path = "../libafl", version = "0.12.0", features = ["adaptive_serialization"] }
 libafl_bolts = { path = "../libafl_bolts", version = "0.12.0" }
 libafl_targets = { path = "../libafl_targets", version = "0.12.0" }
+
+# Document all features of this crate (for `cargo doc`)
+document-features = { version = "0.2", optional = true }
 
 typed-builder = "0.18" # Implement the builder pattern at compiletime
 pyo3 = { version = "0.18", optional = true }
@@ -47,4 +65,3 @@ libafl_qemu = { path = "../libafl_qemu", version = "0.12.0" }
 [lib]
 name = "libafl_sugar"
 crate-type = ["cdylib", "rlib"]
-
