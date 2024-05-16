@@ -87,6 +87,7 @@ where
         state: &mut Z::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
+        log::debug!("Syncing from disk. Left to sync: {:?}", self.to_sync.len());
         let last = state
             .metadata_map()
             .get::<SyncFromDiskMetadata>()
@@ -110,6 +111,7 @@ where
             // By keeping track of these files, we ensure that no file is missed during synchronization,
             // even in the event of a target restart.
             let to_sync = self.to_sync.clone();
+            let count = 0;
             for path in to_sync {
                 let input = (self.load_callback)(fuzzer, state, &path)?;
                 // Removing each path from the `to_sync` HashSet after processing
@@ -117,6 +119,7 @@ where
                 // avoid potential infinite loops that may occur if a file is an objective, as SyncFromDiskStage can safely
                 // resume syncing from the remaining files.
                 self.to_sync.remove(&path);
+                log::debug!("Removed file from to_sync: {:?} - count {:?}", path, count);
                 fuzzer.evaluate_input(state, executor, manager, input)?;
             }
         }
@@ -196,6 +199,7 @@ where
             }
         }
 
+        log::debug!("Number of loaded files {:?}", self.to_sync.len());
         Ok(max_time)
     }
 }
