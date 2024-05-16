@@ -94,9 +94,7 @@ where
         let path = self.sync_dir.clone();
         // Tracks new files to sync based on `last_time`. Files are added to `self.to_sync` and
         // removed before evaluation to ensure each file is processed exactly once.
-        if let Some(max_time) =
-            self.load_from_directory(&path, &last)?
-        {
+        if let Some(max_time) = self.load_from_directory(&path, &last)? {
             if last.is_none() {
                 state
                     .metadata_map_mut()
@@ -191,8 +189,7 @@ where
                     self.to_sync.insert(path.clone());
                 }
             } else if attr.is_dir() {
-                let dir_max_time =
-                    self.load_from_directory(&path, last)?;
+                let dir_max_time = self.load_from_directory(&path, last)?;
                 if let Some(time) = dir_max_time {
                     max_time = Some(max_time.map_or(time, |t: SystemTime| t.max(time)));
                 }
