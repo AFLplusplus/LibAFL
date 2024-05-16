@@ -20,7 +20,7 @@ use libafl::{
     inputs::UsesInput,
     monitors::{
         tui::{ui::TuiUI, TuiMonitor},
-        Monitor, MultiMonitor, SimpleMonitor,
+        Monitor, MultiMonitor,
     },
     stages::{HasCurrentStage, StagesTuple},
     state::{HasExecutions, HasLastReportTime, HasSolutions, UsesState},
@@ -226,7 +226,7 @@ pub fn fuzz(
     } else {
         destroy_output_fds(options);
         fuzz_with!(options, harness, do_fuzz, |fuzz_single| {
-            let mgr = SimpleEventManager::new(SimpleMonitor::new(create_monitor_closure()));
+            let mgr = SimpleEventManager::new(MultiMonitor::new(create_monitor_closure()));
             crate::start_fuzzing_single(fuzz_single, None, mgr)
         })
     }
