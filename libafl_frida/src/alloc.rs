@@ -556,7 +556,7 @@ impl Allocator {
             &mut |range: &RangeDetails| -> bool {
                 let start = range.memory_range().base_address().0 as usize;
                 let end = start + range.memory_range().size();
-                //the poisoned region should be the highest valid userspace region
+                //the shadow region should be the highest valid userspace region, so don't continue after
                 if self.is_managed(start as *mut c_void) {
                     false
                 } else {
@@ -593,7 +593,7 @@ impl Allocator {
 
                 #[cfg(target_vendor = "apple")]
                 if start >= 0x600000000000 {
-                    //this is the MALLOC_NANO region. There is no point in poisoning this as we replace malloc.
+                    //this is the MALLOC_NANO region. There is no point in spending time tracking this region as we hook malloc
                     return false;
                 }
 

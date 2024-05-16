@@ -37,7 +37,7 @@ use yaxpeax_arch::Arch;
 #[cfg(target_arch = "aarch64")]
 use yaxpeax_arm::armv8::a64::{ARMv8, InstDecoder, Opcode, Operand, ShiftStyle, SizeCode};
 #[cfg(target_arch = "x86_64")]
-use yaxpeax_x86::amd64::{InstDecoder, Instruction, Opcode};
+use yaxpeax_x86::{amd64::{InstDecoder, Instruction, Opcode}, long_mode::DisplayStyle};
 
 #[cfg(target_arch = "x86_64")]
 use crate::utils::frida_to_cs;
@@ -495,8 +495,6 @@ impl AsanRuntime {
                     static mut [<$name:snake:upper _PTR>]: *const c_void = 0 as *const c_void;
                     unsafe {[<$name:snake:upper _PTR>] = target_function.0}
 
-                   // extern "system" { fn $name($($param: $param_type),*) -> $return_type; }
-
                     #[allow(non_snake_case)]
                     unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
                         let mut invocation = Interceptor::current_invocation();
@@ -517,13 +515,6 @@ impl AsanRuntime {
                             this.hooks_enabled = previous_hook_state;
                             ret
                         }
-
-                      /*  if !this.suppressed_addresses.contains(&real_address) && this.module_map.as_ref().unwrap().find(real_address as u64).is_some() {
-                            this.[<hook_ $name>]($($param),*)
-                        } else {
-                            let f = unsafe {std::mem::transmute::<*const c_void, extern "C" fn($($param: $param_type),*) -> $return_type>([<$name:snake:upper _PTR>])};
-                            f($($param),*)
-                        } */
                     }
 
                     let self_ptr = core::ptr::from_ref(self) as usize;
@@ -576,6 +567,51 @@ impl AsanRuntime {
                         NativePointer([<replacement_ $name>] as *mut c_void),
                         NativePointer(self_ptr as *mut c_void)
                     );
+                    self.hooks.push(target_function);
+                }
+            }
+        }
+        //This is used for cases where the hook needs a pointer to the original function
+        #[cfg(windows)]
+        macro_rules! hook_func_nolinkage {
+            ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
+                paste::paste! {
+                    log::trace!("Hooking {}", stringify!($name));
+
+                    let target_function = frida_gum::Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function");
+
+                    static mut [<$name:snake:upper _PTR>]: *const c_void = 0 as *const c_void;
+                    unsafe {[<$name:snake:upper _PTR>] = target_function.0}
+
+
+                    #[allow(non_snake_case)]
+                    unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
+                        let mut invocation = Interceptor::current_invocation();
+                        let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
+                        let original = unsafe {std::mem::transmute::<*const c_void, extern "C" fn($($param: $param_type),*) -> $return_type>([<$name:snake:upper _PTR>])};
+                        if this.hooks_enabled {
+                            let previous_hook_state = this.hooks_enabled;
+                            this.hooks_enabled = false;
+                            let ret = this.[<hook_ $name>]($($param),*, original);
+                            this.hooks_enabled = previous_hook_state;
+                            ret
+                        } else {
+                            
+                            let previous_hook_state = this.hooks_enabled;
+                            this.hooks_enabled = false;
+                            let ret = (original)($($param),*);
+                            this.hooks_enabled = previous_hook_state;
+                            ret
+                        }
+                    }
+
+                    let self_ptr = core::ptr::from_ref(self) as usize;
+                    let _ = interceptor.replace(
+                        target_function,
+                        NativePointer([<replacement_ $name>] as *mut c_void),
+                        NativePointer(self_ptr as *mut c_void)
+                    );
+
                     self.hooks.push(target_function);
                 }
             }
@@ -807,7 +843,7 @@ impl AsanRuntime {
                         );
                     }
                     "MapViewOfFile" => {
-                        hook_func!(
+                        hook_func_nolinkage!(
                             Some(libname),
                             MapViewOfFile,
                             (handle: *const c_void, desired_access: u32, file_offset_high: u32, file_offset_low: u32, size: usize),
@@ -1207,7 +1243,7 @@ impl AsanRuntime {
     #[allow(clippy::cast_sign_loss)]
     #[allow(clippy::too_many_lines)]
     extern "system" fn handle_trap(&mut self) {
-        self.hooks_enabled = false;
+        self.disable_hooks();
 
         self.dump_registers();
 
@@ -1223,7 +1259,7 @@ impl AsanRuntime {
         );
 
         let insn = instructions[0]; // This is the very instruction that has triggered fault
-        log::info!("{insn:#?}");
+        log::info!("Fault Instruction: {}", insn.display_with(DisplayStyle::Intel).to_string());
         let operand_count = insn.operand_count();
 
         let mut access_type: Option<AccessType> = None;
@@ -1367,12 +1403,14 @@ impl AsanRuntime {
         // std::thread::sleep(std::time::Duration::from_secs(60));
 
         // self.dump_registers();
+        self.enable_hooks();
     }
 
     #[cfg(target_arch = "aarch64")]
     #[allow(clippy::cast_sign_loss)] // for displacement
     #[allow(clippy::too_many_lines)]
     extern "system" fn handle_trap(&mut self) {
+        self.disable_hooks();
         let mut actual_pc = self.regs[31];
         actual_pc = match self.stalked_addresses.get(&actual_pc) {
             //get the pc associated with the trapped insn
@@ -1489,6 +1527,7 @@ impl AsanRuntime {
             ))
         };
         AsanErrors::get_mut_blocking().report_error(error);
+        self.enable_hooks();
     }
 
     #[cfg(target_arch = "x86_64")]
@@ -1655,7 +1694,7 @@ impl AsanRuntime {
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
         shadow_check!(ops, bit);
         let ops_vec = ops.finalize().unwrap();
-        ops_vec[..ops_vec.len() - 10].to_vec().into_boxed_slice() //subtract 10 because
+        ops_vec[..ops_vec.len() - 10].to_vec().into_boxed_slice() //subtract 10 because we don't need the last nop
     }
 
     #[cfg(target_arch = "aarch64")]
@@ -2513,6 +2552,7 @@ impl AsanRuntime {
                             .to_le_bytes(),
                     ); //add x0, x0, w1, [shift] #[amount]
                 } else if shift_encoding != -1 {
+                    //https://developer.arm.com/documentation/ddi0602/2024-03/Base-Instructions/ADD--shifted-register---Add--shifted-register-- add shifted register
                     #[allow(clippy::cast_sign_loss)]
                     writer.put_bytes(
                         &(0x8b010000 | ((shift_encoding as u32) << 22) | (shift_amount << 10))
