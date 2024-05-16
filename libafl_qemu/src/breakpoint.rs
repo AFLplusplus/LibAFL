@@ -47,6 +47,12 @@ impl BreakpointId {
     }
 }
 
+impl Default for BreakpointId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<CM, E, QT, S> Hash for Breakpoint<CM, E, QT, S>
 where
     CM: CommandManager<E, QT, S>,

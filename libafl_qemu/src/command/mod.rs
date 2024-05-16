@@ -136,6 +136,18 @@ macro_rules! define_std_command_manager {
                 write!(f, stringify!($name))
             }
         }
+
+        impl<QT, S, SM> Default for $name<QT, S, SM>
+        where
+            QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
+            S: State + HasExecutions,
+            S::Input: HasTargetBytes,
+            SM: IsSnapshotManager,
+        {
+            fn default() -> Self {
+                Self::new()
+            }
+        }
     };
 }
 

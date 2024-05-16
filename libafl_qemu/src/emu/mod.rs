@@ -25,6 +25,7 @@ pub use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestVirtAddr};
 #[cfg(emulation_mode = "usermode")]
 pub use libafl_qemu_sys::{MapInfo, MmapPerms, MmapPermsIter};
 use num_traits::Num;
+use typed_builder::TypedBuilder;
 
 use crate::{
     breakpoint::Breakpoint,
@@ -48,6 +49,9 @@ mod systemmode;
 pub use systemmode::*;
 
 use crate::{breakpoint::BreakpointId, command::CommandManager};
+
+type CommandRef<CM, E, QT, S> = Rc<dyn IsCommand<CM, E, QT, S>>;
+type BreakpointMutRef<CM, E, QT, S> = Rc<RefCell<Breakpoint<CM, E, QT, S>>>;
 
 #[derive(Clone, Copy)]
 pub enum GuestAddrKind {
@@ -243,13 +247,15 @@ impl InputLocation {
 }
 
 /// Synchronous Exit handler maintaining only one snapshot.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, TypedBuilder)]
 pub struct StdEmulatorExitHandler<SM>
 where
     SM: IsSnapshotManager + Clone,
 {
     snapshot_manager: RefCell<SM>,
+    #[builder(default)]
     snapshot_id: OnceCell<SnapshotId>,
+    #[builder(default)]
     input_location: OnceCell<InputLocation>,
 }
 
@@ -299,7 +305,7 @@ where
         qemu_executor_state: &mut QemuExecutorState<QT, S>,
         input: &S::Input,
     ) {
-        let exit_handler = emu.state().exit_handler.borrow();
+        let exit_handler = emu.exit_handler.borrow();
 
         if let Some(input_location) = exit_handler.input_location.get() {
             let input_command =
@@ -335,7 +341,8 @@ where
             },
         };
 
-        let (command, ret_reg): (Option<Rc<dyn IsCommand<CM, Self, QT, S>>>, Option<Regs>) =
+        #[allow(clippy::type_complexity)]
+        let (command, ret_reg): (Option<CommandRef<CM, Self, QT, S>>, Option<Regs>) =
             match &mut exit_reason {
                 EmulatorExitResult::QemuExit(shutdown_cause) => match shutdown_cause {
                     QemuShutdownCause::HostSignal(signal) => {
@@ -402,8 +409,8 @@ impl From<CommandError> for EmulatorExitError {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct EmulatorState<CM, E, QT, S>
+#[derive(Clone, Debug, TypedBuilder)]
+pub struct Emulator<CM, E, QT, S>
 where
     CM: CommandManager<E, QT, S>,
     E: EmulatorExitHandler<QT, S>,
@@ -412,21 +419,12 @@ where
 {
     command_manager: CM,
     exit_handler: RefCell<E>,
-    breakpoints_by_addr: RefCell<HashMap<GuestAddr, Rc<RefCell<Breakpoint<CM, E, QT, S>>>>>,
-    breakpoints_by_id: RefCell<HashMap<BreakpointId, Rc<RefCell<Breakpoint<CM, E, QT, S>>>>>,
-    _phantom: PhantomData<(QT, S)>,
-}
-
-#[derive(Clone, Debug)]
-pub struct Emulator<CM, E, QT, S>
-where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
-    QT: QemuHelperTuple<S>,
-    S: State + HasExecutions,
-{
-    state: EmulatorState<CM, E, QT, S>,
+    #[builder(default)]
+    breakpoints_by_addr: RefCell<HashMap<GuestAddr, BreakpointMutRef<CM, E, QT, S>>>,
+    #[builder(default)]
+    breakpoints_by_id: RefCell<HashMap<BreakpointId, BreakpointMutRef<CM, E, QT, S>>>,
     qemu: Qemu,
+    _phantom: PhantomData<(QT, S)>,
 }
 
 #[allow(clippy::unused_self)]
@@ -454,16 +452,12 @@ where
         exit_handler: E,
         command_manager: CM,
     ) -> Result<Self, QemuInitError> {
-        let emu_state = EmulatorState {
+        Ok(Emulator {
             command_manager,
             exit_handler: RefCell::new(exit_handler),
             breakpoints_by_addr: RefCell::new(HashMap::new()),
             breakpoints_by_id: RefCell::new(HashMap::new()),
             _phantom: PhantomData,
-        };
-
-        Ok(Emulator {
-            state: emu_state,
             qemu,
         })
     }
@@ -474,18 +468,8 @@ where
     }
 
     #[must_use]
-    pub fn state(&self) -> &EmulatorState<CM, E, QT, S> {
-        &self.state
-    }
-
-    #[must_use]
-    pub fn state_mut(&mut self) -> &mut EmulatorState<CM, E, QT, S> {
-        &mut self.state
-    }
-
-    #[must_use]
     pub fn exit_handler(&self) -> &RefCell<E> {
-        &self.state().exit_handler
+        &self.exit_handler
     }
 
     #[must_use]
@@ -583,8 +567,7 @@ where
         let bp_ref = Rc::new(RefCell::new(bp));
 
         assert!(
-            self.state()
-                .breakpoints_by_addr
+            self.breakpoints_by_addr
                 .borrow_mut()
                 .insert(bp_addr, bp_ref.clone())
                 .is_none(),
@@ -592,8 +575,7 @@ where
         );
 
         assert!(
-            self.state()
-                .breakpoints_by_id
+            self.breakpoints_by_id
                 .borrow_mut()
                 .insert(bp_id, bp_ref)
                 .is_none(),
@@ -605,7 +587,7 @@ where
 
     pub fn remove_breakpoint(&self, bp_id: BreakpointId) {
         let bp_addr = {
-            let mut bp_map = self.state().breakpoints_by_id.borrow_mut();
+            let mut bp_map = self.breakpoints_by_id.borrow_mut();
             let mut bp = bp_map
                 .get_mut(&bp_id)
                 .expect("Did not find the breakpoint")
@@ -614,13 +596,11 @@ where
             bp.addr()
         };
 
-        self.state()
-            .breakpoints_by_id
+        self.breakpoints_by_id
             .borrow_mut()
             .remove(&bp_id)
             .expect("Could not remove bp");
-        self.state()
-            .breakpoints_by_addr
+        self.breakpoints_by_addr
             .borrow_mut()
             .remove(&bp_addr)
             .expect("Could not remove bp");
@@ -646,7 +626,6 @@ where
                 }
                 QemuExitReason::Breakpoint(bp_addr) => {
                     let bp = self
-                        .state()
                         .breakpoints_by_addr
                         .borrow()
                         .get(&bp_addr)
@@ -655,7 +634,7 @@ where
                     EmulatorExitResult::Breakpoint(bp.clone())
                 }
                 QemuExitReason::SyncExit => EmulatorExitResult::SyncExit(Rc::new(RefCell::new(
-                    SyncExit::new(self.state.command_manager.parse(self.qemu)?),
+                    SyncExit::new(self.command_manager.parse(self.qemu)?),
                 ))),
             }),
             Err(qemu_exit_reason_error) => Err(match qemu_exit_reason_error {
