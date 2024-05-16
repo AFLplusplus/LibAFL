@@ -8,6 +8,8 @@ use crate::{
     Error,
 };
 
+use super::StageIdx;
+
 /// Progress for nested stages. This merely enters/exits the inner stage's scope.
 #[derive(Debug)]
 pub struct NestedStageRestartHelper;
@@ -236,16 +238,16 @@ where
         let fresh = current.is_none();
         let closure_return = fresh && (self.closure)(fuzzer, executor, state, manager)?;
 
-        if current == Some(0) || closure_return {
+        if current == Some(StageIdx(0)) || closure_return {
             if fresh {
-                state.set_stage(0)?;
+                state.set_stage(StageIdx(0))?;
             }
             state.enter_inner_stage()?;
             self.if_stages
                 .perform_all(fuzzer, executor, state, manager)?;
         } else {
             if fresh {
-                state.set_stage(1)?;
+                state.set_stage(StageIdx(1))?;
             }
             state.enter_inner_stage()?;
             self.else_stages

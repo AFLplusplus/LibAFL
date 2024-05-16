@@ -3,19 +3,19 @@ use alloc::vec::Vec;
 use libafl_bolts::Error;
 use serde::{Deserialize, Serialize};
 
-use crate::stages::{HasCurrentStage, HasNestedStageStatus};
+use crate::stages::{HasCurrentStage, HasNestedStageStatus, StageIdx};
 
 /// A stack to keep track of which stage is executing
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct StageStack {
     /// The stage indexes for each nesting of stages
-    stage_idx_stack: Vec<usize>,
+    stage_idx_stack: Vec<StageIdx>,
     /// The current stage depth
     stage_depth: usize,
 }
 
 impl HasCurrentStage for StageStack {
-    fn set_stage(&mut self, idx: usize) -> Result<(), Error> {
+    fn set_stage(&mut self, idx: StageIdx) -> Result<(), Error> {
         // ensure we are in the right frame
         if self.stage_depth != self.stage_idx_stack.len() {
             return Err(Error::illegal_state(
@@ -31,7 +31,7 @@ impl HasCurrentStage for StageStack {
         Ok(())
     }
 
-    fn current_stage(&self) -> Result<Option<usize>, Error> {
+    fn current_stage(&self) -> Result<Option<StageIdx>, Error> {
         Ok(self.stage_idx_stack.get(self.stage_depth).copied())
     }
 
