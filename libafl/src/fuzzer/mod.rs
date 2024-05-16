@@ -1,6 +1,5 @@
 //! The `Fuzzer` is the main struct for a fuzz campaign.
 
-use alloc::string::ToString;
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
 
 use libafl_bolts::current_time;
@@ -206,7 +205,7 @@ where
         executor: &mut E,
         state: &mut EM::State,
         manager: &mut EM,
-    ) -> Result<CorpusId, Error>;
+    ) -> Result<Option<CorpusId>, Error>;
 
     /// Fuzz forever (or until stopped)
     fn fuzz_loop(
@@ -240,20 +239,15 @@ where
         state: &mut EM::State,
         manager: &mut EM,
         iters: u64,
-    ) -> Result<CorpusId, Error> {
-        if iters == 0 {
-            return Err(Error::illegal_argument(
-                "Cannot fuzz for 0 iterations!".to_string(),
-            ));
-        }
-
+    ) -> Result<Option<CorpusId>, Error> {
         let mut ret = None;
         let monitor_timeout = STATS_TIMEOUT_DEFAULT;
 
         for _ in 0..iters {
             // log::info!("Starting another fuzz_loop");
             manager.maybe_report_progress(state, monitor_timeout)?;
-            ret = Some(self.fuzz_one(stages, executor, state, manager)?);
+            let next_ret = self.fuzz_one(stages, executor, state, manager)?;
+            ret = ret.or(next_ret);
         }
 
         manager.report_progress(state)?;
@@ -263,7 +257,7 @@ where
         // But as the state may grow to a few megabytes,
         // for now we won't, and the user has to do it (unless we find a way to do this on `Drop`).
 
-        Ok(ret.unwrap())
+        Ok(ret)
     }
 }
 
@@ -707,18 +701,28 @@ where
         executor: &mut E,
         state: &mut CS::State,
         manager: &mut EM,
-    ) -> Result<CorpusId, Error> {
+    ) -> Result<Option<CorpusId>, Error> {
         // Init timer for scheduler
         #[cfg(feature = "introspection")]
         state.introspection_monitor_mut().start_timer();
 
         // Get the next index from the scheduler
-        let idx = if let Some(idx) = state.current_corpus_idx()? {
-            idx // we are resuming
-        } else {
-            let idx = self.scheduler.next(state)?;
-            state.set_corpus_idx(idx)?; // set up for resume
-            idx
+        let idx = match state.current_corpus_idx()? {
+            // We're resuming
+            Some(idx) => {
+                state.set_corpus_idx(idx)?; // set up for resume
+                Some(idx)
+            }
+            None => {
+                match self.scheduler.next(state) {
+                    Ok(idx) => {
+                        state.set_corpus_idx(idx)?; // set up for resume
+                        Some(idx)
+                    }
+                    Err(Error::Empty(..)) => None,
+                    Err(e) => return Err(e),
+                }
+            }
         };
 
         // Mark the elapsed time for the scheduler
@@ -743,7 +747,7 @@ where
         #[cfg(feature = "introspection")]
         state.introspection_monitor_mut().mark_manager_time();
 
-        {
+        if let Some(idx) = idx {
             if let Ok(mut testcase) = state.testcase_mut(idx) {
                 let scheduled_count = testcase.scheduled_count();
                 // increase scheduled count, this was fuzz_level in afl
@@ -910,7 +914,7 @@ pub mod test {
             _executor: &mut E,
             _state: &mut EM::State,
             _manager: &mut EM,
-        ) -> Result<CorpusId, Error> {
+        ) -> Result<Option<CorpusId>, Error> {
             unimplemented!()
         }
     }

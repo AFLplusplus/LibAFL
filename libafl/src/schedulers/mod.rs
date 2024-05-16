@@ -14,6 +14,9 @@ pub use minimizer::{
     IndexesLenTimeMinimizerScheduler, LenTimeMinimizerScheduler, MinimizerScheduler,
 };
 
+pub mod nop;
+pub use nop::NopScheduler;
+
 pub mod powersched;
 pub use powersched::{PowerQueueScheduler, SchedulerMetadata};
 
