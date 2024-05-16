@@ -157,6 +157,7 @@ where
         }
     }
 
+    #[must_use]
     pub fn id(&self) -> BreakpointId {
         self.id
     }

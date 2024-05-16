@@ -47,7 +47,7 @@ where
     SM: IsSnapshotManager,
 {
     fn command_id(&self) -> GuestReg {
-        bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_INPUT_PHYS.0 as GuestReg
+        GuestReg::from(bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_INPUT_PHYS.0)
     }
 
     fn parse(
@@ -80,7 +80,7 @@ where
     SM: IsSnapshotManager,
 {
     fn command_id(&self) -> GuestReg {
-        bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_INPUT_VIRT.0 as GuestReg
+        GuestReg::from(bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_INPUT_VIRT.0)
     }
 
     fn parse(
@@ -109,7 +109,7 @@ where
     SM: IsSnapshotManager,
 {
     fn command_id(&self) -> GuestReg {
-        bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_START_PHYS.0 as GuestReg
+        GuestReg::from(bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_START_PHYS.0)
     }
 
     fn parse(
@@ -139,7 +139,7 @@ where
     SM: IsSnapshotManager,
 {
     fn command_id(&self) -> GuestReg {
-        bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_START_VIRT.0 as GuestReg
+        GuestReg::from(bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_START_VIRT.0)
     }
 
     fn parse(
@@ -168,7 +168,7 @@ where
     SM: IsSnapshotManager,
 {
     fn command_id(&self) -> GuestReg {
-        bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_SAVE.0 as GuestReg
+        GuestReg::from(bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_SAVE.0)
     }
 
     fn parse(
@@ -190,7 +190,7 @@ where
     SM: IsSnapshotManager,
 {
     fn command_id(&self) -> GuestReg {
-        bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_LOAD.0 as GuestReg
+        GuestReg::from(bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_LOAD.0)
     }
 
     fn parse(
@@ -212,7 +212,7 @@ where
     SM: IsSnapshotManager,
 {
     fn command_id(&self) -> GuestReg {
-        bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_END.0 as GuestReg
+        GuestReg::from(bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_END.0)
     }
 
     fn parse(
@@ -248,7 +248,7 @@ where
     SM: IsSnapshotManager,
 {
     fn command_id(&self) -> GuestReg {
-        bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_VERSION.0 as GuestReg
+        GuestReg::from(bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_VERSION.0)
     }
 
     fn parse(
@@ -273,7 +273,7 @@ where
     SM: IsSnapshotManager,
 {
     fn command_id(&self) -> GuestReg {
-        bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_VADDR_FILTER_ALLOW.0 as GuestReg
+        GuestReg::from(bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_VADDR_FILTER_ALLOW.0)
     }
 
     fn parse(

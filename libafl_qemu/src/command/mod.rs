@@ -70,6 +70,7 @@ macro_rules! define_std_command_manager {
             S::Input: HasTargetBytes,
             SM: IsSnapshotManager,
         {
+            #[must_use]
             pub fn new() -> Self {
                 let native_parsers = Box::new(
                     vec![$(Box::new($native_command_parser)
