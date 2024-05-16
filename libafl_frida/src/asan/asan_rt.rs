@@ -37,7 +37,10 @@ use yaxpeax_arch::Arch;
 #[cfg(target_arch = "aarch64")]
 use yaxpeax_arm::armv8::a64::{ARMv8, InstDecoder, Opcode, Operand, ShiftStyle, SizeCode};
 #[cfg(target_arch = "x86_64")]
-use yaxpeax_x86::{amd64::{InstDecoder, Instruction, Opcode}, long_mode::DisplayStyle};
+use yaxpeax_x86::{
+    amd64::{InstDecoder, Instruction, Opcode},
+    long_mode::DisplayStyle,
+};
 
 #[cfg(target_arch = "x86_64")]
 use crate::utils::frida_to_cs;
@@ -596,7 +599,7 @@ impl AsanRuntime {
                             this.hooks_enabled = previous_hook_state;
                             ret
                         } else {
-                            
+
                             let previous_hook_state = this.hooks_enabled;
                             this.hooks_enabled = false;
                             let ret = (original)($($param),*);
@@ -1259,7 +1262,10 @@ impl AsanRuntime {
         );
 
         let insn = instructions[0]; // This is the very instruction that has triggered fault
-        log::info!("Fault Instruction: {}", insn.display_with(DisplayStyle::Intel).to_string());
+        log::info!(
+            "Fault Instruction: {}",
+            insn.display_with(DisplayStyle::Intel).to_string()
+        );
         let operand_count = insn.operand_count();
 
         let mut access_type: Option<AccessType> = None;
