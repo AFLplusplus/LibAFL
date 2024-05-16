@@ -1,6 +1,5 @@
 //! The fuzzer, and state are the core pieces of every good fuzzer
 
-use alloc::vec::Vec;
 use core::{
     borrow::BorrowMut,
     cell::{Ref, RefMut},
