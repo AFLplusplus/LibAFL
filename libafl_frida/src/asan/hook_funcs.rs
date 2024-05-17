@@ -17,7 +17,11 @@ impl AsanRuntime {
     #[inline]
     #[allow(non_snake_case)]
     #[cfg(windows)]
-    pub fn hook_NtGdiCreateCompatibleDC(&mut self, original: extern "C" fn(_hdc: *const c_void) -> *mut c_void, _hdc: *const c_void) -> *mut c_void {
+    pub fn hook_NtGdiCreateCompatibleDC(
+        &mut self,
+        original: extern "C" fn(_hdc: *const c_void) -> *mut c_void,
+        _hdc: *const c_void,
+    ) -> *mut c_void {
         unsafe { self.allocator_mut().alloc(8, 8) }
     }
 
