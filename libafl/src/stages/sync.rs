@@ -117,30 +117,27 @@ where
                     .append(&mut new_files);
             }
         }
-
-        // Iterate over the paths of files left to sync.
-        // By keeping track of these files, we ensure that no file is missed during synchronization,
-        // even in the event of a target restart.
-        let to_sync = state
-            .metadata_map_mut()
-            .get_mut::<SyncFromDiskMetadata>()
-            .unwrap()
-            .left_to_sync
-            .clone();
-        log::debug!("Number of files to sync: {:?}", to_sync.len());
-        for path in to_sync {
-            let input = (self.load_callback)(fuzzer, state, &path)?;
-            // Removing each path from the `left_to_sync` Vec before evaluating
-            // prevents duplicate processing and ensures that each file is evaluated only once. This approach helps
-            // avoid potential infinite loops that may occur if a file is an objective.
-            state
-                .metadata_map_mut()
-                .get_mut::<SyncFromDiskMetadata>()
-                .unwrap()
-                .left_to_sync
-                .retain(|p| p != &path);
-            log::debug!("Evaluating: {:?}", path);
-            fuzzer.evaluate_input(state, executor, manager, input)?;
+        
+        if let Some(sync_from_disk_metadata) = state.metadata_map_mut().get_mut::<SyncFromDiskMetadata>() {
+            // Iterate over the paths of files left to sync.
+            // By keeping track of these files, we ensure that no file is missed during synchronization,
+            // even in the event of a target restart.
+            let to_sync = sync_from_disk_metadata.left_to_sync.clone();
+            log::debug!("Number of files to sync: {:?}", to_sync.len());
+            for path in to_sync {
+                let input = (self.load_callback)(fuzzer, state, &path)?;
+                // Removing each path from the `left_to_sync` Vec before evaluating
+                // prevents duplicate processing and ensures that each file is evaluated only once. This approach helps
+                // avoid potential infinite loops that may occur if a file is an objective.
+                state
+                    .metadata_map_mut()
+                    .get_mut::<SyncFromDiskMetadata>()
+                    .unwrap()
+                    .left_to_sync
+                    .retain(|p| p != &path);
+                log::debug!("Evaluating: {:?}", path);
+                fuzzer.evaluate_input(state, executor, manager, input)?;
+            }
         }
 
         #[cfg(feature = "introspection")]
