@@ -70,7 +70,7 @@ impl AsanRuntime {
         maximum_size_low: u32,
         name: *const c_void,
     ) -> usize {
-//        winsafe::OutputDebugString("In CreateFileMapping\n");
+        //        winsafe::OutputDebugString("In CreateFileMapping\n");
         original(
             file,
             file_mapping_attributes,
@@ -96,7 +96,7 @@ impl AsanRuntime {
         dll_name: *const c_void,
         base_address: *mut *const c_void,
     ) -> usize {
-//        winsafe::OutputDebugString("LdrLoadDll");
+        //        winsafe::OutputDebugString("LdrLoadDll");
         log::trace!("LdrLoadDll");
         let result = original(search_path, charecteristics, dll_name, base_address);
 
@@ -119,7 +119,7 @@ impl AsanRuntime {
         _context: usize,
         _entry_point: usize,
     ) -> usize {
-//        winsafe::OutputDebugString("LdrpCallInitRoutine");
+        //        winsafe::OutputDebugString("LdrpCallInitRoutine");
         // let result = unsafe { LdrLoadDll(path, file, flags,x )};
         // self.allocator_mut().unpoison_all_existing_memory();
         // result
@@ -1268,7 +1268,6 @@ impl AsanRuntime {
         buf: *const c_void,
         count: usize,
     ) -> usize {
-
         if !self.allocator_mut().check_shadow(buf, count) {
             AsanErrors::get_mut_blocking().report_error(AsanError::BadFuncArgWrite((
                 "write".to_string(),
@@ -1278,7 +1277,7 @@ impl AsanRuntime {
                 Backtrace::new(),
             )));
         }
-        original(fd, buf, count) 
+        original(fd, buf, count)
     }
 
     #[inline]
