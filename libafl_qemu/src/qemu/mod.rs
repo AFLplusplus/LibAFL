@@ -288,6 +288,35 @@ pub trait ArchExtras {
         T: Into<GuestReg>;
 }
 
+#[derive(Copy, Clone, Debug)]
+pub struct ReadRegError<R>(pub R);
+
+impl<R: fmt::Debug> Display for ReadRegError<R> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "Failed to read register {:?}", self.0)
+    }
+}
+
+impl<R: fmt::Debug> std::error::Error for ReadRegError<R> {}
+
+#[derive(Copy, Clone, Debug)]
+pub struct WriteRegError<R, T> {
+    pub reg: R,
+    pub val: T,
+}
+
+impl<R: fmt::Debug, T: fmt::Debug> Display for WriteRegError<R, T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Failed to write value {:?} to register {:?}",
+            self.val, self.reg
+        )
+    }
+}
+
+impl<R: fmt::Debug, T: fmt::Debug> std::error::Error for WriteRegError<R, T> {}
+
 #[allow(clippy::unused_self)]
 impl CPU {
     #[must_use]
@@ -335,37 +364,38 @@ impl CPU {
         unsafe { libafl_qemu_num_regs(self.ptr) }
     }
 
-    pub fn write_reg<R, T>(&self, reg: R, val: T) -> Result<(), String>
+    pub fn write_reg<R, T>(&self, reg: R, val: T) -> Result<(), WriteRegError<R, T>>
     where
-        R: Into<i32>,
-        T: Into<GuestReg>,
+        R: Copy + Into<i32>,
+        T: Copy + Into<GuestReg>,
     {
-        let reg = reg.into();
+        let val0 = val;
+
         #[cfg(feature = "be")]
         let val = GuestReg::to_be(val.into());
 
         #[cfg(not(feature = "be"))]
         let val = GuestReg::to_le(val.into());
 
-        let success = unsafe { libafl_qemu_write_reg(self.ptr, reg, addr_of!(val) as *const u8) };
+        let success =
+            unsafe { libafl_qemu_write_reg(self.ptr, reg.into(), addr_of!(val) as *const u8) };
         if success == 0 {
-            Err(format!("Failed to write to register {reg}"))
+            Err(WriteRegError { reg, val: val0 })
         } else {
             Ok(())
         }
     }
 
-    pub fn read_reg<R, T>(&self, reg: R) -> Result<T, String>
+    pub fn read_reg<R, T>(&self, reg: R) -> Result<T, ReadRegError<R>>
     where
-        R: Into<i32>,
+        R: Copy + Into<i32>,
         T: From<GuestReg>,
     {
         unsafe {
-            let reg = reg.into();
             let mut val = MaybeUninit::uninit();
-            let success = libafl_qemu_read_reg(self.ptr, reg, val.as_mut_ptr() as *mut u8);
+            let success = libafl_qemu_read_reg(self.ptr, reg.into(), val.as_mut_ptr() as *mut u8);
             if success == 0 {
-                Err(format!("Failed to read register {reg}"))
+                Err(ReadRegError(reg))
             } else {
                 #[cfg(feature = "be")]
                 return Ok(GuestReg::from_be(val.assume_init()).into());
@@ -678,18 +708,18 @@ impl Qemu {
         self.current_cpu().unwrap().num_regs()
     }
 
-    pub fn write_reg<R, T>(&self, reg: R, val: T) -> Result<(), String>
+    pub fn write_reg<R, T>(&self, reg: R, val: T) -> Result<(), WriteRegError<R, T>>
     where
         T: Num + PartialOrd + Copy + Into<GuestReg>,
-        R: Into<i32>,
+        R: Copy + Into<i32>,
     {
         self.current_cpu().unwrap().write_reg(reg, val)
     }
 
-    pub fn read_reg<R, T>(&self, reg: R) -> Result<T, String>
+    pub fn read_reg<R, T>(&self, reg: R) -> Result<T, ReadRegError<R>>
     where
         T: Num + PartialOrd + Copy + From<GuestReg>,
-        R: Into<i32>,
+        R: Copy + Into<i32>,
     {
         self.current_cpu().unwrap().read_reg(reg)
     }
@@ -1177,11 +1207,15 @@ pub mod pybind {
         }
 
         fn write_reg(&self, reg: i32, val: GuestUsize) -> PyResult<()> {
-            self.qemu.write_reg(reg, val).map_err(PyValueError::new_err)
+            self.qemu
+                .write_reg(reg, val)
+                .map_err(|e| PyValueError::new_err(e.to_string()))
         }
 
         fn read_reg(&self, reg: i32) -> PyResult<GuestUsize> {
-            self.qemu.read_reg(reg).map_err(PyValueError::new_err)
+            self.qemu
+                .read_reg(reg)
+                .map_err(|e| PyValueError::new_err(e.to_string()))
         }
 
         fn set_breakpoint(&self, addr: GuestAddr) {

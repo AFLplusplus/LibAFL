@@ -80,7 +80,7 @@ impl crate::ArchExtras for crate::CPU {
     where
         T: From<GuestReg>,
     {
-        let stack_ptr: GuestReg = self.read_reg(Regs::Rsp)?;
+        let stack_ptr: GuestReg = self.read_reg(Regs::Rsp).map_err(|e| e.to_string())?;
         let mut ret_addr = [0; size_of::<GuestReg>()];
         unsafe { self.read_mem(stack_ptr, &mut ret_addr) };
         Ok(GuestReg::from_le_bytes(ret_addr).into())
@@ -90,7 +90,7 @@ impl crate::ArchExtras for crate::CPU {
     where
         T: Into<GuestReg>,
     {
-        let stack_ptr: GuestReg = self.read_reg(Regs::Rsp)?;
+        let stack_ptr: GuestReg = self.read_reg(Regs::Rsp).map_err(|e| e.to_string())?;
         let val: GuestReg = val.into();
         let ret_addr = val.to_le_bytes();
         unsafe { self.write_mem(stack_ptr, &ret_addr) };
@@ -115,7 +115,7 @@ impl crate::ArchExtras for crate::CPU {
             r => return Err(format!("Unsupported argument: {r:}")),
         };
 
-        self.read_reg(reg_id)
+        self.read_reg(reg_id).map_err(|e| e.to_string())
     }
 
     fn write_function_argument<T>(
@@ -133,8 +133,8 @@ impl crate::ArchExtras for crate::CPU {
 
         let val: GuestReg = val.into();
         match idx {
-            0 => self.write_reg(Regs::Rdi, val),
-            1 => self.write_reg(Regs::Rsi, val),
+            0 => self.write_reg(Regs::Rdi, val).map_err(|e| e.to_string()),
+            1 => self.write_reg(Regs::Rsi, val).map_err(|e| e.to_string()),
             _ => Err(format!("Unsupported argument: {idx:}")),
         }
     }

@@ -32,7 +32,8 @@ use crate::{
     sys::TCGTemp,
     BackdoorHookId, BlockHookId, CmpHookId, EdgeHookId, EmulatorMemoryChunk, GuestReg, HookData,
     HookId, InstructionHookId, MemAccessInfo, Qemu, QemuExitError, QemuExitReason, QemuHelperTuple,
-    QemuInitError, QemuShutdownCause, ReadHookId, Regs, StdInstrumentationFilter, WriteHookId, CPU,
+    QemuInitError, QemuShutdownCause, ReadHookId, ReadRegError, Regs, StdInstrumentationFilter,
+    WriteHookId, WriteRegError, CPU,
 };
 
 #[cfg(emulation_mode = "usermode")]
@@ -506,10 +507,10 @@ where
     #[deprecated(
         note = "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`."
     )]
-    pub fn write_reg<R, T>(&self, reg: R, val: T) -> Result<(), String>
+    pub fn write_reg<R, T>(&self, reg: R, val: T) -> Result<(), WriteRegError<R, T>>
     where
         T: Num + PartialOrd + Copy + Into<GuestReg>,
-        R: Into<i32>,
+        R: Copy + Into<i32>,
     {
         self.qemu.write_reg(reg, val)
     }
@@ -517,10 +518,10 @@ where
     #[deprecated(
         note = "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`."
     )]
-    pub fn read_reg<R, T>(&self, reg: R) -> Result<T, String>
+    pub fn read_reg<R, T>(&self, reg: R) -> Result<T, ReadRegError<R>>
     where
         T: Num + PartialOrd + Copy + From<GuestReg>,
-        R: Into<i32>,
+        R: Copy + Into<i32>,
     {
         self.qemu.read_reg(reg)
     }

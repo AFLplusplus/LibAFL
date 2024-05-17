@@ -21,8 +21,8 @@ use crate::{
     executor::QemuExecutorState, get_exit_arch_regs, sync_exit::ExitArgs, Emulator,
     EmulatorExitHandler, EmulatorMemoryChunk, ExitHandlerError, ExitHandlerResult, GuestReg,
     HasInstrumentationFilter, InputLocation, IsFilter, IsSnapshotManager, Qemu, QemuHelperTuple,
-    QemuInstrumentationAddressRangeFilter, Regs, StdEmulatorExitHandler, StdInstrumentationFilter,
-    CPU,
+    QemuInstrumentationAddressRangeFilter, ReadRegError, Regs, StdEmulatorExitHandler,
+    StdInstrumentationFilter, WriteRegError, CPU,
 };
 
 pub const VERSION: u64 = bindings::LIBAFL_QEMU_HDR_VERSION_NUMBER as u64;
@@ -121,9 +121,15 @@ impl From<TryFromPrimitiveError<NativeCommand>> for CommandError {
     }
 }
 
-impl From<String> for CommandError {
-    fn from(error_string: String) -> Self {
-        CommandError::RegError(error_string)
+impl<R: Debug> From<ReadRegError<R>> for CommandError {
+    fn from(e: ReadRegError<R>) -> Self {
+        CommandError::RegError(e.to_string())
+    }
+}
+
+impl<R: Debug, T: Debug> From<WriteRegError<R, T>> for CommandError {
+    fn from(e: WriteRegError<R, T>) -> Self {
+        CommandError::RegError(e.to_string())
     }
 }
 
