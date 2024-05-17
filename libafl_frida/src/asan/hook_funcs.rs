@@ -17,7 +17,7 @@ impl AsanRuntime {
     #[inline]
     #[allow(non_snake_case)]
     #[cfg(windows)]
-    pub fn hook_NtGdiCreateCompatibleDC(&mut self, _hdc: *const c_void) -> *mut c_void {
+    pub fn hook_NtGdiCreateCompatibleDC(&mut self, original: extern "C" fn(_hdc: *const c_void) -> *mut c_void, _hdc: *const c_void) -> *mut c_void {
         unsafe { self.allocator_mut().alloc(8, 8) }
     }
 
@@ -548,7 +548,7 @@ impl AsanRuntime {
     #[cfg(windows)]
     pub fn hook_LocalSize(
         &mut self,
-        _original: extern "C" fn(mem: *mut c_void) -> bool,
+        _original: extern "C" fn(mem: *mut c_void) -> usize,
         mem: *mut c_void,
     ) -> usize {
         self.allocator_mut().get_usable_size(mem)

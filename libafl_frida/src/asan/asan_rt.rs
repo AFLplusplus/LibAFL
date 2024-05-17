@@ -557,7 +557,6 @@ impl AsanRuntime {
                             this.hooks_enabled = previous_hook_state;
                             ret
                         } else {
-
                             let previous_hook_state = this.hooks_enabled;
                             this.hooks_enabled = false;
                             let ret = (original)($($param),*);
