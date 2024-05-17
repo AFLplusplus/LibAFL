@@ -8,7 +8,7 @@ use crate::{
     Error,
 };
 
-use super::StageIdx;
+use super::StageIndex;
 
 /// Progress for nested stages. This merely enters/exits the inner stage's scope.
 #[derive(Debug)]
@@ -74,7 +74,8 @@ where
         state: &mut E::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        while state.current_stage()?.is_some() || (self.closure)(fuzzer, executor, state, manager)?
+        while state.current_stage_idx()?.is_some()
+            || (self.closure)(fuzzer, executor, state, manager)?
         {
             self.stages.perform_all(fuzzer, executor, state, manager)?;
         }
@@ -152,7 +153,8 @@ where
         state: &mut E::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        if state.current_stage()?.is_some() || (self.closure)(fuzzer, executor, state, manager)? {
+        if state.current_stage_idx()?.is_some() || (self.closure)(fuzzer, executor, state, manager)?
+        {
             self.if_stages
                 .perform_all(fuzzer, executor, state, manager)?;
         }
@@ -233,21 +235,21 @@ where
         state: &mut E::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        let current = state.current_stage()?;
+        let current = state.current_stage_idx()?;
 
         let fresh = current.is_none();
         let closure_return = fresh && (self.closure)(fuzzer, executor, state, manager)?;
 
-        if current == Some(StageIdx(0)) || closure_return {
+        if current == Some(StageIndex(0)) || closure_return {
             if fresh {
-                state.set_stage(StageIdx(0))?;
+                state.set_current_stage_idx(StageIndex(0))?;
             }
             state.enter_inner_stage()?;
             self.if_stages
                 .perform_all(fuzzer, executor, state, manager)?;
         } else {
             if fresh {
-                state.set_stage(StageIdx(1))?;
+                state.set_current_stage_idx(StageIndex(1))?;
             }
             state.enter_inner_stage()?;
             self.else_stages

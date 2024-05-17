@@ -1,5 +1,7 @@
 //! The fuzzer, and state are the core pieces of every good fuzzer
 
+#[cfg(feature = "std")]
+use alloc::vec::Vec;
 use core::{
     borrow::BorrowMut,
     cell::{Ref, RefMut},
@@ -35,7 +37,7 @@ use crate::{
     fuzzer::{Evaluator, ExecuteInputResult},
     generators::Generator,
     inputs::{Input, UsesInput},
-    stages::{HasCurrentStage, HasNestedStageStatus, StageIdx},
+    stages::{HasCurrentStage, HasNestedStageStatus, StageIndex},
     Error, HasMetadata, HasNamedMetadata,
 };
 
@@ -531,16 +533,16 @@ where
 }
 
 impl<I, C, R, SC> HasCurrentStage for StdState<I, C, R, SC> {
-    fn set_stage(&mut self, idx: StageIdx) -> Result<(), Error> {
-        self.stage_stack.set_stage(idx)
+    fn set_current_stage_idx(&mut self, idx: StageIndex) -> Result<(), Error> {
+        self.stage_stack.set_current_stage_idx(idx)
     }
 
     fn clear_stage(&mut self) -> Result<(), Error> {
         self.stage_stack.clear_stage()
     }
 
-    fn current_stage(&self) -> Result<Option<StageIdx>, Error> {
-        self.stage_stack.current_stage()
+    fn current_stage_idx(&self) -> Result<Option<StageIndex>, Error> {
+        self.stage_stack.current_stage_idx()
     }
 
     fn on_restart(&mut self) -> Result<(), Error> {
@@ -1216,7 +1218,7 @@ impl<I> HasCurrentCorpusIdx for NopState<I> {
 }
 
 impl<I> HasCurrentStage for NopState<I> {
-    fn set_stage(&mut self, _idx: StageIdx) -> Result<(), Error> {
+    fn set_current_stage_idx(&mut self, _idx: StageIndex) -> Result<(), Error> {
         Ok(())
     }
 
@@ -1224,7 +1226,7 @@ impl<I> HasCurrentStage for NopState<I> {
         Ok(())
     }
 
-    fn current_stage(&self) -> Result<Option<StageIdx>, Error> {
+    fn current_stage_idx(&self) -> Result<Option<StageIndex>, Error> {
         Ok(None)
     }
 }
