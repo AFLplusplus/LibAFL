@@ -1,6 +1,9 @@
 //! The power schedules. This stage should be invoked after the calibration stage.
 
+use alloc::borrow::Cow;
 use core::{fmt::Debug, marker::PhantomData};
+
+use libafl_bolts::Named;
 
 use crate::{
     executors::{Executor, HasObservers},
@@ -15,6 +18,7 @@ use crate::{
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
 pub struct PowerMutationalStage<E, F, EM, I, M, Z> {
+    name: Cow<'static, str>,
     /// The mutators we use
     mutator: M,
     /// Helper for restarts
@@ -28,6 +32,12 @@ where
     E: UsesState,
 {
     type State = E::State;
+}
+
+impl<E, F, EM, I, M, Z> Named for PowerMutationalStage<E, F, EM, I, M, Z> {
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
+    }
 }
 
 impl<E, F, EM, I, M, Z> MutationalStage<E, EM, I, M, Z> for PowerMutationalStage<E, F, EM, I, M, Z>
@@ -128,10 +138,15 @@ where
     /// Creates a new transforming [`PowerMutationalStage`]
     pub fn transforming(mutator: M) -> Self {
         Self {
+            name: Cow::Borrowed("PowerMutationalStage"),
             mutator,
             phantom: PhantomData,
             restart_helper: ExecutionCountRestartHelper::default(),
         }
+    }
+    /// Sets the name of the PowerMutationalStage
+    pub fn set_name(&mut self, name: Cow<'static, str>) {
+        self.name = name
     }
 }
 

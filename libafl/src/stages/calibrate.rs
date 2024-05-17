@@ -65,6 +65,7 @@ impl UnstableEntriesMetadata {
 pub struct CalibrationStage<C, O, OT, S> {
     map_observer_handle: Handle<C>,
     map_name: Cow<'static, str>,
+    name: Cow<'static, str>,
     stage_max: usize,
     /// If we should track stability
     track_stability: bool,
@@ -349,6 +350,7 @@ where
             track_stability: true,
             restart_helper: ExecutionCountRestartHelper::default(),
             phantom: PhantomData,
+            name: Cow::Borrowed("CalibrationStage"),
         }
     }
 
@@ -365,6 +367,29 @@ where
             track_stability: false,
             restart_helper: ExecutionCountRestartHelper::default(),
             phantom: PhantomData,
+            name: Cow::Borrowed("CalibrationStage"),
         }
+    }
+    /// Create a new [`CalibrationStage`], naming it as expected by AFL++.
+    #[must_use]
+    pub fn with_afl_name<F>(map_feedback: &F) -> Self
+    where
+        F: HasObserverHandle<Observer = C> + Named,
+    {
+        Self {
+            map_observer_handle: map_feedback.observer_handle().clone(),
+            map_name: map_feedback.name().clone(),
+            stage_max: CAL_STAGE_START,
+            track_stability: true,
+            restart_helper: ExecutionCountRestartHelper::default(),
+            phantom: PhantomData,
+            name: Cow::Borrowed("calibration"),
+        }
+    }
+}
+
+impl<C, O, OT, S> Named for CalibrationStage<C, O, OT, S> {
+    fn name(&self) -> &Cow<'static, str> {
+        return &self.name;
     }
 }

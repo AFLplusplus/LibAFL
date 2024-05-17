@@ -48,6 +48,7 @@ impl SyncFromDiskMetadata {
 /// A stage that loads testcases from disk to sync with other fuzzers such as AFL++
 #[derive(Debug)]
 pub struct SyncFromDiskStage<CB, E, EM, Z> {
+    name: Cow<'static, str>,
     sync_dir: PathBuf,
     load_callback: CB,
     phantom: PhantomData<(E, EM, Z)>,
@@ -65,8 +66,7 @@ where
     E: UsesState,
 {
     fn name(&self) -> &Cow<'static, str> {
-        static NAME: Cow<'static, str> = Cow::Borrowed("SyncFromDiskStage");
-        &NAME
+        &self.name
     }
 }
 
@@ -138,6 +138,17 @@ where
     #[must_use]
     pub fn new(sync_dir: PathBuf, load_callback: CB) -> Self {
         Self {
+            name: Cow::Borrowed("SyncFromDiskStage"),
+            sync_dir,
+            load_callback,
+            phantom: PhantomData,
+        }
+    }
+    /// Creates a new [`SyncFromDiskStage`], naming it as expected by AFL++.
+    #[must_use]
+    pub fn with_afl_name(sync_dir: PathBuf, load_callback: CB) -> Self {
+        Self {
+            name: Cow::Borrowed("sync"),
             sync_dir,
             load_callback,
             phantom: PhantomData,

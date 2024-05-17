@@ -56,6 +56,7 @@ impl Ord for Earlier {
 #[derive(Clone, Debug)]
 pub struct ColorizationStage<C, E, EM, O, Z> {
     map_observer_handle: Handle<C>,
+    name: Option<Cow<'static, str>>,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, EM, O, E, Z)>,
 }
@@ -72,7 +73,11 @@ where
     E: UsesState,
 {
     fn name(&self) -> &Cow<'static, str> {
-        self.map_observer_handle.name()
+        if let Some(name) = &self.name {
+            name
+        } else {
+            &self.map_observer_handle.name()
+        }
     }
 }
 
@@ -308,6 +313,17 @@ where
     pub fn new(map_observer: &C) -> Self {
         Self {
             map_observer_handle: map_observer.handle(),
+            name: None,
+            phantom: PhantomData,
+        }
+    }
+
+    #[must_use]
+    /// Creates a new [`ColorizationStage`], naming it as expected by AFL++.
+    pub fn with_afl_name(map_observer: &C) -> Self {
+        Self {
+            map_observer_handle: map_observer.handle(),
+            name: Some(Cow::Borrowed("colorization")),
             phantom: PhantomData,
         }
     }
