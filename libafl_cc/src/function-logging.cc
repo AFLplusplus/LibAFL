@@ -140,7 +140,7 @@ bool FunctionLogging::runOnModule(Module &M) {
   IntegerType   *Int32Ty = IntegerType::getInt32Ty(C);
   IntegerType   *Int64Ty = IntegerType::getInt64Ty(C);
   FunctionCallee callHook;
-  callHook = M.getOrInsertFunction("__libafl_call_hook", VoidTy, Int64Ty);
+  callHook = M.getOrInsertFunction("__libafl_target_call_hook", VoidTy, Int64Ty);
   uint32_t rand_seed;
 
   rand_seed = time(NULL);

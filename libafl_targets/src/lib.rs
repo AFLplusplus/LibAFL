@@ -121,6 +121,9 @@ pub use coverage::*;
 pub mod value_profile;
 pub use value_profile::*;
 
+pub mod call;
+pub use call::*;
+
 /// runtime related to comparisons
 pub mod cmps;
 pub use cmps::*;
