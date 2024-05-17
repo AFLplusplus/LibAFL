@@ -36,6 +36,7 @@ jobs:
         uses: baptiste0928/cargo-install@v1.3.0
         with:
           crate: mdbook
+          version: "=0.4.38"
       - name: install linkcheck
         uses: baptiste0928/cargo-install@v1.3.0
         with:
