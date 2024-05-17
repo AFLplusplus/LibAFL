@@ -121,6 +121,7 @@ pub use coverage::*;
 pub mod value_profile;
 pub use value_profile::*;
 
+/// The module to hook call instructions
 pub mod call;
 pub use call::*;
 
