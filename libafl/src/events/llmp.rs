@@ -1556,7 +1556,6 @@ where
                             handle.status()
                         }
                         ForkResult::Child => {
-                            println!("AAA!");
                             self.shmem_provider.post_fork(true)?;
                             break (staterestorer, self.shmem_provider.clone(), core_id);
                         }
