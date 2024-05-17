@@ -222,6 +222,7 @@ where
             Input::from_file(p)
         }
         Self {
+            name: Cow::Borrowed("SyncFromDiskStage"),
             sync_dir,
             load_callback: load_callback::<_, _>,
             phantom: PhantomData,
