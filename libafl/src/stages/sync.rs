@@ -117,8 +117,10 @@ where
                     .append(&mut new_files);
             }
         }
-        
-        if let Some(sync_from_disk_metadata) = state.metadata_map_mut().get_mut::<SyncFromDiskMetadata>() {
+
+        if let Some(sync_from_disk_metadata) =
+            state.metadata_map_mut().get_mut::<SyncFromDiskMetadata>()
+        {
             // Iterate over the paths of files left to sync.
             // By keeping track of these files, we ensure that no file is missed during synchronization,
             // even in the event of a target restart.
