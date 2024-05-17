@@ -4,11 +4,71 @@
 use alloc::{borrow::Cow, vec::Vec};
 use core::fmt::Debug;
 use std::path::Path;
+use alloc::string::String;
 
 use libafl_bolts::{ownedref::OwnedMutPtr, Error, Named};
 use serde::{Deserialize, Serialize};
 
 use crate::{inputs::UsesInput, observers::Observer};
+
+use std::collections::HashMap;
+
+#[derive(Debug, Serialize, Deserialize)]
+struct AnalysisData {
+    #[serde(rename = "ID")]
+    id: usize,
+    #[serde(rename = "# BBs")]
+    bb_count: Option<u32>,
+    #[serde(rename = "# insts")]
+    inst_count: Option<u32>,
+    #[serde(rename = "# edges")]
+    edge_count: Option<u32>,
+    #[serde(rename = "# binaryOp")]
+    binary_op_count: Option<u32>,
+    #[serde(rename = "# call")]
+    call_count: Option<u32>,
+    #[serde(rename = "# cmp")]
+    cmp_count: Option<u32>,
+    #[serde(rename = "# load")]
+    load_count: Option<u32>,
+    #[serde(rename = "# store")]
+    store_count: Option<u32>,
+    #[serde(rename = "# alloca")]
+    alloca_count: Option<u32>,
+    #[serde(rename = "# branch")]
+    branch_count: Option<u32>,
+    #[serde(rename = "ABC metric")]
+    abc_metric: f64,
+    cyclomatic: u32,
+    #[serde(rename = "AP")]
+    api_calls: HashMap<String, u32>,
+    #[serde(rename = "h AP")]
+    heap_apis: HashMap<String, u32>,
+    #[serde(rename = "m AP")]
+    memory_apis: HashMap<String, u32>,
+    #[serde(rename = "ne lv")]
+    nested_levels: HashMap<String, u32>,
+    #[serde(rename = "cm gl")]
+    cmp_globals: HashMap<String, u32>,
+    #[serde(rename = "cm nz")]
+    cmp_non_zeros: HashMap<String, u32>,
+    #[serde(rename = "wr st")]
+    struct_writes: HashMap<String, u32>,
+    #[serde(rename = "str arg")]
+    struct_args: HashMap<String, u32>,
+    #[serde(rename = "cm ty")]
+    cmp_types: HashMap<String, u32>,
+    #[serde(rename = "cm cm")]
+    cmp_complexity: HashMap<String, u32>,
+    #[serde(rename = "ar ty")]
+    call_arg_types: HashMap<String, u32>,
+    #[serde(rename = "st ty")]
+    store_types: HashMap<String, u32>,
+    #[serde(rename = "l ty")]
+    load_types: HashMap<String, u32>,
+    #[serde(rename = "al ty")]
+    alloca_types: HashMap<String, u32>,
+}
 
 /// A simple observer with a list of things.
 #[derive(Serialize, Deserialize, Debug)]
