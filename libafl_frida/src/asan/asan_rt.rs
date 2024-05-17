@@ -504,14 +504,15 @@ impl AsanRuntime {
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
                         //is this necessary? The stalked return address will always be the real return address
                      //   let real_address = this.real_address_for_stalked(invocation.return_addr());
+                     let original = unsafe {std::mem::transmute::<*const c_void, extern "C" fn($($param: $param_type),*) -> $return_type>([<$name:snake:upper _PTR>])};
                         if this.hooks_enabled {
                             let previous_hook_state = this.hooks_enabled;
                             this.hooks_enabled = false;
-                            let ret = this.[<hook_ $name>]($($param),*);
+                            let ret = this.[<hook_ $name>](original, $($param),*);
                             this.hooks_enabled = previous_hook_state;
                             ret
                         } else {
-                            let original = unsafe {std::mem::transmute::<*const c_void, extern "C" fn($($param: $param_type),*) -> $return_type>([<$name:snake:upper _PTR>])};
+
                             let previous_hook_state = this.hooks_enabled;
                             this.hooks_enabled = false;
                             let ret = (original)($($param),*);
@@ -547,14 +548,16 @@ impl AsanRuntime {
                     unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
+                        let original = unsafe {std::mem::transmute::<*const c_void, extern "C" fn($($param: $param_type),*) -> $return_type>([<$name:snake:upper _PTR>])};
+
                         if this.hooks_enabled && this.[<hook_check_ $name>]($($param),*){
                             let previous_hook_state = this.hooks_enabled;
                             this.hooks_enabled = false;
-                            let ret = this.[<hook_ $name>]($($param),*);
+                            let ret = this.[<hook_ $name>](original, $($param),*);
                             this.hooks_enabled = previous_hook_state;
                             ret
                         } else {
-                            let original = unsafe {std::mem::transmute::<*const c_void, extern "C" fn($($param: $param_type),*) -> $return_type>([<$name:snake:upper _PTR>])};
+
                             let previous_hook_state = this.hooks_enabled;
                             this.hooks_enabled = false;
                             let ret = (original)($($param),*);
@@ -570,51 +573,6 @@ impl AsanRuntime {
                         NativePointer([<replacement_ $name>] as *mut c_void),
                         NativePointer(self_ptr as *mut c_void)
                     );
-                    self.hooks.push(target_function);
-                }
-            }
-        }
-        //This is used for cases where the hook needs a pointer to the original function
-        #[cfg(windows)]
-        macro_rules! hook_func_nolinkage {
-            ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
-                paste::paste! {
-                    log::trace!("Hooking {}", stringify!($name));
-
-                    let target_function = frida_gum::Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function");
-
-                    static mut [<$name:snake:upper _PTR>]: *const c_void = 0 as *const c_void;
-                    unsafe {[<$name:snake:upper _PTR>] = target_function.0}
-
-
-                    #[allow(non_snake_case)]
-                    unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
-                        let mut invocation = Interceptor::current_invocation();
-                        let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
-                        let original = unsafe {std::mem::transmute::<*const c_void, extern "C" fn($($param: $param_type),*) -> $return_type>([<$name:snake:upper _PTR>])};
-                        if this.hooks_enabled {
-                            let previous_hook_state = this.hooks_enabled;
-                            this.hooks_enabled = false;
-                            let ret = this.[<hook_ $name>]($($param),*, original);
-                            this.hooks_enabled = previous_hook_state;
-                            ret
-                        } else {
-
-                            let previous_hook_state = this.hooks_enabled;
-                            this.hooks_enabled = false;
-                            let ret = (original)($($param),*);
-                            this.hooks_enabled = previous_hook_state;
-                            ret
-                        }
-                    }
-
-                    let self_ptr = core::ptr::from_ref(self) as usize;
-                    let _ = interceptor.replace(
-                        target_function,
-                        NativePointer([<replacement_ $name>] as *mut c_void),
-                        NativePointer(self_ptr as *mut c_void)
-                    );
-
                     self.hooks.push(target_function);
                 }
             }
@@ -846,7 +804,7 @@ impl AsanRuntime {
                         );
                     }
                     "MapViewOfFile" => {
-                        hook_func_nolinkage!(
+                        hook_func!(
                             Some(libname),
                             MapViewOfFile,
                             (handle: *const c_void, desired_access: u32, file_offset_high: u32, file_offset_low: u32, size: usize),
@@ -1234,7 +1192,7 @@ impl AsanRuntime {
 
         This is basically a bandaid solution that happens to work because 2 different Interceptor::obtains will return the same interceptor.
 
-        Ideally the interceptor should be stored in AsanRuntime, but because FridaRuntime has a 'sttaic bound it becomes difficult to introduce that.
+        Ideally the interceptor should be stored in AsanRuntime, but because FridaRuntime has a 'static bound it becomes difficult to introduce that.
         */
         let mut interceptor = Interceptor::obtain(gum);
         for hook in &self.hooks {
