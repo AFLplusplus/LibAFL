@@ -1210,6 +1210,7 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[allow(clippy::too_many_arguments)]
     pub fn hook_mmap(
         &mut self,
         original: extern "C" fn(
