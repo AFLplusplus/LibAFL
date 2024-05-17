@@ -428,6 +428,8 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     );
 
     for pass in &[
+        "profiling.cc",
+        "function-logging.cc",
         "cmplog-routines-pass.cc",
         "autotokens-pass.cc",
         "coverage-accounting-pass.cc",

@@ -61,7 +61,6 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Support/FileSystem.h"
 
@@ -101,7 +100,7 @@ class AnalysisPass : public ModulePass {
   DenseMap<StringRef, BasicBlock *>                 entry_bb;
   DenseMap<BasicBlock *, std::vector<StringRef>>    calls_in_bb;
   DenseMap<StringRef, std::vector<StringRef>>       structLinks;
-  DenseMap<StringRef, std::unordered_map<int, int>> structDesc;
+  // DenseMap<StringRef, std::unordered_map<int, int>> structDesc;
   // The type name is not in the memory, so create std::strign impromptu
 
  private:
@@ -166,8 +165,7 @@ class AnalysisPass : public ModulePass {
     isStrcmp &=
         FT->getNumParams() == 2 && FT->getReturnType()->isIntegerTy(32) &&
         FT->getParamType(0) == FT->getParamType(1) &&
-        FT->getParamType(0) == IntegerType::getInt8PtrTy(M.getContext());
-
+        FT->getParamType(0) == IntegerType::getInt8Ty(M.getContext())->getPointerTo(0);
     return isStrcmp;
   }
 
@@ -188,7 +186,7 @@ class AnalysisPass : public ModulePass {
     isStrncmp &=
         FT->getNumParams() == 3 && FT->getReturnType()->isIntegerTy(32) &&
         FT->getParamType(0) == FT->getParamType(1) &&
-        FT->getParamType(0) == IntegerType::getInt8PtrTy(M.getContext()) &&
+        FT->getParamType(0) == IntegerType::getInt8Ty(M.getContext()) -> getPointerTo(0) &&
         FT->getParamType(2)->isIntegerTy();
     return isStrncmp;
   }
@@ -246,7 +244,7 @@ class AnalysisPass : public ModulePass {
 
   bool isLLVMIntrinsicFn(StringRef &n) {
     // Not interested in these LLVM's functions
-    if (n.startswith("llvm.")) {
+    if (n.starts_with("llvm.")) {
       return true;
     } else {
       return false;
@@ -422,26 +420,6 @@ bool AnalysisPass::runOnModule(Module &M) {
     outs() << "Analysis on " + genericFilePath << "\n";
     LLVMContext &Ctx = M.getContext();
     auto         moduleName = M.getName().str();
-    // printf("Hello\n");
-    for (auto ST : M.getIdentifiedStructTypes()) {
-      std::unordered_map<int, int> types;
-      for (auto T : ST->elements()) {
-        types[T->getTypeID()] += 1;
-        auto ty = T;
-        while (true) {
-          // Recursive
-          if (ty->isPointerTy()) {
-            ty = ty->getPointerElementType();
-            continue;
-          } else if (ty->isStructTy()) {
-            structLinks[ST->getStructName()].push_back(ty->getStructName());
-          }
-          break;
-        }
-      }
-
-      structDesc[ST->getStructName()] = types;
-    }
     nlohmann::json res;
 
     for (auto &F : M) {
@@ -543,18 +521,7 @@ bool AnalysisPass::runOnModule(Module &M) {
                 auto        arg_ty = arg->getType();
                 std::string type_str = typeWriter(arg_ty);
                 callArgTypes[type_str]++;
-
-                auto ty = arg_ty;
-                while (true) {
-                  // recursive
-                  if (ty->isPointerTy()) {
-                    ty = ty->getPointerElementType();
-                    continue;
-                  } else if (ty->isStructTy()) {
-                    structArgs[type_str]++;
-                  }
-                  break;
-                }
+                
               }
             }
           } else if ((cmpInst = dyn_cast<CmpInst>(&IN))) {
@@ -788,12 +755,6 @@ bool AnalysisPass::runOnModule(Module &M) {
       }
       struct_links[moduleName][std::string(key)]["lks"] = links;
       // outs() << "\n";
-    }
-
-    for (auto record = structDesc.begin(); record != structDesc.end();
-         record++) {
-      auto key = record->getFirst();
-      struct_links[moduleName][std::string(key)]["desc"] = record->second;
     }
 
     // outs() << "\n";
