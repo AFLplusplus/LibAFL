@@ -168,6 +168,14 @@ fn main() {
             .compile("coverage");
     }
 
+    {
+        println!("cargo:rerun-if-changed=src/call.c");
+
+        cc::Build::new()
+            .file(src_dir.join("call.c"))
+            .compile("call");
+    }
+
     #[cfg(feature = "cmplog")]
     {
         println!("cargo:rerun-if-changed=src/cmplog.h");

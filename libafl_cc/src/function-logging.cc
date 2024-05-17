@@ -1,5 +1,5 @@
 /*
-   LibAFL - Ctx LLVM pass
+   LibAFL - Function Logging LLVM pass
    --------------------------------------------------
 
    Written by Dongjia Zhang <toka@aflplus.plus>
@@ -69,15 +69,15 @@ using namespace llvm;
 namespace {
 
 #if USE_NEW_PM
-class CtxPass : public PassInfoMixin<CtxPass> {
+class FunctionLogging : public PassInfoMixin<FunctionLogging> {
  public:
-  CtxPass() {
+  FunctionLogging() {
 #else
-class CtxPass : public ModulePass {
+class FunctionLogging : public ModulePass {
  public:
   static char ID;
 
-  CtxPass() : ModulePass(ID) {
+  FunctionLogging() : ModulePass(ID) {
 #endif
   }
 
@@ -110,7 +110,7 @@ class CtxPass : public ModulePass {
 #if USE_NEW_PM
 extern "C" ::llvm::PassPluginLibraryInfo LLVM_ATTRIBUTE_WEAK
 llvmGetPassPluginInfo() {
-  return {LLVM_PLUGIN_API_VERSION, "CtxPass", "v0.1",
+  return {LLVM_PLUGIN_API_VERSION, "FunctionLoggingPass", "v0.1",
           /* lambda to insert our pass into the pass pipeline. */
           [](PassBuilder &PB) {
 
@@ -119,34 +119,32 @@ llvmGetPassPluginInfo() {
   #endif
             PB.registerOptimizerLastEPCallback(
                 [](ModulePassManager &MPM, OptimizationLevel OL) {
-                  MPM.addPass(CtxPass());
+                  MPM.addPass(FunctionLogging());
                 });
           }};
 }
 #else
-char CtxPass::ID = 0;
+char FunctionLogging::ID = 0;
 #endif
 
 #if USE_NEW_PM
-PreservedAnalyses CtxPass::run(Module &M, ModuleAnalysisManager &MAM) {
+PreservedAnalyses FunctionLogging::run(Module &M, ModuleAnalysisManager &MAM) {
 #else
-bool CtxPass::runOnModule(Module &M) {
+bool FunctionLogging::runOnModule(Module &M) {
 
 #endif
-  LLVMContext &C = M.getContext();
-  auto         moduleName = M.getName();
-  IntegerType *Int8Ty = IntegerType::getInt8Ty(C);
-  IntegerType *Int32Ty = IntegerType::getInt32Ty(C);
-
+  LLVMContext   &C = M.getContext();
+  auto           moduleName = M.getName();
+  Type          *VoidTy = Type::getVoidTy(C);
+  IntegerType   *Int8Ty = IntegerType::getInt8Ty(C);
+  IntegerType   *Int32Ty = IntegerType::getInt32Ty(C);
+  IntegerType   *Int64Ty = IntegerType::getInt64Ty(C);
+  FunctionCallee callHook;
+  callHook = M.getOrInsertFunction("__libafl_call_hook", VoidTy, Int64Ty);
   uint32_t rand_seed;
 
   rand_seed = time(NULL);
   srand(rand_seed);
-
-  GlobalVariable *AFLContext = new GlobalVariable(
-      M, Int32Ty, false, GlobalValue::ExternalLinkage, 0, "__afl_prev_ctx");
-  Value *PrevCtx =
-      NULL;  // the ctx value up until now that we save on the stack
 
   for (auto &F : M) {
     int has_calls = 0;
@@ -154,49 +152,17 @@ bool CtxPass::runOnModule(Module &M) {
     if (isIgnoreFunction(&F)) { continue; }
     if (F.size() < 1) { continue; }
     for (auto &BB : F) {
-      BasicBlock::iterator IP = BB.getFirstInsertionPt();
-      IRBuilder<>          IRB(&(*IP));
-      if (&BB == &F.getEntryBlock()) {
-        // if this is the first block..
-        LoadInst *PrevCtxLoad = IRB.CreateLoad(IRB.getInt32Ty(), AFLContext);
-        PrevCtxLoad->setMetadata(M.getMDKindID("nosanitize"),
-                                 MDNode::get(C, None));
-        PrevCtx = PrevCtxLoad;
-
-        // now check for if calls exists
-        for (auto &BB_2 : F) {
-          if (has_calls) { break; }
-          for (auto &IN : BB_2) {
-            CallInst *callInst = nullptr;
-            if ((callInst = dyn_cast<CallInst>(&IN))) {
-              Function *Callee = callInst->getCalledFunction();
-              if (!Callee || Callee->size() < 1) {
-                continue;
-              } else {
-                has_calls = 1;
-                break;
-              }
-            }
-          }
-        }
-
-        if (has_calls) {
-          Value *NewCtx = ConstantInt::get(Int32Ty, RandBelow(map_size));
-          NewCtx = IRB.CreateXor(PrevCtx, NewCtx);
-          StoreInst *StoreCtx = IRB.CreateStore(NewCtx, AFLContext);
-          StoreCtx->setMetadata(M.getMDKindID("nosanitize"),
-                                MDNode::get(C, None));
-        }
-      }
-      // Restore the ctx at the end of BB
-      Instruction *Inst = BB.getTerminator();
-      if (has_calls) {
-        if (isa<ReturnInst>(Inst) || isa<ResumeInst>(Inst)) {
-          IRBuilder<> Post_IRB(Inst);
-          StoreInst  *RestoreCtx;
-          RestoreCtx = Post_IRB.CreateStore(PrevCtx, AFLContext);
-          RestoreCtx->setMetadata(M.getMDKindID("nosanitize"),
-                                  MDNode::get(C, None));
+      for (auto &IN : BB) {
+        CallInst *callInst = nullptr;
+        if ((callInst = dyn_cast<CallInst>(&IN))) {
+          std::size_t function_id = std::hash<std::string>{}(F.getName().str());
+          IRBuilder<> IRB(callInst->getParent());
+          IRB.SetInsertPoint(callInst);
+          std::vector<Value *> args;
+          llvm::Value         *value = llvm::ConstantInt::get(
+              llvm::Type::getInt64Ty(F.getContext()), function_id);
+          args.push_back(value);
+          IRB.CreateCall(callHook, args);
         }
       }
     }
@@ -213,16 +179,17 @@ bool CtxPass::runOnModule(Module &M) {
 #if USE_NEW_PM
 
 #else
-static void registerCtxPass(const PassManagerBuilder &,
-                            legacy::PassManagerBase &PM) {
-  PM.add(new CtxPass());
+static void registerFunctionLoggingPass(const PassManagerBuilder &,
+                                        legacy::PassManagerBase &PM) {
+  PM.add(new FunctionLoggingPass());
 }
 
-static RegisterPass<CtxPass> X("ctx", "ctx instrumentation pass", false, false);
+static RegisterPass<FunctionLogging> X("function-logging",
+                                       "function logging pass", false, false);
 
-static RegisterStandardPasses RegisterCtxPass(
-    PassManagerBuilder::EP_OptimizerLast, registerCtxPass);
+static RegisterStandardPasses RegisterFunctionLogging(
+    PassManagerBuilder::EP_OptimizerLast, registerFunctionLoggingPass);
 
-static RegisterStandardPasses RegisterCtxPass0(
-    PassManagerBuilder::EP_EnabledOnOptLevel0, registerCtxPass);
+static RegisterStandardPasses RegisterFunctionLogging0(
+    PassManagerBuilder::EP_EnabledOnOptLevel0, registerFunctionLoggingPass);
 #endif
