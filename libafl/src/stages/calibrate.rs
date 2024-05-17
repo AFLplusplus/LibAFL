@@ -390,6 +390,6 @@ where
 
 impl<C, O, OT, S> Named for CalibrationStage<C, O, OT, S> {
     fn name(&self) -> &Cow<'static, str> {
-        return &self.name;
+        &self.name
     }
 }

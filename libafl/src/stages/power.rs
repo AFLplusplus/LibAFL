@@ -144,9 +144,9 @@ where
             restart_helper: ExecutionCountRestartHelper::default(),
         }
     }
-    /// Sets the name of the PowerMutationalStage
+    /// Sets the name of the `PowerMutationalStage`
     pub fn set_name(&mut self, name: Cow<'static, str>) {
-        self.name = name
+        self.name = name;
     }
 }
 

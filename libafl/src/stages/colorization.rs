@@ -76,7 +76,7 @@ where
         if let Some(name) = &self.name {
             name
         } else {
-            &self.map_observer_handle.name()
+            self.map_observer_handle.name()
         }
     }
 }
