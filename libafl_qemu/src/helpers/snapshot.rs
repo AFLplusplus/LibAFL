@@ -379,7 +379,7 @@ impl QemuSnapshotHelper {
         {
             let new_maps = self.new_maps.get_mut().unwrap();
 
-            log::info!("Start restore");
+            log::debug!("Start restore");
 
             for acc in &mut self.accesses {
                 unsafe { &mut (*acc.get()) }.dirty.retain(|page| {
@@ -469,7 +469,7 @@ impl QemuSnapshotHelper {
         #[cfg(feature = "paranoid_debug")]
         self.check_snapshot(qemu);
 
-        log::info!("End restore");
+        log::debug!("End restore");
     }
 
     pub fn is_unmap_allowed(&mut self, start: GuestAddr, mut size: usize) -> bool {
