@@ -44,8 +44,8 @@ paranoid_debug = ["libafl_qemu_build/paranoid_debug"] # Will perform as many che
 paste = "1"
 num_enum = "0.7"
 libc = "0.2"
-strum = "0.25"
-strum_macros = "0.25"
+strum = "0.26"
+strum_macros = "0.26"
 pyo3 = { version = "0.18", optional = true }
 
 [build-dependencies]
