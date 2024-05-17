@@ -14,7 +14,8 @@ use crate::{
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
     Error, HasMetadata,
 };
-
+/// Default name for `PowerMutationalStage`
+pub const POWER_MUTATIONAL_STAGE_NAME: &str = "PowerMutationalStage";
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
 pub struct PowerMutationalStage<E, F, EM, I, M, Z> {
@@ -122,31 +123,21 @@ where
 {
     /// Creates a new [`PowerMutationalStage`]
     pub fn new(mutator: M) -> Self {
-        Self::transforming(mutator)
-    }
-}
-
-impl<E, F, EM, I, M, Z> PowerMutationalStage<E, F, EM, I, M, Z>
-where
-    E: Executor<EM, Z> + HasObservers,
-    EM: UsesState<State = E::State>,
-    F: TestcaseScore<E::State>,
-    M: Mutator<I, E::State>,
-    E::State: HasCorpus + HasMetadata + HasRand,
-    Z: Evaluator<E, EM, State = E::State>,
-{
-    /// Creates a new transforming [`PowerMutationalStage`]
-    pub fn transforming(mutator: M) -> Self {
         Self {
-            name: Cow::Borrowed("PowerMutationalStage"),
+            name: Cow::Borrowed(POWER_MUTATIONAL_STAGE_NAME),
             mutator,
             phantom: PhantomData,
             restart_helper: ExecutionCountRestartHelper::default(),
         }
     }
-    /// Sets the name of the `PowerMutationalStage`
-    pub fn set_name(&mut self, name: Cow<'static, str>) {
-        self.name = name;
+    /// Creates a new [`PowerMutationalStage`] with a given name
+    pub fn with_name(mutator: M, name: &'static str) -> Self {
+        Self {
+            name: Cow::Borrowed(name),
+            mutator,
+            phantom: PhantomData,
+            restart_helper: ExecutionCountRestartHelper::default(),
+        }
     }
 }
 

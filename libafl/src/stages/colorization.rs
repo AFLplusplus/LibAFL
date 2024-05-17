@@ -52,11 +52,13 @@ impl Ord for Earlier {
     }
 }
 
+/// AFL++ name for `ColorizationStage`
+pub const COLORIZATION_STAGE_AFL_NAME: &str = "colorization";
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
 pub struct ColorizationStage<C, E, EM, O, Z> {
     map_observer_handle: Handle<C>,
-    name: Option<Cow<'static, str>>,
+    name: Cow<'static, str>,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, EM, O, E, Z)>,
 }
@@ -73,11 +75,7 @@ where
     E: UsesState,
 {
     fn name(&self) -> &Cow<'static, str> {
-        if let Some(name) = &self.name {
-            name
-        } else {
-            self.map_observer_handle.name()
-        }
+        &self.name
     }
 }
 
@@ -313,7 +311,7 @@ where
     pub fn new(map_observer: &C) -> Self {
         Self {
             map_observer_handle: map_observer.handle(),
-            name: None,
+            name: map_observer.handle().name().clone(),
             phantom: PhantomData,
         }
     }
@@ -323,7 +321,7 @@ where
     pub fn with_afl_name(map_observer: &C) -> Self {
         Self {
             map_observer_handle: map_observer.handle(),
-            name: Some(Cow::Borrowed("colorization")),
+            name: Cow::Borrowed(COLORIZATION_STAGE_AFL_NAME),
             phantom: PhantomData,
         }
     }
