@@ -713,7 +713,7 @@ where
         state.introspection_monitor_mut().start_timer();
 
         // Get the next index from the scheduler
-        let idx = if let Some(idx) = state.current_corpus_idx()? {
+        let idx = if let Some(idx) = state.current_corpus_id()? {
             idx // we are resuming
         } else {
             let idx = self.scheduler.next(state)?;
