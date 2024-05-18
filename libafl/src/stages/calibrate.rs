@@ -71,6 +71,8 @@ pub struct CalibrationStage<C, O, OT, S> {
     stage_max: usize,
     /// If we should track stability
     track_stability: bool,
+    /// If we should send the default stability
+    need_default_stability: bool,
     restart_helper: ExecutionCountRestartHelper,
     phantom: PhantomData<(O, OT, S)>,
 }
@@ -315,6 +317,19 @@ where
                     },
                 )?;
             }
+        } else if self.need_default_stability {
+            mgr.fire(
+                state,
+                Event::UpdateUserStats {
+                    name: Cow::from("stability"),
+                    value: UserStats::new(
+                        UserStatsValue::Ratio(map_len as u64, map_len as u64),
+                        AggregatorOps::Avg,
+                    ),
+                    phantom: PhantomData,
+                },
+            )?;
+            self.need_default_stability = false;
         }
 
         Ok(())
@@ -350,6 +365,7 @@ where
             map_name: map_feedback.name().clone(),
             stage_max: CAL_STAGE_START,
             track_stability: true,
+            need_default_stability: true,
             restart_helper: ExecutionCountRestartHelper::default(),
             phantom: PhantomData,
             name: Cow::Borrowed(CALIBRATION_STAGE_NAME),
@@ -367,6 +383,7 @@ where
             map_name: map_feedback.name().clone(),
             stage_max: CAL_STAGE_START,
             track_stability: false,
+            need_default_stability: false,
             restart_helper: ExecutionCountRestartHelper::default(),
             phantom: PhantomData,
             name: Cow::Borrowed(CALIBRATION_STAGE_NAME),
