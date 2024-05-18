@@ -52,8 +52,8 @@ impl Ord for Earlier {
     }
 }
 
-/// AFL++ name for `ColorizationStage`
-pub const COLORIZATION_STAGE_AFL_NAME: &str = "colorization";
+/// Default name for `ColorizationStage`; derived from ALF++
+pub const COLORIZATION_STAGE_NAME: &str = "colorization";
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
 pub struct ColorizationStage<C, E, EM, O, Z> {
@@ -311,17 +311,7 @@ where
     pub fn new(map_observer: &C) -> Self {
         Self {
             map_observer_handle: map_observer.handle(),
-            name: map_observer.handle().name().clone(),
-            phantom: PhantomData,
-        }
-    }
-
-    #[must_use]
-    /// Creates a new [`ColorizationStage`], naming it as expected by AFL++.
-    pub fn with_afl_name(map_observer: &C) -> Self {
-        Self {
-            map_observer_handle: map_observer.handle(),
-            name: Cow::Borrowed(COLORIZATION_STAGE_AFL_NAME),
+            name: Cow::Borrowed(COLORIZATION_STAGE_NAME),
             phantom: PhantomData,
         }
     }

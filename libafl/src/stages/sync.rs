@@ -45,10 +45,8 @@ impl SyncFromDiskMetadata {
     }
 }
 
-/// AFL++ name for `SyncFromDiskStage`
-pub const SYNC_FROM_DISK_STAGE_AFL_NAME: &str = "sync";
-/// Default name for `SyncFromDiskStage`
-pub const SYNC_FROM_DISK_STAGE_NAME: &str = "SyncFromDiskStage";
+/// Default name for `SyncFromDiskStage`; derived from AFL++
+pub const SYNC_FROM_DISK_STAGE_NAME: &str = "sync";
 
 /// A stage that loads testcases from disk to sync with other fuzzers such as AFL++
 #[derive(Debug)]
@@ -144,19 +142,9 @@ where
     pub fn new(sync_dir: PathBuf, load_callback: CB) -> Self {
         Self {
             name: Cow::Borrowed(SYNC_FROM_DISK_STAGE_NAME),
+            phantom: PhantomData,
             sync_dir,
             load_callback,
-            phantom: PhantomData,
-        }
-    }
-    /// Creates a new [`SyncFromDiskStage`], naming it as expected by AFL++.
-    #[must_use]
-    pub fn with_afl_name(sync_dir: PathBuf, load_callback: CB) -> Self {
-        Self {
-            name: Cow::Borrowed(SYNC_FROM_DISK_STAGE_AFL_NAME),
-            sync_dir,
-            load_callback,
-            phantom: PhantomData,
         }
     }
 

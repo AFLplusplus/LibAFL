@@ -14,8 +14,8 @@ use crate::{
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
     Error, HasMetadata,
 };
-/// Default name for `PowerMutationalStage`
-pub const POWER_MUTATIONAL_STAGE_NAME: &str = "PowerMutationalStage";
+/// Default name for `PowerMutationalStage`; derived from AFL++
+pub const POWER_MUTATIONAL_STAGE_NAME: &str = "power";
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
 pub struct PowerMutationalStage<E, F, EM, I, M, Z> {
@@ -125,15 +125,6 @@ where
     pub fn new(mutator: M) -> Self {
         Self {
             name: Cow::Borrowed(POWER_MUTATIONAL_STAGE_NAME),
-            mutator,
-            phantom: PhantomData,
-            restart_helper: ExecutionCountRestartHelper::default(),
-        }
-    }
-    /// Creates a new [`PowerMutationalStage`] with a given name
-    pub fn with_name(mutator: M, name: &'static str) -> Self {
-        Self {
-            name: Cow::Borrowed(name),
             mutator,
             phantom: PhantomData,
             restart_helper: ExecutionCountRestartHelper::default(),
