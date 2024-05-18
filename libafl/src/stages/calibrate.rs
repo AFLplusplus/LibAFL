@@ -40,10 +40,10 @@ impl_serdeany!(UnstableEntriesMetadata);
 impl UnstableEntriesMetadata {
     #[must_use]
     /// Create a new [`struct@UnstableEntriesMetadata`]
-    pub fn new(entries: HashSet<usize>, map_len: usize) -> Self {
+    pub fn new() -> Self {
         Self {
-            unstable_entries: entries,
-            map_len,
+            unstable_entries: HashSet::new(),
+            map_len: 0,
         }
     }
 
@@ -60,6 +60,12 @@ impl UnstableEntriesMetadata {
     }
 }
 
+impl Default for UnstableEntriesMetadata {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Default name for `CalibrationStage`; derived from AFL++
 pub const CALIBRATION_STAGE_NAME: &str = "calibration";
 /// The calibration stage will measure the average exec time and the target's stability for this input.
@@ -71,8 +77,6 @@ pub struct CalibrationStage<C, O, OT, S> {
     stage_max: usize,
     /// If we should track stability
     track_stability: bool,
-    /// If we should send the default stability
-    need_default_stability: bool,
     restart_helper: ExecutionCountRestartHelper,
     phantom: PhantomData<(O, OT, S)>,
 }
@@ -222,25 +226,20 @@ where
             i += 1;
         }
 
+        let mut send_default_stability = false;
         let unstable_found = !unstable_entries.is_empty();
         if unstable_found {
+            let metadata = state.metadata_or_insert_with(UnstableEntriesMetadata::new);
+
             // If we see new stable entries executing this new corpus entries, then merge with the existing one
-            if state.has_metadata::<UnstableEntriesMetadata>() {
-                let existing = state
-                    .metadata_map_mut()
-                    .get_mut::<UnstableEntriesMetadata>()
-                    .unwrap();
-                for item in unstable_entries {
-                    existing.unstable_entries.insert(item); // Insert newly found items
-                }
-                existing.map_len = map_len;
-            } else {
-                state.add_metadata::<UnstableEntriesMetadata>(UnstableEntriesMetadata::new(
-                    HashSet::from_iter(unstable_entries),
-                    map_len,
-                ));
+            for item in unstable_entries {
+                metadata.unstable_entries.insert(item); // Insert newly found items
             }
-        };
+            metadata.map_len = map_len;
+        } else if !state.has_metadata::<UnstableEntriesMetadata>() {
+            send_default_stability = true;
+            state.add_metadata(UnstableEntriesMetadata::new());
+        }
 
         // If weighted scheduler or powerscheduler is used, update it
         if state.has_metadata::<SchedulerMetadata>() {
@@ -302,6 +301,7 @@ where
             if let Some(meta) = state.metadata_map().get::<UnstableEntriesMetadata>() {
                 let unstable_entries = meta.unstable_entries().len();
                 let map_len = meta.map_len();
+                debug_assert_ne!(map_len, 0, "The map_len must never be 0");
                 mgr.fire(
                     state,
                     Event::UpdateUserStats {
@@ -317,7 +317,7 @@ where
                     },
                 )?;
             }
-        } else if self.need_default_stability {
+        } else if send_default_stability {
             mgr.fire(
                 state,
                 Event::UpdateUserStats {
@@ -329,7 +329,6 @@ where
                     phantom: PhantomData,
                 },
             )?;
-            self.need_default_stability = false;
         }
 
         Ok(())
@@ -365,7 +364,6 @@ where
             map_name: map_feedback.name().clone(),
             stage_max: CAL_STAGE_START,
             track_stability: true,
-            need_default_stability: true,
             restart_helper: ExecutionCountRestartHelper::default(),
             phantom: PhantomData,
             name: Cow::Borrowed(CALIBRATION_STAGE_NAME),
@@ -383,7 +381,6 @@ where
             map_name: map_feedback.name().clone(),
             stage_max: CAL_STAGE_START,
             track_stability: false,
-            need_default_stability: false,
             restart_helper: ExecutionCountRestartHelper::default(),
             phantom: PhantomData,
             name: Cow::Borrowed(CALIBRATION_STAGE_NAME),
