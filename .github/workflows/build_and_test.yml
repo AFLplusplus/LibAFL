@@ -50,7 +50,7 @@ jobs:
         if: runner.os == 'Linux'
         run: ./scripts/check_for_blobs.sh
       - name: default nightly
-        run: cargo default nightly
+        run: rustup default nightly
       - name: Build libafl debug
         run: cargo build -p libafl
       - name: Test the book
