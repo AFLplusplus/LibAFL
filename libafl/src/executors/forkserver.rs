@@ -55,6 +55,57 @@ const FS_OPT_MAPSIZE: i32 = 0x40000000_u32 as i32;
 const FS_OPT_SHDMEM_FUZZ: i32 = 0x01000000_u32 as i32;
 #[allow(clippy::cast_possible_wrap)]
 const FS_OPT_AUTODICT: i32 = 0x10000000_u32 as i32;
+#[allow(clippy::cast_possible_wrap)]
+const FS_NEW_ERROR: i32 = 0xeffe0000_u32 as i32;
+
+const FS_NEW_VERSION_MIN: u32 = 1;
+const FS_NEW_VERSION_MAX: u32 = 1;
+
+
+const FS_NEW_OPT_MAPSIZE: i32 = 1_u32 as i32;
+const FS_NEW_OPT_SHDMEM_FUZZ: i32 = 2_u32 as i32;
+const FS_NEW_OPT_AUTODICT: i32 = 0x00000800_u32 as i32;
+
+#[allow(clippy::cast_possible_wrap)]
+const FS_ERROR_MAP_SIZE: i32 = 1_u32 as i32;
+#[allow(clippy::cast_possible_wrap)]
+const FS_ERROR_MAP_ADDR: i32 = 2_u32 as i32;
+#[allow(clippy::cast_possible_wrap)]
+const FS_ERROR_SHM_OPEN: i32 = 4_u32 as i32;
+#[allow(clippy::cast_possible_wrap)]
+const FS_ERROR_SHMAT: i32 = 8_u32 as i32;
+#[allow(clippy::cast_possible_wrap)]
+const FS_ERROR_MMAP: i32 = 16_u32 as i32;
+#[allow(clippy::cast_possible_wrap)]
+const FS_ERROR_OLD_CMPLOG: i32 = 32_u32 as i32;
+#[allow(clippy::cast_possible_wrap)]
+const FS_ERROR_OLD_CMPLOG_QEMU: i32 = 64_u32 as i32;
+
+
+fn report_error_and_exit(status: i32) -> Result<(), Error> {
+    /* Report on the error received via the forkserver controller and exit */
+    match status {
+    FS_ERROR_MAP_SIZE =>
+        Err(Error::unknown(
+            "AFL_MAP_SIZE is not set and fuzzing target reports that the required size is very large. Solution: Run the fuzzing target stand-alone with the environment variable AFL_DEBUG=1 set and set the value for __afl_final_loc in the AFL_MAP_SIZE environment variable for afl-fuzz.".to_string())),
+    FS_ERROR_MAP_ADDR =>
+        Err(Error::unknown(
+            "the fuzzing target reports that hardcoded map address might be the reason the mmap of the shared memory failed. Solution: recompile the target with either afl-clang-lto and do not set AFL_LLVM_MAP_ADDR or recompile with afl-clang-fast.".to_string())),
+    FS_ERROR_SHM_OPEN =>
+        Err(Error::unknown("the fuzzing target reports that the shm_open() call failed.".to_string())),
+    FS_ERROR_SHMAT =>
+        Err(Error::unknown("the fuzzing target reports that the shmat() call failed.".to_string())),
+    FS_ERROR_MMAP => 
+        Err(Error::unknown("the fuzzing target reports that the mmap() call to the shared memory failed.".to_string())),
+    FS_ERROR_OLD_CMPLOG =>
+        Err(Error::unknown(
+            "the -c cmplog target was instrumented with an too old AFL++ version, you need to recompile it.".to_string())),
+    FS_ERROR_OLD_CMPLOG_QEMU =>
+        Err(Error::unknown("The AFL++ QEMU/FRIDA loaders are from an older version, for -c you need to recompile it.".to_string())),
+    _ => 
+        Err(Error::unknown(format!("unknown error code {} from fuzzing target!", status))),
+    }
+}
 
 // #[allow(clippy::cast_possible_wrap)]
 // const FS_OPT_MAX_MAPSIZE: i32 = ((0x00fffffe_u32 >> 1) + 1) as i32; // 8388608
@@ -583,7 +634,6 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
     shmem_provider: Option<&'a mut SP>,
     max_input_size: usize,
     map_size: Option<usize>,
-    real_map_size: i32,
     kill_signal: Option<Signal>,
     timeout: Option<Duration>,
     #[cfg(feature = "regex")]
@@ -755,15 +805,48 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             }
         };
 
-        let (rlen, status) = forkserver.read_st()?; // Initial handshake, read 4-bytes hello message from the forkserver.
+        let (rlen, version_status) = forkserver.read_st()?; // Initial handshake, read 4-bytes hello message from the forkserver.
 
         if rlen != 4 {
             return Err(Error::unknown("Failed to start a forkserver".to_string()));
         }
         log::info!("All right - fork server is up.");
 
-        if status & FS_OPT_ENABLED == FS_OPT_ENABLED && status & FS_OPT_MAPSIZE == FS_OPT_MAPSIZE {
-            let mut map_size = fs_opt_get_mapsize(status);
+        if (version_status & FS_NEW_ERROR) == FS_NEW_ERROR {
+            report_error_and_exit(version_status & 0x0000ffff)?;
+        }
+
+        let version: u32 = version_status as u32 - 0x41464c00_u32;
+        if version_status >= 0x41464c00 && version_status <= 0x41464cff {
+            match version {
+                0 => {
+                    return Err(Error::unknown("Forks server version is not assigned, this hsould not happen. Recompile target."));
+                }
+                FS_NEW_VERSION_MIN..=FS_NEW_VERSION_MAX => {
+                    // good, do nothing
+                }
+                _ => {
+                    return Err(Error::unknown("Fork server version is not supported. Recompile the target."));
+                }
+            }
+        }
+
+        let xored_version_status = (version_status as u32 ^ 0xffffffff) as i32;
+
+        let send_len = forkserver.write_ctl(xored_version_status)?;
+        if send_len != 4 {
+            return Err(Error::unknown("Writing to forkserver failed.".to_string()));
+        }
+
+        log::info!("All right - new fork server model version {} is up", version);
+
+        let (read_len, status) = forkserver.read_st()?;
+        if read_len != 4 {
+            return Err(Error::unknown("Reading from forkserver failed.".to_string()));
+        }
+
+
+        if status & FS_NEW_OPT_MAPSIZE == FS_NEW_OPT_MAPSIZE {
             // When 0, we assume that map_size was filled by the user or const
             /* TODO autofill map size from the observer
 
@@ -771,8 +854,11 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                 self.map_size = Some(map_size as usize);
             }
             */
+            let (read_len, mut map_size) = forkserver.read_st()?;
+            if read_len != 4 {
+                return Err(Error::unknown("Failed to read map size from forkserver".to_string()));
+            }
 
-            self.real_map_size = map_size;
             if map_size % 64 != 0 {
                 map_size = ((map_size + 63) >> 6) << 6;
             }
@@ -780,7 +866,44 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             // TODO set AFL_MAP_SIZE
             assert!(self.map_size.is_none() || map_size as usize <= self.map_size.unwrap());
 
+            // we'll use this later when we truncate the observer
             self.map_size = Some(map_size as usize);
+        }
+
+
+        if status & FS_NEW_OPT_SHDMEM_FUZZ != 0 {
+            if map.is_some() {
+                log::info!("Using SHARED MEMORY FUZZING feature.");
+                self.uses_shmem_testcase = true;
+            }
+            else {
+                return Err(Error::unknown("Target requested sharedmem fuzzing, but you didn't prepare shmem"))
+            }
+        }
+
+        if status & FS_NEW_OPT_AUTODICT != 0 {
+            // Here unlike shmem input fuzzing, we are forced to read things
+            // hence no self.autotokens.is_some() to check if we proceed
+            let (read_len, dict_size) = forkserver.read_st()?;
+            if read_len != 4 {
+                return Err(Error::unknown("Failed to read dictionary size from forkserver".to_string()));
+            }
+
+            if !(2..=0xffffff).contains(&dict_size) {
+                return Err(Error::illegal_state(
+                    "Dictionary has an illegal size".to_string(),
+                ));
+            }
+            log::info!("Autodict size {dict_size:x}");
+            let (rlen, buf) = forkserver.read_st_size(dict_size as usize)?;
+
+            if rlen != dict_size as usize {
+                return Err(Error::unknown("Failed to load autodictionary".to_string()));
+            }
+            if let Some(t) = &mut self.autotokens {
+                t.parse_autodict(&buf, dict_size as usize);
+            }
+
         }
 
         // Only with SHMEM or AUTODICT we can send send_status back or it breaks!
@@ -1066,7 +1189,6 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             input_filename: None,
             shmem_provider: None,
             map_size: None,
-            real_map_size: 0,
             max_input_size: MAX_INPUT_SIZE_DEFAULT,
             kill_signal: None,
             timeout: None,
@@ -1093,7 +1215,6 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             input_filename: self.input_filename,
             shmem_provider: Some(shmem_provider),
             map_size: self.map_size,
-            real_map_size: self.real_map_size,
             max_input_size: MAX_INPUT_SIZE_DEFAULT,
             kill_signal: None,
             timeout: None,
