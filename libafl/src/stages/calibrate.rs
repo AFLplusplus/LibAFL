@@ -60,11 +60,14 @@ impl UnstableEntriesMetadata {
     }
 }
 
+/// Default name for `CalibrationStage`; derived from AFL++
+pub const CALIBRATION_STAGE_NAME: &str = "calibration";
 /// The calibration stage will measure the average exec time and the target's stability for this input.
 #[derive(Clone, Debug)]
 pub struct CalibrationStage<C, O, OT, S> {
     map_observer_handle: Handle<C>,
     map_name: Cow<'static, str>,
+    name: Cow<'static, str>,
     stage_max: usize,
     /// If we should track stability
     track_stability: bool,
@@ -349,6 +352,7 @@ where
             track_stability: true,
             restart_helper: ExecutionCountRestartHelper::default(),
             phantom: PhantomData,
+            name: Cow::Borrowed(CALIBRATION_STAGE_NAME),
         }
     }
 
@@ -365,6 +369,13 @@ where
             track_stability: false,
             restart_helper: ExecutionCountRestartHelper::default(),
             phantom: PhantomData,
+            name: Cow::Borrowed(CALIBRATION_STAGE_NAME),
         }
+    }
+}
+
+impl<C, O, OT, S> Named for CalibrationStage<C, O, OT, S> {
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
     }
 }
