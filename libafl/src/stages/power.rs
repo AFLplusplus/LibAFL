@@ -1,6 +1,9 @@
 //! The power schedules. This stage should be invoked after the calibration stage.
 
+use alloc::borrow::Cow;
 use core::{fmt::Debug, marker::PhantomData};
+
+use libafl_bolts::Named;
 
 use crate::{
     executors::{Executor, HasObservers},
@@ -11,10 +14,12 @@ use crate::{
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
     Error, HasMetadata,
 };
-
+/// Default name for `PowerMutationalStage`; derived from AFL++
+pub const POWER_MUTATIONAL_STAGE_NAME: &str = "power";
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
 pub struct PowerMutationalStage<E, F, EM, I, M, Z> {
+    name: Cow<'static, str>,
     /// The mutators we use
     mutator: M,
     /// Helper for restarts
@@ -28,6 +33,12 @@ where
     E: UsesState,
 {
     type State = E::State;
+}
+
+impl<E, F, EM, I, M, Z> Named for PowerMutationalStage<E, F, EM, I, M, Z> {
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
+    }
 }
 
 impl<E, F, EM, I, M, Z> MutationalStage<E, EM, I, M, Z> for PowerMutationalStage<E, F, EM, I, M, Z>
@@ -112,22 +123,8 @@ where
 {
     /// Creates a new [`PowerMutationalStage`]
     pub fn new(mutator: M) -> Self {
-        Self::transforming(mutator)
-    }
-}
-
-impl<E, F, EM, I, M, Z> PowerMutationalStage<E, F, EM, I, M, Z>
-where
-    E: Executor<EM, Z> + HasObservers,
-    EM: UsesState<State = E::State>,
-    F: TestcaseScore<E::State>,
-    M: Mutator<I, E::State>,
-    E::State: HasCorpus + HasMetadata + HasRand,
-    Z: Evaluator<E, EM, State = E::State>,
-{
-    /// Creates a new transforming [`PowerMutationalStage`]
-    pub fn transforming(mutator: M) -> Self {
         Self {
+            name: Cow::Borrowed(POWER_MUTATIONAL_STAGE_NAME),
             mutator,
             phantom: PhantomData,
             restart_helper: ExecutionCountRestartHelper::default(),
