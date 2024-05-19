@@ -9,7 +9,7 @@ use libafl_bolts::current_time;
 use serde_json::json;
 
 use crate::{
-    corpus::{Corpus, HasCurrentCorpusIdx},
+    corpus::{Corpus, HasCurrentCorpusId},
     events::EventFirer,
     schedulers::minimizer::IsFavoredMetadata,
     stages::Stage,
@@ -69,7 +69,7 @@ where
         state: &mut E::State,
         _manager: &mut EM,
     ) -> Result<(), Error> {
-        let Some(corpus_idx) = state.current_corpus_idx()? else {
+        let Some(corpus_idx) = state.current_corpus_id()? else {
             return Err(Error::illegal_state(
                 "state is not currently processing a corpus index",
             ));

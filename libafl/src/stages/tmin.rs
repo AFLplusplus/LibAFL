@@ -10,7 +10,7 @@ use libafl_bolts::{
 };
 
 use crate::{
-    corpus::{Corpus, HasCurrentCorpusIdx, Testcase},
+    corpus::{Corpus, HasCurrentCorpusId, Testcase},
     events::EventFirer,
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{Feedback, FeedbackFactory, HasObserverHandle},
@@ -72,7 +72,7 @@ where
         state: &mut CS::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        let Some(base_corpus_idx) = state.current_corpus_idx()? else {
+        let Some(base_corpus_idx) = state.current_corpus_id()? else {
             return Err(Error::illegal_state(
                 "state is not currently processing a corpus index",
             ));
