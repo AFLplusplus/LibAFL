@@ -85,6 +85,7 @@ struct Opt {
 
 #[allow(clippy::similar_names)]
 pub fn main() {
+    env_logger::init();
     const MAP_SIZE: usize = 65536;
 
     let opt = Opt::parse();
