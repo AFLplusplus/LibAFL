@@ -6,6 +6,7 @@ use std::{
     fs,
     path::{Path, PathBuf},
     time::SystemTime,
+    vec::Vec,
 };
 
 use libafl_bolts::{current_time, shmem::ShMemProvider, Named};
@@ -33,6 +34,8 @@ use crate::{
 pub struct SyncFromDiskMetadata {
     /// The last time the sync was done
     pub last_time: SystemTime,
+    /// The paths that are left to sync
+    pub left_to_sync: Vec<PathBuf>,
 }
 
 libafl_bolts::impl_serdeany!(SyncFromDiskMetadata);
@@ -40,8 +43,11 @@ libafl_bolts::impl_serdeany!(SyncFromDiskMetadata);
 impl SyncFromDiskMetadata {
     /// Create a new [`struct@SyncFromDiskMetadata`]
     #[must_use]
-    pub fn new(last_time: SystemTime) -> Self {
-        Self { last_time }
+    pub fn new(last_time: SystemTime, left_to_sync: Vec<PathBuf>) -> Self {
+        Self {
+            last_time,
+            left_to_sync,
+        }
     }
 }
 
@@ -89,24 +95,53 @@ where
         state: &mut Z::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
+        log::debug!("Syncing from disk: {:?}", self.sync_dir);
         let last = state
             .metadata_map()
             .get::<SyncFromDiskMetadata>()
             .map(|m| m.last_time);
-        let path = self.sync_dir.clone();
-        if let Some(max_time) =
-            self.load_from_directory(&path, &last, fuzzer, executor, state, manager)?
-        {
+
+        if let (Some(max_time), mut new_files) = self.load_from_directory(&last)? {
             if last.is_none() {
                 state
                     .metadata_map_mut()
-                    .insert(SyncFromDiskMetadata::new(max_time));
+                    .insert(SyncFromDiskMetadata::new(max_time, new_files));
             } else {
                 state
                     .metadata_map_mut()
                     .get_mut::<SyncFromDiskMetadata>()
                     .unwrap()
                     .last_time = max_time;
+                state
+                    .metadata_map_mut()
+                    .get_mut::<SyncFromDiskMetadata>()
+                    .unwrap()
+                    .left_to_sync
+                    .append(&mut new_files);
+            }
+        }
+
+        if let Some(sync_from_disk_metadata) =
+            state.metadata_map_mut().get_mut::<SyncFromDiskMetadata>()
+        {
+            // Iterate over the paths of files left to sync.
+            // By keeping track of these files, we ensure that no file is missed during synchronization,
+            // even in the event of a target restart.
+            let to_sync = sync_from_disk_metadata.left_to_sync.clone();
+            log::debug!("Number of files to sync: {:?}", to_sync.len());
+            for path in to_sync {
+                let input = (self.load_callback)(fuzzer, state, &path)?;
+                // Removing each path from the `left_to_sync` Vec before evaluating
+                // prevents duplicate processing and ensures that each file is evaluated only once. This approach helps
+                // avoid potential infinite loops that may occur if a file is an objective.
+                state
+                    .metadata_map_mut()
+                    .get_mut::<SyncFromDiskMetadata>()
+                    .unwrap()
+                    .left_to_sync
+                    .retain(|p| p != &path);
+                log::debug!("Evaluating: {:?}", path);
+                fuzzer.evaluate_input(state, executor, manager, input)?;
             }
         }
 
@@ -149,15 +184,13 @@ where
     }
 
     fn load_from_directory(
-        &mut self,
-        in_dir: &Path,
+        &self,
         last: &Option<SystemTime>,
-        fuzzer: &mut Z,
-        executor: &mut E,
-        state: &mut Z::State,
-        manager: &mut EM,
-    ) -> Result<Option<SystemTime>, Error> {
+    ) -> Result<(Option<SystemTime>, Vec<PathBuf>), Error> {
         let mut max_time = None;
+        let mut left_to_sync = Vec::<PathBuf>::new();
+        let in_dir = self.sync_dir.clone();
+
         for entry in fs::read_dir(in_dir)? {
             let entry = entry?;
             let path = entry.path();
@@ -172,24 +205,24 @@ where
             if attr.is_file() && attr.len() > 0 {
                 if let Ok(time) = attr.modified() {
                     if let Some(l) = last {
-                        if time.duration_since(*l).is_err() {
+                        if time.duration_since(*l).is_err() || time == *l {
                             continue;
                         }
                     }
                     max_time = Some(max_time.map_or(time, |t: SystemTime| t.max(time)));
-                    let input = (self.load_callback)(fuzzer, state, &path)?;
-                    fuzzer.evaluate_input(state, executor, manager, input)?;
+                    log::info!("Syncing file: {:?}", path);
+                    left_to_sync.push(path.clone());
                 }
             } else if attr.is_dir() {
-                let dir_max_time =
-                    self.load_from_directory(&path, last, fuzzer, executor, state, manager)?;
+                let (dir_max_time, dir_left_to_sync) = self.load_from_directory(last)?;
                 if let Some(time) = dir_max_time {
                     max_time = Some(max_time.map_or(time, |t: SystemTime| t.max(time)));
                 }
+                left_to_sync.extend(dir_left_to_sync);
             }
         }
 
-        Ok(max_time)
+        Ok((max_time, left_to_sync))
     }
 }
 

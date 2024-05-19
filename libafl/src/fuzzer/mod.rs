@@ -7,7 +7,7 @@ use libafl_bolts::current_time;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
-    corpus::{Corpus, CorpusId, HasCurrentCorpusIdx, HasTestcase, Testcase},
+    corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
     events::{Event, EventConfig, EventFirer, EventProcessor, ProgressReporter},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
@@ -369,7 +369,7 @@ where
         + HasCorpus
         + HasImported
         + HasCurrentTestcase<<Self::State as UsesInput>::Input>
-        + HasCurrentCorpusIdx,
+        + HasCurrentCorpusId,
 {
     fn execute_no_process<EM>(
         &mut self,
@@ -697,7 +697,7 @@ where
         + HasTestcase
         + HasImported
         + HasLastReportTime
-        + HasCurrentCorpusIdx
+        + HasCurrentCorpusId
         + HasCurrentStage,
     ST: StagesTuple<E, EM, CS::State, Self>,
 {
@@ -713,7 +713,7 @@ where
         state.introspection_monitor_mut().start_timer();
 
         // Get the next index from the scheduler
-        let idx = if let Some(idx) = state.current_corpus_idx()? {
+        let idx = if let Some(idx) = state.current_corpus_id()? {
             idx // we are resuming
         } else {
             let idx = self.scheduler.next(state)?;
