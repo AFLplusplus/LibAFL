@@ -5,13 +5,13 @@ LIBAFL_DIR=$(realpath "$SCRIPT_DIR/..")
 
 # TODO: This should be rewritten in rust, a Makefile, or some platform-independent language
 
-if ! command -v parallel /dev/null; then
+if ! command -v parallel > /dev/null; then
     echo "Parallel could not be found. Please install parallel (often found in the 'moreutils' package)."
     exit 1
 fi
 
 # Find main rust crates
-CRATES_TO_FMT=$(find $LIBAFL_DIR -type d \( -path "*/fuzzers/*" -o -path "*/target/*" -o -path "*/utils/noaslr" -o -path "*/utils/gdb_qemu" \-o -path "*/docs/listings/baby_fuzzer/listing-*" \) -prune \
+CRATES_TO_FMT=$(find "$LIBAFL_DIR" -type d \( -path "*/fuzzers/*" -o -path "*/target/*" -o -path "*/utils/noaslr" -o -path "*/utils/gdb_qemu" \-o -path "*/docs/listings/baby_fuzzer/listing-*" \) -prune \
   -o -name "Cargo.toml" -print \
   | grep -v "$LIBAFL_DIR/Cargo.toml")$'\n'
 
