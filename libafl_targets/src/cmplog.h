@@ -36,14 +36,14 @@ typedef struct CmpLogHeader {
 #ifndef _WIN32
 typedef struct CmpLogHeaderExtended {
   unsigned hits : 6;
-  unsigned shape: 5;
+  unsigned shape : 5;
   unsigned type : 1;
   unsigned attribute : 4;
 } __attribute__((packed)) CmpLogHeaderExtended;
 #else
 __pragma(pack(push, 1)) typedef struct CmpLogHeaderExtended {
   unsigned hits : 6;
-  unsigned shape: 5;
+  unsigned shape : 5;
   unsigned type : 1;
   unsigned attribute : 4;
 } CmpLogHeaderExtended;
