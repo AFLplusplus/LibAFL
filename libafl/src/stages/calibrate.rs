@@ -71,8 +71,6 @@ pub struct CalibrationStage<C, O, OT, S> {
     stage_max: usize,
     /// If we should track stability
     track_stability: bool,
-    /// If we should send the default stability
-    need_default_stability: bool,
     restart_helper: ExecutionCountRestartHelper,
     phantom: PhantomData<(O, OT, S)>,
 }
@@ -222,6 +220,24 @@ where
             i += 1;
         }
 
+        // Fire a stability event on initialization
+        if self.track_stability && !state.has_metadata::<UnstableEntriesMetadata>() {
+            mgr.fire(
+                state,
+                Event::UpdateUserStats {
+                    name: Cow::from("stability"),
+                    value: UserStats::new(
+                        UserStatsValue::Ratio(
+                            (map_len - unstable_entries.len()) as u64,
+                            map_len as u64,
+                        ),
+                        AggregatorOps::Avg,
+                    ),
+                    phantom: PhantomData,
+                },
+            )?;
+        }
+
         let unstable_found = !unstable_entries.is_empty();
         if unstable_found {
             // If we see new stable entries executing this new corpus entries, then merge with the existing one
@@ -317,19 +333,6 @@ where
                     },
                 )?;
             }
-        } else if self.need_default_stability {
-            mgr.fire(
-                state,
-                Event::UpdateUserStats {
-                    name: Cow::from("stability"),
-                    value: UserStats::new(
-                        UserStatsValue::Ratio(map_len as u64, map_len as u64),
-                        AggregatorOps::Avg,
-                    ),
-                    phantom: PhantomData,
-                },
-            )?;
-            self.need_default_stability = false;
         }
 
         Ok(())
@@ -365,7 +368,6 @@ where
             map_name: map_feedback.name().clone(),
             stage_max: CAL_STAGE_START,
             track_stability: true,
-            need_default_stability: true,
             restart_helper: ExecutionCountRestartHelper::default(),
             phantom: PhantomData,
             name: Cow::Borrowed(CALIBRATION_STAGE_NAME),
@@ -383,7 +385,6 @@ where
             map_name: map_feedback.name().clone(),
             stage_max: CAL_STAGE_START,
             track_stability: false,
-            need_default_stability: false,
             restart_helper: ExecutionCountRestartHelper::default(),
             phantom: PhantomData,
             name: Cow::Borrowed(CALIBRATION_STAGE_NAME),
