@@ -19,11 +19,17 @@ CRATES_TO_FMT=$(find "$LIBAFL_DIR" -type d \( -path "*/fuzzers/*" -o -path "*/ta
 CRATES_TO_FMT+=$(find "$LIBAFL_DIR/fuzzers" "$LIBAFL_DIR/fuzzers/backtrace_baby_fuzzers" "$LIBAFL_DIR/libafl_libfuzzer/libafl_libfuzzer_runtime" -maxdepth 2 -name "Cargo.toml" -print)
 
 echo "Welcome to the happy fmt script. :)"
+
+if [ "$CHECK" ]; then
+  CARGO_FLAGS="--check"
+  CLANG_FLAGS="--dry-run"
+fi
+
 echo "[*] Formatting Rust crates..."
-echo "$CRATES_TO_FMT" | parallel "echo '[*] Running fmt for {}'; cargo +nightly fmt --manifest-path {}"
+echo "$CRATES_TO_FMT" | parallel "echo '[*] Running fmt for {}'; cargo +nightly fmt $CARGO_FLAGS --manifest-path {}"
 
 echo "[*] Formatting C(pp) files"
 # shellcheck disable=SC2046
-clang-format-18 -i --style=file $(find . -type f \( -name '*.cpp' -o -iname '*.hpp' -o -name '*.cc' -o -name '*.cxx' -o -name '*.cc' -o -name '*.c' -o -name '*.h' \) | grep -v '/target/' | grep -v 'libpng-1\.6\.37' | grep -v 'stb_image\.h' | grep -v 'dlmalloc\.c' | grep -v 'QEMU-Nyx')
+clang-format-18 "$CLANG_FLAGS" -i --style=file $(find . -type f \( -name '*.cpp' -o -iname '*.hpp' -o -name '*.cc' -o -name '*.cxx' -o -name '*.cc' -o -name '*.c' -o -name '*.h' \) | grep -v '/target/' | grep -v 'libpng-1\.6\.37' | grep -v 'stb_image\.h' | grep -v 'dlmalloc\.c' | grep -v 'QEMU-Nyx')
 
 echo "[*] Done :)"
