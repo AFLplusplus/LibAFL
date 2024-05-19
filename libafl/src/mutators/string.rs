@@ -259,7 +259,7 @@ fn rand_replace_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
         }
     }
 
-    input.0.bytes_mut().splice(range, replacement);
+    input.0.splice(range, replacement);
     input.1 = extract_metadata(input.0.bytes());
 
     MutationResult::Mutated
@@ -423,7 +423,7 @@ where
                 return Ok(MutationResult::Skipped);
             }
 
-            input.0.bytes_mut().splice(range, token.iter().copied());
+            input.0.splice(range, token.iter().copied());
             input.1 = extract_metadata(input.0.bytes());
             return Ok(MutationResult::Mutated);
         }
@@ -483,7 +483,7 @@ where
                 return Ok(MutationResult::Skipped);
             }
 
-            input.0.bytes_mut().splice(range, token.iter().copied());
+            input.0.splice(range, token.iter().copied());
             input.1 = extract_metadata(input.0.bytes());
             return Ok(MutationResult::Mutated);
         }

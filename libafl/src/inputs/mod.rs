@@ -140,18 +140,19 @@ pub trait HasMutatorBytes: HasLen {
 
     /// Resize the mutator bytes to a given new size.
     /// Use `value` to fill new slots in case the buffer grows.
+    /// See [`alloc::vec::Vec::splice`].
     fn resize(&mut self, new_len: usize, value: u8);
 
-    /// Extends the given buffer with an iterator.
+    /// Extends the given buffer with an iterator. See [`alloc::vec::Vec::extend`]
     fn extend<'a, I: IntoIterator<Item = &'a u8>>(&mut self, iter: I);
 
-    /// Splices the given target bytes according to [`Vec::splice`]'s rules
+    /// Splices the given target bytes according to [`alloc::vec::Vec::splice`]'s rules
     fn splice<R, I>(&mut self, range: R, replace_with: I) -> Splice<'_, I::IntoIter>
     where
         R: RangeBounds<usize>,
         I: IntoIterator<Item = u8>;
 
-    /// Drains the given target bytes according to [`Vec::drain`]'s rules
+    /// Drains the given target bytes according to [`alloc::vec::Vec::drain`]'s rules
     fn drain<R>(&mut self, range: R) -> Drain<'_, u8>
     where
         R: RangeBounds<usize>;
