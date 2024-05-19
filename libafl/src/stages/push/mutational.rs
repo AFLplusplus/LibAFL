@@ -49,7 +49,7 @@ where
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
 {
-    current_corpus_idx: Option<CorpusId>,
+    current_corpus_id: Option<CorpusId>,
     testcases_to_do: usize,
     testcases_done: usize,
 
@@ -76,8 +76,8 @@ where
     }
 
     /// Sets the current corpus index
-    pub fn set_current_corpus_idx(&mut self, current_corpus_idx: CorpusId) {
-        self.current_corpus_idx = Some(current_corpus_idx);
+    pub fn set_current_corpus_id(&mut self, current_corpus_id: CorpusId) {
+        self.current_corpus_id = Some(current_corpus_id);
     }
 }
 
@@ -112,13 +112,13 @@ where
         _observers: &mut OT,
     ) -> Result<(), Error> {
         // Find a testcase to work on, unless someone already set it
-        self.current_corpus_idx = Some(if let Some(corpus_idx) = self.current_corpus_idx {
+        self.current_corpus_id = Some(if let Some(corpus_idx) = self.current_corpus_id {
             corpus_idx
         } else {
             fuzzer.scheduler_mut().next(state)?
         });
 
-        self.testcases_to_do = self.iterations(state, self.current_corpus_idx.unwrap())?;
+        self.testcases_to_do = self.iterations(state, self.current_corpus_id.unwrap())?;
         self.testcases_done = 0;
         Ok(())
     }
@@ -139,7 +139,7 @@ where
 
         let input = state
             .corpus_mut()
-            .cloned_input_for_id(self.current_corpus_idx.unwrap());
+            .cloned_input_for_id(self.current_corpus_id.unwrap());
         let mut input = match input {
             Err(e) => return Some(Err(e)),
             Ok(input) => input,
@@ -172,7 +172,7 @@ where
         fuzzer.execute_and_process(state, event_mgr, last_input, observers, &exit_kind, true)?;
 
         start_timer!(state);
-        self.mutator.post_exec(state, self.current_corpus_idx)?;
+        self.mutator.post_exec(state, self.current_corpus_id)?;
         mark_feature_time!(state, PerfFeature::MutatePostExec);
         self.testcases_done += 1;
 
@@ -187,7 +187,7 @@ where
         _event_mgr: &mut EM,
         _observers: &mut OT,
     ) -> Result<(), Error> {
-        self.current_corpus_idx = None;
+        self.current_corpus_id = None;
         Ok(())
     }
 }
@@ -233,7 +233,7 @@ where
         Self {
             mutator,
             psh: PushStageHelper::new(shared_state, exit_kind),
-            current_corpus_idx: None, // todo
+            current_corpus_id: None, // todo
             testcases_to_do: 0,
             testcases_done: 0,
         }

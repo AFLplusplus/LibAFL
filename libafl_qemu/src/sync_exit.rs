@@ -1,8 +1,15 @@
-use std::fmt::{Display, Formatter};
+use std::{
+    fmt::{Display, Formatter},
+    rc::Rc,
+};
 
 use enum_map::Enum;
+use libafl::state::{HasExecutions, State};
 
-use crate::{command::Command, get_exit_arch_regs, GuestReg, Regs, CPU};
+use crate::{
+    command::{CommandManager, IsCommand},
+    get_exit_arch_regs, EmulatorExitHandler, GuestReg, QemuHelperTuple, Regs, CPU,
+};
 
 #[derive(Debug, Clone, Enum)]
 pub enum ExitArgs {
@@ -16,20 +23,32 @@ pub enum ExitArgs {
     Arg6,
 }
 
-#[derive(Debug, Clone)]
-pub struct SyncExit {
-    command: Command,
+#[derive(Debug)]
+pub struct SyncExit<CM, E, QT, S>
+where
+    CM: CommandManager<E, QT, S>,
+    E: EmulatorExitHandler<QT, S>,
+    QT: QemuHelperTuple<S>,
+    S: State + HasExecutions,
+{
+    command: Rc<dyn IsCommand<CM, E, QT, S>>,
 }
 
-impl SyncExit {
+impl<CM, E, QT, S> SyncExit<CM, E, QT, S>
+where
+    CM: CommandManager<E, QT, S>,
+    E: EmulatorExitHandler<QT, S>,
+    QT: QemuHelperTuple<S>,
+    S: State + HasExecutions,
+{
     #[must_use]
-    pub fn new(command: Command) -> Self {
+    pub fn new(command: Rc<dyn IsCommand<CM, E, QT, S>>) -> Self {
         Self { command }
     }
 
     #[must_use]
-    pub fn command(&self) -> &Command {
-        &self.command
+    pub fn command(&self) -> Rc<dyn IsCommand<CM, E, QT, S>> {
+        self.command.clone()
     }
 
     pub fn ret(&self, cpu: &CPU, value: GuestReg) {
@@ -43,7 +62,13 @@ impl SyncExit {
     }
 }
 
-impl Display for SyncExit {
+impl<CM, E, QT, S> Display for SyncExit<CM, E, QT, S>
+where
+    CM: CommandManager<E, QT, S>,
+    E: EmulatorExitHandler<QT, S>,
+    QT: QemuHelperTuple<S>,
+    S: State + HasExecutions,
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.command)
     }
