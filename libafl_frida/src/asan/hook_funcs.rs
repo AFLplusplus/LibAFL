@@ -19,7 +19,7 @@ impl AsanRuntime {
     #[cfg(windows)]
     pub fn hook_NtGdiCreateCompatibleDC(
         &mut self,
-        original: extern "C" fn(_hdc: *const c_void) -> *mut c_void,
+        _original: extern "C" fn(_hdc: *const c_void) -> *mut c_void,
         _hdc: *const c_void,
     ) -> *mut c_void {
         unsafe { self.allocator_mut().alloc(8, 8) }
