@@ -235,7 +235,8 @@ mod tests {
 
     use crate::{
         inputs::{BytesInput, HasMutatorBytes},
-        prelude::{havoc_mutations_no_crossover, MutatorsTuple, NopState},
+        mutators::{havoc_mutations_no_crossover, MutatorsTuple},
+        state::NopState,
     };
 
     fn init_bytes_input() -> (BytesInput, usize) {
@@ -284,7 +285,6 @@ mod tests {
         assert_eq!(bsi.len(), 2);
         bsi.resize(3, 0);
         assert_eq!(bsi.len(), 3);
-        println!("{bsi:?}");
         assert_eq!(bsi.bytes()[bsi.len() - 1], 0);
         assert_eq!(bytes_input.len(), len_orig + 1);
 
@@ -292,14 +292,11 @@ mod tests {
         assert_eq!(bsi.len(), 3);
         bsi.resize(2, 0);
         assert_eq!(bsi.len(), 2);
-        println!("{bsi:?}");
         assert_eq!(bytes_input, bytes_input_orig);
 
         let mut bsi = bytes_input.sub_input(2..=2);
         bsi.resize(2, 0);
-        println!("{bsi:?}");
         bsi.resize(1, 0);
-        println!("{bsi:?}");
         assert_eq!(bytes_input, bytes_input_orig);
 
         let mut bsi = bytes_input.sub_input(..);

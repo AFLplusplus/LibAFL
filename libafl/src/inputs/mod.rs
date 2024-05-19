@@ -26,7 +26,7 @@ pub mod nautilus;
 use alloc::{
     boxed::Box,
     string::{String, ToString},
-    vec::{Drain, Splice, Vec},
+    vec::{Drain, Splice},
 };
 use core::{clone::Clone, fmt::Debug, marker::PhantomData, ops::RangeBounds};
 #[cfg(feature = "std")]
@@ -76,7 +76,7 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
         P: AsRef<Path>,
     {
         let mut file = File::open(path)?;
-        let mut bytes: Vec<u8> = vec![];
+        let mut bytes = vec![];
         file.read_to_end(&mut bytes)?;
         Ok(postcard::from_bytes(&bytes)?)
     }
