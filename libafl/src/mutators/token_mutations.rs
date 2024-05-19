@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 use crate::mutators::str_decode;
 use crate::{
     corpus::{CorpusId, HasCurrentCorpusIdx},
-    inputs::{HasBytesVec, UsesInput},
+    inputs::{HasMutatorBytes, UsesInput},
     mutators::{
         buffer_self_copy, mutations::buffer_copy, MultiMutator, MutationResult, Mutator, Named,
     },
@@ -305,7 +305,7 @@ pub struct TokenInsert;
 impl<I, S> Mutator<I, S> for TokenInsert
 where
     S: HasMetadata + HasRand + HasMaxSize,
-    I: HasBytesVec,
+    I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
@@ -335,7 +335,7 @@ where
             }
         }
 
-        input.bytes_mut().resize(size + len, 0);
+        input.resize(size + len, 0);
         unsafe {
             buffer_self_copy(input.bytes_mut(), off, off + len, size - off);
             buffer_copy(input.bytes_mut(), token, 0, off, len);
@@ -368,7 +368,7 @@ pub struct TokenReplace;
 impl<I, S> Mutator<I, S> for TokenReplace
 where
     S: UsesInput + HasMetadata + HasRand + HasMaxSize,
-    I: HasBytesVec,
+    I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -427,7 +427,7 @@ pub struct I2SRandReplace;
 impl<I, S> Mutator<I, S> for I2SRandReplace
 where
     S: UsesInput + HasMetadata + HasRand + HasMaxSize,
-    I: HasBytesVec,
+    I: HasMutatorBytes,
 {
     #[allow(clippy::too_many_lines)]
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
@@ -1088,7 +1088,7 @@ impl AFLppRedQueen {
 impl<I, S> MultiMutator<I, S> for AFLppRedQueen
 where
     S: UsesInput + HasMetadata + HasRand + HasMaxSize + HasCorpus + HasCurrentCorpusIdx,
-    I: HasBytesVec + From<Vec<u8>>,
+    I: HasMutatorBytes + From<Vec<u8>>,
 {
     #[allow(clippy::needless_range_loop)]
     #[allow(clippy::too_many_lines)]

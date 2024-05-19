@@ -26,7 +26,7 @@ use crate::{
 };
 #[cfg(feature = "concolic_mutation")]
 use crate::{
-    inputs::HasBytesVec,
+    inputs::HasMutatorBytes,
     mark_feature_time,
     observers::concolic::{ConcolicMetadata, SymExpr, SymExprRef},
     stages::ExecutionCountRestartHelper,
@@ -372,7 +372,7 @@ where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
     Z: Evaluator<E, EM>,
-    Z::Input: HasBytesVec,
+    Z::Input: HasMutatorBytes,
     Z::State: State + HasExecutions + HasCorpus + HasMetadata,
 {
     #[inline]

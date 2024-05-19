@@ -12,7 +12,7 @@ use crate::{
     corpus::{Corpus, HasCurrentCorpusIdx},
     executors::{Executor, HasObservers},
     feedbacks::map::MapNoveltiesMetadata,
-    inputs::{BytesInput, GeneralizedInputMetadata, GeneralizedItem, HasBytesVec, UsesInput},
+    inputs::{BytesInput, GeneralizedInputMetadata, GeneralizedItem, HasMutatorBytes, UsesInput},
     mark_feature_time,
     observers::{CanTrack, MapObserver, ObserversTuple},
     require_novelties_tracking,
@@ -416,12 +416,8 @@ where
                 end = payload.len();
             }
             let mut candidate = BytesInput::new(vec![]);
-            candidate
-                .bytes_mut()
-                .extend(payload[..start].iter().flatten());
-            candidate
-                .bytes_mut()
-                .extend(payload[end..].iter().flatten());
+            candidate.extend(payload[..start].iter().flatten());
+            candidate.extend(payload[end..].iter().flatten());
 
             if self.verify_input(fuzzer, executor, state, manager, novelties, &candidate)? {
                 for item in &mut payload[start..end] {
@@ -469,12 +465,8 @@ where
                 if payload[end] == Some(closing_char) {
                     endings += 1;
                     let mut candidate = BytesInput::new(vec![]);
-                    candidate
-                        .bytes_mut()
-                        .extend(payload[..start].iter().flatten());
-                    candidate
-                        .bytes_mut()
-                        .extend(payload[end..].iter().flatten());
+                    candidate.extend(payload[..start].iter().flatten());
+                    candidate.extend(payload[end..].iter().flatten());
 
                     if self.verify_input(fuzzer, executor, state, manager, novelties, &candidate)? {
                         for item in &mut payload[start..end] {

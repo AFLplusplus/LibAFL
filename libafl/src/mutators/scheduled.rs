@@ -480,7 +480,7 @@ mod tests {
     use crate::{
         corpus::{Corpus, InMemoryCorpus, Testcase},
         feedbacks::ConstFeedback,
-        inputs::{BytesInput, HasBytesVec},
+        inputs::{BytesInput, HasMutatorBytes},
         mutators::{
             mutations::SpliceMutator,
             scheduled::{havoc_mutations, StdScheduledMutator},

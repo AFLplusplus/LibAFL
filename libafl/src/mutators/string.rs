@@ -9,7 +9,7 @@ use libafl_bolts::{rands::Rand, Error, HasLen, Named};
 
 use crate::{
     corpus::{CorpusId, HasTestcase, Testcase},
-    inputs::{BytesInput, HasBytesVec},
+    inputs::{BytesInput, HasMutatorBytes},
     mutators::{rand_range, MutationResult, Mutator, Tokens},
     stages::{
         extract_metadata,
@@ -498,7 +498,7 @@ mod test {
 
     use crate::{
         corpus::NopCorpus,
-        inputs::{BytesInput, HasBytesVec},
+        inputs::{BytesInput, HasMutatorBytes},
         mutators::{Mutator, StringCategoryRandMutator, StringSubcategoryRandMutator},
         stages::extract_metadata,
         state::StdState,
