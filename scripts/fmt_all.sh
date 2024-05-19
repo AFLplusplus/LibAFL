@@ -11,7 +11,7 @@ if ! command -v parallel > /dev/null; then
 fi
 
 # Find main rust crates
-CRATES_TO_FMT=$(find "$LIBAFL_DIR" -type d \( -path "*/fuzzers/*" -o -path "*/target/*" -o -path "*/utils/noaslr" -o -path "*/utils/gdb_qemu" \-o -path "*/docs/listings/baby_fuzzer/listing-*" \) -prune \
+CRATES_TO_FMT=$(find "$LIBAFL_DIR" -type d \( -path "*/fuzzers/*" -o -path "*/target/*" -o -path "*/utils/noaslr" -o -path "*/utils/gdb_qemu" -o -path "*/docs/listings/baby_fuzzer/listing-*" \) -prune \
   -o -name "Cargo.toml" -print \
   | grep -v "$LIBAFL_DIR/Cargo.toml")$'\n'
 
