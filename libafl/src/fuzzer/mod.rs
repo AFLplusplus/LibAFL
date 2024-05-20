@@ -290,6 +290,8 @@ where
     scheduler: CS,
     feedback: F,
     objective: OF,
+    num_testcases: u64,
+    testcase_sampling_rate: Option<u64>,
     phantom: PhantomData<OT>,
 }
 
@@ -469,6 +471,13 @@ where
                     .append_metadata(state, manager, observers, &mut testcase)?;
                 let idx = state.corpus_mut().add(testcase)?;
                 self.scheduler_mut().on_add(state, idx)?;
+
+                self.num_testcases += 1;
+                let send_events = if let Some(sampling_rate) = self.testcase_sampling_rate {
+                    send_events && self.num_testcases % sampling_rate == 0
+                } else {
+                    send_events
+                };
 
                 if send_events {
                     // TODO set None for fast targets
@@ -770,6 +779,25 @@ where
             scheduler,
             feedback,
             objective,
+            num_testcases: 0,
+            testcase_sampling_rate: None,
+            phantom: PhantomData,
+        }
+    }
+
+    /// Create a new `StdFuzzer` with a specified `TestCase` sampling rate
+    pub fn with_sampling_rate(
+        scheduler: CS,
+        feedback: F,
+        objective: OF,
+        sampling_rate: u64,
+    ) -> Self {
+        Self {
+            scheduler,
+            feedback,
+            objective,
+            num_testcases: 0,
+            testcase_sampling_rate: Some(sampling_rate),
             phantom: PhantomData,
         }
     }
