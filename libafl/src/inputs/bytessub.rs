@@ -73,7 +73,7 @@ where
 ///
 /// let mut bytes_input = BytesInput::new(vec![1, 2, 3, 4, 5]);
 /// 
-/// Note that the range ends on an exclusive value this time.
+/// // Note that the range ends on an exclusive value this time.
 /// let mut bsi = bytes_input.sub_input(1..=3);
 /// 
 /// assert_eq!(bsi.bytes(), &[2, 3, 4]);
