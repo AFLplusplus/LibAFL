@@ -2302,7 +2302,7 @@ impl AsanRuntime {
                 Backtrace::new(),
             )));
         }
-        original(s, p4, n)
+        original(s, p4, n);
     }
 
     #[cfg(target_vendor = "apple")]
@@ -2332,7 +2332,7 @@ impl AsanRuntime {
                 Backtrace::new(),
             )));
         }
-        original(s, p8, n)
+        original(s, p8, n);
     }
 
     #[cfg(target_vendor = "apple")]
@@ -2362,6 +2362,6 @@ impl AsanRuntime {
                 Backtrace::new(),
             )));
         }
-        original(s, p16, n)
+        original(s, p16, n);
     }
 }
