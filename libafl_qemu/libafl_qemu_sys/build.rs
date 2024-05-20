@@ -6,8 +6,6 @@ mod host_specific {
 
     #[cfg(not(target_os = "linux"))]
     pub fn build() {
-        // Print a emulation_mode to silence clippy's unexpected cfg on macOS
-        println!("cargo:rustc-cfg=emulation_mode=\"usermode\"");
         println!("cargo:warning=libafl_qemu_sys only builds on Linux hosts ATM");
     }
 }
@@ -22,6 +20,10 @@ fn nightly() {}
 
 fn main() {
     println!("cargo:rustc-check-cfg=cfg(nightly)");
+    println!(r#"cargo::rustc-check-cfg=cfg(emulation_mode, values("usermode", "systemmode"))"#);
+    println!(
+        r#"cargo::rustc-check-cfg=cfg(cpu_target, values("arm", "aarch64", "hexagon", "i386", "mips", "ppc", "x86_64"))"#
+    );
     nightly();
     host_specific::build();
 }
