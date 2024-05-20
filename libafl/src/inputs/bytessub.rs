@@ -1,6 +1,4 @@
-//! A wrapper input that can be used to mutate parts of a byte slice
-//! The `BytesInput` is the "normal" input, a map of bytes, that can be sent directly to the client
-//! (As opposed to other, more abstract, inputs, like an Grammar-Based AST Input)
+//! [`BytesSubInput`] is a wrapper input that can be used to mutate parts of a byte slice
 
 use alloc::vec::Vec;
 use core::{
@@ -12,6 +10,7 @@ use libafl_bolts::HasLen;
 
 use super::HasMutatorBytes;
 
+/// Gets the relevant concrete start index from [`RangeBounds`] (inclusive)
 fn start_index<R>(range: &R) -> usize
 where
     R: RangeBounds<usize>,
@@ -23,18 +22,19 @@ where
     }
 }
 
-fn end_index<R>(range: &R, parent_len: usize) -> usize
+/// Gets the relevant concrete end index from [`RangeBounds`] (exclusive)
+fn end_index<R>(range: &R, max_len: usize) -> usize
 where
     R: RangeBounds<usize>,
 {
     match range.end_bound() {
-        Bound::Unbounded => parent_len,
+        Bound::Unbounded => max_len,
         Bound::Included(end) => end + 1,
         Bound::Excluded(end) => *end,
     }
 }
 
-/// A [`BytesSubInput`] makes it possible to use [`Mutator`]`s` that work on
+/// The [`BytesSubInput`] makes it possible to use [`Mutator`]`s` that work on
 /// inputs implementing the [`HasMutatorBytes`] for a sub-range of this input.
 /// For example, we can do the following:
 /// ```rust
