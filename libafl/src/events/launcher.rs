@@ -107,6 +107,9 @@ where
     #[cfg(all(unix, feature = "std"))]
     #[builder(default = None)]
     stdout_file: Option<&'a str>,
+    /// The time in milliseconds to delay between child launches
+    #[builder(default = 10)]
+    launch_delay: u64,
     /// The actual, opened, `stdout_file` - so that we keep it open until the end
     #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[builder(setter(skip), default = None)]
@@ -251,7 +254,7 @@ where
                         self.shmem_provider.post_fork(true)?;
 
                         #[cfg(feature = "std")]
-                        std::thread::sleep(Duration::from_millis(index * 10));
+                        std::thread::sleep(Duration::from_millis(index * self.launch_delay));
 
                         #[cfg(feature = "std")]
                         if !debug_output {
@@ -659,7 +662,7 @@ where
                         log::info!("{:?} PostFork", unsafe { libc::getpid() });
                         self.shmem_provider.post_fork(true)?;
 
-                        std::thread::sleep(Duration::from_millis(index * 10));
+                        std::thread::sleep(Duration::from_millis(index * self.launch_delay));
 
                         if !debug_output {
                             if let Some(file) = &self.opened_stdout_file {
