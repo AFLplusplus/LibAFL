@@ -511,6 +511,9 @@ where
     /// A file name to write all client output to
     #[builder(default = None)]
     stdout_file: Option<&'a str>,
+    /// The time in milliseconds to delay between child launches
+    #[builder(default = 10)]
+    launch_delay: u64,
     /// The actual, opened, `stdout_file` - so that we keep it open until the end
     #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[builder(setter(skip), default = None)]
