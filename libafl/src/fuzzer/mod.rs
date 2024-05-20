@@ -290,8 +290,7 @@ where
     scheduler: CS,
     feedback: F,
     objective: OF,
-    num_testcases: u64,
-    testcase_sampling_rate: Option<u64>,
+    testcase_sampling_rate: Option<u32>,
     phantom: PhantomData<OT>,
 }
 
@@ -450,7 +449,7 @@ where
         exec_res: &ExecuteInputResult,
         observers: &OT,
         exit_kind: &ExitKind,
-        send_events: bool,
+        mut send_events: bool,
     ) -> Result<Option<CorpusId>, Error>
     where
         EM: EventFirer<State = Self::State>,
@@ -472,12 +471,11 @@ where
                 let idx = state.corpus_mut().add(testcase)?;
                 self.scheduler_mut().on_add(state, idx)?;
 
-                self.num_testcases += 1;
-                let send_events = if let Some(sampling_rate) = self.testcase_sampling_rate {
-                    send_events && self.num_testcases % sampling_rate == 0
-                } else {
-                    send_events
-                };
+                let corpus_count = state.corpus().count();
+
+                if let Some(sampling_rate) = self.testcase_sampling_rate {
+                    send_events &= corpus_count % usize::try_from(sampling_rate).unwrap() == 0;
+                }
 
                 if send_events {
                     // TODO set None for fast targets
@@ -779,24 +777,26 @@ where
             scheduler,
             feedback,
             objective,
-            num_testcases: 0,
             testcase_sampling_rate: None,
             phantom: PhantomData,
         }
     }
 
     /// Create a new `StdFuzzer` with a specified `TestCase` sampling rate
+    /// Only every nth testcase will be forwarded to via the event manager.
+    /// This method is useful if you scale to a very large amount of cores
+    /// and a the central broker cannot keep up with the pressure,
+    /// or if you specifically want to have cores explore different branches.
     pub fn with_sampling_rate(
         scheduler: CS,
         feedback: F,
         objective: OF,
-        sampling_rate: u64,
+        sampling_rate: u32,
     ) -> Self {
         Self {
             scheduler,
             feedback,
             objective,
-            num_testcases: 0,
             testcase_sampling_rate: Some(sampling_rate),
             phantom: PhantomData,
         }
