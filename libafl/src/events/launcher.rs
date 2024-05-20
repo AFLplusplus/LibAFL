@@ -15,7 +15,7 @@
 use alloc::string::ToString;
 #[cfg(feature = "std")]
 use core::marker::PhantomData;
-#[cfg(all(unix, feature = "std", feature = "fork"))]
+#[cfg(all(feature = "std", feature = "fork"))]
 use core::time::Duration;
 use core::{
     fmt::{self, Debug, Formatter},
@@ -402,6 +402,10 @@ where
                                 stderr = Stdio::inherit();
                             };
                         }
+                        
+                        #[cfg(feature = "std")]
+                        std::thread::sleep(Duration::from_millis(id as u64 * self.launch_delay));
+
                         std::env::set_var(_AFL_LAUNCHER_CLIENT, id.to_string());
                         let mut child = startable_self()?;
                         let child = (if debug_output {
