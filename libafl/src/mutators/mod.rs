@@ -87,7 +87,7 @@ pub enum MutationResult {
     Skipped,
 }
 
-/// A [`Mutator] takes an input, and mutates it.
+/// A [`Mutator`] takes an input, and mutates it.
 /// Simple as that.
 pub trait Mutator<I, S>: Named {
     /// Mutate a given input
