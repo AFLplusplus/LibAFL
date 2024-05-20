@@ -727,6 +727,7 @@ where
                 .broker_port(self.broker_port)
                 .kind(ManagerKind::Broker)
                 .remote_broker_addr(self.remote_broker_addr)
+                .launch_delay(100)
                 .exit_cleanly_after(Some(NonZeroUsize::try_from(self.cores.ids.len()).unwrap()))
                 .configuration(self.configuration)
                 .serialize_state(self.serialize_state)
