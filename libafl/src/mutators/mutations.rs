@@ -10,7 +10,7 @@ use libafl_bolts::{rands::Rand, Named};
 
 use crate::{
     corpus::Corpus,
-    inputs::{HasMutatorBytes, Input},
+    inputs::HasMutatorBytes,
     mutators::{MutationResult, Mutator},
     random_corpus_id_with_disabled,
     state::{HasCorpus, HasMaxSize, HasRand},
@@ -1030,12 +1030,12 @@ pub struct CrossoverInsertMutator<I> {
 }
 
 impl<I: HasMutatorBytes> CrossoverInsertMutator<I> {
-    pub(crate) fn crossover_insert(
+    pub(crate) fn crossover_insert<I2: HasMutatorBytes>(
         input: &mut I,
         size: usize,
         target: usize,
         range: Range<usize>,
-        other: &I,
+        other: &I2,
     ) -> MutationResult {
         input.resize(size + range.len(), 0);
         unsafe {
@@ -1062,10 +1062,11 @@ impl<I: HasMutatorBytes> CrossoverInsertMutator<I> {
 
 impl<I, S> Mutator<I, S> for CrossoverInsertMutator<I>
 where
-    S: HasCorpus<Input = I> + HasRand + HasMaxSize,
-    I: Input + HasMutatorBytes,
+    S: HasCorpus + HasRand + HasMaxSize,
+    S::Input: HasMutatorBytes,
+    I: HasMutatorBytes,
 {
-    fn mutate(&mut self, state: &mut S, input: &mut S::Input) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
         let max_size = state.max_size();
         if size >= max_size {
@@ -1125,11 +1126,11 @@ pub struct CrossoverReplaceMutator<I> {
 }
 
 impl<I: HasMutatorBytes> CrossoverReplaceMutator<I> {
-    pub(crate) fn crossover_replace(
+    pub(crate) fn crossover_replace<I2: HasMutatorBytes>(
         input: &mut I,
         target: usize,
         range: Range<usize>,
-        other: &I,
+        other: &I2,
     ) -> MutationResult {
         unsafe {
             buffer_copy(
@@ -1146,10 +1147,11 @@ impl<I: HasMutatorBytes> CrossoverReplaceMutator<I> {
 
 impl<I, S> Mutator<I, S> for CrossoverReplaceMutator<I>
 where
-    S: HasCorpus<Input = I> + HasRand,
-    I: Input + HasMutatorBytes,
+    S: HasCorpus + HasRand,
+    S::Input: HasMutatorBytes,
+    I: HasMutatorBytes,
 {
-    fn mutate(&mut self, state: &mut S, input: &mut S::Input) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
         if size == 0 {
             return Ok(MutationResult::Skipped);
