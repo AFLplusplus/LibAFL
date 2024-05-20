@@ -474,8 +474,8 @@ where
                 let corpus_count = state.corpus().count();
 
                 if let Some(sampling_rate) = self.testcase_sampling_rate {
-                    send_events &= corpus_count % usize::try_from(sampling_rate).unwrap() == 0
-                };
+                    send_events &= corpus_count % usize::try_from(sampling_rate).unwrap() == 0;
+                }
 
                 if send_events {
                     // TODO set None for fast targets
