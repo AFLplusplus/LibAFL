@@ -6,7 +6,6 @@ use std::{env, path::PathBuf, process};
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig},
-    executors::ExitKind,
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -22,16 +21,17 @@ use libafl::{
 use libafl_bolts::{
     core_affinity::Cores,
     current_nanos,
+    ownedref::OwnedMutSlice,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
 };
 use libafl_qemu::{
-    edges::{edges_map_mut_slice, QemuEdgeCoverageHelper, MAX_EDGES_NUM},
+    command::StdCommandManager,
+    edges::{edges_map_mut_ptr, QemuEdgeCoverageHelper, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND},
     emu::Emulator,
     executor::{stateful::StatefulQemuExecutor, QemuExecutorState},
-    EmuExitReasonError, FastSnapshotManager, HandlerError, HandlerResult, QemuHooks,
-    StdEmuExitHandler,
+    FastSnapshotManager, QemuHooks, StdEmulatorExitHandler,
 };
 
 // use libafl_qemu::QemuSnapshotBuilder; for normal qemu snapshot
@@ -53,11 +53,15 @@ pub fn fuzz() {
         // Initialize QEMU
         let args: Vec<String> = env::args().collect();
         let env: Vec<(String, String)> = env::vars().collect();
+
         // let emu_snapshot_manager = QemuSnapshotBuilder::new(true);
         let emu_snapshot_manager = FastSnapshotManager::new(false); // Create a snapshot manager (normal or fast for now).
-        let emu_exit_handler: StdEmuExitHandler<FastSnapshotManager> =
-            StdEmuExitHandler::new(emu_snapshot_manager); // Create an exit handler: it is the entity taking the decision of what should be done when QEMU returns.
-        let emu = Emulator::new(&args, &env, emu_exit_handler).unwrap(); // Create the emulator
+        let emu_exit_handler: StdEmulatorExitHandler<FastSnapshotManager> =
+            StdEmulatorExitHandler::new(emu_snapshot_manager); // Create an exit handler: it is the entity taking the decision of what should be done when QEMU returns.
+
+        let cmd_manager = StdCommandManager::new();
+
+        let emu = Emulator::new(&args, &env, emu_exit_handler, cmd_manager).unwrap(); // Create the emulator
 
         let devices = emu.list_devices();
         println!("Devices = {:?}", devices);
@@ -65,38 +69,18 @@ pub fn fuzz() {
         // The wrapped harness function, calling out to the LLVM-style harness
         let mut harness =
             |input: &BytesInput, qemu_executor_state: &mut QemuExecutorState<_, _>| unsafe {
-                match emu.run(input, qemu_executor_state) {
-                    Ok(handler_result) => match handler_result {
-                        HandlerResult::UnhandledExit(unhandled_exit) => {
-                            panic!("Unhandled exit: {}", unhandled_exit)
-                        }
-                        HandlerResult::EndOfRun(exit_kind) => exit_kind,
-                        HandlerResult::Interrupted => {
-                            println!("Interrupted.");
-                            std::process::exit(0);
-                        }
-                    },
-                    Err(handler_error) => match handler_error {
-                        HandlerError::QemuExitReasonError(emu_exit_reason_error) => {
-                            match emu_exit_reason_error {
-                                EmuExitReasonError::UnknownKind => panic!("unknown kind"),
-                                EmuExitReasonError::UnexpectedExit => ExitKind::Crash,
-                                _ => {
-                                    panic!("Emu Exit unhandled error: {:?}", emu_exit_reason_error)
-                                }
-                            }
-                        }
-                        _ => panic!("Unhandled error: {:?}", handler_error),
-                    },
-                }
+                emu.run(input, qemu_executor_state)
+                    .unwrap()
+                    .try_into()
+                    .unwrap()
             };
 
         // Create an observation channel using the coverage map
         let edges_observer = unsafe {
             HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
                 "edges",
-                edges_map_mut_slice(),
-                addr_of_mut!(MAX_EDGES_NUM),
+                OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_SIZE_IN_USE),
+                addr_of_mut!(MAX_EDGES_FOUND),
             ))
             .track_indices()
         };
@@ -110,7 +94,7 @@ pub fn fuzz() {
             // New maximization map feedback linked to the edges observer and the feedback state
             MaxMapFeedback::new(&edges_observer),
             // Time feedback, this one does not need a feedback state
-            TimeFeedback::with_observer(&time_observer)
+            TimeFeedback::new(&time_observer)
         );
 
         // A feedback to choose if an input is a solution or not

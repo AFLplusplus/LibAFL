@@ -1,74 +1,7 @@
 //! The `LibAFL` `LibFuzzer` runtime, exposing the same functions as the original [`LibFuzzer`](https://llvm.org/docs/LibFuzzer.html).
 
-#![allow(incomplete_features)]
-// For `type_eq`
-#![cfg_attr(unstable_feature, feature(specialization))]
-// For `type_id` and owned things
-#![cfg_attr(unstable_feature, feature(intrinsics))]
-// For `std::simd`
-#![cfg_attr(unstable_feature, feature(portable_simd))]
-#![warn(clippy::cargo)]
-#![allow(ambiguous_glob_reexports)]
-#![deny(clippy::cargo_common_metadata)]
-#![deny(rustdoc::broken_intra_doc_links)]
-#![deny(clippy::all)]
-#![deny(clippy::pedantic)]
-#![allow(
-    clippy::unreadable_literal,
-    clippy::type_repetition_in_bounds,
-    clippy::missing_errors_doc,
-    clippy::cast_possible_truncation,
-    clippy::used_underscore_binding,
-    clippy::ptr_as_ptr,
-    clippy::missing_panics_doc,
-    clippy::missing_docs_in_private_items,
-    clippy::module_name_repetitions,
-    clippy::ptr_cast_constness,
-    clippy::unsafe_derive_deserialize
-)]
-#![cfg_attr(not(test), warn(
-    missing_debug_implementations,
-    missing_docs,
-    //trivial_casts,
-    trivial_numeric_casts,
-    unused_extern_crates,
-    unused_import_braces,
-    unused_qualifications,
-    //unused_results
-))]
-#![cfg_attr(test, deny(
-    missing_debug_implementations,
-    missing_docs,
-    //trivial_casts,
-    trivial_numeric_casts,
-    unused_extern_crates,
-    unused_import_braces,
-    unused_qualifications,
-    unused_must_use,
-    //unused_results
-))]
-#![cfg_attr(
-    test,
-    deny(
-        bad_style,
-        dead_code,
-        improper_ctypes,
-        non_shorthand_field_patterns,
-        no_mangle_generic_items,
-        overflowing_literals,
-        path_statements,
-        patterns_in_fns_without_body,
-        unconditional_recursion,
-        unused,
-        unused_allocation,
-        unused_comparisons,
-        unused_parens,
-        while_true
-    )
-)]
-// Till they fix this buggy lint in clippy
-#![allow(clippy::borrow_as_ptr)]
-#![allow(clippy::borrow_deref_ref)]
+#![forbid(unexpected_cfgs)]
+#![allow(clippy::unsafe_derive_deserialize)]
 
 use core::ffi::{c_char, c_int, CStr};
 use std::{fs::File, io::stderr, os::fd::RawFd};
@@ -110,11 +43,6 @@ mod harness_wrap {
 }
 
 pub(crate) use harness_wrap::libafl_libfuzzer_test_one_input;
-#[cfg(feature = "mimalloc")]
-use mimalloc::MiMalloc;
-#[global_allocator]
-#[cfg(feature = "mimalloc")]
-static GLOBAL: MiMalloc = MiMalloc;
 
 #[allow(clippy::struct_excessive_bools)]
 struct CustomMutationStatus {
@@ -150,7 +78,6 @@ impl CustomMutationStatus {
 macro_rules! fuzz_with {
     ($options:ident, $harness:ident, $operation:expr, $and_then:expr, $edge_maker:expr) => {{
         use libafl_bolts::{
-                current_nanos,
                 rands::StdRand,
                 tuples::{Merge, tuple_list},
                 AsSlice,
@@ -244,7 +171,7 @@ macro_rules! fuzz_with {
                     map_feedback,
                     feedback_and_fast!(ConstFeedback::new($options.shrink()), shrinking_map_feedback),
                     // Time feedback, this one does not need a feedback state
-                    TimeFeedback::with_observer(&time_observer)
+                    TimeFeedback::new(&time_observer)
                 )
             );
 
@@ -282,7 +209,7 @@ macro_rules! fuzz_with {
             let mut state = state.unwrap_or_else(|| {
                 StdState::new(
                     // RNG
-                    StdRand::with_seed(current_nanos()),
+                    StdRand::new(),
                     // Corpus that will be evolved, we keep it in memory for performance
                     LibfuzzerCorpus::new(corpus_dir.clone(), 4096),
                     // Corpus in which we store solutions (crashes in this example),

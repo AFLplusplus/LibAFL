@@ -1,14 +1,27 @@
 //! Implements a mini-bsod generator.
 //! It dumps all important registers and prints a stacktrace.
-//! You may use the [`crate::os::unix_signals::ucontext`]
-//! function to get a [`ucontext_t`].
 
+#[cfg(target_vendor = "apple")]
+use core::mem::size_of;
 use std::io::{BufWriter, Write};
 #[cfg(any(target_os = "solaris", target_os = "illumos"))]
 use std::process::Command;
 
+#[cfg(unix)]
 use libc::siginfo_t;
+#[cfg(target_vendor = "apple")]
+use mach::{
+    message::mach_msg_type_number_t,
+    port::mach_port_t,
+    traps::mach_task_self,
+    vm::mach_vm_region_recurse,
+    vm_region::{vm_region_recurse_info_t, vm_region_submap_info_64},
+    vm_types::{mach_vm_address_t, mach_vm_size_t, natural_t},
+};
+#[cfg(windows)]
+use windows::Win32::System::Diagnostics::Debug::{CONTEXT, EXCEPTION_POINTERS};
 
+#[cfg(unix)]
 use crate::os::unix_signals::{ucontext_t, Signal};
 
 /// Write the content of all important registers
@@ -130,7 +143,7 @@ pub fn dump_registers<W: Write>(
 }
 
 /// Write the content of all important registers
-#[cfg(all(target_vendor = "freebsd", target_arch = "aarch64"))]
+#[cfg(all(target_os = "freebsd", target_arch = "aarch64"))]
 #[allow(clippy::similar_names)]
 pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
@@ -380,7 +393,7 @@ pub fn dump_registers<W: Write>(
     write!(writer, "cs : {:#016x}, ", ucontext.sc_cs)?;
     Ok(())
 }
-///
+
 /// Write the content of all important registers
 #[cfg(all(target_os = "openbsd", target_arch = "aarch64"))]
 #[allow(clippy::similar_names)]
@@ -441,6 +454,34 @@ pub fn dump_registers<W: Write>(
 }
 
 /// Write the content of all important registers
+#[cfg(windows)]
+#[allow(clippy::similar_names)]
+pub fn dump_registers<W: Write>(
+    writer: &mut BufWriter<W>,
+    context: &CONTEXT,
+) -> Result<(), std::io::Error> {
+    write!(writer, "r8 : {:#016x}, ", context.R8)?;
+    write!(writer, "r9 : {:#016x}, ", context.R9)?;
+    write!(writer, "r10: {:#016x}, ", context.R10)?;
+    writeln!(writer, "r11: {:#016x}, ", context.R11)?;
+    write!(writer, "r12: {:#016x}, ", context.R12)?;
+    write!(writer, "r13: {:#016x}, ", context.R13)?;
+    write!(writer, "r14: {:#016x}, ", context.R14)?;
+    writeln!(writer, "r15: {:#016x}, ", context.R15)?;
+    write!(writer, "rdi: {:#016x}, ", context.Rdi)?;
+    write!(writer, "rsi: {:#016x}, ", context.Rsi)?;
+    write!(writer, "rbp: {:#016x}, ", context.Rbp)?;
+    writeln!(writer, "rbx: {:#016x}, ", context.Rbx)?;
+    write!(writer, "rdx: {:#016x}, ", context.Rdx)?;
+    write!(writer, "rax: {:#016x}, ", context.Rax)?;
+    write!(writer, "rcx: {:#016x}, ", context.Rcx)?;
+    writeln!(writer, "rsp: {:#016x}, ", context.Rsp)?;
+    write!(writer, "rip: {:#016x}, ", context.Rip)?;
+    writeln!(writer, "efl: {:#016x}, ", context.EFlags)?;
+
+    Ok(())
+}
+
 #[cfg(all(target_os = "haiku", target_arch = "x86_64"))]
 #[allow(clippy::similar_names)]
 pub fn dump_registers<W: Write>(
@@ -478,6 +519,7 @@ pub fn dump_registers<W: Write>(
     target_os = "dragonfly",
     target_os = "netbsd",
     target_os = "openbsd",
+    windows,
     target_os = "haiku",
     any(target_os = "solaris", target_os = "illumos"),
 )))]
@@ -740,6 +782,7 @@ fn write_crash<W: Write>(
     target_os = "dragonfly",
     target_os = "openbsd",
     target_os = "netbsd",
+    windows,
     target_os = "haiku",
     any(target_os = "solaris", target_os = "illumos"),
 )))]
@@ -750,6 +793,33 @@ fn write_crash<W: Write>(
 ) -> Result<(), std::io::Error> {
     // TODO add fault addr for other platforms.
     writeln!(writer, "Received signal {signal}")?;
+
+    Ok(())
+}
+
+#[cfg(windows)]
+fn write_crash<W: Write>(
+    writer: &mut BufWriter<W>,
+    exception_pointers: *mut EXCEPTION_POINTERS,
+) -> Result<(), std::io::Error> {
+    // TODO add fault addr for other platforms.
+    unsafe {
+        writeln!(
+            writer,
+            "Received exception {:0x} at address {:x}",
+            (*exception_pointers)
+                .ExceptionRecord
+                .as_mut()
+                .unwrap()
+                .ExceptionCode
+                .0,
+            (*exception_pointers)
+                .ExceptionRecord
+                .as_mut()
+                .unwrap()
+                .ExceptionAddress as usize
+        )
+    }?;
 
     Ok(())
 }
@@ -776,7 +846,7 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
         libc::VM_PROC,
         libc::VM_PROC_MAP,
         -1,
-        std::mem::size_of::<libc::kinfo_vmentry>()
+        size_of::<libc::kinfo_vmentry>()
             .try_into()
             .expect("Invalid libc::kinfo_vmentry size"),
     ];
@@ -809,7 +879,7 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
                         .try_into()
                         .expect("invalid kve_structsize value");
                     #[cfg(target_os = "netbsd")]
-                    let sz = std::mem::size_of::<libc::kinfo_vmentry>();
+                    let sz = size_of::<libc::kinfo_vmentry>();
                     if sz == 0 {
                         break;
                     }
@@ -838,7 +908,7 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
 #[cfg(target_os = "openbsd")]
 fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Error> {
     let mut pentry = std::mem::MaybeUninit::<libc::kinfo_vmentry>::uninit();
-    let mut s = std::mem::size_of::<libc::kinfo_vmentry>();
+    let mut s = size_of::<libc::kinfo_vmentry>();
     let arr = &[libc::CTL_KERN, libc::KERN_PROC_VMMAP, unsafe {
         libc::getpid()
     }];
@@ -884,45 +954,50 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
     Ok(())
 }
 
-#[cfg(target_env = "apple")]
+#[cfg(target_vendor = "apple")]
+#[allow(non_camel_case_types)]
 fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Error> {
-    let ptask = std::mem::MaybeUninit::<libc::mach_task_t>::uninit();
+    let mut ptask = std::mem::MaybeUninit::<mach_port_t>::uninit();
     // We start by the lowest virtual address from the userland' standpoint
-    let mut addr = libc::mach_vm_address_t = libc::MACH_VM_MIN_ADDRESS;
-    let mut cnt: libc::mach_msg_type_number_t = 0;
-    let mut sz: libc::mach_vm_size_t = 0;
-    let mut reg: libc::natural_t = 1;
+    let mut addr: mach_vm_address_t = 0;
+    let mut _cnt: mach_msg_type_number_t = 0;
+    let mut sz: mach_vm_size_t = 0;
+    let mut reg: natural_t = 1;
 
-    let mut r =
-        unsafe { libc::task_for_pid(libc::mach_task_self(), libc::getpid(), ptask.as_mut_ptr()) };
+    let mut r = unsafe { libc::task_for_pid(mach_task_self(), libc::getpid(), ptask.as_mut_ptr()) };
     if r != libc::KERN_SUCCESS {
         return Err(std::io::Error::last_os_error());
     }
 
-    let task = ptask.assume_init();
+    let task = unsafe { ptask.assume_init() };
 
     loop {
-        let pvminfo = std::mem::MaybeUninit::<libc::vm_regions_submap_info_64>::uninit();
-        cnt = libc::VM_REGION_SUBMAP_INFO_COUNT_64;
-        r = libc::mach_vm_region_recurse(
-            task,
-            &mut addr,
-            &mut sz,
-            &mut reg,
-            pvminfo.as_mut_ptr() as *mut libc::vm_region_recurse_info_t,
-            &cnt,
-        );
+        let mut pvminfo = std::mem::MaybeUninit::<vm_region_submap_info_64>::uninit();
+        _cnt = mach_msg_type_number_t::try_from(
+            size_of::<vm_region_submap_info_64>() / size_of::<natural_t>(),
+        )
+        .unwrap();
+        r = unsafe {
+            mach_vm_region_recurse(
+                task,
+                &mut addr,
+                &mut sz,
+                &mut reg,
+                pvminfo.as_mut_ptr() as vm_region_recurse_info_t,
+                &mut _cnt,
+            )
+        };
         if r != libc::KERN_SUCCESS {
             break;
         }
 
-        let vminfo = pvminfo.assume_init();
+        let vminfo = unsafe { pvminfo.assume_init() };
         // We are only interested by the first level of the maps
-        if !vminfo.is_submap {
+        if vminfo.is_submap == 0 {
             let i = format!("{}-{}\n", addr, addr + sz);
-            writer.write(&i.into_bytes())?;
+            writer.write_all(&i.into_bytes())?;
         }
-        addr = addr + sz;
+        addr += sz;
     }
 
     Ok(())
@@ -970,7 +1045,7 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
     target_os = "openbsd",
     target_os = "netbsd",
     target_os = "haiku",
-    target_env = "apple",
+    target_vendor = "apple",
     any(target_os = "linux", target_os = "android"),
     any(target_os = "solaris", target_os = "illumos"),
 )))]
@@ -1007,6 +1082,30 @@ pub fn generate_minibsod<W: Write>(
     write_minibsod(writer)
 }
 
+/// Generates a mini-BSOD given an `EXCEPTION_POINTERS` structure.
+#[cfg(windows)]
+#[allow(
+    clippy::non_ascii_literal,
+    clippy::too_many_lines,
+    clippy::not_unsafe_ptr_arg_deref
+)]
+pub fn generate_minibsod<W: Write>(
+    writer: &mut BufWriter<W>,
+    exception_pointers: *mut EXCEPTION_POINTERS,
+) -> Result<(), std::io::Error> {
+    writeln!(writer, "{:━^100}", " CRASH ")?;
+    write_crash(writer, exception_pointers)?;
+    writeln!(writer, "{:━^100}", " REGISTERS ")?;
+    dump_registers(writer, unsafe {
+        (*exception_pointers).ContextRecord.as_mut().unwrap()
+    })?;
+    writeln!(writer, "{:━^100}", " BACKTRACE ")?;
+    writeln!(writer, "{:?}", backtrace::Backtrace::new())?;
+    writeln!(writer, "{:━^100}", " MAPS ")?;
+    write_minibsod(writer)
+}
+
+#[cfg(unix)]
 #[cfg(test)]
 mod tests {
 

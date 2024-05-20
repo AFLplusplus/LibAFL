@@ -10,6 +10,8 @@
 use alloc::{boxed::Box, string::String, vec::Vec};
 use core::{marker::PhantomData, num::NonZeroUsize, time::Duration};
 
+#[cfg(feature = "adaptive_serialization")]
+use libafl_bolts::tuples::{Handle, Handled};
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{
     compress::GzipCompressor,
@@ -24,6 +26,8 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "llmp_compression")]
 use crate::events::llmp::COMPRESS_THRESHOLD;
+#[cfg(feature = "adaptive_serialization")]
+use crate::observers::TimeObserver;
 #[cfg(feature = "scalability_introspection")]
 use crate::state::HasScalabilityMonitor;
 use crate::{
@@ -82,7 +86,7 @@ where
         Ok(Self {
             llmp,
             #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
             phantom: PhantomData,
         })
     }
@@ -96,7 +100,7 @@ where
             // TODO switch to false after solving the bug
             llmp: LlmpBroker::with_keep_pages_attach_to_tcp(shmem_provider, port, true)?,
             #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
             phantom: PhantomData,
         })
     }
@@ -221,6 +225,8 @@ where
     client: LlmpClient<SP>,
     #[cfg(feature = "llmp_compression")]
     compressor: GzipCompressor,
+    #[cfg(feature = "adaptive_serialization")]
+    time_ref: Handle<TimeObserver>,
     is_main: bool,
 }
 
@@ -263,6 +269,10 @@ where
     fn should_serialize_cnt_mut(&mut self) -> &mut usize {
         self.inner.should_serialize_cnt_mut()
     }
+
+    fn time_ref(&self) -> &Handle<TimeObserver> {
+        &self.time_ref
+    }
 }
 
 #[cfg(not(feature = "adaptive_serialization"))]
@@ -275,7 +285,7 @@ where
 
 impl<EM, SP> EventFirer for CentralizedEventManager<EM, SP>
 where
-    EM: AdaptiveSerializer + EventFirer + HasEventManagerId + AdaptiveSerializer,
+    EM: AdaptiveSerializer + EventFirer + HasEventManagerId,
     SP: ShMemProvider + 'static,
 {
     fn fire(
@@ -459,12 +469,31 @@ where
     SP: ShMemProvider + 'static,
 {
     /// Creates a new [`CentralizedEventManager`].
+    #[cfg(not(feature = "adaptive_serialization"))]
     pub fn new(inner: EM, client: LlmpClient<SP>, is_main: bool) -> Result<Self, Error> {
         Ok(Self {
             inner,
             client,
             #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
+            is_main,
+        })
+    }
+
+    /// Creates a new [`CentralizedEventManager`].
+    #[cfg(feature = "adaptive_serialization")]
+    pub fn new(
+        inner: EM,
+        client: LlmpClient<SP>,
+        is_main: bool,
+        time_obs: &TimeObserver,
+    ) -> Result<Self, Error> {
+        Ok(Self {
+            inner,
+            client,
+            #[cfg(feature = "llmp_compression")]
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
+            time_ref: time_obs.handle(),
             is_main,
         })
     }
@@ -473,21 +502,44 @@ where
     ///
     /// If the port is not yet bound, it will act as a broker; otherwise, it
     /// will act as a client.
-    #[cfg(feature = "std")]
+    #[cfg(all(feature = "std", not(feature = "adaptive_serialization")))]
     pub fn on_port(inner: EM, shmem_provider: SP, port: u16, is_main: bool) -> Result<Self, Error> {
         let client = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
         Ok(Self {
             inner,
             client,
             #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
+            is_main,
+        })
+    }
+
+    /// Create a centralized event manager on a port
+    ///
+    /// If the port is not yet bound, it will act as a broker; otherwise, it
+    /// will act as a client.
+    #[cfg(all(feature = "std", feature = "adaptive_serialization"))]
+    pub fn on_port(
+        inner: EM,
+        shmem_provider: SP,
+        port: u16,
+        is_main: bool,
+        time_obs: &TimeObserver,
+    ) -> Result<Self, Error> {
+        let client = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
+        Ok(Self {
+            inner,
+            client,
+            #[cfg(feature = "llmp_compression")]
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
+            time_ref: time_obs.handle(),
             is_main,
         })
     }
 
     /// If a client respawns, it may reuse the existing connection, previously
     /// stored by [`LlmpClient::to_env()`].
-    #[cfg(feature = "std")]
+    #[cfg(all(feature = "std", not(feature = "adaptive_serialization")))]
     pub fn existing_client_from_env(
         inner: EM,
         shmem_provider: SP,
@@ -498,17 +550,33 @@ where
             inner,
             client: LlmpClient::on_existing_from_env(shmem_provider, env_name)?,
             #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
             is_main,
         })
     }
 
-    /// Describe the client event manager's LLMP parts in a restorable fashion
-    pub fn describe(&self) -> Result<LlmpClientDescription, Error> {
-        self.client.describe()
+    /// If a client respawns, it may reuse the existing connection, previously
+    /// stored by [`LlmpClient::to_env()`].
+    #[cfg(all(feature = "std", feature = "adaptive_serialization"))]
+    pub fn existing_client_from_env(
+        inner: EM,
+        shmem_provider: SP,
+        env_name: &str,
+        is_main: bool,
+        time_obs: &TimeObserver,
+    ) -> Result<Self, Error> {
+        Ok(Self {
+            inner,
+            client: LlmpClient::on_existing_from_env(shmem_provider, env_name)?,
+            #[cfg(feature = "llmp_compression")]
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
+            time_ref: time_obs.handle(),
+            is_main,
+        })
     }
 
     /// Create an existing client from description
+    #[cfg(not(feature = "adaptive_serialization"))]
     pub fn existing_client_from_description(
         inner: EM,
         shmem_provider: SP,
@@ -519,9 +587,33 @@ where
             inner,
             client: LlmpClient::existing_client_from_description(shmem_provider, description)?,
             #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
             is_main,
         })
+    }
+
+    /// Create an existing client from description
+    #[cfg(feature = "adaptive_serialization")]
+    pub fn existing_client_from_description(
+        inner: EM,
+        shmem_provider: SP,
+        description: &LlmpClientDescription,
+        is_main: bool,
+        time_obs: &TimeObserver,
+    ) -> Result<Self, Error> {
+        Ok(Self {
+            inner,
+            client: LlmpClient::existing_client_from_description(shmem_provider, description)?,
+            #[cfg(feature = "llmp_compression")]
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
+            time_ref: time_obs.handle(),
+            is_main,
+        })
+    }
+
+    /// Describe the client event manager's LLMP parts in a restorable fashion
+    pub fn describe(&self) -> Result<LlmpClientDescription, Error> {
+        self.client.describe()
     }
 
     /// Write the config for a client [`EventManager`] to env vars, a new
@@ -550,7 +642,7 @@ where
         let serialized = postcard::to_allocvec(event)?;
         let flags = LLMP_FLAG_INITIALIZED;
 
-        match self.compressor.compress(&serialized)? {
+        match self.compressor.maybe_compress(&serialized) {
             Some(comp_buf) => {
                 self.client.send_buf_with_flags(
                     _LLMP_TAG_TO_MAIN,

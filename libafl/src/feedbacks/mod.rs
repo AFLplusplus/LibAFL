@@ -4,43 +4,27 @@
 
 // TODO: make S of Feedback<S> an associated type when specialisation + AT is stable
 
-pub mod map;
-
 use alloc::borrow::Cow;
-
-pub use map::*;
-
-pub mod differential;
-pub use differential::DiffFeedback;
-#[cfg(feature = "std")]
-pub mod concolic;
-#[cfg(feature = "std")]
-pub use concolic::ConcolicFeedback;
-
-#[cfg(feature = "std")]
-pub mod new_hash_feedback;
-#[cfg(feature = "std")]
-pub use new_hash_feedback::NewHashFeedback;
-#[cfg(feature = "std")]
-pub use new_hash_feedback::NewHashFeedbackMetadata;
-
-#[cfg(feature = "nautilus")]
-pub mod nautilus;
-#[cfg(feature = "std")]
-pub mod stdio;
-pub mod transferred;
-
-/// The module for list feedback
-pub mod list;
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
 };
 
-use libafl_bolts::Named;
+#[cfg(feature = "std")]
+pub use concolic::ConcolicFeedback;
+pub use differential::DiffFeedback;
+use libafl_bolts::{
+    tuples::{Handle, Handled, MatchNameRef},
+    Named,
+};
 pub use list::*;
+pub use map::*;
 #[cfg(feature = "nautilus")]
 pub use nautilus::*;
+#[cfg(feature = "std")]
+pub use new_hash_feedback::NewHashFeedback;
+#[cfg(feature = "std")]
+pub use new_hash_feedback::NewHashFeedbackMetadata;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -51,6 +35,22 @@ use crate::{
     state::State,
     Error,
 };
+
+pub mod map;
+
+#[cfg(feature = "std")]
+pub mod concolic;
+pub mod differential;
+#[cfg(feature = "nautilus")]
+pub mod nautilus;
+#[cfg(feature = "std")]
+pub mod new_hash_feedback;
+#[cfg(feature = "std")]
+pub mod stdio;
+pub mod transferred;
+
+/// The module for list feedback
+pub mod list;
 
 /// Feedbacks evaluate the observers.
 /// Basically, they reduce the information provided by an observer to a value,
@@ -138,9 +138,12 @@ where
 }
 
 /// Has an associated observer name (mostly used to retrieve the observer with `MatchName` from an `ObserverTuple`)
-pub trait HasObserverName {
+pub trait HasObserverHandle {
+    /// The observer for which we hold a reference
+    type Observer: ?Sized;
+
     /// The name associated with the observer
-    fn observer_name(&self) -> &Cow<'static, str>;
+    fn observer_handle(&self) -> &Handle<Self::Observer>;
 }
 
 /// A combined feedback consisting of multiple [`Feedback`]s
@@ -931,7 +934,7 @@ pub type TimeoutFeedbackFactory = DefaultFeedbackFactory<TimeoutFeedback>;
 /// It decides, if the given [`TimeObserver`] value of a run is interesting.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TimeFeedback {
-    name: Cow<'static, str>,
+    observer_handle: Handle<TimeObserver>,
 }
 
 impl<S> Feedback<S> for TimeFeedback
@@ -968,7 +971,7 @@ where
         OT: ObserversTuple<S>,
         EM: EventFirer<State = S>,
     {
-        let observer = observers.match_name::<TimeObserver>(self.name()).unwrap();
+        let observer = observers.get(&self.observer_handle).unwrap();
         *testcase.exec_time_mut() = *observer.last_runtime();
         Ok(())
     }
@@ -983,24 +986,16 @@ where
 impl Named for TimeFeedback {
     #[inline]
     fn name(&self) -> &Cow<'static, str> {
-        &self.name
+        self.observer_handle.name()
     }
 }
 
 impl TimeFeedback {
-    /// Creates a new [`TimeFeedback`], deciding if the value of a [`TimeObserver`] with the given `name` of a run is interesting.
-    #[must_use]
-    pub fn new(name: &'static str) -> Self {
-        Self {
-            name: Cow::from(name),
-        }
-    }
-
     /// Creates a new [`TimeFeedback`], deciding if the given [`TimeObserver`] value of a run is interesting.
     #[must_use]
-    pub fn with_observer(observer: &TimeObserver) -> Self {
+    pub fn new(observer: &TimeObserver) -> Self {
         Self {
-            name: observer.name().clone(),
+            observer_handle: observer.handle(),
         }
     }
 }

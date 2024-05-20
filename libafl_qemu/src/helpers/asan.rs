@@ -17,12 +17,12 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use rangemap::RangeMap;
 
 use crate::{
-    emu::{EmuError, MemAccessInfo, SyscallHookResult},
     helpers::{
         calls::FullBacktraceCollector, HasInstrumentationFilter, IsFilter, QemuHelper,
         QemuHelperTuple, QemuInstrumentationAddressRangeFilter,
     },
     hooks::{Hook, QemuHooks},
+    qemu::{MemAccessInfo, QemuInitError, SyscallHookResult},
     snapshot::QemuSnapshotHelper,
     sys::TCGTemp,
     GuestAddr, Qemu, Regs,
@@ -461,7 +461,7 @@ impl AsanGiovese {
 
     pub fn report_or_crash(&mut self, qemu: Qemu, pc: GuestAddr, error: AsanError) {
         if let Some(mut cb) = self.error_callback.take() {
-            (cb)(self, qemu, pc, error);
+            cb(self, qemu, pc, error);
             self.error_callback = Some(cb);
         } else {
             std::process::abort();
@@ -470,7 +470,7 @@ impl AsanGiovese {
 
     pub fn report(&mut self, qemu: Qemu, pc: GuestAddr, error: AsanError) {
         if let Some(mut cb) = self.error_callback.take() {
-            (cb)(self, qemu, pc, error);
+            cb(self, qemu, pc, error);
             self.error_callback = Some(cb);
         }
     }
@@ -668,7 +668,7 @@ static mut ASAN_INITED: bool = false;
 pub fn init_qemu_with_asan(
     args: &mut Vec<String>,
     env: &mut [(String, String)],
-) -> Result<(Qemu, Pin<Box<AsanGiovese>>), EmuError> {
+) -> Result<(Qemu, Pin<Box<AsanGiovese>>), QemuInitError> {
     let current = env::current_exe().unwrap();
     let asan_lib = fs::canonicalize(current)
         .unwrap()

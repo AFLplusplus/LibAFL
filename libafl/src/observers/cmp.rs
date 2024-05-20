@@ -1,11 +1,15 @@
 //! The `CmpObserver` provides access to the logged values of CMP instructions
 
 use alloc::{borrow::Cow, vec::Vec};
-use core::{fmt::Debug, marker::PhantomData};
+use core::{
+    fmt::Debug,
+    marker::PhantomData,
+    ops::{Deref, DerefMut},
+};
 
 use c2rust_bitfields::BitfieldStruct;
 use hashbrown::HashMap;
-use libafl_bolts::{ownedref::OwnedRefMut, serdeany::SerdeAny, AsSlice, AsSliceMut, Named};
+use libafl_bolts::{ownedref::OwnedRefMut, serdeany::SerdeAny, Named};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{executors::ExitKind, inputs::UsesInput, observers::Observer, Error, HasMetadata};
@@ -83,21 +87,16 @@ pub struct CmpValuesMetadata {
 
 libafl_bolts::impl_serdeany!(CmpValuesMetadata);
 
-impl AsSlice for CmpValuesMetadata {
-    type Entry = CmpValues;
-    /// Convert to a slice
-    #[must_use]
-    fn as_slice(&self) -> &[CmpValues] {
-        self.list.as_slice()
+impl Deref for CmpValuesMetadata {
+    type Target = [CmpValues];
+    fn deref(&self) -> &[CmpValues] {
+        &self.list
     }
 }
 
-impl AsSliceMut for CmpValuesMetadata {
-    type Entry = CmpValues;
-    /// Convert to a slice
-    #[must_use]
-    fn as_slice_mut(&mut self) -> &mut [CmpValues] {
-        self.list.as_slice_mut()
+impl DerefMut for CmpValuesMetadata {
+    fn deref_mut(&mut self) -> &mut [CmpValues] {
+        &mut self.list
     }
 }
 
@@ -391,7 +390,7 @@ where
         }
     }
 
-    /// Reference the stored auxiliary data associated with the [`CmpObserverMetadata`]
+    /// Handle the stored auxiliary data associated with the [`CmpObserverMetadata`]
     pub fn data(&self) -> &M::Data {
         &self.data
     }

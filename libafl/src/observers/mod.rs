@@ -1,10 +1,5 @@
 //! Observers give insights about runs of a target, such as coverage, timing, stack depth, and more.
-
-pub mod map;
-
 use alloc::borrow::Cow;
-
-pub use map::*;
 
 pub mod cmp;
 pub use cmp::*;
@@ -20,6 +15,8 @@ pub mod stacktrace;
 pub use stacktrace::*;
 
 pub mod concolic;
+pub mod map;
+pub use map::*;
 
 pub mod value;
 
@@ -29,7 +26,7 @@ use core::{fmt::Debug, time::Duration};
 #[cfg(feature = "std")]
 use std::time::Instant;
 
-#[cfg(feature = "no_std")]
+#[cfg(not(feature = "std"))]
 use libafl_bolts::current_time;
 use libafl_bolts::{tuples::MatchName, Named};
 pub use list::*;
@@ -37,15 +34,6 @@ use serde::{Deserialize, Serialize};
 pub use value::*;
 
 use crate::{executors::ExitKind, inputs::UsesInput, state::UsesState, Error};
-
-/// Something that uses observer like mapfeedbacks
-pub trait UsesObserver<S>
-where
-    S: UsesInput,
-{
-    /// The observer type used
-    type Observer: Observer<S>;
-}
 
 /// Observers observe different information about the target.
 /// They can then be used by various sorts of feedback.
@@ -93,29 +81,6 @@ where
     ) -> Result<(), Error> {
         Ok(())
     }
-
-    /// If this observer observes `stdout`
-    #[inline]
-    fn observes_stdout(&self) -> bool {
-        false
-    }
-    /// If this observer observes `stderr`
-    #[inline]
-    fn observes_stderr(&self) -> bool {
-        false
-    }
-
-    /// React to new `stdout`
-    /// To use this, always return `true` from `observes_stdout`
-    #[inline]
-    #[allow(unused_variables)]
-    fn observe_stdout(&mut self, stdout: &[u8]) {}
-
-    /// React to new `stderr`
-    /// To use this, always return `true` from `observes_stderr`
-    #[inline]
-    #[allow(unused_variables)]
-    fn observe_stderr(&mut self, stderr: &[u8]) {}
 }
 
 /// Defines the observer type shared across traits of the type.
@@ -151,16 +116,6 @@ where
         input: &S::Input,
         exit_kind: &ExitKind,
     ) -> Result<(), Error>;
-
-    /// Returns true if a `stdout` observer was added to the list
-    fn observes_stdout(&self) -> bool;
-    /// Returns true if a `stderr` observer was added to the list
-    fn observes_stderr(&self) -> bool;
-
-    /// Runs `observe_stdout` for all stdout observers in the list
-    fn observe_stdout(&mut self, stdout: &[u8]);
-    /// Runs `observe_stderr` for all stderr observers in the list
-    fn observe_stderr(&mut self, stderr: &[u8]);
 }
 
 impl<S> ObserversTuple<S> for ()
@@ -192,28 +147,6 @@ where
     ) -> Result<(), Error> {
         Ok(())
     }
-
-    /// Returns true if a `stdout` observer was added to the list
-    #[inline]
-    fn observes_stdout(&self) -> bool {
-        false
-    }
-
-    /// Returns true if a `stderr` observer was added to the list
-    #[inline]
-    fn observes_stderr(&self) -> bool {
-        false
-    }
-
-    /// Runs `observe_stdout` for all stdout observers in the list
-    #[inline]
-    #[allow(unused_variables)]
-    fn observe_stdout(&mut self, stdout: &[u8]) {}
-
-    /// Runs `observe_stderr` for all stderr observers in the list
-    #[inline]
-    #[allow(unused_variables)]
-    fn observe_stderr(&mut self, stderr: &[u8]) {}
 }
 
 impl<Head, Tail, S> ObserversTuple<S> for (Head, Tail)
@@ -250,32 +183,6 @@ where
     ) -> Result<(), Error> {
         self.0.post_exec_child(state, input, exit_kind)?;
         self.1.post_exec_child_all(state, input, exit_kind)
-    }
-
-    /// Returns true if a `stdout` observer was added to the list
-    #[inline]
-    fn observes_stdout(&self) -> bool {
-        self.0.observes_stdout() || self.1.observes_stdout()
-    }
-
-    /// Returns true if a `stderr` observer was added to the list
-    #[inline]
-    fn observes_stderr(&self) -> bool {
-        self.0.observes_stderr() || self.1.observes_stderr()
-    }
-
-    /// Runs `observe_stdout` for all stdout observers in the list
-    #[inline]
-    fn observe_stdout(&mut self, stdout: &[u8]) {
-        self.0.observe_stdout(stdout);
-        self.1.observe_stdout(stdout);
-    }
-
-    /// Runs `observe_stderr` for all stderr observers in the list
-    #[inline]
-    fn observe_stderr(&mut self, stderr: &[u8]) {
-        self.0.observe_stderr(stderr);
-        self.1.observe_stderr(stderr);
     }
 }
 
@@ -418,7 +325,7 @@ pub struct TimeObserver {
     #[serde(with = "instant_serializer")]
     start_time: Instant,
 
-    #[cfg(feature = "no_std")]
+    #[cfg(not(feature = "std"))]
     start_time: Duration,
 
     last_runtime: Option<Duration>,
@@ -460,7 +367,7 @@ impl TimeObserver {
             #[cfg(feature = "std")]
             start_time: Instant::now(),
 
-            #[cfg(feature = "no_std")]
+            #[cfg(not(feature = "std"))]
             start_time: Duration::from_secs(0),
 
             last_runtime: None,
@@ -485,7 +392,7 @@ where
         Ok(())
     }
 
-    #[cfg(feature = "no_std")]
+    #[cfg(not(feature = "std"))]
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         self.last_runtime = None;
         self.start_time = current_time();
@@ -503,7 +410,7 @@ where
         Ok(())
     }
 
-    #[cfg(feature = "no_std")]
+    #[cfg(not(feature = "std"))]
     fn post_exec(
         &mut self,
         _state: &mut S,
@@ -511,6 +418,7 @@ where
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         self.last_runtime = current_time().checked_sub(self.start_time);
+        Ok(())
     }
 }
 

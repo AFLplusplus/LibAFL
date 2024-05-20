@@ -175,7 +175,7 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
 }
 
 /// Trait for types which track the current corpus index
-pub trait HasCurrentCorpusIdx {
+pub trait HasCurrentCorpusId {
     /// Set the current corpus index; we have started processing this corpus entry
     fn set_corpus_idx(&mut self, idx: CorpusId) -> Result<(), Error>;
 
@@ -183,7 +183,7 @@ pub trait HasCurrentCorpusIdx {
     fn clear_corpus_idx(&mut self) -> Result<(), Error>;
 
     /// Fetch the current corpus index -- typically used after a state recovery or transfer
-    fn current_corpus_idx(&self) -> Result<Option<CorpusId>, Error>;
+    fn current_corpus_id(&self) -> Result<Option<CorpusId>, Error>;
 }
 
 /// [`Iterator`] over the ids of a [`Corpus`]

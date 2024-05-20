@@ -12,7 +12,7 @@ pub use libafl_targets::{
 use serde::{Deserialize, Serialize};
 
 #[cfg(emulation_mode = "usermode")]
-use crate::{capstone, emu::ArchExtras, CallingConvention, Qemu};
+use crate::{capstone, qemu::ArchExtras, CallingConvention, Qemu};
 use crate::{
     helpers::{
         hash_me, HasInstrumentationFilter, IsFilter, QemuHelper, QemuHelperTuple,

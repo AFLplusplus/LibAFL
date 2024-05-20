@@ -42,8 +42,8 @@ use libafl_bolts::{
     current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, StdShMemProvider},
-    tuples::tuple_list,
-    AsSliceMut, AsSlice, Named,
+    tuples::{tuple_list, Handled},
+    AsSlice, AsSliceMut,
 };
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
@@ -119,7 +119,7 @@ fn fuzz(
         // New maximization map feedback linked to the edges observer and the feedback state
         MaxMapFeedback::new(&edges_observer),
         // Time feedback, this one does not need a feedback state
-        TimeFeedback::with_observer(&time_observer)
+        TimeFeedback::new(&time_observer)
     );
 
     // A feedback to choose if an input is a solution or not
@@ -207,8 +207,7 @@ fn fuzz(
 
         // The concolic observer observers the concolic shared memory map.
         let concolic_observer = ConcolicObserver::new("concolic", concolic_shmem.as_slice_mut());
-
-        let concolic_observer_name = concolic_observer.name().to_string();
+        let concolic_ref = concolic_observer.handle();
 
         // The order of the stages matter!
         let mut stages = tuple_list!(
@@ -217,7 +216,7 @@ fn fuzz(
                 TracingStage::new(
                     MyCommandConfigurator.into_executor(tuple_list!(concolic_observer))
                 ),
-                concolic_observer_name,
+                concolic_ref,
             ),
             // Use the concolic trace for z3-based solving
             SimpleConcolicMutationalStage::default(),
@@ -238,8 +237,8 @@ fn fuzz(
 #[derive(Default, Debug)]
 pub struct MyCommandConfigurator;
 
-impl CommandConfigurator for MyCommandConfigurator {
-    fn spawn_child<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<Child, Error> {
+impl CommandConfigurator<BytesInput> for MyCommandConfigurator {
+    fn spawn_child(&mut self, input: &BytesInput) -> Result<Child, Error> {
         input.to_file("cur_input")?;
 
         Ok(Command::new("./target_symcc.out")

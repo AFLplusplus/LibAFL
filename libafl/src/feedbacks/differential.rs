@@ -7,7 +7,10 @@ use core::{
     marker::PhantomData,
 };
 
-use libafl_bolts::{tuples::MatchName, Named};
+use libafl_bolts::{
+    tuples::{Handle, Handled, MatchName, MatchNameRef},
+    Named,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -55,12 +58,12 @@ where
     /// This feedback's name
     name: Cow<'static, str>,
     /// The first observer to compare against
-    o1_name: Cow<'static, str>,
+    o1_ref: Handle<O1>,
     /// The second observer to compare against
-    o2_name: Cow<'static, str>,
+    o2_ref: Handle<O2>,
     /// The function used to compare the two observers
     compare_fn: F,
-    phantomm: PhantomData<(O1, O2, I, S)>,
+    phantomm: PhantomData<(I, S)>,
 }
 
 impl<F, I, O1, O2, S> DiffFeedback<F, I, O1, O2, S>
@@ -71,16 +74,17 @@ where
 {
     /// Create a new [`DiffFeedback`] using two observers and a test function.
     pub fn new(name: &'static str, o1: &O1, o2: &O2, compare_fn: F) -> Result<Self, Error> {
-        let o1_name = o1.name().clone();
-        let o2_name = o2.name().clone();
-        if o1_name == o2_name {
+        let o1_ref = o1.handle();
+        let o2_ref = o2.handle();
+        if o1_ref.name() == o2_ref.name() {
             Err(Error::illegal_argument(format!(
-                "DiffFeedback: observer names must be different (both were {o1_name})"
+                "DiffFeedback: observer names must be different (both were {})",
+                o1_ref.name()
             )))
         } else {
             Ok(Self {
-                o1_name,
-                o2_name,
+                o1_ref,
+                o2_ref,
                 name: Cow::from(name),
                 compare_fn,
                 phantomm: PhantomData,
@@ -101,8 +105,8 @@ where
     fn create_feedback(&self, _ctx: &T) -> DiffFeedback<F, I, O1, O2, S> {
         Self {
             name: self.name.clone(),
-            o1_name: self.o1_name.clone(),
-            o2_name: self.o2_name.clone(),
+            o1_ref: self.o1_ref.clone(),
+            o2_ref: self.o2_ref.clone(),
             compare_fn: self.compare_fn.clone(),
             phantomm: self.phantomm,
         }
@@ -127,11 +131,11 @@ where
     O2: Named,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "DiffFeedback {{ name: {}, o1: {}, o2: {} }}",
-            self.name, self.o1_name, self.o2_name
-        )
+        f.debug_struct("DiffFeedback")
+            .field("name", self.name())
+            .field("o1", &self.o1_ref)
+            .field("o2", &self.o2_ref)
+            .finish_non_exhaustive()
     }
 }
 
@@ -160,11 +164,11 @@ where
             Error::illegal_argument(format!("DiffFeedback: observer {name} not found"))
         }
         let o1: &O1 = observers
-            .match_name(&self.o1_name)
-            .ok_or_else(|| err(&self.o1_name))?;
+            .get(&self.o1_ref)
+            .ok_or_else(|| err(self.o1_ref.name()))?;
         let o2: &O2 = observers
-            .match_name(&self.o2_name)
-            .ok_or_else(|| err(&self.o2_name))?;
+            .get(&self.o2_ref)
+            .ok_or_else(|| err(self.o2_ref.name()))?;
 
         Ok((self.compare_fn)(o1, o2) == DiffResult::Diff)
     }

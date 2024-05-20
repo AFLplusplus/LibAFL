@@ -185,19 +185,19 @@ mod observers {
         type Entry = u8;
 
         #[inline]
-        fn get(&self, idx: usize) -> &u8 {
+        fn get(&self, idx: usize) -> u8 {
             let elem = self.intervals.query(idx..=idx).next().unwrap();
             let i = elem.value;
             let j = idx - elem.interval.start;
-            unsafe { &(*addr_of!(COUNTERS_MAPS[*i])).as_slice()[j] }
+            unsafe { (*addr_of!(COUNTERS_MAPS[*i])).as_slice()[j] }
         }
 
         #[inline]
-        fn get_mut(&mut self, idx: usize) -> &mut u8 {
+        fn set(&mut self, idx: usize, val: u8) {
             let elem = self.intervals.query_mut(idx..=idx).next().unwrap();
             let i = elem.value;
             let j = idx - elem.interval.start;
-            unsafe { &mut (*addr_of_mut!(COUNTERS_MAPS[*i])).as_slice_mut()[j] }
+            unsafe { (*addr_of_mut!(COUNTERS_MAPS[*i])).as_slice_mut()[j] = val };
         }
 
         #[inline]
@@ -241,7 +241,7 @@ mod observers {
             let cnt = self.usable_count();
             let mut res = Vec::with_capacity(cnt);
             for i in 0..cnt {
-                res.push(*self.get(i));
+                res.push(self.get(i));
             }
             res
         }
@@ -252,7 +252,7 @@ mod observers {
             let cnt = self.usable_count();
             let mut res = 0;
             for i in indexes {
-                if *i < cnt && *self.get(*i) != initial {
+                if *i < cnt && self.get(*i) != initial {
                     res += 1;
                 }
             }
@@ -322,6 +322,7 @@ mod observers {
 
     impl<'it, const DIFFERENTIAL: bool> AsIter<'it> for CountersMultiMapObserver<DIFFERENTIAL> {
         type Item = u8;
+        type Ref = &'it Self::Item;
         type IntoIter = Flatten<Iter<'it, OwnedMutSlice<'static, u8>>>;
 
         fn as_iter(&'it self) -> Self::IntoIter {
@@ -330,10 +331,10 @@ mod observers {
     }
 
     impl<'it, const DIFFERENTIAL: bool> AsIterMut<'it> for CountersMultiMapObserver<DIFFERENTIAL> {
-        type Item = u8;
-        type IntoIter = Flatten<IterMut<'it, OwnedMutSlice<'static, u8>>>;
+        type RefMut = &'it mut Self::Item;
+        type IntoIterMut = Flatten<IterMut<'it, OwnedMutSlice<'static, u8>>>;
 
-        fn as_iter_mut(&'it mut self) -> Self::IntoIter {
+        fn as_iter_mut(&'it mut self) -> Self::IntoIterMut {
             unsafe { COUNTERS_MAPS.iter_mut().flatten() }
         }
     }

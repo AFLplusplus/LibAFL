@@ -12,7 +12,7 @@ use libafl::{
     inputs::BytesInput,
     monitors::SimpleMonitor,
     mutators::{scheduled::havoc_mutations, tokens_mutations, StdScheduledMutator, Tokens},
-    observers::{CanTrack, ExplicitTracking, HitcountsMapObserver, StdMapObserver, TimeObserver},
+    observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, StdState},
@@ -22,7 +22,7 @@ use libafl_bolts::{
     current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, MatchName, Merge},
+    tuples::{tuple_list, Handled, Merge},
     AsSliceMut, Truncate,
 };
 use nix::sys::signal::Signal;
@@ -114,7 +114,7 @@ pub fn main() {
         // New maximization map feedback linked to the edges observer and the feedback state
         MaxMapFeedback::new(&edges_observer),
         // Time feedback, this one does not need a feedback state
-        TimeFeedback::with_observer(&time_observer)
+        TimeFeedback::new(&time_observer)
     );
 
     // A feedback to choose if an input is a solution or not
@@ -163,6 +163,8 @@ pub fn main() {
     // Create the executor for the forkserver
     let args = opt.arguments;
 
+    let observer_ref = edges_observer.handle();
+
     let mut tokens = Tokens::new();
     let mut executor = ForkserverExecutor::builder()
         .program(opt.executable)
@@ -177,10 +179,7 @@ pub fn main() {
         .unwrap();
 
     if let Some(dynamic_map_size) = executor.coverage_map_size() {
-        executor
-            .observers_mut()
-            .match_name_mut::<ExplicitTracking<HitcountsMapObserver<StdMapObserver<'_, u8, false>>, true, false>>("shared_mem")
-            .unwrap()
+        executor.observers_mut()[&observer_ref]
             .as_mut()
             .truncate(dynamic_map_size);
     }

@@ -9,7 +9,7 @@ use core::arch::asm;
     target_arch = "aarch64",
     target_arch = "arm",
     target_arch = "riscv64",
-    target_arsch = "riscv32"
+    target_arch = "riscv32"
 )))]
 use crate::current_nanos;
 
@@ -51,6 +51,7 @@ pub fn read_time_counter() -> u64 {
     v
 }
 
+/// Read a timestamp for measurements
 #[cfg(target_arch = "arm")]
 #[must_use]
 pub fn read_time_counter() -> u64 {

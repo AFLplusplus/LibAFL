@@ -1,6 +1,7 @@
 //! Derives for `LibAFL`
 
 #![no_std]
+#![forbid(unexpected_cfgs)]
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]

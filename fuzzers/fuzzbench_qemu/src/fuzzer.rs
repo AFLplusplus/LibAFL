@@ -37,8 +37,9 @@ use libafl::{
     Error, HasMetadata,
 };
 use libafl_bolts::{
-    current_nanos, current_time,
+    current_time,
     os::{dup2, unix_signals::Signal},
+    ownedref::OwnedMutSlice,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
@@ -47,9 +48,9 @@ use libafl_bolts::{
 use libafl_qemu::{
     // asan::{init_with_asan, QemuAsanHelper},
     cmplog::{CmpLogObserver, QemuCmpLogHelper},
-    edges::edges_map_mut_slice,
+    edges::edges_map_mut_ptr,
     edges::QemuEdgeCoverageHelper,
-    edges::MAX_EDGES_NUM,
+    edges::{EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND},
     elf::EasyElf,
     filter_qemu_args,
     hooks::QemuHooks,
@@ -59,13 +60,13 @@ use libafl_qemu::{
     MmapPerms,
     Qemu,
     QemuExecutor,
+    QemuExitError,
     QemuExitReason,
-    QemuExitReasonError,
     QemuShutdownCause,
     Regs,
 };
 #[cfg(unix)]
-use nix::{self, unistd::dup};
+use nix::unistd::dup;
 
 pub const MAX_INPUT_SIZE: usize = 1048576; // 1MB
 
@@ -257,8 +258,8 @@ fn fuzz(
     let edges_observer = unsafe {
         HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
             "edges",
-            edges_map_mut_slice(),
-            addr_of_mut!(MAX_EDGES_NUM),
+            OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_SIZE_IN_USE),
+            addr_of_mut!(MAX_EDGES_FOUND),
         ))
         .track_indices()
     };
@@ -279,7 +280,7 @@ fn fuzz(
         // New maximization map feedback linked to the edges observer and the feedback state
         map_feedback,
         // Time feedback, this one does not need a feedback state
-        TimeFeedback::with_observer(&time_observer)
+        TimeFeedback::new(&time_observer)
     );
 
     // A feedback to choose if an input is a solution or not
@@ -289,7 +290,7 @@ fn fuzz(
     let mut state = state.unwrap_or_else(|| {
         StdState::new(
             // RNG
-            StdRand::with_seed(current_nanos()),
+            StdRand::new(),
             // Corpus that will be evolved, we keep it in memory for performance
             InMemoryOnDiskCorpus::new(corpus_dir).unwrap(),
             // Corpus in which we store solutions (crashes in this example),
@@ -349,7 +350,7 @@ fn fuzz(
                 Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(Signal::SigInterrupt))) => {
                     process::exit(0)
                 }
-                Err(QemuExitReasonError::UnexpectedExit) => return ExitKind::Crash,
+                Err(QemuExitError::UnexpectedExit) => return ExitKind::Crash,
                 _ => panic!("Unexpected QEMU exit."),
             }
         }

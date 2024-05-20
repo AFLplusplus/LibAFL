@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(not(cpu_target = "hexagon"))]
 use crate::SYS_execve;
 use crate::{
-    elf::EasyElf, emu::ArchExtras, CallingConvention, Hook, Qemu, QemuHelper, QemuHelperTuple,
+    elf::EasyElf, qemu::ArchExtras, CallingConvention, Hook, Qemu, QemuHelper, QemuHelperTuple,
     QemuHooks, SyscallHookResult,
 };
 #[cfg(cpu_target = "hexagon")]

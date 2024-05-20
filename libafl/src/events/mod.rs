@@ -31,7 +31,9 @@ use ahash::RandomState;
 #[cfg(feature = "std")]
 pub use launcher::*;
 #[cfg(all(unix, feature = "std"))]
-use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
+use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal, CTRL_C_EXIT};
+#[cfg(feature = "adaptive_serialization")]
+use libafl_bolts::tuples::{Handle, MatchNameRef};
 use libafl_bolts::{current_time, ClientId};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
@@ -55,29 +57,14 @@ use crate::{
 
 /// Check if ctrl-c is sent with this struct
 #[cfg(all(unix, feature = "std"))]
-pub static mut EVENTMGR_SIGHANDLER_STATE: ShutdownSignalData = ShutdownSignalData {
-    shutting_down: false,
-    exit_from_main: false,
-};
+pub static mut EVENTMGR_SIGHANDLER_STATE: ShutdownSignalData = ShutdownSignalData {};
 
-/// A signal handler for releasing `StateRestore` `ShMem`
-/// This struct holds a pointer to `StateRestore` and clean up the `ShMem` segment used by it.
+/// A signal handler for catching ctrl-c.
+/// The purpose of this signal handler is solely for calling `exit()` with a specific exit code 100
+/// In this way, the restarting manager can tell that we really want to exit
 #[cfg(all(unix, feature = "std"))]
 #[derive(Debug, Clone)]
-pub struct ShutdownSignalData {
-    shutting_down: bool,
-    exit_from_main: bool,
-}
-
-#[cfg(all(unix, feature = "std"))]
-impl ShutdownSignalData {
-    /// Set the flag to true, indicating that this process has allocated shmem
-    pub fn set_exit_from_main(&mut self) {
-        unsafe {
-            core::ptr::write_volatile(core::ptr::addr_of_mut!(self.exit_from_main), true);
-        }
-    }
-}
+pub struct ShutdownSignalData {}
 
 /// Shutdown handler. `SigTerm`, `SigInterrupt`, `SigQuit` call this
 /// We can't handle SIGKILL in the signal handler, this means that you shouldn't kill your fuzzer with `kill -9` because then the shmem segments are never freed
@@ -89,27 +76,15 @@ impl Handler for ShutdownSignalData {
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
     ) {
-        /*
-        println!(
-            "in handler! {} {}",
-            self.exit_from_main,
-            std::process::id()
-        );
-        */
-        // if this process has not allocated any shmem. then simply exit()
-        if !self.exit_from_main {
-            unsafe {
-                #[cfg(unix)]
-                libc::_exit(0);
-
-                #[cfg(windows)]
-                windows::Win32::System::Threading::ExitProcess(1);
-            }
-        }
-
-        // else wait till the next is_shutting_down() is called. then the process will exit throught main().
+        // println!("in handler! {}", std::process::id());
         unsafe {
-            core::ptr::write_volatile(core::ptr::addr_of_mut!(self.shutting_down), true);
+            // println!("Exiting from the handler....");
+
+            #[cfg(unix)]
+            libc::_exit(CTRL_C_EXIT);
+
+            #[cfg(windows)]
+            windows::Win32::System::Threading::ExitProcess(100);
         }
     }
 
@@ -119,7 +94,7 @@ impl Handler for ShutdownSignalData {
 }
 
 /// A per-fuzzer unique `ID`, usually starting with `0` and increasing
-/// by `1` in multiprocessed [`EventManager`]s, such as [`self::llmp::LlmpEventManager`].
+/// by `1` in multiprocessed [`EventManager`]s, such as [`LlmpEventManager`].
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct EventManagerId(
@@ -129,6 +104,8 @@ pub struct EventManagerId(
 
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
+#[cfg(feature = "adaptive_serialization")]
+use crate::observers::TimeObserver;
 use crate::{inputs::UsesInput, stages::HasCurrentStage, state::UsesState};
 
 /// The log event severity
@@ -415,7 +392,7 @@ where
 pub trait EventFirer: UsesState {
     /// Send off an [`Event`] to the broker
     ///
-    /// For multi-processed managers, such as [`llmp::LlmpEventManager`],
+    /// For multi-processed managers, such as [`LlmpEventManager`],
     /// this serializes the [`Event`] and commits it to the [`llmp`] page.
     /// In this case, if you `fire` faster than the broker can consume
     /// (for example for each [`Input`], on multiple cores)
@@ -466,7 +443,7 @@ where
 {
     /// Given the last time, if `monitor_timeout` seconds passed, send off an info/monitor/heartbeat message to the broker.
     /// Returns the new `last` time (so the old one, unless `monitor_timeout` time has passed and monitor have been sent)
-    /// Will return an [`crate::Error`], if the stats could not be sent.
+    /// Will return an [`Error`], if the stats could not be sent.
     fn maybe_report_progress(
         &mut self,
         state: &mut Self::State,
@@ -487,7 +464,7 @@ where
     }
 
     /// Send off an info/monitor/heartbeat message to the broker.
-    /// Will return an [`crate::Error`], if the stats could not be sent.
+    /// Will return an [`Error`], if the stats could not be sent.
     fn report_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
         let executions = *state.executions();
         let cur = current_time();
@@ -875,6 +852,9 @@ pub trait AdaptiveSerializer {
     /// How many times shoukd have been serialized an observer (mut)
     fn should_serialize_cnt_mut(&mut self) -> &mut usize;
 
+    /// A [`Handle`] to the time observer to determine the `time_factor`
+    fn time_ref(&self) -> &Handle<TimeObserver>;
+
     /// Serialize the observer using the `time_factor` and `percentage_threshold`.
     /// These parameters are unique to each of the different types of `EventManager`
     fn serialize_observers_adaptive<S, OT>(
@@ -888,7 +868,7 @@ pub trait AdaptiveSerializer {
         S: UsesInput,
     {
         let exec_time = observers
-            .match_name::<crate::observers::TimeObserver>("time")
+            .get(self.time_ref())
             .map(|o| o.last_runtime().unwrap_or(Duration::ZERO))
             .unwrap();
 

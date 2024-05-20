@@ -16,7 +16,7 @@ use core::{
     time::Duration,
 };
 
-use libafl_bolts::tuples::tuple_list;
+use libafl_bolts::tuples::{tuple_list, RefIndexable};
 
 #[cfg(any(unix, feature = "std"))]
 use crate::executors::hooks::inprocess::GLOBAL_STATE;
@@ -32,7 +32,7 @@ use crate::{
     fuzzer::HasObjective,
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
-    state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions, State, UsesState},
     Error, HasMetadata,
 };
 
@@ -151,12 +151,12 @@ where
     S: State,
 {
     #[inline]
-    fn observers(&self) -> &OT {
+    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         self.inner.observers()
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
+    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
         self.inner.observers_mut()
     }
 }
@@ -438,7 +438,7 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
     E::State: HasExecutions + HasSolutions + HasCorpus,
     Z: HasObjective<Objective = OF, State = E::State>,
 {
-    let observers = executor.observers_mut();
+    let mut observers = executor.observers_mut();
 
     observers
         .post_exec_all(state, input, &exitkind)
@@ -446,7 +446,7 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
 
     let interesting = fuzzer
         .objective_mut()
-        .is_interesting(state, event_mgr, input, observers, &exitkind)
+        .is_interesting(state, event_mgr, input, &*observers, &exitkind)
         .expect("In run_observers_and_save_state objective failure.");
 
     if interesting {
@@ -454,9 +454,14 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
         let mut new_testcase = Testcase::with_executions(input.clone(), executions);
         new_testcase.add_metadata(exitkind);
         new_testcase.set_parent_id_optional(*state.corpus().current());
+
+        if let Ok(mut tc) = state.current_testcase_mut() {
+            tc.found_objective();
+        }
+
         fuzzer
             .objective_mut()
-            .append_metadata(state, event_mgr, observers, &mut new_testcase)
+            .append_metadata(state, event_mgr, &*observers, &mut new_testcase)
             .expect("Failed adding metadata");
         state
             .solutions_mut()

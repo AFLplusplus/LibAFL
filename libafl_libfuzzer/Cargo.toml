@@ -10,11 +10,11 @@ edition = "2021"
 categories = ["development-tools::testing", "fuzzing"]
 
 include = [
-  "/src",
-  "/Cargo.toml",
-  "/build.rs",
-  "/libafl_libfuzzer_runtime",
-  "!/libafl_libfuzzer_runtime/target",
+    "/src",
+    "/Cargo.toml",
+    "/build.rs",
+    "/libafl_libfuzzer_runtime",
+    "!/libafl_libfuzzer_runtime/target",
 ]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -24,12 +24,20 @@ cc = "1.0"
 rustversion = "1.0"
 
 [features]
+default = ["fork"]
+document-features = ["dep:document-features"]
+
 #! ## Feature Flags
 
 ## Enables the derive macros for the arbitrary dependency, transparently forwarded from libfuzzer-sys
 arbitrary-derive = ["libfuzzer-sys/arbitrary-derive"]
+
 ## Enables fuzzer introspection with LibAFL's `introspection` feature
 introspection = []
+
+## Enables forking in the fuzzer runtime for restarting managers for Unix systems (on by default)
+fork = []
+
 ## Embeds the built libafl_libfuzzer_runtime library into the crate with include_bytes! for use
 ## in downstream cases like libafl_cc linking the runtime with:
 ## `-fsanitize=fuzzer-no-link -l:libafl_libfuzzer_runtime.a`
@@ -40,7 +48,7 @@ rabbit = []
 
 [dependencies]
 libfuzzer-sys = { version = "0.4.7", default-features = false }
-document-features = { version = "0.2" }
+document-features = { version = "0.2", optional = true }
 
 [package.metadata.docs.rs]
 features = ["document-features"]

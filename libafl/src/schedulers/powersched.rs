@@ -1,12 +1,12 @@
 //! The queue corpus scheduler for power schedules.
 
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::vec::Vec;
 use core::{marker::PhantomData, time::Duration};
 
-use libafl_bolts::Named;
+use libafl_bolts::{
+    tuples::{Handle, Handled},
+    Named,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -173,9 +173,9 @@ pub enum PowerSchedule {
 #[derive(Clone, Debug)]
 pub struct PowerQueueScheduler<C, O, S> {
     strat: PowerSchedule,
-    map_observer_name: String,
+    map_observer_handle: Handle<C>,
     last_hash: usize,
-    phantom: PhantomData<(C, O, S)>,
+    phantom: PhantomData<(O, S)>,
 }
 
 impl<C, O, S> UsesState for PowerQueueScheduler<C, O, S>
@@ -226,8 +226,8 @@ where
         self.last_hash = hash;
     }
 
-    fn map_observer_name(&self) -> &str {
-        &self.map_observer_name
+    fn map_observer_handle(&self) -> &Handle<C> {
+        &self.map_observer_handle
     }
 }
 
@@ -256,9 +256,9 @@ where
 
     fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
-            Err(Error::empty(String::from(
+            Err(Error::empty(
                 "No entries in corpus. This often implies the target is not properly instrumented.",
-            )))
+            ))
         } else {
             let id = match state.corpus().current() {
                 Some(cur) => {
@@ -305,7 +305,7 @@ where
         }
         PowerQueueScheduler {
             strat,
-            map_observer_name: map_observer.name().to_string(),
+            map_observer_handle: map_observer.handle(),
             last_hash: 0,
             phantom: PhantomData,
         }

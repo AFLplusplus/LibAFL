@@ -1,6 +1,6 @@
-#[cfg(all(unix, not(test)))]
-use core::borrow::Borrow;
 use core::fmt::{self, Debug, Formatter};
+#[cfg(windows)]
+use std::process::abort;
 use std::{ffi::c_void, marker::PhantomData};
 
 use frida_gum::{
@@ -19,8 +19,9 @@ use libafl::{
     state::{HasExecutions, State, UsesState},
     Error,
 };
+use libafl_bolts::tuples::RefIndexable;
 
-#[cfg(all(unix, not(test)))]
+#[cfg(not(test))]
 use crate::asan::errors::AsanErrors;
 use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
 #[cfg(windows)]
@@ -105,11 +106,13 @@ where
             self.stalker.deactivate();
         }
 
-        #[cfg(all(unix, not(test)))]
+        #[cfg(not(test))]
         unsafe {
-            if !AsanErrors::get_mut_blocking().borrow().is_empty() {
+            if !AsanErrors::get_mut_blocking().is_empty() {
                 log::error!("Crashing target as it had ASan errors");
                 libc::raise(libc::SIGABRT);
+                #[cfg(windows)]
+                abort();
             }
         }
         self.helper.post_exec(input)?;
@@ -145,12 +148,12 @@ where
     OT: ObserversTuple<S>,
 {
     #[inline]
-    fn observers(&self) -> &OT {
+    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         self.base.observers()
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
+    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
         self.base.observers_mut()
     }
 }
@@ -205,6 +208,7 @@ where
             }
         }
 
+        log::info!("disable_excludes: {:}", helper.disable_excludes);
         if !helper.disable_excludes {
             for range in ranges.gaps(&(0..usize::MAX)) {
                 log::info!("excluding range: {:x}-{:x}", range.start, range.end);

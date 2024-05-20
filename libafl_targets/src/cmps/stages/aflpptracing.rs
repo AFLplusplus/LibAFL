@@ -1,11 +1,6 @@
-use alloc::{
-    borrow::Cow,
-    string::{String, ToString},
-};
+use alloc::borrow::Cow;
 use core::marker::PhantomData;
 
-#[cfg(feature = "introspection")]
-use libafl::state::HasClientPerfMonitor;
 use libafl::{
     executors::{Executor, HasObservers},
     inputs::{BytesInput, UsesInput},
@@ -14,34 +9,43 @@ use libafl::{
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
-use libafl_bolts::{tuples::MatchName, Named};
+use libafl_bolts::{
+    tuples::{Handle, MatchNameRef},
+    Named,
+};
 
 use crate::cmps::observers::AFLppCmpLogObserver;
 
 /// Trace with tainted input
 #[derive(Clone, Debug)]
-pub struct AFLppCmplogTracingStage<EM, TE, Z> {
+pub struct AFLppCmplogTracingStage<'a, EM, TE, Z>
+where
+    TE: UsesState,
+{
     tracer_executor: TE,
-    cmplog_observer_name: Option<String>,
+    cmplog_observer_handle: Option<Handle<AFLppCmpLogObserver<'a, TE::State>>>,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(EM, TE, Z)>,
 }
 
-impl<EM, TE, Z> UsesState for AFLppCmplogTracingStage<EM, TE, Z>
+impl<EM, TE, Z> UsesState for AFLppCmplogTracingStage<'_, EM, TE, Z>
 where
     TE: UsesState,
 {
     type State = TE::State;
 }
 
-impl<EM, TE, Z> Named for AFLppCmplogTracingStage<EM, TE, Z> {
+impl<EM, TE, Z> Named for AFLppCmplogTracingStage<'_, EM, TE, Z>
+where
+    TE: UsesState,
+{
     fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("AFLppCmplogTracingStage");
         &NAME
     }
 }
 
-impl<E, EM, TE, Z> Stage<E, EM, Z> for AFLppCmplogTracingStage<EM, TE, Z>
+impl<E, EM, TE, Z> Stage<E, EM, Z> for AFLppCmplogTracingStage<'_, EM, TE, Z>
 where
     E: UsesState<State = TE::State>,
     TE: Executor<EM, Z> + HasObservers,
@@ -61,11 +65,11 @@ where
         // First run with the un-mutated input
         let unmutated_input = state.current_input_cloned()?;
 
-        if let Some(name) = &self.cmplog_observer_name {
+        if let Some(observer_handle) = &self.cmplog_observer_handle {
             if let Some(ob) = self
                 .tracer_executor
                 .observers_mut()
-                .match_name_mut::<AFLppCmpLogObserver<TE::State>>(name)
+                .get_mut(observer_handle)
             {
                 // This is not the original input,
                 // Set it to false
@@ -95,11 +99,11 @@ where
             None => return Err(Error::unknown("No metadata found")),
         };
 
-        if let Some(name) = &self.cmplog_observer_name {
+        if let Some(observer_handle) = &self.cmplog_observer_handle {
             if let Some(ob) = self
                 .tracer_executor
                 .observers_mut()
-                .match_name_mut::<AFLppCmpLogObserver<TE::State>>(name)
+                .get_mut(observer_handle)
             {
                 // This is not the original input,
                 // Set it to false
@@ -137,20 +141,26 @@ where
     }
 }
 
-impl<EM, TE, Z> AFLppCmplogTracingStage<EM, TE, Z> {
+impl<'a, EM, TE, Z> AFLppCmplogTracingStage<'a, EM, TE, Z>
+where
+    TE: UsesState,
+{
     /// Creates a new default stage
     pub fn new(tracer_executor: TE) -> Self {
         Self {
-            cmplog_observer_name: None,
+            cmplog_observer_handle: None,
             tracer_executor,
             phantom: PhantomData,
         }
     }
 
     /// With cmplog observer
-    pub fn with_cmplog_observer_name(tracer_executor: TE, name: &'static str) -> Self {
+    pub fn with_cmplog_observer(
+        tracer_executor: TE,
+        observer_handle: Handle<AFLppCmpLogObserver<'a, TE::State>>,
+    ) -> Self {
         Self {
-            cmplog_observer_name: Some(name.to_string()),
+            cmplog_observer_handle: Some(observer_handle),
             tracer_executor,
             phantom: PhantomData,
         }

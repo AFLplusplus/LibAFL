@@ -27,14 +27,14 @@ use libafl::{
 };
 use libafl_bolts::{
     core_affinity::Cores,
-    current_nanos,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
     AsSlice,
 };
 use libafl_targets::{
-    libfuzzer_initialize, libfuzzer_test_one_input, ACCOUNTING_MEMOP_MAP, EDGES_MAP, MAX_EDGES_NUM,
+    libfuzzer_initialize, libfuzzer_test_one_input, ACCOUNTING_MEMOP_MAP, EDGES_MAP,
+    MAX_EDGES_FOUND,
 };
 use mimalloc::MiMalloc;
 
@@ -139,7 +139,7 @@ pub extern "C" fn libafl_main() {
     let mut run_client = |state: Option<_>, mut restarting_mgr, _core_id| {
         // Create an observation channel using the coverage map
         let edges_observer = HitcountsMapObserver::new(unsafe {
-            StdMapObserver::from_mut_ptr("edges", EDGES_MAP.as_mut_ptr(), MAX_EDGES_NUM)
+            StdMapObserver::from_mut_ptr("edges", EDGES_MAP.as_mut_ptr(), MAX_EDGES_FOUND)
         })
         .track_indices();
 
@@ -152,7 +152,7 @@ pub extern "C" fn libafl_main() {
             // New maximization map feedback linked to the edges observer and the feedback state
             MaxMapFeedback::new(&edges_observer),
             // Time feedback, this one does not need a feedback state
-            TimeFeedback::with_observer(&time_observer)
+            TimeFeedback::new(&time_observer)
         );
 
         // A feedback to choose if an input is a solution or not
@@ -162,7 +162,7 @@ pub extern "C" fn libafl_main() {
         let mut state = state.unwrap_or_else(|| {
             StdState::new(
                 // RNG
-                StdRand::with_seed(current_nanos()),
+                StdRand::new(),
                 // Corpus that will be evolved, we keep it in memory for performance
                 InMemoryCorpus::new(),
                 // Corpus in which we store solutions (crashes in this example),

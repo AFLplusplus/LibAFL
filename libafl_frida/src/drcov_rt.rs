@@ -40,6 +40,8 @@ impl FridaRuntime for DrCovRuntime {
             .expect("failed to create directory for coverage files");
     }
 
+    fn deinit(&mut self, _gum: &frida_gum::Gum) {}
+
     /// Called before execution, does nothing
     fn pre_exec<I: Input + HasTargetBytes>(&mut self, _input: &I) -> Result<(), Error> {
         Ok(())

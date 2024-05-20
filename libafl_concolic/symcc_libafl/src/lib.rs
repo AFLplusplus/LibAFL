@@ -1,6 +1,7 @@
 //! This is a 'meta-package' for libafl that exposes a consistent URL and commit hash for the
 //! [`SymCC` fork](https://github.com/AFLplusplus/symcc).
 #![allow(clippy::module_name_repetitions)]
+#![forbid(unexpected_cfgs)]
 
 /// The URL of the `LibAFL` `SymCC` fork.
 pub const SYMCC_REPO_URL: &str = "https://github.com/AFLplusplus/symcc.git";

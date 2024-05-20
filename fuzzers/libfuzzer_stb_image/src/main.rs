@@ -25,7 +25,7 @@ use libafl::{
     state::{HasCorpus, StdState},
     Error,
 };
-use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
+use libafl_bolts::{rands::StdRand, tuples::tuple_list, AsSlice};
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
 };
@@ -81,7 +81,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
         // New maximization map feedback linked to the edges observer and the feedback state
         MaxMapFeedback::new(&edges_observer),
         // Time feedback, this one does not need a feedback state
-        TimeFeedback::with_observer(&time_observer)
+        TimeFeedback::new(&time_observer)
     );
 
     // A feedback to choose if an input is a solution or not
@@ -91,7 +91,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let mut state = state.unwrap_or_else(|| {
         StdState::new(
             // RNG
-            StdRand::with_seed(current_nanos()),
+            StdRand::new(),
             // Corpus that will be evolved, we keep it in memory for performance
             InMemoryCorpus::new(),
             // Corpus in which we store solutions (crashes in this example),

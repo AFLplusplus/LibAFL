@@ -32,6 +32,7 @@
     clippy::missing_panics_doc,
     clippy::pub_underscore_fields
 )]
+#![forbid(unexpected_cfgs)]
 
 pub mod filter;
 pub mod tracing;

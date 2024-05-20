@@ -1,6 +1,8 @@
-use std::{collections::hash_map, fs, hash::Hasher, io::Read, path::Path};
+use std::path::Path;
 
 use bindgen::{BindgenError, Bindings};
+
+use crate::store_generated_content_if_different;
 
 const WRAPPER_HEADER: &str = r#"
 
@@ -82,6 +84,7 @@ const WRAPPER_HEADER: &str = r#"
 #include "libafl/exit.h"
 #include "libafl/hook.h"
 #include "libafl/jit.h"
+#include "libafl/utils.h"
 
 "#;
 
@@ -91,31 +94,8 @@ pub fn generate(
     clang_args: Vec<String>,
 ) -> Result<Bindings, BindgenError> {
     let wrapper_h = build_dir.join("wrapper.h");
-    let existing_wrapper_h = fs::File::open(&wrapper_h);
-    let mut must_rewrite_wrapper = true;
 
-    // Check if equivalent wrapper file already exists without relying on filesystem timestamp.
-    if let Ok(mut wrapper_file) = existing_wrapper_h {
-        let mut existing_wrapper_content = Vec::with_capacity(WRAPPER_HEADER.len());
-        wrapper_file
-            .read_to_end(existing_wrapper_content.as_mut())
-            .unwrap();
-
-        let mut existing_wrapper_hasher = hash_map::DefaultHasher::new();
-        existing_wrapper_hasher.write(existing_wrapper_content.as_ref());
-
-        let mut wrapper_h_hasher = hash_map::DefaultHasher::new();
-        wrapper_h_hasher.write(WRAPPER_HEADER.as_bytes());
-
-        // Check if wrappers are the same
-        if existing_wrapper_hasher.finish() == wrapper_h_hasher.finish() {
-            must_rewrite_wrapper = false;
-        }
-    }
-
-    if must_rewrite_wrapper {
-        fs::write(&wrapper_h, WRAPPER_HEADER).expect("Unable to write wrapper.h");
-    }
+    store_generated_content_if_different(&wrapper_h, WRAPPER_HEADER.as_bytes(), None, None, false);
 
     let bindings = bindgen::Builder::default()
         .derive_debug(true)
@@ -166,6 +146,7 @@ pub fn generate(
         .allowlist_function("libafl_.*")
         .allowlist_function("read_self_maps")
         .allowlist_function("free_self_maps")
+        .allowlist_function("pageflags_get_root")
         .blocklist_function("main_loop_wait") // bindgen issue #1313
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()));
 
@@ -174,7 +155,7 @@ pub fn generate(
         bindings
             .allowlist_type("CPUX86State")
             .allowlist_type("X86CPU")
-    } else if cpu_target == "arssssm" {
+    } else if cpu_target == "arm" {
         bindings
             .allowlist_type("ARMCPU")
             .allowlist_type("ARMv7MState")

@@ -6,9 +6,8 @@ use std::{
     rc::Rc,
 };
 
-#[cfg(unix)]
-use frida_gum::instruction_writer::InstructionWriter;
 use frida_gum::{
+    instruction_writer::InstructionWriter,
     stalker::{StalkerIterator, StalkerOutput, Transformer},
     Gum, Module, ModuleDetails, ModuleMap, PageProtection,
 };
@@ -28,11 +27,9 @@ use yaxpeax_arm::armv8::a64::{ARMv8, InstDecoder};
 #[cfg(target_arch = "x86_64")]
 use yaxpeax_x86::amd64::InstDecoder;
 
-#[cfg(unix)]
-use crate::asan::asan_rt::AsanRuntime;
 #[cfg(feature = "cmplog")]
 use crate::cmplog_rt::CmpLogRuntime;
-use crate::{coverage_rt::CoverageRuntime, drcov_rt::DrCovRuntime};
+use crate::{asan::asan_rt::AsanRuntime, coverage_rt::CoverageRuntime, drcov_rt::DrCovRuntime};
 
 #[cfg(target_vendor = "apple")]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
@@ -48,6 +45,8 @@ pub trait FridaRuntime: 'static + Debug {
         ranges: &RangeMap<usize, (u16, String)>,
         module_map: &Rc<ModuleMap>,
     );
+    /// Deinitialization
+    fn deinit(&mut self, gum: &Gum);
 
     /// Method called before execution
     fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>;
@@ -66,6 +65,9 @@ pub trait FridaRuntimeTuple: MatchFirstType + Debug {
         module_map: &Rc<ModuleMap>,
     );
 
+    /// Deinitialization
+    fn deinit_all(&mut self, gum: &Gum);
+
     /// Method called before execution
     fn pre_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>;
 
@@ -81,6 +83,8 @@ impl FridaRuntimeTuple for () {
         _module_map: &Rc<ModuleMap>,
     ) {
     }
+    fn deinit_all(&mut self, _gum: &Gum) {}
+
     fn pre_exec_all<I: Input + HasTargetBytes>(&mut self, _input: &I) -> Result<(), Error> {
         Ok(())
     }
@@ -102,6 +106,11 @@ where
     ) {
         self.0.init(gum, ranges, module_map);
         self.1.init_all(gum, ranges, module_map);
+    }
+
+    fn deinit_all(&mut self, gum: &Gum) {
+        self.0.deinit(gum);
+        self.1.deinit_all(gum);
     }
 
     fn pre_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
@@ -275,6 +284,11 @@ impl FridaInstrumentationHelperBuilder {
 
         if stalker_enabled {
             for (i, module) in module_map.values().iter().enumerate() {
+                log::trace!(
+                    "module: {:?} {:x}",
+                    module.name(),
+                    module.range().base_address().0 as usize
+                );
                 let range = module.range();
                 let start = range.base_address().0 as usize;
                 ranges
@@ -330,7 +344,7 @@ impl Default for FridaInstrumentationHelperBuilder {
     fn default() -> Self {
         Self {
             stalker_enabled: true,
-            disable_excludes: true,
+            disable_excludes: false,
             instrument_module_predicate: None,
             skip_module_predicate: Box::new(|module| {
                 // Skip the instrumentation module to avoid recursion.
@@ -445,7 +459,7 @@ where
         let runtimes = Rc::clone(runtimes);
 
         #[cfg(target_arch = "x86_64")]
-        let decoder = InstDecoder::minimal();
+        let decoder = InstDecoder::default();
 
         #[cfg(target_arch = "aarch64")]
         let decoder = <ARMv8 as Arch>::Decoder::default();
@@ -459,7 +473,7 @@ where
         basic_block: StalkerIterator,
         output: &StalkerOutput,
         ranges: &Rc<RefCell<RangeMap<usize, (u16, String)>>>,
-        runtimes: &Rc<RefCell<RT>>,
+        runtimes_unborrowed: &Rc<RefCell<RT>>,
         decoder: InstDecoder,
     ) {
         let mut first = true;
@@ -469,10 +483,10 @@ where
             let instr = instruction.instr();
             let instr_size = instr.bytes().len();
             let address = instr.address();
-            // log::trace!("block @ {:x} transformed to {:x}", address, output.writer().pc());
-
+            // log::trace!("x - block @ {:x} transformed to {:x}", address, output.writer().pc());
+            //the ASAN check needs to be done before the hook_rt check due to x86 insns such as call [mem]
             if ranges.borrow().contains_key(&(address as usize)) {
-                let mut runtimes = (*runtimes).borrow_mut();
+                let mut runtimes = (*runtimes_unborrowed).borrow_mut();
                 if first {
                     first = false;
                     // log::info!(
@@ -483,24 +497,29 @@ where
                     if let Some(rt) = runtimes.match_first_type_mut::<CoverageRuntime>() {
                         rt.emit_coverage_mapping(address, output);
                     }
-
                     if let Some(_rt) = runtimes.match_first_type_mut::<DrCovRuntime>() {
                         basic_block_start = address;
                     }
                 }
 
-                #[cfg(unix)]
                 let res = if let Some(_rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
                     AsanRuntime::asan_is_interesting_instruction(decoder, address, instr)
                 } else {
                     None
                 };
 
-                #[cfg(all(target_arch = "x86_64", unix))]
+                #[cfg(target_arch = "x86_64")]
                 if let Some(details) = res {
                     if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
                         rt.emit_shadow_check(
-                            address, output, details.0, details.1, details.2, details.3, details.4,
+                            address,
+                            output,
+                            instr.bytes().len(),
+                            details.0,
+                            details.1,
+                            details.2,
+                            details.3,
+                            details.4,
                         );
                     }
                 }
@@ -541,7 +560,6 @@ where
                     }
                 }
 
-                #[cfg(unix)]
                 if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
                     rt.add_stalked_address(
                         output.writer().pc() as usize - instr_size,
@@ -556,7 +574,10 @@ where
             instruction.keep();
         }
         if basic_block_size != 0 {
-            if let Some(rt) = runtimes.borrow_mut().match_first_type_mut::<DrCovRuntime>() {
+            if let Some(rt) = runtimes_unborrowed
+                .borrow_mut()
+                .match_first_type_mut::<DrCovRuntime>()
+            {
                 log::trace!("{basic_block_start:#016X}:{basic_block_size:X}");
                 rt.drcov_basic_blocks.push(DrCovBasicBlock::new(
                     basic_block_start as usize,
@@ -564,6 +585,11 @@ where
                 ));
             }
         }
+    }
+
+    /// Clean up all runtimes
+    pub fn deinit(&mut self, gum: &Gum) {
+        (*self.runtimes).borrow_mut().deinit_all(gum);
     }
 
     /*

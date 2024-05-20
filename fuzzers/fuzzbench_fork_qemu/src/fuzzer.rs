@@ -38,7 +38,7 @@ use libafl::{
     Error, HasMetadata,
 };
 use libafl_bolts::{
-    current_nanos, current_time,
+    current_time,
     os::{dup2, unix_signals::Signal},
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
@@ -51,11 +51,11 @@ use libafl_qemu::{
     elf::EasyElf,
     filter_qemu_args,
     hooks::QemuHooks,
-    GuestReg, MmapPerms, Qemu, QemuExitReason, QemuExitReasonError, QemuForkExecutor,
-    QemuShutdownCause, Regs,
+    GuestReg, MmapPerms, Qemu, QemuExitError, QemuExitReason, QemuForkExecutor, QemuShutdownCause,
+    Regs,
 };
 #[cfg(unix)]
-use nix::{self, unistd::dup};
+use nix::unistd::dup;
 
 /// The fuzzer main
 pub fn main() {
@@ -258,7 +258,7 @@ fn fuzz(
         // New maximization map feedback linked to the edges observer and the feedback state
         map_feedback,
         // Time feedback, this one does not need a feedback state
-        TimeFeedback::with_observer(&time_observer)
+        TimeFeedback::new(&time_observer)
     );
 
     // A feedback to choose if an input is a solution or not
@@ -268,7 +268,7 @@ fn fuzz(
     let mut state = state.unwrap_or_else(|| {
         StdState::new(
             // RNG
-            StdRand::with_seed(current_nanos()),
+            StdRand::new(),
             // Corpus that will be evolved, we keep it in memory for performance
             InMemoryOnDiskCorpus::new(corpus_dir).unwrap(),
             // Corpus in which we store solutions (crashes in this example),
@@ -328,7 +328,7 @@ fn fuzz(
                 Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(Signal::SigInterrupt))) => {
                     process::exit(0)
                 }
-                Err(QemuExitReasonError::UnexpectedExit) => return ExitKind::Crash,
+                Err(QemuExitError::UnexpectedExit) => return ExitKind::Crash,
                 _ => panic!("Unexpected QEMU exit."),
             }
         }

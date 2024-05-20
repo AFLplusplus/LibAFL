@@ -8,7 +8,9 @@ use core::{
 };
 
 #[cfg(feature = "fork")]
-use libafl::{events::EventManager, executors::InProcessForkExecutor, state::HasLastReportTime};
+use libafl::{
+    events::EventManager, executors::InProcessForkExecutor, state::HasLastReportTime, HasMetadata,
+};
 use libafl::{
     events::{EventFirer, EventRestarter},
     executors::{
@@ -20,11 +22,14 @@ use libafl::{
     fuzzer::HasObjective,
     observers::{ObserversTuple, UsesObservers},
     state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
-    Error, HasMetadata,
+    Error,
 };
-use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Signal};
 #[cfg(feature = "fork")]
 use libafl_bolts::shmem::ShMemProvider;
+use libafl_bolts::{
+    os::unix_signals::{siginfo_t, ucontext_t, Signal},
+    tuples::RefIndexable,
+};
 
 use crate::{helpers::QemuHelperTuple, hooks::QemuHooks, Qemu};
 
@@ -308,7 +313,7 @@ where
         self.state.post_exec::<Self, EM, OT, OF, Z>(
             input,
             qemu,
-            self.inner.observers_mut(),
+            &mut *self.inner.observers_mut(),
             &mut exit_kind,
         );
         Ok(exit_kind)
@@ -343,12 +348,12 @@ where
     QT: QemuHelperTuple<S>,
 {
     #[inline]
-    fn observers(&self) -> &OT {
+    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         self.inner.observers()
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
+    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
         self.inner.observers_mut()
     }
 }
@@ -480,7 +485,7 @@ where
         self.state.hooks.helpers_mut().post_exec_all(
             qemu,
             input,
-            self.inner.observers_mut(),
+            &mut *self.inner.observers_mut(),
             &mut exit_kind,
         );
         Ok(exit_kind)
@@ -527,12 +532,12 @@ where
     Z: UsesState<State = S>,
 {
     #[inline]
-    fn observers(&self) -> &OT {
+    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         self.inner.observers()
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
+    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
         self.inner.observers_mut()
     }
 }

@@ -29,17 +29,17 @@ use libafl::{
 };
 use libafl_bolts::{
     core_affinity::Cores,
-    current_nanos,
+    ownedref::OwnedMutSlice,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, Merge},
+    tuples::{tuple_list, Handled, Merge},
     AsSlice,
 };
-pub use libafl_qemu::emu::Qemu;
+pub use libafl_qemu::qemu::Qemu;
 #[cfg(not(any(feature = "mips", feature = "hexagon")))]
 use libafl_qemu::QemuCmpLogHelper;
 use libafl_qemu::{edges, QemuEdgeCoverageHelper, QemuExecutor, QemuHooks};
-use libafl_targets::{edges_map_mut_slice, CmpLogObserver};
+use libafl_targets::{edges_map_mut_ptr, CmpLogObserver};
 use typed_builder::TypedBuilder;
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
@@ -146,21 +146,27 @@ where
 
         let monitor = MultiMonitor::new(|s| log::info!("{s}"));
 
+        // Create an observation channel to keep track of the execution time
+        let time_observer = TimeObserver::new("time");
+        let time_ref = time_observer.handle();
+
         let mut run_client = |state: Option<_>,
                               mut mgr: LlmpRestartingEventManager<_, _, _>,
                               _core_id| {
+            let time_observer = time_observer.clone();
+
             // Create an observation channel using the coverage map
             let edges_observer = unsafe {
                 HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
                     "edges",
-                    edges_map_mut_slice(),
-                    addr_of_mut!(edges::MAX_EDGES_NUM),
+                    OwnedMutSlice::from_raw_parts_mut(
+                        edges_map_mut_ptr(),
+                        edges::EDGES_MAP_SIZE_IN_USE,
+                    ),
+                    addr_of_mut!(edges::MAX_EDGES_FOUND),
                 ))
                 .track_indices()
             };
-
-            // Create an observation channel to keep track of the execution time
-            let time_observer = TimeObserver::new("time");
 
             // Keep tracks of CMPs
             let cmplog_observer = CmpLogObserver::new("cmplog", true);
@@ -171,7 +177,7 @@ where
                 // New maximization map feedback linked to the edges observer and the feedback state
                 MaxMapFeedback::new(&edges_observer),
                 // Time feedback, this one does not need a feedback state
-                TimeFeedback::with_observer(&time_observer)
+                TimeFeedback::new(&time_observer)
             );
 
             // A feedback to choose if an input is a solution or not
@@ -181,7 +187,7 @@ where
             let mut state = state.unwrap_or_else(|| {
                 StdState::new(
                     // RNG
-                    StdRand::with_seed(current_nanos()),
+                    StdRand::new(),
                     // Corpus that will be evolved, we keep a part in memory for performance
                     CachedOnDiskCorpus::new(out_dir.clone(), CORPUS_CACHE_SIZE).unwrap(),
                     // Corpus in which we store solutions (crashes in this example),
@@ -433,9 +439,11 @@ where
             .run_client(&mut run_client)
             .cores(self.cores)
             .broker_port(self.broker_port)
-            .remote_broker_addr(self.remote_broker_addr);
+            .remote_broker_addr(self.remote_broker_addr)
+            .time_ref(time_ref);
         #[cfg(unix)]
         let launcher = launcher.stdout_file(Some("/dev/null"));
+
         launcher.build().launch().expect("Launcher failed");
     }
 }
@@ -446,7 +454,7 @@ pub mod pybind {
     use std::path::PathBuf;
 
     use libafl_bolts::core_affinity::Cores;
-    use libafl_qemu::emu::pybind::Qemu;
+    use libafl_qemu::qemu::pybind::Qemu;
     use pyo3::{prelude::*, types::PyBytes};
 
     use crate::qemu;

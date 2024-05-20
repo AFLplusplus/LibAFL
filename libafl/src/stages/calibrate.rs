@@ -1,14 +1,10 @@
 //! The calibration stage. The fuzzer measures the average exec time and the bitmap size.
 
-use alloc::{
-    borrow::Cow,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{borrow::Cow, vec::Vec};
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
 
 use hashbrown::HashSet;
-use libafl_bolts::{current_time, impl_serdeany, AsIter, Named};
+use libafl_bolts::{current_time, impl_serdeany, tuples::Handle, AsIter, Named};
 use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
 
@@ -16,10 +12,11 @@ use crate::{
     corpus::{Corpus, SchedulerTestcaseMetadata},
     events::{Event, EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
-    feedbacks::{map::MapFeedbackMetadata, HasObserverName},
+    feedbacks::{map::MapFeedbackMetadata, HasObserverHandle},
     fuzzer::Evaluator,
+    inputs::UsesInput,
     monitors::{AggregatorOps, UserStats, UserStatsValue},
-    observers::{MapObserver, ObserversTuple, UsesObserver},
+    observers::{MapObserver, ObserversTuple},
     schedulers::powersched::SchedulerMetadata,
     stages::{ExecutionCountRestartHelper, Stage},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, State, UsesState},
@@ -43,10 +40,10 @@ impl_serdeany!(UnstableEntriesMetadata);
 impl UnstableEntriesMetadata {
     #[must_use]
     /// Create a new [`struct@UnstableEntriesMetadata`]
-    pub fn new(entries: HashSet<usize>, map_len: usize) -> Self {
+    pub fn new() -> Self {
         Self {
-            unstable_entries: entries,
-            map_len,
+            unstable_entries: HashSet::new(),
+            map_len: 0,
         }
     }
 
@@ -63,16 +60,25 @@ impl UnstableEntriesMetadata {
     }
 }
 
+impl Default for UnstableEntriesMetadata {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Default name for `CalibrationStage`; derived from AFL++
+pub const CALIBRATION_STAGE_NAME: &str = "calibration";
 /// The calibration stage will measure the average exec time and the target's stability for this input.
 #[derive(Clone, Debug)]
 pub struct CalibrationStage<C, O, OT, S> {
-    map_observer_name: String,
-    map_name: String,
+    map_observer_handle: Handle<C>,
+    map_name: Cow<'static, str>,
+    name: Cow<'static, str>,
     stage_max: usize,
     /// If we should track stability
     track_stability: bool,
     restart_helper: ExecutionCountRestartHelper,
-    phantom: PhantomData<(C, O, OT, S)>,
+    phantom: PhantomData<(O, OT, S)>,
 }
 
 const CAL_STAGE_START: usize = 4; // AFL++'s CAL_CYCLES_FAST + 1
@@ -147,10 +153,7 @@ where
             .observers_mut()
             .post_exec_all(state, &input, &exit_kind)?;
 
-        let map_first = &executor
-            .observers()
-            .match_name::<C>(&self.map_observer_name)
-            .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
+        let map_first = &executor.observers()[&self.map_observer_handle]
             .as_ref()
             .to_vec();
 
@@ -191,10 +194,7 @@ where
                 .post_exec_all(state, &input, &exit_kind)?;
 
             if self.track_stability {
-                let map = &executor
-                    .observers()
-                    .match_name::<C>(&self.map_observer_name)
-                    .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
+                let map = &executor.observers()[&self.map_observer_handle]
                     .as_ref()
                     .to_vec();
 
@@ -226,33 +226,25 @@ where
             i += 1;
         }
 
+        let mut send_default_stability = false;
         let unstable_found = !unstable_entries.is_empty();
         if unstable_found {
+            let metadata = state.metadata_or_insert_with(UnstableEntriesMetadata::new);
+
             // If we see new stable entries executing this new corpus entries, then merge with the existing one
-            if state.has_metadata::<UnstableEntriesMetadata>() {
-                let existing = state
-                    .metadata_map_mut()
-                    .get_mut::<UnstableEntriesMetadata>()
-                    .unwrap();
-                for item in unstable_entries {
-                    existing.unstable_entries.insert(item); // Insert newly found items
-                }
-                existing.map_len = map_len;
-            } else {
-                state.add_metadata::<UnstableEntriesMetadata>(UnstableEntriesMetadata::new(
-                    HashSet::from_iter(unstable_entries),
-                    map_len,
-                ));
+            for item in unstable_entries {
+                metadata.unstable_entries.insert(item); // Insert newly found items
             }
-        };
+            metadata.map_len = map_len;
+        } else if !state.has_metadata::<UnstableEntriesMetadata>() {
+            send_default_stability = true;
+            state.add_metadata(UnstableEntriesMetadata::new());
+        }
 
         // If weighted scheduler or powerscheduler is used, update it
         if state.has_metadata::<SchedulerMetadata>() {
-            let map = executor
-                .observers()
-                .match_name::<C>(&self.map_observer_name)
-                .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
-                .as_ref();
+            let observers = executor.observers();
+            let map = observers[&self.map_observer_handle].as_ref();
 
             let mut bitmap_size = map.count_bytes();
             assert!(bitmap_size != 0);
@@ -309,6 +301,7 @@ where
             if let Some(meta) = state.metadata_map().get::<UnstableEntriesMetadata>() {
                 let unstable_entries = meta.unstable_entries().len();
                 let map_len = meta.map_len();
+                debug_assert_ne!(map_len, 0, "The map_len must never be 0");
                 mgr.fire(
                     state,
                     Event::UpdateUserStats {
@@ -324,6 +317,18 @@ where
                     },
                 )?;
             }
+        } else if send_default_stability {
+            mgr.fire(
+                state,
+                Event::UpdateUserStats {
+                    name: Cow::from("stability"),
+                    value: UserStats::new(
+                        UserStatsValue::Ratio(map_len as u64, map_len as u64),
+                        AggregatorOps::Avg,
+                    ),
+                    phantom: PhantomData,
+                },
+            )?;
         }
 
         Ok(())
@@ -343,25 +348,25 @@ where
 impl<C, O, OT, S> CalibrationStage<C, O, OT, S>
 where
     O: MapObserver,
+    for<'it> O: AsIter<'it, Item = O::Entry>,
     C: AsRef<O>,
     OT: ObserversTuple<S>,
-    S: HasCorpus + HasMetadata + HasNamedMetadata,
+    S: UsesInput + HasNamedMetadata,
 {
     /// Create a new [`CalibrationStage`].
     #[must_use]
     pub fn new<F>(map_feedback: &F) -> Self
     where
-        F: HasObserverName + Named + UsesObserver<S, Observer = C>,
-        for<'it> O: AsIter<'it, Item = O::Entry>,
-        C: AsRef<O>,
+        F: HasObserverHandle<Observer = C> + Named,
     {
         Self {
-            map_observer_name: map_feedback.observer_name().to_string(),
-            map_name: map_feedback.name().to_string(),
+            map_observer_handle: map_feedback.observer_handle().clone(),
+            map_name: map_feedback.name().clone(),
             stage_max: CAL_STAGE_START,
             track_stability: true,
             restart_helper: ExecutionCountRestartHelper::default(),
             phantom: PhantomData,
+            name: Cow::Borrowed(CALIBRATION_STAGE_NAME),
         }
     }
 
@@ -369,17 +374,22 @@ where
     #[must_use]
     pub fn ignore_stability<F>(map_feedback: &F) -> Self
     where
-        F: HasObserverName + Named + UsesObserver<S, Observer = C>,
-        for<'it> O: AsIter<'it, Item = O::Entry>,
-        C: AsRef<O>,
+        F: HasObserverHandle<Observer = C> + Named,
     {
         Self {
-            map_observer_name: map_feedback.observer_name().to_string(),
-            map_name: map_feedback.name().to_string(),
+            map_observer_handle: map_feedback.observer_handle().clone(),
+            map_name: map_feedback.name().clone(),
             stage_max: CAL_STAGE_START,
             track_stability: false,
             restart_helper: ExecutionCountRestartHelper::default(),
             phantom: PhantomData,
+            name: Cow::Borrowed(CALIBRATION_STAGE_NAME),
         }
+    }
+}
+
+impl<C, O, OT, S> Named for CalibrationStage<C, O, OT, S> {
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
     }
 }

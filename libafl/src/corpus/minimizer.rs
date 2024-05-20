@@ -1,15 +1,15 @@
 //! Whole corpus minimizers, for reducing the number of samples/the total size/the average runtime
 //! of your corpus.
 
-use alloc::{
-    borrow::Cow,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{borrow::Cow, string::ToString, vec::Vec};
 use core::{hash::Hash, marker::PhantomData};
 
 use hashbrown::{HashMap, HashSet};
-use libafl_bolts::{current_time, tuples::MatchName, AsIter, Named};
+use libafl_bolts::{
+    current_time,
+    tuples::{Handle, Handled},
+    AsIter, Named,
+};
 use num_traits::ToPrimitive;
 use z3::{ast::Bool, Config, Context, Optimize};
 
@@ -51,8 +51,8 @@ where
 /// Algorithm based on WMOPT: <https://hexhive.epfl.ch/publications/files/21ISSTA2.pdf>
 #[derive(Debug)]
 pub struct MapCorpusMinimizer<C, E, O, T, TS> {
-    obs_name: String,
-    phantom: PhantomData<(C, E, O, T, TS)>,
+    observer_handle: Handle<C>,
+    phantom: PhantomData<(E, O, T, TS)>,
 }
 
 /// Standard corpus minimizer, which weights inputs by length and time.
@@ -70,7 +70,7 @@ where
     /// in the future to get observed maps from an executed input.
     pub fn new(obs: &C) -> Self {
         Self {
-            obs_name: obs.name().to_string(),
+            observer_handle: obs.handle(),
             phantom: PhantomData,
         }
     }
@@ -160,15 +160,12 @@ where
             )?;
 
             let seed_expr = Bool::fresh_const(&ctx, "seed");
-            let obs = executor
-                .observers()
-                .match_name::<C>(&self.obs_name)
-                .expect("Observer must be present.")
-                .as_ref();
+            let observers = executor.observers();
+            let obs = observers[&self.observer_handle].as_ref();
 
             // Store coverage, mapping coverage map indices to hit counts (if present) and the
             // associated seeds for the map indices with those hit counts.
-            for (i, e) in obs.as_iter().copied().enumerate() {
+            for (i, e) in obs.as_iter().map(|x| *x).enumerate() {
                 if e != obs.initial() {
                     cov_map
                         .entry(i)

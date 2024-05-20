@@ -80,10 +80,14 @@ ahash = "0.8"
 paste = "1.0"
 log = "0.4.20"
 mmap-rs = "0.6.0"
-
+bit_reverse = "0.1.8"
 yaxpeax-arch = "0.2.7"
 
+[target.'cfg(windows)'.dependencies]
+winsafe = {version = "0.0.20", features = ["kernel"]}
+
+
 [dev-dependencies]
-serial_test = { version = "2", default-features = false, features = ["logging"] }
+serial_test = { version = "3", default-features = false, features = ["logging"] }
 clap = {version = "4.5", features = ["derive"]}
-libloading = "0.7"
+libloading = "0.8"

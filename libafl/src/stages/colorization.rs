@@ -1,8 +1,12 @@
 //! The colorization stage from `colorization()` in afl++
-use alloc::{borrow::Cow, collections::binary_heap::BinaryHeap, string::ToString, vec::Vec};
+use alloc::{borrow::Cow, collections::binary_heap::BinaryHeap, vec::Vec};
 use core::{cmp::Ordering, fmt::Debug, marker::PhantomData, ops::Range};
 
-use libafl_bolts::{rands::Rand, tuples::MatchName, Named};
+use libafl_bolts::{
+    rands::Rand,
+    tuples::{Handle, Handled},
+    Named,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -48,12 +52,15 @@ impl Ord for Earlier {
     }
 }
 
+/// Default name for `ColorizationStage`; derived from ALF++
+pub const COLORIZATION_STAGE_NAME: &str = "colorization";
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
 pub struct ColorizationStage<C, E, EM, O, Z> {
-    map_observer_name: Cow<'static, str>,
+    map_observer_handle: Handle<C>,
+    name: Cow<'static, str>,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(C, E, EM, O, E, Z)>,
+    phantom: PhantomData<(E, EM, O, E, Z)>,
 }
 
 impl<C, E, EM, O, Z> UsesState for ColorizationStage<C, E, EM, O, Z>
@@ -68,7 +75,7 @@ where
     E: UsesState,
 {
     fn name(&self) -> &Cow<'static, str> {
-        &self.map_observer_name
+        &self.name
     }
 }
 
@@ -92,7 +99,7 @@ where
         manager: &mut EM,
     ) -> Result<(), Error> {
         // Run with the mutated input
-        Self::colorize(fuzzer, executor, state, manager, &self.map_observer_name)?;
+        Self::colorize(fuzzer, executor, state, manager, &self.map_observer_handle)?;
 
         Ok(())
     }
@@ -164,7 +171,7 @@ where
         executor: &mut E,
         state: &mut E::State,
         manager: &mut EM,
-        name: &str,
+        observer_handle: &Handle<C>,
     ) -> Result<E::Input, Error> {
         let mut input = state.current_input_cloned()?;
         // The backup of the input
@@ -178,8 +185,14 @@ where
         // First, run orig_input once and get the original hash
 
         // Idea: No need to do this every time
-        let orig_hash =
-            Self::get_raw_map_hash_run(fuzzer, executor, state, manager, consumed_input, name)?;
+        let orig_hash = Self::get_raw_map_hash_run(
+            fuzzer,
+            executor,
+            state,
+            manager,
+            consumed_input,
+            observer_handle,
+        )?;
         let changed_bytes = changed.bytes_mut();
         let input_len = changed_bytes.len();
 
@@ -224,7 +237,7 @@ where
                     state,
                     manager,
                     consumed_input,
-                    name,
+                    observer_handle,
                 )?;
 
                 if orig_hash == changed_hash {
@@ -297,7 +310,8 @@ where
     /// Creates a new [`ColorizationStage`]
     pub fn new(map_observer: &C) -> Self {
         Self {
-            map_observer_name: map_observer.name().clone(),
+            map_observer_handle: map_observer.handle(),
+            name: Cow::Borrowed(COLORIZATION_STAGE_NAME),
             phantom: PhantomData,
         }
     }
@@ -309,17 +323,14 @@ where
         state: &mut E::State,
         manager: &mut EM,
         input: E::Input,
-        name: &str,
+        observer_handle: &Handle<C>,
     ) -> Result<usize, Error> {
         executor.observers_mut().pre_exec_all(state, &input)?;
 
         let exit_kind = executor.run_target(fuzzer, state, manager, &input)?;
 
-        let observer = executor
-            .observers()
-            .match_name::<C>(name)
-            .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
-            .as_ref();
+        let observers = executor.observers();
+        let observer = observers[observer_handle].as_ref();
 
         let hash = observer.hash_simple() as usize;
 

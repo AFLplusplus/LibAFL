@@ -11,6 +11,7 @@ use libafl::{
 use libafl_bolts::{
     fs::{InputFile, INPUTFILE_STD},
     shmem::{ShMem, ShMemProvider, StdShMemProvider},
+    tuples::RefIndexable,
     AsSlice, AsSliceMut,
 };
 use tinyinst::tinyinst::{litecov::RunResult, TinyInst};
@@ -300,12 +301,12 @@ where
     SP: ShMemProvider,
     OT: ObserversTuple<S>,
 {
-    fn observers(&self) -> &OT {
-        &self.observers
+    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
+        RefIndexable::from(&self.observers)
     }
 
-    fn observers_mut(&mut self) -> &mut OT {
-        &mut self.observers
+    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
+        RefIndexable::from(&mut self.observers)
     }
 }
 impl<'a, S, SP, OT> UsesState for TinyInstExecutor<'a, S, SP, OT>

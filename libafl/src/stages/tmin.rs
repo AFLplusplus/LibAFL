@@ -4,13 +4,16 @@ use alloc::borrow::Cow;
 use core::{borrow::BorrowMut, fmt::Debug, hash::Hash, marker::PhantomData};
 
 use ahash::RandomState;
-use libafl_bolts::{HasLen, Named};
+use libafl_bolts::{
+    tuples::{Handle, Handled, MatchNameRef},
+    HasLen, Named,
+};
 
 use crate::{
-    corpus::{Corpus, HasCurrentCorpusIdx, Testcase},
+    corpus::{Corpus, HasCurrentCorpusId, Testcase},
     events::EventFirer,
     executors::{Executor, ExitKind, HasObservers},
-    feedbacks::{Feedback, FeedbackFactory, HasObserverName},
+    feedbacks::{Feedback, FeedbackFactory, HasObserverHandle},
     inputs::UsesInput,
     mark_feature_time,
     mutators::{MutationResult, Mutator},
@@ -69,7 +72,7 @@ where
         state: &mut CS::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        let Some(base_corpus_idx) = state.current_corpus_idx()? else {
+        let Some(base_corpus_idx) = state.current_corpus_id()? else {
             return Err(Error::illegal_state(
                 "state is not currently processing a corpus index",
             ));
@@ -91,7 +94,7 @@ where
         fuzzer.execute_input(state, executor, manager, &base)?;
         let observers = executor.observers();
 
-        let mut feedback = self.create_feedback(observers);
+        let mut feedback = self.create_feedback(&*observers);
 
         let mut i = 0;
         loop {
@@ -130,7 +133,7 @@ where
                     state,
                     manager,
                     input.clone(),
-                    observers,
+                    &*observers,
                     &exit_kind,
                     false,
                 )?;
@@ -139,7 +142,7 @@ where
                     && state.solutions().count() == solution_count
                 {
                     // we do not care about interesting inputs!
-                    if feedback.is_interesting(state, manager, &input, observers, &exit_kind)? {
+                    if feedback.is_interesting(state, manager, &input, &*observers, &exit_kind)? {
                         // we found a reduced corpus entry! use the smaller base
                         base = input;
                         base_post = Some(post.clone());
@@ -172,11 +175,11 @@ where
             // marked as interesting above; similarly, it should not trigger objectives
             fuzzer
                 .feedback_mut()
-                .is_interesting(state, manager, &base, observers, &exit_kind)?;
+                .is_interesting(state, manager, &base, &*observers, &exit_kind)?;
             let mut testcase = Testcase::with_executions(base, *state.executions());
             fuzzer
                 .feedback_mut()
-                .append_metadata(state, manager, observers, &mut testcase)?;
+                .append_metadata(state, manager, &*observers, &mut testcase)?;
             let prev = state.corpus_mut().replace(base_corpus_idx, testcase)?;
             fuzzer
                 .scheduler_mut()
@@ -245,6 +248,14 @@ where
     IP: MutatedTransformPost<CS::State> + Clone,
     I: MutatedTransform<CS::Input, CS::State, Post = IP> + Clone,
 {
+    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        self.restart_helper.restart_progress_should_run(state)
+    }
+
+    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        self.restart_helper.clear_restart_progress(state)
+    }
+
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -258,14 +269,6 @@ where
         state.introspection_monitor_mut().finish_stage();
 
         Ok(())
-    }
-
-    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        self.restart_helper.restart_progress_should_run(state)
-    }
-
-    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        self.restart_helper.clear_restart_progress(state)
     }
 }
 
@@ -348,28 +351,31 @@ where
 /// A feedback which checks if the hash of the currently observed map is equal to the original hash
 /// provided
 #[derive(Clone, Debug)]
-pub struct MapEqualityFeedback<M, S> {
+pub struct MapEqualityFeedback<C, M, S> {
     name: Cow<'static, str>,
-    obs_name: Cow<'static, str>,
+    map_ref: Handle<C>,
     orig_hash: u64,
     phantom: PhantomData<(M, S)>,
 }
 
-impl<M, S> Named for MapEqualityFeedback<M, S> {
+impl<C, M, S> Named for MapEqualityFeedback<C, M, S> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<M, S> HasObserverName for MapEqualityFeedback<M, S> {
-    fn observer_name(&self) -> &Cow<'static, str> {
-        &self.obs_name
+impl<C, M, S> HasObserverHandle for MapEqualityFeedback<C, M, S> {
+    type Observer = C;
+
+    fn observer_handle(&self) -> &Handle<Self::Observer> {
+        &self.map_ref
     }
 }
 
-impl<M, S> Feedback<S> for MapEqualityFeedback<M, S>
+impl<C, M, S> Feedback<S> for MapEqualityFeedback<C, M, S>
 where
     M: MapObserver,
+    C: AsRef<M>,
     S: State,
 {
     fn is_interesting<EM, OT>(
@@ -385,52 +391,57 @@ where
         OT: ObserversTuple<S>,
     {
         let obs = observers
-            .match_name::<M>(self.observer_name())
+            .get(self.observer_handle())
             .expect("Should have been provided valid observer name.");
-        Ok(obs.hash_simple() == self.orig_hash)
+        Ok(obs.as_ref().hash_simple() == self.orig_hash)
     }
 }
 
 /// A feedback factory for ensuring that the maps for minimized inputs are the same
 #[derive(Debug, Clone)]
-pub struct MapEqualityFactory<M, S> {
-    obs_name: Cow<'static, str>,
-    phantom: PhantomData<(M, S)>,
+pub struct MapEqualityFactory<C, M, S> {
+    map_ref: Handle<C>,
+    phantom: PhantomData<(C, M, S)>,
 }
 
-impl<M, S> MapEqualityFactory<M, S>
+impl<C, M, S> MapEqualityFactory<C, M, S>
 where
     M: MapObserver,
+    C: AsRef<M> + Handled,
 {
     /// Creates a new map equality feedback for the given observer
-    pub fn with_observer(obs: &M) -> Self {
+    pub fn new(obs: &C) -> Self {
         Self {
-            obs_name: obs.name().clone(),
+            map_ref: obs.handle(),
             phantom: PhantomData,
         }
     }
 }
 
-impl<M, S> HasObserverName for MapEqualityFactory<M, S> {
-    fn observer_name(&self) -> &Cow<'static, str> {
-        &self.obs_name
+impl<C, M, S> HasObserverHandle for MapEqualityFactory<C, M, S> {
+    type Observer = C;
+
+    fn observer_handle(&self) -> &Handle<C> {
+        &self.map_ref
     }
 }
 
-impl<M, OT, S> FeedbackFactory<MapEqualityFeedback<M, S>, S, OT> for MapEqualityFactory<M, S>
+impl<C, M, OT, S> FeedbackFactory<MapEqualityFeedback<C, M, S>, S, OT>
+    for MapEqualityFactory<C, M, S>
 where
     M: MapObserver,
+    C: AsRef<M> + Handled,
     OT: ObserversTuple<S>,
     S: State + Debug,
 {
-    fn create_feedback(&self, observers: &OT) -> MapEqualityFeedback<M, S> {
+    fn create_feedback(&self, observers: &OT) -> MapEqualityFeedback<C, M, S> {
         let obs = observers
-            .match_name::<M>(self.observer_name())
+            .get(self.observer_handle())
             .expect("Should have been provided valid observer name.");
         MapEqualityFeedback {
             name: Cow::from("MapEq"),
-            obs_name: self.obs_name.clone(),
-            orig_hash: obs.hash_simple(),
+            map_ref: obs.handle(),
+            orig_hash: obs.as_ref().hash_simple(),
             phantom: PhantomData,
         }
     }

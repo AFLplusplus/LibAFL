@@ -39,7 +39,7 @@ pub use tuneable::*;
 use tuple_list::NonEmptyTuple;
 
 use crate::{
-    corpus::{CorpusId, HasCurrentCorpusIdx},
+    corpus::{CorpusId, HasCurrentCorpusId},
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::{Executor, HasObservers},
     inputs::UsesInput,
@@ -63,6 +63,8 @@ pub mod concolic;
 #[cfg(feature = "std")]
 pub mod dump;
 pub mod generalization;
+/// The [`generation::GenStage`] generates a single input and evaluates it.
+pub mod generation;
 pub mod logics;
 pub mod power;
 pub mod stats;
@@ -399,7 +401,7 @@ impl<CS, E, EM, OT, PS, Z> Stage<E, EM, Z> for PushStageAdapter<CS, EM, OT, PS, 
 where
     CS: Scheduler,
     CS::State:
-        HasExecutions + HasMetadata + HasRand + HasCorpus + HasLastReportTime + HasCurrentCorpusIdx,
+        HasExecutions + HasMetadata + HasRand + HasCorpus + HasLastReportTime + HasCurrentCorpusId,
     E: Executor<EM, Z> + HasObservers<Observers = OT, State = CS::State>,
     EM: EventFirer<State = CS::State>
         + EventRestarter
@@ -421,19 +423,20 @@ where
     ) -> Result<(), Error> {
         let push_stage = &mut self.push_stage;
 
-        let Some(corpus_idx) = state.current_corpus_idx()? else {
+        let Some(corpus_idx) = state.current_corpus_id()? else {
             return Err(Error::illegal_state(
                 "state is not currently processing a corpus index",
             ));
         };
 
-        push_stage.set_current_corpus_idx(corpus_idx);
+        push_stage.set_current_corpus_id(corpus_idx);
 
-        push_stage.init(fuzzer, state, event_mgr, executor.observers_mut())?;
+        push_stage.init(fuzzer, state, event_mgr, &mut *executor.observers_mut())?;
 
         loop {
             let input =
-                match push_stage.pre_exec(fuzzer, state, event_mgr, executor.observers_mut()) {
+                match push_stage.pre_exec(fuzzer, state, event_mgr, &mut *executor.observers_mut())
+                {
                     Some(Ok(next_input)) => next_input,
                     Some(Err(err)) => return Err(err),
                     None => break,
@@ -445,14 +448,14 @@ where
                 fuzzer,
                 state,
                 event_mgr,
-                executor.observers_mut(),
+                &mut *executor.observers_mut(),
                 input,
                 exit_kind,
             )?;
         }
 
         self.push_stage
-            .deinit(fuzzer, state, event_mgr, executor.observers_mut())
+            .deinit(fuzzer, state, event_mgr, &mut *executor.observers_mut())
     }
 
     #[inline]
@@ -487,12 +490,12 @@ impl RetryRestartHelper {
         max_retries: usize,
     ) -> Result<bool, Error>
     where
-        S: HasNamedMetadata + HasCurrentCorpusIdx,
+        S: HasNamedMetadata + HasCurrentCorpusId,
         ST: Named,
     {
-        let corpus_idx = state.current_corpus_idx()?.ok_or_else(|| {
+        let corpus_idx = state.current_corpus_id()?.ok_or_else(|| {
             Error::illegal_state(
-                "No current_corpus_idx set in State, but called RetryRestartHelper::should_skip",
+                "No current_corpus_id set in State, but called RetryRestartHelper::should_skip",
             )
         })?;
 
@@ -652,7 +655,7 @@ pub mod test {
     use serde::{Deserialize, Serialize};
 
     use crate::{
-        corpus::{Corpus, HasCurrentCorpusIdx, Testcase},
+        corpus::{Corpus, HasCurrentCorpusId, Testcase},
         inputs::NopInput,
         stages::{RetryRestartHelper, Stage},
         state::{test::test_std_state, HasCorpus, State, UsesState},

@@ -36,7 +36,7 @@ pub fn main() -> Result<(), Error> {
     // Create an observation channel using the signals map
     let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS.len()) };
 
-    let factory = MapEqualityFactory::with_observer(&observer);
+    let factory = MapEqualityFactory::new(&observer);
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);
@@ -55,7 +55,7 @@ pub fn main() -> Result<(), Error> {
     // create a State from scratch
     let mut state = StdState::new(
         // RNG
-        StdRand::with_seed(current_nanos()),
+        StdRand::new(),
         // Corpus that will be evolved, we keep it in memory for performance
         InMemoryOnDiskCorpus::new(corpus_dir).unwrap(),
         // Corpus in which we store solutions (crashes in this example),
@@ -108,7 +108,7 @@ pub fn main() -> Result<(), Error> {
     let minimized_dir = PathBuf::from("./minimized");
 
     let mut state = StdState::new(
-        StdRand::with_seed(current_nanos()),
+        StdRand::new(),
         InMemoryOnDiskCorpus::new(minimized_dir).unwrap(),
         InMemoryCorpus::new(),
         &mut (),

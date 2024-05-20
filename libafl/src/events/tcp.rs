@@ -15,6 +15,8 @@ use std::{
     sync::Arc,
 };
 
+#[cfg(feature = "tcp_compression")]
+use libafl_bolts::compress::GzipCompressor;
 #[cfg(feature = "std")]
 use libafl_bolts::core_affinity::CoreId;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
@@ -36,7 +38,7 @@ use tokio::{
 use typed_builder::TypedBuilder;
 
 use super::{CustomBufEventResult, CustomBufHandlerFn};
-#[cfg(all(unix, feature = "std"))]
+#[cfg(all(unix, feature = "std", not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
     events::{
@@ -182,8 +184,7 @@ where
                         // we forward the sender id as well, so we add 4 bytes to the message length
                         len += 4;
 
-                        #[cfg(feature = "tcp_debug")]
-                        println!("len +4 = {len:?}");
+                        log::debug!("TCP Manager - len +4 = {len:?}");
 
                         let mut buf = vec![0; len as usize];
 
@@ -198,8 +199,7 @@ where
                             return;
                         }
 
-                        #[cfg(feature = "tcp_debug")]
-                        println!("len: {len:?} - {buf:?}");
+                        log::debug!("TCP Manager - len: {len:?} - {buf:?}");
                         tx_inner.send(buf).await.expect("Could not send");
                     }
                 };
@@ -232,8 +232,7 @@ where
                             _ => panic!("Could not receive"),
                         };
 
-                        #[cfg(feature = "tcp_debug")]
-                        println!("{buf:?}");
+                        log::debug!("TCP Manager - {buf:?}");
 
                         if buf.len() <= 4 {
                             log::warn!("We got no contents (or only the length) in a broadcast");
@@ -241,9 +240,7 @@ where
                         }
 
                         if buf[..4] == this_client_id_bytes {
-                            #[cfg(feature = "tcp_debug")]
-                            eprintln!(
-                            "Not forwarding message from this very client ({this_client_id:?})."
+                            log::debug!("TCP Manager - Not forwarding message from this very client ({this_client_id:?})."
                         );
                             continue;
                         }
@@ -287,8 +284,12 @@ where
             // cut off the ID.
             let event_bytes = &buf[4..];
 
-            let event: Event<I> = postcard::from_bytes(event_bytes).unwrap();
-            match Self::handle_in_broker(&mut self.monitor, client_id, &event).unwrap() {
+            #[cfg(feature = "tcp_compression")]
+            let event_bytes = GzipCompressor::new().decompress(event_bytes)?;
+
+            #[allow(clippy::needless_borrow)] // make decompressed vec and slice compatible
+            let event: Event<I> = postcard::from_bytes(&event_bytes)?;
+            match Self::handle_in_broker(&mut self.monitor, client_id, &event)? {
                 BrokerEventResult::Forward => {
                     tx_bc.send(buf).expect("Could not send");
                 }
@@ -300,9 +301,7 @@ where
                 break;
             }
         }
-
-        #[cfg(feature = "tcp_debug")]
-        println!("The last client quit. Exiting.");
+        log::info!("TCP Manager - The last client quit. Exiting.");
 
         Err(Error::shutting_down())
     }
@@ -551,7 +550,7 @@ where
             tcp,
             client_id,
             #[cfg(feature = "tcp_compression")]
-            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            compressor: GzipCompressor::new(),
             configuration,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
@@ -712,38 +711,17 @@ where
     EMH: EventManagerHooksTuple<S>,
     S: State,
 {
-    #[cfg(feature = "tcp_compression")]
     fn fire(
         &mut self,
         _state: &mut Self::State,
         event: Event<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(&event)?;
-        let flags = TCP_FLAG_INITIALIZED;
 
-        match self.compressor.compress(&serialized)? {
-            Some(comp_buf) => {
-                self.tcp.send_buf_with_flags(
-                    TCP_TAG_EVENT_TO_BOTH,
-                    flags | TCP_FLAG_COMPRESSED,
-                    &comp_buf,
-                )?;
-            }
-            None => {
-                self.tcp.send_buf(TCP_TAG_EVENT_TO_BOTH, &serialized)?;
-            }
-        }
-        Ok(())
-    }
+        #[cfg(feature = "tcp_compression")]
+        let serialized = self.compressor.compress(&serialized);
 
-    #[cfg(not(feature = "tcp_compression"))]
-    fn fire(
-        &mut self,
-        _state: &mut Self::State,
-        event: Event<<Self::State as UsesInput>::Input>,
-    ) -> Result<(), Error> {
-        let serialized = postcard::to_allocvec(&event)?;
-        let size = u32::try_from(serialized.len()).unwrap();
+        let size = u32::try_from(serialized.len())?;
         self.tcp.write_all(&size.to_le_bytes())?;
         self.tcp.write_all(&self.client_id.0.to_le_bytes())?;
         self.tcp.write_all(&serialized)?;
@@ -796,7 +774,7 @@ where
                     self.tcp.set_nonblocking(false).expect("set to blocking");
                     let len = u32::from_le_bytes(len_buf);
                     let mut buf = vec![0_u8; len as usize + 4_usize];
-                    self.tcp.read_exact(&mut buf).unwrap();
+                    self.tcp.read_exact(&mut buf)?;
 
                     let mut client_id_buf = [0_u8; 4];
                     client_id_buf.copy_from_slice(&buf[..4]);
@@ -809,7 +787,14 @@ where
                     } else {
                         log::info!("{self_id:?} (from {other_client_id:?}) Received: {buf:?}");
 
-                        let event = postcard::from_bytes(&buf[4..])?;
+                        let buf = &buf[4..];
+                        #[cfg(feature = "tcp_compression")]
+                        let buf = self.compressor.decompress(buf)?;
+
+                        // make decompressed vec and slice compatible
+                        #[allow(clippy::needless_borrow)]
+                        let event = postcard::from_bytes(&buf)?;
+
                         self.handle_in_client(fuzzer, executor, state, other_client_id, event)?;
                         count += 1;
                     }
@@ -1156,19 +1141,6 @@ where
     S: State + HasExecutions + HasMetadata,
     MT: Monitor + Clone,
 {
-    /// Internal function, returns true when shuttdown is requested by a `SIGINT` signal
-    #[inline]
-    #[allow(clippy::unused_self)]
-    fn is_shutting_down() -> bool {
-        #[cfg(unix)]
-        unsafe {
-            core::ptr::read_volatile(core::ptr::addr_of!(EVENTMGR_SIGHANDLER_STATE.shutting_down))
-        }
-
-        #[cfg(windows)]
-        false
-    }
-
     /// Launch the restarting manager
     pub fn launch(&mut self) -> Result<(Option<S>, TcpRestartingEventManager<EMH, S, SP>), Error> {
         // We start ourself as child process to actually fuzz
@@ -1257,15 +1229,6 @@ where
             // Store the information to a map.
             staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
 
-            // We setup signal handlers to clean up shmem segments used by state restorer
-            #[cfg(all(unix, not(miri)))]
-            if let Err(_e) =
-                unsafe { setup_signal_handler(addr_of_mut!(EVENTMGR_SIGHANDLER_STATE)) }
-            {
-                // We can live without a proper ctrl+c signal handler. Print and ignore.
-                log::error!("Failed to setup signal handlers: {_e}");
-            }
-
             let mut ctr: u64 = 0;
             // Client->parent loop
             loop {
@@ -1279,7 +1242,7 @@ where
                     match unsafe { fork() }? {
                         ForkResult::Parent(handle) => {
                             unsafe {
-                                EVENTMGR_SIGHANDLER_STATE.set_exit_from_main();
+                                libc::signal(libc::SIGINT, libc::SIG_IGN);
                             }
                             self.shmem_provider.post_fork(false)?;
                             handle.status()
@@ -1291,18 +1254,30 @@ where
                     }
                 };
 
-                #[cfg(all(unix, not(feature = "fork")))]
+                // If this guy wants to fork, then ignore sigit
+                #[cfg(any(windows, not(feature = "fork")))]
                 unsafe {
-                    EVENTMGR_SIGHANDLER_STATE.set_exit_from_main();
+                    #[cfg(windows)]
+                    libafl_bolts::os::windows_exceptions::signal(
+                        libafl_bolts::os::windows_exceptions::SIGINT,
+                        libafl_bolts::os::windows_exceptions::sig_ign(),
+                    );
+
+                    #[cfg(unix)]
+                    libc::signal(libc::SIGINT, libc::SIG_IGN);
                 }
 
                 // On Windows (or in any case without fork), we spawn ourself again
                 #[cfg(any(windows, not(feature = "fork")))]
                 let child_status = startable_self()?.status()?;
-                #[cfg(all(unix, not(feature = "fork")))]
+                #[cfg(any(windows, not(feature = "fork")))]
                 let child_status = child_status.code().unwrap_or_default();
 
                 compiler_fence(Ordering::SeqCst);
+
+                if child_status == crate::events::CTRL_C_EXIT || staterestorer.wants_to_exit() {
+                    return Err(Error::shutting_down());
+                }
 
                 #[allow(clippy::manual_assert)]
                 if !staterestorer.has_content() && self.serialize_state {
@@ -1317,10 +1292,6 @@ where
                     panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! This can happen if the child calls `exit()`, in that case make sure it uses `abort()`, if it got killed unrecoverable (OOM), or if there is a bug in the fuzzer itself. (Child exited with: {child_status})");
                 }
 
-                if staterestorer.wants_to_exit() || Self::is_shutting_down() {
-                    return Err(Error::shutting_down());
-                }
-
                 ctr = ctr.wrapping_add(1);
             }
         } else {
@@ -1333,6 +1304,14 @@ where
                 None,
             )
         };
+
+        // At this point we are the fuzzer *NOT* the restarter.
+        // We setup signal handlers to clean up shmem segments used by state restorer
+        #[cfg(all(unix, not(miri)))]
+        if let Err(_e) = unsafe { setup_signal_handler(addr_of_mut!(EVENTMGR_SIGHANDLER_STATE)) } {
+            // We can live without a proper ctrl+c signal handler. Print and ignore.
+            log::error!("Failed to setup signal handlers: {_e}");
+        }
 
         if let Some(core_id) = core_id {
             let core_id: CoreId = core_id;
