@@ -34,7 +34,7 @@ where
     }
 }
 
-/// The [`BytesSubInput`] makes it possible to use [`Mutator`]`s` that work on
+/// The [`BytesSubInput`] makes it possible to use [`crate::mutators::Mutator`]`s` that work on
 /// inputs implementing the [`HasMutatorBytes`] for a sub-range of this input.
 /// For example, we can do the following:
 /// ```rust
@@ -42,16 +42,50 @@ where
 /// # extern crate libafl;
 /// # use libafl::inputs::{BytesInput, HasMutatorBytes};
 /// # use alloc::vec::Vec;
+/// #
+/// # #[cfg(not(feature = "std"))]
+/// # #[no_mangle]
+/// # pub extern "C" fn external_current_millis() -> u64 { 0 }
 ///
 /// let mut bytes_input = BytesInput::new(vec![1,2,3]);
 /// let mut bsi = bytes_input.sub_input(1..);
 ///
-/// // Run any mutations on the sub input
+/// // Run any mutations on the sub input.
 /// bsi.bytes_mut()[0] = 42;
 ///
-/// // The mutations are applied to the underlying input
+/// // The mutations are applied to the underlying input.
 /// assert_eq!(bytes_input.bytes()[1], 42);
 /// ```
+///
+/// Growing or shrinking the sub input will grow or shrink the parent input,
+/// and keep elements around the current range untouched / move them accordingly.
+/// 
+/// For example:
+/// ```rust
+/// # extern crate alloc;
+/// # extern crate libafl;
+/// # use libafl::inputs::{BytesInput, HasMutatorBytes};
+/// # use alloc::vec::Vec;
+/// #
+/// # #[cfg(not(feature = "std"))]
+/// # #[no_mangle]
+/// # pub extern "C" fn external_current_millis() -> u64 { 0 }
+///
+/// let mut bytes_input = BytesInput::new(vec![1, 2, 3, 4, 5]);
+/// 
+/// Note that the range ends on an exclusive value this time.
+/// let mut bsi = bytes_input.sub_input(1..=3);
+/// 
+/// assert_eq!(bsi.bytes(), &[2, 3, 4]);
+///
+/// // We extend it with a few values.
+/// bsi.extend(&[42, 42, 42]);
+///
+/// // The values outside of the range are moved back and forwards, accordingly.
+/// assert_eq!(bytes_input.bytes(), [1, 2, 3, 4, 42, 42, 42, 5]);
+/// ```
+/// 
+/// The input supports all methods in the [`HasMutatorBytes`] trait.
 #[derive(Debug)]
 pub struct BytesSubInput<'a, I>
 where
@@ -67,7 +101,7 @@ impl<'a, I> BytesSubInput<'a, I>
 where
     I: HasMutatorBytes + ?Sized + HasLen,
 {
-    /// Creates a new `BytesSubInput` that's a view on an input with mutator bytes.
+    /// Creates a new [`BytesSubInput`] that's a view on an input with mutator bytes.
     /// The sub input can then be used to mutate parts of the original input.
     pub fn new<R>(parent_input: &'a mut I, range: R) -> Self
     where

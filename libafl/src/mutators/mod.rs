@@ -87,14 +87,14 @@ pub enum MutationResult {
     Skipped,
 }
 
-/// A mutator takes input, and mutates it.
+/// A [`Mutator] takes an input, and mutates it.
 /// Simple as that.
 pub trait Mutator<I, S>: Named {
     /// Mutate a given input
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error>;
 
     /// Post-process given the outcome of the execution
-    /// `new_corpus_idx` will be `Some` if a new `Testcase` was created this execution.
+    /// `new_corpus_idx` will be `Some` if a new [`crate::corpus::Testcase`] was created this execution.
     #[inline]
     fn post_exec(
         &mut self,
