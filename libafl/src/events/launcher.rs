@@ -402,7 +402,7 @@ where
                                 stderr = Stdio::inherit();
                             };
                         }
-                        
+
                         #[cfg(feature = "std")]
                         std::thread::sleep(Duration::from_millis(id as u64 * self.launch_delay));
 
