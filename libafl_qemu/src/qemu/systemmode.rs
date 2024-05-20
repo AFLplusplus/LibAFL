@@ -302,6 +302,7 @@ impl EmulatorMemoryChunk {
         }
     }
 
+    #[allow(clippy::map_flatten)]
     pub fn host_iter(&self, qemu: Qemu) -> Box<dyn Iterator<Item = &[u8]>> {
         Box::new(
             self.phys_iter(qemu)

@@ -1,16 +1,18 @@
 use libafl_qemu_sys::{GuestAddr, MmapPerms, VerifyAccess};
 
 use crate::{
+    command::CommandManager,
     emu::{HasExecutions, State},
     Emulator, EmulatorExitHandler, GuestMaps, HookData, NewThreadHookId, PostSyscallHookId,
     PreSyscallHookId, QemuHelperTuple, SyscallHookResult,
 };
 
-impl<QT, S, E> Emulator<QT, S, E>
+impl<CM, E, QT, S> Emulator<CM, E, QT, S>
 where
+    CM: CommandManager<E, QT, S>,
+    E: EmulatorExitHandler<QT, S>,
     QT: QemuHelperTuple<S>,
     S: State + HasExecutions,
-    E: EmulatorExitHandler<QT, S>,
 {
     /// This function gets the memory mappings from the emulator.
     #[must_use]
