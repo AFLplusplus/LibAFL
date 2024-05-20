@@ -123,7 +123,7 @@ fn prepare_transitions<'pda, 'src: 'pda>(
         for symbol in ss.into_iter().rev() {
             state_stack.push_front(symbol);
         }
-        let mut state_stack_sorted: Box<_> = state_stack.iter().copied().collect();
+        let mut state_stack_sorted: Box<[&str]> = state_stack.iter().copied().collect();
         state_stack_sorted.sort_unstable();
 
         let mut transition = Transition {
