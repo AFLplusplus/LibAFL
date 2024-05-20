@@ -94,7 +94,7 @@ pub fn main() -> Result<(), Error> {
         .expect("Failed to generate the initial corpus");
 
     // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::new(havoc_mutations());
+    let mutator = StdScheduledMutator::new(havoc_mutations::<BytesInput>());
     let minimizer = StdScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(
         StdMutationalStage::new(mutator),
