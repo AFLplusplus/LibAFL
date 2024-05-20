@@ -48,10 +48,10 @@ where
 /// # pub extern "C" fn external_current_millis() -> u64 { 0 }
 ///
 /// let mut bytes_input = BytesInput::new(vec![1,2,3]);
-/// let mut bsi = bytes_input.sub_input(1..);
+/// let mut sub_input = bytes_input.sub_input(1..);
 ///
 /// // Run any mutations on the sub input.
-/// bsi.bytes_mut()[0] = 42;
+/// sub_input.bytes_mut()[0] = 42;
 ///
 /// // The mutations are applied to the underlying input.
 /// assert_eq!(bytes_input.bytes()[1], 42);
@@ -74,12 +74,12 @@ where
 /// let mut bytes_input = BytesInput::new(vec![1, 2, 3, 4, 5]);
 /// 
 /// // Note that the range ends on an exclusive value this time.
-/// let mut bsi = bytes_input.sub_input(1..=3);
+/// let mut sub_input = bytes_input.sub_input(1..=3);
 /// 
-/// assert_eq!(bsi.bytes(), &[2, 3, 4]);
+/// assert_eq!(sub_input.bytes(), &[2, 3, 4]);
 ///
 /// // We extend it with a few values.
-/// bsi.extend(&[42, 42, 42]);
+/// sub_input.extend(&[42, 42, 42]);
 ///
 /// // The values outside of the range are moved back and forwards, accordingly.
 /// assert_eq!(bytes_input.bytes(), [1, 2, 3, 4, 42, 42, 42, 5]);
@@ -305,20 +305,20 @@ mod tests {
     fn test_bytessubinput() {
         let (mut bytes_input, len_orig) = init_bytes_input();
 
-        let mut bsi = bytes_input.sub_input(0..1);
-        assert_eq!(bsi.len(), 1);
-        bsi.bytes_mut()[0] = 2;
+        let mut sub_input = bytes_input.sub_input(0..1);
+        assert_eq!(sub_input.len(), 1);
+        sub_input.bytes_mut()[0] = 2;
         assert_eq!(bytes_input.bytes()[0], 2);
 
-        let mut bsi = bytes_input.sub_input(1..=2);
-        assert_eq!(bsi.len(), 2);
-        bsi.bytes_mut()[0] = 3;
+        let mut sub_input = bytes_input.sub_input(1..=2);
+        assert_eq!(sub_input.len(), 2);
+        sub_input.bytes_mut()[0] = 3;
         assert_eq!(bytes_input.bytes()[1], 3);
 
-        let mut bsi = bytes_input.sub_input(..);
-        assert_eq!(bsi.len(), len_orig);
-        bsi.bytes_mut()[0] = 1;
-        bsi.bytes_mut()[1] = 2;
+        let mut sub_input = bytes_input.sub_input(..);
+        assert_eq!(sub_input.len(), len_orig);
+        sub_input.bytes_mut()[0] = 1;
+        sub_input.bytes_mut()[1] = 2;
         assert_eq!(bytes_input.bytes()[0], 1);
     }
 
@@ -327,45 +327,45 @@ mod tests {
         let (mut bytes_input, len_orig) = init_bytes_input();
         let bytes_input_orig = bytes_input.clone();
 
-        let mut bsi = bytes_input.sub_input(2..);
-        assert_eq!(bsi.len(), len_orig - 2);
-        bsi.resize(len_orig, 0);
-        assert_eq!(bsi.bytes()[bsi.len() - 1], 0);
-        assert_eq!(bsi.len(), len_orig);
+        let mut sub_input = bytes_input.sub_input(2..);
+        assert_eq!(sub_input.len(), len_orig - 2);
+        sub_input.resize(len_orig, 0);
+        assert_eq!(sub_input.bytes()[sub_input.len() - 1], 0);
+        assert_eq!(sub_input.len(), len_orig);
         assert_eq!(bytes_input.len(), len_orig + 2);
         assert_eq!(bytes_input.bytes()[bytes_input.len() - 1], 0);
 
         let (mut bytes_input, len_orig) = init_bytes_input();
 
-        let mut bsi = bytes_input.sub_input(..2);
-        assert_eq!(bsi.len(), 2);
-        bsi.resize(3, 0);
-        assert_eq!(bsi.len(), 3);
-        assert_eq!(bsi.bytes()[bsi.len() - 1], 0);
+        let mut sub_input = bytes_input.sub_input(..2);
+        assert_eq!(sub_input.len(), 2);
+        sub_input.resize(3, 0);
+        assert_eq!(sub_input.len(), 3);
+        assert_eq!(sub_input.bytes()[sub_input.len() - 1], 0);
         assert_eq!(bytes_input.len(), len_orig + 1);
 
-        let mut bsi = bytes_input.sub_input(..3);
-        assert_eq!(bsi.len(), 3);
-        bsi.resize(2, 0);
-        assert_eq!(bsi.len(), 2);
+        let mut sub_input = bytes_input.sub_input(..3);
+        assert_eq!(sub_input.len(), 3);
+        sub_input.resize(2, 0);
+        assert_eq!(sub_input.len(), 2);
         assert_eq!(bytes_input, bytes_input_orig);
 
-        let mut bsi = bytes_input.sub_input(2..=2);
-        bsi.resize(2, 0);
-        bsi.resize(1, 0);
+        let mut sub_input = bytes_input.sub_input(2..=2);
+        sub_input.resize(2, 0);
+        sub_input.resize(1, 0);
         assert_eq!(bytes_input, bytes_input_orig);
 
-        let mut bsi = bytes_input.sub_input(..);
-        assert_eq!(bsi.len(), bytes_input_orig.len());
-        bsi.resize(1, 0);
-        assert_eq!(bsi.len(), 1);
-        bsi.resize(10, 0);
-        assert_eq!(bsi.len(), 10);
+        let mut sub_input = bytes_input.sub_input(..);
+        assert_eq!(sub_input.len(), bytes_input_orig.len());
+        sub_input.resize(1, 0);
+        assert_eq!(sub_input.len(), 1);
+        sub_input.resize(10, 0);
+        assert_eq!(sub_input.len(), 10);
         assert_eq!(bytes_input.len(), 10);
         assert_eq!(bytes_input.bytes()[2], 0);
 
-        let mut bsi = bytes_input.sub_input(..);
-        bsi.resize(1, 0);
+        let mut sub_input = bytes_input.sub_input(..);
+        sub_input.resize(1, 0);
         assert_eq!(bytes_input.len(), 1);
     }
 
@@ -374,16 +374,16 @@ mod tests {
         let (mut bytes_input, len_orig) = init_bytes_input();
         let bytes_input_cloned = bytes_input.clone();
 
-        let mut bsi = bytes_input.sub_input(..2);
-        let drained: Vec<_> = bsi.drain(..).collect();
-        assert_eq!(bsi.len(), 0);
+        let mut sub_input = bytes_input.sub_input(..2);
+        let drained: Vec<_> = sub_input.drain(..).collect();
+        assert_eq!(sub_input.len(), 0);
         assert_eq!(bytes_input.len(), len_orig - 2);
 
-        let mut bsi = bytes_input.sub_input(..0);
-        assert_eq!(bsi.len(), 0);
+        let mut sub_input = bytes_input.sub_input(..0);
+        assert_eq!(sub_input.len(), 0);
         let drained_len = drained.len();
-        bsi.extend(&drained[..]);
-        assert_eq!(bsi.len(), drained_len);
+        sub_input.extend(&drained[..]);
+        assert_eq!(sub_input.len(), drained_len);
         assert_eq!(bytes_input, bytes_input_cloned);
     }
 
@@ -392,11 +392,11 @@ mod tests {
         let (mut bytes_input, _len_orig) = init_bytes_input();
         let bytes_input_cloned = bytes_input.clone();
 
-        let mut bsi = bytes_input.sub_input(..2);
+        let mut sub_input = bytes_input.sub_input(..2);
 
         let mut state: NopState<BytesInput> = NopState::new();
 
-        let result = havoc_mutations_no_crossover().mutate_all(&mut state, &mut bsi);
+        let result = havoc_mutations_no_crossover().mutate_all(&mut state, &mut sub_input);
         assert!(result.is_ok());
         assert_ne!(bytes_input, bytes_input_cloned);
     }
