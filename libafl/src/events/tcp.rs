@@ -419,6 +419,7 @@ where
     EMH: EventManagerHooksTuple<S>,
     S: State,
 {
+    sampling_rate: usize,
     hooks: EMH,
     /// The TCP stream for inter process communication
     tcp: TcpStream,
@@ -546,6 +547,7 @@ where
         println!("Our client id: {client_id:?}");
 
         Ok(Self {
+            sampling_rate: 1,
             hooks,
             tcp,
             client_id,
@@ -711,6 +713,10 @@ where
     EMH: EventManagerHooksTuple<S>,
     S: State,
 {
+    fn sample(&self, corpus_count: usize) -> bool {
+        corpus_count % self.sampling_rate == 0
+    }
+
     fn fire(
         &mut self,
         _state: &mut Self::State,
@@ -901,6 +907,10 @@ where
     S: State,
     //CE: CustomEvent<I>,
 {
+    fn sample(&self, corpus_count: usize) -> bool {
+        corpus_count % self.tcp_mgr.sampling_rate == 0
+    }
+
     fn fire(
         &mut self,
         state: &mut Self::State,

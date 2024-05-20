@@ -87,6 +87,10 @@ where
     MT: Monitor,
     S: State,
 {
+    fn sample(&self, _corpus_count: usize) -> bool {
+        true
+    }
+
     fn fire(
         &mut self,
         _state: &mut Self::State,
@@ -340,6 +344,10 @@ where
     S: State,
     SP: ShMemProvider,
 {
+    fn sample(&self, _corpus_count: usize) -> bool {
+        true
+    }
+
     fn fire(
         &mut self,
         _state: &mut Self::State,

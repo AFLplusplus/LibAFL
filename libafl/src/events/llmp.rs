@@ -349,6 +349,8 @@ where
     S: State,
     SP: ShMemProvider + 'static,
 {
+    /// we only send 1 testcase for every `sampling_rate` corpus
+    sampling_rate: usize,
     hooks: EMH,
     /// The LLMP client for inter process communication
     llmp: LlmpClient<SP>,
@@ -503,6 +505,7 @@ where
         time_ref: Handle<TimeObserver>,
     ) -> Result<Self, Error> {
         Ok(LlmpEventManager {
+            sampling_rate: 1,
             hooks: tuple_list!(),
             llmp,
             #[cfg(feature = "llmp_compression")]
@@ -572,6 +575,7 @@ where
         hooks: EMH,
     ) -> Result<Self, Error> {
         Ok(Self {
+            sampling_rate: 1,
             hooks,
             llmp,
             #[cfg(feature = "llmp_compression")]
@@ -633,6 +637,7 @@ where
         time_ref: Handle<TimeObserver>,
     ) -> Result<Self, Error> {
         Ok(Self {
+            sampling_rate: 1,
             hooks,
             llmp,
             #[cfg(feature = "llmp_compression")]
@@ -745,6 +750,11 @@ where
     S: State + HasExecutions + HasMetadata,
     SP: ShMemProvider + 'static,
 {
+    /// Set the sampling rate
+    pub fn set_sampling_rate(&mut self, rate: usize) {
+        self.sampling_rate = rate;
+    }
+
     // Handle arriving events in the client
     #[allow(clippy::unused_self)]
     fn handle_in_client<E, Z>(
@@ -846,6 +856,10 @@ where
     S: State,
     SP: ShMemProvider,
 {
+    fn sample(&self, corpus_count: usize) -> bool {
+        corpus_count % self.sampling_rate == 0
+    }
+
     #[cfg(feature = "llmp_compression")]
     fn fire(
         &mut self,
@@ -1130,6 +1144,10 @@ where
     S: State,
     //CE: CustomEvent<I>,
 {
+    fn sample(&self, corpus_count: usize) -> bool {
+        corpus_count % self.llmp_mgr.sampling_rate == 0
+    }
+
     fn fire(
         &mut self,
         state: &mut Self::State,
@@ -1278,6 +1296,11 @@ where
     /// Get the staterestorer (mutable)
     pub fn staterestorer_mut(&mut self) -> &mut StateRestorer<SP> {
         &mut self.staterestorer
+    }
+
+    /// Set the sampling rate
+    pub fn set_sampling_rate(&mut self, rate: usize) {
+        self.llmp_mgr.sampling_rate = rate;
     }
 
     /// Save LLMP state and empty state in staterestorer
@@ -1710,6 +1733,7 @@ where
     ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
 {
+    sampling_rate: usize,
     llmp: LlmpClient<SP>,
     /// The custom buf handler
     custom_buf_handlers: Vec<Box<CustomBufHandlerFn<S>>>,
@@ -1757,6 +1781,7 @@ where
         converter_back: Option<ICB>,
     ) -> Result<Self, Error> {
         Ok(Self {
+            sampling_rate: 1,
             llmp,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
@@ -1777,6 +1802,7 @@ where
     ) -> Result<Self, Error> {
         let llmp = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
         Ok(Self {
+            sampling_rate: 1,
             llmp,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
@@ -1796,6 +1822,7 @@ where
         converter_back: Option<ICB>,
     ) -> Result<Self, Error> {
         Ok(Self {
+            sampling_rate: 1,
             llmp: LlmpClient::on_existing_from_env(shmem_provider, env_name)?,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
@@ -1827,6 +1854,11 @@ where
     #[cfg(feature = "std")]
     pub fn to_env(&self, env_name: &str) {
         self.llmp.to_env(env_name).unwrap();
+    }
+
+    /// Set the sampling rate
+    pub fn set_sampling_rate(&mut self, rate: usize) {
+        self.sampling_rate = rate;
     }
 
     // Handle arriving events in the client
@@ -1956,6 +1988,10 @@ where
     ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
 {
+    fn sample(&self, corpus_count: usize) -> bool {
+        corpus_count % self.sampling_rate == 0
+    }
+
     #[cfg(feature = "llmp_compression")]
     fn fire(
         &mut self,

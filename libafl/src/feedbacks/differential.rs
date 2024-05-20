@@ -228,6 +228,10 @@ mod tests {
     where
         S: State,
     {
+        fn sample(&self, _corpus_count: usize) -> bool {
+            true
+        }
+
         fn fire(
             &mut self,
             _state: &mut S,

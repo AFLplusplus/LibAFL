@@ -220,6 +220,8 @@ where
     EM: UsesState,
     SP: ShMemProvider + 'static,
 {
+    /// we only send 1 testcase for every `sampling_rate` corpus
+    sampling_rate: usize,
     inner: EM,
     /// The LLMP client for inter process communication
     client: LlmpClient<SP>,
@@ -288,6 +290,10 @@ where
     EM: AdaptiveSerializer + EventFirer + HasEventManagerId,
     SP: ShMemProvider + 'static,
 {
+    fn sample(&self, corpus_count: usize) -> bool {
+        corpus_count % self.sampling_rate == 0
+    }
+
     fn fire(
         &mut self,
         state: &mut Self::State,
@@ -489,6 +495,7 @@ where
         time_obs: &TimeObserver,
     ) -> Result<Self, Error> {
         Ok(Self {
+            sampling_rate: 1,
             inner,
             client,
             #[cfg(feature = "llmp_compression")]
@@ -506,6 +513,7 @@ where
     pub fn on_port(inner: EM, shmem_provider: SP, port: u16, is_main: bool) -> Result<Self, Error> {
         let client = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
         Ok(Self {
+            sampling_rate: 1,
             inner,
             client,
             #[cfg(feature = "llmp_compression")]
@@ -528,6 +536,7 @@ where
     ) -> Result<Self, Error> {
         let client = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
         Ok(Self {
+            sampling_rate: 1,
             inner,
             client,
             #[cfg(feature = "llmp_compression")]
@@ -547,6 +556,7 @@ where
         is_main: bool,
     ) -> Result<Self, Error> {
         Ok(Self {
+            sampling_rate: 1,
             inner,
             client: LlmpClient::on_existing_from_env(shmem_provider, env_name)?,
             #[cfg(feature = "llmp_compression")]
@@ -566,6 +576,7 @@ where
         time_obs: &TimeObserver,
     ) -> Result<Self, Error> {
         Ok(Self {
+            sampling_rate: 1,
             inner,
             client: LlmpClient::on_existing_from_env(shmem_provider, env_name)?,
             #[cfg(feature = "llmp_compression")]
@@ -584,6 +595,7 @@ where
         is_main: bool,
     ) -> Result<Self, Error> {
         Ok(Self {
+            sampling_rate: 1,
             inner,
             client: LlmpClient::existing_client_from_description(shmem_provider, description)?,
             #[cfg(feature = "llmp_compression")]
@@ -602,6 +614,7 @@ where
         time_obs: &TimeObserver,
     ) -> Result<Self, Error> {
         Ok(Self {
+            sampling_rate: 1,
             inner,
             client: LlmpClient::existing_client_from_description(shmem_provider, description)?,
             #[cfg(feature = "llmp_compression")]
@@ -626,6 +639,11 @@ where
     /// Know if this instance is main or secondary
     pub fn is_main(&self) -> bool {
         self.is_main
+    }
+
+    /// Set the sampling rate
+    pub fn set_sampling_rate(&mut self, rate: usize) {
+        self.sampling_rate = rate;
     }
 }
 
