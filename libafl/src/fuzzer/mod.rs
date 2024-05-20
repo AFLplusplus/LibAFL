@@ -474,7 +474,7 @@ where
 
                 self.num_testcases += 1;
                 let send_events = if let Some(sampling_rate) = self.testcase_sampling_rate {
-                        send_events && self.num_testcases % sampling_rate == 0
+                    send_events && self.num_testcases % sampling_rate == 0
                 } else {
                     send_events
                 };
@@ -780,19 +780,24 @@ where
             feedback,
             objective,
             num_testcases: 0,
-            testcase_sampling_rate: None, 
+            testcase_sampling_rate: None,
             phantom: PhantomData,
         }
     }
 
     /// Create a new `StdFuzzer` with a specified `TestCase` sampling rate
-    pub fn with_sampling_rate(scheduler: CS, feedback: F, objective: OF, sampling_rate: u64) -> Self {
+    pub fn with_sampling_rate(
+        scheduler: CS,
+        feedback: F,
+        objective: OF,
+        sampling_rate: u64,
+    ) -> Self {
         Self {
             scheduler,
             feedback,
             objective,
             num_testcases: 0,
-            testcase_sampling_rate: Some(sampling_rate), 
+            testcase_sampling_rate: Some(sampling_rate),
             phantom: PhantomData,
         }
     }
