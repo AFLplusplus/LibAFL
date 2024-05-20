@@ -59,7 +59,7 @@ where
 ///
 /// Growing or shrinking the sub input will grow or shrink the parent input,
 /// and keep elements around the current range untouched / move them accordingly.
-/// 
+///
 /// For example:
 /// ```rust
 /// # extern crate alloc;
@@ -72,10 +72,10 @@ where
 /// # pub extern "C" fn external_current_millis() -> u64 { 0 }
 ///
 /// let mut bytes_input = BytesInput::new(vec![1, 2, 3, 4, 5]);
-/// 
+///
 /// // Note that the range ends on an exclusive value this time.
 /// let mut sub_input = bytes_input.sub_input(1..=3);
-/// 
+///
 /// assert_eq!(sub_input.bytes(), &[2, 3, 4]);
 ///
 /// // We extend it with a few values.
@@ -84,7 +84,7 @@ where
 /// // The values outside of the range are moved back and forwards, accordingly.
 /// assert_eq!(bytes_input.bytes(), [1, 2, 3, 4, 42, 42, 42, 5]);
 /// ```
-/// 
+///
 /// The input supports all methods in the [`HasMutatorBytes`] trait.
 #[derive(Debug)]
 pub struct BytesSubInput<'a, I>
@@ -290,7 +290,7 @@ mod tests {
     use libafl_bolts::HasLen;
 
     use crate::{
-        inputs::{BytesInput, HasMutatorBytes},
+        inputs::{BytesInput, HasMutatorBytes, NopInput},
         mutators::{havoc_mutations_no_crossover, MutatorsTuple},
         state::NopState,
     };
@@ -394,7 +394,8 @@ mod tests {
 
         let mut sub_input = bytes_input.sub_input(..2);
 
-        let mut state: NopState<BytesInput> = NopState::new();
+        // Note that if you want to use NopState in production like this, you should see the rng! :)
+        let mut state: NopState<NopInput> = NopState::new();
 
         let result = havoc_mutations_no_crossover().mutate_all(&mut state, &mut sub_input);
         assert!(result.is_ok());
