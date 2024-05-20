@@ -1,4 +1,4 @@
-//! Mutators mutate input during fuzzing.
+//! [`Mutator`]`s` mutate input during fuzzing.
 
 pub mod scheduled;
 use core::fmt;
@@ -129,12 +129,12 @@ pub trait MultiMutator<I, S>: Named {
     }
 }
 
-/// A `Tuple` of `Mutators` that can execute multiple `Mutators` in a row.
+/// A `Tuple` of [`Mutator`]`s` that can execute multiple `Mutators` in a row.
 pub trait MutatorsTuple<I, S>: HasLen {
-    /// Runs the `mutate` function on all `Mutators` in this `Tuple`.
+    /// Runs the [`Mutator::mutate`] function on all [`Mutator`]`s` in this `Tuple`.
     fn mutate_all(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error>;
 
-    /// Runs the `post_exec` function on all `Mutators` in this `Tuple`.
+    /// Runs the [`Mutator::post_exec`] function on all [`Mutator`]`s` in this `Tuple`.
     /// `new_corpus_idx` will be `Some` if a new `Testcase` was created this execution.
     fn post_exec_all(
         &mut self,

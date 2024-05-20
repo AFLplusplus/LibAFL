@@ -34,13 +34,32 @@ where
     }
 }
 
-/// A bytes input is the basic input
+/// A [`BytesSubInput`] makes it possible to use [`Mutator`]`s` that work on
+/// inputs implementing the [`HasMutatorBytes`] for a sub-range of this input.
+/// For example, we can do the following:
+/// ```rust
+/// # extern crate alloc;
+/// # extern crate libafl;
+/// # use libafl::inputs::{BytesInput, HasMutatorBytes};
+/// # use alloc::vec::Vec;
+///
+/// let mut bytes_input = BytesInput::new(vec![1,2,3]);
+/// let mut bsi = bytes_input.sub_input(1..);
+///
+/// // Run any mutations on the sub input
+/// bsi.bytes_mut()[0] = 42;
+///
+/// // The mutations are applied to the underlying input
+/// assert_eq!(bytes_input.bytes()[1], 42);
+/// ```
 #[derive(Debug)]
 pub struct BytesSubInput<'a, I>
 where
     I: HasMutatorBytes + ?Sized,
 {
+    /// The (complete) parent input we will work on
     pub(crate) parent_input: &'a mut I,
+    /// The range inside the parent input we will work on
     pub(crate) range: Range<usize>,
 }
 
@@ -65,14 +84,17 @@ where
         }
     }
 
+    /// The inclusive start index in the parent buffer
     fn start_index(&self) -> usize {
-        start_index(&self.range)
+        self.range.start
     }
 
+    /// The exclusive end index in the parent buffer
     fn end_index(&self) -> usize {
-        end_index(&self.range, self.parent_input.len())
+        self.range.end
     }
 
+    /// Creates a sub range in the current own range
     fn sub_range<R2>(&self, range: R2) -> (Bound<usize>, Bound<usize>)
     where
         R2: RangeBounds<usize>,
@@ -222,7 +244,7 @@ where
 {
     #[inline]
     fn len(&self) -> usize {
-        self.bytes().len()
+        self.range.end - self.range.start
     }
 }
 
