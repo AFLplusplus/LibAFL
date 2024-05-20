@@ -15,7 +15,7 @@
 use alloc::string::ToString;
 #[cfg(feature = "std")]
 use core::marker::PhantomData;
-#[cfg(all(feature = "std", feature = "fork"))]
+#[cfg(feature = "std")]
 use core::time::Duration;
 use core::{
     fmt::{self, Debug, Formatter},
