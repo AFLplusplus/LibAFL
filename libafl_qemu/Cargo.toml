@@ -73,7 +73,7 @@ hashbrown =  { version = "0.14", features = ["serde"] } # A faster hashmap, nost
 num-traits = "0.2"
 num-derive = "0.4"
 num_enum = "0.7"
-goblin = "0.7"
+goblin = "0.8"
 libc = "0.2"
 strum = "0.25"
 strum_macros = "0.25"
