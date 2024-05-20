@@ -351,7 +351,7 @@ where
             return result.replace(Ok(MutationResult::Skipped));
         }
         bytes.truncate(new_size);
-        core::mem::swap(input.bytes_mut(), &mut bytes);
+        input.bytes_mut().copy_from_slice(&bytes);
         Ok(MutationResult::Mutated)
     }
 }
@@ -440,7 +440,7 @@ where
             return result.replace(Ok(MutationResult::Skipped));
         }
         out.truncate(new_size);
-        core::mem::swap(input.bytes_mut(), &mut out);
+        input.bytes_mut().copy_from_slice(&out);
         Ok(MutationResult::Mutated)
     }
 }

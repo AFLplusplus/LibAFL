@@ -157,7 +157,7 @@ pub trait HasMutatorBytes: HasLen {
     where
         R: RangeBounds<usize>;
 
-    /// Creates a SubInput from this input, that can be used for local mutations.
+    /// Creates a [`BytesSubInput`] from this input, that can be used for local mutations.
     fn sub_input<R>(&mut self, range: R) -> BytesSubInput<Self>
     where
         R: RangeBounds<usize>,
