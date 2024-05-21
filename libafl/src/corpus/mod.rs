@@ -131,8 +131,8 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
     /// Get the next corpus id
     fn next(&self, id: CorpusId) -> Option<CorpusId>;
 
-    /// Peek the next corpus id
-    fn peek(&self) -> CorpusId;
+    /// Peek the next free corpus id
+    fn peek_next_free_id(&self) -> CorpusId;
 
     /// Get the prev corpus id
     fn prev(&self, id: CorpusId) -> Option<CorpusId>;

@@ -264,8 +264,8 @@ where
         self._insert(testcase, false)
     }
 
-    /// Peek the next corpus id
-    pub fn peek(&self) -> CorpusId {
+    /// Peek the next free corpus id
+    pub fn peek_next_free_id(&self) -> CorpusId {
         return CorpusId::from(self.progressive_idx);
     }
 
@@ -435,10 +435,10 @@ where
         &mut self.current
     }
 
-    /// Peek the next corpus id
+    /// Peek the next free corpus id
     #[inline]
-    fn peek(&self) -> CorpusId {
-        self.storage.peek()
+    fn peek_next_free_id(&self) -> CorpusId {
+        self.storage.peek_next_free_id()
     }
 
     #[inline]

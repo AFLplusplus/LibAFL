@@ -149,10 +149,10 @@ where
         self.inner.next(idx)
     }
 
-    /// Peek the next corpus id
+    /// Peek the next free corpus id
     #[inline]
-    fn peek(&self) -> CorpusId {
-        self.inner.peek()
+    fn peek_next_free_id(&self) -> CorpusId {
+        self.inner.peek_next_free_id()
     }
 
     #[inline]
