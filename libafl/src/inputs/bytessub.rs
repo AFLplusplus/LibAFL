@@ -290,7 +290,7 @@ mod tests {
     use libafl_bolts::HasLen;
 
     use crate::{
-        inputs::{BytesInput, HasMutatorBytes, NopInput, VecMutatorBytes},
+        inputs::{BytesInput, HasMutatorBytes, MutVecInput, NopInput},
         mutators::{havoc_mutations_no_crossover, MutatorsTuple},
         state::NopState,
     };
@@ -405,7 +405,7 @@ mod tests {
     #[test]
     fn test_bytessubinput_use_vec() {
         let mut test_vec = vec![0, 1, 2, 3, 4];
-        let mut test_vec = VecMutatorBytes::from(&mut test_vec);
+        let mut test_vec = MutVecInput::from(&mut test_vec);
         let mut sub_vec = test_vec.sub_input(1..2);
         drop(sub_vec.drain(..));
         assert_eq!(test_vec.len(), 4);
