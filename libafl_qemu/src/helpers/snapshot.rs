@@ -73,6 +73,11 @@ pub struct MappingInfo {
     pub size: usize,
 }
 
+/// Filter used to select which pages should be snapshotted or not.
+///
+/// It is supposed to be used primarily for debugging, its usage is discouraged.
+/// If you end up needing it, you most likely have an issue with the snapshot system.
+/// If this is the case, please [fill in an issue on the main repository](https://github.com/AFLplusplus/LibAFL/issues).
 pub enum IntervalSnapshotFilter {
     All,
     AllowList(Vec<Range<GuestAddr>>),
