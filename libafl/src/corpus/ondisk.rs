@@ -106,6 +106,12 @@ where
         self.inner.replace(idx, testcase)
     }
 
+    /// Peek the next corpus id
+    #[inline]
+    fn peek(&self) -> CorpusId {
+        self.inner.peek()
+    }
+
     /// Removes an entry from the corpus, returning it if it was present.
     #[inline]
     fn remove(&mut self, idx: CorpusId) -> Result<Testcase<I>, Error> {

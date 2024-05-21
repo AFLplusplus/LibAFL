@@ -87,6 +87,12 @@ where
         &self.empty
     }
 
+    /// Peek the next corpus id
+    #[inline]
+    fn peek(&self) -> CorpusId {
+        Err(Error::unsupported("Unsupported by NopCorpus"))
+    }
+
     /// Current testcase scheduled (mutable)
     #[inline]
     fn current_mut(&mut self) -> &mut Option<CorpusId> {
