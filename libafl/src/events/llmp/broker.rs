@@ -4,8 +4,6 @@ use core::{marker::PhantomData, num::NonZeroUsize, time::Duration};
 #[cfg(feature = "std")]
 use std::net::ToSocketAddrs;
 
-#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
-use libafl_bolts::os::startable_self;
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{compress::GzipCompressor, llmp::LLMP_FLAG_COMPRESSED};
 use libafl_bolts::{llmp, shmem::ShMemProvider, ClientId};

@@ -10,8 +10,6 @@ use core::time::Duration;
 #[cfg(feature = "std")]
 use std::net::TcpStream;
 
-#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
-use libafl_bolts::os::startable_self;
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{
     compress::GzipCompressor,
@@ -33,7 +31,7 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "llmp_compression")]
 use crate::events::llmp::COMPRESS_THRESHOLD;
-#[cfg(any(feature = "std", feature = "adaptive_serialization"))]
+#[cfg(all(feature = "std", feature = "adaptive_serialization"))]
 use crate::events::AdaptiveSerializer;
 #[cfg(feature = "adaptive_serialization")]
 use crate::observers::TimeObserver;

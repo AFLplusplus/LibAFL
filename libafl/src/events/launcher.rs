@@ -55,7 +55,6 @@ use crate::observers::TimeObserver;
 #[cfg(feature = "std")]
 use crate::{
     events::{
-        centralized::CentralizedEventManagerBuilder,
         llmp::{LlmpRestartingEventManager, LlmpShouldSaveState, ManagerKind, RestartingMgr},
         EventConfig,
     },
@@ -63,6 +62,9 @@ use crate::{
     state::{HasExecutions, State},
     Error,
 };
+
+#[cfg(all(unix, feature = "std"))]
+use crate::events::centralized::CentralizedEventManagerBuilder;
 
 /// The (internal) `env` that indicates we're running as client.
 const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";

@@ -3,8 +3,6 @@
 use alloc::{boxed::Box, vec::Vec};
 use core::marker::PhantomData;
 
-#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
-use libafl_bolts::os::startable_self;
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{
     compress::GzipCompressor,
