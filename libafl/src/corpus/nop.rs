@@ -90,7 +90,7 @@ where
     /// Peek the next corpus id
     #[inline]
     fn peek(&self) -> CorpusId {
-        Err(Error::unsupported("Unsupported by NopCorpus"))
+        CorpusId::from(0_usize)
     }
 
     /// Current testcase scheduled (mutable)
