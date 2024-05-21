@@ -15,10 +15,6 @@ macro_rules! assert_unique_feature {
 }
 
 pub fn build() {
-    println!(r#"cargo::rustc-check-cfg=cfg(emulation_mode, values("usermode", "systemmode"))"#);
-    println!(
-        r#"cargo::rustc-check-cfg=cfg(cpu_target, values("arm", "aarch64", "hexagon", "i386", "mips", "ppc", "x86_64"))"#
-    );
     // Make sure that exactly one qemu mode is set
     assert_unique_feature!("usermode", "systemmode");
     let emulation_mode = if cfg!(feature = "usermode") {

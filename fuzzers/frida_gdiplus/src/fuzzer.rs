@@ -461,6 +461,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
         .configuration(EventConfig::AlwaysUnique)
         .shmem_provider(shmem_provider)
         .monitor(monitor)
+        .launch_delay(100)
         .run_client(&mut run_client)
         .cores(&options.cores)
         .broker_port(options.broker_port)
