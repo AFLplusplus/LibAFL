@@ -54,7 +54,7 @@ use crate::{
 };
 
 /// An [`EventManager`] that forwards all events to other attached fuzzers on shared maps or via tcp,
-/// using low-level message passing, [`llmp`].
+/// using low-level message passing, `llmp`.
 pub struct LlmpEventManager<EMH, S, SP>
 where
     S: State,
@@ -465,7 +465,7 @@ where
     }
 
     /// Write the config for a client [`EventManager`] to env vars, a new
-    /// client can reattach using [`LlmpEventManager::existing_client_from_env()`].
+    /// client can reattach using [`LlmpEventManagerBuilder::build_existing_client_from_env()`].
     #[cfg(feature = "std")]
     pub fn to_env(&self, env_name: &str) {
         self.llmp.to_env(env_name).unwrap();

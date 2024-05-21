@@ -713,7 +713,7 @@ where
     }
 
     /// Write the config for a client [`EventManager`] to env vars, a new
-    /// client can reattach using [`CentralizedEventManager::existing_client_from_env()`].
+    /// client can reattach using [`CentralizedEventManagerBuilder::build_existing_client_from_env()`].
     #[cfg(feature = "std")]
     pub fn to_env(&self, env_name: &str) {
         self.client.to_env(env_name).unwrap();

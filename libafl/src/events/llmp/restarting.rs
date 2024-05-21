@@ -30,6 +30,8 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
+#[cfg(all(feature = "std", not(feature = "adaptive_serialization")))]
+use crate::events::AdaptiveSerializer;
 #[cfg(all(feature = "std", feature = "adaptive_serialization"))]
 use crate::events::AdaptiveSerializer;
 #[cfg(all(unix, feature = "std", not(miri)))]
@@ -314,7 +316,7 @@ pub enum ManagerKind {
         /// The CPU core ID of this client
         cpu_core: Option<CoreId>,
     },
-    /// A [`llmp::LlmpBroker`], forwarding the packets of local clients.
+    /// A [`crate::events::llmp::broker::LlmpEventBroker`], forwarding the packets of local clients.
     Broker,
 }
 
