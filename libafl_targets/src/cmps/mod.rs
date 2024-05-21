@@ -41,11 +41,6 @@ pub const CMPLOG_KIND_INS: u8 = 0;
 /// `CmpLog` routine kind
 pub const CMPLOG_KIND_RTN: u8 = 1;
 
-/// The AFL++ `CMP_TYPE_INS`
-pub const AFL_CMP_TYPE_INS: u32 = 1;
-/// The AFL++ `CMP_TYPE_RTN`
-pub const AFL_CMP_TYPE_RTN: u32 = 2;
-
 // EXTERNS, GLOBALS
 
 #[cfg(feature = "cmplog")]
@@ -415,7 +410,7 @@ pub static mut libafl_cmplog_map: CmpLogMap = CmpLogMap {
 #[cfg(feature = "cmplog_extended_instrumentation")]
 #[allow(clippy::large_stack_arrays)]
 pub static mut libafl_cmplog_map_extended: AFLppCmpLogMap = AFLppCmpLogMap {
-    headers: [AFLppCmpLogHeader { data: [0; 8] }; CMPLOG_MAP_W],
+    headers: [AFLppCmpLogHeader { data: [0; 2] }; CMPLOG_MAP_W],
     vals: AFLppCmpLogVals {
         operands: [[AFLppCmpLogOperands {
             v0: 0,
@@ -507,7 +502,7 @@ impl CmpMap for AFLppCmpLogMap {
     }
 
     fn usable_executions_for(&self, idx: usize) -> usize {
-        if self.headers[idx]._type() == AFL_CMP_TYPE_INS {
+        if self.headers[idx]._type() == CMPLOG_KIND_INS {
             if self.executions_for(idx) < CMPLOG_MAP_H {
                 self.executions_for(idx)
             } else {
@@ -521,7 +516,7 @@ impl CmpMap for AFLppCmpLogMap {
     }
 
     fn values_of(&self, idx: usize, execution: usize) -> Option<CmpValues> {
-        if self.headers[idx]._type() == AFL_CMP_TYPE_INS {
+        if self.headers[idx]._type() == CMPLOG_KIND_INS {
             unsafe {
                 match self.headers[idx].shape() {
                     0 => Some(CmpValues::U8((
@@ -559,7 +554,7 @@ impl CmpMap for AFLppCmpLogMap {
 
     fn reset(&mut self) -> Result<(), Error> {
         // For performance, we reset just the headers
-        self.headers.fill(AFLppCmpLogHeader { data: [0; 8] });
+        self.headers.fill(AFLppCmpLogHeader { data: [0; 2] });
 
         Ok(())
     }
