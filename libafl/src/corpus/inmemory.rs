@@ -264,9 +264,10 @@ where
         self._insert(testcase, false)
     }
 
+    #[must_use]
     /// Peek the next free corpus id
     pub fn peek_next_free_id(&self) -> CorpusId {
-        return CorpusId::from(self.progressive_idx);
+        CorpusId::from(self.progressive_idx)
     }
 
     /// Insert a testcase assigning a `CorpusId` to it
