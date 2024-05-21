@@ -139,8 +139,8 @@ where
     S: State,
     //CE: CustomEvent<I>,
 {
-    fn sample(&self) -> bool {
-        self.llmp_mgr.sample()
+    fn should_send(&self) -> bool {
+        self.llmp_mgr.should_send()
     }
 
     fn fire(

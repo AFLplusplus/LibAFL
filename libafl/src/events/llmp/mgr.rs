@@ -586,7 +586,7 @@ where
     S: State,
     SP: ShMemProvider,
 {
-    fn sample(&self) -> bool {
+    fn should_send(&self) -> bool {
         if let Some(throttle) = self.throttle {
             current_time() - self.last_sent > throttle
         } else {

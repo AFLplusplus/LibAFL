@@ -228,7 +228,7 @@ mod tests {
     where
         S: State,
     {
-        fn sample(&self) -> bool {
+        fn should_send(&self) -> bool {
             true
         }
 

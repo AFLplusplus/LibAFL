@@ -395,7 +395,7 @@ where
     ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
 {
-    fn sample(&self) -> bool {
+    fn should_send(&self) -> bool {
         if let Some(throttle) = self.throttle {
             libafl_bolts::current_time() - self.last_sent > throttle
         } else {

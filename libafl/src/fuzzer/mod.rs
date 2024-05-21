@@ -470,7 +470,7 @@ where
                 let idx = state.corpus_mut().add(testcase)?;
                 self.scheduler_mut().on_add(state, idx)?;
 
-                if send_events && manager.sample() {
+                if send_events && manager.should_send() {
                     // TODO set None for fast targets
                     let observers_buf = if manager.configuration() == EventConfig::AlwaysUnique {
                         None

@@ -497,8 +497,8 @@ where
     EM: AdaptiveSerializer + EventFirer + HasEventManagerId,
     SP: ShMemProvider + 'static,
 {
-    fn sample(&self) -> bool {
-        self.inner.sample()
+    fn should_send(&self) -> bool {
+        self.inner.should_send()
     }
 
     fn fire(
