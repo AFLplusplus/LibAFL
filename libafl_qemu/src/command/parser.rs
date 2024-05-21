@@ -41,7 +41,7 @@ impl<CM, QT, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, QT, S>
     for InputPhysCommandParser
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, QT, S>,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
+    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
     S: State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -71,10 +71,10 @@ where
 
 pub struct InputVirtCommandParser;
 impl<CM, QT, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, QT, S>
-    for crate::command::parser::InputVirtCommandParser
+    for InputVirtCommandParser
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, QT, S>,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
+    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
     S: State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -103,7 +103,7 @@ impl<CM, QT, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, QT, S>
     for StartPhysCommandParser
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, QT, S>,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
+    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
     S: State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -133,7 +133,7 @@ impl<CM, QT, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, QT, S>
     for StartVirtCommandParser
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, QT, S>,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
+    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
     S: State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -162,7 +162,7 @@ pub struct SaveCommandParser;
 impl<CM, QT, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, QT, S> for SaveCommandParser
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, QT, S>,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
+    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
     S: State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -184,7 +184,7 @@ pub struct LoadCommandParser;
 impl<CM, QT, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, QT, S> for LoadCommandParser
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, QT, S>,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
+    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
     S: State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -206,7 +206,7 @@ pub struct EndCommandParser;
 impl<CM, QT, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, QT, S> for EndCommandParser
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, QT, S>,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
+    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
     S: State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -242,7 +242,7 @@ impl<CM, QT, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, QT, S>
     for VersionCommandParser
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, QT, S>,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
+    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
     S: State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -267,7 +267,7 @@ impl<CM, QT, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, QT, S>
     for VaddrFilterAllowRangeCommandParser
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, QT, S>,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
+    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
     S: State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
