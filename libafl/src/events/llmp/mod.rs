@@ -16,8 +16,9 @@ use libafl_bolts::{
     ClientId,
 };
 use serde::Deserialize;
+
 use crate::{
-    events::{Event, EventFirer, CustomBufEventResult, CustomBufHandlerFn},
+    events::{CustomBufEventResult, CustomBufHandlerFn, Event, EventFirer},
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, UsesInput},

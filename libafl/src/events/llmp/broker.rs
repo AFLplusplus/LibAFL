@@ -9,10 +9,11 @@ use libafl_bolts::os::startable_self;
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{compress::GzipCompressor, llmp::LLMP_FLAG_COMPRESSED};
 use libafl_bolts::{llmp, shmem::ShMemProvider, ClientId};
+
 #[cfg(feature = "llmp_compression")]
 use crate::events::llmp::COMPRESS_THRESHOLD;
 use crate::{
-    events::{BrokerEventResult, Event, llmp::LLMP_TAG_EVENT_TO_BOTH},
+    events::{llmp::LLMP_TAG_EVENT_TO_BOTH, BrokerEventResult, Event},
     inputs::Input,
     monitors::Monitor,
     Error,

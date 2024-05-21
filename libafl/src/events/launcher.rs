@@ -55,9 +55,9 @@ use crate::observers::TimeObserver;
 #[cfg(feature = "std")]
 use crate::{
     events::{
+        centralized::CentralizedEventManagerBuilder,
         llmp::{LlmpRestartingEventManager, LlmpShouldSaveState, ManagerKind, RestartingMgr},
         EventConfig,
-        centralized::CentralizedEventManagerBuilder,
     },
     monitors::Monitor,
     state::{HasExecutions, State},

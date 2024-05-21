@@ -17,9 +17,6 @@ use libafl_bolts::{
     compress::GzipCompressor,
     llmp::{LLMP_FLAG_COMPRESSED, LLMP_FLAG_INITIALIZED},
 };
-#[cfg(feature = "llmp_compression")]
-use crate::events::llmp::COMPRESS_THRESHOLD;
-
 #[cfg(feature = "adaptive_serialization")]
 use libafl_bolts::{current_time, tuples::Handle};
 #[cfg(feature = "std")]
@@ -34,6 +31,8 @@ use libafl_bolts::{
 };
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "llmp_compression")]
+use crate::events::llmp::COMPRESS_THRESHOLD;
 #[cfg(any(feature = "std", feature = "adaptive_serialization"))]
 use crate::events::AdaptiveSerializer;
 #[cfg(feature = "adaptive_serialization")]
