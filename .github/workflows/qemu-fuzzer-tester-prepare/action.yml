@@ -7,6 +7,9 @@ runs:
       with:
         submodules: true
         fetch-depth: 0
+    - name: Install deps
+      shell: bash
+      run: sudo apt update && sudo apt install -y nasm ninja-build libc6-dev libgtk-3-dev pax-utils libz3-dev wget qemu-utils libsqlite3-dev gcc-arm-none-eabi
     - uses: Swatinem/rust-cache@v2
       with: { shared-key: "${{ runner.os }}-shared-fuzzer-cache" }
     - uses: actions-rs/toolchain@v1
@@ -28,9 +31,6 @@ runs:
       with:
         directory: ${{ runner.temp }}/llvm
         version: 17
-    - name: Install deps
-      shell: bash
-      run: sudo apt update && sudo apt install -y nasm ninja-build libc6-dev libgtk-3-dev pax-utils libz3-dev wget qemu-utils libsqlite3-dev gcc-arm-none-eabi
     - name: pip install
       shell: bash
       run: python3 -m pip install msgpack jinja2 find_libpython
