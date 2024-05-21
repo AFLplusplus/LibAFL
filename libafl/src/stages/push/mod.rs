@@ -98,7 +98,7 @@ where
     pub errored: bool,
 
     /// The corpus index we're currently working on
-    pub current_corpus_idx: Option<CorpusId>,
+    pub current_corpus_id: Option<CorpusId>,
 
     /// The input we just ran
     pub current_input: Option<<CS::State as UsesInput>::Input>, // Todo: Get rid of copy
@@ -132,7 +132,7 @@ where
             exit_kind: exit_kind_ref,
             errored: false,
             current_input: None,
-            current_corpus_idx: None,
+            current_corpus_id: None,
         }
     }
 
@@ -167,7 +167,7 @@ where
     fn end_of_iter(&mut self, shared_state: PushStageSharedState<CS, EM, OT, Z>, errored: bool) {
         self.set_shared_state(shared_state);
         self.errored = errored;
-        self.current_corpus_idx = None;
+        self.current_corpus_id = None;
         if errored {
             self.initialized = false;
         }
@@ -193,8 +193,8 @@ where
     fn push_stage_helper_mut(&mut self) -> &mut PushStageHelper<CS, EM, OT, Z>;
 
     /// Set the current corpus index this stage works on
-    fn set_current_corpus_idx(&mut self, corpus_idx: CorpusId) {
-        self.push_stage_helper_mut().current_corpus_idx = Some(corpus_idx);
+    fn set_current_corpus_id(&mut self, corpus_idx: CorpusId) {
+        self.push_stage_helper_mut().current_corpus_id = Some(corpus_idx);
     }
 
     /// Called by `next_std` when this stage is being initialized.

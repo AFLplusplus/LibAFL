@@ -83,7 +83,7 @@ concolic_mutation = ["z3"]
 tui_monitor = ["ratatui", "crossterm"]
 
 ## Enables `StringClassificationStage` and associated mutators, which allow for mutations which preserve the Unicode property data
-unicode = ["libafl_bolts/alloc", "ahash/std", "serde/rc", "bitvec", "reqwest", "zip"]
+unicode = ["libafl_bolts/alloc", "ahash/std", "serde/rc", "bitvec"]
 
 ## Enable multi-part input formats and mutators
 multipart_inputs = ["arrayvec", "rand_trait"]
@@ -136,9 +136,7 @@ agpl = ["nautilus"]
 nautilus = ["grammartec", "std", "serde_json/std"]
 
 [build-dependencies]
-reqwest = { version = "0.12", features = ["blocking"], optional = true }
 rustversion = "1.0"
-zip = { version = "0.6", optional = true }
 
 [dev-dependencies]
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
