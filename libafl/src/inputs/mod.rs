@@ -168,55 +168,6 @@ pub trait HasMutatorBytes: HasLen {
 
 /// A wrapper type that allows us to use mutators for Mutators for `&mut `[`Vec`].
 #[derive(Debug)]
-pub struct VecInput(pub Vec<u8>);
-
-impl From<Vec<u8>> for VecInput {
-    fn from(value: Vec<u8>) -> Self {
-        Self(value)
-    }
-}
-
-impl HasLen for VecInput {
-    fn len(&self) -> usize {
-        self.0.len()
-    }
-}
-
-impl HasMutatorBytes for VecInput {
-    fn bytes(&self) -> &[u8] {
-        &self.0
-    }
-
-    fn bytes_mut(&mut self) -> &mut [u8] {
-        &mut self.0
-    }
-
-    fn resize(&mut self, new_len: usize, value: u8) {
-        self.0.resize(new_len, value);
-    }
-
-    fn extend<'b, I: IntoIterator<Item = &'b u8>>(&mut self, iter: I) {
-        self.0.extend(iter);
-    }
-
-    fn splice<R, I>(&mut self, range: R, replace_with: I) -> Splice<'_, I::IntoIter>
-    where
-        R: RangeBounds<usize>,
-        I: IntoIterator<Item = u8>,
-    {
-        self.0.splice::<R, I>(range, replace_with)
-    }
-
-    fn drain<R>(&mut self, range: R) -> Drain<'_, u8>
-    where
-        R: RangeBounds<usize>,
-    {
-        self.0.drain(range)
-    }
-}
-
-/// A wrapper type that allows us to use mutators for Mutators for `&mut `[`Vec`].
-#[derive(Debug)]
 pub struct MutVecInput<'a>(&'a mut Vec<u8>);
 
 impl<'a> From<&'a mut Vec<u8>> for MutVecInput<'a> {
