@@ -85,6 +85,8 @@ struct Opt {
 
 #[allow(clippy::similar_names)]
 pub fn main() {
+    env_logger::init();
+
     const MAP_SIZE: usize = EDGES_MAP_SIZE_IN_USE; //65536;
     let opt = Opt::parse();
 
