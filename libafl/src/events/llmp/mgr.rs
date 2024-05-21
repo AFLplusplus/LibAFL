@@ -30,7 +30,7 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "llmp_compression")]
 use crate::events::llmp::COMPRESS_THRESHOLD;
-#[cfg(all(feature = "std", feature = "adaptive_serialization"))]
+#[cfg(feature = "adaptive_serialization")]
 use crate::events::AdaptiveSerializer;
 #[cfg(feature = "adaptive_serialization")]
 use crate::observers::TimeObserver;
