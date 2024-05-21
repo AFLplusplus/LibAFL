@@ -488,11 +488,11 @@ pub fn build(
             );
         }
 
-        let mut debug_command = Command::new("ls");
+        let mut debug_command = Command::new("pwd");
         debug_command.current_dir(&libafl_qemu_build_dir);
 
         match debug_command.spawn() {
-            Ok(output) => output,
+            Ok(output) => println!("Command: {debug_command:?}; output: {output:?}"),
             Err(e) => panic!("Command {debug_command:?} failed: {e:?}"),
         };
 
