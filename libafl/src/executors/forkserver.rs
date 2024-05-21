@@ -801,7 +801,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         if (0x41464c00..=0x41464cff).contains(&version_status) {
             match version {
                 0 => {
-                    return Err(Error::unknown("Forks server version is not assigned, this hsould not happen. Recompile target."));
+                    return Err(Error::unknown("Fork server version is not assigned, this should not happen. Recompile target."));
                 }
                 FS_NEW_VERSION_MIN..=FS_NEW_VERSION_MAX => {
                     // good, do nothing
