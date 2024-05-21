@@ -77,7 +77,7 @@ impl HasMutatorBytes for BytesInput {
     }
 
     fn extend<'a, I: IntoIterator<Item = &'a u8>>(&mut self, iter: I) {
-        self.bytes.extend(iter);
+        Extend::extend(&mut self.bytes, iter);
     }
 
     fn splice<R, I>(&mut self, range: R, replace_with: I) -> alloc::vec::Splice<'_, I::IntoIter>

@@ -26,7 +26,7 @@ pub mod nautilus;
 use alloc::{
     boxed::Box,
     string::{String, ToString},
-    vec::{Drain, Splice},
+    vec::{Drain, Splice, Vec},
 };
 use core::{clone::Clone, fmt::Debug, marker::PhantomData, ops::RangeBounds};
 #[cfg(feature = "std")]
@@ -163,6 +163,39 @@ pub trait HasMutatorBytes: HasLen {
         R: RangeBounds<usize>,
     {
         BytesSubInput::new(self, range)
+    }
+}
+
+impl HasMutatorBytes for &mut Vec<u8> {
+    fn bytes(&self) -> &[u8] {
+        self
+    }
+
+    fn bytes_mut(&mut self) -> &mut [u8] {
+        self
+    }
+
+    fn resize(&mut self, new_len: usize, value: u8) {
+        Vec::resize(self, new_len, value);
+    }
+
+    fn extend<'a, I: IntoIterator<Item = &'a u8>>(&mut self, iter: I) {
+        Vec::extend(self, iter);
+    }
+
+    fn splice<R, I>(&mut self, range: R, replace_with: I) -> Splice<'_, I::IntoIter>
+    where
+        R: RangeBounds<usize>,
+        I: IntoIterator<Item = u8>,
+    {
+        Vec::splice::<R, I>(self, range, replace_with.into())
+    }
+
+    fn drain<R>(&mut self, range: R) -> Drain<'_, u8>
+    where
+        R: RangeBounds<usize>,
+    {
+        Vec::drain(self, range)
     }
 }
 

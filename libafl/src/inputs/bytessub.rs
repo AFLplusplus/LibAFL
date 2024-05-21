@@ -403,6 +403,15 @@ mod tests {
     }
 
     #[test]
+    fn test_bytessubinput_use_vec() {
+        let mut test_vec = vec![0, 1, 2, 3, 4];
+        let mut test_vec = &mut test_vec;
+        let mut sub_vec = test_vec.sub_input(1..2);
+        drop(sub_vec.drain(..));
+        assert_eq!(test_vec.len(), 4);
+    }
+
+    #[test]
     fn test_ranges() {
         let mut bytes_input = BytesInput::new(vec![1, 2, 3]);
 
