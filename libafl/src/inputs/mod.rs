@@ -12,6 +12,9 @@ pub use gramatron::*;
 pub mod generalized;
 pub use generalized::*;
 
+pub mod bytessub;
+pub use bytessub::BytesSubInput;
+
 #[cfg(feature = "multipart_inputs")]
 pub mod multi;
 #[cfg(feature = "multipart_inputs")]
@@ -23,15 +26,15 @@ pub mod nautilus;
 use alloc::{
     boxed::Box,
     string::{String, ToString},
-    vec::Vec,
+    vec::{Drain, Splice, Vec},
 };
-use core::{clone::Clone, fmt::Debug, marker::PhantomData};
+use core::{clone::Clone, fmt::Debug, marker::PhantomData, ops::RangeBounds};
 #[cfg(feature = "std")]
 use std::{fs::File, hash::Hash, io::Read, path::Path};
 
 #[cfg(feature = "std")]
 use libafl_bolts::fs::write_file_atomic;
-use libafl_bolts::{ownedref::OwnedSlice, Error};
+use libafl_bolts::{ownedref::OwnedSlice, Error, HasLen};
 #[cfg(feature = "nautilus")]
 pub use nautilus::*;
 use serde::{Deserialize, Serialize};
@@ -73,7 +76,7 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
         P: AsRef<Path>,
     {
         let mut file = File::open(path)?;
-        let mut bytes: Vec<u8> = vec![];
+        let mut bytes = vec![];
         file.read_to_end(&mut bytes)?;
         Ok(postcard::from_bytes(&bytes)?)
     }
@@ -127,12 +130,89 @@ pub trait HasTargetBytes {
     fn target_bytes(&self) -> OwnedSlice<u8>;
 }
 
-/// Contains an internal bytes Vector
-pub trait HasBytesVec {
-    /// The internal bytes map
+/// Contains mutateable and resizable bytes
+pub trait HasMutatorBytes: HasLen {
+    /// The bytes
     fn bytes(&self) -> &[u8];
-    /// The internal bytes map (as mutable borrow)
-    fn bytes_mut(&mut self) -> &mut Vec<u8>;
+
+    /// The bytes to mutate
+    fn bytes_mut(&mut self) -> &mut [u8];
+
+    /// Resize the mutator bytes to a given new size.
+    /// Use `value` to fill new slots in case the buffer grows.
+    /// See [`alloc::vec::Vec::splice`].
+    fn resize(&mut self, new_len: usize, value: u8);
+
+    /// Extends the given buffer with an iterator. See [`alloc::vec::Vec::extend`]
+    fn extend<'a, I: IntoIterator<Item = &'a u8>>(&mut self, iter: I);
+
+    /// Splices the given target bytes according to [`alloc::vec::Vec::splice`]'s rules
+    fn splice<R, I>(&mut self, range: R, replace_with: I) -> Splice<'_, I::IntoIter>
+    where
+        R: RangeBounds<usize>,
+        I: IntoIterator<Item = u8>;
+
+    /// Drains the given target bytes according to [`alloc::vec::Vec::drain`]'s rules
+    fn drain<R>(&mut self, range: R) -> Drain<'_, u8>
+    where
+        R: RangeBounds<usize>;
+
+    /// Creates a [`BytesSubInput`] from this input, that can be used for local mutations.
+    fn sub_input<R>(&mut self, range: R) -> BytesSubInput<Self>
+    where
+        R: RangeBounds<usize>,
+    {
+        BytesSubInput::new(self, range)
+    }
+}
+
+/// A wrapper type that allows us to use mutators for Mutators for `&mut `[`Vec`].
+#[derive(Debug)]
+pub struct MutVecInput<'a>(&'a mut Vec<u8>);
+
+impl<'a> From<&'a mut Vec<u8>> for MutVecInput<'a> {
+    fn from(value: &'a mut Vec<u8>) -> Self {
+        Self(value)
+    }
+}
+
+impl<'a> HasLen for MutVecInput<'a> {
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+impl<'a> HasMutatorBytes for MutVecInput<'a> {
+    fn bytes(&self) -> &[u8] {
+        self.0
+    }
+
+    fn bytes_mut(&mut self) -> &mut [u8] {
+        self.0
+    }
+
+    fn resize(&mut self, new_len: usize, value: u8) {
+        self.0.resize(new_len, value);
+    }
+
+    fn extend<'b, I: IntoIterator<Item = &'b u8>>(&mut self, iter: I) {
+        self.0.extend(iter);
+    }
+
+    fn splice<R, I>(&mut self, range: R, replace_with: I) -> Splice<'_, I::IntoIter>
+    where
+        R: RangeBounds<usize>,
+        I: IntoIterator<Item = u8>,
+    {
+        self.0.splice::<R, I>(range, replace_with)
+    }
+
+    fn drain<R>(&mut self, range: R) -> Drain<'_, u8>
+    where
+        R: RangeBounds<usize>,
+    {
+        self.0.drain(range)
+    }
 }
 
 /// Defines the input type shared across traits of the type.

@@ -15,7 +15,7 @@ use libafl_bolts::{fs::write_file_atomic, Error};
 use libafl_bolts::{ownedref::OwnedSlice, HasLen};
 use serde::{Deserialize, Serialize};
 
-use crate::inputs::{HasBytesVec, HasTargetBytes, Input};
+use crate::inputs::{HasMutatorBytes, HasTargetBytes, Input};
 
 /// A bytes input is the basic input
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -61,15 +61,38 @@ impl From<BytesInput> for Rc<RefCell<BytesInput>> {
     }
 }
 
-impl HasBytesVec for BytesInput {
+impl HasMutatorBytes for BytesInput {
     #[inline]
     fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 
     #[inline]
-    fn bytes_mut(&mut self) -> &mut Vec<u8> {
+    fn bytes_mut(&mut self) -> &mut [u8] {
         &mut self.bytes
+    }
+
+    fn resize(&mut self, new_len: usize, value: u8) {
+        self.bytes.resize(new_len, value);
+    }
+
+    fn extend<'a, I: IntoIterator<Item = &'a u8>>(&mut self, iter: I) {
+        Extend::extend(&mut self.bytes, iter);
+    }
+
+    fn splice<R, I>(&mut self, range: R, replace_with: I) -> alloc::vec::Splice<'_, I::IntoIter>
+    where
+        R: core::ops::RangeBounds<usize>,
+        I: IntoIterator<Item = u8>,
+    {
+        self.bytes.splice(range, replace_with)
+    }
+
+    fn drain<R>(&mut self, range: R) -> alloc::vec::Drain<'_, u8>
+    where
+        R: core::ops::RangeBounds<usize>,
+    {
+        self.bytes.drain(range)
     }
 }
 
