@@ -9,7 +9,7 @@ use std::{env, net::SocketAddr, path::PathBuf, time::Duration};
 use clap::Parser;
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
-    events::{launcher::Launcher, llmp::LlmpEventConverter, EventConfig},
+    events::{launcher::Launcher, EventConfig, LlmpEventConverterBuilder},
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, NautilusChunksMetadata, NautilusFeedback},
@@ -120,13 +120,14 @@ pub extern "C" fn libafl_main() {
     let context = NautilusContext::from_file(15, "grammar.json");
 
     let mut event_converter = opt.bytes_broker_port.map(|port| {
-        LlmpEventConverter::on_port(
-            shmem_provider.clone(),
-            port,
-            Some(NautilusToBytesInputConverter::new(&context)),
-            none_input_converter!(),
-        )
-        .unwrap()
+        LlmpEventConverterBuilder::new()
+            .build_on_port(
+                shmem_provider.clone(),
+                port,
+                Some(NautilusToBytesInputConverter::new(&context)),
+                none_input_converter!(),
+            )
+            .unwrap()
     });
 
     // to disconnect the event coverter from the broker later
