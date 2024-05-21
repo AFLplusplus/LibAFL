@@ -8,6 +8,12 @@ use std::vec::Vec;
 use libafl_bolts::Named;
 use serde::{Deserialize, Serialize};
 
+use crate::{
+    inputs::UsesInput,
+    observers::Observer,
+    prelude::{Error, State},
+};
+
 /// An observer that captures stdout of a target.
 /// Only works for supported executors.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -41,6 +47,20 @@ impl Named for StdOutObserver {
     }
 }
 
+impl<S> Observer<S> for StdOutObserver
+where
+    S: State,
+{
+    fn pre_exec_child(
+        &mut self,
+        _state: &mut S,
+        _input: &<S as UsesInput>::Input,
+    ) -> Result<(), Error> {
+        self.stdout = None;
+        Ok(())
+    }
+}
+
 /// An observer that captures stderr of a target.
 /// Only works for supported executors.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -71,5 +91,19 @@ impl StdErrObserver {
 impl Named for StdErrObserver {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
+    }
+}
+
+impl<S> Observer<S> for StdErrObserver
+where
+    S: State,
+{
+    fn pre_exec_child(
+        &mut self,
+        _state: &mut S,
+        _input: &<S as UsesInput>::Input,
+    ) -> Result<(), Error> {
+        self.stderr = None;
+        Ok(())
     }
 }
