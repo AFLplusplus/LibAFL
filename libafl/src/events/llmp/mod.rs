@@ -157,6 +157,7 @@ impl LlmpEventConverterBuilder {
     }
 
     /// Create a client from port and the input converters
+    #[cfg(feature = "std")]
     pub fn build_on_port<DI, IC, ICB, S, SP>(
         self,
         shmem_provider: SP,
@@ -186,6 +187,7 @@ impl LlmpEventConverterBuilder {
     }
 
     /// If a client respawns, it may reuse the existing connection, previously stored by [`LlmpClient::to_env()`].
+    #[cfg(feature = "std")]
     pub fn build_existing_client_from_env<DI, IC, ICB, S, SP>(
         self,
         shmem_provider: SP,
