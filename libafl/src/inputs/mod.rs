@@ -188,7 +188,7 @@ impl HasMutatorBytes for &mut Vec<u8> {
         R: RangeBounds<usize>,
         I: IntoIterator<Item = u8>,
     {
-        Vec::splice::<R, I>(self, range, replace_with.into())
+        Vec::splice::<R, I>(self, range, replace_with)
     }
 
     fn drain<R>(&mut self, range: R) -> Drain<'_, u8>
