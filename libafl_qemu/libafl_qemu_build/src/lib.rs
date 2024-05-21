@@ -1,6 +1,8 @@
 #![forbid(unexpected_cfgs)]
 #![allow(clippy::missing_panics_doc)]
 
+#[rustversion::nightly]
+use std::io::{BufRead, BufReader};
 use std::{
     collections::hash_map,
     env, fs,
@@ -11,8 +13,6 @@ use std::{
     process::Command,
     ptr::addr_of_mut,
 };
-#[rustversion::nightly]
-use std::{BufRead, BufReader};
 
 #[rustversion::nightly]
 use regex::Regex;

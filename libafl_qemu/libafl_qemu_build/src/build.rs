@@ -499,7 +499,10 @@ pub fn build(
 
         let link_str = format!("{link_command:?}");
 
-        let output = link_command.output().unwrap();
+        let output = match link_command.output() {
+            Ok(output) => output,
+            Err(e) => panic!("Command {:?} failed: {:?}", link_command, e),
+        };
 
         if !output.status.success() {
             fs::write(libafl_qemu_build_dir.join("link.command"), link_str)
