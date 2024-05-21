@@ -488,6 +488,14 @@ pub fn build(
             );
         }
 
+        let mut debug_command = Command::new("ls");
+        debug_command.current_dir(&libafl_qemu_build_dir);
+
+        match debug_command.spawn() {
+            Ok(output) => output,
+            Err(e) => panic!("Command {debug_command:?} failed: {e:?}"),
+        };
+
         let mut link_command = cpp_compiler.to_command();
 
         link_command
