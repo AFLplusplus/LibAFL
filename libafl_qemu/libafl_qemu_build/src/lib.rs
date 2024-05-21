@@ -6,13 +6,17 @@ use std::{
     env, fs,
     fs::File,
     hash::Hasher,
-    io::{BufRead, BufReader, Read, Seek, SeekFrom, Write},
+    io::{Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
     process::Command,
     ptr::addr_of_mut,
 };
+#[rustversion::nightly]
+use std::{BufRead, BufReader};
 
+#[rustversion::nightly]
 use regex::Regex;
+#[rustversion::nightly]
 use rustc_version::Version;
 use which::which;
 
