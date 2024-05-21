@@ -501,7 +501,7 @@ pub fn build(
 
         let output = match link_command.output() {
             Ok(output) => output,
-            Err(e) => panic!("Command {:?} failed: {:?}", link_command, e),
+            Err(e) => panic!("Command {link_command:?} failed: {e:?}"),
         };
 
         if !output.status.success() {
