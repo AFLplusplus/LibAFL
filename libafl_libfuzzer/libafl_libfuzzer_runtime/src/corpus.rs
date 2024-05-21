@@ -203,6 +203,9 @@ where
     fn next(&self, id: CorpusId) -> Option<CorpusId> {
         self.mapping.enabled.next(id)
     }
+    fn peek_next_free_id(&self) -> CorpusId {
+        self.mapping.peek_next_free_id()
+    }
 
     fn prev(&self, id: CorpusId) -> Option<CorpusId> {
         self.mapping.enabled.prev(id)
