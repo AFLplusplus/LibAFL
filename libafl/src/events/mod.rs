@@ -436,7 +436,7 @@ pub trait EventFirer: UsesState {
     }
 
     /// Return if we really send this event or not
-    fn sample(&self, corpus_count: usize) -> bool;
+    fn sample(&self) -> bool;
 }
 
 /// [`ProgressReporter`] report progress to the broker.
@@ -624,7 +624,7 @@ impl<S> EventFirer for NopEventManager<S>
 where
     S: State,
 {
-    fn sample(&self, _corpus_count: usize) -> bool {
+    fn sample(&self) -> bool {
         true
     }
 
@@ -712,7 +712,7 @@ impl<EM, M> EventFirer for MonitorTypedEventManager<EM, M>
 where
     EM: EventFirer,
 {
-    fn sample(&self, _corpus_count: usize) -> bool {
+    fn sample(&self) -> bool {
         true
     }
 

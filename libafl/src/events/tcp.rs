@@ -7,6 +7,7 @@ use core::{
     marker::PhantomData,
     num::NonZeroUsize,
     sync::atomic::{compiler_fence, Ordering},
+    time::Duration,
 };
 use std::{
     env,
@@ -419,7 +420,10 @@ where
     EMH: EventManagerHooksTuple<S>,
     S: State,
 {
-    sampling_rate: usize,
+    /// We send message every `throttle` second
+    throttle: Option<Duration>,
+    /// When we sent the last message
+    last_sent: Duration,
     hooks: EMH,
     /// The TCP stream for inter process communication
     tcp: TcpStream,
@@ -434,6 +438,115 @@ where
     /// from nodes with other configurations.
     configuration: EventConfig,
     phantom: PhantomData<S>,
+}
+
+/// Builder for `TcpEventManager`
+#[derive(Debug, Copy, Clone)]
+pub struct TcpEventManagerBuilder<EMH, S> {
+    throttle: Option<Duration>,
+    hooks: EMH,
+    phantom: PhantomData<S>,
+}
+
+impl<S> Default for TcpEventManagerBuilder<(), S> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<S> TcpEventManagerBuilder<(), S> {
+    /// Set the constructor
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            throttle: None,
+            hooks: (),
+            phantom: PhantomData,
+        }
+    }
+
+    /// Set the hooks
+    #[must_use]
+    pub fn hooks<EMH>(self, hooks: EMH) -> TcpEventManagerBuilder<EMH, S> {
+        TcpEventManagerBuilder {
+            throttle: self.throttle,
+            hooks,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<EMH, S> TcpEventManagerBuilder<EMH, S>
+where
+    EMH: EventManagerHooksTuple<S>,
+    S: State + HasExecutions + HasMetadata,
+{
+    /// Set the throttle
+    #[must_use]
+    pub fn throttle(mut self, throttle: Duration) -> Self {
+        self.throttle = Some(throttle);
+        self
+    }
+
+    /// Create a manager from a raw TCP client with hooks
+    pub fn build_from_client<A: ToSocketAddrs>(
+        self,
+        addr: &A,
+        client_id: ClientId,
+        configuration: EventConfig,
+    ) -> Result<TcpEventManager<EMH, S>, Error> {
+        let mut tcp = TcpStream::connect(addr)?;
+
+        let mut our_client_id_buf = client_id.0.to_le_bytes();
+        tcp.write_all(&our_client_id_buf)
+            .expect("Cannot write to the broker");
+
+        tcp.read_exact(&mut our_client_id_buf)
+            .expect("Cannot read from the broker");
+        let client_id = ClientId(u32::from_le_bytes(our_client_id_buf));
+
+        log::info!("Our client id: {client_id:?}");
+
+        Ok(TcpEventManager {
+            throttle: self.throttle,
+            last_sent: Duration::from_secs(0),
+            hooks: self.hooks,
+            tcp,
+            client_id,
+            #[cfg(feature = "tcp_compression")]
+            compressor: GzipCompressor::new(),
+            configuration,
+            phantom: PhantomData,
+            custom_buf_handlers: vec![],
+        })
+    }
+
+    /// Create an TCP event manager on a port specifying the client id with hooks
+    ///
+    /// If the port is not yet bound, it will act as a broker; otherwise, it
+    /// will act as a client.
+    pub fn build_on_port(
+        self,
+        port: u16,
+        client_id: ClientId,
+        configuration: EventConfig,
+    ) -> Result<TcpEventManager<EMH, S>, Error> {
+        Self::build_from_client(self, &("127.0.0.1", port), client_id, configuration)
+    }
+
+    /// Create an TCP event manager on a port specifying the client id from env with hooks
+    ///
+    /// If the port is not yet bound, it will act as a broker; otherwise, it
+    /// will act as a client.
+    pub fn build_existing_from_env<A: ToSocketAddrs>(
+        self,
+        addr: &A,
+        env_name: &str,
+        configuration: EventConfig,
+    ) -> Result<TcpEventManager<EMH, S>, Error> {
+        let this_id = ClientId(str::parse::<u32>(&env::var(env_name)?)?);
+        Self::build_from_client(self, addr, this_id, configuration)
+    }
 }
 
 impl<EMH, S> core::fmt::Debug for TcpEventManager<EMH, S>
@@ -465,148 +578,11 @@ where
     }
 }
 
-impl<S> TcpEventManager<(), S>
-where
-    S: State + HasExecutions + HasMetadata,
-{
-    /// Create a manager from a raw TCP client specifying the client id
-    pub fn existing<A: ToSocketAddrs>(
-        addr: &A,
-        client_id: ClientId,
-        configuration: EventConfig,
-    ) -> Result<Self, Error> {
-        Self::existing_with_hooks(addr, client_id, configuration, tuple_list!())
-    }
-
-    /// Create a manager from a raw TCP client
-    pub fn new<A: ToSocketAddrs>(addr: &A, configuration: EventConfig) -> Result<Self, Error> {
-        Self::existing_with_hooks(addr, UNDEFINED_CLIENT_ID, configuration, tuple_list!())
-    }
-
-    /// Create an TCP event manager on a port specifying the client id
-    ///
-    /// If the port is not yet bound, it will act as a broker; otherwise, it
-    /// will act as a client.
-    pub fn existing_on_port(
-        port: u16,
-        client_id: ClientId,
-        configuration: EventConfig,
-    ) -> Result<Self, Error> {
-        Self::existing_with_hooks(
-            &("127.0.0.1", port),
-            client_id,
-            configuration,
-            tuple_list!(),
-        )
-    }
-
-    /// Create an TCP event manager on a port with hooks
-    ///
-    /// If the port is not yet bound, it will act as a broker; otherwise, it
-    /// will act as a client.
-    pub fn on_port(port: u16, configuration: EventConfig) -> Result<Self, Error> {
-        Self::with_hooks(&("127.0.0.1", port), configuration, tuple_list!())
-    }
-
-    /// Create an TCP event manager on a port specifying the client id from env
-    ///
-    /// If the port is not yet bound, it will act as a broker; otherwise, it
-    /// will act as a client.
-    pub fn existing_from_env<A: ToSocketAddrs>(
-        addr: &A,
-        env_name: &str,
-        configuration: EventConfig,
-    ) -> Result<Self, Error> {
-        let this_id = ClientId(str::parse::<u32>(&env::var(env_name)?)?);
-        Self::existing_with_hooks(addr, this_id, configuration, tuple_list!())
-    }
-}
-
 impl<EMH, S> TcpEventManager<EMH, S>
 where
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata,
 {
-    /// Create a manager from a raw TCP client specifying the client id with hooks
-    pub fn existing_with_hooks<A: ToSocketAddrs>(
-        addr: &A,
-        client_id: ClientId,
-        configuration: EventConfig,
-        hooks: EMH,
-    ) -> Result<Self, Error> {
-        let mut tcp = TcpStream::connect(addr)?;
-
-        let mut our_client_id_buf = client_id.0.to_le_bytes();
-        tcp.write_all(&our_client_id_buf)
-            .expect("Cannot write to the broker");
-
-        tcp.read_exact(&mut our_client_id_buf)
-            .expect("Cannot read from the broker");
-        let client_id = ClientId(u32::from_le_bytes(our_client_id_buf));
-
-        println!("Our client id: {client_id:?}");
-
-        Ok(Self {
-            sampling_rate: 1,
-            hooks,
-            tcp,
-            client_id,
-            #[cfg(feature = "tcp_compression")]
-            compressor: GzipCompressor::new(),
-            configuration,
-            phantom: PhantomData,
-            custom_buf_handlers: vec![],
-        })
-    }
-
-    /// Create a manager from a raw TCP client with hooks
-    pub fn with_hooks<A: ToSocketAddrs>(
-        addr: &A,
-        configuration: EventConfig,
-        hooks: EMH,
-    ) -> Result<Self, Error> {
-        Self::existing_with_hooks(addr, UNDEFINED_CLIENT_ID, configuration, hooks)
-    }
-
-    /// Create an TCP event manager on a port specifying the client id with hooks
-    ///
-    /// If the port is not yet bound, it will act as a broker; otherwise, it
-    /// will act as a client.
-    pub fn existing_on_port_with_hooks(
-        port: u16,
-        client_id: ClientId,
-        configuration: EventConfig,
-        hooks: EMH,
-    ) -> Result<Self, Error> {
-        Self::existing_with_hooks(&("127.0.0.1", port), client_id, configuration, hooks)
-    }
-
-    /// Create an TCP event manager on a port with hooks
-    ///
-    /// If the port is not yet bound, it will act as a broker; otherwise, it
-    /// will act as a client.
-    pub fn on_port_with_hooks(
-        port: u16,
-        configuration: EventConfig,
-        hooks: EMH,
-    ) -> Result<Self, Error> {
-        Self::with_hooks(&("127.0.0.1", port), configuration, hooks)
-    }
-
-    /// Create an TCP event manager on a port specifying the client id from env with hooks
-    ///
-    /// If the port is not yet bound, it will act as a broker; otherwise, it
-    /// will act as a client.
-    pub fn existing_from_env_with_hooks<A: ToSocketAddrs>(
-        addr: &A,
-        env_name: &str,
-        configuration: EventConfig,
-        hooks: EMH,
-    ) -> Result<Self, Error> {
-        let this_id = ClientId(str::parse::<u32>(&env::var(env_name)?)?);
-        Self::existing_with_hooks(addr, this_id, configuration, hooks)
-    }
-
     /// Write the client id for a client [`EventManager`] to env vars
     pub fn to_env(&self, env_name: &str) {
         env::set_var(env_name, format!("{}", self.client_id.0));
@@ -713,8 +689,12 @@ where
     EMH: EventManagerHooksTuple<S>,
     S: State,
 {
-    fn sample(&self, corpus_count: usize) -> bool {
-        corpus_count % self.sampling_rate == 0
+    fn sample(&self) -> bool {
+        if let Some(throttle) = self.throttle {
+            libafl_bolts::current_time() - self.last_sent > throttle
+        } else {
+            true
+        }
     }
 
     fn fire(
@@ -907,8 +887,8 @@ where
     S: State,
     //CE: CustomEvent<I>,
 {
-    fn sample(&self, corpus_count: usize) -> bool {
-        corpus_count % self.tcp_mgr.sampling_rate == 0
+    fn sample(&self) -> bool {
+        self.tcp_mgr.sample()
     }
 
     fn fire(
@@ -1186,11 +1166,13 @@ where
                         }
                         Err(Error::OsError(..)) => {
                             // port was likely already bound
-                            let mgr = TcpEventManager::<EMH, S>::with_hooks(
-                                &("127.0.0.1", self.broker_port),
-                                self.configuration,
-                                self.hooks,
-                            )?;
+                            let mgr = TcpEventManagerBuilder::new()
+                                .hooks(self.hooks)
+                                .build_from_client(
+                                    &("127.0.0.1", self.broker_port),
+                                    UNDEFINED_CLIENT_ID,
+                                    self.configuration,
+                                )?;
                             (mgr, None)
                         }
                         Err(e) => {
@@ -1209,11 +1191,9 @@ where
                 }
                 TcpManagerKind::Client { cpu_core } => {
                     // We are a client
-                    let mgr = TcpEventManager::<EMH, S>::on_port_with_hooks(
-                        self.broker_port,
-                        self.configuration,
-                        self.hooks,
-                    )?;
+                    let mgr = TcpEventManagerBuilder::new()
+                        .hooks(self.hooks)
+                        .build_on_port(self.broker_port, UNDEFINED_CLIENT_ID, self.configuration)?;
 
                     (mgr, cpu_core)
                 }
@@ -1333,12 +1313,9 @@ where
             (
                 state_opt,
                 TcpRestartingEventManager::with_save_state(
-                    TcpEventManager::existing_on_port_with_hooks(
-                        self.broker_port,
-                        this_id,
-                        self.configuration,
-                        self.hooks,
-                    )?,
+                    TcpEventManagerBuilder::new()
+                        .hooks(self.hooks)
+                        .build_on_port(self.broker_port, this_id, self.configuration)?,
                     staterestorer,
                     self.serialize_state,
                 ),
@@ -1346,12 +1323,13 @@ where
         } else {
             log::info!("First run. Let's set it all up");
             // Mgr to send and receive msgs from/to all other fuzzer instances
-            let mgr = TcpEventManager::<EMH, S>::existing_from_env_with_hooks(
-                &("127.0.0.1", self.broker_port),
-                _ENV_FUZZER_BROKER_CLIENT_INITIAL,
-                self.configuration,
-                self.hooks,
-            )?;
+            let mgr = TcpEventManagerBuilder::new()
+                .hooks(self.hooks)
+                .build_existing_from_env(
+                    &("127.0.0.1", self.broker_port),
+                    _ENV_FUZZER_BROKER_CLIENT_INITIAL,
+                    self.configuration,
+                )?;
 
             (
                 None,

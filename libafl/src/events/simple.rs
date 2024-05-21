@@ -87,7 +87,7 @@ where
     MT: Monitor,
     S: State,
 {
-    fn sample(&self, _corpus_count: usize) -> bool {
+    fn sample(&self) -> bool {
         true
     }
 
@@ -344,7 +344,7 @@ where
     S: State,
     SP: ShMemProvider,
 {
-    fn sample(&self, _corpus_count: usize) -> bool {
+    fn sample(&self) -> bool {
         true
     }
 

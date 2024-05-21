@@ -220,8 +220,6 @@ where
     EM: UsesState,
     SP: ShMemProvider + 'static,
 {
-    /// we only send 1 testcase for every `sampling_rate` corpus
-    sampling_rate: usize,
     inner: EM,
     /// The LLMP client for inter process communication
     client: LlmpClient<SP>,
@@ -235,7 +233,6 @@ where
 /// The builder or `CentralizedEventManager`
 #[derive(Debug)]
 pub struct CentralizedEventManagerBuilder {
-    sampling_rate: usize,
     is_main: bool,
 }
 
@@ -249,28 +246,13 @@ impl CentralizedEventManagerBuilder {
     /// The constructor
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            sampling_rate: 1,
-            is_main: false,
-        }
-    }
-
-    /// Change the sampling rate
-    #[must_use]
-    pub fn samping_rate(self, sampling_rate: usize) -> Self {
-        Self {
-            sampling_rate,
-            is_main: self.is_main,
-        }
+        Self { is_main: false }
     }
 
     /// Make this a main evaluator node
     #[must_use]
     pub fn is_main(self, is_main: bool) -> Self {
-        Self {
-            sampling_rate: self.sampling_rate,
-            is_main,
-        }
+        Self { is_main }
     }
 
     /// Creates a new [`CentralizedEventManager`].
@@ -285,7 +267,6 @@ impl CentralizedEventManagerBuilder {
         EM: UsesState,
     {
         Ok(CentralizedEventManager {
-            sampling_rate: self.sampling_rate,
             inner,
             client,
             #[cfg(feature = "llmp_compression")]
@@ -307,7 +288,6 @@ impl CentralizedEventManagerBuilder {
         EM: UsesState,
     {
         Ok(CentralizedEventManager {
-            sampling_rate: self.sampling_rate,
             inner,
             client,
             #[cfg(feature = "llmp_compression")]
@@ -334,7 +314,6 @@ impl CentralizedEventManagerBuilder {
     {
         let client = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
         Ok(CentralizedEventManager {
-            sampling_rate: self.sampling_rate,
             inner,
             client,
             #[cfg(feature = "llmp_compression")]
@@ -361,7 +340,6 @@ impl CentralizedEventManagerBuilder {
     {
         let client = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
         Ok(CentralizedEventManager {
-            sampling_rate: self.sampling_rate,
             inner,
             client,
             #[cfg(feature = "llmp_compression")]
@@ -385,7 +363,6 @@ impl CentralizedEventManagerBuilder {
         SP: ShMemProvider,
     {
         Ok(CentralizedEventManager {
-            sampling_rate: self.sampling_rate,
             inner,
             client: LlmpClient::on_existing_from_env(shmem_provider, env_name)?,
             #[cfg(feature = "llmp_compression")]
@@ -409,7 +386,6 @@ impl CentralizedEventManagerBuilder {
         SP: ShMemProvider,
     {
         Ok(CentralizedEventManager {
-            sampling_rate: self.sampling_rate,
             inner,
             client: LlmpClient::on_existing_from_env(shmem_provider, env_name)?,
             #[cfg(feature = "llmp_compression")]
@@ -432,7 +408,6 @@ impl CentralizedEventManagerBuilder {
         SP: ShMemProvider,
     {
         Ok(CentralizedEventManager {
-            sampling_rate: self.sampling_rate,
             inner,
             client: LlmpClient::existing_client_from_description(shmem_provider, description)?,
             #[cfg(feature = "llmp_compression")]
@@ -455,7 +430,6 @@ impl CentralizedEventManagerBuilder {
         SP: ShMemProvider,
     {
         Ok(CentralizedEventManager {
-            sampling_rate: self.sampling_rate,
             inner,
             client: LlmpClient::existing_client_from_description(shmem_provider, description)?,
             #[cfg(feature = "llmp_compression")]
@@ -523,8 +497,8 @@ where
     EM: AdaptiveSerializer + EventFirer + HasEventManagerId,
     SP: ShMemProvider + 'static,
 {
-    fn sample(&self, corpus_count: usize) -> bool {
-        corpus_count % self.sampling_rate == 0
+    fn sample(&self) -> bool {
+        self.inner.sample()
     }
 
     fn fire(
@@ -722,11 +696,6 @@ where
     /// Know if this instance is main or secondary
     pub fn is_main(&self) -> bool {
         self.is_main
-    }
-
-    /// Set the sampling rate
-    pub fn set_sampling_rate(&mut self, rate: usize) {
-        self.sampling_rate = rate;
     }
 }
 

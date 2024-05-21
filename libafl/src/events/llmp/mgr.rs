@@ -4,28 +4,27 @@
 #[cfg(feature = "std")]
 use alloc::string::ToString;
 use alloc::{boxed::Box, vec::Vec};
-use core::marker::PhantomData;
-#[cfg(all(feature = "std", feature = "adaptive_serialization"))]
-use core::time::Duration;
+use core::{marker::PhantomData, time::Duration};
 #[cfg(feature = "std")]
 use std::net::TcpStream;
 
+#[cfg(feature = "adaptive_serialization")]
+use libafl_bolts::tuples::Handle;
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{
     compress::GzipCompressor,
     llmp::{LLMP_FLAG_COMPRESSED, LLMP_FLAG_INITIALIZED},
 };
-#[cfg(feature = "adaptive_serialization")]
-use libafl_bolts::{current_time, tuples::Handle};
+use libafl_bolts::{
+    current_time,
+    llmp::{LlmpClient, LlmpClientDescription},
+    shmem::ShMemProvider,
+    ClientId,
+};
 #[cfg(feature = "std")]
 use libafl_bolts::{
     llmp::{recv_tcp_msg, send_tcp_msg, TcpRequest, TcpResponse},
     IP_LOCALHOST,
-};
-use libafl_bolts::{
-    llmp::{LlmpClient, LlmpClientDescription},
-    shmem::ShMemProvider,
-    ClientId,
 };
 use serde::{Deserialize, Serialize};
 
@@ -58,8 +57,10 @@ where
     S: State,
     SP: ShMemProvider + 'static,
 {
-    /// we only send 1 testcase for every `sampling_rate` corpus
-    pub(crate) sampling_rate: usize,
+    /// We only send 1 testcase for every `sampling_rate` corpus
+    pub(crate) throttle: Option<Duration>,
+    /// We sent last message at `last_sent`
+    last_sent: Duration,
     hooks: EMH,
     /// The LLMP client for inter process communication
     llmp: LlmpClient<SP>,
@@ -87,7 +88,7 @@ where
 /// Builder for `LlmpEventManager`
 #[derive(Debug, Copy, Clone)]
 pub struct LlmpEventManagerBuilder<EMH> {
-    sampling_rate: usize,
+    throttle: Option<Duration>,
     hooks: EMH,
 }
 
@@ -102,7 +103,7 @@ impl LlmpEventManagerBuilder<()> {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            sampling_rate: 1,
+            throttle: None,
             hooks: (),
         }
     }
@@ -110,7 +111,7 @@ impl LlmpEventManagerBuilder<()> {
     /// Add hooks to it
     pub fn hooks<EMH>(self, hooks: EMH) -> LlmpEventManagerBuilder<EMH> {
         LlmpEventManagerBuilder {
-            sampling_rate: self.sampling_rate,
+            throttle: self.throttle,
             hooks,
         }
     }
@@ -119,8 +120,8 @@ impl LlmpEventManagerBuilder<()> {
 impl<EMH> LlmpEventManagerBuilder<EMH> {
     /// Change the sampling rate
     #[must_use]
-    pub fn sampling_rate(mut self, sampling_rate: usize) -> Self {
-        self.sampling_rate = sampling_rate;
+    pub fn sampling_rate(mut self, throttle: Duration) -> Self {
+        self.throttle = Some(throttle);
         self
     }
 
@@ -137,7 +138,8 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
         S: State,
     {
         Ok(LlmpEventManager {
-            sampling_rate: self.sampling_rate,
+            throttle: self.throttle,
+            last_sent: Duration::from_secs(0),
             hooks: self.hooks,
             llmp,
             #[cfg(feature = "llmp_compression")]
@@ -165,7 +167,8 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
         S: State,
     {
         Ok(LlmpEventManager {
-            sampling_rate: self.sampling_rate,
+            throttle: self.throttle,
+            last_sent: Duration::from_secs(0),
             hooks: self.hooks,
             llmp,
             #[cfg(feature = "llmp_compression")]
@@ -194,7 +197,8 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
     {
         let llmp = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
         Ok(LlmpEventManager {
-            sampling_rate: self.sampling_rate,
+            throttle: self.throttle,
+            last_sent: Duration::from_secs(0),
             hooks: self.hooks,
             llmp,
             #[cfg(feature = "llmp_compression")]
@@ -227,7 +231,8 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
     {
         let llmp = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
         Ok(LlmpEventManager {
-            sampling_rate: self.sampling_rate,
+            throttle: self.throttle,
+            last_sent: Duration::from_secs(0),
             hooks: self.hooks,
             llmp,
             #[cfg(feature = "llmp_compression")]
@@ -254,7 +259,8 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
     {
         let llmp = LlmpClient::on_existing_from_env(shmem_provider, env_name)?;
         Ok(LlmpEventManager {
-            sampling_rate: self.sampling_rate,
+            throttle: self.throttle,
+            last_sent: Duration::from_secs(0),
             hooks: self.hooks,
             llmp,
             #[cfg(feature = "llmp_compression")]
@@ -285,7 +291,8 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
     {
         let llmp = LlmpClient::on_existing_from_env(shmem_provider, env_name)?;
         Ok(LlmpEventManager {
-            sampling_rate: self.sampling_rate,
+            throttle: self.throttle,
+            last_sent: Duration::from_secs(0),
             hooks: self.hooks,
             llmp,
             #[cfg(feature = "llmp_compression")]
@@ -311,7 +318,8 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
     {
         let llmp = LlmpClient::existing_client_from_description(shmem_provider, description)?;
         Ok(LlmpEventManager {
-            sampling_rate: self.sampling_rate,
+            throttle: self.throttle,
+            last_sent: Duration::from_secs(0),
             hooks: self.hooks,
             llmp,
             #[cfg(feature = "llmp_compression")]
@@ -341,7 +349,8 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
     {
         let llmp = LlmpClient::existing_client_from_description(shmem_provider, description)?;
         Ok(LlmpEventManager {
-            sampling_rate: self.sampling_rate,
+            throttle: self.throttle,
+            last_sent: Duration::from_secs(0),
             hooks: self.hooks,
             llmp,
             #[cfg(feature = "llmp_compression")]
@@ -476,11 +485,6 @@ where
     S: State + HasExecutions + HasMetadata,
     SP: ShMemProvider + 'static,
 {
-    /// Set the sampling rate
-    pub fn set_sampling_rate(&mut self, rate: usize) {
-        self.sampling_rate = rate;
-    }
-
     // Handle arriving events in the client
     #[allow(clippy::unused_self)]
     fn handle_in_client<E, Z>(
@@ -582,8 +586,12 @@ where
     S: State,
     SP: ShMemProvider,
 {
-    fn sample(&self, corpus_count: usize) -> bool {
-        corpus_count % self.sampling_rate == 0
+    fn sample(&self) -> bool {
+        if let Some(throttle) = self.throttle {
+            current_time() - self.last_sent > throttle
+        } else {
+            true
+        }
     }
 
     #[cfg(feature = "llmp_compression")]
@@ -607,6 +615,8 @@ where
                 self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
             }
         }
+        self.last_sent = current_time();
+
         Ok(())
     }
 

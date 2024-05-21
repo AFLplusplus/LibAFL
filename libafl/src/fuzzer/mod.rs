@@ -470,9 +470,7 @@ where
                 let idx = state.corpus_mut().add(testcase)?;
                 self.scheduler_mut().on_add(state, idx)?;
 
-                let corpus_count = state.corpus().count();
-
-                if send_events && manager.sample(corpus_count) {
+                if send_events && manager.sample() {
                     // TODO set None for fast targets
                     let observers_buf = if manager.configuration() == EventConfig::AlwaysUnique {
                         None

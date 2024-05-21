@@ -139,8 +139,8 @@ where
     S: State,
     //CE: CustomEvent<I>,
 {
-    fn sample(&self, corpus_count: usize) -> bool {
-        corpus_count % self.llmp_mgr.sampling_rate == 0
+    fn sample(&self) -> bool {
+        self.llmp_mgr.sample()
     }
 
     fn fire(
@@ -788,7 +788,9 @@ mod tests {
         }
 
         #[cfg(not(feature = "adaptive_serialization"))]
-        let mut llmp_mgr = LlmpEventManager::new(llmp_client, "fuzzer".into()).unwrap();
+        let mut llmp_mgr = LlmpEventManagerBuilder::new()
+            .build_from_client(llmp_client, "fuzzer".into())
+            .unwrap();
         #[cfg(feature = "adaptive_serialization")]
         let mut llmp_mgr = LlmpEventManagerBuilder::new()
             .build_from_client(llmp_client, "fuzzer".into(), time_ref.clone())

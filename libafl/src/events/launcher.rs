@@ -48,6 +48,8 @@ use libafl_bolts::{
 use typed_builder::TypedBuilder;
 
 use super::hooks::EventManagerHooksTuple;
+#[cfg(all(unix, feature = "std"))]
+use crate::events::centralized::CentralizedEventManagerBuilder;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use crate::events::{CentralizedEventManager, CentralizedLlmpEventBroker};
 #[cfg(feature = "adaptive_serialization")]
@@ -62,9 +64,6 @@ use crate::{
     state::{HasExecutions, State},
     Error,
 };
-
-#[cfg(all(unix, feature = "std"))]
-use crate::events::centralized::CentralizedEventManagerBuilder;
 
 /// The (internal) `env` that indicates we're running as client.
 const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";

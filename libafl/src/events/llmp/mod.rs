@@ -1,7 +1,7 @@
 //! LLMP-backed event manager for scalable multi-processed fuzzing
 
 use alloc::{boxed::Box, vec::Vec};
-use core::marker::PhantomData;
+use core::{marker::PhantomData, time::Duration};
 
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{
@@ -96,8 +96,9 @@ where
     ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
 {
-    sampling_rate: usize,
+    throttle: Option<Duration>,
     llmp: LlmpClient<SP>,
+    last_sent: Duration,
     /// The custom buf handler
     custom_buf_handlers: Vec<Box<CustomBufHandlerFn<S>>>,
     #[cfg(feature = "llmp_compression")]
@@ -105,6 +106,113 @@ where
     converter: Option<IC>,
     converter_back: Option<ICB>,
     phantom: PhantomData<S>,
+}
+
+/// Build `LlmpEventConverter`
+#[derive(Debug, Clone, Default)]
+pub struct LlmpEventConverterBuilder {
+    throttle: Option<Duration>,
+}
+
+impl LlmpEventConverterBuilder {
+    #[must_use]
+    /// Constructor
+    pub fn new() -> Self {
+        Self { throttle: None }
+    }
+
+    #[must_use]
+    /// Sets the `throttle`
+    pub fn throttle(self, throttle: Duration) -> Self {
+        Self {
+            throttle: Some(throttle),
+        }
+    }
+
+    /// Create a event converter from a raw llmp client
+    pub fn build_from_client<DI, IC, ICB, S, SP>(
+        self,
+        llmp: LlmpClient<SP>,
+        converter: Option<IC>,
+        converter_back: Option<ICB>,
+    ) -> Result<LlmpEventConverter<DI, IC, ICB, S, SP>, Error>
+    where
+        SP: ShMemProvider + 'static,
+        S: UsesInput,
+        IC: InputConverter<From = S::Input, To = DI>,
+        ICB: InputConverter<From = DI, To = S::Input>,
+        DI: Input,
+    {
+        Ok(LlmpEventConverter {
+            throttle: self.throttle,
+            last_sent: Duration::from_secs(0),
+            llmp,
+            #[cfg(feature = "llmp_compression")]
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
+            converter,
+            converter_back,
+            phantom: PhantomData,
+            custom_buf_handlers: vec![],
+        })
+    }
+
+    /// Create a client from port and the input converters
+    pub fn build_on_port<DI, IC, ICB, S, SP>(
+        self,
+        shmem_provider: SP,
+        port: u16,
+        converter: Option<IC>,
+        converter_back: Option<ICB>,
+    ) -> Result<LlmpEventConverter<DI, IC, ICB, S, SP>, Error>
+    where
+        SP: ShMemProvider + 'static,
+        S: UsesInput,
+        IC: InputConverter<From = S::Input, To = DI>,
+        ICB: InputConverter<From = DI, To = S::Input>,
+        DI: Input,
+    {
+        let llmp = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
+        Ok(LlmpEventConverter {
+            throttle: self.throttle,
+            last_sent: Duration::from_secs(0),
+            llmp,
+            #[cfg(feature = "llmp_compression")]
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
+            converter,
+            converter_back,
+            phantom: PhantomData,
+            custom_buf_handlers: vec![],
+        })
+    }
+
+    /// If a client respawns, it may reuse the existing connection, previously stored by [`LlmpClient::to_env()`].
+    pub fn build_existing_client_from_env<DI, IC, ICB, S, SP>(
+        self,
+        shmem_provider: SP,
+        env_name: &str,
+        converter: Option<IC>,
+        converter_back: Option<ICB>,
+    ) -> Result<LlmpEventConverter<DI, IC, ICB, S, SP>, Error>
+    where
+        SP: ShMemProvider + 'static,
+        S: UsesInput,
+        IC: InputConverter<From = S::Input, To = DI>,
+        ICB: InputConverter<From = DI, To = S::Input>,
+        DI: Input,
+    {
+        let llmp = LlmpClient::on_existing_from_env(shmem_provider, env_name)?;
+        Ok(LlmpEventConverter {
+            throttle: self.throttle,
+            last_sent: Duration::from_secs(0),
+            llmp,
+            #[cfg(feature = "llmp_compression")]
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
+            converter,
+            converter_back,
+            phantom: PhantomData,
+            custom_buf_handlers: vec![],
+        })
+    }
 }
 
 impl<DI, IC, ICB, S, SP> core::fmt::Debug for LlmpEventConverter<DI, IC, ICB, S, SP>
@@ -137,65 +245,6 @@ where
     ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
 {
-    /// Create a client from a raw llmp client
-    pub fn new(
-        llmp: LlmpClient<SP>,
-        converter: Option<IC>,
-        converter_back: Option<ICB>,
-    ) -> Result<Self, Error> {
-        Ok(Self {
-            sampling_rate: 1,
-            llmp,
-            #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
-            converter,
-            converter_back,
-            phantom: PhantomData,
-            custom_buf_handlers: vec![],
-        })
-    }
-
-    /// Create a client from port and the input converters
-    #[cfg(feature = "std")]
-    pub fn on_port(
-        shmem_provider: SP,
-        port: u16,
-        converter: Option<IC>,
-        converter_back: Option<ICB>,
-    ) -> Result<Self, Error> {
-        let llmp = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
-        Ok(Self {
-            sampling_rate: 1,
-            llmp,
-            #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
-            converter,
-            converter_back,
-            phantom: PhantomData,
-            custom_buf_handlers: vec![],
-        })
-    }
-
-    /// If a client respawns, it may reuse the existing connection, previously stored by [`LlmpClient::to_env()`].
-    #[cfg(feature = "std")]
-    pub fn existing_client_from_env(
-        shmem_provider: SP,
-        env_name: &str,
-        converter: Option<IC>,
-        converter_back: Option<ICB>,
-    ) -> Result<Self, Error> {
-        Ok(Self {
-            sampling_rate: 1,
-            llmp: LlmpClient::on_existing_from_env(shmem_provider, env_name)?,
-            #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
-            phantom: PhantomData,
-            converter,
-            converter_back,
-            custom_buf_handlers: vec![],
-        })
-    }
-
     // TODO other new_* routines
 
     /// Check if it can convert the input
@@ -217,11 +266,6 @@ where
     #[cfg(feature = "std")]
     pub fn to_env(&self, env_name: &str) {
         self.llmp.to_env(env_name).unwrap();
-    }
-
-    /// Set the sampling rate
-    pub fn set_sampling_rate(&mut self, rate: usize) {
-        self.sampling_rate = rate;
     }
 
     // Handle arriving events in the client
@@ -351,8 +395,12 @@ where
     ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
 {
-    fn sample(&self, corpus_count: usize) -> bool {
-        corpus_count % self.sampling_rate == 0
+    fn sample(&self) -> bool {
+        if let Some(throttle) = self.throttle {
+            libafl_bolts::current_time() - self.last_sent > throttle
+        } else {
+            true
+        }
     }
 
     #[cfg(feature = "llmp_compression")]
@@ -406,6 +454,7 @@ where
                 self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
             }
         }
+        self.last_sent = libafl_bolts::current_time();
         Ok(())
     }
 
