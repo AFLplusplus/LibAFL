@@ -27,10 +27,6 @@
 #define CMPLOG_KIND_INS 0
 #define CMPLOG_KIND_RTN 1
 
-// Same, difference between aflpp and libafl
-#define AFL_CMP_TYPE_INS 1
-#define AFL_CMP_TYPE_RTN 2
-
 typedef struct CmpLogHeader {
   uint16_t hits;
   uint8_t  shape;
@@ -39,23 +35,17 @@ typedef struct CmpLogHeader {
 
 #ifndef _WIN32
 typedef struct CmpLogHeaderExtended {
-  unsigned hits : 24;
-  unsigned id : 24;
+  unsigned hits : 6;
   unsigned shape : 5;
-  unsigned type : 2;
+  unsigned type : 1;
   unsigned attribute : 4;
-  unsigned overflow : 1;
-  unsigned reserved : 4;
 } __attribute__((packed)) CmpLogHeaderExtended;
 #else
 __pragma(pack(push, 1)) typedef struct CmpLogHeaderExtended {
-  unsigned hits : 24;
-  unsigned id : 24;
+  unsigned hits : 6;
   unsigned shape : 5;
-  unsigned type : 2;
+  unsigned type : 1;
   unsigned attribute : 4;
-  unsigned overflow : 1;
-  unsigned reserved : 4;
 } CmpLogHeaderExtended;
 __pragma(pack(pop))
 #endif
@@ -146,8 +136,8 @@ static inline void cmplog_instructions_extended_checked(
 
   // printf("%ld %ld %ld\n", k, arg1, arg2);
   uint16_t hits;
-  if (libafl_cmplog_map_extended_ptr->headers[k].type != AFL_CMP_TYPE_INS) {
-    libafl_cmplog_map_extended_ptr->headers[k].type = AFL_CMP_TYPE_INS;
+  if (libafl_cmplog_map_extended_ptr->headers[k].type != CMPLOG_KIND_INS) {
+    libafl_cmplog_map_extended_ptr->headers[k].type = CMPLOG_KIND_INS;
     libafl_cmplog_map_extended_ptr->headers[k].hits = 1;
     libafl_cmplog_map_extended_ptr->headers[k].shape = shape;
     hits = 0;
@@ -207,8 +197,8 @@ static inline void cmplog_routines_checked_extended(uintptr_t      k,
   libafl_cmplog_enabled = false;
   uint32_t hits;
   // printf("RTN: %ld %ld %ld %ld\n", k, *ptr1, *ptr2, len);
-  if (libafl_cmplog_map_extended_ptr->headers[k].type != AFL_CMP_TYPE_RTN) {
-    libafl_cmplog_map_extended_ptr->headers[k].type = AFL_CMP_TYPE_RTN;
+  if (libafl_cmplog_map_extended_ptr->headers[k].type != CMPLOG_KIND_RTN) {
+    libafl_cmplog_map_extended_ptr->headers[k].type = CMPLOG_KIND_RTN;
     libafl_cmplog_map_extended_ptr->headers[k].hits = 1;
     libafl_cmplog_map_extended_ptr->headers[k].shape = len;
     hits = 0;
