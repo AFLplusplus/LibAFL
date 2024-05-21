@@ -236,6 +236,7 @@ where
         use wait_timeout::ChildExt;
 
         *state.executions_mut() += 1;
+        self.observers.pre_exec_child_all(state, input)?;
 
         let mut child = self.configurer.spawn_child(input)?;
 
@@ -257,6 +258,11 @@ where
                 Ok(ExitKind::Timeout)
             }
         };
+
+        if let Ok(exit_kind) = res {
+            self.observers
+                .post_exec_child_all(state, input, &exit_kind)?;
+        }
 
         if let Some(ref mut ob) = &mut self.configurer.stdout_observer_mut() {
             let mut stdout = Vec::new();
