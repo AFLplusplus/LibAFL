@@ -57,7 +57,7 @@ where
     S: State,
     SP: ShMemProvider + 'static,
 {
-    /// We only send 1 testcase for every `sampling_rate` corpus
+    /// We only send 1 testcase for every `throttle` second
     pub(crate) throttle: Option<Duration>,
     /// We sent last message at `last_sent`
     last_sent: Duration,
@@ -120,7 +120,7 @@ impl LlmpEventManagerBuilder<()> {
 impl<EMH> LlmpEventManagerBuilder<EMH> {
     /// Change the sampling rate
     #[must_use]
-    pub fn sampling_rate(mut self, throttle: Duration) -> Self {
+    pub fn throttle(mut self, throttle: Duration) -> Self {
         self.throttle = Some(throttle);
         self
     }
