@@ -410,11 +410,27 @@ bool AnalysisPass::runOnModule(Module &M) {
   */
   bool run = true;
 
-  bool done_already = file_exist("/out/." + genericFilePath + ".json");
+  std::string output_dir;
+  const char *path = std::getenv("ANALYSIS_OUTPUT");
+  if (path != nullptr) {
+    output_dir = path;
+    if (std::filesystem::exists(output_dir) &&
+        std::filesystem::is_directory(output_dir)) {
+      // good
+    } else {
+      std::cerr << "Output path is empty!" << std::endl;
+    }
+    // Use the output_dir string here
+  } else {
+    std::cerr << "Output path not set!" << std::endl;
+  }
+  bool done_already =
+      file_exist(output_dir + std::string("/") + genericFilePath + ".json");
   if (done_already) {
     run = false;
   } else {
-    std::ofstream out_lock("/out/." + genericFilePath + ".json");
+    std::ofstream out_lock(output_dir + std::string("/") + genericFilePath +
+                           ".json");
   }
 
   if (run) {
@@ -457,7 +473,9 @@ bool AnalysisPass::runOnModule(Module &M) {
       // now we get the sha256sum for this function. (mangled function name
       // should be unique else it will result in linker error) by this we make a
       // map (<fn name> |-> <analysis data>)
-      std::size_t function_id = std::hash<std::string>{}(F.getName().str());
+      std::size_t hashed = std::hash<std::string>{}(F.getName().str());
+      // cast again as string, it's json, key has to be a string
+      std::string function_id = std::to_string(hashed);
 
       for (auto &BB : F) {
         bb_to_cur_loc[&BB] = bb_cnt;
@@ -598,38 +616,38 @@ bool AnalysisPass::runOnModule(Module &M) {
 
       std::string fnname = std::string(F.getName());
 
-      res[fnname]["ID"] = function_id;
+      res[function_id]["name"] = fnname;
 
-      if (bb_cnt) { res[fnname]["# BBs"] = bb_cnt; }
+      if (bb_cnt) { res[function_id]["# BBs"] = bb_cnt; }
 
-      if (inst_cnt) { res[fnname]["# insts"] = inst_cnt; }
+      if (inst_cnt) { res[function_id]["# insts"] = inst_cnt; }
 
-      if (edges_cnt) { res[fnname]["# edges"] = edges_cnt; }
+      if (edges_cnt) { res[function_id]["# edges"] = edges_cnt; }
 
-      if (binary_op_cnt) { res[fnname]["# binaryOp"] = binary_op_cnt; }
+      if (binary_op_cnt) { res[function_id]["# binaryOp"] = binary_op_cnt; }
 
-      if (call_cnt) { res[fnname]["# call"] = call_cnt; }
+      if (call_cnt) { res[function_id]["# call"] = call_cnt; }
 
-      if (cmp_cnt) { res[fnname]["# cmp"] = cmp_cnt; }
+      if (cmp_cnt) { res[function_id]["# cmp"] = cmp_cnt; }
 
-      if (load_cnt) { res[fnname]["# load"] = load_cnt; }
+      if (load_cnt) { res[function_id]["# load"] = load_cnt; }
 
-      if (store_cnt) { res[fnname]["# store"] = store_cnt; }
+      if (store_cnt) { res[function_id]["# store"] = store_cnt; }
 
-      if (alloca_cnt) { res[fnname]["# alloca"] = alloca_cnt; }
+      if (alloca_cnt) { res[function_id]["# alloca"] = alloca_cnt; }
 
-      if (branch_cnt) { res[fnname]["# branch"] = branch_cnt; }
+      if (branch_cnt) { res[function_id]["# branch"] = branch_cnt; }
 
-      res[fnname]["ABC metric"] =
+      res[function_id]["ABC metric"] =
           sqrt(alloca_cnt * alloca_cnt + branch_cnt * branch_cnt +
                call_cnt * call_cnt);
-      res[fnname]["cyclomatic"] = edges_cnt - bb_cnt + 2;
+      res[function_id]["cyclomatic"] = edges_cnt - bb_cnt + 2;
 
       // outs() << "APIs:\n";
       for (auto record = APIcalls.begin(); record != APIcalls.end(); record++) {
         auto key = record->getFirst();
         if (!isLLVMIntrinsicFn(key)) {
-          res[fnname]["AP"][std::string(key)] = APIcalls[key];
+          res[function_id]["AP"][std::string(key)] = APIcalls[key];
           // outs() << key << " " << APIcalls[key] << "\n";
         }
       }
@@ -638,7 +656,7 @@ bool AnalysisPass::runOnModule(Module &M) {
       // outs() << "memoryAPIs:\n";
       for (auto record = heapAPIs.begin(); record != heapAPIs.end(); record++) {
         auto key = record->getFirst();
-        res[fnname]["h AP"][std::string(key)] = heapAPIs[key];
+        res[function_id]["h AP"][std::string(key)] = heapAPIs[key];
         // outs() << key << " " << heapAPIs[key] << "\n";
       }
       // outs() << "\n";
@@ -646,28 +664,28 @@ bool AnalysisPass::runOnModule(Module &M) {
       for (auto record = memoryAPIs.begin(); record != memoryAPIs.end();
            record++) {
         auto key = record->getFirst();
-        res[fnname]["m AP"][std::string(key)] = memoryAPIs[key];
+        res[function_id]["m AP"][std::string(key)] = memoryAPIs[key];
         // outs() << key << " " << memoryAPIs[key] << "\n";
       }
 
       for (auto record = nestedLevel.begin(); record != nestedLevel.end();
            record++) {
         auto key = record->first;
-        res[fnname]["ne lv"][std::to_string(key)] = nestedLevel[key];
+        res[function_id]["ne lv"][std::to_string(key)] = nestedLevel[key];
         // outs() << key << " " << memoryAPIs[key] << "\n";
       }
 
       for (auto record = cmpGlobals.begin(); record != cmpGlobals.end();
            record++) {
         auto key = record->first;
-        res[fnname]["cm gl"][std::to_string(key)] = cmpGlobals[key];
+        res[function_id]["cm gl"][std::to_string(key)] = cmpGlobals[key];
         // outs() << key << " " << memoryAPIs[key] << "\n";
       }
 
       for (auto record = cmpNonZeros.begin(); record != cmpNonZeros.end();
            record++) {
         auto key = record->first;
-        res[fnname]["cm nz"][std::to_string(key)] = cmpNonZeros[key];
+        res[function_id]["cm nz"][std::to_string(key)] = cmpNonZeros[key];
         // outs() << key << " " << memoryAPIs[key] << "\n";
       }
 
@@ -676,7 +694,7 @@ bool AnalysisPass::runOnModule(Module &M) {
            record++) {
         auto key = record->getFirst();
         // Some are nameless struct
-        res[fnname]["wr st"][std::string(key)] = structWrites[key];
+        res[function_id]["wr st"][std::string(key)] = structWrites[key];
         // outs() << key << " " << structWrites[key] << "\n";
       }
       // outs() << "\n";
@@ -685,28 +703,28 @@ bool AnalysisPass::runOnModule(Module &M) {
       for (auto record = structArgs.begin(); record != structArgs.end();
            record++) {
         auto key = record->first;
-        res[fnname]["str arg"][std::string(key)] = record->second;
+        res[function_id]["str arg"][std::string(key)] = record->second;
         // outs() << key << " " << record->second << "\n";
       }
       // outs() << "\n";
 
       // outs() << "CmpTypes:\n";
       for (auto record = cmpTypes.begin(); record != cmpTypes.end(); record++) {
-        res[fnname]["cm ty"][record->first] = record->second;
+        res[function_id]["cm ty"][record->first] = record->second;
         // outs() << record->first << " " << record->second << "\n";
       }
       // outs() << "\n";
 
       for (auto record = cmpComplexity.begin(); record != cmpComplexity.end();
            record++) {
-        res[fnname]["cm cm"][record->first] = record->second;
+        res[function_id]["cm cm"][record->first] = record->second;
         // outs() << record->first << " " << record->second << "\n";
       }
 
       // outs() << "CallArgTypes:\n";
       for (auto record = callArgTypes.begin(); record != callArgTypes.end();
            record++) {
-        res[fnname]["ar ty"][record->first] = record->second;
+        res[function_id]["ar ty"][record->first] = record->second;
         // outs() << record->first << " " << record->second << "\n";
       }
       // outs() << "\n";
@@ -714,7 +732,7 @@ bool AnalysisPass::runOnModule(Module &M) {
       // outs() << "storeTypes:\n";
       for (auto record = storeTypes.begin(); record != storeTypes.end();
            record++) {
-        res[fnname]["st ty"][record->first] = record->second;
+        res[function_id]["st ty"][record->first] = record->second;
         // outs() << record->first << " " << record->second << "\n";
       }
       // outs() << "\n";
@@ -722,7 +740,7 @@ bool AnalysisPass::runOnModule(Module &M) {
       // outs() << "loadTypes:\n";
       for (auto record = loadTypes.begin(); record != loadTypes.end();
            record++) {
-        res[fnname]["l ty"][record->first] = record->second;
+        res[function_id]["l ty"][record->first] = record->second;
         // outs() << record->first << " " << record->second << "\n";
       }
       // outs() << "\n";
@@ -730,20 +748,21 @@ bool AnalysisPass::runOnModule(Module &M) {
       // outs() << "allocaTypes:\n";
       for (auto record = allocaTypes.begin(); record != allocaTypes.end();
            record++) {
-        res[fnname]["al ty"][record->first] = record->second;
+        res[function_id]["al ty"][record->first] = record->second;
         // outs() << record->first << " " << record->second << "\n";
       }
       // outs() << "\n";
 
-      if (getenv("ANALYSIS_OUTPUT_PATH")) {
-        if (std::ofstream(getenv("ANALYSIS_OUTPUT_PATH") + std::string("/") +
+      if (getenv("ANALYSIS_OUTPUT")) {
+        if (std::ofstream(getenv("ANALYSIS_OUTPUT") + std::string("/") +
                           genericFilePath + ".json")
             << res << "\n") {
         } else {
-          abort();
+          errs() << "Failed to write the data"
+                 << "\n";
         }
       } else {
-        errs() << "output path not set!"
+        errs() << "Failed to write the data, output path not set!"
                << "\n";
       }
     }

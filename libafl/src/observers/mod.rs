@@ -16,9 +16,9 @@ pub use stacktrace::*;
 
 /// Profiler observer
 #[cfg(feature = "std")]
-pub mod profiler;
+pub mod profiling;
 #[cfg(feature = "std")]
-pub use profiler::*;
+pub use profiling::*;
 
 pub mod concolic;
 pub mod map;
