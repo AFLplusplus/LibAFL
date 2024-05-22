@@ -498,6 +498,10 @@ pub fn build(
 
         let mut link_command = cpp_compiler.to_command();
 
+        for arg in &cmd {
+            println!("{} is a valid path: {}", arg, Path::new(arg).exists());
+        }
+
         link_command
             .current_dir(&libafl_qemu_build_dir)
             .arg("-o")
