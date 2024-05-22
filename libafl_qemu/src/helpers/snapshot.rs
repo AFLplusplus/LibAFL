@@ -25,11 +25,11 @@ use crate::SYS_mmap2;
 use crate::SYS_newfstatat;
 use crate::{
     asan::QemuAsanHelper,
-    helpers::{QemuHelper, QemuHelperTuple},
+    helpers::{QemuHelper, QemuHelperTuple, Range},
     hooks::{Hook, QemuHooks},
     qemu::SyscallHookResult,
-    Qemu, SYS_fstat, SYS_fstatfs, SYS_futex, SYS_getrandom, SYS_mprotect, SYS_mremap, SYS_munmap,
-    SYS_pread64, SYS_read, SYS_readlinkat, SYS_statfs,
+    Qemu, SYS_brk, SYS_fstat, SYS_fstatfs, SYS_futex, SYS_getrandom, SYS_mprotect, SYS_mremap,
+    SYS_munmap, SYS_pread64, SYS_read, SYS_readlinkat, SYS_statfs,
 };
 
 // TODO use the functions provided by Qemu
@@ -73,6 +73,17 @@ pub struct MappingInfo {
     pub size: usize,
 }
 
+/// Filter used to select which pages should be snapshotted or not.
+///
+/// It is supposed to be used primarily for debugging, its usage is discouraged.
+/// If you end up needing it, you most likely have an issue with the snapshot system.
+/// If this is the case, please [fill in an issue on the main repository](https://github.com/AFLplusplus/LibAFL/issues).
+pub enum IntervalSnapshotFilter {
+    All,
+    AllowList(Vec<Range<GuestAddr>>),
+    DenyList(Vec<Range<GuestAddr>>),
+}
+
 pub struct QemuSnapshotHelper {
     pub accesses: ThreadLocal<UnsafeCell<SnapshotAccessInfo>>,
     pub maps: MappingInfo,
@@ -84,6 +95,7 @@ pub struct QemuSnapshotHelper {
     pub stop_execution: Option<StopExecutionCallback>,
     pub empty: bool,
     pub accurate_unmap: bool,
+    pub interval_filter: Vec<IntervalSnapshotFilter>,
 }
 
 impl core::fmt::Debug for QemuSnapshotHelper {
@@ -114,6 +126,24 @@ impl QemuSnapshotHelper {
             stop_execution: None,
             empty: true,
             accurate_unmap: false,
+            interval_filter: Vec::<IntervalSnapshotFilter>::new(),
+        }
+    }
+
+    #[must_use]
+    pub fn with_filters(interval_filter: Vec<IntervalSnapshotFilter>) -> Self {
+        Self {
+            accesses: ThreadLocal::new(),
+            maps: MappingInfo::default(),
+            new_maps: Mutex::new(MappingInfo::default()),
+            pages: HashMap::default(),
+            brk: 0,
+            mmap_start: 0,
+            mmap_limit: 0,
+            stop_execution: None,
+            empty: true,
+            accurate_unmap: false,
+            interval_filter,
         }
     }
 
@@ -130,11 +160,31 @@ impl QemuSnapshotHelper {
             stop_execution: Some(stop_execution),
             empty: true,
             accurate_unmap: false,
+            interval_filter: Vec::<IntervalSnapshotFilter>::new(),
         }
     }
 
     pub fn use_accurate_unmapping(&mut self) {
         self.accurate_unmap = true;
+    }
+
+    pub fn to_skip(&self, addr: GuestAddr) -> bool {
+        for filter in &self.interval_filter {
+            match filter {
+                IntervalSnapshotFilter::All => return false,
+                IntervalSnapshotFilter::AllowList(allow_list) => {
+                    if allow_list.iter().any(|range| range.contains(&addr)) {
+                        return false;
+                    }
+                }
+                IntervalSnapshotFilter::DenyList(deny_list) => {
+                    if deny_list.iter().any(|range| range.contains(&addr)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
     }
 
     #[allow(clippy::uninit_assumed_init)]
@@ -146,6 +196,10 @@ impl QemuSnapshotHelper {
         for map in qemu.mappings() {
             let mut addr = map.start();
             while addr < map.end() {
+                if self.to_skip(addr) {
+                    addr += SNAPSHOT_PAGE_SIZE as GuestAddr;
+                    continue;
+                }
                 let mut info = SnapshotPageInfo {
                     addr,
                     perms: map.flags(),
@@ -224,6 +278,10 @@ impl QemuSnapshotHelper {
             let mut addr = map.start();
             // assert_eq!(addr & SNAPSHOT_PAGE_MASK, 0);
             while addr < map.end() {
+                if self.to_skip(addr) {
+                    addr += SNAPSHOT_PAGE_SIZE as GuestAddr;
+                    continue;
+                }
                 if let Some(saved_page) = saved_pages_list.remove(&addr) {
                     if saved_page.perms.readable() {
                         let mut current_page_content: MaybeUninit<[u8; SNAPSHOT_PAGE_SIZE]> =
@@ -326,7 +384,7 @@ impl QemuSnapshotHelper {
         {
             let new_maps = self.new_maps.get_mut().unwrap();
 
-            log::info!("Start restore");
+            log::debug!("Start restore");
 
             for acc in &mut self.accesses {
                 unsafe { &mut (*acc.get()) }.dirty.retain(|page| {
@@ -416,7 +474,7 @@ impl QemuSnapshotHelper {
         #[cfg(feature = "paranoid_debug")]
         self.check_snapshot(qemu);
 
-        log::info!("End restore");
+        log::debug!("End restore");
     }
 
     pub fn is_unmap_allowed(&mut self, start: GuestAddr, mut size: usize) -> bool {
@@ -589,14 +647,18 @@ impl QemuSnapshotHelper {
             }
         }
 
+        let mut to_unmap = vec![];
         for entry in new_maps.tree.query(0..GuestAddr::MAX) {
-            drop(qemu.unmap(
-                entry.interval.start,
-                (entry.interval.end - entry.interval.start) as usize,
-            ));
+            to_unmap.push((*entry.interval, entry.value.changed, entry.value.perms));
+        }
+        for (i, ..) in to_unmap {
+            drop(qemu.unmap(i.start, (i.end - i.start) as usize));
+            new_maps.tree.delete(i);
         }
 
-        *new_maps = self.maps.clone();
+        new_maps.tree.clear();
+        new_maps.tree = self.maps.tree.clone();
+        new_maps.size = self.maps.size;
     }
 }
 
@@ -756,6 +818,16 @@ where
         SYS_getrandom => {
             let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
             h.access(a0, a1 as usize);
+        }
+        SYS_brk => {
+            let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
+            if h.brk != result && result != 0 {
+                /* brk has changed. we change mapping from the snapshotted brk address to the new target_brk
+                 * If no brk mapping has been made until now, change_mapped won't change anything and just create a new mapping.
+                 * It is safe to assume RW perms here
+                 */
+                h.change_mapped(h.brk, (result - h.brk) as usize, Some(MmapPerms::ReadWrite));
+            }
         }
         // mmap syscalls
         sys_const => {
