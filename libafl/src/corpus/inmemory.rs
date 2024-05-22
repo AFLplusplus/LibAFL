@@ -264,6 +264,12 @@ where
         self._insert(testcase, false)
     }
 
+    #[must_use]
+    /// Peek the next free corpus id
+    pub fn peek_next_free_id(&self) -> CorpusId {
+        CorpusId::from(self.progressive_idx)
+    }
+
     /// Insert a testcase assigning a `CorpusId` to it
     pub fn insert_disabled(&mut self, testcase: RefCell<Testcase<I>>) -> CorpusId {
         self._insert(testcase, true)
@@ -428,6 +434,12 @@ where
     #[inline]
     fn current_mut(&mut self) -> &mut Option<CorpusId> {
         &mut self.current
+    }
+
+    /// Peek the next free corpus id
+    #[inline]
+    fn peek_next_free_id(&self) -> CorpusId {
+        self.storage.peek_next_free_id()
     }
 
     #[inline]
