@@ -527,6 +527,8 @@ jobs:
         run: ./scripts/shmem_limits_macos.sh
       - name: Run Tests
         run: cargo test
+      - name: Clippy
+        run: cargo +nightly clippy --tests --all
 
   ios:
     runs-on: macOS-latest

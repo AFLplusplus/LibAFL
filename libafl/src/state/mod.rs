@@ -31,7 +31,7 @@ use crate::monitors::ClientPerfMonitor;
 #[cfg(feature = "scalability_introspection")]
 use crate::monitors::ScalabilityMonitor;
 use crate::{
-    corpus::{Corpus, CorpusId, HasCurrentCorpusIdx, HasTestcase, Testcase},
+    corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
     events::{Event, EventFirer, LogSeverity},
     feedbacks::Feedback,
     fuzzer::{Evaluator, ExecuteInputResult},
@@ -53,7 +53,7 @@ pub trait State:
     + DeserializeOwned
     + MaybeHasClientPerfMonitor
     + MaybeHasScalabilityMonitor
-    + HasCurrentCorpusIdx
+    + HasCurrentCorpusId
     + HasCurrentStage
 {
 }
@@ -458,7 +458,7 @@ impl<I, C, R, SC> HasStartTime for StdState<I, C, R, SC> {
     }
 }
 
-impl<I, C, R, SC> HasCurrentCorpusIdx for StdState<I, C, R, SC> {
+impl<I, C, R, SC> HasCurrentCorpusId for StdState<I, C, R, SC> {
     fn set_corpus_idx(&mut self, idx: CorpusId) -> Result<(), Error> {
         self.corpus_idx = Some(idx);
         Ok(())
@@ -469,7 +469,7 @@ impl<I, C, R, SC> HasCurrentCorpusIdx for StdState<I, C, R, SC> {
         Ok(())
     }
 
-    fn current_corpus_idx(&self) -> Result<Option<CorpusId>, Error> {
+    fn current_corpus_id(&self) -> Result<Option<CorpusId>, Error> {
         Ok(self.corpus_idx)
     }
 }
@@ -504,10 +504,10 @@ where
 impl<I, T> HasCurrentTestcase<I> for T
 where
     I: Input,
-    T: HasCorpus + HasCurrentCorpusIdx + UsesInput<Input = I>,
+    T: HasCorpus + HasCurrentCorpusId + UsesInput<Input = I>,
 {
     fn current_testcase(&self) -> Result<Ref<'_, Testcase<I>>, Error> {
-        let Some(corpus_id) = self.current_corpus_idx()? else {
+        let Some(corpus_id) = self.current_corpus_id()? else {
             return Err(Error::key_not_found(
                 "We are not currently processing a testcase",
             ));
@@ -517,7 +517,7 @@ where
     }
 
     fn current_testcase_mut(&self) -> Result<RefMut<'_, Testcase<I>>, Error> {
-        let Some(corpus_id) = self.current_corpus_idx()? else {
+        let Some(corpus_id) = self.current_corpus_id()? else {
             return Err(Error::illegal_state(
                 "We are not currently processing a testcase",
             ));
@@ -1203,7 +1203,7 @@ impl<I> HasRand for NopState<I> {
 
 impl<I> State for NopState<I> where I: Input {}
 
-impl<I> HasCurrentCorpusIdx for NopState<I> {
+impl<I> HasCurrentCorpusId for NopState<I> {
     fn set_corpus_idx(&mut self, _idx: CorpusId) -> Result<(), Error> {
         Ok(())
     }
@@ -1212,7 +1212,7 @@ impl<I> HasCurrentCorpusIdx for NopState<I> {
         Ok(())
     }
 
-    fn current_corpus_idx(&self) -> Result<Option<CorpusId>, Error> {
+    fn current_corpus_id(&self) -> Result<Option<CorpusId>, Error> {
         Ok(None)
     }
 }

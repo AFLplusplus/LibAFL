@@ -529,6 +529,8 @@ mod tests {
                 }
             }
         }
+
+        frida_helper.deinit(GUM.get().expect("Gum uninitialized"));
     }
 
     #[test]

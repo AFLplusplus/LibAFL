@@ -45,6 +45,8 @@ pub trait FridaRuntime: 'static + Debug {
         ranges: &RangeMap<usize, (u16, String)>,
         module_map: &Rc<ModuleMap>,
     );
+    /// Deinitialization
+    fn deinit(&mut self, gum: &Gum);
 
     /// Method called before execution
     fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>;
@@ -63,6 +65,9 @@ pub trait FridaRuntimeTuple: MatchFirstType + Debug {
         module_map: &Rc<ModuleMap>,
     );
 
+    /// Deinitialization
+    fn deinit_all(&mut self, gum: &Gum);
+
     /// Method called before execution
     fn pre_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>;
 
@@ -78,6 +83,8 @@ impl FridaRuntimeTuple for () {
         _module_map: &Rc<ModuleMap>,
     ) {
     }
+    fn deinit_all(&mut self, _gum: &Gum) {}
+
     fn pre_exec_all<I: Input + HasTargetBytes>(&mut self, _input: &I) -> Result<(), Error> {
         Ok(())
     }
@@ -99,6 +106,11 @@ where
     ) {
         self.0.init(gum, ranges, module_map);
         self.1.init_all(gum, ranges, module_map);
+    }
+
+    fn deinit_all(&mut self, gum: &Gum) {
+        self.0.deinit(gum);
+        self.1.deinit_all(gum);
     }
 
     fn pre_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
@@ -573,6 +585,11 @@ where
                 ));
             }
         }
+    }
+
+    /// Clean up all runtimes
+    pub fn deinit(&mut self, gum: &Gum) {
+        (*self.runtimes).borrow_mut().deinit_all(gum);
     }
 
     /*
