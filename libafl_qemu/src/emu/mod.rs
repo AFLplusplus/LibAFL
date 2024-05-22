@@ -97,6 +97,7 @@ where
 pub enum ExitHandlerError {
     QemuExitReasonError(EmulatorExitError),
     SMError(SnapshotManagerError),
+    SMCheckError(SnapshotManagerCheckError),
     CommandError(CommandError),
     UnhandledSignal(Signal),
     MultipleSnapshotDefinition,
@@ -170,6 +171,12 @@ impl From<SnapshotManagerError> for ExitHandlerError {
     }
 }
 
+impl From<SnapshotManagerCheckError> for ExitHandlerError {
+    fn from(sm_check_error: SnapshotManagerCheckError) -> Self {
+        ExitHandlerError::SMCheckError(sm_check_error)
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct SnapshotId {
     id: u64,
@@ -195,7 +202,7 @@ pub trait IsSnapshotManager: Debug + Clone {
     ) -> Result<(), SnapshotManagerCheckError> {
         let check_result = self
             .do_check(reference_snapshot_id, qemu)
-            .or_else(|err| Err(SnapshotManagerCheckError::SnapshotManagerError(err)))?;
+            .map_err(SnapshotManagerCheckError::SnapshotManagerError)?;
 
         if check_result == QemuSnapshotCheckResult::default() {
             Ok(())
