@@ -2,9 +2,8 @@
 
 use core::marker::PhantomData;
 
-use super::StageId;
 use crate::{
-    stages::{HasCurrentStage, HasNestedStageStatus, Stage, StagesTuple},
+    stages::{HasCurrentStage, HasNestedStageStatus, Stage, StageId, StagesTuple},
     state::UsesState,
     Error,
 };
