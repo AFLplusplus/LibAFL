@@ -139,10 +139,7 @@ where
     }
 }
 
-impl<S> HasInstrumentationFilter<(), S> for ()
-where
-    S: UsesInput,
-{
+impl HasInstrumentationFilter<()> for () {
     fn filter(&self) -> &() {
         self
     }
@@ -152,10 +149,9 @@ where
     }
 }
 
-impl<Head, F, S> HasInstrumentationFilter<F, S> for (Head, ())
+impl<Head, F> HasInstrumentationFilter<F> for (Head, ())
 where
-    Head: QemuHelper<S> + HasInstrumentationFilter<F, S>,
-    S: UsesInput,
+    Head: HasInstrumentationFilter<F>,
     F: IsFilter,
 {
     fn filter(&self) -> &F {
@@ -260,7 +256,7 @@ impl IsFilter for Vec<Range<GuestAddr>> {
     }
 }
 
-pub trait HasInstrumentationFilter<F, S>
+pub trait HasInstrumentationFilter<F>
 where
     F: IsFilter,
 {
@@ -275,15 +271,15 @@ where
 }
 
 #[cfg(emulation_mode = "usermode")]
-pub trait StdInstrumentationFilter<S: UsesInput>:
-    HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter, S>
+pub trait StdInstrumentationFilter:
+    HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter>
 {
 }
 
 #[cfg(emulation_mode = "systemmode")]
-pub trait StdInstrumentationFilter<S: UsesInput>:
-    HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter, S>
-    + HasInstrumentationFilter<QemuInstrumentationPagingFilter, S>
+pub trait StdInstrumentationFilter:
+    HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter>
+    + HasInstrumentationFilter<QemuInstrumentationPagingFilter>
 {
 }
 
@@ -292,7 +288,7 @@ static mut EMPTY_ADDRESS_FILTER: UnsafeCell<QemuInstrumentationAddressRangeFilte
 static mut EMPTY_PAGING_FILTER: UnsafeCell<QemuInstrumentationPagingFilter> =
     UnsafeCell::new(QemuFilterList::None);
 
-impl<S> HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter, S> for () {
+impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for () {
     fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
         &QemuFilterList::None
     }
@@ -302,7 +298,7 @@ impl<S> HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter, S> for (
     }
 }
 
-impl<S> HasInstrumentationFilter<QemuInstrumentationPagingFilter, S> for () {
+impl HasInstrumentationFilter<QemuInstrumentationPagingFilter> for () {
     fn filter(&self) -> &QemuInstrumentationPagingFilter {
         &QemuFilterList::None
     }
@@ -313,28 +309,23 @@ impl<S> HasInstrumentationFilter<QemuInstrumentationPagingFilter, S> for () {
 }
 
 #[cfg(emulation_mode = "systemmode")]
-impl<Head, S> StdInstrumentationFilter<S> for (Head, ())
-where
-    Head: QemuHelper<S>
-        + HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter, S>
-        + HasInstrumentationFilter<QemuInstrumentationPagingFilter, S>,
-    S: UsesInput,
+impl<Head> StdInstrumentationFilter for (Head, ()) where
+    Head: HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter>
+        + HasInstrumentationFilter<QemuInstrumentationPagingFilter>
 {
 }
 
 #[cfg(emulation_mode = "usermode")]
-impl<Head, S> StdInstrumentationFilter<S> for (Head, ())
-where
-    Head: QemuHelper<S> + HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter, S>,
-    S: UsesInput,
+impl<Head> StdInstrumentationFilter for (Head, ()) where
+    Head: HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter>
 {
 }
 
 #[cfg(emulation_mode = "systemmode")]
-impl<S> StdInstrumentationFilter<S> for () where S: UsesInput {}
+impl StdInstrumentationFilter for () {}
 
 #[cfg(emulation_mode = "usermode")]
-impl<S> StdInstrumentationFilter<S> for () where S: UsesInput {}
+impl StdInstrumentationFilter for () {}
 
 pub trait IsFilter: Debug {
     type FilterParameter;

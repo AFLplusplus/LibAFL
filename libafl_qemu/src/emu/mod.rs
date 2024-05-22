@@ -295,7 +295,7 @@ where
 // TODO: replace handlers with generics to permit compile-time customization of handlers
 impl<QT, S, SM> EmulatorExitHandler<QT, S> for StdEmulatorExitHandler<SM>
 where
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
+    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
     S: State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,

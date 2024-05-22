@@ -1163,6 +1163,16 @@ impl<I> NopState<I> {
     }
 }
 
+impl<I> HasMaxSize for NopState<I> {
+    fn max_size(&self) -> usize {
+        16_384
+    }
+
+    fn set_max_size(&mut self, _max_size: usize) {
+        unimplemented!("NopState doesn't allow setting a max size")
+    }
+}
+
 impl<I> UsesInput for NopState<I>
 where
     I: Input,

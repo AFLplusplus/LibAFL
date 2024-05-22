@@ -308,12 +308,9 @@ jobs:
           - ./fuzzers/backtrace_baby_fuzzers
           - ./fuzzers/fuzzbench_qemu
           - ./fuzzers/nyx_libxml2_parallel
-          # - ./fuzzers/qemu_launcher
           - ./fuzzers/frida_gdiplus
           - ./fuzzers/libfuzzer_stb_image_concolic
           - ./fuzzers/nautilus_sync
-          # - ./fuzzers/qemu_cmin
-          # - ./fuzzers/qemu_systemmode
           - ./fuzzers/push_harness
           - ./fuzzers/libfuzzer_libpng_centralized
           - ./fuzzers/baby_fuzzer_nautilus
@@ -337,7 +334,6 @@ jobs:
           - ./fuzzers/fuzzbench_forkserver
           # - ./fuzzers/libfuzzer_windows_asan
           - ./fuzzers/baby_fuzzer_minimizing
-          # - ./fuzzers/qemu_coverage
           - ./fuzzers/frida_executable_libpng
           - ./fuzzers/tutorial
           - ./fuzzers/baby_fuzzer_tokens
@@ -351,10 +347,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/workflows/fuzzer-tester-prepare
-      - name: Symlink Headers
-        if: runner.os == 'Linux'
-        shell: bash
-        run: sudo ln -s /usr/include/asm-generic /usr/include/asm
       - name: Build and run example fuzzers (Linux)
         if: runner.os == 'Linux'
         shell: bash
@@ -393,11 +385,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/workflows/qemu-fuzzer-tester-prepare
-      - uses: ./.github/workflows/fuzzer-tester-prepare
-      - name: Symlink Headers
-        if: runner.os == 'Linux'
-        shell: bash
-        run: sudo ln -s /usr/include/asm-generic /usr/include/asm
       - name: Build and run example QEMU fuzzers (Linux)
         if: runner.os == 'Linux'
         shell: bash

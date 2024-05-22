@@ -7,7 +7,7 @@ use libafl_bolts::{rands::Rand, Error};
 use crate::{
     corpus::{Corpus, CorpusId},
     impl_default_multipart,
-    inputs::{multi::MultipartInput, HasBytesVec, Input},
+    inputs::{multi::MultipartInput, HasMutatorBytes, Input},
     mutators::{
         mutations::{
             rand_range, BitFlipMutator, ByteAddMutator, ByteDecMutator, ByteFlipMutator,
@@ -117,7 +117,7 @@ impl_default_multipart!(
 impl<I, S> Mutator<MultipartInput<I>, S> for CrossoverInsertMutator<I>
 where
     S: HasCorpus<Input = MultipartInput<I>> + HasMaxSize + HasRand,
-    I: Input + HasBytesVec,
+    I: Input + HasMutatorBytes,
 {
     fn mutate(
         &mut self,
@@ -221,7 +221,7 @@ where
 impl<I, S> Mutator<MultipartInput<I>, S> for CrossoverReplaceMutator<I>
 where
     S: HasCorpus<Input = MultipartInput<I>> + HasMaxSize + HasRand,
-    I: Input + HasBytesVec,
+    I: Input + HasMutatorBytes,
 {
     fn mutate(
         &mut self,

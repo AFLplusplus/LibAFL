@@ -132,9 +132,7 @@ impl Default for QemuEdgeCoverageHelper {
     }
 }
 
-impl<S: UsesInput> HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter, S>
-    for QemuEdgeCoverageHelper
-{
+impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuEdgeCoverageHelper {
     fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
         &self.address_filter
     }
@@ -145,9 +143,7 @@ impl<S: UsesInput> HasInstrumentationFilter<QemuInstrumentationAddressRangeFilte
 }
 
 #[cfg(emulation_mode = "systemmode")]
-impl<S: UsesInput> HasInstrumentationFilter<QemuInstrumentationPagingFilter, S>
-    for QemuEdgeCoverageHelper
-{
+impl HasInstrumentationFilter<QemuInstrumentationPagingFilter> for QemuEdgeCoverageHelper {
     fn filter(&self) -> &QemuInstrumentationPagingFilter {
         &self.paging_filter
     }
@@ -283,7 +279,7 @@ impl Default for QemuEdgeCoverageChildHelper {
     }
 }
 
-impl<S: UsesInput> HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter, S>
+impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter>
     for QemuEdgeCoverageChildHelper
 {
     fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
@@ -296,9 +292,7 @@ impl<S: UsesInput> HasInstrumentationFilter<QemuInstrumentationAddressRangeFilte
 }
 
 #[cfg(emulation_mode = "systemmode")]
-impl<S: UsesInput> HasInstrumentationFilter<QemuInstrumentationPagingFilter, S>
-    for QemuEdgeCoverageChildHelper
-{
+impl HasInstrumentationFilter<QemuInstrumentationPagingFilter> for QemuEdgeCoverageChildHelper {
     fn filter(&self) -> &QemuInstrumentationPagingFilter {
         &self.paging_filter
     }
@@ -432,7 +426,7 @@ impl Default for QemuEdgeCoverageClassicHelper {
     }
 }
 
-impl<S: UsesInput> HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter, S>
+impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter>
     for QemuEdgeCoverageClassicHelper
 {
     fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
@@ -445,9 +439,7 @@ impl<S: UsesInput> HasInstrumentationFilter<QemuInstrumentationAddressRangeFilte
 }
 
 #[cfg(emulation_mode = "systemmode")]
-impl<S: UsesInput> HasInstrumentationFilter<QemuInstrumentationPagingFilter, S>
-    for QemuEdgeCoverageClassicHelper
-{
+impl HasInstrumentationFilter<QemuInstrumentationPagingFilter> for QemuEdgeCoverageClassicHelper {
     fn filter(&self) -> &QemuInstrumentationPagingFilter {
         &self.paging_filter
     }
