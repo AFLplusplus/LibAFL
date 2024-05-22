@@ -9,7 +9,8 @@ use libafl_qemu_sys::GuestPhysAddr;
 
 use crate::{
     command::CommandManager, emu::IsSnapshotManager, DeviceSnapshotFilter, Emulator,
-    EmulatorExitHandler, Qemu, QemuHelperTuple, SnapshotId, SnapshotManagerError,
+    EmulatorExitHandler, Qemu, QemuHelperTuple, QemuSnapshotCheckResult, SnapshotId,
+    SnapshotManagerError,
 };
 
 impl SnapshotId {
@@ -50,6 +51,17 @@ impl IsSnapshotManager for SnapshotManager {
             SnapshotManager::Fast(fast_sm) => fast_sm.restore(snapshot_id, qemu),
         }
     }
+
+    fn do_check(
+        &self,
+        reference_snapshot_id: &SnapshotId,
+        qemu: &Qemu,
+    ) -> Result<QemuSnapshotCheckResult, SnapshotManagerError> {
+        match self {
+            SnapshotManager::Qemu(qemu_sm) => qemu_sm.do_check(reference_snapshot_id, qemu),
+            SnapshotManager::Fast(fast_sm) => fast_sm.do_check(reference_snapshot_id, qemu),
+        }
+    }
 }
 
 pub type FastSnapshotPtr = *mut libafl_qemu_sys::SyxSnapshot;
@@ -57,20 +69,18 @@ pub type FastSnapshotPtr = *mut libafl_qemu_sys::SyxSnapshot;
 #[derive(Debug, Clone)]
 pub struct FastSnapshotManager {
     snapshots: HashMap<SnapshotId, FastSnapshotPtr>,
-    check_memory_consistency: bool,
 }
 
 impl Default for FastSnapshotManager {
     fn default() -> Self {
-        Self::new(false)
+        Self::new()
     }
 }
 
 impl FastSnapshotManager {
-    pub fn new(check_memory_consistency: bool) -> Self {
+    pub fn new() -> Self {
         Self {
             snapshots: HashMap::new(),
-            check_memory_consistency,
         }
     }
 
@@ -112,6 +122,15 @@ impl IsSnapshotManager for QemuSnapshotManager {
         qemu.load_snapshot(self.snapshot_id_to_name(snapshot_id).as_str(), self.is_sync);
         Ok(())
     }
+
+    fn do_check(
+        &self,
+        _reference_snapshot_id: &SnapshotId,
+        _qemu: &Qemu,
+    ) -> Result<QemuSnapshotCheckResult, SnapshotManagerError> {
+        // We consider the qemu implementation to be 'ideal' for now.
+        Ok(QemuSnapshotCheckResult::default())
+    }
 }
 
 impl IsSnapshotManager for FastSnapshotManager {
@@ -136,18 +155,19 @@ impl IsSnapshotManager for FastSnapshotManager {
             qemu.restore_fast_snapshot(fast_snapshot_ptr);
         }
 
-        if self.check_memory_consistency {
-            let nb_inconsistencies =
-                unsafe { qemu.check_fast_snapshot_memory_consistency(fast_snapshot_ptr) };
-
-            if nb_inconsistencies > 0 {
-                return Err(SnapshotManagerError::MemoryInconsistencies(
-                    nb_inconsistencies,
-                ));
-            }
-        }
-
         Ok(())
+    }
+
+    fn do_check(
+        &self,
+        reference_snapshot_id: &SnapshotId,
+        qemu: &Qemu,
+    ) -> Result<QemuSnapshotCheckResult, SnapshotManagerError> {
+        let fast_snapshot_ptr = *self.snapshots.get(reference_snapshot_id).ok_or(
+            SnapshotManagerError::SnapshotIdNotFound(*reference_snapshot_id),
+        )?;
+
+        unsafe { Ok(qemu.check_fast_snapshot(fast_snapshot_ptr)) }
     }
 }
 
@@ -192,10 +212,6 @@ where
 
     pub unsafe fn restore_fast_snapshot(&self, snapshot: FastSnapshotPtr) {
         self.qemu.restore_fast_snapshot(snapshot)
-    }
-
-    pub unsafe fn check_fast_snapshot_memory_consistency(&self, snapshot: FastSnapshotPtr) -> u64 {
-        self.qemu.check_fast_snapshot_memory_consistency(snapshot)
     }
 
     pub fn list_devices(&self) -> Vec<String> {
