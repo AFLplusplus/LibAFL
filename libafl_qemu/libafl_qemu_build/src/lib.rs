@@ -1,18 +1,22 @@
 #![forbid(unexpected_cfgs)]
 #![allow(clippy::missing_panics_doc)]
 
+#[rustversion::nightly]
+use std::io::{BufRead, BufReader};
 use std::{
     collections::hash_map,
     env, fs,
     fs::File,
     hash::Hasher,
-    io::{BufRead, BufReader, Read, Seek, SeekFrom, Write},
+    io::{Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
     process::Command,
     ptr::addr_of_mut,
 };
 
+#[rustversion::nightly]
 use regex::Regex;
+#[rustversion::nightly]
 use rustc_version::Version;
 use which::which;
 

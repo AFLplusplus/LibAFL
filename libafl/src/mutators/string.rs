@@ -9,7 +9,7 @@ use libafl_bolts::{rands::Rand, Error, HasLen, Named};
 
 use crate::{
     corpus::{CorpusId, HasTestcase, Testcase},
-    inputs::{BytesInput, HasBytesVec},
+    inputs::{BytesInput, HasMutatorBytes},
     mutators::{rand_range, MutationResult, Mutator, Tokens},
     stages::{
         extract_metadata,
@@ -259,7 +259,7 @@ fn rand_replace_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
         }
     }
 
-    input.0.bytes_mut().splice(range, replacement);
+    input.0.splice(range, replacement);
     input.1 = extract_metadata(input.0.bytes());
 
     MutationResult::Mutated
@@ -423,7 +423,7 @@ where
                 return Ok(MutationResult::Skipped);
             }
 
-            input.0.bytes_mut().splice(range, token.iter().copied());
+            input.0.splice(range, token.iter().copied());
             input.1 = extract_metadata(input.0.bytes());
             return Ok(MutationResult::Mutated);
         }
@@ -483,7 +483,7 @@ where
                 return Ok(MutationResult::Skipped);
             }
 
-            input.0.bytes_mut().splice(range, token.iter().copied());
+            input.0.splice(range, token.iter().copied());
             input.1 = extract_metadata(input.0.bytes());
             return Ok(MutationResult::Mutated);
         }
@@ -498,7 +498,7 @@ mod test {
 
     use crate::{
         corpus::NopCorpus,
-        inputs::{BytesInput, HasBytesVec},
+        inputs::{BytesInput, HasMutatorBytes},
         mutators::{Mutator, StringCategoryRandMutator, StringSubcategoryRandMutator},
         stages::extract_metadata,
         state::StdState,

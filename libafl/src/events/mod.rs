@@ -434,6 +434,9 @@ pub trait EventFirer: UsesState {
     fn configuration(&self) -> EventConfig {
         EventConfig::AlwaysUnique
     }
+
+    /// Return if we really send this event or not
+    fn should_send(&self) -> bool;
 }
 
 /// [`ProgressReporter`] report progress to the broker.
@@ -621,6 +624,10 @@ impl<S> EventFirer for NopEventManager<S>
 where
     S: State,
 {
+    fn should_send(&self) -> bool {
+        true
+    }
+
     fn fire(
         &mut self,
         _state: &mut Self::State,
@@ -705,6 +712,10 @@ impl<EM, M> EventFirer for MonitorTypedEventManager<EM, M>
 where
     EM: EventFirer,
 {
+    fn should_send(&self) -> bool {
+        true
+    }
+
     #[inline]
     fn fire(
         &mut self,

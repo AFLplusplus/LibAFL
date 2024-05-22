@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     events::EventFirer,
     executors::{Executor, HasObservers},
-    inputs::HasBytesVec,
+    inputs::HasMutatorBytes,
     mutators::mutations::buffer_copy,
     observers::{MapObserver, ObserversTuple},
     stages::{RetryRestartHelper, Stage},
@@ -84,7 +84,7 @@ where
     EM: UsesState<State = E::State> + EventFirer,
     E: HasObservers + Executor<EM, Z>,
     E::State: HasCorpus + HasMetadata + HasRand + HasNamedMetadata,
-    E::Input: HasBytesVec,
+    E::Input: HasMutatorBytes,
     O: MapObserver,
     C: AsRef<O> + Named,
     Z: UsesState<State = E::State>,
@@ -161,7 +161,7 @@ where
     C: AsRef<O> + Named,
     E: HasObservers + Executor<EM, Z>,
     E::State: HasCorpus + HasMetadata + HasRand,
-    E::Input: HasBytesVec,
+    E::Input: HasMutatorBytes,
     Z: UsesState<State = E::State>,
 {
     #[inline]
