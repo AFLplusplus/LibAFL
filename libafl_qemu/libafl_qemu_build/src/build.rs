@@ -499,7 +499,10 @@ pub fn build(
 
         let link_str = format!("{link_command:?}");
 
-        let output = link_command.output().expect("Partial linked failure");
+        let output = match link_command.output() {
+            Ok(output) => output,
+            Err(e) => panic!("Command {link_command:?} failed: {e:?}"),
+        };
 
         if !output.status.success() {
             fs::write(libafl_qemu_build_dir.join("link.command"), link_str)

@@ -27,6 +27,7 @@ use libafl_bolts::{
     tuples::tuple_list,
 };
 use libafl_qemu::{
+    command::StdCommandManager,
     edges::{edges_map_mut_ptr, QemuEdgeCoverageHelper, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND},
     emu::Emulator,
     executor::{stateful::StatefulQemuExecutor, QemuExecutorState},
@@ -52,11 +53,15 @@ pub fn fuzz() {
         // Initialize QEMU
         let args: Vec<String> = env::args().collect();
         let env: Vec<(String, String)> = env::vars().collect();
+
         // let emu_snapshot_manager = QemuSnapshotBuilder::new(true);
         let emu_snapshot_manager = FastSnapshotManager::new(false); // Create a snapshot manager (normal or fast for now).
         let emu_exit_handler: StdEmulatorExitHandler<FastSnapshotManager> =
             StdEmulatorExitHandler::new(emu_snapshot_manager); // Create an exit handler: it is the entity taking the decision of what should be done when QEMU returns.
-        let emu = Emulator::new(&args, &env, emu_exit_handler).unwrap(); // Create the emulator
+
+        let cmd_manager = StdCommandManager::new();
+
+        let emu = Emulator::new(&args, &env, emu_exit_handler, cmd_manager).unwrap(); // Create the emulator
 
         let devices = emu.list_devices();
         println!("Devices = {:?}", devices);

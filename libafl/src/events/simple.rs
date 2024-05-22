@@ -87,6 +87,10 @@ where
     MT: Monitor,
     S: State,
 {
+    fn should_send(&self) -> bool {
+        true
+    }
+
     fn fire(
         &mut self,
         _state: &mut Self::State,
@@ -340,6 +344,10 @@ where
     S: State,
     SP: ShMemProvider,
 {
+    fn should_send(&self) -> bool {
+        true
+    }
+
     fn fire(
         &mut self,
         _state: &mut Self::State,

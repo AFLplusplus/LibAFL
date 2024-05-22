@@ -149,6 +149,12 @@ where
         self.inner.next(idx)
     }
 
+    /// Peek the next free corpus id
+    #[inline]
+    fn peek_next_free_id(&self) -> CorpusId {
+        self.inner.peek_next_free_id()
+    }
+
     #[inline]
     fn prev(&self, idx: CorpusId) -> Option<CorpusId> {
         self.inner.prev(idx)

@@ -87,6 +87,12 @@ where
         &self.empty
     }
 
+    /// Peek the next free corpus id
+    #[inline]
+    fn peek_next_free_id(&self) -> CorpusId {
+        CorpusId::from(0_usize)
+    }
+
     /// Current testcase scheduled (mutable)
     #[inline]
     fn current_mut(&mut self) -> &mut Option<CorpusId> {

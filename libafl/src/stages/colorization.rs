@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     events::EventFirer,
     executors::{Executor, HasObservers},
-    inputs::HasBytesVec,
+    inputs::HasMutatorBytes,
     mutators::mutations::buffer_copy,
     observers::{MapObserver, ObserversTuple},
     stages::{RetryRestartHelper, Stage},
@@ -52,10 +52,13 @@ impl Ord for Earlier {
     }
 }
 
+/// Default name for `ColorizationStage`; derived from ALF++
+pub const COLORIZATION_STAGE_NAME: &str = "colorization";
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
 pub struct ColorizationStage<C, E, EM, O, Z> {
     map_observer_handle: Handle<C>,
+    name: Cow<'static, str>,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, EM, O, E, Z)>,
 }
@@ -72,7 +75,7 @@ where
     E: UsesState,
 {
     fn name(&self) -> &Cow<'static, str> {
-        self.map_observer_handle.name()
+        &self.name
     }
 }
 
@@ -81,7 +84,7 @@ where
     EM: UsesState<State = E::State> + EventFirer,
     E: HasObservers + Executor<EM, Z>,
     E::State: HasCorpus + HasMetadata + HasRand + HasNamedMetadata,
-    E::Input: HasBytesVec,
+    E::Input: HasMutatorBytes,
     O: MapObserver,
     C: AsRef<O> + Named,
     Z: UsesState<State = E::State>,
@@ -158,7 +161,7 @@ where
     C: AsRef<O> + Named,
     E: HasObservers + Executor<EM, Z>,
     E::State: HasCorpus + HasMetadata + HasRand,
-    E::Input: HasBytesVec,
+    E::Input: HasMutatorBytes,
     Z: UsesState<State = E::State>,
 {
     #[inline]
@@ -308,6 +311,7 @@ where
     pub fn new(map_observer: &C) -> Self {
         Self {
             map_observer_handle: map_observer.handle(),
+            name: Cow::Borrowed(COLORIZATION_STAGE_NAME),
             phantom: PhantomData,
         }
     }

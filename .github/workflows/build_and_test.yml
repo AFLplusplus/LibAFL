@@ -16,6 +16,7 @@ concurrency:
 jobs:
   common:
     strategy:
+      fail-fast: false
       matrix:
         os: [ ubuntu-latest, windows-latest, macOS-latest ]
     runs-on: ${{ matrix.os }}
@@ -48,10 +49,10 @@ jobs:
       - name: Check for binary blobs
         if: runner.os == 'Linux'
         run: ./scripts/check_for_blobs.sh
+      - name: default nightly
+        run: rustup default nightly
       - name: Build libafl debug
         run: cargo build -p libafl
-      - name: Build the book
-        run: cd docs && mdbook build
       - name: Test the book
         # TODO: fix books test fail with updated windows-rs
         if: runner.os != 'Windows'
@@ -307,12 +308,9 @@ jobs:
           - ./fuzzers/backtrace_baby_fuzzers
           - ./fuzzers/fuzzbench_qemu
           - ./fuzzers/nyx_libxml2_parallel
-          # - ./fuzzers/qemu_launcher
           - ./fuzzers/frida_gdiplus
           - ./fuzzers/libfuzzer_stb_image_concolic
           - ./fuzzers/nautilus_sync
-          # - ./fuzzers/qemu_cmin
-          # - ./fuzzers/qemu_systemmode
           - ./fuzzers/push_harness
           - ./fuzzers/libfuzzer_libpng_centralized
           - ./fuzzers/baby_fuzzer_nautilus
@@ -336,7 +334,6 @@ jobs:
           - ./fuzzers/fuzzbench_forkserver
           # - ./fuzzers/libfuzzer_windows_asan
           - ./fuzzers/baby_fuzzer_minimizing
-          # - ./fuzzers/qemu_coverage
           - ./fuzzers/frida_executable_libpng
           - ./fuzzers/tutorial
           - ./fuzzers/baby_fuzzer_tokens
@@ -350,10 +347,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/workflows/fuzzer-tester-prepare
-      - name: Symlink Headers
-        if: runner.os == 'Linux'
-        shell: bash
-        run: sudo ln -s /usr/include/asm-generic /usr/include/asm
       - name: Build and run example fuzzers (Linux)
         if: runner.os == 'Linux'
         shell: bash
@@ -392,11 +385,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/workflows/qemu-fuzzer-tester-prepare
-      - uses: ./.github/workflows/fuzzer-tester-prepare
-      - name: Symlink Headers
-        if: runner.os == 'Linux'
-        shell: bash
-        run: sudo ln -s /usr/include/asm-generic /usr/include/asm
       - name: Build and run example QEMU fuzzers (Linux)
         if: runner.os == 'Linux'
         shell: bash
@@ -526,6 +514,8 @@ jobs:
         run: ./scripts/shmem_limits_macos.sh
       - name: Run Tests
         run: cargo test
+      - name: Clippy
+        run: cargo +nightly clippy --tests --all
 
   ios:
     runs-on: macOS-latest
@@ -558,7 +548,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
       - name: Build Android
-        run: cargo ndk -t arm64-v8a build --release
+        run: cd libafl && cargo ndk -t arm64-v8a build --release
 
     #run: cargo build --target aarch64-linux-android
     # TODO: Figure out how to properly build stuff with clang

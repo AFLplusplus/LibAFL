@@ -128,6 +128,8 @@ impl FridaRuntime for CmpLogRuntime {
         self.generate_instrumentation_blobs();
     }
 
+    fn deinit(&mut self, _gum: &frida_gum::Gum) {}
+
     fn pre_exec<I: Input + HasTargetBytes>(&mut self, _input: &I) -> Result<(), Error> {
         Ok(())
     }

@@ -42,6 +42,8 @@ impl FridaRuntime for CoverageRuntime {
     ) {
     }
 
+    fn deinit(&mut self, _gum: &frida_gum::Gum) {}
+
     fn pre_exec<I: libafl::inputs::Input + libafl::inputs::HasTargetBytes>(
         &mut self,
         _input: &I,

@@ -909,9 +909,7 @@ impl QemuAsanHelper {
     }
 }
 
-impl<S: UsesInput> HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter, S>
-    for QemuAsanHelper
-{
+impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuAsanHelper {
     fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
         &self.filter
     }

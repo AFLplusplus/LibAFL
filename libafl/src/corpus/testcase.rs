@@ -1,4 +1,4 @@
-//! The testcase is a struct embedded in each corpus.
+//! The [`Testcase`] is a struct embedded in each [`Corpus`].
 //! It will contain a respective input, and metadata.
 
 use alloc::string::String;
@@ -34,7 +34,7 @@ pub trait HasTestcase: UsesInput {
     ) -> Result<RefMut<Testcase<<Self as UsesInput>::Input>>, Error>;
 }
 
-/// An entry in the Testcase Corpus
+/// An entry in the [`Testcase`] Corpus
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
 pub struct Testcase<I>

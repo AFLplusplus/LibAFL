@@ -556,12 +556,14 @@ impl Allocator {
             &mut |range: &RangeDetails| -> bool {
                 let start = range.memory_range().base_address().0 as usize;
                 let end = start + range.memory_range().size();
-
-                if !self.is_managed(start as *mut c_void) {
+                //the shadow region should be the highest valid userspace region, so don't continue after
+                if self.is_managed(start as *mut c_void) {
+                    false
+                } else {
+                    log::trace!("Unpoisoning: {:#x}-{:#x}", start, end);
                     self.map_shadow_for_region(start, end, true);
+                    true
                 }
-
-                true
             },
         );
     }
@@ -587,6 +589,14 @@ impl Allocator {
             &mut |range: &RangeDetails| -> bool {
                 let start = range.memory_range().base_address().0 as usize;
                 let end = start + range.memory_range().size();
+                log::trace!("New range: {:#x}-{:#x}", start, end);
+
+                #[cfg(target_vendor = "apple")]
+                if start >= 0x600000000000 {
+                    //this is the MALLOC_NANO region. There is no point in spending time tracking this region as we hook malloc
+                    return false;
+                }
+
                 occupied_ranges.push((start, end));
                 // On x64, if end > 2**48, then that's in vsyscall or something.
                 #[cfg(all(unix, target_arch = "x86_64"))]
@@ -614,15 +624,17 @@ impl Allocator {
         #[cfg(windows)]
         let maxbit = 63;
         #[cfg(unix)]
-        for power in 1..64 {
+        for power in 44..64 {
             if 2_usize.pow(power) > userspace_max {
                 maxbit = power;
                 break;
             }
         }
 
+        log::trace!("max bit: {}", maxbit);
+
         {
-            for try_shadow_bit in 44..maxbit {
+            for try_shadow_bit in 44..=maxbit {
                 let addr: usize = 1 << try_shadow_bit;
                 let shadow_start = addr;
                 let shadow_end = addr + addr + addr;

@@ -15,7 +15,7 @@
 use alloc::string::ToString;
 #[cfg(feature = "std")]
 use core::marker::PhantomData;
-#[cfg(all(unix, feature = "std", feature = "fork"))]
+#[cfg(feature = "std")]
 use core::time::Duration;
 use core::{
     fmt::{self, Debug, Formatter},
@@ -48,6 +48,8 @@ use libafl_bolts::{
 use typed_builder::TypedBuilder;
 
 use super::hooks::EventManagerHooksTuple;
+#[cfg(all(unix, feature = "std"))]
+use crate::events::centralized::CentralizedEventManagerBuilder;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use crate::events::{CentralizedEventManager, CentralizedLlmpEventBroker};
 #[cfg(feature = "adaptive_serialization")]
@@ -107,6 +109,9 @@ where
     #[cfg(all(unix, feature = "std"))]
     #[builder(default = None)]
     stdout_file: Option<&'a str>,
+    /// The time in milliseconds to delay between child launches
+    #[builder(default = 10)]
+    launch_delay: u64,
     /// The actual, opened, `stdout_file` - so that we keep it open until the end
     #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[builder(setter(skip), default = None)]
@@ -251,7 +256,7 @@ where
                         self.shmem_provider.post_fork(true)?;
 
                         #[cfg(feature = "std")]
-                        std::thread::sleep(Duration::from_millis(index * 10));
+                        std::thread::sleep(Duration::from_millis(index * self.launch_delay));
 
                         #[cfg(feature = "std")]
                         if !debug_output {
@@ -399,6 +404,10 @@ where
                                 stderr = Stdio::inherit();
                             };
                         }
+
+                        #[cfg(feature = "std")]
+                        std::thread::sleep(Duration::from_millis(id as u64 * self.launch_delay));
+
                         std::env::set_var(_AFL_LAUNCHER_CLIENT, id.to_string());
                         let mut child = startable_self()?;
                         let child = (if debug_output {
@@ -508,6 +517,9 @@ where
     /// A file name to write all client output to
     #[builder(default = None)]
     stdout_file: Option<&'a str>,
+    /// The time in milliseconds to delay between child launches
+    #[builder(default = 10)]
+    launch_delay: u64,
     /// The actual, opened, `stdout_file` - so that we keep it open until the end
     #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[builder(setter(skip), default = None)]
@@ -659,7 +671,7 @@ where
                         log::info!("{:?} PostFork", unsafe { libc::getpid() });
                         self.shmem_provider.post_fork(true)?;
 
-                        std::thread::sleep(Duration::from_millis(index * 10));
+                        std::thread::sleep(Duration::from_millis(index * self.launch_delay));
 
                         if !debug_output {
                             if let Some(file) = &self.opened_stdout_file {
@@ -686,19 +698,23 @@ where
                         let builder = builder.time_ref(self.time_obs.handle());
                         let (state, mgr) = builder.build().launch()?;
 
+                        let mut centralized_builder = CentralizedEventManagerBuilder::new();
+
+                        if index == 1 {
+                            centralized_builder = centralized_builder.is_main(true);
+                        }
+
                         #[cfg(not(feature = "adaptive_serialization"))]
-                        let c_mgr = CentralizedEventManager::on_port(
+                        let c_mgr = centralized_builder.build_on_port(
                             mgr,
                             self.shmem_provider.clone(),
                             self.centralized_broker_port,
-                            index == 1,
                         )?;
                         #[cfg(feature = "adaptive_serialization")]
-                        let c_mgr = CentralizedEventManager::on_port(
+                        let c_mgr = centralized_builder.build_on_port(
                             mgr,
                             self.shmem_provider.clone(),
                             self.centralized_broker_port,
-                            index == 1,
                             self.time_obs,
                         )?;
 

@@ -228,6 +228,10 @@ mod tests {
     where
         S: State,
     {
+        fn should_send(&self) -> bool {
+            true
+        }
+
         fn fire(
             &mut self,
             _state: &mut S,
