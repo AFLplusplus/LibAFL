@@ -359,6 +359,10 @@ where
         maybe_last.ok_or_else(|| Error::illegal_argument("Can only get the last corpus ID."))
     }
 
+    fn peek_next_free_id(&self) -> CorpusId {
+        CorpusId::from(self.count)
+    }
+
     // This just calls Self::get as ArtifactCorpus disregards disabled entries
     fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error> {
         self.get(id)
