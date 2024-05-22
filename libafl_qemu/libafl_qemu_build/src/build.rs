@@ -499,7 +499,11 @@ pub fn build(
         let mut link_command = cpp_compiler.to_command();
 
         for arg in &cmd {
-            println!("{} is a valid path: {}", arg, Path::new(arg).exists());
+            println!(
+                "{} is a valid path: {}",
+                arg,
+                libafl_qemu_build_dir.join(arg).exists()
+            );
         }
 
         link_command
