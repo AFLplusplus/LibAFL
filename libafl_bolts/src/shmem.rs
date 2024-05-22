@@ -318,6 +318,50 @@ pub trait ShMemProvider: Clone + Default + Debug {
     }
 }
 
+/// An ShMemProvider that does not provide any [`ShMem`].`
+#[derive(Debug, Clone, Default)]
+pub struct NopShMemProvider;
+
+impl ShMemProvider for NopShMemProvider {
+    type ShMem = NopShMem;
+
+    fn new() -> Result<Self, Error> {
+        Ok(Self)
+    }
+
+    fn new_shmem(&mut self, _map_size: usize) -> Result<Self::ShMem, Error> {
+        Ok(NopShMem::default())
+    }
+
+    fn shmem_from_id_and_size(&mut self, _id: ShMemId, _size: usize) -> Result<Self::ShMem, Error> {
+        Ok(NopShMem::default())
+    }
+}
+
+/// An ShMemProvider that does not provide any [`ShMem`].`
+#[derive(Debug, Clone, Default)]
+pub struct NopShMem;
+
+impl ShMem for NopShMem {
+    fn id(&self) -> ShMemId {
+        ShMemId::default()
+    }
+}
+
+impl DerefMut for NopShMem {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unimplemented!("NopShMem does not actually have data (DerefMut won't work)")
+    }
+}
+
+impl Deref for NopShMem {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        unimplemented!("NopShMem does not actually have data (Deref won't work)")
+    }
+}
+
 /// A Handle Counted shared map,
 /// that can use internal mutability.
 /// Useful if the `ShMemProvider` needs to keep local state.

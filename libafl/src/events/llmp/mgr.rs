@@ -18,7 +18,7 @@ use libafl_bolts::{
 use libafl_bolts::{
     current_time,
     llmp::{LlmpClient, LlmpClientDescription},
-    shmem::{ShMemProvider, StdShMemProvider},
+    shmem::{NopShMemProvider, ShMemProvider},
     ClientId,
 };
 #[cfg(feature = "std")]
@@ -46,8 +46,7 @@ use crate::{
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{NopInput, UsesInput},
     observers::ObserversTuple,
-    prelude::NopState,
-    state::{HasExecutions, HasLastReportTime, State, UsesState},
+    state::{HasExecutions, HasLastReportTime, NopState, State, UsesState},
     Error, HasMetadata,
 };
 
@@ -86,7 +85,7 @@ where
     phantom: PhantomData<S>,
 }
 
-impl LlmpEventManager<(), NopState<NopInput>, StdShMemProvider> {
+impl LlmpEventManager<(), NopState<NopInput>, NopShMemProvider> {
     /// Creates a builder for [`LlmpEventManager`]
     #[must_use]
     pub fn builder() -> LlmpEventManagerBuilder<()> {
