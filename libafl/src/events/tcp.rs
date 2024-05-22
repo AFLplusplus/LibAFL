@@ -440,10 +440,13 @@ where
     phantom: PhantomData<S>,
 }
 
-impl<S> TcpEventManager<(), S> {
+impl<S> TcpEventManager<(), S>
+where
+    S: State,
+{
     /// Create a builder for [`TcpEventManager`]
     pub fn builder() -> TcpEventManagerBuilder<(), S> {
-        TcpEventManager::builder()
+        TcpEventManagerBuilder::new()
     }
 }
 
@@ -1175,7 +1178,7 @@ where
                         }
                         Err(Error::OsError(..)) => {
                             // port was likely already bound
-                            let mgr = TcpEventManager::builder()
+                            let mgr = TcpEventManagerBuilder::new()
                                 .hooks(self.hooks)
                                 .build_from_client(
                                     &("127.0.0.1", self.broker_port),
@@ -1200,11 +1203,9 @@ where
                 }
                 TcpManagerKind::Client { cpu_core } => {
                     // We are a client
-                    let mgr = TcpEventManager::builder().hooks(self.hooks).build_on_port(
-                        self.broker_port,
-                        UNDEFINED_CLIENT_ID,
-                        self.configuration,
-                    )?;
+                    let mgr = TcpEventManagerBuilder::new()
+                        .hooks(self.hooks)
+                        .build_on_port(self.broker_port, UNDEFINED_CLIENT_ID, self.configuration)?;
 
                     (mgr, cpu_core)
                 }
@@ -1324,11 +1325,9 @@ where
             (
                 state_opt,
                 TcpRestartingEventManager::with_save_state(
-                    TcpEventManager::builder().hooks(self.hooks).build_on_port(
-                        self.broker_port,
-                        this_id,
-                        self.configuration,
-                    )?,
+                    TcpEventManagerBuilder::new()
+                        .hooks(self.hooks)
+                        .build_on_port(self.broker_port, this_id, self.configuration)?,
                     staterestorer,
                     self.serialize_state,
                 ),
@@ -1336,7 +1335,7 @@ where
         } else {
             log::info!("First run. Let's set it all up");
             // Mgr to send and receive msgs from/to all other fuzzer instances
-            let mgr = TcpEventManager::builder()
+            let mgr = TcpEventManagerBuilder::new()
                 .hooks(self.hooks)
                 .build_existing_from_env(
                     &("127.0.0.1", self.broker_port),
