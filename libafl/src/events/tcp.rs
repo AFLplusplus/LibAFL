@@ -711,6 +711,8 @@ where
         self.tcp.write_all(&size.to_le_bytes())?;
         self.tcp.write_all(&self.client_id.0.to_le_bytes())?;
         self.tcp.write_all(&serialized)?;
+
+        self.last_sent = libafl_bolts::current_time();
         Ok(())
     }
 
