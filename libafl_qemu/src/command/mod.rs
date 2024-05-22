@@ -54,7 +54,7 @@ macro_rules! define_std_command_manager {
     ($name:ident, [$($native_command_parser:ident),+]) => {
         pub struct $name<QT, S, SM>
         where
-            QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
+            QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
             S: State + HasExecutions,
             S::Input: HasTargetBytes,
             SM: IsSnapshotManager,
@@ -65,7 +65,7 @@ macro_rules! define_std_command_manager {
 
         impl<QT, S, SM> $name<QT, S, SM>
         where
-            QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
+            QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
             S: State + HasExecutions,
             S::Input: HasTargetBytes,
             SM: IsSnapshotManager,
@@ -104,7 +104,7 @@ macro_rules! define_std_command_manager {
 
         impl<QT, S, SM> CommandManager<StdEmulatorExitHandler<SM>, QT, S> for $name<QT, S, SM>
         where
-            QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
+            QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
             S: State + HasExecutions,
             S::Input: HasTargetBytes,
             SM: IsSnapshotManager,
@@ -128,7 +128,7 @@ macro_rules! define_std_command_manager {
 
         impl<QT, S, SM> Debug for $name<QT, S, SM>
         where
-            QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
+            QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
             S: State + HasExecutions,
             S::Input: HasTargetBytes,
             SM: IsSnapshotManager,
@@ -140,7 +140,7 @@ macro_rules! define_std_command_manager {
 
         impl<QT, S, SM> Default for $name<QT, S, SM>
         where
-            QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
+            QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
             S: State + HasExecutions,
             S::Input: HasTargetBytes,
             SM: IsSnapshotManager,
@@ -233,7 +233,7 @@ pub struct SaveCommand;
 impl<CM, QT, S, SM> IsCommand<CM, StdEmulatorExitHandler<SM>, QT, S> for SaveCommand
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, QT, S>,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
+    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
     S: State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -272,7 +272,7 @@ where
             allowed_paging_ids.insert(current_paging_id);
 
             let paging_filter =
-                HasInstrumentationFilter::<QemuInstrumentationPagingFilter, S>::filter_mut(
+                HasInstrumentationFilter::<QemuInstrumentationPagingFilter>::filter_mut(
                     qemu_helpers,
                 );
 
@@ -289,7 +289,7 @@ pub struct LoadCommand;
 impl<CM, QT, S, SM> IsCommand<CM, StdEmulatorExitHandler<SM>, QT, S> for LoadCommand
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, QT, S>,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
+    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
     S: State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -330,7 +330,7 @@ pub struct InputCommand {
 impl<CM, QT, S, SM> IsCommand<CM, StdEmulatorExitHandler<SM>, QT, S> for InputCommand
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, QT, S>,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
+    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
     S: State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -367,7 +367,7 @@ pub struct StartCommand {
 impl<CM, QT, S, SM> IsCommand<CM, StdEmulatorExitHandler<SM>, QT, S> for StartCommand
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, QT, S>,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
+    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
     S: State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -418,7 +418,7 @@ pub struct EndCommand(Option<ExitKind>);
 impl<CM, QT, S, SM> IsCommand<CM, StdEmulatorExitHandler<SM>, QT, S> for EndCommand
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, QT, S>,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
+    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
     S: State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -455,7 +455,7 @@ pub struct VersionCommand(u64);
 impl<CM, QT, S, SM> IsCommand<CM, StdEmulatorExitHandler<SM>, QT, S> for VersionCommand
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, QT, S>,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
+    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
     S: State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -496,7 +496,7 @@ where
 impl<CM, QT, S, SM> IsCommand<CM, StdEmulatorExitHandler<SM>, QT, S> for PagingFilterCommand
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, QT, S>,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
+    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
     S: State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -516,9 +516,7 @@ where
         let qemu_helpers = qemu_executor_state.hooks_mut().helpers_mut();
 
         let paging_filter =
-            HasInstrumentationFilter::<QemuInstrumentationPagingFilter, S>::filter_mut(
-                qemu_helpers,
-            );
+            HasInstrumentationFilter::<QemuInstrumentationPagingFilter>::filter_mut(qemu_helpers);
 
         *paging_filter = self.filter.clone();
 
@@ -529,7 +527,7 @@ where
 impl<CM, QT, S, SM> IsCommand<CM, StdEmulatorExitHandler<SM>, QT, S> for AddressRangeFilterCommand
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, QT, S>,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter<S> + Debug,
+    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
     S: State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -550,7 +548,7 @@ where
         let qemu_helpers = qemu_executor_state.hooks_mut().helpers_mut();
 
         let addr_range_filter =
-            HasInstrumentationFilter::<QemuInstrumentationAddressRangeFilter, S>::filter_mut(
+            HasInstrumentationFilter::<QemuInstrumentationAddressRangeFilter>::filter_mut(
                 qemu_helpers,
             );
 

@@ -76,11 +76,7 @@ impl QemuDrCovHelper {
     }
 }
 
-impl<S: UsesInput> HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter, S>
-    for QemuDrCovHelper
-where
-    S: UsesInput,
-{
+impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuDrCovHelper {
     fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
         &self.filter
     }
