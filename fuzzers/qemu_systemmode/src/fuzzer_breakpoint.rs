@@ -90,7 +90,7 @@ pub fn fuzz() {
 
         // Choose Snapshot Builder
         // let emu_snapshot_manager = QemuSnapshotBuilder::new(true);
-        let emu_snapshot_manager = FastSnapshotManager::new(false);
+        let emu_snapshot_manager = FastSnapshotManager::new();
 
         // Choose Exit Handler
         let emu_exit_handler = StdEmulatorExitHandler::new(emu_snapshot_manager);
