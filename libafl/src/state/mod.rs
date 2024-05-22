@@ -37,7 +37,7 @@ use crate::{
     fuzzer::{Evaluator, ExecuteInputResult},
     generators::Generator,
     inputs::{Input, UsesInput},
-    stages::{HasCurrentStage, HasNestedStageStatus, StageIndex},
+    stages::{HasCurrentStage, HasNestedStageStatus, StageId},
     Error, HasMetadata, HasNamedMetadata,
 };
 
@@ -533,7 +533,7 @@ where
 }
 
 impl<I, C, R, SC> HasCurrentStage for StdState<I, C, R, SC> {
-    fn set_current_stage_idx(&mut self, idx: StageIndex) -> Result<(), Error> {
+    fn set_current_stage_idx(&mut self, idx: StageId) -> Result<(), Error> {
         self.stage_stack.set_current_stage_idx(idx)
     }
 
@@ -541,7 +541,7 @@ impl<I, C, R, SC> HasCurrentStage for StdState<I, C, R, SC> {
         self.stage_stack.clear_stage()
     }
 
-    fn current_stage_idx(&self) -> Result<Option<StageIndex>, Error> {
+    fn current_stage_idx(&self) -> Result<Option<StageId>, Error> {
         self.stage_stack.current_stage_idx()
     }
 
@@ -1218,7 +1218,7 @@ impl<I> HasCurrentCorpusId for NopState<I> {
 }
 
 impl<I> HasCurrentStage for NopState<I> {
-    fn set_current_stage_idx(&mut self, _idx: StageIndex) -> Result<(), Error> {
+    fn set_current_stage_idx(&mut self, _idx: StageId) -> Result<(), Error> {
         Ok(())
     }
 
@@ -1226,7 +1226,7 @@ impl<I> HasCurrentStage for NopState<I> {
         Ok(())
     }
 
-    fn current_stage_idx(&self) -> Result<Option<StageIndex>, Error> {
+    fn current_stage_idx(&self) -> Result<Option<StageId>, Error> {
         Ok(None)
     }
 }

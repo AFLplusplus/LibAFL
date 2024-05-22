@@ -180,10 +180,10 @@ where
         manager: &mut EM,
     ) -> Result<(), Error> {
         match state.current_stage_idx()? {
-            Some(idx) if idx < StageIndex(Self::LEN) => {
+            Some(idx) if idx < StageId(Self::LEN) => {
                 // do nothing; we are resuming
             }
-            Some(idx) if idx == StageIndex(Self::LEN) => {
+            Some(idx) if idx == StageId(Self::LEN) => {
                 // perform the stage, but don't set it
                 let stage = &mut self.0;
 
@@ -191,12 +191,12 @@ where
 
                 state.clear_stage()?;
             }
-            Some(idx) if idx > StageIndex(Self::LEN) => {
+            Some(idx) if idx > StageId(Self::LEN) => {
                 unreachable!("We should clear the stage index before we get here...");
             }
             // this is None, but the match can't deduce that
             _ => {
-                state.set_current_stage_idx(StageIndex(Self::LEN))?;
+                state.set_current_stage_idx(StageId(Self::LEN))?;
 
                 let stage = &mut self.0;
                 stage.perform_restartable(fuzzer, executor, state, manager)?;
@@ -543,9 +543,9 @@ impl RetryRestartHelper {
 /// The index of a stage
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[repr(transparent)]
-pub struct StageIndex(pub(crate) usize);
+pub struct StageId(pub(crate) usize);
 
-impl fmt::Display for StageIndex {
+impl fmt::Display for StageId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
     }
@@ -554,13 +554,13 @@ impl fmt::Display for StageIndex {
 /// Trait for types which track the current stage
 pub trait HasCurrentStage {
     /// Set the current stage; we have started processing this stage
-    fn set_current_stage_idx(&mut self, idx: StageIndex) -> Result<(), Error>;
+    fn set_current_stage_idx(&mut self, idx: StageId) -> Result<(), Error>;
 
     /// Clear the current stage; we are done processing this stage
     fn clear_stage(&mut self) -> Result<(), Error>;
 
     /// Fetch the current stage -- typically used after a state recovery or transfer
-    fn current_stage_idx(&self) -> Result<Option<StageIndex>, Error>;
+    fn current_stage_idx(&self) -> Result<Option<StageId>, Error>;
 
     /// Notify of a reset from which we may recover
     fn on_restart(&mut self) -> Result<(), Error> {
