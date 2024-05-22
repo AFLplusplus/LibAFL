@@ -1,14 +1,14 @@
-use alloc::{string::String, vec::Vec};
+use alloc::{borrow::Cow, string::String, vec::Vec};
 use std::{collections::HashMap, fs::File, io::BufReader, path::Path};
 
+use libafl_bolts::{ownedref::OwnedMutPtr, Named};
 use serde::{Deserialize, Serialize};
 
-use crate::Error;
-
+use crate::{inputs::UsesInput, observers::Observer, state::State, Error};
 #[derive(Debug, Serialize, Deserialize)]
 struct FunctionData {
-    #[serde(rename = "ID")]
-    id: usize,
+    #[serde(rename = "name")]
+    name: String,
     #[serde(rename = "# BBs")]
     bb_count: Option<u32>,
     #[serde(rename = "# insts")]
@@ -68,14 +68,20 @@ struct AnalysisData {
 }
 
 /// The observer to lookup the static analysis data at runtime
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ProfilingObserver {
+    /// The name of the observer.
+    pub name: Cow<'static, str>,
     data: AnalysisData,
+    /// things observed in the last run
+    observed: Vec<usize>,
+    /// The list
+    list: OwnedMutPtr<HashMap<usize, usize>>,
 }
 
 impl ProfilingObserver {
     /// The constructor
-    pub fn new<P>(json_path: P) -> Result<Self, Error>
+    pub fn new<P>(json_path: P, list: OwnedMutPtr<HashMap<usize, usize>>) -> Result<Self, Error>
     where
         P: AsRef<Path>,
     {
@@ -83,8 +89,40 @@ impl ProfilingObserver {
         let reader = BufReader::new(f);
         let analysis_data: AnalysisData = serde_json::from_reader(reader)?;
 
+        // debug
+        /*
+        for record in &analysis_data.data {
+            for (key, _value) in record.iter() {
+                log::info!("Record {} found!", key);
+            }
+        }
+        */
+
         Ok(Self {
+            name: Cow::from("profiling"),
             data: analysis_data,
+            observed: vec![],
+            list,
         })
+    }
+}
+
+impl Named for ProfilingObserver {
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
+    }
+}
+
+impl<S> Observer<S> for ProfilingObserver
+where
+    S: State,
+{
+    fn pre_exec_child(
+        &mut self,
+        _state: &mut S,
+        _input: &<S as UsesInput>::Input,
+    ) -> Result<(), Error> {
+        self.observed.clear();
+        Ok(())
     }
 }

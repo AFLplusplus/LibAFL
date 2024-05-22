@@ -18,7 +18,7 @@ use clap::{Arg, Command};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleRestartingEventManager,
-    executors::{inprocess::InProcessExecutor, ExitKind},
+    executors::{inprocess::{InProcessExecutor, HookableInProcessExecutor}, ExitKind},
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -45,12 +45,15 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
+    ownedref::OwnedMutPtr,
     AsSlice,
 };
+use std::ops::Deref;
+
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl_targets::autotokens;
 use libafl_targets::{
-    libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
+    libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver, CallHook, FUNCTION_LIST,
 };
 #[cfg(unix)]
 use nix::unistd::dup;
@@ -248,7 +251,10 @@ fn fuzz(
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    let profiling_observer = ProfilingObserver::new("analysis/concatenated.json");
+    let func_list = OwnedMutPtr::from_raw_mut(FUNCTION_LIST.deref_mut());
+    let profiling_observer = ProfilingObserver::new("analysis/concatenated.json", func_list)?;
+    let callhook = CallHook::new();
+
     let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
     let map_feedback = MaxMapFeedback::new(&edges_observer);
@@ -328,9 +334,10 @@ fn fuzz(
     let mut tracing_harness = harness;
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let mut executor = InProcessExecutor::with_timeout(
+    let mut executor = HookableInProcessExecutor::with_timeout_generic(
+        tuple_list!(callhook.clone()),
         &mut harness,
-        tuple_list!(edges_observer, time_observer),
+        tuple_list!(edges_observer, time_observer, profiling_observer),
         &mut fuzzer,
         &mut state,
         &mut mgr,
@@ -339,7 +346,8 @@ fn fuzz(
 
     // Setup a tracing stage in which we log comparisons
     let tracing = TracingStage::new(
-        InProcessExecutor::with_timeout(
+        HookableInProcessExecutor::with_timeout_generic(
+            tuple_list!(callhook),
             &mut tracing_harness,
             tuple_list!(cmplog_observer),
             &mut fuzzer,
