@@ -389,8 +389,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/workflows/qemu-fuzzer-tester-prepare
-      - name: default stable
-        run: rustup default stable
       - name: Build and run example QEMU fuzzers (Linux)
         if: runner.os == 'Linux'
         shell: bash

@@ -488,23 +488,7 @@ pub fn build(
             );
         }
 
-        let mut debug_command = Command::new("which");
-        debug_command.arg("c++");
-
-        match debug_command.spawn() {
-            Ok(output) => println!("Command: {debug_command:?}; output: {output:?}"),
-            Err(e) => panic!("Command {debug_command:?} failed: {e:?}"),
-        };
-
         let mut link_command = cpp_compiler.to_command();
-
-        for arg in &cmd {
-            println!(
-                "{} is a valid path: {}",
-                arg,
-                libafl_qemu_build_dir.join(arg).exists()
-            );
-        }
 
         link_command
             .current_dir(&libafl_qemu_build_dir)
@@ -512,8 +496,6 @@ pub fn build(
             .arg("libqemu-partially-linked.o")
             .arg("-r")
             .args(cmd);
-
-        println!("cargo:warning={link_command:?}");
 
         let link_str = format!("{link_command:?}");
 
