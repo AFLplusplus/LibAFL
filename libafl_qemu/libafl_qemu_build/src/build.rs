@@ -488,8 +488,8 @@ pub fn build(
             );
         }
 
-        let mut debug_command = Command::new("pwd");
-        debug_command.current_dir(&libafl_qemu_build_dir);
+        let mut debug_command = Command::new("which");
+        debug_command.arg("c++");
 
         match debug_command.spawn() {
             Ok(output) => println!("Command: {debug_command:?}; output: {output:?}"),
@@ -512,6 +512,8 @@ pub fn build(
             .arg("libqemu-partially-linked.o")
             .arg("-r")
             .args(cmd);
+
+        println!("cargo:warning={link_command:?}");
 
         let link_str = format!("{link_command:?}");
 
