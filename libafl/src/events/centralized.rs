@@ -19,11 +19,12 @@ use libafl_bolts::{
 };
 use libafl_bolts::{
     llmp::{self, LlmpBroker, LlmpClient, LlmpClientDescription, Tag},
-    shmem::ShMemProvider,
+    shmem::{ShMemProvider, StdShMemProvider},
     ClientId,
 };
 use serde::{Deserialize, Serialize};
 
+use super::NopEventManager;
 #[cfg(feature = "llmp_compression")]
 use crate::events::llmp::COMPRESS_THRESHOLD;
 #[cfg(feature = "adaptive_serialization")]
@@ -38,9 +39,9 @@ use crate::{
     },
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
-    inputs::{Input, UsesInput},
+    inputs::{Input, NopInput, UsesInput},
     observers::ObserversTuple,
-    state::{HasExecutions, HasLastReportTime, UsesState},
+    state::{HasExecutions, HasLastReportTime, NopState, UsesState},
     Error, HasMetadata,
 };
 
@@ -228,6 +229,14 @@ where
     #[cfg(feature = "adaptive_serialization")]
     time_ref: Handle<TimeObserver>,
     is_main: bool,
+}
+
+impl CentralizedEventManager<NopEventManager<NopState<NopInput>>, StdShMemProvider> {
+    /// Creates a builder for [`CentralizedEventManager`]
+    #[must_use]
+    pub fn builder() -> CentralizedEventManagerBuilder {
+        CentralizedEventManagerBuilder::new()
+    }
 }
 
 /// The builder or `CentralizedEventManager`

@@ -30,6 +30,13 @@ where
     map: Option<<SP as ShMemProvider>::ShMem>,
 }
 
+impl<'a, SP> TinyInstExecutor<'a, (), SP, ()> {
+    /// Create a builder for [`TinyInstExecutor`]
+    pub fn builder() -> TinyInstExecutorBuilder<'a, SP> {
+        TinyInstExecutor::builder()
+    }
+}
+
 impl<'a, S, SP, OT> std::fmt::Debug for TinyInstExecutor<'a, S, SP, OT>
 where
     SP: ShMemProvider,

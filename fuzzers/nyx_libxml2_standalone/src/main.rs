@@ -44,7 +44,7 @@ fn main() {
     let monitor = TuiMonitor::new(ui);
 
     let mut mgr = SimpleEventManager::new(monitor);
-    let mut executor = NyxExecutorBuilder::new().build(helper, tuple_list!(observer));
+    let mut executor = NyxExecutor::builder().build(helper, tuple_list!(observer));
     let mutator = StdScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 

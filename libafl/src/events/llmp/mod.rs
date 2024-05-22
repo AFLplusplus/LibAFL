@@ -10,7 +10,7 @@ use libafl_bolts::{
 };
 use libafl_bolts::{
     llmp::{LlmpClient, LlmpClientDescription, Tag},
-    shmem::ShMemProvider,
+    shmem::{ShMemProvider, StdShMemProvider},
     ClientId,
 };
 use serde::Deserialize;
@@ -19,7 +19,8 @@ use crate::{
     events::{CustomBufEventResult, CustomBufHandlerFn, Event, EventFirer},
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
-    inputs::{Input, InputConverter, UsesInput},
+    inputs::{Input, InputConverter, NopInput, NopInputConverter, UsesInput},
+    prelude::NopState,
     state::{HasExecutions, State, UsesState},
     Error, HasMetadata,
 };
@@ -106,6 +107,22 @@ where
     converter: Option<IC>,
     converter_back: Option<ICB>,
     phantom: PhantomData<S>,
+}
+
+impl
+    LlmpEventConverter<
+        NopInput,
+        NopInputConverter<NopInput>,
+        NopInputConverter<NopInput>,
+        NopState<NopInput>,
+        StdShMemProvider,
+    >
+{
+    /// Create a builder for [`LlmpEventConverter`]
+    #[must_use]
+    pub fn builder() -> LlmpEventConverterBuilder {
+        LlmpEventConverterBuilder::new()
+    }
 }
 
 /// Build `LlmpEventConverter`

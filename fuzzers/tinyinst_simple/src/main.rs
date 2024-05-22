@@ -63,7 +63,7 @@ fn main() {
 
     let mut mgr = SimpleEventManager::new(monitor);
     let mut executor = unsafe {
-        TinyInstExecutorBuilder::new()
+        TinyInstExecutor::builder()
             .tinyinst_args(tinyinst_args)
             .program_args(args)
             .use_shmem()

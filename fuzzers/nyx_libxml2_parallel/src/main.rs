@@ -54,7 +54,7 @@ fn main() {
         let mut feedback = MaxMapFeedback::new(&observer);
         let mut objective = CrashFeedback::new();
         let scheduler = RandScheduler::new();
-        let mut executor = NyxExecutorBuilder::new().build(helper, tuple_list!(observer));
+        let mut executor = NyxExecutor::builder().build(helper, tuple_list!(observer));
 
         // If not restarting, create a State from scratch
         let mut state = state.unwrap_or_else(|| {

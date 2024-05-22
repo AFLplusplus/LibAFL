@@ -189,7 +189,7 @@ impl FridaInstrumentationHelperBuilder {
     /// Instrument all modules in `/usr/lib` as well as `libfoo.so`:
     /// ```
     ///# use libafl_frida::helper::FridaInstrumentationHelperBuilder;
-    /// let builder = FridaInstrumentationHelperBuilder::new()
+    /// let builder = FridaInstrumentationHelper::builder()
     ///     .instrument_module_if(|module| module.name() == "libfoo.so")
     ///     .instrument_module_if(|module| module.path().starts_with("/usr/lib"));
     /// ```
@@ -218,7 +218,7 @@ impl FridaInstrumentationHelperBuilder {
     ///
     /// ```
     ///# use libafl_frida::helper::FridaInstrumentationHelperBuilder;
-    /// let builder = FridaInstrumentationHelperBuilder::new()
+    /// let builder = FridaInstrumentationHelper::builder()
     ///     .instrument_module_if(|module| module.path().starts_with("/usr/lib"))
     ///     .skip_module_if(|module| module.name() == "libfoo.so");
     /// ```
@@ -365,6 +365,13 @@ pub struct FridaInstrumentationHelper<'a, RT: 'a> {
     runtimes: Rc<RefCell<RT>>,
     stalker_enabled: bool,
     pub(crate) disable_excludes: bool,
+}
+
+impl<'a> FridaInstrumentationHelper<'a, ()> {
+    /// Creates a builder for [`FridaInstrumentationHelper`]
+    pub fn builder() -> FridaInstrumentationHelperBuilder {
+        FridaInstrumentationHelper::builder()
+    }
 }
 
 impl<RT> Debug for FridaInstrumentationHelper<'_, RT> {
