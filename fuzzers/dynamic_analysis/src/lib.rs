@@ -2,7 +2,6 @@
 use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
-use once_cell::sync::Lazy;
 use core::{cell::RefCell, time::Duration};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd};
@@ -28,7 +27,7 @@ use libafl::{
         scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
         StdMOptMutator, StdScheduledMutator, Tokens,
     },
-    observers::{CanTrack, HitcountsMapObserver, TimeObserver, ProfilingObserver},
+    observers::{CanTrack, HitcountsMapObserver, ProfilingObserver, TimeObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
@@ -42,20 +41,21 @@ use libafl::{
 use libafl_bolts::{
     current_time,
     os::dup2,
+    ownedref::OwnedMutPtr,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
-    ownedref::OwnedMutPtr,
     AsSlice,
 };
-
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl_targets::autotokens;
 use libafl_targets::{
-    libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver, CallHook, FUNCTION_LIST,
+    libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CallHook,
+    CmpLogObserver, FUNCTION_LIST,
 };
 #[cfg(unix)]
 use nix::unistd::dup;
+use once_cell::sync::Lazy;
 
 /// The fuzzer main (as `no_mangle` C function)
 #[no_mangle]
@@ -250,7 +250,7 @@ fn fuzz(
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    let func_list = unsafe {OwnedMutPtr::from_raw_mut(Lazy::force_mut(&mut FUNCTION_LIST))};
+    let func_list = unsafe { OwnedMutPtr::from_raw_mut(Lazy::force_mut(&mut FUNCTION_LIST)) };
     let profiling_observer = ProfilingObserver::new("concatenated.json", func_list)?;
     let callhook = CallHook::new();
 
