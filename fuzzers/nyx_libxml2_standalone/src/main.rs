@@ -14,7 +14,7 @@ use libafl::{
     Fuzzer, StdFuzzer,
 };
 use libafl_bolts::{rands::StdRand, tuples::tuple_list};
-use libafl_nyx::{executor::NyxExecutorBuilder, helper::NyxHelper, settings::NyxSettings};
+use libafl_nyx::{executor::NyxExecutor, helper::NyxHelper, settings::NyxSettings};
 
 fn main() {
     // nyx stuff
