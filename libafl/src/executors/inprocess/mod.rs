@@ -232,6 +232,7 @@ where
     /// * `user_hooks` - the hooks run before and after the harness's execution
     /// * `harness_fn` - the harness, executing the function
     /// * `observers` - the observers observing the target during execution
+    ///
     /// This may return an error on unix, if signal handler setup fails
     pub fn with_timeout<EM, OF, Z>(
         harness_fn: &'a mut H,
@@ -329,12 +330,13 @@ where
         })
     }
 
-    /// Create a new in mem executor.
+    /// Create a new [`InProcessExecutor`].
     /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
     /// depending on different corpus or state.
     /// * `user_hooks` - the hooks run before and after the harness's execution
     /// * `harness_fn` - the harness, executing the function
     /// * `observers` - the observers observing the target during execution
+    ///
     /// This may return an error on unix, if signal handler setup fails
     pub fn with_timeout_generic<EM, OF, Z>(
         user_hooks: HT,
