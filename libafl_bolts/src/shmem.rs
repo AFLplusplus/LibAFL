@@ -319,7 +319,6 @@ pub trait ShMemProvider: Clone + Default + Debug {
 }
 
 /// An [`ShMemProvider`] that does not provide any [`ShMem`].
-#[cfg(feature = "alloc")]
 #[derive(Debug, Clone, Default)]
 pub struct NopShMemProvider;
 
