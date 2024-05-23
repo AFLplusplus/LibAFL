@@ -236,7 +236,7 @@ pub fn merge(
                     .scheduler_mut()
                     .on_remove(&mut state, idx, &Some(testcase))?;
             } else {
-                rename(file_path, &new_file_path)?;
+                rename(&file_path, &new_file_path)?;
                 *file_path = new_file_path;
             }
         }
