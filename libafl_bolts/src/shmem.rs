@@ -318,7 +318,8 @@ pub trait ShMemProvider: Clone + Default + Debug {
     }
 }
 
-/// An ShMemProvider that does not provide any [`ShMem`].`
+/// An [`ShMemProvider`] that does not provide any [`ShMem`].
+#[cfg(feature = "alloc")]
 #[derive(Debug, Clone, Default)]
 pub struct NopShMemProvider;
 
@@ -330,15 +331,15 @@ impl ShMemProvider for NopShMemProvider {
     }
 
     fn new_shmem(&mut self, _map_size: usize) -> Result<Self::ShMem, Error> {
-        Ok(NopShMem::default())
+        Ok(NopShMem)
     }
 
     fn shmem_from_id_and_size(&mut self, _id: ShMemId, _size: usize) -> Result<Self::ShMem, Error> {
-        Ok(NopShMem::default())
+        Ok(NopShMem)
     }
 }
 
-/// An ShMemProvider that does not provide any [`ShMem`].`
+/// An [`ShMem]`] that does not have any mem nor share anything.
 #[derive(Debug, Clone, Default)]
 pub struct NopShMem;
 
@@ -350,6 +351,7 @@ impl ShMem for NopShMem {
 
 impl DerefMut for NopShMem {
     fn deref_mut(&mut self) -> &mut Self::Target {
+        // TODO: Do we actually want to use a Vec here and have un-shared memory?
         unimplemented!("NopShMem does not actually have data (DerefMut won't work)")
     }
 }

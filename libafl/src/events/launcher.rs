@@ -48,10 +48,8 @@ use libafl_bolts::{
 use typed_builder::TypedBuilder;
 
 use super::hooks::EventManagerHooksTuple;
-#[cfg(all(unix, feature = "std"))]
-use crate::events::centralized::CentralizedEventManager;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
-use crate::events::CentralizedLlmpEventBroker;
+use crate::events::centralized::{CentralizedLlmpEventBroker, CentralizedEventManager};
 #[cfg(feature = "adaptive_serialization")]
 use crate::observers::TimeObserver;
 #[cfg(feature = "std")]

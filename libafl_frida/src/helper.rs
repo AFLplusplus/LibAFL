@@ -367,13 +367,6 @@ pub struct FridaInstrumentationHelper<'a, RT: 'a> {
     pub(crate) disable_excludes: bool,
 }
 
-impl<'a> FridaInstrumentationHelper<'a, ()> {
-    /// Creates a builder for [`FridaInstrumentationHelper`]
-    pub fn builder() -> FridaInstrumentationHelperBuilder {
-        FridaInstrumentationHelper::builder()
-    }
-}
-
 impl<RT> Debug for FridaInstrumentationHelper<'_, RT> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut dbg_me = f.debug_struct("FridaInstrumentationHelper");

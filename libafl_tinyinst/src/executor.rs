@@ -10,7 +10,7 @@ use libafl::{
 };
 use libafl_bolts::{
     fs::{InputFile, INPUTFILE_STD},
-    shmem::{ShMem, ShMemProvider, StdShMemProvider},
+    shmem::{NopShMemProvider, ShMem, ShMemProvider},
     tuples::RefIndexable,
     AsSlice, AsSliceMut,
 };
@@ -30,10 +30,11 @@ where
     map: Option<<SP as ShMemProvider>::ShMem>,
 }
 
-impl<'a, SP> TinyInstExecutor<'a, (), SP, ()> {
+impl<'a> TinyInstExecutor<'a, (), NopShMemProvider, ()> {
     /// Create a builder for [`TinyInstExecutor`]
-    pub fn builder() -> TinyInstExecutorBuilder<'a, SP> {
-        TinyInstExecutor::builder()
+    #[must_use]
+    pub fn builder() -> TinyInstExecutorBuilder<'a, NopShMemProvider> {
+        TinyInstExecutorBuilder::new()
     }
 }
 
@@ -113,16 +114,16 @@ pub struct TinyInstExecutorBuilder<'a, SP> {
 const MAX_FILE: usize = 1024 * 1024;
 const SHMEM_FUZZ_HDR_SIZE: usize = 4;
 
-impl<'a> Default for TinyInstExecutorBuilder<'a, StdShMemProvider> {
+impl<'a> Default for TinyInstExecutorBuilder<'a, NopShMemProvider> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'a> TinyInstExecutorBuilder<'a, StdShMemProvider> {
+impl<'a> TinyInstExecutorBuilder<'a, NopShMemProvider> {
     /// Constructor
     #[must_use]
-    pub fn new() -> TinyInstExecutorBuilder<'a, StdShMemProvider> {
+    pub fn new() -> TinyInstExecutorBuilder<'a, NopShMemProvider> {
         Self {
             tinyinst_args: vec![],
             program_args: vec![],
