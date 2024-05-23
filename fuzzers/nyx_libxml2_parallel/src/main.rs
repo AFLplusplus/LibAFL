@@ -19,7 +19,7 @@ use libafl_bolts::{
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
 };
-use libafl_nyx::{executor::NyxExecutorBuilder, helper::NyxHelper, settings::NyxSettings};
+use libafl_nyx::{executor::NyxExecutor, helper::NyxHelper, settings::NyxSettings};
 
 fn main() {
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
