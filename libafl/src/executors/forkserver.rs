@@ -1324,7 +1324,7 @@ mod tests {
     use serial_test::serial;
 
     use crate::{
-        executors::forkserver::ForkserverExecutorBuilder,
+        executors::forkserver::ForkserverExecutor,
         observers::{ConstMapObserver, HitcountsMapObserver},
         Error,
     };
@@ -1348,7 +1348,7 @@ mod tests {
             shmem_buf,
         ));
 
-        let executor = ForkserverExecutorBuilder::new()
+        let executor = ForkserverExecutor::builder()
             .program(bin)
             .args(args)
             .debug_child(false)

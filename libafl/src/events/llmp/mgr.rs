@@ -18,7 +18,7 @@ use libafl_bolts::{
 use libafl_bolts::{
     current_time,
     llmp::{LlmpClient, LlmpClientDescription},
-    shmem::ShMemProvider,
+    shmem::{NopShMemProvider, ShMemProvider},
     ClientId,
 };
 #[cfg(feature = "std")]
@@ -44,9 +44,9 @@ use crate::{
     },
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
-    inputs::UsesInput,
+    inputs::{NopInput, UsesInput},
     observers::ObserversTuple,
-    state::{HasExecutions, HasLastReportTime, State, UsesState},
+    state::{HasExecutions, HasLastReportTime, NopState, State, UsesState},
     Error, HasMetadata,
 };
 
@@ -83,6 +83,14 @@ where
     #[cfg(feature = "adaptive_serialization")]
     pub(crate) time_ref: Handle<TimeObserver>,
     phantom: PhantomData<S>,
+}
+
+impl LlmpEventManager<(), NopState<NopInput>, NopShMemProvider> {
+    /// Creates a builder for [`LlmpEventManager`]
+    #[must_use]
+    pub fn builder() -> LlmpEventManagerBuilder<()> {
+        LlmpEventManagerBuilder::new()
+    }
 }
 
 /// Builder for `LlmpEventManager`

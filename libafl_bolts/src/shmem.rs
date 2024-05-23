@@ -2,11 +2,9 @@
 //! too.)
 
 #[cfg(feature = "alloc")]
-use alloc::{rc::Rc, string::ToString};
+use alloc::{rc::Rc, string::ToString, vec::Vec};
 #[cfg(feature = "alloc")]
-use core::fmt::Display;
-#[cfg(feature = "alloc")]
-use core::{cell::RefCell, fmt, mem::ManuallyDrop};
+use core::{cell::RefCell, fmt, fmt::Display, mem::ManuallyDrop};
 use core::{
     fmt::Debug,
     mem,
@@ -315,6 +313,72 @@ pub trait ShMemProvider: Clone + Default + Debug {
     /// Release the resources associated with the given [`ShMem`]
     fn release_shmem(&mut self, _shmem: &mut Self::ShMem) {
         // do nothing
+    }
+}
+
+/// An [`ShMemProvider`] that does not provide any [`ShMem`].
+/// This is mainly for testing and type magic.
+/// The resulting [`NopShMem`] is backed by a simple byte buffer to do some simple non-shared things with.
+/// Calling [`NopShMemProvider::shmem_from_id_and_size`] will return new maps for the same id every time.
+///
+/// # Note
+/// If you just want a simple shared memory implementation, use [`StdShMemProvider`] instead.
+#[cfg(feature = "alloc")]
+#[derive(Debug, Clone, Default)]
+pub struct NopShMemProvider;
+
+#[cfg(feature = "alloc")]
+impl ShMemProvider for NopShMemProvider {
+    type ShMem = NopShMem;
+
+    fn new() -> Result<Self, Error> {
+        Ok(Self)
+    }
+
+    fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
+        self.shmem_from_id_and_size(ShMemId::default(), map_size)
+    }
+
+    fn shmem_from_id_and_size(
+        &mut self,
+        id: ShMemId,
+        map_size: usize,
+    ) -> Result<Self::ShMem, Error> {
+        Ok(NopShMem {
+            id,
+            buf: vec![0; map_size],
+        })
+    }
+}
+
+/// An [`ShMem]`] that does not have any mem nor share anything.
+#[cfg(feature = "alloc")]
+#[derive(Debug, Clone, Default)]
+pub struct NopShMem {
+    id: ShMemId,
+    buf: Vec<u8>,
+}
+
+#[cfg(feature = "alloc")]
+impl ShMem for NopShMem {
+    fn id(&self) -> ShMemId {
+        self.id
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl DerefMut for NopShMem {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.buf
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl Deref for NopShMem {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        &self.buf
     }
 }
 
