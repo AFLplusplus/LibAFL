@@ -227,6 +227,7 @@ where
     /// * `user_hooks` - the hooks run before and after the harness's execution
     /// * `harness_fn` - the harness, executing the function
     /// * `observers` - the observers observing the target during execution
+    ///
     /// This may return an error on unix, if signal handler setup fails
     pub fn with_timeout<EM, OF, Z>(
         harness_fn: &'a mut H,
@@ -354,6 +355,7 @@ where
     /// * `user_hooks` - the hooks run before and after the harness's execution
     /// * `harness_fn` - the harness, executing the function
     /// * `observers` - the observers observing the target during execution
+    ///
     /// This may return an error on unix, if signal handler setup fails
     #[allow(clippy::too_many_arguments)]
     pub fn with_timeout_generic<EM, OF, Z>(

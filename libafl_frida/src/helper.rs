@@ -189,7 +189,7 @@ impl FridaInstrumentationHelperBuilder {
     /// Instrument all modules in `/usr/lib` as well as `libfoo.so`:
     /// ```
     ///# use libafl_frida::helper::FridaInstrumentationHelperBuilder;
-    /// let builder = FridaInstrumentationHelperBuilder::new()
+    /// let builder = FridaInstrumentationHelper::builder()
     ///     .instrument_module_if(|module| module.name() == "libfoo.so")
     ///     .instrument_module_if(|module| module.path().starts_with("/usr/lib"));
     /// ```
@@ -218,7 +218,7 @@ impl FridaInstrumentationHelperBuilder {
     ///
     /// ```
     ///# use libafl_frida::helper::FridaInstrumentationHelperBuilder;
-    /// let builder = FridaInstrumentationHelperBuilder::new()
+    /// let builder = FridaInstrumentationHelper::builder()
     ///     .instrument_module_if(|module| module.path().starts_with("/usr/lib"))
     ///     .skip_module_if(|module| module.name() == "libfoo.so");
     /// ```

@@ -48,10 +48,8 @@ use libafl_bolts::{
 use typed_builder::TypedBuilder;
 
 use super::hooks::EventManagerHooksTuple;
-#[cfg(all(unix, feature = "std"))]
-use crate::events::centralized::CentralizedEventManagerBuilder;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
-use crate::events::{CentralizedEventManager, CentralizedLlmpEventBroker};
+use crate::events::centralized::{CentralizedEventManager, CentralizedLlmpEventBroker};
 #[cfg(feature = "adaptive_serialization")]
 use crate::observers::TimeObserver;
 #[cfg(feature = "std")]
@@ -698,7 +696,7 @@ where
                         let builder = builder.time_ref(self.time_obs.handle());
                         let (state, mgr) = builder.build().launch()?;
 
-                        let mut centralized_builder = CentralizedEventManagerBuilder::new();
+                        let mut centralized_builder = CentralizedEventManager::builder();
 
                         if index == 1 {
                             centralized_builder = centralized_builder.is_main(true);
