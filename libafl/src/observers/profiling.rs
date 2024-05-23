@@ -136,7 +136,7 @@ where
     ) -> Result<(), Error> {
         // in reality, this should be done in a stage
         // but here just for poc
-        for (key, _item) in self.map().iter() {
+        for (key, _item) in self.map() {
             let found = self.lookup(*key);
             log::info!("key: {}, data: {:#?}", key, found);
         }

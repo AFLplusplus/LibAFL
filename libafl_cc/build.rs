@@ -429,7 +429,6 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     );
 
     for pass in &[
-        "profiling.cc",
         "function-logging.cc",
         "cmplog-routines-pass.cc",
         "autotokens-pass.cc",
@@ -450,7 +449,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     }
 
     // Optional pass
-    for pass in &["dump-cfg-pass.cc"] {
+    for pass in &["dump-cfg-pass.cc", "profiling.cc"] {
         build_pass(
             bindir_path,
             out_dir,

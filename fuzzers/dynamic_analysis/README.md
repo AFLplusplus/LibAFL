@@ -1,5 +1,7 @@
 # Dynamic Analysis Fuzzer
 This fuzzer is to show how you can collect runtime analysis information during fuzzing using LibAFL. We use the Little-CMS project for the example.
+First, this fuzzer requires `nlohmann-json3-dev` to work.
+
 To run the fuzzer,
 0. Compile the fuzzer with `cargo build --release`
 1. `mkdir analysis` and run `build.sh`. This will compile Little-CMS to extract the analysis information and generate a json file for each module.
