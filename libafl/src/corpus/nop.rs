@@ -89,7 +89,7 @@ where
 
     /// Peek the next free corpus id
     #[inline]
-    fn peek_next_free_id(&self) -> CorpusId {
+    fn peek_free_id(&self) -> CorpusId {
         CorpusId::from(0_usize)
     }
 

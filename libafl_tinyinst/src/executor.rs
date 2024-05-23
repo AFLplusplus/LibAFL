@@ -1,5 +1,4 @@
-use core::marker::PhantomData;
-use std::time::Duration;
+use core::{marker::PhantomData, ptr, time::Duration};
 
 use libafl::{
     executors::{Executor, ExitKind, HasObservers},
@@ -10,19 +9,19 @@ use libafl::{
 };
 use libafl_bolts::{
     fs::{InputFile, INPUTFILE_STD},
-    shmem::{ShMem, ShMemProvider, StdShMemProvider},
+    shmem::{NopShMemProvider, ShMem, ShMemProvider},
     tuples::RefIndexable,
     AsSlice, AsSliceMut,
 };
 use tinyinst::tinyinst::{litecov::RunResult, TinyInst};
 
-/// Tinyinst executor
-pub struct TinyInstExecutor<'a, S, SP, OT>
+/// [`TinyInst`](https://github.com/googleprojectzero/TinyInst) executor
+pub struct TinyInstExecutor<S, SP, OT>
 where
     SP: ShMemProvider,
 {
     tinyinst: TinyInst,
-    coverage: &'a mut Vec<u64>,
+    coverage_ptr: *mut Vec<u64>,
     timeout: Duration,
     observers: OT,
     phantom: PhantomData<S>,
@@ -30,7 +29,15 @@ where
     map: Option<<SP as ShMemProvider>::ShMem>,
 }
 
-impl<'a, S, SP, OT> std::fmt::Debug for TinyInstExecutor<'a, S, SP, OT>
+impl<'a> TinyInstExecutor<(), NopShMemProvider, ()> {
+    /// Create a builder for [`TinyInstExecutor`]
+    #[must_use]
+    pub fn builder() -> TinyInstExecutorBuilder<'a, NopShMemProvider> {
+        TinyInstExecutorBuilder::new()
+    }
+}
+
+impl<S, SP, OT> std::fmt::Debug for TinyInstExecutor<S, SP, OT>
 where
     SP: ShMemProvider,
 {
@@ -41,7 +48,7 @@ where
     }
 }
 
-impl<'a, EM, S, SP, OT, Z> Executor<EM, Z> for TinyInstExecutor<'a, S, SP, OT>
+impl<EM, S, SP, OT, Z> Executor<EM, Z> for TinyInstExecutor<S, SP, OT>
 where
     EM: UsesState<State = S>,
     S: State + HasExecutions,
@@ -80,7 +87,8 @@ where
         let mut status = RunResult::OK;
         unsafe {
             status = self.tinyinst.run();
-            self.tinyinst.vec_coverage(self.coverage, false);
+            self.tinyinst
+                .vec_coverage(self.coverage_ptr.as_mut().unwrap(), false);
         }
 
         match status {
@@ -100,30 +108,52 @@ pub struct TinyInstExecutorBuilder<'a, SP> {
     tinyinst_args: Vec<String>,
     program_args: Vec<String>,
     timeout: Duration,
+    coverage_ptr: *mut Vec<u64>,
     shmem_provider: Option<&'a mut SP>,
 }
 
 const MAX_FILE: usize = 1024 * 1024;
 const SHMEM_FUZZ_HDR_SIZE: usize = 4;
 
-impl<'a> Default for TinyInstExecutorBuilder<'a, StdShMemProvider> {
+impl<'a> Default for TinyInstExecutorBuilder<'a, NopShMemProvider> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'a> TinyInstExecutorBuilder<'a, StdShMemProvider> {
+impl<'a> TinyInstExecutorBuilder<'a, NopShMemProvider> {
     /// Constructor
     #[must_use]
-    pub fn new() -> TinyInstExecutorBuilder<'a, StdShMemProvider> {
+    pub fn new() -> TinyInstExecutorBuilder<'a, NopShMemProvider> {
         Self {
             tinyinst_args: vec![],
             program_args: vec![],
             timeout: Duration::new(3, 0),
             shmem_provider: None,
+            coverage_ptr: ptr::null_mut(),
         }
     }
 
+    /// Use this to enable shmem testcase passing.
+    #[must_use]
+    pub fn shmem_provider<SP: ShMemProvider>(
+        self,
+        shmem_provider: &'a mut SP,
+    ) -> TinyInstExecutorBuilder<'a, SP> {
+        TinyInstExecutorBuilder {
+            tinyinst_args: self.tinyinst_args,
+            program_args: self.program_args,
+            timeout: self.timeout,
+            shmem_provider: Some(shmem_provider),
+            coverage_ptr: ptr::null_mut(),
+        }
+    }
+}
+
+impl<'a, SP> TinyInstExecutorBuilder<'a, SP>
+where
+    SP: ShMemProvider,
+{
     /// Argument for tinyinst instrumentation
     #[must_use]
     pub fn tinyinst_arg(mut self, arg: String) -> Self {
@@ -207,31 +237,22 @@ impl<'a> TinyInstExecutorBuilder<'a, StdShMemProvider> {
         self
     }
 
-    /// Use this to enable shmem testcase passing.
+    /// Set the pointer to the coverage vec used to observer the execution.
+    ///
+    /// # Safety
+    /// The coverage vec pointer must point to a valid vec and outlive the time the [`TinyInstExecutor`] is alive.
+    /// The map will be dereferenced and borrowed mutably during execution. This may not happen concurrently.
     #[must_use]
-    pub fn shmem_provider<SP: ShMemProvider>(
-        self,
-        shmem_provider: &'a mut SP,
-    ) -> TinyInstExecutorBuilder<'a, SP> {
-        TinyInstExecutorBuilder {
-            tinyinst_args: self.tinyinst_args,
-            program_args: self.program_args,
-            timeout: self.timeout,
-            shmem_provider: Some(shmem_provider),
-        }
+    pub fn coverage_ptr(mut self, coverage_ptr: *mut Vec<u64>) -> Self {
+        self.coverage_ptr = coverage_ptr;
+        self
     }
-}
 
-impl<'a, SP> TinyInstExecutorBuilder<'a, SP>
-where
-    SP: ShMemProvider,
-{
-    /// Build tinyinst executor
-    pub fn build<OT, S>(
-        &mut self,
-        coverage: &'a mut Vec<u64>,
-        observers: OT,
-    ) -> Result<TinyInstExecutor<'a, S, SP, OT>, Error> {
+    /// Build [`TinyInst`](https://github.com/googleprojectzero/TinyInst) executor
+    pub fn build<OT, S>(&mut self, observers: OT) -> Result<TinyInstExecutor<S, SP, OT>, Error> {
+        if self.coverage_ptr.is_null() {
+            return Err(Error::illegal_argument("Coverage pointer may not be null."));
+        }
         let (map, shmem_id) = match &mut self.shmem_provider {
             Some(provider) => {
                 // setup shared memory
@@ -285,7 +306,7 @@ where
 
         Ok(TinyInstExecutor {
             tinyinst,
-            coverage,
+            coverage_ptr: self.coverage_ptr,
             timeout: self.timeout,
             observers,
             phantom: PhantomData,
@@ -295,7 +316,7 @@ where
     }
 }
 
-impl<'a, S, SP, OT> HasObservers for TinyInstExecutor<'a, S, SP, OT>
+impl<S, SP, OT> HasObservers for TinyInstExecutor<S, SP, OT>
 where
     S: State,
     SP: ShMemProvider,
@@ -309,14 +330,14 @@ where
         RefIndexable::from(&mut self.observers)
     }
 }
-impl<'a, S, SP, OT> UsesState for TinyInstExecutor<'a, S, SP, OT>
+impl<S, SP, OT> UsesState for TinyInstExecutor<S, SP, OT>
 where
     S: State,
     SP: ShMemProvider,
 {
     type State = S;
 }
-impl<'a, S, SP, OT> UsesObservers for TinyInstExecutor<'a, S, SP, OT>
+impl<S, SP, OT> UsesObservers for TinyInstExecutor<S, SP, OT>
 where
     OT: ObserversTuple<S>,
     S: State,

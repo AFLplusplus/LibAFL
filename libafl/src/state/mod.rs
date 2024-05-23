@@ -1,5 +1,6 @@
 //! The fuzzer, and state are the core pieces of every good fuzzer
 
+#[cfg(feature = "std")]
 use alloc::vec::Vec;
 use core::{
     borrow::BorrowMut,
@@ -22,6 +23,9 @@ use libafl_bolts::{
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
+mod stack;
+pub use stack::StageStack;
+
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
 #[cfg(feature = "scalability_introspection")]
@@ -33,7 +37,7 @@ use crate::{
     fuzzer::{Evaluator, ExecuteInputResult},
     generators::Generator,
     inputs::{Input, UsesInput},
-    stages::{HasCurrentStage, HasNestedStageStatus},
+    stages::{HasCurrentStage, HasNestedStageStatus, StageId},
     Error, HasMetadata, HasNamedMetadata,
 };
 
@@ -257,10 +261,7 @@ pub struct StdState<I, C, R, SC> {
     last_report_time: Option<Duration>,
     /// The current index of the corpus; used to record for resumable fuzzing.
     corpus_idx: Option<CorpusId>,
-    /// The stage indexes for each nesting of stages
-    stage_idx_stack: Vec<usize>,
-    /// The current stage depth
-    stage_depth: usize,
+    stage_stack: StageStack,
     phantom: PhantomData<I>,
 }
 
@@ -532,41 +533,30 @@ where
 }
 
 impl<I, C, R, SC> HasCurrentStage for StdState<I, C, R, SC> {
-    fn set_stage(&mut self, idx: usize) -> Result<(), Error> {
-        // ensure we are in the right frame
-        if self.stage_depth != self.stage_idx_stack.len() {
-            return Err(Error::illegal_state(
-                "stage not resumed before setting stage",
-            ));
-        }
-        self.stage_idx_stack.push(idx);
-        Ok(())
+    fn set_current_stage_idx(&mut self, idx: StageId) -> Result<(), Error> {
+        self.stage_stack.set_current_stage_idx(idx)
     }
 
     fn clear_stage(&mut self) -> Result<(), Error> {
-        self.stage_idx_stack.truncate(self.stage_depth);
-        Ok(())
+        self.stage_stack.clear_stage()
     }
 
-    fn current_stage(&self) -> Result<Option<usize>, Error> {
-        Ok(self.stage_idx_stack.get(self.stage_depth).copied())
+    fn current_stage_idx(&self) -> Result<Option<StageId>, Error> {
+        self.stage_stack.current_stage_idx()
     }
 
     fn on_restart(&mut self) -> Result<(), Error> {
-        self.stage_depth = 0; // reset the stage depth so that we may resume inward
-        Ok(())
+        self.stage_stack.on_restart()
     }
 }
 
 impl<I, C, R, SC> HasNestedStageStatus for StdState<I, C, R, SC> {
     fn enter_inner_stage(&mut self) -> Result<(), Error> {
-        self.stage_depth += 1;
-        Ok(())
+        self.stage_stack.enter_inner_stage()
     }
 
     fn exit_inner_stage(&mut self) -> Result<(), Error> {
-        self.stage_depth -= 1;
-        Ok(())
+        self.stage_stack.exit_inner_stage()
     }
 }
 
@@ -1107,8 +1097,7 @@ where
             dont_reenter: None,
             last_report_time: None,
             corpus_idx: None,
-            stage_depth: 0,
-            stage_idx_stack: Vec::new(),
+            stage_stack: StageStack::default(),
             phantom: PhantomData,
             #[cfg(feature = "std")]
             multicore_inputs_processed: None,
@@ -1239,7 +1228,7 @@ impl<I> HasCurrentCorpusId for NopState<I> {
 }
 
 impl<I> HasCurrentStage for NopState<I> {
-    fn set_stage(&mut self, _idx: usize) -> Result<(), Error> {
+    fn set_current_stage_idx(&mut self, _idx: StageId) -> Result<(), Error> {
         Ok(())
     }
 
@@ -1247,7 +1236,7 @@ impl<I> HasCurrentStage for NopState<I> {
         Ok(())
     }
 
-    fn current_stage(&self) -> Result<Option<usize>, Error> {
+    fn current_stage_idx(&self) -> Result<Option<StageId>, Error> {
         Ok(None)
     }
 }

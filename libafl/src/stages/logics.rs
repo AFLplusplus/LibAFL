@@ -3,7 +3,7 @@
 use core::marker::PhantomData;
 
 use crate::{
-    stages::{HasCurrentStage, HasNestedStageStatus, Stage, StagesTuple},
+    stages::{HasCurrentStage, HasNestedStageStatus, Stage, StageId, StagesTuple},
     state::UsesState,
     Error,
 };
@@ -72,7 +72,8 @@ where
         state: &mut E::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        while state.current_stage()?.is_some() || (self.closure)(fuzzer, executor, state, manager)?
+        while state.current_stage_idx()?.is_some()
+            || (self.closure)(fuzzer, executor, state, manager)?
         {
             self.stages.perform_all(fuzzer, executor, state, manager)?;
         }
@@ -150,7 +151,8 @@ where
         state: &mut E::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        if state.current_stage()?.is_some() || (self.closure)(fuzzer, executor, state, manager)? {
+        if state.current_stage_idx()?.is_some() || (self.closure)(fuzzer, executor, state, manager)?
+        {
             self.if_stages
                 .perform_all(fuzzer, executor, state, manager)?;
         }
@@ -231,21 +233,21 @@ where
         state: &mut E::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        let current = state.current_stage()?;
+        let current = state.current_stage_idx()?;
 
         let fresh = current.is_none();
         let closure_return = fresh && (self.closure)(fuzzer, executor, state, manager)?;
 
-        if current == Some(0) || closure_return {
+        if current == Some(StageId(0)) || closure_return {
             if fresh {
-                state.set_stage(0)?;
+                state.set_current_stage_idx(StageId(0))?;
             }
             state.enter_inner_stage()?;
             self.if_stages
                 .perform_all(fuzzer, executor, state, manager)?;
         } else {
             if fresh {
-                state.set_stage(1)?;
+                state.set_current_stage_idx(StageId(1))?;
             }
             state.enter_inner_stage()?;
             self.else_stages
