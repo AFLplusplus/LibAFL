@@ -1,13 +1,10 @@
 //! A generic shared memory region to be used by any functions (queues or feedbacks
 //! too.)
 
-use alloc::vec::Vec;
 #[cfg(feature = "alloc")]
-use alloc::{rc::Rc, string::ToString};
+use alloc::{rc::Rc, vec::Vec, string::ToString};
 #[cfg(feature = "alloc")]
-use core::fmt::Display;
-#[cfg(feature = "alloc")]
-use core::{cell::RefCell, fmt, mem::ManuallyDrop};
+use core::{cell::RefCell, fmt, mem::ManuallyDrop, fmt::Display};
 use core::{
     fmt::Debug,
     mem,
