@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, ptr::addr_of_mut, time::Duration};
 
 use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus, Testcase},
@@ -20,7 +20,7 @@ use libafl_bolts::shmem::Win32ShMemProvider;
 use libafl_bolts::{
     ownedref::OwnedMutPtr, rands::StdRand, shmem::ShMemProvider, tuples::tuple_list,
 };
-use libafl_tinyinst::executor::TinyInstExecutorBuilder;
+use libafl_tinyinst::executor::TinyInstExecutor;
 static mut COVERAGE: Vec<u64> = vec![];
 
 #[cfg(not(any(target_vendor = "apple", windows, target_os = "linux")))]
@@ -37,7 +37,7 @@ fn main() {
     // use file to pass testcases
     // let args = vec!["test.exe".to_string(), "-f".to_string(), "@@".to_string()];
 
-    let coverage = unsafe { OwnedMutPtr::Ptr(core::ptr::addr_of_mut!(COVERAGE)) };
+    let coverage = unsafe { OwnedMutPtr::Ptr(addr_of_mut!(COVERAGE)) };
     let observer = ListObserver::new("cov", coverage);
     let mut feedback = ListFeedback::new(&observer);
     #[cfg(windows)]
@@ -68,9 +68,10 @@ fn main() {
             .program_args(args)
             .use_shmem()
             .persistent("test.exe".to_string(), "fuzz".to_string(), 1, 10000)
-            .timeout(std::time::Duration::new(5, 0))
+            .timeout(Duration::new(5, 0))
             .shmem_provider(&mut shmem_provider)
-            .build(&mut COVERAGE, tuple_list!(observer))
+            .coverage_ptr(addr_of_mut!(COVERAGE))
+            .build(tuple_list!(observer))
             .unwrap()
     };
     let mutator = StdScheduledMutator::new(havoc_mutations());

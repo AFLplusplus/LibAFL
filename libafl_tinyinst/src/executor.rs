@@ -1,5 +1,4 @@
-use core::marker::PhantomData;
-use std::time::Duration;
+use core::{ptr, time::Duration, marker::PhantomData};
 
 use libafl::{
     executors::{Executor, ExitKind, HasObservers},
@@ -9,20 +8,17 @@ use libafl::{
     Error,
 };
 use libafl_bolts::{
-    fs::{InputFile, INPUTFILE_STD},
-    shmem::{NopShMemProvider, ShMem, ShMemProvider},
-    tuples::RefIndexable,
-    AsSlice, AsSliceMut,
+    fs::{InputFile, INPUTFILE_STD}, shmem::{NopShMemProvider, ShMem, ShMemProvider}, tuples::RefIndexable, AsSlice, AsSliceMut
 };
 use tinyinst::tinyinst::{litecov::RunResult, TinyInst};
 
-/// Tinyinst executor
-pub struct TinyInstExecutor<'a, S, SP, OT>
+/// [`TinyInst`](https://github.com/googleprojectzero/TinyInst) executor
+pub struct TinyInstExecutor<S, SP, OT>
 where
     SP: ShMemProvider,
 {
     tinyinst: TinyInst,
-    coverage: &'a mut Vec<u64>,
+    coverage_ptr: *mut Vec<u64>,
     timeout: Duration,
     observers: OT,
     phantom: PhantomData<S>,
@@ -30,7 +26,7 @@ where
     map: Option<<SP as ShMemProvider>::ShMem>,
 }
 
-impl<'a> TinyInstExecutor<'a, (), NopShMemProvider, ()> {
+impl<'a> TinyInstExecutor<(), NopShMemProvider, ()> {
     /// Create a builder for [`TinyInstExecutor`]
     #[must_use]
     pub fn builder() -> TinyInstExecutorBuilder<'a, NopShMemProvider> {
@@ -38,7 +34,7 @@ impl<'a> TinyInstExecutor<'a, (), NopShMemProvider, ()> {
     }
 }
 
-impl<'a, S, SP, OT> std::fmt::Debug for TinyInstExecutor<'a, S, SP, OT>
+impl<'a, S, SP, OT> std::fmt::Debug for TinyInstExecutor<S, SP, OT>
 where
     SP: ShMemProvider,
 {
@@ -49,7 +45,7 @@ where
     }
 }
 
-impl<'a, EM, S, SP, OT, Z> Executor<EM, Z> for TinyInstExecutor<'a, S, SP, OT>
+impl<'a, EM, S, SP, OT, Z> Executor<EM, Z> for TinyInstExecutor<S, SP, OT>
 where
     EM: UsesState<State = S>,
     S: State + HasExecutions,
@@ -88,7 +84,7 @@ where
         let mut status = RunResult::OK;
         unsafe {
             status = self.tinyinst.run();
-            self.tinyinst.vec_coverage(self.coverage, false);
+            self.tinyinst.vec_coverage(self.coverage_ptr.as_mut().unwrap(), false);
         }
 
         match status {
@@ -108,6 +104,7 @@ pub struct TinyInstExecutorBuilder<'a, SP> {
     tinyinst_args: Vec<String>,
     program_args: Vec<String>,
     timeout: Duration,
+    coverage_ptr: *mut Vec<u64>,
     shmem_provider: Option<&'a mut SP>,
 }
 
@@ -129,6 +126,7 @@ impl<'a> TinyInstExecutorBuilder<'a, NopShMemProvider> {
             program_args: vec![],
             timeout: Duration::new(3, 0),
             shmem_provider: None,
+            coverage_ptr: ptr::null_mut(),
         }
     }
 
@@ -226,7 +224,16 @@ impl<'a> TinyInstExecutorBuilder<'a, NopShMemProvider> {
             program_args: self.program_args,
             timeout: self.timeout,
             shmem_provider: Some(shmem_provider),
+            coverage_ptr: ptr::null_mut(),
         }
+    }
+
+    /// Set the pointer to the coverage vec used to observer the execution.
+    /// 
+    /// # Safety
+    /// The coverage vec pointer must point to a valid vec and outlive the time the [`TinyInstExecutor`] is alive.
+    pub fn coverage_ptr(&mut self, coverage_ptr: *mut Vec<u64>) {
+        self.coverage_ptr = coverage_ptr;
     }
 }
 
@@ -234,12 +241,14 @@ impl<'a, SP> TinyInstExecutorBuilder<'a, SP>
 where
     SP: ShMemProvider,
 {
-    /// Build tinyinst executor
-    pub fn build<OT, S>(
+    /// Build [`TinyInst`](https://github.com/googleprojectzero/TinyInst) executor
+    pub unsafe fn build<OT, S>(
         &mut self,
-        coverage: &'a mut Vec<u64>,
         observers: OT,
-    ) -> Result<TinyInstExecutor<'a, S, SP, OT>, Error> {
+    ) -> Result<TinyInstExecutor<S, SP, OT>, Error> {
+        if self.coverage_ptr.is_null() {
+            return Err(Error::illegal_argument("Coverage pointer may not be null."))
+        }
         let (map, shmem_id) = match &mut self.shmem_provider {
             Some(provider) => {
                 // setup shared memory
@@ -293,7 +302,7 @@ where
 
         Ok(TinyInstExecutor {
             tinyinst,
-            coverage,
+            coverage_ptr: self.coverage_ptr,
             timeout: self.timeout,
             observers,
             phantom: PhantomData,
@@ -303,7 +312,7 @@ where
     }
 }
 
-impl<'a, S, SP, OT> HasObservers for TinyInstExecutor<'a, S, SP, OT>
+impl<S, SP, OT> HasObservers for TinyInstExecutor<S, SP, OT>
 where
     S: State,
     SP: ShMemProvider,
@@ -317,14 +326,14 @@ where
         RefIndexable::from(&mut self.observers)
     }
 }
-impl<'a, S, SP, OT> UsesState for TinyInstExecutor<'a, S, SP, OT>
+impl<S, SP, OT> UsesState for TinyInstExecutor<S, SP, OT>
 where
     S: State,
     SP: ShMemProvider,
 {
     type State = S;
 }
-impl<'a, S, SP, OT> UsesObservers for TinyInstExecutor<'a, S, SP, OT>
+impl<S, SP, OT> UsesObservers for TinyInstExecutor<S, SP, OT>
 where
     OT: ObserversTuple<S>,
     S: State,

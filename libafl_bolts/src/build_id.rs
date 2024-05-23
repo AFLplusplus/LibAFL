@@ -22,13 +22,12 @@ static BUILD_ID: OnceLock<Uuid> = OnceLock::new();
 /// invocations of identically laid out binaries.
 ///
 /// As such:
-/// * It is guaranteed to be identical within multiple invocations of the same
-/// binary.
+/// * It is guaranteed to be identical within multiple invocations of the same binary.
 /// * It is guaranteed to be different across binaries with different code or
-/// data segments or layout.
+///   data segments or layout.
 /// * Equality is unspecified if the binaries have identical code and data
-/// segments and layout but differ immaterially (e.g. if a timestamp is included
-/// in the binary at compile time).
+///   segments and layout but differ immaterially (e.g. if a timestamp is included
+///   in the binary at compile time).
 ///
 /// # Examples
 ///
