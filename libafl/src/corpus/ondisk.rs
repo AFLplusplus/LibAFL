@@ -108,8 +108,8 @@ where
 
     /// Peek the next free corpus id
     #[inline]
-    fn peek_next_free_id(&self) -> CorpusId {
-        self.inner.peek_next_free_id()
+    fn peek_free_id(&self) -> CorpusId {
+        self.inner.peek_free_id()
     }
 
     /// Removes an entry from the corpus, returning it if it was present.
