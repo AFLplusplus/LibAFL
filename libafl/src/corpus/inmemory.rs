@@ -266,7 +266,7 @@ where
 
     #[must_use]
     /// Peek the next free corpus id
-    pub fn peek_next_free_id(&self) -> CorpusId {
+    pub fn peek_free_id(&self) -> CorpusId {
         CorpusId::from(self.progressive_idx)
     }
 
@@ -438,8 +438,8 @@ where
 
     /// Peek the next free corpus id
     #[inline]
-    fn peek_next_free_id(&self) -> CorpusId {
-        self.storage.peek_next_free_id()
+    fn peek_free_id(&self) -> CorpusId {
+        self.storage.peek_free_id()
     }
 
     #[inline]
