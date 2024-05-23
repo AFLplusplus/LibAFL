@@ -37,7 +37,7 @@ impl<'a> TinyInstExecutor<(), NopShMemProvider, ()> {
     }
 }
 
-impl<'a, S, SP, OT> std::fmt::Debug for TinyInstExecutor<S, SP, OT>
+impl<S, SP, OT> std::fmt::Debug for TinyInstExecutor<S, SP, OT>
 where
     SP: ShMemProvider,
 {
@@ -48,7 +48,7 @@ where
     }
 }
 
-impl<'a, EM, S, SP, OT, Z> Executor<EM, Z> for TinyInstExecutor<S, SP, OT>
+impl<EM, S, SP, OT, Z> Executor<EM, Z> for TinyInstExecutor<S, SP, OT>
 where
     EM: UsesState<State = S>,
     S: State + HasExecutions,
@@ -242,6 +242,7 @@ where
     /// # Safety
     /// The coverage vec pointer must point to a valid vec and outlive the time the [`TinyInstExecutor`] is alive.
     /// The map will be dereferenced and borrowed mutably during execution. This may not happen concurrently.
+    #[must_use]
     pub fn coverage_ptr(mut self, coverage_ptr: *mut Vec<u64>) -> Self {
         self.coverage_ptr = coverage_ptr;
         self
