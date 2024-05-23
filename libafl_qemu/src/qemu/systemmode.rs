@@ -16,7 +16,7 @@ use num_traits::Zero;
 
 use crate::{
     EmulatorMemoryChunk, FastSnapshotPtr, GuestAddrKind, MemAccessInfo, Qemu, QemuExitError,
-    QemuExitReason, CPU,
+    QemuExitReason, QemuSnapshotCheckResult, CPU,
 };
 
 pub(super) extern "C" fn qemu_cleanup_atexit() {
@@ -256,8 +256,15 @@ impl Qemu {
         libafl_qemu_sys::syx_snapshot_root_restore(snapshot)
     }
 
-    pub unsafe fn check_fast_snapshot_memory_consistency(&self, snapshot: FastSnapshotPtr) -> u64 {
-        libafl_qemu_sys::syx_snapshot_check_memory_consistency(snapshot)
+    pub unsafe fn check_fast_snapshot(
+        &self,
+        ref_snapshot: FastSnapshotPtr,
+    ) -> QemuSnapshotCheckResult {
+        let check_result = libafl_qemu_sys::syx_snapshot_check(ref_snapshot);
+
+        QemuSnapshotCheckResult {
+            nb_page_inconsistencies: check_result.nb_inconsistencies,
+        }
     }
 
     pub fn list_devices(&self) -> Vec<String> {
