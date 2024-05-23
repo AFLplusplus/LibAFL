@@ -21,15 +21,15 @@
 //! ## Techniques
 //! The serialization format applies multiple techniques to achieve its goals.
 //! * It uses bincode for efficient binary serialization. Crucially, bincode uses variable length integer encoding,
-//! allowing it encode small integers use fewer bytes.
+//!   allowing it encode small integers use fewer bytes.
 //! * References to previous expressions are stored relative to the current expressions id. The vast majority of
-//! expressions refer to other expressions that were defined close to their use. Therefore, encoding relative references
-//! keeps references small. Therefore, they make optimal use of bincodes variable length integer encoding.
+//!   expressions refer to other expressions that were defined close to their use. Therefore, encoding relative references
+//!   keeps references small. Therefore, they make optimal use of bincodes variable length integer encoding.
 //! * Ids of expressions ([`SymExprRef`]s) are implicitly derived by their position in the message stream. Effectively,
-//! a counter is used to identify expressions.
+//!   a counter is used to identify expressions.
 //! * The current length of the trace in bytes in serialized in a fixed format at the beginning of the trace.
-//! This length is updated regularly when the trace is in a consistent state. This allows the reader to avoid reading
-//! malformed data if the traced process crashed.
+//!   This length is updated regularly when the trace is in a consistent state. This allows the reader to avoid reading
+//!   malformed data if the traced process crashed.
 //!
 //! ## Example
 //! The expression `SymExpr::BoolAnd { a: SymExpr::True, b: SymExpr::False }` would be encoded as:
