@@ -9,7 +9,7 @@ use std::{env, net::SocketAddr, path::PathBuf, time::Duration};
 use clap::Parser;
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
-    events::{launcher::Launcher, EventConfig},
+    events::{launcher::Launcher, llmp::LlmpEventConverter, EventConfig},
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, NautilusChunksMetadata, NautilusFeedback},

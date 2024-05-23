@@ -248,10 +248,7 @@ where
     }
 
     /// Build [`TinyInst`](https://github.com/googleprojectzero/TinyInst) executor
-    pub fn build<OT, S>(
-        &mut self,
-        observers: OT,
-    ) -> Result<TinyInstExecutor<S, SP, OT>, Error> {
+    pub fn build<OT, S>(&mut self, observers: OT) -> Result<TinyInstExecutor<S, SP, OT>, Error> {
         if self.coverage_ptr.is_null() {
             return Err(Error::illegal_argument("Coverage pointer may not be null."));
         }
