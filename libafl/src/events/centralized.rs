@@ -19,7 +19,7 @@ use libafl_bolts::{
 };
 use libafl_bolts::{
     llmp::{self, LlmpBroker, LlmpClient, LlmpClientDescription, Tag},
-    shmem::{ShMemProvider, StdShMemProvider},
+    shmem::{NopShMemProvider, ShMemProvider},
     ClientId,
 };
 use serde::{Deserialize, Serialize};
