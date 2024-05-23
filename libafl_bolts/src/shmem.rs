@@ -2,9 +2,9 @@
 //! too.)
 
 #[cfg(feature = "alloc")]
-use alloc::{rc::Rc, vec::Vec, string::ToString};
+use alloc::{rc::Rc, string::ToString, vec::Vec};
 #[cfg(feature = "alloc")]
-use core::{cell::RefCell, fmt, mem::ManuallyDrop, fmt::Display};
+use core::{cell::RefCell, fmt, fmt::Display, mem::ManuallyDrop};
 use core::{
     fmt::Debug,
     mem,
@@ -320,7 +320,7 @@ pub trait ShMemProvider: Clone + Default + Debug {
 /// This is mainly for testing and type magic.
 /// The resulting [`NopShMem`] is backed by a simple byte buffer to do some simple non-shared things with.
 /// Calling [`NopShMemProvider::shmem_from_id_and_size`] will return new maps for the same id every time.
-/// 
+///
 /// # Note
 /// If you just want a simple shared memory implementation, use [`StdShMemProvider`] instead.
 #[cfg(feature = "alloc")]
@@ -339,15 +339,22 @@ impl ShMemProvider for NopShMemProvider {
         self.shmem_from_id_and_size(ShMemId::default(), map_size)
     }
 
-    fn shmem_from_id_and_size(&mut self, id: ShMemId, map_size: usize) -> Result<Self::ShMem, Error> {
-        Ok(NopShMem {id, buf: vec![0; map_size]})
+    fn shmem_from_id_and_size(
+        &mut self,
+        id: ShMemId,
+        map_size: usize,
+    ) -> Result<Self::ShMem, Error> {
+        Ok(NopShMem {
+            id,
+            buf: vec![0; map_size],
+        })
     }
 }
 
 /// An [`ShMem]`] that does not have any mem nor share anything.
 #[cfg(feature = "alloc")]
 #[derive(Debug, Clone, Default)]
-pub struct NopShMem{
+pub struct NopShMem {
     id: ShMemId,
     buf: Vec<u8>,
 }

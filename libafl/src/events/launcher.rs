@@ -49,7 +49,7 @@ use typed_builder::TypedBuilder;
 
 use super::hooks::EventManagerHooksTuple;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
-use crate::events::centralized::{CentralizedLlmpEventBroker, CentralizedEventManager};
+use crate::events::centralized::{CentralizedEventManager, CentralizedLlmpEventBroker};
 #[cfg(feature = "adaptive_serialization")]
 use crate::observers::TimeObserver;
 #[cfg(feature = "std")]
