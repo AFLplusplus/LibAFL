@@ -33,7 +33,7 @@ pub struct NyxExecutor<S, OT> {
 impl NyxExecutor<(), ()> {
     /// Create a builder for [`NyxExeuctor`]
     pub fn builder() -> NyxExecutorBuilder {
-        NyxExecutor::builder()
+        NyxExecutorBuilder::new()
     }
 }
 
