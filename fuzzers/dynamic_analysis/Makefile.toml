@@ -37,8 +37,8 @@ mac_alias = "fuzz_o_unix"
 windows_alias = "unsupported"
 
 [tasks.fuzz_o_unix]
-command = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cc"
-args = ["--libafl-no-link", "-O3", "-c", "fuzz.c", "-o", "fuzz.o"]
+command = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cxx"
+args = ["--libafl-no-link", "-O3","-I", "./Little-CMS/include", "-c", "cms_transform_fuzzer.cc", "-o", "cms_transform_fuzzer.o"]
 dependencies = ["cc", "cxx"]
 
 # Fuzzer
@@ -49,7 +49,7 @@ windows_alias = "unsupported"
 
 [tasks.fuzzer_unix]
 command = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cxx"
-args = ["--libafl", "fuzz.o", "-o", "${FUZZER_NAME}", "-lm", "-lz"]
+args = ["--libafl", "cms_transform_fuzzer.o", "./Little-CMS/src/.libs/liblcms2.a", "-o", "${FUZZER_NAME}", "-lm", "-lz"]
 dependencies = ["cc", "cxx", "fuzz_o"]
 
 # Run

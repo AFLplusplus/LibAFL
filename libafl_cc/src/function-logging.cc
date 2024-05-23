@@ -152,21 +152,16 @@ bool FunctionLogging::runOnModule(Module &M) {
 
     if (isIgnoreFunction(&F)) { continue; }
     if (F.size() < 1) { continue; }
-    for (auto &BB : F) {
-      for (auto &IN : BB) {
-        CallInst *callInst = nullptr;
-        if ((callInst = dyn_cast<CallInst>(&IN))) {
-          std::size_t function_id = std::hash<std::string>{}(F.getName().str());
-          IRBuilder<> IRB(callInst->getParent());
-          IRB.SetInsertPoint(callInst);
-          std::vector<Value *> args;
-          llvm::Value         *value = llvm::ConstantInt::get(
-              llvm::Type::getInt64Ty(F.getContext()), function_id);
-          args.push_back(value);
-          IRB.CreateCall(callHook, args);
-        }
-      }
-    }
+    // instrument the first basic block of this fn
+    BasicBlock &entry = F.front();
+    std::size_t function_id = std::hash<std::string>{}(F.getName().str());
+    IRBuilder<> IRB(&entry);
+    IRB.SetInsertPoint(&entry.front());
+    std::vector<Value *> args;
+    llvm::Value         *value = llvm::ConstantInt::get(
+        llvm::Type::getInt64Ty(F.getContext()), function_id);
+    args.push_back(value);
+    IRB.CreateCall(callHook, args);
   }
 
 #if USE_NEW_PM

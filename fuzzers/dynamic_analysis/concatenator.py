@@ -11,16 +11,17 @@ def concatenate_json_files(input_dir):
             if file.endswith('.json'):
                 json_files.append(os.path.join(root, file))
     
-    data = []
+    data = dict()
     for json_file in json_files:
         with open(json_file, 'r') as file:
             if os.stat(json_file).st_size == 0:
                 # skip empty file else json.load() fails
                 continue
             json_data = json.load(file)
-            data.append(json_data)
+            print(type(json_data), file)
+            data = data | json_data
     
-    output_file = os.path.join(input_dir, 'concatenated.json')
+    output_file = os.path.join(os.getcwd(), 'concatenated.json')
     with open(output_file, 'w') as file:
         json.dump([data], file)
     

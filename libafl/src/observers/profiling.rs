@@ -1,12 +1,14 @@
-use alloc::{borrow::Cow, string::String, vec::Vec};
-use std::{collections::HashMap, fs::File, io::BufReader, path::Path};
+use alloc::{borrow::Cow, string::String};
+use std::{fs::File, io::BufReader, path::Path};
 
+use hashbrown::HashMap;
 use libafl_bolts::{ownedref::OwnedMutPtr, Named};
 use serde::{Deserialize, Serialize};
 
 use crate::{inputs::UsesInput, observers::Observer, state::State, Error};
 #[derive(Debug, Serialize, Deserialize)]
-struct FunctionData {
+/// The json data
+pub struct FunctionData {
     #[serde(rename = "name")]
     name: String,
     #[serde(rename = "# BBs")]
@@ -64,7 +66,7 @@ struct FunctionData {
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct AnalysisData {
-    data: Vec<HashMap<String, FunctionData>>,
+    data: HashMap<usize, FunctionData>,
 }
 
 /// The observer to lookup the static analysis data at runtime
@@ -72,23 +74,20 @@ struct AnalysisData {
 pub struct ProfilingObserver {
     /// The name of the observer.
     pub name: Cow<'static, str>,
-    data: AnalysisData,
-    /// things observed in the last run
-    observed: Vec<usize>,
-    /// The list
-    list: OwnedMutPtr<HashMap<usize, usize>>,
+    db: AnalysisData,
+    /// The map
+    map: OwnedMutPtr<HashMap<usize, usize>>,
 }
 
 impl ProfilingObserver {
     /// The constructor
-    pub fn new<P>(json_path: P, list: OwnedMutPtr<HashMap<usize, usize>>) -> Result<Self, Error>
+    pub fn new<P>(json_path: P, map: OwnedMutPtr<HashMap<usize, usize>>) -> Result<Self, Error>
     where
         P: AsRef<Path>,
     {
         let f = File::open(json_path)?;
         let reader = BufReader::new(f);
         let analysis_data: AnalysisData = serde_json::from_reader(reader)?;
-
         // debug
         /*
         for record in &analysis_data.data {
@@ -100,10 +99,22 @@ impl ProfilingObserver {
 
         Ok(Self {
             name: Cow::from("profiling"),
-            data: analysis_data,
-            observed: vec![],
-            list,
+            db: analysis_data,
+            map,
         })
+    }
+
+    /// Get the map
+    #[must_use]
+    pub fn map(&self) -> &HashMap<usize, usize> {
+        self.map.as_ref()
+    }
+
+    /// lookup the data through db
+    #[must_use]
+    pub fn lookup(&self, function_id: usize) -> Option<&FunctionData> {
+        let item = self.db.data.get(&function_id);
+        item
     }
 }
 
@@ -117,12 +128,19 @@ impl<S> Observer<S> for ProfilingObserver
 where
     S: State,
 {
-    fn pre_exec_child(
+    fn post_exec(
         &mut self,
         _state: &mut S,
         _input: &<S as UsesInput>::Input,
+        _exit_kind: &crate::executors::ExitKind,
     ) -> Result<(), Error> {
-        self.observed.clear();
+        // in reality, this should be done in a stage
+        // but here just for poc
+        for (key, _item) in self.map().iter() {
+            let found = self.lookup(*key);
+            log::info!("key: {}, data: {:#?}", key, found);
+        }
+        log::info!("");
         Ok(())
     }
 }

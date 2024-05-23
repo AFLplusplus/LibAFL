@@ -2,7 +2,7 @@
 use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
-
+use once_cell::sync::Lazy;
 use core::{cell::RefCell, time::Duration};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd};
@@ -18,7 +18,7 @@ use clap::{Arg, Command};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleRestartingEventManager,
-    executors::{inprocess::{InProcessExecutor, HookableInProcessExecutor}, ExitKind},
+    executors::{inprocess::HookableInProcessExecutor, ExitKind},
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -48,7 +48,6 @@ use libafl_bolts::{
     ownedref::OwnedMutPtr,
     AsSlice,
 };
-use std::ops::Deref;
 
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl_targets::autotokens;
@@ -251,8 +250,8 @@ fn fuzz(
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    let func_list = OwnedMutPtr::from_raw_mut(FUNCTION_LIST.deref_mut());
-    let profiling_observer = ProfilingObserver::new("analysis/concatenated.json", func_list)?;
+    let func_list = unsafe {OwnedMutPtr::from_raw_mut(Lazy::force_mut(&mut FUNCTION_LIST))};
+    let profiling_observer = ProfilingObserver::new("concatenated.json", func_list)?;
     let callhook = CallHook::new();
 
     let cmplog_observer = CmpLogObserver::new("cmplog", true);
@@ -394,7 +393,7 @@ fn fuzz(
         let null_fd = file_null.as_raw_fd();
         dup2(null_fd, io::stdout().as_raw_fd())?;
         if std::env::var("LIBAFL_FUZZBENCH_DEBUG").is_err() {
-            dup2(null_fd, io::stderr().as_raw_fd())?;
+            // dup2(null_fd, io::stderr().as_raw_fd())?;
         }
     }
     // reopen file to make sure we're at the end

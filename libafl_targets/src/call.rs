@@ -7,18 +7,17 @@ use libafl::{
 };
 use once_cell::sync::Lazy;
 /// The list of functions that this execution has observed
-pub static mut FUNCTION_LIST: Lazy<HashMap<usize, usize>> = Lazy::new(|| {
-    let m = HashMap::new();
-    m
-});
+pub static mut FUNCTION_LIST: Lazy<HashMap<usize, usize>> = Lazy::new(|| HashMap::new());
 
 #[no_mangle]
 /// The runtime code inserted at every callinst invokation (if you used the function-logging.cc)
+/// # Safety
+/// unsafe because it touches pub static mut
 pub unsafe extern "C" fn __libafl_target_call_hook(id: usize) {
     *FUNCTION_LIST.entry(id).or_insert(0) += 1;
 }
 
-/// The empty struct to clear the FUNCTION_LIST before the execution
+/// The empty struct to clear the `FUNCTION_LIST` before the execution
 #[derive(Debug, Clone, Copy, Default)]
 pub struct CallHook<S> {
     phantom: PhantomData<S>,
@@ -26,6 +25,7 @@ pub struct CallHook<S> {
 
 impl<S> CallHook<S> {
     /// The constructor
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
