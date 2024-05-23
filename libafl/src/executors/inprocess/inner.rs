@@ -25,12 +25,10 @@ use crate::{
         inprocess::HasInProcessHooks,
         Executor, HasObservers,
     },
-    feedbacks::Feedback,
-    fuzzer::HasObjective,
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
     state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
-    Error,
+    Error, Evaluator,
 };
 
 /// The internal state of `GenericInProcessExecutor`.
@@ -165,7 +163,7 @@ where
     S: HasExecutions + HasSolutions + HasCorpus + State,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
-    pub fn generic<E, EM, OF, Z>(
+    pub fn generic<E, EM, Z>(
         user_hooks: HT,
         observers: OT,
         fuzzer: &mut Z,
@@ -175,11 +173,10 @@ where
     where
         E: Executor<EM, Z, State = S> + HasObservers + HasInProcessHooks<S>,
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: Evaluator<E, EM, State = S>,
     {
-        Self::with_timeout_generic::<E, EM, OF, Z>(
+        Self::with_timeout_generic::<E, EM, Z>(
             user_hooks,
             observers,
             fuzzer,
@@ -191,7 +188,7 @@ where
 
     /// Create a new in mem executor with the default timeout and use batch mode(5 sec)
     #[cfg(all(feature = "std", target_os = "linux"))]
-    pub fn batched_timeout_generic<E, EM, OF, Z>(
+    pub fn batched_timeout_generic<E, EM, Z>(
         user_hooks: HT,
         observers: OT,
         fuzzer: &mut Z,
@@ -202,11 +199,10 @@ where
     where
         E: Executor<EM, Z, State = S> + HasObservers + HasInProcessHooks<S>,
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: Evaluator<E, EM, State = S>,
     {
-        let mut me = Self::with_timeout_generic::<E, EM, OF, Z>(
+        let mut me = Self::with_timeout_generic::<E, EM, Z>(
             user_hooks, observers, fuzzer, state, event_mgr, exec_tmout,
         )?;
         me.hooks_mut().0.timer_mut().batch_mode = true;
@@ -221,7 +217,7 @@ where
     /// * `observers` - the observers observing the target during execution
     ///
     /// This may return an error on unix, if signal handler setup fails
-    pub fn with_timeout_generic<E, EM, OF, Z>(
+    pub fn with_timeout_generic<E, EM, Z>(
         user_hooks: HT,
         observers: OT,
         _fuzzer: &mut Z,
@@ -232,11 +228,10 @@ where
     where
         E: Executor<EM, Z, State = S> + HasObservers + HasInProcessHooks<S>,
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: Evaluator<E, EM, State = S>,
     {
-        let default = InProcessHooks::new::<E, EM, OF, Z>(timeout)?;
+        let default = InProcessHooks::new::<E, EM, Z>(timeout)?;
         let mut hooks = tuple_list!(default).merge(user_hooks);
         hooks.init_all::<Self>(state);
 
