@@ -1,6 +1,7 @@
 //! A generic shared memory region to be used by any functions (queues or feedbacks
 //! too.)
 
+use alloc::vec::Vec;
 #[cfg(feature = "alloc")]
 use alloc::{rc::Rc, string::ToString};
 #[cfg(feature = "alloc")]
@@ -319,9 +320,17 @@ pub trait ShMemProvider: Clone + Default + Debug {
 }
 
 /// An [`ShMemProvider`] that does not provide any [`ShMem`].
+/// This is mainly for testing and type magic.
+/// The resulting [`NopShMem`] is backed by a simple byte buffer to do some simple non-shared things with.
+/// Calling [`NopShMemProvider::shmem_from_id_and_size`] will return new maps for the same id every time.
+/// 
+/// # Note
+/// If you just want a simple shared memory implementation, use [`StdShMemProvider`] instead.
+#[cfg(feature = "alloc")]
 #[derive(Debug, Clone, Default)]
 pub struct NopShMemProvider;
 
+#[cfg(feature = "alloc")]
 impl ShMemProvider for NopShMemProvider {
     type ShMem = NopShMem;
 
@@ -329,37 +338,43 @@ impl ShMemProvider for NopShMemProvider {
         Ok(Self)
     }
 
-    fn new_shmem(&mut self, _map_size: usize) -> Result<Self::ShMem, Error> {
-        Ok(NopShMem)
+    fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
+        self.shmem_from_id_and_size(ShMemId::default(), map_size)
     }
 
-    fn shmem_from_id_and_size(&mut self, _id: ShMemId, _size: usize) -> Result<Self::ShMem, Error> {
-        Ok(NopShMem)
+    fn shmem_from_id_and_size(&mut self, id: ShMemId, map_size: usize) -> Result<Self::ShMem, Error> {
+        Ok(NopShMem {id, buf: vec![0; map_size]})
     }
 }
 
 /// An [`ShMem]`] that does not have any mem nor share anything.
+#[cfg(feature = "alloc")]
 #[derive(Debug, Clone, Default)]
-pub struct NopShMem;
+pub struct NopShMem{
+    id: ShMemId,
+    buf: Vec<u8>,
+}
 
+#[cfg(feature = "alloc")]
 impl ShMem for NopShMem {
     fn id(&self) -> ShMemId {
-        ShMemId::default()
+        self.id
     }
 }
 
+#[cfg(feature = "alloc")]
 impl DerefMut for NopShMem {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        // TODO: Do we actually want to use a Vec here and have un-shared memory?
-        unimplemented!("NopShMem does not actually have data (DerefMut won't work)")
+        &mut self.buf
     }
 }
 
+#[cfg(feature = "alloc")]
 impl Deref for NopShMem {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
-        unimplemented!("NopShMem does not actually have data (Deref won't work)")
+        &self.buf
     }
 }
 
