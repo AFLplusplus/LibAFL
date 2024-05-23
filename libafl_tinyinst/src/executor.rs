@@ -241,13 +241,14 @@ where
     ///
     /// # Safety
     /// The coverage vec pointer must point to a valid vec and outlive the time the [`TinyInstExecutor`] is alive.
+    /// The map will be dereferenced and borrowed mutably during execution. This may not happen concurrently.
     pub fn coverage_ptr(mut self, coverage_ptr: *mut Vec<u64>) -> Self {
         self.coverage_ptr = coverage_ptr;
         self
     }
 
     /// Build [`TinyInst`](https://github.com/googleprojectzero/TinyInst) executor
-    pub unsafe fn build<OT, S>(
+    pub fn build<OT, S>(
         &mut self,
         observers: OT,
     ) -> Result<TinyInstExecutor<S, SP, OT>, Error> {
