@@ -231,7 +231,7 @@ where
     is_main: bool,
 }
 
-impl CentralizedEventManager<NopEventManager<NopState<NopInput>>, StdShMemProvider> {
+impl CentralizedEventManager<NopEventManager<NopState<NopInput>>, NopShMemProvider> {
     /// Creates a builder for [`CentralizedEventManager`]
     #[must_use]
     pub fn builder() -> CentralizedEventManagerBuilder {
