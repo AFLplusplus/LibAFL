@@ -1,17 +1,9 @@
-# Fuzzbench Harness
-
-This folder contains an example fuzzer tailored for fuzzbench.
-It uses the best possible setting, with the exception of a SimpleRestartingEventManager instead of an LlmpEventManager - since fuzzbench is single threaded.
-Real fuzz campaigns should consider using multithreaded LlmpEventManager, see the other examples.
-
-## Build
-
-To build this example, run `cargo build --release`.
-This will build the fuzzer compilers (`libafl_cc` and `libafl_cpp`) with `src/lib.rs` as fuzzer.
-The fuzzer uses the libfuzzer compatibility layer and the SanitizerCoverage runtime functions for coverage feedback.
-
-These can then be used to build libfuzzer harnesses in the software project of your choice.
-Finally, just run the resulting binary with `out_dir`, `in_dir`.
-
-In any real-world scenario, you should use `taskset` to pin each client to an empty CPU core, the lib does not pick an empty core automatically (yet).
-
+# Dynamic Analysis Fuzzer
+This fuzzer is to show how you can collect runtime analysis information during fuzzing using LibAFL. We use the Little-CMS project for the example.
+To run the fuzzer,
+0. Compile the fuzzer with `cargo build --release`
+1. `mkdir analysis` and run `build.sh`. This will compile Little-CMS to extract the analysis information and generate a json file for each module.
+2. run `python3 concatenator.py analysis`. This will concatenate all the json into one single file. This json file maps a function id to its analysis information.
+3. Compile the fuzzer with `cargo make fuzzer`. This will instrument the fuzzer at every function entry point. Therefore, whenever we reach the entry of any function, we 
+can log its id and logs what functions we executed.
+4. Run the fuzzer `RUST_LOG=info ./fuzzer --input ./corpus --output ./out`. You'll see a stream of analysis data 
