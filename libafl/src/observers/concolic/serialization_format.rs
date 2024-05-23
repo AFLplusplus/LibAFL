@@ -1,22 +1,23 @@
 //! # Concolic Tracing Serialization Format
+//!
 //! ## Design Goals
 //! * The serialization format for concolic tracing was developed with the goal of being space and time efficient.
 //! * Additionally, it should be easy to maintain and extend.
 //! * It does not have to be compatible with other programming languages.
 //! * It should be resilient to crashes. Since we are fuzzing, we are expecting the traced program to crash at some
-//! point.
+//!   point.
 //!
 //! The format as implemented fulfils these design goals.
 //! Specifically:
 //! * it requires only constant memory space for serialization, which allows for tracing complex and/or
-//! long-running programs.
+//!   long-running programs.
 //! * the trace itself requires little space. A typical binary operation (such as an add) typically takes just 3 bytes.
 //! * it easy to encode. There is no translation between the interface of the runtime itself and the trace it generates.
 //! * it is similarly easy to decode and can be easily translated into an in-memory AST without overhead, because
-//! expressions are decoded from leaf to root instead of root to leaf.
+//!   expressions are decoded from leaf to root instead of root to leaf.
 //! * At its core, it is just [`SymExpr`]s, which can be added to, modified and removed from with ease. The
-//! definitions are automatically shared between the runtime and the consuming program, since both depend on the same
-//! `LibAFL`.
+//!   definitions are automatically shared between the runtime and the consuming program, since both depend on the same
+//!   `LibAFL`.
 //!
 //! ## Techniques
 //! The serialization format applies multiple techniques to achieve its goals.

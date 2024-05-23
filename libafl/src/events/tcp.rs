@@ -445,6 +445,7 @@ where
     S: State,
 {
     /// Create a builder for [`TcpEventManager`]
+    #[must_use]
     pub fn builder() -> TcpEventManagerBuilder<(), S> {
         TcpEventManagerBuilder::new()
     }
