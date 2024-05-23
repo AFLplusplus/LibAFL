@@ -1,4 +1,4 @@
-use core::{ptr, time::Duration, marker::PhantomData};
+use core::{marker::PhantomData, ptr, time::Duration};
 
 use libafl::{
     executors::{Executor, ExitKind, HasObservers},
@@ -8,7 +8,10 @@ use libafl::{
     Error,
 };
 use libafl_bolts::{
-    fs::{InputFile, INPUTFILE_STD}, shmem::{NopShMemProvider, ShMem, ShMemProvider}, tuples::RefIndexable, AsSlice, AsSliceMut
+    fs::{InputFile, INPUTFILE_STD},
+    shmem::{NopShMemProvider, ShMem, ShMemProvider},
+    tuples::RefIndexable,
+    AsSlice, AsSliceMut,
 };
 use tinyinst::tinyinst::{litecov::RunResult, TinyInst};
 
@@ -84,7 +87,8 @@ where
         let mut status = RunResult::OK;
         unsafe {
             status = self.tinyinst.run();
-            self.tinyinst.vec_coverage(self.coverage_ptr.as_mut().unwrap(), false);
+            self.tinyinst
+                .vec_coverage(self.coverage_ptr.as_mut().unwrap(), false);
         }
 
         match status {
@@ -130,6 +134,26 @@ impl<'a> TinyInstExecutorBuilder<'a, NopShMemProvider> {
         }
     }
 
+    /// Use this to enable shmem testcase passing.
+    #[must_use]
+    pub fn shmem_provider<SP: ShMemProvider>(
+        self,
+        shmem_provider: &'a mut SP,
+    ) -> TinyInstExecutorBuilder<'a, SP> {
+        TinyInstExecutorBuilder {
+            tinyinst_args: self.tinyinst_args,
+            program_args: self.program_args,
+            timeout: self.timeout,
+            shmem_provider: Some(shmem_provider),
+            coverage_ptr: ptr::null_mut(),
+        }
+    }
+}
+
+impl<'a, SP> TinyInstExecutorBuilder<'a, SP>
+where
+    SP: ShMemProvider,
+{
     /// Argument for tinyinst instrumentation
     #[must_use]
     pub fn tinyinst_arg(mut self, arg: String) -> Self {
@@ -213,41 +237,22 @@ impl<'a> TinyInstExecutorBuilder<'a, NopShMemProvider> {
         self
     }
 
-    /// Use this to enable shmem testcase passing.
-    #[must_use]
-    pub fn shmem_provider<SP: ShMemProvider>(
-        self,
-        shmem_provider: &'a mut SP,
-    ) -> TinyInstExecutorBuilder<'a, SP> {
-        TinyInstExecutorBuilder {
-            tinyinst_args: self.tinyinst_args,
-            program_args: self.program_args,
-            timeout: self.timeout,
-            shmem_provider: Some(shmem_provider),
-            coverage_ptr: ptr::null_mut(),
-        }
-    }
-
     /// Set the pointer to the coverage vec used to observer the execution.
-    /// 
+    ///
     /// # Safety
     /// The coverage vec pointer must point to a valid vec and outlive the time the [`TinyInstExecutor`] is alive.
-    pub fn coverage_ptr(&mut self, coverage_ptr: *mut Vec<u64>) {
+    pub fn coverage_ptr(mut self, coverage_ptr: *mut Vec<u64>) -> Self {
         self.coverage_ptr = coverage_ptr;
+        self
     }
-}
 
-impl<'a, SP> TinyInstExecutorBuilder<'a, SP>
-where
-    SP: ShMemProvider,
-{
     /// Build [`TinyInst`](https://github.com/googleprojectzero/TinyInst) executor
     pub unsafe fn build<OT, S>(
         &mut self,
         observers: OT,
     ) -> Result<TinyInstExecutor<S, SP, OT>, Error> {
         if self.coverage_ptr.is_null() {
-            return Err(Error::illegal_argument("Coverage pointer may not be null."))
+            return Err(Error::illegal_argument("Coverage pointer may not be null."));
         }
         let (map, shmem_id) = match &mut self.shmem_provider {
             Some(provider) => {
