@@ -333,6 +333,7 @@ jobs:
           - ./fuzzers/libfuzzer_stb_image
           - ./fuzzers/fuzzbench_forkserver
           # - ./fuzzers/libfuzzer_windows_asan
+          - ./fuzzers/dynamic_analysis
           - ./fuzzers/baby_fuzzer_minimizing
           - ./fuzzers/frida_executable_libpng
           - ./fuzzers/tutorial
