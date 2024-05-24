@@ -55,7 +55,7 @@ pub fn fuzz() {
         let env: Vec<(String, String)> = env::vars().collect();
 
         // let emu_snapshot_manager = QemuSnapshotBuilder::new(true);
-        let emu_snapshot_manager = FastSnapshotManager::new(false); // Create a snapshot manager (normal or fast for now).
+        let emu_snapshot_manager = FastSnapshotManager::new(); // Create a snapshot manager (normal or fast for now).
         let emu_exit_handler: StdEmulatorExitHandler<FastSnapshotManager> =
             StdEmulatorExitHandler::new(emu_snapshot_manager); // Create an exit handler: it is the entity taking the decision of what should be done when QEMU returns.
 

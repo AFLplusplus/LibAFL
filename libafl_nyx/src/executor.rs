@@ -30,6 +30,13 @@ pub struct NyxExecutor<S, OT> {
     phantom: PhantomData<S>,
 }
 
+impl NyxExecutor<(), ()> {
+    /// Create a builder for [`NyxExeuctor`]
+    pub fn builder() -> NyxExecutorBuilder {
+        NyxExecutorBuilder::new()
+    }
+}
+
 impl<S, OT> UsesState for NyxExecutor<S, OT>
 where
     S: State,

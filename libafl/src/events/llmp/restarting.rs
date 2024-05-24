@@ -1,4 +1,7 @@
-//! Llmp restarting manager
+//! The `LLMP` restarting manager will
+//! forward messages over lockless shared maps.
+//! When the target crashes, a watch process (the parent) will
+//! restart/refork it.
 
 use alloc::vec::Vec;
 #[cfg(all(unix, not(miri), feature = "std"))]
@@ -42,7 +45,7 @@ use crate::{
     events::{
         hooks::EventManagerHooksTuple, Event, EventConfig, EventFirer, EventManager,
         EventManagerId, EventProcessor, EventRestarter, HasEventManagerId, LlmpEventBroker,
-        LlmpEventManager, LlmpEventManagerBuilder, LlmpShouldSaveState, ProgressReporter,
+        LlmpEventManager, LlmpShouldSaveState, ProgressReporter,
     },
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
@@ -483,11 +486,11 @@ where
                         }
                         LlmpConnection::IsClient { client } => {
                             #[cfg(not(feature = "adaptive_serialization"))]
-                            let mgr: LlmpEventManager<EMH, S, SP> = LlmpEventManagerBuilder::new()
+                            let mgr: LlmpEventManager<EMH, S, SP> = LlmpEventManager::builder()
                                 .hooks(self.hooks)
                                 .build_from_client(client, self.configuration)?;
                             #[cfg(feature = "adaptive_serialization")]
-                            let mgr: LlmpEventManager<EMH, S, SP> = LlmpEventManagerBuilder::new()
+                            let mgr: LlmpEventManager<EMH, S, SP> = LlmpEventManager::builder()
                                 .hooks(self.hooks)
                                 .build_from_client(
                                     client,
@@ -511,7 +514,7 @@ where
                 ManagerKind::Client { cpu_core } => {
                     // We are a client
                     #[cfg(not(feature = "adaptive_serialization"))]
-                    let mgr = LlmpEventManagerBuilder::new()
+                    let mgr = LlmpEventManager::builder()
                         .hooks(self.hooks)
                         .build_on_port(
                             self.shmem_provider.clone(),
@@ -519,7 +522,7 @@ where
                             self.configuration,
                         )?;
                     #[cfg(feature = "adaptive_serialization")]
-                    let mgr = LlmpEventManagerBuilder::new()
+                    let mgr = LlmpEventManager::builder()
                         .hooks(self.hooks)
                         .build_on_port(
                             self.shmem_provider.clone(),
@@ -648,7 +651,7 @@ where
         let (state, mut mgr) =
             if let Some((state_opt, mgr_description)) = staterestorer.restore()? {
                 #[cfg(not(feature = "adaptive_serialization"))]
-                let llmp_mgr = LlmpEventManagerBuilder::new()
+                let llmp_mgr = LlmpEventManager::builder()
                     .hooks(self.hooks)
                     .build_existing_client_from_description(
                         new_shmem_provider,
@@ -656,7 +659,7 @@ where
                         self.configuration,
                     )?;
                 #[cfg(feature = "adaptive_serialization")]
-                let llmp_mgr = LlmpEventManagerBuilder::new()
+                let llmp_mgr = LlmpEventManager::builder()
                     .hooks(self.hooks)
                     .build_existing_client_from_description(
                         new_shmem_provider,
@@ -676,7 +679,7 @@ where
                 log::info!("First run. Let's set it all up");
                 // Mgr to send and receive msgs from/to all other fuzzer instances
                 #[cfg(not(feature = "adaptive_serialization"))]
-                let mgr = LlmpEventManagerBuilder::new()
+                let mgr = LlmpEventManager::builder()
                     .hooks(self.hooks)
                     .build_existing_client_from_env(
                         new_shmem_provider,
@@ -684,7 +687,7 @@ where
                         self.configuration,
                     )?;
                 #[cfg(feature = "adaptive_serialization")]
-                let mgr = LlmpEventManagerBuilder::new()
+                let mgr = LlmpEventManager::builder()
                     .hooks(self.hooks)
                     .build_existing_client_from_env(
                         new_shmem_provider,
@@ -738,7 +741,7 @@ mod tests {
 
     use crate::{
         corpus::{Corpus, InMemoryCorpus, Testcase},
-        events::llmp::{restarting::_ENV_FUZZER_SENDER, LlmpEventManagerBuilder},
+        events::llmp::{restarting::_ENV_FUZZER_SENDER, LlmpEventManager},
         executors::{ExitKind, InProcessExecutor},
         feedbacks::ConstFeedback,
         fuzzer::Fuzzer,
@@ -788,11 +791,11 @@ mod tests {
         }
 
         #[cfg(not(feature = "adaptive_serialization"))]
-        let mut llmp_mgr = LlmpEventManagerBuilder::new()
+        let mut llmp_mgr = LlmpEventManager::builder()
             .build_from_client(llmp_client, "fuzzer".into())
             .unwrap();
         #[cfg(feature = "adaptive_serialization")]
-        let mut llmp_mgr = LlmpEventManagerBuilder::new()
+        let mut llmp_mgr = LlmpEventManager::builder()
             .build_from_client(llmp_client, "fuzzer".into(), time_ref.clone())
             .unwrap();
 
@@ -837,7 +840,7 @@ mod tests {
 
         let (mut state_clone, mgr_description) = staterestorer.restore().unwrap().unwrap();
         #[cfg(not(feature = "adaptive_serialization"))]
-        let mut llmp_clone = LlmpEventManagerBuilder::new()
+        let mut llmp_clone = LlmpEventManager::builder()
             .build_existing_client_from_description(
                 shmem_provider,
                 &mgr_description,
@@ -845,7 +848,7 @@ mod tests {
             )
             .unwrap();
         #[cfg(feature = "adaptive_serialization")]
-        let mut llmp_clone = LlmpEventManagerBuilder::new()
+        let mut llmp_clone = LlmpEventManager::builder()
             .build_existing_client_from_description(
                 shmem_provider,
                 &mgr_description,

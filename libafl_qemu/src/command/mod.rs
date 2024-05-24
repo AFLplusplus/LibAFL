@@ -317,6 +317,11 @@ where
             .snapshot_manager_borrow_mut()
             .restore(&snapshot_id, qemu)?;
 
+        #[cfg(feature = "paranoid_debug")]
+        emu_exit_handler
+            .snapshot_manager_borrow()
+            .check(&snapshot_id, emu.qemu())?;
+
         Ok(None)
     }
 }
@@ -444,6 +449,11 @@ where
         emu_exit_handler
             .snapshot_manager_borrow_mut()
             .restore(&snapshot_id, emu.qemu())?;
+
+        #[cfg(feature = "paranoid_debug")]
+        emu_exit_handler
+            .snapshot_manager_borrow()
+            .check(&snapshot_id, emu.qemu())?;
 
         Ok(Some(ExitHandlerResult::EndOfRun(self.0.unwrap())))
     }

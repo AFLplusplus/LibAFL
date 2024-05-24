@@ -35,7 +35,8 @@ use crate::{
     sys::TCGTemp,
     BackdoorHookId, BlockHookId, CmpHookId, EdgeHookId, EmulatorMemoryChunk, GuestReg, HookData,
     HookId, InstructionHookId, MemAccessInfo, Qemu, QemuExitError, QemuExitReason, QemuHelperTuple,
-    QemuInitError, QemuShutdownCause, ReadHookId, Regs, StdInstrumentationFilter, WriteHookId, CPU,
+    QemuInitError, QemuShutdownCause, QemuSnapshotCheckResult, ReadHookId, Regs,
+    StdInstrumentationFilter, WriteHookId, CPU,
 };
 
 #[cfg(emulation_mode = "usermode")]
@@ -95,6 +96,7 @@ where
 pub enum ExitHandlerError {
     QemuExitReasonError(EmulatorExitError),
     SMError(SnapshotManagerError),
+    SMCheckError(SnapshotManagerCheckError),
     CommandError(CommandError),
     UnhandledSignal(Signal),
     MultipleSnapshotDefinition,
@@ -106,6 +108,12 @@ pub enum ExitHandlerError {
 pub enum SnapshotManagerError {
     SnapshotIdNotFound(SnapshotId),
     MemoryInconsistencies(u64),
+}
+
+#[derive(Debug, Clone)]
+pub enum SnapshotManagerCheckError {
+    SnapshotManagerError(SnapshotManagerError),
+    SnapshotCheckError(QemuSnapshotCheckResult),
 }
 
 impl<CM, E, QT, S> TryFrom<ExitHandlerResult<CM, E, QT, S>> for ExitKind
@@ -162,6 +170,12 @@ impl From<SnapshotManagerError> for ExitHandlerError {
     }
 }
 
+impl From<SnapshotManagerCheckError> for ExitHandlerError {
+    fn from(sm_check_error: SnapshotManagerCheckError) -> Self {
+        ExitHandlerError::SMCheckError(sm_check_error)
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct SnapshotId {
     id: u64,
@@ -174,6 +188,27 @@ pub trait IsSnapshotManager: Debug + Clone {
         snapshot_id: &SnapshotId,
         qemu: &Qemu,
     ) -> Result<(), SnapshotManagerError>;
+    fn do_check(
+        &self,
+        reference_snapshot_id: &SnapshotId,
+        qemu: &Qemu,
+    ) -> Result<QemuSnapshotCheckResult, SnapshotManagerError>;
+
+    fn check(
+        &self,
+        reference_snapshot_id: &SnapshotId,
+        qemu: &Qemu,
+    ) -> Result<(), SnapshotManagerCheckError> {
+        let check_result = self
+            .do_check(reference_snapshot_id, qemu)
+            .map_err(SnapshotManagerCheckError::SnapshotManagerError)?;
+
+        if check_result == QemuSnapshotCheckResult::default() {
+            Ok(())
+        } else {
+            Err(SnapshotManagerCheckError::SnapshotCheckError(check_result))
+        }
+    }
 }
 
 // TODO: Rework with generics for command handlers?

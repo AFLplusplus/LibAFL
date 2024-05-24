@@ -5,7 +5,7 @@ use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
 use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig, EventRestarter, LlmpRestartingEventManager},
-    executors::forkserver::ForkserverExecutorBuilder,
+    executors::forkserver::ForkserverExecutor,
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -175,7 +175,7 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
             let forkserver = if self.shmem_testcase {
-                ForkserverExecutorBuilder::new()
+                ForkserverExecutor::builder()
                     .program(self.program.clone())
                     .parse_afl_cmdline(self.arguments)
                     .is_persistent(true)
@@ -186,7 +186,7 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
                     .shmem_provider(&mut shmem_provider_client)
                     .build_dynamic_map(edges_observer, tuple_list!(time_observer))
             } else {
-                ForkserverExecutorBuilder::new()
+                ForkserverExecutor::builder()
                     .program(self.program.clone())
                     .parse_afl_cmdline(self.arguments)
                     .is_persistent(true)

@@ -440,6 +440,17 @@ where
     phantom: PhantomData<S>,
 }
 
+impl<S> TcpEventManager<(), S>
+where
+    S: State,
+{
+    /// Create a builder for [`TcpEventManager`]
+    #[must_use]
+    pub fn builder() -> TcpEventManagerBuilder<(), S> {
+        TcpEventManagerBuilder::new()
+    }
+}
+
 /// Builder for `TcpEventManager`
 #[derive(Debug, Copy, Clone)]
 pub struct TcpEventManagerBuilder<EMH, S> {
