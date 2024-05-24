@@ -145,8 +145,7 @@ where
     }
     #[cfg(feature = "track_hit_feedbacks")]
     fn prev_result(&self) -> Option<bool> {
-        // aarnav:: TODO
-        Some(self.novelty.is_empty())
+        Some(!self.novelty.is_empty())
     }
 }
 

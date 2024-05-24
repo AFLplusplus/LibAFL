@@ -85,6 +85,8 @@ pub struct NewHashFeedback<O, S> {
     o_ref: Handle<O>,
     /// Initial capacity of hash set
     capacity: usize,
+    #[cfg(feature = "track_hit_feedbacks")]
+    prev_result: Option<bool>,
     phantom: PhantomData<S>,
 }
 
@@ -123,23 +125,26 @@ where
             .get_mut::<NewHashFeedbackMetadata>(&self.name)
             .unwrap();
 
-        match observer.hash() {
+        let res = match observer.hash() {
             Some(hash) => {
-                let res = backtrace_state
+                backtrace_state
                     .update_hash_set(hash)
-                    .expect("Failed to update the hash state");
-                Ok(res)
+                    .expect("Failed to update the hash state")
             }
             None => {
                 // We get here if the hash was not updated, i.e the first run or if no crash happens
-                Ok(false)
+                false
             }
+        };
+        #[cfg(feature = "track_hit_feedbacks")] 
+        {
+            self.prev_result = Some(res);
         }
+        Ok(res)
     }
     #[cfg(feature = "track_hit_feedbacks")]
     fn prev_result(&self) -> Option<bool> {
-        // aarnav TODO
-        Some(false)
+        self.prev_result
     }
 }
 
@@ -183,6 +188,8 @@ where
             name: Cow::from(NEWHASHFEEDBACK_PREFIX.to_string() + observer.name()),
             o_ref: observer.handle(),
             capacity,
+            #[cfg(feature = "track_hit_feedbacks")]
+            prev_result: None,
             phantom: PhantomData,
         }
     }

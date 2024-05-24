@@ -37,7 +37,10 @@ impl TransferringMetadata {
 /// Simple feedback which may be used to test whether the testcase was transferred from another node
 /// in a multi-node fuzzing arrangement.
 #[derive(Copy, Clone, Debug)]
-pub struct TransferredFeedback;
+pub struct TransferredFeedback {
+    #[cfg(feature = "track_hit_feedbacks")]
+    prev_result: Option<bool>
+}
 
 impl Named for TransferredFeedback {
     fn name(&self) -> &Cow<'static, str> {
@@ -66,11 +69,15 @@ where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
-        Ok(state.metadata::<TransferringMetadata>()?.transferring)
+        let res = state.metadata::<TransferringMetadata>()?.transferring;
+        #[cfg(feature = "track_hit_feedbacks")]
+        {
+            self.prev_result = Some(res);
+        }
+        Ok(res)
     }
     #[cfg(feature = "track_hit_feedbacks")]
     fn prev_result(&self) -> Option<bool> {
-        // aarnav TODO
-        Some(false)
+        self.prev_result
     }
 }
