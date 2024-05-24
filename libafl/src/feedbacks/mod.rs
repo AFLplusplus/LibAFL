@@ -549,9 +549,7 @@ where
     fn append_hit_feedbacks(first: &A, second: &B, list: &mut Vec<Cow<'static, str>>) {
         if first.last_result().expect("should have run") {
             first.append_hit_feedbacks(list);
-            return;
-        }
-        if second.last_result().expect("should have run") {
+        } else if second.last_result().expect("should have run") {
             second.append_hit_feedbacks(list);
         }
     }
@@ -1170,18 +1168,12 @@ where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
-        Ok(match self {
-            ConstFeedback::True => true,
-            ConstFeedback::False => false,
-        })
+        Ok((*self).into())
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Option<bool> {
-        Some(match self {
-            ConstFeedback::True => true,
-            ConstFeedback::False => false,
-        })
+        Some((*self).into())
     }
 }
 
@@ -1210,3 +1202,13 @@ impl From<bool> for ConstFeedback {
         }
     }
 }
+
+impl From<ConstFeedback> for bool {
+    fn from(value: ConstFeedback) -> Self {
+        match value {
+            ConstFeedback::True => true,
+            ConstFeedback::False => false,
+        }
+    }
+}
+
