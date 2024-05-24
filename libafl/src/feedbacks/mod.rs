@@ -929,6 +929,60 @@ impl Default for TimeoutFeedback {
 /// A feedback factory for timeout feedbacks
 pub type TimeoutFeedbackFactory = DefaultFeedbackFactory<TimeoutFeedback>;
 
+/// A [`DiffExitKindFeedback`] checks if there is a difference in the [`crate::executors::ExitKind`]s in a [`crate::executors::DiffExecutor`].
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct DiffExitKindFeedback {}
+
+impl<S> Feedback<S> for DiffExitKindFeedback
+where
+    S: State,
+{
+    #[allow(clippy::wrong_self_convention)]
+    fn is_interesting<EM, OT>(
+        &mut self,
+        _state: &mut S,
+        _manager: &mut EM,
+        _input: &S::Input,
+        _observers: &OT,
+        exit_kind: &ExitKind,
+    ) -> Result<bool, Error>
+    where
+        EM: EventFirer<State = S>,
+        OT: ObserversTuple<S>,
+    {
+        if let ExitKind::Diff { .. } = exit_kind {
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+}
+
+impl Named for DiffExitKindFeedback {
+    #[inline]
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("DiffExitKindFeedback");
+        &NAME
+    }
+}
+
+impl DiffExitKindFeedback {
+    /// Returns a new [`DiffExitKindFeedback`].
+    #[must_use]
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Default for DiffExitKindFeedback {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// A feedback factory for diff exit kind feedbacks
+pub type DiffExitKindFeedbackFactory = DefaultFeedbackFactory<DiffExitKindFeedback>;
+
 /// Nop feedback that annotates execution time in the new testcase, if any
 /// for this Feedback, the testcase is never interesting (use with an OR).
 /// It decides, if the given [`TimeObserver`] value of a run is interesting.
