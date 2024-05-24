@@ -26,6 +26,9 @@ document-features = ["dep:document-features"]
 ## Enables features that need rust's `std` lib to work, like print, env, ... support
 std = ["serde_json", "serde_json/std", "nix", "serde/std", "bincode", "wait-timeout", "uuid", "backtrace", "serial_test", "libafl_bolts/std", "typed-builder"]
 
+## Tracks the Feedbacks and the Objectives hit
+track_hit_feedbacks = ["std"]
+
 ## Collects performance statistics of the fuzzing pipeline and displays it on `Monitor` components
 introspection = []
 

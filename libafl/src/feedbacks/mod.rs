@@ -5,6 +5,11 @@
 // TODO: make S of Feedback<S> an associated type when specialisation + AT is stable
 
 use alloc::borrow::Cow;
+#[cfg(feature = "track_hit_feedbacks")]
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
@@ -113,6 +118,16 @@ where
         ret
     }
 
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Option<bool>;
+
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn get_hit_feedbacks(&self, list: &mut Vec<String>) {
+        if self.last_result().expect("no last result") {
+            list.push(self.name().to_string());
+        }
+    }
+
     /// Append to the testcase the generated metadata in case of a new corpus item
     #[inline]
     #[allow(unused_variables)]
@@ -211,7 +226,14 @@ where
         self.second.init_state(state)?;
         Ok(())
     }
-
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Option<bool> {
+        return FL::last_result(&self.first, &self.second);
+    }
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn get_hit_feedbacks(&self, list: &mut Vec<String>) {
+        FL::get_hit_feedbacks(&self.first, &self.second, list);
+    }
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
@@ -325,6 +347,13 @@ where
     where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>;
+    
+    /// Get the result of the last `Self::is_interesting` run
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(first: &A, second: &B) -> Option<bool>;
+
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn get_hit_feedbacks(first: &A, second: &B, list: &mut Vec<String>);
 
     /// If this pair is interesting (with introspection features enabled)
     #[cfg(feature = "introspection")]
@@ -438,6 +467,22 @@ where
         let b = second.is_interesting(state, manager, input, observers, exit_kind)?;
         Ok(a || b)
     }
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(first: &A, second: &B) -> Option<bool> {
+        Some(
+            first.last_result().expect("should have run")
+                || second.last_result().expect("should have run"),
+        )
+    }
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn get_hit_feedbacks(first: &A, second: &B, list: &mut Vec<String>) {
+        if first.last_result().expect("should have run") {
+            first.get_hit_feedbacks(list);
+        }
+        if second.last_result().expect("should have run") {
+            second.get_hit_feedbacks(list);
+        }
+    }
 
     #[cfg(feature = "introspection")]
     fn is_pair_interesting_introspection<EM, OT>(
@@ -490,6 +535,25 @@ where
         }
 
         second.is_interesting(state, manager, input, observers, exit_kind)
+    }
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(first: &A, second: &B) -> Option<bool> {
+        if first.last_result().expect("should have run") {
+            return Some(true);
+        }
+
+        // The second must have run if the first wasn't interesting
+        Some(second.last_result().expect("should have run"))
+    }
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn get_hit_feedbacks(first: &A, second: &B, list: &mut Vec<String>) {
+        if first.last_result().expect("should have run") {
+            first.get_hit_feedbacks(list);
+            return;
+        }
+        if second.last_result().expect("should have run") {
+            second.get_hit_feedbacks(list);
+        }
     }
 
     #[cfg(feature = "introspection")]
@@ -545,6 +609,23 @@ where
         Ok(a && b)
     }
 
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(first: &A, second: &B) -> Option<bool> {
+        Some(
+            first.last_result().expect("should have run")
+                && second.last_result().expect("should have run"),
+        )
+    }
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn get_hit_feedbacks(first: &A, second: &B, list: &mut Vec<String>) {
+        if first.last_result().expect("should have run")
+            && second.last_result().expect("should have run")
+        {
+            first.get_hit_feedbacks(list);
+            second.get_hit_feedbacks(list);
+        }
+    }
+
     #[cfg(feature = "introspection")]
     fn is_pair_interesting_introspection<EM, OT>(
         first: &mut A,
@@ -596,6 +677,29 @@ where
         }
 
         second.is_interesting(state, manager, input, observers, exit_kind)
+    }
+
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(first: &A, second: &B) -> Option<bool> {
+        if let Some(first) = first.last_result() {
+            if !first {
+                return Some(false);
+            }
+        }
+
+        // The second must have run if the first wasn't interesting
+        Some(second.last_result().expect("should have run"))
+    }
+
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn get_hit_feedbacks(first: &A, second: &B, list: &mut Vec<String>) {
+        if first.last_result().expect("should have run") {
+            first.get_hit_feedbacks(list);
+            return;
+        }
+        if second.last_result().expect("should have run") {
+            second.get_hit_feedbacks(list);
+        }
     }
 
     #[cfg(feature = "introspection")]
@@ -715,6 +819,11 @@ where
     fn discard_metadata(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
         self.first.discard_metadata(state, input)
     }
+
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Option<bool> {
+        return Some(!self.first.last_result().expect("should have run"));
+    }
 }
 
 impl<A, S> Named for NotFeedback<A, S>
@@ -816,11 +925,18 @@ where
     {
         Ok(false)
     }
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Option<bool> {
+        return Some(false);
+    }
 }
 
 /// A [`CrashFeedback`] reports as interesting if the target crashed.
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct CrashFeedback {}
+pub struct CrashFeedback {
+    #[cfg(feature = "track_hit_feedbacks")]
+    last_result: Option<bool>,
+}
 
 impl<S> Feedback<S> for CrashFeedback
 where
@@ -839,11 +955,17 @@ where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
-        if let ExitKind::Crash = exit_kind {
-            Ok(true)
-        } else {
-            Ok(false)
+        let res = matches!(exit_kind, ExitKind::Crash);
+        #[cfg(feature = "track_hit_feedbacks")]
+        {
+            self.last_result = Some(res);
         }
+        Ok(res)
+    }
+
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Option<bool> {
+        self.last_result
     }
 }
 
@@ -859,7 +981,10 @@ impl CrashFeedback {
     /// Creates a new [`CrashFeedback`]
     #[must_use]
     pub fn new() -> Self {
-        Self {}
+        Self {
+            #[cfg(feature = "track_hit_feedbacks")]
+            last_result: None,
+        }
     }
 }
 
@@ -877,7 +1002,10 @@ impl<S: State, T> FeedbackFactory<CrashFeedback, S, T> for CrashFeedback {
 
 /// A [`TimeoutFeedback`] reduces the timeout value of a run.
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct TimeoutFeedback {}
+pub struct TimeoutFeedback {
+    #[cfg(feature = "track_hit_feedbacks")]
+    last_result: Option<bool>,
+}
 
 impl<S> Feedback<S> for TimeoutFeedback
 where
@@ -896,11 +1024,17 @@ where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
-        if let ExitKind::Timeout = exit_kind {
-            Ok(true)
-        } else {
-            Ok(false)
+        let res = matches!(exit_kind, ExitKind::Timeout);
+        #[cfg(feature = "track_hit_feedbacks")]
+        {
+            self.last_result = Some(res);
         }
+        Ok(res)
+    }
+
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Option<bool> {
+        self.last_result
     }
 }
 
@@ -916,7 +1050,10 @@ impl TimeoutFeedback {
     /// Returns a new [`TimeoutFeedback`].
     #[must_use]
     pub fn new() -> Self {
-        Self {}
+        Self {
+            #[cfg(feature = "track_hit_feedbacks")]
+            last_result: None,
+        }
     }
 }
 
@@ -981,6 +1118,11 @@ where
     fn discard_metadata(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         Ok(())
     }
+
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Option<bool> {
+        Some(false)
+    }
 }
 
 impl Named for TimeFeedback {
@@ -1029,6 +1171,14 @@ where
         OT: ObserversTuple<S>,
     {
         Ok(match self {
+            ConstFeedback::True => true,
+            ConstFeedback::False => false,
+        })
+    }
+
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Option<bool> {
+        Some(match self {
             ConstFeedback::True => true,
             ConstFeedback::False => false,
         })

@@ -61,6 +61,9 @@ where
     o1_ref: Handle<O1>,
     /// The second observer to compare against
     o2_ref: Handle<O2>,
+    // The previous run's result of `Self::is_interesting`
+    #[cfg(feature = "track_hit_feedbacks")]
+    last_result: Option<bool>,
     /// The function used to compare the two observers
     compare_fn: F,
     phantomm: PhantomData<(I, S)>,
@@ -86,6 +89,8 @@ where
                 o1_ref,
                 o2_ref,
                 name: Cow::from(name),
+                #[cfg(feature = "track_hit_feedbacks")]
+                last_result: None,
                 compare_fn,
                 phantomm: PhantomData,
             })
@@ -108,6 +113,8 @@ where
             o1_ref: self.o1_ref.clone(),
             o2_ref: self.o2_ref.clone(),
             compare_fn: self.compare_fn.clone(),
+            #[cfg(feature = "track_hit_feedbacks")]
+            last_result: None,
             phantomm: self.phantomm,
         }
     }
@@ -169,8 +176,18 @@ where
         let o2: &O2 = observers
             .get(&self.o2_ref)
             .ok_or_else(|| err(self.o2_ref.name()))?;
+        let res = (self.compare_fn)(o1, o2) == DiffResult::Diff;
+        #[cfg(feature = "track_hit_feedbacks")]
+        {
+            self.last_result = Some(res);
+        }
+        Ok(res)
+    }
 
-        Ok((self.compare_fn)(o1, o2) == DiffResult::Diff)
+    /// Get the result of the last is_interesting run
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Option<bool> {
+        self.last_result
     }
 }
 

@@ -391,6 +391,9 @@ pub struct MapFeedback<C, N, O, R, T> {
     map_ref: Handle<C>,
     /// Name of the feedback as shown in the `UserStats`
     stats_name: Cow<'static, str>,
+    // The previous run's result of `Self::is_interesting`
+    #[cfg(feature = "track_hit_feedbacks")]
+    last_result: Option<bool>,
     /// Phantom Data of Reducer
     phantom: PhantomData<(C, N, O, R, T)>,
 }
@@ -424,7 +427,12 @@ where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
-        Ok(self.is_interesting_default(state, manager, input, observers, exit_kind))
+        let res = self.is_interesting_default(state, manager, input, observers, exit_kind);
+        #[cfg(feature = "track_hit_feedbacks")]
+        {
+            self.last_result = Some(res);
+        }
+        Ok(res)
     }
 
     #[rustversion::not(nightly)]
@@ -440,7 +448,13 @@ where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
-        Ok(self.is_interesting_default(state, manager, input, observers, exit_kind))
+        let res = self.is_interesting_default(state, manager, input, observers, exit_kind);
+
+        #[cfg(feature = "track_hit_feedbacks")]
+        {
+            self.last_result = Some(res);
+        }
+        Ok(res)
     }
 
     fn append_metadata<EM, OT>(
@@ -532,6 +546,12 @@ where
         )?;
 
         Ok(())
+    }
+    
+    /// Get the result of the last is_interesting run
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Option<bool> {
+        self.last_result
     }
 }
 
@@ -648,7 +668,10 @@ where
                 }
             }
         }
-
+        #[cfg(feature = "track_hit_feedbacks")]
+        {
+            self.last_result = Some(interesting);
+        }
         Ok(interesting)
     }
 }
@@ -699,6 +722,8 @@ where
             name: map_observer.name().clone(),
             map_ref: map_observer.handle(),
             stats_name: create_stats_name(map_observer.name()),
+            #[cfg(feature = "track_hit_feedbacks")]
+            last_result: None,
             phantom: PhantomData,
         }
     }
@@ -714,6 +739,8 @@ where
             map_ref: map_observer.handle(),
             stats_name: create_stats_name(&name),
             name,
+            #[cfg(feature = "track_hit_feedbacks")]
+            last_result: None,
             phantom: PhantomData,
         }
     }

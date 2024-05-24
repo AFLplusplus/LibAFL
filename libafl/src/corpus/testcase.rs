@@ -9,6 +9,9 @@ use core::{
 #[cfg(feature = "std")]
 use std::path::PathBuf;
 
+#[cfg(feature = "track_hit_feedbacks")]
+use alloc::vec::Vec;
+
 use libafl_bolts::{serdeany::SerdeAnyMap, HasLen};
 use serde::{Deserialize, Serialize};
 
@@ -67,6 +70,9 @@ where
     disabled: bool,
     /// has found crash (or timeout) or not
     objectives_found: usize,
+    /// Vector of `Feedback` that deemed this `Testcase` interesting
+    #[cfg(feature = "track_hit_feedbacks")]
+    hit_feedbacks: Vec<String>,
 }
 
 impl<I> HasMetadata for Testcase<I>
@@ -211,6 +217,20 @@ where
         self.disabled = disabled;
     }
 
+    /// Get the hit feedbacks
+    #[inline]
+    #[cfg(feature = "track_hit_feedbacks")]
+    pub fn hit_feedbacks(&self) -> &Vec<String> {
+        &self.hit_feedbacks
+    }
+    
+    /// Get the hit feedbacks (mutable)
+    #[inline]
+    #[cfg(feature = "track_hit_feedbacks")]
+    pub fn hit_feedbacks_mut(&mut self) -> &mut Vec<String> {
+        &mut self.hit_feedbacks
+    }
+
     /// Create a new Testcase instance given an input
     #[inline]
     pub fn new(mut input: I) -> Self {
@@ -230,6 +250,8 @@ where
             parent_id: None,
             disabled: false,
             objectives_found: 0,
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_feedbacks: Vec::new(),
         }
     }
 
@@ -252,6 +274,8 @@ where
             parent_id: Some(parent_id),
             disabled: false,
             objectives_found: 0,
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_feedbacks: Vec::new(),
         }
     }
 
@@ -274,6 +298,8 @@ where
             parent_id: None,
             disabled: false,
             objectives_found: 0,
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_feedbacks: Vec::new(),
         }
     }
 
@@ -296,6 +322,8 @@ where
             parent_id: None,
             disabled: false,
             objectives_found: 0,
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_feedbacks: Vec::new(),
         }
     }
 
@@ -348,6 +376,8 @@ where
             metadata_path: None,
             disabled: false,
             objectives_found: 0,
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_feedbacks: Vec::new(),
         }
     }
 }

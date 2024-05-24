@@ -136,6 +136,11 @@ where
             }
         }
     }
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Option<bool> {
+        // aarnav TODO
+        Some(false)
+    }
 }
 
 impl<O, S> Named for NewHashFeedback<O, S> {
