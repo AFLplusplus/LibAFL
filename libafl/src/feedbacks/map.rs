@@ -393,7 +393,7 @@ pub struct MapFeedback<C, N, O, R, T> {
     stats_name: Cow<'static, str>,
     // The previous run's result of [`Self::is_interesting`]
     #[cfg(feature = "track_hit_feedbacks")]
-    last_result: Option<bool>,
+    prev_result: Option<bool>,
     /// Phantom Data of Reducer
     phantom: PhantomData<(C, N, O, R, T)>,
 }
@@ -430,7 +430,7 @@ where
         let res = self.is_interesting_default(state, manager, input, observers, exit_kind);
         #[cfg(feature = "track_hit_feedbacks")]
         {
-            self.last_result = Some(res);
+            self.prev_result = Some(res);
         }
         Ok(res)
     }
@@ -452,7 +452,7 @@ where
 
         #[cfg(feature = "track_hit_feedbacks")]
         {
-            self.last_result = Some(res);
+            self.prev_result = Some(res);
         }
         Ok(res)
     }
@@ -550,8 +550,8 @@ where
 
     /// Get the result of the last is_interesting run
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Option<bool> {
-        self.last_result
+    fn prev_result(&self) -> Option<bool> {
+        self.prev_result
     }
 }
 
@@ -670,7 +670,7 @@ where
         }
         #[cfg(feature = "track_hit_feedbacks")]
         {
-            self.last_result = Some(interesting);
+            self.prev_result = Some(interesting);
         }
         Ok(interesting)
     }
@@ -723,7 +723,7 @@ where
             map_ref: map_observer.handle(),
             stats_name: create_stats_name(map_observer.name()),
             #[cfg(feature = "track_hit_feedbacks")]
-            last_result: None,
+            prev_result: None,
             phantom: PhantomData,
         }
     }
@@ -740,7 +740,7 @@ where
             stats_name: create_stats_name(&name),
             name,
             #[cfg(feature = "track_hit_feedbacks")]
-            last_result: None,
+            prev_result: None,
             phantom: PhantomData,
         }
     }

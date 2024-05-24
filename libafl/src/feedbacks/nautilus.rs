@@ -124,7 +124,7 @@ where
         Ok(())
     }
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Option<bool> {
+    fn prev_result(&self) -> Option<bool> {
         // aarnav TODO
         Some(false)
     }

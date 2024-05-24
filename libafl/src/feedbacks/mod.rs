@@ -119,11 +119,11 @@ where
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Option<bool>;
+    fn prev_result(&self) -> Option<bool>;
 
     #[cfg(feature = "track_hit_feedbacks")]
     fn append_hit_feedbacks(&self, list: &mut Vec<Cow<'static, str>>) {
-        if self.last_result().expect("no last result") {
+        if self.prev_result().expect("no last result") {
             list.push(self.name().clone());
         }
     }
@@ -227,8 +227,8 @@ where
         Ok(())
     }
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Option<bool> {
-        return FL::last_result(&self.first, &self.second);
+    fn prev_result(&self) -> Option<bool> {
+        return FL::prev_result(&self.first, &self.second);
     }
     #[cfg(feature = "track_hit_feedbacks")]
     fn append_hit_feedbacks(&self, list: &mut Vec<Cow<'static, str>>) {
@@ -350,7 +350,7 @@ where
 
     /// Get the result of the last `Self::is_interesting` run
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(first: &A, second: &B) -> Option<bool>;
+    fn prev_result(first: &A, second: &B) -> Option<bool>;
 
     #[cfg(feature = "track_hit_feedbacks")]
     fn append_hit_feedbacks(first: &A, second: &B, list: &mut Vec<Cow<'static, str>>);
@@ -468,18 +468,18 @@ where
         Ok(a || b)
     }
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(first: &A, second: &B) -> Option<bool> {
+    fn prev_result(first: &A, second: &B) -> Option<bool> {
         Some(
-            first.last_result().expect("should have run")
-                || second.last_result().expect("should have run"),
+            first.prev_result().expect("should have run")
+                || second.prev_result().expect("should have run"),
         )
     }
     #[cfg(feature = "track_hit_feedbacks")]
     fn append_hit_feedbacks(first: &A, second: &B, list: &mut Vec<Cow<'static, str>>) {
-        if first.last_result().expect("should have run") {
+        if first.prev_result().expect("should have run") {
             first.append_hit_feedbacks(list);
         }
-        if second.last_result().expect("should have run") {
+        if second.prev_result().expect("should have run") {
             second.append_hit_feedbacks(list);
         }
     }
@@ -537,19 +537,19 @@ where
         second.is_interesting(state, manager, input, observers, exit_kind)
     }
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(first: &A, second: &B) -> Option<bool> {
-        if first.last_result().expect("should have run") {
+    fn prev_result(first: &A, second: &B) -> Option<bool> {
+        if first.prev_result().expect("should have run") {
             return Some(true);
         }
 
         // The second must have run if the first wasn't interesting
-        Some(second.last_result().expect("should have run"))
+        Some(second.prev_result().expect("should have run"))
     }
     #[cfg(feature = "track_hit_feedbacks")]
     fn append_hit_feedbacks(first: &A, second: &B, list: &mut Vec<Cow<'static, str>>) {
-        if first.last_result().expect("should have run") {
+        if first.prev_result().expect("should have run") {
             first.append_hit_feedbacks(list);
-        } else if second.last_result().expect("should have run") {
+        } else if second.prev_result().expect("should have run") {
             second.append_hit_feedbacks(list);
         }
     }
@@ -608,16 +608,16 @@ where
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(first: &A, second: &B) -> Option<bool> {
+    fn prev_result(first: &A, second: &B) -> Option<bool> {
         Some(
-            first.last_result().expect("should have run")
-                && second.last_result().expect("should have run!"),
+            first.prev_result().expect("should have run")
+                && second.prev_result().expect("should have run!"),
         )
     }
     #[cfg(feature = "track_hit_feedbacks")]
     fn append_hit_feedbacks(first: &A, second: &B, list: &mut Vec<Cow<'static, str>>) {
-        if first.last_result().expect("should have run")
-            && second.last_result().expect("should have run")
+        if first.prev_result().expect("should have run")
+            && second.prev_result().expect("should have run")
         {
             first.append_hit_feedbacks(list);
             second.append_hit_feedbacks(list);
@@ -678,24 +678,24 @@ where
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(first: &A, second: &B) -> Option<bool> {
-        if let Some(first) = first.last_result() {
+    fn prev_result(first: &A, second: &B) -> Option<bool> {
+        if let Some(first) = first.prev_result() {
             if !first {
                 return Some(false);
             }
         }
 
         // The second must have run if the first wasn't interesting
-        Some(second.last_result().expect("should have run"))
+        Some(second.prev_result().expect("should have run"))
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
     fn append_hit_feedbacks(first: &A, second: &B, list: &mut Vec<Cow<'static, str>>) {
-        if first.last_result().expect("should have run") {
+        if first.prev_result().expect("should have run") {
             first.append_hit_feedbacks(list);
             return;
         }
-        if second.last_result().expect("should have run") {
+        if second.prev_result().expect("should have run") {
             second.append_hit_feedbacks(list);
         }
     }
@@ -819,8 +819,8 @@ where
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Option<bool> {
-        return Some(!self.first.last_result().expect("should have run"));
+    fn prev_result(&self) -> Option<bool> {
+        return Some(!self.first.prev_result().expect("should have run"));
     }
 }
 
@@ -924,7 +924,7 @@ where
         Ok(false)
     }
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Option<bool> {
+    fn prev_result(&self) -> Option<bool> {
         return Some(false);
     }
 }
@@ -933,7 +933,7 @@ where
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CrashFeedback {
     #[cfg(feature = "track_hit_feedbacks")]
-    last_result: Option<bool>,
+    prev_result: Option<bool>,
 }
 
 impl<S> Feedback<S> for CrashFeedback
@@ -956,14 +956,14 @@ where
         let res = matches!(exit_kind, ExitKind::Crash);
         #[cfg(feature = "track_hit_feedbacks")]
         {
-            self.last_result = Some(res);
+            self.prev_result = Some(res);
         }
         Ok(res)
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Option<bool> {
-        self.last_result
+    fn prev_result(&self) -> Option<bool> {
+        self.prev_result
     }
 }
 
@@ -981,7 +981,7 @@ impl CrashFeedback {
     pub fn new() -> Self {
         Self {
             #[cfg(feature = "track_hit_feedbacks")]
-            last_result: None,
+            prev_result: None,
         }
     }
 }
@@ -1002,7 +1002,7 @@ impl<S: State, T> FeedbackFactory<CrashFeedback, S, T> for CrashFeedback {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TimeoutFeedback {
     #[cfg(feature = "track_hit_feedbacks")]
-    last_result: Option<bool>,
+    prev_result: Option<bool>,
 }
 
 impl<S> Feedback<S> for TimeoutFeedback
@@ -1025,14 +1025,14 @@ where
         let res = matches!(exit_kind, ExitKind::Timeout);
         #[cfg(feature = "track_hit_feedbacks")]
         {
-            self.last_result = Some(res);
+            self.prev_result = Some(res);
         }
         Ok(res)
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Option<bool> {
-        self.last_result
+    fn prev_result(&self) -> Option<bool> {
+        self.prev_result
     }
 }
 
@@ -1050,7 +1050,7 @@ impl TimeoutFeedback {
     pub fn new() -> Self {
         Self {
             #[cfg(feature = "track_hit_feedbacks")]
-            last_result: None,
+            prev_result: None,
         }
     }
 }
@@ -1118,7 +1118,7 @@ where
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Option<bool> {
+    fn prev_result(&self) -> Option<bool> {
         Some(false)
     }
 }
@@ -1172,7 +1172,7 @@ where
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Option<bool> {
+    fn prev_result(&self) -> Option<bool> {
         Some((*self).into())
     }
 }
