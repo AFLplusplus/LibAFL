@@ -184,7 +184,7 @@ where
         Ok(res)
     }
 
-    /// Get the result of the last is_interesting run
+    /// Get the result of the previous [`Self::is_interesting`] run
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Option<bool> {
         self.last_result

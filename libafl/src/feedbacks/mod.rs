@@ -40,8 +40,8 @@ use crate::{
     state::State,
     Error,
 };
-
 pub mod map;
+pub mod testcase_name;
 
 #[cfg(feature = "std")]
 pub mod concolic;
@@ -122,9 +122,9 @@ where
     fn last_result(&self) -> Option<bool>;
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn get_hit_feedbacks(&self, list: &mut Vec<String>) {
+    fn append_hit_feedbacks(&self, list: &mut Vec<Cow<'static, str>>) {
         if self.last_result().expect("no last result") {
-            list.push(self.name().to_string());
+            list.push(self.name().clone());
         }
     }
 
@@ -231,8 +231,8 @@ where
         return FL::last_result(&self.first, &self.second);
     }
     #[cfg(feature = "track_hit_feedbacks")]
-    fn get_hit_feedbacks(&self, list: &mut Vec<String>) {
-        FL::get_hit_feedbacks(&self.first, &self.second, list);
+    fn append_hit_feedbacks(&self, list: &mut Vec<Cow<'static, str>>) {
+        FL::append_hit_feedbacks(&self.first, &self.second, list);
     }
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
@@ -347,13 +347,13 @@ where
     where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>;
-    
+
     /// Get the result of the last `Self::is_interesting` run
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(first: &A, second: &B) -> Option<bool>;
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn get_hit_feedbacks(first: &A, second: &B, list: &mut Vec<String>);
+    fn append_hit_feedbacks(first: &A, second: &B, list: &mut Vec<Cow<'static, str>>);
 
     /// If this pair is interesting (with introspection features enabled)
     #[cfg(feature = "introspection")]
@@ -475,12 +475,12 @@ where
         )
     }
     #[cfg(feature = "track_hit_feedbacks")]
-    fn get_hit_feedbacks(first: &A, second: &B, list: &mut Vec<String>) {
+    fn append_hit_feedbacks(first: &A, second: &B, list: &mut Vec<Cow<'static, str>>) {
         if first.last_result().expect("should have run") {
-            first.get_hit_feedbacks(list);
+            first.append_hit_feedbacks(list);
         }
         if second.last_result().expect("should have run") {
-            second.get_hit_feedbacks(list);
+            second.append_hit_feedbacks(list);
         }
     }
 
@@ -546,13 +546,13 @@ where
         Some(second.last_result().expect("should have run"))
     }
     #[cfg(feature = "track_hit_feedbacks")]
-    fn get_hit_feedbacks(first: &A, second: &B, list: &mut Vec<String>) {
+    fn append_hit_feedbacks(first: &A, second: &B, list: &mut Vec<Cow<'static, str>>) {
         if first.last_result().expect("should have run") {
-            first.get_hit_feedbacks(list);
+            first.append_hit_feedbacks(list);
             return;
         }
         if second.last_result().expect("should have run") {
-            second.get_hit_feedbacks(list);
+            second.append_hit_feedbacks(list);
         }
     }
 
@@ -613,16 +613,16 @@ where
     fn last_result(first: &A, second: &B) -> Option<bool> {
         Some(
             first.last_result().expect("should have run")
-                && second.last_result().expect("should have run"),
+                && second.last_result().expect("should have run!"),
         )
     }
     #[cfg(feature = "track_hit_feedbacks")]
-    fn get_hit_feedbacks(first: &A, second: &B, list: &mut Vec<String>) {
+    fn append_hit_feedbacks(first: &A, second: &B, list: &mut Vec<Cow<'static, str>>) {
         if first.last_result().expect("should have run")
             && second.last_result().expect("should have run")
         {
-            first.get_hit_feedbacks(list);
-            second.get_hit_feedbacks(list);
+            first.append_hit_feedbacks(list);
+            second.append_hit_feedbacks(list);
         }
     }
 
@@ -692,13 +692,13 @@ where
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn get_hit_feedbacks(first: &A, second: &B, list: &mut Vec<String>) {
+    fn append_hit_feedbacks(first: &A, second: &B, list: &mut Vec<Cow<'static, str>>) {
         if first.last_result().expect("should have run") {
-            first.get_hit_feedbacks(list);
+            first.append_hit_feedbacks(list);
             return;
         }
         if second.last_result().expect("should have run") {
-            second.get_hit_feedbacks(list);
+            second.append_hit_feedbacks(list);
         }
     }
 

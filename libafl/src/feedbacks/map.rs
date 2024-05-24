@@ -391,7 +391,7 @@ pub struct MapFeedback<C, N, O, R, T> {
     map_ref: Handle<C>,
     /// Name of the feedback as shown in the `UserStats`
     stats_name: Cow<'static, str>,
-    // The previous run's result of `Self::is_interesting`
+    // The previous run's result of [`Self::is_interesting`]
     #[cfg(feature = "track_hit_feedbacks")]
     last_result: Option<bool>,
     /// Phantom Data of Reducer
@@ -547,7 +547,7 @@ where
 
         Ok(())
     }
-    
+
     /// Get the result of the last is_interesting run
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Option<bool> {

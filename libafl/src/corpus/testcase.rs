@@ -2,15 +2,14 @@
 //! It will contain a respective input, and metadata.
 
 use alloc::string::String;
+#[cfg(feature = "track_hit_feedbacks")]
+use alloc::{borrow::Cow, vec::Vec};
 use core::{
     cell::{Ref, RefMut},
     time::Duration,
 };
 #[cfg(feature = "std")]
 use std::path::PathBuf;
-
-#[cfg(feature = "track_hit_feedbacks")]
-use alloc::vec::Vec;
 
 use libafl_bolts::{serdeany::SerdeAnyMap, HasLen};
 use serde::{Deserialize, Serialize};
@@ -72,7 +71,7 @@ where
     objectives_found: usize,
     /// Vector of `Feedback` that deemed this `Testcase` interesting
     #[cfg(feature = "track_hit_feedbacks")]
-    hit_feedbacks: Vec<String>,
+    hit_feedbacks: Vec<Cow<'static, str>>,
 }
 
 impl<I> HasMetadata for Testcase<I>
@@ -220,14 +219,14 @@ where
     /// Get the hit feedbacks
     #[inline]
     #[cfg(feature = "track_hit_feedbacks")]
-    pub fn hit_feedbacks(&self) -> &Vec<String> {
+    pub fn hit_feedbacks(&self) -> &Vec<Cow<'static, str>> {
         &self.hit_feedbacks
     }
-    
+
     /// Get the hit feedbacks (mutable)
     #[inline]
     #[cfg(feature = "track_hit_feedbacks")]
-    pub fn hit_feedbacks_mut(&mut self) -> &mut Vec<String> {
+    pub fn hit_feedbacks_mut(&mut self) -> &mut Vec<Cow<'static, str>> {
         &mut self.hit_feedbacks
     }
 

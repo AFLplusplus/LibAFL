@@ -467,7 +467,7 @@ where
                 let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
                 #[cfg(feature = "track_hit_feedbacks")]
                 self.feedback_mut()
-                    .get_hit_feedbacks(&mut testcase.feedbacks_hit_mut());
+                    .append_hit_feedbacks(&mut testcase.hit_feedbacks_mut());
                 self.feedback_mut()
                     .append_metadata(state, manager, observers, &mut testcase)?;
                 let idx = state.corpus_mut().add(testcase)?;
