@@ -200,6 +200,7 @@ fn main() {
         }
     }
 
+    #[cfg(any(feature = "forkserver", feature = "windows_asan"))]
     let target_family = std::env::var("CARGO_CFG_TARGET_FAMILY").unwrap();
 
     #[cfg(feature = "forkserver")]

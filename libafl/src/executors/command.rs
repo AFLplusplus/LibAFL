@@ -182,8 +182,7 @@ impl CommandExecutor<(), (), ()> {
     /// By default, input is read from stdin, unless you specify a different location using
     /// * `arg_input_arg` for input delivered _as_ an command line argument
     /// * `arg_input_file` for input via a file of a specific name
-    /// * `arg_input_file_std` for a file with default name
-    /// (at the right location in the arguments)
+    /// * `arg_input_file_std` for a file with default name (at the right location in the arguments)
     #[must_use]
     pub fn builder() -> CommandExecutorBuilder {
         CommandExecutorBuilder::new()
