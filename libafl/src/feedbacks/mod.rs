@@ -364,37 +364,6 @@ where
         self(ctx)
     }
 }
-
-/// A feedback factory which merely invokes `::default()` for the feedback type provided
-#[derive(Default, Debug, Copy, Clone)]
-pub struct DefaultFeedbackFactory<F>
-where
-    F: Default,
-{
-    phantom: PhantomData<F>,
-}
-
-impl<F> DefaultFeedbackFactory<F>
-where
-    F: Default,
-{
-    /// Create the feedback factory
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
-impl<F, S, T> FeedbackFactory<F, S, T> for DefaultFeedbackFactory<F>
-where
-    F: Feedback<S> + Default,
-    S: State,
-{
-    fn create_feedback(&self, _ctx: &T) -> F {
-        F::default()
-    }
-}
-
 /// Eager `OR` combination of two feedbacks
 #[derive(Debug, Clone)]
 pub struct LogicEagerOr {}
@@ -820,7 +789,7 @@ where
 
 /// A [`CrashFeedback`] reports as interesting if the target crashed.
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct CrashFeedback {}
+pub struct CrashFeedback;
 
 impl<S> Feedback<S> for CrashFeedback
 where
@@ -859,7 +828,7 @@ impl CrashFeedback {
     /// Creates a new [`CrashFeedback`]
     #[must_use]
     pub fn new() -> Self {
-        Self {}
+        Self
     }
 }
 
@@ -877,7 +846,7 @@ impl<S: State, T> FeedbackFactory<CrashFeedback, S, T> for CrashFeedback {
 
 /// A [`TimeoutFeedback`] reduces the timeout value of a run.
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct TimeoutFeedback {}
+pub struct TimeoutFeedback;
 
 impl<S> Feedback<S> for TimeoutFeedback
 where
@@ -916,7 +885,7 @@ impl TimeoutFeedback {
     /// Returns a new [`TimeoutFeedback`].
     #[must_use]
     pub fn new() -> Self {
-        Self {}
+        Self
     }
 }
 
@@ -927,11 +896,15 @@ impl Default for TimeoutFeedback {
 }
 
 /// A feedback factory for timeout feedbacks
-pub type TimeoutFeedbackFactory = DefaultFeedbackFactory<TimeoutFeedback>;
+impl<S: State, T> FeedbackFactory<TimeoutFeedback, S, T> for TimeoutFeedback {
+    fn create_feedback(&self, _ctx: &T) -> TimeoutFeedback {
+        TimeoutFeedback::new()
+    }
+}
 
 /// A [`DiffExitKindFeedback`] checks if there is a difference in the [`crate::executors::ExitKind`]s in a [`crate::executors::DiffExecutor`].
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct DiffExitKindFeedback {}
+pub struct DiffExitKindFeedback;
 
 impl<S> Feedback<S> for DiffExitKindFeedback
 where
@@ -970,7 +943,7 @@ impl DiffExitKindFeedback {
     /// Returns a new [`DiffExitKindFeedback`].
     #[must_use]
     pub fn new() -> Self {
-        Self {}
+        Self
     }
 }
 
@@ -981,7 +954,11 @@ impl Default for DiffExitKindFeedback {
 }
 
 /// A feedback factory for diff exit kind feedbacks
-pub type DiffExitKindFeedbackFactory = DefaultFeedbackFactory<DiffExitKindFeedback>;
+impl<S: State, T> FeedbackFactory<DiffExitKindFeedback, S, T> for DiffExitKindFeedback {
+    fn create_feedback(&self, _ctx: &T) -> DiffExitKindFeedback {
+        DiffExitKindFeedback::new()
+    }
+}
 
 /// Nop feedback that annotates execution time in the new testcase, if any
 /// for this Feedback, the testcase is never interesting (use with an OR).
