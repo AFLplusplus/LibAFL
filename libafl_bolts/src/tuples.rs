@@ -731,16 +731,21 @@ where
     }
 }
 
+/// Trait for structs which are capable of mapping a given type to another.
 pub trait Mapper<T> {
+    /// The result of the mapping operation.
     type Output;
 
+    /// The actual mapping operation.
     fn map(&mut self, from: T) -> Self::Output;
 }
 
 /// Map all entries in a tuple to another type, dependent on the tail type.
 pub trait Map<M> {
+    /// The result of the mapping operation.
     type MapResult;
 
+    /// Perform the mapping!
     fn map(self, mapper: M) -> Self::MapResult;
 }
 
@@ -760,9 +765,7 @@ where
 impl<M> Map<M> for () {
     type MapResult = ();
 
-    fn map(self, _mapper: M) -> Self::MapResult {
-        self
-    }
+    fn map(self, _mapper: M) -> Self::MapResult {}
 }
 
 /// Iterate over a tuple, executing the given `expr` for each element.
