@@ -121,6 +121,12 @@ pub use coverage::*;
 pub mod value_profile;
 pub use value_profile::*;
 
+/// The module to hook call instructions
+#[cfg(feature = "function-logging")]
+pub mod call;
+#[cfg(feature = "function-logging")]
+pub use call::*;
+
 /// runtime related to comparisons
 pub mod cmps;
 pub use cmps::*;
