@@ -7,7 +7,7 @@ use libafl::{
     corpus::{Corpus, HasTestcase, InMemoryCorpus, Testcase},
     events::SimpleEventManager,
     executors::{inprocess_fork::InProcessForkExecutor, ExitKind},
-    feedbacks::{CrashFeedback, TimeoutFeedbackFactory},
+    feedbacks::{CrashFeedback, TimeoutFeedback},
     inputs::{BytesInput, HasMutatorBytes, HasTargetBytes},
     mutators::{havoc_mutations_no_crossover, Mutator, StdScheduledMutator},
     schedulers::QueueScheduler,
@@ -93,7 +93,7 @@ fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
             fuzzer.fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr)?;
         }
         ExitKind::Timeout => {
-            let factory = TimeoutFeedbackFactory::default();
+            let factory = TimeoutFeedback;
             let tmin = StdTMinMutationalStage::new(
                 mutator,
                 factory,

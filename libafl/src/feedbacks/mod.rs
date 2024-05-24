@@ -923,11 +923,7 @@ where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
-        if let ExitKind::Diff { .. } = exit_kind {
-            Ok(true)
-        } else {
-            Ok(false)
-        }
+        Ok(matches!(exit_kind, ExitKind::Diff { .. }))
     }
 }
 
