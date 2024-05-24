@@ -954,6 +954,7 @@ mod test {
         let mapped = orig.map(MyMapper);
 
         // this won't compile if the mapped type is not correct
+        #[allow(clippy::no_effect_underscore_binding)]
         let _type_assert: tuple_list_type!(W<A>, W<B>, W<C>) = mapped;
     }
 }
