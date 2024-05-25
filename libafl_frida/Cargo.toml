@@ -24,7 +24,7 @@ all-features = true
 default = ["serdeany_autoreg"]
 cmplog = ["iced-x86"]
 serdeany_autoreg = ["libafl_bolts/serdeany_autoreg"]
-
+track_hit_feedbacks = ["libafl/track_hit_feedbacks"]
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
 
