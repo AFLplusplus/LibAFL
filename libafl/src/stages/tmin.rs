@@ -356,6 +356,7 @@ pub struct MapEqualityFeedback<C, M, S> {
     map_ref: Handle<C>,
     orig_hash: u64,
     #[cfg(feature = "track_hit_feedbacks")]
+    // The previous run's result of `Self::is_interesting`
     last_result: Option<bool>,
     phantom: PhantomData<(M, S)>,
 }
