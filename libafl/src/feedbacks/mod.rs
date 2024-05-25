@@ -117,9 +117,13 @@ where
         ret
     }
 
+    /// CUT MY LIFE INTO PIECES; THIS IS MY LAST [`Feedback::is_interesting`] run
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Option<bool>;
 
+    /// Append this [`Feedback`]'s name if [`Feedback::last_result`] is true
+    /// If you have any nested Feedbacks, you must call this function on them if relevant.
+    /// See the implementations of [`CombinedFeedback`]
     #[cfg(feature = "track_hit_feedbacks")]
     fn append_hit_feedbacks(&self, list: &mut Vec<Cow<'static, str>>) {
         if self.last_result().expect("no last result") {
@@ -442,9 +446,10 @@ where
                 || second.last_result().expect("should have run"),
         )
     }
-    /// Note: Eager OR's hit feedbacks will behave like Fast OR.
+    /// Note: Eager OR's hit feedbacks will behave like Fast OR
     /// because the second feedback will not have contributed to the result.
-    /// Set the Feedback feedback_or! if you wish to prioritize
+    /// Set the second feedback as the first (A, B) vs (B, A) 
+    /// to "prioritize" the result in case of Eager OR.
     #[cfg(feature = "track_hit_feedbacks")]
     fn append_hit_feedbacks(first: &A, second: &B, list: &mut Vec<Cow<'static, str>>) {
         if first.last_result().expect("should have run") {
