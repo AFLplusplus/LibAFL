@@ -50,7 +50,6 @@ pub mod nautilus;
 pub mod new_hash_feedback;
 #[cfg(feature = "std")]
 pub mod stdio;
-pub mod testcase_name;
 pub mod transferred;
 
 /// The module for list feedback
@@ -355,6 +354,9 @@ where
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(first: &A, second: &B) -> Option<bool>;
 
+    /// Append this [`Feedback`]'s name if [`Feedback::last_result`] is true
+    /// If you have any nested Feedbacks, you must call this function on them if relevant.
+    /// See the implementations of [`CombinedFeedback`]
     #[cfg(feature = "track_hit_feedbacks")]
     fn append_hit_feedbacks(first: &A, second: &B, list: &mut Vec<Cow<'static, str>>);
 
