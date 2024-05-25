@@ -510,6 +510,9 @@ where
                 if let Ok(mut tc) = state.current_testcase_mut() {
                     tc.found_objective();
                 }
+                #[cfg(feature = "track_hit_feedbacks")]
+                self.objective_mut()
+                    .append_hit_feedbacks(&mut testcase.hit_objectives_mut());
                 self.objective_mut()
                     .append_metadata(state, manager, observers, &mut testcase)?;
                 state.solutions_mut().add(testcase)?;

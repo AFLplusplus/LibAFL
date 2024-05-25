@@ -40,17 +40,17 @@ use crate::{
     state::State,
     Error,
 };
-pub mod map;
-
 #[cfg(feature = "std")]
 pub mod concolic;
 pub mod differential;
+pub mod map;
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
 #[cfg(feature = "std")]
 pub mod new_hash_feedback;
 #[cfg(feature = "std")]
 pub mod stdio;
+pub mod testcase_name;
 pub mod transferred;
 
 /// The module for list feedback
@@ -448,7 +448,7 @@ where
     }
     /// Note: Eager OR's hit feedbacks will behave like Fast OR
     /// because the second feedback will not have contributed to the result.
-    /// Set the second feedback as the first (A, B) vs (B, A) 
+    /// Set the second feedback as the first (A, B) vs (B, A)
     /// to "prioritize" the result in case of Eager OR.
     #[cfg(feature = "track_hit_feedbacks")]
     fn append_hit_feedbacks(first: &A, second: &B, list: &mut Vec<Cow<'static, str>>) {

@@ -69,9 +69,12 @@ where
     disabled: bool,
     /// has found crash (or timeout) or not
     objectives_found: usize,
-    /// Vector of `Feedback` that deemed this `Testcase` interesting
+    /// Vector of `Feedback` names that deemed this `Testcase` as corpus worthy
     #[cfg(feature = "track_hit_feedbacks")]
     hit_feedbacks: Vec<Cow<'static, str>>,
+    /// Vector of `Feedback` names that deemed this `Testcase` as solution worthy
+    #[cfg(feature = "track_hit_feedbacks")]
+    hit_objectives: Vec<Cow<'static, str>>,
 }
 
 impl<I> HasMetadata for Testcase<I>
@@ -230,6 +233,20 @@ where
         &mut self.hit_feedbacks
     }
 
+    /// Get the hit objectives
+    #[inline]
+    #[cfg(feature = "track_hit_feedbacks")]
+    pub fn hit_objectives(&self) -> &Vec<Cow<'static, str>> {
+        &self.hit_objectives
+    }
+
+    /// Get the hit objectives (mutable)
+    #[inline]
+    #[cfg(feature = "track_hit_feedbacks")]
+    pub fn hit_objectives_mut(&mut self) -> &mut Vec<Cow<'static, str>> {
+        &mut self.hit_objectives
+    }
+
     /// Create a new Testcase instance given an input
     #[inline]
     pub fn new(mut input: I) -> Self {
@@ -251,6 +268,8 @@ where
             objectives_found: 0,
             #[cfg(feature = "track_hit_feedbacks")]
             hit_feedbacks: Vec::new(),
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_objectives: Vec::new(),
         }
     }
 
@@ -275,6 +294,8 @@ where
             objectives_found: 0,
             #[cfg(feature = "track_hit_feedbacks")]
             hit_feedbacks: Vec::new(),
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_objectives: Vec::new(),
         }
     }
 
@@ -299,6 +320,8 @@ where
             objectives_found: 0,
             #[cfg(feature = "track_hit_feedbacks")]
             hit_feedbacks: Vec::new(),
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_objectives: Vec::new(),
         }
     }
 
@@ -323,6 +346,8 @@ where
             objectives_found: 0,
             #[cfg(feature = "track_hit_feedbacks")]
             hit_feedbacks: Vec::new(),
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_objectives: Vec::new(),
         }
     }
 
@@ -377,6 +402,8 @@ where
             objectives_found: 0,
             #[cfg(feature = "track_hit_feedbacks")]
             hit_feedbacks: Vec::new(),
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_objectives: Vec::new(),
         }
     }
 }
