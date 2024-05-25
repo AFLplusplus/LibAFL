@@ -627,6 +627,9 @@ where
         )?;
 
         if is_solution {
+            #[cfg(feature = "track_hit_feedbacks")]
+            self.objective_mut()
+                .append_hit_feedbacks(&mut testcase.hit_objectives_mut());
             self.objective_mut()
                 .append_metadata(state, manager, &*observers, &mut testcase)?;
             let idx = state.solutions_mut().add(testcase)?;
@@ -662,6 +665,9 @@ where
             &exit_kind,
         )?;
 
+        #[cfg(feature = "track_hit_feedbacks")]
+        self.feedback_mut()
+            .append_hit_feedbacks(&mut testcase.hit_feedbacks_mut());
         // Add the input to the main corpus
         self.feedback_mut()
             .append_metadata(state, manager, &*observers, &mut testcase)?;
