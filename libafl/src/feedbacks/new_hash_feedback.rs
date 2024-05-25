@@ -86,7 +86,7 @@ pub struct NewHashFeedback<O, S> {
     /// Initial capacity of hash set
     capacity: usize,
     #[cfg(feature = "track_hit_feedbacks")]
-    prev_result: Option<bool>,
+    last_result: Option<bool>,
     phantom: PhantomData<S>,
 }
 
@@ -126,25 +126,23 @@ where
             .unwrap();
 
         let res = match observer.hash() {
-            Some(hash) => {
-                backtrace_state
-                    .update_hash_set(hash)
-                    .expect("Failed to update the hash state")
-            }
+            Some(hash) => backtrace_state
+                .update_hash_set(hash)
+                .expect("Failed to update the hash state"),
             None => {
                 // We get here if the hash was not updated, i.e the first run or if no crash happens
                 false
             }
         };
-        #[cfg(feature = "track_hit_feedbacks")] 
+        #[cfg(feature = "track_hit_feedbacks")]
         {
-            self.prev_result = Some(res);
+            self.last_result = Some(res);
         }
         Ok(res)
     }
     #[cfg(feature = "track_hit_feedbacks")]
-    fn prev_result(&self) -> Option<bool> {
-        self.prev_result
+    fn last_result(&self) -> Option<bool> {
+        self.last_result
     }
 }
 
@@ -189,7 +187,7 @@ where
             o_ref: observer.handle(),
             capacity,
             #[cfg(feature = "track_hit_feedbacks")]
-            prev_result: None,
+            last_result: None,
             phantom: PhantomData,
         }
     }

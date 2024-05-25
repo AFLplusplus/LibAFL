@@ -39,7 +39,7 @@ impl TransferringMetadata {
 #[derive(Copy, Clone, Debug)]
 pub struct TransferredFeedback {
     #[cfg(feature = "track_hit_feedbacks")]
-    prev_result: Option<bool>
+    last_result: Option<bool>,
 }
 
 impl Named for TransferredFeedback {
@@ -72,12 +72,12 @@ where
         let res = state.metadata::<TransferringMetadata>()?.transferring;
         #[cfg(feature = "track_hit_feedbacks")]
         {
-            self.prev_result = Some(res);
+            self.last_result = Some(res);
         }
         Ok(res)
     }
     #[cfg(feature = "track_hit_feedbacks")]
-    fn prev_result(&self) -> Option<bool> {
-        self.prev_result
+    fn last_result(&self) -> Option<bool> {
+        self.last_result
     }
 }

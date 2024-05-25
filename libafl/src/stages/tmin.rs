@@ -356,7 +356,7 @@ pub struct MapEqualityFeedback<C, M, S> {
     map_ref: Handle<C>,
     orig_hash: u64,
     #[cfg(feature = "track_hit_feedbacks")]
-    prev_result: Option<bool>,
+    last_result: Option<bool>,
     phantom: PhantomData<(M, S)>,
 }
 
@@ -398,13 +398,13 @@ where
         let res = obs.as_ref().hash_simple() == self.orig_hash;
         #[cfg(feature = "track_hit_feedbacks")]
         {
-            self.prev_result = Some(res);
+            self.last_result = Some(res);
         }
         Ok(res)
     }
     #[cfg(feature = "track_hit_feedbacks")]
-    fn prev_result(&self) -> Option<bool> {
-        self.prev_result
+    fn last_result(&self) -> Option<bool> {
+        self.last_result
     }
 }
 
@@ -454,7 +454,7 @@ where
             map_ref: obs.handle(),
             orig_hash: obs.as_ref().hash_simple(),
             #[cfg(feature = "track_hit_feedbacks")]
-            prev_result: None,
+            last_result: None,
             phantom: PhantomData,
         }
     }
