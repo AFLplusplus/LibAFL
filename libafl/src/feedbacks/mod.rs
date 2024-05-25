@@ -6,10 +6,7 @@
 
 use alloc::borrow::Cow;
 #[cfg(feature = "track_hit_feedbacks")]
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::vec::Vec;
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
@@ -230,7 +227,7 @@ where
     }
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Option<bool> {
-        return FL::last_result(&self.first, &self.second);
+        FL::last_result(&self.first, &self.second)
     }
     #[cfg(feature = "track_hit_feedbacks")]
     fn append_hit_feedbacks(&self, list: &mut Vec<Cow<'static, str>>) {
@@ -797,7 +794,7 @@ where
 
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Option<bool> {
-        return Some(!self.first.last_result().expect("should have run"));
+        Some(!self.first.last_result().expect("should have run"))
     }
 }
 
@@ -902,7 +899,7 @@ where
     }
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Option<bool> {
-        return Some(false);
+        Some(false)
     }
 }
 

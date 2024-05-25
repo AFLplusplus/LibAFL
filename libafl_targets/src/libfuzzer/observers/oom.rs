@@ -167,4 +167,9 @@ where
     {
         Ok(Self::oomed())
     }
+
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> bool {
+        Self::oomed()
+    }
 }
