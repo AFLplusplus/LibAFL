@@ -128,8 +128,7 @@ where
 
         let res = match observer.hash() {
             Some(hash) => backtrace_state
-                .update_hash_set(hash)
-                .expect("Failed to update the hash state"),
+                .update_hash_set(hash)?,
             None => {
                 // We get here if the hash was not updated, i.e the first run or if no crash happens
                 false
