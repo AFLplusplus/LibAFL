@@ -78,7 +78,7 @@ where
         Ok(res)
     }
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Option<bool> {
-        self.last_result
+    fn last_result(&self) -> Result<bool, Error> {
+        self.last_result.ok_or(Error::premature_last_result())
     }
 }

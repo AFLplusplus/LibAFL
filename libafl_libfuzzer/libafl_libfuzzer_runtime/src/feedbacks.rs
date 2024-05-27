@@ -63,8 +63,8 @@ where
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Option<bool> {
-        Some(*self.keep.borrow())
+    fn last_result(&self) -> Result<bool, Error> {
+        Ok(*self.keep.borrow())
     }
 }
 
@@ -139,8 +139,8 @@ where
         Ok(false)
     }
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Option<bool> {
-        Some(false)
+    fn last_result(&self) -> Result<bool, Error> {
+        Ok(false)
     }
 
     fn append_metadata<EM, OT>(

@@ -144,8 +144,8 @@ where
         Ok(())
     }
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Option<bool> {
-        Some(!self.novelty.is_empty())
+    fn last_result(&self) -> Result<bool, Error> {
+        Ok(!self.novelty.is_empty())
     }
 }
 

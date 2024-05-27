@@ -115,16 +115,17 @@ where
 
     /// CUT MY LIFE INTO PIECES; THIS IS MY LAST [`Feedback::is_interesting`] run
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Option<bool>;
+    fn last_result(&self) -> Result<bool, Error>;
 
     /// Append this [`Feedback`]'s name if [`Feedback::last_result`] is true
     /// If you have any nested Feedbacks, you must call this function on them if relevant.
     /// See the implementations of [`CombinedFeedback`]
     #[cfg(feature = "track_hit_feedbacks")]
-    fn append_hit_feedbacks(&self, list: &mut Vec<Cow<'static, str>>) {
-        if self.last_result().expect("no last result") {
+    fn append_hit_feedbacks(&self, list: &mut Vec<Cow<'static, str>>) -> Result<(), Error> {
+        if self.last_result()? {
             list.push(self.name().clone());
         }
+        Ok(())
     }
 
     /// Append to the testcase the generated metadata in case of a new corpus item
@@ -226,12 +227,12 @@ where
         Ok(())
     }
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Option<bool> {
+    fn last_result(&self) -> Result<bool, Error> {
         FL::last_result(&self.first, &self.second)
     }
     #[cfg(feature = "track_hit_feedbacks")]
-    fn append_hit_feedbacks(&self, list: &mut Vec<Cow<'static, str>>) {
-        FL::append_hit_feedbacks(&self.first, &self.second, list);
+    fn append_hit_feedbacks(&self, list: &mut Vec<Cow<'static, str>>) -> Result<(), Error> {
+        FL::append_hit_feedbacks(&self.first, &self.second, list)
     }
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
@@ -349,13 +350,17 @@ where
 
     /// Get the result of the last `Self::is_interesting` run
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(first: &A, second: &B) -> Option<bool>;
+    fn last_result(first: &A, second: &B) -> Result<bool, Error>;
 
     /// Append this [`Feedback`]'s name if [`Feedback::last_result`] is true
     /// If you have any nested Feedbacks, you must call this function on them if relevant.
     /// See the implementations of [`CombinedFeedback`]
     #[cfg(feature = "track_hit_feedbacks")]
-    fn append_hit_feedbacks(first: &A, second: &B, list: &mut Vec<Cow<'static, str>>);
+    fn append_hit_feedbacks(
+        first: &A,
+        second: &B,
+        list: &mut Vec<Cow<'static, str>>,
+    ) -> Result<(), Error>;
 
     /// If this pair is interesting (with introspection features enabled)
     #[cfg(feature = "introspection")]
@@ -439,23 +444,25 @@ where
         Ok(a || b)
     }
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(first: &A, second: &B) -> Option<bool> {
-        Some(
-            first.last_result().expect("should have run")
-                || second.last_result().expect("should have run"),
-        )
+    fn last_result(first: &A, second: &B) -> Result<bool, Error> {
+        Ok(first.last_result()? || second.last_result()?)
     }
     /// Note: Eager OR's hit feedbacks will behave like Fast OR
     /// because the second feedback will not have contributed to the result.
     /// Set the second feedback as the first (A, B) vs (B, A)
     /// to "prioritize" the result in case of Eager OR.
     #[cfg(feature = "track_hit_feedbacks")]
-    fn append_hit_feedbacks(first: &A, second: &B, list: &mut Vec<Cow<'static, str>>) {
-        if first.last_result().expect("should have run") {
-            first.append_hit_feedbacks(list);
-        } else if second.last_result().expect("should have run") {
-            second.append_hit_feedbacks(list);
+    fn append_hit_feedbacks(
+        first: &A,
+        second: &B,
+        list: &mut Vec<Cow<'static, str>>,
+    ) -> Result<(), Error> {
+        if first.last_result()? {
+            first.append_hit_feedbacks(list)?;
+        } else if second.last_result()? {
+            second.append_hit_feedbacks(list)?;
         }
+        Ok(())
     }
 
     #[cfg(feature = "introspection")]
@@ -511,21 +518,26 @@ where
         second.is_interesting(state, manager, input, observers, exit_kind)
     }
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(first: &A, second: &B) -> Option<bool> {
-        if first.last_result().expect("should have run") {
-            return Some(true);
+    fn last_result(first: &A, second: &B) -> Result<bool, Error> {
+        if first.last_result()? {
+            return Ok(true);
         }
 
         // The second must have run if the first wasn't interesting
-        Some(second.last_result().expect("should have run"))
+        second.last_result()
     }
     #[cfg(feature = "track_hit_feedbacks")]
-    fn append_hit_feedbacks(first: &A, second: &B, list: &mut Vec<Cow<'static, str>>) {
-        if first.last_result().expect("should have run") {
-            first.append_hit_feedbacks(list);
-        } else if second.last_result().expect("should have run") {
-            second.append_hit_feedbacks(list);
+    fn append_hit_feedbacks(
+        first: &A,
+        second: &B,
+        list: &mut Vec<Cow<'static, str>>,
+    ) -> Result<(), Error> {
+        if first.last_result()? {
+            first.append_hit_feedbacks(list)?;
+        } else if second.last_result()? {
+            second.append_hit_feedbacks(list)?;
         }
+        Ok(())
     }
 
     #[cfg(feature = "introspection")]
@@ -582,20 +594,20 @@ where
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(first: &A, second: &B) -> Option<bool> {
-        Some(
-            first.last_result().expect("should have run")
-                && second.last_result().expect("should have run!"),
-        )
+    fn last_result(first: &A, second: &B) -> Result<bool, Error> {
+        Ok(first.last_result()? && second.last_result()?)
     }
     #[cfg(feature = "track_hit_feedbacks")]
-    fn append_hit_feedbacks(first: &A, second: &B, list: &mut Vec<Cow<'static, str>>) {
-        if first.last_result().expect("should have run")
-            && second.last_result().expect("should have run")
-        {
-            first.append_hit_feedbacks(list);
-            second.append_hit_feedbacks(list);
+    fn append_hit_feedbacks(
+        first: &A,
+        second: &B,
+        list: &mut Vec<Cow<'static, str>>,
+    ) -> Result<(), Error> {
+        if first.last_result()? && second.last_result()? {
+            first.append_hit_feedbacks(list)?;
+            second.append_hit_feedbacks(list)?;
         }
+        Ok(())
     }
 
     #[cfg(feature = "introspection")]
@@ -652,26 +664,27 @@ where
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(first: &A, second: &B) -> Option<bool> {
-        if let Some(first) = first.last_result() {
-            if !first {
-                return Some(false);
-            }
+    fn last_result(first: &A, second: &B) -> Result<bool, Error> {
+        if !first.last_result()? {
+            return Ok(false);
         }
 
         // The second must have run if the first wasn't interesting
-        Some(second.last_result().expect("should have run"))
+        second.last_result()
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn append_hit_feedbacks(first: &A, second: &B, list: &mut Vec<Cow<'static, str>>) {
-        if first.last_result().expect("should have run") {
-            first.append_hit_feedbacks(list);
-            return;
+    fn append_hit_feedbacks(
+        first: &A,
+        second: &B,
+        list: &mut Vec<Cow<'static, str>>,
+    ) -> Result<(), Error> {
+        if first.last_result()? {
+            first.append_hit_feedbacks(list)?;
+        } else if second.last_result()? {
+            second.append_hit_feedbacks(list)?;
         }
-        if second.last_result().expect("should have run") {
-            second.append_hit_feedbacks(list);
-        }
+        Ok(())
     }
 
     #[cfg(feature = "introspection")]
@@ -793,8 +806,8 @@ where
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Option<bool> {
-        Some(!self.first.last_result().expect("should have run"))
+    fn last_result(&self) -> Result<bool, Error> {
+        Ok(!self.first.last_result()?)
     }
 }
 
@@ -898,8 +911,8 @@ where
         Ok(false)
     }
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Option<bool> {
-        Some(false)
+    fn last_result(&self) -> Result<bool, Error> {
+        Ok(false)
     }
 }
 
@@ -937,8 +950,8 @@ where
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Option<bool> {
-        self.last_result
+    fn last_result(&self) -> Result<bool, Error> {
+        self.last_result.ok_or(Error::premature_last_result())
     }
 }
 
@@ -1007,8 +1020,8 @@ where
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Option<bool> {
-        self.last_result
+    fn last_result(&self) -> Result<bool, Error> {
+        self.last_result.ok_or(Error::premature_last_result())
     }
 }
 
@@ -1077,8 +1090,8 @@ where
         Ok(res)
     }
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Option<bool> {
-        self.last_result
+    fn last_result(&self) -> Result<bool, Error> {
+        self.last_result.ok_or(Error::premature_last_result())
     }
 }
 
@@ -1168,8 +1181,8 @@ where
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Option<bool> {
-        Some(false)
+    fn last_result(&self) -> Result<bool, Error> {
+        Ok(false)
     }
 }
 
@@ -1222,8 +1235,8 @@ where
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Option<bool> {
-        Some((*self).into())
+    fn last_result(&self) -> Result<bool, Error> {
+        Ok((*self).into())
     }
 }
 

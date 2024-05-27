@@ -99,7 +99,7 @@ where
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Option<bool> {
-        Some(false)
+    fn last_result(&self) -> Result<bool, Error> {
+        Ok(false)
     }
 }
