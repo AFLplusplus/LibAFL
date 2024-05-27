@@ -10,6 +10,8 @@ use libafl_bolts::{
 };
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "track_hit_feedbacks")]
+use crate::feedbacks::premature_last_result_err;
 use crate::{
     events::EventFirer,
     executors::ExitKind,
@@ -127,8 +129,7 @@ where
             .unwrap();
 
         let res = match observer.hash() {
-            Some(hash) => backtrace_state
-                .update_hash_set(hash)?,
+            Some(hash) => backtrace_state.update_hash_set(hash)?,
             None => {
                 // We get here if the hash was not updated, i.e the first run or if no crash happens
                 false
@@ -142,7 +143,7 @@ where
     }
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Result<bool, Error> {
-        self.last_result.ok_or(Error::premature_last_result())
+        self.last_result.ok_or(premature_last_result_err())
     }
 }
 

@@ -13,6 +13,8 @@ use libafl_bolts::{
 };
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "track_hit_feedbacks")]
+use crate::feedbacks::premature_last_result_err;
 use crate::{
     events::EventFirer,
     executors::ExitKind,
@@ -186,7 +188,7 @@ where
 
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Result<bool, Error> {
-        self.last_result.ok_or(Error::premature_last_result())
+        self.last_result.ok_or(premature_last_result_err())
     }
 }
 

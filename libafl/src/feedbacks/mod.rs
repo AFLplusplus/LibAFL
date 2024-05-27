@@ -951,7 +951,7 @@ where
 
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Result<bool, Error> {
-        self.last_result.ok_or(Error::premature_last_result())
+        self.last_result.ok_or(premature_last_result_err())
     }
 }
 
@@ -1021,7 +1021,7 @@ where
 
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Result<bool, Error> {
-        self.last_result.ok_or(Error::premature_last_result())
+        self.last_result.ok_or(premature_last_result_err())
     }
 }
 
@@ -1091,7 +1091,7 @@ where
     }
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Result<bool, Error> {
-        self.last_result.ok_or(Error::premature_last_result())
+        self.last_result.ok_or(premature_last_result_err())
     }
 }
 
@@ -1273,4 +1273,10 @@ impl From<ConstFeedback> for bool {
             ConstFeedback::False => false,
         }
     }
+}
+
+#[cfg(feature = "track_hit_feedbacks")]
+/// Error if [`Feedback::last_result`] is called before the `Feedback` is actually run.
+pub(crate) fn premature_last_result_err() -> Error {
+    Error::illegal_state("last_result called before Feedback was run")
 }

@@ -9,6 +9,8 @@ use libafl_bolts::{
     HasLen, Named,
 };
 
+#[cfg(feature = "track_hit_feedbacks")]
+use crate::feedbacks::premature_last_result_err;
 use crate::{
     corpus::{Corpus, HasCurrentCorpusId, Testcase},
     events::EventFirer,
@@ -31,7 +33,6 @@ use crate::{
 };
 #[cfg(feature = "introspection")]
 use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
-
 /// Mutational stage which minimizes corpus entries.
 ///
 /// You must provide at least one mutator that actually reduces size.
@@ -405,7 +406,7 @@ where
     }
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Result<bool, Error> {
-        self.last_result.ok_or(Error::premature_last_result())
+        self.last_result.ok_or(premature_last_result_err())
     }
 }
 

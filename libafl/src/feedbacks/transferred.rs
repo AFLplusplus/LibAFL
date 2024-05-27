@@ -6,11 +6,12 @@ use alloc::borrow::Cow;
 use libafl_bolts::{impl_serdeany, Error, Named};
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "track_hit_feedbacks")]
+use crate::feedbacks::premature_last_result_err;
 use crate::{
     events::EventFirer, executors::ExitKind, feedbacks::Feedback, observers::ObserversTuple,
     state::State, HasMetadata,
 };
-
 /// Constant name of the [`TransferringMetadata`].
 pub const TRANSFERRED_FEEDBACK_NAME: Cow<'static, str> =
     Cow::Borrowed("transferred_feedback_internal");
@@ -79,6 +80,6 @@ where
     }
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Result<bool, Error> {
-        self.last_result.ok_or(Error::premature_last_result())
+        self.last_result.ok_or(premature_last_result_err())
     }
 }

@@ -451,13 +451,6 @@ impl Error {
     {
         Error::InvalidCorpus(arg.into(), ErrorBacktrace::new())
     }
-
-    /// If [`Feedback::last_result`] is called before the `Feedback` is actually run.
-    #[cfg(feature = "track_hit_feedbacks")]
-    #[must_use]
-    pub fn premature_last_result() -> Self {
-        Error::illegal_state("last_result called before Feedback was run")
-    }
 }
 
 impl Display for Error {

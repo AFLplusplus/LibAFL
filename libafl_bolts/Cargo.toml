@@ -26,8 +26,6 @@ document-features = ["dep:document-features"]
 ## Enables features that need rust's `std` lib to work, like print, env, ... support
 std = ["serde_json", "serde_json/std", "hostname", "nix", "serde/std", "uuid", "backtrace", "uds", "serial_test", "alloc"]
 
-
-track_hit_feedbacks = []
 ## Enables all features that allocate in `no_std`
 alloc = ["serde/alloc", "hashbrown", "postcard", "erased-serde/alloc", "ahash"]
 
