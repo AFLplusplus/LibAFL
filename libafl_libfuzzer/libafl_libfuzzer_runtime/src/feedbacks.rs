@@ -61,6 +61,11 @@ where
     {
         Ok(*self.keep.borrow())
     }
+
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Option<bool> {
+        Some(*self.keep.borrow())
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -132,6 +137,10 @@ where
     {
         self.exit_kind = *exit_kind;
         Ok(false)
+    }
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Option<bool> {
+        Some(false)
     }
 
     fn append_metadata<EM, OT>(

@@ -93,10 +93,7 @@ fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
             fuzzer.fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr)?;
         }
         ExitKind::Timeout => {
-            let factory = TimeoutFeedback {
-                #[cfg(feature = "track_hit_feedbacks")]
-                last_result: None,
-            };
+            let factory = TimeoutFeedback::new();
             let tmin = StdTMinMutationalStage::new(
                 mutator,
                 factory,
