@@ -236,8 +236,8 @@ pub fn merge(
                     .scheduler_mut()
                     .on_remove(&mut state, idx, &Some(testcase))?;
             } else {
-                #[allow(clippy::needless_borrows_for_generic_args)]
                 // False-positive: file_path is used just below
+                #[allow(clippy::needless_borrows_for_generic_args)]
                 rename(&file_path, &new_file_path)?;
                 *file_path = new_file_path;
             }
