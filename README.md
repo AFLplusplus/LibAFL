@@ -116,18 +116,7 @@ The best-tested fuzzer is [`./fuzzers/libfuzzer_libpng`](./fuzzers/libfuzzer_lib
 
 ## Contributing
 
-For bugs, feel free to open issues or contact us directly. Thank you for your support. <3
-
-Even though we will gladly assist you in finishing up your PR, try to
-- keep all the crates compiling with *stable* rust (hide the eventual non-stable code under [`cfg`s](https://github.com/AFLplusplus/LibAFL/blob/main/libafl/build.rs#L26))
-- run `cargo +nightly fmt` on your code before pushing
-- check the output of `cargo clippy --all` or `./clippy.sh`
-- run `cargo build --no-default-features` to check for `no_std` compatibility (and possibly add `#[cfg(feature = "std")]`) to hide parts of your code.
-
-Some checks can be performed automatically during commit using [pre-commit](https://pre-commit.com/).
-Once the package is installed, simply run `pre-commit install` to enable the hooks, the checks will run automatically before the commit becomes effective.
-
-Some of the parts in this list may be hard, don't be afraid to open a PR if you cannot fix them by yourself, so we can help.
+Please check out [CONTRIBUTING.md](CONTRIBUTING.md) for the contributing guideline.
 
 ## Cite
 
