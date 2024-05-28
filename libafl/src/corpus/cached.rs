@@ -115,6 +115,13 @@ where
         Ok(testcase)
     }
 
+    /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases.
+    fn remove_from_all(&mut self, idx: CorpusId) -> Result<Testcase<Self::Input>, Error> {
+        let testcase = self.inner.remove_from_all(idx)?;
+        self.cached_indexes.borrow_mut().retain(|e| *e != idx);
+        Ok(testcase)
+    }
+
     /// Get by id; considers only enabled testcases
     #[inline]
     fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {

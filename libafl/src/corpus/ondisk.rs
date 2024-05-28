@@ -118,6 +118,12 @@ where
         self.inner.remove(idx)
     }
 
+    /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases
+    #[inline]
+    fn remove_from_all(&mut self, idx: CorpusId) -> Result<Testcase<I>, Error> {
+        self.inner.remove_from_all(idx)
+    }
+
     /// Get by id; will check the disabled corpus if not available in the enabled
     #[inline]
     fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {

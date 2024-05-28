@@ -406,6 +406,18 @@ where
             .ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
     }
 
+    /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases
+    #[inline]
+    fn remove_from_all(&mut self, idx: CorpusId) -> Result<Testcase<Self::Input>, Error> {
+        let mut testcase = self.storage.enabled.remove(idx);
+        if testcase.is_none() {
+            testcase = self.storage.disabled.remove(idx);
+        }
+        testcase
+            .map(|x| x.take())
+            .ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
+    }
+
     /// Get by id; considers only enabled testcases
     #[inline]
     fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {

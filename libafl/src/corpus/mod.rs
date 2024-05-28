@@ -116,6 +116,9 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
     /// Removes an entry from the corpus, returning it if it was present.
     fn remove(&mut self, id: CorpusId) -> Result<Testcase<Self::Input>, Error>;
 
+    /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases
+    fn remove_from_all(&mut self, id: CorpusId) -> Result<Testcase<Self::Input>, Error>;
+
     /// Get by id; considers only enabled testcases
     fn get(&self, id: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error>;
 
