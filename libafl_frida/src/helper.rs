@@ -18,7 +18,7 @@ use libafl::{
 use libafl_bolts::{cli::FuzzerOptions, tuples::MatchFirstType};
 use libafl_targets::drcov::DrCovBasicBlock;
 #[cfg(unix)]
-use nix::sys::mman::{mmap, MapFlags, ProtFlags};
+use nix::sys::mman::{mmap_anonymous, MapFlags, ProtFlags};
 use rangemap::RangeMap;
 #[cfg(target_arch = "aarch64")]
 use yaxpeax_arch::Arch;
@@ -613,26 +613,20 @@ where
     // workaround frida's frida-gum-allocate-near bug:
     #[cfg(unix)]
     fn workaround_gum_allocate_near() {
-        use std::fs::File;
-
         unsafe {
             for _ in 0..512 {
-                mmap::<File>(
+                mmap_anonymous(
                     None,
                     std::num::NonZeroUsize::new_unchecked(128 * 1024),
                     ProtFlags::PROT_NONE,
-                    ANONYMOUS_FLAG | MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
-                    None,
-                    0,
+                    MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
                 )
                 .expect("Failed to map dummy regions for frida workaround");
-                mmap::<File>(
+                mmap_anonymous(
                     None,
                     std::num::NonZeroUsize::new_unchecked(4 * 1024 * 1024),
                     ProtFlags::PROT_NONE,
-                    ANONYMOUS_FLAG | MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
-                    None,
-                    0,
+                    MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
                 )
                 .expect("Failed to map dummy regions for frida workaround");
             }
