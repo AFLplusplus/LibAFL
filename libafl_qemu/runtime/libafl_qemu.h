@@ -87,7 +87,7 @@ typedef enum LibaflQemuEndStatus {
         libafl_word ret;                                                                            \
         __asm__ volatile (                                                                        \
               "mov %1, %%rax\n"                                                                   \
-              ".dword " XSTRINGIFY(opcode) "\n"                                                   \
+              ".4byte " XSTRINGIFY(opcode) "\n"                                                   \
               "mov %%rax, %0\n"                                                                   \
               : "=g"(ret)                                                                         \
               : "g"(action)                                                                       \
@@ -102,7 +102,7 @@ typedef enum LibaflQemuEndStatus {
         __asm__ volatile (                                                                        \
             "mov %1, %%rax\n"                                                                     \
             "mov %2, %%rdi\n"                                                                     \
-            ".dword " XSTRINGIFY(opcode) "\n"                                                     \
+            ".4byte " XSTRINGIFY(opcode) "\n"                                                     \
             "mov %%rax, %0\n"                                                                     \
             : "=g"(ret)                                                                           \
             : "g"(action), "g"(arg1)                                                              \
@@ -118,7 +118,7 @@ typedef enum LibaflQemuEndStatus {
         "mov %1, %%rax\n"                                                                         \
         "mov %2, %%rdi\n"                                                                         \
         "mov %3, %%rsi\n"                                                                         \
-        ".dword " XSTRINGIFY(opcode) "\n"                                                         \
+        ".4byte " XSTRINGIFY(opcode) "\n"                                                         \
         "mov %%rax, %0\n"                                                                         \
         : "=g"(ret)                                                                               \
         : "g"(action), "g"(arg1), "g"(arg2)                                                       \
