@@ -31,11 +31,6 @@ use yaxpeax_x86::amd64::InstDecoder;
 use crate::cmplog_rt::CmpLogRuntime;
 use crate::{asan::asan_rt::AsanRuntime, coverage_rt::CoverageRuntime, drcov_rt::DrCovRuntime};
 
-#[cfg(target_vendor = "apple")]
-const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
-#[cfg(not(any(target_vendor = "apple", target_os = "windows")))]
-const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
-
 /// The Runtime trait
 pub trait FridaRuntime: 'static + Debug {
     /// Initialization
