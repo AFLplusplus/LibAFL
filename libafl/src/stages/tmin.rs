@@ -9,6 +9,8 @@ use libafl_bolts::{
     HasLen, Named,
 };
 
+#[cfg(feature = "track_hit_feedbacks")]
+use crate::feedbacks::premature_last_result_err;
 use crate::{
     corpus::{Corpus, HasCurrentCorpusId, Testcase},
     events::EventFirer,
@@ -31,7 +33,6 @@ use crate::{
 };
 #[cfg(feature = "introspection")]
 use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
-
 /// Mutational stage which minimizes corpus entries.
 ///
 /// You must provide at least one mutator that actually reduces size.
@@ -355,6 +356,9 @@ pub struct MapEqualityFeedback<C, M, S> {
     name: Cow<'static, str>,
     map_ref: Handle<C>,
     orig_hash: u64,
+    #[cfg(feature = "track_hit_feedbacks")]
+    // The previous run's result of `Self::is_interesting`
+    last_result: Option<bool>,
     phantom: PhantomData<(M, S)>,
 }
 
@@ -393,7 +397,16 @@ where
         let obs = observers
             .get(self.observer_handle())
             .expect("Should have been provided valid observer name.");
-        Ok(obs.as_ref().hash_simple() == self.orig_hash)
+        let res = obs.as_ref().hash_simple() == self.orig_hash;
+        #[cfg(feature = "track_hit_feedbacks")]
+        {
+            self.last_result = Some(res);
+        }
+        Ok(res)
+    }
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Result<bool, Error> {
+        self.last_result.ok_or(premature_last_result_err())
     }
 }
 
@@ -442,6 +455,8 @@ where
             name: Cow::from("MapEq"),
             map_ref: obs.handle(),
             orig_hash: obs.as_ref().hash_simple(),
+            #[cfg(feature = "track_hit_feedbacks")]
+            last_result: None,
             phantom: PhantomData,
         }
     }

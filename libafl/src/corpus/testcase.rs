@@ -2,6 +2,8 @@
 //! It will contain a respective input, and metadata.
 
 use alloc::string::String;
+#[cfg(feature = "track_hit_feedbacks")]
+use alloc::{borrow::Cow, vec::Vec};
 use core::{
     cell::{Ref, RefMut},
     time::Duration,
@@ -67,6 +69,12 @@ where
     disabled: bool,
     /// has found crash (or timeout) or not
     objectives_found: usize,
+    /// Vector of `Feedback` names that deemed this `Testcase` as corpus worthy
+    #[cfg(feature = "track_hit_feedbacks")]
+    hit_feedbacks: Vec<Cow<'static, str>>,
+    /// Vector of `Feedback` names that deemed this `Testcase` as solution worthy
+    #[cfg(feature = "track_hit_feedbacks")]
+    hit_objectives: Vec<Cow<'static, str>>,
 }
 
 impl<I> HasMetadata for Testcase<I>
@@ -211,6 +219,34 @@ where
         self.disabled = disabled;
     }
 
+    /// Get the hit feedbacks
+    #[inline]
+    #[cfg(feature = "track_hit_feedbacks")]
+    pub fn hit_feedbacks(&self) -> &Vec<Cow<'static, str>> {
+        &self.hit_feedbacks
+    }
+
+    /// Get the hit feedbacks (mutable)
+    #[inline]
+    #[cfg(feature = "track_hit_feedbacks")]
+    pub fn hit_feedbacks_mut(&mut self) -> &mut Vec<Cow<'static, str>> {
+        &mut self.hit_feedbacks
+    }
+
+    /// Get the hit objectives
+    #[inline]
+    #[cfg(feature = "track_hit_feedbacks")]
+    pub fn hit_objectives(&self) -> &Vec<Cow<'static, str>> {
+        &self.hit_objectives
+    }
+
+    /// Get the hit objectives (mutable)
+    #[inline]
+    #[cfg(feature = "track_hit_feedbacks")]
+    pub fn hit_objectives_mut(&mut self) -> &mut Vec<Cow<'static, str>> {
+        &mut self.hit_objectives
+    }
+
     /// Create a new Testcase instance given an input
     #[inline]
     pub fn new(mut input: I) -> Self {
@@ -230,6 +266,10 @@ where
             parent_id: None,
             disabled: false,
             objectives_found: 0,
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_feedbacks: Vec::new(),
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_objectives: Vec::new(),
         }
     }
 
@@ -252,6 +292,10 @@ where
             parent_id: Some(parent_id),
             disabled: false,
             objectives_found: 0,
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_feedbacks: Vec::new(),
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_objectives: Vec::new(),
         }
     }
 
@@ -274,6 +318,10 @@ where
             parent_id: None,
             disabled: false,
             objectives_found: 0,
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_feedbacks: Vec::new(),
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_objectives: Vec::new(),
         }
     }
 
@@ -296,6 +344,10 @@ where
             parent_id: None,
             disabled: false,
             objectives_found: 0,
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_feedbacks: Vec::new(),
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_objectives: Vec::new(),
         }
     }
 
@@ -348,6 +400,10 @@ where
             metadata_path: None,
             disabled: false,
             objectives_found: 0,
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_feedbacks: Vec::new(),
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_objectives: Vec::new(),
         }
     }
 }
