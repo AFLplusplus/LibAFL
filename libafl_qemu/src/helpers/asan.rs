@@ -1349,7 +1349,7 @@ fn load_file_section<'input, 'arena, Endian: addr2line::gimli::Endianity>(
 /// has been removed in version v0.23 for some reason.
 /// TODO: find another cleaner solution.
 mod addr2line_legacy {
-    use std::{borrow::Cow, fs::File, path::PathBuf, sync::Arc};
+    use std::{borrow::Cow, ffi::OsString, fs::File, path::PathBuf, sync::Arc};
 
     use addr2line::{gimli, LookupContinuation, LookupResult};
     use object::Object;
@@ -1416,14 +1416,14 @@ mod addr2line_legacy {
             path: Option<PathBuf>,
         ) -> Option<gimli::DwarfPackage<R>> {
             let mut path = path.map_or_else(std::env::current_exe, Ok).ok()?;
-            let dwp_extension = path
-                .extension()
-                .map(|previous_extension| {
+            let dwp_extension = path.extension().map_or_else(
+                || OsString::from("dwp"),
+                |previous_extension| {
                     let mut previous_extension = previous_extension.to_os_string();
                     previous_extension.push(".dwp");
                     previous_extension
-                })
-                .unwrap_or_else(|| "dwp".into());
+                },
+            );
             path.set_extension(dwp_extension);
             let file = File::open(&path).ok()?;
             let map = unsafe { memmap2::Mmap::map(&file).ok()? };
