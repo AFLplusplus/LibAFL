@@ -465,6 +465,9 @@ where
 
                 // Add the input to the main corpus
                 let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
+                #[cfg(feature = "track_hit_feedbacks")]
+                self.feedback_mut()
+                    .append_hit_feedbacks(testcase.hit_feedbacks_mut())?;
                 self.feedback_mut()
                     .append_metadata(state, manager, observers, &mut testcase)?;
                 let idx = state.corpus_mut().add(testcase)?;
@@ -507,6 +510,9 @@ where
                 if let Ok(mut tc) = state.current_testcase_mut() {
                     tc.found_objective();
                 }
+                #[cfg(feature = "track_hit_feedbacks")]
+                self.objective_mut()
+                    .append_hit_feedbacks(testcase.hit_objectives_mut())?;
                 self.objective_mut()
                     .append_metadata(state, manager, observers, &mut testcase)?;
                 state.solutions_mut().add(testcase)?;
@@ -621,6 +627,9 @@ where
         )?;
 
         if is_solution {
+            #[cfg(feature = "track_hit_feedbacks")]
+            self.objective_mut()
+                .append_hit_feedbacks(testcase.hit_objectives_mut())?;
             self.objective_mut()
                 .append_metadata(state, manager, &*observers, &mut testcase)?;
             let idx = state.solutions_mut().add(testcase)?;
@@ -656,6 +665,9 @@ where
             &exit_kind,
         )?;
 
+        #[cfg(feature = "track_hit_feedbacks")]
+        self.feedback_mut()
+            .append_hit_feedbacks(testcase.hit_feedbacks_mut())?;
         // Add the input to the main corpus
         self.feedback_mut()
             .append_metadata(state, manager, &*observers, &mut testcase)?;

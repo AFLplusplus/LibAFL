@@ -701,6 +701,11 @@ where
         self.errors = None;
         Ok(())
     }
+
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Result<bool, Error> {
+        Ok(self.errors.is_some())
+    }
 }
 
 impl<S> Named for AsanErrorsFeedback<S> {
