@@ -39,7 +39,12 @@ use crate::{
 };
 #[cfg(feature = "std")]
 pub mod concolic;
+#[cfg(feature = "std")]
+/// The module for list [`CustomTestcaseFilenameFeedback`]
+pub mod custom_testcase_filename;
 pub mod differential;
+/// The module for list feedback
+pub mod list;
 pub mod map;
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
@@ -48,9 +53,6 @@ pub mod new_hash_feedback;
 #[cfg(feature = "std")]
 pub mod stdio;
 pub mod transferred;
-
-/// The module for list feedback
-pub mod list;
 
 /// Feedbacks evaluate the observers.
 /// Basically, they reduce the information provided by an observer to a value,
