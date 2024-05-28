@@ -16,8 +16,8 @@ codegen-units = 1
 opt-level = 3
 
 [dependencies]
-env_logger = "0.10"
+env_logger = "0.11"
 libafl = { path = "../../libafl/", features = ["std", "derive"] }
 libafl_bolts = { path = "../../libafl_bolts/" }
 clap = { version = "4.0", features = ["derive"] }
-nix = "0.27"
+nix = { version = "0.29", features = ["signal"] }
