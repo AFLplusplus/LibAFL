@@ -18,7 +18,7 @@ use std::ffi::CString;
 #[cfg(target_arch = "arm")]
 pub use libc::c_ulong;
 #[cfg(feature = "std")]
-use nix::errno::{errno, Errno};
+use nix::errno::Errno;
 
 /// The special exit code when the target exited through ctrl-c
 pub const CTRL_C_EXIT: i32 = 100;
@@ -518,7 +518,7 @@ pub fn ucontext() -> Result<ucontext_t, Error> {
             #[cfg(feature = "std")]
             Err(Error::unknown(format!(
                 "Failed to get ucontext: {:?}",
-                Errno::from_i32(errno())
+                Errno::last()
             )))
         }
     } else {

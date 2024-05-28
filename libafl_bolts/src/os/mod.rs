@@ -12,7 +12,7 @@ pub mod unix_signals;
 #[cfg(unix)]
 pub use unix_signals::CTRL_C_EXIT;
 
-#[cfg(all(unix, feature = "std"))]
+#[cfg(all(unix, feature = "alloc"))]
 pub mod pipes;
 
 #[cfg(all(unix, feature = "std"))]

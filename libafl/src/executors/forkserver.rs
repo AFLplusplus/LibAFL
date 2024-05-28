@@ -488,7 +488,7 @@ impl Forkserver {
         let st_read = unsafe { BorrowedFd::borrow_raw(st_read) };
 
         let mut readfds = FdSet::new();
-        readfds.insert(&st_read);
+        readfds.insert(st_read);
         // We'll pass a copied timeout to keep the original timeout intact, because select updates timeout to indicate how much time was left. See select(2)
         let sret = pselect(
             Some(readfds.highest().unwrap().as_raw_fd() + 1),
