@@ -15,9 +15,9 @@ categories = ["development-tools::testing", "emulators", "embedded", "os", "no-s
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libnyx = { git = "https://github.com/nyx-fuzz/libnyx.git", rev = "6833d23" }
-libafl = { path = "../libafl", version = "0.12.0", features = ["std", "libafl_derive", "frida_cli" ]}
-libafl_bolts = { path = "../libafl_bolts", version = "0.12.0", features = ["std", "libafl_derive", "frida_cli" ]}
-libafl_targets = { path = "../libafl_targets", version = "0.12.0", features = ["std", "sancov_cmplog"] }
+libafl = { path = "../libafl", version = "0.13.0", features = ["std", "libafl_derive", "frida_cli" ]}
+libafl_bolts = { path = "../libafl_bolts", version = "0.13.0", features = ["std", "libafl_derive", "frida_cli" ]}
+libafl_targets = { path = "../libafl_targets", version = "0.13.0", features = ["std", "sancov_cmplog"] }
 
 nix = { version = "0.28.0", features = ["fs"] }
 typed-builder = "0.18.1"
