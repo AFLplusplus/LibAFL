@@ -522,6 +522,15 @@ pub struct Handle<T: ?Sized> {
 
 #[cfg(feature = "alloc")]
 impl<T: ?Sized> Handle<T> {
+    /// Create a new [`Handle`] with the given name.
+    #[must_use]
+    pub fn new(name: Cow<'static, str>) -> Self {
+        Self {
+            name,
+            phantom: PhantomData,
+        }
+    }
+
     /// Fetch the name of the referenced instance.
     ///
     /// We explicitly do *not* implement [`Named`], as this could potentially lead to confusion

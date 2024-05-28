@@ -199,17 +199,6 @@ use xxhash_rust::xxh3::xxh3_64;
 )]
 pub struct ClientId(pub u32);
 
-#[cfg(feature = "std")]
-use log::{Metadata, Record};
-
-#[deprecated(
-    since = "0.11.0",
-    note = "The launcher module has moved out of `libafl_bolts` into `libafl::events::launcher`."
-)]
-/// Dummy module informing potential users that the launcher module has moved
-/// out of `libafl_bolts` into `libafl::events::launcher`.
-pub mod launcher {}
-
 use core::{
     array::TryFromSliceError,
     fmt::{self, Display},
@@ -222,6 +211,8 @@ use std::{env::VarError, io};
 
 #[cfg(feature = "libafl_derive")]
 pub use libafl_derive::SerdeAny;
+#[cfg(feature = "std")]
+use log::{Metadata, Record};
 #[cfg(feature = "alloc")]
 use {
     alloc::string::{FromUtf8Error, String},
