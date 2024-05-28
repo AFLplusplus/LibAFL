@@ -1378,7 +1378,7 @@ mod addr2line_legacy {
         file: &O,
         endian: R::Endian,
         loader: &mut F,
-    ) -> Result<R, gimli::Error>
+    ) -> R
     where
         O: Object<'data>,
         R: gimli::Reader<Endian = gimli::RunTimeEndian>,
@@ -1393,7 +1393,7 @@ mod addr2line_legacy {
                     .and_then(|section| section.uncompressed_data().ok())
             })
             .unwrap_or(Cow::Borrowed(&[]));
-        Ok(loader(data, endian))
+        loader(data, endian)
     }
 
     /// A simple builtin split DWARF loader.
@@ -1415,7 +1415,7 @@ mod addr2line_legacy {
             loader: &mut F,
             path: Option<PathBuf>,
         ) -> Option<gimli::DwarfPackage<R>> {
-            let mut path = path.map(Ok).unwrap_or_else(std::env::current_exe).ok()?;
+            let mut path = path.map_or_else(std::env::current_exe, Ok).ok()?;
             let dwp_extension = path
                 .extension()
                 .map(|previous_extension| {
@@ -1436,8 +1436,8 @@ mod addr2line_legacy {
             };
 
             let empty = loader(Cow::Borrowed(&[]), endian);
-            gimli::DwarfPackage::load(
-                |section_id| load_section(section_id, &dwp, endian, loader),
+            gimli::DwarfPackage::load::<_, gimli::Error>(
+                |section_id| Ok(load_section(section_id, &dwp, endian, loader)),
                 empty,
             )
             .ok()
@@ -1494,8 +1494,8 @@ mod addr2line_legacy {
                                     gimli::RunTimeEndian::Big
                                 };
 
-                                r = gimli::Dwarf::load(|id| {
-                                    load_section(id, &file, endian, &mut self.loader)
+                                r = gimli::Dwarf::load::<_, gimli::Error>(|id| {
+                                    Ok(load_section(id, &file, endian, &mut self.loader))
                                 })
                                 .ok()
                                 .map(|mut dwo_dwarf| {
