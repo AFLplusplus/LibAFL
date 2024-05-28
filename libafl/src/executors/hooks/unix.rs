@@ -16,10 +16,9 @@ pub mod unix_signal_handler {
             inprocess::{run_observers_and_save_state, HasInProcessHooks},
             Executor, ExitKind, HasObservers,
         },
-        feedbacks::Feedback,
-        fuzzer::HasObjective,
         inputs::{Input, UsesInput},
         state::{HasCorpus, HasExecutions, HasSolutions},
+        Evaluator,
     };
 
     pub(crate) type HandlerFuncPtr = unsafe fn(
@@ -73,13 +72,12 @@ pub mod unix_signal_handler {
     }
 
     /// invokes the `post_exec` hook on all observer in case of panic
-    pub fn setup_panic_hook<E, EM, OF, Z>()
+    pub fn setup_panic_hook<E, EM, Z>()
     where
         E: HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State>,
+        Z: Evaluator<E, EM, State = E::State>,
     {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| unsafe {
@@ -94,7 +92,7 @@ pub mod unix_signal_handler {
                 let fuzzer = (*data).fuzzer_mut::<Z>();
                 let event_mgr = (*data).event_mgr_mut::<EM>();
 
-                run_observers_and_save_state::<E, EM, OF, Z>(
+                run_observers_and_save_state::<E, EM, Z>(
                     executor,
                     state,
                     input,
@@ -116,7 +114,7 @@ pub mod unix_signal_handler {
     /// Well, signal handling is not safe
     #[cfg(unix)]
     #[allow(clippy::needless_pass_by_value)]
-    pub unsafe fn inproc_timeout_handler<E, EM, OF, Z>(
+    pub unsafe fn inproc_timeout_handler<E, EM, Z>(
         _signal: Signal,
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
@@ -124,9 +122,8 @@ pub mod unix_signal_handler {
     ) where
         E: HasObservers + HasInProcessHooks<E::State>,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State>,
+        Z: Evaluator<E, EM, State = E::State>,
     {
         // this stuff is for batch timeout
         if !data.executor_ptr.is_null()
@@ -151,7 +148,7 @@ pub mod unix_signal_handler {
 
         log::error!("Timeout in fuzz run.");
 
-        run_observers_and_save_state::<E, EM, OF, Z>(
+        run_observers_and_save_state::<E, EM, Z>(
             executor,
             state,
             input,
@@ -171,7 +168,7 @@ pub mod unix_signal_handler {
     /// Well, signal handling is not safe
     #[allow(clippy::too_many_lines)]
     #[allow(clippy::needless_pass_by_value)]
-    pub unsafe fn inproc_crash_handler<E, EM, OF, Z>(
+    pub unsafe fn inproc_crash_handler<E, EM, Z>(
         signal: Signal,
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
@@ -179,9 +176,8 @@ pub mod unix_signal_handler {
     ) where
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State>,
+        Z: Evaluator<E, EM, State = E::State>,
     {
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
         let _context = _context.map(|p| {
@@ -221,7 +217,7 @@ pub mod unix_signal_handler {
                 }
             }
 
-            run_observers_and_save_state::<E, EM, OF, Z>(
+            run_observers_and_save_state::<E, EM, Z>(
                 executor,
                 state,
                 input,

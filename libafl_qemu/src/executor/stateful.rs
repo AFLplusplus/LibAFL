@@ -15,7 +15,7 @@ use libafl::{
     fuzzer::HasObjective,
     observers::{ObserversTuple, UsesObservers},
     state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
-    Error,
+    Error, Evaluator,
 };
 use libafl_bolts::tuples::RefIndexable;
 
@@ -56,7 +56,7 @@ where
     OT: ObserversTuple<S>,
     QT: QemuHelperTuple<S> + Debug,
 {
-    pub fn new<EM, OF, Z>(
+    pub fn new<EM, Z>(
         hooks: &'a mut QemuHooks<QT, S>,
         harness_fn: &'a mut H,
         observers: OT,
@@ -67,14 +67,16 @@ where
     ) -> Result<Self, Error>
     where
         EM: EventFirer<State = S> + EventRestarter<State = S>,
-        OF: Feedback<S>,
         S: State + HasExecutions + HasCorpus + HasSolutions,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: Evaluator<
+            StatefulInProcessExecutor<'a, H, OT, S, QemuExecutorState<'a, QT, S>>,
+            EM,
+            State = <StatefulQemuExecutor<'a, H, OT, QT, S> as UsesState>::State,
+        >,
     {
         let qemu_state = QemuExecutorState::new::<
             StatefulInProcessExecutor<'a, H, OT, S, QemuExecutorState<'a, QT, S>>,
             EM,
-            OF,
             OT,
             Z,
         >(hooks)?;
@@ -85,14 +87,7 @@ where
 
         #[cfg(emulation_mode = "usermode")]
         {
-            inner.inprocess_hooks_mut().crash_handler = inproc_qemu_crash_handler::<
-                StatefulInProcessExecutor<'a, H, OT, S, QemuExecutorState<'a, QT, S>>,
-                EM,
-                OF,
-                Z,
-                QT,
-                S,
-            > as *const c_void;
+            inner.inprocess_hooks_mut().crash_handler = inproc_qemu_crash_handler as *const c_void;
         }
 
         #[cfg(emulation_mode = "systemmode")]
@@ -100,7 +95,6 @@ where
             inner.inprocess_hooks_mut().timeout_handler = inproc_qemu_timeout_handler::<
                 StatefulInProcessExecutor<'a, H, OT, S, QemuExecutorState<'a, QT, S>>,
                 EM,
-                OF,
                 Z,
             > as *const c_void;
         }

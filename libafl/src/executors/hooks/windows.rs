@@ -18,20 +18,19 @@ pub mod windows_asan_handler {
             ExitKind, HasObservers,
         },
         feedbacks::Feedback,
-        fuzzer::HasObjective,
         inputs::UsesInput,
         state::{HasCorpus, HasExecutions, HasSolutions},
+        Evaluator,
     };
 
     /// # Safety
     /// ASAN deatch handler
-    pub unsafe extern "C" fn asan_death_handler<E, EM, OF, Z>()
+    pub unsafe extern "C" fn asan_death_handler<E, EM, Z>()
     where
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State>,
+        Z: Evaluator<E, EM, State = E::State>,
     {
         let data = addr_of_mut!(GLOBAL_STATE);
         (*data).set_in_handler(true);
@@ -85,7 +84,7 @@ pub mod windows_asan_handler {
             // Make sure we don't crash in the crash handler forever.
             let input = (*data).take_current_input::<<E::State as UsesInput>::Input>();
 
-            run_observers_and_save_state::<E, EM, OF, Z>(
+            run_observers_and_save_state::<E, EM, Z>(
                 executor,
                 state,
                 input,
@@ -132,9 +131,9 @@ pub mod windows_exception_handler {
             Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
-        fuzzer::HasObjective,
         inputs::{Input, UsesInput},
         state::{HasCorpus, HasExecutions, HasSolutions, State},
+        Evaluator,
     };
 
     pub(crate) type HandlerFuncPtr =
@@ -173,13 +172,12 @@ pub mod windows_exception_handler {
     /// # Safety
     /// Well, exception handling is not safe
     #[cfg(feature = "std")]
-    pub fn setup_panic_hook<E, EM, OF, Z>()
+    pub fn setup_panic_hook<E, EM, Z>()
     where
         E: HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State>,
+        Z: Evaluator<E, EM, State = E::State>,
     {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| unsafe {
@@ -210,7 +208,7 @@ pub mod windows_exception_handler {
 
                 let input = (*data).take_current_input::<<E::State as UsesInput>::Input>();
 
-                run_observers_and_save_state::<E, EM, OF, Z>(
+                run_observers_and_save_state::<E, EM, Z>(
                     executor,
                     state,
                     input,
@@ -230,16 +228,15 @@ pub mod windows_exception_handler {
     ///
     /// # Safety
     /// Well, exception handling is not safe
-    pub unsafe extern "system" fn inproc_timeout_handler<E, EM, OF, Z>(
+    pub unsafe extern "system" fn inproc_timeout_handler<E, EM, Z>(
         _p0: *mut u8,
         global_state: *mut c_void,
         _p1: *mut u8,
     ) where
         E: HasObservers + HasInProcessHooks<E::State>,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
         E::State: State + HasExecutions + HasSolutions + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State>,
+        Z: Evaluator<E, EM, State = E::State>,
     {
         let data: &mut InProcessExecutorHandlerData =
             &mut *(global_state as *mut InProcessExecutorHandlerData);
@@ -276,7 +273,7 @@ pub mod windows_exception_handler {
                     .unwrap();
                 data.current_input_ptr = ptr::null_mut();
 
-                run_observers_and_save_state::<E, EM, OF, Z>(
+                run_observers_and_save_state::<E, EM, Z>(
                     executor,
                     state,
                     input,
@@ -301,15 +298,14 @@ pub mod windows_exception_handler {
     /// # Safety
     /// Well, exception handling is not safe
     #[allow(clippy::too_many_lines)]
-    pub unsafe fn inproc_crash_handler<E, EM, OF, Z>(
+    pub unsafe fn inproc_crash_handler<E, EM, Z>(
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,
     ) where
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State>,
+        Z: Evaluator<E, EM, State = E::State>,
     {
         // Have we set a timer_before?
         if data.ptp_timer.is_some() {
@@ -407,7 +403,7 @@ pub mod windows_exception_handler {
                     }
                     log::error!("{}", std::str::from_utf8(&bsod).unwrap());
                 }
-                run_observers_and_save_state::<E, EM, OF, Z>(
+                run_observers_and_save_state::<E, EM, Z>(
                     executor,
                     state,
                     input,
