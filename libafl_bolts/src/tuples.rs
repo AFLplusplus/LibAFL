@@ -732,12 +732,12 @@ where
 }
 
 /// Trait for structs which are capable of mapping a given type to another.
-pub trait Mapper<T> {
+pub trait MappingFunctor<T> {
     /// The result of the mapping operation.
     type Output;
 
     /// The actual mapping operation.
-    fn map(&mut self, from: T) -> Self::Output;
+    fn apply(&mut self, from: T) -> Self::Output;
 }
 
 /// Map all entries in a tuple to another type, dependent on the tail type.
@@ -751,13 +751,13 @@ pub trait Map<M> {
 
 impl<Head, Tail, M> Map<M> for (Head, Tail)
 where
-    M: Mapper<Head>,
+    M: MappingFunctor<Head>,
     Tail: Map<M>,
 {
     type MapResult = (M::Output, Tail::MapResult);
 
     fn map(self, mut mapper: M) -> Self::MapResult {
-        let head = mapper.map(self.0);
+        let head = mapper.apply(self.0);
         (head, self.1.map(mapper))
     }
 }
@@ -888,7 +888,7 @@ mod test {
 
     #[cfg(feature = "alloc")]
     use crate::ownedref::OwnedMutSlice;
-    use crate::tuples::{type_eq, Map, Mapper};
+    use crate::tuples::{type_eq, Map, MappingFunctor};
 
     #[test]
     #[allow(unused_qualifications)] // for type name tests
@@ -938,10 +938,10 @@ mod test {
         struct W<T>(T);
         struct MyMapper;
 
-        impl<T> Mapper<T> for MyMapper {
+        impl<T> MappingFunctor<T> for MyMapper {
             type Output = W<T>;
 
-            fn map(&mut self, from: T) -> Self::Output {
+            fn apply(&mut self, from: T) -> Self::Output {
                 W(from)
             }
         }
