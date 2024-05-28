@@ -22,6 +22,7 @@ use std::{
     env,
     io::{Read, Write},
     marker::PhantomData,
+    os::fd::{AsFd, BorrowedFd},
     rc::{Rc, Weak},
     sync::{Arc, Condvar, Mutex},
     thread::JoinHandle,
@@ -36,6 +37,7 @@ use std::{
 };
 
 use hashbrown::HashMap;
+use nix::poll::PollTimeout;
 #[cfg(all(feature = "std", unix))]
 use nix::poll::{poll, PollFd, PollFlags};
 use serde::{Deserialize, Serialize};
@@ -672,7 +674,7 @@ where
         };
 
         let mut poll_fds: Vec<PollFd> = vec![PollFd::new(
-            &listener,
+            listener.as_fd(),
             PollFlags::POLLIN | PollFlags::POLLRDNORM | PollFlags::POLLRDBAND,
         )];
 
@@ -681,7 +683,7 @@ where
         cvar.notify_one();
 
         loop {
-            match poll(&mut poll_fds, -1) {
+            match poll(&mut poll_fds, PollTimeout::NONE) {
                 Ok(num_fds) if num_fds > 0 => (),
                 Ok(_) => continue,
                 Err(e) => {
@@ -718,11 +720,10 @@ where
 
                         let pollfd = PollFd::new(
                             // # Safety
-                            // This cast will make `PollFd::new` ignore the lifetime of our stream.
+                            // Going through a raw fd will make `PollFd::new` ignore the lifetime of our stream.
                             // As of nix 0.27, the `PollFd` is safer, in that it checks the lifetime of the given stream.
-                            // We did not develop this server with that new constraint in mind, but it is upheld.
-                            // The `new` function then gets the `raw_fd` from this stream, and operate on that int internally.
-                            unsafe { &*(&stream as *const _) },
+                            // We did not develop this server with that new constraint in mind, but it is upheld by our code.
+                            unsafe { BorrowedFd::borrow_raw(stream.as_raw_fd()) },
                             PollFlags::POLLIN | PollFlags::POLLRDNORM | PollFlags::POLLRDBAND,
                         );
 

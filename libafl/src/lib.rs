@@ -88,13 +88,6 @@ pub extern crate alloc;
 #[allow(unused_imports)]
 #[macro_use]
 extern crate libafl_derive;
-/// Dummy export that will warn with a deprecation note on usage.
-/// Use the `libafl_bolts` crate instead.
-#[deprecated(
-    since = "0.11.0",
-    note = "All LibAFL bolts have moved to the libafl_bolts crate."
-)]
-pub mod bolts {}
 #[cfg(feature = "derive")]
 #[doc(hidden)]
 pub use libafl_derive::*;
