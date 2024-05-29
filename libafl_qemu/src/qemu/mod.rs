@@ -134,14 +134,17 @@ pub struct QemuRWError {
 }
 
 impl QemuRWError {
+    #[must_use]
     pub fn new(kind: QemuRWErrorKind, cause: QemuRWErrorCause, cpu: Option<CPUStatePtr>) -> Self {
         Self { kind, cause, cpu }
     }
 
+    #[must_use]
     pub fn current_cpu_not_found(kind: QemuRWErrorKind) -> Self {
         Self::new(kind, QemuRWErrorCause::CurrentCpuNotFound, None)
     }
 
+    #[must_use]
     pub fn new_argument_error(kind: QemuRWErrorKind, reg_id: i32) -> Self {
         Self::new(kind, QemuRWErrorCause::WrongArgument(reg_id), None)
     }

@@ -123,7 +123,7 @@ impl crate::ArchExtras for crate::CPU {
             r => {
                 return Err(QemuRWError::new_argument_error(
                     QemuRWErrorKind::Read,
-                    r as i32,
+                    i32::from(r),
                 ))
             }
         };

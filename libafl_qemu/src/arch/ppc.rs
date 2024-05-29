@@ -158,7 +158,7 @@ impl crate::ArchExtras for crate::CPU {
             r => {
                 return Err(QemuRWError::new_argument_error(
                     QemuRWErrorKind::Read,
-                    r as i32,
+                    i32::from(r),
                 ))
             }
         };
@@ -181,7 +181,7 @@ impl crate::ArchExtras for crate::CPU {
         match idx {
             0 => self.write_reg(Regs::R3, val),
             1 => self.write_reg(Regs::R4, val),
-            r => return Err(QemuRWError::new_argument_error(QemuRWErrorKind::Write, r)),
+            r => Err(QemuRWError::new_argument_error(QemuRWErrorKind::Write, r)),
         }
     }
 }
