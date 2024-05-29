@@ -48,7 +48,7 @@ use crate::{
         LlmpEventManager, LlmpShouldSaveState, ProgressReporter,
     },
     executors::{Executor, HasObservers},
-    fuzzer::{EvaluatorObservers, ExecutionProcessor},
+    fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::UsesInput,
     monitors::Monitor,
     observers::ObserversTuple,
@@ -219,7 +219,9 @@ where
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata,
     SP: ShMemProvider + 'static,
-    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers>, //CE: CustomEvent<I>,
+    Z: ExecutionProcessor<E::Observers, State = S>
+        + EvaluatorObservers<E::Observers>
+        + Evaluator<E, LlmpEventManager<EMH, S, SP>>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         let res = self.llmp_mgr.process(fuzzer, state, executor)?;
@@ -236,7 +238,9 @@ where
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata + HasLastReportTime,
     SP: ShMemProvider + 'static,
-    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers>, //CE: CustomEvent<I>,
+    Z: ExecutionProcessor<E::Observers, State = S>
+        + EvaluatorObservers<E::Observers>
+        + Evaluator<E, LlmpEventManager<EMH, S, SP>>,
 {
 }
 
