@@ -13,7 +13,7 @@ pub mod generalized;
 pub use generalized::*;
 
 pub mod bytessub;
-pub use bytessub::BytesSubInput;
+pub use bytessub::{BytesSubInput, MutableBytesSubInput};
 
 #[cfg(feature = "multipart_inputs")]
 pub mod multi;
@@ -121,6 +121,48 @@ impl HasTargetBytes for NopInput {
     }
 }
 
+/// Target bytes wrapper keeping track of the current read position.
+/// Convenient wrapper when bytes must be split it in multiple subinputs.
+#[derive(Debug)]
+pub struct BytesReader<'a, I>
+where
+    I: HasTargetBytes + HasLen,
+{
+    parent_input: &'a I,
+    pos: usize,
+}
+
+impl<'a, I> BytesReader<'a, I>
+where
+    I: HasTargetBytes + HasLen,
+{
+    /// Create a new [`BytesReader`].
+    /// The position of the reader is initialized to 0.
+    pub fn new(input: &'a I) -> Self {
+        Self {
+            parent_input: input,
+            pos: 0,
+        }
+    }
+
+    /// Read an immutable subinput from the parent input, from the current cursor position up to `limit` bytes.
+    /// If the resulting slice would go beyond the end of the parent input, it will be limited to the length of the parent input.
+    #[must_use]
+    pub fn read_to_slice(&mut self, limit: usize) -> BytesSubInput<'a> {
+        let sub_input = BytesSubInput::new(self.parent_input, self.pos..(self.pos + limit));
+
+        self.pos += sub_input.len();
+
+        sub_input
+    }
+}
+
+impl<'a, I: HasTargetBytes + HasLen> From<&'a I> for BytesReader<'a, I> {
+    fn from(input: &'a I) -> Self {
+        Self::new(input)
+    }
+}
+
 // TODO change this to fn target_bytes(&self, buffer: &mut Vec<u8>) -> &[u8];
 /// Can be represented with a vector of bytes.
 /// This representation is not necessarily deserializable.
@@ -158,11 +200,30 @@ pub trait HasMutatorBytes: HasLen {
         R: RangeBounds<usize>;
 
     /// Creates a [`BytesSubInput`] from this input, that can be used for local mutations.
-    fn sub_input<R>(&mut self, range: R) -> BytesSubInput<Self>
+    fn sub_input<R>(&self, range: R) -> BytesSubInput
     where
         R: RangeBounds<usize>,
+        Self: Sized,
     {
         BytesSubInput::new(self, range)
+    }
+
+    /// Creates a [`MutableBytesSubInput`] from this input, that can be used for local mutations.
+    fn sub_input_mut<R>(&mut self, range: R) -> MutableBytesSubInput<Self>
+    where
+        R: RangeBounds<usize>,
+        Self: Sized,
+    {
+        MutableBytesSubInput::new(self, range)
+    }
+}
+
+impl<I> HasTargetBytes for I
+where
+    I: HasMutatorBytes,
+{
+    fn target_bytes(&self) -> OwnedSlice<u8> {
+        OwnedSlice::from(self.bytes())
     }
 }
 
@@ -290,5 +351,31 @@ where
 
     fn convert(&mut self, input: Self::From) -> Result<Self::To, Error> {
         (self.convert_cb)(input)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::ops::Deref;
+
+    use crate::inputs::{BytesInput, BytesReader, HasTargetBytes};
+
+    #[test]
+    fn test_bytesreader() {
+        let bytes_input = BytesInput::new(vec![1, 2, 3, 4, 5, 6, 7]);
+        let mut bytes_reader = BytesReader::new(&bytes_input);
+
+        let bytes_read = bytes_reader.read_to_slice(2);
+        assert_eq!(bytes_read.target_bytes().deref(), &[1, 2]);
+
+        let bytes_read = bytes_reader.read_to_slice(3);
+        assert_eq!(bytes_read.target_bytes().deref(), &[3, 4, 5]);
+
+        let bytes_read = bytes_reader.read_to_slice(8);
+        assert_eq!(bytes_read.target_bytes().deref(), &[6, 7]);
+
+        let bytes_read = bytes_reader.read_to_slice(8);
+        let bytes_read_ref: &[u8] = &[];
+        assert_eq!(bytes_read.target_bytes().deref(), bytes_read_ref);
     }
 }
