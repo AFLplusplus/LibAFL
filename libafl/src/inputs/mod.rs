@@ -356,8 +356,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use core::ops::Deref;
-
     use crate::inputs::{BytesInput, BytesReader, HasTargetBytes};
 
     #[test]
@@ -366,16 +364,16 @@ mod tests {
         let mut bytes_reader = BytesReader::new(&bytes_input);
 
         let bytes_read = bytes_reader.read_to_slice(2);
-        assert_eq!(bytes_read.target_bytes().deref(), &[1, 2]);
+        assert_eq!(*bytes_read.target_bytes(), [1, 2]);
 
         let bytes_read = bytes_reader.read_to_slice(3);
-        assert_eq!(bytes_read.target_bytes().deref(), &[3, 4, 5]);
+        assert_eq!(*bytes_read.target_bytes(), [3, 4, 5]);
 
         let bytes_read = bytes_reader.read_to_slice(8);
-        assert_eq!(bytes_read.target_bytes().deref(), &[6, 7]);
+        assert_eq!(*bytes_read.target_bytes(), [6, 7]);
 
         let bytes_read = bytes_reader.read_to_slice(8);
         let bytes_read_ref: &[u8] = &[];
-        assert_eq!(bytes_read.target_bytes().deref(), bytes_read_ref);
+        assert_eq!(&*bytes_read.target_bytes(), bytes_read_ref);
     }
 }

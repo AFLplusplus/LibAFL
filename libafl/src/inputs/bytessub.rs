@@ -397,7 +397,6 @@ where
 mod tests {
 
     use alloc::vec::Vec;
-    use core::ops::Deref;
 
     use libafl_bolts::HasLen;
 
@@ -418,13 +417,13 @@ mod tests {
         let (bytes_input, _) = init_bytes_input();
 
         let sub_input = bytes_input.sub_input(0..1);
-        assert_eq!(sub_input.target_bytes().deref(), &[1]);
+        assert_eq!(*sub_input.target_bytes(), [1]);
 
         let sub_input = bytes_input.sub_input(1..=2);
-        assert_eq!(sub_input.target_bytes().deref(), &[2, 3]);
+        assert_eq!(*sub_input.target_bytes(), [2, 3]);
 
         let sub_input = bytes_input.sub_input(..);
-        assert_eq!(sub_input.target_bytes().deref(), &[1, 2, 3, 4, 5, 6, 7]);
+        assert_eq!(*sub_input.target_bytes(), [1, 2, 3, 4, 5, 6, 7]);
     }
 
     #[test]
