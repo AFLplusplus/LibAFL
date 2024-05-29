@@ -56,10 +56,6 @@ pub mod mutational;
 pub mod push;
 pub mod tmin;
 
-/// Corpus pruning stage
-pub mod pruning;
-pub use pruning::*;
-
 pub mod calibrate;
 pub mod colorization;
 #[cfg(feature = "std")]
