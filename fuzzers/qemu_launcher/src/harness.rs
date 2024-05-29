@@ -32,7 +32,7 @@ impl<'a> Harness<'a> {
 
         let ret_addr: GuestAddr = qemu
             .read_return_address()
-            .map_err(|e| Error::unknown(format!("Failed to read return address: {e:}")))?;
+            .map_err(|e| Error::unknown(format!("Failed to read return address: {e:?}")))?;
 
         Ok(Harness {
             qemu,
