@@ -410,6 +410,7 @@ impl<'a, T> OwnedSlice<'a, T> {
     }
 
     /// Returns a subslice of the slice.
+    #[must_use]
     pub fn slice<R: RangeBounds<usize> + SliceIndex<[T], Output = [T]>>(
         &'a self,
         range: R,
