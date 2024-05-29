@@ -18,13 +18,13 @@ use crate::{
     Error,
 };
 
-/// A [`CustomTestcaseFilenameFeedback`] takes a closure which returns a filename for the testcase.
+/// A [`CustomFilenameToTestcaseFeedback`] takes a closure which returns a filename for the testcase.
 /// Is never interesting (use with an Eager OR).
 /// Note: Use only in conjunction with a [`Corpus`] type that writes to disk.
 /// Note: If used as part of the `Objective` chain, then it will only apply to testcases which are
 /// `Objectives`, vice versa for `Feedback`.
 #[derive(Serialize, Deserialize)]
-pub struct CustomTestcaseFilenameFeedback<F, I, S>
+pub struct CustomFilenameToTestcaseFeedback<F, I, S>
 where
     I: Input,
     S: State<Input = I>,
@@ -35,13 +35,13 @@ where
     phantomm: PhantomData<(I, S)>,
 }
 
-impl<F, I, S> CustomTestcaseFilenameFeedback<F, I, S>
+impl<F, I, S> CustomFilenameToTestcaseFeedback<F, I, S>
 where
     I: Input,
     S: State<Input = I>,
     F: FnMut(&mut S, &mut Testcase<I>) -> Result<String, Error>,
 {
-    /// Create a new [`CustomTestcaseFilenameFeedback`].
+    /// Create a new [`CustomFilenameToTestcaseFeedback`].
     pub fn new(func: F) -> Self {
         Self {
             func,
@@ -50,14 +50,14 @@ where
     }
 }
 
-impl<F, I, S, T> FeedbackFactory<CustomTestcaseFilenameFeedback<F, I, S>, S, T>
-    for CustomTestcaseFilenameFeedback<F, I, S>
+impl<F, I, S, T> FeedbackFactory<CustomFilenameToTestcaseFeedback<F, I, S>, S, T>
+    for CustomFilenameToTestcaseFeedback<F, I, S>
 where
     I: Input,
     S: State<Input = I>,
     F: FnMut(&mut S, &mut Testcase<I>) -> Result<String, Error> + Clone,
 {
-    fn create_feedback(&self, _ctx: &T) -> CustomTestcaseFilenameFeedback<F, I, S> {
+    fn create_feedback(&self, _ctx: &T) -> CustomFilenameToTestcaseFeedback<F, I, S> {
         Self {
             func: self.func.clone(),
             phantomm: self.phantomm,
@@ -65,37 +65,38 @@ where
     }
 }
 
-impl<F, I, S> Named for CustomTestcaseFilenameFeedback<F, I, S>
+impl<F, I, S> Named for CustomFilenameToTestcaseFeedback<F, I, S>
 where
     I: Input,
     S: State<Input = I>,
     F: FnMut(&mut S, &mut Testcase<I>) -> Result<String, Error>,
 {
     fn name(&self) -> &Cow<'static, str> {
-        static NAME: Cow<'static, str> = Cow::Borrowed("CustomTestcaseFilenameFeedback");
+        static NAME: Cow<'static, str> = Cow::Borrowed("CustomFilenameToTestcaseFeedback");
         &NAME
     }
 }
 
-impl<F, I, S> Debug for CustomTestcaseFilenameFeedback<F, I, S>
+impl<F, I, S> Debug for CustomFilenameToTestcaseFeedback<F, I, S>
 where
     I: Input,
     S: State<Input = I>,
     F: FnMut(&mut S, &mut Testcase<I>) -> Result<String, Error>,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("CustomTestcaseFilenameFeedback")
+        f.debug_struct("CustomFilenameToTestcaseFeedback")
             .finish_non_exhaustive()
     }
 }
 
-impl<F, I, S> Feedback<S> for CustomTestcaseFilenameFeedback<F, I, S>
+impl<F, I, S> Feedback<S> for CustomFilenameToTestcaseFeedback<F, I, S>
 where
     S: State<Input = I>,
     F: FnMut(&mut S, &mut Testcase<S::Input>) -> Result<String, Error>,
     I: Input,
 {
     #[allow(clippy::wrong_self_convention)]
+    #[inline]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
@@ -126,6 +127,7 @@ where
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
+    #[inline]
     fn last_result(&self) -> Result<bool, Error> {
         Ok(false)
     }

@@ -40,7 +40,7 @@ use crate::{
 #[cfg(feature = "std")]
 pub mod concolic;
 #[cfg(feature = "std")]
-/// The module for list [`CustomTestcaseFilenameFeedback`]
+/// The module for `CustomFilenameToTestcaseFeedback`
 pub mod custom_testcase_filename;
 pub mod differential;
 /// The module for list feedback
