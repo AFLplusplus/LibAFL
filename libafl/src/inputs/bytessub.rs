@@ -70,16 +70,19 @@ impl<'a> BytesSubInput<'a> {
     }
 
     /// The parent input
+    #[must_use]
     pub fn parent_input(&self) -> OwnedSlice<'a, u8> {
         self.parent_input.clone()
     }
 
     /// The inclusive start index in the parent buffer
+    #[must_use]
     pub fn start_index(&self) -> usize {
         self.range.start
     }
 
     /// The exclusive end index in the parent buffer
+    #[must_use]
     pub fn end_index(&self) -> usize {
         self.range.end
     }
