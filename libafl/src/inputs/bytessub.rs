@@ -394,7 +394,7 @@ where
 mod tests {
 
     use alloc::vec::Vec;
-    use std::ops::Deref;
+    use core::ops::Deref;
 
     use libafl_bolts::HasLen;
 

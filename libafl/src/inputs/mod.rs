@@ -356,7 +356,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::ops::Deref;
+    use core::ops::Deref;
 
     use crate::inputs::{BytesInput, BytesReader, HasTargetBytes};
 
