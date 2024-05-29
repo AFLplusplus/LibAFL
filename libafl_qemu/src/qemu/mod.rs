@@ -1260,11 +1260,15 @@ pub mod pybind {
         }
 
         fn write_reg(&self, reg: i32, val: GuestUsize) -> PyResult<()> {
-            self.qemu.write_reg(reg, val).map_err(PyValueError::new_err)
+            self.qemu
+                .write_reg(reg, val)
+                .map_err(|_| PyValueError::new_err("write register error"))
         }
 
         fn read_reg(&self, reg: i32) -> PyResult<GuestUsize> {
-            self.qemu.read_reg(reg).map_err(PyValueError::new_err)
+            self.qemu
+                .read_reg(reg)
+                .map_err(|_| PyValueError::new_err("read register error"))
         }
 
         fn set_breakpoint(&self, addr: GuestAddr) {
