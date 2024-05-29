@@ -32,7 +32,8 @@ use libafl_bolts::{
 use libafl_qemu::{
     edges::{edges_map_mut_ptr, QemuEdgeCoverageHelper, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND},
     elf::EasyElf,
-    Qemu, QemuExecutor, QemuExitError, QemuExitReason, QemuHooks, QemuShutdownCause, Regs,
+    Qemu, QemuExecutor, QemuExitError, QemuExitReason, QemuHooks, QemuRWError, QemuShutdownCause,
+    Regs,
 };
 use libafl_qemu_sys::GuestPhysAddr;
 
