@@ -134,7 +134,7 @@ pub fn fuzz() {
                 // If the execution stops at any point other then the designated breakpoint (e.g. a breakpoint on a panic method) we consider it a crash
                 let mut pcs = (0..qemu.num_cpus())
                     .map(|i| qemu.cpu_from_index(i))
-                    .map(|cpu| -> Result<u32, String> { cpu.read_reg(Regs::Pc) });
+                    .map(|cpu| -> Result<u32, QemuRWError> { cpu.read_reg(Regs::Pc) });
                 let ret = match pcs
                     .find(|pc| (breakpoint..breakpoint + 5).contains(pc.as_ref().unwrap_or(&0)))
                 {
