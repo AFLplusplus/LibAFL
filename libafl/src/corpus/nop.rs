@@ -63,15 +63,9 @@ where
         Err(Error::unsupported("Unsupported by NopCorpus"))
     }
 
-    /// Removes an entry from the corpus, returning it if it was present.
-    #[inline]
-    fn remove(&mut self, _idx: CorpusId) -> Result<Testcase<I>, Error> {
-        Err(Error::unsupported("Unsupported by NopCorpus"))
-    }
-
     /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases
     #[inline]
-    fn remove_from_all(&mut self, _idx: CorpusId) -> Result<Testcase<I>, Error> {
+    fn remove(&mut self, _idx: CorpusId) -> Result<Testcase<I>, Error> {
         Err(Error::unsupported("Unsupported by NopCorpus"))
     }
 
