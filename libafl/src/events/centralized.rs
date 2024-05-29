@@ -753,10 +753,11 @@ where
         executor: &mut E,
     ) -> Result<usize, Error>
     where
-        E: Executor<Self, Z> + HasObservers<State = EM::State>,
+        E: Executor<Self, Z> + HasObservers<State = <Self as UsesState>::State>,
         EM::State: UsesInput + HasExecutions + HasMetadata,
         for<'a> E::Observers: Deserialize<'a>,
-        Z: ExecutionProcessor<E::Observers, State = EM::State> + EvaluatorObservers<E::Observers>,
+        Z: ExecutionProcessor<E::Observers, State = <Self as UsesState>::State>
+            + EvaluatorObservers<E::Observers>,
     {
         // TODO: Get around local event copy by moving handle_in_client
         let self_id = self.client.sender().id();
@@ -799,10 +800,11 @@ where
         event: Event<<EM::State as UsesInput>::Input>,
     ) -> Result<(), Error>
     where
-        E: Executor<Self, Z> + HasObservers<State = EM::State>,
+        E: Executor<Self, Z> + HasObservers<State = <Self as UsesState>::State>,
         EM::State: UsesInput + HasExecutions + HasMetadata,
         for<'a> E::Observers: Deserialize<'a>,
-        Z: ExecutionProcessor<E::Observers, State = EM::State> + EvaluatorObservers<E::Observers>,
+        Z: ExecutionProcessor<E::Observers, State = <Self as UsesState>::State>
+            + EvaluatorObservers<E::Observers>,
     {
         match event {
             Event::NewTestcase {

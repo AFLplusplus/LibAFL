@@ -21,8 +21,8 @@ pub struct WithObservers<E, OT> {
 impl<E, EM, OT, Z> Executor<EM, Z> for WithObservers<E, OT>
 where
     E: Executor<EM, Z>,
-    EM: UsesState<State = E::State>,
-    Z: UsesState<State = E::State>,
+    EM: UsesState<State = Self::State>,
+    Z: UsesState<State = Self::State>,
 {
     fn run_target(
         &mut self,

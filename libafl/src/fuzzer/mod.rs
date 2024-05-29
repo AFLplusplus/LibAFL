@@ -568,8 +568,8 @@ where
 impl<CS, E, EM, F, OF, OT> Evaluator<E, EM> for StdFuzzer<CS, F, OF, OT>
 where
     CS: Scheduler,
-    E: HasObservers<State = CS::State, Observers = OT> + Executor<EM, Self>,
-    EM: EventFirer<State = CS::State>,
+    E: HasObservers<State = Self::State, Observers = OT> + Executor<EM, Self>,
+    EM: EventFirer<State = Self::State>,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
     OT: ObserversTuple<CS::State> + Serialize + DeserializeOwned,
@@ -699,8 +699,8 @@ where
 impl<CS, E, EM, F, OF, OT, ST> Fuzzer<E, EM, ST> for StdFuzzer<CS, F, OF, OT>
 where
     CS: Scheduler,
-    E: UsesState<State = CS::State>,
-    EM: ProgressReporter + EventProcessor<E, Self, State = CS::State>,
+    E: UsesState<State = Self::State>,
+    EM: ProgressReporter + EventProcessor<E, Self, State = Self::State>,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
     CS::State: HasExecutions
@@ -795,9 +795,9 @@ where
         input: &<CS::State as UsesInput>::Input,
     ) -> Result<ExitKind, Error>
     where
-        E: Executor<EM, Self> + HasObservers<Observers = OT, State = CS::State>,
-        EM: UsesState<State = CS::State>,
-        OT: ObserversTuple<CS::State>,
+        E: Executor<EM, Self> + HasObservers<Observers = OT, State = <Self as UsesState>::State>,
+        EM: UsesState<State = <Self as UsesState>::State>,
+        OT: ObserversTuple<<Self as UsesState>::State>,
     {
         start_timer!(state);
         executor.observers_mut().pre_exec_all(state, input)?;
@@ -833,13 +833,13 @@ where
     ) -> Result<ExitKind, Error>;
 }
 
-impl<CS, E, EM, F, OF> ExecutesInput<E, EM> for StdFuzzer<CS, F, OF, E::Observers>
+impl<CS, E, EM, F, OF, OT> ExecutesInput<E, EM> for StdFuzzer<CS, F, OF, OT>
 where
     CS: Scheduler,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
-    E: Executor<EM, Self> + HasObservers<State = CS::State>,
-    EM: UsesState<State = CS::State>,
+    E: Executor<EM, Self> + HasObservers<State = Self::State>,
+    EM: UsesState<State = Self::State>,
     CS::State: UsesInput + HasExecutions + HasCorpus,
 {
     /// Runs the input and triggers observers and feedback
@@ -912,7 +912,7 @@ pub mod test {
     impl<ST, E, EM> Fuzzer<E, EM, ST> for NopFuzzer<E::State>
     where
         E: UsesState,
-        EM: ProgressReporter<State = E::State>,
+        EM: ProgressReporter<State = Self::State>,
         ST: StagesTuple<E, EM, E::State, Self>,
         E::State: HasMetadata + HasExecutions + HasLastReportTime + HasCurrentStage,
     {

@@ -81,13 +81,13 @@ where
 
 impl<C, E, EM, O, Z> Stage<E, EM, Z> for ColorizationStage<C, E, EM, O, Z>
 where
-    EM: UsesState<State = E::State> + EventFirer,
+    EM: UsesState<State = Self::State> + EventFirer,
     E: HasObservers + Executor<EM, Z>,
     E::State: HasCorpus + HasMetadata + HasRand + HasNamedMetadata,
     E::Input: HasMutatorBytes,
     O: MapObserver,
     C: AsRef<O> + Named,
-    Z: UsesState<State = E::State>,
+    Z: UsesState<State = Self::State>,
 {
     #[inline]
     #[allow(clippy::let_and_return)]
@@ -156,13 +156,13 @@ libafl_bolts::impl_serdeany!(TaintMetadata);
 
 impl<C, E, EM, O, Z> ColorizationStage<C, E, EM, O, Z>
 where
-    EM: UsesState<State = E::State> + EventFirer,
+    EM: UsesState<State = <Self as UsesState>::State> + EventFirer,
     O: MapObserver,
     C: AsRef<O> + Named,
     E: HasObservers + Executor<EM, Z>,
     E::State: HasCorpus + HasMetadata + HasRand,
     E::Input: HasMutatorBytes,
-    Z: UsesState<State = E::State>,
+    Z: UsesState<State = <Self as UsesState>::State>,
 {
     #[inline]
     #[allow(clippy::let_and_return)]

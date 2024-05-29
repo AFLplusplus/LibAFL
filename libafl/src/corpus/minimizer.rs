@@ -41,9 +41,9 @@ where
     ) -> Result<(), Error>
     where
         E: Executor<EM, Z> + HasObservers,
-        CS: Scheduler<State = E::State> + RemovableScheduler, // schedulers that has on_remove/on_replace only!
-        EM: EventFirer<State = E::State>,
-        Z: HasScheduler<Scheduler = CS, State = E::State>;
+        CS: Scheduler<State = Self::State> + RemovableScheduler, // schedulers that has on_remove/on_replace only!
+        EM: EventFirer<State = Self::State>,
+        Z: HasScheduler<Scheduler = CS, State = Self::State>;
 }
 
 /// Minimizes a corpus according to coverage maps, weighting by the specified `TestcaseScore`.
@@ -95,9 +95,9 @@ where
     ) -> Result<(), Error>
     where
         E: Executor<EM, Z> + HasObservers,
-        CS: Scheduler<State = E::State> + RemovableScheduler,
-        EM: EventFirer<State = E::State>,
-        Z: HasScheduler<Scheduler = CS, State = E::State>,
+        CS: Scheduler<State = Self::State> + RemovableScheduler,
+        EM: EventFirer<State = Self::State>,
+        Z: HasScheduler<Scheduler = CS, State = Self::State>,
     {
         let cfg = Config::default();
         let ctx = Context::new(&cfg);

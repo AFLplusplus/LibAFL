@@ -43,8 +43,8 @@ where
 
 impl<E, EM, Z, G> Stage<E, EM, Z> for GenStage<G, Z>
 where
-    E: UsesState<State = Z::State>,
-    EM: UsesState<State = Z::State>,
+    E: UsesState<State = Self::State>,
+    EM: UsesState<State = Self::State>,
     Z: Evaluator<E, EM>,
     Z::State: HasCorpus + HasRand,
     G: Generator<<<Z as UsesState>::State as UsesInput>::Input, Z::State>,
