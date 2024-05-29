@@ -184,7 +184,7 @@ impl<'a> BytesSubInput<'a> {
 #[derive(Debug)]
 pub struct BytesSubInputMut<'a, I>
 where
-    I: HasTargetBytes + ?Sized,
+    I: HasMutatorBytes + ?Sized,
 {
     /// The (complete) parent input we will work on
     pub(crate) parent_input: &'a mut I,
@@ -194,7 +194,7 @@ where
 
 impl<'a, I> BytesSubInputMut<'a, I>
 where
-    I: HasTargetBytes + ?Sized + HasLen,
+    I: HasMutatorBytes + ?Sized + HasLen,
 {
     /// Creates a new [`BytesSubInputMut`] that's a view on an input with mutator bytes.
     /// The sub input can then be used to mutate parts of the original input.
@@ -382,7 +382,7 @@ impl<'a> HasTargetBytes for BytesSubInput<'a> {
 
 impl<'a, I> HasLen for BytesSubInputMut<'a, I>
 where
-    I: HasTargetBytes + HasLen + ?Sized,
+    I: HasMutatorBytes + HasLen + ?Sized,
 {
     #[inline]
     fn len(&self) -> usize {
