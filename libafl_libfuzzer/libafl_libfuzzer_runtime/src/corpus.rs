@@ -181,6 +181,10 @@ where
         unimplemented!("It is unsafe to use this corpus variant with replace!");
     }
 
+    fn remove_from_all(&mut self, _id: CorpusId) -> Result<Testcase<Self::Input>, Error> {
+        unimplemented!("It is unsafe to use this corpus variant with replace!");
+    }
+
     fn get(&self, id: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error> {
         self._get(id, &self.mapping.enabled)
     }
@@ -342,6 +346,10 @@ where
     }
 
     fn remove(&mut self, _id: CorpusId) -> Result<Testcase<Self::Input>, Error> {
+        unimplemented!("Artifact prefix is thin and cannot get, replace, or remove.")
+    }
+
+    fn remove_from_all(&mut self, _id: CorpusId) -> Result<Testcase<Self::Input>, Error> {
         unimplemented!("Artifact prefix is thin and cannot get, replace, or remove.")
     }
 
