@@ -13,7 +13,7 @@ pub mod generalized;
 pub use generalized::*;
 
 pub mod bytessub;
-pub use bytessub::{BytesSubInput, MutableBytesSubInput};
+pub use bytessub::{BytesSubInput, BytesSubInputMut};
 
 #[cfg(feature = "multipart_inputs")]
 pub mod multi;
@@ -208,13 +208,13 @@ pub trait HasMutatorBytes: HasLen {
         BytesSubInput::new(self, range)
     }
 
-    /// Creates a [`MutableBytesSubInput`] from this input, that can be used for local mutations.
-    fn sub_input_mut<R>(&mut self, range: R) -> MutableBytesSubInput<Self>
+    /// Creates a [`BytesSubInputMut`] from this input, that can be used for local mutations.
+    fn sub_input_mut<R>(&mut self, range: R) -> BytesSubInputMut<Self>
     where
         R: RangeBounds<usize>,
         Self: Sized,
     {
-        MutableBytesSubInput::new(self, range)
+        BytesSubInputMut::new(self, range)
     }
 }
 

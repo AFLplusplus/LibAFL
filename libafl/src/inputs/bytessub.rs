@@ -1,4 +1,4 @@
-//! [`MutableBytesSubInput`] is a wrapper input that can be used to mutate parts of a byte slice
+//! [`BytesSubInputMut`] is a wrapper input that can be used to mutate parts of a byte slice
 
 use alloc::vec::Vec;
 use core::{
@@ -39,7 +39,7 @@ where
 /// An immutable contiguous subslice of an input implementing [`HasTargetBytes`].
 /// It is mostly useful to cheaply wrap a subslice of a given input.
 ///
-/// A mutable version is available: [`MutableBytesSubInput`].
+/// A mutable version is available: [`BytesSubInputMut`].
 #[derive(Debug)]
 pub struct BytesSubInput<'a> {
     /// The (complete) parent input we will work on
@@ -49,7 +49,7 @@ pub struct BytesSubInput<'a> {
 }
 
 impl<'a> BytesSubInput<'a> {
-    /// Creates a new [`MutableBytesSubInput`] that's a view on an input with mutator bytes.
+    /// Creates a new [`BytesSubInputMut`] that's a view on an input with mutator bytes.
     /// The sub input can then be used to mutate parts of the original input.
     pub fn new<I, R>(parent_input: &'a I, range: R) -> Self
     where
@@ -129,7 +129,7 @@ impl<'a> BytesSubInput<'a> {
     }
 }
 
-/// The [`MutableBytesSubInput`] makes it possible to use [`crate::mutators::Mutator`]`s` that work on
+/// The [`BytesSubInputMut`] makes it possible to use [`crate::mutators::Mutator`]`s` that work on
 /// inputs implementing the [`HasMutatorBytes`] for a sub-range of this input.
 /// For example, we can do the following:
 /// ```rust
@@ -182,7 +182,7 @@ impl<'a> BytesSubInput<'a> {
 ///
 /// The input supports all methods in the [`HasMutatorBytes`] trait if the parent input also implements this trait.
 #[derive(Debug)]
-pub struct MutableBytesSubInput<'a, I>
+pub struct BytesSubInputMut<'a, I>
 where
     I: HasTargetBytes + ?Sized,
 {
@@ -192,11 +192,11 @@ where
     pub(crate) range: Range<usize>,
 }
 
-impl<'a, I> MutableBytesSubInput<'a, I>
+impl<'a, I> BytesSubInputMut<'a, I>
 where
     I: HasTargetBytes + ?Sized + HasLen,
 {
-    /// Creates a new [`MutableBytesSubInput`] that's a view on an input with mutator bytes.
+    /// Creates a new [`BytesSubInputMut`] that's a view on an input with mutator bytes.
     /// The sub input can then be used to mutate parts of the original input.
     pub fn new<R>(parent_input: &'a mut I, range: R) -> Self
     where
@@ -204,7 +204,7 @@ where
     {
         let parent_len = parent_input.len();
 
-        MutableBytesSubInput {
+        BytesSubInputMut {
             parent_input,
             range: Range {
                 start: start_index(&range),
@@ -268,7 +268,7 @@ where
     }
 }
 
-impl<'a, I> HasMutatorBytes for MutableBytesSubInput<'a, I>
+impl<'a, I> HasMutatorBytes for BytesSubInputMut<'a, I>
 where
     I: HasMutatorBytes,
 {
@@ -380,7 +380,7 @@ impl<'a> HasTargetBytes for BytesSubInput<'a> {
     }
 }
 
-impl<'a, I> HasLen for MutableBytesSubInput<'a, I>
+impl<'a, I> HasLen for BytesSubInputMut<'a, I>
 where
     I: HasTargetBytes + HasLen + ?Sized,
 {
