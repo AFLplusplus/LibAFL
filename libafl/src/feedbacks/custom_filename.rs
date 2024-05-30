@@ -20,7 +20,7 @@ use crate::{
 
 /// A [`CustomFilenameToTestcaseFeedback`] takes a closure which returns a filename for the testcase.
 /// Is never interesting (use with an Eager OR).
-/// Note: Use only in conjunction with a [`Corpus`] type that writes to disk.
+/// Note: Use only in conjunction with a `Corpus` type that writes to disk.
 /// Note: If used as part of the `Objective` chain, then it will only apply to testcases which are
 /// `Objectives`, vice versa for `Feedback`.
 #[derive(Serialize, Deserialize)]
