@@ -23,7 +23,7 @@ where
     TE: UsesState,
 {
     tracer_executor: TE,
-    cmplog_observer_handle: Option<Handle<AFLppCmpLogObserver<'a, TE::State>>>,
+    cmplog_observer_handle: Option<Handle<AFLppCmpLogObserver<'a, <Self as UsesState>::State>>>,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(EM, TE, Z)>,
 }
@@ -49,7 +49,7 @@ impl<E, EM, TE, Z> Stage<E, EM, Z> for AFLppCmplogTracingStage<'_, EM, TE, Z>
 where
     E: UsesState<State = Self::State>,
     TE: Executor<EM, Z> + HasObservers,
-    TE::State:
+    Self::State:
         HasExecutions + HasCorpus + HasMetadata + UsesInput<Input = BytesInput> + HasNamedMetadata,
     EM: UsesState<State = Self::State>,
     Z: UsesState<State = Self::State>,
