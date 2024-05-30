@@ -373,14 +373,14 @@ where
     EM: UsesState<State = Self::State>,
     Z: Evaluator<E, EM>,
     Z::Input: HasMutatorBytes,
-    Z::State: State + HasExecutions + HasCorpus + HasMetadata,
+    Self::State: State + HasExecutions + HasCorpus + HasMetadata,
 {
     #[inline]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut Z::State,
+        state: &mut Self::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
         {

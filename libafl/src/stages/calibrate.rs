@@ -14,12 +14,11 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{map::MapFeedbackMetadata, HasObserverHandle},
     fuzzer::Evaluator,
-    inputs::UsesInput,
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
     schedulers::powersched::SchedulerMetadata,
     stages::{ExecutionCountRestartHelper, Stage},
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, State, UsesState},
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
 
@@ -70,7 +69,7 @@ impl Default for UnstableEntriesMetadata {
 pub const CALIBRATION_STAGE_NAME: &str = "calibration";
 /// The calibration stage will measure the average exec time and the target's stability for this input.
 #[derive(Clone, Debug)]
-pub struct CalibrationStage<C, O, OT, S> {
+pub struct CalibrationStage<C, E, O, OT> {
     map_observer_handle: Handle<C>,
     map_name: Cow<'static, str>,
     name: Cow<'static, str>,
@@ -78,29 +77,29 @@ pub struct CalibrationStage<C, O, OT, S> {
     /// If we should track stability
     track_stability: bool,
     restart_helper: ExecutionCountRestartHelper,
-    phantom: PhantomData<(O, OT, S)>,
+    phantom: PhantomData<(E, O, OT)>,
 }
 
 const CAL_STAGE_START: usize = 4; // AFL++'s CAL_CYCLES_FAST + 1
 const CAL_STAGE_MAX: usize = 8; // AFL++'s CAL_CYCLES + 1
 
-impl<C, O, OT, S> UsesState for CalibrationStage<C, O, OT, S>
+impl<C, E, O, OT> UsesState for CalibrationStage<C, E, O, OT>
 where
-    S: State,
+    E: UsesState,
 {
-    type State = S;
+    type State = E::State;
 }
 
-impl<C, E, EM, O, OT, Z> Stage<E, EM, Z> for CalibrationStage<C, O, OT, E::State>
+impl<C, E, EM, O, OT, Z> Stage<E, EM, Z> for CalibrationStage<C, E, O, OT>
 where
     E: Executor<EM, Z> + HasObservers<Observers = OT>,
-    EM: EventFirer<State = E::State>,
+    EM: EventFirer<State = Self::State>,
     O: MapObserver,
     C: AsRef<O>,
     for<'de> <O as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static,
-    OT: ObserversTuple<E::State>,
-    E::State: HasCorpus + HasMetadata + HasNamedMetadata + HasExecutions,
-    Z: Evaluator<E, EM, State = E::State>,
+    OT: ObserversTuple<Self::State>,
+    Self::State: HasCorpus + HasMetadata + HasNamedMetadata + HasExecutions,
+    Z: Evaluator<E, EM, State = Self::State>,
 {
     #[inline]
     #[allow(
@@ -112,7 +111,7 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut E::State,
+        state: &mut Self::State,
         mgr: &mut EM,
     ) -> Result<(), Error> {
         // Run this stage only once for each corpus entry and only if we haven't already inspected it
@@ -345,13 +344,13 @@ where
     }
 }
 
-impl<C, O, OT, S> CalibrationStage<C, O, OT, S>
+impl<C, E, O, OT> CalibrationStage<C, E, O, OT>
 where
     O: MapObserver,
     for<'it> O: AsIter<'it, Item = O::Entry>,
     C: AsRef<O>,
-    OT: ObserversTuple<S>,
-    S: UsesInput + HasNamedMetadata,
+    OT: ObserversTuple<<Self as UsesState>::State>,
+    E: UsesState,
 {
     /// Create a new [`CalibrationStage`].
     #[must_use]
