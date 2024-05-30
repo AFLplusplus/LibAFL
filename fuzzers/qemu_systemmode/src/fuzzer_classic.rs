@@ -32,7 +32,8 @@ use libafl_bolts::{
 use libafl_qemu::{
     edges::{edges_map_mut_ptr, QemuEdgeCoverageHelper, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND},
     elf::EasyElf,
-    Qemu, QemuExecutor, QemuExitError, QemuExitReason, QemuHooks, QemuShutdownCause, Regs,
+    Qemu, QemuExecutor, QemuExitError, QemuExitReason, QemuHooks, QemuRWError, QemuShutdownCause,
+    Regs,
 };
 use libafl_qemu_sys::GuestPhysAddr;
 
@@ -134,7 +135,7 @@ pub fn fuzz() {
                 // If the execution stops at any point other then the designated breakpoint (e.g. a breakpoint on a panic method) we consider it a crash
                 let mut pcs = (0..qemu.num_cpus())
                     .map(|i| qemu.cpu_from_index(i))
-                    .map(|cpu| -> Result<u32, String> { cpu.read_reg(Regs::Pc) });
+                    .map(|cpu| -> Result<u32, QemuRWError> { cpu.read_reg(Regs::Pc) });
                 let ret = match pcs
                     .find(|pc| (breakpoint..breakpoint + 5).contains(pc.as_ref().unwrap_or(&0)))
                 {
