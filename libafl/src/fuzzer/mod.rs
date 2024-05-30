@@ -200,7 +200,7 @@ where
         &mut self,
         stages: &mut ST,
         executor: &mut E,
-        state: &mut EM::State,
+        state: &mut Self::State,
         manager: &mut EM,
     ) -> Result<CorpusId, Error>;
 
@@ -209,7 +209,7 @@ where
         &mut self,
         stages: &mut ST,
         executor: &mut E,
-        state: &mut EM::State,
+        state: &mut Self::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
         let monitor_timeout = STATS_TIMEOUT_DEFAULT;
@@ -233,7 +233,7 @@ where
         &mut self,
         stages: &mut ST,
         executor: &mut E,
-        state: &mut EM::State,
+        state: &mut Self::State,
         manager: &mut EM,
         iters: u64,
     ) -> Result<CorpusId, Error> {
@@ -703,7 +703,7 @@ where
         &mut self,
         stages: &mut ST,
         executor: &mut E,
-        state: &mut CS::State,
+        state: &mut Self::State,
         manager: &mut EM,
     ) -> Result<CorpusId, Error> {
         // Init timer for scheduler
@@ -899,8 +899,8 @@ pub mod test {
     where
         E: UsesState,
         EM: ProgressReporter<State = Self::State>,
-        ST: StagesTuple<E, EM, E::State, Self>,
-        E::State: HasMetadata + HasExecutions + HasLastReportTime + HasCurrentStage,
+        ST: StagesTuple<E, EM, Self::State, Self>,
+        Self::State: HasMetadata + HasExecutions + HasLastReportTime + HasCurrentStage,
     {
         fn fuzz_one(
             &mut self,

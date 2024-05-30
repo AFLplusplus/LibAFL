@@ -46,8 +46,8 @@ impl<A, B, EM, Z> Executor<EM, Z> for CombinedExecutor<A, B>
 where
     A: Executor<EM, Z>,
     B: Executor<EM, Z, State = <Self as UsesState>::State>,
+    Self::State: HasExecutions,
     EM: UsesState<State = <Self as UsesState>::State>,
-    EM::State: HasExecutions,
     Z: UsesState<State = <Self as UsesState>::State>,
 {
     fn run_target(

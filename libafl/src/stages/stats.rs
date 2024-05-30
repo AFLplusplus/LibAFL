@@ -25,8 +25,6 @@ use crate::{
 /// The [`AflStatsStage`] is a simple stage that computes and reports some stats.
 #[derive(Debug, Clone)]
 pub struct AflStatsStage<E, EM, Z>
-where
-    E: UsesState,
 {
     // the number of testcases that have been fuzzed
     has_fuzzed_size: usize,
@@ -56,13 +54,13 @@ where
     E: UsesState,
     EM: EventFirer<State = Self::State>,
     Z: UsesState<State = Self::State>,
-    E::State: HasImported + HasCorpus + HasMetadata,
+    Self::State: HasImported + HasCorpus + HasMetadata,
 {
     fn perform(
         &mut self,
         _fuzzer: &mut Z,
         _executor: &mut E,
-        state: &mut E::State,
+        state: &mut Self::State,
         _manager: &mut EM,
     ) -> Result<(), Error> {
         let Some(corpus_idx) = state.current_corpus_id()? else {
@@ -146,7 +144,7 @@ where
     E: UsesState,
     EM: EventFirer<State = <Self as UsesState>::State>,
     Z: UsesState<State = <Self as UsesState>::State>,
-    E::State: HasImported + HasCorpus + HasMetadata,
+    <Self as UsesState>::State: HasImported + HasCorpus + HasMetadata,
 {
     /// create a new instance of the [`AflStatsStage`]
     #[must_use]
@@ -163,7 +161,7 @@ where
     E: UsesState,
     EM: EventFirer<State = <Self as UsesState>::State>,
     Z: UsesState<State = <Self as UsesState>::State>,
-    E::State: HasImported + HasCorpus + HasMetadata,
+    <Self as UsesState>::State: HasImported + HasCorpus + HasMetadata,
 {
     /// the default instance of the [`AflStatsStage`]
     #[must_use]

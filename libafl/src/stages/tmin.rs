@@ -220,11 +220,7 @@ impl<CS, E, EM, F1, F2, FF, I, IP, M, OT, Z> UsesState
     for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, I, IP, M, OT, Z>
 where
     CS: Scheduler,
-    M: Mutator<I, CS::State>,
-    Z: ExecutionProcessor<OT, State = CS::State>,
     CS::State: HasCorpus,
-    IP: MutatedTransformPost<CS::State> + Clone,
-    I: MutatedTransform<CS::Input, CS::State, Post = IP> + Clone,
 {
     type State = CS::State;
 }
@@ -234,20 +230,20 @@ impl<CS, E, EM, F1, F2, FF, I, IP, M, OT, Z> Stage<E, EM, Z>
 where
     CS: Scheduler + RemovableScheduler,
     CS::State: HasCorpus + HasSolutions + HasExecutions + HasMaxSize + HasCorpus + HasMetadata,
-    <CS::State as UsesInput>::Input: HasLen + Hash,
+    <Self::State as UsesInput>::Input: HasLen + Hash,
     E: Executor<EM, Z> + HasObservers<Observers = OT, State = CS::State>,
-    EM: EventFirer<State = CS::State>,
-    F1: Feedback<CS::State>,
-    F2: Feedback<CS::State>,
-    FF: FeedbackFactory<F2, CS::State, OT>,
-    M: Mutator<I, CS::State>,
-    OT: ObserversTuple<CS::State>,
-    Z: ExecutionProcessor<OT, State = CS::State>
+    EM: EventFirer<State = Self::State>,
+    F1: Feedback<Self::State>,
+    F2: Feedback<Self::State>,
+    FF: FeedbackFactory<F2, Self::State, OT>,
+    M: Mutator<I, Self::State>,
+    OT: ObserversTuple<Self::State>,
+    Z: ExecutionProcessor<OT, State = Self::State>
         + ExecutesInput<E, EM>
         + HasFeedback<Feedback = F1>
         + HasScheduler<Scheduler = CS>,
-    IP: MutatedTransformPost<CS::State> + Clone,
-    I: MutatedTransform<CS::Input, CS::State, Post = IP> + Clone,
+    IP: MutatedTransformPost<Self::State> + Clone,
+    I: MutatedTransform<Self::Input, Self::State, Post = IP> + Clone,
 {
     fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
         self.restart_helper.restart_progress_should_run(state)
@@ -289,21 +285,21 @@ impl<CS, E, EM, F1, F2, FF, I, IP, M, OT, Z> TMinMutationalStage<CS, E, EM, F1, 
     for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, I, IP, M, OT, Z>
 where
     CS: Scheduler + RemovableScheduler,
-    E: HasObservers<Observers = OT, State = CS::State> + Executor<EM, Z>,
-    EM: EventFirer<State = CS::State>,
-    F1: Feedback<CS::State>,
-    F2: Feedback<CS::State>,
-    FF: FeedbackFactory<F2, CS::State, OT>,
-    <CS::State as UsesInput>::Input: HasLen + Hash,
-    M: Mutator<I, CS::State>,
-    OT: ObserversTuple<CS::State>,
+    E: HasObservers<Observers = OT, State = Self::State> + Executor<EM, Z>,
+    EM: EventFirer<State = Self::State>,
+    F1: Feedback<Self::State>,
+    F2: Feedback<Self::State>,
+    FF: FeedbackFactory<F2, Self::State, OT>,
+    <Self::State as UsesInput>::Input: HasLen + Hash,
+    M: Mutator<I, Self::State>,
+    OT: ObserversTuple<Self::State>,
     CS::State: HasCorpus + HasSolutions + HasExecutions + HasMaxSize + HasMetadata,
-    Z: ExecutionProcessor<OT, State = CS::State>
+    Z: ExecutionProcessor<OT, State = Self::State>
         + ExecutesInput<E, EM>
         + HasFeedback<Feedback = F1>
         + HasScheduler<Scheduler = CS>,
-    IP: MutatedTransformPost<CS::State> + Clone,
-    I: MutatedTransform<CS::Input, CS::State, Post = IP> + Clone,
+    IP: MutatedTransformPost<Self::State> + Clone,
+    I: MutatedTransform<CS::Input, Self::State, Post = IP> + Clone,
 {
     /// The mutator, added to this stage
     #[inline]
@@ -318,7 +314,7 @@ where
     }
 
     /// Gets the number of iterations from a fixed number of runs
-    fn iterations(&self, _state: &mut CS::State) -> Result<usize, Error> {
+    fn iterations(&self, _state: &mut Self::State) -> Result<usize, Error> {
         Ok(self.runs)
     }
 
@@ -331,11 +327,11 @@ impl<CS, E, EM, F1, F2, FF, I, IP, M, OT, Z>
     StdTMinMutationalStage<CS, E, EM, F1, F2, FF, I, IP, M, OT, Z>
 where
     CS: Scheduler,
-    M: Mutator<I, CS::State>,
-    Z: ExecutionProcessor<OT, State = CS::State>,
+    M: Mutator<I, <Self as UsesState>::State>,
+    Z: ExecutionProcessor<OT, State = <Self as UsesState>::State>,
     CS::State: HasCorpus,
-    IP: MutatedTransformPost<CS::State> + Clone,
-    I: MutatedTransform<CS::Input, CS::State, Post = IP> + Clone,
+    IP: MutatedTransformPost<<Self as UsesState>::State> + Clone,
+    I: MutatedTransform<<Self as UsesInput>::Input, <Self as UsesState>::State, Post = IP> + Clone,
 {
     /// Creates a new minimizing mutational stage that will minimize provided corpus entries
     pub fn new(mutator: M, factory: FF, runs: usize) -> Self {

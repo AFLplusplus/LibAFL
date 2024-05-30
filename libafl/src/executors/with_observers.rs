@@ -45,7 +45,7 @@ where
 impl<E, OT> UsesObservers for WithObservers<E, OT>
 where
     E: UsesState,
-    OT: ObserversTuple<E::State>,
+    OT: ObserversTuple<Self::State>,
 {
     type Observers = OT;
 }
@@ -53,7 +53,7 @@ where
 impl<E, OT> HasObservers for WithObservers<E, OT>
 where
     E: UsesState,
-    OT: ObserversTuple<E::State>,
+    OT: ObserversTuple<Self::State>,
 {
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         RefIndexable::from(&self.observers)
