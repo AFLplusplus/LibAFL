@@ -130,11 +130,7 @@ pub trait EvaluatorObservers<OT>: UsesState + Sized {
 }
 
 /// Evaluate an input modifying the state of the fuzzer
-pub trait Evaluator<E, EM>: UsesState
-where
-    E: UsesState<State = Self::State>,
-    EM: UsesState<State = Self::State>,
-{
+pub trait Evaluator<E, EM>: UsesState {
     /// Runs the input and triggers observers and feedback,
     /// returns if is interesting an (option) the index of the new [`crate::corpus::Testcase`] in the corpus
     fn evaluate_input(

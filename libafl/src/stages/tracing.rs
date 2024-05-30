@@ -36,7 +36,7 @@ where
 impl<EM, TE, Z> TracingStage<EM, TE, Z>
 where
     TE: Executor<EM, Z> + HasObservers,
-    TE::State: HasExecutions + HasCorpus + HasNamedMetadata,
+    <Self as UsesState>::State: HasExecutions + HasCorpus + HasNamedMetadata,
     EM: UsesState<State = <Self as UsesState>::State>,
     Z: UsesState<State = <Self as UsesState>::State>,
 {
@@ -46,7 +46,7 @@ where
     pub fn trace(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut TE::State,
+        state: &mut <Self as UsesState>::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
         start_timer!(state);
@@ -82,7 +82,7 @@ impl<E, EM, TE, Z> Stage<E, EM, Z> for TracingStage<EM, TE, Z>
 where
     E: UsesState<State = <Self as UsesState>::State>,
     TE: Executor<EM, Z> + HasObservers,
-    TE::State: HasExecutions + HasCorpus + HasNamedMetadata,
+    <Self as UsesState>::State: HasExecutions + HasCorpus + HasNamedMetadata,
     EM: UsesState<State = <Self as UsesState>::State>,
     Z: UsesState<State = <Self as UsesState>::State>,
 {
@@ -91,7 +91,7 @@ where
         &mut self,
         fuzzer: &mut Z,
         _executor: &mut E,
-        state: &mut TE::State,
+        state: &mut <Self as UsesState>::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
         self.trace(fuzzer, state, manager)
@@ -173,14 +173,14 @@ where
     EM: UsesState<State = <Self as UsesState>::State>,
     SOT: ObserversTuple<E::State>,
     Z: UsesState<State = <Self as UsesState>::State>,
-    E::State: State + HasExecutions + HasCorpus + HasNamedMetadata + Debug,
+    <Self as UsesState>::State: State + HasExecutions + HasCorpus + HasNamedMetadata + Debug,
 {
     #[inline]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut ShadowExecutor<E, SOT>,
-        state: &mut E::State,
+        state: &mut <Self as UsesState>::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
         start_timer!(state);
@@ -225,7 +225,7 @@ where
 impl<E, EM, SOT, Z> ShadowTracingStage<E, EM, SOT, Z>
 where
     E: Executor<EM, Z> + HasObservers,
-    E::State: State + HasExecutions + HasCorpus,
+    <Self as UsesState>::State: State + HasExecutions + HasCorpus,
     EM: UsesState<State = <Self as UsesState>::State>,
     SOT: ObserversTuple<E::State>,
     Z: UsesState<State = <Self as UsesState>::State>,
