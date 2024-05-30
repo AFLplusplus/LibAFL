@@ -44,11 +44,11 @@ impl<E, F, EM, I, M, Z> Named for PowerMutationalStage<E, F, EM, I, M, Z> {
 impl<E, F, EM, I, M, Z> MutationalStage<E, EM, I, M, Z> for PowerMutationalStage<E, F, EM, I, M, Z>
 where
     E: Executor<EM, Z> + HasObservers,
-    EM: UsesState<State = E::State>,
+    EM: UsesState<State = Self::State>,
     F: TestcaseScore<E::State>,
     M: Mutator<I, E::State>,
     E::State: HasCorpus + HasMetadata + HasRand + HasExecutions,
-    Z: Evaluator<E, EM, State = E::State>,
+    Z: Evaluator<E, EM, State = Self::State>,
     I: MutatedTransform<E::Input, E::State> + Clone,
 {
     /// The mutator, added to this stage
@@ -81,11 +81,11 @@ where
 impl<E, F, EM, I, M, Z> Stage<E, EM, Z> for PowerMutationalStage<E, F, EM, I, M, Z>
 where
     E: Executor<EM, Z> + HasObservers,
-    EM: UsesState<State = E::State>,
+    EM: UsesState<State = Self::State>,
     F: TestcaseScore<E::State>,
     M: Mutator<I, E::State>,
     E::State: HasCorpus + HasMetadata + HasRand + HasExecutions,
-    Z: Evaluator<E, EM, State = E::State>,
+    Z: Evaluator<E, EM, State = Self::State>,
     I: MutatedTransform<E::Input, E::State> + Clone,
 {
     #[inline]
@@ -115,11 +115,11 @@ where
 impl<E, F, EM, M, Z> PowerMutationalStage<E, F, EM, E::Input, M, Z>
 where
     E: Executor<EM, Z> + HasObservers,
-    EM: UsesState<State = E::State>,
+    EM: UsesState<State = <Self as UsesState>::State>,
     F: TestcaseScore<E::State>,
     M: Mutator<E::Input, E::State>,
     E::State: HasCorpus + HasMetadata + HasRand,
-    Z: Evaluator<E, EM, State = E::State>,
+    Z: Evaluator<E, EM, State = <Self as UsesState>::State>,
 {
     /// Creates a new [`PowerMutationalStage`]
     pub fn new(mutator: M) -> Self {

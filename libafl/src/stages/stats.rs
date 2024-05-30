@@ -27,8 +27,6 @@ use crate::{
 pub struct AflStatsStage<E, EM, Z>
 where
     E: UsesState,
-    EM: EventFirer<State = E::State>,
-    Z: UsesState<State = E::State>,
 {
     // the number of testcases that have been fuzzed
     has_fuzzed_size: usize,
@@ -49,8 +47,6 @@ where
 impl<E, EM, Z> UsesState for AflStatsStage<E, EM, Z>
 where
     E: UsesState,
-    EM: EventFirer<State = E::State>,
-    Z: UsesState<State = E::State>,
 {
     type State = E::State;
 }
@@ -58,8 +54,8 @@ where
 impl<E, EM, Z> Stage<E, EM, Z> for AflStatsStage<E, EM, Z>
 where
     E: UsesState,
-    EM: EventFirer<State = E::State>,
-    Z: UsesState<State = E::State>,
+    EM: EventFirer<State = Self::State>,
+    Z: UsesState<State = Self::State>,
     E::State: HasImported + HasCorpus + HasMetadata,
 {
     fn perform(
@@ -148,8 +144,8 @@ where
 impl<E, EM, Z> AflStatsStage<E, EM, Z>
 where
     E: UsesState,
-    EM: EventFirer<State = E::State>,
-    Z: UsesState<State = E::State>,
+    EM: EventFirer<State = <Self as UsesState>::State>,
+    Z: UsesState<State = <Self as UsesState>::State>,
     E::State: HasImported + HasCorpus + HasMetadata,
 {
     /// create a new instance of the [`AflStatsStage`]
@@ -165,8 +161,8 @@ where
 impl<E, EM, Z> Default for AflStatsStage<E, EM, Z>
 where
     E: UsesState,
-    EM: EventFirer<State = E::State>,
-    Z: UsesState<State = E::State>,
+    EM: EventFirer<State = <Self as UsesState>::State>,
+    Z: UsesState<State = <Self as UsesState>::State>,
     E::State: HasImported + HasCorpus + HasMetadata,
 {
     /// the default instance of the [`AflStatsStage`]

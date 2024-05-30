@@ -61,7 +61,7 @@ where
     E: UsesState<State = Self::State>,
     EM: UsesState<State = Self::State>,
     TE: Executor<EM, Z> + HasObservers,
-    TE::State: HasExecutions + HasCorpus + HasNamedMetadata,
+    Self::State: HasExecutions + HasCorpus + HasNamedMetadata,
     Z: UsesState<State = Self::State>,
 {
     #[inline]
@@ -69,7 +69,7 @@ where
         &mut self,
         fuzzer: &mut Z,
         _executor: &mut E,
-        state: &mut TE::State,
+        state: &mut Self::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
         self.inner.trace(fuzzer, state, manager)?;

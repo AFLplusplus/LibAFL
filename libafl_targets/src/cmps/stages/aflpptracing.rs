@@ -47,12 +47,12 @@ where
 
 impl<E, EM, TE, Z> Stage<E, EM, Z> for AFLppCmplogTracingStage<'_, EM, TE, Z>
 where
-    E: UsesState<State = TE::State>,
+    E: UsesState<State = Self::State>,
     TE: Executor<EM, Z> + HasObservers,
     TE::State:
         HasExecutions + HasCorpus + HasMetadata + UsesInput<Input = BytesInput> + HasNamedMetadata,
-    EM: UsesState<State = TE::State>,
-    Z: UsesState<State = TE::State>,
+    EM: UsesState<State = Self::State>,
+    Z: UsesState<State = Self::State>,
 {
     #[inline]
     fn perform(

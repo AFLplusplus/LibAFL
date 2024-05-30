@@ -37,8 +37,8 @@ impl<EM, TE, Z> TracingStage<EM, TE, Z>
 where
     TE: Executor<EM, Z> + HasObservers,
     TE::State: HasExecutions + HasCorpus + HasNamedMetadata,
-    EM: UsesState<State = TE::State>,
-    Z: UsesState<State = TE::State>,
+    EM: UsesState<State = <Self as UsesState>::State>,
+    Z: UsesState<State = <Self as UsesState>::State>,
 {
     /// Perform tracing on the given `CorpusId`. Useful for if wrapping [`TracingStage`] with your
     /// own stage and you need to manage [`super::NestedStageRestartHelper`] differently; see
@@ -80,11 +80,11 @@ where
 
 impl<E, EM, TE, Z> Stage<E, EM, Z> for TracingStage<EM, TE, Z>
 where
-    E: UsesState<State = TE::State>,
+    E: UsesState<State = <Self as UsesState>::State>,
     TE: Executor<EM, Z> + HasObservers,
     TE::State: HasExecutions + HasCorpus + HasNamedMetadata,
-    EM: UsesState<State = TE::State>,
-    Z: UsesState<State = TE::State>,
+    EM: UsesState<State = <Self as UsesState>::State>,
+    Z: UsesState<State = <Self as UsesState>::State>,
 {
     #[inline]
     fn perform(
@@ -170,9 +170,9 @@ where
 impl<E, EM, SOT, Z> Stage<ShadowExecutor<E, SOT>, EM, Z> for ShadowTracingStage<E, EM, SOT, Z>
 where
     E: Executor<EM, Z> + HasObservers,
-    EM: UsesState<State = E::State>,
+    EM: UsesState<State = <Self as UsesState>::State>,
     SOT: ObserversTuple<E::State>,
-    Z: UsesState<State = E::State>,
+    Z: UsesState<State = <Self as UsesState>::State>,
     E::State: State + HasExecutions + HasCorpus + HasNamedMetadata + Debug,
 {
     #[inline]
@@ -226,9 +226,9 @@ impl<E, EM, SOT, Z> ShadowTracingStage<E, EM, SOT, Z>
 where
     E: Executor<EM, Z> + HasObservers,
     E::State: State + HasExecutions + HasCorpus,
-    EM: UsesState<State = E::State>,
+    EM: UsesState<State = <Self as UsesState>::State>,
     SOT: ObserversTuple<E::State>,
-    Z: UsesState<State = E::State>,
+    Z: UsesState<State = <Self as UsesState>::State>,
 {
     /// Creates a new default stage
     pub fn new(_executor: &mut ShadowExecutor<E, SOT>) -> Self {
