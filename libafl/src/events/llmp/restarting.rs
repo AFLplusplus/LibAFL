@@ -406,6 +406,9 @@ where
     /// The shared memory provider to use for the broker or client spawned by the restarting
     /// manager.
     shmem_provider: SP,
+    #[builder(default = false)]
+    /// Consider this testcase as interesting always if true
+    always_interesting: bool,
     /// The configuration
     configuration: EventConfig,
     /// The monitor to use
@@ -491,10 +494,12 @@ where
                         LlmpConnection::IsClient { client } => {
                             #[cfg(not(feature = "adaptive_serialization"))]
                             let mgr: LlmpEventManager<EMH, S, SP> = LlmpEventManager::builder()
+                                .always_interesting(self.always_interesting)
                                 .hooks(self.hooks)
                                 .build_from_client(client, self.configuration)?;
                             #[cfg(feature = "adaptive_serialization")]
                             let mgr: LlmpEventManager<EMH, S, SP> = LlmpEventManager::builder()
+                                .always_interesting(self.always_interesting)
                                 .hooks(self.hooks)
                                 .build_from_client(
                                     client,
@@ -519,6 +524,7 @@ where
                     // We are a client
                     #[cfg(not(feature = "adaptive_serialization"))]
                     let mgr = LlmpEventManager::builder()
+                        .always_interesting(self.always_interesting)
                         .hooks(self.hooks)
                         .build_on_port(
                             self.shmem_provider.clone(),
@@ -527,6 +533,7 @@ where
                         )?;
                     #[cfg(feature = "adaptive_serialization")]
                     let mgr = LlmpEventManager::builder()
+                        .always_interesting(self.always_interesting)
                         .hooks(self.hooks)
                         .build_on_port(
                             self.shmem_provider.clone(),
