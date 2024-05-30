@@ -22,7 +22,7 @@ pub struct ShadowExecutor<E, SOT> {
 impl<E, SOT> Debug for ShadowExecutor<E, SOT>
 where
     E: Debug,
-    SOT: Debug
+    SOT: Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("ShadowExecutor")

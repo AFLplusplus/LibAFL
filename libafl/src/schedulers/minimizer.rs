@@ -260,7 +260,11 @@ where
     /// Update the [`Corpus`] score using the [`MinimizerScheduler`]
     #[allow(clippy::unused_self)]
     #[allow(clippy::cast_possible_wrap)]
-    pub fn update_score(&self, state: &mut <Self as UsesState>::State, idx: CorpusId) -> Result<(), Error> {
+    pub fn update_score(
+        &self,
+        state: &mut <Self as UsesState>::State,
+        idx: CorpusId,
+    ) -> Result<(), Error> {
         // Create a new top rated meta if not existing
         if state.metadata_map().get::<TopRatedsMetadata>().is_none() {
             state.add_metadata(TopRatedsMetadata::new());

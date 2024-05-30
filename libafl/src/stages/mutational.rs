@@ -198,7 +198,7 @@ where
 
 impl<E, EM, I, M, Z> UsesState for StdMutationalStage<E, EM, I, M, Z>
 where
-    Z: UsesState
+    Z: UsesState,
 {
     type State = Z::State;
 }
@@ -298,8 +298,7 @@ where
     type State = Z::State;
 }
 
-impl<E, EM, I, M, Z> Named for MultiMutationalStage<E, EM, I, M, Z>
-{
+impl<E, EM, I, M, Z> Named for MultiMutationalStage<E, EM, I, M, Z> {
     fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("MultiMutational");
         &NAME
@@ -368,8 +367,7 @@ where
     }
 }
 
-impl<E, EM, I, M, Z> MultiMutationalStage<E, EM, I, M, Z>
-{
+impl<E, EM, I, M, Z> MultiMutationalStage<E, EM, I, M, Z> {
     /// Creates a new transforming mutational stage
     pub fn transforming(mutator: M) -> Self {
         Self {

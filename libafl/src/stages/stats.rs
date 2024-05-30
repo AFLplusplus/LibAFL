@@ -24,8 +24,7 @@ use crate::{
 
 /// The [`AflStatsStage`] is a simple stage that computes and reports some stats.
 #[derive(Debug, Clone)]
-pub struct AflStatsStage<E, EM, Z>
-{
+pub struct AflStatsStage<E, EM, Z> {
     // the number of testcases that have been fuzzed
     has_fuzzed_size: usize,
     // the number of "favored" testcases
