@@ -151,15 +151,15 @@ pub enum PartialBytesSubInput<'a> {
 
 impl<'a> PartialBytesSubInput<'a> {
     /// Consumes `PartialBytesSubInput` and returns true if it was empty, false otherwise.
+    #[must_use]
     pub fn empty(self) -> bool {
-        match self {
-            PartialBytesSubInput::Empty => true,
-            _ => false,
-        }
+        matches!(self, PartialBytesSubInput::Empty)
     }
 
     /// Consumes `PartialBytesSubInput` and returns the partial slice if it was a partial slice, None otherwise.
+    #[must_use]
     pub fn partial(self) -> Option<BytesSubInput<'a>> {
+        #[allow(clippy::match_wildcard_for_single_variants)]
         match self {
             PartialBytesSubInput::Partial(partial_slice) => Some(partial_slice),
             _ => None,
