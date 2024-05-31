@@ -46,7 +46,7 @@ where
 
 impl<CB, E, EM, Z> Stage<E, EM, Z> for DumpToDiskStage<CB, EM, Z>
 where
-    CB: FnMut(&<Z::State as UsesInput>::Input, &Z::State) -> Vec<u8>,
+    CB: FnMut(&<Self::State as UsesInput>::Input, &Self::State) -> Vec<u8>,
     EM: UsesState,
     E: UsesState<State = Self::State>,
     Z: UsesState<State = Self::State>,

@@ -387,7 +387,7 @@ where
     }
 }
 
-impl<C, O, OT, S> Named for CalibrationStage<C, O, OT, S> {
+impl<C, E, O, OT> Named for CalibrationStage<C, E, O, OT> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }

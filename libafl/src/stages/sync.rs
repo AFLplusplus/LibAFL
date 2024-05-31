@@ -70,10 +70,7 @@ where
     type State = Z::State;
 }
 
-impl<CB, E, EM, Z> Named for SyncFromDiskStage<CB, E, EM, Z>
-where
-    E: UsesState,
-{
+impl<CB, E, EM, Z> Named for SyncFromDiskStage<CB, E, EM, Z> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
@@ -164,18 +161,7 @@ where
     }
 }
 
-impl<CB, E, EM, Z> SyncFromDiskStage<CB, E, EM, Z>
-where
-    CB: FnMut(
-        &mut Z,
-        &mut <Self as UsesState>::State,
-        &Path,
-    ) -> Result<<<Self as UsesState>::State as UsesInput>::Input, Error>,
-    E: UsesState<State = <Self as UsesState>::State>,
-    EM: UsesState<State = <Self as UsesState>::State>,
-    Z: Evaluator<E, EM>,
-    <Self as UsesState>::State: HasCorpus + HasRand + HasMetadata,
-{
+impl<CB, E, EM, Z> SyncFromDiskStage<CB, E, EM, Z> {
     /// Creates a new [`SyncFromDiskStage`]
     #[must_use]
     pub fn new(sync_dir: PathBuf, load_callback: CB) -> Self {
@@ -239,7 +225,6 @@ where
     E: UsesState<State = <Self as UsesState>::State>,
     EM: UsesState<State = <Self as UsesState>::State>,
     Z: Evaluator<E, EM>,
-    <Self as UsesState>::State: HasCorpus + HasRand + HasMetadata,
 {
     /// Creates a new [`SyncFromDiskStage`] invoking `Input::from_file` to load inputs
     #[must_use]

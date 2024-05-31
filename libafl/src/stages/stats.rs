@@ -138,13 +138,7 @@ where
     }
 }
 
-impl<E, EM, Z> AflStatsStage<E, EM, Z>
-where
-    E: UsesState,
-    EM: EventFirer<State = <Self as UsesState>::State>,
-    Z: UsesState<State = <Self as UsesState>::State>,
-    <Self as UsesState>::State: HasImported + HasCorpus + HasMetadata,
-{
+impl<E, EM, Z> AflStatsStage<E, EM, Z> {
     /// create a new instance of the [`AflStatsStage`]
     #[must_use]
     pub fn new(interval: Duration) -> Self {
@@ -155,13 +149,7 @@ where
     }
 }
 
-impl<E, EM, Z> Default for AflStatsStage<E, EM, Z>
-where
-    E: UsesState,
-    EM: EventFirer<State = <Self as UsesState>::State>,
-    Z: UsesState<State = <Self as UsesState>::State>,
-    <Self as UsesState>::State: HasImported + HasCorpus + HasMetadata,
-{
+impl<E, EM, Z> Default for AflStatsStage<E, EM, Z> {
     /// the default instance of the [`AflStatsStage`]
     #[must_use]
     fn default() -> Self {
