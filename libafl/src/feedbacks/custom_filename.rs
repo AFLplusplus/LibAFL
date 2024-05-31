@@ -50,7 +50,7 @@ where
     }
 }
 
-impl<F, I, S, T> FeedbackFactory<CustomFilenameToTestcaseFeedback<F, I, S>, S, T>
+impl<F, I, S, T> FeedbackFactory<CustomFilenameToTestcaseFeedback<F, I, S>, T>
     for CustomFilenameToTestcaseFeedback<F, I, S>
 where
     I: Input,
