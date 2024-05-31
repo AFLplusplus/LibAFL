@@ -62,9 +62,9 @@ impl<'data, 'tree: 'data, 'ctx: 'data, W: Write, T: TreeLike> Unparser<'data, 't
 
     fn write(&mut self, data: &[u8]) {
         if let Some(buff) = self.buffers.last_mut() {
-            buff.write(data).unwrap();
+            buff.write_all(data).unwrap();
         } else {
-            self.w.write(data).unwrap();
+            self.w.write_all(data).unwrap();
         }
     }
 
