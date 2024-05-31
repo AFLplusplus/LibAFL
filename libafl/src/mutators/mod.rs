@@ -20,6 +20,8 @@ pub use grimoire::*;
 pub mod tuneable;
 pub use tuneable::*;
 
+pub(crate) mod grammartec;
+
 #[cfg(feature = "unicode")]
 pub mod string;
 #[cfg(feature = "unicode")]
