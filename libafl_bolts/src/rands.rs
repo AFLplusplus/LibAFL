@@ -53,29 +53,6 @@ fn splitmix64(x: &mut u64) -> u64 {
 /// Not cryptographically secure (which is not what you want during fuzzing ;) )
 pub type StdRand = RomuDuoJrRand;
 
-/// Choose an item at random from the given iterator, sampling uniformly.
-///
-/// Note: the runtime cost is bound by the iterator's [`nth`][`Iterator::nth`] implementation
-///  * For `Vec`, slice, array, this is O(1)
-///  * For `HashMap`, `HashSet`, this is O(n)
-pub fn choose<I>(from: I, rand: u64) -> I::Item
-where
-    I: IntoIterator,
-    I::IntoIter: ExactSizeIterator,
-{
-    // create iterator
-    let mut iter = from.into_iter();
-
-    // make sure there is something to choose from
-    debug_assert!(iter.len() > 0, "choosing from an empty iterator");
-
-    // pick a random, valid index
-    let index = fast_bound(rand, iter.len());
-
-    // return the item chosen
-    iter.nth(index).unwrap()
-}
-
 /// Faster and almost unbiased alternative to `rand % n`.
 ///
 /// For N-bit bound, probability of getting a biased value is 1/2^(64-N).
@@ -132,13 +109,67 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
     }
 
     /// Convenient variant of [`choose`].
-    fn choose<I>(&mut self, from: I) -> I::Item
+    /// 
+    /// This method uses [`Iterator::size_hint`] for optimization. With an
+    /// accurate hint and where [`Iterator::nth`] is a constant-time operation
+    /// this method can offer `O(1)` performance. Where no size hint is
+    /// available, complexity is `O(n)` where `n` is the iterator length.
+    /// Partial hints (where `lower > 0`) also improve performance.
+    /// 
+    /// Copy&paste from [`rand::IteratorRandom`](https://docs.rs/rand/0.8.5/rand/seq/trait.IteratorRandom.html#method.choose)
+    fn choose<I>(&mut self, from: I) -> Option<I::Item>
     where
-        I: IntoIterator,
-        I::IntoIter: ExactSizeIterator,
-    {
-        choose(from, self.next())
+        I: IntoIterator {
+        let mut iter = from.into_iter();
+        let (mut lower, mut upper) = iter.size_hint();
+        let mut consumed = 0;
+        let mut result = None;
+
+        // Handling for this condition outside the loop allows the optimizer to eliminate the loop
+        // when the Iterator is an ExactSizeIterator. This has a large performance impact on e.g.
+        // seq_iter_choose_from_1000.
+        if upper == Some(lower) {
+            return if lower == 0 {
+                None
+            } else {
+                iter.nth(self.below(lower))
+            };
+        }
+
+        // Continue until the iterator is exhausted
+        loop {
+            if lower > 1 {
+                let ix = self.below(lower + consumed);
+                let skip = if ix < lower {
+                    result = iter.nth(ix);
+                    lower - (ix + 1)
+                } else {
+                    lower
+                };
+                if upper == Some(lower) {
+                    return result;
+                }
+                consumed += lower;
+                if skip > 0 {
+                    iter.nth(skip - 1);
+                }
+            } else {
+                let elem = iter.next();
+                if elem.is_none() {
+                    return result;
+                }
+                consumed += 1;
+                if self.below(consumed) == 0 {
+                    result = elem;
+                }
+            }
+
+            let hint = iter.size_hint();
+            lower = hint.0;
+            upper = hint.1;
+        }
     }
+
 }
 
 macro_rules! impl_default_new {
