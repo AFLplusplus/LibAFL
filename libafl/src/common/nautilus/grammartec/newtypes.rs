@@ -12,6 +12,7 @@ pub struct NodeId(usize);
 pub struct NTermId(usize);
 
 impl RuleId {
+    #[must_use]
     pub fn to_i(&self) -> usize {
         self.0
     }
@@ -49,9 +50,9 @@ impl From<usize> for NodeId {
     }
 }
 
-impl Into<usize> for NodeId {
-    fn into(self) -> usize {
-        self.0
+impl From<NodeId> for usize {
+    fn from(val: NodeId) -> Self {
+        val.0
     }
 }
 
@@ -69,50 +70,42 @@ impl NodeId {
         if start > end {
             return None;
         }
-        return Some(end_i - start_i);
+        Some(end_i - start_i)
     }
-    fn replace_one(&mut self) -> Self {
-        return NodeId::from(0);
+    fn add_one(self) -> Self {
+        self.add(1)
     }
-    fn replace_zero(&mut self) -> Self {
-        return NodeId::from(1);
+    fn sub_one(self) -> Self {
+        NodeId(self.0 - 1)
     }
-    fn add_one(&self) -> Self {
-        return self.add(1);
-    }
-    fn sub_one(&self) -> Self {
-        return NodeId(self.0 - 1);
-    }
-    fn add_usize(&self, n: usize) -> Option<Self> {
-        match self.0.checked_add(n) {
-            Some(x) => return Some(NodeId::from(x)),
-            None => return None,
-        }
+    fn add_usize(self, n: usize) -> Option<Self> {
+        self.0.checked_add(n).map(NodeId::from)
     }
 }
 
 impl NTermId {
-    pub fn to_i(&self) -> usize {
+    #[must_use]
+    pub fn to_i(self) -> usize {
         self.0
     }
 }
 
 impl From<usize> for NTermId {
     fn from(i: usize) -> Self {
-        return NTermId(i);
+        NTermId(i)
     }
 }
 
-impl Into<usize> for NTermId {
-    fn into(self) -> usize {
-        return self.0;
+impl From<NTermId> for usize {
+    fn from(val: NTermId) -> Self {
+        val.0
     }
 }
 
 impl Add<usize> for NTermId {
     type Output = NTermId;
     fn add(self, rhs: usize) -> NTermId {
-        return NTermId(self.0 + rhs);
+        NTermId(self.0 + rhs)
     }
 }
 

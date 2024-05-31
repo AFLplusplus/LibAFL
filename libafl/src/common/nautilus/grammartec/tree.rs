@@ -178,7 +178,7 @@ where
     fn unparse_node_to_vec(&self, n: NodeId, ctx: &Context) -> Vec<u8> {
         let mut data = vec![];
         self.unparse(n, ctx, &mut data);
-        return data;
+        data
     }
 
     fn unparse_print(&self, ctx: &Context) {
@@ -478,7 +478,7 @@ mod tests {
             size += sub_size;
         }
         tree.sizes[n.to_i()] = size;
-        return size;
+        size
     }
 
     #[test]

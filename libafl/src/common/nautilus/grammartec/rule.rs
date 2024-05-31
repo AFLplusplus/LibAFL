@@ -1,5 +1,6 @@
 use alloc::{string::String, vec::Vec};
 use core::cell::OnceCell;
+use std::sync::OnceLock;
 
 use libafl_bolts::rands::Rand;
 use pyo3::prelude::{PyObject, Python};
@@ -22,8 +23,8 @@ pub enum RuleChild {
     NTerm(NTermId),
 }
 
-const SPLITTER: OnceCell<regex::Regex> = OnceCell::new();
-const TOKENIZER: OnceCell<regex::bytes::Regex> = OnceCell::new();
+static SPLITTER: OnceLock<regex::Regex> = OnceLock::new();
+static TOKENIZER: OnceLock<regex::bytes::Regex> = OnceLock::new();
 
 fn show_bytes(bs: &[u8]) -> String {
     use std::{ascii::escape_default, str};
@@ -33,7 +34,7 @@ fn show_bytes(bs: &[u8]) -> String {
         let part: Vec<u8> = escape_default(b).collect();
         visible.push_str(str::from_utf8(&part).unwrap());
     }
-    return format!("\"{}\"", visible);
+    format!("\"{visible}\"")
 }
 
 impl RuleChild {
@@ -44,20 +45,19 @@ impl RuleChild {
 
     pub fn from_nt(nt: &str, ctx: &mut Context) -> Self {
         let (nonterm, _) = RuleChild::split_nt_description(nt);
-        return RuleChild::NTerm(ctx.aquire_nt_id(&nonterm));
+        RuleChild::NTerm(ctx.aquire_nt_id(&nonterm))
     }
 
     fn split_nt_description(nonterm: &str) -> (String, String) {
-        let splitter = SPLITTER;
-        let splitter = splitter.get_or_init(|| {
+        let splitter = SPLITTER.get_or_init(|| {
             regex::Regex::new(r"^\{([A-Z][a-zA-Z_\-0-9]*)(?::([a-zA-Z_\-0-9]*))?\}$")
                 .expect("RAND_1363289094")
         });
 
         //splits {A:a} or {A} into A and maybe a
-        let descr = splitter.captures(nonterm).expect(&format!("could not interpret Nonterminal {nonterm:?}. Nonterminal Descriptions need to match start with a capital letter and con only contain [a-zA-Z_-0-9]"));
+        let descr = splitter.captures(nonterm).unwrap_or_else(|| panic!("could not interpret Nonterminal {nonterm:?}. Nonterminal Descriptions need to match start with a capital letter and con only contain [a-zA-Z_-0-9]"));
         //let name = descr.get(2).map(|m| m.as_str().into()).unwrap_or(default.to_string()));
-        return (descr[1].into(), String::new());
+        (descr[1].into(), String::new())
     }
 
     fn debug_show(&self, ctx: &Context) -> String {
@@ -74,6 +74,7 @@ pub enum RuleIdOrCustom {
     Custom(RuleId, Vec<u8>),
 }
 impl RuleIdOrCustom {
+    #[must_use]
     pub fn id(&self) -> RuleId {
         match self {
             RuleIdOrCustom::Rule(id) | RuleIdOrCustom::Custom(id, _) => *id,
@@ -83,7 +84,7 @@ impl RuleIdOrCustom {
     #[must_use]
     pub fn data(&self) -> &[u8] {
         match self {
-            RuleIdOrCustom::Custom(_, data) => return data,
+            RuleIdOrCustom::Custom(_, data) => data,
             RuleIdOrCustom::Rule(_) => panic!("cannot get data on a normal rule"),
         }
     }
@@ -103,8 +104,9 @@ pub struct RegExpRule {
 }
 
 impl RegExpRule {
+    #[must_use]
     pub fn debug_show(&self, ctx: &Context) -> String {
-        return format!("{} => {:?}", ctx.nt_id_to_s(self.nonterm), self.hir);
+        format!("{} => {:?}", ctx.nt_id_to_s(self.nonterm), self.hir)
     }
 }
 
@@ -116,6 +118,7 @@ pub struct ScriptRule {
 }
 
 impl ScriptRule {
+    #[must_use]
     pub fn debug_show(&self, ctx: &Context) -> String {
         let args = self
             .nonterms
@@ -135,6 +138,7 @@ pub struct PlainRule {
 }
 
 impl PlainRule {
+    #[must_use]
     pub fn debug_show(&self, ctx: &Context) -> String {
         let args = self
             .children
@@ -160,7 +164,7 @@ impl Rule {
     pub fn from_script(
         ctx: &mut Context,
         nonterm: &str,
-        nterms: Vec<String>,
+        nterms: &[String],
         script: PyObject,
     ) -> Self {
         return Self::Script(ScriptRule {
@@ -204,13 +208,14 @@ impl Rule {
                 }
             })
             .collect();
-        return Self::Plain(PlainRule {
+        Self::Plain(PlainRule {
             nonterm: ctx.aquire_nt_id(nonterm),
             children,
             nonterms,
-        });
+        })
     }
 
+    #[must_use]
     pub fn from_term(ntermid: NTermId, term: &[u8]) -> Self {
         let children = vec![RuleChild::Term(term.to_vec())];
         let nonterms = vec![];
@@ -248,8 +253,7 @@ impl Rule {
     }
 
     fn tokenize(format: &[u8], ctx: &mut Context) -> Vec<RuleChild> {
-        let tokenizer = TOKENIZER;
-        let tokenizer = tokenizer.get_or_init(|| {
+        let tokenizer = TOKENIZER.get_or_init(|| {
             regex::bytes::RegexBuilder::new(r"(?-u)(\{[^}\\]+\})|((?:[^{\\]|\\\{|\\\}|\\)+)")
                 .dot_matches_new_line(true)
                 .build()
@@ -331,7 +335,7 @@ impl Rule {
             if new_nterms.is_empty() {
                 cur_child_max_len = remaining_len;
             } else {
-                cur_child_max_len = ctx.get_random_len(rand, remaining_len, &new_nterms);
+                cur_child_max_len = Context::get_random_len(rand, remaining_len, &new_nterms);
             }
             cur_child_max_len += ctx.get_min_len_for_nt(*nt);
 

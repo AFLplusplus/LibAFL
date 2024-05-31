@@ -22,11 +22,12 @@ pub struct ChunkStoreWrapper {
     pub is_locked: AtomicBool,
 }
 impl ChunkStoreWrapper {
+    #[must_use]
     pub fn new(work_dir: String) -> Self {
-        return ChunkStoreWrapper {
+        ChunkStoreWrapper {
             chunkstore: RwLock::new(ChunkStore::new(work_dir)),
             is_locked: AtomicBool::new(false),
-        };
+        }
     }
 }
 
@@ -40,14 +41,15 @@ pub struct ChunkStore {
 }
 
 impl ChunkStore {
+    #[must_use]
     pub fn new(work_dir: String) -> Self {
-        return ChunkStore {
+        ChunkStore {
             nts_to_chunks: HashMap::new(),
             seen_outputs: HashSet::new(),
             trees: vec![],
             work_dir,
             number_of_chunks: 0,
-        };
+        }
     }
 
     pub fn add_tree(&mut self, tree: Tree, ctx: &Context) {
@@ -65,7 +67,7 @@ impl ChunkStore {
                 self.seen_outputs.insert(buffer.clone());
                 self.nts_to_chunks
                     .entry(tree.get_rule(n, ctx).nonterm())
-                    .or_insert_with(|| vec![])
+                    .or_insert_with(Vec::new)
                     .push((id, n));
                 let mut file = File::create(format!(
                     "{}/outputs/chunks/chunk_{:09}",
@@ -73,7 +75,7 @@ impl ChunkStore {
                 ))
                 .expect("RAND_596689790");
                 self.number_of_chunks += 1;
-                file.write(&buffer).expect("RAND_606896756");
+                file.write_all(&buffer).expect("RAND_606896756");
                 contains_new_chunk = true;
             }
         }
@@ -82,8 +84,8 @@ impl ChunkStore {
         }
     }
 
-    pub fn get_alternative_to<'a, R: Rand>(
-        &'a self,
+    pub fn get_alternative_to<R: Rand>(
+        &self,
         rand: &mut R,
         r: RuleId,
         ctx: &Context,
@@ -97,11 +99,12 @@ impl ChunkStore {
         });
         //The unwrap_or is just a quick and dirty fix to catch Errors from the sampler
         let selected = relevant.and_then(|iter| rand.choose(iter));
-        return selected.map(|&(tid, nid)| (&self.trees[tid], nid));
+        selected.map(|&(tid, nid)| (&self.trees[tid], nid))
     }
 
+    #[must_use]
     pub fn trees(&self) -> usize {
-        return self.trees.len();
+        self.trees.len()
     }
 }
 
@@ -125,7 +128,7 @@ mod tests {
         let _ = ctx.add_rule("C", b"c");
         ctx.initialize(101);
         let random_size = ctx.get_random_len_for_ruleid(&r1);
-        println!("random_size: {}", random_size);
+        println!("random_size: {random_size}");
         let tree = ctx.generate_tree_from_rule(&mut rand, r1, random_size);
         fs::create_dir_all("/tmp/outputs/chunks").expect("40234068");
         let mut cks = ChunkStore::new("/tmp/".to_string());

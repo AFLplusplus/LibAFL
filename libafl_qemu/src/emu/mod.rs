@@ -8,12 +8,12 @@ use core::{
 };
 use std::{
     cell::{OnceCell, Ref, RefCell, RefMut},
-    collections::HashMap,
     hash::Hash,
     ops::Add,
     rc::Rc,
 };
 
+use hashbrown::HashMap;
 use libafl::{
     executors::ExitKind,
     inputs::HasTargetBytes,

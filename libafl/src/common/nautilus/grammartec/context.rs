@@ -25,9 +25,16 @@ pub struct Context {
     max_len: usize,
 }
 
+impl Default for Context {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Context {
+    #[must_use]
     pub fn new() -> Self {
-        return Context {
+        Context {
             rules: vec![],
             nts_to_rules: HashMap::new(),
             nt_ids_to_name: HashMap::new(),
@@ -39,7 +46,7 @@ impl Context {
             rules_to_num_options: HashMap::new(),
             nts_to_num_options: HashMap::new(),
             max_len: 0,
-        };
+        }
     }
 
     pub fn initialize(&mut self, max_len: usize) {
@@ -48,15 +55,18 @@ impl Context {
         self.max_len = max_len + 2;
     }
 
+    #[must_use]
     pub fn get_rule(&self, r: RuleId) -> &Rule {
         let id: usize = r.into();
-        return &self.rules[id];
+        &self.rules[id]
     }
 
+    #[must_use]
     pub fn get_nt(&self, r: &RuleIdOrCustom) -> NTermId {
         return self.get_rule(r.id()).nonterm();
     }
 
+    #[must_use]
     pub fn get_num_children(&self, r: &RuleIdOrCustom) -> usize {
         return self.get_rule(r.id()).number_of_nonterms();
     }
@@ -66,23 +76,17 @@ impl Context {
         let rule = Rule::from_format(self, nt, format);
         let ntid = self.aquire_nt_id(nt);
         self.rules.push(rule);
-        self.nts_to_rules
-            .entry(ntid)
-            .or_insert_with(|| vec![])
-            .push(rid);
-        return rid;
+        self.nts_to_rules.entry(ntid).or_default().push(rid);
+        rid
     }
 
-    pub fn add_script(&mut self, nt: &str, nts: Vec<String>, script: PyObject) -> RuleId {
+    pub fn add_script(&mut self, nt: &str, nts: &[String], script: PyObject) -> RuleId {
         let rid = self.rules.len().into();
         let rule = Rule::from_script(self, nt, nts, script);
         let ntid = self.aquire_nt_id(nt);
         self.rules.push(rule);
-        self.nts_to_rules
-            .entry(ntid)
-            .or_insert_with(|| vec![])
-            .push(rid);
-        return rid;
+        self.nts_to_rules.entry(ntid).or_default().push(rid);
+        rid
     }
 
     pub fn add_regex(&mut self, nt: &str, regex: &str) -> RuleId {
@@ -90,31 +94,26 @@ impl Context {
         let rule = Rule::from_regex(self, nt, regex);
         let ntid = self.aquire_nt_id(nt);
         self.rules.push(rule);
-        self.nts_to_rules
-            .entry(ntid)
-            .or_insert_with(|| vec![])
-            .push(rid);
-        return rid;
+        self.nts_to_rules.entry(ntid).or_default().push(rid);
+        rid
     }
 
-    pub fn add_term_rule(&mut self, nt: &str, term: &Vec<u8>) -> RuleId {
+    pub fn add_term_rule(&mut self, nt: &str, term: &[u8]) -> RuleId {
         let rid = self.rules.len().into();
         let ntid = self.aquire_nt_id(nt);
         self.rules.push(Rule::from_term(ntid, term));
-        self.nts_to_rules
-            .entry(ntid)
-            .or_insert_with(|| vec![])
-            .push(rid);
-        return rid;
+        self.nts_to_rules.entry(ntid).or_default().push(rid);
+        rid
     }
 
     pub fn aquire_nt_id(&mut self, nt: &str) -> NTermId {
         let next_id = self.nt_ids_to_name.len().into();
         let id = self.names_to_nt_id.entry(nt.into()).or_insert(next_id);
         self.nt_ids_to_name.entry(*id).or_insert(nt.into());
-        return *id;
+        *id
     }
 
+    #[must_use]
     pub fn nt_id(&self, nt: &str) -> NTermId {
         return *self
             .names_to_nt_id
@@ -122,13 +121,14 @@ impl Context {
             .expect(&("no such nonterminal: ".to_owned() + nt));
     }
 
+    #[must_use]
     pub fn nt_id_to_s(&self, nt: NTermId) -> String {
-        return self.nt_ids_to_name[&nt].clone();
+        self.nt_ids_to_name[&nt].clone()
     }
 
     fn calc_min_len_for_rule(&self, r: RuleId) -> Option<usize> {
         let mut res = 1;
-        for nt_id in self.get_rule(r).nonterms().iter() {
+        for nt_id in self.get_rule(r).nonterms() {
             if let Some(min) = self.nts_to_min_size.get(nt_id) {
                 //println!("Calculating length for Rule(calc_min_len_for_rule): {}, current: {}, adding: {}, because of rule: {}", self.nt_id_to_s(self.get_rule(r).nonterm().clone()), res, min, self.nt_id_to_s(nt_id.clone()));
                 res += *min;
@@ -137,18 +137,16 @@ impl Context {
             }
         }
         //println!("Calculated length for Rule(calc_min_len_for_rule): {}, Length: {}", self.nt_id_to_s(self.get_rule(r).nonterm().clone()), res);
-        return Some(res);
+        Some(res)
     }
 
     pub fn calc_min_len(&mut self) {
         let mut something_changed = true;
-        while something_changed == true {
+        while something_changed {
             //TODO: find a better solution to prevent  consumed_len >= ctx.get_min_len_for_nt(*nt)' Assertions
-            let mut unknown_rules = (0..self.rules.len())
-                .map(|i| RuleId::from(i))
-                .collect::<Vec<_>>();
+            let mut unknown_rules = (0..self.rules.len()).map(RuleId::from).collect::<Vec<_>>();
             something_changed = false;
-            while unknown_rules.len() > 0 {
+            while !unknown_rules.is_empty() {
                 let last_len = unknown_rules.len();
                 unknown_rules.retain(|rule| {
                     if let Some(min) = self.calc_min_len_for_rule(*rule) {
@@ -169,7 +167,7 @@ impl Context {
                 if last_len == unknown_rules.len() {
                     println!("Found unproductive rules: (missing base/non recursive case?)");
                     for r in unknown_rules {
-                        println!("{}", self.get_rule(r).debug_show(&self));
+                        println!("{}", self.get_rule(r).debug_show(self));
                     }
                     panic!("Broken Grammar");
                 }
@@ -180,14 +178,14 @@ impl Context {
 
     fn calc_num_options_for_rule(&self, r: RuleId) -> usize {
         let mut res = 1_usize;
-        for nt_id in self.get_rule(r).nonterms().iter() {
+        for nt_id in self.get_rule(r).nonterms() {
             res = res.saturating_mul(*self.nts_to_num_options.get(nt_id).unwrap_or(&1));
         }
-        return res;
+        res
     }
 
     pub fn calc_num_options(&mut self) {
-        for (nt, rules) in self.nts_to_rules.iter() {
+        for (nt, rules) in &self.nts_to_rules {
             self.nts_to_num_options.entry(*nt).or_insert(rules.len());
         }
 
@@ -216,17 +214,13 @@ impl Context {
         }
     }
 
+    #[must_use]
     pub fn check_if_nterm_has_multiple_possiblities(&self, nt: &NTermId) -> bool {
         self.get_rules_for_nt(*nt).len() > 1
     }
 
-    pub fn get_random_len<R: Rand>(
-        &self,
-        rand: &mut R,
-        len: usize,
-        rhs_of_rule: &Vec<NTermId>,
-    ) -> usize {
-        self.simple_get_random_len(rand, rhs_of_rule.len(), len)
+    pub fn get_random_len<R: Rand>(rand: &mut R, len: usize, rhs_of_rule: &[NTermId]) -> usize {
+        Self::simple_get_random_len(rand, rhs_of_rule.len(), len)
     }
 
     //we need to get maximal sizes for all subtrees. To generate trees fairly, we want to split the
@@ -234,28 +228,28 @@ impl Context {
     //regardless of its index in the current rule. We use this version of the algorithm described
     //here: https://stackoverflow.com/a/8068956 to get the first value.
     fn simple_get_random_len<R: Rand>(
-        &self,
         rand: &mut R,
         number_of_children: usize,
         total_remaining_len: usize,
     ) -> usize {
         let mut res = total_remaining_len;
-        let iters = (number_of_children as i32) - 1;
+        let iters = i32::try_from(number_of_children).unwrap() - 1;
         for _ in 0..iters {
             let proposal = rand.between(0, total_remaining_len);
             if proposal < res {
-                res = proposal
+                res = proposal;
             }
         }
-        return res;
+        res
     }
 
+    #[must_use]
     pub fn get_min_len_for_nt(&self, nt: NTermId) -> usize {
-        return self.nts_to_min_size[&nt];
+        self.nts_to_min_size[&nt]
     }
 
     pub fn get_random_rule_for_nt<R: Rand>(&self, rand: &mut R, nt: NTermId, len: usize) -> RuleId {
-        return self.simple_get_random_rule_for_nt(rand, nt, len);
+        self.simple_get_random_rule_for_nt(rand, nt, len)
     }
 
     pub fn get_applicable_rules<'a, R: Rand>(
@@ -292,15 +286,16 @@ impl Context {
         nt: NTermId,
         max_len: usize,
     ) -> RuleId {
-        let p_include_short_rules = if self.nts_to_num_options[&nt] < 10 {
+        let p_include_short_rules = 100;
+        /*if self.nts_to_num_options[&nt] < 10 {
             100 * 0
         } else if max_len > 100 {
             2 * 0
         } else if max_len > 20 {
             50 * 0
         } else {
-            100 * 0
-        };
+            100 * 0;
+        }; */
 
         if let Some(opt) = self.choose_applicable_rule(rand, max_len, nt, p_include_short_rules) {
             opt
@@ -427,10 +422,10 @@ mod tests {
             let mut tree = Tree::from_rule_vec(vec![], &ctx);
             tree.generate_from_nt(&mut rand, ctx.nt_id("E"), 9, &ctx);
             assert!(tree.rules.len() < 10);
-            assert!(tree.rules.len() >= 1);
+            assert!(!tree.rules.is_empty());
         }
 
-        let rules = vec![r0, r1, r4, r4, r4]
+        let rules = [r0, r1, r4, r4, r4]
             .iter()
             .map(|x| RuleIdOrCustom::Rule(*x))
             .collect::<Vec<_>>();
@@ -442,7 +437,7 @@ mod tests {
             "((1*1)+1)"
         );
 
-        let rules = vec![r0, r1, r2, r3, r4, r4, r4, r4, r4]
+        let rules = [r0, r1, r2, r3, r4, r4, r4, r4, r4]
             .iter()
             .map(|x| RuleIdOrCustom::Rule(*x))
             .collect::<Vec<_>>();
