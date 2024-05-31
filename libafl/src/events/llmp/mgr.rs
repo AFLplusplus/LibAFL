@@ -43,7 +43,7 @@ use crate::{
         ProgressReporter,
     },
     executors::{Executor, HasObservers},
-    fuzzer::{EvaluatorObservers, ExecutionProcessor},
+    fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{NopInput, UsesInput},
     observers::ObserversTuple,
     state::{HasExecutions, HasLastReportTime, NopState, State, UsesState},
@@ -59,6 +59,8 @@ where
 {
     /// We only send 1 testcase for every `throttle` second
     pub(crate) throttle: Option<Duration>,
+    /// Treat the incoming testcase as interesting always without evaluating them
+    always_interesting: bool,
     /// We sent last message at `last_sent`
     last_sent: Duration,
     hooks: EMH,
@@ -98,6 +100,7 @@ impl LlmpEventManager<(), NopState<NopInput>, NopShMemProvider> {
 pub struct LlmpEventManagerBuilder<EMH> {
     throttle: Option<Duration>,
     hooks: EMH,
+    always_interesting: bool,
 }
 
 impl Default for LlmpEventManagerBuilder<()> {
@@ -113,6 +116,7 @@ impl LlmpEventManagerBuilder<()> {
         Self {
             throttle: None,
             hooks: (),
+            always_interesting: false,
         }
     }
 
@@ -121,6 +125,17 @@ impl LlmpEventManagerBuilder<()> {
         LlmpEventManagerBuilder {
             throttle: self.throttle,
             hooks,
+            always_interesting: self.always_interesting,
+        }
+    }
+
+    /// Set `always_interesting`
+    #[must_use]
+    pub fn always_interesting(self, always_interesting: bool) -> LlmpEventManagerBuilder<()> {
+        LlmpEventManagerBuilder {
+            throttle: self.throttle,
+            hooks: self.hooks,
+            always_interesting,
         }
     }
 }
@@ -149,6 +164,7 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
             throttle: self.throttle,
             last_sent: Duration::from_secs(0),
             hooks: self.hooks,
+            always_interesting: self.always_interesting,
             llmp,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
@@ -178,6 +194,7 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
             throttle: self.throttle,
             last_sent: Duration::from_secs(0),
             hooks: self.hooks,
+            always_interesting: self.always_interesting,
             llmp,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
@@ -208,6 +225,7 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
             throttle: self.throttle,
             last_sent: Duration::from_secs(0),
             hooks: self.hooks,
+            always_interesting: self.always_interesting,
             llmp,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
@@ -242,6 +260,7 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
             throttle: self.throttle,
             last_sent: Duration::from_secs(0),
             hooks: self.hooks,
+            always_interesting: self.always_interesting,
             llmp,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
@@ -270,6 +289,7 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
             throttle: self.throttle,
             last_sent: Duration::from_secs(0),
             hooks: self.hooks,
+            always_interesting: self.always_interesting,
             llmp,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
@@ -302,6 +322,7 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
             throttle: self.throttle,
             last_sent: Duration::from_secs(0),
             hooks: self.hooks,
+            always_interesting: self.always_interesting,
             llmp,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
@@ -329,6 +350,7 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
             throttle: self.throttle,
             last_sent: Duration::from_secs(0),
             hooks: self.hooks,
+            always_interesting: self.always_interesting,
             llmp,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
@@ -360,6 +382,7 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
             throttle: self.throttle,
             last_sent: Duration::from_secs(0),
             hooks: self.hooks,
+            always_interesting: self.always_interesting,
             llmp,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
@@ -506,7 +529,9 @@ where
     where
         E: Executor<Self, Z> + HasObservers<State = S>,
         for<'a> E::Observers: Deserialize<'a>,
-        Z: ExecutionProcessor<E::Observers, State = S> + EvaluatorObservers<E::Observers>,
+        Z: ExecutionProcessor<E::Observers, State = S>
+            + EvaluatorObservers<E::Observers>
+            + Evaluator<E, Self>,
     {
         if !self.hooks.pre_exec_all(state, client_id, &event)? {
             return Ok(());
@@ -524,33 +549,40 @@ where
             } => {
                 log::info!("Received new Testcase from {client_id:?} ({client_config:?}, forward {forward_id:?})");
 
-                let res = if client_config.match_with(&self.configuration)
-                    && observers_buf.is_some()
-                {
-                    #[cfg(feature = "adaptive_serialization")]
-                    let start = current_time();
-                    let observers: E::Observers =
-                        postcard::from_bytes(observers_buf.as_ref().unwrap())?;
-                    #[cfg(feature = "adaptive_serialization")]
-                    {
-                        self.deserialization_time = current_time() - start;
-                    }
-                    #[cfg(feature = "scalability_introspection")]
-                    {
-                        state.scalability_monitor_mut().testcase_with_observers += 1;
-                    }
-                    fuzzer.execute_and_process(state, self, input, &observers, &exit_kind, false)?
-                } else {
-                    #[cfg(feature = "scalability_introspection")]
-                    {
-                        state.scalability_monitor_mut().testcase_without_observers += 1;
-                    }
-                    fuzzer.evaluate_input_with_observers::<E, Self>(
-                        state, executor, self, input, false,
-                    )?
-                };
-                if let Some(item) = res.1 {
+                if self.always_interesting {
+                    let item = fuzzer.add_input(state, executor, self, input)?;
                     log::info!("Added received Testcase as item #{item}");
+                } else {
+                    let res = if client_config.match_with(&self.configuration)
+                        && observers_buf.is_some()
+                    {
+                        #[cfg(feature = "adaptive_serialization")]
+                        let start = current_time();
+                        let observers: E::Observers =
+                            postcard::from_bytes(observers_buf.as_ref().unwrap())?;
+                        #[cfg(feature = "adaptive_serialization")]
+                        {
+                            self.deserialization_time = current_time() - start;
+                        }
+                        #[cfg(feature = "scalability_introspection")]
+                        {
+                            state.scalability_monitor_mut().testcase_with_observers += 1;
+                        }
+                        fuzzer.execute_and_process(
+                            state, self, input, &observers, &exit_kind, false,
+                        )?
+                    } else {
+                        #[cfg(feature = "scalability_introspection")]
+                        {
+                            state.scalability_monitor_mut().testcase_without_observers += 1;
+                        }
+                        fuzzer.evaluate_input_with_observers::<E, Self>(
+                            state, executor, self, input, false,
+                        )?
+                    };
+                    if let Some(item) = res.1 {
+                        log::info!("Added received Testcase as item #{item}");
+                    }
                 }
             }
             Event::CustomBuf { tag, buf } => {
@@ -686,7 +718,9 @@ where
     SP: ShMemProvider,
     E: HasObservers<State = S> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
-    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers, State = S>,
+    Z: ExecutionProcessor<E::Observers, State = S>
+        + EvaluatorObservers<E::Observers>
+        + Evaluator<E, Self>,
 {
     fn process(
         &mut self,
@@ -732,7 +766,9 @@ where
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata + HasLastReportTime,
     SP: ShMemProvider,
-    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers, State = S>,
+    Z: ExecutionProcessor<E::Observers, State = S>
+        + EvaluatorObservers<E::Observers>
+        + Evaluator<E, Self>,
 {
 }
 
