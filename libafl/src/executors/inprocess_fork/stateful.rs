@@ -11,11 +11,11 @@ use libafl_bolts::{
 };
 use nix::unistd::{fork, ForkResult};
 
-use super::super::hooks::ExecutorHooksTuple;
 use crate::{
     events::{EventFirer, EventRestarter},
     executors::{
-        inprocess_fork::GenericInProcessForkExecutorInner, Executor, ExitKind, HasObservers,
+        hooks::ExecutorHooksTuple, inprocess_fork::GenericInProcessForkExecutorInner, Executor,
+        ExitKind, HasObservers,
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
