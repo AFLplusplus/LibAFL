@@ -14,20 +14,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::cmp;
-use std::collections::HashSet;
-use std::io;
-use std::io::Write;
-use std::marker::Sized;
-
 use alloc::vec::Vec;
+use std::{cmp, collections::HashSet, io, io::Write, marker::Sized};
+
 use context::Context;
 use newtypes::{NTermID, NodeID, RuleID};
-use pyo3::prelude::{PyObject, PyResult, Python};
-use pyo3::types::{PyBytes, PyString, PyTuple};
-use pyo3::FromPyObject;
-use rand::thread_rng;
-use rand::Rng;
+use pyo3::{
+    prelude::{PyObject, PyResult, Python},
+    types::{PyBytes, PyString, PyTuple},
+    FromPyObject,
+};
+use rand::{thread_rng, Rng};
 use recursion_info::RecursionInfo;
 use rule::{PlainRule, RegExpRule, Rule, RuleChild, RuleIDOrCustom, ScriptRule};
 use serde::{Deserialize, Serialize};
@@ -461,9 +458,10 @@ impl<'a> TreeLike for TreeMutation<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use super::super::context::Context;
-    use super::super::newtypes::NodeID;
+    use super::{
+        super::{context::Context, newtypes::NodeID},
+        *,
+    };
 
     fn calc_subtree_sizes_and_parents_rec_test(tree: &mut Tree, n: NodeID, ctx: &Context) -> usize {
         let mut cur = n + 1;

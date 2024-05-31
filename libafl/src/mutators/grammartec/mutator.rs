@@ -17,16 +17,13 @@
 extern crate rand;
 
 use alloc::vec::Vec;
-use rand::seq::SliceRandom;
-use rand::Rng;
-
-use std::collections::HashSet;
-use std::mem;
+use std::{collections::HashSet, mem};
 
 use chunkstore::ChunkStore;
 use context::Context;
 use forksrv::newtypes::SubprocessError;
 use newtypes::NodeID;
+use rand::{seq::SliceRandom, Rng};
 use recursion_info::RecursionInfo;
 use rule::RuleIDOrCustom;
 use tree::{Tree, TreeLike, TreeMutation};
@@ -314,13 +311,13 @@ impl Mutator {
 
 #[cfg(test)]
 mod tests {
+    use std::{collections::HashSet, str};
+
     use chunkstore::ChunkStore;
     use context::Context;
     use mutator::Mutator;
     use newtypes::{NodeID, RuleID};
     use rule::RuleIDOrCustom;
-    use std::collections::HashSet;
-    use std::str;
     use tree::{Tree, TreeLike, TreeMutation};
 
     #[test]

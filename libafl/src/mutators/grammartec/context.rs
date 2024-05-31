@@ -14,16 +14,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use alloc::{string::String, vec::Vec};
 use std::collections::HashMap;
-use alloc::string::String;
-use alloc::vec::Vec;
-use rand::seq::IteratorRandom;
-use rand::{thread_rng, Rng};
-use pyo3::prelude::PyObject;
 
-use super::newtypes::{NTermID, RuleID};
-use super::rule::{Rule, RuleIDOrCustom};
-use super::tree::Tree;
+use pyo3::prelude::PyObject;
+use rand::{seq::IteratorRandom, thread_rng, Rng};
+
+use super::{
+    newtypes::{NTermID, RuleID},
+    rule::{Rule, RuleIDOrCustom},
+    tree::Tree,
+};
 
 #[derive(Clone)]
 pub struct Context {
@@ -333,8 +334,11 @@ impl Context {
 #[cfg(test)]
 mod tests {
     use Context;
-    use super::super::rule::{Rule, RuleChild, RuleIDOrCustom};
-    use super::super::tree::{Tree, TreeLike};
+
+    use super::super::{
+        rule::{Rule, RuleChild, RuleIDOrCustom},
+        tree::{Tree, TreeLike},
+    };
 
     #[test]
     fn simple_context() {

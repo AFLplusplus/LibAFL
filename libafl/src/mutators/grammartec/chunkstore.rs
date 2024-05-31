@@ -14,25 +14,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use alloc::string::String;
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
+use std::{
+    collections::{HashMap, HashSet},
+    fs::File,
+    io::Write,
+    sync::{atomic::AtomicBool, RwLock},
+};
+
 use libafl_bolts::rands::Rand;
 use rand::seq::IteratorRandom;
-use serde::Deserialize;
-use serde::Serialize;
-use std::collections::HashMap;
-use std::collections::HashSet;
-use std::fs::File;
-use std::io::Write;
-use std::sync::atomic::AtomicBool;
-use std::sync::RwLock;
+use serde::{Deserialize, Serialize};
 
-use serde::{Serialize, Deserialize};
-
-use super::context::Context;
-use super::newtypes::{NTermID, NodeID, RuleID};
-use super::rule::RuleIDOrCustom;
-use super::tree::{Tree, TreeLike};
+use super::{
+    context::Context,
+    newtypes::{NTermID, NodeID, RuleID},
+    rule::RuleIDOrCustom,
+    tree::{Tree, TreeLike},
+};
 
 pub struct ChunkStoreWrapper {
     pub chunkstore: RwLock<ChunkStore>,
@@ -99,7 +98,12 @@ impl ChunkStore {
         }
     }
 
-    pub fn get_alternative_to<'a, R: Rand>(&'a self, rand: &R, r: RuleID, ctx: &Context) -> Option<(&Tree, NodeID)> {
+    pub fn get_alternative_to<'a, R: Rand>(
+        &'a self,
+        rand: &R,
+        r: RuleID,
+        ctx: &Context,
+    ) -> Option<(&Tree, NodeID)> {
         let chunks = self
             .nts_to_chunks
             .get(&ctx.get_nt(&RuleIDOrCustom::Rule(r)));
@@ -108,7 +112,7 @@ impl ChunkStore {
                 .filter(move |&&(tid, nid)| self.trees[tid].get_rule_id(nid) != r)
         });
         //The unwrap_or is just a quick and dirty fix to catch Errors from the sampler
-        let selected = relevant.and_then(|iter| rand.choose(iter)));
+        let selected = relevant.and_then(|iter| rand.choose(iter));
         return selected.map(|&(tid, nid)| (&self.trees[tid], nid));
     }
 
@@ -120,11 +124,9 @@ impl ChunkStore {
 #[cfg(test)]
 mod tests {
     use alloc::string::ToString;
-
-    use super::super::chunkstore::ChunkStore;
-    use super::super::context::Context;
     use std::fs;
-    use super::super::tree::TreeLike;
+
+    use super::super::{chunkstore::ChunkStore, context::Context, tree::TreeLike};
 
     #[test]
     fn chunk_store() {

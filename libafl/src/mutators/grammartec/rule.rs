@@ -14,19 +14,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use alloc::{string::String, vec::Vec};
 use core::cell::OnceCell;
 
-use alloc::string::String;
-use alloc::vec::Vec;
 use context::Context;
 use newtypes::{NTermID, NodeID, RuleID};
 use pyo3::prelude::{PyObject, Python};
-use rand::thread_rng;
-use rand::Rng;
+use rand::{thread_rng, Rng};
 use regex;
 use regex_syntax::hir::Hir;
-use serde::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tree::Tree;
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -39,8 +36,7 @@ const SPLITTER: OnceCell<regex::Regex> = OnceCell::new();
 const TOKENIZER: OnceCell<regex::bytes::Regex> = OnceCell::new();
 
 fn show_bytes(bs: &[u8]) -> String {
-    use std::ascii::escape_default;
-    use std::str;
+    use std::{ascii::escape_default, str};
 
     let mut visible = String::new();
     for &b in bs {
@@ -62,8 +58,10 @@ impl RuleChild {
 
     fn split_nt_description(nonterm: &str) -> (String, String) {
         let splitter = SPLITTER;
-        let splitter = splitter.get_or_init(|| regex::Regex::new(r"^\{([A-Z][a-zA-Z_\-0-9]*)(?::([a-zA-Z_\-0-9]*))?\}$")
-        .expect("RAND_1363289094"));
+        let splitter = splitter.get_or_init(|| {
+            regex::Regex::new(r"^\{([A-Z][a-zA-Z_\-0-9]*)(?::([a-zA-Z_\-0-9]*))?\}$")
+                .expect("RAND_1363289094")
+        });
 
         //splits {A:a} or {A} into A and maybe a
         let descr = splitter.captures(nonterm).expect(&format!("could not interpret Nonterminal {:?}. Nonterminal Descriptions need to match start with a capital letter and con only contain [a-zA-Z_-0-9]",nonterm));
@@ -263,11 +261,12 @@ impl Rule {
     }
 
     fn tokenize(format: &[u8], ctx: &mut Context) -> Vec<RuleChild> {
-        let tokenizer = TOKENIZER.get_or_init(||
-                regex::bytes::RegexBuilder::new(r"(?-u)(\{[^}\\]+\})|((?:[^{\\]|\\\{|\\\}|\\)+)")
-                    .dot_matches_new_line(true)
-                    .build()
-                    .expect("RAND_994455541"));
+        let tokenizer = TOKENIZER.get_or_init(|| {
+            regex::bytes::RegexBuilder::new(r"(?-u)(\{[^}\\]+\})|((?:[^{\\]|\\\{|\\\}|\\)+)")
+                .dot_matches_new_line(true)
+                .build()
+                .expect("RAND_994455541")
+        });
         //RegExp Changed from (\{[^}\\]+\})|((?:[^{\\]|\\\{|\\\}|\\\\)+) because of problems with \\ (\\ was not matched and therefore thrown away)
 
         return tokenizer

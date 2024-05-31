@@ -15,16 +15,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use alloc::vec::Vec;
-use rand::rngs::StdRng;
-use rand::thread_rng;
-use rand::Rng;
-use rand::SeedableRng;
-use std::collections::HashMap;
-use std::fmt;
+use std::{collections::HashMap, fmt};
 
 use context::Context;
 use loaded_dice::LoadedDiceSampler;
 use newtypes::{NTermID, NodeID};
+use rand::{rngs::StdRng, thread_rng, Rng, SeedableRng};
 use tree::Tree;
 
 pub struct RecursionInfo {
