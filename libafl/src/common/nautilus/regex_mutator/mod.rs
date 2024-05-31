@@ -23,19 +23,20 @@ impl RegexScript {
 
     pub fn get_mod<R: Rand>(&mut self, rand: &mut R, val: usize) -> usize {
         if self.remaining == 0 {
-            return 0;
+            0
+        } else {
+            rand.below(val)
         }
-        return (rand.next() as usize) % val;
     }
 
     pub fn get_range<R: Rand>(&mut self, rand: &mut R, min: usize, max: usize) -> usize {
-        return self.get_mod(rand, max - min) + min;
+        self.get_mod(rand, max - min) + min
     }
 }
 
 fn append_char(res: &mut Vec<u8>, chr: char) {
     let mut buf = [0; 4];
-    res.extend_from_slice(chr.encode_utf8(&mut buf).as_bytes())
+    res.extend_from_slice(chr.encode_utf8(&mut buf).as_bytes());
 }
 
 fn append_lit(res: &mut Vec<u8>, lit: &Literal) {
@@ -46,7 +47,7 @@ fn append_unicode_range<R: Rand>(
     rand: &mut R,
     res: &mut Vec<u8>,
     scr: &mut RegexScript,
-    cls: &ClassUnicodeRange,
+    cls: ClassUnicodeRange,
 ) {
     let mut chr_a_buf = [0; 4];
     let mut chr_b_buf = [0; 4];
@@ -62,30 +63,30 @@ fn append_byte_range<R: Rand>(
     rand: &mut R,
     res: &mut Vec<u8>,
     scr: &mut RegexScript,
-    cls: &ClassBytesRange,
+    cls: ClassBytesRange,
 ) {
     res.push(scr.get_range(rand, cls.start() as usize, (cls.end() + 1) as usize) as u8);
 }
 
 fn append_class<R: Rand>(rand: &mut R, res: &mut Vec<u8>, scr: &mut RegexScript, cls: &Class) {
-    use regex_syntax::hir::Class::*;
+    use regex_syntax::hir::Class::{Bytes, Unicode};
     match cls {
         Unicode(cls) => {
             let rngs = cls.ranges();
             let rng = rngs[scr.get_mod(rand, rngs.len())];
-            append_unicode_range(rand, res, scr, &rng);
+            append_unicode_range(rand, res, scr, rng);
         }
         Bytes(cls) => {
             let rngs = cls.ranges();
             let rng = rngs[scr.get_mod(rand, rngs.len())];
-            append_byte_range(rand, res, scr, &rng);
+            append_byte_range(rand, res, scr, rng);
         }
     }
 }
 
 fn get_length<R: Rand>(rand: &mut R, scr: &mut RegexScript) -> usize {
     let bits = scr.get_mod(rand, 8);
-    return scr.get_mod(rand, 2 << bits);
+    scr.get_mod(rand, 2 << bits)
 }
 
 fn get_repetition_range<R: Rand>(
@@ -95,9 +96,9 @@ fn get_repetition_range<R: Rand>(
     scr: &mut RegexScript,
 ) -> usize {
     match (min, max) {
-        (a, None) => return get_length(rand, scr) + (a as usize),
-        (a, Some(b)) if a == b => return a as usize,
-        (a, Some(b)) => return scr.get_range(rand, a as usize, b as usize),
+        (a, None) => get_length(rand, scr) + (a as usize),
+        (a, Some(b)) if a == b => a as usize,
+        (a, Some(b)) => scr.get_range(rand, a as usize, b as usize),
     }
 }
 
@@ -108,9 +109,9 @@ fn get_repetitions<R: Rand>(
     scr: &mut RegexScript,
 ) -> usize {
     match (min, max) {
-        (0, Some(1)) => return scr.get_mod(rand, 2),
-        (0, _) => return get_length(rand, scr),
-        (1, _) => return 1 + get_length(rand, scr),
+        (0, Some(1)) => scr.get_mod(rand, 2),
+        (0, _) => get_length(rand, scr),
+        (1, _) => 1 + get_length(rand, scr),
         (min, max) => get_repetition_range(rand, min, max, scr),
     }
 }
@@ -120,7 +121,7 @@ pub fn generate<R: Rand>(rand: &mut R, hir: &Hir) -> Vec<u8> {
     let mut scr = RegexScript::new(rand);
     let mut stack = vec![hir];
     let mut res = vec![];
-    while stack.len() > 0 {
+    while !stack.is_empty() {
         match stack.pop().unwrap().kind() {
             HirKind::Empty => {}
             HirKind::Literal(lit) => append_lit(&mut res, lit),
@@ -137,5 +138,5 @@ pub fn generate<R: Rand>(rand: &mut R, hir: &Hir) -> Vec<u8> {
             HirKind::Look(_) => (),
         }
     }
-    return res;
+    res
 }

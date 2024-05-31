@@ -192,10 +192,10 @@ impl Context {
         }
 
         let mut something_changed = true;
-        while something_changed == true {
+        while something_changed {
             something_changed = false;
 
-            for rid in (0..self.rules.len()).map(|i| RuleId::from(i)) {
+            for rid in (0..self.rules.len()).map(RuleId::from) {
                 let num = self.calc_num_options_for_rule(rid);
                 let nt = self.get_rule(rid).nonterm();
                 let e = self.nts_to_num_options.entry(nt).or_insert(num);
@@ -217,7 +217,7 @@ impl Context {
     }
 
     pub fn check_if_nterm_has_multiple_possiblities(&self, nt: &NTermId) -> bool {
-        return self.get_rules_for_nt(*nt).len() > 1;
+        self.get_rules_for_nt(*nt).len() > 1
     }
 
     pub fn get_random_len<R: Rand>(
@@ -226,7 +226,7 @@ impl Context {
         len: usize,
         rhs_of_rule: &Vec<NTermId>,
     ) -> usize {
-        return self.simple_get_random_len(rand, rhs_of_rule.len(), len);
+        self.simple_get_random_len(rand, rhs_of_rule.len(), len)
     }
 
     //we need to get maximal sizes for all subtrees. To generate trees fairly, we want to split the
@@ -314,16 +314,19 @@ impl Context {
         }
     }
 
+    #[must_use]
     pub fn get_random_len_for_ruleid(&self, _rule_id: &RuleId) -> usize {
-        return self.max_len; //TODO?????
+        self.max_len //TODO?????
     }
 
+    #[must_use]
     pub fn get_random_len_for_nt(&self, _nt: &NTermId) -> usize {
-        return self.max_len;
+        self.max_len
     }
 
+    #[must_use]
     pub fn get_rules_for_nt(&self, nt: NTermId) -> &Vec<RuleId> {
-        return &self.nts_to_rules[&nt];
+        &self.nts_to_rules[&nt]
     }
 
     pub fn generate_tree_from_nt<R: Rand>(
@@ -339,7 +342,7 @@ impl Context {
     pub fn generate_tree_from_rule<R: Rand>(&self, rand: &mut R, r: RuleId, len: usize) -> Tree {
         let mut tree = Tree::from_rule_vec(vec![], self);
         tree.generate_from_rule(rand, r, len, self);
-        return tree;
+        tree
     }
 }
 

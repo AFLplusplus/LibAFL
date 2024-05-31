@@ -2,7 +2,7 @@
 Loaded Dice
 ============
 
-A simple crate that implements a random sampler implementing the alias method (https://en.wikipedia.org/wiki/Alias_method). It can be used to sample from discrete probability distributions efficiently (`O(1)` per sample). One uses it by passing a vector of probabilities to the constructor. The constructor builds a data structure in `O(n*n*log(n))` (Note: It would be quite possible to implement this in `O(n*log(n))`, however for reasonable sized number of values this method is faster than using the more efficient data structures. If the construction is slow in your case, you might consider using min/max heaps instead of resorting the array after each construction step). This data structure can then be used to to sample a numbers between `0` and `n` with the corresponding probabilities.
+A simple crate that implements a random sampler implementing the [alias method](https://en.wikipedia.org/wiki/Alias_method). It can be used to sample from discrete probability distributions efficiently (`O(1)` per sample). One uses it by passing a vector of probabilities to the constructor. The constructor builds a data structure in `O(n*n*log(n))` (Note: It would be quite possible to implement this in `O(n*log(n))`, however for reasonable sized number of values this method is faster than using the more efficient data structures. If the construction is slow in your case, you might consider using min/max heaps instead of resorting the array after each construction step). This data structure can then be used to to sample a numbers between `0` and `n` with the corresponding probabilities.
 
 Assume we want to sample from the following distribution: `p(0)=0.5, p(1)=0.3, p(2)=0.1, p(3)=0.1`:
 
@@ -53,8 +53,8 @@ pub struct LoadedDiceSampler {
 }
 
 impl LoadedDiceSampler {
-
     /// Create a new [`LoadedDiceSampler`] with the given probabilities
+    #[must_use]
     pub fn new(probs: Vec<f64>) -> Self {
         let entries = LoadedDiceSampler::construct_table(probs);
         Self { entries }
@@ -73,6 +73,7 @@ impl LoadedDiceSampler {
     }
 
     /// Create the table for this [`LoadedDiceSampler`]
+    #[allow(clippy::cast_precision_loss)]
     fn construct_table(probs: Vec<f64>) -> Vec<AliasEntry> {
         let mut res = vec![];
         let n = probs.len() as f64;
@@ -93,7 +94,7 @@ impl LoadedDiceSampler {
         }
         let (last_i, last_p) = tmp.pop().unwrap();
         assert!(0.999 < last_p * n && last_p * n < 1.001); // last value should always be exactly 1 but floats...
-        res.push(AliasEntry::new(last_i, core::usize::MAX, 1.0));
+        res.push(AliasEntry::new(last_i, usize::MAX, 1.0));
 
         res
     }
@@ -103,12 +104,12 @@ impl LoadedDiceSampler {
 mod tests {
     use alloc::vec::Vec;
 
+    use super::LoadedDiceSampler;
     use crate::rands::{Rand, StdRand};
 
-    use super::LoadedDiceSampler;
-
     #[test]
-    fn it_works() {
+    #[allow(clippy::cast_precision_loss)]
+    fn test_loaded_dice() {
         let mut rng = StdRand::new();
         let len = rng.between(3, 9);
         let base = (0..len).map(|_| rng.next_float()).collect::<Vec<_>>();

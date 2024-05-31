@@ -18,13 +18,15 @@ pub struct Mutator {
 }
 
 impl Mutator {
+    #[must_use]
     pub fn new(ctx: &Context) -> Self {
-        return Mutator {
+        Mutator {
             scratchpad: Tree::from_rule_vec(vec![], ctx),
-        };
+        }
     }
 
     //Return value indicates if minimization is complete: true: complete, false: not complete
+    #[allow(clippy::too_many_arguments)]
     pub fn minimize_tree<F, R: Rand>(
         &mut self,
         rand: &mut R,
@@ -44,7 +46,7 @@ impl Mutator {
             let nt = tree.get_rule(n, ctx).nonterm();
             if tree.subtree_size(n) > ctx.get_min_len_for_nt(nt) {
                 self.scratchpad
-                    .generate_from_nt(rand, nt, ctx.get_min_len_for_nt(nt), &ctx);
+                    .generate_from_nt(rand, nt, ctx.get_min_len_for_nt(nt), ctx);
                 if let Some(t) = Mutator::test_and_convert(
                     tree,
                     n,
@@ -62,7 +64,7 @@ impl Mutator {
                 return Ok(false);
             }
         }
-        return Ok(true);
+        Ok(true)
     }
 
     //Return value indicates if minimization is complete: true: complete, false: not complete
@@ -191,7 +193,7 @@ impl Mutator {
             let repl = tree.mutate_replace_from_tree(n, &self.scratchpad, NodeId::from(0));
             tester(&repl, ctx)?;
         }
-        return Ok(());
+        Ok(())
     }
 
     pub fn mut_random_recursion<F, R: Rand>(

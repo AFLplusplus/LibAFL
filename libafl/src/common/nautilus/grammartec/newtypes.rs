@@ -18,25 +18,26 @@ impl RuleId {
 }
 
 impl From<usize> for RuleId {
-    fn from(i: usize) -> Self {
-        return RuleId(i);
+    fn from(i: usize) -> RuleId {
+        RuleId(i)
     }
 }
 
-impl Into<usize> for RuleId {
-    fn into(self) -> usize {
-        return self.0;
+impl From<RuleId> for usize {
+    fn from(rule: RuleId) -> usize {
+        rule.0
     }
 }
 
 impl Add<usize> for RuleId {
     type Output = RuleId;
     fn add(self, rhs: usize) -> RuleId {
-        return RuleId(self.0 + rhs);
+        RuleId(self.0 + rhs)
     }
 }
 
 impl NodeId {
+    #[must_use]
     pub fn to_i(&self) -> usize {
         self.0
     }
@@ -44,25 +45,25 @@ impl NodeId {
 
 impl From<usize> for NodeId {
     fn from(i: usize) -> Self {
-        return NodeId(i);
+        NodeId(i)
     }
 }
 
 impl Into<usize> for NodeId {
     fn into(self) -> usize {
-        return self.0;
+        self.0
     }
 }
 
 impl Add<usize> for NodeId {
     type Output = NodeId;
     fn add(self, rhs: usize) -> NodeId {
-        return NodeId(self.0 + rhs);
+        NodeId(self.0 + rhs)
     }
 }
 
 impl NodeId {
-    fn steps_between(start: &Self, end: &Self) -> Option<usize> {
+    fn steps_between(start: Self, end: Self) -> Option<usize> {
         let start_i = start.to_i();
         let end_i = end.to_i();
         if start > end {

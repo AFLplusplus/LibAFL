@@ -56,7 +56,7 @@ fn splitmix64(x: &mut u64) -> u64 {
 pub type StdRand = RomuDuoJrRand;
 
 /// Choose an item at random from the given iterator, sampling uniformly.
-/// 
+///
 /// Will only return `None` for an empty iterator.
 ///
 /// Note: the runtime cost is bound by the iterator's [`nth`][`Iterator::nth`] implementation
@@ -137,17 +137,18 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
     }
 
     /// Convenient variant of [`choose`].
-    /// 
+    ///
     /// This method uses [`Iterator::size_hint`] for optimization. With an
     /// accurate hint and where [`Iterator::nth`] is a constant-time operation
     /// this method can offer `O(1)` performance. Where no size hint is
     /// available, complexity is `O(n)` where `n` is the iterator length.
     /// Partial hints (where `lower > 0`) also improve performance.
-    /// 
+    ///
     /// Copy&paste from [`rand::IteratorRandom`](https://docs.rs/rand/0.8.5/rand/seq/trait.IteratorRandom.html#method.choose)
     fn choose<I>(&mut self, from: I) -> Option<I::Item>
     where
-        I: IntoIterator {
+        I: IntoIterator,
+    {
         let mut iter = from.into_iter();
         let (mut lower, mut upper) = iter.size_hint();
         let mut consumed = 0;
@@ -197,7 +198,6 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
             upper = hint.1;
         }
     }
-
 }
 
 macro_rules! impl_default_new {

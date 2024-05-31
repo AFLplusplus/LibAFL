@@ -45,7 +45,7 @@ impl ChunkStore {
             nts_to_chunks: HashMap::new(),
             seen_outputs: HashSet::new(),
             trees: vec![],
-            work_dir: work_dir,
+            work_dir,
             number_of_chunks: 0,
         };
     }
