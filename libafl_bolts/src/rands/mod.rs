@@ -8,6 +8,7 @@ use core::{
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
+#[cfg(feature = "alloc")]
 pub mod loaded_dice;
 
 /// Return a pseudo-random seed. For `no_std` environments, a single deterministic sequence is used.
