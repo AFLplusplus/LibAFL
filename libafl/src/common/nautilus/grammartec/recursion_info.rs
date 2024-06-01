@@ -86,7 +86,7 @@ impl RecursionInfo {
         for v in &mut weights {
             *v /= norm;
         }
-        LoadedDiceSampler::new(weights)
+        LoadedDiceSampler::new(&weights)
     }
 
     pub fn get_random_recursion_pair<R: Rand>(&mut self, rand: &mut R) -> (NodeId, NodeId) {

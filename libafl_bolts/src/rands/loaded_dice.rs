@@ -54,7 +54,7 @@ pub struct LoadedDiceSampler {
 impl LoadedDiceSampler {
     /// Create a new [`LoadedDiceSampler`] with the given probabilities
     #[must_use]
-    pub fn new(probs: Vec<f64>) -> Self {
+    pub fn new(probs: &[f64]) -> Self {
         let entries = LoadedDiceSampler::construct_table(probs);
         Self { entries }
     }
@@ -73,12 +73,12 @@ impl LoadedDiceSampler {
 
     /// Create the table for this [`LoadedDiceSampler`]
     #[allow(clippy::cast_precision_loss)]
-    fn construct_table(probs: Vec<f64>) -> Vec<AliasEntry> {
+    fn construct_table(probs: &[f64]) -> Vec<AliasEntry> {
         let mut res = vec![];
         let n = probs.len() as f64;
         let inv_n = 1.0 / probs.len() as f64;
 
-        let mut tmp = { probs.into_iter().enumerate().collect::<Vec<_>>() };
+        let mut tmp = { probs.into_iter().copied().enumerate().collect::<Vec<_>>() };
 
         while tmp.len() > 1 {
             // eqv: rust sort ist optimized for nearly sorted cases, so I assume that a
@@ -114,7 +114,7 @@ mod tests {
         let base = (0..len).map(|_| rng.next_float()).collect::<Vec<_>>();
         let sum: f64 = base.iter().sum();
         let base = base.iter().map(|v| v / sum).collect::<Vec<_>>();
-        let mut s = LoadedDiceSampler::new(base.clone());
+        let mut s = LoadedDiceSampler::new(&base);
         let mut res: Vec<usize> = vec![0; len];
         let iter: usize = 1000000;
         for _ in 0..iter {
