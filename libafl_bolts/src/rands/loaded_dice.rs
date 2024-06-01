@@ -11,7 +11,7 @@ Assume we want to sample from the following distribution: `p(0)=0.5, p(1)=0.3, p
 use libafl_bolts::rands::{StdRand, loaded_dice::LoadedDiceSampler};
 fn main() {
     let mut rand = StdRand::new();
-    let mut sampler = LoadedDiceSampler::new(vec![0.5, 0.3, 0.1, 0.1]);
+    let mut sampler = LoadedDiceSampler::new(&[0.5, 0.3, 0.1, 0.1]);
     let iter: usize = 100;
     for i in (0..iter) {
         println!("{}", sampler.sample(&mut rand));
@@ -114,11 +114,11 @@ mod tests {
         let base = (0..len).map(|_| rng.next_float()).collect::<Vec<_>>();
         let sum: f64 = base.iter().sum();
         let base = base.iter().map(|v| v / sum).collect::<Vec<_>>();
-        let mut s = LoadedDiceSampler::new(&base);
+        let mut sampler = LoadedDiceSampler::new(&base);
         let mut res: Vec<usize> = vec![0; len];
         let iter: usize = 1000000;
         for _ in 0..iter {
-            let i = s.sample(&mut rng);
+            let i = sampler.sample(&mut rng);
             res[i] += 1;
         }
         let _res_p = res
