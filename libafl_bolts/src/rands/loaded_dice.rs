@@ -7,15 +7,14 @@ A simple crate that implements a random sampler implementing the [alias method](
 Assume we want to sample from the following distribution: `p(0)=0.5, p(1)=0.3, p(2)=0.1, p(3)=0.1`:
 
 ```rust
-extern crate libafl_bolts;
-
+# extern crate libafl_bolts;
 use libafl_bolts::rands::{StdRand, loaded_dice::LoadedDiceSampler};
 fn main() {
-    let mut s = LoadedDiceSampler::new(vec!(0.5, 0.3, 0.1, 0.1)));
     let mut rand = StdRand::new();
+    let mut sampler = LoadedDiceSampler::new(vec![0.5, 0.3, 0.1, 0.1]);
     let iter: usize = 100;
     for i in (0..iter) {
-        println!("{}", s.sample(&mut rand));
+        println!("{}", sampler.sample(&mut rand));
     }
 }
 ```
