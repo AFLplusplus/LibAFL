@@ -109,7 +109,7 @@ mod tests {
     #[test]
     #[allow(clippy::cast_precision_loss)]
     fn test_loaded_dice() {
-        let mut rng = StdRand::new();
+        let mut rng = StdRand::with_seed(1337);
         let len = rng.between(3, 9);
         let base = (0..len).map(|_| rng.next_float()).collect::<Vec<_>>();
         let sum: f64 = base.iter().sum();
