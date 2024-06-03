@@ -8,15 +8,15 @@ use alloc::{rc::Rc, string::String, vec::Vec};
 use core::cell::RefCell;
 use std::hash::{Hash, Hasher};
 
-use grammartec::{
-    newtypes::NodeID,
-    rule::RuleIDOrCustom,
-    tree::{Tree, TreeLike},
-};
 use libafl_bolts::HasLen;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    common::nautilus::grammartec::{
+        newtypes::NodeId,
+        rule::RuleIdOrCustom,
+        tree::{Tree, TreeLike},
+    },
     generators::nautilus::NautilusContext,
     inputs::{BytesInput, Input, InputConverter},
     Error,
@@ -78,7 +78,7 @@ impl NautilusInput {
     /// Generate a `Nautilus` input from the given bytes
     pub fn unparse(&self, context: &NautilusContext, bytes: &mut Vec<u8>) {
         bytes.clear();
-        self.tree.unparse(NodeID::from(0), &context.ctx, bytes);
+        self.tree.unparse(NodeId::from(0), &context.ctx, bytes);
     }
 
     /// Get the tree representation of this input
@@ -99,11 +99,11 @@ impl Hash for NautilusInput {
         self.tree().paren.hash(state);
         for r in &self.tree().rules {
             match r {
-                RuleIDOrCustom::Custom(a, b) => {
+                RuleIdOrCustom::Custom(a, b) => {
                     a.hash(state);
                     b.hash(state);
                 }
-                RuleIDOrCustom::Rule(a) => a.hash(state),
+                RuleIdOrCustom::Rule(a) => a.hash(state),
             }
         }
         self.tree().sizes.hash(state);

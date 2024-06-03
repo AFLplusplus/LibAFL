@@ -130,13 +130,8 @@ llmp_debug = ["std", "libafl_bolts/llmp_debug"]
 ## Reduces the initial map size for llmp
 llmp_small_maps = ["libafl_bolts/llmp_small_maps"] # reduces initial map size for llmp
 
-#! ## License-Changing Dependencies(!)
-
-## Enables all features hiding dependencies licensed under `AGPL`
-agpl = ["nautilus"]
-
-## Enables the [`Nautilus`](https://wcventure.github.io/FuzzingPaper/Paper/NDSS19_Nautilus.pdf) Grammar Mutator (AGPL-licensed)
-nautilus = ["grammartec", "std", "serde_json/std"]
+## Grammar mutator. Requires nightly.
+nautilus = ["std", "serde_json/std", "pyo3", "rand_trait", "regex-syntax"]
 
 [build-dependencies]
 rustversion = "1.0"
@@ -193,15 +188,14 @@ arrayvec = { version = "0.7.4", optional = true, default-features = false } # us
 const_format = "0.2.32" # used for providing helpful compiler output
 const_panic = "0.2.8" # similarly, for formatting const panic output
 
+pyo3 = { version = "0.18.3", optional = true } # For nautilus
+regex-syntax = { version = "0.8.3", optional = true } # For nautilus
+
 # optional-dev deps (change when target.'cfg(accessible(::std))'.test-dependencies will be stable)
 serial_test = { version = "3", optional = true, default-features = false, features = ["logging"] }
 
 # Document all features of this crate (for `cargo doc`)
 document-features = { version = "0.2", optional = true }
-
-# AGPL
-# !!! this create requires nightly
-grammartec = { version = "0.3.1", optional = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2" # For (*nix) libc

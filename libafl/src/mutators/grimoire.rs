@@ -51,8 +51,8 @@ where
                 {
                     gap_indices.push(i);
                 }
-                let min_idx = *choose(&*gap_indices, rand1);
-                let max_idx = *choose(&*gap_indices, rand2);
+                let min_idx = *choose(&*gap_indices, rand1).unwrap();
+                let max_idx = *choose(&*gap_indices, rand2).unwrap();
                 let (mut min_idx, max_idx) = (min(min_idx, max_idx), max(min_idx, max_idx));
 
                 gap_indices.clear();
@@ -73,7 +73,7 @@ where
 
         if let Some(meta) = state.metadata_map().get::<Tokens>() {
             if !meta.tokens().is_empty() {
-                let tok = choose(meta.tokens(), rand1);
+                let tok = choose(meta.tokens(), rand1).unwrap();
                 if items.last() != Some(&GeneralizedItem::Gap) {
                     items.push(GeneralizedItem::Gap);
                 }
@@ -169,7 +169,10 @@ where
     ) -> Result<MutationResult, Error> {
         let mut mutated = MutationResult::Skipped;
 
-        let depth = *state.rand_mut().choose(&RECURSIVE_REPLACEMENT_DEPTH);
+        let depth = *state
+            .rand_mut()
+            .choose(&RECURSIVE_REPLACEMENT_DEPTH)
+            .unwrap();
         for _ in 0..depth {
             if generalised_meta.generalized_len() >= MAX_RECURSIVE_REPLACEMENT_LEN {
                 break;
@@ -187,7 +190,7 @@ where
             if self.gap_indices.is_empty() {
                 break;
             }
-            let selected = *state.rand_mut().choose(&self.gap_indices);
+            let selected = *state.rand_mut().choose(&self.gap_indices).unwrap();
             self.gap_indices.clear();
 
             self.scratch.extend_from_slice(&gen[selected + 1..]);

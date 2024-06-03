@@ -1,12 +1,12 @@
 #[cfg(emulation_mode = "systemmode")]
 use std::collections::HashSet;
 use std::{
-    collections::HashMap,
     fmt::{Debug, Display, Error, Formatter},
     rc::Rc,
 };
 
 use enum_map::{Enum, EnumMap};
+use hashbrown::HashMap;
 use libafl::{
     executors::ExitKind,
     inputs::HasTargetBytes,
@@ -28,8 +28,8 @@ use crate::{
     sync_exit::ExitArgs,
     Emulator, EmulatorExitHandler, EmulatorMemoryChunk, ExitHandlerError, ExitHandlerResult,
     GuestReg, HasInstrumentationFilter, InputLocation, IsFilter, IsSnapshotManager, Qemu,
-    QemuHelperTuple, QemuInstrumentationAddressRangeFilter, Regs, StdEmulatorExitHandler,
-    StdInstrumentationFilter, CPU,
+    QemuHelperTuple, QemuInstrumentationAddressRangeFilter, QemuRWError, Regs,
+    StdEmulatorExitHandler, StdInstrumentationFilter, CPU,
 };
 
 pub mod parser;
@@ -217,13 +217,13 @@ pub type AddressRangeFilterCommand = FilterCommand<QemuInstrumentationAddressRan
 #[derive(Debug, Clone)]
 pub enum CommandError {
     UnknownCommand(GuestReg),
-    RegError(String),
+    RWError(QemuRWError),
     VersionDifference(u64),
 }
 
-impl From<String> for CommandError {
-    fn from(error_string: String) -> Self {
-        CommandError::RegError(error_string)
+impl From<QemuRWError> for CommandError {
+    fn from(error: QemuRWError) -> Self {
+        CommandError::RWError(error)
     }
 }
 
