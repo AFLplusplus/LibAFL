@@ -723,14 +723,12 @@ impl TuiUI {
     }
 
     #[cfg(feature = "introspection")]
-    fn draw_introspection_text<B>(
+    fn draw_introspection_text(
         &mut self,
         f: &mut Frame,
         app: &Arc<RwLock<TuiContext>>,
         area: Rect,
-    ) where
-        B: Backend,
-    {
+    ) {
         let mut items = vec![];
         {
             let ctx = app.read().unwrap();
@@ -769,7 +767,8 @@ impl TuiUI {
             };
         }
 
-        let table = Table::new(items)
+        let table = Table::default()
+            .rows(items)
             .block(
                 Block::default()
                     .title(Span::styled(
@@ -780,7 +779,7 @@ impl TuiUI {
                     ))
                     .borders(Borders::ALL),
             )
-            .widths(&[Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)]);
+            .widths([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)]);
         f.render_widget(table, area);
     }
     #[allow(clippy::unused_self)]
