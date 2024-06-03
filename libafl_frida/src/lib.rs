@@ -3,8 +3,9 @@ The [`Frida`](https://frida.re) executor is a binary-only mode for `LibAFL`.
 It can report coverage and, on supported architectures, even reports memory access errors.
 
 Additional documentation is available in [the `LibAFL` book](https://aflplus.plus/libafl-book/advanced_features/frida.html).
-*/
 
+*/
+#![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
 #![forbid(unexpected_cfgs)]
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(clippy::all)]
