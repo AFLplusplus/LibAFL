@@ -5,10 +5,10 @@ use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple};
 use libafl_bolts::tuples::{MatchFirstType, SplitBorrowExtractFirstType};
 use libafl_qemu_sys::{GuestAddr, GuestPhysAddr};
 
-use crate::{hooks::QemuHooks, Qemu};
+use crate::Qemu;
 
 pub mod edges;
-pub use edges::QemuEdgeCoverageHelper;
+pub use edges::QemuEdgeCoverageTool;
 
 #[cfg(not(cpu_target = "hexagon"))]
 pub mod calls;
@@ -40,7 +40,9 @@ pub use snapshot::QemuSnapshotHelper;
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
 pub mod asan;
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
-pub use asan::{init_qemu_with_asan, QemuAsanHelper};
+pub use asan::{init_qemu_with_asan, QemuAsanTool};
+
+use crate::emu::hooks::EmulatorTools;
 
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
 pub mod asan_guest;
@@ -49,93 +51,157 @@ pub use asan_guest::{init_qemu_with_asan_guest, QemuAsanGuestHelper};
 
 /// A helper for `libafl_qemu`.
 // TODO remove 'static when specialization will be stable
-pub trait QemuHelper<S>: 'static + Debug
+pub trait EmulatorTool<S>: 'static + Debug
 where
-    S: UsesInput,
+    S: Unpin + UsesInput,
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = true;
 
-    fn init_hooks<QT>(&self, _hooks: &QemuHooks<QT, S>)
+    /// Initialize the tool, mostly used to install some hooks early.
+    fn init_tool<QT>(&self, _emulator_tools: &mut EmulatorTools<QT, S>)
     where
-        QT: QemuHelperTuple<S>,
+        QT: EmulatorToolTuple<S>,
     {
     }
 
-    fn first_exec<QT>(&self, _hooks: &QemuHooks<QT, S>)
+    fn first_exec<QT>(&self, _emulator_tools: &mut EmulatorTools<QT, S>)
     where
-        QT: QemuHelperTuple<S>,
+        QT: EmulatorToolTuple<S>,
     {
     }
 
-    fn pre_exec(&mut self, _qemu: Qemu, _input: &S::Input) {}
+    fn pre_exec<QT>(&mut self, _emulator_tools: &mut EmulatorTools<QT, S>, _input: &S::Input)
+    where
+        QT: EmulatorToolTuple<S>,
+    {
+    }
 
-    fn post_exec<OT>(
+    fn post_exec<OT, QT>(
         &mut self,
-        _qemu: Qemu,
+        _emulator_tools: &mut EmulatorTools<QT, S>,
         _input: &S::Input,
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
+        QT: EmulatorToolTuple<S>,
     {
     }
 }
 
-pub trait QemuHelperTuple<S>: MatchFirstType + for<'a> SplitBorrowExtractFirstType<'a>
+pub trait EmulatorToolTuple<S>:
+    MatchFirstType + for<'a> SplitBorrowExtractFirstType<'a> + Unpin
 where
-    S: UsesInput,
+    S: Unpin + UsesInput,
 {
     const HOOKS_DO_SIDE_EFFECTS: bool;
 
-    fn init_hooks_all<QT>(&self, hooks: &QemuHooks<QT, S>)
+    fn init_tools_all<QT>(&self, _emulator_tools: &mut EmulatorTools<QT, S>)
     where
-        QT: QemuHelperTuple<S>;
+        QT: EmulatorToolTuple<S>;
 
-    fn first_exec_all<QT>(&self, hooks: &QemuHooks<QT, S>)
+    fn first_exec_all<QT>(&self, _emulator_tools: &mut EmulatorTools<QT, S>)
     where
-        QT: QemuHelperTuple<S>;
+        QT: EmulatorToolTuple<S>;
 
-    fn pre_exec_all(&mut self, _qemu: Qemu, input: &S::Input);
+    fn pre_exec_all<QT>(&mut self, _emulator_tools: &mut EmulatorTools<QT, S>, _input: &S::Input)
+    where
+        QT: EmulatorToolTuple<S>;
 
-    fn post_exec_all<OT>(
+    fn post_exec_all<OT, QT>(
         &mut self,
-        _qemu: Qemu,
-        input: &S::Input,
-        _observers: &mut OT,
-        _exit_kind: &mut ExitKind,
-    ) where
-        OT: ObserversTuple<S>;
-}
-
-impl<S> QemuHelperTuple<S> for ()
-where
-    S: UsesInput,
-{
-    const HOOKS_DO_SIDE_EFFECTS: bool = false;
-
-    fn init_hooks_all<QT>(&self, _hooks: &QemuHooks<QT, S>)
-    where
-        QT: QemuHelperTuple<S>,
-    {
-    }
-
-    fn first_exec_all<QT>(&self, _hooks: &QemuHooks<QT, S>)
-    where
-        QT: QemuHelperTuple<S>,
-    {
-    }
-
-    fn pre_exec_all(&mut self, _qemu: Qemu, _input: &S::Input) {}
-
-    fn post_exec_all<OT>(
-        &mut self,
-        _qemu: Qemu,
+        _emulator_tools: &mut EmulatorTools<QT, S>,
         _input: &S::Input,
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
+        QT: EmulatorToolTuple<S>;
+}
+
+impl<S> EmulatorToolTuple<S> for ()
+where
+    S: Unpin + UsesInput,
+{
+    const HOOKS_DO_SIDE_EFFECTS: bool = false;
+
+    fn init_tools_all<QT>(&self, _emulator_tools: &mut EmulatorTools<QT, S>)
+    where
+        QT: EmulatorToolTuple<S>,
     {
+    }
+
+    fn first_exec_all<QT>(&self, _emulator_tools: &mut EmulatorTools<QT, S>)
+    where
+        QT: EmulatorToolTuple<S>,
+    {
+    }
+
+    fn pre_exec_all<QT>(&mut self, _emulator_tools: &mut EmulatorTools<QT, S>, _input: &S::Input)
+    where
+        QT: EmulatorToolTuple<S>,
+    {
+    }
+
+    fn post_exec_all<OT, QT>(
+        &mut self,
+        _emulator_tools: &mut EmulatorTools<QT, S>,
+        _input: &S::Input,
+        _observers: &mut OT,
+        _exit_kind: &mut ExitKind,
+    ) where
+        OT: ObserversTuple<S>,
+        QT: EmulatorToolTuple<S>,
+    {
+    }
+}
+
+impl<Head, Tail, S> EmulatorToolTuple<S> for (Head, Tail)
+where
+    Head: EmulatorTool<S> + Unpin,
+    Tail: EmulatorToolTuple<S>,
+    S: Unpin + UsesInput,
+{
+    const HOOKS_DO_SIDE_EFFECTS: bool = Head::HOOKS_DO_SIDE_EFFECTS || Tail::HOOKS_DO_SIDE_EFFECTS;
+
+    fn init_tools_all<QT>(&self, emulator_tools: &mut EmulatorTools<QT, S>)
+    where
+        QT: EmulatorToolTuple<S>,
+    {
+        self.0.init_tool(emulator_tools);
+        self.1.init_tools_all(emulator_tools);
+    }
+
+    fn first_exec_all<QT>(&self, emulator_tools: &mut EmulatorTools<QT, S>)
+    where
+        QT: EmulatorToolTuple<S>,
+    {
+        self.0.first_exec(emulator_tools);
+        self.1.first_exec_all(emulator_tools);
+    }
+
+    fn pre_exec_all<QT>(&mut self, emulator_tools: &mut EmulatorTools<QT, S>, input: &S::Input)
+    where
+        QT: EmulatorToolTuple<S>,
+    {
+        self.0.pre_exec(emulator_tools, input);
+        self.1.pre_exec_all(emulator_tools, input);
+    }
+
+    fn post_exec_all<OT, QT>(
+        &mut self,
+        emulator_tools: &mut EmulatorTools<QT, S>,
+        input: &S::Input,
+        observers: &mut OT,
+        exit_kind: &mut ExitKind,
+    ) where
+        OT: ObserversTuple<S>,
+        QT: EmulatorToolTuple<S>,
+    {
+        self.0
+            .post_exec(emulator_tools, input, observers, exit_kind);
+        self.1
+            .post_exec_all(emulator_tools, input, observers, exit_kind);
     }
 }
 
@@ -160,49 +226,6 @@ where
 
     fn filter_mut(&mut self) -> &mut F {
         self.0.filter_mut()
-    }
-}
-
-impl<Head, Tail, S> QemuHelperTuple<S> for (Head, Tail)
-where
-    Head: QemuHelper<S>,
-    Tail: QemuHelperTuple<S>,
-    S: UsesInput,
-{
-    const HOOKS_DO_SIDE_EFFECTS: bool = Head::HOOKS_DO_SIDE_EFFECTS || Tail::HOOKS_DO_SIDE_EFFECTS;
-
-    fn init_hooks_all<QT>(&self, hooks: &QemuHooks<QT, S>)
-    where
-        QT: QemuHelperTuple<S>,
-    {
-        self.0.init_hooks(hooks);
-        self.1.init_hooks_all(hooks);
-    }
-
-    fn first_exec_all<QT>(&self, hooks: &QemuHooks<QT, S>)
-    where
-        QT: QemuHelperTuple<S>,
-    {
-        self.0.first_exec(hooks);
-        self.1.first_exec_all(hooks);
-    }
-
-    fn pre_exec_all(&mut self, qemu: Qemu, input: &S::Input) {
-        self.0.pre_exec(qemu, input);
-        self.1.pre_exec_all(qemu, input);
-    }
-
-    fn post_exec_all<OT>(
-        &mut self,
-        qemu: Qemu,
-        input: &S::Input,
-        observers: &mut OT,
-        exit_kind: &mut ExitKind,
-    ) where
-        OT: ObserversTuple<S>,
-    {
-        self.0.post_exec(qemu, input, observers, exit_kind);
-        self.1.post_exec_all(qemu, input, observers, exit_kind);
     }
 }
 

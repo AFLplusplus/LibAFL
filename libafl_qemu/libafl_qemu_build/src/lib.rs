@@ -389,8 +389,8 @@ pub fn maybe_generate_stub_bindings(
 pub fn maybe_generate_stub_bindings(
     _cpu_target: &str,
     _emulation_mode: &str,
-    _stub_bindings_file: &PathBuf,
-    _bindings_file: &PathBuf,
+    _stub_bindings_file: &Path,
+    _bindings_file: &Path,
 ) {
     // Do nothing
 }

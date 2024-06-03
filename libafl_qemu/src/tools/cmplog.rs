@@ -14,11 +14,10 @@ use serde::{Deserialize, Serialize};
 #[cfg(emulation_mode = "usermode")]
 use crate::{capstone, qemu::ArchExtras, CallingConvention, Qemu};
 use crate::{
-    helpers::{
-        hash_me, HasInstrumentationFilter, IsFilter, QemuHelper, QemuHelperTuple,
-        QemuInstrumentationAddressRangeFilter,
-    },
-    hooks::{Hook, QemuHooks},
+    emu::hooks::EmulatorTools,
+    qemu::hooks::Hook,
+    tools::{hash_me, HasInstrumentationFilter, IsFilter, QemuInstrumentationAddressRangeFilter},
+    EmulatorTool, EmulatorToolTuple,
 };
 
 #[cfg_attr(
@@ -76,15 +75,15 @@ impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuCmp
     }
 }
 
-impl<S> QemuHelper<S> for QemuCmpLogHelper
+impl<S> EmulatorTool<S> for QemuCmpLogHelper
 where
-    S: UsesInput + HasMetadata,
+    S: Unpin + UsesInput + HasMetadata,
 {
-    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
+    fn first_exec<QT>(&self, emulator_tools: &mut EmulatorTools<QT, S>)
     where
-        QT: QemuHelperTuple<S>,
+        QT: EmulatorToolTuple<S>,
     {
-        hooks.cmps(
+        emulator_tools.cmps(
             Hook::Function(gen_unique_cmp_ids::<QT, S>),
             Hook::Raw(trace_cmp1_cmplog),
             Hook::Raw(trace_cmp2_cmplog),
@@ -117,18 +116,17 @@ impl Default for QemuCmpLogChildHelper {
     }
 }
 
-impl<S> QemuHelper<S> for QemuCmpLogChildHelper
+impl<S> EmulatorTool<S> for QemuCmpLogChildHelper
 where
-    S: UsesInput,
-    S: HasMetadata,
+    S: Unpin + UsesInput + HasMetadata,
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
+    fn first_exec<QT>(&self, emulator_tools: &mut EmulatorTools<QT, S>)
     where
-        QT: QemuHelperTuple<S>,
+        QT: EmulatorToolTuple<S>,
     {
-        hooks.cmps(
+        emulator_tools.cmps(
             Hook::Function(gen_hashed_cmp_ids::<QT, S>),
             Hook::Raw(trace_cmp1_cmplog),
             Hook::Raw(trace_cmp2_cmplog),
@@ -139,17 +137,16 @@ where
 }
 
 pub fn gen_unique_cmp_ids<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+    emulator_tools: &mut EmulatorTools<QT, S>,
     state: Option<&mut S>,
     pc: GuestAddr,
     _size: usize,
 ) -> Option<u64>
 where
-    S: HasMetadata,
-    S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    QT: EmulatorToolTuple<S>,
+    S: Unpin + UsesInput + HasMetadata,
 {
-    if let Some(h) = hooks.match_helper_mut::<QemuCmpLogHelper>() {
+    if let Some(h) = emulator_tools.match_tool::<QemuCmpLogHelper>() {
         if !h.must_instrument(pc) {
             return None;
         }
@@ -171,17 +168,16 @@ where
 }
 
 pub fn gen_hashed_cmp_ids<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+    emulator_tools: &mut EmulatorTools<QT, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
     _size: usize,
 ) -> Option<u64>
 where
-    S: HasMetadata,
-    S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    S: HasMetadata + Unpin + UsesInput,
+    QT: EmulatorToolTuple<S>,
 {
-    if let Some(h) = hooks.match_helper_mut::<QemuCmpLogChildHelper>() {
+    if let Some(h) = emulator_tools.match_tool::<QemuCmpLogChildHelper>() {
         if !h.must_instrument(pc) {
             return None;
         }
@@ -263,15 +259,15 @@ impl QemuCmpLogRoutinesHelper {
     }
 
     fn gen_blocks_calls<QT, S>(
-        hooks: &mut QemuHooks<QT, S>,
+        emulator_tools: &mut EmulatorTools<QT, S>,
         _state: Option<&mut S>,
         pc: GuestAddr,
     ) -> Option<u64>
     where
-        S: UsesInput,
-        QT: QemuHelperTuple<S>,
+        S: Unpin + UsesInput,
+        QT: EmulatorToolTuple<S>,
     {
-        if let Some(h) = hooks.helpers_mut().match_first_type_mut::<Self>() {
+        if let Some(h) = emulator_tools.match_tool::<Self>() {
             if !h.must_instrument(pc) {
                 return None;
             }
@@ -285,9 +281,9 @@ impl QemuCmpLogRoutinesHelper {
             .unwrap();
         }
 
-        let qemu = hooks.qemu();
+        let qemu = emulator_tools.qemu();
 
-        if let Some(h) = hooks.helpers().match_first_type::<Self>() {
+        if let Some(h) = emulator_tools.match_tool::<Self>() {
             #[allow(unused_mut)]
             let mut code = {
                 #[cfg(emulation_mode = "usermode")]
@@ -314,7 +310,12 @@ impl QemuCmpLogRoutinesHelper {
                     match u32::from(detail.0) {
                         capstone::InsnGroupType::CS_GRP_CALL => {
                             let k = (hash_me(pc.into())) & (CMPLOG_MAP_W as u64 - 1);
-                            qemu.set_hook(k, insn.address() as GuestAddr, Self::on_call, false);
+                            qemu.hooks().add_instruction_hooks(
+                                k,
+                                insn.address() as GuestAddr,
+                                Self::on_call,
+                                false,
+                            );
                         }
                         capstone::InsnGroupType::CS_GRP_RET
                         | capstone::InsnGroupType::CS_GRP_INVALID
@@ -356,15 +357,15 @@ impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuCmp
 }
 
 #[cfg(emulation_mode = "usermode")]
-impl<S> QemuHelper<S> for QemuCmpLogRoutinesHelper
+impl<S> EmulatorTool<S> for QemuCmpLogRoutinesHelper
 where
-    S: UsesInput,
+    S: Unpin + UsesInput,
 {
-    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
+    fn first_exec<QT>(&self, emulator_tools: &mut EmulatorTools<QT, S>)
     where
-        QT: QemuHelperTuple<S>,
+        QT: EmulatorToolTuple<S>,
     {
-        hooks.blocks(
+        emulator_tools.blocks(
             Hook::Function(Self::gen_blocks_calls::<QT, S>),
             Hook::Empty,
             Hook::Empty,

@@ -7,19 +7,16 @@ use std::{
     path::PathBuf,
 };
 
-use libafl::{inputs::UsesInput, HasMetadata};
+use libafl::inputs::UsesInput;
 
 #[cfg(not(feature = "clippy"))]
 use crate::sys::libafl_tcg_gen_asan;
 use crate::{
-    helpers::{
-        HasInstrumentationFilter, IsFilter, QemuHelper, QemuHelperTuple,
-        QemuInstrumentationAddressRangeFilter,
-    },
-    hooks::{Hook, QemuHooks},
-    qemu::{MemAccessInfo, Qemu, QemuInitError},
+    emu::hooks::EmulatorTools,
+    qemu::{hooks::Hook, MemAccessInfo, Qemu, QemuInitError},
     sys::TCGTemp,
-    GuestAddr, MapInfo,
+    tools::{HasInstrumentationFilter, IsFilter, QemuInstrumentationAddressRangeFilter},
+    EmulatorTool, EmulatorToolTuple, GuestAddr, MapInfo,
 };
 
 static mut ASAN_GUEST_INITED: bool = false;
@@ -208,17 +205,19 @@ impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuAsa
 }
 
 fn gen_readwrite_guest_asan<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+    emulator_tools: &mut EmulatorTools<QT, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
     addr: *mut TCGTemp,
     info: MemAccessInfo,
 ) -> Option<u64>
 where
-    S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    S: Unpin + UsesInput,
+    QT: EmulatorToolTuple<S>,
 {
-    let h = hooks.match_helper_mut::<QemuAsanGuestHelper>().unwrap();
+    let h = emulator_tools
+        .match_tool_mut::<QemuAsanGuestHelper>()
+        .unwrap();
     if !h.must_instrument(pc) {
         return None;
     }
@@ -245,39 +244,40 @@ where
 unsafe fn libafl_tcg_gen_asan(addr: *mut TCGTemp, size: usize) {}
 
 fn guest_trace_error_asan<QT, S>(
-    _hooks: &mut QemuHooks<QT, S>,
+    _emulator_tools: &mut EmulatorTools<QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     _addr: GuestAddr,
 ) where
-    S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    S: Unpin + UsesInput,
+    QT: EmulatorToolTuple<S>,
 {
     panic!("I really shouldn't be here");
 }
 
 fn guest_trace_error_n_asan<QT, S>(
-    _hooks: &mut QemuHooks<QT, S>,
+    _emulator_tools: &mut EmulatorTools<QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     _addr: GuestAddr,
     _n: usize,
 ) where
-    S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    S: Unpin + UsesInput,
+    QT: EmulatorToolTuple<S>,
 {
     panic!("I really shouldn't be here either");
 }
 
-impl<S> QemuHelper<S> for QemuAsanGuestHelper
+impl<S> EmulatorTool<S> for QemuAsanGuestHelper
 where
-    S: UsesInput + HasMetadata,
+    S: Unpin + UsesInput,
 {
-    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
+    fn first_exec<QT>(&self, emulator_tools: &mut EmulatorTools<QT, S>)
     where
-        QT: QemuHelperTuple<S>,
+        QT: EmulatorToolTuple<S>,
+        S: Unpin + UsesInput,
     {
-        hooks.reads(
+        emulator_tools.reads(
             Hook::Function(gen_readwrite_guest_asan::<QT, S>),
             Hook::Function(guest_trace_error_asan::<QT, S>),
             Hook::Function(guest_trace_error_asan::<QT, S>),
@@ -286,7 +286,7 @@ where
             Hook::Function(guest_trace_error_n_asan::<QT, S>),
         );
 
-        hooks.writes(
+        emulator_tools.writes(
             Hook::Function(gen_readwrite_guest_asan::<QT, S>),
             Hook::Function(guest_trace_error_asan::<QT, S>),
             Hook::Function(guest_trace_error_asan::<QT, S>),

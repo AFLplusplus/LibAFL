@@ -8,7 +8,7 @@ use std::{
     sync::Mutex,
 };
 
-use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple, HasMetadata};
+use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple};
 use libc::{
     c_void, MAP_ANON, MAP_FAILED, MAP_FIXED, MAP_NORESERVE, MAP_PRIVATE, PROT_READ, PROT_WRITE,
 };
@@ -17,14 +17,13 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use rangemap::RangeMap;
 
 use crate::{
-    helpers::{
-        calls::FullBacktraceCollector, HasInstrumentationFilter, IsFilter, QemuHelper,
-        QemuHelperTuple, QemuInstrumentationAddressRangeFilter,
-    },
-    hooks::{Hook, QemuHooks},
-    qemu::{MemAccessInfo, QemuInitError, SyscallHookResult},
+    qemu::{MemAccessInfo, QemuInitError},
     snapshot::QemuSnapshotHelper,
     sys::TCGTemp,
+    tools::{
+        calls::FullBacktraceCollector, EmulatorTool, EmulatorToolTuple, HasInstrumentationFilter,
+        IsFilter, QemuInstrumentationAddressRangeFilter,
+    },
     GuestAddr, Qemu, Regs,
 };
 
@@ -157,6 +156,11 @@ use std::pin::Pin;
 
 use object::{Object, ObjectSection};
 
+use crate::{
+    emu::hooks::EmulatorTools,
+    qemu::hooks::{Hook, QemuHooks, SyscallHookResult},
+};
+
 pub struct AsanGiovese {
     pub alloc_tree: Mutex<IntervalTree<GuestAddr, AllocTreeItem>>,
     pub saved_tree: IntervalTree<GuestAddr, AllocTreeItem>,
@@ -210,7 +214,7 @@ impl AsanGiovese {
     }
 
     #[must_use]
-    fn new(emu: Qemu) -> Pin<Box<Self>> {
+    fn new(qemu_hooks: QemuHooks) -> Pin<Box<Self>> {
         let res = Self {
             alloc_tree: Mutex::new(IntervalTree::new()),
             saved_tree: IntervalTree::new(),
@@ -220,7 +224,7 @@ impl AsanGiovese {
             snapshot_shadow: true, // By default, track the dirty shadow pages
         };
         let mut boxed = Box::pin(res);
-        emu.add_pre_syscall_hook(boxed.as_mut(), Self::fake_syscall);
+        qemu_hooks.add_pre_syscall_hook(boxed.as_mut(), Self::fake_syscall);
         boxed
     }
 
@@ -718,7 +722,7 @@ pub fn init_qemu_with_asan(
     }
 
     let qemu = Qemu::init(args, env)?;
-    let rt = AsanGiovese::new(qemu);
+    let rt = AsanGiovese::new(qemu.hooks());
 
     Ok((qemu, rt))
 }
@@ -730,10 +734,10 @@ pub enum QemuAsanOptions {
     SnapshotDetectLeaks,
 }
 
-pub type QemuAsanChildHelper = QemuAsanHelper;
+pub type QemuAsanChildTool = QemuAsanTool;
 
 #[derive(Debug)]
-pub struct QemuAsanHelper {
+pub struct QemuAsanTool {
     enabled: bool,
     detect_leaks: bool,
     empty: bool,
@@ -741,7 +745,7 @@ pub struct QemuAsanHelper {
     filter: QemuInstrumentationAddressRangeFilter,
 }
 
-impl QemuAsanHelper {
+impl QemuAsanTool {
     #[must_use]
     pub fn default(rt: Pin<Box<AsanGiovese>>) -> Self {
         Self::new(
@@ -912,7 +916,7 @@ impl QemuAsanHelper {
     }
 }
 
-impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuAsanHelper {
+impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuAsanTool {
     fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
         &self.filter
     }
@@ -922,28 +926,28 @@ impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuAsa
     }
 }
 
-impl<S> QemuHelper<S> for QemuAsanHelper
+impl<S> EmulatorTool<S> for QemuAsanTool
 where
-    S: UsesInput + HasMetadata,
+    S: Unpin + UsesInput,
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn init_hooks<QT>(&self, hooks: &QemuHooks<QT, S>)
+    fn init_tool<QT>(&self, emulator_tools: &mut EmulatorTools<QT, S>)
     where
-        QT: QemuHelperTuple<S>,
+        QT: EmulatorToolTuple<S>,
     {
-        hooks.syscalls(Hook::Function(qasan_fake_syscall::<QT, S>));
+        emulator_tools.syscalls(Hook::Function(qasan_fake_syscall::<QT, S>));
 
         if self.rt.error_callback.is_some() {
-            hooks.crash_function(oncrash_asan::<QT, S>);
+            emulator_tools.crash_function(oncrash_asan::<QT, S>);
         }
     }
 
-    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
+    fn first_exec<QT>(&self, emulator_tools: &mut EmulatorTools<QT, S>)
     where
-        QT: QemuHelperTuple<S>,
+        QT: EmulatorToolTuple<S>,
     {
-        hooks.reads(
+        emulator_tools.reads(
             Hook::Function(gen_readwrite_asan::<QT, S>),
             Hook::Function(trace_read1_asan::<QT, S>),
             Hook::Function(trace_read2_asan::<QT, S>),
@@ -952,8 +956,8 @@ where
             Hook::Function(trace_read_n_asan::<QT, S>),
         );
 
-        if hooks.match_helper::<QemuSnapshotHelper>().is_none() {
-            hooks.writes(
+        if emulator_tools.match_tool::<QemuSnapshotHelper>().is_none() {
+            emulator_tools.writes(
                 Hook::Function(gen_readwrite_asan::<QT, S>),
                 Hook::Function(trace_write1_asan::<QT, S>),
                 Hook::Function(trace_write2_asan::<QT, S>),
@@ -962,8 +966,8 @@ where
                 Hook::Function(trace_write_n_asan::<QT, S>),
             );
         } else {
-            // track writes for both helpers as opt
-            hooks.writes(
+            // track writes for both tools as opt
+            emulator_tools.writes(
                 Hook::Function(gen_write_asan_snapshot::<QT, S>),
                 Hook::Function(trace_write1_asan_snapshot::<QT, S>),
                 Hook::Function(trace_write2_asan_snapshot::<QT, S>),
@@ -974,51 +978,55 @@ where
         }
     }
 
-    fn pre_exec(&mut self, qemu: Qemu, _input: &S::Input) {
+    fn pre_exec<QT>(&mut self, emulator_tools: &mut EmulatorTools<QT, S>, _input: &S::Input)
+    where
+        QT: EmulatorToolTuple<S>,
+    {
         if self.empty {
-            self.rt.snapshot(qemu);
+            self.rt.snapshot(emulator_tools.qemu());
             self.empty = false;
         }
     }
 
-    fn post_exec<OT>(
+    fn post_exec<OT, QT>(
         &mut self,
-        qemu: Qemu,
+        emulator_tools: &mut EmulatorTools<QT, S>,
         _input: &S::Input,
         _observers: &mut OT,
         exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
+        QT: EmulatorToolTuple<S>,
     {
-        if self.reset(qemu) == AsanRollback::HasLeaks {
+        if self.reset(emulator_tools.qemu()) == AsanRollback::HasLeaks {
             *exit_kind = ExitKind::Crash;
         }
     }
 }
 
-pub fn oncrash_asan<QT, S>(hooks: &mut QemuHooks<QT, S>, target_sig: i32)
+pub fn oncrash_asan<QT, S>(emulator_tools: &mut EmulatorTools<QT, S>, target_sig: i32)
 where
-    S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    QT: EmulatorToolTuple<S>,
+    S: Unpin + UsesInput,
 {
-    let qemu = *hooks.qemu();
-    let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+    let qemu = emulator_tools.qemu();
+    let h = emulator_tools.match_tool_mut::<QemuAsanTool>().unwrap();
     let pc: GuestAddr = qemu.read_reg(Regs::Pc).unwrap();
     h.rt.report(qemu, pc, AsanError::Signal(target_sig));
 }
 
 pub fn gen_readwrite_asan<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+    emulator_tools: &mut EmulatorTools<QT, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
     _addr: *mut TCGTemp,
     _info: MemAccessInfo,
 ) -> Option<u64>
 where
-    S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    QT: EmulatorToolTuple<S>,
+    S: Unpin + UsesInput,
 {
-    let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+    let h = emulator_tools.match_tool_mut::<QemuAsanTool>().unwrap();
     if h.must_instrument(pc) {
         Some(pc.into())
     } else {
@@ -1027,159 +1035,159 @@ where
 }
 
 pub fn trace_read1_asan<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+    emulator_tools: &mut EmulatorTools<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
 ) where
-    S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    QT: EmulatorToolTuple<S>,
+    S: Unpin + UsesInput,
 {
-    let qemu = *hooks.qemu();
-    let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+    let qemu = emulator_tools.qemu();
+    let h = emulator_tools.match_tool_mut::<QemuAsanTool>().unwrap();
     h.read_1(qemu, id as GuestAddr, addr);
 }
 
 pub fn trace_read2_asan<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+    emulator_tools: &mut EmulatorTools<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
 ) where
-    S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    S: Unpin + UsesInput,
+    QT: EmulatorToolTuple<S>,
 {
-    let qemu = *hooks.qemu();
-    let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+    let qemu = emulator_tools.qemu();
+    let h = emulator_tools.match_tool_mut::<QemuAsanTool>().unwrap();
     h.read_2(qemu, id as GuestAddr, addr);
 }
 
 pub fn trace_read4_asan<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+    emulator_tools: &mut EmulatorTools<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
 ) where
-    S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    S: Unpin + UsesInput,
+    QT: EmulatorToolTuple<S>,
 {
-    let qemu = *hooks.qemu();
-    let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+    let qemu = emulator_tools.qemu();
+    let h = emulator_tools.match_tool_mut::<QemuAsanTool>().unwrap();
     h.read_4(qemu, id as GuestAddr, addr);
 }
 
 pub fn trace_read8_asan<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+    emulator_tools: &mut EmulatorTools<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
 ) where
-    S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    S: Unpin + UsesInput,
+    QT: EmulatorToolTuple<S>,
 {
-    let qemu = *hooks.qemu();
-    let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+    let qemu = emulator_tools.qemu();
+    let h = emulator_tools.match_tool_mut::<QemuAsanTool>().unwrap();
     h.read_8(qemu, id as GuestAddr, addr);
 }
 
 pub fn trace_read_n_asan<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+    emulator_tools: &mut EmulatorTools<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
     size: usize,
 ) where
-    S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    S: Unpin + UsesInput,
+    QT: EmulatorToolTuple<S>,
 {
-    let qemu = *hooks.qemu();
-    let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+    let qemu = emulator_tools.qemu();
+    let h = emulator_tools.match_tool_mut::<QemuAsanTool>().unwrap();
     h.read_n(qemu, id as GuestAddr, addr, size);
 }
 
 pub fn trace_write1_asan<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+    emulator_tools: &mut EmulatorTools<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
 ) where
-    S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    S: Unpin + UsesInput,
+    QT: EmulatorToolTuple<S>,
 {
-    let qemu = *hooks.qemu();
-    let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+    let qemu = emulator_tools.qemu();
+    let h = emulator_tools.match_tool_mut::<QemuAsanTool>().unwrap();
     h.write_1(qemu, id as GuestAddr, addr);
 }
 
 pub fn trace_write2_asan<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+    emulator_tools: &mut EmulatorTools<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
 ) where
-    S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    S: Unpin + UsesInput,
+    QT: EmulatorToolTuple<S>,
 {
-    let qemu = *hooks.qemu();
-    let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+    let qemu = emulator_tools.qemu();
+    let h = emulator_tools.match_tool_mut::<QemuAsanTool>().unwrap();
     h.write_2(qemu, id as GuestAddr, addr);
 }
 
 pub fn trace_write4_asan<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+    emulator_tools: &mut EmulatorTools<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
 ) where
-    S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    S: Unpin + UsesInput,
+    QT: EmulatorToolTuple<S>,
 {
-    let qemu = *hooks.qemu();
-    let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+    let qemu = emulator_tools.qemu();
+    let h = emulator_tools.match_tool_mut::<QemuAsanTool>().unwrap();
     h.write_4(qemu, id as GuestAddr, addr);
 }
 
 pub fn trace_write8_asan<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+    emulator_tools: &mut EmulatorTools<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
 ) where
-    S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    S: Unpin + UsesInput,
+    QT: EmulatorToolTuple<S>,
 {
-    let qemu = *hooks.qemu();
-    let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+    let qemu = emulator_tools.qemu();
+    let h = emulator_tools.match_tool_mut::<QemuAsanTool>().unwrap();
     h.write_8(qemu, id as GuestAddr, addr);
 }
 
 pub fn trace_write_n_asan<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+    emulator_tools: &mut EmulatorTools<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
     size: usize,
 ) where
-    S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    S: Unpin + UsesInput,
+    QT: EmulatorToolTuple<S>,
 {
-    let qemu = *hooks.qemu();
-    let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+    let qemu = emulator_tools.qemu();
+    let h = emulator_tools.match_tool_mut::<QemuAsanTool>().unwrap();
     h.read_n(qemu, id as GuestAddr, addr, size);
 }
 
 pub fn gen_write_asan_snapshot<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+    emulator_tools: &mut EmulatorTools<QT, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
     _addr: *mut TCGTemp,
     _info: MemAccessInfo,
 ) -> Option<u64>
 where
-    S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    S: Unpin + UsesInput,
+    QT: EmulatorToolTuple<S>,
 {
-    let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+    let h = emulator_tools.match_tool_mut::<QemuAsanTool>().unwrap();
     if h.must_instrument(pc) {
         Some(pc.into())
     } else {
@@ -1188,99 +1196,109 @@ where
 }
 
 pub fn trace_write1_asan_snapshot<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+    emulator_tools: &mut EmulatorTools<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
 ) where
-    S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    S: Unpin + UsesInput,
+    QT: EmulatorToolTuple<S>,
 {
     if id != 0 {
-        let qemu = *hooks.qemu();
-        let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+        let qemu = emulator_tools.qemu();
+        let h = emulator_tools.match_tool_mut::<QemuAsanTool>().unwrap();
         h.write_1(qemu, id as GuestAddr, addr);
     }
-    let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
+    let h = emulator_tools
+        .match_tool_mut::<QemuSnapshotHelper>()
+        .unwrap();
     h.access(addr, 1);
 }
 
 pub fn trace_write2_asan_snapshot<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+    emulator_tools: &mut EmulatorTools<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
 ) where
-    S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    S: Unpin + UsesInput,
+    QT: EmulatorToolTuple<S>,
 {
     if id != 0 {
-        let qemu = *hooks.qemu();
-        let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+        let qemu = emulator_tools.qemu();
+        let h = emulator_tools.match_tool_mut::<QemuAsanTool>().unwrap();
         h.write_2(qemu, id as GuestAddr, addr);
     }
-    let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
+    let h = emulator_tools
+        .match_tool_mut::<QemuSnapshotHelper>()
+        .unwrap();
     h.access(addr, 2);
 }
 
 pub fn trace_write4_asan_snapshot<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+    emulator_tools: &mut EmulatorTools<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
 ) where
-    S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    S: Unpin + UsesInput,
+    QT: EmulatorToolTuple<S>,
 {
     if id != 0 {
-        let qemu = *hooks.qemu();
-        let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+        let qemu = emulator_tools.qemu();
+        let h = emulator_tools.match_tool_mut::<QemuAsanTool>().unwrap();
         h.write_4(qemu, id as GuestAddr, addr);
     }
-    let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
+    let h = emulator_tools
+        .match_tool_mut::<QemuSnapshotHelper>()
+        .unwrap();
     h.access(addr, 4);
 }
 
 pub fn trace_write8_asan_snapshot<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+    emulator_tools: &mut EmulatorTools<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
 ) where
-    S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    S: Unpin + UsesInput,
+    QT: EmulatorToolTuple<S>,
 {
     if id != 0 {
-        let qemu = *hooks.qemu();
-        let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+        let qemu = emulator_tools.qemu();
+        let h = emulator_tools.match_tool_mut::<QemuAsanTool>().unwrap();
         h.write_8(qemu, id as GuestAddr, addr);
     }
-    let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
+    let h = emulator_tools
+        .match_tool_mut::<QemuSnapshotHelper>()
+        .unwrap();
     h.access(addr, 8);
 }
 
 pub fn trace_write_n_asan_snapshot<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+    emulator_tools: &mut EmulatorTools<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
     size: usize,
 ) where
-    S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    S: Unpin + UsesInput,
+    QT: EmulatorToolTuple<S>,
 {
     if id != 0 {
-        let qemu = *hooks.qemu();
-        let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+        let qemu = emulator_tools.qemu();
+        let h = emulator_tools.match_tool_mut::<QemuAsanTool>().unwrap();
         h.read_n(qemu, id as GuestAddr, addr, size);
     }
-    let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
+    let h = emulator_tools
+        .match_tool_mut::<QemuSnapshotHelper>()
+        .unwrap();
     h.access(addr, size);
 }
 
 #[allow(clippy::too_many_arguments)]
 pub fn qasan_fake_syscall<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+    emulator_tools: &mut EmulatorTools<QT, S>,
     _state: Option<&mut S>,
     sys_num: i32,
     a0: GuestAddr,
@@ -1293,12 +1311,12 @@ pub fn qasan_fake_syscall<QT, S>(
     _a7: GuestAddr,
 ) -> SyscallHookResult
 where
-    S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    S: Unpin + UsesInput,
+    QT: EmulatorToolTuple<S>,
 {
     if sys_num == QASAN_FAKESYS_NR {
-        let qemu = *hooks.qemu();
-        let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+        let qemu = emulator_tools.qemu();
+        let h = emulator_tools.match_tool_mut::<QemuAsanTool>().unwrap();
         match QasanAction::try_from(a0).expect("Invalid QASan action number") {
             QasanAction::CheckLoad => {
                 let pc: GuestAddr = qemu.read_reg(Regs::Pc).unwrap();

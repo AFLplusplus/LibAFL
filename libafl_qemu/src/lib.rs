@@ -38,11 +38,8 @@ pub use arch::*;
 
 pub mod elf;
 
-pub mod helpers;
-pub use helpers::*;
-
-pub mod hooks;
-pub use hooks::*;
+pub mod tools;
+pub use tools::*;
 
 pub mod executor;
 pub use executor::QemuExecutor;
@@ -103,7 +100,7 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
     #[cfg(emulation_mode = "usermode")]
     m.add_class::<qemu::GuestMaps>()?;
 
-    m.add_class::<qemu::SyscallHookResult>()?;
+    m.add_class::<qemu::hooks::SyscallHookResult>()?;
     m.add_class::<qemu::pybind::Qemu>()?;
 
     Ok(())
