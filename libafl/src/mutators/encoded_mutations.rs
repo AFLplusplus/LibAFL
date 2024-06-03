@@ -29,7 +29,7 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedRandMutator {
         if input.codes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
-            let val = state.rand_mut().choose(input.codes_mut());
+            let val = state.rand_mut().choose(input.codes_mut()).unwrap();
             *val = state.rand_mut().next() as u32;
             Ok(MutationResult::Mutated)
         }
@@ -60,7 +60,7 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedIncMutator {
         if input.codes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
-            let val = state.rand_mut().choose(input.codes_mut());
+            let val = state.rand_mut().choose(input.codes_mut()).unwrap();
             *val = val.wrapping_add(1);
             Ok(MutationResult::Mutated)
         }
@@ -91,7 +91,7 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedDecMutator {
         if input.codes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
-            let val = state.rand_mut().choose(input.codes_mut());
+            let val = state.rand_mut().choose(input.codes_mut()).unwrap();
             *val = val.wrapping_sub(1);
             Ok(MutationResult::Mutated)
         }
@@ -122,7 +122,7 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedAddMutator {
         if input.codes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
-            let val = state.rand_mut().choose(input.codes_mut());
+            let val = state.rand_mut().choose(input.codes_mut()).unwrap();
             let num = 1 + state.rand_mut().below(ARITH_MAX) as u32;
             *val = match state.rand_mut().below(2) {
                 0 => val.wrapping_add(num),

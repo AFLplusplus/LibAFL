@@ -107,9 +107,8 @@ where
         self.inner.replace(idx, testcase)
     }
 
-    /// Removes an entry from the corpus, returning it if it was present.
-    #[inline]
-    fn remove(&mut self, idx: CorpusId) -> Result<Testcase<I>, Error> {
+    /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases.
+    fn remove(&mut self, idx: CorpusId) -> Result<Testcase<Self::Input>, Error> {
         let testcase = self.inner.remove(idx)?;
         self.cached_indexes.borrow_mut().retain(|e| *e != idx);
         Ok(testcase)

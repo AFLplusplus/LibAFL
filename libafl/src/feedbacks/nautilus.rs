@@ -3,11 +3,11 @@ use alloc::{borrow::Cow, string::String};
 use core::{fmt::Debug, marker::PhantomData};
 use std::fs::create_dir_all;
 
-use grammartec::{chunkstore::ChunkStore, context::Context};
 use libafl_bolts::Named;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    common::nautilus::grammartec::{chunkstore::ChunkStore, context::Context},
     corpus::{Corpus, Testcase},
     events::EventFirer,
     executors::ExitKind,

@@ -8,7 +8,7 @@ use pyo3::prelude::*;
 pub use strum_macros::EnumIter;
 pub use syscall_numbers::x86::*;
 
-use crate::{sync_exit::ExitArgs, CallingConvention, GuestAddr};
+use crate::{sync_exit::ExitArgs, CallingConvention, GuestAddr, QemuRWError, QemuRWErrorKind};
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
 #[repr(i32)]
@@ -67,7 +67,7 @@ pub fn capstone() -> capstone::arch::x86::ArchCapstoneBuilder {
 pub type GuestReg = u32;
 
 impl crate::ArchExtras for crate::CPU {
-    fn read_return_address<T>(&self) -> Result<T, String>
+    fn read_return_address<T>(&self) -> Result<T, QemuRWError>
     where
         T: From<GuestReg>,
     {
@@ -77,7 +77,7 @@ impl crate::ArchExtras for crate::CPU {
         Ok(GuestReg::from_le_bytes(ret_addr).into())
     }
 
-    fn write_return_address<T>(&self, val: T) -> Result<(), String>
+    fn write_return_address<T>(&self, val: T) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg>,
     {
@@ -88,13 +88,11 @@ impl crate::ArchExtras for crate::CPU {
         Ok(())
     }
 
-    fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, String>
+    fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, QemuRWError>
     where
         T: From<GuestReg>,
     {
-        if conv != CallingConvention::Cdecl {
-            return Err(format!("Unsupported calling convention: {conv:#?}"));
-        }
+        QemuRWError::check_conv(QemuRWErrorKind::Read, CallingConvention::Cdecl, conv)?;
 
         match idx {
             0..=1 => {
@@ -112,7 +110,12 @@ impl crate::ArchExtras for crate::CPU {
                 }
                 Ok(GuestReg::from_le_bytes(val).into())
             }
-            _ => Err(format!("Unsupported argument: {idx:}")),
+            r => {
+                return Err(QemuRWError::new_argument_error(
+                    QemuRWErrorKind::Read,
+                    i32::from(r),
+                ))
+            }
         }
     }
 
@@ -121,13 +124,11 @@ impl crate::ArchExtras for crate::CPU {
         conv: CallingConvention,
         idx: i32,
         val: T,
-    ) -> Result<(), String>
+    ) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg>,
     {
-        if conv != CallingConvention::Cdecl {
-            return Err(format!("Unsupported calling convention: {conv:#?}"));
-        }
+        QemuRWError::check_conv(QemuRWErrorKind::Write, CallingConvention::Cdecl, conv)?;
 
         match idx {
             0..=1 => {
@@ -146,7 +147,7 @@ impl crate::ArchExtras for crate::CPU {
                 }
                 Ok(())
             }
-            _ => Err(format!("Unsupported argument: {idx:}")),
+            r => Err(QemuRWError::new_argument_error(QemuRWErrorKind::Write, r)),
         }
     }
 }
