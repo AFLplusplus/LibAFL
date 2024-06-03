@@ -181,10 +181,10 @@ where
     }
 
     /// Read an immutable subinput from the parent input, from the current cursor position up to `limit` bytes.
-    /// If the resulting slice would go beyond the end of the parent input, it will be limited to the length of the parent input.
+    /// If the resulting slice would go beyond the end of the parent input, it will be truncated to the length of the parent input.
     /// This function does not provide any feedback on whether the slice was cropped or not.
     #[must_use]
-    pub fn read_to_slice_unchecked(&mut self, limit: usize) -> BytesSubInput<'a> {
+    pub fn read_to_slice_truncated(&mut self, limit: usize) -> BytesSubInput<'a> {
         let sub_input = BytesSubInput::new(self.parent_input, self.pos..(self.pos + limit));
 
         self.pos += sub_input.len();
@@ -194,11 +194,15 @@ where
 
     /// Read an immutable subinput from the parent input, from the current cursor position up to `limit` bytes.
     /// If the resulting slice would go beyond the end of the parent input, it will be limited to the length of the parent input.
+    /// The function returns
+    /// - `Ok(Slice)` if the returned slice has `limit` bytes.
+    /// - `Err(Partial(slice))` if the returned slice has strictly less than `limit` bytes and is not empty.
+    /// - `Err(Empty)` if the reader was already at the end or `limit` equals zero.
     pub fn read_to_slice(
         &mut self,
         limit: usize,
     ) -> Result<BytesSubInput<'a>, PartialBytesSubInput<'a>> {
-        let slice_to_return = self.read_to_slice_unchecked(limit);
+        let slice_to_return = self.read_to_slice_truncated(limit);
 
         let real_len = slice_to_return.len();
 
@@ -418,16 +422,16 @@ mod tests {
         let bytes_input = BytesInput::new(vec![1, 2, 3, 4, 5, 6, 7]);
         let mut bytes_reader = BytesReader::new(&bytes_input);
 
-        let bytes_read = bytes_reader.read_to_slice_unchecked(2);
+        let bytes_read = bytes_reader.read_to_slice_truncated(2);
         assert_eq!(*bytes_read.target_bytes(), [1, 2]);
 
-        let bytes_read = bytes_reader.read_to_slice_unchecked(3);
+        let bytes_read = bytes_reader.read_to_slice_truncated(3);
         assert_eq!(*bytes_read.target_bytes(), [3, 4, 5]);
 
-        let bytes_read = bytes_reader.read_to_slice_unchecked(8);
+        let bytes_read = bytes_reader.read_to_slice_truncated(8);
         assert_eq!(*bytes_read.target_bytes(), [6, 7]);
 
-        let bytes_read = bytes_reader.read_to_slice_unchecked(8);
+        let bytes_read = bytes_reader.read_to_slice_truncated(8);
         let bytes_read_ref: &[u8] = &[];
         assert_eq!(&*bytes_read.target_bytes(), bytes_read_ref);
     }
