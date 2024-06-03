@@ -18,12 +18,12 @@ categories = [
 ]
 
 [package.metadata.docs.rs]
-no-default-features = true
+no-default-features = true # We can't use auto-download inside docs.rs (no internet)
 all-features = false
 features = ["cmplog", "serdeany_autoreg", "track_hit_feedbacks", "document-features"]
 
 [features]
-default = ["serdeany_autoreg"]
+default = ["serdeany_autoreg", "auto-download"]
 document-features = ["dep:document-features"]
 
 #! # Feature Flags
