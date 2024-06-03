@@ -236,7 +236,7 @@ pub mod pybind {
         exceptions::PyValueError, pymethods, types::PyInt, FromPyObject, PyObject, PyResult, Python,
     };
 
-    use crate::{pybind::Qemu, SyscallHookResult};
+    use crate::{pybind::Qemu, qemu::hooks::SyscallHookResult};
 
     static mut PY_SYSCALL_HOOK: Option<PyObject> = None;
 
@@ -334,6 +334,7 @@ pub mod pybind {
                 PY_SYSCALL_HOOK = Some(hook);
             }
             self.qemu
+                .hooks()
                 .add_pre_syscall_hook(0u64, py_syscall_hook_wrapper);
         }
     }
