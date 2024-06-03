@@ -13,29 +13,29 @@ pub use edges::QemuEdgeCoverageTool;
 #[cfg(not(cpu_target = "hexagon"))]
 pub mod calls;
 #[cfg(not(cpu_target = "hexagon"))]
-pub use calls::QemuCallTracerHelper;
+pub use calls::QemuCallTracerTool;
 
 #[cfg(not(cpu_target = "hexagon"))]
 pub mod drcov;
 #[cfg(not(cpu_target = "hexagon"))]
-pub use drcov::QemuDrCovHelper;
+pub use drcov::QemuDrCovTool;
 
 #[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]
 pub mod cmplog;
 #[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]
-pub use cmplog::QemuCmpLogHelper;
+pub use cmplog::QemuCmpLogTool;
 
 #[cfg(all(emulation_mode = "usermode", feature = "injections"))]
 pub mod injections;
 #[cfg(all(emulation_mode = "usermode", feature = "injections"))]
-pub use injections::QemuInjectionHelper;
+pub use injections::QemuInjectionTool;
 
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
 pub mod snapshot;
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
 pub use snapshot::IntervalSnapshotFilter;
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
-pub use snapshot::QemuSnapshotHelper;
+pub use snapshot::QemuSnapshotTool;
 
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
 pub mod asan;
@@ -47,9 +47,9 @@ use crate::emu::hooks::EmulatorTools;
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
 pub mod asan_guest;
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
-pub use asan_guest::{init_qemu_with_asan_guest, QemuAsanGuestHelper};
+pub use asan_guest::{init_qemu_with_asan_guest, QemuAsanGuestTool};
 
-/// A helper for `libafl_qemu`.
+/// A tool for `libafl_qemu`.
 // TODO remove 'static when specialization will be stable
 pub trait EmulatorTool<S>: 'static + Debug
 where

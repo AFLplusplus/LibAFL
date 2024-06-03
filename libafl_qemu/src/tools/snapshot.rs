@@ -36,7 +36,7 @@ use crate::{
 pub const SNAPSHOT_PAGE_SIZE: usize = 4096;
 pub const SNAPSHOT_PAGE_MASK: GuestAddr = !(SNAPSHOT_PAGE_SIZE as GuestAddr - 1);
 
-pub type StopExecutionCallback = Box<dyn FnMut(&mut QemuSnapshotHelper, &Qemu)>;
+pub type StopExecutionCallback = Box<dyn FnMut(&mut QemuSnapshotTool, &Qemu)>;
 
 #[derive(Clone, Debug)]
 pub struct SnapshotPageInfo {
@@ -84,7 +84,7 @@ pub enum IntervalSnapshotFilter {
     DenyList(Vec<Range<GuestAddr>>),
 }
 
-pub struct QemuSnapshotHelper {
+pub struct QemuSnapshotTool {
     pub accesses: ThreadLocal<UnsafeCell<SnapshotAccessInfo>>,
     pub maps: MappingInfo,
     pub new_maps: Mutex<MappingInfo>,
@@ -98,9 +98,9 @@ pub struct QemuSnapshotHelper {
     pub interval_filter: Vec<IntervalSnapshotFilter>,
 }
 
-impl core::fmt::Debug for QemuSnapshotHelper {
+impl core::fmt::Debug for QemuSnapshotTool {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("QemuSnapshotHelper")
+        f.debug_struct("QemuSnapshotTool")
             .field("accesses", &self.accesses)
             .field("new_maps", &self.new_maps)
             .field("pages", &self.pages)
@@ -112,7 +112,7 @@ impl core::fmt::Debug for QemuSnapshotHelper {
     }
 }
 
-impl QemuSnapshotHelper {
+impl QemuSnapshotTool {
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -662,13 +662,13 @@ impl QemuSnapshotHelper {
     }
 }
 
-impl Default for QemuSnapshotHelper {
+impl Default for QemuSnapshotTool {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<S> EmulatorTool<S> for QemuSnapshotHelper
+impl<S> EmulatorTool<S> for QemuSnapshotTool
 where
     S: Unpin + UsesInput,
 {
@@ -677,7 +677,7 @@ where
         QT: EmulatorToolTuple<S>,
     {
         if emulator_tools.match_tool::<QemuAsanTool>().is_none() {
-            // The ASan helper, if present, will call the tracer hook for the snapshot helper as opt
+            // The ASan tool, if present, will call the tracer hook for the snapshot helper as opt
             emulator_tools.writes(
                 Hook::Empty,
                 Hook::Function(trace_write_snapshot::<QT, S, 1>),
@@ -715,9 +715,7 @@ pub fn trace_write_snapshot<QT, S, const SIZE: usize>(
     S: Unpin + UsesInput,
     QT: EmulatorToolTuple<S>,
 {
-    let h = emulator_tools
-        .match_tool_mut::<QemuSnapshotHelper>()
-        .unwrap();
+    let h = emulator_tools.match_tool_mut::<QemuSnapshotTool>().unwrap();
     h.access(addr, SIZE);
 }
 
@@ -731,9 +729,7 @@ pub fn trace_write_n_snapshot<QT, S>(
     S: Unpin + UsesInput,
     QT: EmulatorToolTuple<S>,
 {
-    let h = emulator_tools
-        .match_tool_mut::<QemuSnapshotHelper>()
-        .unwrap();
+    let h = emulator_tools.match_tool_mut::<QemuSnapshotTool>().unwrap();
     h.access(addr, size);
 }
 
@@ -757,9 +753,7 @@ where
     QT: EmulatorToolTuple<S>,
 {
     if i64::from(sys_num) == SYS_munmap {
-        let h = emulator_tools
-            .match_tool_mut::<QemuSnapshotHelper>()
-            .unwrap();
+        let h = emulator_tools.match_tool_mut::<QemuSnapshotTool>().unwrap();
         if !h.is_unmap_allowed(a0 as GuestAddr, a1 as usize) {
             return SyscallHookResult::new(Some(0));
         }
@@ -790,21 +784,15 @@ where
     // NOT A COMPLETE LIST OF MEMORY EFFECTS
     match i64::from(sys_num) {
         SYS_read | SYS_pread64 => {
-            let h = emulator_tools
-                .match_tool_mut::<QemuSnapshotHelper>()
-                .unwrap();
+            let h = emulator_tools.match_tool_mut::<QemuSnapshotTool>().unwrap();
             h.access(a1, a2 as usize);
         }
         SYS_readlinkat => {
-            let h = emulator_tools
-                .match_tool_mut::<QemuSnapshotHelper>()
-                .unwrap();
+            let h = emulator_tools.match_tool_mut::<QemuSnapshotTool>().unwrap();
             h.access(a2, a3 as usize);
         }
         SYS_futex => {
-            let h = emulator_tools
-                .match_tool_mut::<QemuSnapshotHelper>()
-                .unwrap();
+            let h = emulator_tools.match_tool_mut::<QemuSnapshotTool>().unwrap();
             h.access(a0, a3 as usize);
         }
         #[cfg(not(any(
@@ -815,37 +803,27 @@ where
         )))]
         SYS_newfstatat => {
             if a2 != 0 {
-                let h = emulator_tools
-                    .match_tool_mut::<QemuSnapshotHelper>()
-                    .unwrap();
+                let h = emulator_tools.match_tool_mut::<QemuSnapshotTool>().unwrap();
                 h.access(a2, 4096); // stat is not greater than a page
             }
         }
         #[cfg(any(cpu_target = "arm", cpu_target = "mips", cpu_target = "i386"))]
         SYS_fstatat64 => {
             if a2 != 0 {
-                let h = emulator_tools
-                    .match_tool_mut::<QemuSnapshotHelper>()
-                    .unwrap();
+                let h = emulator_tools.match_tool_mut::<QemuSnapshotTool>().unwrap();
                 h.access(a2, 4096); // stat is not greater than a page
             }
         }
         SYS_statfs | SYS_fstatfs | SYS_fstat => {
-            let h = emulator_tools
-                .match_tool_mut::<QemuSnapshotHelper>()
-                .unwrap();
+            let h = emulator_tools.match_tool_mut::<QemuSnapshotTool>().unwrap();
             h.access(a1, 4096); // stat is not greater than a page
         }
         SYS_getrandom => {
-            let h = emulator_tools
-                .match_tool_mut::<QemuSnapshotHelper>()
-                .unwrap();
+            let h = emulator_tools.match_tool_mut::<QemuSnapshotTool>().unwrap();
             h.access(a0, a1 as usize);
         }
         SYS_brk => {
-            let h = emulator_tools
-                .match_tool_mut::<QemuSnapshotHelper>()
-                .unwrap();
+            let h = emulator_tools.match_tool_mut::<QemuSnapshotTool>().unwrap();
             if h.brk != result && result != 0 {
                 /* brk has changed. we change mapping from the snapshotted brk address to the new target_brk
                  * If no brk mapping has been made until now, change_mapped won't change anything and just create a new mapping.
@@ -867,9 +845,7 @@ where
             #[cfg(any(cpu_target = "arm", cpu_target = "mips"))]
             if sys_const == SYS_mmap2 {
                 if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
-                    let h = emulator_tools
-                        .match_tool_mut::<QemuSnapshotHelper>()
-                        .unwrap();
+                    let h = emulator_tools.match_tool_mut::<QemuSnapshotTool>().unwrap();
                     h.add_mapped(result, a1 as usize, Some(prot));
                 }
             }
@@ -877,31 +853,23 @@ where
             #[cfg(not(cpu_target = "arm"))]
             if sys_const == SYS_mmap {
                 if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
-                    let h = emulator_tools
-                        .match_tool_mut::<QemuSnapshotHelper>()
-                        .unwrap();
+                    let h = emulator_tools.match_tool_mut::<QemuSnapshotTool>().unwrap();
                     h.add_mapped(result, a1 as usize, Some(prot));
                 }
             }
 
             if sys_const == SYS_mremap {
-                let h = emulator_tools
-                    .match_tool_mut::<QemuSnapshotHelper>()
-                    .unwrap();
+                let h = emulator_tools.match_tool_mut::<QemuSnapshotTool>().unwrap();
                 // TODO get the old permissions from the removed mapping
                 h.remove_mapped(a0, a1 as usize);
                 h.add_mapped(result, a2 as usize, None);
             } else if sys_const == SYS_mprotect {
                 if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
-                    let h = emulator_tools
-                        .match_tool_mut::<QemuSnapshotHelper>()
-                        .unwrap();
+                    let h = emulator_tools.match_tool_mut::<QemuSnapshotTool>().unwrap();
                     h.change_mapped(a0, a1 as usize, Some(prot));
                 }
             } else if sys_const == SYS_munmap {
-                let h = emulator_tools
-                    .match_tool_mut::<QemuSnapshotHelper>()
-                    .unwrap();
+                let h = emulator_tools.match_tool_mut::<QemuSnapshotTool>().unwrap();
                 if !h.accurate_unmap && !h.is_unmap_allowed(a0, a1 as usize) {
                     h.remove_mapped(a0, a1 as usize);
                 }

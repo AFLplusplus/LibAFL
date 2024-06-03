@@ -43,11 +43,11 @@ impl QemuCmpsMapMetadata {
 libafl_bolts::impl_serdeany!(QemuCmpsMapMetadata);
 
 #[derive(Debug)]
-pub struct QemuCmpLogHelper {
+pub struct QemuCmpLogTool {
     filter: QemuInstrumentationAddressRangeFilter,
 }
 
-impl QemuCmpLogHelper {
+impl QemuCmpLogTool {
     #[must_use]
     pub fn new(filter: QemuInstrumentationAddressRangeFilter) -> Self {
         Self { filter }
@@ -59,13 +59,13 @@ impl QemuCmpLogHelper {
     }
 }
 
-impl Default for QemuCmpLogHelper {
+impl Default for QemuCmpLogTool {
     fn default() -> Self {
         Self::new(QemuInstrumentationAddressRangeFilter::None)
     }
 }
 
-impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuCmpLogHelper {
+impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuCmpLogTool {
     fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
         &self.filter
     }
@@ -75,7 +75,7 @@ impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuCmp
     }
 }
 
-impl<S> EmulatorTool<S> for QemuCmpLogHelper
+impl<S> EmulatorTool<S> for QemuCmpLogTool
 where
     S: Unpin + UsesInput + HasMetadata,
 {
@@ -94,11 +94,11 @@ where
 }
 
 #[derive(Debug)]
-pub struct QemuCmpLogChildHelper {
+pub struct QemuCmpLogChildTool {
     filter: QemuInstrumentationAddressRangeFilter,
 }
 
-impl QemuCmpLogChildHelper {
+impl QemuCmpLogChildTool {
     #[must_use]
     pub fn new(filter: QemuInstrumentationAddressRangeFilter) -> Self {
         Self { filter }
@@ -110,13 +110,13 @@ impl QemuCmpLogChildHelper {
     }
 }
 
-impl Default for QemuCmpLogChildHelper {
+impl Default for QemuCmpLogChildTool {
     fn default() -> Self {
         Self::new(QemuInstrumentationAddressRangeFilter::None)
     }
 }
 
-impl<S> EmulatorTool<S> for QemuCmpLogChildHelper
+impl<S> EmulatorTool<S> for QemuCmpLogChildTool
 where
     S: Unpin + UsesInput + HasMetadata,
 {
@@ -146,7 +146,7 @@ where
     QT: EmulatorToolTuple<S>,
     S: Unpin + UsesInput + HasMetadata,
 {
-    if let Some(h) = emulator_tools.match_tool::<QemuCmpLogHelper>() {
+    if let Some(h) = emulator_tools.match_tool::<QemuCmpLogTool>() {
         if !h.must_instrument(pc) {
             return None;
         }
@@ -177,7 +177,7 @@ where
     S: HasMetadata + Unpin + UsesInput,
     QT: EmulatorToolTuple<S>,
 {
-    if let Some(h) = emulator_tools.match_tool::<QemuCmpLogChildHelper>() {
+    if let Some(h) = emulator_tools.match_tool::<QemuCmpLogChildTool>() {
         if !h.must_instrument(pc) {
             return None;
         }
@@ -211,13 +211,13 @@ pub extern "C" fn trace_cmp8_cmplog(_: *const (), id: u64, v0: u64, v1: u64) {
 
 #[cfg(emulation_mode = "usermode")]
 #[derive(Debug)]
-pub struct QemuCmpLogRoutinesHelper {
+pub struct QemuCmpLogRoutinesTool {
     filter: QemuInstrumentationAddressRangeFilter,
     cs: Capstone,
 }
 
 #[cfg(emulation_mode = "usermode")]
-impl QemuCmpLogRoutinesHelper {
+impl QemuCmpLogRoutinesTool {
     #[must_use]
     pub fn new(filter: QemuInstrumentationAddressRangeFilter) -> Self {
         Self {
@@ -346,7 +346,7 @@ impl QemuCmpLogRoutinesHelper {
 }
 
 #[cfg(emulation_mode = "usermode")]
-impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuCmpLogRoutinesHelper {
+impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuCmpLogRoutinesTool {
     fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
         &self.filter
     }
@@ -357,7 +357,7 @@ impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuCmp
 }
 
 #[cfg(emulation_mode = "usermode")]
-impl<S> EmulatorTool<S> for QemuCmpLogRoutinesHelper
+impl<S> EmulatorTool<S> for QemuCmpLogRoutinesTool
 where
     S: Unpin + UsesInput,
 {

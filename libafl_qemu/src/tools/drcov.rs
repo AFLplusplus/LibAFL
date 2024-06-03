@@ -37,7 +37,7 @@ impl QemuDrCovMetadata {
 libafl_bolts::impl_serdeany!(QemuDrCovMetadata);
 
 #[derive(Debug)]
-pub struct QemuDrCovHelper {
+pub struct QemuDrCovTool {
     filter: QemuInstrumentationAddressRangeFilter,
     module_mapping: RangeMap<usize, (u16, String)>,
     filename: PathBuf,
@@ -45,7 +45,7 @@ pub struct QemuDrCovHelper {
     drcov_len: usize,
 }
 
-impl QemuDrCovHelper {
+impl QemuDrCovTool {
     #[must_use]
     #[allow(clippy::let_underscore_untyped)]
     pub fn new(
@@ -74,7 +74,7 @@ impl QemuDrCovHelper {
     }
 }
 
-impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuDrCovHelper {
+impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuDrCovTool {
     fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
         &self.filter
     }
@@ -84,7 +84,7 @@ impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuDrC
     }
 }
 
-impl<S> EmulatorTool<S> for QemuDrCovHelper
+impl<S> EmulatorTool<S> for QemuDrCovTool
 where
     S: Unpin + UsesInput + HasMetadata,
 {
@@ -198,8 +198,8 @@ where
     S: Unpin + UsesInput + HasMetadata,
     QT: EmulatorToolTuple<S>,
 {
-    let drcov_helper = emulator_tools.match_tool::<QemuDrCovHelper>().unwrap();
-    if !drcov_helper.must_instrument(pc) {
+    let drcov_tool = emulator_tools.match_tool::<QemuDrCovTool>().unwrap();
+    if !drcov_tool.must_instrument(pc) {
         return None;
     }
 
@@ -219,7 +219,7 @@ where
     match DRCOV_MAP.lock().unwrap().as_mut().unwrap().entry(pc) {
         Entry::Occupied(e) => {
             let id = *e.get();
-            if drcov_helper.full_trace {
+            if drcov_tool.full_trace {
                 Some(id)
             } else {
                 None
@@ -229,7 +229,7 @@ where
             let id = meta.current_id;
             e.insert(id);
             meta.current_id = id + 1;
-            if drcov_helper.full_trace {
+            if drcov_tool.full_trace {
                 // GuestAddress is u32 for 32 bit guests
                 #[allow(clippy::unnecessary_cast)]
                 Some(id as u64)
@@ -249,8 +249,8 @@ pub fn gen_block_lengths<QT, S>(
     S: Unpin + UsesInput + HasMetadata,
     QT: EmulatorToolTuple<S>,
 {
-    let drcov_helper = emulator_tools.match_tool::<QemuDrCovHelper>().unwrap();
-    if !drcov_helper.must_instrument(pc) {
+    let drcov_tool = emulator_tools.match_tool::<QemuDrCovTool>().unwrap();
+    if !drcov_tool.must_instrument(pc) {
         return;
     }
     DRCOV_LENGTHS
@@ -270,7 +270,7 @@ pub fn exec_trace_block<QT, S>(
     S: Unpin + UsesInput + HasMetadata,
 {
     if emulator_tools
-        .match_tool::<QemuDrCovHelper>()
+        .match_tool::<QemuDrCovTool>()
         .unwrap()
         .full_trace
     {

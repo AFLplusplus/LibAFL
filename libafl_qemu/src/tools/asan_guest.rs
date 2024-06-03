@@ -118,13 +118,13 @@ impl From<&MapInfo> for QemuAsanGuestMapping {
 }
 
 #[derive(Debug)]
-pub struct QemuAsanGuestHelper {
+pub struct QemuAsanGuestTool {
     filter: QemuInstrumentationAddressRangeFilter,
     mappings: Vec<QemuAsanGuestMapping>,
 }
 
 #[cfg(any(cpu_target = "aarch64", cpu_target = "x86_64", feature = "clippy"))]
-impl QemuAsanGuestHelper {
+impl QemuAsanGuestTool {
     const HIGH_SHADOW_START: GuestAddr = 0x02008fff7000;
     const HIGH_SHADOW_END: GuestAddr = 0x10007fff7fff;
     const LOW_SHADOW_START: GuestAddr = 0x00007fff8000;
@@ -137,14 +137,14 @@ impl QemuAsanGuestHelper {
     cpu_target = "mips",
     cpu_target = "ppc"
 ))]
-impl QemuAsanGuestHelper {
+impl QemuAsanGuestTool {
     const HIGH_SHADOW_START: GuestAddr = 0x28000000;
     const HIGH_SHADOW_END: GuestAddr = 0x3fffffff;
     const LOW_SHADOW_START: GuestAddr = 0x20000000;
     const LOW_SHADOW_END: GuestAddr = 0x23ffffff;
 }
 
-impl QemuAsanGuestHelper {
+impl QemuAsanGuestTool {
     #[must_use]
     pub fn default(emu: &Qemu, asan: String) -> Self {
         Self::new(emu, asan, QemuInstrumentationAddressRangeFilter::None)
@@ -194,7 +194,7 @@ impl QemuAsanGuestHelper {
     }
 }
 
-impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuAsanGuestHelper {
+impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuAsanGuestTool {
     fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
         &self.filter
     }
@@ -216,7 +216,7 @@ where
     QT: EmulatorToolTuple<S>,
 {
     let h = emulator_tools
-        .match_tool_mut::<QemuAsanGuestHelper>()
+        .match_tool_mut::<QemuAsanGuestTool>()
         .unwrap();
     if !h.must_instrument(pc) {
         return None;
@@ -268,7 +268,7 @@ fn guest_trace_error_n_asan<QT, S>(
     panic!("I really shouldn't be here either");
 }
 
-impl<S> EmulatorTool<S> for QemuAsanGuestHelper
+impl<S> EmulatorTool<S> for QemuAsanGuestTool
 where
     S: Unpin + UsesInput,
 {

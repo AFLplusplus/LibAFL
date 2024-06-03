@@ -556,10 +556,10 @@ where
         _ret_reg: Option<Regs>,
     ) -> Result<Option<ExitHandlerResult<CM, StdEmulatorExitHandler<SM>, QT, S>>, ExitHandlerError>
     {
-        let qemu_helpers = emu.tools_mut().tools_mut();
+        let qemu_tools = emu.tools_mut().tools_mut();
 
         let paging_filter =
-            HasInstrumentationFilter::<QemuInstrumentationPagingFilter>::filter_mut(qemu_helpers);
+            HasInstrumentationFilter::<QemuInstrumentationPagingFilter>::filter_mut(qemu_tools);
 
         *paging_filter = self.filter.clone();
 

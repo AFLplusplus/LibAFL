@@ -37,7 +37,7 @@ use libafl_bolts::{
 };
 pub use libafl_qemu::qemu::Qemu;
 #[cfg(not(any(feature = "mips", feature = "hexagon")))]
-use libafl_qemu::QemuCmpLogHelper;
+use libafl_qemu::QemuCmpLogTool;
 use libafl_qemu::{edges, QemuEdgeCoverageHelper, QemuExecutor, QemuHooks};
 use libafl_targets::{edges_map_mut_ptr, CmpLogObserver};
 use typed_builder::TypedBuilder;

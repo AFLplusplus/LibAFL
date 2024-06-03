@@ -806,24 +806,6 @@ where
     S: Unpin + UsesInput,
 {
     pub(super) fn new(qemu: Qemu, tools: QT) -> Pin<Box<Self>> {
-        // unsafe {
-        //     assert!(
-        //         !HOOKS_IS_INITIALIZED,
-        //         "Only an instance of QemuHooks is permitted"
-        //     );
-        //     HOOKS_IS_INITIALIZED = true;
-        // }
-        // let slf = Box::new(Self {
-        //     qemu,
-        //     tools: helpers,
-        //     phantom: PhantomData,
-        // });
-        // slf.tools.init_hooks_all(&slf);
-        // unsafe {
-        //     QEMU_HOOKS_PTR = addr_of!(*slf) as *const c_void;
-        // }
-        // slf
-
         let mut tools = Box::pin(Self {
             qemu,
             tools: Box::pin(tools),

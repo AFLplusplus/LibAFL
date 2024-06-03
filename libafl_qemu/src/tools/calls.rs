@@ -39,7 +39,7 @@ pub trait CallTraceCollector: 'static {
         S: Unpin + UsesInput,
         QT: EmulatorToolTuple<S>;
 
-    // Frowarded from the `QemuCallTracerHelper`
+    // Frowarded from the `QemuCallTracerTool`
     fn pre_exec<I>(&mut self, _qemu: Qemu, _input: &I)
     where
         I: Input,
@@ -212,7 +212,7 @@ where
 }
 
 #[derive(Debug)]
-pub struct QemuCallTracerHelper<T>
+pub struct QemuCallTracerTool<T>
 where
     T: CallTraceCollectorTuple,
 {
@@ -221,7 +221,7 @@ where
     collectors: Option<T>,
 }
 
-impl<T> QemuCallTracerHelper<T>
+impl<T> QemuCallTracerTool<T>
 where
     T: CallTraceCollectorTuple + Debug,
 {
@@ -381,7 +381,7 @@ where
     }
 }
 
-impl<T> HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuCallTracerHelper<T>
+impl<T> HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuCallTracerTool<T>
 where
     T: CallTraceCollectorTuple,
 {
@@ -394,7 +394,7 @@ where
     }
 }
 
-impl<S, T> EmulatorTool<S> for QemuCallTracerHelper<T>
+impl<S, T> EmulatorTool<S> for QemuCallTracerTool<T>
 where
     S: Unpin + UsesInput,
     T: CallTraceCollectorTuple + Debug,

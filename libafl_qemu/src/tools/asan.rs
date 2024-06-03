@@ -18,7 +18,7 @@ use rangemap::RangeMap;
 
 use crate::{
     qemu::{MemAccessInfo, QemuInitError},
-    snapshot::QemuSnapshotHelper,
+    snapshot::QemuSnapshotTool,
     sys::TCGTemp,
     tools::{
         calls::FullBacktraceCollector, EmulatorTool, EmulatorToolTuple, HasInstrumentationFilter,
@@ -956,7 +956,7 @@ where
             Hook::Function(trace_read_n_asan::<QT, S>),
         );
 
-        if emulator_tools.match_tool::<QemuSnapshotHelper>().is_none() {
+        if emulator_tools.match_tool::<QemuSnapshotTool>().is_none() {
             emulator_tools.writes(
                 Hook::Function(gen_readwrite_asan::<QT, S>),
                 Hook::Function(trace_write1_asan::<QT, S>),
@@ -1209,9 +1209,7 @@ pub fn trace_write1_asan_snapshot<QT, S>(
         let h = emulator_tools.match_tool_mut::<QemuAsanTool>().unwrap();
         h.write_1(qemu, id as GuestAddr, addr);
     }
-    let h = emulator_tools
-        .match_tool_mut::<QemuSnapshotHelper>()
-        .unwrap();
+    let h = emulator_tools.match_tool_mut::<QemuSnapshotTool>().unwrap();
     h.access(addr, 1);
 }
 
@@ -1229,9 +1227,7 @@ pub fn trace_write2_asan_snapshot<QT, S>(
         let h = emulator_tools.match_tool_mut::<QemuAsanTool>().unwrap();
         h.write_2(qemu, id as GuestAddr, addr);
     }
-    let h = emulator_tools
-        .match_tool_mut::<QemuSnapshotHelper>()
-        .unwrap();
+    let h = emulator_tools.match_tool_mut::<QemuSnapshotTool>().unwrap();
     h.access(addr, 2);
 }
 
@@ -1249,9 +1245,7 @@ pub fn trace_write4_asan_snapshot<QT, S>(
         let h = emulator_tools.match_tool_mut::<QemuAsanTool>().unwrap();
         h.write_4(qemu, id as GuestAddr, addr);
     }
-    let h = emulator_tools
-        .match_tool_mut::<QemuSnapshotHelper>()
-        .unwrap();
+    let h = emulator_tools.match_tool_mut::<QemuSnapshotTool>().unwrap();
     h.access(addr, 4);
 }
 
@@ -1269,9 +1263,7 @@ pub fn trace_write8_asan_snapshot<QT, S>(
         let h = emulator_tools.match_tool_mut::<QemuAsanTool>().unwrap();
         h.write_8(qemu, id as GuestAddr, addr);
     }
-    let h = emulator_tools
-        .match_tool_mut::<QemuSnapshotHelper>()
-        .unwrap();
+    let h = emulator_tools.match_tool_mut::<QemuSnapshotTool>().unwrap();
     h.access(addr, 8);
 }
 
@@ -1290,9 +1282,7 @@ pub fn trace_write_n_asan_snapshot<QT, S>(
         let h = emulator_tools.match_tool_mut::<QemuAsanTool>().unwrap();
         h.read_n(qemu, id as GuestAddr, addr, size);
     }
-    let h = emulator_tools
-        .match_tool_mut::<QemuSnapshotHelper>()
-        .unwrap();
+    let h = emulator_tools.match_tool_mut::<QemuSnapshotTool>().unwrap();
     h.access(addr, size);
 }
 

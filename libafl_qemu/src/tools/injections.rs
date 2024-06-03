@@ -152,13 +152,13 @@ pub struct Match {
 }
 
 #[derive(Debug)]
-pub struct QemuInjectionHelper {
+pub struct QemuInjectionTool {
     pub tokens: Vec<String>,
     definitions: HashMap<String, InjectionDefinition>,
     matches_list: Vec<Matches>,
 }
 
-impl QemuInjectionHelper {
+impl QemuInjectionTool {
     /// `configure_injections` is the main function to activate the injection
     /// vulnerability detection feature.
     pub fn from_yaml<P: AsRef<Path> + Display>(yaml_file: P) -> Result<Self, Error> {
@@ -225,8 +225,8 @@ impl QemuInjectionHelper {
             .read_function_argument(CallingConvention::Cdecl, parameter)
             .unwrap_or_default();
 
-        let helper = emulator_tools.match_tool_mut::<Self>().unwrap();
-        let matches = &helper.matches_list[id];
+        let tool = emulator_tools.match_tool_mut::<Self>().unwrap();
+        let matches = &tool.matches_list[id];
 
         //println!("reg value = {:x}", reg);
 
@@ -258,7 +258,7 @@ impl QemuInjectionHelper {
     }
 }
 
-impl<S> EmulatorTool<S> for QemuInjectionHelper
+impl<S> EmulatorTool<S> for QemuInjectionTool
 where
     S: Unpin + UsesInput,
 {
@@ -356,8 +356,8 @@ where
     log::trace!("syscall_hook {syscall} {SYS_execve}");
     debug_assert!(i32::try_from(SYS_execve).is_ok());
     if syscall == SYS_execve as i32 {
-        let _helper = emulator_tools
-            .match_tool_mut::<QemuInjectionHelper>()
+        let _tool = emulator_tools
+            .match_tool_mut::<QemuInjectionTool>()
             .unwrap();
         if x0 > 0 && x1 > 0 {
             let c_array = x1 as *const *const c_char;

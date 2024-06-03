@@ -650,36 +650,6 @@ pub struct QemuHooks {
     _private: (),
 }
 
-// impl<I, QT> QemuHooks<QT, NopState<I>>
-// where
-//     QT: QemuHelperTuple<NopState<I>>,
-//     NopState<I>: UsesInput<Input = I>,
-// {
-//     pub fn reproducer(qemu: Qemu, helpers: QT) -> Box<Self> {
-//         Self::new(qemu, helpers)
-//     }
-//
-//     pub fn repro_run<H>(&mut self, harness: &mut H, input: &I) -> ExitKind
-//     where
-//         H: FnMut(&I) -> ExitKind,
-//     {
-//         unsafe {
-//             if FIRST_EXEC {
-//                 self.tools.first_exec_all(self);
-//                 FIRST_EXEC = false;
-//             }
-//         }
-//         self.tools.pre_exec_all(self.qemu, input);
-//
-//         let mut exit_kind = harness(input);
-//
-//         self.tools
-//             .post_exec_all(self.qemu, input, &mut (), &mut exit_kind);
-//
-//         exit_kind
-//     }
-// }
-
 impl QemuHooks {
     /// Get a QemuHooks object.
     /// Same as `QemuHooks::get`, but without checking whether QemuHooks have been correctly initialized.
