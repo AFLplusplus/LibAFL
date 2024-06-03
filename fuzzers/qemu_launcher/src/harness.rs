@@ -24,15 +24,15 @@ impl<'a> Harness<'a> {
 
         let pc: GuestReg = qemu
             .read_reg(Regs::Pc)
-            .map_err(|e| Error::unknown(format!("Failed to read PC: {e:}")))?;
+            .map_err(|e| Error::unknown(format!("Failed to read PC: {e:?}")))?;
 
         let stack_ptr: GuestAddr = qemu
             .read_reg(Regs::Sp)
-            .map_err(|e| Error::unknown(format!("Failed to read stack pointer: {e:}")))?;
+            .map_err(|e| Error::unknown(format!("Failed to read stack pointer: {e:?}")))?;
 
         let ret_addr: GuestAddr = qemu
             .read_return_address()
-            .map_err(|e| Error::unknown(format!("Failed to read return address: {e:}")))?;
+            .map_err(|e| Error::unknown(format!("Failed to read return address: {e:?}")))?;
 
         Ok(Harness {
             qemu,
@@ -62,23 +62,23 @@ impl<'a> Harness<'a> {
 
         self.qemu
             .write_reg(Regs::Pc, self.pc)
-            .map_err(|e| Error::unknown(format!("Failed to write PC: {e:}")))?;
+            .map_err(|e| Error::unknown(format!("Failed to write PC: {e:?}")))?;
 
         self.qemu
             .write_reg(Regs::Sp, self.stack_ptr)
-            .map_err(|e| Error::unknown(format!("Failed to write SP: {e:}")))?;
+            .map_err(|e| Error::unknown(format!("Failed to write SP: {e:?}")))?;
 
         self.qemu
             .write_return_address(self.ret_addr)
-            .map_err(|e| Error::unknown(format!("Failed to write return address: {e:}")))?;
+            .map_err(|e| Error::unknown(format!("Failed to write return address: {e:?}")))?;
 
         self.qemu
             .write_function_argument(CallingConvention::Cdecl, 0, self.input_addr)
-            .map_err(|e| Error::unknown(format!("Failed to write argument 0: {e:}")))?;
+            .map_err(|e| Error::unknown(format!("Failed to write argument 0: {e:?}")))?;
 
         self.qemu
             .write_function_argument(CallingConvention::Cdecl, 1, len)
-            .map_err(|e| Error::unknown(format!("Failed to write argument 1: {e:}")))?;
+            .map_err(|e| Error::unknown(format!("Failed to write argument 1: {e:?}")))?;
         unsafe {
             let _ = self.qemu.run();
         };
