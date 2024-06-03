@@ -189,19 +189,6 @@ jobs:
     # Fix me plz
     # - name: Test Build libafl_libfuzzer with embed
     #  run: cargo +nightly test --features=embed-runtime --manifest-path libafl_libfuzzer/Cargo.toml
-  ubuntu-check-nightly:
-    runs-on: ubuntu-22.04
-    needs: ubuntu
-    steps:
-      - uses: actions/checkout@v3
-      - uses: ./.github/workflows/ubuntu-prepare
-      - uses: Swatinem/rust-cache@v2
-        with: { shared-key: "ubuntu" }
-      # ---- build and feature check ----
-      # cargo-hack's --feature-powerset would be nice here but libafl has a too many knobs
-      - name: Check nightly features
-        run: cargo +nightly check --features=agpl && cargo +nightly check --features=nautilus
-
 
   ubuntu-check:
     runs-on: ubuntu-22.04
@@ -218,7 +205,6 @@ jobs:
       # cargo-hack's --feature-powerset would be nice here but libafl has a too many knobs
       - name: Check each feature
         # Skipping `python` as it has to be built with the `maturin` tool
-        # `agpl`, `nautilus` require nightly
         # `sancov_pcguard_edges` is tested seperatelyc
         run: python3 ./scripts/parallellize_cargo_check.py ${{ matrix.instance_idx }}
 

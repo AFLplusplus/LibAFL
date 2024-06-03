@@ -78,7 +78,7 @@ impl LoadedDiceSampler {
         let n = probs.len() as f64;
         let inv_n = 1.0 / probs.len() as f64;
 
-        let mut tmp = { probs.into_iter().copied().enumerate().collect::<Vec<_>>() };
+        let mut tmp = { probs.iter().copied().enumerate().collect::<Vec<_>>() };
 
         while tmp.len() > 1 {
             // eqv: rust sort ist optimized for nearly sorted cases, so I assume that a
@@ -92,7 +92,7 @@ impl LoadedDiceSampler {
             *max_p -= used_prob;
         }
         let (last_i, last_p) = tmp.pop().unwrap();
-        assert!(0.999 < last_p * n && last_p * n < 1.001); // last value should always be exactly 1 but floats...
+        debug_assert!(0.999 < last_p * n && last_p * n < 1.001); // last value should always be exactly 1 but floats...
         res.push(AliasEntry::new(last_i, usize::MAX, 1.0));
 
         res
