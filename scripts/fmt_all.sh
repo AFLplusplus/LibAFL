@@ -31,7 +31,7 @@ if [ "$CHECK" ]; then
 fi
 
 echo "[*] Formatting Rust crates..."
-if ! echo "$CRATES_TO_FMT" | parallel --halt-on-error 1 "echo '[*] Running fmt for {}'; cargo +nightly fmt $CARGO_FLAGS --manifest-path {}"
+if ! echo "$CRATES_TO_FMT" | parallel --halt-on-error 1 -- "echo '[*] Running fmt for {}'; cargo +nightly fmt $CARGO_FLAGS --manifest-path {}"
 then
   echo "Rust format failed."
   exit 1
@@ -44,6 +44,18 @@ if command -v clang-format-18 > /dev/null; then
   if ! clang-format-18 "$CLANG_FLAGS" -i --style=file "$C_FILES"
   then
     echo "C(pp) format failed."
+    exit 1
+  fi
+
+else
+  echo "Warning: clang-format-18 not found. C(pp) files formatting skipped."
+fi
+
+if command -v black > /dev/null; then
+  echo "[*] Formatting python files"
+  if ! black "$SCRIPT_DIR"
+  then
+    echo "Python format failed."
     exit 1
   fi
 
