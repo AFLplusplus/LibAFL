@@ -73,7 +73,6 @@ frida-gum-sys = { version = "0.13.6", features = [
     "invocation-listener",
 ] }
 frida-gum = { version = "0.13.6", features = [
-    "auto-download",
     "event-sink",
     "invocation-listener",
     "module-names",
