@@ -1,8 +1,6 @@
 //! The high-level hooks
 #![allow(clippy::type_complexity, clippy::missing_transmute_annotations)]
 
-#[cfg(emulation_mode = "usermode")]
-use core::ptr::addr_of_mut;
 use core::{ffi::c_void, fmt::Debug, mem::transmute, ptr};
 
 use libafl::{executors::hooks::inprocess::inprocess_get_state, inputs::UsesInput};
@@ -615,33 +613,6 @@ create_exec_wrapper!(cmp, (id: u64, v0: u64, v1: u64), 3, 4, CmpHookId);
 // Crash hook wrappers
 #[cfg(emulation_mode = "usermode")]
 pub type CrashHookClosure<QT, S> = Box<dyn FnMut(&mut EmulatorTools<QT, S>, i32)>;
-#[cfg(emulation_mode = "usermode")]
-static mut CRASH_HOOKS: Vec<HookRepr> = vec![];
-
-#[cfg(emulation_mode = "usermode")]
-pub extern "C" fn crash_hook_wrapper<QT, S>(target_sig: i32)
-where
-    QT: EmulatorToolTuple<S>,
-    S: Unpin + UsesInput,
-{
-    unsafe {
-        let hooks = Qemu::get().unwrap().hooks();
-
-        for crash_hook in &mut (*addr_of_mut!(CRASH_HOOKS)) {
-            match crash_hook {
-                HookRepr::Function(ptr) => {
-                    let func: fn(QemuHooks, i32) = transmute(*ptr);
-                    func(hooks, target_sig);
-                }
-                HookRepr::Closure(ptr) => {
-                    let func: &mut Box<dyn FnMut(QemuHooks, i32)> = transmute(ptr);
-                    func(hooks, target_sig);
-                }
-                HookRepr::Empty => (),
-            }
-        }
-    }
-}
 
 /// The thin wrapper around QEMU hooks.
 /// It is considered unsafe to use it directly.

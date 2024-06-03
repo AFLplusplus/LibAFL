@@ -1,6 +1,6 @@
 #![allow(clippy::missing_transmute_annotations)]
 
-use std::{fmt::Debug, marker::PhantomData, mem::transmute, pin::Pin, ptr};
+use std::{fmt::Debug, marker::PhantomData, mem::transmute, pin::Pin, ptr, ptr::addr_of_mut};
 
 use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple};
 use libafl_qemu_sys::{CPUArchStatePtr, FatPtr, GuestAddr, GuestUsize, TCGTemp};
@@ -8,9 +8,9 @@ use libafl_qemu_sys::{CPUArchStatePtr, FatPtr, GuestAddr, GuestUsize, TCGTemp};
 #[cfg(emulation_mode = "usermode")]
 use crate::qemu::hooks::{
     closure_new_thread_hook_wrapper, closure_post_syscall_hook_wrapper,
-    closure_pre_syscall_hook_wrapper, crash_hook_wrapper, func_new_thread_hook_wrapper,
-    func_post_syscall_hook_wrapper, func_pre_syscall_hook_wrapper, NewThreadHook, NewThreadHookId,
-    PostSyscallHook, PostSyscallHookId, PreSyscallHook, PreSyscallHookId, SyscallHookResult,
+    closure_pre_syscall_hook_wrapper, func_new_thread_hook_wrapper, func_post_syscall_hook_wrapper,
+    func_pre_syscall_hook_wrapper, NewThreadHook, NewThreadHookId, PostSyscallHook,
+    PostSyscallHookId, PreSyscallHook, PreSyscallHookId, SyscallHookResult,
 };
 use crate::{
     qemu::hooks::{
@@ -59,6 +59,34 @@ macro_rules! hook_to_repr {
 }
 
 static mut EMULATOR_TOOLS: *mut () = ptr::null_mut();
+
+#[cfg(emulation_mode = "usermode")]
+static mut CRASH_HOOKS: Vec<HookRepr> = vec![];
+
+#[cfg(emulation_mode = "usermode")]
+pub extern "C" fn crash_hook_wrapper<QT, S>(target_sig: i32)
+where
+    QT: EmulatorToolTuple<S>,
+    S: Unpin + UsesInput,
+{
+    unsafe {
+        let hooks = Qemu::get().unwrap().hooks();
+
+        for crash_hook in &mut (*addr_of_mut!(CRASH_HOOKS)) {
+            match crash_hook {
+                HookRepr::Function(ptr) => {
+                    let func: fn(QemuHooks, i32) = transmute(*ptr);
+                    func(hooks, target_sig);
+                }
+                HookRepr::Closure(ptr) => {
+                    let func: &mut Box<dyn FnMut(QemuHooks, i32)> = transmute(ptr);
+                    func(hooks, target_sig);
+                }
+                HookRepr::Empty => (),
+            }
+        }
+    }
+}
 
 /// High-level hooks, notably used by `QemuTool`s
 #[derive(Debug)]
