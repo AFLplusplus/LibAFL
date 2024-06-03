@@ -28,7 +28,7 @@ use libafl_bolts::{
 use libafl_qemu::{
     drcov::QemuDrCovHelper, elf::EasyElf, ArchExtras, CallingConvention, GuestAddr, GuestReg,
     MmapPerms, Qemu, QemuExecutor, QemuExitReason, QemuHooks,
-    QemuInstrumentationAddressRangeFilter, QemuShutdownCause, Regs,
+    QemuInstrumentationAddressRangeFilter, QemuRWError, QemuShutdownCause, Regs,
 };
 use rangemap::RangeMap;
 
@@ -155,7 +155,7 @@ pub fn fuzz() {
 
     let stack_ptr: GuestAddr = qemu.read_reg(Regs::Sp).unwrap();
 
-    let reset = |buf: &[u8], len: GuestReg| -> Result<(), String> {
+    let reset = |buf: &[u8], len: GuestReg| -> Result<(), QemuRWError> {
         unsafe {
             qemu.write_mem(input_addr, buf);
             qemu.write_reg(Regs::Pc, test_one_input_ptr)?;

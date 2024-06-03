@@ -495,6 +495,9 @@ where
     monitor: MT,
     /// The configuration
     configuration: EventConfig,
+    /// Consider this testcase as interesting always if true
+    #[builder(default = false)]
+    always_interesting: bool,
     /// The 'main' function to run for each client forked. This probably shouldn't return
     #[builder(default, setter(strip_option))]
     run_client: Option<CF>,
@@ -684,6 +687,7 @@ where
 
                         // Fuzzer client. keeps retrying the connection to broker till the broker starts
                         let builder = RestartingMgr::<(), MT, S, SP>::builder()
+                            .always_interesting(self.always_interesting)
                             .shmem_provider(self.shmem_provider.clone())
                             .broker_port(self.broker_port)
                             .kind(ManagerKind::Client {

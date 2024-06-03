@@ -396,12 +396,14 @@ where
             .ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
     }
 
-    /// Removes an entry from the corpus, returning it if it was present.
+    /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases
     #[inline]
-    fn remove(&mut self, idx: CorpusId) -> Result<Testcase<I>, Error> {
-        self.storage
-            .enabled
-            .remove(idx)
+    fn remove(&mut self, idx: CorpusId) -> Result<Testcase<Self::Input>, Error> {
+        let mut testcase = self.storage.enabled.remove(idx);
+        if testcase.is_none() {
+            testcase = self.storage.disabled.remove(idx);
+        }
+        testcase
             .map(|x| x.take())
             .ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
     }
