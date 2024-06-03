@@ -503,7 +503,7 @@ jobs:
       - name: Run Tests
         run: cargo test
       - name: Clippy
-        run: cargo +nightly clippy --tests --all
+        run: cargo +nightly clippy --tests --all --all-features
 
   ios:
     runs-on: macOS-latest

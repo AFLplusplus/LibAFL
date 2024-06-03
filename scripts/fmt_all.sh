@@ -31,7 +31,7 @@ if [ "$CHECK" ]; then
 fi
 
 echo "[*] Formatting Rust crates..."
-if ! echo "$CRATES_TO_FMT" | parallel --halt-on-error 1 -- "echo '[*] Running fmt for {}'; cargo +nightly fmt $CARGO_FLAGS --manifest-path {}"
+if ! echo "$CRATES_TO_FMT" | parallel --halt-on-error 1 "echo '[*] Running fmt for {}'; cargo +nightly fmt $CARGO_FLAGS --manifest-path {}"
 then
   echo "Rust format failed."
   exit 1
