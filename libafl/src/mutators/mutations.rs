@@ -129,8 +129,8 @@ where
         if input.bytes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
-            let bit = 1 << state.rand_mut().choose(0..8);
-            let byte = state.rand_mut().choose(input.bytes_mut());
+            let bit = 1 << state.rand_mut().choose(0..8).unwrap();
+            let byte = state.rand_mut().choose(input.bytes_mut()).unwrap();
             *byte ^= bit;
             Ok(MutationResult::Mutated)
         }
@@ -165,7 +165,7 @@ where
         if input.bytes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
-            *state.rand_mut().choose(input.bytes_mut()) ^= 0xff;
+            *state.rand_mut().choose(input.bytes_mut()).unwrap() ^= 0xff;
             Ok(MutationResult::Mutated)
         }
     }
@@ -199,7 +199,7 @@ where
         if input.bytes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
-            let byte = state.rand_mut().choose(input.bytes_mut());
+            let byte = state.rand_mut().choose(input.bytes_mut()).unwrap();
             *byte = byte.wrapping_add(1);
             Ok(MutationResult::Mutated)
         }
@@ -234,7 +234,7 @@ where
         if input.bytes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
-            let byte = state.rand_mut().choose(input.bytes_mut());
+            let byte = state.rand_mut().choose(input.bytes_mut()).unwrap();
             *byte = byte.wrapping_sub(1);
             Ok(MutationResult::Mutated)
         }
@@ -269,7 +269,7 @@ where
         if input.bytes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
-            let byte = state.rand_mut().choose(input.bytes_mut());
+            let byte = state.rand_mut().choose(input.bytes_mut()).unwrap();
             *byte = (!(*byte)).wrapping_add(1);
             Ok(MutationResult::Mutated)
         }
@@ -304,7 +304,7 @@ where
         if input.bytes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
-            let byte = state.rand_mut().choose(input.bytes_mut());
+            let byte = state.rand_mut().choose(input.bytes_mut()).unwrap();
             *byte ^= 1 + state.rand_mut().below(254) as u8;
             Ok(MutationResult::Mutated)
         }
@@ -352,7 +352,7 @@ macro_rules! add_mutator_impl {
                     // choose a random window of bytes (windows overlap) and convert to $size
                     let (index, bytes) = state
                         .rand_mut()
-                        .choose(input.bytes().windows(size_of::<$size>()).enumerate());
+                        .choose(input.bytes().windows(size_of::<$size>()).enumerate()).unwrap();
                     let val = <$size>::from_ne_bytes(bytes.try_into().unwrap());
 
                     // mutate
@@ -415,8 +415,8 @@ macro_rules! interesting_mutator_impl {
                     let bytes = input.bytes_mut();
                     let upper_bound = (bytes.len() + 1 - size_of::<$size>());
                     let idx = state.rand_mut().below(upper_bound);
-                    let val = *state.rand_mut().choose(&$interesting) as $size;
-                    let new_bytes = match state.rand_mut().choose(&[0, 1]) {
+                    let val = *state.rand_mut().choose(&$interesting).unwrap() as $size;
+                    let new_bytes = match state.rand_mut().choose(&[0, 1]).unwrap() {
                         0 => val.to_be_bytes(),
                         _ => val.to_le_bytes(),
                     };
@@ -656,7 +656,7 @@ where
         }
         let range = rand_range(state, size, min(size, 16));
 
-        let val = *state.rand_mut().choose(input.bytes());
+        let val = *state.rand_mut().choose(input.bytes()).unwrap();
         let quantity = range.len();
         buffer_set(input.bytes_mut(), range.start, quantity, val);
 
