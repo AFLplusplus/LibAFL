@@ -35,6 +35,7 @@ exclude = [
     "libafl_qemu/libafl_qemu_sys",
     "utils/noaslr",
     "utils/gdb_qemu",
+    "utils/libafl_fmt",
     "scripts",
 ]
 
