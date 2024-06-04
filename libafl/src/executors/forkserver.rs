@@ -21,6 +21,7 @@ use std::{
 use libafl_bolts::{
     fs::{get_unique_std_input_file, InputFile},
     os::{dup2, pipes::Pipe},
+    ownedref::OwnedSlice,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{Handle, Handled, MatchNameRef, Prepend, RefIndexable},
     AsSlice, AsSliceMut, Truncate,
@@ -1230,7 +1231,7 @@ where
             input_bytes_copy
                 .as_slice_mut()
                 .copy_from_slice(&input_bytes.as_slice());
-            input_bytes = input_bytes_copy.into();
+            input_bytes = OwnedSlice::from(input_bytes_copy);
         }
         let input_size_in_bytes = input_size.to_ne_bytes();
         if self.uses_shmem_testcase {
