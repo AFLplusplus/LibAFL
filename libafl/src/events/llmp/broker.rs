@@ -21,10 +21,7 @@ use crate::{
 #[derive(Debug)]
 pub struct LlmpEventBroker<I, MT, SP>
 where
-    I: Input,
     SP: ShMemProvider + 'static,
-    MT: Monitor,
-    //CE: CustomEvent<I>,
 {
     monitor: MT,
     llmp: llmp::LlmpBroker<SP>,

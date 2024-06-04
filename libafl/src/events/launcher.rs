@@ -80,15 +80,7 @@ const LIBAFL_DEBUG_OUTPUT: &str = "LIBAFL_DEBUG_OUTPUT";
     clippy::ignored_unit_patterns
 )]
 #[derive(TypedBuilder)]
-pub struct Launcher<'a, CF, EMH, MT, S, SP>
-where
-    CF: FnOnce(Option<S>, LlmpRestartingEventManager<EMH, S, SP>, CoreId) -> Result<(), Error>,
-    EMH: EventManagerHooksTuple<S>,
-    S::Input: 'a,
-    MT: Monitor,
-    SP: ShMemProvider + 'static,
-    S: State + 'a,
-{
+pub struct Launcher<'a, CF, EMH, MT, S, SP> {
     /// The `ShmemProvider` to use
     shmem_provider: SP,
     /// The monitor instance to use
@@ -472,23 +464,7 @@ where
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 #[derive(TypedBuilder)]
 #[allow(clippy::type_complexity, missing_debug_implementations)]
-pub struct CentralizedLauncher<'a, CF, MF, MT, S, SP>
-where
-    CF: FnOnce(
-        Option<S>,
-        CentralizedEventManager<LlmpRestartingEventManager<(), S, SP>, SP>, // No hooks for centralized EM
-        CoreId,
-    ) -> Result<(), Error>,
-    MF: FnOnce(
-        Option<S>,
-        CentralizedEventManager<LlmpRestartingEventManager<(), S, SP>, SP>, // No hooks for centralized EM
-        CoreId,
-    ) -> Result<(), Error>,
-    S::Input: 'a,
-    MT: Monitor,
-    SP: ShMemProvider + 'static,
-    S: State + 'a,
-{
+pub struct CentralizedLauncher<'a, CF, MF, MT, S, SP> {
     /// The `ShmemProvider` to use
     shmem_provider: SP,
     /// The monitor instance to use
@@ -549,22 +525,7 @@ where
 }
 
 #[cfg(all(unix, feature = "std", feature = "fork"))]
-impl<CF, MF, MT, S, SP> Debug for CentralizedLauncher<'_, CF, MF, MT, S, SP>
-where
-    CF: FnOnce(
-        Option<S>,
-        CentralizedEventManager<LlmpRestartingEventManager<(), S, SP>, SP>,
-        CoreId,
-    ) -> Result<(), Error>,
-    MF: FnOnce(
-        Option<S>,
-        CentralizedEventManager<LlmpRestartingEventManager<(), S, SP>, SP>, // No hooks for centralized EM
-        CoreId,
-    ) -> Result<(), Error>,
-    MT: Monitor + Clone,
-    SP: ShMemProvider + 'static,
-    S: State,
-{
+impl<CF, MF, MT, S, SP> Debug for CentralizedLauncher<'_, CF, MF, MT, S, SP> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("Launcher")
             .field("configuration", &self.configuration)
