@@ -154,17 +154,16 @@ where
 
         let observers = &executor.observers();
         let map_first = observers[&self.map_observer_handle].as_ref();
-        let map_first_filled_count = map_first
-                .count_bytes()
-                .try_into()
-                .map_err(|len| Error::illegal_state(
-                    format!(
-                        "map's filled entry count ({}) is greater than usize::MAX ({})",
-                        len,
-                        usize::MAX,
-                    )
-                    .as_str(),
-                ))?;
+        let map_first_filled_count = map_first.count_bytes().try_into().map_err(|len| {
+            Error::illegal_state(
+                format!(
+                    "map's filled entry count ({}) is greater than usize::MAX ({})",
+                    len,
+                    usize::MAX,
+                )
+                .as_str(),
+            )
+        })?;
         let map_first_entries = map_first.to_vec();
         let map_first_len = map_first.to_vec().len();
         let mut unstable_entries: Vec<usize> = vec![];
@@ -309,7 +308,10 @@ where
         if unstable_found {
             if let Some(meta) = state.metadata_map().get::<UnstableEntriesMetadata>() {
                 let unstable_entries = meta.unstable_entries().len();
-                debug_assert_ne!(map_first_filled_count, 0, "The map's filled count must never be 0");
+                debug_assert_ne!(
+                    map_first_filled_count, 0,
+                    "The map's filled count must never be 0"
+                );
                 mgr.fire(
                     state,
                     Event::UpdateUserStats {
@@ -331,7 +333,10 @@ where
                 Event::UpdateUserStats {
                     name: Cow::from("stability"),
                     value: UserStats::new(
-                        UserStatsValue::Ratio(map_first_filled_count as u64, map_first_filled_count as u64),
+                        UserStatsValue::Ratio(
+                            map_first_filled_count as u64,
+                            map_first_filled_count as u64,
+                        ),
                         AggregatorOps::Avg,
                     ),
                     phantom: PhantomData,
