@@ -36,12 +36,12 @@ use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 /// Mutational stage which minimizes corpus entries.
 ///
 /// You must provide at least one mutator that actually reduces size.
-pub trait TMinMutationalStage<E, EM, F2, IP, M, Z>:
-    Stage<E, EM, Z> + FeedbackFactory<F2, E::Observers>
+pub trait TMinMutationalStage<E, EM, F, IP, M, Z>:
+    Stage<E, EM, Z> + FeedbackFactory<F, E::Observers>
 where
     E: UsesState<State = Self::State> + HasObservers,
     EM: UsesState<State = Self::State> + EventFirer,
-    F2: Feedback<Self::State>,
+    F: Feedback<Self::State>,
     Self::State: HasMaxSize + HasCorpus + HasSolutions + HasExecutions,
     Self::Input: MutatedTransform<Self::Input, Self::State, Post = IP> + Clone + Hash + HasLen,
     IP: Clone + MutatedTransformPost<Self::State>,
@@ -202,7 +202,7 @@ where
 
 /// The default corpus entry minimising mutational stage
 #[derive(Clone, Debug)]
-pub struct StdTMinMutationalStage<E, EM, F2, FF, IP, M, Z> {
+pub struct StdTMinMutationalStage<E, EM, F, FF, IP, M, Z> {
     /// The mutator(s) this stage uses
     mutator: M,
     /// The factory
@@ -212,24 +212,24 @@ pub struct StdTMinMutationalStage<E, EM, F2, FF, IP, M, Z> {
     /// The progress helper for this stage, keeping track of resumes after timeouts/crashes
     restart_helper: ExecutionCountRestartHelper,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(E, EM, F2, IP, Z)>,
+    phantom: PhantomData<(E, EM, F, IP, Z)>,
 }
 
-impl<E, EM, F2, FF, IP, M, Z> UsesState for StdTMinMutationalStage<E, EM, F2, FF, IP, M, Z>
+impl<E, EM, F, FF, IP, M, Z> UsesState for StdTMinMutationalStage<E, EM, F, FF, IP, M, Z>
 where
     Z: UsesState,
 {
     type State = Z::State;
 }
 
-impl<E, EM, F2, FF, IP, M, Z> Stage<E, EM, Z> for StdTMinMutationalStage<E, EM, F2, FF, IP, M, Z>
+impl<E, EM, F, FF, IP, M, Z> Stage<E, EM, Z> for StdTMinMutationalStage<E, EM, F, FF, IP, M, Z>
 where
     Z: HasScheduler + ExecutionProcessor<E::Observers> + ExecutesInput<E, EM> + HasFeedback,
     Z::Scheduler: RemovableScheduler,
     E: HasObservers<State = Self::State>,
     EM: EventFirer<State = Self::State>,
-    FF: FeedbackFactory<F2, E::Observers>,
-    F2: Feedback<Self::State>,
+    FF: FeedbackFactory<F, E::Observers>,
+    F: Feedback<Self::State>,
     Self::Input: MutatedTransform<Self::Input, Self::State, Post = IP> + Clone + HasLen + Hash,
     Self::State: HasMetadata + HasExecutions + HasSolutions + HasCorpus + HasMaxSize,
     M: Mutator<Self::Input, Self::State>,
@@ -259,26 +259,26 @@ where
     }
 }
 
-impl<E, EM, F2, FF, IP, M, Z> FeedbackFactory<F2, E::Observers>
-    for StdTMinMutationalStage<E, EM, F2, FF, IP, M, Z>
+impl<E, EM, F, FF, IP, M, Z> FeedbackFactory<F, E::Observers>
+    for StdTMinMutationalStage<E, EM, F, FF, IP, M, Z>
 where
     E: HasObservers,
-    FF: FeedbackFactory<F2, E::Observers>,
+    FF: FeedbackFactory<F, E::Observers>,
 {
-    fn create_feedback(&self, ctx: &E::Observers) -> F2 {
+    fn create_feedback(&self, ctx: &E::Observers) -> F {
         self.factory.create_feedback(ctx)
     }
 }
 
-impl<E, EM, F2, FF, IP, M, Z> TMinMutationalStage<E, EM, F2, IP, M, Z>
-    for StdTMinMutationalStage<E, EM, F2, FF, IP, M, Z>
+impl<E, EM, F, FF, IP, M, Z> TMinMutationalStage<E, EM, F, IP, M, Z>
+    for StdTMinMutationalStage<E, EM, F, FF, IP, M, Z>
 where
     Z: HasScheduler + ExecutionProcessor<E::Observers> + ExecutesInput<E, EM> + HasFeedback,
     Z::Scheduler: RemovableScheduler,
     E: HasObservers<State = Self::State>,
     EM: EventFirer<State = Self::State>,
-    FF: FeedbackFactory<F2, E::Observers>,
-    F2: Feedback<Self::State>,
+    FF: FeedbackFactory<F, E::Observers>,
+    F: Feedback<Self::State>,
     Self::Input: MutatedTransform<Self::Input, Self::State, Post = IP> + Clone + HasLen + Hash,
     Self::State: HasMetadata + HasExecutions + HasSolutions + HasCorpus + HasMaxSize,
     M: Mutator<Self::Input, Self::State>,
@@ -306,7 +306,7 @@ where
     }
 }
 
-impl<E, EM, F2, FF, IP, M, Z> StdTMinMutationalStage<E, EM, F2, FF, IP, M, Z> {
+impl<E, EM, F, FF, IP, M, Z> StdTMinMutationalStage<E, EM, F, FF, IP, M, Z> {
     /// Creates a new minimizing mutational stage that will minimize provided corpus entries
     pub fn new(mutator: M, factory: FF, runs: usize) -> Self {
         Self {
