@@ -1230,7 +1230,7 @@ where
             let mut input_bytes_copy = Vec::with_capacity(input_size);
             input_bytes_copy
                 .as_slice_mut()
-                .copy_from_slice(&input_bytes.as_slice());
+                .copy_from_slice(input_bytes.as_slice());
             input_bytes = OwnedSlice::from(input_bytes_copy);
         }
         let input_size_in_bytes = input_size.to_ne_bytes();
