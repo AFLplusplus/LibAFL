@@ -36,7 +36,7 @@ use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 /// Mutational stage which minimizes corpus entries.
 ///
 /// You must provide at least one mutator that actually reduces size.
-pub trait TMinMutationalStage<E, EM, F1, F2, IP, M, Z>:
+pub trait TMinMutationalStage<E, EM, F2, IP, M, Z>:
     Stage<E, EM, Z> + FeedbackFactory<F2, E::Observers>
 where
     E: UsesState<State = Self::State> + HasObservers,
@@ -202,7 +202,7 @@ where
 
 /// The default corpus entry minimising mutational stage
 #[derive(Clone, Debug)]
-pub struct StdTMinMutationalStage<E, EM, F1, F2, FF, IP, M, Z> {
+pub struct StdTMinMutationalStage<E, EM, F2, FF, IP, M, Z> {
     /// The mutator(s) this stage uses
     mutator: M,
     /// The factory
@@ -212,18 +212,17 @@ pub struct StdTMinMutationalStage<E, EM, F1, F2, FF, IP, M, Z> {
     /// The progress helper for this stage, keeping track of resumes after timeouts/crashes
     restart_helper: ExecutionCountRestartHelper,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(E, EM, F1, F2, IP, Z)>,
+    phantom: PhantomData<(E, EM, F2, IP, Z)>,
 }
 
-impl<E, EM, F1, F2, FF, IP, M, Z> UsesState for StdTMinMutationalStage<E, EM, F1, F2, FF, IP, M, Z>
+impl<E, EM, F2, FF, IP, M, Z> UsesState for StdTMinMutationalStage<E, EM, F2, FF, IP, M, Z>
 where
     Z: UsesState,
 {
     type State = Z::State;
 }
 
-impl<E, EM, F1, F2, FF, IP, M, Z> Stage<E, EM, Z>
-    for StdTMinMutationalStage<E, EM, F1, F2, FF, IP, M, Z>
+impl<E, EM, F2, FF, IP, M, Z> Stage<E, EM, Z> for StdTMinMutationalStage<E, EM, F2, FF, IP, M, Z>
 where
     Z: HasScheduler + ExecutionProcessor<E::Observers> + ExecutesInput<E, EM> + HasFeedback,
     Z::Scheduler: RemovableScheduler,
@@ -260,8 +259,8 @@ where
     }
 }
 
-impl<E, EM, F1, F2, FF, IP, M, Z> FeedbackFactory<F2, E::Observers>
-    for StdTMinMutationalStage<E, EM, F1, F2, FF, IP, M, Z>
+impl<E, EM, F2, FF, IP, M, Z> FeedbackFactory<F2, E::Observers>
+    for StdTMinMutationalStage<E, EM, F2, FF, IP, M, Z>
 where
     E: HasObservers,
     FF: FeedbackFactory<F2, E::Observers>,
@@ -271,8 +270,8 @@ where
     }
 }
 
-impl<E, EM, F1, F2, FF, IP, M, Z> TMinMutationalStage<E, EM, F1, F2, IP, M, Z>
-    for StdTMinMutationalStage<E, EM, F1, F2, FF, IP, M, Z>
+impl<E, EM, F2, FF, IP, M, Z> TMinMutationalStage<E, EM, F2, IP, M, Z>
+    for StdTMinMutationalStage<E, EM, F2, FF, IP, M, Z>
 where
     Z: HasScheduler + ExecutionProcessor<E::Observers> + ExecutesInput<E, EM> + HasFeedback,
     Z::Scheduler: RemovableScheduler,
@@ -307,7 +306,7 @@ where
     }
 }
 
-impl<E, EM, F1, F2, FF, IP, M, Z> StdTMinMutationalStage<E, EM, F1, F2, FF, IP, M, Z> {
+impl<E, EM, F2, FF, IP, M, Z> StdTMinMutationalStage<E, EM, F2, FF, IP, M, Z> {
     /// Creates a new minimizing mutational stage that will minimize provided corpus entries
     pub fn new(mutator: M, factory: FF, runs: usize) -> Self {
         Self {
