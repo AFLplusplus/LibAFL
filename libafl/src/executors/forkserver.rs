@@ -661,6 +661,15 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             Some(t) => t.into(),
             None => Duration::from_millis(5000).into(),
         };
+        if self.min_input_size > self.max_input_size {
+            return Err(Error::illegal_argument(
+                format!(
+                    "Minimum input size ({}) must not exceed maximum input size ({})",
+                    self.min_input_size, self.max_input_size
+                )
+                .as_str(),
+            ));
+        }
 
         Ok(ForkserverExecutor {
             target,
