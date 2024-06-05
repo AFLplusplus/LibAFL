@@ -154,16 +154,13 @@ where
 
         let observers = &executor.observers();
         let map_first = observers[&self.map_observer_handle].as_ref();
-        let map_first_filled_count = map_first.count_bytes().try_into().map_err(|len| {
-            Error::illegal_state(
-                format!(
-                    "map's filled entry count ({}) is greater than usize::MAX ({})",
-                    len,
-                    usize::MAX,
-                )
-                .as_str(),
-            )
-        })?;
+        let map_first_filled_count = state
+            .named_metadata_map()
+            .get::<MapFeedbackMetadata<O::Entry>>(&self.map_name)
+            .ok_or(Error::illegal_state(
+                "unable to find MapFeedbackMetadata in State",
+            ))?
+            .num_covered_map_indexes;
         let map_first_entries = map_first.to_vec();
         let map_first_len = map_first.to_vec().len();
         let mut unstable_entries: Vec<usize> = vec![];
