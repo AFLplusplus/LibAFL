@@ -626,11 +626,11 @@ where
         client_inner_mgr_builder: CIMF,
     ) -> Result<(), Error>
     where
-        CIMF: FnOnce(&Self, CoreId) -> Result<(Option<S>, CIM), Error> + Clone,
+        CIMF: FnOnce(&Self, CoreId) -> Result<(Option<S>, CIM), Error>,
         MIMF: FnOnce(&Self, CoreId) -> Result<(Option<S>, MIM), Error>,
     {
         let mut main_inner_mgr_builder = Some(main_inner_mgr_builder);
-        let client_inner_mgr_builder = Some(client_inner_mgr_builder);
+        let mut client_inner_mgr_builder = Some(client_inner_mgr_builder);
 
         if self.cores.ids.is_empty() {
             return Err(Error::illegal_argument(
@@ -741,7 +741,7 @@ where
                         } else {
                             // Secondary clients
                             let (state, mgr) =
-                                client_inner_mgr_builder.clone().take().unwrap()(self, *bind_to)?;
+                                client_inner_mgr_builder.take().unwrap()(self, *bind_to)?;
 
                             let centralized_builder = CentralizedEventManager::builder();
 
