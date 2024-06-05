@@ -631,10 +631,7 @@ where
             builder.build().launch()
         };
 
-        self.launch_generic(
-            Some(restarting_mgr_builder.clone()),
-            Some(restarting_mgr_builder),
-        )
+        self.launch_generic(restarting_mgr_builder, restarting_mgr_builder)
     }
 }
 
@@ -660,13 +657,16 @@ where
     /// `client_inner_mgr_builder` will be called to build the inner manager of the secondary nodes.
     pub fn launch_generic<CIMF, MIMF>(
         &mut self,
-        mut main_inner_mgr_builder: Option<MIMF>,
-        client_inner_mgr_builder: Option<CIMF>,
+        main_inner_mgr_builder: MIMF,
+        client_inner_mgr_builder: CIMF,
     ) -> Result<(), Error>
     where
         CIMF: FnOnce(&Self, CoreId) -> Result<(Option<S>, CIM), Error> + Clone,
         MIMF: FnOnce(&Self, CoreId) -> Result<(Option<S>, MIM), Error>,
     {
+        let mut main_inner_mgr_builder = Some(main_inner_mgr_builder);
+        let client_inner_mgr_builder = Some(client_inner_mgr_builder);
+
         if self.cores.ids.is_empty() {
             return Err(Error::illegal_argument(
                 "No cores to spawn on given, cannot launch anything.",
