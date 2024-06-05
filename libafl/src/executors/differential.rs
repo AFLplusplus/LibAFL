@@ -31,10 +31,10 @@ impl<A, B, DOT, OTA, OTB> DiffExecutor<A, B, DOT, OTA, OTB> {
     pub fn new(primary: A, secondary: B, observers: DOT) -> Self
     where
         A: UsesState + HasObservers<Observers = OTA>,
-        B: UsesState<State = A::State> + HasObservers<Observers = OTB>,
-        DOT: DifferentialObserversTuple<OTA, OTB, A::State>,
-        OTA: ObserversTuple<A::State>,
-        OTB: ObserversTuple<A::State>,
+        B: UsesState<State = <Self as UsesState>::State> + HasObservers<Observers = OTB>,
+        DOT: DifferentialObserversTuple<OTA, OTB, <Self as UsesState>::State>,
+        OTA: ObserversTuple<<Self as UsesState>::State>,
+        OTB: ObserversTuple<<Self as UsesState>::State>,
     {
         Self {
             primary,
@@ -61,10 +61,10 @@ impl<A, B, DOT, OTA, OTB> DiffExecutor<A, B, DOT, OTA, OTB> {
 impl<A, B, DOT, EM, Z> Executor<EM, Z> for DiffExecutor<A, B, DOT, A::Observers, B::Observers>
 where
     A: Executor<EM, Z> + HasObservers,
-    B: Executor<EM, Z, State = A::State> + HasObservers,
-    EM: UsesState<State = A::State>,
-    DOT: DifferentialObserversTuple<A::Observers, B::Observers, A::State>,
-    Z: UsesState<State = A::State>,
+    B: Executor<EM, Z, State = <Self as UsesState>::State> + HasObservers,
+    EM: UsesState<State = <Self as UsesState>::State>,
+    DOT: DifferentialObserversTuple<A::Observers, B::Observers, <Self as UsesState>::State>,
+    Z: UsesState<State = <Self as UsesState>::State>,
 {
     fn run_target(
         &mut self,
@@ -196,10 +196,10 @@ impl<A, B, DOT> ProxyObserversTuple<A, B, DOT> {
 impl<A, B, DOT, OTA, OTB> UsesObservers for DiffExecutor<A, B, DOT, OTA, OTB>
 where
     A: HasObservers<Observers = OTA>,
-    B: HasObservers<Observers = OTB, State = A::State>,
-    OTA: ObserversTuple<A::State>,
-    OTB: ObserversTuple<A::State>,
-    DOT: DifferentialObserversTuple<OTA, OTB, A::State>,
+    B: HasObservers<Observers = OTB, State = <Self as UsesState>::State>,
+    OTA: ObserversTuple<<Self as UsesState>::State>,
+    OTB: ObserversTuple<<Self as UsesState>::State>,
+    DOT: DifferentialObserversTuple<OTA, OTB, <Self as UsesState>::State>,
 {
     type Observers = ProxyObserversTuple<OTA, OTB, DOT>;
 }
@@ -207,7 +207,6 @@ where
 impl<A, B, DOT, OTA, OTB> UsesState for DiffExecutor<A, B, DOT, OTA, OTB>
 where
     A: UsesState,
-    B: UsesState<State = A::State>,
 {
     type State = A::State;
 }
@@ -215,10 +214,10 @@ where
 impl<A, B, DOT, OTA, OTB> HasObservers for DiffExecutor<A, B, DOT, OTA, OTB>
 where
     A: HasObservers<Observers = OTA>,
-    B: HasObservers<Observers = OTB, State = A::State>,
-    OTA: ObserversTuple<A::State>,
-    OTB: ObserversTuple<A::State>,
-    DOT: DifferentialObserversTuple<OTA, OTB, A::State>,
+    B: HasObservers<Observers = OTB, State = <Self as UsesState>::State>,
+    OTA: ObserversTuple<<Self as UsesState>::State>,
+    OTB: ObserversTuple<<Self as UsesState>::State>,
+    DOT: DifferentialObserversTuple<OTA, OTB, <Self as UsesState>::State>,
 {
     #[inline]
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {

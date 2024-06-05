@@ -81,13 +81,13 @@ where
 
 impl<C, E, EM, O, Z> Stage<E, EM, Z> for ColorizationStage<C, E, EM, O, Z>
 where
-    EM: UsesState<State = E::State> + EventFirer,
+    EM: UsesState<State = Self::State> + EventFirer,
     E: HasObservers + Executor<EM, Z>,
-    E::State: HasCorpus + HasMetadata + HasRand + HasNamedMetadata,
+    Self::State: HasCorpus + HasMetadata + HasRand + HasNamedMetadata,
     E::Input: HasMutatorBytes,
     O: MapObserver,
     C: AsRef<O> + Named,
-    Z: UsesState<State = E::State>,
+    Z: UsesState<State = Self::State>,
 {
     #[inline]
     #[allow(clippy::let_and_return)]
@@ -95,7 +95,7 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E, // don't need the *main* executor for tracing
-        state: &mut E::State,
+        state: &mut Self::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
         // Run with the mutated input
@@ -156,20 +156,20 @@ libafl_bolts::impl_serdeany!(TaintMetadata);
 
 impl<C, E, EM, O, Z> ColorizationStage<C, E, EM, O, Z>
 where
-    EM: UsesState<State = E::State> + EventFirer,
+    EM: UsesState<State = <Self as UsesState>::State> + EventFirer,
     O: MapObserver,
     C: AsRef<O> + Named,
     E: HasObservers + Executor<EM, Z>,
-    E::State: HasCorpus + HasMetadata + HasRand,
+    <Self as UsesState>::State: HasCorpus + HasMetadata + HasRand,
     E::Input: HasMutatorBytes,
-    Z: UsesState<State = E::State>,
+    Z: UsesState<State = <Self as UsesState>::State>,
 {
     #[inline]
     #[allow(clippy::let_and_return)]
     fn colorize(
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut E::State,
+        state: &mut <Self as UsesState>::State,
         manager: &mut EM,
         observer_handle: &Handle<C>,
     ) -> Result<E::Input, Error> {
@@ -320,7 +320,7 @@ where
     fn get_raw_map_hash_run(
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut E::State,
+        state: &mut <Self as UsesState>::State,
         manager: &mut EM,
         input: E::Input,
         observer_handle: &Handle<C>,
@@ -346,7 +346,7 @@ where
 
     /// Replace bytes with random values but following certain rules
     #[allow(clippy::needless_range_loop)]
-    fn type_replace(bytes: &mut [u8], state: &mut E::State) {
+    fn type_replace(bytes: &mut [u8], state: &mut <Self as UsesState>::State) {
         let len = bytes.len();
         for idx in 0..len {
             let c = match bytes[idx] {

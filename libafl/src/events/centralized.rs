@@ -751,14 +751,15 @@ where
     fn receive_from_secondary<E, Z>(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut EM::State,
+        state: &mut <Self as UsesState>::State,
         executor: &mut E,
     ) -> Result<usize, Error>
     where
-        E: Executor<Self, Z> + HasObservers<State = EM::State>,
-        EM::State: UsesInput + HasExecutions + HasMetadata,
+        E: Executor<Self, Z> + HasObservers<State = <Self as UsesState>::State>,
+        <Self as UsesState>::State: UsesInput + HasExecutions + HasMetadata,
         for<'a> E::Observers: Deserialize<'a>,
-        Z: ExecutionProcessor<E::Observers, State = EM::State> + EvaluatorObservers<E::Observers>,
+        Z: ExecutionProcessor<E::Observers, State = <Self as UsesState>::State>
+            + EvaluatorObservers<E::Observers>,
     {
         // TODO: Get around local event copy by moving handle_in_client
         let self_id = self.client.sender().id();
@@ -783,7 +784,7 @@ where
             } else {
                 msg
             };
-            let event: Event<<<EM as UsesState>::State as UsesInput>::Input> =
+            let event: Event<<<Self as UsesState>::State as UsesInput>::Input> =
                 postcard::from_bytes(event_bytes)?;
             self.handle_in_main(fuzzer, executor, state, client_id, event)?;
             count += 1;
@@ -796,15 +797,16 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut EM::State,
+        state: &mut <Self as UsesState>::State,
         client_id: ClientId,
-        event: Event<<EM::State as UsesInput>::Input>,
+        event: Event<<<Self as UsesState>::State as UsesInput>::Input>,
     ) -> Result<(), Error>
     where
-        E: Executor<Self, Z> + HasObservers<State = EM::State>,
-        EM::State: UsesInput + HasExecutions + HasMetadata,
+        E: Executor<Self, Z> + HasObservers<State = <Self as UsesState>::State>,
+        <Self as UsesState>::State: UsesInput + HasExecutions + HasMetadata,
         for<'a> E::Observers: Deserialize<'a>,
-        Z: ExecutionProcessor<E::Observers, State = EM::State> + EvaluatorObservers<E::Observers>,
+        Z: ExecutionProcessor<E::Observers, State = <Self as UsesState>::State>
+            + EvaluatorObservers<E::Observers>,
     {
         match event {
             Event::NewTestcase {
