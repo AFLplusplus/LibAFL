@@ -59,7 +59,7 @@ use crate::{
         EventConfig,
     },
     monitors::Monitor,
-    state::{HasExecutions, State},
+    state::{HasExecutions, State, UsesState},
     Error,
 };
 
@@ -472,18 +472,20 @@ where
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 #[derive(TypedBuilder)]
 #[allow(clippy::type_complexity, missing_debug_implementations)]
-pub struct CentralizedLauncher<'a, CF, MF, MT, S, SP>
+pub struct CentralizedLauncher<'a, CF, CIM, MF, MIM, MT, S, SP>
 where
     CF: FnOnce(
         Option<S>,
-        CentralizedEventManager<LlmpRestartingEventManager<(), S, SP>, SP>, // No hooks for centralized EM
+        CentralizedEventManager<CIM, SP>, // No hooks for centralized EM
         CoreId,
     ) -> Result<(), Error>,
+    CIM: UsesState,
     MF: FnOnce(
         Option<S>,
-        CentralizedEventManager<LlmpRestartingEventManager<(), S, SP>, SP>, // No hooks for centralized EM
+        CentralizedEventManager<MIM, SP>, // No hooks for centralized EM
         CoreId,
     ) -> Result<(), Error>,
+    MIM: UsesState,
     S::Input: 'a,
     MT: Monitor,
     SP: ShMemProvider + 'static,
@@ -501,7 +503,7 @@ where
     /// The 'main' function to run for each client forked. This probably shouldn't return
     #[builder(default, setter(strip_option))]
     run_client: Option<CF>,
-    /// The 'main' function to run for the main evaluator noed
+    /// The 'main' function to run for the main evaluator node
     #[builder(default, setter(strip_option))]
     main_run_client: Option<MF>,
     /// The broker port to use (or to attach to, in case [`Self::spawn_broker`] is `false`)
@@ -548,22 +550,20 @@ where
     #[builder(default = LlmpShouldSaveState::OnRestart)]
     serialize_state: LlmpShouldSaveState,
     #[builder(setter(skip), default = PhantomData)]
-    phantom_data: PhantomData<(&'a S, &'a SP)>,
+    phantom_data: PhantomData<(&'a S, &'a SP, CIM, MIM)>,
 }
 
 #[cfg(all(unix, feature = "std", feature = "fork"))]
-impl<CF, MF, MT, S, SP> Debug for CentralizedLauncher<'_, CF, MF, MT, S, SP>
+impl<CF, CIM, MF, MIM, MT, S, SP> Debug for CentralizedLauncher<'_, CF, CIM, MF, MIM, MT, S, SP>
 where
-    CF: FnOnce(
-        Option<S>,
-        CentralizedEventManager<LlmpRestartingEventManager<(), S, SP>, SP>,
-        CoreId,
-    ) -> Result<(), Error>,
+    CF: FnOnce(Option<S>, CentralizedEventManager<CIM, SP>, CoreId) -> Result<(), Error>,
     MF: FnOnce(
         Option<S>,
-        CentralizedEventManager<LlmpRestartingEventManager<(), S, SP>, SP>, // No hooks for centralized EM
+        CentralizedEventManager<MIM, SP>, // No hooks for centralized EM
         CoreId,
     ) -> Result<(), Error>,
+    CIM: UsesState,
+    MIM: UsesState,
     MT: Monitor + Clone,
     SP: ShMemProvider + 'static,
     S: State,
@@ -581,27 +581,92 @@ where
     }
 }
 
+pub type StdCentralizedInnerMgr<S, SP> = LlmpRestartingEventManager<(), S, SP>;
+
 #[cfg(all(unix, feature = "std", feature = "fork"))]
-impl<'a, CF, MF, MT, S, SP> CentralizedLauncher<'a, CF, MF, MT, S, SP>
+impl<'a, CF, MF, MT, S, SP>
+    CentralizedLauncher<
+        'a,
+        CF,
+        StdCentralizedInnerMgr<S, SP>,
+        MF,
+        StdCentralizedInnerMgr<S, SP>,
+        MT,
+        S,
+        SP,
+    >
 where
     CF: FnOnce(
         Option<S>,
-        CentralizedEventManager<LlmpRestartingEventManager<(), S, SP>, SP>,
+        CentralizedEventManager<StdCentralizedInnerMgr<S, SP>, SP>,
         CoreId,
     ) -> Result<(), Error>,
     MF: FnOnce(
         Option<S>,
-        CentralizedEventManager<LlmpRestartingEventManager<(), S, SP>, SP>, // No hooks for centralized EM
+        CentralizedEventManager<StdCentralizedInnerMgr<S, SP>, SP>,
         CoreId,
     ) -> Result<(), Error>,
     MT: Monitor + Clone,
     S: State + HasExecutions,
     SP: ShMemProvider + 'static,
 {
+    /// Launch a standard Centralized-based fuzzer
+    pub fn launch(&mut self) -> Result<(), Error> {
+        let restarting_mgr_builder = |centralized_launcher: &Self, core_to_bind: CoreId| {
+            // Fuzzer client. keeps retrying the connection to broker till the broker starts
+            let builder = RestartingMgr::<(), MT, S, SP>::builder()
+                .always_interesting(centralized_launcher.always_interesting)
+                .shmem_provider(centralized_launcher.shmem_provider.clone())
+                .broker_port(centralized_launcher.broker_port)
+                .kind(ManagerKind::Client {
+                    cpu_core: Some(core_to_bind),
+                })
+                .configuration(centralized_launcher.configuration)
+                .serialize_state(centralized_launcher.serialize_state)
+                .hooks(tuple_list!());
+
+            #[cfg(feature = "adaptive_serialization")]
+            let builder = builder.time_ref(centralized_launcher.time_obs.handle());
+
+            builder.build().launch()
+        };
+
+        self.launch_generic(
+            Some(restarting_mgr_builder.clone()),
+            Some(restarting_mgr_builder),
+        )
+    }
+}
+
+#[cfg(all(unix, feature = "std", feature = "fork"))]
+impl<'a, CF, CIM, MF, MIM, MT, S, SP> CentralizedLauncher<'a, CF, CIM, MF, MIM, MT, S, SP>
+where
+    CF: FnOnce(Option<S>, CentralizedEventManager<CIM, SP>, CoreId) -> Result<(), Error>,
+    CIM: UsesState,
+    MF: FnOnce(
+        Option<S>,
+        CentralizedEventManager<MIM, SP>, // No hooks for centralized EM
+        CoreId,
+    ) -> Result<(), Error>,
+    MIM: UsesState,
+    MT: Monitor + Clone,
+    S: State + HasExecutions,
+    SP: ShMemProvider + 'static,
+{
     #[allow(clippy::similar_names)]
     #[allow(clippy::too_many_lines)]
-    /// launch the broker and the client and fuzz
-    pub fn launch(&mut self) -> Result<(), Error> {
+    /// Launch a Centralized-based fuzzer.
+    /// `main_inner_mgr_builder` will be called to build the inner manager of the main node.
+    /// `client_inner_mgr_builder` will be called to build the inner manager of the secondary nodes.
+    pub fn launch_generic<CIMF, MIMF>(
+        &mut self,
+        mut main_inner_mgr_builder: Option<MIMF>,
+        client_inner_mgr_builder: Option<CIMF>,
+    ) -> Result<(), Error>
+    where
+        CIMF: FnOnce(&Self, CoreId) -> Result<(Option<S>, CIM), Error> + Clone,
+        MIMF: FnOnce(&Self, CoreId) -> Result<(Option<S>, MIM), Error>,
+    {
         if self.cores.ids.is_empty() {
             return Err(Error::illegal_argument(
                 "No cores to spawn on given, cannot launch anything.",
@@ -685,46 +750,53 @@ where
                             }
                         }
 
-                        // Fuzzer client. keeps retrying the connection to broker till the broker starts
-                        let builder = RestartingMgr::<(), MT, S, SP>::builder()
-                            .always_interesting(self.always_interesting)
-                            .shmem_provider(self.shmem_provider.clone())
-                            .broker_port(self.broker_port)
-                            .kind(ManagerKind::Client {
-                                cpu_core: Some(*bind_to),
-                            })
-                            .configuration(self.configuration)
-                            .serialize_state(self.serialize_state)
-                            .hooks(tuple_list!());
-                        #[cfg(feature = "adaptive_serialization")]
-                        let builder = builder.time_ref(self.time_obs.handle());
-                        let (state, mgr) = builder.build().launch()?;
-
-                        let mut centralized_builder = CentralizedEventManager::builder();
-
                         if index == 1 {
+                            // Main client
+                            let (state, mgr) =
+                                main_inner_mgr_builder.take().unwrap()(self, *bind_to)?;
+
+                            let mut centralized_builder = CentralizedEventManager::builder();
                             centralized_builder = centralized_builder.is_main(true);
-                        }
 
-                        #[cfg(not(feature = "adaptive_serialization"))]
-                        let c_mgr = centralized_builder.build_on_port(
-                            mgr,
-                            self.shmem_provider.clone(),
-                            self.centralized_broker_port,
-                        )?;
-                        #[cfg(feature = "adaptive_serialization")]
-                        let c_mgr = centralized_builder.build_on_port(
-                            mgr,
-                            self.shmem_provider.clone(),
-                            self.centralized_broker_port,
-                            self.time_obs,
-                        )?;
+                            #[cfg(not(feature = "adaptive_serialization"))]
+                            let c_mgr = centralized_builder.build_on_port(
+                                mgr,
+                                self.shmem_provider.clone(),
+                                self.centralized_broker_port,
+                            )?;
+                            #[cfg(feature = "adaptive_serialization")]
+                            let c_mgr = centralized_builder.build_on_port(
+                                mgr,
+                                self.shmem_provider.clone(),
+                                self.centralized_broker_port,
+                                self.time_obs,
+                            )?;
 
-                        if index == 1 {
-                            return (self.main_run_client.take().unwrap())(state, c_mgr, *bind_to);
+                            self.main_run_client.take().unwrap()(state, c_mgr, *bind_to)
+                        } else {
+                            // Secondary clients
+                            let (state, mgr) =
+                                client_inner_mgr_builder.clone().take().unwrap()(self, *bind_to)?;
+
+                            let centralized_builder = CentralizedEventManager::builder();
+
+                            #[cfg(not(feature = "adaptive_serialization"))]
+                            let c_mgr = centralized_builder.build_on_port(
+                                mgr,
+                                self.shmem_provider.clone(),
+                                self.centralized_broker_port,
+                            )?;
+                            #[cfg(feature = "adaptive_serialization")]
+                            let c_mgr = centralized_builder.build_on_port(
+                                mgr,
+                                self.shmem_provider.clone(),
+                                self.centralized_broker_port,
+                                self.time_obs,
+                            )?;
+
+                            self.run_client.take().unwrap()(state, c_mgr, *bind_to)
                         }
-                        return (self.run_client.take().unwrap())(state, c_mgr, *bind_to);
-                    }
+                    }?,
                 };
             }
         }

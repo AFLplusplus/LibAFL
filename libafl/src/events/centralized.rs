@@ -214,7 +214,7 @@ where
     }
 }
 
-/// A wrapper manager to implement a main-secondary architecture witgh another broker
+/// A wrapper manager to implement a main-secondary architecture with another broker
 #[derive(Debug)]
 pub struct CentralizedEventManager<EM, SP>
 where
@@ -518,7 +518,8 @@ where
         if !self.is_main {
             // secondary node
             let mut is_tc = false;
-            let is_nt_or_heartbeat = match &mut event {
+            // Forward to main only if new tc or heartbeat
+            let should_be_forwarded = match &mut event {
                 Event::NewTestcase {
                     input: _,
                     client_config: _,
@@ -541,7 +542,7 @@ where
                 _ => false,
             };
 
-            if is_nt_or_heartbeat {
+            if should_be_forwarded {
                 self.forward_to_main(&event)?;
                 if is_tc {
                     // early return here because we only send it to centralized not main broker.
@@ -549,7 +550,8 @@ where
                 }
             }
         }
-        // now inner llmp manager will process it
+
+        // now inner llmp manager will process it if it's not a new testcase from a secondary node.
         self.inner.fire(state, event)
     }
 
