@@ -79,7 +79,11 @@ where
     }
 }
 
-impl<CB, E, EM, ST, Z> WhileStage<CB, E, EM, ST, Z> {
+impl<CB, E, EM, ST, Z> WhileStage<CB, E, EM, ST, Z>
+where
+    CB: FnMut(&mut Z, &mut E, &mut <Self as UsesState>::State, &mut EM) -> Result<bool, Error>,
+    E: UsesState,
+{
     /// Constructor
     pub fn new(closure: CB, stages: ST) -> Self {
         Self {
@@ -139,7 +143,11 @@ where
     }
 }
 
-impl<CB, E, EM, ST, Z> IfStage<CB, E, EM, ST, Z> {
+impl<CB, E, EM, ST, Z> IfStage<CB, E, EM, ST, Z>
+where
+    CB: FnMut(&mut Z, &mut E, &mut <Self as UsesState>::State, &mut EM) -> Result<bool, Error>,
+    E: UsesState,
+{
     /// Constructor for this conditionally enabled stage.
     /// If the closure returns true, the wrapped stage will be executed, else it will be skipped.
     pub fn new(closure: CB, if_stages: ST) -> Self {
@@ -220,7 +228,11 @@ where
     }
 }
 
-impl<CB, E, EM, ST1, ST2, Z> IfElseStage<CB, E, EM, ST1, ST2, Z> {
+impl<CB, E, EM, ST1, ST2, Z> IfElseStage<CB, E, EM, ST1, ST2, Z>
+where
+    CB: FnMut(&mut Z, &mut E, &mut <Self as UsesState>::State, &mut EM) -> Result<bool, Error>,
+    E: UsesState,
+{
     /// Constructor
     pub fn new(closure: CB, if_stages: ST1, else_stages: ST2) -> Self {
         Self {
