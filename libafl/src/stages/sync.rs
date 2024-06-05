@@ -65,15 +65,12 @@ pub struct SyncFromDiskStage<CB, E, EM, Z> {
 
 impl<CB, E, EM, Z> UsesState for SyncFromDiskStage<CB, E, EM, Z>
 where
-    E: UsesState,
+    Z: UsesState,
 {
-    type State = E::State;
+    type State = Z::State;
 }
 
-impl<CB, E, EM, Z> Named for SyncFromDiskStage<CB, E, EM, Z>
-where
-    E: UsesState,
-{
+impl<CB, E, EM, Z> Named for SyncFromDiskStage<CB, E, EM, Z> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
@@ -81,18 +78,18 @@ where
 
 impl<CB, E, EM, Z> Stage<E, EM, Z> for SyncFromDiskStage<CB, E, EM, Z>
 where
-    CB: FnMut(&mut Z, &mut Z::State, &Path) -> Result<<Z::State as UsesInput>::Input, Error>,
-    E: UsesState<State = Z::State>,
-    EM: UsesState<State = Z::State>,
+    CB: FnMut(&mut Z, &mut Self::State, &Path) -> Result<<Self::State as UsesInput>::Input, Error>,
+    E: UsesState<State = Self::State>,
+    EM: UsesState<State = Self::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasCorpus + HasRand + HasMetadata + HasNamedMetadata,
+    Self::State: HasCorpus + HasRand + HasMetadata + HasNamedMetadata,
 {
     #[inline]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut Z::State,
+        state: &mut Self::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
         log::debug!("Syncing from disk: {:?}", self.sync_dir);
@@ -164,14 +161,7 @@ where
     }
 }
 
-impl<CB, E, EM, Z> SyncFromDiskStage<CB, E, EM, Z>
-where
-    CB: FnMut(&mut Z, &mut Z::State, &Path) -> Result<<Z::State as UsesInput>::Input, Error>,
-    E: UsesState<State = Z::State>,
-    EM: UsesState<State = Z::State>,
-    Z: Evaluator<E, EM>,
-    Z::State: HasCorpus + HasRand + HasMetadata,
-{
+impl<CB, E, EM, Z> SyncFromDiskStage<CB, E, EM, Z> {
     /// Creates a new [`SyncFromDiskStage`]
     #[must_use]
     pub fn new(sync_dir: PathBuf, load_callback: CB) -> Self {
@@ -232,10 +222,9 @@ pub type SyncFromDiskFunction<S, Z> =
 
 impl<E, EM, Z> SyncFromDiskStage<SyncFromDiskFunction<Z::State, Z>, E, EM, Z>
 where
-    E: UsesState<State = Z::State>,
-    EM: UsesState<State = Z::State>,
+    E: UsesState<State = <Self as UsesState>::State>,
+    EM: UsesState<State = <Self as UsesState>::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasCorpus + HasRand + HasMetadata,
 {
     /// Creates a new [`SyncFromDiskStage`] invoking `Input::from_file` to load inputs
     #[must_use]
@@ -318,7 +307,7 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut Z::State,
+        state: &mut Self::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
         if self.client.can_convert() {
