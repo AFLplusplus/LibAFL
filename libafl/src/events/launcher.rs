@@ -542,10 +542,11 @@ impl<CF, CIM, MF, MIM, MT, S, SP> Debug for CentralizedLauncher<'_, CF, CIM, MF,
     }
 }
 
+/// The standard inner manager of centralized.
 pub type StdCentralizedInnerMgr<S, SP> = LlmpRestartingEventManager<(), S, SP>;
 
 #[cfg(all(unix, feature = "std", feature = "fork"))]
-impl<'a, CF, CIM, MF, MIM, MT, S, SP>
+impl<'a, CF, MF, MT, S, SP>
     CentralizedLauncher<
         'a,
         CF,
