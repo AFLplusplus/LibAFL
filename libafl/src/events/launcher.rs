@@ -48,10 +48,13 @@ use libafl_bolts::{
 use typed_builder::TypedBuilder;
 
 use super::hooks::EventManagerHooksTuple;
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use crate::events::centralized::{CentralizedEventManager, CentralizedLlmpEventBroker};
 #[cfg(feature = "adaptive_serialization")]
 use crate::observers::TimeObserver;
+#[cfg(all(unix, feature = "std", feature = "fork"))]
+use crate::{
+    events::centralized::{CentralizedEventManager, CentralizedLlmpEventBroker},
+    state::UsesState,
+};
 #[cfg(feature = "std")]
 use crate::{
     events::{
@@ -59,7 +62,7 @@ use crate::{
         EventConfig,
     },
     monitors::Monitor,
-    state::{HasExecutions, State, UsesState},
+    state::{HasExecutions, State},
     Error,
 };
 
@@ -542,7 +545,7 @@ impl<CF, CIM, MF, MIM, MT, S, SP> Debug for CentralizedLauncher<'_, CF, CIM, MF,
     }
 }
 
-/// The standard inner manager of centralized.
+/// The standard inner manager of centralized
 pub type StdCentralizedInnerMgr<S, SP> = LlmpRestartingEventManager<(), S, SP>;
 
 #[cfg(all(unix, feature = "std", feature = "fork"))]
