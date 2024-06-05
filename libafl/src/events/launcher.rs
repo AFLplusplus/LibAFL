@@ -477,10 +477,10 @@ pub struct CentralizedLauncher<'a, CF, CIM, MF, MIM, MT, S, SP> {
     /// Consider this testcase as interesting always if true
     #[builder(default = false)]
     always_interesting: bool,
-    /// The 'main' function to run for each client forked. This probably shouldn't return
+    /// The 'main' function to run for each secondary client forked. This probably shouldn't return
     #[builder(default, setter(strip_option))]
-    run_client: Option<CF>,
-    /// The 'main' function to run for the main evaluator node
+    secondary_run_client: Option<CF>,
+    /// The 'main' function to run for the main evaluator node.
     #[builder(default, setter(strip_option))]
     main_run_client: Option<MF>,
     /// The broker port to use (or to attach to, in case [`Self::spawn_broker`] is `false`)
@@ -615,22 +615,22 @@ where
     S: State + HasExecutions,
     SP: ShMemProvider + 'static,
 {
+    /// Launch a Centralized-based fuzzer.
+    /// - `main_inner_mgr_builder` will be called to build the inner manager of the main node.
+    /// - `secondary_inner_mgr_builder` will be called to build the inner manager of the secondary nodes.
     #[allow(clippy::similar_names)]
     #[allow(clippy::too_many_lines)]
-    /// Launch a Centralized-based fuzzer.
-    /// `main_inner_mgr_builder` will be called to build the inner manager of the main node.
-    /// `client_inner_mgr_builder` will be called to build the inner manager of the secondary nodes.
     pub fn launch_generic<CIMF, MIMF>(
         &mut self,
         main_inner_mgr_builder: MIMF,
-        client_inner_mgr_builder: CIMF,
+        secondary_inner_mgr_builder: CIMF,
     ) -> Result<(), Error>
     where
         CIMF: FnOnce(&Self, CoreId) -> Result<(Option<S>, CIM), Error>,
         MIMF: FnOnce(&Self, CoreId) -> Result<(Option<S>, MIM), Error>,
     {
         let mut main_inner_mgr_builder = Some(main_inner_mgr_builder);
-        let mut client_inner_mgr_builder = Some(client_inner_mgr_builder);
+        let mut secondary_inner_mgr_builder = Some(secondary_inner_mgr_builder);
 
         if self.cores.ids.is_empty() {
             return Err(Error::illegal_argument(
@@ -638,7 +638,7 @@ where
             ));
         }
 
-        if self.run_client.is_none() {
+        if self.secondary_run_client.is_none() {
             return Err(Error::illegal_argument(
                 "No client callback provided".to_string(),
             ));
@@ -741,7 +741,7 @@ where
                         } else {
                             // Secondary clients
                             let (state, mgr) =
-                                client_inner_mgr_builder.take().unwrap()(self, *bind_to)?;
+                                secondary_inner_mgr_builder.take().unwrap()(self, *bind_to)?;
 
                             let centralized_builder = CentralizedEventManager::builder();
 
@@ -759,7 +759,7 @@ where
                                 self.time_obs,
                             )?;
 
-                            self.run_client.take().unwrap()(state, c_mgr, *bind_to)
+                            self.secondary_run_client.take().unwrap()(state, c_mgr, *bind_to)
                         }
                     }?,
                 };
