@@ -375,8 +375,8 @@ pub fn setup_restarting_mgr_std<MT, S>(
     Error,
 >
 where
-    MT: Monitor + Clone,
-    S: State + HasExecutions,
+    MT: Monitor + Clone + 'static,
+    S: State + HasExecutions + 'static,
 {
     RestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)

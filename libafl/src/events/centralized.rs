@@ -9,6 +9,8 @@
 
 use alloc::{boxed::Box, string::String, vec::Vec};
 use core::fmt::Debug;
+#[cfg(feature = "adaptive_serialization")]
+use core::time::Duration;
 
 #[cfg(feature = "adaptive_serialization")]
 use libafl_bolts::tuples::{Handle, Handled};

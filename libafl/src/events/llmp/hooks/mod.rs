@@ -44,7 +44,8 @@ where
         &mut self,
         client_id: ClientId,
         msg_tag: &mut Tag,
-        msg_flags: &mut Flags,
+        #[cfg(feature = "llmp_compression")] msg_flags: &mut Flags,
+        #[cfg(not(feature = "llmp_compression"))] _msg_flags: &mut Flags,
         msg: &mut [u8],
     ) -> Result<LlmpMsgHookResult, Error> {
         let monitor = &mut self.monitor;
