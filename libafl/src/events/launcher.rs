@@ -28,6 +28,8 @@ use std::process::Stdio;
 #[cfg(all(unix, feature = "std"))]
 use std::{fs::File, os::unix::io::AsRawFd};
 
+#[cfg(all(unix, feature = "std", feature = "fork"))]
+use libafl_bolts::llmp::LlmpBroker;
 #[cfg(all(unix, feature = "std"))]
 use libafl_bolts::os::dup2;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
@@ -41,7 +43,6 @@ use libafl_bolts::{
 };
 use libafl_bolts::{
     core_affinity::{CoreId, Cores},
-    llmp::LlmpBroker,
     shmem::ShMemProvider,
     tuples::tuple_list,
 };
