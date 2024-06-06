@@ -340,7 +340,7 @@ where
             };
 
             // Update depth
-            if runs_in_current_cycle == corpus_counts {
+            if runs_in_current_cycle >= corpus_counts {
                 let psmeta = state.metadata_mut::<SchedulerMetadata>()?;
                 psmeta.set_queue_cycles(psmeta.queue_cycles() + 1);
             }
