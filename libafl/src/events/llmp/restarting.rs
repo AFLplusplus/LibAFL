@@ -323,7 +323,7 @@ pub enum ManagerKind {
         /// The CPU core ID of this client
         cpu_core: Option<CoreId>,
     },
-    /// A [`crate::events::llmp::broker::StdLlmpEventHook`], forwarding the packets of local clients.
+    /// An [`LlmpBroker`], forwarding the packets of local clients.
     Broker,
 }
 
