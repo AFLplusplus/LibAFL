@@ -3487,7 +3487,6 @@ mod tests {
     use super::{
         LlmpClient,
         LlmpConnection::{self, IsBroker, IsClient},
-        LlmpMsgHookResult::ForwardToClients,
         Tag,
     };
     use crate::shmem::{ShMemProvider, StdShMemProvider};
