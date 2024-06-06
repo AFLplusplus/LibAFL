@@ -64,7 +64,7 @@ fn main() {
         features.push("libafl/introspection");
     }
 
-    if features.is_empty() {
+    if !features.is_empty() {
         command.arg("--features").arg(features.join(","));
     }
 
@@ -104,7 +104,7 @@ fn main() {
             .arg(&archive_path)
             .stdout(Stdio::piped())
             .spawn()
-            .unwrap();
+            .expect("llvm-nm works (are you using nightly?)");
 
         let mut redefinitions_file = BufWriter::new(File::create(&redefined_symbols).unwrap());
 
