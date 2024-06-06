@@ -36,7 +36,7 @@ use crate::{
     feedbacks::Feedback,
     fuzzer::{Evaluator, ExecuteInputResult},
     generators::Generator,
-    inputs::{Input, UsesInput},
+    inputs::Input,
     stages::{HasCurrentStage, HasNestedStageStatus, StageId},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -48,13 +48,7 @@ pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
 /// Contains all important information about the current run.
 /// Will be used to restart the fuzzing process at any time.
 pub trait State:
-    UsesInput
-    + Serialize
-    + DeserializeOwned
-    + MaybeHasClientPerfMonitor
-    + MaybeHasScalabilityMonitor
-    + HasCurrentCorpusId
-    + HasCurrentStage
+    MaybeHasClientPerfMonitor + MaybeHasScalabilityMonitor + HasCurrentCorpusId + HasCurrentStage
 {
 }
 
@@ -447,33 +441,6 @@ impl<I, C, R, SC> HasCurrentCorpusId for StdState<I, C, R, SC> {
     fn current_corpus_id(&self) -> Result<Option<CorpusId>, Error> {
         Ok(self.corpus_idx)
     }
-}
-
-/// Has information about the current [`Testcase`] we are fuzzing
-pub trait HasCurrentTestcase<I>
-where
-    I: Input,
-{
-    /// Gets the current [`Testcase`] we are fuzzing
-    ///
-    /// Will return [`Error::key_not_found`] if no `corpus_idx` is currently set.
-    fn current_testcase(&self) -> Result<Ref<'_, Testcase<I>>, Error>;
-    //fn current_testcase(&self) -> Result<&Testcase<I>, Error>;
-
-    /// Gets the current [`Testcase`] we are fuzzing (mut)
-    ///
-    /// Will return [`Error::key_not_found`] if no `corpus_idx` is currently set.
-    fn current_testcase_mut(&self) -> Result<RefMut<'_, Testcase<I>>, Error>;
-    //fn current_testcase_mut(&self) -> Result<&mut Testcase<I>, Error>;
-
-    /// Gets a cloned representation of the current [`Testcase`].
-    ///
-    /// Will return [`Error::key_not_found`] if no `corpus_idx` is currently set.
-    ///
-    /// # Note
-    /// This allocates memory and copies the contents!
-    /// For performance reasons, if you just need to access the testcase, use [`Self::current_testcase`] instead.
-    fn current_input_cloned(&self) -> Result<I, Error>;
 }
 
 impl<I, T> HasCurrentTestcase<I> for T

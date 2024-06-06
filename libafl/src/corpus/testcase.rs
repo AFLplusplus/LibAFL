@@ -14,28 +14,31 @@ use std::path::PathBuf;
 use libafl_bolts::{serdeany::SerdeAnyMap, HasLen};
 use serde::{Deserialize, Serialize};
 
-use super::{Corpus, HasCorpus};
+use super::{Corpus, HasCorpus, HasCurrentCorpusId};
 use crate::{corpus::CorpusId, inputs::Input, Error, HasMetadata};
 
-/// Shorthand to receive a [`Ref`] or [`RefMut`] to a stored [`Testcase`], by [`CorpusId`].
-/// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
-pub trait HasTestcase {
+/// Helper trait for receiving a [`Testcase`] associated with a given [`CorpusId`].
+pub trait HasTestcase: HasCorpus {
     type Input;
 
-    /// Shorthand to receive a [`Ref`] to a stored [`Testcase`], by [`CorpusId`].
-    /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
+    /// Get a [`Ref`] of the [`Testcase`] associated with the provided [`CorpusId`].
     fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<Self::Input>>, Error>;
 
-    /// Shorthand to receive a [`RefMut`] to a stored [`Testcase`], by [`CorpusId`].
-    /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
+    /// Get a [`RefMut`] of the [`Testcase`] associated with the provided [`CorpusId`].
     fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<Testcase<Self::Input>>, Error>;
+
+    /// Get a copy of the input associated with the provided [`CorpusId`].
+    fn input_cloned(&self, id: CorpusId) -> Result<Ref<Self::Input>, Error> {
+        let mut testcase = self.testcase_mut(id)?;
+        testcase.load_input(self.corpus()).cloned()
+    }
 }
 
-impl<C> HasTestcase for C
+impl<HC> HasTestcase for HC
 where
-    C: HasCorpus,
+    HC: HasCorpus,
 {
-    type Input = <<C as HasCorpus>::Corpus as Corpus>::Input;
+    type Input = <<HC as HasCorpus>::Corpus as Corpus>::Input;
 
     fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<Self::Input>>, Error> {
         self.corpus().get(id).map(|rc| rc.borrow())
@@ -46,7 +49,48 @@ where
     }
 }
 
-/// An entry in the [`Testcase`] Corpus
+/// Helper trait for receiving a [`Testcase`] associated with the current [`CorpusId`].
+pub trait HasCurrentTestcase: HasTestcase + HasCurrentCorpusId {
+    /// Get a [`Ref`] of the [`Testcase`] associated with the current [`CorpusId`].
+    fn current_testcase(&self) -> Result<Ref<Testcase<<Self as HasTestcase>::Input>>, Error>;
+
+    /// Get a [`RefMut`] of the [`Testcase`] associated with the current [`CorpusId`].
+    fn current_testcase_mut(&self)
+        -> Result<RefMut<Testcase<<Self as HasTestcase>::Input>>, Error>;
+
+    /// Get a copy of the input associated with the current [`CorpusId`].
+    fn current_input_cloned(&self) -> Result<<Self as HasTestcase>::Input, Error> {
+        let mut testcase = self.current_testcase_mut()?;
+        testcase.load_input(self.corpus()).cloned()
+    }
+}
+
+impl<HC> HasCurrentTestcase for HC
+where
+    HC: HasTestcase + HasCurrentCorpusId,
+{
+    fn current_testcase(&self) -> Result<Ref<Testcase<Self::Input>>, Error> {
+        let Some(corpus_id) = self.current_corpus_id()? else {
+            return Err(Error::key_not_found(
+                "We are not currently processing a testcase",
+            ));
+        };
+
+        self.testcase(corpus_id)
+    }
+
+    fn current_testcase_mut(&self) -> Result<RefMut<Testcase<Self::Input>>, Error> {
+        let Some(corpus_id) = self.current_corpus_id()? else {
+            return Err(Error::key_not_found(
+                "We are not currently processing a testcase",
+            ));
+        };
+
+        self.testcase_mut(corpus_id)
+    }
+}
+
+/// An entry in a [`Corpus`]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Testcase<I> {
     /// The [`Input`] of this [`Testcase`], or `None`, if it is not currently in memory
@@ -111,7 +155,10 @@ impl<I> Testcase<I> {
         &self.input
     }
 
-    /// Get the input, if any (mutable)
+    /// Get the input mutably, if any
+    ///
+    /// Modifications to this copy of the testcase may or may not propagate back to the corpus. If
+    /// you are trying to modify the entry as it appears in the corpus, see [`Corpus::replace`].
     #[inline]
     pub fn input_mut(&mut self) -> &mut Option<I> {
         // self.cached_len = None;
@@ -378,10 +425,7 @@ impl<I> Testcase<I> {
     }
 }
 
-impl<I> Default for Testcase<I>
-where
-    I: Input,
-{
+impl<I> Default for Testcase<I> {
     /// Create a new default Testcase
     #[inline]
     fn default() -> Self {
@@ -441,126 +485,11 @@ where
 }
 
 /// Create a testcase from an input
-impl<I> From<I> for Testcase<I>
-where
-    I: Input,
-{
+impl<I> From<I> for Testcase<I> {
     fn from(input: I) -> Self {
         Testcase::new(input)
     }
 }
-
-/// The Metadata for each testcase used in power schedules.
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[cfg_attr(
-    any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
-)] // for SerdeAny
-pub struct SchedulerTestcaseMetadata {
-    /// Number of bits set in bitmap, updated in `calibrate_case`
-    bitmap_size: u64,
-    /// Number of queue cycles behind
-    handicap: u64,
-    /// Path depth, initialized in `on_add`
-    depth: u64,
-    /// Offset in `n_fuzz`
-    n_fuzz_entry: usize,
-    /// Cycles used to calibrate this (not really needed if it were not for `on_replace` and `on_remove`)
-    cycle_and_time: (Duration, usize),
-}
-
-impl SchedulerTestcaseMetadata {
-    /// Create new [`struct@SchedulerTestcaseMetadata`]
-    #[must_use]
-    pub fn new(depth: u64) -> Self {
-        Self {
-            bitmap_size: 0,
-            handicap: 0,
-            depth,
-            n_fuzz_entry: 0,
-            cycle_and_time: (Duration::default(), 0),
-        }
-    }
-
-    /// Create new [`struct@SchedulerTestcaseMetadata`] given `n_fuzz_entry`
-    #[must_use]
-    pub fn with_n_fuzz_entry(depth: u64, n_fuzz_entry: usize) -> Self {
-        Self {
-            bitmap_size: 0,
-            handicap: 0,
-            depth,
-            n_fuzz_entry,
-            cycle_and_time: (Duration::default(), 0),
-        }
-    }
-
-    /// Get the bitmap size
-    #[inline]
-    #[must_use]
-    pub fn bitmap_size(&self) -> u64 {
-        self.bitmap_size
-    }
-
-    /// Set the bitmap size
-    #[inline]
-    pub fn set_bitmap_size(&mut self, val: u64) {
-        self.bitmap_size = val;
-    }
-
-    /// Get the handicap
-    #[inline]
-    #[must_use]
-    pub fn handicap(&self) -> u64 {
-        self.handicap
-    }
-
-    /// Set the handicap
-    #[inline]
-    pub fn set_handicap(&mut self, val: u64) {
-        self.handicap = val;
-    }
-
-    /// Get the depth
-    #[inline]
-    #[must_use]
-    pub fn depth(&self) -> u64 {
-        self.depth
-    }
-
-    /// Set the depth
-    #[inline]
-    pub fn set_depth(&mut self, val: u64) {
-        self.depth = val;
-    }
-
-    /// Get the `n_fuzz_entry`
-    #[inline]
-    #[must_use]
-    pub fn n_fuzz_entry(&self) -> usize {
-        self.n_fuzz_entry
-    }
-
-    /// Set the `n_fuzz_entry`
-    #[inline]
-    pub fn set_n_fuzz_entry(&mut self, val: usize) {
-        self.n_fuzz_entry = val;
-    }
-
-    /// Get the cycles
-    #[inline]
-    #[must_use]
-    pub fn cycle_and_time(&self) -> (Duration, usize) {
-        self.cycle_and_time
-    }
-
-    #[inline]
-    /// Setter for cycles
-    pub fn set_cycle_and_time(&mut self, cycle_and_time: (Duration, usize)) {
-        self.cycle_and_time = cycle_and_time;
-    }
-}
-
-libafl_bolts::impl_serdeany!(SchedulerTestcaseMetadata);
 
 #[cfg(feature = "std")]
 impl<I> Drop for Testcase<I>
