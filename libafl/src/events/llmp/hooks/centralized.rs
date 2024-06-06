@@ -26,7 +26,7 @@ where
     phantom: PhantomData<(I, SP)>,
 }
 
-impl<I, SP> LlmpHook<SP> for CentralizedLlmpHook<I, SP>
+impl<I, SP> LlmpHook for CentralizedLlmpHook<I, SP>
 where
     I: Input,
     SP: ShMemProvider + 'static,
@@ -34,11 +34,11 @@ where
     fn on_new_message(
         &mut self,
         client_id: ClientId,
-        message_tag: &mut Tag,
-        message_flags: &mut Flags,
-        message: &mut [u8],
+        msg_tag: &mut Tag,
+        msg_flags: &mut Flags,
+        msg: &mut [u8],
     ) -> Result<LlmpMsgHookResult, Error> {
-        if *message_tag == _LLMP_TAG_TO_MAIN {
+        if *msg_tag == _LLMP_TAG_TO_MAIN {
             #[cfg(feature = "llmp_compression")]
             let compressor = &self.compressor;
             #[cfg(not(feature = "llmp_compression"))]
@@ -46,11 +46,11 @@ where
             #[cfg(feature = "llmp_compression")]
             let compressed;
             #[cfg(feature = "llmp_compression")]
-            let event_bytes = if *message_flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
-                compressed = compressor.decompress(message)?;
+            let event_bytes = if *msg_flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
+                compressed = compressor.decompress(msg)?;
                 &compressed
             } else {
-                &*message
+                &*msg
             };
             let event: Event<I> = postcard::from_bytes(event_bytes)?;
             match Self::handle_in_broker(client_id, &event)? {

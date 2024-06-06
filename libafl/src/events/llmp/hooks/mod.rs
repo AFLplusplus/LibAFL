@@ -34,7 +34,7 @@ where
     phantom: PhantomData<(I, SP)>,
 }
 
-impl<I, MT, SP> LlmpHook<SP> for StdLlmpEventHook<I, MT, SP>
+impl<I, MT, SP> LlmpHook for StdLlmpEventHook<I, MT, SP>
 where
     I: Input,
     MT: Monitor,
@@ -43,25 +43,25 @@ where
     fn on_new_message(
         &mut self,
         client_id: ClientId,
-        message_tag: &mut Tag,
-        message_flags: &mut Flags,
-        message: &mut [u8],
+        msg_tag: &mut Tag,
+        msg_flags: &mut Flags,
+        msg: &mut [u8],
     ) -> Result<LlmpMsgHookResult, Error> {
         let monitor = &mut self.monitor;
         #[cfg(feature = "llmp_compression")]
         let compressor = &self.compressor;
 
-        if *message_tag == LLMP_TAG_EVENT_TO_BOTH {
+        if *msg_tag == LLMP_TAG_EVENT_TO_BOTH {
             #[cfg(not(feature = "llmp_compression"))]
-            let event_bytes = message;
+            let event_bytes = msg;
             #[cfg(feature = "llmp_compression")]
             let compressed;
             #[cfg(feature = "llmp_compression")]
-            let event_bytes = if *message_flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
-                compressed = compressor.decompress(message)?;
+            let event_bytes = if *msg_flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
+                compressed = compressor.decompress(msg)?;
                 &compressed
             } else {
-                &*message
+                &*msg
             };
             let event: Event<I> = postcard::from_bytes(event_bytes)?;
             match Self::handle_in_broker(monitor, client_id, &event)? {

@@ -8,12 +8,14 @@ use core::time::Duration;
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
 use std::{num::NonZeroUsize, thread, time};
 
+use libafl_bolts::bolts_prelude::LlmpMsgHookResult;
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
 use libafl_bolts::{
-    llmp::{self, Tag},
+    llmp::{self, Flags, LlmpHook, Tag},
     shmem::{ShMemProvider, StdShMemProvider},
     ClientId, Error, SimpleStderrLogger,
 };
+use tuple_list::tuple_list;
 
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
 const _TAG_SIMPLE_U32_V1: Tag = Tag(0x5130_0321);
@@ -90,39 +92,47 @@ fn large_msg_loop(port: u16) -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
-#[allow(clippy::unnecessary_wraps)]
+pub struct LlmpExampleHook;
+
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
-fn broker_message_hook(
-    msg_or_timeout: Option<(ClientId, llmp::Tag, llmp::Flags, &[u8])>,
-) -> Result<llmp::LlmpMsgHookResult, Error> {
-    let Some((client_id, tag, _flags, message)) = msg_or_timeout else {
+impl LlmpHook for LlmpExampleHook {
+    fn on_new_message(
+        &mut self,
+        client_id: ClientId,
+        msg_tag: &mut Tag,
+        _msg_flags: &mut Flags,
+        msg: &mut [u8],
+    ) -> Result<LlmpMsgHookResult, Error> {
+        match *msg_tag {
+            _TAG_SIMPLE_U32_V1 => {
+                println!(
+                    "Client {:?} sent message: {:?}",
+                    client_id,
+                    u32::from_le_bytes(msg.try_into()?)
+                );
+                Ok(LlmpMsgHookResult::ForwardToClients)
+            }
+            _TAG_MATH_RESULT_V1 => {
+                println!(
+                    "Adder Client has this current result: {:?}",
+                    u32::from_le_bytes(msg.try_into()?)
+                );
+                Ok(LlmpMsgHookResult::Handled)
+            }
+            _ => {
+                println!("Unknown message id received: {msg_tag:?}");
+                Ok(LlmpMsgHookResult::ForwardToClients)
+            }
+        }
+    }
+
+    fn on_timeout(&mut self) -> Result<(), Error> {
         println!(
             "No client did anything for {} seconds..",
             BROKER_TIMEOUT.as_secs()
         );
-        return Ok(llmp::LlmpMsgHookResult::Handled);
-    };
 
-    match tag {
-        _TAG_SIMPLE_U32_V1 => {
-            println!(
-                "Client {:?} sent message: {:?}",
-                client_id,
-                u32::from_le_bytes(message.try_into()?)
-            );
-            Ok(llmp::LlmpMsgHookResult::ForwardToClients)
-        }
-        _TAG_MATH_RESULT_V1 => {
-            println!(
-                "Adder Client has this current result: {:?}",
-                u32::from_le_bytes(message.try_into()?)
-            );
-            Ok(llmp::LlmpMsgHookResult::Handled)
-        }
-        _ => {
-            println!("Unknown message id received: {tag:?}");
-            Ok(llmp::LlmpMsgHookResult::ForwardToClients)
-        }
+        Ok(())
     }
 }
 
@@ -154,26 +164,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match mode.as_str() {
         "broker" => {
-            let mut broker = llmp::LlmpBroker::new(StdShMemProvider::new()?)?;
+            let mut broker = llmp::LlmpBroker::new_with_hooks(
+                StdShMemProvider::new()?,
+                tuple_list!(LlmpExampleHook),
+            )?;
             broker.launch_tcp_listener_on(port)?;
             // Exit when we got at least _n_ nodes, and all of them quit.
             broker.set_exit_cleanly_after(NonZeroUsize::new(1_usize).unwrap());
-            broker.loop_with_timeouts(
-                &mut broker_message_hook,
-                BROKER_TIMEOUT,
-                Some(SLEEP_BETWEEN_FORWARDS),
-            );
+            broker.loop_with_timeouts(BROKER_TIMEOUT, Some(SLEEP_BETWEEN_FORWARDS));
         }
         "b2b" => {
-            let mut broker = llmp::LlmpBroker::new(StdShMemProvider::new()?)?;
+            let mut broker = llmp::LlmpBroker::new_with_hooks(
+                StdShMemProvider::new()?,
+                tuple_list!(LlmpExampleHook),
+            )?;
             broker.launch_tcp_listener_on(b2b_port)?;
             // connect back to the main broker.
             broker.connect_b2b(("127.0.0.1", port))?;
-            broker.loop_with_timeouts(
-                &mut broker_message_hook,
-                BROKER_TIMEOUT,
-                Some(SLEEP_BETWEEN_FORWARDS),
-            );
+            broker.loop_with_timeouts(BROKER_TIMEOUT, Some(SLEEP_BETWEEN_FORWARDS));
         }
         "ctr" => {
             let mut client =

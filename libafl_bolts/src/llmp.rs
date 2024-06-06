@@ -702,7 +702,7 @@ impl LlmpMsg {
 #[derive(Debug)]
 pub enum LlmpConnection<MT, SP>
 where
-    MT: LlmpHookTuple<SP>,
+    MT: LlmpHookTuple,
     SP: ShMemProvider + 'static,
 {
     /// A broker and a thread using this tcp background thread
@@ -770,7 +770,7 @@ where
 
 impl<MT, SP> LlmpConnection<MT, SP>
 where
-    MT: LlmpHookTuple<SP>,
+    MT: LlmpHookTuple,
     SP: ShMemProvider,
 {
     /// Describe this in a reproducible fashion, if it's a client
@@ -2018,7 +2018,7 @@ where
 #[derive(Debug)]
 pub struct LlmpBroker<HT, SP>
 where
-    HT: LlmpHookTuple<SP>,
+    HT: LlmpHookTuple,
     SP: ShMemProvider + 'static,
 {
     /// Broadcast map from broker to all clients
@@ -2085,15 +2085,15 @@ impl CtrlHandler for LlmpShutdownSignalHandler {
 }
 
 /// Llmp hooks
-pub trait LlmpHook<SP> {
+pub trait LlmpHook {
     /// Hook called whenever a new message is received. It receives an llmp message as input, does
     /// something with it (read, transform, forward, etc...) and decides to discard it or not.
     fn on_new_message(
         &mut self,
         client_id: ClientId,
-        message_tag: &mut Tag,
-        message_flags: &mut Flags,
-        message: &mut [u8],
+        msg_tag: &mut Tag,
+        msg_flags: &mut Flags,
+        msg: &mut [u8],
     ) -> Result<LlmpMsgHookResult, Error>;
 
     /// Hook called whenever there is a timeout.
@@ -2103,27 +2103,27 @@ pub trait LlmpHook<SP> {
 }
 
 /// A tuple of Llmp hooks. They are evaluated sequentially, and returns if one decides to filter out the evaluated message.
-pub trait LlmpHookTuple<SP> {
+pub trait LlmpHookTuple {
     /// Call all hook callbacks on new message.
     fn on_new_message_all(
         &mut self,
         client_id: ClientId,
-        message_tag: &mut Tag,
-        message_flags: &mut Flags,
-        message: &mut [u8],
+        msg_tag: &mut Tag,
+        msg_flags: &mut Flags,
+        msg: &mut [u8],
     ) -> Result<LlmpMsgHookResult, Error>;
 
     /// Call all hook callbacks on timeout.
     fn on_timeout_all(&mut self) -> Result<(), Error>;
 }
 
-impl<SP> LlmpHookTuple<SP> for () {
+impl LlmpHookTuple for () {
     fn on_new_message_all(
         &mut self,
         _client_id: ClientId,
-        _message_tag: &mut Tag,
-        _message_flags: &mut Flags,
-        _message: &mut [u8],
+        _msg_tag: &mut Tag,
+        _msg_flags: &mut Flags,
+        _msg: &mut [u8],
     ) -> Result<LlmpMsgHookResult, Error> {
         Ok(LlmpMsgHookResult::ForwardToClients)
     }
@@ -2133,22 +2133,19 @@ impl<SP> LlmpHookTuple<SP> for () {
     }
 }
 
-impl<Head, Tail, SP> LlmpHookTuple<SP> for (Head, Tail)
+impl<Head, Tail> LlmpHookTuple for (Head, Tail)
 where
-    Head: LlmpHook<SP> + 'static,
-    Tail: LlmpHookTuple<SP>,
+    Head: LlmpHook + 'static,
+    Tail: LlmpHookTuple,
 {
     fn on_new_message_all(
         &mut self,
         client_id: ClientId,
-        message_tag: &mut Tag,
-        message_flags: &mut Flags,
-        message: &mut [u8],
+        msg_tag: &mut Tag,
+        msg_flags: &mut Flags,
+        msg: &mut [u8],
     ) -> Result<LlmpMsgHookResult, Error> {
-        match self
-            .0
-            .on_new_message(client_id, message_tag, message_flags, message)?
-        {
+        match self.0.on_new_message(client_id, msg_tag, msg_flags, msg)? {
             LlmpMsgHookResult::Handled => {
                 // message handled, stop early
                 Ok(LlmpMsgHookResult::Handled)
@@ -2156,7 +2153,7 @@ where
             LlmpMsgHookResult::ForwardToClients => {
                 // message should be forwarded, continue iterating
                 self.1
-                    .on_new_message_all(client_id, message_tag, message_flags, message)
+                    .on_new_message_all(client_id, msg_tag, msg_flags, msg)
             }
         }
     }
@@ -2206,7 +2203,7 @@ where
 
     /// Add hooks to an empty [`LlmpBroker`].
     /// Appending hooks to any [`LlmpBroker`] is not supported yet.
-    pub fn add_hooks<NHT: LlmpHookTuple<SP>>(self, new_hooks: NHT) -> LlmpBroker<NHT, SP> {
+    pub fn add_hooks<NHT: LlmpHookTuple>(self, new_hooks: NHT) -> LlmpBroker<NHT, SP> {
         LlmpBroker::<NHT, SP> {
             llmp_out: self.llmp_out,
             llmp_clients: self.llmp_clients,
@@ -2224,7 +2221,7 @@ where
 /// It may intercept messages passing through.
 impl<HT, SP> LlmpBroker<HT, SP>
 where
-    HT: LlmpHookTuple<SP>,
+    HT: LlmpHookTuple,
     SP: ShMemProvider + 'static,
 {
     /// Create and initialize a new [`LlmpBroker`], associated with some hooks.
