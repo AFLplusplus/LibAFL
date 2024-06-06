@@ -668,7 +668,7 @@ where
                 let llmp_centralized_hook = CentralizedLlmpHook::<S::Input, SP>::new()?;
 
                 // TODO switch to false after solving the bug
-                let mut broker = LlmpBroker::with_keep_pages_attach_to_tcp_with_hooks(
+                let mut broker = LlmpBroker::with_keep_pages_attach_to_tcp(
                     self.shmem_provider.clone(),
                     tuple_list!(llmp_centralized_hook),
                     self.centralized_broker_port,

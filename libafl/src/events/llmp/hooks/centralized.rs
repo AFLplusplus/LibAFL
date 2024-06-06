@@ -3,7 +3,7 @@ use std::{fmt::Debug, marker::PhantomData};
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{compress::GzipCompressor, llmp::LLMP_FLAG_COMPRESSED};
 use libafl_bolts::{
-    llmp::{Flags, LlmpHook, LlmpMsgHookResult, Tag},
+    llmp::{Flags, LlmpBrokerState, LlmpHook, LlmpMsgHookResult, Tag},
     shmem::ShMemProvider,
     ClientId, Error,
 };
@@ -26,13 +26,14 @@ where
     phantom: PhantomData<(I, SP)>,
 }
 
-impl<I, SP> LlmpHook for CentralizedLlmpHook<I, SP>
+impl<I, SP> LlmpHook<SP> for CentralizedLlmpHook<I, SP>
 where
     I: Input,
     SP: ShMemProvider + 'static,
 {
     fn on_new_message(
         &mut self,
+        _llmp_broker_state: &mut LlmpBrokerState<SP>,
         client_id: ClientId,
         msg_tag: &mut Tag,
         msg_flags: &mut Flags,

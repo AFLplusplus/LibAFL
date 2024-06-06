@@ -460,11 +460,13 @@ where
             let broker_things = |mut broker: LlmpBroker<_, SP>, remote_broker_addr| {
                 if let Some(remote_broker_addr) = remote_broker_addr {
                     log::info!("B2b: Connecting to {:?}", &remote_broker_addr);
-                    broker.connect_b2b(remote_broker_addr)?;
+                    broker.state_mut().connect_b2b(remote_broker_addr)?;
                 };
 
                 if let Some(exit_cleanly_after) = self.exit_cleanly_after {
-                    broker.set_exit_cleanly_after(exit_cleanly_after);
+                    broker
+                        .state_mut()
+                        .set_exit_cleanly_after(exit_cleanly_after);
                 }
 
                 broker.loop_with_timeouts(Duration::from_secs(30), Some(Duration::from_millis(5)));
@@ -519,7 +521,7 @@ where
                 ManagerKind::Broker => {
                     let llmp_hook = StdLlmpEventHook::new(self.monitor.take().unwrap())?;
 
-                    let broker = LlmpBroker::create_attach_to_tcp_with_hooks(
+                    let broker = LlmpBroker::create_attach_to_tcp(
                         self.shmem_provider.clone(),
                         tuple_list!(llmp_hook),
                         self.broker_port,

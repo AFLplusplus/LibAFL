@@ -5,10 +5,11 @@ extern crate alloc;
 
 #[cfg(not(target_os = "haiku"))]
 use core::time::Duration;
+use std::marker::PhantomData;
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
 use std::{num::NonZeroUsize, thread, time};
 
-use libafl_bolts::bolts_prelude::LlmpMsgHookResult;
+use libafl_bolts::{bolts_prelude::LlmpMsgHookResult, llmp::LlmpBrokerState};
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
 use libafl_bolts::{
     llmp::{self, Flags, LlmpHook, Tag},
@@ -92,12 +93,32 @@ fn large_msg_loop(port: u16) -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
-pub struct LlmpExampleHook;
+pub struct LlmpExampleHook<SP>
+where
+    SP: ShMemProvider + 'static,
+{
+    phantom: PhantomData<SP>,
+}
+
+impl<SP> LlmpExampleHook<SP>
+where
+    SP: ShMemProvider + 'static,
+{
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
 
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
-impl LlmpHook for LlmpExampleHook {
+impl<SP> LlmpHook<SP> for LlmpExampleHook<SP>
+where
+    SP: ShMemProvider + 'static,
+{
     fn on_new_message(
         &mut self,
+        _llmp_broker_state: &mut LlmpBrokerState<SP>,
         client_id: ClientId,
         msg_tag: &mut Tag,
         _msg_flags: &mut Flags,
@@ -164,9 +185,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match mode.as_str() {
         "broker" => {
-            let mut broker = llmp::LlmpBroker::new_with_hooks(
+            let mut broker = llmp::LlmpBroker::new(
                 StdShMemProvider::new()?,
-                tuple_list!(LlmpExampleHook),
+                tuple_list!(LlmpExampleHook::new()),
             )?;
             broker.launch_tcp_listener_on(port)?;
             // Exit when we got at least _n_ nodes, and all of them quit.
@@ -174,9 +195,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             broker.loop_with_timeouts(BROKER_TIMEOUT, Some(SLEEP_BETWEEN_FORWARDS));
         }
         "b2b" => {
-            let mut broker = llmp::LlmpBroker::new_with_hooks(
+            let mut broker = llmp::LlmpBroker::new(
                 StdShMemProvider::new()?,
-                tuple_list!(LlmpExampleHook),
+                tuple_list!(LlmpExampleHook::new()),
             )?;
             broker.launch_tcp_listener_on(b2b_port)?;
             // connect back to the main broker.
