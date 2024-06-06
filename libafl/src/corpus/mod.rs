@@ -31,7 +31,7 @@ pub use minimizer::*;
 pub use nop::NopCorpus;
 use serde::{Deserialize, Serialize};
 
-use crate::{inputs::UsesInput, Error};
+use crate::Error;
 
 /// An abstraction for the index that identify a testcase in the corpus
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -85,7 +85,9 @@ macro_rules! random_corpus_id_with_disabled {
 }
 
 /// Corpus with all current [`Testcase`]s, or solutions
-pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
+pub trait Corpus {
+    type Input;
+
     /// Returns the number of all enabled entries
     fn count(&self) -> usize;
 
@@ -174,6 +176,33 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
     fn cloned_input_for_id(&self, idx: CorpusId) -> Result<Self::Input, Error> {
         let mut testcase = self.get(idx)?.borrow_mut();
         Ok(testcase.load_input(self)?.clone())
+    }
+}
+
+/// Trait for elements offering a corpus
+pub trait HasCorpus {
+    /// The associated type implementing [`Corpus`].
+    type Corpus: Corpus;
+
+    /// The testcase corpus
+    fn corpus(&self) -> &Self::Corpus;
+    /// The testcase corpus (mutable)
+    fn corpus_mut(&mut self) -> &mut Self::Corpus;
+}
+
+// reflexive: allows us to have some nice auto impl tricks
+impl<C> HasCorpus for C
+where
+    C: Corpus,
+{
+    type Corpus = Self;
+
+    fn corpus(&self) -> &Self::Corpus {
+        self
+    }
+
+    fn corpus_mut(&mut self) -> &mut Self::Corpus {
+        self
     }
 }
 

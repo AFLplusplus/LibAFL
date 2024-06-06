@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use super::{CachedOnDiskCorpus, HasTestcase};
 use crate::{
     corpus::{Corpus, CorpusId, Testcase},
-    inputs::{Input, UsesInput},
+    inputs::Input,
     Error,
 };
 
@@ -49,22 +49,11 @@ pub struct OnDiskMetadata<'a> {
 ///
 /// Metadata is written to a `.<filename>.metadata` file in the same folder by default.
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct OnDiskCorpus<I>
-where
-    I: Input,
-{
+pub struct OnDiskCorpus<I> {
     /// The root directory backing this corpus
     dir_path: PathBuf,
     /// We wrapp a cached corpus and set its size to 1.
     inner: CachedOnDiskCorpus<I>,
-}
-
-impl<I> UsesInput for OnDiskCorpus<I>
-where
-    I: Input,
-{
-    type Input = I;
 }
 
 impl<I> Corpus for OnDiskCorpus<I>
@@ -184,29 +173,7 @@ where
     }
 }
 
-impl<I> HasTestcase for OnDiskCorpus<I>
-where
-    I: Input,
-{
-    fn testcase(
-        &self,
-        id: CorpusId,
-    ) -> Result<core::cell::Ref<Testcase<<Self as UsesInput>::Input>>, Error> {
-        Ok(self.get(id)?.borrow())
-    }
-
-    fn testcase_mut(
-        &self,
-        id: CorpusId,
-    ) -> Result<core::cell::RefMut<Testcase<<Self as UsesInput>::Input>>, Error> {
-        Ok(self.get(id)?.borrow_mut())
-    }
-}
-
-impl<I> OnDiskCorpus<I>
-where
-    I: Input,
-{
+impl<I> OnDiskCorpus<I> {
     /// Creates an [`OnDiskCorpus`].
     ///
     /// This corpus stores all testcases to disk.

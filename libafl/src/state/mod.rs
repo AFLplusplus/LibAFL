@@ -31,7 +31,7 @@ use crate::monitors::ClientPerfMonitor;
 #[cfg(feature = "scalability_introspection")]
 use crate::monitors::ScalabilityMonitor;
 use crate::{
-    corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
+    corpus::{Corpus, CorpusId, HasCorpus, HasCurrentCorpusId, HasTestcase, Testcase},
     events::{Event, EventFirer, LogSeverity},
     feedbacks::Feedback,
     fuzzer::{Evaluator, ExecuteInputResult},
@@ -56,31 +56,6 @@ pub trait State:
     + HasCurrentCorpusId
     + HasCurrentStage
 {
-}
-
-/// Structs which implement this trait are aware of the state. This is used for type enforcement.
-pub trait UsesState: UsesInput<Input = <Self::State as UsesInput>::Input> {
-    /// The state known by this type.
-    type State: State;
-}
-
-// blanket impl which automatically defines UsesInput for anything that implements UsesState
-impl<KS> UsesInput for KS
-where
-    KS: UsesState,
-{
-    type Input = <KS::State as UsesInput>::Input;
-}
-
-/// Trait for elements offering a corpus
-pub trait HasCorpus: UsesInput {
-    /// The associated type implementing [`Corpus`].
-    type Corpus: Corpus<Input = <Self as UsesInput>::Input>;
-
-    /// The testcase corpus
-    fn corpus(&self) -> &Self::Corpus;
-    /// The testcase corpus (mutable)
-    fn corpus_mut(&mut self) -> &mut Self::Corpus;
 }
 
 /// Interact with the maximum size

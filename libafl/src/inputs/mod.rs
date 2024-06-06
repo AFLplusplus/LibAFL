@@ -61,7 +61,7 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
 
 /// An input for the target
 #[cfg(feature = "std")]
-pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
+pub trait Input: Clone {
     /// Write this input to the file
     fn to_file<P>(&self, path: P) -> Result<(), Error>
     where
@@ -89,7 +89,7 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
 }
 
 /// Convert between two input types with a state
-pub trait InputConverter: Debug {
+pub trait InputConverter {
     /// Source type
     type From: Input;
     /// Destination type
@@ -213,13 +213,6 @@ impl<'a> HasMutatorBytes for MutVecInput<'a> {
     {
         self.0.drain(range)
     }
-}
-
-/// Defines the input type shared across traits of the type.
-/// Needed for consistency across HasCorpus/HasSolutions and friends.
-pub trait UsesInput {
-    /// Type which will be used throughout this state.
-    type Input: Input;
 }
 
 #[derive(Debug)]

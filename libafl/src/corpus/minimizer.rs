@@ -14,13 +14,13 @@ use num_traits::ToPrimitive;
 use z3::{ast::Bool, Config, Context, Optimize};
 
 use crate::{
-    corpus::Corpus,
+    corpus::{Corpus, HasCorpus},
     events::{Event, EventFirer, LogSeverity},
     executors::{Executor, HasObservers},
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
     schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
-    state::{HasCorpus, HasExecutions, UsesState},
+    state::{HasExecutions, UsesState},
     Error, HasMetadata, HasScheduler,
 };
 

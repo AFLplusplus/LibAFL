@@ -14,35 +14,41 @@ use std::path::PathBuf;
 use libafl_bolts::{serdeany::SerdeAnyMap, HasLen};
 use serde::{Deserialize, Serialize};
 
-use super::Corpus;
-use crate::{
-    corpus::CorpusId,
-    inputs::{Input, UsesInput},
-    Error, HasMetadata,
-};
+use super::{Corpus, HasCorpus};
+use crate::{corpus::CorpusId, inputs::Input, Error, HasMetadata};
 
 /// Shorthand to receive a [`Ref`] or [`RefMut`] to a stored [`Testcase`], by [`CorpusId`].
 /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
-pub trait HasTestcase: UsesInput {
+pub trait HasTestcase {
+    type Input;
+
     /// Shorthand to receive a [`Ref`] to a stored [`Testcase`], by [`CorpusId`].
     /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
-    fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<<Self as UsesInput>::Input>>, Error>;
+    fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<Self::Input>>, Error>;
 
     /// Shorthand to receive a [`RefMut`] to a stored [`Testcase`], by [`CorpusId`].
     /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
-    fn testcase_mut(
-        &self,
-        id: CorpusId,
-    ) -> Result<RefMut<Testcase<<Self as UsesInput>::Input>>, Error>;
+    fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<Testcase<Self::Input>>, Error>;
+}
+
+impl<C> HasTestcase for C
+where
+    C: HasCorpus,
+{
+    type Input = <<C as HasCorpus>::Corpus as Corpus>::Input;
+
+    fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<Self::Input>>, Error> {
+        self.corpus().get(id).map(|rc| rc.borrow())
+    }
+
+    fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<Testcase<Self::Input>>, Error> {
+        self.corpus().get(id).map(|rc| rc.borrow_mut())
+    }
 }
 
 /// An entry in the [`Testcase`] Corpus
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct Testcase<I>
-where
-    I: Input,
-{
+pub struct Testcase<I> {
     /// The [`Input`] of this [`Testcase`], or `None`, if it is not currently in memory
     input: Option<I>,
     /// The filename for this [`Testcase`]
@@ -77,10 +83,7 @@ where
     hit_objectives: Vec<Cow<'static, str>>,
 }
 
-impl<I> HasMetadata for Testcase<I>
-where
-    I: Input,
-{
+impl<I> HasMetadata for Testcase<I> {
     /// Get all the metadata into an [`hashbrown::HashMap`]
     #[inline]
     fn metadata_map(&self) -> &SerdeAnyMap {
@@ -95,12 +98,9 @@ where
 }
 
 /// Impl of a testcase
-impl<I> Testcase<I>
-where
-    I: Input,
-{
+impl<I> Testcase<I> {
     /// Returns this [`Testcase`] with a loaded `Input`]
-    pub fn load_input<C: Corpus<Input = I>>(&mut self, corpus: &C) -> Result<&I, Error> {
+    pub fn load_input<C: Corpus>(&mut self, corpus: &C) -> Result<&I, Error> {
         corpus.load_input_into(self)?;
         Ok(self.input.as_ref().unwrap())
     }

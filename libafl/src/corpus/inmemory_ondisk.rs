@@ -22,7 +22,7 @@ use super::{
 };
 use crate::{
     corpus::{Corpus, CorpusId, InMemoryCorpus, Testcase},
-    inputs::{Input, UsesInput},
+    inputs::Input,
     Error, HasMetadata,
 };
 
@@ -31,11 +31,7 @@ use crate::{
 /// Metadata is written to a `.<filename>.metadata` file in the same folder by default.
 #[cfg(feature = "std")]
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct InMemoryOnDiskCorpus<I>
-where
-    I: Input,
-{
+pub struct InMemoryOnDiskCorpus<I> {
     inner: InMemoryCorpus<I>,
     dir_path: PathBuf,
     meta_format: Option<OnDiskMetadataFormat>,
@@ -43,17 +39,12 @@ where
     locking: bool,
 }
 
-impl<I> UsesInput for InMemoryOnDiskCorpus<I>
-where
-    I: Input,
-{
-    type Input = I;
-}
-
 impl<I> Corpus for InMemoryOnDiskCorpus<I>
 where
     I: Input,
 {
+    type Input = I;
+
     /// Returns the number of all enabled entries
     #[inline]
     fn count(&self) -> usize {
@@ -200,29 +191,7 @@ where
     }
 }
 
-impl<I> HasTestcase for InMemoryOnDiskCorpus<I>
-where
-    I: Input,
-{
-    fn testcase(
-        &self,
-        id: CorpusId,
-    ) -> Result<core::cell::Ref<Testcase<<Self as UsesInput>::Input>>, Error> {
-        Ok(self.get(id)?.borrow())
-    }
-
-    fn testcase_mut(
-        &self,
-        id: CorpusId,
-    ) -> Result<core::cell::RefMut<Testcase<<Self as UsesInput>::Input>>, Error> {
-        Ok(self.get(id)?.borrow_mut())
-    }
-}
-
-impl<I> InMemoryOnDiskCorpus<I>
-where
-    I: Input,
-{
+impl<I> InMemoryOnDiskCorpus<I> {
     /// Creates an [`InMemoryOnDiskCorpus`].
     ///
     /// This corpus stores all testcases to disk, and keeps all of them in memory, as well.
