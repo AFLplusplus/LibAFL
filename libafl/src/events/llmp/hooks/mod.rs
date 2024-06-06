@@ -19,7 +19,7 @@ use crate::{
 };
 
 /// centralized hook
-#[cfg(feature = "std")]
+#[cfg(all(unix, feature = "std"))]
 pub mod centralized;
 
 /// An LLMP-backed event hook for scalable multi-processed fuzzing
