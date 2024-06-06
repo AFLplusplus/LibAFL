@@ -8,7 +8,7 @@
 // 4. The "main broker", the gathers the stats from the fuzzer clients and broadcast the newly found testcases from the main evaluator.
 
 use alloc::{boxed::Box, string::String, vec::Vec};
-use core::{marker::PhantomData, num::NonZeroUsize, time::Duration};
+use core::fmt::Debug;
 
 #[cfg(feature = "adaptive_serialization")]
 use libafl_bolts::tuples::{Handle, Handled};
@@ -18,7 +18,7 @@ use libafl_bolts::{
     llmp::{LLMP_FLAG_COMPRESSED, LLMP_FLAG_INITIALIZED},
 };
 use libafl_bolts::{
-    llmp::{self, LlmpBroker, LlmpClient, LlmpClientDescription, Tag},
+    llmp::{LlmpClient, LlmpClientDescription, Tag},
     shmem::{NopShMemProvider, ShMemProvider},
     ClientId,
 };
@@ -33,9 +33,9 @@ use crate::observers::TimeObserver;
 use crate::state::HasScalabilityMonitor;
 use crate::{
     events::{
-        AdaptiveSerializer, BrokerEventResult, CustomBufEventResult, Event, EventConfig,
-        EventFirer, EventManager, EventManagerId, EventProcessor, EventRestarter,
-        HasCustomBufHandlers, HasEventManagerId, LogSeverity, ProgressReporter,
+        AdaptiveSerializer, CustomBufEventResult, Event, EventConfig, EventFirer, EventManager,
+        EventManagerId, EventProcessor, EventRestarter, HasCustomBufHandlers, HasEventManagerId,
+        LogSeverity, ProgressReporter,
     },
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
@@ -45,174 +45,7 @@ use crate::{
     Error, HasMetadata,
 };
 
-const _LLMP_TAG_TO_MAIN: Tag = Tag(0x3453453);
-
-/// An LLMP-backed event manager for scalable multi-processed fuzzing
-pub struct CentralizedLlmpEventBroker<I, SP>
-where
-    I: Input,
-    SP: ShMemProvider + 'static,
-    //CE: CustomEvent<I>,
-{
-    llmp: LlmpBroker<SP>,
-    #[cfg(feature = "llmp_compression")]
-    compressor: GzipCompressor,
-    phantom: PhantomData<I>,
-}
-
-impl<I, SP> core::fmt::Debug for CentralizedLlmpEventBroker<I, SP>
-where
-    SP: ShMemProvider + 'static,
-    I: Input,
-{
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let mut debug_struct = f.debug_struct("CentralizedLlmpEventBroker");
-        let debug = debug_struct.field("llmp", &self.llmp);
-        //.field("custom_buf_handlers", &self.custom_buf_handlers)
-        #[cfg(feature = "llmp_compression")]
-        let debug = debug.field("compressor", &self.compressor);
-        debug
-            .field("phantom", &self.phantom)
-            .finish_non_exhaustive()
-    }
-}
-
-impl<I, SP> CentralizedLlmpEventBroker<I, SP>
-where
-    I: Input,
-    SP: ShMemProvider + 'static,
-{
-    /// Create an event broker from a raw broker.
-    pub fn new(llmp: LlmpBroker<SP>) -> Result<Self, Error> {
-        Ok(Self {
-            llmp,
-            #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
-            phantom: PhantomData,
-        })
-    }
-
-    /// Create an LLMP broker on a port.
-    ///
-    /// The port must not be bound yet to have a broker.
-    #[cfg(feature = "std")]
-    pub fn on_port(shmem_provider: SP, port: u16) -> Result<Self, Error> {
-        Ok(Self {
-            // TODO switch to false after solving the bug
-            llmp: LlmpBroker::with_keep_pages_attach_to_tcp(shmem_provider, port, true)?,
-            #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
-            phantom: PhantomData,
-        })
-    }
-
-    /// Exit the broker process cleanly after at least `n` clients attached and all of them disconnected again
-    pub fn set_exit_cleanly_after(&mut self, n_clients: NonZeroUsize) {
-        self.llmp.set_exit_cleanly_after(n_clients);
-    }
-
-    /// Run forever in the broker
-    #[cfg(not(feature = "llmp_broker_timeouts"))]
-    pub fn broker_loop(&mut self) -> Result<(), Error> {
-        #[cfg(feature = "llmp_compression")]
-        let compressor = &self.compressor;
-        self.llmp.loop_forever(
-            &mut |client_id, tag, _flags, msg| {
-                if tag == _LLMP_TAG_TO_MAIN {
-                    #[cfg(not(feature = "llmp_compression"))]
-                    let event_bytes = msg;
-                    #[cfg(feature = "llmp_compression")]
-                    let compressed;
-                    #[cfg(feature = "llmp_compression")]
-                    let event_bytes = if _flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
-                        compressed = compressor.decompress(msg)?;
-                        &compressed
-                    } else {
-                        msg
-                    };
-                    let event: Event<I> = postcard::from_bytes(event_bytes)?;
-                    match Self::handle_in_broker(client_id, &event)? {
-                        BrokerEventResult::Forward => Ok(llmp::LlmpMsgHookResult::ForwardToClients),
-                        BrokerEventResult::Handled => Ok(llmp::LlmpMsgHookResult::Handled),
-                    }
-                } else {
-                    Ok(llmp::LlmpMsgHookResult::ForwardToClients)
-                }
-            },
-            Some(Duration::from_millis(5)),
-        );
-
-        #[cfg(all(feature = "std", feature = "llmp_debug"))]
-        println!("The last client quit. Exiting.");
-
-        Err(Error::shutting_down())
-    }
-
-    /// Run in the broker until all clients exit
-    #[cfg(feature = "llmp_broker_timeouts")]
-    pub fn broker_loop(&mut self) -> Result<(), Error> {
-        #[cfg(feature = "llmp_compression")]
-        let compressor = &self.compressor;
-        self.llmp.loop_with_timeouts(
-            &mut |msg_or_timeout| {
-                if let Some((client_id, tag, _flags, msg)) = msg_or_timeout {
-                    if tag == _LLMP_TAG_TO_MAIN {
-                        #[cfg(not(feature = "llmp_compression"))]
-                        let event_bytes = msg;
-                        #[cfg(feature = "llmp_compression")]
-                        let compressed;
-                        #[cfg(feature = "llmp_compression")]
-                        let event_bytes = if _flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
-                            compressed = compressor.decompress(msg)?;
-                            &compressed
-                        } else {
-                            msg
-                        };
-                        let event: Event<I> = postcard::from_bytes(event_bytes)?;
-                        match Self::handle_in_broker(client_id, &event)? {
-                            BrokerEventResult::Forward => {
-                                Ok(llmp::LlmpMsgHookResult::ForwardToClients)
-                            }
-                            BrokerEventResult::Handled => Ok(llmp::LlmpMsgHookResult::Handled),
-                        }
-                    } else {
-                        Ok(llmp::LlmpMsgHookResult::ForwardToClients)
-                    }
-                } else {
-                    Ok(llmp::LlmpMsgHookResult::Handled)
-                }
-            },
-            Duration::from_secs(30),
-            Some(Duration::from_millis(5)),
-        );
-
-        #[cfg(feature = "llmp_debug")]
-        println!("The last client quit. Exiting.");
-
-        Err(Error::shutting_down())
-    }
-
-    /// Handle arriving events in the broker
-    #[allow(clippy::unnecessary_wraps)]
-    fn handle_in_broker(
-        _client_id: ClientId,
-        event: &Event<I>,
-    ) -> Result<BrokerEventResult, Error> {
-        match &event {
-            Event::NewTestcase {
-                input: _,
-                client_config: _,
-                exit_kind: _,
-                corpus_size: _,
-                observers_buf: _,
-                time: _,
-                executions: _,
-                forward_id: _,
-            } => Ok(BrokerEventResult::Forward),
-            _ => Ok(BrokerEventResult::Handled),
-        }
-    }
-}
+pub(crate) const _LLMP_TAG_TO_MAIN: Tag = Tag(0x3453453);
 
 /// A wrapper manager to implement a main-secondary architecture with another broker
 #[derive(Debug)]

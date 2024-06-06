@@ -639,12 +639,22 @@ pub struct LlmpMsg {
 
 /// The message we receive
 impl LlmpMsg {
-    /// Gets the buffer from this message as slice, with the corrent length.
+    /// Gets the buffer from this message as slice, with the correct length.
+    ///
     /// # Safety
     /// This is unsafe if somebody has access to shared mem pages on the system.
     #[must_use]
     pub unsafe fn as_slice_unsafe(&self) -> &[u8] {
         slice::from_raw_parts(self.buf.as_ptr(), self.buf_len as usize)
+    }
+
+    /// Gets the buffer from this message as a mutable slice, with the correct length.
+    ///
+    /// # Safety
+    /// This is unsafe if somebody has access to shared mem pages on the system.
+    #[must_use]
+    pub unsafe fn as_slice_mut_unsafe(&mut self) -> &mut [u8] {
+        slice::from_raw_parts_mut(self.buf.as_mut_ptr(), self.buf_len as usize)
     }
 
     /// Gets the buffer from this message as slice, with the correct length.
@@ -653,6 +663,21 @@ impl LlmpMsg {
         unsafe {
             if self.in_shmem(map) {
                 Ok(self.as_slice_unsafe())
+            } else {
+                Err(Error::illegal_state("Current message not in page. The sharedmap get tampered with or we have a BUG."))
+            }
+        }
+    }
+
+    /// Gets the buffer from this message as mutable slice, with the correct length.
+    #[inline]
+    pub fn try_as_slice_mut<SHM: ShMem>(
+        &mut self,
+        map: &mut LlmpSharedMap<SHM>,
+    ) -> Result<&mut [u8], Error> {
+        unsafe {
+            if self.in_shmem(map) {
+                Ok(self.as_slice_mut_unsafe())
             } else {
                 Err(Error::illegal_state("Current message not in page. The sharedmap get tampered with or we have a BUG."))
             }
@@ -675,14 +700,15 @@ impl LlmpMsg {
 
 /// An Llmp instance
 #[derive(Debug)]
-pub enum LlmpConnection<SP>
+pub enum LlmpConnection<MT, SP>
 where
+    MT: LlmpHookTuple<SP>,
     SP: ShMemProvider + 'static,
 {
     /// A broker and a thread using this tcp background thread
     IsBroker {
         /// The [`LlmpBroker`] of this [`LlmpConnection`].
-        broker: LlmpBroker<SP>,
+        broker: LlmpBroker<MT, SP>,
     },
     /// A client, connected to the port
     IsClient {
@@ -691,7 +717,7 @@ where
     },
 }
 
-impl<SP> LlmpConnection<SP>
+impl<SP> LlmpConnection<(), SP>
 where
     SP: ShMemProvider,
 {
@@ -740,8 +766,14 @@ where
         let conn = LlmpConnection::IsClient { client };
         Ok(conn)
     }
+}
 
-    /// Describe this in a reproducable fashion, if it's a client
+impl<MT, SP> LlmpConnection<MT, SP>
+where
+    MT: LlmpHookTuple<SP>,
+    SP: ShMemProvider,
+{
+    /// Describe this in a reproducible fashion, if it's a client
     pub fn describe(&self) -> Result<LlmpClientDescription, Error> {
         Ok(match self {
             LlmpConnection::IsClient { client } => client.describe()?,
@@ -753,7 +785,7 @@ where
     pub fn existing_client_from_description(
         shmem_provider: SP,
         description: &LlmpClientDescription,
-    ) -> Result<LlmpConnection<SP>, Error> {
+    ) -> Result<LlmpConnection<MT, SP>, Error> {
         Ok(LlmpConnection::IsClient {
             client: LlmpClient::existing_client_from_description(shmem_provider, description)?,
         })
@@ -793,6 +825,7 @@ pub struct LlmpPage {
     pub receivers_left_count: AtomicU16,
     #[cfg(target_pointer_width = "64")]
     /// The current message ID
+    /// It also servers to know whether the next message can be read or not.
     pub current_msg_id: AtomicU64,
     #[cfg(not(target_pointer_width = "64"))]
     /// The current message ID
@@ -1983,8 +2016,9 @@ where
 
 /// The broker (node 0)
 #[derive(Debug)]
-pub struct LlmpBroker<SP>
+pub struct LlmpBroker<HT, SP>
 where
+    HT: LlmpHookTuple<SP>,
     SP: ShMemProvider + 'static,
 {
     /// Broadcast map from broker to all clients
@@ -2007,6 +2041,8 @@ where
     clients_to_remove: Vec<ClientId>,
     /// The `ShMemProvider` to use
     shmem_provider: SP,
+    /// LLMP hooks
+    hooks: HT,
 }
 
 /// A signal handler for the [`LlmpBroker`].
@@ -2048,9 +2084,90 @@ impl CtrlHandler for LlmpShutdownSignalHandler {
     }
 }
 
-/// The broker forwards all messages to its own bus-like broadcast map.
-/// It may intercept messages passing through.
-impl<SP> LlmpBroker<SP>
+/// Llmp hooks
+pub trait LlmpHook<SP> {
+    /// Hook called whenever a new message is received. It receives an llmp message as input, does
+    /// something with it (read, transform, forward, etc...) and decides to discard it or not.
+    fn on_new_message(
+        &mut self,
+        client_id: ClientId,
+        message_tag: &mut Tag,
+        message_flags: &mut Flags,
+        message: &mut [u8],
+    ) -> Result<LlmpMsgHookResult, Error>;
+
+    /// Hook called whenever there is a timeout.
+    fn on_timeout(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+/// A tuple of Llmp hooks. They are evaluated sequentially, and returns if one decides to filter out the evaluated message.
+pub trait LlmpHookTuple<SP> {
+    /// Call all hook callbacks on new message.
+    fn on_new_message_all(
+        &mut self,
+        client_id: ClientId,
+        message_tag: &mut Tag,
+        message_flags: &mut Flags,
+        message: &mut [u8],
+    ) -> Result<LlmpMsgHookResult, Error>;
+
+    /// Call all hook callbacks on timeout.
+    fn on_timeout_all(&mut self) -> Result<(), Error>;
+}
+
+impl<SP> LlmpHookTuple<SP> for () {
+    fn on_new_message_all(
+        &mut self,
+        _client_id: ClientId,
+        _message_tag: &mut Tag,
+        _message_flags: &mut Flags,
+        _message: &mut [u8],
+    ) -> Result<LlmpMsgHookResult, Error> {
+        Ok(LlmpMsgHookResult::ForwardToClients)
+    }
+
+    fn on_timeout_all(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+impl<Head, Tail, SP> LlmpHookTuple<SP> for (Head, Tail)
+where
+    Head: LlmpHook<SP> + 'static,
+    Tail: LlmpHookTuple<SP>,
+{
+    fn on_new_message_all(
+        &mut self,
+        client_id: ClientId,
+        message_tag: &mut Tag,
+        message_flags: &mut Flags,
+        message: &mut [u8],
+    ) -> Result<LlmpMsgHookResult, Error> {
+        match self
+            .0
+            .on_new_message(client_id, message_tag, message_flags, message)?
+        {
+            LlmpMsgHookResult::Handled => {
+                // message handled, stop early
+                Ok(LlmpMsgHookResult::Handled)
+            }
+            LlmpMsgHookResult::ForwardToClients => {
+                // message should be forwarded, continue iterating
+                self.1
+                    .on_new_message_all(client_id, message_tag, message_flags, message)
+            }
+        }
+    }
+
+    fn on_timeout_all(&mut self) -> Result<(), Error> {
+        self.0.on_timeout()?;
+        self.1.on_timeout_all()
+    }
+}
+
+impl<SP> LlmpBroker<(), SP>
 where
     SP: ShMemProvider + 'static,
 {
@@ -2058,20 +2175,67 @@ where
     pub fn new(shmem_provider: SP) -> Result<Self, Error> {
         // Broker never cleans up the pages so that new
         // clients may join at any time
-        #[cfg(feature = "std")]
-        {
-            Self::with_keep_pages(shmem_provider, true)
-        }
-
-        #[cfg(not(feature = "std"))]
-        {
-            Self::with_keep_pages(shmem_provider, true)
-        }
+        LlmpBroker::<(), SP>::new_with_hooks(shmem_provider, ())
     }
 
     /// Create and initialize a new [`LlmpBroker`] telling if it has to keep pages forever
-    pub fn with_keep_pages(
+    pub fn with_keep_pages(shmem_provider: SP, keep_pages_forever: bool) -> Result<Self, Error> {
+        LlmpBroker::<(), SP>::with_keep_pages_and_hooks(shmem_provider, (), keep_pages_forever)
+    }
+
+    /// Create a new [`LlmpBroker`] attaching to a TCP port and telling if it has to keep pages forever
+    #[cfg(feature = "std")]
+    pub fn with_keep_pages_attach_to_tcp(
+        shmem_provider: SP,
+        port: u16,
+        keep_pages_forever: bool,
+    ) -> Result<Self, Error> {
+        LlmpBroker::<(), SP>::with_keep_pages_attach_to_tcp_with_hooks(
+            shmem_provider,
+            (),
+            port,
+            keep_pages_forever,
+        )
+    }
+
+    /// Create a new [`LlmpBroker`] attaching to a TCP port
+    #[cfg(feature = "std")]
+    pub fn create_attach_to_tcp(shmem_provider: SP, port: u16) -> Result<Self, Error> {
+        LlmpBroker::<(), SP>::create_attach_to_tcp_with_hooks(shmem_provider, (), port)
+    }
+
+    /// Add hooks to an empty [`LlmpBroker`].
+    /// Appending hooks to any [`LlmpBroker`] is not supported yet.
+    pub fn add_hooks<NHT: LlmpHookTuple<SP>>(self, new_hooks: NHT) -> LlmpBroker<NHT, SP> {
+        LlmpBroker::<NHT, SP> {
+            llmp_out: self.llmp_out,
+            llmp_clients: self.llmp_clients,
+            listeners: self.listeners,
+            num_clients_seen: self.num_clients_seen,
+            exit_cleanly_after: self.exit_cleanly_after,
+            clients_to_remove: self.clients_to_remove,
+            shmem_provider: self.shmem_provider,
+            hooks: new_hooks,
+        }
+    }
+}
+
+/// The broker forwards all messages to its own bus-like broadcast map.
+/// It may intercept messages passing through.
+impl<HT, SP> LlmpBroker<HT, SP>
+where
+    HT: LlmpHookTuple<SP>,
+    SP: ShMemProvider + 'static,
+{
+    /// Create and initialize a new [`LlmpBroker`], associated with some hooks.
+    pub fn new_with_hooks(shmem_provider: SP, hooks: HT) -> Result<Self, Error> {
+        Self::with_keep_pages_and_hooks(shmem_provider, hooks, true)
+    }
+
+    /// Create and initialize a new [`LlmpBroker`] telling if it has to keep pages forever
+    pub fn with_keep_pages_and_hooks(
         mut shmem_provider: SP,
+        hooks: HT,
         keep_pages_forever: bool,
     ) -> Result<Self, Error> {
         Ok(LlmpBroker {
@@ -2089,17 +2253,18 @@ where
             },
             llmp_clients: vec![],
             clients_to_remove: Vec::new(),
-            shmem_provider,
             listeners: vec![],
             exit_cleanly_after: None,
             num_clients_seen: 0,
+            shmem_provider,
+            hooks,
         })
     }
 
     /// Gets the [`ClientId`] the next client attaching to this broker will get.
-    /// In its current implememtation, the inner value of the next [`ClientId`]
+    /// In its current implementation, the inner value of the next [`ClientId`]
     /// is equal to `self.num_clients_seen`.
-    /// Calling `peek_next_client_id` mutliple times (without adding a client) will yield the same value.
+    /// Calling `peek_next_client_id` multiple times (without adding a client) will yield the same value.
     #[must_use]
     #[inline]
     pub fn peek_next_client_id(&self) -> ClientId {
@@ -2112,20 +2277,29 @@ where
 
     /// Create a new [`LlmpBroker`] attaching to a TCP port
     #[cfg(feature = "std")]
-    pub fn create_attach_to_tcp(shmem_provider: SP, port: u16) -> Result<Self, Error> {
-        Self::with_keep_pages_attach_to_tcp(shmem_provider, port, true)
+    pub fn create_attach_to_tcp_with_hooks(
+        shmem_provider: SP,
+        hooks: HT,
+        port: u16,
+    ) -> Result<Self, Error> {
+        Self::with_keep_pages_attach_to_tcp_with_hooks(shmem_provider, hooks, port, true)
     }
 
     /// Create a new [`LlmpBroker`] attaching to a TCP port and telling if it has to keep pages forever
     #[cfg(feature = "std")]
-    pub fn with_keep_pages_attach_to_tcp(
+    pub fn with_keep_pages_attach_to_tcp_with_hooks(
         shmem_provider: SP,
+        hooks: HT,
         port: u16,
         keep_pages_forever: bool,
     ) -> Result<Self, Error> {
         match tcp_bind(port) {
             Ok(listener) => {
-                let mut broker = LlmpBroker::with_keep_pages(shmem_provider, keep_pages_forever)?;
+                let mut broker = LlmpBroker::with_keep_pages_and_hooks(
+                    shmem_provider,
+                    hooks,
+                    keep_pages_forever,
+                )?;
                 let _listener_thread = broker.launch_listener(Listener::Tcp(listener))?;
                 Ok(broker)
             }
@@ -2133,7 +2307,7 @@ where
         }
     }
 
-    /// Set this broker to exit after at least `count` clients attached and all client exited.
+    /// Set this broker to exit after at least `n_clients` clients attached and all client exited.
     /// Will ignore the own listener thread, if `create_attach_to_tcp`
     ///
     /// So, if the `n_client` value is `2`, the broker will not exit after client 1 connected and disconnected,
@@ -2271,14 +2445,11 @@ where
     /// The broker walks all pages and looks for changes, then broadcasts them on
     /// its own shared page, once.
     #[inline]
-    pub fn once<F>(&mut self, on_new_msg: &mut F) -> Result<bool, Error>
-    where
-        F: FnMut(ClientId, Tag, Flags, &[u8]) -> Result<LlmpMsgHookResult, Error>,
-    {
+    pub fn broker_once(&mut self) -> Result<bool, Error> {
         let mut new_messages = false;
         for i in 0..self.llmp_clients.len() {
             let client_id = self.llmp_clients[i].id;
-            match unsafe { self.handle_new_msgs(client_id, on_new_msg) } {
+            match unsafe { self.handle_new_msgs(client_id) } {
                 Ok(has_messages) => {
                     new_messages = has_messages;
                 }
@@ -2362,14 +2533,7 @@ where
     /// Panics on error.
     /// 5 millis of sleep can't hurt to keep busywait not at 100%
     #[cfg(feature = "std")]
-    pub fn loop_with_timeouts<F>(
-        &mut self,
-        on_new_msg_or_timeout: &mut F,
-        timeout: Duration,
-        sleep_time: Option<Duration>,
-    ) where
-        F: FnMut(Option<(ClientId, Tag, Flags, &[u8])>) -> Result<LlmpMsgHookResult, Error>,
-    {
+    pub fn loop_with_timeouts(&mut self, timeout: Duration, sleep_time: Option<Duration>) {
         use super::current_milliseconds;
 
         #[cfg(any(all(unix, not(miri)), all(windows, feature = "std")))]
@@ -2380,14 +2544,14 @@ where
 
         while !self.is_shutting_down() {
             if current_milliseconds() > end_time {
-                on_new_msg_or_timeout(None).expect("An error occurred in broker timeout. Exiting.");
+                self.hooks
+                    .on_timeout_all()
+                    .expect("An error occurred in broker timeout. Exiting.");
                 end_time = current_milliseconds() + timeout;
             }
 
             if self
-                .once(&mut |client_id, tag, flags, buf| {
-                    on_new_msg_or_timeout(Some((client_id, tag, flags, buf)))
-                })
+                .broker_once()
                 .expect("An error occurred when brokering. Exiting.")
             {
                 end_time = current_milliseconds() + timeout;
@@ -2429,15 +2593,12 @@ where
     /// forwarding and handling all incoming messages from clients.
     /// 5 millis of sleep can't hurt to keep busywait not at 100%
     /// On std, if you need to run code even if no update got sent, use `Self::loop_with_timeout` (needs the `std` feature).
-    pub fn loop_forever<F>(&mut self, on_new_msg: &mut F, sleep_time: Option<Duration>)
-    where
-        F: FnMut(ClientId, Tag, Flags, &[u8]) -> Result<LlmpMsgHookResult, Error>,
-    {
+    pub fn loop_forever(&mut self, sleep_time: Option<Duration>) {
         #[cfg(any(all(unix, not(miri)), all(windows, feature = "std")))]
         Self::setup_handlers();
 
         while !self.is_shutting_down() {
-            self.once(on_new_msg)
+            self.broker_once()
                 .expect("An error occurred when brokering. Exiting.");
 
             if let Some(exit_after_count) = self.exit_cleanly_after {
@@ -2487,7 +2648,7 @@ where
 
     /// Announces a new client on the given shared map.
     /// Called from a background thread, typically.
-    /// Upon receiving this message, the broker should map the announced page and start trckang it for new messages.
+    /// Upon receiving this message, the broker should map the announced page and start tracking it for new messages.
     #[allow(dead_code)]
     fn announce_new_client(
         sender: &mut LlmpSender<SP>,
@@ -2737,7 +2898,7 @@ where
     /// Launches a thread using a listener socket, on which new clients may connect to this broker
     pub fn launch_listener(&mut self, listener: Listener) -> Result<thread::JoinHandle<()>, Error> {
         // Later in the execution, after the initial map filled up,
-        // the current broacast map will will point to a different map.
+        // the current broadcast map will point to a different map.
         // However, the original map is (as of now) never freed, new clients will start
         // to read from the initial map id.
 
@@ -2793,7 +2954,7 @@ where
                         );
 
                         // Send initial information, without anyone asking.
-                        // This makes it a tiny bit easier to map the  broker map for new Clients.
+                        // This makes it a tiny bit easier to map the broker map for new Clients.
                         match send_tcp_msg(&mut stream, &broker_hello) {
                             Ok(()) => {}
                             Err(e) => {
@@ -2843,14 +3004,7 @@ where
     /// Returns `true` if new messages were broker-ed
     #[inline]
     #[allow(clippy::cast_ptr_alignment)]
-    unsafe fn handle_new_msgs<F>(
-        &mut self,
-        client_id: ClientId,
-        on_new_msg: &mut F,
-    ) -> Result<bool, Error>
-    where
-        F: FnMut(ClientId, Tag, Flags, &[u8]) -> Result<LlmpMsgHookResult, Error>,
-    {
+    unsafe fn handle_new_msgs(&mut self, client_id: ClientId) -> Result<bool, Error> {
         let mut new_messages = false;
 
         // TODO: We could memcpy a range of pending messages, instead of one by one.
@@ -2970,12 +3124,16 @@ where
                     };
 
                     let map = &mut self.llmp_clients[pos].current_recv_shmem;
-                    let msg_buf = (*msg).try_as_slice(map)?;
-                    if let LlmpMsgHookResult::Handled =
-                        (on_new_msg)(client_id, (*msg).tag, (*msg).flags, msg_buf)?
-                    {
+                    let msg_buf = (*msg).try_as_slice_mut(map)?;
+                    if let LlmpMsgHookResult::Handled = self.hooks.on_new_message_all(
+                        client_id,
+                        &mut (*msg).tag,
+                        &mut (*msg).flags,
+                        msg_buf,
+                    )? {
                         should_forward_msg = false;
                     }
+
                     if should_forward_msg {
                         self.forward_msg(msg)?;
                     }
@@ -3293,26 +3451,28 @@ where
         // We'll set `sender_id` later
         let mut ret = Self::new(shmem_provider, map, ClientId(0))?;
 
+        // Now sender contains 1 shmem, that must be shared back with the broker.
         let client_hello_req = TcpRequest::LocalClientHello {
             shmem_description: ret.sender.out_shmems.first().unwrap().shmem.description(),
         };
-
         send_tcp_msg(&mut stream, &client_hello_req)?;
 
-        let TcpResponse::LocalClientAccepted { client_id } =
-            recv_tcp_msg(&mut stream)?.try_into()?
+        // The broker accepted the client, and sent back an ID.
+        let TcpResponse::LocalClientAccepted {
+            client_id: client_sender_id,
+        } = recv_tcp_msg(&mut stream)?.try_into()?
         else {
             return Err(Error::illegal_state(
                 "Unexpected Response from Broker".to_string(),
             ));
         };
 
-        // Set our ID to the one the broker sent us..
+        // Set our ID to the one the broker sent us.
         // This is mainly so we can filter out our own msgs later.
-        ret.sender.id = client_id;
+        ret.sender.id = client_sender_id;
         // Also set the sender on our initial llmp map correctly.
         unsafe {
-            (*ret.sender.out_shmems.first_mut().unwrap().page_mut()).sender_id = client_id;
+            (*ret.sender.out_shmems.first_mut().unwrap().page_mut()).sender_id = client_sender_id;
         }
 
         Ok(ret)
@@ -3354,9 +3514,7 @@ mod tests {
 
         // Give the (background) tcp thread a few millis to post the message
         sleep(Duration::from_millis(100));
-        broker
-            .once(&mut |_sender_id, _tag, _flags, _msg| Ok(ForwardToClients))
-            .unwrap();
+        broker.broker_once().unwrap();
 
         let tag: Tag = Tag(0x1337);
         let arr: [u8; 1] = [1_u8];
@@ -3377,9 +3535,7 @@ mod tests {
         client.send_buf(tag, &arr).unwrap();
 
         // Forward stuff to clients
-        broker
-            .once(&mut |_sender_id, _tag, _flags, _msg| Ok(ForwardToClients))
-            .unwrap();
+        broker.broker_once().unwrap();
         let (_sender_id, tag2, arr2) = client.recv_buf_blocking().unwrap();
         assert_eq!(tag, tag2);
         assert_eq!(arr[0], arr2[0]);

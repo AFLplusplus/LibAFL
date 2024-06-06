@@ -1,0 +1,114 @@
+use std::{fmt::Debug, marker::PhantomData};
+
+use libafl_bolts::{
+    compress::GzipCompressor,
+    llmp::{Flags, LlmpHook, LlmpMsgHookResult, Tag, LLMP_FLAG_COMPRESSED},
+    shmem::ShMemProvider,
+    ClientId, Error,
+};
+
+use crate::{
+    events::{BrokerEventResult, Event, COMPRESS_THRESHOLD, _LLMP_TAG_TO_MAIN},
+    inputs::Input,
+};
+
+/// An LLMP-backed event manager for scalable multi-processed fuzzing
+pub struct CentralizedLlmpHook<I, SP>
+where
+    I: Input,
+    SP: ShMemProvider + 'static,
+{
+    #[cfg(feature = "llmp_compression")]
+    compressor: GzipCompressor,
+    phantom: PhantomData<(I, SP)>,
+}
+
+impl<I, SP> LlmpHook<SP> for CentralizedLlmpHook<I, SP>
+where
+    I: Input,
+    SP: ShMemProvider + 'static,
+{
+    fn on_new_message(
+        &mut self,
+        client_id: ClientId,
+        message_tag: &mut Tag,
+        message_flags: &mut Flags,
+        message: &mut [u8],
+    ) -> Result<LlmpMsgHookResult, Error> {
+        if *message_tag == _LLMP_TAG_TO_MAIN {
+            #[cfg(feature = "llmp_compression")]
+            let compressor = &self.compressor;
+            #[cfg(not(feature = "llmp_compression"))]
+            let event_bytes = msg;
+            #[cfg(feature = "llmp_compression")]
+            let compressed;
+            #[cfg(feature = "llmp_compression")]
+            let event_bytes = if *message_flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
+                compressed = compressor.decompress(message)?;
+                &compressed
+            } else {
+                &*message
+            };
+            let event: Event<I> = postcard::from_bytes(event_bytes)?;
+            match Self::handle_in_broker(client_id, &event)? {
+                BrokerEventResult::Forward => Ok(LlmpMsgHookResult::ForwardToClients),
+                BrokerEventResult::Handled => Ok(LlmpMsgHookResult::Handled),
+            }
+        } else {
+            Ok(LlmpMsgHookResult::ForwardToClients)
+        }
+    }
+}
+
+impl<I, SP> Debug for CentralizedLlmpHook<I, SP>
+where
+    SP: ShMemProvider + 'static,
+    I: Input,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut debug_struct = f.debug_struct("CentralizedLlmpEventBroker");
+
+        #[cfg(feature = "llmp_compression")]
+        let debug_struct = debug_struct.field("compressor", &self.compressor);
+
+        debug_struct
+            .field("phantom", &self.phantom)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<I, SP> CentralizedLlmpHook<I, SP>
+where
+    I: Input,
+    SP: ShMemProvider + 'static,
+{
+    /// Create an event broker from a raw broker.
+    pub fn new() -> Result<Self, Error> {
+        Ok(Self {
+            #[cfg(feature = "llmp_compression")]
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
+            phantom: PhantomData,
+        })
+    }
+
+    /// Handle arriving events in the broker
+    #[allow(clippy::unnecessary_wraps)]
+    fn handle_in_broker(
+        _client_id: ClientId,
+        event: &Event<I>,
+    ) -> Result<BrokerEventResult, Error> {
+        match &event {
+            Event::NewTestcase {
+                input: _,
+                client_config: _,
+                exit_kind: _,
+                corpus_size: _,
+                observers_buf: _,
+                time: _,
+                executions: _,
+                forward_id: _,
+            } => Ok(BrokerEventResult::Forward),
+            _ => Ok(BrokerEventResult::Handled),
+        }
+    }
+}
