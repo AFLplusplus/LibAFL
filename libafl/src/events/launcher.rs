@@ -678,7 +678,7 @@ where
                 // Run in the broker until all clients exit
                 broker.loop_with_timeouts(Duration::from_secs(30), Some(Duration::from_millis(5)));
 
-                println!("The last client quit. Exiting.");
+                log::info!("The last client quit. Exiting.");
 
                 return Err(Error::shutting_down());
             }

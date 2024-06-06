@@ -189,9 +189,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 StdShMemProvider::new()?,
                 tuple_list!(LlmpExampleHook::new()),
             )?;
-            broker.launch_tcp_listener_on(port)?;
+            broker.state_mut().launch_tcp_listener_on(port)?;
             // Exit when we got at least _n_ nodes, and all of them quit.
-            broker.set_exit_cleanly_after(NonZeroUsize::new(1_usize).unwrap());
+            broker
+                .state_mut()
+                .set_exit_cleanly_after(NonZeroUsize::new(1_usize).unwrap());
             broker.loop_with_timeouts(BROKER_TIMEOUT, Some(SLEEP_BETWEEN_FORWARDS));
         }
         "b2b" => {
@@ -199,9 +201,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 StdShMemProvider::new()?,
                 tuple_list!(LlmpExampleHook::new()),
             )?;
-            broker.launch_tcp_listener_on(b2b_port)?;
+            broker.state_mut().launch_tcp_listener_on(b2b_port)?;
             // connect back to the main broker.
-            broker.connect_b2b(("127.0.0.1", port))?;
+            broker.state_mut().connect_b2b(("127.0.0.1", port))?;
             broker.loop_with_timeouts(BROKER_TIMEOUT, Some(SLEEP_BETWEEN_FORWARDS));
         }
         "ctr" => {

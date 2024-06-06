@@ -472,7 +472,7 @@ where
                 broker.loop_with_timeouts(Duration::from_secs(30), Some(Duration::from_millis(5)));
 
                 #[cfg(feature = "llmp_debug")]
-                println!("The last client quit. Exiting.");
+                log::info!("The last client quit. Exiting.");
 
                 Err(Error::shutting_down())
             };
