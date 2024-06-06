@@ -48,7 +48,7 @@ also need to create a new [`ShMem`] each time their bufs are filled up.
 
 To use, you will have to create a broker using [`LlmpBroker::new()`].
 Then, create some [`LlmpClient`]`s` in other threads and register them
-with the main thread using [`LlmpBroker::register_client`].
+with the main thread using [`LlmpBrokerState::register_client`].
 Finally, call [`LlmpBroker::loop_forever()`].
 
 For broker2broker communication, all messages are forwarded via network sockets.
@@ -2200,7 +2200,7 @@ impl<SP> LlmpBroker<(), SP>
 where
     SP: ShMemProvider + 'static,
 {
-    /// Add hooks to a hookless LlmpBroker.
+    /// Add hooks to a hookless [`LlmpBroker`].
     /// We do not support replacing hooks for now.
     pub fn add_hooks<HT>(self, hooks: HT) -> LlmpBroker<HT, SP>
     where
