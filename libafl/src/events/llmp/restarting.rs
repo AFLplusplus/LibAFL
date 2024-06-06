@@ -8,7 +8,7 @@ use alloc::vec::Vec;
 use core::ptr::addr_of_mut;
 #[cfg(feature = "std")]
 use core::sync::atomic::{compiler_fence, Ordering};
-#[cfg(all(feature = "std", feature = "adaptive_serialization"))]
+#[cfg(feature = "std")]
 use core::time::Duration;
 use core::{marker::PhantomData, num::NonZeroUsize};
 #[cfg(feature = "std")]
@@ -24,11 +24,11 @@ use libafl_bolts::os::unix_signals::setup_signal_handler;
 use libafl_bolts::os::{fork, ForkResult};
 #[cfg(feature = "adaptive_serialization")]
 use libafl_bolts::tuples::{Handle, Handled};
+use libafl_bolts::{llmp::LlmpBroker, shmem::ShMemProvider, tuples::tuple_list};
 #[cfg(feature = "std")]
 use libafl_bolts::{
     llmp::LlmpConnection, os::CTRL_C_EXIT, shmem::StdShMemProvider, staterestore::StateRestorer,
 };
-use libafl_bolts::{shmem::ShMemProvider, tuples::tuple_list};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
@@ -44,8 +44,8 @@ use crate::observers::TimeObserver;
 use crate::{
     events::{
         hooks::EventManagerHooksTuple, Event, EventConfig, EventFirer, EventManager,
-        EventManagerId, EventProcessor, EventRestarter, HasEventManagerId, LlmpEventBroker,
-        LlmpEventManager, LlmpShouldSaveState, ProgressReporter,
+        EventManagerId, EventProcessor, EventRestarter, HasEventManagerId, LlmpEventManager,
+        LlmpShouldSaveState, ProgressReporter, StdLlmpEventHook,
     },
     executors::{Executor, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
@@ -323,7 +323,7 @@ pub enum ManagerKind {
         /// The CPU core ID of this client
         cpu_core: Option<CoreId>,
     },
-    /// A [`crate::events::llmp::broker::LlmpEventBroker`], forwarding the packets of local clients.
+    /// An [`LlmpBroker`], forwarding the packets of local clients.
     Broker,
 }
 
@@ -344,8 +344,8 @@ pub fn setup_restarting_mgr_std<MT, S>(
     Error,
 >
 where
-    MT: Monitor + Clone,
-    S: State + HasExecutions,
+    MT: Monitor + Clone + 'static,
+    S: State + HasExecutions + 'static,
 {
     RestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)
@@ -375,8 +375,8 @@ pub fn setup_restarting_mgr_std<MT, S>(
     Error,
 >
 where
-    MT: Monitor + Clone,
-    S: State + HasExecutions,
+    MT: Monitor + Clone + 'static,
+    S: State + HasExecutions + 'static,
 {
     RestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)
@@ -448,8 +448,8 @@ impl<EMH, MT, S, SP> RestartingMgr<EMH, MT, S, SP>
 where
     EMH: EventManagerHooksTuple<S> + Copy + Clone,
     SP: ShMemProvider,
-    S: State + HasExecutions,
-    MT: Monitor + Clone,
+    S: State + HasExecutions + 'static,
+    MT: Monitor + Clone + 'static,
 {
     /// Launch the broker and the clients and fuzz
     pub fn launch(&mut self) -> Result<(Option<S>, LlmpRestartingEventManager<EMH, S, SP>), Error> {
@@ -457,18 +457,24 @@ where
         let (staterestorer, new_shmem_provider, core_id) = if std::env::var(_ENV_FUZZER_SENDER)
             .is_err()
         {
-            let broker_things = |mut broker: LlmpEventBroker<S::Input, MT, SP>,
-                                 remote_broker_addr| {
+            let broker_things = |mut broker: LlmpBroker<_, SP>, remote_broker_addr| {
                 if let Some(remote_broker_addr) = remote_broker_addr {
                     log::info!("B2b: Connecting to {:?}", &remote_broker_addr);
-                    broker.connect_b2b(remote_broker_addr)?;
+                    broker.state_mut().connect_b2b(remote_broker_addr)?;
                 };
 
                 if let Some(exit_cleanly_after) = self.exit_cleanly_after {
-                    broker.set_exit_cleanly_after(exit_cleanly_after);
+                    broker
+                        .state_mut()
+                        .set_exit_cleanly_after(exit_cleanly_after);
                 }
 
-                broker.broker_loop()
+                broker.loop_with_timeouts(Duration::from_secs(30), Some(Duration::from_millis(5)));
+
+                #[cfg(feature = "llmp_debug")]
+                log::info!("The last client quit. Exiting.");
+
+                Err(Error::shutting_down())
             };
             // We get here if we are on Unix, or we are a broker on Windows (or without forks).
             let (mgr, core_id) = match self.kind {
@@ -477,8 +483,7 @@ where
                         LlmpConnection::on_port(self.shmem_provider.clone(), self.broker_port)?;
                     match connection {
                         LlmpConnection::IsBroker { broker } => {
-                            let event_broker = LlmpEventBroker::<S::Input, MT, SP>::new(
-                                broker,
+                            let llmp_hook = StdLlmpEventHook::<S::Input, MT, SP>::new(
                                 self.monitor.take().unwrap(),
                             )?;
 
@@ -487,7 +492,10 @@ where
                                 "Doing broker things. Run this tool again to start fuzzing in a client."
                             );
 
-                            broker_things(event_broker, self.remote_broker_addr)?;
+                            broker_things(
+                                broker.add_hooks(tuple_list!(llmp_hook)),
+                                self.remote_broker_addr,
+                            )?;
 
                             return Err(Error::shutting_down());
                         }
@@ -511,13 +519,15 @@ where
                     }
                 }
                 ManagerKind::Broker => {
-                    let event_broker = LlmpEventBroker::<S::Input, MT, SP>::on_port(
+                    let llmp_hook = StdLlmpEventHook::new(self.monitor.take().unwrap())?;
+
+                    let broker = LlmpBroker::create_attach_to_tcp(
                         self.shmem_provider.clone(),
-                        self.monitor.take().unwrap(),
+                        tuple_list!(llmp_hook),
                         self.broker_port,
                     )?;
 
-                    broker_things(event_broker, self.remote_broker_addr)?;
+                    broker_things(broker, self.remote_broker_addr)?;
                     unreachable!("The broker may never return normally, only on errors or when shutting down.");
                 }
                 ManagerKind::Client { cpu_core } => {

@@ -24,13 +24,13 @@ use crate::{
     Error, HasMetadata,
 };
 
-/// The llmp broker
-pub mod broker;
-pub use broker::*;
-
 /// The llmp event manager
 pub mod mgr;
 pub use mgr::*;
+
+/// The llmp hooks
+pub mod hooks;
+pub use hooks::*;
 
 /// The llmp restarting manager
 #[cfg(feature = "std")]
