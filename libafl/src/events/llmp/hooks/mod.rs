@@ -1,14 +1,13 @@
 //! Standard LLMP hook
 use core::marker::PhantomData;
 
+#[cfg(feature = "llmp_compression")]
+use libafl_bolts::{compress::GzipCompressor, llmp::LLMP_FLAG_COMPRESSED};
 use libafl_bolts::{
-    bolts_prelude::{Flags, LlmpMsgHookResult, Tag},
-    llmp::LlmpHook,
+    llmp::{Flags, LlmpHook, LlmpMsgHookResult, Tag},
     shmem::ShMemProvider,
     ClientId,
 };
-#[cfg(feature = "llmp_compression")]
-use libafl_bolts::{compress::GzipCompressor, llmp::LLMP_FLAG_COMPRESSED};
 
 #[cfg(feature = "llmp_compression")]
 use crate::events::llmp::COMPRESS_THRESHOLD;
@@ -20,6 +19,7 @@ use crate::{
 };
 
 /// centralized hook
+#[cfg(feature = "std")]
 pub mod centralized;
 
 /// An LLMP-backed event hook for scalable multi-processed fuzzing
@@ -53,7 +53,7 @@ where
 
         if *message_tag == LLMP_TAG_EVENT_TO_BOTH {
             #[cfg(not(feature = "llmp_compression"))]
-            let event_bytes = msg;
+            let event_bytes = message;
             #[cfg(feature = "llmp_compression")]
             let compressed;
             #[cfg(feature = "llmp_compression")]

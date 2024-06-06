@@ -7,7 +7,7 @@ use alloc::{rc::Rc, string::ToString, vec::Vec};
 use core::{cell::RefCell, fmt, fmt::Display, mem::ManuallyDrop};
 use core::{
     fmt::Debug,
-    mem,
+    mem::size_of,
     ops::{Deref, DerefMut},
 };
 #[cfg(feature = "std")]
@@ -202,7 +202,7 @@ pub trait ShMem: Sized + Debug + Clone + DerefMut<Target = [u8]> {
     /// Convert to a ptr of a given type, checking the size.
     /// If the map is too small, returns `None`
     fn as_ptr_of<T: Sized>(&self) -> Option<*const T> {
-        if self.len() >= mem::size_of::<T>() {
+        if self.len() >= size_of::<T>() {
             Some(self.as_ptr() as *const T)
         } else {
             None
@@ -212,7 +212,7 @@ pub trait ShMem: Sized + Debug + Clone + DerefMut<Target = [u8]> {
     /// Convert to a mut ptr of a given type, checking the size.
     /// If the map is too small, returns `None`
     fn as_mut_ptr_of<T: Sized>(&mut self) -> Option<*mut T> {
-        if self.len() >= mem::size_of::<T>() {
+        if self.len() >= size_of::<T>() {
             Some(self.as_mut_ptr() as *mut T)
         } else {
             None
@@ -267,7 +267,7 @@ pub trait ShMemProvider: Clone + Default + Debug {
 
     /// Create a new shared memory mapping to hold an object of the given type, and initializes it with the given value.
     fn uninit_on_shmem<T: Sized + 'static>(&mut self) -> Result<Self::ShMem, Error> {
-        self.new_shmem(mem::size_of::<T>())
+        self.new_shmem(size_of::<T>())
     }
 
     /// Get a mapping given a description
