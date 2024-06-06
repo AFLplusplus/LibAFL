@@ -19,8 +19,7 @@ command = (
     "--no-dev-deps --exclude libafl_libfuzzer --print-command-list"
 )
 
-env = {}
-env.update(os.environ)
+env = os.environ.copy()
 # DOCS_RS is needed for libafl_frida to build without auto-download
 env["DOCS_RS"] = "1"
 
