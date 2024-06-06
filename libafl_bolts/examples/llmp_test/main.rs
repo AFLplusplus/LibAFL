@@ -93,21 +93,22 @@ fn large_msg_loop(port: u16) -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
-pub struct LlmpExampleHook<SP>
-where
-    SP: ShMemProvider + 'static,
-{
+pub struct LlmpExampleHook<SP> {
     phantom: PhantomData<SP>,
 }
 
-impl<SP> LlmpExampleHook<SP>
-where
-    SP: ShMemProvider + 'static,
-{
+impl<SP> LlmpExampleHook<SP> {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
         }
+    }
+}
+
+impl<SP> Default for LlmpExampleHook<SP> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

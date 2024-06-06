@@ -16,11 +16,7 @@ use crate::{
 };
 
 /// An LLMP-backed event manager for scalable multi-processed fuzzing
-pub struct CentralizedLlmpHook<I, SP>
-where
-    I: Input,
-    SP: ShMemProvider + 'static,
-{
+pub struct CentralizedLlmpHook<I, SP> {
     #[cfg(feature = "llmp_compression")]
     compressor: GzipCompressor,
     phantom: PhantomData<(I, SP)>,
@@ -64,11 +60,7 @@ where
     }
 }
 
-impl<I, SP> Debug for CentralizedLlmpHook<I, SP>
-where
-    SP: ShMemProvider + 'static,
-    I: Input,
-{
+impl<I, SP> Debug for CentralizedLlmpHook<I, SP> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut debug_struct = f.debug_struct("CentralizedLlmpEventBroker");
 

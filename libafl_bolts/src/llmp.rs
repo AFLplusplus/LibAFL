@@ -701,15 +701,14 @@ impl LlmpMsg {
 
 /// An Llmp instance
 #[derive(Debug)]
-pub enum LlmpConnection<MT, SP>
+pub enum LlmpConnection<HT, SP>
 where
-    MT: LlmpHookTuple<SP>,
     SP: ShMemProvider + 'static,
 {
     /// A broker and a thread using this tcp background thread
     IsBroker {
         /// The [`LlmpBroker`] of this [`LlmpConnection`].
-        broker: LlmpBroker<MT, SP>,
+        broker: LlmpBroker<HT, SP>,
     },
     /// A client, connected to the port
     IsClient {
@@ -2051,7 +2050,6 @@ where
 #[derive(Debug)]
 pub struct LlmpBroker<HT, SP>
 where
-    HT: LlmpHookTuple<SP>,
     SP: ShMemProvider + 'static,
 {
     /// The broker
