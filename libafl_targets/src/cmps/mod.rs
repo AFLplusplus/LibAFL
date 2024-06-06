@@ -8,7 +8,8 @@ use alloc::{alloc::alloc_zeroed, boxed::Box, vec::Vec};
 use core::{
     alloc::Layout,
     fmt::{self, Debug, Formatter},
-    mem, ptr, slice,
+    mem::{size_of, zeroed},
+    ptr, slice,
 };
 
 use libafl::{
@@ -30,11 +31,11 @@ pub const CMPLOG_RTN_LEN: usize = 32;
 
 /// The hight of a cmplog routine map
 pub const CMPLOG_MAP_RTN_H: usize =
-    (CMPLOG_MAP_H * mem::size_of::<CmpLogInstruction>()) / mem::size_of::<CmpLogRoutine>();
+    (CMPLOG_MAP_H * size_of::<CmpLogInstruction>()) / size_of::<CmpLogRoutine>();
 
 /// The height of extended rountine map
 pub const CMPLOG_MAP_RTN_EXTENDED_H: usize =
-    CMPLOG_MAP_H * mem::size_of::<AFLppCmpLogOperands>() / mem::size_of::<AFLppCmpLogFnOperands>();
+    CMPLOG_MAP_H * size_of::<AFLppCmpLogOperands>() / size_of::<AFLppCmpLogFnOperands>();
 
 /// `CmpLog` instruction kind
 pub const CMPLOG_KIND_INS: u8 = 0;
@@ -318,7 +319,7 @@ pub struct CmpLogMap {
 
 impl Default for CmpLogMap {
     fn default() -> Self {
-        unsafe { mem::zeroed() }
+        unsafe { zeroed() }
     }
 }
 
@@ -474,9 +475,8 @@ impl Serialize for AFLppCmpLogMap {
     where
         S: Serializer,
     {
-        let slice = unsafe {
-            slice::from_raw_parts(ptr::from_ref(self) as *const u8, mem::size_of::<Self>())
-        };
+        let slice =
+            unsafe { slice::from_raw_parts(ptr::from_ref(self) as *const u8, size_of::<Self>()) };
         serializer.serialize_bytes(slice)
     }
 }

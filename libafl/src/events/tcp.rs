@@ -772,7 +772,7 @@ where
                 Ok(()) => {
                     self.tcp.set_nonblocking(false).expect("set to blocking");
                     let len = u32::from_le_bytes(len_buf);
-                    let mut buf = vec![0_u8; len as usize + 4_usize];
+                    let mut buf = vec![0_u8; 4_usize + len as usize];
                     self.tcp.read_exact(&mut buf)?;
 
                     let mut client_id_buf = [0_u8; 4];
