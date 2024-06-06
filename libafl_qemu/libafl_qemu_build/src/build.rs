@@ -101,7 +101,7 @@ fn configure_qemu(
 
     if is_usermode {
         // Usermode options
-        cmd.args(["--disable-fdt", "--disable-system"]);
+        cmd.args(["--disable-fdt", "--disable-system", "--disable-docs"]);
     } else {
         // Systemmode options
         cmd.arg(if cfg!(feature = "slirp") {
