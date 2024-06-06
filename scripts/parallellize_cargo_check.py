@@ -19,9 +19,13 @@ command = (
     "--no-dev-deps --exclude libafl_libfuzzer --print-command-list"
 )
 
-# Run the command and capture the output
+env = {}
+env.update(os.environ)
 # DOCS_RS is needed for libafl_frida to build without auto-download
-output = subprocess.check_output(command, env={"DOCS_RS": "1"}, shell=True, text=True)
+env["DOCS_RS"] = "1"
+
+# Run the command and capture the output
+output = subprocess.check_output(command, env=env, shell=True, text=True)
 output = output.strip().split("\n")[0:]
 all_task_cnt = len(output) // 2  # by 2 cuz one task has two lines
 task_per_core = math.ceil(all_task_cnt // ci_instances)
