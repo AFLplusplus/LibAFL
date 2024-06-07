@@ -1,12 +1,13 @@
-//! LLMP broker
-
-use core::{marker::PhantomData, num::NonZeroUsize, time::Duration};
-#[cfg(feature = "std")]
-use std::net::ToSocketAddrs;
+//! Standard LLMP hook
+use core::marker::PhantomData;
 
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{compress::GzipCompressor, llmp::LLMP_FLAG_COMPRESSED};
-use libafl_bolts::{llmp, shmem::ShMemProvider, ClientId};
+use libafl_bolts::{
+    llmp::{Flags, LlmpBrokerInner, LlmpHook, LlmpMsgHookResult, Tag},
+    shmem::ShMemProvider,
+    ClientId,
+};
 
 #[cfg(feature = "llmp_compression")]
 use crate::events::llmp::COMPRESS_THRESHOLD;
@@ -17,146 +18,79 @@ use crate::{
     Error,
 };
 
-/// An LLMP-backed event manager for scalable multi-processed fuzzing
+/// centralized hook
+#[cfg(all(unix, feature = "std"))]
+pub mod centralized;
+
+/// An LLMP-backed event hook for scalable multi-processed fuzzing
 #[derive(Debug)]
-pub struct LlmpEventBroker<I, MT, SP>
-where
-    SP: ShMemProvider + 'static,
-{
+pub struct StdLlmpEventHook<I, MT> {
     monitor: MT,
-    llmp: llmp::LlmpBroker<SP>,
     #[cfg(feature = "llmp_compression")]
     compressor: GzipCompressor,
     phantom: PhantomData<I>,
 }
 
-impl<I, MT, SP> LlmpEventBroker<I, MT, SP>
+impl<I, MT, SP> LlmpHook<SP> for StdLlmpEventHook<I, MT>
 where
     I: Input,
-    SP: ShMemProvider + 'static,
+    MT: Monitor,
+    SP: ShMemProvider,
+{
+    fn on_new_message(
+        &mut self,
+        _broker_inner: &mut LlmpBrokerInner<SP>,
+        client_id: ClientId,
+        msg_tag: &mut Tag,
+        #[cfg(feature = "llmp_compression")] msg_flags: &mut Flags,
+        #[cfg(not(feature = "llmp_compression"))] _msg_flags: &mut Flags,
+        msg: &mut [u8],
+    ) -> Result<LlmpMsgHookResult, Error> {
+        let monitor = &mut self.monitor;
+        #[cfg(feature = "llmp_compression")]
+        let compressor = &self.compressor;
+
+        if *msg_tag == LLMP_TAG_EVENT_TO_BOTH {
+            #[cfg(not(feature = "llmp_compression"))]
+            let event_bytes = msg;
+            #[cfg(feature = "llmp_compression")]
+            let compressed;
+            #[cfg(feature = "llmp_compression")]
+            let event_bytes = if *msg_flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
+                compressed = compressor.decompress(msg)?;
+                &compressed
+            } else {
+                &*msg
+            };
+            let event: Event<I> = postcard::from_bytes(event_bytes)?;
+            match Self::handle_in_broker(monitor, client_id, &event)? {
+                BrokerEventResult::Forward => Ok(LlmpMsgHookResult::ForwardToClients),
+                BrokerEventResult::Handled => Ok(LlmpMsgHookResult::Handled),
+            }
+        } else {
+            Ok(LlmpMsgHookResult::ForwardToClients)
+        }
+    }
+
+    fn on_timeout(&mut self) -> Result<(), Error> {
+        self.monitor.display("Broker Heartbeat", ClientId(0));
+        Ok(())
+    }
+}
+
+impl<I, MT> StdLlmpEventHook<I, MT>
+where
+    I: Input,
     MT: Monitor,
 {
     /// Create an event broker from a raw broker.
-    pub fn new(llmp: llmp::LlmpBroker<SP>, monitor: MT) -> Result<Self, Error> {
+    pub fn new(monitor: MT) -> Result<Self, Error> {
         Ok(Self {
             monitor,
-            llmp,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
             phantom: PhantomData,
         })
-    }
-
-    /// Create an LLMP broker on a port.
-    ///
-    /// The port must not be bound yet to have a broker.
-    #[cfg(feature = "std")]
-    pub fn on_port(shmem_provider: SP, monitor: MT, port: u16) -> Result<Self, Error> {
-        Ok(Self {
-            monitor,
-            llmp: llmp::LlmpBroker::create_attach_to_tcp(shmem_provider, port)?,
-            #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
-            phantom: PhantomData,
-        })
-    }
-
-    /// Exit the broker process cleanly after at least `n` clients attached and all of them disconnected again
-    pub fn set_exit_cleanly_after(&mut self, n_clients: NonZeroUsize) {
-        self.llmp.set_exit_cleanly_after(n_clients);
-    }
-
-    /// Connect to an LLMP broker on the given address
-    #[cfg(feature = "std")]
-    pub fn connect_b2b<A>(&mut self, addr: A) -> Result<(), Error>
-    where
-        A: ToSocketAddrs,
-    {
-        self.llmp.connect_b2b(addr)
-    }
-
-    /// Run forever in the broker
-    #[cfg(not(feature = "llmp_broker_timeouts"))]
-    pub fn broker_loop(&mut self) -> Result<(), Error> {
-        let monitor = &mut self.monitor;
-        #[cfg(feature = "llmp_compression")]
-        let compressor = &self.compressor;
-        self.llmp.loop_forever(
-            &mut |client_id, tag, _flags, msg| {
-                if tag == LLMP_TAG_EVENT_TO_BOTH {
-                    #[cfg(not(feature = "llmp_compression"))]
-                    let event_bytes = msg;
-                    #[cfg(feature = "llmp_compression")]
-                    let compressed;
-                    #[cfg(feature = "llmp_compression")]
-                    let event_bytes = if _flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
-                        compressed = compressor.decompress(msg)?;
-                        &compressed
-                    } else {
-                        msg
-                    };
-                    let event: Event<I> = postcard::from_bytes(event_bytes)?;
-                    match Self::handle_in_broker(monitor, client_id, &event)? {
-                        BrokerEventResult::Forward => Ok(llmp::LlmpMsgHookResult::ForwardToClients),
-                        BrokerEventResult::Handled => Ok(llmp::LlmpMsgHookResult::Handled),
-                    }
-                } else {
-                    Ok(llmp::LlmpMsgHookResult::ForwardToClients)
-                }
-            },
-            Some(Duration::from_millis(5)),
-        );
-
-        #[cfg(all(feature = "std", feature = "llmp_debug"))]
-        println!("The last client quit. Exiting.");
-
-        Err(Error::shutting_down())
-    }
-
-    /// Run in the broker until all clients exit
-    #[cfg(feature = "llmp_broker_timeouts")]
-    pub fn broker_loop(&mut self) -> Result<(), Error> {
-        let monitor = &mut self.monitor;
-        #[cfg(feature = "llmp_compression")]
-        let compressor = &self.compressor;
-        self.llmp.loop_with_timeouts(
-            &mut |msg_or_timeout| {
-                if let Some((client_id, tag, _flags, msg)) = msg_or_timeout {
-                    if tag == LLMP_TAG_EVENT_TO_BOTH {
-                        #[cfg(not(feature = "llmp_compression"))]
-                        let event_bytes = msg;
-                        #[cfg(feature = "llmp_compression")]
-                        let compressed;
-                        #[cfg(feature = "llmp_compression")]
-                        let event_bytes = if _flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
-                            compressed = compressor.decompress(msg)?;
-                            &compressed
-                        } else {
-                            msg
-                        };
-                        let event: Event<I> = postcard::from_bytes(event_bytes)?;
-                        match Self::handle_in_broker(monitor, client_id, &event)? {
-                            BrokerEventResult::Forward => {
-                                Ok(llmp::LlmpMsgHookResult::ForwardToClients)
-                            }
-                            BrokerEventResult::Handled => Ok(llmp::LlmpMsgHookResult::Handled),
-                        }
-                    } else {
-                        Ok(llmp::LlmpMsgHookResult::ForwardToClients)
-                    }
-                } else {
-                    monitor.display("Broker Heartbeat", ClientId(0));
-                    Ok(llmp::LlmpMsgHookResult::Handled)
-                }
-            },
-            Duration::from_secs(30),
-            Some(Duration::from_millis(5)),
-        );
-
-        #[cfg(feature = "llmp_debug")]
-        println!("The last client quit. Exiting.");
-
-        Err(Error::shutting_down())
     }
 
     /// Handle arriving events in the broker

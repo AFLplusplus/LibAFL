@@ -3,7 +3,7 @@
 #[rustversion::nightly]
 #[cfg(feature = "sancov_ngram4")]
 use core::simd::num::SimdUint;
-use core::{mem, ptr, slice};
+use core::{mem::align_of, ptr, slice};
 
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ctx"))]
 use libafl::executors::{hooks::ExecutorHook, HasObservers};
@@ -346,7 +346,7 @@ pub fn sanitizer_cov_pc_table() -> Option<&'static [PcTableEntry]> {
             "PC Table size is not evens - start: {PCS_BEG:x?} end: {PCS_END:x?}"
         );
         assert_eq!(
-            (PCS_BEG as usize) % mem::align_of::<PcTableEntry>(),
+            (PCS_BEG as usize) % align_of::<PcTableEntry>(),
             0,
             "Unaligned PC Table - start: {PCS_BEG:x?} end: {PCS_END:x?}"
         );

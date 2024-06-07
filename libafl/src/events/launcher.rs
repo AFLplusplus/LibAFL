@@ -28,6 +28,8 @@ use std::process::Stdio;
 #[cfg(all(unix, feature = "std"))]
 use std::{fs::File, os::unix::io::AsRawFd};
 
+#[cfg(all(unix, feature = "std", feature = "fork"))]
+use libafl_bolts::llmp::LlmpBroker;
 #[cfg(all(unix, feature = "std"))]
 use libafl_bolts::os::dup2;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
@@ -52,7 +54,7 @@ use super::hooks::EventManagerHooksTuple;
 use crate::observers::TimeObserver;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use crate::{
-    events::centralized::{CentralizedEventManager, CentralizedLlmpEventBroker},
+    events::{centralized::CentralizedEventManager, llmp::centralized::CentralizedLlmpHook},
     state::UsesState,
 };
 #[cfg(feature = "std")]
@@ -142,7 +144,7 @@ where
     CF: FnOnce(Option<S>, LlmpRestartingEventManager<EMH, S, SP>, CoreId) -> Result<(), Error>,
     EMH: EventManagerHooksTuple<S>,
     MT: Monitor + Clone,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
     S: State,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -169,7 +171,7 @@ where
     CF: FnOnce(Option<S>, LlmpRestartingEventManager<(), S, SP>, CoreId) -> Result<(), Error>,
     MT: Monitor + Clone,
     S: State + HasExecutions,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     /// Launch the broker and the clients and fuzz
     #[cfg(all(unix, feature = "std", feature = "fork"))]
@@ -192,7 +194,7 @@ where
     EMH: EventManagerHooksTuple<S> + Clone + Copy,
     MT: Monitor + Clone,
     S: State + HasExecutions,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     /// Launch the broker and the clients and fuzz with a user-supplied hook
     #[cfg(all(unix, feature = "std", feature = "fork"))]
@@ -564,7 +566,7 @@ where
     ) -> Result<(), Error>,
     MT: Monitor + Clone,
     S: State + HasExecutions,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     /// Launch a standard Centralized-based fuzzer
     pub fn launch(&mut self) -> Result<(), Error> {
@@ -603,7 +605,7 @@ where
     ) -> Result<(), Error>,
     MT: Monitor + Clone,
     S: State + HasExecutions,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     /// Launch a Centralized-based fuzzer.
     /// - `main_inner_mgr_builder` will be called to build the inner manager of the main node.
@@ -663,12 +665,22 @@ where
                 log::info!("PID: {:#?} I am centralized broker", std::process::id());
                 self.shmem_provider.post_fork(true)?;
 
-                let mut broker: CentralizedLlmpEventBroker<S::Input, SP> =
-                    CentralizedLlmpEventBroker::on_port(
-                        self.shmem_provider.clone(),
-                        self.centralized_broker_port,
-                    )?;
-                broker.broker_loop()?;
+                let llmp_centralized_hook = CentralizedLlmpHook::<S::Input>::new()?;
+
+                // TODO switch to false after solving the bug
+                let mut broker = LlmpBroker::with_keep_pages_attach_to_tcp(
+                    self.shmem_provider.clone(),
+                    tuple_list!(llmp_centralized_hook),
+                    self.centralized_broker_port,
+                    true,
+                )?;
+
+                // Run in the broker until all clients exit
+                broker.loop_with_timeouts(Duration::from_secs(30), Some(Duration::from_millis(5)));
+
+                log::info!("The last client quit. Exiting.");
+
+                return Err(Error::shutting_down());
             }
         }
 

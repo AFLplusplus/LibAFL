@@ -24,13 +24,13 @@ use crate::{
     Error, HasMetadata,
 };
 
-/// The llmp broker
-pub mod broker;
-pub use broker::*;
-
 /// The llmp event manager
 pub mod mgr;
 pub use mgr::*;
+
+/// The llmp hooks
+pub mod hooks;
+pub use hooks::*;
 
 /// The llmp restarting manager
 #[cfg(feature = "std")]
@@ -91,7 +91,7 @@ impl LlmpShouldSaveState {
 pub struct LlmpEventConverter<DI, IC, ICB, S, SP>
 where
     S: UsesInput,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
     IC: InputConverter<From = S::Input, To = DI>,
     ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
@@ -153,7 +153,7 @@ impl LlmpEventConverterBuilder {
         converter_back: Option<ICB>,
     ) -> Result<LlmpEventConverter<DI, IC, ICB, S, SP>, Error>
     where
-        SP: ShMemProvider + 'static,
+        SP: ShMemProvider,
         S: UsesInput,
         IC: InputConverter<From = S::Input, To = DI>,
         ICB: InputConverter<From = DI, To = S::Input>,
@@ -182,7 +182,7 @@ impl LlmpEventConverterBuilder {
         converter_back: Option<ICB>,
     ) -> Result<LlmpEventConverter<DI, IC, ICB, S, SP>, Error>
     where
-        SP: ShMemProvider + 'static,
+        SP: ShMemProvider,
         S: UsesInput,
         IC: InputConverter<From = S::Input, To = DI>,
         ICB: InputConverter<From = DI, To = S::Input>,
@@ -212,7 +212,7 @@ impl LlmpEventConverterBuilder {
         converter_back: Option<ICB>,
     ) -> Result<LlmpEventConverter<DI, IC, ICB, S, SP>, Error>
     where
-        SP: ShMemProvider + 'static,
+        SP: ShMemProvider,
         S: UsesInput,
         IC: InputConverter<From = S::Input, To = DI>,
         ICB: InputConverter<From = DI, To = S::Input>,
@@ -235,7 +235,7 @@ impl LlmpEventConverterBuilder {
 
 impl<DI, IC, ICB, S, SP> core::fmt::Debug for LlmpEventConverter<DI, IC, ICB, S, SP>
 where
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
     S: UsesInput,
     IC: InputConverter<From = S::Input, To = DI>,
     ICB: InputConverter<From = DI, To = S::Input>,
@@ -258,7 +258,7 @@ where
 impl<DI, IC, ICB, S, SP> LlmpEventConverter<DI, IC, ICB, S, SP>
 where
     S: UsesInput + HasExecutions + HasMetadata,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
     IC: InputConverter<From = S::Input, To = DI>,
     ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
