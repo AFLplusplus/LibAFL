@@ -14,7 +14,7 @@ instance_idx = int(sys.argv[1])
 # set llvm config
 os.environ["LLVM_CONFIG"] = "llvm-config"
 command = (
-    "cargo hack check --workspace --each-feature --clean-per-run --ignore-unknown-features "
+    "cargo hack check --workspace --each-feature --clean-per-run "
     "--exclude-features=prelude,python,sancov_pcguard_edges,arm,aarch64,i386,be,systemmode,whole_archive "
     "--no-dev-deps --exclude libafl_libfuzzer --print-command-list"
 )
