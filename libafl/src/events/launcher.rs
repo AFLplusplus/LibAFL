@@ -50,6 +50,8 @@ use libafl_bolts::{
 use typed_builder::TypedBuilder;
 
 use super::hooks::EventManagerHooksTuple;
+#[cfg(feature = "multi_machine")]
+use crate::events::node::{NodeDescriptor, TcpNodeLlmpHook};
 #[cfg(feature = "adaptive_serialization")]
 use crate::observers::TimeObserver;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
@@ -516,9 +518,10 @@ pub struct CentralizedLauncher<'a, CF, IM, MF, MT, S, SP> {
     opened_stderr_file: Option<File>,
     /// The `ip:port` address of another broker to connect our new broker to for multi-machine
     /// clusters.
-
     #[builder(default = None)]
     remote_broker_addr: Option<SocketAddr>,
+    #[cfg(feature = "multi_machine")]
+    multi_machine_descriptor: NodeDescriptor<SocketAddr>,
     /// If this launcher should spawn a new `broker` on `[Self::broker_port]` (default).
     /// The reason you may not want this is, if you already have a [`Launcher`]
     /// with a different configuration (for the same target) running on this machine.
@@ -665,12 +668,19 @@ where
                 log::info!("PID: {:#?} I am centralized broker", std::process::id());
                 self.shmem_provider.post_fork(true)?;
 
-                let llmp_centralized_hook = CentralizedLlmpHook::<S::Input>::new()?;
+                #[cfg(feature = "multi_machine")]
+                let hooks = tuple_list!(
+                    CentralizedLlmpHook::<S::Input>::new()?,
+                    TcpNodeLlmpHook::<S::Input>::new(&self.multi_machine_descriptor)?,
+                );
+
+                #[cfg(not(feature = "multi_machine"))]
+                let hooks = tuple_list!(CentralizedLlmpHook::<S::Input>::new()?);
 
                 // TODO switch to false after solving the bug
                 let mut broker = LlmpBroker::with_keep_pages_attach_to_tcp(
                     self.shmem_provider.clone(),
-                    tuple_list!(llmp_centralized_hook),
+                    hooks,
                     self.centralized_broker_port,
                     true,
                 )?;
