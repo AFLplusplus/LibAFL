@@ -24,6 +24,7 @@ use core::{
     fmt,
     hash::{BuildHasher, Hasher},
     marker::PhantomData,
+    ops::ControlFlow,
     time::Duration,
 };
 
@@ -107,7 +108,9 @@ pub struct EventManagerId(
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
 use crate::{
-    inputs::UsesInput, observers::TimeObserver, stages::HasCurrentStage, state::UsesState,
+    corpus::{Corpus, HasCorpus},
+    observers::TimeObserver,
+    stages::HasCurrentStage,
 };
 
 /// The log event severity
@@ -145,15 +148,6 @@ impl fmt::Display for LogSeverity {
     }
 }
 
-/// The result of a custom buf handler added using [`HasCustomBufHandlers::add_custom_buf_handler`]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CustomBufEventResult {
-    /// Exit early from event handling
-    Handled,
-    /// Call the next handler, if available
-    Next,
-}
-
 /// Indicate if an event worked or not
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub enum BrokerEventResult {
@@ -174,7 +168,6 @@ pub enum EventConfig {
         name_hash: u64,
     },
     /// Create a fuzzer config from a build-time [`Uuid`]
-    #[cfg(feature = "std")]
     BuildID {
         /// The build-time [`Uuid`]
         id: Uuid,
@@ -207,13 +200,9 @@ impl EventConfig {
         match self {
             EventConfig::AlwaysUnique => false,
             EventConfig::FromName { name_hash: a } => match other {
-                #[cfg(not(feature = "std"))]
-                EventConfig::AlwaysUnique => false,
                 EventConfig::FromName { name_hash: b } => a == b,
-                #[cfg(feature = "std")]
-                EventConfig::AlwaysUnique | EventConfig::BuildID { id: _ } => false,
+                EventConfig::AlwaysUnique | EventConfig::BuildID { .. } => false,
             },
-            #[cfg(feature = "std")]
             EventConfig::BuildID { id: a } => match other {
                 EventConfig::AlwaysUnique | EventConfig::FromName { name_hash: _ } => false,
                 EventConfig::BuildID { id: b } => a == b,
@@ -254,7 +243,6 @@ where
 // TODO remove forward_id as not anymore needed for centralized
 /// Events sent around in the library
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "I: serde::de::DeserializeOwned")]
 pub enum Event<I>
 where
     I: Input,
@@ -343,55 +331,27 @@ where
     },*/
 }
 
-impl<I> Event<I>
-where
-    I: Input,
-{
+impl<I> Event<I> {
     fn name(&self) -> &str {
         match self {
-            Event::NewTestcase {
-                input: _,
-                client_config: _,
-                corpus_size: _,
-                exit_kind: _,
-                observers_buf: _,
-                time: _,
-                executions: _,
-                forward_id: _,
-            } => "Testcase",
-            Event::UpdateExecStats {
-                time: _,
-                executions: _,
-                phantom: _,
-            } => "Client Heartbeat",
-            Event::UpdateUserStats {
-                name: _,
-                value: _,
-                phantom: _,
-            } => "UserStats",
+            Event::NewTestcase { .. } => "Testcase",
+            Event::UpdateExecStats { .. } => "Client Heartbeat",
+            Event::UpdateUserStats { .. } => "UserStats",
             #[cfg(feature = "introspection")]
-            Event::UpdatePerfMonitor {
-                time: _,
-                executions: _,
-                introspection_monitor: _,
-                phantom: _,
-            } => "PerfMonitor",
+            Event::UpdatePerfMonitor { .. } => "PerfMonitor",
             Event::Objective { .. } => "Objective",
-            Event::Log {
-                severity_level: _,
-                message: _,
-                phantom: _,
-            } => "Log",
+            Event::Log { .. } => "Log",
             Event::CustomBuf { .. } => "CustomBuf",
-            /*Event::Custom {
-                sender_id: _, /*custom_event} => custom_event.name()*/
-            } => "todo",*/
+            /*Event::Custom { .. } => "todo",*/
         }
     }
 }
 
 /// [`EventFirer`] fire an event.
-pub trait EventFirer: UsesState {
+pub trait EventFirer<S>
+where
+    S: HasCorpus,
+{
     /// Send off an [`Event`] to the broker
     ///
     /// For multi-processed managers, such as [`LlmpEventManager`],
@@ -402,15 +362,15 @@ pub trait EventFirer: UsesState {
     /// This should not happen for a normal use-case.
     fn fire(
         &mut self,
-        state: &mut Self::State,
-        event: Event<<Self::State as UsesInput>::Input>,
+        state: &mut S,
+        event: Event<<<S as HasCorpus>::Corpus as Corpus>::Input>,
     ) -> Result<(), Error>;
 
     /// Send off an [`Event::Log`] event to the broker.
     /// This is a shortcut for [`EventFirer::fire`] with [`Event::Log`] as argument.
     fn log(
         &mut self,
-        state: &mut Self::State,
+        state: &mut S,
         severity_level: LogSeverity,
         message: String,
     ) -> Result<(), Error> {
@@ -442,16 +402,16 @@ pub trait EventFirer: UsesState {
 }
 
 /// [`ProgressReporter`] report progress to the broker.
-pub trait ProgressReporter: EventFirer
+pub trait ProgressReporter<S>: EventFirer<S>
 where
-    Self::State: HasMetadata + HasExecutions + HasLastReportTime,
+    S: HasCorpus + HasMetadata + HasExecutions + HasLastReportTime,
 {
     /// Given the last time, if `monitor_timeout` seconds passed, send off an info/monitor/heartbeat message to the broker.
     /// Returns the new `last` time (so the old one, unless `monitor_timeout` time has passed and monitor have been sent)
     /// Will return an [`Error`], if the stats could not be sent.
     fn maybe_report_progress(
         &mut self,
-        state: &mut Self::State,
+        state: &mut S,
         monitor_timeout: Duration,
     ) -> Result<(), Error> {
         let Some(last_report_time) = state.last_report_time() else {
@@ -470,7 +430,7 @@ where
 
     /// Send off an info/monitor/heartbeat message to the broker.
     /// Will return an [`Error`], if the stats could not be sent.
-    fn report_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn report_progress(&mut self, state: &mut S) -> Result<(), Error> {
         let executions = *state.executions();
         let cur = current_time();
 
@@ -533,12 +493,15 @@ where
 }
 
 /// Restartable trait
-pub trait EventRestarter: UsesState {
+pub trait EventRestarter<S>
+where
+    S: HasCurrentStage,
+{
     /// For restarting event managers, implement a way to forward state to their next peers.
     /// You *must* ensure that [`HasCurrentStage::on_restart`] will be invoked in this method, by you
     /// or an internal [`EventRestarter`], before the state is saved for recovery.
     #[inline]
-    fn on_restart(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
         state.on_restart()?;
         self.await_restart_safe();
         Ok(())
@@ -556,15 +519,10 @@ pub trait EventRestarter: UsesState {
 }
 
 /// [`EventProcessor`] process all the incoming messages
-pub trait EventProcessor<E, Z>: UsesState {
+pub trait EventProcessor<E, S, Z> {
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
-    fn process(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut Self::State,
-        executor: &mut E,
-    ) -> Result<usize, Error>;
+    fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error>;
 }
 /// The id of this [`EventManager`].
 /// For multi processed [`EventManager`]s,
@@ -577,20 +535,66 @@ pub trait HasEventManagerId {
 
 /// [`EventManager`] is the main communications hub.
 /// For the "normal" multi-processed mode, you may want to look into [`LlmpRestartingEventManager`]
-pub trait EventManager<E, Z>:
-    EventFirer + EventProcessor<E, Z> + EventRestarter + HasEventManagerId + ProgressReporter
+pub trait EventManager<E, S, Z>:
+    EventFirer<S>
+    + EventProcessor<E, S, Z>
+    + EventRestarter<S>
+    + HasEventManagerId
+    + ProgressReporter<S>
 where
-    Self::State: HasMetadata + HasExecutions + HasLastReportTime,
+    S: HasCorpus + HasCurrentStage + HasMetadata + HasExecutions + HasLastReportTime,
 {
 }
 
-/// The handler function for custom buffers exchanged via [`EventManager`]
-type CustomBufHandlerFn<S> = dyn FnMut(&mut S, &str, &[u8]) -> Result<CustomBufEventResult, Error>;
+pub trait CustomBufHandler<S> {
+    fn handle_custom(
+        &mut self,
+        state: &mut S,
+        tag: &str,
+        buf: Vec<u8>,
+    ) -> Result<ControlFlow<(), Vec<u8>>, Error>;
+}
 
-/// Supports custom buf handlers to handle `CustomBuf` events.
-pub trait HasCustomBufHandlers: UsesState {
-    /// Adds a custom buffer handler that will run for each incoming `CustomBuf` event.
-    fn add_custom_buf_handler(&mut self, handler: Box<CustomBufHandlerFn<Self::State>>);
+pub trait CustomBufHandlerTuple<S> {
+    fn handle_custom_all(&mut self, state: &mut S, tag: &str, buf: Vec<u8>) -> Result<(), Error>;
+}
+
+impl<Head, Tail, S> CustomBufHandlerTuple<S> for (Head, Tail)
+where
+    Head: CustomBufHandler<S>,
+    Tail: CustomBufHandlerTuple<S>,
+{
+    fn handle_custom_all(&mut self, state: &mut S, tag: &str, buf: Vec<u8>) -> Result<(), Error> {
+        if let ControlFlow::Continue(buf) = self.0.handle_custom(state, tag, buf)? {
+            self.1.handle_custom_all(state, tag, buf)?;
+        }
+        Ok(())
+    }
+}
+
+impl<S> CustomBufHandlerTuple<S> for () {
+    fn handle_custom_all(
+        &mut self,
+        _state: &mut S,
+        _tag: &str,
+        _buf: Vec<u8>,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+/// The handler function for custom buffers exchanged via [`EventManager`]
+type CustomBufHandlerFn<S> = dyn FnMut(&mut S, &str, &[u8]) -> Result<ControlFlow<()>, Error>;
+
+impl<S> CustomBufHandlerTuple<S> for Vec<Box<CustomBufHandlerFn<S>>> {
+    fn handle_custom_all(&mut self, state: &mut S, tag: &str, buf: Vec<u8>) -> Result<(), Error> {
+        for handler in self {
+            if let ControlFlow::Break(_) = handler(state, tag, &buf)? {
+                break;
+            }
+        }
+        Ok(())
+    }
 }
 
 /// An eventmgr for tests, and as placeholder if you really don't need an event manager.
@@ -615,16 +619,9 @@ impl<S> Default for NopEventManager<S> {
     }
 }
 
-impl<S> UsesState for NopEventManager<S>
+impl<S> EventFirer<S> for NopEventManager<S>
 where
-    S: State,
-{
-    type State = S;
-}
-
-impl<S> EventFirer for NopEventManager<S>
-where
-    S: State,
+    S: HasCorpus,
 {
     fn should_send(&self) -> bool {
         true
@@ -633,18 +630,15 @@ where
     fn fire(
         &mut self,
         _state: &mut Self::State,
-        _event: Event<<Self::State as UsesInput>::Input>,
+        _event: Event<<<S as HasCorpus>::Corpus as Corpus>::Input>,
     ) -> Result<(), Error> {
         Ok(())
     }
 }
 
-impl<S> EventRestarter for NopEventManager<S> where S: State {}
+impl<S> EventRestarter<S> for NopEventManager<S> where S: HasCurrentStage {}
 
-impl<E, S, Z> EventProcessor<E, Z> for NopEventManager<S>
-where
-    S: State + HasExecutions,
-{
+impl<E, S, Z> EventProcessor<E, S, Z> for NopEventManager<S> {
     fn process(
         &mut self,
         _fuzzer: &mut Z,
@@ -655,26 +649,13 @@ where
     }
 }
 
-impl<E, S, Z> EventManager<E, Z> for NopEventManager<S> where
-    S: State + HasExecutions + HasLastReportTime + HasMetadata
+impl<E, S, Z> EventManager<E, S, Z> for NopEventManager<S> where
+    S: HasCorpus + HasCurrentStage + HasMetadata + HasExecutions + HasLastReportTime
 {
 }
 
-impl<S> HasCustomBufHandlers for NopEventManager<S>
-where
-    S: State,
-{
-    fn add_custom_buf_handler(
-        &mut self,
-        _handler: Box<
-            dyn FnMut(&mut Self::State, &str, &[u8]) -> Result<CustomBufEventResult, Error>,
-        >,
-    ) {
-    }
-}
-
-impl<S> ProgressReporter for NopEventManager<S> where
-    S: State + HasExecutions + HasLastReportTime + HasMetadata
+impl<S> ProgressReporter<S> for NopEventManager<S> where
+    S: HasCorpus + HasMetadata + HasExecutions + HasLastReportTime
 {
 }
 
@@ -703,16 +684,10 @@ impl<EM, M> MonitorTypedEventManager<EM, M> {
     }
 }
 
-impl<EM, M> UsesState for MonitorTypedEventManager<EM, M>
+impl<EM, M, S> EventFirer<S> for MonitorTypedEventManager<EM, M>
 where
-    EM: UsesState,
-{
-    type State = EM::State;
-}
-
-impl<EM, M> EventFirer for MonitorTypedEventManager<EM, M>
-where
-    EM: EventFirer,
+    EM: EventFirer<S>,
+    S: HasCorpus,
 {
     fn should_send(&self) -> bool {
         true
@@ -722,7 +697,7 @@ where
     fn fire(
         &mut self,
         state: &mut Self::State,
-        event: Event<<Self::State as UsesInput>::Input>,
+        event: Event<<<S as HasCorpus>::Corpus as Corpus>::Input>,
     ) -> Result<(), Error> {
         self.inner.fire(state, event)
     }
@@ -751,9 +726,10 @@ where
     }
 }
 
-impl<EM, M> EventRestarter for MonitorTypedEventManager<EM, M>
+impl<EM, M, S> EventRestarter<S> for MonitorTypedEventManager<EM, M>
 where
-    EM: EventRestarter,
+    EM: EventRestarter<S>,
+    S: HasCurrentStage,
 {
     #[inline]
     fn on_restart(&mut self, state: &mut Self::State) -> Result<(), Error> {
@@ -771,9 +747,9 @@ where
     }
 }
 
-impl<E, EM, M, Z> EventProcessor<E, Z> for MonitorTypedEventManager<EM, M>
+impl<E, EM, M, S, Z> EventProcessor<E, S, Z> for MonitorTypedEventManager<EM, M>
 where
-    EM: EventProcessor<E, Z>,
+    EM: EventProcessor<E, S, Z>,
 {
     #[inline]
     fn process(
@@ -786,34 +762,17 @@ where
     }
 }
 
-impl<E, EM, M, Z> EventManager<E, Z> for MonitorTypedEventManager<EM, M>
+impl<E, EM, M, S, Z> EventManager<E, S, Z> for MonitorTypedEventManager<EM, M>
 where
-    EM: EventManager<E, Z>,
-    Self::State: HasLastReportTime + HasExecutions + HasMetadata,
+    EM: EventManager<E, S, Z>,
+    S: HasCorpus + HasCurrentStage + HasMetadata + HasExecutions + HasLastReportTime,
 {
 }
 
-impl<EM, M> HasCustomBufHandlers for MonitorTypedEventManager<EM, M>
+impl<EM, M, S> ProgressReporter<S> for MonitorTypedEventManager<EM, M>
 where
-    Self: UsesState,
-    EM: HasCustomBufHandlers<State = Self::State>,
-{
-    #[inline]
-    fn add_custom_buf_handler(
-        &mut self,
-        handler: Box<
-            dyn FnMut(&mut Self::State, &str, &[u8]) -> Result<CustomBufEventResult, Error>,
-        >,
-    ) {
-        self.inner.add_custom_buf_handler(handler);
-    }
-}
-
-impl<EM, M> ProgressReporter for MonitorTypedEventManager<EM, M>
-where
-    Self: UsesState,
-    EM: ProgressReporter<State = Self::State>,
-    Self::State: HasLastReportTime + HasExecutions + HasMetadata,
+    EM: ProgressReporter<S>,
+    S: HasCorpus + HasMetadata + HasExecutions + HasLastReportTime,
 {
     #[inline]
     fn maybe_report_progress(
@@ -873,7 +832,7 @@ pub trait AdaptiveSerializer {
     ) -> Result<Option<Vec<u8>>, Error>
     where
         OT: ObserversTuple<S> + Serialize,
-        S: UsesInput,
+        S: HasCorpus,
     {
         match self.time_ref() {
             Some(t) => {

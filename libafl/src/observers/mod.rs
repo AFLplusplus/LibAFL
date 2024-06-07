@@ -39,7 +39,13 @@ pub use list::*;
 use serde::{Deserialize, Serialize};
 pub use value::*;
 
-use crate::{executors::ExitKind, inputs::UsesInput, state::UsesState, Error};
+use crate::{
+    corpus::{Corpus, HasCorpus},
+    executors::ExitKind,
+    inputs::UsesInput,
+    state::UsesState,
+    Error,
+};
 
 /// Observers observe different information about the target.
 /// They can then be used by various sorts of feedback.
@@ -99,27 +105,35 @@ pub trait UsesObservers: UsesState {
 /// A haskell-style tuple of observers
 pub trait ObserversTuple<S>: MatchName
 where
-    S: UsesInput,
+    S: HasCorpus,
 {
     /// This is called right before the next execution.
-    fn pre_exec_all(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error>;
+    fn pre_exec_all(
+        &mut self,
+        state: &mut S,
+        input: &<S::Corpus as Corpus>::Input,
+    ) -> Result<(), Error>;
 
     /// This is called right after the last execution
     fn post_exec_all(
         &mut self,
         state: &mut S,
-        input: &S::Input,
+        input: &<S::Corpus as Corpus>::Input,
         exit_kind: &ExitKind,
     ) -> Result<(), Error>;
 
     /// This is called right before the next execution in the child process, if any.
-    fn pre_exec_child_all(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error>;
+    fn pre_exec_child_all(
+        &mut self,
+        state: &mut S,
+        input: &<S::Corpus as Corpus>::Input,
+    ) -> Result<(), Error>;
 
     /// This is called right after the last execution in the child process, if any.
     fn post_exec_child_all(
         &mut self,
         state: &mut S,
-        input: &S::Input,
+        input: &<S::Corpus as Corpus>::Input,
         exit_kind: &ExitKind,
     ) -> Result<(), Error>;
 }
