@@ -43,12 +43,18 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct TcpMultiMachineEventManagerHook<I> {
+pub struct TcpMultiMachineEventManagerHook<I>
+where
+    I: Input,
+{
     shared_state: Arc<RwLock<TcpMultiMachineState<I>>>, // the actual state of the broker hook
     rt: Arc<Runtime>, // the tokio runtime used to interact with other machines. Keep it outside to avoid locking it.
 }
 
-impl<I> TcpMultiMachineEventManagerHook<I> {
+impl<I> TcpMultiMachineEventManagerHook<I>
+where
+    I: Input,
+{
     pub(crate) fn new(
         shared_state: Arc<RwLock<TcpMultiMachineState<I>>>,
         rt: Arc<Runtime>,

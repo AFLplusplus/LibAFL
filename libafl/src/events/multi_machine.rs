@@ -9,7 +9,6 @@ use std::{
     time::Duration,
 };
 
-use async_std::io::WriteExt;
 use enumflags2::{bitflags, BitFlags};
 use libafl_bolts::{current_time, Error};
 use log::info;
@@ -29,6 +28,7 @@ use crate::{
         hooks::multi_machine::TcpMultiMachineEventManagerHook,
         llmp::multi_machine::TcpMultiMachineLlmpHook, Event,
     },
+    inputs::Input,
     prelude::State,
 };
 
@@ -48,10 +48,23 @@ pub enum NodePolicy {
 
 const DUMMY_BYTE: u8 = 0x14;
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct TcpNodeMsg<I> {
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(bound = "I: serde::de::DeserializeOwned")]
+pub struct TcpNodeMsg<I>
+where
+    I: Input,
+{
     // id: NodeId,
     event: Event<I>,
+}
+
+impl<I> TcpNodeMsg<I>
+where
+    I: Input,
+{
+    pub fn new(event: Event<I>) -> TcpNodeMsg<I> {
+        TcpNodeMsg { event }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -67,7 +80,10 @@ impl NodeId {
 
 /// The state of the hook shared between the background threads and the main thread.
 #[derive(Debug)]
-pub struct TcpMultiMachineState<I> {
+pub struct TcpMultiMachineState<I>
+where
+    I: Input,
+{
     parent: Option<TcpStream>, // the parent to which the testcases should be forwarded when deemed interesting
     children: HashMap<NodeId, TcpStream>, // The children who connected during the fuzzing session.
     old_events: Vec<Event<I>>,
@@ -164,7 +180,10 @@ impl TcpMultiMachineBuilder {
     }
 }
 
-impl<I> TcpMultiMachineState<I> {
+impl<I> TcpMultiMachineState<I>
+where
+    I: Input,
+{
     /// Read a [`TcpNodeMsg`] from a stream.
     /// Expects a message written by [`TcpMultiMachineState::write_msg`].
     /// If there is nothing to read from the stream, return asap with Ok(None).
@@ -223,37 +242,31 @@ impl<I> TcpMultiMachineState<I> {
         event: &Event<S::Input>,
     ) -> Result<(), Error> {
         if let Some(parent) = &mut self.parent {
-            if self.flags.contains(NodePolicy::ForwardToParent) {
-                match self.write_msg(parent, event).await {
-                    Err(_) => {
-                        // most likely the parent disconnected. drop the connection
-                        info!(
-                            "The parent disconnected. We won't try to communicate with it again."
-                        );
-                        self.parent.take();
-                    }
-                    Ok(_) => {} // write was successful, continue
+            match self.write_msg(parent, TcpNodeMsg::new(event)).await {
+                Err(_) => {
+                    // most likely the parent disconnected. drop the connection
+                    info!("The parent disconnected. We won't try to communicate with it again.");
+                    self.parent.take();
                 }
+                Ok(_) => {} // write was successful, continue
             }
         }
 
-        if self.flags.contains(NodePolicy::ForwardToChildren) {
-            let mut ids_to_remove: Vec<NodeId> = Vec::new();
-            for (child_id, child_stream) in &mut self.children {
-                match self.write_msg(child_stream, event) {
-                    Err(_) => {
-                        // most likely the child disconnected. drop the connection later on and continue.
-                        info!("The child disconnected. We won't try to communicate with it again.");
-                        ids_to_remove.push(child_id.clone());
-                    }
-                    Ok(_) => {} // write was successful, continue
+        let mut ids_to_remove: Vec<NodeId> = Vec::new();
+        for (child_id, child_stream) in &mut self.children {
+            match self.write_msg(child_stream, event) {
+                Err(_) => {
+                    // most likely the child disconnected. drop the connection later on and continue.
+                    info!("The child disconnected. We won't try to communicate with it again.");
+                    ids_to_remove.push(child_id.clone());
                 }
+                Ok(_) => {} // write was successful, continue
             }
+        }
 
-            // Garbage collect disconnected children
-            for id_to_remove in &ids_to_remove {
-                self.children.remove(id_to_remove);
-            }
+        // Garbage collect disconnected children
+        for id_to_remove in &ids_to_remove {
+            self.children.remove(id_to_remove);
         }
 
         Ok(())

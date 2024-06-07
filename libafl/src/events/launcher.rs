@@ -51,7 +51,7 @@ use typed_builder::TypedBuilder;
 
 use super::hooks::EventManagerHooksTuple;
 #[cfg(feature = "multi_machine")]
-use crate::events::multi_machine::{NodeDescriptor, TcpNodeLlmpHook};
+use crate::events::multi_machine::NodeDescriptor;
 #[cfg(feature = "adaptive_serialization")]
 use crate::observers::TimeObserver;
 #[cfg(all(unix, feature = "std", feature = "fork"))]

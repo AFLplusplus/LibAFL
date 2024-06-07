@@ -544,6 +544,14 @@ impl From<serde_json::Error> for Error {
     }
 }
 
+/// Stringify the json serializer error
+#[cfg(feature = "bitcode")]
+impl From<bitcode::Error> for Error {
+    fn from(err: bitcode::Error) -> Self {
+        Self::serialize(format!("{err:?}"))
+    }
+}
+
 #[cfg(all(unix, feature = "std"))]
 impl From<nix::Error> for Error {
     fn from(err: nix::Error) -> Self {

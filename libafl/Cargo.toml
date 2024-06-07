@@ -68,7 +68,7 @@ tcp_manager = ["tokio", "std"]
 tcp_compression = ["tcp_manager", "libafl_bolts/gzip"]
 
 ## Enable multi-machine support
-multi_machine = ["tokio", "std", "enumflags2", "ahash/std", "bitcode"]
+multi_machine = ["libafl_bolts/bitcode", "bitcode", "tokio", "std", "enumflags2", "ahash/std"]
 
 ## Enables the `NaiveTokenizer` and `StacktraceObserver`
 regex = ["std", "dep:regex"]
@@ -174,7 +174,7 @@ tide = { version = "0.16", optional = true }
 async-std = { version = "1.12", features = ["attributes"], optional = true }
 futures = { version = "0.3", optional = true }
 log = "0.4.20"
-tokio = { version = "1.38", optional = true, features = ["sync", "net", "rt", "io-util", "macros", "rt-multi-thread"] } # used for TCP Event Manager and multi-machine llmp hook
+tokio = { version = "1.38", optional = true, features = ["sync", "net", "rt", "io-util", "macros", "rt-multi-thread", "time"] } # used for TCP Event Manager and multi-machine
 enumflags2 = { version = "0.7", optional = true }
 bitcode = { version = "0.6", optional = true, features = ["serde"] }
 

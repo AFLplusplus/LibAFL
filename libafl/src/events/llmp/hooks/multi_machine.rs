@@ -3,22 +3,31 @@ use std::{prelude::rust_2015::Vec, sync::Arc};
 use libafl_bolts::{
     bolts_prelude::{Flags, LlmpBrokerInner, LlmpMsgHookResult, Tag},
     llmp::LlmpHook,
+    prelude::ShMemProvider,
     ClientId, Error,
 };
 use tokio::{runtime::Runtime, sync::RwLock};
 
 use crate::{
     events::{multi_machine::TcpMultiMachineState, Event},
+    inputs::Input,
     state::State,
 };
 
 #[derive(Debug)]
-pub struct TcpMultiMachineLlmpHook<I> {
+pub struct TcpMultiMachineLlmpHook<I>
+where
+    I: Input,
+{
     shared_state: Arc<RwLock<TcpMultiMachineState<I>>>, // the actual state of the broker hook
     rt: Arc<Runtime>, // the tokio runtime used to interact with other machines. Keep it outside to avoid locking it.
 }
 
-impl<I> TcpMultiMachineLlmpHook<I> {
+impl<I> TcpMultiMachineLlmpHook<I>
+where
+    I: Input,
+{
+    /// Should not be created alone. Use [`TcpMultiMachineBuilder`] instead.
     pub(crate) fn new(
         shared_state: Arc<RwLock<TcpMultiMachineState<I>>>,
         rt: Arc<Runtime>,
@@ -27,13 +36,14 @@ impl<I> TcpMultiMachineLlmpHook<I> {
     }
 }
 
-impl<S> LlmpHook<S> for TcpMultiMachineLlmpHook<S::Input>
+impl<SP, I> LlmpHook<SP> for TcpMultiMachineLlmpHook<I>
 where
-    S: State,
+    SP: ShMemProvider,
+    I: Input,
 {
     fn on_new_message(
         &mut self,
-        broker_inner: &mut LlmpBrokerInner<S>,
+        broker_inner: &mut LlmpBrokerInner<SP>,
         client_id: ClientId,
         msg_tag: &mut Tag,
         msg_flags: &mut Flags,
@@ -41,7 +51,7 @@ where
     ) -> Result<LlmpMsgHookResult, Error> {
         // Here, we can access all the messages that passed the EventManager filters.
         // Thus, the messages are initially destined to be broadcast to the other clients because they were deemed interesting.
-        todo!();
+
         let shared_state = self.shared_state.clone();
         let incoming_events: Vec<Event<S::Input>> = self.rt.block_on(async move {
             let mut state_wr_lock = shared_state.write().await;
@@ -66,8 +76,8 @@ where
         })?;
 
         // Add incoming events to the ones we should filter
-        events.extend_from_slice(&incoming_events);
+        // events.extend_from_slice(&incoming_events);
 
-        Ok(true)
+        Ok(LlmpMsgHookResult::ForwardToClients)
     }
 }
