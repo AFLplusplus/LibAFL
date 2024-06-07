@@ -2106,7 +2106,7 @@ where
     /// something with it (read, transform, forward, etc...) and decides to discard it or not.
     fn on_new_message(
         &mut self,
-        llmp_broker_state: &mut LlmpBrokerInner<SP>,
+        broker_inner: &mut LlmpBrokerInner<SP>,
         client_id: ClientId,
         msg_tag: &mut Tag,
         msg_flags: &mut Flags,

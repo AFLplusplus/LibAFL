@@ -29,7 +29,7 @@ where
 {
     fn on_new_message(
         &mut self,
-        _llmp_broker_state: &mut LlmpBrokerInner<SP>,
+        _broker_inner: &mut LlmpBrokerInner<SP>,
         client_id: ClientId,
         msg_tag: &mut Tag,
         msg_flags: &mut Flags,
