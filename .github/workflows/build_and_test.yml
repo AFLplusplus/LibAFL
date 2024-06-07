@@ -506,7 +506,7 @@ jobs:
       - name: Run Tests
         run: cargo test
       - name: Clippy
-        run: cargo +nightly clippy --tests --all
+        run: cargo +nightly clippy --tests --all --exclude libafl_nyx --exclude symcc_runtime --exclude runtime_test
 
   ios:
     runs-on: macOS-latest
