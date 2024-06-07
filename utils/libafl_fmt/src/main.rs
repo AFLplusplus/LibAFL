@@ -144,8 +144,9 @@ async fn main() -> io::Result<()> {
         tokio_joinset.spawn(run_cargo_fmt(project, cli.check, cli.verbose));
     }
 
-    let (clang, warning) = if which("clang-format-18").is_ok() {
-        (Some("clang-format-18"), None)
+    let (clang, warning) = if which("clang-format-17").is_ok() {
+        // can't use 18 for ci.
+        (Some("clang-format-17"), None)
     } else if which("clang-format").is_ok() {
         (
             Some("clang-format"),
