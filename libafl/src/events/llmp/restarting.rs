@@ -460,12 +460,12 @@ where
             let broker_things = |mut broker: LlmpBroker<_, SP>, remote_broker_addr| {
                 if let Some(remote_broker_addr) = remote_broker_addr {
                     log::info!("B2b: Connecting to {:?}", &remote_broker_addr);
-                    broker.state_mut().connect_b2b(remote_broker_addr)?;
+                    broker.inner_mut().connect_b2b(remote_broker_addr)?;
                 };
 
                 if let Some(exit_cleanly_after) = self.exit_cleanly_after {
                     broker
-                        .state_mut()
+                        .inner_mut()
                         .set_exit_cleanly_after(exit_cleanly_after);
                 }
 
@@ -483,7 +483,7 @@ where
                         LlmpConnection::on_port(self.shmem_provider.clone(), self.broker_port)?;
                     match connection {
                         LlmpConnection::IsBroker { broker } => {
-                            let llmp_hook = StdLlmpEventHook::<S::Input, MT, SP>::new(
+                            let llmp_hook = StdLlmpEventHook::<S::Input, MT>::new(
                                 self.monitor.take().unwrap(),
                             )?;
 

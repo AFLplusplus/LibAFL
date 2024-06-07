@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{compress::GzipCompressor, llmp::LLMP_FLAG_COMPRESSED};
 use libafl_bolts::{
-    llmp::{Flags, LlmpBrokerState, LlmpHook, LlmpMsgHookResult, Tag},
+    llmp::{Flags, LlmpBrokerInner, LlmpHook, LlmpMsgHookResult, Tag},
     shmem::ShMemProvider,
     ClientId,
 };
@@ -24,17 +24,14 @@ pub mod centralized;
 
 /// An LLMP-backed event hook for scalable multi-processed fuzzing
 #[derive(Debug)]
-pub struct StdLlmpEventHook<I, MT, SP>
-where
-    SP: ShMemProvider,
-{
+pub struct StdLlmpEventHook<I, MT> {
     monitor: MT,
     #[cfg(feature = "llmp_compression")]
     compressor: GzipCompressor,
-    phantom: PhantomData<(I, SP)>,
+    phantom: PhantomData<I>,
 }
 
-impl<I, MT, SP> LlmpHook<SP> for StdLlmpEventHook<I, MT, SP>
+impl<I, MT, SP> LlmpHook<SP> for StdLlmpEventHook<I, MT>
 where
     I: Input,
     MT: Monitor,
@@ -42,7 +39,7 @@ where
 {
     fn on_new_message(
         &mut self,
-        _llmp_broker_state: &mut LlmpBrokerState<SP>,
+        _llmp_broker_state: &mut LlmpBrokerInner<SP>,
         client_id: ClientId,
         msg_tag: &mut Tag,
         #[cfg(feature = "llmp_compression")] msg_flags: &mut Flags,
@@ -81,10 +78,9 @@ where
     }
 }
 
-impl<I, MT, SP> StdLlmpEventHook<I, MT, SP>
+impl<I, MT> StdLlmpEventHook<I, MT>
 where
     I: Input,
-    SP: ShMemProvider,
     MT: Monitor,
 {
     /// Create an event broker from a raw broker.
