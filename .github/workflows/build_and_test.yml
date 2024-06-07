@@ -117,7 +117,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
-      - name: Add nightly rustfmt and clippy
+      - name: Add nightly clippy
         run: rustup toolchain install nightly --component miri --allow-downgrade
       # --- miri undefined behavior test --
       - name: Run miri tests
@@ -136,8 +136,8 @@ jobs:
         run: sudo apt purge llvm* clang* lld* lldb* opt*
       - name: Install and cache deps
         run: sudo apt update && sudo apt install ninja-build shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
-      - name: Add nightly rustfmt and clippy
-        run: rustup toolchain install nightly --component rustfmt --component clippy --component miri --allow-downgrade
+      - name: Add nightly clippy
+        run: rustup toolchain install nightly --component clippy --component miri --allow-downgrade
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
@@ -169,7 +169,7 @@ jobs:
 
       - name: Install and cache deps
         run: sudo apt update && sudo apt install ninja-build shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
-      - name: Add nightly rustfmt and clippy
+      - name: Add nightly clippy
         run: rustup toolchain install nightly --component clippy --allow-downgrade && rustup default nightly
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
@@ -389,7 +389,7 @@ jobs:
           profile: minimal
           toolchain: nightly
           override: true
-          components: rustfmt, rust-src
+          components: rust-src
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
       - name: Add targets
@@ -409,7 +409,7 @@ jobs:
           profile: minimal
           toolchain: nightly
           override: true
-          components: rustfmt, clippy, rust-src
+          components: clippy, rust-src
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
       - name: Add targets
@@ -491,8 +491,8 @@ jobs:
         with:
           profile: minimal
           toolchain: stable
-      - name: Add nightly rustfmt and clippy
-        run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade && rustup default nightly
+      - name: Add nightly clippy
+        run: rustup toolchain install nightly --component clippy --allow-downgrade && rustup default nightly
       - name: Install deps
         run: brew install z3 gtk+3
       - name: Install cxxbridge
