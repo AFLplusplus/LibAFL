@@ -193,7 +193,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             broker.inner_mut().launch_tcp_listener_on(port)?;
             // Exit when we got at least _n_ nodes, and all of them quit.
             broker
-                .state_mut()
+                .inner_mut()
                 .set_exit_cleanly_after(NonZeroUsize::new(1_usize).unwrap());
             broker.loop_with_timeouts(BROKER_TIMEOUT, Some(SLEEP_BETWEEN_FORWARDS));
         }
