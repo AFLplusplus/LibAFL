@@ -263,6 +263,8 @@ jobs:
         with:
           directory: ${{ runner.temp }}/llvm
           version: 17
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
       - name: Format Check
         run: ./scripts/fmt_all.sh check
 
