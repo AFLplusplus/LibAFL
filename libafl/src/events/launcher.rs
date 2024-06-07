@@ -665,7 +665,7 @@ where
                 log::info!("PID: {:#?} I am centralized broker", std::process::id());
                 self.shmem_provider.post_fork(true)?;
 
-                let llmp_centralized_hook = CentralizedLlmpHook::<S::Input, SP>::new()?;
+                let llmp_centralized_hook = CentralizedLlmpHook::<S::Input>::new()?;
 
                 // TODO switch to false after solving the bug
                 let mut broker = LlmpBroker::with_keep_pages_attach_to_tcp(

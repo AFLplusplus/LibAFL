@@ -9,7 +9,7 @@ use std::marker::PhantomData;
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
 use std::{num::NonZeroUsize, thread, time};
 
-use libafl_bolts::{bolts_prelude::LlmpMsgHookResult, llmp::LlmpBrokerState};
+use libafl_bolts::{bolts_prelude::LlmpMsgHookResult, llmp::LlmpBrokerInner};
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
 use libafl_bolts::{
     llmp::{self, Flags, LlmpHook, Tag},
@@ -119,7 +119,7 @@ where
 {
     fn on_new_message(
         &mut self,
-        _llmp_broker_state: &mut LlmpBrokerState<SP>,
+        _broker_inner: &mut LlmpBrokerInner<SP>,
         client_id: ClientId,
         msg_tag: &mut Tag,
         _msg_flags: &mut Flags,
@@ -190,10 +190,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 StdShMemProvider::new()?,
                 tuple_list!(LlmpExampleHook::new()),
             )?;
-            broker.state_mut().launch_tcp_listener_on(port)?;
+            broker.inner_mut().launch_tcp_listener_on(port)?;
             // Exit when we got at least _n_ nodes, and all of them quit.
             broker
-                .state_mut()
+                .inner_mut()
                 .set_exit_cleanly_after(NonZeroUsize::new(1_usize).unwrap());
             broker.loop_with_timeouts(BROKER_TIMEOUT, Some(SLEEP_BETWEEN_FORWARDS));
         }
@@ -202,9 +202,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 StdShMemProvider::new()?,
                 tuple_list!(LlmpExampleHook::new()),
             )?;
-            broker.state_mut().launch_tcp_listener_on(b2b_port)?;
+            broker.inner_mut().launch_tcp_listener_on(b2b_port)?;
             // connect back to the main broker.
-            broker.state_mut().connect_b2b(("127.0.0.1", port))?;
+            broker.inner_mut().connect_b2b(("127.0.0.1", port))?;
             broker.loop_with_timeouts(BROKER_TIMEOUT, Some(SLEEP_BETWEEN_FORWARDS));
         }
         "ctr" => {

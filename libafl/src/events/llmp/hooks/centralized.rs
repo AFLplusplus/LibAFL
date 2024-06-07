@@ -3,7 +3,7 @@ use std::{fmt::Debug, marker::PhantomData};
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{compress::GzipCompressor, llmp::LLMP_FLAG_COMPRESSED};
 use libafl_bolts::{
-    llmp::{Flags, LlmpBrokerState, LlmpHook, LlmpMsgHookResult, Tag},
+    llmp::{Flags, LlmpBrokerInner, LlmpHook, LlmpMsgHookResult, Tag},
     shmem::ShMemProvider,
     ClientId, Error,
 };
@@ -16,20 +16,20 @@ use crate::{
 };
 
 /// An LLMP-backed event manager for scalable multi-processed fuzzing
-pub struct CentralizedLlmpHook<I, SP> {
+pub struct CentralizedLlmpHook<I> {
     #[cfg(feature = "llmp_compression")]
     compressor: GzipCompressor,
-    phantom: PhantomData<(I, SP)>,
+    phantom: PhantomData<I>,
 }
 
-impl<I, SP> LlmpHook<SP> for CentralizedLlmpHook<I, SP>
+impl<I, SP> LlmpHook<SP> for CentralizedLlmpHook<I>
 where
     I: Input,
     SP: ShMemProvider,
 {
     fn on_new_message(
         &mut self,
-        _llmp_broker_state: &mut LlmpBrokerState<SP>,
+        _broker_inner: &mut LlmpBrokerInner<SP>,
         client_id: ClientId,
         msg_tag: &mut Tag,
         msg_flags: &mut Flags,
@@ -60,9 +60,9 @@ where
     }
 }
 
-impl<I, SP> Debug for CentralizedLlmpHook<I, SP> {
+impl<I> Debug for CentralizedLlmpHook<I> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let mut debug_struct = f.debug_struct("CentralizedLlmpEventBroker");
+        let mut debug_struct = f.debug_struct("CentralizedLlmpHook");
 
         #[cfg(feature = "llmp_compression")]
         let debug_struct = debug_struct.field("compressor", &self.compressor);
@@ -73,10 +73,9 @@ impl<I, SP> Debug for CentralizedLlmpHook<I, SP> {
     }
 }
 
-impl<I, SP> CentralizedLlmpHook<I, SP>
+impl<I> CentralizedLlmpHook<I>
 where
     I: Input,
-    SP: ShMemProvider,
 {
     /// Create an event broker from a raw broker.
     pub fn new() -> Result<Self, Error> {
