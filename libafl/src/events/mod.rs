@@ -55,6 +55,9 @@ use crate::{
     state::HasScalabilityMonitor,
 };
 
+#[cfg(feature = "multi_machine")]
+pub mod multi_machine;
+
 /// Check if ctrl-c is sent with this struct
 #[cfg(all(unix, feature = "std"))]
 pub static mut EVENTMGR_SIGHANDLER_STATE: ShutdownSignalData = ShutdownSignalData {};

@@ -9,7 +9,7 @@ use crate::{events::Event, state::State, Error};
 
 /// node hook, for multi-machine fuzzing
 #[cfg(feature = "multi_machine")]
-pub mod node;
+pub mod multi_machine;
 
 /// The hooks that are run before and after the event manager calls `handle_in_client`
 pub trait EventManagerHook<S>
@@ -27,7 +27,9 @@ where
 
     /// The hook that runs after `handle_in_client`
     /// Return false if you want to cancel the subsequent event handling
-    fn post_exec(&mut self, state: &mut S, client_id: ClientId) -> Result<bool, Error>;
+    fn post_exec(&mut self, _state: &mut S, _client_id: ClientId) -> Result<bool, Error> {
+        Ok(true)
+    }
 }
 
 /// The tuples contains hooks to be executed for `handle_in_client`

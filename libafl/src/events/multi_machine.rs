@@ -1,26 +1,17 @@
 use core::fmt::Display;
 use std::{
     collections::HashMap,
-    marker::PhantomData,
-    mem::MaybeUninit,
+    prelude::rust_2015::Vec,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc, OnceLock,
     },
-    thread::sleep,
     time::Duration,
-    vec::Vec,
 };
 
-use bitcode::{Decode, Encode};
+use async_std::io::WriteExt;
 use enumflags2::{bitflags, BitFlags};
-use libafl_bolts::{
-    bolts_prelude::{Flags, LlmpMsgHookResult, Tag},
-    current_time,
-    llmp::LlmpHook,
-    shmem::ShMemProvider,
-    ClientId, Error,
-};
+use libafl_bolts::{current_time, Error};
 use log::info;
 use serde::{Deserialize, Serialize};
 use tokio::{
@@ -29,13 +20,16 @@ use tokio::{
     runtime::Runtime,
     sync::RwLock,
     task::JoinHandle,
+    time,
 };
 use typed_builder::TypedBuilder;
 
 use crate::{
-    events::{hooks::EventManagerHook, Event},
-    inputs::Input,
-    state::State,
+    events::{
+        hooks::multi_machine::TcpMultiMachineEventManagerHook,
+        llmp::multi_machine::TcpMultiMachineLlmpHook, Event,
+    },
+    prelude::State,
 };
 
 const LISTEN_PORT_BASE: u16 = 50000;
@@ -52,17 +46,12 @@ pub enum NodePolicy {
     // ForwardFromParentToChildren, // Incoming messages from parent are forwarded to children and children to come in the future.
 }
 
-/// A node in the multi-machine model event manager.
-///
-/// Currently, a node can have 0 to 1 parent and multiple children.
-///
-/// This pattern allows for children-to-parent testcase handling.
-/// Once a machine will detect a testcase that is deemed interesting, it will be forwarded to the
-/// parent.
-#[derive(Debug)]
-pub struct TcpNodeEventManagerHook<I> {
-    shared_state: Arc<RwLock<TcpNodeEventLlmpSharedState<I>>>, // the actual state of the broker hook
-    rt: Runtime, // the tokio runtime used to interact with other machines. Keep it outside to avoid locking it.
+const DUMMY_BYTE: u8 = 0x14;
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct TcpNodeMsg<I> {
+    // id: NodeId,
+    event: Event<I>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -78,7 +67,7 @@ impl NodeId {
 
 /// The state of the hook shared between the background threads and the main thread.
 #[derive(Debug)]
-pub struct TcpNodeEventLlmpSharedState<I> {
+pub struct TcpMultiMachineState<I> {
     parent: Option<TcpStream>, // the parent to which the testcases should be forwarded when deemed interesting
     children: HashMap<NodeId, TcpStream>, // The children who connected during the fuzzing session.
     old_events: Vec<Event<I>>,
@@ -97,14 +86,23 @@ pub struct NodeDescriptor<A> {
     pub flags: BitFlags<NodePolicy>, // The policy for shared messages between nodes.
 }
 
-impl TcpNodeEventManagerHook {
-    /// Build a new [`TcpNodeEventManagerHook`] from a [`NodeDescriptor`]
-    pub fn new<A: ToSocketAddrs + Display>(
+pub struct TcpMultiMachineBuilder {}
+
+impl TcpMultiMachineBuilder {
+    /// Build a new [`TcpMultiMachineEventManagerHook`] from a [`NodeDescriptor`]
+    pub fn new<A: ToSocketAddrs + Display, I>(
         node_descriptor: &NodeDescriptor<A>,
-    ) -> Result<Self, Error> {
+    ) -> Result<
+        (
+            TcpMultiMachineEventManagerHook<I>,
+            TcpMultiMachineLlmpHook<I>,
+        ),
+        Error,
+    > {
         // Tokio runtime, useful to welcome new children.
-        let rt =
-            Runtime::new().or_else(|_| Err(Error::unknown("Tokio runtime spawning failed")))?;
+        let rt = Arc::new(
+            Runtime::new().or_else(|_| Err(Error::unknown("Tokio runtime spawning failed"))),
+        )?;
 
         // Try to connect to the parent if we should
         let parent: Option<TcpStream> = rt.block_on(async {
@@ -126,7 +124,7 @@ impl TcpNodeEventManagerHook {
                         }
                     }
 
-                    sleep(Duration::from_secs(1));
+                    time::sleep(Duration::from_secs(1)).await;
                 }
             } else {
                 Ok(None)
@@ -135,7 +133,7 @@ impl TcpNodeEventManagerHook {
 
         // Create the state of the hook. This will be shared with the background server, so we wrap
         // it with concurrent-safe objects
-        let state = Arc::new(RwLock::new(TcpNodeEventLlmpSharedState {
+        let state = Arc::new(RwLock::new(TcpMultiMachineState {
             parent,
             children: HashMap::default(),
             old_events: Vec::new(),
@@ -159,24 +157,16 @@ impl TcpNodeEventManagerHook {
             });
         }
 
-        Ok(Self {
-            shared_state: state,
-            rt,
-        })
+        Ok((
+            TcpMultiMachineEventManagerHook::new(state.clone(), rt.clone()),
+            TcpMultiMachineLlmpHook::new(state, rt),
+        ))
     }
 }
 
-const DUMMY_BYTE: u8 = 0x14;
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct TcpNodeMsg<I> {
-    // id: NodeId,
-    event: Event<I>,
-}
-
-impl<I> TcpNodeEventLlmpSharedState<I> {
+impl<I> TcpMultiMachineState<I> {
     /// Read a [`TcpNodeMsg`] from a stream.
-    /// Expects a message written by [`TcpNodeEventLlmpSharedState::write_msg`].
+    /// Expects a message written by [`TcpMultiMachineState::write_msg`].
     /// If there is nothing to read from the stream, return asap with Ok(None).
     async fn read_msg(&mut self, stream: &mut TcpStream) -> Result<Option<TcpNodeMsg<I>>, Error> {
         // 0. Check if we should try to fetch something from the stream
@@ -207,7 +197,7 @@ impl<I> TcpNodeEventLlmpSharedState<I> {
     }
 
     /// Write a [`TcpNodeMsg`] to a stream.
-    /// Can be read back using [`TcpNodeEventLlmpSharedState::read_msg`].
+    /// Can be read back using [`TcpMultiMachineState::read_msg`].
     async fn write_msg(
         &mut self,
         stream: &mut TcpStream,
@@ -230,11 +220,11 @@ impl<I> TcpNodeEventLlmpSharedState<I> {
 
     async fn send_interesting_events_to_nodes<S: State>(
         &mut self,
-        events: &Event<S::Input>,
-    ) -> Result<Vec<TcpNodeMsg>, Error> {
+        event: &Event<S::Input>,
+    ) -> Result<(), Error> {
         if let Some(parent) = &mut self.parent {
             if self.flags.contains(NodePolicy::ForwardToParent) {
-                match self.write_msg(parent, msg).await {
+                match self.write_msg(parent, event).await {
                     Err(_) => {
                         // most likely the parent disconnected. drop the connection
                         info!(
@@ -250,7 +240,7 @@ impl<I> TcpNodeEventLlmpSharedState<I> {
         if self.flags.contains(NodePolicy::ForwardToChildren) {
             let mut ids_to_remove: Vec<NodeId> = Vec::new();
             for (child_id, child_stream) in &mut self.children {
-                match self.write_msg(child_stream, msg) {
+                match self.write_msg(child_stream, event) {
                     Err(_) => {
                         // most likely the child disconnected. drop the connection later on and continue.
                         info!("The child disconnected. We won't try to communicate with it again.");
@@ -271,7 +261,7 @@ impl<I> TcpNodeEventLlmpSharedState<I> {
 
     /// Flush the message queue from other nodes and add incoming events to the
     /// centralized event manager queue.
-    async fn handle_new_messages_from_nodes<S: State>(
+    pub(crate) async fn handle_new_messages_from_nodes<S: State>(
         &mut self,
         events: &mut Vec<Event<S::Input>>,
     ) -> Result<(), Error> {
@@ -314,57 +304,5 @@ impl<I> TcpNodeEventLlmpSharedState<I> {
         }
 
         Ok(())
-    }
-}
-
-impl<S> EventManagerHook<S> for TcpNodeEventManagerHook<S::Input>
-where
-    S: State,
-{
-    fn pre_exec(
-        &mut self,
-        _state: &mut S,
-        _client_id: ClientId,
-        events: &mut Vec<Event<S::Input>>,
-    ) -> Result<bool, Error> {
-        // Here, we get all the events from the other clients. we don't want to actually send them directly to
-        // other nodes now. We will though receive other nodes' messages and make them go through the centralized
-        // filter.
-        let shared_state = self.shared_state.clone();
-        let incoming_events: Vec<Event<S::Input>> = self.rt.block_on(async move {
-            let mut state_wr_lock = shared_state.write().await;
-
-            // for event in events.as_ref() {
-            //     // First, we handle the message. Since it involves network, we do it first and await on it.
-            //     state_wr_lock.handle_new_message_from_node(event).await?;
-
-            //     // add the msg to the list of old messages to send to a future child.
-            //     state_wr_lock.old_events.push();
-            // }
-
-            let mut incoming_events = Vec::new();
-            state_wr_lock.handle_new_messages_from_nodes(&mut incoming_events)?;
-
-            // TODO: remove once debug is over
-            {
-                log::debug!("[{}] New incoming events: {:?}", incoming_events);
-            }
-
-            Ok(incoming_events)
-        })?;
-
-        // Add incoming events to the ones we should filter
-        events.extend_from_slice(&incoming_events);
-
-        Ok(true)
-    }
-
-    fn post_exec(
-        &mut self,
-        state: &mut S,
-        client_id: ClientId,
-        events: &mut Vec<Event<S::Input>>,
-    ) -> Result<bool, Error> {
-        todo!();
     }
 }

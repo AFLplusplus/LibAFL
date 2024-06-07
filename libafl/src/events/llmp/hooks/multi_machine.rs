@@ -1,0 +1,73 @@
+use std::{prelude::rust_2015::Vec, sync::Arc};
+
+use libafl_bolts::{
+    bolts_prelude::{Flags, LlmpBrokerInner, LlmpMsgHookResult, Tag},
+    llmp::LlmpHook,
+    ClientId, Error,
+};
+use tokio::{runtime::Runtime, sync::RwLock};
+
+use crate::{
+    events::{multi_machine::TcpMultiMachineState, Event},
+    state::State,
+};
+
+#[derive(Debug)]
+pub struct TcpMultiMachineLlmpHook<I> {
+    shared_state: Arc<RwLock<TcpMultiMachineState<I>>>, // the actual state of the broker hook
+    rt: Arc<Runtime>, // the tokio runtime used to interact with other machines. Keep it outside to avoid locking it.
+}
+
+impl<I> TcpMultiMachineLlmpHook<I> {
+    pub(crate) fn new(
+        shared_state: Arc<RwLock<TcpMultiMachineState<I>>>,
+        rt: Arc<Runtime>,
+    ) -> Self {
+        Self { shared_state, rt }
+    }
+}
+
+impl<S> LlmpHook<S> for TcpMultiMachineLlmpHook<S::Input>
+where
+    S: State,
+{
+    fn on_new_message(
+        &mut self,
+        broker_inner: &mut LlmpBrokerInner<S>,
+        client_id: ClientId,
+        msg_tag: &mut Tag,
+        msg_flags: &mut Flags,
+        msg: &mut [u8],
+    ) -> Result<LlmpMsgHookResult, Error> {
+        // Here, we can access all the messages that passed the EventManager filters.
+        // Thus, the messages are initially destined to be broadcast to the other clients because they were deemed interesting.
+        todo!();
+        let shared_state = self.shared_state.clone();
+        let incoming_events: Vec<Event<S::Input>> = self.rt.block_on(async move {
+            let mut state_wr_lock = shared_state.write().await;
+
+            // for event in events.as_ref() {
+            //     // First, we handle the message. Since it involves network, we do it first and await on it.
+            //     state_wr_lock.handle_new_message_from_node(event).await?;
+
+            //     // add the msg to the list of old messages to send to a future child.
+            //     state_wr_lock.old_events.push();
+            // }
+
+            let mut incoming_events = Vec::new();
+            state_wr_lock.handle_new_messages_from_nodes(&mut incoming_events)?;
+
+            // TODO: remove once debug is over
+            {
+                log::debug!("New incoming events: {:?}", incoming_events);
+            }
+
+            Ok(incoming_events)
+        })?;
+
+        // Add incoming events to the ones we should filter
+        events.extend_from_slice(&incoming_events);
+
+        Ok(true)
+    }
+}
