@@ -91,8 +91,14 @@ struct Cli {
 #[tokio::main]
 async fn main() -> io::Result<()> {
     let cli = Cli::parse();
-    let libafl_root_dir = project_root::get_project_root().expect("Could not locate project root.");
+    let libafl_root_dir = match project_root::get_project_root() {
+        Ok(p) => p,
+        Err(_) => std::env::current_dir()
+            .expect("Failed to get current directory")
+            .into(),
+    };
 
+    println!("Using {:#?} as the project root", libafl_root_dir);
     let rust_excluded_directories = RegexSet::new([
         r".*target.*",
         r".*utils/noaslr.*",
