@@ -169,8 +169,8 @@ where
 impl<'a, CF, MT, S, SP> Launcher<'a, CF, (), MT, S, SP>
 where
     CF: FnOnce(Option<S>, LlmpRestartingEventManager<(), S, SP>, CoreId) -> Result<(), Error>,
-    MT: Monitor + Clone,
-    S: State + HasExecutions,
+    MT: Monitor + Clone + 'static,
+    S: State + HasExecutions + 'static,
     SP: ShMemProvider + 'static,
 {
     /// Launch the broker and the clients and fuzz
@@ -192,8 +192,8 @@ impl<'a, CF, EMH, MT, S, SP> Launcher<'a, CF, EMH, MT, S, SP>
 where
     CF: FnOnce(Option<S>, LlmpRestartingEventManager<EMH, S, SP>, CoreId) -> Result<(), Error>,
     EMH: EventManagerHooksTuple<S> + Clone + Copy,
-    MT: Monitor + Clone,
-    S: State + HasExecutions,
+    MT: Monitor + Clone + 'static,
+    S: State + HasExecutions + 'static,
     SP: ShMemProvider + 'static,
 {
     /// Launch the broker and the clients and fuzz with a user-supplied hook
@@ -564,8 +564,8 @@ where
         CentralizedEventManager<StdCentralizedInnerMgr<S, SP>, SP>,
         CoreId,
     ) -> Result<(), Error>,
-    MT: Monitor + Clone,
-    S: State + HasExecutions,
+    MT: Monitor + Clone + 'static,
+    S: State + HasExecutions + 'static,
     SP: ShMemProvider + 'static,
 {
     /// Launch a standard Centralized-based fuzzer
@@ -603,8 +603,8 @@ where
         CentralizedEventManager<IM, SP>, // No hooks for centralized EM
         CoreId,
     ) -> Result<(), Error>,
-    MT: Monitor + Clone,
-    S: State + HasExecutions,
+    MT: Monitor + Clone + 'static,
+    S: State + HasExecutions + 'static,
     SP: ShMemProvider + 'static,
 {
     /// Launch a Centralized-based fuzzer.
