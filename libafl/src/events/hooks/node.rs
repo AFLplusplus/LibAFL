@@ -14,12 +14,8 @@ use std::{
 
 use bitcode::{Decode, Encode};
 use enumflags2::{bitflags, BitFlags};
-#[cfg(feature = "llmp_compression")]
-use libafl_bolts::bolts_prelude::GzipCompressor;
-#[cfg(feature = "llmp_compression")]
-use libafl_bolts::bolts_prelude::LLMP_FLAG_COMPRESSED;
 use libafl_bolts::{
-    bolts_prelude::{Flags, LlmpBrokerState, LlmpMsgHookResult, Tag},
+    bolts_prelude::{Flags, LlmpMsgHookResult, Tag},
     current_time,
     llmp::LlmpHook,
     shmem::ShMemProvider,
@@ -36,7 +32,11 @@ use tokio::{
 };
 use typed_builder::TypedBuilder;
 
-use crate::{events::Event, inputs::Input};
+use crate::{
+    events::{hooks::EventManagerHook, Event},
+    inputs::Input,
+    state::State,
+};
 
 const LISTEN_PORT_BASE: u16 = 50000;
 
@@ -47,10 +47,9 @@ pub enum NodePolicy {
     // From current node to neighbours
     SendToParent,
     SendToChildren,
-
     // From neighbours to neighbours
-    ForwardFromChildrenToParent, // Incoming messages from children are forwarded to the parent, if any.
-    ForwardFromParentToChildren, // Incoming messages from parent are forwarded to children and children to come in the future.
+    // ForwardFromChildrenToParent, // Incoming messages from children are forwarded to the parent, if any.
+    // ForwardFromParentToChildren, // Incoming messages from parent are forwarded to children and children to come in the future.
 }
 
 /// A node in the multi-machine model event manager.
@@ -61,10 +60,9 @@ pub enum NodePolicy {
 /// Once a machine will detect a testcase that is deemed interesting, it will be forwarded to the
 /// parent.
 #[derive(Debug)]
-pub struct TcpNodeLlmpHook<I> {
-    shared_state: Arc<RwLock<TcpNodeEventLlmpSharedState>>, // the actual state of the broker hook
+pub struct TcpNodeEventManagerHook<I> {
+    shared_state: Arc<RwLock<TcpNodeEventLlmpSharedState<I>>>, // the actual state of the broker hook
     rt: Runtime, // the tokio runtime used to interact with other machines. Keep it outside to avoid locking it.
-    phantom: PhantomData<I>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -80,12 +78,10 @@ impl NodeId {
 
 /// The state of the hook shared between the background threads and the main thread.
 #[derive(Debug)]
-pub struct TcpNodeEventLlmpSharedState {
+pub struct TcpNodeEventLlmpSharedState<I> {
     parent: Option<TcpStream>, // the parent to which the testcases should be forwarded when deemed interesting
     children: HashMap<NodeId, TcpStream>, // The children who connected during the fuzzing session.
-    old_events: Vec<Vec<u8>>,
-    #[cfg(feature = "llmp_compression")]
-    compressor: GzipCompressor,
+    old_events: Vec<Event<I>>,
     flags: BitFlags<NodePolicy>,
 }
 
@@ -101,8 +97,8 @@ pub struct NodeDescriptor<A> {
     pub flags: BitFlags<NodePolicy>, // The policy for shared messages between nodes.
 }
 
-impl<I> TcpNodeLlmpHook<I> {
-    /// Build a new [`TcpNodeLlmpHook`] from a [`NodeDescriptor`]
+impl TcpNodeEventManagerHook {
+    /// Build a new [`TcpNodeEventManagerHook`] from a [`NodeDescriptor`]
     pub fn new<A: ToSocketAddrs + Display>(
         node_descriptor: &NodeDescriptor<A>,
     ) -> Result<Self, Error> {
@@ -116,10 +112,10 @@ impl<I> TcpNodeLlmpHook<I> {
                 let timeout = current_time() + node_descriptor.timeout;
 
                 loop {
-                    log::info!("Trying to connect to parent @ {}..", parent_addr);
+                    info!("Trying to connect to parent @ {}..", parent_addr);
                     match TcpStream::connect(parent_addr).await {
                         Ok(stream) => {
-                            log::info!("Connected to parent @ {}", parent_addr);
+                            info!("Connected to parent @ {}", parent_addr);
 
                             break Ok(Some(stream));
                         }
@@ -143,8 +139,6 @@ impl<I> TcpNodeLlmpHook<I> {
             parent,
             children: HashMap::default(),
             old_events: Vec::new(),
-            #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::new(),
             flags: node_descriptor.flags,
         }));
 
@@ -168,21 +162,34 @@ impl<I> TcpNodeLlmpHook<I> {
         Ok(Self {
             shared_state: state,
             rt,
-            phantom: PhantomData,
         })
     }
 }
 
+const DUMMY_BYTE: u8 = 0x14;
+
 #[derive(Clone, Serialize, Deserialize)]
-pub struct TcpNodeMsg {
-    // id: ClientId,
-    msg: Vec<u8>,
+pub struct TcpNodeMsg<I> {
+    // id: NodeId,
+    event: Event<I>,
 }
 
-impl TcpNodeEventLlmpSharedState {
+impl<I> TcpNodeEventLlmpSharedState<I> {
     /// Read a [`TcpNodeMsg`] from a stream.
     /// Expects a message written by [`TcpNodeEventLlmpSharedState::write_msg`].
-    async fn read_msg(&mut self, stream: &mut TcpStream) -> Result<Vec<u8>, Error> {
+    /// If there is nothing to read from the stream, return asap with Ok(None).
+    async fn read_msg(&mut self, stream: &mut TcpStream) -> Result<Option<TcpNodeMsg<I>>, Error> {
+        // 0. Check if we should try to fetch something from the stream
+        let mut dummy_byte: [u8; 1] = [0u8];
+        let n_read = stream.read(&mut dummy_byte).await?;
+
+        if n_read == 0 {
+            return Ok(None); // Nothing to read from this stream
+        }
+
+        // we should always read the dummy byte at this point.
+        assert_eq!(u8::from_le_bytes(dummy_byte), DUMMY_BYTE);
+
         // 1. Read msg size
         let mut node_msg_len: [u8; 4] = [0; 4];
         stream.read_exact(&mut node_msg_len).await?;
@@ -196,27 +203,34 @@ impl TcpNodeEventLlmpSharedState {
         }
         stream.read_exact(node_msg.as_mut_slice()).await?;
 
-        Ok(node_msg)
+        Ok(Some(bitcode::deserialize(node_msg.as_ref())?))
     }
 
     /// Write a [`TcpNodeMsg`] to a stream.
     /// Can be read back using [`TcpNodeEventLlmpSharedState::read_msg`].
-    async fn write_msg(&mut self, stream: &mut TcpStream, msg: &Vec<u8>) -> Result<(), Error> {
-        let msg_len = u32::to_le_bytes(msg.len() as u32);
+    async fn write_msg(
+        &mut self,
+        stream: &mut TcpStream,
+        msg: &TcpNodeMsg<I>,
+    ) -> Result<(), Error> {
+        let serialized_msg = bitcode::serialize(msg)?;
+        let msg_len = u32::to_le_bytes(serialized_msg.len() as u32);
+
+        // 0. Write the dummy byte
+        stream.write(&[DUMMY_BYTE]).await?;
 
         // 1. Write msg size
         stream.write(&msg_len).await?;
 
         // 2. Write msg
-        stream.write(msg).await?;
+        stream.write(&serialized_msg).await?;
 
         Ok(())
     }
 
-    /// The message was received because the main sent something to the broker
-    async fn handle_new_message_from_node(
+    async fn send_interesting_events_to_nodes<S: State>(
         &mut self,
-        msg: &Vec<u8>,
+        events: &Event<S::Input>,
     ) -> Result<Vec<TcpNodeMsg>, Error> {
         if let Some(parent) = &mut self.parent {
             if self.flags.contains(NodePolicy::ForwardToParent) {
@@ -240,13 +254,13 @@ impl TcpNodeEventLlmpSharedState {
                     Err(_) => {
                         // most likely the child disconnected. drop the connection later on and continue.
                         info!("The child disconnected. We won't try to communicate with it again.");
-                        to_remove.push(child_id.clone());
+                        ids_to_remove.push(child_id.clone());
                     }
                     Ok(_) => {} // write was successful, continue
                 }
             }
 
-            // Garbage collect children
+            // Garbage collect disconnected children
             for id_to_remove in &ids_to_remove {
                 self.children.remove(id_to_remove);
             }
@@ -254,59 +268,103 @@ impl TcpNodeEventLlmpSharedState {
 
         Ok(())
     }
+
+    /// Flush the message queue from other nodes and add incoming events to the
+    /// centralized event manager queue.
+    async fn handle_new_messages_from_nodes<S: State>(
+        &mut self,
+        events: &mut Vec<Event<S::Input>>,
+    ) -> Result<(), Error> {
+        // Our (potential) parent could have something for us
+        if let Some(parent) = &mut self.parent {
+            match self.read_msg(parent).await {
+                Err(_) => {
+                    // most likely the parent disconnected. drop the connection
+                    info!("The parent disconnected. We won't try to communicate with it again.");
+                    self.parent.take();
+                }
+                Ok(Some(msg)) => {
+                    // The parent has something for us, we store it
+                    events.write().await.push(msg.event)
+                }
+                Ok(None) => {} // nothing from the parent, we continue
+            }
+        }
+
+        // What about the (potential) children?
+        let mut ids_to_remove: Vec<NodeId> = Vec::new();
+        for (child_id, child_stream) in &mut self.children {
+            match self.read_msg(child_stream) {
+                Err(_) => {
+                    // most likely the child disconnected. drop the connection later on and continue.
+                    info!("The child disconnected. We won't try to communicate with it again.");
+                    ids_to_remove.push(child_id.clone());
+                }
+                Ok(Some(msg)) => {
+                    // A child has something for us, we store it
+                    events.write().await.push(msg.event)
+                }
+                Ok(None) => {} // nothing from the parent, we continue
+            }
+        }
+
+        // Garbage collect disconnected children
+        for id_to_remove in &ids_to_remove {
+            self.children.remove(id_to_remove);
+        }
+
+        Ok(())
+    }
 }
 
-impl<I, SP> LlmpHook<SP> for TcpNodeLlmpHook<I>
+impl<S> EventManagerHook<S> for TcpNodeEventManagerHook<S::Input>
 where
-    I: Input,
-    SP: ShMemProvider + 'static,
+    S: State,
 {
-    fn on_new_message(
+    fn pre_exec(
         &mut self,
-        _llmp_broker_state: &mut LlmpBrokerState<SP>,
+        _state: &mut S,
         _client_id: ClientId,
-        _msg_tag: &mut Tag,
-        msg_flags: &mut Flags,
-        msg: &mut [u8],
-    ) -> Result<LlmpMsgHookResult, Error> {
+        events: &mut Vec<Event<S::Input>>,
+    ) -> Result<bool, Error> {
+        // Here, we get all the events from the other clients. we don't want to actually send them directly to
+        // other nodes now. We will though receive other nodes' messages and make them go through the centralized
+        // filter.
         let shared_state = self.shared_state.clone();
-        let _: Result<(), Error> = self.rt.block_on(async {
+        let incoming_events: Vec<Event<S::Input>> = self.rt.block_on(async move {
             let mut state_wr_lock = shared_state.write().await;
 
-            // First, we handle the message. Since it involves network, we do it first and await on it.
-            state_wr_lock.handle_new_message(msg.as_ref()).await?;
+            // for event in events.as_ref() {
+            //     // First, we handle the message. Since it involves network, we do it first and await on it.
+            //     state_wr_lock.handle_new_message_from_node(event).await?;
 
-            // add the msg to the list of old messages to send to a future child.
-            state_wr_lock.old_events.push(Vec::from(msg.as_ref()));
+            //     // add the msg to the list of old messages to send to a future child.
+            //     state_wr_lock.old_events.push();
+            // }
+
+            let mut incoming_events = Vec::new();
+            state_wr_lock.handle_new_messages_from_nodes(&mut incoming_events)?;
 
             // TODO: remove once debug is over
             {
-                #[cfg(feature = "llmp_compression")]
-                let compressor = &state_wr_lock.compressor;
-                #[cfg(not(feature = "llmp_compression"))]
-                let event_bytes = msg;
-                #[cfg(feature = "llmp_compression")]
-                let compressed;
-                #[cfg(feature = "llmp_compression")]
-                let event_bytes = if *msg_flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
-                    compressed = compressor.decompress(msg)?;
-                    &compressed
-                } else {
-                    &*msg
-                };
-                let event: Event<I> = postcard::from_bytes(event_bytes)?;
-
-                log::debug!(
-                    "[{}] New event: {:?}",
-                    state_wr_lock.old_events.len(),
-                    event
-                );
+                log::debug!("[{}] New incoming events: {:?}", incoming_events);
             }
 
-            Ok(())
-        });
+            Ok(incoming_events)
+        })?;
 
-        // Always forward to client, we do not filter.
-        Ok(LlmpMsgHookResult::ForwardToClients)
+        // Add incoming events to the ones we should filter
+        events.extend_from_slice(&incoming_events);
+
+        Ok(true)
+    }
+
+    fn post_exec(
+        &mut self,
+        state: &mut S,
+        client_id: ClientId,
+        events: &mut Vec<Event<S::Input>>,
+    ) -> Result<bool, Error> {
+        todo!();
     }
 }

@@ -1,9 +1,15 @@
 //! Hooks for event managers, especifically these are used to hook before and and `handle_in_client`.
 //! This will allow user to define pre/post-processing code when the event manager receives any message from
 //! other clients
+use std::vec::Vec;
+
 use libafl_bolts::ClientId;
 
 use crate::{events::Event, state::State, Error};
+
+/// node hook, for multi-machine fuzzing
+#[cfg(feature = "multi_machine")]
+pub mod node;
 
 /// The hooks that are run before and after the event manager calls `handle_in_client`
 pub trait EventManagerHook<S>
@@ -16,8 +22,9 @@ where
         &mut self,
         state: &mut S,
         client_id: ClientId,
-        event: &Event<S::Input>,
+        events: &mut Vec<Event<S::Input>>,
     ) -> Result<bool, Error>;
+
     /// The hook that runs after `handle_in_client`
     /// Return false if you want to cancel the subsequent event handling
     fn post_exec(&mut self, state: &mut S, client_id: ClientId) -> Result<bool, Error>;
@@ -33,7 +40,7 @@ where
         &mut self,
         state: &mut S,
         client_id: ClientId,
-        event: &Event<S::Input>,
+        events: &mut Vec<Event<S::Input>>,
     ) -> Result<bool, Error>;
     /// The hook that runs after `handle_in_client`
     fn post_exec_all(&mut self, state: &mut S, client_id: ClientId) -> Result<bool, Error>;
@@ -48,10 +55,11 @@ where
         &mut self,
         _state: &mut S,
         _client_id: ClientId,
-        _event: &Event<S::Input>,
+        _event: &mut Vec<Event<S::Input>>,
     ) -> Result<bool, Error> {
         Ok(true)
     }
+
     /// The hook that runs after `handle_in_client`
     fn post_exec_all(&mut self, _state: &mut S, _client_id: ClientId) -> Result<bool, Error> {
         Ok(true)
@@ -69,12 +77,13 @@ where
         &mut self,
         state: &mut S,
         client_id: ClientId,
-        event: &Event<S::Input>,
+        events: &mut Vec<Event<S::Input>>,
     ) -> Result<bool, Error> {
-        let first = self.0.pre_exec(state, client_id, event)?;
-        let second = self.1.pre_exec_all(state, client_id, event)?;
+        let first = self.0.pre_exec(state, client_id, events)?;
+        let second = self.1.pre_exec_all(state, client_id, events)?;
         Ok(first & second)
     }
+
     /// The hook that runs after `handle_in_client`
     fn post_exec_all(&mut self, state: &mut S, client_id: ClientId) -> Result<bool, Error> {
         let first = self.0.post_exec(state, client_id)?;

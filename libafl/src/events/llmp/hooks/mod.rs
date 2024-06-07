@@ -22,10 +22,6 @@ use crate::{
 #[cfg(all(unix, feature = "std"))]
 pub mod centralized;
 
-/// node hook, for multi-machine fuzzing
-#[cfg(feature = "multi_machine")]
-pub mod node;
-
 /// An LLMP-backed event hook for scalable multi-processed fuzzing
 #[derive(Debug)]
 pub struct StdLlmpEventHook<I, MT> {
