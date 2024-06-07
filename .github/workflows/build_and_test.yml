@@ -256,6 +256,8 @@ jobs:
           override: true
           components: rustfmt
       - uses: actions/checkout@v3
+      - name: Install clang-format-18
+        run: sudo apt install clang-format-18
       - name: Format Check
         run: ./scripts/fmt_all.sh check
 
