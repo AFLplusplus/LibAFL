@@ -158,7 +158,7 @@ async fn main() -> io::Result<()> {
             Some("clang-format not found. Skipping C formatting..."),
         )
     };
-    println!("Using {:#?} to format...", clang);
+    // println!("Using {:#?} to format...", clang);
     if let Some(clang) = clang {
         let c_files_to_fmt: Vec<PathBuf> = WalkDir::new(&libafl_root_dir)
             .into_iter()
