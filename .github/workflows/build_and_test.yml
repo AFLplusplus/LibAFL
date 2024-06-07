@@ -260,7 +260,7 @@ jobs:
           components: rustfmt
       - uses: actions/checkout@v3
       - name: Format Check
-        run: cargo fmt -- --check
+        run: ./scripts/fmt_all.sh check
 
   fuzzers-preflight:
     runs-on: ubuntu-latest

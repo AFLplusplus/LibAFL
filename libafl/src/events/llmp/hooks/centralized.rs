@@ -35,7 +35,8 @@ where
         msg_flags: &mut Flags,
         msg: &mut [u8],
     ) -> Result<LlmpMsgHookResult, Error> {
-        if *msg_tag == _LLMP_TAG_TO_MAIN {
+        if *msg_tag == _LLMP_TAG_TO_MAIN 
+        {
             #[cfg(feature = "llmp_compression")]
             let compressor = &self.compressor;
             #[cfg(not(feature = "llmp_compression"))]
