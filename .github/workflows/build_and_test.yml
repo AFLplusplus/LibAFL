@@ -256,6 +256,8 @@ jobs:
           override: true
           components: rustfmt
       - uses: actions/checkout@v3
+      - name: Remove existing clang and LLVM
+        run: sudo apt purge llvm* clang*
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
         with:
