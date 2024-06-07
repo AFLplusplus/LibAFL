@@ -31,7 +31,7 @@ async fn run_cargo_fmt(path: PathBuf, is_check: bool, verbose: bool) -> io::Resu
     let res = fmt_command.output().await?;
 
     if !res.status.success() {
-        println!("{}", from_utf8(&res.stdout).unwrap());
+        println!("{}", from_utf8(&res.stderr).unwrap());
         return Err(io::Error::new(ErrorKind::Other, "Cargo fmt failed."));
     }
 
@@ -96,6 +96,7 @@ async fn main() -> io::Result<()> {
         r".*utils/gdb_qemu.*",
         r".*docs/listings/baby_fuzzer/listing-.*",
         r".*LibAFL/Cargo.toml.*",
+        r".*AFLplusplus.*",
     ])
     .expect("Could not create the regex set from the given regex");
 
@@ -105,6 +106,7 @@ async fn main() -> io::Result<()> {
         r".*stb_image\.h$",
         r".*dlmalloc\.c$",
         r".*QEMU-Nyx.*",
+        r".*AFLplusplus.*",
     ])
     .expect("Could not create the regex set from the given regex");
 
