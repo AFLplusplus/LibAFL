@@ -32,7 +32,10 @@ async fn run_cargo_fmt(path: PathBuf, is_check: bool, verbose: bool) -> io::Resu
 
     if !res.status.success() {
         println!("{}", from_utf8(&res.stderr).unwrap());
-        return Err(io::Error::new(ErrorKind::Other, "Cargo fmt failed."));
+        return Err(io::Error::new(
+            ErrorKind::Other,
+            format!("Cargo fmt failed. Run cargo fmt for {:#?}", path),
+        ));
     }
 
     Ok(())
@@ -88,8 +91,14 @@ struct Cli {
 #[tokio::main]
 async fn main() -> io::Result<()> {
     let cli = Cli::parse();
-    let libafl_root_dir = project_root::get_project_root().expect("Could not locate project root.");
+    let libafl_root_dir = match project_root::get_project_root() {
+        Ok(p) => p,
+        Err(_) => std::env::current_dir()
+            .expect("Failed to get current directory")
+            .into(),
+    };
 
+    println!("Using {:#?} as the project root", libafl_root_dir);
     let rust_excluded_directories = RegexSet::new([
         r".*target.*",
         r".*utils/noaslr.*",
@@ -107,6 +116,7 @@ async fn main() -> io::Result<()> {
         r".*dlmalloc\.c$",
         r".*QEMU-Nyx.*",
         r".*AFLplusplus.*",
+        r".*cms_transform_fuzzer.cc.*",
     ])
     .expect("Could not create the regex set from the given regex");
 
@@ -134,8 +144,9 @@ async fn main() -> io::Result<()> {
         tokio_joinset.spawn(run_cargo_fmt(project, cli.check, cli.verbose));
     }
 
-    let (clang, warning) = if which("clang-format-18").is_ok() {
-        (Some("clang-format-18"), None)
+    let (clang, warning) = if which("clang-format-17").is_ok() {
+        // can't use 18 for ci.
+        (Some("clang-format-17"), None)
     } else if which("clang-format").is_ok() {
         (
             Some("clang-format"),
@@ -147,7 +158,7 @@ async fn main() -> io::Result<()> {
             Some("clang-format not found. Skipping C formatting..."),
         )
     };
-
+    // println!("Using {:#?} to format...", clang);
     if let Some(clang) = clang {
         let c_files_to_fmt: Vec<PathBuf> = WalkDir::new(&libafl_root_dir)
             .into_iter()
