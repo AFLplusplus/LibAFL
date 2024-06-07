@@ -139,7 +139,7 @@ fn fuzz_many_forking<M>(
     monitor: M,
 ) -> Result<(), Error>
 where
-    M: Monitor + Clone + Debug + 'static,
+    M: Monitor + Clone + Debug,
 {
     destroy_output_fds(options);
     let broker_port = std::env::var(PORT_PROVIDER_VAR)
