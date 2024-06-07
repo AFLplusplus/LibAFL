@@ -3587,6 +3587,6 @@ mod tests {
         assert_eq!(arr[0], arr2[0]);
 
         // We want at least the tcp and sender clients.
-        assert_eq!(broker.state.llmp_clients.len(), 2);
+        assert_eq!(broker.inner.llmp_clients.len(), 2);
     }
 }
