@@ -181,7 +181,6 @@ jobs:
           version: 17
       - name: Run clippy
         run: ./scripts/clippy.sh
-
     # --- test embedding the libafl_libfuzzer_runtime library
     # Fix me plz
     # - name: Test Build libafl_libfuzzer with embed
