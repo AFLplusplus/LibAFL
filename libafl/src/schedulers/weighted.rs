@@ -324,13 +324,13 @@ where
 
             let wsmeta = state.metadata_mut::<WeightedScheduleMetadata>()?;
 
-            let current_cycles = wsmeta.runs_in_current_cycle();
+            let runs_in_current_cycle = wsmeta.runs_in_current_cycle();
 
             // TODO deal with corpus_counts decreasing due to removals
-            if current_cycles >= corpus_counts {
+            if runs_in_current_cycle >= corpus_counts {
                 wsmeta.set_runs_current_cycle(0);
             } else {
-                wsmeta.set_runs_current_cycle(current_cycles + 1);
+                wsmeta.set_runs_current_cycle(runs_in_current_cycle + 1);
             }
 
             let idx = if probability < *wsmeta.alias_probability().get(&s).unwrap() {
@@ -340,7 +340,7 @@ where
             };
 
             // Update depth
-            if current_cycles > corpus_counts {
+            if runs_in_current_cycle >= corpus_counts {
                 let psmeta = state.metadata_mut::<SchedulerMetadata>()?;
                 psmeta.set_queue_cycles(psmeta.queue_cycles() + 1);
             }
