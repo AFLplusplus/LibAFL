@@ -142,7 +142,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
       - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v1
+        uses: KyleMayes/install-llvm-action@v2
         with:
           directory: ${{ runner.temp }}/llvm
           version: 17
@@ -175,7 +175,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
       - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v1
+        uses: KyleMayes/install-llvm-action@v2
         with:
           directory: ${{ runner.temp }}/llvm
           version: 17
@@ -230,7 +230,7 @@ jobs:
       - name: Remove existing clang and LLVM
         run: sudo apt purge llvm* clang*
       - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v1
+        uses: KyleMayes/install-llvm-action@v2
         with:
           directory: ${{ runner.temp }}/llvm
           version: 17
@@ -258,7 +258,7 @@ jobs:
       - name: Remove existing clang and LLVM
         run: sudo apt purge llvm* clang*
       - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v1
+        uses: KyleMayes/install-llvm-action@v2
         with:
           directory: ${{ runner.temp }}/llvm
           version: 17
