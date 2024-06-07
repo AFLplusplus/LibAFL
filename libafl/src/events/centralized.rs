@@ -54,7 +54,7 @@ pub(crate) const _LLMP_TAG_TO_MAIN: Tag = Tag(0x3453453);
 pub struct CentralizedEventManager<EM, SP>
 where
     EM: UsesState,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     inner: EM,
     /// The LLMP client for inter process communication
@@ -286,7 +286,7 @@ impl CentralizedEventManagerBuilder {
 impl<EM, SP> UsesState for CentralizedEventManager<EM, SP>
 where
     EM: UsesState,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     type State = EM::State;
 }
@@ -295,7 +295,7 @@ where
 impl<EM, SP> AdaptiveSerializer for CentralizedEventManager<EM, SP>
 where
     EM: AdaptiveSerializer + UsesState,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     fn serialization_time(&self) -> Duration {
         self.inner.serialization_time()
@@ -332,14 +332,14 @@ where
 impl<EM, SP> AdaptiveSerializer for CentralizedEventManager<EM, SP>
 where
     EM: AdaptiveSerializer + UsesState,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
 }
 
 impl<EM, SP> EventFirer for CentralizedEventManager<EM, SP>
 where
     EM: AdaptiveSerializer + EventFirer + HasEventManagerId,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     fn should_send(&self) -> bool {
         self.inner.should_send()
@@ -429,7 +429,7 @@ where
 impl<EM, SP> EventRestarter for CentralizedEventManager<EM, SP>
 where
     EM: EventRestarter,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     #[inline]
     fn on_restart(&mut self, state: &mut Self::State) -> Result<(), Error> {
@@ -458,7 +458,7 @@ where
     Z: EvaluatorObservers<E::Observers, State = Self::State>
         + ExecutionProcessor<E::Observers, State = Self::State>,
     Self::State: HasExecutions + HasMetadata,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     fn process(
         &mut self,
@@ -484,14 +484,14 @@ where
     for<'a> E::Observers: Deserialize<'a>,
     Z: EvaluatorObservers<E::Observers, State = Self::State>
         + ExecutionProcessor<E::Observers, State = Self::State>,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
 }
 
 impl<EM, SP> HasCustomBufHandlers for CentralizedEventManager<EM, SP>
 where
     EM: HasCustomBufHandlers,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     /// Adds a custom buffer handler that will run for each incoming `CustomBuf` event.
     fn add_custom_buf_handler(
@@ -508,14 +508,14 @@ impl<EM, SP> ProgressReporter for CentralizedEventManager<EM, SP>
 where
     EM: AdaptiveSerializer + ProgressReporter + HasEventManagerId,
     EM::State: HasMetadata + HasExecutions + HasLastReportTime,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
 }
 
 impl<EM, SP> HasEventManagerId for CentralizedEventManager<EM, SP>
 where
     EM: HasEventManagerId + UsesState,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     fn mgr_id(&self) -> EventManagerId {
         self.inner.mgr_id()
@@ -525,7 +525,7 @@ where
 impl<EM, SP> CentralizedEventManager<EM, SP>
 where
     EM: UsesState,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     /// Describe the client event manager's LLMP parts in a restorable fashion
     pub fn describe(&self) -> Result<LlmpClientDescription, Error> {
@@ -548,7 +548,7 @@ where
 impl<EM, SP> CentralizedEventManager<EM, SP>
 where
     EM: UsesState + EventFirer + AdaptiveSerializer + HasEventManagerId,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     #[cfg(feature = "llmp_compression")]
     fn forward_to_main<I>(&mut self, event: &Event<I>) -> Result<(), Error>

@@ -144,7 +144,7 @@ where
     CF: FnOnce(Option<S>, LlmpRestartingEventManager<EMH, S, SP>, CoreId) -> Result<(), Error>,
     EMH: EventManagerHooksTuple<S>,
     MT: Monitor + Clone,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
     S: State,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -169,9 +169,9 @@ where
 impl<'a, CF, MT, S, SP> Launcher<'a, CF, (), MT, S, SP>
 where
     CF: FnOnce(Option<S>, LlmpRestartingEventManager<(), S, SP>, CoreId) -> Result<(), Error>,
-    MT: Monitor + Clone + 'static,
-    S: State + HasExecutions + 'static,
-    SP: ShMemProvider + 'static,
+    MT: Monitor + Clone,
+    S: State + HasExecutions,
+    SP: ShMemProvider,
 {
     /// Launch the broker and the clients and fuzz
     #[cfg(all(unix, feature = "std", feature = "fork"))]
@@ -192,9 +192,9 @@ impl<'a, CF, EMH, MT, S, SP> Launcher<'a, CF, EMH, MT, S, SP>
 where
     CF: FnOnce(Option<S>, LlmpRestartingEventManager<EMH, S, SP>, CoreId) -> Result<(), Error>,
     EMH: EventManagerHooksTuple<S> + Clone + Copy,
-    MT: Monitor + Clone + 'static,
-    S: State + HasExecutions + 'static,
-    SP: ShMemProvider + 'static,
+    MT: Monitor + Clone,
+    S: State + HasExecutions,
+    SP: ShMemProvider,
 {
     /// Launch the broker and the clients and fuzz with a user-supplied hook
     #[cfg(all(unix, feature = "std", feature = "fork"))]
@@ -564,9 +564,9 @@ where
         CentralizedEventManager<StdCentralizedInnerMgr<S, SP>, SP>,
         CoreId,
     ) -> Result<(), Error>,
-    MT: Monitor + Clone + 'static,
-    S: State + HasExecutions + 'static,
-    SP: ShMemProvider + 'static,
+    MT: Monitor + Clone,
+    S: State + HasExecutions,
+    SP: ShMemProvider,
 {
     /// Launch a standard Centralized-based fuzzer
     pub fn launch(&mut self) -> Result<(), Error> {
@@ -603,9 +603,9 @@ where
         CentralizedEventManager<IM, SP>, // No hooks for centralized EM
         CoreId,
     ) -> Result<(), Error>,
-    MT: Monitor + Clone + 'static,
-    S: State + HasExecutions + 'static,
-    SP: ShMemProvider + 'static,
+    MT: Monitor + Clone,
+    S: State + HasExecutions,
+    SP: ShMemProvider,
 {
     /// Launch a Centralized-based fuzzer.
     /// - `main_inner_mgr_builder` will be called to build the inner manager of the main node.

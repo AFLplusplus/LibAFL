@@ -62,7 +62,7 @@ use crate::{
 pub struct LlmpRestartingEventManager<EMH, S, SP>
 where
     S: State,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
     //CE: CustomEvent<I>,
 {
     /// The embedded LLMP event manager
@@ -76,7 +76,7 @@ where
 #[cfg(all(feature = "std", feature = "adaptive_serialization"))]
 impl<EMH, S, SP> AdaptiveSerializer for LlmpRestartingEventManager<EMH, S, SP>
 where
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
     S: State,
 {
     fn serialization_time(&self) -> Duration {
@@ -113,7 +113,7 @@ where
 #[cfg(all(feature = "std", not(feature = "adaptive_serialization")))]
 impl<EMH, S, SP> AdaptiveSerializer for LlmpRestartingEventManager<EMH, S, SP>
 where
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
     S: State,
 {
 }
@@ -122,7 +122,7 @@ where
 impl<EMH, S, SP> UsesState for LlmpRestartingEventManager<EMH, S, SP>
 where
     S: State,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     type State = S;
 }
@@ -218,7 +218,7 @@ where
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
     Z: ExecutionProcessor<E::Observers, State = S>
         + EvaluatorObservers<E::Observers>
         + Evaluator<E, LlmpEventManager<EMH, S, SP>>,
@@ -237,7 +237,7 @@ where
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata + HasLastReportTime,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
     Z: ExecutionProcessor<E::Observers, State = S>
         + EvaluatorObservers<E::Observers>
         + Evaluator<E, LlmpEventManager<EMH, S, SP>>,
@@ -248,7 +248,7 @@ where
 impl<EMH, S, SP> HasEventManagerId for LlmpRestartingEventManager<EMH, S, SP>
 where
     S: State,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     fn mgr_id(&self) -> EventManagerId {
         self.llmp_mgr.mgr_id()
@@ -265,7 +265,7 @@ const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT";
 impl<EMH, S, SP> LlmpRestartingEventManager<EMH, S, SP>
 where
     S: State,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
     //CE: CustomEvent<I>,
 {
     /// Create a new runner, the executed child doing the actual fuzzing.
@@ -344,8 +344,8 @@ pub fn setup_restarting_mgr_std<MT, S>(
     Error,
 >
 where
-    MT: Monitor + Clone + 'static,
-    S: State + HasExecutions + 'static,
+    MT: Monitor + Clone,
+    S: State + HasExecutions,
 {
     RestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)
@@ -375,8 +375,8 @@ pub fn setup_restarting_mgr_std<MT, S>(
     Error,
 >
 where
-    MT: Monitor + Clone + 'static,
-    S: State + HasExecutions + 'static,
+    MT: Monitor + Clone,
+    S: State + HasExecutions,
 {
     RestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)
@@ -399,7 +399,7 @@ pub struct RestartingMgr<EMH, MT, S, SP>
 where
     EMH: EventManagerHooksTuple<S>,
     S: State,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
     MT: Monitor,
     //CE: CustomEvent<I>,
 {
@@ -448,8 +448,8 @@ impl<EMH, MT, S, SP> RestartingMgr<EMH, MT, S, SP>
 where
     EMH: EventManagerHooksTuple<S> + Copy + Clone,
     SP: ShMemProvider,
-    S: State + HasExecutions + 'static,
-    MT: Monitor + Clone + 'static,
+    S: State + HasExecutions,
+    MT: Monitor + Clone,
 {
     /// Launch the broker and the clients and fuzz
     pub fn launch(&mut self) -> Result<(Option<S>, LlmpRestartingEventManager<EMH, S, SP>), Error> {

@@ -25,7 +25,7 @@ pub struct CentralizedLlmpHook<I, SP> {
 impl<I, SP> LlmpHook<SP> for CentralizedLlmpHook<I, SP>
 where
     I: Input,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     fn on_new_message(
         &mut self,
@@ -76,7 +76,7 @@ impl<I, SP> Debug for CentralizedLlmpHook<I, SP> {
 impl<I, SP> CentralizedLlmpHook<I, SP>
 where
     I: Input,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     /// Create an event broker from a raw broker.
     pub fn new() -> Result<Self, Error> {
