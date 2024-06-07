@@ -88,17 +88,17 @@ where
 impl<CS, F, M, O> RemovableScheduler for MinimizerScheduler<CS, F, M, O>
 where
     CS: RemovableScheduler,
-    F: TestcaseScore<CS::State>,
+    F: TestcaseScore<<Self as UsesState>::State>,
     M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
-    CS::State: HasCorpus + HasMetadata + HasRand,
+    <Self as UsesState>::State: HasCorpus + HasMetadata + HasRand,
     O: CanTrack,
 {
     /// Replaces the testcase at the given idx
     fn on_replace(
         &mut self,
-        state: &mut CS::State,
+        state: &mut <Self as UsesState>::State,
         idx: CorpusId,
-        testcase: &Testcase<<CS::State as UsesInput>::Input>,
+        testcase: &Testcase<<<Self as UsesState>::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
         self.base.on_replace(state, idx, testcase)?;
         self.update_score(state, idx)
@@ -107,9 +107,9 @@ where
     /// Removes an entry from the corpus
     fn on_remove(
         &mut self,
-        state: &mut CS::State,
+        state: &mut <Self as UsesState>::State,
         idx: CorpusId,
-        testcase: &Option<Testcase<<CS::State as UsesInput>::Input>>,
+        testcase: &Option<Testcase<<<Self as UsesState>::State as UsesInput>::Input>>,
     ) -> Result<(), Error> {
         self.base.on_remove(state, idx, testcase)?;
         let mut entries =
@@ -196,13 +196,13 @@ where
 impl<CS, F, M, O> Scheduler for MinimizerScheduler<CS, F, M, O>
 where
     CS: Scheduler,
-    F: TestcaseScore<CS::State>,
+    F: TestcaseScore<Self::State>,
     M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
-    CS::State: HasCorpus + HasMetadata + HasRand,
+    Self::State: HasCorpus + HasMetadata + HasRand,
     O: CanTrack,
 {
     /// Called when a [`Testcase`] is added to the corpus
-    fn on_add(&mut self, state: &mut CS::State, idx: CorpusId) -> Result<(), Error> {
+    fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
         self.base.on_add(state, idx)?;
         self.update_score(state, idx)
     }
@@ -221,7 +221,7 @@ where
     }
 
     /// Gets the next entry
-    fn next(&mut self, state: &mut CS::State) -> Result<CorpusId, Error> {
+    fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
         self.cull(state)?;
         let mut idx = self.base.next(state)?;
         while {
@@ -252,15 +252,19 @@ where
 impl<CS, F, M, O> MinimizerScheduler<CS, F, M, O>
 where
     CS: Scheduler,
-    F: TestcaseScore<CS::State>,
+    F: TestcaseScore<<Self as UsesState>::State>,
     M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
-    CS::State: HasCorpus + HasMetadata + HasRand,
+    <Self as UsesState>::State: HasCorpus + HasMetadata + HasRand,
     O: CanTrack,
 {
     /// Update the [`Corpus`] score using the [`MinimizerScheduler`]
     #[allow(clippy::unused_self)]
     #[allow(clippy::cast_possible_wrap)]
-    pub fn update_score(&self, state: &mut CS::State, idx: CorpusId) -> Result<(), Error> {
+    pub fn update_score(
+        &self,
+        state: &mut <Self as UsesState>::State,
+        idx: CorpusId,
+    ) -> Result<(), Error> {
         // Create a new top rated meta if not existing
         if state.metadata_map().get::<TopRatedsMetadata>().is_none() {
             state.add_metadata(TopRatedsMetadata::new());
@@ -334,7 +338,7 @@ where
 
     /// Cull the [`Corpus`] using the [`MinimizerScheduler`]
     #[allow(clippy::unused_self)]
-    pub fn cull(&self, state: &CS::State) -> Result<(), Error> {
+    pub fn cull(&self, state: &<Self as UsesState>::State) -> Result<(), Error> {
         let Some(top_rated) = state.metadata_map().get::<TopRatedsMetadata>() else {
             return Ok(());
         };

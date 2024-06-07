@@ -55,7 +55,7 @@ use crate::{
 pub struct LlmpEventManager<EMH, S, SP>
 where
     S: State,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     /// We only send 1 testcase for every `throttle` second
     pub(crate) throttle: Option<Duration>,
@@ -396,7 +396,7 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
 #[cfg(feature = "adaptive_serialization")]
 impl<EMH, S, SP> AdaptiveSerializer for LlmpEventManager<EMH, S, SP>
 where
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
     S: State,
 {
     fn serialization_time(&self) -> Duration {
@@ -432,7 +432,7 @@ where
 
 impl<EMH, S, SP> core::fmt::Debug for LlmpEventManager<EMH, S, SP>
 where
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
     S: State,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -450,7 +450,7 @@ where
 
 impl<EMH, S, SP> Drop for LlmpEventManager<EMH, S, SP>
 where
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
     S: State,
 {
     /// LLMP clients will have to wait until their pages are mapped by somebody.
@@ -462,7 +462,7 @@ where
 impl<EMH, S, SP> LlmpEventManager<EMH, S, SP>
 where
     S: State,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     /// Calling this function will tell the llmp broker that this client is exiting
     /// This should be called from the restarter not from the actual fuzzer client
@@ -514,7 +514,7 @@ impl<EMH, S, SP> LlmpEventManager<EMH, S, SP>
 where
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     // Handle arriving events in the client
     #[allow(clippy::unused_self)]
