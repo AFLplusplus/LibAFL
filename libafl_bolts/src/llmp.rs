@@ -703,7 +703,7 @@ impl LlmpMsg {
 #[derive(Debug)]
 pub enum LlmpConnection<HT, SP>
 where
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     /// A broker and a thread using this tcp background thread
     IsBroker {
@@ -2022,7 +2022,7 @@ where
 #[derive(Debug)]
 pub struct LlmpBrokerState<SP>
 where
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     /// Broadcast map from broker to all clients
     llmp_out: LlmpSender<SP>,
@@ -2050,7 +2050,7 @@ where
 #[derive(Debug)]
 pub struct LlmpBroker<HT, SP>
 where
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     /// The broker
     state: LlmpBrokerState<SP>,
@@ -2100,7 +2100,7 @@ impl CtrlHandler for LlmpShutdownSignalHandler {
 /// Llmp hooks
 pub trait LlmpHook<SP>
 where
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     /// Hook called whenever a new message is received. It receives an llmp message as input, does
     /// something with it (read, transform, forward, etc...) and decides to discard it or not.
@@ -2162,7 +2162,7 @@ impl<Head, Tail, SP> LlmpHookTuple<SP> for (Head, Tail)
 where
     Head: LlmpHook<SP>,
     Tail: LlmpHookTuple<SP>,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     fn on_new_message_all(
         &mut self,
@@ -2196,7 +2196,7 @@ where
 
 impl<SP> LlmpBroker<(), SP>
 where
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     /// Add hooks to a hookless [`LlmpBroker`].
     /// We do not support replacing hooks for now.
@@ -2214,7 +2214,7 @@ where
 impl<HT, SP> LlmpBroker<HT, SP>
 where
     HT: LlmpHookTuple<SP>,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     /// Create and initialize a new [`LlmpBroker`], associated with some hooks.
     pub fn new(shmem_provider: SP, hooks: HT) -> Result<Self, Error> {
@@ -2584,7 +2584,7 @@ where
 /// It may intercept messages passing through.
 impl<SP> LlmpBrokerState<SP>
 where
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     /// Create and initialize a new [`LlmpBrokerState`], associated with some hooks.
     pub fn new(shmem_provider: SP) -> Result<Self, Error> {

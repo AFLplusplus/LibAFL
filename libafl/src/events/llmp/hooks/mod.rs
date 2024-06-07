@@ -26,7 +26,7 @@ pub mod centralized;
 #[derive(Debug)]
 pub struct StdLlmpEventHook<I, MT, SP>
 where
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     monitor: MT,
     #[cfg(feature = "llmp_compression")]
@@ -38,7 +38,7 @@ impl<I, MT, SP> LlmpHook<SP> for StdLlmpEventHook<I, MT, SP>
 where
     I: Input,
     MT: Monitor,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     fn on_new_message(
         &mut self,
@@ -84,7 +84,7 @@ where
 impl<I, MT, SP> StdLlmpEventHook<I, MT, SP>
 where
     I: Input,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
     MT: Monitor,
 {
     /// Create an event broker from a raw broker.
