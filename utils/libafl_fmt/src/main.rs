@@ -107,6 +107,7 @@ async fn main() -> io::Result<()> {
         r".*dlmalloc\.c$",
         r".*QEMU-Nyx.*",
         r".*AFLplusplus.*",
+        r".*Little-CMS.*",
     ])
     .expect("Could not create the regex set from the given regex");
 
