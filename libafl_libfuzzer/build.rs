@@ -13,7 +13,7 @@ const NAMESPACE_LEN: usize = NAMESPACE.as_bytes().len();
 
 #[allow(clippy::too_many_lines)]
 fn main() {
-    if cfg!(any(clippy, docsrs)) {
+    if cfg!(any(clippy, docsrs, test)) {
         return; // skip when clippy or docs is running
     }
 
