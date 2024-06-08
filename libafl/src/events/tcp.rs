@@ -38,6 +38,9 @@ use tokio::{
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
+#[cfg(feature = "std")]
+use libafl_bolts::os::CTRL_C_EXIT;
+
 use super::{CustomBufEventResult, CustomBufHandlerFn};
 #[cfg(all(unix, feature = "std", not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
@@ -1278,7 +1281,7 @@ where
 
                 compiler_fence(Ordering::SeqCst);
 
-                if child_status == crate::events::CTRL_C_EXIT || staterestorer.wants_to_exit() {
+                if child_status == CTRL_C_EXIT || staterestorer.wants_to_exit() {
                     return Err(Error::shutting_down());
                 }
 

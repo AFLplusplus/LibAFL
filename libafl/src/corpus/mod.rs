@@ -21,12 +21,13 @@ pub mod cached;
 #[cfg(feature = "std")]
 pub use cached::CachedOnDiskCorpus;
 
-#[cfg(feature = "cmin")]
+#[cfg(all(feature = "cmin", unix))]
 pub mod minimizer;
 use core::{cell::RefCell, fmt};
 
 pub mod nop;
-#[cfg(feature = "cmin")]
+#[cfg(all(feature = "cmin", unix))]
+
 pub use minimizer::*;
 pub use nop::NopCorpus;
 use serde::{Deserialize, Serialize};
