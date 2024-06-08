@@ -326,7 +326,6 @@ pub fn setup_restarting_mgr_std<MT, S>(
     monitor: MT,
     broker_port: u16,
     configuration: EventConfig,
-    time_obs: Option<Handle<TimeObserver>>,
 ) -> Result<
     (
         Option<S>,
@@ -336,7 +335,7 @@ pub fn setup_restarting_mgr_std<MT, S>(
 >
 where
     MT: Monitor + Clone,
-    S: State + HasExecutions,
+    S: State,
 {
     RestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)
@@ -344,7 +343,39 @@ where
         .broker_port(broker_port)
         .configuration(configuration)
         .hooks(tuple_list!())
-        .time_ref(time_obs)
+        .build()
+        .launch()
+}
+
+/// Sets up a restarting fuzzer, using the [`StdShMemProvider`], and standard features.
+/// The restarting mgr is a combination of restarter and runner, that can be used on systems with and without `fork` support.
+/// The restarter will spawn a new process each time the child crashes or timeouts.
+/// This one, additionally uses the timeobserver for the adaptive serialization
+#[cfg(feature = "std")]
+#[allow(clippy::type_complexity)]
+pub fn setup_restarting_mgr_std_adaptive<MT, S>(
+    monitor: MT,
+    broker_port: u16,
+    configuration: EventConfig,
+    time_obs: Handle<TimeObserver>,
+) -> Result<
+    (
+        Option<S>,
+        LlmpRestartingEventManager<(), S, StdShMemProvider>,
+    ),
+    Error,
+>
+where
+    MT: Monitor + Clone,
+    S: State,
+{
+    RestartingMgr::builder()
+        .shmem_provider(StdShMemProvider::new()?)
+        .monitor(Some(monitor))
+        .broker_port(broker_port)
+        .configuration(configuration)
+        .hooks(tuple_list!())
+        .time_ref(Some(time_obs))
         .build()
         .launch()
 }
@@ -396,6 +427,7 @@ where
     serialize_state: LlmpShouldSaveState,
     /// The hooks passed to event manager:
     hooks: EMH,
+    #[builder(default = None)]
     time_ref: Option<Handle<TimeObserver>>,
     #[builder(setter(skip), default = PhantomData)]
     phantom_data: PhantomData<(EMH, S)>,
@@ -407,7 +439,7 @@ impl<EMH, MT, S, SP> RestartingMgr<EMH, MT, S, SP>
 where
     EMH: EventManagerHooksTuple<S> + Copy + Clone,
     SP: ShMemProvider,
-    S: State + HasExecutions,
+    S: State,
     MT: Monitor + Clone,
 {
     /// Launch the broker and the clients and fuzz
