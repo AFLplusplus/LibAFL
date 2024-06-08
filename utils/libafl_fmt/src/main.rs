@@ -1,9 +1,80 @@
+/*!
+ * # `LibAFL` fmt
+ *
+ * Formatting `LibAFL` since 2024
+ */
+#![forbid(unexpected_cfgs)]
+#![allow(incomplete_features)]
+#![warn(clippy::cargo)]
+#![allow(ambiguous_glob_reexports)]
+#![deny(rustdoc::broken_intra_doc_links)]
+#![deny(clippy::all)]
+#![deny(clippy::pedantic)]
+#![allow(
+    clippy::unreadable_literal,
+    clippy::type_repetition_in_bounds,
+    clippy::missing_errors_doc,
+    clippy::cast_possible_truncation,
+    clippy::used_underscore_binding,
+    clippy::ptr_as_ptr,
+    clippy::missing_panics_doc,
+    clippy::missing_docs_in_private_items,
+    clippy::module_name_repetitions,
+    clippy::ptr_cast_constness,
+    clippy::unsafe_derive_deserialize,
+    clippy::similar_names,
+    clippy::too_many_lines
+)]
+#![cfg_attr(not(test), warn(
+    missing_debug_implementations,
+    missing_docs,
+    //trivial_casts,
+    trivial_numeric_casts,
+    unused_extern_crates,
+    unused_import_braces,
+    unused_qualifications,
+    //unused_results
+))]
+#![cfg_attr(test, deny(
+    missing_debug_implementations,
+    missing_docs,
+    //trivial_casts,
+    trivial_numeric_casts,
+    unused_extern_crates,
+    unused_import_braces,
+    unused_qualifications,
+    unused_must_use,
+    //unused_results
+))]
+#![cfg_attr(
+    test,
+    deny(
+        bad_style,
+        dead_code,
+        improper_ctypes,
+        non_shorthand_field_patterns,
+        no_mangle_generic_items,
+        overflowing_literals,
+        path_statements,
+        patterns_in_fns_without_body,
+        unconditional_recursion,
+        unused,
+        unused_allocation,
+        unused_comparisons,
+        unused_parens,
+        while_true
+    )
+)]
+// Till they fix this buggy lint in clippy
+#![allow(clippy::borrow_as_ptr)]
+#![allow(clippy::borrow_deref_ref)]
+
 use std::{io, io::ErrorKind, path::PathBuf, str::from_utf8};
 
 use clap::Parser;
 use regex::RegexSet;
 use tokio::{process::Command, task::JoinSet};
-use walkdir::WalkDir;
+use walkdir::{DirEntry, WalkDir};
 use which::which;
 
 async fn run_cargo_fmt(path: PathBuf, is_check: bool, verbose: bool) -> io::Result<()> {
@@ -34,7 +105,7 @@ async fn run_cargo_fmt(path: PathBuf, is_check: bool, verbose: bool) -> io::Resu
         println!("{}", from_utf8(&res.stderr).unwrap());
         return Err(io::Error::new(
             ErrorKind::Other,
-            format!("Cargo fmt failed. Run cargo fmt for {:#?}", path),
+            format!("Cargo fmt failed. Run cargo fmt for {path:#?}"),
         ));
     }
 
@@ -69,15 +140,16 @@ async fn run_clang_fmt(
 
     let res = fmt_command.output().await?;
 
-    if !res.status.success() {
-        println!("{}", from_utf8(&res.stderr).unwrap());
-        return Err(io::Error::new(
+    if res.status.success() {
+        Ok(())
+    } else {
+        let stderr = from_utf8(&res.stderr).unwrap().to_string();
+        println!("{stderr}");
+        Err(io::Error::new(
             ErrorKind::Other,
-            format!("{} failed.", clang),
-        ));
+            format!("{clang} failed: {stderr}"),
+        ))
     }
-
-    Ok(())
 }
 
 #[derive(Parser)]
@@ -93,12 +165,10 @@ async fn main() -> io::Result<()> {
     let cli = Cli::parse();
     let libafl_root_dir = match project_root::get_project_root() {
         Ok(p) => p,
-        Err(_) => std::env::current_dir()
-            .expect("Failed to get current directory")
-            .into(),
+        Err(_) => std::env::current_dir().expect("Failed to get current directory"),
     };
 
-    println!("Using {:#?} as the project root", libafl_root_dir);
+    println!("Using {libafl_root_dir:#?} as the project root");
     let rust_excluded_directories = RegexSet::new([
         r".*target.*",
         r".*utils/noaslr.*",
@@ -132,10 +202,10 @@ async fn main() -> io::Result<()> {
 
     let rust_projects_to_fmt: Vec<PathBuf> = WalkDir::new(&libafl_root_dir)
         .into_iter()
-        .filter_map(|entry| entry.ok())
+        .filter_map(Result::ok)
         .filter(|e| !rust_excluded_directories.is_match(e.path().as_os_str().to_str().unwrap()))
         .filter(|e| e.file_name() == "Cargo.toml")
-        .map(|e| e.into_path())
+        .map(DirEntry::into_path)
         .collect();
 
     let mut tokio_joinset = JoinSet::new();
@@ -162,11 +232,11 @@ async fn main() -> io::Result<()> {
     if let Some(clang) = clang {
         let c_files_to_fmt: Vec<PathBuf> = WalkDir::new(&libafl_root_dir)
             .into_iter()
-            .filter_map(|entry| entry.ok())
+            .filter_map(Result::ok)
             .filter(|e| !c_excluded_directories.is_match(e.path().as_os_str().to_str().unwrap()))
             .filter(|e| e.file_type().is_file())
             .filter(|e| c_file_to_format.is_match(e.file_name().to_str().unwrap()))
-            .map(|e| e.into_path())
+            .map(DirEntry::into_path)
             .collect();
 
         for c_file in c_files_to_fmt {
@@ -176,22 +246,22 @@ async fn main() -> io::Result<()> {
 
     while let Some(res) = tokio_joinset.join_next().await {
         match res? {
-            Ok(_) => {}
+            Ok(()) => {}
             Err(err) => {
-                println!("Error: {}", err);
+                println!("Error: {err}");
                 std::process::exit(exitcode::IOERR)
             }
         }
     }
 
     if let Some(warning) = warning {
-        println!("Warning: {}", warning);
+        println!("Warning: {warning}");
     }
 
     if cli.check {
-        println!("[*] Check finished successfully.")
+        println!("[*] Check finished successfully.");
     } else {
-        println!("[*] Formatting finished successfully.")
+        println!("[*] Formatting finished successfully.");
     }
 
     Ok(())
