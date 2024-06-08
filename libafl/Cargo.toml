@@ -85,7 +85,7 @@ concolic_mutation = ["z3"]
 ## Enable the fancy TuiMonitor for a termanal UI using crossterm
 tui_monitor = ["ratatui", "crossterm"]
 
-## Enables `StringClassificationStage` and associated mutators, which allow for mutations which preserve the Unicode property data
+## Enables `UnicodeClassificationStage` and associated mutators, which allow for mutations which preserve the Unicode property data
 unicode = ["libafl_bolts/alloc", "ahash/std", "serde/rc", "bitvec"]
 
 ## Enable multi-part input formats and mutators

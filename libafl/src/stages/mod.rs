@@ -27,8 +27,6 @@ pub use mutational::{MutationalStage, StdMutationalStage};
 pub use power::{PowerMutationalStage, StdPowerMutationalStage};
 use serde::{Deserialize, Serialize};
 pub use stats::AflStatsStage;
-#[cfg(feature = "unicode")]
-pub use string::*;
 #[cfg(feature = "std")]
 pub use sync::*;
 pub use tmin::{
@@ -37,6 +35,8 @@ pub use tmin::{
 pub use tracing::{ShadowTracingStage, TracingStage};
 pub use tuneable::*;
 use tuple_list::NonEmptyTuple;
+#[cfg(feature = "unicode")]
+pub use unicode::*;
 
 use crate::{
     corpus::{CorpusId, HasCurrentCorpusId},
@@ -68,12 +68,12 @@ pub mod generation;
 pub mod logics;
 pub mod power;
 pub mod stats;
-#[cfg(feature = "unicode")]
-pub mod string;
 #[cfg(feature = "std")]
 pub mod sync;
 pub mod tracing;
 pub mod tuneable;
+#[cfg(feature = "unicode")]
+pub mod unicode;
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
