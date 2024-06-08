@@ -252,7 +252,7 @@ fn include_path(build_dir: &Path, path: &str) -> String {
 /// If `fresh_content` != `content_file_to_update` (the file is read directly if `content_file_to_update` is None), update the file. prefix is not considered for comparison.
 /// If a prefix is given, it will be added as the first line of the file.
 pub fn store_generated_content_if_different(
-    file_to_update: &PathBuf,
+    file_to_update: &Path,
     fresh_content: &[u8],
     content_file_to_update: Option<Vec<u8>>,
     first_line_prefix: Option<&str>,
@@ -310,8 +310,8 @@ pub fn store_generated_content_if_different(
 pub fn maybe_generate_stub_bindings(
     cpu_target: &str,
     emulation_mode: &str,
-    stub_bindings_file: &PathBuf,
-    bindings_file: &PathBuf,
+    stub_bindings_file: &Path,
+    bindings_file: &Path,
 ) {
     if cpu_target == "x86_64" && emulation_mode == "usermode" {
         let current_rustc_version =
@@ -389,8 +389,8 @@ pub fn maybe_generate_stub_bindings(
 pub fn maybe_generate_stub_bindings(
     _cpu_target: &str,
     _emulation_mode: &str,
-    _stub_bindings_file: &PathBuf,
-    _bindings_file: &PathBuf,
+    _stub_bindings_file: &Path,
+    _bindings_file: &Path,
 ) {
     // Do nothing
 }

@@ -137,8 +137,8 @@ pub fn build() {
     maybe_generate_stub_bindings(
         &cpu_target,
         &emulation_mode,
-        &stub_runtime_bindings_file,
-        &runtime_bindings_file
+        stub_runtime_bindings_file.as_path(),
+        runtime_bindings_file.as_path()
     );
 
     if (emulation_mode == "usermode") && (qemu_asan || qemu_asan_guest) {

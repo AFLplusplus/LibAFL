@@ -9,9 +9,9 @@ use core::{fmt, marker::PhantomData};
 
 pub use calibrate::CalibrationStage;
 pub use colorization::*;
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", unix))]
 pub use concolic::ConcolicTracingStage;
-#[cfg(all(feature = "std", feature = "concolic_mutation"))]
+#[cfg(all(feature = "std", feature = "concolic_mutation", unix))]
 pub use concolic::SimpleConcolicMutationalStage;
 #[cfg(feature = "std")]
 pub use dump::*;
@@ -58,7 +58,7 @@ pub mod tmin;
 
 pub mod calibrate;
 pub mod colorization;
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", unix))]
 pub mod concolic;
 #[cfg(feature = "std")]
 pub mod dump;
