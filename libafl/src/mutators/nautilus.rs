@@ -18,8 +18,7 @@ use crate::{
     generators::nautilus::NautilusContext,
     inputs::nautilus::NautilusInput,
     mutators::{MutationResult, Mutator},
-    prelude::HasRand,
-    state::HasCorpus,
+    state::{HasCorpus, HasRand},
     Error, HasMetadata,
 };
 

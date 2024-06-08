@@ -21,9 +21,9 @@ pub mod tuneable;
 pub use tuneable::*;
 
 #[cfg(feature = "unicode")]
-pub mod string;
+pub mod unicode;
 #[cfg(feature = "unicode")]
-pub use string::*;
+pub use unicode::*;
 
 #[cfg(feature = "multipart_inputs")]
 pub mod multi;
