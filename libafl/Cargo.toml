@@ -53,9 +53,6 @@ gzip = ["libafl_bolts/gzip"]
 ## If set, will use the `fork()` syscall to spawn children, instead of launching a new command, if supported by the OS (has no effect on `Windows`).
 fork = ["libafl_bolts/derive"]
 
-## Collected stats to decide if observers must be serialized or not (which should reduce mem use and increase speed)
-adaptive_serialization = []
-
 ## If this feature is set, `LibAFL` targets (and the fuzzer) will crash on `SIGPIPE` on unix systems.
 handle_sigpipe = []
 
