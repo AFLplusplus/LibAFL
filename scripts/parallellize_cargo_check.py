@@ -37,4 +37,5 @@ for task in output[
     else:
         os.environ["DOCS_RS"] = ""
     print("Running ", task)
+    print(os.environ)
     cargo_check = subprocess.check_output(task, shell=True, text=True)
