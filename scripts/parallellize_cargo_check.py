@@ -14,8 +14,6 @@ instance_idx = int(sys.argv[1])
 
 # Set llvm config
 os.environ["LLVM_CONFIG"] = "llvm-config"
-# DOCS_RS is needed for libafl_frida to build without auto-download
-os.environ["DOCS_RS"] = "1"
 
 command = (
     "DOCS_RS=1 cargo hack check --workspace --each-feature --clean-per-run "
@@ -34,4 +32,9 @@ for task in output[
     instance_idx * 2 * task_per_core : (instance_idx + 1) * 2 * task_per_core
 ]:
     print("Running ", task)
-    cargo_check = subprocess.check_output(task, shell=True, text=True)
+    print(os.environ)
+    if "libafl_frida" in task:
+        # DOCS_RS is needed for libafl_frida to build without auto-download feature
+        cargo_check = subprocess.check_output(task, shell=True, text=True, env=dict(os.environ, DOCS_RS="1"))
+    else:
+        cargo_check = subprocess.check_output(task, shell=True, text=True)
