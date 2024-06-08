@@ -4,7 +4,7 @@
 //! which only stores a certain number of [`Testcase`]s and removes additional ones in a FIFO manner.
 
 use alloc::string::String;
-use core::{cell::RefCell, time::Duration};
+use core::cell::RefCell;
 #[cfg(feature = "std")]
 use std::{fs, fs::File, io::Write};
 use std::{
@@ -14,7 +14,6 @@ use std::{
 
 #[cfg(feature = "gzip")]
 use libafl_bolts::compress::GzipCompressor;
-use libafl_bolts::serdeany::SerdeAnyMap;
 use serde::{Deserialize, Serialize};
 
 use super::{

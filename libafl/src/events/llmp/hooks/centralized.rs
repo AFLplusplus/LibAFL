@@ -43,7 +43,7 @@ where
             #[cfg(feature = "llmp_compression")]
             let compressed;
             #[cfg(feature = "llmp_compression")]
-            let event_bytes = if *msg_flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
+            let event_bytes = if *_msg_flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
                 compressed = compressor.decompress(msg)?;
                 &compressed
             } else {
