@@ -1,4 +1,5 @@
-//! Mutators for preserving string categories, which may be useful for certain targets which are primarily string-oriented.
+//! Mutators for preserving unicode string categories,
+//! which may be useful for certain targets which are primarily string-oriented.
 use alloc::{borrow::Cow, vec::Vec};
 use core::{
     cmp::{Ordering, Reverse},
@@ -14,7 +15,7 @@ use crate::{
     stages::{
         extract_metadata,
         mutational::{MutatedTransform, MutatedTransformPost},
-        StringIdentificationMetadata,
+        UnicodeIdentificationMetadata,
     },
     state::{HasCorpus, HasMaxSize, HasRand},
     HasMetadata,
@@ -27,17 +28,17 @@ use crate::{
 pub mod unicode_categories;
 
 /// Input which contains the context necessary to perform unicode mutations
-pub type UnicodeInput = (BytesInput, StringIdentificationMetadata);
+pub type UnicodeInput = (BytesInput, UnicodeIdentificationMetadata);
 
 impl<S> MutatedTransform<BytesInput, S> for UnicodeInput
 where
     S: HasCorpus<Input = BytesInput> + HasTestcase,
 {
-    type Post = StringIdentificationMetadata;
+    type Post = UnicodeIdentificationMetadata;
 
     fn try_transform_from(base: &mut Testcase<BytesInput>, state: &S) -> Result<Self, Error> {
         let input = base.load_input(state.corpus())?.clone();
-        let metadata = base.metadata::<StringIdentificationMetadata>().cloned()?;
+        let metadata = base.metadata::<UnicodeIdentificationMetadata>().cloned()?;
         Ok((input, metadata))
     }
 
@@ -46,7 +47,7 @@ where
     }
 }
 
-impl<S> MutatedTransformPost<S> for StringIdentificationMetadata
+impl<S> MutatedTransformPost<S> for UnicodeIdentificationMetadata
 where
     S: HasTestcase,
 {
@@ -64,7 +65,7 @@ const MAX_CHARS: usize = 16;
 fn choose_start<R: Rand>(
     rand: &mut R,
     bytes: &[u8],
-    meta: &StringIdentificationMetadata,
+    meta: &UnicodeIdentificationMetadata,
 ) -> Option<(usize, usize)> {
     let idx = rand.below(bytes.len());
     let mut options = Vec::new();
@@ -268,16 +269,16 @@ fn rand_replace_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
 /// Mutator which randomly replaces a randomly selected range of bytes with bytes that preserve the
 /// range's category
 #[derive(Debug, Default)]
-pub struct StringCategoryRandMutator;
+pub struct UnicodeCategoryRandMutator;
 
-impl Named for StringCategoryRandMutator {
+impl Named for UnicodeCategoryRandMutator {
     fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("string-category-rand");
         &NAME
     }
 }
 
-impl<S> Mutator<UnicodeInput, S> for StringCategoryRandMutator
+impl<S> Mutator<UnicodeInput, S> for UnicodeCategoryRandMutator
 where
     S: HasRand + HasMaxSize,
 {
@@ -327,16 +328,16 @@ where
 /// Mutator which randomly replaces a randomly selected range of bytes with bytes that preserve the
 /// range's subcategory
 #[derive(Debug, Default)]
-pub struct StringSubcategoryRandMutator;
+pub struct UnicodeSubcategoryRandMutator;
 
-impl Named for StringSubcategoryRandMutator {
+impl Named for UnicodeSubcategoryRandMutator {
     fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("string-subcategory-rand");
         &NAME
     }
 }
 
-impl<S> Mutator<UnicodeInput, S> for StringSubcategoryRandMutator
+impl<S> Mutator<UnicodeInput, S> for UnicodeSubcategoryRandMutator
 where
     S: HasRand + HasMaxSize,
 {
@@ -374,16 +375,16 @@ where
 
 /// Mutator which randomly replaces a full category-contiguous region of chars with a random token
 #[derive(Debug, Default)]
-pub struct StringCategoryTokenReplaceMutator;
+pub struct UnicodeCategoryTokenReplaceMutator;
 
-impl Named for StringCategoryTokenReplaceMutator {
+impl Named for UnicodeCategoryTokenReplaceMutator {
     fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("string-category-token-replace");
         &NAME
     }
 }
 
-impl<S> Mutator<UnicodeInput, S> for StringCategoryTokenReplaceMutator
+impl<S> Mutator<UnicodeInput, S> for UnicodeCategoryTokenReplaceMutator
 where
     S: HasRand + HasMaxSize + HasMetadata,
 {
@@ -434,16 +435,16 @@ where
 
 /// Mutator which randomly replaces a full subcategory-contiguous region of chars with a random token
 #[derive(Debug, Default)]
-pub struct StringSubcategoryTokenReplaceMutator;
+pub struct UnicodeSubcategoryTokenReplaceMutator;
 
-impl Named for StringSubcategoryTokenReplaceMutator {
+impl Named for UnicodeSubcategoryTokenReplaceMutator {
     fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("string-subcategory-replace");
         &NAME
     }
 }
 
-impl<S> Mutator<UnicodeInput, S> for StringSubcategoryTokenReplaceMutator
+impl<S> Mutator<UnicodeInput, S> for UnicodeSubcategoryTokenReplaceMutator
 where
     S: HasRand + HasMaxSize + HasMetadata,
 {
@@ -499,7 +500,7 @@ mod test {
     use crate::{
         corpus::NopCorpus,
         inputs::{BytesInput, HasMutatorBytes},
-        mutators::{Mutator, StringCategoryRandMutator, StringSubcategoryRandMutator},
+        mutators::{Mutator, UnicodeCategoryRandMutator, UnicodeSubcategoryRandMutator},
         stages::extract_metadata,
         state::StdState,
     };
@@ -511,7 +512,7 @@ mod test {
             let hex = "0123456789abcdef0123456789abcdef";
             let mut bytes = BytesInput::from(hex.as_bytes());
 
-            let mut mutator = StringCategoryRandMutator;
+            let mut mutator = UnicodeCategoryRandMutator;
 
             let mut state = StdState::new(
                 StdRand::with_seed(0),
@@ -543,7 +544,7 @@ mod test {
             let hex = "0123456789abcdef0123456789abcdef";
             let mut bytes = BytesInput::from(hex.as_bytes());
 
-            let mut mutator = StringSubcategoryRandMutator;
+            let mut mutator = UnicodeSubcategoryRandMutator;
 
             let mut state = StdState::new(
                 StdRand::with_seed(0),
