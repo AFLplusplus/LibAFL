@@ -117,7 +117,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
-      - name: Add nightly rustfmt and clippy
+      - name: Add nightly clippy
         run: rustup toolchain install nightly --component miri --allow-downgrade
       # --- miri undefined behavior test --
       - name: Run miri tests
@@ -136,22 +136,19 @@ jobs:
         run: sudo apt purge llvm* clang* lld* lldb* opt*
       - name: Install and cache deps
         run: sudo apt update && sudo apt install ninja-build shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
-      - name: Add nightly rustfmt and clippy
-        run: rustup toolchain install nightly --component rustfmt --component clippy --component miri --allow-downgrade
+      - name: Add nightly clippy
+        run: rustup toolchain install nightly --component clippy --component miri --allow-downgrade
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
       - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v1
+        uses: KyleMayes/install-llvm-action@v2
         with:
           directory: ${{ runner.temp }}/llvm
           version: 17
-      # ---- format check ----
       # pcguard edges and pcguard hitcounts are not compatible and we need to build them seperately
       - name: Check pcguard edges
         run: cargo check --features=sancov_pcguard_edges
-      - name: Run clang-format style check for C/C++ programs.
-        run: clang-format -n -Werror --style=file $(find . -type f \( -name '*.cpp' -o -iname '*.hpp' -o -name '*.cc' -o -name '*.cxx' -o -name '*.cc' -o -name '*.h' \) | grep -v '/target/' | grep -v 'libpng-1\.6\.37' | grep -v 'stb_image\.h' | grep -v 'dlmalloc\.c' | grep -v 'QEMU-Nyx')
       - name: run shellcheck
         run: shellcheck ./scripts/*.sh
       # ---- build normal and examples ----
@@ -172,19 +169,18 @@ jobs:
 
       - name: Install and cache deps
         run: sudo apt update && sudo apt install ninja-build shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
-      - name: Add nightly rustfmt and clippy
+      - name: Add nightly clippy
         run: rustup toolchain install nightly --component clippy --allow-downgrade && rustup default nightly
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
       - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v1
+        uses: KyleMayes/install-llvm-action@v2
         with:
           directory: ${{ runner.temp }}/llvm
           version: 17
       - name: Run clippy
         run: ./scripts/clippy.sh
-
     # --- test embedding the libafl_libfuzzer_runtime library
     # Fix me plz
     # - name: Test Build libafl_libfuzzer with embed
@@ -234,7 +230,7 @@ jobs:
       - name: Remove existing clang and LLVM
         run: sudo apt purge llvm* clang*
       - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v1
+        uses: KyleMayes/install-llvm-action@v2
         with:
           directory: ${{ runner.temp }}/llvm
           version: 17
@@ -259,8 +255,15 @@ jobs:
           override: true
           components: rustfmt
       - uses: actions/checkout@v3
+      - name: Remove existing clang and LLVM
+        run: sudo apt purge llvm* clang*
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          directory: ${{ runner.temp }}/llvm
+          version: 17
       - name: Format Check
-        run: cargo fmt -- --check
+        run: ./scripts/fmt_all.sh check
 
   fuzzers-preflight:
     runs-on: ubuntu-latest
@@ -386,7 +389,7 @@ jobs:
           profile: minimal
           toolchain: nightly
           override: true
-          components: rustfmt, rust-src
+          components: rust-src
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
       - name: Add targets
@@ -406,7 +409,7 @@ jobs:
           profile: minimal
           toolchain: nightly
           override: true
-          components: rustfmt, clippy, rust-src
+          components: clippy, rust-src
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
       - name: Add targets
@@ -488,8 +491,8 @@ jobs:
         with:
           profile: minimal
           toolchain: stable
-      - name: Add nightly rustfmt and clippy
-        run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade && rustup default nightly
+      - name: Add nightly clippy
+        run: rustup toolchain install nightly --component clippy --allow-downgrade && rustup default nightly
       - name: Install deps
         run: brew install z3 gtk+3
       - name: Install cxxbridge
@@ -503,7 +506,7 @@ jobs:
       - name: Run Tests
         run: cargo test
       - name: Clippy
-        run: cargo +nightly clippy --tests --all
+        run: cargo +nightly clippy --tests --all --exclude libafl_nyx --exclude symcc_runtime --exclude runtime_test
 
   ios:
     runs-on: macOS-latest
