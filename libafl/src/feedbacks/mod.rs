@@ -52,6 +52,7 @@ pub mod nautilus;
 pub mod new_hash_feedback;
 #[cfg(feature = "std")]
 pub mod stdio;
+pub mod transferred;
 
 /// Feedbacks evaluate the observers.
 /// Basically, they reduce the information provided by an observer to a value,
