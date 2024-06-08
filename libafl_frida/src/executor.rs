@@ -1,6 +1,4 @@
 use core::fmt::{self, Debug, Formatter};
-#[cfg(windows)]
-use std::process::abort;
 use std::{ffi::c_void, marker::PhantomData};
 
 use frida_gum::{
@@ -112,7 +110,7 @@ where
                 log::error!("Crashing target as it had ASan errors");
                 libc::raise(libc::SIGABRT);
                 #[cfg(windows)]
-                abort();
+                std::process::abort();
             }
         }
         self.helper.post_exec(input)?;
@@ -220,7 +218,7 @@ where
         }
 
         #[cfg(windows)]
-        initialize(&gum);
+        initialize(gum);
 
         Self {
             base,

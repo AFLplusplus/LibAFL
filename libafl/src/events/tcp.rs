@@ -24,6 +24,8 @@ use libafl_bolts::core_affinity::CoreId;
 use libafl_bolts::os::startable_self;
 #[cfg(all(unix, feature = "std", not(miri)))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
+#[cfg(feature = "std")]
+use libafl_bolts::os::CTRL_C_EXIT;
 #[cfg(all(feature = "std", feature = "fork", unix))]
 use libafl_bolts::os::{fork, ForkResult};
 use libafl_bolts::{shmem::ShMemProvider, tuples::tuple_list, ClientId};
@@ -37,9 +39,6 @@ use tokio::{
 };
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
-
-#[cfg(feature = "std")]
-use libafl_bolts::os::CTRL_C_EXIT;
 
 use super::{CustomBufEventResult, CustomBufHandlerFn};
 #[cfg(all(unix, feature = "std", not(miri)))]
