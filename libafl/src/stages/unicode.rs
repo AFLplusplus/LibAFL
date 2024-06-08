@@ -17,13 +17,13 @@ use crate::{
 
 /// Metadata which stores the list of pre-computed string-like ranges in the input
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
-pub struct StringIdentificationMetadata {
+pub struct UnicodeIdentificationMetadata {
     ranges: Rc<Vec<(usize, BitVec)>>,
 }
 
-impl_serdeany!(StringIdentificationMetadata);
+impl_serdeany!(UnicodeIdentificationMetadata);
 
-impl StringIdentificationMetadata {
+impl UnicodeIdentificationMetadata {
     /// The list of pre-computed string-like ranges in the input
     #[must_use]
     pub fn ranges(&self) -> &Vec<(usize, BitVec)> {
@@ -31,7 +31,7 @@ impl StringIdentificationMetadata {
     }
 }
 
-pub(crate) fn extract_metadata(bytes: &[u8]) -> StringIdentificationMetadata {
+pub(crate) fn extract_metadata(bytes: &[u8]) -> UnicodeIdentificationMetadata {
     let mut ranges = Vec::new();
 
     if !bytes.is_empty() {
@@ -64,24 +64,24 @@ pub(crate) fn extract_metadata(bytes: &[u8]) -> StringIdentificationMetadata {
         }
     }
 
-    StringIdentificationMetadata {
+    UnicodeIdentificationMetadata {
         ranges: Rc::new(ranges),
     }
 }
 
 /// Stage which identifies potential strings in the provided input
 #[derive(Debug)]
-pub struct StringIdentificationStage<S> {
+pub struct UnicodeIdentificationStage<S> {
     phantom: PhantomData<S>,
 }
 
-impl<S> Default for StringIdentificationStage<S> {
+impl<S> Default for UnicodeIdentificationStage<S> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<S> StringIdentificationStage<S> {
+impl<S> UnicodeIdentificationStage<S> {
     /// Create a new instance of the string identification stage
     #[must_use]
     pub fn new() -> Self {
@@ -91,14 +91,14 @@ impl<S> StringIdentificationStage<S> {
     }
 }
 
-impl<S> UsesState for StringIdentificationStage<S>
+impl<S> UsesState for UnicodeIdentificationStage<S>
 where
     S: State,
 {
     type State = S;
 }
 
-impl<S, E, EM, Z> Stage<E, EM, Z> for StringIdentificationStage<S>
+impl<S, E, EM, Z> Stage<E, EM, Z> for UnicodeIdentificationStage<S>
 where
     S: HasTestcase<Input = BytesInput> + HasCorpus + State,
     E: UsesState<State = S>,
@@ -113,7 +113,7 @@ where
         _manager: &mut EM,
     ) -> Result<(), Error> {
         let mut tc = state.current_testcase_mut()?;
-        if tc.has_metadata::<StringIdentificationMetadata>() {
+        if tc.has_metadata::<UnicodeIdentificationMetadata>() {
             return Ok(()); // skip recompute
         }
 
