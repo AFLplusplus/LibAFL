@@ -386,7 +386,7 @@ impl Deref for NopShMem {
 /// that can use internal mutability.
 /// Useful if the `ShMemProvider` needs to keep local state.
 #[cfg(feature = "alloc")]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct RcShMem<T: ShMemProvider> {
     internal: ManuallyDrop<T::ShMem>,
     provider: Rc<RefCell<T>>,
