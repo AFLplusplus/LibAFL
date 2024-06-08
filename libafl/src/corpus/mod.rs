@@ -27,7 +27,6 @@ use core::{cell::RefCell, fmt};
 
 pub mod nop;
 #[cfg(all(feature = "cmin", unix))]
-
 pub use minimizer::*;
 pub use nop::NopCorpus;
 use serde::{Deserialize, Serialize};

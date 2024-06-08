@@ -342,7 +342,8 @@ where
             Ok(core_conf) => {
                 let core_id = core_conf.parse()?;
                 // the actual client. do the fuzzing
-                let (state, mgr) = RestartingMgr::<EMH, MT, S, SP>::builder()
+
+                let builder = RestartingMgr::<EMH, MT, S, SP>::builder()
                     .shmem_provider(self.shmem_provider.clone())
                     .broker_port(self.broker_port)
                     .kind(ManagerKind::Client {
@@ -350,9 +351,12 @@ where
                     })
                     .configuration(self.configuration)
                     .serialize_state(self.serialize_state)
-                    .hooks(hooks)
-                    .build()
-                    .launch()?;
+                    .hooks(hooks);
+
+                #[cfg(feature = "adaptive_serialization")]
+                let builder = builder.time_ref(self.time_ref.clone());
+
+                let (state, mgr) = builder.build().launch()?;
 
                 return (self.run_client.take().unwrap())(state, mgr, CoreId(core_id));
             }
@@ -433,7 +437,7 @@ where
             #[cfg(feature = "std")]
             log::info!("I am broker!!.");
 
-            RestartingMgr::<EMH, MT, S, SP>::builder()
+            let builder = RestartingMgr::<EMH, MT, S, SP>::builder()
                 .shmem_provider(self.shmem_provider.clone())
                 .monitor(Some(self.monitor.clone()))
                 .broker_port(self.broker_port)
@@ -442,9 +446,12 @@ where
                 .exit_cleanly_after(Some(NonZeroUsize::try_from(self.cores.ids.len()).unwrap()))
                 .configuration(self.configuration)
                 .serialize_state(self.serialize_state)
-                .hooks(hooks)
-                .build()
-                .launch()?;
+                .hooks(hooks);
+
+            #[cfg(feature = "adaptive_serialization")]
+            let builder = builder.time_ref(self.time_ref.clone());
+
+            builder.build().launch()?;
 
             //broker exited. kill all clients.
             for handle in &mut handles {
