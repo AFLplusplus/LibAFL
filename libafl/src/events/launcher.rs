@@ -35,7 +35,13 @@ use libafl_bolts::os::dup2;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use libafl_bolts::os::startable_self;
 #[cfg(feature = "adaptive_serialization")]
-#[cfg(all(unix, feature = "std", feature = "fork"))]
+use libafl_bolts::tuples::Handle;
+#[cfg(all(
+    unix,
+    feature = "std",
+    feature = "fork",
+    feature = "adaptive_serialization"
+))]
 use libafl_bolts::tuples::Handled;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use libafl_bolts::{
@@ -45,7 +51,7 @@ use libafl_bolts::{
 use libafl_bolts::{
     core_affinity::{CoreId, Cores},
     shmem::ShMemProvider,
-    tuples::{tuple_list, Handle},
+    tuples::tuple_list,
 };
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
