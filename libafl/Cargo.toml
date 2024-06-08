@@ -131,7 +131,7 @@ llmp_debug = ["std", "libafl_bolts/llmp_debug"]
 llmp_small_maps = ["libafl_bolts/llmp_small_maps"] # reduces initial map size for llmp
 
 ## Grammar mutator. Requires nightly.
-nautilus = ["std", "serde_json/std", "pyo3", "rand_trait", "regex-syntax"]
+nautilus = ["std", "serde_json/std", "pyo3", "rand_trait", "regex-syntax", "regex"]
 
 [build-dependencies]
 rustversion = "1.0"
