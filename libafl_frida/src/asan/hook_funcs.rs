@@ -11,9 +11,12 @@ use crate::{
         errors::{AsanError, AsanErrors},
     },
 };
+
+#[cfg(windows)]
 extern "system" {
     fn memcpy(dst: *mut c_void, src: *const c_void, size: usize) -> *mut c_void;
 }
+#[cfg(windows)]
 extern "system" {
     fn memset(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
 }

@@ -440,7 +440,7 @@ where
             .cores(self.cores)
             .broker_port(self.broker_port)
             .remote_broker_addr(self.remote_broker_addr)
-            .time_ref(time_ref);
+            .time_ref(Some(time_ref));
         #[cfg(unix)]
         let launcher = launcher.stdout_file(Some("/dev/null"));
 

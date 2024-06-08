@@ -48,7 +48,7 @@ hexagon = ["libafl_qemu/hexagon"]
 pyo3-build-config = { version = "0.21", optional = true }
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.12.0", features = ["adaptive_serialization"] }
+libafl = { path = "../libafl", version = "0.12.0" }
 libafl_bolts = { path = "../libafl_bolts", version = "0.12.0" }
 libafl_targets = { path = "../libafl_targets", version = "0.12.0" }
 
