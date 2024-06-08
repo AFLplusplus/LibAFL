@@ -35,7 +35,7 @@ for task in output[
         # DOCS_RS is needed for libafl_frida to build without auto-download
         os.environ["DOCS_RS"] = "1"
     else:
-        os.environ["DOCS_RS"] = ""
+        os.environ.pop("DOCS_RS")
     print("Running ", task)
     print(os.environ)
     cargo_check = subprocess.check_output(task, shell=True, text=True)
