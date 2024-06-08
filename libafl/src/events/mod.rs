@@ -55,6 +55,7 @@ use crate::{
     state::HasScalabilityMonitor,
 };
 
+/// Multi-machine mode
 #[cfg(feature = "multi_machine")]
 pub mod multi_machine;
 

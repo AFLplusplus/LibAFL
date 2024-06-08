@@ -10,7 +10,7 @@ use std::{
 };
 
 use enumflags2::{bitflags, BitFlags};
-use libafl_bolts::{current_time, Error};
+use libafl_bolts::{bolts_prelude::GzipCompressor, current_time, ownedref::OwnedRef, Error};
 use log::info;
 use serde::{Deserialize, Serialize};
 use tokio::{
@@ -29,41 +29,56 @@ use crate::{
         llmp::multi_machine::TcpMultiMachineLlmpHook, Event,
     },
     inputs::Input,
-    prelude::State,
 };
 
 const LISTEN_PORT_BASE: u16 = 50000;
 
-#[bitflags(default = ForwardToParent | ForwardToChildren | ChildrenToParent | ParentToChildren)]
+#[bitflags(default = SendToParent | SendToChildren)]
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum NodePolicy {
-    // From current node to neighbours
-    SendToParent,
-    SendToChildren,
-    // From neighbours to neighbours
-    // ForwardFromChildrenToParent, // Incoming messages from children are forwarded to the parent, if any.
-    // ForwardFromParentToChildren, // Incoming messages from parent are forwarded to children and children to come in the future.
+    SendToParent,   // Send current node's interesting inputs to parent.
+    SendToChildren, // Send current node's interesting inputs to children.
 }
 
 const DUMMY_BYTE: u8 = 0x14;
 
+// Use OwnedRef as much as possible here to avoid useless copies.
+/// An owned TCP message for multi machine
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct TcpNodeMsg<I>
+pub struct OwnedTcpMultiMachineMsg<'a, I>
 where
     I: Input,
 {
-    // id: NodeId,
+    event: OwnedRef<'a, Event<I>>,
+}
+
+/// A TCP message for multi machine
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(bound = "I: serde::de::DeserializeOwned")]
+pub struct TcpMultiMachineMsg<I>
+where
+    I: Input,
+{
     event: Event<I>,
 }
 
-impl<I> TcpNodeMsg<I>
+impl<'a, I> OwnedTcpMultiMachineMsg<'a, I>
 where
     I: Input,
 {
-    pub fn new(event: Event<I>) -> TcpNodeMsg<I> {
-        TcpNodeMsg { event }
+    pub fn new(event: OwnedRef<'a, Event<I>>) -> Self {
+        Self { event }
+    }
+}
+
+impl<I> TcpMultiMachineMsg<I>
+where
+    I: Input,
+{
+    pub fn new(event: Event<I>) -> Self {
+        Self { event }
     }
 }
 
@@ -88,6 +103,8 @@ where
     children: HashMap<NodeId, TcpStream>, // The children who connected during the fuzzing session.
     old_events: Vec<Event<I>>,
     flags: BitFlags<NodePolicy>,
+    #[cfg(feature = "llmp_compression")]
+    compressor: GzipCompressor,
 }
 
 /// The tree descriptor for the
@@ -98,15 +115,20 @@ pub struct NodeDescriptor<A> {
     pub max_nb_children: u16, // the max amount of children.
     #[builder(default = Duration::from_secs(60))]
     pub timeout: Duration, // The timeout for connecting to parent
+    /// Node flags
     #[builder(default_code = "BitFlags::default()")]
     pub flags: BitFlags<NodePolicy>, // The policy for shared messages between nodes.
 }
 
-pub struct TcpMultiMachineBuilder {}
+/// A Multi-machine hooks builder.
+#[derive(Debug)]
+pub struct TcpMultiMachineBuilder {
+    _private: (),
+}
 
 impl TcpMultiMachineBuilder {
     /// Build a new [`TcpMultiMachineEventManagerHook`] from a [`NodeDescriptor`]
-    pub fn new<A: ToSocketAddrs + Display, I>(
+    pub fn build<A: ToSocketAddrs + Display, I>(
         node_descriptor: &NodeDescriptor<A>,
     ) -> Result<
         (
@@ -114,11 +136,14 @@ impl TcpMultiMachineBuilder {
             TcpMultiMachineLlmpHook<I>,
         ),
         Error,
-    > {
+    >
+    where
+        I: Input + Send + Sync + 'static,
+    {
         // Tokio runtime, useful to welcome new children.
         let rt = Arc::new(
-            Runtime::new().or_else(|_| Err(Error::unknown("Tokio runtime spawning failed"))),
-        )?;
+            Runtime::new().or_else(|_| Err(Error::unknown("Tokio runtime spawning failed")))?,
+        );
 
         // Try to connect to the parent if we should
         let parent: Option<TcpStream> = rt.block_on(async {
@@ -154,6 +179,8 @@ impl TcpMultiMachineBuilder {
             children: HashMap::default(),
             old_events: Vec::new(),
             flags: node_descriptor.flags,
+            #[cfg(feature = "llmp_compression")]
+            compressor: GzipCompressor::new(),
         }));
 
         // Now, setup the background tasks for the children to connect to
@@ -161,14 +188,18 @@ impl TcpMultiMachineBuilder {
             let bg_state = state.clone();
             let _: JoinHandle<Result<(), std::io::Error>> = rt.spawn(async move {
                 let port = LISTEN_PORT_BASE + i;
-                let listener = TcpListener::bind(format!("127.0.0.1:{}", port)).await?;
+                let addr = format!("127.0.0.1:{}", port);
+                let listener = TcpListener::bind(addr).await?;
                 let state = bg_state;
 
                 loop {
-                    let (stream, _) = listener.accept().await?;
+                    info!("listening for children on {:?}...", listener);
+                    let (stream, addr) = listener.accept().await?;
+                    info!("{} joined the children.", addr);
                     let mut state_guard = state.write().await;
 
                     state_guard.children.insert(NodeId::new(), stream);
+                    info!("{} added the child.", addr);
                 }
             });
         }
@@ -184,10 +215,16 @@ impl<I> TcpMultiMachineState<I>
 where
     I: Input,
 {
-    /// Read a [`TcpNodeMsg`] from a stream.
+    /// The compressor
+    #[cfg(feature = "llmp_compression")]
+    pub fn compressor(&mut self) -> &GzipCompressor {
+        &self.compressor
+    }
+
+    /// Read a [`TcpMultiMachineMsg`] from a stream.
     /// Expects a message written by [`TcpMultiMachineState::write_msg`].
     /// If there is nothing to read from the stream, return asap with Ok(None).
-    async fn read_msg(&mut self, stream: &mut TcpStream) -> Result<Option<TcpNodeMsg<I>>, Error> {
+    async fn read_msg(stream: &mut TcpStream) -> Result<Option<TcpMultiMachineMsg<I>>, Error> {
         // 0. Check if we should try to fetch something from the stream
         let mut dummy_byte: [u8; 1] = [0u8];
         let n_read = stream.read(&mut dummy_byte).await?;
@@ -215,12 +252,11 @@ where
         Ok(Some(bitcode::deserialize(node_msg.as_ref())?))
     }
 
-    /// Write a [`TcpNodeMsg`] to a stream.
+    /// Write a [`TcpMultiMachineMsg`] to a stream.
     /// Can be read back using [`TcpMultiMachineState::read_msg`].
-    async fn write_msg(
-        &mut self,
+    async fn write_msg<'a>(
         stream: &mut TcpStream,
-        msg: &TcpNodeMsg<I>,
+        msg: &OwnedTcpMultiMachineMsg<'a, I>,
     ) -> Result<(), Error> {
         let serialized_msg = bitcode::serialize(msg)?;
         let msg_len = u32::to_le_bytes(serialized_msg.len() as u32);
@@ -237,12 +273,15 @@ where
         Ok(())
     }
 
-    async fn send_interesting_events_to_nodes<S: State>(
+    pub(crate) async fn send_interesting_event_to_nodes(
         &mut self,
-        event: &Event<S::Input>,
+        event: &Event<I>,
     ) -> Result<(), Error> {
+        info!("[multi-machine] Sending interesting events to nodes...");
+
+        let msg = OwnedTcpMultiMachineMsg::new(OwnedRef::Ref(event));
         if let Some(parent) = &mut self.parent {
-            match self.write_msg(parent, TcpNodeMsg::new(event)).await {
+            match Self::write_msg(parent, &msg).await {
                 Err(_) => {
                     // most likely the parent disconnected. drop the connection
                     info!("The parent disconnected. We won't try to communicate with it again.");
@@ -254,7 +293,7 @@ where
 
         let mut ids_to_remove: Vec<NodeId> = Vec::new();
         for (child_id, child_stream) in &mut self.children {
-            match self.write_msg(child_stream, event) {
+            match Self::write_msg(child_stream, &msg).await {
                 Err(_) => {
                     // most likely the child disconnected. drop the connection later on and continue.
                     info!("The child disconnected. We won't try to communicate with it again.");
@@ -274,13 +313,15 @@ where
 
     /// Flush the message queue from other nodes and add incoming events to the
     /// centralized event manager queue.
-    pub(crate) async fn handle_new_messages_from_nodes<S: State>(
+    pub(crate) async fn handle_new_messages_from_nodes(
         &mut self,
-        events: &mut Vec<Event<S::Input>>,
+        events: &mut Vec<Event<I>>,
     ) -> Result<(), Error> {
+        info!("Checking for now events from other nodes...");
+
         // Our (potential) parent could have something for us
         if let Some(parent) = &mut self.parent {
-            match self.read_msg(parent).await {
+            match Self::read_msg(parent).await {
                 Err(_) => {
                     // most likely the parent disconnected. drop the connection
                     info!("The parent disconnected. We won't try to communicate with it again.");
@@ -288,7 +329,7 @@ where
                 }
                 Ok(Some(msg)) => {
                     // The parent has something for us, we store it
-                    events.write().await.push(msg.event)
+                    events.push(msg.event)
                 }
                 Ok(None) => {} // nothing from the parent, we continue
             }
@@ -297,7 +338,7 @@ where
         // What about the (potential) children?
         let mut ids_to_remove: Vec<NodeId> = Vec::new();
         for (child_id, child_stream) in &mut self.children {
-            match self.read_msg(child_stream) {
+            match Self::read_msg(child_stream).await {
                 Err(_) => {
                     // most likely the child disconnected. drop the connection later on and continue.
                     info!("The child disconnected. We won't try to communicate with it again.");
@@ -305,7 +346,7 @@ where
                 }
                 Ok(Some(msg)) => {
                     // A child has something for us, we store it
-                    events.write().await.push(msg.event)
+                    events.push(msg.event)
                 }
                 Ok(None) => {} // nothing from the parent, we continue
             }

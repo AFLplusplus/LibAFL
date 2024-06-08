@@ -25,6 +25,16 @@ where
         events: &mut Vec<Event<S::Input>>,
     ) -> Result<bool, Error>;
 
+    /// Triggered when the even manager decides to fire the event after processing
+    fn on_fire(
+        &mut self,
+        _state: &mut S,
+        _client_id: ClientId,
+        _event: &Event<S::Input>,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
+
     /// The hook that runs after `handle_in_client`
     /// Return false if you want to cancel the subsequent event handling
     fn post_exec(&mut self, _state: &mut S, _client_id: ClientId) -> Result<bool, Error> {
@@ -44,6 +54,15 @@ where
         client_id: ClientId,
         events: &mut Vec<Event<S::Input>>,
     ) -> Result<bool, Error>;
+
+    /// Ran when the Event Manager decides to accept an event and propagates it
+    fn on_fire_all(
+        &mut self,
+        state: &mut S,
+        client_id: ClientId,
+        event: &Event<S::Input>,
+    ) -> Result<(), Error>;
+
     /// The hook that runs after `handle_in_client`
     fn post_exec_all(&mut self, state: &mut S, client_id: ClientId) -> Result<bool, Error>;
 }
@@ -60,6 +79,15 @@ where
         _event: &mut Vec<Event<S::Input>>,
     ) -> Result<bool, Error> {
         Ok(true)
+    }
+
+    fn on_fire_all(
+        &mut self,
+        _state: &mut S,
+        _client_id: ClientId,
+        _event: &Event<S::Input>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 
     /// The hook that runs after `handle_in_client`
@@ -84,6 +112,16 @@ where
         let first = self.0.pre_exec(state, client_id, events)?;
         let second = self.1.pre_exec_all(state, client_id, events)?;
         Ok(first & second)
+    }
+
+    fn on_fire_all(
+        &mut self,
+        state: &mut S,
+        client_id: ClientId,
+        event: &Event<S::Input>,
+    ) -> Result<(), Error> {
+        self.0.on_fire(state, client_id, event)?;
+        self.1.on_fire_all(state, client_id, event)
     }
 
     /// The hook that runs after `handle_in_client`

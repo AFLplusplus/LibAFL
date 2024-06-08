@@ -1,7 +1,7 @@
-use std::{prelude::rust_2015::Vec, sync::Arc};
+use std::sync::Arc;
 
 use libafl_bolts::{
-    bolts_prelude::{Flags, LlmpBrokerInner, LlmpMsgHookResult, Tag},
+    bolts_prelude::{Flags, LlmpBrokerInner, LlmpMsgHookResult, Tag, LLMP_FLAG_COMPRESSED},
     llmp::LlmpHook,
     prelude::ShMemProvider,
     ClientId, Error,
@@ -11,10 +11,9 @@ use tokio::{runtime::Runtime, sync::RwLock};
 use crate::{
     events::{multi_machine::TcpMultiMachineState, Event},
     inputs::Input,
-    state::State,
 };
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct TcpMultiMachineLlmpHook<I>
 where
     I: Input,
@@ -41,19 +40,21 @@ where
     SP: ShMemProvider,
     I: Input,
 {
+    /// On new message, forward every message from main to other nodes (according to policy)
     fn on_new_message(
         &mut self,
-        broker_inner: &mut LlmpBrokerInner<SP>,
-        client_id: ClientId,
-        msg_tag: &mut Tag,
+        _broker_inner: &mut LlmpBrokerInner<SP>,
+        _client_id: ClientId,
+        _msg_tag: &mut Tag,
         msg_flags: &mut Flags,
         msg: &mut [u8],
     ) -> Result<LlmpMsgHookResult, Error> {
+        log::info!("On new message starts.");
         // Here, we can access all the messages that passed the EventManager filters.
         // Thus, the messages are initially destined to be broadcast to the other clients because they were deemed interesting.
 
         let shared_state = self.shared_state.clone();
-        let incoming_events: Vec<Event<S::Input>> = self.rt.block_on(async move {
+        let res: Result<(), Error> = self.rt.block_on(async move {
             let mut state_wr_lock = shared_state.write().await;
 
             // for event in events.as_ref() {
@@ -64,16 +65,32 @@ where
             //     state_wr_lock.old_events.push();
             // }
 
-            let mut incoming_events = Vec::new();
-            state_wr_lock.handle_new_messages_from_nodes(&mut incoming_events)?;
+            #[cfg(not(feature = "llmp_compression"))]
+            let event_bytes = msg;
+            #[cfg(feature = "llmp_compression")]
+            let compressed;
+            #[cfg(feature = "llmp_compression")]
+            let event_bytes = if *msg_flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
+                compressed = state_wr_lock.compressor().decompress(msg)?;
+                &compressed
+            } else {
+                &*msg
+            };
+            let event: Event<I> = postcard::from_bytes(event_bytes)?;
+
+            state_wr_lock
+                .send_interesting_event_to_nodes(&event)
+                .await?;
 
             // TODO: remove once debug is over
-            {
-                log::debug!("New incoming events: {:?}", incoming_events);
-            }
+            // {
+            //     log::debug!("New incoming events: {:?}", incoming_events);
+            // }
 
-            Ok(incoming_events)
-        })?;
+            Ok(())
+        });
+
+        res?;
 
         // Add incoming events to the ones we should filter
         // events.extend_from_slice(&incoming_events);

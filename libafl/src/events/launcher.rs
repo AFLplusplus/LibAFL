@@ -59,6 +59,13 @@ use crate::{
     events::{centralized::CentralizedEventManager, llmp::centralized::CentralizedLlmpHook},
     state::UsesState,
 };
+use crate::{
+    events::{
+        hooks::multi_machine::TcpMultiMachineEventManagerHook,
+        multi_machine::TcpMultiMachineBuilder,
+    },
+    inputs::UsesInput,
+};
 #[cfg(feature = "std")]
 use crate::{
     events::{
@@ -471,7 +478,7 @@ where
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 #[derive(TypedBuilder)]
 #[allow(clippy::type_complexity, missing_debug_implementations)]
-pub struct CentralizedLauncher<'a, CF, IM, MF, MT, S, SP> {
+pub struct CentralizedLauncher<'a, CF, CEMH, IM, MEMH, MF, MT, S, SP> {
     /// The `ShmemProvider` to use
     shmem_provider: SP,
     /// The monitor instance to use
@@ -521,7 +528,7 @@ pub struct CentralizedLauncher<'a, CF, IM, MF, MT, S, SP> {
     #[builder(default = None)]
     remote_broker_addr: Option<SocketAddr>,
     #[cfg(feature = "multi_machine")]
-    multi_machine_descriptor: NodeDescriptor<SocketAddr>,
+    multi_machine_node_descriptor: NodeDescriptor<SocketAddr>,
     /// If this launcher should spawn a new `broker` on `[Self::broker_port]` (default).
     /// The reason you may not want this is, if you already have a [`Launcher`]
     /// with a different configuration (for the same target) running on this machine.
@@ -532,11 +539,13 @@ pub struct CentralizedLauncher<'a, CF, IM, MF, MT, S, SP> {
     #[builder(default = LlmpShouldSaveState::OnRestart)]
     serialize_state: LlmpShouldSaveState,
     #[builder(setter(skip), default = PhantomData)]
-    phantom_data: PhantomData<(IM, &'a S, &'a SP)>,
+    phantom_data: PhantomData<(CEMH, MEMH, IM, &'a S, &'a SP)>,
 }
 
 #[cfg(all(unix, feature = "std", feature = "fork"))]
-impl<CF, IM, MF, MT, S, SP> Debug for CentralizedLauncher<'_, CF, IM, MF, MT, S, SP> {
+impl<CF, CEMH, IM, MEMH, MF, MT, S, SP> Debug
+    for CentralizedLauncher<'_, CF, CEMH, IM, MEMH, MF, MT, S, SP>
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("Launcher")
             .field("configuration", &self.configuration)
@@ -554,26 +563,34 @@ impl<CF, IM, MF, MT, S, SP> Debug for CentralizedLauncher<'_, CF, IM, MF, MT, S,
 pub type StdCentralizedInnerMgr<S, SP> = LlmpRestartingEventManager<(), S, SP>;
 
 #[cfg(all(unix, feature = "std", feature = "fork"))]
-impl<'a, CF, MF, MT, S, SP>
-    CentralizedLauncher<'a, CF, StdCentralizedInnerMgr<S, SP>, MF, MT, S, SP>
+impl<'a, CF, CEMH, MF, MEMH, MT, S, SP>
+    CentralizedLauncher<'a, CF, CEMH, StdCentralizedInnerMgr<S, SP>, MEMH, MF, MT, S, SP>
 where
     CF: FnOnce(
         Option<S>,
-        CentralizedEventManager<StdCentralizedInnerMgr<S, SP>, SP>,
+        CentralizedEventManager<StdCentralizedInnerMgr<S, SP>, (), S, SP>,
         CoreId,
     ) -> Result<(), Error>,
+    CEMH: EventManagerHooksTuple<S>,
     MF: FnOnce(
         Option<S>,
-        CentralizedEventManager<StdCentralizedInnerMgr<S, SP>, SP>,
+        CentralizedEventManager<
+            StdCentralizedInnerMgr<S, SP>,
+            (TcpMultiMachineEventManagerHook<S::Input>, ()),
+            S,
+            SP,
+        >,
         CoreId,
     ) -> Result<(), Error>,
+    MEMH: EventManagerHooksTuple<S>,
     MT: Monitor + Clone,
     S: State + HasExecutions,
+    S::Input: Send + Sync + 'static,
     SP: ShMemProvider,
 {
     /// Launch a standard Centralized-based fuzzer
     pub fn launch(&mut self) -> Result<(), Error> {
-        let restarting_mgr_builder = |centralized_launcher: &Self, core_to_bind: CoreId| {
+        let main_restarting_mgr_builder = |centralized_launcher: &Self, core_to_bind: CoreId| {
             // Fuzzer client. keeps retrying the connection to broker till the broker starts
             let builder = RestartingMgr::<(), MT, S, SP>::builder()
                 .always_interesting(centralized_launcher.always_interesting)
@@ -592,22 +609,29 @@ where
             builder.build().launch()
         };
 
-        self.launch_generic(restarting_mgr_builder, restarting_mgr_builder)
+        self.launch_generic(
+            main_restarting_mgr_builder.clone(),
+            main_restarting_mgr_builder.clone(),
+        )
     }
 }
 
 #[cfg(all(unix, feature = "std", feature = "fork"))]
-impl<'a, CF, IM, MF, MT, S, SP> CentralizedLauncher<'a, CF, IM, MF, MT, S, SP>
+impl<'a, CF, CEMH, IM, MEMH, MF, MT, S, SP>
+    CentralizedLauncher<'a, CF, CEMH, IM, MEMH, MF, MT, S, SP>
 where
-    CF: FnOnce(Option<S>, CentralizedEventManager<IM, SP>, CoreId) -> Result<(), Error>,
-    IM: UsesState,
+    CF: FnOnce(Option<S>, CentralizedEventManager<IM, (), S, SP>, CoreId) -> Result<(), Error>,
+    CEMH: EventManagerHooksTuple<S>,
+    IM: UsesState<State = S>,
+    MEMH: EventManagerHooksTuple<S>,
     MF: FnOnce(
         Option<S>,
-        CentralizedEventManager<IM, SP>, // No hooks for centralized EM
+        CentralizedEventManager<IM, (TcpMultiMachineEventManagerHook<S::Input>, ()), S, SP>, // No hooks for centralized EM
         CoreId,
     ) -> Result<(), Error>,
     MT: Monitor + Clone,
     S: State + HasExecutions,
+    <<IM as UsesState>::State as UsesInput>::Input: Send + Sync + 'static,
     SP: ShMemProvider,
 {
     /// Launch a Centralized-based fuzzer.
@@ -653,6 +677,12 @@ where
 
         let debug_output = std::env::var(LIBAFL_DEBUG_OUTPUT).is_ok();
 
+        #[cfg(feature = "multi_machine")]
+        let (multi_machine_event_manager_hook, _multi_machine_llmp_hook) =
+            TcpMultiMachineBuilder::build(&self.multi_machine_node_descriptor)?;
+
+        let mut multi_machine_event_manager_hook = Some(multi_machine_event_manager_hook);
+
         // Spawn centralized broker
         self.shmem_provider.pre_fork()?;
         match unsafe { fork() }? {
@@ -671,7 +701,7 @@ where
                 #[cfg(feature = "multi_machine")]
                 let hooks = tuple_list!(
                     CentralizedLlmpHook::<S::Input>::new()?,
-                    TcpNodeLlmpHook::<S::Input>::new(&self.multi_machine_descriptor)?,
+                    // multi_machine_llmp_hook,
                 );
 
                 #[cfg(not(feature = "multi_machine"))]
@@ -737,12 +767,14 @@ where
                             #[cfg(not(feature = "adaptive_serialization"))]
                             let c_mgr = centralized_builder.build_on_port(
                                 mgr,
+                                tuple_list!(multi_machine_event_manager_hook.take().unwrap()),
                                 self.shmem_provider.clone(),
                                 self.centralized_broker_port,
                             )?;
                             #[cfg(feature = "adaptive_serialization")]
                             let c_mgr = centralized_builder.build_on_port(
                                 mgr,
+                                tuple_list!(multi_machine_event_manager_hook.take().unwrap()),
                                 self.shmem_provider.clone(),
                                 self.centralized_broker_port,
                                 self.time_obs,
@@ -759,12 +791,14 @@ where
                             #[cfg(not(feature = "adaptive_serialization"))]
                             let c_mgr = centralized_builder.build_on_port(
                                 mgr,
+                                tuple_list!(),
                                 self.shmem_provider.clone(),
                                 self.centralized_broker_port,
                             )?;
                             #[cfg(feature = "adaptive_serialization")]
                             let c_mgr = centralized_builder.build_on_port(
                                 mgr,
+                                tuple_list!(),
                                 self.shmem_provider.clone(),
                                 self.centralized_broker_port,
                                 self.time_obs,

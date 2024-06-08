@@ -22,6 +22,7 @@ use crate::{
 #[cfg(all(unix, feature = "std"))]
 pub mod centralized;
 
+/// Multi-machine hook
 #[cfg(feature = "multi_machine")]
 pub mod multi_machine;
 
