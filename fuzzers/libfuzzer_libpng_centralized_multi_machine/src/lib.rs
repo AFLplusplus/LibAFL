@@ -417,7 +417,7 @@ pub extern "C" fn libafl_main() {
         .centralized_broker_port(broker_port + 1)
         .remote_broker_addr(opt.remote_broker_addr)
         .multi_machine_node_descriptor(node_description)
-        .stdout_file(Some("/dev/null"))
+        // .stdout_file(Some("/dev/null"))
         .build()
         .launch()
     {

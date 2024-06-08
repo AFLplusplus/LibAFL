@@ -42,8 +42,6 @@ where
         _client_id: ClientId,
         events: &mut Vec<Event<S::Input>>,
     ) -> Result<bool, Error> {
-        info!("Pre-exec event manager hook.");
-
         // Here, we get all the events from the other clients. we don't want to actually send them directly to
         // other nodes now. We will though receive other nodes' messages and make them go through the centralized
         // filter.
@@ -65,14 +63,9 @@ where
                 .await?;
 
             info!(
-                "[multi-machine] received {} new event.",
+                "Received {} new event.",
                 incoming_events.len()
             );
-
-            // TODO: remove once debug is over
-            {
-                debug!("New incoming events: {:?}", incoming_events);
-            }
 
             Ok(incoming_events)
         });
@@ -89,8 +82,6 @@ where
         _client_id: ClientId,
         event: &Event<S::Input>,
     ) -> Result<(), Error> {
-        info!("On_fire event manager hook.");
-
         // Here, we can access all the messages that passed the EventManager "filter".
         // Thus, the messages are initially destined to be broadcast to the other clients because they were deemed interesting.
         // It could also be used as an llmp hook, in case we need to use multiple filters.
@@ -111,7 +102,7 @@ where
                 .send_interesting_event_to_nodes(&event)
                 .await?;
 
-            info!("[multi-machine] sent a new event to parent.");
+            info!("Sent a new event to parent.");
 
             // TODO: remove once debug is over
             // {

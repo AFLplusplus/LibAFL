@@ -317,7 +317,7 @@ where
         &mut self,
         events: &mut Vec<Event<I>>,
     ) -> Result<(), Error> {
-        info!("Checking for now events from other nodes...");
+        info!("Checking for new events from other nodes...");
 
         // Our (potential) parent could have something for us
         if let Some(parent) = &mut self.parent {
