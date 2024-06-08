@@ -530,7 +530,6 @@ where
         state: &mut Self::State,
         executor: &mut E,
     ) -> Result<usize, Error> {
-        panic!();
         if self.is_main {
             // main node
             self.receive_from_secondary(fuzzer, state, executor)
