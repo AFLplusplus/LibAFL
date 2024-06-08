@@ -18,7 +18,7 @@ os.environ["LLVM_CONFIG"] = "llvm-config"
 os.environ["DOCS_RS"] = "1"
 
 command = (
-    "cargo hack check --workspace --each-feature --clean-per-run "
+    "DOCS_RS=1 cargo hack check --workspace --each-feature --clean-per-run "
     "--exclude-features=prelude,python,sancov_pcguard_edges,arm,aarch64,i386,be,systemmode,whole_archive "
     "--no-dev-deps --exclude libafl_libfuzzer --print-command-list"
 )
