@@ -32,7 +32,7 @@ where
         _broker_inner: &mut LlmpBrokerInner<SP>,
         client_id: ClientId,
         msg_tag: &mut Tag,
-        msg_flags: &mut Flags,
+        _msg_flags: &mut Flags,
         msg: &mut [u8],
     ) -> Result<LlmpMsgHookResult, Error> {
         if *msg_tag == _LLMP_TAG_TO_MAIN {

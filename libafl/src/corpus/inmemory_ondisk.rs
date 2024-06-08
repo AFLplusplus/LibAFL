@@ -27,15 +27,6 @@ use crate::{
     Error, HasMetadata,
 };
 
-/// The [`Testcase`] metadata that'll be stored to disk
-#[cfg(feature = "std")]
-#[derive(Debug, Serialize)]
-pub struct InMemoryOnDiskMetadata<'a> {
-    metadata: &'a SerdeAnyMap,
-    exec_time: &'a Option<Duration>,
-    executions: &'a usize,
-}
-
 /// A corpus able to store [`Testcase`]s to disk, while also keeping all of them in memory.
 ///
 /// Metadata is written to a `.<filename>.metadata` file in the same folder by default.
