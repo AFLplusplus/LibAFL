@@ -131,8 +131,9 @@ where
 impl<'a, CS, O> Scheduler for CoverageAccountingScheduler<'a, CS, O>
 where
     CS: Scheduler,
-    CS::State: HasCorpus + HasMetadata + HasRand + Debug,
-    <CS::State as UsesInput>::Input: HasLen,
+    Self::State: HasCorpus + HasMetadata + HasRand,
+    CS::State: Debug,
+    <Self::State as UsesInput>::Input: HasLen,
     O: CanTrack,
 {
     fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {

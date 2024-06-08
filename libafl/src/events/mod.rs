@@ -787,7 +787,7 @@ where
 impl<E, EM, M, Z> EventManager<E, Z> for MonitorTypedEventManager<EM, M>
 where
     EM: EventManager<E, Z>,
-    EM::State: HasLastReportTime + HasExecutions + HasMetadata,
+    Self::State: HasLastReportTime + HasExecutions + HasMetadata,
 {
 }
 
@@ -811,7 +811,7 @@ impl<EM, M> ProgressReporter for MonitorTypedEventManager<EM, M>
 where
     Self: UsesState,
     EM: ProgressReporter<State = Self::State>,
-    EM::State: HasLastReportTime + HasExecutions + HasMetadata,
+    Self::State: HasLastReportTime + HasExecutions + HasMetadata,
 {
     #[inline]
     fn maybe_report_progress(

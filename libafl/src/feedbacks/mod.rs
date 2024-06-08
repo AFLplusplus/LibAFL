@@ -310,11 +310,11 @@ where
     }
 }
 
-impl<A, B, FL, S, T> FeedbackFactory<CombinedFeedback<A, B, FL, S>, S, T>
+impl<A, B, FL, S, T> FeedbackFactory<CombinedFeedback<A, B, FL, S>, T>
     for CombinedFeedback<A, B, FL, S>
 where
-    A: Feedback<S> + FeedbackFactory<A, S, T>,
-    B: Feedback<S> + FeedbackFactory<B, S, T>,
+    A: Feedback<S> + FeedbackFactory<A, T>,
+    B: Feedback<S> + FeedbackFactory<B, T>,
     FL: FeedbackLogic<A, B, S>,
     S: State,
 {
@@ -383,20 +383,14 @@ where
 
 /// Factory for feedbacks which should be sensitive to an existing context, e.g. observer(s) from a
 /// specific execution
-pub trait FeedbackFactory<F, S, T>
-where
-    F: Feedback<S>,
-    S: State,
-{
+pub trait FeedbackFactory<F, T> {
     /// Create the feedback from the provided context
     fn create_feedback(&self, ctx: &T) -> F;
 }
 
-impl<FE, FU, S, T> FeedbackFactory<FE, S, T> for FU
+impl<FE, FU, T> FeedbackFactory<FE, T> for FU
 where
     FU: Fn(&T) -> FE,
-    FE: Feedback<S>,
-    S: State,
 {
     fn create_feedback(&self, ctx: &T) -> FE {
         self(ctx)
@@ -982,7 +976,7 @@ impl Default for CrashFeedback {
     }
 }
 
-impl<S: State, T> FeedbackFactory<CrashFeedback, S, T> for CrashFeedback {
+impl<T> FeedbackFactory<CrashFeedback, T> for CrashFeedback {
     fn create_feedback(&self, _ctx: &T) -> CrashFeedback {
         CrashFeedback::new()
     }
@@ -1053,7 +1047,7 @@ impl Default for TimeoutFeedback {
 }
 
 /// A feedback factory for timeout feedbacks
-impl<S: State, T> FeedbackFactory<TimeoutFeedback, S, T> for TimeoutFeedback {
+impl<T> FeedbackFactory<TimeoutFeedback, T> for TimeoutFeedback {
     fn create_feedback(&self, _ctx: &T) -> TimeoutFeedback {
         TimeoutFeedback::new()
     }
@@ -1123,7 +1117,7 @@ impl Default for DiffExitKindFeedback {
 }
 
 /// A feedback factory for diff exit kind feedbacks
-impl<S: State, T> FeedbackFactory<DiffExitKindFeedback, S, T> for DiffExitKindFeedback {
+impl<T> FeedbackFactory<DiffExitKindFeedback, T> for DiffExitKindFeedback {
     fn create_feedback(&self, _ctx: &T) -> DiffExitKindFeedback {
         DiffExitKindFeedback::new()
     }

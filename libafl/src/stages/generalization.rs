@@ -58,7 +58,6 @@ impl<C, EM, O, OT, Z> Named for GeneralizationStage<C, EM, O, OT, Z> {
 impl<C, EM, O, OT, Z> UsesState for GeneralizationStage<C, EM, O, OT, Z>
 where
     EM: UsesState,
-    EM::State: UsesInput<Input = BytesInput>,
 {
     type State = EM::State;
 }
@@ -67,12 +66,11 @@ impl<C, E, EM, O, Z> Stage<E, EM, Z> for GeneralizationStage<C, EM, O, E::Observ
 where
     O: MapObserver,
     C: CanTrack + AsRef<O> + Named,
-    E: Executor<EM, Z> + HasObservers,
-    E::Observers: ObserversTuple<E::State>,
-    E::State:
+    E: Executor<EM, Z, State = Self::State> + HasObservers,
+    Self::State:
         UsesInput<Input = BytesInput> + HasExecutions + HasMetadata + HasCorpus + HasNamedMetadata,
-    EM: UsesState<State = E::State>,
-    Z: UsesState<State = E::State>,
+    EM: UsesState,
+    Z: UsesState<State = Self::State>,
 {
     #[inline]
     #[allow(clippy::too_many_lines)]
@@ -80,7 +78,7 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut E::State,
+        state: &mut Self::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
         let Some(corpus_idx) = state.current_corpus_id()? else {
@@ -339,8 +337,9 @@ where
     EM: UsesState,
     O: MapObserver,
     C: CanTrack + AsRef<O> + Named,
-    OT: ObserversTuple<EM::State>,
-    EM::State: UsesInput<Input = BytesInput> + HasExecutions + HasMetadata + HasCorpus,
+    OT: ObserversTuple<<Self as UsesState>::State>,
+    <Self as UsesState>::State:
+        UsesInput<Input = BytesInput> + HasExecutions + HasMetadata + HasCorpus,
 {
     /// Create a new [`GeneralizationStage`].
     #[must_use]
@@ -356,14 +355,14 @@ where
         &self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut EM::State,
+        state: &mut <Self as UsesState>::State,
         manager: &mut EM,
         novelties: &[usize],
         input: &BytesInput,
     ) -> Result<bool, Error>
     where
-        E: Executor<EM, Z> + HasObservers<Observers = OT, State = EM::State>,
-        Z: UsesState<State = EM::State>,
+        E: Executor<EM, Z> + HasObservers<Observers = OT, State = <Self as UsesState>::State>,
+        Z: UsesState<State = <Self as UsesState>::State>,
     {
         start_timer!(state);
         executor.observers_mut().pre_exec_all(state, input)?;
@@ -398,7 +397,7 @@ where
         &self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut EM::State,
+        state: &mut <Self as UsesState>::State,
         manager: &mut EM,
         payload: &mut Vec<Option<u8>>,
         novelties: &[usize],
@@ -406,8 +405,8 @@ where
         split_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, Z> + HasObservers<Observers = OT, State = EM::State>,
-        Z: UsesState<State = EM::State>,
+        E: Executor<EM, Z> + HasObservers<Observers = OT, State = <Self as UsesState>::State>,
+        Z: UsesState<State = <Self as UsesState>::State>,
     {
         let mut start = 0;
         while start < payload.len() {
@@ -437,7 +436,7 @@ where
         &self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut EM::State,
+        state: &mut <Self as UsesState>::State,
         manager: &mut EM,
         payload: &mut Vec<Option<u8>>,
         novelties: &[usize],
@@ -445,8 +444,8 @@ where
         closing_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, Z> + HasObservers<Observers = OT, State = EM::State>,
-        Z: UsesState<State = EM::State>,
+        E: Executor<EM, Z> + HasObservers<Observers = OT, State = <Self as UsesState>::State>,
+        Z: UsesState<State = <Self as UsesState>::State>,
     {
         let mut index = 0;
         while index < payload.len() {
