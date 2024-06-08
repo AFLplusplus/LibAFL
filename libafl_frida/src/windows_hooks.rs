@@ -1,10 +1,11 @@
 // Based on the example of setting hooks: Https://github.com/frida/frida-rust/blob/main/examples/gum/hook_open/src/lib.rs
+use std::ffi::c_void;
+
 use frida_gum::{interceptor::Interceptor, Gum, Module, NativePointer};
 use libafl_bolts::os::windows_exceptions::{
     handle_exception, IsProcessorFeaturePresent, UnhandledExceptionFilter, EXCEPTION_POINTERS,
     PROCESSOR_FEATURE_ID,
 };
-use std::ffi::c_void;
 
 unsafe extern "C" fn is_processor_feature_present_detour(feature: u32) -> bool {
     match feature {
@@ -23,11 +24,17 @@ pub fn initialize(gum: &Gum) {
     let is_processor_feature_present =
         Module::find_export_by_name(Some("kernel32.dll"), "IsProcessorFeaturePresent");
     let is_processor_feature_present = is_processor_feature_present.unwrap();
-    assert!(!is_processor_feature_present.is_null(), "IsProcessorFeaturePresent not found");
+    assert!(
+        !is_processor_feature_present.is_null(),
+        "IsProcessorFeaturePresent not found"
+    );
     let unhandled_exception_filter =
         Module::find_export_by_name(Some("kernel32.dll"), "UnhandledExceptionFilter");
     let unhandled_exception_filter = unhandled_exception_filter.unwrap();
-    assert!(!unhandled_exception_filter.is_null(), "UnhandledExceptionFilter not found");
+    assert!(
+        !unhandled_exception_filter.is_null(),
+        "UnhandledExceptionFilter not found"
+    );
 
     let mut interceptor = Interceptor::obtain(gum);
 
@@ -46,7 +53,4 @@ pub fn initialize(gum: &Gum) {
             NativePointer(std::ptr::null_mut()),
         )
         .unwrap_or(NativePointer(std::ptr::null_mut()));
-
-
-
 }

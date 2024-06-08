@@ -448,7 +448,6 @@ impl AsanRuntime {
         let ret = unsafe { self.allocator_mut().alloc(size, 8) };
 
         if flags & 0x40 == 0x40 {
-
             unsafe {
                 memset(ret, 0, size);
             }
@@ -466,7 +465,7 @@ impl AsanRuntime {
     ) -> *mut c_void {
         unsafe {
             let ret = self.allocator_mut().alloc(size, 0x8);
-            if !mem.is_null()  && !ret.is_null() {
+            if !mem.is_null() && !ret.is_null() {
                 let old_size = self.allocator_mut().get_usable_size(mem);
                 let copy_size = if size < old_size { size } else { old_size };
                 (mem as *mut u8).copy_to(ret as *mut u8, copy_size);
