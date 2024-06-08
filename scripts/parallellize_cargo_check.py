@@ -11,20 +11,20 @@ if len(sys.argv) != 2:
     exit(1)
 
 instance_idx = int(sys.argv[1])
-# set llvm config
+
+# Set llvm config
 os.environ["LLVM_CONFIG"] = "llvm-config"
+# DOCS_RS is needed for libafl_frida to build without auto-download
+os.environ["DOCS_RS"] = "1"
+
 command = (
     "cargo hack check --workspace --each-feature --clean-per-run "
     "--exclude-features=prelude,python,sancov_pcguard_edges,arm,aarch64,i386,be,systemmode,whole_archive "
     "--no-dev-deps --exclude libafl_libfuzzer --print-command-list"
 )
 
-env = os.environ.copy()
-# DOCS_RS is needed for libafl_frida to build without auto-download
-env["DOCS_RS"] = "1"
-
 # Run the command and capture the output
-output = subprocess.check_output(command, env=env, shell=True, text=True)
+output = subprocess.check_output(command, shell=True, text=True)
 output = output.strip().split("\n")[0:]
 all_task_cnt = len(output) // 2  # by 2 cuz one task has two lines
 task_per_core = math.ceil(all_task_cnt // ci_instances)
