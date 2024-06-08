@@ -31,11 +31,9 @@ print(task_per_core, "tasks assigned to this instance")
 for task in output[
     instance_idx * 2 * task_per_core : (instance_idx + 1) * 2 * task_per_core
 ]:
-    if "libafl_frida" in task:
-        # DOCS_RS is needed for libafl_frida to build without auto-download
-        os.environ["DOCS_RS"] = "1"
-    else:
-        os.environ.pop("DOCS_RS")
     print("Running ", task)
     print(os.environ)
-    cargo_check = subprocess.check_output(task, shell=True, text=True)
+    if "libafl_frida" in task:
+        cargo_check = subprocess.check_output(task, shell=True, text=True, env=dict(os.environ, DOCS_RS="1"))
+    else:
+        cargo_check = subprocess.check_output(task, shell=True, text=True)
