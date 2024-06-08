@@ -33,5 +33,9 @@ print(task_per_core, "tasks assigned to this instance")
 for task in output[
     instance_idx * 2 * task_per_core : (instance_idx + 1) * 2 * task_per_core
 ]:
+    if "libafl_frida" in task:
+        os.environ["DOCS_RS"] = "1"
+    else:
+        os.environ["DOCS_RS"] = ""
     print("Running ", task)
     cargo_check = subprocess.check_output(task, shell=True, text=True)
