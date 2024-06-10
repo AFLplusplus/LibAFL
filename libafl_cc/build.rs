@@ -203,22 +203,22 @@ fn build_pass(
             Ok(s) => {
                 if !s.success() {
                     if optional {
-                        println!("cargo:warning=Skipping src/{src_file}");
+                        println!("cargo:warning=Skipping src/{src_file} - Exit status: {s}");
                     } else {
-                        panic!("Failed to compile {src_file}");
+                        panic!("Failed to compile {src_file} - Exit status: {s}");
                     }
                 }
             }
-            Err(_) => {
+            Err(err) => {
                 if optional {
-                    println!("cargo:warning=Skipping src/{src_file}");
+                    println!("cargo:warning=Skipping src/{src_file} - {err}");
                 } else {
-                    panic!("Failed to compile {src_file}");
+                    panic!("Failed to compile {src_file} - {err}");
                 }
             }
         },
         None => {
-            println!("cargo:warning=Skipping src/{src_file}");
+            println!("cargo:warning=Skipping src/{src_file} - Only supported on Windows or *nix.");
         }
     }
 }

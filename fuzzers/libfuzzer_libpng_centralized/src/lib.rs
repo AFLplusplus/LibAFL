@@ -135,9 +135,9 @@ pub extern "C" fn libafl_main() {
 
     let monitor = MultiMonitor::new(|s| println!("{s}"));
 
-    let mut run_client = |state: Option<_>,
-                          mut mgr: CentralizedEventManager<_, _>,
-                          _core_id: CoreId| {
+    let mut secondary_run_client = |state: Option<_>,
+                                    mut mgr: CentralizedEventManager<_, _>,
+                                    _core_id: CoreId| {
         // Create an observation channel using the coverage map
         let edges_observer =
             HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") }).track_indices();
@@ -252,13 +252,13 @@ pub extern "C" fn libafl_main() {
         Ok(())
     };
 
-    let mut main_run_client = run_client.clone(); // clone it just for borrow checker
+    let mut main_run_client = secondary_run_client.clone(); // clone it just for borrow checker
 
     match CentralizedLauncher::builder()
         .shmem_provider(shmem_provider)
         .configuration(EventConfig::from_name("default"))
         .monitor(monitor)
-        .run_client(&mut run_client)
+        .secondary_run_client(&mut secondary_run_client)
         .main_run_client(&mut main_run_client)
         .cores(&cores)
         .broker_port(broker_port)

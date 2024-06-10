@@ -12,7 +12,7 @@ use libafl::{
 pub type CB = unsafe extern "C" fn() -> ();
 
 extern "C" {
-    fn __sanitizer_set_death_callback(cb: CB);
+    fn __sanitizer_set_death_callback(cb: Option<CB>);
 }
 
 /// Setup `ASan` callback on windows
@@ -35,5 +35,5 @@ where
     E::State: HasSolutions + HasCorpus + HasExecutions,
     Z: HasObjective<Objective = OF, State = E::State>,
 {
-    __sanitizer_set_death_callback(asan_death_handler::<E, EM, OF, Z>);
+    __sanitizer_set_death_callback(Some(asan_death_handler::<E, EM, OF, Z>));
 }

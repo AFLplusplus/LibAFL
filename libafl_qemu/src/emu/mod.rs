@@ -8,12 +8,12 @@ use core::{
 };
 use std::{
     cell::{OnceCell, Ref, RefCell, RefMut},
-    collections::HashMap,
     hash::Hash,
     ops::Add,
     rc::Rc,
 };
 
+use hashbrown::HashMap;
 use libafl::{
     executors::ExitKind,
     inputs::HasTargetBytes,
@@ -35,7 +35,7 @@ use crate::{
     sys::TCGTemp,
     BackdoorHookId, BlockHookId, CmpHookId, EdgeHookId, EmulatorMemoryChunk, GuestReg, HookData,
     HookId, InstructionHookId, MemAccessInfo, Qemu, QemuExitError, QemuExitReason, QemuHelperTuple,
-    QemuInitError, QemuShutdownCause, QemuSnapshotCheckResult, ReadHookId, Regs,
+    QemuInitError, QemuRWError, QemuShutdownCause, QemuSnapshotCheckResult, ReadHookId, Regs,
     StdInstrumentationFilter, WriteHookId, CPU,
 };
 
@@ -570,10 +570,10 @@ where
     #[deprecated(
         note = "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`."
     )]
-    pub fn write_reg<R, T>(&self, reg: R, val: T) -> Result<(), String>
+    pub fn write_reg<R, T>(&self, reg: R, val: T) -> Result<(), QemuRWError>
     where
         T: Num + PartialOrd + Copy + Into<GuestReg>,
-        R: Into<i32>,
+        R: Into<i32> + Clone,
     {
         self.qemu.write_reg(reg, val)
     }
@@ -581,10 +581,10 @@ where
     #[deprecated(
         note = "This function has been moved to the `Qemu` low-level structure. Please access it through `emu.qemu()`."
     )]
-    pub fn read_reg<R, T>(&self, reg: R) -> Result<T, String>
+    pub fn read_reg<R, T>(&self, reg: R) -> Result<T, QemuRWError>
     where
         T: Num + PartialOrd + Copy + From<GuestReg>,
-        R: Into<i32>,
+        R: Into<i32> + Clone,
     {
         self.qemu.read_reg(reg)
     }

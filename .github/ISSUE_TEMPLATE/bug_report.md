@@ -13,6 +13,8 @@ Thank you for making LibAFL better!
 
 **Describe the bug**
 A clear and concise description of what the bug is.
+If you want to present the backtrace, don't forget to run with `errors_backtrace` feature and log from `RUST_LOG`
+In addition, please tell us what is your fuzzer's Cargo.toml
 
 **To Reproduce**
 Steps to reproduce the behavior:

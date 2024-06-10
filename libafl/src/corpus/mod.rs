@@ -21,12 +21,12 @@ pub mod cached;
 #[cfg(feature = "std")]
 pub use cached::CachedOnDiskCorpus;
 
-#[cfg(feature = "cmin")]
+#[cfg(all(feature = "cmin", unix))]
 pub mod minimizer;
 use core::{cell::RefCell, fmt};
 
 pub mod nop;
-#[cfg(feature = "cmin")]
+#[cfg(all(feature = "cmin", unix))]
 pub use minimizer::*;
 pub use nop::NopCorpus;
 use serde::{Deserialize, Serialize};
@@ -113,7 +113,7 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
         testcase: Testcase<Self::Input>,
     ) -> Result<Testcase<Self::Input>, Error>;
 
-    /// Removes an entry from the corpus, returning it if it was present.
+    /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases
     fn remove(&mut self, id: CorpusId) -> Result<Testcase<Self::Input>, Error>;
 
     /// Get by id; considers only enabled testcases

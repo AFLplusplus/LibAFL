@@ -24,6 +24,8 @@ use libafl_bolts::core_affinity::CoreId;
 use libafl_bolts::os::startable_self;
 #[cfg(all(unix, feature = "std", not(miri)))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
+#[cfg(feature = "std")]
+use libafl_bolts::os::CTRL_C_EXIT;
 #[cfg(all(feature = "std", feature = "fork", unix))]
 use libafl_bolts::os::{fork, ForkResult};
 use libafl_bolts::{shmem::ShMemProvider, tuples::tuple_list, ClientId};
@@ -772,7 +774,7 @@ where
                 Ok(()) => {
                     self.tcp.set_nonblocking(false).expect("set to blocking");
                     let len = u32::from_le_bytes(len_buf);
-                    let mut buf = vec![0_u8; len as usize + 4_usize];
+                    let mut buf = vec![0_u8; 4_usize + len as usize];
                     self.tcp.read_exact(&mut buf)?;
 
                     let mut client_id_buf = [0_u8; 4];
@@ -1278,7 +1280,7 @@ where
 
                 compiler_fence(Ordering::SeqCst);
 
-                if child_status == crate::events::CTRL_C_EXIT || staterestorer.wants_to_exit() {
+                if child_status == CTRL_C_EXIT || staterestorer.wants_to_exit() {
                     return Err(Error::shutting_down());
                 }
 

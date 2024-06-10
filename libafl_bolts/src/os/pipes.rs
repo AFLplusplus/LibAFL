@@ -1,18 +1,20 @@
 //! Unix `pipe` wrapper for `LibAFL`
-use alloc::rc::Rc;
-use core::{borrow::Borrow, cell::RefCell};
 #[cfg(feature = "std")]
 use std::{
+    borrow::Borrow,
+    cell::RefCell,
     io::{self, ErrorKind, Read, Write},
     os::{
         fd::{AsFd, AsRawFd, OwnedFd},
         unix::io::RawFd,
     },
+    rc::Rc,
 };
 
 #[cfg(feature = "std")]
 use nix::unistd::{pipe, read, write};
 
+#[cfg(feature = "std")]
 use crate::Error;
 
 /// A unix pipe wrapper for `LibAFL`

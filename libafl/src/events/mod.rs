@@ -32,9 +32,11 @@ use ahash::RandomState;
 pub use launcher::*;
 #[cfg(all(unix, feature = "std"))]
 use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal, CTRL_C_EXIT};
-#[cfg(feature = "adaptive_serialization")]
-use libafl_bolts::tuples::{Handle, MatchNameRef};
-use libafl_bolts::{current_time, ClientId};
+use libafl_bolts::{
+    current_time,
+    tuples::{Handle, MatchNameRef},
+    ClientId,
+};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use uuid::Uuid;
@@ -104,9 +106,9 @@ pub struct EventManagerId(
 
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
-#[cfg(feature = "adaptive_serialization")]
-use crate::observers::TimeObserver;
-use crate::{inputs::UsesInput, stages::HasCurrentStage, state::UsesState};
+use crate::{
+    inputs::UsesInput, observers::TimeObserver, stages::HasCurrentStage, state::UsesState,
+};
 
 /// The log event severity
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -787,7 +789,7 @@ where
 impl<E, EM, M, Z> EventManager<E, Z> for MonitorTypedEventManager<EM, M>
 where
     EM: EventManager<E, Z>,
-    EM::State: HasLastReportTime + HasExecutions + HasMetadata,
+    Self::State: HasLastReportTime + HasExecutions + HasMetadata,
 {
 }
 
@@ -811,7 +813,7 @@ impl<EM, M> ProgressReporter for MonitorTypedEventManager<EM, M>
 where
     Self: UsesState,
     EM: ProgressReporter<State = Self::State>,
-    EM::State: HasLastReportTime + HasExecutions + HasMetadata,
+    Self::State: HasLastReportTime + HasExecutions + HasMetadata,
 {
     #[inline]
     fn maybe_report_progress(
@@ -839,11 +841,6 @@ where
 }
 
 /// Collected stats to decide if observers must be serialized or not
-#[cfg(not(feature = "adaptive_serialization"))]
-pub trait AdaptiveSerializer {}
-
-/// Collected stats to decide if observers must be serialized or not
-#[cfg(feature = "adaptive_serialization")]
 pub trait AdaptiveSerializer {
     /// Expose the collected observers serialization time
     fn serialization_time(&self) -> Duration;
@@ -864,7 +861,7 @@ pub trait AdaptiveSerializer {
     fn should_serialize_cnt_mut(&mut self) -> &mut usize;
 
     /// A [`Handle`] to the time observer to determine the `time_factor`
-    fn time_ref(&self) -> &Handle<TimeObserver>;
+    fn time_ref(&self) -> &Option<Handle<TimeObserver>>;
 
     /// Serialize the observer using the `time_factor` and `percentage_threshold`.
     /// These parameters are unique to each of the different types of `EventManager`
@@ -878,35 +875,41 @@ pub trait AdaptiveSerializer {
         OT: ObserversTuple<S> + Serialize,
         S: UsesInput,
     {
-        let exec_time = observers
-            .get(self.time_ref())
-            .map(|o| o.last_runtime().unwrap_or(Duration::ZERO))
-            .unwrap();
+        match self.time_ref() {
+            Some(t) => {
+                let exec_time = observers
+                    .get(t)
+                    .map(|o| o.last_runtime().unwrap_or(Duration::ZERO))
+                    .unwrap();
 
-        let mut must_ser =
-            (self.serialization_time() + self.deserialization_time()) * time_factor < exec_time;
-        if must_ser {
-            *self.should_serialize_cnt_mut() += 1;
-        }
+                let mut must_ser = (self.serialization_time() + self.deserialization_time())
+                    * time_factor
+                    < exec_time;
+                if must_ser {
+                    *self.should_serialize_cnt_mut() += 1;
+                }
 
-        if self.serializations_cnt() > 32 {
-            must_ser = (self.should_serialize_cnt() * 100 / self.serializations_cnt())
-                > percentage_threshold;
-        }
+                if self.serializations_cnt() > 32 {
+                    must_ser = (self.should_serialize_cnt() * 100 / self.serializations_cnt())
+                        > percentage_threshold;
+                }
 
-        if self.serialization_time() == Duration::ZERO
-            || must_ser
-            || self.serializations_cnt().trailing_zeros() >= 8
-        {
-            let start = current_time();
-            let ser = postcard::to_allocvec(observers)?;
-            *self.serialization_time_mut() = current_time() - start;
+                if self.serialization_time() == Duration::ZERO
+                    || must_ser
+                    || self.serializations_cnt().trailing_zeros() >= 8
+                {
+                    let start = current_time();
+                    let ser = postcard::to_allocvec(observers)?;
+                    *self.serialization_time_mut() = current_time() - start;
 
-            *self.serializations_cnt_mut() += 1;
-            Ok(Some(ser))
-        } else {
-            *self.serializations_cnt_mut() += 1;
-            Ok(None)
+                    *self.serializations_cnt_mut() += 1;
+                    Ok(Some(ser))
+                } else {
+                    *self.serializations_cnt_mut() += 1;
+                    Ok(None)
+                }
+            }
+            None => Ok(None),
         }
     }
 }

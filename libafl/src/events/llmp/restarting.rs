@@ -8,7 +8,7 @@ use alloc::vec::Vec;
 use core::ptr::addr_of_mut;
 #[cfg(feature = "std")]
 use core::sync::atomic::{compiler_fence, Ordering};
-#[cfg(all(feature = "std", feature = "adaptive_serialization"))]
+#[cfg(feature = "std")]
 use core::time::Duration;
 use core::{marker::PhantomData, num::NonZeroUsize};
 #[cfg(feature = "std")]
@@ -22,36 +22,34 @@ use libafl_bolts::os::startable_self;
 use libafl_bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(feature = "std", feature = "fork", unix))]
 use libafl_bolts::os::{fork, ForkResult};
-#[cfg(feature = "adaptive_serialization")]
-use libafl_bolts::tuples::{Handle, Handled};
+use libafl_bolts::{
+    llmp::LlmpBroker,
+    shmem::ShMemProvider,
+    tuples::{tuple_list, Handle},
+};
 #[cfg(feature = "std")]
 use libafl_bolts::{
     llmp::LlmpConnection, os::CTRL_C_EXIT, shmem::StdShMemProvider, staterestore::StateRestorer,
 };
-use libafl_bolts::{shmem::ShMemProvider, tuples::tuple_list};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
-#[cfg(all(feature = "std", not(feature = "adaptive_serialization")))]
-use crate::events::AdaptiveSerializer;
-#[cfg(all(feature = "std", feature = "adaptive_serialization"))]
+#[cfg(feature = "std")]
 use crate::events::AdaptiveSerializer;
 #[cfg(all(unix, feature = "std", not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
-#[cfg(feature = "adaptive_serialization")]
-use crate::observers::TimeObserver;
 use crate::{
     events::{
         hooks::EventManagerHooksTuple, Event, EventConfig, EventFirer, EventManager,
-        EventManagerId, EventProcessor, EventRestarter, HasEventManagerId, LlmpEventBroker,
-        LlmpEventManager, LlmpShouldSaveState, ProgressReporter,
+        EventManagerId, EventProcessor, EventRestarter, HasEventManagerId, LlmpEventManager,
+        LlmpShouldSaveState, ProgressReporter, StdLlmpEventHook,
     },
     executors::{Executor, HasObservers},
-    fuzzer::{EvaluatorObservers, ExecutionProcessor},
+    fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::UsesInput,
     monitors::Monitor,
-    observers::ObserversTuple,
+    observers::{ObserversTuple, TimeObserver},
     state::{HasExecutions, HasLastReportTime, State, UsesState},
     Error, HasMetadata,
 };
@@ -62,7 +60,7 @@ use crate::{
 pub struct LlmpRestartingEventManager<EMH, S, SP>
 where
     S: State,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
     //CE: CustomEvent<I>,
 {
     /// The embedded LLMP event manager
@@ -73,10 +71,10 @@ where
     save_state: LlmpShouldSaveState,
 }
 
-#[cfg(all(feature = "std", feature = "adaptive_serialization"))]
+#[cfg(feature = "std")]
 impl<EMH, S, SP> AdaptiveSerializer for LlmpRestartingEventManager<EMH, S, SP>
 where
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
     S: State,
 {
     fn serialization_time(&self) -> Duration {
@@ -105,24 +103,16 @@ where
         self.llmp_mgr.should_serialize_cnt_mut()
     }
 
-    fn time_ref(&self) -> &Handle<TimeObserver> {
+    fn time_ref(&self) -> &Option<Handle<TimeObserver>> {
         &self.llmp_mgr.time_ref
     }
-}
-
-#[cfg(all(feature = "std", not(feature = "adaptive_serialization")))]
-impl<EMH, S, SP> AdaptiveSerializer for LlmpRestartingEventManager<EMH, S, SP>
-where
-    SP: ShMemProvider + 'static,
-    S: State,
-{
 }
 
 #[cfg(feature = "std")]
 impl<EMH, S, SP> UsesState for LlmpRestartingEventManager<EMH, S, SP>
 where
     S: State,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     type State = S;
 }
@@ -218,8 +208,10 @@ where
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata,
-    SP: ShMemProvider + 'static,
-    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers>, //CE: CustomEvent<I>,
+    SP: ShMemProvider,
+    Z: ExecutionProcessor<E::Observers, State = S>
+        + EvaluatorObservers<E::Observers>
+        + Evaluator<E, LlmpEventManager<EMH, S, SP>>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         let res = self.llmp_mgr.process(fuzzer, state, executor)?;
@@ -235,8 +227,10 @@ where
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata + HasLastReportTime,
-    SP: ShMemProvider + 'static,
-    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers>, //CE: CustomEvent<I>,
+    SP: ShMemProvider,
+    Z: ExecutionProcessor<E::Observers, State = S>
+        + EvaluatorObservers<E::Observers>
+        + Evaluator<E, LlmpEventManager<EMH, S, SP>>,
 {
 }
 
@@ -244,7 +238,7 @@ where
 impl<EMH, S, SP> HasEventManagerId for LlmpRestartingEventManager<EMH, S, SP>
 where
     S: State,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
 {
     fn mgr_id(&self) -> EventManagerId {
         self.llmp_mgr.mgr_id()
@@ -261,7 +255,7 @@ const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT";
 impl<EMH, S, SP> LlmpRestartingEventManager<EMH, S, SP>
 where
     S: State,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
     //CE: CustomEvent<I>,
 {
     /// Create a new runner, the executed child doing the actual fuzzing.
@@ -319,14 +313,14 @@ pub enum ManagerKind {
         /// The CPU core ID of this client
         cpu_core: Option<CoreId>,
     },
-    /// A [`crate::events::llmp::broker::LlmpEventBroker`], forwarding the packets of local clients.
+    /// An [`LlmpBroker`], forwarding the packets of local clients.
     Broker,
 }
 
 /// Sets up a restarting fuzzer, using the [`StdShMemProvider`], and standard features.
 /// The restarting mgr is a combination of restarter and runner, that can be used on systems with and without `fork` support.
 /// The restarter will spawn a new process each time the child crashes or timeouts.
-#[cfg(all(feature = "std", not(feature = "adaptive_serialization")))]
+#[cfg(feature = "std")]
 #[allow(clippy::type_complexity)]
 pub fn setup_restarting_mgr_std<MT, S>(
     monitor: MT,
@@ -341,7 +335,7 @@ pub fn setup_restarting_mgr_std<MT, S>(
 >
 where
     MT: Monitor + Clone,
-    S: State + HasExecutions,
+    S: State,
 {
     RestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)
@@ -356,13 +350,14 @@ where
 /// Sets up a restarting fuzzer, using the [`StdShMemProvider`], and standard features.
 /// The restarting mgr is a combination of restarter and runner, that can be used on systems with and without `fork` support.
 /// The restarter will spawn a new process each time the child crashes or timeouts.
-#[cfg(all(feature = "std", feature = "adaptive_serialization"))]
+/// This one, additionally uses the timeobserver for the adaptive serialization
+#[cfg(feature = "std")]
 #[allow(clippy::type_complexity)]
-pub fn setup_restarting_mgr_std<MT, S>(
+pub fn setup_restarting_mgr_std_adaptive<MT, S>(
     monitor: MT,
     broker_port: u16,
     configuration: EventConfig,
-    time_obs: &TimeObserver,
+    time_obs: Handle<TimeObserver>,
 ) -> Result<
     (
         Option<S>,
@@ -372,7 +367,7 @@ pub fn setup_restarting_mgr_std<MT, S>(
 >
 where
     MT: Monitor + Clone,
-    S: State + HasExecutions,
+    S: State,
 {
     RestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)
@@ -380,7 +375,7 @@ where
         .broker_port(broker_port)
         .configuration(configuration)
         .hooks(tuple_list!())
-        .time_ref(time_obs.handle())
+        .time_ref(Some(time_obs))
         .build()
         .launch()
 }
@@ -395,13 +390,16 @@ pub struct RestartingMgr<EMH, MT, S, SP>
 where
     EMH: EventManagerHooksTuple<S>,
     S: State,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
     MT: Monitor,
     //CE: CustomEvent<I>,
 {
     /// The shared memory provider to use for the broker or client spawned by the restarting
     /// manager.
     shmem_provider: SP,
+    #[builder(default = false)]
+    /// Consider this testcase as interesting always if true
+    always_interesting: bool,
     /// The configuration
     configuration: EventConfig,
     /// The monitor to use
@@ -429,8 +427,8 @@ where
     serialize_state: LlmpShouldSaveState,
     /// The hooks passed to event manager:
     hooks: EMH,
-    #[cfg(feature = "adaptive_serialization")]
-    time_ref: Handle<TimeObserver>,
+    #[builder(default = None)]
+    time_ref: Option<Handle<TimeObserver>>,
     #[builder(setter(skip), default = PhantomData)]
     phantom_data: PhantomData<(EMH, S)>,
 }
@@ -441,7 +439,7 @@ impl<EMH, MT, S, SP> RestartingMgr<EMH, MT, S, SP>
 where
     EMH: EventManagerHooksTuple<S> + Copy + Clone,
     SP: ShMemProvider,
-    S: State + HasExecutions,
+    S: State,
     MT: Monitor + Clone,
 {
     /// Launch the broker and the clients and fuzz
@@ -450,18 +448,24 @@ where
         let (staterestorer, new_shmem_provider, core_id) = if std::env::var(_ENV_FUZZER_SENDER)
             .is_err()
         {
-            let broker_things = |mut broker: LlmpEventBroker<S::Input, MT, SP>,
-                                 remote_broker_addr| {
+            let broker_things = |mut broker: LlmpBroker<_, SP>, remote_broker_addr| {
                 if let Some(remote_broker_addr) = remote_broker_addr {
                     log::info!("B2b: Connecting to {:?}", &remote_broker_addr);
-                    broker.connect_b2b(remote_broker_addr)?;
+                    broker.inner_mut().connect_b2b(remote_broker_addr)?;
                 };
 
                 if let Some(exit_cleanly_after) = self.exit_cleanly_after {
-                    broker.set_exit_cleanly_after(exit_cleanly_after);
+                    broker
+                        .inner_mut()
+                        .set_exit_cleanly_after(exit_cleanly_after);
                 }
 
-                broker.broker_loop()
+                broker.loop_with_timeouts(Duration::from_secs(30), Some(Duration::from_millis(5)));
+
+                #[cfg(feature = "llmp_debug")]
+                log::info!("The last client quit. Exiting.");
+
+                Err(Error::shutting_down())
             };
             // We get here if we are on Unix, or we are a broker on Windows (or without forks).
             let (mgr, core_id) = match self.kind {
@@ -470,8 +474,7 @@ where
                         LlmpConnection::on_port(self.shmem_provider.clone(), self.broker_port)?;
                     match connection {
                         LlmpConnection::IsBroker { broker } => {
-                            let event_broker = LlmpEventBroker::<S::Input, MT, SP>::new(
-                                broker,
+                            let llmp_hook = StdLlmpEventHook::<S::Input, MT>::new(
                                 self.monitor.take().unwrap(),
                             )?;
 
@@ -480,17 +483,16 @@ where
                                 "Doing broker things. Run this tool again to start fuzzing in a client."
                             );
 
-                            broker_things(event_broker, self.remote_broker_addr)?;
+                            broker_things(
+                                broker.add_hooks(tuple_list!(llmp_hook)),
+                                self.remote_broker_addr,
+                            )?;
 
                             return Err(Error::shutting_down());
                         }
                         LlmpConnection::IsClient { client } => {
-                            #[cfg(not(feature = "adaptive_serialization"))]
                             let mgr: LlmpEventManager<EMH, S, SP> = LlmpEventManager::builder()
-                                .hooks(self.hooks)
-                                .build_from_client(client, self.configuration)?;
-                            #[cfg(feature = "adaptive_serialization")]
-                            let mgr: LlmpEventManager<EMH, S, SP> = LlmpEventManager::builder()
+                                .always_interesting(self.always_interesting)
                                 .hooks(self.hooks)
                                 .build_from_client(
                                     client,
@@ -502,27 +504,21 @@ where
                     }
                 }
                 ManagerKind::Broker => {
-                    let event_broker = LlmpEventBroker::<S::Input, MT, SP>::on_port(
+                    let llmp_hook = StdLlmpEventHook::new(self.monitor.take().unwrap())?;
+
+                    let broker = LlmpBroker::create_attach_to_tcp(
                         self.shmem_provider.clone(),
-                        self.monitor.take().unwrap(),
+                        tuple_list!(llmp_hook),
                         self.broker_port,
                     )?;
 
-                    broker_things(event_broker, self.remote_broker_addr)?;
+                    broker_things(broker, self.remote_broker_addr)?;
                     unreachable!("The broker may never return normally, only on errors or when shutting down.");
                 }
                 ManagerKind::Client { cpu_core } => {
                     // We are a client
-                    #[cfg(not(feature = "adaptive_serialization"))]
                     let mgr = LlmpEventManager::builder()
-                        .hooks(self.hooks)
-                        .build_on_port(
-                            self.shmem_provider.clone(),
-                            self.broker_port,
-                            self.configuration,
-                        )?;
-                    #[cfg(feature = "adaptive_serialization")]
-                    let mgr = LlmpEventManager::builder()
+                        .always_interesting(self.always_interesting)
                         .hooks(self.hooks)
                         .build_on_port(
                             self.shmem_provider.clone(),
@@ -650,15 +646,6 @@ where
         // If we're restarting, deserialize the old state.
         let (state, mut mgr) =
             if let Some((state_opt, mgr_description)) = staterestorer.restore()? {
-                #[cfg(not(feature = "adaptive_serialization"))]
-                let llmp_mgr = LlmpEventManager::builder()
-                    .hooks(self.hooks)
-                    .build_existing_client_from_description(
-                        new_shmem_provider,
-                        &mgr_description,
-                        self.configuration,
-                    )?;
-                #[cfg(feature = "adaptive_serialization")]
                 let llmp_mgr = LlmpEventManager::builder()
                     .hooks(self.hooks)
                     .build_existing_client_from_description(
@@ -678,15 +665,6 @@ where
             } else {
                 log::info!("First run. Let's set it all up");
                 // Mgr to send and receive msgs from/to all other fuzzer instances
-                #[cfg(not(feature = "adaptive_serialization"))]
-                let mgr = LlmpEventManager::builder()
-                    .hooks(self.hooks)
-                    .build_existing_client_from_env(
-                        new_shmem_provider,
-                        _ENV_FUZZER_BROKER_CLIENT_INITIAL,
-                        self.configuration,
-                    )?;
-                #[cfg(feature = "adaptive_serialization")]
                 let mgr = LlmpEventManager::builder()
                     .hooks(self.hooks)
                     .build_existing_client_from_env(
@@ -727,14 +705,12 @@ where
 mod tests {
     use core::sync::atomic::{compiler_fence, Ordering};
 
-    #[cfg(feature = "adaptive_serialization")]
-    use libafl_bolts::tuples::Handled;
     use libafl_bolts::{
         llmp::{LlmpClient, LlmpSharedMap},
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
         staterestore::StateRestorer,
-        tuples::tuple_list,
+        tuples::{tuple_list, Handled},
         ClientId,
     };
     use serial_test::serial;
@@ -761,7 +737,6 @@ mod tests {
         let rand = StdRand::with_seed(0);
 
         let time = TimeObserver::new("time");
-        #[cfg(feature = "adaptive_serialization")]
         let time_ref = time.handle();
 
         let mut corpus = InMemoryCorpus::<BytesInput>::new();
@@ -790,13 +765,8 @@ mod tests {
             llmp_client.mark_safe_to_unmap();
         }
 
-        #[cfg(not(feature = "adaptive_serialization"))]
         let mut llmp_mgr = LlmpEventManager::builder()
-            .build_from_client(llmp_client, "fuzzer".into())
-            .unwrap();
-        #[cfg(feature = "adaptive_serialization")]
-        let mut llmp_mgr = LlmpEventManager::builder()
-            .build_from_client(llmp_client, "fuzzer".into(), time_ref.clone())
+            .build_from_client(llmp_client, "fuzzer".into(), Some(time_ref.clone()))
             .unwrap();
 
         let scheduler = RandScheduler::new();
@@ -839,21 +809,12 @@ mod tests {
         assert!(sc_cpy.has_content());
 
         let (mut state_clone, mgr_description) = staterestorer.restore().unwrap().unwrap();
-        #[cfg(not(feature = "adaptive_serialization"))]
         let mut llmp_clone = LlmpEventManager::builder()
             .build_existing_client_from_description(
                 shmem_provider,
                 &mgr_description,
                 "fuzzer".into(),
-            )
-            .unwrap();
-        #[cfg(feature = "adaptive_serialization")]
-        let mut llmp_clone = LlmpEventManager::builder()
-            .build_existing_client_from_description(
-                shmem_provider,
-                &mgr_description,
-                "fuzzer".into(),
-                time_ref,
+                Some(time_ref),
             )
             .unwrap();
 

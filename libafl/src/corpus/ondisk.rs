@@ -112,7 +112,7 @@ where
         self.inner.peek_free_id()
     }
 
-    /// Removes an entry from the corpus, returning it if it was present.
+    /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases
     #[inline]
     fn remove(&mut self, idx: CorpusId) -> Result<Testcase<I>, Error> {
         self.inner.remove(idx)

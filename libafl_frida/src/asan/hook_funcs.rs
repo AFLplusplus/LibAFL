@@ -12,6 +12,14 @@ use crate::{
     },
 };
 
+#[cfg(windows)]
+extern "system" {
+    fn memcpy(dst: *mut c_void, src: *const c_void, size: usize) -> *mut c_void;
+}
+#[cfg(windows)]
+extern "system" {
+    fn memset(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
+}
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 impl AsanRuntime {
     #[inline]
@@ -193,14 +201,11 @@ impl AsanRuntime {
         let ret = unsafe { allocator.alloc(size, 8) };
 
         if flags & 8 == 8 {
-            extern "system" {
-                fn memset(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
-            }
             unsafe {
                 memset(ret, 0, size);
             }
         }
-        if flags & 4 == 4 && ret == std::ptr::null_mut() {
+        if flags & 4 == 4 && ret.is_null() {
             unimplemented!();
         }
         ret
@@ -219,14 +224,11 @@ impl AsanRuntime {
         let ret = unsafe { allocator.alloc(size, 8) };
 
         if flags & 8 == 8 {
-            extern "system" {
-                fn memset(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
-            }
             unsafe {
                 memset(ret, 0, size);
             }
         }
-        if flags & 4 == 4 && ret == std::ptr::null_mut() {
+        if flags & 4 == 4 && ret.is_null() {
             unimplemented!();
         }
         ret
@@ -253,10 +255,8 @@ impl AsanRuntime {
         }
         let ret = unsafe {
             let ret = allocator.alloc(size, 8);
-            extern "system" {
-                fn memcpy(dst: *mut c_void, src: *const c_void, size: usize) -> *mut c_void;
-            }
-            memcpy(ret as *mut c_void, ptr, allocator.get_usable_size(ptr));
+
+            memcpy(ret, ptr, allocator.get_usable_size(ptr));
             allocator.release(ptr);
             ret
         };
@@ -269,7 +269,7 @@ impl AsanRuntime {
                 memset(ret, 0, size);
             }
         }
-        if flags & 4 == 4 && ret == std::ptr::null_mut() {
+        if flags & 4 == 4 && ret.is_null() {
             unimplemented!();
         }
         if flags & 0x10 == 0x10 && ret != ptr {
@@ -300,10 +300,8 @@ impl AsanRuntime {
         }
         let ret = unsafe {
             let ret = allocator.alloc(size, 8);
-            extern "system" {
-                fn memcpy(dst: *mut c_void, src: *const c_void, size: usize) -> *mut c_void;
-            }
-            memcpy(ret as *mut c_void, ptr, allocator.get_usable_size(ptr));
+
+            memcpy(ret, ptr, allocator.get_usable_size(ptr));
             allocator.release(ptr);
             ret
         };
@@ -316,7 +314,7 @@ impl AsanRuntime {
                 memset(ret, 0, size);
             }
         }
-        if flags & 4 == 4 && ret == std::ptr::null_mut() {
+        if flags & 4 == 4 && ret.is_null() {
             unimplemented!();
         }
         if flags & 0x10 == 0x10 && ret != ptr {
@@ -453,9 +451,6 @@ impl AsanRuntime {
         let ret = unsafe { self.allocator_mut().alloc(size, 8) };
 
         if flags & 0x40 == 0x40 {
-            extern "system" {
-                fn memset(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
-            }
             unsafe {
                 memset(ret, 0, size);
             }
@@ -473,7 +468,7 @@ impl AsanRuntime {
     ) -> *mut c_void {
         unsafe {
             let ret = self.allocator_mut().alloc(size, 0x8);
-            if mem != std::ptr::null_mut() && ret != std::ptr::null_mut() {
+            if !mem.is_null() && !ret.is_null() {
                 let old_size = self.allocator_mut().get_usable_size(mem);
                 let copy_size = if size < old_size { size } else { old_size };
                 (mem as *mut u8).copy_to(ret as *mut u8, copy_size);
@@ -603,7 +598,7 @@ impl AsanRuntime {
     ) -> *mut c_void {
         unsafe {
             let ret = self.allocator_mut().alloc(size, 0x8);
-            if mem != std::ptr::null_mut() && ret != std::ptr::null_mut() {
+            if !mem.is_null() && !ret.is_null() {
                 let old_size = self.allocator_mut().get_usable_size(mem);
                 let copy_size = if size < old_size { size } else { old_size };
                 (mem as *mut u8).copy_to(ret as *mut u8, copy_size);

@@ -17,16 +17,9 @@ use crate::{
 ///
 /// This stage can be used to construct black-box (e.g., grammar-based) fuzzers.
 #[derive(Debug)]
-pub struct GenStage<G, Z>(G, PhantomData<Z>)
-where
-    Z: UsesState,
-    G: Generator<<<Z as UsesState>::State as UsesInput>::Input, Z::State>;
+pub struct GenStage<G, Z>(G, PhantomData<Z>);
 
-impl<G, Z> GenStage<G, Z>
-where
-    Z: UsesState,
-    G: Generator<<<Z as UsesState>::State as UsesInput>::Input, Z::State>,
-{
+impl<G, Z> GenStage<G, Z> {
     /// Create a new [`GenStage`].
     pub fn new(g: G) -> Self {
         Self(g, PhantomData)
@@ -36,25 +29,24 @@ where
 impl<G, Z> UsesState for GenStage<G, Z>
 where
     Z: UsesState,
-    G: Generator<<<Z as UsesState>::State as UsesInput>::Input, Z::State>,
 {
     type State = Z::State;
 }
 
 impl<E, EM, Z, G> Stage<E, EM, Z> for GenStage<G, Z>
 where
-    E: UsesState<State = Z::State>,
-    EM: UsesState<State = Z::State>,
+    E: UsesState<State = Self::State>,
+    EM: UsesState<State = Self::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasCorpus + HasRand,
-    G: Generator<<<Z as UsesState>::State as UsesInput>::Input, Z::State>,
+    Self::State: HasCorpus + HasRand,
+    G: Generator<<<Self as UsesState>::State as UsesInput>::Input, Self::State>,
 {
     #[inline]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut Z::State,
+        state: &mut Self::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
         let input = self.0.generate(state)?;

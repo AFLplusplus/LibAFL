@@ -235,7 +235,7 @@ fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
 ))]
 mod linux {
     use alloc::{string::ToString, vec::Vec};
-    use std::mem;
+    use core::mem::{size_of, zeroed};
 
     #[cfg(not(target_os = "freebsd"))]
     use libc::cpu_set_t;
@@ -276,7 +276,7 @@ mod linux {
         let result = unsafe {
             sched_setaffinity(
                 0, // Defaults to current thread
-                mem::size_of::<cpu_set_t>(),
+                size_of::<cpu_set_t>(),
                 &set,
             )
         };
@@ -295,7 +295,7 @@ mod linux {
         let result = unsafe {
             sched_getaffinity(
                 0, // Defaults to current thread
-                mem::size_of::<cpu_set_t>(),
+                size_of::<cpu_set_t>(),
                 &mut set,
             )
         };
@@ -310,7 +310,7 @@ mod linux {
     }
 
     fn new_cpu_set() -> cpu_set_t {
-        unsafe { mem::zeroed::<cpu_set_t>() }
+        unsafe { zeroed::<cpu_set_t>() }
     }
 
     #[cfg(test)]

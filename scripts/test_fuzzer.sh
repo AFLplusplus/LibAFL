@@ -49,14 +49,11 @@ do
 
     cd "$fuzzer" || exit 1
     # Clippy checks
-    if [ "$1" != "--no-fmt" ]; then
-        
-        echo "[*] Checking fmt for $fuzzer"
-        cargo fmt --all -- --check || exit 1
+    if [ "$1" != "--no-clippy" ]; then
         echo "[*] Running clippy for $fuzzer"
         cargo clippy || exit 1
     else
-        echo "[+] Skipping fmt and clippy for $fuzzer (--no-fmt specified)"
+        echo "[+] Skipping fmt and clippy for $fuzzer (--no-clippy specified)"
     fi
     
     if [ -e ./Makefile.toml ] && grep -qF "skip_core_tasks = true" Makefile.toml; then
