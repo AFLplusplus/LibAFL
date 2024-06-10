@@ -50,7 +50,7 @@ use crate::{
     monitors::UserStats,
     observers::ObserversTuple,
     state::{HasExecutions, HasLastReportTime, State},
-    Error, HasMetadata,
+    Error,
 };
 #[cfg(feature = "scalability_introspection")]
 use crate::{
@@ -404,7 +404,7 @@ where
 /// [`ProgressReporter`] report progress to the broker.
 pub trait ProgressReporter<S>: EventFirer<S>
 where
-    S: HasCorpus + HasMetadata + HasExecutions + HasLastReportTime,
+    S: HasCorpus + HasExecutions + HasLastReportTime,
 {
     /// Given the last time, if `monitor_timeout` seconds passed, send off an info/monitor/heartbeat message to the broker.
     /// Returns the new `last` time (so the old one, unless `monitor_timeout` time has passed and monitor have been sent)
@@ -542,7 +542,7 @@ pub trait EventManager<E, S, Z>:
     + HasEventManagerId
     + ProgressReporter<S>
 where
-    S: HasCorpus + HasCurrentStage + HasMetadata + HasExecutions + HasLastReportTime,
+    S: HasCorpus + HasCurrentStage + HasExecutions + HasLastReportTime,
 {
 }
 
@@ -650,12 +650,12 @@ impl<E, S, Z> EventProcessor<E, S, Z> for NopEventManager<S> {
 }
 
 impl<E, S, Z> EventManager<E, S, Z> for NopEventManager<S> where
-    S: HasCorpus + HasCurrentStage + HasMetadata + HasExecutions + HasLastReportTime
+    S: HasCorpus + HasCurrentStage + HasExecutions + HasLastReportTime
 {
 }
 
 impl<S> ProgressReporter<S> for NopEventManager<S> where
-    S: HasCorpus + HasMetadata + HasExecutions + HasLastReportTime
+    S: HasCorpus + HasExecutions + HasLastReportTime
 {
 }
 
@@ -765,14 +765,14 @@ where
 impl<E, EM, M, S, Z> EventManager<E, S, Z> for MonitorTypedEventManager<EM, M>
 where
     EM: EventManager<E, S, Z>,
-    S: HasCorpus + HasCurrentStage + HasMetadata + HasExecutions + HasLastReportTime,
+    S: HasCorpus + HasCurrentStage + HasExecutions + HasLastReportTime,
 {
 }
 
 impl<EM, M, S> ProgressReporter<S> for MonitorTypedEventManager<EM, M>
 where
     EM: ProgressReporter<S>,
-    S: HasCorpus + HasMetadata + HasExecutions + HasLastReportTime,
+    S: HasCorpus + HasExecutions + HasLastReportTime,
 {
     #[inline]
     fn maybe_report_progress(

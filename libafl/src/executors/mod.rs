@@ -3,6 +3,7 @@
 #[cfg(unix)]
 use alloc::vec::Vec;
 use core::fmt::Debug;
+use std::ops::{Deref, DerefMut};
 
 pub use combined::CombinedExecutor;
 #[cfg(all(feature = "std", any(unix, doc)))]
@@ -22,7 +23,6 @@ pub use with_observers::WithObservers;
 
 use crate::{
     observers::{ObserversTuple, UsesObservers},
-    state::UsesState,
     Error,
 };
 
@@ -110,26 +110,25 @@ libafl_bolts::impl_serdeany!(DiffExitKind);
 
 /// Holds a tuple of Observers
 pub trait HasObservers: UsesObservers {
+    type ObserversRef: Deref<Target = Self::Observers>;
+    type ObserversRefMut: DerefMut<Target = Self::Observers>;
+
     /// Get the linked observers
-    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers>;
+    fn observers(&self) -> RefIndexable<Self::ObserversRef, Self::Observers>;
 
     /// Get the linked observers (mutable)
-    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers>;
+    fn observers_mut(&mut self) -> RefIndexable<Self::ObserversRefMut, Self::Observers>;
 }
 
 /// An executor takes the given inputs, and runs the harness/target.
-pub trait Executor<EM, Z>: UsesState
-where
-    EM: UsesState<State = Self::State>,
-    Z: UsesState<State = Self::State>,
-{
+pub trait Executor<EM, I, S, Z> {
     /// Instruct the target about the input and run
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut Self::State,
+        state: &mut S,
         mgr: &mut EM,
-        input: &Self::Input,
+        input: &I,
     ) -> Result<ExitKind, Error>;
 
     /// Wraps this Executor with the given [`ObserversTuple`] to implement [`HasObservers`].
@@ -139,7 +138,7 @@ where
     fn with_observers<OT>(self, observers: OT) -> WithObservers<Self, OT>
     where
         Self: Sized,
-        OT: ObserversTuple<Self::State>,
+        OT: ObserversTuple<I, S>,
     {
         WithObservers::new(self, observers)
     }
@@ -175,7 +174,7 @@ pub mod test {
         executors::{Executor, ExitKind},
         fuzzer::test::NopFuzzer,
         inputs::{BytesInput, HasTargetBytes},
-        state::{HasExecutions, NopState, State, UsesState},
+        state::{HasExecutions, NopState},
     };
 
     /// A simple executor that does nothing.
@@ -200,26 +199,17 @@ pub mod test {
         }
     }
 
-    impl<S> UsesState for NopExecutor<S>
+    impl<EM, I, S, Z> Executor<EM, I, S, Z> for NopExecutor<S>
     where
-        S: State,
-    {
-        type State = S;
-    }
-
-    impl<EM, S, Z> Executor<EM, Z> for NopExecutor<S>
-    where
-        EM: UsesState<State = S>,
-        S: State + HasExecutions,
-        S::Input: HasTargetBytes,
-        Z: UsesState<State = S>,
+        S: HasExecutions,
+        I: HasTargetBytes,
     {
         fn run_target(
             &mut self,
             _fuzzer: &mut Z,
             state: &mut Self::State,
             _mgr: &mut EM,
-            input: &Self::Input,
+            input: &I,
         ) -> Result<ExitKind, Error> {
             *state.executions_mut() += 1;
 

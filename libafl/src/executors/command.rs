@@ -1,9 +1,5 @@
 //! The command executor executes a sub program for each run
 use alloc::vec::Vec;
-use core::{
-    fmt::{self, Debug, Formatter},
-    marker::PhantomData,
-};
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 #[cfg(feature = "std")]
@@ -26,9 +22,9 @@ use libafl_bolts::{
 use crate::executors::{Executor, ExitKind};
 use crate::{
     executors::HasObservers,
-    inputs::{HasTargetBytes, UsesInput},
+    inputs::{BytesInput, HasTargetBytes},
     observers::{ObserversTuple, StdErrObserver, StdOutObserver, UsesObservers},
-    state::{HasExecutions, State, UsesState},
+    state::{HasExecutions, State},
     std::borrow::ToOwned,
 };
 #[cfg(feature = "std")]
@@ -160,18 +156,18 @@ where
     }
 }
 
-/// A `CommandExecutor` is a wrapper around [`std::process::Command`] to execute a target as a child process.
+/// A `CommandExecutor` is a wrapper around [`Command`] to execute a target as a child process.
 /// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] on it.
 /// Instead, you can use [`CommandExecutor::builder()`] to construct a [`CommandExecutor`] backed by a [`StdCommandConfigurator`].
-pub struct CommandExecutor<OT, S, T> {
+#[derive(Debug)]
+pub struct CommandExecutor<OT, T> {
     /// The wrapped command configurer
     configurer: T,
     /// The observers used by this executor
     observers: OT,
-    phantom: PhantomData<S>,
 }
 
-impl CommandExecutor<(), (), ()> {
+impl CommandExecutor<(), ()> {
     /// Creates a builder for a new [`CommandExecutor`],
     /// backed by a [`StdCommandConfigurator`]
     /// This is usually the easiest way to construct a [`CommandExecutor`].
@@ -189,24 +185,7 @@ impl CommandExecutor<(), (), ()> {
     }
 }
 
-impl<OT, S, T> Debug for CommandExecutor<OT, S, T>
-where
-    T: Debug,
-    OT: Debug,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("CommandExecutor")
-            .field("inner", &self.configurer)
-            .field("observers", &self.observers)
-            .finish()
-    }
-}
-
-impl<OT, S, T> CommandExecutor<OT, S, T>
-where
-    T: Debug,
-    OT: Debug,
-{
+impl<OT, T> CommandExecutor<OT, T> {
     /// Accesses the inner value
     pub fn inner(&mut self) -> &mut T {
         &mut self.configurer
@@ -215,13 +194,11 @@ where
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
 #[cfg(all(feature = "std", unix))]
-impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<OT, S, T>
+impl<EM, I, OT, S, T, Z> Executor<EM, I, S, Z> for CommandExecutor<OT, T>
 where
-    EM: UsesState<State = S>,
-    S: State + HasExecutions,
-    T: CommandConfigurator<S::Input>,
-    OT: Debug + MatchName + ObserversTuple<S>,
-    Z: UsesState<State = S>,
+    S: HasExecutions,
+    T: CommandConfigurator<I>,
+    OT: ObserversTuple<I, S>,
 {
     fn run_target(
         &mut self,
@@ -263,7 +240,7 @@ where
                 .post_exec_child_all(state, input, &exit_kind)?;
         }
 
-        if let Some(ref mut ob) = &mut self.configurer.stdout_observer_mut() {
+        if let Some(ob) = self.configurer.stdout_observer_mut() {
             let mut stdout = Vec::new();
             child.stdout.as_mut().ok_or_else(|| {
                  Error::illegal_state(
@@ -272,7 +249,7 @@ where
              })?.read_to_end(&mut stdout)?;
             ob.observe_stdout(&stdout);
         }
-        if let Some(ref mut ob) = &mut self.configurer.stderr_observer_mut() {
+        if let Some(ob) = self.configurer.stderr_observer_mut() {
             let mut stderr = Vec::new();
             child.stderr.as_mut().ok_or_else(|| {
                  Error::illegal_state(
@@ -285,26 +262,13 @@ where
     }
 }
 
-impl<OT, S, T> UsesState for CommandExecutor<OT, S, T>
-where
-    S: State,
-{
-    type State = S;
-}
-
-impl<OT, S, T> UsesObservers for CommandExecutor<OT, S, T>
-where
-    OT: ObserversTuple<S>,
-    S: State,
-{
+impl<OT, T> UsesObservers for CommandExecutor<OT, T> {
     type Observers = OT;
 }
 
-impl<OT, S, T> HasObservers for CommandExecutor<OT, S, T>
+impl<OT, T> HasObservers for CommandExecutor<OT, T>
 where
-    S: State,
-    T: Debug,
-    OT: ObserversTuple<S>,
+    OT: MatchName,
 {
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         RefIndexable::from(&self.observers)
@@ -479,14 +443,12 @@ impl CommandExecutorBuilder {
     }
 
     /// Builds the `CommandExecutor`
-    pub fn build<OT, S>(
+    pub fn build<OT>(
         &self,
         observers: OT,
-    ) -> Result<CommandExecutor<OT, S, StdCommandConfigurator>, Error>
+    ) -> Result<CommandExecutor<OT, StdCommandConfigurator>, Error>
     where
-        OT: MatchName + ObserversTuple<S>,
-        S: UsesInput,
-        S::Input: Input + HasTargetBytes,
+        OT: MatchName,
     {
         let Some(program) = &self.program else {
             return Err(Error::illegal_argument(
@@ -533,16 +495,14 @@ impl CommandExecutorBuilder {
             timeout: self.timeout,
             command,
         };
-        Ok(
-            <StdCommandConfigurator as CommandConfigurator<S::Input>>::into_executor::<OT, S>(
-                configurator,
-                observers,
-            ),
-        )
+        // we use BytesInput here, but this configurator is compatible with any HasTargetBytes type
+        Ok(<StdCommandConfigurator as CommandConfigurator<
+            BytesInput,
+        >>::into_executor::<OT>(configurator, observers))
     }
 }
 
-/// A `CommandConfigurator` takes care of creating and spawning a [`std::process::Command`] for the [`CommandExecutor`].
+/// A `CommandConfigurator` takes care of creating and spawning a [`Command`] for the [`CommandExecutor`].
 /// # Example
 #[cfg_attr(all(feature = "std", unix), doc = " ```")]
 #[cfg_attr(not(all(feature = "std", unix)), doc = " ```ignore")]
@@ -611,14 +571,13 @@ pub trait CommandConfigurator<I>: Sized {
     fn exec_timeout(&self) -> Duration;
 
     /// Create an `Executor` from this `CommandConfigurator`.
-    fn into_executor<OT, S>(self, observers: OT) -> CommandExecutor<OT, S, Self>
+    fn into_executor<OT>(self, observers: OT) -> CommandExecutor<OT, Self>
     where
         OT: MatchName,
     {
         CommandExecutor {
             configurer: self,
             observers,
-            phantom: PhantomData,
         }
     }
 }

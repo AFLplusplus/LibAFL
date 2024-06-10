@@ -36,7 +36,7 @@ use crate::{
     monitors::Monitor,
     stages::HasCurrentStage,
     state::{HasExecutions, HasLastReportTime},
-    Error, HasMetadata,
+    Error,
 };
 #[cfg(feature = "std")]
 use crate::{
@@ -97,8 +97,6 @@ impl<H, I, MT, S> EventRestarter<S> for SimpleEventManager<H, I, MT> where S: Ha
 
 impl<E, H, I, MT, S, Z> EventProcessor<E, S, Z> for SimpleEventManager<H, I, MT>
 where
-    S: HasCorpus,
-    S::Corpus: Corpus<Input = I>,
     H: CustomBufHandlerTuple<S>,
 {
     fn process(
@@ -118,7 +116,7 @@ where
 impl<H, I, MT, S> ProgressReporter<S> for SimpleEventManager<H, I, MT>
 where
     MT: Monitor,
-    S: HasCorpus + HasMetadata + HasExecutions + HasLastReportTime,
+    S: HasCorpus + HasExecutions + HasLastReportTime,
     S::Corpus: Corpus<Input = I>,
 {
 }
@@ -132,7 +130,7 @@ impl<H, I, MT> HasEventManagerId for SimpleEventManager<H, I, MT> {
 impl<E, H, I, MT, S, Z> EventManager<E, S, Z> for SimpleEventManager<H, I, MT>
 where
     MT: Monitor,
-    S: HasCorpus + HasCurrentStage + HasMetadata + HasExecutions + HasLastReportTime,
+    S: HasCorpus + HasCurrentStage + HasExecutions + HasLastReportTime,
     S::Corpus: Corpus<Input = I>,
     H: CustomBufHandlerTuple<S>,
 {
@@ -385,7 +383,7 @@ where
 impl<E, H, I, MT, S, SP, Z> EventManager<E, S, Z> for SimpleRestartingEventManager<H, I, MT, SP>
 where
     MT: Monitor,
-    S: HasCorpus + HasCurrentStage + HasMetadata + HasExecutions + HasLastReportTime,
+    S: HasCorpus + HasCurrentStage + HasExecutions + HasLastReportTime,
     S::Corpus: Corpus<Input = I>,
     SP: ShMemProvider,
     H: CustomBufHandlerTuple<S>,

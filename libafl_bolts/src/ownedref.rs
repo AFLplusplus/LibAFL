@@ -827,14 +827,14 @@ where
 
 /// Wrap a C-style mutable pointer and convert to a Box on serialize
 #[derive(Clone, Debug)]
-pub enum OwnedMutPtr<T: Sized> {
+pub enum OwnedMutPtr<T> {
     /// A mut ptr to the content
     Ptr(*mut T),
     /// An owned [`Box`] to the content
     Owned(Box<T>),
 }
 
-impl<T: Sized> OwnedMutPtr<T> {
+impl<T> OwnedMutPtr<T> {
     /// Creates a new [`OwnedMutPtr`] from a raw pointer
     ///
     /// # Safety
@@ -845,7 +845,10 @@ impl<T: Sized> OwnedMutPtr<T> {
     }
 }
 
-impl<T: Sized + Serialize> Serialize for OwnedMutPtr<T> {
+impl<T> Serialize for OwnedMutPtr<T>
+where
+    T: Serialize,
+{
     fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -854,9 +857,9 @@ impl<T: Sized + Serialize> Serialize for OwnedMutPtr<T> {
     }
 }
 
-impl<'de, T: Sized + serde::de::DeserializeOwned> Deserialize<'de> for OwnedMutPtr<T>
+impl<'de, T> Deserialize<'de> for OwnedMutPtr<T>
 where
-    Vec<T>: Deserialize<'de>,
+    T: Sized + Deserialize<'de>,
 {
     fn deserialize<D>(de: D) -> Result<Self, D::Error>
     where
