@@ -646,6 +646,7 @@ pub mod unix_shmem {
     mod default {
         use alloc::string::ToString;
         use core::{
+            ffi::CStr,
             ops::{Deref, DerefMut},
             ptr, slice,
         };
@@ -821,6 +822,16 @@ pub mod unix_shmem {
                 size: usize,
             ) -> Result<Self::ShMem, Error> {
                 MmapShMem::shmem_from_id_and_size(id, size)
+            }
+
+            fn release_shmem(&mut self, shmem: &mut Self::ShMem) {
+                let fd = CStr::from_bytes_until_nul(shmem.id().as_array())
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .parse()
+                    .unwrap();
+                unsafe { close(fd) };
             }
         }
 
@@ -1032,6 +1043,7 @@ pub mod unix_shmem {
 
         #[derive(Copy, Clone)]
         #[repr(C)]
+        #[allow(non_camel_case_types)]
         struct ashmem_pin {
             pub offset: c_uint,
             pub len: c_uint,
