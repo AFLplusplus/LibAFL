@@ -112,7 +112,7 @@ where
                 log::error!("Crashing target as it had ASan errors");
                 libc::raise(libc::SIGABRT);
                 #[cfg(windows)]
-                std::process::abort();
+                abort();
             }
         }
         self.helper.post_exec(input)?;

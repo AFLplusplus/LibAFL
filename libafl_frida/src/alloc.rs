@@ -380,7 +380,11 @@ impl Allocator {
         log::trace!("map_shadow_for_region: {:x}, {:x}", start, end);
         let shadow_start = self.round_down_to_page(shadow_mapping_start);
         let shadow_end = self.round_up_to_page((end - start) / 8 + self.page_size + shadow_start);
-        log::trace!("map_shadow_for_region: shadow_start {:x}, shadow_end {:x}", shadow_start, shadow_end);
+        log::trace!(
+            "map_shadow_for_region: shadow_start {:x}, shadow_end {:x}",
+            shadow_start,
+            shadow_end
+        );
         if self.using_pre_allocated_shadow_mapping {
             let mut newly_committed_regions = Vec::new();
             for gap in self.shadow_pages.gaps(&(shadow_start..shadow_end)) {
@@ -409,8 +413,11 @@ impl Allocator {
                 }
             }
             for newly_committed_region in newly_committed_regions {
-                log::trace!("committed shadow pages: start {:x}, end {:x}", 
-                    newly_committed_region.start(), newly_committed_region.end());
+                log::trace!(
+                    "committed shadow pages: start {:x}, end {:x}",
+                    newly_committed_region.start(),
+                    newly_committed_region.end()
+                );
                 self.shadow_pages
                     .insert(newly_committed_region.start()..newly_committed_region.end());
                 self.mappings
@@ -676,7 +683,11 @@ impl Allocator {
                         shadow_bit = (try_shadow_bit).try_into().unwrap();
 
                         log::warn!("shadow_bit {shadow_bit:} is suitable");
-                        log::trace!("shadow area from {:x} to {:x} pre-allocated", addr, addr + 1 << (try_shadow_bit + 1));
+                        log::trace!(
+                            "shadow area from {:x} to {:x} pre-allocated",
+                            addr,
+                            addr + (1 << (try_shadow_bit + 1))
+                        );
                         self.pre_allocated_shadow_mappings.push(mapping);
                         self.using_pre_allocated_shadow_mapping = true;
                         break;

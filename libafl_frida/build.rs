@@ -3,12 +3,12 @@
 
 fn main() {
     let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap();
-    if target_os != "ios" { 
+    if target_os != "ios" {
         cc::Build::new().file("src/gettls.c").compile("libgettls.a");
     }
 
     let target_family = std::env::var("CARGO_CFG_TARGET_FAMILY").unwrap();
-    
+
     // Force linking against libc++
     if target_family == "unix" {
         println!("cargo:rustc-link-lib=dylib=c++");
@@ -25,7 +25,7 @@ fn main() {
         let compiler = cc::Build::new()
             .cpp(true)
             .file("test_harness.cpp")
-            .get_compiler();      
+            .get_compiler();
         let mut cmd = std::process::Command::new(compiler.path());
         let cmd = cmd
             .args(compiler.args())
@@ -55,11 +55,14 @@ fn main() {
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
         );
-        
-        // std::fs::write("compiler_output.txt", output_str.clone()).expect("Unable to write file");        
+
+        // std::fs::write("compiler_output.txt", output_str.clone()).expect("Unable to write file");
         if !output.status.success() {
-            panic!("Failed to link test_harness.dll\n {:?}", output_str.as_str());
-        }        
+            panic!(
+                "Failed to link test_harness.dll\n {:?}",
+                output_str.as_str()
+            );
+        }
     } else {
         let compiler = cc::Build::new()
             .cpp(true)
