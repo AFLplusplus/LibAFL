@@ -57,12 +57,10 @@ fn main() {
         );
 
         // std::fs::write("compiler_output.txt", output_str.clone()).expect("Unable to write file");
-        if !output.status.success() {
-            panic!(
+        assert!(output.status.success(),
                 "Failed to link test_harness.dll\n {:?}",
                 output_str.as_str()
             );
-        }
     } else {
         let compiler = cc::Build::new()
             .cpp(true)
