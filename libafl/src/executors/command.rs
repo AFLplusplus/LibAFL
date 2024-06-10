@@ -23,7 +23,7 @@ use crate::executors::{Executor, ExitKind};
 use crate::{
     executors::HasObservers,
     inputs::{BytesInput, HasTargetBytes},
-    observers::{ObserversTuple, StdErrObserver, StdOutObserver, UsesObservers},
+    observers::{ObserversTuple, StdErrObserver, StdOutObserver},
     state::{HasExecutions, State},
     std::borrow::ToOwned,
 };
@@ -262,19 +262,19 @@ where
     }
 }
 
-impl<OT, T> UsesObservers for CommandExecutor<OT, T> {
-    type Observers = OT;
-}
-
-impl<OT, T> HasObservers for CommandExecutor<OT, T>
+impl<'a, OT, T> HasObservers<'a> for CommandExecutor<OT, T>
 where
     OT: MatchName,
 {
-    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
+    type Observers = OT;
+    type ObserversRef = &'a Self::Observers;
+    type ObserversRefMut = &'a mut Self::Observers;
+
+    fn observers(&'a self) -> RefIndexable<&'a Self::Observers, Self::Observers> {
         RefIndexable::from(&self.observers)
     }
 
-    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
+    fn observers_mut(&'a mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
         RefIndexable::from(&mut self.observers)
     }
 }

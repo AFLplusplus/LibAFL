@@ -16,15 +16,12 @@ pub use inprocess::InProcessExecutor;
 pub use inprocess_fork::InProcessForkExecutor;
 #[cfg(unix)]
 use libafl_bolts::os::unix_signals::Signal;
-use libafl_bolts::tuples::RefIndexable;
+use libafl_bolts::{bolts_prelude::MatchName, tuples::RefIndexable};
 use serde::{Deserialize, Serialize};
 pub use shadow::ShadowExecutor;
 pub use with_observers::WithObservers;
 
-use crate::{
-    observers::{ObserversTuple, UsesObservers},
-    Error,
-};
+use crate::{observers::ObserversTuple, Error};
 
 pub mod combined;
 #[cfg(all(feature = "std", any(unix, doc)))]
@@ -109,15 +106,17 @@ impl From<ExitKind> for DiffExitKind {
 libafl_bolts::impl_serdeany!(DiffExitKind);
 
 /// Holds a tuple of Observers
-pub trait HasObservers: UsesObservers {
+pub trait HasObservers<'a> {
+    /// The observers type
+    type Observers: MatchName;
     type ObserversRef: Deref<Target = Self::Observers>;
     type ObserversRefMut: DerefMut<Target = Self::Observers>;
 
     /// Get the linked observers
-    fn observers(&self) -> RefIndexable<Self::ObserversRef, Self::Observers>;
+    fn observers(&'a self) -> RefIndexable<Self::ObserversRef, Self::Observers>;
 
     /// Get the linked observers (mutable)
-    fn observers_mut(&mut self) -> RefIndexable<Self::ObserversRefMut, Self::Observers>;
+    fn observers_mut(&'a mut self) -> RefIndexable<Self::ObserversRefMut, Self::Observers>;
 }
 
 /// An executor takes the given inputs, and runs the harness/target.

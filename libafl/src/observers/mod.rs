@@ -86,13 +86,6 @@ pub trait Observer<I, S>: Named {
     }
 }
 
-/// Defines the observer type shared across traits of the type.
-/// Needed for consistency across HasCorpus/HasSolutions and friends.
-pub trait UsesObservers {
-    /// The observers type
-    type Observers: MatchName;
-}
-
 /// A haskell-style tuple of observers
 pub trait ObserversTuple<I, S>: MatchName {
     /// This is called right before the next execution.

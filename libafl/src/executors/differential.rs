@@ -7,16 +7,12 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
-use libafl_bolts::{
-    ownedref::OwnedMutPtr,
-    prelude::OwnedPtr,
-    tuples::{MatchName, RefIndexable},
-};
+use libafl_bolts::tuples::{MatchName, RefIndexable};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    observers::{DifferentialObserversTuple, ObserversTuple, UsesObservers},
+    observers::{DifferentialObserversTuple, ObserversTuple},
     Error,
 };
 
@@ -49,13 +45,17 @@ impl<A, B, DOT> DiffExecutor<A, B, DOT> {
     }
 }
 
+// for<'a> is a bit gross, but necessary -- the lifetime isn't constrained by anything else!
 impl<A, B, DOT, EM, I, S, Z> Executor<EM, I, S, Z> for DiffExecutor<A, B, DOT>
 where
-    A: Executor<EM, I, S, Z> + HasObservers,
-    B: Executor<EM, I, S, Z> + HasObservers,
-    A::Observers: ObserversTuple<I, S>,
-    B::Observers: ObserversTuple<I, S>,
-    DOT: DifferentialObserversTuple<A::Observers, B::Observers>,
+    A: Executor<EM, I, S, Z> + for<'a> HasObservers<'a>,
+    B: Executor<EM, I, S, Z> + for<'a> HasObservers<'a>,
+    for<'a> <A as HasObservers<'a>>::Observers: ObserversTuple<I, S>,
+    for<'a> <B as HasObservers<'a>>::Observers: ObserversTuple<I, S>,
+    for<'a> DOT: DifferentialObserversTuple<
+        <A as HasObservers<'a>>::Observers,
+        <B as HasObservers<'a>>::Observers,
+    >,
 {
     fn run_target(
         &mut self,
@@ -64,25 +64,33 @@ where
         mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
-        self.observers
-            .pre_observe_first_all(self.primary.observers_mut().deref_mut())?;
-        self.primary.observers_mut().pre_exec_all(state, input)?;
+        {
+            let mut primary_obs = self.primary.observers_mut();
+            self.observers
+                .pre_observe_first_all(primary_obs.deref_mut())?;
+            primary_obs.pre_exec_all(state, input)?;
+        }
         let ret1 = self.primary.run_target(fuzzer, state, mgr, input)?;
-        self.primary
-            .observers_mut()
-            .post_exec_all(state, input, &ret1)?;
-        self.observers
-            .post_observe_first_all(self.primary.observers_mut().deref_mut())?;
+        {
+            let mut primary_obs = self.primary.observers_mut();
+            primary_obs.post_exec_all(state, input, &ret1)?;
+            self.observers
+                .post_observe_first_all(primary_obs.deref_mut())?;
+        }
 
-        self.observers
-            .pre_observe_second_all(self.secondary.observers_mut().deref_mut())?;
-        self.secondary.observers_mut().pre_exec_all(state, input)?;
+        {
+            let mut secondary_obs = self.secondary.observers_mut();
+            self.observers
+                .pre_observe_second_all(secondary_obs.deref_mut())?;
+            secondary_obs.pre_exec_all(state, input)?;
+        }
         let ret2 = self.secondary.run_target(fuzzer, state, mgr, input)?;
-        self.secondary
-            .observers_mut()
-            .post_exec_all(state, input, &ret2)?;
-        self.observers
-            .post_observe_second_all(self.secondary.observers_mut().deref_mut())?;
+        {
+            let mut secondary_obs = self.secondary.observers_mut();
+            secondary_obs.post_exec_all(state, input, &ret2)?;
+            self.observers
+                .post_observe_second_all(secondary_obs.deref_mut())?;
+        }
         if ret1 == ret2 {
             Ok(ret1)
         } else {
@@ -97,20 +105,20 @@ where
 
 /// Proxy the observers of the inner executors
 #[derive(Debug)]
-pub enum ProxyObserversTuple<A, B, DOT>
+pub enum ProxyObserversTuple<'a, A, B, DOT>
 where
-    A: HasObservers,
-    B: HasObservers,
+    A: HasObservers<'a>,
+    B: HasObservers<'a>,
 {
-    Wrapped(OwnedPtr<DiffExecutor<A, B, DOT>>),
-    WrappedMut(OwnedMutPtr<DiffExecutor<A, B, DOT>>),
+    Wrapped(&'a DiffExecutor<A, B, DOT>),
+    WrappedMut(&'a mut DiffExecutor<A, B, DOT>),
     Owned(A::Observers, B::Observers, DOT),
 }
 
-impl<A, B, DOT> Serialize for ProxyObserversTuple<A, B, DOT>
+impl<'a, A, B, DOT> Serialize for ProxyObserversTuple<'a, A, B, DOT>
 where
-    A: HasObservers,
-    B: HasObservers,
+    A: HasObservers<'a>,
+    B: HasObservers<'a>,
     A::Observers: Serialize,
     B::Observers: Serialize,
     DOT: Serialize,
@@ -120,32 +128,26 @@ where
         S: Serializer,
     {
         let serializable = match self {
-            ProxyObserversTuple::Wrapped(exec) => {
-                let exec = exec.as_ref();
-                (
-                    exec.primary.observers().deref(),
-                    exec.secondary.observers().deref(),
-                    &exec.observers,
-                )
-            }
-            ProxyObserversTuple::WrappedMut(exec) => {
-                let exec = exec.as_ref();
-                (
-                    exec.primary.observers().deref(),
-                    exec.secondary.observers().deref(),
-                    &exec.observers,
-                )
-            }
+            ProxyObserversTuple::Wrapped(exec) => (
+                exec.primary.observers().deref(),
+                exec.secondary.observers().deref(),
+                &exec.observers,
+            ),
+            ProxyObserversTuple::WrappedMut(exec) => (
+                exec.primary.observers().deref(),
+                exec.secondary.observers().deref(),
+                &exec.observers,
+            ),
             ProxyObserversTuple::Owned(a, b, dot) => (a, b, dot),
         };
         serializable.serialize(serializer)
     }
 }
 
-impl<'de, A, B, DOT> Deserialize<'de> for ProxyObserversTuple<A, B, DOT>
+impl<'a, 'de, A, B, DOT> Deserialize<'de> for ProxyObserversTuple<'a, A, B, DOT>
 where
-    A: HasObservers,
-    B: HasObservers,
+    A: HasObservers<'a>,
+    B: HasObservers<'a>,
     A::Observers: Deserialize<'de>,
     B::Observers: Deserialize<'de>,
     DOT: Deserialize<'de>,
@@ -160,10 +162,10 @@ where
 }
 
 #[allow(deprecated)]
-fn match_name_ptr<'a, T, A, B, DOT>(exec: &'a DiffExecutor<A, B, DOT>, name: &str) -> Option<&'a T>
+fn match_name_ref<'a, T, A, B, DOT>(exec: &'a DiffExecutor<A, B, DOT>, name: &str) -> Option<&'a T>
 where
-    A: HasObservers,
-    B: HasObservers,
+    A: HasObservers<'a>,
+    B: HasObservers<'a>,
     DOT: MatchName,
 {
     if let Some(t) = exec.primary.observers().match_name::<T>(name) {
@@ -175,17 +177,17 @@ where
     }
 }
 
-impl<A, B, DOT> MatchName for ProxyObserversTuple<A, B, DOT>
+impl<'a, A, B, DOT> MatchName for ProxyObserversTuple<'a, A, B, DOT>
 where
-    A: HasObservers,
-    B: HasObservers,
+    A: HasObservers<'a>,
+    B: HasObservers<'a>,
     DOT: MatchName,
 {
     #[allow(deprecated)]
     fn match_name<T>(&self, name: &str) -> Option<&T> {
         match self {
-            ProxyObserversTuple::Wrapped(exec) => match_name_ptr(exec.as_ref(), name),
-            ProxyObserversTuple::WrappedMut(exec) => match_name_ptr(exec.as_ref(), name),
+            ProxyObserversTuple::Wrapped(exec) => match_name_ref(exec.as_ref(), name),
+            ProxyObserversTuple::WrappedMut(exec) => match_name_ref(exec.as_ref(), name),
             ProxyObserversTuple::Owned(primary, secondary, observers) => {
                 if let Some(t) = primary.match_name::<T>(name) {
                     Some(t)
@@ -227,10 +229,10 @@ where
     }
 }
 
-impl<A, B, DOT, I, S> ObserversTuple<I, S> for ProxyObserversTuple<A, B, DOT>
+impl<'a, A, B, DOT, I, S> ObserversTuple<I, S> for ProxyObserversTuple<'a, A, B, DOT>
 where
-    A: HasObservers,
-    B: HasObservers,
+    A: HasObservers<'a>,
+    B: HasObservers<'a>,
     DOT: MatchName + ObserversTuple<A, B>,
     A::Observers: ObserversTuple<I, S>,
     B::Observers: ObserversTuple<I, S>,
@@ -290,15 +292,7 @@ where
     }
 }
 
-impl<A, B, DOT> UsesObservers for DiffExecutor<A, B, DOT>
-where
-    A: HasObservers,
-    B: HasObservers,
-{
-    type Observers = ProxyObserversTuple<A::Observers, B::Observers, DOT>;
-}
-
-impl<A, B, DOT> Deref for ProxyObserversTuple<A, B, DOT> {
+impl<'a, A, B, DOT> Deref for ProxyObserversTuple<'a, A, B, DOT> {
     type Target = Self;
 
     fn deref(&self) -> &Self::Target {
@@ -306,30 +300,31 @@ impl<A, B, DOT> Deref for ProxyObserversTuple<A, B, DOT> {
     }
 }
 
-impl<A, B, DOT> DerefMut for ProxyObserversTuple<A, B, DOT> {
+impl<'a, A, B, DOT> DerefMut for ProxyObserversTuple<'a, A, B, DOT> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self
     }
 }
 
-impl<A, B, DOT> HasObservers for DiffExecutor<A, B, DOT>
+impl<'a, A, B, DOT> HasObservers<'a> for DiffExecutor<A, B, DOT>
 where
-    A: HasObservers,
-    B: HasObservers,
+    A: HasObservers<'a>,
+    B: HasObservers<'a>,
     DOT: MatchName,
 {
+    type Observers = ProxyObserversTuple<'a, A, B, DOT>;
     type ObserversRef = Self::Observers;
     type ObserversRefMut = Self::Observers;
 
     #[inline]
-    fn observers(&self) -> RefIndexable<Self::ObserversRef, Self::Observers> {
-        let proxy = ProxyObserversTuple::Wrapped(OwnedPtr::Ptr(self));
+    fn observers(&'a self) -> RefIndexable<Self::ObserversRef, Self::Observers> {
+        let proxy = ProxyObserversTuple::Wrapped(self);
         RefIndexable::from(proxy)
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> RefIndexable<Self::ObserversRefMut, Self::Observers> {
-        let proxy = ProxyObserversTuple::WrappedMut(OwnedMutPtr::Ptr(self));
+    fn observers_mut(&'a mut self) -> RefIndexable<Self::ObserversRefMut, Self::Observers> {
+        let proxy = ProxyObserversTuple::WrappedMut(self);
         RefIndexable::from(proxy)
     }
 }
