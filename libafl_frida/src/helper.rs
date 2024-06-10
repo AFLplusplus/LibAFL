@@ -183,7 +183,7 @@ impl FridaInstrumentationHelperBuilder {
     /// # Example
     /// Instrument all modules in `/usr/lib` as well as `libfoo.so`:
     /// ```
-    ///# use libafl_frida::helper::FridaInstrumentationHelperBuilder;
+    ///# use libafl_frida::helper::FridaInstrumentationHelper;
     /// let builder = FridaInstrumentationHelper::builder()
     ///     .instrument_module_if(|module| module.name() == "libfoo.so")
     ///     .instrument_module_if(|module| module.path().starts_with("/usr/lib"));
@@ -212,7 +212,7 @@ impl FridaInstrumentationHelperBuilder {
     /// Instrument all modules in `/usr/lib`, but exclude `libfoo.so`.
     ///
     /// ```
-    ///# use libafl_frida::helper::FridaInstrumentationHelperBuilder;
+    ///# use libafl_frida::helper::FridaInstrumentationHelper;
     /// let builder = FridaInstrumentationHelper::builder()
     ///     .instrument_module_if(|module| module.path().starts_with("/usr/lib"))
     ///     .skip_module_if(|module| module.name() == "libfoo.so");
@@ -484,13 +484,20 @@ where
                 let mut runtimes = (*runtimes_unborrowed).borrow_mut();
                 if first {
                     first = false;
-                    // log::info!(
-                    //     "block @ {:x} transformed to {:x}",
-                    //     address,
-                    //     output.writer().pc()
-                    // );
+                    log::trace!(
+                        "block @ {:x} transformed to {:x}",
+                        address,
+                        output.writer().pc()
+                    );
                     if let Some(rt) = runtimes.match_first_type_mut::<CoverageRuntime>() {
+                        let start = output.writer().pc();
                         rt.emit_coverage_mapping(address, output);
+                        log::trace!(
+                            "emitted coverage info mapping for {:x} at {:x}-{:x}",
+                            address,
+                            start, output.writer().pc()
+                        );
+
                     }
                     if let Some(_rt) = runtimes.match_first_type_mut::<DrCovRuntime>() {
                         basic_block_start = address;
@@ -506,6 +513,7 @@ where
                 #[cfg(target_arch = "x86_64")]
                 if let Some(details) = res {
                     if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
+                        let start = output.writer().pc();                        
                         rt.emit_shadow_check(
                             address,
                             output,
@@ -515,6 +523,11 @@ where
                             details.2,
                             details.3,
                             details.4,
+                        );
+                        log::trace!(
+                            "emitted shadow_check for {:x} at {:x}-{:x}",
+                            address,
+                            start, output.writer().pc()
                         );
                     }
                 }

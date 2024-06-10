@@ -373,7 +373,18 @@ mod tests {
         executor::FridaInProcessExecutor,
         helper::FridaInstrumentationHelper,
     };
-
+    
+    #[cfg(unix)]
+    use mimalloc::MiMalloc;
+    #[cfg(unix)]
+    #[global_allocator]
+    static GLOBAL: MiMalloc = MiMalloc;
+    #[cfg(windows)]
+    use dlmalloc::GlobalDlmalloc;
+    #[cfg(windows)]
+    #[global_allocator]
+    static GLOBAL: GlobalDlmalloc = GlobalDlmalloc;
+    
     static GUM: OnceLock<Gum> = OnceLock::new();
 
     #[allow(clippy::too_many_lines)]
