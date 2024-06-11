@@ -478,6 +478,7 @@ jobs:
           profile: minimal
           toolchain: stable
       - uses: actions/checkout@v3
+      - uses: ./.github/workflows/windows-tester-prepare      
       - uses: Swatinem/rust-cache@v2
       - name: Run real clippy, not the fake one
         shell: pwsh
