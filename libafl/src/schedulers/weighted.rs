@@ -101,7 +101,7 @@ pub struct WeightedScheduler<C, F, O, S> {
     map_observer_handle: Handle<C>,
     last_hash: usize,
     phantom: PhantomData<(F, O, S)>,
-    /// Change strategy on completion of every queue cycle.
+    /// Cycle `PowerSchedule` on completion of every queue cycle.
     cycle_schedules: bool,
 }
 
@@ -134,7 +134,7 @@ where
         }
     }
 
-    /// Cycles the `PowerSchedule` on completion of a queue cycle
+    /// Cycle the `PowerSchedule` on completion of a queue cycle
     #[must_use]
     pub fn cycle_schedules(mut self) -> Self {
         self.cycle_schedules = true;
