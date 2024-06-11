@@ -479,10 +479,9 @@ jobs:
           toolchain: stable
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
-      - name: Run clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
+      - name: Run real clippy, not the fake one
+        shell: pwsh
+        run: .\scripts\clippy.ps1
 
   macos:
     runs-on: macOS-latest

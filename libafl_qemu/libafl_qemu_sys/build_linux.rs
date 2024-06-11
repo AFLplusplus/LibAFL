@@ -100,7 +100,7 @@ pub fn build() {
     maybe_generate_stub_bindings(
         &cpu_target,
         &emulation_mode,
-        &stub_bindings_file,
-        &bindings_file,
+        stub_bindings_file.as_path(),
+        bindings_file.as_path(),
     );
 }

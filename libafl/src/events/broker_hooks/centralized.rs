@@ -32,7 +32,7 @@ where
         _broker_inner: &mut LlmpBrokerInner<SP>,
         client_id: ClientId,
         msg_tag: &mut Tag,
-        msg_flags: &mut Flags,
+        _msg_flags: &mut Flags,
         msg: &mut [u8],
         _new_msgs: &mut Vec<(Tag, Flags, Vec<u8>)>,
     ) -> Result<LlmpMsgHookResult, Error> {
@@ -44,7 +44,7 @@ where
             #[cfg(feature = "llmp_compression")]
             let compressed;
             #[cfg(feature = "llmp_compression")]
-            let event_bytes = if *msg_flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
+            let event_bytes = if *_msg_flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
                 compressed = compressor.decompress(msg)?;
                 &compressed
             } else {
