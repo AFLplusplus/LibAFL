@@ -19,8 +19,9 @@ cc = { version = "1.0", features = ["parallel"] }
 which = "4.4"
 
 [dependencies]
+env_logger = "0.10"
 libafl = { path = "../../libafl/" }
-libafl_bolts = { path = "../../libafl_bolts/" }
+libafl_bolts = { path = "../../libafl_bolts/", features = ["errors_backtrace"] }
 libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_hitcounts", "libfuzzer"] }
 # TODO Include it only when building cc
 libafl_cc = { path = "../../libafl_cc/" }
