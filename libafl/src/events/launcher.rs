@@ -841,17 +841,6 @@ where
             // let builder = builder.time_ref(self.time_obs.handle());
 
             // builder.build().launch()?;
-        } else {
-            for handle in &handles {
-                let mut status = 0;
-                log::info!("Not spawning broker (spawn_broker is false). Waiting for fuzzer children to exit...");
-                unsafe {
-                    libc::waitpid(*handle, &mut status, 0);
-                    if status != 0 {
-                        log::info!("Client with pid {handle} exited with status {status}");
-                    }
-                }
-            }
         }
 
         brokers.loop_with_timeouts(Duration::from_secs(30), Some(Duration::from_millis(5)));
