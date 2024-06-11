@@ -232,7 +232,7 @@ where
     }
 
     /// Cycles the strategy of the scheduler; tries to mimic AFL++'s cycling formula
-    pub fn cycle_schedule(
+    fn cycle_schedule(
         &mut self,
         metadata: &mut SchedulerMetadata,
     ) -> Result<PowerSchedule, Error> {
