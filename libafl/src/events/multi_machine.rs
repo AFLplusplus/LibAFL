@@ -25,7 +25,7 @@ use tokio::{
 use typed_builder::TypedBuilder;
 
 use crate::{
-    events::{Event, TcpMultiMachineEventManagerHook, TcpMultiMachineLlmpHook},
+    events::{Event, TcpMultiMachineLlmpReceiverHook, TcpMultiMachineLlmpSenderHook},
     inputs::Input,
 };
 
@@ -136,13 +136,17 @@ pub struct TcpMultiMachineBuilder {
 }
 
 impl TcpMultiMachineBuilder {
-    /// Build a new [`TcpMultiMachineEventManagerHook`] from a [`NodeDescriptor`]
+    /// Build a new couple [`TcpMultiMachineLlmpSenderHook`] / [`TcpMultiMachineLlmpReceiverHook`] from a [`NodeDescriptor`].
+    /// Everything is initialized and ready to be used.
+    /// Beware, the hooks should run in the same process as the one this function is called.
+    /// This is because we spawn a tokio runtime underneath.
+    /// Check https://github.com/tokio-rs/tokio/issues/4301 for more details.
     pub fn build<A: ToSocketAddrs + Display, I>(
         node_descriptor: NodeDescriptor<A>,
     ) -> Result<
         (
-            TcpMultiMachineEventManagerHook<A, I>,
-            TcpMultiMachineLlmpHook<A, I>,
+            TcpMultiMachineLlmpSenderHook<A, I>,
+            TcpMultiMachineLlmpReceiverHook<A, I>,
         ),
         Error,
     >
@@ -162,9 +166,17 @@ impl TcpMultiMachineBuilder {
             compressor: GzipCompressor::new(),
         }));
 
+        let rt = Arc::new(
+            Runtime::new().or_else(|_| Err(Error::unknown("Tokio runtime spawning failed")))?,
+        );
+
+        unsafe {
+            TcpMultiMachineState::init(state.clone(), rt.clone())?;
+        }
+
         Ok((
-            TcpMultiMachineEventManagerHook::new(state.clone()),
-            TcpMultiMachineLlmpHook::new(state),
+            TcpMultiMachineLlmpSenderHook::new(state.clone(), rt.clone()),
+            TcpMultiMachineLlmpReceiverHook::new(state, rt),
         ))
     }
 }
@@ -174,11 +186,13 @@ where
     A: Clone + Display + ToSocketAddrs + Send + Sync + 'static,
     I: Input + Send + Sync + 'static,
 {
-    /// Make sure the state has been initialized.
-    /// We must defer initialization because the builder runs in a different process as the one
-    /// in which the network sockets will run.
-    /// TODO: use oncecell or lazycell to make sure this function is ran whenever necessary.
-    pub fn init_once(self_mutex: Arc<RwLock<Self>>, rt: Arc<Runtime>) -> Result<(), Error> {
+    /// Initializes the Multi-Machine state.
+    ///
+    /// # Safety
+    ///
+    /// This should be run **only once**, in the same process as the llmp hooks, and before the hooks
+    /// are effectively used.
+    unsafe fn init(self_mutex: Arc<RwLock<Self>>, rt: Arc<Runtime>) -> Result<(), Error> {
         // We consider it is initialized there, so that we can atomically get & set.
         let is_init = rt.block_on(async {
             let mut wr_mutex = self_mutex.write().await;
@@ -226,7 +240,7 @@ where
             for i in 0..node_descriptor.max_nb_children {
                 let bg_state = self_mutex.clone();
                 info!("Spawning child task {}", i);
-                let _: JoinHandle<Result<(), std::io::Error>> = rt.spawn(async move {
+                let _: JoinHandle<Result<(), io::Error>> = rt.spawn(async move {
                     info!("spawn worked");
                     let port = LISTEN_PORT_BASE + i;
                     let addr = format!("127.0.0.1:{}", port);
@@ -363,7 +377,7 @@ where
 
     /// Flush the message queue from other nodes and add incoming events to the
     /// centralized event manager queue.
-    pub(crate) async fn handle_new_messages_from_nodes(
+    pub(crate) async fn receive_new_messages_from_nodes(
         &mut self,
         events: &mut Vec<Event<I>>,
     ) -> Result<(), Error> {

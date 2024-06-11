@@ -52,7 +52,7 @@ use super::{EventManagerHooksTuple, StdLlmpEventHook};
 #[cfg(feature = "multi_machine")]
 use crate::events::multi_machine::NodeDescriptor;
 #[cfg(feature = "multi_machine")]
-use crate::events::{multi_machine::TcpMultiMachineBuilder, TcpMultiMachineEventManagerHook};
+use crate::events::multi_machine::TcpMultiMachineBuilder;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use crate::{
     events::{centralized::CentralizedEventManager, CentralizedLlmpHook},
@@ -668,13 +668,6 @@ where
 
         let debug_output = std::env::var(LIBAFL_DEBUG_OUTPUT).is_ok();
 
-        #[cfg(feature = "multi_machine")]
-        let (_multi_machine_event_manager_hook, multi_machine_llmp_hook) =
-            TcpMultiMachineBuilder::build::<
-                SocketAddr,
-                <<IM as UsesState>::State as UsesInput>::Input,
-            >(self.multi_machine_node_descriptor.clone())?;
-
         // Spawn clients
         let mut index = 0_u64;
         for (id, bind_to) in core_ids.iter().enumerate().take(num_cores) {
@@ -747,6 +740,14 @@ where
             }
         }
 
+        #[cfg(feature = "multi_machine")]
+        // Create this after forks, to avoid problems with tokio runtime
+        let (multi_machine_sender_hook, multi_machine_receiver_hook) =
+            TcpMultiMachineBuilder::build::<
+                SocketAddr,
+                <<IM as UsesState>::State as UsesInput>::Input,
+            >(self.multi_machine_node_descriptor.clone())?;
+
         let mut brokers = Brokers::new();
 
         // Add centralized broker
@@ -754,7 +755,7 @@ where
             #[cfg(feature = "multi_machine")]
             let centralized_hooks = tuple_list!(
                 CentralizedLlmpHook::<S::Input>::new()?,
-                multi_machine_llmp_hook,
+                multi_machine_sender_hook,
             );
 
             #[cfg(not(feature = "multi_machine"))]
@@ -769,15 +770,29 @@ where
             )?
         }));
 
+        #[cfg(feature = "multi_machine")]
+        assert!(
+            self.spawn_broker,
+            "Multi machine is not compatible with externally spawned brokers for now."
+        );
+
         // If we should add another broker, add it to other brokers.
         if self.spawn_broker {
             log::info!("I am broker!!.");
 
-            let llmp_hook = StdLlmpEventHook::<S::Input, MT>::new(self.monitor.clone())?;
+            #[cfg(not(feature = "multi_machine"))]
+            let llmp_hook =
+                tuple_list!(StdLlmpEventHook::<S::Input, MT>::new(self.monitor.clone())?,);
+
+            #[cfg(feature = "multi_machine")]
+            let llmp_hook = tuple_list!(
+                StdLlmpEventHook::<S::Input, MT>::new(self.monitor.clone())?,
+                multi_machine_receiver_hook,
+            );
 
             let mut broker = LlmpBroker::create_attach_to_tcp(
                 self.shmem_provider.clone(),
-                tuple_list!(llmp_hook),
+                llmp_hook,
                 self.broker_port,
             )?;
 
