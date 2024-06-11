@@ -36,8 +36,8 @@ use crate::observers::TimeObserver;
 use crate::state::HasScalabilityMonitor;
 use crate::{
     events::{
-        hooks::EventManagerHooksTuple, AdaptiveSerializer, CustomBufEventResult, Event,
-        EventConfig, EventFirer, EventManager, EventManagerId, EventProcessor, EventRestarter,
+        AdaptiveSerializer, CustomBufEventResult, Event, EventConfig, EventFirer, EventManager,
+        EventManagerHooksTuple, EventManagerId, EventProcessor, EventRestarter,
         HasCustomBufHandlers, HasEventManagerId, LogSeverity, ProgressReporter,
     },
     executors::{Executor, HasObservers},
@@ -49,6 +49,7 @@ use crate::{
 };
 
 pub(crate) const _LLMP_TAG_TO_MAIN: Tag = Tag(0x3453453);
+pub(crate) const _LLMP_TAG_TO_SECONDARY: Tag = Tag(0x3453453);
 
 /// A wrapper manager to implement a main-secondary architecture with another broker
 #[derive(Debug)]
@@ -60,7 +61,7 @@ where
     SP: ShMemProvider,
 {
     inner: EM,
-    /// The LLMP client for inter process communication
+    /// The centralized LLMP client for inter process communication
     client: LlmpClient<SP>,
     #[cfg(feature = "llmp_compression")]
     compressor: GzipCompressor,
@@ -125,7 +126,7 @@ impl CentralizedEventManagerBuilder {
         S: State,
         SP: ShMemProvider,
     {
-        Ok(CentralizedEventManager {
+        let mut ret = CentralizedEventManager {
             inner,
             hooks,
             client,
@@ -133,7 +134,11 @@ impl CentralizedEventManagerBuilder {
             compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
             is_main: self.is_main,
             phantom: PhantomData,
-        })
+        };
+
+        ret.hooks.init_all()?;
+
+        Ok(ret)
     }
 
     /// Creates a new [`CentralizedEventManager`].
@@ -151,7 +156,7 @@ impl CentralizedEventManagerBuilder {
         S: State,
         SP: ShMemProvider,
     {
-        Ok(CentralizedEventManager {
+        let mut ret = CentralizedEventManager {
             inner,
             hooks,
             client,
@@ -160,7 +165,11 @@ impl CentralizedEventManagerBuilder {
             time_ref: time_obs.handle(),
             is_main: self.is_main,
             phantom: PhantomData,
-        })
+        };
+
+        ret.hooks.init_all()?;
+
+        Ok(ret)
     }
 
     /// Create a centralized event manager on a port
@@ -182,7 +191,8 @@ impl CentralizedEventManagerBuilder {
         SP: ShMemProvider,
     {
         let client = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
-        Ok(CentralizedEventManager {
+
+        let mut ret = CentralizedEventManager {
             inner,
             hooks,
             client,
@@ -190,7 +200,11 @@ impl CentralizedEventManagerBuilder {
             compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
             is_main: self.is_main,
             phantom: PhantomData,
-        })
+        };
+
+        ret.hooks.init_all()?;
+
+        Ok(ret)
     }
 
     /// Create a centralized event manager on a port
@@ -213,7 +227,7 @@ impl CentralizedEventManagerBuilder {
         SP: ShMemProvider,
     {
         let client = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
-        Ok(CentralizedEventManager {
+        let mut ret = CentralizedEventManager {
             inner,
             hooks,
             client,
@@ -222,7 +236,11 @@ impl CentralizedEventManagerBuilder {
             time_ref: time_obs.handle(),
             is_main: self.is_main,
             phantom: PhantomData,
-        })
+        };
+
+        ret.hooks.init_all()?;
+
+        Ok(ret)
     }
 
     /// If a client respawns, it may reuse the existing connection, previously
@@ -241,7 +259,7 @@ impl CentralizedEventManagerBuilder {
         S: State,
         SP: ShMemProvider,
     {
-        Ok(CentralizedEventManager {
+        let mut ret = CentralizedEventManager {
             inner,
             hooks,
             client: LlmpClient::on_existing_from_env(shmem_provider, env_name)?,
@@ -249,7 +267,11 @@ impl CentralizedEventManagerBuilder {
             compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
             is_main: self.is_main,
             phantom: PhantomData,
-        })
+        };
+
+        ret.hooks.init_all()?;
+
+        Ok(ret)
     }
 
     /// If a client respawns, it may reuse the existing connection, previously
@@ -533,6 +555,7 @@ where
         if self.is_main {
             // main node
             self.receive_from_secondary(fuzzer, state, executor)
+            // self.inner.process(fuzzer, state, executor)
         } else {
             // The main node does not process incoming events from the broker ATM
             self.inner.process(fuzzer, state, executor)
@@ -771,19 +794,20 @@ where
 
                     if let Some(item) = res.1 {
                         if res.1.is_some() {
-                            self.inner.fire(
-                                state,
-                                Event::NewTestcase {
-                                    input,
-                                    client_config,
-                                    exit_kind,
-                                    corpus_size,
-                                    observers_buf,
-                                    time,
-                                    executions,
-                                    forward_id,
-                                },
-                            )?;
+                            let event = Event::NewTestcase {
+                                input,
+                                client_config,
+                                exit_kind,
+                                corpus_size,
+                                observers_buf,
+                                time,
+                                executions,
+                                forward_id,
+                            };
+
+                            self.hooks.on_fire_all(state, client_id, &event)?;
+
+                            self.inner.fire(state, event)?;
                         }
                         log::info!("Added received Testcase as item #{item}");
                     }

@@ -1,7 +1,8 @@
 //! An [`EventManager`] manages all events that go to other instances of the fuzzer.
 //! The messages are commonly information about new Testcases as well as stats and other [`Event`]s.
 
-pub mod hooks;
+pub mod events_hooks;
+pub use events_hooks::*;
 
 pub mod simple;
 pub use simple::*;
@@ -15,6 +16,9 @@ pub mod launcher;
 #[allow(clippy::ignored_unit_patterns)]
 pub mod llmp;
 pub use llmp::*;
+
+pub mod broker_hooks;
+pub use broker_hooks::*;
 
 #[cfg(feature = "tcp_manager")]
 #[allow(clippy::ignored_unit_patterns)]

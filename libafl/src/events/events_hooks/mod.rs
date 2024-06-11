@@ -10,12 +10,19 @@ use crate::{events::Event, state::State, Error};
 /// node hook, for multi-machine fuzzing
 #[cfg(feature = "multi_machine")]
 pub mod multi_machine;
+#[cfg(feature = "multi_machine")]
+pub use multi_machine::*;
 
-/// The hooks that are run before and after the event manager calls `handle_in_client`
+/// The broker_hooks that are run before and after the event manager calls `handle_in_client`
 pub trait EventManagerHook<S>
 where
     S: State,
 {
+    /// Hook run on event manager initialization.
+    fn init(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+
     /// The hook that runs before `handle_in_client`
     /// Return false if you want to cancel the subsequent event handling
     fn pre_exec(
@@ -42,11 +49,14 @@ where
     }
 }
 
-/// The tuples contains hooks to be executed for `handle_in_client`
+/// The tuples contains broker_hooks to be executed for `handle_in_client`
 pub trait EventManagerHooksTuple<S>
 where
     S: State,
 {
+    /// Init all broker_hooks
+    fn init_all(&mut self) -> Result<(), Error>;
+
     /// The hook that runs before `handle_in_client`
     fn pre_exec_all(
         &mut self,
@@ -71,6 +81,11 @@ impl<S> EventManagerHooksTuple<S> for ()
 where
     S: State,
 {
+    /// Init all broker_hooks
+    fn init_all(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+
     /// The hook that runs before `handle_in_client`
     fn pre_exec_all(
         &mut self,
@@ -102,6 +117,12 @@ where
     Tail: EventManagerHooksTuple<S>,
     S: State,
 {
+    /// Init all broker_hooks
+    fn init_all(&mut self) -> Result<(), Error> {
+        self.0.init()?;
+        self.1.init_all()
+    }
+
     /// The hook that runs before `handle_in_client`
     fn pre_exec_all(
         &mut self,

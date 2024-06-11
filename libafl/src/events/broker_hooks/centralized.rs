@@ -1,9 +1,9 @@
-use std::{fmt::Debug, marker::PhantomData};
+use std::{fmt::Debug, marker::PhantomData, vec::Vec};
 
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{compress::GzipCompressor, llmp::LLMP_FLAG_COMPRESSED};
 use libafl_bolts::{
-    llmp::{Flags, LlmpBrokerInner, LlmpHook, LlmpMsgHookResult, Tag},
+    llmp::{Flags, LlmpBrokerInner, LlmpHook, LlmpMsg, LlmpMsgHookResult, Tag},
     shmem::ShMemProvider,
     ClientId, Error,
 };
@@ -11,7 +11,7 @@ use libafl_bolts::{
 #[cfg(feature = "llmp_compression")]
 use crate::events::COMPRESS_THRESHOLD;
 use crate::{
-    events::{BrokerEventResult, Event, _LLMP_TAG_TO_MAIN},
+    events::{BrokerEventResult, Event, _LLMP_TAG_TO_MAIN, _LLMP_TAG_TO_SECONDARY},
     inputs::Input,
 };
 
@@ -34,6 +34,7 @@ where
         msg_tag: &mut Tag,
         msg_flags: &mut Flags,
         msg: &mut [u8],
+        _new_msgs: &mut Vec<(Tag, Flags, Vec<u8>)>,
     ) -> Result<LlmpMsgHookResult, Error> {
         if *msg_tag == _LLMP_TAG_TO_MAIN {
             #[cfg(feature = "llmp_compression")]

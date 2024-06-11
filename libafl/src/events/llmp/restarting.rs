@@ -43,9 +43,9 @@ use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::observers::TimeObserver;
 use crate::{
     events::{
-        hooks::EventManagerHooksTuple, Event, EventConfig, EventFirer, EventManager,
-        EventManagerId, EventProcessor, EventRestarter, HasEventManagerId, LlmpEventManager,
-        LlmpShouldSaveState, ProgressReporter, StdLlmpEventHook,
+        Event, EventConfig, EventFirer, EventManager, EventManagerHooksTuple, EventManagerId,
+        EventProcessor, EventRestarter, HasEventManagerId, LlmpEventManager, LlmpShouldSaveState,
+        ProgressReporter, StdLlmpEventHook,
     },
     executors::{Executor, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
@@ -453,7 +453,7 @@ where
 {
     /// Launch the broker and the clients and fuzz
     pub fn launch(&mut self) -> Result<(Option<S>, LlmpRestartingEventManager<EMH, S, SP>), Error> {
-        // We start ourself as child process to actually fuzz
+        // We start ourselves as child process to actually fuzz
         let (staterestorer, new_shmem_provider, core_id) = if std::env::var(_ENV_FUZZER_SENDER)
             .is_err()
         {

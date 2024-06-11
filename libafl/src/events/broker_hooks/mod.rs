@@ -1,10 +1,11 @@
-//! Standard LLMP hook
+//! Hooks called on broker side
 use core::marker::PhantomData;
+use std::vec::Vec;
 
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{compress::GzipCompressor, llmp::LLMP_FLAG_COMPRESSED};
 use libafl_bolts::{
-    llmp::{Flags, LlmpBrokerInner, LlmpHook, LlmpMsgHookResult, Tag},
+    llmp::{Flags, LlmpBrokerInner, LlmpHook, LlmpMsg, LlmpMsgHookResult, Tag},
     shmem::ShMemProvider,
     ClientId,
 };
@@ -21,10 +22,14 @@ use crate::{
 /// centralized hook
 #[cfg(all(unix, feature = "std"))]
 pub mod centralized;
+#[cfg(all(unix, feature = "std"))]
+pub use centralized::*;
 
 /// Multi-machine hook
 #[cfg(feature = "multi_machine")]
-pub mod multi_machine;
+pub mod centralized_multi_machine;
+#[cfg(feature = "multi_machine")]
+pub use centralized_multi_machine::*;
 
 /// An LLMP-backed event hook for scalable multi-processed fuzzing
 #[derive(Debug)]
@@ -49,6 +54,7 @@ where
         #[cfg(feature = "llmp_compression")] msg_flags: &mut Flags,
         #[cfg(not(feature = "llmp_compression"))] _msg_flags: &mut Flags,
         msg: &mut [u8],
+        _new_msgs: &mut Vec<(Tag, Flags, Vec<u8>)>,
     ) -> Result<LlmpMsgHookResult, Error> {
         let monitor = &mut self.monitor;
         #[cfg(feature = "llmp_compression")]

@@ -36,11 +36,10 @@ use crate::events::AdaptiveSerializer;
 use crate::observers::TimeObserver;
 use crate::{
     events::{
-        hooks::EventManagerHooksTuple,
         llmp::{LLMP_TAG_EVENT_TO_BOTH, _LLMP_TAG_EVENT_TO_BROKER},
         CustomBufEventResult, CustomBufHandlerFn, Event, EventConfig, EventFirer, EventManager,
-        EventManagerId, EventProcessor, EventRestarter, HasCustomBufHandlers, HasEventManagerId,
-        ProgressReporter,
+        EventManagerHooksTuple, EventManagerId, EventProcessor, EventRestarter,
+        HasCustomBufHandlers, HasEventManagerId, ProgressReporter,
     },
     executors::{Executor, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},

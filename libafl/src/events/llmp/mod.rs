@@ -28,10 +28,6 @@ use crate::{
 pub mod mgr;
 pub use mgr::*;
 
-/// The llmp hooks
-pub mod hooks;
-pub use hooks::*;
-
 /// The llmp restarting manager
 #[cfg(feature = "std")]
 pub mod restarting;
@@ -39,14 +35,14 @@ pub mod restarting;
 pub use restarting::*;
 
 /// Forward this to the client
-const _LLMP_TAG_EVENT_TO_CLIENT: Tag = Tag(0x2C11E471);
+pub(crate) const _LLMP_TAG_EVENT_TO_CLIENT: Tag = Tag(0x2C11E471);
 /// Only handle this in the broker
-const _LLMP_TAG_EVENT_TO_BROKER: Tag = Tag(0x2B80438);
+pub(crate) const _LLMP_TAG_EVENT_TO_BROKER: Tag = Tag(0x2B80438);
 /// Handle in both
 ///
-const LLMP_TAG_EVENT_TO_BOTH: Tag = Tag(0x2B0741);
-const _LLMP_TAG_RESTART: Tag = Tag(0x8357A87);
-const _LLMP_TAG_NO_RESTART: Tag = Tag(0x57A7EE71);
+pub(crate) const LLMP_TAG_EVENT_TO_BOTH: Tag = Tag(0x2B0741);
+pub(crate) const _LLMP_TAG_RESTART: Tag = Tag(0x8357A87);
+pub(crate) const _LLMP_TAG_NO_RESTART: Tag = Tag(0x57A7EE71);
 
 /// The minimum buffer size at which to compress LLMP IPC messages.
 #[cfg(any(feature = "llmp_compression", feature = "tcp_compression"))]

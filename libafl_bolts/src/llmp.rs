@@ -2058,6 +2058,70 @@ where
     hooks: HT,
 }
 
+pub trait Broker {
+    fn is_shutting_down(&self) -> bool;
+
+    fn on_timeout(&mut self) -> Result<(), Error>;
+
+    fn broker_once(&mut self) -> Result<bool, Error>;
+
+    fn exit_after(&self) -> Option<NonZeroUsize>;
+
+    fn has_clients(&self) -> bool;
+
+    fn send_buf(&mut self, tag: Tag, buf: &[u8]) -> Result<(), Error>;
+
+    fn num_clients_seen(&self) -> usize;
+
+    fn nb_listeners(&self) -> usize;
+}
+
+impl<HT, SP> Broker for LlmpBroker<HT, SP>
+where
+    HT: LlmpHookTuple<SP>,
+    SP: ShMemProvider,
+{
+    fn is_shutting_down(&self) -> bool {
+        self.inner.is_shutting_down()
+    }
+
+    fn on_timeout(&mut self) -> Result<(), Error> {
+        self.hooks.on_timeout_all()
+    }
+
+    fn broker_once(&mut self) -> Result<bool, Error> {
+        self.broker_once()
+    }
+
+    fn exit_after(&self) -> Option<NonZeroUsize> {
+        self.inner.exit_cleanly_after
+    }
+
+    fn has_clients(&self) -> bool {
+        self.inner.has_clients()
+    }
+
+    fn send_buf(&mut self, tag: Tag, buf: &[u8]) -> Result<(), Error> {
+        self.inner.llmp_out.send_buf(tag, buf)
+    }
+
+    fn num_clients_seen(&self) -> usize {
+        self.inner.num_clients_seen
+    }
+
+    fn nb_listeners(&self) -> usize {
+        self.inner.listeners.len()
+    }
+}
+
+use std::boxed::Box;
+
+/// A set of brokers.
+/// Limitation: the hooks must be the same.
+pub struct Brokers {
+    llmp_brokers: Vec<Box<dyn Broker>>,
+}
+
 /// A signal handler for the [`LlmpBroker`].
 /// On unix, it handles signals
 /// On Windows - control signals (e.g., CTRL+C)
@@ -2111,6 +2175,7 @@ where
         msg_tag: &mut Tag,
         msg_flags: &mut Flags,
         msg: &mut [u8],
+        new_msgs: &mut Vec<(Tag, Flags, Vec<u8>)>,
     ) -> Result<LlmpMsgHookResult, Error>;
 
     /// Hook called whenever there is a timeout.
@@ -2132,6 +2197,7 @@ where
         msg_tag: &mut Tag,
         msg_flags: &mut Flags,
         msg: &mut [u8],
+        new_msgs: &mut Vec<(Tag, Flags, Vec<u8>)>,
     ) -> Result<LlmpMsgHookResult, Error>;
 
     /// Call all hook callbacks on timeout.
@@ -2149,6 +2215,7 @@ where
         _msg_tag: &mut Tag,
         _msg_flags: &mut Flags,
         _msg: &mut [u8],
+        _new_msgs: &mut Vec<(Tag, Flags, Vec<u8>)>,
     ) -> Result<LlmpMsgHookResult, Error> {
         Ok(LlmpMsgHookResult::ForwardToClients)
     }
@@ -2171,10 +2238,11 @@ where
         msg_tag: &mut Tag,
         msg_flags: &mut Flags,
         msg: &mut [u8],
+        new_msgs: &mut Vec<(Tag, Flags, Vec<u8>)>,
     ) -> Result<LlmpMsgHookResult, Error> {
         match self
             .0
-            .on_new_message(inner, client_id, msg_tag, msg_flags, msg)?
+            .on_new_message(inner, client_id, msg_tag, msg_flags, msg, new_msgs)?
         {
             LlmpMsgHookResult::Handled => {
                 // message handled, stop early
@@ -2183,7 +2251,7 @@ where
             LlmpMsgHookResult::ForwardToClients => {
                 // message should be forwarded, continue iterating
                 self.1
-                    .on_new_message_all(inner, client_id, msg_tag, msg_flags, msg)
+                    .on_new_message_all(inner, client_id, msg_tag, msg_flags, msg, new_msgs)
             }
         }
     }
@@ -2207,6 +2275,116 @@ where
         LlmpBroker {
             inner: self.inner,
             hooks,
+        }
+    }
+}
+
+impl Brokers {
+    pub fn new() -> Self {
+        Self {
+            llmp_brokers: Vec::new(),
+        }
+    }
+
+    pub fn add(&mut self, broker: Box<dyn Broker>) {
+        self.llmp_brokers.push(broker);
+    }
+
+    #[cfg(any(all(unix, not(miri)), all(windows, feature = "std")))]
+    fn setup_handlers() {
+        #[cfg(all(unix, not(miri)))]
+        if let Err(e) = unsafe { setup_signal_handler(ptr::addr_of_mut!(LLMP_SIGHANDLER_STATE)) } {
+            // We can live without a proper ctrl+c signal handler - Ignore.
+            log::info!("Failed to setup signal handlers: {e}");
+        } else {
+            log::info!("Successfully setup signal handlers");
+        }
+
+        #[cfg(all(windows, feature = "std"))]
+        if let Err(e) = unsafe { setup_ctrl_handler(ptr::addr_of_mut!(LLMP_SIGHANDLER_STATE)) } {
+            // We can live without a proper ctrl+c signal handler - Ignore.
+            log::info!("Failed to setup control handlers: {e}");
+        } else {
+            log::info!(
+                "{}: Broker successfully setup control handlers",
+                std::process::id().to_string()
+            );
+        }
+    }
+
+    /// Loops until the last client quits the last broker,
+    /// forwarding and handling all incoming messages from clients for each broker.
+    /// Will call `on_timeout` roughly after `timeout`
+    /// Panics on error.
+    /// 5 millis of sleep can't hurt to keep busywait not at 100%
+    #[cfg(feature = "std")]
+    pub fn loop_with_timeouts(&mut self, timeout: Duration, sleep_time: Option<Duration>) {
+        use super::current_milliseconds;
+
+        #[cfg(any(all(unix, not(miri)), all(windows, feature = "std")))]
+        Self::setup_handlers();
+
+        let timeout = timeout.as_millis() as u64;
+        let mut end_time = current_milliseconds() + timeout;
+
+        loop {
+            self.llmp_brokers.retain_mut(|broker| {
+                if !broker.is_shutting_down() {
+                    if current_milliseconds() > end_time {
+                        broker
+                            .on_timeout()
+                            .expect("An error occurred in broker timeout. Exiting.");
+                        end_time = current_milliseconds() + timeout;
+                    }
+
+                    if broker
+                        .broker_once()
+                        .expect("An error occurred when brokering. Exiting.")
+                    {
+                        end_time = current_milliseconds() + timeout;
+                    }
+
+                    if let Some(exit_after_count) = broker.exit_after() {
+                        // log::trace!(
+                        //     "Clients connected: {} && > {} - {} >= {}",
+                        //     self.has_clients(),
+                        //     self.num_clients_seen,
+                        //     self.listeners.len(),
+                        //     exit_after_count
+                        // );
+                        if !broker.has_clients()
+                            && (broker.num_clients_seen() - broker.nb_listeners())
+                                >= exit_after_count.into()
+                        {
+                            // No more clients connected, and the amount of clients we were waiting for was previously connected.
+                            // exit cleanly.
+                            return false;
+                        }
+                    }
+
+                    true
+                } else {
+                    broker.send_buf(LLMP_TAG_EXITING, &[]).expect(
+                        "Error when shutting down broker: Could not send LLMP_TAG_EXITING msg.",
+                    );
+
+                    false
+                }
+            });
+
+            if self.llmp_brokers.is_empty() {
+                break;
+            }
+
+            #[cfg(feature = "std")]
+            if let Some(time) = sleep_time {
+                thread::sleep(time);
+            }
+
+            #[cfg(not(feature = "std"))]
+            if let Some(time) = sleep_time {
+                panic!("Cannot sleep on no_std platform (requested {time:?})");
+            }
         }
     }
 }
@@ -2522,9 +2700,6 @@ where
                 }
                 // handle all other messages
                 _ => {
-                    // The message is not specifically for use. Let the user handle it, then forward it to the clients, if necessary.
-                    let mut should_forward_msg = true;
-
                     let pos = if (client_id.0 as usize) < self.inner.llmp_clients.len()
                         && self.inner.llmp_clients[client_id.0 as usize].id == client_id
                     {
@@ -2539,18 +2714,26 @@ where
 
                     let map = &mut self.inner.llmp_clients[pos].current_recv_shmem;
                     let msg_buf = (*msg).try_as_slice_mut(map)?;
-                    if let LlmpMsgHookResult::Handled = self.hooks.on_new_message_all(
+
+                    // The message is not specifically for use. Let the user handle it, then forward it to the clients, if necessary.
+                    let mut new_msgs: Vec<(Tag, Flags, Vec<u8>)> = Vec::new();
+                    if let LlmpMsgHookResult::ForwardToClients = self.hooks.on_new_message_all(
                         &mut self.inner,
                         client_id,
                         &mut (*msg).tag,
                         &mut (*msg).flags,
                         msg_buf,
+                        &mut new_msgs,
                     )? {
-                        should_forward_msg = false;
+                        self.inner.forward_msg(msg)?;
                     }
 
-                    if should_forward_msg {
-                        self.inner_mut().forward_msg(msg)?;
+                    for (new_msg_tag, new_msg_flag, new_msg) in new_msgs {
+                        self.inner.llmp_out.send_buf_with_flags(
+                            new_msg_tag,
+                            new_msg_flag,
+                            new_msg.as_ref(),
+                        )?;
                     }
                 }
             }

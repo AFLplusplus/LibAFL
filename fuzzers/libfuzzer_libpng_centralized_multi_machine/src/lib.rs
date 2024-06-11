@@ -9,8 +9,7 @@ use clap::{self, Parser};
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{
-        centralized::CentralizedEventManager,
-        hooks::multi_machine::TcpMultiMachineEventManagerHook, launcher::CentralizedLauncher,
+        centralized::CentralizedEventManager, launcher::CentralizedLauncher,
         multi_machine::NodeDescriptor, EventConfig,
     },
     executors::{inprocess::InProcessExecutor, ExitKind},
@@ -406,7 +405,7 @@ pub extern "C" fn libafl_main() {
         node_description.max_nb_children = nb_children;
     }
 
-    match CentralizedLauncher::<_, (), _, (TcpMultiMachineEventManagerHook<_>, ()), _, _, _, _>::builder()
+    match CentralizedLauncher::<_, (), _, (), _, _, _, _>::builder()
         .shmem_provider(shmem_provider)
         .configuration(EventConfig::from_name("default"))
         .monitor(monitor)
