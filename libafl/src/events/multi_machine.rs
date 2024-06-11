@@ -31,7 +31,7 @@ use crate::{
 
 const LISTEN_PORT_BASE: u16 = 50000;
 
-#[bitflags(default = SendToParent | SendToChildren)]
+#[bitflags(default = SendToParent)]
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq)]
 /// The node policy. It represents flags that can be applied to the node to change how it behaves.
@@ -105,7 +105,6 @@ where
     I: Input,
 {
     node_descriptor: NodeDescriptor<A>,
-    is_initialized: bool,
     parent: Option<TcpStream>, // the parent to which the testcases should be forwarded when deemed interesting
     children: HashMap<NodeId, TcpStream>, // The children who connected during the fuzzing session.
     old_events: Vec<Event<I>>,
@@ -158,7 +157,6 @@ impl TcpMultiMachineBuilder {
         // it with concurrent-safe objects
         let state = Arc::new(RwLock::new(TcpMultiMachineState {
             node_descriptor,
-            is_initialized: false,
             parent: None,
             children: HashMap::default(),
             old_events: Vec::new(),
@@ -193,77 +191,66 @@ where
     /// This should be run **only once**, in the same process as the llmp hooks, and before the hooks
     /// are effectively used.
     unsafe fn init(self_mutex: Arc<RwLock<Self>>, rt: Arc<Runtime>) -> Result<(), Error> {
-        // We consider it is initialized there, so that we can atomically get & set.
-        let is_init = rt.block_on(async {
-            let mut wr_mutex = self_mutex.write().await;
+        let node_descriptor =
+            rt.block_on(async { self_mutex.read().await.node_descriptor.clone() });
 
-            let ret = wr_mutex.is_initialized;
-            wr_mutex.is_initialized = true;
-            ret
-        });
+        // Try to connect to the parent if we should
+        rt.block_on(async {
+            let parent_mutex = self_mutex.clone();
+            let mut parent_lock = parent_mutex.write().await;
 
-        if !is_init {
-            let node_descriptor =
-                rt.block_on(async { self_mutex.read().await.node_descriptor.clone() });
+            if let Some(parent_addr) = &parent_lock.node_descriptor.parent_addr {
+                let timeout = current_time() + parent_lock.node_descriptor.timeout;
 
-            // Try to connect to the parent if we should
-            rt.block_on(async {
-                let parent_mutex = self_mutex.clone();
-                let mut parent_lock = parent_mutex.write().await;
+                parent_lock.parent = loop {
+                    info!("Trying to connect to parent @ {}..", parent_addr);
+                    match TcpStream::connect(parent_addr).await {
+                        Ok(stream) => {
+                            info!("Connected to parent @ {}", parent_addr);
 
-                if let Some(parent_addr) = &parent_lock.node_descriptor.parent_addr {
-                    let timeout = current_time() + parent_lock.node_descriptor.timeout;
-
-                    parent_lock.parent = loop {
-                        info!("Trying to connect to parent @ {}..", parent_addr);
-                        match TcpStream::connect(parent_addr).await {
-                            Ok(stream) => {
-                                info!("Connected to parent @ {}", parent_addr);
-
-                                break Some(stream);
-                            }
-                            Err(e) => {
-                                if current_time() > timeout {
-                                    return Err(Error::os_error(e, "Unable to connect to parent"));
-                                }
+                            break Some(stream);
+                        }
+                        Err(e) => {
+                            if current_time() > timeout {
+                                return Err(Error::os_error(e, "Unable to connect to parent"));
                             }
                         }
-
-                        time::sleep(Duration::from_secs(1)).await;
-                    };
-                }
-
-                Ok(())
-            })?;
-
-            // Now, setup the background tasks for the children to connect to
-            for i in 0..node_descriptor.max_nb_children {
-                let bg_state = self_mutex.clone();
-                info!("Spawning child task {}", i);
-                let _: JoinHandle<Result<(), io::Error>> = rt.spawn(async move {
-                    info!("spawn worked");
-                    let port = LISTEN_PORT_BASE + i;
-                    let addr = format!("127.0.0.1:{}", port);
-                    info!("Starting background child task on {addr}...");
-                    let listener = TcpListener::bind(addr).await?;
-                    let state = bg_state;
-
-                    loop {
-                        info!("listening for children on {:?}...", listener);
-                        let (stream, addr) = listener.accept().await?;
-                        info!("{} joined the children.", addr);
-                        let mut state_guard = state.write().await;
-
-                        state_guard.children.insert(NodeId::new(), stream);
-                        info!(
-                            "[pid {}]{} added the child. nb children: {}",
-                            process::id(),
-                            addr,
-                            state_guard.children.len()
-                        );
                     }
-                });
+
+                    time::sleep(Duration::from_secs(1)).await;
+                };
             }
+
+            Ok(())
+        })?;
+
+        // Now, setup the background tasks for the children to connect to
+        for i in 0..node_descriptor.max_nb_children {
+            let bg_state = self_mutex.clone();
+            info!("Spawning child task {}", i);
+            let _: JoinHandle<Result<(), io::Error>> = rt.spawn(async move {
+                info!("spawn worked");
+                let port = LISTEN_PORT_BASE + i;
+                let addr = format!("127.0.0.1:{}", port);
+                info!("Starting background child task on {addr}...");
+                let listener = TcpListener::bind(addr).await?;
+                let state = bg_state;
+
+                loop {
+                    info!("listening for children on {:?}...", listener);
+                    let (stream, addr) = listener.accept().await?;
+                    info!("{} joined the children.", addr);
+                    let mut state_guard = state.write().await;
+
+                    state_guard.children.insert(NodeId::new(), stream);
+                    info!(
+                        "[pid {}]{} added the child. nb children: {}",
+                        process::id(),
+                        addr,
+                        state_guard.children.len()
+                    );
+                }
+            });
         }
 
         Ok(())
@@ -336,40 +323,53 @@ where
         &mut self,
         event: &Event<I>,
     ) -> Result<(), Error> {
-        assert!(self.is_initialized);
-
         info!("[multi-machine] Sending interesting events to nodes...");
 
         let msg = OwnedTcpMultiMachineMsg::new(OwnedRef::Ref(event));
-        if let Some(parent) = &mut self.parent {
-            info!("Sending to parent...");
-            match Self::write_msg(parent, &msg).await {
-                Err(_) => {
-                    // most likely the parent disconnected. drop the connection
-                    info!("The parent disconnected. We won't try to communicate with it again.");
-                    self.parent.take();
+
+        if self
+            .node_descriptor
+            .flags
+            .intersects(NodePolicy::SendToParent)
+        {
+            if let Some(parent) = &mut self.parent {
+                info!("Sending to parent...");
+                match Self::write_msg(parent, &msg).await {
+                    Err(_) => {
+                        // most likely the parent disconnected. drop the connection
+                        info!(
+                            "The parent disconnected. We won't try to communicate with it again."
+                        );
+                        self.parent.take();
+                    }
+                    Ok(_) => {} // write was successful, continue
                 }
-                Ok(_) => {} // write was successful, continue
             }
         }
 
-        let mut ids_to_remove: Vec<NodeId> = Vec::new();
-        for (child_id, child_stream) in &mut self.children {
-            info!("Sending to child...");
-            match Self::write_msg(child_stream, &msg).await {
-                Err(_) => {
-                    // most likely the child disconnected. drop the connection later on and continue.
-                    info!("The child disconnected. We won't try to communicate with it again.");
-                    ids_to_remove.push(child_id.clone());
+        if self
+            .node_descriptor
+            .flags
+            .intersects(NodePolicy::SendToChildren)
+        {
+            let mut ids_to_remove: Vec<NodeId> = Vec::new();
+            for (child_id, child_stream) in &mut self.children {
+                info!("Sending to child...");
+                match Self::write_msg(child_stream, &msg).await {
+                    Err(_) => {
+                        // most likely the child disconnected. drop the connection later on and continue.
+                        info!("The child disconnected. We won't try to communicate with it again.");
+                        ids_to_remove.push(child_id.clone());
+                    }
+                    Ok(_) => {} // write was successful, continue
                 }
-                Ok(_) => {} // write was successful, continue
             }
-        }
 
-        // Garbage collect disconnected children
-        for id_to_remove in &ids_to_remove {
-            info!("Child {:?} has been garbage collected.", id_to_remove);
-            self.children.remove(id_to_remove);
+            // Garbage collect disconnected children
+            for id_to_remove in &ids_to_remove {
+                info!("Child {:?} has been garbage collected.", id_to_remove);
+                self.children.remove(id_to_remove);
+            }
         }
 
         Ok(())
@@ -381,8 +381,6 @@ where
         &mut self,
         events: &mut Vec<Event<I>>,
     ) -> Result<(), Error> {
-        assert!(self.is_initialized);
-
         info!("Checking for new events from other nodes...");
 
         // Our (potential) parent could have something for us

@@ -138,8 +138,6 @@ where
     ) -> Result<LlmpMsgHookResult, Error> {
         let shared_state = self.shared_state.clone();
 
-        info!("Using shared state {:?}", shared_state);
-
         let res: Result<(), Error> = self.rt.block_on(async move {
             let mut state_wr_lock = shared_state.write().await;
 
@@ -191,29 +189,22 @@ where
         &mut self,
         _broker_inner: &mut LlmpBrokerInner<SP>,
         _client_id: ClientId,
-        msg_tag: &mut Tag,
-        msg_flags: &mut Flags,
-        msg: &mut [u8],
+        _msg_tag: &mut Tag,
+        _msg_flags: &mut Flags,
+        _msg: &mut [u8],
         new_msgs: &mut Vec<(Tag, Flags, Vec<u8>)>,
     ) -> Result<LlmpMsgHookResult, Error> {
         let shared_state = self.shared_state.clone();
 
-        info!("Using shared state {:?}", shared_state);
-
         let res: Result<(), Error> = self.rt.block_on(async move {
             let mut state_wr_lock = shared_state.write().await;
 
-            // for event in events.as_ref() {
-            //     // First, we handle the message. Since it involves network, we do it first and await on it.
-            //     state_wr_lock.handle_new_message_from_node(event).await?;
-
-            //     // add the msg to the list of old messages to send to a future child.
-            //     state_wr_lock.old_events.push();
-            // }
             let mut new_events: Vec<Event<I>> = Vec::new();
             state_wr_lock
                 .receive_new_messages_from_nodes(&mut new_events)
                 .await?;
+
+            info!("New events: {:?}", new_events);
 
             let msgs_to_send: Result<Vec<(Tag, Flags, Vec<u8>)>, Error> = new_events
                 .into_iter()
