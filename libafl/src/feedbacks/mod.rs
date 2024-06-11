@@ -34,7 +34,7 @@ use crate::{
     events::EventFirer,
     executors::ExitKind,
     observers::{ObserversTuple, TimeObserver},
-    state::State,
+    state::GenState,
     Error,
 };
 #[cfg(feature = "std")]
@@ -59,7 +59,7 @@ pub mod transferred;
 /// indicating the "interestingness" of the last run.
 pub trait Feedback<S>: Named
 where
-    S: State,
+    S: GenState,
 {
     /// Initializes the feedback state.
     /// This method is called after that the `State` is created.
@@ -170,7 +170,7 @@ where
     A: Feedback<S>,
     B: Feedback<S>,
     FL: FeedbackLogic<A, B, S>,
-    S: State,
+    S: GenState,
 {
     /// First [`Feedback`]
     pub first: A,
@@ -185,7 +185,7 @@ where
     A: Feedback<S>,
     B: Feedback<S>,
     FL: FeedbackLogic<A, B, S>,
-    S: State,
+    S: GenState,
 {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
@@ -197,7 +197,7 @@ where
     A: Feedback<S>,
     B: Feedback<S>,
     FL: FeedbackLogic<A, B, S>,
-    S: State,
+    S: GenState,
 {
     /// Create a new combined feedback
     pub fn new(first: A, second: B) -> Self {
@@ -221,7 +221,7 @@ where
     A: Feedback<S>,
     B: Feedback<S>,
     FL: FeedbackLogic<A, B, S>,
-    S: State,
+    S: GenState,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         self.first.init_state(state)?;
@@ -316,7 +316,7 @@ where
     A: Feedback<S> + FeedbackFactory<A, T>,
     B: Feedback<S> + FeedbackFactory<B, T>,
     FL: FeedbackLogic<A, B, S>,
-    S: State,
+    S: GenState,
 {
     fn create_feedback(&self, ctx: &T) -> CombinedFeedback<A, B, FL, S> {
         CombinedFeedback::new(
@@ -331,7 +331,7 @@ pub trait FeedbackLogic<A, B, S>: 'static
 where
     A: Feedback<S>,
     B: Feedback<S>,
-    S: State,
+    S: GenState,
 {
     /// The name of this combination
     fn name() -> &'static str;
@@ -416,7 +416,7 @@ impl<A, B, S> FeedbackLogic<A, B, S> for LogicEagerOr
 where
     A: Feedback<S>,
     B: Feedback<S>,
-    S: State,
+    S: GenState,
 {
     fn name() -> &'static str {
         "Eager OR"
@@ -487,7 +487,7 @@ impl<A, B, S> FeedbackLogic<A, B, S> for LogicFastOr
 where
     A: Feedback<S>,
     B: Feedback<S>,
-    S: State,
+    S: GenState,
 {
     fn name() -> &'static str {
         "Fast OR"
@@ -565,7 +565,7 @@ impl<A, B, S> FeedbackLogic<A, B, S> for LogicEagerAnd
 where
     A: Feedback<S>,
     B: Feedback<S>,
-    S: State,
+    S: GenState,
 {
     fn name() -> &'static str {
         "Eager AND"
@@ -632,7 +632,7 @@ impl<A, B, S> FeedbackLogic<A, B, S> for LogicFastAnd
 where
     A: Feedback<S>,
     B: Feedback<S>,
-    S: State,
+    S: GenState,
 {
     fn name() -> &'static str {
         "Fast AND"
@@ -731,7 +731,7 @@ pub type FastOrFeedback<A, B, S> = CombinedFeedback<A, B, LogicFastOr, S>;
 pub struct NotFeedback<A, S>
 where
     A: Feedback<S>,
-    S: State,
+    S: GenState,
 {
     /// The feedback to invert
     pub first: A,
@@ -743,7 +743,7 @@ where
 impl<A, S> Debug for NotFeedback<A, S>
 where
     A: Feedback<S> + Debug,
-    S: State,
+    S: GenState,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("NotFeedback")
@@ -756,7 +756,7 @@ where
 impl<A, S> Feedback<S> for NotFeedback<A, S>
 where
     A: Feedback<S>,
-    S: State,
+    S: GenState,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         self.first.init_state(state)
@@ -810,7 +810,7 @@ where
 impl<A, S> Named for NotFeedback<A, S>
 where
     A: Feedback<S>,
-    S: State,
+    S: GenState,
 {
     #[inline]
     fn name(&self) -> &Cow<'static, str> {
@@ -821,7 +821,7 @@ where
 impl<A, S> NotFeedback<A, S>
 where
     A: Feedback<S>,
-    S: State,
+    S: GenState,
 {
     /// Creates a new [`NotFeedback`].
     pub fn new(first: A) -> Self {
@@ -889,7 +889,7 @@ macro_rules! feedback_not {
 /// Hack to use () as empty Feedback
 impl<S> Feedback<S> for ()
 where
-    S: State,
+    S: GenState,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
@@ -922,7 +922,7 @@ pub struct CrashFeedback {
 
 impl<S> Feedback<S> for CrashFeedback
 where
-    S: State,
+    S: GenState,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
@@ -992,7 +992,7 @@ pub struct TimeoutFeedback {
 
 impl<S> Feedback<S> for TimeoutFeedback
 where
-    S: State,
+    S: GenState,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
@@ -1063,7 +1063,7 @@ pub struct DiffExitKindFeedback {
 
 impl<S> Feedback<S> for DiffExitKindFeedback
 where
-    S: State,
+    S: GenState,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
@@ -1133,7 +1133,7 @@ pub struct TimeFeedback {
 
 impl<S> Feedback<S> for TimeFeedback
 where
-    S: State,
+    S: GenState,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
@@ -1211,7 +1211,7 @@ pub enum ConstFeedback {
 
 impl<S> Feedback<S> for ConstFeedback
 where
-    S: State,
+    S: GenState,
 {
     #[inline]
     #[allow(clippy::wrong_self_convention)]

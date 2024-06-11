@@ -1,4 +1,8 @@
-//! The fuzzer, and state are the core pieces of every good fuzzer
+//! This module defines two traits for the state of fuzzers ([`GenState`] and
+//! [`State`]), together with their canonical `impl`s ([`StdGenState`] and
+//! [`StdState`]). [`GenState`] is intended for use with *generative* fuzzers,
+//! i.e., fuzzers that do not store a corpus or mutate testcases from
+//! one. [`State`] is intended for mutational fuzzers.
 
 #[cfg(feature = "std")]
 use alloc::vec::Vec;
@@ -44,19 +48,29 @@ use crate::{
 /// The maximum size of a testcase
 pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
 
-/// The [`State`] of the fuzzer.
-/// Contains all important information about the current run.
+/// The state of a generative fuzzer.
+///
+/// Contains all the important information about the current fuzzing campaign.
 /// Will be used to restart the fuzzing process at any time.
-pub trait State:
+///
+/// See also [`State`] for the corresponding trait for mutational fuzzers.
+pub trait GenState:
     UsesInput
     + Serialize
     + DeserializeOwned
     + MaybeHasClientPerfMonitor
     + MaybeHasScalabilityMonitor
-    + HasCurrentCorpusId
     + HasCurrentStage
 {
 }
+
+/// The of a mutational fuzzer.
+///
+/// Contains all the important information about the current fuzzing campaign.
+/// Will be used to restart the fuzzing process at any time.
+///
+/// See also [`GenState`] for the corresponding trait for generative fuzzers.
+pub trait State: GenState + HasCurrentCorpusId {}
 
 /// Structs which implement this trait are aware of the state. This is used for type enforcement.
 pub trait UsesState: UsesInput<Input = <Self::State as UsesInput>::Input> {
@@ -215,14 +229,15 @@ impl<'a, I, S, Z> Debug for LoadConfig<'a, I, S, Z> {
     }
 }
 
-/// The state a fuzz run.
+/// The state a generative fuzzing campaign. Implements [`GenState`].
+///
+/// See [`StdState`] for the corresponding `impl` of [`State`].
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "
-        C: serde::Serialize + for<'a> serde::Deserialize<'a>,
         SC: serde::Serialize + for<'a> serde::Deserialize<'a>,
         R: serde::Serialize + for<'a> serde::Deserialize<'a>
     ")]
-pub struct StdState<I, C, R, SC> {
+pub struct StdGenState<I, R, SC> {
     /// RNG instance
     rand: R,
     /// How many times the executor ran the harness/target
@@ -231,8 +246,6 @@ pub struct StdState<I, C, R, SC> {
     start_time: Duration,
     /// the number of new paths that imported from other fuzzers
     imported: usize,
-    /// The corpus
-    corpus: C,
     // Solutions corpus
     solutions: SC,
     /// Metadata stored for this state by one of the components
@@ -246,6 +259,235 @@ pub struct StdState<I, C, R, SC> {
     introspection_monitor: ClientPerfMonitor,
     #[cfg(feature = "scalability_introspection")]
     scalability_monitor: ScalabilityMonitor,
+    /// The last time we reported progress (if available/used).
+    /// This information is used by fuzzer `maybe_report_progress`.
+    last_report_time: Option<Duration>,
+    stage_stack: StageStack,
+    phantom: PhantomData<I>,
+}
+
+impl<I, R, SC> StdGenState<I, R, SC>
+where
+    I: Input,
+    R: Rand,
+    SC: Corpus<Input = <Self as UsesInput>::Input>,
+{
+    fn new_no_init_objetive(rand: R, solutions: SC) -> Self {
+        Self {
+            rand,
+            executions: 0,
+            imported: 0,
+            start_time: Duration::from_millis(0),
+            metadata: SerdeAnyMap::default(),
+            named_metadata: NamedSerdeAnyMap::default(),
+            solutions,
+            max_size: DEFAULT_MAX_SIZE,
+            #[cfg(feature = "introspection")]
+            introspection_monitor: ClientPerfMonitor::new(),
+            #[cfg(feature = "scalability_introspection")]
+            scalability_monitor: ScalabilityMonitor::new(),
+            last_report_time: None,
+            stage_stack: StageStack::default(),
+            phantom: PhantomData,
+        }
+    }
+
+    /// Creates a new state, taking ownership of all of the individual components during fuzzing.
+    pub fn new<O>(rand: R, solutions: SC, objective: &mut O) -> Result<Self, Error>
+    where
+        O: Feedback<Self>,
+    {
+        let mut state = Self::new_no_init_objetive(rand, solutions);
+        objective.init_state(&mut state)?;
+        Ok(state)
+    }
+}
+
+impl<I, R, SC> UsesInput for StdGenState<I, R, SC>
+where
+    I: Input,
+{
+    type Input = I;
+}
+
+impl<I, R, SC> GenState for StdGenState<I, R, SC>
+where
+    R: Rand,
+    SC: Corpus<Input = Self::Input>,
+    Self: UsesInput,
+{
+}
+
+impl<I, R, SC> HasRand for StdGenState<I, R, SC>
+where
+    R: Rand,
+{
+    type Rand = R;
+
+    /// The rand instance
+    #[inline]
+    fn rand(&self) -> &Self::Rand {
+        &self.rand
+    }
+
+    /// The rand instance (mutable)
+    #[inline]
+    fn rand_mut(&mut self) -> &mut Self::Rand {
+        &mut self.rand
+    }
+}
+
+impl<I, R, SC> HasSolutions for StdGenState<I, R, SC>
+where
+    I: Input,
+    SC: Corpus<Input = <Self as UsesInput>::Input>,
+{
+    type Solutions = SC;
+
+    /// Returns the solutions corpus
+    #[inline]
+    fn solutions(&self) -> &SC {
+        &self.solutions
+    }
+
+    /// Returns the solutions corpus (mutable)
+    #[inline]
+    fn solutions_mut(&mut self) -> &mut SC {
+        &mut self.solutions
+    }
+}
+
+impl<I, R, SC> HasMetadata for StdGenState<I, R, SC> {
+    /// Get all the metadata into an [`hashbrown::HashMap`]
+    #[inline]
+    fn metadata_map(&self) -> &SerdeAnyMap {
+        &self.metadata
+    }
+
+    /// Get all the metadata into an [`hashbrown::HashMap`] (mutable)
+    #[inline]
+    fn metadata_map_mut(&mut self) -> &mut SerdeAnyMap {
+        &mut self.metadata
+    }
+}
+
+impl<I, R, SC> HasNamedMetadata for StdGenState<I, R, SC> {
+    /// Get all the metadata into an [`hashbrown::HashMap`]
+    #[inline]
+    fn named_metadata_map(&self) -> &NamedSerdeAnyMap {
+        &self.named_metadata
+    }
+
+    /// Get all the metadata into an [`hashbrown::HashMap`] (mutable)
+    #[inline]
+    fn named_metadata_map_mut(&mut self) -> &mut NamedSerdeAnyMap {
+        &mut self.named_metadata
+    }
+}
+
+impl<I, R, SC> HasExecutions for StdGenState<I, R, SC> {
+    /// The executions counter
+    #[inline]
+    fn executions(&self) -> &u64 {
+        &self.executions
+    }
+
+    /// The executions counter (mutable)
+    #[inline]
+    fn executions_mut(&mut self) -> &mut u64 {
+        &mut self.executions
+    }
+}
+
+impl<I, R, SC> HasImported for StdGenState<I, R, SC> {
+    /// Return the number of new paths that imported from other fuzzers
+    #[inline]
+    fn imported(&self) -> &usize {
+        &self.imported
+    }
+
+    /// Return the number of new paths that imported from other fuzzers
+    #[inline]
+    fn imported_mut(&mut self) -> &mut usize {
+        &mut self.imported
+    }
+}
+
+impl<I, R, SC> HasLastReportTime for StdGenState<I, R, SC> {
+    /// The last time we reported progress,if available/used.
+    /// This information is used by fuzzer `maybe_report_progress`.
+    fn last_report_time(&self) -> &Option<Duration> {
+        &self.last_report_time
+    }
+
+    /// The last time we reported progress,if available/used (mutable).
+    /// This information is used by fuzzer `maybe_report_progress`.
+    fn last_report_time_mut(&mut self) -> &mut Option<Duration> {
+        &mut self.last_report_time
+    }
+}
+
+impl<I, R, SC> HasMaxSize for StdGenState<I, R, SC> {
+    fn max_size(&self) -> usize {
+        self.max_size
+    }
+
+    fn set_max_size(&mut self, max_size: usize) {
+        self.max_size = max_size;
+    }
+}
+
+impl<I, R, SC> HasStartTime for StdGenState<I, R, SC> {
+    /// The starting time
+    #[inline]
+    fn start_time(&self) -> &Duration {
+        &self.start_time
+    }
+
+    /// The starting time (mutable)
+    #[inline]
+    fn start_time_mut(&mut self) -> &mut Duration {
+        &mut self.start_time
+    }
+}
+
+#[cfg(feature = "introspection")]
+impl<I, R, SC> HasClientPerfMonitor for StdGenState<I, R, SC> {
+    fn introspection_monitor(&self) -> &ClientPerfMonitor {
+        &self.introspection_monitor
+    }
+
+    fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
+        &mut self.introspection_monitor
+    }
+}
+
+#[cfg(feature = "scalability_introspection")]
+impl<I, R, SC> HasScalabilityMonitor for StdGenState<I, R, SC> {
+    fn scalability_monitor(&self) -> &ScalabilityMonitor {
+        &self.scalability_monitor
+    }
+
+    fn scalability_monitor_mut(&mut self) -> &mut ScalabilityMonitor {
+        &mut self.scalability_monitor
+    }
+}
+
+/// The state a mutational fuzzing campaign. Implements [`State`].
+///
+/// See [`StdGenState`] for the corresponding `impl` of [`GenState`].
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(bound = "
+        C: serde::Serialize + for<'a> serde::Deserialize<'a>,
+        SC: serde::Serialize + for<'a> serde::Deserialize<'a>,
+        R: serde::Serialize + for<'a> serde::Deserialize<'a>
+    ")]
+pub struct StdState<I, C, R, SC> {
+    inner: StdGenState<I, R, SC>,
+    /// The corpus
+    corpus: C,
+    /// The current index of the corpus; used to record for resumable fuzzing.
+    corpus_idx: Option<CorpusId>,
     #[cfg(feature = "std")]
     /// Remaining initial inputs to load, if any
     remaining_initial_files: Option<Vec<PathBuf>>,
@@ -256,13 +498,6 @@ pub struct StdState<I, C, R, SC> {
     /// If inputs have been processed for multicore loading
     /// relevant only for `load_initial_inputs_multicore`
     multicore_inputs_processed: Option<bool>,
-    /// The last time we reported progress (if available/used).
-    /// This information is used by fuzzer `maybe_report_progress`.
-    last_report_time: Option<Duration>,
-    /// The current index of the corpus; used to record for resumable fuzzing.
-    corpus_idx: Option<CorpusId>,
-    stage_stack: StageStack,
-    phantom: PhantomData<I>,
 }
 
 impl<I, C, R, SC> UsesInput for StdState<I, C, R, SC>
@@ -270,6 +505,15 @@ where
     I: Input,
 {
     type Input = I;
+}
+
+impl<I, C, R, SC> GenState for StdState<I, C, R, SC>
+where
+    C: Corpus<Input = Self::Input>,
+    R: Rand,
+    SC: Corpus<Input = Self::Input>,
+    Self: UsesInput,
+{
 }
 
 impl<I, C, R, SC> State for StdState<I, C, R, SC>
@@ -290,13 +534,13 @@ where
     /// The rand instance
     #[inline]
     fn rand(&self) -> &Self::Rand {
-        &self.rand
+        self.inner.rand()
     }
 
     /// The rand instance (mutable)
     #[inline]
     fn rand_mut(&mut self) -> &mut Self::Rand {
-        &mut self.rand
+        self.inner.rand_mut()
     }
 }
 
@@ -354,13 +598,13 @@ where
     /// Returns the solutions corpus
     #[inline]
     fn solutions(&self) -> &SC {
-        &self.solutions
+        self.inner.solutions()
     }
 
     /// Returns the solutions corpus (mutable)
     #[inline]
     fn solutions_mut(&mut self) -> &mut SC {
-        &mut self.solutions
+        self.inner.solutions_mut()
     }
 }
 
@@ -368,13 +612,13 @@ impl<I, C, R, SC> HasMetadata for StdState<I, C, R, SC> {
     /// Get all the metadata into an [`hashbrown::HashMap`]
     #[inline]
     fn metadata_map(&self) -> &SerdeAnyMap {
-        &self.metadata
+        self.inner.metadata_map()
     }
 
     /// Get all the metadata into an [`hashbrown::HashMap`] (mutable)
     #[inline]
     fn metadata_map_mut(&mut self) -> &mut SerdeAnyMap {
-        &mut self.metadata
+        self.inner.metadata_map_mut()
     }
 }
 
@@ -382,13 +626,13 @@ impl<I, C, R, SC> HasNamedMetadata for StdState<I, C, R, SC> {
     /// Get all the metadata into an [`hashbrown::HashMap`]
     #[inline]
     fn named_metadata_map(&self) -> &NamedSerdeAnyMap {
-        &self.named_metadata
+        self.inner.named_metadata_map()
     }
 
     /// Get all the metadata into an [`hashbrown::HashMap`] (mutable)
     #[inline]
     fn named_metadata_map_mut(&mut self) -> &mut NamedSerdeAnyMap {
-        &mut self.named_metadata
+        self.inner.named_metadata_map_mut()
     }
 }
 
@@ -396,13 +640,13 @@ impl<I, C, R, SC> HasExecutions for StdState<I, C, R, SC> {
     /// The executions counter
     #[inline]
     fn executions(&self) -> &u64 {
-        &self.executions
+        self.inner.executions()
     }
 
     /// The executions counter (mutable)
     #[inline]
     fn executions_mut(&mut self) -> &mut u64 {
-        &mut self.executions
+        self.inner.executions_mut()
     }
 }
 
@@ -410,13 +654,13 @@ impl<I, C, R, SC> HasImported for StdState<I, C, R, SC> {
     /// Return the number of new paths that imported from other fuzzers
     #[inline]
     fn imported(&self) -> &usize {
-        &self.imported
+        self.inner.imported()
     }
 
     /// Return the number of new paths that imported from other fuzzers
     #[inline]
     fn imported_mut(&mut self) -> &mut usize {
-        &mut self.imported
+        self.inner.imported_mut()
     }
 }
 
@@ -424,23 +668,23 @@ impl<I, C, R, SC> HasLastReportTime for StdState<I, C, R, SC> {
     /// The last time we reported progress,if available/used.
     /// This information is used by fuzzer `maybe_report_progress`.
     fn last_report_time(&self) -> &Option<Duration> {
-        &self.last_report_time
+        self.inner.last_report_time()
     }
 
     /// The last time we reported progress,if available/used (mutable).
     /// This information is used by fuzzer `maybe_report_progress`.
     fn last_report_time_mut(&mut self) -> &mut Option<Duration> {
-        &mut self.last_report_time
+        self.inner.last_report_time_mut()
     }
 }
 
 impl<I, C, R, SC> HasMaxSize for StdState<I, C, R, SC> {
     fn max_size(&self) -> usize {
-        self.max_size
+        self.inner.max_size()
     }
 
     fn set_max_size(&mut self, max_size: usize) {
-        self.max_size = max_size;
+        self.inner.set_max_size(max_size);
     }
 }
 
@@ -448,13 +692,13 @@ impl<I, C, R, SC> HasStartTime for StdState<I, C, R, SC> {
     /// The starting time
     #[inline]
     fn start_time(&self) -> &Duration {
-        &self.start_time
+        self.inner.start_time()
     }
 
     /// The starting time (mutable)
     #[inline]
     fn start_time_mut(&mut self) -> &mut Duration {
-        &mut self.start_time
+        self.inner.start_time_mut()
     }
 }
 
@@ -532,7 +776,7 @@ where
     }
 }
 
-impl<I, C, R, SC> HasCurrentStage for StdState<I, C, R, SC> {
+impl<I, R, SC> HasCurrentStage for StdGenState<I, R, SC> {
     fn set_current_stage_idx(&mut self, idx: StageId) -> Result<(), Error> {
         self.stage_stack.set_current_stage_idx(idx)
     }
@@ -550,13 +794,41 @@ impl<I, C, R, SC> HasCurrentStage for StdState<I, C, R, SC> {
     }
 }
 
-impl<I, C, R, SC> HasNestedStageStatus for StdState<I, C, R, SC> {
+impl<I, C, R, SC> HasCurrentStage for StdState<I, C, R, SC> {
+    fn set_current_stage_idx(&mut self, idx: StageId) -> Result<(), Error> {
+        self.inner.set_current_stage_idx(idx)
+    }
+
+    fn clear_stage(&mut self) -> Result<(), Error> {
+        self.inner.clear_stage()
+    }
+
+    fn current_stage_idx(&self) -> Result<Option<StageId>, Error> {
+        self.inner.current_stage_idx()
+    }
+
+    fn on_restart(&mut self) -> Result<(), Error> {
+        self.inner.on_restart()
+    }
+}
+
+impl<I, R, SC> HasNestedStageStatus for StdGenState<I, R, SC> {
     fn enter_inner_stage(&mut self) -> Result<(), Error> {
         self.stage_stack.enter_inner_stage()
     }
 
     fn exit_inner_stage(&mut self) -> Result<(), Error> {
         self.stage_stack.exit_inner_stage()
+    }
+}
+
+impl<I, C, R, SC> HasNestedStageStatus for StdState<I, C, R, SC> {
+    fn enter_inner_stage(&mut self) -> Result<(), Error> {
+        self.inner.enter_inner_stage()
+    }
+
+    fn exit_inner_stage(&mut self) -> Result<(), Error> {
+        self.inner.exit_inner_stage()
     }
 }
 
@@ -1077,28 +1349,15 @@ where
         F: Feedback<Self>,
         O: Feedback<Self>,
     {
+        let inner = StdGenState::new_no_init_objetive(rand, solutions);
         let mut state = Self {
-            rand,
-            executions: 0,
-            imported: 0,
-            start_time: Duration::from_millis(0),
-            metadata: SerdeAnyMap::default(),
-            named_metadata: NamedSerdeAnyMap::default(),
+            inner,
             corpus,
-            solutions,
-            max_size: DEFAULT_MAX_SIZE,
-            #[cfg(feature = "introspection")]
-            introspection_monitor: ClientPerfMonitor::new(),
-            #[cfg(feature = "scalability_introspection")]
-            scalability_monitor: ScalabilityMonitor::new(),
+            corpus_idx: None,
             #[cfg(feature = "std")]
             remaining_initial_files: None,
             #[cfg(feature = "std")]
             dont_reenter: None,
-            last_report_time: None,
-            corpus_idx: None,
-            stage_stack: StageStack::default(),
-            phantom: PhantomData,
             #[cfg(feature = "std")]
             multicore_inputs_processed: None,
         };
@@ -1111,22 +1370,22 @@ where
 #[cfg(feature = "introspection")]
 impl<I, C, R, SC> HasClientPerfMonitor for StdState<I, C, R, SC> {
     fn introspection_monitor(&self) -> &ClientPerfMonitor {
-        &self.introspection_monitor
+        self.inner.introspection_monitor()
     }
 
     fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
-        &mut self.introspection_monitor
+        self.inner.introspection_monitor_mut()
     }
 }
 
 #[cfg(feature = "scalability_introspection")]
 impl<I, C, R, SC> HasScalabilityMonitor for StdState<I, C, R, SC> {
     fn scalability_monitor(&self) -> &ScalabilityMonitor {
-        &self.scalability_monitor
+        self.inner.scalability_monitor()
     }
 
     fn scalability_monitor_mut(&mut self) -> &mut ScalabilityMonitor {
-        &mut self.scalability_monitor
+        self.inner.scalability_monitor_mut()
     }
 }
 
@@ -1211,6 +1470,7 @@ impl<I> HasRand for NopState<I> {
     }
 }
 
+impl<I> GenState for NopState<I> where I: Input {}
 impl<I> State for NopState<I> where I: Input {}
 
 impl<I> HasCurrentCorpusId for NopState<I> {
