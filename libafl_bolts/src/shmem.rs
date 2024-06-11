@@ -756,6 +756,7 @@ pub mod unix_shmem {
                 }
             }
 
+            #[allow(clippy::unnecessary_wraps)]
             fn shmem_from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 unsafe {
                     /* map the shared memory segment to the address space of the process */
