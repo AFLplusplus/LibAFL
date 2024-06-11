@@ -684,6 +684,7 @@ pub mod unix_shmem {
 
         impl MmapShMem {
             /// Create a new [`MmapShMem`]
+            /// This will *NOT* automatically delete the shmem files, meaning that it's user's responsibility to delete all `/dev/shm/libafl_*` after fuzzing
             pub fn new(map_size: usize, rand_id: u32) -> Result<Self, Error> {
                 unsafe {
                     let full_file_name = format!("/libafl_{}_{}", process::id(), rand_id);
@@ -907,10 +908,13 @@ pub mod unix_shmem {
                     );
 
                     // None in case we didn't [`shm_open`] this ourselves, but someone sent us the FD.
-                    log::info!("Dropping {:#?}", self.filename_path);
-                    if let Some(filename_path) = self.filename_path {
-                        // shm_unlink(filename_path.as_ptr() as *const _);
-                    }
+                    // log::info!("Dropping {:#?}", self.filename_path);
+                    // if let Some(filename_path) = self.filename_path {
+                    // shm_unlink(filename_path.as_ptr() as *const _);
+                    // }
+                    // We cannot shm_unlink here!
+                    // unlike unix common shmem we don't have refcounter.
+                    // so there's no guarantee that there's no other process still using it.
                 }
             }
         }
