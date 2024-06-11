@@ -71,6 +71,11 @@ impl SchedulerMetadata {
         self.strat
     }
 
+    /// The powerschedule strategy
+    pub fn set_strat(&mut self, strat: Option<PowerSchedule>) {
+        self.strat = strat;
+    }
+
     /// The measured exec time during calibration
     #[must_use]
     pub fn exec_time(&self) -> Duration {

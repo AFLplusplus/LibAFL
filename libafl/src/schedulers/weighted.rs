@@ -101,6 +101,8 @@ pub struct WeightedScheduler<C, F, O, S> {
     map_observer_handle: Handle<C>,
     last_hash: usize,
     phantom: PhantomData<(F, O, S)>,
+    /// Change strategy on completion of every queue cycle.
+    cycle_schedules: bool,
 }
 
 impl<C, F, O, S> WeightedScheduler<C, F, O, S>
@@ -127,8 +129,16 @@ where
             map_observer_handle: map_observer.handle(),
             last_hash: 0,
             table_invalidated: true,
+            cycle_schedules: false,
             phantom: PhantomData,
         }
+    }
+
+    /// Cycles the `PowerSchedule` on completion of a queue cycle
+    #[must_use]
+    pub fn cycle_schedules(mut self) -> Self {
+        self.cycle_schedules = true;
+        self
     }
 
     #[must_use]
@@ -219,6 +229,27 @@ where
         wsmeta.set_alias_probability(alias_probability);
         wsmeta.set_alias_table(alias_table);
         Ok(())
+    }
+
+    /// Cycles the strategy of the scheduler; tries to mimic AFL++'s cycling formula
+    pub fn cycle_schedule(
+        &mut self,
+        metadata: &mut SchedulerMetadata,
+    ) -> Result<PowerSchedule, Error> {
+        let next_strat = match metadata.strat().ok_or(Error::illegal_argument(
+            "No strategy specified when initializing scheduler; cannot cycle!",
+        ))? {
+            PowerSchedule::EXPLORE => PowerSchedule::EXPLOIT,
+            PowerSchedule::COE => PowerSchedule::LIN,
+            PowerSchedule::LIN => PowerSchedule::QUAD,
+            PowerSchedule::FAST => PowerSchedule::COE,
+            PowerSchedule::QUAD => PowerSchedule::FAST,
+            PowerSchedule::EXPLOIT => PowerSchedule::EXPLORE,
+        };
+        metadata.set_strat(Some(next_strat));
+        // We need to recalculate the scores of testcases.
+        self.table_invalidated = true;
+        Ok(next_strat)
     }
 }
 
@@ -343,6 +374,9 @@ where
             if runs_in_current_cycle >= corpus_counts {
                 let psmeta = state.metadata_mut::<SchedulerMetadata>()?;
                 psmeta.set_queue_cycles(psmeta.queue_cycles() + 1);
+                if self.cycle_schedules {
+                    self.cycle_schedule(psmeta)?;
+                }
             }
 
             self.set_current_scheduled(state, Some(idx))?;
