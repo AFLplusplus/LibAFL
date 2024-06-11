@@ -21,10 +21,10 @@ use core::{
     fmt::{self, Debug, Formatter},
     num::NonZeroUsize,
 };
-#[cfg(feature = "std")]
-use std::net::SocketAddr;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use std::process::Stdio;
+#[cfg(feature = "std")]
+use std::{boxed::Box, net::SocketAddr};
 #[cfg(all(unix, feature = "std"))]
 use std::{fs::File, os::unix::io::AsRawFd};
 
@@ -41,6 +41,7 @@ use libafl_bolts::{
 };
 use libafl_bolts::{
     core_affinity::{CoreId, Cores},
+    llmp::Brokers,
     shmem::ShMemProvider,
     tuples::{tuple_list, Handle},
 };
@@ -50,6 +51,8 @@ use typed_builder::TypedBuilder;
 use super::{EventManagerHooksTuple, StdLlmpEventHook};
 #[cfg(feature = "multi_machine")]
 use crate::events::multi_machine::NodeDescriptor;
+#[cfg(feature = "multi_machine")]
+use crate::events::{multi_machine::TcpMultiMachineBuilder, TcpMultiMachineEventManagerHook};
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use crate::{
     events::{centralized::CentralizedEventManager, CentralizedLlmpHook},
@@ -65,11 +68,7 @@ use crate::{
     state::{HasExecutions, State},
     Error,
 };
-use crate::{
-    events::{multi_machine::TcpMultiMachineBuilder, TcpMultiMachineEventManagerHook},
-    inputs::UsesInput,
-    observers::TimeObserver,
-};
+use crate::{inputs::UsesInput, observers::TimeObserver};
 
 /// The (internal) `env` that indicates we're running as client.
 const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
@@ -576,10 +575,10 @@ where
         CoreId,
     ) -> Result<(), Error>,
     MEMH: EventManagerHooksTuple<S>,
-    MT: Monitor + Clone,
+    MT: Monitor + Clone + 'static,
     S: State + HasExecutions,
     S::Input: Send + Sync + 'static,
-    SP: ShMemProvider,
+    SP: ShMemProvider + 'static,
 {
     /// Launch a standard Centralized-based fuzzer
     pub fn launch(&mut self) -> Result<(), Error> {
@@ -621,10 +620,10 @@ where
         CentralizedEventManager<IM, (), S, SP>, // No broker_hooks for centralized EM
         CoreId,
     ) -> Result<(), Error>,
-    MT: Monitor + Clone,
+    MT: Monitor + Clone + 'static,
     S: State + HasExecutions,
     <<IM as UsesState>::State as UsesInput>::Input: Send + Sync + 'static,
-    SP: ShMemProvider,
+    SP: ShMemProvider + 'static,
 {
     /// Launch a Centralized-based fuzzer.
     /// - `main_inner_mgr_builder` will be called to build the inner manager of the main node.
@@ -679,47 +678,30 @@ where
         // let mut multi_machine_event_manager_hook = Some(multi_machine_event_manager_hook);
 
         // Spawn centralized broker
-        self.shmem_provider.pre_fork()?;
-        match unsafe { fork() }? {
-            ForkResult::Parent(child) => {
-                self.shmem_provider.post_fork(false)?;
-                handles.push(child.pid);
-                #[cfg(feature = "std")]
-                log::info!("PID: {:#?} centralized broker spawned", std::process::id());
-            }
-            ForkResult::Child => {
-                log::info!("{:?} PostFork", unsafe { libc::getpid() });
-                #[cfg(feature = "std")]
-                log::info!("PID: {:#?} I am centralized broker", std::process::id());
-                self.shmem_provider.post_fork(true)?;
+        // self.shmem_provider.pre_fork()?;
+        // match unsafe { fork() }? {
+        //     ForkResult::Parent(child) => {
+        //         self.shmem_provider.post_fork(false)?;
+        //         handles.push(child.pid);
+        //         #[cfg(feature = "std")]
+        //         log::info!("PID: {:#?} centralized broker spawned", std::process::id());
+        //     }
+        //     ForkResult::Child => {
+        //         log::info!("{:?} PostFork", unsafe { libc::getpid() });
+        //         #[cfg(feature = "std")]
+        //         log::info!("PID: {:#?} I am centralized broker", std::process::id());
+        //         self.shmem_provider.post_fork(true)?;
 
-                #[cfg(feature = "multi_machine")]
-                let hooks = tuple_list!(
-                    CentralizedLlmpHook::<S::Input>::new()?,
-                    multi_machine_llmp_hook,
-                );
+        //         // Run in the broker until all clients exit
+        //         broker.loop_with_timeouts(Duration::from_secs(30), Some(Duration::from_millis(5)));
 
-                #[cfg(not(feature = "multi_machine"))]
-                let hooks = tuple_list!(CentralizedLlmpHook::<S::Input>::new()?);
+        //         log::info!("The last client quit. Exiting.");
 
-                // TODO switch to false after solving the bug
-                let mut broker = LlmpBroker::with_keep_pages_attach_to_tcp(
-                    self.shmem_provider.clone(),
-                    hooks,
-                    self.centralized_broker_port,
-                    true,
-                )?;
+        //         return Err(Error::shutting_down());
+        //     }
+        // }
 
-                // Run in the broker until all clients exit
-                broker.loop_with_timeouts(Duration::from_secs(30), Some(Duration::from_millis(5)));
-
-                log::info!("The last client quit. Exiting.");
-
-                return Err(Error::shutting_down());
-            }
-        }
-
-        std::thread::sleep(Duration::from_millis(10));
+        // std::thread::sleep(Duration::from_millis(10));
 
         // Spawn clients
         let mut index = 0_u64;
@@ -793,10 +775,34 @@ where
             }
         }
 
+        let mut brokers = Brokers::new();
+
+        let centralized_broker = {
+            #[cfg(feature = "multi_machine")]
+            let centralized_hooks = tuple_list!(
+                CentralizedLlmpHook::<S::Input>::new()?,
+                multi_machine_llmp_hook,
+            );
+
+            #[cfg(not(feature = "multi_machine"))]
+            let centralized_hooks = tuple_list!(CentralizedLlmpHook::<S::Input>::new()?);
+
+            // TODO switch to false after solving the bug
+            LlmpBroker::with_keep_pages_attach_to_tcp(
+                self.shmem_provider.clone(),
+                centralized_hooks,
+                self.centralized_broker_port,
+                true,
+            )?
+        };
+
+        brokers.add(Box::new(centralized_broker));
+
         if self.spawn_broker {
+            // If we should add a broker, add it to brokers.
             log::info!("I am broker!!.");
 
-            let llmp_hook = StdLlmpEventHook::new(self.monitor.clone())?;
+            let llmp_hook = StdLlmpEventHook::<S::Input, MT>::new(self.monitor.clone())?;
 
             let mut broker = LlmpBroker::create_attach_to_tcp(
                 self.shmem_provider.clone(),
@@ -815,19 +821,7 @@ where
                 .inner_mut()
                 .set_exit_cleanly_after(exit_cleanly_after);
 
-            broker.loop_with_timeouts(Duration::from_secs(30), Some(Duration::from_millis(5)));
-
-            #[cfg(feature = "llmp_debug")]
-            log::info!("The last client quit. Exiting.");
-
-            // Broker exited. kill all clients.
-            for handle in &handles {
-                unsafe {
-                    libc::kill(*handle, libc::SIGINT);
-                }
-            }
-
-            return Err(Error::shutting_down());
+            brokers.add(Box::new(broker));
 
             // unreachable!("The broker may never return normally, only on errors or when shutting down.");
 
@@ -860,6 +854,18 @@ where
             }
         }
 
-        Ok(())
+        brokers.loop_with_timeouts(Duration::from_secs(30), Some(Duration::from_millis(5)));
+
+        #[cfg(feature = "llmp_debug")]
+        log::info!("The last client quit. Exiting.");
+
+        // Broker exited. kill all clients.
+        for handle in &handles {
+            unsafe {
+                libc::kill(*handle, libc::SIGINT);
+            }
+        }
+
+        return Err(Error::shutting_down());
     }
 }
