@@ -675,34 +675,6 @@ where
                 <<IM as UsesState>::State as UsesInput>::Input,
             >(self.multi_machine_node_descriptor.clone())?;
 
-        // let mut multi_machine_event_manager_hook = Some(multi_machine_event_manager_hook);
-
-        // Spawn centralized broker
-        // self.shmem_provider.pre_fork()?;
-        // match unsafe { fork() }? {
-        //     ForkResult::Parent(child) => {
-        //         self.shmem_provider.post_fork(false)?;
-        //         handles.push(child.pid);
-        //         #[cfg(feature = "std")]
-        //         log::info!("PID: {:#?} centralized broker spawned", std::process::id());
-        //     }
-        //     ForkResult::Child => {
-        //         log::info!("{:?} PostFork", unsafe { libc::getpid() });
-        //         #[cfg(feature = "std")]
-        //         log::info!("PID: {:#?} I am centralized broker", std::process::id());
-        //         self.shmem_provider.post_fork(true)?;
-
-        //         // Run in the broker until all clients exit
-        //         broker.loop_with_timeouts(Duration::from_secs(30), Some(Duration::from_millis(5)));
-
-        //         log::info!("The last client quit. Exiting.");
-
-        //         return Err(Error::shutting_down());
-        //     }
-        // }
-
-        // std::thread::sleep(Duration::from_millis(10));
-
         // Spawn clients
         let mut index = 0_u64;
         for (id, bind_to) in core_ids.iter().enumerate().take(num_cores) {
@@ -777,7 +749,8 @@ where
 
         let mut brokers = Brokers::new();
 
-        let centralized_broker = {
+        // Add centralized broker
+        brokers.add(Box::new({
             #[cfg(feature = "multi_machine")]
             let centralized_hooks = tuple_list!(
                 CentralizedLlmpHook::<S::Input>::new()?,
@@ -794,12 +767,10 @@ where
                 self.centralized_broker_port,
                 true,
             )?
-        };
+        }));
 
-        brokers.add(Box::new(centralized_broker));
-
+        // If we should add another broker, add it to other brokers.
         if self.spawn_broker {
-            // If we should add a broker, add it to brokers.
             log::info!("I am broker!!.");
 
             let llmp_hook = StdLlmpEventHook::<S::Input, MT>::new(self.monitor.clone())?;
@@ -822,33 +793,15 @@ where
                 .set_exit_cleanly_after(exit_cleanly_after);
 
             brokers.add(Box::new(broker));
-
-            // unreachable!("The broker may never return normally, only on errors or when shutting down.");
-
-            // // TODO we don't want always a broker here, think about using different laucher process to spawn different configurations
-            // let builder = RestartingMgr::<(), MT, S, SP>::builder()
-            //     .shmem_provider(self.shmem_provider.clone())
-            //     .monitor(Some(self.monitor.clone()))
-            //     .broker_port(self.broker_port)
-            //     .kind(ManagerKind::Broker)
-            //     .remote_broker_addr(self.remote_broker_addr)
-            //     .exit_cleanly_after(Some(NonZeroUsize::try_from(self.cores.ids.len()).unwrap()))
-            //     .configuration(self.configuration)
-            //     .serialize_state(self.serialize_state)
-            //     .hooks(tuple_list!());
-
-            // #[cfg(feature = "adaptive_serialization")]
-            // let builder = builder.time_ref(self.time_obs.handle());
-
-            // builder.build().launch()?;
         }
 
+        // Loop over all the brokers that should be polled
         brokers.loop_with_timeouts(Duration::from_secs(30), Some(Duration::from_millis(5)));
 
         #[cfg(feature = "llmp_debug")]
         log::info!("The last client quit. Exiting.");
 
-        // Broker exited. kill all clients.
+        // Brokers exited. kill all clients.
         for handle in &handles {
             unsafe {
                 libc::kill(*handle, libc::SIGINT);
