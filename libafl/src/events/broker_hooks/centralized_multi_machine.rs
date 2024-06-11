@@ -162,6 +162,8 @@ where
             };
             let event: Event<I> = postcard::from_bytes(event_bytes)?;
 
+            info!("Sending event {}", event.name());
+
             state_wr_lock
                 .send_interesting_event_to_nodes(&event)
                 .await?;
@@ -204,7 +206,9 @@ where
                 .receive_new_messages_from_nodes(&mut new_events)
                 .await?;
 
-            info!("New events: {:?}", new_events);
+            for event in &new_events {
+                info!("received event {}", event.name_detailed());
+            }
 
             let msgs_to_send: Result<Vec<(Tag, Flags, Vec<u8>)>, Error> = new_events
                 .into_iter()

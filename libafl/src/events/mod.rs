@@ -30,6 +30,7 @@ use core::{
     marker::PhantomData,
     time::Duration,
 };
+use std::string::ToString;
 
 use ahash::RandomState;
 #[cfg(feature = "std")]
@@ -391,6 +392,48 @@ where
                 phantom: _,
             } => "Log",
             Event::CustomBuf { .. } => "CustomBuf",
+            /*Event::Custom {
+                sender_id: _, /*custom_event} => custom_event.name()*/
+            } => "todo",*/
+        }
+    }
+
+    fn name_detailed(&self) -> String {
+        match self {
+            Event::NewTestcase {
+                input,
+                client_config: _,
+                corpus_size: _,
+                exit_kind: _,
+                observers_buf: _,
+                time: _,
+                executions: _,
+                forward_id: _,
+            } => format!("Testcase {}", input.generate_name(0)),
+            Event::UpdateExecStats {
+                time: _,
+                executions: _,
+                phantom: _,
+            } => "Client Heartbeat".to_string(),
+            Event::UpdateUserStats {
+                name: _,
+                value: _,
+                phantom: _,
+            } => "UserStats".to_string(),
+            #[cfg(feature = "introspection")]
+            Event::UpdatePerfMonitor {
+                time: _,
+                executions: _,
+                introspection_monitor: _,
+                phantom: _,
+            } => "PerfMonitor".to_string(),
+            Event::Objective { .. } => "Objective".to_string(),
+            Event::Log {
+                severity_level: _,
+                message: _,
+                phantom: _,
+            } => "Log".to_string(),
+            Event::CustomBuf { .. } => "CustomBuf".to_string(),
             /*Event::Custom {
                 sender_id: _, /*custom_event} => custom_event.name()*/
             } => "todo",*/
