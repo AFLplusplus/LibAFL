@@ -32,9 +32,9 @@ use crate::events::llmp::COMPRESS_THRESHOLD;
 use crate::{
     events::{
         llmp::{LLMP_TAG_EVENT_TO_BOTH, _LLMP_TAG_EVENT_TO_BROKER},
-        AdaptiveSerializer, CustomBufEventResult, CustomBufHandlerFn, Event, EventConfig, EventFirer, EventManager,
-        EventManagerHooksTuple, EventManagerId, EventProcessor, EventRestarter,
-        HasCustomBufHandlers, HasEventManagerId, ProgressReporter,
+        AdaptiveSerializer, CustomBufEventResult, CustomBufHandlerFn, Event, EventConfig,
+        EventFirer, EventManager, EventManagerHooksTuple, EventManagerId, EventProcessor,
+        EventRestarter, HasCustomBufHandlers, HasEventManagerId, ProgressReporter,
     },
     executors::{Executor, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
@@ -428,54 +428,54 @@ where
                 } => {
                     log::info!("Received new Testcase from {client_id:?} ({client_config:?}, forward {forward_id:?})");
 
-                if self.always_interesting {
-                    let item = fuzzer.add_input(state, executor, self, input)?;
-                    log::info!("Added received Testcase as item #{item}");
-                } else {
-                    let res = if client_config.match_with(&self.configuration)
-                        && observers_buf.is_some()
-                    {
-                        let start = current_time();
-                        let observers: E::Observers =
-                            postcard::from_bytes(observers_buf.as_ref().unwrap())?;
-                        {
-                            self.deserialization_time = current_time() - start;
-                        }
-                        #[cfg(feature = "scalability_introspection")]
-                        {
-                            state.scalability_monitor_mut().testcase_with_observers += 1;
-                        }
-                        fuzzer.execute_and_process(
-                            state, self, input, &observers, &exit_kind, false,
-                        )?
-                    } else {
-                        #[cfg(feature = "scalability_introspection")]
-                        {
-                            state.scalability_monitor_mut().testcase_without_observers += 1;
-                        }
-                        fuzzer.evaluate_input_with_observers::<E, Self>(
-                            state, executor, self, input, false,
-                        )?
-                    };
-                    if let Some(item) = res.1 {
+                    if self.always_interesting {
+                        let item = fuzzer.add_input(state, executor, self, input)?;
                         log::info!("Added received Testcase as item #{item}");
+                    } else {
+                        let res = if client_config.match_with(&self.configuration)
+                            && observers_buf.is_some()
+                        {
+                            let start = current_time();
+                            let observers: E::Observers =
+                                postcard::from_bytes(observers_buf.as_ref().unwrap())?;
+                            {
+                                self.deserialization_time = current_time() - start;
+                            }
+                            #[cfg(feature = "scalability_introspection")]
+                            {
+                                state.scalability_monitor_mut().testcase_with_observers += 1;
+                            }
+                            fuzzer.execute_and_process(
+                                state, self, input, &observers, &exit_kind, false,
+                            )?
+                        } else {
+                            #[cfg(feature = "scalability_introspection")]
+                            {
+                                state.scalability_monitor_mut().testcase_without_observers += 1;
+                            }
+                            fuzzer.evaluate_input_with_observers::<E, Self>(
+                                state, executor, self, input, false,
+                            )?
+                        };
+                        if let Some(item) = res.1 {
+                            log::info!("Added received Testcase as item #{item}");
+                        }
                     }
                 }
-            }
-            Event::CustomBuf { tag, buf } => {
-                for handler in &mut self.custom_buf_handlers {
-                    if handler(state, &tag, &buf)? == CustomBufEventResult::Handled {
-                        break;
+                Event::CustomBuf { tag, buf } => {
+                    for handler in &mut self.custom_buf_handlers {
+                        if handler(state, &tag, &buf)? == CustomBufEventResult::Handled {
+                            break;
+                        }
                     }
                 }
+                _ => {
+                    return Err(Error::unknown(format!(
+                        "Received illegal message that message should not have arrived: {:?}.",
+                        event.name()
+                    )));
+                }
             }
-            _ => {
-                return Err(Error::unknown(format!(
-                    "Received illegal message that message should not have arrived: {:?}.",
-                    event.name()
-                )));
-            }
-        }
         }
 
         self.hooks.post_exec_all(state, client_id)?;

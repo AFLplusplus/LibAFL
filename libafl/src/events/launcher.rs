@@ -50,7 +50,6 @@ use typed_builder::TypedBuilder;
 use super::{EventManagerHooksTuple, StdLlmpEventHook};
 #[cfg(feature = "multi_machine")]
 use crate::events::multi_machine::NodeDescriptor;
-use crate::observers::TimeObserver;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use crate::{
     events::{centralized::CentralizedEventManager, CentralizedLlmpHook},
@@ -69,6 +68,7 @@ use crate::{
 use crate::{
     events::{multi_machine::TcpMultiMachineBuilder, TcpMultiMachineEventManagerHook},
     inputs::UsesInput,
+    observers::TimeObserver,
 };
 
 /// The (internal) `env` that indicates we're running as client.
