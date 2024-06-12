@@ -136,7 +136,7 @@ where
 
     /// Cycle the `PowerSchedule` on completion of a queue cycle
     #[must_use]
-    pub fn cycle_schedules(mut self) -> Self {
+    pub fn cycling_scheduler(mut self) -> Self {
         self.cycle_schedules = true;
         self
     }
