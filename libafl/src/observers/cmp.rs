@@ -390,7 +390,7 @@ where
         }
     }
 
-    /// Reference the stored auxiliary data associated with the [`CmpObserverMetadata`]
+    /// Handle the stored auxiliary data associated with the [`CmpObserverMetadata`]
     pub fn data(&self) -> &M::Data {
         &self.data
     }
@@ -516,12 +516,10 @@ impl AFLppCmpValuesMetadata {
 /// - reserved:  Reserved for future use
 pub struct AFLppCmpLogHeader {
     /// The header values
-    #[bitfield(name = "hits", ty = "u32", bits = "0..=23")]
-    #[bitfield(name = "id", ty = "u32", bits = "24..=47")]
-    #[bitfield(name = "shape", ty = "u32", bits = "48..=52")]
-    #[bitfield(name = "_type", ty = "u32", bits = "53..=54")]
-    #[bitfield(name = "attribute", ty = "u32", bits = "55..=58")]
-    #[bitfield(name = "overflow", ty = "u32", bits = "59..=59")]
-    #[bitfield(name = "reserved", ty = "u32", bits = "60..=63")]
-    pub data: [u8; 8],
+    #[bitfield(name = "hits", ty = "u32", bits = "0..=5")] // 6 bits up to 63 entries, we have CMP_MAP_H = 32 (so using half of it)
+    #[bitfield(name = "shape", ty = "u32", bits = "6..=10")] // 31 + 1 bytes max
+    #[bitfield(name = "_type", ty = "u8", bits = "11..=11")] // 2: cmp, rtn
+    #[bitfield(name = "attribute", ty = "u32", bits = "12..=15")]
+    // 16 types for arithmetic comparison types
+    pub data: [u8; 2],
 }

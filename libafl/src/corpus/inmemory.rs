@@ -264,6 +264,12 @@ where
         self._insert(testcase, false)
     }
 
+    #[must_use]
+    /// Peek the next free corpus id
+    pub fn peek_free_id(&self) -> CorpusId {
+        CorpusId::from(self.progressive_idx)
+    }
+
     /// Insert a testcase assigning a `CorpusId` to it
     pub fn insert_disabled(&mut self, testcase: RefCell<Testcase<I>>) -> CorpusId {
         self._insert(testcase, true)
@@ -390,12 +396,14 @@ where
             .ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
     }
 
-    /// Removes an entry from the corpus, returning it if it was present.
+    /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases
     #[inline]
-    fn remove(&mut self, idx: CorpusId) -> Result<Testcase<I>, Error> {
-        self.storage
-            .enabled
-            .remove(idx)
+    fn remove(&mut self, idx: CorpusId) -> Result<Testcase<Self::Input>, Error> {
+        let mut testcase = self.storage.enabled.remove(idx);
+        if testcase.is_none() {
+            testcase = self.storage.disabled.remove(idx);
+        }
+        testcase
             .map(|x| x.take())
             .ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
     }
@@ -428,6 +436,12 @@ where
     #[inline]
     fn current_mut(&mut self) -> &mut Option<CorpusId> {
         &mut self.current
+    }
+
+    /// Peek the next free corpus id
+    #[inline]
+    fn peek_free_id(&self) -> CorpusId {
+        self.storage.peek_free_id()
     }
 
     #[inline]

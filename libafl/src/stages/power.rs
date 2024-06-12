@@ -1,6 +1,9 @@
 //! The power schedules. This stage should be invoked after the calibration stage.
 
+use alloc::borrow::Cow;
 use core::{fmt::Debug, marker::PhantomData};
+
+use libafl_bolts::Named;
 
 use crate::{
     executors::{Executor, HasObservers},
@@ -11,10 +14,12 @@ use crate::{
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
     Error, HasMetadata,
 };
-
+/// Default name for `PowerMutationalStage`; derived from AFL++
+pub const POWER_MUTATIONAL_STAGE_NAME: &str = "power";
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
 pub struct PowerMutationalStage<E, F, EM, I, M, Z> {
+    name: Cow<'static, str>,
     /// The mutators we use
     mutator: M,
     /// Helper for restarts
@@ -30,15 +35,21 @@ where
     type State = E::State;
 }
 
+impl<E, F, EM, I, M, Z> Named for PowerMutationalStage<E, F, EM, I, M, Z> {
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
+    }
+}
+
 impl<E, F, EM, I, M, Z> MutationalStage<E, EM, I, M, Z> for PowerMutationalStage<E, F, EM, I, M, Z>
 where
     E: Executor<EM, Z> + HasObservers,
-    EM: UsesState<State = E::State>,
-    F: TestcaseScore<E::State>,
-    M: Mutator<I, E::State>,
-    E::State: HasCorpus + HasMetadata + HasRand + HasExecutions,
-    Z: Evaluator<E, EM, State = E::State>,
-    I: MutatedTransform<E::Input, E::State> + Clone,
+    EM: UsesState<State = Self::State>,
+    F: TestcaseScore<Self::State>,
+    M: Mutator<I, Self::State>,
+    Self::State: HasCorpus + HasMetadata + HasRand + HasExecutions,
+    Z: Evaluator<E, EM, State = Self::State>,
+    I: MutatedTransform<E::Input, Self::State> + Clone,
 {
     /// The mutator, added to this stage
     #[inline]
@@ -54,7 +65,7 @@ where
 
     /// Gets the number of iterations as a random number
     #[allow(clippy::cast_sign_loss)]
-    fn iterations(&self, state: &mut E::State) -> Result<usize, Error> {
+    fn iterations(&self, state: &mut Self::State) -> Result<usize, Error> {
         // Update handicap
         let mut testcase = state.current_testcase_mut()?;
         let score = F::compute(state, &mut testcase)? as usize;
@@ -62,7 +73,7 @@ where
         Ok(score)
     }
 
-    fn execs_since_progress_start(&mut self, state: &mut <Z>::State) -> Result<u64, Error> {
+    fn execs_since_progress_start(&mut self, state: &mut Self::State) -> Result<u64, Error> {
         self.restart_helper.execs_since_progress_start(state)
     }
 }
@@ -70,12 +81,12 @@ where
 impl<E, F, EM, I, M, Z> Stage<E, EM, Z> for PowerMutationalStage<E, F, EM, I, M, Z>
 where
     E: Executor<EM, Z> + HasObservers,
-    EM: UsesState<State = E::State>,
-    F: TestcaseScore<E::State>,
-    M: Mutator<I, E::State>,
-    E::State: HasCorpus + HasMetadata + HasRand + HasExecutions,
-    Z: Evaluator<E, EM, State = E::State>,
-    I: MutatedTransform<E::Input, E::State> + Clone,
+    EM: UsesState<State = Self::State>,
+    F: TestcaseScore<Self::State>,
+    M: Mutator<I, Self::State>,
+    Self::State: HasCorpus + HasMetadata + HasRand + HasExecutions,
+    Z: Evaluator<E, EM, State = Self::State>,
+    I: MutatedTransform<Self::Input, Self::State> + Clone,
 {
     #[inline]
     #[allow(clippy::let_and_return)]
@@ -83,7 +94,7 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut E::State,
+        state: &mut Self::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
         let ret = self.perform_mutational(fuzzer, executor, state, manager);
@@ -104,30 +115,16 @@ where
 impl<E, F, EM, M, Z> PowerMutationalStage<E, F, EM, E::Input, M, Z>
 where
     E: Executor<EM, Z> + HasObservers,
-    EM: UsesState<State = E::State>,
-    F: TestcaseScore<E::State>,
-    M: Mutator<E::Input, E::State>,
-    E::State: HasCorpus + HasMetadata + HasRand,
-    Z: Evaluator<E, EM, State = E::State>,
+    EM: UsesState<State = <Self as UsesState>::State>,
+    F: TestcaseScore<<Self as UsesState>::State>,
+    M: Mutator<E::Input, <Self as UsesState>::State>,
+    <Self as UsesState>::State: HasCorpus + HasMetadata + HasRand,
+    Z: Evaluator<E, EM, State = <Self as UsesState>::State>,
 {
     /// Creates a new [`PowerMutationalStage`]
     pub fn new(mutator: M) -> Self {
-        Self::transforming(mutator)
-    }
-}
-
-impl<E, F, EM, I, M, Z> PowerMutationalStage<E, F, EM, I, M, Z>
-where
-    E: Executor<EM, Z> + HasObservers,
-    EM: UsesState<State = E::State>,
-    F: TestcaseScore<E::State>,
-    M: Mutator<I, E::State>,
-    E::State: HasCorpus + HasMetadata + HasRand,
-    Z: Evaluator<E, EM, State = E::State>,
-{
-    /// Creates a new transforming [`PowerMutationalStage`]
-    pub fn transforming(mutator: M) -> Self {
         Self {
+            name: Cow::Borrowed(POWER_MUTATIONAL_STAGE_NAME),
             mutator,
             phantom: PhantomData,
             restart_helper: ExecutionCountRestartHelper::default(),

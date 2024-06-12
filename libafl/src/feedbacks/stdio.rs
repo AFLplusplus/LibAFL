@@ -4,7 +4,7 @@ use alloc::{borrow::Cow, string::String};
 
 use libafl_bolts::{
     impl_serdeany,
-    tuples::{MatchNameRef, Reference, Referenceable},
+    tuples::{Handle, Handled, MatchNameRef},
     Named,
 };
 use serde::{Deserialize, Serialize};
@@ -32,7 +32,7 @@ impl_serdeany!(StdOutMetadata);
 /// is never interesting (use with an OR).
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct StdOutToMetadataFeedback {
-    o_ref: Reference<StdOutObserver>,
+    o_ref: Handle<StdOutObserver>,
 }
 
 impl<S> Feedback<S> for StdOutToMetadataFeedback
@@ -90,6 +90,11 @@ where
     fn discard_metadata(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         Ok(())
     }
+
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Result<bool, Error> {
+        Ok(false)
+    }
 }
 
 impl Named for StdOutToMetadataFeedback {
@@ -104,7 +109,7 @@ impl StdOutToMetadataFeedback {
     #[must_use]
     pub fn new(observer: &StdOutObserver) -> Self {
         Self {
-            o_ref: observer.reference(),
+            o_ref: observer.handle(),
         }
     }
 }
@@ -122,7 +127,7 @@ impl_serdeany!(StdErrMetadata);
 /// is never interesting (use with an OR).
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct StdErrToMetadataFeedback {
-    o_ref: Reference<StdErrObserver>,
+    o_ref: Handle<StdErrObserver>,
 }
 
 impl<S> Feedback<S> for StdErrToMetadataFeedback
@@ -180,6 +185,10 @@ where
     fn discard_metadata(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         Ok(())
     }
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Result<bool, Error> {
+        Ok(false)
+    }
 }
 
 impl Named for StdErrToMetadataFeedback {
@@ -194,7 +203,7 @@ impl StdErrToMetadataFeedback {
     #[must_use]
     pub fn new(observer: &StdErrObserver) -> Self {
         Self {
-            o_ref: observer.reference(),
+            o_ref: observer.handle(),
         }
     }
 }

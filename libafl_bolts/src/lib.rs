@@ -4,6 +4,7 @@
 #![doc = include_str!("../README.md")]
 /*! */
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
+#![forbid(unexpected_cfgs)]
 #![allow(incomplete_features)]
 #![no_std]
 // For `type_eq`
@@ -121,7 +122,7 @@ pub mod fs;
 #[cfg(feature = "alloc")]
 pub mod llmp;
 pub mod math;
-#[cfg(all(feature = "std", unix))]
+#[cfg(feature = "std")]
 pub mod minibsod;
 pub mod os;
 #[cfg(feature = "alloc")]
@@ -198,17 +199,6 @@ use xxhash_rust::xxh3::xxh3_64;
 )]
 pub struct ClientId(pub u32);
 
-#[cfg(feature = "std")]
-use log::{Metadata, Record};
-
-#[deprecated(
-    since = "0.11.0",
-    note = "The launcher module has moved out of `libafl_bolts` into `libafl::events::launcher`."
-)]
-/// Dummy module informing potential users that the launcher module has moved
-/// out of `libafl_bolts` into `libafl::events::launcher`.
-pub mod launcher {}
-
 use core::{
     array::TryFromSliceError,
     fmt::{self, Display},
@@ -221,6 +211,8 @@ use std::{env::VarError, io};
 
 #[cfg(feature = "libafl_derive")]
 pub use libafl_derive::SerdeAny;
+#[cfg(feature = "std")]
+use log::{Metadata, Record};
 #[cfg(feature = "alloc")]
 use {
     alloc::string::{FromUtf8Error, String},

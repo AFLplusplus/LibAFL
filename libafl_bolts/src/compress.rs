@@ -22,8 +22,20 @@ impl GzipCompressor {
     /// If the buffer is at least larger as large as the `threshold` value, we compress the buffer.
     /// When given a `threshold` of `0`, the `GzipCompressor` will always compress.
     #[must_use]
-    pub fn new(threshold: usize) -> Self {
+    pub fn with_threshold(threshold: usize) -> Self {
         Self { threshold }
+    }
+
+    /// Create a [`GzipCompressor`] that will always compress
+    #[must_use]
+    pub fn new() -> Self {
+        Self { threshold: 0 }
+    }
+}
+
+impl Default for GzipCompressor {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -31,18 +43,24 @@ impl GzipCompressor {
     /// Compression.
     /// If the buffer is smaller than the threshold of this compressor, `None` will be returned.
     /// Else, the buffer is compressed.
-    pub fn compress(&self, buf: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+    #[must_use]
+    pub fn maybe_compress(&self, buf: &[u8]) -> Option<Vec<u8>> {
         if buf.len() >= self.threshold {
             //compress if the buffer is large enough
-            let compressed = compress_to_vec(buf, CompressionLevel::BestSpeed as u8);
-            Ok(Some(compressed))
+            Some(self.compress(buf))
         } else {
-            Ok(None)
+            None
         }
     }
 
+    /// Force compression.
+    /// Will ignore the preset threshold, and always compress.
+    #[must_use]
+    pub fn compress(&self, buf: &[u8]) -> Vec<u8> {
+        compress_to_vec(buf, CompressionLevel::BestSpeed as u8)
+    }
+
     /// Decompression.
-    /// Flag is used to indicate if it's compressed or not
     #[allow(clippy::unused_self)]
     pub fn decompress(&self, buf: &[u8]) -> Result<Vec<u8>, Error> {
         let decompressed = decompress_to_vec(buf);
@@ -60,10 +78,10 @@ mod tests {
 
     #[test]
     fn test_compression() {
-        let compressor = GzipCompressor::new(1);
+        let compressor = GzipCompressor::with_threshold(1);
         assert!(
             compressor
-                .decompress(&compressor.compress(&[1u8; 1024]).unwrap().unwrap())
+                .decompress(&compressor.maybe_compress(&[1u8; 1024]).unwrap())
                 .unwrap()
                 == vec![1u8; 1024]
         );
@@ -71,8 +89,8 @@ mod tests {
 
     #[test]
     fn test_threshold() {
-        let compressor = GzipCompressor::new(1024);
-        assert!(compressor.compress(&[1u8; 1023]).unwrap().is_none());
-        assert!(compressor.compress(&[1u8; 1024]).unwrap().is_some());
+        let compressor = GzipCompressor::with_threshold(1024);
+        assert!(compressor.maybe_compress(&[1u8; 1023]).is_none());
+        assert!(compressor.maybe_compress(&[1u8; 1024]).is_some());
     }
 }

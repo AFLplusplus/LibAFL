@@ -8,7 +8,7 @@ use pyo3::prelude::*;
 pub use strum_macros::EnumIter;
 pub use syscall_numbers::arm::*;
 
-use crate::{sync_exit::BackdoorArgs, CallingConvention};
+use crate::{sync_exit::ExitArgs, CallingConvention, QemuRWError, QemuRWErrorKind};
 
 /// Registers for the ARM instruction set.
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
@@ -33,19 +33,19 @@ pub enum Regs {
     R25 = 25,
 }
 
-static BACKDOOR_ARCH_REGS: OnceLock<EnumMap<BackdoorArgs, Regs>> = OnceLock::new();
+static EXIT_ARCH_REGS: OnceLock<EnumMap<ExitArgs, Regs>> = OnceLock::new();
 
-pub fn get_backdoor_arch_regs() -> &'static EnumMap<BackdoorArgs, Regs> {
-    BACKDOOR_ARCH_REGS.get_or_init(|| {
+pub fn get_exit_arch_regs() -> &'static EnumMap<ExitArgs, Regs> {
+    EXIT_ARCH_REGS.get_or_init(|| {
         enum_map! {
-            BackdoorArgs::Ret  => Regs::R0,
-            BackdoorArgs::Cmd  => Regs::R0,
-            BackdoorArgs::Arg1 => Regs::R1,
-            BackdoorArgs::Arg2 => Regs::R2,
-            BackdoorArgs::Arg3 => Regs::R3,
-            BackdoorArgs::Arg4 => Regs::R4,
-            BackdoorArgs::Arg5 => Regs::R5,
-            BackdoorArgs::Arg6 => Regs::R6,
+            ExitArgs::Ret  => Regs::R0,
+            ExitArgs::Cmd  => Regs::R0,
+            ExitArgs::Arg1 => Regs::R1,
+            ExitArgs::Arg2 => Regs::R2,
+            ExitArgs::Arg3 => Regs::R3,
+            ExitArgs::Arg4 => Regs::R4,
+            ExitArgs::Arg5 => Regs::R5,
+            ExitArgs::Arg6 => Regs::R6,
         }
     })
 }
@@ -88,27 +88,25 @@ pub fn capstone_thumb() -> capstone::arch::arm::ArchCapstoneBuilder {
 pub type GuestReg = u32;
 
 impl crate::ArchExtras for crate::CPU {
-    fn read_return_address<T>(&self) -> Result<T, String>
+    fn read_return_address<T>(&self) -> Result<T, QemuRWError>
     where
         T: From<GuestReg>,
     {
         self.read_reg(Regs::Lr)
     }
 
-    fn write_return_address<T>(&self, val: T) -> Result<(), String>
+    fn write_return_address<T>(&self, val: T) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg>,
     {
         self.write_reg(Regs::Lr, val)
     }
 
-    fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, String>
+    fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, QemuRWError>
     where
         T: From<GuestReg>,
     {
-        if conv != CallingConvention::Cdecl {
-            return Err(format!("Unsupported calling convention: {conv:#?}"));
-        }
+        QemuRWError::check_conv(QemuRWErrorKind::Read, CallingConvention::Cdecl, conv)?;
 
         let reg_id = match idx {
             0 => Regs::R0,
@@ -116,7 +114,12 @@ impl crate::ArchExtras for crate::CPU {
             2 => Regs::R2,
             3 => Regs::R3,
             // 4.. would be on the stack, let's not do this for now
-            r => return Err(format!("Unsupported argument: {r:}")),
+            r => {
+                return Err(QemuRWError::new_argument_error(
+                    QemuRWErrorKind::Read,
+                    i32::from(r),
+                ))
+            }
         };
 
         self.read_reg(reg_id)
@@ -127,19 +130,17 @@ impl crate::ArchExtras for crate::CPU {
         conv: CallingConvention,
         idx: i32,
         val: T,
-    ) -> Result<(), String>
+    ) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg>,
     {
-        if conv != CallingConvention::Cdecl {
-            return Err(format!("Unsupported calling convention: {conv:#?}"));
-        }
+        QemuRWError::check_conv(QemuRWErrorKind::Write, CallingConvention::Cdecl, conv)?;
 
         let val: GuestReg = val.into();
         match idx {
             0 => self.write_reg(Regs::R0, val),
             1 => self.write_reg(Regs::R1, val),
-            _ => Err(format!("Unsupported argument: {idx:}")),
+            r => Err(QemuRWError::new_argument_error(QemuRWErrorKind::Write, r)),
         }
     }
 }

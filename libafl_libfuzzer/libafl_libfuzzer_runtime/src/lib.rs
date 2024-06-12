@@ -1,12 +1,6 @@
 //! The `LibAFL` `LibFuzzer` runtime, exposing the same functions as the original [`LibFuzzer`](https://llvm.org/docs/LibFuzzer.html).
 
-#![allow(incomplete_features)]
-// For `type_eq`
-#![cfg_attr(unstable_feature, feature(specialization))]
-// For `type_id` and owned things
-#![cfg_attr(unstable_feature, feature(intrinsics))]
-// For `std::simd`
-#![cfg_attr(unstable_feature, feature(portable_simd))]
+#![forbid(unexpected_cfgs)]
 #![warn(clippy::cargo)]
 #![allow(ambiguous_glob_reexports)]
 #![deny(clippy::cargo_common_metadata)]
@@ -24,7 +18,9 @@
     clippy::missing_docs_in_private_items,
     clippy::module_name_repetitions,
     clippy::ptr_cast_constness,
-    clippy::unsafe_derive_deserialize
+    clippy::unsafe_derive_deserialize,
+    clippy::similar_names,
+    clippy::too_many_lines
 )]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
@@ -110,11 +106,6 @@ mod harness_wrap {
 }
 
 pub(crate) use harness_wrap::libafl_libfuzzer_test_one_input;
-#[cfg(feature = "mimalloc")]
-use mimalloc::MiMalloc;
-#[global_allocator]
-#[cfg(feature = "mimalloc")]
-static GLOBAL: MiMalloc = MiMalloc;
 
 #[allow(clippy::struct_excessive_bools)]
 struct CustomMutationStatus {
@@ -150,7 +141,6 @@ impl CustomMutationStatus {
 macro_rules! fuzz_with {
     ($options:ident, $harness:ident, $operation:expr, $and_then:expr, $edge_maker:expr) => {{
         use libafl_bolts::{
-                current_nanos,
                 rands::StdRand,
                 tuples::{Merge, tuple_list},
                 AsSlice,
@@ -165,8 +155,8 @@ macro_rules! fuzz_with {
             mutators::{
                 GrimoireExtensionMutator, GrimoireRecursiveReplacementMutator, GrimoireRandomDeleteMutator,
                 GrimoireStringReplacementMutator, havoc_crossover, havoc_mutations, havoc_mutations_no_crossover,
-                I2SRandReplace, StdScheduledMutator, StringCategoryRandMutator, StringSubcategoryRandMutator,
-                StringCategoryTokenReplaceMutator, StringSubcategoryTokenReplaceMutator, Tokens, tokens_mutations
+                I2SRandReplace, StdScheduledMutator, UnicodeCategoryRandMutator, UnicodeSubcategoryRandMutator,
+                UnicodeCategoryTokenReplaceMutator, UnicodeSubcategoryTokenReplaceMutator, Tokens, tokens_mutations
             },
             observers::{stacktrace::BacktraceObserver, TimeObserver, CanTrack},
             schedulers::{
@@ -174,7 +164,7 @@ macro_rules! fuzz_with {
             },
             stages::{
                 CalibrationStage, GeneralizationStage, IfStage, StdMutationalStage,
-                StdPowerMutationalStage, StringIdentificationStage, TracingStage,
+                StdPowerMutationalStage, UnicodeIdentificationStage, TracingStage,
             },
             state::{HasCorpus, StdState},
             StdFuzzer,
@@ -282,7 +272,7 @@ macro_rules! fuzz_with {
             let mut state = state.unwrap_or_else(|| {
                 StdState::new(
                     // RNG
-                    StdRand::with_seed(current_nanos()),
+                    StdRand::new(),
                     // Corpus that will be evolved, we keep it in memory for performance
                     LibfuzzerCorpus::new(corpus_dir.clone(), 4096),
                     // Corpus in which we store solutions (crashes in this example),
@@ -299,29 +289,29 @@ macro_rules! fuzz_with {
 
             // Set up a string category analysis stage for unicode mutations
             let unicode_used = $options.unicode();
-            let string_mutator = StdScheduledMutator::new(
+            let unicode_mutator = StdScheduledMutator::new(
                 tuple_list!(
-                    StringCategoryRandMutator,
-                    StringSubcategoryRandMutator,
-                    StringSubcategoryRandMutator,
-                    StringSubcategoryRandMutator,
-                    StringSubcategoryRandMutator,
+                    UnicodeCategoryRandMutator,
+                    UnicodeSubcategoryRandMutator,
+                    UnicodeSubcategoryRandMutator,
+                    UnicodeSubcategoryRandMutator,
+                    UnicodeSubcategoryRandMutator,
                 )
             );
-            let string_replace_mutator = StdScheduledMutator::new(
+            let unicode_replace_mutator = StdScheduledMutator::new(
                 tuple_list!(
-                    StringCategoryTokenReplaceMutator,
-                    StringSubcategoryTokenReplaceMutator,
-                    StringSubcategoryTokenReplaceMutator,
-                    StringSubcategoryTokenReplaceMutator,
-                    StringSubcategoryTokenReplaceMutator,
+                    UnicodeCategoryTokenReplaceMutator,
+                    UnicodeSubcategoryTokenReplaceMutator,
+                    UnicodeSubcategoryTokenReplaceMutator,
+                    UnicodeSubcategoryTokenReplaceMutator,
+                    UnicodeSubcategoryTokenReplaceMutator,
                 )
             );
-            let string_power = StdMutationalStage::transforming(string_mutator);
-            let string_replace_power = StdMutationalStage::transforming(string_replace_mutator);
+            let unicode_power = StdMutationalStage::transforming(unicode_mutator);
+            let unicode_replace_power = StdMutationalStage::transforming(unicode_replace_mutator);
 
-            let string_analysis = StringIdentificationStage::new();
-            let string_analysis = IfStage::new(|_, _, _, _| Ok((unicode_used && mutator_status.std_mutational).into()), tuple_list!(string_analysis, string_power, string_replace_power));
+            let unicode_analysis = UnicodeIdentificationStage::new();
+            let unicode_analysis = IfStage::new(|_, _, _, _| Ok((unicode_used && mutator_status.std_mutational).into()), tuple_list!(unicode_analysis, unicode_power, unicode_replace_power));
 
             // Attempt to use tokens from libfuzzer dicts
             if !state.has_metadata::<Tokens>() {
@@ -491,7 +481,7 @@ macro_rules! fuzz_with {
                 calibration,
                 generalization,
                 tracing,
-                string_analysis,
+                unicode_analysis,
                 i2s,
                 cm_i2s,
                 std_power,

@@ -18,15 +18,16 @@ debug = true
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
-which = { version = "4.4" }
+which = { version = "6.0" }
 
 [dependencies]
 clap = { version = "4.0", features = ["derive"] }
-nix = "0.27"
+nix = { version = "0.29", features = ["signal"] }
 libafl = { path = "../../libafl/" }
 libafl_bolts = { path = "../../libafl_bolts/" }
 libafl_cc = { path = "../../libafl_cc/" }
 libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_hitcounts", "libfuzzer", "pointer_maps"] }
+env_logger = "0.11"
 
 [lib]
 name = "libforkserver_libafl_cc"

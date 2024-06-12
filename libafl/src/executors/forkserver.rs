@@ -21,8 +21,9 @@ use std::{
 use libafl_bolts::{
     fs::{get_unique_std_input_file, InputFile},
     os::{dup2, pipes::Pipe},
+    ownedref::OwnedSlice,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{MatchNameRef, Prepend, RefIndexable, Reference, Referenceable},
+    tuples::{Handle, Handled, MatchNameRef, Prepend, RefIndexable},
     AsSlice, AsSliceMut, Truncate,
 };
 use nix::{
@@ -48,28 +49,61 @@ use crate::{
 
 const FORKSRV_FD: i32 = 198;
 #[allow(clippy::cast_possible_wrap)]
-const FS_OPT_ENABLED: i32 = 0x80000001_u32 as i32;
-#[allow(clippy::cast_possible_wrap)]
-const FS_OPT_MAPSIZE: i32 = 0x40000000_u32 as i32;
-#[allow(clippy::cast_possible_wrap)]
-const FS_OPT_SHDMEM_FUZZ: i32 = 0x01000000_u32 as i32;
-#[allow(clippy::cast_possible_wrap)]
-const FS_OPT_AUTODICT: i32 = 0x10000000_u32 as i32;
+const FS_NEW_ERROR: i32 = 0xeffe0000_u32 as i32;
 
-// #[allow(clippy::cast_possible_wrap)]
-// const FS_OPT_MAX_MAPSIZE: i32 = ((0x00fffffe_u32 >> 1) + 1) as i32; // 8388608
-const fn fs_opt_get_mapsize(x: i32) -> i32 {
-    ((x & 0x00fffffe) >> 1) + 1
+const FS_NEW_VERSION_MIN: u32 = 1;
+const FS_NEW_VERSION_MAX: u32 = 1;
+#[allow(clippy::cast_possible_wrap)]
+const FS_NEW_OPT_MAPSIZE: i32 = 1_u32 as i32;
+#[allow(clippy::cast_possible_wrap)]
+const FS_NEW_OPT_SHDMEM_FUZZ: i32 = 2_u32 as i32;
+#[allow(clippy::cast_possible_wrap)]
+const FS_NEW_OPT_AUTODICT: i32 = 0x00000800_u32 as i32;
+
+#[allow(clippy::cast_possible_wrap)]
+const FS_ERROR_MAP_SIZE: i32 = 1_u32 as i32;
+#[allow(clippy::cast_possible_wrap)]
+const FS_ERROR_MAP_ADDR: i32 = 2_u32 as i32;
+#[allow(clippy::cast_possible_wrap)]
+const FS_ERROR_SHM_OPEN: i32 = 4_u32 as i32;
+#[allow(clippy::cast_possible_wrap)]
+const FS_ERROR_SHMAT: i32 = 8_u32 as i32;
+#[allow(clippy::cast_possible_wrap)]
+const FS_ERROR_MMAP: i32 = 16_u32 as i32;
+#[allow(clippy::cast_possible_wrap)]
+const FS_ERROR_OLD_CMPLOG: i32 = 32_u32 as i32;
+#[allow(clippy::cast_possible_wrap)]
+const FS_ERROR_OLD_CMPLOG_QEMU: i32 = 64_u32 as i32;
+
+fn report_error_and_exit(status: i32) -> Result<(), Error> {
+    /* Report on the error received via the forkserver controller and exit */
+    match status {
+    FS_ERROR_MAP_SIZE =>
+        Err(Error::unknown(
+            "AFL_MAP_SIZE is not set and fuzzing target reports that the required size is very large. Solution: Run the fuzzing target stand-alone with the environment variable AFL_DEBUG=1 set and set the value for __afl_final_loc in the AFL_MAP_SIZE environment variable for afl-fuzz.".to_string())),
+    FS_ERROR_MAP_ADDR =>
+        Err(Error::unknown(
+            "the fuzzing target reports that hardcoded map address might be the reason the mmap of the shared memory failed. Solution: recompile the target with either afl-clang-lto and do not set AFL_LLVM_MAP_ADDR or recompile with afl-clang-fast.".to_string())),
+    FS_ERROR_SHM_OPEN =>
+        Err(Error::unknown("the fuzzing target reports that the shm_open() call failed.".to_string())),
+    FS_ERROR_SHMAT =>
+        Err(Error::unknown("the fuzzing target reports that the shmat() call failed.".to_string())),
+    FS_ERROR_MMAP =>
+        Err(Error::unknown("the fuzzing target reports that the mmap() call to the shared memory failed.".to_string())),
+    FS_ERROR_OLD_CMPLOG =>
+        Err(Error::unknown(
+            "the -c cmplog target was instrumented with an too old AFL++ version, you need to recompile it.".to_string())),
+    FS_ERROR_OLD_CMPLOG_QEMU =>
+        Err(Error::unknown("The AFL++ QEMU/FRIDA loaders are from an older version, for -c you need to recompile it.".to_string())),
+    _ =>
+        Err(Error::unknown(format!("unknown error code {status} from fuzzing target!"))),
+    }
 }
-/* const fn fs_opt_set_mapsize(x: usize) -> usize {
-    if x <= 1 {
-      if x > FS_OPT_MAX_MAPSIZE { 0 } else { (x - 1) << 1 }
-    } else { 0 }
-} */
 
 /// The length of header bytes which tells shmem size
 const SHMEM_FUZZ_HDR_SIZE: usize = 4;
 const MAX_INPUT_SIZE_DEFAULT: usize = 1024 * 1024;
+const MIN_INPUT_SIZE_DEFAULT: usize = 1;
 
 /// The default signal to use to kill child processes
 const KILL_SIGNAL_DEFAULT: Signal = Signal::SIGTERM;
@@ -456,7 +490,7 @@ impl Forkserver {
         let st_read = unsafe { BorrowedFd::borrow_raw(st_read) };
 
         let mut readfds = FdSet::new();
-        readfds.insert(&st_read);
+        readfds.insert(st_read);
         // We'll pass a copied timeout to keep the original timeout intact, because select updates timeout to indicate how much time was left. See select(2)
         let sret = pselect(
             Some(readfds.highest().unwrap().as_raw_fd() + 1),
@@ -497,8 +531,10 @@ where
     map: Option<SP::ShMem>,
     phantom: PhantomData<S>,
     map_size: Option<usize>,
+    min_input_size: usize,
+    max_input_size: usize,
     #[cfg(feature = "regex")]
-    asan_obs: Reference<AsanBacktraceObserver>,
+    asan_obs: Handle<AsanBacktraceObserver>,
     timeout: TimeSpec,
     crash_exitcode: Option<i8>,
 }
@@ -582,12 +618,12 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
     input_filename: Option<OsString>,
     shmem_provider: Option<&'a mut SP>,
     max_input_size: usize,
+    min_input_size: usize,
     map_size: Option<usize>,
-    real_map_size: i32,
     kill_signal: Option<Signal>,
     timeout: Option<Duration>,
     #[cfg(feature = "regex")]
-    asan_obs: Option<Reference<AsanBacktraceObserver>>,
+    asan_obs: Option<Handle<AsanBacktraceObserver>>,
     crash_exitcode: Option<i8>,
 }
 
@@ -625,6 +661,15 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             Some(t) => t.into(),
             None => Duration::from_millis(5000).into(),
         };
+        if self.min_input_size > self.max_input_size {
+            return Err(Error::illegal_argument(
+                format!(
+                    "Minimum input size ({}) must not exceed maximum input size ({})",
+                    self.min_input_size, self.max_input_size
+                )
+                .as_str(),
+            ));
+        }
 
         Ok(ForkserverExecutor {
             target,
@@ -636,11 +681,13 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             map,
             phantom: PhantomData,
             map_size: self.map_size,
+            min_input_size: self.min_input_size,
+            max_input_size: self.max_input_size,
             timeout,
             asan_obs: self
                 .asan_obs
                 .clone()
-                .unwrap_or(AsanBacktraceObserver::default().reference()),
+                .unwrap_or(AsanBacktraceObserver::default().handle()),
             crash_exitcode: self.crash_exitcode,
         })
     }
@@ -698,11 +745,13 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             map,
             phantom: PhantomData,
             map_size: self.map_size,
+            min_input_size: self.min_input_size,
+            max_input_size: self.max_input_size,
             timeout,
             asan_obs: self
                 .asan_obs
                 .clone()
-                .unwrap_or(AsanBacktraceObserver::default().reference()),
+                .unwrap_or(AsanBacktraceObserver::default().handle()),
             crash_exitcode: self.crash_exitcode,
         })
     }
@@ -755,15 +804,54 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             }
         };
 
-        let (rlen, status) = forkserver.read_st()?; // Initial handshake, read 4-bytes hello message from the forkserver.
+        let (rlen, version_status) = forkserver.read_st()?; // Initial handshake, read 4-bytes hello message from the forkserver.
 
         if rlen != 4 {
             return Err(Error::unknown("Failed to start a forkserver".to_string()));
         }
-        log::info!("All right - fork server is up.");
 
-        if status & FS_OPT_ENABLED == FS_OPT_ENABLED && status & FS_OPT_MAPSIZE == FS_OPT_MAPSIZE {
-            let mut map_size = fs_opt_get_mapsize(status);
+        if (version_status & FS_NEW_ERROR) == FS_NEW_ERROR {
+            report_error_and_exit(version_status & 0x0000ffff)?;
+        }
+
+        let keep = version_status;
+        let version: u32 = version_status as u32 - 0x41464c00_u32;
+        if (0x41464c00..=0x41464cff).contains(&version_status) {
+            match version {
+                0 => {
+                    return Err(Error::unknown("Fork server version is not assigned, this should not happen. Recompile target."));
+                }
+                FS_NEW_VERSION_MIN..=FS_NEW_VERSION_MAX => {
+                    // good, do nothing
+                }
+                _ => {
+                    return Err(Error::unknown(
+                        "Fork server version is not supported. Recompile the target.",
+                    ));
+                }
+            }
+        }
+
+        let xored_version_status = (version_status as u32 ^ 0xffffffff) as i32;
+
+        let send_len = forkserver.write_ctl(xored_version_status)?;
+        if send_len != 4 {
+            return Err(Error::unknown("Writing to forkserver failed.".to_string()));
+        }
+
+        log::info!(
+            "All right - new fork server model version {} is up",
+            version
+        );
+
+        let (read_len, status) = forkserver.read_st()?;
+        if read_len != 4 {
+            return Err(Error::unknown(
+                "Reading from forkserver failed.".to_string(),
+            ));
+        }
+
+        if status & FS_NEW_OPT_MAPSIZE == FS_NEW_OPT_MAPSIZE {
             // When 0, we assume that map_size was filled by the user or const
             /* TODO autofill map size from the observer
 
@@ -771,8 +859,13 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                 self.map_size = Some(map_size as usize);
             }
             */
+            let (read_len, mut map_size) = forkserver.read_st()?;
+            if read_len != 4 {
+                return Err(Error::unknown(
+                    "Failed to read map size from forkserver".to_string(),
+                ));
+            }
 
-            self.real_map_size = map_size;
             if map_size % 64 != 0 {
                 map_size = ((map_size + 63) >> 6) << 6;
             }
@@ -780,68 +873,57 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             // TODO set AFL_MAP_SIZE
             assert!(self.map_size.is_none() || map_size as usize <= self.map_size.unwrap());
 
+            // we'll use this later when we truncate the observer
             self.map_size = Some(map_size as usize);
         }
 
-        // Only with SHMEM or AUTODICT we can send send_status back or it breaks!
-        // If forkserver is responding, we then check if there's any option enabled.
-        // We'll send 4-bytes message back to the forkserver to tell which features to use
-        // The forkserver is listening to our response if either shmem fuzzing is enabled or auto dict is enabled
-        // <https://github.com/AFLplusplus/AFLplusplus/blob/147654f8715d237fe45c1657c87b2fe36c4db22a/instrumentation/afl-compiler-rt.o.c#L1026>
-        if status & FS_OPT_ENABLED == FS_OPT_ENABLED
-            && (status & FS_OPT_SHDMEM_FUZZ == FS_OPT_SHDMEM_FUZZ
-                || status & FS_OPT_AUTODICT == FS_OPT_AUTODICT)
-        {
-            let mut send_status = FS_OPT_ENABLED;
-
-            if (status & FS_OPT_SHDMEM_FUZZ == FS_OPT_SHDMEM_FUZZ) && map.is_some() {
+        if status & FS_NEW_OPT_SHDMEM_FUZZ != 0 {
+            if map.is_some() {
                 log::info!("Using SHARED MEMORY FUZZING feature.");
-                send_status |= FS_OPT_SHDMEM_FUZZ;
                 self.uses_shmem_testcase = true;
+            } else {
+                return Err(Error::unknown(
+                    "Target requested sharedmem fuzzing, but you didn't prepare shmem",
+                ));
+            }
+        }
+
+        if status & FS_NEW_OPT_AUTODICT != 0 {
+            // Here unlike shmem input fuzzing, we are forced to read things
+            // hence no self.autotokens.is_some() to check if we proceed
+            let (read_len, dict_size) = forkserver.read_st()?;
+            if read_len != 4 {
+                return Err(Error::unknown(
+                    "Failed to read dictionary size from forkserver".to_string(),
+                ));
             }
 
-            if (status & FS_OPT_AUTODICT == FS_OPT_AUTODICT) && self.autotokens.is_some() {
-                log::info!("Using AUTODICT feature");
-                send_status |= FS_OPT_AUTODICT;
+            if !(2..=0xffffff).contains(&dict_size) {
+                return Err(Error::illegal_state(
+                    "Dictionary has an illegal size".to_string(),
+                ));
             }
+            log::info!("Autodict size {dict_size:x}");
+            let (rlen, buf) = forkserver.read_st_size(dict_size as usize)?;
 
-            if send_status != FS_OPT_ENABLED {
-                // if send_status is not changed (Options are available but we didn't use any), then don't send the next write_ctl message.
-                // This is important
-
-                let send_len = forkserver.write_ctl(send_status)?;
-                if send_len != 4 {
-                    return Err(Error::unknown("Writing to forkserver failed.".to_string()));
-                }
-
-                if (send_status & FS_OPT_AUTODICT) == FS_OPT_AUTODICT {
-                    let (read_len, dict_size) = forkserver.read_st()?;
-                    if read_len != 4 {
-                        return Err(Error::unknown(
-                            "Reading from forkserver failed.".to_string(),
-                        ));
-                    }
-
-                    if !(2..=0xffffff).contains(&dict_size) {
-                        return Err(Error::illegal_state(
-                            "Dictionary has an illegal size".to_string(),
-                        ));
-                    }
-
-                    log::info!("Autodict size {dict_size:x}");
-
-                    let (rlen, buf) = forkserver.read_st_size(dict_size as usize)?;
-
-                    if rlen != dict_size as usize {
-                        return Err(Error::unknown("Failed to load autodictionary".to_string()));
-                    }
-                    if let Some(t) = &mut self.autotokens {
-                        t.parse_autodict(&buf, dict_size as usize);
-                    }
-                }
+            if rlen != dict_size as usize {
+                return Err(Error::unknown("Failed to load autodictionary".to_string()));
             }
-        } else {
-            log::warn!("Forkserver Options are not available.");
+            if let Some(t) = &mut self.autotokens {
+                t.parse_autodict(&buf, dict_size as usize);
+            }
+        }
+
+        let (read_len, aflx) = forkserver.read_st()?;
+        if read_len != 4 {
+            return Err(Error::unknown("Reading from forkserver failed".to_string()));
+        }
+
+        if aflx != version_status {
+            return Err(Error::unknown(format!(
+                "Error in forkserver communication ({:x}=>{:x})",
+                keep, aflx
+            )));
         }
 
         Ok((forkserver, input_file, map))
@@ -943,6 +1025,20 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             res.push(arg.as_ref().to_owned());
         }
         self.arguments.append(&mut res);
+        self
+    }
+
+    /// Set the max input size
+    #[must_use]
+    pub fn max_input_size(mut self, size: usize) -> Self {
+        self.max_input_size = size;
+        self
+    }
+
+    /// Set the min input size
+    #[must_use]
+    pub fn min_input_size(mut self, size: usize) -> Self {
+        self.min_input_size = size;
         self
     }
 
@@ -1066,8 +1162,8 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             input_filename: None,
             shmem_provider: None,
             map_size: None,
-            real_map_size: 0,
             max_input_size: MAX_INPUT_SIZE_DEFAULT,
+            min_input_size: MIN_INPUT_SIZE_DEFAULT,
             kill_signal: None,
             timeout: None,
             asan_obs: None,
@@ -1093,8 +1189,8 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             input_filename: self.input_filename,
             shmem_provider: Some(shmem_provider),
             map_size: self.map_size,
-            real_map_size: self.real_map_size,
             max_input_size: MAX_INPUT_SIZE_DEFAULT,
+            min_input_size: MIN_INPUT_SIZE_DEFAULT,
             kill_signal: None,
             timeout: None,
             asan_obs: None,
@@ -1132,6 +1228,21 @@ where
 
         let last_run_timed_out = self.forkserver.last_run_timed_out_raw();
 
+        let mut input_bytes = input.target_bytes();
+        let mut input_size = input_bytes.as_slice().len();
+        if input_size > self.max_input_size {
+            // Truncate like AFL++ does
+            input_size = self.max_input_size;
+        } else if input_size < self.min_input_size {
+            // Extend like AFL++ does
+            input_size = self.min_input_size;
+            let mut input_bytes_copy = Vec::with_capacity(input_size);
+            input_bytes_copy
+                .as_slice_mut()
+                .copy_from_slice(input_bytes.as_slice());
+            input_bytes = OwnedSlice::from(input_bytes_copy);
+        }
+        let input_size_in_bytes = input_size.to_ne_bytes();
         if self.uses_shmem_testcase {
             debug_assert!(
                 self.map.is_some(),
@@ -1140,21 +1251,14 @@ where
             // # Safety
             // Struct can never be created when uses_shmem_testcase is true and map is none.
             let map = unsafe { self.map.as_mut().unwrap_unchecked() };
-            let target_bytes = input.target_bytes();
-            let mut size = target_bytes.as_slice().len();
-            let max_size = map.len() - SHMEM_FUZZ_HDR_SIZE;
-            if size > max_size {
-                // Truncate like AFL++ does
-                size = max_size;
-            }
-            let size_in_bytes = size.to_ne_bytes();
-            // The first four bytes tells the size of the shmem.
+            // The first four bytes declares the size of the shmem.
             map.as_slice_mut()[..SHMEM_FUZZ_HDR_SIZE]
-                .copy_from_slice(&size_in_bytes[..SHMEM_FUZZ_HDR_SIZE]);
-            map.as_slice_mut()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
-                .copy_from_slice(&target_bytes.as_slice()[..size]);
+                .copy_from_slice(&input_size_in_bytes[..SHMEM_FUZZ_HDR_SIZE]);
+            map.as_slice_mut()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + input_size)]
+                .copy_from_slice(&input_bytes.as_slice()[..input_size]);
         } else {
-            self.input_file.write_buf(input.target_bytes().as_slice())?;
+            self.input_file
+                .write_buf(&input_bytes.as_slice()[..input_size])?;
         }
 
         let send_len = self.forkserver.write_ctl(last_run_timed_out)?;
@@ -1262,7 +1366,7 @@ mod tests {
     use serial_test::serial;
 
     use crate::{
-        executors::forkserver::ForkserverExecutorBuilder,
+        executors::forkserver::ForkserverExecutor,
         observers::{ConstMapObserver, HitcountsMapObserver},
         Error,
     };
@@ -1286,7 +1390,7 @@ mod tests {
             shmem_buf,
         ));
 
-        let executor = ForkserverExecutorBuilder::new()
+        let executor = ForkserverExecutor::builder()
             .program(bin)
             .args(args)
             .debug_child(false)

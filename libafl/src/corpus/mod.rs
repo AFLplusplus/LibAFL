@@ -21,12 +21,12 @@ pub mod cached;
 #[cfg(feature = "std")]
 pub use cached::CachedOnDiskCorpus;
 
-#[cfg(feature = "cmin")]
+#[cfg(all(feature = "cmin", unix))]
 pub mod minimizer;
 use core::{cell::RefCell, fmt};
 
 pub mod nop;
-#[cfg(feature = "cmin")]
+#[cfg(all(feature = "cmin", unix))]
 pub use minimizer::*;
 pub use nop::NopCorpus;
 use serde::{Deserialize, Serialize};
@@ -113,7 +113,7 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
         testcase: Testcase<Self::Input>,
     ) -> Result<Testcase<Self::Input>, Error>;
 
-    /// Removes an entry from the corpus, returning it if it was present.
+    /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases
     fn remove(&mut self, id: CorpusId) -> Result<Testcase<Self::Input>, Error>;
 
     /// Get by id; considers only enabled testcases
@@ -130,6 +130,9 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
 
     /// Get the next corpus id
     fn next(&self, id: CorpusId) -> Option<CorpusId>;
+
+    /// Peek the next free corpus id
+    fn peek_free_id(&self) -> CorpusId;
 
     /// Get the prev corpus id
     fn prev(&self, id: CorpusId) -> Option<CorpusId>;
@@ -175,7 +178,7 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
 }
 
 /// Trait for types which track the current corpus index
-pub trait HasCurrentCorpusIdx {
+pub trait HasCurrentCorpusId {
     /// Set the current corpus index; we have started processing this corpus entry
     fn set_corpus_idx(&mut self, idx: CorpusId) -> Result<(), Error>;
 
@@ -183,7 +186,7 @@ pub trait HasCurrentCorpusIdx {
     fn clear_corpus_idx(&mut self) -> Result<(), Error>;
 
     /// Fetch the current corpus index -- typically used after a state recovery or transfer
-    fn current_corpus_idx(&self) -> Result<Option<CorpusId>, Error>;
+    fn current_corpus_id(&self) -> Result<Option<CorpusId>, Error>;
 }
 
 /// [`Iterator`] over the ids of a [`Corpus`]

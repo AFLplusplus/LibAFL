@@ -30,7 +30,7 @@ typedef UINT64 libafl_word;
 #else
   #include <stdint.h>
 
-  #ifdef __x86_64__
+  #if defined(__x86_64__) || defined(__aarch64__)
     typedef uint64_t libafl_word;
     #define LIBAFL_CALLING_CONVENTION __attribute__(())
   #endif
@@ -80,14 +80,14 @@ typedef enum LibaflQemuEndStatus {
       #endif
 #else
 
-  #ifdef __x86_64__
+  #if defined(__x86_64__)
     #define LIBAFL_DEFINE_FUNCTIONS(name, opcode)                                                   \
       libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call0(                                 \
           libafl_word action) {                                                                     \
         libafl_word ret;                                                                            \
         __asm__ volatile (                                                                        \
               "mov %1, %%rax\n"                                                                   \
-              ".dword " XSTRINGIFY(opcode) "\n"                                                   \
+              ".4byte " XSTRINGIFY(opcode) "\n"                                                   \
               "mov %%rax, %0\n"                                                                   \
               : "=g"(ret)                                                                         \
               : "g"(action)                                                                       \
@@ -102,7 +102,7 @@ typedef enum LibaflQemuEndStatus {
         __asm__ volatile (                                                                        \
             "mov %1, %%rax\n"                                                                     \
             "mov %2, %%rdi\n"                                                                     \
-            ".dword " XSTRINGIFY(opcode) "\n"                                                     \
+            ".4byte " XSTRINGIFY(opcode) "\n"                                                     \
             "mov %%rax, %0\n"                                                                     \
             : "=g"(ret)                                                                           \
             : "g"(action), "g"(arg1)                                                              \
@@ -118,7 +118,7 @@ typedef enum LibaflQemuEndStatus {
         "mov %1, %%rax\n"                                                                         \
         "mov %2, %%rdi\n"                                                                         \
         "mov %3, %%rsi\n"                                                                         \
-        ".dword " XSTRINGIFY(opcode) "\n"                                                         \
+        ".4byte " XSTRINGIFY(opcode) "\n"                                                         \
         "mov %%rax, %0\n"                                                                         \
         : "=g"(ret)                                                                               \
         : "g"(action), "g"(arg1), "g"(arg2)                                                       \
@@ -126,9 +126,8 @@ typedef enum LibaflQemuEndStatus {
         ); \
         return ret;                                                                                 \
       }
-  #endif
 
-  #ifdef __arm__
+  #elif defined(__arm__)
     #define LIBAFL_DEFINE_FUNCTIONS(name, opcode)                                                   \
       libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call0(                                 \
           libafl_word action) {                                                                     \
@@ -174,6 +173,55 @@ typedef enum LibaflQemuEndStatus {
     );   \
         return ret;                                                                                 \
       }
+
+  #elif defined(__aarch64__)
+    #define LIBAFL_DEFINE_FUNCTIONS(name, opcode)                                                   \
+      libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call0(                                 \
+          libafl_word action) {                                                                     \
+        libafl_word ret;                                                                            \
+        __asm__ volatile (                                                                        \
+        "mov x0, %1\n"                                                                            \
+        ".word " XSTRINGIFY(opcode) "\n"                                              \
+        "mov %0, x0\n"                                                                            \
+        : "=r"(ret)                                                                               \
+        : "r"(action)                                                                             \
+        : "x0"                                                                                    \
+    ); \
+        return ret;                                                                                 \
+      }                                                                                             \
+                                                                                                    \
+      libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call1(                                 \
+          libafl_word action, libafl_word arg1) {                                                   \
+        libafl_word ret;                                                                            \
+        __asm__ volatile (                                                                      \
+        "mov x0, %1\n"                                                                      \
+        "mov x1, %2\n"                                                                      \
+        ".word " XSTRINGIFY(opcode) "\n"                                        \
+        "mov %0, x0\n"                                                                      \
+        : "=r"(ret)                                                                         \
+        : "r"(action), "r"(arg1)                                                            \
+        : "x0", "x1"                                                                        \
+    );   \
+        return ret;                                                                                 \
+      }                                                                                             \
+                                                                                                    \
+      libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call2(                                 \
+          libafl_word action, libafl_word arg1, libafl_word arg2) {                                 \
+        libafl_word ret;                                                                            \
+        __asm__ volatile (                                                                      \
+        "mov x0, %1\n"                                                                      \
+        "mov x1, %2\n"                                                                      \
+        "mov x2, %3\n"                                                                      \
+        ".word " XSTRINGIFY(opcode) "\n"                                        \
+        "mov %0, x0\n"                                                                      \
+        : "=r"(ret)                                                                         \
+        : "r"(action), "r"(arg1), "r"(arg2)                                                 \
+        : "x0", "x1", "x2"                                                                  \
+    );   \
+        return ret;                                                                                 \
+      }
+  #else
+    #warning "LibAFL QEMU Runtime does not support your architecture yet, please leave an issue."
   #endif
 
 #endif

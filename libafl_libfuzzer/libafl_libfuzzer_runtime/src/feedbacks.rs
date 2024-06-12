@@ -61,6 +61,11 @@ where
     {
         Ok(*self.keep.borrow())
     }
+
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Result<bool, Error> {
+        Ok(*self.keep.borrow())
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -131,6 +136,10 @@ where
         OT: ObserversTuple<S>,
     {
         self.exit_kind = *exit_kind;
+        Ok(false)
+    }
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Result<bool, Error> {
         Ok(false)
     }
 

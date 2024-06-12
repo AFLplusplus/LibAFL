@@ -38,7 +38,7 @@ use libafl::{
     Error, HasMetadata,
 };
 use libafl_bolts::{
-    current_nanos, current_time,
+    current_time,
     os::{dup2, unix_signals::Signal},
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
@@ -51,8 +51,8 @@ use libafl_qemu::{
     elf::EasyElf,
     filter_qemu_args,
     hooks::QemuHooks,
-    GuestReg, MmapPerms, Qemu, QemuExitReason, QemuExitReasonError, QemuForkExecutor,
-    QemuShutdownCause, Regs,
+    GuestReg, MmapPerms, Qemu, QemuExitError, QemuExitReason, QemuForkExecutor, QemuShutdownCause,
+    Regs,
 };
 #[cfg(unix)]
 use nix::unistd::dup;
@@ -268,7 +268,7 @@ fn fuzz(
     let mut state = state.unwrap_or_else(|| {
         StdState::new(
             // RNG
-            StdRand::with_seed(current_nanos()),
+            StdRand::new(),
             // Corpus that will be evolved, we keep it in memory for performance
             InMemoryOnDiskCorpus::new(corpus_dir).unwrap(),
             // Corpus in which we store solutions (crashes in this example),
@@ -328,7 +328,7 @@ fn fuzz(
                 Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(Signal::SigInterrupt))) => {
                     process::exit(0)
                 }
-                Err(QemuExitReasonError::UnexpectedExit) => return ExitKind::Crash,
+                Err(QemuExitError::UnexpectedExit) => return ExitKind::Crash,
                 _ => panic!("Unexpected QEMU exit."),
             }
         }

@@ -63,7 +63,7 @@ where
         Err(Error::unsupported("Unsupported by NopCorpus"))
     }
 
-    /// Removes an entry from the corpus, returning it if it was present.
+    /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases
     #[inline]
     fn remove(&mut self, _idx: CorpusId) -> Result<Testcase<I>, Error> {
         Err(Error::unsupported("Unsupported by NopCorpus"))
@@ -85,6 +85,12 @@ where
     #[inline]
     fn current(&self) -> &Option<CorpusId> {
         &self.empty
+    }
+
+    /// Peek the next free corpus id
+    #[inline]
+    fn peek_free_id(&self) -> CorpusId {
+        CorpusId::from(0_usize)
     }
 
     /// Current testcase scheduled (mutable)

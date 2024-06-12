@@ -13,14 +13,14 @@ use libafl::{
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
-    mutators::{StdScheduledMutator, StringCategoryRandMutator, StringSubcategoryRandMutator},
+    mutators::{StdScheduledMutator, UnicodeCategoryRandMutator, UnicodeSubcategoryRandMutator},
     observers::StdMapObserver,
     schedulers::QueueScheduler,
-    stages::{mutational::StdMutationalStage, StringIdentificationStage},
+    stages::{mutational::StdMutationalStage, UnicodeIdentificationStage},
     state::StdState,
     Evaluator,
 };
-use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
+use libafl_bolts::{rands::StdRand, tuples::tuple_list, AsSlice};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 64] = [0; 64];
@@ -67,7 +67,7 @@ pub fn main() {
     // create a State from scratch
     let mut state = StdState::new(
         // RNG
-        StdRand::with_seed(current_nanos()),
+        StdRand::new(),
         // Corpus that will be evolved, we keep it in memory for performance
         InMemoryCorpus::new(),
         // Corpus in which we store solutions (crashes in this example),
@@ -121,14 +121,14 @@ pub fn main() {
 
     // Setup a mutational stage with a basic bytes mutator
     let mutator = StdScheduledMutator::new(tuple_list!(
-        StringCategoryRandMutator,
-        StringSubcategoryRandMutator,
-        StringSubcategoryRandMutator,
-        StringSubcategoryRandMutator,
-        StringSubcategoryRandMutator
+        UnicodeCategoryRandMutator,
+        UnicodeSubcategoryRandMutator,
+        UnicodeSubcategoryRandMutator,
+        UnicodeSubcategoryRandMutator,
+        UnicodeSubcategoryRandMutator
     ));
     let mut stages = tuple_list!(
-        StringIdentificationStage::new(),
+        UnicodeIdentificationStage::new(),
         StdMutationalStage::transforming(mutator)
     );
 

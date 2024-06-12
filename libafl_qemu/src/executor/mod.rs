@@ -8,7 +8,9 @@ use core::{
 };
 
 #[cfg(feature = "fork")]
-use libafl::{events::EventManager, executors::InProcessForkExecutor, state::HasLastReportTime};
+use libafl::{
+    events::EventManager, executors::InProcessForkExecutor, state::HasLastReportTime, HasMetadata,
+};
 use libafl::{
     events::{EventFirer, EventRestarter},
     executors::{
@@ -20,7 +22,7 @@ use libafl::{
     fuzzer::HasObjective,
     observers::{ObserversTuple, UsesObservers},
     state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
-    Error, HasMetadata,
+    Error,
 };
 #[cfg(feature = "fork")]
 use libafl_bolts::shmem::ShMemProvider;

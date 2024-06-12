@@ -46,18 +46,18 @@ where
 
 impl<CB, E, EM, Z> Stage<E, EM, Z> for DumpToDiskStage<CB, EM, Z>
 where
-    CB: FnMut(&<Z::State as UsesInput>::Input, &Z::State) -> Vec<u8>,
-    EM: UsesState<State = Z::State>,
-    E: UsesState<State = Z::State>,
-    Z: UsesState,
-    Z::State: HasCorpus + HasSolutions + HasRand + HasMetadata,
+    CB: FnMut(&<Self::State as UsesInput>::Input, &Self::State) -> Vec<u8>,
+    EM: UsesState,
+    E: UsesState<State = Self::State>,
+    Z: UsesState<State = Self::State>,
+    Self::State: HasCorpus + HasSolutions + HasRand + HasMetadata,
 {
     #[inline]
     fn perform(
         &mut self,
         _fuzzer: &mut Z,
         _executor: &mut E,
-        state: &mut Z::State,
+        state: &mut Self::State,
         _manager: &mut EM,
     ) -> Result<(), Error> {
         let (mut corpus_idx, mut solutions_idx) =
@@ -129,9 +129,9 @@ where
 
 impl<CB, EM, Z> DumpToDiskStage<CB, EM, Z>
 where
-    EM: UsesState<State = Z::State>,
+    EM: UsesState,
     Z: UsesState,
-    Z::State: HasCorpus + HasSolutions + HasRand + HasMetadata,
+    <Self as UsesState>::State: HasCorpus + HasSolutions + HasRand + HasMetadata,
 {
     /// Create a new [`DumpToDiskStage`]
     pub fn new<A, B>(to_bytes: CB, corpus_dir: A, solutions_dir: B) -> Result<Self, Error>

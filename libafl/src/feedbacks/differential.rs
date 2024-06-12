@@ -8,11 +8,13 @@ use core::{
 };
 
 use libafl_bolts::{
-    tuples::{MatchName, MatchNameRef, Reference, Referenceable},
+    tuples::{Handle, Handled, MatchName, MatchNameRef},
     Named,
 };
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "track_hit_feedbacks")]
+use crate::feedbacks::premature_last_result_err;
 use crate::{
     events::EventFirer,
     executors::ExitKind,
@@ -58,9 +60,12 @@ where
     /// This feedback's name
     name: Cow<'static, str>,
     /// The first observer to compare against
-    o1_ref: Reference<O1>,
+    o1_ref: Handle<O1>,
     /// The second observer to compare against
-    o2_ref: Reference<O2>,
+    o2_ref: Handle<O2>,
+    // The previous run's result of `Self::is_interesting`
+    #[cfg(feature = "track_hit_feedbacks")]
+    last_result: Option<bool>,
     /// The function used to compare the two observers
     compare_fn: F,
     phantomm: PhantomData<(I, S)>,
@@ -74,8 +79,8 @@ where
 {
     /// Create a new [`DiffFeedback`] using two observers and a test function.
     pub fn new(name: &'static str, o1: &O1, o2: &O2, compare_fn: F) -> Result<Self, Error> {
-        let o1_ref = o1.reference();
-        let o2_ref = o2.reference();
+        let o1_ref = o1.handle();
+        let o2_ref = o2.handle();
         if o1_ref.name() == o2_ref.name() {
             Err(Error::illegal_argument(format!(
                 "DiffFeedback: observer names must be different (both were {})",
@@ -86,6 +91,8 @@ where
                 o1_ref,
                 o2_ref,
                 name: Cow::from(name),
+                #[cfg(feature = "track_hit_feedbacks")]
+                last_result: None,
                 compare_fn,
                 phantomm: PhantomData,
             })
@@ -93,7 +100,7 @@ where
     }
 }
 
-impl<F, I, O1, O2, S, T> FeedbackFactory<DiffFeedback<F, I, O1, O2, S>, S, T>
+impl<F, I, O1, O2, S, T> FeedbackFactory<DiffFeedback<F, I, O1, O2, S>, T>
     for DiffFeedback<F, I, O1, O2, S>
 where
     F: FnMut(&O1, &O2) -> DiffResult + Clone,
@@ -108,6 +115,8 @@ where
             o1_ref: self.o1_ref.clone(),
             o2_ref: self.o2_ref.clone(),
             compare_fn: self.compare_fn.clone(),
+            #[cfg(feature = "track_hit_feedbacks")]
+            last_result: None,
             phantomm: self.phantomm,
         }
     }
@@ -169,8 +178,17 @@ where
         let o2: &O2 = observers
             .get(&self.o2_ref)
             .ok_or_else(|| err(self.o2_ref.name()))?;
+        let res = (self.compare_fn)(o1, o2) == DiffResult::Diff;
+        #[cfg(feature = "track_hit_feedbacks")]
+        {
+            self.last_result = Some(res);
+        }
+        Ok(res)
+    }
 
-        Ok((self.compare_fn)(o1, o2) == DiffResult::Diff)
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Result<bool, Error> {
+        self.last_result.ok_or(premature_last_result_err())
     }
 }
 
@@ -228,6 +246,10 @@ mod tests {
     where
         S: State,
     {
+        fn should_send(&self) -> bool {
+            true
+        }
+
         fn fire(
             &mut self,
             _state: &mut S,

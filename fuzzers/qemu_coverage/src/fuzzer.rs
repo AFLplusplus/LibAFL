@@ -19,7 +19,6 @@ use libafl::{
 };
 use libafl_bolts::{
     core_affinity::Cores,
-    current_nanos,
     os::unix_signals::Signal,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
@@ -29,7 +28,7 @@ use libafl_bolts::{
 use libafl_qemu::{
     drcov::QemuDrCovHelper, elf::EasyElf, ArchExtras, CallingConvention, GuestAddr, GuestReg,
     MmapPerms, Qemu, QemuExecutor, QemuExitReason, QemuHooks,
-    QemuInstrumentationAddressRangeFilter, QemuShutdownCause, Regs,
+    QemuInstrumentationAddressRangeFilter, QemuRWError, QemuShutdownCause, Regs,
 };
 use rangemap::RangeMap;
 
@@ -156,7 +155,7 @@ pub fn fuzz() {
 
     let stack_ptr: GuestAddr = qemu.read_reg(Regs::Sp).unwrap();
 
-    let reset = |buf: &[u8], len: GuestReg| -> Result<(), String> {
+    let reset = |buf: &[u8], len: GuestReg| -> Result<(), QemuRWError> {
         unsafe {
             qemu.write_mem(input_addr, buf);
             qemu.write_reg(Regs::Pc, test_one_input_ptr)?;
@@ -216,7 +215,7 @@ pub fn fuzz() {
 
             let mut state = state.unwrap_or_else(|| {
                 StdState::new(
-                    StdRand::with_seed(current_nanos()),
+                    StdRand::new(),
                     NopCorpus::new(),
                     NopCorpus::new(),
                     &mut feedback,

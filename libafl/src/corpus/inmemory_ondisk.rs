@@ -4,7 +4,7 @@
 //! which only stores a certain number of [`Testcase`]s and removes additional ones in a FIFO manner.
 
 use alloc::string::String;
-use core::{cell::RefCell, time::Duration};
+use core::cell::RefCell;
 #[cfg(feature = "std")]
 use std::{fs, fs::File, io::Write};
 use std::{
@@ -14,7 +14,6 @@ use std::{
 
 #[cfg(feature = "gzip")]
 use libafl_bolts::compress::GzipCompressor;
-use libafl_bolts::serdeany::SerdeAnyMap;
 use serde::{Deserialize, Serialize};
 
 use super::{
@@ -26,15 +25,6 @@ use crate::{
     inputs::{Input, UsesInput},
     Error, HasMetadata,
 };
-
-/// The [`Testcase`] metadata that'll be stored to disk
-#[cfg(feature = "std")]
-#[derive(Debug, Serialize)]
-pub struct InMemoryOnDiskMetadata<'a> {
-    metadata: &'a SerdeAnyMap,
-    exec_time: &'a Option<Duration>,
-    executions: &'a usize,
-}
 
 /// A corpus able to store [`Testcase`]s to disk, while also keeping all of them in memory.
 ///
@@ -112,7 +102,7 @@ where
         Ok(entry)
     }
 
-    /// Removes an entry from the corpus, returning it if it was present.
+    /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled corpus
     #[inline]
     fn remove(&mut self, idx: CorpusId) -> Result<Testcase<I>, Error> {
         let entry = self.inner.remove(idx)?;
@@ -147,6 +137,12 @@ where
     #[inline]
     fn next(&self, idx: CorpusId) -> Option<CorpusId> {
         self.inner.next(idx)
+    }
+
+    /// Peek the next free corpus id
+    #[inline]
+    fn peek_free_id(&self) -> CorpusId {
+        self.inner.peek_free_id()
     }
 
     #[inline]
@@ -435,9 +431,9 @@ where
                 OnDiskMetadataFormat::Json => serde_json::to_vec(&ondisk_meta)?,
                 OnDiskMetadataFormat::JsonPretty => serde_json::to_vec_pretty(&ondisk_meta)?,
                 #[cfg(feature = "gzip")]
-                OnDiskMetadataFormat::JsonGzip => GzipCompressor::new(0)
-                    .compress(&serde_json::to_vec_pretty(&ondisk_meta)?)?
-                    .unwrap(),
+                OnDiskMetadataFormat::JsonGzip => {
+                    GzipCompressor::new().compress(&serde_json::to_vec_pretty(&ondisk_meta)?)
+                }
             };
             tmpfile.write_all(&serialized)?;
             fs::rename(&tmpfile_path, &metafile_path)?;

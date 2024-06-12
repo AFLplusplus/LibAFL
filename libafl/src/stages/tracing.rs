@@ -36,17 +36,18 @@ where
 impl<EM, TE, Z> TracingStage<EM, TE, Z>
 where
     TE: Executor<EM, Z> + HasObservers,
-    TE::State: HasExecutions + HasCorpus + HasNamedMetadata,
-    EM: UsesState<State = TE::State>,
-    Z: UsesState<State = TE::State>,
+    <Self as UsesState>::State: HasExecutions + HasCorpus + HasNamedMetadata,
+    EM: UsesState<State = <Self as UsesState>::State>,
+    Z: UsesState<State = <Self as UsesState>::State>,
 {
+    #[allow(rustdoc::broken_intra_doc_links)]
     /// Perform tracing on the given `CorpusId`. Useful for if wrapping [`TracingStage`] with your
-    /// own stage and you need to manage [`super::NestedStageRestartHelper`] differently; see
-    /// [`super::ConcolicTracingStage`]'s implementation as an example of usage.
+    /// own stage and you need to manage [`super::NestedStageRestartHelper`] differently
+    /// see [`super::ConcolicTracingStage`]'s implementation as an example of usage.
     pub fn trace(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut TE::State,
+        state: &mut <Self as UsesState>::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
         start_timer!(state);
@@ -80,18 +81,18 @@ where
 
 impl<E, EM, TE, Z> Stage<E, EM, Z> for TracingStage<EM, TE, Z>
 where
-    E: UsesState<State = TE::State>,
+    E: UsesState<State = <Self as UsesState>::State>,
     TE: Executor<EM, Z> + HasObservers,
-    TE::State: HasExecutions + HasCorpus + HasNamedMetadata,
-    EM: UsesState<State = TE::State>,
-    Z: UsesState<State = TE::State>,
+    <Self as UsesState>::State: HasExecutions + HasCorpus + HasNamedMetadata,
+    EM: UsesState<State = <Self as UsesState>::State>,
+    Z: UsesState<State = <Self as UsesState>::State>,
 {
     #[inline]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         _executor: &mut E,
-        state: &mut TE::State,
+        state: &mut <Self as UsesState>::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
         self.trace(fuzzer, state, manager)
@@ -170,17 +171,17 @@ where
 impl<E, EM, SOT, Z> Stage<ShadowExecutor<E, SOT>, EM, Z> for ShadowTracingStage<E, EM, SOT, Z>
 where
     E: Executor<EM, Z> + HasObservers,
-    EM: UsesState<State = E::State>,
+    EM: UsesState<State = <Self as UsesState>::State>,
     SOT: ObserversTuple<E::State>,
-    Z: UsesState<State = E::State>,
-    E::State: State + HasExecutions + HasCorpus + HasNamedMetadata + Debug,
+    Z: UsesState<State = <Self as UsesState>::State>,
+    <Self as UsesState>::State: State + HasExecutions + HasCorpus + HasNamedMetadata + Debug,
 {
     #[inline]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut ShadowExecutor<E, SOT>,
-        state: &mut E::State,
+        state: &mut <Self as UsesState>::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
         start_timer!(state);
@@ -225,10 +226,10 @@ where
 impl<E, EM, SOT, Z> ShadowTracingStage<E, EM, SOT, Z>
 where
     E: Executor<EM, Z> + HasObservers,
-    E::State: State + HasExecutions + HasCorpus,
-    EM: UsesState<State = E::State>,
+    <Self as UsesState>::State: State + HasExecutions + HasCorpus,
+    EM: UsesState<State = <Self as UsesState>::State>,
     SOT: ObserversTuple<E::State>,
-    Z: UsesState<State = E::State>,
+    Z: UsesState<State = <Self as UsesState>::State>,
 {
     /// Creates a new default stage
     pub fn new(_executor: &mut ShadowExecutor<E, SOT>) -> Self {

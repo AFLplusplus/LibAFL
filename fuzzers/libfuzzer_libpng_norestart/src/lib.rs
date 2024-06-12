@@ -31,9 +31,8 @@ use libafl::{
 };
 use libafl_bolts::{
     core_affinity::Cores,
-    current_nanos,
     rands::StdRand,
-    shmem::{ShMemProvider, StdShMemProvider},
+    shmem::{MmapShMemProvider, ShMemProvider},
     tuples::{tuple_list, Merge},
     AsSlice,
 };
@@ -143,7 +142,7 @@ pub extern "C" fn libafl_main() {
     // Needed only on no_std
     // unsafe { RegistryBuilder::register::<Tokens>(); }
     let opt = Opt::parse();
-
+    env_logger::init();
     let broker_port = opt.broker_port;
     let cores = opt.cores;
 
@@ -153,7 +152,7 @@ pub extern "C" fn libafl_main() {
         opt.reload_corpus
     );
 
-    let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
+    let shmem_provider = MmapShMemProvider::new().expect("Failed to init shared memory");
 
     let monitor = OnDiskTOMLMonitor::new(
         "./fuzzer_stats.toml",
@@ -186,7 +185,7 @@ pub extern "C" fn libafl_main() {
         let mut state = state.unwrap_or_else(|| {
             StdState::new(
                 // RNG
-                StdRand::with_seed(current_nanos()),
+                StdRand::new(),
                 // Corpus that will be evolved, we keep it in memory for performance
                 InMemoryOnDiskCorpus::new(&opt.input[0]).unwrap(),
                 // Corpus in which we store solutions (crashes in this example),

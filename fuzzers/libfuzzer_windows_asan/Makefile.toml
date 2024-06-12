@@ -81,6 +81,11 @@ windows_alias = "test_windows" # TODO
 [tasks.test_windows]
 script_runner = "@shell"
 script='''
+start "" "${FUZZER_NAME}.exe"
+start "" "${FUZZER_NAME}.exe"
+#ping is for timeout
+ping -n 10 127.0.0.1>NUL && taskkill /im ${FUZZER_NAME}.exe /F
+>nul 2>nul dir /a-d "crashes\*" && (echo Files exist) || (exit /b 1337)
 '''
 dependencies = [ "fuzzer" ]
 

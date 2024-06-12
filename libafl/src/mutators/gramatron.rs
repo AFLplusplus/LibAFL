@@ -138,7 +138,11 @@ where
         meta.map.get(&input.terminals()[insert_at].state).map_or(
             Ok(MutationResult::Skipped),
             |splice_points| {
-                let from = *choose(splice_points, rand_num);
+                let from = if let Some(from) = choose(splice_points, rand_num) {
+                    *from
+                } else {
+                    return Ok(MutationResult::Skipped);
+                };
 
                 input.terminals_mut().truncate(insert_at);
                 input
@@ -208,7 +212,7 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let chosen = *state.rand_mut().choose(&self.states);
+        let chosen = *state.rand_mut().choose(&self.states).unwrap();
         let chosen_nums = self.counters.get(&chosen).unwrap().0;
 
         #[allow(clippy::cast_sign_loss, clippy::pedantic)]

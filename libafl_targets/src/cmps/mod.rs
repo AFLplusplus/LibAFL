@@ -8,7 +8,8 @@ use alloc::{alloc::alloc_zeroed, boxed::Box, vec::Vec};
 use core::{
     alloc::Layout,
     fmt::{self, Debug, Formatter},
-    mem, ptr, slice,
+    mem::{size_of, zeroed},
+    ptr, slice,
 };
 
 use libafl::{
@@ -30,21 +31,16 @@ pub const CMPLOG_RTN_LEN: usize = 32;
 
 /// The hight of a cmplog routine map
 pub const CMPLOG_MAP_RTN_H: usize =
-    (CMPLOG_MAP_H * mem::size_of::<CmpLogInstruction>()) / mem::size_of::<CmpLogRoutine>();
+    (CMPLOG_MAP_H * size_of::<CmpLogInstruction>()) / size_of::<CmpLogRoutine>();
 
 /// The height of extended rountine map
 pub const CMPLOG_MAP_RTN_EXTENDED_H: usize =
-    CMPLOG_MAP_H * mem::size_of::<AFLppCmpLogOperands>() / mem::size_of::<AFLppCmpLogFnOperands>();
+    CMPLOG_MAP_H * size_of::<AFLppCmpLogOperands>() / size_of::<AFLppCmpLogFnOperands>();
 
 /// `CmpLog` instruction kind
 pub const CMPLOG_KIND_INS: u8 = 0;
 /// `CmpLog` routine kind
 pub const CMPLOG_KIND_RTN: u8 = 1;
-
-/// The AFL++ `CMP_TYPE_INS`
-pub const AFL_CMP_TYPE_INS: u32 = 1;
-/// The AFL++ `CMP_TYPE_RTN`
-pub const AFL_CMP_TYPE_RTN: u32 = 2;
 
 // EXTERNS, GLOBALS
 
@@ -283,7 +279,7 @@ impl Debug for AFLppCmpLogVals {
 
 impl AFLppCmpLogVals {
     #[must_use]
-    /// Reference comparison values as comparison operands
+    /// Handle comparison values as comparison operands
     pub fn operands(&self) -> &[[AFLppCmpLogOperands; CMPLOG_MAP_H]; CMPLOG_MAP_W] {
         unsafe { &self.operands }
     }
@@ -295,7 +291,7 @@ impl AFLppCmpLogVals {
     }
 
     #[must_use]
-    /// Reference comparison values as comparison function operands
+    /// Handle comparison values as comparison function operands
     pub fn fn_operands(
         &self,
     ) -> &[[AFLppCmpLogFnOperands; CMPLOG_MAP_RTN_EXTENDED_H]; CMPLOG_MAP_W] {
@@ -323,7 +319,7 @@ pub struct CmpLogMap {
 
 impl Default for CmpLogMap {
     fn default() -> Self {
-        unsafe { mem::zeroed() }
+        unsafe { zeroed() }
     }
 }
 
@@ -415,7 +411,7 @@ pub static mut libafl_cmplog_map: CmpLogMap = CmpLogMap {
 #[cfg(feature = "cmplog_extended_instrumentation")]
 #[allow(clippy::large_stack_arrays)]
 pub static mut libafl_cmplog_map_extended: AFLppCmpLogMap = AFLppCmpLogMap {
-    headers: [AFLppCmpLogHeader { data: [0; 8] }; CMPLOG_MAP_W],
+    headers: [AFLppCmpLogHeader { data: [0; 2] }; CMPLOG_MAP_W],
     vals: AFLppCmpLogVals {
         operands: [[AFLppCmpLogOperands {
             v0: 0,
@@ -450,7 +446,7 @@ impl AFLppCmpLogMap {
     }
 
     #[must_use]
-    /// Reference the headers for the map
+    /// Handle the headers for the map
     pub fn headers(&self) -> &[AFLppCmpLogHeader] {
         &self.headers
     }
@@ -462,7 +458,7 @@ impl AFLppCmpLogMap {
     }
 
     #[must_use]
-    /// Reference the values for the map
+    /// Handle the values for the map
     pub fn values(&self) -> &AFLppCmpLogVals {
         &self.vals
     }
@@ -479,9 +475,8 @@ impl Serialize for AFLppCmpLogMap {
     where
         S: Serializer,
     {
-        let slice = unsafe {
-            slice::from_raw_parts(ptr::from_ref(self) as *const u8, mem::size_of::<Self>())
-        };
+        let slice =
+            unsafe { slice::from_raw_parts(ptr::from_ref(self) as *const u8, size_of::<Self>()) };
         serializer.serialize_bytes(slice)
     }
 }
@@ -507,7 +502,7 @@ impl CmpMap for AFLppCmpLogMap {
     }
 
     fn usable_executions_for(&self, idx: usize) -> usize {
-        if self.headers[idx]._type() == AFL_CMP_TYPE_INS {
+        if self.headers[idx]._type() == CMPLOG_KIND_INS {
             if self.executions_for(idx) < CMPLOG_MAP_H {
                 self.executions_for(idx)
             } else {
@@ -521,7 +516,7 @@ impl CmpMap for AFLppCmpLogMap {
     }
 
     fn values_of(&self, idx: usize, execution: usize) -> Option<CmpValues> {
-        if self.headers[idx]._type() == AFL_CMP_TYPE_INS {
+        if self.headers[idx]._type() == CMPLOG_KIND_INS {
             unsafe {
                 match self.headers[idx].shape() {
                     0 => Some(CmpValues::U8((
@@ -559,7 +554,7 @@ impl CmpMap for AFLppCmpLogMap {
 
     fn reset(&mut self) -> Result<(), Error> {
         // For performance, we reset just the headers
-        self.headers.fill(AFLppCmpLogHeader { data: [0; 8] });
+        self.headers.fill(AFLppCmpLogHeader { data: [0; 2] });
 
         Ok(())
     }

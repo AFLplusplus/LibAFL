@@ -1,7 +1,9 @@
-//! The testcase is a struct embedded in each corpus.
+//! The [`Testcase`] is a struct embedded in each [`Corpus`].
 //! It will contain a respective input, and metadata.
 
 use alloc::string::String;
+#[cfg(feature = "track_hit_feedbacks")]
+use alloc::{borrow::Cow, vec::Vec};
 use core::{
     cell::{Ref, RefMut},
     time::Duration,
@@ -34,7 +36,7 @@ pub trait HasTestcase: UsesInput {
     ) -> Result<RefMut<Testcase<<Self as UsesInput>::Input>>, Error>;
 }
 
-/// An entry in the Testcase Corpus
+/// An entry in the [`Testcase`] Corpus
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
 pub struct Testcase<I>
@@ -65,6 +67,14 @@ where
     parent_id: Option<CorpusId>,
     /// If the testcase is "disabled"
     disabled: bool,
+    /// has found crash (or timeout) or not
+    objectives_found: usize,
+    /// Vector of `Feedback` names that deemed this `Testcase` as corpus worthy
+    #[cfg(feature = "track_hit_feedbacks")]
+    hit_feedbacks: Vec<Cow<'static, str>>,
+    /// Vector of `Feedback` names that deemed this `Testcase` as solution worthy
+    #[cfg(feature = "track_hit_feedbacks")]
+    hit_objectives: Vec<Cow<'static, str>>,
 }
 
 impl<I> HasMetadata for Testcase<I>
@@ -209,6 +219,34 @@ where
         self.disabled = disabled;
     }
 
+    /// Get the hit feedbacks
+    #[inline]
+    #[cfg(feature = "track_hit_feedbacks")]
+    pub fn hit_feedbacks(&self) -> &Vec<Cow<'static, str>> {
+        &self.hit_feedbacks
+    }
+
+    /// Get the hit feedbacks (mutable)
+    #[inline]
+    #[cfg(feature = "track_hit_feedbacks")]
+    pub fn hit_feedbacks_mut(&mut self) -> &mut Vec<Cow<'static, str>> {
+        &mut self.hit_feedbacks
+    }
+
+    /// Get the hit objectives
+    #[inline]
+    #[cfg(feature = "track_hit_feedbacks")]
+    pub fn hit_objectives(&self) -> &Vec<Cow<'static, str>> {
+        &self.hit_objectives
+    }
+
+    /// Get the hit objectives (mutable)
+    #[inline]
+    #[cfg(feature = "track_hit_feedbacks")]
+    pub fn hit_objectives_mut(&mut self) -> &mut Vec<Cow<'static, str>> {
+        &mut self.hit_objectives
+    }
+
     /// Create a new Testcase instance given an input
     #[inline]
     pub fn new(mut input: I) -> Self {
@@ -227,6 +265,11 @@ where
             scheduled_count: 0,
             parent_id: None,
             disabled: false,
+            objectives_found: 0,
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_feedbacks: Vec::new(),
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_objectives: Vec::new(),
         }
     }
 
@@ -248,6 +291,11 @@ where
             scheduled_count: 0,
             parent_id: Some(parent_id),
             disabled: false,
+            objectives_found: 0,
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_feedbacks: Vec::new(),
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_objectives: Vec::new(),
         }
     }
 
@@ -269,6 +317,11 @@ where
             scheduled_count: 0,
             parent_id: None,
             disabled: false,
+            objectives_found: 0,
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_feedbacks: Vec::new(),
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_objectives: Vec::new(),
         }
     }
 
@@ -290,6 +343,11 @@ where
             scheduled_count: 0,
             parent_id: None,
             disabled: false,
+            objectives_found: 0,
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_feedbacks: Vec::new(),
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_objectives: Vec::new(),
         }
     }
 
@@ -307,6 +365,16 @@ where
     /// Sets the id of the parent, that this testcase was derived from
     pub fn set_parent_id_optional(&mut self, parent_id: Option<CorpusId>) {
         self.parent_id = parent_id;
+    }
+
+    /// Gets how many objectives were found by mutating this testcase
+    pub fn objectives_found(&self) -> usize {
+        self.objectives_found
+    }
+
+    /// Adds one objectives to the `objectives_found` counter. Mostly called from crash handler or executor.
+    pub fn found_objective(&mut self) {
+        self.objectives_found = self.objectives_found.saturating_add(1);
     }
 }
 
@@ -331,6 +399,11 @@ where
             #[cfg(feature = "std")]
             metadata_path: None,
             disabled: false,
+            objectives_found: 0,
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_feedbacks: Vec::new(),
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_objectives: Vec::new(),
         }
     }
 }

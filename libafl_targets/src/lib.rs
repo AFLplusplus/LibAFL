@@ -3,6 +3,8 @@
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
+#![forbid(unexpected_cfgs)]
+// For `std::simd`
 #![cfg_attr(nightly, feature(portable_simd))]
 #![allow(
     clippy::unreadable_literal,
@@ -118,6 +120,12 @@ pub use coverage::*;
 
 pub mod value_profile;
 pub use value_profile::*;
+
+/// The module to hook call instructions
+#[cfg(feature = "function-logging")]
+pub mod call;
+#[cfg(feature = "function-logging")]
+pub use call::*;
 
 /// runtime related to comparisons
 pub mod cmps;

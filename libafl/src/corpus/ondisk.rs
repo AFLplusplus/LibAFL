@@ -106,7 +106,13 @@ where
         self.inner.replace(idx, testcase)
     }
 
-    /// Removes an entry from the corpus, returning it if it was present.
+    /// Peek the next free corpus id
+    #[inline]
+    fn peek_free_id(&self) -> CorpusId {
+        self.inner.peek_free_id()
+    }
+
+    /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases
     #[inline]
     fn remove(&mut self, idx: CorpusId) -> Result<Testcase<I>, Error> {
         self.inner.remove(idx)

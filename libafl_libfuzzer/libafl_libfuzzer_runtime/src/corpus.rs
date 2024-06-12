@@ -203,6 +203,9 @@ where
     fn next(&self, id: CorpusId) -> Option<CorpusId> {
         self.mapping.enabled.next(id)
     }
+    fn peek_free_id(&self) -> CorpusId {
+        self.mapping.peek_free_id()
+    }
 
     fn prev(&self, id: CorpusId) -> Option<CorpusId> {
         self.mapping.enabled.prev(id)
@@ -354,6 +357,10 @@ where
             None
         };
         maybe_last.ok_or_else(|| Error::illegal_argument("Can only get the last corpus ID."))
+    }
+
+    fn peek_free_id(&self) -> CorpusId {
+        CorpusId::from(self.count)
     }
 
     // This just calls Self::get as ArtifactCorpus disregards disabled entries

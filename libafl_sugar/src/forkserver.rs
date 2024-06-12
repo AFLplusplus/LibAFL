@@ -5,7 +5,7 @@ use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
 use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig, EventRestarter, LlmpRestartingEventManager},
-    executors::forkserver::ForkserverExecutorBuilder,
+    executors::forkserver::ForkserverExecutor,
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -23,10 +23,9 @@ use libafl::{
 };
 use libafl_bolts::{
     core_affinity::Cores,
-    current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, Merge, Referenceable},
+    tuples::{tuple_list, Handled, Merge},
     AsSliceMut,
 };
 use typed_builder::TypedBuilder;
@@ -116,7 +115,7 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
-        let time_ref = time_observer.reference();
+        let time_ref = time_observer.handle();
 
         let mut run_client = |state: Option<_>,
                               mut mgr: LlmpRestartingEventManager<_, _, _>,
@@ -153,7 +152,7 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
             let mut state = state.unwrap_or_else(|| {
                 StdState::new(
                     // RNG
-                    StdRand::with_seed(current_nanos()),
+                    StdRand::new(),
                     // Corpus that will be evolved, we keep a part in memory for performance
                     CachedOnDiskCorpus::new(out_dir.clone(), CORPUS_CACHE_SIZE).unwrap(),
                     // Corpus in which we store solutions (crashes in this example),
@@ -176,7 +175,7 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
             let forkserver = if self.shmem_testcase {
-                ForkserverExecutorBuilder::new()
+                ForkserverExecutor::builder()
                     .program(self.program.clone())
                     .parse_afl_cmdline(self.arguments)
                     .is_persistent(true)
@@ -187,7 +186,7 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
                     .shmem_provider(&mut shmem_provider_client)
                     .build_dynamic_map(edges_observer, tuple_list!(time_observer))
             } else {
-                ForkserverExecutorBuilder::new()
+                ForkserverExecutor::builder()
                     .program(self.program.clone())
                     .parse_afl_cmdline(self.arguments)
                     .is_persistent(true)
@@ -296,7 +295,7 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
             .cores(self.cores)
             .broker_port(self.broker_port)
             .remote_broker_addr(self.remote_broker_addr)
-            .time_ref(time_ref);
+            .time_ref(Some(time_ref));
         #[cfg(unix)]
         let launcher = launcher.stdout_file(Some("/dev/null"));
         match launcher.build().launch() {

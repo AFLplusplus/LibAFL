@@ -1,12 +1,55 @@
 //! The random number generators of `LibAFL`
-use core::{debug_assert, fmt::Debug};
 
-#[cfg(feature = "rand_trait")]
-use rand_core::{impls::fill_bytes_via_next, RngCore};
+use core::{
+    debug_assert,
+    fmt::Debug,
+    sync::atomic::{AtomicUsize, Ordering},
+};
+
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
+#[cfg(feature = "alloc")]
+pub mod loaded_dice;
+
+/// Return a pseudo-random seed. For `no_std` environments, a single deterministic sequence is used.
+#[must_use]
+#[allow(unreachable_code)]
+pub fn random_seed() -> u64 {
+    #[cfg(feature = "std")]
+    return random_seed_from_random_state();
+    #[cfg(all(not(feature = "std"), target_has_atomic = "ptr"))]
+    return random_seed_deterministic();
+    // no_std and no atomics; https://xkcd.com/221/
+    4
+}
+
+static SEED_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+#[allow(dead_code)]
+#[cfg(target_has_atomic = "ptr")]
+fn random_seed_deterministic() -> u64 {
+    let mut seed = SEED_COUNTER.fetch_add(1, Ordering::Relaxed) as u64;
+    splitmix64(&mut seed)
+}
+
+#[allow(dead_code)]
 #[cfg(feature = "std")]
-use crate::current_nanos;
+fn random_seed_from_random_state() -> u64 {
+    use std::{
+        collections::hash_map::RandomState,
+        hash::{BuildHasher, Hasher},
+    };
+    RandomState::new().build_hasher().finish()
+}
+
+// https://prng.di.unimi.it/splitmix64.c
+fn splitmix64(x: &mut u64) -> u64 {
+    *x = x.wrapping_add(0x9e3779b97f4a7c15);
+    let mut z = *x;
+    z = (z ^ (z >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94d049bb133111eb);
+    z ^ (z >> 31)
+}
 
 /// The standard rand implementation for `LibAFL`.
 /// It is usually the right choice, with very good speed and a reasonable randomness.
@@ -15,10 +58,12 @@ pub type StdRand = RomuDuoJrRand;
 
 /// Choose an item at random from the given iterator, sampling uniformly.
 ///
+/// Will only return `None` for an empty iterator.
+///
 /// Note: the runtime cost is bound by the iterator's [`nth`][`Iterator::nth`] implementation
 ///  * For `Vec`, slice, array, this is O(1)
 ///  * For `HashMap`, `HashSet`, this is O(n)
-pub fn choose<I>(from: I, rand: u64) -> I::Item
+pub fn choose<I>(from: I, rand: u64) -> Option<I::Item>
 where
     I: IntoIterator,
     I::IntoIter: ExactSizeIterator,
@@ -26,14 +71,15 @@ where
     // create iterator
     let mut iter = from.into_iter();
 
-    // make sure there is something to choose from
-    debug_assert!(iter.len() > 0, "choosing from an empty iterator");
+    if iter.len() == 0 {
+        return None;
+    }
 
     // pick a random, valid index
     let index = fast_bound(rand, iter.len());
 
     // return the item chosen
-    iter.nth(index).unwrap()
+    Some(iter.nth(index).unwrap())
 }
 
 /// Faster and almost unbiased alternative to `rand % n`.
@@ -92,73 +138,99 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
     }
 
     /// Convenient variant of [`choose`].
-    fn choose<I>(&mut self, from: I) -> I::Item
+    ///
+    /// This method uses [`Iterator::size_hint`] for optimization. With an
+    /// accurate hint and where [`Iterator::nth`] is a constant-time operation
+    /// this method can offer `O(1)` performance. Where no size hint is
+    /// available, complexity is `O(n)` where `n` is the iterator length.
+    /// Partial hints (where `lower > 0`) also improve performance.
+    ///
+    /// Copy&paste from [`rand::IteratorRandom`](https://docs.rs/rand/0.8.5/rand/seq/trait.IteratorRandom.html#method.choose)
+    fn choose<I>(&mut self, from: I) -> Option<I::Item>
     where
         I: IntoIterator,
-        I::IntoIter: ExactSizeIterator,
     {
-        choose(from, self.next())
+        let mut iter = from.into_iter();
+        let (mut lower, mut upper) = iter.size_hint();
+        let mut consumed = 0;
+        let mut result = None;
+
+        // Handling for this condition outside the loop allows the optimizer to eliminate the loop
+        // when the Iterator is an ExactSizeIterator. This has a large performance impact on e.g.
+        // seq_iter_choose_from_1000.
+        if upper == Some(lower) {
+            return if lower == 0 {
+                None
+            } else {
+                iter.nth(self.below(lower))
+            };
+        }
+
+        // Continue until the iterator is exhausted
+        loop {
+            if lower > 1 {
+                let ix = self.below(lower + consumed);
+                let skip = if ix < lower {
+                    result = iter.nth(ix);
+                    lower - (ix + 1)
+                } else {
+                    lower
+                };
+                if upper == Some(lower) {
+                    return result;
+                }
+                consumed += lower;
+                if skip > 0 {
+                    iter.nth(skip - 1);
+                }
+            } else {
+                let elem = iter.next();
+                if elem.is_none() {
+                    return result;
+                }
+                consumed += 1;
+                if self.below(consumed) == 0 {
+                    result = elem;
+                }
+            }
+
+            let hint = iter.size_hint();
+            lower = hint.0;
+            upper = hint.1;
+        }
     }
 }
 
-// helper macro for deriving Default
-macro_rules! default_rand {
+macro_rules! impl_default_new {
     ($rand: ty) => {
-        /// A default RNG will usually produce a nondeterministic stream of random numbers.
-        /// As we do not have any way to get random seeds for `no_std`, they have to be reproducible there.
-        /// Use [`$rand::with_seed`] to generate a reproducible RNG.
         impl Default for $rand {
-            #[cfg(feature = "std")]
+            /// Creates a generator seeded with [`random_seed`].
             fn default() -> Self {
-                Self::new()
+                Self::with_seed(random_seed())
             }
-            #[cfg(not(feature = "std"))]
-            fn default() -> Self {
-                Self::with_seed(0xAF1)
+        }
+
+        impl $rand {
+            /// Creates a generator seeded with [`random_seed`].
+            #[must_use]
+            pub fn new() -> Self {
+                Self::with_seed(random_seed())
             }
         }
     };
 }
 
-// https://prng.di.unimi.it/splitmix64.c
-fn splitmix64(x: &mut u64) -> u64 {
-    *x = x.wrapping_add(0x9e3779b97f4a7c15);
-    let mut z = *x;
-    z = (z ^ (z >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
-    z = (z ^ (z >> 27)).wrapping_mul(0x94d049bb133111eb);
-    z ^ (z >> 31)
-}
+impl_default_new!(Xoshiro256PlusPlusRand);
+impl_default_new!(XorShift64Rand);
+impl_default_new!(Lehmer64Rand);
+impl_default_new!(RomuTrioRand);
+impl_default_new!(RomuDuoJrRand);
+impl_default_new!(Sfc64Rand);
 
-// Derive Default by calling `new(DEFAULT_SEED)` on each of the following Rand types.
-default_rand!(Xoshiro256PlusPlusRand);
-default_rand!(XorShift64Rand);
-default_rand!(Lehmer64Rand);
-default_rand!(RomuTrioRand);
-default_rand!(RomuDuoJrRand);
-default_rand!(Sfc64Rand);
-
-/// Initialize Rand types from a source of randomness.
-///
-/// Default implementations are provided with the "std" feature enabled, using system time in
-/// nanoseconds as the initial seed.
-pub trait RandomSeed: Rand + Default {
-    /// Creates a new [`RandomSeed`].
-    fn new() -> Self;
-}
-
-// helper macro to impl RandomSeed
-macro_rules! impl_random {
+macro_rules! impl_rng_core {
     ($rand: ty) => {
-        #[cfg(feature = "std")]
-        impl RandomSeed for $rand {
-            /// Creates a rand instance, pre-seeded with the current time in nanoseconds.
-            fn new() -> Self {
-                Self::with_seed(current_nanos())
-            }
-        }
-
         #[cfg(feature = "rand_trait")]
-        impl RngCore for $rand {
+        impl rand_core::RngCore for $rand {
             fn next_u32(&mut self) -> u32 {
                 self.next() as u32
             }
@@ -168,7 +240,7 @@ macro_rules! impl_random {
             }
 
             fn fill_bytes(&mut self, dest: &mut [u8]) {
-                fill_bytes_via_next(self, dest)
+                rand_core::impls::fill_bytes_via_next(self, dest)
             }
 
             fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
@@ -178,12 +250,12 @@ macro_rules! impl_random {
     };
 }
 
-impl_random!(Xoshiro256PlusPlusRand);
-impl_random!(XorShift64Rand);
-impl_random!(Lehmer64Rand);
-impl_random!(RomuTrioRand);
-impl_random!(RomuDuoJrRand);
-impl_random!(Sfc64Rand);
+impl_rng_core!(Xoshiro256PlusPlusRand);
+impl_rng_core!(XorShift64Rand);
+impl_rng_core!(Lehmer64Rand);
+impl_rng_core!(RomuTrioRand);
+impl_rng_core!(RomuDuoJrRand);
+impl_rng_core!(Sfc64Rand);
 
 /// xoshiro256++ PRNG: <https://prng.di.unimi.it/>
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
@@ -480,38 +552,75 @@ mod tests {
         test_single_rand(&mut Sfc64Rand::with_seed(0));
     }
 
-    #[cfg(feature = "std")]
     #[test]
-    fn test_random_seed() {
-        use crate::rands::RandomSeed;
+    fn test_romutrio_golden() {
+        // https://github.com/ziglang/zig/blob/130fb5cb0fb9039e79450c9db58d6590c5bee3b3/lib/std/Random/RomuTrio.zig#L75-L95
+        let golden: [u64; 10] = [
+            16294208416658607535,
+            13964609475759908645,
+            4703697494102998476,
+            3425221541186733346,
+            2285772463536419399,
+            9454187757529463048,
+            13695907680080547496,
+            8328236714879408626,
+            12323357569716880909,
+            12375466223337721820,
+        ];
 
-        let mut rand_fixed = StdRand::with_seed(0);
-        let mut rand = StdRand::new();
-
-        // The seed should be reasonably random so these never fail
-        assert_ne!(rand.next(), rand_fixed.next());
-        test_single_rand(&mut rand);
-    }
-
-    #[test]
-    #[cfg(feature = "rand_trait")]
-    fn test_rgn_core_support() {
-        use rand_core::RngCore;
-
-        use crate::rands::StdRand;
-        pub struct Mutator<R: RngCore> {
-            rng: R,
+        let mut s = RomuTrioRand::with_seed(0);
+        for v in golden {
+            let u = s.next();
+            assert_eq!(v, u);
         }
-
-        let mut mutator = Mutator {
-            rng: StdRand::with_seed(0),
-        };
-
-        log::info!("random value: {}", mutator.rng.next_u32());
     }
 
     #[test]
-    fn test_sfc64_golden_zig() {
+    fn test_romuduojr_golden() {
+        // https://github.com/eqv/rand_romu/blob/c0379dc3c21ffac8440197e2f8fe95c226c44bfe/src/lib.rs#L65-L79
+        let golden: [u64; 9] = [
+            0x3c91b13ee3913664,
+            0xdc1980b78df3115,
+            0x1c163b704996d2ad,
+            0xa000c594bb28313b,
+            0xfb6c42e69a523526,
+            0x1fcebd6988ab21d8,
+            0x5e0a8abf025f8f02,
+            0x29554b00ffab0263,
+            0xff5b6bb1551cf66,
+        ];
+
+        let mut s = RomuDuoJrRand {
+            x_state: 0x3c91b13ee3913664u64,
+            y_state: 0x863f0e37c2637d1fu64,
+        };
+        for v in golden {
+            let u = s.next();
+            assert_eq!(v, u);
+        }
+    }
+
+    #[test]
+    fn test_xoshiro256pp_golden() {
+        // https://github.com/ziglang/zig/blob/130fb5cb0fb9039e79450c9db58d6590c5bee3b3/lib/std/Random/Xoshiro256.zig#L96-L103
+        let golden: [u64; 6] = [
+            0x53175d61490b23df,
+            0x61da6f3dc380d507,
+            0x5c0fdf91ec9a7bfc,
+            0x02eebf8c3bbe5e1a,
+            0x7eca04ebaf4a5eea,
+            0x0543c37757f08d9a,
+        ];
+
+        let mut s = Xoshiro256PlusPlusRand::with_seed(0);
+        for v in golden {
+            let u = s.next();
+            assert_eq!(v, u);
+        }
+    }
+
+    #[test]
+    fn test_sfc64_golden() {
         // https://github.com/ziglang/zig/blob/130fb5cb0fb9039e79450c9db58d6590c5bee3b3/lib/std/Random/Sfc64.zig#L73-L99
         let golden: [u64; 16] = [
             0x3acfa029e3cc6041,
@@ -548,8 +657,7 @@ pub mod pybind {
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};
 
-    use super::Rand;
-    use crate::{current_nanos, rands::StdRand};
+    use super::{random_seed, Rand, StdRand};
 
     #[pyclass(unsendable, name = "StdRand")]
     #[allow(clippy::unsafe_derive_deserialize)]
@@ -563,9 +671,9 @@ pub mod pybind {
     #[pymethods]
     impl PythonStdRand {
         #[staticmethod]
-        fn with_current_nanos() -> Self {
+        fn with_random_seed() -> Self {
             Self {
-                inner: StdRand::with_seed(current_nanos()),
+                inner: StdRand::with_seed(random_seed()),
             }
         }
 

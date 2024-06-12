@@ -2,6 +2,7 @@ use std::{
     env, fs,
     path::{Path, PathBuf},
     process::Command,
+    str::FromStr,
 };
 
 use which::which;
@@ -10,7 +11,7 @@ use crate::cargo_add_rpath;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "c9519ee8b6cb1ba54b7df1001f7f39f07218d514";
+const QEMU_REVISION: &str = "9d2197b73bf5e66e709f9f1669467d5c84062da0";
 
 #[allow(clippy::module_name_repetitions)]
 pub struct BuildResult {
@@ -70,33 +71,37 @@ fn configure_qemu(
 ) -> Command {
     let mut cmd = Command::new("./configure");
 
+    let linker_interceptor = qemu_path.join("linker_interceptor.py");
+    let linker_interceptor_plus_plus = qemu_path.join("linker_interceptor++.py");
+
+    println!("cargo:rerun-if-changed={}", linker_interceptor.display());
+    println!(
+        "cargo:rerun-if-changed={}",
+        linker_interceptor_plus_plus.display()
+    );
+
     // Set common options for usermode and systemmode
     cmd.current_dir(qemu_path)
         .env("__LIBAFL_QEMU_CONFIGURE", "")
         .env("__LIBAFL_QEMU_BUILD_OUT", build_dir.join("linkinfo.json"))
         .env("__LIBAFL_QEMU_BUILD_CC", cc_compiler.path())
         .env("__LIBAFL_QEMU_BUILD_CXX", cpp_compiler.path())
-        .arg(&format!(
-            "--cc={}",
-            qemu_path.join("linker_interceptor.py").display()
-        ))
-        .arg(&format!(
-            "--cxx={}",
-            qemu_path.join("linker_interceptor++.py").display()
-        ))
+        .arg(&format!("--cc={}", linker_interceptor.display()))
+        .arg(&format!("--cxx={}", linker_interceptor_plus_plus.display()))
         .arg("--as-shared-lib")
         .arg(&format!("--target-list={cpu_target}-{target_suffix}"))
-        .arg("--disable-bsd-user")
-        .arg("--disable-capstone");
+        // .arg("--disable-capstone")
+        .arg("--disable-bsd-user");
 
-    if cfg!(debug_assertions) {
-        // cmd.arg("--enable-debug");
-        // .arg("--enable-debug-tcg");
+    if cfg!(feature = "paranoid_debug") {
+        cmd.arg("--enable-debug")
+            .arg("--enable-debug-tcg")
+            .arg("--enable-sanitizers");
     }
 
     if is_usermode {
         // Usermode options
-        cmd.args(["--disable-fdt", "--disable-system"]);
+        cmd.args(["--disable-fdt", "--disable-system", "--disable-docs"]);
     } else {
         // Systemmode options
         cmd.arg(if cfg!(feature = "slirp") {
@@ -273,6 +278,7 @@ pub fn build(
 
     println!("cargo:rerun-if-env-changed=LIBAFL_QEMU_DIR");
     println!("cargo:rerun-if-env-changed=LIBAFL_QEMU_CLONE_DIR");
+    println!("cargo:rerun-if-env-changed=LIBAFL_QEMU_FORCE_BUILD");
     println!("cargo:rerun-if-env-changed=LIBAFL_QEMU_FORCE_CONFIGURE");
     println!("cargo:rerun-if-env-changed=LIBAFL_QEMU_NO_BUILD");
 
@@ -449,6 +455,23 @@ pub fn build(
     }
     */
 
+    let compile_commands_string = &fs::read_to_string(libafl_qemu_build_dir.join("linkinfo.json"))
+        .expect("Failed to read linkinfo.json");
+
+    let linkinfo = json::parse(compile_commands_string).expect("Failed to parse linkinfo.json");
+
+    for source in linkinfo["sources"].members() {
+        let source_path = PathBuf::from_str(source.as_str().unwrap()).unwrap();
+
+        let source_path = if source_path.is_relative() {
+            libafl_qemu_build_dir.join(source_path)
+        } else {
+            source_path
+        };
+
+        println!("cargo:rerun-if-changed={}", source_path.display());
+    }
+
     if cfg!(feature = "shared") {
         let qemu_build_dir_str = libafl_qemu_build_dir
             .to_str()
@@ -457,12 +480,6 @@ pub fn build(
         println!("cargo:rustc-link-lib=dylib={output_lib_link}");
         cargo_add_rpath(qemu_build_dir_str);
     } else {
-        let compile_commands_string =
-            &fs::read_to_string(libafl_qemu_build_dir.join("linkinfo.json"))
-                .expect("Failed to read linkinfo.json");
-
-        let linkinfo = json::parse(compile_commands_string).expect("Failed to parse linkinfo.json");
-
         let mut cmd = vec![];
         for arg in linkinfo["cmd"].members() {
             cmd.push(
@@ -482,7 +499,10 @@ pub fn build(
 
         let link_str = format!("{link_command:?}");
 
-        let output = link_command.output().expect("Partial linked failure");
+        let output = match link_command.output() {
+            Ok(output) => output,
+            Err(e) => panic!("Command {link_command:?} failed: {e:?}"),
+        };
 
         if !output.status.success() {
             fs::write(libafl_qemu_build_dir.join("link.command"), link_str)
@@ -617,6 +637,11 @@ pub fn build(
                 );
             cargo_add_rpath(&val);
         }
+    }
+
+    if cfg!(feature = "paranoid_debug") {
+        println!("cargo:rustc-link-lib=ubsan");
+        println!("cargo:rustc-link-lib=asan");
     }
 
     /*

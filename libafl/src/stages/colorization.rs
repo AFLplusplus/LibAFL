@@ -4,7 +4,7 @@ use core::{cmp::Ordering, fmt::Debug, marker::PhantomData, ops::Range};
 
 use libafl_bolts::{
     rands::Rand,
-    tuples::{Reference, Referenceable},
+    tuples::{Handle, Handled},
     Named,
 };
 use serde::{Deserialize, Serialize};
@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     events::EventFirer,
     executors::{Executor, HasObservers},
-    inputs::HasBytesVec,
+    inputs::HasMutatorBytes,
     mutators::mutations::buffer_copy,
     observers::{MapObserver, ObserversTuple},
     stages::{RetryRestartHelper, Stage},
@@ -52,10 +52,13 @@ impl Ord for Earlier {
     }
 }
 
+/// Default name for `ColorizationStage`; derived from ALF++
+pub const COLORIZATION_STAGE_NAME: &str = "colorization";
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
 pub struct ColorizationStage<C, E, EM, O, Z> {
-    map_observer_ref: Reference<C>,
+    map_observer_handle: Handle<C>,
+    name: Cow<'static, str>,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, EM, O, E, Z)>,
 }
@@ -72,19 +75,19 @@ where
     E: UsesState,
 {
     fn name(&self) -> &Cow<'static, str> {
-        self.map_observer_ref.name()
+        &self.name
     }
 }
 
 impl<C, E, EM, O, Z> Stage<E, EM, Z> for ColorizationStage<C, E, EM, O, Z>
 where
-    EM: UsesState<State = E::State> + EventFirer,
+    EM: UsesState<State = Self::State> + EventFirer,
     E: HasObservers + Executor<EM, Z>,
-    E::State: HasCorpus + HasMetadata + HasRand + HasNamedMetadata,
-    E::Input: HasBytesVec,
+    Self::State: HasCorpus + HasMetadata + HasRand + HasNamedMetadata,
+    E::Input: HasMutatorBytes,
     O: MapObserver,
     C: AsRef<O> + Named,
-    Z: UsesState<State = E::State>,
+    Z: UsesState<State = Self::State>,
 {
     #[inline]
     #[allow(clippy::let_and_return)]
@@ -92,11 +95,11 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E, // don't need the *main* executor for tracing
-        state: &mut E::State,
+        state: &mut Self::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
         // Run with the mutated input
-        Self::colorize(fuzzer, executor, state, manager, &self.map_observer_ref)?;
+        Self::colorize(fuzzer, executor, state, manager, &self.map_observer_handle)?;
 
         Ok(())
     }
@@ -153,22 +156,22 @@ libafl_bolts::impl_serdeany!(TaintMetadata);
 
 impl<C, E, EM, O, Z> ColorizationStage<C, E, EM, O, Z>
 where
-    EM: UsesState<State = E::State> + EventFirer,
+    EM: UsesState<State = <Self as UsesState>::State> + EventFirer,
     O: MapObserver,
     C: AsRef<O> + Named,
     E: HasObservers + Executor<EM, Z>,
-    E::State: HasCorpus + HasMetadata + HasRand,
-    E::Input: HasBytesVec,
-    Z: UsesState<State = E::State>,
+    <Self as UsesState>::State: HasCorpus + HasMetadata + HasRand,
+    E::Input: HasMutatorBytes,
+    Z: UsesState<State = <Self as UsesState>::State>,
 {
     #[inline]
     #[allow(clippy::let_and_return)]
     fn colorize(
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut E::State,
+        state: &mut <Self as UsesState>::State,
         manager: &mut EM,
-        obs_ref: &Reference<C>,
+        observer_handle: &Handle<C>,
     ) -> Result<E::Input, Error> {
         let mut input = state.current_input_cloned()?;
         // The backup of the input
@@ -182,8 +185,14 @@ where
         // First, run orig_input once and get the original hash
 
         // Idea: No need to do this every time
-        let orig_hash =
-            Self::get_raw_map_hash_run(fuzzer, executor, state, manager, consumed_input, obs_ref)?;
+        let orig_hash = Self::get_raw_map_hash_run(
+            fuzzer,
+            executor,
+            state,
+            manager,
+            consumed_input,
+            observer_handle,
+        )?;
         let changed_bytes = changed.bytes_mut();
         let input_len = changed_bytes.len();
 
@@ -228,7 +237,7 @@ where
                     state,
                     manager,
                     consumed_input,
-                    obs_ref,
+                    observer_handle,
                 )?;
 
                 if orig_hash == changed_hash {
@@ -301,7 +310,8 @@ where
     /// Creates a new [`ColorizationStage`]
     pub fn new(map_observer: &C) -> Self {
         Self {
-            map_observer_ref: map_observer.reference(),
+            map_observer_handle: map_observer.handle(),
+            name: Cow::Borrowed(COLORIZATION_STAGE_NAME),
             phantom: PhantomData,
         }
     }
@@ -310,17 +320,17 @@ where
     fn get_raw_map_hash_run(
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut E::State,
+        state: &mut <Self as UsesState>::State,
         manager: &mut EM,
         input: E::Input,
-        obs_ref: &Reference<C>,
+        observer_handle: &Handle<C>,
     ) -> Result<usize, Error> {
         executor.observers_mut().pre_exec_all(state, &input)?;
 
         let exit_kind = executor.run_target(fuzzer, state, manager, &input)?;
 
         let observers = executor.observers();
-        let observer = observers[obs_ref].as_ref();
+        let observer = observers[observer_handle].as_ref();
 
         let hash = observer.hash_simple() as usize;
 
@@ -336,7 +346,7 @@ where
 
     /// Replace bytes with random values but following certain rules
     #[allow(clippy::needless_range_loop)]
-    fn type_replace(bytes: &mut [u8], state: &mut E::State) {
+    fn type_replace(bytes: &mut [u8], state: &mut <Self as UsesState>::State) {
         let len = bytes.len();
         for idx in 0..len {
             let c = match bytes[idx] {

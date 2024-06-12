@@ -5,13 +5,13 @@ Other stages may enrich [`crate::corpus::Testcase`]s with metadata.
 */
 
 use alloc::{borrow::Cow, boxed::Box, vec::Vec};
-use core::marker::PhantomData;
+use core::{fmt, marker::PhantomData};
 
 pub use calibrate::CalibrationStage;
 pub use colorization::*;
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", unix))]
 pub use concolic::ConcolicTracingStage;
-#[cfg(all(feature = "std", feature = "concolic_mutation"))]
+#[cfg(all(feature = "std", feature = "concolic_mutation", unix))]
 pub use concolic::SimpleConcolicMutationalStage;
 #[cfg(feature = "std")]
 pub use dump::*;
@@ -27,8 +27,6 @@ pub use mutational::{MutationalStage, StdMutationalStage};
 pub use power::{PowerMutationalStage, StdPowerMutationalStage};
 use serde::{Deserialize, Serialize};
 pub use stats::AflStatsStage;
-#[cfg(feature = "unicode")]
-pub use string::*;
 #[cfg(feature = "std")]
 pub use sync::*;
 pub use tmin::{
@@ -37,9 +35,11 @@ pub use tmin::{
 pub use tracing::{ShadowTracingStage, TracingStage};
 pub use tuneable::*;
 use tuple_list::NonEmptyTuple;
+#[cfg(feature = "unicode")]
+pub use unicode::*;
 
 use crate::{
-    corpus::{CorpusId, HasCurrentCorpusIdx},
+    corpus::{CorpusId, HasCurrentCorpusId},
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::{Executor, HasObservers},
     inputs::UsesInput,
@@ -58,20 +58,22 @@ pub mod tmin;
 
 pub mod calibrate;
 pub mod colorization;
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", unix))]
 pub mod concolic;
 #[cfg(feature = "std")]
 pub mod dump;
 pub mod generalization;
+/// The [`generation::GenStage`] generates a single input and evaluates it.
+pub mod generation;
 pub mod logics;
 pub mod power;
 pub mod stats;
-#[cfg(feature = "unicode")]
-pub mod string;
 #[cfg(feature = "std")]
 pub mod sync;
 pub mod tracing;
 pub mod tuneable;
+#[cfg(feature = "unicode")]
+pub mod unicode;
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
@@ -151,7 +153,7 @@ where
         stage: &mut S,
         _: &mut EM,
     ) -> Result<(), Error> {
-        if stage.current_stage()?.is_some() {
+        if stage.current_stage_idx()?.is_some() {
             Err(Error::illegal_state(
                 "Got to the end of the tuple without completing resume.",
             ))
@@ -177,11 +179,11 @@ where
         state: &mut Head::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        match state.current_stage()? {
-            Some(idx) if idx < Self::LEN => {
+        match state.current_stage_idx()? {
+            Some(idx) if idx < StageId(Self::LEN) => {
                 // do nothing; we are resuming
             }
-            Some(idx) if idx == Self::LEN => {
+            Some(idx) if idx == StageId(Self::LEN) => {
                 // perform the stage, but don't set it
                 let stage = &mut self.0;
 
@@ -189,12 +191,12 @@ where
 
                 state.clear_stage()?;
             }
-            Some(idx) if idx > Self::LEN => {
+            Some(idx) if idx > StageId(Self::LEN) => {
                 unreachable!("We should clear the stage index before we get here...");
             }
             // this is None, but the match can't deduce that
             _ => {
-                state.set_stage(Self::LEN)?;
+                state.set_current_stage_idx(StageId(Self::LEN))?;
 
                 let stage = &mut self.0;
                 stage.perform_restartable(fuzzer, executor, state, manager)?;
@@ -283,28 +285,19 @@ where
 
 /// A [`Stage`] that will call a closure
 #[derive(Debug)]
-pub struct ClosureStage<CB, E, EM, Z>
-where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<(), Error>,
-    E: UsesState,
-{
+pub struct ClosureStage<CB, E, EM, Z> {
     closure: CB,
     phantom: PhantomData<(E, EM, Z)>,
 }
 
 impl<CB, E, EM, Z> UsesState for ClosureStage<CB, E, EM, Z>
 where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<(), Error>,
     E: UsesState,
 {
     type State = E::State;
 }
 
-impl<CB, E, EM, Z> Named for ClosureStage<CB, E, EM, Z>
-where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<(), Error>,
-    E: UsesState,
-{
+impl<CB, E, EM, Z> Named for ClosureStage<CB, E, EM, Z> {
     fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("<unnamed fn>");
         &NAME
@@ -313,11 +306,11 @@ where
 
 impl<CB, E, EM, Z> Stage<E, EM, Z> for ClosureStage<CB, E, EM, Z>
 where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<(), Error>,
+    CB: FnMut(&mut Z, &mut E, &mut Self::State, &mut EM) -> Result<(), Error>,
     E: UsesState,
-    EM: UsesState<State = E::State>,
-    Z: UsesState<State = E::State>,
-    E::State: HasNamedMetadata,
+    EM: UsesState<State = Self::State>,
+    Z: UsesState<State = Self::State>,
+    Self::State: HasNamedMetadata,
 {
     fn perform(
         &mut self,
@@ -342,11 +335,7 @@ where
 }
 
 /// A stage that takes a closure
-impl<CB, E, EM, Z> ClosureStage<CB, E, EM, Z>
-where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<(), Error>,
-    E: UsesState,
-{
+impl<CB, E, EM, Z> ClosureStage<CB, E, EM, Z> {
     /// Create a new [`ClosureStage`]
     #[must_use]
     pub fn new(closure: CB) -> Self {
@@ -359,7 +348,7 @@ where
 
 impl<CB, E, EM, Z> From<CB> for ClosureStage<CB, E, EM, Z>
 where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<(), Error>,
+    CB: FnMut(&mut Z, &mut E, &mut <Self as UsesState>::State, &mut EM) -> Result<(), Error>,
     E: UsesState,
 {
     #[must_use]
@@ -398,17 +387,17 @@ where
 impl<CS, E, EM, OT, PS, Z> Stage<E, EM, Z> for PushStageAdapter<CS, EM, OT, PS, Z>
 where
     CS: Scheduler,
-    CS::State:
-        HasExecutions + HasMetadata + HasRand + HasCorpus + HasLastReportTime + HasCurrentCorpusIdx,
-    E: Executor<EM, Z> + HasObservers<Observers = OT, State = CS::State>,
-    EM: EventFirer<State = CS::State>
+    Self::State:
+        HasExecutions + HasMetadata + HasRand + HasCorpus + HasLastReportTime + HasCurrentCorpusId,
+    E: Executor<EM, Z> + HasObservers<Observers = OT, State = Self::State>,
+    EM: EventFirer<State = Self::State>
         + EventRestarter
         + HasEventManagerId
-        + ProgressReporter<State = CS::State>,
-    OT: ObserversTuple<CS::State>,
+        + ProgressReporter<State = Self::State>,
+    OT: ObserversTuple<Self::State>,
     PS: PushStage<CS, EM, OT, Z>,
-    Z: ExecutesInput<E, EM, State = CS::State>
-        + ExecutionProcessor<OT, State = CS::State>
+    Z: ExecutesInput<E, EM, State = Self::State>
+        + ExecutionProcessor<OT, State = Self::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
 {
@@ -421,13 +410,13 @@ where
     ) -> Result<(), Error> {
         let push_stage = &mut self.push_stage;
 
-        let Some(corpus_idx) = state.current_corpus_idx()? else {
+        let Some(corpus_idx) = state.current_corpus_id()? else {
             return Err(Error::illegal_state(
                 "state is not currently processing a corpus index",
             ));
         };
 
-        push_stage.set_current_corpus_idx(corpus_idx);
+        push_stage.set_current_corpus_id(corpus_idx);
 
         push_stage.init(fuzzer, state, event_mgr, &mut *executor.observers_mut())?;
 
@@ -488,12 +477,12 @@ impl RetryRestartHelper {
         max_retries: usize,
     ) -> Result<bool, Error>
     where
-        S: HasNamedMetadata + HasCurrentCorpusIdx,
+        S: HasNamedMetadata + HasCurrentCorpusId,
         ST: Named,
     {
-        let corpus_idx = state.current_corpus_idx()?.ok_or_else(|| {
+        let corpus_idx = state.current_corpus_id()?.ok_or_else(|| {
             Error::illegal_state(
-                "No current_corpus_idx set in State, but called RetryRestartHelper::should_skip",
+                "No current_corpus_id set in State, but called RetryRestartHelper::should_skip",
             )
         })?;
 
@@ -538,16 +527,27 @@ impl RetryRestartHelper {
     }
 }
 
+/// The index of a stage
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[repr(transparent)]
+pub struct StageId(pub(crate) usize);
+
+impl fmt::Display for StageId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 /// Trait for types which track the current stage
 pub trait HasCurrentStage {
     /// Set the current stage; we have started processing this stage
-    fn set_stage(&mut self, idx: usize) -> Result<(), Error>;
+    fn set_current_stage_idx(&mut self, idx: StageId) -> Result<(), Error>;
 
     /// Clear the current stage; we are done processing this stage
     fn clear_stage(&mut self) -> Result<(), Error>;
 
     /// Fetch the current stage -- typically used after a state recovery or transfer
-    fn current_stage(&self) -> Result<Option<usize>, Error>;
+    fn current_stage_idx(&self) -> Result<Option<StageId>, Error>;
 
     /// Notify of a reset from which we may recover
     fn on_restart(&mut self) -> Result<(), Error> {
@@ -653,7 +653,7 @@ pub mod test {
     use serde::{Deserialize, Serialize};
 
     use crate::{
-        corpus::{Corpus, HasCurrentCorpusIdx, Testcase},
+        corpus::{Corpus, HasCurrentCorpusId, Testcase},
         inputs::NopInput,
         stages::{RetryRestartHelper, Stage},
         state::{test::test_std_state, HasCorpus, State, UsesState},

@@ -55,7 +55,7 @@ pub fn main() -> Result<(), Error> {
     // create a State from scratch
     let mut state = StdState::new(
         // RNG
-        StdRand::with_seed(current_nanos()),
+        StdRand::new(),
         // Corpus that will be evolved, we keep it in memory for performance
         InMemoryOnDiskCorpus::new(corpus_dir).unwrap(),
         // Corpus in which we store solutions (crashes in this example),
@@ -94,8 +94,8 @@ pub fn main() -> Result<(), Error> {
         .expect("Failed to generate the initial corpus");
 
     // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::new(havoc_mutations());
-    let minimizer = StdScheduledMutator::new(havoc_mutations());
+    let mutator = StdScheduledMutator::new(havoc_mutations::<BytesInput>());
+    let minimizer = StdScheduledMutator::new(havoc_mutations::<BytesInput>());
     let mut stages = tuple_list!(
         StdMutationalStage::new(mutator),
         StdTMinMutationalStage::new(minimizer, factory, 128)
@@ -108,7 +108,7 @@ pub fn main() -> Result<(), Error> {
     let minimized_dir = PathBuf::from("./minimized");
 
     let mut state = StdState::new(
-        StdRand::with_seed(current_nanos()),
+        StdRand::new(),
         InMemoryOnDiskCorpus::new(minimized_dir).unwrap(),
         InMemoryCorpus::new(),
         &mut (),
@@ -121,7 +121,7 @@ pub fn main() -> Result<(), Error> {
 
     let mut mgr = SimpleEventManager::new(mon);
 
-    let minimizer = StdScheduledMutator::new(havoc_mutations());
+    let minimizer = StdScheduledMutator::new(havoc_mutations::<BytesInput>());
     let mut stages = tuple_list!(StdTMinMutationalStage::new(
         minimizer,
         CrashFeedback::new(),

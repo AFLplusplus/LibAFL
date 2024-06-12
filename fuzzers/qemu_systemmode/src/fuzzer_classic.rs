@@ -22,17 +22,18 @@ use libafl::{
 use libafl_bolts::{
     core_affinity::Cores,
     current_nanos,
-    os::unix_signals::Signal,
+    os::unix_signals::{Signal, CTRL_C_EXIT},
+    ownedref::OwnedMutSlice,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
     AsSlice,
 };
 use libafl_qemu::{
-    edges::{edges_map_mut_slice, QemuEdgeCoverageHelper, MAX_EDGES_NUM},
+    edges::{edges_map_mut_ptr, QemuEdgeCoverageHelper, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND},
     elf::EasyElf,
-    emu::Qemu,
-    QemuExecutor, QemuExitReason, QemuExitReasonError, QemuHooks, QemuShutdownCause, Regs,
+    Qemu, QemuExecutor, QemuExitError, QemuExitReason, QemuHooks, QemuRWError, QemuShutdownCause,
+    Regs,
 };
 use libafl_qemu_sys::GuestPhysAddr;
 
@@ -126,15 +127,15 @@ pub fn fuzz() {
                     Ok(QemuExitReason::Breakpoint(_)) => {}
                     Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(
                         Signal::SigInterrupt,
-                    ))) => process::exit(0),
-                    Err(QemuExitReasonError::UnexpectedExit) => return ExitKind::Crash,
+                    ))) => process::exit(CTRL_C_EXIT),
+                    Err(QemuExitError::UnexpectedExit) => return ExitKind::Crash,
                     _ => panic!("Unexpected QEMU exit."),
                 }
 
                 // If the execution stops at any point other then the designated breakpoint (e.g. a breakpoint on a panic method) we consider it a crash
                 let mut pcs = (0..qemu.num_cpus())
                     .map(|i| qemu.cpu_from_index(i))
-                    .map(|cpu| -> Result<u32, String> { cpu.read_reg(Regs::Pc) });
+                    .map(|cpu| -> Result<u32, QemuRWError> { cpu.read_reg(Regs::Pc) });
                 let ret = match pcs
                     .find(|pc| (breakpoint..breakpoint + 5).contains(pc.as_ref().unwrap_or(&0)))
                 {
@@ -161,8 +162,8 @@ pub fn fuzz() {
         let edges_observer = unsafe {
             HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
                 "edges",
-                edges_map_mut_slice(),
-                addr_of_mut!(MAX_EDGES_NUM),
+                OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_SIZE_IN_USE),
+                addr_of_mut!(MAX_EDGES_FOUND),
             ))
             .track_indices()
         };

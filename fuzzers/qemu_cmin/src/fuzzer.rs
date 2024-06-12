@@ -20,7 +20,6 @@ use libafl::{
 };
 use libafl_bolts::{
     core_affinity::Cores,
-    current_nanos,
     os::unix_signals::Signal,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
@@ -30,9 +29,8 @@ use libafl_bolts::{
 use libafl_qemu::{
     edges::{QemuEdgeCoverageChildHelper, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},
     elf::EasyElf,
-    emu::Emulator,
-    ArchExtras, CallingConvention, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExitReason,
-    QemuExitReasonError, QemuForkExecutor, QemuHooks, QemuShutdownCause, Regs,
+    ArchExtras, CallingConvention, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExitError,
+    QemuExitReason, QemuForkExecutor, QemuHooks, QemuShutdownCause, Regs,
 };
 
 #[derive(Default)]
@@ -176,7 +174,7 @@ pub fn fuzz() -> Result<(), Error> {
 
     let mut state = state.unwrap_or_else(|| {
         StdState::new(
-            StdRand::with_seed(current_nanos()),
+            StdRand::new(),
             InMemoryOnDiskCorpus::new(PathBuf::from(options.output)).unwrap(),
             NopCorpus::new(),
             &mut feedback,
@@ -213,7 +211,7 @@ pub fn fuzz() -> Result<(), Error> {
                 Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(Signal::SigInterrupt))) => {
                     process::exit(0)
                 }
-                Err(QemuExitReasonError::UnexpectedExit) => return ExitKind::Crash,
+                Err(QemuExitError::UnexpectedExit) => return ExitKind::Crash,
                 _ => panic!("Unexpected QEMU exit."),
             }
         }

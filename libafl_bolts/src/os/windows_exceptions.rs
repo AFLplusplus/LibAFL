@@ -11,7 +11,7 @@ use core::{
 use std::os::raw::{c_long, c_void};
 
 use log::info;
-use num_enum::TryFromPrimitive;
+use num_enum::FromPrimitive;
 pub use windows::Win32::{
     Foundation::{BOOL, NTSTATUS},
     System::{
@@ -25,6 +25,9 @@ pub use windows::Win32::{
 
 use crate::Error;
 
+/// The special exit code when the target exited through ctrl-c
+pub const CTRL_C_EXIT: i32 = -1073741510;
+
 // For VEH
 const EXCEPTION_CONTINUE_EXECUTION: c_long = -1;
 
@@ -32,7 +35,7 @@ const EXCEPTION_CONTINUE_EXECUTION: c_long = -1;
 const EXCEPTION_CONTINUE_SEARCH: c_long = 0;
 
 // For SEH
-//const EXCEPTION_EXECUTE_HANDLER: c_long = 1;
+// const EXCEPTION_EXECUTE_HANDLER: c_long = 1;
 
 // From https://github.com/Alexpux/mingw-w64/blob/master/mingw-w64-headers/crt/signal.h
 pub const SIGINT: i32 = 2;
@@ -94,65 +97,130 @@ pub const STATUS_SXS_EARLY_DEACTIVATION: i32 = 0xC015000F;
 pub const STATUS_SXS_INVALID_DEACTIVATION: i32 = 0xC0150010;
 pub const STATUS_NOT_IMPLEMENTED: i32 = 0xC0000002;
 
-#[derive(Debug, TryFromPrimitive, Clone, Copy)]
+// from https://github.com/x64dbg/x64dbg/blob/4d631707b89d97e199844c08f5b65d8ea5d5d3f3/bin/exceptiondb.txt
+pub const STATUS_WX86_UNSIMULATE: i32 = 0x4000001C;
+pub const STATUS_WX86_CONTINUE: i32 = 0x4000001D;
+pub const STATUS_WX86_SINGLE_STEP: i32 = 0x4000001E;
+pub const STATUS_WX86_BREAKPOINT: i32 = 0x4000001F;
+pub const STATUS_WX86_EXCEPTION_CONTINUE: i32 = 0x40000020;
+pub const STATUS_WX86_EXCEPTION_LASTCHANCE: i32 = 0x40000021;
+pub const STATUS_WX86_EXCEPTION_CHAIN: i32 = 0x40000022;
+pub const STATUS_WX86_CREATEWX86TIB: i32 = 0x40000028;
+pub const DBG_TERMINATE_THREAD: i32 = 0x40010003;
+pub const DBG_TERMINATE_PROCESS: i32 = 0x40010004;
+pub const DBG_CONTROL_C: i32 = 0x40010005;
+pub const DBG_PRINTEXCEPTION_C: i32 = 0x40010006;
+pub const DBG_RIPEXCEPTION: i32 = 0x40010007;
+pub const DBG_CONTROL_BREAK: i32 = 0x40010008;
+pub const DBG_COMMAND_EXCEPTION: i32 = 0x40010009;
+pub const DBG_PRINTEXCEPTION_WIDE_C: i32 = 0x4001000A;
+pub const EXCEPTION_RO_ORIGINATEERROR: i32 = 0x40080201;
+pub const EXCEPTION_RO_TRANSFORMERROR: i32 = 0x40080202;
+pub const MS_VC_EXCEPTION: i32 = 0x406D1388;
+pub const DBG_EXCEPTION_NOT_HANDLED: i32 = 0x80010001;
+pub const STATUS_INVALID_PARAMETER: i32 = 0xC000000D;
+pub const STATUS_ILLEGAL_FLOAT_CONTEXT: i32 = 0xC000014A;
+pub const EXCEPTION_POSSIBLE_DEADLOCK: i32 = 0xC0000194;
+pub const STATUS_INVALID_EXCEPTION_HANDLER: i32 = 0xC00001A5;
+pub const STATUS_DATATYPE_MISALIGNMENT_ERROR: i32 = 0xC00002C5;
+pub const STATUS_USER_CALLBACK: i32 = 0xC000041D;
+pub const CLR_EXCEPTION: i32 = 0xE0434352;
+pub const CPP_EH_EXCEPTION: i32 = 0xE06D7363;
+pub const VCPP_EXCEPTION_ERROR_INVALID_PARAMETER: i32 = 0xC06D0057;
+pub const VCPP_EXCEPTION_ERROR_MOD_NOT_FOUND: i32 = 0xC06D007E;
+pub const VCPP_EXCEPTION_ERROR_PROC_NOT_FOUND: i32 = 0xC06D007F;
+
+#[derive(Debug, FromPrimitive, Clone, Copy)]
 #[repr(i32)]
 pub enum ExceptionCode {
-    // From https://docs.microsoft.com/en-us/windows/win32/debug/getexceptioncode
-    AccessViolation = STATUS_ACCESS_VIOLATION,
-    ArrayBoundsExceeded = STATUS_ARRAY_BOUNDS_EXCEEDED,
-    Breakpoint = STATUS_BREAKPOINT,
-    DatatypeMisalignment = STATUS_DATATYPE_MISALIGNMENT,
-    FltDenormalOperand = STATUS_FLOAT_DENORMAL_OPERAND,
-    FltDivideByZero = STATUS_FLOAT_DIVIDE_BY_ZERO,
-    FltInexactResult = STATUS_FLOAT_INEXACT_RESULT,
-    FltInvalidOperation = STATUS_FLOAT_INVALID_OPERATION,
-    FltOverflow = STATUS_FLOAT_OVERFLOW,
-    FltStackCheck = STATUS_FLOAT_STACK_CHECK,
-    FltUnderflow = STATUS_FLOAT_UNDERFLOW,
-    GuardPageViolation = STATUS_GUARD_PAGE_VIOLATION,
-    IllegalInstruction = STATUS_ILLEGAL_INSTRUCTION,
-    InPageError = STATUS_IN_PAGE_ERROR,
-    IntegerDivideByZero = STATUS_INTEGER_DIVIDE_BY_ZERO,
-    IntegerOverflow = STATUS_INTEGER_OVERFLOW,
-    InvalidDisposition = STATUS_INVALID_DISPOSITION,
-    InvalidHandle = STATUS_INVALID_HANDLE,
-    NoncontinuableException = STATUS_NONCONTINUABLE_EXCEPTION,
-    PrivilegedInstruction = STATUS_PRIVILEGED_INSTRUCTION,
-    SingleStep = STATUS_SINGLE_STEP,
-    StackOverflow = STATUS_STACK_OVERFLOW,
-    UnwindConsolidate = STATUS_UNWIND_CONSOLIDATE,
-    // Addition exceptions
-    Wait0 = STATUS_WAIT_0,
-    AbandonedWait0 = STATUS_ABANDONED_WAIT_0,
-    UserAPC = STATUS_USER_APC,
+    // From https://github.com/wine-mirror/wine/blob/master/include/winnt.h#L611
+    WaitZero = STATUS_WAIT_0,
+    AbandonedWaitZero = STATUS_ABANDONED_WAIT_0,
+    UserApc = STATUS_USER_APC,
     Timeout = STATUS_TIMEOUT,
     Pending = STATUS_PENDING,
     SegmentNotification = STATUS_SEGMENT_NOTIFICATION,
     FatalAppExit = STATUS_FATAL_APP_EXIT,
+    GuardPageViolation = STATUS_GUARD_PAGE_VIOLATION,
+    DatatypeMisalignment = STATUS_DATATYPE_MISALIGNMENT,
+    Breakpoint = STATUS_BREAKPOINT,
+    SingleStep = STATUS_SINGLE_STEP,
     Longjump = STATUS_LONGJUMP,
-    DLLNotFound = STATUS_DLL_NOT_FOUND,
+    UnwindConsolidate = STATUS_UNWIND_CONSOLIDATE,
+    AccessViolation = STATUS_ACCESS_VIOLATION,
+    InPageError = STATUS_IN_PAGE_ERROR,
+    InvalidHandle = STATUS_INVALID_HANDLE,
+    NoMemory = STATUS_NO_MEMORY,
+    IllegalInstruction = STATUS_ILLEGAL_INSTRUCTION,
+    NoncontinuableException = STATUS_NONCONTINUABLE_EXCEPTION,
+    InvalidDisposition = STATUS_INVALID_DISPOSITION,
+    ArrayBoundsExceeded = STATUS_ARRAY_BOUNDS_EXCEEDED,
+    FloatDenormalOperand = STATUS_FLOAT_DENORMAL_OPERAND,
+    FloatDivideByZero = STATUS_FLOAT_DIVIDE_BY_ZERO,
+    FloatInexactResult = STATUS_FLOAT_INEXACT_RESULT,
+    FloatInvalidOperation = STATUS_FLOAT_INVALID_OPERATION,
+    FloatOverflow = STATUS_FLOAT_OVERFLOW,
+    FloatStackCheck = STATUS_FLOAT_STACK_CHECK,
+    FloatUnderflow = STATUS_FLOAT_UNDERFLOW,
+    IntegerDivideByZero = STATUS_INTEGER_DIVIDE_BY_ZERO,
+    IntegerOverflow = STATUS_INTEGER_OVERFLOW,
+    PrivilegedInstruction = STATUS_PRIVILEGED_INSTRUCTION,
+    StackOverflow = STATUS_STACK_OVERFLOW,
+    DllNotFound = STATUS_DLL_NOT_FOUND,
     OrdinalNotFound = STATUS_ORDINAL_NOT_FOUND,
-    EntryPointNotFound = STATUS_ENTRYPOINT_NOT_FOUND,
+    EntrypointNotFound = STATUS_ENTRYPOINT_NOT_FOUND,
     ControlCExit = STATUS_CONTROL_C_EXIT,
     DllInitFailed = STATUS_DLL_INIT_FAILED,
-    FltMultipleFaults = STATUS_FLOAT_MULTIPLE_FAULTS,
-    FltMultipleTraps = STATUS_FLOAT_MULTIPLE_TRAPS,
+    FloatMultipleFaults = STATUS_FLOAT_MULTIPLE_FAULTS,
+    FloatMultipleTraps = STATUS_FLOAT_MULTIPLE_TRAPS,
     RegNatConsumption = STATUS_REG_NAT_CONSUMPTION,
     HeapCorruption = STATUS_HEAP_CORRUPTION,
     StackBufferOverrun = STATUS_STACK_BUFFER_OVERRUN,
-    InvalidCRuntimeParameter = STATUS_INVALID_CRUNTIME_PARAMETER,
+    InvalidCruntimeParameter = STATUS_INVALID_CRUNTIME_PARAMETER,
     AssertionFailure = STATUS_ASSERTION_FAILURE,
-    SXSEarlyDeactivation = STATUS_SXS_EARLY_DEACTIVATION,
-    SXSInvalidDeactivation = STATUS_SXS_INVALID_DEACTIVATION,
+    SxsEarlyDeactivation = STATUS_SXS_EARLY_DEACTIVATION,
+    SxsInvalidDeactivation = STATUS_SXS_INVALID_DEACTIVATION,
     NotImplemented = STATUS_NOT_IMPLEMENTED,
-    #[num_enum(default)]
-    Other,
+    // from https://github.com/x64dbg/x64dbg/blob/4d631707b89d97e199844c08f5b65d8ea5d5d3f3/bin/exceptiondb.txt
+    Wx86Unsimulate = STATUS_WX86_UNSIMULATE,
+    Wx86Continue = STATUS_WX86_CONTINUE,
+    Wx86SingleStep = STATUS_WX86_SINGLE_STEP,
+    Wx86Breakpoint = STATUS_WX86_BREAKPOINT,
+    Wx86ExceptionContinue = STATUS_WX86_EXCEPTION_CONTINUE,
+    Wx86ExceptionLastchance = STATUS_WX86_EXCEPTION_LASTCHANCE,
+    Wx86ExceptionChain = STATUS_WX86_EXCEPTION_CHAIN,
+    Wx86Createwx86Tib = STATUS_WX86_CREATEWX86TIB,
+    DbgTerminateThread = DBG_TERMINATE_THREAD,
+    DbgTerminateProcess = DBG_TERMINATE_PROCESS,
+    DbgControlC = DBG_CONTROL_C,
+    DbgPrintexceptionC = DBG_PRINTEXCEPTION_C,
+    DbgRipexception = DBG_RIPEXCEPTION,
+    DbgControlBreak = DBG_CONTROL_BREAK,
+    DbgCommandException = DBG_COMMAND_EXCEPTION,
+    DbgPrintexceptionWideC = DBG_PRINTEXCEPTION_WIDE_C,
+    ExceptionRoOriginateError = EXCEPTION_RO_ORIGINATEERROR,
+    ExceptionRoTransformError = EXCEPTION_RO_TRANSFORMERROR,
+    MsVcException = MS_VC_EXCEPTION,
+    DbgExceptionNotHandled = DBG_EXCEPTION_NOT_HANDLED,
+    InvalidParameter = STATUS_INVALID_PARAMETER,
+    IllegalFloatContext = STATUS_ILLEGAL_FLOAT_CONTEXT,
+    ExceptionPossibleDeadlock = EXCEPTION_POSSIBLE_DEADLOCK,
+    InvalidExceptionHandler = STATUS_INVALID_EXCEPTION_HANDLER,
+    DatatypeMisalignmentError = STATUS_DATATYPE_MISALIGNMENT_ERROR,
+    UserCallback = STATUS_USER_CALLBACK,
+    ClrException = CLR_EXCEPTION,
+    CppEhException = CPP_EH_EXCEPTION,
+    VcppExceptionErrorInvalidParameter = VCPP_EXCEPTION_ERROR_INVALID_PARAMETER,
+    VcppExceptionErrorModNotFound = VCPP_EXCEPTION_ERROR_MOD_NOT_FOUND,
+    VcppExceptionErrorProcNotFound = VCPP_EXCEPTION_ERROR_PROC_NOT_FOUND,
+    #[default]
+    Others,
 }
 
 pub static CRASH_EXCEPTIONS: &[ExceptionCode] = &[
     ExceptionCode::AccessViolation,
     ExceptionCode::ArrayBoundsExceeded,
-    ExceptionCode::FltDivideByZero,
+    ExceptionCode::FloatDivideByZero,
     ExceptionCode::GuardPageViolation,
     ExceptionCode::IllegalInstruction,
     ExceptionCode::InPageError,
@@ -177,111 +245,181 @@ impl Eq for ExceptionCode {}
 unsafe impl Sync for ExceptionCode {}
 
 impl Display for ExceptionCode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            ExceptionCode::AccessViolation => write!(f, "STATUS_ACCESS_VIOLATION")?,
-            ExceptionCode::ArrayBoundsExceeded => write!(f, "STATUS_ARRAY_BOUNDS_EXCEEDED")?,
-            ExceptionCode::Breakpoint => write!(f, "STATUS_BREAKPOINT")?,
-            ExceptionCode::DatatypeMisalignment => write!(f, "STATUS_DATATYPE_MISALIGNMENT")?,
-            ExceptionCode::FltDenormalOperand => write!(f, "STATUS_FLOAT_DENORMAL_OPERAND")?,
-            ExceptionCode::FltDivideByZero => write!(f, "STATUS_FLOAT_DIVIDE_BY_ZERO")?,
-            ExceptionCode::FltInexactResult => write!(f, "STATUS_FLOAT_INEXACT_RESULT")?,
-            ExceptionCode::FltInvalidOperation => write!(f, "STATUS_FLOAT_INVALID_OPERATION")?,
-            ExceptionCode::FltOverflow => write!(f, "STATUS_FLOAT_OVERFLOW")?,
-            ExceptionCode::FltStackCheck => write!(f, "STATUS_FLOAT_STACK_CHECK")?,
-            ExceptionCode::FltUnderflow => write!(f, "STATUS_FLOAT_UNDERFLOW")?,
-            ExceptionCode::GuardPageViolation => write!(f, "STATUS_GUARD_PAGE_VIOLATION")?,
-            ExceptionCode::IllegalInstruction => write!(f, "STATUS_ILLEGAL_INSTRUCTION")?,
-            ExceptionCode::InPageError => write!(f, "STATUS_IN_PAGE_ERROR")?,
-            ExceptionCode::IntegerDivideByZero => write!(f, "STATUS_INTEGER_DIVIDE_BY_ZERO")?,
-            ExceptionCode::IntegerOverflow => write!(f, "STATUS_INTEGER_OVERFLOW")?,
-            ExceptionCode::InvalidDisposition => write!(f, "STATUS_INVALID_DISPOSITION")?,
-            ExceptionCode::InvalidHandle => write!(f, "STATUS_INVALID_HANDLE")?,
-            ExceptionCode::NoncontinuableException => write!(f, "STATUS_NONCONTINUABLE_EXCEPTION")?,
-            ExceptionCode::PrivilegedInstruction => write!(f, "STATUS_PRIVILEGED_INSTRUCTION")?,
-            ExceptionCode::SingleStep => write!(f, "STATUS_SINGLE_STEP")?,
-            ExceptionCode::StackOverflow => write!(f, "STATUS_STACK_OVERFLOW")?,
-            ExceptionCode::UnwindConsolidate => write!(f, "STATUS_UNWIND_CONSOLIDATE")?,
-            ExceptionCode::Wait0 => write!(f, "STATUS_WAIT_0")?,
-            ExceptionCode::AbandonedWait0 => write!(f, "STATUS_ABANDONED_WAIT_0")?,
-            ExceptionCode::UserAPC => write!(f, "STATUS_USER_APC")?,
-            ExceptionCode::Timeout => write!(f, "STATUS_TIMEOUT")?,
-            ExceptionCode::Pending => write!(f, "STATUS_PENDING")?,
-            ExceptionCode::SegmentNotification => write!(f, "STATUS_SEGMENT_NOTIFICATION")?,
-            ExceptionCode::FatalAppExit => write!(f, "STATUS_FATAL_APP_EXIT")?,
-            ExceptionCode::Longjump => write!(f, "STATUS_LONGJUMP")?,
-            ExceptionCode::DLLNotFound => write!(f, "STATUS_DLL_NOT_FOUND")?,
-            ExceptionCode::OrdinalNotFound => write!(f, "STATUS_ORDINAL_NOT_FOUND")?,
-            ExceptionCode::EntryPointNotFound => write!(f, "STATUS_ENTRYPOINT_NOT_FOUND")?,
-            ExceptionCode::ControlCExit => write!(f, "STATUS_CONTROL_C_EXIT")?,
-            ExceptionCode::DllInitFailed => write!(f, "STATUS_DLL_INIT_FAILED")?,
-            ExceptionCode::FltMultipleFaults => write!(f, "STATUS_FLOAT_MULTIPLE_FAULTS")?,
-            ExceptionCode::FltMultipleTraps => write!(f, "STATUS_FLOAT_MULTIPLE_TRAPS")?,
-            ExceptionCode::RegNatConsumption => write!(f, "STATUS_REG_NAT_CONSUMPTION")?,
-            ExceptionCode::HeapCorruption => write!(f, "STATUS_HEAP_CORRUPTION")?,
-            ExceptionCode::StackBufferOverrun => write!(f, "STATUS_STACK_BUFFER_OVERRUN")?,
-            ExceptionCode::InvalidCRuntimeParameter => {
-                write!(f, "STATUS_INVALID_CRUNTIME_PARAMETER")?;
+            ExceptionCode::WaitZero => write!(f, "STATUS_WAIT_0"),
+            ExceptionCode::AbandonedWaitZero => write!(f, "STATUS_ABANDONED_WAIT_0"),
+            ExceptionCode::UserApc => write!(f, "STATUS_USER_APC"),
+            ExceptionCode::Timeout => write!(f, "STATUS_TIMEOUT"),
+            ExceptionCode::Pending => write!(f, "STATUS_PENDING"),
+            ExceptionCode::SegmentNotification => write!(f, "STATUS_SEGMENT_NOTIFICATION"),
+            ExceptionCode::FatalAppExit => write!(f, "STATUS_FATAL_APP_EXIT"),
+            ExceptionCode::GuardPageViolation => write!(f, "STATUS_GUARD_PAGE_VIOLATION"),
+            ExceptionCode::DatatypeMisalignment => write!(f, "STATUS_DATATYPE_MISALIGNMENT"),
+            ExceptionCode::Breakpoint => write!(f, "STATUS_BREAKPOINT"),
+            ExceptionCode::SingleStep => write!(f, "STATUS_SINGLE_STEP"),
+            ExceptionCode::Longjump => write!(f, "STATUS_LONGJUMP"),
+            ExceptionCode::UnwindConsolidate => write!(f, "STATUS_UNWIND_CONSOLIDATE"),
+            ExceptionCode::AccessViolation => write!(f, "STATUS_ACCESS_VIOLATION"),
+            ExceptionCode::InPageError => write!(f, "STATUS_IN_PAGE_ERROR"),
+            ExceptionCode::InvalidHandle => write!(f, "STATUS_INVALID_HANDLE"),
+            ExceptionCode::NoMemory => write!(f, "STATUS_NO_MEMORY"),
+            ExceptionCode::IllegalInstruction => write!(f, "STATUS_ILLEGAL_INSTRUCTION"),
+            ExceptionCode::NoncontinuableException => write!(f, "STATUS_NONCONTINUABLE_EXCEPTION"),
+            ExceptionCode::InvalidDisposition => write!(f, "STATUS_INVALID_DISPOSITION"),
+            ExceptionCode::ArrayBoundsExceeded => write!(f, "STATUS_ARRAY_BOUNDS_EXCEEDED"),
+            ExceptionCode::FloatDenormalOperand => write!(f, "STATUS_FLOAT_DENORMAL_OPERAND"),
+            ExceptionCode::FloatDivideByZero => write!(f, "STATUS_FLOAT_DIVIDE_BY_ZERO"),
+            ExceptionCode::FloatInexactResult => write!(f, "STATUS_FLOAT_INEXACT_RESULT"),
+            ExceptionCode::FloatInvalidOperation => write!(f, "STATUS_FLOAT_INVALID_OPERATION"),
+            ExceptionCode::FloatOverflow => write!(f, "STATUS_FLOAT_OVERFLOW"),
+            ExceptionCode::FloatStackCheck => write!(f, "STATUS_FLOAT_STACK_CHECK"),
+            ExceptionCode::FloatUnderflow => write!(f, "STATUS_FLOAT_UNDERFLOW"),
+            ExceptionCode::IntegerDivideByZero => write!(f, "STATUS_INTEGER_DIVIDE_BY_ZERO"),
+            ExceptionCode::IntegerOverflow => write!(f, "STATUS_INTEGER_OVERFLOW"),
+            ExceptionCode::PrivilegedInstruction => write!(f, "STATUS_PRIVILEGED_INSTRUCTION"),
+            ExceptionCode::StackOverflow => write!(f, "STATUS_STACK_OVERFLOW"),
+            ExceptionCode::DllNotFound => write!(f, "STATUS_DLL_NOT_FOUND"),
+            ExceptionCode::OrdinalNotFound => write!(f, "STATUS_ORDINAL_NOT_FOUND"),
+            ExceptionCode::EntrypointNotFound => write!(f, "STATUS_ENTRYPOINT_NOT_FOUND"),
+            ExceptionCode::ControlCExit => write!(f, "STATUS_CONTROL_C_EXIT"),
+            ExceptionCode::DllInitFailed => write!(f, "STATUS_DLL_INIT_FAILED"),
+            ExceptionCode::FloatMultipleFaults => write!(f, "STATUS_FLOAT_MULTIPLE_FAULTS"),
+            ExceptionCode::FloatMultipleTraps => write!(f, "STATUS_FLOAT_MULTIPLE_TRAPS"),
+            ExceptionCode::RegNatConsumption => write!(f, "STATUS_REG_NAT_CONSUMPTION"),
+            ExceptionCode::HeapCorruption => write!(f, "STATUS_HEAP_CORRUPTION"),
+            ExceptionCode::StackBufferOverrun => write!(f, "STATUS_STACK_BUFFER_OVERRUN"),
+            ExceptionCode::InvalidCruntimeParameter => {
+                write!(f, "STATUS_INVALID_CRUNTIME_PARAMETER")
             }
-            ExceptionCode::AssertionFailure => write!(f, "STATUS_ASSERTION_FAILURE")?,
-            ExceptionCode::SXSEarlyDeactivation => write!(f, "STATUS_SXS_EARLY_DEACTIVATION")?,
-            ExceptionCode::SXSInvalidDeactivation => write!(f, "STATUS_SXS_INVALID_DEACTIVATION")?,
-            ExceptionCode::NotImplemented => write!(f, "STATUS_NOT_IMPLEMENTED")?,
-            ExceptionCode::Other => write!(f, "Other/User defined exception")?,
-        };
-
-        Ok(())
+            ExceptionCode::AssertionFailure => write!(f, "STATUS_ASSERTION_FAILURE"),
+            ExceptionCode::SxsEarlyDeactivation => write!(f, "STATUS_SXS_EARLY_DEACTIVATION"),
+            ExceptionCode::SxsInvalidDeactivation => write!(f, "STATUS_SXS_INVALID_DEACTIVATION"),
+            ExceptionCode::NotImplemented => write!(f, "STATUS_NOT_IMPLEMENTED"),
+            ExceptionCode::Wx86Unsimulate => write!(f, "STATUS_WX86_UNSIMULATE"),
+            ExceptionCode::Wx86Continue => write!(f, "STATUS_WX86_CONTINUE"),
+            ExceptionCode::Wx86SingleStep => write!(f, "STATUS_WX86_SINGLE_STEP"),
+            ExceptionCode::Wx86Breakpoint => write!(f, "STATUS_WX86_BREAKPOINT"),
+            ExceptionCode::Wx86ExceptionContinue => write!(f, "STATUS_WX86_EXCEPTION_CONTINUE"),
+            ExceptionCode::Wx86ExceptionLastchance => write!(f, "STATUS_WX86_EXCEPTION_LASTCHANCE"),
+            ExceptionCode::Wx86ExceptionChain => write!(f, "STATUS_WX86_EXCEPTION_CHAIN"),
+            ExceptionCode::Wx86Createwx86Tib => write!(f, "STATUS_WX86_CREATEWX86TIB"),
+            ExceptionCode::DbgTerminateThread => write!(f, "DBG_TERMINATE_THREAD"),
+            ExceptionCode::DbgTerminateProcess => write!(f, "DBG_TERMINATE_PROCESS"),
+            ExceptionCode::DbgControlC => write!(f, "DBG_CONTROL_C"),
+            ExceptionCode::DbgPrintexceptionC => write!(f, "DBG_PRINTEXCEPTION_C"),
+            ExceptionCode::DbgRipexception => write!(f, "DBG_RIPEXCEPTION"),
+            ExceptionCode::DbgControlBreak => write!(f, "DBG_CONTROL_BREAK"),
+            ExceptionCode::DbgCommandException => write!(f, "DBG_COMMAND_EXCEPTION"),
+            ExceptionCode::DbgPrintexceptionWideC => write!(f, "DBG_PRINTEXCEPTION_WIDE_C"),
+            ExceptionCode::ExceptionRoOriginateError => write!(f, "EXCEPTION_RO_ORIGINATEERROR"),
+            ExceptionCode::ExceptionRoTransformError => write!(f, "EXCEPTION_RO_TRANSFORMERROR"),
+            ExceptionCode::MsVcException => write!(f, "MS_VC_EXCEPTION"),
+            ExceptionCode::DbgExceptionNotHandled => write!(f, "DBG_EXCEPTION_NOT_HANDLED"),
+            ExceptionCode::InvalidParameter => write!(f, "STATUS_INVALID_PARAMETER"),
+            ExceptionCode::IllegalFloatContext => write!(f, "STATUS_ILLEGAL_FLOAT_CONTEXT"),
+            ExceptionCode::ExceptionPossibleDeadlock => write!(f, "EXCEPTION_POSSIBLE_DEADLOCK"),
+            ExceptionCode::InvalidExceptionHandler => write!(f, "STATUS_INVALID_EXCEPTION_HANDLER"),
+            ExceptionCode::DatatypeMisalignmentError => {
+                write!(f, "STATUS_DATATYPE_MISALIGNMENT_ERROR")
+            }
+            ExceptionCode::UserCallback => write!(f, "STATUS_USER_CALLBACK"),
+            ExceptionCode::ClrException => write!(f, "CLR_EXCEPTION"),
+            ExceptionCode::CppEhException => write!(f, "CPP_EH_EXCEPTION"),
+            ExceptionCode::VcppExceptionErrorInvalidParameter => {
+                write!(f, "VCPP_EXCEPTION_ERROR_INVALID_PARAMETER")
+            }
+            ExceptionCode::VcppExceptionErrorModNotFound => {
+                write!(f, "VCPP_EXCEPTION_ERROR_MOD_NOT_FOUND")
+            }
+            ExceptionCode::VcppExceptionErrorProcNotFound => {
+                write!(f, "VCPP_EXCEPTION_ERROR_PROC_NOT_FOUND")
+            }
+            ExceptionCode::Others => write!(f, "Unknown exception code"),
+        }
     }
 }
 
-pub static EXCEPTION_CODES_MAPPING: [ExceptionCode; 47] = [
-    ExceptionCode::AccessViolation,
-    ExceptionCode::ArrayBoundsExceeded,
-    ExceptionCode::Breakpoint,
-    ExceptionCode::DatatypeMisalignment,
-    ExceptionCode::FltDenormalOperand,
-    ExceptionCode::FltDivideByZero,
-    ExceptionCode::FltInexactResult,
-    ExceptionCode::FltInvalidOperation,
-    ExceptionCode::FltOverflow,
-    ExceptionCode::FltStackCheck,
-    ExceptionCode::FltUnderflow,
-    ExceptionCode::GuardPageViolation,
-    ExceptionCode::IllegalInstruction,
-    ExceptionCode::InPageError,
-    ExceptionCode::IntegerDivideByZero,
-    ExceptionCode::IntegerOverflow,
-    ExceptionCode::InvalidDisposition,
-    ExceptionCode::InvalidHandle,
-    ExceptionCode::NoncontinuableException,
-    ExceptionCode::PrivilegedInstruction,
-    ExceptionCode::SingleStep,
-    ExceptionCode::StackOverflow,
-    ExceptionCode::UnwindConsolidate,
-    ExceptionCode::Wait0,
-    ExceptionCode::AbandonedWait0,
-    ExceptionCode::UserAPC,
+pub static EXCEPTION_CODES_MAPPING: [ExceptionCode; 79] = [
+    ExceptionCode::WaitZero,
+    ExceptionCode::AbandonedWaitZero,
+    ExceptionCode::UserApc,
     ExceptionCode::Timeout,
     ExceptionCode::Pending,
     ExceptionCode::SegmentNotification,
     ExceptionCode::FatalAppExit,
+    ExceptionCode::GuardPageViolation,
+    ExceptionCode::DatatypeMisalignment,
+    ExceptionCode::Breakpoint,
+    ExceptionCode::SingleStep,
     ExceptionCode::Longjump,
-    ExceptionCode::DLLNotFound,
+    ExceptionCode::UnwindConsolidate,
+    ExceptionCode::AccessViolation,
+    ExceptionCode::InPageError,
+    ExceptionCode::InvalidHandle,
+    ExceptionCode::NoMemory,
+    ExceptionCode::IllegalInstruction,
+    ExceptionCode::NoncontinuableException,
+    ExceptionCode::InvalidDisposition,
+    ExceptionCode::ArrayBoundsExceeded,
+    ExceptionCode::FloatDenormalOperand,
+    ExceptionCode::FloatDivideByZero,
+    ExceptionCode::FloatInexactResult,
+    ExceptionCode::FloatInvalidOperation,
+    ExceptionCode::FloatOverflow,
+    ExceptionCode::FloatStackCheck,
+    ExceptionCode::FloatUnderflow,
+    ExceptionCode::IntegerDivideByZero,
+    ExceptionCode::IntegerOverflow,
+    ExceptionCode::PrivilegedInstruction,
+    ExceptionCode::StackOverflow,
+    ExceptionCode::DllNotFound,
     ExceptionCode::OrdinalNotFound,
-    ExceptionCode::EntryPointNotFound,
+    ExceptionCode::EntrypointNotFound,
     ExceptionCode::ControlCExit,
     ExceptionCode::DllInitFailed,
-    ExceptionCode::FltMultipleFaults,
-    ExceptionCode::FltMultipleTraps,
+    ExceptionCode::FloatMultipleFaults,
+    ExceptionCode::FloatMultipleTraps,
     ExceptionCode::RegNatConsumption,
     ExceptionCode::HeapCorruption,
     ExceptionCode::StackBufferOverrun,
-    ExceptionCode::InvalidCRuntimeParameter,
+    ExceptionCode::InvalidCruntimeParameter,
     ExceptionCode::AssertionFailure,
-    ExceptionCode::SXSEarlyDeactivation,
-    ExceptionCode::SXSInvalidDeactivation,
+    ExceptionCode::SxsEarlyDeactivation,
+    ExceptionCode::SxsInvalidDeactivation,
     ExceptionCode::NotImplemented,
-    ExceptionCode::Other,
+    ExceptionCode::Wx86Unsimulate,
+    ExceptionCode::Wx86Continue,
+    ExceptionCode::Wx86SingleStep,
+    ExceptionCode::Wx86Breakpoint,
+    ExceptionCode::Wx86ExceptionContinue,
+    ExceptionCode::Wx86ExceptionLastchance,
+    ExceptionCode::Wx86ExceptionChain,
+    ExceptionCode::Wx86Createwx86Tib,
+    ExceptionCode::DbgTerminateThread,
+    ExceptionCode::DbgTerminateProcess,
+    ExceptionCode::DbgControlC,
+    ExceptionCode::DbgPrintexceptionC,
+    ExceptionCode::DbgRipexception,
+    ExceptionCode::DbgControlBreak,
+    ExceptionCode::DbgCommandException,
+    ExceptionCode::DbgPrintexceptionWideC,
+    ExceptionCode::ExceptionRoOriginateError,
+    ExceptionCode::ExceptionRoTransformError,
+    ExceptionCode::MsVcException,
+    ExceptionCode::DbgExceptionNotHandled,
+    ExceptionCode::InvalidParameter,
+    ExceptionCode::IllegalFloatContext,
+    ExceptionCode::ExceptionPossibleDeadlock,
+    ExceptionCode::InvalidExceptionHandler,
+    ExceptionCode::DatatypeMisalignmentError,
+    ExceptionCode::UserCallback,
+    ExceptionCode::ClrException,
+    ExceptionCode::CppEhException,
+    ExceptionCode::VcppExceptionErrorInvalidParameter,
+    ExceptionCode::VcppExceptionErrorModNotFound,
+    ExceptionCode::VcppExceptionErrorProcNotFound,
+    ExceptionCode::Others,
 ];
 
 #[cfg(feature = "alloc")]
@@ -300,12 +438,14 @@ struct HandlerHolder {
     handler: UnsafeCell<*mut dyn Handler>,
 }
 
-pub const EXCEPTION_HANDLERS_SIZE: usize = 64;
+pub const EXCEPTION_HANDLERS_SIZE: usize = 96;
 
 unsafe impl Send for HandlerHolder {}
 
 /// Keep track of which handler is registered for which exception
 static mut EXCEPTION_HANDLERS: [Option<HandlerHolder>; EXCEPTION_HANDLERS_SIZE] = [
+    None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+    None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
     None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
     None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
     None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
@@ -361,17 +501,23 @@ pub unsafe extern "system" fn handle_exception(
         .as_mut()
         .unwrap()
         .ExceptionCode;
-    let exception_code = match ExceptionCode::try_from(code.0) {
-        Ok(x) => x,
-        Err(_) => ExceptionCode::Other,
-    };
+    let exception_code = From::from(code.0);
     log::info!("Received exception; code: {}", exception_code);
     internal_handle_exception(exception_code, exception_pointers)
 }
 
+/// Return `SIGIGN` this is 1 (when represented as u64)
+/// Check `https://github.com/ziglang/zig/blob/956f53beb09c07925970453d4c178c6feb53ba70/lib/libc/include/any-windows-any/signal.h#L51`
+/// # Safety
+/// It is just casting into another type, nothing unsafe.
+#[must_use]
+pub const unsafe fn sig_ign() -> NativeSignalHandlerType {
+    core::mem::transmute(1u64)
+}
+
 type NativeSignalHandlerType = unsafe extern "C" fn(i32);
 extern "C" {
-    fn signal(signum: i32, func: NativeSignalHandlerType) -> *const c_void;
+    pub fn signal(signum: i32, func: NativeSignalHandlerType) -> *const c_void;
 }
 
 unsafe extern "C" fn handle_signal(_signum: i32) {
@@ -416,7 +562,10 @@ pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: *mut T) -> 
     // See https://github.com/AFLplusplus/LibAFL/pull/403
     AddVectoredExceptionHandler(
         0,
-        Some(core::mem::transmute(handle_exception as *const c_void)),
+        Some(core::mem::transmute::<
+            *const core::ffi::c_void,
+            unsafe extern "system" fn(*mut EXCEPTION_POINTERS) -> i32,
+        >(handle_exception as *const c_void)),
     );
     Ok(())
 }

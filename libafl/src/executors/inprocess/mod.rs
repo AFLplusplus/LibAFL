@@ -32,7 +32,7 @@ use crate::{
     fuzzer::HasObjective,
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
-    state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions, State, UsesState},
     Error, HasMetadata,
 };
 
@@ -232,6 +232,7 @@ where
     /// * `user_hooks` - the hooks run before and after the harness's execution
     /// * `harness_fn` - the harness, executing the function
     /// * `observers` - the observers observing the target during execution
+    ///
     /// This may return an error on unix, if signal handler setup fails
     pub fn with_timeout<EM, OF, Z>(
         harness_fn: &'a mut H,
@@ -329,12 +330,13 @@ where
         })
     }
 
-    /// Create a new in mem executor.
+    /// Create a new [`InProcessExecutor`].
     /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
     /// depending on different corpus or state.
     /// * `user_hooks` - the hooks run before and after the harness's execution
     /// * `harness_fn` - the harness, executing the function
     /// * `observers` - the observers observing the target during execution
+    ///
     /// This may return an error on unix, if signal handler setup fails
     pub fn with_timeout_generic<EM, OF, Z>(
         user_hooks: HT,
@@ -454,6 +456,11 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
         let mut new_testcase = Testcase::with_executions(input.clone(), executions);
         new_testcase.add_metadata(exitkind);
         new_testcase.set_parent_id_optional(*state.corpus().current());
+
+        if let Ok(mut tc) = state.current_testcase_mut() {
+            tc.found_objective();
+        }
+
         fuzzer
             .objective_mut()
             .append_metadata(state, event_mgr, &*observers, &mut new_testcase)

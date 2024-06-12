@@ -1,8 +1,10 @@
-//! Sugar API to simplify the life of the naive user of `LibAFL`
-
+//! Sugar API to simplify the life of users of `LibAFL` that just want to fuzz.
+/*! */
+#![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
+#![forbid(unexpected_cfgs)]
 #![allow(
     clippy::unreadable_literal,
     clippy::type_repetition_in_bounds,

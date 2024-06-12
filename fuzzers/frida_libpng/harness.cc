@@ -88,7 +88,7 @@ static char *allocation = NULL;
 __attribute__((noinline)) void func3(char *alloc) {
 // printf("func3\n");
 #ifdef _WIN32
-  if (rand() == 0) {
+  if ((rand() % 2) == 0) {
     alloc[0x1ff] = 0xde;
     printf("alloc[0x200]: %d\n", alloc[0x200]);
   }

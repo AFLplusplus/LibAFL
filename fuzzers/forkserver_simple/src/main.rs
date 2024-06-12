@@ -22,7 +22,7 @@ use libafl_bolts::{
     current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, Merge, Referenceable},
+    tuples::{tuple_list, Handled, Merge},
     AsSliceMut, Truncate,
 };
 use nix::sys::signal::Signal;
@@ -85,6 +85,7 @@ struct Opt {
 
 #[allow(clippy::similar_names)]
 pub fn main() {
+    env_logger::init();
     const MAP_SIZE: usize = 65536;
 
     let opt = Opt::parse();
@@ -163,7 +164,7 @@ pub fn main() {
     // Create the executor for the forkserver
     let args = opt.arguments;
 
-    let observer_ref = edges_observer.reference();
+    let observer_ref = edges_observer.handle();
 
     let mut tokens = Tokens::new();
     let mut executor = ForkserverExecutor::builder()

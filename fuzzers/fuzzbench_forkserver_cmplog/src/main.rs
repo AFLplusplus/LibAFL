@@ -33,11 +33,11 @@ use libafl::{
     Error, HasMetadata,
 };
 use libafl_bolts::{
-    current_nanos, current_time,
+    current_time,
     ownedref::OwnedRefMut,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, Merge, Referenceable},
+    tuples::{tuple_list, Handled, Merge},
     AsSliceMut,
 };
 use libafl_targets::{
@@ -277,7 +277,7 @@ fn fuzz(
     // create a State from scratch
     let mut state = StdState::new(
         // RNG
-        StdRand::with_seed(current_nanos()),
+        StdRand::new(),
         // Corpus that will be evolved, we keep it in memory for performance
         InMemoryOnDiskCorpus::<BytesInput>::new(corpus_dir).unwrap(),
         // Corpus in which we store solutions (crashes in this example),
@@ -355,7 +355,7 @@ fn fuzz(
         let cmpmap = unsafe { OwnedRefMut::from_shmem(&mut cmplog_shmem) };
 
         let cmplog_observer = AFLppCmpLogObserver::new("cmplog", cmpmap, true);
-        let cmplog_ref = cmplog_observer.reference();
+        let cmplog_ref = cmplog_observer.handle();
 
         let cmplog_executor = ForkserverExecutor::builder()
             .program(exec)

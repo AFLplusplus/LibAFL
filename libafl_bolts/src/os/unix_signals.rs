@@ -1,6 +1,8 @@
 //! Signal handling for unix
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
+#[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
+use core::mem::size_of;
 #[cfg(feature = "alloc")]
 use core::{
     cell::UnsafeCell,
@@ -18,7 +20,10 @@ use std::ffi::CString;
 #[cfg(target_arch = "arm")]
 pub use libc::c_ulong;
 #[cfg(feature = "std")]
-use nix::errno::{errno, Errno};
+use nix::errno::Errno;
+
+/// The special exit code when the target exited through ctrl-c
+pub const CTRL_C_EXIT: i32 = 100;
 
 /// ARMv7-specific representation of a saved context
 #[cfg(target_arch = "arm")]
@@ -157,7 +162,7 @@ pub struct arm_thread_state64 {
 //#[repr(align(16))]
 pub struct arm_neon_state64 {
     /// opaque
-    pub opaque: [u8; (32 * 16) + (2 * mem::size_of::<u32>())],
+    pub opaque: [u8; (32 * 16) + (2 * size_of::<u32>())],
 }
 
 /// ```c
@@ -300,6 +305,19 @@ pub enum Signal {
     SigInterrupt = SIGINT,
     /// `SIGTRAP` signal id
     SigTrap = SIGTRAP,
+}
+
+#[cfg(feature = "std")]
+impl Signal {
+    /// Handle an incoming signal
+    pub fn handle(&self) {
+        match self {
+            Signal::SigInterrupt | Signal::SigQuit | Signal::SigTerm => {
+                std::process::exit(CTRL_C_EXIT)
+            }
+            _ => {}
+        }
+    }
 }
 
 impl TryFrom<&str> for Signal {
@@ -502,7 +520,7 @@ pub fn ucontext() -> Result<ucontext_t, Error> {
             #[cfg(feature = "std")]
             Err(Error::unknown(format!(
                 "Failed to get ucontext: {:?}",
-                Errno::from_i32(errno())
+                Errno::last()
             )))
         }
     } else {

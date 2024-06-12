@@ -28,7 +28,6 @@ use libafl::{
 };
 use libafl_bolts::{
     core_affinity::Cores,
-    current_nanos,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
@@ -121,13 +120,14 @@ pub extern "C" fn libafl_main() {
     let context = NautilusContext::from_file(15, "grammar.json");
 
     let mut event_converter = opt.bytes_broker_port.map(|port| {
-        LlmpEventConverter::on_port(
-            shmem_provider.clone(),
-            port,
-            Some(NautilusToBytesInputConverter::new(&context)),
-            none_input_converter!(),
-        )
-        .unwrap()
+        LlmpEventConverter::builder()
+            .build_on_port(
+                shmem_provider.clone(),
+                port,
+                Some(NautilusToBytesInputConverter::new(&context)),
+                none_input_converter!(),
+            )
+            .unwrap()
     });
 
     // to disconnect the event coverter from the broker later
@@ -159,7 +159,7 @@ pub extern "C" fn libafl_main() {
         let mut state = state.unwrap_or_else(|| {
             StdState::new(
                 // RNG
-                StdRand::with_seed(current_nanos()),
+                StdRand::new(),
                 // Corpus that will be evolved, we keep it in memory for performance
                 InMemoryCorpus::new(),
                 // Corpus in which we store solutions (crashes in this example),

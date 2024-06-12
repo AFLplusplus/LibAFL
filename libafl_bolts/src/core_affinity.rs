@@ -203,16 +203,6 @@ impl TryFrom<&str> for Cores {
     }
 }
 
-/// Parses core binding args from user input.
-/// Returns a Vec of CPU IDs.
-/// * `./fuzzer --cores 1,2-4,6`: clients run in cores 1,2,3,4,6
-/// * `./fuzzer --cores all`: one client runs on each available core
-#[cfg(feature = "std")]
-#[deprecated(since = "0.8.1", note = "Use Cores::from_cmdline instead")]
-pub fn parse_core_bind_arg(args: &str) -> Result<Vec<usize>, Error> {
-    Ok(Cores::from_cmdline(args)?.ids.iter().map(|x| x.0).collect())
-}
-
 // Linux Section
 
 #[cfg(any(
@@ -245,7 +235,7 @@ fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
 ))]
 mod linux {
     use alloc::{string::ToString, vec::Vec};
-    use std::mem;
+    use core::mem::{size_of, zeroed};
 
     #[cfg(not(target_os = "freebsd"))]
     use libc::cpu_set_t;
@@ -286,7 +276,7 @@ mod linux {
         let result = unsafe {
             sched_setaffinity(
                 0, // Defaults to current thread
-                mem::size_of::<cpu_set_t>(),
+                size_of::<cpu_set_t>(),
                 &set,
             )
         };
@@ -305,7 +295,7 @@ mod linux {
         let result = unsafe {
             sched_getaffinity(
                 0, // Defaults to current thread
-                mem::size_of::<cpu_set_t>(),
+                size_of::<cpu_set_t>(),
                 &mut set,
             )
         };
@@ -320,7 +310,7 @@ mod linux {
     }
 
     fn new_cpu_set() -> cpu_set_t {
-        unsafe { mem::zeroed::<cpu_set_t>() }
+        unsafe { zeroed::<cpu_set_t>() }
     }
 
     #[cfg(test)]

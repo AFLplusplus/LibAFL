@@ -8,7 +8,7 @@ use std::vec::Vec;
 use libafl_bolts::Named;
 use serde::{Deserialize, Serialize};
 
-use crate::{inputs::UsesInput, observers::Observer};
+use crate::{inputs::UsesInput, observers::Observer, state::State, Error};
 
 /// An observer that captures stdout of a target.
 /// Only works for supported executors.
@@ -30,19 +30,9 @@ impl StdOutObserver {
             stdout: None,
         }
     }
-}
-
-impl<S> Observer<S> for StdOutObserver
-where
-    S: UsesInput,
-{
-    #[inline]
-    fn observes_stdout(&self) -> bool {
-        true
-    }
 
     /// React to new `stdout`
-    fn observe_stdout(&mut self, stdout: &[u8]) {
+    pub fn observe_stdout(&mut self, stdout: &[u8]) {
         self.stdout = Some(stdout.into());
     }
 }
@@ -50,6 +40,20 @@ where
 impl Named for StdOutObserver {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
+    }
+}
+
+impl<S> Observer<S> for StdOutObserver
+where
+    S: State,
+{
+    fn pre_exec_child(
+        &mut self,
+        _state: &mut S,
+        _input: &<S as UsesInput>::Input,
+    ) -> Result<(), Error> {
+        self.stdout = None;
+        Ok(())
     }
 }
 
@@ -73,19 +77,9 @@ impl StdErrObserver {
             stderr: None,
         }
     }
-}
-
-impl<S> Observer<S> for StdErrObserver
-where
-    S: UsesInput,
-{
-    #[inline]
-    fn observes_stderr(&self) -> bool {
-        true
-    }
 
     /// React to new `stderr`
-    fn observe_stderr(&mut self, stderr: &[u8]) {
+    pub fn observe_stderr(&mut self, stderr: &[u8]) {
         self.stderr = Some(stderr.into());
     }
 }
@@ -93,5 +87,19 @@ where
 impl Named for StdErrObserver {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
+    }
+}
+
+impl<S> Observer<S> for StdErrObserver
+where
+    S: State,
+{
+    fn pre_exec_child(
+        &mut self,
+        _state: &mut S,
+        _input: &<S as UsesInput>::Input,
+    ) -> Result<(), Error> {
+        self.stderr = None;
+        Ok(())
     }
 }

@@ -6,8 +6,8 @@ use libafl_qemu_sys::GuestAddr;
 #[cfg(emulation_mode = "systemmode")]
 use libafl_qemu_sys::GuestPhysAddr;
 pub use libafl_targets::{
-    edges_map_mut_ptr, edges_map_mut_slice, edges_max_num, std_edges_map_observer, EDGES_MAP,
-    EDGES_MAP_PTR, EDGES_MAP_PTR_NUM, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_NUM,
+    edges_map_mut_ptr, EDGES_MAP, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE, EDGES_MAP_SIZE_MAX,
+    MAX_EDGES_FOUND,
 };
 use serde::{Deserialize, Serialize};
 
@@ -132,9 +132,7 @@ impl Default for QemuEdgeCoverageHelper {
     }
 }
 
-impl<S: UsesInput> HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter, S>
-    for QemuEdgeCoverageHelper
-{
+impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuEdgeCoverageHelper {
     fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
         &self.address_filter
     }
@@ -145,9 +143,7 @@ impl<S: UsesInput> HasInstrumentationFilter<QemuInstrumentationAddressRangeFilte
 }
 
 #[cfg(emulation_mode = "systemmode")]
-impl<S: UsesInput> HasInstrumentationFilter<QemuInstrumentationPagingFilter, S>
-    for QemuEdgeCoverageHelper
-{
+impl HasInstrumentationFilter<QemuInstrumentationPagingFilter> for QemuEdgeCoverageHelper {
     fn filter(&self) -> &QemuInstrumentationPagingFilter {
         &self.paging_filter
     }
@@ -283,7 +279,7 @@ impl Default for QemuEdgeCoverageChildHelper {
     }
 }
 
-impl<S: UsesInput> HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter, S>
+impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter>
     for QemuEdgeCoverageChildHelper
 {
     fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
@@ -296,9 +292,7 @@ impl<S: UsesInput> HasInstrumentationFilter<QemuInstrumentationAddressRangeFilte
 }
 
 #[cfg(emulation_mode = "systemmode")]
-impl<S: UsesInput> HasInstrumentationFilter<QemuInstrumentationPagingFilter, S>
-    for QemuEdgeCoverageChildHelper
-{
+impl HasInstrumentationFilter<QemuInstrumentationPagingFilter> for QemuEdgeCoverageChildHelper {
     fn filter(&self) -> &QemuInstrumentationPagingFilter {
         &self.paging_filter
     }
@@ -432,7 +426,7 @@ impl Default for QemuEdgeCoverageClassicHelper {
     }
 }
 
-impl<S: UsesInput> HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter, S>
+impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter>
     for QemuEdgeCoverageClassicHelper
 {
     fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
@@ -445,9 +439,7 @@ impl<S: UsesInput> HasInstrumentationFilter<QemuInstrumentationAddressRangeFilte
 }
 
 #[cfg(emulation_mode = "systemmode")]
-impl<S: UsesInput> HasInstrumentationFilter<QemuInstrumentationPagingFilter, S>
-    for QemuEdgeCoverageClassicHelper
-{
+impl HasInstrumentationFilter<QemuInstrumentationPagingFilter> for QemuEdgeCoverageClassicHelper {
     fn filter(&self) -> &QemuInstrumentationPagingFilter {
         &self.paging_filter
     }
@@ -539,8 +531,7 @@ where
             let paging_id = hooks
                 .qemu()
                 .current_cpu()
-                .map(|cpu| cpu.current_paging_id())
-                .flatten();
+                .and_then(|cpu| cpu.current_paging_id());
 
             if !h.must_instrument(src, paging_id) && !h.must_instrument(dest, paging_id) {
                 return None;
@@ -553,18 +544,18 @@ where
     match meta.map.entry((src, dest)) {
         Entry::Occupied(e) => {
             let id = *e.get();
-            let nxt = (id as usize + 1) & (EDGES_MAP_SIZE_IN_USE - 1);
+            let nxt = (id as usize + 1) & (EDGES_MAP_SIZE_MAX - 1);
             unsafe {
-                MAX_EDGES_NUM = max(MAX_EDGES_NUM, nxt);
+                MAX_EDGES_FOUND = max(MAX_EDGES_FOUND, nxt);
             }
             Some(id)
         }
         Entry::Vacant(e) => {
             let id = meta.current_id;
             e.insert(id);
-            meta.current_id = (id + 1) & (EDGES_MAP_SIZE_IN_USE as u64 - 1);
+            meta.current_id = (id + 1) & (EDGES_MAP_SIZE_MAX as u64 - 1);
             unsafe {
-                MAX_EDGES_NUM = meta.current_id as usize;
+                MAX_EDGES_FOUND = meta.current_id as usize;
             }
             // GuestAddress is u32 for 32 bit guests
             #[allow(clippy::unnecessary_cast)]
@@ -609,8 +600,7 @@ where
             let paging_id = hooks
                 .qemu()
                 .current_cpu()
-                .map(|cpu| cpu.current_paging_id())
-                .flatten();
+                .and_then(|cpu| cpu.current_paging_id());
 
             if !h.must_instrument(src, paging_id) && !h.must_instrument(dest, paging_id) {
                 return None;
@@ -619,7 +609,7 @@ where
     }
     // GuestAddress is u32 for 32 bit guests
     #[allow(clippy::unnecessary_cast)]
-    Some((hash_me(src as u64) ^ hash_me(dest as u64)) & (unsafe { EDGES_MAP_PTR_NUM } as u64 - 1))
+    Some((hash_me(src as u64) ^ hash_me(dest as u64)) & (EDGES_MAP_SIZE_MAX as u64 - 1))
 }
 
 pub extern "C" fn trace_edge_hitcount_ptr(_: *const (), id: u64) {
@@ -676,8 +666,7 @@ where
             let paging_id = hooks
                 .qemu()
                 .current_cpu()
-                .map(|cpu| cpu.current_paging_id())
-                .flatten();
+                .and_then(|cpu| cpu.current_paging_id());
 
             if !h.must_instrument(pc, paging_id) {
                 return None;
@@ -692,7 +681,7 @@ where
 pub extern "C" fn trace_block_transition_hitcount(_: *const (), id: u64) {
     unsafe {
         PREV_LOC.with(|prev_loc| {
-            let x = ((*prev_loc.get() ^ id) as usize) & (EDGES_MAP_PTR_NUM - 1);
+            let x = ((*prev_loc.get() ^ id) as usize) & (EDGES_MAP_SIZE_MAX - 1);
             let entry = EDGES_MAP_PTR.add(x);
             *entry = (*entry).wrapping_add(1);
             *prev_loc.get() = id.overflowing_shr(1).0;
@@ -703,7 +692,7 @@ pub extern "C" fn trace_block_transition_hitcount(_: *const (), id: u64) {
 pub extern "C" fn trace_block_transition_single(_: *const (), id: u64) {
     unsafe {
         PREV_LOC.with(|prev_loc| {
-            let x = ((*prev_loc.get() ^ id) as usize) & (EDGES_MAP_PTR_NUM - 1);
+            let x = ((*prev_loc.get() ^ id) as usize) & (EDGES_MAP_SIZE_MAX - 1);
             let entry = EDGES_MAP_PTR.add(x);
             *entry = 1;
             *prev_loc.get() = id.overflowing_shr(1).0;
