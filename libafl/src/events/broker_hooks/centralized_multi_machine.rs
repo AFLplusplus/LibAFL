@@ -2,10 +2,7 @@ use core::fmt::{Debug, Display};
 use std::{sync::Arc, vec::Vec};
 
 use libafl_bolts::{
-    bolts_prelude::{
-        Flags, LlmpBrokerInner, LlmpMsg, LlmpMsgHookResult, Tag, LLMP_FLAG_COMPRESSED,
-        LLMP_FLAG_INITIALIZED,
-    },
+    bolts_prelude::{Flags, LlmpBrokerInner, LlmpMsgHookResult, Tag, LLMP_FLAG_COMPRESSED},
     llmp::LlmpHook,
     prelude::ShMemProvider,
     ClientId, Error,
@@ -61,27 +58,6 @@ where
         rt: Arc<Runtime>,
     ) -> Self {
         Self { shared_state, rt }
-    }
-
-    #[cfg(feature = "llmp_compression")]
-    fn try_compress(
-        state_lock: &mut RwLockWriteGuard<TcpMultiMachineState<A, I>>,
-        event: &Event<I>,
-    ) -> Result<(Flags, Vec<u8>), Error> {
-        let serialized = postcard::to_allocvec(&event)?;
-
-        match state_lock.compressor().maybe_compress(&serialized) {
-            Some(comp_buf) => Ok((LLMP_FLAG_COMPRESSED, comp_buf)),
-            None => Ok((Flags(0), serialized)),
-        }
-    }
-
-    #[cfg(not(feature = "llmp_compression"))]
-    fn try_compress(
-        _state_lock: &mut RwLockWriteGuard<TcpMultiMachineState<A, I>>,
-        event: &Event<I>,
-    ) -> Result<(Flags, Vec<u8>), Error> {
-        Ok((Flags(0), postcard::to_allocvec(&event)?))
     }
 }
 
@@ -219,7 +195,7 @@ where
                 })
                 .collect();
 
-            new_msgs.extend(msgs_to_send?.into_iter());
+            new_msgs.extend(msgs_to_send?);
 
             Ok(())
         });

@@ -70,6 +70,7 @@ where
     I: Input,
 {
     /// Create a new [`OwnedTcpMultiMachineMsg`]. It is a more lightweight version of [`TcpMultiMachineMsg`]
+    #[must_use]
     pub fn new(event: OwnedRef<'a, Event<I>>) -> Self {
         Self { event }
     }
@@ -85,8 +86,8 @@ where
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-/// A NodeId (unused for now)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+/// A `NodeId` (unused for now)
 pub struct NodeId(pub u64);
 
 impl NodeId {
@@ -100,12 +101,15 @@ impl NodeId {
 
 /// The state of the hook shared between the background threads and the main thread.
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct TcpMultiMachineState<A, I>
 where
     I: Input,
 {
     node_descriptor: NodeDescriptor<A>,
-    parent: Option<TcpStream>, // the parent to which the testcases should be forwarded when deemed interesting
+    /// the parent to which the testcases should be forwarded when deemed interesting
+    parent: Option<TcpStream>,
+    /// The children who connected during the fuzzing session.
     children: HashMap<NodeId, TcpStream>, // The children who connected during the fuzzing session.
     old_events: Vec<Event<I>>,
     #[cfg(feature = "llmp_compression")]
@@ -128,7 +132,7 @@ pub struct NodeDescriptor<A> {
     pub flags: BitFlags<NodePolicy>, // The policy for shared messages between nodes.
 }
 
-/// A Multi-machine broker_hooks builder.
+/// A Multi-machine `broker_hooks` builder.
 #[derive(Debug)]
 pub struct TcpMultiMachineBuilder {
     _private: (),
@@ -139,8 +143,8 @@ impl TcpMultiMachineBuilder {
     /// Everything is initialized and ready to be used.
     /// Beware, the hooks should run in the same process as the one this function is called.
     /// This is because we spawn a tokio runtime underneath.
-    /// Check https://github.com/tokio-rs/tokio/issues/4301 for more details.
-    pub fn build<A: ToSocketAddrs + Display, I>(
+    /// Check `<https://github.com/tokio-rs/tokio/issues/4301>` for more details.
+    pub fn build<A, I>(
         node_descriptor: NodeDescriptor<A>,
     ) -> Result<
         (
@@ -164,12 +168,11 @@ impl TcpMultiMachineBuilder {
             compressor: GzipCompressor::new(),
         }));
 
-        let rt = Arc::new(
-            Runtime::new().or_else(|_| Err(Error::unknown("Tokio runtime spawning failed")))?,
-        );
+        let rt =
+            Arc::new(Runtime::new().map_err(|_| Error::unknown("Tokio runtime spawning failed"))?);
 
         unsafe {
-            TcpMultiMachineState::init(state.clone(), rt.clone())?;
+            TcpMultiMachineState::init(&state.clone(), &rt.clone())?;
         }
 
         Ok((
@@ -190,7 +193,7 @@ where
     ///
     /// This should be run **only once**, in the same process as the llmp hooks, and before the hooks
     /// are effectively used.
-    unsafe fn init(self_mutex: Arc<RwLock<Self>>, rt: Arc<Runtime>) -> Result<(), Error> {
+    unsafe fn init(self_mutex: &Arc<RwLock<Self>>, rt: &Arc<Runtime>) -> Result<(), Error> {
         let node_descriptor =
             rt.block_on(async { self_mutex.read().await.node_descriptor.clone() });
 
@@ -228,10 +231,10 @@ where
         for i in 0..node_descriptor.max_nb_children {
             let bg_state = self_mutex.clone();
             info!("Spawning child task {}", i);
-            let _: JoinHandle<Result<(), io::Error>> = rt.spawn(async move {
+            let _handle: JoinHandle<Result<(), io::Error>> = rt.spawn(async move {
                 info!("spawn worked");
                 let port = LISTEN_PORT_BASE + i;
-                let addr = format!("127.0.0.1:{}", port);
+                let addr = format!("127.0.0.1:{port}");
                 info!("Starting background child task on {addr}...");
                 let listener = TcpListener::bind(addr).await?;
                 let state = bg_state;
@@ -334,15 +337,10 @@ where
         {
             if let Some(parent) = &mut self.parent {
                 info!("Sending to parent...");
-                match Self::write_msg(parent, &msg).await {
-                    Err(_) => {
-                        // most likely the parent disconnected. drop the connection
-                        info!(
-                            "The parent disconnected. We won't try to communicate with it again."
-                        );
-                        self.parent.take();
-                    }
-                    Ok(_) => {} // write was successful, continue
+                if (Self::write_msg(parent, &msg).await).is_err() {
+                    // most likely the parent disconnected. drop the connection
+                    info!("The parent disconnected. We won't try to communicate with it again.");
+                    self.parent.take();
                 }
             }
         }
@@ -355,13 +353,10 @@ where
             let mut ids_to_remove: Vec<NodeId> = Vec::new();
             for (child_id, child_stream) in &mut self.children {
                 info!("Sending to child...");
-                match Self::write_msg(child_stream, &msg).await {
-                    Err(_) => {
-                        // most likely the child disconnected. drop the connection later on and continue.
-                        info!("The child disconnected. We won't try to communicate with it again.");
-                        ids_to_remove.push(child_id.clone());
-                    }
-                    Ok(_) => {} // write was successful, continue
+                if (Self::write_msg(child_stream, &msg).await).is_err() {
+                    // most likely the child disconnected. drop the connection later on and continue.
+                    info!("The child disconnected. We won't try to communicate with it again.");
+                    ids_to_remove.push(*child_id);
                 }
             }
 
@@ -390,25 +385,24 @@ where
                 Ok(Some(msg)) => {
                     info!("Received event from parent");
                     // The parent has something for us, we store it
-                    events.push(msg.event)
+                    events.push(msg.event);
                 }
 
                 Ok(None) => {
                     // nothing from the parent, we continue
-                    info!("Nothing from parent")
+                    info!("Nothing from parent");
                 }
 
                 Err(Error::OsError(io_err, _, _)) => {
-                    match io_err.kind() {
-                        io::ErrorKind::WouldBlock => {
-                            // Expected, ignore.
-                            info!("Would ignore, continue...")
-                        }
-                        _ => {
-                            // most likely the parent disconnected. drop the connection
-                            info!("The parent disconnected. We won't try to communicate with it again.");
-                            self.parent.take();
-                        }
+                    if io_err.kind() == io::ErrorKind::WouldBlock {
+                        // Expected, ignore.
+                        info!("Would ignore, continue...");
+                    } else {
+                        // most likely the parent disconnected. drop the connection
+                        info!(
+                            "The parent disconnected. We won't try to communicate with it again."
+                        );
+                        self.parent.take();
                     }
                 }
                 Err(e) => {
@@ -432,27 +426,24 @@ where
                 Ok(Some(msg)) => {
                     info!("Received event from child!");
                     // The parent has something for us, we store it
-                    events.push(msg.event)
+                    events.push(msg.event);
                 }
 
                 // Received nothing
                 Ok(None) => {
-                    info!("Nothing from child")
+                    info!("Nothing from child");
                     // nothing from the parent, we continue
                 }
 
                 // I/O error
                 Err(Error::OsError(io_err, _, _)) => {
-                    match io_err.kind() {
-                        io::ErrorKind::WouldBlock => {
-                            // Expected, ignore.
-                            info!("Would ignore, continue...")
-                        }
-                        _ => {
-                            // most likely the parent disconnected. drop the connection
-                            info!("The child disconnected. We won't try to communicate with it again.");
-                            ids_to_remove.push(child_id.clone())
-                        }
+                    if io_err.kind() == io::ErrorKind::WouldBlock {
+                        // Expected, ignore.
+                        info!("Would ignore, continue...");
+                    } else {
+                        // most likely the parent disconnected. drop the connection
+                        info!("The child disconnected. We won't try to communicate with it again.");
+                        ids_to_remove.push(*child_id);
                     }
                 }
 

@@ -124,6 +124,7 @@ where
         msg_tag: &mut Tag,
         _msg_flags: &mut Flags,
         msg: &mut [u8],
+        _new_msgs: &mut Vec<(Tag, Flags, Vec<u8>)>,
     ) -> Result<LlmpMsgHookResult, Error> {
         match *msg_tag {
             _TAG_SIMPLE_U32_V1 => {

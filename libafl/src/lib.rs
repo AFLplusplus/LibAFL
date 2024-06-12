@@ -30,7 +30,8 @@ Welcome to `LibAFL`
     clippy::ptr_cast_constness,
     clippy::unsafe_derive_deserialize,
     clippy::similar_names,
-    clippy::too_many_lines
+    clippy::too_many_lines,
+    clippy::type_complexity
 )]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,

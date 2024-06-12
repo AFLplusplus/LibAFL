@@ -2058,21 +2058,30 @@ where
     hooks: HT,
 }
 
+/// The trait for brokers.
 pub trait Broker {
+    /// Getter to `is_shutting_down`
     fn is_shutting_down(&self) -> bool;
 
+    /// The hooks run for `on_timeout`
     fn on_timeout(&mut self) -> Result<(), Error>;
 
+    /// The main thing the `broker` does
     fn broker_once(&mut self) -> Result<bool, Error>;
 
+    /// Getter to `exit_after`
     fn exit_after(&self) -> Option<NonZeroUsize>;
 
+    /// Getter to `has_clients`
     fn has_clients(&self) -> bool;
 
+    /// Send the buffer out
     fn send_buf(&mut self, tag: Tag, buf: &[u8]) -> Result<(), Error>;
 
+    /// Getter to `num_clients_seen`
     fn num_clients_seen(&self) -> usize;
 
+    /// Getter to `nb_listeners`
     fn nb_listeners(&self) -> usize;
 }
 
@@ -2118,8 +2127,17 @@ use std::boxed::Box;
 
 /// A set of brokers.
 /// Limitation: the hooks must be the same.
+#[derive(Default)]
 pub struct Brokers {
+    /// the brokers
     llmp_brokers: Vec<Box<dyn Broker>>,
+}
+
+impl Debug for Brokers {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        Debug::fmt("Brokers", f)?;
+        Ok(())
+    }
 }
 
 /// A signal handler for the [`LlmpBroker`].
@@ -2280,12 +2298,15 @@ where
 }
 
 impl Brokers {
+    /// The constructor
+    #[must_use]
     pub fn new() -> Self {
         Self {
             llmp_brokers: Vec::new(),
         }
     }
 
+    /// Add another broker
     pub fn add(&mut self, broker: Box<dyn Broker>) {
         self.llmp_brokers.push(broker);
     }
