@@ -3,7 +3,7 @@ use std::{fmt::Debug, marker::PhantomData, vec::Vec};
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{compress::GzipCompressor, llmp::LLMP_FLAG_COMPRESSED};
 use libafl_bolts::{
-    llmp::{Flags, LlmpBrokerInner, LlmpHook, LlmpMsg, LlmpMsgHookResult, Tag},
+    llmp::{Flags, LlmpBrokerInner, LlmpHook, LlmpMsgHookResult, Tag},
     shmem::ShMemProvider,
     ClientId, Error,
 };
@@ -11,7 +11,7 @@ use libafl_bolts::{
 #[cfg(feature = "llmp_compression")]
 use crate::events::COMPRESS_THRESHOLD;
 use crate::{
-    events::{BrokerEventResult, Event, _LLMP_TAG_TO_MAIN, _LLMP_TAG_TO_SECONDARY},
+    events::{BrokerEventResult, Event, _LLMP_TAG_TO_MAIN},
     inputs::Input,
 };
 

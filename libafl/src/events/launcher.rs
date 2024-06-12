@@ -600,10 +600,7 @@ where
             builder.build().launch()
         };
 
-        self.launch_generic(
-            restarting_mgr_builder.clone(),
-            restarting_mgr_builder.clone(),
-        )
+        self.launch_generic(restarting_mgr_builder, restarting_mgr_builder)
     }
 }
 
@@ -823,6 +820,6 @@ where
             }
         }
 
-        return Err(Error::shutting_down());
+        Err(Error::shutting_down())
     }
 }

@@ -13,7 +13,7 @@ use crate::{events::Event, state::State, Error};
 // #[cfg(feature = "multi_machine")]
 // pub use multi_machine::*;
 
-/// The broker_hooks that are run before and after the event manager calls `handle_in_client`
+/// The `broker_hooks` that are run before and after the event manager calls `handle_in_client`
 pub trait EventManagerHook<S>
 where
     S: State,
@@ -49,12 +49,12 @@ where
     }
 }
 
-/// The tuples contains broker_hooks to be executed for `handle_in_client`
+/// The tuples contains `broker_hooks` to be executed for `handle_in_client`
 pub trait EventManagerHooksTuple<S>
 where
     S: State,
 {
-    /// Init all broker_hooks
+    /// Init all `broker_hooks`
     fn init_all(&mut self) -> Result<(), Error>;
 
     /// The hook that runs before `handle_in_client`
@@ -81,7 +81,7 @@ impl<S> EventManagerHooksTuple<S> for ()
 where
     S: State,
 {
-    /// Init all broker_hooks
+    /// Init all `broker_hooks`
     fn init_all(&mut self) -> Result<(), Error> {
         Ok(())
     }
@@ -117,7 +117,7 @@ where
     Tail: EventManagerHooksTuple<S>,
     S: State,
 {
-    /// Init all broker_hooks
+    /// Init all `broker_hooks`
     fn init_all(&mut self) -> Result<(), Error> {
         self.0.init()?;
         self.1.init_all()

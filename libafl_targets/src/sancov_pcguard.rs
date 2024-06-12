@@ -17,7 +17,6 @@ use libafl::executors::{hooks::ExecutorHook, HasObservers};
 ))]
 use crate::coverage::EDGES_MAP;
 use crate::coverage::MAX_EDGES_FOUND;
-
 #[cfg(feature = "sancov_ngram4")]
 #[allow(unused)]
 use crate::EDGES_MAP_SIZE_IN_USE;

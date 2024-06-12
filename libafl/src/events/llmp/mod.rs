@@ -45,7 +45,7 @@ pub(crate) const _LLMP_TAG_RESTART: Tag = Tag(0x8357A87);
 pub(crate) const _LLMP_TAG_NO_RESTART: Tag = Tag(0x57A7EE71);
 
 /// The minimum buffer size at which to compress LLMP IPC messages.
-#[cfg(any(feature = "llmp_compression", feature = "tcp_compression"))]
+#[cfg(feature = "llmp_compression")]
 pub const COMPRESS_THRESHOLD: usize = 1024;
 
 /// Specify if the State must be persistent over restarts

@@ -18,11 +18,6 @@ pub mod llmp;
 pub use llmp::*;
 
 pub mod broker_hooks;
-pub use broker_hooks::*;
-
-#[cfg(feature = "tcp_manager")]
-#[allow(clippy::ignored_unit_patterns)]
-pub mod tcp;
 use alloc::{borrow::Cow, boxed::Box, string::String, vec::Vec};
 use core::{
     fmt,
@@ -33,6 +28,7 @@ use core::{
 use std::string::ToString;
 
 use ahash::RandomState;
+pub use broker_hooks::*;
 #[cfg(feature = "std")]
 pub use launcher::*;
 #[cfg(all(unix, feature = "std"))]
@@ -398,6 +394,7 @@ where
         }
     }
 
+    #[cfg(feature = "multi_machine")]
     fn name_detailed(&self) -> String {
         match self {
             Event::NewTestcase {

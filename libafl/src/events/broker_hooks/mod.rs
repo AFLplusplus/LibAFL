@@ -5,7 +5,7 @@ use std::vec::Vec;
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{compress::GzipCompressor, llmp::LLMP_FLAG_COMPRESSED};
 use libafl_bolts::{
-    llmp::{Flags, LlmpBrokerInner, LlmpHook, LlmpMsg, LlmpMsgHookResult, Tag},
+    llmp::{Flags, LlmpBrokerInner, LlmpHook, LlmpMsgHookResult, Tag},
     shmem::ShMemProvider,
     ClientId,
 };
