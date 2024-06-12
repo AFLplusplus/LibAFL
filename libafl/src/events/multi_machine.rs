@@ -277,6 +277,7 @@ where
         Ok(())
     }
 
+    /// Add an event as past event.
     pub fn add_past_event(&mut self, event: Event<I>) {
         self.old_events.push(event)
     }
@@ -351,7 +352,8 @@ where
         info!("Send old events to new child...");
 
         for old_event in &self.old_events {
-            let event_ref = OwnedTcpMultiMachineMsg::new(OwnedRef::Ref(old_event));
+            info!("\told event: sending {}...", old_event.name_detailed());
+            let event_ref = unsafe { OwnedTcpMultiMachineMsg::new(OwnedRef::Ref(old_event)) };
             Self::write_msg(stream, &event_ref).await?;
         }
 
@@ -364,7 +366,7 @@ where
     ) -> Result<(), Error> {
         info!("[multi-machine] Sending interesting events to nodes...");
 
-        let msg = OwnedTcpMultiMachineMsg::new(OwnedRef::Ref(event));
+        let msg = unsafe { OwnedTcpMultiMachineMsg::new(OwnedRef::Ref(event)) };
 
         if self
             .node_descriptor

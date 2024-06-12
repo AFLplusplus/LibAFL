@@ -22,6 +22,7 @@ use libafl_bolts::{
     tuples::Handle,
     ClientId,
 };
+use log::info;
 use serde::{Deserialize, Serialize};
 
 use super::NopEventManager;
@@ -576,6 +577,7 @@ where
             };
             let event: Event<<<Self as UsesState>::State as UsesInput>::Input> =
                 postcard::from_bytes(event_bytes)?;
+            info!("Processor received message {}", event.name_detailed());
             self.handle_in_main(fuzzer, executor, state, client_id, event)?;
             count += 1;
         }
@@ -598,34 +600,35 @@ where
         Z: ExecutionProcessor<E::Observers, State = <Self as UsesState>::State>
             + EvaluatorObservers<E::Observers>,
     {
-        let mut events: Vec<Event<<<Self as UsesState>::State as UsesInput>::Input>> = vec![event];
-        if !self.hooks.pre_exec_all(state, client_id, &mut events)? {
-            return Ok(());
-        }
+        log::info!("handle_in_main!");
 
-        for event in events {
-            match event {
-                Event::NewTestcase {
-                    input,
-                    client_config,
-                    exit_kind,
-                    corpus_size,
-                    observers_buf,
-                    time,
-                    executions,
-                    forward_id,
-                } => {
-                    log::info!("Received new Testcase from {client_id:?} ({client_config:?}, forward {forward_id:?})");
+        let event_name = event.name_detailed();
 
-                    let res = if client_config.match_with(&self.configuration())
-                        && observers_buf.is_some()
-                    {
+        match event {
+            Event::NewTestcase {
+                input,
+                client_config,
+                exit_kind,
+                corpus_size,
+                observers_buf,
+                time,
+                executions,
+                forward_id,
+            } => {
+                info!(
+                    "Received {} from {client_id:?} ({client_config:?}, forward {forward_id:?})",
+                    event_name
+                );
+
+                let res =
+                    if client_config.match_with(&self.configuration()) && observers_buf.is_some() {
                         let observers: E::Observers =
                             postcard::from_bytes(observers_buf.as_ref().unwrap())?;
                         #[cfg(feature = "scalability_introspection")]
                         {
                             state.scalability_monitor_mut().testcase_with_observers += 1;
                         }
+                        info!("Running fuzzer with event {}", event_name);
                         fuzzer.execute_and_process(
                             state,
                             self,
@@ -639,6 +642,7 @@ where
                         {
                             state.scalability_monitor_mut().testcase_without_observers += 1;
                         }
+                        info!("Running fuzzer with event {}", event_name);
                         fuzzer.evaluate_input_with_observers::<E, Self>(
                             state,
                             executor,
@@ -648,32 +652,32 @@ where
                         )?
                     };
 
-                    if let Some(item) = res.1 {
-                        if res.1.is_some() {
-                            let event = Event::NewTestcase {
-                                input,
-                                client_config,
-                                exit_kind,
-                                corpus_size,
-                                observers_buf,
-                                time,
-                                executions,
-                                forward_id,
-                            };
+                if let Some(item) = res.1 {
+                    let event = Event::NewTestcase {
+                        input,
+                        client_config,
+                        exit_kind,
+                        corpus_size,
+                        observers_buf,
+                        time,
+                        executions,
+                        forward_id,
+                    };
 
-                            self.hooks.on_fire_all(state, client_id, &event)?;
+                    self.hooks.on_fire_all(state, client_id, &event)?;
 
-                            self.inner.fire(state, event)?;
-                        }
-                        log::info!("Added received Testcase as item #{item}");
-                    }
+                    info!("Adding received Testcase {} as item #{item}...", event_name);
+
+                    self.inner.fire(state, event)?;
+                } else {
+                    info!("{} was discarded...)", event_name);
                 }
-                _ => {
-                    return Err(Error::unknown(format!(
-                        "Received illegal message that message should not have arrived: {:?}.",
-                        event.name()
-                    )));
-                }
+            }
+            _ => {
+                return Err(Error::unknown(format!(
+                    "Received illegal message that message should not have arrived: {:?}.",
+                    event.name()
+                )));
             }
         }
 

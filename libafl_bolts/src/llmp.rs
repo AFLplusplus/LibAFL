@@ -1274,7 +1274,8 @@ where
             )));
         }
 
-        (*msg).message_id.0 = (*page).current_msg_id.load(Ordering::Relaxed) + 1;
+        let mid = (*page).current_msg_id.load(Ordering::Relaxed) + 1;
+        (*msg).message_id.0 = mid;
 
         // Make sure all things have been written to the page, and commit the message to the page
         (*page)
@@ -1283,6 +1284,12 @@ where
 
         self.last_msg_sent = msg;
         self.has_unsent_message = false;
+
+        info!(
+            "[{} - {:#x}] Send message with id {}",
+            self.id.0, self as *const Self as u64, mid
+        );
+
         Ok(())
     }
 
@@ -1691,6 +1698,14 @@ where
             if !(*msg).in_shmem(&mut self.current_recv_shmem) {
                 return Err(Error::illegal_state("Unexpected message in map (out of map bounds) - buggy client or tampered shared map detected!"));
             }
+
+            info!(
+                "[{} - {:#x}] Received message with ID {}...",
+                self.id.0,
+                self as *const Self as u64,
+                (*msg).message_id.0
+            );
+
             // Handle special, LLMP internal, messages.
             match (*msg).tag {
                 LLMP_TAG_UNSET => panic!(
@@ -2124,6 +2139,8 @@ where
 }
 
 use std::boxed::Box;
+
+use log::info;
 
 /// A set of brokers.
 /// Limitation: the hooks must be the same.
@@ -2749,6 +2766,7 @@ where
                         self.inner.forward_msg(msg)?;
                     }
 
+                    info!("New msg vector: {}", new_msgs.len());
                     for (new_msg_tag, new_msg_flag, new_msg) in new_msgs {
                         self.inner.llmp_out.send_buf_with_flags(
                             new_msg_tag,

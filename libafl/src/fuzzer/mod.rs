@@ -27,7 +27,7 @@ use crate::{
 use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 
 /// Send a monitor update all 15 (or more) seconds
-const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
+const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(1);
 
 /// Holds a scheduler
 pub trait HasScheduler: UsesState

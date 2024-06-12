@@ -15,7 +15,9 @@ use tokio::{
 };
 
 use crate::{
-    events::{multi_machine::TcpMultiMachineState, Event, _LLMP_TAG_TO_MAIN},
+    events::{
+        multi_machine::TcpMultiMachineState, Event, _LLMP_TAG_TO_MAIN, _LLMP_TAG_TO_SECONDARY,
+    },
     inputs::Input,
 };
 

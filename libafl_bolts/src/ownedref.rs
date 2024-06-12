@@ -83,6 +83,7 @@ where
         Self::RefRaw(ptr, UnsafeMarker::new())
     }
 
+    /// Returns true if the inner ref is a raw pointer, false otherwise.
     pub fn is_raw(&self) -> bool {
         match self {
             OwnedRef::Ref(_) => true,
