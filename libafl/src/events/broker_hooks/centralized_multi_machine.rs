@@ -138,6 +138,8 @@ where
             };
             let event: Event<I> = postcard::from_bytes(event_bytes)?;
 
+            state_wr_lock.add_past_event(event.clone());
+
             info!("Sending event {}", event.name());
 
             state_wr_lock

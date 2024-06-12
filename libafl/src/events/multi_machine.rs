@@ -55,6 +55,10 @@ where
     event: OwnedRef<'a, Event<I>>,
 }
 
+/// We do not use raw pointers, so no problem with thead-safety
+unsafe impl<'a, I: Input> Send for OwnedTcpMultiMachineMsg<'a, I> {}
+unsafe impl<'a, I: Input> Sync for OwnedTcpMultiMachineMsg<'a, I> {}
+
 /// A TCP message for multi machine
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
@@ -70,8 +74,15 @@ where
     I: Input,
 {
     /// Create a new [`OwnedTcpMultiMachineMsg`]. It is a more lightweight version of [`TcpMultiMachineMsg`]
+    ///
+    /// # Safety
+    ///
+    /// OwnedRef should **never** be a raw pointer for thread-safety reasons.
+    /// We check this for debug builds, but not for release.
     #[must_use]
-    pub fn new(event: OwnedRef<'a, Event<I>>) -> Self {
+    pub unsafe fn new(event: OwnedRef<'a, Event<I>>) -> Self {
+        debug_assert!(!event.is_raw());
+
         Self { event }
     }
 }
@@ -231,19 +242,26 @@ where
         for i in 0..node_descriptor.max_nb_children {
             let bg_state = self_mutex.clone();
             info!("Spawning child task {}", i);
-            let _handle: JoinHandle<Result<(), io::Error>> = rt.spawn(async move {
+            let _handle: JoinHandle<Result<(), Error>> = rt.spawn(async move {
                 info!("spawn worked");
                 let port = LISTEN_PORT_BASE + i;
                 let addr = format!("127.0.0.1:{port}");
                 info!("Starting background child task on {addr}...");
-                let listener = TcpListener::bind(addr).await?;
+                let listener = TcpListener::bind(addr).await.map_err(|e| {
+                    Error::os_error(e, format!("Error while binding to port {port}"))
+                })?;
                 let state = bg_state;
 
                 loop {
                     info!("listening for children on {:?}...", listener);
-                    let (stream, addr) = listener.accept().await?;
+                    let (mut stream, addr) = listener
+                        .accept()
+                        .await
+                        .map_err(|e| Error::os_error(e, "Error while listening for child"))?;
                     info!("{} joined the children.", addr);
                     let mut state_guard = state.write().await;
+
+                    state_guard.send_old_events_to_stream(&mut stream).await?;
 
                     state_guard.children.insert(NodeId::new(), stream);
                     info!(
@@ -257,6 +275,10 @@ where
         }
 
         Ok(())
+    }
+
+    pub fn add_past_event(&mut self, event: Event<I>) {
+        self.old_events.push(event)
     }
 
     /// The compressor
@@ -318,6 +340,20 @@ where
 
         // 2. Write msg
         stream.write(&serialized_msg).await?;
+
+        Ok(())
+    }
+
+    pub(crate) async fn send_old_events_to_stream(
+        &mut self,
+        stream: &mut TcpStream,
+    ) -> Result<(), Error> {
+        info!("Send old events to new child...");
+
+        for old_event in &self.old_events {
+            let event_ref = OwnedTcpMultiMachineMsg::new(OwnedRef::Ref(old_event));
+            Self::write_msg(stream, &event_ref).await?;
+        }
 
         Ok(())
     }

@@ -82,6 +82,13 @@ where
         );
         Self::RefRaw(ptr, UnsafeMarker::new())
     }
+
+    pub fn is_raw(&self) -> bool {
+        match self {
+            OwnedRef::Ref(_) => true,
+            _ => false,
+        }
+    }
 }
 
 impl<'a, T> OwnedRef<'a, T>
