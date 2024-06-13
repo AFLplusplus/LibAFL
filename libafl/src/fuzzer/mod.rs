@@ -477,6 +477,7 @@ where
                             time: current_time(),
                             executions: *state.executions(),
                             forward_id: None,
+                            node_id: None,
                         },
                     )?;
                 } else {
@@ -676,6 +677,7 @@ where
                 time: current_time(),
                 executions: *state.executions(),
                 forward_id: None,
+                node_id: None,
             },
         )?;
         Ok(idx)

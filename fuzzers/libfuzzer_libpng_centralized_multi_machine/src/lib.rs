@@ -118,7 +118,7 @@ struct Opt {
     #[arg(
         short,
         long,
-        help = "The address of the parent node, if any",
+        help = "The address of the parent node to connect to, if any",
         name = "PARENT_ADDR",
         default_value = None
     )]
@@ -127,11 +127,11 @@ struct Opt {
     #[arg(
         short,
         long,
-        help = "The maximum number of children a node can have",
+        help = "The port on which the node will listen on, if children are to be expected",
         name = "NB_CHILDREN",
         default_value = None
     )]
-    nb_children: Option<u16>,
+    node_listening_port: Option<u16>,
 }
 
 /// The main fn, `no_mangle` as it is a C symbol
@@ -401,8 +401,8 @@ pub extern "C" fn libafl_main() {
 
     let mut node_description = NodeDescriptor::builder().parent_addr(parent_addr).build();
 
-    if let Some(nb_children) = opt.nb_children {
-        node_description.max_nb_children = nb_children;
+    if opt.node_listening_port.is_some() {
+        node_description.node_listening_port = opt.node_listening_port;
     }
 
     match CentralizedLauncher::<_, (), _, (), _, _, _, _>::builder()

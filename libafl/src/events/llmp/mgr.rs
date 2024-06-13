@@ -25,6 +25,7 @@ use libafl_bolts::{
     llmp::{recv_tcp_msg, send_tcp_msg, TcpRequest, TcpResponse},
     IP_LOCALHOST,
 };
+use log::info;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "llmp_compression")]
@@ -409,72 +410,66 @@ where
             + EvaluatorObservers<E::Observers>
             + Evaluator<E, Self>,
     {
-        let mut events: Vec<Event<S::Input>> = vec![event];
-        if !self.hooks.pre_exec_all(state, client_id, &mut events)? {
-            return Ok(());
-        }
+        let evt_name = event.name_detailed();
+        match event {
+            Event::NewTestcase {
+                input,
+                client_config,
+                exit_kind,
+                observers_buf,
+                forward_id,
+                ..
+            } => {
+                info!("[{}] Received new Testcase {evt_name} from {client_id:?} ({client_config:?}, forward {forward_id:?})", std::process::id());
 
-        for event in events {
-            match event {
-                Event::NewTestcase {
-                    input,
-                    client_config,
-                    exit_kind,
-                    corpus_size: _,
-                    observers_buf,
-                    time: _,
-                    executions: _,
-                    forward_id,
-                } => {
-                    log::info!("Received new Testcase from {client_id:?} ({client_config:?}, forward {forward_id:?})");
-
-                    if self.always_interesting {
-                        let item = fuzzer.add_input(state, executor, self, input)?;
-                        log::info!("Added received Testcase as item #{item}");
-                    } else {
-                        let res = if client_config.match_with(&self.configuration)
-                            && observers_buf.is_some()
+                if self.always_interesting {
+                    let item = fuzzer.add_input(state, executor, self, input)?;
+                    info!("Added received Testcase as item #{item}");
+                } else {
+                    let res = if client_config.match_with(&self.configuration)
+                        && observers_buf.is_some()
+                    {
+                        let start = current_time();
+                        let observers: E::Observers =
+                            postcard::from_bytes(observers_buf.as_ref().unwrap())?;
                         {
-                            let start = current_time();
-                            let observers: E::Observers =
-                                postcard::from_bytes(observers_buf.as_ref().unwrap())?;
-                            {
-                                self.deserialization_time = current_time() - start;
-                            }
-                            #[cfg(feature = "scalability_introspection")]
-                            {
-                                state.scalability_monitor_mut().testcase_with_observers += 1;
-                            }
-                            fuzzer.execute_and_process(
-                                state, self, input, &observers, &exit_kind, false,
-                            )?
-                        } else {
-                            #[cfg(feature = "scalability_introspection")]
-                            {
-                                state.scalability_monitor_mut().testcase_without_observers += 1;
-                            }
-                            fuzzer.evaluate_input_with_observers::<E, Self>(
-                                state, executor, self, input, false,
-                            )?
-                        };
-                        if let Some(item) = res.1 {
-                            log::info!("Added received Testcase as item #{item}");
+                            self.deserialization_time = current_time() - start;
                         }
+                        #[cfg(feature = "scalability_introspection")]
+                        {
+                            state.scalability_monitor_mut().testcase_with_observers += 1;
+                        }
+                        fuzzer.execute_and_process(
+                            state, self, input, &observers, &exit_kind, false,
+                        )?
+                    } else {
+                        #[cfg(feature = "scalability_introspection")]
+                        {
+                            state.scalability_monitor_mut().testcase_without_observers += 1;
+                        }
+                        fuzzer.evaluate_input_with_observers::<E, Self>(
+                            state, executor, self, input, false,
+                        )?
+                    };
+                    if let Some(item) = res.1 {
+                        info!("Added received Testcase {evt_name} as item #{item}");
+                    } else {
+                        info!("Testcase {evt_name} was discarded")
                     }
                 }
-                Event::CustomBuf { tag, buf } => {
-                    for handler in &mut self.custom_buf_handlers {
-                        if handler(state, &tag, &buf)? == CustomBufEventResult::Handled {
-                            break;
-                        }
+            }
+            Event::CustomBuf { tag, buf } => {
+                for handler in &mut self.custom_buf_handlers {
+                    if handler(state, &tag, &buf)? == CustomBufEventResult::Handled {
+                        break;
                     }
                 }
-                _ => {
-                    return Err(Error::unknown(format!(
-                        "Received illegal message that message should not have arrived: {:?}.",
-                        event.name()
-                    )));
-                }
+            }
+            _ => {
+                return Err(Error::unknown(format!(
+                    "Received illegal message that message should not have arrived: {:?}.",
+                    event.name()
+                )));
             }
         }
 
@@ -622,6 +617,7 @@ where
                 msg
             };
             let event: Event<S::Input> = postcard::from_bytes(event_bytes)?;
+            info!("Received event in normal llmp {}", event.name_detailed());
             self.handle_in_client(fuzzer, executor, state, client_id, event)?;
             count += 1;
         }

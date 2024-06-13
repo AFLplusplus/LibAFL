@@ -333,6 +333,7 @@ where
                         time: current_time(),
                         executions: 0,
                         forward_id: None,
+                        node_id: None,
                     },
                 )?;
 

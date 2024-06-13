@@ -112,7 +112,8 @@ pub struct EventManagerId(
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
 use crate::{
-    inputs::UsesInput, observers::TimeObserver, stages::HasCurrentStage, state::UsesState,
+    events::multi_machine::NodeId, inputs::UsesInput, observers::TimeObserver,
+    stages::HasCurrentStage, state::UsesState,
 };
 
 /// The log event severity
@@ -284,6 +285,8 @@ where
         executions: u64,
         /// The original sender if, if forwarded
         forward_id: Option<ClientId>,
+        /// The (multi-machine) node from which the tc is from, if any
+        node_id: Option<NodeId>,
     },
     /// New stats event to monitor.
     UpdateExecStats {
@@ -354,39 +357,13 @@ where
 {
     fn name(&self) -> &str {
         match self {
-            Event::NewTestcase {
-                input: _,
-                client_config: _,
-                corpus_size: _,
-                exit_kind: _,
-                observers_buf: _,
-                time: _,
-                executions: _,
-                forward_id: _,
-            } => "Testcase",
-            Event::UpdateExecStats {
-                time: _,
-                executions: _,
-                phantom: _,
-            } => "Client Heartbeat",
-            Event::UpdateUserStats {
-                name: _,
-                value: _,
-                phantom: _,
-            } => "UserStats",
+            Event::NewTestcase { .. } => "Testcase",
+            Event::UpdateExecStats { .. } => "Client Heartbeat",
+            Event::UpdateUserStats { .. } => "UserStats",
             #[cfg(feature = "introspection")]
-            Event::UpdatePerfMonitor {
-                time: _,
-                executions: _,
-                introspection_monitor: _,
-                phantom: _,
-            } => "PerfMonitor",
+            Event::UpdatePerfMonitor { .. } => "PerfMonitor",
             Event::Objective { .. } => "Objective",
-            Event::Log {
-                severity_level: _,
-                message: _,
-                phantom: _,
-            } => "Log",
+            Event::Log { .. } => "Log",
             Event::CustomBuf { .. } => "CustomBuf",
             /*Event::Custom {
                 sender_id: _, /*custom_event} => custom_event.name()*/
@@ -397,39 +374,13 @@ where
     #[cfg(feature = "multi_machine")]
     fn name_detailed(&self) -> String {
         match self {
-            Event::NewTestcase {
-                input,
-                client_config: _,
-                corpus_size: _,
-                exit_kind: _,
-                observers_buf: _,
-                time: _,
-                executions: _,
-                forward_id: _,
-            } => format!("Testcase {}", input.generate_name(0)),
-            Event::UpdateExecStats {
-                time: _,
-                executions: _,
-                phantom: _,
-            } => "Client Heartbeat".to_string(),
-            Event::UpdateUserStats {
-                name: _,
-                value: _,
-                phantom: _,
-            } => "UserStats".to_string(),
+            Event::NewTestcase { input, .. } => format!("Testcase {}", input.generate_name(0)),
+            Event::UpdateExecStats { .. } => "Client Heartbeat".to_string(),
+            Event::UpdateUserStats { .. } => "UserStats".to_string(),
             #[cfg(feature = "introspection")]
-            Event::UpdatePerfMonitor {
-                time: _,
-                executions: _,
-                introspection_monitor: _,
-                phantom: _,
-            } => "PerfMonitor".to_string(),
+            Event::UpdatePerfMonitor { .. } => "PerfMonitor".to_string(),
             Event::Objective { .. } => "Objective".to_string(),
-            Event::Log {
-                severity_level: _,
-                message: _,
-                phantom: _,
-            } => "Log".to_string(),
+            Event::Log { .. } => "Log".to_string(),
             Event::CustomBuf { .. } => "CustomBuf".to_string(),
             /*Event::Custom {
                 sender_id: _, /*custom_event} => custom_event.name()*/
@@ -997,22 +948,14 @@ mod tests {
             time: current_time(),
             executions: 0,
             forward_id: None,
+            node_id: None,
         };
 
         let serialized = postcard::to_allocvec(&e).unwrap();
 
         let d = postcard::from_bytes::<Event<BytesInput>>(&serialized).unwrap();
         match d {
-            Event::NewTestcase {
-                input: _,
-                observers_buf,
-                corpus_size: _,
-                exit_kind: _,
-                client_config: _,
-                time: _,
-                executions: _,
-                forward_id: _,
-            } => {
+            Event::NewTestcase { observers_buf, .. } => {
                 let o: tuple_list_type!(StdMapObserver::<u32, false>) =
                     postcard::from_bytes(observers_buf.as_ref().unwrap()).unwrap();
                 assert_eq!("test", o.0.name());

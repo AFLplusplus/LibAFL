@@ -112,14 +112,11 @@ where
     ) -> Result<BrokerEventResult, Error> {
         match &event {
             Event::NewTestcase {
-                input: _,
-                client_config: _,
-                exit_kind: _,
                 corpus_size,
-                observers_buf: _,
                 time,
                 executions,
                 forward_id,
+                ..
             } => {
                 let id = if let Some(id) = *forward_id {
                     id

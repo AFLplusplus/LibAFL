@@ -45,6 +45,7 @@ use libafl_bolts::{
     shmem::ShMemProvider,
     tuples::{tuple_list, Handle},
 };
+use log::info;
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
@@ -697,6 +698,7 @@ where
 
                         if index == 1 {
                             // Main client
+                            info!("Running main client on PID {}", std::process::id());
                             let (state, mgr) =
                                 main_inner_mgr_builder.take().unwrap()(self, *bind_to)?;
 
@@ -717,6 +719,7 @@ where
                             self.main_run_client.take().unwrap()(state, c_mgr, *bind_to)
                         } else {
                             // Secondary clients
+                            info!("Running secondary client on PID {}", std::process::id());
                             let (state, mgr) =
                                 secondary_inner_mgr_builder.take().unwrap()(self, *bind_to)?;
 
@@ -752,7 +755,7 @@ where
             #[cfg(feature = "multi_machine")]
             let centralized_hooks = tuple_list!(
                 CentralizedLlmpHook::<S::Input>::new()?,
-                multi_machine_sender_hook,
+                multi_machine_receiver_hook,
             );
 
             #[cfg(not(feature = "multi_machine"))]
@@ -775,16 +778,16 @@ where
 
         // If we should add another broker, add it to other brokers.
         if self.spawn_broker {
-            log::info!("I am broker!!.");
+            info!("I am broker!!.");
 
             #[cfg(not(feature = "multi_machine"))]
             let llmp_hook =
-                tuple_list!(StdLlmpEventHook::<S::Input, MT>::new(self.monitor.clone())?,);
+                tuple_list!(StdLlmpEventHook::<S::Input, MT>::new(self.monitor.clone())?);
 
             #[cfg(feature = "multi_machine")]
             let llmp_hook = tuple_list!(
                 StdLlmpEventHook::<S::Input, MT>::new(self.monitor.clone())?,
-                multi_machine_receiver_hook,
+                multi_machine_sender_hook,
             );
 
             let mut broker = LlmpBroker::create_attach_to_tcp(
@@ -807,11 +810,16 @@ where
             brokers.add(Box::new(broker));
         }
 
+        info!(
+            "Brokers have been initialized on port {}.",
+            std::process::id()
+        );
+
         // Loop over all the brokers that should be polled
         brokers.loop_with_timeouts(Duration::from_secs(30), Some(Duration::from_millis(5)));
 
         #[cfg(feature = "llmp_debug")]
-        log::info!("The last client quit. Exiting.");
+        info!("The last client quit. Exiting.");
 
         // Brokers exited. kill all clients.
         for handle in &handles {

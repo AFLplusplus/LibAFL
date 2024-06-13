@@ -94,16 +94,7 @@ where
         event: &Event<I>,
     ) -> Result<BrokerEventResult, Error> {
         match &event {
-            Event::NewTestcase {
-                input: _,
-                client_config: _,
-                exit_kind: _,
-                corpus_size: _,
-                observers_buf: _,
-                time: _,
-                executions: _,
-                forward_id: _,
-            } => Ok(BrokerEventResult::Forward),
+            Event::NewTestcase { .. } => Ok(BrokerEventResult::Forward),
             _ => Ok(BrokerEventResult::Handled),
         }
     }

@@ -301,14 +301,7 @@ where
     {
         match event {
             Event::NewTestcase {
-                input,
-                client_config: _,
-                exit_kind: _,
-                corpus_size: _,
-                observers_buf: _, // Useless as we are converting between types
-                time: _,
-                executions: _,
-                forward_id,
+                input, forward_id, ..
             } => {
                 info!("Received new Testcase to convert from {client_id:?} (forward {forward_id:?}, forward {forward_id:?})");
 
@@ -440,6 +433,7 @@ where
                 time,
                 executions,
                 forward_id,
+                node_id,
             } => Event::NewTestcase {
                 input: self.converter.as_mut().unwrap().convert(input)?,
                 client_config,
@@ -449,6 +443,7 @@ where
                 time,
                 executions,
                 forward_id,
+                node_id,
             },
             Event::CustomBuf { buf, tag } => Event::CustomBuf { buf, tag },
             _ => {
@@ -495,6 +490,7 @@ where
                 time,
                 executions,
                 forward_id,
+                node_id,
             } => Event::NewTestcase {
                 input: self.converter.as_mut().unwrap().convert(input)?,
                 client_config,
@@ -504,6 +500,7 @@ where
                 time,
                 executions,
                 forward_id,
+                node_id,
             },
             Event::CustomBuf { buf, tag } => Event::CustomBuf { buf, tag },
             _ => {

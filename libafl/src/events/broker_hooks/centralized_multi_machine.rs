@@ -1,9 +1,10 @@
 use core::fmt::{Debug, Display};
-use std::{sync::Arc, vec::Vec};
+use std::{marker::PhantomData, slice, sync::Arc, vec::Vec};
 
 use libafl_bolts::{
     bolts_prelude::{Flags, LlmpBrokerInner, LlmpMsgHookResult, Tag, LLMP_FLAG_COMPRESSED},
     llmp::LlmpHook,
+    ownedref::OwnedRef,
     prelude::ShMemProvider,
     ClientId, Error,
 };
@@ -12,14 +13,52 @@ use tokio::{
     net::ToSocketAddrs,
     runtime::Runtime,
     sync::{RwLock, RwLockWriteGuard},
+    task::JoinHandle,
 };
 
 use crate::{
     events::{
-        multi_machine::TcpMultiMachineState, Event, _LLMP_TAG_TO_MAIN, _LLMP_TAG_TO_SECONDARY,
+        multi_machine::{MultiMachineMsg, TcpMultiMachineState},
+        Event, _LLMP_TAG_TO_MAIN,
     },
     inputs::Input,
 };
+
+/// Makes a raw pointer send + sync.
+/// Extremely unsafe to use in general, only use this if you know what you're doing.
+#[derive(Debug, Clone, Copy)]
+pub struct NullLock<T> {
+    value: T,
+}
+
+unsafe impl<T> Send for NullLock<T> {}
+unsafe impl<T> Sync for NullLock<T> {}
+
+impl<T> NullLock<T> {
+    /// Instantiate a [`NullLock`]
+    ///
+    /// # Safety
+    ///
+    /// The null lock makes anything Send + Sync, which is usually very dangerous.
+    pub unsafe fn new(value: T) -> Self {
+        Self { value }
+    }
+
+    /// Get a reference to value
+    pub fn get(&self) -> &T {
+        &self.value
+    }
+
+    /// Get a mutable reference to value
+    pub fn get_mut(&mut self) -> &mut T {
+        &mut self.value
+    }
+
+    /// Get back the value
+    pub fn into_innter(self) -> T {
+        self.value
+    }
+}
 
 /// The Receiving side of the multi-machine architecture
 /// It is responsible for receiving messages from other neighbours.
@@ -30,9 +69,10 @@ where
     I: Input,
 {
     /// the actual state of the broker hook
-    shared_state: Arc<RwLock<TcpMultiMachineState<A, I>>>,
+    shared_state: Arc<RwLock<TcpMultiMachineState<A>>>,
     /// the tokio runtime used to interact with other machines. Keep it outside to avoid locking it.
     rt: Arc<Runtime>,
+    phantom: PhantomData<I>,
 }
 
 /// The Receiving side of the multi-machine architecture
@@ -44,9 +84,10 @@ where
     I: Input,
 {
     /// the actual state of the broker hook
-    shared_state: Arc<RwLock<TcpMultiMachineState<A, I>>>,
+    shared_state: Arc<RwLock<TcpMultiMachineState<A>>>,
     /// the tokio runtime used to interact with other machines. Keep it outside to avoid locking it.
     rt: Arc<Runtime>,
+    phantom: PhantomData<I>,
 }
 
 impl<A, I> TcpMultiMachineLlmpSenderHook<A, I>
@@ -56,10 +97,14 @@ where
 {
     /// Should not be created alone. Use [`TcpMultiMachineBuilder`] instead.
     pub(crate) fn new(
-        shared_state: Arc<RwLock<TcpMultiMachineState<A, I>>>,
+        shared_state: Arc<RwLock<TcpMultiMachineState<A>>>,
         rt: Arc<Runtime>,
     ) -> Self {
-        Self { shared_state, rt }
+        Self {
+            shared_state,
+            rt,
+            phantom: PhantomData,
+        }
     }
 }
 
@@ -70,15 +115,19 @@ where
 {
     /// Should not be created alone. Use [`TcpMultiMachineBuilder`] instead.
     pub(crate) fn new(
-        shared_state: Arc<RwLock<TcpMultiMachineState<A, I>>>,
+        shared_state: Arc<RwLock<TcpMultiMachineState<A>>>,
         rt: Arc<Runtime>,
     ) -> Self {
-        Self { shared_state, rt }
+        Self {
+            shared_state,
+            rt,
+            phantom: PhantomData,
+        }
     }
 
     #[cfg(feature = "llmp_compression")]
     fn try_compress(
-        state_lock: &mut RwLockWriteGuard<TcpMultiMachineState<A, I>>,
+        state_lock: &mut RwLockWriteGuard<TcpMultiMachineState<A>>,
         event: &Event<I>,
     ) -> Result<(Flags, Vec<u8>), Error> {
         let serialized = postcard::to_allocvec(&event)?;
@@ -91,7 +140,7 @@ where
 
     #[cfg(not(feature = "llmp_compression"))]
     fn try_compress(
-        _state_lock: &mut RwLockWriteGuard<TcpMultiMachineState<A, I>>,
+        _state_lock: &mut RwLockWriteGuard<TcpMultiMachineState<A>>,
         event: &Event<I>,
     ) -> Result<(Flags, Vec<u8>), Error> {
         Ok((Flags(0), postcard::to_allocvec(&event)?))
@@ -110,51 +159,48 @@ where
         _broker_inner: &mut LlmpBrokerInner<SP>,
         _client_id: ClientId,
         _msg_tag: &mut Tag,
-        msg_flags: &mut Flags,
+        _msg_flags: &mut Flags,
         msg: &mut [u8],
         _new_msgs: &mut Vec<(Tag, Flags, Vec<u8>)>,
     ) -> Result<LlmpMsgHookResult, Error> {
         let shared_state = self.shared_state.clone();
 
-        let res: Result<(), Error> = self.rt.block_on(async move {
+        // Here, we suppose msg will never be written again and will always be available.
+        // Thus, it is safe to handle this in a separate thread.
+        let msg_lock = unsafe { NullLock::new((msg.as_ptr(), msg.len())) };
+        // let flags = msg_flags.clone();
+
+        let _handle: JoinHandle<Result<(), Error>> = self.rt.spawn(async move {
             let mut state_wr_lock = shared_state.write().await;
+            let (msg_ptr, msg_len) = msg_lock.into_innter();
+            let msg: &[u8] = unsafe { slice::from_raw_parts(msg_ptr, msg_len) };
 
-            // for event in events.as_ref() {
-            //     // First, we handle the message. Since it involves network, we do it first and await on it.
-            //     state_wr_lock.handle_new_message_from_node(event).await?;
+            // #[cfg(not(feature = "llmp_compression"))]
+            // let event_bytes = msg;
+            // #[cfg(feature = "llmp_compression")]
+            // let compressed;
+            // #[cfg(feature = "llmp_compression")]
+            // let event_bytes = if flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
+            //     compressed = state_wr_lock.compressor().decompress(msg)?;
+            //     &compressed
+            // } else {
+            //     &*msg
+            // };
+            // let event: Event<I> = postcard::from_bytes(event_bytes)?;
 
-            //     // add the msg to the list of old messages to send to a future child.
-            //     state_wr_lock.old_events.push();
-            // }
+            let mm_msg: MultiMachineMsg<I> = MultiMachineMsg::llmp_msg(OwnedRef::Ref(msg));
 
-            #[cfg(not(feature = "llmp_compression"))]
-            let event_bytes = msg;
-            #[cfg(feature = "llmp_compression")]
-            let compressed;
-            #[cfg(feature = "llmp_compression")]
-            let event_bytes = if *msg_flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
-                compressed = state_wr_lock.compressor().decompress(msg)?;
-                &compressed
-            } else {
-                &*msg
-            };
-            let event: Event<I> = postcard::from_bytes(event_bytes)?;
+            // TODO: do not copy here
+            state_wr_lock.add_past_msg(msg);
 
-            state_wr_lock.add_past_event(event.clone());
-
-            info!("Sending event {}", event.name());
+            info!("Sending msg...");
 
             state_wr_lock
-                .send_interesting_event_to_nodes(&event)
+                .send_interesting_event_to_nodes(&mm_msg)
                 .await?;
 
             Ok(())
         });
-
-        res?;
-
-        // Add incoming events to the ones we should filter
-        // events.extend_from_slice(&incoming_events);
 
         Ok(LlmpMsgHookResult::ForwardToClients)
     }
@@ -181,25 +227,39 @@ where
         let res: Result<(), Error> = self.rt.block_on(async move {
             let mut state_wr_lock = shared_state.write().await;
 
-            let mut new_events: Vec<Event<I>> = Vec::new();
+            let mut incoming_msgs: Vec<MultiMachineMsg<I>> = Vec::new();
             state_wr_lock
-                .receive_new_messages_from_nodes(&mut new_events)
+                .receive_new_messages_from_nodes(&mut incoming_msgs)
                 .await?;
 
-            for event in &new_events {
-                info!("received event {}", event.name_detailed());
-            }
+            info!("received {} new incoming msg(s)", incoming_msgs.len());
 
-            let msgs_to_send: Result<Vec<(Tag, Flags, Vec<u8>)>, Error> = new_events
+            let msgs_to_forward: Result<Vec<(Tag, Flags, Vec<u8>)>, Error> = incoming_msgs
                 .into_iter()
-                .map(|event| {
-                    let (inner_flags, buf) = Self::try_compress(&mut state_wr_lock, &event)?;
+                .map(|mm_msg| match mm_msg {
+                    MultiMachineMsg::LlmpMsg(msg) => {
+                        let msg = msg.into_owned().unwrap().into_vec();
+                        #[cfg(feature = "llmp_compression")]
+                        match state_wr_lock.compressor().maybe_compress(msg.as_ref()) {
+                            Some(comp_buf) => {
+                                Ok((_LLMP_TAG_TO_MAIN, LLMP_FLAG_COMPRESSED, comp_buf))
+                            }
+                            None => Ok((_LLMP_TAG_TO_MAIN, Flags(0), msg)),
+                        }
+                        #[cfg(not(feature = "llmp_compression"))]
+                        Ok((_LLMP_TAG_TO_MAIN, Flags(0), msg))
+                    }
+                    MultiMachineMsg::Event(evt) => {
+                        let evt = evt.into_owned().unwrap();
+                        let (inner_flags, buf) =
+                            Self::try_compress(&mut state_wr_lock, evt.as_ref())?;
 
-                    Ok((_LLMP_TAG_TO_MAIN, inner_flags, buf))
+                        Ok((_LLMP_TAG_TO_MAIN, inner_flags, buf))
+                    }
                 })
                 .collect();
 
-            new_msgs.extend(msgs_to_send?);
+            new_msgs.extend(msgs_to_forward?);
 
             Ok(())
         });

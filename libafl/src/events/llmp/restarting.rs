@@ -31,6 +31,7 @@ use libafl_bolts::{
 use libafl_bolts::{
     llmp::LlmpConnection, os::CTRL_C_EXIT, shmem::StdShMemProvider, staterestore::StateRestorer,
 };
+use log::info;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
@@ -554,7 +555,7 @@ where
             let mut ctr: u64 = 0;
             // Client->parent loop
             loop {
-                log::info!("Spawning next client (id {ctr})");
+                info!("Spawning next client (id {ctr})");
 
                 // On Unix, we fork (when fork feature is enabled)
                 #[cfg(all(unix, feature = "fork"))]
@@ -569,6 +570,11 @@ where
                             handle.status()
                         }
                         ForkResult::Child => {
+                            info!(
+                                "{} has been forked into {}",
+                                std::os::unix::process::parent_id(),
+                                std::process::id()
+                            );
                             self.shmem_provider.post_fork(true)?;
                             break (staterestorer, self.shmem_provider.clone(), core_id);
                         }

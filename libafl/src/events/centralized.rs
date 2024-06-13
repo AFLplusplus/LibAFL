@@ -9,7 +9,7 @@
 
 use alloc::{boxed::Box, string::String, vec::Vec};
 use core::{fmt::Debug, time::Duration};
-use std::marker::PhantomData;
+use std::{marker::PhantomData, process};
 
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{
@@ -303,25 +303,12 @@ where
             let mut is_tc = false;
             // Forward to main only if new tc or heartbeat
             let should_be_forwarded = match &mut event {
-                Event::NewTestcase {
-                    input: _,
-                    client_config: _,
-                    exit_kind: _,
-                    corpus_size: _,
-                    time: _,
-                    executions: _,
-                    observers_buf: _,
-                    forward_id,
-                } => {
+                Event::NewTestcase { forward_id, .. } => {
                     *forward_id = Some(ClientId(self.inner.mgr_id().0 as u32));
                     is_tc = true;
                     true
                 }
-                Event::UpdateExecStats {
-                    time: _,
-                    executions: _,
-                    phantom: _,
-                } => true, // send it but this guy won't be handled. the only purpose is to keep this client alive else the broker thinks it is dead and will dc it
+                Event::UpdateExecStats { .. } => true, // send it but this guy won't be handled. the only purpose is to keep this client alive else the broker thinks it is dead and will dc it
                 _ => false,
             };
 
@@ -600,7 +587,7 @@ where
         Z: ExecutionProcessor<E::Observers, State = <Self as UsesState>::State>
             + EvaluatorObservers<E::Observers>,
     {
-        log::info!("handle_in_main!");
+        info!("handle_in_main!");
 
         let event_name = event.name_detailed();
 
@@ -614,6 +601,7 @@ where
                 time,
                 executions,
                 forward_id,
+                node_id,
             } => {
                 info!(
                     "Received {} from {client_id:?} ({client_config:?}, forward {forward_id:?})",
@@ -628,7 +616,11 @@ where
                         {
                             state.scalability_monitor_mut().testcase_with_observers += 1;
                         }
-                        info!("Running fuzzer with event {}", event_name);
+                        info!(
+                            "[{}] Running fuzzer with event {}",
+                            process::id(),
+                            event_name
+                        );
                         fuzzer.execute_and_process(
                             state,
                             self,
@@ -642,7 +634,11 @@ where
                         {
                             state.scalability_monitor_mut().testcase_without_observers += 1;
                         }
-                        info!("Running fuzzer with event {}", event_name);
+                        info!(
+                            "[{}] Running fuzzer with event {}",
+                            process::id(),
+                            event_name
+                        );
                         fuzzer.evaluate_input_with_observers::<E, Self>(
                             state,
                             executor,
@@ -662,15 +658,20 @@ where
                         time,
                         executions,
                         forward_id,
+                        node_id,
                     };
 
                     self.hooks.on_fire_all(state, client_id, &event)?;
 
-                    info!("Adding received Testcase {} as item #{item}...", event_name);
+                    info!(
+                        "[{}] Adding received Testcase {} as item #{item}...",
+                        process::id(),
+                        event_name
+                    );
 
                     self.inner.fire(state, event)?;
                 } else {
-                    info!("{} was discarded...)", event_name);
+                    info!("[{}] {} was discarded...)", process::id(), event_name);
                 }
             }
             _ => {

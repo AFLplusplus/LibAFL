@@ -1,7 +1,8 @@
 use core::fmt::Display;
 use std::{
     collections::HashMap,
-    io, process,
+    io::ErrorKind,
+    process,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc, OnceLock,
@@ -29,9 +30,7 @@ use crate::{
     inputs::Input,
 };
 
-const LISTEN_PORT_BASE: u16 = 50000;
-
-#[bitflags(default = SendToParent)]
+#[bitflags(default = SendToParent | SendToChildren)]
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq)]
 /// The node policy. It represents flags that can be applied to the node to change how it behaves.
@@ -44,60 +43,47 @@ pub enum NodePolicy {
 
 const DUMMY_BYTE: u8 = 0x14;
 
-// Use OwnedRef as much as possible here to avoid useless copies.
+/// Use OwnedRef as much as possible here to avoid useless copies.
 /// An owned TCP message for multi machine
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct OwnedTcpMultiMachineMsg<'a, I>
+pub enum MultiMachineMsg<'a, I>
 where
     I: Input,
 {
-    event: OwnedRef<'a, Event<I>>,
+    LlmpMsg(OwnedRef<'a, [u8]>),
+    Event(OwnedRef<'a, Event<I>>),
 }
 
 /// We do not use raw pointers, so no problem with thead-safety
-unsafe impl<'a, I: Input> Send for OwnedTcpMultiMachineMsg<'a, I> {}
-unsafe impl<'a, I: Input> Sync for OwnedTcpMultiMachineMsg<'a, I> {}
+unsafe impl<'a, I: Input> Send for MultiMachineMsg<'a, I> {}
+unsafe impl<'a, I: Input> Sync for MultiMachineMsg<'a, I> {}
 
-/// A TCP message for multi machine
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct TcpMultiMachineMsg<I>
+impl<'a, I> MultiMachineMsg<'a, I>
 where
     I: Input,
 {
-    event: Event<I>,
-}
-
-impl<'a, I> OwnedTcpMultiMachineMsg<'a, I>
-where
-    I: Input,
-{
-    /// Create a new [`OwnedTcpMultiMachineMsg`]. It is a more lightweight version of [`TcpMultiMachineMsg`]
+    /// Create a new [`MultiMachineMsg`] as event.
     ///
     /// # Safety
     ///
     /// OwnedRef should **never** be a raw pointer for thread-safety reasons.
     /// We check this for debug builds, but not for release.
     #[must_use]
-    pub unsafe fn new(event: OwnedRef<'a, Event<I>>) -> Self {
+    pub unsafe fn event(event: OwnedRef<'a, Event<I>>) -> Self {
         debug_assert!(!event.is_raw());
 
-        Self { event }
+        MultiMachineMsg::Event(event)
+    }
+
+    /// Create a new [`MultiMachineMsg`] from an llmp msg.
+    #[must_use]
+    pub fn llmp_msg(msg: OwnedRef<'a, [u8]>) -> Self {
+        MultiMachineMsg::LlmpMsg(msg)
     }
 }
 
-impl<I> TcpMultiMachineMsg<I>
-where
-    I: Input,
-{
-    /// Create a new [`TcpMultiMachineMsg`].
-    pub fn new(event: Event<I>) -> Self {
-        Self { event }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 /// A `NodeId` (unused for now)
 pub struct NodeId(pub u64);
 
@@ -113,16 +99,13 @@ impl NodeId {
 /// The state of the hook shared between the background threads and the main thread.
 #[derive(Debug)]
 #[allow(dead_code)]
-pub struct TcpMultiMachineState<A, I>
-where
-    I: Input,
-{
+pub struct TcpMultiMachineState<A> {
     node_descriptor: NodeDescriptor<A>,
     /// the parent to which the testcases should be forwarded when deemed interesting
     parent: Option<TcpStream>,
     /// The children who connected during the fuzzing session.
     children: HashMap<NodeId, TcpStream>, // The children who connected during the fuzzing session.
-    old_events: Vec<Event<I>>,
+    old_msgs: Vec<Vec<u8>>,
     #[cfg(feature = "llmp_compression")]
     compressor: GzipCompressor,
 }
@@ -132,12 +115,15 @@ where
 pub struct NodeDescriptor<A> {
     /// The parent address, if there is one.
     pub parent_addr: Option<A>,
-    #[builder(default = 0)]
-    /// The max amount of children
-    pub max_nb_children: u16,
+
+    /// The node listening port. Defaults to 50000
+    #[builder(default = Some(50000))]
+    pub node_listening_port: Option<u16>,
+
     #[builder(default = Duration::from_secs(60))]
     /// The timeout for connecting to parent
     pub timeout: Duration,
+
     /// Node flags
     #[builder(default_code = "BitFlags::default()")]
     pub flags: BitFlags<NodePolicy>, // The policy for shared messages between nodes.
@@ -174,7 +160,7 @@ impl TcpMultiMachineBuilder {
             node_descriptor,
             parent: None,
             children: HashMap::default(),
-            old_events: Vec::new(),
+            old_msgs: Vec::new(),
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(),
         }));
@@ -183,7 +169,7 @@ impl TcpMultiMachineBuilder {
             Arc::new(Runtime::new().map_err(|_| Error::unknown("Tokio runtime spawning failed"))?);
 
         unsafe {
-            TcpMultiMachineState::init(&state.clone(), &rt.clone())?;
+            TcpMultiMachineState::init::<I>(&state.clone(), &rt.clone())?;
         }
 
         Ok((
@@ -193,10 +179,9 @@ impl TcpMultiMachineBuilder {
     }
 }
 
-impl<A, I> TcpMultiMachineState<A, I>
+impl<A> TcpMultiMachineState<A>
 where
     A: Clone + Display + ToSocketAddrs + Send + Sync + 'static,
-    I: Input + Send + Sync + 'static,
 {
     /// Initializes the Multi-Machine state.
     ///
@@ -204,7 +189,10 @@ where
     ///
     /// This should be run **only once**, in the same process as the llmp hooks, and before the hooks
     /// are effectively used.
-    unsafe fn init(self_mutex: &Arc<RwLock<Self>>, rt: &Arc<Runtime>) -> Result<(), Error> {
+    unsafe fn init<I: Input>(
+        self_mutex: &Arc<RwLock<Self>>,
+        rt: &Arc<Runtime>,
+    ) -> Result<(), Error> {
         let node_descriptor =
             rt.block_on(async { self_mutex.read().await.node_descriptor.clone() });
 
@@ -239,16 +227,13 @@ where
         })?;
 
         // Now, setup the background tasks for the children to connect to
-        for i in 0..node_descriptor.max_nb_children {
+        if let Some(listening_port) = node_descriptor.node_listening_port {
             let bg_state = self_mutex.clone();
-            info!("Spawning child task {}", i);
             let _handle: JoinHandle<Result<(), Error>> = rt.spawn(async move {
-                info!("spawn worked");
-                let port = LISTEN_PORT_BASE + i;
-                let addr = format!("127.0.0.1:{port}");
+                let addr = format!("0.0.0.0:{}", listening_port);
                 info!("Starting background child task on {addr}...");
                 let listener = TcpListener::bind(addr).await.map_err(|e| {
-                    Error::os_error(e, format!("Error while binding to port {port}"))
+                    Error::os_error(e, format!("Error while binding to port {listening_port}"))
                 })?;
                 let state = bg_state;
 
@@ -261,7 +246,9 @@ where
                     info!("{} joined the children.", addr);
                     let mut state_guard = state.write().await;
 
-                    state_guard.send_old_events_to_stream(&mut stream).await?;
+                    state_guard
+                        .send_old_events_to_stream::<I>(&mut stream)
+                        .await?;
 
                     state_guard.children.insert(NodeId::new(), stream);
                     info!(
@@ -278,8 +265,8 @@ where
     }
 
     /// Add an event as past event.
-    pub fn add_past_event(&mut self, event: Event<I>) {
-        self.old_events.push(event)
+    pub fn add_past_msg(&mut self, msg: &[u8]) {
+        self.old_msgs.push(msg.to_vec())
     }
 
     /// The compressor
@@ -291,11 +278,21 @@ where
     /// Read a [`TcpMultiMachineMsg`] from a stream.
     /// Expects a message written by [`TcpMultiMachineState::write_msg`].
     /// If there is nothing to read from the stream, return asap with Ok(None).
-    async fn read_msg(stream: &mut TcpStream) -> Result<Option<TcpMultiMachineMsg<I>>, Error> {
+    async fn read_msg<'a, I: Input + 'a>(
+        stream: &mut TcpStream,
+    ) -> Result<Option<MultiMachineMsg<'a, I>>, Error> {
         // 0. Check if we should try to fetch something from the stream
         let mut dummy_byte: [u8; 1] = [0u8];
         info!("Starting read msg...");
-        let n_read = stream.try_read(&mut dummy_byte)?;
+
+        let n_read = match stream.try_read(&mut dummy_byte) {
+            Ok(n) => n,
+            Err(e) if e.kind() == ErrorKind::WouldBlock => {
+                return Ok(None);
+            }
+            Err(e) => return Err(Error::os_error(e, "try read failed")),
+        };
+
         info!("msg read.");
 
         if n_read == 0 {
@@ -321,52 +318,55 @@ where
         }
         stream.read_exact(node_msg.as_mut_slice()).await?;
 
-        Ok(Some(bitcode::deserialize(node_msg.as_ref())?))
+        Ok(Some(bincode::deserialize(node_msg.as_ref()).map_err(
+            |_| Error::serialize("Error while deserializing"),
+        )?))
     }
 
     /// Write an [`OwnedTcpMultiMachineMsg`] to a stream.
     /// Can be read back using [`TcpMultiMachineState::read_msg`].
-    async fn write_msg<'a>(
+    async fn write_msg<'a, I: Input>(
         stream: &mut TcpStream,
-        msg: &OwnedTcpMultiMachineMsg<'a, I>,
+        msg: &MultiMachineMsg<'a, I>,
     ) -> Result<(), Error> {
-        let serialized_msg = bitcode::serialize(msg)?;
+        let serialized_msg =
+            bincode::serialize(msg).map_err(|_| Error::serialize("Error while serializing"))?;
         let msg_len = u32::to_le_bytes(serialized_msg.len() as u32);
 
         // 0. Write the dummy byte
-        stream.write(&[DUMMY_BYTE]).await?;
+        stream.write_all(&[DUMMY_BYTE]).await?;
 
         // 1. Write msg size
-        stream.write(&msg_len).await?;
+        stream.write_all(&msg_len).await?;
 
         // 2. Write msg
-        stream.write(&serialized_msg).await?;
+        stream.write_all(&serialized_msg).await?;
 
         Ok(())
     }
 
-    pub(crate) async fn send_old_events_to_stream(
+    pub(crate) async fn send_old_events_to_stream<I: Input>(
         &mut self,
         stream: &mut TcpStream,
     ) -> Result<(), Error> {
         info!("Send old events to new child...");
 
-        for old_event in &self.old_events {
-            info!("\told event: sending {}...", old_event.name_detailed());
-            let event_ref = unsafe { OwnedTcpMultiMachineMsg::new(OwnedRef::Ref(old_event)) };
+        for old_msg in &self.old_msgs {
+            let event_ref: MultiMachineMsg<I> =
+                unsafe { MultiMachineMsg::llmp_msg(OwnedRef::Ref(old_msg.as_slice())) };
             Self::write_msg(stream, &event_ref).await?;
         }
+
+        info!("Sent {} old messages.", self.old_msgs.len());
 
         Ok(())
     }
 
-    pub(crate) async fn send_interesting_event_to_nodes(
+    pub(crate) async fn send_interesting_event_to_nodes<'a, I: Input>(
         &mut self,
-        event: &Event<I>,
+        msg: &MultiMachineMsg<'a, I>,
     ) -> Result<(), Error> {
         info!("[multi-machine] Sending interesting events to nodes...");
-
-        let msg = unsafe { OwnedTcpMultiMachineMsg::new(OwnedRef::Ref(event)) };
 
         if self
             .node_descriptor
@@ -376,8 +376,7 @@ where
             if let Some(parent) = &mut self.parent {
                 info!("Sending to parent...");
                 if (Self::write_msg(parent, &msg).await).is_err() {
-                    // most likely the parent disconnected. drop the connection
-                    info!("The parent disconnected. We won't try to communicate with it again.");
+                    info!("The parent most likely disconnected. We won't try to communicate with it again.");
                     self.parent.take();
                 }
             }
@@ -410,42 +409,42 @@ where
 
     /// Flush the message queue from other nodes and add incoming events to the
     /// centralized event manager queue.
-    pub(crate) async fn receive_new_messages_from_nodes(
+    pub(crate) async fn receive_new_messages_from_nodes<'a, I: Input>(
         &mut self,
-        events: &mut Vec<Event<I>>,
+        msgs: &mut Vec<MultiMachineMsg<'a, I>>,
     ) -> Result<(), Error> {
         info!("Checking for new events from other nodes...");
 
         // Our (potential) parent could have something for us
         if let Some(parent) = &mut self.parent {
-            info!("Receiving from parent...");
-            match Self::read_msg(parent).await {
-                Ok(Some(msg)) => {
-                    info!("Received event from parent");
-                    // The parent has something for us, we store it
-                    events.push(msg.event);
-                }
+            loop {
+                info!("Receiving from parent...");
+                match Self::read_msg(parent).await {
+                    Ok(Some(msg)) => {
+                        info!("Received event from parent");
+                        // The parent has something for us, we store it
+                        msgs.push(msg);
+                    }
 
-                Ok(None) => {
-                    // nothing from the parent, we continue
-                    info!("Nothing from parent");
-                }
+                    Ok(None) => {
+                        // nothing from the parent, we continue
+                        info!("Nothing from parent");
+                        break;
+                    }
 
-                Err(Error::OsError(io_err, _, _)) => {
-                    if io_err.kind() == io::ErrorKind::WouldBlock {
-                        // Expected, ignore.
-                        info!("Would ignore, continue...");
-                    } else {
+                    Err(Error::OsError(_, _, _)) => {
                         // most likely the parent disconnected. drop the connection
                         info!(
                             "The parent disconnected. We won't try to communicate with it again."
                         );
                         self.parent.take();
+                        break;
                     }
-                }
-                Err(e) => {
-                    info!("An error occured and was not expected.");
-                    return Err(e);
+
+                    Err(e) => {
+                        info!("An error occurred and was not expected.");
+                        return Err(e);
+                    }
                 }
             }
         }
@@ -458,37 +457,34 @@ where
             self.children.len()
         );
         for (child_id, child_stream) in &mut self.children {
-            info!("Receiving from child {:?}...", child_id);
-            match Self::read_msg(child_stream).await {
-                // Received a msg
-                Ok(Some(msg)) => {
-                    info!("Received event from child!");
-                    // The parent has something for us, we store it
-                    events.push(msg.event);
-                }
+            loop {
+                info!("Receiving from child {:?}...", child_id);
 
-                // Received nothing
-                Ok(None) => {
-                    info!("Nothing from child");
-                    // nothing from the parent, we continue
-                }
+                match Self::read_msg(child_stream).await {
+                    Ok(Some(msg)) => {
+                        // The parent has something for us, we store it
+                        info!("Received event from child!");
+                        msgs.push(msg);
+                    }
 
-                // I/O error
-                Err(Error::OsError(io_err, _, _)) => {
-                    if io_err.kind() == io::ErrorKind::WouldBlock {
-                        // Expected, ignore.
-                        info!("Would ignore, continue...");
-                    } else {
+                    Ok(None) => {
+                        // nothing from the parent, we continue
+                        info!("Nothing from child");
+                        break;
+                    }
+
+                    Err(Error::OsError(_, _, _)) => {
                         // most likely the parent disconnected. drop the connection
                         info!("The child disconnected. We won't try to communicate with it again.");
                         ids_to_remove.push(*child_id);
+                        break;
                     }
-                }
 
-                // Other error
-                Err(e) => {
-                    info!("An error occurred and was not expected.");
-                    return Err(e);
+                    Err(e) => {
+                        // Other error
+                        info!("An error occurred and was not expected.");
+                        return Err(e);
+                    }
                 }
             }
         }

@@ -2630,6 +2630,7 @@ where
 
     /// Broker broadcast to its own page for all others to read
     /// Returns `true` if new messages were broker-ed
+    /// It is supposed that the message is never unmapped.
     #[inline]
     #[allow(clippy::cast_ptr_alignment)]
     unsafe fn handle_new_msgs(&mut self, client_id: ClientId) -> Result<bool, Error> {
