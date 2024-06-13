@@ -1,8 +1,10 @@
 use core::fmt::{Debug, Display};
 use std::{marker::PhantomData, slice, sync::Arc, vec::Vec};
 
+#[cfg(feature = "llmp_compression")]
+use libafl_bolts::bolts_prelude::LLMP_FLAG_COMPRESSED;
 use libafl_bolts::{
-    bolts_prelude::{Flags, LlmpBrokerInner, LlmpMsgHookResult, Tag, LLMP_FLAG_COMPRESSED},
+    bolts_prelude::{Flags, LlmpBrokerInner, LlmpMsgHookResult, Tag},
     llmp::LlmpHook,
     ownedref::OwnedRef,
     prelude::ShMemProvider,

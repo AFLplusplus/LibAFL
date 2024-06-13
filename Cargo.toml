@@ -36,6 +36,7 @@ exclude = [
     "utils/noaslr",
     "utils/gdb_qemu",
     "utils/libafl_fmt",
+    "utils/desyscall",
     "scripts",
 ]
 

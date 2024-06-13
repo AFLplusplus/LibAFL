@@ -115,6 +115,7 @@ where
         }
     }
 
+    /// Return the inner value, if owned by the given object
     pub fn into_owned(self) -> Option<Box<T>> {
         match self {
             Self::Owned(val) => Some(val),
