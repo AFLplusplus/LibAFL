@@ -63,10 +63,10 @@ slirp = [ "systemmode", "libafl_qemu_sys/slirp" ] # build qemu with host libslir
 shared = [ "libafl_qemu_sys/shared" ]
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.12.0", default-features = false, features = ["std", "derive", "regex"] }
-libafl_bolts = { path = "../libafl_bolts", version = "0.12.0", default-features = false, features = ["std", "derive"] }
-libafl_targets = { path = "../libafl_targets", version = "0.12.0" }
-libafl_qemu_sys = { path = "./libafl_qemu_sys", version = "0.12.0" }
+libafl = { path = "../libafl", version = "0.13.0", default-features = false, features = ["std", "derive", "regex"] }
+libafl_bolts = { path = "../libafl_bolts", version = "0.13.0", default-features = false, features = ["std", "derive"] }
+libafl_targets = { path = "../libafl_targets", version = "0.13.0" }
+libafl_qemu_sys = { path = "./libafl_qemu_sys", version = "0.13.0" }
 
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
 hashbrown =  { version = "0.14", features = ["serde"] } # A faster hashmap, nostd compatible
@@ -98,7 +98,7 @@ memmap2 = "0.9"
 document-features = { version = "0.2", optional = true }
 
 [build-dependencies]
-libafl_qemu_build = { path = "./libafl_qemu_build", version = "0.12.0" }
+libafl_qemu_build = { path = "./libafl_qemu_build", version = "0.13.0" }
 pyo3-build-config = { version = "0.21", optional = true }
 rustversion = "1.0"
 bindgen = "0.69"
