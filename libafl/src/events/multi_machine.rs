@@ -30,6 +30,8 @@ use crate::{
     inputs::Input,
 };
 
+const MAX_NB_RECEIVED_AT_ONCE: usize = 10;
+
 #[bitflags(default = SendToParent | SendToChildren)]
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -414,16 +416,23 @@ where
         msgs: &mut Vec<MultiMachineMsg<'a, I>>,
     ) -> Result<(), Error> {
         info!("Checking for new events from other nodes...");
+        let mut nb_received = 0usize;
 
         // Our (potential) parent could have something for us
         if let Some(parent) = &mut self.parent {
             loop {
+                // Exit if received a lot of inputs at once.
+                if nb_received > MAX_NB_RECEIVED_AT_ONCE {
+                    return Ok(());
+                }
+
                 info!("Receiving from parent...");
                 match Self::read_msg(parent).await {
                     Ok(Some(msg)) => {
                         info!("Received event from parent");
                         // The parent has something for us, we store it
                         msgs.push(msg);
+                        nb_received += 1;
                     }
 
                     Ok(None) => {
@@ -458,13 +467,18 @@ where
         );
         for (child_id, child_stream) in &mut self.children {
             loop {
-                info!("Receiving from child {:?}...", child_id);
+                // Exit if received a lot of inputs at once.
+                if nb_received > MAX_NB_RECEIVED_AT_ONCE {
+                    return Ok(());
+                }
 
+                info!("Receiving from child {:?}...", child_id);
                 match Self::read_msg(child_stream).await {
                     Ok(Some(msg)) => {
                         // The parent has something for us, we store it
                         info!("Received event from child!");
                         msgs.push(msg);
+                        nb_received += 1;
                     }
 
                     Ok(None) => {

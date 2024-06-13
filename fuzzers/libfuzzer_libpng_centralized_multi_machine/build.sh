@@ -20,6 +20,7 @@ export CFLAGS="$CFLAGS -DSQLITE_MAX_LENGTH=128000000 \
 pushd sqlite3
 
 if [ ! -f "Makefile" ]; then
+    echo "Run configure..."
     ./configure
 fi
 make -j$(nproc)

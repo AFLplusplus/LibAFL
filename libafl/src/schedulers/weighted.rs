@@ -232,10 +232,7 @@ where
     }
 
     /// Cycles the strategy of the scheduler; tries to mimic AFL++'s cycling formula
-    fn cycle_schedule(
-        &mut self,
-        metadata: &mut SchedulerMetadata,
-    ) -> Result<PowerSchedule, Error> {
+    fn cycle_schedule(&mut self, metadata: &mut SchedulerMetadata) -> Result<PowerSchedule, Error> {
         let next_strat = match metadata.strat().ok_or(Error::illegal_argument(
             "No strategy specified when initializing scheduler; cannot cycle!",
         ))? {
