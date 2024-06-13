@@ -365,6 +365,8 @@ mod tests {
     use libafl_bolts::{
         cli::FuzzerOptions, rands::StdRand, tuples::tuple_list, AsSlice, SimpleStdoutLogger,
     };
+    #[cfg(unix)]
+    use mimalloc::MiMalloc;
 
     use crate::{
         asan::{
@@ -375,6 +377,14 @@ mod tests {
         executor::FridaInProcessExecutor,
         helper::FridaInstrumentationHelper,
     };
+    #[cfg(unix)]
+    #[global_allocator]
+    static GLOBAL: MiMalloc = MiMalloc;
+    #[cfg(windows)]
+    use dlmalloc::GlobalDlmalloc;
+    #[cfg(windows)]
+    #[global_allocator]
+    static GLOBAL: GlobalDlmalloc = GlobalDlmalloc;
 
     static GUM: OnceLock<Gum> = OnceLock::new();
 

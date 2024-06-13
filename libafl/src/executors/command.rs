@@ -3,6 +3,7 @@ use alloc::vec::Vec;
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
+    ops::IndexMut,
 };
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
@@ -18,7 +19,7 @@ use std::{
 
 use libafl_bolts::{
     fs::{get_unique_std_input_file, InputFile},
-    tuples::{MatchName, RefIndexable},
+    tuples::{Handle, MatchName, RefIndexable},
     AsSlice,
 };
 
@@ -63,8 +64,8 @@ pub struct StdCommandConfigurator {
     /// If set to true, the child output will remain visible
     /// By default, the child output is hidden to increase execution speed
     debug_child: bool,
-    stdout_observer: Option<StdOutObserver>,
-    stderr_observer: Option<StdErrObserver>,
+    stdout_observer: Option<Handle<StdOutObserver>>,
+    stderr_observer: Option<Handle<StdErrObserver>>,
     timeout: Duration,
     /// true: input gets delivered via stdink
     input_location: InputLocation,
@@ -76,20 +77,12 @@ impl<I> CommandConfigurator<I> for StdCommandConfigurator
 where
     I: HasTargetBytes,
 {
-    fn stdout_observer(&self) -> Option<&StdOutObserver> {
-        self.stdout_observer.as_ref()
+    fn stdout_observer(&self) -> Option<Handle<StdOutObserver>> {
+        self.stdout_observer.clone()
     }
 
-    fn stdout_observer_mut(&mut self) -> Option<&mut StdOutObserver> {
-        self.stdout_observer.as_mut()
-    }
-
-    fn stderr_observer(&self) -> Option<&StdErrObserver> {
-        self.stderr_observer.as_ref()
-    }
-
-    fn stderr_observer_mut(&mut self) -> Option<&mut StdErrObserver> {
-        self.stderr_observer.as_mut()
+    fn stderr_observer(&self) -> Option<Handle<StdErrObserver>> {
+        self.stderr_observer.clone()
     }
 
     fn spawn_child(&mut self, input: &I) -> Result<Child, Error> {
@@ -219,7 +212,7 @@ impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<OT, S, T>
 where
     EM: UsesState<State = S>,
     S: State + HasExecutions,
-    T: CommandConfigurator<S::Input>,
+    T: CommandConfigurator<S::Input> + Debug,
     OT: Debug + MatchName + ObserversTuple<S>,
     Z: UsesState<State = S>,
 {
@@ -263,23 +256,27 @@ where
                 .post_exec_child_all(state, input, &exit_kind)?;
         }
 
-        if let Some(ref mut ob) = &mut self.configurer.stdout_observer_mut() {
+        if let Some(h) = &mut self.configurer.stdout_observer() {
             let mut stdout = Vec::new();
             child.stdout.as_mut().ok_or_else(|| {
                  Error::illegal_state(
                      "Observer tries to read stderr, but stderr was not `Stdio::pipe` in CommandExecutor",
                  )
              })?.read_to_end(&mut stdout)?;
-            ob.observe_stdout(&stdout);
+            let mut observers = self.observers_mut();
+            let obs = observers.index_mut(h);
+            obs.observe_stdout(&stdout);
         }
-        if let Some(ref mut ob) = &mut self.configurer.stderr_observer_mut() {
+        if let Some(h) = &mut self.configurer.stderr_observer() {
             let mut stderr = Vec::new();
             child.stderr.as_mut().ok_or_else(|| {
                  Error::illegal_state(
                      "Observer tries to read stderr, but stderr was not `Stdio::pipe` in CommandExecutor",
                  )
              })?.read_to_end(&mut stderr)?;
-            ob.observe_stderr(&stderr);
+            let mut observers = self.observers_mut();
+            let obs = observers.index_mut(h);
+            obs.observe_stderr(&stderr);
         }
         res
     }
@@ -318,8 +315,8 @@ where
 /// The builder for a default [`CommandExecutor`] that should fit most use-cases.
 #[derive(Debug, Clone)]
 pub struct CommandExecutorBuilder {
-    stdout: Option<StdOutObserver>,
-    stderr: Option<StdErrObserver>,
+    stdout: Option<Handle<StdOutObserver>>,
+    stderr: Option<Handle<StdErrObserver>>,
     debug_child: bool,
     program: Option<OsString>,
     args: Vec<OsString>,
@@ -386,13 +383,13 @@ impl CommandExecutorBuilder {
     }
 
     /// Sets the stdout observer
-    pub fn stdout_observer(&mut self, stdout: StdOutObserver) -> &mut Self {
+    pub fn stdout_observer(&mut self, stdout: Handle<StdOutObserver>) -> &mut Self {
         self.stdout = Some(stdout);
         self
     }
 
     /// Sets the stderr observer
-    pub fn stderr_observer(&mut self, stderr: StdErrObserver) -> &mut Self {
+    pub fn stderr_observer(&mut self, stderr: Handle<StdErrObserver>) -> &mut Self {
         self.stderr = Some(stderr);
         self
     }
@@ -587,20 +584,11 @@ impl CommandExecutorBuilder {
 #[cfg(all(feature = "std", any(unix, doc)))]
 pub trait CommandConfigurator<I>: Sized {
     /// Get the stdout
-    fn stdout_observer(&self) -> Option<&StdOutObserver> {
+    fn stdout_observer(&self) -> Option<Handle<StdOutObserver>> {
         None
     }
-    /// Get the mut stdout
-    fn stdout_observer_mut(&mut self) -> Option<&mut StdOutObserver> {
-        None
-    }
-
     /// Get the stderr
-    fn stderr_observer(&self) -> Option<&StdErrObserver> {
-        None
-    }
-    /// Get the mut stderr
-    fn stderr_observer_mut(&mut self) -> Option<&mut StdErrObserver> {
+    fn stderr_observer(&self) -> Option<Handle<StdErrObserver>> {
         None
     }
 

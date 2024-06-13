@@ -8,6 +8,7 @@ fn main() {
     }
 
     let target_family = std::env::var("CARGO_CFG_TARGET_FAMILY").unwrap();
+
     // Force linking against libc++
     if target_family == "unix" {
         println!("cargo:rustc-link-lib=dylib=c++");
@@ -23,7 +24,7 @@ fn main() {
     if target_family == "windows" {
         let compiler = cc::Build::new()
             .cpp(true)
-            .file("test_harness.a")
+            .file("test_harness.cpp")
             .get_compiler();
         let mut cmd = std::process::Command::new(compiler.path());
         let cmd = cmd
@@ -46,7 +47,21 @@ fn main() {
                 std::env::var("HOME").unwrap()
             ));
         cmd.arg("/dll").arg("/OUT:test_harness.dll");
-        cmd.status().expect("Failed to link test_harness.dll");
+        let output = cmd.output().expect("Failed to link test_harness.dll");
+        let output_str = format!(
+            "{:?}\nstatus: {}\nstdout: {}\nstderr: {}",
+            cmd,
+            output.status,
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        // std::fs::write("compiler_output.txt", output_str.clone()).expect("Unable to write file");
+        assert!(
+            output.status.success(),
+            "Failed to link test_harness.dll\n {:?}",
+            output_str.as_str()
+        );
     } else {
         let compiler = cc::Build::new()
             .cpp(true)
