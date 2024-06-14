@@ -477,6 +477,7 @@ where
                             time: current_time(),
                             executions: *state.executions(),
                             forward_id: None,
+                            #[cfg(feature = "multi_machine")]
                             node_id: None,
                         },
                     )?;
@@ -677,6 +678,7 @@ where
                 time: current_time(),
                 executions: *state.executions(),
                 forward_id: None,
+                #[cfg(feature = "multi_machine")]
                 node_id: None,
             },
         )?;

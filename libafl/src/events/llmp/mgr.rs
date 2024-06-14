@@ -410,7 +410,6 @@ where
             + EvaluatorObservers<E::Observers>
             + Evaluator<E, Self>,
     {
-        let evt_name = event.name_detailed();
         match event {
             Event::NewTestcase {
                 input,
@@ -420,6 +419,8 @@ where
                 forward_id,
                 ..
             } => {
+                let evt_name = event.name_detailed();
+
                 info!("[{}] Received new Testcase {evt_name} from {client_id:?} ({client_config:?}, forward {forward_id:?})", std::process::id());
 
                 if self.always_interesting {

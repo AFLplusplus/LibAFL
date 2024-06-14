@@ -589,8 +589,6 @@ where
     {
         info!("handle_in_main!");
 
-        let event_name = event.name_detailed();
-
         match event {
             Event::NewTestcase {
                 input,
@@ -601,6 +599,7 @@ where
                 time,
                 executions,
                 forward_id,
+                #[cfg(feature = "multi_machine")]
                 node_id,
             } => {
                 info!(
@@ -658,6 +657,7 @@ where
                         time,
                         executions,
                         forward_id,
+                        #[cfg(feature = "multi_machine")]
                         node_id,
                     };
 

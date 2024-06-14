@@ -109,11 +109,12 @@ pub struct EventManagerId(
     pub usize,
 );
 
+#[cfg(feature = "multi_machine")]
+use crate::events::multi_machine::NodeId;
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
 use crate::{
-    events::multi_machine::NodeId, inputs::UsesInput, observers::TimeObserver,
-    stages::HasCurrentStage, state::UsesState,
+    inputs::UsesInput, observers::TimeObserver, stages::HasCurrentStage, state::UsesState,
 };
 
 /// The log event severity
@@ -286,6 +287,7 @@ where
         /// The original sender if, if forwarded
         forward_id: Option<ClientId>,
         /// The (multi-machine) node from which the tc is from, if any
+        #[cfg(feature = "multi_machine")]
         node_id: Option<NodeId>,
     },
     /// New stats event to monitor.
@@ -371,17 +373,18 @@ where
         }
     }
 
-    #[cfg(feature = "multi_machine")]
-    fn name_detailed(&self) -> String {
+    fn name_detailed(&self) -> &str {
         match self {
-            Event::NewTestcase { input, .. } => format!("Testcase {}", input.generate_name(0)),
-            Event::UpdateExecStats { .. } => "Client Heartbeat".to_string(),
-            Event::UpdateUserStats { .. } => "UserStats".to_string(),
+            Event::NewTestcase { input, .. } => {
+                format!("Testcase {}", input.generate_name(0)).as_str()
+            }
+            Event::UpdateExecStats { .. } => "Client Heartbeat",
+            Event::UpdateUserStats { .. } => "UserStats",
             #[cfg(feature = "introspection")]
-            Event::UpdatePerfMonitor { .. } => "PerfMonitor".to_string(),
-            Event::Objective { .. } => "Objective".to_string(),
-            Event::Log { .. } => "Log".to_string(),
-            Event::CustomBuf { .. } => "CustomBuf".to_string(),
+            Event::UpdatePerfMonitor { .. } => "PerfMonitor",
+            Event::Objective { .. } => "Objective",
+            Event::Log { .. } => "Log",
+            Event::CustomBuf { .. } => "CustomBuf",
             /*Event::Custom {
                 sender_id: _, /*custom_event} => custom_event.name()*/
             } => "todo",*/
@@ -948,6 +951,7 @@ mod tests {
             time: current_time(),
             executions: 0,
             forward_id: None,
+            #[cfg(feature = "multi_machine")]
             node_id: None,
         };
 
