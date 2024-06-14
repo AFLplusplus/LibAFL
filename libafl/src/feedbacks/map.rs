@@ -495,10 +495,11 @@ where
                 .enumerate()
                 .filter(|(_, value)| *value != initial)
             {
-                if history_map[i] == initial {
+                let val = R::reduce(history_map[i], value);
+                if history_map[i] == initial && val != initial {
                     map_state.num_covered_map_indexes += 1;
                 }
-                history_map[i] = R::reduce(history_map[i], value);
+                history_map[i] = val;
                 indices.push(i);
             }
             let meta = MapIndexesMetadata::new(indices);
@@ -510,10 +511,11 @@ where
                 .enumerate()
                 .filter(|(_, value)| *value != initial)
             {
-                if history_map[i] == initial {
+                let val = R::reduce(history_map[i], value);
+                if history_map[i] == initial && val != initial {
                     map_state.num_covered_map_indexes += 1;
                 }
-                history_map[i] = R::reduce(history_map[i], value);
+                history_map[i] = val;
             }
         }
 
