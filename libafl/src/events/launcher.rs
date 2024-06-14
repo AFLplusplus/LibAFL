@@ -476,7 +476,7 @@ where
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 #[derive(TypedBuilder)]
 #[allow(clippy::type_complexity, missing_debug_implementations)]
-pub struct CentralizedLauncher<'a, CF, CEMH, IM, MEMH, MF, MT, S, SP> {
+pub struct CentralizedLauncher<'a, CF, MF, MT, S, SP> {
     /// The `ShmemProvider` to use
     shmem_provider: SP,
     /// The monitor instance to use
@@ -537,13 +537,11 @@ pub struct CentralizedLauncher<'a, CF, CEMH, IM, MEMH, MF, MT, S, SP> {
     #[builder(default = LlmpShouldSaveState::OnRestart)]
     serialize_state: LlmpShouldSaveState,
     #[builder(setter(skip), default = PhantomData)]
-    phantom_data: PhantomData<(CEMH, MEMH, IM, &'a S, &'a SP)>,
+    phantom_data: PhantomData<(&'a S, &'a SP)>,
 }
 
 #[cfg(all(unix, feature = "std", feature = "fork"))]
-impl<CF, CEMH, IM, MEMH, MF, MT, S, SP> Debug
-    for CentralizedLauncher<'_, CF, CEMH, IM, MEMH, MF, MT, S, SP>
-{
+impl<CF, MF, MT, S, SP> Debug for CentralizedLauncher<'_, CF, MF, MT, S, SP> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("Launcher")
             .field("configuration", &self.configuration)
@@ -561,28 +559,27 @@ impl<CF, CEMH, IM, MEMH, MF, MT, S, SP> Debug
 pub type StdCentralizedInnerMgr<S, SP> = LlmpRestartingEventManager<(), S, SP>;
 
 #[cfg(all(unix, feature = "std", feature = "fork"))]
-impl<'a, CF, CEMH, MF, MEMH, MT, S, SP>
-    CentralizedLauncher<'a, CF, CEMH, StdCentralizedInnerMgr<S, SP>, MEMH, MF, MT, S, SP>
+impl<'a, CF, MF, MT, S, SP> CentralizedLauncher<'a, CF, MF, MT, S, SP>
 where
-    CF: FnOnce(
-        Option<S>,
-        CentralizedEventManager<StdCentralizedInnerMgr<S, SP>, (), S, SP>,
-        CoreId,
-    ) -> Result<(), Error>,
-    CEMH: EventManagerHooksTuple<S>,
     MF: FnOnce(
         Option<S>,
         CentralizedEventManager<StdCentralizedInnerMgr<S, SP>, (), S, SP>,
         CoreId,
     ) -> Result<(), Error>,
-    MEMH: EventManagerHooksTuple<S>,
     MT: Monitor + Clone + 'static,
     S: State + HasExecutions,
     S::Input: Send + Sync + 'static,
     SP: ShMemProvider + 'static,
 {
     /// Launch a standard Centralized-based fuzzer
-    pub fn launch(&mut self) -> Result<(), Error> {
+    pub fn launch(&mut self) -> Result<(), Error>
+    where
+        CF: FnOnce(
+            Option<S>,
+            CentralizedEventManager<StdCentralizedInnerMgr<S, SP>, (), S, SP>,
+            CoreId,
+        ) -> Result<(), Error>,
+    {
         let restarting_mgr_builder = |centralized_launcher: &Self, core_to_bind: CoreId| {
             // Fuzzer client. keeps retrying the connection to broker till the broker starts
             let builder = RestartingMgr::<(), MT, S, SP>::builder()
@@ -606,21 +603,10 @@ where
 }
 
 #[cfg(all(unix, feature = "std", feature = "fork"))]
-impl<'a, CF, CEMH, IM, MEMH, MF, MT, S, SP>
-    CentralizedLauncher<'a, CF, CEMH, IM, MEMH, MF, MT, S, SP>
+impl<'a, CF, MF, MT, S, SP> CentralizedLauncher<'a, CF, MF, MT, S, SP>
 where
-    CF: FnOnce(Option<S>, CentralizedEventManager<IM, (), S, SP>, CoreId) -> Result<(), Error>,
-    CEMH: EventManagerHooksTuple<S>,
-    IM: UsesState<State = S>,
-    MEMH: EventManagerHooksTuple<S>,
-    MF: FnOnce(
-        Option<S>,
-        CentralizedEventManager<IM, (), S, SP>, // No broker_hooks for centralized EM
-        CoreId,
-    ) -> Result<(), Error>,
     MT: Monitor + Clone + 'static,
     S: State + HasExecutions,
-    <<IM as UsesState>::State as UsesInput>::Input: Send + Sync + 'static,
     SP: ShMemProvider + 'static,
 {
     /// Launch a Centralized-based fuzzer.
@@ -628,13 +614,21 @@ where
     /// - `secondary_inner_mgr_builder` will be called to build the inner manager of the secondary nodes.
     #[allow(clippy::similar_names)]
     #[allow(clippy::too_many_lines)]
-    pub fn launch_generic<IMF>(
+    pub fn launch_generic<EM, EMB>(
         &mut self,
-        main_inner_mgr_builder: IMF,
-        secondary_inner_mgr_builder: IMF,
+        main_inner_mgr_builder: EMB,
+        secondary_inner_mgr_builder: EMB,
     ) -> Result<(), Error>
     where
-        IMF: FnOnce(&Self, CoreId) -> Result<(Option<S>, IM), Error>,
+        CF: FnOnce(Option<S>, CentralizedEventManager<EM, (), S, SP>, CoreId) -> Result<(), Error>,
+        EM: UsesState<State = S>,
+        EMB: FnOnce(&Self, CoreId) -> Result<(Option<S>, EM), Error>,
+        MF: FnOnce(
+            Option<S>,
+            CentralizedEventManager<EM, (), S, SP>, // No broker_hooks for centralized EM
+            CoreId,
+        ) -> Result<(), Error>,
+        <<EM as UsesState>::State as UsesInput>::Input: Send + Sync + 'static,
     {
         let mut main_inner_mgr_builder = Some(main_inner_mgr_builder);
         let mut secondary_inner_mgr_builder = Some(secondary_inner_mgr_builder);
@@ -745,7 +739,7 @@ where
         let (multi_machine_sender_hook, multi_machine_receiver_hook) =
             TcpMultiMachineBuilder::build::<
                 SocketAddr,
-                <<IM as UsesState>::State as UsesInput>::Input,
+                <<EM as UsesState>::State as UsesInput>::Input,
             >(self.multi_machine_node_descriptor.clone())?;
 
         let mut brokers = Brokers::new();

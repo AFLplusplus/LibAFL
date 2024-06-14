@@ -285,7 +285,7 @@ pub extern "C" fn libafl_main() {
         node_description.node_listening_port = opt.node_listening_port;
     }
 
-    match CentralizedLauncher::<_, (), _, (), _, _, _, _>::builder()
+    match CentralizedLauncher::builder()
         .shmem_provider(shmem_provider)
         .configuration(EventConfig::from_name("default"))
         .monitor(monitor)
