@@ -772,7 +772,7 @@ where
         }
     }
 
-    /// Runs the input and triggers observers and feedback
+    /// Runs the input and triggers observers
     pub fn execute_input<E, EM>(
         &mut self,
         state: &mut <Self as UsesState>::State,
