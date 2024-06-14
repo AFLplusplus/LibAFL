@@ -14,8 +14,8 @@ use crate::{inputs::UsesInput, observers::Observer, state::State, Error};
 /// Only works for supported executors.
 ///
 /// # Example usage
-#[cfg_attr(all(feature = "std", unix), doc = " ```")]
-#[cfg_attr(not(all(feature = "std", unix)), doc = " ```ignore")]
+#[cfg_attr(all(feature = "std", target_os = "linux"), doc = " ```")]
+#[cfg_attr(not(all(feature = "std", target_os = "linux")), doc = " ```ignore")]
 /// use std::borrow::Cow;
 ///
 /// use libafl::{
@@ -155,6 +155,7 @@ use crate::{inputs::UsesInput, observers::Observer, state::State, Error};
 ///         // stdout will still contain data, we're just checking that there is an error message
 ///     }
 /// }
+/// ```
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct StdOutObserver {
