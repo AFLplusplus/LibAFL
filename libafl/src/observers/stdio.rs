@@ -1,150 +1,6 @@
 //! The [`StdOutObserver`] and [`StdErrObserver`] observers look at the stdout of a program
 //! The executor must explicitly support these observers.
 //! For example, they are supported on the [`crate::executors::CommandExecutor`].
-//!
-//! # Example usage
-//! ```rust
-//! use std::borrow::Cow;
-//!
-//! use libafl::{
-//!     corpus::{Corpus, InMemoryCorpus, Testcase},
-//!     events::{EventFirer, NopEventManager},
-//!     executors::{CommandExecutor, ExitKind},
-//!     feedbacks::Feedback,
-//!     inputs::{BytesInput, UsesInput},
-//!     mutators::{MutationResult, NopMutator},
-//!     observers::{ObserversTuple, StdErrObserver, StdOutObserver},
-//!     schedulers::QueueScheduler,
-//!     stages::StdMutationalStage,
-//!     state::{HasCorpus, State, StdState},
-//!     Error, Fuzzer, StdFuzzer,
-//! };
-//!
-//! use libafl_bolts::{
-//!     current_nanos,
-//!     rands::StdRand,
-//!     tuples::{tuple_list, Handle, Handled, MatchNameRef},
-//!     Named,
-//! };
-//!
-//! static mut STDOUT: Option<Vec<u8>> = None;
-//! static mut STDERR: Option<Vec<u8>> = None;
-//!
-//! #[derive(Clone)]
-//! struct ExportStdXObserver {
-//!     stdout_observer: Handle<StdOutObserver>,
-//!     stderr_observer: Handle<StdErrObserver>,
-//! }
-//!
-//! impl<S> Feedback<S> for ExportStdXObserver
-//! where
-//!     S: State,
-//!     S: UsesInput<Input = BytesInput>,
-//! {
-//!     fn is_interesting<EM, OT>(
-//!         &mut self,
-//!         _state: &mut S,
-//!         _manager: &mut EM,
-//!         _input: &<S>::Input,
-//!         observers: &OT,
-//!         _exit_kind: &ExitKind,
-//!     ) -> Result<bool, Error>
-//!     where
-//!         EM: EventFirer<State = S>,
-//!         OT: ObserversTuple<S>,
-//!     {
-//!         unsafe {
-//!             STDOUT = observers.get(&self.stdout_observer).unwrap().stdout.clone();
-//!             STDERR = observers.get(&self.stderr_observer).unwrap().stderr.clone();
-//!         }
-//!         Ok(true)
-//!     }
-//! }
-//!
-//! impl Named for ExportStdXObserver {
-//!     fn name(&self) -> &Cow<'static, str> {
-//!         &Cow::Borrowed("ExportStdXObserver")
-//!     }
-//! }
-//!
-//! fn main() {
-//!     let input_text = "Hello, World!";
-//!     let encoded_input_text = "SGVsbG8sIFdvcmxkIQo=";
-//!
-//!     let stdout_observer = StdOutObserver::new("stdout-observer");
-//!     let stderr_observer = StdErrObserver::new("stderr-observer");
-//!
-//!     let mut feedback = ExportStdXObserver {
-//!         stdout_observer: stdout_observer.handle(),
-//!         stderr_observer: stderr_observer.handle(),
-//!     };
-//!
-//!     let mut objective = ();
-//!
-//!     let mut executor = CommandExecutor::builder()
-//!         .program("base64")
-//!         .arg("--decode")
-//!         .stdout_observer(stdout_observer.handle())
-//!         .stderr_observer(stderr_observer.handle())
-//!         .build(tuple_list!(stdout_observer, stderr_observer))
-//!         .unwrap();
-//!
-//!     let mut state = StdState::new(
-//!         StdRand::with_seed(current_nanos()),
-//!         InMemoryCorpus::new(),
-//!         InMemoryCorpus::new(),
-//!         &mut feedback,
-//!         &mut objective,
-//!     )
-//!     .unwrap();
-//!
-//!     let scheduler = QueueScheduler::new();
-//!     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-//!     let mut manager = NopEventManager::new();
-//!
-//!     let mut stages = tuple_list!(StdMutationalStage::new(NopMutator::new(
-//!         MutationResult::Mutated
-//!     )));
-//!
-//!     state
-//!         .corpus_mut()
-//!         .add(Testcase::new(BytesInput::from(
-//!             encoded_input_text.as_bytes().to_vec(),
-//!         )))
-//!         .unwrap();
-//!
-//!     let corpus_id = fuzzer
-//!         .fuzz_one(&mut stages, &mut executor, &mut state, &mut manager)
-//!         .unwrap();
-//!
-//!     unsafe {
-//!         assert!(input_text
-//!             .as_bytes()
-//!             .iter()
-//!             .zip(STDOUT.as_ref().unwrap().iter().filter(|e| **e != 10)) // ignore newline chars
-//!             .all(|(&a, &b)| a == b));
-//!         assert!(STDERR.as_ref().unwrap().is_empty());
-//!     }
-//!
-//!     state
-//!         .corpus()
-//!         .get(corpus_id)
-//!         .unwrap()
-//!         .replace(Testcase::new(BytesInput::from(
-//!             encoded_input_text.bytes().skip(1).collect::<Vec<u8>>(), // skip one char to make it invalid code
-//!         )));
-//!
-//!     fuzzer
-//!         .fuzz_one(&mut stages, &mut executor, &mut state, &mut manager)
-//!         .unwrap();
-//!
-//!     unsafe {
-//!         let compare_vec: Vec<u8> = Vec::new();
-//!         assert_eq!(compare_vec, *STDERR.as_ref().unwrap());
-//!         // stdout will still contain data, we're just checking that there is an error message
-//!     }
-//! }
-//! ```
 
 use alloc::borrow::Cow;
 use std::vec::Vec;
@@ -156,6 +12,150 @@ use crate::{inputs::UsesInput, observers::Observer, state::State, Error};
 
 /// An observer that captures stdout of a target.
 /// Only works for supported executors.
+///
+/// # Example usage
+#[cfg_attr(all(feature = "std", unix), doc = " ```")]
+#[cfg_attr(not(all(feature = "std", unix)), doc = " ```ignore")]
+/// use std::borrow::Cow;
+///
+/// use libafl::{
+///     corpus::{Corpus, InMemoryCorpus, Testcase},
+///     events::{EventFirer, NopEventManager},
+///     executors::{CommandExecutor, ExitKind},
+///     feedbacks::Feedback,
+///     inputs::{BytesInput, UsesInput},
+///     mutators::{MutationResult, NopMutator},
+///     observers::{ObserversTuple, StdErrObserver, StdOutObserver},
+///     schedulers::QueueScheduler,
+///     stages::StdMutationalStage,
+///     state::{HasCorpus, State, StdState},
+///     Error, Fuzzer, StdFuzzer,
+/// };
+///
+/// use libafl_bolts::{
+///     current_nanos,
+///     rands::StdRand,
+///     tuples::{tuple_list, Handle, Handled, MatchNameRef},
+///     Named,
+/// };
+///
+/// static mut STDOUT: Option<Vec<u8>> = None;
+/// static mut STDERR: Option<Vec<u8>> = None;
+///
+/// #[derive(Clone)]
+/// struct ExportStdXObserver {
+///     stdout_observer: Handle<StdOutObserver>,
+///     stderr_observer: Handle<StdErrObserver>,
+/// }
+///
+/// impl<S> Feedback<S> for ExportStdXObserver
+/// where
+///     S: State
+/// {
+///     fn is_interesting<EM, OT>(
+///         &mut self,
+///         _state: &mut S,
+///         _manager: &mut EM,
+///         _input: &<S>::Input,
+///         observers: &OT,
+///         _exit_kind: &ExitKind,
+///     ) -> Result<bool, Error>
+///     where
+///         EM: EventFirer<State = S>,
+///         OT: ObserversTuple<S>,
+///     {
+///         unsafe {
+///             STDOUT = observers.get(&self.stdout_observer).unwrap().stdout.clone();
+///             STDERR = observers.get(&self.stderr_observer).unwrap().stderr.clone();
+///         }
+///         Ok(true)
+///     }
+/// }
+///
+/// impl Named for ExportStdXObserver {
+///     fn name(&self) -> &Cow<'static, str> {
+///         &Cow::Borrowed("ExportStdXObserver")
+///     }
+/// }
+///
+/// fn main() {
+///     let input_text = "Hello, World!";
+///     let encoded_input_text = "SGVsbG8sIFdvcmxkIQo=";
+///
+///     let stdout_observer = StdOutObserver::new("stdout-observer");
+///     let stderr_observer = StdErrObserver::new("stderr-observer");
+///
+///     let mut feedback = ExportStdXObserver {
+///         stdout_observer: stdout_observer.handle(),
+///         stderr_observer: stderr_observer.handle(),
+///     };
+///
+///     let mut objective = ();
+///
+///     let mut executor = CommandExecutor::builder()
+///         .program("base64")
+///         .arg("--decode")
+///         .stdout_observer(stdout_observer.handle())
+///         .stderr_observer(stderr_observer.handle())
+///         .build(tuple_list!(stdout_observer, stderr_observer))
+///         .unwrap();
+///
+///     let mut state = StdState::new(
+///         StdRand::with_seed(current_nanos()),
+///         InMemoryCorpus::new(),
+///         InMemoryCorpus::new(),
+///         &mut feedback,
+///         &mut objective,
+///     )
+///     .unwrap();
+///
+///     let scheduler = QueueScheduler::new();
+///     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+///     let mut manager = NopEventManager::new();
+///
+///     let mut stages = tuple_list!(StdMutationalStage::new(NopMutator::new(
+///         MutationResult::Mutated
+///     )));
+///
+///     state
+///         .corpus_mut()
+///         .add(Testcase::new(BytesInput::from(
+///             encoded_input_text.as_bytes().to_vec(),
+///         )))
+///         .unwrap();
+///
+///     let corpus_id = fuzzer
+///         .fuzz_one(&mut stages, &mut executor, &mut state, &mut manager)
+///         .unwrap();
+///
+///     unsafe {
+///         assert!(input_text
+///             .as_bytes()
+///             .iter()
+///             .zip(STDOUT.as_ref().unwrap().iter().filter(|e| **e != 10)) // ignore newline chars
+///             .all(|(&a, &b)| a == b));
+///         assert!(STDERR.as_ref().unwrap().is_empty());
+///     }
+///
+///     state
+///         .corpus()
+///         .get(corpus_id)
+///         .unwrap()
+///         .replace(Testcase::new(BytesInput::from(
+///             encoded_input_text.bytes().skip(1).collect::<Vec<u8>>(), // skip one char to make it invalid code
+///         )));
+///
+///     fuzzer
+///         .fuzz_one(&mut stages, &mut executor, &mut state, &mut manager)
+///         .unwrap();
+///
+///     unsafe {
+///         let compare_vec: Vec<u8> = Vec::new();
+///         assert_eq!(compare_vec, *STDERR.as_ref().unwrap());
+///         // stdout will still contain data, we're just checking that there is an error message
+///     }
+/// }
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct StdOutObserver {
     /// The name of the observer.
@@ -208,6 +208,8 @@ where
 
 /// An observer that captures stderr of a target.
 /// Only works for supported executors.
+///
+/// Check docs for [`StdOutObserver`] for example.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct StdErrObserver {
     /// The name of the observer.
