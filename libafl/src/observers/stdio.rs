@@ -14,8 +14,11 @@ use crate::{inputs::UsesInput, observers::Observer, state::State, Error};
 /// Only works for supported executors.
 ///
 /// # Example usage
-#[cfg_attr(all(feature = "std", unix, not(miri)), doc = " ```")] // miri doesn't like the Command crate
-#[cfg_attr(not(all(feature = "std", unix, not(miri))), doc = " ```ignore")]
+#[cfg_attr(all(feature = "std", target_os = "linux", not(miri)), doc = " ```")] // miri doesn't like the Command crate, linux as a shorthand for the availability of base64
+#[cfg_attr(
+    not(all(feature = "std", target_os = "linux", not(miri))),
+    doc = " ```ignore"
+)]
 /// use std::borrow::Cow;
 ///
 /// use libafl::{
