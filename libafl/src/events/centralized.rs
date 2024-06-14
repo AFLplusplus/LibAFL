@@ -589,6 +589,8 @@ where
     {
         info!("handle_in_main!");
 
+        let event_name = event.name_detailed();
+
         match event {
             Event::NewTestcase {
                 input,
