@@ -1091,7 +1091,7 @@ where
     }
 
     /// For non zero-copy, we want to get rid of old pages with duplicate messages in the client
-    /// eventually. This function This function sees if we can deallocate older pages.
+    /// eventually. This function sees if we can deallocate older pages.
     /// The broker would have informed us by setting the safe_to_unmap-flag.
     unsafe fn prune_old_pages(&mut self) {
         // Exclude the current page by splitting of the last element for this iter

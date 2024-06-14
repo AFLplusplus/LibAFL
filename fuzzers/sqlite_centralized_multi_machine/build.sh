@@ -2,6 +2,7 @@
 
 if [ ! -d "sqlite3" ]; then
     curl 'https://sqlite.org/src/tarball/sqlite.tar.gz?r=c78cbf2e86850cc6' -o sqlite3.tar.gz && mkdir sqlite3 && pushd sqlite3 && tar xzf ../sqlite3.tar.gz --strip-components 1 && popd
+    mkdir corpus
     find ./sqlite3 -name "*.test" -exec cp {} corpus/ \;
 fi
 
