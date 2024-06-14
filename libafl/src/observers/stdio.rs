@@ -70,6 +70,10 @@ use crate::{inputs::UsesInput, observers::Observer, state::State, Error};
 ///         }
 ///         Ok(true)
 ///     }
+///
+///     fn last_result(&self) -> Result<bool, Error> {
+///         Ok(true)
+///     }
 /// }
 ///
 /// impl Named for ExportStdXObserver {
