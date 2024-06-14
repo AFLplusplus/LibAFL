@@ -4,10 +4,7 @@
 //!
 //! # Example usage
 //! ```rust
-//! #[cfg_attr(all(feature = "std", unix), doc = " ```")]
-//! #[cfg_attr(not(all(feature = "std", unix)), doc = " ```ignore")]
 //! use std::borrow::Cow;
-//!
 //!
 //! use libafl::{
 //!     corpus::{Corpus, InMemoryCorpus, Testcase},
