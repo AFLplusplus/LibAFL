@@ -175,6 +175,17 @@ where
     }
 }
 
+impl<'a> AsRef<[u8]> for OwnedRef<'a, [u8]> {
+    #[must_use]
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            OwnedRef::RefRaw(r, _) => unsafe { (*r).as_ref().unwrap() },
+            OwnedRef::Ref(r) => r,
+            OwnedRef::Owned(v) => v.as_ref(),
+        }
+    }
+}
+
 impl<'a, T> AsRef<T> for OwnedRef<'a, T>
 where
     T: Sized,

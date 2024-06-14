@@ -1,5 +1,6 @@
 use core::fmt::Display;
 use std::{
+    boxed::Box,
     collections::HashMap,
     io::ErrorKind,
     process,
@@ -49,8 +50,8 @@ const DUMMY_BYTE: u8 = 0x14;
 
 /// Use OwnedRef as much as possible here to avoid useless copies.
 /// An owned TCP message for multi machine
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "I: serde::de::DeserializeOwned")]
+#[derive(Clone, Debug)]
+// #[serde(bound = "I: serde::de::DeserializeOwned")]
 pub enum MultiMachineMsg<'a, I>
 where
     I: Input,
@@ -87,6 +88,19 @@ where
     #[must_use]
     pub fn llmp_msg(msg: OwnedRef<'a, [u8]>) -> Self {
         MultiMachineMsg::LlmpMsg(msg)
+    }
+
+    pub fn serialize_as_ref(&self) -> &[u8] {
+        match self {
+            MultiMachineMsg::LlmpMsg(msg) => msg.as_ref(),
+            MultiMachineMsg::Event(_) => {
+                panic!("Not supported")
+            }
+        }
+    }
+
+    pub fn from_llmp_msg(msg: Box<[u8]>) -> MultiMachineMsg<'a, I> {
+        MultiMachineMsg::LlmpMsg(OwnedRef::Owned(msg))
     }
 }
 
@@ -324,10 +338,9 @@ where
             node_msg.set_len(node_msg_len);
         }
         stream.read_exact(node_msg.as_mut_slice()).await?;
+        let node_msg = node_msg.into_boxed_slice();
 
-        Ok(Some(bincode::deserialize(node_msg.as_ref()).map_err(
-            |_| Error::serialize("Error while deserializing"),
-        )?))
+        Ok(Some(MultiMachineMsg::from_llmp_msg(node_msg)))
     }
 
     /// Write an [`OwnedTcpMultiMachineMsg`] to a stream.
@@ -336,8 +349,7 @@ where
         stream: &mut TcpStream,
         msg: &MultiMachineMsg<'a, I>,
     ) -> Result<(), Error> {
-        let serialized_msg =
-            bincode::serialize(msg).map_err(|_| Error::serialize("Error while serializing"))?;
+        let serialized_msg = msg.serialize_as_ref();
         let msg_len = u32::to_le_bytes(serialized_msg.len() as u32);
 
         // 0. Write the dummy byte
@@ -347,7 +359,7 @@ where
         stream.write_all(&msg_len).await?;
 
         // 2. Write msg
-        stream.write_all(&serialized_msg).await?;
+        stream.write_all(serialized_msg).await?;
 
         Ok(())
     }

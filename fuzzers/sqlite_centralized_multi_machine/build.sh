@@ -5,10 +5,14 @@ if [ ! -d "sqlite3" ]; then
     find ./sqlite3 -name "*.test" -exec cp {} corpus/ \;
 fi
 
-cargo build --release
+if [ "$1" = "release" ]; then
+  cargo build --release
+else
+  cargo build
+fi
 
-export CC=`pwd`/target/release/libafl_cc
-export CXX=`pwd`/target/release/libafl_cxx
+export CC=`pwd`/target/debug/libafl_cc
+export CXX=`pwd`/target/debug/libafl_cxx
 export CFLAGS='--libafl'
 export CXXFLAGS='--libafl'
 export CFLAGS="$CFLAGS -DSQLITE_MAX_LENGTH=128000000 \
@@ -27,5 +31,11 @@ make -j$(nproc)
 make sqlite3.c
 popd
 
-./target/release/libafl_cc --libafl -I ./sqlite3 -c ./sqlite3/test/ossfuzz.c -o ./sqlite3/test/ossfuzz.o
-./target/release/libafl_cxx --libafl -o ossfuzz ./sqlite3/test/ossfuzz.o ./sqlite3/sqlite3.o -pthread -ldl -lz
+if [ "$1" = "release" ]; then
+  ./target/release/libafl_cc --libafl -I ./sqlite3 -c ./sqlite3/test/ossfuzz.c -o ./sqlite3/test/ossfuzz.o
+  ./target/release/libafl_cxx --libafl -o ossfuzz ./sqlite3/test/ossfuzz.o ./sqlite3/sqlite3.o -pthread -ldl -lz
+else
+  ./target/debug/libafl_cc --libafl -I ./sqlite3 -c ./sqlite3/test/ossfuzz.c -o ./sqlite3/test/ossfuzz.o
+  ./target/debug/libafl_cxx --libafl -o ossfuzz ./sqlite3/test/ossfuzz.o ./sqlite3/sqlite3.o -pthread -ldl -lz
+fi
+

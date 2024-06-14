@@ -116,7 +116,6 @@ struct Opt {
     tokens: Vec<PathBuf>,
     */
     #[arg(
-        short,
         long,
         help = "The address of the parent node to connect to, if any",
         name = "PARENT_ADDR",
@@ -125,10 +124,9 @@ struct Opt {
     parent_addr: Option<String>,
 
     #[arg(
-        short,
         long,
         help = "The port on which the node will listen on, if children are to be expected",
-        name = "NB_CHILDREN",
+        name = "NODE_LISTENING_PORT",
         default_value = None
     )]
     node_listening_port: Option<u16>,
