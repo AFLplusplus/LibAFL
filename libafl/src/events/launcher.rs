@@ -476,7 +476,7 @@ where
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 #[derive(TypedBuilder)]
 #[allow(clippy::type_complexity, missing_debug_implementations)]
-pub struct CentralizedLauncher<'a, CF, MF, MT, S, SP> {
+pub struct CentralizedLauncher<'a, CF, MF, MT, SP> {
     /// The `ShmemProvider` to use
     shmem_provider: SP,
     /// The monitor instance to use
@@ -536,12 +536,10 @@ pub struct CentralizedLauncher<'a, CF, MF, MT, S, SP> {
     /// Tell the manager to serialize or not the state on restart
     #[builder(default = LlmpShouldSaveState::OnRestart)]
     serialize_state: LlmpShouldSaveState,
-    #[builder(setter(skip), default = PhantomData)]
-    phantom_data: PhantomData<(&'a S, &'a SP)>,
 }
 
 #[cfg(all(unix, feature = "std", feature = "fork"))]
-impl<CF, MF, MT, S, SP> Debug for CentralizedLauncher<'_, CF, MF, MT, S, SP> {
+impl<CF, MF, MT, SP> Debug for CentralizedLauncher<'_, CF, MF, MT, SP> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("Launcher")
             .field("configuration", &self.configuration)
@@ -559,22 +557,22 @@ impl<CF, MF, MT, S, SP> Debug for CentralizedLauncher<'_, CF, MF, MT, S, SP> {
 pub type StdCentralizedInnerMgr<S, SP> = LlmpRestartingEventManager<(), S, SP>;
 
 #[cfg(all(unix, feature = "std", feature = "fork"))]
-impl<'a, CF, MF, MT, S, SP> CentralizedLauncher<'a, CF, MF, MT, S, SP>
+impl<'a, CF, MF, MT, SP> CentralizedLauncher<'a, CF, MF, MT, SP>
 where
-    MF: FnOnce(
-        Option<S>,
-        CentralizedEventManager<StdCentralizedInnerMgr<S, SP>, (), S, SP>,
-        CoreId,
-    ) -> Result<(), Error>,
     MT: Monitor + Clone + 'static,
-    S: State + HasExecutions,
-    S::Input: Send + Sync + 'static,
     SP: ShMemProvider + 'static,
 {
     /// Launch a standard Centralized-based fuzzer
-    pub fn launch(&mut self) -> Result<(), Error>
+    pub fn launch<S>(&mut self) -> Result<(), Error>
     where
+        S: State,
+        S::Input: Send + Sync + 'static,
         CF: FnOnce(
+            Option<S>,
+            CentralizedEventManager<StdCentralizedInnerMgr<S, SP>, (), S, SP>,
+            CoreId,
+        ) -> Result<(), Error>,
+        MF: FnOnce(
             Option<S>,
             CentralizedEventManager<StdCentralizedInnerMgr<S, SP>, (), S, SP>,
             CoreId,
@@ -603,10 +601,9 @@ where
 }
 
 #[cfg(all(unix, feature = "std", feature = "fork"))]
-impl<'a, CF, MF, MT, S, SP> CentralizedLauncher<'a, CF, MF, MT, S, SP>
+impl<'a, CF, MF, MT, SP> CentralizedLauncher<'a, CF, MF, MT, SP>
 where
     MT: Monitor + Clone + 'static,
-    S: State + HasExecutions,
     SP: ShMemProvider + 'static,
 {
     /// Launch a Centralized-based fuzzer.
@@ -614,12 +611,14 @@ where
     /// - `secondary_inner_mgr_builder` will be called to build the inner manager of the secondary nodes.
     #[allow(clippy::similar_names)]
     #[allow(clippy::too_many_lines)]
-    pub fn launch_generic<EM, EMB>(
+    pub fn launch_generic<EM, EMB, S>(
         &mut self,
         main_inner_mgr_builder: EMB,
         secondary_inner_mgr_builder: EMB,
     ) -> Result<(), Error>
     where
+        S: State,
+        S::Input: Send + Sync + 'static,
         CF: FnOnce(Option<S>, CentralizedEventManager<EM, (), S, SP>, CoreId) -> Result<(), Error>,
         EM: UsesState<State = S>,
         EMB: FnOnce(&Self, CoreId) -> Result<(Option<S>, EM), Error>,
