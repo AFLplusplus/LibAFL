@@ -12,7 +12,9 @@ use std::{
 };
 
 use enumflags2::{bitflags, BitFlags};
-use libafl_bolts::{bolts_prelude::GzipCompressor, current_time, ownedref::OwnedRef, Error};
+#[cfg(feature = "llmp_compression")]
+use libafl_bolts::bolts_prelude::GzipCompressor;
+use libafl_bolts::{current_time, ownedref::OwnedRef, Error};
 use log::info;
 use serde::{Deserialize, Serialize};
 use tokio::{
@@ -53,7 +55,10 @@ pub enum MultiMachineMsg<'a, I>
 where
     I: Input,
 {
+    /// A raw llmp message (not deserialized)
     LlmpMsg(OwnedRef<'a, [u8]>),
+
+    /// A LibAFL Event (already deserialized)
     Event(OwnedRef<'a, Event<I>>),
 }
 
@@ -355,7 +360,7 @@ where
 
         for old_msg in &self.old_msgs {
             let event_ref: MultiMachineMsg<I> =
-                unsafe { MultiMachineMsg::llmp_msg(OwnedRef::Ref(old_msg.as_slice())) };
+                MultiMachineMsg::llmp_msg(OwnedRef::Ref(old_msg.as_slice()));
             Self::write_msg(stream, &event_ref).await?;
         }
 

@@ -3693,7 +3693,10 @@ where
                             match TcpStream::connect((IP_LOCALHOST, port)) {
                                 Ok(stream) => break stream,
                                 Err(_) => {
-                                    log::info!("Connection Refused.. Retrying");
+                                    info!("Connection Refused. Retrying...");
+
+                                    #[cfg(feature = "std")]
+                                    thread::sleep(Duration::from_millis(50));
                                 }
                             }
                         }
