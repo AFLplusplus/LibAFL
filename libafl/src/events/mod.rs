@@ -373,18 +373,18 @@ where
         }
     }
 
-    fn name_detailed(&self) -> &str {
+    fn name_detailed(&self) -> String {
         match self {
             Event::NewTestcase { input, .. } => {
-                format!("Testcase {}", input.generate_name(0)).as_str()
+                format!("Testcase {}", input.generate_name(0))
             }
-            Event::UpdateExecStats { .. } => "Client Heartbeat",
-            Event::UpdateUserStats { .. } => "UserStats",
+            Event::UpdateExecStats { .. } => "Client Heartbeat".to_string(),
+            Event::UpdateUserStats { .. } => "UserStats".to_string(),
             #[cfg(feature = "introspection")]
-            Event::UpdatePerfMonitor { .. } => "PerfMonitor",
-            Event::Objective { .. } => "Objective",
-            Event::Log { .. } => "Log",
-            Event::CustomBuf { .. } => "CustomBuf",
+            Event::UpdatePerfMonitor { .. } => "PerfMonitor".to_string(),
+            Event::Objective { .. } => "Objective".to_string(),
+            Event::Log { .. } => "Log".to_string(),
+            Event::CustomBuf { .. } => "CustomBuf".to_string(),
             /*Event::Custom {
                 sender_id: _, /*custom_event} => custom_event.name()*/
             } => "todo",*/

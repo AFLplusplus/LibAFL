@@ -90,6 +90,7 @@ where
         MultiMachineMsg::LlmpMsg(msg)
     }
 
+    /// Get the message
     pub fn serialize_as_ref(&self) -> &[u8] {
         match self {
             MultiMachineMsg::LlmpMsg(msg) => msg.as_ref(),
@@ -99,6 +100,7 @@ where
         }
     }
 
+    /// To owned message
     pub fn from_llmp_msg(msg: Box<[u8]>) -> MultiMachineMsg<'a, I> {
         MultiMachineMsg::LlmpMsg(OwnedRef::Owned(msg))
     }
