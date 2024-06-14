@@ -10,12 +10,12 @@ use core::{
 use std::{fs::File, io::Read, path::Path};
 
 use ahash::RandomState;
+use libafl_bolts::HasLen;
 #[cfg(feature = "std")]
 use libafl_bolts::{fs::write_file_atomic, Error};
-use libafl_bolts::{ownedref::OwnedSlice, HasLen};
 use serde::{Deserialize, Serialize};
 
-use crate::inputs::{HasMutatorBytes, HasTargetBytes, Input};
+use crate::inputs::{HasMutatorBytes, Input};
 
 /// A bytes input is the basic input
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -93,13 +93,6 @@ impl HasMutatorBytes for BytesInput {
         R: core::ops::RangeBounds<usize>,
     {
         self.bytes.drain(range)
-    }
-}
-
-impl HasTargetBytes for BytesInput {
-    #[inline]
-    fn target_bytes(&self) -> OwnedSlice<u8> {
-        OwnedSlice::from(&self.bytes)
     }
 }
 
