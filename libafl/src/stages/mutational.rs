@@ -12,7 +12,7 @@ use crate::{
     inputs::Input,
     mark_feature_time,
     mutators::{MultiMutator, MutationResult, Mutator},
-    stages::{ExecutionCountRestartHelper, RetryRestartHelper, Stage},
+    stages::{RetryRestartHelper, Stage},
     start_timer,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
     Error, HasMetadata, HasNamedMetadata,
@@ -94,9 +94,6 @@ where
     /// Gets the number of iterations this mutator should run for.
     fn iterations(&self, state: &mut Self::State) -> Result<usize, Error>;
 
-    /// Gets the number of executions this mutator already did since it got first called in this fuzz round.
-    fn execs_since_progress_start(&mut self, state: &mut Self::State) -> Result<u64, Error>;
-
     /// Runs this (mutational) stage for the given testcase
     #[allow(clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
     fn perform_mutational(
@@ -108,12 +105,6 @@ where
     ) -> Result<(), Error> {
         start_timer!(state);
 
-        // Here saturating_sub is needed as self.iterations() might be actually smaller than the previous value before reset.
-        /*
-        let num = self
-            .iterations(state)?
-            .saturating_sub(self.execs_since_progress_start(state)?);
-        */
         let num = self.iterations(state)?;
         let mut testcase = state.current_testcase_mut()?;
 
@@ -159,8 +150,6 @@ pub struct StdMutationalStage<E, EM, I, M, Z> {
     mutator: M,
     /// The maximum amount of iterations we should do each round
     max_iterations: usize,
-    /// The progress helper for this mutational stage
-    restart_helper: ExecutionCountRestartHelper,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, EM, I, Z)>,
 }
@@ -189,10 +178,6 @@ where
     /// Gets the number of iterations as a random number
     fn iterations(&self, state: &mut Self::State) -> Result<usize, Error> {
         Ok(1 + state.rand_mut().below(self.max_iterations))
-    }
-
-    fn execs_since_progress_start(&mut self, state: &mut Self::State) -> Result<u64, Error> {
-        self.restart_helper.execs_since_progress_start(state)
     }
 }
 
@@ -277,7 +262,6 @@ where
         Self {
             mutator,
             max_iterations,
-            restart_helper: ExecutionCountRestartHelper::default(),
             phantom: PhantomData,
         }
     }

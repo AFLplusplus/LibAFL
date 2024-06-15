@@ -10,7 +10,7 @@ use crate::{
     fuzzer::Evaluator,
     mutators::Mutator,
     schedulers::{testcase_score::CorpusPowerTestcaseScore, TestcaseScore},
-    stages::{mutational::MutatedTransform, ExecutionCountRestartHelper, MutationalStage, Stage},
+    stages::{mutational::MutatedTransform, MutationalStage, Stage},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
     Error, HasMetadata,
 };
@@ -22,8 +22,6 @@ pub struct PowerMutationalStage<E, F, EM, I, M, Z> {
     name: Cow<'static, str>,
     /// The mutators we use
     mutator: M,
-    /// Helper for restarts
-    restart_helper: ExecutionCountRestartHelper,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, F, EM, I, Z)>,
 }
@@ -71,10 +69,6 @@ where
         let score = F::compute(state, &mut testcase)? as usize;
 
         Ok(score)
-    }
-
-    fn execs_since_progress_start(&mut self, state: &mut Self::State) -> Result<u64, Error> {
-        self.restart_helper.execs_since_progress_start(state)
     }
 }
 
@@ -127,7 +121,6 @@ where
             name: Cow::Borrowed(POWER_MUTATIONAL_STAGE_NAME),
             mutator,
             phantom: PhantomData,
-            restart_helper: ExecutionCountRestartHelper::default(),
         }
     }
 }

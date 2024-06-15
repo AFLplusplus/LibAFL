@@ -248,10 +248,6 @@ where
             1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS),
         )
     }
-
-    fn execs_since_progress_start(&mut self, state: &mut Self::State) -> Result<u64, Error> {
-        self.restart_helper.execs_since_progress_start(state)
-    }
 }
 
 impl<E, EM, I, M, Z> UsesState for TuneableMutationalStage<E, EM, I, M, Z>
@@ -464,6 +460,13 @@ where
         mark_feature_time!(state, PerfFeature::MutatePostExec);
 
         Ok(())
+    }
+
+    fn execs_since_progress_start(
+        &mut self,
+        state: &mut <Self as UsesState>::State,
+    ) -> Result<u64, Error> {
+        self.restart_helper.execs_since_progress_start(state)
     }
 }
 
