@@ -34,9 +34,9 @@ use libafl::{
     },
     stages::{
         calibrate::CalibrationStage, power::StdPowerMutationalStage, StdMutationalStage,
-        TracingStage,
+        TracingStage, corpus_pruning::RestartStage,
     },
-    state::{HasCorpus, StdState},
+    state::{HasCorpus, StdState, HasExecutions},
     Error, HasMetadata,
 };
 use libafl_bolts::{
@@ -349,8 +349,14 @@ fn fuzz(
         // Give it more time!
     );
 
+    let cb = |_fuzzer: &mut _, _executor: &mut _, state: &mut StdState<_, _, _, _>, _event_manager: &mut _| -> Result<bool, Error> {
+        let exec_count = state.executions();
+        Ok(exec_count % 100 == 0) 
+    };
+
+    let restart = RestartStage::new(cb);
     // The order of the stages matter!
-    let mut stages = tuple_list!(calibration, tracing, i2s, power);
+    let mut stages = tuple_list!(calibration, tracing, i2s, power, restart);
 
     // Read tokens
     if state.metadata_map().get::<Tokens>().is_none() {
@@ -383,10 +389,6 @@ fn fuzz(
     #[cfg(unix)]
     {
         let null_fd = file_null.as_raw_fd();
-        dup2(null_fd, io::stdout().as_raw_fd())?;
-        if std::env::var("LIBAFL_FUZZBENCH_DEBUG").is_err() {
-            dup2(null_fd, io::stderr().as_raw_fd())?;
-        }
     }
     // reopen file to make sure we're at the end
     log.replace(OpenOptions::new().append(true).create(true).open(logfile)?);
