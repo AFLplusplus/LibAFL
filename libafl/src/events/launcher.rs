@@ -14,8 +14,6 @@
 
 use alloc::string::ToString;
 #[cfg(feature = "std")]
-use core::marker::PhantomData;
-#[cfg(feature = "std")]
 use core::time::Duration;
 use core::{
     fmt::{self, Debug, Formatter},
@@ -88,7 +86,7 @@ const LIBAFL_DEBUG_OUTPUT: &str = "LIBAFL_DEBUG_OUTPUT";
     clippy::ignored_unit_patterns
 )]
 #[derive(TypedBuilder)]
-pub struct Launcher<'a, CF, EMH, MT, S, SP> {
+pub struct Launcher<'a, CF, MT, SP> {
     /// The `ShmemProvider` to use
     shmem_provider: SP,
     /// The monitor instance to use
@@ -139,18 +137,9 @@ pub struct Launcher<'a, CF, EMH, MT, S, SP> {
     /// Tell the manager to serialize or not the state on restart
     #[builder(default = LlmpShouldSaveState::OnRestart)]
     serialize_state: LlmpShouldSaveState,
-    #[builder(setter(skip), default = PhantomData)]
-    phantom_data: PhantomData<(&'a S, &'a SP, EMH)>,
 }
 
-impl<CF, EMH, MT, S, SP> Debug for Launcher<'_, CF, EMH, MT, S, SP>
-where
-    CF: FnOnce(Option<S>, LlmpRestartingEventManager<EMH, S, SP>, CoreId) -> Result<(), Error>,
-    EMH: EventManagerHooksTuple<S>,
-    MT: Monitor + Clone,
-    SP: ShMemProvider,
-    S: State,
-{
+impl<CF, MT, SP> Debug for Launcher<'_, CF, MT, SP> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut dbg_struct = f.debug_struct("Launcher");
         dbg_struct
@@ -170,16 +159,18 @@ where
     }
 }
 
-impl<'a, CF, MT, S, SP> Launcher<'a, CF, (), MT, S, SP>
+impl<'a, CF, MT, SP> Launcher<'a, CF, MT, SP>
 where
-    CF: FnOnce(Option<S>, LlmpRestartingEventManager<(), S, SP>, CoreId) -> Result<(), Error>,
     MT: Monitor + Clone,
-    S: State + HasExecutions,
     SP: ShMemProvider,
 {
     /// Launch the broker and the clients and fuzz
     #[cfg(all(unix, feature = "std", feature = "fork"))]
-    pub fn launch(&mut self) -> Result<(), Error> {
+    pub fn launch<S>(&mut self) -> Result<(), Error>
+    where
+        S: State + HasExecutions,
+        CF: FnOnce(Option<S>, LlmpRestartingEventManager<(), S, SP>, CoreId) -> Result<(), Error>,
+    {
         Self::launch_with_hooks(self, tuple_list!())
     }
 
@@ -192,19 +183,21 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<'a, CF, EMH, MT, S, SP> Launcher<'a, CF, EMH, MT, S, SP>
+impl<'a, CF, MT, SP> Launcher<'a, CF, MT, SP>
 where
-    CF: FnOnce(Option<S>, LlmpRestartingEventManager<EMH, S, SP>, CoreId) -> Result<(), Error>,
-    EMH: EventManagerHooksTuple<S> + Clone + Copy,
     MT: Monitor + Clone,
-    S: State + HasExecutions,
     SP: ShMemProvider,
 {
     /// Launch the broker and the clients and fuzz with a user-supplied hook
     #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[allow(clippy::similar_names)]
     #[allow(clippy::too_many_lines)]
-    pub fn launch_with_hooks(&mut self, hooks: EMH) -> Result<(), Error> {
+    pub fn launch_with_hooks<EMH, S>(&mut self, hooks: EMH) -> Result<(), Error>
+    where
+        S: State + HasExecutions,
+        EMH: EventManagerHooksTuple<S> + Clone + Copy,
+        CF: FnOnce(Option<S>, LlmpRestartingEventManager<EMH, S, SP>, CoreId) -> Result<(), Error>,
+    {
         if self.cores.ids.is_empty() {
             return Err(Error::illegal_argument(
                 "No cores to spawn on given, cannot launch anything.",
@@ -335,7 +328,12 @@ where
     /// Launch the broker and the clients and fuzz
     #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
     #[allow(unused_mut, clippy::match_wild_err_arm)]
-    pub fn launch_with_hooks(&mut self, hooks: EMH) -> Result<(), Error> {
+    pub fn launch_with_hooks<EMH, S>(&mut self, hooks: EMH) -> Result<(), Error>
+    where
+        S: State + HasExecutions,
+        EMH: EventManagerHooksTuple<S> + Clone + Copy,
+        CF: FnOnce(Option<S>, LlmpRestartingEventManager<EMH, S, SP>, CoreId) -> Result<(), Error>,
+    {
         use libafl_bolts::core_affinity;
 
         let is_client = std::env::var(_AFL_LAUNCHER_CLIENT);

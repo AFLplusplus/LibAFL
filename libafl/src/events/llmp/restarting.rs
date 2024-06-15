@@ -387,14 +387,7 @@ where
 #[cfg(feature = "std")]
 #[allow(clippy::default_trait_access, clippy::ignored_unit_patterns)]
 #[derive(TypedBuilder, Debug)]
-pub struct RestartingMgr<EMH, MT, S, SP>
-where
-    EMH: EventManagerHooksTuple<S>,
-    S: State,
-    SP: ShMemProvider,
-    MT: Monitor,
-    //CE: CustomEvent<I>,
-{
+pub struct RestartingMgr<EMH, MT, S, SP> {
     /// The shared memory provider to use for the broker or client spawned by the restarting
     /// manager.
     shmem_provider: SP,

@@ -48,7 +48,7 @@ pub enum NodePolicy {
 
 const DUMMY_BYTE: u8 = 0x14;
 
-/// Use OwnedRef as much as possible here to avoid useless copies.
+/// Use `OwnedRef` as much as possible here to avoid useless copies.
 /// An owned TCP message for multi machine
 #[derive(Clone, Debug)]
 // #[serde(bound = "I: serde::de::DeserializeOwned")]
@@ -59,7 +59,7 @@ where
     /// A raw llmp message (not deserialized)
     LlmpMsg(OwnedRef<'a, [u8]>),
 
-    /// A LibAFL Event (already deserialized)
+    /// A `LibAFL` Event (already deserialized)
     Event(OwnedRef<'a, Event<I>>),
 }
 
@@ -75,7 +75,7 @@ where
     ///
     /// # Safety
     ///
-    /// OwnedRef should **never** be a raw pointer for thread-safety reasons.
+    /// `OwnedRef` should **never** be a raw pointer for thread-safety reasons.
     /// We check this for debug builds, but not for release.
     #[must_use]
     pub unsafe fn event(event: OwnedRef<'a, Event<I>>) -> Self {
@@ -91,6 +91,7 @@ where
     }
 
     /// Get the message
+    #[must_use]
     pub fn serialize_as_ref(&self) -> &[u8] {
         match self {
             MultiMachineMsg::LlmpMsg(msg) => msg.as_ref(),
@@ -101,6 +102,7 @@ where
     }
 
     /// To owned message
+    #[must_use]
     pub fn from_llmp_msg(msg: Box<[u8]>) -> MultiMachineMsg<'a, I> {
         MultiMachineMsg::LlmpMsg(OwnedRef::Owned(msg))
     }
@@ -253,7 +255,7 @@ where
         if let Some(listening_port) = node_descriptor.node_listening_port {
             let bg_state = self_mutex.clone();
             let _handle: JoinHandle<Result<(), Error>> = rt.spawn(async move {
-                let addr = format!("0.0.0.0:{}", listening_port);
+                let addr = format!("0.0.0.0:{listening_port}");
                 info!("Starting background child task on {addr}...");
                 let listener = TcpListener::bind(addr).await.map_err(|e| {
                     Error::os_error(e, format!("Error while binding to port {listening_port}"))
@@ -289,7 +291,7 @@ where
 
     /// Add an event as past event.
     pub fn add_past_msg(&mut self, msg: &[u8]) {
-        self.old_msgs.push(msg.to_vec())
+        self.old_msgs.push(msg.to_vec());
     }
 
     /// The compressor
@@ -396,7 +398,7 @@ where
         {
             if let Some(parent) = &mut self.parent {
                 info!("Sending to parent...");
-                if (Self::write_msg(parent, &msg).await).is_err() {
+                if (Self::write_msg(parent, msg).await).is_err() {
                     info!("The parent most likely disconnected. We won't try to communicate with it again.");
                     self.parent.take();
                 }
@@ -411,7 +413,7 @@ where
             let mut ids_to_remove: Vec<NodeId> = Vec::new();
             for (child_id, child_stream) in &mut self.children {
                 info!("Sending to child...");
-                if (Self::write_msg(child_stream, &msg).await).is_err() {
+                if (Self::write_msg(child_stream, msg).await).is_err() {
                     // most likely the child disconnected. drop the connection later on and continue.
                     info!("The child disconnected. We won't try to communicate with it again.");
                     ids_to_remove.push(*child_id);

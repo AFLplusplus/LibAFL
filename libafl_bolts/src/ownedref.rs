@@ -83,7 +83,7 @@ where
 {
     fn clone(&self) -> Self {
         match self {
-            Self::RefRaw(ptr, mrkr) => Self::RefRaw(ptr.clone(), mrkr.clone()),
+            Self::RefRaw(ptr, mrkr) => Self::RefRaw(*ptr, mrkr.clone()),
             Self::Ref(slice) => Self::Ref(slice),
             Self::Owned(elt) => Self::Owned(elt.clone()),
         }
@@ -108,14 +108,13 @@ where
     }
 
     /// Returns true if the inner ref is a raw pointer, false otherwise.
+    #[must_use]
     pub fn is_raw(&self) -> bool {
-        match self {
-            OwnedRef::Ref(_) => true,
-            _ => false,
-        }
+        matches!(self, OwnedRef::Ref(_))
     }
 
     /// Return the inner value, if owned by the given object
+    #[must_use]
     pub fn into_owned(self) -> Option<Box<T>> {
         match self {
             Self::Owned(val) => Some(val),

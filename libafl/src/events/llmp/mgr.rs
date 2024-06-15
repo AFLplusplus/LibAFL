@@ -455,7 +455,7 @@ where
                     if let Some(item) = res.1 {
                         info!("Added received Testcase {evt_name} as item #{item}");
                     } else {
-                        info!("Testcase {evt_name} was discarded")
+                        info!("Testcase {evt_name} was discarded");
                     }
                 }
             }

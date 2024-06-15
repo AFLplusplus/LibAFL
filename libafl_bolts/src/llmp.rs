@@ -3690,15 +3690,14 @@ where
                     ErrorKind::ConnectionRefused => {
                         //connection refused. loop till the broker is up
                         loop {
-                            match TcpStream::connect((IP_LOCALHOST, port)) {
-                                Ok(stream) => break stream,
-                                Err(_) => {
-                                    info!("Connection Refused. Retrying...");
-
-                                    #[cfg(feature = "std")]
-                                    thread::sleep(Duration::from_millis(50));
-                                }
+                            if let Ok(stream) = TcpStream::connect((IP_LOCALHOST, port)) {
+                                break stream;
                             }
+
+                            info!("Connection Refused. Retrying...");
+
+                            #[cfg(feature = "std")]
+                            thread::sleep(Duration::from_millis(50));
                         }
                     }
                     _ => return Err(Error::illegal_state(e.to_string())),
