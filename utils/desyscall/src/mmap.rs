@@ -1,6 +1,7 @@
+use std::ptr;
+
 use libc::{c_int, c_void, off_t, size_t};
 use meminterval::Interval;
-use std::ptr;
 
 use crate::{Context, Mapping, Pointer};
 
@@ -440,8 +441,9 @@ pub unsafe fn madvise(addr: *mut c_void, length: size_t, advice: c_int) -> c_int
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use rusty_fork::rusty_fork_test;
+
+    use super::*;
     // cargo test -- --nocapture --test-threads=1
 
     rusty_fork_test! {

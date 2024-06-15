@@ -1,6 +1,7 @@
+use std::{mem::MaybeUninit, sync::Once};
+
 use libc::{c_int, c_void};
 use meminterval::IntervalTree;
-use std::{mem::MaybeUninit, sync::Once};
 
 pub mod file;
 pub mod mmap;
