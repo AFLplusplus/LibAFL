@@ -1,6 +1,7 @@
+use std::ptr;
+
 use libc::{c_int, c_void, off_t, size_t};
 use meminterval::Interval;
-use std::ptr;
 
 use crate::{Context, Mapping, Pointer};
 
@@ -36,8 +37,11 @@ extern "C" {
     fn __libafl_raw_madvise(addr: *mut c_void, length: size_t, advice: c_int) -> c_int;
 }
 
+/// # Safety
+/// Call to functions using syscalls
 #[no_mangle]
-pub unsafe fn mmap(
+#[allow(clippy::too_many_lines)]
+pub unsafe extern "C" fn mmap(
     addr: Pointer,
     length: size_t,
     prot: c_int,
@@ -66,7 +70,7 @@ pub unsafe fn mmap(
                 continue;
             }
             if length <= entry.interval.end as usize - entry.interval.start as usize {
-                candidate = Some((entry.interval.clone(), entry.value.clone()));
+                candidate = Some((*entry.interval, entry.value.clone()));
                 break;
             }
         }
@@ -76,7 +80,7 @@ pub unsafe fn mmap(
             if length < size {
                 ctx.mappings.delete(cand.0);
 
-                let end = cand.0.start.offset(length as isize);
+                let end = cand.0.start.add(length);
                 ctx.mappings.insert(
                     cand.0.start..end,
                     Mapping {
@@ -100,7 +104,7 @@ pub unsafe fn mmap(
             let ret = __libafl_raw_mmap(addr, length, prot, flags, fd, offset) as Pointer;
 
             if ret != libc::MAP_FAILED as Pointer {
-                let end = ret.offset(length as isize);
+                let end = ret.add(length);
                 ctx.mappings.insert(
                     ret..end,
                     Mapping {
@@ -119,7 +123,7 @@ pub unsafe fn mmap(
         return ret;
     }
 
-    let end = addr.offset(length as isize);
+    let end = addr.add(length);
 
     let mut prev: Option<(_, _)> = None;
     let mut fail = false;
@@ -133,12 +137,10 @@ pub unsafe fn mmap(
             if entry.interval.start != p.0 {
                 fail = true;
             }
-        } else {
-            if entry.interval.start > addr {
-                fail = true;
-            } else if entry.interval.start < addr {
-                reminder = Some((entry.interval.start, entry.value.clone()));
-            }
+        } else if entry.interval.start > addr {
+            fail = true;
+        } else if entry.interval.start < addr {
+            reminder = Some((entry.interval.start, entry.value.clone()));
         }
         if entry.value.prot != prot {
             fail = true;
@@ -148,12 +150,13 @@ pub unsafe fn mmap(
             already_mapped = true;
         }
 
-        intervals.push(entry.interval.clone());
+        intervals.push(*entry.interval);
 
         prev = Some((entry.interval.end, entry.value));
     }
 
     let mut reminder_next = None;
+    #[allow(clippy::comparison_chain)]
     if let Some(p) = prev.take() {
         if p.0 < end {
             fail = true;
@@ -216,8 +219,10 @@ pub unsafe fn mmap(
     ret
 }
 
+/// # Safety
+/// Call to functions using syscalls
 #[no_mangle]
-pub unsafe fn munmap(addr: *mut c_void, length: size_t) -> c_int {
+pub unsafe extern "C" fn munmap(addr: *mut c_void, length: size_t) -> c_int {
     let ctx = Context::get();
 
     if !ctx.enabled {
@@ -234,7 +239,7 @@ pub unsafe fn munmap(addr: *mut c_void, length: size_t) -> c_int {
     } else {
         length
     };
-    let end = addr.offset(aligned_length as isize);
+    let end = addr.add(aligned_length);
 
     ctx.disable();
 
@@ -286,7 +291,7 @@ pub unsafe fn munmap(addr: *mut c_void, length: size_t) -> c_int {
             new_entries.push((Interval::new(end, entry.interval.end), entry.value.clone()));
         }
 
-        intervals.push(entry.interval.clone());
+        intervals.push(*entry.interval);
     }
 
     for interval in intervals {
@@ -302,8 +307,10 @@ pub unsafe fn munmap(addr: *mut c_void, length: size_t) -> c_int {
     0
 }
 
+/// # Safety
+/// Calling to functions using syscalls
 #[no_mangle]
-pub unsafe fn mprotect(addr: *mut c_void, length: size_t, prot: c_int) -> c_int {
+pub unsafe extern "C" fn mprotect(addr: *mut c_void, length: size_t, prot: c_int) -> c_int {
     let ctx = Context::get();
 
     if !ctx.enabled {
@@ -316,7 +323,7 @@ pub unsafe fn mprotect(addr: *mut c_void, length: size_t, prot: c_int) -> c_int 
     } else {
         length
     };
-    let end = addr.offset(aligned_length as isize);
+    let end = addr.add(aligned_length);
 
     ctx.disable();
 
@@ -324,11 +331,9 @@ pub unsafe fn mprotect(addr: *mut c_void, length: size_t, prot: c_int) -> c_int 
 
     if let Some(mut entry) = query_iter.next() {
         // cache the repeated mprotects on the same region
-        if entry.interval.start == addr && entry.interval.end == end {
-            if entry.value.prot == prot {
-                ctx.enable();
-                return 0;
-            }
+        if entry.interval.start == addr && entry.interval.end == end && entry.value.prot == prot {
+            ctx.enable();
+            return 0;
         }
 
         let ret = __libafl_raw_mprotect(addr, length, prot);
@@ -385,7 +390,7 @@ pub unsafe fn mprotect(addr: *mut c_void, length: size_t, prot: c_int) -> c_int 
                 new_entries.push((Interval::new(end, entry.interval.end), entry.value.clone()));
             }
 
-            intervals.push(entry.interval.clone());
+            intervals.push(*entry.interval);
 
             if let Some(next) = query_iter.next() {
                 entry = next;
@@ -427,8 +432,10 @@ pub unsafe fn mprotect(addr: *mut c_void, length: size_t, prot: c_int) -> c_int 
     }
 }
 
+/// # Safety
+/// Call to functions using syscalls
 #[no_mangle]
-pub unsafe fn madvise(addr: *mut c_void, length: size_t, advice: c_int) -> c_int {
+pub unsafe extern "C" fn madvise(addr: *mut c_void, length: size_t, advice: c_int) -> c_int {
     let ctx = Context::get();
 
     if ctx.enabled && advice == libc::MADV_DONTNEED {
@@ -440,8 +447,9 @@ pub unsafe fn madvise(addr: *mut c_void, length: size_t, advice: c_int) -> c_int
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use rusty_fork::rusty_fork_test;
+
+    use super::*;
     // cargo test -- --nocapture --test-threads=1
 
     rusty_fork_test! {
@@ -453,7 +461,7 @@ mod tests {
                 let p = mmap(0x7ffff9f9e000usize as Pointer, 4096, 0x7, 0x22, 0, 0);
                 assert!(p as isize != -1);
 
-                println!("Pre {:?}", p);
+                println!("Pre {p:?}", );
                 Context::get().print_mappings();
 
                 let r = munmap(p, 1);
@@ -474,10 +482,10 @@ mod tests {
                 let p = mmap(0x7ffff9f9e000usize as Pointer, PAGE_SIZE*4, 0x7, 0x22, 0, 0);
                 assert!(p as isize != -1);
 
-                println!("Pre {:?}", p);
+                println!("Pre {p:?}",);
                 Context::get().print_mappings();
 
-                let r = munmap(p.offset(PAGE_SIZE as isize), PAGE_SIZE*2);
+                let r = munmap(p.add(PAGE_SIZE), PAGE_SIZE*2);
                 assert!(r == 0);
 
                 println!("Post");
@@ -495,19 +503,19 @@ mod tests {
                 let p = mmap(0x7ffff9f9e000usize as Pointer, PAGE_SIZE*4, 0x7, 0x22, 0, 0);
                 assert!(p as isize != -1);
 
-                println!("Pre {:?}", p);
+                println!("Pre {p:?}");
                 Context::get().print_mappings();
 
-                let r = munmap(p.offset(PAGE_SIZE as isize), PAGE_SIZE*2);
+                let r = munmap(p.add(PAGE_SIZE), PAGE_SIZE*2);
                 assert!(r == 0);
 
                 println!("Post");
                 Context::get().print_mappings();
 
-                let p = mmap(p.offset(PAGE_SIZE as isize), PAGE_SIZE, 0x1, 0x22, 0, 0);
+                let p = mmap(p.add(PAGE_SIZE), PAGE_SIZE, 0x1, 0x22, 0, 0);
                 assert!(p as isize != -1);
 
-                println!("Remap {:?}", p);
+                println!("Remap {p:?}");
                 Context::get().print_mappings();
             }
         }
@@ -522,10 +530,10 @@ mod tests {
                 let p = mmap(0 as Pointer, PAGE_SIZE*4, 0x7, 0x22, 0, 0);
                 assert!(p as isize != -1);
 
-                println!("Pre {:?}", p);
+                println!("Pre {p:?}");
                 Context::get().print_mappings();
 
-                let r = munmap(p.offset(PAGE_SIZE as isize), PAGE_SIZE*2);
+                let r = munmap(p.add(PAGE_SIZE), PAGE_SIZE*2);
                 assert!(r == 0);
 
                 println!("Post");
@@ -534,7 +542,7 @@ mod tests {
                 let p = mmap(0 as Pointer, PAGE_SIZE, 0x7, 0x22, 0, 0);
                 assert!(p as isize != -1);
 
-                println!("Remap {:?}", p);
+                println!("Remap {p:?}");
                 Context::get().print_mappings();
             }
         }

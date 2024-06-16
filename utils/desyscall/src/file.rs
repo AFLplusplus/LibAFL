@@ -9,8 +9,11 @@ extern "C" {
     fn __libafl_raw_read(fd: c_int, buf: Pointer, count: size_t) -> ssize_t;
 }
 
+/// # Safety
+/// Call to functions using syscalls
+#[allow(clippy::cast_possible_wrap)]
 #[no_mangle]
-pub unsafe fn write(fd: c_int, buf: Pointer, count: size_t) -> ssize_t {
+pub unsafe extern "C" fn write(fd: c_int, buf: Pointer, count: size_t) -> ssize_t {
     let ctx = Context::get();
 
     if ctx.enabled && (fd == 1 || fd == 2) {
@@ -20,11 +23,13 @@ pub unsafe fn write(fd: c_int, buf: Pointer, count: size_t) -> ssize_t {
     }
 }
 
+/// # Safety
+/// Call to functions using syscalls
 #[no_mangle]
-pub unsafe fn read(fd: c_int, buf: Pointer, count: size_t) -> ssize_t {
+pub unsafe extern "C" fn read(fd: c_int, buf: Pointer, count: size_t) -> ssize_t {
     let ctx = Context::get();
 
-    if ctx.enabled && fd >= 0 && fd <= 2 {
+    if ctx.enabled && (0..=2).contains(&fd) {
         0
     } else {
         __libafl_raw_read(fd, buf, count)
