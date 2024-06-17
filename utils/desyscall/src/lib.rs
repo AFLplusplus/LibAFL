@@ -1,13 +1,20 @@
+#[cfg(target_os = "linux")]
 use std::{mem::MaybeUninit, sync::Once};
 
+#[cfg(target_os = "linux")]
 use libc::{c_int, c_void};
+#[cfg(target_os = "linux")]
 use meminterval::IntervalTree;
 
+#[cfg(target_os = "linux")]
 pub mod file;
+#[cfg(target_os = "linux")]
 pub mod mmap;
 
+#[cfg(target_os = "linux")]
 pub type Pointer = *mut c_void;
 
+#[cfg(target_os = "linux")]
 #[derive(Debug, Clone)]
 pub struct Mapping {
     prot: c_int,
@@ -15,18 +22,21 @@ pub struct Mapping {
     mapped: bool,
 }
 
+#[cfg(target_os = "linux")]
 pub struct Context {
     enabled: bool,
     mappings: IntervalTree<Pointer, Mapping>,
     exit_hook: Option<Box<dyn FnMut(i32)>>,
 }
 
+#[cfg(target_os = "linux")]
 impl Default for Context {
     fn default() -> Self {
         Self::new()
     }
 }
 
+#[cfg(target_os = "linux")]
 impl Context {
     #[must_use]
     pub fn new() -> Self {
@@ -76,6 +86,7 @@ impl Context {
     }
 }
 
+#[cfg(target_os = "linux")]
 extern "C" {
     fn __libafl_raw_exit_group(status: c_int);
 }
@@ -84,6 +95,7 @@ extern "C" {
 /// # Safety
 /// Call to function using syscalls
 #[no_mangle]
+#[cfg(target_os = "linux")]
 pub unsafe extern "C" fn _exit(status: c_int) {
     let ctx = Context::get();
 
