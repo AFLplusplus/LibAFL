@@ -61,6 +61,9 @@ use crate::events::multi_machine::TcpMultiMachineBuilder;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use crate::events::{centralized::CentralizedEventManager, CentralizedLlmpHook};
 #[cfg(all(unix, feature = "std", feature = "fork"))]
+use crate::inputs::UsesInput;
+use crate::observers::TimeObserver;
+#[cfg(all(unix, feature = "std", feature = "fork"))]
 use crate::state::UsesState;
 #[cfg(feature = "std")]
 use crate::{
@@ -72,7 +75,6 @@ use crate::{
     state::{HasExecutions, State},
     Error,
 };
-use crate::{inputs::UsesInput, observers::TimeObserver};
 
 /// The (internal) `env` that indicates we're running as client.
 const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
