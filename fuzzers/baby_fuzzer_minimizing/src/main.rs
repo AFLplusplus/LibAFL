@@ -138,7 +138,7 @@ pub fn main() -> Result<(), Error> {
 
     state.load_initial_inputs_forced(&mut fuzzer, &mut executor, &mut mgr, &[solution_dir])?;
 
-    let first_id = state.corpus().first();
+    let first_id = state.corpus().first().expect("Empty corpus");
     state.set_corpus_id(first_id)?;
 
     stages.perform_all(&mut fuzzer, &mut executor, &mut state, &mut mgr)?;
