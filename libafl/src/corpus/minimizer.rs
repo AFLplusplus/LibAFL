@@ -118,7 +118,7 @@ where
         let mut curr = 0;
         while let Some(idx) = cur_id {
             let (weight, input) = {
-                let mut testcase = state.corpus().get(idx)?.borrow_mut();
+                let mut testcase = state.corpus().get(id)?.borrow_mut();
                 let weight = TS::compute(state, &mut *testcase)?
                     .to_u64()
                     .expect("Weight must be computable.");

@@ -50,8 +50,8 @@ where
         }
     }
 
-    fn post_exec(&mut self, state: &mut S, new_corpus_idx: Option<CorpusId>) -> Result<(), Error> {
-        M::post_exec(self, state, new_corpus_idx)
+    fn post_exec(&mut self, state: &mut S, new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
+        M::post_exec(self, state, new_corpus_id)
     }
 }
 
@@ -174,7 +174,7 @@ where
             }
         }
 
-        let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+        let mut other_testcase = state.corpus().get(id)?.borrow_mut();
         let other = other_testcase.load_input(state.corpus())?;
 
         let choice = name_choice % other.names().len();
@@ -198,7 +198,7 @@ where
             let target = state.rand_mut().below(size);
             let range = rand_range(state, other_size, min(other_size, size - target));
 
-            let other_testcase = state.corpus().get(idx)?.borrow_mut();
+            let other_testcase = state.corpus().get(id)?.borrow_mut();
             // No need to load the input again, it'll still be cached.
             let other = other_testcase.input().as_ref().unwrap();
 
@@ -278,7 +278,7 @@ where
             }
         }
 
-        let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+        let mut other_testcase = state.corpus().get(id)?.borrow_mut();
         let other = other_testcase.load_input(state.corpus())?;
 
         let choice = name_choice % other.names().len();
@@ -302,7 +302,7 @@ where
             let target = state.rand_mut().below(size);
             let range = rand_range(state, other_size, min(other_size, size - target));
 
-            let other_testcase = state.corpus().get(idx)?.borrow_mut();
+            let other_testcase = state.corpus().get(id)?.borrow_mut();
             // No need to load the input again, it'll still be cached.
             let other = other_testcase.input().as_ref().unwrap();
 

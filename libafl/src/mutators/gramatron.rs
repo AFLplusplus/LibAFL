@@ -123,7 +123,7 @@ where
 
         let rand_num = state.rand_mut().next();
 
-        let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+        let mut other_testcase = state.corpus().get(id)?.borrow_mut();
 
         if !other_testcase.has_metadata::<GramatronIdxMapMetadata>() {
             let meta = GramatronIdxMapMetadata::new(other_testcase.load_input(state.corpus())?);

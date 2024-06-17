@@ -33,7 +33,7 @@ where
     fn on_remove(
         &mut self,
         _state: &mut Self::State,
-        idx: CorpusId,
+        id: CorpusId,
         _testcase: &Option<Testcase<<Self::State as UsesInput>::Input>>,
     ) -> Result<(), Error> {
         self.all.remove(&idx);
@@ -45,9 +45,9 @@ impl<S> Scheduler for MergeScheduler<S>
 where
     S: State + HasCorpus,
 {
-    fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
+    fn on_add(&mut self, state: &mut Self::State, id: CorpusId) -> Result<(), Error> {
         self.all.insert(idx);
-        let testcase = state.corpus().get(idx)?.borrow();
+        let testcase = state.corpus().get(id)?.borrow();
         let meta = testcase.metadata::<MapNoveltiesMetadata>()?;
         for cov_idx in &meta.list {
             self.mapping.insert(*cov_idx, idx);

@@ -410,13 +410,13 @@ where
     ) -> Result<(), Error> {
         let push_stage = &mut self.push_stage;
 
-        let Some(corpus_idx) = state.current_corpus_id()? else {
+        let Some(corpus_id) = state.current_corpus_id()? else {
             return Err(Error::illegal_state(
                 "state is not currently processing a corpus index",
             ));
         };
 
-        push_stage.set_current_corpus_id(corpus_idx);
+        push_stage.set_current_corpus_id(corpus_id);
 
         push_stage.init(fuzzer, state, event_mgr, &mut *executor.observers_mut())?;
 
@@ -480,7 +480,7 @@ impl RetryRestartHelper {
         S: HasNamedMetadata + HasCurrentCorpusId,
         ST: Named,
     {
-        let corpus_idx = state.current_corpus_id()?.ok_or_else(|| {
+        let corpus_id = state.current_corpus_id()?.ok_or_else(|| {
             Error::illegal_state(
                 "No current_corpus_id set in State, but called RetryRestartHelper::should_skip",
             )
@@ -504,9 +504,9 @@ impl RetryRestartHelper {
         metadata.tries_remaining = Some(tries_remaining);
 
         Ok(if tries_remaining == 0 {
-            metadata.skipped.insert(corpus_idx);
+            metadata.skipped.insert(corpus_id);
             false
-        } else if metadata.skipped.contains(&corpus_idx) {
+        } else if metadata.skipped.contains(&corpus_id) {
             // skip this testcase, we already retried it often enough...
             false
         } else {
@@ -757,9 +757,9 @@ pub mod test {
         let mut state = test_std_state();
         let stage = StageWithOneTry;
 
-        let corpus_idx = state.corpus_mut().add(Testcase::new(NopInput {}))?;
+        let corpus_id = state.corpus_mut().add(Testcase::new(NopInput {}))?;
 
-        state.set_corpus_idx(corpus_idx)?;
+        state.set_corpus_id(corpus_id)?;
 
         for _ in 0..10 {
             // used normally, no retries means we never skip

@@ -456,11 +456,11 @@ where
 
         // Time is measured directly the `evaluate_input` function
         let (untransformed, post) = input.try_transform_into(state)?;
-        let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
+        let (_, corpus_id) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
 
         start_timer!(state);
-        self.mutator_mut().post_exec(state, corpus_idx)?;
-        post.post_exec(state, corpus_idx)?;
+        self.mutator_mut().post_exec(state, corpus_id)?;
+        post.post_exec(state, corpus_id)?;
         mark_feature_time!(state, PerfFeature::MutatePostExec);
 
         Ok(())

@@ -110,7 +110,7 @@ where
 
     fn get(&self, idx: usize) -> Self::Entry {
         let initial = self.inner.initial();
-        if self.inner.get(idx) == initial {
+        if self.inner.get(id) == initial {
             *self.value_observer.default_value()
         } else {
             *self.value_observer.value()

@@ -62,7 +62,7 @@ where
         state: &mut Self::State,
         _manager: &mut EM,
     ) -> Result<(), Error> {
-        let Some(corpus_idx) = state.current_corpus_id()? else {
+        let Some(corpus_id) = state.current_corpus_id()? else {
             return Err(Error::illegal_state(
                 "state is not currently processing a corpus index",
             ));
@@ -71,7 +71,7 @@ where
         // Report your stats every `STATS_REPORT_INTERVAL`
         // compute pending, pending_favored, imported, own_finds
         {
-            let testcase = state.corpus().get(corpus_idx)?.borrow();
+            let testcase = state.corpus().get(corpus_id)?.borrow();
             if testcase.scheduled_count() == 0 {
                 self.has_fuzzed_size += 1;
                 if testcase.has_metadata::<IsFavoredMetadata>() {

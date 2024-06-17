@@ -54,7 +54,7 @@ where
     }
 
     /// Touch this index and maybe evict an entry if we have touched an input which was unloaded.
-    fn touch(&self, idx: CorpusId, corpus: &TestcaseStorageMap<I>) -> Result<(), Error> {
+    fn touch(&self, id: CorpusId, corpus: &TestcaseStorageMap<I>) -> Result<(), Error> {
         let mut loaded_mapping = self.loaded_mapping.borrow_mut();
         let mut loaded_entries = self.loaded_entries.borrow_mut();
         match loaded_mapping.entry(idx) {
@@ -74,7 +74,7 @@ where
         }
         if loaded_entries.len() > self.max_len {
             let idx = loaded_entries.pop_first().unwrap().1; // cannot panic
-            let cell = corpus.get(idx).ok_or_else(|| {
+            let cell = corpus.get(id).ok_or_else(|| {
                 Error::key_not_found(format!("Tried to evict non-existent entry {idx}"))
             })?;
             let mut tc = cell.try_borrow_mut()?;
@@ -107,7 +107,7 @@ where
         } else {
             &self.mapping.enabled
         };
-        let mut testcase = corpus.get(idx).unwrap().borrow_mut();
+        let mut testcase = corpus.get(id).unwrap().borrow_mut();
         match testcase.file_path() {
             Some(path) if path.canonicalize()?.starts_with(&self.corpus_dir) => {
                 // if it's already in the correct dir, we retain it
@@ -171,7 +171,7 @@ where
 
     fn replace(
         &mut self,
-        _idx: CorpusId,
+        _id: CorpusId,
         _testcase: Testcase<Self::Input>,
     ) -> Result<Testcase<Self::Input>, Error> {
         unimplemented!("It is unsafe to use this corpus variant with replace!");
@@ -335,7 +335,7 @@ where
 
     fn replace(
         &mut self,
-        _idx: CorpusId,
+        _id: CorpusId,
         _testcase: Testcase<Self::Input>,
     ) -> Result<Testcase<Self::Input>, Error> {
         unimplemented!("Artifact prefix is thin and cannot get, replace, or remove.")

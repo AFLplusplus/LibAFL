@@ -60,7 +60,7 @@ where
         state: &mut Self::State,
         _manager: &mut EM,
     ) -> Result<(), Error> {
-        let (mut corpus_idx, mut solutions_idx) =
+        let (mut corpus_id, mut solutions_idx) =
             if let Some(meta) = state.metadata_map().get::<DumpToDiskMetadata>() {
                 (
                     meta.last_corpus.and_then(|x| state.corpus().next(x)),
@@ -70,7 +70,7 @@ where
                 (state.corpus().first(), state.solutions().first())
             };
 
-        while let Some(i) = corpus_idx {
+        while let Some(i) = corpus_id {
             let mut testcase = state.corpus().get(i)?.borrow_mut();
             state.corpus().load_input_into(&mut testcase)?;
             let bytes = (self.to_bytes)(testcase.input().as_ref().unwrap(), state);
@@ -85,7 +85,7 @@ where
             let mut f = File::create(fname)?;
             drop(f.write_all(&bytes));
 
-            corpus_idx = state.corpus().next(i);
+            corpus_id = state.corpus().next(i);
         }
 
         while let Some(i) = solutions_idx {

@@ -413,7 +413,7 @@ where
         EM: EventFirer<State = Self::State>,
     {
         let exec_res = self.execute_no_process(state, manager, &input, observers, exit_kind)?;
-        let corpus_idx = self.process_execution(
+        let corpus_id = self.process_execution(
             state,
             manager,
             input,
@@ -422,7 +422,7 @@ where
             exit_kind,
             send_events,
         )?;
-        Ok((exec_res, corpus_idx))
+        Ok((exec_res, corpus_id))
     }
 
     /// Evaluate if a set of observation channels has an interesting state
@@ -457,7 +457,7 @@ where
                 self.feedback_mut()
                     .append_metadata(state, manager, observers, &mut testcase)?;
                 let idx = state.corpus_mut().add(testcase)?;
-                self.scheduler_mut().on_add(state, idx)?;
+                self.scheduler_mut().on_add(state, id)?;
 
                 if send_events && manager.should_send() {
                     // TODO set None for fast targets
@@ -658,7 +658,7 @@ where
         self.feedback_mut()
             .append_metadata(state, manager, &*observers, &mut testcase)?;
         let idx = state.corpus_mut().add(testcase)?;
-        self.scheduler_mut().on_add(state, idx)?;
+        self.scheduler_mut().on_add(state, id)?;
 
         let observers_buf = if manager.configuration() == EventConfig::AlwaysUnique {
             None
@@ -715,7 +715,7 @@ where
             idx // we are resuming
         } else {
             let idx = self.scheduler.next(state)?;
-            state.set_corpus_idx(idx)?; // set up for resume
+            state.set_corpus_id(idx)?; // set up for resume
             idx
         };
 
@@ -742,14 +742,14 @@ where
         state.introspection_monitor_mut().mark_manager_time();
 
         {
-            if let Ok(mut testcase) = state.testcase_mut(idx) {
+            if let Ok(mut testcase) = state.testcase_mut(id) {
                 let scheduled_count = testcase.scheduled_count();
                 // increase scheduled count, this was fuzz_level in afl
                 testcase.set_scheduled_count(scheduled_count + 1);
             }
         }
 
-        state.clear_corpus_idx()?;
+        state.clear_corpus_id()?;
 
         Ok(idx)
     }

@@ -399,7 +399,7 @@ where
     }
 
     #[allow(clippy::cast_precision_loss)]
-    fn post_exec(&mut self, state: &mut S, _new_corpus_idx: Option<CorpusId>) -> Result<(), Error> {
+    fn post_exec(&mut self, state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
         let before = self.finds_before;
         let after = state.corpus().count() + state.solutions().count();
 

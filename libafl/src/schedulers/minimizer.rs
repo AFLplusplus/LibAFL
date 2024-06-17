@@ -97,10 +97,10 @@ where
     fn on_replace(
         &mut self,
         state: &mut <Self as UsesState>::State,
-        idx: CorpusId,
+        id: CorpusId,
         testcase: &Testcase<<<Self as UsesState>::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
-        self.base.on_replace(state, idx, testcase)?;
+        self.base.on_replace(state, id, testcase)?;
         self.update_score(state, idx)
     }
 
@@ -108,15 +108,15 @@ where
     fn on_remove(
         &mut self,
         state: &mut <Self as UsesState>::State,
-        idx: CorpusId,
+        id: CorpusId,
         testcase: &Option<Testcase<<<Self as UsesState>::State as UsesInput>::Input>>,
     ) -> Result<(), Error> {
-        self.base.on_remove(state, idx, testcase)?;
+        self.base.on_remove(state, id, testcase)?;
         let mut entries =
             if let Some(meta) = state.metadata_map_mut().get_mut::<TopRatedsMetadata>() {
                 let entries = meta
                     .map
-                    .extract_if(|_, other_idx| *other_idx == idx)
+                    .extract_if(|_, other_idx| *other_idx == id)
                     .map(|(entry, _)| entry)
                     .collect::<Vec<_>>();
                 entries
@@ -202,8 +202,8 @@ where
     O: CanTrack,
 {
     /// Called when a [`Testcase`] is added to the corpus
-    fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
-        self.base.on_add(state, idx)?;
+    fn on_add(&mut self, state: &mut Self::State, id: CorpusId) -> Result<(), Error> {
+        self.base.on_add(state, id)?;
         self.update_score(state, idx)
     }
 
@@ -223,17 +223,17 @@ where
     /// Gets the next entry
     fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
         self.cull(state)?;
-        let mut idx = self.base.next(state)?;
+        let mut id = self.base.next(state)?;
         while {
             let has = !state
                 .corpus()
-                .get(idx)?
+                .get(id)?
                 .borrow()
                 .has_metadata::<IsFavoredMetadata>();
             has
         } && state.rand_mut().coinflip(self.skip_non_favored_prob)
         {
-            idx = self.base.next(state)?;
+            id = self.base.next(state)?;
         }
         Ok(idx)
     }
@@ -242,7 +242,7 @@ where
     fn set_current_scheduled(
         &mut self,
         _state: &mut Self::State,
-        _next_idx: Option<CorpusId>,
+        _next_id: Option<CorpusId>,
     ) -> Result<(), Error> {
         // We do nothing here, the inner scheduler will take care of it
         Ok(())
@@ -263,7 +263,7 @@ where
     pub fn update_score(
         &self,
         state: &mut <Self as UsesState>::State,
-        idx: CorpusId,
+        id: CorpusId,
     ) -> Result<(), Error> {
         // Create a new top rated meta if not existing
         if state.metadata_map().get::<TopRatedsMetadata>().is_none() {
@@ -272,21 +272,21 @@ where
 
         let mut new_favoreds = vec![];
         {
-            let mut entry = state.corpus().get(idx)?.borrow_mut();
+            let mut entry = state.corpus().get(id)?.borrow_mut();
             let factor = F::compute(state, &mut *entry)?;
             let meta = entry.metadata_map_mut().get_mut::<M>().ok_or_else(|| {
                 Error::key_not_found(format!(
-                    "Metadata needed for MinimizerScheduler not found in testcase #{idx}"
+                    "Metadata needed for MinimizerScheduler not found in testcase #{id}"
                 ))
             })?;
             let top_rateds = state.metadata_map().get::<TopRatedsMetadata>().unwrap();
             for elem in meta.as_iter() {
-                if let Some(old_idx) = top_rateds.map.get(&*elem) {
-                    if *old_idx == idx {
+                if let Some(old_id) = top_rateds.map.get(&*elem) {
+                    if *old_id == id {
                         new_favoreds.push(*elem); // always retain current; we'll drop it later otherwise
                         continue;
                     }
-                    let mut old = state.corpus().get(*old_idx)?.borrow_mut();
+                    let mut old = state.corpus().get(*old_id)?.borrow_mut();
                     if factor > F::compute(state, &mut *old)? {
                         continue;
                     }
@@ -294,7 +294,7 @@ where
                     let must_remove = {
                         let old_meta = old.metadata_map_mut().get_mut::<M>().ok_or_else(|| {
                             Error::key_not_found(format!(
-                                "{} needed for MinimizerScheduler not found in testcase #{old_idx}",
+                                "{} needed for MinimizerScheduler not found in testcase #{old_id}",
                                 type_name::<M>()
                             ))
                         })?;
@@ -317,7 +317,7 @@ where
             drop(
                 state
                     .corpus()
-                    .get(idx)?
+                    .get(id)?
                     .borrow_mut()
                     .metadata_map_mut()
                     .remove::<M>(),
@@ -331,7 +331,7 @@ where
                 .get_mut::<TopRatedsMetadata>()
                 .unwrap()
                 .map
-                .insert(elem, idx);
+                .insert(elem, id);
         }
         Ok(())
     }
