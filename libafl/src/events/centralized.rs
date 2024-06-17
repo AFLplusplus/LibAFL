@@ -45,7 +45,6 @@ use crate::{
 };
 
 pub(crate) const _LLMP_TAG_TO_MAIN: Tag = Tag(0x3453453);
-pub(crate) const _LLMP_TAG_TO_SECONDARY: Tag = Tag(0x3453453);
 
 /// A wrapper manager to implement a main-secondary architecture with another broker
 #[derive(Debug)]
