@@ -1,8 +1,6 @@
 //! Hooks for event managers, especifically these are used to hook before and and `handle_in_client`.
 //! This will allow user to define pre/post-processing code when the event manager receives any message from
 //! other clients
-use std::vec::Vec;
-
 use libafl_bolts::ClientId;
 
 use crate::{events::Event, state::State, Error};
@@ -18,18 +16,13 @@ pub trait EventManagerHook<S>
 where
     S: State,
 {
-    /// Hook run on event manager initialization.
-    fn init(&mut self) -> Result<(), Error> {
-        Ok(())
-    }
-
     /// The hook that runs before `handle_in_client`
     /// Return false if you want to cancel the subsequent event handling
     fn pre_exec(
         &mut self,
         state: &mut S,
         client_id: ClientId,
-        events: &mut Vec<Event<S::Input>>,
+        event: &Event<S::Input>,
     ) -> Result<bool, Error>;
 
     /// Triggered when the even manager decides to fire the event after processing
@@ -54,15 +47,12 @@ pub trait EventManagerHooksTuple<S>
 where
     S: State,
 {
-    /// Init all `broker_hooks`
-    fn init_all(&mut self) -> Result<(), Error>;
-
     /// The hook that runs before `handle_in_client`
     fn pre_exec_all(
         &mut self,
         state: &mut S,
         client_id: ClientId,
-        events: &mut Vec<Event<S::Input>>,
+        event: &Event<S::Input>,
     ) -> Result<bool, Error>;
 
     /// Ran when the Event Manager decides to accept an event and propagates it
@@ -81,17 +71,12 @@ impl<S> EventManagerHooksTuple<S> for ()
 where
     S: State,
 {
-    /// Init all `broker_hooks`
-    fn init_all(&mut self) -> Result<(), Error> {
-        Ok(())
-    }
-
     /// The hook that runs before `handle_in_client`
     fn pre_exec_all(
         &mut self,
         _state: &mut S,
         _client_id: ClientId,
-        _event: &mut Vec<Event<S::Input>>,
+        _event: &Event<S::Input>,
     ) -> Result<bool, Error> {
         Ok(true)
     }
@@ -117,21 +102,15 @@ where
     Tail: EventManagerHooksTuple<S>,
     S: State,
 {
-    /// Init all `broker_hooks`
-    fn init_all(&mut self) -> Result<(), Error> {
-        self.0.init()?;
-        self.1.init_all()
-    }
-
     /// The hook that runs before `handle_in_client`
     fn pre_exec_all(
         &mut self,
         state: &mut S,
         client_id: ClientId,
-        events: &mut Vec<Event<S::Input>>,
+        event: &Event<S::Input>,
     ) -> Result<bool, Error> {
-        let first = self.0.pre_exec(state, client_id, events)?;
-        let second = self.1.pre_exec_all(state, client_id, events)?;
+        let first = self.0.pre_exec(state, client_id, event)?;
+        let second = self.1.pre_exec_all(state, client_id, event)?;
         Ok(first & second)
     }
 

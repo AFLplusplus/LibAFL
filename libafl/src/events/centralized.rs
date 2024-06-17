@@ -121,7 +121,7 @@ impl CentralizedEventManagerBuilder {
         S: State,
         SP: ShMemProvider,
     {
-        let mut ret = CentralizedEventManager {
+        Ok(CentralizedEventManager {
             inner,
             hooks,
             client,
@@ -130,11 +130,7 @@ impl CentralizedEventManagerBuilder {
             time_ref: time_obs,
             is_main: self.is_main,
             phantom: PhantomData,
-        };
-
-        ret.hooks.init_all()?;
-
-        Ok(ret)
+        })
     }
 
     /// Create a centralized event manager on a port
@@ -157,7 +153,7 @@ impl CentralizedEventManagerBuilder {
         SP: ShMemProvider,
     {
         let client = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
-        let mut ret = CentralizedEventManager {
+        Ok(CentralizedEventManager {
             inner,
             hooks,
             client,
@@ -166,11 +162,7 @@ impl CentralizedEventManagerBuilder {
             time_ref: time_obs,
             is_main: self.is_main,
             phantom: PhantomData,
-        };
-
-        ret.hooks.init_all()?;
-
-        Ok(ret)
+        })
     }
 
     /// If a client respawns, it may reuse the existing connection, previously
@@ -190,7 +182,7 @@ impl CentralizedEventManagerBuilder {
         S: State,
         SP: ShMemProvider,
     {
-        let mut ret = CentralizedEventManager {
+        Ok(CentralizedEventManager {
             inner,
             hooks,
             client: LlmpClient::on_existing_from_env(shmem_provider, env_name)?,
@@ -199,11 +191,7 @@ impl CentralizedEventManagerBuilder {
             time_ref: time_obs,
             is_main: self.is_main,
             phantom: PhantomData,
-        };
-
-        ret.hooks.init_all()?;
-
-        Ok(ret)
+        })
     }
 
     /// Create an existing client from description
