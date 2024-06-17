@@ -1,6 +1,6 @@
 //! Hooks called on broker side
 use core::marker::PhantomData;
-use std::vec::Vec;
+use alloc::vec::Vec;
 
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{compress::GzipCompressor, llmp::LLMP_FLAG_COMPRESSED};

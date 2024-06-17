@@ -1,4 +1,5 @@
-use std::{fmt::Debug, marker::PhantomData, vec::Vec};
+use core::{fmt::Debug, marker::PhantomData};
+use alloc::vec::Vec;
 
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{compress::GzipCompressor, llmp::LLMP_FLAG_COMPRESSED};
