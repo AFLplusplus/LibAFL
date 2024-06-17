@@ -77,6 +77,7 @@ use core::{
 };
 #[cfg(feature = "std")]
 use std::{
+    boxed::Box,
     env,
     io::{ErrorKind, Read, Write},
     net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs},
@@ -86,6 +87,7 @@ use std::{
 
 #[cfg(all(debug_assertions, feature = "llmp_debug", feature = "std"))]
 use backtrace::Backtrace;
+use log::debug;
 #[cfg(all(unix, feature = "std"))]
 #[cfg(not(any(target_os = "solaris", target_os = "illumos")))]
 use nix::sys::socket::{self, sockopt::ReusePort};
@@ -2138,18 +2140,16 @@ where
     }
 }
 
-use std::boxed::Box;
-
-use log::debug;
-
 /// A set of brokers.
 /// Limitation: the hooks must be the same.
+#[cfg(feature = "std")]
 #[derive(Default)]
 pub struct Brokers {
     /// the brokers
     llmp_brokers: Vec<Box<dyn Broker>>,
 }
 
+#[cfg(feature = "std")]
 impl Debug for Brokers {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         Debug::fmt("Brokers", f)?;
@@ -2314,6 +2314,7 @@ where
     }
 }
 
+#[cfg(feature = "std")]
 impl Brokers {
     /// The constructor
     #[must_use]
