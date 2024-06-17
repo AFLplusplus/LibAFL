@@ -1,3 +1,3 @@
 #!/bin/bash
 
-RUST_LOG=info ./ossfuzz --cores 2-3 --input ./corpus
+./ossfuzz --cores 4-7 --input ./corpus

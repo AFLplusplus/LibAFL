@@ -16,7 +16,7 @@ use enumflags2::{bitflags, BitFlags};
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::bolts_prelude::GzipCompressor;
 use libafl_bolts::{current_time, ownedref::OwnedRef, Error};
-use log::info;
+use log::{error, info};
 use serde::{Deserialize, Serialize};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -262,26 +262,34 @@ where
                 })?;
                 let state = bg_state;
 
-                loop {
+                // The main listening loop. Should never fail.
+                'listening: loop {
                     info!("listening for children on {:?}...", listener);
-                    let (mut stream, addr) = listener
+                    match listener
                         .accept()
-                        .await
-                        .map_err(|e| Error::os_error(e, "Error while listening for child"))?;
-                    info!("{} joined the children.", addr);
-                    let mut state_guard = state.write().await;
+                        .await {
+                        Ok((mut stream, addr)) => {
+                            info!("{} joined the children.", addr);
+                            let mut state_guard = state.write().await;
 
-                    state_guard
-                        .send_old_events_to_stream::<I>(&mut stream)
-                        .await?;
+                            if let Err(e) = state_guard
+                                .send_old_events_to_stream::<I>(&mut stream)
+                                .await {
+                                error!("Error while send old messages: {:?}.", e);
+                                error!("The loop will resume");
+                                continue 'listening;
+                            }
 
-                    state_guard.children.insert(NodeId::new(), stream);
-                    info!(
-                        "[pid {}]{} added the child. nb children: {}",
-                        process::id(),
-                        addr,
-                        state_guard.children.len()
-                    );
+                            state_guard.children.insert(NodeId::new(), stream);
+                            info!("[pid {}]{} added the child. nb children: {}",
+                                process::id(),
+                                addr,
+                                state_guard.children.len())
+                        }
+                        Err(e) => {
+                            error!("Error while accepting child {:?}.", e)
+                        }
+                    }
                 }
             });
         }
@@ -357,12 +365,15 @@ where
         let msg_len = u32::to_le_bytes(serialized_msg.len() as u32);
 
         // 0. Write the dummy byte
+        info!("Sending dummy byte");
         stream.write_all(&[DUMMY_BYTE]).await?;
 
         // 1. Write msg size
+        info!("Sending msg len");
         stream.write_all(&msg_len).await?;
 
         // 2. Write msg
+        info!("Sending msg");
         stream.write_all(serialized_msg).await?;
 
         Ok(())
@@ -377,7 +388,9 @@ where
         for old_msg in &self.old_msgs {
             let event_ref: MultiMachineMsg<I> =
                 MultiMachineMsg::llmp_msg(OwnedRef::Ref(old_msg.as_slice()));
+            info!("Sending an old message...");
             Self::write_msg(stream, &event_ref).await?;
+            info!("Old message sent.");
         }
 
         info!("Sent {} old messages.", self.old_msgs.len());
@@ -389,7 +402,7 @@ where
         &mut self,
         msg: &MultiMachineMsg<'a, I>,
     ) -> Result<(), Error> {
-        info!("[multi-machine] Sending interesting events to nodes...");
+        info!("Sending interesting events to nodes...");
 
         if self
             .node_descriptor
@@ -398,8 +411,9 @@ where
         {
             if let Some(parent) = &mut self.parent {
                 info!("Sending to parent...");
-                if (Self::write_msg(parent, msg).await).is_err() {
-                    info!("The parent most likely disconnected. We won't try to communicate with it again.");
+                if let Err(e) = Self::write_msg(parent, msg).await {
+                    error!("The parent disconnected. We won't try to communicate with it again.");
+                    error!("Error: {:?}", e);
                     self.parent.take();
                 }
             }
@@ -508,9 +522,10 @@ where
                         break;
                     }
 
-                    Err(Error::OsError(_, _, _)) => {
+                    Err(Error::OsError(e, _, _)) => {
                         // most likely the parent disconnected. drop the connection
-                        info!("The child disconnected. We won't try to communicate with it again.");
+                        error!("The parent disconnected. We won't try to communicate with it again.");
+                        error!("Error: {:?}", e);
                         ids_to_remove.push(*child_id);
                         break;
                     }
