@@ -839,7 +839,9 @@ where
 macro_rules! feedback_and {
     ( $last:expr ) => { $last };
 
-    ( $head:expr, $($tail:expr), +) => {
+    ( $last:expr, ) => { $last };
+
+    ( $head:expr, $($tail:expr),+ $(,)?) => {
         // recursive call
         $crate::feedbacks::EagerAndFeedback::new($head , feedback_and!($($tail),+))
     };
@@ -850,7 +852,9 @@ macro_rules! feedback_and {
 macro_rules! feedback_and_fast {
     ( $last:expr ) => { $last };
 
-    ( $head:expr, $($tail:expr), +) => {
+    ( $last:expr, ) => { $last };
+
+    ( $head:expr, $($tail:expr),+ $(,)?) => {
         // recursive call
         $crate::feedbacks::FastAndFeedback::new($head , feedback_and_fast!($($tail),+))
     };
@@ -861,7 +865,9 @@ macro_rules! feedback_and_fast {
 macro_rules! feedback_or {
     ( $last:expr ) => { $last };
 
-    ( $head:expr, $($tail:expr), +) => {
+    ( $last:expr, ) => { $last };
+
+    ( $head:expr, $($tail:expr),+ $(,)?) => {
         // recursive call
         $crate::feedbacks::EagerOrFeedback::new($head , feedback_or!($($tail),+))
     };
@@ -872,7 +878,9 @@ macro_rules! feedback_or {
 macro_rules! feedback_or_fast {
     ( $last:expr ) => { $last };
 
-    ( $head:expr, $($tail:expr), +) => {
+    ( $last:expr, ) => { $last };
+
+    ( $head:expr, $($tail:expr),+ $(,)?) => {
         // recursive call
         $crate::feedbacks::FastOrFeedback::new($head , feedback_or_fast!($($tail),+))
     };

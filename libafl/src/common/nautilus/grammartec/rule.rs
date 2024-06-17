@@ -4,7 +4,6 @@ use std::sync::OnceLock;
 
 use libafl_bolts::rands::Rand;
 use pyo3::prelude::{PyObject, Python};
-use regex;
 use regex_syntax::hir::Hir;
 use serde::{Deserialize, Serialize};
 

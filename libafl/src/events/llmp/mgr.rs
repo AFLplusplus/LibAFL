@@ -8,8 +8,6 @@ use core::{marker::PhantomData, time::Duration};
 #[cfg(feature = "std")]
 use std::net::TcpStream;
 
-#[cfg(feature = "adaptive_serialization")]
-use libafl_bolts::tuples::Handle;
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{
     compress::GzipCompressor,
@@ -19,6 +17,7 @@ use libafl_bolts::{
     current_time,
     llmp::{LlmpClient, LlmpClientDescription},
     shmem::{NopShMemProvider, ShMemProvider},
+    tuples::Handle,
     ClientId,
 };
 #[cfg(feature = "std")]
@@ -30,22 +29,18 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "llmp_compression")]
 use crate::events::llmp::COMPRESS_THRESHOLD;
-#[cfg(feature = "adaptive_serialization")]
-use crate::events::AdaptiveSerializer;
-#[cfg(feature = "adaptive_serialization")]
-use crate::observers::TimeObserver;
 use crate::{
     events::{
         hooks::EventManagerHooksTuple,
         llmp::{LLMP_TAG_EVENT_TO_BOTH, _LLMP_TAG_EVENT_TO_BROKER},
-        CustomBufEventResult, CustomBufHandlerFn, Event, EventConfig, EventFirer, EventManager,
-        EventManagerId, EventProcessor, EventRestarter, HasCustomBufHandlers, HasEventManagerId,
-        ProgressReporter,
+        AdaptiveSerializer, CustomBufEventResult, CustomBufHandlerFn, Event, EventConfig,
+        EventFirer, EventManager, EventManagerId, EventProcessor, EventRestarter,
+        HasCustomBufHandlers, HasEventManagerId, ProgressReporter,
     },
     executors::{Executor, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{NopInput, UsesInput},
-    observers::ObserversTuple,
+    observers::{ObserversTuple, TimeObserver},
     state::{HasExecutions, HasLastReportTime, NopState, State, UsesState},
     Error, HasMetadata,
 };
@@ -74,16 +69,11 @@ where
     /// A node will not re-use the observer values sent over LLMP
     /// from nodes with other configurations.
     configuration: EventConfig,
-    #[cfg(feature = "adaptive_serialization")]
     serialization_time: Duration,
-    #[cfg(feature = "adaptive_serialization")]
     deserialization_time: Duration,
-    #[cfg(feature = "adaptive_serialization")]
     serializations_cnt: usize,
-    #[cfg(feature = "adaptive_serialization")]
     should_serialize_cnt: usize,
-    #[cfg(feature = "adaptive_serialization")]
-    pub(crate) time_ref: Handle<TimeObserver>,
+    pub(crate) time_ref: Option<Handle<TimeObserver>>,
     phantom: PhantomData<S>,
 }
 
@@ -149,12 +139,11 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
     }
 
     /// Create a manager from a raw LLMP client
-    #[cfg(feature = "adaptive_serialization")]
     pub fn build_from_client<S, SP>(
         self,
         llmp: LlmpClient<SP>,
         configuration: EventConfig,
-        time_ref: Handle<TimeObserver>,
+        time_ref: Option<Handle<TimeObserver>>,
     ) -> Result<LlmpEventManager<EMH, S, SP>, Error>
     where
         SP: ShMemProvider,
@@ -179,42 +168,17 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
         })
     }
 
-    /// Create a manager from a raw LLMP client
-    #[cfg(not(feature = "adaptive_serialization"))]
-    pub fn build_from_client<S, SP>(
-        self,
-        llmp: LlmpClient<SP>,
-        configuration: EventConfig,
-    ) -> Result<LlmpEventManager<EMH, S, SP>, Error>
-    where
-        SP: ShMemProvider,
-        S: State,
-    {
-        Ok(LlmpEventManager {
-            throttle: self.throttle,
-            last_sent: Duration::from_secs(0),
-            hooks: self.hooks,
-            always_interesting: self.always_interesting,
-            llmp,
-            #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
-            configuration,
-            phantom: PhantomData,
-            custom_buf_handlers: vec![],
-        })
-    }
-
     /// Create an LLMP event manager on a port
     ///
     /// If the port is not yet bound, it will act as a broker; otherwise, it
     /// will act as a client.
-    #[cfg(all(feature = "std", feature = "adaptive_serialization"))]
+    #[cfg(feature = "std")]
     pub fn build_on_port<S, SP>(
         self,
         shmem_provider: SP,
         port: u16,
         configuration: EventConfig,
-        time_ref: Handle<TimeObserver>,
+        time_ref: Option<Handle<TimeObserver>>,
     ) -> Result<LlmpEventManager<EMH, S, SP>, Error>
     where
         SP: ShMemProvider,
@@ -240,45 +204,15 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
         })
     }
 
-    /// Create an LLMP event manager on a port
-    ///
-    /// If the port is not yet bound, it will act as a broker; otherwise, it
-    /// will act as a client.
-    #[cfg(all(feature = "std", not(feature = "adaptive_serialization")))]
-    pub fn build_on_port<S, SP>(
-        self,
-        shmem_provider: SP,
-        port: u16,
-        configuration: EventConfig,
-    ) -> Result<LlmpEventManager<EMH, S, SP>, Error>
-    where
-        SP: ShMemProvider,
-        S: State,
-    {
-        let llmp = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
-        Ok(LlmpEventManager {
-            throttle: self.throttle,
-            last_sent: Duration::from_secs(0),
-            hooks: self.hooks,
-            always_interesting: self.always_interesting,
-            llmp,
-            #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
-            configuration,
-            phantom: PhantomData,
-            custom_buf_handlers: vec![],
-        })
-    }
-
     /// If a client respawns, it may reuse the existing connection, previously
     /// stored by [`LlmpClient::to_env()`].
-    #[cfg(all(feature = "std", feature = "adaptive_serialization"))]
+    #[cfg(feature = "std")]
     pub fn build_existing_client_from_env<S, SP>(
         self,
         shmem_provider: SP,
         env_name: &str,
         configuration: EventConfig,
-        time_ref: Handle<TimeObserver>,
+        time_ref: Option<Handle<TimeObserver>>,
     ) -> Result<LlmpEventManager<EMH, S, SP>, Error>
     where
         SP: ShMemProvider,
@@ -304,42 +238,13 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
         })
     }
 
-    /// If a client respawns, it may reuse the existing connection, previously
-    /// stored by [`LlmpClient::to_env()`].
-    #[cfg(all(feature = "std", not(feature = "adaptive_serialization")))]
-    pub fn build_existing_client_from_env<S, SP>(
-        self,
-        shmem_provider: SP,
-        env_name: &str,
-        configuration: EventConfig,
-    ) -> Result<LlmpEventManager<EMH, S, SP>, Error>
-    where
-        SP: ShMemProvider,
-        S: State,
-    {
-        let llmp = LlmpClient::on_existing_from_env(shmem_provider, env_name)?;
-        Ok(LlmpEventManager {
-            throttle: self.throttle,
-            last_sent: Duration::from_secs(0),
-            hooks: self.hooks,
-            always_interesting: self.always_interesting,
-            llmp,
-            #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
-            configuration,
-            phantom: PhantomData,
-            custom_buf_handlers: vec![],
-        })
-    }
-
     /// Create an existing client from description
-    #[cfg(feature = "adaptive_serialization")]
     pub fn build_existing_client_from_description<S, SP>(
         self,
         shmem_provider: SP,
         description: &LlmpClientDescription,
         configuration: EventConfig,
-        time_ref: Handle<TimeObserver>,
+        time_ref: Option<Handle<TimeObserver>>,
     ) -> Result<LlmpEventManager<EMH, S, SP>, Error>
     where
         SP: ShMemProvider,
@@ -360,40 +265,12 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
             serializations_cnt: 0,
             should_serialize_cnt: 0,
             time_ref,
-            phantom: PhantomData,
-            custom_buf_handlers: vec![],
-        })
-    }
-
-    /// Create an existing client from description
-    #[cfg(not(feature = "adaptive_serialization"))]
-    pub fn build_existing_client_from_description<S, SP>(
-        self,
-        shmem_provider: SP,
-        description: &LlmpClientDescription,
-        configuration: EventConfig,
-    ) -> Result<LlmpEventManager<EMH, S, SP>, Error>
-    where
-        SP: ShMemProvider,
-        S: State,
-    {
-        let llmp = LlmpClient::existing_client_from_description(shmem_provider, description)?;
-        Ok(LlmpEventManager {
-            throttle: self.throttle,
-            last_sent: Duration::from_secs(0),
-            hooks: self.hooks,
-            always_interesting: self.always_interesting,
-            llmp,
-            #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
-            configuration,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
         })
     }
 }
 
-#[cfg(feature = "adaptive_serialization")]
 impl<EMH, S, SP> AdaptiveSerializer for LlmpEventManager<EMH, S, SP>
 where
     SP: ShMemProvider,
@@ -425,7 +302,7 @@ where
         &mut self.should_serialize_cnt
     }
 
-    fn time_ref(&self) -> &Handle<TimeObserver> {
+    fn time_ref(&self) -> &Option<Handle<TimeObserver>> {
         &self.time_ref
     }
 }
@@ -556,11 +433,9 @@ where
                     let res = if client_config.match_with(&self.configuration)
                         && observers_buf.is_some()
                     {
-                        #[cfg(feature = "adaptive_serialization")]
                         let start = current_time();
                         let observers: E::Observers =
                             postcard::from_bytes(observers_buf.as_ref().unwrap())?;
-                        #[cfg(feature = "adaptive_serialization")]
                         {
                             self.deserialization_time = current_time() - start;
                         }
@@ -671,15 +546,6 @@ where
         Ok(())
     }
 
-    #[cfg(not(feature = "adaptive_serialization"))]
-    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
-    where
-        OT: ObserversTuple<Self::State> + Serialize,
-    {
-        Ok(Some(postcard::to_allocvec(observers)?))
-    }
-
-    #[cfg(feature = "adaptive_serialization")]
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
     where
         OT: ObserversTuple<Self::State> + Serialize,

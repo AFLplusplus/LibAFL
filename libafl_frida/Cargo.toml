@@ -49,17 +49,17 @@ yaxpeax-x86 = "1.2.2"
 iced-x86 = { version = "1.20.0", features = ["code_asm"], optional = true }
 
 [dependencies]
-libafl = { path = "../libafl", default-features = false, version = "0.12.0", features = [
+libafl = { path = "../libafl", default-features = false, version = "0.13.0", features = [
     "std",
     "derive",
     "frida_cli",
 ] }
-libafl_bolts = { path = "../libafl_bolts", version = "0.12.0", default-features = false, features = [
+libafl_bolts = { path = "../libafl_bolts", version = "0.13.0", default-features = false, features = [
     "std",
     "derive",
     "frida_cli"
 ] }
-libafl_targets = { path = "../libafl_targets", version = "0.12.0", features = [
+libafl_targets = { path = "../libafl_targets", version = "0.13.0", features = [
     "std",
     "sancov_cmplog",
 ] }
@@ -87,7 +87,7 @@ backtrace = { version = "0.3", default-features = false, features = [
     "serde",
 ] }
 num-traits = "0.2"
-ahash = "0.8"
+ahash = "^0.8" # fetch the latest
 paste = "1.0"
 log = "0.4.20"
 mmap-rs = "0.6.0"
@@ -104,3 +104,5 @@ winsafe = {version = "0.0.21", features = ["kernel"]}
 serial_test = { version = "3", default-features = false, features = ["logging"] }
 clap = {version = "4.5", features = ["derive"]}
 libloading = "0.8"
+mimalloc = { version = "0.1", default-features = false }
+dlmalloc ={version = "0.2.6", features = ["global"]}

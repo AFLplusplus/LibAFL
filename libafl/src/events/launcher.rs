@@ -34,8 +34,6 @@ use libafl_bolts::llmp::LlmpBroker;
 use libafl_bolts::os::dup2;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use libafl_bolts::os::startable_self;
-#[cfg(feature = "adaptive_serialization")]
-use libafl_bolts::tuples::{Handle, Handled};
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use libafl_bolts::{
     core_affinity::get_core_ids,
@@ -44,13 +42,12 @@ use libafl_bolts::{
 use libafl_bolts::{
     core_affinity::{CoreId, Cores},
     shmem::ShMemProvider,
-    tuples::tuple_list,
+    tuples::{tuple_list, Handle},
 };
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
 use super::hooks::EventManagerHooksTuple;
-#[cfg(feature = "adaptive_serialization")]
 use crate::observers::TimeObserver;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use crate::{
@@ -124,8 +121,9 @@ pub struct Launcher<'a, CF, EMH, MT, S, SP> {
     /// clusters.
     #[builder(default = None)]
     remote_broker_addr: Option<SocketAddr>,
-    #[cfg(feature = "adaptive_serialization")]
-    time_ref: Handle<TimeObserver>,
+    /// The time observer for addaptive serialization
+    #[builder(default = None)]
+    time_ref: Option<Handle<TimeObserver>>,
     /// If this launcher should spawn a new `broker` on `[Self::broker_port]` (default).
     /// The reason you may not want this is, if you already have a [`Launcher`]
     /// with a different configuration (for the same target) running on this machine.
@@ -275,7 +273,6 @@ where
                             .configuration(self.configuration)
                             .serialize_state(self.serialize_state)
                             .hooks(hooks);
-                        #[cfg(feature = "adaptive_serialization")]
                         let builder = builder.time_ref(self.time_ref.clone());
                         let (state, mgr) = builder.build().launch()?;
 
@@ -301,7 +298,6 @@ where
                 .serialize_state(self.serialize_state)
                 .hooks(hooks);
 
-            #[cfg(feature = "adaptive_serialization")]
             let builder = builder.time_ref(self.time_ref.clone());
 
             builder.build().launch()?;
@@ -342,7 +338,8 @@ where
             Ok(core_conf) => {
                 let core_id = core_conf.parse()?;
                 // the actual client. do the fuzzing
-                let (state, mgr) = RestartingMgr::<EMH, MT, S, SP>::builder()
+
+                let builder = RestartingMgr::<EMH, MT, S, SP>::builder()
                     .shmem_provider(self.shmem_provider.clone())
                     .broker_port(self.broker_port)
                     .kind(ManagerKind::Client {
@@ -350,9 +347,11 @@ where
                     })
                     .configuration(self.configuration)
                     .serialize_state(self.serialize_state)
-                    .hooks(hooks)
-                    .build()
-                    .launch()?;
+                    .hooks(hooks);
+
+                let builder = builder.time_ref(self.time_ref.clone());
+
+                let (state, mgr) = builder.build().launch()?;
 
                 return (self.run_client.take().unwrap())(state, mgr, CoreId(core_id));
             }
@@ -433,7 +432,7 @@ where
             #[cfg(feature = "std")]
             log::info!("I am broker!!.");
 
-            RestartingMgr::<EMH, MT, S, SP>::builder()
+            let builder = RestartingMgr::<EMH, MT, S, SP>::builder()
                 .shmem_provider(self.shmem_provider.clone())
                 .monitor(Some(self.monitor.clone()))
                 .broker_port(self.broker_port)
@@ -442,9 +441,11 @@ where
                 .exit_cleanly_after(Some(NonZeroUsize::try_from(self.cores.ids.len()).unwrap()))
                 .configuration(self.configuration)
                 .serialize_state(self.serialize_state)
-                .hooks(hooks)
-                .build()
-                .launch()?;
+                .hooks(hooks);
+
+            let builder = builder.time_ref(self.time_ref.clone());
+
+            builder.build().launch()?;
 
             //broker exited. kill all clients.
             for handle in &mut handles {
@@ -492,8 +493,8 @@ pub struct CentralizedLauncher<'a, CF, IM, MF, MT, S, SP> {
     #[builder(default = 1338_u16)]
     centralized_broker_port: u16,
     /// The time observer by which to adaptively serialize
-    #[cfg(feature = "adaptive_serialization")]
-    time_obs: &'a TimeObserver,
+    #[builder(default = None)]
+    time_obs: Option<Handle<TimeObserver>>,
     /// The list of cores to run on
     cores: &'a Cores,
     /// A file name to write all client output to
@@ -583,8 +584,7 @@ where
                 .serialize_state(centralized_launcher.serialize_state)
                 .hooks(tuple_list!());
 
-            #[cfg(feature = "adaptive_serialization")]
-            let builder = builder.time_ref(centralized_launcher.time_obs.handle());
+            let builder = builder.time_ref(centralized_launcher.time_obs.clone());
 
             builder.build().launch()
         };
@@ -724,18 +724,11 @@ where
                             let mut centralized_builder = CentralizedEventManager::builder();
                             centralized_builder = centralized_builder.is_main(true);
 
-                            #[cfg(not(feature = "adaptive_serialization"))]
                             let c_mgr = centralized_builder.build_on_port(
                                 mgr,
                                 self.shmem_provider.clone(),
                                 self.centralized_broker_port,
-                            )?;
-                            #[cfg(feature = "adaptive_serialization")]
-                            let c_mgr = centralized_builder.build_on_port(
-                                mgr,
-                                self.shmem_provider.clone(),
-                                self.centralized_broker_port,
-                                self.time_obs,
+                                self.time_obs.clone(),
                             )?;
 
                             self.main_run_client.take().unwrap()(state, c_mgr, *bind_to)
@@ -746,18 +739,11 @@ where
 
                             let centralized_builder = CentralizedEventManager::builder();
 
-                            #[cfg(not(feature = "adaptive_serialization"))]
                             let c_mgr = centralized_builder.build_on_port(
                                 mgr,
                                 self.shmem_provider.clone(),
                                 self.centralized_broker_port,
-                            )?;
-                            #[cfg(feature = "adaptive_serialization")]
-                            let c_mgr = centralized_builder.build_on_port(
-                                mgr,
-                                self.shmem_provider.clone(),
-                                self.centralized_broker_port,
-                                self.time_obs,
+                                self.time_obs.clone(),
                             )?;
 
                             self.secondary_run_client.take().unwrap()(state, c_mgr, *bind_to)
@@ -782,8 +768,7 @@ where
                 .serialize_state(self.serialize_state)
                 .hooks(tuple_list!());
 
-            #[cfg(feature = "adaptive_serialization")]
-            let builder = builder.time_ref(self.time_obs.handle());
+            let builder = builder.time_ref(self.time_obs.clone());
 
             builder.build().launch()?;
 

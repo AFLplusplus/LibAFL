@@ -40,9 +40,10 @@ where
     EM: UsesState<State = <Self as UsesState>::State>,
     Z: UsesState<State = <Self as UsesState>::State>,
 {
+    #[allow(rustdoc::broken_intra_doc_links)]
     /// Perform tracing on the given `CorpusId`. Useful for if wrapping [`TracingStage`] with your
-    /// own stage and you need to manage [`super::NestedStageRestartHelper`] differently; see
-    /// [`super::ConcolicTracingStage`]'s implementation as an example of usage.
+    /// own stage and you need to manage [`super::NestedStageRestartHelper`] differently
+    /// see [`super::ConcolicTracingStage`]'s implementation as an example of usage.
     pub fn trace(
         &mut self,
         fuzzer: &mut Z,

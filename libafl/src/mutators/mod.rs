@@ -21,9 +21,9 @@ pub mod tuneable;
 pub use tuneable::*;
 
 #[cfg(feature = "unicode")]
-pub mod string;
+pub mod unicode;
 #[cfg(feature = "unicode")]
-pub use string::*;
+pub use unicode::*;
 
 #[cfg(feature = "multipart_inputs")]
 pub mod multi;
@@ -33,7 +33,7 @@ pub use multi::*;
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
 
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{borrow::Cow, boxed::Box, vec::Vec};
 
 use libafl_bolts::{tuples::IntoVec, HasLen, Named};
 #[cfg(feature = "nautilus")]
@@ -401,5 +401,37 @@ impl<I, S> MutatorsTuple<I, S> for Vec<Box<dyn Mutator<I, S>>> {
 impl<I, S> IntoVec<Box<dyn Mutator<I, S>>> for Vec<Box<dyn Mutator<I, S>>> {
     fn into_vec(self) -> Vec<Box<dyn Mutator<I, S>>> {
         self
+    }
+}
+
+/// [`Mutator`] that does nothing, used for testing.
+///
+/// Example:
+///
+/// ```rust,ignore
+/// let mut stages = tuple_list!(StdMutationalStage::new(NopMutator(MutationResult::Mutated)));
+/// ```
+#[derive(Debug, Clone)]
+pub struct NopMutator {
+    result: MutationResult,
+}
+
+impl NopMutator {
+    /// The passed argument is returned every time the mutator is called.
+    #[must_use]
+    pub fn new(result: MutationResult) -> Self {
+        Self { result }
+    }
+}
+
+impl<I, S> Mutator<I, S> for NopMutator {
+    fn mutate(&mut self, _state: &mut S, _input: &mut I) -> Result<MutationResult, Error> {
+        Ok(self.result)
+    }
+}
+
+impl Named for NopMutator {
+    fn name(&self) -> &Cow<'static, str> {
+        &Cow::Borrowed("NopMutator")
     }
 }
