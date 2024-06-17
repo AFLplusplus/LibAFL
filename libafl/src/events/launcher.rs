@@ -70,7 +70,6 @@ use crate::{
     Error,
 };
 use crate::{inputs::UsesInput, observers::TimeObserver};
-use crate::executors::hooks::unix::unix_signal_handler;
 
 /// The (internal) `env` that indicates we're running as client.
 const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
