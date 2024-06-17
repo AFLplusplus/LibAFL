@@ -21,7 +21,14 @@ pub struct Context {
     exit_hook: Option<Box<dyn FnMut(i32)>>,
 }
 
+impl Default for Context {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Context {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             enabled: false,
@@ -74,13 +81,15 @@ extern "C" {
 }
 
 // void _exit(int status);
+/// # Safety
+/// Call to function using syscalls
 #[no_mangle]
-pub unsafe fn _exit(status: c_int) {
+pub unsafe extern "C" fn _exit(status: c_int) {
     let ctx = Context::get();
 
     if ctx.enabled {
         if let Some(hook) = &mut ctx.exit_hook {
-            (hook)(status as i32);
+            (hook)(status);
         }
     }
 
