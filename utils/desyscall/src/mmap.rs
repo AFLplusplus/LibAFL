@@ -41,6 +41,7 @@ extern "C" {
 /// Call to functions using syscalls
 #[no_mangle]
 #[allow(clippy::too_many_lines)]
+#[cfg(not(windows))]
 pub unsafe extern "C" fn mmap(
     addr: Pointer,
     length: size_t,
@@ -57,7 +58,10 @@ pub unsafe extern "C" fn mmap(
 
     // validity checks
     if length == 0 || length % PAGE_SIZE != 0 || (addr as usize) % PAGE_SIZE != 0 {
-        *libc::__errno_location() = libc::EINVAL;
+        #[cfg(target_os = "linux")]
+        {
+            *libc::__errno_location() = libc::EINVAL;
+        }
         return libc::MAP_FAILED as Pointer;
     }
 
@@ -231,7 +235,10 @@ pub unsafe extern "C" fn munmap(addr: *mut c_void, length: size_t) -> c_int {
 
     // validity checks
     if length == 0 || (addr as usize) % PAGE_SIZE != 0 {
-        *libc::__errno_location() = libc::EINVAL;
+        #[cfg(target_os = "linux")]
+        {
+            *libc::__errno_location() = libc::EINVAL;
+        }
         return -1;
     }
     let aligned_length = if length % PAGE_SIZE != 0 {
@@ -435,9 +442,9 @@ pub unsafe extern "C" fn mprotect(addr: *mut c_void, length: size_t, prot: c_int
 /// # Safety
 /// Call to functions using syscalls
 #[no_mangle]
+#[cfg(not(windows))]
 pub unsafe extern "C" fn madvise(addr: *mut c_void, length: size_t, advice: c_int) -> c_int {
     let ctx = Context::get();
-
     if ctx.enabled && advice == libc::MADV_DONTNEED {
         0
     } else {
@@ -446,6 +453,7 @@ pub unsafe extern "C" fn madvise(addr: *mut c_void, length: size_t, advice: c_in
 }
 
 #[cfg(test)]
+#[cfg(not(windows))]
 mod tests {
     use rusty_fork::rusty_fork_test;
 
