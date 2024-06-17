@@ -7,10 +7,9 @@ use std::{
 };
 
 #[cfg(feature = "llmp_compression")]
-use libafl_bolts::bolts_prelude::LLMP_FLAG_COMPRESSED;
+use libafl_bolts::llmp::LLMP_FLAG_COMPRESSED;
 use libafl_bolts::{
-    bolts_prelude::{Flags, LlmpBrokerInner, LlmpMsgHookResult, Tag},
-    llmp::LlmpHook,
+    llmp::{LlmpHook, Flags, LlmpBrokerInner, LlmpMsgHookResult, Tag},
     ownedref::OwnedRef,
     prelude::ShMemProvider,
     ClientId, Error,

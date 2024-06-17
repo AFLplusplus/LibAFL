@@ -54,9 +54,9 @@ use typed_builder::TypedBuilder;
 use super::EventManagerHooksTuple;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use super::StdLlmpEventHook;
-#[cfg(feature = "multi_machine")]
+#[cfg(all(unix, feature = "std", feature = "fork", feature = "multi_machine"))]
 use crate::events::multi_machine::NodeDescriptor;
-#[cfg(feature = "multi_machine")]
+#[cfg(all(unix, feature = "std", feature = "fork", feature = "multi_machine"))]
 use crate::events::multi_machine::TcpMultiMachineBuilder;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use crate::events::{centralized::CentralizedEventManager, CentralizedLlmpHook};
