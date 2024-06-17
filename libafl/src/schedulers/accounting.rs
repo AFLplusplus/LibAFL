@@ -15,12 +15,11 @@ use crate::{
     feedbacks::MapIndexesMetadata,
     inputs::UsesInput,
     observers::{CanTrack, ObserversTuple},
-    prelude::HasCurrentTestcase,
     schedulers::{
         minimizer::{IsFavoredMetadata, MinimizerScheduler, DEFAULT_SKIP_NON_FAVORED_PROB},
         LenTimeMulTestcaseScore, Scheduler,
     },
-    state::{HasCorpus, HasRand, UsesState},
+    state::{HasCorpus, HasCurrentTestcase, HasRand, UsesState},
     Error, HasMetadata,
 };
 
