@@ -131,7 +131,7 @@ where
         // We special-case crossover with self
         let id = random_corpus_id!(state.corpus(), state.rand_mut());
         if let Some(cur) = state.corpus().current() {
-            if idx == *cur {
+            if id == *cur {
                 let choice = name_choice % input.names().len();
                 let name = input.names()[choice].clone();
 
@@ -150,7 +150,7 @@ where
                     .parts_by_name(&name)
                     .filter(|&(p, _)| p != choice)
                     .nth(part_choice % parts)
-                    .map(|(idx, part)| (idx, part.bytes().len()));
+                    .map(|(id, part)| (id, part.bytes().len()));
 
                 if let Some((part_idx, size)) = maybe_size {
                     let target = state.rand_mut().below(size);
@@ -235,7 +235,7 @@ where
         // We special-case crossover with self
         let id = random_corpus_id!(state.corpus(), state.rand_mut());
         if let Some(cur) = state.corpus().current() {
-            if idx == *cur {
+            if id == *cur {
                 let choice = name_choice % input.names().len();
                 let name = input.names()[choice].clone();
 
@@ -254,7 +254,7 @@ where
                     .parts_by_name(&name)
                     .filter(|&(p, _)| p != choice)
                     .nth(part_choice % parts)
-                    .map(|(idx, part)| (idx, part.bytes().len()));
+                    .map(|(id, part)| (id, part.bytes().len()));
 
                 if let Some((part_idx, size)) = maybe_size {
                     let target = state.rand_mut().below(size);
