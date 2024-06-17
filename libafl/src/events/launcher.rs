@@ -177,7 +177,11 @@ where
     /// Launch the broker and the clients and fuzz
     #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
     #[allow(unused_mut, clippy::match_wild_err_arm)]
-    pub fn launch(&mut self) -> Result<(), Error> {
+    pub fn launch<S>(&mut self) -> Result<(), Error>
+    where
+        S: State + HasExecutions,
+        CF: FnOnce(Option<S>, LlmpRestartingEventManager<(), S, SP>, CoreId) -> Result<(), Error>,
+    {
         Self::launch_with_hooks(self, tuple_list!())
     }
 }

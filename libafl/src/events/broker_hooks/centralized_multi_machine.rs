@@ -1,4 +1,10 @@
-use std::{fmt::{Debug, Display}, marker::PhantomData, slice, sync::Arc, vec::Vec};
+use std::{
+    fmt::{Debug, Display},
+    marker::PhantomData,
+    slice,
+    sync::Arc,
+    vec::Vec,
+};
 
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::bolts_prelude::LLMP_FLAG_COMPRESSED;

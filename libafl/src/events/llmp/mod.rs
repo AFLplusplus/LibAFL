@@ -492,6 +492,7 @@ where
                 time,
                 executions,
                 forward_id,
+                #[cfg(feature = "multi_machine")]
                 node_id,
             } => Event::NewTestcase {
                 input: self.converter.as_mut().unwrap().convert(input)?,
@@ -502,6 +503,7 @@ where
                 time,
                 executions,
                 forward_id,
+                #[cfg(feature = "multi_machine")]
                 node_id,
             },
             Event::CustomBuf { buf, tag } => Event::CustomBuf { buf, tag },

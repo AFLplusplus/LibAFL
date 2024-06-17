@@ -421,6 +421,7 @@ where
                 forward_id,
                 ..
             } => {
+                #[cfg(feature = "std")]
                 debug!("[{}] Received new Testcase {evt_name} from {client_id:?} ({client_config:?}, forward {forward_id:?})", std::process::id());
 
                 if self.always_interesting {

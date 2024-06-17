@@ -18,14 +18,18 @@ pub mod llmp;
 pub use llmp::*;
 
 pub mod broker_hooks;
-use alloc::{borrow::Cow, boxed::Box, string::String, vec::Vec};
+use alloc::{
+    borrow::Cow,
+    boxed::Box,
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::{
     fmt,
     hash::{BuildHasher, Hasher},
     marker::PhantomData,
     time::Duration,
 };
-use std::string::ToString;
 
 use ahash::RandomState;
 pub use broker_hooks::*;
