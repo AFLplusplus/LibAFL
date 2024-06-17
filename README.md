@@ -11,6 +11,7 @@ LibAFL is written and maintained by
  * [s1341](https://twitter.com/srubenst1341) <github@shmarya.net>
  * [Dongjia Zhang](https://github.com/tokatoka) <toka@aflplus.plus>
  * [Addison Crump](https://github.com/addisoncrump) <me@addisoncrump.info>
+ * [Romain Malmain](https://github.com/rmalmain) <rmalmain@pm.me>
 
 ## Why LibAFL?
 
