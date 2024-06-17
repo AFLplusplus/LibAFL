@@ -117,7 +117,7 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let idx = random_corpus_id!(state.corpus(), state.rand_mut());
+        let id = random_corpus_id!(state.corpus(), state.rand_mut());
 
         let insert_at = state.rand_mut().below(input.terminals().len());
 

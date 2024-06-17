@@ -101,7 +101,7 @@ where
         testcase: &Testcase<<<Self as UsesState>::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
         self.base.on_replace(state, id, testcase)?;
-        self.update_score(state, idx)
+        self.update_score(state, id)
     }
 
     /// Removes an entry from the corpus
@@ -204,7 +204,7 @@ where
     /// Called when a [`Testcase`] is added to the corpus
     fn on_add(&mut self, state: &mut Self::State, id: CorpusId) -> Result<(), Error> {
         self.base.on_add(state, id)?;
-        self.update_score(state, idx)
+        self.update_score(state, id)
     }
 
     /// An input has been evaluated
@@ -235,7 +235,7 @@ where
         {
             id = self.base.next(state)?;
         }
-        Ok(idx)
+        Ok(id)
     }
 
     /// Set current fuzzed corpus id and `scheduled_count`

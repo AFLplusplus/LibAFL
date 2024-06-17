@@ -45,8 +45,8 @@ pub enum PacketType {
 }
 
 impl Input for PacketData {
-    fn generate_name(&self, idx: usize) -> String {
-        format!("id_{idx}")
+    fn generate_name(&self, id: CorpusId) -> String {
+        format!("id_{}", id.0)
     }
 }
 

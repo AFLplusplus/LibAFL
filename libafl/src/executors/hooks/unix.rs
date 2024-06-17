@@ -9,6 +9,7 @@ pub mod unix_signal_handler {
     use libc::siginfo_t;
 
     use crate::{
+        corpus::CorpusId,
         events::{EventFirer, EventRestarter},
         executors::{
             common_signals,
@@ -204,7 +205,7 @@ pub mod unix_signal_handler {
                 let mut bsod = Vec::new();
                 {
                     let mut writer = std::io::BufWriter::new(&mut bsod);
-                    let _ = writeln!(writer, "input: {:?}", input.generate_name(0));
+                    let _ = writeln!(writer, "input: {:?}", input.generate_name(CorpusId(0)));
                     let bsod = libafl_bolts::minibsod::generate_minibsod(
                         &mut writer,
                         signal,

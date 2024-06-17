@@ -179,7 +179,7 @@ where
             // Keep track of that seed's index and weight
             seed_exprs.insert(seed_expr, (idx, weight));
 
-            cur_id = state.corpus().next(idx);
+            cur_id = state.corpus().next(id);
         }
 
         manager.log(

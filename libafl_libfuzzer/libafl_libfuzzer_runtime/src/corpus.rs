@@ -57,25 +57,25 @@ where
     fn touch(&self, id: CorpusId, corpus: &TestcaseStorageMap<I>) -> Result<(), Error> {
         let mut loaded_mapping = self.loaded_mapping.borrow_mut();
         let mut loaded_entries = self.loaded_entries.borrow_mut();
-        match loaded_mapping.entry(idx) {
+        match loaded_mapping.entry(id) {
             Entry::Occupied(mut e) => {
                 let &old = e.get();
                 let new = self.next_recency.fetch_add(1, Ordering::Relaxed);
                 e.insert(new);
                 loaded_entries.remove(&old);
-                loaded_entries.insert(new, idx);
+                loaded_entries.insert(new, id);
             }
             Entry::Vacant(e) => {
                 // new entry! send it in
                 let new = self.next_recency.fetch_add(1, Ordering::Relaxed);
                 e.insert(new);
-                loaded_entries.insert(new, idx);
+                loaded_entries.insert(new, id);
             }
         }
         if loaded_entries.len() > self.max_len {
-            let idx = loaded_entries.pop_first().unwrap().1; // cannot panic
+            let id = loaded_entries.pop_first().unwrap().1; // cannot panic
             let cell = corpus.get(id).ok_or_else(|| {
-                Error::key_not_found(format!("Tried to evict non-existent entry {idx}"))
+                Error::key_not_found(format!("Tried to evict non-existent entry {id}"))
             })?;
             let mut tc = cell.try_borrow_mut()?;
             let _ = tc.input_mut().take();
@@ -97,7 +97,7 @@ where
         testcase: RefCell<Testcase<I>>,
         is_disabled: bool,
     ) -> Result<CorpusId, Error> {
-        let idx = if is_disabled {
+        let id = if is_disabled {
             self.mapping.insert_disabled(testcase)
         } else {
             self.mapping.insert(testcase)
@@ -118,7 +118,7 @@ where
                         "The testcase, when added to the corpus, must have an input present!",
                     )
                 })?;
-                let name = input.generate_name(idx.into());
+                let name = input.generate_name(id);
                 let path = self.corpus_dir.join(&name);
 
                 match input.to_file(&path) {
@@ -134,8 +134,8 @@ where
                 testcase.file_path_mut().replace(path);
             }
         };
-        self.touch(idx, corpus)?;
-        Ok(idx)
+        self.touch(id, corpus)?;
+        Ok(id)
     }
 }
 

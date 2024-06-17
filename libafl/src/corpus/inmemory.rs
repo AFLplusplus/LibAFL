@@ -72,7 +72,7 @@ where
     /// Replace a testcase given a `CorpusId`
     #[cfg(not(feature = "corpus_btreemap"))]
     pub fn replace(&mut self, id: CorpusId, testcase: Testcase<I>) -> Option<Testcase<I>> {
-        if let Some(entry) = self.map.get_mut(&idx) {
+        if let Some(entry) = self.map.get_mut(&id) {
             Some(entry.testcase.replace(testcase))
         } else {
             None
@@ -85,11 +85,11 @@ where
         self.map.get_mut(&idx).map(|entry| entry.replace(testcase))
     }
 
-    /// Remove a testcase given a `CorpusId`
+    /// Remove a testcase given a [`CorpusId`]
     #[cfg(not(feature = "corpus_btreemap"))]
     pub fn remove(&mut self, id: CorpusId) -> Option<RefCell<Testcase<I>>> {
         if let Some(item) = self.map.remove(&id) {
-            self.remove_key(idx);
+            self.remove_key(id);
             if let Some(prev) = item.prev {
                 self.map.get_mut(&prev).unwrap().next = item.next;
             } else {
@@ -108,10 +108,10 @@ where
         }
     }
 
-    /// Remove a testcase given a `CorpusId`
+    /// Remove a testcase given a [`CorpusId`]
     #[cfg(feature = "corpus_btreemap")]
     pub fn remove(&mut self, id: CorpusId) -> Option<RefCell<Testcase<I>>> {
-        self.remove_key(idx);
+        self.remove_key(id);
         self.map.remove(&id)
     }
 
@@ -119,7 +119,7 @@ where
     #[cfg(not(feature = "corpus_btreemap"))]
     #[must_use]
     pub fn get(&self, id: CorpusId) -> Option<&RefCell<Testcase<I>>> {
-        self.map.get(&idx).as_ref().map(|x| &x.testcase)
+        self.map.get(&id).as_ref().map(|x| &x.testcase)
     }
 
     /// Get a testcase given a `CorpusId`
@@ -133,7 +133,7 @@ where
     #[cfg(not(feature = "corpus_btreemap"))]
     #[must_use]
     pub fn next(&self, id: CorpusId) -> Option<CorpusId> {
-        if let Some(item) = self.map.get(&idx) {
+        if let Some(item) = self.map.get(&id) {
             item.next
         } else {
             None
@@ -164,7 +164,7 @@ where
     #[cfg(not(feature = "corpus_btreemap"))]
     #[must_use]
     pub fn prev(&self, id: CorpusId) -> Option<CorpusId> {
-        if let Some(item) = self.map.get(&idx) {
+        if let Some(item) = self.map.get(&id) {
             item.prev
         } else {
             None
@@ -274,10 +274,11 @@ where
     pub fn insert_disabled(&mut self, testcase: RefCell<Testcase<I>>) -> CorpusId {
         self._insert(testcase, true)
     }
+
     /// Insert a testcase assigning a `CorpusId` to it
     #[cfg(not(feature = "corpus_btreemap"))]
     fn _insert(&mut self, testcase: RefCell<Testcase<I>>, is_disabled: bool) -> CorpusId {
-        let idx = CorpusId::from(self.progressive_id);
+        let id = CorpusId::from(self.progressive_id);
         self.progressive_id += 1;
         let corpus = if is_disabled {
             &mut self.disabled
@@ -294,16 +295,16 @@ where
             corpus.first_id = Some(id);
         }
         corpus.last_id = Some(id);
-        corpus.insert_key(idx);
+        corpus.insert_key(id);
         corpus.map.insert(
-            idx,
+            id,
             TestcaseStorageItem {
                 testcase,
                 prev,
                 next: None,
             },
         );
-        idx
+        id
     }
 
     /// Insert a testcase assigning a `CorpusId` to it
@@ -390,22 +391,21 @@ where
     /// Replaces the testcase at the given idx
     #[inline]
     fn replace(&mut self, id: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
-        self.storage
-            .enabled
-            .replace(idx, testcase)
-            .ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
+        self.storage.enabled.replace(id, testcase).ok_or_else(|| {
+            Error::key_not_found(format!("Index {id} not found, could not replace."))
+        })
     }
 
     /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases
     #[inline]
     fn remove(&mut self, id: CorpusId) -> Result<Testcase<Self::Input>, Error> {
-        let mut testcase = self.storage.enabled.remove(idx);
+        let mut testcase = self.storage.enabled.remove(id);
         if testcase.is_none() {
-            testcase = self.storage.disabled.remove(idx);
+            testcase = self.storage.disabled.remove(id);
         }
         testcase
             .map(|x| x.take())
-            .ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
+            .ok_or_else(|| Error::key_not_found(format!("Index {id} not found")))
     }
 
     /// Get by id; considers only enabled testcases
@@ -414,7 +414,7 @@ where
         self.storage
             .enabled
             .get(id)
-            .ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
+            .ok_or_else(|| Error::key_not_found(format!("Index {id} not found")))
     }
     /// Get by id; considers both enabled and disabled testcases
     #[inline]
@@ -423,7 +423,7 @@ where
         if testcase.is_none() {
             testcase = self.storage.disabled.get(id);
         }
-        testcase.ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
+        testcase.ok_or_else(|| Error::key_not_found(format!("Index {id} not found")))
     }
 
     /// Current testcase scheduled
@@ -446,12 +446,12 @@ where
 
     #[inline]
     fn next(&self, id: CorpusId) -> Option<CorpusId> {
-        self.storage.enabled.next(idx)
+        self.storage.enabled.next(id)
     }
 
     #[inline]
     fn prev(&self, id: CorpusId) -> Option<CorpusId> {
-        self.storage.enabled.prev(idx)
+        self.storage.enabled.prev(id)
     }
 
     #[inline]

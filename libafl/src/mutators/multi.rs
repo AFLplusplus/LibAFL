@@ -129,7 +129,7 @@ where
         let part_choice = state.rand_mut().next() as usize;
 
         // We special-case crossover with self
-        let idx = random_corpus_id!(state.corpus(), state.rand_mut());
+        let id = random_corpus_id!(state.corpus(), state.rand_mut());
         if let Some(cur) = state.corpus().current() {
             if idx == *cur {
                 let choice = name_choice % input.names().len();
@@ -233,7 +233,7 @@ where
         let part_choice = state.rand_mut().next() as usize;
 
         // We special-case crossover with self
-        let idx = random_corpus_id!(state.corpus(), state.rand_mut());
+        let id = random_corpus_id!(state.corpus(), state.rand_mut());
         if let Some(cur) = state.corpus().current() {
             if idx == *cur {
                 let choice = name_choice % input.names().len();

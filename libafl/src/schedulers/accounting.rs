@@ -15,6 +15,7 @@ use crate::{
     feedbacks::MapIndexesMetadata,
     inputs::UsesInput,
     observers::{CanTrack, ObserversTuple},
+    prelude::HasCurrentTestcase,
     schedulers::{
         minimizer::{IsFavoredMetadata, MinimizerScheduler, DEFAULT_SKIP_NON_FAVORED_PROB},
         LenTimeMulTestcaseScore, Scheduler,
@@ -178,7 +179,7 @@ where
 
         // Don't add corpus.curret(). The inner scheduler will take care of it
 
-        Ok(idx)
+        Ok(id)
     }
 
     /// Set current fuzzed corpus id and `scheduled_count`
@@ -229,7 +230,7 @@ where
                             equal_score = true;
                         }
 
-                        let mut old = state.corpus().get(*old_id)?.borrow_mut();
+                        let mut old = state.corpus().get_from_all(*old_id)?.borrow_mut();
                         let must_remove = {
                             let old_meta = old.metadata_map_mut().get_mut::<AccountingIndexesMetadata>().ok_or_else(|| {
                                 Error::key_not_found(format!(
@@ -253,7 +254,7 @@ where
 
                 // if its accounting is equal to others', it's not favored
                 if equal_score {
-                    top_acc.map.remove(&id);
+                    top_acc.map.remove(&idx);
                 } else if top_acc.max_accounting[idx] < self.accounting_map[idx] {
                     new_favoreds.push(idx);
 
@@ -266,15 +267,9 @@ where
             return Ok(());
         }
 
-        state
-            .corpus()
-            .get(id)?
-            .borrow_mut()
-            .metadata_map_mut()
-            .insert(AccountingIndexesMetadata::with_tcref(
-                indexes,
-                new_favoreds.len() as isize,
-            ));
+        state.current_testcase_mut()?.metadata_map_mut().insert(
+            AccountingIndexesMetadata::with_tcref(indexes, new_favoreds.len() as isize),
+        );
 
         let top_acc = state
             .metadata_map_mut()

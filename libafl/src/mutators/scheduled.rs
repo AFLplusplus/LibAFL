@@ -389,7 +389,7 @@ where
     }
 
     fn post_exec(&mut self, state: &mut S, corpus_id: Option<CorpusId>) -> Result<(), Error> {
-        if let Some(idx) = corpus_id {
+        if let Some(id) = corpus_id {
             let mut testcase = (*state.corpus_mut().get(id)?).borrow_mut();
             let mut log = Vec::<Cow<'static, str>>::new();
             while let Some(idx) = self.mutation_log.pop() {
