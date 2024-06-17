@@ -285,10 +285,10 @@ where
                                 process::id(),
                                 addr,
                                 state_guard.children.len()
-                            )
+                            );
                         }
                         Err(e) => {
-                            error!("Error while accepting child {:?}.", e)
+                            error!("Error while accepting child {:?}.", e);
                         }
                     }
                 }
@@ -312,6 +312,7 @@ where
     /// Read a [`TcpMultiMachineMsg`] from a stream.
     /// Expects a message written by [`TcpMultiMachineState::write_msg`].
     /// If there is nothing to read from the stream, return asap with Ok(None).
+    #[allow(clippy::uninit_vec)]
     async fn read_msg<'a, I: Input + 'a>(
         stream: &mut TcpStream,
     ) -> Result<Option<MultiMachineMsg<'a, I>>, Error> {
@@ -346,6 +347,7 @@ where
 
         // 2. Read msg
         // do not store msg on the stack to avoid overflow issues
+        // TODO: optimize with less allocations...
         let mut node_msg: Vec<u8> = Vec::with_capacity(node_msg_len);
         unsafe {
             node_msg.set_len(node_msg_len);
