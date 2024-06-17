@@ -58,6 +58,12 @@ handle_sigpipe = []
 
 #! ## Additional Components
 
+## Enables `TcpEventManager`, a simple EventManager proxying everything via TCP. This uses `tokio`.
+tcp_manager = ["tokio", "std"]
+
+## Enables compression for the TCP manager
+tcp_compression = ["tcp_manager", "libafl_bolts/gzip"]
+
 ## Enable multi-machine support
 multi_machine = ["tokio", "std", "enumflags2", "ahash/std"]
 
