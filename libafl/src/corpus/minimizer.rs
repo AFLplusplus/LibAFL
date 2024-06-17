@@ -116,7 +116,7 @@ where
 
         let total = state.corpus().count() as u64;
         let mut curr = 0;
-        while let Some(idx) = cur_id {
+        while let Some(id) = cur_id {
             let (weight, input) = {
                 let mut testcase = state.corpus().get(id)?.borrow_mut();
                 let weight = TS::compute(state, &mut *testcase)?

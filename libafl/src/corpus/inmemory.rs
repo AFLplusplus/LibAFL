@@ -43,10 +43,10 @@ where
     pub map: alloc::collections::btree_map::BTreeMap<CorpusId, RefCell<Testcase<I>>>,
     /// The keys in order (use `Vec::binary_search`)
     pub keys: Vec<CorpusId>,
-    /// First inserted idx
+    /// First inserted id
     #[cfg(not(feature = "corpus_btreemap"))]
     first_id: Option<CorpusId>,
-    /// Last inserted idx
+    /// Last inserted id
     #[cfg(not(feature = "corpus_btreemap"))]
     last_id: Option<CorpusId>,
 }
@@ -82,7 +82,7 @@ where
     /// Replace a testcase given a `CorpusId`
     #[cfg(feature = "corpus_btreemap")]
     pub fn replace(&mut self, id: CorpusId, testcase: Testcase<I>) -> Option<Testcase<I>> {
-        self.map.get_mut(&idx).map(|entry| entry.replace(testcase))
+        self.map.get_mut(&id).map(|entry| entry.replace(testcase))
     }
 
     /// Remove a testcase given a [`CorpusId`]
@@ -126,7 +126,7 @@ where
     #[cfg(feature = "corpus_btreemap")]
     #[must_use]
     pub fn get(&self, id: CorpusId) -> Option<&RefCell<Testcase<I>>> {
-        self.map.get(&idx)
+        self.map.get(&id)
     }
 
     /// Get the next id given a `CorpusId` (creation order)
@@ -147,9 +147,9 @@ where
         // TODO see if using self.keys is faster
         let mut range = self
             .map
-            .range((core::ops::Bound::Included(idx), core::ops::Bound::Unbounded));
+            .range((core::ops::Bound::Included(id), core::ops::Bound::Unbounded));
         if let Some((this_id, _)) = range.next() {
-            if idx != *this_id {
+            if id != *this_id {
                 return None;
             }
         }
@@ -178,9 +178,9 @@ where
         // TODO see if using self.keys is faster
         let mut range = self
             .map
-            .range((core::ops::Bound::Unbounded, core::ops::Bound::Included(idx)));
+            .range((core::ops::Bound::Unbounded, core::ops::Bound::Included(id)));
         if let Some((this_id, _)) = range.next_back() {
-            if idx != *this_id {
+            if id != *this_id {
                 return None;
             }
         }
@@ -244,7 +244,7 @@ where
     pub enabled: TestcaseStorageMap<I>,
     /// The map in which disabled testcases are stored
     pub disabled: TestcaseStorageMap<I>,
-    /// The progressive idx for both maps
+    /// The progressive id for both maps
     progressive_id: usize,
 }
 
@@ -310,16 +310,16 @@ where
     /// Insert a testcase assigning a `CorpusId` to it
     #[cfg(feature = "corpus_btreemap")]
     fn _insert(&mut self, testcase: RefCell<Testcase<I>>, is_disabled: bool) -> CorpusId {
-        let idx = CorpusId::from(self.progressive_id);
+        let id = CorpusId::from(self.progressive_id);
         self.progressive_id += 1;
         let corpus = if is_disabled {
             &mut self.disabled
         } else {
             &mut self.enabled
         };
-        corpus.insert_key(idx);
-        corpus.map.insert(idx, testcase);
-        idx
+        corpus.insert_key(id);
+        corpus.map.insert(id, testcase);
+        id
     }
 
     /// Create new `TestcaseStorage`
@@ -388,7 +388,7 @@ where
         Ok(self.storage.insert_disabled(RefCell::new(testcase)))
     }
 
-    /// Replaces the testcase at the given idx
+    /// Replaces the testcase at the given id
     #[inline]
     fn replace(&mut self, id: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
         self.storage.enabled.replace(id, testcase).ok_or_else(|| {
