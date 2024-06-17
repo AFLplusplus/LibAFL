@@ -63,7 +63,7 @@ use crate::{
 };
 
 /// Multi-machine mode
-#[cfg(feature = "multi_machine")]
+#[cfg(all(unix, feature = "std", feature = "multi_machine"))]
 pub mod multi_machine;
 
 /// Check if ctrl-c is sent with this struct
