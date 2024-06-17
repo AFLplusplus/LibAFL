@@ -11,7 +11,7 @@ use libafl_bolts::llmp::LLMP_FLAG_COMPRESSED;
 use libafl_bolts::{
     llmp::{Flags, LlmpBrokerInner, LlmpHook, LlmpMsgHookResult, Tag},
     ownedref::OwnedRef,
-    prelude::ShMemProvider,
+    shmem::ShMemProvider,
     ClientId, Error,
 };
 use log::debug;

@@ -26,9 +26,9 @@ pub mod centralized;
 pub use centralized::*;
 
 /// Multi-machine hook
-#[cfg(feature = "multi_machine")]
+#[cfg(all(unix, feature = "multi_machine"))]
 pub mod centralized_multi_machine;
-#[cfg(feature = "multi_machine")]
+#[cfg(all(unix, feature = "multi_machine"))]
 pub use centralized_multi_machine::*;
 
 /// An LLMP-backed event hook for scalable multi-processed fuzzing
