@@ -9,7 +9,7 @@ categories = ["development-tools::testing", "emulators", "embedded", "os", "no-s
 keywords = ["fuzzing", "libafl", "ldpreload"]
 
 [dependencies]
-meminterval = "0.3"
+meminterval = "0.4"
 libc = "0.2"
 
 [dev-dependencies]
