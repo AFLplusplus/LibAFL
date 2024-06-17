@@ -291,7 +291,7 @@ where
         /// The original sender if, if forwarded
         forward_id: Option<ClientId>,
         /// The (multi-machine) node from which the tc is from, if any
-        #[cfg(feature = "multi_machine")]
+        #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
         node_id: Option<NodeId>,
     },
     /// New stats event to monitor.
@@ -955,7 +955,7 @@ mod tests {
             time: current_time(),
             executions: 0,
             forward_id: None,
-            #[cfg(feature = "multi_machine")]
+            #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
             node_id: None,
         };
 
