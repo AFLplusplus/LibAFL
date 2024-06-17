@@ -3,6 +3,11 @@
 use std::env;
 
 fn main() {
+    if cfg!(not(target_os = "linux")) {
+        println!("Not supported!");
+        return;
+    }
+
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = out_dir.to_string_lossy().to_string();
 

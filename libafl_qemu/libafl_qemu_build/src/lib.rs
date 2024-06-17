@@ -306,6 +306,7 @@ pub fn store_generated_content_if_different(
             .unwrap_or_else(|_| panic!("Unable to write in {}", file_to_update.display()));
     }
 }
+
 #[rustversion::nightly]
 pub fn maybe_generate_stub_bindings(
     cpu_target: &str,
@@ -313,7 +314,7 @@ pub fn maybe_generate_stub_bindings(
     stub_bindings_file: &Path,
     bindings_file: &Path,
 ) {
-    if cpu_target == "x86_64" && emulation_mode == "usermode" {
+    if env::var("CARGO_CFG_DOC").is_ok() && cpu_target == "x86_64" && emulation_mode == "usermode" {
         let current_rustc_version =
             rustc_version::version().expect("Could not get current rustc version");
         let semver_re = Regex::new(r"/\* (.*) \*/").unwrap();
