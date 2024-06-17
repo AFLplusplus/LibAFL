@@ -16,7 +16,7 @@ use enumflags2::{bitflags, BitFlags};
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::bolts_prelude::GzipCompressor;
 use libafl_bolts::{current_time, ownedref::OwnedRef, Error};
-use log::{error, info};
+use log::{debug, error};
 use serde::{Deserialize, Serialize};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -230,10 +230,10 @@ where
                 let timeout = current_time() + parent_lock.node_descriptor.timeout;
 
                 parent_lock.parent = loop {
-                    info!("Trying to connect to parent @ {}..", parent_addr);
+                    debug!("Trying to connect to parent @ {}..", parent_addr);
                     match TcpStream::connect(parent_addr).await {
                         Ok(stream) => {
-                            info!("Connected to parent @ {}", parent_addr);
+                            debug!("Connected to parent @ {}", parent_addr);
 
                             break Some(stream);
                         }
@@ -256,7 +256,7 @@ where
             let bg_state = self_mutex.clone();
             let _handle: JoinHandle<Result<(), Error>> = rt.spawn(async move {
                 let addr = format!("0.0.0.0:{listening_port}");
-                info!("Starting background child task on {addr}...");
+                debug!("Starting background child task on {addr}...");
                 let listener = TcpListener::bind(addr).await.map_err(|e| {
                     Error::os_error(e, format!("Error while binding to port {listening_port}"))
                 })?;
@@ -264,27 +264,28 @@ where
 
                 // The main listening loop. Should never fail.
                 'listening: loop {
-                    info!("listening for children on {:?}...", listener);
-                    match listener
-                        .accept()
-                        .await {
+                    debug!("listening for children on {:?}...", listener);
+                    match listener.accept().await {
                         Ok((mut stream, addr)) => {
-                            info!("{} joined the children.", addr);
+                            debug!("{} joined the children.", addr);
                             let mut state_guard = state.write().await;
 
                             if let Err(e) = state_guard
                                 .send_old_events_to_stream::<I>(&mut stream)
-                                .await {
+                                .await
+                            {
                                 error!("Error while send old messages: {:?}.", e);
                                 error!("The loop will resume");
                                 continue 'listening;
                             }
 
                             state_guard.children.insert(NodeId::new(), stream);
-                            info!("[pid {}]{} added the child. nb children: {}",
+                            debug!(
+                                "[pid {}]{} added the child. nb children: {}",
                                 process::id(),
                                 addr,
-                                state_guard.children.len())
+                                state_guard.children.len()
+                            )
                         }
                         Err(e) => {
                             error!("Error while accepting child {:?}.", e)
@@ -316,7 +317,7 @@ where
     ) -> Result<Option<MultiMachineMsg<'a, I>>, Error> {
         // 0. Check if we should try to fetch something from the stream
         let mut dummy_byte: [u8; 1] = [0u8];
-        info!("Starting read msg...");
+        debug!("Starting read msg...");
 
         let n_read = match stream.try_read(&mut dummy_byte) {
             Ok(n) => n,
@@ -326,14 +327,14 @@ where
             Err(e) => return Err(Error::os_error(e, "try read failed")),
         };
 
-        info!("msg read.");
+        debug!("msg read.");
 
         if n_read == 0 {
-            info!("No dummy byte received...");
+            debug!("No dummy byte received...");
             return Ok(None); // Nothing to read from this stream
         }
 
-        info!("Received dummy byte!");
+        debug!("Received dummy byte!");
 
         // we should always read the dummy byte at this point.
         assert_eq!(u8::from_le_bytes(dummy_byte), DUMMY_BYTE);
@@ -365,15 +366,15 @@ where
         let msg_len = u32::to_le_bytes(serialized_msg.len() as u32);
 
         // 0. Write the dummy byte
-        info!("Sending dummy byte");
+        debug!("Sending dummy byte");
         stream.write_all(&[DUMMY_BYTE]).await?;
 
         // 1. Write msg size
-        info!("Sending msg len");
+        debug!("Sending msg len");
         stream.write_all(&msg_len).await?;
 
         // 2. Write msg
-        info!("Sending msg");
+        debug!("Sending msg");
         stream.write_all(serialized_msg).await?;
 
         Ok(())
@@ -383,17 +384,17 @@ where
         &mut self,
         stream: &mut TcpStream,
     ) -> Result<(), Error> {
-        info!("Send old events to new child...");
+        debug!("Send old events to new child...");
 
         for old_msg in &self.old_msgs {
             let event_ref: MultiMachineMsg<I> =
                 MultiMachineMsg::llmp_msg(OwnedRef::Ref(old_msg.as_slice()));
-            info!("Sending an old message...");
+            debug!("Sending an old message...");
             Self::write_msg(stream, &event_ref).await?;
-            info!("Old message sent.");
+            debug!("Old message sent.");
         }
 
-        info!("Sent {} old messages.", self.old_msgs.len());
+        debug!("Sent {} old messages.", self.old_msgs.len());
 
         Ok(())
     }
@@ -402,7 +403,7 @@ where
         &mut self,
         msg: &MultiMachineMsg<'a, I>,
     ) -> Result<(), Error> {
-        info!("Sending interesting events to nodes...");
+        debug!("Sending interesting events to nodes...");
 
         if self
             .node_descriptor
@@ -410,7 +411,7 @@ where
             .intersects(NodePolicy::SendToParent)
         {
             if let Some(parent) = &mut self.parent {
-                info!("Sending to parent...");
+                debug!("Sending to parent...");
                 if let Err(e) = Self::write_msg(parent, msg).await {
                     error!("The parent disconnected. We won't try to communicate with it again.");
                     error!("Error: {:?}", e);
@@ -426,17 +427,17 @@ where
         {
             let mut ids_to_remove: Vec<NodeId> = Vec::new();
             for (child_id, child_stream) in &mut self.children {
-                info!("Sending to child...");
+                debug!("Sending to child...");
                 if (Self::write_msg(child_stream, msg).await).is_err() {
                     // most likely the child disconnected. drop the connection later on and continue.
-                    info!("The child disconnected. We won't try to communicate with it again.");
+                    debug!("The child disconnected. We won't try to communicate with it again.");
                     ids_to_remove.push(*child_id);
                 }
             }
 
             // Garbage collect disconnected children
             for id_to_remove in &ids_to_remove {
-                info!("Child {:?} has been garbage collected.", id_to_remove);
+                debug!("Child {:?} has been garbage collected.", id_to_remove);
                 self.children.remove(id_to_remove);
             }
         }
@@ -450,7 +451,7 @@ where
         &mut self,
         msgs: &mut Vec<MultiMachineMsg<'a, I>>,
     ) -> Result<(), Error> {
-        info!("Checking for new events from other nodes...");
+        debug!("Checking for new events from other nodes...");
         let mut nb_received = 0usize;
 
         // Our (potential) parent could have something for us
@@ -461,10 +462,10 @@ where
                     return Ok(());
                 }
 
-                info!("Receiving from parent...");
+                debug!("Receiving from parent...");
                 match Self::read_msg(parent).await {
                     Ok(Some(msg)) => {
-                        info!("Received event from parent");
+                        debug!("Received event from parent");
                         // The parent has something for us, we store it
                         msgs.push(msg);
                         nb_received += 1;
@@ -472,13 +473,13 @@ where
 
                     Ok(None) => {
                         // nothing from the parent, we continue
-                        info!("Nothing from parent");
+                        debug!("Nothing from parent");
                         break;
                     }
 
                     Err(Error::OsError(_, _, _)) => {
                         // most likely the parent disconnected. drop the connection
-                        info!(
+                        debug!(
                             "The parent disconnected. We won't try to communicate with it again."
                         );
                         self.parent.take();
@@ -486,7 +487,7 @@ where
                     }
 
                     Err(e) => {
-                        info!("An error occurred and was not expected.");
+                        debug!("An error occurred and was not expected.");
                         return Err(e);
                     }
                 }
@@ -495,7 +496,7 @@ where
 
         // What about the (potential) children?
         let mut ids_to_remove: Vec<NodeId> = Vec::new();
-        info!(
+        debug!(
             "[pid {}] Nb children: {}",
             process::id(),
             self.children.len()
@@ -507,24 +508,26 @@ where
                     return Ok(());
                 }
 
-                info!("Receiving from child {:?}...", child_id);
+                debug!("Receiving from child {:?}...", child_id);
                 match Self::read_msg(child_stream).await {
                     Ok(Some(msg)) => {
                         // The parent has something for us, we store it
-                        info!("Received event from child!");
+                        debug!("Received event from child!");
                         msgs.push(msg);
                         nb_received += 1;
                     }
 
                     Ok(None) => {
                         // nothing from the parent, we continue
-                        info!("Nothing from child");
+                        debug!("Nothing from child");
                         break;
                     }
 
                     Err(Error::OsError(e, _, _)) => {
                         // most likely the parent disconnected. drop the connection
-                        error!("The parent disconnected. We won't try to communicate with it again.");
+                        error!(
+                            "The parent disconnected. We won't try to communicate with it again."
+                        );
                         error!("Error: {:?}", e);
                         ids_to_remove.push(*child_id);
                         break;
@@ -532,7 +535,7 @@ where
 
                     Err(e) => {
                         // Other error
-                        info!("An error occurred and was not expected.");
+                        debug!("An error occurred and was not expected.");
                         return Err(e);
                     }
                 }
@@ -541,7 +544,7 @@ where
 
         // Garbage collect disconnected children
         for id_to_remove in &ids_to_remove {
-            info!("Child {:?} has been garbage collected.", id_to_remove);
+            debug!("Child {:?} has been garbage collected.", id_to_remove);
             self.children.remove(id_to_remove);
         }
 

@@ -10,7 +10,7 @@ use libafl_bolts::{
     prelude::ShMemProvider,
     ClientId, Error,
 };
-use log::info;
+use log::debug;
 use tokio::{
     net::ToSocketAddrs,
     runtime::Runtime,
@@ -195,7 +195,7 @@ where
             // TODO: do not copy here
             state_wr_lock.add_past_msg(msg);
 
-            info!("Sending msg...");
+            debug!("Sending msg...");
 
             state_wr_lock
                 .send_interesting_event_to_nodes(&mm_msg)
@@ -234,7 +234,7 @@ where
                 .receive_new_messages_from_nodes(&mut incoming_msgs)
                 .await?;
 
-            info!("received {} new incoming msg(s)", incoming_msgs.len());
+            debug!("received {} new incoming msg(s)", incoming_msgs.len());
 
             let msgs_to_forward: Result<Vec<(Tag, Flags, Vec<u8>)>, Error> = incoming_msgs
                 .into_iter()

@@ -25,8 +25,6 @@ use std::process::Stdio;
 use std::{boxed::Box, net::SocketAddr};
 #[cfg(all(unix, feature = "std"))]
 use std::{fs::File, os::unix::io::AsRawFd};
-use std::mem::MaybeUninit;
-use libc::{c_int, SIG_UNBLOCK, sigaddset, sigemptyset, signal, sigprocmask, SIGSEGV, sigset_t, size_t};
 
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use libafl_bolts::llmp::LlmpBroker;
@@ -45,7 +43,7 @@ use libafl_bolts::{
     shmem::ShMemProvider,
     tuples::{tuple_list, Handle},
 };
-use log::info;
+use log::debug;
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
@@ -600,15 +598,6 @@ where
     }
 }
 
-unsafe extern "C" fn handler(signum: c_int) {
-    println!("received signal {}", signum);
-    let mut sigs = MaybeUninit::<sigset_t>::uninit();
-    sigemptyset(sigs.as_mut_ptr());
-    sigaddset(sigs.as_mut_ptr(), signum);
-    sigprocmask(SIG_UNBLOCK, sigs.as_mut_ptr(), std::ptr::null_mut());
-    panic!("SIGV!");
-}
-
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 impl<'a, CF, MF, MT, SP> CentralizedLauncher<'a, CF, MF, MT, SP>
 where
@@ -657,7 +646,7 @@ where
         let num_cores = core_ids.len();
         let mut handles = vec![];
 
-        info!("spawning on cores: {:?}", self.cores);
+        debug!("spawning on cores: {:?}", self.cores);
 
         self.opened_stdout_file = self
             .stdout_file
@@ -679,10 +668,10 @@ where
                         self.shmem_provider.post_fork(false)?;
                         handles.push(child.pid);
                         #[cfg(feature = "std")]
-                        info!("child spawned and bound to core {id}");
+                        log::info!("child spawned and bound to core {id}");
                     }
                     ForkResult::Child => {
-                        info!("{:?} PostFork", unsafe { libc::getpid() });
+                        log::info!("{:?} PostFork", unsafe { libc::getpid() });
                         self.shmem_provider.post_fork(true)?;
 
                         std::thread::sleep(Duration::from_millis(index * self.launch_delay));
@@ -700,7 +689,7 @@ where
 
                         if index == 1 {
                             // Main client
-                            info!("Running main client on PID {}", std::process::id());
+                            debug!("Running main client on PID {}", std::process::id());
                             let (state, mgr) =
                                 main_inner_mgr_builder.take().unwrap()(self, *bind_to)?;
 
@@ -721,7 +710,7 @@ where
                             self.main_run_client.take().unwrap()(state, c_mgr, *bind_to)
                         } else {
                             // Secondary clients
-                            info!("Running secondary client on PID {}", std::process::id());
+                            debug!("Running secondary client on PID {}", std::process::id());
                             let (state, mgr) =
                                 secondary_inner_mgr_builder.take().unwrap()(self, *bind_to)?;
 
@@ -780,7 +769,7 @@ where
 
         // If we should add another broker, add it to other brokers.
         if self.spawn_broker {
-            info!("I am broker!!.");
+            log::info!("I am broker!!.");
 
             #[cfg(not(feature = "multi_machine"))]
             let llmp_hook =
@@ -812,22 +801,16 @@ where
             brokers.add(Box::new(broker));
         }
 
-        info!(
+        debug!(
             "Brokers have been initialized on port {}.",
             std::process::id()
         );
-
-        // TODO: remove after debug?
-        unsafe {
-            let f = handler as *const fn(c_int);
-            signal(SIGSEGV, f as size_t);
-        }
 
         // Loop over all the brokers that should be polled
         brokers.loop_with_timeouts(Duration::from_secs(30), Some(Duration::from_millis(5)));
 
         #[cfg(feature = "llmp_debug")]
-        info!("The last client quit. Exiting.");
+        log::info!("The last client quit. Exiting.");
 
         // Brokers exited. kill all clients.
         for handle in &handles {

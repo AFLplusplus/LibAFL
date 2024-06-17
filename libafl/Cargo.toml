@@ -164,7 +164,7 @@ prometheus-client = { version = "0.22", optional = true } # For the prometheus m
 tide = { version = "0.16", optional = true }
 async-std = { version = "1.12", features = ["attributes"], optional = true }
 futures = { version = "0.3", optional = true }
-log = "0.4.20"
+log = { version = "0.4", features = ["release_max_level_info"] }
 tokio = { version = "1.38", optional = true, features = ["sync", "net", "rt", "io-util", "macros", "rt-multi-thread", "time"] } # used for TCP Event Manager and multi-machine
 enumflags2 = { version = "0.7", optional = true }
 bitcode = { version = "0.6", optional = true, features = ["serde"] }

@@ -1285,7 +1285,7 @@ where
         self.last_msg_sent = msg;
         self.has_unsent_message = false;
 
-        info!(
+        debug!(
             "[{} - {:#x}] Send message with id {}",
             self.id.0, self as *const Self as u64, mid
         );
@@ -1699,7 +1699,7 @@ where
                 return Err(Error::illegal_state("Unexpected message in map (out of map bounds) - buggy client or tampered shared map detected!"));
             }
 
-            info!(
+            debug!(
                 "[{} - {:#x}] Received message with ID {}...",
                 self.id.0,
                 self as *const Self as u64,
@@ -2140,7 +2140,7 @@ where
 
 use std::boxed::Box;
 
-use log::info;
+use log::debug;
 
 /// A set of brokers.
 /// Limitation: the hooks must be the same.
@@ -2767,7 +2767,7 @@ where
                         self.inner.forward_msg(msg)?;
                     }
 
-                    info!("New msg vector: {}", new_msgs.len());
+                    debug!("New msg vector: {}", new_msgs.len());
                     for (new_msg_tag, new_msg_flag, new_msg) in new_msgs {
                         self.inner.llmp_out.send_buf_with_flags(
                             new_msg_tag,
@@ -3694,7 +3694,7 @@ where
                                 break stream;
                             }
 
-                            info!("Connection Refused. Retrying...");
+                            debug!("Connection Refused. Retrying...");
 
                             #[cfg(feature = "std")]
                             thread::sleep(Duration::from_millis(50));
