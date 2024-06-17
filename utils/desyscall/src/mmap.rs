@@ -1,3 +1,5 @@
+//! Stub out syscalls. Linux only.
+
 use std::ptr;
 
 use libc::{c_int, c_void, off_t, size_t};
@@ -452,8 +454,7 @@ pub unsafe extern "C" fn madvise(addr: *mut c_void, length: size_t, advice: c_in
     }
 }
 
-#[cfg(test)]
-#[cfg(not(windows))]
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     use rusty_fork::rusty_fork_test;
 
