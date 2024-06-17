@@ -418,6 +418,7 @@ where
                 client_config,
                 exit_kind,
                 observers_buf,
+                #[cfg(feature = "std")]
                 forward_id,
                 ..
             } => {
