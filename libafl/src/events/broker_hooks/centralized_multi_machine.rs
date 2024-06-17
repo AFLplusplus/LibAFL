@@ -25,7 +25,6 @@ use tokio::{
 
 use crate::{
     events::{
-        self,
         multi_machine::{MultiMachineMsg, TcpMultiMachineState},
         Event, _LLMP_TAG_TO_MAIN,
     },
@@ -70,7 +69,7 @@ impl<T> NullLock<T> {
 
 /// The Receiving side of the multi-machine architecture
 /// It is responsible for receiving messages from other neighbours.
-/// Please check [`events::multi_machine`] for more information.
+/// Please check [`crate::events::multi_machine`] for more information.
 #[derive(Debug)]
 pub struct TcpMultiMachineLlmpSenderHook<A, I>
 where
@@ -85,7 +84,7 @@ where
 
 /// The Receiving side of the multi-machine architecture
 /// It is responsible for receiving messages from other neighbours.
-/// Please check [`events::multi_machine`] for more information.
+/// Please check [`crate::events::multi_machine`] for more information.
 #[derive(Debug)]
 pub struct TcpMultiMachineLlmpReceiverHook<A, I>
 where

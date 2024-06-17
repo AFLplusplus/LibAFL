@@ -59,7 +59,7 @@ handle_sigpipe = []
 #! ## Additional Components
 
 ## Enable multi-machine support
-multi_machine = ["libafl_bolts/bitcode", "bitcode", "tokio", "std", "enumflags2", "ahash/std"]
+multi_machine = ["tokio", "std", "enumflags2", "ahash/std"]
 
 ## Enables the `NaiveTokenizer` and `StacktraceObserver`
 regex = ["std", "dep:regex"]
@@ -167,7 +167,6 @@ futures = { version = "0.3", optional = true }
 log = { version = "0.4", features = ["release_max_level_info"] }
 tokio = { version = "1.38", optional = true, features = ["sync", "net", "rt", "io-util", "macros", "rt-multi-thread", "time"] } # used for TCP Event Manager and multi-machine
 enumflags2 = { version = "0.7", optional = true }
-bitcode = { version = "0.6", optional = true, features = ["serde"] }
 
 wait-timeout = { version = "0.2", optional = true } # used by CommandExecutor to wait for child process
 
