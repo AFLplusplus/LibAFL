@@ -113,7 +113,7 @@ pub struct EventManagerId(
     pub usize,
 );
 
-#[cfg(feature = "multi_machine")]
+#[cfg(all(unix, feature = "std", feature = "multi_machine"))]
 use crate::events::multi_machine::NodeId;
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
