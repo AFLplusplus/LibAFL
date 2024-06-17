@@ -31,6 +31,7 @@ use libafl_bolts::{
 use libafl_bolts::{
     llmp::LlmpConnection, os::CTRL_C_EXIT, shmem::StdShMemProvider, staterestore::StateRestorer,
 };
+#[cfg(all(unix, feature = "fork"))]
 use log::debug;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]

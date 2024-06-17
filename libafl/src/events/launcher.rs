@@ -19,13 +19,17 @@ use core::{
     fmt::{self, Debug, Formatter},
     num::NonZeroUsize,
 };
+#[cfg(all(unix, feature = "std", feature = "fork"))]
+use std::boxed::Box;
+#[cfg(feature = "std")]
+use std::net::SocketAddr;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use std::process::Stdio;
-#[cfg(feature = "std")]
-use std::{boxed::Box, net::SocketAddr};
 #[cfg(all(unix, feature = "std"))]
 use std::{fs::File, os::unix::io::AsRawFd};
 
+#[cfg(all(unix, feature = "std", feature = "fork"))]
+use libafl_bolts::llmp::Brokers;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use libafl_bolts::llmp::LlmpBroker;
 #[cfg(all(unix, feature = "std"))]
@@ -39,24 +43,25 @@ use libafl_bolts::{
 };
 use libafl_bolts::{
     core_affinity::{CoreId, Cores},
-    llmp::Brokers,
     shmem::ShMemProvider,
     tuples::{tuple_list, Handle},
 };
+#[cfg(all(unix, feature = "std", feature = "fork"))]
 use log::debug;
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
-use super::{EventManagerHooksTuple, StdLlmpEventHook};
+use super::EventManagerHooksTuple;
+#[cfg(all(unix, feature = "std", feature = "fork"))]
+use super::StdLlmpEventHook;
 #[cfg(feature = "multi_machine")]
 use crate::events::multi_machine::NodeDescriptor;
 #[cfg(feature = "multi_machine")]
 use crate::events::multi_machine::TcpMultiMachineBuilder;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
-use crate::{
-    events::{centralized::CentralizedEventManager, CentralizedLlmpHook},
-    state::UsesState,
-};
+use crate::events::{centralized::CentralizedEventManager, CentralizedLlmpHook};
+#[cfg(all(unix, feature = "std", feature = "fork"))]
+use crate::state::UsesState;
 #[cfg(feature = "std")]
 use crate::{
     events::{
