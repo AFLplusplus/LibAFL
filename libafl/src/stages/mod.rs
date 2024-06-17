@@ -51,6 +51,8 @@ use crate::{
     HasScheduler,
 };
 
+/// Corpus pruning stage
+pub mod corpus_pruning;
 /// Mutational stage is the normal fuzzing stage.
 pub mod mutational;
 pub mod push;
