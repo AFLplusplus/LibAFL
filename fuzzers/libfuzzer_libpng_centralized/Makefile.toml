@@ -72,7 +72,7 @@ windows_alias = "unsupported"
 
 [tasks.fuzzer_unix]
 command = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cxx"
-args = ["${PROJECT_DIR}/harness.cc", "${PROJECT_DIR}/libpng-1.6.37/.libs/libpng16.a", "-I", "${PROJECT_DIR}/libpng-1.6.37/", "-o", "${FUZZER_NAME}", "-D", "HAS_DUMMY_CRASH", "-lm", "-lz"]
+args = ["${PROJECT_DIR}/harness.cc", "${PROJECT_DIR}/libpng-1.6.37/.libs/libpng16.a", "-I", "${PROJECT_DIR}/libpng-1.6.37/", "-o", "${FUZZER_NAME}", "-lm", "-lz"]
 dependencies = [ "lib", "cxx", "cc" ]
 
 # Run the fuzzer
