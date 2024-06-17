@@ -333,6 +333,8 @@ where
                         time: current_time(),
                         executions: 0,
                         forward_id: None,
+                        #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
+                        node_id: None,
                     },
                 )?;
 

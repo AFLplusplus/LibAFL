@@ -1092,7 +1092,7 @@ where
         }
 
         let range = rand_range(state, other_size, min(other_size, max_size - size));
-        let target = state.rand_mut().below(size);
+        let target = state.rand_mut().below(size); // TODO: fix bug if size is 0
 
         let other_testcase = state.corpus().get_from_all(idx)?.borrow_mut();
         // No need to load the input again, it'll still be cached.

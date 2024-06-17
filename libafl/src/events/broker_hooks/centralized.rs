@@ -1,4 +1,5 @@
-use std::{fmt::Debug, marker::PhantomData};
+use alloc::vec::Vec;
+use core::{fmt::Debug, marker::PhantomData};
 
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{compress::GzipCompressor, llmp::LLMP_FLAG_COMPRESSED};
@@ -34,6 +35,7 @@ where
         msg_tag: &mut Tag,
         _msg_flags: &mut Flags,
         msg: &mut [u8],
+        _new_msgs: &mut Vec<(Tag, Flags, Vec<u8>)>,
     ) -> Result<LlmpMsgHookResult, Error> {
         if *msg_tag == _LLMP_TAG_TO_MAIN {
             #[cfg(feature = "llmp_compression")]
@@ -93,16 +95,7 @@ where
         event: &Event<I>,
     ) -> Result<BrokerEventResult, Error> {
         match &event {
-            Event::NewTestcase {
-                input: _,
-                client_config: _,
-                exit_kind: _,
-                corpus_size: _,
-                observers_buf: _,
-                time: _,
-                executions: _,
-                forward_id: _,
-            } => Ok(BrokerEventResult::Forward),
+            Event::NewTestcase { .. } => Ok(BrokerEventResult::Forward),
             _ => Ok(BrokerEventResult::Handled),
         }
     }

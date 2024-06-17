@@ -13,7 +13,7 @@ BOOL APIENTRY DllMain(HANDLE hModule, DWORD ul_reason_for_call,
   return TRUE;
 }
 
-  #define EXTERN extern "C" __declspec(dllexport)  
+  #define EXTERN extern "C" __declspec(dllexport)
 #else
   #define EXTERN
 extern "C" {

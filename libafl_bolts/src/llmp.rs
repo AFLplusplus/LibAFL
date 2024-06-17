@@ -77,6 +77,7 @@ use core::{
 };
 #[cfg(feature = "std")]
 use std::{
+    boxed::Box,
     env,
     io::{ErrorKind, Read, Write},
     net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs},
@@ -86,10 +87,12 @@ use std::{
 
 #[cfg(all(debug_assertions, feature = "llmp_debug", feature = "std"))]
 use backtrace::Backtrace;
+use log::debug;
 #[cfg(all(unix, feature = "std"))]
 #[cfg(not(any(target_os = "solaris", target_os = "illumos")))]
 use nix::sys::socket::{self, sockopt::ReusePort};
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "std")]
 use tuple_list::tuple_list;
 
 #[cfg(all(unix, not(miri)))]
@@ -1091,7 +1094,7 @@ where
     }
 
     /// For non zero-copy, we want to get rid of old pages with duplicate messages in the client
-    /// eventually. This function This function sees if we can deallocate older pages.
+    /// eventually. This function sees if we can deallocate older pages.
     /// The broker would have informed us by setting the safe_to_unmap-flag.
     unsafe fn prune_old_pages(&mut self) {
         // Exclude the current page by splitting of the last element for this iter
@@ -1274,7 +1277,8 @@ where
             )));
         }
 
-        (*msg).message_id.0 = (*page).current_msg_id.load(Ordering::Relaxed) + 1;
+        let mid = (*page).current_msg_id.load(Ordering::Relaxed) + 1;
+        (*msg).message_id.0 = mid;
 
         // Make sure all things have been written to the page, and commit the message to the page
         (*page)
@@ -1283,6 +1287,12 @@ where
 
         self.last_msg_sent = msg;
         self.has_unsent_message = false;
+
+        debug!(
+            "[{} - {:#x}] Send message with id {}",
+            self.id.0, self as *const Self as u64, mid
+        );
+
         Ok(())
     }
 
@@ -1691,6 +1701,14 @@ where
             if !(*msg).in_shmem(&mut self.current_recv_shmem) {
                 return Err(Error::illegal_state("Unexpected message in map (out of map bounds) - buggy client or tampered shared map detected!"));
             }
+
+            debug!(
+                "[{} - {:#x}] Received message with ID {}...",
+                self.id.0,
+                self as *const Self as u64,
+                (*msg).message_id.0
+            );
+
             // Handle special, LLMP internal, messages.
             match (*msg).tag {
                 LLMP_TAG_UNSET => panic!(
@@ -2058,6 +2076,88 @@ where
     hooks: HT,
 }
 
+/// The trait for brokers.
+pub trait Broker {
+    /// Getter to `is_shutting_down`
+    fn is_shutting_down(&self) -> bool;
+
+    /// The hooks run for `on_timeout`
+    fn on_timeout(&mut self) -> Result<(), Error>;
+
+    /// The main thing the `broker` does
+    fn broker_once(&mut self) -> Result<bool, Error>;
+
+    /// Getter to `exit_after`
+    fn exit_after(&self) -> Option<NonZeroUsize>;
+
+    /// Getter to `has_clients`
+    fn has_clients(&self) -> bool;
+
+    /// Send the buffer out
+    fn send_buf(&mut self, tag: Tag, buf: &[u8]) -> Result<(), Error>;
+
+    /// Getter to `num_clients_seen`
+    fn num_clients_seen(&self) -> usize;
+
+    /// Getter to `nb_listeners`
+    fn nb_listeners(&self) -> usize;
+}
+
+impl<HT, SP> Broker for LlmpBroker<HT, SP>
+where
+    HT: LlmpHookTuple<SP>,
+    SP: ShMemProvider,
+{
+    fn is_shutting_down(&self) -> bool {
+        self.inner.is_shutting_down()
+    }
+
+    fn on_timeout(&mut self) -> Result<(), Error> {
+        self.hooks.on_timeout_all()
+    }
+
+    fn broker_once(&mut self) -> Result<bool, Error> {
+        self.broker_once()
+    }
+
+    fn exit_after(&self) -> Option<NonZeroUsize> {
+        self.inner.exit_cleanly_after
+    }
+
+    fn has_clients(&self) -> bool {
+        self.inner.has_clients()
+    }
+
+    fn send_buf(&mut self, tag: Tag, buf: &[u8]) -> Result<(), Error> {
+        self.inner.llmp_out.send_buf(tag, buf)
+    }
+
+    fn num_clients_seen(&self) -> usize {
+        self.inner.num_clients_seen
+    }
+
+    fn nb_listeners(&self) -> usize {
+        self.inner.listeners.len()
+    }
+}
+
+/// A set of brokers.
+/// Limitation: the hooks must be the same.
+#[cfg(feature = "std")]
+#[derive(Default)]
+pub struct Brokers {
+    /// the brokers
+    llmp_brokers: Vec<Box<dyn Broker>>,
+}
+
+#[cfg(feature = "std")]
+impl Debug for Brokers {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        Debug::fmt("Brokers", f)?;
+        Ok(())
+    }
+}
+
 /// A signal handler for the [`LlmpBroker`].
 /// On unix, it handles signals
 /// On Windows - control signals (e.g., CTRL+C)
@@ -2111,6 +2211,7 @@ where
         msg_tag: &mut Tag,
         msg_flags: &mut Flags,
         msg: &mut [u8],
+        new_msgs: &mut Vec<(Tag, Flags, Vec<u8>)>,
     ) -> Result<LlmpMsgHookResult, Error>;
 
     /// Hook called whenever there is a timeout.
@@ -2132,6 +2233,7 @@ where
         msg_tag: &mut Tag,
         msg_flags: &mut Flags,
         msg: &mut [u8],
+        new_msgs: &mut Vec<(Tag, Flags, Vec<u8>)>,
     ) -> Result<LlmpMsgHookResult, Error>;
 
     /// Call all hook callbacks on timeout.
@@ -2149,6 +2251,7 @@ where
         _msg_tag: &mut Tag,
         _msg_flags: &mut Flags,
         _msg: &mut [u8],
+        _new_msgs: &mut Vec<(Tag, Flags, Vec<u8>)>,
     ) -> Result<LlmpMsgHookResult, Error> {
         Ok(LlmpMsgHookResult::ForwardToClients)
     }
@@ -2171,10 +2274,11 @@ where
         msg_tag: &mut Tag,
         msg_flags: &mut Flags,
         msg: &mut [u8],
+        new_msgs: &mut Vec<(Tag, Flags, Vec<u8>)>,
     ) -> Result<LlmpMsgHookResult, Error> {
         match self
             .0
-            .on_new_message(inner, client_id, msg_tag, msg_flags, msg)?
+            .on_new_message(inner, client_id, msg_tag, msg_flags, msg, new_msgs)?
         {
             LlmpMsgHookResult::Handled => {
                 // message handled, stop early
@@ -2183,7 +2287,7 @@ where
             LlmpMsgHookResult::ForwardToClients => {
                 // message should be forwarded, continue iterating
                 self.1
-                    .on_new_message_all(inner, client_id, msg_tag, msg_flags, msg)
+                    .on_new_message_all(inner, client_id, msg_tag, msg_flags, msg, new_msgs)
             }
         }
     }
@@ -2207,6 +2311,120 @@ where
         LlmpBroker {
             inner: self.inner,
             hooks,
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl Brokers {
+    /// The constructor
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            llmp_brokers: Vec::new(),
+        }
+    }
+
+    /// Add another broker
+    pub fn add(&mut self, broker: Box<dyn Broker>) {
+        self.llmp_brokers.push(broker);
+    }
+
+    #[cfg(any(all(unix, not(miri)), all(windows, feature = "std")))]
+    fn setup_handlers() {
+        #[cfg(all(unix, not(miri)))]
+        if let Err(e) = unsafe { setup_signal_handler(ptr::addr_of_mut!(LLMP_SIGHANDLER_STATE)) } {
+            // We can live without a proper ctrl+c signal handler - Ignore.
+            log::info!("Failed to setup signal handlers: {e}");
+        } else {
+            log::info!("Successfully setup signal handlers");
+        }
+
+        #[cfg(all(windows, feature = "std"))]
+        if let Err(e) = unsafe { setup_ctrl_handler(ptr::addr_of_mut!(LLMP_SIGHANDLER_STATE)) } {
+            // We can live without a proper ctrl+c signal handler - Ignore.
+            log::info!("Failed to setup control handlers: {e}");
+        } else {
+            log::info!(
+                "{}: Broker successfully setup control handlers",
+                std::process::id().to_string()
+            );
+        }
+    }
+
+    /// Loops until the last client quits the last broker,
+    /// forwarding and handling all incoming messages from clients for each broker.
+    /// Will call `on_timeout` roughly after `timeout`
+    /// Panics on error.
+    /// 5 millis of sleep can't hurt to keep busywait not at 100%
+    #[cfg(feature = "std")]
+    pub fn loop_with_timeouts(&mut self, timeout: Duration, sleep_time: Option<Duration>) {
+        use super::current_milliseconds;
+
+        #[cfg(any(all(unix, not(miri)), all(windows, feature = "std")))]
+        Self::setup_handlers();
+
+        let timeout = timeout.as_millis() as u64;
+        let mut end_time = current_milliseconds() + timeout;
+
+        loop {
+            self.llmp_brokers.retain_mut(|broker| {
+                if !broker.is_shutting_down() {
+                    if current_milliseconds() > end_time {
+                        broker
+                            .on_timeout()
+                            .expect("An error occurred in broker timeout. Exiting.");
+                        end_time = current_milliseconds() + timeout;
+                    }
+
+                    if broker
+                        .broker_once()
+                        .expect("An error occurred when brokering. Exiting.")
+                    {
+                        end_time = current_milliseconds() + timeout;
+                    }
+
+                    if let Some(exit_after_count) = broker.exit_after() {
+                        // log::trace!(
+                        //     "Clients connected: {} && > {} - {} >= {}",
+                        //     self.has_clients(),
+                        //     self.num_clients_seen,
+                        //     self.listeners.len(),
+                        //     exit_after_count
+                        // );
+                        if !broker.has_clients()
+                            && (broker.num_clients_seen() - broker.nb_listeners())
+                                >= exit_after_count.into()
+                        {
+                            // No more clients connected, and the amount of clients we were waiting for was previously connected.
+                            // exit cleanly.
+                            return false;
+                        }
+                    }
+
+                    true
+                } else {
+                    broker.send_buf(LLMP_TAG_EXITING, &[]).expect(
+                        "Error when shutting down broker: Could not send LLMP_TAG_EXITING msg.",
+                    );
+
+                    false
+                }
+            });
+
+            if self.llmp_brokers.is_empty() {
+                break;
+            }
+
+            #[cfg(feature = "std")]
+            if let Some(time) = sleep_time {
+                thread::sleep(time);
+            }
+
+            #[cfg(not(feature = "std"))]
+            if let Some(time) = sleep_time {
+                panic!("Cannot sleep on no_std platform (requested {time:?})");
+            }
         }
     }
 }
@@ -2414,6 +2632,7 @@ where
 
     /// Broker broadcast to its own page for all others to read
     /// Returns `true` if new messages were broker-ed
+    /// It is supposed that the message is never unmapped.
     #[inline]
     #[allow(clippy::cast_ptr_alignment)]
     unsafe fn handle_new_msgs(&mut self, client_id: ClientId) -> Result<bool, Error> {
@@ -2522,9 +2741,6 @@ where
                 }
                 // handle all other messages
                 _ => {
-                    // The message is not specifically for use. Let the user handle it, then forward it to the clients, if necessary.
-                    let mut should_forward_msg = true;
-
                     let pos = if (client_id.0 as usize) < self.inner.llmp_clients.len()
                         && self.inner.llmp_clients[client_id.0 as usize].id == client_id
                     {
@@ -2539,18 +2755,27 @@ where
 
                     let map = &mut self.inner.llmp_clients[pos].current_recv_shmem;
                     let msg_buf = (*msg).try_as_slice_mut(map)?;
-                    if let LlmpMsgHookResult::Handled = self.hooks.on_new_message_all(
+
+                    // The message is not specifically for use. Let the user handle it, then forward it to the clients, if necessary.
+                    let mut new_msgs: Vec<(Tag, Flags, Vec<u8>)> = Vec::new();
+                    if let LlmpMsgHookResult::ForwardToClients = self.hooks.on_new_message_all(
                         &mut self.inner,
                         client_id,
                         &mut (*msg).tag,
                         &mut (*msg).flags,
                         msg_buf,
+                        &mut new_msgs,
                     )? {
-                        should_forward_msg = false;
+                        self.inner.forward_msg(msg)?;
                     }
 
-                    if should_forward_msg {
-                        self.inner_mut().forward_msg(msg)?;
+                    debug!("New msg vector: {}", new_msgs.len());
+                    for (new_msg_tag, new_msg_flag, new_msg) in new_msgs {
+                        self.inner.llmp_out.send_buf_with_flags(
+                            new_msg_tag,
+                            new_msg_flag,
+                            new_msg.as_ref(),
+                        )?;
                     }
                 }
             }
@@ -3467,12 +3692,14 @@ where
                     ErrorKind::ConnectionRefused => {
                         //connection refused. loop till the broker is up
                         loop {
-                            match TcpStream::connect((IP_LOCALHOST, port)) {
-                                Ok(stream) => break stream,
-                                Err(_) => {
-                                    log::info!("Connection Refused.. Retrying");
-                                }
+                            if let Ok(stream) = TcpStream::connect((IP_LOCALHOST, port)) {
+                                break stream;
                             }
+
+                            debug!("Connection Refused. Retrying...");
+
+                            #[cfg(feature = "std")]
+                            thread::sleep(Duration::from_millis(50));
                         }
                     }
                     _ => return Err(Error::illegal_state(e.to_string())),

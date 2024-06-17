@@ -3,12 +3,15 @@
 //! In this example, you will see the use of the `launcher` feature.
 //! The `launcher` will spawn new processes for each cpu core.
 use core::time::Duration;
-use std::{env, net::SocketAddr, path::PathBuf};
+use std::{env, net::SocketAddr, path::PathBuf, str::FromStr};
 
 use clap::{self, Parser};
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
-    events::{centralized::CentralizedEventManager, launcher::CentralizedLauncher, EventConfig},
+    events::{
+        centralized::CentralizedEventManager, launcher::CentralizedLauncher,
+        multi_machine::NodeDescriptor, EventConfig,
+    },
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -99,6 +102,7 @@ struct Opt {
     default_value = "10000"
     )]
     timeout: Duration,
+
     /*
     /// This fuzzer has hard-coded tokens
     #[arg(
@@ -111,6 +115,21 @@ struct Opt {
     )]
     tokens: Vec<PathBuf>,
     */
+    #[arg(
+        long,
+        help = "The address of the parent node to connect to, if any",
+        name = "PARENT_ADDR",
+        default_value = None
+    )]
+    parent_addr: Option<String>,
+
+    #[arg(
+        long,
+        help = "The port on which the node will listen on, if children are to be expected",
+        name = "NODE_LISTENING_PORT",
+        default_value = None
+    )]
+    node_listening_port: Option<u16>,
 }
 
 /// The main fn, `no_mangle` as it is a C symbol
@@ -254,6 +273,18 @@ pub extern "C" fn libafl_main() {
 
     let mut main_run_client = secondary_run_client.clone(); // clone it just for borrow checker
 
+    let parent_addr: Option<SocketAddr> = if let Some(parent_str) = opt.parent_addr {
+        Some(SocketAddr::from_str(parent_str.as_str()).expect("Wrong parent address"))
+    } else {
+        None
+    };
+
+    let mut node_description = NodeDescriptor::builder().parent_addr(parent_addr).build();
+
+    if opt.node_listening_port.is_some() {
+        node_description.node_listening_port = opt.node_listening_port;
+    }
+
     match CentralizedLauncher::builder()
         .shmem_provider(shmem_provider)
         .configuration(EventConfig::from_name("default"))
@@ -262,8 +293,10 @@ pub extern "C" fn libafl_main() {
         .main_run_client(&mut main_run_client)
         .cores(&cores)
         .broker_port(broker_port)
+        .centralized_broker_port(broker_port + 1)
         .remote_broker_addr(opt.remote_broker_addr)
-        .stdout_file(Some("/dev/null"))
+        .multi_machine_node_descriptor(node_description)
+        // .stdout_file(Some("/dev/null"))
         .build()
         .launch()
     {
