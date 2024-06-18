@@ -258,11 +258,11 @@ where
         }
     }
 
-    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn restart_progress_should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
         Ok(true)
     }
 
-    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
         Ok(())
     }
 }
