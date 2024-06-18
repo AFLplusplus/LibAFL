@@ -290,8 +290,8 @@ where
             return Ok(());
         };
 
-        for (_key, idx) in &top_rated.map {
-            let mut entry = state.corpus().get(*idx)?.borrow_mut();
+        for (_key, id) in &top_rated.map {
+            let mut entry = state.corpus().get(*id)?.borrow_mut();
             if entry.scheduled_count() > 0 {
                 continue;
             }

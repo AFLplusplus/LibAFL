@@ -224,7 +224,7 @@ where
             // reverse order; if indexes are stored in a vec, we need to remove from back to front
             removed.sort_unstable_by(|id1, id2| id2.cmp(id1));
             for id in removed {
-                let removed = state.corpus_mut().remove(idx)?;
+                let removed = state.corpus_mut().remove(id)?;
                 // scheduler needs to know we've removed the input, or it will continue to try
                 // to use now-missing inputs
                 fuzzer

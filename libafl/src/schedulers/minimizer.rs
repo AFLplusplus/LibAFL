@@ -93,7 +93,7 @@ where
     <Self as UsesState>::State: HasCorpus + HasMetadata + HasRand,
     O: CanTrack,
 {
-    /// Replaces the testcase at the given idx
+    /// Replaces the testcase at the given id
     fn on_replace(
         &mut self,
         state: &mut <Self as UsesState>::State,
@@ -116,7 +116,7 @@ where
             if let Some(meta) = state.metadata_map_mut().get_mut::<TopRatedsMetadata>() {
                 let entries = meta
                     .map
-                    .extract_if(|_, other_idx| *other_idx == id)
+                    .extract_if(|_, other_id| *other_id == id)
                     .map(|(entry, _)| entry)
                     .collect::<Vec<_>>();
                 entries
@@ -125,8 +125,8 @@ where
             };
         entries.sort_unstable(); // this should already be sorted, but just in case
         let mut map = HashMap::new();
-        for i in state.corpus().ids() {
-            let mut old = state.corpus().get(i)?.borrow_mut();
+        for current_id in state.corpus().ids() {
+            let mut old = state.corpus().get(current_id)?.borrow_mut();
             let factor = F::compute(state, &mut *old)?;
             if let Some(old_map) = old.metadata_map_mut().get_mut::<M>() {
                 let mut e_iter = entries.iter();
@@ -144,13 +144,13 @@ where
                             Ordering::Equal => {
                                 // if we found a better factor, prefer it
                                 map.entry(*e)
-                                    .and_modify(|(f, idx)| {
+                                    .and_modify(|(f, id)| {
                                         if *f > factor {
                                             *f = factor;
-                                            *idx = i;
+                                            *id = current_id;
                                         }
                                     })
-                                    .or_insert((factor, i));
+                                    .or_insert((factor, current_id));
                                 entry = e_iter.next();
                                 map_entry = map_iter.next();
                             }
@@ -174,16 +174,16 @@ where
             };
             meta.map.reserve(reserve);
 
-            for (entry, (_, new_idx)) in map_iter {
-                let mut new = state.corpus().get(*new_idx)?.borrow_mut();
+            for (entry, (_, new_id)) in map_iter {
+                let mut new = state.corpus().get(*new_id)?.borrow_mut();
                 let new_meta = new.metadata_map_mut().get_mut::<M>().ok_or_else(|| {
                     Error::key_not_found(format!(
-                        "{} needed for MinimizerScheduler not found in testcase #{new_idx}",
+                        "{} needed for MinimizerScheduler not found in testcase #{new_id}",
                         type_name::<M>()
                     ))
                 })?;
                 *new_meta.refcnt_mut() += 1;
-                meta.map.insert(*entry, *new_idx);
+                meta.map.insert(*entry, *new_id);
             }
 
             // Put back the metadata
@@ -345,12 +345,12 @@ where
 
         let mut acc = HashSet::new();
 
-        for (key, idx) in &top_rated.map {
+        for (key, id) in &top_rated.map {
             if !acc.contains(key) {
-                let mut entry = state.corpus().get(*idx)?.borrow_mut();
+                let mut entry = state.corpus().get(*id)?.borrow_mut();
                 let meta = entry.metadata_map().get::<M>().ok_or_else(|| {
                     Error::key_not_found(format!(
-                        "{} needed for MinimizerScheduler not found in testcase #{idx}",
+                        "{} needed for MinimizerScheduler not found in testcase #{id}",
                         type_name::<M>()
                     ))
                 })?;

@@ -1135,7 +1135,7 @@ where
         // println!("orig: {:#?} new: {:#?}", orig_cmpvals, new_cmpvals);
 
         // Compute when mutating it for the 1st time.
-        let current_corpus_id = state.current_corpus_id()?.ok_or_else(|| Error::key_not_found("No corpus-idx is currently being fuzzed, but called AFLppRedQueen::multi_mutated()."))?;
+        let current_corpus_id = state.current_corpus_id()?.ok_or_else(|| Error::key_not_found("No corpus-id is currently being fuzzed, but called AFLppRedQueen::multi_mutated()."))?;
         if self.last_corpus_id.is_none() || self.last_corpus_id.unwrap() != current_corpus_id {
             self.text_type = check_if_text(orig_bytes, orig_bytes.len());
             self.last_corpus_id = Some(current_corpus_id);
