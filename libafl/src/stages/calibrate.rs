@@ -9,7 +9,7 @@ use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata},
+    corpus::{Corpus, SchedulerTestcaseMetadata},
     events::{Event, EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{map::MapFeedbackMetadata, HasObserverHandle},
@@ -349,19 +349,9 @@ where
         Ok(())
     }
 
-    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        // DON'T EVER RESTART IF YOU FAIL IN CALIBRATION STAGE
-        let tc = state.current_corpus_id()?;
-        match tc {
-            Some(x) => {
-                let removed = state.corpus_mut().remove(x)?;
-                state.corpus_mut().add_disabled(removed)?;
-            }
-            None => {
-                // nothing can be done
-            }
-        }
-
+    fn restart_progress_should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+        // DON'T RESTART IF THE TESTCASE FAILS IN CALIBRATION STAGE!!!
+        // RESTARTING FROM A FAILED TESTCASE WILL ONLY RESULT IN A ENDLESS LOOP!!!!
         Ok(false)
     }
 

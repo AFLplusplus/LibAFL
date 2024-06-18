@@ -20,7 +20,7 @@ use crate::state::HasClientPerfMonitor;
 use crate::{
     executors::{Executor, HasObservers},
     observers::concolic::ConcolicObserver,
-    stages::{RetryRestartHelper, Stage, TracingStage},
+    stages::{Stage, TracingStage},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -83,12 +83,12 @@ where
         Ok(())
     }
 
-    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        RetryRestartHelper::restart_progress_should_run(state, self, 3)
+    fn restart_progress_should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+        Ok(false)
     }
 
-    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RetryRestartHelper::clear_restart_progress(state, self)
+    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        Ok(())
     }
 }
 

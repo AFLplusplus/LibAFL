@@ -15,7 +15,7 @@ use crate::{
     inputs::HasMutatorBytes,
     mutators::mutations::buffer_copy,
     observers::{MapObserver, ObserversTuple},
-    stages::{RetryRestartHelper, Stage},
+    stages::Stage,
     state::{HasCorpus, HasCurrentTestcase, HasRand, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -104,14 +104,14 @@ where
         Ok(())
     }
 
-    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn restart_progress_should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
         // TODO this stage needs a proper resume
-        RetryRestartHelper::restart_progress_should_run(state, self, 3)
+        Ok(false)
     }
 
-    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
         // TODO this stage needs a proper resume
-        RetryRestartHelper::clear_restart_progress(state, self)
+        Ok(())
     }
 }
 

@@ -199,7 +199,7 @@ where
                 state.set_current_stage_idx(StageId(Self::LEN))?;
 
                 let stage = &mut self.0;
-                stage.perform_restartable(fuzzer, executor, state, manager)?;
+                stage.perform(fuzzer, executor, state, manager)?;
 
                 state.clear_stage()?;
             }
