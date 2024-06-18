@@ -101,7 +101,7 @@ where
     A: Clone + Display + ToSocketAddrs + Send + Sync + 'static,
     I: Input + Send + Sync + 'static,
 {
-    /// Should not be created alone. Use [`TcpMultiMachineBuilder`] instead.
+    /// Should not be created alone. Use [`TcpMultiMachineHooksBuilder`] instead.
     pub(crate) fn new(
         shared_state: Arc<RwLock<TcpMultiMachineState<A>>>,
         rt: Arc<Runtime>,
@@ -119,7 +119,7 @@ where
     A: Clone + Display + ToSocketAddrs + Send + Sync + 'static,
     I: Input + Send + Sync + 'static,
 {
-    /// Should not be created alone. Use [`TcpMultiMachineBuilder`] instead.
+    /// Should not be created alone. Use [`TcpMultiMachineHooksBuilder`] instead.
     ///
     /// # Safety
     /// For [`Self::on_new_message`], this struct assumes that the `msg` parameter

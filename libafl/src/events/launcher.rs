@@ -55,7 +55,7 @@ use super::StdLlmpEventHook;
 #[cfg(all(unix, feature = "std", feature = "fork", feature = "multi_machine"))]
 use crate::events::multi_machine::NodeDescriptor;
 #[cfg(all(unix, feature = "std", feature = "fork", feature = "multi_machine"))]
-use crate::events::multi_machine::TcpMultiMachineBuilder;
+use crate::events::multi_machine::TcpMultiMachineHooks;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use crate::events::{centralized::CentralizedEventManager, CentralizedLlmpHook};
 #[cfg(all(unix, feature = "std", feature = "fork"))]
@@ -746,14 +746,13 @@ where
         // # Safety
         // The `multi_machine_receiver_hook` needs messages to outlive the receiver.
         // The underlying memory region for incoming messages lives longer than the async thread processing them.
-        let TcpMultiMachine {
+        let TcpMultiMachineHooks {
             sender: multi_machine_sender_hook,
             receiver: multi_machine_receiver_hook,
         } = unsafe {
-            TcpMultiMachineBuilder()
-                .build::<SocketAddr, <<EM as UsesState>::State as UsesInput>::Input>(
-                    self.multi_machine_node_descriptor.clone(),
-                )?
+            TcpMultiMachineHooks::builder()
+                .node_descriptor(self.multi_machine_node_descriptor.clone())
+                .build::<<<EM as UsesState>::State as UsesInput>::Input>()?
         };
 
         let mut brokers = Brokers::new();
