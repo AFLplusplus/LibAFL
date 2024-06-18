@@ -90,6 +90,7 @@ use backtrace::Backtrace;
 #[cfg(not(any(target_os = "solaris", target_os = "illumos")))]
 use nix::sys::socket::{self, sockopt::ReusePort};
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "std")]
 use tuple_list::tuple_list;
 
 #[cfg(all(unix, not(miri)))]
