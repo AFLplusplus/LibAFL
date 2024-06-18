@@ -402,7 +402,7 @@ pub mod windows_exception_handler {
                     let mut bsod = Vec::new();
                     {
                         let mut writer = std::io::BufWriter::new(&mut bsod);
-                        writeln!(writer, "input: {:?}", input.generate_name(CorpusId(0))).unwrap();
+                        writeln!(writer, "input: {:?}", input.generate_name(None)).unwrap();
                         libafl_bolts::minibsod::generate_minibsod(&mut writer, exception_pointers)
                             .unwrap();
                         writer.flush().unwrap();

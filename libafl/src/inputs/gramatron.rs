@@ -44,7 +44,7 @@ pub struct GramatronInput {
 impl Input for GramatronInput {
     /// Generate a name for this input
     #[must_use]
-    fn generate_name(&self, _id: CorpusId) -> String {
+    fn generate_name(&self, _id: Option<CorpusId>) -> String {
         let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
         for term in &self.terms {
             hasher.write(term.symbol.as_bytes());

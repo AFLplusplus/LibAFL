@@ -30,13 +30,18 @@ pub struct NautilusInput {
 impl Input for NautilusInput {
     /// Generate a name for this input
     #[must_use]
-    fn generate_name(&self, id: CorpusId) -> String {
+    fn generate_name(&self, id: Option<CorpusId>) -> String {
         /*let mut hasher = AHasher::new_with_keys(0, 0);
         for term in &self.terms {
             hasher.write(term.symbol.as_bytes());
         }
         format!("{:016x}", hasher.finish())*/
-        format!("id:{}", id.0)
+
+        if let Some(id) = id {
+            format!("id_{}", id.0)
+        } else {
+            "id_unknown".into()
+        }
     }
 }
 

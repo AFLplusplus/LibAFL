@@ -45,8 +45,12 @@ pub enum PacketType {
 }
 
 impl Input for PacketData {
-    fn generate_name(&self, id: CorpusId) -> String {
-        format!("id_{}", id.0)
+    fn generate_name(&self, id: Option<CorpusId>) -> String {
+        if let Some(id) {
+            format!("id_{}", id.0)
+        } else {
+            "id_unknown"
+        }
     }
 }
 

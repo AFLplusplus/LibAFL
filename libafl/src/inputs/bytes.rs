@@ -50,7 +50,7 @@ impl Input for BytesInput {
     }
 
     /// Generate a name for this input
-    fn generate_name(&self, _id: CorpusId) -> String {
+    fn generate_name(&self, _id: Option<CorpusId>) -> String {
         let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
         hasher.write(self.bytes());
         format!("{:016x}", hasher.finish())

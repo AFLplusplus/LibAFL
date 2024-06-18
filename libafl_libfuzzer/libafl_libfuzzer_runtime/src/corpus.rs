@@ -118,7 +118,7 @@ where
                         "The testcase, when added to the corpus, must have an input present!",
                     )
                 })?;
-                let name = input.generate_name(id);
+                let name = input.generate_name(Some(id));
                 let path = self.corpus_dir.join(&name);
 
                 match input.to_file(&path) {

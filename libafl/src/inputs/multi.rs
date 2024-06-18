@@ -153,7 +153,7 @@ impl<I> Input for MultipartInput<I>
 where
     I: Input,
 {
-    fn generate_name(&self, id: CorpusId) -> String {
+    fn generate_name(&self, id: Option<CorpusId>) -> String {
         self.names
             .iter()
             .cloned()
