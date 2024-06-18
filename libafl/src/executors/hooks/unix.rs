@@ -9,7 +9,6 @@ pub mod unix_signal_handler {
     use libc::siginfo_t;
 
     use crate::{
-        corpus::CorpusId,
         events::{EventFirer, EventRestarter},
         executors::{
             common_signals,
