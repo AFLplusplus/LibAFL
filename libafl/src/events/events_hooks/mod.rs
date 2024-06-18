@@ -1,4 +1,4 @@
-//! Hooks for event managers, especifically these are used to hook before and and `handle_in_client`.
+//! Hooks for event managers, especifically these are used to hook before `handle_in_client`.
 //! This will allow user to define pre/post-processing code when the event manager receives any message from
 //! other clients
 use libafl_bolts::ClientId;
