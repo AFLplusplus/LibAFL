@@ -8,28 +8,6 @@ use crate::{
     Error,
 };
 
-/// Progress for nested stages. This merely enters/exits the inner stage's scope.
-#[derive(Debug)]
-pub struct NestedStageRestartHelper;
-
-impl NestedStageRestartHelper {
-    fn restart_progress_should_run<S, ST>(state: &mut S, _stage: &ST) -> Result<bool, Error>
-    where
-        S: HasNestedStageStatus,
-    {
-        state.enter_inner_stage()?;
-        Ok(true)
-    }
-
-    fn clear_restart_progress<S, ST>(state: &mut S, _stage: &ST) -> Result<(), Error>
-    where
-        S: HasNestedStageStatus,
-    {
-        state.exit_inner_stage()?;
-        Ok(())
-    }
-}
-
 #[derive(Debug)]
 /// Perform the stage while the closure evaluates to true
 pub struct WhileStage<CB, E, EM, ST, Z> {
@@ -70,12 +48,12 @@ where
         Ok(())
     }
 
-    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        NestedStageRestartHelper::restart_progress_should_run(state, self)
+    fn restart_progress_should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+        Ok(true)
     }
 
-    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        NestedStageRestartHelper::clear_restart_progress(state, self)
+    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -134,12 +112,12 @@ where
         Ok(())
     }
 
-    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        NestedStageRestartHelper::restart_progress_should_run(state, self)
+    fn restart_progress_should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+        Ok(true)
     }
 
-    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        NestedStageRestartHelper::clear_restart_progress(state, self)
+    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -219,12 +197,12 @@ where
         Ok(())
     }
 
-    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        NestedStageRestartHelper::restart_progress_should_run(state, self)
+    fn restart_progress_should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+        Ok(true)
     }
 
-    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        NestedStageRestartHelper::clear_restart_progress(state, self)
+    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -281,11 +259,11 @@ where
     }
 
     fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        NestedStageRestartHelper::restart_progress_should_run(state, self)
+        Ok(true)
     }
 
     fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        NestedStageRestartHelper::clear_restart_progress(state, self)
+        Ok(())
     }
 }
 
