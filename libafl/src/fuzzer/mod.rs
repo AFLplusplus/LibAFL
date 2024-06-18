@@ -13,14 +13,13 @@ use crate::{
     feedbacks::Feedback,
     inputs::UsesInput,
     mark_feature_time,
-    observers::ObserversTuple,
-    prelude::HasStopNext,
+    observers::ObserversTuple, 
     schedulers::Scheduler,
     stages::{HasCurrentStage, StagesTuple},
     start_timer,
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime, HasSolutions,
-        UsesState,
+        UsesState, HasStopNext,
     },
     Error, HasMetadata,
 };
