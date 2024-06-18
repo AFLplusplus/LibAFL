@@ -32,7 +32,6 @@ Welcome to `LibAFL`
     clippy::similar_names,
     clippy::too_many_lines,
     clippy::into_iter_without_iter, // broken
-    clippy::type_complexity,
 )]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,

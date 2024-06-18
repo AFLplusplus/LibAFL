@@ -22,7 +22,6 @@ use libafl_bolts::{
     tuples::Handle,
     ClientId,
 };
-use log::debug;
 use serde::{Deserialize, Serialize};
 
 use super::NopEventManager;
@@ -551,7 +550,7 @@ where
             };
             let event: Event<<<Self as UsesState>::State as UsesInput>::Input> =
                 postcard::from_bytes(event_bytes)?;
-            debug!("Processor received message {}", event.name_detailed());
+            log::debug!("Processor received message {}", event.name_detailed());
             self.handle_in_main(fuzzer, executor, state, client_id, event)?;
             count += 1;
         }
@@ -574,7 +573,7 @@ where
         Z: ExecutionProcessor<E::Observers, State = <Self as UsesState>::State>
             + EvaluatorObservers<E::Observers>,
     {
-        debug!("handle_in_main!");
+        log::debug!("handle_in_main!");
 
         let event_name = event.name_detailed();
 
@@ -591,7 +590,7 @@ where
                 #[cfg(feature = "multi_machine")]
                 node_id,
             } => {
-                debug!(
+                log::debug!(
                     "Received {} from {client_id:?} ({client_config:?}, forward {forward_id:?})",
                     event_name
                 );
@@ -604,7 +603,7 @@ where
                         {
                             state.scalability_monitor_mut().testcase_with_observers += 1;
                         }
-                        debug!(
+                        log::debug!(
                             "[{}] Running fuzzer with event {}",
                             process::id(),
                             event_name
@@ -622,7 +621,7 @@ where
                         {
                             state.scalability_monitor_mut().testcase_without_observers += 1;
                         }
-                        debug!(
+                        log::debug!(
                             "[{}] Running fuzzer with event {}",
                             process::id(),
                             event_name
@@ -652,7 +651,7 @@ where
 
                     self.hooks.on_fire_all(state, client_id, &event)?;
 
-                    debug!(
+                    log::debug!(
                         "[{}] Adding received Testcase {} as item #{item}...",
                         process::id(),
                         event_name
@@ -660,7 +659,7 @@ where
 
                     self.inner.fire(state, event)?;
                 } else {
-                    debug!("[{}] {} was discarded...)", process::id(), event_name);
+                    log::debug!("[{}] {} was discarded...)", process::id(), event_name);
                 }
             }
             _ => {

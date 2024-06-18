@@ -25,7 +25,6 @@ use libafl_bolts::{
     llmp::{recv_tcp_msg, send_tcp_msg, TcpRequest, TcpResponse},
     IP_LOCALHOST,
 };
-use log::debug;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "llmp_compression")]
@@ -370,7 +369,7 @@ where
             Ok(_) => (),
             Err(e) => log::error!("Failed to send tcp message {:#?}", e),
         }
-        debug!("Asking he broker to be disconnected");
+        log::debug!("Asking he broker to be disconnected");
         Ok(())
     }
 
@@ -423,11 +422,11 @@ where
                 ..
             } => {
                 #[cfg(feature = "std")]
-                debug!("[{}] Received new Testcase {evt_name} from {client_id:?} ({client_config:?}, forward {forward_id:?})", std::process::id());
+                log::debug!("[{}] Received new Testcase {evt_name} from {client_id:?} ({client_config:?}, forward {forward_id:?})", std::process::id());
 
                 if self.always_interesting {
                     let item = fuzzer.add_input(state, executor, self, input)?;
-                    debug!("Added received Testcase as item #{item}");
+                    log::debug!("Added received Testcase as item #{item}");
                 } else {
                     let res = if client_config.match_with(&self.configuration)
                         && observers_buf.is_some()
@@ -455,9 +454,9 @@ where
                         )?
                     };
                     if let Some(item) = res.1 {
-                        debug!("Added received Testcase {evt_name} as item #{item}");
+                        log::debug!("Added received Testcase {evt_name} as item #{item}");
                     } else {
-                        debug!("Testcase {evt_name} was discarded");
+                        log::debug!("Testcase {evt_name} was discarded");
                     }
                 }
             }
@@ -620,7 +619,7 @@ where
                 msg
             };
             let event: Event<S::Input> = postcard::from_bytes(event_bytes)?;
-            debug!("Received event in normal llmp {}", event.name_detailed());
+            log::debug!("Received event in normal llmp {}", event.name_detailed());
             self.handle_in_client(fuzzer, executor, state, client_id, event)?;
             count += 1;
         }

@@ -14,7 +14,6 @@ use libafl_bolts::{
     shmem::ShMemProvider,
     ClientId, Error,
 };
-use log::debug;
 use tokio::{
     net::ToSocketAddrs,
     runtime::Runtime,
@@ -102,7 +101,7 @@ where
     A: Clone + Display + ToSocketAddrs + Send + Sync + 'static,
     I: Input + Send + Sync + 'static,
 {
-    /// Should not be created alone. Use [`TcpMultiMachineBuilder`] instead.
+    /// Should not be created alone. Use [`TcpMultiMachineHooksBuilder`] instead.
     pub(crate) fn new(
         shared_state: Arc<RwLock<TcpMultiMachineState<A>>>,
         rt: Arc<Runtime>,
@@ -120,8 +119,13 @@ where
     A: Clone + Display + ToSocketAddrs + Send + Sync + 'static,
     I: Input + Send + Sync + 'static,
 {
-    /// Should not be created alone. Use [`TcpMultiMachineBuilder`] instead.
-    pub(crate) fn new(
+    /// Should not be created alone. Use [`TcpMultiMachineHooksBuilder`] instead.
+    ///
+    /// # Safety
+    /// For [`Self::on_new_message`], this struct assumes that the `msg` parameter
+    /// (or rather, the memory it points to), lives sufficiently long
+    /// for an async background task to process it.
+    pub(crate) unsafe fn new(
         shared_state: Arc<RwLock<TcpMultiMachineState<A>>>,
         rt: Arc<Runtime>,
     ) -> Self {
@@ -200,7 +204,7 @@ where
             // TODO: do not copy here
             state_wr_lock.add_past_msg(msg);
 
-            debug!("Sending msg...");
+            log::debug!("Sending msg...");
 
             state_wr_lock
                 .send_interesting_event_to_nodes(&mm_msg)
@@ -239,7 +243,7 @@ where
                 .receive_new_messages_from_nodes(&mut incoming_msgs)
                 .await?;
 
-            debug!("received {} new incoming msg(s)", incoming_msgs.len());
+            log::debug!("received {} new incoming msg(s)", incoming_msgs.len());
 
             let msgs_to_forward: Result<Vec<(Tag, Flags, Vec<u8>)>, Error> = incoming_msgs
                 .into_iter()

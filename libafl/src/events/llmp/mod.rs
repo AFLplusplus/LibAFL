@@ -13,7 +13,6 @@ use libafl_bolts::{
     shmem::{NopShMemProvider, ShMemProvider},
     ClientId,
 };
-use log::debug;
 use serde::Deserialize;
 
 use crate::{
@@ -303,7 +302,7 @@ where
             Event::NewTestcase {
                 input, forward_id, ..
             } => {
-                debug!("Received new Testcase to convert from {client_id:?} (forward {forward_id:?}, forward {forward_id:?})");
+                log::debug!("Received new Testcase to convert from {client_id:?} (forward {forward_id:?}, forward {forward_id:?})");
 
                 let Some(converter) = self.converter_back.as_mut() else {
                     return Ok(());
@@ -377,7 +376,7 @@ where
             };
 
             let event: Event<DI> = postcard::from_bytes(event_bytes)?;
-            debug!("Processor received message {}", event.name_detailed());
+            log::debug!("Processor received message {}", event.name_detailed());
             self.handle_in_client(fuzzer, executor, state, manager, client_id, event)?;
             count += 1;
         }

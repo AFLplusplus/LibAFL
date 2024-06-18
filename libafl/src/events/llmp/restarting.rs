@@ -31,8 +31,6 @@ use libafl_bolts::{
 use libafl_bolts::{
     llmp::LlmpConnection, os::CTRL_C_EXIT, shmem::StdShMemProvider, staterestore::StateRestorer,
 };
-#[cfg(all(unix, feature = "fork"))]
-use log::debug;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
@@ -564,7 +562,7 @@ where
                             handle.status()
                         }
                         ForkResult::Child => {
-                            debug!(
+                            log::debug!(
                                 "{} has been forked into {}",
                                 std::os::unix::process::parent_id(),
                                 std::process::id()
