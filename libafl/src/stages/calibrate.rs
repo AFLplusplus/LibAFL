@@ -9,7 +9,7 @@ use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, SchedulerTestcaseMetadata},
+    corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata},
     events::{Event, EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{map::MapFeedbackMetadata, HasObserverHandle},
@@ -17,7 +17,7 @@ use crate::{
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
     schedulers::powersched::SchedulerMetadata,
-    stages::{ExecutionCountRestartHelper, Stage},
+    stages::Stage,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -75,7 +75,6 @@ pub struct CalibrationStage<C, E, O, OT> {
     stage_max: usize,
     /// If we should track stability
     track_stability: bool,
-    restart_helper: ExecutionCountRestartHelper,
     phantom: PhantomData<(E, O, OT)>,
 }
 
@@ -124,8 +123,6 @@ where
         }
 
         let mut iter = self.stage_max;
-        // If we restarted after a timeout or crash, do less iterations.
-        iter -= usize::try_from(self.restart_helper.execs_since_progress_start(state)?)?;
 
         let input = state.current_input_cloned()?;
 
@@ -353,13 +350,23 @@ where
     }
 
     fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        // TODO: Make sure this is the correct way / there may be a better way?
-        self.restart_helper.restart_progress_should_run(state)
+        // DON'T EVER RESTART IF YOU FAIL IN CALIBRATION STAGE
+        let tc = state.current_corpus_id()?;
+        match tc {
+            Some(x) => {
+                let removed = state.corpus_mut().remove(x)?;
+                state.corpus_mut().add_disabled(removed)?;
+            }
+            None => {
+                // nothing can be done
+            }
+        }
+
+        Ok(false)
     }
 
-    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        // TODO: Make sure this is the correct way / there may be a better way?
-        self.restart_helper.clear_restart_progress(state)
+    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -382,7 +389,6 @@ where
             map_name: map_feedback.name().clone(),
             stage_max: CAL_STAGE_START,
             track_stability: true,
-            restart_helper: ExecutionCountRestartHelper::default(),
             phantom: PhantomData,
             name: Cow::Borrowed(CALIBRATION_STAGE_NAME),
         }
@@ -399,7 +405,6 @@ where
             map_name: map_feedback.name().clone(),
             stage_max: CAL_STAGE_START,
             track_stability: false,
-            restart_helper: ExecutionCountRestartHelper::default(),
             phantom: PhantomData,
             name: Cow::Borrowed(CALIBRATION_STAGE_NAME),
         }
