@@ -166,7 +166,12 @@ impl TcpMultiMachineBuilder {
     /// Beware, the hooks should run in the same process as the one this function is called.
     /// This is because we spawn a tokio runtime underneath.
     /// Check `<https://github.com/tokio-rs/tokio/issues/4301>` for more details.
-    pub fn build<A, I>(
+    ///
+    /// # Safety
+    /// The returned [`TcpMultiMachineLlmpReceiverHook`] assumes that the `msg` parameter
+    /// passed to the `on_new_message` method (or rather, the memory it points to),
+    /// lives sufficiently long for an async background task to process it.
+    pub unsafe fn build<A, I>(
         node_descriptor: NodeDescriptor<A>,
     ) -> Result<
         (

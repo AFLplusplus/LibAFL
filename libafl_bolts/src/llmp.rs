@@ -87,7 +87,6 @@ use std::{
 
 #[cfg(all(debug_assertions, feature = "llmp_debug", feature = "std"))]
 use backtrace::Backtrace;
-use log::debug;
 #[cfg(all(unix, feature = "std"))]
 #[cfg(not(any(target_os = "solaris", target_os = "illumos")))]
 use nix::sys::socket::{self, sockopt::ReusePort};
@@ -1288,7 +1287,7 @@ where
         self.last_msg_sent = msg;
         self.has_unsent_message = false;
 
-        debug!(
+        log::debug!(
             "[{} - {:#x}] Send message with id {}",
             self.id.0, self as *const Self as u64, mid
         );
@@ -1702,7 +1701,7 @@ where
                 return Err(Error::illegal_state("Unexpected message in map (out of map bounds) - buggy client or tampered shared map detected!"));
             }
 
-            debug!(
+            log::debug!(
                 "[{} - {:#x}] Received message with ID {}...",
                 self.id.0,
                 self as *const Self as u64,
@@ -2769,7 +2768,7 @@ where
                         self.inner.forward_msg(msg)?;
                     }
 
-                    debug!("New msg vector: {}", new_msgs.len());
+                    log::debug!("New msg vector: {}", new_msgs.len());
                     for (new_msg_tag, new_msg_flag, new_msg) in new_msgs {
                         self.inner.llmp_out.send_buf_with_flags(
                             new_msg_tag,
@@ -3696,7 +3695,7 @@ where
                                 break stream;
                             }
 
-                            debug!("Connection Refused. Retrying...");
+                            log::debug!("Connection Refused. Retrying...");
 
                             #[cfg(feature = "std")]
                             thread::sleep(Duration::from_millis(50));

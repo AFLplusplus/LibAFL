@@ -46,8 +46,6 @@ use libafl_bolts::{
     shmem::ShMemProvider,
     tuples::{tuple_list, Handle},
 };
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use log::debug;
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
@@ -657,7 +655,7 @@ where
         let num_cores = core_ids.len();
         let mut handles = vec![];
 
-        debug!("spawning on cores: {:?}", self.cores);
+        log::debug!("spawning on cores: {:?}", self.cores);
 
         self.opened_stdout_file = self
             .stdout_file
@@ -700,7 +698,7 @@ where
 
                         if index == 1 {
                             // Main client
-                            debug!("Running main client on PID {}", std::process::id());
+                            log::debug!("Running main client on PID {}", std::process::id());
                             let (state, mgr) =
                                 main_inner_mgr_builder.take().unwrap()(self, *bind_to)?;
 
@@ -721,7 +719,7 @@ where
                             self.main_run_client.take().unwrap()(state, c_mgr, *bind_to)
                         } else {
                             // Secondary clients
-                            debug!("Running secondary client on PID {}", std::process::id());
+                            log::debug!("Running secondary client on PID {}", std::process::id());
                             let (state, mgr) =
                                 secondary_inner_mgr_builder.take().unwrap()(self, *bind_to)?;
 
@@ -744,11 +742,12 @@ where
 
         #[cfg(feature = "multi_machine")]
         // Create this after forks, to avoid problems with tokio runtime
-        let (multi_machine_sender_hook, multi_machine_receiver_hook) =
+        let (multi_machine_sender_hook, multi_machine_receiver_hook) = unsafe {
             TcpMultiMachineBuilder::build::<
                 SocketAddr,
                 <<EM as UsesState>::State as UsesInput>::Input,
-            >(self.multi_machine_node_descriptor.clone())?;
+            >(self.multi_machine_node_descriptor.clone())?
+        };
 
         let mut brokers = Brokers::new();
 
@@ -812,7 +811,7 @@ where
             brokers.add(Box::new(broker));
         }
 
-        debug!(
+        log::debug!(
             "Brokers have been initialized on port {}.",
             std::process::id()
         );
