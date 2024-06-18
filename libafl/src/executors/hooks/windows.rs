@@ -311,7 +311,6 @@ pub mod windows_exception_handler {
         E::State: HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
-        use crate::corpus::CorpusId;
 
         // Have we set a timer_before?
         if data.ptp_timer.is_some() {
