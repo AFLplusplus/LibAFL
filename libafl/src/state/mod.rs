@@ -55,6 +55,7 @@ pub trait State:
     + MaybeHasScalabilityMonitor
     + HasCurrentCorpusId
     + HasCurrentStage
+    + HasStopNext
 {
 }
 
@@ -261,6 +262,8 @@ pub struct StdState<I, C, R, SC> {
     last_report_time: Option<Duration>,
     /// The current index of the corpus; used to record for resumable fuzzing.
     corpus_idx: Option<CorpusId>,
+    /// Tell the fuzzer to stop at the start of the next fuzzing iteration.
+    stop_next: bool,
     stage_stack: StageStack,
     phantom: PhantomData<I>,
 }
@@ -529,6 +532,24 @@ where
     fn current_input_cloned(&self) -> Result<I, Error> {
         let mut testcase = self.current_testcase_mut()?;
         Ok(testcase.borrow_mut().load_input(self.corpus())?.clone())
+    }
+}
+
+/// The State tells the fuzzer if it should stop when starting the next fuzzing iteration
+pub trait HasStopNext {
+    /// Should the fuzzer to exit on the next fuzzing iteration
+    fn stop_next(&self) -> bool;
+
+    /// Tell the fuzzer if it should stop on the next fuzzing iteration (mutable)
+    fn stop_next_mut(&mut self) -> &mut bool;
+}
+
+impl<I, C, R, SC> HasStopNext for StdState<I, C, R, SC> {
+    fn stop_next_mut(&mut self) -> &mut bool {
+        &mut self.stop_next
+    }
+    fn stop_next(&self) -> bool {
+        self.stop_next
     }
 }
 
@@ -1087,6 +1108,7 @@ where
             corpus,
             solutions,
             max_size: DEFAULT_MAX_SIZE,
+            stop_next: false,
             #[cfg(feature = "introspection")]
             introspection_monitor: ClientPerfMonitor::new(),
             #[cfg(feature = "scalability_introspection")]
@@ -1135,6 +1157,7 @@ impl<I, C, R, SC> HasScalabilityMonitor for StdState<I, C, R, SC> {
 pub struct NopState<I> {
     metadata: SerdeAnyMap,
     execution: u64,
+    stop_next: bool,
     rand: StdRand,
     phantom: PhantomData<I>,
 }
@@ -1147,6 +1170,7 @@ impl<I> NopState<I> {
             metadata: SerdeAnyMap::new(),
             execution: 0,
             rand: StdRand::default(),
+            stop_next: false,
             phantom: PhantomData,
         }
     }
@@ -1176,6 +1200,15 @@ impl<I> HasExecutions for NopState<I> {
 
     fn executions_mut(&mut self) -> &mut u64 {
         &mut self.execution
+    }
+}
+
+impl<I> HasStopNext for NopState<I> {
+    fn stop_next_mut(&mut self) -> &mut bool {
+        &mut self.stop_next
+    }
+    fn stop_next(&self) -> bool {
+        self.stop_next
     }
 }
 
