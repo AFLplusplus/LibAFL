@@ -8,7 +8,9 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
-    events::{Event, EventConfig, EventFirer, EventProcessor, ProgressReporter},
+    events::{
+        CustomBufEventResult, Event, EventConfig, EventFirer, EventProcessor, ProgressReporter,
+    },
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     inputs::UsesInput,
@@ -218,6 +220,27 @@ where
             manager.maybe_report_progress(state, monitor_timeout)?;
             self.fuzz_one(stages, executor, state, manager)?;
         }
+    }
+
+    /// Fuzz for x amount of time.
+    fn fuzz_for_duration(
+        &mut self,
+        stages: &mut ST,
+        executor: &mut E,
+        state: &mut Self::State,
+        manager: &mut EM,
+        duration: Duration,
+    ) -> Result<(), Error> {
+        let monitor_timeout = STATS_TIMEOUT_DEFAULT;
+        let start_time = current_time();
+        loop {
+            manager.maybe_report_progress(state, monitor_timeout)?;
+            self.fuzz_one(stages, executor, state, manager)?;
+            if current_time().saturating_sub(start_time) >= duration {
+                break;
+            }
+        }
+        Ok(())
     }
 
     /// Fuzz for n iterations.
