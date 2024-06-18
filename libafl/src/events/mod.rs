@@ -1,7 +1,8 @@
 //! An [`EventManager`] manages all events that go to other instances of the fuzzer.
 //! The messages are commonly information about new Testcases as well as stats and other [`Event`]s.
 
-pub mod hooks;
+pub mod events_hooks;
+pub use events_hooks::*;
 
 pub mod simple;
 pub use simple::*;
@@ -16,10 +17,13 @@ pub mod launcher;
 pub mod llmp;
 pub use llmp::*;
 
-#[cfg(feature = "tcp_manager")]
-#[allow(clippy::ignored_unit_patterns)]
-pub mod tcp;
-use alloc::{borrow::Cow, boxed::Box, string::String, vec::Vec};
+pub mod broker_hooks;
+use alloc::{
+    borrow::Cow,
+    boxed::Box,
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::{
     fmt,
     hash::{BuildHasher, Hasher},
@@ -28,6 +32,7 @@ use core::{
 };
 
 use ahash::RandomState;
+pub use broker_hooks::*;
 #[cfg(feature = "std")]
 pub use launcher::*;
 #[cfg(all(unix, feature = "std"))]
@@ -56,6 +61,10 @@ use crate::{
     monitors::{AggregatorOps, UserStatsValue},
     state::HasScalabilityMonitor,
 };
+
+/// Multi-machine mode
+#[cfg(all(unix, feature = "std", feature = "multi_machine"))]
+pub mod multi_machine;
 
 /// Check if ctrl-c is sent with this struct
 #[cfg(all(unix, feature = "std"))]
@@ -104,6 +113,8 @@ pub struct EventManagerId(
     pub usize,
 );
 
+#[cfg(all(unix, feature = "std", feature = "multi_machine"))]
+use crate::events::multi_machine::NodeId;
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
 use crate::{
@@ -279,6 +290,9 @@ where
         executions: u64,
         /// The original sender if, if forwarded
         forward_id: Option<ClientId>,
+        /// The (multi-machine) node from which the tc is from, if any
+        #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
+        node_id: Option<NodeId>,
     },
     /// New stats event to monitor.
     UpdateExecStats {
@@ -349,40 +363,32 @@ where
 {
     fn name(&self) -> &str {
         match self {
-            Event::NewTestcase {
-                input: _,
-                client_config: _,
-                corpus_size: _,
-                exit_kind: _,
-                observers_buf: _,
-                time: _,
-                executions: _,
-                forward_id: _,
-            } => "Testcase",
-            Event::UpdateExecStats {
-                time: _,
-                executions: _,
-                phantom: _,
-            } => "Client Heartbeat",
-            Event::UpdateUserStats {
-                name: _,
-                value: _,
-                phantom: _,
-            } => "UserStats",
+            Event::NewTestcase { .. } => "Testcase",
+            Event::UpdateExecStats { .. } => "Client Heartbeat",
+            Event::UpdateUserStats { .. } => "UserStats",
             #[cfg(feature = "introspection")]
-            Event::UpdatePerfMonitor {
-                time: _,
-                executions: _,
-                introspection_monitor: _,
-                phantom: _,
-            } => "PerfMonitor",
+            Event::UpdatePerfMonitor { .. } => "PerfMonitor",
             Event::Objective { .. } => "Objective",
-            Event::Log {
-                severity_level: _,
-                message: _,
-                phantom: _,
-            } => "Log",
+            Event::Log { .. } => "Log",
             Event::CustomBuf { .. } => "CustomBuf",
+            /*Event::Custom {
+                sender_id: _, /*custom_event} => custom_event.name()*/
+            } => "todo",*/
+        }
+    }
+
+    fn name_detailed(&self) -> String {
+        match self {
+            Event::NewTestcase { input, .. } => {
+                format!("Testcase {}", input.generate_name(0))
+            }
+            Event::UpdateExecStats { .. } => "Client Heartbeat".to_string(),
+            Event::UpdateUserStats { .. } => "UserStats".to_string(),
+            #[cfg(feature = "introspection")]
+            Event::UpdatePerfMonitor { .. } => "PerfMonitor".to_string(),
+            Event::Objective { .. } => "Objective".to_string(),
+            Event::Log { .. } => "Log".to_string(),
+            Event::CustomBuf { .. } => "CustomBuf".to_string(),
             /*Event::Custom {
                 sender_id: _, /*custom_event} => custom_event.name()*/
             } => "todo",*/
@@ -949,22 +955,15 @@ mod tests {
             time: current_time(),
             executions: 0,
             forward_id: None,
+            #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
+            node_id: None,
         };
 
         let serialized = postcard::to_allocvec(&e).unwrap();
 
         let d = postcard::from_bytes::<Event<BytesInput>>(&serialized).unwrap();
         match d {
-            Event::NewTestcase {
-                input: _,
-                observers_buf,
-                corpus_size: _,
-                exit_kind: _,
-                client_config: _,
-                time: _,
-                executions: _,
-                forward_id: _,
-            } => {
+            Event::NewTestcase { observers_buf, .. } => {
                 let o: tuple_list_type!(StdMapObserver::<u32, false>) =
                     postcard::from_bytes(observers_buf.as_ref().unwrap()).unwrap();
                 assert_eq!("test", o.0.name());

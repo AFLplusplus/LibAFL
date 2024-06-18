@@ -294,7 +294,8 @@ jobs:
           - ./fuzzers/libfuzzer_libpng_launcher
           - ./fuzzers/libfuzzer_libpng_accounting
           - ./fuzzers/forkserver_libafl_cc
-          - ./fuzzers/libfuzzer_libpng_tcp_manager
+          # - ./fuzzers/libfuzzer_libpng_tcp_manager
+          # - ./fuzzers/sqlite_centralized_multi_machine
           - ./fuzzers/backtrace_baby_fuzzers
           - ./fuzzers/fuzzbench_qemu
           - ./fuzzers/nyx_libxml2_parallel

@@ -35,10 +35,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 int __libafl_raw_mprotect(void *addr, size_t len, int prot);
 
-void* mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
-int munmap(void *addr, size_t length);
-void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, ... /* void *new_address */);
-int mprotect(void *addr, size_t len, int prot);
+void *mmap(void *addr, size_t length, int prot, int flags, int fd,
+           off_t offset);
+int   munmap(void *addr, size_t length);
+void *mremap(void *old_address, size_t old_size, size_t new_size, int flags,
+             ... /* void *new_address */);
+int   mprotect(void *addr, size_t len, int prot);
 
 #ifdef __x86_64__
 
@@ -197,9 +199,9 @@ __attribute__((constructor)) void __libafl_hotpatch(void) {
   HOTPATCH(mmap)
   HOTPATCH(munmap)
   HOTPATCH(mprotect)
-  
+
   HOTPATCH(write)
-  
+
   HOTPATCH(_exit)
 
   #undef HOTPATCH
