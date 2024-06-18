@@ -19,7 +19,7 @@ use crate::{
     start_timer,
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime, HasSolutions,
-        UsesState, HasStopNext,
+        UsesState, HasShouldStopFuzzing,
     },
     Error, HasMetadata,
 };
@@ -182,7 +182,7 @@ pub trait Evaluator<E, EM>: UsesState {
 /// The main fuzzer trait.
 pub trait Fuzzer<E, EM, ST>: Sized + UsesState
 where
-    Self::State: HasMetadata + HasExecutions + HasLastReportTime + HasStopNext,
+    Self::State: HasMetadata + HasExecutions + HasLastReportTime + HasShouldStopFuzzing,
     E: UsesState<State = Self::State>,
     EM: ProgressReporter<State = Self::State>,
     ST: StagesTuple<E, EM, Self::State, Self>,
@@ -216,8 +216,8 @@ where
         loop {
             // log::info!("Starting another fuzz_loop");
             manager.maybe_report_progress(state, monitor_timeout)?;
-            if state.stop_next() {
-                *state.stop_next_mut() = false;
+            if state.should_stop_fuzzing() {
+                *state.should_stop_fuzzing_mut() = false;
                 break;
             }
             self.fuzz_one(stages, executor, state, manager)?;
@@ -254,8 +254,8 @@ where
         for _ in 0..iters {
             // log::info!("Starting another fuzz_loop");
             manager.maybe_report_progress(state, monitor_timeout)?;
-            if state.stop_next() {
-                *state.stop_next_mut() = false;
+            if state.should_stop_fuzzing() {
+                *state.should_stop_fuzzing_mut() = false;
                 break;
             }
             ret = Some(self.fuzz_one(stages, executor, state, manager)?);
