@@ -2368,7 +2368,15 @@ impl Brokers {
 
         loop {
             self.llmp_brokers.retain_mut(|broker| {
-                if !broker.is_shutting_down() {
+                if broker.is_shutting_down() {
+
+                    broker.send_buf(LLMP_TAG_EXITING, &[]).expect(
+                        "Error when shutting down broker: Could not send LLMP_TAG_EXITING msg.",
+                    );
+
+                    false
+
+                } else {
                     if current_milliseconds() > end_time {
                         broker
                             .on_timeout()
@@ -2402,12 +2410,6 @@ impl Brokers {
                     }
 
                     true
-                } else {
-                    broker.send_buf(LLMP_TAG_EXITING, &[]).expect(
-                        "Error when shutting down broker: Could not send LLMP_TAG_EXITING msg.",
-                    );
-
-                    false
                 }
             });
 

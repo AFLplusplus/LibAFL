@@ -45,9 +45,9 @@ use super::{CustomBufEventResult, CustomBufHandlerFn};
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
     events::{
-        EventManagerHooksTuple, BrokerEventResult, Event, EventConfig, EventFirer,
-        EventManager, EventManagerId, EventProcessor, EventRestarter, HasCustomBufHandlers,
-        HasEventManagerId, ProgressReporter,
+        BrokerEventResult, Event, EventConfig, EventFirer, EventManager, EventManagerHooksTuple,
+        EventManagerId, EventProcessor, EventRestarter, HasCustomBufHandlers, HasEventManagerId,
+        ProgressReporter,
     },
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
@@ -318,14 +318,11 @@ where
     ) -> Result<BrokerEventResult, Error> {
         match &event {
             Event::NewTestcase {
-                input: _,
-                client_config: _,
-                exit_kind: _,
                 corpus_size,
-                observers_buf: _,
                 time,
                 executions,
                 forward_id,
+                ..
             } => {
                 let id = if let Some(id) = *forward_id {
                     id
@@ -624,11 +621,9 @@ where
                 input,
                 client_config,
                 exit_kind,
-                corpus_size: _,
                 observers_buf,
-                time: _,
-                executions: _,
                 forward_id,
+                ..
             } => {
                 log::info!("Received new Testcase from {client_id:?} ({client_config:?}, forward {forward_id:?})");
 
