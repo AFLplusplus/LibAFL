@@ -98,7 +98,7 @@ where
             .get::<SyncFromDiskMetadata>()
             .map(|m| m.last_time);
 
-        if let (Some(max_time), mut new_files) = self.load_from_directory(&last)? {
+        if let (Some(max_time), mut new_files) = self.load_from_directory(None, &last)? {
             if last.is_none() {
                 state
                     .metadata_map_mut()
@@ -175,11 +175,15 @@ impl<CB, E, EM, Z> SyncFromDiskStage<CB, E, EM, Z> {
 
     fn load_from_directory(
         &self,
+        path: Option<PathBuf>,
         last: &Option<SystemTime>,
     ) -> Result<(Option<SystemTime>, Vec<PathBuf>), Error> {
         let mut max_time = None;
         let mut left_to_sync = Vec::<PathBuf>::new();
-        let in_dir = self.sync_dir.clone();
+        let in_dir = match path {
+            Some(p) => p,
+            None => self.sync_dir.clone(),
+        };
 
         for entry in fs::read_dir(in_dir)? {
             let entry = entry?;
@@ -204,7 +208,8 @@ impl<CB, E, EM, Z> SyncFromDiskStage<CB, E, EM, Z> {
                     left_to_sync.push(path.clone());
                 }
             } else if attr.is_dir() {
-                let (dir_max_time, dir_left_to_sync) = self.load_from_directory(last)?;
+                let (dir_max_time, dir_left_to_sync) =
+                    self.load_from_directory(Some(entry.path()), last)?;
                 if let Some(time) = dir_max_time {
                     max_time = Some(max_time.map_or(time, |t: SystemTime| t.max(time)));
                 }
