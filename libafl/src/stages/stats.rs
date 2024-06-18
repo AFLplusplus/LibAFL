@@ -128,7 +128,7 @@ where
     #[inline]
     fn restart_progress_should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
         // Not running the target so we wont't crash/timeout and, hence, don't need to restore anything
-        Ok(true)
+        Ok(false)
     }
 
     #[inline]

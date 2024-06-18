@@ -369,7 +369,7 @@ where
     #[inline]
     fn restart_progress_should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
         // No restart handling needed - does not execute the target.
-        Ok(true)
+        Ok(false)
     }
 
     #[inline]

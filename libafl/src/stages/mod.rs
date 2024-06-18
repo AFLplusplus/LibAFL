@@ -88,6 +88,8 @@ where
     /// On restart, this will be called again.
     /// As long as [`Stage::clear_restart_progress`], all subsequent calls happen on restart.
     /// Returns `true`, if the stage's [`Stage::perform`] method should run, else `false`.
+    /// Who should set this to true?
+    /// In general, if your stage does not involve random behavior, or it is deterministic, then you should always set this to false
     fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error>;
 
     /// Clear the current status tracking of the associated stage
