@@ -154,6 +154,15 @@ pub struct NodeDescriptor<A> {
     pub flags: BitFlags<NodePolicy>, // The policy for shared messages between nodes.
 }
 
+/// A set of multi-machine `broker_hooks`.
+#[derive(Debug)]
+pub struct TcpMultiMachine<A, I> {
+    /// The sender hooks
+    pub sender: TcpMultiMachineLlmpSenderHook<A, I>,
+    /// The receiver hooks
+    pub recevier: TcpMultiMachineLlmpReceiverHook<A, I>,
+}
+
 /// A Multi-machine `broker_hooks` builder.
 #[derive(Debug)]
 pub struct TcpMultiMachineBuilder {
@@ -161,7 +170,7 @@ pub struct TcpMultiMachineBuilder {
 }
 
 impl TcpMultiMachineBuilder {
-    /// Build a new couple [`TcpMultiMachineLlmpSenderHook`] / [`TcpMultiMachineLlmpReceiverHook`] from a [`NodeDescriptor`].
+    /// Build a new [`TcpMultiMachineHooks`] containing a sender and a receiver from a [`NodeDescriptor`].
     /// Everything is initialized and ready to be used.
     /// Beware, the hooks should run in the same process as the one this function is called.
     /// This is because we spawn a tokio runtime underneath.
@@ -173,13 +182,7 @@ impl TcpMultiMachineBuilder {
     /// lives sufficiently long for an async background task to process it.
     pub unsafe fn build<A, I>(
         node_descriptor: NodeDescriptor<A>,
-    ) -> Result<
-        (
-            TcpMultiMachineLlmpSenderHook<A, I>,
-            TcpMultiMachineLlmpReceiverHook<A, I>,
-        ),
-        Error,
-    >
+    ) -> Result<TcpMultiMachineHooks<A, I>, Error>
     where
         A: Clone + Display + ToSocketAddrs + Send + Sync + 'static,
         I: Input + Send + Sync + 'static,
@@ -202,10 +205,10 @@ impl TcpMultiMachineBuilder {
             TcpMultiMachineState::init::<I>(&state.clone(), &rt.clone())?;
         }
 
-        Ok((
-            TcpMultiMachineLlmpSenderHook::new(state.clone(), rt.clone()),
-            TcpMultiMachineLlmpReceiverHook::new(state, rt),
-        ))
+        Ok(TcpMultiMachineBuilder {
+            sender: TcpMultiMachineLlmpSenderHook::new(state.clone(), rt.clone()),
+            receiver: TcpMultiMachineLlmpReceiverHook::new(state, rt),
+        })
     }
 }
 
