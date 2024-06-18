@@ -42,9 +42,12 @@ where
         while state.current_stage_idx()?.is_some()
             || (self.closure)(fuzzer, executor, state, manager)?
         {
+            state.enter_inner_stage()?;
             self.stages.perform_all(fuzzer, executor, state, manager)?;
         }
 
+        state.exit_inner_stage()?;
+        state.clear_stage()?;
         Ok(())
     }
 
@@ -106,9 +109,13 @@ where
     ) -> Result<(), Error> {
         if state.current_stage_idx()?.is_some() || (self.closure)(fuzzer, executor, state, manager)?
         {
+            state.enter_inner_stage()?;
+
             self.if_stages
                 .perform_all(fuzzer, executor, state, manager)?;
         }
+        state.exit_inner_stage()?;
+        state.clear_stage()?;
         Ok(())
     }
 
@@ -252,10 +259,13 @@ where
         manager: &mut EM,
     ) -> Result<(), Error> {
         if let Some(stages) = &mut self.stages {
-            stages.perform_all(fuzzer, executor, state, manager)
-        } else {
-            Ok(())
+            state.enter_inner_stage()?;
+            stages.perform_all(fuzzer, executor, state, manager)?;
         }
+
+        state.exit_inner_stage()?;
+        state.clear_stage()?;
+        Ok(())
     }
 
     fn restart_progress_should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
