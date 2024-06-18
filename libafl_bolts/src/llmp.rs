@@ -2374,43 +2374,43 @@ impl Brokers {
                         "Error when shutting down broker: Could not send LLMP_TAG_EXITING msg.",
                     );
 
-                    false
+                    return false
 
-                } else {
-                    if current_milliseconds() > end_time {
-                        broker
-                            .on_timeout()
-                            .expect("An error occurred in broker timeout. Exiting.");
-                        end_time = current_milliseconds() + timeout;
-                    }
-
-                    if broker
-                        .broker_once()
-                        .expect("An error occurred when brokering. Exiting.")
-                    {
-                        end_time = current_milliseconds() + timeout;
-                    }
-
-                    if let Some(exit_after_count) = broker.exit_after() {
-                        // log::trace!(
-                        //     "Clients connected: {} && > {} - {} >= {}",
-                        //     self.has_clients(),
-                        //     self.num_clients_seen,
-                        //     self.listeners.len(),
-                        //     exit_after_count
-                        // );
-                        if !broker.has_clients()
-                            && (broker.num_clients_seen() - broker.nb_listeners())
-                                >= exit_after_count.into()
-                        {
-                            // No more clients connected, and the amount of clients we were waiting for was previously connected.
-                            // exit cleanly.
-                            return false;
-                        }
-                    }
-
-                    true
                 }
+
+                if current_milliseconds() > end_time {
+                    broker
+                        .on_timeout()
+                        .expect("An error occurred in broker timeout. Exiting.");
+                    end_time = current_milliseconds() + timeout;
+                }
+
+                if broker
+                    .broker_once()
+                    .expect("An error occurred when brokering. Exiting.")
+                {
+                    end_time = current_milliseconds() + timeout;
+                }
+
+                if let Some(exit_after_count) = broker.exit_after() {
+                    // log::trace!(
+                    //     "Clients connected: {} && > {} - {} >= {}",
+                    //     self.has_clients(),
+                    //     self.num_clients_seen,
+                    //     self.listeners.len(),
+                    //     exit_after_count
+                    // );
+                    if !broker.has_clients()
+                        && (broker.num_clients_seen() - broker.nb_listeners())
+                            >= exit_after_count.into()
+                    {
+                        // No more clients connected, and the amount of clients we were waiting for was previously connected.
+                        // exit cleanly.
+                        return false;
+                    }
+                }
+
+                true
             });
 
             if self.llmp_brokers.is_empty() {
