@@ -208,7 +208,6 @@ impl<CB, E, EM, Z> SyncFromDiskStage<CB, E, EM, Z> {
                     left_to_sync.push(path.clone());
                 }
             } else if attr.is_dir() {
-                log::info!("{:#?} {:#?}", attr, entry);
                 let (dir_max_time, dir_left_to_sync) =
                     self.load_from_directory(Some(entry.path()), last)?;
                 if let Some(time) = dir_max_time {
