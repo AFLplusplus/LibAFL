@@ -2,6 +2,7 @@
 
 use alloc::vec::Vec;
 use core::{
+    borrow::BorrowMut,
     fmt::Debug,
     ops::{Deref, DerefMut},
 };
@@ -266,9 +267,15 @@ where
             return Ok(());
         }
 
-        state.current_testcase_mut()?.metadata_map_mut().insert(
-            AccountingIndexesMetadata::with_tcref(indexes, new_favoreds.len() as isize),
-        );
+        state
+            .corpus()
+            .get(id)?
+            .borrow_mut()
+            .metadata_map_mut()
+            .insert(AccountingIndexesMetadata::with_tcref(
+                indexes,
+                new_favoreds.len() as isize,
+            ));
 
         let top_acc = state
             .metadata_map_mut()
