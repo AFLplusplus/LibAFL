@@ -24,6 +24,7 @@ impl MultiMachineTree {
     ///
     /// - machines: machines to add.
     /// - `max_children_per_parent`: each parent will have at most this amount of children
+    #[must_use]
     pub fn generate(machines: &[SocketAddr], max_children_per_parent: u64) -> Self {
         let mut graph = Graph::<MultiMachineNode, ()>::new();
         let mut machines = Vec::from(machines);
@@ -46,7 +47,7 @@ impl MultiMachineTree {
             if graph.nb_children(nodes_to_populate_now[populate_idx as usize])
                 == max_children_per_parent
             {
-                nodes_to_populate_now = nodes_to_populate_later.drain(..).collect();
+                nodes_to_populate_now = core::mem::take(&mut nodes_to_populate_later);
                 populate_idx = 0; // should be useless
             }
 
