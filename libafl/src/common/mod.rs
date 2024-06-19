@@ -81,7 +81,7 @@ pub trait HasMetadata {
 }
 
 /// Trait for elements offering named metadata
-pub trait HasNamedMetadata {
+pub trait HasNamedMetadata: HasMetadata {
     /// A map, storing all metadata
     fn named_metadata_map(&self) -> &NamedSerdeAnyMap;
     /// A map, storing all metadata (mutable)

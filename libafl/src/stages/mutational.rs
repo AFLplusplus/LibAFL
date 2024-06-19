@@ -12,7 +12,7 @@ use crate::{
     inputs::Input,
     mark_feature_time,
     mutators::{MultiMutator, MutationResult, Mutator},
-    stages::{ExecutionCountRestartHelper, RetryRestartHelper, Stage},
+    stages::{RestartHelper, Stage},
     start_timer,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
     Error, HasMetadata, HasNamedMetadata,
@@ -94,9 +94,6 @@ where
     /// Gets the number of iterations this mutator should run for.
     fn iterations(&self, state: &mut Self::State) -> Result<usize, Error>;
 
-    /// Gets the number of executions this mutator already did since it got first called in this fuzz round.
-    fn execs_since_progress_start(&mut self, state: &mut Self::State) -> Result<u64, Error>;
-
     /// Runs this (mutational) stage for the given testcase
     #[allow(clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
     fn perform_mutational(
@@ -159,8 +156,6 @@ pub struct StdMutationalStage<E, EM, I, M, Z> {
     mutator: M,
     /// The maximum amount of iterations we should do each round
     max_iterations: usize,
-    /// The progress helper for this mutational stage
-    restart_helper: ExecutionCountRestartHelper,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, EM, I, Z)>,
 }
@@ -189,10 +184,6 @@ where
     /// Gets the number of iterations as a random number
     fn iterations(&self, state: &mut Self::State) -> Result<usize, Error> {
         Ok(1 + state.rand_mut().below(self.max_iterations))
-    }
-
-    fn execs_since_progress_start(&mut self, state: &mut Self::State) -> Result<u64, Error> {
-        self.restart_helper.execs_since_progress_start(state)
     }
 }
 
@@ -229,14 +220,14 @@ where
         ret
     }
 
-    fn restart_progress_should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+    fn should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
         Ok(true)
-        // self.restart_helper.restart_progress_should_run(state)
+        // self.restart_helper.should_run(state)
     }
 
-    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
         Ok(())
-        // self.restart_helper.clear_restart_progress(state)
+        // self.restart_helper.clear_progress(state)
     }
 }
 
@@ -277,7 +268,6 @@ where
         Self {
             mutator,
             max_iterations,
-            restart_helper: ExecutionCountRestartHelper::default(),
             phantom: PhantomData,
         }
     }
@@ -315,15 +305,14 @@ where
     I: MutatedTransform<Self::Input, Self::State> + Clone,
 {
     #[inline]
-    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        // TODO: add proper crash/timeout handling
-        // For now, Make sure we don't get stuck crashing on a single testcase
-        RetryRestartHelper::restart_progress_should_run(state, self, 3)
+    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        // Make sure we don't get stuck crashing on a single testcase
+        RestartHelper::should_run(state, self, 3)
     }
 
     #[inline]
-    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RetryRestartHelper::clear_restart_progress(state, self)
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        RestartHelper::clear_progress(state, self)
     }
 
     #[inline]

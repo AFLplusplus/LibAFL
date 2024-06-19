@@ -5,7 +5,7 @@ use libafl::{
     executors::{Executor, HasObservers},
     inputs::{BytesInput, UsesInput},
     observers::ObserversTuple,
-    stages::{colorization::TaintMetadata, RetryRestartHelper, Stage},
+    stages::{colorization::TaintMetadata, RestartHelper, Stage},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -126,14 +126,14 @@ where
         Ok(())
     }
 
-    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
         // TODO: this may need better resumption? (Or is it always used with a forkserver?)
-        RetryRestartHelper::restart_progress_should_run(state, self, 3)
+        RestartHelper::should_run(state, self, 3)
     }
 
-    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
         // TODO: this may need better resumption? (Or is it always used with a forkserver?)
-        RetryRestartHelper::clear_restart_progress(state, self)
+        RestartHelper::clear_progress(state, self)
     }
 }
 

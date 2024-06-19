@@ -10,9 +10,9 @@ use crate::{
     fuzzer::Evaluator,
     mutators::Mutator,
     schedulers::{testcase_score::CorpusPowerTestcaseScore, TestcaseScore},
-    stages::{mutational::MutatedTransform, ExecutionCountRestartHelper, MutationalStage, Stage},
+    stages::{mutational::MutatedTransform, MutationalStage, RestartHelper, Stage},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
-    Error, HasMetadata,
+    Error, HasMetadata, HasNamedMetadata,
 };
 /// Default name for `PowerMutationalStage`; derived from AFL++
 pub const POWER_MUTATIONAL_STAGE_NAME: &str = "power";
@@ -22,8 +22,6 @@ pub struct PowerMutationalStage<E, F, EM, I, M, Z> {
     name: Cow<'static, str>,
     /// The mutators we use
     mutator: M,
-    /// Helper for restarts
-    restart_helper: ExecutionCountRestartHelper,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, F, EM, I, Z)>,
 }
@@ -47,7 +45,7 @@ where
     EM: UsesState<State = Self::State>,
     F: TestcaseScore<Self::State>,
     M: Mutator<I, Self::State>,
-    Self::State: HasCorpus + HasMetadata + HasRand + HasExecutions,
+    Self::State: HasCorpus + HasMetadata + HasRand + HasExecutions + HasNamedMetadata,
     Z: Evaluator<E, EM, State = Self::State>,
     I: MutatedTransform<E::Input, Self::State> + Clone,
 {
@@ -72,10 +70,6 @@ where
 
         Ok(score)
     }
-
-    fn execs_since_progress_start(&mut self, state: &mut Self::State) -> Result<u64, Error> {
-        self.restart_helper.execs_since_progress_start(state)
-    }
 }
 
 impl<E, F, EM, I, M, Z> Stage<E, EM, Z> for PowerMutationalStage<E, F, EM, I, M, Z>
@@ -84,7 +78,7 @@ where
     EM: UsesState<State = Self::State>,
     F: TestcaseScore<Self::State>,
     M: Mutator<I, Self::State>,
-    Self::State: HasCorpus + HasMetadata + HasRand + HasExecutions,
+    Self::State: HasCorpus + HasMetadata + HasRand + HasExecutions + HasNamedMetadata,
     Z: Evaluator<E, EM, State = Self::State>,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
 {
@@ -101,14 +95,13 @@ where
         ret
     }
 
-    fn restart_progress_should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
-        Ok(true)
-        // self.restart_helper.restart_progress_should_run(state)
+    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        // Make sure we don't get stuck crashing on a single testcase
+        RestartHelper::should_run(state, self, 3)
     }
 
-    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
-        Ok(())
-        // self.restart_helper.clear_restart_progress(state)
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        RestartHelper::clear_progress(state, self)
     }
 }
 
@@ -127,7 +120,6 @@ where
             name: Cow::Borrowed(POWER_MUTATIONAL_STAGE_NAME),
             mutator,
             phantom: PhantomData,
-            restart_helper: ExecutionCountRestartHelper::default(),
         }
     }
 }

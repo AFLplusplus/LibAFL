@@ -9,7 +9,7 @@ use crate::{
     executors::{Executor, HasObservers, ShadowExecutor},
     mark_feature_time,
     observers::ObserversTuple,
-    stages::{RetryRestartHelper, Stage},
+    stages::{RestartHelper, Stage},
     start_timer,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, State, UsesState},
     Error, HasNamedMetadata,
@@ -21,7 +21,6 @@ use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 #[derive(Clone, Debug)]
 pub struct TracingStage<EM, TE, Z> {
     tracer_executor: TE,
-    max_retries: usize,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(EM, TE, Z)>,
 }
@@ -96,12 +95,12 @@ where
         self.trace(fuzzer, state, manager)
     }
 
-    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        RetryRestartHelper::restart_progress_should_run(state, self, self.max_retries)
+    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        RestartHelper::zero(state, self)
     }
 
-    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RetryRestartHelper::clear_restart_progress(state, self)
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        RestartHelper::clear_progress(state, self)
     }
 }
 
@@ -117,17 +116,8 @@ impl<EM, TE, Z> TracingStage<EM, TE, Z> {
     pub fn new(tracer_executor: TE) -> Self {
         Self {
             tracer_executor,
-            max_retries: 10,
             phantom: PhantomData,
         }
-    }
-
-    /// Specify how many times that this stage will try again to trace the input before giving up
-    /// and not processing the input again. 0 retries means that the trace will be tried only once.
-    #[must_use]
-    pub fn with_retries(mut self, retries: usize) -> Self {
-        self.max_retries = retries;
-        self
     }
 
     /// Gets the underlying tracer executor
@@ -210,12 +200,12 @@ where
         Ok(())
     }
 
-    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        RetryRestartHelper::restart_progress_should_run(state, self, self.max_retries)
+    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        RestartHelper::zero(state, self)
     }
 
-    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RetryRestartHelper::clear_restart_progress(state, self)
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        RestartHelper::clear_progress(state, self)
     }
 }
 

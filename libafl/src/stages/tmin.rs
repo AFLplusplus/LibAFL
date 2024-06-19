@@ -235,12 +235,12 @@ where
     M: Mutator<Self::Input, Self::State>,
     IP: MutatedTransformPost<Self::State> + Clone,
 {
-    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        self.restart_helper.restart_progress_should_run(state)
+    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        self.restart_helper.should_run(state)
     }
 
-    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        self.restart_helper.clear_restart_progress(state)
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        self.restart_helper.clear_progress(state)
     }
 
     fn perform(

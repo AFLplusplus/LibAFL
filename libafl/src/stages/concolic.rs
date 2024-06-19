@@ -20,7 +20,7 @@ use crate::state::HasClientPerfMonitor;
 use crate::{
     executors::{Executor, HasObservers},
     observers::concolic::ConcolicObserver,
-    stages::{RetryRestartHelper, Stage, TracingStage},
+    stages::{RestartHelper, Stage, TracingStage},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -83,12 +83,15 @@ where
         Ok(())
     }
 
-    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        RetryRestartHelper::restart_progress_should_run(state, self, 3)
+    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        // This is a deterministic stage
+        // Once it failed, then don't retry,
+        // It will just fail again
+        RestartHelper::zero(state, self)
     }
 
-    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RetryRestartHelper::clear_restart_progress(state, self)
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        RestartHelper::clear_progress(state, self)
     }
 }
 
@@ -353,8 +356,6 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
 #[cfg(feature = "concolic_mutation")]
 #[derive(Clone, Debug)]
 pub struct SimpleConcolicMutationalStage<Z> {
-    /// The helper keeps track of progress for timeouting/restarting targets
-    restart_helper: ExecutionCountRestartHelper,
     phantom: PhantomData<Z>,
 }
 
@@ -396,11 +397,8 @@ where
             mutations
         });
 
-        let post_restart_skip_cnt =
-            usize::try_from(self.restart_helper.execs_since_progress_start(state)?)?;
-
         if let Some(mutations) = mutations {
-            for mutation in mutations.into_iter().skip(post_restart_skip_cnt) {
+            for mutation in mutations.into_iter() {
                 let mut input_copy = state.current_input_cloned()?;
                 for (index, new_byte) in mutation {
                     input_copy.bytes_mut()[index] = new_byte;
@@ -413,13 +411,16 @@ where
     }
 
     #[inline]
-    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        self.restart_helper.restart_progress_should_run(state)
+    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        // This is a deterministic stage
+        // Once it failed, then don't retry,
+        // It will just fail again
+        RestartHelper::zero(state, self)
     }
 
     #[inline]
-    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        self.restart_helper.clear_restart_progress(state)
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        RestartHelper::clear_progress(state, self)
     }
 }
 
@@ -427,7 +428,6 @@ where
 impl<Z> Default for SimpleConcolicMutationalStage<Z> {
     fn default() -> Self {
         Self {
-            restart_helper: ExecutionCountRestartHelper::default(),
             phantom: PhantomData,
         }
     }
