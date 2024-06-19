@@ -23,7 +23,7 @@ use libafl::{
         Monitor, MultiMonitor,
     },
     stages::{HasCurrentStage, StagesTuple},
-    state::{HasExecutions, HasLastReportTime, HasShouldStopFuzzing, HasSolutions, UsesState},
+    state::{HasExecutions, HasLastReportTime, Stoppable, HasSolutions, UsesState},
     Error, Fuzzer, HasMetadata,
 };
 use libafl_bolts::{
@@ -72,7 +72,7 @@ where
         + HasSolutions
         + HasLastReportTime
         + HasCurrentStage
-        + HasShouldStopFuzzing,
+        + Stoppable,
     E: UsesState<State = S>,
     EM: ProgressReporter<State = S>,
     ST: StagesTuple<E, EM, S, F>,

@@ -13,13 +13,13 @@ use crate::{
     feedbacks::Feedback,
     inputs::UsesInput,
     mark_feature_time,
-    observers::ObserversTuple, 
+    observers::ObserversTuple,
     schedulers::Scheduler,
     stages::{HasCurrentStage, StagesTuple},
     start_timer,
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime, HasSolutions,
-        UsesState, HasShouldStopFuzzing,
+        Stoppable, UsesState,
     },
     Error, HasMetadata,
 };
@@ -182,7 +182,7 @@ pub trait Evaluator<E, EM>: UsesState {
 /// The main fuzzer trait.
 pub trait Fuzzer<E, EM, ST>: Sized + UsesState
 where
-    Self::State: HasMetadata + HasExecutions + HasLastReportTime + HasShouldStopFuzzing,
+    Self::State: HasMetadata + HasExecutions + HasLastReportTime + Stoppable,
     E: UsesState<State = Self::State>,
     EM: ProgressReporter<State = Self::State>,
     ST: StagesTuple<E, EM, Self::State, Self>,

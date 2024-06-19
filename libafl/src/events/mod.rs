@@ -347,7 +347,7 @@ impl<I> Event<I>
 where
     I: Input,
 {
-    fn name(&self) -> &str {
+    pub fn name(&self) -> &str {
         match self {
             Event::NewTestcase {
                 input: _,

@@ -55,7 +55,7 @@ pub trait State:
     + MaybeHasScalabilityMonitor
     + HasCurrentCorpusId
     + HasCurrentStage
-    + HasShouldStopFuzzing
+    + Stoppable
 {
 }
 
@@ -536,7 +536,7 @@ where
 }
 
 /// The State tells the fuzzer if it should stop when starting the next fuzzing iteration
-pub trait HasShouldStopFuzzing {
+pub trait Stoppable {
     /// Should the fuzzer to exit on the next fuzzing iteration
     fn should_stop_fuzzing(&self) -> bool;
 
@@ -544,7 +544,7 @@ pub trait HasShouldStopFuzzing {
     fn should_stop_fuzzing_mut(&mut self) -> &mut bool;
 }
 
-impl<I, C, R, SC> HasShouldStopFuzzing for StdState<I, C, R, SC> {
+impl<I, C, R, SC> Stoppable for StdState<I, C, R, SC> {
     fn should_stop_fuzzing_mut(&mut self) -> &mut bool {
         &mut self.should_stop_fuzzing
     }
@@ -1203,7 +1203,7 @@ impl<I> HasExecutions for NopState<I> {
     }
 }
 
-impl<I> HasShouldStopFuzzing for NopState<I> {
+impl<I> Stoppable for NopState<I> {
     fn should_stop_fuzzing_mut(&mut self) -> &mut bool {
         &mut self.should_stop_fuzzing
     }

@@ -7,7 +7,7 @@ use libafl::{
     inputs::UsesInput,
     monitors::SimpleMonitor,
     stages::{HasCurrentStage, StagesTuple},
-    state::{HasExecutions, HasLastReportTime},
+    state::{HasExecutions, HasLastReportTime, Stoppable},
     Error, Fuzzer, HasMetadata, HasNamedMetadata,
 };
 
@@ -29,7 +29,8 @@ where
         + HasExecutions
         + UsesInput
         + HasLastReportTime
-        + HasCurrentStage,
+        + HasCurrentStage
+        + Stoppable,
     E: HasObservers<State = S>,
     EM: ProgressReporter<State = S>,
     ST: StagesTuple<E, EM, S, F>,
