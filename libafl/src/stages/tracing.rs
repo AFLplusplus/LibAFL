@@ -97,8 +97,8 @@ where
         Ok(StageResult::Success)
     }
 
-    fn should_run(&mut self, state: &mut Self::State) -> Result<ExecutionDecision, Error> {
-        RestartHelper::zero(state, &self.name)
+    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        RestartHelper::no_retry(state, &self.name)
     }
 
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
@@ -207,12 +207,11 @@ where
     }
 
     fn should_run(&mut self, state: &mut Self::State) -> Result<ExecutionDecision, Error> {
-        RestartHelper::zero(state, &self.name)
+        RestartHelper::no_retry(state, &self.name)
     }
 
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
         RestartHelper::clear_progress(state, &self.name)
-    }
 }
 
 impl<E, EM, SOT, Z> ShadowTracingStage<E, EM, SOT, Z>

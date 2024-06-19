@@ -371,7 +371,7 @@ where
     fn should_run(&mut self, state: &mut Self::State) -> Result<ExecutionDecision, Error> {
         // There's no restart safety in the content of the closure.
         // don't restart
-        RestartHelper::zero(state, &self.name)
+        RestartHelper::no_retry(state, &self.name)
     }
 
     #[inline]
@@ -503,7 +503,7 @@ where
     #[inline]
     fn should_run(&mut self, state: &mut Self::State) -> Result<ExecutionDecision, Error> {
         // TODO: Proper restart handling - call post_exec at the right time, etc...
-        RestartHelper::zero(state, &self.name)
+        RestartHelper::no_retry(state, &self.name)
     }
 
     #[inline]
@@ -524,7 +524,7 @@ impl_serdeany!(RestartHelper);
 
 impl RestartHelper {
     /// Don't allow restart
-    pub fn zero<S>(state: &mut S, name: &str) -> Result<ExecutionDecision, Error>
+    pub fn no_retry<S>(state: &mut S, name: &str) -> Result<bool, Error>
     where
         S: HasNamedMetadata + HasCurrentCorpusId,
     {
@@ -532,7 +532,7 @@ impl RestartHelper {
     }
 
     /// Don't allow restart and abort all the following stages
-    pub fn zero_else_abort<S>(state: &mut S, name: &str) -> Result<ExecutionDecision, Error>
+    pub fn no_retry_else_abort<S>(state: &mut S, name: &str) -> Result<ExecutionDecision, Error>
     where
         S: HasNamedMetadata + HasCurrentCorpusId,
     {

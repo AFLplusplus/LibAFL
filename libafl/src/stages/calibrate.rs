@@ -354,7 +354,7 @@ where
     fn should_run(&mut self, state: &mut Self::State) -> Result<ExecutionDecision, Error> {
         // Calibration stage disallow restarts
         // If a testcase that causes crash/timeout in the queue, we need to remove it from the queue immediately.
-        let ret = RestartHelper::zero_else_abort(state, &self.name)?;
+        let ret = RestartHelper::no_retry_else_abort(state, &self.name);
 
         if ret == ExecutionDecision::Abort {
             // Now if we decide to abort executions, then we should remove this testcase from the corpus

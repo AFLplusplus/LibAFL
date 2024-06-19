@@ -112,7 +112,7 @@ where
         // This is a deterministic stage
         // Once it failed, then don't retry,
         // It will just fail again
-        RestartHelper::zero(state, &self.name)
+        RestartHelper::no_retry(state, &self.name)
     }
 
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
