@@ -372,7 +372,7 @@ fn fuzz_binary(
         5,
     )?;
 
-    let power = StdPowerMutationalStage::new(mutator);
+    let power = StdPowerMutationalStage::new(mutator, "power");
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(
@@ -584,7 +584,7 @@ fn fuzz_text(
         5,
     )?;
 
-    let power = StdPowerMutationalStage::new(mutator);
+    let power = StdPowerMutationalStage::new(mutator, "power");
 
     let grimoire_mutator = StdScheduledMutator::with_max_stack_pow(
         tuple_list!(

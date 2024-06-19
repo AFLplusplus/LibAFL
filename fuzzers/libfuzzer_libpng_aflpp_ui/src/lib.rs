@@ -155,7 +155,7 @@ fn fuzz(
     // Setup a basic mutator with a mutational stage
     let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
-    let power = StdPowerMutationalStage::new(mutator);
+    let power = StdPowerMutationalStage::new(mutator, "power");
 
     // Setup a stage that can collect and send the AFL-like data
     let aflstats = AflStatsStage::new(Duration::from_secs(3));

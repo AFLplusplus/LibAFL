@@ -1,23 +1,21 @@
 use std::net::SocketAddr;
-use petgraph::{Direction, Graph};
-use petgraph::graph::NodeIndex;
+
+use petgraph::{graph::NodeIndex, Direction, Graph};
 
 /// A node of the network
 #[derive(Debug, Clone)]
 pub struct MultiMachineNode {
-    addr: SocketAddr
+    addr: SocketAddr,
 }
 
 /// The tree
 pub struct MultiMachineTree {
-    pub graph: Graph<MultiMachineNode, ()>
+    pub graph: Graph<MultiMachineNode, ()>,
 }
 
 impl MultiMachineNode {
     pub fn new(addr: SocketAddr) -> Self {
-        Self {
-            addr
-        }
+        Self { addr }
     }
 }
 
@@ -34,13 +32,10 @@ impl MultiMachineTree {
         let root = if let Some(root) = machines.pop() {
             graph.add_node(MultiMachineNode::new(root))
         } else {
-            return Self {
-                graph
-            };
+            return Self { graph };
         };
 
-        let mut graph = Self { graph
-        };
+        let mut graph = Self { graph };
 
         let mut populate_idx = 0u64; // round-robin population to avoid congestion
         let mut nodes_to_populate_now: Vec<NodeIndex> = vec![root]; // current nodes we are working on
@@ -49,12 +44,17 @@ impl MultiMachineTree {
 
         // place all the machines in the graph
         while let Some(machine) = machines.pop() {
-            if graph.nb_children(nodes_to_populate_now[populate_idx as usize]) == max_children_per_parent {
+            if graph.nb_children(nodes_to_populate_now[populate_idx as usize])
+                == max_children_per_parent
+            {
                 nodes_to_populate_now = nodes_to_populate_later.drain(..).collect();
                 populate_idx = 0; // should be useless
             }
 
-            let new_child = graph.add_child(nodes_to_populate_now[populate_idx as usize], MultiMachineNode::new(machine));
+            let new_child = graph.add_child(
+                nodes_to_populate_now[populate_idx as usize],
+                MultiMachineNode::new(machine),
+            );
             nodes_to_populate_later.push(new_child);
 
             populate_idx = (populate_idx + 1) % nodes_to_populate_now.len() as u64;
@@ -70,6 +70,8 @@ impl MultiMachineTree {
     }
 
     fn nb_children(&self, node: NodeIndex) -> u64 {
-        self.graph.neighbors_directed(node, Direction::Incoming).count() as u64
+        self.graph
+            .neighbors_directed(node, Direction::Incoming)
+            .count() as u64
     }
 }
