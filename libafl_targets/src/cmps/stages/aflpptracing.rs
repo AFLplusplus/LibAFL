@@ -5,7 +5,7 @@ use libafl::{
     executors::{Executor, HasObservers},
     inputs::{BytesInput, UsesInput},
     observers::ObserversTuple,
-    stages::{colorization::TaintMetadata, RestartHelper, Stage, StageResult, ExecutionDecision},
+    stages::{colorization::TaintMetadata, ExecutionDecision, RestartHelper, Stage, StageResult},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };

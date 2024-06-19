@@ -528,12 +528,21 @@ impl RestartHelper {
     where
         S: HasNamedMetadata + HasCurrentCorpusId,
     {
-        Self::should_run(state, name, 0)
+        Self::_should_run(state, name, 0, false)
+    }
+
+    /// Don't allow restart and abort all the following stages
+    pub fn zero_else_abort<S>(state: &mut S, name: &str) -> Result<ExecutionDecision, Error>
+    where
+        S: HasNamedMetadata + HasCurrentCorpusId,
+    {
+        Self::_should_run(state, name, 0, true)
     }
 
     /// Initializes (or counts down in) the progress helper, giving it the amount of max retries
     ///
-    /// Returns `true` if the stage should run
+    /// Returns `ExecutionDecision::Continue` if the stage should run
+    /// else stop the execution of this stage
     pub fn should_run<S>(
         state: &mut S,
         name: &str,
@@ -542,6 +551,39 @@ impl RestartHelper {
     where
         S: HasNamedMetadata + HasCurrentCorpusId,
     {
+        Self::_should_run(state, name, max_retries, false)
+    }
+
+    /// Initializes (or counts down in) the progress helper, giving it the amount of max retries
+    ///
+    /// Returns `ExecutionDecision::Continue` if the stage should run
+    /// else abort all the following stage execution
+    pub fn should_run_else_abort<S>(
+        state: &mut S,
+        name: &str,
+        max_retries: usize,
+    ) -> Result<ExecutionDecision, Error>
+    where
+        S: HasNamedMetadata + HasCurrentCorpusId,
+    {
+        Self::_should_run(state, name, max_retries, false)
+    }
+
+    fn _should_run<S>(
+        state: &mut S,
+        name: &str,
+        max_retries: usize,
+        abort: bool,
+    ) -> Result<ExecutionDecision, Error>
+    where
+        S: HasNamedMetadata + HasCurrentCorpusId,
+    {
+        let when_fail = if abort {
+            ExecutionDecision::Abort
+        } else {
+            ExecutionDecision::Stop
+        };
+
         let corpus_idx = state.current_corpus_id()?.ok_or_else(|| {
             Error::illegal_state(
                 "No current_corpus_id set in State, but called RestartHelper::should_skip",
@@ -567,10 +609,10 @@ impl RestartHelper {
 
         Ok(if tries_remaining == 0 {
             metadata.skipped.insert(corpus_idx);
-            ExecutionDecision::Stop
+            when_fail
         } else if metadata.skipped.contains(&corpus_idx) {
             // skip this testcase, we already retried it often enough...
-            ExecutionDecision::Stop
+            when_fail
         } else {
             ExecutionDecision::Continue
         })
