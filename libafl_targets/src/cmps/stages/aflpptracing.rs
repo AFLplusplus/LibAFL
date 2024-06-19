@@ -127,7 +127,7 @@ where
     fn should_run(&mut self, state: &mut Self::State) -> Result<ExecutionDecision, Error> {
         // Tracing stage is always deterministic
         // don't restart
-        RestartHelper::zero(state, &self.name)
+        RestartHelper::no_retry(state, &self.name)
     }
 
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
