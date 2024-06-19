@@ -87,8 +87,6 @@ where
             self.tracer_executor
                 .run_target(fuzzer, state, manager, &unmutated_input)?;
 
-        *state.executions_mut() += 1;
-
         self.tracer_executor
             .observers_mut()
             .post_exec_all(state, &unmutated_input, &exit_kind)?;
@@ -120,8 +118,6 @@ where
         let exit_kind = self
             .tracer_executor
             .run_target(fuzzer, state, manager, &mutated_input)?;
-
-        *state.executions_mut() += 1;
 
         self.tracer_executor
             .observers_mut()

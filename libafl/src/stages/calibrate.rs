@@ -307,8 +307,6 @@ where
             data.set_handicap(handicap);
         }
 
-        *state.executions_mut() += u64::try_from(i).unwrap();
-
         // Send the stability event to the broker
         if unstable_found {
             if let Some(meta) = state.metadata_map().get::<UnstableEntriesMetadata>() {
