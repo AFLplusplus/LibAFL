@@ -36,7 +36,7 @@ where
         id: CorpusId,
         _testcase: &Option<Testcase<<Self::State as UsesInput>::Input>>,
     ) -> Result<(), Error> {
-        self.all.remove(&idx);
+        self.all.remove(&id);
         Ok(())
     }
 }
@@ -46,11 +46,11 @@ where
     S: State + HasCorpus,
 {
     fn on_add(&mut self, state: &mut Self::State, id: CorpusId) -> Result<(), Error> {
-        self.all.insert(idx);
+        self.all.insert(id);
         let testcase = state.corpus().get(id)?.borrow();
         let meta = testcase.metadata::<MapNoveltiesMetadata>()?;
-        for cov_idx in &meta.list {
-            self.mapping.insert(*cov_idx, idx);
+        for cov_ in &meta.list {
+            self.mapping.insert(*cov_, id);
         }
         Ok(())
     }
