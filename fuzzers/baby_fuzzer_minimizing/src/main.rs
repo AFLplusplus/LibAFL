@@ -125,7 +125,8 @@ pub fn main() -> Result<(), Error> {
     let mut stages = tuple_list!(StdTMinMutationalStage::new(
         minimizer,
         CrashFeedback::new(),
-        1 << 10
+        1 << 10,
+        "tmin",
     ));
 
     let scheduler = QueueScheduler::new();
