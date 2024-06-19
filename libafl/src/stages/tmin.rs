@@ -80,7 +80,9 @@ where
 
         let orig_max_size = state.max_size();
         // basically copy-pasted from mutational.rs
-        let num = self.iterations(state)?.saturating_sub(usize::try_from(self.execs_since_progress_start(state)?)?);
+        let num = self
+            .iterations(state)?
+            .saturating_sub(usize::try_from(self.execs_since_progress_start(state)?)?);
 
         // If num is negative, then quit.
         if num == 0 {
