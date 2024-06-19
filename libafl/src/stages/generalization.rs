@@ -372,8 +372,6 @@ where
         let exit_kind = executor.run_target(fuzzer, state, manager, input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
-        *state.executions_mut() += 1;
-
         start_timer!(state);
         executor
             .observers_mut()

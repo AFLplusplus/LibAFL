@@ -67,8 +67,6 @@ where
             .run_target(fuzzer, state, manager, &input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
-        *state.executions_mut() += 1;
-
         start_timer!(state);
         self.tracer_executor
             .observers_mut()
@@ -199,8 +197,6 @@ where
         start_timer!(state);
         let exit_kind = executor.run_target(fuzzer, state, manager, &input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
-
-        *state.executions_mut() += 1;
 
         start_timer!(state);
         executor
