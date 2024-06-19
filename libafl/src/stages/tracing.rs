@@ -97,7 +97,7 @@ where
     }
 
     fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        RestartHelper::zero(state, &self.name)
+        RestartHelper::no_retry(state, &self.name)
     }
 
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
@@ -206,7 +206,7 @@ where
     }
 
     fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        RestartHelper::zero(state, &self.name)
+        RestartHelper::no_retry(state, &self.name)
     }
 
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
