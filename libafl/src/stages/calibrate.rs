@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use super::ExecutionDecision;
 use crate::{
-    corpus::{Corpus, SchedulerTestcaseMetadata},
+    corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata},
     events::{Event, EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{map::MapFeedbackMetadata, HasObserverHandle},
@@ -354,10 +354,18 @@ where
     fn should_run(&mut self, state: &mut Self::State) -> Result<ExecutionDecision, Error> {
         // Calibration stage disallow restarts
         // If a testcase that causes crash/timeout in the queue, we need to remove it from the queue immediately.
-        RestartHelper::zero_else_abort(state, &self.name)
+        let ret = RestartHelper::zero_else_abort(state, &self.name)?;
 
-        // todo
-        // remove this guy from corpus queue
+        if ret == ExecutionDecision::Abort {
+            // Now if we decide to abort executions, then we should remove this testcase from the corpus
+            let id_to_remove = state.current_corpus_id()?;
+            if let Some(x) = id_to_remove {
+                log::info!("Moving corpus {} to the disabled corpus queue because it failed in the calibration stage", x);
+                let tc = state.corpus_mut().remove(x)?;
+                state.corpus_mut().add_disabled(tc)?;
+            }
+        }
+        Ok(ret)
     }
 
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
