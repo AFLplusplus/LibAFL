@@ -97,7 +97,7 @@ where
         Ok(StageResult::Success)
     }
 
-    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_run(&mut self, state: &mut Self::State) -> Result<ExecutionDecision, Error> {
         RestartHelper::no_retry(state, &self.name)
     }
 

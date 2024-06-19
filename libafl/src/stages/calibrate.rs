@@ -354,16 +354,19 @@ where
     fn should_run(&mut self, state: &mut Self::State) -> Result<ExecutionDecision, Error> {
         // Calibration stage disallow restarts
         // If a testcase that causes crash/timeout in the queue, we need to remove it from the queue immediately.
-        let ret = RestartHelper::no_retry_else_abort(state, &self.name);
+        let ret = RestartHelper::no_retry_else_abort(state, &self.name)?;
 
-        if ret == ExecutionDecision::Abort {
-            // Now if we decide to abort executions, then we should remove this testcase from the corpus
-            let id_to_remove = state.current_corpus_id()?;
-            if let Some(x) = id_to_remove {
-                log::info!("Moving corpus {} to the disabled corpus queue because it failed in the calibration stage", x);
-                let tc = state.corpus_mut().remove(x)?;
-                state.corpus_mut().add_disabled(tc)?;
+        match ret {
+            ExecutionDecision::Abort => {
+                // Now if we decide to abort executions, then we should remove this testcase from the corpus
+                let id_to_remove = state.current_corpus_id()?;
+                if let Some(x) = id_to_remove {
+                    log::info!("Moving corpus {} to the disabled corpus queue because it failed in the calibration stage", x);
+                    let tc = state.corpus_mut().remove(x)?;
+                    state.corpus_mut().add_disabled(tc)?;
+                }
             }
+            _ => (),
         }
         Ok(ret)
     }
