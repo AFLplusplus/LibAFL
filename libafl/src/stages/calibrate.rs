@@ -20,7 +20,7 @@ use crate::{
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
     schedulers::powersched::SchedulerMetadata,
-    stages::{RestartHelper, Stage},
+    stages::{RestartHelper, Stage, StageResult},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -114,14 +114,14 @@ where
         executor: &mut E,
         state: &mut Self::State,
         mgr: &mut EM,
-    ) -> Result<(), Error> {
+    ) -> Result<StageResult, Error> {
         // Run this stage only once for each corpus entry and only if we haven't already inspected it
         {
             let testcase = state.current_testcase()?;
             // println!("calibration; corpus.scheduled_count() : {}", corpus.scheduled_count());
 
             if testcase.scheduled_count() > 0 {
-                return Ok(());
+                return Ok(StageResult::Success);
             }
         }
 
@@ -347,7 +347,7 @@ where
             )?;
         }
 
-        Ok(())
+        Ok(StageResult::Success)
     }
 
     fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {

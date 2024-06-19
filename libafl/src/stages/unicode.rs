@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     corpus::HasTestcase,
     inputs::{BytesInput, HasMutatorBytes},
-    stages::Stage,
+    stages::{Stage, StageResult},
     state::{HasCorpus, HasCurrentTestcase, State, UsesState},
     HasMetadata,
 };
@@ -111,10 +111,10 @@ where
         _executor: &mut E,
         state: &mut Self::State,
         _manager: &mut EM,
-    ) -> Result<(), Error> {
+    ) -> Result<StageResult, Error> {
         let mut tc = state.current_testcase_mut()?;
         if tc.has_metadata::<UnicodeIdentificationMetadata>() {
-            return Ok(()); // skip recompute
+            return Ok(StageResult::Success); // skip recompute
         }
 
         let input = tc.load_input(state.corpus())?;
@@ -123,7 +123,7 @@ where
         let metadata = extract_metadata(bytes);
         tc.add_metadata(metadata);
 
-        Ok(())
+        Ok(StageResult::Success)
     }
 
     #[inline]

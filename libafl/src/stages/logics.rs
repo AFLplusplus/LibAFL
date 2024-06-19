@@ -3,7 +3,7 @@
 use core::marker::PhantomData;
 
 use crate::{
-    stages::{HasCurrentStage, HasNestedStageStatus, Stage, StageId, StagesTuple},
+    stages::{HasCurrentStage, HasNestedStageStatus, Stage, StageId, StageResult, StagesTuple},
     state::UsesState,
     Error,
 };
@@ -60,14 +60,22 @@ where
         executor: &mut E,
         state: &mut Self::State,
         manager: &mut EM,
-    ) -> Result<(), Error> {
-        while state.current_stage_idx()?.is_some()
-            || (self.closure)(fuzzer, executor, state, manager)?
-        {
-            self.stages.perform_all(fuzzer, executor, state, manager)?;
-        }
+    ) -> Result<StageResult, Error> {
+        let res = loop {
+            if state.current_stage_idx()?.is_some()
+                || (self.closure)(fuzzer, executor, state, manager)?
+            {
+                if let StageResult::Abort =
+                    self.stages.perform_all(fuzzer, executor, state, manager)?
+                {
+                    break StageResult::Abort;
+                }
+            } else {
+                break StageResult::Success;
+            }
+        };
 
-        Ok(())
+        Ok(res)
     }
 
     fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
@@ -125,13 +133,16 @@ where
         executor: &mut E,
         state: &mut Self::State,
         manager: &mut EM,
-    ) -> Result<(), Error> {
-        if state.current_stage_idx()?.is_some() || (self.closure)(fuzzer, executor, state, manager)?
+    ) -> Result<StageResult, Error> {
+        let res = if state.current_stage_idx()?.is_some()
+            || (self.closure)(fuzzer, executor, state, manager)?
         {
             self.if_stages
-                .perform_all(fuzzer, executor, state, manager)?;
-        }
-        Ok(())
+                .perform_all(fuzzer, executor, state, manager)?
+        } else {
+            StageResult::Success
+        };
+        Ok(res)
     }
 
     fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
@@ -191,32 +202,32 @@ where
         executor: &mut E,
         state: &mut Self::State,
         manager: &mut EM,
-    ) -> Result<(), Error> {
+    ) -> Result<StageResult, Error> {
         let current = state.current_stage_idx()?;
 
         let fresh = current.is_none();
         let closure_return = fresh && (self.closure)(fuzzer, executor, state, manager)?;
 
-        if current == Some(StageId(0)) || closure_return {
+        let res = if current == Some(StageId(0)) || closure_return {
             if fresh {
                 state.set_current_stage_idx(StageId(0))?;
             }
             state.enter_inner_stage()?;
             self.if_stages
-                .perform_all(fuzzer, executor, state, manager)?;
+                .perform_all(fuzzer, executor, state, manager)?
         } else {
             if fresh {
                 state.set_current_stage_idx(StageId(1))?;
             }
             state.enter_inner_stage()?;
             self.else_stages
-                .perform_all(fuzzer, executor, state, manager)?;
-        }
+                .perform_all(fuzzer, executor, state, manager)?
+        };
 
         state.exit_inner_stage()?;
         state.clear_stage()?;
 
-        Ok(())
+        Ok(res)
     }
 
     fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
@@ -272,11 +283,11 @@ where
         executor: &mut E,
         state: &mut Self::State,
         manager: &mut EM,
-    ) -> Result<(), Error> {
+    ) -> Result<StageResult, Error> {
         if let Some(stages) = &mut self.stages {
             stages.perform_all(fuzzer, executor, state, manager)
         } else {
-            Ok(())
+            Ok(StageResult::Success)
         }
     }
 

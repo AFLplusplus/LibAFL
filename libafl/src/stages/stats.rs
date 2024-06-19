@@ -12,7 +12,7 @@ use crate::{
     corpus::{Corpus, HasCurrentCorpusId},
     events::EventFirer,
     schedulers::minimizer::IsFavoredMetadata,
-    stages::Stage,
+    stages::{Stage, StageResult},
     state::{HasCorpus, HasImported, UsesState},
     Error, HasMetadata,
 };
@@ -61,7 +61,7 @@ where
         _executor: &mut E,
         state: &mut Self::State,
         _manager: &mut EM,
-    ) -> Result<(), Error> {
+    ) -> Result<StageResult, Error> {
         let Some(corpus_idx) = state.current_corpus_id()? else {
             return Err(Error::illegal_state(
                 "state is not currently processing a corpus index",
@@ -78,7 +78,7 @@ where
                     self.is_favored_size += 1;
                 }
             } else {
-                return Ok(());
+                return Ok(StageResult::Success);
             }
         }
 
@@ -122,7 +122,7 @@ where
             self.last_report_time = cur;
         }
 
-        Ok(())
+        Ok(StageResult::Success)
     }
 
     #[inline]

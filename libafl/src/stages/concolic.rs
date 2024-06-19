@@ -20,7 +20,7 @@ use crate::state::HasClientPerfMonitor;
 use crate::{
     executors::{Executor, HasObservers},
     observers::concolic::ConcolicObserver,
-    stages::{RestartHelper, Stage, TracingStage},
+    stages::{RestartHelper, Stage, StageResult, TracingStage},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -73,7 +73,7 @@ where
         _executor: &mut E,
         state: &mut Self::State,
         manager: &mut EM,
-    ) -> Result<(), Error> {
+    ) -> Result<StageResult, Error> {
         self.inner.trace(fuzzer, state, manager)?;
         if let Some(observer) = self.inner.executor().observers().get(&self.observer_handle) {
             let metadata = observer.create_metadata_from_current_map();
@@ -82,7 +82,7 @@ where
                 .metadata_map_mut()
                 .insert(metadata);
         }
-        Ok(())
+        Ok(StageResult::Success)
     }
 
     fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
@@ -401,7 +401,7 @@ where
         executor: &mut E,
         state: &mut Self::State,
         manager: &mut EM,
-    ) -> Result<(), Error> {
+    ) -> Result<StageResult, Error> {
         {
             start_timer!(state);
             mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
@@ -425,7 +425,7 @@ where
                 fuzzer.evaluate_input(state, executor, manager, input_copy)?;
             }
         }
-        Ok(())
+        Ok(StageResult::Success)
     }
 
     #[inline]

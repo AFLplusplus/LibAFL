@@ -20,7 +20,7 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, UsesInput},
-    stages::{RestartHelper, Stage},
+    stages::{RestartHelper, Stage, StageResult},
     state::{HasCorpus, HasExecutions, HasRand, State, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -91,7 +91,7 @@ where
         executor: &mut E,
         state: &mut Self::State,
         manager: &mut EM,
-    ) -> Result<(), Error> {
+    ) -> Result<StageResult, Error> {
         log::debug!("Syncing from disk: {:?}", self.sync_dir);
         let last = state
             .metadata_map()
@@ -145,7 +145,7 @@ where
         #[cfg(feature = "introspection")]
         state.introspection_monitor_mut().finish_stage();
 
-        Ok(())
+        Ok(StageResult::Success)
     }
 
     #[inline]
@@ -314,7 +314,7 @@ where
         executor: &mut E,
         state: &mut Self::State,
         manager: &mut EM,
-    ) -> Result<(), Error> {
+    ) -> Result<StageResult, Error> {
         if self.client.can_convert() {
             let last_id = state
                 .metadata_map()
@@ -363,7 +363,7 @@ where
         self.client.process(fuzzer, state, executor, manager)?;
         #[cfg(feature = "introspection")]
         state.introspection_monitor_mut().finish_stage();
-        Ok(())
+        Ok(StageResult::Success)
     }
 
     #[inline]

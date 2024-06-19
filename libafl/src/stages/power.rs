@@ -10,7 +10,7 @@ use crate::{
     fuzzer::Evaluator,
     mutators::Mutator,
     schedulers::{testcase_score::CorpusPowerTestcaseScore, TestcaseScore},
-    stages::{mutational::MutatedTransform, MutationalStage, RestartHelper, Stage},
+    stages::{mutational::MutatedTransform, MutationalStage, RestartHelper, Stage, StageResult},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -90,9 +90,9 @@ where
         executor: &mut E,
         state: &mut Self::State,
         manager: &mut EM,
-    ) -> Result<(), Error> {
-        let ret = self.perform_mutational(fuzzer, executor, state, manager);
-        ret
+    ) -> Result<StageResult, Error> {
+        self.perform_mutational(fuzzer, executor, state, manager)?;
+        Ok(StageResult::Success)
     }
 
     fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {

@@ -7,7 +7,7 @@ use core::marker::PhantomData;
 use crate::{
     generators::Generator,
     inputs::UsesInput,
-    stages::Stage,
+    stages::{Stage, StageResult},
     state::{HasCorpus, HasRand, UsesState},
     Error, Evaluator,
 };
@@ -48,10 +48,10 @@ where
         executor: &mut E,
         state: &mut Self::State,
         manager: &mut EM,
-    ) -> Result<(), Error> {
+    ) -> Result<StageResult, Error> {
         let input = self.0.generate(state)?;
         fuzzer.evaluate_input(state, executor, manager, input)?;
-        Ok(())
+        Ok(StageResult::Success)
     }
 
     fn should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {

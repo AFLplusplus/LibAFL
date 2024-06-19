@@ -19,7 +19,7 @@ use crate::{
     mark_feature_time,
     observers::{CanTrack, MapObserver, ObserversTuple},
     require_novelties_tracking,
-    stages::{RestartHelper, Stage},
+    stages::{RestartHelper, Stage, StageResult},
     start_timer,
     state::{HasCorpus, HasExecutions, UsesState},
     Error, HasMetadata, HasNamedMetadata,
@@ -86,7 +86,7 @@ where
         executor: &mut E,
         state: &mut Self::State,
         manager: &mut EM,
-    ) -> Result<(), Error> {
+    ) -> Result<StageResult, Error> {
         let Some(corpus_idx) = state.current_corpus_id()? else {
             return Err(Error::illegal_state(
                 "state is not currently processing a corpus index",
@@ -99,7 +99,7 @@ where
                 let corpus = state.corpus();
                 let mut testcase = corpus.get(corpus_idx)?.borrow_mut();
                 if testcase.scheduled_count() > 0 {
-                    return Ok(());
+                    return Ok(StageResult::Success);
                 }
 
                 corpus.load_input_into(&mut testcase)?;
@@ -116,14 +116,14 @@ where
                     ))
                 })?;
             if meta.as_slice().is_empty() {
-                return Ok(()); // don't generalise inputs which don't have novelties
+                return Ok(StageResult::Success); // don't generalise inputs which don't have novelties
             }
             (payload, original, meta.as_slice().to_vec())
         };
 
         // Do not generalized unstable inputs
         if !self.verify_input(fuzzer, executor, state, manager, &novelties, &original)? {
-            return Ok(());
+            return Ok(StageResult::Success);
         }
 
         self.find_gaps(
@@ -322,7 +322,7 @@ where
             }
         }
 
-        Ok(())
+        Ok(StageResult::Success)
     }
 
     #[inline]

@@ -19,7 +19,7 @@ use crate::{
     inputs::HasMutatorBytes,
     mutators::mutations::buffer_copy,
     observers::{MapObserver, ObserversTuple},
-    stages::{RestartHelper, Stage},
+    stages::{RestartHelper, Stage, StageResult},
     state::{HasCorpus, HasCurrentTestcase, HasRand, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -101,11 +101,11 @@ where
         executor: &mut E, // don't need the *main* executor for tracing
         state: &mut Self::State,
         manager: &mut EM,
-    ) -> Result<(), Error> {
+    ) -> Result<StageResult, Error> {
         // Run with the mutated input
         Self::colorize(fuzzer, executor, state, manager, &self.map_observer_handle)?;
 
-        Ok(())
+        Ok(StageResult::Success)
     }
 
     fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {

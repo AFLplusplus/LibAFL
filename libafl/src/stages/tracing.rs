@@ -9,7 +9,7 @@ use crate::{
     executors::{Executor, HasObservers, ShadowExecutor},
     mark_feature_time,
     observers::ObserversTuple,
-    stages::{RestartHelper, Stage},
+    stages::{RestartHelper, Stage, StageResult},
     start_timer,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, State, UsesState},
     Error, HasNamedMetadata,
@@ -92,8 +92,9 @@ where
         _executor: &mut E,
         state: &mut <Self as UsesState>::State,
         manager: &mut EM,
-    ) -> Result<(), Error> {
-        self.trace(fuzzer, state, manager)
+    ) -> Result<StageResult, Error> {
+        self.trace(fuzzer, state, manager)?;
+        Ok(StageResult::Success)
     }
 
     fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
@@ -176,7 +177,7 @@ where
         executor: &mut ShadowExecutor<E, SOT>,
         state: &mut <Self as UsesState>::State,
         manager: &mut EM,
-    ) -> Result<(), Error> {
+    ) -> Result<StageResult, Error> {
         start_timer!(state);
         let input = state.current_input_cloned()?;
 
@@ -202,7 +203,7 @@ where
             .post_exec_all(state, &input, &exit_kind)?;
         mark_feature_time!(state, PerfFeature::PostExecObservers);
 
-        Ok(())
+        Ok(StageResult::Success)
     }
 
     fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {

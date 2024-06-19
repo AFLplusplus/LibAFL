@@ -79,6 +79,15 @@ pub mod tuneable;
 #[cfg(feature = "unicode")]
 pub mod unicode;
 
+/// Decide what to do with the stage execution result
+#[derive(Copy, Clone, Debug)]
+pub enum StageResult {
+    /// Continue execution onto the next stage.
+    Success,
+    /// Abort executing `fuzz_one` immediately
+    Abort,
+}
+
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
 pub trait Stage<E, EM, Z>: UsesState
@@ -109,7 +118,7 @@ where
         executor: &mut E,
         state: &mut Self::State,
         manager: &mut EM,
-    ) -> Result<(), Error>;
+    ) -> Result<StageResult, Error>;
 
     /// Run the stage, calling [`Stage::should_run`] and [`Stage::clear_progress`] appropriately
     fn perform_restartable(
@@ -118,11 +127,14 @@ where
         executor: &mut E,
         state: &mut Self::State,
         manager: &mut EM,
-    ) -> Result<(), Error> {
-        if self.should_run(state)? {
-            self.perform(fuzzer, executor, state, manager)?;
-        }
-        self.clear_progress(state)
+    ) -> Result<StageResult, Error> {
+        let ret = if self.should_run(state)? {
+            self.perform(fuzzer, executor, state, manager)?
+        } else {
+            StageResult::Success
+        };
+        self.clear_progress(state)?;
+        Ok(ret)
     }
 }
 
@@ -141,7 +153,7 @@ where
         executor: &mut E,
         state: &mut S,
         manager: &mut EM,
-    ) -> Result<(), Error>;
+    ) -> Result<StageResult, Error>;
 }
 
 impl<E, EM, S, Z> StagesTuple<E, EM, S, Z> for ()
@@ -157,13 +169,13 @@ where
         _: &mut E,
         stage: &mut S,
         _: &mut EM,
-    ) -> Result<(), Error> {
+    ) -> Result<StageResult, Error> {
         if stage.current_stage_idx()?.is_some() {
             Err(Error::illegal_state(
                 "Got to the end of the tuple without completing resume.",
             ))
         } else {
-            Ok(())
+            Ok(StageResult::Success)
         }
     }
 }
@@ -183,18 +195,21 @@ where
         executor: &mut E,
         state: &mut Head::State,
         manager: &mut EM,
-    ) -> Result<(), Error> {
-        match state.current_stage_idx()? {
+    ) -> Result<StageResult, Error> {
+        let result = match state.current_stage_idx()? {
             Some(idx) if idx < StageId(Self::LEN) => {
                 // do nothing; we are resuming
+                StageResult::Success
             }
             Some(idx) if idx == StageId(Self::LEN) => {
                 // perform the stage, but don't set it
                 let stage = &mut self.0;
 
-                stage.perform_restartable(fuzzer, executor, state, manager)?;
+                let ret = stage.perform_restartable(fuzzer, executor, state, manager)?;
 
                 state.clear_stage()?;
+
+                ret
             }
             Some(idx) if idx > StageId(Self::LEN) => {
                 unreachable!("We should clear the stage index before we get here...");
@@ -204,14 +219,18 @@ where
                 state.set_current_stage_idx(StageId(Self::LEN))?;
 
                 let stage = &mut self.0;
-                stage.perform_restartable(fuzzer, executor, state, manager)?;
+                let ret = stage.perform_restartable(fuzzer, executor, state, manager)?;
 
                 state.clear_stage()?;
-            }
-        }
 
-        // Execute the remaining stages
-        self.1.perform_all(fuzzer, executor, state, manager)
+                ret
+            }
+        };
+
+        match result {
+            StageResult::Success => self.1.perform_all(fuzzer, executor, state, manager),
+            StageResult::Abort => Ok(StageResult::Abort),
+        }
     }
 }
 
@@ -282,9 +301,15 @@ where
         executor: &mut E,
         state: &mut S,
         manager: &mut EM,
-    ) -> Result<(), Error> {
-        self.iter_mut()
-            .try_for_each(|x| x.perform_restartable(fuzzer, executor, state, manager))
+    ) -> Result<StageResult, Error> {
+        for stage in self.iter_mut() {
+            let res = stage.perform_restartable(fuzzer, executor, state, manager)?;
+            match res {
+                StageResult::Abort => return Ok(res),
+                StageResult::Success => (), // do nothing
+            }
+        }
+        Ok(StageResult::Success)
     }
 }
 
@@ -326,8 +351,9 @@ where
         executor: &mut E,
         state: &mut E::State,
         manager: &mut EM,
-    ) -> Result<(), Error> {
-        (self.closure)(fuzzer, executor, state, manager)
+    ) -> Result<StageResult, Error> {
+        (self.closure)(fuzzer, executor, state, manager)?;
+        Ok(StageResult::Success)
     }
 
     #[inline]
@@ -423,7 +449,7 @@ where
         executor: &mut E,
         state: &mut CS::State,
         event_mgr: &mut EM,
-    ) -> Result<(), Error> {
+    ) -> Result<StageResult, Error> {
         let push_stage = &mut self.push_stage;
 
         let Some(corpus_idx) = state.current_corpus_id()? else {
@@ -458,7 +484,9 @@ where
         }
 
         self.push_stage
-            .deinit(fuzzer, state, event_mgr, &mut *executor.observers_mut())
+            .deinit(fuzzer, state, event_mgr, &mut *executor.observers_mut())?;
+
+        Ok(StageResult::Success)
     }
 
     #[inline]
@@ -671,7 +699,7 @@ pub mod test {
     use crate::{
         corpus::{Corpus, HasCurrentCorpusId, Testcase},
         inputs::NopInput,
-        stages::{RestartHelper, Stage},
+        stages::{RestartHelper, Stage, StageResult},
         state::{test::test_std_state, HasCorpus, State, UsesState},
         HasMetadata,
     };
@@ -739,8 +767,8 @@ pub mod test {
             _executor: &mut E,
             _state: &mut Self::State,
             _manager: &mut EM,
-        ) -> Result<(), Error> {
-            Ok(())
+        ) -> Result<StageResult, Error> {
+            Ok(StageResult::Success)
         }
 
         fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {

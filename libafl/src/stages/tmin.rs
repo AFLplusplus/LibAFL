@@ -23,7 +23,7 @@ use crate::{
     schedulers::RemovableScheduler,
     stages::{
         mutational::{MutatedTransform, MutatedTransformPost},
-        ExecutionCountRestartHelper, Stage,
+        ExecutionCountRestartHelper, Stage, StageResult,
     },
     start_timer,
     state::{
@@ -259,13 +259,13 @@ where
         executor: &mut E,
         state: &mut Z::State,
         manager: &mut EM,
-    ) -> Result<(), Error> {
+    ) -> Result<StageResult, Error> {
         self.perform_minification(fuzzer, executor, state, manager)?;
 
         #[cfg(feature = "introspection")]
         state.introspection_monitor_mut().finish_stage();
 
-        Ok(())
+        Ok(StageResult::Success)
     }
 }
 

@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     corpus::{Corpus, CorpusId},
     inputs::UsesInput,
-    stages::Stage,
+    stages::{Stage, StageResult},
     state::{HasCorpus, HasRand, HasSolutions, UsesState},
     Error, HasMetadata,
 };
@@ -59,7 +59,7 @@ where
         _executor: &mut E,
         state: &mut Self::State,
         _manager: &mut EM,
-    ) -> Result<(), Error> {
+    ) -> Result<StageResult, Error> {
         let (mut corpus_idx, mut solutions_idx) =
             if let Some(meta) = state.metadata_map().get::<DumpToDiskMetadata>() {
                 (
@@ -111,7 +111,7 @@ where
             last_solution: state.solutions().last(),
         });
 
-        Ok(())
+        Ok(StageResult::Success)
     }
 
     #[inline]

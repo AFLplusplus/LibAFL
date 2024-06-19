@@ -12,7 +12,7 @@ use crate::{
     inputs::Input,
     mark_feature_time,
     mutators::{MultiMutator, MutationResult, Mutator},
-    stages::{RestartHelper, Stage},
+    stages::{RestartHelper, Stage, StageResult},
     start_timer,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
     Error, HasMetadata, HasNamedMetadata,
@@ -211,13 +211,13 @@ where
         executor: &mut E,
         state: &mut Self::State,
         manager: &mut EM,
-    ) -> Result<(), Error> {
-        let ret = self.perform_mutational(fuzzer, executor, state, manager);
+    ) -> Result<StageResult, Error> {
+        self.perform_mutational(fuzzer, executor, state, manager)?;
 
         #[cfg(feature = "introspection")]
         state.introspection_monitor_mut().finish_stage();
 
-        ret
+        Ok(StageResult::Success)
     }
 
     fn should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
@@ -327,10 +327,10 @@ where
         executor: &mut E,
         state: &mut Self::State,
         manager: &mut EM,
-    ) -> Result<(), Error> {
+    ) -> Result<StageResult, Error> {
         let mut testcase = state.current_testcase_mut()?;
         let Ok(input) = I::try_transform_from(&mut testcase, state) else {
-            return Ok(());
+            return Ok(StageResult::Success);
         };
         drop(testcase);
 
@@ -345,7 +345,7 @@ where
         }
         // println!("Found {}", found);
 
-        Ok(())
+        Ok(StageResult::Success)
     }
 }
 

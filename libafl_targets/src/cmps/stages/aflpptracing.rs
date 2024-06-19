@@ -5,7 +5,7 @@ use libafl::{
     executors::{Executor, HasObservers},
     inputs::{BytesInput, UsesInput},
     observers::ObserversTuple,
-    stages::{colorization::TaintMetadata, RestartHelper, Stage},
+    stages::{colorization::TaintMetadata, RestartHelper, Stage, StageResult},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -63,7 +63,7 @@ where
         _executor: &mut E,
         state: &mut TE::State,
         manager: &mut EM,
-    ) -> Result<(), Error> {
+    ) -> Result<StageResult, Error> {
         // First run with the un-mutated input
         let unmutated_input = state.current_input_cloned()?;
 
@@ -121,7 +121,7 @@ where
             .observers_mut()
             .post_exec_all(state, &mutated_input, &exit_kind)?;
 
-        Ok(())
+        Ok(StageResult::Success)
     }
 
     fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {

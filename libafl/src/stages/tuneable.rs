@@ -11,7 +11,7 @@ use crate::{
     mutators::{MutationResult, Mutator},
     stages::{
         mutational::{MutatedTransform, MutatedTransformPost, DEFAULT_MUTATIONAL_MAX_ITERATIONS},
-        ExecutionCountRestartHelper, MutationalStage, Stage,
+        ExecutionCountRestartHelper, MutationalStage, Stage, StageResult,
     },
     start_timer,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
@@ -274,13 +274,13 @@ where
         executor: &mut E,
         state: &mut Self::State,
         manager: &mut EM,
-    ) -> Result<(), Error> {
-        let ret = self.perform_mutational(fuzzer, executor, state, manager);
+    ) -> Result<StageResult, Error> {
+        self.perform_mutational(fuzzer, executor, state, manager)?;
 
         #[cfg(feature = "introspection")]
         state.introspection_monitor_mut().finish_stage();
 
-        ret
+        Ok(StageResult::Success)
     }
 
     fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
