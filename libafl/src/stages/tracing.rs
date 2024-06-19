@@ -212,6 +212,7 @@ where
 
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
         RestartHelper::clear_progress(state, &self.name)
+    }
 }
 
 impl<E, EM, SOT, Z> ShadowTracingStage<E, EM, SOT, Z>

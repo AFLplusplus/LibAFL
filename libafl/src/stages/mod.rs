@@ -524,7 +524,7 @@ impl_serdeany!(RestartHelper);
 
 impl RestartHelper {
     /// Don't allow restart
-    pub fn no_retry<S>(state: &mut S, name: &str) -> Result<bool, Error>
+    pub fn no_retry<S>(state: &mut S, name: &str) -> Result<ExecutionDecision, Error>
     where
         S: HasNamedMetadata + HasCurrentCorpusId,
     {
