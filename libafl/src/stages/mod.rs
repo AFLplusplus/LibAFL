@@ -402,7 +402,8 @@ where
         + HasCorpus
         + HasLastReportTime
         + HasCurrentCorpusId
-        + HasNamedMetadata,
+        + HasNamedMetadata
+        + HasMetadata,
     E: Executor<EM, Z> + HasObservers<Observers = OT, State = Self::State>,
     EM: EventFirer<State = Self::State>
         + EventRestarter

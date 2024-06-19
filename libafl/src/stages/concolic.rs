@@ -29,7 +29,6 @@ use crate::{
     inputs::HasMutatorBytes,
     mark_feature_time,
     observers::concolic::{ConcolicMetadata, SymExpr, SymExprRef},
-    stages::ExecutionCountRestartHelper,
     start_timer,
     state::State,
     Evaluator,
@@ -368,13 +367,21 @@ where
 }
 
 #[cfg(feature = "concolic_mutation")]
+impl<Z> Named for SimpleConcolicMutationalStage<Z> {
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("SimpleConcolicMutationalStage");
+        &NAME
+    }
+}
+
+#[cfg(feature = "concolic_mutation")]
 impl<E, EM, Z> Stage<E, EM, Z> for SimpleConcolicMutationalStage<Z>
 where
     E: UsesState<State = Self::State>,
     EM: UsesState<State = Self::State>,
     Z: Evaluator<E, EM>,
     Z::Input: HasMutatorBytes,
-    Self::State: State + HasExecutions + HasCorpus + HasMetadata,
+    Self::State: State + HasExecutions + HasCorpus + HasMetadata + HasNamedMetadata,
 {
     #[inline]
     fn perform(
@@ -398,7 +405,7 @@ where
         });
 
         if let Some(mutations) = mutations {
-            for mutation in mutations.into_iter() {
+            for mutation in mutations {
                 let mut input_copy = state.current_input_cloned()?;
                 for (index, new_byte) in mutation {
                     input_copy.bytes_mut()[index] = new_byte;

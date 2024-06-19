@@ -298,10 +298,10 @@ where
     EM: UsesState<State = <Self as UsesState>::State>,
     M: Mutator<I, <Self as UsesState>::State>,
     Z: Evaluator<E, EM>,
-    <Self as UsesState>::State: HasCorpus + HasRand + HasNamedMetadata + HasExecutions,
+    <Self as UsesState>::State:
+        HasCorpus + HasRand + HasNamedMetadata + HasExecutions + HasMetadata,
     I: MutatedTransform<Z::Input, <Self as UsesState>::State> + Clone,
 {
-    #[must_use]
     fn execs_since_progress_start(
         &mut self,
         state: &mut <Self as UsesState>::State,
