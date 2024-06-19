@@ -23,7 +23,7 @@ use crate::{
     schedulers::RemovableScheduler,
     stages::{
         mutational::{MutatedTransform, MutatedTransformPost},
-        ExecutionCountRestartHelper, Stage, StageResult,
+        ExecutionCountRestartHelper, ExecutionDecision, Stage, StageResult,
     },
     start_timer,
     state::{
@@ -245,7 +245,7 @@ where
     M: Mutator<Self::Input, Self::State>,
     IP: MutatedTransformPost<Self::State> + Clone,
 {
-    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_run(&mut self, state: &mut Self::State) -> Result<ExecutionDecision, Error> {
         self.restart_helper.should_run(state)
     }
 

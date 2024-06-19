@@ -79,7 +79,18 @@ pub mod tuneable;
 #[cfg(feature = "unicode")]
 pub mod unicode;
 
-/// Decide what to do with the stage execution result
+/// Decide on what to do after evaluating `should_run`
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum ExecutionDecision {
+    /// Continue executing the stage
+    Continue,
+    /// Stop executing this stage,
+    Stop,
+    /// Abort all the stages
+    Abort,
+}
+
+/// Decide on what to do with the stage execution result
 #[derive(Copy, Clone, Debug)]
 pub enum StageResult {
     /// Continue execution onto the next stage.
@@ -101,7 +112,7 @@ where
     /// On restart, this will be called again.
     /// As long as [`Stage::clear_progress`], all subsequent calls happen on restart.
     /// Returns `true`, if the stage's [`Stage::perform`] method should run, else `false`.
-    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error>;
+    fn should_run(&mut self, state: &mut Self::State) -> Result<ExecutionDecision, Error>;
 
     /// Clear the current status tracking of the associated stage
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error>;
@@ -128,11 +139,12 @@ where
         state: &mut Self::State,
         manager: &mut EM,
     ) -> Result<StageResult, Error> {
-        let ret = if self.should_run(state)? {
-            self.perform(fuzzer, executor, state, manager)?
-        } else {
-            StageResult::Success
+        let ret = match self.should_run(state)? {
+            ExecutionDecision::Continue => self.perform(fuzzer, executor, state, manager)?,
+            ExecutionDecision::Stop => StageResult::Success,
+            ExecutionDecision::Abort => StageResult::Abort,
         };
+
         self.clear_progress(state)?;
         Ok(ret)
     }
@@ -304,9 +316,8 @@ where
     ) -> Result<StageResult, Error> {
         for stage in self.iter_mut() {
             let res = stage.perform_restartable(fuzzer, executor, state, manager)?;
-            match res {
-                StageResult::Abort => return Ok(res),
-                StageResult::Success => (), // do nothing
+            if let StageResult::Abort = res {
+                return Ok(res);
             }
         }
         Ok(StageResult::Success)
@@ -357,7 +368,7 @@ where
     }
 
     #[inline]
-    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_run(&mut self, state: &mut Self::State) -> Result<ExecutionDecision, Error> {
         // There's no restart safety in the content of the closure.
         // don't restart
         RestartHelper::zero(state, &self.name)
@@ -490,7 +501,7 @@ where
     }
 
     #[inline]
-    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_run(&mut self, state: &mut Self::State) -> Result<ExecutionDecision, Error> {
         // TODO: Proper restart handling - call post_exec at the right time, etc...
         RestartHelper::zero(state, &self.name)
     }
@@ -513,7 +524,7 @@ impl_serdeany!(RestartHelper);
 
 impl RestartHelper {
     /// Don't allow restart
-    pub fn zero<S>(state: &mut S, name: &str) -> Result<bool, Error>
+    pub fn zero<S>(state: &mut S, name: &str) -> Result<ExecutionDecision, Error>
     where
         S: HasNamedMetadata + HasCurrentCorpusId,
     {
@@ -523,7 +534,11 @@ impl RestartHelper {
     /// Initializes (or counts down in) the progress helper, giving it the amount of max retries
     ///
     /// Returns `true` if the stage should run
-    pub fn should_run<S>(state: &mut S, name: &str, max_retries: usize) -> Result<bool, Error>
+    pub fn should_run<S>(
+        state: &mut S,
+        name: &str,
+        max_retries: usize,
+    ) -> Result<ExecutionDecision, Error>
     where
         S: HasNamedMetadata + HasCurrentCorpusId,
     {
@@ -552,12 +567,12 @@ impl RestartHelper {
 
         Ok(if tries_remaining == 0 {
             metadata.skipped.insert(corpus_idx);
-            false
+            ExecutionDecision::Stop
         } else if metadata.skipped.contains(&corpus_idx) {
             // skip this testcase, we already retried it often enough...
-            false
+            ExecutionDecision::Stop
         } else {
-            true
+            ExecutionDecision::Continue
         })
     }
 
@@ -664,7 +679,7 @@ impl ExecutionCountRestartHelper {
     }
 
     /// Initialize progress for the stage this wrapper wraps.
-    pub fn should_run<S>(&mut self, state: &mut S) -> Result<bool, Error>
+    pub fn should_run<S>(&mut self, state: &mut S) -> Result<ExecutionDecision, Error>
     where
         S: HasMetadata + HasExecutions,
     {
@@ -673,7 +688,7 @@ impl ExecutionCountRestartHelper {
             started_at_execs: executions,
         });
         self.started_at_execs = Some(metadata.started_at_execs);
-        Ok(true)
+        Ok(ExecutionDecision::Continue)
     }
 
     /// Clear progress for the stage this wrapper wraps.
@@ -699,7 +714,7 @@ pub mod test {
     use crate::{
         corpus::{Corpus, HasCurrentCorpusId, Testcase},
         inputs::NopInput,
-        stages::{RestartHelper, Stage, StageResult},
+        stages::{ExecutionDecision, RestartHelper, Stage, StageResult},
         state::{test::test_std_state, HasCorpus, State, UsesState},
         HasMetadata,
     };
@@ -718,7 +733,7 @@ pub mod test {
 
     impl TestProgress {
         #[allow(clippy::unnecessary_wraps)]
-        fn should_run<S, ST>(state: &mut S, _stage: &ST) -> Result<bool, Error>
+        fn should_run<S, ST>(state: &mut S, _stage: &ST) -> Result<ExecutionDecision, Error>
         where
             S: HasMetadata,
         {
@@ -731,7 +746,7 @@ pub mod test {
                 "Test failed; we resumed a succeeded stage!"
             );
 
-            Ok(true)
+            Ok(ExecutionDecision::Continue)
         }
 
         fn clear_progress<S, ST>(state: &mut S, _stage: &ST) -> Result<(), Error>
@@ -771,7 +786,7 @@ pub mod test {
             Ok(StageResult::Success)
         }
 
-        fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        fn should_run(&mut self, state: &mut Self::State) -> Result<ExecutionDecision, Error> {
             TestProgress::should_run(state, self)
         }
 
@@ -807,29 +822,42 @@ pub mod test {
 
         for _ in 0..10 {
             // used normally, no retries means we never skip
-            assert!(RestartHelper::should_run(&mut state, stage.name(), 1)?);
+            assert!(
+                RestartHelper::should_run(&mut state, stage.name(), 1)?
+                    == ExecutionDecision::Continue
+            );
             RestartHelper::clear_progress(&mut state, stage.name())?;
         }
 
         for _ in 0..10 {
             // used normally, only one retry means we never skip
-            assert!(RestartHelper::should_run(&mut state, stage.name(), 2)?);
-            assert!(RestartHelper::should_run(&mut state, stage.name(), 2)?);
+            assert!(
+                RestartHelper::should_run(&mut state, stage.name(), 2)?
+                    == ExecutionDecision::Continue
+            );
+            assert!(
+                RestartHelper::should_run(&mut state, stage.name(), 2)?
+                    == ExecutionDecision::Continue
+            );
             RestartHelper::clear_progress(&mut state, stage.name())?;
         }
 
-        assert!(RestartHelper::should_run(&mut state, stage.name(), 2)?);
+        assert!(
+            RestartHelper::should_run(&mut state, stage.name(), 2)? == ExecutionDecision::Continue
+        );
         // task failed, let's resume
         // we still have one more try!
-        assert!(RestartHelper::should_run(&mut state, stage.name(), 2)?);
+        assert!(
+            RestartHelper::should_run(&mut state, stage.name(), 2)? == ExecutionDecision::Continue
+        );
 
         // task failed, let's resume
         // out of retries, so now we skip
-        assert!(!RestartHelper::should_run(&mut state, stage.name(), 2)?);
+        assert!(RestartHelper::should_run(&mut state, stage.name(), 2)? == ExecutionDecision::Stop);
         RestartHelper::clear_progress(&mut state, stage.name())?;
 
         // we previously exhausted this testcase's retries, so we skip
-        assert!(!RestartHelper::should_run(&mut state, stage.name(), 2)?);
+        assert!(RestartHelper::should_run(&mut state, stage.name(), 2)? == ExecutionDecision::Stop);
         RestartHelper::clear_progress(&mut state, stage.name())?;
 
         Ok(())

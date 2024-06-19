@@ -19,7 +19,7 @@ use crate::{
     mark_feature_time,
     observers::{CanTrack, MapObserver, ObserversTuple},
     require_novelties_tracking,
-    stages::{RestartHelper, Stage, StageResult},
+    stages::{ExecutionDecision, RestartHelper, Stage, StageResult},
     start_timer,
     state::{HasCorpus, HasExecutions, UsesState},
     Error, HasMetadata, HasNamedMetadata,
@@ -326,7 +326,7 @@ where
     }
 
     #[inline]
-    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_run(&mut self, state: &mut Self::State) -> Result<ExecutionDecision, Error> {
         // TODO: We need to be able to resume better if something crashes or times out
         RestartHelper::should_run(state, &self.name, 3)
     }

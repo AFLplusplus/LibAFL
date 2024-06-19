@@ -12,7 +12,7 @@ use crate::{
     inputs::Input,
     mark_feature_time,
     mutators::{MultiMutator, MutationResult, Mutator},
-    stages::{RestartHelper, Stage, StageResult},
+    stages::{ExecutionDecision, RestartHelper, Stage, StageResult},
     start_timer,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
     Error, HasMetadata, HasNamedMetadata,
@@ -220,8 +220,8 @@ where
         Ok(StageResult::Success)
     }
 
-    fn should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
-        Ok(true)
+    fn should_run(&mut self, _state: &mut Self::State) -> Result<ExecutionDecision, Error> {
+        Ok(ExecutionDecision::Continue)
         // self.restart_helper.should_run(state)
     }
 
@@ -308,7 +308,7 @@ where
     I: MutatedTransform<Self::Input, Self::State> + Clone,
 {
     #[inline]
-    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_run(&mut self, state: &mut Self::State) -> Result<ExecutionDecision, Error> {
         // Make sure we don't get stuck crashing on a single testcase
         RestartHelper::should_run(state, &self.name, 3)
     }

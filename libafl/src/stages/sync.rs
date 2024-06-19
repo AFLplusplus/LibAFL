@@ -20,7 +20,7 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, UsesInput},
-    stages::{RestartHelper, Stage, StageResult},
+    stages::{ExecutionDecision, RestartHelper, Stage, StageResult},
     state::{HasCorpus, HasExecutions, HasRand, State, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -149,7 +149,7 @@ where
     }
 
     #[inline]
-    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_run(&mut self, state: &mut Self::State) -> Result<ExecutionDecision, Error> {
         // TODO: Needs proper crash handling for when an imported testcase crashes
         // For now, Make sure we don't get stuck crashing on this testcase
         RestartHelper::zero(state, &self.name)
@@ -367,9 +367,9 @@ where
     }
 
     #[inline]
-    fn should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+    fn should_run(&mut self, _state: &mut Self::State) -> Result<ExecutionDecision, Error> {
         // No restart handling needed - does not execute the target.
-        Ok(true)
+        Ok(ExecutionDecision::Continue)
     }
 
     #[inline]

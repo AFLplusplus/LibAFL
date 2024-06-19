@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     corpus::{Corpus, CorpusId},
     inputs::UsesInput,
-    stages::{Stage, StageResult},
+    stages::{ExecutionDecision, Stage, StageResult},
     state::{HasCorpus, HasRand, HasSolutions, UsesState},
     Error, HasMetadata,
 };
@@ -115,9 +115,9 @@ where
     }
 
     #[inline]
-    fn should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+    fn should_run(&mut self, _state: &mut Self::State) -> Result<ExecutionDecision, Error> {
         // Not executing the target, so restart safety is not needed
-        Ok(true)
+        Ok(ExecutionDecision::Continue)
     }
 
     #[inline]

@@ -20,7 +20,7 @@ use crate::state::HasClientPerfMonitor;
 use crate::{
     executors::{Executor, HasObservers},
     observers::concolic::ConcolicObserver,
-    stages::{RestartHelper, Stage, StageResult, TracingStage},
+    stages::{ExecutionDecision, RestartHelper, Stage, StageResult, TracingStage},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -85,7 +85,7 @@ where
         Ok(StageResult::Success)
     }
 
-    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_run(&mut self, state: &mut Self::State) -> Result<ExecutionDecision, Error> {
         // This is a deterministic stage
         // Once it failed, then don't retry,
         // It will just fail again
@@ -429,7 +429,7 @@ where
     }
 
     #[inline]
-    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_run(&mut self, state: &mut Self::State) -> Result<ExecutionDecision, Error> {
         // This is a deterministic stage
         // Once it failed, then don't retry,
         // It will just fail again

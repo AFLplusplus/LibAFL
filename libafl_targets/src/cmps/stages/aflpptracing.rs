@@ -5,7 +5,7 @@ use libafl::{
     executors::{Executor, HasObservers},
     inputs::{BytesInput, UsesInput},
     observers::ObserversTuple,
-    stages::{colorization::TaintMetadata, RestartHelper, Stage, StageResult},
+    stages::{colorization::TaintMetadata, RestartHelper, Stage, StageResult, ExecutionDecision},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -124,7 +124,7 @@ where
         Ok(StageResult::Success)
     }
 
-    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_run(&mut self, state: &mut Self::State) -> Result<ExecutionDecision, Error> {
         // Tracing stage is always deterministic
         // don't restart
         RestartHelper::zero(state, &self.name)

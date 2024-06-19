@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     corpus::HasTestcase,
     inputs::{BytesInput, HasMutatorBytes},
-    stages::{Stage, StageResult},
+    stages::{ExecutionDecision, Stage, StageResult},
     state::{HasCorpus, HasCurrentTestcase, State, UsesState},
     HasMetadata,
 };
@@ -127,9 +127,9 @@ where
     }
 
     #[inline]
-    fn should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+    fn should_run(&mut self, _state: &mut Self::State) -> Result<ExecutionDecision, Error> {
         // Stage does not run the target. No reset helper needed.
-        Ok(true)
+        Ok(ExecutionDecision::Continue)
     }
 
     #[inline]

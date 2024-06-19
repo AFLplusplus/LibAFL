@@ -11,6 +11,7 @@ use libafl_bolts::{current_time, impl_serdeany, tuples::Handle, AsIter, Named};
 use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
 
+use super::ExecutionDecision;
 use crate::{
     corpus::{Corpus, SchedulerTestcaseMetadata},
     events::{Event, EventFirer, LogSeverity},
@@ -350,7 +351,7 @@ where
         Ok(StageResult::Success)
     }
 
-    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_run(&mut self, state: &mut Self::State) -> Result<ExecutionDecision, Error> {
         // Calibration stage disallow restarts
         // If a testcase that causes crash/timeout in the queue, we need to remove it from the queue immediately.
         RestartHelper::zero(state, &self.name)

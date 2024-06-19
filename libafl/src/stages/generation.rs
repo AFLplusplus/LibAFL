@@ -7,7 +7,7 @@ use core::marker::PhantomData;
 use crate::{
     generators::Generator,
     inputs::UsesInput,
-    stages::{Stage, StageResult},
+    stages::{ExecutionDecision, Stage, StageResult},
     state::{HasCorpus, HasRand, UsesState},
     Error, Evaluator,
 };
@@ -54,10 +54,10 @@ where
         Ok(StageResult::Success)
     }
 
-    fn should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+    fn should_run(&mut self, _state: &mut Self::State) -> Result<ExecutionDecision, Error> {
         // It's a random generation stage
         // so you can restart for whatever times you want
-        Ok(true)
+        Ok(ExecutionDecision::Continue)
     }
 
     fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {

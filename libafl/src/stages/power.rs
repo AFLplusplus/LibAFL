@@ -10,7 +10,10 @@ use crate::{
     fuzzer::Evaluator,
     mutators::Mutator,
     schedulers::{testcase_score::CorpusPowerTestcaseScore, TestcaseScore},
-    stages::{mutational::MutatedTransform, MutationalStage, RestartHelper, Stage, StageResult},
+    stages::{
+        mutational::MutatedTransform, ExecutionDecision, MutationalStage, RestartHelper, Stage,
+        StageResult,
+    },
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -95,7 +98,7 @@ where
         Ok(StageResult::Success)
     }
 
-    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_run(&mut self, state: &mut Self::State) -> Result<ExecutionDecision, Error> {
         // Make sure we don't get stuck crashing on a single testcase
         RestartHelper::should_run(state, &self.name, 3)
     }

@@ -9,7 +9,7 @@ use crate::{
     executors::{Executor, HasObservers, ShadowExecutor},
     mark_feature_time,
     observers::ObserversTuple,
-    stages::{RestartHelper, Stage, StageResult},
+    stages::{ExecutionDecision, RestartHelper, Stage, StageResult},
     start_timer,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, State, UsesState},
     Error, HasNamedMetadata,
@@ -97,7 +97,7 @@ where
         Ok(StageResult::Success)
     }
 
-    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_run(&mut self, state: &mut Self::State) -> Result<ExecutionDecision, Error> {
         RestartHelper::zero(state, &self.name)
     }
 
@@ -206,7 +206,7 @@ where
         Ok(StageResult::Success)
     }
 
-    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_run(&mut self, state: &mut Self::State) -> Result<ExecutionDecision, Error> {
         RestartHelper::zero(state, &self.name)
     }
 

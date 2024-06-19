@@ -19,7 +19,7 @@ use crate::{
     inputs::HasMutatorBytes,
     mutators::mutations::buffer_copy,
     observers::{MapObserver, ObserversTuple},
-    stages::{RestartHelper, Stage, StageResult},
+    stages::{ExecutionDecision, RestartHelper, Stage, StageResult},
     state::{HasCorpus, HasCurrentTestcase, HasRand, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -108,7 +108,7 @@ where
         Ok(StageResult::Success)
     }
 
-    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_run(&mut self, state: &mut Self::State) -> Result<ExecutionDecision, Error> {
         // This is a deterministic stage
         // Once it failed, then don't retry,
         // It will just fail again

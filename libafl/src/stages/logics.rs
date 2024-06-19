@@ -3,7 +3,10 @@
 use core::marker::PhantomData;
 
 use crate::{
-    stages::{HasCurrentStage, HasNestedStageStatus, Stage, StageId, StageResult, StagesTuple},
+    stages::{
+        ExecutionDecision, HasCurrentStage, HasNestedStageStatus, Stage, StageId, StageResult,
+        StagesTuple,
+    },
     state::UsesState,
     Error,
 };
@@ -13,12 +16,12 @@ use crate::{
 pub struct NestedStageRestartHelper;
 
 impl NestedStageRestartHelper {
-    fn should_run<S, ST>(state: &mut S, _stage: &ST) -> Result<bool, Error>
+    fn should_run<S, ST>(state: &mut S, _stage: &ST) -> Result<ExecutionDecision, Error>
     where
         S: HasNestedStageStatus,
     {
         state.enter_inner_stage()?;
-        Ok(true)
+        Ok(ExecutionDecision::Continue)
     }
 
     fn clear_progress<S, ST>(state: &mut S, _stage: &ST) -> Result<(), Error>
@@ -78,7 +81,7 @@ where
         Ok(res)
     }
 
-    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_run(&mut self, state: &mut Self::State) -> Result<ExecutionDecision, Error> {
         NestedStageRestartHelper::should_run(state, self)
     }
 
@@ -145,7 +148,7 @@ where
         Ok(res)
     }
 
-    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_run(&mut self, state: &mut Self::State) -> Result<ExecutionDecision, Error> {
         NestedStageRestartHelper::should_run(state, self)
     }
 
@@ -230,7 +233,7 @@ where
         Ok(res)
     }
 
-    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_run(&mut self, state: &mut Self::State) -> Result<ExecutionDecision, Error> {
         NestedStageRestartHelper::should_run(state, self)
     }
 
@@ -291,7 +294,7 @@ where
         }
     }
 
-    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_run(&mut self, state: &mut Self::State) -> Result<ExecutionDecision, Error> {
         NestedStageRestartHelper::should_run(state, self)
     }
 

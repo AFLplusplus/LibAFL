@@ -11,7 +11,7 @@ use crate::{
     mutators::{MutationResult, Mutator},
     stages::{
         mutational::{MutatedTransform, MutatedTransformPost, DEFAULT_MUTATIONAL_MAX_ITERATIONS},
-        ExecutionCountRestartHelper, MutationalStage, Stage, StageResult,
+        ExecutionCountRestartHelper, ExecutionDecision, MutationalStage, Stage, StageResult,
     },
     start_timer,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
@@ -283,7 +283,7 @@ where
         Ok(StageResult::Success)
     }
 
-    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_run(&mut self, state: &mut Self::State) -> Result<ExecutionDecision, Error> {
         self.restart_helper.should_run(state)
     }
 
