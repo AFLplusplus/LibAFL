@@ -1,6 +1,6 @@
 //! The tracing stage can trace the target and enrich a testcase with metadata, for example for `CmpLog`.
 
-use alloc::borrow::Cow;
+use alloc::borrow::{Cow, ToOwned};
 use core::{fmt::Debug, marker::PhantomData};
 
 use libafl_bolts::Named;
@@ -20,6 +20,7 @@ use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 /// A stage that runs a tracer executor
 #[derive(Clone, Debug)]
 pub struct TracingStage<EM, TE, Z> {
+    name: Cow<'static, str>,
     tracer_executor: TE,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(EM, TE, Z)>,
@@ -96,25 +97,27 @@ where
     }
 
     fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        RestartHelper::zero(state, self)
+        RestartHelper::zero(state, &self.name)
     }
 
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RestartHelper::clear_progress(state, self)
+        RestartHelper::clear_progress(state, &self.name)
     }
 }
 
 impl<EM, TE, Z> Named for TracingStage<EM, TE, Z> {
     fn name(&self) -> &Cow<'static, str> {
-        static NAME: Cow<'static, str> = Cow::Borrowed("TracingStage");
-        &NAME
+        &self.name
     }
 }
+/// The name for tracing stage
+pub static TRACING_STAGE_NAME: &str = "tracing";
 
 impl<EM, TE, Z> TracingStage<EM, TE, Z> {
     /// Creates a new default stage
-    pub fn new(tracer_executor: TE) -> Self {
+    pub fn new(tracer_executor: TE, name: &str) -> Self {
         Self {
+            name: Cow::Owned(TRACING_STAGE_NAME.to_owned() + ":" + name),
             tracer_executor,
             phantom: PhantomData,
         }
@@ -134,7 +137,7 @@ impl<EM, TE, Z> TracingStage<EM, TE, Z> {
 /// A stage that runs the shadow executor using also the shadow observers
 #[derive(Clone, Debug)]
 pub struct ShadowTracingStage<E, EM, SOT, Z> {
-    max_retries: usize,
+    name: Cow<'static, str>,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, EM, SOT, Z)>,
 }
@@ -146,13 +149,15 @@ where
     type State = E::State;
 }
 
+/// Name for shadow tracing stage
+pub static SHADOW_TRACING_STAGE_NAME: &str = "shadow";
+
 impl<E, EM, SOT, Z> Named for ShadowTracingStage<E, EM, SOT, Z>
 where
     E: UsesState,
 {
     fn name(&self) -> &Cow<'static, str> {
-        static NAME: Cow<'static, str> = Cow::Borrowed("ShadowTracingStage");
-        &NAME
+        &self.name
     }
 }
 
@@ -201,11 +206,11 @@ where
     }
 
     fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        RestartHelper::zero(state, self)
+        RestartHelper::zero(state, &self.name)
     }
 
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RestartHelper::clear_progress(state, self)
+        RestartHelper::clear_progress(state, &self.name)
     }
 }
 
@@ -218,18 +223,10 @@ where
     Z: UsesState<State = <Self as UsesState>::State>,
 {
     /// Creates a new default stage
-    pub fn new(_executor: &mut ShadowExecutor<E, SOT>) -> Self {
+    pub fn new(_executor: &mut ShadowExecutor<E, SOT>, name: &str) -> Self {
         Self {
-            max_retries: 10,
+            name: Cow::Owned(SHADOW_TRACING_STAGE_NAME.to_owned() + ":" + name),
             phantom: PhantomData,
         }
-    }
-
-    /// Specify how many times that this stage will try again to trace the input before giving up
-    /// and not processing the input again. 0 retries means that the trace will be tried only once.
-    #[must_use]
-    pub fn with_retries(mut self, retries: usize) -> Self {
-        self.max_retries = retries;
-        self
     }
 }

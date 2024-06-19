@@ -1,6 +1,6 @@
 //! The [`TMinMutationalStage`] is a stage which will attempt to minimize corpus entries.
 
-use alloc::borrow::Cow;
+use alloc::borrow::{Cow, ToOwned};
 use core::{borrow::BorrowMut, fmt::Debug, hash::Hash, marker::PhantomData};
 
 use ahash::RandomState;
@@ -29,7 +29,8 @@ use crate::{
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasMaxSize, HasSolutions, State, UsesState,
     },
-    Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasMetadata, HasScheduler,
+    Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasMetadata, HasNamedMetadata,
+    HasScheduler,
 };
 #[cfg(feature = "introspection")]
 use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
@@ -79,8 +80,12 @@ where
 
         let orig_max_size = state.max_size();
         // basically copy-pasted from mutational.rs
-        let num = self.iterations(state)?
-            - usize::try_from(self.execs_since_progress_start(state)?).unwrap();
+        let num = self.iterations(state)?.saturating_sub(usize::try_from(self.execs_since_progress_start(state)?)?);
+
+        // If num is negative, then quit.
+        if num == 0 {
+            return Ok(());
+        }
 
         start_timer!(state);
         let transformed =
@@ -203,6 +208,8 @@ where
 /// The default corpus entry minimising mutational stage
 #[derive(Clone, Debug)]
 pub struct StdTMinMutationalStage<E, EM, F, FF, IP, M, Z> {
+    /// The name
+    name: Cow<'static, str>,
     /// The mutator(s) this stage uses
     mutator: M,
     /// The factory
@@ -231,7 +238,8 @@ where
     FF: FeedbackFactory<F, E::Observers>,
     F: Feedback<Self::State>,
     Self::Input: MutatedTransform<Self::Input, Self::State, Post = IP> + Clone + HasLen + Hash,
-    Self::State: HasMetadata + HasExecutions + HasSolutions + HasCorpus + HasMaxSize,
+    Self::State:
+        HasMetadata + HasExecutions + HasSolutions + HasCorpus + HasMaxSize + HasNamedMetadata,
     M: Mutator<Self::Input, Self::State>,
     IP: MutatedTransformPost<Self::State> + Clone,
 {
@@ -270,6 +278,15 @@ where
     }
 }
 
+impl<E, EM, F, FF, IP, M, Z> Named for StdTMinMutationalStage<E, EM, F, FF, IP, M, Z> {
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
+    }
+}
+
+/// The name for tmin stage
+pub static TMIN_STAGE_NAME: &str = "tmin";
+
 impl<E, EM, F, FF, IP, M, Z> TMinMutationalStage<E, EM, F, IP, M, Z>
     for StdTMinMutationalStage<E, EM, F, FF, IP, M, Z>
 where
@@ -280,7 +297,8 @@ where
     FF: FeedbackFactory<F, E::Observers>,
     F: Feedback<Self::State>,
     Self::Input: MutatedTransform<Self::Input, Self::State, Post = IP> + Clone + HasLen + Hash,
-    Self::State: HasMetadata + HasExecutions + HasSolutions + HasCorpus + HasMaxSize,
+    Self::State:
+        HasMetadata + HasExecutions + HasSolutions + HasCorpus + HasMaxSize + HasNamedMetadata,
     M: Mutator<Self::Input, Self::State>,
     IP: MutatedTransformPost<Self::State> + Clone,
 {
@@ -302,14 +320,16 @@ where
     }
 
     fn execs_since_progress_start(&mut self, state: &mut Self::State) -> Result<u64, Error> {
-        self.restart_helper.execs_since_progress_start(state)
+        self.restart_helper
+            .execs_since_progress_start(state, &self.name)
     }
 }
 
 impl<E, EM, F, FF, IP, M, Z> StdTMinMutationalStage<E, EM, F, FF, IP, M, Z> {
     /// Creates a new minimizing mutational stage that will minimize provided corpus entries
-    pub fn new(mutator: M, factory: FF, runs: usize) -> Self {
+    pub fn new(mutator: M, factory: FF, runs: usize, name: &str) -> Self {
         Self {
+            name: Cow::Owned(TMIN_STAGE_NAME.to_owned() + ":" + name),
             mutator,
             factory,
             runs,

@@ -306,7 +306,8 @@ where
         &mut self,
         state: &mut <Self as UsesState>::State,
     ) -> Result<u64, Error> {
-        self.restart_helper.execs_since_progress_start(state)
+        self.restart_helper
+            .execs_since_progress_start(state, &self.name)
     }
 
     /// Creates a new default tuneable mutational stage

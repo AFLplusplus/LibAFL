@@ -1,6 +1,6 @@
 //! The power schedules. This stage should be invoked after the calibration stage.
 
-use alloc::borrow::Cow;
+use alloc::borrow::{Cow, ToOwned};
 use core::{fmt::Debug, marker::PhantomData};
 
 use libafl_bolts::Named;
@@ -97,11 +97,11 @@ where
 
     fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
         // Make sure we don't get stuck crashing on a single testcase
-        RestartHelper::should_run(state, self, 3)
+        RestartHelper::should_run(state, &self.name, 3)
     }
 
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RestartHelper::clear_progress(state, self)
+        RestartHelper::clear_progress(state, &self.name)
     }
 }
 
@@ -115,9 +115,9 @@ where
     Z: Evaluator<E, EM, State = <Self as UsesState>::State>,
 {
     /// Creates a new [`PowerMutationalStage`]
-    pub fn new(mutator: M) -> Self {
+    pub fn new(mutator: M, name: &str) -> Self {
         Self {
-            name: Cow::Borrowed(POWER_MUTATIONAL_STAGE_NAME),
+            name: Cow::Owned(POWER_MUTATIONAL_STAGE_NAME.to_owned() + ":" + name),
             mutator,
             phantom: PhantomData,
         }

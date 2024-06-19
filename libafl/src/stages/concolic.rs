@@ -2,7 +2,7 @@
 //! and use the results for fuzzer input and mutations.
 //!
 
-use alloc::borrow::Cow;
+use alloc::borrow::{Cow, ToOwned};
 #[cfg(feature = "concolic_mutation")]
 use alloc::{string::ToString, vec::Vec};
 #[cfg(feature = "concolic_mutation")]
@@ -37,6 +37,7 @@ use crate::{
 /// Wraps a [`TracingStage`] to add concolic observing.
 #[derive(Clone, Debug)]
 pub struct ConcolicTracingStage<'a, EM, TE, Z> {
+    name: Cow<'static, str>,
     inner: TracingStage<EM, TE, Z>,
     observer_handle: Handle<ConcolicObserver<'a>>,
 }
@@ -48,10 +49,12 @@ where
     type State = TE::State;
 }
 
+/// The name for concolic tracer
+pub const CONCOLIC_TRACING_STAGE_NAME: &str = "concolictracing";
+
 impl<EM, TE, Z> Named for ConcolicTracingStage<'_, EM, TE, Z> {
     fn name(&self) -> &Cow<'static, str> {
-        static NAME: Cow<'static, str> = Cow::Borrowed("ConcolicTracingStage");
-        &NAME
+        &self.name
     }
 }
 
@@ -86,11 +89,11 @@ where
         // This is a deterministic stage
         // Once it failed, then don't retry,
         // It will just fail again
-        RestartHelper::zero(state, self)
+        RestartHelper::zero(state, &self.name)
     }
 
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RestartHelper::clear_progress(state, self)
+        RestartHelper::clear_progress(state, &self.name)
     }
 }
 
@@ -101,9 +104,13 @@ impl<'a, EM, TE, Z> ConcolicTracingStage<'a, EM, TE, Z> {
         inner: TracingStage<EM, TE, Z>,
         observer_handle: Handle<ConcolicObserver<'a>>,
     ) -> Self {
+        let observer_name = observer_handle.name().clone();
         Self {
             inner,
             observer_handle,
+            name: Cow::Owned(
+                CONCOLIC_TRACING_STAGE_NAME.to_owned() + ":" + observer_name.into_owned().as_str(),
+            ),
         }
     }
 }
@@ -355,6 +362,7 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
 #[cfg(feature = "concolic_mutation")]
 #[derive(Clone, Debug)]
 pub struct SimpleConcolicMutationalStage<Z> {
+    name: Cow<'static, str>,
     phantom: PhantomData<Z>,
 }
 
@@ -367,10 +375,13 @@ where
 }
 
 #[cfg(feature = "concolic_mutation")]
+/// The name for concolic mutation stage
+pub const SIMPLE_CONCOLIC_MUTATIONAL_NAME: &str = "concolicmutation";
+
+#[cfg(feature = "concolic_mutation")]
 impl<Z> Named for SimpleConcolicMutationalStage<Z> {
     fn name(&self) -> &Cow<'static, str> {
-        static NAME: Cow<'static, str> = Cow::Borrowed("SimpleConcolicMutationalStage");
-        &NAME
+        &self.name
     }
 }
 
@@ -422,19 +433,21 @@ where
         // This is a deterministic stage
         // Once it failed, then don't retry,
         // It will just fail again
-        RestartHelper::zero(state, self)
+        RestartHelper::zero(state, &self.name)
     }
 
     #[inline]
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RestartHelper::clear_progress(state, self)
+        RestartHelper::clear_progress(state, &self.name)
     }
 }
 
 #[cfg(feature = "concolic_mutation")]
-impl<Z> Default for SimpleConcolicMutationalStage<Z> {
-    fn default() -> Self {
+impl<Z> SimpleConcolicMutationalStage<Z> {
+    #[must_use]
+    pub fn new(name: &str) -> Self {
         Self {
+            name: Cow::Owned(SIMPLE_CONCOLIC_MUTATIONAL_NAME.to_owned() + ":" + name),
             phantom: PhantomData,
         }
     }

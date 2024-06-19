@@ -1,7 +1,7 @@
 //| The [`MutationalStage`] is the default stage used during fuzzing.
 //! For the current input, it will perform a range of random mutations, and then run them in the executor.
 
-use alloc::borrow::Cow;
+use alloc::borrow::{Cow, ToOwned};
 use core::marker::PhantomData;
 
 use libafl_bolts::{rands::Rand, Named};
@@ -276,10 +276,14 @@ where
 /// A mutational stage that operates on multiple inputs, as returned by [`MultiMutator::multi_mutate`].
 #[derive(Clone, Debug)]
 pub struct MultiMutationalStage<E, EM, I, M, Z> {
+    name: Cow<'static, str>,
     mutator: M,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, EM, I, Z)>,
 }
+
+/// The name for multi mutational stage
+pub static MULTI_MUTATIONAL_STAGE: &str = "multimutational";
 
 impl<E, EM, I, M, Z> UsesState for MultiMutationalStage<E, EM, I, M, Z>
 where
@@ -290,8 +294,7 @@ where
 
 impl<E, EM, I, M, Z> Named for MultiMutationalStage<E, EM, I, M, Z> {
     fn name(&self) -> &Cow<'static, str> {
-        static NAME: Cow<'static, str> = Cow::Borrowed("MultiMutational");
-        &NAME
+        &self.name
     }
 }
 
@@ -307,12 +310,12 @@ where
     #[inline]
     fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
         // Make sure we don't get stuck crashing on a single testcase
-        RestartHelper::should_run(state, self, 3)
+        RestartHelper::should_run(state, &self.name, 3)
     }
 
     #[inline]
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RestartHelper::clear_progress(state, self)
+        RestartHelper::clear_progress(state, &self.name)
     }
 
     #[inline]
@@ -351,15 +354,16 @@ where
     Z: UsesState,
 {
     /// Creates a new [`MultiMutationalStage`]
-    pub fn new(mutator: M) -> Self {
-        Self::transforming(mutator)
+    pub fn new(mutator: M, name: &str) -> Self {
+        Self::transforming(mutator, name)
     }
 }
 
 impl<E, EM, I, M, Z> MultiMutationalStage<E, EM, I, M, Z> {
     /// Creates a new transforming mutational stage
-    pub fn transforming(mutator: M) -> Self {
+    pub fn transforming(mutator: M, name: &str) -> Self {
         Self {
+            name: Cow::Owned(MULTI_MUTATIONAL_STAGE.to_owned() + ":" + name),
             mutator,
             phantom: PhantomData,
         }

@@ -219,7 +219,7 @@ fn fuzz(
                 concolic_ref,
             ),
             // Use the concolic trace for z3-based solving
-            SimpleConcolicMutationalStage::default(),
+            SimpleConcolicMutationalStage::new("concolic"),
         );
 
         fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut restarting_mgr)?;

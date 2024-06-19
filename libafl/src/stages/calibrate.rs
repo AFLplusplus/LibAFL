@@ -1,6 +1,9 @@
 //! The calibration stage. The fuzzer measures the average exec time and the bitmap size.
 
-use alloc::{borrow::Cow, vec::Vec};
+use alloc::{
+    borrow::{Cow, ToOwned},
+    vec::Vec,
+};
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
 
 use hashbrown::HashSet;
@@ -350,7 +353,7 @@ where
     fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
         // Calibration stage disallow restarts
         // If a testcase that causes crash/timeout in the queue, we need to remove it from the queue immediately.
-        RestartHelper::zero(state, self)
+        RestartHelper::zero(state, &self.name)
 
         // todo
         // remove this guy from corpus queue
@@ -358,7 +361,7 @@ where
 
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
         // TODO: Make sure this is the correct way / there may be a better way?
-        RestartHelper::clear_progress(state, self)
+        RestartHelper::clear_progress(state, &self.name)
     }
 }
 
@@ -376,13 +379,16 @@ where
     where
         F: HasObserverHandle<Observer = C> + Named,
     {
+        let map_name = map_feedback.name().clone();
         Self {
             map_observer_handle: map_feedback.observer_handle().clone(),
-            map_name: map_feedback.name().clone(),
+            map_name: map_name.clone(),
             stage_max: CAL_STAGE_START,
             track_stability: true,
             phantom: PhantomData,
-            name: Cow::Borrowed(CALIBRATION_STAGE_NAME),
+            name: Cow::Owned(
+                CALIBRATION_STAGE_NAME.to_owned() + ":" + map_name.into_owned().as_str(),
+            ),
         }
     }
 
@@ -392,14 +398,9 @@ where
     where
         F: HasObserverHandle<Observer = C> + Named,
     {
-        Self {
-            map_observer_handle: map_feedback.observer_handle().clone(),
-            map_name: map_feedback.name().clone(),
-            stage_max: CAL_STAGE_START,
-            track_stability: false,
-            phantom: PhantomData,
-            name: Cow::Borrowed(CALIBRATION_STAGE_NAME),
-        }
+        let mut ret = Self::new(map_feedback);
+        ret.track_stability = false;
+        ret
     }
 }
 

@@ -1,6 +1,6 @@
 //! The [`SyncFromDiskStage`] is a stage that imports inputs from disk for e.g. sync with AFL
 
-use alloc::borrow::Cow;
+use alloc::borrow::{Cow, ToOwned};
 use core::marker::PhantomData;
 use std::{
     fs,
@@ -152,21 +152,21 @@ where
     fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
         // TODO: Needs proper crash handling for when an imported testcase crashes
         // For now, Make sure we don't get stuck crashing on this testcase
-        RestartHelper::zero(state, self)
+        RestartHelper::zero(state, &self.name)
     }
 
     #[inline]
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RestartHelper::clear_progress(state, self)
+        RestartHelper::clear_progress(state, &self.name)
     }
 }
 
 impl<CB, E, EM, Z> SyncFromDiskStage<CB, E, EM, Z> {
     /// Creates a new [`SyncFromDiskStage`]
     #[must_use]
-    pub fn new(sync_dir: PathBuf, load_callback: CB) -> Self {
+    pub fn new(sync_dir: PathBuf, load_callback: CB, name: &str) -> Self {
         Self {
-            name: Cow::Borrowed(SYNC_FROM_DISK_STAGE_NAME),
+            name: Cow::Owned(SYNC_FROM_DISK_STAGE_NAME.to_owned() + ":" + name),
             phantom: PhantomData,
             sync_dir,
             load_callback,
