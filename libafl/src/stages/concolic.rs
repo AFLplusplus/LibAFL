@@ -445,6 +445,7 @@ where
 #[cfg(feature = "concolic_mutation")]
 impl<Z> SimpleConcolicMutationalStage<Z> {
     #[must_use]
+    /// Construct this stage
     pub fn new(name: &str) -> Self {
         Self {
             name: Cow::Owned(SIMPLE_CONCOLIC_MUTATIONAL_NAME.to_owned() + ":" + name),

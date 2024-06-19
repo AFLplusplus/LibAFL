@@ -273,9 +273,6 @@ jobs:
         run: ./scripts/check_tested_fuzzers.sh
 
   fuzzers:
-    needs:
-      - ubuntu
-      - fuzzers-preflight
     strategy:
       fail-fast: false
       matrix:
