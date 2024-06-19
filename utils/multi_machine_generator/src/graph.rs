@@ -3,10 +3,8 @@ use std::net::SocketAddr;
 use petgraph::{graph::NodeIndex, Direction, Graph};
 
 /// A node of the network
-#[derive(Debug, Clone)]
-pub struct MultiMachineNode {
-    addr: SocketAddr,
-}
+#[derive(Debug, Clone, Default)]
+pub struct MultiMachineNode {}
 
 /// The tree
 pub struct MultiMachineTree {
@@ -14,8 +12,9 @@ pub struct MultiMachineTree {
 }
 
 impl MultiMachineNode {
-    pub fn new(addr: SocketAddr) -> Self {
-        Self { addr }
+    #[must_use]
+    pub fn new() -> Self {
+        Self {}
     }
 }
 
@@ -24,13 +23,13 @@ impl MultiMachineTree {
     ///
     ///
     /// - machines: machines to add.
-    /// - max_children_per_parent: each parent will have at most this amount of children
+    /// - `max_children_per_parent`: each parent will have at most this amount of children
     pub fn generate(machines: &[SocketAddr], max_children_per_parent: u64) -> Self {
         let mut graph = Graph::<MultiMachineNode, ()>::new();
         let mut machines = Vec::from(machines);
 
-        let root = if let Some(root) = machines.pop() {
-            graph.add_node(MultiMachineNode::new(root))
+        let root = if let Some(_root) = machines.pop() {
+            graph.add_node(MultiMachineNode::new())
         } else {
             return Self { graph };
         };
@@ -43,7 +42,7 @@ impl MultiMachineTree {
         let mut nodes_to_populate_later: Vec<NodeIndex> = Vec::new();
 
         // place all the machines in the graph
-        while let Some(machine) = machines.pop() {
+        while let Some(_machine) = machines.pop() {
             if graph.nb_children(nodes_to_populate_now[populate_idx as usize])
                 == max_children_per_parent
             {
@@ -53,7 +52,7 @@ impl MultiMachineTree {
 
             let new_child = graph.add_child(
                 nodes_to_populate_now[populate_idx as usize],
-                MultiMachineNode::new(machine),
+                MultiMachineNode::new(),
             );
             nodes_to_populate_later.push(new_child);
 

@@ -40,5 +40,5 @@ fn main() {
 
     let dot = Dot::new(&multi_machine_graph.graph);
 
-    fs::write("multi_machine.dot", format!("{:?}", dot)).unwrap();
+    fs::write("multi_machine.dot", format!("{dot:?}", dot)).unwrap();
 }

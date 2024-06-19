@@ -347,6 +347,7 @@ fn fuzz(
             timeout * 10,
         )?,
         // Give it more time!
+        "tracing",
     );
 
     // The order of the stages matter!
