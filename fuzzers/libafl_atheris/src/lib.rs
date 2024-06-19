@@ -216,13 +216,16 @@ pub extern "C" fn LLVMFuzzerRunDriver(
         };
 
         // Setup a tracing stage in which we log comparisons
-        let tracing = TracingStage::new(InProcessExecutor::new(
-            &mut harness,
-            tuple_list!(cmplog_observer),
-            &mut fuzzer,
-            &mut state,
-            &mut mgr,
-        )?);
+        let tracing = TracingStage::new(
+            InProcessExecutor::new(
+                &mut harness,
+                tuple_list!(cmplog_observer),
+                &mut fuzzer,
+                &mut state,
+                &mut mgr,
+            )?,
+            "tracing",
+        );
 
         // Setup a randomic Input2State stage
         let i2s =

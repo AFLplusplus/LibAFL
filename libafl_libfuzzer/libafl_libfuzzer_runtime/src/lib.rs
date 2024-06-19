@@ -474,7 +474,7 @@ macro_rules! fuzz_with {
                 &mut fuzzer,
                 &mut state,
                 &mut mgr,
-            )?), ()));
+            )?, "tracing"), ()));
 
             // The order of the stages matter!
             let mut stages = tuple_list!(

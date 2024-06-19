@@ -214,7 +214,8 @@ fn fuzz(
             // Create a concolic trace
             ConcolicTracingStage::new(
                 TracingStage::new(
-                    MyCommandConfigurator.into_executor(tuple_list!(concolic_observer))
+                    MyCommandConfigurator.into_executor(tuple_list!(concolic_observer)),
+                    "tracing",
                 ),
                 concolic_ref,
             ),
