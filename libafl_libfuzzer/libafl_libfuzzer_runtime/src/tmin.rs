@@ -88,6 +88,7 @@ fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
                 } else {
                     options.runs()
                 },
+                "tmin",
             );
             let mut stages = tuple_list!(tmin);
             fuzzer.fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr)?;
@@ -102,6 +103,7 @@ fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
                 } else {
                     options.runs()
                 },
+                "tmin",
             );
             let mut stages = tuple_list!(tmin);
             fuzzer.fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr)?;

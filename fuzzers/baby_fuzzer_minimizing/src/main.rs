@@ -98,7 +98,7 @@ pub fn main() -> Result<(), Error> {
     let minimizer = StdScheduledMutator::new(havoc_mutations::<BytesInput>());
     let mut stages = tuple_list!(
         StdMutationalStage::new(mutator),
-        StdTMinMutationalStage::new(minimizer, factory, 128)
+        StdTMinMutationalStage::new(minimizer, factory, 128, "tmin")
     );
 
     while state.solutions().is_empty() {
