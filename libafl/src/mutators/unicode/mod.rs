@@ -51,9 +51,9 @@ impl<S> MutatedTransformPost<S> for UnicodeIdentificationMetadata
 where
     S: HasTestcase,
 {
-    fn post_exec(self, state: &mut S, corpus_idx: Option<CorpusId>) -> Result<(), Error> {
-        if let Some(corpus_idx) = corpus_idx {
-            let mut tc = state.testcase_mut(corpus_idx)?;
+    fn post_exec(self, state: &mut S, corpus_id: Option<CorpusId>) -> Result<(), Error> {
+        if let Some(corpus_id) = corpus_id {
+            let mut tc = state.testcase_mut(corpus_id)?;
             tc.add_metadata(self);
         }
         Ok(())

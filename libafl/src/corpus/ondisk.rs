@@ -102,8 +102,8 @@ where
 
     /// Replaces the testcase at the given idx
     #[inline]
-    fn replace(&mut self, idx: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
-        self.inner.replace(idx, testcase)
+    fn replace(&mut self, id: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
+        self.inner.replace(id, testcase)
     }
 
     /// Peek the next free corpus id
@@ -114,20 +114,20 @@ where
 
     /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases
     #[inline]
-    fn remove(&mut self, idx: CorpusId) -> Result<Testcase<I>, Error> {
-        self.inner.remove(idx)
+    fn remove(&mut self, id: CorpusId) -> Result<Testcase<I>, Error> {
+        self.inner.remove(id)
     }
 
     /// Get by id; will check the disabled corpus if not available in the enabled
     #[inline]
-    fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
-        self.inner.get(idx)
+    fn get(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
+        self.inner.get(id)
     }
 
     /// Get by id; considers both enabled and disabled testcases
     #[inline]
-    fn get_from_all(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
-        self.inner.get_from_all(idx)
+    fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
+        self.inner.get_from_all(id)
     }
 
     /// Current testcase scheduled
@@ -143,13 +143,13 @@ where
     }
 
     #[inline]
-    fn next(&self, idx: CorpusId) -> Option<CorpusId> {
-        self.inner.next(idx)
+    fn next(&self, id: CorpusId) -> Option<CorpusId> {
+        self.inner.next(id)
     }
 
     #[inline]
-    fn prev(&self, idx: CorpusId) -> Option<CorpusId> {
-        self.inner.prev(idx)
+    fn prev(&self, id: CorpusId) -> Option<CorpusId> {
+        self.inner.prev(id)
     }
 
     #[inline]

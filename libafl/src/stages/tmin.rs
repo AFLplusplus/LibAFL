@@ -71,7 +71,7 @@ where
         state: &mut Self::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        let Some(base_corpus_idx) = state.current_corpus_id()? else {
+        let Some(base_corpus_id) = state.current_corpus_id()? else {
             return Err(Error::illegal_state(
                 "state is not currently processing a corpus index",
             ));
@@ -118,7 +118,7 @@ where
             }
 
             let (input, post) = input_transformed.try_transform_into(state)?;
-            let corpus_idx = if input.len() < before_len {
+            let corpus_id = if input.len() < before_len {
                 // run the input
                 let exit_kind = fuzzer.execute_input(state, executor, manager, &input)?;
                 let observers = executor.observers();
@@ -129,7 +129,7 @@ where
                 // TODO replace if process_execution adds a return value for solution index
                 let solution_count = state.solutions().count();
                 let corpus_count = state.corpus().count();
-                let (_, corpus_idx) = fuzzer.execute_and_process(
+                let (_, corpus_id) = fuzzer.execute_and_process(
                     state,
                     manager,
                     input.clone(),
@@ -152,7 +152,7 @@ where
                     }
                 }
 
-                corpus_idx
+                corpus_id
             } else {
                 // we can't guarantee that the mutators provided will necessarily reduce size, so
                 // skip any mutations that actually increase size so we don't waste eval time
@@ -160,8 +160,8 @@ where
             };
 
             start_timer!(state);
-            self.mutator_mut().post_exec(state, corpus_idx)?;
-            post.post_exec(state, corpus_idx)?;
+            self.mutator_mut().post_exec(state, corpus_id)?;
+            post.post_exec(state, corpus_id)?;
             mark_feature_time!(state, PerfFeature::MutatePostExec);
 
             i = next_i;
@@ -180,15 +180,15 @@ where
             fuzzer
                 .feedback_mut()
                 .append_metadata(state, manager, &*observers, &mut testcase)?;
-            let prev = state.corpus_mut().replace(base_corpus_idx, testcase)?;
+            let prev = state.corpus_mut().replace(base_corpus_id, testcase)?;
             fuzzer
                 .scheduler_mut()
-                .on_replace(state, base_corpus_idx, &prev)?;
+                .on_replace(state, base_corpus_id, &prev)?;
             // perform the post operation for the new testcase, e.g. to update metadata.
             // base_post should be updated along with the base (and is no longer None)
             base_post
                 .ok_or_else(|| Error::empty_optional("Failed to get the MutatedTransformPost"))?
-                .post_exec(state, Some(base_corpus_idx))?;
+                .post_exec(state, Some(base_corpus_id))?;
         }
 
         state.set_max_size(orig_max_size);

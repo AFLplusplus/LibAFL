@@ -193,8 +193,8 @@ where
     fn push_stage_helper_mut(&mut self) -> &mut PushStageHelper<CS, EM, OT, Z>;
 
     /// Set the current corpus index this stage works on
-    fn set_current_corpus_id(&mut self, corpus_idx: CorpusId) {
-        self.push_stage_helper_mut().current_corpus_id = Some(corpus_idx);
+    fn set_current_corpus_id(&mut self, corpus_id: CorpusId) {
+        self.push_stage_helper_mut().current_corpus_id = Some(corpus_id);
     }
 
     /// Called by `next_std` when this stage is being initialized.

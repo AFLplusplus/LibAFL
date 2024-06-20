@@ -27,7 +27,7 @@ use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 pub trait MutatedTransformPost<S>: Sized {
     /// Perform any post-execution steps necessary for the transformed input (e.g., updating metadata)
     #[inline]
-    fn post_exec(self, state: &mut S, new_corpus_idx: Option<CorpusId>) -> Result<(), Error> {
+    fn post_exec(self, state: &mut S, new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -136,11 +136,11 @@ where
 
             // Time is measured directly the `evaluate_input` function
             let (untransformed, post) = input.try_transform_into(state)?;
-            let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
+            let (_, corpus_id) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
 
             start_timer!(state);
-            self.mutator_mut().post_exec(state, corpus_idx)?;
-            post.post_exec(state, corpus_idx)?;
+            self.mutator_mut().post_exec(state, corpus_id)?;
+            post.post_exec(state, corpus_id)?;
             mark_feature_time!(state, PerfFeature::MutatePostExec);
         }
 
@@ -347,9 +347,9 @@ where
         for new_input in generated {
             // Time is measured directly the `evaluate_input` function
             let (untransformed, post) = new_input.try_transform_into(state)?;
-            let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
-            self.mutator.multi_post_exec(state, corpus_idx)?;
-            post.post_exec(state, corpus_idx)?;
+            let (_, corpus_id) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
+            self.mutator.multi_post_exec(state, corpus_id)?;
+            post.post_exec(state, corpus_id)?;
         }
         // println!("Found {}", found);
 

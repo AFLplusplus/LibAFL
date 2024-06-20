@@ -1073,17 +1073,16 @@ where
             return Ok(MutationResult::Skipped);
         }
 
+        let id = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
         // We don't want to use the testcase we're already using for splicing
-        let idx = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
-
         if let Some(cur) = state.corpus().current() {
-            if idx == *cur {
+            if id == *cur {
                 return Ok(MutationResult::Skipped);
             }
         }
 
         let other_size = {
-            let mut other_testcase = state.corpus().get_from_all(idx)?.borrow_mut();
+            let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
             other_testcase.load_input(state.corpus())?.bytes().len()
         };
 
@@ -1094,7 +1093,7 @@ where
         let range = rand_range(state, other_size, min(other_size, max_size - size));
         let target = state.rand_mut().below(size); // TODO: fix bug if size is 0
 
-        let other_testcase = state.corpus().get_from_all(idx)?.borrow_mut();
+        let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
         // No need to load the input again, it'll still be cached.
         let other = other_testcase.input().as_ref().unwrap();
 
@@ -1157,16 +1156,16 @@ where
             return Ok(MutationResult::Skipped);
         }
 
+        let id = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
         // We don't want to use the testcase we're already using for splicing
-        let idx = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
         if let Some(cur) = state.corpus().current() {
-            if idx == *cur {
+            if id == *cur {
                 return Ok(MutationResult::Skipped);
             }
         }
 
         let other_size = {
-            let mut testcase = state.corpus().get_from_all(idx)?.borrow_mut();
+            let mut testcase = state.corpus().get_from_all(id)?.borrow_mut();
             testcase.load_input(state.corpus())?.bytes().len()
         };
 
@@ -1177,7 +1176,7 @@ where
         let target = state.rand_mut().below(size);
         let range = rand_range(state, other_size, min(other_size, size - target));
 
-        let other_testcase = state.corpus().get_from_all(idx)?.borrow_mut();
+        let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
         // No need to load the input again, it'll still be cached.
         let other = other_testcase.input().as_ref().unwrap();
 
@@ -1230,16 +1229,16 @@ where
 {
     #[allow(clippy::cast_sign_loss)]
     fn mutate(&mut self, state: &mut S, input: &mut S::Input) -> Result<MutationResult, Error> {
+        let id = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
         // We don't want to use the testcase we're already using for splicing
-        let idx = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
         if let Some(cur) = state.corpus().current() {
-            if idx == *cur {
+            if id == *cur {
                 return Ok(MutationResult::Skipped);
             }
         }
 
         let (first_diff, last_diff) = {
-            let mut other_testcase = state.corpus().get_from_all(idx)?.borrow_mut();
+            let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
             let other = other_testcase.load_input(state.corpus())?;
 
             let (f, l) = locate_diffs(input.bytes(), other.bytes());
@@ -1253,7 +1252,7 @@ where
 
         let split_at = state.rand_mut().between(first_diff, last_diff);
 
-        let other_testcase = state.corpus().get_from_all(idx)?.borrow_mut();
+        let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
         // Input will already be loaded.
         let other = other_testcase.input().as_ref().unwrap();
 

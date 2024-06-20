@@ -268,7 +268,7 @@ where
     fn on_remove(
         &mut self,
         _state: &mut Self::State,
-        _idx: CorpusId,
+        _id: CorpusId,
         _prev: &Option<Testcase<<Self::State as UsesInput>::Input>>,
     ) -> Result<(), Error> {
         self.table_invalidated = true;
@@ -279,7 +279,7 @@ where
     fn on_replace(
         &mut self,
         _state: &mut Self::State,
-        _idx: CorpusId,
+        _id: CorpusId,
         _prev: &Testcase<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
         self.table_invalidated = true;
@@ -315,8 +315,8 @@ where
     C: AsRef<O> + Named,
 {
     /// Called when a [`Testcase`] is added to the corpus
-    fn on_add(&mut self, state: &mut S, idx: CorpusId) -> Result<(), Error> {
-        self.on_add_metadata(state, idx)?;
+    fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
+        self.on_add_metadata(state, id)?;
         self.table_invalidated = true;
         Ok(())
     }
@@ -385,11 +385,11 @@ where
     fn set_current_scheduled(
         &mut self,
         state: &mut Self::State,
-        next_idx: Option<CorpusId>,
+        next_id: Option<CorpusId>,
     ) -> Result<(), Error> {
-        self.on_next_metadata(state, next_idx)?;
+        self.on_next_metadata(state, next_id)?;
 
-        *state.corpus_mut().current_mut() = next_idx;
+        *state.corpus_mut().current_mut() = next_id;
         Ok(())
     }
 }

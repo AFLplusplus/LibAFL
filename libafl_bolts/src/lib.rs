@@ -12,6 +12,7 @@
 // For `std::simd`
 #![cfg_attr(nightly, feature(portable_simd))]
 // For `core::error`
+#![cfg_attr(nightly, feature(error_in_core))]
 #![warn(clippy::cargo)]
 #![allow(ambiguous_glob_reexports)]
 #![deny(clippy::cargo_common_metadata)]

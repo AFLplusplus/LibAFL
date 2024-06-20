@@ -81,7 +81,7 @@ where
         state: &mut Self::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        let Some(corpus_idx) = state.current_corpus_id()? else {
+        let Some(corpus_id) = state.current_corpus_id()? else {
             return Err(Error::illegal_state(
                 "state is not currently processing a corpus index",
             ));
@@ -91,7 +91,7 @@ where
             start_timer!(state);
             {
                 let corpus = state.corpus();
-                let mut testcase = corpus.get(corpus_idx)?.borrow_mut();
+                let mut testcase = corpus.get(corpus_id)?.borrow_mut();
                 if testcase.scheduled_count() > 0 {
                     return Ok(());
                 }
@@ -99,14 +99,14 @@ where
                 corpus.load_input_into(&mut testcase)?;
             }
             mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
-            let mut entry = state.corpus().get(corpus_idx)?.borrow_mut();
+            let mut entry = state.corpus().get(corpus_id)?.borrow_mut();
             let input = entry.input_mut().as_mut().unwrap();
 
             let payload: Vec<_> = input.bytes().iter().map(|&x| Some(x)).collect();
             let original = input.clone();
             let meta = entry.metadata_map().get::<MapNoveltiesMetadata>().ok_or_else(|| {
                     Error::key_not_found(format!(
-                        "MapNoveltiesMetadata needed for GeneralizationStage not found in testcase #{corpus_idx} (check the arguments of MapFeedback::new(...))"
+                        "MapNoveltiesMetadata needed for GeneralizationStage not found in testcase #{corpus_id} (check the arguments of MapFeedback::new(...))"
                     ))
                 })?;
             if meta.as_slice().is_empty() {
@@ -311,7 +311,7 @@ where
                 assert!(meta.generalized().first() == Some(&GeneralizedItem::Gap));
                 assert!(meta.generalized().last() == Some(&GeneralizedItem::Gap));
 
-                let mut entry = state.corpus().get(corpus_idx)?.borrow_mut();
+                let mut entry = state.corpus().get(corpus_id)?.borrow_mut();
                 entry.metadata_map_mut().insert(meta);
             }
         }

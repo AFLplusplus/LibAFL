@@ -383,7 +383,7 @@ where
     fn name_detailed(&self) -> String {
         match self {
             Event::NewTestcase { input, .. } => {
-                format!("Testcase {}", input.generate_name(0))
+                format!("Testcase {}", input.generate_name(None))
             }
             Event::UpdateExecStats { .. } => "Client Heartbeat".to_string(),
             Event::UpdateUserStats { .. } => "UserStats".to_string(),
