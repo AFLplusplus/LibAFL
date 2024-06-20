@@ -128,7 +128,9 @@ where
     pub fn name(mutator: M) -> Self {
         let stage_id = POWER_MUTATIONAL_STAGE_ID.fetch_add(1, Relaxed);
         Self {
-            name: Cow::Owned(POWER_MUTATIONAL_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_str()),
+            name: Cow::Owned(
+                POWER_MUTATIONAL_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_str(),
+            ),
             mutator,
             phantom: PhantomData,
         }

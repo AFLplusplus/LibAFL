@@ -4,8 +4,11 @@ use alloc::{
     borrow::{Cow, ToOwned},
     string::ToString,
 };
-use core::sync::atomic::{AtomicUsize, Ordering::Relaxed};
-use core::{fmt::Debug, marker::PhantomData};
+use core::{
+    fmt::Debug,
+    marker::PhantomData,
+    sync::atomic::{AtomicUsize, Ordering::Relaxed},
+};
 
 use libafl_bolts::Named;
 
