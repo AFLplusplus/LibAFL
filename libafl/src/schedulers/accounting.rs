@@ -2,7 +2,6 @@
 
 use alloc::vec::Vec;
 use core::{
-    borrow::BorrowMut,
     fmt::Debug,
     ops::{Deref, DerefMut},
 };
@@ -20,7 +19,7 @@ use crate::{
         minimizer::{IsFavoredMetadata, MinimizerScheduler, DEFAULT_SKIP_NON_FAVORED_PROB},
         LenTimeMulTestcaseScore, Scheduler,
     },
-    state::{HasCorpus, HasCurrentTestcase, HasRand, UsesState},
+    state::{HasCorpus, HasRand, UsesState},
     Error, HasMetadata,
 };
 
