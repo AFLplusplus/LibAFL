@@ -19,7 +19,7 @@ use crate::{
     inputs::HasMutatorBytes,
     mutators::mutations::buffer_copy,
     observers::{MapObserver, ObserversTuple},
-    stages::{RestartHelper, Stage},
+    stages::{Stage, StdRestartHelper},
     state::{HasCorpus, HasCurrentTestcase, HasRand, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -108,15 +108,15 @@ where
         Ok(())
     }
 
-    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
         // This is a deterministic stage
         // Once it failed, then don't retry,
         // It will just fail again
-        RestartHelper::no_retry(state, &self.name)
+        StdRestartHelper::no_retry(state, &self.name)
     }
 
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RestartHelper::clear_progress(state, &self.name)
+        StdRestartHelper::clear_progress(state, &self.name)
     }
 }
 

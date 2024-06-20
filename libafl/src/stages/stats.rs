@@ -126,7 +126,7 @@ where
     }
 
     #[inline]
-    fn should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
         // Not running the target so we wont't crash/timeout and, hence, don't need to restore anything
         Ok(true)
     }

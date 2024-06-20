@@ -127,7 +127,7 @@ where
     }
 
     #[inline]
-    fn should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
         // Stage does not run the target. No reset helper needed.
         Ok(true)
     }

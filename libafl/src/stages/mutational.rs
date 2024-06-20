@@ -15,7 +15,7 @@ use crate::{
     inputs::Input,
     mark_feature_time,
     mutators::{MultiMutator, MutationResult, Mutator},
-    stages::{RestartHelper, Stage},
+    stages::{Stage, StdRestartHelper},
     start_timer,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
     Error, HasMetadata, HasNamedMetadata,
@@ -236,12 +236,12 @@ where
         ret
     }
 
-    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        RestartHelper::should_run(state, &self.name, 3)
+    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        StdRestartHelper::should_restart(state, &self.name, 3)
     }
 
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RestartHelper::clear_progress(state, &self.name)
+        StdRestartHelper::clear_progress(state, &self.name)
     }
 }
 
@@ -333,14 +333,14 @@ where
     I: MutatedTransform<Self::Input, Self::State> + Clone,
 {
     #[inline]
-    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
         // Make sure we don't get stuck crashing on a single testcase
-        RestartHelper::should_run(state, &self.name, 3)
+        StdRestartHelper::should_restart(state, &self.name, 3)
     }
 
     #[inline]
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RestartHelper::clear_progress(state, &self.name)
+        StdRestartHelper::clear_progress(state, &self.name)
     }
 
     #[inline]

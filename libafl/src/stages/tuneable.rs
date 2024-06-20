@@ -283,8 +283,8 @@ where
         ret
     }
 
-    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        self.restart_helper.should_run(state, &self.name)
+    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        self.restart_helper.should_restart(state, &self.name)
     }
 
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {

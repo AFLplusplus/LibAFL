@@ -19,7 +19,7 @@ use crate::state::HasClientPerfMonitor;
 use crate::{
     executors::{Executor, HasObservers},
     observers::concolic::ConcolicObserver,
-    stages::{RestartHelper, Stage, TracingStage},
+    stages::{Stage, StdRestartHelper, TracingStage},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -84,15 +84,15 @@ where
         Ok(())
     }
 
-    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
         // This is a deterministic stage
         // Once it failed, then don't retry,
         // It will just fail again
-        RestartHelper::no_retry(state, &self.name)
+        StdRestartHelper::no_retry(state, &self.name)
     }
 
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RestartHelper::clear_progress(state, &self.name)
+        StdRestartHelper::clear_progress(state, &self.name)
     }
 }
 
@@ -432,16 +432,16 @@ where
     }
 
     #[inline]
-    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
         // This is a deterministic stage
         // Once it failed, then don't retry,
         // It will just fail again
-        RestartHelper::no_retry(state, &self.name)
+        StdRestartHelper::no_retry(state, &self.name)
     }
 
     #[inline]
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RestartHelper::clear_progress(state, &self.name)
+        StdRestartHelper::clear_progress(state, &self.name)
     }
 }
 

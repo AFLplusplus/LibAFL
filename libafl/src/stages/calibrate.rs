@@ -20,7 +20,7 @@ use crate::{
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
     schedulers::powersched::SchedulerMetadata,
-    stages::{RestartHelper, Stage},
+    stages::{Stage, StdRestartHelper},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -350,10 +350,10 @@ where
         Ok(())
     }
 
-    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
         // Calibration stage disallow restarts
         // If a testcase that causes crash/timeout in the queue, we need to remove it from the queue immediately.
-        RestartHelper::no_retry(state, &self.name)
+        StdRestartHelper::no_retry(state, &self.name)
 
         // todo
         // remove this guy from corpus queue
@@ -361,7 +361,7 @@ where
 
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
         // TODO: Make sure this is the correct way / there may be a better way?
-        RestartHelper::clear_progress(state, &self.name)
+        StdRestartHelper::clear_progress(state, &self.name)
     }
 }
 

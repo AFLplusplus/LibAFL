@@ -115,7 +115,7 @@ where
     }
 
     #[inline]
-    fn should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
         // Not executing the target, so restart safety is not needed
         Ok(true)
     }

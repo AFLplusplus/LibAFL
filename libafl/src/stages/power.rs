@@ -13,7 +13,7 @@ use crate::{
     fuzzer::Evaluator,
     mutators::Mutator,
     schedulers::{testcase_score::CorpusPowerTestcaseScore, TestcaseScore},
-    stages::{mutational::MutatedTransform, MutationalStage, RestartHelper, Stage},
+    stages::{mutational::MutatedTransform, MutationalStage, Stage, StdRestartHelper},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -101,13 +101,13 @@ where
         ret
     }
 
-    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
         // Make sure we don't get stuck crashing on a single testcase
-        RestartHelper::should_run(state, &self.name, 3)
+        StdRestartHelper::should_restart(state, &self.name, 3)
     }
 
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RestartHelper::clear_progress(state, &self.name)
+        StdRestartHelper::clear_progress(state, &self.name)
     }
 }
 
