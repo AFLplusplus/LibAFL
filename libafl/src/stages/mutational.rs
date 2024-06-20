@@ -1,8 +1,14 @@
 //| The [`MutationalStage`] is the default stage used during fuzzing.
 //! For the current input, it will perform a range of random mutations, and then run them in the executor.
 
-use alloc::borrow::{Cow, ToOwned};
-use core::marker::PhantomData;
+use alloc::{
+    borrow::{Cow, ToOwned},
+    string::ToString,
+};
+use core::{
+    marker::PhantomData,
+    sync::atomic::{AtomicUsize, Ordering::Relaxed},
+};
 
 use libafl_bolts::{rands::Rand, Named};
 
@@ -152,6 +158,8 @@ pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: usize = 128;
 /// The default mutational stage
 #[derive(Clone, Debug)]
 pub struct StdMutationalStage<E, EM, I, M, Z> {
+    /// The name
+    name: Cow<'static, str>,
     /// The mutator(s) to use
     mutator: M,
     /// The maximum amount of iterations we should do each round
@@ -166,7 +174,7 @@ where
     EM: UsesState<State = Self::State>,
     M: Mutator<I, Self::State>,
     Z: Evaluator<E, EM>,
-    Self::State: HasCorpus + HasRand + HasExecutions + HasMetadata,
+    Self::State: HasCorpus + HasRand + HasExecutions + HasMetadata + HasNamedMetadata,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
 {
     /// The mutator, added to this stage
@@ -187,11 +195,22 @@ where
     }
 }
 
+/// The unique id for mutational stage
+static MUTATIONAL_STAGE_ID: AtomicUsize = AtomicUsize::new(0);
+/// The name for mutational stage
+pub static MUTATIONAL_STAGE_NAME: &str = "mutational";
+
 impl<E, EM, I, M, Z> UsesState for StdMutationalStage<E, EM, I, M, Z>
 where
     Z: UsesState,
 {
     type State = Z::State;
+}
+
+impl<E, EM, I, M, Z> Named for StdMutationalStage<E, EM, I, M, Z> {
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
+    }
 }
 
 impl<E, EM, I, M, Z> Stage<E, EM, Z> for StdMutationalStage<E, EM, I, M, Z>
@@ -200,7 +219,7 @@ where
     EM: UsesState<State = Self::State>,
     M: Mutator<I, Self::State>,
     Z: Evaluator<E, EM>,
-    Self::State: HasCorpus + HasRand + HasMetadata + HasExecutions,
+    Self::State: HasCorpus + HasRand + HasMetadata + HasExecutions + HasNamedMetadata,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
 {
     #[inline]
@@ -220,14 +239,12 @@ where
         ret
     }
 
-    fn should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
-        Ok(true)
-        // self.restart_helper.should_run(state)
+    fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        RestartHelper::should_run(state, &self.name, 3)
     }
 
-    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
-        Ok(())
-        // self.restart_helper.clear_progress(state)
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        RestartHelper::clear_progress(state, &self.name)
     }
 }
 
@@ -265,7 +282,11 @@ where
 
     /// Creates a new transforming mutational stage with the given max iterations
     pub fn transforming_with_max_iterations(mutator: M, max_iterations: usize) -> Self {
+        let stage_id = MUTATIONAL_STAGE_ID.fetch_add(1, Relaxed);
         Self {
+            name: Cow::Owned(
+                MUTATIONAL_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_str(),
+            ),
             mutator,
             max_iterations,
             phantom: PhantomData,
@@ -282,8 +303,10 @@ pub struct MultiMutationalStage<E, EM, I, M, Z> {
     phantom: PhantomData<(E, EM, I, Z)>,
 }
 
+/// The unique id for multi mutational stage
+static MULTI_MUTATIONAL_STAGE_ID: AtomicUsize = AtomicUsize::new(0);
 /// The name for multi mutational stage
-pub static MULTI_MUTATIONAL_STAGE: &str = "multimutational";
+pub static MULTI_MUTATIONAL_STAGE_NAME: &str = "multimutational";
 
 impl<E, EM, I, M, Z> UsesState for MultiMutationalStage<E, EM, I, M, Z>
 where
@@ -354,16 +377,19 @@ where
     Z: UsesState,
 {
     /// Creates a new [`MultiMutationalStage`]
-    pub fn new(mutator: M, name: &str) -> Self {
-        Self::transforming(mutator, name)
+    pub fn new(mutator: M) -> Self {
+        Self::transforming(mutator)
     }
 }
 
 impl<E, EM, I, M, Z> MultiMutationalStage<E, EM, I, M, Z> {
     /// Creates a new transforming mutational stage
-    pub fn transforming(mutator: M, name: &str) -> Self {
+    pub fn transforming(mutator: M) -> Self {
+        let stage_id = MULTI_MUTATIONAL_STAGE_ID.fetch_add(1, Relaxed);
         Self {
-            name: Cow::Owned(MULTI_MUTATIONAL_STAGE.to_owned() + ":" + name),
+            name: Cow::Owned(
+                MULTI_MUTATIONAL_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_str(),
+            ),
             mutator,
             phantom: PhantomData,
         }

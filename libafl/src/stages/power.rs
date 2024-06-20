@@ -1,7 +1,14 @@
 //! The power schedules. This stage should be invoked after the calibration stage.
 
-use alloc::borrow::{Cow, ToOwned};
-use core::{fmt::Debug, marker::PhantomData};
+use alloc::{
+    borrow::{Cow, ToOwned},
+    string::ToString,
+};
+use core::{
+    fmt::Debug,
+    marker::PhantomData,
+    sync::atomic::{AtomicUsize, Ordering::Relaxed},
+};
 
 use libafl_bolts::Named;
 
@@ -14,6 +21,9 @@ use crate::{
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
+
+/// The unique id for this stage
+static POWER_MUTATIONAL_STAGE_ID: AtomicUsize = AtomicUsize::new(0);
 /// Default name for `PowerMutationalStage`; derived from AFL++
 pub const POWER_MUTATIONAL_STAGE_NAME: &str = "power";
 /// The mutational stage using power schedules
@@ -115,9 +125,10 @@ where
     Z: Evaluator<E, EM, State = <Self as UsesState>::State>,
 {
     /// Creates a new [`PowerMutationalStage`]
-    pub fn new(mutator: M, name: &str) -> Self {
+    pub fn name(mutator: M) -> Self {
+        let stage_id = POWER_MUTATIONAL_STAGE_ID.fetch_add(1, Relaxed);
         Self {
-            name: Cow::Owned(POWER_MUTATIONAL_STAGE_NAME.to_owned() + ":" + name),
+            name: Cow::Owned(POWER_MUTATIONAL_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_str()),
             mutator,
             phantom: PhantomData,
         }

@@ -7,9 +7,14 @@ Other stages may enrich [`crate::corpus::Testcase`]s with metadata.
 use alloc::{
     borrow::{Cow, ToOwned},
     boxed::Box,
+    string::ToString,
     vec::Vec,
 };
-use core::{fmt, marker::PhantomData};
+use core::{
+    fmt,
+    marker::PhantomData,
+    sync::atomic::{AtomicUsize, Ordering::Relaxed},
+};
 
 pub use calibrate::CalibrationStage;
 pub use colorization::*;
@@ -288,6 +293,7 @@ where
     }
 }
 
+static CLOSURE_STAGE_ID: AtomicUsize = AtomicUsize::new(0);
 /// The name for closure stage
 pub static CLOSURE_STAGE_NAME: &str = "closure";
 
@@ -347,9 +353,10 @@ where
 impl<CB, E, EM, Z> ClosureStage<CB, E, EM, Z> {
     /// Create a new [`ClosureStage`]
     #[must_use]
-    pub fn new(closure: CB, name: &str) -> Self {
+    pub fn new(closure: CB) -> Self {
+        let stage_id = CLOSURE_STAGE_ID.fetch_add(1, Relaxed);
         Self {
-            name: Cow::Owned(CLOSURE_STAGE_NAME.to_owned() + ":" + name),
+            name: Cow::Owned(CLOSURE_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_ref()),
             closure,
             phantom: PhantomData,
         }
@@ -369,15 +376,19 @@ impl<CS, EM, OT, PS, Z> PushStageAdapter<CS, EM, OT, PS, Z> {
     /// Create a new [`PushStageAdapter`], wrapping the given [`PushStage`]
     /// to be used as a normal [`Stage`]
     #[must_use]
-    pub fn new(push_stage: PS, name: &str) -> Self {
+    pub fn new(push_stage: PS) -> Self {
+        let stage_id = PUSH_STAGE_ADAPTER_ID.fetch_add(1, Relaxed);
         Self {
-            name: Cow::Owned(PUSH_STAGE_ADAPTER_NAME.to_owned() + ":" + name),
+            name: Cow::Owned(
+                PUSH_STAGE_ADAPTER_NAME.to_owned() + ":" + stage_id.to_string().as_str(),
+            ),
             push_stage,
             phantom: PhantomData,
         }
     }
 }
 
+static PUSH_STAGE_ADAPTER_ID: AtomicUsize = AtomicUsize::new(0);
 /// The name for push stage adapter
 pub static PUSH_STAGE_ADAPTER_NAME: &str = "pushstageadapter";
 
@@ -636,14 +647,15 @@ impl ExecutionCountRestartHelper {
     }
 
     /// Initialize progress for the stage this wrapper wraps.
-    pub fn should_run<S>(&mut self, state: &mut S) -> Result<bool, Error>
+    pub fn should_run<S>(&mut self, state: &mut S, name: &str) -> Result<bool, Error>
     where
-        S: HasMetadata + HasExecutions,
+        S: HasNamedMetadata + HasExecutions,
     {
         let executions = *state.executions();
-        let metadata = state.metadata_or_insert_with(|| ExecutionCountRestartHelperMetadata {
-            started_at_execs: executions,
-        });
+        let metadata =
+            state.named_metadata_or_insert_with(name, || ExecutionCountRestartHelperMetadata {
+                started_at_execs: executions,
+            });
         self.started_at_execs = Some(metadata.started_at_execs);
         Ok(true)
     }

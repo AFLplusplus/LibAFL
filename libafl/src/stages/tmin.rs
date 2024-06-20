@@ -1,7 +1,16 @@
 //! The [`TMinMutationalStage`] is a stage which will attempt to minimize corpus entries.
 
-use alloc::borrow::{Cow, ToOwned};
-use core::{borrow::BorrowMut, fmt::Debug, hash::Hash, marker::PhantomData};
+use alloc::{
+    borrow::{Cow, ToOwned},
+    string::ToString,
+};
+use core::{
+    borrow::BorrowMut,
+    fmt::Debug,
+    hash::Hash,
+    marker::PhantomData,
+    sync::atomic::{AtomicUsize, Ordering::Relaxed},
+};
 
 use ahash::RandomState;
 use libafl_bolts::{
@@ -246,7 +255,7 @@ where
     IP: MutatedTransformPost<Self::State> + Clone,
 {
     fn should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        self.restart_helper.should_run(state)
+        self.restart_helper.should_run(state, &self.name)
     }
 
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
@@ -286,6 +295,8 @@ impl<E, EM, F, FF, IP, M, Z> Named for StdTMinMutationalStage<E, EM, F, FF, IP, 
     }
 }
 
+/// The counter for giving this stage unique id
+static TMIN_STAGE_ID: AtomicUsize = AtomicUsize::new(0);
 /// The name for tmin stage
 pub static TMIN_STAGE_NAME: &str = "tmin";
 
@@ -329,9 +340,10 @@ where
 
 impl<E, EM, F, FF, IP, M, Z> StdTMinMutationalStage<E, EM, F, FF, IP, M, Z> {
     /// Creates a new minimizing mutational stage that will minimize provided corpus entries
-    pub fn new(mutator: M, factory: FF, runs: usize, name: &str) -> Self {
+    pub fn new(mutator: M, factory: FF, runs: usize) -> Self {
+        let stage_id = TMIN_STAGE_ID.fetch_add(1, Relaxed);
         Self {
-            name: Cow::Owned(TMIN_STAGE_NAME.to_owned() + ":" + name),
+            name: Cow::Owned(TMIN_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_str()),
             mutator,
             factory,
             runs,

@@ -1,12 +1,18 @@
 //! This module contains the `concolic` stages, which can trace a target using symbolic execution
 //! and use the results for fuzzer input and mutations.
 //!
-
-use alloc::borrow::{Cow, ToOwned};
+#[cfg(feature = "concolic_mutation")]
+use alloc::{
+    borrow::{Cow, ToOwned},
+    string::ToString,
+};
 #[cfg(feature = "concolic_mutation")]
 use alloc::{string::ToString, vec::Vec};
 #[cfg(feature = "concolic_mutation")]
-use core::marker::PhantomData;
+use core::{
+    marker::PhantomData,
+    sync::atomic::{AtomicUsize, Ordering::Relaxed},
+};
 
 use libafl_bolts::{
     tuples::{Handle, MatchNameRef},
@@ -375,6 +381,10 @@ where
 }
 
 #[cfg(feature = "concolic_mutation")]
+/// The unique id for this stage
+static SIMPLE_CONCOLIC_MUTATIONAL_ID: AtomicUsize = AtomicUsize::new(0);
+
+#[cfg(feature = "concolic_mutation")]
 /// The name for concolic mutation stage
 pub const SIMPLE_CONCOLIC_MUTATIONAL_NAME: &str = "concolicmutation";
 
@@ -446,9 +456,12 @@ where
 impl<Z> SimpleConcolicMutationalStage<Z> {
     #[must_use]
     /// Construct this stage
-    pub fn new(name: &str) -> Self {
+    pub fn new() -> Self {
+        let stage_id = SIMPLE_CONCOLIC_MUTATIONAL_ID.fetch_add(1, Relaxed);
         Self {
-            name: Cow::Owned(SIMPLE_CONCOLIC_MUTATIONAL_NAME.to_owned() + ":" + name),
+            name: Cow::Owned(
+                SIMPLE_CONCOLIC_MUTATIONAL_NAME.to_owned() + ":" + stage_id.to_string().as_str(),
+            ),
             phantom: PhantomData,
         }
     }
