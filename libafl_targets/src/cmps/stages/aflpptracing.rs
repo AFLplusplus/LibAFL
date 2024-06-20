@@ -1,11 +1,11 @@
-use alloc::borrow::Cow;
+use alloc::borrow::{Cow, ToOwned};
 use core::marker::PhantomData;
 
 use libafl::{
     executors::{Executor, HasObservers},
     inputs::{BytesInput, UsesInput},
     observers::ObserversTuple,
-    stages::{colorization::TaintMetadata, RetryRestartHelper, Stage},
+    stages::{colorization::TaintMetadata, Stage, StdRestartHelper},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -22,11 +22,14 @@ pub struct AFLppCmplogTracingStage<'a, EM, TE, Z>
 where
     TE: UsesState,
 {
+    name: Cow<'static, str>,
     tracer_executor: TE,
-    cmplog_observer_handle: Option<Handle<AFLppCmpLogObserver<'a, <Self as UsesState>::State>>>,
+    cmplog_observer_handle: Handle<AFLppCmpLogObserver<'a, <Self as UsesState>::State>>,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(EM, TE, Z)>,
 }
+/// The name for aflpp tracing stage
+pub static AFLPP_CMPLOG_TRACING_STAGE_NAME: &str = "aflpptracing";
 
 impl<EM, TE, Z> UsesState for AFLppCmplogTracingStage<'_, EM, TE, Z>
 where
@@ -40,8 +43,7 @@ where
     TE: UsesState,
 {
     fn name(&self) -> &Cow<'static, str> {
-        static NAME: Cow<'static, str> = Cow::Borrowed("AFLppCmplogTracingStage");
-        &NAME
+        &self.name
     }
 }
 
@@ -65,19 +67,17 @@ where
         // First run with the un-mutated input
         let unmutated_input = state.current_input_cloned()?;
 
-        if let Some(observer_handle) = &self.cmplog_observer_handle {
-            if let Some(ob) = self
-                .tracer_executor
-                .observers_mut()
-                .get_mut(observer_handle)
-            {
-                // This is not the original input,
-                // Set it to false
-                ob.set_original(true);
-            }
-            // I can't think of any use of this stage if you don't use AFLppCmpLogObserver
-            // but do nothing ofcourse
+        if let Some(ob) = self
+            .tracer_executor
+            .observers_mut()
+            .get_mut(&self.cmplog_observer_handle)
+        {
+            // This is not the original input,
+            // Set it to false
+            ob.set_original(true);
         }
+        // I can't think of any use of this stage if you don't use AFLppCmpLogObserver
+        // but do nothing ofcourse
 
         self.tracer_executor
             .observers_mut()
@@ -97,19 +97,17 @@ where
             None => return Err(Error::unknown("No metadata found")),
         };
 
-        if let Some(observer_handle) = &self.cmplog_observer_handle {
-            if let Some(ob) = self
-                .tracer_executor
-                .observers_mut()
-                .get_mut(observer_handle)
-            {
-                // This is not the original input,
-                // Set it to false
-                ob.set_original(false);
-            }
-            // I can't think of any use of this stage if you don't use AFLppCmpLogObserver
-            // but do nothing ofcourse
+        if let Some(ob) = self
+            .tracer_executor
+            .observers_mut()
+            .get_mut(&self.cmplog_observer_handle)
+        {
+            // This is not the original input,
+            // Set it to false
+            ob.set_original(false);
         }
+        // I can't think of any use of this stage if you don't use AFLppCmpLogObserver
+        // but do nothing ofcourse
 
         self.tracer_executor
             .observers_mut()
@@ -126,14 +124,15 @@ where
         Ok(())
     }
 
-    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        // TODO: this may need better resumption? (Or is it always used with a forkserver?)
-        RetryRestartHelper::restart_progress_should_run(state, self, 3)
+    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        // Tracing stage is always deterministic
+        // don't restart
+        StdRestartHelper::no_retry(state, &self.name)
     }
 
-    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
         // TODO: this may need better resumption? (Or is it always used with a forkserver?)
-        RetryRestartHelper::clear_restart_progress(state, self)
+        StdRestartHelper::clear_progress(state, &self.name)
     }
 }
 
@@ -141,22 +140,19 @@ impl<'a, EM, TE, Z> AFLppCmplogTracingStage<'a, EM, TE, Z>
 where
     TE: UsesState,
 {
-    /// Creates a new default stage
-    pub fn new(tracer_executor: TE) -> Self {
-        Self {
-            cmplog_observer_handle: None,
-            tracer_executor,
-            phantom: PhantomData,
-        }
-    }
-
     /// With cmplog observer
-    pub fn with_cmplog_observer(
+    pub fn new(
         tracer_executor: TE,
         observer_handle: Handle<AFLppCmpLogObserver<'a, TE::State>>,
     ) -> Self {
+        let observer_name = observer_handle.name().clone();
         Self {
-            cmplog_observer_handle: Some(observer_handle),
+            name: Cow::Owned(
+                AFLPP_CMPLOG_TRACING_STAGE_NAME.to_owned()
+                    + ":"
+                    + observer_name.into_owned().as_str(),
+            ),
+            cmplog_observer_handle: observer_handle,
             tracer_executor,
             phantom: PhantomData,
         }

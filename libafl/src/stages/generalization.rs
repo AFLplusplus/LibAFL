@@ -1,6 +1,9 @@
 //! The tracing stage can trace the target and enrich a [`crate::corpus::Testcase`] with metadata, for example for `CmpLog`.
 
-use alloc::{borrow::Cow, vec::Vec};
+use alloc::{
+    borrow::{Cow, ToOwned},
+    vec::Vec,
+};
 use core::{fmt::Debug, marker::PhantomData};
 
 use libafl_bolts::{
@@ -16,7 +19,7 @@ use crate::{
     mark_feature_time,
     observers::{CanTrack, MapObserver, ObserversTuple},
     require_novelties_tracking,
-    stages::{RetryRestartHelper, Stage},
+    stages::{Stage, StdRestartHelper},
     start_timer,
     state::{HasCorpus, HasExecutions, UsesState},
     Error, HasMetadata, HasNamedMetadata,
@@ -40,9 +43,13 @@ fn find_next_char(list: &[Option<u8>], mut idx: usize, ch: u8) -> usize {
     idx
 }
 
+/// The name for generalization stage
+pub static GENERALIZATION_STAGE_NAME: &str = "generalization";
+
 /// A stage that runs a tracer executor
 #[derive(Clone, Debug)]
 pub struct GeneralizationStage<C, EM, O, OT, Z> {
+    name: Cow<'static, str>,
     map_observer_handle: Handle<C>,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(EM, O, OT, Z)>,
@@ -50,8 +57,7 @@ pub struct GeneralizationStage<C, EM, O, OT, Z> {
 
 impl<C, EM, O, OT, Z> Named for GeneralizationStage<C, EM, O, OT, Z> {
     fn name(&self) -> &Cow<'static, str> {
-        static NAME: Cow<'static, str> = Cow::Borrowed("GeneralizationStage");
-        &NAME
+        &self.name
     }
 }
 
@@ -320,15 +326,15 @@ where
     }
 
     #[inline]
-    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
         // TODO: We need to be able to resume better if something crashes or times out
-        RetryRestartHelper::restart_progress_should_run(state, self, 3)
+        StdRestartHelper::should_restart(state, &self.name, 3)
     }
 
     #[inline]
-    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
         // TODO: We need to be able to resume better if something crashes or times out
-        RetryRestartHelper::clear_restart_progress(state, self)
+        StdRestartHelper::clear_progress(state, &self.name)
     }
 }
 
@@ -345,7 +351,11 @@ where
     #[must_use]
     pub fn new(map_observer: &C) -> Self {
         require_novelties_tracking!("GeneralizationStage", C);
+        let name = map_observer.name().clone();
         Self {
+            name: Cow::Owned(
+                GENERALIZATION_STAGE_NAME.to_owned() + ":" + name.into_owned().as_str(),
+            ),
             map_observer_handle: map_observer.handle(),
             phantom: PhantomData,
         }

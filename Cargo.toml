@@ -21,6 +21,7 @@ members = [
     "utils/libafl_benches",
     "utils/gramatron/construct_automata",
     "utils/desyscall",
+    "utils/multi_machine_generator",
 ]
 default-members = [
     "libafl",

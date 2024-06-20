@@ -1,7 +1,10 @@
 //| The [`MutationalStage`] is the default stage used during fuzzing.
 //! For the current input, it will perform a range of random mutations, and then run them in the executor.
 
-use alloc::borrow::Cow;
+use alloc::{
+    borrow::{Cow, ToOwned},
+    string::ToString,
+};
 use core::marker::PhantomData;
 
 use libafl_bolts::{rands::Rand, Named};
@@ -12,7 +15,7 @@ use crate::{
     inputs::Input,
     mark_feature_time,
     mutators::{MultiMutator, MutationResult, Mutator},
-    stages::{ExecutionCountRestartHelper, RetryRestartHelper, Stage},
+    stages::{Stage, StdRestartHelper},
     start_timer,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
     Error, HasMetadata, HasNamedMetadata,
@@ -94,9 +97,6 @@ where
     /// Gets the number of iterations this mutator should run for.
     fn iterations(&self, state: &mut Self::State) -> Result<usize, Error>;
 
-    /// Gets the number of executions this mutator already did since it got first called in this fuzz round.
-    fn execs_since_progress_start(&mut self, state: &mut Self::State) -> Result<u64, Error>;
-
     /// Runs this (mutational) stage for the given testcase
     #[allow(clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
     fn perform_mutational(
@@ -155,12 +155,12 @@ pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: usize = 128;
 /// The default mutational stage
 #[derive(Clone, Debug)]
 pub struct StdMutationalStage<E, EM, I, M, Z> {
+    /// The name
+    name: Cow<'static, str>,
     /// The mutator(s) to use
     mutator: M,
     /// The maximum amount of iterations we should do each round
     max_iterations: usize,
-    /// The progress helper for this mutational stage
-    restart_helper: ExecutionCountRestartHelper,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, EM, I, Z)>,
 }
@@ -171,7 +171,7 @@ where
     EM: UsesState<State = Self::State>,
     M: Mutator<I, Self::State>,
     Z: Evaluator<E, EM>,
-    Self::State: HasCorpus + HasRand + HasExecutions + HasMetadata,
+    Self::State: HasCorpus + HasRand + HasExecutions + HasMetadata + HasNamedMetadata,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
 {
     /// The mutator, added to this stage
@@ -190,11 +190,12 @@ where
     fn iterations(&self, state: &mut Self::State) -> Result<usize, Error> {
         Ok(1 + state.rand_mut().below(self.max_iterations))
     }
-
-    fn execs_since_progress_start(&mut self, state: &mut Self::State) -> Result<u64, Error> {
-        self.restart_helper.execs_since_progress_start(state)
-    }
 }
+
+/// The unique id for mutational stage
+static mut MUTATIONAL_STAGE_ID: usize = 0;
+/// The name for mutational stage
+pub static MUTATIONAL_STAGE_NAME: &str = "mutational";
 
 impl<E, EM, I, M, Z> UsesState for StdMutationalStage<E, EM, I, M, Z>
 where
@@ -203,13 +204,19 @@ where
     type State = Z::State;
 }
 
+impl<E, EM, I, M, Z> Named for StdMutationalStage<E, EM, I, M, Z> {
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
+    }
+}
+
 impl<E, EM, I, M, Z> Stage<E, EM, Z> for StdMutationalStage<E, EM, I, M, Z>
 where
     E: UsesState<State = Self::State>,
     EM: UsesState<State = Self::State>,
     M: Mutator<I, Self::State>,
     Z: Evaluator<E, EM>,
-    Self::State: HasCorpus + HasRand + HasMetadata + HasExecutions,
+    Self::State: HasCorpus + HasRand + HasMetadata + HasExecutions + HasNamedMetadata,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
 {
     #[inline]
@@ -229,14 +236,12 @@ where
         ret
     }
 
-    fn restart_progress_should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
-        Ok(true)
-        // self.restart_helper.restart_progress_should_run(state)
+    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        StdRestartHelper::should_restart(state, &self.name, 3)
     }
 
-    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
-        Ok(())
-        // self.restart_helper.clear_restart_progress(state)
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        StdRestartHelper::clear_progress(state, &self.name)
     }
 }
 
@@ -274,10 +279,18 @@ where
 
     /// Creates a new transforming mutational stage with the given max iterations
     pub fn transforming_with_max_iterations(mutator: M, max_iterations: usize) -> Self {
+        // unsafe but impossible that you create two threads both instantiating this instance
+        let stage_id = unsafe {
+            let ret = MUTATIONAL_STAGE_ID;
+            MUTATIONAL_STAGE_ID += 1;
+            ret
+        };
         Self {
+            name: Cow::Owned(
+                MUTATIONAL_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_str(),
+            ),
             mutator,
             max_iterations,
-            restart_helper: ExecutionCountRestartHelper::default(),
             phantom: PhantomData,
         }
     }
@@ -286,10 +299,16 @@ where
 /// A mutational stage that operates on multiple inputs, as returned by [`MultiMutator::multi_mutate`].
 #[derive(Clone, Debug)]
 pub struct MultiMutationalStage<E, EM, I, M, Z> {
+    name: Cow<'static, str>,
     mutator: M,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, EM, I, Z)>,
 }
+
+/// The unique id for multi mutational stage
+static mut MULTI_MUTATIONAL_STAGE_ID: usize = 0;
+/// The name for multi mutational stage
+pub static MULTI_MUTATIONAL_STAGE_NAME: &str = "multimutational";
 
 impl<E, EM, I, M, Z> UsesState for MultiMutationalStage<E, EM, I, M, Z>
 where
@@ -300,8 +319,7 @@ where
 
 impl<E, EM, I, M, Z> Named for MultiMutationalStage<E, EM, I, M, Z> {
     fn name(&self) -> &Cow<'static, str> {
-        static NAME: Cow<'static, str> = Cow::Borrowed("MultiMutational");
-        &NAME
+        &self.name
     }
 }
 
@@ -315,15 +333,14 @@ where
     I: MutatedTransform<Self::Input, Self::State> + Clone,
 {
     #[inline]
-    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        // TODO: add proper crash/timeout handling
-        // For now, Make sure we don't get stuck crashing on a single testcase
-        RetryRestartHelper::restart_progress_should_run(state, self, 3)
+    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        // Make sure we don't get stuck crashing on a single testcase
+        StdRestartHelper::should_restart(state, &self.name, 3)
     }
 
     #[inline]
-    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RetryRestartHelper::clear_restart_progress(state, self)
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        StdRestartHelper::clear_progress(state, &self.name)
     }
 
     #[inline]
@@ -370,7 +387,16 @@ where
 impl<E, EM, I, M, Z> MultiMutationalStage<E, EM, I, M, Z> {
     /// Creates a new transforming mutational stage
     pub fn transforming(mutator: M) -> Self {
+        // unsafe but impossible that you create two threads both instantiating this instance
+        let stage_id = unsafe {
+            let ret = MULTI_MUTATIONAL_STAGE_ID;
+            MULTI_MUTATIONAL_STAGE_ID += 1;
+            ret
+        };
         Self {
+            name: Cow::Owned(
+                MULTI_MUTATIONAL_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_str(),
+            ),
             mutator,
             phantom: PhantomData,
         }

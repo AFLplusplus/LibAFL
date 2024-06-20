@@ -1,6 +1,9 @@
 //! The calibration stage. The fuzzer measures the average exec time and the bitmap size.
 
-use alloc::{borrow::Cow, vec::Vec};
+use alloc::{
+    borrow::{Cow, ToOwned},
+    vec::Vec,
+};
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
 
 use hashbrown::HashSet;
@@ -17,7 +20,7 @@ use crate::{
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
     schedulers::powersched::SchedulerMetadata,
-    stages::{ExecutionCountRestartHelper, Stage},
+    stages::{Stage, StdRestartHelper},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -75,7 +78,6 @@ pub struct CalibrationStage<C, E, O, OT> {
     stage_max: usize,
     /// If we should track stability
     track_stability: bool,
-    restart_helper: ExecutionCountRestartHelper,
     phantom: PhantomData<(E, O, OT)>,
 }
 
@@ -125,8 +127,6 @@ where
 
         let mut iter = self.stage_max;
         // If we restarted after a timeout or crash, do less iterations.
-        iter -= usize::try_from(self.restart_helper.execs_since_progress_start(state)?)?;
-
         let input = state.current_input_cloned()?;
 
         // Run once to get the initial calibration map
@@ -350,14 +350,18 @@ where
         Ok(())
     }
 
-    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        // TODO: Make sure this is the correct way / there may be a better way?
-        self.restart_helper.restart_progress_should_run(state)
+    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        // Calibration stage disallow restarts
+        // If a testcase that causes crash/timeout in the queue, we need to remove it from the queue immediately.
+        StdRestartHelper::no_retry(state, &self.name)
+
+        // todo
+        // remove this guy from corpus queue
     }
 
-    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
         // TODO: Make sure this is the correct way / there may be a better way?
-        self.restart_helper.clear_restart_progress(state)
+        StdRestartHelper::clear_progress(state, &self.name)
     }
 }
 
@@ -375,14 +379,16 @@ where
     where
         F: HasObserverHandle<Observer = C> + Named,
     {
+        let map_name = map_feedback.name().clone();
         Self {
             map_observer_handle: map_feedback.observer_handle().clone(),
-            map_name: map_feedback.name().clone(),
+            map_name: map_name.clone(),
             stage_max: CAL_STAGE_START,
             track_stability: true,
-            restart_helper: ExecutionCountRestartHelper::default(),
             phantom: PhantomData,
-            name: Cow::Borrowed(CALIBRATION_STAGE_NAME),
+            name: Cow::Owned(
+                CALIBRATION_STAGE_NAME.to_owned() + ":" + map_name.into_owned().as_str(),
+            ),
         }
     }
 
@@ -392,15 +398,9 @@ where
     where
         F: HasObserverHandle<Observer = C> + Named,
     {
-        Self {
-            map_observer_handle: map_feedback.observer_handle().clone(),
-            map_name: map_feedback.name().clone(),
-            stage_max: CAL_STAGE_START,
-            track_stability: false,
-            restart_helper: ExecutionCountRestartHelper::default(),
-            phantom: PhantomData,
-            name: Cow::Borrowed(CALIBRATION_STAGE_NAME),
-        }
+        let mut ret = Self::new(map_feedback);
+        ret.track_stability = false;
+        ret
     }
 }
 

@@ -6,11 +6,10 @@
 //!
 //! We suppose everyone is on the same network and the machines have the fuzzer ready to run on each machine.
 
+use std::{fs, net::SocketAddr, str::FromStr};
 
-use std::fs;
-use std::net::SocketAddr;
-use std::str::FromStr;
 use petgraph::dot::Dot;
+
 use crate::graph::MultiMachineTree;
 
 pub mod graph;
@@ -41,5 +40,5 @@ fn main() {
 
     let dot = Dot::new(&multi_machine_graph.graph);
 
-    fs::write("multi_machine.dot", format!("{:?}", dot)).unwrap();
+    fs::write("multi_machine.dot", format!("{dot:?}")).unwrap();
 }
