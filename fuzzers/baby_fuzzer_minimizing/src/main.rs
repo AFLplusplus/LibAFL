@@ -98,7 +98,7 @@ pub fn main() -> Result<(), Error> {
     let minimizer = StdScheduledMutator::new(havoc_mutations::<BytesInput>());
     let mut stages = tuple_list!(
         StdMutationalStage::new(mutator),
-        StdTMinMutationalStage::new(minimizer, factory, 128, "tmin")
+        StdTMinMutationalStage::new(minimizer, factory, 128)
     );
 
     while state.solutions().is_empty() {
@@ -126,7 +126,6 @@ pub fn main() -> Result<(), Error> {
         minimizer,
         CrashFeedback::new(),
         1 << 10,
-        "tmin",
     ));
 
     let scheduler = QueueScheduler::new();
