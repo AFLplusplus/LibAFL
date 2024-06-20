@@ -125,7 +125,7 @@ where
     Z: Evaluator<E, EM, State = <Self as UsesState>::State>,
 {
     /// Creates a new [`PowerMutationalStage`]
-    pub fn name(mutator: M) -> Self {
+    pub fn new(mutator: M) -> Self {
         let stage_id = POWER_MUTATIONAL_STAGE_ID.fetch_add(1, Relaxed);
         Self {
             name: Cow::Owned(

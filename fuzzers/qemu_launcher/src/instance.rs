@@ -185,7 +185,7 @@ impl<'a, M: Monitor> Instance<'a, M> {
                 5,
             )?;
 
-            let power = StdPowerMutationalStage::new(mutator, "power");
+            let power = StdPowerMutationalStage::new(mutator);
 
             // The order of the stages matter!
             let mut stages = tuple_list!(calibration, tracing, i2s, power);

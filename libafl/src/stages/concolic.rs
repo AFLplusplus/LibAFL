@@ -2,11 +2,9 @@
 //! and use the results for fuzzer input and mutations.
 //!
 #[cfg(feature = "concolic_mutation")]
-use alloc::vec::Vec;
-#[cfg(feature = "concolic_mutation")]
+use alloc::{vec::Vec, string::ToString};
 use alloc::{
     borrow::{Cow, ToOwned},
-    string::ToString,
 };
 #[cfg(feature = "concolic_mutation")]
 use core::{
