@@ -408,17 +408,14 @@ fn fuzz_binary(
     )?;
 
     // Setup a tracing stage in which we log comparisons
-    let tracing = TracingStage::new(
-        InProcessExecutor::with_timeout(
-            &mut tracing_harness,
-            tuple_list!(cmplog_observer),
-            &mut fuzzer,
-            &mut state,
-            &mut mgr,
-            timeout * 10,
-        )?,
-        "tracing",
-    );
+    let tracing = TracingStage::new(InProcessExecutor::with_timeout(
+        &mut tracing_harness,
+        tuple_list!(cmplog_observer),
+        &mut fuzzer,
+        &mut state,
+        &mut mgr,
+        timeout * 10,
+    )?);
 
     // The order of the stages matter!
     let mut stages = tuple_list!(calibration, tracing, i2s, power);
@@ -637,18 +634,15 @@ fn fuzz_text(
         timeout,
     )?;
     // Setup a tracing stage in which we log comparisons
-    let tracing = TracingStage::new(
-        InProcessExecutor::with_timeout(
-            &mut tracing_harness,
-            tuple_list!(cmplog_observer),
-            &mut fuzzer,
-            &mut state,
-            &mut mgr,
-            // Give it more time!
-            timeout * 10,
-        )?,
-        "tracing",
-    );
+    let tracing = TracingStage::new(InProcessExecutor::with_timeout(
+        &mut tracing_harness,
+        tuple_list!(cmplog_observer),
+        &mut fuzzer,
+        &mut state,
+        &mut mgr,
+        // Give it more time!
+        timeout * 10,
+    )?);
 
     // The order of the stages matter!
     let mut stages = tuple_list!(generalization, calibration, tracing, i2s, power, grimoire);

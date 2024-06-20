@@ -365,7 +365,7 @@ fn fuzz(
             .build(tuple_list!(cmplog_observer))
             .unwrap();
 
-        let tracing = TracingStage::new(cmplog_executor, "tracing");
+        let tracing = TracingStage::new(cmplog_executor);
 
         // Setup a randomic Input2State stage
         let i2s =

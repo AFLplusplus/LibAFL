@@ -188,7 +188,7 @@ fn fuzz(
     }
 
     // Setup a tracing stage in which we log comparisons
-    let tracing = ShadowTracingStage::new(&mut executor, "shadow");
+    let tracing = ShadowTracingStage::new(&mut executor);
 
     // Setup a randomic Input2State stage
     let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
@@ -215,12 +215,11 @@ fn fuzz(
             ConcolicTracingStage::new(
                 TracingStage::new(
                     MyCommandConfigurator.into_executor(tuple_list!(concolic_observer)),
-                    "tracing",
                 ),
                 concolic_ref,
             ),
             // Use the concolic trace for z3-based solving
-            SimpleConcolicMutationalStage::new("concolic"),
+            SimpleConcolicMutationalStage::new(),
         );
 
         fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut restarting_mgr)?;

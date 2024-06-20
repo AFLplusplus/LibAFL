@@ -282,7 +282,7 @@ where
                 }
 
                 // Setup a tracing stage in which we log comparisons
-                let tracing = ShadowTracingStage::new(&mut executor, "shadow");
+                let tracing = ShadowTracingStage::new(&mut executor);
 
                 // Setup a randomic Input2State stage
                 let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(

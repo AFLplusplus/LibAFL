@@ -2,12 +2,12 @@
 //! and use the results for fuzzer input and mutations.
 //!
 #[cfg(feature = "concolic_mutation")]
+use alloc::vec::Vec;
+#[cfg(feature = "concolic_mutation")]
 use alloc::{
     borrow::{Cow, ToOwned},
     string::ToString,
 };
-#[cfg(feature = "concolic_mutation")]
-use alloc::{string::ToString, vec::Vec};
 #[cfg(feature = "concolic_mutation")]
 use core::{
     marker::PhantomData,
@@ -366,7 +366,7 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
 
 /// A mutational stage that uses Z3 to solve concolic constraints attached to the [`crate::corpus::Testcase`] by the [`ConcolicTracingStage`].
 #[cfg(feature = "concolic_mutation")]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct SimpleConcolicMutationalStage<Z> {
     name: Cow<'static, str>,
     phantom: PhantomData<Z>,
