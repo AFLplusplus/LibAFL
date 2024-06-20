@@ -489,7 +489,7 @@ impl RestartHelper {
     where
         S: HasNamedMetadata + HasCurrentCorpusId,
     {
-        Self::should_run(state, name, 0)
+        Self::should_run(state, name, 1)
     }
 
     /// Initializes (or counts down in) the progress helper, giving it the amount of max retries
