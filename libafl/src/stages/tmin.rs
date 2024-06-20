@@ -4,13 +4,7 @@ use alloc::{
     borrow::{Cow, ToOwned},
     string::ToString,
 };
-use core::{
-    borrow::BorrowMut,
-    fmt::Debug,
-    hash::Hash,
-    marker::PhantomData,
-    sync::atomic::{AtomicUsize, Ordering::Relaxed},
-};
+use core::{borrow::BorrowMut, fmt::Debug, hash::Hash, marker::PhantomData};
 
 use ahash::RandomState;
 use libafl_bolts::{
@@ -296,7 +290,7 @@ impl<E, EM, F, FF, IP, M, Z> Named for StdTMinMutationalStage<E, EM, F, FF, IP, 
 }
 
 /// The counter for giving this stage unique id
-static TMIN_STAGE_ID: AtomicUsize = AtomicUsize::new(0);
+static mut TMIN_STAGE_ID: usize = 0;
 /// The name for tmin stage
 pub static TMIN_STAGE_NAME: &str = "tmin";
 
@@ -341,7 +335,12 @@ where
 impl<E, EM, F, FF, IP, M, Z> StdTMinMutationalStage<E, EM, F, FF, IP, M, Z> {
     /// Creates a new minimizing mutational stage that will minimize provided corpus entries
     pub fn new(mutator: M, factory: FF, runs: usize) -> Self {
-        let stage_id = TMIN_STAGE_ID.fetch_add(1, Relaxed);
+        // unsafe but impossible that you create two threads both instantiating this instance
+        let stage_id = unsafe {
+            let ret = TMIN_STAGE_ID;
+            TMIN_STAGE_ID += 1;
+            ret
+        };
         Self {
             name: Cow::Owned(TMIN_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_str()),
             mutator,

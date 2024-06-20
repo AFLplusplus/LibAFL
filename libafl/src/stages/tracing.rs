@@ -4,11 +4,7 @@ use alloc::{
     borrow::{Cow, ToOwned},
     string::ToString,
 };
-use core::{
-    fmt::Debug,
-    marker::PhantomData,
-    sync::atomic::{AtomicUsize, Ordering::Relaxed},
-};
+use core::{fmt::Debug, marker::PhantomData};
 
 use libafl_bolts::Named;
 
@@ -119,14 +115,20 @@ impl<EM, TE, Z> Named for TracingStage<EM, TE, Z> {
 }
 
 /// The counter for giving this stage unique id
-static TRACING_STAGE_ID: AtomicUsize = AtomicUsize::new(0);
+static mut TRACING_STAGE_ID: usize = 0;
 /// The name for tracing stage
 pub static TRACING_STAGE_NAME: &str = "tracing";
 
 impl<EM, TE, Z> TracingStage<EM, TE, Z> {
     /// Creates a new default stage
     pub fn new(tracer_executor: TE) -> Self {
-        let stage_id = TRACING_STAGE_ID.fetch_add(1, Relaxed);
+        // unsafe but impossible that you create two threads both instantiating this instance
+        let stage_id = unsafe {
+            let ret = TRACING_STAGE_ID;
+            TRACING_STAGE_ID += 1;
+            ret
+        };
+
         Self {
             name: Cow::Owned(TRACING_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_ref()),
             tracer_executor,
@@ -160,7 +162,7 @@ where
     type State = E::State;
 }
 /// The counter for giving this stage unique id
-static SHADOW_TRACING_STAGE_ID: AtomicUsize = AtomicUsize::new(0);
+static mut SHADOW_TRACING_STAGE_ID: usize = 0;
 /// Name for shadow tracing stage
 pub static SHADOW_TRACING_STAGE_NAME: &str = "shadow";
 
@@ -236,7 +238,12 @@ where
 {
     /// Creates a new default stage
     pub fn new(_executor: &mut ShadowExecutor<E, SOT>) -> Self {
-        let stage_id = SHADOW_TRACING_STAGE_ID.fetch_add(1, Relaxed);
+        // unsafe but impossible that you create two threads both instantiating this instance
+        let stage_id = unsafe {
+            let ret = SHADOW_TRACING_STAGE_ID;
+            SHADOW_TRACING_STAGE_ID += 1;
+            ret
+        };
         Self {
             name: Cow::Owned(
                 SHADOW_TRACING_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_str(),

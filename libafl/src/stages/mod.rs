@@ -10,11 +10,7 @@ use alloc::{
     string::ToString,
     vec::Vec,
 };
-use core::{
-    fmt,
-    marker::PhantomData,
-    sync::atomic::{AtomicUsize, Ordering::Relaxed},
-};
+use core::{fmt, marker::PhantomData};
 
 pub use calibrate::CalibrationStage;
 pub use colorization::*;
@@ -293,7 +289,7 @@ where
     }
 }
 
-static CLOSURE_STAGE_ID: AtomicUsize = AtomicUsize::new(0);
+static mut CLOSURE_STAGE_ID: usize = 0;
 /// The name for closure stage
 pub static CLOSURE_STAGE_NAME: &str = "closure";
 
@@ -354,7 +350,12 @@ impl<CB, E, EM, Z> ClosureStage<CB, E, EM, Z> {
     /// Create a new [`ClosureStage`]
     #[must_use]
     pub fn new(closure: CB) -> Self {
-        let stage_id = CLOSURE_STAGE_ID.fetch_add(1, Relaxed);
+        // unsafe but impossible that you create two threads both instantiating this instance
+        let stage_id = unsafe {
+            let ret = CLOSURE_STAGE_ID;
+            CLOSURE_STAGE_ID += 1;
+            ret
+        };
         Self {
             name: Cow::Owned(CLOSURE_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_ref()),
             closure,
@@ -377,7 +378,12 @@ impl<CS, EM, OT, PS, Z> PushStageAdapter<CS, EM, OT, PS, Z> {
     /// to be used as a normal [`Stage`]
     #[must_use]
     pub fn new(push_stage: PS) -> Self {
-        let stage_id = PUSH_STAGE_ADAPTER_ID.fetch_add(1, Relaxed);
+        // unsafe but impossible that you create two threads both instantiating this instance
+        let stage_id = unsafe {
+            let ret = PUSH_STAGE_ADAPTER_ID;
+            PUSH_STAGE_ADAPTER_ID += 1;
+            ret
+        };
         Self {
             name: Cow::Owned(
                 PUSH_STAGE_ADAPTER_NAME.to_owned() + ":" + stage_id.to_string().as_str(),
@@ -387,8 +393,8 @@ impl<CS, EM, OT, PS, Z> PushStageAdapter<CS, EM, OT, PS, Z> {
         }
     }
 }
-
-static PUSH_STAGE_ADAPTER_ID: AtomicUsize = AtomicUsize::new(0);
+/// The unique counter for this stage
+static mut PUSH_STAGE_ADAPTER_ID: usize = 0;
 /// The name for push stage adapter
 pub static PUSH_STAGE_ADAPTER_NAME: &str = "pushstageadapter";
 

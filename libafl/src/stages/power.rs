@@ -4,11 +4,7 @@ use alloc::{
     borrow::{Cow, ToOwned},
     string::ToString,
 };
-use core::{
-    fmt::Debug,
-    marker::PhantomData,
-    sync::atomic::{AtomicUsize, Ordering::Relaxed},
-};
+use core::{fmt::Debug, marker::PhantomData};
 
 use libafl_bolts::Named;
 
@@ -23,7 +19,7 @@ use crate::{
 };
 
 /// The unique id for this stage
-static POWER_MUTATIONAL_STAGE_ID: AtomicUsize = AtomicUsize::new(0);
+static mut POWER_MUTATIONAL_STAGE_ID: usize = 0;
 /// Default name for `PowerMutationalStage`; derived from AFL++
 pub const POWER_MUTATIONAL_STAGE_NAME: &str = "power";
 /// The mutational stage using power schedules
@@ -126,7 +122,12 @@ where
 {
     /// Creates a new [`PowerMutationalStage`]
     pub fn new(mutator: M) -> Self {
-        let stage_id = POWER_MUTATIONAL_STAGE_ID.fetch_add(1, Relaxed);
+        // unsafe but impossible that you create two threads both instantiating this instance
+        let stage_id = unsafe {
+            let ret = POWER_MUTATIONAL_STAGE_ID;
+            POWER_MUTATIONAL_STAGE_ID += 1;
+            ret
+        };
         Self {
             name: Cow::Owned(
                 POWER_MUTATIONAL_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_str(),
