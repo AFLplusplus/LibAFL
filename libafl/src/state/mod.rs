@@ -48,6 +48,22 @@ pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
 /// The [`State`] of the fuzzer.
 /// Contains all important information about the current run.
 /// Will be used to restart the fuzzing process at any time.
+#[cfg(not(feature = "std"))]
+pub trait State:
+    UsesInput
+    + Serialize
+    + DeserializeOwned
+    + MaybeHasClientPerfMonitor
+    + MaybeHasScalabilityMonitor
+    + HasCurrentCorpusId
+    + HasCurrentStage
+{
+}
+
+/// The [`State`] of the fuzzer.
+/// Contains all important information about the current run.
+/// Will be used to restart the fuzzing process at any time.
+#[cfg(feature = "std")]
 pub trait State:
     UsesInput
     + Serialize
@@ -200,6 +216,7 @@ pub trait HasLastReportTime {
 }
 
 /// Trait for getting the optional dump directory for the state
+#[cfg(feature = "std")]
 pub trait HasDumpStateDir {
     /// Get the dump dir, if there is one.
     fn dump_state_dir(&self) -> Option<&PathBuf>;
@@ -282,6 +299,7 @@ where
     type Input = I;
 }
 
+#[cfg(feature = "std")]
 impl<I, C, R, SC> HasDumpStateDir for StdState<I, C, R, SC> {
     fn dump_state_dir(&self) -> Option<&PathBuf> {
         #[cfg(feature = "dump_state")]
@@ -1189,6 +1207,7 @@ impl<I> HasMaxSize for NopState<I> {
     }
 }
 
+#[cfg(feature = "std")]
 impl<I> HasDumpStateDir for NopState<I> {
     fn dump_state_dir(&self) -> Option<&PathBuf> {
         None
