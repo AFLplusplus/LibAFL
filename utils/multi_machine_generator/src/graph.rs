@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 
-use petgraph::{graph::NodeIndex, visit::Dfs, Direction, Graph};
-use serde::{Deserialize, Serialize};
+use petgraph::{graph::NodeIndex, Direction, Graph};
+use serde::Serialize;
 
 /// A node of the network
 #[derive(Debug, Clone)]
@@ -108,8 +108,6 @@ impl MultiMachineTree {
     }
 
     pub fn get_config(&self, default_port: u16) -> Vec<MultiMachineNodeConfig> {
-        let mut dfs = Dfs::new(&self.graph, self.graph.node_indices().next().unwrap());
-
         let mut node_configs: Vec<MultiMachineNodeConfig> = Vec::new();
         for node_idx in self.graph.node_indices() {
             let node = &self.graph[node_idx];

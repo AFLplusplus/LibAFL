@@ -6,7 +6,7 @@
 //!
 //! We suppose everyone is on the same network and the machines have the fuzzer ready to run on each machine.
 
-use std::{fs, fs::File, io, io::BufRead, net::SocketAddr, path::PathBuf, str::FromStr};
+use std::{fs, fs::File, io, io::BufRead, path::PathBuf};
 
 use clap::Parser;
 use petgraph::dot::Dot;
