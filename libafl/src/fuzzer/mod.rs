@@ -14,7 +14,6 @@ use ahash::RandomState;
 use libafl_bolts::current_time;
 #[cfg(all(feature = "std", feature = "dump_state"))]
 use libafl_bolts::os::CTRL_C_EXIT;
-use log::info;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
@@ -235,11 +234,11 @@ where
             #[cfg(feature = "dump_state")]
             unsafe {
                 if INTERRUPT_FUZZER {
-                    info!("Interrupting fuzzer...");
+                    log::info!("Interrupting fuzzer...");
 
                     // Dump state if needed.
                     if let Some(dump_path) = state.dump_state_dir() {
-                        info!("Dumping state to disk...");
+                        log::info!("Dumping state to disk...");
                         let serialized = postcard::to_allocvec(&state)?;
 
                         // Taken from staterestorer

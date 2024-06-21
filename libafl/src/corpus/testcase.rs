@@ -11,7 +11,10 @@ use core::{
 #[cfg(feature = "std")]
 use std::path::PathBuf;
 
-use libafl_bolts::{current_time, serdeany::SerdeAnyMap, HasLen};
+#[cfg(feature = "dump_state")]
+use libafl_bolts::current_time;
+
+use libafl_bolts::{serdeany::SerdeAnyMap, HasLen};
 use serde::{Deserialize, Serialize};
 
 use super::Corpus;

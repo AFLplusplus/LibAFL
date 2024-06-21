@@ -48,6 +48,8 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use uuid::Uuid;
+#[cfg(all(unix, not(feature = "dump_state")))]
+use libafl_bolts::os::CTRL_C_EXIT;
 
 #[cfg(feature = "introspection")]
 use crate::state::HasClientPerfMonitor;
@@ -57,8 +59,12 @@ use crate::{
     monitors::UserStats,
     observers::ObserversTuple,
     state::{HasExecutions, HasLastReportTime, State},
-    Error, HasMetadata, INTERRUPT_FUZZER,
+    Error, HasMetadata,
 };
+
+#[cfg(all(unix, feature = "dump_state"))]
+use crate::INTERRUPT_FUZZER;
+
 #[cfg(feature = "scalability_introspection")]
 use crate::{
     monitors::{AggregatorOps, UserStatsValue},
