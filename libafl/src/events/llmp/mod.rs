@@ -20,6 +20,7 @@ use crate::{
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, NopInput, NopInputConverter, UsesInput},
+    prelude::Stoppable,
     state::{HasExecutions, NopState, State, UsesState},
     Error, HasMetadata,
 };
@@ -253,7 +254,7 @@ where
 
 impl<DI, IC, ICB, S, SP> LlmpEventConverter<DI, IC, ICB, S, SP>
 where
-    S: UsesInput + HasExecutions + HasMetadata,
+    S: UsesInput + HasExecutions + HasMetadata + Stoppable,
     SP: ShMemProvider,
     IC: InputConverter<From = S::Input, To = DI>,
     ICB: InputConverter<From = DI, To = S::Input>,
@@ -327,6 +328,10 @@ where
                         break;
                     }
                 }
+                Ok(())
+            }
+            Event::Stop => {
+                *state.should_stop_mut() = true;
                 Ok(())
             }
             _ => Err(Error::unknown(format!(

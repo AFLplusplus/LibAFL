@@ -467,6 +467,9 @@ where
                     }
                 }
             }
+            Event::Stop => {
+                *state.should_stop_mut() = true;
+            }
             _ => {
                 return Err(Error::unknown(format!(
                     "Received illegal message that message should not have arrived: {:?}.",
