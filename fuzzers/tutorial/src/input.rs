@@ -1,7 +1,10 @@
 use std::hash::Hash;
 
 use lain::prelude::*;
-use libafl::inputs::{HasTargetBytes, Input};
+use libafl::{
+    corpus::CorpusId,
+    inputs::{HasTargetBytes, Input},
+};
 use libafl_bolts::{ownedref::OwnedSlice, HasLen};
 use serde::{Deserialize, Serialize};
 
@@ -45,8 +48,12 @@ pub enum PacketType {
 }
 
 impl Input for PacketData {
-    fn generate_name(&self, idx: usize) -> String {
-        format!("id_{idx}")
+    fn generate_name(&self, id: Option<CorpusId>) -> String {
+        if let Some(id) = id {
+            format!("id_{}", id.0)
+        } else {
+            "id_unknown".into()
+        }
     }
 }
 

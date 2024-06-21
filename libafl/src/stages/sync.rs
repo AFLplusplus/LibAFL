@@ -1,6 +1,6 @@
 //! The [`SyncFromDiskStage`] is a stage that imports inputs from disk for e.g. sync with AFL
 
-use alloc::borrow::Cow;
+use alloc::borrow::{Cow, ToOwned};
 use core::marker::PhantomData;
 use std::{
     fs,
@@ -20,7 +20,7 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, UsesInput},
-    stages::{RetryRestartHelper, Stage},
+    stages::{Stage, StdRestartHelper},
     state::{HasCorpus, HasExecutions, HasRand, State, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -98,7 +98,7 @@ where
             .get::<SyncFromDiskMetadata>()
             .map(|m| m.last_time);
 
-        if let (Some(max_time), mut new_files) = self.load_from_directory(&last)? {
+        if let (Some(max_time), mut new_files) = self.load_from_directory(None, &last)? {
             if last.is_none() {
                 state
                     .metadata_map_mut()
@@ -149,24 +149,24 @@ where
     }
 
     #[inline]
-    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
         // TODO: Needs proper crash handling for when an imported testcase crashes
         // For now, Make sure we don't get stuck crashing on this testcase
-        RetryRestartHelper::restart_progress_should_run(state, self, 3)
+        StdRestartHelper::no_retry(state, &self.name)
     }
 
     #[inline]
-    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RetryRestartHelper::clear_restart_progress(state, self)
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        StdRestartHelper::clear_progress(state, &self.name)
     }
 }
 
 impl<CB, E, EM, Z> SyncFromDiskStage<CB, E, EM, Z> {
     /// Creates a new [`SyncFromDiskStage`]
     #[must_use]
-    pub fn new(sync_dir: PathBuf, load_callback: CB) -> Self {
+    pub fn new(sync_dir: PathBuf, load_callback: CB, name: &str) -> Self {
         Self {
-            name: Cow::Borrowed(SYNC_FROM_DISK_STAGE_NAME),
+            name: Cow::Owned(SYNC_FROM_DISK_STAGE_NAME.to_owned() + ":" + name),
             phantom: PhantomData,
             sync_dir,
             load_callback,
@@ -175,11 +175,15 @@ impl<CB, E, EM, Z> SyncFromDiskStage<CB, E, EM, Z> {
 
     fn load_from_directory(
         &self,
+        path: Option<PathBuf>,
         last: &Option<SystemTime>,
     ) -> Result<(Option<SystemTime>, Vec<PathBuf>), Error> {
         let mut max_time = None;
         let mut left_to_sync = Vec::<PathBuf>::new();
-        let in_dir = self.sync_dir.clone();
+        let in_dir = match path {
+            Some(p) => p,
+            None => self.sync_dir.clone(),
+        };
 
         for entry in fs::read_dir(in_dir)? {
             let entry = entry?;
@@ -204,7 +208,8 @@ impl<CB, E, EM, Z> SyncFromDiskStage<CB, E, EM, Z> {
                     left_to_sync.push(path.clone());
                 }
             } else if attr.is_dir() {
-                let (dir_max_time, dir_left_to_sync) = self.load_from_directory(last)?;
+                let (dir_max_time, dir_left_to_sync) =
+                    self.load_from_directory(Some(entry.path()), last)?;
                 if let Some(time) = dir_max_time {
                     max_time = Some(max_time.map_or(time, |t: SystemTime| t.max(time)));
                 }
@@ -333,6 +338,8 @@ where
                         time: current_time(),
                         executions: 0,
                         forward_id: None,
+                        #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
+                        node_id: None,
                     },
                 )?;
 
@@ -360,13 +367,13 @@ where
     }
 
     #[inline]
-    fn restart_progress_should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
         // No restart handling needed - does not execute the target.
         Ok(true)
     }
 
     #[inline]
-    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
         // Not needed - does not execute the target.
         Ok(())
     }

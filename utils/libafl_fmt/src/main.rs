@@ -188,6 +188,7 @@ async fn main() -> io::Result<()> {
         r".*AFLplusplus.*",
         r".*Little-CMS.*",
         r".*cms_transform_fuzzer.cc.*",
+        r".*sqlite3.*",
     ])
     .expect("Could not create the regex set from the given regex");
 

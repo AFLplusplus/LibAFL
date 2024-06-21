@@ -1,4 +1,5 @@
-//! Standard LLMP hook
+//! Hooks called on broker side
+use alloc::vec::Vec;
 use core::marker::PhantomData;
 
 #[cfg(feature = "llmp_compression")]
@@ -21,6 +22,14 @@ use crate::{
 /// centralized hook
 #[cfg(all(unix, feature = "std"))]
 pub mod centralized;
+#[cfg(all(unix, feature = "std"))]
+pub use centralized::*;
+
+/// Multi-machine hook
+#[cfg(all(unix, feature = "multi_machine"))]
+pub mod centralized_multi_machine;
+#[cfg(all(unix, feature = "multi_machine"))]
+pub use centralized_multi_machine::*;
 
 /// An LLMP-backed event hook for scalable multi-processed fuzzing
 #[derive(Debug)]
@@ -45,6 +54,7 @@ where
         #[cfg(feature = "llmp_compression")] msg_flags: &mut Flags,
         #[cfg(not(feature = "llmp_compression"))] _msg_flags: &mut Flags,
         msg: &mut [u8],
+        _new_msgs: &mut Vec<(Tag, Flags, Vec<u8>)>,
     ) -> Result<LlmpMsgHookResult, Error> {
         let monitor = &mut self.monitor;
         #[cfg(feature = "llmp_compression")]
@@ -102,14 +112,11 @@ where
     ) -> Result<BrokerEventResult, Error> {
         match &event {
             Event::NewTestcase {
-                input: _,
-                client_config: _,
-                exit_kind: _,
                 corpus_size,
-                observers_buf: _,
                 time,
                 executions,
                 forward_id,
+                ..
             } => {
                 let id = if let Some(id) = *forward_id {
                     id

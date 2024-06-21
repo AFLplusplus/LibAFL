@@ -1,6 +1,9 @@
 //! The [`TMinMutationalStage`] is a stage which will attempt to minimize corpus entries.
 
-use alloc::borrow::Cow;
+use alloc::{
+    borrow::{Cow, ToOwned},
+    string::ToString,
+};
 use core::{borrow::BorrowMut, fmt::Debug, hash::Hash, marker::PhantomData};
 
 use ahash::RandomState;
@@ -29,7 +32,8 @@ use crate::{
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasMaxSize, HasSolutions, State, UsesState,
     },
-    Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasMetadata, HasScheduler,
+    Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasMetadata, HasNamedMetadata,
+    HasScheduler,
 };
 #[cfg(feature = "introspection")]
 use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
@@ -71,7 +75,7 @@ where
         state: &mut Self::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        let Some(base_corpus_idx) = state.current_corpus_id()? else {
+        let Some(base_corpus_id) = state.current_corpus_id()? else {
             return Err(Error::illegal_state(
                 "state is not currently processing a corpus index",
             ));
@@ -79,8 +83,14 @@ where
 
         let orig_max_size = state.max_size();
         // basically copy-pasted from mutational.rs
-        let num = self.iterations(state)?
-            - usize::try_from(self.execs_since_progress_start(state)?).unwrap();
+        let num = self
+            .iterations(state)?
+            .saturating_sub(usize::try_from(self.execs_since_progress_start(state)?)?);
+
+        // If num is negative, then quit.
+        if num == 0 {
+            return Ok(());
+        }
 
         start_timer!(state);
         let transformed =
@@ -118,7 +128,7 @@ where
             }
 
             let (input, post) = input_transformed.try_transform_into(state)?;
-            let corpus_idx = if input.len() < before_len {
+            let corpus_id = if input.len() < before_len {
                 // run the input
                 let exit_kind = fuzzer.execute_input(state, executor, manager, &input)?;
                 let observers = executor.observers();
@@ -129,7 +139,7 @@ where
                 // TODO replace if process_execution adds a return value for solution index
                 let solution_count = state.solutions().count();
                 let corpus_count = state.corpus().count();
-                let (_, corpus_idx) = fuzzer.execute_and_process(
+                let (_, corpus_id) = fuzzer.execute_and_process(
                     state,
                     manager,
                     input.clone(),
@@ -152,7 +162,7 @@ where
                     }
                 }
 
-                corpus_idx
+                corpus_id
             } else {
                 // we can't guarantee that the mutators provided will necessarily reduce size, so
                 // skip any mutations that actually increase size so we don't waste eval time
@@ -160,8 +170,8 @@ where
             };
 
             start_timer!(state);
-            self.mutator_mut().post_exec(state, corpus_idx)?;
-            post.post_exec(state, corpus_idx)?;
+            self.mutator_mut().post_exec(state, corpus_id)?;
+            post.post_exec(state, corpus_id)?;
             mark_feature_time!(state, PerfFeature::MutatePostExec);
 
             i = next_i;
@@ -180,15 +190,15 @@ where
             fuzzer
                 .feedback_mut()
                 .append_metadata(state, manager, &*observers, &mut testcase)?;
-            let prev = state.corpus_mut().replace(base_corpus_idx, testcase)?;
+            let prev = state.corpus_mut().replace(base_corpus_id, testcase)?;
             fuzzer
                 .scheduler_mut()
-                .on_replace(state, base_corpus_idx, &prev)?;
+                .on_replace(state, base_corpus_id, &prev)?;
             // perform the post operation for the new testcase, e.g. to update metadata.
             // base_post should be updated along with the base (and is no longer None)
             base_post
                 .ok_or_else(|| Error::empty_optional("Failed to get the MutatedTransformPost"))?
-                .post_exec(state, Some(base_corpus_idx))?;
+                .post_exec(state, Some(base_corpus_id))?;
         }
 
         state.set_max_size(orig_max_size);
@@ -203,6 +213,8 @@ where
 /// The default corpus entry minimising mutational stage
 #[derive(Clone, Debug)]
 pub struct StdTMinMutationalStage<E, EM, F, FF, IP, M, Z> {
+    /// The name
+    name: Cow<'static, str>,
     /// The mutator(s) this stage uses
     mutator: M,
     /// The factory
@@ -231,16 +243,17 @@ where
     FF: FeedbackFactory<F, E::Observers>,
     F: Feedback<Self::State>,
     Self::Input: MutatedTransform<Self::Input, Self::State, Post = IP> + Clone + HasLen + Hash,
-    Self::State: HasMetadata + HasExecutions + HasSolutions + HasCorpus + HasMaxSize,
+    Self::State:
+        HasMetadata + HasExecutions + HasSolutions + HasCorpus + HasMaxSize + HasNamedMetadata,
     M: Mutator<Self::Input, Self::State>,
     IP: MutatedTransformPost<Self::State> + Clone,
 {
-    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        self.restart_helper.restart_progress_should_run(state)
+    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        self.restart_helper.should_restart(state, &self.name)
     }
 
-    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        self.restart_helper.clear_restart_progress(state)
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        self.restart_helper.clear_progress(state)
     }
 
     fn perform(
@@ -270,6 +283,17 @@ where
     }
 }
 
+impl<E, EM, F, FF, IP, M, Z> Named for StdTMinMutationalStage<E, EM, F, FF, IP, M, Z> {
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
+    }
+}
+
+/// The counter for giving this stage unique id
+static mut TMIN_STAGE_ID: usize = 0;
+/// The name for tmin stage
+pub static TMIN_STAGE_NAME: &str = "tmin";
+
 impl<E, EM, F, FF, IP, M, Z> TMinMutationalStage<E, EM, F, IP, M, Z>
     for StdTMinMutationalStage<E, EM, F, FF, IP, M, Z>
 where
@@ -280,7 +304,8 @@ where
     FF: FeedbackFactory<F, E::Observers>,
     F: Feedback<Self::State>,
     Self::Input: MutatedTransform<Self::Input, Self::State, Post = IP> + Clone + HasLen + Hash,
-    Self::State: HasMetadata + HasExecutions + HasSolutions + HasCorpus + HasMaxSize,
+    Self::State:
+        HasMetadata + HasExecutions + HasSolutions + HasCorpus + HasMaxSize + HasNamedMetadata,
     M: Mutator<Self::Input, Self::State>,
     IP: MutatedTransformPost<Self::State> + Clone,
 {
@@ -302,14 +327,22 @@ where
     }
 
     fn execs_since_progress_start(&mut self, state: &mut Self::State) -> Result<u64, Error> {
-        self.restart_helper.execs_since_progress_start(state)
+        self.restart_helper
+            .execs_since_progress_start(state, &self.name)
     }
 }
 
 impl<E, EM, F, FF, IP, M, Z> StdTMinMutationalStage<E, EM, F, FF, IP, M, Z> {
     /// Creates a new minimizing mutational stage that will minimize provided corpus entries
     pub fn new(mutator: M, factory: FF, runs: usize) -> Self {
+        // unsafe but impossible that you create two threads both instantiating this instance
+        let stage_id = unsafe {
+            let ret = TMIN_STAGE_ID;
+            TMIN_STAGE_ID += 1;
+            ret
+        };
         Self {
+            name: Cow::Owned(TMIN_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_str()),
             mutator,
             factory,
             runs,

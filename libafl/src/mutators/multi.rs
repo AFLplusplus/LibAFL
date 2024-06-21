@@ -50,8 +50,8 @@ where
         }
     }
 
-    fn post_exec(&mut self, state: &mut S, new_corpus_idx: Option<CorpusId>) -> Result<(), Error> {
-        M::post_exec(self, state, new_corpus_idx)
+    fn post_exec(&mut self, state: &mut S, new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
+        M::post_exec(self, state, new_corpus_id)
     }
 }
 
@@ -129,9 +129,9 @@ where
         let part_choice = state.rand_mut().next() as usize;
 
         // We special-case crossover with self
-        let idx = random_corpus_id!(state.corpus(), state.rand_mut());
+        let id = random_corpus_id!(state.corpus(), state.rand_mut());
         if let Some(cur) = state.corpus().current() {
-            if idx == *cur {
+            if id == *cur {
                 let choice = name_choice % input.names().len();
                 let name = input.names()[choice].clone();
 
@@ -150,7 +150,7 @@ where
                     .parts_by_name(&name)
                     .filter(|&(p, _)| p != choice)
                     .nth(part_choice % parts)
-                    .map(|(idx, part)| (idx, part.bytes().len()));
+                    .map(|(id, part)| (id, part.bytes().len()));
 
                 if let Some((part_idx, size)) = maybe_size {
                     let target = state.rand_mut().below(size);
@@ -174,7 +174,7 @@ where
             }
         }
 
-        let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+        let mut other_testcase = state.corpus().get(id)?.borrow_mut();
         let other = other_testcase.load_input(state.corpus())?;
 
         let choice = name_choice % other.names().len();
@@ -198,7 +198,7 @@ where
             let target = state.rand_mut().below(size);
             let range = rand_range(state, other_size, min(other_size, size - target));
 
-            let other_testcase = state.corpus().get(idx)?.borrow_mut();
+            let other_testcase = state.corpus().get(id)?.borrow_mut();
             // No need to load the input again, it'll still be cached.
             let other = other_testcase.input().as_ref().unwrap();
 
@@ -233,9 +233,9 @@ where
         let part_choice = state.rand_mut().next() as usize;
 
         // We special-case crossover with self
-        let idx = random_corpus_id!(state.corpus(), state.rand_mut());
+        let id = random_corpus_id!(state.corpus(), state.rand_mut());
         if let Some(cur) = state.corpus().current() {
-            if idx == *cur {
+            if id == *cur {
                 let choice = name_choice % input.names().len();
                 let name = input.names()[choice].clone();
 
@@ -254,7 +254,7 @@ where
                     .parts_by_name(&name)
                     .filter(|&(p, _)| p != choice)
                     .nth(part_choice % parts)
-                    .map(|(idx, part)| (idx, part.bytes().len()));
+                    .map(|(id, part)| (id, part.bytes().len()));
 
                 if let Some((part_idx, size)) = maybe_size {
                     let target = state.rand_mut().below(size);
@@ -278,7 +278,7 @@ where
             }
         }
 
-        let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+        let mut other_testcase = state.corpus().get(id)?.borrow_mut();
         let other = other_testcase.load_input(state.corpus())?;
 
         let choice = name_choice % other.names().len();
@@ -302,7 +302,7 @@ where
             let target = state.rand_mut().below(size);
             let range = rand_range(state, other_size, min(other_size, size - target));
 
-            let other_testcase = state.corpus().get(idx)?.borrow_mut();
+            let other_testcase = state.corpus().get(id)?.borrow_mut();
             // No need to load the input again, it'll still be cached.
             let other = other_testcase.input().as_ref().unwrap();
 

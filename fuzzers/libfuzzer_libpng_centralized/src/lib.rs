@@ -136,7 +136,7 @@ pub extern "C" fn libafl_main() {
     let monitor = MultiMonitor::new(|s| println!("{s}"));
 
     let mut secondary_run_client = |state: Option<_>,
-                                    mut mgr: CentralizedEventManager<_, _>,
+                                    mut mgr: CentralizedEventManager<_, _, _, _>,
                                     _core_id: CoreId| {
         // Create an observation channel using the coverage map
         let edges_observer =

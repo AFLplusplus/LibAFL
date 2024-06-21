@@ -27,6 +27,7 @@ mod bindings {
 pub use bindings::*;
 
 #[cfg(any(feature = "clippy", not(target_os = "linux")))]
+#[allow(dead_code)]
 #[rustfmt::skip]
 mod x86_64_stub_bindings;
 
@@ -126,6 +127,7 @@ pub type GuestHwAddrInfo = crate::qemu_plugin_hwaddr;
 
 #[derive(Debug)]
 #[repr(C)]
+#[cfg(target_os = "linux")]
 #[cfg_attr(feature = "python", pyclass(unsendable))]
 pub struct MapInfo {
     start: GuestAddr,
@@ -213,6 +215,7 @@ extern_c_checked! {
     pub fn libafl_qemu_gdb_reply(buf: *const u8, len: usize);
 }
 
+#[cfg(target_os = "linux")]
 #[cfg_attr(feature = "python", pymethods)]
 impl MapInfo {
     #[must_use]

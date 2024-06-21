@@ -4,7 +4,7 @@ use std::env;
 
 fn main() {
     if cfg!(not(target_os = "linux")) {
-        println!("Not supported!");
+        println!("cargo:warning=Not supported!");
         return;
     }
 

@@ -76,14 +76,14 @@ where
                 let mut n_paths = 0;
                 let mut v = 0.0;
                 let cur_index = state.corpus().current().unwrap();
-                for idx in corpus.ids() {
-                    let n_fuzz_entry = if cur_index == idx {
+                for id in corpus.ids() {
+                    let n_fuzz_entry = if cur_index == id {
                         entry
                             .metadata::<SchedulerTestcaseMetadata>()?
                             .n_fuzz_entry()
                     } else {
                         corpus
-                            .get(idx)?
+                            .get(id)?
                             .borrow()
                             .metadata::<SchedulerTestcaseMetadata>()?
                             .n_fuzz_entry()

@@ -57,8 +57,6 @@ where
         mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
-        *state.executions_mut() += 1;
-
         self.primary.run_target(fuzzer, state, mgr, input)
     }
 }
