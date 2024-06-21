@@ -20,8 +20,7 @@ use crate::{
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, NopInput, NopInputConverter, UsesInput},
-    prelude::Stoppable,
-    state::{HasExecutions, NopState, State, UsesState},
+    state::{HasExecutions, NopState, State, Stoppable, UsesState},
     Error, HasMetadata,
 };
 
