@@ -54,28 +54,28 @@ where
     }
 
     /// Touch this index and maybe evict an entry if we have touched an input which was unloaded.
-    fn touch(&self, idx: CorpusId, corpus: &TestcaseStorageMap<I>) -> Result<(), Error> {
+    fn touch(&self, id: CorpusId, corpus: &TestcaseStorageMap<I>) -> Result<(), Error> {
         let mut loaded_mapping = self.loaded_mapping.borrow_mut();
         let mut loaded_entries = self.loaded_entries.borrow_mut();
-        match loaded_mapping.entry(idx) {
+        match loaded_mapping.entry(id) {
             Entry::Occupied(mut e) => {
                 let &old = e.get();
                 let new = self.next_recency.fetch_add(1, Ordering::Relaxed);
                 e.insert(new);
                 loaded_entries.remove(&old);
-                loaded_entries.insert(new, idx);
+                loaded_entries.insert(new, id);
             }
             Entry::Vacant(e) => {
                 // new entry! send it in
                 let new = self.next_recency.fetch_add(1, Ordering::Relaxed);
                 e.insert(new);
-                loaded_entries.insert(new, idx);
+                loaded_entries.insert(new, id);
             }
         }
         if loaded_entries.len() > self.max_len {
-            let idx = loaded_entries.pop_first().unwrap().1; // cannot panic
-            let cell = corpus.get(idx).ok_or_else(|| {
-                Error::key_not_found(format!("Tried to evict non-existent entry {idx}"))
+            let id = loaded_entries.pop_first().unwrap().1; // cannot panic
+            let cell = corpus.get(id).ok_or_else(|| {
+                Error::key_not_found(format!("Tried to evict non-existent entry {id}"))
             })?;
             let mut tc = cell.try_borrow_mut()?;
             let _ = tc.input_mut().take();
@@ -97,7 +97,7 @@ where
         testcase: RefCell<Testcase<I>>,
         is_disabled: bool,
     ) -> Result<CorpusId, Error> {
-        let idx = if is_disabled {
+        let id = if is_disabled {
             self.mapping.insert_disabled(testcase)
         } else {
             self.mapping.insert(testcase)
@@ -107,7 +107,7 @@ where
         } else {
             &self.mapping.enabled
         };
-        let mut testcase = corpus.get(idx).unwrap().borrow_mut();
+        let mut testcase = corpus.get(id).unwrap().borrow_mut();
         match testcase.file_path() {
             Some(path) if path.canonicalize()?.starts_with(&self.corpus_dir) => {
                 // if it's already in the correct dir, we retain it
@@ -118,7 +118,7 @@ where
                         "The testcase, when added to the corpus, must have an input present!",
                     )
                 })?;
-                let name = input.generate_name(idx.into());
+                let name = input.generate_name(Some(id));
                 let path = self.corpus_dir.join(&name);
 
                 match input.to_file(&path) {
@@ -134,8 +134,8 @@ where
                 testcase.file_path_mut().replace(path);
             }
         };
-        self.touch(idx, corpus)?;
-        Ok(idx)
+        self.touch(id, corpus)?;
+        Ok(id)
     }
 }
 
@@ -171,7 +171,7 @@ where
 
     fn replace(
         &mut self,
-        _idx: CorpusId,
+        _id: CorpusId,
         _testcase: Testcase<Self::Input>,
     ) -> Result<Testcase<Self::Input>, Error> {
         unimplemented!("It is unsafe to use this corpus variant with replace!");
@@ -335,7 +335,7 @@ where
 
     fn replace(
         &mut self,
-        _idx: CorpusId,
+        _id: CorpusId,
         _testcase: Testcase<Self::Input>,
     ) -> Result<Testcase<Self::Input>, Error> {
         unimplemented!("Artifact prefix is thin and cannot get, replace, or remove.")

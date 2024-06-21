@@ -37,6 +37,7 @@ impl Display for MultiMachineNode {
 }
 
 impl MultiMachineNode {
+    #[must_use]
     pub fn new(addr: String) -> Self {
         Self { addr }
     }
@@ -47,7 +48,8 @@ impl MultiMachineTree {
     ///
     ///
     /// - machines: machines to add.
-    /// - max_children_per_parent: each parent will have at most this amount of children
+    /// - `max_children_per_parent`: each parent will have at most this amount of children
+    #[must_use]
     pub fn generate(machines: &[String], max_children_per_parent: u64) -> Self {
         let mut graph = Graph::<MultiMachineNode, MultiMachineEdge>::new();
         let mut machines = Vec::from(machines);

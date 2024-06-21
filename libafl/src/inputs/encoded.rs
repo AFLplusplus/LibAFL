@@ -19,7 +19,7 @@ use libafl_bolts::{Error, HasLen};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::inputs::Input;
+use crate::{corpus::CorpusId, inputs::Input};
 
 /// Trait to encode bytes to an [`EncodedInput`] using the given [`Tokenizer`]
 pub trait InputEncoder<T>
@@ -202,7 +202,7 @@ pub struct EncodedInput {
 impl Input for EncodedInput {
     /// Generate a name for this input
     #[must_use]
-    fn generate_name(&self, _idx: usize) -> String {
+    fn generate_name(&self, _id: Option<CorpusId>) -> String {
         let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
         for code in &self.codes {
             hasher.write(&code.to_le_bytes());

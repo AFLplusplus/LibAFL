@@ -36,7 +36,7 @@ use crate::{inputs::UsesInput, Error};
 /// An abstraction for the index that identify a testcase in the corpus
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[repr(transparent)]
-pub struct CorpusId(pub(crate) usize);
+pub struct CorpusId(pub usize);
 
 impl fmt::Display for CorpusId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -109,7 +109,7 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
     /// Replaces the [`Testcase`] at the given idx, returning the existing.
     fn replace(
         &mut self,
-        idx: CorpusId,
+        id: CorpusId,
         testcase: Testcase<Self::Input>,
     ) -> Result<Testcase<Self::Input>, Error>;
 
@@ -171,8 +171,8 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
     fn store_input_from(&self, testcase: &Testcase<Self::Input>) -> Result<(), Error>;
 
     /// Loads the `Input` for a given [`CorpusId`] from the [`Corpus`], and returns the clone.
-    fn cloned_input_for_id(&self, idx: CorpusId) -> Result<Self::Input, Error> {
-        let mut testcase = self.get(idx)?.borrow_mut();
+    fn cloned_input_for_id(&self, id: CorpusId) -> Result<Self::Input, Error> {
+        let mut testcase = self.get(id)?.borrow_mut();
         Ok(testcase.load_input(self)?.clone())
     }
 }
@@ -180,10 +180,10 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
 /// Trait for types which track the current corpus index
 pub trait HasCurrentCorpusId {
     /// Set the current corpus index; we have started processing this corpus entry
-    fn set_corpus_idx(&mut self, idx: CorpusId) -> Result<(), Error>;
+    fn set_corpus_id(&mut self, id: CorpusId) -> Result<(), Error>;
 
     /// Clear the current corpus index; we are done with this entry
-    fn clear_corpus_idx(&mut self) -> Result<(), Error>;
+    fn clear_corpus_id(&mut self) -> Result<(), Error>;
 
     /// Fetch the current corpus index -- typically used after a state recovery or transfer
     fn current_corpus_id(&self) -> Result<Option<CorpusId>, Error>;

@@ -618,9 +618,9 @@ pub struct AFLppRedQueen {
     enable_transform: bool,
     enable_arith: bool,
     text_type: TextType,
-    /// We use this variable to check if we scheduled a new `corpus_idx`
+    /// We use this variable to check if we scheduled a new `corpus_id`
     /// - and, hence, need to recalculate `text_type`
-    last_corpus_idx: Option<CorpusId>,
+    last_corpus_id: Option<CorpusId>,
 }
 
 impl AFLppRedQueen {
@@ -1135,10 +1135,10 @@ where
         // println!("orig: {:#?} new: {:#?}", orig_cmpvals, new_cmpvals);
 
         // Compute when mutating it for the 1st time.
-        let current_corpus_id = state.current_corpus_id()?.ok_or_else(|| Error::key_not_found("No corpus-idx is currently being fuzzed, but called AFLppRedQueen::multi_mutated()."))?;
-        if self.last_corpus_idx.is_none() || self.last_corpus_idx.unwrap() != current_corpus_id {
+        let current_corpus_id = state.current_corpus_id()?.ok_or_else(|| Error::key_not_found("No corpus-id is currently being fuzzed, but called AFLppRedQueen::multi_mutated()."))?;
+        if self.last_corpus_id.is_none() || self.last_corpus_id.unwrap() != current_corpus_id {
             self.text_type = check_if_text(orig_bytes, orig_bytes.len());
-            self.last_corpus_idx = Some(current_corpus_id);
+            self.last_corpus_id = Some(current_corpus_id);
         }
         // println!("approximate size: {cmp_len} x {input_len}");
         for cmp_idx in 0..cmp_len {
@@ -1690,7 +1690,7 @@ impl AFLppRedQueen {
             enable_transform: false,
             enable_arith: false,
             text_type: TextType::None,
-            last_corpus_idx: None,
+            last_corpus_id: None,
         }
     }
 
@@ -1701,7 +1701,7 @@ impl AFLppRedQueen {
             enable_transform: transform,
             enable_arith: arith,
             text_type: TextType::None,
-            last_corpus_idx: None,
+            last_corpus_id: None,
         }
     }
 

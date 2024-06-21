@@ -38,7 +38,7 @@ use crate::{
 use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 
 /// Send a monitor update all 15 (or more) seconds
-const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(1);
+const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
 
 /// Holds a scheduler
 pub trait HasScheduler: UsesState
@@ -290,7 +290,6 @@ where
         let monitor_timeout = STATS_TIMEOUT_DEFAULT;
 
         for _ in 0..iters {
-            // log::info!("Starting another fuzz_loop");
             manager.maybe_report_progress(state, monitor_timeout)?;
             ret = Some(self.fuzz_one(stages, executor, state, manager)?);
         }
@@ -456,7 +455,7 @@ where
         EM: EventFirer<State = Self::State>,
     {
         let exec_res = self.execute_no_process(state, manager, &input, observers, exit_kind)?;
-        let corpus_idx = self.process_execution(
+        let corpus_id = self.process_execution(
             state,
             manager,
             input,
@@ -465,7 +464,7 @@ where
             exit_kind,
             send_events,
         )?;
-        Ok((exec_res, corpus_idx))
+        Ok((exec_res, corpus_id))
     }
 
     /// Evaluate if a set of observation channels has an interesting state
@@ -499,8 +498,8 @@ where
                     .append_hit_feedbacks(testcase.hit_feedbacks_mut())?;
                 self.feedback_mut()
                     .append_metadata(state, manager, observers, &mut testcase)?;
-                let idx = state.corpus_mut().add(testcase)?;
-                self.scheduler_mut().on_add(state, idx)?;
+                let id = state.corpus_mut().add(testcase)?;
+                self.scheduler_mut().on_add(state, id)?;
 
                 if send_events && manager.should_send() {
                     // TODO set None for fast targets
@@ -528,7 +527,7 @@ where
                     // This testcase is from the other fuzzers.
                     *state.imported_mut() += 1;
                 }
-                Ok(Some(idx))
+                Ok(Some(id))
             }
             ExecuteInputResult::Solution => {
                 // Not interesting
@@ -626,8 +625,8 @@ where
         let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
         testcase.set_disabled(true);
         // Add the disabled input to the main corpus
-        let idx = state.corpus_mut().add_disabled(testcase)?;
-        Ok(idx)
+        let id = state.corpus_mut().add_disabled(testcase)?;
+        Ok(id)
     }
     /// Adds an input, even if it's not considered `interesting` by any of the executors
     fn add_input(
@@ -663,7 +662,7 @@ where
                 .append_hit_feedbacks(testcase.hit_objectives_mut())?;
             self.objective_mut()
                 .append_metadata(state, manager, &*observers, &mut testcase)?;
-            let idx = state.solutions_mut().add(testcase)?;
+            let id = state.solutions_mut().add(testcase)?;
 
             let executions = *state.executions();
             manager.fire(
@@ -674,7 +673,7 @@ where
                     time: current_time(),
                 },
             )?;
-            return Ok(idx);
+            return Ok(id);
         }
 
         // Not a solution
@@ -702,8 +701,8 @@ where
         // Add the input to the main corpus
         self.feedback_mut()
             .append_metadata(state, manager, &*observers, &mut testcase)?;
-        let idx = state.corpus_mut().add(testcase)?;
-        self.scheduler_mut().on_add(state, idx)?;
+        let id = state.corpus_mut().add(testcase)?;
+        self.scheduler_mut().on_add(state, id)?;
 
         let observers_buf = if manager.configuration() == EventConfig::AlwaysUnique {
             None
@@ -725,7 +724,7 @@ where
                 node_id: None,
             },
         )?;
-        Ok(idx)
+        Ok(id)
     }
 }
 
@@ -758,12 +757,12 @@ where
         state.introspection_monitor_mut().start_timer();
 
         // Get the next index from the scheduler
-        let idx = if let Some(idx) = state.current_corpus_id()? {
-            idx // we are resuming
+        let id = if let Some(id) = state.current_corpus_id()? {
+            id // we are resuming
         } else {
-            let idx = self.scheduler.next(state)?;
-            state.set_corpus_idx(idx)?; // set up for resume
-            idx
+            let id = self.scheduler.next(state)?;
+            state.set_corpus_id(id)?; // set up for resume
+            id
         };
 
         // Mark the elapsed time for the scheduler
@@ -789,16 +788,16 @@ where
         state.introspection_monitor_mut().mark_manager_time();
 
         {
-            if let Ok(mut testcase) = state.testcase_mut(idx) {
+            if let Ok(mut testcase) = state.testcase_mut(id) {
                 let scheduled_count = testcase.scheduled_count();
                 // increase scheduled count, this was fuzz_level in afl
                 testcase.set_scheduled_count(scheduled_count + 1);
             }
         }
 
-        state.clear_corpus_idx()?;
+        state.clear_corpus_id()?;
 
-        Ok(idx)
+        Ok(id)
     }
 }
 

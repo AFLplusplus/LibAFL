@@ -29,14 +29,14 @@ impl<S> Scheduler for QueueScheduler<S>
 where
     S: HasCorpus + HasTestcase + State,
 {
-    fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
+    fn on_add(&mut self, state: &mut Self::State, id: CorpusId) -> Result<(), Error> {
         // Set parent id
-        let current_idx = *state.corpus().current();
+        let current_id = *state.corpus().current();
         state
             .corpus()
-            .get(idx)?
+            .get(id)?
             .borrow_mut()
-            .set_parent_id_optional(current_idx);
+            .set_parent_id_optional(current_id);
 
         Ok(())
     }
@@ -112,10 +112,10 @@ mod tests {
 
         let mut state = StdState::new(rand, q, objective_q, &mut feedback, &mut objective).unwrap();
 
-        let next_idx = scheduler.next(&mut state).unwrap();
+        let next_id = scheduler.next(&mut state).unwrap();
         let filename = state
             .corpus()
-            .get(next_idx)
+            .get(next_id)
             .unwrap()
             .borrow()
             .filename()

@@ -1,5 +1,9 @@
 //! The colorization stage from `colorization()` in afl++
-use alloc::{borrow::Cow, collections::binary_heap::BinaryHeap, vec::Vec};
+use alloc::{
+    borrow::{Cow, ToOwned},
+    collections::binary_heap::BinaryHeap,
+    vec::Vec,
+};
 use core::{cmp::Ordering, fmt::Debug, marker::PhantomData, ops::Range};
 
 use libafl_bolts::{
@@ -15,7 +19,7 @@ use crate::{
     inputs::HasMutatorBytes,
     mutators::mutations::buffer_copy,
     observers::{MapObserver, ObserversTuple},
-    stages::{RetryRestartHelper, Stage},
+    stages::{Stage, StdRestartHelper},
     state::{HasCorpus, HasCurrentTestcase, HasRand, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -104,14 +108,15 @@ where
         Ok(())
     }
 
-    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        // TODO this stage needs a proper resume
-        RetryRestartHelper::restart_progress_should_run(state, self, 3)
+    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        // This is a deterministic stage
+        // Once it failed, then don't retry,
+        // It will just fail again
+        StdRestartHelper::no_retry(state, &self.name)
     }
 
-    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        // TODO this stage needs a proper resume
-        RetryRestartHelper::clear_restart_progress(state, self)
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        StdRestartHelper::clear_progress(state, &self.name)
     }
 }
 
@@ -309,9 +314,10 @@ where
     #[must_use]
     /// Creates a new [`ColorizationStage`]
     pub fn new(map_observer: &C) -> Self {
+        let obs_name = map_observer.name().clone().into_owned();
         Self {
             map_observer_handle: map_observer.handle(),
-            name: Cow::Borrowed(COLORIZATION_STAGE_NAME),
+            name: Cow::Owned(COLORIZATION_STAGE_NAME.to_owned() + ":" + obs_name.as_str()),
             phantom: PhantomData,
         }
     }

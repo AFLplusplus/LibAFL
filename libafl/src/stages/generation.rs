@@ -54,11 +54,13 @@ where
         Ok(())
     }
 
-    fn restart_progress_should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+        // It's a random generation stage
+        // so you can restart for whatever times you want
         Ok(true)
     }
 
-    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
         Ok(())
     }
 }

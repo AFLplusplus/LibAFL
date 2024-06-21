@@ -1,6 +1,9 @@
 //! The power schedules. This stage should be invoked after the calibration stage.
 
-use alloc::borrow::Cow;
+use alloc::{
+    borrow::{Cow, ToOwned},
+    string::ToString,
+};
 use core::{fmt::Debug, marker::PhantomData};
 
 use libafl_bolts::Named;
@@ -10,10 +13,13 @@ use crate::{
     fuzzer::Evaluator,
     mutators::Mutator,
     schedulers::{testcase_score::CorpusPowerTestcaseScore, TestcaseScore},
-    stages::{mutational::MutatedTransform, ExecutionCountRestartHelper, MutationalStage, Stage},
+    stages::{mutational::MutatedTransform, MutationalStage, Stage, StdRestartHelper},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
-    Error, HasMetadata,
+    Error, HasMetadata, HasNamedMetadata,
 };
+
+/// The unique id for this stage
+static mut POWER_MUTATIONAL_STAGE_ID: usize = 0;
 /// Default name for `PowerMutationalStage`; derived from AFL++
 pub const POWER_MUTATIONAL_STAGE_NAME: &str = "power";
 /// The mutational stage using power schedules
@@ -22,8 +28,6 @@ pub struct PowerMutationalStage<E, F, EM, I, M, Z> {
     name: Cow<'static, str>,
     /// The mutators we use
     mutator: M,
-    /// Helper for restarts
-    restart_helper: ExecutionCountRestartHelper,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, F, EM, I, Z)>,
 }
@@ -47,7 +51,7 @@ where
     EM: UsesState<State = Self::State>,
     F: TestcaseScore<Self::State>,
     M: Mutator<I, Self::State>,
-    Self::State: HasCorpus + HasMetadata + HasRand + HasExecutions,
+    Self::State: HasCorpus + HasMetadata + HasRand + HasExecutions + HasNamedMetadata,
     Z: Evaluator<E, EM, State = Self::State>,
     I: MutatedTransform<E::Input, Self::State> + Clone,
 {
@@ -72,10 +76,6 @@ where
 
         Ok(score)
     }
-
-    fn execs_since_progress_start(&mut self, state: &mut Self::State) -> Result<u64, Error> {
-        self.restart_helper.execs_since_progress_start(state)
-    }
 }
 
 impl<E, F, EM, I, M, Z> Stage<E, EM, Z> for PowerMutationalStage<E, F, EM, I, M, Z>
@@ -84,7 +84,7 @@ where
     EM: UsesState<State = Self::State>,
     F: TestcaseScore<Self::State>,
     M: Mutator<I, Self::State>,
-    Self::State: HasCorpus + HasMetadata + HasRand + HasExecutions,
+    Self::State: HasCorpus + HasMetadata + HasRand + HasExecutions + HasNamedMetadata,
     Z: Evaluator<E, EM, State = Self::State>,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
 {
@@ -101,14 +101,13 @@ where
         ret
     }
 
-    fn restart_progress_should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
-        Ok(true)
-        // self.restart_helper.restart_progress_should_run(state)
+    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        // Make sure we don't get stuck crashing on a single testcase
+        StdRestartHelper::should_restart(state, &self.name, 3)
     }
 
-    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
-        Ok(())
-        // self.restart_helper.clear_restart_progress(state)
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        StdRestartHelper::clear_progress(state, &self.name)
     }
 }
 
@@ -123,11 +122,18 @@ where
 {
     /// Creates a new [`PowerMutationalStage`]
     pub fn new(mutator: M) -> Self {
+        // unsafe but impossible that you create two threads both instantiating this instance
+        let stage_id = unsafe {
+            let ret = POWER_MUTATIONAL_STAGE_ID;
+            POWER_MUTATIONAL_STAGE_ID += 1;
+            ret
+        };
         Self {
-            name: Cow::Borrowed(POWER_MUTATIONAL_STAGE_NAME),
+            name: Cow::Owned(
+                POWER_MUTATIONAL_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_str(),
+            ),
             mutator,
             phantom: PhantomData,
-            restart_helper: ExecutionCountRestartHelper::default(),
         }
     }
 }

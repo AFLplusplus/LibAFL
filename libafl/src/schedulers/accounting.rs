@@ -136,9 +136,9 @@ where
     <Self::State as UsesInput>::Input: HasLen,
     O: CanTrack,
 {
-    fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
-        self.update_accounting_score(state, idx)?;
-        self.inner.on_add(state, idx)
+    fn on_add(&mut self, state: &mut Self::State, id: CorpusId) -> Result<(), Error> {
+        self.update_accounting_score(state, id)?;
+        self.inner.on_add(state, id)
     }
 
     fn on_evaluation<OT>(
@@ -163,29 +163,29 @@ where
         } else {
             self.inner.cull(state)?;
         }
-        let mut idx = self.inner.base_mut().next(state)?;
+        let mut id = self.inner.base_mut().next(state)?;
         while {
             let has = !state
                 .corpus()
-                .get(idx)?
+                .get(id)?
                 .borrow()
                 .has_metadata::<IsFavoredMetadata>();
             has
         } && state.rand_mut().coinflip(self.skip_non_favored_prob)
         {
-            idx = self.inner.base_mut().next(state)?;
+            id = self.inner.base_mut().next(state)?;
         }
 
         // Don't add corpus.curret(). The inner scheduler will take care of it
 
-        Ok(idx)
+        Ok(id)
     }
 
     /// Set current fuzzed corpus id and `scheduled_count`
     fn set_current_scheduled(
         &mut self,
         _state: &mut Self::State,
-        _next_idx: Option<CorpusId>,
+        _next_id: Option<CorpusId>,
     ) -> Result<(), Error> {
         // We do nothing here, the inner scheduler will take care of it
         Ok(())
@@ -205,7 +205,7 @@ where
     pub fn update_accounting_score(
         &self,
         state: &mut CS::State,
-        idx: CorpusId,
+        id: CorpusId,
     ) -> Result<(), Error> {
         let mut indexes = vec![];
         let mut new_favoreds = vec![];
@@ -220,7 +220,7 @@ where
                 {
                     let top_acc = state.metadata_map().get::<TopAccountingMetadata>().unwrap();
 
-                    if let Some(old_idx) = top_acc.map.get(&idx) {
+                    if let Some(old_id) = top_acc.map.get(&idx) {
                         if top_acc.max_accounting[idx] > self.accounting_map[idx] {
                             continue;
                         }
@@ -229,11 +229,11 @@ where
                             equal_score = true;
                         }
 
-                        let mut old = state.corpus().get(*old_idx)?.borrow_mut();
+                        let mut old = state.corpus().get_from_all(*old_id)?.borrow_mut();
                         let must_remove = {
                             let old_meta = old.metadata_map_mut().get_mut::<AccountingIndexesMetadata>().ok_or_else(|| {
                                 Error::key_not_found(format!(
-                                    "AccountingIndexesMetadata, needed by CoverageAccountingScheduler, not found in testcase #{old_idx}"
+                                    "AccountingIndexesMetadata, needed by CoverageAccountingScheduler, not found in testcase #{old_id}"
                                 ))
                             })?;
                             *old_meta.refcnt_mut() -= 1;
@@ -268,7 +268,7 @@ where
 
         state
             .corpus()
-            .get(idx)?
+            .get(id)?
             .borrow_mut()
             .metadata_map_mut()
             .insert(AccountingIndexesMetadata::with_tcref(
@@ -283,7 +283,7 @@ where
         top_acc.changed = true;
 
         for elem in new_favoreds {
-            top_acc.map.insert(elem, idx);
+            top_acc.map.insert(elem, id);
         }
 
         Ok(())
@@ -296,8 +296,8 @@ where
             return Ok(());
         };
 
-        for (_key, idx) in &top_rated.map {
-            let mut entry = state.corpus().get(*idx)?.borrow_mut();
+        for (_key, id) in &top_rated.map {
+            let mut entry = state.corpus().get(*id)?.borrow_mut();
             if entry.scheduled_count() > 0 {
                 continue;
             }

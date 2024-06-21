@@ -108,7 +108,7 @@ impl LibfuzzerCrashCauseFeedback {
         let base = if let Some(filename) = testcase.filename() {
             filename.clone()
         } else {
-            let name = testcase.input().as_ref().unwrap().generate_name(0);
+            let name = testcase.input().as_ref().unwrap().generate_name(None);
             name
         };
         let file_path = self.artifact_prefix.dir().join(format!(

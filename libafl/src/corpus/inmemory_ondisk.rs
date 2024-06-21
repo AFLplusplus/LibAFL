@@ -74,52 +74,52 @@ where
     /// Add an enabled testcase to the corpus and return its index
     #[inline]
     fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
-        let idx = self.inner.add(testcase)?;
-        let testcase = &mut self.get(idx).unwrap().borrow_mut();
-        self.save_testcase(testcase, idx)?;
+        let id = self.inner.add(testcase)?;
+        let testcase = &mut self.get(id).unwrap().borrow_mut();
+        self.save_testcase(testcase, id)?;
         *testcase.input_mut() = None;
-        Ok(idx)
+        Ok(id)
     }
 
     /// Add a disabled testcase to the corpus and return its index
     #[inline]
     fn add_disabled(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
-        let idx = self.inner.add_disabled(testcase)?;
-        let testcase = &mut self.get_from_all(idx).unwrap().borrow_mut();
-        self.save_testcase(testcase, idx)?;
+        let id = self.inner.add_disabled(testcase)?;
+        let testcase = &mut self.get_from_all(id).unwrap().borrow_mut();
+        self.save_testcase(testcase, id)?;
         *testcase.input_mut() = None;
-        Ok(idx)
+        Ok(id)
     }
 
     /// Replaces the testcase at the given idx
     #[inline]
-    fn replace(&mut self, idx: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
-        let entry = self.inner.replace(idx, testcase)?;
+    fn replace(&mut self, id: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
+        let entry = self.inner.replace(id, testcase)?;
         self.remove_testcase(&entry)?;
-        let testcase = &mut self.get(idx).unwrap().borrow_mut();
-        self.save_testcase(testcase, idx)?;
+        let testcase = &mut self.get(id).unwrap().borrow_mut();
+        self.save_testcase(testcase, id)?;
         *testcase.input_mut() = None;
         Ok(entry)
     }
 
     /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled corpus
     #[inline]
-    fn remove(&mut self, idx: CorpusId) -> Result<Testcase<I>, Error> {
-        let entry = self.inner.remove(idx)?;
+    fn remove(&mut self, id: CorpusId) -> Result<Testcase<I>, Error> {
+        let entry = self.inner.remove(id)?;
         self.remove_testcase(&entry)?;
         Ok(entry)
     }
 
     /// Get by id; considers only enabled testcases
     #[inline]
-    fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
-        self.inner.get(idx)
+    fn get(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
+        self.inner.get(id)
     }
 
     /// Get by id; considers both enabled and disabled testcases
     #[inline]
-    fn get_from_all(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
-        self.inner.get_from_all(idx)
+    fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
+        self.inner.get_from_all(id)
     }
 
     /// Current testcase scheduled
@@ -135,8 +135,8 @@ where
     }
 
     #[inline]
-    fn next(&self, idx: CorpusId) -> Option<CorpusId> {
-        self.inner.next(idx)
+    fn next(&self, id: CorpusId) -> Option<CorpusId> {
+        self.inner.next(id)
     }
 
     /// Peek the next free corpus id
@@ -146,8 +146,8 @@ where
     }
 
     #[inline]
-    fn prev(&self, idx: CorpusId) -> Option<CorpusId> {
-        self.inner.prev(idx)
+    fn prev(&self, id: CorpusId) -> Option<CorpusId> {
+        self.inner.prev(id)
     }
 
     #[inline]
@@ -372,10 +372,10 @@ where
         }
     }
 
-    fn save_testcase(&self, testcase: &mut Testcase<I>, idx: CorpusId) -> Result<(), Error> {
+    fn save_testcase(&self, testcase: &mut Testcase<I>, id: CorpusId) -> Result<(), Error> {
         let file_name_orig = testcase.filename_mut().take().unwrap_or_else(|| {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
-            testcase.input().as_ref().unwrap().generate_name(idx.0)
+            testcase.input().as_ref().unwrap().generate_name(Some(id))
         });
 
         // New testcase, we need to save it.

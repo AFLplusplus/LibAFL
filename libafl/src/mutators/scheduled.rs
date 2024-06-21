@@ -388,9 +388,9 @@ where
         self.scheduled_mutate(state, input)
     }
 
-    fn post_exec(&mut self, state: &mut S, corpus_idx: Option<CorpusId>) -> Result<(), Error> {
-        if let Some(idx) = corpus_idx {
-            let mut testcase = (*state.corpus_mut().get(idx)?).borrow_mut();
+    fn post_exec(&mut self, state: &mut S, corpus_id: Option<CorpusId>) -> Result<(), Error> {
+        if let Some(id) = corpus_id {
+            let mut testcase = (*state.corpus_mut().get(id)?).borrow_mut();
             let mut log = Vec::<Cow<'static, str>>::new();
             while let Some(idx) = self.mutation_log.pop() {
                 let name = self.scheduled.mutations().name(idx.0).unwrap().clone(); // TODO maybe return an Error on None

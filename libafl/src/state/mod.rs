@@ -268,7 +268,7 @@ pub struct StdState<I, C, R, SC> {
     /// This information is used by fuzzer `maybe_report_progress`.
     last_report_time: Option<Duration>,
     /// The current index of the corpus; used to record for resumable fuzzing.
-    corpus_idx: Option<CorpusId>,
+    corpus_id: Option<CorpusId>,
     stage_stack: StageStack,
     #[cfg(feature = "dump_state")]
     dump_state_dir: Option<PathBuf>,
@@ -475,18 +475,18 @@ impl<I, C, R, SC> HasStartTime for StdState<I, C, R, SC> {
 }
 
 impl<I, C, R, SC> HasCurrentCorpusId for StdState<I, C, R, SC> {
-    fn set_corpus_idx(&mut self, idx: CorpusId) -> Result<(), Error> {
-        self.corpus_idx = Some(idx);
+    fn set_corpus_id(&mut self, id: CorpusId) -> Result<(), Error> {
+        self.corpus_id = Some(id);
         Ok(())
     }
 
-    fn clear_corpus_idx(&mut self) -> Result<(), Error> {
-        self.corpus_idx = None;
+    fn clear_corpus_id(&mut self) -> Result<(), Error> {
+        self.corpus_id = None;
         Ok(())
     }
 
     fn current_corpus_id(&self) -> Result<Option<CorpusId>, Error> {
-        Ok(self.corpus_idx)
+        Ok(self.corpus_id)
     }
 }
 
@@ -497,19 +497,19 @@ where
 {
     /// Gets the current [`Testcase`] we are fuzzing
     ///
-    /// Will return [`Error::key_not_found`] if no `corpus_idx` is currently set.
+    /// Will return [`Error::key_not_found`] if no `corpus_id` is currently set.
     fn current_testcase(&self) -> Result<Ref<'_, Testcase<I>>, Error>;
     //fn current_testcase(&self) -> Result<&Testcase<I>, Error>;
 
     /// Gets the current [`Testcase`] we are fuzzing (mut)
     ///
-    /// Will return [`Error::key_not_found`] if no `corpus_idx` is currently set.
+    /// Will return [`Error::key_not_found`] if no `corpus_id` is currently set.
     fn current_testcase_mut(&self) -> Result<RefMut<'_, Testcase<I>>, Error>;
     //fn current_testcase_mut(&self) -> Result<&mut Testcase<I>, Error>;
 
     /// Gets a cloned representation of the current [`Testcase`].
     ///
-    /// Will return [`Error::key_not_found`] if no `corpus_idx` is currently set.
+    /// Will return [`Error::key_not_found`] if no `corpus_id` is currently set.
     ///
     /// # Note
     /// This allocates memory and copies the contents!
@@ -1113,7 +1113,7 @@ where
             #[cfg(feature = "std")]
             dont_reenter: None,
             last_report_time: None,
-            corpus_idx: None,
+            corpus_id: None,
             stage_stack: StageStack::default(),
             phantom: PhantomData,
             #[cfg(feature = "std")]
@@ -1239,11 +1239,11 @@ impl<I> HasRand for NopState<I> {
 impl<I> State for NopState<I> where I: Input {}
 
 impl<I> HasCurrentCorpusId for NopState<I> {
-    fn set_corpus_idx(&mut self, _idx: CorpusId) -> Result<(), Error> {
+    fn set_corpus_id(&mut self, _id: CorpusId) -> Result<(), Error> {
         Ok(())
     }
 
-    fn clear_corpus_idx(&mut self) -> Result<(), Error> {
+    fn clear_corpus_id(&mut self) -> Result<(), Error> {
         Ok(())
     }
 

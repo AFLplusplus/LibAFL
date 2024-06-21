@@ -277,6 +277,7 @@ jobs:
       - ubuntu
       - fuzzers-preflight
     strategy:
+      fail-fast: true
       matrix:
         os: [ ubuntu-latest ]
         fuzzer:

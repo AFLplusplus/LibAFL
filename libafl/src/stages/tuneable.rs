@@ -248,10 +248,6 @@ where
             1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS),
         )
     }
-
-    fn execs_since_progress_start(&mut self, state: &mut Self::State) -> Result<u64, Error> {
-        self.restart_helper.execs_since_progress_start(state)
-    }
 }
 
 impl<E, EM, I, M, Z> UsesState for TuneableMutationalStage<E, EM, I, M, Z>
@@ -287,12 +283,12 @@ where
         ret
     }
 
-    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        self.restart_helper.restart_progress_should_run(state)
+    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        self.restart_helper.should_restart(state, &self.name)
     }
 
-    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        self.restart_helper.clear_restart_progress(state)
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        self.restart_helper.clear_progress(state)
     }
 }
 
@@ -303,9 +299,17 @@ where
     M: Mutator<I, <Self as UsesState>::State>,
     Z: Evaluator<E, EM>,
     <Self as UsesState>::State:
-        HasCorpus + HasRand + HasNamedMetadata + HasMetadata + HasExecutions,
+        HasCorpus + HasRand + HasNamedMetadata + HasExecutions + HasMetadata,
     I: MutatedTransform<Z::Input, <Self as UsesState>::State> + Clone,
 {
+    fn execs_since_progress_start(
+        &mut self,
+        state: &mut <Self as UsesState>::State,
+    ) -> Result<u64, Error> {
+        self.restart_helper
+            .execs_since_progress_start(state, &self.name)
+    }
+
     /// Creates a new default tuneable mutational stage
     #[must_use]
     pub fn new(state: &mut <Self as UsesState>::State, mutator: M) -> Self {
@@ -456,11 +460,11 @@ where
 
         // Time is measured directly the `evaluate_input` function
         let (untransformed, post) = input.try_transform_into(state)?;
-        let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
+        let (_, corpus_id) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
 
         start_timer!(state);
-        self.mutator_mut().post_exec(state, corpus_idx)?;
-        post.post_exec(state, corpus_idx)?;
+        self.mutator_mut().post_exec(state, corpus_id)?;
+        post.post_exec(state, corpus_id)?;
         mark_feature_time!(state, PerfFeature::MutatePostExec);
 
         Ok(())
