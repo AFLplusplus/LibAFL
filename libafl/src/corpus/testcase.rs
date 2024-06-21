@@ -11,7 +11,7 @@ use core::{
 #[cfg(feature = "std")]
 use std::path::PathBuf;
 
-use libafl_bolts::{serdeany::SerdeAnyMap, HasLen};
+use libafl_bolts::{current_time, serdeany::SerdeAnyMap, HasLen};
 use serde::{Deserialize, Serialize};
 
 use super::Corpus;
@@ -75,6 +75,9 @@ where
     /// Vector of `Feedback` names that deemed this `Testcase` as solution worthy
     #[cfg(feature = "track_hit_feedbacks")]
     hit_objectives: Vec<Cow<'static, str>>,
+    /// Timestamp from epoch
+    #[cfg(feature = "dump_state")]
+    timestamp: Duration,
 }
 
 impl<I> HasMetadata for Testcase<I>
@@ -270,6 +273,8 @@ where
             hit_feedbacks: Vec::new(),
             #[cfg(feature = "track_hit_feedbacks")]
             hit_objectives: Vec::new(),
+            #[cfg(feature = "dump_state")]
+            timestamp: current_time(),
         }
     }
 
@@ -296,6 +301,8 @@ where
             hit_feedbacks: Vec::new(),
             #[cfg(feature = "track_hit_feedbacks")]
             hit_objectives: Vec::new(),
+            #[cfg(feature = "dump_state")]
+            timestamp: current_time(),
         }
     }
 
@@ -322,6 +329,8 @@ where
             hit_feedbacks: Vec::new(),
             #[cfg(feature = "track_hit_feedbacks")]
             hit_objectives: Vec::new(),
+            #[cfg(feature = "dump_state")]
+            timestamp: current_time(),
         }
     }
 
@@ -348,6 +357,8 @@ where
             hit_feedbacks: Vec::new(),
             #[cfg(feature = "track_hit_feedbacks")]
             hit_objectives: Vec::new(),
+            #[cfg(feature = "dump_state")]
+            timestamp: current_time(),
         }
     }
 
@@ -404,6 +415,8 @@ where
             hit_feedbacks: Vec::new(),
             #[cfg(feature = "track_hit_feedbacks")]
             hit_objectives: Vec::new(),
+            #[cfg(feature = "dump_state")]
+            timestamp: current_time(),
         }
     }
 }

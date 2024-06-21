@@ -39,7 +39,7 @@ pub use broker_hooks::*;
 #[cfg(feature = "std")]
 pub use launcher::*;
 #[cfg(all(unix, feature = "std"))]
-use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal, CTRL_C_EXIT};
+use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
 use libafl_bolts::{
     current_time,
     tuples::{Handle, MatchNameRef},
@@ -57,7 +57,7 @@ use crate::{
     monitors::UserStats,
     observers::ObserversTuple,
     state::{HasExecutions, HasLastReportTime, State},
-    Error, HasMetadata,
+    Error, HasMetadata, INTERRUPT_FUZZER,
 };
 #[cfg(feature = "scalability_introspection")]
 use crate::{
@@ -95,7 +95,18 @@ impl Handler for ShutdownSignalData {
             // println!("Exiting from the handler....");
 
             #[cfg(unix)]
-            libc::_exit(CTRL_C_EXIT);
+            {
+                #[cfg(not(feature = "dump_state"))]
+                {
+                    libc::_exit(CTRL_C_EXIT);
+                }
+
+                #[cfg(feature = "dump_state")]
+                {
+                    // fuzzer will exit at the end of fuzzing run.
+                    INTERRUPT_FUZZER = true;
+                }
+            }
 
             #[cfg(windows)]
             windows::Win32::System::Threading::ExitProcess(100);

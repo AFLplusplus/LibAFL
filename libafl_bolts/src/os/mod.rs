@@ -32,6 +32,7 @@ use std::{fs::File, os::fd::AsRawFd, sync::OnceLock};
 pub mod windows_exceptions;
 #[cfg(unix)]
 use libc::pid_t;
+use nix::sys::wait::WaitStatus;
 #[cfg(all(windows, feature = "std"))]
 pub use windows_exceptions::CTRL_C_EXIT;
 
@@ -47,16 +48,23 @@ pub struct ChildHandle {
     pub pid: pid_t,
 }
 
+use nix::{sys::wait::waitpid, unistd::Pid};
+
 #[cfg(unix)]
 impl ChildHandle {
     /// Block until the child exited and the status code becomes available
     #[must_use]
     pub fn status(&self) -> i32 {
-        let mut status = -1;
-        unsafe {
-            libc::waitpid(self.pid, &mut status, 0);
+        let ret = { waitpid(Some(Pid::from_raw(self.pid)), None) };
+
+        log::info!("Client exited: {:?}", ret);
+        match ret {
+            Ok(WaitStatus::Exited(_, status)) => status,
+            _ => {
+                log::error!("Client unexpected exit");
+                0
+            }
         }
-        libc::WEXITSTATUS(status)
     }
 }
 

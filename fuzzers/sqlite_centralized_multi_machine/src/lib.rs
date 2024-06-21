@@ -191,6 +191,7 @@ pub extern "C" fn libafl_main() {
                 &mut feedback,
                 // Same for objective feedbacks
                 &mut objective,
+                Some(PathBuf::from("./dumped_state")),
             )
             .unwrap()
         });

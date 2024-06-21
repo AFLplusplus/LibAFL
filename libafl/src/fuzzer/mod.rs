@@ -2,8 +2,19 @@
 
 use alloc::string::ToString;
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
+#[cfg(all(feature = "std", feature = "dump_state"))]
+use std::{
+    fs::{self, File},
+    hash::{BuildHasher, Hasher},
+    io::Write,
+};
 
+#[cfg(all(feature = "std", feature = "dump_state"))]
+use ahash::RandomState;
 use libafl_bolts::current_time;
+#[cfg(all(feature = "std", feature = "dump_state"))]
+use libafl_bolts::os::CTRL_C_EXIT;
+use log::info;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
@@ -18,8 +29,8 @@ use crate::{
     stages::{HasCurrentStage, StagesTuple},
     start_timer,
     state::{
-        HasCorpus, HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime, HasSolutions,
-        UsesState,
+        HasCorpus, HasCurrentTestcase, HasDumpStateDir, HasExecutions, HasImported,
+        HasLastReportTime, HasSolutions, UsesState,
     },
     Error, HasMetadata,
 };
@@ -179,10 +190,13 @@ pub trait Evaluator<E, EM>: UsesState {
     ) -> Result<CorpusId, Error>;
 }
 
+/// The fuzzer should stop at the end of the current run.
+pub static mut INTERRUPT_FUZZER: bool = false;
+
 /// The main fuzzer trait.
 pub trait Fuzzer<E, EM, ST>: Sized + UsesState
 where
-    Self::State: HasMetadata + HasExecutions + HasLastReportTime,
+    Self::State: HasMetadata + HasExecutions + HasLastReportTime + HasDumpStateDir,
     E: UsesState<State = Self::State>,
     EM: ProgressReporter<State = Self::State>,
     ST: StagesTuple<E, EM, Self::State, Self>,
@@ -214,9 +228,38 @@ where
     ) -> Result<(), Error> {
         let monitor_timeout = STATS_TIMEOUT_DEFAULT;
         loop {
-            // log::info!("Starting another fuzz_loop");
             manager.maybe_report_progress(state, monitor_timeout)?;
-            self.fuzz_one(stages, executor, state, manager)?;
+
+            let fuzzer_ret = self.fuzz_one(stages, executor, state, manager);
+
+            #[cfg(feature = "dump_state")]
+            unsafe {
+                if INTERRUPT_FUZZER {
+                    info!("Interrupting fuzzer...");
+
+                    // Dump state if needed.
+                    if let Some(dump_path) = state.dump_state_dir() {
+                        info!("Dumping state to disk...");
+                        let serialized = postcard::to_allocvec(&state)?;
+
+                        // Taken from staterestorer
+                        // generate a filename
+                        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
+                        // Using the last few k as randomness for a filename, hoping it's unique.
+                        hasher.write(&serialized[serialized.len().saturating_sub(4096)..]);
+
+                        let filename = format!("{:016x}.libafl_state", hasher.finish());
+                        let dump_file = dump_path.join(&filename);
+
+                        fs::create_dir_all(dump_path.as_path())?;
+                        File::create(dump_file)?.write_all(&serialized)?;
+                    }
+
+                    libc::exit(CTRL_C_EXIT);
+                }
+            }
+
+            fuzzer_ret?;
         }
     }
 

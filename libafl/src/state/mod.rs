@@ -18,6 +18,7 @@ use std::{
 #[cfg(feature = "std")]
 use libafl_bolts::core_affinity::{CoreId, Cores};
 use libafl_bolts::{
+    current_time,
     rands::{Rand, StdRand},
     serdeany::{NamedSerdeAnyMap, SerdeAnyMap},
 };
@@ -55,6 +56,7 @@ pub trait State:
     + MaybeHasScalabilityMonitor
     + HasCurrentCorpusId
     + HasCurrentStage
+    + HasDumpStateDir
 {
 }
 
@@ -197,6 +199,12 @@ pub trait HasLastReportTime {
     fn last_report_time_mut(&mut self) -> &mut Option<Duration>;
 }
 
+/// Trait for getting the optional dump directory for the state
+pub trait HasDumpStateDir {
+    /// Get the dump dir, if there is one.
+    fn dump_state_dir(&self) -> Option<&PathBuf>;
+}
+
 /// Struct that holds the options for input loading
 #[cfg(feature = "std")]
 pub struct LoadConfig<'a, I, S, Z> {
@@ -262,6 +270,8 @@ pub struct StdState<I, C, R, SC> {
     /// The current index of the corpus; used to record for resumable fuzzing.
     corpus_idx: Option<CorpusId>,
     stage_stack: StageStack,
+    #[cfg(feature = "dump_state")]
+    dump_state_dir: Option<PathBuf>,
     phantom: PhantomData<I>,
 }
 
@@ -270,6 +280,12 @@ where
     I: Input,
 {
     type Input = I;
+}
+
+impl<I, C, R, SC> HasDumpStateDir for StdState<I, C, R, SC> {
+    fn dump_state_dir(&self) -> Option<&PathBuf> {
+        self.dump_state_dir.as_ref()
+    }
 }
 
 impl<I, C, R, SC> State for StdState<I, C, R, SC>
@@ -1072,6 +1088,7 @@ where
         solutions: SC,
         feedback: &mut F,
         objective: &mut O,
+        #[cfg(feature = "dump_state")] dump_state_dir: Option<PathBuf>,
     ) -> Result<Self, Error>
     where
         F: Feedback<Self>,
@@ -1081,7 +1098,7 @@ where
             rand,
             executions: 0,
             imported: 0,
-            start_time: Duration::from_millis(0),
+            start_time: current_time(),
             metadata: SerdeAnyMap::default(),
             named_metadata: NamedSerdeAnyMap::default(),
             corpus,
@@ -1101,6 +1118,8 @@ where
             phantom: PhantomData,
             #[cfg(feature = "std")]
             multicore_inputs_processed: None,
+            #[cfg(feature = "dump_state")]
+            dump_state_dir,
         };
         feedback.init_state(&mut state)?;
         objective.init_state(&mut state)?;
@@ -1159,6 +1178,12 @@ impl<I> HasMaxSize for NopState<I> {
 
     fn set_max_size(&mut self, _max_size: usize) {
         unimplemented!("NopState doesn't allow setting a max size")
+    }
+}
+
+impl<I> HasDumpStateDir for NopState<I> {
+    fn dump_state_dir(&self) -> Option<&PathBuf> {
+        None
     }
 }
 

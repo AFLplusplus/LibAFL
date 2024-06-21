@@ -1289,7 +1289,9 @@ where
 
         log::debug!(
             "[{} - {:#x}] Send message with id {}",
-            self.id.0, self as *const Self as u64, mid
+            self.id.0,
+            self as *const Self as u64,
+            mid
         );
 
         Ok(())
@@ -2369,13 +2371,11 @@ impl Brokers {
         loop {
             self.llmp_brokers.retain_mut(|broker| {
                 if broker.is_shutting_down() {
-
                     broker.send_buf(LLMP_TAG_EXITING, &[]).expect(
                         "Error when shutting down broker: Could not send LLMP_TAG_EXITING msg.",
                     );
 
-                    return false
-
+                    return false;
                 }
 
                 if current_milliseconds() > end_time {
