@@ -16,6 +16,8 @@ use libafl_bolts::current_time;
 use libafl_bolts::os::CTRL_C_EXIT;
 use serde::{de::DeserializeOwned, Serialize};
 
+#[cfg(feature = "std")]
+use crate::state::HasDumpStateDir;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
     events::{Event, EventConfig, EventFirer, EventProcessor, ProgressReporter},
@@ -28,8 +30,8 @@ use crate::{
     stages::{HasCurrentStage, StagesTuple},
     start_timer,
     state::{
-        HasCorpus, HasCurrentTestcase, HasDumpStateDir, HasExecutions, HasImported,
-        HasLastReportTime, HasSolutions, UsesState,
+        HasCorpus, HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime, HasSolutions,
+        UsesState,
     },
     Error, HasMetadata,
 };
