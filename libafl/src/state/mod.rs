@@ -263,7 +263,7 @@ pub struct StdState<I, C, R, SC> {
     /// The current index of the corpus; used to record for resumable fuzzing.
     corpus_idx: Option<CorpusId>,
     /// Tell the fuzzer to stop at the start of the next fuzzing iteration.
-    should_stop_fuzzing: bool,
+    should_stop: bool,
     stage_stack: StageStack,
     phantom: PhantomData<I>,
 }
@@ -535,21 +535,21 @@ where
     }
 }
 
-/// The State tells the fuzzer if it should stop when starting the next fuzzing iteration
+/// A trait for types that want to expose a stop API
 pub trait Stoppable {
-    /// Should the fuzzer to exit on the next fuzzing iteration
-    fn should_stop_fuzzing(&self) -> bool;
+    /// Should stop
+    fn should_stop(&self) -> bool;
 
-    /// Tell the fuzzer if it should stop on the next fuzzing iteration (mutable)
-    fn should_stop_fuzzing_mut(&mut self) -> &mut bool;
+    /// Should stop (mutable)
+    fn should_stop_mut(&mut self) -> &mut bool;
 }
 
 impl<I, C, R, SC> Stoppable for StdState<I, C, R, SC> {
-    fn should_stop_fuzzing_mut(&mut self) -> &mut bool {
-        &mut self.should_stop_fuzzing
+    fn should_stop_mut(&mut self) -> &mut bool {
+        &mut self.should_stop
     }
-    fn should_stop_fuzzing(&self) -> bool {
-        self.should_stop_fuzzing
+    fn should_stop(&self) -> bool {
+        self.should_stop
     }
 }
 
@@ -1108,7 +1108,7 @@ where
             corpus,
             solutions,
             max_size: DEFAULT_MAX_SIZE,
-            should_stop_fuzzing: false,
+            should_stop: false,
             #[cfg(feature = "introspection")]
             introspection_monitor: ClientPerfMonitor::new(),
             #[cfg(feature = "scalability_introspection")]
@@ -1157,7 +1157,7 @@ impl<I, C, R, SC> HasScalabilityMonitor for StdState<I, C, R, SC> {
 pub struct NopState<I> {
     metadata: SerdeAnyMap,
     execution: u64,
-    should_stop_fuzzing: bool,
+    should_stop: bool,
     rand: StdRand,
     phantom: PhantomData<I>,
 }
@@ -1170,7 +1170,7 @@ impl<I> NopState<I> {
             metadata: SerdeAnyMap::new(),
             execution: 0,
             rand: StdRand::default(),
-            should_stop_fuzzing: false,
+            should_stop: false,
             phantom: PhantomData,
         }
     }
@@ -1204,11 +1204,11 @@ impl<I> HasExecutions for NopState<I> {
 }
 
 impl<I> Stoppable for NopState<I> {
-    fn should_stop_fuzzing_mut(&mut self) -> &mut bool {
-        &mut self.should_stop_fuzzing
+    fn should_stop_mut(&mut self) -> &mut bool {
+        &mut self.should_stop
     }
-    fn should_stop_fuzzing(&self) -> bool {
-        self.should_stop_fuzzing
+    fn should_stop(&self) -> bool {
+        self.should_stop
     }
 }
 
