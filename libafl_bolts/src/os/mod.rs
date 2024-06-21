@@ -32,7 +32,6 @@ use std::{fs::File, os::fd::AsRawFd, sync::OnceLock};
 pub mod windows_exceptions;
 #[cfg(unix)]
 use libc::pid_t;
-use nix::sys::wait::WaitStatus;
 #[cfg(all(windows, feature = "std"))]
 pub use windows_exceptions::CTRL_C_EXIT;
 
@@ -48,7 +47,8 @@ pub struct ChildHandle {
     pub pid: pid_t,
 }
 
-use nix::{sys::wait::waitpid, unistd::Pid};
+#[cfg(unix)]
+use nix::{sys::wait::{WaitStatus, waitpid}, unistd::Pid};
 
 #[cfg(unix)]
 impl ChildHandle {

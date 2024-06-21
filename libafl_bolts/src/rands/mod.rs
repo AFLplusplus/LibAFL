@@ -3,8 +3,11 @@
 use core::{
     debug_assert,
     fmt::Debug,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::atomic::AtomicUsize,
 };
+
+#[cfg(target_has_atomic = "ptr")]
+use core::sync::atomic::Ordering;
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
