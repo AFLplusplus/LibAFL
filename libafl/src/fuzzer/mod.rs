@@ -16,7 +16,7 @@ use libafl_bolts::current_time;
 use libafl_bolts::os::CTRL_C_EXIT;
 use serde::{de::DeserializeOwned, Serialize};
 
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", feature = "dump_state"))]
 use crate::state::HasDumpStateDir;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
@@ -197,7 +197,7 @@ pub static mut INTERRUPT_FUZZER: bool = false;
 /// The main fuzzer trait.
 pub trait Fuzzer<E, EM, ST>: Sized + UsesState
 where
-    Self::State: HasMetadata + HasExecutions + HasLastReportTime + HasDumpStateDir,
+    Self::State: HasMetadata + HasExecutions + HasLastReportTime,
     E: UsesState<State = Self::State>,
     EM: ProgressReporter<State = Self::State>,
     ST: StagesTuple<E, EM, Self::State, Self>,

@@ -68,7 +68,7 @@ tcp_compression = ["tcp_manager", "libafl_bolts/gzip"]
 multi_machine = ["tokio", "std", "enumflags2", "ahash/std"]
 
 ## Dump state of each client on exit
-dump_state = []
+dump_state = ["std"]
 
 ## Enables the `NaiveTokenizer` and `StacktraceObserver`
 regex = ["std", "dep:regex"]
