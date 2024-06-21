@@ -40,7 +40,7 @@ pub use broker_hooks::*;
 pub use launcher::*;
 #[cfg(all(unix, feature = "std"))]
 use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
-#[cfg(all(unix, not(feature = "dump_state")))]
+#[cfg(all(unix, feature = "std", not(feature = "dump_state")))]
 use libafl_bolts::os::CTRL_C_EXIT;
 use libafl_bolts::{
     current_time,
