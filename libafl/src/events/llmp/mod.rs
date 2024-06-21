@@ -329,10 +329,7 @@ where
                 }
                 Ok(())
             }
-            Event::Stop => {
-                *state.should_stop_mut() = true;
-                Ok(())
-            }
+            Event::Stop => Ok(()),
             _ => Err(Error::unknown(format!(
                 "Received illegal message that message should not have arrived: {:?}.",
                 event.name()
