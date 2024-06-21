@@ -61,12 +61,11 @@ impl ChildHandle {
         let ret = { waitpid(Some(Pid::from_raw(self.pid)), None) };
 
         log::info!("Client exited: {:?}", ret);
-        match ret {
-            Ok(WaitStatus::Exited(_, status)) => status,
-            _ => {
-                log::error!("Client unexpected exit");
-                0
-            }
+        if let Ok(WaitStatus::Exited(_, status)) = ret {
+            status
+        } else {
+            log::error!("Client unexpected exit");
+            0
         }
     }
 }
