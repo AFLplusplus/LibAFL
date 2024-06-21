@@ -48,7 +48,10 @@ pub struct ChildHandle {
 }
 
 #[cfg(unix)]
-use nix::{sys::wait::{WaitStatus, waitpid}, unistd::Pid};
+use nix::{
+    sys::wait::{waitpid, WaitStatus},
+    unistd::Pid,
+};
 
 #[cfg(unix)]
 impl ChildHandle {

@@ -40,6 +40,8 @@ pub use broker_hooks::*;
 pub use launcher::*;
 #[cfg(all(unix, feature = "std"))]
 use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
+#[cfg(all(unix, not(feature = "dump_state")))]
+use libafl_bolts::os::CTRL_C_EXIT;
 use libafl_bolts::{
     current_time,
     tuples::{Handle, MatchNameRef},
@@ -48,11 +50,11 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use uuid::Uuid;
-#[cfg(all(unix, not(feature = "dump_state")))]
-use libafl_bolts::os::CTRL_C_EXIT;
 
 #[cfg(feature = "introspection")]
 use crate::state::HasClientPerfMonitor;
+#[cfg(all(unix, feature = "dump_state"))]
+use crate::INTERRUPT_FUZZER;
 use crate::{
     executors::ExitKind,
     inputs::Input,
@@ -61,10 +63,6 @@ use crate::{
     state::{HasExecutions, HasLastReportTime, State},
     Error, HasMetadata,
 };
-
-#[cfg(all(unix, feature = "dump_state"))]
-use crate::INTERRUPT_FUZZER;
-
 #[cfg(feature = "scalability_introspection")]
 use crate::{
     monitors::{AggregatorOps, UserStatsValue},

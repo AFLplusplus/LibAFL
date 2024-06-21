@@ -13,7 +13,6 @@ use std::path::PathBuf;
 
 #[cfg(feature = "dump_state")]
 use libafl_bolts::current_time;
-
 use libafl_bolts::{serdeany::SerdeAnyMap, HasLen};
 use serde::{Deserialize, Serialize};
 

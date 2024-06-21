@@ -284,7 +284,11 @@ where
 
 impl<I, C, R, SC> HasDumpStateDir for StdState<I, C, R, SC> {
     fn dump_state_dir(&self) -> Option<&PathBuf> {
-        self.dump_state_dir.as_ref()
+        if cfg!(feature = "dump_state") {
+            self.dump_state_dir.as_ref()
+        } else {
+            None
+        }
     }
 }
 
@@ -1181,6 +1185,7 @@ impl<I> HasMaxSize for NopState<I> {
     }
 }
 
+#[cfg(feature = "dump_state")]
 impl<I> HasDumpStateDir for NopState<I> {
     fn dump_state_dir(&self) -> Option<&PathBuf> {
         None
