@@ -75,12 +75,23 @@ pub use owned_map::*;
 /// let mut feedback = MaxMapFeedback::new(&edges_observer);
 /// #
 /// # // init the state
+/// # #[cfg(not(feature = "dump_state"))]
 /// # let mut state = StdState::new(
 /// #     StdRand::with_seed(0),
 /// #     InMemoryCorpus::<BytesInput>::new(),
 /// #     InMemoryCorpus::new(),
 /// #     &mut feedback,
-/// #     &mut ()
+/// #     &mut (),
+/// # ).unwrap();
+///
+/// # #[cfg(feature = "dump_state")]
+/// # let mut state = StdState::new(
+/// #     StdRand::with_seed(0),
+/// #     InMemoryCorpus::<BytesInput>::new(),
+/// #     InMemoryCorpus::new(),
+/// #     &mut feedback,
+/// #     &mut (),
+/// #     None,
 /// # ).unwrap();
 /// # feedback.init_state(&mut state).unwrap();
 ///
