@@ -44,7 +44,7 @@ pub fn fuzz() {
     // No concurrency in WASM so these accesses are not racing.
     unsafe {
         RegistryBuilder::register::<MapFeedbackMetadata<u8>>();
-        RegistryBuilder::register::<ExecutionCountRestartHelperMetadata>();
+        RegistryBuilder::register::<StdRestartHelper >();
     }
 
     let mut signals = [0u8; 64];
