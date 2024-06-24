@@ -33,6 +33,7 @@ use static_alloc::Bump;
 #[global_allocator]
 static A: Bump<[u8; 512 * 1024 * 1024]> = Bump::uninit();
 
+#[cfg(not(test))]
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     #[cfg(unix)]
