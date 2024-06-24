@@ -108,24 +108,12 @@ use crate::{inputs::UsesInput, observers::Observer, state::State, Error};
 ///         .build(tuple_list!(stdout_observer, stderr_observer))
 ///         .unwrap();
 ///
-///     #[cfg(not(feature = "dump_state"))]
 ///     let mut state = StdState::new(
 ///         StdRand::with_seed(current_nanos()),
 ///         InMemoryCorpus::new(),
 ///         InMemoryCorpus::new(),
 ///         &mut feedback,
 ///         &mut objective,
-///     )
-///     .unwrap();
-///
-///     #[cfg(feature = "dump_state")]
-///     let mut state = StdState::new(
-///         StdRand::with_seed(current_nanos()),
-///         InMemoryCorpus::new(),
-///         InMemoryCorpus::new(),
-///         &mut feedback,
-///         &mut objective,
-///         None,
 ///     )
 ///     .unwrap();
 ///
