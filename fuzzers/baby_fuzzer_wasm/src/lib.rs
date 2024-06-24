@@ -11,7 +11,7 @@ use libafl::{
     mutators::{havoc_mutations, StdScheduledMutator},
     observers::StdMapObserver,
     schedulers::QueueScheduler,
-    stages::{StdRestartHelper, StdMutationalStage},
+    stages::{StdMutationalStage, StdRestartHelper},
     state::{HasSolutions, StdState},
     Fuzzer, StdFuzzer,
 };

@@ -27,12 +27,14 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 mod stack;
 pub use stack::StageStack;
 
+#[cfg(all(feature = "std", feature = "dump_state"))]
+use crate::corpus::testcase::TestcaseDump;
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
 #[cfg(feature = "scalability_introspection")]
 use crate::monitors::ScalabilityMonitor;
 use crate::{
-    corpus::{testcase::TestcaseDump, Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
+    corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
     events::{Event, EventFirer, LogSeverity},
     feedbacks::Feedback,
     fuzzer::{Evaluator, ExecuteInputResult},
