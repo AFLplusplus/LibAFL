@@ -116,7 +116,8 @@ impl MultiMachineTree {
         for node_idx in self.graph.node_indices() {
             let node = &self.graph[node_idx];
 
-            self.get_parent(node_idx)
+            let parent = self
+                .get_parent(node_idx)
                 .map(|parent_idx| self.graph[parent_idx].addr.clone());
 
             node_configs.push(MultiMachineNodeConfig {
