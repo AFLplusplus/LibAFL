@@ -506,7 +506,7 @@ pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: *mut T) -> Res
 #[inline(always)]
 pub fn ucontext() -> Result<ucontext_t, Error> {
     let mut ucontext = unsafe { mem::zeroed() };
-    if cfg!(not(target_os = "openbsd")) {
+    if cfg!(not(any(target_os = "openbsd", target_os = "haiku"))) {
         if unsafe { getcontext(&mut ucontext) } == 0 {
             Ok(ucontext)
         } else {
