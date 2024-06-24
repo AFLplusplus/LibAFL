@@ -1,4 +1,7 @@
-use std::fmt::{Display, Formatter};
+use std::{
+    fmt::{Display, Formatter},
+    mem,
+};
 
 use petgraph::{graph::NodeIndex, Direction, Graph};
 use serde::Serialize;
@@ -73,7 +76,7 @@ impl MultiMachineTree {
             if graph.nb_children(nodes_to_populate_now[populate_idx as usize])
                 == max_children_per_parent
             {
-                nodes_to_populate_now = nodes_to_populate_later.drain(..).collect();
+                nodes_to_populate_now = mem::take(&mut nodes_to_populate_later);
                 populate_idx = 0; // should be useless
             }
 
@@ -107,22 +110,20 @@ impl MultiMachineTree {
             .next()
     }
 
+    #[must_use]
     pub fn get_config(&self, default_port: u16) -> Vec<MultiMachineNodeConfig> {
         let mut node_configs: Vec<MultiMachineNodeConfig> = Vec::new();
         for node_idx in self.graph.node_indices() {
             let node = &self.graph[node_idx];
 
-            let parent = if let Some(parent_idx) = self.get_parent(node_idx) {
-                Some(self.graph[parent_idx].addr.clone())
-            } else {
-                None
-            };
+            self.get_parent(node_idx)
+                .map(|parent_idx| self.graph[parent_idx].addr.clone());
 
             node_configs.push(MultiMachineNodeConfig {
                 addr: node.addr.clone(),
                 parent,
                 port: default_port,
-            })
+            });
         }
 
         node_configs

@@ -43,7 +43,7 @@ fn main() {
     // final graph
     if let Some(dot_path) = opt.dot_output {
         let dot = Dot::new(&multi_machine_graph.graph);
-        fs::write(dot_path, format!("{}", dot)).unwrap();
+        fs::write(dot_path, format!("{dot}")).unwrap();
     }
 
     if let Some(json_path) = opt.json_output {
