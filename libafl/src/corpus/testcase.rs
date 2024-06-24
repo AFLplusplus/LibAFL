@@ -19,6 +19,7 @@ use serde::{Deserialize, Serialize};
 use super::Corpus;
 use crate::{
     corpus::CorpusId,
+    feedbacks::{MapFeedbackMetadata, MapIndexesMetadata},
     inputs::{Input, UsesInput},
     Error, HasMetadata,
 };
@@ -109,9 +110,11 @@ where
     /// Timestamp from epoch
     #[cfg(feature = "dump_state")]
     timestamp: Duration,
+    map_feedbeck_metadata: Option<MapIndexesMetadata>,
 }
 
 #[cfg(feature = "dump_state")]
+#[cfg(all(feature = "std", feature = "dump_state"))]
 impl<I> TryFrom<Testcase<I>> for TestcaseDump<I>
 where
     I: Input,
@@ -119,6 +122,9 @@ where
     type Error = Error;
 
     fn try_from(tc: Testcase<I>) -> Result<Self, Self::Error> {
+        log::info!("testcase metadata: {:?}", tc.metadata);
+        let map_fb = tc.metadata.get::<MapIndexesMetadata>();
+
         Ok(TestcaseDump {
             input: tc.input.clone().ok_or(Error::empty("No input loaded"))?,
             exec_time: tc.exec_time,
@@ -126,10 +132,11 @@ where
             disabled: tc.disabled,
             objectives_found: tc.objectives_found,
             #[cfg(feature = "track_hit_feedbacks")]
-            hit_feedbacks: tc.hit_feedbacks,
+            hit_feedbacks: tc.hit_feedbacks.clone(),
             #[cfg(feature = "track_hit_feedbacks")]
-            hit_objectives: tc.hit_objectives,
+            hit_objectives: tc.hit_objectives.clone(),
             timestamp: tc.timestamp,
+            map_feedbeck_metadata: map_fb.cloned(),
         })
     }
 }
