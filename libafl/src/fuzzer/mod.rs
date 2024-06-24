@@ -2,12 +2,12 @@
 
 use alloc::string::ToString;
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
-use std::path::PathBuf;
 #[cfg(all(feature = "std", feature = "dump_state"))]
 use std::{
     fs::{self, File},
     hash::{BuildHasher, Hasher},
     io::Write,
+    path::PathBuf,
 };
 
 #[cfg(all(feature = "std", feature = "dump_state"))]

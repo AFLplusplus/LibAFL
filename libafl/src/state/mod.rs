@@ -182,7 +182,7 @@ pub trait MaybeCanDumpState {
 
 /// Trait for getting the optional dump directory for the state
 #[cfg(all(feature = "std", not(feature = "dump_state")))]
-pub trait MaybeHasDumpStateDir {}
+pub trait MaybeCanDumpState {}
 
 #[cfg(all(feature = "std", not(feature = "dump_state")))]
 impl<T> MaybeCanDumpState for T {}
