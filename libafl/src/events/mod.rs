@@ -98,22 +98,23 @@ impl Handler for ShutdownSignalData {
         unsafe {
             // println!("Exiting from the handler....");
 
-            #[cfg(unix)]
+            #[cfg(feature = "dump_state")]
             {
-                #[cfg(not(feature = "dump_state"))]
+                // fuzzer will exit at the end of fuzzing run.
+                INTERRUPT_FUZZER = true;
+            }
+
+            #[cfg(not(feature = "dump_state"))]
+            {
+                #[cfg(unix)]
                 {
                     libc::_exit(CTRL_C_EXIT);
                 }
-
-                #[cfg(feature = "dump_state")]
                 {
-                    // fuzzer will exit at the end of fuzzing run.
-                    INTERRUPT_FUZZER = true;
+                    #[cfg(windows)]
+                    windows::Win32::System::Threading::ExitProcess(100);
                 }
             }
-
-            #[cfg(windows)]
-            windows::Win32::System::Threading::ExitProcess(100);
         }
     }
 

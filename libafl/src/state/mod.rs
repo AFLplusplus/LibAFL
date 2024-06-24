@@ -70,7 +70,7 @@ pub trait State:
     + DeserializeOwned
     + MaybeHasClientPerfMonitor
     + MaybeHasScalabilityMonitor
-    + MaybeHasDumpStateDir
+    + MaybeCanDumpState
     + HasCurrentCorpusId
     + HasCurrentStage
 {
@@ -169,9 +169,15 @@ impl<T> MaybeHasScalabilityMonitor for T where T: HasScalabilityMonitor {}
 
 /// Trait for getting the optional dump directory for the state
 #[cfg(all(feature = "std", feature = "dump_state"))]
-pub trait MaybeHasDumpStateDir {
+pub trait MaybeCanDumpState {
+    /// The dump state type
+    type StateDump: Serialize + for<'de> Deserialize<'de>;
+
     /// Get the dump dir, if there is one.
     fn dump_state_dir(&self) -> Option<&PathBuf>;
+
+    /// Generate the state dump
+    fn gen_dump_state(&mut self) -> Result<Self::StateDump, Error>;
 }
 
 /// Trait for getting the optional dump directory for the state
@@ -179,7 +185,7 @@ pub trait MaybeHasDumpStateDir {
 pub trait MaybeHasDumpStateDir {}
 
 #[cfg(all(feature = "std", not(feature = "dump_state")))]
-impl<T> MaybeHasDumpStateDir for T {}
+impl<T> MaybeCanDumpState for T {}
 
 /// Trait for offering a [`ScalabilityMonitor`]
 #[cfg(feature = "scalability_introspection")]
@@ -299,6 +305,20 @@ pub struct StdState<I, C, R, SC> {
     phantom: PhantomData<I>,
 }
 
+/// The standard state dump
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(bound = "I: serde::de::DeserializeOwned")]
+pub struct StdStateDump<I>
+where
+    I: Input,
+{
+    /// Fuzzer start time.
+    start_time: Duration,
+
+    /// Loaded inputs
+    testcases: Vec<Testcase<I>>,
+}
+
 impl<I, C, R, SC> UsesInput for StdState<I, C, R, SC>
 where
     I: Input,
@@ -307,18 +327,40 @@ where
 }
 
 #[cfg(all(feature = "std", feature = "dump_state"))]
-impl<I, C, R, SC> MaybeHasDumpStateDir for StdState<I, C, R, SC> {
+impl<I, C, R, SC> MaybeCanDumpState for StdState<I, C, R, SC>
+where
+    C: Corpus<Input = I>,
+    I: Input,
+{
+    type StateDump = StdStateDump<I>;
+
     fn dump_state_dir(&self) -> Option<&PathBuf> {
         self.dump_state_dir.as_ref()
+    }
+
+    fn gen_dump_state(&mut self) -> Result<Self::StateDump, Error> {
+        let mut tcs: Vec<Testcase<I>> = Vec::new();
+        for corpus_id in self.corpus.ids() {
+            let mut tc = self.corpus.get(corpus_id)?.clone();
+            let tc_ref = tc.get_mut();
+            tc_ref.load_input(&self.corpus)?;
+            tcs.push(tc_ref.clone());
+        }
+
+        Ok(StdStateDump {
+            start_time: self.start_time,
+            testcases: tcs,
+        })
     }
 }
 
 impl<I, C, R, SC> State for StdState<I, C, R, SC>
 where
     C: Corpus<Input = Self::Input>,
+    I: Input,
     R: Rand,
     SC: Corpus<Input = Self::Input>,
-    Self: UsesInput,
+    Self: UsesInput<Input = I>,
 {
 }
 
@@ -1247,9 +1289,15 @@ impl<I> HasMaxSize for NopState<I> {
 }
 
 #[cfg(all(feature = "std", feature = "dump_state"))]
-impl<I> MaybeHasDumpStateDir for NopState<I> {
+impl<I> MaybeCanDumpState for NopState<I> {
+    type StateDump = ();
+
     fn dump_state_dir(&self) -> Option<&PathBuf> {
         None
+    }
+
+    fn gen_dump_state(&mut self) -> Result<Self::StateDump, Error> {
+        Ok(())
     }
 }
 

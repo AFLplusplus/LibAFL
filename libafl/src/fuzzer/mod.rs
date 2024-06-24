@@ -2,6 +2,7 @@
 
 use alloc::string::ToString;
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
+use std::path::PathBuf;
 #[cfg(all(feature = "std", feature = "dump_state"))]
 use std::{
     fs::{self, File},
@@ -17,7 +18,7 @@ use libafl_bolts::os::CTRL_C_EXIT;
 use serde::{de::DeserializeOwned, Serialize};
 
 #[cfg(all(feature = "std", feature = "dump_state"))]
-use crate::state::MaybeHasDumpStateDir;
+use crate::state::MaybeCanDumpState;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
     events::{Event, EventConfig, EventFirer, EventProcessor, ProgressReporter},
@@ -238,25 +239,33 @@ where
                 if INTERRUPT_FUZZER {
                     log::info!("Interrupting fuzzer...");
 
+                    let dump_path: Option<PathBuf> = state.dump_state_dir().cloned();
+
                     // Dump state if needed.
-                    if let Some(dump_path) = state.dump_state_dir() {
+                    if let Some(dump_path) = dump_path {
                         log::info!("Dumping state to disk...");
-                        let serialized = postcard::to_allocvec(&state)?;
+                        let state_dump = state.gen_dump_state()?;
+                        let dump_serialized = postcard::to_allocvec(&state_dump)?;
 
                         // Taken from staterestorer
                         // generate a filename
                         let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
                         // Using the last few k as randomness for a filename, hoping it's unique.
-                        hasher.write(&serialized[serialized.len().saturating_sub(4096)..]);
+                        hasher
+                            .write(&dump_serialized[dump_serialized.len().saturating_sub(4096)..]);
 
                         let filename = format!("{:016x}.libafl_state", hasher.finish());
-                        let dump_file = dump_path.join(&filename);
+                        let dump_file = dump_path.join(filename);
 
                         fs::create_dir_all(dump_path.as_path())?;
-                        File::create(dump_file)?.write_all(&serialized)?;
+                        File::create(dump_file)?.write_all(&dump_serialized)?;
                     }
 
+                    #[cfg(unix)]
                     libc::exit(CTRL_C_EXIT);
+
+                    #[cfg(windows)]
+                    windows::Win32::System::Threading::ExitProcess(100);
                 }
             }
 
