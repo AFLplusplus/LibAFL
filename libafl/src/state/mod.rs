@@ -1107,7 +1107,7 @@ where
     }
 
     /// Creates a new `State`, taking ownership of all of the individual components during fuzzing.
-    pub fn new<F, O>(
+    fn new_inner<F, O>(
         rand: R,
         corpus: C,
         solutions: SC,
@@ -1149,6 +1149,46 @@ where
         feedback.init_state(&mut state)?;
         objective.init_state(&mut state)?;
         Ok(state)
+    }
+
+    /// Creates a new `State`, taking ownership of all of the individual components during fuzzing.
+    #[cfg(feature = "dump_state")]
+    pub fn new_with_dump_state<F, O>(
+        rand: R,
+        corpus: C,
+        solutions: SC,
+        feedback: &mut F,
+        objective: &mut O,
+        dump_state_dir: Option<PathBuf>,
+    ) -> Result<Self, Error>
+    where
+        F: Feedback<Self>,
+        O: Feedback<Self>,
+    {
+        Self::new_inner(rand, corpus, solutions, feedback, objective, dump_state_dir)
+    }
+
+    /// Creates a new `State`, taking ownership of all of the individual components during fuzzing.
+    pub fn new<F, O>(
+        rand: R,
+        corpus: C,
+        solutions: SC,
+        feedback: &mut F,
+        objective: &mut O,
+    ) -> Result<Self, Error>
+    where
+        F: Feedback<Self>,
+        O: Feedback<Self>,
+    {
+        Self::new_inner(
+            rand,
+            corpus,
+            solutions,
+            feedback,
+            objective,
+            #[cfg(feature = "dump_state")]
+            None,
+        )
     }
 }
 

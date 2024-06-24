@@ -178,7 +178,7 @@ pub extern "C" fn libafl_main() {
 
         // If not restarting, create a State from scratch
         let mut state = state.unwrap_or_else(|| {
-            StdState::new(
+            StdState::new_with_dump_state(
                 // RNG
                 StdRand::new(),
                 // Corpus that will be evolved, we keep it in memory for performance
