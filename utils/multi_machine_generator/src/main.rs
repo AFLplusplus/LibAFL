@@ -49,6 +49,6 @@ fn main() {
     if let Some(json_path) = opt.json_output {
         let cfg = multi_machine_graph.get_config(opt.default_port);
         let cfg_json = serde_json::to_string_pretty(&cfg).unwrap();
-        fs::write(json_path, &cfg_json).unwrap();
+        fs::write(json_path, cfg_json).unwrap();
     }
 }

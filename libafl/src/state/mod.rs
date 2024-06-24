@@ -1107,7 +1107,7 @@ where
     }
 
     /// Creates a new `State`, taking ownership of all of the individual components during fuzzing.
-    fn new_inner<F, O>(
+    fn _new<F, O>(
         rand: R,
         corpus: C,
         solutions: SC,
@@ -1153,7 +1153,7 @@ where
 
     /// Creates a new `State`, taking ownership of all of the individual components during fuzzing.
     #[cfg(feature = "dump_state")]
-    pub fn new_with_dump_state<F, O>(
+    pub fn with_dump_state<F, O>(
         rand: R,
         corpus: C,
         solutions: SC,
@@ -1165,7 +1165,7 @@ where
         F: Feedback<Self>,
         O: Feedback<Self>,
     {
-        Self::new_inner(rand, corpus, solutions, feedback, objective, dump_state_dir)
+        Self::_new(rand, corpus, solutions, feedback, objective, dump_state_dir)
     }
 
     /// Creates a new `State`, taking ownership of all of the individual components during fuzzing.
@@ -1180,7 +1180,7 @@ where
         F: Feedback<Self>,
         O: Feedback<Self>,
     {
-        Self::new_inner(
+        Self::_new(
             rand,
             corpus,
             solutions,
