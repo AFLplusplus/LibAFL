@@ -16,7 +16,7 @@ use crate::graph::MultiMachineTree;
 pub mod graph;
 
 #[derive(Parser)]
-struct Cli {
+struct Opt {
     #[arg(short, long)]
     machines_file: PathBuf,
     #[arg(long)]
@@ -30,9 +30,9 @@ struct Cli {
 }
 
 fn main() {
-    let cli = Cli::parse();
+    let opt = Opt::parse();
 
-    let machine_file = File::open(cli.machines_file.as_path()).unwrap();
+    let machine_file = File::open(opt.machines_file.as_path()).unwrap();
     let machines: Vec<String> = io::BufReader::new(machine_file)
         .lines()
         .map(|m| m.unwrap())
@@ -41,13 +41,13 @@ fn main() {
     let multi_machine_graph = MultiMachineTree::generate(&machines, 3);
 
     // final graph
-    if let Some(dot_path) = cli.dot_output {
+    if let Some(dot_path) = opt.dot_output {
         let dot = Dot::new(&multi_machine_graph.graph);
         fs::write(dot_path, format!("{}", dot)).unwrap();
     }
 
-    if let Some(json_path) = cli.json_output {
-        let cfg = multi_machine_graph.get_config(cli.default_port);
+    if let Some(json_path) = opt.json_output {
+        let cfg = multi_machine_graph.get_config(opt.default_port);
         let cfg_json = serde_json::to_string_pretty(&cfg).unwrap();
         fs::write(json_path, &cfg_json).unwrap();
     }

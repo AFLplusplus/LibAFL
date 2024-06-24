@@ -70,9 +70,9 @@ pub trait State:
     + DeserializeOwned
     + MaybeHasClientPerfMonitor
     + MaybeHasScalabilityMonitor
+    + MaybeHasDumpStateDir
     + HasCurrentCorpusId
     + HasCurrentStage
-    + HasDumpStateDir
 {
 }
 
@@ -167,6 +167,20 @@ impl<T> MaybeHasScalabilityMonitor for T {}
 #[cfg(feature = "scalability_introspection")]
 impl<T> MaybeHasScalabilityMonitor for T where T: HasScalabilityMonitor {}
 
+/// Trait for getting the optional dump directory for the state
+#[cfg(all(feature = "std", feature = "dump_state"))]
+pub trait MaybeHasDumpStateDir {
+    /// Get the dump dir, if there is one.
+    fn dump_state_dir(&self) -> Option<&PathBuf>;
+}
+
+/// Trait for getting the optional dump directory for the state
+#[cfg(all(feature = "std", not(feature = "dump_state")))]
+pub trait MaybeHasDumpStateDir {}
+
+#[cfg(all(feature = "std", not(feature = "dump_state")))]
+impl<T> MaybeHasDumpStateDir for T {}
+
 /// Trait for offering a [`ScalabilityMonitor`]
 #[cfg(feature = "scalability_introspection")]
 pub trait HasScalabilityMonitor {
@@ -213,13 +227,6 @@ pub trait HasLastReportTime {
     /// The last time we reported progress,if available/used (mutable).
     /// This information is used by fuzzer `maybe_report_progress`.
     fn last_report_time_mut(&mut self) -> &mut Option<Duration>;
-}
-
-/// Trait for getting the optional dump directory for the state
-#[cfg(feature = "std")]
-pub trait HasDumpStateDir {
-    /// Get the dump dir, if there is one.
-    fn dump_state_dir(&self) -> Option<&PathBuf>;
 }
 
 /// Struct that holds the options for input loading
@@ -299,18 +306,10 @@ where
     type Input = I;
 }
 
-#[cfg(feature = "std")]
-impl<I, C, R, SC> HasDumpStateDir for StdState<I, C, R, SC> {
+#[cfg(all(feature = "std", feature = "dump_state"))]
+impl<I, C, R, SC> MaybeHasDumpStateDir for StdState<I, C, R, SC> {
     fn dump_state_dir(&self) -> Option<&PathBuf> {
-        #[cfg(feature = "dump_state")]
-        {
-            self.dump_state_dir.as_ref()
-        }
-
-        #[cfg(not(feature = "dump_state"))]
-        {
-            None
-        }
+        self.dump_state_dir.as_ref()
     }
 }
 
@@ -1207,8 +1206,8 @@ impl<I> HasMaxSize for NopState<I> {
     }
 }
 
-#[cfg(feature = "std")]
-impl<I> HasDumpStateDir for NopState<I> {
+#[cfg(all(feature = "std", feature = "dump_state"))]
+impl<I> MaybeHasDumpStateDir for NopState<I> {
     fn dump_state_dir(&self) -> Option<&PathBuf> {
         None
     }

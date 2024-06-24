@@ -17,7 +17,7 @@ use libafl_bolts::os::CTRL_C_EXIT;
 use serde::{de::DeserializeOwned, Serialize};
 
 #[cfg(all(feature = "std", feature = "dump_state"))]
-use crate::state::HasDumpStateDir;
+use crate::state::MaybeHasDumpStateDir;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
     events::{Event, EventConfig, EventFirer, EventProcessor, ProgressReporter},
