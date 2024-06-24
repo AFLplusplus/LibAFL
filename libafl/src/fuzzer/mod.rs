@@ -13,7 +13,7 @@ use std::{
 #[cfg(all(feature = "std", feature = "dump_state"))]
 use ahash::RandomState;
 use libafl_bolts::current_time;
-#[cfg(all(feature = "std", feature = "dump_state"))]
+#[cfg(all(unix, feature = "dump_state"))]
 use libafl_bolts::os::CTRL_C_EXIT;
 use serde::{de::DeserializeOwned, Serialize};
 

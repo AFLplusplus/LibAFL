@@ -82,6 +82,58 @@ where
     timestamp: Duration,
 }
 
+/// A [`Testcase`] ready for being dumped to memory
+#[cfg(feature = "dump_state")]
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(bound = "I: serde::de::DeserializeOwned")]
+pub struct TestcaseDump<I>
+where
+    I: Input,
+{
+    /// The [`Input`] of this [`Testcase`], or `None`, if it is not currently in memory
+    input: I,
+    /// Time needed to execute the input
+    exec_time: Option<Duration>,
+    /// Parent [`CorpusId`], if known
+    parent_id: Option<CorpusId>,
+    /// If the testcase is "disabled"
+    disabled: bool,
+    /// has found crash (or timeout) or not
+    objectives_found: usize,
+    /// Vector of `Feedback` names that deemed this `Testcase` as corpus worthy
+    #[cfg(feature = "track_hit_feedbacks")]
+    hit_feedbacks: Vec<Cow<'static, str>>,
+    /// Vector of `Feedback` names that deemed this `Testcase` as solution worthy
+    #[cfg(feature = "track_hit_feedbacks")]
+    hit_objectives: Vec<Cow<'static, str>>,
+    /// Timestamp from epoch
+    #[cfg(feature = "dump_state")]
+    timestamp: Duration,
+}
+
+#[cfg(feature = "dump_state")]
+impl<I> TryFrom<Testcase<I>> for TestcaseDump<I>
+where
+    I: Input,
+{
+    type Error = Error;
+
+    fn try_from(tc: Testcase<I>) -> Result<Self, Self::Error> {
+        Ok(TestcaseDump {
+            input: tc.input.clone().ok_or(Error::empty("No input loaded"))?,
+            exec_time: tc.exec_time,
+            parent_id: tc.parent_id,
+            disabled: tc.disabled,
+            objectives_found: tc.objectives_found,
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_feedbacks: tc.hit_feedbacks,
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_objectives: tc.hit_objectives,
+            timestamp: tc.timestamp,
+        })
+    }
+}
+
 impl<I> HasMetadata for Testcase<I>
 where
     I: Input,

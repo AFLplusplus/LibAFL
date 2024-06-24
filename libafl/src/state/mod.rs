@@ -32,7 +32,7 @@ use crate::monitors::ClientPerfMonitor;
 #[cfg(feature = "scalability_introspection")]
 use crate::monitors::ScalabilityMonitor;
 use crate::{
-    corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
+    corpus::{testcase::TestcaseDump, Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
     events::{Event, EventFirer, LogSeverity},
     feedbacks::Feedback,
     fuzzer::{Evaluator, ExecuteInputResult},
@@ -317,7 +317,7 @@ where
     start_time: Duration,
 
     /// Loaded inputs
-    testcases: Vec<Testcase<I>>,
+    testcases: Vec<TestcaseDump<I>>,
 }
 
 impl<I, C, R, SC> UsesInput for StdState<I, C, R, SC>
@@ -340,12 +340,12 @@ where
     }
 
     fn gen_dump_state(&mut self) -> Result<Self::StateDump, Error> {
-        let mut tcs: Vec<Testcase<I>> = Vec::new();
+        let mut tcs: Vec<TestcaseDump<I>> = Vec::new();
         for corpus_id in self.corpus.ids() {
             let mut tc = self.corpus.get(corpus_id)?.clone();
             let tc_ref = tc.get_mut();
             tc_ref.load_input(&self.corpus)?;
-            tcs.push(tc_ref.clone());
+            tcs.push(tc_ref.clone().try_into()?);
         }
 
         Ok(StdStateDump {
