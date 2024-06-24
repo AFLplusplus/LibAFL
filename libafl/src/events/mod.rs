@@ -94,27 +94,18 @@ impl Handler for ShutdownSignalData {
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
     ) {
-        // println!("in handler! {}", std::process::id());
         unsafe {
-            // println!("Exiting from the handler....");
-
             #[cfg(feature = "dump_state")]
             {
                 // fuzzer will exit at the end of fuzzing run.
                 INTERRUPT_FUZZER = true;
             }
 
-            #[cfg(not(feature = "dump_state"))]
-            {
-                #[cfg(unix)]
-                {
-                    libc::_exit(CTRL_C_EXIT);
-                }
-                {
-                    #[cfg(windows)]
-                    windows::Win32::System::Threading::ExitProcess(100);
-                }
-            }
+            #[cfg(all(unix, not(feature = "dump_state")))]
+            libc::_exit(CTRL_C_EXIT);
+
+            #[cfg(all(windows, not(feature = "dump_state")))]
+            windows::Win32::System::Threading::ExitProcess(100);
         }
     }
 
