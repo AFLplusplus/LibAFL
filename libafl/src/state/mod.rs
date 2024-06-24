@@ -306,6 +306,7 @@ pub struct StdState<I, C, R, SC> {
 }
 
 /// The standard state dump
+#[cfg(all(feature = "std", feature = "dump_state"))]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
 pub struct StdStateDump<I>
