@@ -19,7 +19,6 @@ use serde::{Deserialize, Serialize};
 use super::Corpus;
 use crate::{
     corpus::CorpusId,
-    feedbacks::{MapFeedbackMetadata, MapIndexesMetadata},
     inputs::{Input, UsesInput},
     Error, HasMetadata,
 };
@@ -93,24 +92,15 @@ where
 {
     /// The [`Input`] of this [`Testcase`], or `None`, if it is not currently in memory
     input: I,
-    /// Time needed to execute the input
-    exec_time: Option<Duration>,
     /// Parent [`CorpusId`], if known
     parent_id: Option<CorpusId>,
     /// If the testcase is "disabled"
     disabled: bool,
     /// has found crash (or timeout) or not
     objectives_found: usize,
-    /// Vector of `Feedback` names that deemed this `Testcase` as corpus worthy
-    #[cfg(feature = "track_hit_feedbacks")]
-    hit_feedbacks: Vec<Cow<'static, str>>,
-    /// Vector of `Feedback` names that deemed this `Testcase` as solution worthy
-    #[cfg(feature = "track_hit_feedbacks")]
-    hit_objectives: Vec<Cow<'static, str>>,
     /// Timestamp from epoch
     #[cfg(feature = "dump_state")]
     timestamp: Duration,
-    map_feedbeck_metadata: Option<MapIndexesMetadata>,
 }
 
 #[cfg(feature = "dump_state")]
@@ -122,21 +112,12 @@ where
     type Error = Error;
 
     fn try_from(tc: Testcase<I>) -> Result<Self, Self::Error> {
-        log::info!("testcase metadata: {:?}", tc.metadata);
-        let map_fb = tc.metadata.get::<MapIndexesMetadata>();
-
         Ok(TestcaseDump {
             input: tc.input.clone().ok_or(Error::empty("No input loaded"))?,
-            exec_time: tc.exec_time,
             parent_id: tc.parent_id,
             disabled: tc.disabled,
             objectives_found: tc.objectives_found,
-            #[cfg(feature = "track_hit_feedbacks")]
-            hit_feedbacks: tc.hit_feedbacks.clone(),
-            #[cfg(feature = "track_hit_feedbacks")]
-            hit_objectives: tc.hit_objectives.clone(),
             timestamp: tc.timestamp,
-            map_feedbeck_metadata: map_fb.cloned(),
         })
     }
 }
