@@ -225,7 +225,7 @@ where
 }
 
 /// A testcase metadata holding a list of indexes of a map
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
     allow(clippy::unsafe_derive_deserialize)

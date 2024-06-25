@@ -177,7 +177,7 @@ where
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
         state.on_restart()?;
 
-        // First, reset the page to 0 so the next iteration can read read from the beginning of this page
+        // First, reset the page to 0 so the next iteration can read from the beginning of this page
         self.staterestorer.reset();
         self.staterestorer.save(&(
             if self.save_state.on_restart() {
@@ -573,7 +573,7 @@ where
                     }
                 };
 
-                // If this guy wants to fork, then ignore sigit
+                // If this guy wants to fork, then ignore sigint
                 #[cfg(any(windows, not(feature = "fork")))]
                 unsafe {
                     #[cfg(windows)]
@@ -592,7 +592,7 @@ where
                 #[cfg(any(windows, not(feature = "fork")))]
                 let child_status = child_status.code().unwrap_or_default();
 
-                compiler_fence(Ordering::SeqCst);
+                compiler_fence(Ordering::SeqCst); // really useful?
 
                 if child_status == CTRL_C_EXIT || staterestorer.wants_to_exit() {
                     // if ctrl-c is pressed, we end up in this branch

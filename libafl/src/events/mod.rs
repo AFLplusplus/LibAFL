@@ -39,7 +39,9 @@ pub use broker_hooks::*;
 #[cfg(feature = "std")]
 pub use launcher::*;
 #[cfg(all(unix, feature = "std"))]
-use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal, CTRL_C_EXIT};
+use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
+#[cfg(all(unix, feature = "std", not(feature = "dump_state")))]
+use libafl_bolts::os::CTRL_C_EXIT;
 use libafl_bolts::{
     current_time,
     tuples::{Handle, MatchNameRef},
@@ -51,6 +53,8 @@ use uuid::Uuid;
 
 #[cfg(feature = "introspection")]
 use crate::state::HasClientPerfMonitor;
+#[cfg(all(unix, feature = "dump_state"))]
+use crate::INTERRUPT_FUZZER;
 use crate::{
     executors::ExitKind,
     inputs::Input,
@@ -90,14 +94,17 @@ impl Handler for ShutdownSignalData {
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
     ) {
-        // println!("in handler! {}", std::process::id());
         unsafe {
-            // println!("Exiting from the handler....");
+            #[cfg(feature = "dump_state")]
+            {
+                // fuzzer will exit at the end of fuzzing run.
+                INTERRUPT_FUZZER = true;
+            }
 
-            #[cfg(unix)]
+            #[cfg(all(unix, not(feature = "dump_state")))]
             libc::_exit(CTRL_C_EXIT);
 
-            #[cfg(windows)]
+            #[cfg(all(windows, not(feature = "dump_state")))]
             windows::Win32::System::Threading::ExitProcess(100);
         }
     }

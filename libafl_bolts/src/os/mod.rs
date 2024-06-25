@@ -48,15 +48,25 @@ pub struct ChildHandle {
 }
 
 #[cfg(unix)]
+use nix::{
+    sys::wait::{waitpid, WaitStatus},
+    unistd::Pid,
+};
+
+#[cfg(unix)]
 impl ChildHandle {
     /// Block until the child exited and the status code becomes available
     #[must_use]
     pub fn status(&self) -> i32 {
-        let mut status = -1;
-        unsafe {
-            libc::waitpid(self.pid, &mut status, 0);
+        let ret = { waitpid(Some(Pid::from_raw(self.pid)), None) };
+
+        log::info!("Client exited: {:?}", ret);
+        if let Ok(WaitStatus::Exited(_, status)) = ret {
+            status
+        } else {
+            log::error!("Client unexpected exit");
+            0
         }
-        libc::WEXITSTATUS(status)
     }
 }
 
