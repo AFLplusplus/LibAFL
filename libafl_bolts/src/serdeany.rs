@@ -1,15 +1,12 @@
 //! Poor-rust-man's downcasts for stuff we send over the wire (or shared maps)
 
-use alloc::boxed::Box;
 #[cfg(feature = "unsafe_stable_anymap")]
 use alloc::string::ToString;
+use alloc::{boxed::Box, string::String};
+#[cfg(feature = "unsafe_stable_anymap")]
+use core::any::type_name;
 #[cfg(not(feature = "unsafe_stable_anymap"))]
 use core::any::TypeId;
-#[cfg(feature = "unsafe_stable_anymap")]
-use core::{
-    any::type_name,
-    hash::{Hash, Hasher},
-};
 use core::{any::Any, fmt::Debug};
 
 use serde::{de::DeserializeSeed, Deserialize, Deserializer, Serialize, Serializer};
@@ -24,7 +21,7 @@ pub type TypeRepr = u128;
 
 /// The type of a stored type in this anymap (`String`)
 #[cfg(feature = "unsafe_stable_anymap")]
-pub type TypeRepr = u128;
+pub type TypeRepr = String;
 
 #[cfg(not(feature = "unsafe_stable_anymap"))]
 fn type_repr<T>() -> TypeRepr
@@ -44,26 +41,24 @@ where
 
 #[cfg(feature = "unsafe_stable_anymap")]
 fn type_repr_owned<T>() -> TypeRepr {
-    let mut hasher = crate::hasher_std();
-    type_name::<T>().to_string().hash(&mut hasher);
-    (hasher.finish() as u128) << 64
+    type_name::<T>().to_string()
 }
 
 #[cfg(feature = "unsafe_stable_anymap")]
-fn type_repr<T>() -> TypeRepr {
-    let mut hasher = crate::hasher_std();
-    type_name::<T>().to_string().hash(&mut hasher);
-    (hasher.finish() as u128) << 64
+fn type_repr<T>() -> &'static str {
+    type_name::<T>()
 }
 
 /// A (de)serializable Any trait
 pub trait SerdeAny: Any + erased_serde::Serialize + Debug {
-    /// returns this as Any trait
+    /// Returns this type as [`Any`] trait.
     fn as_any(&self) -> &dyn Any;
-    /// returns this as mutable Any trait
+    /// Returns this as mutable [`Any`] trait.
     fn as_any_mut(&mut self) -> &mut dyn Any;
-    /// returns this as boxed Any trait
+    /// Returns this as boxed [`Any`] trait.
     fn as_any_boxed(self: Box<Self>) -> Box<dyn Any>;
+    /// Returns the [`core::any::type_name`] of this type.
+    fn type_name(&self) -> &'static str;
 }
 
 /// Wrap a type for serialization
@@ -154,9 +149,9 @@ pub mod serdeany_registry {
         where
             V: serde::de::SeqAccess<'de>,
         {
-            let id: TypeRepr = visitor.next_element()?.unwrap();
+            let id: String = visitor.next_element()?.unwrap();
 
-            println!("Deserializing {:x} {:#?} {:#?}", id, id, id & 0xffffffffffffffff);
+            println!("Deserializing {:#?}", id);
 
             let cb = unsafe {
                 REGISTRY
@@ -188,17 +183,14 @@ pub mod serdeany_registry {
             assert!(!self.finalized, "Registry is already finalized!");
 
             let id = type_repr_owned::<T>();
-            println!("Registering {:x}, TypeId: {:#?}", id, TypeId::of::<T>());
+            println!("Registering {:?}, TypeId: {:#?}", id, TypeId::of::<T>());
             let deserializers = self.deserializers.get_or_insert_with(HashMap::default);
-            let _entry = deserializers
-                .entry(id)
-                .or_insert_with(|| {
-                    (
-                        |de| 
-                        Ok(Box::new(erased_serde::deserialize::<T>(de)?)),
-                        type_repr_owned::<T>(),
-                    )
-                });
+            let _entry = deserializers.entry(id).or_insert_with(|| {
+                (
+                    |de| Ok(Box::new(erased_serde::deserialize::<T>(de)?)),
+                    type_repr_owned::<T>(),
+                )
+            });
 
             #[cfg(feature = "unsafe_stable_anymap")]
             println!("{:#?} {:#?}", _entry.1, type_repr_owned::<T>());
@@ -291,6 +283,7 @@ pub mod serdeany_registry {
             T: crate::serdeany::SerdeAny,
         {
             let type_repr = type_repr::<T>();
+            #[cfg(not(feature = "unsafe_stable_anymap"))]
             let type_repr = &type_repr;
 
             self.map
@@ -306,6 +299,7 @@ pub mod serdeany_registry {
             T: crate::serdeany::SerdeAny,
         {
             let type_repr = type_repr::<T>();
+            #[cfg(not(feature = "unsafe_stable_anymap"))]
             let type_repr = &type_repr;
 
             self.map
@@ -321,6 +315,7 @@ pub mod serdeany_registry {
             T: crate::serdeany::SerdeAny,
         {
             let type_repr = type_repr::<T>();
+            #[cfg(not(feature = "unsafe_stable_anymap"))]
             let type_repr = &type_repr;
 
             self.map
@@ -362,6 +357,7 @@ pub mod serdeany_registry {
             T: crate::serdeany::SerdeAny,
         {
             let type_repr = type_repr::<T>();
+            #[cfg(not(feature = "unsafe_stable_anymap"))]
             let type_repr = &type_repr;
 
             assert!(
@@ -420,6 +416,7 @@ pub mod serdeany_registry {
             T: crate::serdeany::SerdeAny,
         {
             let type_repr = type_repr::<T>();
+            #[cfg(not(feature = "unsafe_stable_anymap"))]
             let type_repr = &type_repr;
 
             self.map.contains_key(type_repr)
@@ -467,6 +464,7 @@ pub mod serdeany_registry {
             T: crate::serdeany::SerdeAny,
         {
             let type_repr = type_repr::<T>();
+            #[cfg(not(feature = "unsafe_stable_anymap"))]
             let type_repr = &type_repr;
 
             match self.map.get(type_repr) {
@@ -483,6 +481,7 @@ pub mod serdeany_registry {
             T: crate::serdeany::SerdeAny,
         {
             let type_repr = type_repr::<T>();
+            #[cfg(not(feature = "unsafe_stable_anymap"))]
             let type_repr = &type_repr;
 
             match self.map.get_mut(type_repr) {
@@ -501,6 +500,7 @@ pub mod serdeany_registry {
             T: crate::serdeany::SerdeAny,
         {
             let type_repr = type_repr::<T>();
+            #[cfg(not(feature = "unsafe_stable_anymap"))]
             let type_repr = &type_repr;
 
             match self.map.get_mut(type_repr) {
@@ -528,6 +528,7 @@ pub mod serdeany_registry {
             T: crate::serdeany::SerdeAny,
         {
             let type_repr = type_repr::<T>();
+            #[cfg(not(feature = "unsafe_stable_anymap"))]
             let type_repr = &type_repr;
 
             #[allow(clippy::manual_map)]
@@ -553,6 +554,7 @@ pub mod serdeany_registry {
             T: crate::serdeany::SerdeAny,
         {
             let type_repr = type_repr::<T>();
+            #[cfg(not(feature = "unsafe_stable_anymap"))]
             let type_repr = &type_repr;
 
             #[allow(clippy::manual_map)]
@@ -618,6 +620,7 @@ pub mod serdeany_registry {
             T: crate::serdeany::SerdeAny,
         {
             let type_repr = type_repr::<T>();
+            #[cfg(not(feature = "unsafe_stable_anymap"))]
             let type_repr = &type_repr;
 
             assert!(
@@ -724,6 +727,7 @@ pub mod serdeany_registry {
             T: crate::serdeany::SerdeAny,
         {
             let type_repr = type_repr::<T>();
+            #[cfg(not(feature = "unsafe_stable_anymap"))]
             let type_repr = &type_repr;
 
             self.map.contains_key(type_repr)
@@ -737,6 +741,7 @@ pub mod serdeany_registry {
             T: crate::serdeany::SerdeAny,
         {
             let type_repr = type_repr::<T>();
+            #[cfg(not(feature = "unsafe_stable_anymap"))]
             let type_repr = &type_repr;
 
             match self.map.get(type_repr) {
@@ -769,9 +774,9 @@ impl Serialize for dyn crate::serdeany::SerdeAny {
     {
         use serde::ser::SerializeSeq;
 
-        let id = crate::anymap::unpack_type_id(self.type_id());
+        let name = self.type_name();
         let mut seq = se.serialize_seq(Some(2))?;
-        seq.serialize_element(&id)?;
+        seq.serialize_element(name)?;
         seq.serialize_element(&crate::serdeany::Wrap(self))?;
         seq.end()
     }
@@ -841,6 +846,10 @@ macro_rules! impl_serdeany {
             ) -> $crate::alloc::boxed::Box<dyn ::core::any::Any> {
                 self
             }
+
+            fn type_name(&self) -> &'static str {
+                core::any::type_name::<Self>()
+            }
         }
 
         #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
@@ -877,6 +886,10 @@ macro_rules! impl_serdeany {
                 self: $crate::alloc::boxed::Box<$struct_name>,
             ) -> $crate::alloc::boxed::Box<dyn ::core::any::Any> {
                 self
+            }
+
+            fn type_name(&self) -> &'static str {
+                core::any::type_name::<Self>()
             }
         }
 
