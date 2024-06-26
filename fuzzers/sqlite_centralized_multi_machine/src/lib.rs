@@ -210,8 +210,8 @@ pub extern "C" fn libafl_main() {
         }
 
         // Setup a basic mutator with a mutational stage
-//        let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
-        let mut stages = tuple_list!();
+        let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
+        let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
         // A minimization+queue policy to get testcasess from the corpus
         let scheduler =
