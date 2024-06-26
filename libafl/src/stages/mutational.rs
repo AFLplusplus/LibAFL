@@ -15,7 +15,7 @@ use crate::{
     inputs::Input,
     mark_feature_time,
     mutators::{MultiMutator, MutationResult, Mutator},
-    stages::{Stage, StdRestartHelper},
+    stages::{RetryCountRestartHelper, Stage},
     start_timer,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
     Error, HasMetadata, HasNamedMetadata,
@@ -237,11 +237,11 @@ where
     }
 
     fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        StdRestartHelper::should_restart(state, &self.name, 3)
+        RetryCountRestartHelper::should_restart(state, &self.name, 3)
     }
 
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        StdRestartHelper::clear_progress(state, &self.name)
+        RetryCountRestartHelper::clear_progress(state, &self.name)
     }
 }
 
@@ -335,12 +335,12 @@ where
     #[inline]
     fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
         // Make sure we don't get stuck crashing on a single testcase
-        StdRestartHelper::should_restart(state, &self.name, 3)
+        RetryCountRestartHelper::should_restart(state, &self.name, 3)
     }
 
     #[inline]
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        StdRestartHelper::clear_progress(state, &self.name)
+        RetryCountRestartHelper::clear_progress(state, &self.name)
     }
 
     #[inline]

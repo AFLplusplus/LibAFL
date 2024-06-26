@@ -10,9 +10,9 @@ use crate::{
 
 /// Progress for nested stages. This merely enters/exits the inner stage's scope.
 #[derive(Debug)]
-pub struct NestedStageStdRestartHelper;
+pub struct NestedStageRetryCountRestartHelper;
 
-impl NestedStageStdRestartHelper {
+impl NestedStageRetryCountRestartHelper {
     fn should_restart<S, ST>(state: &mut S, _stage: &ST) -> Result<bool, Error>
     where
         S: HasNestedStageStatus,
@@ -71,11 +71,11 @@ where
     }
 
     fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        NestedStageStdRestartHelper::should_restart(state, self)
+        NestedStageRetryCountRestartHelper::should_restart(state, self)
     }
 
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        NestedStageStdRestartHelper::clear_progress(state, self)
+        NestedStageRetryCountRestartHelper::clear_progress(state, self)
     }
 }
 
@@ -135,11 +135,11 @@ where
     }
 
     fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        NestedStageStdRestartHelper::should_restart(state, self)
+        NestedStageRetryCountRestartHelper::should_restart(state, self)
     }
 
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        NestedStageStdRestartHelper::clear_progress(state, self)
+        NestedStageRetryCountRestartHelper::clear_progress(state, self)
     }
 }
 
@@ -220,11 +220,11 @@ where
     }
 
     fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        NestedStageStdRestartHelper::should_restart(state, self)
+        NestedStageRetryCountRestartHelper::should_restart(state, self)
     }
 
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        NestedStageStdRestartHelper::clear_progress(state, self)
+        NestedStageRetryCountRestartHelper::clear_progress(state, self)
     }
 }
 
@@ -281,11 +281,11 @@ where
     }
 
     fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        NestedStageStdRestartHelper::should_restart(state, self)
+        NestedStageRetryCountRestartHelper::should_restart(state, self)
     }
 
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        NestedStageStdRestartHelper::clear_progress(state, self)
+        NestedStageRetryCountRestartHelper::clear_progress(state, self)
     }
 }
 
