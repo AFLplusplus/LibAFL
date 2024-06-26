@@ -1,8 +1,8 @@
 //! Poor-rust-man's downcasts for stuff we send over the wire (or shared maps)
 
+use alloc::boxed::Box;
 #[cfg(feature = "stable_anymap")]
-use alloc::string::ToString;
-use alloc::{boxed::Box, string::String};
+use alloc::string::{String, ToString};
 #[cfg(feature = "stable_anymap")]
 use core::any::type_name;
 #[cfg(not(feature = "stable_anymap"))]
@@ -150,7 +150,7 @@ pub mod serdeany_registry {
         where
             V: serde::de::SeqAccess<'de>,
         {
-            let id: String = visitor.next_element()?.unwrap();
+            let id: TypeRepr = visitor.next_element()?.unwrap();
 
             let cb = unsafe {
                 REGISTRY
