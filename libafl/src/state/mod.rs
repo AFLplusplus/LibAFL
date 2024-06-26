@@ -316,10 +316,10 @@ where
     I: Input,
 {
     /// Fuzzer start time.
-    start_time: Duration,
+    pub start_time: Duration,
 
     /// Loaded inputs
-    testcases: Vec<TestcaseDump<I>>,
+    pub testcases: Vec<TestcaseDump<I>>,
 }
 
 impl<I, C, R, SC> UsesInput for StdState<I, C, R, SC>
