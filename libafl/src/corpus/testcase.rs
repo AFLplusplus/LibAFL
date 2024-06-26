@@ -91,7 +91,7 @@ where
     I: Input,
 {
     /// The [`Input`] of this [`Testcase`], or `None`, if it is not currently in memory
-    input: I,
+    pub input: I,
     /// Parent [`CorpusId`], if known
     parent_id: Option<CorpusId>,
     /// If the testcase is "disabled"
@@ -100,7 +100,7 @@ where
     objectives_found: usize,
     /// Timestamp from epoch
     #[cfg(feature = "dump_state")]
-    timestamp: Duration,
+    pub timestamp: Duration,
 }
 
 #[cfg(feature = "dump_state")]
