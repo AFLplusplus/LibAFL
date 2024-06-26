@@ -6,10 +6,10 @@ if [ ! -d "sqlite3" ]; then
     find ./sqlite3 -name "*.test" -exec cp {} corpus/ \;
 fi
 
-if [ "$1" = "release" ]; then
-  cargo build --release
-else
+if [ "$1" = "d" ]; then
   cargo build
+else
+  cargo build --release
 fi
 
 export CC=`pwd`/target/debug/libafl_cc
