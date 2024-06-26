@@ -235,7 +235,7 @@ fn fuzz(
                 return Ok(());
             }
             _ => {
-                return Err(err);
+                panic!("Failed to setup the restarter: {err}");
             }
         },
     };
@@ -267,10 +267,7 @@ fn fuzz(
     let mut objective = CrashFeedback::new();
 
     // If not restarting, create a State from scratch
-    let mut state = state.map(|state| {
-        
-        state;
-    }).unwrap_or_else(|| {
+    let mut state = state.unwrap_or_else(|| {
         StdState::new(
             // RNG
             StdRand::new(),
@@ -386,9 +383,9 @@ fn fuzz(
     #[cfg(unix)]
     {
         let null_fd = file_null.as_raw_fd();
-        // dup2(null_fd, io::stdout().as_raw_fd())?;
+        dup2(null_fd, io::stdout().as_raw_fd())?;
         if std::env::var("LIBAFL_FUZZBENCH_DEBUG").is_err() {
-            // dup2(null_fd, io::stderr().as_raw_fd())?;
+            dup2(null_fd, io::stderr().as_raw_fd())?;
         }
     }
     // reopen file to make sure we're at the end
