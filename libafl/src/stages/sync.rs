@@ -20,7 +20,7 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, UsesInput},
-    stages::{Stage, StdRestartHelper},
+    stages::{RetryCountRestartHelper, Stage},
     state::{HasCorpus, HasExecutions, HasRand, State, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -152,12 +152,12 @@ where
     fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
         // TODO: Needs proper crash handling for when an imported testcase crashes
         // For now, Make sure we don't get stuck crashing on this testcase
-        StdRestartHelper::no_retry(state, &self.name)
+        RetryCountRestartHelper::no_retry(state, &self.name)
     }
 
     #[inline]
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        StdRestartHelper::clear_progress(state, &self.name)
+        RetryCountRestartHelper::clear_progress(state, &self.name)
     }
 }
 
