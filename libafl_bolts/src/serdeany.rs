@@ -132,13 +132,8 @@ pub mod serdeany_registry {
     };
 
     /// A [`HashMap`] that maps from [`TypeRepr`] to a deserializer and its [`TypeRepr`].
-    /// We store the [`TypeId`] to make sure we never have any duplicate types in the map.
-    #[cfg(feature = "stable_anymap")]
+    /// We store the [`TypeId`] to assert we don't have duplicate types in the case of the `stable_anymap` feature.
     type DeserializeCallbackMap = HashMap<TypeRepr, (DeserializeCallback<dyn SerdeAny>, TypeId)>;
-
-    /// A [`HashMap`] that maps from [`TypeRepr`] to a deserializer and its [`TypeRepr`].
-    #[cfg(not(feature = "stable_anymap"))]
-    type DeserializeCallbackMap = HashMap<TypeRepr, (DeserializeCallback<dyn SerdeAny>)>;
 
     /// Visitor object used internally for the [`crate::serdeany::SerdeAny`] registry.
     #[derive(Debug)]
@@ -192,11 +187,12 @@ pub mod serdeany_registry {
                 .or_insert_with(|| {
                     (
                         |de| Ok(Box::new(erased_serde::deserialize::<T>(de)?)),
-                        #[cfg(feature = "stable_anymap")]
                         TypeId::of::<T>(),
                     )
                 });
 
+            // We assert that only one element with the given TypeId is in the map.
+            // This is only necessary for stable_anymap where we don't directly use the TypeId, but the type_name instead.
             #[cfg(feature = "stable_anymap")]
             assert_eq!(_entry.1, TypeId::of::<T>(), "Fatal safety error: TypeId of type {} is not equal to the deserializer's TypeId for this type! Two registered types have the same type_name!", type_repr::<T>());
         }
