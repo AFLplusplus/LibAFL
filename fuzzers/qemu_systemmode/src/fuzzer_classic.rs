@@ -32,6 +32,9 @@ use libafl_bolts::{
 use libafl_qemu::{
     edges::{edges_map_mut_ptr, QemuEdgeCoverageHelper, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND},
     elf::EasyElf,
+    qemu_opt::{
+        QemuOpt, QemuOptDiskImageFileFormat, QemuOptDrive, QemuOptDriveInterface, QemuOptSerial,
+    },
     Qemu, QemuExecutor, QemuExitError, QemuExitReason, QemuHooks, QemuRWError, QemuShutdownCause,
     Regs,
 };
@@ -84,9 +87,26 @@ pub fn fuzz() {
 
     let mut run_client = |state: Option<_>, mut mgr, _core_id| {
         // Initialize QEMU
-        let args: Vec<String> = env::args().collect();
+        // let args: Vec<String> = env::args().collect();
         let env: Vec<(String, String)> = env::vars().collect();
-        let qemu = Qemu::init(&args, &env).unwrap();
+        // let qemu = Qemu::init(&args, &env).unwrap();
+
+        //TODO: broken vars like ${TARGET_DIR}
+        let qemu_opt = QemuOpt::new()
+            .machine("mps2-an385".to_string())
+            .monitor(QemuOptSerial::null)
+            .kernel(PathBuf::from("${TARGET_DIR}/example.elf"))
+            .serial(QemuOptSerial::null)
+            .no_graphic()
+            .snapshot()
+            .add_drive(
+                QemuOptDrive::new()
+                    .interface(QemuOptDriveInterface::none)
+                    .format(QemuOptDiskImageFileFormat::qcow2)
+                    .file(PathBuf::from("${TARGET_DIR}/dummy.qcow2")),
+            )
+            .do_not_start_cpu();
+        let qemu = Qemu::with_options(&qemu_opt, &env).expect("Failed to initialized QEMU");
 
         qemu.set_breakpoint(main_addr);
         unsafe {
