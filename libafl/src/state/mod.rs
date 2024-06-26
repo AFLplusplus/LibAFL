@@ -1081,7 +1081,7 @@ where
             rand,
             executions: 0,
             imported: 0,
-            start_time: Duration::from_millis(0),
+            start_time: libafl_bolts::current_time(),
             metadata: SerdeAnyMap::default(),
             named_metadata: NamedSerdeAnyMap::default(),
             corpus,
