@@ -774,9 +774,18 @@ impl Serialize for dyn crate::serdeany::SerdeAny {
     {
         use serde::ser::SerializeSeq;
 
-        let name = self.type_name();
+        #[cfg(not(feature = "unsafe_stable_anymap"))]
+        let type_id = crate::anymap::unpack_type_id(self.type_id());
+        #[cfg(not(feature = "unsafe_stable_anymap"))]
+        let type_id = &type_id;
+
+        // For the stable anymap, we use the `type_name` as type id.
+        // Of course this may go wrong... :)
+        #[cfg(feature = "unsafe_stable_anymap")]
+        let type_id = self.type_name();
+
         let mut seq = se.serialize_seq(Some(2))?;
-        seq.serialize_element(name)?;
+        seq.serialize_element(type_id)?;
         seq.serialize_element(&crate::serdeany::Wrap(self))?;
         seq.end()
     }
