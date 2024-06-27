@@ -857,9 +857,9 @@ impl LlmpPage {
 
     #[inline]
     fn receiver_left(&mut self) {
-        let receivers_joined_count = &mut self.receivers_joined_count;
+        let receivers_left_count = &mut self.receivers_joined_count;
         //receivers_joined_count.fetch_add(1, Ordering::Relaxed);
-        receivers_joined_count.store(1, Ordering::Relaxed);
+        receivers_left_count.store(1, Ordering::Relaxed);
     }
 }
 
