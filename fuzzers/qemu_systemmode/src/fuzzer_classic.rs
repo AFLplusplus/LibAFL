@@ -30,10 +30,12 @@ use libafl_bolts::{
     AsSlice,
 };
 use libafl_qemu::{
-    edges::{edges_map_mut_ptr, QemuEdgeCoverageHelper, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND},
+    command::NopCommandManager,
+    edges::{edges_map_mut_ptr, QemuEdgeCoverageTool, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND},
     elf::EasyElf,
-    Qemu, QemuExecutor, QemuExitError, QemuExitReason, QemuHooks, QemuRWError, QemuShutdownCause,
-    Regs,
+    executor::{stateful::StatefulQemuExecutor, QemuExecutorState},
+    Emulator, NopEmulatorExitHandler, QemuExitError, QemuExitReason, QemuRWError,
+    QemuShutdownCause, Regs,
 };
 use libafl_qemu_sys::GuestPhysAddr;
 
@@ -86,15 +88,29 @@ pub fn fuzz() {
         // Initialize QEMU
         let args: Vec<String> = env::args().collect();
         let env: Vec<(String, String)> = env::vars().collect();
-        let qemu = Qemu::init(&args, &env).unwrap();
+
+        let emulator_tools = tuple_list!(QemuEdgeCoverageTool::default());
+
+        let mut emulator = Emulator::new(
+            args.as_slice(),
+            env.as_slice(),
+            emulator_tools,
+            NopEmulatorExitHandler,
+            NopCommandManager,
+        )
+        .unwrap();
+
+        let qemu = emulator.qemu();
 
         qemu.set_breakpoint(main_addr);
+
         unsafe {
             match qemu.run() {
                 Ok(QemuExitReason::Breakpoint(_)) => {}
                 _ => panic!("Unexpected QEMU exit."),
             }
         }
+
         qemu.remove_breakpoint(main_addr);
 
         qemu.set_breakpoint(breakpoint); // BREAKPOINT
@@ -111,7 +127,8 @@ pub fn fuzz() {
         let snap = qemu.create_fast_snapshot(true);
 
         // The wrapped harness function, calling out to the LLVM-style harness
-        let mut harness = |input: &BytesInput| {
+        let mut harness = |input: &BytesInput, state: &mut QemuExecutorState<_, _, _, _>| {
+            let emulator = state.emulator_mut();
             let target = input.target_bytes();
             let mut buf = target.as_slice();
             let len = buf.len();
@@ -123,7 +140,7 @@ pub fn fuzz() {
 
                 qemu.write_phys_mem(input_addr, buf);
 
-                match qemu.run() {
+                match emulator.qemu().run() {
                     Ok(QemuExitReason::Breakpoint(_)) => {}
                     Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(
                         Signal::SigInterrupt,
@@ -209,12 +226,9 @@ pub fn fuzz() {
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-        let mut hooks =
-            QemuHooks::new(qemu.clone(), tuple_list!(QemuEdgeCoverageHelper::default()));
-
         // Create a QEMU in-process executor
-        let mut executor = QemuExecutor::new(
-            &mut hooks,
+        let mut executor = StatefulQemuExecutor::new(
+            &mut emulator,
             &mut harness,
             tuple_list!(edges_observer, time_observer),
             &mut fuzzer,
