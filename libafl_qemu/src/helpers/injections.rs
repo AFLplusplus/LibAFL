@@ -304,7 +304,7 @@ where
                     libs.iter()
                         .filter_map(|lib| find_function(qemu, &lib.name, name, lib.off).unwrap())
                         .inspect(|&func_pc| {
-                            log::info!("Injections: Function {name} found at {func_pc:#x}")
+                            log::info!("Injections: Function {name} found at {func_pc:#x}");
                         })
                         .collect()
                 };
