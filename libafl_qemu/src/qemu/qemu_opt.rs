@@ -1,21 +1,28 @@
-use core::fmt;
-use std::{fmt::Formatter, path::PathBuf};
+use core::{
+    fmt,
+    fmt::{Display, Formatter},
+};
+use std::path::PathBuf;
 
-use strum_macros::Display;
+use libafl_derive;
+use strum_macros;
+use typed_builder::TypedBuilder;
+
+use crate::{Qemu, QemuInitError};
 
 #[allow(non_camel_case_types)]
-#[derive(Default, Debug, Display, Clone, Copy)]
-pub enum QemuOptAccelerator {
+#[derive(Debug, strum_macros::Display, Clone)]
+#[strum(prefix = "-accel ")]
+pub enum Accelerator {
     kvm,
-    #[default]
     tcg,
 }
 
 #[allow(non_camel_case_types)]
-#[derive(Default, Debug, Display, Clone, Copy)]
-pub enum QemuOptDriveInterface {
+#[derive(Debug, strum_macros::Display, Clone)]
+#[strum(prefix = "if=")]
+pub enum DriveInterface {
     floppy,
-    #[default]
     ide,
     mtd,
     none,
@@ -26,22 +33,26 @@ pub enum QemuOptDriveInterface {
 }
 
 #[allow(non_camel_case_types)]
-#[derive(Debug, Display, Clone, Copy)]
-pub enum QemuOptDiskImageFileFormat {
+#[derive(Debug, strum_macros::Display, Clone)]
+#[strum(prefix = "format=")]
+pub enum DiskImageFileFormat {
     qcow2,
     raw,
 }
 
-#[derive(Debug, Default, Clone)]
-pub struct QemuOptDrive {
+#[derive(Debug, Clone, Default, TypedBuilder)]
+pub struct Drive {
+    #[builder(default, setter(strip_option))]
     file: Option<PathBuf>,
-    format: Option<QemuOptDiskImageFileFormat>,
-    interface: Option<QemuOptDriveInterface>,
+    #[builder(default, setter(strip_option))]
+    format: Option<DiskImageFileFormat>,
+    #[builder(default, setter(strip_option))]
+    interface: Option<DriveInterface>,
 }
 
-impl fmt::Display for QemuOptDrive {
+impl Display for Drive {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, " -drive")?;
+        write!(f, "-drive")?;
 
         let mut is_first_option = true;
         let mut separator = || {
@@ -57,10 +68,10 @@ impl fmt::Display for QemuOptDrive {
             write!(f, "{}file={}", separator(), file.to_str().unwrap())?;
         }
         if let Some(format) = &self.format {
-            write!(f, "{}format={}", separator(), format)?;
+            write!(f, "{}{format}", separator())?;
         }
         if let Some(interface) = &self.interface {
-            write!(f, "{}if={}", separator(), interface)?;
+            write!(f, "{}{interface}", separator())?;
         }
 
         Ok(())
@@ -68,209 +79,171 @@ impl fmt::Display for QemuOptDrive {
 }
 
 #[allow(non_camel_case_types)]
-#[derive(Default, Debug, Display, Clone, Copy)]
-pub enum QemuOptSerial {
+#[derive(Debug, strum_macros::Display, Clone)]
+#[strum(prefix = "-serial ")]
+pub enum Serial {
     none,
     null,
-    #[default]
     stdio,
 }
 
-#[derive(Debug, Default, Clone)]
-pub struct QemuOpt {
-    accelerator: Option<QemuOptAccelerator>,
-    /// Set the directory for the BIOS, VGA BIOS and keymaps.
-    bios_path: Option<PathBuf>,
-    drives: Vec<QemuOptDrive>,
-    kernel: Option<PathBuf>,
-    load_vm: Option<PathBuf>,
-    machine: Option<String>,
-    monitor: Option<QemuOptSerial>,
-    no_graphic: bool,
-    /// ram size in MiB
-    ram_size: Option<u32>,
-    serial: Option<QemuOptSerial>,
-    smp_cpus: Option<u32>,
-    snapshot: bool,
-    vga_pci: bool,
-    do_not_start_cpu: bool,
+#[allow(non_camel_case_types)]
+#[derive(Debug, strum_macros::Display, Clone)]
+#[strum(prefix = "-monitor ")]
+pub enum Monitor {
+    none,
+    null,
+    stdio,
 }
 
-impl fmt::Display for QemuOpt {
+/// Set the directory for the BIOS, VGA BIOS and keymaps.
+#[derive(Debug, Clone)]
+pub struct Bios {
+    pub path: Option<PathBuf>,
+}
+
+impl Display for Bios {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if let Some(accelerator) = &self.accelerator {
-            write!(f, " -accel {accelerator}")?;
+        if let Some(path) = &self.path {
+            write!(f, "-L {}", path.to_str().unwrap())?;
         }
-
-        if let Some(bios_path) = &self.bios_path {
-            write!(f, " -L {}", bios_path.to_str().unwrap())?;
-        }
-
-        for drive in &self.drives {
-            drive.fmt(f)?;
-        }
-
-        if let Some(kernel) = &self.kernel {
-            write!(f, " -kernel {}", kernel.to_str().unwrap())?;
-        }
-
-        if let Some(load_vm) = &self.load_vm {
-            write!(f, " -loadvm {}", load_vm.to_str().unwrap())?;
-        }
-
-        if let Some(machine) = &self.machine {
-            write!(f, " -machine {machine}")?;
-        }
-
-        if let Some(monitor) = &self.monitor {
-            write!(f, " -monitor {monitor}")?;
-        }
-
-        if self.no_graphic {
-            write!(f, " -nographic")?;
-        }
-
-        if let Some(ram_size) = &self.ram_size {
-            write!(f, " -m {ram_size}M")?;
-        }
-
-        if let Some(serial) = &self.serial {
-            write!(f, " -serial {serial}")?;
-        }
-
-        if let Some(smp_cpus) = &self.smp_cpus {
-            write!(f, " -smp {smp_cpus}")?;
-        }
-
-        if self.snapshot {
-            write!(f, " -snapshot")?;
-        }
-
-        if self.vga_pci {
-            write!(f, " -device VGA")?;
-        }
-
-        if self.do_not_start_cpu {
-            write!(f, " -S")?;
-        }
-
         Ok(())
     }
 }
 
-impl QemuOptDrive {
-    #[must_use]
-    pub fn new() -> QemuOptDrive {
-        QemuOptDrive::default()
-    }
+#[derive(Debug, Clone)]
+pub struct Kernel {
+    pub path: PathBuf,
+}
 
-    #[must_use]
-    pub fn file(mut self, file: PathBuf) -> QemuOptDrive {
-        self.file = Some(file);
-        self
-    }
-
-    #[must_use]
-    pub fn format(mut self, format: QemuOptDiskImageFileFormat) -> QemuOptDrive {
-        self.format = Some(format);
-        self
-    }
-
-    #[must_use]
-    pub fn interface(mut self, interface: QemuOptDriveInterface) -> QemuOptDrive {
-        self.interface = Some(interface);
-        self
+impl Display for Kernel {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "-kernel {}", self.path.to_str().unwrap())
     }
 }
 
-impl QemuOpt {
-    #[must_use]
-    pub fn new() -> QemuOpt {
-        QemuOpt::default()
-    }
+#[derive(Debug, Clone)]
+pub struct LoadVM {
+    pub path: PathBuf,
+}
 
-    #[must_use]
-    pub fn accelerator(mut self, accelerator: QemuOptAccelerator) -> QemuOpt {
-        self.accelerator = Some(accelerator);
-        self
+impl Display for LoadVM {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "-loadvm {}", self.path.to_str().unwrap())
     }
+}
 
-    #[must_use]
-    pub fn bios_path(mut self, bios_path: PathBuf) -> QemuOpt {
-        self.bios_path = Some(bios_path);
-        self
+#[derive(Debug, Clone)]
+pub struct Machine {
+    pub machine: String,
+}
+
+impl Display for Machine {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "-machine {}", self.machine)
     }
+}
 
-    #[must_use]
-    pub fn add_drive(mut self, drive: QemuOptDrive) -> QemuOpt {
-        self.drives.push(drive);
-        self
+#[derive(Debug, Clone, strum_macros::Display)]
+pub enum Snapshot {
+    #[strum(serialize = "-snapshot")]
+    ENABLE,
+    #[strum(serialize = "")]
+    DISABLE,
+}
+
+#[derive(Debug, Clone, strum_macros::Display)]
+pub enum StartCPU {
+    #[strum(serialize = "")]
+    ENABLE,
+    #[strum(serialize = "-S")]
+    DISABLE,
+}
+
+#[derive(Debug, Clone, strum_macros::Display)]
+pub enum NoGraphic {
+    #[strum(serialize = "-nographic")]
+    ENABLE,
+    #[strum(serialize = "")]
+    DISABLE,
+}
+
+#[derive(Debug, Clone)]
+pub enum RamSize {
+    MB(u32),
+    GB(u32),
+}
+
+impl Display for RamSize {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            RamSize::MB(mb) => write!(f, "-m {mb}M"),
+            RamSize::GB(gb) => write!(f, "-m {gb}G"),
+        }
     }
+}
 
-    #[must_use]
-    pub fn kernel(mut self, kernel: PathBuf) -> QemuOpt {
-        self.kernel = Some(kernel);
-        self
+#[derive(Debug, Clone)]
+pub struct SmpCpus {
+    pub cpus: u32,
+}
+
+impl Display for SmpCpus {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "-smp {}", self.cpus)
     }
+}
 
-    #[must_use]
-    pub fn load_vm(mut self, load_vm: PathBuf) -> QemuOpt {
-        self.load_vm = Some(load_vm);
-        self
-    }
+#[derive(Debug, Clone, strum_macros::Display)]
+pub enum VgaPci {
+    #[strum(serialize = "-device VGA")]
+    ENABLE,
+    #[strum(serialize = "")]
+    DISABLE,
+}
 
-    #[must_use]
-    pub fn machine(mut self, machine: String) -> QemuOpt {
-        self.machine = Some(machine);
-        self
-    }
+#[derive(Debug, Clone, Default, libafl_derive::Display, TypedBuilder)]
+#[builder(build_method(into), builder_method(vis = "pub(crate)"))]
+pub struct QemuConfig {
+    #[builder(default, setter(strip_option))]
+    accelerator: Option<Accelerator>,
+    #[builder(default, setter(strip_option))]
+    bios: Option<Bios>,
+    #[builder(default)]
+    drives: Vec<Drive>,
+    #[builder(default, setter(strip_option))]
+    kernel: Option<Kernel>,
+    #[builder(default, setter(strip_option))]
+    load_vm: Option<LoadVM>,
+    #[builder(default, setter(strip_option))]
+    machine: Option<Machine>,
+    #[builder(default, setter(strip_option))]
+    monitor: Option<Monitor>,
+    #[builder(default, setter(strip_option))]
+    no_graphic: Option<NoGraphic>,
+    #[builder(default, setter(strip_option))]
+    ram_size: Option<RamSize>,
+    #[builder(default, setter(strip_option))]
+    serial: Option<Serial>,
+    #[builder(default, setter(strip_option))]
+    smp_cpus: Option<SmpCpus>,
+    #[builder(default, setter(strip_option))]
+    snapshot: Option<Snapshot>,
+    #[builder(default, setter(strip_option))]
+    vga_pci: Option<VgaPci>,
+    #[builder(default, setter(strip_option))]
+    start_cpu: Option<StartCPU>,
+}
 
-    #[must_use]
-    pub fn monitor(mut self, monitor: QemuOptSerial) -> QemuOpt {
-        self.monitor = Some(monitor);
-        self
-    }
-
-    #[must_use]
-    pub fn no_graphic(mut self) -> QemuOpt {
-        self.no_graphic = true;
-        self
-    }
-
-    #[must_use]
-    pub fn ram_size(mut self, ram_size: u32) -> QemuOpt {
-        self.ram_size = Some(ram_size);
-        self
-    }
-
-    #[must_use]
-    pub fn serial(mut self, serial: QemuOptSerial) -> QemuOpt {
-        self.serial = Some(serial);
-        self
-    }
-
-    #[must_use]
-    pub fn smp_cpus(mut self, smp_cpus: u32) -> QemuOpt {
-        self.smp_cpus = Some(smp_cpus);
-        self
-    }
-
-    #[must_use]
-    pub fn snapshot(mut self) -> QemuOpt {
-        self.snapshot = true;
-        self
-    }
-
-    #[must_use]
-    pub fn vga_pci(mut self) -> QemuOpt {
-        self.vga_pci = true;
-        self
-    }
-
-    #[must_use]
-    pub fn do_not_start_cpu(mut self) -> QemuOpt {
-        self.do_not_start_cpu = true;
-        self
+impl Into<Result<Qemu, QemuInitError>> for QemuConfig {
+    fn into(self) -> Result<Qemu, QemuInitError> {
+        // TODO improve this without splitting
+        let args = self
+            .to_string()
+            .split(' ')
+            .map(std::string::ToString::to_string)
+            .collect::<Vec<String>>();
+        Qemu::init(&args, &[])
     }
 }
 
@@ -280,18 +253,17 @@ mod test {
 
     #[test]
     fn default_fmt_is_empty() {
-        let opt = QemuOpt::default();
+        let opt: QemuConfig = QemuConfig::builder().build();
         assert_eq!(opt.to_string(), "");
     }
 
     #[test]
     fn drive_no_file_fmt() {
-        let drive = QemuOptDrive {
-            file: None,
-            format: Some(QemuOptDiskImageFileFormat::raw),
-            interface: Some(QemuOptDriveInterface::default()),
-        };
-        assert_eq!(drive.to_string(), " -drive format=raw,if=ide");
+        let drive = Drive::builder()
+            .format(DiskImageFileFormat::raw)
+            .interface(DriveInterface::ide)
+            .build();
+        assert_eq!(drive.to_string(), "-drive format=raw,if=ide");
     }
 
     #[test]
@@ -307,24 +279,34 @@ mod test {
             -S";
         let shell_config_args = str_split_sort(shell_config, " -");
 
-        let qemu_opt = QemuOpt::new()
-            .machine("mps2-an385".to_string())
-            .monitor(QemuOptSerial::null)
-            .kernel(PathBuf::from("${TARGET_DIR}/example.elf"))
-            .serial(QemuOptSerial::null)
-            .no_graphic()
-            .snapshot()
-            .add_drive(
-                QemuOptDrive::new()
-                    .interface(QemuOptDriveInterface::none)
-                    .format(QemuOptDiskImageFileFormat::qcow2)
-                    .file(PathBuf::from("${TARGET_DIR}/dummy.qcow2")),
-            )
-            .do_not_start_cpu();
+        let qemu_opt: QemuConfig = Qemu::builder()
+            .machine(Machine {
+                machine: "mps2-an385".to_string(),
+            })
+            .monitor(Monitor::null)
+            .kernel(Kernel {
+                path: PathBuf::from("${TARGET_DIR}/example.elf"),
+            })
+            .serial(Serial::null)
+            .no_graphic(NoGraphic::ENABLE)
+            .snapshot(Snapshot::ENABLE)
+            .drives(vec![Drive::builder()
+                .interface(DriveInterface::none)
+                .format(DiskImageFileFormat::qcow2)
+                .file(PathBuf::from("${TARGET_DIR}/dummy.qcow2"))
+                .build()])
+            .start_cpu(StartCPU::DISABLE)
+            .build();
         let qemu_opt_str = qemu_opt.to_string();
         let qemu_opt_str_args = str_split_sort(&qemu_opt_str, " -");
 
         assert_eq!(qemu_opt_str_args, shell_config_args);
+    }
+
+    #[test]
+    fn accelerator_fmt() {
+        let opt: QemuConfig = Qemu::builder().accelerator(Accelerator::kvm).build();
+        assert_eq!(opt.to_string(), " -accel kvm");
     }
 
     #[must_use]

@@ -36,7 +36,7 @@ use strum::IntoEnumIterator;
 use crate::{GuestAddrKind, GuestReg, Regs};
 
 pub mod qemu_opt;
-use qemu_opt::QemuOpt;
+use qemu_opt::{QemuConfig, QemuConfigBuilder};
 
 #[cfg(emulation_mode = "usermode")]
 mod usermode;
@@ -572,18 +572,11 @@ impl From<u8> for HookData {
 
 #[allow(clippy::unused_self)]
 impl Qemu {
-    #[allow(clippy::must_use_candidate)]
-    pub fn with_options(
-        qemu_opts: &QemuOpt,
-        env: &[(String, String)],
-    ) -> Result<Self, QemuInitError> {
-        //TODO: do it properly without this shortcut
-        let args = qemu_opts
-            .to_string()
-            .split(' ')
-            .map(std::string::ToString::to_string)
-            .collect::<Vec<String>>();
-        Self::init(&args, env)
+    pub fn builder() -> QemuConfigBuilder {
+        // Since Qemu is a zero sized struct, this is not a completely standard builder pattern.
+        // The Qemu configuration is not stored in the Qemu struct after build().
+        // Therefore, to use the derived builder and avoid boilerplate a builder for QemuBuilder is derived.
+        QemuConfig::builder()
     }
 
     #[allow(clippy::must_use_candidate, clippy::similar_names)]
