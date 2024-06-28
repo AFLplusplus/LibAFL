@@ -393,7 +393,7 @@ where
     }
 
     fn on_shutdown(&mut self) -> Result<(), Error> {
-        Ok(())
+        self.inner.on_shutdown()
     }
 }
 
