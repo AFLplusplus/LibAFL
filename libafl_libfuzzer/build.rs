@@ -60,9 +60,6 @@ fn main() {
     if cfg!(any(feature = "fork")) {
         features.push("fork");
     }
-    if cfg!(any(feature = "introspection")) {
-        features.push("introspection");
-    }
 
     if !features.is_empty() {
         command.arg("--features").arg(features.join(","));
