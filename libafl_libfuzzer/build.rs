@@ -61,7 +61,7 @@ fn main() {
         features.push("fork");
     }
     if cfg!(any(feature = "introspection")) {
-        features.push("libafl/introspection");
+        features.push("introspection");
     }
 
     if !features.is_empty() {

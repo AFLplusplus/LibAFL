@@ -33,7 +33,7 @@ document-features = ["dep:document-features"]
 arbitrary-derive = ["libfuzzer-sys/arbitrary-derive"]
 
 ## Enables fuzzer introspection with LibAFL's `introspection` feature
-introspection = []
+introspection = ["libafl/introspection]
 
 ## Enables forking in the fuzzer runtime for restarting managers for Unix systems (on by default)
 fork = []
