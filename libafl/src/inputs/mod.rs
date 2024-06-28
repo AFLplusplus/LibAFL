@@ -1,4 +1,4 @@
-//! Inputs are the actual contents sent to a target for each exeuction.
+//! Inputs are the actual contents sent to a target for each execution.
 
 pub mod bytes;
 pub use bytes::BytesInput;

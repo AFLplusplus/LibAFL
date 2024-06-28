@@ -12,7 +12,7 @@ use std::{fs::File, io::Read, path::Path};
 use ahash::RandomState;
 #[cfg(feature = "std")]
 use libafl_bolts::{fs::write_file_atomic, Error};
-use libafl_bolts::{ownedref::OwnedSlice, HasLen};
+use libafl_bolts::{ownedref::OwnedSlice, HasLen, Truncate};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -25,6 +25,8 @@ use crate::{
 pub struct BytesInput {
     /// The raw input bytes
     pub(crate) bytes: Vec<u8>,
+    /// The current actual length of this input
+    len: usize,
 }
 
 impl Input for BytesInput {
@@ -49,6 +51,10 @@ impl Input for BytesInput {
         Ok(BytesInput::new(bytes))
     }
 
+    fn wrapped_as_testcase(&mut self) {
+        self.bytes().truncate(self.len);
+    }
+
     /// Generate a name for this input
     fn generate_name(&self, _id: Option<CorpusId>) -> String {
         let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
@@ -67,19 +73,31 @@ impl From<BytesInput> for Rc<RefCell<BytesInput>> {
 impl HasMutatorBytes for BytesInput {
     #[inline]
     fn bytes(&self) -> &[u8] {
-        &self.bytes
+        &self.bytes[..self.len]
     }
 
     #[inline]
     fn bytes_mut(&mut self) -> &mut [u8] {
-        &mut self.bytes
+        &mut self.bytes[..self.len]
     }
 
     fn resize(&mut self, new_len: usize, value: u8) {
-        self.bytes.resize(new_len, value);
+        if new_len <= self.len {
+            // We shrink. Keep the memory around for later use.
+            self.len = new_len;
+        } else if self.bytes.len() >= new_len {
+            // We still have enough space.
+            let old_len = self.len;
+            self.bytes[old_len..new_len].fill(value);
+            self.len = new_len;
+        } else {
+            self.len = new_len;
+            self.bytes.resize(new_len, value);
+        }
     }
 
     fn extend<'a, I: IntoIterator<Item = &'a u8>>(&mut self, iter: I) {
+        self.bytes.truncate(self.len);
         Extend::extend(&mut self.bytes, iter);
     }
 
@@ -88,6 +106,7 @@ impl HasMutatorBytes for BytesInput {
         R: core::ops::RangeBounds<usize>,
         I: IntoIterator<Item = u8>,
     {
+        self.bytes.truncate(self.len);
         self.bytes.splice(range, replace_with)
     }
 
@@ -95,6 +114,7 @@ impl HasMutatorBytes for BytesInput {
     where
         R: core::ops::RangeBounds<usize>,
     {
+        self.bytes.truncate(self.len);
         self.bytes.drain(range)
     }
 }
@@ -109,7 +129,7 @@ impl HasTargetBytes for BytesInput {
 impl HasLen for BytesInput {
     #[inline]
     fn len(&self) -> usize {
-        self.bytes.len()
+        self.len
     }
 }
 
@@ -134,7 +154,8 @@ impl From<BytesInput> for Vec<u8> {
 impl BytesInput {
     /// Creates a new bytes input using the given bytes
     #[must_use]
-    pub const fn new(bytes: Vec<u8>) -> Self {
-        Self { bytes }
+    pub fn new(bytes: Vec<u8>) -> Self {
+        let len = bytes.len();
+        Self { bytes, len }
     }
 }
