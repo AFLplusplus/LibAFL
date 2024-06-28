@@ -798,7 +798,7 @@ where
     EM: EventProcessor<E, Z>,
 {
     #[inline]
-    default fn process(
+    fn process(
         &mut self,
         fuzzer: &mut Z,
         state: &mut Self::State,
@@ -807,19 +807,11 @@ where
         self.inner.process(fuzzer, state, executor)
     }
 
-    default fn on_shutdown(&mut self) -> Result<(), Error> {
-        Ok(())
+   fn on_shutdown(&mut self) -> Result<(), Error> {
+        self.inner.on_shutdown()
     }
 }
 
-impl<E, EM, M, Z> EventProcessor<E, Z> for MonitorTypedEventManager<EM, M>
-where
-    EM: EventProcessor<E, Z> + EventRestarter,
-{
-    fn on_shutdown(&mut self) -> Result<(), Error> {
-        self.inner.send_exiting()
-    }
-}
 
 impl<E, EM, M, Z> EventManager<E, Z> for MonitorTypedEventManager<EM, M>
 where
