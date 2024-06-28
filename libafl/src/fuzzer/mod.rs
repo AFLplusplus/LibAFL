@@ -184,7 +184,7 @@ pub trait Fuzzer<E, EM, ST>: Sized + UsesState
 where
     Self::State: HasMetadata + HasExecutions + HasLastReportTime + Stoppable,
     E: UsesState<State = Self::State>,
-    EM: ProgressReporter<State = Self::State>,
+    EM: ProgressReporter<State = Self::State> + EventProcessor<E, Self>,
     ST: StagesTuple<E, EM, Self::State, Self>,
 {
     /// Fuzz for a single iteration.
@@ -218,6 +218,7 @@ where
             manager.maybe_report_progress(state, monitor_timeout)?;
             if state.should_stop() {
                 *state.should_stop_mut() = false;
+                manager.on_shutdown()?;
                 break;
             }
             self.fuzz_one(stages, executor, state, manager)?;
