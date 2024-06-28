@@ -813,6 +813,10 @@ where
 
         Ok(count)
     }
+
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        self.send_exiting()
+    }
 }
 
 impl<E, EMH, S, Z> EventManager<E, Z> for TcpEventManager<EMH, S>
@@ -970,6 +974,10 @@ where
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         self.tcp_mgr.process(fuzzer, state, executor)
+    }
+
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        self.send_exiting()
     }
 }
 

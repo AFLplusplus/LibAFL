@@ -875,7 +875,7 @@ pub mod test {
 
     use crate::{
         corpus::CorpusId,
-        events::ProgressReporter,
+        events::{EventProcessor, ProgressReporter},
         stages::{HasCurrentStage, StagesTuple},
         state::{HasExecutions, HasLastReportTime, State, UsesState},
         Fuzzer, HasMetadata,
@@ -911,7 +911,7 @@ pub mod test {
     impl<ST, E, EM> Fuzzer<E, EM, ST> for NopFuzzer<E::State>
     where
         E: UsesState,
-        EM: ProgressReporter<State = Self::State>,
+        EM: ProgressReporter<State = Self::State> + EventProcessor<E, Self>,
         ST: StagesTuple<E, EM, Self::State, Self>,
         Self::State: HasMetadata + HasExecutions + HasLastReportTime + HasCurrentStage,
     {

@@ -45,13 +45,13 @@ pub use unicode::*;
 
 use crate::{
     corpus::{CorpusId, HasCurrentCorpusId},
-    events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
+    events::{EventFirer, EventProcessor, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::{Executor, HasObservers},
     inputs::UsesInput,
     observers::ObserversTuple,
     schedulers::Scheduler,
     stages::push::PushStage,
-    state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand, State, UsesState},
+    state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand, State, Stoppable, UsesState},
     Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasMetadata, HasNamedMetadata,
     HasScheduler,
 };
@@ -135,7 +135,7 @@ where
     Z: UsesState<State = S>,
     S: UsesInput + HasCurrentStage,
 {
-    /// Performs all `Stages` in this tuple
+    /// Performs all `Stages` in this tuple.
     fn perform_all(
         &mut self,
         fuzzer: &mut Z,
@@ -174,10 +174,13 @@ where
     Head: Stage<E, EM, Z>,
     Tail: StagesTuple<E, EM, Head::State, Z> + HasConstLen,
     E: UsesState<State = Head::State>,
-    EM: UsesState<State = Head::State>,
+    EM: UsesState<State = Head::State> + EventProcessor<E, Z>,
     Z: UsesState<State = Head::State>,
     Head::State: HasCurrentStage,
 {
+    /// Performs all stages in the tuple,
+    /// checks after every stage if [`State::should_stop`]
+    /// is true and stops if so.
     fn perform_all(
         &mut self,
         fuzzer: &mut Z,
@@ -209,6 +212,12 @@ where
 
                 state.clear_stage()?;
             }
+        }
+
+        if state.should_stop() {
+            *state.should_stop_mut() = false;
+            manager.on_shutdown()?;
+            return Err(Error::ShuttingDown);
         }
 
         // Execute the remaining stages
@@ -273,10 +282,13 @@ impl<E, EM, S, Z> StagesTuple<E, EM, S, Z>
     for Vec<Box<dyn Stage<E, EM, Z, State = S, Input = S::Input>>>
 where
     E: UsesState<State = S>,
-    EM: UsesState<State = S>,
+    EM: UsesState<State = S> + EventProcessor<E, Z>,
     Z: UsesState<State = S>,
     S: UsesInput + HasCurrentStage + State,
 {
+    /// Performs all stages in the `Vec`
+    /// checks after every stage if [`State::should_stop`]
+    /// is true and stops if so.
     fn perform_all(
         &mut self,
         fuzzer: &mut Z,
@@ -284,8 +296,14 @@ where
         state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        self.iter_mut()
-            .try_for_each(|x| x.perform_restartable(fuzzer, executor, state, manager))
+        self.iter_mut().try_for_each(|x| {
+            if state.should_stop() {
+                *state.should_stop_mut() = false;
+                manager.on_shutdown()?;
+                return Err(Error::shutting_down());
+            }
+            x.perform_restartable(fuzzer, executor, state, manager)
+        })
     }
 }
 
