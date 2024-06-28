@@ -12,8 +12,8 @@ else
   cargo build --release
 fi
 
-export CC=`pwd`/target/debug/libafl_cc
-export CXX=`pwd`/target/debug/libafl_cxx
+export CC=`pwd`/target/release/libafl_cc
+export CXX=`pwd`/target/release/libafl_cxx
 export CFLAGS='--libafl'
 export CXXFLAGS='--libafl'
 export CFLAGS="$CFLAGS -DSQLITE_MAX_LENGTH=128000000 \
