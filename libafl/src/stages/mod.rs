@@ -179,8 +179,8 @@ where
     Head::State: HasCurrentStage,
 {
     /// Performs all stages in the tuple,
-    /// checks after every stage if [`State::should_stop`]
-    /// is true and stops if so.
+    /// Checks after every stage if state wants to stop
+    /// and returns an [`Error::ShuttingDown`] if so
     fn perform_all(
         &mut self,
         fuzzer: &mut Z,
@@ -217,7 +217,7 @@ where
         if state.should_stop() {
             *state.should_stop_mut() = false;
             manager.on_shutdown()?;
-            return Err(Error::ShuttingDown);
+            return Err(Error::shutting_down());
         }
 
         // Execute the remaining stages
@@ -287,8 +287,8 @@ where
     S: UsesInput + HasCurrentStage + State,
 {
     /// Performs all stages in the `Vec`
-    /// checks after every stage if [`State::should_stop`]
-    /// is true and stops if so.
+    /// Checks after every stage if state wants to stop
+    /// and returns an [`Error::ShuttingDown`] if so
     fn perform_all(
         &mut self,
         fuzzer: &mut Z,
