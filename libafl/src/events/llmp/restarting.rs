@@ -218,6 +218,10 @@ where
         self.intermediate_save()?;
         Ok(res)
     }
+
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        self.send_exiting()
+    }
 }
 
 #[cfg(feature = "std")]

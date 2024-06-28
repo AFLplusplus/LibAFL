@@ -130,6 +130,10 @@ where
         }
         Ok(count)
     }
+
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        self.send_exiting()
+    }
 }
 
 impl<E, MT, S, Z> EventManager<E, Z> for SimpleEventManager<MT, S>
@@ -404,6 +408,9 @@ where
             }
         }
         Ok(count)
+    }
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        self.send_exiting()
     }
 }
 

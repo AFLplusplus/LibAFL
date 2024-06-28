@@ -391,6 +391,10 @@ where
             self.inner.process(fuzzer, state, executor)
         }
     }
+
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl<E, EM, EMH, S, SP, Z> EventManager<E, Z> for CentralizedEventManager<EM, EMH, S, SP>

@@ -366,6 +366,7 @@ impl<I> Event<I>
 where
     I: Input,
 {
+    /// Event's corresponding name
     pub fn name(&self) -> &str {
         match self {
             Event::NewTestcase { .. } => "Testcase",
@@ -383,6 +384,7 @@ where
         }
     }
 
+    /// Event's corresponding name with additional info
     fn name_detailed(&self) -> String {
         match self {
             Event::NewTestcase { input, .. } => {
@@ -403,7 +405,7 @@ where
     }
 }
 
-/// [`EventFirer`] fire an event.
+/// [`EventFirer`] fires an event.
 pub trait EventFirer: UsesState {
     /// Send off an [`Event`] to the broker
     ///
@@ -578,6 +580,9 @@ pub trait EventProcessor<E, Z>: UsesState {
         state: &mut Self::State,
         executor: &mut E,
     ) -> Result<usize, Error>;
+
+    /// Shutdown gracefully; typically without saving state.
+    fn on_shutdown(&mut self) -> Result<(), Error>;
 }
 /// The id of this [`EventManager`].
 /// For multi processed [`EventManager`]s,
@@ -665,6 +670,10 @@ where
         _executor: &mut E,
     ) -> Result<usize, Error> {
         Ok(0)
+    }
+
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -789,13 +798,26 @@ where
     EM: EventProcessor<E, Z>,
 {
     #[inline]
-    fn process(
+    default fn process(
         &mut self,
         fuzzer: &mut Z,
         state: &mut Self::State,
         executor: &mut E,
     ) -> Result<usize, Error> {
         self.inner.process(fuzzer, state, executor)
+    }
+
+    default fn on_shutdown(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+impl<E, EM, M, Z> EventProcessor<E, Z> for MonitorTypedEventManager<EM, M>
+where
+    EM: EventProcessor<E, Z> + EventRestarter,
+{
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        self.inner.send_exiting()
     }
 }
 
