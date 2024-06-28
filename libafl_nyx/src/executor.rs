@@ -121,18 +121,15 @@ where
             }
         };
 
-        match self.stdout.as_mut() {
-            Some(ob) => {
-                let mut stdout = Vec::new();
-                self.helper.nyx_stdout.rewind()?;
-                self.helper
-                    .nyx_stdout
-                    .read_to_end(&mut stdout)
-                    .map_err(|e| Error::illegal_state(format!("Failed to read Nyx stdout: {e}")))?;
+        if let Some(ob) = self.stdout.as_mut() {
+            let mut stdout = Vec::new();
+            self.helper.nyx_stdout.rewind()?;
+            self.helper
+                .nyx_stdout
+                .read_to_end(&mut stdout)
+                .map_err(|e| Error::illegal_state(format!("Failed to read Nyx stdout: {e}")))?;
 
-                ob.observe_stdout(&stdout);
-            }
-            None => (),
+            ob.observe_stdout(&stdout);
         }
 
         Ok(exit_kind)

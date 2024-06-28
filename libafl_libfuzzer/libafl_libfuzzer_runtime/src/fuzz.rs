@@ -74,7 +74,7 @@ where
         + HasCurrentStage
         + Stoppable,
     E: UsesState<State = S>,
-    EM: ProgressReporter<State = S>,
+    EM: ProgressReporter<State = S> + EventProcessor<E, F>,
     ST: StagesTuple<E, EM, S, F>,
 {
     if let Some(solution) = state.solutions().last() {
