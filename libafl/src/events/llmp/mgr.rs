@@ -409,8 +409,10 @@ where
             + EvaluatorObservers<E::Observers>
             + Evaluator<E, Self>,
     {
+        if !self.hooks.pre_exec_all(state, client_id, &event)? {
+            return Ok(());
+        }
         let evt_name = event.name_detailed();
-
         match event {
             Event::NewTestcase {
                 input,

@@ -12,7 +12,7 @@ use crate::{
     executors::{Executor, HasObservers, ShadowExecutor},
     mark_feature_time,
     observers::ObserversTuple,
-    stages::{Stage, StdRestartHelper},
+    stages::{RetryCountRestartHelper, Stage},
     start_timer,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, State, UsesState},
     Error, HasNamedMetadata,
@@ -45,7 +45,7 @@ where
 {
     #[allow(rustdoc::broken_intra_doc_links)]
     /// Perform tracing on the given `CorpusId`. Useful for if wrapping [`TracingStage`] with your
-    /// own stage and you need to manage [`super::NestedStageStdRestartHelper`] differently
+    /// own stage and you need to manage [`super::NestedStageRetryCountRestartHelper`] differently
     /// see [`super::ConcolicTracingStage`]'s implementation as an example of usage.
     pub fn trace(
         &mut self,
@@ -100,11 +100,11 @@ where
     }
 
     fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        StdRestartHelper::no_retry(state, &self.name)
+        RetryCountRestartHelper::no_retry(state, &self.name)
     }
 
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        StdRestartHelper::clear_progress(state, &self.name)
+        RetryCountRestartHelper::clear_progress(state, &self.name)
     }
 }
 
@@ -220,11 +220,11 @@ where
     }
 
     fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        StdRestartHelper::no_retry(state, &self.name)
+        RetryCountRestartHelper::no_retry(state, &self.name)
     }
 
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        StdRestartHelper::clear_progress(state, &self.name)
+        RetryCountRestartHelper::clear_progress(state, &self.name)
     }
 }
 

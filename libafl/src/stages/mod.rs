@@ -354,12 +354,12 @@ where
     fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
         // There's no restart safety in the content of the closure.
         // don't restart
-        StdRestartHelper::no_retry(state, &self.name)
+        RetryCountRestartHelper::no_retry(state, &self.name)
     }
 
     #[inline]
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        StdRestartHelper::clear_progress(state, &self.name)
+        RetryCountRestartHelper::clear_progress(state, &self.name)
     }
 }
 
@@ -499,26 +499,26 @@ where
     #[inline]
     fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
         // TODO: Proper restart handling - call post_exec at the right time, etc...
-        StdRestartHelper::no_retry(state, &self.name)
+        RetryCountRestartHelper::no_retry(state, &self.name)
     }
 
     #[inline]
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        StdRestartHelper::clear_progress(state, &self.name)
+        RetryCountRestartHelper::clear_progress(state, &self.name)
     }
 }
 
 /// Progress which permits a fixed amount of resumes per round of fuzzing. If this amount is ever
 /// exceeded, the input will no longer be executed by this stage.
 #[derive(Clone, Deserialize, Serialize, Debug)]
-pub struct StdRestartHelper {
+pub struct RetryCountRestartHelper {
     tries_remaining: Option<usize>,
     skipped: HashSet<CorpusId>,
 }
 
-impl_serdeany!(StdRestartHelper);
+impl_serdeany!(RetryCountRestartHelper);
 
-impl StdRestartHelper {
+impl RetryCountRestartHelper {
     /// Don't allow restart
     pub fn no_retry<S>(state: &mut S, name: &str) -> Result<bool, Error>
     where
@@ -536,7 +536,7 @@ impl StdRestartHelper {
     {
         let corpus_id = state.current_corpus_id()?.ok_or_else(|| {
             Error::illegal_state(
-                "No current_corpus_id set in State, but called StdRestartHelper::should_skip",
+                "No current_corpus_id set in State, but called RetryCountRestartHelper::should_skip",
             )
         })?;
 
@@ -707,7 +707,7 @@ pub mod test {
     use crate::{
         corpus::{Corpus, HasCurrentCorpusId, Testcase},
         inputs::NopInput,
-        stages::{Stage, StdRestartHelper},
+        stages::{RetryCountRestartHelper, Stage},
         state::{test::test_std_state, HasCorpus, State, UsesState},
         HasMetadata,
     };
@@ -794,7 +794,7 @@ pub mod test {
         // No concurrency per testcase
         #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
         unsafe {
-            StdRestartHelper::register();
+            RetryCountRestartHelper::register();
         }
 
         struct StageWithOneTry;
@@ -815,37 +815,37 @@ pub mod test {
 
         for _ in 0..10 {
             // used normally, no retries means we never skip
-            assert!(StdRestartHelper::should_restart(
+            assert!(RetryCountRestartHelper::should_restart(
                 &mut state,
                 stage.name(),
                 1
             )?);
-            StdRestartHelper::clear_progress(&mut state, stage.name())?;
+            RetryCountRestartHelper::clear_progress(&mut state, stage.name())?;
         }
 
         for _ in 0..10 {
             // used normally, only one retry means we never skip
-            assert!(StdRestartHelper::should_restart(
+            assert!(RetryCountRestartHelper::should_restart(
                 &mut state,
                 stage.name(),
                 2
             )?);
-            assert!(StdRestartHelper::should_restart(
+            assert!(RetryCountRestartHelper::should_restart(
                 &mut state,
                 stage.name(),
                 2
             )?);
-            StdRestartHelper::clear_progress(&mut state, stage.name())?;
+            RetryCountRestartHelper::clear_progress(&mut state, stage.name())?;
         }
 
-        assert!(StdRestartHelper::should_restart(
+        assert!(RetryCountRestartHelper::should_restart(
             &mut state,
             stage.name(),
             2
         )?);
         // task failed, let's resume
         // we still have one more try!
-        assert!(StdRestartHelper::should_restart(
+        assert!(RetryCountRestartHelper::should_restart(
             &mut state,
             stage.name(),
             2
@@ -853,20 +853,20 @@ pub mod test {
 
         // task failed, let's resume
         // out of retries, so now we skip
-        assert!(!StdRestartHelper::should_restart(
+        assert!(!RetryCountRestartHelper::should_restart(
             &mut state,
             stage.name(),
             2
         )?);
-        StdRestartHelper::clear_progress(&mut state, stage.name())?;
+        RetryCountRestartHelper::clear_progress(&mut state, stage.name())?;
 
         // we previously exhausted this testcase's retries, so we skip
-        assert!(!StdRestartHelper::should_restart(
+        assert!(!RetryCountRestartHelper::should_restart(
             &mut state,
             stage.name(),
             2
         )?);
-        StdRestartHelper::clear_progress(&mut state, stage.name())?;
+        RetryCountRestartHelper::clear_progress(&mut state, stage.name())?;
 
         Ok(())
     }
