@@ -443,9 +443,8 @@ where
                         {
                             state.scalability_monitor_mut().testcase_with_observers += 1;
                         }
-                        fuzzer.evaluate_execution(
-                            state, self, input, &observers, &exit_kind, false,
-                        )?
+                        fuzzer
+                            .evaluate_execution(state, self, input, &observers, &exit_kind, false)?
                     } else {
                         #[cfg(feature = "scalability_introspection")]
                         {
