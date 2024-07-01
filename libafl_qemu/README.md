@@ -8,7 +8,7 @@ It comes in two variants, usermode to fuzz Linux ELFs userspace binaries and sys
 
 If you use LibAFL QEMU for your academic work, consider citing the follwing paper:
 
-```
+```bibtex
 @InProceedings{libaflqemu:bar24,
   title        = {{LibAFL QEMU: A Library for Fuzzing-oriented Emulation}},
   author       = {Romain Malmain and Andrea Fioraldi and Aurélien Francillon},
