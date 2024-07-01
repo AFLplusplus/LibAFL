@@ -70,8 +70,8 @@ pub trait HasObjective: UsesState {
 
 /// Evaluates if an input is interesting using the feedback
 pub trait ExecutionProcessor<OT>: UsesState {
-    /// Evaluate if a set of observation channels has an interesting state
-    fn execute_no_process<EM>(
+    /// Check the outcome of the execution, find if it is worth for corpus or objectives
+    fn check_results<EM>(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
@@ -98,7 +98,7 @@ pub trait ExecutionProcessor<OT>: UsesState {
         EM: EventFirer<State = Self::State>;
 
     /// Evaluate if a set of observation channels has an interesting state
-    fn execute_and_process<EM>(
+    fn evaluate_execution<EM>(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
@@ -356,7 +356,7 @@ where
         + HasCurrentTestcase<<Self::State as UsesInput>::Input>
         + HasCurrentCorpusId,
 {
-    fn execute_no_process<EM>(
+    fn check_results<EM>(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
@@ -399,7 +399,7 @@ where
         Ok(res)
     }
 
-    fn execute_and_process<EM>(
+    fn evaluate_execution<EM>(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
@@ -411,7 +411,7 @@ where
     where
         EM: EventFirer<State = Self::State>,
     {
-        let exec_res = self.execute_no_process(state, manager, &input, observers, exit_kind)?;
+        let exec_res = self.check_results(state, manager, &input, observers, exit_kind)?;
         let corpus_id = self.process_execution(
             state,
             manager,
@@ -548,7 +548,7 @@ where
 
         self.scheduler.on_evaluation(state, &input, &*observers)?;
 
-        self.execute_and_process(state, manager, input, &*observers, &exit_kind, send_events)
+        self.evaluate_execution(state, manager, input, &*observers, &exit_kind, send_events)
     }
 }
 

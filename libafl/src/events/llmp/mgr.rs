@@ -443,7 +443,7 @@ where
                         {
                             state.scalability_monitor_mut().testcase_with_observers += 1;
                         }
-                        fuzzer.execute_and_process(
+                        fuzzer.evaluate_execution(
                             state, self, input, &observers, &exit_kind, false,
                         )?
                     } else {
