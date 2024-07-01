@@ -318,6 +318,9 @@ where
     /// Fuzzer start time.
     pub start_time: Duration,
 
+    /// Total nb of execs
+    pub executions: u64,
+
     /// Loaded inputs
     pub testcases: Vec<TestcaseDump<I>>,
 }
@@ -352,6 +355,7 @@ where
 
         Ok(StdStateDump {
             start_time: self.start_time,
+            executions: self.executions,
             testcases: tcs,
         })
     }
