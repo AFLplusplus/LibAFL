@@ -1,9 +1,9 @@
 //! The [`Testcase`] is a struct embedded in each [`Corpus`].
 //! It will contain a respective input, and metadata.
 
-use alloc::string::String;
 #[cfg(feature = "track_hit_feedbacks")]
-use alloc::{borrow::Cow, vec::Vec};
+use alloc::vec::Vec;
+use alloc::{borrow::Cow, string::String};
 use core::{
     cell::{Ref, RefMut},
     time::Duration,
@@ -51,7 +51,7 @@ where
     #[cfg(feature = "std")]
     file_path: Option<PathBuf>,
     /// Map of metadata associated with this [`Testcase`]
-    metadata: SerdeAnyMap,
+    metadata: Cow<'static, SerdeAnyMap>,
     /// Complete path to the metadata [`SerdeAnyMap`] on disk, if this [`Testcase`] is backed by a file in the filesystem
     #[cfg(feature = "std")]
     metadata_path: Option<PathBuf>,
@@ -90,7 +90,7 @@ where
     /// Get all the metadata into an [`hashbrown::HashMap`] (mutable)
     #[inline]
     fn metadata_map_mut(&mut self) -> &mut SerdeAnyMap {
-        &mut self.metadata
+        self.metadata.to_mut()
     }
 }
 
@@ -256,7 +256,7 @@ where
             filename: None,
             #[cfg(feature = "std")]
             file_path: None,
-            metadata: SerdeAnyMap::default(),
+            metadata: Cow::Owned(SerdeAnyMap::default()),
             #[cfg(feature = "std")]
             metadata_path: None,
             exec_time: None,
@@ -282,7 +282,7 @@ where
             filename: None,
             #[cfg(feature = "std")]
             file_path: None,
-            metadata: SerdeAnyMap::default(),
+            metadata: Cow::Owned(SerdeAnyMap::default()),
             #[cfg(feature = "std")]
             metadata_path: None,
             exec_time: None,
@@ -308,7 +308,7 @@ where
             filename: Some(filename),
             #[cfg(feature = "std")]
             file_path: None,
-            metadata: SerdeAnyMap::default(),
+            metadata: Cow::Owned(SerdeAnyMap::default()),
             #[cfg(feature = "std")]
             metadata_path: None,
             exec_time: None,
@@ -334,7 +334,7 @@ where
             filename: None,
             #[cfg(feature = "std")]
             file_path: None,
-            metadata: SerdeAnyMap::default(),
+            metadata: Cow::Owned(SerdeAnyMap::default()),
             #[cfg(feature = "std")]
             metadata_path: None,
             exec_time: None,
@@ -388,7 +388,7 @@ where
         Testcase {
             input: None,
             filename: None,
-            metadata: SerdeAnyMap::new(),
+            metadata: Cow::Owned(SerdeAnyMap::new()),
             exec_time: None,
             cached_len: None,
             scheduled_count: 0,

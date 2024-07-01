@@ -3,7 +3,7 @@
 //! For a lower memory footprint, consider using [`crate::corpus::CachedOnDiskCorpus`]
 //! which only stores a certain number of [`Testcase`]s and removes additional ones in a FIFO manner.
 
-use alloc::string::String;
+use alloc::{borrow::Cow, string::String};
 use core::cell::RefCell;
 #[cfg(feature = "std")]
 use std::{fs, fs::File, io::Write};
@@ -419,7 +419,7 @@ where
             tmpfile_path.set_file_name(format!(".{metafile_name}.tmp",));
 
             let ondisk_meta = OnDiskMetadata {
-                metadata: testcase.metadata_map(),
+                metadata: Cow::Owned(testcase.metadata_map().clone()),
                 exec_time: testcase.exec_time(),
                 executions: testcase.executions(),
             };

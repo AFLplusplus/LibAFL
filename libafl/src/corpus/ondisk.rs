@@ -4,7 +4,7 @@
 //! For any other occasions, consider using [`crate::corpus::CachedOnDiskCorpus`]
 //! which stores a certain number of testcases in memory and removes additional ones in a FIFO manner.
 
-use alloc::string::String;
+use alloc::{borrow::Cow, string::String};
 use core::{cell::RefCell, time::Duration};
 use std::path::{Path, PathBuf};
 
@@ -38,7 +38,7 @@ pub enum OnDiskMetadataFormat {
 #[derive(Debug, Serialize)]
 pub struct OnDiskMetadata<'a> {
     /// The dynamic metadata [`SerdeAnyMap`] stored to disk
-    pub metadata: &'a SerdeAnyMap,
+    pub metadata: Cow<'a, SerdeAnyMap>,
     /// The exec time for this [`Testcase`]
     pub exec_time: &'a Option<Duration>,
     /// The amount of executions for this [`Testcase`]

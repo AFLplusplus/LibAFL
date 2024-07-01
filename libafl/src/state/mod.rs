@@ -1,5 +1,6 @@
 //! The fuzzer, and state are the core pieces of every good fuzzer
 
+use alloc::borrow::Cow;
 #[cfg(feature = "std")]
 use alloc::vec::Vec;
 use core::{
@@ -236,7 +237,7 @@ pub struct StdState<I, C, R, SC> {
     // Solutions corpus
     solutions: SC,
     /// Metadata stored for this state by one of the components
-    metadata: SerdeAnyMap,
+    metadata: Cow<'static, SerdeAnyMap>,
     /// Metadata stored with names
     named_metadata: NamedSerdeAnyMap,
     /// `MaxSize` testcase size for mutators that appreciate it
@@ -374,7 +375,7 @@ impl<I, C, R, SC> HasMetadata for StdState<I, C, R, SC> {
     /// Get all the metadata into an [`hashbrown::HashMap`] (mutable)
     #[inline]
     fn metadata_map_mut(&mut self) -> &mut SerdeAnyMap {
-        &mut self.metadata
+        self.metadata.to_mut()
     }
 }
 
@@ -1082,7 +1083,7 @@ where
             executions: 0,
             imported: 0,
             start_time: libafl_bolts::current_time(),
-            metadata: SerdeAnyMap::default(),
+            metadata: Cow::Owned(SerdeAnyMap::default()),
             named_metadata: NamedSerdeAnyMap::default(),
             corpus,
             solutions,
