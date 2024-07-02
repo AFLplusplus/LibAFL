@@ -153,6 +153,7 @@ fn build_pass(
     src_dir: &Path,
     src_file: &str,
     additional_srcfiles: Option<&Vec<&str>>,
+    required: bool,
 ) {
     let dot_offset = src_file.rfind('.').unwrap();
     let src_stub = &src_file[..dot_offset];
@@ -202,11 +203,19 @@ fn build_pass(
         Some(res) => match res {
             Ok(s) => {
                 if !s.success() {
-                    panic!("Failed to compile required compiler pass src/{src_file} - Exit status: {s}");
+                    if required {
+                        panic!("Failed to compile required compiler pass src/{src_file} - Exit status: {s}");
+                    } else {
+                        println!("cargo:warning=Skipping non-required compiler pass src/{src_file} - Reason: Exit status {s}");
+                    }
                 }
             }
             Err(err) => {
-                panic!("Failed to compile required compiler pass src/{src_file} - {err}");
+                if required {
+                    panic!("Failed to compile required compiler pass src/{src_file} - Exit status: {s}");
+                } else {
+                    println!("cargo:warning=Skipping non-required compiler pass src/{src_file} - Reason: Exit status {s}");
+                }
             }
         },
         None => {
@@ -417,6 +426,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         src_dir,
         "ddg-instr.cc",
         Some(&vec!["ddg-utils.cc"]),
+        true,
     );
 
     #[cfg(feature = "function-logging")]
@@ -428,6 +438,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         src_dir,
         "function-logging.cc",
         None,
+        true,
     );
 
     #[cfg(feature = "cmplog-routines")]
@@ -439,6 +450,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         src_dir,
         "cmplog-routines-pass.cc",
         None,
+        true,
     );
 
     #[cfg(feature = "autotokens")]
@@ -450,6 +462,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         src_dir,
         "autotokens-pass.cc",
         None,
+        true,
     );
 
     #[cfg(feature = "coverage-accounting")]
@@ -461,6 +474,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         src_dir,
         "coverage-accounting-pass.cc",
         None,
+        true,
     );
 
     #[cfg(feature = "cmplog-instructions")]
@@ -472,6 +486,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         src_dir,
         "cmplog-instructions-pass.cc",
         None,
+        true,
     );
 
     #[cfg(feature = "ctx")]
@@ -483,6 +498,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         src_dir,
         "ctx-pass.cc",
         None,
+        true,
     );
 
     #[cfg(feature = "dump-cfg")]
@@ -494,6 +510,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         src_dir,
         "dump-cfg-pass.cc",
         None,
+        true,
     );
 
     #[cfg(feature = "profiling")]
@@ -505,6 +522,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         src_dir,
         "profiling-pass.cc",
         None,
+        false,
     );
 
     cc::Build::new()
