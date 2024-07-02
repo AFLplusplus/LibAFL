@@ -262,8 +262,9 @@ pub struct StdState<I, C, R, SC> {
     last_report_time: Option<Duration>,
     /// The current index of the corpus; used to record for resumable fuzzing.
     corpus_id: Option<CorpusId>,
-    /// Tell the fuzzer to stop at the start of the next fuzzing iteration.
-    should_stop: bool,
+    /// Request the fuzzer to stop at the start of the next stage
+    /// or at the beginning of the next fuzzing iteration
+    stop_requested: bool,
     stage_stack: StageStack,
     phantom: PhantomData<I>,
 }
@@ -537,27 +538,27 @@ where
 
 /// A trait for types that want to expose a stop API
 pub trait Stoppable {
-    /// Check if should stop
-    fn should_stop(&self) -> bool;
+    /// Check if stop is requested
+    fn stop_requested(&self) -> bool;
 
     /// Request to stop
-    fn initiate_stop(&mut self);
+    fn request_stop(&mut self);
 
-    /// Reset stop value
-    fn reset_stop(&mut self);
+    /// Discard the stop request
+    fn discard_stop_request(&mut self);
 }
 
 impl<I, C, R, SC> Stoppable for StdState<I, C, R, SC> {
-    fn initiate_stop(&mut self) {
-        self.should_stop = true;
+    fn request_stop(&mut self) {
+        self.stop_requested = true;
     }
 
-    fn reset_stop(&mut self) {
-        self.should_stop = false;
+    fn discard_stop_request(&mut self) {
+        self.stop_requested = false;
     }
 
-    fn should_stop(&self) -> bool {
-        self.should_stop
+    fn stop_requested(&self) -> bool {
+        self.stop_requested
     }
 }
 
@@ -1116,7 +1117,7 @@ where
             corpus,
             solutions,
             max_size: DEFAULT_MAX_SIZE,
-            should_stop: false,
+            stop_requested: false,
             #[cfg(feature = "introspection")]
             introspection_monitor: ClientPerfMonitor::new(),
             #[cfg(feature = "scalability_introspection")]
@@ -1165,7 +1166,7 @@ impl<I, C, R, SC> HasScalabilityMonitor for StdState<I, C, R, SC> {
 pub struct NopState<I> {
     metadata: SerdeAnyMap,
     execution: u64,
-    should_stop: bool,
+    stop_requested: bool,
     rand: StdRand,
     phantom: PhantomData<I>,
 }
@@ -1178,7 +1179,7 @@ impl<I> NopState<I> {
             metadata: SerdeAnyMap::new(),
             execution: 0,
             rand: StdRand::default(),
-            should_stop: false,
+            stop_requested: false,
             phantom: PhantomData,
         }
     }
@@ -1212,16 +1213,16 @@ impl<I> HasExecutions for NopState<I> {
 }
 
 impl<I> Stoppable for NopState<I> {
-    fn initiate_stop(&mut self) {
-        self.should_stop = true;
+    fn request_stop(&mut self) {
+        self.stop_requested = true;
     }
 
-    fn reset_stop(&mut self) {
-        self.should_stop = false;
+    fn discard_stop_request(&mut self) {
+        self.stop_requested = false;
     }
 
-    fn should_stop(&self) -> bool {
-        self.should_stop
+    fn stop_requested(&self) -> bool {
+        self.stop_requested
     }
 }
 

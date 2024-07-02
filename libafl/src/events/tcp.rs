@@ -658,7 +658,7 @@ where
                 }
             }
             Event::Stop => {
-                state.initiate_stop();
+                state.request_stop();
             }
             _ => {
                 return Err(Error::unknown(format!(

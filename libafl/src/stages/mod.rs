@@ -214,8 +214,8 @@ where
             }
         }
 
-        if state.should_stop() {
-            state.reset_stop();
+        if state.stop_requested() {
+            state.discard_stop_request();
             manager.on_shutdown()?;
             return Err(Error::shutting_down());
         }
@@ -297,8 +297,8 @@ where
         manager: &mut EM,
     ) -> Result<(), Error> {
         self.iter_mut().try_for_each(|x| {
-            if state.should_stop() {
-                state.reset_stop();
+            if state.stop_requested() {
+                state.discard_stop_request();
                 manager.on_shutdown()?;
                 return Err(Error::shutting_down());
             }

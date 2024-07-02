@@ -300,7 +300,7 @@ where
                 Ok(())
             }
             Event::Stop => {
-                state.initiate_stop();
+                state.request_stop();
                 Ok(())
             }
             _ => Err(Error::unknown(format!(
