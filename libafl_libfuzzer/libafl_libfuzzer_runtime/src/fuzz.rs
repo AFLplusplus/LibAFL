@@ -13,7 +13,7 @@ use std::{
 use libafl::{
     corpus::Corpus,
     events::{
-        launcher::Launcher, EventConfig, ProgressReporter, SimpleEventManager,
+        launcher::Launcher, EventConfig, EventProcessor, ProgressReporter, SimpleEventManager,
         SimpleRestartingEventManager,
     },
     executors::ExitKind,
@@ -23,7 +23,7 @@ use libafl::{
         Monitor, MultiMonitor,
     },
     stages::{HasCurrentStage, StagesTuple},
-    state::{HasExecutions, HasLastReportTime, Stoppable, HasSolutions, UsesState},
+    state::{HasExecutions, HasLastReportTime, HasSolutions, Stoppable, UsesState},
     Error, Fuzzer, HasMetadata,
 };
 use libafl_bolts::{
