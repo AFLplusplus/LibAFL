@@ -21,12 +21,7 @@ pub use llmp::*;
 pub mod tcp;
 
 pub mod broker_hooks;
-use alloc::{
-    borrow::Cow,
-    boxed::Box,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{borrow::Cow, boxed::Box, string::String, vec::Vec};
 use core::{
     fmt,
     hash::{BuildHasher, Hasher},
