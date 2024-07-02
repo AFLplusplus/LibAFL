@@ -56,6 +56,7 @@ pub trait State:
     + MaybeHasScalabilityMonitor
     + HasCurrentCorpusId
     + HasCurrentStage
+    + Stoppable
 {
 }
 
@@ -262,6 +263,9 @@ pub struct StdState<I, C, R, SC> {
     last_report_time: Option<Duration>,
     /// The current index of the corpus; used to record for resumable fuzzing.
     corpus_id: Option<CorpusId>,
+    /// Request the fuzzer to stop at the start of the next stage
+    /// or at the beginning of the next fuzzing iteration
+    stop_requested: bool,
     stage_stack: StageStack,
     phantom: PhantomData<I>,
 }
@@ -530,6 +534,32 @@ where
     fn current_input_cloned(&self) -> Result<I, Error> {
         let mut testcase = self.current_testcase_mut()?;
         Ok(testcase.borrow_mut().load_input(self.corpus())?.clone())
+    }
+}
+
+/// A trait for types that want to expose a stop API
+pub trait Stoppable {
+    /// Check if stop is requested
+    fn stop_requested(&self) -> bool;
+
+    /// Request to stop
+    fn request_stop(&mut self);
+
+    /// Discard the stop request
+    fn discard_stop_request(&mut self);
+}
+
+impl<I, C, R, SC> Stoppable for StdState<I, C, R, SC> {
+    fn request_stop(&mut self) {
+        self.stop_requested = true;
+    }
+
+    fn discard_stop_request(&mut self) {
+        self.stop_requested = false;
+    }
+
+    fn stop_requested(&self) -> bool {
+        self.stop_requested
     }
 }
 
@@ -1088,6 +1118,7 @@ where
             corpus,
             solutions,
             max_size: DEFAULT_MAX_SIZE,
+            stop_requested: false,
             #[cfg(feature = "introspection")]
             introspection_monitor: ClientPerfMonitor::new(),
             #[cfg(feature = "scalability_introspection")]
@@ -1136,6 +1167,7 @@ impl<I, C, R, SC> HasScalabilityMonitor for StdState<I, C, R, SC> {
 pub struct NopState<I> {
     metadata: SerdeAnyMap,
     execution: u64,
+    stop_requested: bool,
     rand: StdRand,
     phantom: PhantomData<I>,
 }
@@ -1148,6 +1180,7 @@ impl<I> NopState<I> {
             metadata: SerdeAnyMap::new(),
             execution: 0,
             rand: StdRand::default(),
+            stop_requested: false,
             phantom: PhantomData,
         }
     }
@@ -1177,6 +1210,20 @@ impl<I> HasExecutions for NopState<I> {
 
     fn executions_mut(&mut self) -> &mut u64 {
         &mut self.execution
+    }
+}
+
+impl<I> Stoppable for NopState<I> {
+    fn request_stop(&mut self) {
+        self.stop_requested = true;
+    }
+
+    fn discard_stop_request(&mut self) {
+        self.stop_requested = false;
+    }
+
+    fn stop_requested(&self) -> bool {
+        self.stop_requested
     }
 }
 

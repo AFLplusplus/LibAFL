@@ -2091,6 +2091,9 @@ pub trait Broker {
     /// Getter to `exit_after`
     fn exit_after(&self) -> Option<NonZeroUsize>;
 
+    /// Setter for `exit_after`
+    fn set_exit_after(&mut self, n_clients: NonZeroUsize);
+
     /// Getter to `has_clients`
     fn has_clients(&self) -> bool;
 
@@ -2123,6 +2126,9 @@ where
 
     fn exit_after(&self) -> Option<NonZeroUsize> {
         self.inner.exit_cleanly_after
+    }
+    fn set_exit_after(&mut self, n_clients: NonZeroUsize) {
+        self.inner.set_exit_cleanly_after(n_clients);
     }
 
     fn has_clients(&self) -> bool {

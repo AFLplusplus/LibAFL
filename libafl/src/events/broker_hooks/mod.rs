@@ -208,6 +208,7 @@ where
                 Ok(BrokerEventResult::Handled)
             }
             Event::CustomBuf { .. } => Ok(BrokerEventResult::Forward),
+            Event::Stop => Ok(BrokerEventResult::Forward),
             //_ => Ok(BrokerEventResult::Forward),
         }
     }

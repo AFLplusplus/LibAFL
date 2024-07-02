@@ -1,13 +1,13 @@
 use std::ffi::c_int;
 
 use libafl::{
-    events::{ProgressReporter, SimpleEventManager},
+    events::{EventProcessor, ProgressReporter, SimpleEventManager},
     executors::HasObservers,
     feedbacks::MapFeedbackMetadata,
     inputs::UsesInput,
     monitors::SimpleMonitor,
     stages::{HasCurrentStage, StagesTuple},
-    state::{HasExecutions, HasLastReportTime},
+    state::{HasExecutions, HasLastReportTime, Stoppable},
     Error, Fuzzer, HasMetadata, HasNamedMetadata,
 };
 
@@ -29,9 +29,10 @@ where
         + HasExecutions
         + UsesInput
         + HasLastReportTime
-        + HasCurrentStage,
+        + HasCurrentStage
+        + Stoppable,
     E: HasObservers<State = S>,
-    EM: ProgressReporter<State = S>,
+    EM: ProgressReporter<State = S> + EventProcessor<E, F>,
     ST: StagesTuple<E, EM, S, F>,
 {
     let meta = state

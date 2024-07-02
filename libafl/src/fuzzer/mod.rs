@@ -19,7 +19,7 @@ use crate::{
     start_timer,
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime, HasSolutions,
-        UsesState,
+        Stoppable, UsesState,
     },
     Error, HasMetadata,
 };
@@ -70,8 +70,8 @@ pub trait HasObjective: UsesState {
 
 /// Evaluates if an input is interesting using the feedback
 pub trait ExecutionProcessor<OT>: UsesState {
-    /// Evaluate if a set of observation channels has an interesting state
-    fn execute_no_process<EM>(
+    /// Check the outcome of the execution, find if it is worth for corpus or objectives
+    fn check_results<EM>(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
@@ -98,7 +98,7 @@ pub trait ExecutionProcessor<OT>: UsesState {
         EM: EventFirer<State = Self::State>;
 
     /// Evaluate if a set of observation channels has an interesting state
-    fn execute_and_process<EM>(
+    fn evaluate_execution<EM>(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
@@ -182,9 +182,9 @@ pub trait Evaluator<E, EM>: UsesState {
 /// The main fuzzer trait.
 pub trait Fuzzer<E, EM, ST>: Sized + UsesState
 where
-    Self::State: HasMetadata + HasExecutions + HasLastReportTime,
+    Self::State: HasMetadata + HasExecutions + HasLastReportTime + Stoppable,
     E: UsesState<State = Self::State>,
-    EM: ProgressReporter<State = Self::State>,
+    EM: ProgressReporter<State = Self::State> + EventProcessor<E, Self>,
     ST: StagesTuple<E, EM, Self::State, Self>,
 {
     /// Fuzz for a single iteration.
@@ -216,8 +216,14 @@ where
         loop {
             // log::info!("Starting another fuzz_loop");
             manager.maybe_report_progress(state, monitor_timeout)?;
+            if state.stop_requested() {
+                state.discard_stop_request();
+                manager.on_shutdown()?;
+                break;
+            }
             self.fuzz_one(stages, executor, state, manager)?;
         }
+        Ok(())
     }
 
     /// Fuzz for n iterations.
@@ -248,6 +254,10 @@ where
 
         for _ in 0..iters {
             manager.maybe_report_progress(state, monitor_timeout)?;
+            if state.stop_requested() {
+                state.discard_stop_request();
+                break;
+            }
             ret = Some(self.fuzz_one(stages, executor, state, manager)?);
         }
 
@@ -356,7 +366,7 @@ where
         + HasCurrentTestcase<<Self::State as UsesInput>::Input>
         + HasCurrentCorpusId,
 {
-    fn execute_no_process<EM>(
+    fn check_results<EM>(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
@@ -399,7 +409,7 @@ where
         Ok(res)
     }
 
-    fn execute_and_process<EM>(
+    fn evaluate_execution<EM>(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
@@ -411,7 +421,7 @@ where
     where
         EM: EventFirer<State = Self::State>,
     {
-        let exec_res = self.execute_no_process(state, manager, &input, observers, exit_kind)?;
+        let exec_res = self.check_results(state, manager, &input, observers, exit_kind)?;
         let corpus_id = self.process_execution(
             state,
             manager,
@@ -548,7 +558,7 @@ where
 
         self.scheduler.on_evaluation(state, &input, &*observers)?;
 
-        self.execute_and_process(state, manager, input, &*observers, &exit_kind, send_events)
+        self.evaluate_execution(state, manager, input, &*observers, &exit_kind, send_events)
     }
 }
 
@@ -865,7 +875,7 @@ pub mod test {
 
     use crate::{
         corpus::CorpusId,
-        events::ProgressReporter,
+        events::{EventProcessor, ProgressReporter},
         stages::{HasCurrentStage, StagesTuple},
         state::{HasExecutions, HasLastReportTime, State, UsesState},
         Fuzzer, HasMetadata,
@@ -901,7 +911,7 @@ pub mod test {
     impl<ST, E, EM> Fuzzer<E, EM, ST> for NopFuzzer<E::State>
     where
         E: UsesState,
-        EM: ProgressReporter<State = Self::State>,
+        EM: ProgressReporter<State = Self::State> + EventProcessor<E, Self>,
         ST: StagesTuple<E, EM, Self::State, Self>,
         Self::State: HasMetadata + HasExecutions + HasLastReportTime + HasCurrentStage,
     {
