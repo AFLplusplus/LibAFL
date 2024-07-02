@@ -562,7 +562,10 @@ pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: *mut T) -> 
     // See https://github.com/AFLplusplus/LibAFL/pull/403
     AddVectoredExceptionHandler(
         0,
-        Some(core::mem::transmute(handle_exception as *const c_void)),
+        Some(core::mem::transmute::<
+            *const core::ffi::c_void,
+            unsafe extern "system" fn(*mut EXCEPTION_POINTERS) -> i32,
+        >(handle_exception as *const c_void)),
     );
     Ok(())
 }

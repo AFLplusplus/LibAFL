@@ -65,10 +65,15 @@ impl SchedulerMetadata {
         }
     }
 
-    /// The powerschedule strategy
+    /// The `PowerSchedule`
     #[must_use]
     pub fn strat(&self) -> Option<PowerSchedule> {
         self.strat
+    }
+
+    /// Set the `PowerSchedule`
+    pub fn set_strat(&mut self, strat: Option<PowerSchedule>) {
+        self.strat = strat;
     }
 
     /// The measured exec time during calibration
@@ -195,7 +200,7 @@ where
     fn on_remove(
         &mut self,
         _state: &mut Self::State,
-        _idx: CorpusId,
+        _id: CorpusId,
         _prev: &Option<Testcase<<Self::State as UsesInput>::Input>>,
     ) -> Result<(), Error> {
         Ok(())
@@ -205,7 +210,7 @@ where
     fn on_replace(
         &mut self,
         _state: &mut Self::State,
-        _idx: CorpusId,
+        _id: CorpusId,
         _prev: &Testcase<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
         Ok(())
@@ -238,8 +243,8 @@ where
     C: AsRef<O>,
 {
     /// Called when a [`Testcase`] is added to the corpus
-    fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
-        self.on_add_metadata(state, idx)
+    fn on_add(&mut self, state: &mut Self::State, id: CorpusId) -> Result<(), Error> {
+        self.on_add_metadata(state, id)
     }
 
     fn on_evaluation<OT>(
@@ -282,11 +287,11 @@ where
     fn set_current_scheduled(
         &mut self,
         state: &mut Self::State,
-        next_idx: Option<CorpusId>,
+        next_id: Option<CorpusId>,
     ) -> Result<(), Error> {
-        self.on_next_metadata(state, next_idx)?;
+        self.on_next_metadata(state, next_id)?;
 
-        *state.corpus_mut().current_mut() = next_idx;
+        *state.corpus_mut().current_mut() = next_id;
         Ok(())
     }
 }

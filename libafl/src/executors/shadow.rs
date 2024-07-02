@@ -21,8 +21,8 @@ pub struct ShadowExecutor<E, SOT> {
 
 impl<E, SOT> Debug for ShadowExecutor<E, SOT>
 where
-    E: UsesState + Debug,
-    SOT: ObserversTuple<E::State> + Debug,
+    E: Debug,
+    SOT: Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("ShadowExecutor")
@@ -35,7 +35,7 @@ where
 impl<E, SOT> ShadowExecutor<E, SOT>
 where
     E: HasObservers,
-    SOT: ObserversTuple<E::State>,
+    SOT: ObserversTuple<<Self as UsesState>::State>,
 {
     /// Create a new `ShadowExecutor`, wrapping the given `executor`.
     pub fn new(executor: E, shadow_observers: SOT) -> Self {
@@ -61,9 +61,9 @@ where
 impl<E, EM, SOT, Z> Executor<EM, Z> for ShadowExecutor<E, SOT>
 where
     E: Executor<EM, Z> + HasObservers,
-    SOT: ObserversTuple<E::State>,
-    EM: UsesState<State = E::State>,
-    Z: UsesState<State = E::State>,
+    SOT: ObserversTuple<Self::State>,
+    EM: UsesState<State = Self::State>,
+    Z: UsesState<State = Self::State>,
 {
     fn run_target(
         &mut self,
@@ -93,7 +93,7 @@ where
 impl<E, SOT> HasObservers for ShadowExecutor<E, SOT>
 where
     E: HasObservers,
-    SOT: ObserversTuple<E::State>,
+    SOT: ObserversTuple<Self::State>,
 {
     #[inline]
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {

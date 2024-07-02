@@ -1,7 +1,6 @@
 //! Welcome to `LibAFL` QEMU
 //!
 //! __Warning__: The documentation is built by default for `x86_64` in `usermode`. To access the documentation of other architectures or `systemmode`, the documentation must be rebuilt with the right features.
-#![doc = include_str!("../../README.md")]
 /*! */
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
 #![forbid(unexpected_cfgs)]

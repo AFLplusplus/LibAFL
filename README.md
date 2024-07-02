@@ -11,6 +11,7 @@ LibAFL is written and maintained by
  * [s1341](https://twitter.com/srubenst1341) <github@shmarya.net>
  * [Dongjia Zhang](https://github.com/tokatoka) <toka@aflplus.plus>
  * [Addison Crump](https://github.com/addisoncrump) <me@addisoncrump.info>
+ * [Romain Malmain](https://github.com/rmalmain) <rmalmain@pm.me>
 
 ## Why LibAFL?
 
@@ -148,12 +149,4 @@ Licensed under either of <a href="LICENSE-APACHE">Apache License, Version
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in this crate by you, as defined in the Apache-2.0 license, shall
 be dual licensed as above, without any additional terms or conditions.
-</sub>
-
-<br>
-
-<sub>
-Dependencies under more restrictive licenses, such as GPL or AGPL, can be enabled
-using the respective feature in each crate when it is present, such as the
-'agpl' feature of the libafl crate.
 </sub>

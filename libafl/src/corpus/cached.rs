@@ -44,7 +44,7 @@ where
     fn cache_testcase<'a>(
         &'a self,
         testcase: &'a RefCell<Testcase<I>>,
-        idx: CorpusId,
+        id: CorpusId,
     ) -> Result<(), Error> {
         if testcase.borrow().input().is_none() {
             self.load_input_into(&mut testcase.borrow_mut())?;
@@ -62,7 +62,7 @@ where
                     }
                 }
             }
-            self.cached_indexes.borrow_mut().push_back(idx);
+            self.cached_indexes.borrow_mut().push_back(id);
         }
         Ok(())
     }
@@ -102,30 +102,30 @@ where
 
     /// Replaces the testcase at the given idx
     #[inline]
-    fn replace(&mut self, idx: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
+    fn replace(&mut self, id: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
         // TODO finish
-        self.inner.replace(idx, testcase)
+        self.inner.replace(id, testcase)
     }
 
     /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases.
-    fn remove(&mut self, idx: CorpusId) -> Result<Testcase<Self::Input>, Error> {
-        let testcase = self.inner.remove(idx)?;
-        self.cached_indexes.borrow_mut().retain(|e| *e != idx);
+    fn remove(&mut self, id: CorpusId) -> Result<Testcase<Self::Input>, Error> {
+        let testcase = self.inner.remove(id)?;
+        self.cached_indexes.borrow_mut().retain(|e| *e != id);
         Ok(testcase)
     }
 
     /// Get by id; considers only enabled testcases
     #[inline]
-    fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
-        let testcase = { self.inner.get(idx)? };
-        self.cache_testcase(testcase, idx)?;
+    fn get(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
+        let testcase = { self.inner.get(id)? };
+        self.cache_testcase(testcase, id)?;
         Ok(testcase)
     }
     /// Get by id; considers both enabled and disabled testcases
     #[inline]
-    fn get_from_all(&self, idx: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error> {
-        let testcase = { self.inner.get_from_all(idx)? };
-        self.cache_testcase(testcase, idx)?;
+    fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error> {
+        let testcase = { self.inner.get_from_all(id)? };
+        self.cache_testcase(testcase, id)?;
         Ok(testcase)
     }
 
@@ -142,8 +142,8 @@ where
     }
 
     #[inline]
-    fn next(&self, idx: CorpusId) -> Option<CorpusId> {
-        self.inner.next(idx)
+    fn next(&self, id: CorpusId) -> Option<CorpusId> {
+        self.inner.next(id)
     }
 
     /// Peek the next free corpus id
@@ -153,8 +153,8 @@ where
     }
 
     #[inline]
-    fn prev(&self, idx: CorpusId) -> Option<CorpusId> {
-        self.inner.prev(idx)
+    fn prev(&self, id: CorpusId) -> Option<CorpusId> {
+        self.inner.prev(id)
     }
 
     #[inline]

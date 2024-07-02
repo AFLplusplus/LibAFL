@@ -116,9 +116,9 @@ where
 
         let total = state.corpus().count() as u64;
         let mut curr = 0;
-        while let Some(idx) = cur_id {
+        while let Some(id) = cur_id {
             let (weight, input) = {
-                let mut testcase = state.corpus().get(idx)?.borrow_mut();
+                let mut testcase = state.corpus().get(id)?.borrow_mut();
                 let weight = TS::compute(state, &mut *testcase)?
                     .to_u64()
                     .expect("Weight must be computable.");
@@ -177,9 +177,9 @@ where
             }
 
             // Keep track of that seed's index and weight
-            seed_exprs.insert(seed_expr, (idx, weight));
+            seed_exprs.insert(seed_expr, (id, weight));
 
-            cur_id = state.corpus().next(idx);
+            cur_id = state.corpus().next(id);
         }
 
         manager.log(
@@ -215,21 +215,21 @@ where
 
         let res = if let Some(model) = opt.get_model() {
             let mut removed = Vec::with_capacity(state.corpus().count());
-            for (seed, (idx, _)) in seed_exprs {
+            for (seed, (id, _)) in seed_exprs {
                 // if the model says the seed isn't there, mark it for deletion
                 if !model.eval(&seed, true).unwrap().as_bool().unwrap() {
-                    removed.push(idx);
+                    removed.push(id);
                 }
             }
             // reverse order; if indexes are stored in a vec, we need to remove from back to front
-            removed.sort_unstable_by(|idx1, idx2| idx2.cmp(idx1));
-            for idx in removed {
-                let removed = state.corpus_mut().remove(idx)?;
+            removed.sort_unstable_by(|id1, id2| id2.cmp(id1));
+            for id in removed {
+                let removed = state.corpus_mut().remove(id)?;
                 // scheduler needs to know we've removed the input, or it will continue to try
                 // to use now-missing inputs
                 fuzzer
                     .scheduler_mut()
-                    .on_remove(state, idx, &Some(removed))?;
+                    .on_remove(state, id, &Some(removed))?;
             }
             Ok(())
         } else {

@@ -3,8 +3,9 @@ The [`Frida`](https://frida.re) executor is a binary-only mode for `LibAFL`.
 It can report coverage and, on supported architectures, even reports memory access errors.
 
 Additional documentation is available in [the `LibAFL` book](https://aflplus.plus/libafl-book/advanced_features/frida.html).
-*/
 
+*/
+#![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
 #![forbid(unexpected_cfgs)]
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(clippy::all)]
@@ -21,7 +22,8 @@ Additional documentation is available in [the `LibAFL` book](https://aflplus.plu
     clippy::module_name_repetitions,
     clippy::unreadable_literal,
     clippy::ptr_cast_constness,
-    clippy::must_use_candidate
+    clippy::must_use_candidate,
+    clippy::too_many_arguments
 )]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
@@ -69,7 +71,7 @@ pub mod alloc;
 pub mod asan;
 
 #[cfg(windows)]
-/// Windows specific hooks to catch __fastfail like exceptions with Frida, see https://github.com/AFLplusplus/LibAFL/issues/395 for more details
+/// Windows specific hooks to catch __fastfail like exceptions with Frida, see <https://github.com/AFLplusplus/LibAFL/issues/395> for more details
 pub mod windows_hooks;
 
 pub mod coverage_rt;
@@ -363,6 +365,8 @@ mod tests {
     use libafl_bolts::{
         cli::FuzzerOptions, rands::StdRand, tuples::tuple_list, AsSlice, SimpleStdoutLogger,
     };
+    #[cfg(unix)]
+    use mimalloc::MiMalloc;
 
     use crate::{
         asan::{
@@ -373,6 +377,14 @@ mod tests {
         executor::FridaInProcessExecutor,
         helper::FridaInstrumentationHelper,
     };
+    #[cfg(unix)]
+    #[global_allocator]
+    static GLOBAL: MiMalloc = MiMalloc;
+    #[cfg(windows)]
+    use dlmalloc::GlobalDlmalloc;
+    #[cfg(windows)]
+    #[global_allocator]
+    static GLOBAL: GlobalDlmalloc = GlobalDlmalloc;
 
     static GUM: OnceLock<Gum> = OnceLock::new();
 

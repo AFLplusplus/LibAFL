@@ -57,27 +57,27 @@ where
         Err(Error::unsupported("Unsupported by NopCorpus"))
     }
 
-    /// Replaces the testcase at the given idx
+    /// Replaces the testcase with the given id
     #[inline]
-    fn replace(&mut self, _idx: CorpusId, _testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
+    fn replace(&mut self, _id: CorpusId, _testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
         Err(Error::unsupported("Unsupported by NopCorpus"))
     }
 
     /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases
     #[inline]
-    fn remove(&mut self, _idx: CorpusId) -> Result<Testcase<I>, Error> {
+    fn remove(&mut self, _id: CorpusId) -> Result<Testcase<I>, Error> {
         Err(Error::unsupported("Unsupported by NopCorpus"))
     }
 
     /// Get by id; considers only enabled testcases
     #[inline]
-    fn get(&self, _idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
+    fn get(&self, _id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
         Err(Error::unsupported("Unsupported by NopCorpus"))
     }
 
     /// Get by id; considers both enabled and disabled testcases
     #[inline]
-    fn get_from_all(&self, _idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
+    fn get_from_all(&self, _id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
         Err(Error::unsupported("Unsupported by NopCorpus"))
     }
 
@@ -100,12 +100,12 @@ where
     }
 
     #[inline]
-    fn next(&self, _idx: CorpusId) -> Option<CorpusId> {
+    fn next(&self, _id: CorpusId) -> Option<CorpusId> {
         None
     }
 
     #[inline]
-    fn prev(&self, _idx: CorpusId) -> Option<CorpusId> {
+    fn prev(&self, _id: CorpusId) -> Option<CorpusId> {
         None
     }
 

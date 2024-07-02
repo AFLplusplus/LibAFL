@@ -1,9 +1,9 @@
 use std::{
-    collections::HashMap,
     fmt::Debug,
     sync::atomic::{AtomicU64, Ordering},
 };
 
+use hashbrown::HashMap;
 use libafl::state::{HasExecutions, State};
 use libafl_qemu_sys::GuestPhysAddr;
 

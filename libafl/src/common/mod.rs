@@ -1,7 +1,12 @@
 //! This module defines trait shared across different `LibAFL` modules
 
+#![allow(unused, missing_docs)]
+
 use alloc::boxed::Box;
 use core::any::type_name;
+
+#[cfg(feature = "nautilus")]
+pub mod nautilus;
 
 use libafl_bolts::{
     serdeany::{NamedSerdeAnyMap, SerdeAny, SerdeAnyMap},

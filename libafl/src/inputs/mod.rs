@@ -39,6 +39,8 @@ use libafl_bolts::{ownedref::OwnedSlice, Error, HasLen};
 pub use nautilus::*;
 use serde::{Deserialize, Serialize};
 
+use crate::corpus::CorpusId;
+
 /// An input for the target
 #[cfg(not(feature = "std"))]
 pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
@@ -53,7 +55,7 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
     }
 
     /// Generate a name for this input
-    fn generate_name(&self, idx: usize) -> String;
+    fn generate_name(&self, id: Option<CorpusId>) -> String;
 
     /// An hook executed if the input is stored as `Testcase`
     fn wrapped_as_testcase(&mut self) {}
@@ -82,7 +84,7 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
     }
 
     /// Generate a name for this input, the user is responsible for making each name of testcase unique.
-    fn generate_name(&self, idx: usize) -> String;
+    fn generate_name(&self, id: Option<CorpusId>) -> String;
 
     /// An hook executed if the input is stored as `Testcase`
     fn wrapped_as_testcase(&mut self) {}
@@ -111,7 +113,7 @@ macro_rules! none_input_converter {
 #[derive(Copy, Clone, Serialize, Deserialize, Debug, Hash)]
 pub struct NopInput {}
 impl Input for NopInput {
-    fn generate_name(&self, _idx: usize) -> String {
+    fn generate_name(&self, _id: Option<CorpusId>) -> String {
         "nop-input".to_string()
     }
 }

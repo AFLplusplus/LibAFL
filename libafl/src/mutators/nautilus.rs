@@ -3,19 +3,22 @@
 use alloc::borrow::Cow;
 use core::fmt::Debug;
 
-use grammartec::{
-    context::Context,
-    mutator::Mutator as BackingMutator,
-    tree::{Tree, TreeMutation},
+use libafl_bolts::{
+    rands::{Rand, RomuDuoJrRand},
+    Named,
 };
-use libafl_bolts::Named;
 
 use crate::{
+    common::nautilus::grammartec::{
+        context::Context,
+        mutator::Mutator as BackingMutator,
+        tree::{Tree, TreeMutation},
+    },
     feedbacks::NautilusChunksMetadata,
     generators::nautilus::NautilusContext,
     inputs::nautilus::NautilusInput,
     mutators::{MutationResult, Mutator},
-    state::HasCorpus,
+    state::{HasCorpus, HasRand},
     Error, HasMetadata,
 };
 
@@ -31,16 +34,17 @@ impl Debug for NautilusRandomMutator<'_> {
     }
 }
 
-impl<S> Mutator<NautilusInput, S> for NautilusRandomMutator<'_> {
+impl<S: HasRand> Mutator<NautilusInput, S> for NautilusRandomMutator<'_> {
     fn mutate(
         &mut self,
-        _state: &mut S,
+        state: &mut S,
         input: &mut NautilusInput,
     ) -> Result<MutationResult, Error> {
         // TODO get rid of tmp
         let mut tmp = vec![];
         self.mutator
-            .mut_random::<_, ()>(
+            .mut_random::<_, _>(
+                state.rand_mut(),
                 &input.tree,
                 self.ctx,
                 &mut |t: &TreeMutation, _ctx: &Context| {
@@ -92,10 +96,10 @@ impl Debug for NautilusRecursionMutator<'_> {
     }
 }
 
-impl<S> Mutator<NautilusInput, S> for NautilusRecursionMutator<'_> {
+impl<S: HasRand> Mutator<NautilusInput, S> for NautilusRecursionMutator<'_> {
     fn mutate(
         &mut self,
-        _state: &mut S,
+        state: &mut S,
         input: &mut NautilusInput,
     ) -> Result<MutationResult, Error> {
         // TODO don't calc recursions here
@@ -103,7 +107,8 @@ impl<S> Mutator<NautilusInput, S> for NautilusRecursionMutator<'_> {
             // TODO get rid of tmp
             let mut tmp = vec![];
             self.mutator
-                .mut_random_recursion::<_, ()>(
+                .mut_random_recursion::<_, _>(
+                    state.rand_mut(),
                     &input.tree,
                     recursions,
                     self.ctx,
@@ -157,21 +162,24 @@ impl Debug for NautilusSpliceMutator<'_> {
 
 impl<S> Mutator<NautilusInput, S> for NautilusSpliceMutator<'_>
 where
-    S: HasCorpus<Input = NautilusInput> + HasMetadata,
+    S: HasCorpus<Input = NautilusInput> + HasMetadata + HasRand,
 {
     fn mutate(
         &mut self,
         state: &mut S,
         input: &mut NautilusInput,
     ) -> Result<MutationResult, Error> {
+        // TODO get rid of tmp
+        let mut tmp = vec![];
+        // Create a fast temp mutator to get around borrowing..
+        let mut rand_cpy = { RomuDuoJrRand::with_seed(state.rand_mut().next()) };
         let meta = state
             .metadata_map()
             .get::<NautilusChunksMetadata>()
             .expect("NautilusChunksMetadata not in the state");
-        // TODO get rid of tmp
-        let mut tmp = vec![];
         self.mutator
-            .mut_splice::<_, ()>(
+            .mut_splice::<_, _>(
+                &mut rand_cpy,
                 &input.tree,
                 self.ctx,
                 &meta.cks,

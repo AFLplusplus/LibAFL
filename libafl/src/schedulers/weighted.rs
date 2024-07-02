@@ -101,6 +101,8 @@ pub struct WeightedScheduler<C, F, O, S> {
     map_observer_handle: Handle<C>,
     last_hash: usize,
     phantom: PhantomData<(F, O, S)>,
+    /// Cycle `PowerSchedule` on completion of every queue cycle.
+    cycle_schedules: bool,
 }
 
 impl<C, F, O, S> WeightedScheduler<C, F, O, S>
@@ -127,8 +129,16 @@ where
             map_observer_handle: map_observer.handle(),
             last_hash: 0,
             table_invalidated: true,
+            cycle_schedules: false,
             phantom: PhantomData,
         }
+    }
+
+    /// Cycle the `PowerSchedule` on completion of a queue cycle
+    #[must_use]
+    pub fn cycling_scheduler(mut self) -> Self {
+        self.cycle_schedules = true;
+        self
     }
 
     #[must_use]
@@ -220,6 +230,24 @@ where
         wsmeta.set_alias_table(alias_table);
         Ok(())
     }
+
+    /// Cycles the strategy of the scheduler; tries to mimic AFL++'s cycling formula
+    fn cycle_schedule(&mut self, metadata: &mut SchedulerMetadata) -> Result<PowerSchedule, Error> {
+        let next_strat = match metadata.strat().ok_or(Error::illegal_argument(
+            "No strategy specified when initializing scheduler; cannot cycle!",
+        ))? {
+            PowerSchedule::EXPLORE => PowerSchedule::EXPLOIT,
+            PowerSchedule::COE => PowerSchedule::LIN,
+            PowerSchedule::LIN => PowerSchedule::QUAD,
+            PowerSchedule::FAST => PowerSchedule::COE,
+            PowerSchedule::QUAD => PowerSchedule::FAST,
+            PowerSchedule::EXPLOIT => PowerSchedule::EXPLORE,
+        };
+        metadata.set_strat(Some(next_strat));
+        // We need to recalculate the scores of testcases.
+        self.table_invalidated = true;
+        Ok(next_strat)
+    }
 }
 
 impl<C, F, O, S> UsesState for WeightedScheduler<C, F, O, S>
@@ -240,7 +268,7 @@ where
     fn on_remove(
         &mut self,
         _state: &mut Self::State,
-        _idx: CorpusId,
+        _id: CorpusId,
         _prev: &Option<Testcase<<Self::State as UsesInput>::Input>>,
     ) -> Result<(), Error> {
         self.table_invalidated = true;
@@ -251,7 +279,7 @@ where
     fn on_replace(
         &mut self,
         _state: &mut Self::State,
-        _idx: CorpusId,
+        _id: CorpusId,
         _prev: &Testcase<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
         self.table_invalidated = true;
@@ -287,8 +315,8 @@ where
     C: AsRef<O> + Named,
 {
     /// Called when a [`Testcase`] is added to the corpus
-    fn on_add(&mut self, state: &mut S, idx: CorpusId) -> Result<(), Error> {
-        self.on_add_metadata(state, idx)?;
+    fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
+        self.on_add_metadata(state, id)?;
         self.table_invalidated = true;
         Ok(())
     }
@@ -324,13 +352,13 @@ where
 
             let wsmeta = state.metadata_mut::<WeightedScheduleMetadata>()?;
 
-            let current_cycles = wsmeta.runs_in_current_cycle();
+            let runs_in_current_cycle = wsmeta.runs_in_current_cycle();
 
             // TODO deal with corpus_counts decreasing due to removals
-            if current_cycles >= corpus_counts {
+            if runs_in_current_cycle >= corpus_counts {
                 wsmeta.set_runs_current_cycle(0);
             } else {
-                wsmeta.set_runs_current_cycle(current_cycles + 1);
+                wsmeta.set_runs_current_cycle(runs_in_current_cycle + 1);
             }
 
             let idx = if probability < *wsmeta.alias_probability().get(&s).unwrap() {
@@ -340,9 +368,12 @@ where
             };
 
             // Update depth
-            if current_cycles > corpus_counts {
+            if runs_in_current_cycle >= corpus_counts {
                 let psmeta = state.metadata_mut::<SchedulerMetadata>()?;
                 psmeta.set_queue_cycles(psmeta.queue_cycles() + 1);
+                if self.cycle_schedules {
+                    self.cycle_schedule(psmeta)?;
+                }
             }
 
             self.set_current_scheduled(state, Some(idx))?;
@@ -354,11 +385,11 @@ where
     fn set_current_scheduled(
         &mut self,
         state: &mut Self::State,
-        next_idx: Option<CorpusId>,
+        next_id: Option<CorpusId>,
     ) -> Result<(), Error> {
-        self.on_next_metadata(state, next_idx)?;
+        self.on_next_metadata(state, next_id)?;
 
-        *state.corpus_mut().current_mut() = next_idx;
+        *state.corpus_mut().current_mut() = next_id;
         Ok(())
     }
 }
