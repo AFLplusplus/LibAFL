@@ -807,11 +807,10 @@ where
         self.inner.process(fuzzer, state, executor)
     }
 
-   fn on_shutdown(&mut self) -> Result<(), Error> {
+    fn on_shutdown(&mut self) -> Result<(), Error> {
         self.inner.on_shutdown()
     }
 }
-
 
 impl<E, EM, M, Z> EventManager<E, Z> for MonitorTypedEventManager<EM, M>
 where

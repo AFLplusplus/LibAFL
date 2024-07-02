@@ -96,6 +96,7 @@ where
     ) -> Result<BrokerEventResult, Error> {
         match &event {
             Event::NewTestcase { .. } => Ok(BrokerEventResult::Forward),
+            Event::Stop => Ok(BrokerEventResult::Forward),
             _ => Ok(BrokerEventResult::Handled),
         }
     }

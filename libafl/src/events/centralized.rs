@@ -39,7 +39,7 @@ use crate::{
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, NopInput, UsesInput},
     observers::{ObserversTuple, TimeObserver},
-    state::{HasExecutions, HasLastReportTime, NopState, State, UsesState},
+    state::{HasExecutions, HasLastReportTime, NopState, State, Stoppable, UsesState},
     Error, HasMetadata,
 };
 
@@ -295,6 +295,7 @@ where
                     true
                 }
                 Event::UpdateExecStats { .. } => true, // send it but this guy won't be handled. the only purpose is to keep this client alive else the broker thinks it is dead and will dc it
+                Event::Stop => true,
                 _ => false,
             };
 
@@ -393,7 +394,8 @@ where
     }
 
     fn on_shutdown(&mut self) -> Result<(), Error> {
-        self.inner.on_shutdown()
+        self.inner.on_shutdown()?;
+        self.client.sender_mut().send_exiting()
     }
 }
 
@@ -480,7 +482,7 @@ impl<EM, EMH, S, SP> CentralizedEventManager<EM, EMH, S, SP>
 where
     EM: UsesState + EventFirer + AdaptiveSerializer + HasEventManagerId,
     EMH: EventManagerHooksTuple<EM::State>,
-    S: State,
+    S: State + Stoppable,
     SP: ShMemProvider,
 {
     #[cfg(feature = "llmp_compression")]
@@ -665,6 +667,9 @@ where
                 } else {
                     log::debug!("[{}] {} was discarded...)", process::id(), event_name);
                 }
+            }
+            Event::Stop => {
+                *state.should_stop_mut() = true;
             }
             _ => {
                 return Err(Error::unknown(format!(
