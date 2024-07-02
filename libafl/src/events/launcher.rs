@@ -43,6 +43,7 @@ use libafl_bolts::{
 };
 use libafl_bolts::{
     core_affinity::{CoreId, Cores},
+    llmp::Broker,
     shmem::ShMemProvider,
     tuples::{tuple_list, Handle},
 };
@@ -778,9 +779,7 @@ where
                 self.centralized_broker_port,
                 true,
             )?;
-            broker
-                .inner_mut()
-                .set_exit_cleanly_after(exit_cleanly_after);
+            broker.set_exit_after(exit_cleanly_after);
             broker
         }));
 
@@ -815,9 +814,7 @@ where
                 broker.inner_mut().connect_b2b(remote_broker_addr)?;
             };
 
-            broker
-                .inner_mut()
-                .set_exit_cleanly_after(exit_cleanly_after);
+            broker.set_exit_after(exit_cleanly_after);
 
             brokers.add(Box::new(broker));
         }

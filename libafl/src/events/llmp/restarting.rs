@@ -4,6 +4,7 @@
 //! restart/refork it.
 
 use alloc::vec::Vec;
+use libafl_bolts::llmp::Broker;
 #[cfg(all(unix, not(miri), feature = "std"))]
 use core::ptr::addr_of_mut;
 #[cfg(feature = "std")]
@@ -453,8 +454,7 @@ where
 
                 if let Some(exit_cleanly_after) = self.exit_cleanly_after {
                     broker
-                        .inner_mut()
-                        .set_exit_cleanly_after(exit_cleanly_after);
+                        .set_exit_after(exit_cleanly_after);
                 }
 
                 broker.loop_with_timeouts(Duration::from_secs(30), Some(Duration::from_millis(5)));

@@ -1159,7 +1159,7 @@ where
         {
             let broker_things = |mut broker: TcpEventBroker<S::Input, MT>, _remote_broker_addr| {
                 if let Some(exit_cleanly_after) = self.exit_cleanly_after {
-                    broker.set_exit_cleanly_after(exit_cleanly_after);
+                    broker.set_exit_after(exit_cleanly_after);
                 }
 
                 broker.broker_loop()
