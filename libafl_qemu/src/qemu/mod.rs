@@ -1,7 +1,7 @@
 //! Low-level QEMU library
 //!
 //! This module exposes the low-level QEMU library through [`Qemu`].
-//! To access higher-level features of QEMU, it is recommanded to use [`crate::Emulator`] instead.
+//! To access higher-level features of QEMU, it is recommended to use [`crate::Emulator`] instead.
 
 use core::fmt;
 use std::{
@@ -12,8 +12,7 @@ use std::{
     mem::MaybeUninit,
     ops::Range,
     pin::Pin,
-    ptr,
-    ptr::{addr_of, null},
+    ptr::{self, addr_of, null},
 };
 
 use libafl_bolts::os::unix_signals::Signal;
@@ -35,6 +34,9 @@ use pyo3::prelude::*;
 use strum::IntoEnumIterator;
 
 use crate::{GuestAddrKind, GuestReg, Regs};
+
+pub mod qemu_opt;
+use qemu_opt::{QemuConfig, QemuConfigBuilder};
 
 #[cfg(emulation_mode = "usermode")]
 mod usermode;
@@ -570,6 +572,13 @@ impl From<u8> for HookData {
 
 #[allow(clippy::unused_self)]
 impl Qemu {
+    pub fn builder() -> QemuConfigBuilder {
+        // Since Qemu is a zero sized struct, this is not a completely standard builder pattern.
+        // The Qemu configuration is not stored in the Qemu struct after build().
+        // Therefore, to use the derived builder and avoid boilerplate a builder for QemuBuilder is derived.
+        QemuConfig::builder()
+    }
+
     #[allow(clippy::must_use_candidate, clippy::similar_names)]
     pub fn init(args: &[String], env: &[(String, String)]) -> Result<Self, QemuInitError> {
         if args.is_empty() {
@@ -608,7 +617,7 @@ impl Qemu {
             qemu_user_init(argc, argv.as_ptr(), envp.as_ptr());
             #[cfg(emulation_mode = "systemmode")]
             {
-                qemu_init(argc, argv.as_ptr(), envp.as_ptr());
+                qemu_init(argc, argv.as_ptr());
                 libc::atexit(qemu_cleanup_atexit);
                 libafl_qemu_sys::syx_snapshot_init(true);
             }
