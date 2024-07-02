@@ -144,6 +144,7 @@ fn find_llvm_version() -> Option<i32> {
 }
 
 #[allow(clippy::too_many_arguments)]
+#[allow(unused)]
 fn build_pass(
     bindir_path: &Path,
     out_dir: &Path,
@@ -152,7 +153,6 @@ fn build_pass(
     src_dir: &Path,
     src_file: &str,
     additional_srcfiles: Option<&Vec<&str>>,
-    required: bool,
 ) {
     let dot_offset = src_file.rfind('.').unwrap();
     let src_stub = &src_file[..dot_offset];
@@ -202,19 +202,11 @@ fn build_pass(
         Some(res) => match res {
             Ok(s) => {
                 if !s.success() {
-                    if required {
-                        panic!("Failed to compile required compiler pass src/{src_file} - Exit status: {s}");
-                    } else {
-                        println!("cargo:warning=Skipping non-required compiler pass src/{src_file} - Reason: Exit status {s}");
-                    }
+                    panic!("Failed to compile required compiler pass src/{src_file} - Exit status: {s}");
                 }
             }
             Err(err) => {
-                if required {
-                    panic!("Failed to compile required compiler pass src/{src_file} - {err}");
-                } else {
-                    println!("cargo:warning=Skipping non-required compiler pass src/{src_file} - Reason: {err}");
-                }
+                panic!("Failed to compile required compiler pass src/{src_file} - {err}");
             }
         },
         None => {
@@ -416,6 +408,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         ldflags.push(&sdk_path);
     };
 
+    #[cfg(feature = "ddg-instr")]
     build_pass(
         bindir_path,
         out_dir,
@@ -424,42 +417,95 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         src_dir,
         "ddg-instr.cc",
         Some(&vec!["ddg-utils.cc"]),
-        false,
     );
 
-    for pass in [
+    #[cfg(feature = "function-logging")]
+    build_pass(
+        bindir_path,
+        out_dir,
+        &cxxflags,
+        &ldflags,
+        src_dir,
         "function-logging.cc",
-        "cmplog-routines-pass.cc",
-        "autotokens-pass.cc",
-        "coverage-accounting-pass.cc",
-        "cmplog-instructions-pass.cc",
-        "ctx-pass.cc",
-    ] {
-        build_pass(
-            bindir_path,
-            out_dir,
-            &cxxflags,
-            &ldflags,
-            src_dir,
-            pass,
-            None,
-            true,
-        );
-    }
+        None,
+    );
 
-    // Optional pass
-    for pass in ["dump-cfg-pass.cc", "profiling.cc"] {
-        build_pass(
-            bindir_path,
-            out_dir,
-            &cxxflags,
-            &ldflags,
-            src_dir,
-            pass,
-            None,
-            false,
-        );
-    }
+    #[cfg(feature = "cmplog-routines")]
+    build_pass(
+        bindir_path,
+        out_dir,
+        &cxxflags,
+        &ldflags,
+        src_dir,
+        "cmplog-routines-pass.cc",
+        None,
+    );
+
+    #[cfg(feature = "autotokens")]
+    build_pass(
+        bindir_path,
+        out_dir,
+        &cxxflags,
+        &ldflags,
+        src_dir,
+        "autotokens-pass.cc",
+        None,
+    );
+
+    #[cfg(feature = "coverage-accounting")]
+    build_pass(
+        bindir_path,
+        out_dir,
+        &cxxflags,
+        &ldflags,
+        src_dir,
+        "coverage-accounting-pass.cc",
+        None,
+    );
+
+    #[cfg(feature = "cmplog-instructions")]
+    build_pass(
+        bindir_path,
+        out_dir,
+        &cxxflags,
+        &ldflags,
+        src_dir,
+        "cmplog-instructions-pass.cc",
+        None,
+    );
+
+    #[cfg(feature = "ctx")]
+    build_pass(
+        bindir_path,
+        out_dir,
+        &cxxflags,
+        &ldflags,
+        src_dir,
+        "ctx-pass.cc",
+        None,
+    );
+
+    #[cfg(feature = "dump-cfg")]
+    build_pass(
+        bindir_path,
+        out_dir,
+        &cxxflags,
+        &ldflags,
+        src_dir,
+        "dump-cfg-pass.cc",
+        None,
+    );
+
+    #[cfg(feature = "profiling")]
+    build_pass(
+        bindir_path,
+        out_dir,
+        &cxxflags,
+        &ldflags,
+        src_dir,
+        "profiling-pass.cc",
+        None,
+    );
 
     cc::Build::new()
         .file(src_dir.join("no-link-rt.c"))
