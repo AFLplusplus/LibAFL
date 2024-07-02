@@ -1,7 +1,7 @@
 use std::ffi::c_int;
 
 use libafl::{
-    events::{ProgressReporter, SimpleEventManager},
+    events::{EventProcessor, ProgressReporter, SimpleEventManager},
     executors::HasObservers,
     feedbacks::MapFeedbackMetadata,
     inputs::UsesInput,
