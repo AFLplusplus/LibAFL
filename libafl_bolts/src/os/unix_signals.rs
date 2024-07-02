@@ -1,6 +1,8 @@
 //! Signal handling for unix
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
+#[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
+use core::mem::size_of;
 #[cfg(feature = "alloc")]
 use core::{
     cell::UnsafeCell,
@@ -160,7 +162,7 @@ pub struct arm_thread_state64 {
 //#[repr(align(16))]
 pub struct arm_neon_state64 {
     /// opaque
-    pub opaque: [u8; (32 * 16) + (2 * mem::size_of::<u32>())],
+    pub opaque: [u8; (32 * 16) + (2 * size_of::<u32>())],
 }
 
 /// ```c
@@ -504,7 +506,7 @@ pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: *mut T) -> Res
 #[inline(always)]
 pub fn ucontext() -> Result<ucontext_t, Error> {
     let mut ucontext = unsafe { mem::zeroed() };
-    if cfg!(not(target_os = "openbsd")) {
+    if cfg!(not(any(target_os = "openbsd", target_os = "haiku"))) {
         if unsafe { getcontext(&mut ucontext) } == 0 {
             Ok(ucontext)
         } else {

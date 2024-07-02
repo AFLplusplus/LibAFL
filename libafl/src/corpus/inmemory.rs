@@ -43,12 +43,12 @@ where
     pub map: alloc::collections::btree_map::BTreeMap<CorpusId, RefCell<Testcase<I>>>,
     /// The keys in order (use `Vec::binary_search`)
     pub keys: Vec<CorpusId>,
-    /// First inserted idx
+    /// First inserted id
     #[cfg(not(feature = "corpus_btreemap"))]
-    first_idx: Option<CorpusId>,
-    /// Last inserted idx
+    first_id: Option<CorpusId>,
+    /// Last inserted id
     #[cfg(not(feature = "corpus_btreemap"))]
-    last_idx: Option<CorpusId>,
+    last_id: Option<CorpusId>,
 }
 
 impl<I> TestcaseStorageMap<I>
@@ -71,8 +71,8 @@ where
 
     /// Replace a testcase given a `CorpusId`
     #[cfg(not(feature = "corpus_btreemap"))]
-    pub fn replace(&mut self, idx: CorpusId, testcase: Testcase<I>) -> Option<Testcase<I>> {
-        if let Some(entry) = self.map.get_mut(&idx) {
+    pub fn replace(&mut self, id: CorpusId, testcase: Testcase<I>) -> Option<Testcase<I>> {
+        if let Some(entry) = self.map.get_mut(&id) {
             Some(entry.testcase.replace(testcase))
         } else {
             None
@@ -81,26 +81,26 @@ where
 
     /// Replace a testcase given a `CorpusId`
     #[cfg(feature = "corpus_btreemap")]
-    pub fn replace(&mut self, idx: CorpusId, testcase: Testcase<I>) -> Option<Testcase<I>> {
-        self.map.get_mut(&idx).map(|entry| entry.replace(testcase))
+    pub fn replace(&mut self, id: CorpusId, testcase: Testcase<I>) -> Option<Testcase<I>> {
+        self.map.get_mut(&id).map(|entry| entry.replace(testcase))
     }
 
-    /// Remove a testcase given a `CorpusId`
+    /// Remove a testcase given a [`CorpusId`]
     #[cfg(not(feature = "corpus_btreemap"))]
-    pub fn remove(&mut self, idx: CorpusId) -> Option<RefCell<Testcase<I>>> {
-        if let Some(item) = self.map.remove(&idx) {
-            self.remove_key(idx);
+    pub fn remove(&mut self, id: CorpusId) -> Option<RefCell<Testcase<I>>> {
+        if let Some(item) = self.map.remove(&id) {
+            self.remove_key(id);
             if let Some(prev) = item.prev {
                 self.map.get_mut(&prev).unwrap().next = item.next;
             } else {
                 // first elem
-                self.first_idx = item.next;
+                self.first_id = item.next;
             }
             if let Some(next) = item.next {
                 self.map.get_mut(&next).unwrap().prev = item.prev;
             } else {
                 // last elem
-                self.last_idx = item.prev;
+                self.last_id = item.prev;
             }
             Some(item.testcase)
         } else {
@@ -108,32 +108,32 @@ where
         }
     }
 
-    /// Remove a testcase given a `CorpusId`
+    /// Remove a testcase given a [`CorpusId`]
     #[cfg(feature = "corpus_btreemap")]
-    pub fn remove(&mut self, idx: CorpusId) -> Option<RefCell<Testcase<I>>> {
-        self.remove_key(idx);
-        self.map.remove(&idx)
+    pub fn remove(&mut self, id: CorpusId) -> Option<RefCell<Testcase<I>>> {
+        self.remove_key(id);
+        self.map.remove(&id)
     }
 
     /// Get a testcase given a `CorpusId`
     #[cfg(not(feature = "corpus_btreemap"))]
     #[must_use]
-    pub fn get(&self, idx: CorpusId) -> Option<&RefCell<Testcase<I>>> {
-        self.map.get(&idx).as_ref().map(|x| &x.testcase)
+    pub fn get(&self, id: CorpusId) -> Option<&RefCell<Testcase<I>>> {
+        self.map.get(&id).as_ref().map(|x| &x.testcase)
     }
 
     /// Get a testcase given a `CorpusId`
     #[cfg(feature = "corpus_btreemap")]
     #[must_use]
-    pub fn get(&self, idx: CorpusId) -> Option<&RefCell<Testcase<I>>> {
-        self.map.get(&idx)
+    pub fn get(&self, id: CorpusId) -> Option<&RefCell<Testcase<I>>> {
+        self.map.get(&id)
     }
 
     /// Get the next id given a `CorpusId` (creation order)
     #[cfg(not(feature = "corpus_btreemap"))]
     #[must_use]
-    pub fn next(&self, idx: CorpusId) -> Option<CorpusId> {
-        if let Some(item) = self.map.get(&idx) {
+    pub fn next(&self, id: CorpusId) -> Option<CorpusId> {
+        if let Some(item) = self.map.get(&id) {
             item.next
         } else {
             None
@@ -143,13 +143,13 @@ where
     /// Get the next id given a `CorpusId` (creation order)
     #[cfg(feature = "corpus_btreemap")]
     #[must_use]
-    pub fn next(&self, idx: CorpusId) -> Option<CorpusId> {
+    pub fn next(&self, id: CorpusId) -> Option<CorpusId> {
         // TODO see if using self.keys is faster
         let mut range = self
             .map
-            .range((core::ops::Bound::Included(idx), core::ops::Bound::Unbounded));
+            .range((core::ops::Bound::Included(id), core::ops::Bound::Unbounded));
         if let Some((this_id, _)) = range.next() {
-            if idx != *this_id {
+            if id != *this_id {
                 return None;
             }
         }
@@ -163,8 +163,8 @@ where
     /// Get the previous id given a `CorpusId` (creation order)
     #[cfg(not(feature = "corpus_btreemap"))]
     #[must_use]
-    pub fn prev(&self, idx: CorpusId) -> Option<CorpusId> {
-        if let Some(item) = self.map.get(&idx) {
+    pub fn prev(&self, id: CorpusId) -> Option<CorpusId> {
+        if let Some(item) = self.map.get(&id) {
             item.prev
         } else {
             None
@@ -174,13 +174,13 @@ where
     /// Get the previous id given a `CorpusId` (creation order)
     #[cfg(feature = "corpus_btreemap")]
     #[must_use]
-    pub fn prev(&self, idx: CorpusId) -> Option<CorpusId> {
+    pub fn prev(&self, id: CorpusId) -> Option<CorpusId> {
         // TODO see if using self.keys is faster
         let mut range = self
             .map
-            .range((core::ops::Bound::Unbounded, core::ops::Bound::Included(idx)));
+            .range((core::ops::Bound::Unbounded, core::ops::Bound::Included(id)));
         if let Some((this_id, _)) = range.next_back() {
-            if idx != *this_id {
+            if id != *this_id {
                 return None;
             }
         }
@@ -195,7 +195,7 @@ where
     #[cfg(not(feature = "corpus_btreemap"))]
     #[must_use]
     pub fn first(&self) -> Option<CorpusId> {
-        self.first_idx
+        self.first_id
     }
 
     /// Get the first created id
@@ -209,7 +209,7 @@ where
     #[cfg(not(feature = "corpus_btreemap"))]
     #[must_use]
     pub fn last(&self) -> Option<CorpusId> {
-        self.last_idx
+        self.last_id
     }
 
     /// Get the last created id
@@ -227,9 +227,9 @@ where
             map: alloc::collections::BTreeMap::default(),
             keys: Vec::default(),
             #[cfg(not(feature = "corpus_btreemap"))]
-            first_idx: None,
+            first_id: None,
             #[cfg(not(feature = "corpus_btreemap"))]
-            last_idx: None,
+            last_id: None,
         }
     }
 }
@@ -244,8 +244,8 @@ where
     pub enabled: TestcaseStorageMap<I>,
     /// The map in which disabled testcases are stored
     pub disabled: TestcaseStorageMap<I>,
-    /// The progressive idx for both maps
-    progressive_idx: usize,
+    /// The progressive id for both maps
+    progressive_id: usize,
 }
 
 impl<I> UsesInput for TestcaseStorage<I>
@@ -267,58 +267,59 @@ where
     #[must_use]
     /// Peek the next free corpus id
     pub fn peek_free_id(&self) -> CorpusId {
-        CorpusId::from(self.progressive_idx)
+        CorpusId::from(self.progressive_id)
     }
 
     /// Insert a testcase assigning a `CorpusId` to it
     pub fn insert_disabled(&mut self, testcase: RefCell<Testcase<I>>) -> CorpusId {
         self._insert(testcase, true)
     }
+
     /// Insert a testcase assigning a `CorpusId` to it
     #[cfg(not(feature = "corpus_btreemap"))]
     fn _insert(&mut self, testcase: RefCell<Testcase<I>>, is_disabled: bool) -> CorpusId {
-        let idx = CorpusId::from(self.progressive_idx);
-        self.progressive_idx += 1;
+        let id = CorpusId::from(self.progressive_id);
+        self.progressive_id += 1;
         let corpus = if is_disabled {
             &mut self.disabled
         } else {
             &mut self.enabled
         };
-        let prev = if let Some(last_idx) = corpus.last_idx {
-            corpus.map.get_mut(&last_idx).unwrap().next = Some(idx);
-            Some(last_idx)
+        let prev = if let Some(last_id) = corpus.last_id {
+            corpus.map.get_mut(&last_id).unwrap().next = Some(id);
+            Some(last_id)
         } else {
             None
         };
-        if corpus.first_idx.is_none() {
-            corpus.first_idx = Some(idx);
+        if corpus.first_id.is_none() {
+            corpus.first_id = Some(id);
         }
-        corpus.last_idx = Some(idx);
-        corpus.insert_key(idx);
+        corpus.last_id = Some(id);
+        corpus.insert_key(id);
         corpus.map.insert(
-            idx,
+            id,
             TestcaseStorageItem {
                 testcase,
                 prev,
                 next: None,
             },
         );
-        idx
+        id
     }
 
     /// Insert a testcase assigning a `CorpusId` to it
     #[cfg(feature = "corpus_btreemap")]
     fn _insert(&mut self, testcase: RefCell<Testcase<I>>, is_disabled: bool) -> CorpusId {
-        let idx = CorpusId::from(self.progressive_idx);
-        self.progressive_idx += 1;
+        let id = CorpusId::from(self.progressive_id);
+        self.progressive_id += 1;
         let corpus = if is_disabled {
             &mut self.disabled
         } else {
             &mut self.enabled
         };
-        corpus.insert_key(idx);
-        corpus.map.insert(idx, testcase);
-        idx
+        corpus.insert_key(id);
+        corpus.map.insert(id, testcase);
+        id
     }
 
     /// Create new `TestcaseStorage`
@@ -327,7 +328,7 @@ where
         Self {
             enabled: TestcaseStorageMap::new(),
             disabled: TestcaseStorageMap::new(),
-            progressive_idx: 0,
+            progressive_id: 0,
         }
     }
 }
@@ -387,43 +388,42 @@ where
         Ok(self.storage.insert_disabled(RefCell::new(testcase)))
     }
 
-    /// Replaces the testcase at the given idx
+    /// Replaces the testcase at the given id
     #[inline]
-    fn replace(&mut self, idx: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
-        self.storage
-            .enabled
-            .replace(idx, testcase)
-            .ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
+    fn replace(&mut self, id: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
+        self.storage.enabled.replace(id, testcase).ok_or_else(|| {
+            Error::key_not_found(format!("Index {id} not found, could not replace."))
+        })
     }
 
     /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases
     #[inline]
-    fn remove(&mut self, idx: CorpusId) -> Result<Testcase<Self::Input>, Error> {
-        let mut testcase = self.storage.enabled.remove(idx);
+    fn remove(&mut self, id: CorpusId) -> Result<Testcase<Self::Input>, Error> {
+        let mut testcase = self.storage.enabled.remove(id);
         if testcase.is_none() {
-            testcase = self.storage.disabled.remove(idx);
+            testcase = self.storage.disabled.remove(id);
         }
         testcase
             .map(|x| x.take())
-            .ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
+            .ok_or_else(|| Error::key_not_found(format!("Index {id} not found")))
     }
 
     /// Get by id; considers only enabled testcases
     #[inline]
-    fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
+    fn get(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
         self.storage
             .enabled
-            .get(idx)
-            .ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
+            .get(id)
+            .ok_or_else(|| Error::key_not_found(format!("Index {id} not found")))
     }
     /// Get by id; considers both enabled and disabled testcases
     #[inline]
-    fn get_from_all(&self, idx: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error> {
-        let mut testcase = self.storage.enabled.get(idx);
+    fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error> {
+        let mut testcase = self.storage.enabled.get(id);
         if testcase.is_none() {
-            testcase = self.storage.disabled.get(idx);
+            testcase = self.storage.disabled.get(id);
         }
-        testcase.ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
+        testcase.ok_or_else(|| Error::key_not_found(format!("Index {id} not found")))
     }
 
     /// Current testcase scheduled
@@ -445,13 +445,13 @@ where
     }
 
     #[inline]
-    fn next(&self, idx: CorpusId) -> Option<CorpusId> {
-        self.storage.enabled.next(idx)
+    fn next(&self, id: CorpusId) -> Option<CorpusId> {
+        self.storage.enabled.next(id)
     }
 
     #[inline]
-    fn prev(&self, idx: CorpusId) -> Option<CorpusId> {
-        self.storage.enabled.prev(idx)
+    fn prev(&self, id: CorpusId) -> Option<CorpusId> {
+        self.storage.enabled.prev(id)
     }
 
     #[inline]

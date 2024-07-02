@@ -30,14 +30,14 @@ fn extend_with_random_generalized<S>(
 where
     S: HasMetadata + HasRand + HasCorpus,
 {
-    let idx = random_corpus_id!(state.corpus(), state.rand_mut());
+    let id = random_corpus_id!(state.corpus(), state.rand_mut());
 
     if state.rand_mut().coinflip(CHOOSE_SUBINPUT_PROB) {
         if state.rand_mut().coinflip(0.5) {
             let rand1 = state.rand_mut().next();
             let rand2 = state.rand_mut().next();
 
-            let other_testcase = state.corpus().get(idx)?.borrow();
+            let other_testcase = state.corpus().get(id)?.borrow();
             if let Some(other) = other_testcase
                 .metadata_map()
                 .get::<GeneralizedInputMetadata>()
@@ -88,7 +88,7 @@ where
         }
     }
 
-    let other_testcase = state.corpus().get(idx)?.borrow();
+    let other_testcase = state.corpus().get(id)?.borrow();
     if let Some(other) = other_testcase
         .metadata_map()
         .get::<GeneralizedInputMetadata>()

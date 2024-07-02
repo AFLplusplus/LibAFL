@@ -1,9 +1,6 @@
 //! Input for the [`Nautilus`](https://github.com/RUB-SysSec/nautilus) grammar fuzzer methods
 //!
-
-//use ahash::AHasher;
-//use core::hash::Hasher;
-
+//!
 use alloc::{rc::Rc, string::String, vec::Vec};
 use core::cell::RefCell;
 use std::hash::{Hash, Hasher};
@@ -17,6 +14,7 @@ use crate::{
         rule::RuleIdOrCustom,
         tree::{Tree, TreeLike},
     },
+    corpus::CorpusId,
     generators::nautilus::NautilusContext,
     inputs::{BytesInput, Input, InputConverter},
     Error,
@@ -32,13 +30,18 @@ pub struct NautilusInput {
 impl Input for NautilusInput {
     /// Generate a name for this input
     #[must_use]
-    fn generate_name(&self, idx: usize) -> String {
+    fn generate_name(&self, id: Option<CorpusId>) -> String {
         /*let mut hasher = AHasher::new_with_keys(0, 0);
         for term in &self.terms {
             hasher.write(term.symbol.as_bytes());
         }
         format!("{:016x}", hasher.finish())*/
-        format!("id:{idx}")
+
+        if let Some(id) = id {
+            format!("id_{}", id.0)
+        } else {
+            "id_unknown".into()
+        }
     }
 }
 

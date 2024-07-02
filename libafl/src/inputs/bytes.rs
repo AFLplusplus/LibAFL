@@ -15,7 +15,10 @@ use libafl_bolts::{fs::write_file_atomic, Error};
 use libafl_bolts::{ownedref::OwnedSlice, HasLen};
 use serde::{Deserialize, Serialize};
 
-use crate::inputs::{HasMutatorBytes, HasTargetBytes, Input};
+use crate::{
+    corpus::CorpusId,
+    inputs::{HasMutatorBytes, HasTargetBytes, Input},
+};
 
 /// A bytes input is the basic input
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -47,7 +50,7 @@ impl Input for BytesInput {
     }
 
     /// Generate a name for this input
-    fn generate_name(&self, _idx: usize) -> String {
+    fn generate_name(&self, _id: Option<CorpusId>) -> String {
         let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
         hasher.write(self.bytes());
         format!("{:016x}", hasher.finish())

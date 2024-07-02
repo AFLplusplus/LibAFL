@@ -1,5 +1,5 @@
 use core::fmt::{self, Debug, Formatter};
-#[cfg(windows)]
+#[cfg(all(windows, not(test)))]
 use std::process::abort;
 use std::{ffi::c_void, marker::PhantomData};
 
@@ -220,7 +220,7 @@ where
         }
 
         #[cfg(windows)]
-        initialize(&gum);
+        initialize(gum);
 
         Self {
             base,

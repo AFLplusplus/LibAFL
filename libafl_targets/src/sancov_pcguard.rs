@@ -3,7 +3,7 @@
 #[rustversion::nightly]
 #[cfg(feature = "sancov_ngram4")]
 use core::simd::num::SimdUint;
-use core::{mem, ptr, slice};
+use core::{mem::align_of, ptr, slice};
 
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ctx"))]
 use libafl::executors::{hooks::ExecutorHook, HasObservers};
@@ -18,6 +18,7 @@ use libafl::executors::{hooks::ExecutorHook, HasObservers};
 use crate::coverage::EDGES_MAP;
 use crate::coverage::MAX_EDGES_FOUND;
 #[cfg(feature = "sancov_ngram4")]
+#[allow(unused)]
 use crate::EDGES_MAP_SIZE_IN_USE;
 #[cfg(feature = "pointer_maps")]
 use crate::{coverage::EDGES_MAP_PTR, EDGES_MAP_SIZE_MAX};
@@ -29,6 +30,7 @@ compile_error!(
 );
 
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
+#[allow(unused)]
 use core::ops::ShlAssign;
 
 #[cfg(feature = "sancov_ngram4")]
@@ -346,7 +348,7 @@ pub fn sanitizer_cov_pc_table() -> Option<&'static [PcTableEntry]> {
             "PC Table size is not evens - start: {PCS_BEG:x?} end: {PCS_END:x?}"
         );
         assert_eq!(
-            (PCS_BEG as usize) % mem::align_of::<PcTableEntry>(),
+            (PCS_BEG as usize) % align_of::<PcTableEntry>(),
             0,
             "Unaligned PC Table - start: {PCS_BEG:x?} end: {PCS_END:x?}"
         );

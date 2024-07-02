@@ -117,13 +117,13 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let idx = random_corpus_id!(state.corpus(), state.rand_mut());
+        let id = random_corpus_id!(state.corpus(), state.rand_mut());
 
         let insert_at = state.rand_mut().below(input.terminals().len());
 
         let rand_num = state.rand_mut().next();
 
-        let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+        let mut other_testcase = state.corpus().get(id)?.borrow_mut();
 
         if !other_testcase.has_metadata::<GramatronIdxMapMetadata>() {
             let meta = GramatronIdxMapMetadata::new(other_testcase.load_input(state.corpus())?);

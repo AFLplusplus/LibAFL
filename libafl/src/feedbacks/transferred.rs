@@ -37,7 +37,7 @@ impl TransferringMetadata {
 
 /// Simple feedback which may be used to test whether the testcase was transferred from another node
 /// in a multi-node fuzzing arrangement.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Default)]
 pub struct TransferredFeedback {
     #[cfg(feature = "track_hit_feedbacks")]
     // The previous run's result of `Self::is_interesting`

@@ -53,7 +53,7 @@ impl<'a, T> Truncate for &'a mut [T] {
 }
 
 /// Wrap a reference and convert to a [`Box`] on serialize
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub enum OwnedRef<'a, T>
 where
     T: 'a + ?Sized,
@@ -64,6 +64,30 @@ where
     Ref(&'a T),
     /// An owned [`Box`] of a type
     Owned(Box<T>),
+}
+
+/// Special case, &\[u8] is a fat pointer containing the size implicitly.
+impl<'a> Clone for OwnedRef<'a, [u8]> {
+    fn clone(&self) -> Self {
+        match self {
+            Self::RefRaw(_, _) => panic!("Cannot clone"),
+            Self::Ref(slice) => Self::Ref(slice),
+            Self::Owned(elt) => Self::Owned(elt.clone()),
+        }
+    }
+}
+
+impl<'a, T> Clone for OwnedRef<'a, T>
+where
+    T: 'a + Sized + Clone,
+{
+    fn clone(&self) -> Self {
+        match self {
+            Self::RefRaw(ptr, mrkr) => Self::RefRaw(*ptr, mrkr.clone()),
+            Self::Ref(slice) => Self::Ref(slice),
+            Self::Owned(elt) => Self::Owned(elt.clone()),
+        }
+    }
 }
 
 impl<'a, T> OwnedRef<'a, T>
@@ -81,6 +105,21 @@ where
             "Null pointer passed to OwnedRef::ref_raw constructor!"
         );
         Self::RefRaw(ptr, UnsafeMarker::new())
+    }
+
+    /// Returns true if the inner ref is a raw pointer, false otherwise.
+    #[must_use]
+    pub fn is_raw(&self) -> bool {
+        matches!(self, OwnedRef::Ref(_))
+    }
+
+    /// Return the inner value, if owned by the given object
+    #[must_use]
+    pub fn into_owned(self) -> Option<Box<T>> {
+        match self {
+            Self::Owned(val) => Some(val),
+            _ => None,
+        }
     }
 }
 
@@ -132,6 +171,17 @@ where
         D: Deserializer<'de>,
     {
         Deserialize::deserialize(deserializer).map(OwnedRef::Owned)
+    }
+}
+
+impl<'a> AsRef<[u8]> for OwnedRef<'a, [u8]> {
+    #[must_use]
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            OwnedRef::RefRaw(r, _) => unsafe { (*r).as_ref().unwrap() },
+            OwnedRef::Ref(r) => r,
+            OwnedRef::Owned(v) => v.as_ref(),
+        }
     }
 }
 

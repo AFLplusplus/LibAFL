@@ -206,15 +206,15 @@ pub fn merge(
             });
     }
 
-    for idx in fuzzer.scheduler().removable() {
-        let testcase = state.corpus_mut().remove(idx)?;
+    for id in fuzzer.scheduler().removable() {
+        let testcase = state.corpus_mut().remove(id)?;
         fuzzer
             .scheduler_mut()
-            .on_remove(&mut state, idx, &Some(testcase))?;
+            .on_remove(&mut state, id, &Some(testcase))?;
     }
 
-    for idx in fuzzer.scheduler().current().clone() {
-        let mut testcase = state.corpus_mut().get(idx)?.borrow_mut();
+    for id in fuzzer.scheduler().current().clone() {
+        let mut testcase = state.corpus_mut().get(id)?.borrow_mut();
         let file_path = testcase
             .file_path_mut()
             .as_mut()
@@ -231,10 +231,10 @@ pub fn merge(
             new_file_path.push(base);
             if new_file_path.exists() {
                 drop(testcase);
-                let testcase = state.corpus_mut().remove(idx)?;
+                let testcase = state.corpus_mut().remove(id)?;
                 fuzzer
                     .scheduler_mut()
-                    .on_remove(&mut state, idx, &Some(testcase))?;
+                    .on_remove(&mut state, id, &Some(testcase))?;
             } else {
                 // False-positive: file_path is used just below
                 #[allow(clippy::needless_borrows_for_generic_args)]

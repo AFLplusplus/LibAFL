@@ -51,7 +51,7 @@ where
     fn on_remove(
         &mut self,
         _state: &mut Self::State,
-        _idx: CorpusId,
+        _id: CorpusId,
         _testcase: &Option<Testcase<<Self::State as UsesInput>::Input>>,
     ) -> Result<(), Error> {
         Ok(())
@@ -61,7 +61,7 @@ where
     fn on_replace(
         &mut self,
         _state: &mut Self::State,
-        _idx: CorpusId,
+        _id: CorpusId,
         _prev: &Testcase<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
         Ok(())
@@ -85,10 +85,10 @@ where
     fn map_observer_handle(&self) -> &Handle<C>;
 
     /// Called when a [`Testcase`] is added to the corpus
-    fn on_add_metadata(&self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
-        let current_idx = *state.corpus().current();
+    fn on_add_metadata(&self, state: &mut Self::State, id: CorpusId) -> Result<(), Error> {
+        let current_id = *state.corpus().current();
 
-        let mut depth = match current_idx {
+        let mut depth = match current_id {
             Some(parent_idx) => state
                 .testcase(parent_idx)?
                 .metadata::<SchedulerTestcaseMetadata>()?
@@ -101,12 +101,12 @@ where
 
         // Attach a `SchedulerTestcaseMetadata` to the queue entry.
         depth += 1;
-        let mut testcase = state.testcase_mut(idx)?;
+        let mut testcase = state.testcase_mut(id)?;
         testcase.add_metadata(SchedulerTestcaseMetadata::with_n_fuzz_entry(
             depth,
             self.last_hash(),
         ));
-        testcase.set_parent_id_optional(current_idx);
+        testcase.set_parent_id_optional(current_id);
         Ok(())
     }
 
@@ -142,12 +142,12 @@ where
     fn on_next_metadata(
         &mut self,
         state: &mut Self::State,
-        _next_idx: Option<CorpusId>,
+        _next_id: Option<CorpusId>,
     ) -> Result<(), Error> {
-        let current_idx = *state.corpus().current();
+        let current_id = *state.corpus().current();
 
-        if let Some(idx) = current_idx {
-            let mut testcase = state.testcase_mut(idx)?;
+        if let Some(id) = current_id {
+            let mut testcase = state.testcase_mut(id)?;
             let tcmeta = testcase.metadata_mut::<SchedulerTestcaseMetadata>()?;
 
             if tcmeta.handicap() >= 4 {
@@ -168,7 +168,7 @@ where
     Self::State: HasCorpus,
 {
     /// Called when a [`Testcase`] is added to the corpus
-    fn on_add(&mut self, _state: &mut Self::State, _idx: CorpusId) -> Result<(), Error>;
+    fn on_add(&mut self, _state: &mut Self::State, _id: CorpusId) -> Result<(), Error>;
     // Add parent_id here if it has no inner
 
     /// An input has been evaluated
@@ -192,9 +192,9 @@ where
     fn set_current_scheduled(
         &mut self,
         state: &mut Self::State,
-        next_idx: Option<CorpusId>,
+        next_id: Option<CorpusId>,
     ) -> Result<(), Error> {
-        *state.corpus_mut().current_mut() = next_idx;
+        *state.corpus_mut().current_mut() = next_id;
         Ok(())
     }
 }
@@ -216,14 +216,14 @@ impl<S> Scheduler for RandScheduler<S>
 where
     S: HasCorpus + HasRand + HasTestcase + State,
 {
-    fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
+    fn on_add(&mut self, state: &mut Self::State, id: CorpusId) -> Result<(), Error> {
         // Set parent id
-        let current_idx = *state.corpus().current();
+        let current_id = *state.corpus().current();
         state
             .corpus()
-            .get(idx)?
+            .get(id)?
             .borrow_mut()
-            .set_parent_id_optional(current_idx);
+            .set_parent_id_optional(current_id);
 
         Ok(())
     }

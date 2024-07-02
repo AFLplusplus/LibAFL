@@ -73,8 +73,8 @@ where
     /// Calculate the score and store in `ProbabilityMetadata`
     #[allow(clippy::cast_precision_loss)]
     #[allow(clippy::unused_self)]
-    pub fn store_probability(&self, state: &mut S, idx: CorpusId) -> Result<(), Error> {
-        let prob = F::compute(state, &mut *state.corpus().get(idx)?.borrow_mut())?;
+    pub fn store_probability(&self, state: &mut S, id: CorpusId) -> Result<(), Error> {
+        let prob = F::compute(state, &mut *state.corpus().get(id)?.borrow_mut())?;
         debug_assert!(
             prob >= 0.0 && prob.is_finite(),
             "scheduler probability is {prob}; to work correctly it must be >= 0.0 and finite"
@@ -83,7 +83,7 @@ where
             .metadata_map_mut()
             .get_mut::<ProbabilityMetadata>()
             .unwrap();
-        meta.map.insert(idx, prob);
+        meta.map.insert(id, prob);
         meta.total_probability += prob;
         Ok(())
     }
@@ -97,14 +97,14 @@ where
     fn on_remove(
         &mut self,
         state: &mut Self::State,
-        idx: CorpusId,
+        id: CorpusId,
         _testcase: &Option<Testcase<<Self::State as UsesInput>::Input>>,
     ) -> Result<(), Error> {
         let meta = state
             .metadata_map_mut()
             .get_mut::<ProbabilityMetadata>()
             .unwrap();
-        if let Some(prob) = meta.map.remove(&idx) {
+        if let Some(prob) = meta.map.remove(&id) {
             meta.total_probability -= prob;
         }
         Ok(())
@@ -113,18 +113,18 @@ where
     fn on_replace(
         &mut self,
         state: &mut Self::State,
-        idx: CorpusId,
+        id: CorpusId,
         _prev: &Testcase<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
         let meta = state
             .metadata_map_mut()
             .get_mut::<ProbabilityMetadata>()
             .unwrap();
-        if let Some(prob) = meta.map.remove(&idx) {
+        if let Some(prob) = meta.map.remove(&id) {
             meta.total_probability -= prob;
         }
 
-        self.store_probability(state, idx)
+        self.store_probability(state, id)
     }
 }
 
@@ -140,18 +140,18 @@ where
     F: TestcaseScore<S>,
     S: HasCorpus + HasMetadata + HasRand + HasTestcase + State,
 {
-    fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
-        let current_idx = *state.corpus().current();
+    fn on_add(&mut self, state: &mut Self::State, id: CorpusId) -> Result<(), Error> {
+        let current_id = *state.corpus().current();
         state
             .corpus()
-            .get(idx)?
+            .get(id)?
             .borrow_mut()
-            .set_parent_id_optional(current_idx);
+            .set_parent_id_optional(current_id);
 
         if state.metadata_map().get::<ProbabilityMetadata>().is_none() {
             state.add_metadata(ProbabilityMetadata::new());
         }
-        self.store_probability(state, idx)
+        self.store_probability(state, id)
     }
 
     /// Gets the next entry
@@ -262,10 +262,10 @@ mod tests {
         .unwrap();
         scheduler.on_add(state.borrow_mut(), idx1).unwrap();
         scheduler.on_add(state.borrow_mut(), idx2).unwrap();
-        let next_idx1 = scheduler.next(&mut state).unwrap();
-        let next_idx2 = scheduler.next(&mut state).unwrap();
-        let next_idx3 = scheduler.next(&mut state).unwrap();
-        assert_eq!(next_idx1, next_idx2);
-        assert_ne!(next_idx1, next_idx3);
+        let next_id1 = scheduler.next(&mut state).unwrap();
+        let next_id2 = scheduler.next(&mut state).unwrap();
+        let next_id3 = scheduler.next(&mut state).unwrap();
+        assert_eq!(next_id1, next_id2);
+        assert_ne!(next_id1, next_id3);
     }
 }

@@ -13,7 +13,7 @@ use std::{
 use libafl::{
     corpus::Corpus,
     events::{
-        launcher::Launcher, EventConfig, ProgressReporter, SimpleEventManager,
+        launcher::Launcher, EventConfig, EventProcessor, ProgressReporter, SimpleEventManager,
         SimpleRestartingEventManager,
     },
     executors::ExitKind,
@@ -23,7 +23,7 @@ use libafl::{
         Monitor, MultiMonitor,
     },
     stages::{HasCurrentStage, StagesTuple},
-    state::{HasExecutions, HasLastReportTime, HasSolutions, UsesState},
+    state::{HasExecutions, HasLastReportTime, HasSolutions, Stoppable, UsesState},
     Error, Fuzzer, HasMetadata,
 };
 use libafl_bolts::{
@@ -66,9 +66,15 @@ fn do_fuzz<F, ST, E, S, EM>(
 ) -> Result<(), Error>
 where
     F: Fuzzer<E, EM, ST, State = S>,
-    S: HasMetadata + HasExecutions + UsesInput + HasSolutions + HasLastReportTime + HasCurrentStage,
+    S: HasMetadata
+        + HasExecutions
+        + UsesInput
+        + HasSolutions
+        + HasLastReportTime
+        + HasCurrentStage
+        + Stoppable,
     E: UsesState<State = S>,
-    EM: ProgressReporter<State = S>,
+    EM: ProgressReporter<State = S> + EventProcessor<E, F>,
     ST: StagesTuple<E, EM, S, F>,
 {
     if let Some(solution) = state.solutions().last() {
@@ -139,7 +145,7 @@ fn fuzz_many_forking<M>(
     monitor: M,
 ) -> Result<(), Error>
 where
-    M: Monitor + Clone + Debug,
+    M: Monitor + Clone + Debug + 'static,
 {
     destroy_output_fds(options);
     let broker_port = std::env::var(PORT_PROVIDER_VAR)
