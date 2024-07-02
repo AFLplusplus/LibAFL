@@ -29,6 +29,8 @@ use std::process::Stdio;
 use std::{fs::File, os::unix::io::AsRawFd};
 
 #[cfg(all(unix, feature = "std", feature = "fork"))]
+use libafl_bolts::llmp::Broker;
+#[cfg(all(unix, feature = "std", feature = "fork"))]
 use libafl_bolts::llmp::Brokers;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use libafl_bolts::llmp::LlmpBroker;
@@ -43,7 +45,6 @@ use libafl_bolts::{
 };
 use libafl_bolts::{
     core_affinity::{CoreId, Cores},
-    llmp::Broker,
     shmem::ShMemProvider,
     tuples::{tuple_list, Handle},
 };

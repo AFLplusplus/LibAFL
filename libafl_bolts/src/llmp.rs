@@ -2090,7 +2090,7 @@ pub trait Broker {
 
     /// Getter to `exit_after`
     fn exit_after(&self) -> Option<NonZeroUsize>;
-    
+
     /// Setter for `exit_after`
     fn set_exit_after(&mut self, n_clients: NonZeroUsize);
 
