@@ -122,8 +122,6 @@ where
         state: &mut S,
         _executor: &mut E,
     ) -> Result<usize, Error> {
-        // Note: `SimpleRestartingEventManager` overrides this function;
-        // any changes to this function must also change `SimpleRestartingEventManager::process`
         let count = self.events.len();
         while let Some(event) = self.events.pop() {
             self.handle_in_client(state, event)?;
@@ -393,21 +391,11 @@ where
 {
     fn process(
         &mut self,
-        _fuzzer: &mut Z,
+        fuzzer: &mut Z,
         state: &mut Self::State,
-        _executor: &mut E,
+        executor: &mut E,
     ) -> Result<usize, Error> {
-        let count = self.simple_event_mgr.events.len();
-        // we need to override fn process and handle stop events appropriately
-        // since we are a restarting manager
-        while let Some(event) = self.simple_event_mgr.events.pop() {
-            let stop_event = matches!(event, Event::Stop);
-            self.simple_event_mgr.handle_in_client(state, event)?;
-            if stop_event {
-                self.send_exiting()?;
-            }
-        }
-        Ok(count)
+        self.simple_event_mgr.process(fuzzer, state, executor)
     }
     fn on_shutdown(&mut self) -> Result<(), Error> {
         self.send_exiting()

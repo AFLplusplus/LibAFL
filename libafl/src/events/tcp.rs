@@ -659,7 +659,6 @@ where
             }
             Event::Stop => {
                 *state.should_stop_mut() = true;
-                self.send_exiting()?;
             }
             _ => {
                 return Err(Error::unknown(format!(
