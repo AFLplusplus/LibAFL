@@ -819,7 +819,7 @@ where
 
             brokers.add(Box::new(broker));
         }
-        log::debug!("Brokers have been initialized; pid {}.", std::process::id());
+        log::debug!("Broker has been initialized; pid {}.", std::process::id());
 
         // Loop over all the brokers that should be polled
         brokers.loop_with_timeouts(Duration::from_secs(30), Some(Duration::from_millis(5)));
