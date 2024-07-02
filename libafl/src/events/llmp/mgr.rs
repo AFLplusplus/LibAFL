@@ -468,6 +468,9 @@ where
                     }
                 }
             }
+            Event::Stop => {
+                state.request_stop();
+            }
             _ => {
                 return Err(Error::unknown(format!(
                     "Received illegal message that message should not have arrived: {:?}.",
@@ -625,6 +628,10 @@ where
             count += 1;
         }
         Ok(count)
+    }
+
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        self.send_exiting()
     }
 }
 

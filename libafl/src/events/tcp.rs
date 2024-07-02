@@ -407,7 +407,7 @@ where
                 log::log!((*severity_level).into(), "{message}");
                 Ok(BrokerEventResult::Handled)
             }
-            Event::CustomBuf { .. } => Ok(BrokerEventResult::Forward),
+            Event::CustomBuf { .. } | Event::Stop => Ok(BrokerEventResult::Forward),
             //_ => Ok(BrokerEventResult::Forward),
         }
     }
@@ -657,6 +657,9 @@ where
                     }
                 }
             }
+            Event::Stop => {
+                state.request_stop();
+            }
             _ => {
                 return Err(Error::unknown(format!(
                     "Received illegal message that message should not have arrived: {:?}.",
@@ -808,6 +811,10 @@ where
         self.tcp.set_nonblocking(false).expect("set to blocking");
 
         Ok(count)
+    }
+
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        self.send_exiting()
     }
 }
 
@@ -966,6 +973,10 @@ where
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         self.tcp_mgr.process(fuzzer, state, executor)
+    }
+
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        self.send_exiting()
     }
 }
 
