@@ -300,7 +300,7 @@ where
                 Ok(())
             }
             Event::Stop => {
-                *state.should_stop_mut() = true;
+                state.initiate_stop();
                 Ok(())
             }
             _ => Err(Error::unknown(format!(

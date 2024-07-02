@@ -537,17 +537,25 @@ where
 
 /// A trait for types that want to expose a stop API
 pub trait Stoppable {
-    /// Should stop
+    /// Check if should stop
     fn should_stop(&self) -> bool;
 
-    /// Should stop (mutable)
-    fn should_stop_mut(&mut self) -> &mut bool;
+    /// Request to stop
+    fn initiate_stop(&mut self);
+
+    /// Reset stop value
+    fn reset_stop(&mut self);
 }
 
 impl<I, C, R, SC> Stoppable for StdState<I, C, R, SC> {
-    fn should_stop_mut(&mut self) -> &mut bool {
-        &mut self.should_stop
+    fn initiate_stop(&mut self) {
+        self.should_stop = true;
     }
+
+    fn reset_stop(&mut self) {
+        self.should_stop = false;
+    }
+
     fn should_stop(&self) -> bool {
         self.should_stop
     }
@@ -1204,9 +1212,14 @@ impl<I> HasExecutions for NopState<I> {
 }
 
 impl<I> Stoppable for NopState<I> {
-    fn should_stop_mut(&mut self) -> &mut bool {
-        &mut self.should_stop
+    fn initiate_stop(&mut self) {
+        self.should_stop = true;
     }
+
+    fn reset_stop(&mut self) {
+        self.should_stop = false;
+    }
+
     fn should_stop(&self) -> bool {
         self.should_stop
     }

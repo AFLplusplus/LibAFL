@@ -217,7 +217,7 @@ where
             // log::info!("Starting another fuzz_loop");
             manager.maybe_report_progress(state, monitor_timeout)?;
             if state.should_stop() {
-                *state.should_stop_mut() = false;
+                state.reset_stop();
                 manager.on_shutdown()?;
                 break;
             }
@@ -255,7 +255,7 @@ where
         for _ in 0..iters {
             manager.maybe_report_progress(state, monitor_timeout)?;
             if state.should_stop() {
-                *state.should_stop_mut() = false;
+                state.reset_stop();
                 break;
             }
             ret = Some(self.fuzz_one(stages, executor, state, manager)?);

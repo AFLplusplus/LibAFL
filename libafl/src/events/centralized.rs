@@ -670,7 +670,7 @@ where
                 }
             }
             Event::Stop => {
-                *state.should_stop_mut() = true;
+                state.initiate_stop();
             }
             _ => {
                 return Err(Error::unknown(format!(

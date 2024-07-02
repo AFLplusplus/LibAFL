@@ -215,7 +215,7 @@ where
         }
 
         if state.should_stop() {
-            *state.should_stop_mut() = false;
+            state.reset_stop();
             manager.on_shutdown()?;
             return Err(Error::shutting_down());
         }
@@ -298,7 +298,7 @@ where
     ) -> Result<(), Error> {
         self.iter_mut().try_for_each(|x| {
             if state.should_stop() {
-                *state.should_stop_mut() = false;
+                state.reset_stop();
                 manager.on_shutdown()?;
                 return Err(Error::shutting_down());
             }
