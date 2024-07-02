@@ -90,7 +90,7 @@ paste = "1"
 enum-map = "2.7"
 serde_yaml = { version = "0.9", optional = true } # For parsing the injections yaml file
 toml = { version = "0.8.13", optional = true } # For parsing the injections toml file
-pyo3 = { version = "0.18", optional = true , features = ["multiple-pymethods"]}
+pyo3 = { version = "0.21", optional = true , features = ["multiple-pymethods"]}
 bytes-utils = "0.1"
 typed-builder = "0.18"
 memmap2 = "0.9"
