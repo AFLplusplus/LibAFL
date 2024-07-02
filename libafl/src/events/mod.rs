@@ -385,19 +385,19 @@ where
     }
 
     /// Event's corresponding name with additional info
-    fn name_detailed(&self) -> String {
+    fn name_detailed(&self) -> Cow<'static, str> {
         match self {
             Event::NewTestcase { input, .. } => {
-                format!("Testcase {}", input.generate_name(None))
+                Cow::Owned(format!("Testcase {}", input.generate_name(None)))
             }
-            Event::UpdateExecStats { .. } => "Client Heartbeat".to_string(),
-            Event::UpdateUserStats { .. } => "UserStats".to_string(),
+            Event::UpdateExecStats { .. } => Cow::Borrowed("Client Heartbeat"),
+            Event::UpdateUserStats { .. } => Cow::Borrowed("UserStats"),
             #[cfg(feature = "introspection")]
-            Event::UpdatePerfMonitor { .. } => "PerfMonitor".to_string(),
-            Event::Objective { .. } => "Objective".to_string(),
-            Event::Log { .. } => "Log".to_string(),
-            Event::CustomBuf { .. } => "CustomBuf".to_string(),
-            Event::Stop => "Stop".to_string(),
+            Event::UpdatePerfMonitor { .. } => Cow::Borrowed("PerfMonitor"),
+            Event::Objective { .. } => Cow::Borrowed("Objective"),
+            Event::Log { .. } => Cow::Borrowed("Log"),
+            Event::CustomBuf { .. } => Cow::Borrowed("CustomBuf"),
+            Event::Stop => Cow::Borrowed("Stop"),
             /*Event::Custom {
                 sender_id: _, /*custom_event} => custom_event.name()*/
             } => "todo",*/

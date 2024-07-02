@@ -4,7 +4,6 @@
 //! restart/refork it.
 
 use alloc::vec::Vec;
-use libafl_bolts::llmp::Broker;
 #[cfg(all(unix, not(miri), feature = "std"))]
 use core::ptr::addr_of_mut;
 #[cfg(feature = "std")]
@@ -23,14 +22,14 @@ use libafl_bolts::os::startable_self;
 use libafl_bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(feature = "std", feature = "fork", unix))]
 use libafl_bolts::os::{fork, ForkResult};
-use libafl_bolts::{
-    llmp::LlmpBroker,
-    shmem::ShMemProvider,
-    tuples::{tuple_list, Handle},
-};
 #[cfg(feature = "std")]
 use libafl_bolts::{
     llmp::LlmpConnection, os::CTRL_C_EXIT, shmem::StdShMemProvider, staterestore::StateRestorer,
+};
+use libafl_bolts::{
+    llmp::{Broker, LlmpBroker},
+    shmem::ShMemProvider,
+    tuples::{tuple_list, Handle},
 };
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
@@ -453,8 +452,7 @@ where
                 };
 
                 if let Some(exit_cleanly_after) = self.exit_cleanly_after {
-                    broker
-                        .set_exit_after(exit_cleanly_after);
+                    broker.set_exit_after(exit_cleanly_after);
                 }
 
                 broker.loop_with_timeouts(Duration::from_secs(30), Some(Duration::from_millis(5)));
