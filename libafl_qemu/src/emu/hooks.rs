@@ -962,7 +962,8 @@ where
 
         #[cfg(not(debug_assertions))]
         {
-            EMULATOR_TOOL_TUPLE as *mut ET as &mut ET
+            (EMULATOR_TOOLS as *mut EmulatorTools<ET, S>)
+                .as_mut_unchecked()
         }
     }
 
