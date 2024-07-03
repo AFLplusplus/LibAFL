@@ -314,6 +314,7 @@ pub fn store_generated_content_if_different(
     }
 }
 
+#[rustversion::nightly]
 fn parse_stub(
     stub_bindings_file: &Path,
     current_rustc_version: &Version,
