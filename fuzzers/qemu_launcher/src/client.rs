@@ -13,8 +13,8 @@ use libafl_qemu::injections::QemuInjectionHelper;
 use libafl_qemu::{
     asan::{init_qemu_with_asan, QemuAsanHelper},
     asan_guest::{init_qemu_with_asan_guest, QemuAsanGuestHelper},
-    cmplog::QemuCmpLogHelper,
-    edges::QemuEdgeCoverageHelper,
+    cmplog::QemuCmpLogTool,
+    edges::QemuEdgeCoverageTool,
     elf::EasyElf,
     ArchExtras, GuestAddr, Qemu, QemuInstrumentationAddressRangeFilter,
 };
@@ -164,7 +164,7 @@ impl<'a> Client<'a> {
 
         let is_cmplog = self.options.is_cmplog_core(core_id);
 
-        let edge_coverage_helper = QemuEdgeCoverageHelper::new(self.coverage_filter(&qemu)?);
+        let edge_coverage_helper = QemuEdgeCoverageTool::new(self.coverage_filter(&qemu)?);
 
         let instance = Instance::builder()
             .options(self.options)
@@ -178,7 +178,7 @@ impl<'a> Client<'a> {
                 instance.build().run(
                     tuple_list!(
                         edge_coverage_helper,
-                        QemuCmpLogHelper::default(),
+                        QemuCmpLogTool::default(),
                         QemuAsanHelper::default(asan.take().unwrap()),
                         injection_helper,
                     ),
@@ -188,7 +188,7 @@ impl<'a> Client<'a> {
                 instance.build().run(
                     tuple_list!(
                         edge_coverage_helper,
-                        QemuCmpLogHelper::default(),
+                        QemuCmpLogTool::default(),
                         QemuAsanHelper::default(asan.take().unwrap()),
                     ),
                     state,
@@ -199,7 +199,7 @@ impl<'a> Client<'a> {
                 instance.build().run(
                     tuple_list!(
                         edge_coverage_helper,
-                        QemuCmpLogHelper::default(),
+                        QemuCmpLogTool::default(),
                         QemuAsanGuestHelper::default(&qemu, asan_lib.take().unwrap()),
                         injection_helper
                     ),
@@ -209,7 +209,7 @@ impl<'a> Client<'a> {
                 instance.build().run(
                     tuple_list!(
                         edge_coverage_helper,
-                        QemuCmpLogHelper::default(),
+                        QemuCmpLogTool::default(),
                         QemuAsanGuestHelper::default(&qemu, asan_lib.take().unwrap()),
                     ),
                     state,
@@ -245,14 +245,14 @@ impl<'a> Client<'a> {
                 instance.build().run(
                     tuple_list!(
                         edge_coverage_helper,
-                        QemuCmpLogHelper::default(),
+                        QemuCmpLogTool::default(),
                         injection_helper
                     ),
                     state,
                 )
             } else {
                 instance.build().run(
-                    tuple_list!(edge_coverage_helper, QemuCmpLogHelper::default()),
+                    tuple_list!(edge_coverage_helper, QemuCmpLogTool::default()),
                     state,
                 )
             }

@@ -47,9 +47,9 @@ use libafl_bolts::{
 };
 use libafl_qemu::{
     // asan::{init_with_asan, QemuAsanHelper},
-    cmplog::{CmpLogObserver, QemuCmpLogHelper},
+    cmplog::{CmpLogObserver, QemuCmpLogTool},
     edges::edges_map_mut_ptr,
-    edges::QemuEdgeCoverageHelper,
+    edges::QemuEdgeCoverageTool,
     edges::{EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND},
     elf::EasyElf,
     filter_qemu_args,
@@ -361,8 +361,8 @@ fn fuzz(
     let mut hooks = QemuHooks::new(
         qemu.clone(),
         tuple_list!(
-            QemuEdgeCoverageHelper::default(),
-            QemuCmpLogHelper::default(),
+            QemuEdgeCoverageTool::default(),
+            QemuCmpLogTool::default(),
             // QemuAsanHelper::default(asan),
             //QemuSnapshotHelper::new()
         ),
