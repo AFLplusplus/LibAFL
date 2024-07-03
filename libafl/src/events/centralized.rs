@@ -39,7 +39,7 @@ use crate::{
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, NopInput, UsesInput},
     observers::{ObserversTuple, TimeObserver},
-    state::{HasExecutions, HasLastReportTime, NopState, State, UsesState},
+    state::{HasExecutions, HasLastReportTime, NopState, State, Stoppable, UsesState},
     Error, HasMetadata,
 };
 
@@ -279,6 +279,7 @@ where
         self.inner.should_send()
     }
 
+    #[allow(clippy::match_same_arms)]
     fn fire(
         &mut self,
         state: &mut Self::State,
@@ -295,6 +296,7 @@ where
                     true
                 }
                 Event::UpdateExecStats { .. } => true, // send it but this guy won't be handled. the only purpose is to keep this client alive else the broker thinks it is dead and will dc it
+                Event::Stop => true,
                 _ => false,
             };
 
@@ -391,6 +393,11 @@ where
             self.inner.process(fuzzer, state, executor)
         }
     }
+
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        self.inner.on_shutdown()?;
+        self.client.sender_mut().send_exiting()
+    }
 }
 
 impl<E, EM, EMH, S, SP, Z> EventManager<E, Z> for CentralizedEventManager<EM, EMH, S, SP>
@@ -476,7 +483,7 @@ impl<EM, EMH, S, SP> CentralizedEventManager<EM, EMH, S, SP>
 where
     EM: UsesState + EventFirer + AdaptiveSerializer + HasEventManagerId,
     EMH: EventManagerHooksTuple<EM::State>,
-    S: State,
+    S: State + Stoppable,
     SP: ShMemProvider,
 {
     #[cfg(feature = "llmp_compression")]
@@ -608,7 +615,7 @@ where
                             process::id(),
                             event_name
                         );
-                        fuzzer.execute_and_process(
+                        fuzzer.evaluate_execution(
                             state,
                             self,
                             input.clone(),
@@ -661,6 +668,9 @@ where
                 } else {
                     log::debug!("[{}] {} was discarded...)", process::id(), event_name);
                 }
+            }
+            Event::Stop => {
+                state.request_stop();
             }
             _ => {
                 return Err(Error::unknown(format!(

@@ -857,9 +857,9 @@ impl LlmpPage {
 
     #[inline]
     fn receiver_left(&mut self) {
-        let receivers_joined_count = &mut self.receivers_joined_count;
+        let receivers_left_count = &mut self.receivers_left_count;
         //receivers_joined_count.fetch_add(1, Ordering::Relaxed);
-        receivers_joined_count.store(1, Ordering::Relaxed);
+        receivers_left_count.store(1, Ordering::Relaxed);
     }
 }
 
@@ -2091,6 +2091,9 @@ pub trait Broker {
     /// Getter to `exit_after`
     fn exit_after(&self) -> Option<NonZeroUsize>;
 
+    /// Setter for `exit_after`
+    fn set_exit_after(&mut self, n_clients: NonZeroUsize);
+
     /// Getter to `has_clients`
     fn has_clients(&self) -> bool;
 
@@ -2123,6 +2126,9 @@ where
 
     fn exit_after(&self) -> Option<NonZeroUsize> {
         self.inner.exit_cleanly_after
+    }
+    fn set_exit_after(&mut self, n_clients: NonZeroUsize) {
+        self.inner.set_exit_cleanly_after(n_clients);
     }
 
     fn has_clients(&self) -> bool {

@@ -19,7 +19,7 @@ use crate::{
     mark_feature_time,
     observers::{CanTrack, MapObserver, ObserversTuple},
     require_novelties_tracking,
-    stages::{Stage, StdRestartHelper},
+    stages::{RetryCountRestartHelper, Stage},
     start_timer,
     state::{HasCorpus, HasExecutions, UsesState},
     Error, HasMetadata, HasNamedMetadata,
@@ -328,13 +328,13 @@ where
     #[inline]
     fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
         // TODO: We need to be able to resume better if something crashes or times out
-        StdRestartHelper::should_restart(state, &self.name, 3)
+        RetryCountRestartHelper::should_restart(state, &self.name, 3)
     }
 
     #[inline]
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
         // TODO: We need to be able to resume better if something crashes or times out
-        StdRestartHelper::clear_progress(state, &self.name)
+        RetryCountRestartHelper::clear_progress(state, &self.name)
     }
 }
 

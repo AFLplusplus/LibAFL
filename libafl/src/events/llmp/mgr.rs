@@ -409,8 +409,10 @@ where
             + EvaluatorObservers<E::Observers>
             + Evaluator<E, Self>,
     {
+        if !self.hooks.pre_exec_all(state, client_id, &event)? {
+            return Ok(());
+        }
         let evt_name = event.name_detailed();
-
         match event {
             Event::NewTestcase {
                 input,
@@ -441,9 +443,8 @@ where
                         {
                             state.scalability_monitor_mut().testcase_with_observers += 1;
                         }
-                        fuzzer.execute_and_process(
-                            state, self, input, &observers, &exit_kind, false,
-                        )?
+                        fuzzer
+                            .evaluate_execution(state, self, input, &observers, &exit_kind, false)?
                     } else {
                         #[cfg(feature = "scalability_introspection")]
                         {
@@ -466,6 +467,9 @@ where
                         break;
                     }
                 }
+            }
+            Event::Stop => {
+                state.request_stop();
             }
             _ => {
                 return Err(Error::unknown(format!(
@@ -624,6 +628,10 @@ where
             count += 1;
         }
         Ok(count)
+    }
+
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        self.send_exiting()
     }
 }
 

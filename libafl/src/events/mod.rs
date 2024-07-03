@@ -21,12 +21,7 @@ pub use llmp::*;
 pub mod tcp;
 
 pub mod broker_hooks;
-use alloc::{
-    borrow::Cow,
-    boxed::Box,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{borrow::Cow, boxed::Box, string::String, vec::Vec};
 use core::{
     fmt,
     hash::{BuildHasher, Hasher},
@@ -353,6 +348,8 @@ where
         /// Tag of this buffer
         tag: String,
     },
+    /// Exit gracefully
+    Stop,
     /*/// A custom type
     Custom {
         // TODO: Allow custom events
@@ -364,7 +361,8 @@ impl<I> Event<I>
 where
     I: Input,
 {
-    fn name(&self) -> &str {
+    /// Event's corresponding name
+    pub fn name(&self) -> &str {
         match self {
             Event::NewTestcase { .. } => "Testcase",
             Event::UpdateExecStats { .. } => "Client Heartbeat",
@@ -377,21 +375,24 @@ where
             /*Event::Custom {
                 sender_id: _, /*custom_event} => custom_event.name()*/
             } => "todo",*/
+            Event::Stop => "Stop",
         }
     }
 
-    fn name_detailed(&self) -> String {
+    /// Event's corresponding name with additional info
+    fn name_detailed(&self) -> Cow<'static, str> {
         match self {
             Event::NewTestcase { input, .. } => {
-                format!("Testcase {}", input.generate_name(None))
+                Cow::Owned(format!("Testcase {}", input.generate_name(None)))
             }
-            Event::UpdateExecStats { .. } => "Client Heartbeat".to_string(),
-            Event::UpdateUserStats { .. } => "UserStats".to_string(),
+            Event::UpdateExecStats { .. } => Cow::Borrowed("Client Heartbeat"),
+            Event::UpdateUserStats { .. } => Cow::Borrowed("UserStats"),
             #[cfg(feature = "introspection")]
-            Event::UpdatePerfMonitor { .. } => "PerfMonitor".to_string(),
-            Event::Objective { .. } => "Objective".to_string(),
-            Event::Log { .. } => "Log".to_string(),
-            Event::CustomBuf { .. } => "CustomBuf".to_string(),
+            Event::UpdatePerfMonitor { .. } => Cow::Borrowed("PerfMonitor"),
+            Event::Objective { .. } => Cow::Borrowed("Objective"),
+            Event::Log { .. } => Cow::Borrowed("Log"),
+            Event::CustomBuf { .. } => Cow::Borrowed("CustomBuf"),
+            Event::Stop => Cow::Borrowed("Stop"),
             /*Event::Custom {
                 sender_id: _, /*custom_event} => custom_event.name()*/
             } => "todo",*/
@@ -399,7 +400,7 @@ where
     }
 }
 
-/// [`EventFirer`] fire an event.
+/// [`EventFirer`] fires an event.
 pub trait EventFirer: UsesState {
     /// Send off an [`Event`] to the broker
     ///
@@ -574,6 +575,9 @@ pub trait EventProcessor<E, Z>: UsesState {
         state: &mut Self::State,
         executor: &mut E,
     ) -> Result<usize, Error>;
+
+    /// Shutdown gracefully; typically without saving state.
+    fn on_shutdown(&mut self) -> Result<(), Error>;
 }
 /// The id of this [`EventManager`].
 /// For multi processed [`EventManager`]s,
@@ -661,6 +665,10 @@ where
         _executor: &mut E,
     ) -> Result<usize, Error> {
         Ok(0)
+    }
+
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -792,6 +800,10 @@ where
         executor: &mut E,
     ) -> Result<usize, Error> {
         self.inner.process(fuzzer, state, executor)
+    }
+
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        self.inner.on_shutdown()
     }
 }
 

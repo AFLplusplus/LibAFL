@@ -168,6 +168,8 @@ fn main() {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     /* The main node has a broker, and a few worker threads */
 
+    use libafl_bolts::llmp::Broker;
+
     let mode = std::env::args()
         .nth(1)
         .expect("no mode specified, chose 'broker', 'b2b', 'ctr', 'adder', 'large', or 'exiting'");
@@ -193,9 +195,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             )?;
             broker.inner_mut().launch_tcp_listener_on(port)?;
             // Exit when we got at least _n_ nodes, and all of them quit.
-            broker
-                .inner_mut()
-                .set_exit_cleanly_after(NonZeroUsize::new(1_usize).unwrap());
+            broker.set_exit_after(NonZeroUsize::new(1_usize).unwrap());
             broker.loop_with_timeouts(BROKER_TIMEOUT, Some(SLEEP_BETWEEN_FORWARDS));
         }
         "b2b" => {

@@ -65,10 +65,10 @@ xxh3 = ["xxhash-rust"]
 
 ## With this feature, the AnyMap uses [`type_name`](https://doc.rust-lang.org/std/any/fn.type_name.html)
 ## instead of [`TypeId::of`](https://doc.rust-lang.org/std/any/struct.TypeId.html#method.of) for deserialization.
-## With this feature, stored state may remain deserializable across multiple compilations of LibAFL.
-## This is **unsafe** and may lead to type confusions. Only use when you know what you are doing/ you have tests in place.
-## The rust doc specifically states that "multiple types may map to the same type name"!
-unsafe_stable_anymap = []
+## With this feature, stored state remains deserializable across multiple compilations of LibAFL.
+## The rust doc specifically states that "multiple types may map to the same type name", so it could potentially lead to bugs.
+## However, we make sure that no two types with the same name ever exist.
+stable_anymap = []
 
 ## Automatically register all `#[derive(SerdeAny)]` types at startup.
 serdeany_autoreg = ["ctor"]
@@ -92,7 +92,7 @@ llmp_small_maps = ["alloc"]
 rustversion = "1.0"
 
 [dependencies]
-libafl_derive = { version = "0.13.0", optional = true, path = "../libafl_derive" }
+libafl_derive = { version = "0.13.1", optional = true, path = "../libafl_derive" }
 static_assertions = "1.1.0"
 
 tuple_list = { version = "0.1.3" }

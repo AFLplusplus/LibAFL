@@ -20,7 +20,7 @@ use crate::{
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, NopInput, NopInputConverter, UsesInput},
-    state::{HasExecutions, NopState, State, UsesState},
+    state::{HasExecutions, NopState, State, Stoppable, UsesState},
     Error, HasMetadata,
 };
 
@@ -253,7 +253,7 @@ where
 
 impl<DI, IC, ICB, S, SP> LlmpEventConverter<DI, IC, ICB, S, SP>
 where
-    S: UsesInput + HasExecutions + HasMetadata,
+    S: UsesInput + HasExecutions + HasMetadata + Stoppable,
     SP: ShMemProvider,
     IC: InputConverter<From = S::Input, To = DI>,
     ICB: InputConverter<From = DI, To = S::Input>,
@@ -329,6 +329,7 @@ where
                 }
                 Ok(())
             }
+            Event::Stop => Ok(()),
             _ => Err(Error::unknown(format!(
                 "Received illegal message that message should not have arrived: {:?}.",
                 event.name()
