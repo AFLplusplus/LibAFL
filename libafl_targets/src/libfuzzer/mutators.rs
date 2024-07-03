@@ -173,7 +173,7 @@ where
                     drop(result);
 
                     if succeeded {
-                        let target = intermediary.bytes();
+                        let target = intermediary.bytes_ref();
                         if target.as_slice().len() > max_size {
                             self.result
                                 .replace(Err(Error::illegal_state("Mutation result was too long!")))
@@ -322,7 +322,7 @@ where
         input: &mut S::Input,
     ) -> Result<MutationResult, Error> {
         let seed = state.rand_mut().next();
-        let target = input.bytes();
+        let target = input.bytes_ref();
         let mut bytes = Vec::with_capacity(state.max_size());
         bytes.extend_from_slice(target.as_slice());
         bytes.resize(state.max_size(), 0);
@@ -406,12 +406,12 @@ where
 
         let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
         let other = other_testcase.load_input(state.corpus())?;
-        let data2 = Vec::from(other.bytes());
+        let data2 = Vec::from(other.bytes_ref());
         drop(other_testcase);
 
         let seed = state.rand_mut().next();
         let mut out = vec![0u8; state.max_size()];
-        let data1 = input.bytes();
+        let data1 = input.bytes_ref();
 
         // we assume that the fuzzer did not use this mutator, but instead utilised their own
         let result = Rc::new(RefCell::new(Ok(MutationResult::Mutated)));

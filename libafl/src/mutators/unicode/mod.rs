@@ -224,7 +224,7 @@ fn rand_replace_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
 ) -> MutationResult {
     let temp_range = rand_range(state, range.end - range.start, MAX_CHARS);
     let range = (range.start + temp_range.start)..(range.start + temp_range.end);
-    let range = match core::str::from_utf8(&input.0.bytes()[range.clone()]) {
+    let range = match core::str::from_utf8(&input.0.bytes_ref()[range.clone()]) {
         Ok(_) => range,
         Err(e) => range.start..(range.start + e.valid_up_to()),
     };
@@ -233,7 +233,7 @@ fn rand_replace_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
     println!(
         "mutating range: {:?} ({:?})",
         range,
-        core::str::from_utf8(&input.0.bytes()[range.clone()])
+        core::str::from_utf8(&input.0.bytes_ref()[range.clone()])
     );
     if range.start == range.end {
         return MutationResult::Skipped;
@@ -261,7 +261,7 @@ fn rand_replace_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
     }
 
     input.0.splice(range, replacement);
-    input.1 = extract_metadata(input.0.bytes());
+    input.1 = extract_metadata(input.0.bytes_ref());
 
     MutationResult::Mutated
 }
@@ -283,11 +283,11 @@ where
     S: HasRand + HasMaxSize,
 {
     fn mutate(&mut self, state: &mut S, input: &mut UnicodeInput) -> Result<MutationResult, Error> {
-        if input.0.bytes().is_empty() {
+        if input.0.bytes_ref().is_empty() {
             return Ok(MutationResult::Skipped);
         }
 
-        let bytes = input.0.bytes();
+        let bytes = input.0.bytes_ref();
         let meta = &input.1;
         if let Some((base, len)) = choose_start(state.rand_mut(), bytes, meta) {
             let substring = core::str::from_utf8(&bytes[base..][..len])?;
@@ -342,11 +342,11 @@ where
     S: HasRand + HasMaxSize,
 {
     fn mutate(&mut self, state: &mut S, input: &mut UnicodeInput) -> Result<MutationResult, Error> {
-        if input.0.bytes().is_empty() {
+        if input.0.bytes_ref().is_empty() {
             return Ok(MutationResult::Skipped);
         }
 
-        let bytes = input.0.bytes();
+        let bytes = input.0.bytes_ref();
         let meta = &input.1;
         if let Some((base, len)) = choose_start(state.rand_mut(), bytes, meta) {
             let substring = core::str::from_utf8(&bytes[base..][..len])?;
@@ -389,7 +389,7 @@ where
     S: HasRand + HasMaxSize + HasMetadata,
 {
     fn mutate(&mut self, state: &mut S, input: &mut UnicodeInput) -> Result<MutationResult, Error> {
-        if input.0.bytes().is_empty() {
+        if input.0.bytes_ref().is_empty() {
             return Ok(MutationResult::Skipped);
         }
 
@@ -404,7 +404,7 @@ where
         };
         let token_idx = state.rand_mut().below(tokens_len);
 
-        let bytes = input.0.bytes();
+        let bytes = input.0.bytes_ref();
         let meta = &input.1;
         if let Some((base, len)) = choose_start(state.rand_mut(), bytes, meta) {
             let substring = core::str::from_utf8(&bytes[base..][..len])?;
@@ -425,7 +425,7 @@ where
             }
 
             input.0.splice(range, token.iter().copied());
-            input.1 = extract_metadata(input.0.bytes());
+            input.1 = extract_metadata(input.0.bytes_ref());
             return Ok(MutationResult::Mutated);
         }
 
@@ -449,7 +449,7 @@ where
     S: HasRand + HasMaxSize + HasMetadata,
 {
     fn mutate(&mut self, state: &mut S, input: &mut UnicodeInput) -> Result<MutationResult, Error> {
-        if input.0.bytes().is_empty() {
+        if input.0.bytes_ref().is_empty() {
             return Ok(MutationResult::Skipped);
         }
 
@@ -464,7 +464,7 @@ where
         };
         let token_idx = state.rand_mut().below(tokens_len);
 
-        let bytes = input.0.bytes();
+        let bytes = input.0.bytes_ref();
         let meta = &input.1;
         if let Some((base, len)) = choose_start(state.rand_mut(), bytes, meta) {
             let substring = core::str::from_utf8(&bytes[base..][..len])?;
@@ -485,7 +485,7 @@ where
             }
 
             input.0.splice(range, token.iter().copied());
-            input.1 = extract_metadata(input.0.bytes());
+            input.1 = extract_metadata(input.0.bytes_ref());
             return Ok(MutationResult::Mutated);
         }
 
@@ -523,10 +523,10 @@ mod test {
             )?;
 
             for _ in 0..(1 << 12) {
-                let metadata = extract_metadata(bytes.bytes());
+                let metadata = extract_metadata(bytes.bytes_ref());
                 let mut input = (bytes, metadata);
                 let _ = mutator.mutate(&mut state, &mut input);
-                println!("{:?}", core::str::from_utf8(input.0.bytes()).unwrap());
+                println!("{:?}", core::str::from_utf8(input.0.bytes_ref()).unwrap());
                 bytes = input.0;
             }
 
@@ -555,10 +555,10 @@ mod test {
             )?;
 
             for _ in 0..(1 << 12) {
-                let metadata = extract_metadata(bytes.bytes());
+                let metadata = extract_metadata(bytes.bytes_ref());
                 let mut input = (bytes, metadata);
                 let _ = mutator.mutate(&mut state, &mut input);
-                println!("{:?}", core::str::from_utf8(input.0.bytes()).unwrap());
+                println!("{:?}", core::str::from_utf8(input.0.bytes_ref()).unwrap());
                 bytes = input.0;
             }
 

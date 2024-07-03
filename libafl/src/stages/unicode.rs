@@ -119,7 +119,7 @@ where
 
         let input = tc.load_input(state.corpus())?;
 
-        let bytes = input.bytes();
+        let bytes = input.bytes_ref();
         let metadata = extract_metadata(bytes);
         tc.add_metadata(metadata);
 

@@ -10,14 +10,14 @@ use core::{
 use std::{fs::File, io::Read, path::Path};
 
 use ahash::RandomState;
-use libafl_bolts::HasLen;
 #[cfg(feature = "std")]
 use libafl_bolts::{fs::write_file_atomic, Error};
+use libafl_bolts::{ownedref::OwnedSlice, HasLen};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::CorpusId,
-    inputs::{HasMutatorBytes, HasTargetBytes, Input},
+    inputs::{HasBytes, HasMutatorBytes, HasTargetBytes, Input},
 };
 
 /// A bytes input is the basic input
@@ -52,7 +52,7 @@ impl Input for BytesInput {
     /// Generate a name for this input
     fn generate_name(&self, _id: Option<CorpusId>) -> String {
         let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
-        hasher.write(self.bytes());
+        hasher.write(self.bytes_ref());
         format!("{:016x}", hasher.finish())
     }
 }
@@ -64,9 +64,25 @@ impl From<BytesInput> for Rc<RefCell<BytesInput>> {
     }
 }
 
+impl HasLen for BytesInput {
+    #[inline]
+    fn len(&self) -> usize {
+        self.bytes.len()
+    }
+}
+
+impl HasBytes for BytesInput {
+    #[inline]
+    fn bytes(&self) -> OwnedSlice<u8> {
+        OwnedSlice::from(&self.bytes)
+    }
+}
+
+impl HasTargetBytes for BytesInput {}
+
 impl HasMutatorBytes for BytesInput {
     #[inline]
-    fn bytes(&self) -> &[u8] {
+    fn bytes_ref(&self) -> &[u8] {
         &self.bytes
     }
 
@@ -96,13 +112,6 @@ impl HasMutatorBytes for BytesInput {
         R: core::ops::RangeBounds<usize>,
     {
         self.bytes.drain(range)
-    }
-}
-
-impl HasLen for BytesInput {
-    #[inline]
-    fn len(&self) -> usize {
-        self.bytes.len()
     }
 }
 

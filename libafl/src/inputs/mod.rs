@@ -117,11 +117,13 @@ impl Input for NopInput {
         "nop-input".to_string()
     }
 }
-impl HasTargetBytes for NopInput {
-    fn target_bytes(&self) -> OwnedSlice<u8> {
+impl HasBytes for NopInput {
+    fn bytes(&self) -> OwnedSlice<u8> {
         OwnedSlice::from(vec![])
     }
 }
+
+impl HasTargetBytes for NopInput {}
 
 impl HasLen for NopInput {
     fn len(&self) -> usize {
@@ -132,10 +134,7 @@ impl HasLen for NopInput {
 /// Target bytes wrapper keeping track of the current read position.
 /// Convenient wrapper when bytes must be split it in multiple subinputs.
 #[derive(Debug)]
-pub struct BytesReader<'a, I>
-where
-    I: HasTargetBytes + HasLen,
-{
+pub struct BytesReader<'a, I> {
     parent_input: &'a I,
     pos: usize,
 }
@@ -186,7 +185,7 @@ where
     /// If the resulting slice would go beyond the end of the parent input, it will be truncated to the length of the parent input.
     /// This function does not provide any feedback on whether the slice was cropped or not.
     #[must_use]
-    pub fn read_to_slice_truncated(&mut self, limit: usize) -> BytesSubInput<'a> {
+    pub fn next_sub_slice_truncated(&mut self, limit: usize) -> BytesSubInput<'a> {
         let sub_input = BytesSubInput::new(self.parent_input, self.pos..(self.pos + limit));
 
         self.pos += sub_input.len();
@@ -200,11 +199,11 @@ where
     /// - `Ok(Slice)` if the returned slice has `limit` bytes.
     /// - `Err(Partial(slice))` if the returned slice has strictly less than `limit` bytes and is not empty.
     /// - `Err(Empty)` if the reader was already at the end or `limit` equals zero.
-    pub fn read_to_slice(
+    pub fn next_sub_input(
         &mut self,
         limit: usize,
     ) -> Result<BytesSubInput<'a>, PartialBytesSubInput<'a>> {
-        let slice_to_return = self.read_to_slice_truncated(limit);
+        let slice_to_return = self.next_sub_slice_truncated(limit);
 
         let real_len = slice_to_return.len();
 
@@ -224,38 +223,47 @@ impl<'a, I: HasTargetBytes + HasLen> From<&'a I> for BytesReader<'a, I> {
     }
 }
 
+/// Can be represented with a vector of bytes.
+pub trait HasBytes: HasLen {
+    /// The bytes
+    fn bytes(&self) -> OwnedSlice<u8>;
+}
+
 // TODO change this to fn target_bytes(&self, buffer: &mut Vec<u8>) -> &[u8];
+/// Has a byte representation intended for the target.
 /// Can be represented with a vector of bytes.
 /// This representation is not necessarily deserializable.
 /// Instead, it can be used as bytes input for a target
-pub trait HasTargetBytes: HasLen {
-    /// Target bytes, that can be written to a target
-    fn target_bytes(&self) -> OwnedSlice<u8>;
+pub trait HasTargetBytes: HasBytes {
+    /// The target bytes. Defaults to the byte representation.
+    fn target_bytes(&self) -> OwnedSlice<u8> {
+        self.bytes()
+    }
 }
 
-/// Contains mutateable and resizable bytes
-pub trait HasMutatorBytes: HasLen {
+/// Contains mutable and resizable bytes
+pub trait HasMutatorBytes: HasBytes {
     /// The bytes
-    fn bytes(&self) -> &[u8];
+    fn bytes_ref(&self) -> &[u8];
 
     /// The bytes to mutate
     fn bytes_mut(&mut self) -> &mut [u8];
 
     /// Resize the mutator bytes to a given new size.
     /// Use `value` to fill new slots in case the buffer grows.
-    /// See [`alloc::vec::Vec::splice`].
+    /// See [`Vec::splice`].
     fn resize(&mut self, new_len: usize, value: u8);
 
     /// Extends the given buffer with an iterator. See [`alloc::vec::Vec::extend`]
     fn extend<'a, I: IntoIterator<Item = &'a u8>>(&mut self, iter: I);
 
-    /// Splices the given target bytes according to [`alloc::vec::Vec::splice`]'s rules
+    /// Splices the given target bytes according to [`Vec::splice`]'s rules
     fn splice<R, I>(&mut self, range: R, replace_with: I) -> Splice<'_, I::IntoIter>
     where
         R: RangeBounds<usize>,
         I: IntoIterator<Item = u8>;
 
-    /// Drains the given target bytes according to [`alloc::vec::Vec::drain`]'s rules
+    /// Drains the given target bytes according to [`Vec::drain`]'s rules
     fn drain<R>(&mut self, range: R) -> Drain<'_, u8>
     where
         R: RangeBounds<usize>;
@@ -279,15 +287,6 @@ pub trait HasMutatorBytes: HasLen {
     }
 }
 
-impl<I> HasTargetBytes for I
-where
-    I: HasMutatorBytes,
-{
-    fn target_bytes(&self) -> OwnedSlice<u8> {
-        OwnedSlice::from(self.bytes())
-    }
-}
-
 /// A wrapper type that allows us to use mutators for Mutators for `&mut `[`Vec`].
 #[derive(Debug)]
 pub struct MutVecInput<'a>(&'a mut Vec<u8>);
@@ -304,8 +303,14 @@ impl<'a> HasLen for MutVecInput<'a> {
     }
 }
 
+impl<'a> HasBytes for MutVecInput<'a> {
+    fn bytes(&self) -> OwnedSlice<u8> {
+        OwnedSlice::from(self.0.as_slice())
+    }
+}
+
 impl<'a> HasMutatorBytes for MutVecInput<'a> {
-    fn bytes(&self) -> &[u8] {
+    fn bytes_ref(&self) -> &[u8] {
         self.0
     }
 
@@ -424,16 +429,16 @@ mod tests {
         let bytes_input = BytesInput::new(vec![1, 2, 3, 4, 5, 6, 7]);
         let mut bytes_reader = BytesReader::new(&bytes_input);
 
-        let bytes_read = bytes_reader.read_to_slice_truncated(2);
+        let bytes_read = bytes_reader.next_sub_slice_truncated(2);
         assert_eq!(*bytes_read.target_bytes(), [1, 2]);
 
-        let bytes_read = bytes_reader.read_to_slice_truncated(3);
+        let bytes_read = bytes_reader.next_sub_slice_truncated(3);
         assert_eq!(*bytes_read.target_bytes(), [3, 4, 5]);
 
-        let bytes_read = bytes_reader.read_to_slice_truncated(8);
+        let bytes_read = bytes_reader.next_sub_slice_truncated(8);
         assert_eq!(*bytes_read.target_bytes(), [6, 7]);
 
-        let bytes_read = bytes_reader.read_to_slice_truncated(8);
+        let bytes_read = bytes_reader.next_sub_slice_truncated(8);
         let bytes_read_ref: &[u8] = &[];
         assert_eq!(&*bytes_read.target_bytes(), bytes_read_ref);
     }
@@ -443,19 +448,19 @@ mod tests {
         let bytes_input = BytesInput::new(vec![1, 2, 3, 4, 5, 6, 7]);
         let mut bytes_reader = BytesReader::new(&bytes_input);
 
-        let bytes_read = bytes_reader.read_to_slice(2);
+        let bytes_read = bytes_reader.next_sub_input(2);
         assert_eq!(*bytes_read.unwrap().target_bytes(), [1, 2]);
 
-        let bytes_read = bytes_reader.read_to_slice(3);
+        let bytes_read = bytes_reader.next_sub_input(3);
         assert_eq!(*bytes_read.unwrap().target_bytes(), [3, 4, 5]);
 
-        let bytes_read = bytes_reader.read_to_slice(8);
+        let bytes_read = bytes_reader.next_sub_input(8);
         assert_eq!(
             *bytes_read.unwrap_err().partial().unwrap().target_bytes(),
             [6, 7]
         );
 
-        let bytes_read = bytes_reader.read_to_slice(8);
+        let bytes_read = bytes_reader.next_sub_input(8);
         assert!(bytes_read.unwrap_err().empty());
     }
 }

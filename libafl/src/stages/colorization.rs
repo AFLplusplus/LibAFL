@@ -228,7 +228,7 @@ where
                 unsafe {
                     buffer_copy(
                         input.bytes_mut(),
-                        changed.bytes(),
+                        changed.bytes_ref(),
                         range_start,
                         range_start,
                         copy_len,
@@ -257,7 +257,7 @@ where
                     unsafe {
                         buffer_copy(
                             input.bytes_mut(),
-                            backup.bytes(),
+                            backup.bytes_ref(),
                             range_start,
                             range_start,
                             copy_len,
@@ -300,11 +300,11 @@ where
         }
 
         if let Some(meta) = state.metadata_map_mut().get_mut::<TaintMetadata>() {
-            meta.update(input.bytes().to_vec(), res);
+            meta.update(input.bytes_ref().to_vec(), res);
 
             // println!("meta: {:#?}", meta);
         } else {
-            let meta = TaintMetadata::new(input.bytes().to_vec(), res);
+            let meta = TaintMetadata::new(input.bytes_ref().to_vec(), res);
             state.add_metadata::<TaintMetadata>(meta);
         }
 
