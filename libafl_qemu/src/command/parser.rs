@@ -21,10 +21,10 @@ use crate::{
 
 pub static EMU_EXIT_KIND_MAP: OnceLock<EnumMap<NativeExitKind, Option<ExitKind>>> = OnceLock::new();
 
-pub trait NativeCommandParser<CM, E, QT, S>
+pub trait NativeCommandParser<CM, EH, QT, S>
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
+    CM: CommandManager<EH, QT, S>,
+    EH: EmulatorExitHandler<QT, S>,
     QT: EmulatorToolTuple<S>,
     S: Unpin + State + HasExecutions,
 {
@@ -34,7 +34,7 @@ where
         &self,
         qemu: Qemu,
         arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
-    ) -> Result<Rc<dyn IsCommand<CM, E, QT, S>>, CommandError>;
+    ) -> Result<Rc<dyn IsCommand<CM, EH, QT, S>>, CommandError>;
 }
 
 pub struct InputPhysCommandParser;

@@ -24,30 +24,30 @@ pub enum ExitArgs {
 }
 
 #[derive(Debug)]
-pub struct SyncExit<CM, E, QT, S>
+pub struct SyncExit<CM, EH, QT, S>
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
+    CM: CommandManager<EH, QT, S>,
+    EH: EmulatorExitHandler<QT, S>,
     QT: EmulatorToolTuple<S>,
     S: Unpin + State + HasExecutions,
 {
-    command: Rc<dyn IsCommand<CM, E, QT, S>>,
+    command: Rc<dyn IsCommand<CM, EH, QT, S>>,
 }
 
-impl<CM, E, QT, S> SyncExit<CM, E, QT, S>
+impl<CM, EH, QT, S> SyncExit<CM, EH, QT, S>
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
+    CM: CommandManager<EH, QT, S>,
+    EH: EmulatorExitHandler<QT, S>,
     QT: EmulatorToolTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     #[must_use]
-    pub fn new(command: Rc<dyn IsCommand<CM, E, QT, S>>) -> Self {
+    pub fn new(command: Rc<dyn IsCommand<CM, EH, QT, S>>) -> Self {
         Self { command }
     }
 
     #[must_use]
-    pub fn command(&self) -> Rc<dyn IsCommand<CM, E, QT, S>> {
+    pub fn command(&self) -> Rc<dyn IsCommand<CM, EH, QT, S>> {
         self.command.clone()
     }
 
@@ -62,10 +62,10 @@ where
     }
 }
 
-impl<CM, E, QT, S> Display for SyncExit<CM, E, QT, S>
+impl<CM, EH, QT, S> Display for SyncExit<CM, EH, QT, S>
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
+    CM: CommandManager<EH, QT, S>,
+    EH: EmulatorExitHandler<QT, S>,
     QT: EmulatorToolTuple<S>,
     S: Unpin + State + HasExecutions,
 {

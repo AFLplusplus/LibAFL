@@ -23,16 +23,16 @@ pub struct BreakpointId(u64);
 
 // TODO: distinguish breakpoints with IDs instead of addresses to avoid collisions.
 #[derive(Debug)]
-pub struct Breakpoint<CM, E, QT, S>
+pub struct Breakpoint<CM, EH, QT, S>
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
+    CM: CommandManager<EH, QT, S>,
+    EH: EmulatorExitHandler<QT, S>,
     QT: EmulatorToolTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     id: BreakpointId,
     addr: GuestAddr,
-    cmd: Option<Rc<dyn IsCommand<CM, E, QT, S>>>,
+    cmd: Option<Rc<dyn IsCommand<CM, EH, QT, S>>>,
     disable_on_trigger: bool,
     enabled: bool,
 }
@@ -53,10 +53,10 @@ impl Default for BreakpointId {
     }
 }
 
-impl<CM, E, QT, S> Hash for Breakpoint<CM, E, QT, S>
+impl<CM, EH, QT, S> Hash for Breakpoint<CM, EH, QT, S>
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
+    CM: CommandManager<EH, QT, S>,
+    EH: EmulatorExitHandler<QT, S>,
     QT: EmulatorToolTuple<S>,
     S: Unpin + State + HasExecutions,
 {
@@ -65,10 +65,10 @@ where
     }
 }
 
-impl<CM, E, QT, S> PartialEq for Breakpoint<CM, E, QT, S>
+impl<CM, EH, QT, S> PartialEq for Breakpoint<CM, EH, QT, S>
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
+    CM: CommandManager<EH, QT, S>,
+    EH: EmulatorExitHandler<QT, S>,
     QT: EmulatorToolTuple<S>,
     S: Unpin + State + HasExecutions,
 {
@@ -77,19 +77,19 @@ where
     }
 }
 
-impl<CM, E, QT, S> Eq for Breakpoint<CM, E, QT, S>
+impl<CM, EH, QT, S> Eq for Breakpoint<CM, EH, QT, S>
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
+    CM: CommandManager<EH, QT, S>,
+    EH: EmulatorExitHandler<QT, S>,
     QT: EmulatorToolTuple<S>,
     S: Unpin + State + HasExecutions,
 {
 }
 
-impl<CM, E, QT, S> Display for Breakpoint<CM, E, QT, S>
+impl<CM, EH, QT, S> Display for Breakpoint<CM, EH, QT, S>
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
+    CM: CommandManager<EH, QT, S>,
+    EH: EmulatorExitHandler<QT, S>,
     QT: EmulatorToolTuple<S>,
     S: Unpin + State + HasExecutions,
 {
@@ -98,10 +98,10 @@ where
     }
 }
 
-impl<CM, E, QT, S> Borrow<BreakpointId> for Breakpoint<CM, E, QT, S>
+impl<CM, EH, QT, S> Borrow<BreakpointId> for Breakpoint<CM, EH, QT, S>
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
+    CM: CommandManager<EH, QT, S>,
+    EH: EmulatorExitHandler<QT, S>,
     QT: EmulatorToolTuple<S>,
     S: Unpin + State + HasExecutions,
 {
@@ -110,10 +110,10 @@ where
     }
 }
 
-impl<CM, E, QT, S> Borrow<GuestAddr> for Breakpoint<CM, E, QT, S>
+impl<CM, EH, QT, S> Borrow<GuestAddr> for Breakpoint<CM, EH, QT, S>
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
+    CM: CommandManager<EH, QT, S>,
+    EH: EmulatorExitHandler<QT, S>,
     QT: EmulatorToolTuple<S>,
     S: Unpin + State + HasExecutions,
 {
@@ -122,10 +122,10 @@ where
     }
 }
 
-impl<CM, E, QT, S> Breakpoint<CM, E, QT, S>
+impl<CM, EH, QT, S> Breakpoint<CM, EH, QT, S>
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
+    CM: CommandManager<EH, QT, S>,
+    EH: EmulatorExitHandler<QT, S>,
     QT: EmulatorToolTuple<S>,
     S: Unpin + State + HasExecutions,
 {
@@ -143,7 +143,7 @@ where
 
     // Emu will execute the command when it meets the breakpoint.
     #[must_use]
-    pub fn with_command<C: IsCommand<CM, E, QT, S> + 'static>(
+    pub fn with_command<C: IsCommand<CM, EH, QT, S> + 'static>(
         addr: GuestAddr,
         cmd: C,
         disable_on_trigger: bool,
@@ -181,7 +181,7 @@ where
         }
     }
 
-    pub fn trigger(&mut self, qemu: Qemu) -> Option<Rc<dyn IsCommand<CM, E, QT, S>>> {
+    pub fn trigger(&mut self, qemu: Qemu) -> Option<Rc<dyn IsCommand<CM, EH, QT, S>>> {
         if self.disable_on_trigger {
             self.disable(qemu);
         }

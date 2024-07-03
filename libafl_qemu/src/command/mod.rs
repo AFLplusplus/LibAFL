@@ -153,13 +153,13 @@ macro_rules! define_std_command_manager {
 
 pub struct NopCommandManager;
 
-impl<E, QT, S> CommandManager<E, QT, S> for NopCommandManager
+impl<EH, QT, S> CommandManager<EH, QT, S> for NopCommandManager
 where
-    E: EmulatorExitHandler<QT, S>,
+    EH: EmulatorExitHandler<QT, S>,
     QT: EmulatorToolTuple<S>,
     S: Unpin + State + HasExecutions,
 {
-    fn parse(&self, _qemu: Qemu) -> Result<Rc<dyn IsCommand<Self, E, QT, S>>, CommandError> {
+    fn parse(&self, _qemu: Qemu) -> Result<Rc<dyn IsCommand<Self, EH, QT, S>>, CommandError> {
         Ok(Rc::new(NopCommand))
     }
 }
@@ -179,13 +179,13 @@ define_std_command_manager!(
     ]
 );
 
-pub trait CommandManager<E, QT, S>: Sized
+pub trait CommandManager<EH, QT, S>: Sized
 where
-    E: EmulatorExitHandler<QT, S>,
+    EH: EmulatorExitHandler<QT, S>,
     QT: EmulatorToolTuple<S>,
     S: Unpin + State + HasExecutions,
 {
-    fn parse(&self, qemu: Qemu) -> Result<Rc<dyn IsCommand<Self, E, QT, S>>, CommandError>;
+    fn parse(&self, qemu: Qemu) -> Result<Rc<dyn IsCommand<Self, EH, QT, S>>, CommandError>;
 }
 
 #[derive(Debug, Clone, Enum, TryFromPrimitive)]
@@ -196,10 +196,10 @@ pub enum NativeExitKind {
     Crash = bindings::LibaflQemuEndStatus_LIBAFL_QEMU_END_CRASH.0 as u64, // Crash reported in the VM
 }
 
-pub trait IsCommand<CM, E, QT, S>: Debug + Display
+pub trait IsCommand<CM, EH, QT, S>: Debug + Display
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
+    CM: CommandManager<EH, QT, S>,
+    EH: EmulatorExitHandler<QT, S>,
     QT: EmulatorToolTuple<S>,
     S: Unpin + State + HasExecutions,
 {
@@ -214,10 +214,10 @@ where
     ///     - `InnerHandlerResult`: How the high-level handler should behave
     fn run(
         &self,
-        emu: &mut Emulator<CM, E, QT, S>,
+        emu: &mut Emulator<CM, EH, QT, S>,
         input: &S::Input,
         ret_reg: Option<Regs>,
-    ) -> Result<Option<ExitHandlerResult<CM, E, QT, S>>, ExitHandlerError>;
+    ) -> Result<Option<ExitHandlerResult<CM, EH, QT, S>>, ExitHandlerError>;
 }
 
 #[cfg(emulation_mode = "systemmode")]

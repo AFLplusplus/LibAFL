@@ -171,10 +171,10 @@ impl IsSnapshotManager for FastSnapshotManager {
     }
 }
 
-impl<CM, E, QT, S> Emulator<CM, E, QT, S>
+impl<CM, EH, QT, S> Emulator<CM, EH, QT, S>
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
+    CM: CommandManager<EH, QT, S>,
+    EH: EmulatorExitHandler<QT, S>,
     QT: EmulatorToolTuple<S>,
     S: Unpin + State + HasExecutions,
 {

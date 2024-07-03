@@ -60,16 +60,16 @@ pub enum GuestAddrKind {
 }
 
 #[derive(Debug, Clone)]
-pub enum EmulatorExitResult<CM, E, QT, S>
+pub enum EmulatorExitResult<CM, EH, QT, S>
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
+    CM: CommandManager<EH, QT, S>,
+    EH: EmulatorExitHandler<QT, S>,
     QT: EmulatorToolTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     QemuExit(QemuShutdownCause), // QEMU ended for some reason.
-    Breakpoint(Rc<RefCell<Breakpoint<CM, E, QT, S>>>), // Breakpoint triggered. Contains the address of the trigger.
-    SyncExit(Rc<RefCell<SyncExit<CM, E, QT, S>>>), // Synchronous backdoor: The guest triggered a backdoor and should return to LibAFL.
+    Breakpoint(Rc<RefCell<Breakpoint<CM, EH, QT, S>>>), // Breakpoint triggered. Contains the address of the trigger.
+    SyncExit(Rc<RefCell<SyncExit<CM, EH, QT, S>>>), // Synchronous backdoor: The guest triggered a backdoor and should return to LibAFL.
 }
 
 #[derive(Debug, Clone)]
@@ -81,21 +81,21 @@ pub enum EmulatorExitError {
 }
 
 #[derive(Debug, Clone)]
-pub enum ExitHandlerResult<CM, E, QT, S>
+pub enum ExitHandlerResult<CM, EH, QT, S>
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
+    CM: CommandManager<EH, QT, S>,
+    EH: EmulatorExitHandler<QT, S>,
     QT: EmulatorToolTuple<S>,
     S: Unpin + State + HasExecutions,
 {
-    ReturnToHarness(EmulatorExitResult<CM, E, QT, S>), // Return to the harness immediately. Can happen at any point of the run when the handler is not supposed to handle a request.
+    ReturnToHarness(EmulatorExitResult<CM, EH, QT, S>), // Return to the harness immediately. Can happen at any point of the run when the handler is not supposed to handle a request.
     EndOfRun(ExitKind), // The run is over and the emulator is ready for the next iteration.
 }
 
-impl<CM, E, QT, S> ExitHandlerResult<CM, E, QT, S>
+impl<CM, EH, QT, S> ExitHandlerResult<CM, EH, QT, S>
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
+    CM: CommandManager<EH, QT, S>,
+    EH: EmulatorExitHandler<QT, S>,
     QT: EmulatorToolTuple<S>,
     S: Unpin + State + HasExecutions,
 {
@@ -131,16 +131,16 @@ pub enum SnapshotManagerCheckError {
     SnapshotCheckError(QemuSnapshotCheckResult),
 }
 
-impl<CM, E, QT, S> TryFrom<ExitHandlerResult<CM, E, QT, S>> for ExitKind
+impl<CM, EH, QT, S> TryFrom<ExitHandlerResult<CM, EH, QT, S>> for ExitKind
 where
-    CM: CommandManager<E, QT, S> + Debug,
-    E: EmulatorExitHandler<QT, S>,
+    CM: CommandManager<EH, QT, S> + Debug,
+    EH: EmulatorExitHandler<QT, S>,
     QT: EmulatorToolTuple<S> + Debug,
     S: Unpin + State + HasExecutions + Debug,
 {
     type Error = String;
 
-    fn try_from(value: ExitHandlerResult<CM, E, QT, S>) -> Result<Self, Self::Error> {
+    fn try_from(value: ExitHandlerResult<CM, EH, QT, S>) -> Result<Self, Self::Error> {
         match value {
             ExitHandlerResult::ReturnToHarness(unhandled_qemu_exit) => {
                 Err(format!("Unhandled QEMU exit: {:?}", &unhandled_qemu_exit))
@@ -428,10 +428,10 @@ impl From<CommandError> for ExitHandlerError {
     }
 }
 
-impl<CM, E, QT, S> Display for EmulatorExitResult<CM, E, QT, S>
+impl<CM, EH, QT, S> Display for EmulatorExitResult<CM, EH, QT, S>
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
+    CM: CommandManager<EH, QT, S>,
+    EH: EmulatorExitHandler<QT, S>,
     QT: EmulatorToolTuple<S>,
     S: Unpin + State + HasExecutions,
 {
@@ -475,10 +475,10 @@ where
 }
 
 #[allow(clippy::unused_self)]
-impl<CM, E, QT, S> Emulator<CM, E, QT, S>
+impl<CM, EH, QT, S> Emulator<CM, EH, QT, S>
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
+    CM: CommandManager<EH, QT, S>,
+    EH: EmulatorExitHandler<QT, S>,
     QT: EmulatorToolTuple<S>,
     S: Unpin + State + HasExecutions,
 {
@@ -487,7 +487,7 @@ where
         args: &[String],
         env: &[(String, String)],
         tools: QT,
-        exit_handler: E,
+        exit_handler: EH,
         command_manager: CM,
     ) -> Result<Self, QemuInitError> {
         let qemu = Qemu::init(args, env)?;
@@ -498,7 +498,7 @@ where
     pub fn new_with_qemu(
         qemu: Qemu,
         tools: QT,
-        exit_handler: E,
+        exit_handler: EH,
         command_manager: CM,
     ) -> Result<Self, QemuInitError> {
         Ok(Emulator {
@@ -526,7 +526,7 @@ where
     }
 
     #[must_use]
-    pub fn exit_handler(&self) -> &RefCell<E> {
+    pub fn exit_handler(&self) -> &RefCell<EH> {
         &self.exit_handler
     }
 
@@ -614,7 +614,7 @@ where
         self.qemu.read_reg(reg)
     }
 
-    pub fn add_breakpoint(&self, mut bp: Breakpoint<CM, E, QT, S>, enable: bool) -> BreakpointId {
+    pub fn add_breakpoint(&self, mut bp: Breakpoint<CM, EH, QT, S>, enable: bool) -> BreakpointId {
         if enable {
             bp.enable(self.qemu);
         }
@@ -695,7 +695,7 @@ where
     ///
     /// Should, in general, be safe to call.
     /// Of course, the emulated target is not contained securely and can corrupt state or interact with the operating system.
-    pub unsafe fn run_qemu(&self) -> Result<EmulatorExitResult<CM, E, QT, S>, EmulatorExitError> {
+    pub unsafe fn run_qemu(&self) -> Result<EmulatorExitResult<CM, EH, QT, S>, EmulatorExitError> {
         match self.qemu.run() {
             Ok(qemu_exit_reason) => Ok(match qemu_exit_reason {
                 QemuExitReason::End(qemu_shutdown_cause) => {
@@ -732,7 +732,7 @@ where
     pub unsafe fn run(
         &mut self,
         input: &S::Input,
-    ) -> Result<ExitHandlerResult<CM, E, QT, S>, ExitHandlerError> {
+    ) -> Result<ExitHandlerResult<CM, EH, QT, S>, ExitHandlerError> {
         loop {
             // if self.first_exec {
             //     self.tools_mut().first_exec_all();
@@ -743,13 +743,13 @@ where
             // self.tools_mut().pre_exec_all(input);
 
             // Insert input if the location is already known
-            E::qemu_pre_exec(self, input);
+            EH::qemu_pre_exec(self, input);
 
             // Run QEMU
             let exit_reason = self.run_qemu();
 
             // Handle QEMU exit
-            if let Some(exit_handler_result) = E::qemu_post_exec(self, exit_reason, input)? {
+            if let Some(exit_handler_result) = EH::qemu_post_exec(self, exit_reason, input)? {
                 return Ok(exit_handler_result);
             }
         }
