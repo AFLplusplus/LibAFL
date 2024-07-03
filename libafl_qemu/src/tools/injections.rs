@@ -22,11 +22,8 @@ use serde::{Deserialize, Serialize};
 use crate::SYS_execve;
 use crate::{
     elf::EasyElf,
-    emu::hooks::EmulatorTools,
-    qemu::{
-        hooks::{Hook, SyscallHookResult},
-        ArchExtras,
-    },
+    emu::EmulatorTools,
+    qemu::{ArchExtras, Hook, SyscallHookResult},
     CallingConvention, EmulatorTool, EmulatorToolTuple, Qemu,
 };
 

@@ -44,8 +44,8 @@ mod systemmode;
 #[allow(unused_imports)]
 pub use systemmode::*;
 
-use crate::qemu::hooks::QemuHooks;
-pub mod hooks;
+mod hooks;
+pub use hooks::*;
 
 static mut QEMU_IS_INITIALIZED: bool = false;
 
@@ -566,6 +566,7 @@ impl Qemu {
         Ok(Qemu { _private: () })
     }
 
+    #[must_use]
     pub fn hooks(&self) -> QemuHooks {
         unsafe { QemuHooks::get_unchecked() }
     }

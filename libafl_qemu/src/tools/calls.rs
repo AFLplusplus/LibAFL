@@ -12,8 +12,8 @@ use thread_local::ThreadLocal;
 
 use crate::{
     capstone,
-    emu::hooks::EmulatorTools,
-    qemu::{hooks::Hook, ArchExtras},
+    emu::EmulatorTools,
+    qemu::{ArchExtras, Hook},
     tools::{HasInstrumentationFilter, IsFilter, QemuInstrumentationAddressRangeFilter},
     EmulatorTool, EmulatorToolTuple, Qemu,
 };

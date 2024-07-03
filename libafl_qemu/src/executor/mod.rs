@@ -32,7 +32,7 @@ use libafl_bolts::{
 };
 
 #[cfg(emulation_mode = "usermode")]
-use crate::emu::hooks::EmulatorTools;
+use crate::emu::EmulatorTools;
 use crate::{command::CommandManager, tools::EmulatorToolTuple, Emulator, EmulatorExitHandler};
 
 /// A version of `QemuExecutor` with a state accessible from the harness.
@@ -181,6 +181,7 @@ where
         Ok(QemuExecutorState { emulator })
     }
 
+    #[must_use]
     pub fn emulator(&self) -> &Emulator<CM, EH, QT, S> {
         self.emulator
     }
@@ -285,7 +286,7 @@ where
         OF: Feedback<S>,
         Z: HasObjective<Objective = OF, State = S>,
     {
-        self.emulator.post_exec_all(input, observers, exit_kind)
+        self.emulator.post_exec_all(input, observers, exit_kind);
     }
 }
 

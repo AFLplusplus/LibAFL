@@ -1,19 +1,26 @@
 #![allow(clippy::missing_transmute_annotations)]
 
-use std::{fmt::Debug, marker::PhantomData, mem::transmute, pin::Pin, ptr, ptr::addr_of_mut};
+#[cfg(feature = "usermode")]
+use std::ptr::addr_of_mut;
+use std::{fmt::Debug, marker::PhantomData, mem::transmute, pin::Pin, ptr};
 
 use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple};
 use libafl_qemu_sys::{CPUArchStatePtr, FatPtr, GuestAddr, GuestUsize, TCGTemp};
 
 #[cfg(emulation_mode = "usermode")]
-use crate::qemu::hooks::{
+use crate::qemu::{
     closure_new_thread_hook_wrapper, closure_post_syscall_hook_wrapper,
     closure_pre_syscall_hook_wrapper, func_new_thread_hook_wrapper, func_post_syscall_hook_wrapper,
     func_pre_syscall_hook_wrapper, NewThreadHook, NewThreadHookId, PostSyscallHook,
     PostSyscallHookId, PreSyscallHook, PreSyscallHookId, SyscallHookResult,
 };
+#[cfg(feature = "usermode")]
+use crate::qemu::{
+    CrashHookClosure, NewThreadHookClosure, PostSyscallHookClosure, PostSyscallHookFn,
+    PreSyscallHookClosure, PreSyscallHookFn,
+};
 use crate::{
-    qemu::hooks::{
+    qemu::{
         block_0_exec_hook_wrapper, block_gen_hook_wrapper, block_post_gen_hook_wrapper,
         closure_backdoor_hook_wrapper, closure_instruction_hook_wrapper, cmp_0_exec_hook_wrapper,
         cmp_1_exec_hook_wrapper, cmp_2_exec_hook_wrapper, cmp_3_exec_hook_wrapper,
@@ -24,12 +31,10 @@ use crate::{
         write_1_exec_hook_wrapper, write_2_exec_hook_wrapper, write_3_exec_hook_wrapper,
         write_4_exec_hook_wrapper, write_gen_hook_wrapper, BackdoorHook, BackdoorHookClosure,
         BackdoorHookFn, BackdoorHookId, BlockExecHook, BlockGenHook, BlockHookId, BlockPostGenHook,
-        CmpExecHook, CmpGenHook, CmpHookId, CrashHookClosure, EdgeExecHook, EdgeGenHook,
-        EdgeHookId, Hook, HookRepr, HookState, InstructionHook, InstructionHookClosure,
-        InstructionHookFn, InstructionHookId, NewThreadHookClosure, PostSyscallHookClosure,
-        PostSyscallHookFn, PreSyscallHookClosure, PreSyscallHookFn, QemuHooks, ReadExecHook,
-        ReadExecNHook, ReadGenHook, ReadHookId, WriteExecHook, WriteExecNHook, WriteGenHook,
-        WriteHookId,
+        CmpExecHook, CmpGenHook, CmpHookId, EdgeExecHook, EdgeGenHook, EdgeHookId, Hook, HookRepr,
+        HookState, InstructionHook, InstructionHookClosure, InstructionHookFn, InstructionHookId,
+        QemuHooks, ReadExecHook, ReadExecNHook, ReadGenHook, ReadHookId, WriteExecHook,
+        WriteExecNHook, WriteGenHook, WriteHookId,
     },
     EmulatorTool, EmulatorToolTuple, MemAccessInfo, Qemu,
 };
@@ -137,6 +142,7 @@ where
     QT: EmulatorToolTuple<S>,
     S: Unpin + UsesInput,
 {
+    #[must_use]
     pub fn new(qemu_hooks: QemuHooks) -> Self {
         Self {
             qemu_hooks,
@@ -264,13 +270,13 @@ where
                 [hook_to_repr!(execution_hook)],
             )));
 
-            let hook_state = &mut *(self
-                .edge_hooks
-                .last_mut()
-                .unwrap()
-                .as_mut()
-                .get_unchecked_mut()
-                as *mut HookState<1, EdgeHookId>);
+            let hook_state = &mut *ptr::from_mut::<HookState<1, EdgeHookId>>(
+                self.edge_hooks
+                    .last_mut()
+                    .unwrap()
+                    .as_mut()
+                    .get_unchecked_mut(),
+            );
 
             let id = self.qemu_hooks.add_edge_hooks(hook_state, gen, exec);
 
@@ -321,13 +327,13 @@ where
                 [hook_to_repr!(execution_hook)],
             )));
 
-            let hook_state = &mut *(self
-                .block_hooks
-                .last_mut()
-                .unwrap()
-                .as_mut()
-                .get_unchecked_mut()
-                as *mut HookState<1, BlockHookId>);
+            let hook_state = &mut *ptr::from_mut::<HookState<1, BlockHookId>>(
+                self.block_hooks
+                    .last_mut()
+                    .unwrap()
+                    .as_mut()
+                    .get_unchecked_mut(),
+            );
 
             let id = self
                 .qemu_hooks
@@ -344,6 +350,7 @@ where
         }
     }
 
+    #[allow(clippy::similar_names)]
     pub fn reads(
         &mut self,
         generation_hook: ReadGenHook<QT, S>,
@@ -408,13 +415,13 @@ where
                 ],
             )));
 
-            let hook_state = &mut *(self
-                .read_hooks
-                .last_mut()
-                .unwrap()
-                .as_mut()
-                .get_unchecked_mut()
-                as *mut HookState<5, ReadHookId>);
+            let hook_state = &mut *ptr::from_mut::<HookState<5, ReadHookId>>(
+                self.read_hooks
+                    .last_mut()
+                    .unwrap()
+                    .as_mut()
+                    .get_unchecked_mut(),
+            );
 
             let id = self
                 .qemu_hooks
@@ -431,6 +438,7 @@ where
         }
     }
 
+    #[allow(clippy::similar_names)]
     pub fn writes(
         &mut self,
         generation_hook: WriteGenHook<QT, S>,
@@ -495,13 +503,13 @@ where
                 ],
             )));
 
-            let hook_state = &mut *(self
-                .write_hooks
-                .last_mut()
-                .unwrap()
-                .as_mut()
-                .get_unchecked_mut()
-                as *mut HookState<5, WriteHookId>);
+            let hook_state = &mut *ptr::from_mut::<HookState<5, WriteHookId>>(
+                self.write_hooks
+                    .last_mut()
+                    .unwrap()
+                    .as_mut()
+                    .get_unchecked_mut(),
+            );
 
             let id = self
                 .qemu_hooks
@@ -569,13 +577,13 @@ where
                 ],
             )));
 
-            let hook_state = &mut *(self
-                .cmp_hooks
-                .last_mut()
-                .unwrap()
-                .as_mut()
-                .get_unchecked_mut()
-                as *mut HookState<4, CmpHookId>);
+            let hook_state = &mut *ptr::from_mut::<HookState<4, CmpHookId>>(
+                self.cmp_hooks
+                    .last_mut()
+                    .unwrap()
+                    .as_mut()
+                    .get_unchecked_mut(),
+            );
 
             let id = self
                 .qemu_hooks
@@ -848,7 +856,7 @@ where
         // Set global EmulatorTools pointer
         unsafe {
             if EMULATOR_TOOLS.is_null() {
-                EMULATOR_TOOLS = tools.as_mut().get_mut() as *mut Self as *mut ();
+                EMULATOR_TOOLS = ptr::from_mut::<Self>(tools.as_mut().get_mut()) as *mut ();
             } else {
                 panic!("Emulator Tools have already been set and is still active. It is not supported to have multiple instances of `EmulatorTools` at the same time yet.")
             }
@@ -865,10 +873,12 @@ where
         tools
     }
 
+    #[must_use]
     pub fn qemu(&self) -> Qemu {
         self.qemu
     }
 
+    #[must_use]
     pub fn tools(&self) -> &QT {
         self.tools.as_ref().get_ref()
     }
@@ -917,6 +927,7 @@ where
         }
     }
 
+    #[must_use]
     pub fn match_tool<T>(&self) -> Option<&T>
     where
         T: EmulatorTool<S>,
@@ -931,14 +942,15 @@ where
         self.tools.match_first_type_mut::<T>()
     }
 
-    /// Get a mutable reference to EmulatorTools (supposedly initialized beforehand).
+    /// Get a mutable reference to `EmulatorTools` (supposedly initialized beforehand).
     ///
     /// # Safety
     ///
-    /// This will always return a reference, but it will be incorrect if EmulatorTools has not
+    /// This will always return a reference, but it will be incorrect if `EmulatorTools` has not
     /// been initialized previously.
     /// The user should also be consistent with the generic use (it will suppose they are the same
     /// as the ones used at initialization time).
+    #[must_use]
     pub unsafe fn emulator_tools_mut_unchecked<'a>() -> &'a mut EmulatorTools<QT, S> {
         #[cfg(debug_assertions)]
         {
@@ -953,7 +965,7 @@ where
         }
     }
 
-    /// Get a mutable reference to EmulatorTools.
+    /// Get a mutable reference to `EmulatorTools`.
     /// This version is safer than `emulator_tools_mut_unchecked` since it will check that
     /// initialization has occurred previously.
     ///
@@ -961,6 +973,7 @@ where
     ///
     /// This version still presents some unsafeness: The user should be consistent with the
     /// generic use (it will suppose they are the same as the ones used at initialization time).
+    #[must_use]
     pub unsafe fn emulator_tools_mut<'a>() -> Option<&'a mut EmulatorTools<QT, S>> {
         unsafe { (EMULATOR_TOOLS as *mut EmulatorTools<QT, S>).as_mut() }
     }
@@ -1202,11 +1215,11 @@ where
         self.hooks.thread_creation_closure(hook)
     }
     pub fn crash_function(&mut self, hook: fn(&mut EmulatorTools<QT, S>, target_signal: i32)) {
-        self.hooks.crash_function(hook)
+        self.hooks.crash_function(hook);
     }
 
     pub fn crash_closure(&mut self, hook: CrashHookClosure<QT, S>) {
-        self.hooks.crash_closure(hook)
+        self.hooks.crash_closure(hook);
     }
 }
 

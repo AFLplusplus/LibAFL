@@ -25,8 +25,8 @@ use crate::SYS_mmap2;
 use crate::SYS_newfstatat;
 use crate::{
     asan::QemuAsanTool,
-    emu::hooks::EmulatorTools,
-    qemu::hooks::{Hook, SyscallHookResult},
+    emu::EmulatorTools,
+    qemu::{Hook, SyscallHookResult},
     tools::{EmulatorTool, EmulatorToolTuple, Range},
     Qemu, SYS_brk, SYS_fstat, SYS_fstatfs, SYS_futex, SYS_getrandom, SYS_mprotect, SYS_mremap,
     SYS_munmap, SYS_pread64, SYS_read, SYS_readlinkat, SYS_statfs,

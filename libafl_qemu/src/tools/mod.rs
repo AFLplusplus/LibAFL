@@ -42,7 +42,7 @@ pub mod asan;
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
 pub use asan::{init_qemu_with_asan, QemuAsanTool};
 
-use crate::emu::hooks::EmulatorTools;
+use crate::emu::EmulatorTools;
 
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
 pub mod asan_guest;

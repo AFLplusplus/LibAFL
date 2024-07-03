@@ -18,6 +18,7 @@ use hashbrown::HashMap;
 use libafl::{
     executors::ExitKind,
     inputs::HasTargetBytes,
+    observers::ObserversTuple,
     state::{HasExecutions, State},
 };
 use libafl_bolts::os::unix_signals::Signal;
@@ -37,8 +38,8 @@ use crate::{
     StdInstrumentationFilter, CPU,
 };
 
-pub mod hooks;
-use libafl::observers::ObserversTuple;
+mod hooks;
+pub use hooks::*;
 
 #[cfg(emulation_mode = "usermode")]
 mod usermode;
@@ -48,7 +49,7 @@ mod systemmode;
 #[cfg(emulation_mode = "systemmode")]
 pub use systemmode::*;
 
-use crate::{breakpoint::BreakpointId, command::CommandManager, emu::hooks::EmulatorTools};
+use crate::{breakpoint::BreakpointId, command::CommandManager};
 
 type CommandRef<CM, E, QT, S> = Rc<dyn IsCommand<CM, E, QT, S>>;
 type BreakpointMutRef<CM, E, QT, S> = Rc<RefCell<Breakpoint<CM, E, QT, S>>>;
@@ -99,6 +100,8 @@ where
     QT: EmulatorToolTuple<S>,
     S: Unpin + State + HasExecutions,
 {
+    #[must_use]
+    #[allow(clippy::match_wildcard_for_single_variants)]
     pub fn end_of_run(&self) -> Option<ExitKind> {
         match self {
             ExitHandlerResult::EndOfRun(exit_kind) => Some(*exit_kind),
@@ -672,11 +675,11 @@ where
     }
 
     pub fn first_exec_all(&mut self) {
-        self.tools.first_exec_all()
+        self.tools.first_exec_all();
     }
 
     pub fn pre_exec_all(&mut self, input: &S::Input) {
-        self.tools.pre_exec_all(input)
+        self.tools.pre_exec_all(input);
     }
 
     pub fn post_exec_all<OT>(
@@ -687,7 +690,7 @@ where
     ) where
         OT: ObserversTuple<S>,
     {
-        self.tools.post_exec_all(input, observers, exit_kind)
+        self.tools.post_exec_all(input, observers, exit_kind);
     }
 
     /// This function will run the emulator until the next breakpoint, or until finish.

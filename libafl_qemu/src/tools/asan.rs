@@ -157,8 +157,8 @@ use std::pin::Pin;
 use object::{Object, ObjectSection};
 
 use crate::{
-    emu::hooks::EmulatorTools,
-    qemu::hooks::{Hook, QemuHooks, SyscallHookResult},
+    emu::EmulatorTools,
+    qemu::{Hook, QemuHooks, SyscallHookResult},
 };
 
 pub struct AsanGiovese {

@@ -11,7 +11,7 @@ use libafl_qemu_sys::{CPUArchStatePtr, FatPtr, GuestAddr, GuestUsize};
 use pyo3::{pyclass, pymethods, FromPyObject};
 
 use crate::{
-    emu::hooks::EmulatorTools,
+    emu::EmulatorTools,
     qemu::{MemAccessInfo, Qemu},
     sys::TCGTemp,
     tools::EmulatorToolTuple,
@@ -224,6 +224,7 @@ macro_rules! create_hook_id {
             #[derive(Clone, Copy, PartialEq, Debug)]
             pub struct [<$name HookId>](pub(crate) usize);
             impl [<$name HookId>] {
+                #[must_use]
                 pub fn invalid() -> Self {
                     Self(0)
                 }
@@ -240,6 +241,7 @@ macro_rules! create_hook_id {
             #[derive(Clone, Copy, PartialEq, Debug)]
             pub struct [<$name HookId>](pub(crate) usize);
             impl [<$name HookId>] {
+                #[must_use]
                 pub fn invalid() -> Self {
                     Self(0)
                 }
@@ -622,8 +624,8 @@ pub struct QemuHooks {
 }
 
 impl QemuHooks {
-    /// Get a QemuHooks object.
-    /// Same as `QemuHooks::get`, but without checking whether QemuHooks have been correctly initialized.
+    /// Get a `QemuHooks` object.
+    /// Same as `QemuHooks::get`, but without checking whether `QemuHooks` have been correctly initialized.
     ///
     /// # Safety
     ///
@@ -634,6 +636,7 @@ impl QemuHooks {
         QemuHooks { _private: () }
     }
 
+    #[must_use]
     pub fn get() -> Option<Self> {
         // Use QEMU to check if hooks have been initialized.
         Some(Qemu::get()?.hooks())
@@ -915,7 +918,8 @@ impl QemuHooks {
     }
 
     #[allow(clippy::type_complexity)]
-    pub(crate) fn set_crash_hook(&self, callback: extern "C" fn(i32)) {
+    #[allow(clippy::unused_self)]
+    pub(crate) fn set_crash_hook(self, callback: extern "C" fn(i32)) {
         unsafe {
             libafl_dump_core_hook = callback;
         }

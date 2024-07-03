@@ -8,8 +8,8 @@ use rangemap::RangeMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    emu::hooks::EmulatorTools,
-    qemu::hooks::Hook,
+    emu::EmulatorTools,
+    qemu::Hook,
     tools::{HasInstrumentationFilter, IsFilter, QemuInstrumentationAddressRangeFilter},
     EmulatorTool, EmulatorToolTuple,
 };

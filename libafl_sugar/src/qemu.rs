@@ -38,7 +38,10 @@ use libafl_bolts::{
 pub use libafl_qemu::qemu::Qemu;
 #[cfg(not(any(feature = "mips", feature = "hexagon")))]
 use libafl_qemu::QemuCmpLogTool;
-use libafl_qemu::{edges, QemuEdgeCoverageHelper, QemuExecutor, QemuHooks};
+use libafl_qemu::{
+    command::NopCommandManager, edges, Emulator, NopEmulatorExitHandler, QemuEdgeCoverageTool,
+    QemuExecutor,
+};
 use libafl_targets::{edges_map_mut_ptr, CmpLogObserver};
 use typed_builder::TypedBuilder;
 
@@ -119,7 +122,7 @@ where
 {
     /// Run the fuzzer
     #[allow(clippy::too_many_lines, clippy::similar_names)]
-    pub fn run(&mut self, qemu: &Qemu) {
+    pub fn run(&mut self, qemu: Qemu) {
         let conf = match self.configuration.as_ref() {
             Some(name) => EventConfig::from_name(name),
             None => EventConfig::AlwaysUnique,
@@ -222,19 +225,26 @@ where
             };
 
             if self.use_cmplog.unwrap_or(false) {
-                let mut hooks = QemuHooks::new(
-                    *qemu,
+                let tools = {
                     #[cfg(not(any(feature = "mips", feature = "hexagon")))]
-                    tuple_list!(
-                        QemuEdgeCoverageHelper::default(),
-                        QemuCmpLogHelper::default(),
-                    ),
+                    {
+                        tuple_list!(QemuEdgeCoverageTool::default(), QemuCmpLogTool::default(),)
+                    }
                     #[cfg(any(feature = "mips", feature = "hexagon"))]
-                    tuple_list!(QemuEdgeCoverageHelper::default()),
-                );
+                    {
+                        tuple_list!(QemuEdgeCoverageTool::default())
+                    }
+                };
+
+                let mut emulator = Emulator::new_with_qemu(
+                    qemu,
+                    tools,
+                    NopEmulatorExitHandler,
+                    NopCommandManager,
+                )?;
 
                 let executor = QemuExecutor::new(
-                    &mut hooks,
+                    &mut emulator,
                     &mut harness,
                     tuple_list!(edges_observer, time_observer),
                     &mut fuzzer,
@@ -334,11 +344,17 @@ where
                     }
                 }
             } else {
-                let mut hooks =
-                    QemuHooks::new(*qemu, tuple_list!(QemuEdgeCoverageHelper::default()));
+                let tools = tuple_list!(QemuEdgeCoverageTool::default());
+
+                let mut emulator = Emulator::new_with_qemu(
+                    qemu,
+                    tools,
+                    NopEmulatorExitHandler,
+                    NopCommandManager,
+                )?;
 
                 let mut executor = QemuExecutor::new(
-                    &mut hooks,
+                    &mut emulator,
                     &mut harness,
                     tuple_list!(edges_observer, time_observer),
                     &mut fuzzer,
@@ -520,7 +536,7 @@ pub mod pybind {
                 .tokens_file(self.tokens_file.clone())
                 .iterations(self.iterations)
                 .build()
-                .run(&qemu.qemu);
+                .run(qemu.qemu);
         }
     }
 

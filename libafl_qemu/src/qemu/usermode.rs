@@ -132,7 +132,7 @@ impl Qemu {
         }
     }
 
-    pub(super) unsafe fn run_inner(&self) {
+    pub(super) unsafe fn run_inner(self) {
         libafl_qemu_run();
     }
 

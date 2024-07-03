@@ -100,7 +100,7 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
     #[cfg(emulation_mode = "usermode")]
     m.add_class::<qemu::GuestMaps>()?;
 
-    m.add_class::<qemu::hooks::SyscallHookResult>()?;
+    m.add_class::<qemu::SyscallHookResult>()?;
     m.add_class::<qemu::pybind::Qemu>()?;
 
     Ok(())

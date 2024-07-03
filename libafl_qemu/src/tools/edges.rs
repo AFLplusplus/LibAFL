@@ -14,8 +14,8 @@ use serde::{Deserialize, Serialize};
 #[cfg(emulation_mode = "systemmode")]
 use crate::tools::QemuInstrumentationPagingFilter;
 use crate::{
-    emu::hooks::EmulatorTools,
-    qemu::hooks::Hook,
+    emu::EmulatorTools,
+    qemu::Hook,
     tools::{hash_me, HasInstrumentationFilter, QemuInstrumentationAddressRangeFilter},
     EmulatorTool, EmulatorToolTuple, IsFilter,
 };

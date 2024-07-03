@@ -12,8 +12,8 @@ use libafl::inputs::UsesInput;
 #[cfg(not(feature = "clippy"))]
 use crate::sys::libafl_tcg_gen_asan;
 use crate::{
-    emu::hooks::EmulatorTools,
-    qemu::{hooks::Hook, MemAccessInfo, Qemu, QemuInitError},
+    emu::EmulatorTools,
+    qemu::{Hook, MemAccessInfo, Qemu, QemuInitError},
     sys::TCGTemp,
     tools::{HasInstrumentationFilter, IsFilter, QemuInstrumentationAddressRangeFilter},
     EmulatorTool, EmulatorToolTuple, GuestAddr, MapInfo,

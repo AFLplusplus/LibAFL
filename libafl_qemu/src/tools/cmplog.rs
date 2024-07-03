@@ -14,8 +14,8 @@ use serde::{Deserialize, Serialize};
 #[cfg(emulation_mode = "usermode")]
 use crate::{capstone, qemu::ArchExtras, CallingConvention, Qemu};
 use crate::{
-    emu::hooks::EmulatorTools,
-    qemu::hooks::Hook,
+    emu::EmulatorTools,
+    qemu::Hook,
     tools::{hash_me, HasInstrumentationFilter, IsFilter, QemuInstrumentationAddressRangeFilter},
     EmulatorTool, EmulatorToolTuple,
 };
