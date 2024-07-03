@@ -486,13 +486,13 @@ mod tests {
     fn test() {
         let tmp = env::temp_dir();
         let path = tmp.join("testfile.tmp");
-        _ = fs::remove_file(path);
-        let mut f = open_unique(path).unwrap();
+        _ = fs::remove_file(&path);
+        let mut f = open_unique(&path).unwrap();
         f.write_all(&[0; 1]).unwrap();
 
-        match try_open(path) {
+        match try_open(&path) {
             Ok(None) => (),
-            Ok(_) => panic!("File {path} did not exist even though it should have?"),
+            Ok(_) => panic!("File {path:?} did not exist even though it should have?"),
             Err(e) => panic!("An unexpected error occurred: {e}"),
         };
         drop(f);
