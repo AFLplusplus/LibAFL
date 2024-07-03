@@ -2,7 +2,6 @@
 
 #[cfg(emulation_mode = "usermode")]
 use std::ptr::addr_of_mut;
-
 use std::{fmt::Debug, marker::PhantomData, mem::transmute, pin::Pin, ptr};
 
 use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple};
@@ -962,8 +961,7 @@ where
 
         #[cfg(not(debug_assertions))]
         {
-            (EMULATOR_TOOLS as *mut EmulatorTools<ET, S>)
-                .as_mut_unchecked()
+            (EMULATOR_TOOLS as *mut EmulatorTools<ET, S>).as_mut_unchecked()
         }
     }
 
