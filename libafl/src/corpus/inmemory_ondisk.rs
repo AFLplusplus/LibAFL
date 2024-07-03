@@ -9,6 +9,7 @@ use core::cell::RefCell;
 use std::{fs, fs::File, io::Write};
 use std::{
     fs::OpenOptions,
+    io,
     path::{Path, PathBuf},
 };
 
@@ -25,6 +26,25 @@ use crate::{
     inputs::{Input, UsesInput},
     Error, HasMetadata,
 };
+
+/// Opens the given `path` and returns an error if it fails.
+/// If the open succeeds, it will return the file.
+/// If the open fails for _any_ reason, including, but not limited to, a preexisting existing file of that name,
+/// it will instead return the respective [`io::Error`].
+fn open_unique<P: AsRef<Path>>(path: P) -> Result<File, io::Error> {
+    OpenOptions::new().write(true).create_new(true).open(path)
+}
+
+/// Tries to open the given `path` and returns `None` _only_ if the file already exists.
+/// If the open succeeds, it will return the file.
+/// If the open fails for some other reason, it will instead return the respective [`io::Error`].
+fn try_open<P: AsRef<Path>>(path: P) -> Result<Option<File>, io::Error> {
+    match open_unique(path) {
+        Ok(ret) => Ok(Some(ret)),
+        Err(err) if err.kind() == io::ErrorKind::AlreadyExists => Ok(None),
+        Err(err) => Err(err),
+    }
+}
 
 /// A corpus able to store [`Testcase`]s to disk, while also keeping all of them in memory.
 ///
@@ -295,7 +315,7 @@ where
     ) -> Result<Self, Error> {
         match fs::create_dir_all(dir_path) {
             Ok(()) => {}
-            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {}
             Err(e) => return Err(e.into()),
         }
         Ok(InMemoryOnDiskCorpus {
@@ -331,16 +351,11 @@ where
                 let new_lock_filename = format!(".{new_filename}.lafl_lock");
 
                 // Try to create lock file for new testcases
-                if OpenOptions::new()
-                    .create_new(true)
-                    .write(true)
-                    .open(self.dir_path.join(new_lock_filename))
-                    .is_err()
-                {
+                if let Err(err) = open_unique(self.dir_path.join(&new_lock_filename)) {
                     *testcase.filename_mut() = Some(old_filename);
-                    return Err(Error::illegal_state(
-                        "unable to create lock file for new testcase",
-                    ));
+                    return Err(Error::illegal_state(format!(
+                        "Unable to create lock file {new_lock_filename} for new testcase: {err}"
+                    )));
                 }
             }
 
@@ -387,12 +402,7 @@ where
                 let lockfile_name = format!(".{file_name}.lafl_lock");
                 let lockfile_path = self.dir_path.join(lockfile_name);
 
-                if OpenOptions::new()
-                    .write(true)
-                    .create_new(true)
-                    .open(lockfile_path)
-                    .is_ok()
-                {
+                if try_open(lockfile_path)?.is_some() {
                     break file_name;
                 }
 
@@ -463,5 +473,29 @@ where
     #[must_use]
     pub fn dir_path(&self) -> &PathBuf {
         &self.dir_path
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{env, fs, io::Write};
+
+    use super::{open_unique, try_open};
+
+    #[test]
+    fn test() {
+        let tmp = env::temp_dir();
+        let path = tmp.join("testfile.tmp");
+        _ = fs::remove_file(path);
+        let mut f = open_unique(path).unwrap();
+        f.write_all(&[0; 1]).unwrap();
+
+        match try_open(path) {
+            Ok(None) => (),
+            Ok(_) => panic!("File {path} did not exist even though it should have?"),
+            Err(e) => panic!("An unexpected error occurred: {e}"),
+        };
+        drop(f);
+        fs::remove_file(path).unwrap();
     }
 }
