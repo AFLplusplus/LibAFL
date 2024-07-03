@@ -47,7 +47,7 @@ pub fn set_corpus_filepath(
     let mut name = generate_base_filename(state);
     if testcase
         .hit_feedbacks()
-        .contains(&Cow::Borrowed("shared_mem"))
+        .contains(&Cow::Borrowed("edges"))
     {
         name = format!("{name},+cov");
     }
