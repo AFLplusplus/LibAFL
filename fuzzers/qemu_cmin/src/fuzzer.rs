@@ -27,10 +27,12 @@ use libafl_bolts::{
     AsSlice, AsSliceMut,
 };
 use libafl_qemu::{
-    edges::{QemuEdgeCoverageChildHelper, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},
+    command::NopCommandManager,
+    edges::{QemuEdgeCoverageChildTool, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},
     elf::EasyElf,
-    ArchExtras, CallingConvention, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExitError,
-    QemuExitReason, QemuForkExecutor, QemuHooks, QemuShutdownCause, Regs,
+    ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms,
+    NopEmulatorExitHandler, Qemu, QemuExitError, QemuExitReason, QemuForkExecutor,
+    QemuShutdownCause, Regs,
 };
 
 #[derive(Default)]
@@ -219,10 +221,13 @@ pub fn fuzz() -> Result<(), Error> {
         ExitKind::Ok
     };
 
-    let mut hooks = QemuHooks::new(qemu, tuple_list!(QemuEdgeCoverageChildHelper::default(),));
+    let tools = tuple_list!(QemuEdgeCoverageChildTool::default(),);
+
+    let mut emulator =
+        Emulator::new_with_qemu(qemu, tools, NopEmulatorExitHandler, NopCommandManager)?;
 
     let mut executor = QemuForkExecutor::new(
-        &mut hooks,
+        &mut emulator,
         &mut harness,
         tuple_list!(edges_observer),
         &mut fuzzer,
