@@ -50,7 +50,7 @@ where
     QT: EmulatorToolTuple<S> + Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("QemuExecutor")
+        f.debug_struct("StatefulQemuExecutor")
             .field("inner", &self.inner)
             .finish()
     }
