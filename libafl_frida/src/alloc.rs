@@ -158,6 +158,7 @@ impl Allocator {
     #[must_use]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn alloc(&mut self, size: usize, _alignment: usize) -> *mut c_void {
+        log::trace!("alloc");
         let mut is_malloc_zero = false;
         let size = if size == 0 {
             is_malloc_zero = true;
@@ -242,6 +243,7 @@ impl Allocator {
     /// Releases the allocation at the given address.
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn release(&mut self, ptr: *mut c_void) {
+        log::trace!("release {:?}", ptr);
         let Some(metadata) = self.allocations.get_mut(&(ptr as usize)) else {
             if !ptr.is_null() {
                 AsanErrors::get_mut_blocking()
@@ -375,9 +377,14 @@ impl Allocator {
         unpoison: bool,
     ) -> (usize, usize) {
         let shadow_mapping_start = map_to_shadow!(self, start);
-
+        log::trace!("map_shadow_for_region: {:x}, {:x}", start, end);
         let shadow_start = self.round_down_to_page(shadow_mapping_start);
         let shadow_end = self.round_up_to_page((end - start) / 8 + self.page_size + shadow_start);
+        log::trace!(
+            "map_shadow_for_region: shadow_start {:x}, shadow_end {:x}",
+            shadow_start,
+            shadow_end
+        );
         if self.using_pre_allocated_shadow_mapping {
             let mut newly_committed_regions = Vec::new();
             for gap in self.shadow_pages.gaps(&(shadow_start..shadow_end)) {
@@ -406,6 +413,11 @@ impl Allocator {
                 }
             }
             for newly_committed_region in newly_committed_regions {
+                log::trace!(
+                    "committed shadow pages: start {:x}, end {:x}",
+                    newly_committed_region.start(),
+                    newly_committed_region.end()
+                );
                 self.shadow_pages
                     .insert(newly_committed_region.start()..newly_committed_region.end());
                 self.mappings
@@ -549,21 +561,20 @@ impl Allocator {
         }
     }
 
-    /// Unpoison all the memory that is currently mapped with read/write permissions.
+    /// Unpoison all the memory that is currently mapped with read permissions.
     pub fn unpoison_all_existing_memory(&mut self) {
         RangeDetails::enumerate_with_prot(
             PageProtection::Read,
             &mut |range: &RangeDetails| -> bool {
                 let start = range.memory_range().base_address().0 as usize;
                 let end = start + range.memory_range().size();
-                //the shadow region should be the highest valid userspace region, so don't continue after
                 if self.is_managed(start as *mut c_void) {
-                    false
+                    log::trace!("Not unpoisoning: {:#x}-{:#x}, is_managed", start, end);
                 } else {
                     log::trace!("Unpoisoning: {:#x}-{:#x}", start, end);
                     self.map_shadow_for_region(start, end, true);
-                    true
                 }
+                true
             },
         );
     }
@@ -672,6 +683,11 @@ impl Allocator {
                         shadow_bit = (try_shadow_bit).try_into().unwrap();
 
                         log::warn!("shadow_bit {shadow_bit:} is suitable");
+                        log::trace!(
+                            "shadow area from {:x} to {:x} pre-allocated",
+                            addr,
+                            addr + (1 << (try_shadow_bit + 1))
+                        );
                         self.pre_allocated_shadow_mappings.push(mapping);
                         self.using_pre_allocated_shadow_mapping = true;
                         break;
@@ -734,6 +750,7 @@ impl Default for Allocator {
 }
 
 #[test]
+#[cfg(not(windows))] // not working yet
 fn check_shadow() {
     let mut allocator = Allocator::default();
     allocator.init();

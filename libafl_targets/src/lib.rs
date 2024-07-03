@@ -16,7 +16,8 @@
     clippy::missing_panics_doc,
     clippy::missing_docs_in_private_items,
     clippy::module_name_repetitions,
-    clippy::pub_underscore_fields
+    clippy::pub_underscore_fields,
+    clippy::into_iter_without_iter, // broken
 )]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,

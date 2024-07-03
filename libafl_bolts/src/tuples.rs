@@ -522,6 +522,15 @@ pub struct Handle<T: ?Sized> {
 
 #[cfg(feature = "alloc")]
 impl<T: ?Sized> Handle<T> {
+    /// Create a new [`Handle`] with the given name.
+    #[must_use]
+    pub fn new(name: Cow<'static, str>) -> Self {
+        Self {
+            name,
+            phantom: PhantomData,
+        }
+    }
+
     /// Fetch the name of the referenced instance.
     ///
     /// We explicitly do *not* implement [`Named`], as this could potentially lead to confusion
@@ -731,6 +740,43 @@ where
     }
 }
 
+/// Trait for structs which are capable of mapping a given type to another.
+pub trait MappingFunctor<T> {
+    /// The result of the mapping operation.
+    type Output;
+
+    /// The actual mapping operation.
+    fn apply(&mut self, from: T) -> Self::Output;
+}
+
+/// Map all entries in a tuple to another type, dependent on the tail type.
+pub trait Map<M> {
+    /// The result of the mapping operation.
+    type MapResult;
+
+    /// Perform the mapping!
+    fn map(self, mapper: M) -> Self::MapResult;
+}
+
+impl<Head, Tail, M> Map<M> for (Head, Tail)
+where
+    M: MappingFunctor<Head>,
+    Tail: Map<M>,
+{
+    type MapResult = (M::Output, Tail::MapResult);
+
+    fn map(self, mut mapper: M) -> Self::MapResult {
+        let head = mapper.apply(self.0);
+        (head, self.1.map(mapper))
+    }
+}
+
+impl<M> Map<M> for () {
+    type MapResult = ();
+
+    fn map(self, _mapper: M) -> Self::MapResult {}
+}
+
 /// Iterate over a tuple, executing the given `expr` for each element.
 #[macro_export]
 #[allow(clippy::items_after_statements)]
@@ -847,9 +893,11 @@ impl<Head, Tail> PlusOne for (Head, Tail) where
 
 #[cfg(test)]
 mod test {
+    use tuple_list::{tuple_list, tuple_list_type};
+
     #[cfg(feature = "alloc")]
     use crate::ownedref::OwnedMutSlice;
-    use crate::tuples::type_eq;
+    use crate::tuples::{type_eq, Map, MappingFunctor};
 
     #[test]
     #[allow(unused_qualifications)] // for type name tests
@@ -892,5 +940,30 @@ mod test {
             OwnedMutSlice<u8>,
             crate::ownedref::OwnedMutSlice<u32>,
         >());
+    }
+
+    #[test]
+    fn test_mapper() {
+        struct W<T>(T);
+        struct MyMapper;
+
+        impl<T> MappingFunctor<T> for MyMapper {
+            type Output = W<T>;
+
+            fn apply(&mut self, from: T) -> Self::Output {
+                W(from)
+            }
+        }
+
+        struct A;
+        struct B;
+        struct C;
+
+        let orig = tuple_list!(A, B, C);
+        let mapped = orig.map(MyMapper);
+
+        // this won't compile if the mapped type is not correct
+        #[allow(clippy::no_effect_underscore_binding)]
+        let _type_assert: tuple_list_type!(W<A>, W<B>, W<C>) = mapped;
     }
 }

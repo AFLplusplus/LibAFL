@@ -9,9 +9,6 @@ runs:
         toolchain: stable
     - uses: actions/checkout@v3
     - uses: Swatinem/rust-cache@v2
-    - name: Windows Build
-      shell: pwsh
-      run: cargo build --verbose
     - name: Build docs
       shell: pwsh
       run: cargo doc

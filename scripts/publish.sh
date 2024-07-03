@@ -74,7 +74,7 @@ if git submodule status | grep "^-">/dev/null ; then \
 fi
 
 cd libafl_concolic/symcc_runtime
-cargo publish "$@"
+cargo publish "$@" --allow-dirty
 cd ../.. || exit 1
 
 cd libafl_libfuzzer

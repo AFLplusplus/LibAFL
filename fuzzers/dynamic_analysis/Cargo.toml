@@ -1,6 +1,6 @@
 [package]
-name = "fuzzbench"
-version = "0.12.0"
+name = "dynamic_analysis"
+version = "0.13.0"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 edition = "2021"
 
@@ -22,10 +22,10 @@ strip = true
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
-which = "4.4"
+which = "6.0"
 
 [dependencies]
-env_logger = "0.10"
+env_logger = "0.11"
 once_cell = "1.19"
 libafl = { path = "../../libafl/" }
 libafl_bolts = { path = "../../libafl_bolts/" }
@@ -33,7 +33,7 @@ libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_h
 # TODO Include it only when building cc
 libafl_cc = { path = "../../libafl_cc/" }
 clap = { version = "4.0", features = ["default"] }
-nix = { version = "0.27", features = ["fs"] }
+nix = { version = "0.29", features = ["fs"] }
 mimalloc = { version = "*", default-features = false }
 
 [lib]

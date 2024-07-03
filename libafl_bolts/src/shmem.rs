@@ -7,7 +7,7 @@ use alloc::{rc::Rc, string::ToString, vec::Vec};
 use core::{cell::RefCell, fmt, fmt::Display, mem::ManuallyDrop};
 use core::{
     fmt::Debug,
-    mem,
+    mem::size_of,
     ops::{Deref, DerefMut},
 };
 #[cfg(feature = "std")]
@@ -202,7 +202,7 @@ pub trait ShMem: Sized + Debug + Clone + DerefMut<Target = [u8]> {
     /// Convert to a ptr of a given type, checking the size.
     /// If the map is too small, returns `None`
     fn as_ptr_of<T: Sized>(&self) -> Option<*const T> {
-        if self.len() >= mem::size_of::<T>() {
+        if self.len() >= size_of::<T>() {
             Some(self.as_ptr() as *const T)
         } else {
             None
@@ -212,7 +212,7 @@ pub trait ShMem: Sized + Debug + Clone + DerefMut<Target = [u8]> {
     /// Convert to a mut ptr of a given type, checking the size.
     /// If the map is too small, returns `None`
     fn as_mut_ptr_of<T: Sized>(&mut self) -> Option<*mut T> {
-        if self.len() >= mem::size_of::<T>() {
+        if self.len() >= size_of::<T>() {
             Some(self.as_mut_ptr() as *mut T)
         } else {
             None
@@ -267,7 +267,7 @@ pub trait ShMemProvider: Clone + Default + Debug {
 
     /// Create a new shared memory mapping to hold an object of the given type, and initializes it with the given value.
     fn uninit_on_shmem<T: Sized + 'static>(&mut self) -> Result<Self::ShMem, Error> {
-        self.new_shmem(mem::size_of::<T>())
+        self.new_shmem(size_of::<T>())
     }
 
     /// Get a mapping given a description
@@ -386,7 +386,7 @@ impl Deref for NopShMem {
 /// that can use internal mutability.
 /// Useful if the `ShMemProvider` needs to keep local state.
 #[cfg(feature = "alloc")]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct RcShMem<T: ShMemProvider> {
     internal: ManuallyDrop<T::ShMem>,
     provider: Rc<RefCell<T>>,
@@ -644,12 +644,14 @@ pub mod unix_shmem {
 
     #[cfg(all(unix, feature = "std", not(target_os = "android")))]
     mod default {
+        #[cfg(target_vendor = "apple")]
         use alloc::string::ToString;
         use core::{
+            ffi::CStr,
             ops::{Deref, DerefMut},
             ptr, slice,
         };
-        use std::{io::Write, process};
+        use std::process;
 
         use libc::{
             c_int, c_uchar, close, ftruncate, mmap, munmap, shm_open, shm_unlink, shmat, shmctl,
@@ -662,13 +664,7 @@ pub mod unix_shmem {
             Error,
         };
 
-        // This is macOS's limit
-        // https://stackoverflow.com/questions/38049068/osx-shm-open-returns-enametoolong
-        #[cfg(target_vendor = "apple")]
-        const MAX_MMAP_FILENAME_LEN: usize = 31;
-
-        #[cfg(not(target_vendor = "apple"))]
-        const MAX_MMAP_FILENAME_LEN: usize = 256;
+        const MAX_MMAP_FILENAME_LEN: usize = 20;
 
         /// Mmap-based The sharedmap impl for unix using [`shm_open`] and [`mmap`].
         /// Default on `MacOS` and `iOS`, where we need a central point to unmap
@@ -690,22 +686,27 @@ pub mod unix_shmem {
 
         impl MmapShMem {
             /// Create a new [`MmapShMem`]
+            /// This will *NOT* automatically delete the shmem files, meaning that it's user's responsibility to delete all `/dev/shm/libafl_*` after fuzzing
             pub fn new(map_size: usize, rand_id: u32) -> Result<Self, Error> {
                 unsafe {
+                    let full_file_name = format!("/libafl_{}_{}", process::id(), rand_id);
                     let mut filename_path = [0_u8; MAX_MMAP_FILENAME_LEN];
-                    write!(
-                        &mut filename_path[..MAX_MMAP_FILENAME_LEN - 1],
-                        "/libafl_{}_{}",
+                    filename_path
+                        .copy_from_slice(&full_file_name.as_bytes()[..MAX_MMAP_FILENAME_LEN]);
+                    filename_path[MAX_MMAP_FILENAME_LEN - 1] = 0; // Null terminate!
+                    log::info!(
+                        "{} Creating shmem {} {:#?}",
+                        map_size,
                         process::id(),
-                        rand_id
-                    )?;
-
+                        filename_path
+                    );
                     /* create the shared memory segment as if it was a file */
                     let shm_fd = shm_open(
                         filename_path.as_ptr() as *const _,
                         libc::O_CREAT | libc::O_RDWR | libc::O_EXCL,
                         0o600,
                     );
+
                     if shm_fd == -1 {
                         return Err(Error::last_os_error(format!(
                             "Failed to shm_open map with id {filename_path:?}",
@@ -737,42 +738,84 @@ pub mod unix_shmem {
                         )));
                     }
 
+                    // Apple uses it for served shmem provider, which uses fd
+                    // Others will just use filename
+
+                    #[cfg(target_vendor = "apple")]
+                    let id = ShMemId::from_string(&format!("{shm_fd}"));
+                    #[cfg(not(target_vendor = "apple"))]
+                    let id = ShMemId::from_string(core::str::from_utf8(&filename_path)?);
+
                     Ok(Self {
                         filename_path: Some(filename_path),
                         map: map as *mut u8,
                         map_size,
                         shm_fd,
-                        id: ShMemId::from_string(&format!("{shm_fd}")),
+                        id,
                     })
                 }
             }
 
+            #[allow(clippy::unnecessary_wraps)]
             fn shmem_from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 unsafe {
-                    let shm_fd: i32 = id.to_string().parse().unwrap();
-
                     /* map the shared memory segment to the address space of the process */
-                    let map = mmap(
-                        ptr::null_mut(),
-                        map_size,
-                        libc::PROT_READ | libc::PROT_WRITE,
-                        libc::MAP_SHARED,
-                        shm_fd,
-                        0,
-                    );
-                    if map == libc::MAP_FAILED || map.is_null() {
-                        close(shm_fd);
-                        return Err(Error::last_os_error(format!(
-                            "mmap() failed for map with fd {shm_fd:?}"
-                        )));
-                    }
+                    #[cfg(target_vendor = "apple")]
+                    let (map, shm_fd) = {
+                        let shm_fd: i32 = id.to_string().parse().unwrap();
+                        let map = mmap(
+                            ptr::null_mut(),
+                            map_size,
+                            libc::PROT_READ | libc::PROT_WRITE,
+                            libc::MAP_SHARED,
+                            shm_fd,
+                            0,
+                        );
+                        (map, shm_fd)
+                    };
+
+                    #[cfg(not(target_vendor = "apple"))]
+                    let (map, shm_fd) = {
+                        let mut filename_path = [0_u8; MAX_MMAP_FILENAME_LEN];
+                        filename_path.copy_from_slice(&id.id);
+
+                        /* attach to the shared memory segment as if it was a file */
+                        let shm_fd =
+                            shm_open(filename_path.as_ptr() as *const _, libc::O_RDWR, 0o600);
+                        if shm_fd == -1 {
+                            log::info!(
+                                "Trying to attach to {:#?} but failed {}",
+                                filename_path,
+                                process::id()
+                            );
+                            return Err(Error::last_os_error(format!(
+                                "Failed to shm_open map with id {filename_path:?}",
+                            )));
+                        }
+                        /* map the shared memory segment to the address space of the process */
+                        let map = mmap(
+                            ptr::null_mut(),
+                            map_size,
+                            libc::PROT_READ | libc::PROT_WRITE,
+                            libc::MAP_SHARED,
+                            shm_fd,
+                            0,
+                        );
+                        if map == libc::MAP_FAILED || map.is_null() {
+                            close(shm_fd);
+                            return Err(Error::last_os_error(format!(
+                                "mmap() failed for map with fd {shm_fd:?}"
+                            )));
+                        }
+                        (map, shm_fd)
+                    };
 
                     Ok(Self {
                         filename_path: None,
                         map: map as *mut u8,
                         map_size,
                         shm_fd,
-                        id: ShMemId::from_string(&format!("{shm_fd}")),
+                        id,
                     })
                 }
             }
@@ -787,9 +830,7 @@ pub mod unix_shmem {
         /// A [`ShMemProvider`] which uses [`shm_open`] and [`mmap`] to provide shared memory mappings.
         #[cfg(unix)]
         #[derive(Clone, Debug)]
-        pub struct MmapShMemProvider {
-            rand: StdRand,
-        }
+        pub struct MmapShMemProvider {}
 
         unsafe impl Send for MmapShMemProvider {}
 
@@ -806,12 +847,11 @@ pub mod unix_shmem {
             type ShMem = MmapShMem;
 
             fn new() -> Result<Self, Error> {
-                Ok(Self {
-                    rand: StdRand::new(),
-                })
+                Ok(Self {})
             }
             fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
-                let id = self.rand.next() as u32;
+                let mut rand = StdRand::with_seed(crate::rands::random_seed());
+                let id = rand.next() as u32;
                 MmapShMem::new(map_size, id)
             }
 
@@ -821,6 +861,16 @@ pub mod unix_shmem {
                 size: usize,
             ) -> Result<Self::ShMem, Error> {
                 MmapShMem::shmem_from_id_and_size(id, size)
+            }
+
+            fn release_shmem(&mut self, shmem: &mut Self::ShMem) {
+                let fd = CStr::from_bytes_until_nul(shmem.id().as_array())
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .parse()
+                    .unwrap();
+                unsafe { close(fd) };
             }
         }
 
@@ -861,9 +911,13 @@ pub mod unix_shmem {
                     );
 
                     // None in case we didn't [`shm_open`] this ourselves, but someone sent us the FD.
-                    if let Some(filename_path) = self.filename_path {
-                        shm_unlink(filename_path.as_ptr() as *const _);
-                    }
+                    // log::info!("Dropping {:#?}", self.filename_path);
+                    // if let Some(filename_path) = self.filename_path {
+                    // shm_unlink(filename_path.as_ptr() as *const _);
+                    // }
+                    // We cannot shm_unlink here!
+                    // unlike unix common shmem we don't have refcounter.
+                    // so there's no guarantee that there's no other process still using it.
                 }
             }
         }
@@ -1032,6 +1086,7 @@ pub mod unix_shmem {
 
         #[derive(Copy, Clone)]
         #[repr(C)]
+        #[allow(non_camel_case_types)]
         struct ashmem_pin {
             pub offset: c_uint,
             pub len: c_uint,

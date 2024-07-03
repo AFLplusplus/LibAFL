@@ -111,6 +111,61 @@ pub struct QemuSnapshotCheckResult {
     nb_page_inconsistencies: u64,
 }
 
+#[derive(Debug, Clone)]
+pub enum QemuRWErrorKind {
+    Read,
+    Write,
+}
+
+#[derive(Debug, Clone)]
+pub enum QemuRWErrorCause {
+    WrongCallingConvention(CallingConvention, CallingConvention), // expected, given
+    WrongArgument(i32),
+    CurrentCpuNotFound,
+    Reg(i32),
+}
+
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct QemuRWError {
+    kind: QemuRWErrorKind,
+    cause: QemuRWErrorCause,
+    cpu: Option<CPUStatePtr>, // Only makes sense when cause != CurrentCpuNotFound
+}
+
+impl QemuRWError {
+    #[must_use]
+    pub fn new(kind: QemuRWErrorKind, cause: QemuRWErrorCause, cpu: Option<CPUStatePtr>) -> Self {
+        Self { kind, cause, cpu }
+    }
+
+    #[must_use]
+    pub fn current_cpu_not_found(kind: QemuRWErrorKind) -> Self {
+        Self::new(kind, QemuRWErrorCause::CurrentCpuNotFound, None)
+    }
+
+    #[must_use]
+    pub fn new_argument_error(kind: QemuRWErrorKind, reg_id: i32) -> Self {
+        Self::new(kind, QemuRWErrorCause::WrongArgument(reg_id), None)
+    }
+
+    pub fn check_conv(
+        kind: QemuRWErrorKind,
+        expected_conv: CallingConvention,
+        given_conv: CallingConvention,
+    ) -> Result<(), Self> {
+        if expected_conv != given_conv {
+            return Err(Self::new(
+                kind,
+                QemuRWErrorCause::WrongCallingConvention(expected_conv, given_conv),
+                None,
+            ));
+        }
+
+        Ok(())
+    }
+}
+
 /// Represents a QEMU snapshot check result for which no error was detected
 impl Default for QemuSnapshotCheckResult {
     fn default() -> Self {
@@ -183,7 +238,7 @@ pub struct CPU {
     ptr: CPUStatePtr,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum CallingConvention {
     Cdecl,
 }
@@ -283,13 +338,13 @@ impl From<libafl_qemu_sys::MemOpIdx> for MemAccessInfo {
 }
 
 pub trait ArchExtras {
-    fn read_return_address<T>(&self) -> Result<T, String>
+    fn read_return_address<T>(&self) -> Result<T, QemuRWError>
     where
         T: From<GuestReg>;
-    fn write_return_address<T>(&self, val: T) -> Result<(), String>
+    fn write_return_address<T>(&self, val: T) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg>;
-    fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, String>
+    fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, QemuRWError>
     where
         T: From<GuestReg>;
     fn write_function_argument<T>(
@@ -297,7 +352,7 @@ pub trait ArchExtras {
         conv: CallingConvention,
         idx: i32,
         val: T,
-    ) -> Result<(), String>
+    ) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg>;
 }
@@ -349,37 +404,46 @@ impl CPU {
         unsafe { libafl_qemu_num_regs(self.ptr) }
     }
 
-    pub fn write_reg<R, T>(&self, reg: R, val: T) -> Result<(), String>
+    pub fn write_reg<R, T>(&self, reg: R, val: T) -> Result<(), QemuRWError>
     where
-        R: Into<i32>,
+        R: Into<i32> + Clone,
         T: Into<GuestReg>,
     {
-        let reg = reg.into();
+        let reg_id = reg.clone().into();
         #[cfg(feature = "be")]
         let val = GuestReg::to_be(val.into());
 
         #[cfg(not(feature = "be"))]
         let val = GuestReg::to_le(val.into());
 
-        let success = unsafe { libafl_qemu_write_reg(self.ptr, reg, addr_of!(val) as *const u8) };
+        let success =
+            unsafe { libafl_qemu_write_reg(self.ptr, reg_id, addr_of!(val) as *const u8) };
         if success == 0 {
-            Err(format!("Failed to write to register {reg}"))
+            Err(QemuRWError {
+                kind: QemuRWErrorKind::Write,
+                cause: QemuRWErrorCause::Reg(reg.into()),
+                cpu: Some(self.ptr),
+            })
         } else {
             Ok(())
         }
     }
 
-    pub fn read_reg<R, T>(&self, reg: R) -> Result<T, String>
+    pub fn read_reg<R, T>(&self, reg: R) -> Result<T, QemuRWError>
     where
-        R: Into<i32>,
+        R: Into<i32> + Clone,
         T: From<GuestReg>,
     {
         unsafe {
-            let reg = reg.into();
+            let reg_id = reg.clone().into();
             let mut val = MaybeUninit::uninit();
-            let success = libafl_qemu_read_reg(self.ptr, reg, val.as_mut_ptr() as *mut u8);
+            let success = libafl_qemu_read_reg(self.ptr, reg_id, val.as_mut_ptr() as *mut u8);
             if success == 0 {
-                Err(format!("Failed to read register {reg}"))
+                Err(QemuRWError {
+                    kind: QemuRWErrorKind::Write,
+                    cause: QemuRWErrorCause::Reg(reg.into()),
+                    cpu: Some(self.ptr),
+                })
             } else {
                 #[cfg(feature = "be")]
                 return Ok(GuestReg::from_be(val.assume_init()).into());
@@ -692,20 +756,24 @@ impl Qemu {
         self.current_cpu().unwrap().num_regs()
     }
 
-    pub fn write_reg<R, T>(&self, reg: R, val: T) -> Result<(), String>
+    pub fn write_reg<R, T>(&self, reg: R, val: T) -> Result<(), QemuRWError>
     where
         T: Num + PartialOrd + Copy + Into<GuestReg>,
-        R: Into<i32>,
+        R: Into<i32> + Clone,
     {
-        self.current_cpu().unwrap().write_reg(reg, val)
+        self.current_cpu()
+            .ok_or(QemuRWError::current_cpu_not_found(QemuRWErrorKind::Write))?
+            .write_reg(reg, val)
     }
 
-    pub fn read_reg<R, T>(&self, reg: R) -> Result<T, String>
+    pub fn read_reg<R, T>(&self, reg: R) -> Result<T, QemuRWError>
     where
         T: Num + PartialOrd + Copy + From<GuestReg>,
-        R: Into<i32>,
+        R: Into<i32> + Clone,
     {
-        self.current_cpu().unwrap().read_reg(reg)
+        self.current_cpu()
+            .ok_or(QemuRWError::current_cpu_not_found(QemuRWErrorKind::Read))?
+            .read_reg(reg)
     }
 
     pub fn set_breakpoint(&self, addr: GuestAddr) {
@@ -947,30 +1015,34 @@ impl Qemu {
 }
 
 impl ArchExtras for Qemu {
-    fn read_return_address<T>(&self) -> Result<T, String>
+    fn read_return_address<T>(&self) -> Result<T, QemuRWError>
     where
         T: From<GuestReg>,
     {
         self.current_cpu()
-            .ok_or("Failed to get current CPU")?
+            .ok_or(QemuRWError {
+                kind: QemuRWErrorKind::Read,
+                cause: QemuRWErrorCause::CurrentCpuNotFound,
+                cpu: None,
+            })?
             .read_return_address::<T>()
     }
 
-    fn write_return_address<T>(&self, val: T) -> Result<(), String>
+    fn write_return_address<T>(&self, val: T) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg>,
     {
         self.current_cpu()
-            .ok_or("Failed to get current CPU")?
+            .ok_or(QemuRWError::current_cpu_not_found(QemuRWErrorKind::Write))?
             .write_return_address::<T>(val)
     }
 
-    fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, String>
+    fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, QemuRWError>
     where
         T: From<GuestReg>,
     {
         self.current_cpu()
-            .ok_or("Failed to get current CPU")?
+            .ok_or(QemuRWError::current_cpu_not_found(QemuRWErrorKind::Read))?
             .read_function_argument::<T>(conv, idx)
     }
 
@@ -979,12 +1051,12 @@ impl ArchExtras for Qemu {
         conv: CallingConvention,
         idx: i32,
         val: T,
-    ) -> Result<(), String>
+    ) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg>,
     {
         self.current_cpu()
-            .ok_or("Failed to get current CPU")?
+            .ok_or(QemuRWError::current_cpu_not_found(QemuRWErrorKind::Write))?
             .write_function_argument::<T>(conv, idx, val)
     }
 }
@@ -1053,7 +1125,7 @@ impl EmulatorMemoryChunk {
         let new_addr = self.addr + range.start;
         let slice_size = range.clone().count();
 
-        if new_addr + (slice_size as GuestUsize) >= self.addr + self.size {
+        if new_addr + (slice_size as GuestUsize) >= self.addr + self.size.into() {
             return None;
         }
 
@@ -1191,11 +1263,15 @@ pub mod pybind {
         }
 
         fn write_reg(&self, reg: i32, val: GuestUsize) -> PyResult<()> {
-            self.qemu.write_reg(reg, val).map_err(PyValueError::new_err)
+            self.qemu
+                .write_reg(reg, val)
+                .map_err(|_| PyValueError::new_err("write register error"))
         }
 
         fn read_reg(&self, reg: i32) -> PyResult<GuestUsize> {
-            self.qemu.read_reg(reg).map_err(PyValueError::new_err)
+            self.qemu
+                .read_reg(reg)
+                .map_err(|_| PyValueError::new_err("read register error"))
         }
 
         fn set_breakpoint(&self, addr: GuestAddr) {

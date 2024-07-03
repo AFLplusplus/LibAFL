@@ -59,15 +59,15 @@ windows_asan = ["common"] # Compile C code for ASAN on Windows
 whole_archive = [] # use +whole-archive to ensure the presence of weak symbols
 cmplog_extended_instrumentation = [] # support for aflpp cmplog map, we will remove this once aflpp and libafl cmplog shares the same LLVM passes.
 function-logging = ["common"]
-
+track_hit_feedbacks = ["libafl/track_hit_feedbacks"]
 [build-dependencies]
 bindgen = "0.69.4"
 cc = { version = "1.0", features = ["parallel"] }
 rustversion = "1.0"
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.12.0", default-features = false, features = [] }
-libafl_bolts = { path = "../libafl_bolts", version = "0.12.0", default-features = false, features = [] }
+libafl = { path = "../libafl", version = "0.13.1", default-features = false, features = [] }
+libafl_bolts = { path = "../libafl_bolts", version = "0.13.1", default-features = false, features = [] }
 libc = "0.2"
 hashbrown = "0.14"
 once_cell = "1.19"

@@ -7,7 +7,7 @@ use std::{
 use libafl::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::HasTargetBytes,
-    observers::{ObserversTuple, StdErrObserver, StdOutObserver, UsesObservers},
+    observers::{ObserversTuple, StdOutObserver, UsesObservers},
     state::{HasExecutions, State, UsesState},
     Error,
 };
@@ -151,6 +151,12 @@ impl<S, OT> NyxExecutor<S, OT> {
 pub struct NyxExecutorBuilder {
     stdout: Option<StdOutObserver>,
     // stderr: Option<StdErrObserver>,
+}
+
+impl Default for NyxExecutorBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl NyxExecutorBuilder {

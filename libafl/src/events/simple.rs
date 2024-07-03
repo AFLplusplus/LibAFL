@@ -205,14 +205,10 @@ where
     ) -> Result<BrokerEventResult, Error> {
         match event {
             Event::NewTestcase {
-                input: _,
-                client_config: _,
-                exit_kind: _,
                 corpus_size,
-                observers_buf: _,
                 time,
                 executions,
-                forward_id: _,
+                ..
             } => {
                 monitor.client_stats_insert(ClientId(0));
                 monitor
@@ -225,9 +221,7 @@ where
                 Ok(BrokerEventResult::Handled)
             }
             Event::UpdateExecStats {
-                time,
-                executions,
-                phantom: _,
+                time, executions, ..
             } => {
                 // TODO: The monitor buffer should be added on client add.
                 monitor.client_stats_insert(ClientId(0));
@@ -238,11 +232,7 @@ where
                 monitor.display(event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
-            Event::UpdateUserStats {
-                name,
-                value,
-                phantom: _,
-            } => {
+            Event::UpdateUserStats { name, value, .. } => {
                 monitor.client_stats_insert(ClientId(0));
                 monitor
                     .client_stats_mut_for(ClientId(0))
@@ -256,7 +246,7 @@ where
                 time,
                 executions,
                 introspection_monitor,
-                phantom: _,
+                ..
             } => {
                 // TODO: The monitor buffer should be added on client add.
                 monitor.client_stats_insert(ClientId(0));
@@ -284,7 +274,7 @@ where
             Event::Log {
                 severity_level,
                 message,
-                phantom: _,
+                ..
             } => {
                 let (_, _) = (message, severity_level);
                 log::log!((*severity_level).into(), "{message}");

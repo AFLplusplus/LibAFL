@@ -46,21 +46,21 @@ where
 
 impl<CB, E, EM, Z> Stage<E, EM, Z> for DumpToDiskStage<CB, EM, Z>
 where
-    CB: FnMut(&<Z::State as UsesInput>::Input, &Z::State) -> Vec<u8>,
-    EM: UsesState<State = Z::State>,
-    E: UsesState<State = Z::State>,
-    Z: UsesState,
-    Z::State: HasCorpus + HasSolutions + HasRand + HasMetadata,
+    CB: FnMut(&<Self::State as UsesInput>::Input, &Self::State) -> Vec<u8>,
+    EM: UsesState,
+    E: UsesState<State = Self::State>,
+    Z: UsesState<State = Self::State>,
+    Self::State: HasCorpus + HasSolutions + HasRand + HasMetadata,
 {
     #[inline]
     fn perform(
         &mut self,
         _fuzzer: &mut Z,
         _executor: &mut E,
-        state: &mut Z::State,
+        state: &mut Self::State,
         _manager: &mut EM,
     ) -> Result<(), Error> {
-        let (mut corpus_idx, mut solutions_idx) =
+        let (mut corpus_id, mut solutions_id) =
             if let Some(meta) = state.metadata_map().get::<DumpToDiskMetadata>() {
                 (
                     meta.last_corpus.and_then(|x| state.corpus().next(x)),
@@ -70,7 +70,7 @@ where
                 (state.corpus().first(), state.solutions().first())
             };
 
-        while let Some(i) = corpus_idx {
+        while let Some(i) = corpus_id {
             let mut testcase = state.corpus().get(i)?.borrow_mut();
             state.corpus().load_input_into(&mut testcase)?;
             let bytes = (self.to_bytes)(testcase.input().as_ref().unwrap(), state);
@@ -85,16 +85,16 @@ where
             let mut f = File::create(fname)?;
             drop(f.write_all(&bytes));
 
-            corpus_idx = state.corpus().next(i);
+            corpus_id = state.corpus().next(i);
         }
 
-        while let Some(i) = solutions_idx {
-            let mut testcase = state.solutions().get(i)?.borrow_mut();
+        while let Some(current_id) = solutions_id {
+            let mut testcase = state.solutions().get(current_id)?.borrow_mut();
             state.solutions().load_input_into(&mut testcase)?;
             let bytes = (self.to_bytes)(testcase.input().as_ref().unwrap(), state);
 
             let fname = self.solutions_dir.join(format!(
-                "id_{i}_{}",
+                "id_{current_id}_{}",
                 testcase
                     .filename()
                     .as_ref()
@@ -103,7 +103,7 @@ where
             let mut f = File::create(fname)?;
             drop(f.write_all(&bytes));
 
-            solutions_idx = state.solutions().next(i);
+            solutions_id = state.solutions().next(current_id);
         }
 
         state.add_metadata(DumpToDiskMetadata {
@@ -115,13 +115,13 @@ where
     }
 
     #[inline]
-    fn restart_progress_should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
         // Not executing the target, so restart safety is not needed
         Ok(true)
     }
 
     #[inline]
-    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
         // Not executing the target, so restart safety is not needed
         Ok(())
     }
@@ -129,9 +129,9 @@ where
 
 impl<CB, EM, Z> DumpToDiskStage<CB, EM, Z>
 where
-    EM: UsesState<State = Z::State>,
+    EM: UsesState,
     Z: UsesState,
-    Z::State: HasCorpus + HasSolutions + HasRand + HasMetadata,
+    <Self as UsesState>::State: HasCorpus + HasSolutions + HasRand + HasMetadata,
 {
     /// Create a new [`DumpToDiskStage`]
     pub fn new<A, B>(to_bytes: CB, corpus_dir: A, solutions_dir: B) -> Result<Self, Error>

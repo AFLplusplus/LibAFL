@@ -1,6 +1,9 @@
 //! The calibration stage. The fuzzer measures the average exec time and the bitmap size.
 
-use alloc::{borrow::Cow, vec::Vec};
+use alloc::{
+    borrow::{Cow, ToOwned},
+    vec::Vec,
+};
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
 
 use hashbrown::HashSet;
@@ -14,18 +17,16 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{map::MapFeedbackMetadata, HasObserverHandle},
     fuzzer::Evaluator,
-    inputs::UsesInput,
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
     schedulers::powersched::SchedulerMetadata,
-    stages::{ExecutionCountRestartHelper, Stage},
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, State, UsesState},
+    stages::{RetryCountRestartHelper, Stage},
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
 
 /// The metadata to keep unstable entries
-/// In libafl, the stability is the number of the unstable entries divided by the size of the map
-/// This is different from AFL++, which shows the number of the unstable entries divided by the number of filled entries.
+/// Formula is same as AFL++: number of unstable entries divided by the number of filled entries.
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
     allow(clippy::unsafe_derive_deserialize)
@@ -33,7 +34,7 @@ use crate::{
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct UnstableEntriesMetadata {
     unstable_entries: HashSet<usize>,
-    map_len: usize,
+    filled_entries_count: usize,
 }
 impl_serdeany!(UnstableEntriesMetadata);
 
@@ -43,7 +44,7 @@ impl UnstableEntriesMetadata {
     pub fn new() -> Self {
         Self {
             unstable_entries: HashSet::new(),
-            map_len: 0,
+            filled_entries_count: 0,
         }
     }
 
@@ -55,8 +56,8 @@ impl UnstableEntriesMetadata {
 
     /// Getter
     #[must_use]
-    pub fn map_len(&self) -> usize {
-        self.map_len
+    pub fn filled_entries_count(&self) -> usize {
+        self.filled_entries_count
     }
 }
 
@@ -70,37 +71,36 @@ impl Default for UnstableEntriesMetadata {
 pub const CALIBRATION_STAGE_NAME: &str = "calibration";
 /// The calibration stage will measure the average exec time and the target's stability for this input.
 #[derive(Clone, Debug)]
-pub struct CalibrationStage<C, O, OT, S> {
+pub struct CalibrationStage<C, E, O, OT> {
     map_observer_handle: Handle<C>,
     map_name: Cow<'static, str>,
     name: Cow<'static, str>,
     stage_max: usize,
     /// If we should track stability
     track_stability: bool,
-    restart_helper: ExecutionCountRestartHelper,
-    phantom: PhantomData<(O, OT, S)>,
+    phantom: PhantomData<(E, O, OT)>,
 }
 
 const CAL_STAGE_START: usize = 4; // AFL++'s CAL_CYCLES_FAST + 1
 const CAL_STAGE_MAX: usize = 8; // AFL++'s CAL_CYCLES + 1
 
-impl<C, O, OT, S> UsesState for CalibrationStage<C, O, OT, S>
+impl<C, E, O, OT> UsesState for CalibrationStage<C, E, O, OT>
 where
-    S: State,
+    E: UsesState,
 {
-    type State = S;
+    type State = E::State;
 }
 
-impl<C, E, EM, O, OT, Z> Stage<E, EM, Z> for CalibrationStage<C, O, OT, E::State>
+impl<C, E, EM, O, OT, Z> Stage<E, EM, Z> for CalibrationStage<C, E, O, OT>
 where
     E: Executor<EM, Z> + HasObservers<Observers = OT>,
-    EM: EventFirer<State = E::State>,
+    EM: EventFirer<State = Self::State>,
     O: MapObserver,
     C: AsRef<O>,
     for<'de> <O as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static,
-    OT: ObserversTuple<E::State>,
-    E::State: HasCorpus + HasMetadata + HasNamedMetadata + HasExecutions,
-    Z: Evaluator<E, EM, State = E::State>,
+    OT: ObserversTuple<Self::State>,
+    Self::State: HasCorpus + HasMetadata + HasNamedMetadata + HasExecutions,
+    Z: Evaluator<E, EM, State = Self::State>,
 {
     #[inline]
     #[allow(
@@ -112,7 +112,7 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut E::State,
+        state: &mut Self::State,
         mgr: &mut EM,
     ) -> Result<(), Error> {
         // Run this stage only once for each corpus entry and only if we haven't already inspected it
@@ -127,8 +127,6 @@ where
 
         let mut iter = self.stage_max;
         // If we restarted after a timeout or crash, do less iterations.
-        iter -= usize::try_from(self.restart_helper.execs_since_progress_start(state)?)?;
-
         let input = state.current_input_cloned()?;
 
         // Run once to get the initial calibration map
@@ -153,12 +151,27 @@ where
             .observers_mut()
             .post_exec_all(state, &input, &exit_kind)?;
 
-        let map_first = &executor.observers()[&self.map_observer_handle]
-            .as_ref()
-            .to_vec();
-
+        let observers = &executor.observers();
+        let map_first = observers[&self.map_observer_handle].as_ref();
+        let map_first_filled_count = match state
+            .named_metadata_map()
+            .get::<MapFeedbackMetadata<O::Entry>>(&self.map_name)
+        {
+            Some(metadata) => metadata.num_covered_map_indexes,
+            None => map_first.count_bytes().try_into().map_err(|len| {
+                Error::illegal_state(
+                    format!(
+                        "map's filled entry count ({}) is greater than usize::MAX ({})",
+                        len,
+                        usize::MAX,
+                    )
+                    .as_str(),
+                )
+            })?,
+        };
+        let map_first_entries = map_first.to_vec();
+        let map_first_len = map_first.to_vec().len();
         let mut unstable_entries: Vec<usize> = vec![];
-        let map_len: usize = map_first.len();
         // Run CAL_STAGE_START - 1 times, increase by 2 for every time a new
         // run is found to be unstable or to crash with CAL_STAGE_MAX total runs.
         let mut i = 1;
@@ -204,11 +217,11 @@ where
                     .unwrap()
                     .history_map;
 
-                if history_map.len() < map_len {
-                    history_map.resize(map_len, O::Entry::default());
+                if history_map.len() < map_first_len {
+                    history_map.resize(map_first_len, O::Entry::default());
                 }
 
-                for (idx, (first, (cur, history))) in map_first
+                for (idx, (first, (cur, history))) in map_first_entries
                     .iter()
                     .zip(map.iter().zip(history_map.iter_mut()))
                     .enumerate()
@@ -231,11 +244,11 @@ where
         if unstable_found {
             let metadata = state.metadata_or_insert_with(UnstableEntriesMetadata::new);
 
-            // If we see new stable entries executing this new corpus entries, then merge with the existing one
+            // If we see new unstable entries executing this new corpus entries, then merge with the existing one
             for item in unstable_entries {
                 metadata.unstable_entries.insert(item); // Insert newly found items
             }
-            metadata.map_len = map_len;
+            metadata.filled_entries_count = map_first_filled_count;
         } else if !state.has_metadata::<UnstableEntriesMetadata>() {
             send_default_stability = true;
             state.add_metadata(UnstableEntriesMetadata::new());
@@ -294,22 +307,22 @@ where
             data.set_handicap(handicap);
         }
 
-        *state.executions_mut() += u64::try_from(i).unwrap();
-
         // Send the stability event to the broker
         if unstable_found {
             if let Some(meta) = state.metadata_map().get::<UnstableEntriesMetadata>() {
                 let unstable_entries = meta.unstable_entries().len();
-                let map_len = meta.map_len();
-                debug_assert_ne!(map_len, 0, "The map_len must never be 0");
+                debug_assert_ne!(
+                    map_first_filled_count, 0,
+                    "The map's filled count must never be 0"
+                );
                 mgr.fire(
                     state,
                     Event::UpdateUserStats {
                         name: Cow::from("stability"),
                         value: UserStats::new(
                             UserStatsValue::Ratio(
-                                (map_len - unstable_entries) as u64,
-                                map_len as u64,
+                                (map_first_filled_count - unstable_entries) as u64,
+                                map_first_filled_count as u64,
                             ),
                             AggregatorOps::Avg,
                         ),
@@ -323,7 +336,10 @@ where
                 Event::UpdateUserStats {
                     name: Cow::from("stability"),
                     value: UserStats::new(
-                        UserStatsValue::Ratio(map_len as u64, map_len as u64),
+                        UserStatsValue::Ratio(
+                            map_first_filled_count as u64,
+                            map_first_filled_count as u64,
+                        ),
                         AggregatorOps::Avg,
                     ),
                     phantom: PhantomData,
@@ -334,24 +350,28 @@ where
         Ok(())
     }
 
-    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        // TODO: Make sure this is the correct way / there may be a better way?
-        self.restart_helper.restart_progress_should_run(state)
+    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        // Calibration stage disallow restarts
+        // If a testcase that causes crash/timeout in the queue, we need to remove it from the queue immediately.
+        RetryCountRestartHelper::no_retry(state, &self.name)
+
+        // todo
+        // remove this guy from corpus queue
     }
 
-    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
         // TODO: Make sure this is the correct way / there may be a better way?
-        self.restart_helper.clear_restart_progress(state)
+        RetryCountRestartHelper::clear_progress(state, &self.name)
     }
 }
 
-impl<C, O, OT, S> CalibrationStage<C, O, OT, S>
+impl<C, E, O, OT> CalibrationStage<C, E, O, OT>
 where
     O: MapObserver,
     for<'it> O: AsIter<'it, Item = O::Entry>,
     C: AsRef<O>,
-    OT: ObserversTuple<S>,
-    S: UsesInput + HasNamedMetadata,
+    OT: ObserversTuple<<Self as UsesState>::State>,
+    E: UsesState,
 {
     /// Create a new [`CalibrationStage`].
     #[must_use]
@@ -359,14 +379,16 @@ where
     where
         F: HasObserverHandle<Observer = C> + Named,
     {
+        let map_name = map_feedback.name().clone();
         Self {
             map_observer_handle: map_feedback.observer_handle().clone(),
-            map_name: map_feedback.name().clone(),
+            map_name: map_name.clone(),
             stage_max: CAL_STAGE_START,
             track_stability: true,
-            restart_helper: ExecutionCountRestartHelper::default(),
             phantom: PhantomData,
-            name: Cow::Borrowed(CALIBRATION_STAGE_NAME),
+            name: Cow::Owned(
+                CALIBRATION_STAGE_NAME.to_owned() + ":" + map_name.into_owned().as_str(),
+            ),
         }
     }
 
@@ -376,19 +398,13 @@ where
     where
         F: HasObserverHandle<Observer = C> + Named,
     {
-        Self {
-            map_observer_handle: map_feedback.observer_handle().clone(),
-            map_name: map_feedback.name().clone(),
-            stage_max: CAL_STAGE_START,
-            track_stability: false,
-            restart_helper: ExecutionCountRestartHelper::default(),
-            phantom: PhantomData,
-            name: Cow::Borrowed(CALIBRATION_STAGE_NAME),
-        }
+        let mut ret = Self::new(map_feedback);
+        ret.track_stability = false;
+        ret
     }
 }
 
-impl<C, O, OT, S> Named for CalibrationStage<C, O, OT, S> {
+impl<C, E, O, OT> Named for CalibrationStage<C, E, O, OT> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }

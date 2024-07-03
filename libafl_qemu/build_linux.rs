@@ -6,6 +6,13 @@ use std::{
 
 use libafl_qemu_build::maybe_generate_stub_bindings;
 
+static LIBAFL_QEMU_RUNTIME_TEST: &str = r#"
+#include <stdio.h>
+#include "libafl_qemu.h"
+
+int main() {}
+"#;
+
 #[allow(clippy::too_many_lines)]
 pub fn build() {
     // Note: Unique features are checked in libafl_qemu_sys
@@ -41,6 +48,17 @@ pub fn build() {
 
     let libafl_runtime_dir = src_dir.join("runtime");
     let libafl_qemu_hdr = libafl_runtime_dir.join(libafl_qemu_hdr_name);
+
+    let libafl_runtime_testfile = out_dir.join("runtime_test.c");
+    fs::write(&libafl_runtime_testfile, LIBAFL_QEMU_RUNTIME_TEST).expect("Could not write runtime test file");
+
+    let mut runtime_test_cc_compiler = cc::Build::new();
+
+    runtime_test_cc_compiler.cpp(false)
+        .include(&libafl_runtime_dir)
+        .file(&libafl_runtime_testfile);
+
+    runtime_test_cc_compiler.try_compile("runtime_test").unwrap();
 
     let runtime_bindings_file = out_dir.join("libafl_qemu_bindings.rs");
     let stub_runtime_bindings_file = src_dir.join("runtime/libafl_qemu_stub_bindings.rs");
@@ -119,8 +137,8 @@ pub fn build() {
     maybe_generate_stub_bindings(
         &cpu_target,
         &emulation_mode,
-        &stub_runtime_bindings_file,
-        &runtime_bindings_file
+        stub_runtime_bindings_file.as_path(),
+        runtime_bindings_file.as_path()
     );
 
     if (emulation_mode == "usermode") && (qemu_asan || qemu_asan_guest) {

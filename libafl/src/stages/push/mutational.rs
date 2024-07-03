@@ -71,7 +71,7 @@ where
 {
     /// Gets the number of iterations as a random number
     #[allow(clippy::unused_self, clippy::unnecessary_wraps)] // TODO: we should put this function into a trait later
-    fn iterations(&self, state: &mut CS::State, _corpus_idx: CorpusId) -> Result<usize, Error> {
+    fn iterations(&self, state: &mut CS::State, _corpus_id: CorpusId) -> Result<usize, Error> {
         Ok(1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS))
     }
 
@@ -112,8 +112,8 @@ where
         _observers: &mut OT,
     ) -> Result<(), Error> {
         // Find a testcase to work on, unless someone already set it
-        self.current_corpus_id = Some(if let Some(corpus_idx) = self.current_corpus_id {
-            corpus_idx
+        self.current_corpus_id = Some(if let Some(corpus_id) = self.current_corpus_id {
+            corpus_id
         } else {
             fuzzer.scheduler_mut().next(state)?
         });
@@ -169,7 +169,7 @@ where
     ) -> Result<(), Error> {
         // todo: is_interesting, etc.
 
-        fuzzer.execute_and_process(state, event_mgr, last_input, observers, &exit_kind, true)?;
+        fuzzer.evaluate_execution(state, event_mgr, last_input, observers, &exit_kind, true)?;
 
         start_timer!(state);
         self.mutator.post_exec(state, self.current_corpus_id)?;

@@ -18,7 +18,7 @@ use libafl::{
 use libafl_bolts::{cli::FuzzerOptions, tuples::MatchFirstType};
 use libafl_targets::drcov::DrCovBasicBlock;
 #[cfg(unix)]
-use nix::sys::mman::{mmap, MapFlags, ProtFlags};
+use nix::sys::mman::{mmap_anonymous, MapFlags, ProtFlags};
 use rangemap::RangeMap;
 #[cfg(target_arch = "aarch64")]
 use yaxpeax_arch::Arch;
@@ -30,11 +30,6 @@ use yaxpeax_x86::amd64::InstDecoder;
 #[cfg(feature = "cmplog")]
 use crate::cmplog_rt::CmpLogRuntime;
 use crate::{asan::asan_rt::AsanRuntime, coverage_rt::CoverageRuntime, drcov_rt::DrCovRuntime};
-
-#[cfg(target_vendor = "apple")]
-const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
-#[cfg(not(any(target_vendor = "apple", target_os = "windows")))]
-const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
 
 /// The Runtime trait
 pub trait FridaRuntime: 'static + Debug {
@@ -188,7 +183,7 @@ impl FridaInstrumentationHelperBuilder {
     /// # Example
     /// Instrument all modules in `/usr/lib` as well as `libfoo.so`:
     /// ```
-    ///# use libafl_frida::helper::FridaInstrumentationHelperBuilder;
+    ///# use libafl_frida::helper::FridaInstrumentationHelper;
     /// let builder = FridaInstrumentationHelper::builder()
     ///     .instrument_module_if(|module| module.name() == "libfoo.so")
     ///     .instrument_module_if(|module| module.path().starts_with("/usr/lib"));
@@ -217,7 +212,7 @@ impl FridaInstrumentationHelperBuilder {
     /// Instrument all modules in `/usr/lib`, but exclude `libfoo.so`.
     ///
     /// ```
-    ///# use libafl_frida::helper::FridaInstrumentationHelperBuilder;
+    ///# use libafl_frida::helper::FridaInstrumentationHelper;
     /// let builder = FridaInstrumentationHelper::builder()
     ///     .instrument_module_if(|module| module.path().starts_with("/usr/lib"))
     ///     .skip_module_if(|module| module.name() == "libfoo.so");
@@ -469,6 +464,7 @@ where
         })
     }
 
+    #[allow(clippy::too_many_lines)]
     fn transform(
         basic_block: StalkerIterator,
         output: &StalkerOutput,
@@ -489,13 +485,20 @@ where
                 let mut runtimes = (*runtimes_unborrowed).borrow_mut();
                 if first {
                     first = false;
-                    // log::info!(
-                    //     "block @ {:x} transformed to {:x}",
-                    //     address,
-                    //     output.writer().pc()
-                    // );
+                    log::trace!(
+                        "block @ {:x} transformed to {:x}",
+                        address,
+                        output.writer().pc()
+                    );
                     if let Some(rt) = runtimes.match_first_type_mut::<CoverageRuntime>() {
+                        let start = output.writer().pc();
                         rt.emit_coverage_mapping(address, output);
+                        log::trace!(
+                            "emitted coverage info mapping for {:x} at {:x}-{:x}",
+                            address,
+                            start,
+                            output.writer().pc()
+                        );
                     }
                     if let Some(_rt) = runtimes.match_first_type_mut::<DrCovRuntime>() {
                         basic_block_start = address;
@@ -511,6 +514,7 @@ where
                 #[cfg(target_arch = "x86_64")]
                 if let Some(details) = res {
                     if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
+                        let start = output.writer().pc();
                         rt.emit_shadow_check(
                             address,
                             output,
@@ -520,6 +524,12 @@ where
                             details.2,
                             details.3,
                             details.4,
+                        );
+                        log::trace!(
+                            "emitted shadow_check for {:x} at {:x}-{:x}",
+                            address,
+                            start,
+                            output.writer().pc()
                         );
                     }
                 }
@@ -613,26 +623,20 @@ where
     // workaround frida's frida-gum-allocate-near bug:
     #[cfg(unix)]
     fn workaround_gum_allocate_near() {
-        use std::fs::File;
-
         unsafe {
             for _ in 0..512 {
-                mmap::<File>(
+                mmap_anonymous(
                     None,
                     std::num::NonZeroUsize::new_unchecked(128 * 1024),
                     ProtFlags::PROT_NONE,
-                    ANONYMOUS_FLAG | MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
-                    None,
-                    0,
+                    MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
                 )
                 .expect("Failed to map dummy regions for frida workaround");
-                mmap::<File>(
+                mmap_anonymous(
                     None,
                     std::num::NonZeroUsize::new_unchecked(4 * 1024 * 1024),
                     ProtFlags::PROT_NONE,
-                    ANONYMOUS_FLAG | MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
-                    None,
-                    0,
+                    MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
                 )
                 .expect("Failed to map dummy regions for frida workaround");
             }

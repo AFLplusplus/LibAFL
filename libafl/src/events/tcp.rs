@@ -24,6 +24,8 @@ use libafl_bolts::core_affinity::CoreId;
 use libafl_bolts::os::startable_self;
 #[cfg(all(unix, feature = "std", not(miri)))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
+#[cfg(feature = "std")]
+use libafl_bolts::os::CTRL_C_EXIT;
 #[cfg(all(feature = "std", feature = "fork", unix))]
 use libafl_bolts::os::{fork, ForkResult};
 use libafl_bolts::{shmem::ShMemProvider, tuples::tuple_list, ClientId};
@@ -43,9 +45,9 @@ use super::{CustomBufEventResult, CustomBufHandlerFn};
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
     events::{
-        hooks::EventManagerHooksTuple, BrokerEventResult, Event, EventConfig, EventFirer,
-        EventManager, EventManagerId, EventProcessor, EventRestarter, HasCustomBufHandlers,
-        HasEventManagerId, ProgressReporter,
+        BrokerEventResult, Event, EventConfig, EventFirer, EventManager, EventManagerHooksTuple,
+        EventManagerId, EventProcessor, EventRestarter, HasCustomBufHandlers, HasEventManagerId,
+        ProgressReporter,
     },
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
@@ -316,14 +318,11 @@ where
     ) -> Result<BrokerEventResult, Error> {
         match &event {
             Event::NewTestcase {
-                input: _,
-                client_config: _,
-                exit_kind: _,
                 corpus_size,
-                observers_buf: _,
                 time,
                 executions,
                 forward_id,
+                ..
             } => {
                 let id = if let Some(id) = *forward_id {
                     id
@@ -622,11 +621,9 @@ where
                 input,
                 client_config,
                 exit_kind,
-                corpus_size: _,
                 observers_buf,
-                time: _,
-                executions: _,
                 forward_id,
+                ..
             } => {
                 log::info!("Received new Testcase from {client_id:?} ({client_config:?}, forward {forward_id:?})");
 
@@ -639,7 +636,7 @@ where
                     {
                         state.scalability_monitor_mut().testcase_with_observers += 1;
                     }
-                    fuzzer.execute_and_process(state, self, input, &observers, &exit_kind, false)?
+                    fuzzer.evaluate_execution(state, self, input, &observers, &exit_kind, false)?
                 } else {
                     #[cfg(feature = "scalability_introspection")]
                     {
@@ -772,7 +769,7 @@ where
                 Ok(()) => {
                     self.tcp.set_nonblocking(false).expect("set to blocking");
                     let len = u32::from_le_bytes(len_buf);
-                    let mut buf = vec![0_u8; len as usize + 4_usize];
+                    let mut buf = vec![0_u8; 4_usize + len as usize];
                     self.tcp.read_exact(&mut buf)?;
 
                     let mut client_id_buf = [0_u8; 4];
@@ -1278,7 +1275,7 @@ where
 
                 compiler_fence(Ordering::SeqCst);
 
-                if child_status == crate::events::CTRL_C_EXIT || staterestorer.wants_to_exit() {
+                if child_status == CTRL_C_EXIT || staterestorer.wants_to_exit() {
                     return Err(Error::shutting_down());
                 }
 

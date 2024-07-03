@@ -942,6 +942,7 @@ impl AsanRuntime {
         let cpp_libs = ["libc++.1.dylib", "libc++abi.dylib", "libsystem_c.dylib"];
         */
 
+        #[cfg(any(target_os = "linux", target_vendor = "apple"))]
         macro_rules! hook_cpp {
            ($libname:literal, $lib_ident:ident) => {
             log::info!("Hooking c++ functions in {}", $libname);
@@ -1721,11 +1722,11 @@ impl AsanRuntime {
                 ;   .arch x64
                // ; int3
                 ; mov     rdx, 1
-                ; shl     rdx, shadow_bit as i8 //rcx now contains the mask
-                ; mov rcx, rdi //copy address into rdx
-                ; and rcx, 7 //rsi now contains the offset for unaligned accesses
-                ; shr rdi, 3 //rdi now contains the shadow byte offset
-                ; add rdi, rdx //add rdx and rdi to get the address of the shadow byte. rdi now contains the shadow address
+                ; shl     rdx, shadow_bit as i8 //rdx = shadow_base
+                ; mov rcx, rdi //copy address into rcx
+                ; and rcx, 7 //remainder
+                ; shr rdi, 3 //start >> 3
+                ; add rdi, rdx //shadow_base + (start >> 3)
                 ; mov edx, [rdi]  //load 4 shadow bytes. We load 4 just in case of an unaligned access
                 ; bswap edx  //bswap to get it into an acceptable form
                 ; shl edx, cl //this shifts by the unaligned access offset. why does x86 require cl...
@@ -2258,7 +2259,7 @@ impl AsanRuntime {
     #[allow(clippy::result_unit_err)]
     pub fn asan_is_interesting_instruction(
         decoder: InstDecoder,
-        _address: u64,
+        address: u64,
         instr: &Insn,
     ) -> Option<(u8, X86Register, X86Register, u8, i32)> {
         let result = frida_to_cs(decoder, instr);
@@ -2290,6 +2291,8 @@ impl AsanRuntime {
             return None;
         }
 
+        log::trace!("{:#x} {:#?} {:#?}", address, cs_instr, cs_instr.to_string());
+
         for operand in operands {
             if operand.is_memory() {
                 // log::trace!("{:#?}", operand);
@@ -2297,12 +2300,17 @@ impl AsanRuntime {
                 // because in x64 there's no mem to mem inst, just return the first memory operand
 
                 if let Some((basereg, indexreg, scale, disp)) = operand_details(&operand) {
-                    let memsz = cs_instr.mem_size().unwrap().bytes_size().unwrap(); // this won't fail if it is mem access inst
+                    // if the base register is rip, then it is a pc-relative access
+                    // and does not deal with dynamically allocated memory
+                    if basereg != X86Register::Rip {
+                        let memsz = cs_instr.mem_size().unwrap().bytes_size().unwrap(); // this won't fail if it is mem access inst
 
-                    // println!("{:#?} {:#?} {:#?}", cs_instr, cs_instr.to_string(), operand);
-                    // println!("{:#?}", (memsz, basereg, indexreg, scale, disp));
-
-                    return Some((memsz, basereg, indexreg, scale, disp));
+                        // println!("{:#?} {:#?} {:#?}", cs_instr, cs_instr.to_string(), operand);
+                        // println!("{:#?}", (memsz, basereg, indexreg, scale, disp));
+                        log::trace!("ASAN Interesting operand {:#?}", operand);
+                        log::trace!("{:#?}", (memsz, basereg, indexreg, scale, disp));
+                        return Some((memsz, basereg, indexreg, scale, disp));
+                    }
                 } // else {} // perhaps avx instructions?
             }
         }

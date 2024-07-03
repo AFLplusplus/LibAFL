@@ -18,6 +18,8 @@ use libafl_bolts::{
 use num_traits::PrimInt;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
+#[cfg(feature = "track_hit_feedbacks")]
+use crate::feedbacks::premature_last_result_err;
 use crate::{
     corpus::Testcase,
     events::{Event, EventFirer},
@@ -45,7 +47,7 @@ pub type AlwaysInterestingMapFeedback<C, O, T> = MapFeedback<C, AllIsNovel, O, N
 /// but only, if a value is larger than `pow2` of the previous.
 pub type MaxMapPow2Feedback<C, O, T> = MapFeedback<C, NextPow2IsNovel, O, MaxReducer, T>;
 /// A [`MapFeedback`] that strives to maximize the map contents,
-/// but only, if a value is larger than `pow2` of the previous.
+/// but only, if a value is either `T::one()` or `T::max_value()`.
 pub type MaxMapOneOrFilledFeedback<C, O, T> = MapFeedback<C, OneOrFilledIsNovel, O, MaxReducer, T>;
 
 /// A `Reducer` function is used to aggregate values for the novelty search
@@ -391,6 +393,9 @@ pub struct MapFeedback<C, N, O, R, T> {
     map_ref: Handle<C>,
     /// Name of the feedback as shown in the `UserStats`
     stats_name: Cow<'static, str>,
+    // The previous run's result of [`Self::is_interesting`]
+    #[cfg(feature = "track_hit_feedbacks")]
+    last_result: Option<bool>,
     /// Phantom Data of Reducer
     phantom: PhantomData<(C, N, O, R, T)>,
 }
@@ -424,7 +429,12 @@ where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
-        Ok(self.is_interesting_default(state, manager, input, observers, exit_kind))
+        let res = self.is_interesting_default(state, manager, input, observers, exit_kind);
+        #[cfg(feature = "track_hit_feedbacks")]
+        {
+            self.last_result = Some(res);
+        }
+        Ok(res)
     }
 
     #[rustversion::not(nightly)]
@@ -440,7 +450,13 @@ where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
-        Ok(self.is_interesting_default(state, manager, input, observers, exit_kind))
+        let res = self.is_interesting_default(state, manager, input, observers, exit_kind);
+
+        #[cfg(feature = "track_hit_feedbacks")]
+        {
+            self.last_result = Some(res);
+        }
+        Ok(res)
     }
 
     fn append_metadata<EM, OT>(
@@ -479,10 +495,11 @@ where
                 .enumerate()
                 .filter(|(_, value)| *value != initial)
             {
-                if history_map[i] == initial {
+                let val = R::reduce(history_map[i], value);
+                if history_map[i] == initial && val != initial {
                     map_state.num_covered_map_indexes += 1;
                 }
-                history_map[i] = R::reduce(history_map[i], value);
+                history_map[i] = val;
                 indices.push(i);
             }
             let meta = MapIndexesMetadata::new(indices);
@@ -494,10 +511,11 @@ where
                 .enumerate()
                 .filter(|(_, value)| *value != initial)
             {
-                if history_map[i] == initial {
+                let val = R::reduce(history_map[i], value);
+                if history_map[i] == initial && val != initial {
                     map_state.num_covered_map_indexes += 1;
                 }
-                history_map[i] = R::reduce(history_map[i], value);
+                history_map[i] = val;
             }
         }
 
@@ -532,6 +550,11 @@ where
         )?;
 
         Ok(())
+    }
+
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Result<bool, Error> {
+        self.last_result.ok_or(premature_last_result_err())
     }
 }
 
@@ -648,7 +671,10 @@ where
                 }
             }
         }
-
+        #[cfg(feature = "track_hit_feedbacks")]
+        {
+            self.last_result = Some(interesting);
+        }
         Ok(interesting)
     }
 }
@@ -699,6 +725,8 @@ where
             name: map_observer.name().clone(),
             map_ref: map_observer.handle(),
             stats_name: create_stats_name(map_observer.name()),
+            #[cfg(feature = "track_hit_feedbacks")]
+            last_result: None,
             phantom: PhantomData,
         }
     }
@@ -714,6 +742,8 @@ where
             map_ref: map_observer.handle(),
             stats_name: create_stats_name(&name),
             name,
+            #[cfg(feature = "track_hit_feedbacks")]
+            last_result: None,
             phantom: PhantomData,
         }
     }

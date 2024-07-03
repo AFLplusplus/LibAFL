@@ -21,6 +21,7 @@ use std::{
 use libafl_bolts::{
     fs::{get_unique_std_input_file, InputFile},
     os::{dup2, pipes::Pipe},
+    ownedref::OwnedSlice,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{Handle, Handled, MatchNameRef, Prepend, RefIndexable},
     AsSlice, AsSliceMut, Truncate,
@@ -102,6 +103,7 @@ fn report_error_and_exit(status: i32) -> Result<(), Error> {
 /// The length of header bytes which tells shmem size
 const SHMEM_FUZZ_HDR_SIZE: usize = 4;
 const MAX_INPUT_SIZE_DEFAULT: usize = 1024 * 1024;
+const MIN_INPUT_SIZE_DEFAULT: usize = 1;
 
 /// The default signal to use to kill child processes
 const KILL_SIGNAL_DEFAULT: Signal = Signal::SIGTERM;
@@ -488,7 +490,7 @@ impl Forkserver {
         let st_read = unsafe { BorrowedFd::borrow_raw(st_read) };
 
         let mut readfds = FdSet::new();
-        readfds.insert(&st_read);
+        readfds.insert(st_read);
         // We'll pass a copied timeout to keep the original timeout intact, because select updates timeout to indicate how much time was left. See select(2)
         let sret = pselect(
             Some(readfds.highest().unwrap().as_raw_fd() + 1),
@@ -529,6 +531,8 @@ where
     map: Option<SP::ShMem>,
     phantom: PhantomData<S>,
     map_size: Option<usize>,
+    min_input_size: usize,
+    max_input_size: usize,
     #[cfg(feature = "regex")]
     asan_obs: Handle<AsanBacktraceObserver>,
     timeout: TimeSpec,
@@ -614,6 +618,7 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
     input_filename: Option<OsString>,
     shmem_provider: Option<&'a mut SP>,
     max_input_size: usize,
+    min_input_size: usize,
     map_size: Option<usize>,
     kill_signal: Option<Signal>,
     timeout: Option<Duration>,
@@ -656,6 +661,15 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             Some(t) => t.into(),
             None => Duration::from_millis(5000).into(),
         };
+        if self.min_input_size > self.max_input_size {
+            return Err(Error::illegal_argument(
+                format!(
+                    "Minimum input size ({}) must not exceed maximum input size ({})",
+                    self.min_input_size, self.max_input_size
+                )
+                .as_str(),
+            ));
+        }
 
         Ok(ForkserverExecutor {
             target,
@@ -667,6 +681,8 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             map,
             phantom: PhantomData,
             map_size: self.map_size,
+            min_input_size: self.min_input_size,
+            max_input_size: self.max_input_size,
             timeout,
             asan_obs: self
                 .asan_obs
@@ -729,6 +745,8 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             map,
             phantom: PhantomData,
             map_size: self.map_size,
+            min_input_size: self.min_input_size,
+            max_input_size: self.max_input_size,
             timeout,
             asan_obs: self
                 .asan_obs
@@ -1010,6 +1028,20 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         self
     }
 
+    /// Set the max input size
+    #[must_use]
+    pub fn max_input_size(mut self, size: usize) -> Self {
+        self.max_input_size = size;
+        self
+    }
+
+    /// Set the min input size
+    #[must_use]
+    pub fn min_input_size(mut self, size: usize) -> Self {
+        self.min_input_size = size;
+        self
+    }
+
     /// Adds an environmental var to the harness's commandline
     #[must_use]
     pub fn env<K, V>(mut self, key: K, val: V) -> Self
@@ -1131,6 +1163,7 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             shmem_provider: None,
             map_size: None,
             max_input_size: MAX_INPUT_SIZE_DEFAULT,
+            min_input_size: MIN_INPUT_SIZE_DEFAULT,
             kill_signal: None,
             timeout: None,
             asan_obs: None,
@@ -1157,6 +1190,7 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             shmem_provider: Some(shmem_provider),
             map_size: self.map_size,
             max_input_size: MAX_INPUT_SIZE_DEFAULT,
+            min_input_size: MIN_INPUT_SIZE_DEFAULT,
             kill_signal: None,
             timeout: None,
             asan_obs: None,
@@ -1194,6 +1228,21 @@ where
 
         let last_run_timed_out = self.forkserver.last_run_timed_out_raw();
 
+        let mut input_bytes = input.target_bytes();
+        let mut input_size = input_bytes.as_slice().len();
+        if input_size > self.max_input_size {
+            // Truncate like AFL++ does
+            input_size = self.max_input_size;
+        } else if input_size < self.min_input_size {
+            // Extend like AFL++ does
+            input_size = self.min_input_size;
+            let mut input_bytes_copy = Vec::with_capacity(input_size);
+            input_bytes_copy
+                .as_slice_mut()
+                .copy_from_slice(input_bytes.as_slice());
+            input_bytes = OwnedSlice::from(input_bytes_copy);
+        }
+        let input_size_in_bytes = input_size.to_ne_bytes();
         if self.uses_shmem_testcase {
             debug_assert!(
                 self.map.is_some(),
@@ -1202,21 +1251,14 @@ where
             // # Safety
             // Struct can never be created when uses_shmem_testcase is true and map is none.
             let map = unsafe { self.map.as_mut().unwrap_unchecked() };
-            let target_bytes = input.target_bytes();
-            let mut size = target_bytes.as_slice().len();
-            let max_size = map.len() - SHMEM_FUZZ_HDR_SIZE;
-            if size > max_size {
-                // Truncate like AFL++ does
-                size = max_size;
-            }
-            let size_in_bytes = size.to_ne_bytes();
-            // The first four bytes tells the size of the shmem.
+            // The first four bytes declares the size of the shmem.
             map.as_slice_mut()[..SHMEM_FUZZ_HDR_SIZE]
-                .copy_from_slice(&size_in_bytes[..SHMEM_FUZZ_HDR_SIZE]);
-            map.as_slice_mut()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
-                .copy_from_slice(&target_bytes.as_slice()[..size]);
+                .copy_from_slice(&input_size_in_bytes[..SHMEM_FUZZ_HDR_SIZE]);
+            map.as_slice_mut()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + input_size)]
+                .copy_from_slice(&input_bytes.as_slice()[..input_size]);
         } else {
-            self.input_file.write_buf(input.target_bytes().as_slice())?;
+            self.input_file
+                .write_buf(&input_bytes.as_slice()[..input_size])?;
         }
 
         let send_len = self.forkserver.write_ctl(last_run_timed_out)?;

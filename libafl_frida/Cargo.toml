@@ -18,12 +18,25 @@ categories = [
 ]
 
 [package.metadata.docs.rs]
-all-features = true
+no-default-features = true # We can't use auto-download inside docs.rs (no internet)
+all-features = false
+features = ["cmplog", "serdeany_autoreg", "track_hit_feedbacks", "document-features"]
 
 [features]
-default = ["serdeany_autoreg"]
+default = ["serdeany_autoreg", "auto-download"]
+document-features = ["dep:document-features"]
+
+#! # Feature Flags
+#! ### General Features
+
+## Enables `cmplog`, a mode that logs comparisons. This increases runtime overhead but also increases the fuzzer's solving capabilities. Should be used on some cores.
 cmplog = ["iced-x86"]
+## Automatically register all types with LibAFL's serializer. There's hardly a reason not to use this.
 serdeany_autoreg = ["libafl_bolts/serdeany_autoreg"]
+## If hit feedbacks should be tracked as part of LibAFL's feedback.
+track_hit_feedbacks = ["libafl/track_hit_feedbacks"]
+## If Frida should be automatically downloaded (else you'll have to provide a Frida version to use manually)
+auto-download = ["frida-gum-sys/auto-download", "frida-gum/auto-download"]
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
@@ -36,32 +49,30 @@ yaxpeax-x86 = "1.2.2"
 iced-x86 = { version = "1.20.0", features = ["code_asm"], optional = true }
 
 [dependencies]
-libafl = { path = "../libafl", default-features = false, version = "0.12.0", features = [
+libafl = { path = "../libafl", default-features = false, version = "0.13.1", features = [
     "std",
     "derive",
     "frida_cli",
 ] }
-libafl_bolts = { path = "../libafl_bolts", version = "0.12.0", default-features = false, features = [
+libafl_bolts = { path = "../libafl_bolts", version = "0.13.1", default-features = false, features = [
     "std",
     "derive",
     "frida_cli"
 ] }
-libafl_targets = { path = "../libafl_targets", version = "0.12.0", features = [
+libafl_targets = { path = "../libafl_targets", version = "0.13.1", features = [
     "std",
     "sancov_cmplog",
 ] }
 
-nix = { version = "0.27", features = ["mman"] }
+nix = { version = "0.29", features = ["mman"] }
 libc = "0.2"
 hashbrown = "0.14"
 rangemap = "1.3"
 frida-gum-sys = { version = "0.13.6", features = [
-    "auto-download",
     "event-sink",
     "invocation-listener",
 ] }
 frida-gum = { version = "0.13.6", features = [
-    "auto-download",
     "event-sink",
     "invocation-listener",
     "module-names",
@@ -76,18 +87,22 @@ backtrace = { version = "0.3", default-features = false, features = [
     "serde",
 ] }
 num-traits = "0.2"
-ahash = "0.8"
+ahash = "^0.8" # fetch the latest
 paste = "1.0"
 log = "0.4.20"
 mmap-rs = "0.6.0"
 bit_reverse = "0.1.8"
 yaxpeax-arch = "0.2.7"
 
+document-features = { version = "0.2", optional = true } # Document all features of this crate (for `cargo doc`)
+
 [target.'cfg(windows)'.dependencies]
-winsafe = {version = "0.0.20", features = ["kernel"]}
+winsafe = {version = "0.0.21", features = ["kernel"]}
 
 
 [dev-dependencies]
 serial_test = { version = "3", default-features = false, features = ["logging"] }
 clap = {version = "4.5", features = ["derive"]}
 libloading = "0.8"
+mimalloc = { version = "0.1", default-features = false }
+dlmalloc ={version = "0.2.6", features = ["global"]}

@@ -21,7 +21,7 @@ runs:
       shell: bash
       run: rustup toolchain install nightly --allow-downgrade
     - name: Install LLVM and Clang
-      uses: KyleMayes/install-llvm-action@v1
+      uses: KyleMayes/install-llvm-action@v2
       with:
         directory: ${{ runner.temp }}/llvm
         version: 17

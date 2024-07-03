@@ -214,12 +214,12 @@ fn fuzz(
             // Create a concolic trace
             ConcolicTracingStage::new(
                 TracingStage::new(
-                    MyCommandConfigurator.into_executor(tuple_list!(concolic_observer))
+                    MyCommandConfigurator.into_executor(tuple_list!(concolic_observer)),
                 ),
                 concolic_ref,
             ),
             // Use the concolic trace for z3-based solving
-            SimpleConcolicMutationalStage::default(),
+            SimpleConcolicMutationalStage::new(),
         );
 
         fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut restarting_mgr)?;
