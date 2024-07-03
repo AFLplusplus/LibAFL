@@ -7,7 +7,7 @@ readme = "../README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "testing", "security"]
 edition = "2021"
-categories = ["development-tools::testing", "fuzzing"]
+categories = ["development-tools::testing"]
 
 include = [
     "/src",
@@ -31,9 +31,6 @@ document-features = ["dep:document-features"]
 
 ## Enables the derive macros for the arbitrary dependency, transparently forwarded from libfuzzer-sys
 arbitrary-derive = ["libfuzzer-sys/arbitrary-derive"]
-
-## Enables fuzzer introspection with LibAFL's `introspection` feature
-introspection = []
 
 ## Enables forking in the fuzzer runtime for restarting managers for Unix systems (on by default)
 fork = []

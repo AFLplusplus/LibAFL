@@ -29,7 +29,7 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedRandMutator {
         if input.codes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
-            let val = state.rand_mut().choose(input.codes_mut());
+            let val = state.rand_mut().choose(input.codes_mut()).unwrap();
             *val = state.rand_mut().next() as u32;
             Ok(MutationResult::Mutated)
         }
@@ -60,7 +60,7 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedIncMutator {
         if input.codes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
-            let val = state.rand_mut().choose(input.codes_mut());
+            let val = state.rand_mut().choose(input.codes_mut()).unwrap();
             *val = val.wrapping_add(1);
             Ok(MutationResult::Mutated)
         }
@@ -91,7 +91,7 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedDecMutator {
         if input.codes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
-            let val = state.rand_mut().choose(input.codes_mut());
+            let val = state.rand_mut().choose(input.codes_mut()).unwrap();
             *val = val.wrapping_sub(1);
             Ok(MutationResult::Mutated)
         }
@@ -122,7 +122,7 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedAddMutator {
         if input.codes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
-            let val = state.rand_mut().choose(input.codes_mut());
+            let val = state.rand_mut().choose(input.codes_mut()).unwrap();
             let num = 1 + state.rand_mut().below(ARITH_MAX) as u32;
             *val = match state.rand_mut().below(2) {
                 0 => val.wrapping_add(num),
@@ -292,16 +292,16 @@ where
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         let size = input.codes().len();
 
+        let id = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
         // We don't want to use the testcase we're already using for splicing
-        let idx = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
         if let Some(cur) = state.corpus().current() {
-            if idx == *cur {
+            if id == *cur {
                 return Ok(MutationResult::Skipped);
             }
         }
 
         let other_size = {
-            let mut other_testcase = state.corpus().get_from_all(idx)?.borrow_mut();
+            let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
             other_testcase.load_input(state.corpus())?.codes().len()
         };
 
@@ -322,7 +322,7 @@ where
             }
         }
 
-        let other_testcase = state.corpus().get_from_all(idx)?.borrow_mut();
+        let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
         // no need to `load_input` again -  we did that above already.
         let other = other_testcase.input().as_ref().unwrap();
 
@@ -365,17 +365,17 @@ where
             return Ok(MutationResult::Skipped);
         }
 
+        let id = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
         // We don't want to use the testcase we're already using for splicing
-        let idx = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
         if let Some(cur) = state.corpus().current() {
-            if idx == *cur {
+            if id == *cur {
                 return Ok(MutationResult::Skipped);
             }
         }
 
         let other_size = {
             // new scope to make the borrow checker happy
-            let mut other_testcase = state.corpus().get_from_all(idx)?.borrow_mut();
+            let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
             other_testcase.load_input(state.corpus())?.codes().len()
         };
 
@@ -387,7 +387,7 @@ where
         let len = state.rand_mut().below(min(other_size - from, size));
         let to = state.rand_mut().below(size - len);
 
-        let other_testcase = state.corpus().get_from_all(idx)?.borrow_mut();
+        let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
         // no need to load the input again, it'll already be present at this point.
         let other = other_testcase.input().as_ref().unwrap();
 

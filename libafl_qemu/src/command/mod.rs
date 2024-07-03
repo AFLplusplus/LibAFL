@@ -1,12 +1,12 @@
 #[cfg(emulation_mode = "systemmode")]
 use std::collections::HashSet;
 use std::{
-    collections::HashMap,
     fmt::{Debug, Display, Error, Formatter},
     rc::Rc,
 };
 
 use enum_map::{Enum, EnumMap};
+use hashbrown::HashMap;
 use libafl::{
     executors::ExitKind,
     inputs::HasTargetBytes,

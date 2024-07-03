@@ -4,14 +4,19 @@ A well-known [`Stage`], for example, is the mutational stage, running multiple [
 Other stages may enrich [`crate::corpus::Testcase`]s with metadata.
 */
 
-use alloc::{borrow::Cow, boxed::Box, vec::Vec};
+use alloc::{
+    borrow::{Cow, ToOwned},
+    boxed::Box,
+    string::ToString,
+    vec::Vec,
+};
 use core::{fmt, marker::PhantomData};
 
 pub use calibrate::CalibrationStage;
 pub use colorization::*;
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", unix))]
 pub use concolic::ConcolicTracingStage;
-#[cfg(all(feature = "std", feature = "concolic_mutation"))]
+#[cfg(all(feature = "std", feature = "concolic_mutation", unix))]
 pub use concolic::SimpleConcolicMutationalStage;
 #[cfg(feature = "std")]
 pub use dump::*;
@@ -27,8 +32,6 @@ pub use mutational::{MutationalStage, StdMutationalStage};
 pub use power::{PowerMutationalStage, StdPowerMutationalStage};
 use serde::{Deserialize, Serialize};
 pub use stats::AflStatsStage;
-#[cfg(feature = "unicode")]
-pub use string::*;
 #[cfg(feature = "std")]
 pub use sync::*;
 pub use tmin::{
@@ -37,16 +40,18 @@ pub use tmin::{
 pub use tracing::{ShadowTracingStage, TracingStage};
 pub use tuneable::*;
 use tuple_list::NonEmptyTuple;
+#[cfg(feature = "unicode")]
+pub use unicode::*;
 
 use crate::{
     corpus::{CorpusId, HasCurrentCorpusId},
-    events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
+    events::{EventFirer, EventProcessor, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::{Executor, HasObservers},
     inputs::UsesInput,
     observers::ObserversTuple,
     schedulers::Scheduler,
     stages::push::PushStage,
-    state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand, State, UsesState},
+    state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand, State, Stoppable, UsesState},
     Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasMetadata, HasNamedMetadata,
     HasScheduler,
 };
@@ -58,7 +63,7 @@ pub mod tmin;
 
 pub mod calibrate;
 pub mod colorization;
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", unix))]
 pub mod concolic;
 #[cfg(feature = "std")]
 pub mod dump;
@@ -68,12 +73,12 @@ pub mod generation;
 pub mod logics;
 pub mod power;
 pub mod stats;
-#[cfg(feature = "unicode")]
-pub mod string;
 #[cfg(feature = "std")]
 pub mod sync;
 pub mod tracing;
 pub mod tuneable;
+#[cfg(feature = "unicode")]
+pub mod unicode;
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
@@ -86,18 +91,19 @@ where
     /// This method will be called before every call to [`Stage::perform`].
     /// Initialize the restart tracking for this stage, _if it is not yet initialized_.
     /// On restart, this will be called again.
-    /// As long as [`Stage::clear_restart_progress`], all subsequent calls happen on restart.
+    /// As long as [`Stage::clear_progress`], all subsequent calls happen on restart.
     /// Returns `true`, if the stage's [`Stage::perform`] method should run, else `false`.
-    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error>;
+    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error>;
 
     /// Clear the current status tracking of the associated stage
-    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error>;
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error>;
 
     /// Run the stage.
     ///
-    /// Before a call to perform, [`Stage::restart_progress_should_run`] will be (must be!) called.
-    /// After returning (so non-target crash or timeout in a restarting case), [`Stage::clear_restart_progress`] gets called.
+    /// Before a call to perform, [`Stage::should_restart`] will be (must be!) called.
+    /// After returning (so non-target crash or timeout in a restarting case), [`Stage::clear_progress`] gets called.
     /// A call to [`Stage::perform_restartable`] will do these things implicitly.
+    /// DON'T call this function directly except from `preform_restartable` !!
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -106,7 +112,7 @@ where
         manager: &mut EM,
     ) -> Result<(), Error>;
 
-    /// Run the stage, calling [`Stage::restart_progress_should_run`] and [`Stage::clear_restart_progress`] appropriately
+    /// Run the stage, calling [`Stage::should_restart`] and [`Stage::clear_progress`] appropriately
     fn perform_restartable(
         &mut self,
         fuzzer: &mut Z,
@@ -114,10 +120,10 @@ where
         state: &mut Self::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        if self.restart_progress_should_run(state)? {
+        if self.should_restart(state)? {
             self.perform(fuzzer, executor, state, manager)?;
         }
-        self.clear_restart_progress(state)
+        self.clear_progress(state)
     }
 }
 
@@ -129,7 +135,7 @@ where
     Z: UsesState<State = S>,
     S: UsesInput + HasCurrentStage,
 {
-    /// Performs all `Stages` in this tuple
+    /// Performs all `Stages` in this tuple.
     fn perform_all(
         &mut self,
         fuzzer: &mut Z,
@@ -168,10 +174,13 @@ where
     Head: Stage<E, EM, Z>,
     Tail: StagesTuple<E, EM, Head::State, Z> + HasConstLen,
     E: UsesState<State = Head::State>,
-    EM: UsesState<State = Head::State>,
+    EM: UsesState<State = Head::State> + EventProcessor<E, Z>,
     Z: UsesState<State = Head::State>,
     Head::State: HasCurrentStage,
 {
+    /// Performs all stages in the tuple,
+    /// Checks after every stage if state wants to stop
+    /// and returns an [`Error::ShuttingDown`] if so
     fn perform_all(
         &mut self,
         fuzzer: &mut Z,
@@ -203,6 +212,12 @@ where
 
                 state.clear_stage()?;
             }
+        }
+
+        if state.stop_requested() {
+            state.discard_stop_request();
+            manager.on_shutdown()?;
+            return Err(Error::shutting_down());
         }
 
         // Execute the remaining stages
@@ -267,10 +282,13 @@ impl<E, EM, S, Z> StagesTuple<E, EM, S, Z>
     for Vec<Box<dyn Stage<E, EM, Z, State = S, Input = S::Input>>>
 where
     E: UsesState<State = S>,
-    EM: UsesState<State = S>,
+    EM: UsesState<State = S> + EventProcessor<E, Z>,
     Z: UsesState<State = S>,
     S: UsesInput + HasCurrentStage + State,
 {
+    /// Performs all stages in the `Vec`
+    /// Checks after every stage if state wants to stop
+    /// and returns an [`Error::ShuttingDown`] if so
     fn perform_all(
         &mut self,
         fuzzer: &mut Z,
@@ -278,48 +296,49 @@ where
         state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        self.iter_mut()
-            .try_for_each(|x| x.perform_restartable(fuzzer, executor, state, manager))
+        self.iter_mut().try_for_each(|x| {
+            if state.stop_requested() {
+                state.discard_stop_request();
+                manager.on_shutdown()?;
+                return Err(Error::shutting_down());
+            }
+            x.perform_restartable(fuzzer, executor, state, manager)
+        })
     }
 }
 
+static mut CLOSURE_STAGE_ID: usize = 0;
+/// The name for closure stage
+pub static CLOSURE_STAGE_NAME: &str = "closure";
+
 /// A [`Stage`] that will call a closure
 #[derive(Debug)]
-pub struct ClosureStage<CB, E, EM, Z>
-where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<(), Error>,
-    E: UsesState,
-{
+pub struct ClosureStage<CB, E, EM, Z> {
+    name: Cow<'static, str>,
     closure: CB,
     phantom: PhantomData<(E, EM, Z)>,
 }
 
 impl<CB, E, EM, Z> UsesState for ClosureStage<CB, E, EM, Z>
 where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<(), Error>,
     E: UsesState,
 {
     type State = E::State;
 }
 
-impl<CB, E, EM, Z> Named for ClosureStage<CB, E, EM, Z>
-where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<(), Error>,
-    E: UsesState,
-{
+impl<CB, E, EM, Z> Named for ClosureStage<CB, E, EM, Z> {
     fn name(&self) -> &Cow<'static, str> {
-        static NAME: Cow<'static, str> = Cow::Borrowed("<unnamed fn>");
-        &NAME
+        &self.name
     }
 }
 
 impl<CB, E, EM, Z> Stage<E, EM, Z> for ClosureStage<CB, E, EM, Z>
 where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<(), Error>,
+    CB: FnMut(&mut Z, &mut E, &mut Self::State, &mut EM) -> Result<(), Error>,
     E: UsesState,
-    EM: UsesState<State = E::State>,
-    Z: UsesState<State = E::State>,
-    E::State: HasNamedMetadata,
+    EM: UsesState<State = Self::State>,
+    Z: UsesState<State = Self::State>,
+    Self::State: HasNamedMetadata,
 {
     fn perform(
         &mut self,
@@ -332,41 +351,34 @@ where
     }
 
     #[inline]
-    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        // Make sure we don't get stuck crashing on a single closure
-        RetryRestartHelper::restart_progress_should_run(state, self, 3)
+    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        // There's no restart safety in the content of the closure.
+        // don't restart
+        RetryCountRestartHelper::no_retry(state, &self.name)
     }
 
     #[inline]
-    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        RetryRestartHelper::clear_restart_progress(state, self)
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        RetryCountRestartHelper::clear_progress(state, &self.name)
     }
 }
 
 /// A stage that takes a closure
-impl<CB, E, EM, Z> ClosureStage<CB, E, EM, Z>
-where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<(), Error>,
-    E: UsesState,
-{
+impl<CB, E, EM, Z> ClosureStage<CB, E, EM, Z> {
     /// Create a new [`ClosureStage`]
     #[must_use]
     pub fn new(closure: CB) -> Self {
+        // unsafe but impossible that you create two threads both instantiating this instance
+        let stage_id = unsafe {
+            let ret = CLOSURE_STAGE_ID;
+            CLOSURE_STAGE_ID += 1;
+            ret
+        };
         Self {
+            name: Cow::Owned(CLOSURE_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_ref()),
             closure,
             phantom: PhantomData,
         }
-    }
-}
-
-impl<CB, E, EM, Z> From<CB> for ClosureStage<CB, E, EM, Z>
-where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<(), Error>,
-    E: UsesState,
-{
-    #[must_use]
-    fn from(closure: CB) -> Self {
-        Self::new(closure)
     }
 }
 
@@ -374,6 +386,7 @@ where
 #[allow(clippy::type_complexity)]
 #[derive(Debug)]
 pub struct PushStageAdapter<CS, EM, OT, PS, Z> {
+    name: Cow<'static, str>,
     push_stage: PS,
     phantom: PhantomData<(CS, EM, OT, Z)>,
 }
@@ -383,12 +396,25 @@ impl<CS, EM, OT, PS, Z> PushStageAdapter<CS, EM, OT, PS, Z> {
     /// to be used as a normal [`Stage`]
     #[must_use]
     pub fn new(push_stage: PS) -> Self {
+        // unsafe but impossible that you create two threads both instantiating this instance
+        let stage_id = unsafe {
+            let ret = PUSH_STAGE_ADAPTER_ID;
+            PUSH_STAGE_ADAPTER_ID += 1;
+            ret
+        };
         Self {
+            name: Cow::Owned(
+                PUSH_STAGE_ADAPTER_NAME.to_owned() + ":" + stage_id.to_string().as_str(),
+            ),
             push_stage,
             phantom: PhantomData,
         }
     }
 }
+/// The unique counter for this stage
+static mut PUSH_STAGE_ADAPTER_ID: usize = 0;
+/// The name for push stage adapter
+pub static PUSH_STAGE_ADAPTER_NAME: &str = "pushstageadapter";
 
 impl<CS, EM, OT, PS, Z> UsesState for PushStageAdapter<CS, EM, OT, PS, Z>
 where
@@ -397,20 +423,32 @@ where
     type State = CS::State;
 }
 
+impl<CS, EM, OT, PS, Z> Named for PushStageAdapter<CS, EM, OT, PS, Z> {
+    #[must_use]
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
+    }
+}
+
 impl<CS, E, EM, OT, PS, Z> Stage<E, EM, Z> for PushStageAdapter<CS, EM, OT, PS, Z>
 where
     CS: Scheduler,
-    CS::State:
-        HasExecutions + HasMetadata + HasRand + HasCorpus + HasLastReportTime + HasCurrentCorpusId,
-    E: Executor<EM, Z> + HasObservers<Observers = OT, State = CS::State>,
-    EM: EventFirer<State = CS::State>
+    Self::State: HasExecutions
+        + HasRand
+        + HasCorpus
+        + HasLastReportTime
+        + HasCurrentCorpusId
+        + HasNamedMetadata
+        + HasMetadata,
+    E: Executor<EM, Z> + HasObservers<Observers = OT, State = Self::State>,
+    EM: EventFirer<State = Self::State>
         + EventRestarter
         + HasEventManagerId
-        + ProgressReporter<State = CS::State>,
-    OT: ObserversTuple<CS::State>,
+        + ProgressReporter<State = Self::State>,
+    OT: ObserversTuple<Self::State>,
     PS: PushStage<CS, EM, OT, Z>,
-    Z: ExecutesInput<E, EM, State = CS::State>
-        + ExecutionProcessor<OT, State = CS::State>
+    Z: ExecutesInput<E, EM, State = Self::State>
+        + ExecutionProcessor<OT, State = Self::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
 {
@@ -423,13 +461,13 @@ where
     ) -> Result<(), Error> {
         let push_stage = &mut self.push_stage;
 
-        let Some(corpus_idx) = state.current_corpus_id()? else {
+        let Some(corpus_id) = state.current_corpus_id()? else {
             return Err(Error::illegal_state(
                 "state is not currently processing a corpus index",
             ));
         };
 
-        push_stage.set_current_corpus_id(corpus_idx);
+        push_stage.set_current_corpus_id(corpus_id);
 
         push_stage.init(fuzzer, state, event_mgr, &mut *executor.observers_mut())?;
 
@@ -459,48 +497,51 @@ where
     }
 
     #[inline]
-    fn restart_progress_should_run(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
         // TODO: Proper restart handling - call post_exec at the right time, etc...
-        Ok(true)
+        RetryCountRestartHelper::no_retry(state, &self.name)
     }
 
     #[inline]
-    fn clear_restart_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
-        Ok(())
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        RetryCountRestartHelper::clear_progress(state, &self.name)
     }
 }
 
 /// Progress which permits a fixed amount of resumes per round of fuzzing. If this amount is ever
 /// exceeded, the input will no longer be executed by this stage.
 #[derive(Clone, Deserialize, Serialize, Debug)]
-pub struct RetryRestartHelper {
+pub struct RetryCountRestartHelper {
     tries_remaining: Option<usize>,
     skipped: HashSet<CorpusId>,
 }
 
-impl_serdeany!(RetryRestartHelper);
+impl_serdeany!(RetryCountRestartHelper);
 
-impl RetryRestartHelper {
+impl RetryCountRestartHelper {
+    /// Don't allow restart
+    pub fn no_retry<S>(state: &mut S, name: &str) -> Result<bool, Error>
+    where
+        S: HasNamedMetadata + HasCurrentCorpusId,
+    {
+        Self::should_restart(state, name, 1)
+    }
+
     /// Initializes (or counts down in) the progress helper, giving it the amount of max retries
     ///
     /// Returns `true` if the stage should run
-    pub fn restart_progress_should_run<S, ST>(
-        state: &mut S,
-        stage: &ST,
-        max_retries: usize,
-    ) -> Result<bool, Error>
+    pub fn should_restart<S>(state: &mut S, name: &str, max_retries: usize) -> Result<bool, Error>
     where
         S: HasNamedMetadata + HasCurrentCorpusId,
-        ST: Named,
     {
-        let corpus_idx = state.current_corpus_id()?.ok_or_else(|| {
+        let corpus_id = state.current_corpus_id()?.ok_or_else(|| {
             Error::illegal_state(
-                "No current_corpus_id set in State, but called RetryRestartHelper::should_skip",
+                "No current_corpus_id set in State, but called RetryCountRestartHelper::should_skip",
             )
         })?;
 
         let initial_tries_remaining = max_retries + 1;
-        let metadata = state.named_metadata_or_insert_with(stage.name(), || Self {
+        let metadata = state.named_metadata_or_insert_with(name, || Self {
             tries_remaining: Some(initial_tries_remaining),
             skipped: HashSet::new(),
         });
@@ -517,9 +558,9 @@ impl RetryRestartHelper {
         metadata.tries_remaining = Some(tries_remaining);
 
         Ok(if tries_remaining == 0 {
-            metadata.skipped.insert(corpus_idx);
+            metadata.skipped.insert(corpus_id);
             false
-        } else if metadata.skipped.contains(&corpus_idx) {
+        } else if metadata.skipped.contains(&corpus_id) {
             // skip this testcase, we already retried it often enough...
             false
         } else {
@@ -528,14 +569,11 @@ impl RetryRestartHelper {
     }
 
     /// Clears the progress
-    pub fn clear_restart_progress<S, ST>(state: &mut S, stage: &ST) -> Result<(), Error>
+    pub fn clear_progress<S>(state: &mut S, name: &str) -> Result<(), Error>
     where
         S: HasNamedMetadata,
-        ST: Named,
     {
-        state
-            .named_metadata_mut::<Self>(stage.name())?
-            .tries_remaining = None;
+        state.named_metadata_mut::<Self>(name)?.tries_remaining = None;
         Ok(())
     }
 }
@@ -610,15 +648,15 @@ impl ExecutionCountRestartHelper {
     }
 
     /// The execs done since start of this [`Stage`]/helper
-    pub fn execs_since_progress_start<S>(&mut self, state: &mut S) -> Result<u64, Error>
+    pub fn execs_since_progress_start<S>(&mut self, state: &mut S, name: &str) -> Result<u64, Error>
     where
-        S: HasMetadata + HasExecutions,
+        S: HasNamedMetadata + HasExecutions,
     {
         let started_at_execs = if let Some(started_at_execs) = self.started_at_execs {
             started_at_execs
         } else {
             state
-                .metadata::<ExecutionCountRestartHelperMetadata>()
+                .named_metadata::<ExecutionCountRestartHelperMetadata>(name)
                 .map(|x| {
                     self.started_at_execs = Some(x.started_at_execs);
                     x.started_at_execs
@@ -633,26 +671,27 @@ impl ExecutionCountRestartHelper {
     }
 
     /// Initialize progress for the stage this wrapper wraps.
-    pub fn restart_progress_should_run<S>(&mut self, state: &mut S) -> Result<bool, Error>
+    pub fn should_restart<S>(&mut self, state: &mut S, name: &str) -> Result<bool, Error>
     where
-        S: HasMetadata + HasExecutions,
+        S: HasNamedMetadata + HasExecutions,
     {
         let executions = *state.executions();
-        let metadata = state.metadata_or_insert_with(|| ExecutionCountRestartHelperMetadata {
-            started_at_execs: executions,
-        });
+        let metadata =
+            state.named_metadata_or_insert_with(name, || ExecutionCountRestartHelperMetadata {
+                started_at_execs: executions,
+            });
         self.started_at_execs = Some(metadata.started_at_execs);
         Ok(true)
     }
 
     /// Clear progress for the stage this wrapper wraps.
-    pub fn clear_restart_progress<S>(&mut self, state: &mut S) -> Result<(), Error>
+    pub fn clear_progress<S>(&mut self, state: &mut S) -> Result<(), Error>
     where
         S: HasMetadata,
     {
         self.started_at_execs = None;
         let _metadata = state.remove_metadata::<ExecutionCountRestartHelperMetadata>();
-        debug_assert!(_metadata.is_some(), "Called clear_restart_progress, but restart_progress_should_run was not called before (or did mutational stages get nested?)");
+        debug_assert!(_metadata.is_some(), "Called clear_progress, but should_restart was not called before (or did mutational stages get nested?)");
         Ok(())
     }
 }
@@ -668,7 +707,7 @@ pub mod test {
     use crate::{
         corpus::{Corpus, HasCurrentCorpusId, Testcase},
         inputs::NopInput,
-        stages::{RetryRestartHelper, Stage},
+        stages::{RetryCountRestartHelper, Stage},
         state::{test::test_std_state, HasCorpus, State, UsesState},
         HasMetadata,
     };
@@ -687,7 +726,7 @@ pub mod test {
 
     impl TestProgress {
         #[allow(clippy::unnecessary_wraps)]
-        fn restart_progress_should_run<S, ST>(state: &mut S, _stage: &ST) -> Result<bool, Error>
+        fn should_restart<S, ST>(state: &mut S, _stage: &ST) -> Result<bool, Error>
         where
             S: HasMetadata,
         {
@@ -703,7 +742,7 @@ pub mod test {
             Ok(true)
         }
 
-        fn clear_restart_progress<S, ST>(state: &mut S, _stage: &ST) -> Result<(), Error>
+        fn clear_progress<S, ST>(state: &mut S, _stage: &ST) -> Result<(), Error>
         where
             S: HasMetadata,
         {
@@ -740,12 +779,12 @@ pub mod test {
             Ok(())
         }
 
-        fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-            TestProgress::restart_progress_should_run(state, self)
+        fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+            TestProgress::should_restart(state, self)
         }
 
-        fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-            TestProgress::clear_restart_progress(state, self)
+        fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+            TestProgress::clear_progress(state, self)
         }
     }
 
@@ -755,7 +794,7 @@ pub mod test {
         // No concurrency per testcase
         #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
         unsafe {
-            RetryRestartHelper::register();
+            RetryCountRestartHelper::register();
         }
 
         struct StageWithOneTry;
@@ -770,50 +809,64 @@ pub mod test {
         let mut state = test_std_state();
         let stage = StageWithOneTry;
 
-        let corpus_idx = state.corpus_mut().add(Testcase::new(NopInput {}))?;
+        let corpus_id = state.corpus_mut().add(Testcase::new(NopInput {}))?;
 
-        state.set_corpus_idx(corpus_idx)?;
+        state.set_corpus_id(corpus_id)?;
 
         for _ in 0..10 {
             // used normally, no retries means we never skip
-            assert!(RetryRestartHelper::restart_progress_should_run(
-                &mut state, &stage, 1
+            assert!(RetryCountRestartHelper::should_restart(
+                &mut state,
+                stage.name(),
+                1
             )?);
-            RetryRestartHelper::clear_restart_progress(&mut state, &stage)?;
+            RetryCountRestartHelper::clear_progress(&mut state, stage.name())?;
         }
 
         for _ in 0..10 {
             // used normally, only one retry means we never skip
-            assert!(RetryRestartHelper::restart_progress_should_run(
-                &mut state, &stage, 2
+            assert!(RetryCountRestartHelper::should_restart(
+                &mut state,
+                stage.name(),
+                2
             )?);
-            assert!(RetryRestartHelper::restart_progress_should_run(
-                &mut state, &stage, 2
+            assert!(RetryCountRestartHelper::should_restart(
+                &mut state,
+                stage.name(),
+                2
             )?);
-            RetryRestartHelper::clear_restart_progress(&mut state, &stage)?;
+            RetryCountRestartHelper::clear_progress(&mut state, stage.name())?;
         }
 
-        assert!(RetryRestartHelper::restart_progress_should_run(
-            &mut state, &stage, 2
+        assert!(RetryCountRestartHelper::should_restart(
+            &mut state,
+            stage.name(),
+            2
         )?);
         // task failed, let's resume
         // we still have one more try!
-        assert!(RetryRestartHelper::restart_progress_should_run(
-            &mut state, &stage, 2
+        assert!(RetryCountRestartHelper::should_restart(
+            &mut state,
+            stage.name(),
+            2
         )?);
 
         // task failed, let's resume
         // out of retries, so now we skip
-        assert!(!RetryRestartHelper::restart_progress_should_run(
-            &mut state, &stage, 2
+        assert!(!RetryCountRestartHelper::should_restart(
+            &mut state,
+            stage.name(),
+            2
         )?);
-        RetryRestartHelper::clear_restart_progress(&mut state, &stage)?;
+        RetryCountRestartHelper::clear_progress(&mut state, stage.name())?;
 
         // we previously exhausted this testcase's retries, so we skip
-        assert!(!RetryRestartHelper::restart_progress_should_run(
-            &mut state, &stage, 2
+        assert!(!RetryCountRestartHelper::should_restart(
+            &mut state,
+            stage.name(),
+            2
         )?);
-        RetryRestartHelper::clear_restart_progress(&mut state, &stage)?;
+        RetryCountRestartHelper::clear_progress(&mut state, stage.name())?;
 
         Ok(())
     }

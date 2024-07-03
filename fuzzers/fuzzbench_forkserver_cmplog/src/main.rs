@@ -368,7 +368,7 @@ fn fuzz(
             .build(tuple_list!(cmplog_observer))
             .unwrap();
 
-        let tracing = AFLppCmplogTracingStage::with_cmplog_observer(cmplog_executor, cmplog_ref);
+        let tracing = AFLppCmplogTracingStage::new(cmplog_executor, cmplog_ref);
 
         // Setup a randomic Input2State stage
         let rq = MultiMutationalStage::new(AFLppRedQueen::with_cmplog_options(true, true));

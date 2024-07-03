@@ -104,14 +104,14 @@ impl<S> Scheduler for TuneableScheduler<S>
 where
     S: HasCorpus + HasMetadata + HasTestcase + State,
 {
-    fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
+    fn on_add(&mut self, state: &mut Self::State, id: CorpusId) -> Result<(), Error> {
         // Set parent id
-        let current_idx = *state.corpus().current();
+        let current_id = *state.corpus().current();
         state
             .corpus()
-            .get(idx)?
+            .get(id)?
             .borrow_mut()
-            .set_parent_id_optional(current_idx);
+            .set_parent_id_optional(current_id);
 
         Ok(())
     }

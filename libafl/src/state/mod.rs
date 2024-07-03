@@ -55,6 +55,7 @@ pub trait State:
     + MaybeHasScalabilityMonitor
     + HasCurrentCorpusId
     + HasCurrentStage
+    + Stoppable
 {
 }
 
@@ -260,7 +261,10 @@ pub struct StdState<I, C, R, SC> {
     /// This information is used by fuzzer `maybe_report_progress`.
     last_report_time: Option<Duration>,
     /// The current index of the corpus; used to record for resumable fuzzing.
-    corpus_idx: Option<CorpusId>,
+    corpus_id: Option<CorpusId>,
+    /// Request the fuzzer to stop at the start of the next stage
+    /// or at the beginning of the next fuzzing iteration
+    stop_requested: bool,
     stage_stack: StageStack,
     phantom: PhantomData<I>,
 }
@@ -459,18 +463,18 @@ impl<I, C, R, SC> HasStartTime for StdState<I, C, R, SC> {
 }
 
 impl<I, C, R, SC> HasCurrentCorpusId for StdState<I, C, R, SC> {
-    fn set_corpus_idx(&mut self, idx: CorpusId) -> Result<(), Error> {
-        self.corpus_idx = Some(idx);
+    fn set_corpus_id(&mut self, id: CorpusId) -> Result<(), Error> {
+        self.corpus_id = Some(id);
         Ok(())
     }
 
-    fn clear_corpus_idx(&mut self) -> Result<(), Error> {
-        self.corpus_idx = None;
+    fn clear_corpus_id(&mut self) -> Result<(), Error> {
+        self.corpus_id = None;
         Ok(())
     }
 
     fn current_corpus_id(&self) -> Result<Option<CorpusId>, Error> {
-        Ok(self.corpus_idx)
+        Ok(self.corpus_id)
     }
 }
 
@@ -481,19 +485,19 @@ where
 {
     /// Gets the current [`Testcase`] we are fuzzing
     ///
-    /// Will return [`Error::key_not_found`] if no `corpus_idx` is currently set.
+    /// Will return [`Error::key_not_found`] if no `corpus_id` is currently set.
     fn current_testcase(&self) -> Result<Ref<'_, Testcase<I>>, Error>;
     //fn current_testcase(&self) -> Result<&Testcase<I>, Error>;
 
     /// Gets the current [`Testcase`] we are fuzzing (mut)
     ///
-    /// Will return [`Error::key_not_found`] if no `corpus_idx` is currently set.
+    /// Will return [`Error::key_not_found`] if no `corpus_id` is currently set.
     fn current_testcase_mut(&self) -> Result<RefMut<'_, Testcase<I>>, Error>;
     //fn current_testcase_mut(&self) -> Result<&mut Testcase<I>, Error>;
 
     /// Gets a cloned representation of the current [`Testcase`].
     ///
-    /// Will return [`Error::key_not_found`] if no `corpus_idx` is currently set.
+    /// Will return [`Error::key_not_found`] if no `corpus_id` is currently set.
     ///
     /// # Note
     /// This allocates memory and copies the contents!
@@ -529,6 +533,32 @@ where
     fn current_input_cloned(&self) -> Result<I, Error> {
         let mut testcase = self.current_testcase_mut()?;
         Ok(testcase.borrow_mut().load_input(self.corpus())?.clone())
+    }
+}
+
+/// A trait for types that want to expose a stop API
+pub trait Stoppable {
+    /// Check if stop is requested
+    fn stop_requested(&self) -> bool;
+
+    /// Request to stop
+    fn request_stop(&mut self);
+
+    /// Discard the stop request
+    fn discard_stop_request(&mut self);
+}
+
+impl<I, C, R, SC> Stoppable for StdState<I, C, R, SC> {
+    fn request_stop(&mut self) {
+        self.stop_requested = true;
+    }
+
+    fn discard_stop_request(&mut self) {
+        self.stop_requested = false;
+    }
+
+    fn stop_requested(&self) -> bool {
+        self.stop_requested
     }
 }
 
@@ -568,7 +598,7 @@ where
     R: Rand,
     SC: Corpus<Input = <Self as UsesInput>::Input>,
 {
-    /// Decide if the state nust load the inputs
+    /// Decide if the state must load the inputs
     pub fn must_load_initial_inputs(&self) -> bool {
         self.corpus().count() == 0
             || (self.remaining_initial_files.is_some()
@@ -1081,12 +1111,13 @@ where
             rand,
             executions: 0,
             imported: 0,
-            start_time: Duration::from_millis(0),
+            start_time: libafl_bolts::current_time(),
             metadata: SerdeAnyMap::default(),
             named_metadata: NamedSerdeAnyMap::default(),
             corpus,
             solutions,
             max_size: DEFAULT_MAX_SIZE,
+            stop_requested: false,
             #[cfg(feature = "introspection")]
             introspection_monitor: ClientPerfMonitor::new(),
             #[cfg(feature = "scalability_introspection")]
@@ -1096,7 +1127,7 @@ where
             #[cfg(feature = "std")]
             dont_reenter: None,
             last_report_time: None,
-            corpus_idx: None,
+            corpus_id: None,
             stage_stack: StageStack::default(),
             phantom: PhantomData,
             #[cfg(feature = "std")]
@@ -1135,6 +1166,7 @@ impl<I, C, R, SC> HasScalabilityMonitor for StdState<I, C, R, SC> {
 pub struct NopState<I> {
     metadata: SerdeAnyMap,
     execution: u64,
+    stop_requested: bool,
     rand: StdRand,
     phantom: PhantomData<I>,
 }
@@ -1147,6 +1179,7 @@ impl<I> NopState<I> {
             metadata: SerdeAnyMap::new(),
             execution: 0,
             rand: StdRand::default(),
+            stop_requested: false,
             phantom: PhantomData,
         }
     }
@@ -1176,6 +1209,20 @@ impl<I> HasExecutions for NopState<I> {
 
     fn executions_mut(&mut self) -> &mut u64 {
         &mut self.execution
+    }
+}
+
+impl<I> Stoppable for NopState<I> {
+    fn request_stop(&mut self) {
+        self.stop_requested = true;
+    }
+
+    fn discard_stop_request(&mut self) {
+        self.stop_requested = false;
+    }
+
+    fn stop_requested(&self) -> bool {
+        self.stop_requested
     }
 }
 
@@ -1214,11 +1261,11 @@ impl<I> HasRand for NopState<I> {
 impl<I> State for NopState<I> where I: Input {}
 
 impl<I> HasCurrentCorpusId for NopState<I> {
-    fn set_corpus_idx(&mut self, _idx: CorpusId) -> Result<(), Error> {
+    fn set_corpus_id(&mut self, _id: CorpusId) -> Result<(), Error> {
         Ok(())
     }
 
-    fn clear_corpus_idx(&mut self) -> Result<(), Error> {
+    fn clear_corpus_id(&mut self) -> Result<(), Error> {
         Ok(())
     }
 

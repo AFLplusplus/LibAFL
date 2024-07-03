@@ -101,7 +101,7 @@ fn configure_qemu(
 
     if is_usermode {
         // Usermode options
-        cmd.args(["--disable-fdt", "--disable-system"]);
+        cmd.args(["--disable-fdt", "--disable-system", "--disable-docs"]);
     } else {
         // Systemmode options
         cmd.arg(if cfg!(feature = "slirp") {
@@ -434,7 +434,7 @@ pub fn build(
 
     /*
     let mut objects = vec![];
-    for dir in &[
+    for dir in [
         build_dir.join("libcommon.fa.p"),
         build_dir.join(format!("libqemu-{cpu_target}-{target_suffix}.fa.p")),
     ] {

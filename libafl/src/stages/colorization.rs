@@ -1,5 +1,9 @@
 //! The colorization stage from `colorization()` in afl++
-use alloc::{borrow::Cow, collections::binary_heap::BinaryHeap, vec::Vec};
+use alloc::{
+    borrow::{Cow, ToOwned},
+    collections::binary_heap::BinaryHeap,
+    vec::Vec,
+};
 use core::{cmp::Ordering, fmt::Debug, marker::PhantomData, ops::Range};
 
 use libafl_bolts::{
@@ -15,7 +19,7 @@ use crate::{
     inputs::HasMutatorBytes,
     mutators::mutations::buffer_copy,
     observers::{MapObserver, ObserversTuple},
-    stages::{RetryRestartHelper, Stage},
+    stages::{RetryCountRestartHelper, Stage},
     state::{HasCorpus, HasCurrentTestcase, HasRand, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -81,13 +85,13 @@ where
 
 impl<C, E, EM, O, Z> Stage<E, EM, Z> for ColorizationStage<C, E, EM, O, Z>
 where
-    EM: UsesState<State = E::State> + EventFirer,
+    EM: UsesState<State = Self::State> + EventFirer,
     E: HasObservers + Executor<EM, Z>,
-    E::State: HasCorpus + HasMetadata + HasRand + HasNamedMetadata,
+    Self::State: HasCorpus + HasMetadata + HasRand + HasNamedMetadata,
     E::Input: HasMutatorBytes,
     O: MapObserver,
     C: AsRef<O> + Named,
-    Z: UsesState<State = E::State>,
+    Z: UsesState<State = Self::State>,
 {
     #[inline]
     #[allow(clippy::let_and_return)]
@@ -95,7 +99,7 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E, // don't need the *main* executor for tracing
-        state: &mut E::State,
+        state: &mut Self::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
         // Run with the mutated input
@@ -104,14 +108,15 @@ where
         Ok(())
     }
 
-    fn restart_progress_should_run(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        // TODO this stage needs a proper resume
-        RetryRestartHelper::restart_progress_should_run(state, self, 3)
+    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+        // This is a deterministic stage
+        // Once it failed, then don't retry,
+        // It will just fail again
+        RetryCountRestartHelper::no_retry(state, &self.name)
     }
 
-    fn clear_restart_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        // TODO this stage needs a proper resume
-        RetryRestartHelper::clear_restart_progress(state, self)
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        RetryCountRestartHelper::clear_progress(state, &self.name)
     }
 }
 
@@ -156,20 +161,20 @@ libafl_bolts::impl_serdeany!(TaintMetadata);
 
 impl<C, E, EM, O, Z> ColorizationStage<C, E, EM, O, Z>
 where
-    EM: UsesState<State = E::State> + EventFirer,
+    EM: UsesState<State = <Self as UsesState>::State> + EventFirer,
     O: MapObserver,
     C: AsRef<O> + Named,
     E: HasObservers + Executor<EM, Z>,
-    E::State: HasCorpus + HasMetadata + HasRand,
+    <Self as UsesState>::State: HasCorpus + HasMetadata + HasRand,
     E::Input: HasMutatorBytes,
-    Z: UsesState<State = E::State>,
+    Z: UsesState<State = <Self as UsesState>::State>,
 {
     #[inline]
     #[allow(clippy::let_and_return)]
     fn colorize(
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut E::State,
+        state: &mut <Self as UsesState>::State,
         manager: &mut EM,
         observer_handle: &Handle<C>,
     ) -> Result<E::Input, Error> {
@@ -309,9 +314,10 @@ where
     #[must_use]
     /// Creates a new [`ColorizationStage`]
     pub fn new(map_observer: &C) -> Self {
+        let obs_name = map_observer.name().clone().into_owned();
         Self {
             map_observer_handle: map_observer.handle(),
-            name: Cow::Borrowed(COLORIZATION_STAGE_NAME),
+            name: Cow::Owned(COLORIZATION_STAGE_NAME.to_owned() + ":" + obs_name.as_str()),
             phantom: PhantomData,
         }
     }
@@ -320,7 +326,7 @@ where
     fn get_raw_map_hash_run(
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut E::State,
+        state: &mut <Self as UsesState>::State,
         manager: &mut EM,
         input: E::Input,
         observer_handle: &Handle<C>,
@@ -346,7 +352,7 @@ where
 
     /// Replace bytes with random values but following certain rules
     #[allow(clippy::needless_range_loop)]
-    fn type_replace(bytes: &mut [u8], state: &mut E::State) {
+    fn type_replace(bytes: &mut [u8], state: &mut <Self as UsesState>::State) {
         let len = bytes.len();
         for idx in 0..len {
             let c = match bytes[idx] {

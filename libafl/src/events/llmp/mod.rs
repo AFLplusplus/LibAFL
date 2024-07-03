@@ -20,13 +20,9 @@ use crate::{
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, NopInput, NopInputConverter, UsesInput},
-    state::{HasExecutions, NopState, State, UsesState},
+    state::{HasExecutions, NopState, State, Stoppable, UsesState},
     Error, HasMetadata,
 };
-
-/// The llmp broker
-pub mod broker;
-pub use broker::*;
 
 /// The llmp event manager
 pub mod mgr;
@@ -39,17 +35,17 @@ pub mod restarting;
 pub use restarting::*;
 
 /// Forward this to the client
-const _LLMP_TAG_EVENT_TO_CLIENT: Tag = Tag(0x2C11E471);
+pub(crate) const _LLMP_TAG_EVENT_TO_CLIENT: Tag = Tag(0x2C11E471);
 /// Only handle this in the broker
-const _LLMP_TAG_EVENT_TO_BROKER: Tag = Tag(0x2B80438);
+pub(crate) const _LLMP_TAG_EVENT_TO_BROKER: Tag = Tag(0x2B80438);
 /// Handle in both
 ///
-const LLMP_TAG_EVENT_TO_BOTH: Tag = Tag(0x2B0741);
-const _LLMP_TAG_RESTART: Tag = Tag(0x8357A87);
-const _LLMP_TAG_NO_RESTART: Tag = Tag(0x57A7EE71);
+pub(crate) const LLMP_TAG_EVENT_TO_BOTH: Tag = Tag(0x2B0741);
+pub(crate) const _LLMP_TAG_RESTART: Tag = Tag(0x8357A87);
+pub(crate) const _LLMP_TAG_NO_RESTART: Tag = Tag(0x57A7EE71);
 
 /// The minimum buffer size at which to compress LLMP IPC messages.
-#[cfg(any(feature = "llmp_compression", feature = "tcp_compression"))]
+#[cfg(feature = "llmp_compression")]
 pub const COMPRESS_THRESHOLD: usize = 1024;
 
 /// Specify if the State must be persistent over restarts
@@ -91,7 +87,7 @@ impl LlmpShouldSaveState {
 pub struct LlmpEventConverter<DI, IC, ICB, S, SP>
 where
     S: UsesInput,
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
     IC: InputConverter<From = S::Input, To = DI>,
     ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
@@ -153,7 +149,7 @@ impl LlmpEventConverterBuilder {
         converter_back: Option<ICB>,
     ) -> Result<LlmpEventConverter<DI, IC, ICB, S, SP>, Error>
     where
-        SP: ShMemProvider + 'static,
+        SP: ShMemProvider,
         S: UsesInput,
         IC: InputConverter<From = S::Input, To = DI>,
         ICB: InputConverter<From = DI, To = S::Input>,
@@ -182,7 +178,7 @@ impl LlmpEventConverterBuilder {
         converter_back: Option<ICB>,
     ) -> Result<LlmpEventConverter<DI, IC, ICB, S, SP>, Error>
     where
-        SP: ShMemProvider + 'static,
+        SP: ShMemProvider,
         S: UsesInput,
         IC: InputConverter<From = S::Input, To = DI>,
         ICB: InputConverter<From = DI, To = S::Input>,
@@ -212,7 +208,7 @@ impl LlmpEventConverterBuilder {
         converter_back: Option<ICB>,
     ) -> Result<LlmpEventConverter<DI, IC, ICB, S, SP>, Error>
     where
-        SP: ShMemProvider + 'static,
+        SP: ShMemProvider,
         S: UsesInput,
         IC: InputConverter<From = S::Input, To = DI>,
         ICB: InputConverter<From = DI, To = S::Input>,
@@ -235,7 +231,7 @@ impl LlmpEventConverterBuilder {
 
 impl<DI, IC, ICB, S, SP> core::fmt::Debug for LlmpEventConverter<DI, IC, ICB, S, SP>
 where
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider,
     S: UsesInput,
     IC: InputConverter<From = S::Input, To = DI>,
     ICB: InputConverter<From = DI, To = S::Input>,
@@ -257,8 +253,8 @@ where
 
 impl<DI, IC, ICB, S, SP> LlmpEventConverter<DI, IC, ICB, S, SP>
 where
-    S: UsesInput + HasExecutions + HasMetadata,
-    SP: ShMemProvider + 'static,
+    S: UsesInput + HasExecutions + HasMetadata + Stoppable,
+    SP: ShMemProvider,
     IC: InputConverter<From = S::Input, To = DI>,
     ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
@@ -304,16 +300,9 @@ where
     {
         match event {
             Event::NewTestcase {
-                input,
-                client_config: _,
-                exit_kind: _,
-                corpus_size: _,
-                observers_buf: _, // Useless as we are converting between types
-                time: _,
-                executions: _,
-                forward_id,
+                input, forward_id, ..
             } => {
-                log::info!("Received new Testcase to convert from {client_id:?} (forward {forward_id:?}, forward {forward_id:?})");
+                log::debug!("Received new Testcase to convert from {client_id:?} (forward {forward_id:?}, forward {forward_id:?})");
 
                 let Some(converter) = self.converter_back.as_mut() else {
                     return Ok(());
@@ -340,6 +329,7 @@ where
                 }
                 Ok(())
             }
+            Event::Stop => Ok(()),
             _ => Err(Error::unknown(format!(
                 "Received illegal message that message should not have arrived: {:?}.",
                 event.name()
@@ -387,6 +377,7 @@ where
             };
 
             let event: Event<DI> = postcard::from_bytes(event_bytes)?;
+            log::debug!("Processor received message {}", event.name_detailed());
             self.handle_in_client(fuzzer, executor, state, manager, client_id, event)?;
             count += 1;
         }
@@ -442,6 +433,8 @@ where
                 time,
                 executions,
                 forward_id,
+                #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
+                node_id,
             } => Event::NewTestcase {
                 input: self.converter.as_mut().unwrap().convert(input)?,
                 client_config,
@@ -451,6 +444,8 @@ where
                 time,
                 executions,
                 forward_id,
+                #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
+                node_id,
             },
             Event::CustomBuf { buf, tag } => Event::CustomBuf { buf, tag },
             _ => {
@@ -497,6 +492,8 @@ where
                 time,
                 executions,
                 forward_id,
+                #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
+                node_id,
             } => Event::NewTestcase {
                 input: self.converter.as_mut().unwrap().convert(input)?,
                 client_config,
@@ -506,6 +503,8 @@ where
                 time,
                 executions,
                 forward_id,
+                #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
+                node_id,
             },
             Event::CustomBuf { buf, tag } => Event::CustomBuf { buf, tag },
             _ => {

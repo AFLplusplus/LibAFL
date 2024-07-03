@@ -16,18 +16,18 @@ runs:
       with:
         profile: minimal
         toolchain: stable
-    - name: Add stable rustfmt and clippy
+    - name: Add stable clippy
       shell: bash
-      run: rustup toolchain install stable --component rustfmt --component clippy --allow-downgrade
-    - name: Add nightly rustfmt and clippy
+      run: rustup toolchain install stable --component clippy --allow-downgrade
+    - name: Add nightly clippy
       shell: bash
-      run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
+      run: rustup toolchain install nightly --component clippy --allow-downgrade
     - name: Remove obsolete llvm (Linux)
       if: runner.os == 'Linux'
       shell: bash
       run: sudo apt purge -y llvm* clang*
     - name: Install LLVM and Clang
-      uses: KyleMayes/install-llvm-action@v1
+      uses: KyleMayes/install-llvm-action@v2
       with:
         directory: ${{ runner.temp }}/llvm
         version: 17

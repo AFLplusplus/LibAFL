@@ -285,22 +285,24 @@ where
 #[cfg(test)]
 mod tests {
 
-    use alloc::{
-        string::{String, ToString},
-        vec::Vec,
-    };
-
+    #[cfg(not(target_os = "haiku"))]
     use serial_test::serial;
-
-    use crate::{
-        shmem::{ShMemProvider, StdShMemProvider},
-        staterestore::StateRestorer,
-    };
 
     #[test]
     #[serial]
     #[cfg_attr(miri, ignore)]
+    #[cfg(not(target_os = "haiku"))]
     fn test_state_restore() {
+        use alloc::{
+            string::{String, ToString},
+            vec::Vec,
+        };
+
+        use crate::{
+            shmem::{ShMemProvider, StdShMemProvider},
+            staterestore::StateRestorer,
+        };
+
         const TESTMAP_SIZE: usize = 1024;
 
         let mut shmem_provider = StdShMemProvider::new().unwrap();

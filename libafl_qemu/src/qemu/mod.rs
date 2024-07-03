@@ -905,7 +905,7 @@ impl QemuMemoryChunk {
         let new_addr = self.addr + range.start;
         let slice_size = range.clone().count();
 
-        if new_addr + (slice_size as GuestUsize) >= self.addr + self.size {
+        if new_addr + (slice_size as GuestUsize) >= self.addr + self.size.into() {
             return None;
         }
 
