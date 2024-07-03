@@ -27,19 +27,19 @@ use crate::{
     Error, HasMetadata,
 };
 
-/// Opens the given `path` and returns an error if it fails.
-/// If the open succeeds, it will return the file.
-/// If the open fails for _any_ reason, including, but not limited to, a preexisting existing file of that name,
+/// Creates the given `path` and returns an error if it fails.
+/// If the create succeeds, it will return the file.
+/// If the create fails for _any_ reason, including, but not limited to, a preexisting existing file of that name,
 /// it will instead return the respective [`io::Error`].
-fn open_unique<P: AsRef<Path>>(path: P) -> Result<File, io::Error> {
+fn create_new<P: AsRef<Path>>(path: P) -> Result<File, io::Error> {
     OpenOptions::new().write(true).create_new(true).open(path)
 }
 
-/// Tries to open the given `path` and returns `None` _only_ if the file already exists.
-/// If the open succeeds, it will return the file.
-/// If the open fails for some other reason, it will instead return the respective [`io::Error`].
-fn try_open<P: AsRef<Path>>(path: P) -> Result<Option<File>, io::Error> {
-    match open_unique(path) {
+/// Tries to create the given `path` and returns `None` _only_ if the file already existed.
+/// If the create succeeds, it will return the file.
+/// If the create fails for some other reason, it will instead return the respective [`io::Error`].
+fn try_create_new<P: AsRef<Path>>(path: P) -> Result<Option<File>, io::Error> {
+    match create_new(path) {
         Ok(ret) => Ok(Some(ret)),
         Err(err) if err.kind() == io::ErrorKind::AlreadyExists => Ok(None),
         Err(err) => Err(err),
@@ -351,7 +351,7 @@ where
                 let new_lock_filename = format!(".{new_filename}.lafl_lock");
 
                 // Try to create lock file for new testcases
-                if let Err(err) = open_unique(self.dir_path.join(&new_lock_filename)) {
+                if let Err(err) = create_new(self.dir_path.join(&new_lock_filename)) {
                     *testcase.filename_mut() = Some(old_filename);
                     return Err(Error::illegal_state(format!(
                         "Unable to create lock file {new_lock_filename} for new testcase: {err}"
@@ -402,7 +402,7 @@ where
                 let lockfile_name = format!(".{file_name}.lafl_lock");
                 let lockfile_path = self.dir_path.join(lockfile_name);
 
-                if try_open(lockfile_path)?.is_some() {
+                if try_create_new(lockfile_path)?.is_some() {
                     break file_name;
                 }
 
@@ -480,17 +480,17 @@ where
 mod tests {
     use std::{env, fs, io::Write};
 
-    use super::{open_unique, try_open};
+    use super::{create_new, try_create_new};
 
     #[test]
     fn test() {
         let tmp = env::temp_dir();
         let path = tmp.join("testfile.tmp");
         _ = fs::remove_file(&path);
-        let mut f = open_unique(&path).unwrap();
+        let mut f = create_new(&path).unwrap();
         f.write_all(&[0; 1]).unwrap();
 
-        match try_open(&path) {
+        match try_create_new(&path) {
             Ok(None) => (),
             Ok(_) => panic!("File {path:?} did not exist even though it should have?"),
             Err(e) => panic!("An unexpected error occurred: {e}"),
