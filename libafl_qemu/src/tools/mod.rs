@@ -58,33 +58,33 @@ where
     const HOOKS_DO_SIDE_EFFECTS: bool = true;
 
     /// Initialize the tool, mostly used to install some hooks early.
-    fn init_tool<QT>(&self, _emulator_tools: &mut EmulatorTools<QT, S>)
+    fn init_tool<ET>(&self, _emulator_tools: &mut EmulatorTools<ET, S>)
     where
-        QT: EmulatorToolTuple<S>,
+        ET: EmulatorToolTuple<S>,
     {
     }
 
-    fn first_exec<QT>(&self, _emulator_tools: &mut EmulatorTools<QT, S>)
+    fn first_exec<ET>(&self, _emulator_tools: &mut EmulatorTools<ET, S>)
     where
-        QT: EmulatorToolTuple<S>,
+        ET: EmulatorToolTuple<S>,
     {
     }
 
-    fn pre_exec<QT>(&mut self, _emulator_tools: &mut EmulatorTools<QT, S>, _input: &S::Input)
+    fn pre_exec<ET>(&mut self, _emulator_tools: &mut EmulatorTools<ET, S>, _input: &S::Input)
     where
-        QT: EmulatorToolTuple<S>,
+        ET: EmulatorToolTuple<S>,
     {
     }
 
-    fn post_exec<OT, QT>(
+    fn post_exec<OT, ET>(
         &mut self,
-        _emulator_tools: &mut EmulatorTools<QT, S>,
+        _emulator_tools: &mut EmulatorTools<ET, S>,
         _input: &S::Input,
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
-        QT: EmulatorToolTuple<S>,
+        ET: EmulatorToolTuple<S>,
     {
     }
 }
@@ -96,27 +96,27 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool;
 
-    fn init_tools_all<QT>(&self, _emulator_tools: &mut EmulatorTools<QT, S>)
+    fn init_tools_all<ET>(&self, _emulator_tools: &mut EmulatorTools<ET, S>)
     where
-        QT: EmulatorToolTuple<S>;
+        ET: EmulatorToolTuple<S>;
 
-    fn first_exec_all<QT>(&self, _emulator_tools: &mut EmulatorTools<QT, S>)
+    fn first_exec_all<ET>(&self, _emulator_tools: &mut EmulatorTools<ET, S>)
     where
-        QT: EmulatorToolTuple<S>;
+        ET: EmulatorToolTuple<S>;
 
-    fn pre_exec_all<QT>(&mut self, _emulator_tools: &mut EmulatorTools<QT, S>, _input: &S::Input)
+    fn pre_exec_all<ET>(&mut self, _emulator_tools: &mut EmulatorTools<ET, S>, _input: &S::Input)
     where
-        QT: EmulatorToolTuple<S>;
+        ET: EmulatorToolTuple<S>;
 
-    fn post_exec_all<OT, QT>(
+    fn post_exec_all<OT, ET>(
         &mut self,
-        _emulator_tools: &mut EmulatorTools<QT, S>,
+        _emulator_tools: &mut EmulatorTools<ET, S>,
         _input: &S::Input,
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
-        QT: EmulatorToolTuple<S>;
+        ET: EmulatorToolTuple<S>;
 }
 
 impl<S> EmulatorToolTuple<S> for ()
@@ -125,33 +125,33 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn init_tools_all<QT>(&self, _emulator_tools: &mut EmulatorTools<QT, S>)
+    fn init_tools_all<ET>(&self, _emulator_tools: &mut EmulatorTools<ET, S>)
     where
-        QT: EmulatorToolTuple<S>,
+        ET: EmulatorToolTuple<S>,
     {
     }
 
-    fn first_exec_all<QT>(&self, _emulator_tools: &mut EmulatorTools<QT, S>)
+    fn first_exec_all<ET>(&self, _emulator_tools: &mut EmulatorTools<ET, S>)
     where
-        QT: EmulatorToolTuple<S>,
+        ET: EmulatorToolTuple<S>,
     {
     }
 
-    fn pre_exec_all<QT>(&mut self, _emulator_tools: &mut EmulatorTools<QT, S>, _input: &S::Input)
+    fn pre_exec_all<ET>(&mut self, _emulator_tools: &mut EmulatorTools<ET, S>, _input: &S::Input)
     where
-        QT: EmulatorToolTuple<S>,
+        ET: EmulatorToolTuple<S>,
     {
     }
 
-    fn post_exec_all<OT, QT>(
+    fn post_exec_all<OT, ET>(
         &mut self,
-        _emulator_tools: &mut EmulatorTools<QT, S>,
+        _emulator_tools: &mut EmulatorTools<ET, S>,
         _input: &S::Input,
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
-        QT: EmulatorToolTuple<S>,
+        ET: EmulatorToolTuple<S>,
     {
     }
 }
@@ -164,39 +164,39 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = Head::HOOKS_DO_SIDE_EFFECTS || Tail::HOOKS_DO_SIDE_EFFECTS;
 
-    fn init_tools_all<QT>(&self, emulator_tools: &mut EmulatorTools<QT, S>)
+    fn init_tools_all<ET>(&self, emulator_tools: &mut EmulatorTools<ET, S>)
     where
-        QT: EmulatorToolTuple<S>,
+        ET: EmulatorToolTuple<S>,
     {
         self.0.init_tool(emulator_tools);
         self.1.init_tools_all(emulator_tools);
     }
 
-    fn first_exec_all<QT>(&self, emulator_tools: &mut EmulatorTools<QT, S>)
+    fn first_exec_all<ET>(&self, emulator_tools: &mut EmulatorTools<ET, S>)
     where
-        QT: EmulatorToolTuple<S>,
+        ET: EmulatorToolTuple<S>,
     {
         self.0.first_exec(emulator_tools);
         self.1.first_exec_all(emulator_tools);
     }
 
-    fn pre_exec_all<QT>(&mut self, emulator_tools: &mut EmulatorTools<QT, S>, input: &S::Input)
+    fn pre_exec_all<ET>(&mut self, emulator_tools: &mut EmulatorTools<ET, S>, input: &S::Input)
     where
-        QT: EmulatorToolTuple<S>,
+        ET: EmulatorToolTuple<S>,
     {
         self.0.pre_exec(emulator_tools, input);
         self.1.pre_exec_all(emulator_tools, input);
     }
 
-    fn post_exec_all<OT, QT>(
+    fn post_exec_all<OT, ET>(
         &mut self,
-        emulator_tools: &mut EmulatorTools<QT, S>,
+        emulator_tools: &mut EmulatorTools<ET, S>,
         input: &S::Input,
         observers: &mut OT,
         exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
-        QT: EmulatorToolTuple<S>,
+        ET: EmulatorToolTuple<S>,
     {
         self.0
             .post_exec(emulator_tools, input, observers, exit_kind);

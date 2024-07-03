@@ -51,8 +51,8 @@ pub use systemmode::*;
 
 use crate::{breakpoint::BreakpointId, command::CommandManager};
 
-type CommandRef<CM, E, QT, S> = Rc<dyn IsCommand<CM, E, QT, S>>;
-type BreakpointMutRef<CM, E, QT, S> = Rc<RefCell<Breakpoint<CM, E, QT, S>>>;
+type CommandRef<CM, E, ET, S> = Rc<dyn IsCommand<CM, E, ET, S>>;
+type BreakpointMutRef<CM, E, ET, S> = Rc<RefCell<Breakpoint<CM, E, ET, S>>>;
 
 #[derive(Clone, Copy)]
 pub enum GuestAddrKind {
@@ -61,16 +61,16 @@ pub enum GuestAddrKind {
 }
 
 #[derive(Debug, Clone)]
-pub enum EmulatorExitResult<CM, EH, QT, S>
+pub enum EmulatorExitResult<CM, EH, ET, S>
 where
-    CM: CommandManager<EH, QT, S>,
-    EH: EmulatorExitHandler<QT, S>,
-    QT: EmulatorToolTuple<S>,
+    CM: CommandManager<EH, ET, S>,
+    EH: EmulatorExitHandler<ET, S>,
+    ET: EmulatorToolTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     QemuExit(QemuShutdownCause), // QEMU ended for some reason.
-    Breakpoint(Rc<RefCell<Breakpoint<CM, EH, QT, S>>>), // Breakpoint triggered. Contains the address of the trigger.
-    SyncExit(Rc<RefCell<SyncExit<CM, EH, QT, S>>>), // Synchronous backdoor: The guest triggered a backdoor and should return to LibAFL.
+    Breakpoint(Rc<RefCell<Breakpoint<CM, EH, ET, S>>>), // Breakpoint triggered. Contains the address of the trigger.
+    SyncExit(Rc<RefCell<SyncExit<CM, EH, ET, S>>>), // Synchronous backdoor: The guest triggered a backdoor and should return to LibAFL.
 }
 
 #[derive(Debug, Clone)]
@@ -82,22 +82,22 @@ pub enum EmulatorExitError {
 }
 
 #[derive(Debug, Clone)]
-pub enum ExitHandlerResult<CM, EH, QT, S>
+pub enum ExitHandlerResult<CM, EH, ET, S>
 where
-    CM: CommandManager<EH, QT, S>,
-    EH: EmulatorExitHandler<QT, S>,
-    QT: EmulatorToolTuple<S>,
+    CM: CommandManager<EH, ET, S>,
+    EH: EmulatorExitHandler<ET, S>,
+    ET: EmulatorToolTuple<S>,
     S: Unpin + State + HasExecutions,
 {
-    ReturnToHarness(EmulatorExitResult<CM, EH, QT, S>), // Return to the harness immediately. Can happen at any point of the run when the handler is not supposed to handle a request.
+    ReturnToHarness(EmulatorExitResult<CM, EH, ET, S>), // Return to the harness immediately. Can happen at any point of the run when the handler is not supposed to handle a request.
     EndOfRun(ExitKind), // The run is over and the emulator is ready for the next iteration.
 }
 
-impl<CM, EH, QT, S> ExitHandlerResult<CM, EH, QT, S>
+impl<CM, EH, ET, S> ExitHandlerResult<CM, EH, ET, S>
 where
-    CM: CommandManager<EH, QT, S>,
-    EH: EmulatorExitHandler<QT, S>,
-    QT: EmulatorToolTuple<S>,
+    CM: CommandManager<EH, ET, S>,
+    EH: EmulatorExitHandler<ET, S>,
+    ET: EmulatorToolTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     #[must_use]
@@ -134,16 +134,16 @@ pub enum SnapshotManagerCheckError {
     SnapshotCheckError(QemuSnapshotCheckResult),
 }
 
-impl<CM, EH, QT, S> TryFrom<ExitHandlerResult<CM, EH, QT, S>> for ExitKind
+impl<CM, EH, ET, S> TryFrom<ExitHandlerResult<CM, EH, ET, S>> for ExitKind
 where
-    CM: CommandManager<EH, QT, S> + Debug,
-    EH: EmulatorExitHandler<QT, S>,
-    QT: EmulatorToolTuple<S> + Debug,
+    CM: CommandManager<EH, ET, S> + Debug,
+    EH: EmulatorExitHandler<ET, S>,
+    ET: EmulatorToolTuple<S> + Debug,
     S: Unpin + State + HasExecutions + Debug,
 {
     type Error = String;
 
-    fn try_from(value: ExitHandlerResult<CM, EH, QT, S>) -> Result<Self, Self::Error> {
+    fn try_from(value: ExitHandlerResult<CM, EH, ET, S>) -> Result<Self, Self::Error> {
         match value {
             ExitHandlerResult::ReturnToHarness(unhandled_qemu_exit) => {
                 Err(format!("Unhandled QEMU exit: {:?}", &unhandled_qemu_exit))
@@ -226,21 +226,21 @@ pub trait IsSnapshotManager: Debug + Clone {
     }
 }
 
-pub trait EmulatorExitHandler<QT, S>: Sized + Debug + Clone
+pub trait EmulatorExitHandler<ET, S>: Sized + Debug + Clone
 where
-    QT: EmulatorToolTuple<S>,
+    ET: EmulatorToolTuple<S>,
     S: Unpin + State + HasExecutions,
 {
-    fn qemu_pre_exec<CM: CommandManager<Self, QT, S>>(
-        emu: &mut Emulator<CM, Self, QT, S>,
+    fn qemu_pre_exec<CM: CommandManager<Self, ET, S>>(
+        emu: &mut Emulator<CM, Self, ET, S>,
         input: &S::Input,
     );
 
-    fn qemu_post_exec<CM: CommandManager<Self, QT, S>>(
-        emu: &mut Emulator<CM, Self, QT, S>,
-        exit_reason: Result<EmulatorExitResult<CM, Self, QT, S>, EmulatorExitError>,
+    fn qemu_post_exec<CM: CommandManager<Self, ET, S>>(
+        emu: &mut Emulator<CM, Self, ET, S>,
+        exit_reason: Result<EmulatorExitResult<CM, Self, ET, S>, EmulatorExitError>,
         input: &S::Input,
-    ) -> Result<Option<ExitHandlerResult<CM, Self, QT, S>>, ExitHandlerError>;
+    ) -> Result<Option<ExitHandlerResult<CM, Self, ET, S>>, ExitHandlerError>;
 }
 
 /// Special kind of Exit handler with no data embedded.
@@ -249,22 +249,22 @@ where
 #[derive(Clone, Debug)]
 pub struct NopEmulatorExitHandler;
 
-impl<QT, S> EmulatorExitHandler<QT, S> for NopEmulatorExitHandler
+impl<ET, S> EmulatorExitHandler<ET, S> for NopEmulatorExitHandler
 where
-    QT: EmulatorToolTuple<S>,
+    ET: EmulatorToolTuple<S>,
     S: Unpin + State + HasExecutions,
 {
-    fn qemu_pre_exec<CM: CommandManager<Self, QT, S>>(
-        _: &mut Emulator<CM, Self, QT, S>,
+    fn qemu_pre_exec<CM: CommandManager<Self, ET, S>>(
+        _: &mut Emulator<CM, Self, ET, S>,
         _: &S::Input,
     ) {
     }
 
-    fn qemu_post_exec<CM: CommandManager<Self, QT, S>>(
-        _: &mut Emulator<CM, Self, QT, S>,
-        exit_reason: Result<EmulatorExitResult<CM, Self, QT, S>, EmulatorExitError>,
+    fn qemu_post_exec<CM: CommandManager<Self, ET, S>>(
+        _: &mut Emulator<CM, Self, ET, S>,
+        exit_reason: Result<EmulatorExitResult<CM, Self, ET, S>, EmulatorExitError>,
         _: &S::Input,
-    ) -> Result<Option<ExitHandlerResult<CM, Self, QT, S>>, ExitHandlerError> {
+    ) -> Result<Option<ExitHandlerResult<CM, Self, ET, S>>, ExitHandlerError> {
         match exit_reason {
             Ok(reason) => Ok(Some(ExitHandlerResult::ReturnToHarness(reason))),
             Err(error) => Err(error)?,
@@ -337,15 +337,15 @@ where
 }
 
 // TODO: replace handlers with generics to permit compile-time customization of handlers
-impl<QT, S, SM> EmulatorExitHandler<QT, S> for StdEmulatorExitHandler<SM>
+impl<ET, S, SM> EmulatorExitHandler<ET, S> for StdEmulatorExitHandler<SM>
 where
-    QT: EmulatorToolTuple<S> + StdInstrumentationFilter + Debug,
+    ET: EmulatorToolTuple<S> + StdInstrumentationFilter + Debug,
     S: Unpin + State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
 {
-    fn qemu_pre_exec<CM: CommandManager<Self, QT, S>>(
-        emu: &mut Emulator<CM, Self, QT, S>,
+    fn qemu_pre_exec<CM: CommandManager<Self, ET, S>>(
+        emu: &mut Emulator<CM, Self, ET, S>,
         input: &S::Input,
     ) {
         let input_location = {
@@ -363,11 +363,11 @@ where
         }
     }
 
-    fn qemu_post_exec<CM: CommandManager<Self, QT, S>>(
-        emu: &mut Emulator<CM, Self, QT, S>,
-        exit_reason: Result<EmulatorExitResult<CM, Self, QT, S>, EmulatorExitError>,
+    fn qemu_post_exec<CM: CommandManager<Self, ET, S>>(
+        emu: &mut Emulator<CM, Self, ET, S>,
+        exit_reason: Result<EmulatorExitResult<CM, Self, ET, S>, EmulatorExitError>,
         input: &S::Input,
-    ) -> Result<Option<ExitHandlerResult<CM, Self, QT, S>>, ExitHandlerError> {
+    ) -> Result<Option<ExitHandlerResult<CM, Self, ET, S>>, ExitHandlerError> {
         let exit_handler = emu.exit_handler().borrow_mut();
         let qemu = emu.qemu();
 
@@ -388,7 +388,7 @@ where
         };
 
         #[allow(clippy::type_complexity)]
-        let (command, ret_reg): (Option<CommandRef<CM, Self, QT, S>>, Option<Regs>) =
+        let (command, ret_reg): (Option<CommandRef<CM, Self, ET, S>>, Option<Regs>) =
             match &mut exit_reason {
                 EmulatorExitResult::QemuExit(shutdown_cause) => match shutdown_cause {
                     QemuShutdownCause::HostSignal(signal) => {
@@ -431,11 +431,11 @@ impl From<CommandError> for ExitHandlerError {
     }
 }
 
-impl<CM, EH, QT, S> Display for EmulatorExitResult<CM, EH, QT, S>
+impl<CM, EH, ET, S> Display for EmulatorExitResult<CM, EH, ET, S>
 where
-    CM: CommandManager<EH, QT, S>,
-    EH: EmulatorExitHandler<QT, S>,
-    QT: EmulatorToolTuple<S>,
+    CM: CommandManager<EH, ET, S>,
+    EH: EmulatorExitHandler<ET, S>,
+    ET: EmulatorToolTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
@@ -458,38 +458,38 @@ impl From<CommandError> for EmulatorExitError {
 // TODO: Replace TypedBuilder by something better, it does not work correctly with default and
 // inter-dependent fields.
 #[derive(Debug, TypedBuilder)]
-pub struct Emulator<CM, EH, QT, S>
+pub struct Emulator<CM, EH, ET, S>
 where
-    CM: CommandManager<EH, QT, S>,
-    EH: EmulatorExitHandler<QT, S>,
-    QT: EmulatorToolTuple<S>,
+    CM: CommandManager<EH, ET, S>,
+    EH: EmulatorExitHandler<ET, S>,
+    ET: EmulatorToolTuple<S>,
     S: Unpin + State + HasExecutions,
 {
-    tools: Pin<Box<EmulatorTools<QT, S>>>,
+    tools: Pin<Box<EmulatorTools<ET, S>>>,
     command_manager: CM,
     exit_handler: RefCell<EH>,
     #[builder(default)]
-    breakpoints_by_addr: RefCell<HashMap<GuestAddr, BreakpointMutRef<CM, EH, QT, S>>>,
+    breakpoints_by_addr: RefCell<HashMap<GuestAddr, BreakpointMutRef<CM, EH, ET, S>>>,
     #[builder(default)]
-    breakpoints_by_id: RefCell<HashMap<BreakpointId, BreakpointMutRef<CM, EH, QT, S>>>,
+    breakpoints_by_id: RefCell<HashMap<BreakpointId, BreakpointMutRef<CM, EH, ET, S>>>,
     #[builder(setter(transform = |args: &[String], env: &[(String, String)]| Qemu::init(args, env).unwrap()))]
     qemu: Qemu,
-    _phantom: PhantomData<(QT, S)>,
+    _phantom: PhantomData<(ET, S)>,
 }
 
 #[allow(clippy::unused_self)]
-impl<CM, EH, QT, S> Emulator<CM, EH, QT, S>
+impl<CM, EH, ET, S> Emulator<CM, EH, ET, S>
 where
-    CM: CommandManager<EH, QT, S>,
-    EH: EmulatorExitHandler<QT, S>,
-    QT: EmulatorToolTuple<S>,
+    CM: CommandManager<EH, ET, S>,
+    EH: EmulatorExitHandler<ET, S>,
+    ET: EmulatorToolTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     #[allow(clippy::must_use_candidate, clippy::similar_names)]
     pub fn new(
         args: &[String],
         env: &[(String, String)],
-        tools: QT,
+        tools: ET,
         exit_handler: EH,
         command_manager: CM,
     ) -> Result<Self, QemuInitError> {
@@ -500,7 +500,7 @@ where
 
     pub fn new_with_qemu(
         qemu: Qemu,
-        tools: QT,
+        tools: ET,
         exit_handler: EH,
         command_manager: CM,
     ) -> Result<Self, QemuInitError> {
@@ -515,11 +515,11 @@ where
         })
     }
 
-    pub fn tools(&self) -> &EmulatorTools<QT, S> {
+    pub fn tools(&self) -> &EmulatorTools<ET, S> {
         &self.tools
     }
 
-    pub fn tools_mut(&mut self) -> &mut EmulatorTools<QT, S> {
+    pub fn tools_mut(&mut self) -> &mut EmulatorTools<ET, S> {
         self.tools.as_mut().get_mut()
     }
 
@@ -617,7 +617,7 @@ where
         self.qemu.read_reg(reg)
     }
 
-    pub fn add_breakpoint(&self, mut bp: Breakpoint<CM, EH, QT, S>, enable: bool) -> BreakpointId {
+    pub fn add_breakpoint(&self, mut bp: Breakpoint<CM, EH, ET, S>, enable: bool) -> BreakpointId {
         if enable {
             bp.enable(self.qemu);
         }
@@ -698,7 +698,7 @@ where
     ///
     /// Should, in general, be safe to call.
     /// Of course, the emulated target is not contained securely and can corrupt state or interact with the operating system.
-    pub unsafe fn run_qemu(&self) -> Result<EmulatorExitResult<CM, EH, QT, S>, EmulatorExitError> {
+    pub unsafe fn run_qemu(&self) -> Result<EmulatorExitResult<CM, EH, ET, S>, EmulatorExitError> {
         match self.qemu.run() {
             Ok(qemu_exit_reason) => Ok(match qemu_exit_reason {
                 QemuExitReason::End(qemu_shutdown_cause) => {
@@ -735,7 +735,7 @@ where
     pub unsafe fn run(
         &mut self,
         input: &S::Input,
-    ) -> Result<ExitHandlerResult<CM, EH, QT, S>, ExitHandlerError> {
+    ) -> Result<ExitHandlerResult<CM, EH, ET, S>, ExitHandlerError> {
         loop {
             // if self.first_exec {
             //     self.tools_mut().first_exec_all();

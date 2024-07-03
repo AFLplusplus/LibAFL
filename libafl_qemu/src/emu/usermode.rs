@@ -6,11 +6,11 @@ use crate::{
     Emulator, EmulatorExitHandler, EmulatorToolTuple, GuestMaps,
 };
 
-impl<CM, EH, QT, S> Emulator<CM, EH, QT, S>
+impl<CM, EH, ET, S> Emulator<CM, EH, ET, S>
 where
-    CM: CommandManager<EH, QT, S>,
-    EH: EmulatorExitHandler<QT, S>,
-    QT: EmulatorToolTuple<S>,
+    CM: CommandManager<EH, ET, S>,
+    EH: EmulatorExitHandler<ET, S>,
+    ET: EmulatorToolTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     /// This function gets the memory mappings from the emulator.

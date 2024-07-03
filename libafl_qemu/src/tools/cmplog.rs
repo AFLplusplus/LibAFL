@@ -79,12 +79,12 @@ impl<S> EmulatorTool<S> for QemuCmpLogTool
 where
     S: Unpin + UsesInput + HasMetadata,
 {
-    fn first_exec<QT>(&self, emulator_tools: &mut EmulatorTools<QT, S>)
+    fn first_exec<ET>(&self, emulator_tools: &mut EmulatorTools<ET, S>)
     where
-        QT: EmulatorToolTuple<S>,
+        ET: EmulatorToolTuple<S>,
     {
         emulator_tools.cmps(
-            Hook::Function(gen_unique_cmp_ids::<QT, S>),
+            Hook::Function(gen_unique_cmp_ids::<ET, S>),
             Hook::Raw(trace_cmp1_cmplog),
             Hook::Raw(trace_cmp2_cmplog),
             Hook::Raw(trace_cmp4_cmplog),
@@ -122,12 +122,12 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn first_exec<QT>(&self, emulator_tools: &mut EmulatorTools<QT, S>)
+    fn first_exec<ET>(&self, emulator_tools: &mut EmulatorTools<ET, S>)
     where
-        QT: EmulatorToolTuple<S>,
+        ET: EmulatorToolTuple<S>,
     {
         emulator_tools.cmps(
-            Hook::Function(gen_hashed_cmp_ids::<QT, S>),
+            Hook::Function(gen_hashed_cmp_ids::<ET, S>),
             Hook::Raw(trace_cmp1_cmplog),
             Hook::Raw(trace_cmp2_cmplog),
             Hook::Raw(trace_cmp4_cmplog),
@@ -136,14 +136,14 @@ where
     }
 }
 
-pub fn gen_unique_cmp_ids<QT, S>(
-    emulator_tools: &mut EmulatorTools<QT, S>,
+pub fn gen_unique_cmp_ids<ET, S>(
+    emulator_tools: &mut EmulatorTools<ET, S>,
     state: Option<&mut S>,
     pc: GuestAddr,
     _size: usize,
 ) -> Option<u64>
 where
-    QT: EmulatorToolTuple<S>,
+    ET: EmulatorToolTuple<S>,
     S: Unpin + UsesInput + HasMetadata,
 {
     if let Some(h) = emulator_tools.match_tool::<QemuCmpLogTool>() {
@@ -167,15 +167,15 @@ where
     }))
 }
 
-pub fn gen_hashed_cmp_ids<QT, S>(
-    emulator_tools: &mut EmulatorTools<QT, S>,
+pub fn gen_hashed_cmp_ids<ET, S>(
+    emulator_tools: &mut EmulatorTools<ET, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
     _size: usize,
 ) -> Option<u64>
 where
     S: HasMetadata + Unpin + UsesInput,
-    QT: EmulatorToolTuple<S>,
+    ET: EmulatorToolTuple<S>,
 {
     if let Some(h) = emulator_tools.match_tool::<QemuCmpLogChildTool>() {
         if !h.must_instrument(pc) {
@@ -258,14 +258,14 @@ impl QemuCmpLogRoutinesTool {
         }
     }
 
-    fn gen_blocks_calls<QT, S>(
-        emulator_tools: &mut EmulatorTools<QT, S>,
+    fn gen_blocks_calls<ET, S>(
+        emulator_tools: &mut EmulatorTools<ET, S>,
         _state: Option<&mut S>,
         pc: GuestAddr,
     ) -> Option<u64>
     where
         S: Unpin + UsesInput,
-        QT: EmulatorToolTuple<S>,
+        ET: EmulatorToolTuple<S>,
     {
         if let Some(h) = emulator_tools.match_tool::<Self>() {
             if !h.must_instrument(pc) {
@@ -361,12 +361,12 @@ impl<S> EmulatorTool<S> for QemuCmpLogRoutinesTool
 where
     S: Unpin + UsesInput,
 {
-    fn first_exec<QT>(&self, emulator_tools: &mut EmulatorTools<QT, S>)
+    fn first_exec<ET>(&self, emulator_tools: &mut EmulatorTools<ET, S>)
     where
-        QT: EmulatorToolTuple<S>,
+        ET: EmulatorToolTuple<S>,
     {
         emulator_tools.blocks(
-            Hook::Function(Self::gen_blocks_calls::<QT, S>),
+            Hook::Function(Self::gen_blocks_calls::<ET, S>),
             Hook::Empty,
             Hook::Empty,
         );

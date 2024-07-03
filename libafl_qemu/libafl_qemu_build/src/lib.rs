@@ -25,6 +25,7 @@ mod build;
 
 pub use build::build;
 
+#[rustversion::nightly]
 use crate::build::QEMU_REVISION;
 
 const LLVM_VERSION_MAX: i32 = 33;

@@ -68,9 +68,9 @@ pub struct Instance<'a, M: Monitor> {
 }
 
 impl<'a, M: Monitor> Instance<'a, M> {
-    pub fn run<QT>(&mut self, helpers: QT, state: Option<ClientState>) -> Result<(), Error>
+    pub fn run<ET>(&mut self, helpers: ET, state: Option<ClientState>) -> Result<(), Error>
     where
-        QT: QemuHelperTuple<ClientState> + Debug,
+        ET: QemuHelperTuple<ClientState> + Debug,
     {
         let mut hooks = QemuHooks::new(*self.qemu, helpers);
 

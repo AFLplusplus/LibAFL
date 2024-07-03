@@ -210,9 +210,9 @@ impl QemuInjectionTool {
         })
     }
 
-    fn on_call_check<QT, S>(emulator_tools: &mut EmulatorTools<QT, S>, id: usize, parameter: u8)
+    fn on_call_check<ET, S>(emulator_tools: &mut EmulatorTools<ET, S>, id: usize, parameter: u8)
     where
-        QT: EmulatorToolTuple<S>,
+        ET: EmulatorToolTuple<S>,
         S: Unpin + UsesInput,
     {
         let qemu = emulator_tools.qemu();
@@ -259,16 +259,16 @@ impl<S> EmulatorTool<S> for QemuInjectionTool
 where
     S: Unpin + UsesInput,
 {
-    fn init_tool<QT>(&self, emulator_tools: &mut EmulatorTools<QT, S>)
+    fn init_tool<ET>(&self, emulator_tools: &mut EmulatorTools<ET, S>)
     where
-        QT: EmulatorToolTuple<S>,
+        ET: EmulatorToolTuple<S>,
     {
-        emulator_tools.syscalls(Hook::Function(syscall_hook::<QT, S>));
+        emulator_tools.syscalls(Hook::Function(syscall_hook::<ET, S>));
     }
 
-    fn first_exec<QT>(&self, emulator_tools: &mut EmulatorTools<QT, S>)
+    fn first_exec<ET>(&self, emulator_tools: &mut EmulatorTools<ET, S>)
     where
-        QT: EmulatorToolTuple<S>,
+        ET: EmulatorToolTuple<S>,
     {
         let qemu = emulator_tools.qemu();
         let mut libs: Vec<LibInfo> = Vec::new();
@@ -332,8 +332,8 @@ where
     }
 }
 
-fn syscall_hook<QT, S>(
-    emulator_tools: &mut EmulatorTools<QT, S>, // our instantiated QemuHooks
+fn syscall_hook<ET, S>(
+    emulator_tools: &mut EmulatorTools<ET, S>, // our instantiated QemuHooks
     _state: Option<&mut S>,
     syscall: i32,  // syscall number
     x0: GuestAddr, // registers ...
@@ -346,7 +346,7 @@ fn syscall_hook<QT, S>(
     _x7: GuestAddr,
 ) -> SyscallHookResult
 where
-    QT: EmulatorToolTuple<S>,
+    ET: EmulatorToolTuple<S>,
     S: Unpin + UsesInput,
 {
     log::trace!("syscall_hook {syscall} {SYS_execve}");

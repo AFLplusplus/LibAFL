@@ -88,26 +88,26 @@ impl<S> EmulatorTool<S> for QemuDrCovTool
 where
     S: Unpin + UsesInput + HasMetadata,
 {
-    fn init_tool<QT>(&self, emulator_tools: &mut EmulatorTools<QT, S>)
+    fn init_tool<ET>(&self, emulator_tools: &mut EmulatorTools<ET, S>)
     where
-        QT: EmulatorToolTuple<S>,
+        ET: EmulatorToolTuple<S>,
     {
         emulator_tools.blocks(
-            Hook::Function(gen_unique_block_ids::<QT, S>),
-            Hook::Function(gen_block_lengths::<QT, S>),
-            Hook::Function(exec_trace_block::<QT, S>),
+            Hook::Function(gen_unique_block_ids::<ET, S>),
+            Hook::Function(gen_block_lengths::<ET, S>),
+            Hook::Function(exec_trace_block::<ET, S>),
         );
     }
 
-    fn post_exec<OT, QT>(
+    fn post_exec<OT, ET>(
         &mut self,
-        _emulator_tools: &mut EmulatorTools<QT, S>,
+        _emulator_tools: &mut EmulatorTools<ET, S>,
         _input: &S::Input,
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
-        QT: EmulatorToolTuple<S>,
+        ET: EmulatorToolTuple<S>,
     {
         let lengths_opt = DRCOV_LENGTHS.lock().unwrap();
         let lengths = lengths_opt.as_ref().unwrap();
@@ -189,14 +189,14 @@ where
     }
 }
 
-pub fn gen_unique_block_ids<QT, S>(
-    emulator_tools: &mut EmulatorTools<QT, S>,
+pub fn gen_unique_block_ids<ET, S>(
+    emulator_tools: &mut EmulatorTools<ET, S>,
     state: Option<&mut S>,
     pc: GuestAddr,
 ) -> Option<u64>
 where
     S: Unpin + UsesInput + HasMetadata,
-    QT: EmulatorToolTuple<S>,
+    ET: EmulatorToolTuple<S>,
 {
     let drcov_tool = emulator_tools.match_tool::<QemuDrCovTool>().unwrap();
     if !drcov_tool.must_instrument(pc) {
@@ -240,14 +240,14 @@ where
     }
 }
 
-pub fn gen_block_lengths<QT, S>(
-    emulator_tools: &mut EmulatorTools<QT, S>,
+pub fn gen_block_lengths<ET, S>(
+    emulator_tools: &mut EmulatorTools<ET, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
     block_length: GuestUsize,
 ) where
     S: Unpin + UsesInput + HasMetadata,
-    QT: EmulatorToolTuple<S>,
+    ET: EmulatorToolTuple<S>,
 {
     let drcov_tool = emulator_tools.match_tool::<QemuDrCovTool>().unwrap();
     if !drcov_tool.must_instrument(pc) {
@@ -261,12 +261,12 @@ pub fn gen_block_lengths<QT, S>(
         .insert(pc, block_length);
 }
 
-pub fn exec_trace_block<QT, S>(
-    emulator_tools: &mut EmulatorTools<QT, S>,
+pub fn exec_trace_block<ET, S>(
+    emulator_tools: &mut EmulatorTools<ET, S>,
     _state: Option<&mut S>,
     id: u64,
 ) where
-    QT: EmulatorToolTuple<S>,
+    ET: EmulatorToolTuple<S>,
     S: Unpin + UsesInput + HasMetadata,
 {
     if emulator_tools

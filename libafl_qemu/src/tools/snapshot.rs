@@ -672,31 +672,31 @@ impl<S> EmulatorTool<S> for QemuSnapshotTool
 where
     S: Unpin + UsesInput,
 {
-    fn init_tool<QT>(&self, emulator_tools: &mut EmulatorTools<QT, S>)
+    fn init_tool<ET>(&self, emulator_tools: &mut EmulatorTools<ET, S>)
     where
-        QT: EmulatorToolTuple<S>,
+        ET: EmulatorToolTuple<S>,
     {
         if emulator_tools.match_tool::<QemuAsanTool>().is_none() {
             // The ASan tool, if present, will call the tracer hook for the snapshot helper as opt
             emulator_tools.writes(
                 Hook::Empty,
-                Hook::Function(trace_write_snapshot::<QT, S, 1>),
-                Hook::Function(trace_write_snapshot::<QT, S, 2>),
-                Hook::Function(trace_write_snapshot::<QT, S, 4>),
-                Hook::Function(trace_write_snapshot::<QT, S, 8>),
-                Hook::Function(trace_write_n_snapshot::<QT, S>),
+                Hook::Function(trace_write_snapshot::<ET, S, 1>),
+                Hook::Function(trace_write_snapshot::<ET, S, 2>),
+                Hook::Function(trace_write_snapshot::<ET, S, 4>),
+                Hook::Function(trace_write_snapshot::<ET, S, 8>),
+                Hook::Function(trace_write_n_snapshot::<ET, S>),
             );
         }
 
         if !self.accurate_unmap {
-            emulator_tools.syscalls(Hook::Function(filter_mmap_snapshot::<QT, S>));
+            emulator_tools.syscalls(Hook::Function(filter_mmap_snapshot::<ET, S>));
         }
-        emulator_tools.after_syscalls(Hook::Function(trace_mmap_snapshot::<QT, S>));
+        emulator_tools.after_syscalls(Hook::Function(trace_mmap_snapshot::<ET, S>));
     }
 
-    fn pre_exec<QT>(&mut self, emulator_tools: &mut EmulatorTools<QT, S>, _input: &S::Input)
+    fn pre_exec<ET>(&mut self, emulator_tools: &mut EmulatorTools<ET, S>, _input: &S::Input)
     where
-        QT: EmulatorToolTuple<S>,
+        ET: EmulatorToolTuple<S>,
     {
         if self.empty {
             self.snapshot(emulator_tools.qemu());
@@ -706,28 +706,28 @@ where
     }
 }
 
-pub fn trace_write_snapshot<QT, S, const SIZE: usize>(
-    emulator_tools: &mut EmulatorTools<QT, S>,
+pub fn trace_write_snapshot<ET, S, const SIZE: usize>(
+    emulator_tools: &mut EmulatorTools<ET, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
 ) where
     S: Unpin + UsesInput,
-    QT: EmulatorToolTuple<S>,
+    ET: EmulatorToolTuple<S>,
 {
     let h = emulator_tools.match_tool_mut::<QemuSnapshotTool>().unwrap();
     h.access(addr, SIZE);
 }
 
-pub fn trace_write_n_snapshot<QT, S>(
-    emulator_tools: &mut EmulatorTools<QT, S>,
+pub fn trace_write_n_snapshot<ET, S>(
+    emulator_tools: &mut EmulatorTools<ET, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
     size: usize,
 ) where
     S: Unpin + UsesInput,
-    QT: EmulatorToolTuple<S>,
+    ET: EmulatorToolTuple<S>,
 {
     let h = emulator_tools.match_tool_mut::<QemuSnapshotTool>().unwrap();
     h.access(addr, size);
@@ -735,8 +735,8 @@ pub fn trace_write_n_snapshot<QT, S>(
 
 #[allow(clippy::too_many_arguments)]
 #[allow(non_upper_case_globals)]
-pub fn filter_mmap_snapshot<QT, S>(
-    emulator_tools: &mut EmulatorTools<QT, S>,
+pub fn filter_mmap_snapshot<ET, S>(
+    emulator_tools: &mut EmulatorTools<ET, S>,
     _state: Option<&mut S>,
     sys_num: i32,
     a0: GuestAddr,
@@ -750,7 +750,7 @@ pub fn filter_mmap_snapshot<QT, S>(
 ) -> SyscallHookResult
 where
     S: Unpin + UsesInput,
-    QT: EmulatorToolTuple<S>,
+    ET: EmulatorToolTuple<S>,
 {
     if i64::from(sys_num) == SYS_munmap {
         let h = emulator_tools.match_tool_mut::<QemuSnapshotTool>().unwrap();
@@ -763,8 +763,8 @@ where
 
 #[allow(clippy::too_many_arguments)]
 #[allow(non_upper_case_globals)]
-pub fn trace_mmap_snapshot<QT, S>(
-    emulator_tools: &mut EmulatorTools<QT, S>,
+pub fn trace_mmap_snapshot<ET, S>(
+    emulator_tools: &mut EmulatorTools<ET, S>,
     _state: Option<&mut S>,
     result: GuestAddr,
     sys_num: i32,
@@ -779,7 +779,7 @@ pub fn trace_mmap_snapshot<QT, S>(
 ) -> GuestAddr
 where
     S: Unpin + UsesInput,
-    QT: EmulatorToolTuple<S>,
+    ET: EmulatorToolTuple<S>,
 {
     // NOT A COMPLETE LIST OF MEMORY EFFECTS
     match i64::from(sys_num) {

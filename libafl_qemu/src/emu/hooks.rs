@@ -1,7 +1,8 @@
 #![allow(clippy::missing_transmute_annotations)]
 
-#[cfg(feature = "usermode")]
+#[cfg(emulation_mode = "usermode")]
 use std::ptr::addr_of_mut;
+
 use std::{fmt::Debug, marker::PhantomData, mem::transmute, pin::Pin, ptr};
 
 use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple};
@@ -14,7 +15,7 @@ use crate::qemu::{
     func_pre_syscall_hook_wrapper, NewThreadHook, NewThreadHookId, PostSyscallHook,
     PostSyscallHookId, PreSyscallHook, PreSyscallHookId, SyscallHookResult,
 };
-#[cfg(feature = "usermode")]
+#[cfg(emulation_mode = "usermode")]
 use crate::qemu::{
     CrashHookClosure, NewThreadHookClosure, PostSyscallHookClosure, PostSyscallHookFn,
     PreSyscallHookClosure, PreSyscallHookFn,
@@ -69,9 +70,9 @@ static mut EMULATOR_TOOLS: *mut () = ptr::null_mut();
 static mut CRASH_HOOKS: Vec<HookRepr> = vec![];
 
 #[cfg(emulation_mode = "usermode")]
-pub extern "C" fn crash_hook_wrapper<QT, S>(target_sig: i32)
+pub extern "C" fn crash_hook_wrapper<ET, S>(target_sig: i32)
 where
-    QT: EmulatorToolTuple<S>,
+    ET: EmulatorToolTuple<S>,
     S: Unpin + UsesInput,
 {
     unsafe {
@@ -95,26 +96,26 @@ where
 
 /// High-level hooks, notably used by `QemuTool`s
 #[derive(Debug)]
-pub struct EmulatorTools<QT, S>
+pub struct EmulatorTools<ET, S>
 where
-    QT: EmulatorToolTuple<S>,
+    ET: EmulatorToolTuple<S>,
     S: Unpin + UsesInput,
 {
     qemu: Qemu,
-    tools: Pin<Box<QT>>,
-    hooks: EmulatorHooks<QT, S>,
+    tools: Pin<Box<ET>>,
+    hooks: EmulatorHooks<ET, S>,
     phantom: PhantomData<S>,
 }
 
 /// Hook collection,
 #[derive(Debug)]
-pub struct EmulatorHooks<QT, S>
+pub struct EmulatorHooks<ET, S>
 where
-    QT: EmulatorToolTuple<S>,
+    ET: EmulatorToolTuple<S>,
     S: Unpin + UsesInput,
 {
     qemu_hooks: QemuHooks,
-    phantom: PhantomData<(QT, S)>,
+    phantom: PhantomData<(ET, S)>,
 
     instruction_hooks: Vec<Pin<Box<(InstructionHookId, FatPtr)>>>,
     backdoor_hooks: Vec<Pin<Box<(BackdoorHookId, FatPtr)>>>,
@@ -137,9 +138,9 @@ where
     crash_hooks: Vec<HookRepr>,
 }
 
-impl<QT, S> EmulatorHooks<QT, S>
+impl<ET, S> EmulatorHooks<ET, S>
 where
-    QT: EmulatorToolTuple<S>,
+    ET: EmulatorToolTuple<S>,
     S: Unpin + UsesInput,
 {
     #[must_use]
@@ -172,7 +173,7 @@ where
     pub fn instruction_closure(
         &mut self,
         addr: GuestAddr,
-        hook: InstructionHookClosure<QT, S>,
+        hook: InstructionHookClosure<ET, S>,
         invalidate_block: bool,
     ) -> InstructionHookId {
         let fat: FatPtr = unsafe { transmute(hook) };
@@ -192,7 +193,7 @@ where
             let id = self.qemu_hooks.add_instruction_hooks(
                 &mut *hook_state,
                 addr,
-                closure_instruction_hook_wrapper::<QT, S>,
+                closure_instruction_hook_wrapper::<ET, S>,
                 invalidate_block,
             );
             self.instruction_hooks
@@ -208,7 +209,7 @@ where
     pub fn instructions(
         &mut self,
         addr: GuestAddr,
-        hook: InstructionHook<QT, S>,
+        hook: InstructionHook<ET, S>,
         invalidate_block: bool,
     ) -> Option<InstructionHookId> {
         match hook {
@@ -228,14 +229,14 @@ where
     pub fn instruction_function(
         &mut self,
         addr: GuestAddr,
-        hook: InstructionHookFn<QT, S>,
+        hook: InstructionHookFn<ET, S>,
         invalidate_block: bool,
     ) -> InstructionHookId {
         unsafe {
             self.qemu_hooks.add_instruction_hooks(
                 transmute(hook),
                 addr,
-                func_instruction_hook_wrapper::<QT, S>,
+                func_instruction_hook_wrapper::<ET, S>,
                 invalidate_block,
             )
         }
@@ -243,13 +244,13 @@ where
 
     pub fn edges(
         &mut self,
-        generation_hook: EdgeGenHook<QT, S>,
-        execution_hook: EdgeExecHook<QT, S>,
+        generation_hook: EdgeGenHook<ET, S>,
+        execution_hook: EdgeExecHook<ET, S>,
     ) -> EdgeHookId {
         unsafe {
             let gen = get_raw_hook!(
                 generation_hook,
-                edge_gen_hook_wrapper::<QT, S>,
+                edge_gen_hook_wrapper::<ET, S>,
                 unsafe extern "C" fn(
                     &mut HookState<1, EdgeHookId>,
                     src: GuestAddr,
@@ -259,7 +260,7 @@ where
 
             let exec = get_raw_hook!(
                 execution_hook,
-                edge_0_exec_hook_wrapper::<QT, S>,
+                edge_0_exec_hook_wrapper::<ET, S>,
                 unsafe extern "C" fn(&mut HookState<1, EdgeHookId>, id: u64)
             );
 
@@ -293,20 +294,20 @@ where
 
     pub fn blocks(
         &mut self,
-        generation_hook: BlockGenHook<QT, S>,
-        post_generation_hook: BlockPostGenHook<QT, S>,
-        execution_hook: BlockExecHook<QT, S>,
+        generation_hook: BlockGenHook<ET, S>,
+        post_generation_hook: BlockPostGenHook<ET, S>,
+        execution_hook: BlockExecHook<ET, S>,
     ) -> BlockHookId {
         unsafe {
             let gen = get_raw_hook!(
                 generation_hook,
-                block_gen_hook_wrapper::<QT, S>,
+                block_gen_hook_wrapper::<ET, S>,
                 unsafe extern "C" fn(&mut HookState<1, BlockHookId>, pc: GuestAddr) -> u64
             );
 
             let postgen = get_raw_hook!(
                 post_generation_hook,
-                block_post_gen_hook_wrapper::<QT, S>,
+                block_post_gen_hook_wrapper::<ET, S>,
                 unsafe extern "C" fn(
                     &mut HookState<1, BlockHookId>,
                     pc: GuestAddr,
@@ -316,7 +317,7 @@ where
 
             let exec = get_raw_hook!(
                 execution_hook,
-                block_0_exec_hook_wrapper::<QT, S>,
+                block_0_exec_hook_wrapper::<ET, S>,
                 unsafe extern "C" fn(&mut HookState<1, BlockHookId>, id: u64)
             );
 
@@ -353,17 +354,17 @@ where
     #[allow(clippy::similar_names)]
     pub fn reads(
         &mut self,
-        generation_hook: ReadGenHook<QT, S>,
-        execution_hook_1: ReadExecHook<QT, S>,
-        execution_hook_2: ReadExecHook<QT, S>,
-        execution_hook_4: ReadExecHook<QT, S>,
-        execution_hook_8: ReadExecHook<QT, S>,
-        execution_hook_n: ReadExecNHook<QT, S>,
+        generation_hook: ReadGenHook<ET, S>,
+        execution_hook_1: ReadExecHook<ET, S>,
+        execution_hook_2: ReadExecHook<ET, S>,
+        execution_hook_4: ReadExecHook<ET, S>,
+        execution_hook_8: ReadExecHook<ET, S>,
+        execution_hook_n: ReadExecNHook<ET, S>,
     ) -> ReadHookId {
         unsafe {
             let gen = get_raw_hook!(
                 generation_hook,
-                read_gen_hook_wrapper::<QT, S>,
+                read_gen_hook_wrapper::<ET, S>,
                 unsafe extern "C" fn(
                     &mut HookState<5, ReadHookId>,
                     pc: GuestAddr,
@@ -373,27 +374,27 @@ where
             );
             let exec1 = get_raw_hook!(
                 execution_hook_1,
-                read_0_exec_hook_wrapper::<QT, S>,
+                read_0_exec_hook_wrapper::<ET, S>,
                 unsafe extern "C" fn(&mut HookState<5, ReadHookId>, id: u64, addr: GuestAddr)
             );
             let exec2 = get_raw_hook!(
                 execution_hook_2,
-                read_1_exec_hook_wrapper::<QT, S>,
+                read_1_exec_hook_wrapper::<ET, S>,
                 unsafe extern "C" fn(&mut HookState<5, ReadHookId>, id: u64, addr: GuestAddr)
             );
             let exec4 = get_raw_hook!(
                 execution_hook_4,
-                read_2_exec_hook_wrapper::<QT, S>,
+                read_2_exec_hook_wrapper::<ET, S>,
                 unsafe extern "C" fn(&mut HookState<5, ReadHookId>, id: u64, addr: GuestAddr)
             );
             let exec8 = get_raw_hook!(
                 execution_hook_8,
-                read_3_exec_hook_wrapper::<QT, S>,
+                read_3_exec_hook_wrapper::<ET, S>,
                 unsafe extern "C" fn(&mut HookState<5, ReadHookId>, id: u64, addr: GuestAddr)
             );
             let execn = get_raw_hook!(
                 execution_hook_n,
-                read_4_exec_hook_wrapper::<QT, S>,
+                read_4_exec_hook_wrapper::<ET, S>,
                 unsafe extern "C" fn(
                     &mut HookState<5, ReadHookId>,
                     id: u64,
@@ -441,17 +442,17 @@ where
     #[allow(clippy::similar_names)]
     pub fn writes(
         &mut self,
-        generation_hook: WriteGenHook<QT, S>,
-        execution_hook_1: WriteExecHook<QT, S>,
-        execution_hook_2: WriteExecHook<QT, S>,
-        execution_hook_4: WriteExecHook<QT, S>,
-        execution_hook_8: WriteExecHook<QT, S>,
-        execution_hook_n: WriteExecNHook<QT, S>,
+        generation_hook: WriteGenHook<ET, S>,
+        execution_hook_1: WriteExecHook<ET, S>,
+        execution_hook_2: WriteExecHook<ET, S>,
+        execution_hook_4: WriteExecHook<ET, S>,
+        execution_hook_8: WriteExecHook<ET, S>,
+        execution_hook_n: WriteExecNHook<ET, S>,
     ) -> WriteHookId {
         unsafe {
             let gen = get_raw_hook!(
                 generation_hook,
-                write_gen_hook_wrapper::<QT, S>,
+                write_gen_hook_wrapper::<ET, S>,
                 unsafe extern "C" fn(
                     &mut HookState<5, WriteHookId>,
                     pc: GuestAddr,
@@ -461,27 +462,27 @@ where
             );
             let exec1 = get_raw_hook!(
                 execution_hook_1,
-                write_0_exec_hook_wrapper::<QT, S>,
+                write_0_exec_hook_wrapper::<ET, S>,
                 unsafe extern "C" fn(&mut HookState<5, WriteHookId>, id: u64, addr: GuestAddr)
             );
             let exec2 = get_raw_hook!(
                 execution_hook_2,
-                write_1_exec_hook_wrapper::<QT, S>,
+                write_1_exec_hook_wrapper::<ET, S>,
                 unsafe extern "C" fn(&mut HookState<5, WriteHookId>, id: u64, addr: GuestAddr)
             );
             let exec4 = get_raw_hook!(
                 execution_hook_4,
-                write_2_exec_hook_wrapper::<QT, S>,
+                write_2_exec_hook_wrapper::<ET, S>,
                 unsafe extern "C" fn(&mut HookState<5, WriteHookId>, id: u64, addr: GuestAddr)
             );
             let exec8 = get_raw_hook!(
                 execution_hook_8,
-                write_3_exec_hook_wrapper::<QT, S>,
+                write_3_exec_hook_wrapper::<ET, S>,
                 unsafe extern "C" fn(&mut HookState<5, WriteHookId>, id: u64, addr: GuestAddr)
             );
             let execn = get_raw_hook!(
                 execution_hook_n,
-                write_4_exec_hook_wrapper::<QT, S>,
+                write_4_exec_hook_wrapper::<ET, S>,
                 unsafe extern "C" fn(
                     &mut HookState<5, WriteHookId>,
                     id: u64,
@@ -528,16 +529,16 @@ where
 
     pub fn cmps(
         &mut self,
-        generation_hook: CmpGenHook<QT, S>,
-        execution_hook_1: CmpExecHook<QT, S, u8>,
-        execution_hook_2: CmpExecHook<QT, S, u16>,
-        execution_hook_4: CmpExecHook<QT, S, u32>,
-        execution_hook_8: CmpExecHook<QT, S, u64>,
+        generation_hook: CmpGenHook<ET, S>,
+        execution_hook_1: CmpExecHook<ET, S, u8>,
+        execution_hook_2: CmpExecHook<ET, S, u16>,
+        execution_hook_4: CmpExecHook<ET, S, u32>,
+        execution_hook_8: CmpExecHook<ET, S, u64>,
     ) -> CmpHookId {
         unsafe {
             let gen = get_raw_hook!(
                 generation_hook,
-                cmp_gen_hook_wrapper::<QT, S>,
+                cmp_gen_hook_wrapper::<ET, S>,
                 unsafe extern "C" fn(
                     &mut HookState<4, CmpHookId>,
                     pc: GuestAddr,
@@ -546,22 +547,22 @@ where
             );
             let exec1 = get_raw_hook!(
                 execution_hook_1,
-                cmp_0_exec_hook_wrapper::<QT, S>,
+                cmp_0_exec_hook_wrapper::<ET, S>,
                 unsafe extern "C" fn(&mut HookState<4, CmpHookId>, id: u64, v0: u8, v1: u8)
             );
             let exec2 = get_raw_hook!(
                 execution_hook_2,
-                cmp_1_exec_hook_wrapper::<QT, S>,
+                cmp_1_exec_hook_wrapper::<ET, S>,
                 unsafe extern "C" fn(&mut HookState<4, CmpHookId>, id: u64, v0: u16, v1: u16)
             );
             let exec4 = get_raw_hook!(
                 execution_hook_4,
-                cmp_2_exec_hook_wrapper::<QT, S>,
+                cmp_2_exec_hook_wrapper::<ET, S>,
                 unsafe extern "C" fn(&mut HookState<4, CmpHookId>, id: u64, v0: u32, v1: u32)
             );
             let exec8 = get_raw_hook!(
                 execution_hook_8,
-                cmp_3_exec_hook_wrapper::<QT, S>,
+                cmp_3_exec_hook_wrapper::<ET, S>,
                 unsafe extern "C" fn(&mut HookState<4, CmpHookId>, id: u64, v0: u64, v1: u64)
             );
 
@@ -600,7 +601,7 @@ where
         }
     }
 
-    pub fn backdoor_closure(&mut self, hook: BackdoorHookClosure<QT, S>) -> BackdoorHookId {
+    pub fn backdoor_closure(&mut self, hook: BackdoorHookClosure<ET, S>) -> BackdoorHookId {
         unsafe {
             let fat: FatPtr = transmute(hook);
             self.backdoor_hooks
@@ -616,7 +617,7 @@ where
 
             let id = self
                 .qemu_hooks
-                .add_backdoor_hook(&mut *hook_state, closure_backdoor_hook_wrapper::<QT, S>);
+                .add_backdoor_hook(&mut *hook_state, closure_backdoor_hook_wrapper::<ET, S>);
 
             self.backdoor_hooks
                 .last_mut()
@@ -631,15 +632,15 @@ where
 
     pub fn backdoor_function(
         &self,
-        hook: fn(&mut EmulatorTools<QT, S>, Option<&mut S>, cpu: CPUArchStatePtr, pc: GuestAddr),
+        hook: fn(&mut EmulatorTools<ET, S>, Option<&mut S>, cpu: CPUArchStatePtr, pc: GuestAddr),
     ) -> BackdoorHookId {
         unsafe {
             self.qemu_hooks
-                .add_backdoor_hook(transmute(hook), func_backdoor_hook_wrapper::<QT, S>)
+                .add_backdoor_hook(transmute(hook), func_backdoor_hook_wrapper::<ET, S>)
         }
     }
 
-    pub fn backdoor(&mut self, hook: BackdoorHook<QT, S>) -> Option<BackdoorHookId> {
+    pub fn backdoor(&mut self, hook: BackdoorHook<ET, S>) -> Option<BackdoorHookId> {
         match hook {
             Hook::Function(f) => Some(self.backdoor_function(f)),
             Hook::Closure(c) => Some(self.backdoor_closure(c)),
@@ -653,13 +654,13 @@ where
 }
 
 #[cfg(emulation_mode = "usermode")]
-impl<QT, S> EmulatorHooks<QT, S>
+impl<ET, S> EmulatorHooks<ET, S>
 where
-    QT: EmulatorToolTuple<S>,
+    ET: EmulatorToolTuple<S>,
     S: Unpin + UsesInput,
 {
     #[allow(clippy::type_complexity)]
-    pub fn syscalls(&mut self, hook: PreSyscallHook<QT, S>) -> Option<PreSyscallHookId> {
+    pub fn syscalls(&mut self, hook: PreSyscallHook<ET, S>) -> Option<PreSyscallHookId> {
         match hook {
             Hook::Function(f) => Some(self.syscalls_function(f)),
             Hook::Closure(c) => Some(self.syscalls_closure(c)),
@@ -672,15 +673,15 @@ where
     }
 
     #[allow(clippy::type_complexity)]
-    pub fn syscalls_function(&mut self, hook: PreSyscallHookFn<QT, S>) -> PreSyscallHookId {
+    pub fn syscalls_function(&mut self, hook: PreSyscallHookFn<ET, S>) -> PreSyscallHookId {
         unsafe {
             self.qemu_hooks
-                .add_pre_syscall_hook(transmute(hook), func_pre_syscall_hook_wrapper::<QT, S>)
+                .add_pre_syscall_hook(transmute(hook), func_pre_syscall_hook_wrapper::<ET, S>)
         }
     }
 
     #[allow(clippy::type_complexity)]
-    pub fn syscalls_closure(&mut self, hook: PreSyscallHookClosure<QT, S>) -> PreSyscallHookId {
+    pub fn syscalls_closure(&mut self, hook: PreSyscallHookClosure<ET, S>) -> PreSyscallHookId {
         unsafe {
             let fat: FatPtr = transmute(hook);
 
@@ -697,7 +698,7 @@ where
 
             let id = self
                 .qemu_hooks
-                .add_pre_syscall_hook(&mut *hook_state, closure_pre_syscall_hook_wrapper::<QT, S>);
+                .add_pre_syscall_hook(&mut *hook_state, closure_pre_syscall_hook_wrapper::<ET, S>);
             self.pre_syscall_hooks
                 .last_mut()
                 .unwrap()
@@ -709,7 +710,7 @@ where
     }
 
     #[allow(clippy::type_complexity)]
-    pub fn after_syscalls(&mut self, hook: PostSyscallHook<QT, S>) -> Option<PostSyscallHookId> {
+    pub fn after_syscalls(&mut self, hook: PostSyscallHook<ET, S>) -> Option<PostSyscallHookId> {
         match hook {
             Hook::Function(f) => Some(self.after_syscalls_function(f)),
             Hook::Closure(c) => Some(self.after_syscalls_closure(c)),
@@ -722,17 +723,17 @@ where
     }
 
     #[allow(clippy::type_complexity)]
-    pub fn after_syscalls_function(&mut self, hook: PostSyscallHookFn<QT, S>) -> PostSyscallHookId {
+    pub fn after_syscalls_function(&mut self, hook: PostSyscallHookFn<ET, S>) -> PostSyscallHookId {
         unsafe {
             self.qemu_hooks
-                .add_post_syscall_hook(transmute(hook), func_post_syscall_hook_wrapper::<QT, S>)
+                .add_post_syscall_hook(transmute(hook), func_post_syscall_hook_wrapper::<ET, S>)
         }
     }
 
     #[allow(clippy::type_complexity)]
     pub fn after_syscalls_closure(
         &mut self,
-        hook: PostSyscallHookClosure<QT, S>,
+        hook: PostSyscallHookClosure<ET, S>,
     ) -> PostSyscallHookId {
         unsafe {
             let fat: FatPtr = transmute(hook);
@@ -749,7 +750,7 @@ where
 
             let id = self.qemu_hooks.add_post_syscall_hook(
                 &mut *hooks_state,
-                closure_post_syscall_hook_wrapper::<QT, S>,
+                closure_post_syscall_hook_wrapper::<ET, S>,
             );
             self.post_syscall_hooks
                 .last_mut()
@@ -761,7 +762,7 @@ where
         }
     }
 
-    pub fn thread_creation(&mut self, hook: NewThreadHook<QT, S>) -> Option<NewThreadHookId> {
+    pub fn thread_creation(&mut self, hook: NewThreadHook<ET, S>) -> Option<NewThreadHookId> {
         match hook {
             Hook::Function(f) => Some(self.thread_creation_function(f)),
             Hook::Closure(c) => Some(self.thread_creation_closure(c)),
@@ -775,17 +776,17 @@ where
 
     pub fn thread_creation_function(
         &mut self,
-        hook: fn(&mut EmulatorTools<QT, S>, Option<&mut S>, tid: u32) -> bool,
+        hook: fn(&mut EmulatorTools<ET, S>, Option<&mut S>, tid: u32) -> bool,
     ) -> NewThreadHookId {
         unsafe {
             self.qemu_hooks
-                .add_new_thread_hook(transmute(hook), func_new_thread_hook_wrapper::<QT, S>)
+                .add_new_thread_hook(transmute(hook), func_new_thread_hook_wrapper::<ET, S>)
         }
     }
 
     pub fn thread_creation_closure(
         &mut self,
-        hook: NewThreadHookClosure<QT, S>,
+        hook: NewThreadHookClosure<ET, S>,
     ) -> NewThreadHookId {
         unsafe {
             let fat: FatPtr = transmute(hook);
@@ -802,7 +803,7 @@ where
 
             let id = self
                 .qemu_hooks
-                .add_new_thread_hook(&mut *hook_state, closure_new_thread_hook_wrapper::<QT, S>);
+                .add_new_thread_hook(&mut *hook_state, closure_new_thread_hook_wrapper::<ET, S>);
             self.new_thread_hooks
                 .last_mut()
                 .unwrap()
@@ -812,23 +813,23 @@ where
             id
         }
     }
-    pub fn crash_function(&mut self, hook: fn(&mut EmulatorTools<QT, S>, target_signal: i32)) {
-        self.qemu_hooks.set_crash_hook(crash_hook_wrapper::<QT, S>);
+    pub fn crash_function(&mut self, hook: fn(&mut EmulatorTools<ET, S>, target_signal: i32)) {
+        self.qemu_hooks.set_crash_hook(crash_hook_wrapper::<ET, S>);
         self.crash_hooks
             .push(HookRepr::Function(hook as *const libc::c_void));
     }
 
-    pub fn crash_closure(&mut self, hook: CrashHookClosure<QT, S>) {
+    pub fn crash_closure(&mut self, hook: CrashHookClosure<ET, S>) {
         unsafe {
-            self.qemu_hooks.set_crash_hook(crash_hook_wrapper::<QT, S>);
+            self.qemu_hooks.set_crash_hook(crash_hook_wrapper::<ET, S>);
             self.crash_hooks.push(HookRepr::Closure(transmute(hook)));
         }
     }
 }
 
-impl<QT, S> Default for EmulatorHooks<QT, S>
+impl<ET, S> Default for EmulatorHooks<ET, S>
 where
-    QT: EmulatorToolTuple<S>,
+    ET: EmulatorToolTuple<S>,
     S: Unpin + UsesInput,
 {
     fn default() -> Self {
@@ -836,12 +837,12 @@ where
     }
 }
 
-impl<QT, S> EmulatorTools<QT, S>
+impl<ET, S> EmulatorTools<ET, S>
 where
-    QT: EmulatorToolTuple<S>,
+    ET: EmulatorToolTuple<S>,
     S: Unpin + UsesInput,
 {
-    pub(super) fn new(qemu: Qemu, tools: QT) -> Pin<Box<Self>> {
+    pub(super) fn new(qemu: Qemu, tools: ET) -> Pin<Box<Self>> {
         let mut tools = Box::pin(Self {
             qemu,
             tools: Box::pin(tools),
@@ -879,15 +880,15 @@ where
     }
 
     #[must_use]
-    pub fn tools(&self) -> &QT {
+    pub fn tools(&self) -> &ET {
         self.tools.as_ref().get_ref()
     }
 
-    pub fn tools_mut(&mut self) -> &mut QT {
+    pub fn tools_mut(&mut self) -> &mut ET {
         self.tools.as_mut().get_mut()
     }
 
-    pub fn hooks_mut(&mut self) -> &mut EmulatorHooks<QT, S> {
+    pub fn hooks_mut(&mut self) -> &mut EmulatorHooks<ET, S> {
         &mut self.hooks
     }
 
@@ -951,17 +952,17 @@ where
     /// The user should also be consistent with the generic use (it will suppose they are the same
     /// as the ones used at initialization time).
     #[must_use]
-    pub unsafe fn emulator_tools_mut_unchecked<'a>() -> &'a mut EmulatorTools<QT, S> {
+    pub unsafe fn emulator_tools_mut_unchecked<'a>() -> &'a mut EmulatorTools<ET, S> {
         #[cfg(debug_assertions)]
         {
-            (EMULATOR_TOOLS as *mut EmulatorTools<QT, S>)
+            (EMULATOR_TOOLS as *mut EmulatorTools<ET, S>)
                 .as_mut()
                 .unwrap()
         }
 
         #[cfg(not(debug_assertions))]
         {
-            EMULATOR_TOOL_TUPLE as *mut QT as &mut QT
+            EMULATOR_TOOL_TUPLE as *mut ET as &mut ET
         }
     }
 
@@ -974,14 +975,14 @@ where
     /// This version still presents some unsafeness: The user should be consistent with the
     /// generic use (it will suppose they are the same as the ones used at initialization time).
     #[must_use]
-    pub unsafe fn emulator_tools_mut<'a>() -> Option<&'a mut EmulatorTools<QT, S>> {
-        unsafe { (EMULATOR_TOOLS as *mut EmulatorTools<QT, S>).as_mut() }
+    pub unsafe fn emulator_tools_mut<'a>() -> Option<&'a mut EmulatorTools<ET, S>> {
+        unsafe { (EMULATOR_TOOLS as *mut EmulatorTools<ET, S>).as_mut() }
     }
 
     pub fn instructions(
         &mut self,
         addr: GuestAddr,
-        hook: InstructionHook<QT, S>,
+        hook: InstructionHook<ET, S>,
         invalidate_block: bool,
     ) -> Option<InstructionHookId> {
         self.hooks.instructions(addr, hook, invalidate_block)
@@ -990,7 +991,7 @@ where
     pub fn instruction_function(
         &mut self,
         addr: GuestAddr,
-        hook: fn(&mut EmulatorTools<QT, S>, Option<&mut S>, GuestAddr),
+        hook: fn(&mut EmulatorTools<ET, S>, Option<&mut S>, GuestAddr),
         invalidate_block: bool,
     ) -> InstructionHookId {
         self.hooks
@@ -1000,7 +1001,7 @@ where
     pub fn instruction_closure(
         &mut self,
         addr: GuestAddr,
-        hook: InstructionHookClosure<QT, S>,
+        hook: InstructionHookClosure<ET, S>,
         invalidate_block: bool,
     ) -> InstructionHookId {
         self.hooks.instruction_closure(addr, hook, invalidate_block)
@@ -1008,17 +1009,17 @@ where
 
     pub fn edges(
         &mut self,
-        generation_hook: EdgeGenHook<QT, S>,
-        execution_hook: EdgeExecHook<QT, S>,
+        generation_hook: EdgeGenHook<ET, S>,
+        execution_hook: EdgeExecHook<ET, S>,
     ) -> EdgeHookId {
         self.hooks.edges(generation_hook, execution_hook)
     }
 
     pub fn blocks(
         &mut self,
-        generation_hook: BlockGenHook<QT, S>,
-        post_generation_hook: BlockPostGenHook<QT, S>,
-        execution_hook: BlockExecHook<QT, S>,
+        generation_hook: BlockGenHook<ET, S>,
+        post_generation_hook: BlockPostGenHook<ET, S>,
+        execution_hook: BlockExecHook<ET, S>,
     ) -> BlockHookId {
         self.hooks
             .blocks(generation_hook, post_generation_hook, execution_hook)
@@ -1027,12 +1028,12 @@ where
     #[allow(clippy::similar_names)]
     pub fn reads(
         &mut self,
-        generation_hook: ReadGenHook<QT, S>,
-        execution_hook_1: ReadExecHook<QT, S>,
-        execution_hook_2: ReadExecHook<QT, S>,
-        execution_hook_4: ReadExecHook<QT, S>,
-        execution_hook_8: ReadExecHook<QT, S>,
-        execution_hook_n: ReadExecNHook<QT, S>,
+        generation_hook: ReadGenHook<ET, S>,
+        execution_hook_1: ReadExecHook<ET, S>,
+        execution_hook_2: ReadExecHook<ET, S>,
+        execution_hook_4: ReadExecHook<ET, S>,
+        execution_hook_8: ReadExecHook<ET, S>,
+        execution_hook_n: ReadExecNHook<ET, S>,
     ) -> ReadHookId {
         self.hooks.reads(
             generation_hook,
@@ -1047,12 +1048,12 @@ where
     #[allow(clippy::similar_names)]
     pub fn writes(
         &mut self,
-        generation_hook: WriteGenHook<QT, S>,
-        execution_hook_1: WriteExecHook<QT, S>,
-        execution_hook_2: WriteExecHook<QT, S>,
-        execution_hook_4: WriteExecHook<QT, S>,
-        execution_hook_8: WriteExecHook<QT, S>,
-        execution_hook_n: WriteExecNHook<QT, S>,
+        generation_hook: WriteGenHook<ET, S>,
+        execution_hook_1: WriteExecHook<ET, S>,
+        execution_hook_2: WriteExecHook<ET, S>,
+        execution_hook_4: WriteExecHook<ET, S>,
+        execution_hook_8: WriteExecHook<ET, S>,
+        execution_hook_n: WriteExecNHook<ET, S>,
     ) -> WriteHookId {
         self.hooks.writes(
             generation_hook,
@@ -1066,11 +1067,11 @@ where
 
     pub fn cmps(
         &mut self,
-        generation_hook: CmpGenHook<QT, S>,
-        execution_hook_1: CmpExecHook<QT, S, u8>,
-        execution_hook_2: CmpExecHook<QT, S, u16>,
-        execution_hook_4: CmpExecHook<QT, S, u32>,
-        execution_hook_8: CmpExecHook<QT, S, u64>,
+        generation_hook: CmpGenHook<ET, S>,
+        execution_hook_1: CmpExecHook<ET, S, u8>,
+        execution_hook_2: CmpExecHook<ET, S, u16>,
+        execution_hook_4: CmpExecHook<ET, S, u32>,
+        execution_hook_8: CmpExecHook<ET, S, u64>,
     ) -> CmpHookId {
         self.hooks.cmps(
             generation_hook,
@@ -1081,28 +1082,28 @@ where
         )
     }
 
-    pub fn backdoor(&mut self, hook: BackdoorHook<QT, S>) -> Option<BackdoorHookId> {
+    pub fn backdoor(&mut self, hook: BackdoorHook<ET, S>) -> Option<BackdoorHookId> {
         self.hooks.backdoor(hook)
     }
 
-    pub fn backdoor_function(&mut self, hook: BackdoorHookFn<QT, S>) -> BackdoorHookId {
+    pub fn backdoor_function(&mut self, hook: BackdoorHookFn<ET, S>) -> BackdoorHookId {
         self.hooks.backdoor_function(hook)
     }
 
-    pub fn backdoor_closure(&mut self, hook: BackdoorHookClosure<QT, S>) -> BackdoorHookId {
+    pub fn backdoor_closure(&mut self, hook: BackdoorHookClosure<ET, S>) -> BackdoorHookId {
         self.hooks.backdoor_closure(hook)
     }
 }
 
 /// Usermode-only high-level functions
 #[cfg(emulation_mode = "usermode")]
-impl<QT, S> EmulatorTools<QT, S>
+impl<ET, S> EmulatorTools<ET, S>
 where
-    QT: EmulatorToolTuple<S>,
+    ET: EmulatorToolTuple<S>,
     S: Unpin + UsesInput,
 {
     #[allow(clippy::type_complexity)]
-    pub fn syscalls(&mut self, hook: PreSyscallHook<QT, S>) -> Option<PreSyscallHookId> {
+    pub fn syscalls(&mut self, hook: PreSyscallHook<ET, S>) -> Option<PreSyscallHookId> {
         self.hooks.syscalls(hook)
     }
 
@@ -1110,7 +1111,7 @@ where
     pub fn syscalls_function(
         &mut self,
         hook: fn(
-            &mut EmulatorTools<QT, S>,
+            &mut EmulatorTools<ET, S>,
             Option<&mut S>,
             sys_num: i32,
             a0: GuestAddr,
@@ -1131,7 +1132,7 @@ where
         &mut self,
         hook: Box<
             dyn for<'a> FnMut(
-                &'a mut EmulatorTools<QT, S>,
+                &'a mut EmulatorTools<ET, S>,
                 Option<&'a mut S>,
                 i32,
                 GuestAddr,
@@ -1149,7 +1150,7 @@ where
     }
 
     #[allow(clippy::type_complexity)]
-    pub fn after_syscalls(&mut self, hook: PostSyscallHook<QT, S>) -> Option<PostSyscallHookId> {
+    pub fn after_syscalls(&mut self, hook: PostSyscallHook<ET, S>) -> Option<PostSyscallHookId> {
         self.hooks.after_syscalls(hook)
     }
 
@@ -1157,7 +1158,7 @@ where
     pub fn after_syscalls_function(
         &mut self,
         hook: fn(
-            &mut EmulatorTools<QT, S>,
+            &mut EmulatorTools<ET, S>,
             Option<&mut S>,
             res: GuestAddr,
             sys_num: i32,
@@ -1179,7 +1180,7 @@ where
         &mut self,
         hook: Box<
             dyn for<'a> FnMut(
-                &'a mut EmulatorTools<QT, S>,
+                &'a mut EmulatorTools<ET, S>,
                 Option<&mut S>,
                 GuestAddr,
                 i32,
@@ -1197,35 +1198,35 @@ where
         self.hooks.after_syscalls_closure(hook)
     }
 
-    pub fn thread_creation(&mut self, hook: NewThreadHook<QT, S>) -> Option<NewThreadHookId> {
+    pub fn thread_creation(&mut self, hook: NewThreadHook<ET, S>) -> Option<NewThreadHookId> {
         self.hooks.thread_creation(hook)
     }
 
     pub fn thread_creation_function(
         &mut self,
-        hook: fn(&mut EmulatorTools<QT, S>, Option<&mut S>, tid: u32) -> bool,
+        hook: fn(&mut EmulatorTools<ET, S>, Option<&mut S>, tid: u32) -> bool,
     ) -> NewThreadHookId {
         self.hooks.thread_creation_function(hook)
     }
 
     pub fn thread_creation_closure(
         &mut self,
-        hook: NewThreadHookClosure<QT, S>,
+        hook: NewThreadHookClosure<ET, S>,
     ) -> NewThreadHookId {
         self.hooks.thread_creation_closure(hook)
     }
-    pub fn crash_function(&mut self, hook: fn(&mut EmulatorTools<QT, S>, target_signal: i32)) {
+    pub fn crash_function(&mut self, hook: fn(&mut EmulatorTools<ET, S>, target_signal: i32)) {
         self.hooks.crash_function(hook);
     }
 
-    pub fn crash_closure(&mut self, hook: CrashHookClosure<QT, S>) {
+    pub fn crash_closure(&mut self, hook: CrashHookClosure<ET, S>) {
         self.hooks.crash_closure(hook);
     }
 }
 
-impl<QT, S> Drop for EmulatorTools<QT, S>
+impl<ET, S> Drop for EmulatorTools<ET, S>
 where
-    QT: EmulatorToolTuple<S>,
+    ET: EmulatorToolTuple<S>,
     S: Unpin + UsesInput,
 {
     fn drop(&mut self) {

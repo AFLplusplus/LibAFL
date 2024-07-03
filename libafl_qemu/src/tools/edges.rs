@@ -155,17 +155,17 @@ impl<S> EmulatorTool<S> for QemuEdgeCoverageTool
 where
     S: Unpin + UsesInput + HasMetadata,
 {
-    fn first_exec<QT>(&self, emulator_tools: &mut EmulatorTools<QT, S>)
+    fn first_exec<ET>(&self, emulator_tools: &mut EmulatorTools<ET, S>)
     where
-        QT: EmulatorToolTuple<S>,
+        ET: EmulatorToolTuple<S>,
     {
         if self.use_hitcounts {
             // hooks.edges(
-            //     Hook::Function(gen_unique_edge_ids::<QT, S>),
+            //     Hook::Function(gen_unique_edge_ids::<ET, S>),
             //     Hook::Raw(trace_edge_hitcount),
             // );
             let hook_id =
-                emulator_tools.edges(Hook::Function(gen_unique_edge_ids::<QT, S>), Hook::Empty);
+                emulator_tools.edges(Hook::Function(gen_unique_edge_ids::<ET, S>), Hook::Empty);
             unsafe {
                 libafl_qemu_sys::libafl_qemu_edge_hook_set_jit(
                     hook_id.0,
@@ -174,11 +174,11 @@ where
             }
         } else {
             // hooks.edges(
-            //     Hook::Function(gen_unique_edge_ids::<QT, S>),
+            //     Hook::Function(gen_unique_edge_ids::<ET, S>),
             //     Hook::Raw(trace_edge_single),
             // );
             let hook_id =
-                emulator_tools.edges(Hook::Function(gen_unique_edge_ids::<QT, S>), Hook::Empty);
+                emulator_tools.edges(Hook::Function(gen_unique_edge_ids::<ET, S>), Hook::Empty);
             unsafe {
                 libafl_qemu_sys::libafl_qemu_edge_hook_set_jit(
                     hook_id.0,
@@ -306,18 +306,18 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn first_exec<QT>(&self, emulator_tools: &mut EmulatorTools<QT, S>)
+    fn first_exec<ET>(&self, emulator_tools: &mut EmulatorTools<ET, S>)
     where
-        QT: EmulatorToolTuple<S>,
+        ET: EmulatorToolTuple<S>,
     {
         if self.use_hitcounts {
             emulator_tools.edges(
-                Hook::Function(gen_hashed_edge_ids::<QT, S>),
+                Hook::Function(gen_hashed_edge_ids::<ET, S>),
                 Hook::Raw(trace_edge_hitcount_ptr),
             );
         } else {
             emulator_tools.edges(
-                Hook::Function(gen_hashed_edge_ids::<QT, S>),
+                Hook::Function(gen_hashed_edge_ids::<ET, S>),
                 Hook::Raw(trace_edge_single_ptr),
             );
         }
@@ -454,14 +454,14 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn first_exec<QT>(&self, emulator_tools: &mut EmulatorTools<QT, S>)
+    fn first_exec<ET>(&self, emulator_tools: &mut EmulatorTools<ET, S>)
     where
-        QT: EmulatorToolTuple<S>,
+        ET: EmulatorToolTuple<S>,
     {
         if self.use_hitcounts {
             if self.use_jit {
                 let hook_id = emulator_tools.blocks(
-                    Hook::Function(gen_hashed_block_ids::<QT, S>),
+                    Hook::Function(gen_hashed_block_ids::<ET, S>),
                     Hook::Empty,
                     Hook::Empty,
                 );
@@ -474,7 +474,7 @@ where
                 }
             } else {
                 emulator_tools.blocks(
-                    Hook::Function(gen_hashed_block_ids::<QT, S>),
+                    Hook::Function(gen_hashed_block_ids::<ET, S>),
                     Hook::Empty,
                     Hook::Raw(trace_block_transition_hitcount),
                 );
@@ -482,7 +482,7 @@ where
         } else {
             if self.use_jit {
                 let hook_id = emulator_tools.blocks(
-                    Hook::Function(gen_hashed_block_ids::<QT, S>),
+                    Hook::Function(gen_hashed_block_ids::<ET, S>),
                     Hook::Empty,
                     Hook::Empty,
                 );
@@ -495,7 +495,7 @@ where
                 }
             } else {
                 emulator_tools.blocks(
-                    Hook::Function(gen_hashed_block_ids::<QT, S>),
+                    Hook::Function(gen_hashed_block_ids::<ET, S>),
                     Hook::Empty,
                     Hook::Raw(trace_block_transition_single),
                 );
@@ -506,14 +506,14 @@ where
 
 thread_local!(static PREV_LOC : UnsafeCell<u64> = const { UnsafeCell::new(0) });
 
-pub fn gen_unique_edge_ids<QT, S>(
-    emulator_tools: &mut EmulatorTools<QT, S>,
+pub fn gen_unique_edge_ids<ET, S>(
+    emulator_tools: &mut EmulatorTools<ET, S>,
     state: Option<&mut S>,
     src: GuestAddr,
     dest: GuestAddr,
 ) -> Option<u64>
 where
-    QT: EmulatorToolTuple<S>,
+    ET: EmulatorToolTuple<S>,
     S: Unpin + UsesInput + HasMetadata,
 {
     if let Some(h) = emulator_tools.match_tool::<QemuEdgeCoverageTool>() {
@@ -574,14 +574,14 @@ pub extern "C" fn trace_edge_single(_: *const (), id: u64) {
     }
 }
 
-pub fn gen_hashed_edge_ids<QT, S>(
-    emulator_tools: &mut EmulatorTools<QT, S>,
+pub fn gen_hashed_edge_ids<ET, S>(
+    emulator_tools: &mut EmulatorTools<ET, S>,
     _state: Option<&mut S>,
     src: GuestAddr,
     dest: GuestAddr,
 ) -> Option<u64>
 where
-    QT: EmulatorToolTuple<S>,
+    ET: EmulatorToolTuple<S>,
     S: Unpin + UsesInput,
 {
     if let Some(h) = emulator_tools.match_tool::<QemuEdgeCoverageChildTool>() {
@@ -622,14 +622,14 @@ pub extern "C" fn trace_edge_single_ptr(_: *const (), id: u64) {
 }
 
 /*
-pub fn gen_addr_block_ids<QT, S>(
-    _hooks: &mut QemuHooks<QT, S>,
+pub fn gen_addr_block_ids<ET, S>(
+    _hooks: &mut QemuHooks<ET, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
 ) -> Option<u64>
 where
    S: Unpin + UsesInput,
-    QT: QemuToolTuple<S>,
+    ET: QemuToolTuple<S>,
 {
     // GuestAddress is u32 for 32 bit guests
     #[allow(clippy::unnecessary_cast)]
@@ -637,14 +637,14 @@ where
 }
 */
 
-pub fn gen_hashed_block_ids<QT, S>(
-    emulator_tools: &mut EmulatorTools<QT, S>,
+pub fn gen_hashed_block_ids<ET, S>(
+    emulator_tools: &mut EmulatorTools<ET, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
 ) -> Option<u64>
 where
     S: Unpin + UsesInput,
-    QT: EmulatorToolTuple<S>,
+    ET: EmulatorToolTuple<S>,
 {
     if let Some(h) = emulator_tools.match_tool::<QemuEdgeCoverageClassicTool>() {
         #[cfg(emulation_mode = "usermode")]

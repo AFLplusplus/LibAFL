@@ -204,8 +204,8 @@ impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuAsa
     }
 }
 
-fn gen_readwrite_guest_asan<QT, S>(
-    emulator_tools: &mut EmulatorTools<QT, S>,
+fn gen_readwrite_guest_asan<ET, S>(
+    emulator_tools: &mut EmulatorTools<ET, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
     addr: *mut TCGTemp,
@@ -213,7 +213,7 @@ fn gen_readwrite_guest_asan<QT, S>(
 ) -> Option<u64>
 where
     S: Unpin + UsesInput,
-    QT: EmulatorToolTuple<S>,
+    ET: EmulatorToolTuple<S>,
 {
     let h = emulator_tools
         .match_tool_mut::<QemuAsanGuestTool>()
@@ -243,27 +243,27 @@ where
 #[allow(unused_variables)]
 unsafe fn libafl_tcg_gen_asan(addr: *mut TCGTemp, size: usize) {}
 
-fn guest_trace_error_asan<QT, S>(
-    _emulator_tools: &mut EmulatorTools<QT, S>,
+fn guest_trace_error_asan<ET, S>(
+    _emulator_tools: &mut EmulatorTools<ET, S>,
     _state: Option<&mut S>,
     _id: u64,
     _addr: GuestAddr,
 ) where
     S: Unpin + UsesInput,
-    QT: EmulatorToolTuple<S>,
+    ET: EmulatorToolTuple<S>,
 {
     panic!("I really shouldn't be here");
 }
 
-fn guest_trace_error_n_asan<QT, S>(
-    _emulator_tools: &mut EmulatorTools<QT, S>,
+fn guest_trace_error_n_asan<ET, S>(
+    _emulator_tools: &mut EmulatorTools<ET, S>,
     _state: Option<&mut S>,
     _id: u64,
     _addr: GuestAddr,
     _n: usize,
 ) where
     S: Unpin + UsesInput,
-    QT: EmulatorToolTuple<S>,
+    ET: EmulatorToolTuple<S>,
 {
     panic!("I really shouldn't be here either");
 }
@@ -272,27 +272,27 @@ impl<S> EmulatorTool<S> for QemuAsanGuestTool
 where
     S: Unpin + UsesInput,
 {
-    fn first_exec<QT>(&self, emulator_tools: &mut EmulatorTools<QT, S>)
+    fn first_exec<ET>(&self, emulator_tools: &mut EmulatorTools<ET, S>)
     where
-        QT: EmulatorToolTuple<S>,
+        ET: EmulatorToolTuple<S>,
         S: Unpin + UsesInput,
     {
         emulator_tools.reads(
-            Hook::Function(gen_readwrite_guest_asan::<QT, S>),
-            Hook::Function(guest_trace_error_asan::<QT, S>),
-            Hook::Function(guest_trace_error_asan::<QT, S>),
-            Hook::Function(guest_trace_error_asan::<QT, S>),
-            Hook::Function(guest_trace_error_asan::<QT, S>),
-            Hook::Function(guest_trace_error_n_asan::<QT, S>),
+            Hook::Function(gen_readwrite_guest_asan::<ET, S>),
+            Hook::Function(guest_trace_error_asan::<ET, S>),
+            Hook::Function(guest_trace_error_asan::<ET, S>),
+            Hook::Function(guest_trace_error_asan::<ET, S>),
+            Hook::Function(guest_trace_error_asan::<ET, S>),
+            Hook::Function(guest_trace_error_n_asan::<ET, S>),
         );
 
         emulator_tools.writes(
-            Hook::Function(gen_readwrite_guest_asan::<QT, S>),
-            Hook::Function(guest_trace_error_asan::<QT, S>),
-            Hook::Function(guest_trace_error_asan::<QT, S>),
-            Hook::Function(guest_trace_error_asan::<QT, S>),
-            Hook::Function(guest_trace_error_asan::<QT, S>),
-            Hook::Function(guest_trace_error_n_asan::<QT, S>),
+            Hook::Function(gen_readwrite_guest_asan::<ET, S>),
+            Hook::Function(guest_trace_error_asan::<ET, S>),
+            Hook::Function(guest_trace_error_asan::<ET, S>),
+            Hook::Function(guest_trace_error_asan::<ET, S>),
+            Hook::Function(guest_trace_error_asan::<ET, S>),
+            Hook::Function(guest_trace_error_n_asan::<ET, S>),
         );
     }
 }
