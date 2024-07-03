@@ -1,26 +1,4 @@
-use crate::{
-    afl_stats::AflStatsStage,
-    corpus::{set_corpus_filepath, set_solution_filepath},
-    feedback::{CustomFilepathToTestcaseFeedback, FeedbackLocation, SeedFeedback},
-    run_fuzzer_with_stage,
-    utils::PowerScheduleCustom,
-    Opt, AFL_DEFAULT_INPUT_LEN_MAX, AFL_DEFAULT_INPUT_LEN_MIN, SHMEM_ENV_VAR,
-};
-
-use serde::{Deserialize, Serialize};
 use std::{borrow::Cow, path::PathBuf, time::Duration};
-
-use libafl_bolts::{
-    current_nanos, current_time,
-    fs::get_unique_std_input_file,
-    ownedref::OwnedRefMut,
-    rands::StdRand,
-    shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, Handled, Merge},
-    AsSliceMut,
-};
-
-use libafl_targets::{cmps::AFLppCmpLogMap, AFLppCmpLogObserver, AFLppCmplogTracingStage};
 
 use libafl::{
     corpus::{Corpus, OnDiskCorpus},
@@ -40,7 +18,27 @@ use libafl::{
         StdPowerMutationalStage,
     },
     state::{HasCorpus, HasCurrentTestcase, HasStartTime, StdState},
-    Error, HasFeedback, HasMetadata, HasObjective,
+    Error, HasFeedback, HasMetadata,
+};
+use libafl_bolts::{
+    current_nanos, current_time,
+    fs::get_unique_std_input_file,
+    ownedref::OwnedRefMut,
+    rands::StdRand,
+    shmem::{ShMem, ShMemProvider, UnixShMemProvider},
+    tuples::{tuple_list, Handled, Merge},
+    AsSliceMut,
+};
+use libafl_targets::{cmps::AFLppCmpLogMap, AFLppCmpLogObserver, AFLppCmplogTracingStage};
+use serde::{Deserialize, Serialize};
+
+use crate::{
+    afl_stats::AflStatsStage,
+    corpus::{set_corpus_filepath, set_solution_filepath},
+    feedback::{CustomFilepathToTestcaseFeedback, SeedFeedback},
+    run_fuzzer_with_stage,
+    utils::PowerScheduleCustom,
+    Opt, AFL_DEFAULT_INPUT_LEN_MAX, AFL_DEFAULT_INPUT_LEN_MIN, SHMEM_ENV_VAR,
 };
 
 #[allow(clippy::too_many_lines)]
@@ -91,33 +89,27 @@ where
             feedback_or!(map_feedback, TimeFeedback::new(&time_observer)),
             CustomFilepathToTestcaseFeedback::new(set_corpus_filepath, fuzzer_dir.clone())
         ),
-        FeedbackLocation::Feedback,
-        opt.clone(),
+        opt,
     );
 
     /*
      * Feedback to decide if the Input is "solution worthy".
      * We check if it's a crash or a timeout (if we are configured to consider timeouts)
      * The `CustomFilepathToTestcaseFeedback is used to adhere to AFL++'s corpus format.
-     * The `Seedfeedback` is used during seed loading to adhere to AFL++'s handling of seeds.
      * The `MaxMapFeedback` saves objectives only if they hit new edges
      * */
-    let mut objective = SeedFeedback::new(
-        feedback_or!(
-            feedback_and!(
-                feedback_or_fast!(
-                    CrashFeedback::new(),
-                    feedback_and!(
-                        ConstFeedback::new(!opt.ignore_timeouts),
-                        TimeoutFeedback::new()
-                    )
-                ),
-                MaxMapFeedback::with_name("edges_objective", &edges_observer)
+    let mut objective = feedback_or!(
+        feedback_and!(
+            feedback_or_fast!(
+                CrashFeedback::new(),
+                feedback_and!(
+                    ConstFeedback::new(!opt.ignore_timeouts),
+                    TimeoutFeedback::new()
+                )
             ),
-            CustomFilepathToTestcaseFeedback::new(set_solution_filepath, fuzzer_dir.clone())
+            MaxMapFeedback::with_name("edges_objective", &edges_observer)
         ),
-        FeedbackLocation::Objective,
-        opt.clone(),
+        CustomFilepathToTestcaseFeedback::new(set_solution_filepath, fuzzer_dir.clone())
     );
 
     // Initialize our State if necessary
@@ -169,7 +161,9 @@ where
     // May be used to provide a ram-disk etc..
     if let Some(cur_input_dir) = &opt.cur_input_dir {
         if opt.harness_input_stdin.is_none() {
-            return Err(Error::illegal_argument("cannot use AFL_TMPDIR with stdin input type."))
+            return Err(Error::illegal_argument(
+                "cannot use AFL_TMPDIR with stdin input type.",
+            ));
         }
         executor = executor.arg_input_file(cur_input_dir.join(get_unique_std_input_file()));
     }
@@ -210,7 +204,6 @@ where
     *state.start_time_mut() = current_time();
 
     // Tell [`SeedFeedback`] that we're done loading seeds; rendering it benign.
-    fuzzer.objective_mut().done_loading_seeds();
     fuzzer.feedback_mut().done_loading_seeds();
 
     // Create a AFLStatsStage; TODO builder?

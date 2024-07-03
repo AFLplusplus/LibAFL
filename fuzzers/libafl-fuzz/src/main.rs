@@ -9,7 +9,6 @@ use std::{collections::HashMap, path::PathBuf};
 mod afl_stats;
 mod feedback;
 use clap::Parser;
-
 use corpus::{check_autoresume, remove_main_node_file};
 mod corpus;
 mod executor;
@@ -40,7 +39,7 @@ fn main() {
 
     // Create our Monitor
     let monitor = MultiMonitor::new(|s| println!("{s}"));
-/*     let monitor = MultiMonitor::new(|_s| {}); */
+    /*     let monitor = MultiMonitor::new(|_s| {}); */
 
     opt.auto_resume = if opt.auto_resume {
         true

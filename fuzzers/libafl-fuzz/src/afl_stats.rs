@@ -9,9 +9,6 @@ use std::{
     process,
 };
 
-use libafl_bolts::current_time;
-use nix::libc::{getrusage, rusage, RUSAGE_CHILDREN};
-
 use libafl::{
     corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata, Testcase},
     events::EventFirer,
@@ -21,6 +18,8 @@ use libafl::{
     state::{HasCorpus, HasExecutions, HasImported, HasStartTime, Stoppable, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
+use libafl_bolts::current_time;
+use nix::libc::{getrusage, rusage, RUSAGE_CHILDREN};
 
 use crate::{fuzzer::fuzzer_target_mode, utils::get_run_cmdline, Opt};
 

@@ -45,10 +45,7 @@ pub fn set_corpus_filepath(
     _fuzzer_dir: &PathBuf,
 ) -> Result<(), Error> {
     let mut name = generate_base_filename(state);
-    if testcase
-        .hit_feedbacks()
-        .contains(&Cow::Borrowed("edges"))
-    {
+    if testcase.hit_feedbacks().contains(&Cow::Borrowed("edges")) {
         name = format!("{name},+cov");
     }
     *testcase.filename_mut() = Some(name);

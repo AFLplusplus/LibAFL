@@ -46,7 +46,6 @@ pub fn check_binary(opt: &mut Opt, shmem_env_var: &str) -> Result<(), Error> {
                 ));
             }
         }
-
     }
     metadata = bin_path.metadata()?;
     let is_reg = !bin_path.is_symlink() && !bin_path.is_dir();
@@ -117,9 +116,9 @@ pub fn check_binary(opt: &mut Opt, shmem_env_var: &str) -> Result<(), Error> {
         && !opt.nyx_mode;
 
     if check_instrumentation && !is_instrumented(&mmap, shmem_env_var) {
-            return Err(Error::illegal_argument(
-                "target binary is not instrumented correctly",
-            ));
+        return Err(Error::illegal_argument(
+            "target binary is not instrumented correctly",
+        ));
     }
 
     if opt.forkserver_cs || opt.qemu_mode || opt.frida_mode && is_instrumented(&mmap, shmem_env_var)

@@ -1,3 +1,5 @@
+use std::{borrow::Cow, marker::PhantomData, path::PathBuf};
+
 use libafl::{
     corpus::Testcase,
     events::EventFirer,
@@ -9,25 +11,12 @@ use libafl::{
 };
 use libafl_bolts::{Error, Named};
 use serde::{Deserialize, Serialize};
-use std::{borrow::Cow, marker::PhantomData, path::PathBuf};
 
 use crate::Opt;
 
-#[allow(clippy::module_name_repetitions)]
-#[derive(Debug)]
-pub enum FeedbackLocation {
-    Objective,
-    Feedback,
-}
-
 /// A wrapper feedback used to determine actions for initial seeds.
 /// Handles `AFL_EXIT_ON_SEED_ISSUES`, `AFL_IGNORE_SEED_ISSUES` & default afl-fuzz behavior
-/// then, essentially becomes a "const" feedback.
-///
-/// Note:
-/// For `LibAFL` breaking changes, this Feedback will only work if `LibAFL` checks
-/// that the Input is a `Solution` before it checks if it is `corpus_worthy`
-///
+/// then, essentially becomes benign
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
 pub struct SeedFeedback<A, S>
@@ -37,9 +26,9 @@ where
 {
     /// Inner [`Feedback`]
     pub inner: A,
-    /// either Objective or Feedback
-    location: FeedbackLocation,
-    opt: Opt,
+    ignore_timeouts: bool,
+    ignore_seed_issues: bool,
+    exit_on_seed_issues: bool,
     phantom: PhantomData<S>,
     done_loading_seeds: bool,
 }
@@ -48,12 +37,12 @@ where
     A: Feedback<S>,
     S: State,
 {
-    /// Create a new combined feedback
-    pub fn new(inner: A, location: FeedbackLocation, opt: Opt) -> Self {
+    pub fn new(inner: A, opt: &Opt) -> Self {
         Self {
             inner,
-            location,
-            opt,
+            ignore_timeouts: opt.ignore_seed_issues,
+            ignore_seed_issues: opt.ignore_seed_issues,
+            exit_on_seed_issues: opt.exit_on_seed_issues,
             phantom: PhantomData,
             done_loading_seeds: false,
         }
@@ -81,40 +70,26 @@ where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
-        // TODO: refactor
         if !self.done_loading_seeds {
             match exit_kind {
                 ExitKind::Timeout => {
-                    if !self.opt.ignore_timeouts {
-                        match self.location {
-                            FeedbackLocation::Feedback => {
-                                // We regard all timeouts as uninteresting.
-                                return Ok(false);
-                            }
-                            FeedbackLocation::Objective => {
-                                if !self.opt.ignore_seed_issues || self.opt.exit_on_seed_issues {
-                                    return Err(Error::invalid_corpus(
-                                        "input led to a timeout; use AFL_IGNORE_SEED_ISSUES=true",
-                                    ));
-                                }
-                            }
+                    if !self.ignore_timeouts {
+                        if !self.ignore_seed_issues || self.exit_on_seed_issues {
+                            return Err(Error::invalid_corpus(
+                                "input led to a timeout; use AFL_IGNORE_SEED_ISSUES=true",
+                            ));
+                        } else {
+                            // we regard all timeouts as uninteresting during seed loading.
+                            return Ok(false);
                         }
                     }
                 }
                 ExitKind::Crash => {
-                    match self.location {
-                        FeedbackLocation::Feedback => {
-                            // We regard all crashes as uninteresting.
-                            return Ok(false);
-                        }
-                        FeedbackLocation::Objective => {
-                            if self.opt.exit_on_seed_issues {
-                                return Err(Error::invalid_corpus("input let to a crash; either omit AFL_EXIT_ON_SEED_ISSUES or set it to false."));
-                            }
-                            // We regard all crashes as uninteresting during seed loading
-                            return Ok(false);
-                        }
+                    if self.exit_on_seed_issues {
+                        return Err(Error::invalid_corpus("input let to a crash; either omit AFL_EXIT_ON_SEED_ISSUES or set it to false."));
                     }
+                    // We regard all crashes as uninteresting during seed loading
+                    return Ok(false);
                 }
                 _ => {}
             }
