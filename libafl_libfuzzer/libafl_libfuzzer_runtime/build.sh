@@ -17,28 +17,37 @@ if ! cargo +nightly --version >& /dev/null; then
   exit 1
 fi
 
-RUSTC_BIN="$(cargo +nightly rustc -Zunstable-options --print target-libdir)/../bin"
-RUST_LLD="${RUSTC_BIN}/rust-lld"
-RUST_AR="${RUSTC_BIN}/llvm-ar"
-
-if ! [ -f "${RUST_LLD}" ] && [ -f "${RUST_AR}" ]; then
-  echo -e "You must install the llvm-tools component: \`rustup component add llvm-tools'"
-  exit 1
-fi
-
 cargo +nightly build --profile "$profile"
 
-tmpdir=""
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  # MacOS and iOS
+  "${CXX:-clang++}" -dynamiclib -Wl,-force_load target/release/libafl_libfuzzer_runtime.a  \
+    -Wl,-U,_LLVMFuzzerInitialize -Wl,-U,_LLVMFuzzerCustomMutator -Wl,-U,_LLVMFuzzerCustomCrossOver -Wl,-U,_libafl_main \
+    -o libafl_libfuzzer_runtime.dylib
+else
+  # Linux and *BSD
+  RUSTC_BIN="$(cargo +nightly rustc -Zunstable-options --print target-libdir)/../bin"
+  RUST_LLD="${RUSTC_BIN}/rust-lld"
+  RUST_AR="${RUSTC_BIN}/llvm-ar"
 
-cleanup() {
-    rm -rf "${tmpdir}"
-    exit
-}
-trap cleanup INT TERM
+  if ! [ -f "${RUST_LLD}" ] && [ -f "${RUST_AR}" ]; then
+    echo -e "You must install the llvm-tools component: \`rustup component add llvm-tools'"
+    exit 1
+  fi
 
-tmpdir="$(mktemp -d)"
-"${RUST_LLD}" -flavor gnu -r --whole-archive target/release/libafl_libfuzzer_runtime.a -o "${tmpdir}/libFuzzer.o"
-"${RUST_AR}" cr libFuzzer.a "${tmpdir}/libFuzzer.o"
+  tmpdir=""
 
-echo "Done! Wrote the runtime to \`${SCRIPT_DIR}/libFuzzer.a'"
-cleanup
+  cleanup() {
+      rm -rf "${tmpdir}"
+      exit
+  }
+  trap cleanup INT TERM
+
+  tmpdir="$(mktemp -d)"
+  "${RUST_LLD}" -flavor gnu -r --whole-archive target/release/libafl_libfuzzer_runtime.a -o "${tmpdir}/libFuzzer.o"
+  "${RUST_AR}" cr libFuzzer.a "${tmpdir}/libFuzzer.o"
+
+  echo "Done! Wrote the runtime to \`${SCRIPT_DIR}/libFuzzer.a'"
+  cleanup
+fi
+
