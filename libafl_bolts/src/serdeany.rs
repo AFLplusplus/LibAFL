@@ -2,10 +2,7 @@
 
 use alloc::boxed::Box;
 #[cfg(feature = "stable_anymap")]
-use alloc::{
-    borrow::Cow,
-    string::{String, ToString},
-};
+use alloc::{borrow::Cow, string::ToString};
 #[cfg(feature = "stable_anymap")]
 use core::any::type_name;
 #[cfg(not(feature = "stable_anymap"))]
