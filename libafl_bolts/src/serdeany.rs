@@ -2,7 +2,10 @@
 
 use alloc::boxed::Box;
 #[cfg(feature = "stable_anymap")]
-use alloc::string::{String, ToString};
+use alloc::{
+    borrow::Cow,
+    string::{String, ToString},
+};
 #[cfg(feature = "stable_anymap")]
 use core::any::type_name;
 #[cfg(not(feature = "stable_anymap"))]
@@ -21,7 +24,7 @@ pub type TypeRepr = u128;
 
 /// The type of a stored type in this anymap (`String`)
 #[cfg(feature = "stable_anymap")]
-pub type TypeRepr = String;
+pub type TypeRepr = Cow<'static, str>;
 
 #[cfg(not(feature = "stable_anymap"))]
 fn type_repr<T>() -> TypeRepr
