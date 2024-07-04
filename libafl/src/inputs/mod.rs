@@ -171,6 +171,7 @@ impl<'a> PartialBytesSubInput<'a> {
 impl<'a> BytesReader<'a> {
     /// Create a new [`BytesReader`].
     /// The position of the reader is initialized to 0.
+    #[must_use]
     pub fn new(input: &'a [u8]) -> Self {
         Self {
             parent_input: input,

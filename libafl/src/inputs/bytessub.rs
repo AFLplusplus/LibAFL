@@ -57,15 +57,13 @@ impl<'a> BytesSlice<'a> {
     {
         let parent_len = parent_slice.len();
 
-        let ret = BytesSlice {
+        BytesSlice {
             parent_input: parent_slice,
             range: Range {
                 start: start_index(&range),
                 end: end_index(&range, parent_len),
             },
-        };
-
-        ret
+        }
     }
 
     /// Creates a new [`BytesSubInputMut`] that's a view on an input with mutator bytes.
