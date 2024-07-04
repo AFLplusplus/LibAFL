@@ -419,11 +419,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::inputs::{BytesInput, BytesReader, HasTargetBytes};
+    use crate::inputs::{BytesReader, HasTargetBytes};
 
     #[test]
     fn test_bytesreader_toslice_unchecked() {
-        let bytes_input = BytesInput::new(vec![1, 2, 3, 4, 5, 6, 7]);
+        let bytes_input = vec![1, 2, 3, 4, 5, 6, 7];
         let mut bytes_reader = BytesReader::new(&bytes_input);
 
         let bytes_read = bytes_reader.next_sub_slice_truncated(2);
@@ -442,7 +442,7 @@ mod tests {
 
     #[test]
     fn test_bytesreader_toslice() {
-        let bytes_input = BytesInput::new(vec![1, 2, 3, 4, 5, 6, 7]);
+        let bytes_input = vec![1, 2, 3, 4, 5, 6, 7];
         let mut bytes_reader = BytesReader::new(&bytes_input);
 
         let bytes_read = bytes_reader.next_sub_input(2);
