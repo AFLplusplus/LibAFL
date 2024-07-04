@@ -13,7 +13,7 @@ pub mod generalized;
 pub use generalized::*;
 
 pub mod bytessub;
-pub use bytessub::{BytesSubInput, BytesSubInputMut};
+pub use bytessub::{BytesSlice, BytesSubInputMut};
 
 #[cfg(feature = "multipart_inputs")]
 pub mod multi;
@@ -132,10 +132,10 @@ impl HasLen for NopInput {
 }
 
 /// Target bytes wrapper keeping track of the current read position.
-/// Convenient wrapper when bytes must be split it in multiple subinputs.
+/// Convenient wrapper when bytes must be split in multiple subinputs.
 #[derive(Debug)]
-pub struct BytesReader<'a, I> {
-    parent_input: &'a I,
+pub struct BytesReader<'a> {
+    parent_input: &'a [u8],
     pos: usize,
 }
 
@@ -147,7 +147,7 @@ pub enum PartialBytesSubInput<'a> {
     /// The slice is empty, and thus not kept
     Empty,
     /// The slice is strictly smaller than the expected one.
-    Partial(BytesSubInput<'a>),
+    Partial(BytesSlice<'a>),
 }
 
 impl<'a> PartialBytesSubInput<'a> {
@@ -159,7 +159,7 @@ impl<'a> PartialBytesSubInput<'a> {
 
     /// Consumes `PartialBytesSubInput` and returns the partial slice if it was a partial slice, None otherwise.
     #[must_use]
-    pub fn partial(self) -> Option<BytesSubInput<'a>> {
+    pub fn partial(self) -> Option<BytesSlice<'a>> {
         #[allow(clippy::match_wildcard_for_single_variants)]
         match self {
             PartialBytesSubInput::Partial(partial_slice) => Some(partial_slice),
@@ -168,13 +168,10 @@ impl<'a> PartialBytesSubInput<'a> {
     }
 }
 
-impl<'a, I> BytesReader<'a, I>
-where
-    I: HasTargetBytes + HasLen,
-{
+impl<'a> BytesReader<'a> {
     /// Create a new [`BytesReader`].
     /// The position of the reader is initialized to 0.
-    pub fn new(input: &'a I) -> Self {
+    pub fn new(input: &'a [u8]) -> Self {
         Self {
             parent_input: input,
             pos: 0,
@@ -185,8 +182,8 @@ where
     /// If the resulting slice would go beyond the end of the parent input, it will be truncated to the length of the parent input.
     /// This function does not provide any feedback on whether the slice was cropped or not.
     #[must_use]
-    pub fn next_sub_slice_truncated(&mut self, limit: usize) -> BytesSubInput<'a> {
-        let sub_input = BytesSubInput::new(self.parent_input, self.pos..(self.pos + limit));
+    pub fn next_sub_slice_truncated(&mut self, limit: usize) -> BytesSlice<'a> {
+        let sub_input = BytesSlice::with_slice(self.parent_input, self.pos..(self.pos + limit));
 
         self.pos += sub_input.len();
 
@@ -202,7 +199,7 @@ where
     pub fn next_sub_input(
         &mut self,
         limit: usize,
-    ) -> Result<BytesSubInput<'a>, PartialBytesSubInput<'a>> {
+    ) -> Result<BytesSlice<'a>, PartialBytesSubInput<'a>> {
         let slice_to_return = self.next_sub_slice_truncated(limit);
 
         let real_len = slice_to_return.len();
@@ -217,8 +214,8 @@ where
     }
 }
 
-impl<'a, I: HasTargetBytes + HasLen> From<&'a I> for BytesReader<'a, I> {
-    fn from(input: &'a I) -> Self {
+impl<'a> From<&'a [u8]> for BytesReader<'a> {
+    fn from(input: &'a [u8]) -> Self {
         Self::new(input)
     }
 }
@@ -268,13 +265,13 @@ pub trait HasMutatorBytes: HasBytes {
     where
         R: RangeBounds<usize>;
 
-    /// Creates a [`BytesSubInput`] from this input, that can be used for local mutations.
-    fn sub_input<R>(&self, range: R) -> BytesSubInput
+    /// Creates a [`BytesSlice`] from this input, that can be used for local mutations.
+    fn sub_input<R>(&self, range: R) -> BytesSlice
     where
         R: RangeBounds<usize>,
         Self: Sized,
     {
-        BytesSubInput::new(self, range)
+        BytesSlice::new(self.bytes(), range)
     }
 
     /// Creates a [`BytesSubInputMut`] from this input, that can be used for local mutations.

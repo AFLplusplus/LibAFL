@@ -41,25 +41,24 @@ where
 ///
 /// A mutable version is available: [`BytesSubInputMut`].
 #[derive(Debug)]
-pub struct BytesSubInput<'a> {
+pub struct BytesSlice<'a> {
     /// The (complete) parent input we will work on
     parent_input: OwnedSlice<'a, u8>,
     /// The range inside the parent input we will work on
     range: Range<usize>,
 }
 
-impl<'a> BytesSubInput<'a> {
+impl<'a> BytesSlice<'a> {
     /// Creates a new [`BytesSubInputMut`] that's a view on an input with mutator bytes.
     /// The sub input can then be used to mutate parts of the original input.
-    pub fn new<I, R>(parent_input: &'a I, range: R) -> Self
+    pub fn new<R>(parent_slice: OwnedSlice<'a, u8>, range: R) -> Self
     where
-        I: HasBytes,
         R: RangeBounds<usize>,
     {
-        let parent_len = parent_input.len();
+        let parent_len = parent_slice.len();
 
-        let ret = BytesSubInput {
-            parent_input: parent_input.bytes(),
+        let ret = BytesSlice {
+            parent_input: parent_slice,
             range: Range {
                 start: start_index(&range),
                 end: end_index(&range, parent_len),
@@ -67,6 +66,15 @@ impl<'a> BytesSubInput<'a> {
         };
 
         ret
+    }
+
+    /// Creates a new [`BytesSubInputMut`] that's a view on an input with mutator bytes.
+    /// The sub input can then be used to mutate parts of the original input.
+    pub fn with_slice<R>(parent_slice: &'a [u8], range: R) -> Self
+    where
+        R: RangeBounds<usize>,
+    {
+        Self::new(parent_slice.into(), range)
     }
 
     /// The parent input
@@ -88,9 +96,9 @@ impl<'a> BytesSubInput<'a> {
     }
 
     /// Creates a sub range in the current own range
-    pub fn sub_range<R2>(&self, range: R2) -> (Bound<usize>, Bound<usize>)
+    pub fn sub_range<R>(&self, range: R) -> (Bound<usize>, Bound<usize>)
     where
-        R2: RangeBounds<usize>,
+        R: RangeBounds<usize>,
     {
         let start = match (self.range.start_bound(), range.start_bound()) {
             (Bound::Unbounded, Bound::Unbounded) => Bound::Unbounded,
@@ -388,20 +396,20 @@ where
     }
 }
 
-impl<'a> HasLen for BytesSubInput<'a> {
+impl<'a> HasLen for BytesSlice<'a> {
     #[inline]
     fn len(&self) -> usize {
         self.range.len()
     }
 }
 
-impl<'a> HasBytes for BytesSubInput<'a> {
+impl<'a> HasBytes for BytesSlice<'a> {
     fn bytes(&self) -> OwnedSlice<u8> {
         self.parent_input.slice(self.range.clone())
     }
 }
 
-impl<'a> HasTargetBytes for BytesSubInput<'a> {}
+impl<'a> HasTargetBytes for BytesSlice<'a> {}
 
 #[cfg(test)]
 mod tests {
