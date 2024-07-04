@@ -305,7 +305,7 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                         }
                         "grimoire" => self.grimoire = Some(parse_or_bail!(name, value, u64) > 0),
                         "use_value_profile" => {
-                            self.use_value_profile = Some(parse_or_bail!(name, value, u64) > 0)
+                            self.use_value_profile = Some(parse_or_bail!(name, value, u64) > 0);
                         }
                         "unicode" => self.unicode = Some(parse_or_bail!(name, value, u64) > 0),
                         "artifact_prefix" => {
