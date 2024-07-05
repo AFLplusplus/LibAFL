@@ -1,8 +1,8 @@
 //! Poor-rust-man's downcasts for stuff we send over the wire (or shared maps)
 
-use alloc::boxed::Box;
 #[cfg(feature = "stable_anymap")]
-use alloc::{borrow::Cow, string::ToString};
+use alloc::borrow::Cow;
+use alloc::boxed::Box;
 #[cfg(feature = "stable_anymap")]
 use core::any::type_name;
 #[cfg(not(feature = "stable_anymap"))]
