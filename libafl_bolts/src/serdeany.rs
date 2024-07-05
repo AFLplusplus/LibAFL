@@ -41,7 +41,7 @@ where
 
 #[cfg(feature = "stable_anymap")]
 fn type_repr_owned<T>() -> TypeRepr {
-    TypeRepr::from(type_name::<T>().to_string())
+    type_name::<T>()
 }
 
 #[cfg(feature = "stable_anymap")]
