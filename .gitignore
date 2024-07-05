@@ -18,6 +18,7 @@ vendor
 *.bin
 *.dll
 *.exe
+*.dylib
 *.dSYM
 *.obj
 
