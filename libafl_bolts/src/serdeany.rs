@@ -41,7 +41,7 @@ where
 
 #[cfg(feature = "stable_anymap")]
 fn type_repr_owned<T>() -> TypeRepr {
-    type_name::<T>()
+    Cow::Borrowed(type_name::<T>())
 }
 
 #[cfg(feature = "stable_anymap")]
