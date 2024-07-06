@@ -1,12 +1,15 @@
 use std::{borrow::Cow, path::PathBuf, time::Duration};
 
 use libafl::{
-    corpus::{Corpus, OnDiskCorpus},
-    events::{CentralizedEventManager, EventManagerHooksTuple, LlmpRestartingEventManager},
+    corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
+    events::{
+        CentralizedEventManager, EventManagerHooksTuple, EventProcessor,
+        LlmpRestartingEventManager, ProgressReporter,
+    },
     executors::forkserver::{ForkserverExecutor, ForkserverExecutorBuilder},
     feedback_and, feedback_or, feedback_or_fast,
     feedbacks::{ConstFeedback, CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::StdFuzzer,
     inputs::BytesInput,
     mutators::{
         scheduled::havoc_mutations, tokens_mutations, AFLppRedQueen, StdScheduledMutator, Tokens,
@@ -17,10 +20,13 @@ use libafl::{
     },
     stages::{
         mutational::MultiMutationalStage, CalibrationStage, ColorizationStage, IfStage,
-        StdPowerMutationalStage,
+        StagesTuple, StdPowerMutationalStage,
     },
-    state::{HasCorpus, HasCurrentTestcase, HasStartTime, StdState},
-    Error, HasMetadata, HasFeedback,
+    state::{
+        HasCorpus, HasCurrentTestcase, HasExecutions, HasLastReportTime, HasStartTime, StdState,
+        UsesState,
+    },
+    Error, Fuzzer, HasFeedback, HasMetadata,
 };
 use libafl_bolts::{
     current_nanos, current_time,
@@ -38,8 +44,7 @@ use crate::{
     afl_stats::AflStatsStage,
     corpus::{set_corpus_filepath, set_solution_filepath},
     feedback::{filepath::CustomFilepathToTestcaseFeedback, seed::SeedFeedback},
-    run_fuzzer_with_stage, Opt, AFL_DEFAULT_INPUT_LEN_MAX, AFL_DEFAULT_INPUT_LEN_MIN,
-    SHMEM_ENV_VAR,
+    Opt, AFL_DEFAULT_INPUT_LEN_MAX, AFL_DEFAULT_INPUT_LEN_MIN, SHMEM_ENV_VAR,
 };
 
 #[allow(clippy::too_many_lines)]
@@ -117,7 +122,8 @@ where
     let mut state = state.unwrap_or_else(|| {
         StdState::new(
             StdRand::with_seed(current_nanos()),
-            OnDiskCorpus::<BytesInput>::new(fuzzer_dir.join("queue")).unwrap(),
+            // TODO: configure testcache size
+            CachedOnDiskCorpus::<BytesInput>::new(fuzzer_dir.join("queue"), 10).unwrap(),
             OnDiskCorpus::<BytesInput>::new(fuzzer_dir.clone()).unwrap(),
             &mut feedback,
             &mut objective,
@@ -250,7 +256,7 @@ where
         // and if run with AFL_CMPLOG_ONLY_NEW, then we avoid cmplog.
         let cb = |_fuzzer: &mut _,
                   _executor: &mut _,
-                  state: &mut StdState<_, OnDiskCorpus<_>, _, _>,
+                  state: &mut LibaflFuzzState,
                   _event_manager: &mut _|
          -> Result<bool, Error> {
             let testcase = state.current_testcase()?;
@@ -265,27 +271,27 @@ where
         let mut stages = tuple_list!(calibration, cmplog, power, afl_stats_stage);
 
         // Run our fuzzer; WITH CmpLog
-        run_fuzzer_with_stage!(
+        run_fuzzer_with_stages(
             &opt,
-            fuzzer,
+            &mut fuzzer,
             &mut stages,
             &mut executor,
             &mut state,
-            &mut restarting_mgr
-        );
+            &mut restarting_mgr,
+        )?;
     } else {
         // The order of the stages matter!
         let mut stages = tuple_list!(calibration, power, afl_stats_stage);
 
         // Run our fuzzer; NO CmpLog
-        run_fuzzer_with_stage!(
+        run_fuzzer_with_stages(
             &opt,
-            fuzzer,
+            &mut fuzzer,
             &mut stages,
             &mut executor,
             &mut state,
-            &mut restarting_mgr
-        );
+            &mut restarting_mgr,
+        )?;
     }
     Ok(())
     // TODO: serialize state when exiting.
@@ -359,4 +365,27 @@ pub struct IsInitialCorpusEntryMetadata {}
 libafl_bolts::impl_serdeany!(IsInitialCorpusEntryMetadata);
 
 pub type LibaflFuzzState =
-    StdState<BytesInput, OnDiskCorpus<BytesInput>, StdRand, OnDiskCorpus<BytesInput>>;
+    StdState<BytesInput, CachedOnDiskCorpus<BytesInput>, StdRand, OnDiskCorpus<BytesInput>>;
+
+pub fn run_fuzzer_with_stages<Z, ST, E, EM>(
+    opt: &Opt,
+    fuzzer: &mut Z,
+    stages: &mut ST,
+    executor: &mut E,
+    state: &mut <Z as UsesState>::State,
+    mgr: &mut EM,
+) -> Result<(), Error>
+where
+    Z: Fuzzer<E, EM, ST>,
+    E: UsesState<State = Z::State>,
+    EM: ProgressReporter<State = Z::State> + EventProcessor<E, Z>,
+    ST: StagesTuple<E, EM, Z::State, Z>,
+    <Z as UsesState>::State: HasLastReportTime + HasExecutions + HasMetadata,
+{
+    if opt.bench_just_one {
+        fuzzer.fuzz_loop_for(stages, executor, state, mgr, 1)?;
+    } else {
+        fuzzer.fuzz_loop(stages, executor, state, mgr)?;
+    }
+    Ok(())
+}

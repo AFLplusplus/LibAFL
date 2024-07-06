@@ -21,7 +21,7 @@ use libafl::{
 use libafl_bolts::current_time;
 use nix::libc::{getrusage, rusage, RUSAGE_CHILDREN};
 
-use crate::{fuzzer::fuzzer_target_mode, utils::get_run_cmdline, Opt};
+use crate::{fuzzer::fuzzer_target_mode, Opt};
 
 /// The [`AflStatsStage`] is a Stage that calculates and writes
 /// AFL++'s `fuzzer_stats` and `plot_data` information.
@@ -649,4 +649,10 @@ command_line      : {}
             self.command_line
         )
     }
+}
+
+/// Get the command used to invoke libafl-fuzz
+pub fn get_run_cmdline() -> Cow<'static, str> {
+    let args: Vec<String> = std::env::args().collect();
+    Cow::Owned(args.join(" "))
 }

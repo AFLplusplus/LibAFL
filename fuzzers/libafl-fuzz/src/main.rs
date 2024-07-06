@@ -13,7 +13,6 @@ mod corpus;
 mod executor;
 mod fuzzer;
 mod hooks;
-mod utils;
 use fuzzer::run_client;
 use libafl::{
     events::{CentralizedLauncher, EventConfig},
