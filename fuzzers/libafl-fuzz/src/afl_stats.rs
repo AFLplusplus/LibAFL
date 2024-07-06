@@ -4,8 +4,7 @@ use std::{
     borrow::Cow,
     fmt::Display,
     fs::{File, OpenOptions},
-    io::{self, BufRead, BufReader, Write},
-    mem,
+    io::{BufRead, BufReader, Write},
     path::PathBuf,
     process,
 };
@@ -19,8 +18,7 @@ use libafl::{
     state::{HasCorpus, HasExecutions, HasImported, HasStartTime, Stoppable, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
-use libafl_bolts::current_time;
-use nix::libc::{getrusage, rusage, RUSAGE_CHILDREN};
+use libafl_bolts::{current_time, os::peak_rss_mb};
 
 use crate::{fuzzer::fuzzer_target_mode, Opt};
 
@@ -291,7 +289,7 @@ where
             execs_since_crash: total_executions - self.execs_at_last_objective,
             exec_timeout: self.exec_timeout, // TODO
             slowest_exec_ms: self.slowest_exec.as_millis(),
-            peak_rss_mb: self.peak_rss_mb()?,
+            peak_rss_mb: peak_rss_mb()?,
             cpu_affinity: 0, // TODO
             total_edges: map_size,
             edges_found: filled_entries_in_map,
@@ -406,21 +404,6 @@ where
             .open(self.fuzzer_dir.join("plot_data"))?;
         writeln!(file, "{plot_data}")?;
         Ok(())
-    }
-
-    #[allow(clippy::unused_self)]
-    // Derived from https://github.com/RustPython/RustPython/blob/7996a10116681e9f85eda03413d5011b805e577f/stdlib/src/resource.rs#L113
-    // LICENSE: MIT https://github.com/RustPython/RustPython/commit/37355d612a451fba7fef8f13a1b9fdd51310b37e
-    fn peak_rss_mb(&self) -> Result<i64, Error> {
-        let rss = unsafe {
-            let mut rusage = mem::MaybeUninit::<rusage>::uninit();
-            if getrusage(RUSAGE_CHILDREN, rusage.as_mut_ptr()) == -1 {
-                Err(io::Error::last_os_error())
-            } else {
-                Ok(rusage.assume_init())
-            }
-        }?;
-        Ok(rss.ru_maxrss >> 10)
     }
 
     fn maybe_update_is_favored_size(
