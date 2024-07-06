@@ -159,7 +159,9 @@ pub fn check_autoresume(
 fn create_dir_if_not_exists(path: &PathBuf) -> std::io::Result<()> {
     if path.is_file() {
         return Err(io::Error::new(
-            io::ErrorKind::NotADirectory,
+            // TODO: change this to ErrorKind::NotADirectory 
+            // when stabilitzed https://github.com/rust-lang/rust/issues/86442
+            io::ErrorKind::Other,
             format!("{} is a file!", path.display()),
         ));
     }

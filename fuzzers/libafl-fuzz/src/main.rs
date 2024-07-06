@@ -1,4 +1,3 @@
-#![feature(io_error_more)]
 #![deny(clippy::pedantic)]
 #![allow(clippy::unsafe_derive_deserialize)]
 #![allow(clippy::ptr_arg)]
