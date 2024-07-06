@@ -63,7 +63,7 @@ where
     shmem.write_to_env(SHMEM_ENV_VAR).unwrap();
     let shmem_buf = shmem.as_slice_mut();
 
-    // Create an observation channel to keep track of the execution time.
+    // Create an observation channel to keep track of edges hit.
     let edges_observer = unsafe {
         HitcountsMapObserver::new(StdMapObserver::new("edges", shmem_buf)).track_indices()
     };
