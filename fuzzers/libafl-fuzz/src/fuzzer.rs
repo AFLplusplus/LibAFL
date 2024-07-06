@@ -27,7 +27,7 @@ use libafl_bolts::{
     fs::get_unique_std_input_file,
     ownedref::OwnedRefMut,
     rands::StdRand,
-    shmem::{ShMem, ShMemProvider, UnixShMemProvider},
+    shmem::{ShMem, ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Handled, Merge},
     AsSliceMut,
 };
@@ -59,7 +59,7 @@ where
     SP: ShMemProvider,
 {
     // Create the shared memory map for comms with the forkserver
-    let mut shmem_provider = UnixShMemProvider::new().unwrap();
+    let mut shmem_provider = StdShMemProvider::new().unwrap();
     let mut shmem = shmem_provider.new_shmem(opt.map_size).unwrap();
     shmem.write_to_env(SHMEM_ENV_VAR).unwrap();
     let shmem_buf = shmem.as_slice_mut();
@@ -293,8 +293,8 @@ where
 
 fn base_executor<'a>(
     opt: &'a Opt,
-    shmem_provider: &'a mut UnixShMemProvider,
-) -> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
+    shmem_provider: &'a mut StdShMemProvider,
+) -> ForkserverExecutorBuilder<'a, StdShMemProvider> {
     let mut executor = ForkserverExecutor::builder()
         .program(opt.executable.clone())
         .shmem_provider(shmem_provider)

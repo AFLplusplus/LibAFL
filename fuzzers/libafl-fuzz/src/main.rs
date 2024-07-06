@@ -24,7 +24,7 @@ use libafl::{
 };
 use libafl_bolts::{
     core_affinity::{CoreId, Cores},
-    shmem::{ShMemProvider, UnixShMemProvider},
+    shmem::{ShMemProvider, StdShMemProvider},
 };
 use nix::sys::signal::Signal;
 
@@ -35,7 +35,7 @@ fn main() {
     executor::check_binary(&mut opt, SHMEM_ENV_VAR).expect("binary to be valid");
 
     // Create the shared memory map provider for LLMP
-    let shmem_provider = UnixShMemProvider::new().unwrap();
+    let shmem_provider = StdShMemProvider::new().unwrap();
 
     // Create our Monitor
     let monitor = MultiMonitor::new(|s| println!("{s}"));
