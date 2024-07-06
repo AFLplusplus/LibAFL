@@ -216,22 +216,22 @@ where
                 "state is not currently processing a corpus index",
             ));
         };
-        let testcase = state.corpus().get(corpus_idx)?.clone();
+        let testcase = state.corpus().get(corpus_idx)?.borrow();
         // NOTE: scheduled_count represents the amount of fuzzing iterations a
         // testcase has had. Since this stage is kept at the very end of stage list,
         // the entry would have been fuzzed already (and should contain IsFavoredMetadata) but would have a scheduled count of zero
         // since the scheduled count is incremented after all stages have been run.
-        if testcase.borrow().scheduled_count() == 0 {
+        if testcase.scheduled_count() == 0 {
             // New testcase!
             self.cycles_wo_finds = 0;
             self.update_last_find();
-            self.maybe_update_last_crash(&testcase.borrow(), state);
-            self.maybe_update_last_hang(&testcase.borrow(), state);
+            self.maybe_update_last_crash(&testcase, state);
+            self.maybe_update_last_hang(&testcase, state);
             self.update_has_fuzzed_size();
-            self.maybe_update_is_favored_size(&testcase.borrow());
+            self.maybe_update_is_favored_size(&testcase);
         }
-        self.maybe_update_slowest_exec(&testcase.borrow());
-        self.maybe_update_max_depth(&testcase.borrow())?;
+        self.maybe_update_slowest_exec(&testcase);
+        self.maybe_update_max_depth(&testcase)?;
 
         // See if we actually need to run the stage, if not, avoid dynamic value computation.
         if !self.check_interval() {
