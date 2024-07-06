@@ -161,7 +161,7 @@ where
     // Set a custom directory for the current Input if configured;
     // May be used to provide a ram-disk etc..
     if let Some(cur_input_dir) = &opt.cur_input_dir {
-        if opt.harness_input_stdin.is_none() {
+        if opt.harness_input_type.is_none() {
             return Err(Error::illegal_argument(
                 "cannot use AFL_TMPDIR with stdin input type.",
             ));
@@ -309,7 +309,7 @@ fn base_executor<'a>(
     if let Some(target_env) = &opt.target_env {
         executor = executor.envs(target_env);
     }
-    if let Some(harness_input_type) = &opt.harness_input_stdin {
+    if let Some(harness_input_type) = &opt.harness_input_type {
         executor = executor.parse_afl_cmdline([harness_input_type]);
     }
     executor

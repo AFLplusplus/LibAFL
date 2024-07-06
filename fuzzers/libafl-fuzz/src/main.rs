@@ -98,8 +98,9 @@ fn main() {
 /// The Configuration
 struct Opt {
     executable: PathBuf,
-    #[arg(value_parser = validate_harness_input_type)]
-    harness_input_stdin: Option<String>,
+
+    #[arg(value_parser = validate_harness_input_stdin)]
+    harness_input_type: Option<&'static str>,
 
     // NOTE: afl-fuzz does not accept multiple input directories
     #[arg(short = 'i')]
@@ -204,6 +205,7 @@ const OUTPUT_GRACE: u64 = 25;
 const PERSIST_SIG: &str = "##SIG_AFL_PERSISTENT##";
 const DEFER_SIG: &str = "##SIG_AFL_DEFER_FORKSRV##";
 const SHMEM_ENV_VAR: &str = "__AFL_SHM_ID";
+static AFL_HARNESS_FILE_INPUT: &str = "@@";
 
 fn validate_map_size(s: &str) -> Result<usize, String> {
     let map_size: usize = s
@@ -218,11 +220,11 @@ fn validate_map_size(s: &str) -> Result<usize, String> {
     }
 }
 
-fn validate_harness_input_type(s: &str) -> Result<String, String> {
+fn validate_harness_input_stdin(s: &str) -> Result<&'static str, String> {
     if s != "@@" {
         return Err("Unknown harness input type. Use \"@@\" for file, omit for stdin ".to_string());
     }
-    Ok(s.to_string())
+    Ok(AFL_HARNESS_FILE_INPUT)
 }
 
 /// parse `AFL_TARGET_ENV`; expects: FOO=BAR TEST=ASD
