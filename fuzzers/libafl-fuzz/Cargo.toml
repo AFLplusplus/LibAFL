@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.5.4", features = ["derive", "env"] }
 env_logger = "0.11.3"
-libafl = { path = "../../libafl", features = ["std", "derive", "track_hit_feedbacks"]}
+libafl = { path = "../../libafl", features = ["std", "derive", "track_hit_feedbacks", "clap"]}
 libafl_bolts = { path = "../../libafl_bolts", features = ["std"]}
 libafl_targets = { path = "../../libafl_targets"}
 memmap2 = "0.9.4"

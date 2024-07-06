@@ -19,6 +19,7 @@ use fuzzer::run_client;
 use libafl::{
     events::{CentralizedLauncher, EventConfig},
     monitors::MultiMonitor,
+    schedulers::powersched::PowerSchedule,
     Error,
 };
 use libafl_bolts::{
@@ -26,7 +27,6 @@ use libafl_bolts::{
     shmem::{ShMemProvider, UnixShMemProvider},
 };
 use nix::sys::signal::Signal;
-use utils::PowerScheduleCustom;
 
 #[allow(clippy::too_many_lines)]
 fn main() {
@@ -108,7 +108,7 @@ struct Opt {
     #[arg(short = 'o')]
     output_dir: PathBuf,
     #[arg(short = 'p')]
-    power_schedule: Option<PowerScheduleCustom>,
+    power_schedule: Option<PowerSchedule>,
     #[arg(short = 'c')]
     cmplog_binary: Option<PathBuf>,
     #[arg(short = 'F')]

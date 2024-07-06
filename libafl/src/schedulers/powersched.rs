@@ -157,6 +157,7 @@ impl SchedulerMetadata {
 
 /// The power schedule to use
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 pub enum PowerSchedule {
     /// The `explore` power schedule
     EXPLORE,

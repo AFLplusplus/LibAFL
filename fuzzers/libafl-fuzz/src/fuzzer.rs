@@ -12,7 +12,9 @@ use libafl::{
         scheduled::havoc_mutations, tokens_mutations, AFLppRedQueen, StdScheduledMutator, Tokens,
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
-    schedulers::{IndexesLenTimeMinimizerScheduler, StdWeightedScheduler},
+    schedulers::{
+        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
+    },
     stages::{
         mutational::MultiMutationalStage, CalibrationStage, ColorizationStage, IfStage,
         StdPowerMutationalStage,
@@ -36,9 +38,8 @@ use crate::{
     afl_stats::AflStatsStage,
     corpus::{set_corpus_filepath, set_solution_filepath},
     feedback::{CustomFilepathToTestcaseFeedback, SeedFeedback},
-    run_fuzzer_with_stage,
-    utils::PowerScheduleCustom,
-    Opt, AFL_DEFAULT_INPUT_LEN_MAX, AFL_DEFAULT_INPUT_LEN_MIN, SHMEM_ENV_VAR,
+    run_fuzzer_with_stage, Opt, AFL_DEFAULT_INPUT_LEN_MAX, AFL_DEFAULT_INPUT_LEN_MIN,
+    SHMEM_ENV_VAR,
 };
 
 #[allow(clippy::too_many_lines)]
@@ -128,7 +129,7 @@ where
     let power = StdPowerMutationalStage::new(StdScheduledMutator::new(
         havoc_mutations().merge(tokens_mutations()),
     ));
-    let strategy = opt.power_schedule.unwrap_or(PowerScheduleCustom::Explore);
+    let strategy = opt.power_schedule.unwrap_or(PowerSchedule::EXPLORE);
 
     // Create our ColorizationStage
     let colorization = ColorizationStage::new(&edges_observer);
