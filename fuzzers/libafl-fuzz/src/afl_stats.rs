@@ -1,3 +1,4 @@
+extern crate proc_macro;
 use core::{marker::PhantomData, time::Duration};
 use std::{
     borrow::Cow,
@@ -523,23 +524,20 @@ where
 
 impl Display for AFLPlotData<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}",
-            self.relative_time,
-            self.cycles_done,
-            self.cur_item,
-            self.corpus_count,
-            self.pending_total,
-            self.pending_favs,
-            self.total_edges,
-            self.saved_crashes,
-            self.saved_hangs,
-            self.max_depth,
-            self.execs_per_sec,
-            self.execs_done,
-            self.edges_found
-        )
+        write!(f, "{},", self.relative_time)?;
+        write!(f, "{},", self.cycles_done)?;
+        write!(f, "{},", self.cur_item)?;
+        write!(f, "{},", self.corpus_count)?;
+        write!(f, "{},", self.pending_total)?;
+        write!(f, "{},", self.pending_favs)?;
+        write!(f, "{},", self.total_edges)?;
+        write!(f, "{},", self.saved_crashes)?;
+        write!(f, "{},", self.saved_hangs)?;
+        write!(f, "{},", self.max_depth)?;
+        write!(f, "{},", self.execs_per_sec)?;
+        write!(f, "{},", self.execs_done)?;
+        write!(f, "{}", self.edges_found)?;
+        Ok(())
     }
 }
 impl AFLPlotData<'_> {
@@ -547,110 +545,59 @@ impl AFLPlotData<'_> {
         "# relative_time, cycles_done, cur_item, corpus_count, pending_total, pending_favs, total_edges, saved_crashes, saved_hangs, max_depth, execs_per_sec, execs_done, edges_found".to_string()
     }
 }
-
 impl Display for AFLFuzzerStats<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "start_time        : {}
-last_update       : {}
-run_time          : {} 
-fuzzer_pid        : {} 
-cycles_done       : {} 
-cycles_wo_finds   : {} 
-time_wo_finds     : {} 
-fuzz_time         : {} 
-calibration_time  : {} 
-sync_time         : {} 
-trim_time         : {} 
-execs_done        : {} 
-execs_per_sec     : {} 
-execs_ps_last_min : {} 
-corpus_count      : {} 
-corpus_favored    : {} 
-corpus_found      : {} 
-corpus_imported   : {} 
-corpus_variable   : {} 
-max_depth         : {} 
-cur_item          : {} 
-pending_favs      : {} 
-pending_total     : {} 
-stability         : {:.2}%
-bitmap_cvg        : {:.2}%
-saved_crashes     : {} 
-saved_hangs       : {} 
-last_find         : {} 
-last_crash        : {} 
-last_hang         : {} 
-execs_since_crash : {} 
-exec_timeout      : {} 
-slowest_exec_ms   : {} 
-peak_rss_mb       : {} 
-cpu_affinity      : {} 
-edges_found       : {} 
-total_edges       : {} 
-var_byte_count    : {} 
-havoc_expansion   : {} 
-auto_dict_entries : {} 
-testcache_size    : {} 
-testcache_count   : {} 
-testcache_evict   : {} 
-afl_banner        : {} 
-afl_version       : {} 
-target_mode       : {} 
-command_line      : {} 
-",
-            self.start_time,
-            self.last_update,
-            self.run_time,
-            self.fuzzer_pid,
-            self.cycles_done,
-            self.cycles_wo_find,
-            self.time_wo_finds,
-            self.fuzz_time,
-            self.calibration_time,
-            self.sync_time,
-            self.trim_time,
-            self.execs_done,
-            self.execs_per_sec,
-            self.execs_ps_last_min,
-            self.corpus_count,
-            self.corpus_favored,
-            self.corpus_found,
-            self.corpus_imported,
-            self.corpus_variable,
-            self.max_depth,
-            self.cur_item,
-            self.pending_favs,
-            self.pending_total,
-            self.stability,
-            self.bitmap_cvg,
-            self.saved_crashes,
-            self.saved_hangs,
-            self.last_find.as_secs(),
-            self.last_crash.as_secs(),
-            self.last_hang.as_secs(),
-            self.execs_since_crash,
-            self.exec_timeout,
-            self.slowest_exec_ms,
-            self.peak_rss_mb,
-            self.cpu_affinity,
-            self.edges_found,
-            self.total_edges,
-            self.var_byte_count,
-            self.havoc_expansion,
-            self.auto_dict_entries,
-            self.testcache_size,
-            self.testcache_count,
-            self.testcache_evict,
-            self.afl_banner,
-            self.afl_version,
-            self.target_mode,
-            self.command_line
-        )
+        writeln!(f, "start_time        : {}", &self.start_time)?;
+        writeln!(f, "start_time        : {}", &self.start_time)?;
+        writeln!(f, "last_update       : {}", &self.last_update)?;
+        writeln!(f, "run_time          : {}", &self.run_time)?;
+        writeln!(f, "fuzzer_pid        : {}", &self.fuzzer_pid)?;
+        writeln!(f, "cycles_done       : {}", &self.cycles_done)?;
+        writeln!(f, "cycles_wo_find    : {}", &self.cycles_wo_find)?;
+        writeln!(f, "time_wo_finds     : {}", &self.time_wo_finds)?;
+        writeln!(f, "fuzz_time         : {}", &self.fuzz_time)?;
+        writeln!(f, "calibration_time  : {}", &self.calibration_time)?;
+        writeln!(f, "sync_time         : {}", &self.sync_time)?;
+        writeln!(f, "trim_time         : {}", &self.trim_time)?;
+        writeln!(f, "execs_done        : {}", &self.execs_done)?;
+        writeln!(f, "execs_per_sec     : {}", &self.execs_per_sec)?;
+        writeln!(f, "execs_ps_last_min : {}", &self.execs_ps_last_min)?;
+        writeln!(f, "corpus_count      : {}", &self.corpus_count)?;
+        writeln!(f, "corpus_favored    : {}", &self.corpus_favored)?;
+        writeln!(f, "corpus_found      : {}", &self.corpus_found)?;
+        writeln!(f, "corpus_imported   : {}", &self.corpus_imported)?;
+        writeln!(f, "max_depth         : {}", &self.max_depth)?;
+        writeln!(f, "cur_item          : {}", &self.cur_item)?;
+        writeln!(f, "pending_favs      : {}", &self.pending_favs)?;
+        writeln!(f, "pending_total     : {}", &self.pending_total)?;
+        writeln!(f, "corpus_variable   : {}", &self.corpus_variable)?;
+        writeln!(f, "stability         : {:.2}%", &self.stability)?;
+        writeln!(f, "bitmap_cvg        : {:.2}%", &self.bitmap_cvg)?;
+        writeln!(f, "saved_crashes     : {}", &self.saved_crashes)?;
+        writeln!(f, "saved_hangs       : {}", &self.saved_hangs)?;
+        writeln!(f, "last_find         : {}", &self.last_find.as_secs())?;
+        writeln!(f, "last_crash        : {}", &self.last_crash.as_secs())?;
+        writeln!(f, "last_hang         : {}", &self.last_hang.as_secs())?;
+        writeln!(f, "execs_since_crash : {}", &self.execs_since_crash)?;
+        writeln!(f, "exec_timeout      : {}", &self.exec_timeout)?;
+        writeln!(f, "slowest_exec_ms   : {}", &self.slowest_exec_ms)?;
+        writeln!(f, "peak_rss_mb       : {}", &self.peak_rss_mb)?;
+        writeln!(f, "cpu_affinity      : {}", &self.cpu_affinity)?;
+        writeln!(f, "edges_found       : {}", &self.edges_found)?;
+        writeln!(f, "total_edges       : {}", &self.total_edges)?;
+        writeln!(f, "var_byte_count    : {}", &self.var_byte_count)?;
+        writeln!(f, "havoc_expansion   : {}", &self.havoc_expansion)?;
+        writeln!(f, "auto_dict_entries : {}", &self.auto_dict_entries)?;
+        writeln!(f, "testcache_size    : {}", &self.testcache_size)?;
+        writeln!(f, "testcache_count   : {}", &self.testcache_count)?;
+        writeln!(f, "testcache_evict   : {}", &self.testcache_evict)?;
+        writeln!(f, "afl_banner        : {}", self.afl_banner)?;
+        writeln!(f, "afl_version       : {}", self.afl_version)?;
+        writeln!(f, "target_mode       : {}", self.target_mode)?;
+        writeln!(f, "command_line      : {}", self.command_line)?;
+        Ok(())
     }
 }
-
 /// Get the command used to invoke libafl-fuzz
 pub fn get_run_cmdline() -> Cow<'static, str> {
     let args: Vec<String> = std::env::args().collect();
