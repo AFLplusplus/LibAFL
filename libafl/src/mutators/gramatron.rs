@@ -1,4 +1,4 @@
-//! Gramatron is the rewritten gramatron fuzzer in rust.
+//! Gramatron is the rewritten gramatron mutator in rust.
 //! See the original gramatron repo [`Gramatron`](https://github.com/HexHive/Gramatron) for more details.
 use alloc::{borrow::Cow, vec::Vec};
 use core::cmp::max;
