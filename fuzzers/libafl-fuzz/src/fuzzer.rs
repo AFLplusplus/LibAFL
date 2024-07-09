@@ -43,6 +43,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     afl_stats::AflStatsStage,
     corpus::{set_corpus_filepath, set_solution_filepath},
+    env_parser::AFL_DEFAULT_MAP_SIZE,
     feedback::{filepath::CustomFilepathToTestcaseFeedback, seed::SeedFeedback},
     Opt, AFL_DEFAULT_INPUT_LEN_MAX, AFL_DEFAULT_INPUT_LEN_MIN, SHMEM_ENV_VAR,
 };
@@ -65,7 +66,9 @@ where
 {
     // Create the shared memory map for comms with the forkserver
     let mut shmem_provider = StdShMemProvider::new().unwrap();
-    let mut shmem = shmem_provider.new_shmem(opt.map_size).unwrap();
+    let mut shmem = shmem_provider
+        .new_shmem(opt.map_size.unwrap_or(AFL_DEFAULT_MAP_SIZE))
+        .unwrap();
     shmem.write_to_env(SHMEM_ENV_VAR).unwrap();
     let shmem_buf = shmem.as_slice_mut();
 
@@ -304,7 +307,7 @@ fn base_executor<'a>(
     let mut executor = ForkserverExecutor::builder()
         .program(opt.executable.clone())
         .shmem_provider(shmem_provider)
-        .coverage_map_size(opt.map_size)
+        .coverage_map_size(opt.map_size.unwrap_or(AFL_DEFAULT_MAP_SIZE))
         .debug_child(opt.debug_child)
         .is_persistent(opt.is_persistent)
         .is_deferred_frksrv(opt.defer_forkserver)

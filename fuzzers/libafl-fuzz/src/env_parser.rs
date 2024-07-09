@@ -40,8 +40,8 @@ pub fn parse_envs(opt: &mut Opt) -> Result<(), Error> {
     if let Ok(res) = std::env::var("AFL_MAP_SIZE") {
         let map_size = res.parse()?;
         validate_map_size(map_size)?;
-        opt.map_size = map_size;
-    }
+        opt.map_size = Some(map_size);
+    };
     if let Ok(res) = std::env::var("AFL_IGNORE_TIMEOUT") {
         opt.ignore_timeouts = parse_bool(&res)?;
     }
@@ -76,7 +76,7 @@ pub fn parse_envs(opt: &mut Opt) -> Result<(), Error> {
         opt.stats_interval = res.parse()?;
     }
     if let Ok(res) = std::env::var("AFL_BROKER_PORT") {
-        opt.broker_port = res.parse()?;
+        opt.broker_port = Some(res.parse()?);
     }
     if let Ok(res) = std::env::var("AFL_EXIT_ON_SEED_ISSUES") {
         opt.exit_on_seed_issues = parse_bool(&res)?;
@@ -140,5 +140,7 @@ fn validate_map_size(map_size: usize) -> Result<usize, Error> {
         )))
     }
 }
+
 const AFL_MAP_SIZE_MIN: usize = usize::pow(2, 3);
 const AFL_MAP_SIZE_MAX: usize = usize::pow(2, 30);
+pub const AFL_DEFAULT_MAP_SIZE: usize = 65536;

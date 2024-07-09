@@ -80,7 +80,7 @@ fn main() {
             run_client(state, mgr, &fuzzer_dir, &opt)
         })
         .cores(&opt.cores.clone().expect("invariant; should never occur"))
-        .broker_port(opt.broker_port)
+        .broker_port(opt.broker_port.unwrap_or(AFL_DEFAULT_BROKER_PORT))
         .build()
         .launch()
     {
@@ -137,7 +137,7 @@ struct Opt {
     #[clap(skip)]
     kill_signal: Option<Signal>,
     #[clap(skip)]
-    map_size: usize,
+    map_size: Option<usize>,
     #[clap(skip)]
     ignore_timeouts: bool,
     #[clap(skip)]
@@ -166,7 +166,7 @@ struct Opt {
     #[clap(skip)]
     cores: Option<Cores>,
     #[clap(skip)]
-    broker_port: u16,
+    broker_port: Option<u16>,
 
     // Seed config
     #[clap(skip)]
@@ -207,11 +207,10 @@ struct Opt {
     non_instrumented_mode: bool,
 }
 
-
 const AFL_DEFAULT_INPUT_LEN_MAX: usize = 1_048_576;
 const AFL_DEFAULT_INPUT_LEN_MIN: usize = 1;
 const OUTPUT_GRACE: u64 = 25;
-
+pub const AFL_DEFAULT_BROKER_PORT: u16 = 1337;
 const PERSIST_SIG: &str = "##SIG_AFL_PERSISTENT##";
 const DEFER_SIG: &str = "##SIG_AFL_DEFER_FORKSRV##";
 const SHMEM_ENV_VAR: &str = "__AFL_SHM_ID";
