@@ -384,7 +384,7 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
             unicode: self.unicode.unwrap_or(true),
             forks: self.forks,
             dict: self.dict.map(|path| {
-                Tokens::from_file(path).expect("Couldn't load tokens from specified dictionary")
+                Tokens::from_file(path).expect("Couldn't load tokens from specified tokens file")
             }),
             dirs: self.dirs.into_iter().map(PathBuf::from).collect(),
             ignore_crashes: self.ignore_crashes.unwrap_or_default(),
