@@ -21,16 +21,16 @@ use crate::{fuzzer::LibaflFuzzState, OUTPUT_GRACE};
 
 pub fn generate_base_filename(state: &mut LibaflFuzzState) -> String {
     let is_seed = state.must_load_initial_inputs();
-    let id = state.corpus().peek_free_id();
+    let id = state.corpus().peek_free_id().0;
     let name = if is_seed {
         // TODO set orig filename
         format!("id:{id:0>6},time:0,execs:0,orig:TODO",)
     } else {
         // TODO: change hardcoded values of op (operation aka stage_name) & rep (amount of stacked mutations applied)
         let src = if let Some(parent_id) = state.corpus().current() {
-            parent_id.to_string()
+            parent_id.0
         } else {
-            String::new()
+            0
         };
         let execs = *state.executions();
         let time = (current_time() - *state.start_time()).as_secs();
