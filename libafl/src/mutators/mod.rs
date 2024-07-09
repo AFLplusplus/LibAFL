@@ -1,7 +1,7 @@
 //! [`Mutator`]`s` mutate input during fuzzing. These can be used standalone or in combination with other mutators to explore the input space more effectively.
 //!
 //! The following mutators are provided by this module:
-//! - [`MOpt`]: A mutator scheduler that uses a modified Particle Swarm Optimization algorithm to determine an optimal distribution of mutators.
+//! - [`MOpt`]: The mutation scheduler used in AFL++. It uses a modified Particle Swarm Optimization algorithm to determine an optimal distribution of mutators.
 //! - [`GramatronRandomMutator`]: A random mutator using grammar automatons to perform grammar-aware fuzzing.
 pub mod scheduled;
 use core::fmt;
