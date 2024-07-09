@@ -99,7 +99,7 @@ pub fn check_autoresume(
                 "Looks like the job output directory is being actively used by another instance",
             )),
             _ => {
-                return Err(Error::illegal_state(
+                return Err(Error::last_os_error(
                     format!("Error creating lock for output dir: exit code {}", err.1).as_str(),
                 ))
             }

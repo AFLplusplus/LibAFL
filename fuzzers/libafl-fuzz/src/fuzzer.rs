@@ -305,7 +305,6 @@ fn base_executor<'a>(
         .program(opt.executable.clone())
         .shmem_provider(shmem_provider)
         .coverage_map_size(opt.map_size)
-        .kill_signal(opt.kill_signal)
         .debug_child(opt.debug_child)
         .is_persistent(opt.is_persistent)
         .is_deferred_frksrv(opt.defer_forkserver)
@@ -314,6 +313,9 @@ fn base_executor<'a>(
         .timeout(Duration::from_millis(opt.hang_timeout));
     if let Some(target_env) = &opt.target_env {
         executor = executor.envs(target_env);
+    }
+    if let Some(kill_signal) = opt.kill_signal {
+        executor = executor.kill_signal(kill_signal)
     }
     if let Some(harness_input_type) = &opt.harness_input_type {
         executor = executor.parse_afl_cmdline([harness_input_type]);

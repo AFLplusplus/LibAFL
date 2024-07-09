@@ -6,6 +6,7 @@
 #![allow(clippy::similar_names)]
 use std::{collections::HashMap, path::PathBuf};
 mod afl_stats;
+mod env_parser;
 mod feedback;
 use clap::Parser;
 use corpus::{check_autoresume, remove_main_node_file};
@@ -13,6 +14,7 @@ mod corpus;
 mod executor;
 mod fuzzer;
 mod hooks;
+use env_parser::parse_envs;
 use fuzzer::run_client;
 use libafl::{
     events::{CentralizedLauncher, EventConfig},
@@ -30,6 +32,7 @@ use nix::sys::signal::Signal;
 fn main() {
     env_logger::init();
     let mut opt = Opt::parse();
+    parse_envs(&mut opt).expect("invalid configuration");
     executor::check_binary(&mut opt, SHMEM_ENV_VAR).expect("binary to be valid");
 
     // Create the shared memory map provider for LLMP
@@ -76,7 +79,7 @@ fn main() {
             check_autoresume(&fuzzer_dir, &opt.input_dir, opt.auto_resume).unwrap();
             run_client(state, mgr, &fuzzer_dir, &opt)
         })
-        .cores(&opt.cores)
+        .cores(&opt.cores.clone().expect("invariant; should never occur"))
         .broker_port(opt.broker_port)
         .build()
         .launch()
@@ -113,89 +116,97 @@ struct Opt {
     #[arg(short = 'F')]
     foreign_sync_dirs: Vec<PathBuf>,
     // Environment + CLI variables
-    #[arg(env = "AFL_INPUT_LEN_MAX", short = 'G')]
+    #[arg(short = 'G')]
     max_input_len: Option<usize>,
-    #[arg(env = "AFL_INPUT_LEN_MIN", short = 'g')]
+    #[arg(short = 'g')]
     min_input_len: Option<usize>,
+
     // Environment Variables
-    #[arg(env = "AFL_BENCH_JUST_ONE")]
+    #[clap(skip)]
     bench_just_one: bool,
-    #[arg(env = "AFL_BENCH_UNTIL_CRASH")]
+    #[clap(skip)]
     bench_until_crash: bool,
-    #[arg(env = "AFL_HANG_TMOUT", default_value_t = 100)]
+    #[clap(skip)]
     hang_timeout: u64,
-    #[arg(env = "AFL_DEBUG_CHILD")]
+    #[clap(skip)]
     debug_child: bool,
-    #[arg(env = "AFL_PERSISTENT")]
+    #[clap(skip)]
     is_persistent: bool,
-    #[arg(env = "AFL_NO_AUTODICT")]
+    #[clap(skip)]
     no_autodict: bool,
-    #[arg(env = "AFL_KILL_SIGNAL", default_value_t = Signal::SIGKILL)]
-    kill_signal: Signal,
-    #[arg(env = "AFL_MAP_SIZE", default_value_t = 65536,
-        value_parser= validate_map_size)]
+    #[clap(skip)]
+    kill_signal: Option<Signal>,
+    #[clap(skip)]
     map_size: usize,
-    #[arg(env = "AFL_IGNORE_TIMEOUTS")]
+    #[clap(skip)]
     ignore_timeouts: bool,
-    #[arg(env = "AFL_TMPDIR")]
+    #[clap(skip)]
     cur_input_dir: Option<PathBuf>,
-    #[arg(env = "AFL_CRASH_EXITCODE")]
+    #[clap(skip)]
     crash_exitcode: Option<i8>,
-    #[arg(env = "AFL_TARGET_ENV", value_parser=parse_target_env)]
+    #[clap(skip)]
     target_env: Option<HashMap<String, String>>,
-    #[arg(env = "AFL_CYCLE_SCHEDULES")]
+    #[clap(skip)]
     cycle_schedules: bool,
-    #[arg(env = "AFL_CMPLOG_ONLY_NEW")]
+    #[clap(skip)]
     cmplog_only_new: bool,
-    #[arg(env = "AFL_PRELOAD")]
+    #[clap(skip)]
     afl_preload: Option<String>,
-    #[arg(env = "AFL_AUTORESUME")]
+    #[clap(skip)]
     auto_resume: bool,
-    #[arg(env = "AFL_SKIP_BIN_CHECK")]
+    #[clap(skip)]
     skip_bin_check: bool,
-    #[arg(env = "AFL_DEFER_FORKSRV")]
+    #[clap(skip)]
     defer_forkserver: bool,
     /// in seconds
-    #[arg(env = "AFL_FUZZER_STATS_UPDATE_INTERVAL", default_value = "60")]
+    #[clap(skip)]
     stats_interval: u64,
 
     // New Environment Variables
-    #[arg(env = "AFL_NUM_CORES", value_parser = Cores::from_cmdline)]
-    cores: Cores,
-    #[arg(env = "AFL_BROKER_PORT", default_value = "1337")]
+    #[clap(skip)]
+    cores: Option<Cores>,
+    #[clap(skip)]
     broker_port: u16,
 
     // Seed config
-    #[arg(env = "AFL_EXIT_ON_SEED_ISSUES")]
+    #[clap(skip)]
     exit_on_seed_issues: bool,
     // renamed from IGNORE_SEED_PROBLEMS
-    #[arg(env = "AFL_IGNORE_SEED_ISSUES")]
+    #[clap(skip)]
     ignore_seed_issues: bool,
-    #[arg(env = "AFL_CRASHING_SEED_AS_NEW_CRASH")]
+    #[clap(skip)]
     crash_seed_as_new_crash: bool,
 
     // TODO:
-    #[arg(env = "AFL_FRIDA_PERSISTENT_ADDR")]
+    #[clap(skip)]
     frida_persistent_addr: Option<String>,
-    #[arg(env = "AFL_QEMU_CUSTOM_BIN")]
+    #[clap(skip)]
     qemu_custom_bin: bool,
-    #[arg(env = "AFL_CS_CUSTOM_BIN")]
+    #[clap(skip)]
     cs_custom_bin: bool,
+    #[clap(skip)]
     use_wine: bool,
+    #[clap(skip)]
     uses_asan: bool,
+    #[clap(skip)]
     frida_mode: bool,
+    #[clap(skip)]
     qemu_mode: bool,
     #[cfg(target_os = "linux")]
+    #[clap(skip)]
     nyx_mode: bool,
+    #[clap(skip)]
     unicorn_mode: bool,
+    #[clap(skip)]
     forkserver_cs: bool,
+    #[clap(skip)]
     no_forkserver: bool,
+    #[clap(skip)]
     crash_mode: bool,
+    #[clap(skip)]
     non_instrumented_mode: bool,
 }
 
-const AFL_MAP_SIZE_MIN: usize = usize::pow(2, 3);
-const AFL_MAP_SIZE_MAX: usize = usize::pow(2, 30);
 
 const AFL_DEFAULT_INPUT_LEN_MAX: usize = 1_048_576;
 const AFL_DEFAULT_INPUT_LEN_MIN: usize = 1;
@@ -206,41 +217,9 @@ const DEFER_SIG: &str = "##SIG_AFL_DEFER_FORKSRV##";
 const SHMEM_ENV_VAR: &str = "__AFL_SHM_ID";
 static AFL_HARNESS_FILE_INPUT: &str = "@@";
 
-fn validate_map_size(s: &str) -> Result<usize, String> {
-    let map_size: usize = s
-        .parse()
-        .map_err(|_| format!("`{s}` isn't a valid unsigned integer"))?;
-    if map_size > AFL_MAP_SIZE_MIN && map_size < AFL_MAP_SIZE_MAX {
-        Ok(map_size)
-    } else {
-        Err(format!(
-            "AFL_MAP_SIZE not in range {AFL_MAP_SIZE_MIN} (2 ^ 3) - {AFL_MAP_SIZE_MAX} (2 ^ 30)",
-        ))
-    }
-}
-
 fn validate_harness_input_stdin(s: &str) -> Result<&'static str, String> {
     if s != "@@" {
         return Err("Unknown harness input type. Use \"@@\" for file, omit for stdin ".to_string());
     }
     Ok(AFL_HARNESS_FILE_INPUT)
-}
-
-/// parse `AFL_TARGET_ENV`; expects: FOO=BAR TEST=ASD
-fn parse_target_env(s: &str) -> Result<Option<HashMap<String, String>>, String> {
-    let env_regex = regex::Regex::new(r"([^\s=]+)\s*=\s*([^\s]+)").unwrap();
-    let mut target_env = HashMap::new();
-    for vars in env_regex.captures_iter(s) {
-        target_env.insert(
-            vars.get(1)
-                .ok_or("invalid environment variable format!".to_string())?
-                .as_str()
-                .to_string(),
-            vars.get(2)
-                .ok_or("invalid environment variable format!".to_string())?
-                .as_str()
-                .to_string(),
-        );
-    }
-    Ok(Some(target_env))
 }
