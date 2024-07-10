@@ -18,7 +18,7 @@ use libafl::{
     state::{HasCorpus, HasExecutions, HasImported, HasStartTime, Stoppable, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
-use libafl_bolts::{current_time, os::peak_rss_mb};
+use libafl_bolts::{current_time, os::peak_rss_mb_children};
 
 use crate::{fuzzer::fuzzer_target_mode, Opt};
 
@@ -289,7 +289,7 @@ where
             execs_since_crash: total_executions - self.execs_at_last_objective,
             exec_timeout: self.exec_timeout, // TODO
             slowest_exec_ms: self.slowest_exec.as_millis(),
-            peak_rss_mb: peak_rss_mb()?,
+            peak_rss_mb: peak_rss_mb_children()?,
             cpu_affinity: 0, // TODO
             total_edges: map_size,
             edges_found: filled_entries_in_map,
