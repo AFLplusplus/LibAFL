@@ -86,10 +86,10 @@ fn configure_qemu(
         .env("__LIBAFL_QEMU_BUILD_OUT", build_dir.join("linkinfo.json"))
         .env("__LIBAFL_QEMU_BUILD_CC", cc_compiler.path())
         .env("__LIBAFL_QEMU_BUILD_CXX", cpp_compiler.path())
-        .arg(&format!("--cc={}", linker_interceptor.display()))
-        .arg(&format!("--cxx={}", linker_interceptor_plus_plus.display()))
+        .arg(format!("--cc={}", linker_interceptor.display()))
+        .arg(format!("--cxx={}", linker_interceptor_plus_plus.display()))
         .arg("--as-shared-lib")
-        .arg(&format!("--target-list={cpu_target}-{target_suffix}"))
+        .arg(format!("--target-list={cpu_target}-{target_suffix}"))
         // .arg("--disable-capstone")
         .arg("--disable-bsd-user");
 
@@ -237,7 +237,7 @@ fn build_qemu(
         .arg("-j");
 
     if let Some(j) = jobs {
-        cmd.arg(&format!("{j}")).env("V", "1");
+        cmd.arg(format!("{j}")).env("V", "1");
     }
 
     cmd
