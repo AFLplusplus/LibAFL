@@ -36,12 +36,9 @@ windows_alias = "unsupported"
 script_runner="@shell"
 script='''
 cargo build --release
-AFL_PATH=${AFL_DIR_NAME} ${AFL_CC_PATH} ${AFL_DIR_NAME}/test-instr.c -o out-instr
-AFL_CORES=1 LLVM_CONFIG=${LLVM_CONFIG} AFL_STATS_INTERVAL=1 timeout 5 ${LIBAFL_FUZZ_PATH} -i ./test/seeds -o ./test/output $(pwd)/out-instr
-test -n "$( ls ./test/output/fuzzer_main/queue/id:000002* 2>/dev/null )" || exit 1
-test -n "$( ls ./test/output/fuzzer_main/fuzzer_stats 2>/dev/null )" || exit 1
-test -n "$( ls ./test/output/fuzzer_main/plot_data 2>/dev/null )" || exit 1
-test -n "$( ls ./test/output/fuzzer_main/crashe2s 2>/dev/null )" || exit 1
-test -n "$( ls ./test/output/fuzzer_main/hangs 2>/dev/null )" || exit 1
+
+AFL_LLVM_CMPLOG=1 ${AFL_CC_PATH} -o ./test/test-cmplog ./test/test-cmplog.c > /dev/null 2>&1
+AF_CORES=1 AFL_BENCH_UNTIL_CRASH=1 ${LIBAFL_FUZZ_PATH} -Z -l 3 -m none -V30 -i in -o ./test/output_cmplog -c 0 -- ./test/test-cmplog >>errors 2>&1
+test -n "$( ls ./test/output_cmplog/default/crashes/id:000000* ./test/output_cmplog/default/hangs/id:000000* 2>/dev/null )" || exit 1
 '''
 dependencies = ["fuzzer"]

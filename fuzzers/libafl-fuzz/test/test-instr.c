@@ -30,11 +30,12 @@ int main(int argc, char **argv) {
 
   // we support command line parameter and stdin
   if (argc == 2) {
-    printf("%s  |  %s\n", argv[0],argv[1]);
+
     buf = argv[1];
+
   } else {
+
     if (argc >= 3 && strcmp(argv[1], "-f") == 0) {
-      printf("%s  |  %s  |  %s\n", argv[0],argv[1],argv[2]);
 
       if ((fd = open(argv[2], O_RDONLY)) < 0) {
 
@@ -53,7 +54,7 @@ int main(int argc, char **argv) {
     }
 
     buf[cnt] = 0;
-    printf("norm_buf%s", buf);
+
   }
 
   if (getenv("AFL_DEBUG")) fprintf(stderr, "test-instr: %s\n", buf);
@@ -63,15 +64,15 @@ int main(int argc, char **argv) {
   switch (buf[0]) {
 
     case '0':
-/*       printf("Looks like a zero to me!\n"); */
+      printf("Looks like a zero to me!\n");
       break;
 
     case '1':
-/*       printf("Pretty sure that is a one!\n"); */
+      printf("Pretty sure that is a one!\n");
       break;
 
     default:
-/*       printf("Neither one or zero? How quaint!\n"); */
+      printf("Neither one or zero? How quaint!\n");
       break;
 
   }
@@ -79,3 +80,4 @@ int main(int argc, char **argv) {
   return 0;
 
 }
+
