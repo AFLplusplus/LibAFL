@@ -24,5 +24,5 @@ libafl = { path = "../../libafl/" }
 libafl_bolts = { path = "../../libafl_bolts/" }
 libafl_qemu = { path = "../../libafl_qemu/", features = ["x86_64", "usermode"] }
 
-clap = { version = "4.0", features = ["default"] }
+clap = { version = "4.5", features = ["default"] }
 nix = { version = "0.29", features = ["fs"] }
