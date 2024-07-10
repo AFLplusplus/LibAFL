@@ -891,26 +891,28 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         if status & FS_NEW_OPT_AUTODICT != 0 {
             // Here unlike shmem input fuzzing, we are forced to read things
             // hence no self.autotokens.is_some() to check if we proceed
-            let (read_len, dict_size) = forkserver.read_st()?;
+            let (read_len, autotokens_size) = forkserver.read_st()?;
             if read_len != 4 {
                 return Err(Error::unknown(
-                    "Failed to read dictionary size from forkserver".to_string(),
+                    "Failed to read autotokens size from forkserver".to_string(),
                 ));
             }
 
-            if !(2..=0xffffff).contains(&dict_size) {
+            let tokens_size_max = 0xffffff;
+
+            if !(2..=tokens_size_max).contains(&autotokens_size) {
                 return Err(Error::illegal_state(
-                    "Dictionary has an illegal size".to_string(),
+                    format!("Autotokens size is incorrect, expected 2 to {tokens_size_max} (inclusive), but got {autotokens_size}. Make sure your afl-cc verison is up to date."),
                 ));
             }
-            log::info!("Autodict size {dict_size:x}");
-            let (rlen, buf) = forkserver.read_st_size(dict_size as usize)?;
+            log::info!("Autotokens size {autotokens_size:x}");
+            let (rlen, buf) = forkserver.read_st_size(autotokens_size as usize)?;
 
-            if rlen != dict_size as usize {
-                return Err(Error::unknown("Failed to load autodictionary".to_string()));
+            if rlen != autotokens_size as usize {
+                return Err(Error::unknown("Failed to load autotokens".to_string()));
             }
             if let Some(t) = &mut self.autotokens {
-                t.parse_autodict(&buf, dict_size as usize);
+                t.parse_autodict(&buf, autotokens_size as usize);
             }
         }
 

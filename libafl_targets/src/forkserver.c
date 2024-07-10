@@ -239,7 +239,7 @@ void __afl_start_forkserver(void) {
 
   void (*old_sigchld_handler)(int) = signal(SIGCHLD, SIG_DFL);
 
-  int autodict_on = __token_start != NULL && __token_stop != NULL;
+  int autotokens_on = __token_start != NULL && __token_stop != NULL;
 
   /* Phone home and tell the parent that we're OK. If parent isn't there,
      assume we're not running in forkserver mode and just execute program. */
@@ -256,7 +256,7 @@ void __afl_start_forkserver(void) {
 
   status = FS_NEW_OPT_MAPSIZE;
   if (__afl_sharedmem_fuzzing) { status |= FS_NEW_OPT_SHDMEM_FUZZ; }
-  if (autodict_on) { status |= FS_NEW_OPT_AUTODICT; }
+  if (autotokens_on) { status |= FS_NEW_OPT_AUTODICT; }
 
   if (write(FORKSRV_FD + 1, msg, 4) != 4) { _exit(1); }
 
@@ -266,14 +266,14 @@ void __afl_start_forkserver(void) {
   status = __afl_map_size;
   if (write(FORKSRV_FD + 1, msg, 4) != 4) { _exit(1); }
 
-  // FS_NEW_OPT_AUTODICT - send autodictionary
-  if (autodict_on) {
-    // pass the dictionary through the forkserver FD
+  // FS_NEW_OPT_AUTODICT - send autotokens
+  if (autotokens_on) {
+    // pass the autotokens through the forkserver FD
     uint32_t len = (__token_stop - __token_start), offset = 0;
 
     if (write(FORKSRV_FD + 1, &len, 4) != 4) {
-      write(2, "Error: could not send dictionary len\n",
-            strlen("Error: could not send dictionary len\n"));
+      write(2, "Error: could not send autotokens len\n",
+            strlen("Error: could not send autotokens len\n"));
       _exit(1);
     }
 
@@ -282,7 +282,7 @@ void __afl_start_forkserver(void) {
       ret = write(FORKSRV_FD + 1, __token_start + offset, len);
 
       if (ret < 1) {
-        write_error("could not send dictionary");
+        write_error("could not send autotokens");
         _exit(1);
       }
 
