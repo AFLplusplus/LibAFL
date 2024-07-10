@@ -11,7 +11,7 @@ LIBAFL_FUZZ_PATH={value = "./target/release/libafl-fuzz"}
 #LLVM_CONFIG="llvm-config-18"
 
 
-[tasks.fuzzer]
+[tasks.buil_afl]
 script_runner="@shell"
 script='''
 if [ ! -d "$AFL_DIR_NAME" ]; then
@@ -44,4 +44,4 @@ test -n "$( ls ./test/output/fuzzer_main/plot_data 2>/dev/null )" || exit 1
 test -n "$( ls ./test/output/fuzzer_main/crashe2s 2>/dev/null )" || exit 1
 test -n "$( ls ./test/output/fuzzer_main/hangs 2>/dev/null )" || exit 1
 '''
-dependencies = ["fuzzer"]
+dependencies = ["build_afl"]
