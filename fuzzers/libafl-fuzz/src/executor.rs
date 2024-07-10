@@ -77,30 +77,27 @@ pub fn check_binary(opt: &mut Opt, shmem_env_var: &str) -> Result<(), Error> {
             "Oops, the target binary looks like a shell script.",
         ));
     }
-    #[cfg(target_os = "macos")]
+
+    // check if the binary is an ELF file
+    if mmap[0..4] != [0x7f, 0x45, 0x4c, 0x46] {
+        return Err(Error::illegal_argument(format!(
+            "Program '{}' is not an ELF binary",
+            bin_path.display()
+        )));
+    }
+
+    #[cfg(all(target_os = "macos", not(target_arch = "arm")))]
     {
-        // check if the binary is an ELF file
-        if mmap[0..4] != [0x7f, 0x45, 0x4c, 0x46] {
+        if (mmap[0] != 0xCF || mmap[1] != 0xFA || mmap[2] != 0xED)
+            && (mmap[0] != 0xCA || mmap[1] != 0xFE || mmap[2] != 0xBA)
+        {
             return Err(Error::illegal_argument(format!(
-                "Program '{}' is not an ELF binary",
+                "Program '{}' is not a 64-bit or universal Mach-O binary",
                 bin_path.display()
             )));
         }
-
-        #[cfg(not(target_arch = "arm"))]
-        {
-            if (mmap[0] != 0xCF || mmap[1] != 0xFA || mmap[2] != 0xED)
-                && (mmap[0] != 0xCA || mmap[1] != 0xFE || mmap[2] != 0xBA)
-            {
-                return Err(Error::illegal_argument(format!(
-                    "Program '{}' is not a 64-bit or universal Mach-O binary",
-                    bin_path.display()
-                )));
-            }
-        }
     }
 
-    #[cfg(not(target_os = "linux"))]
     let check_instrumentation = !opt.qemu_mode
         && !opt.frida_mode
         && !opt.unicorn_mode
@@ -108,12 +105,7 @@ pub fn check_binary(opt: &mut Opt, shmem_env_var: &str) -> Result<(), Error> {
         && !opt.non_instrumented_mode;
 
     #[cfg(target_os = "linux")]
-    let check_instrumentation = !opt.qemu_mode
-        && !opt.frida_mode
-        && !opt.unicorn_mode
-        && !opt.forkserver_cs
-        && !opt.non_instrumented_mode
-        && !opt.nyx_mode;
+    let check_instrumentation = check_instrumentation && !opt.nyx_mode;
 
     if check_instrumentation && !is_instrumented(&mmap, shmem_env_var) {
         return Err(Error::illegal_argument(
