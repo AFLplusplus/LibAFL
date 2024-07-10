@@ -12,7 +12,6 @@ if [ ! -d "$AFL_DIR_NAME" ]; then
 	cd ..
 fi
 
-# TODO; debug
 cargo build --release
 
 
