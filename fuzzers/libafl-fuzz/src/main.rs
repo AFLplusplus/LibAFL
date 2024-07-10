@@ -4,6 +4,9 @@
 #![allow(clippy::unnecessary_wraps)]
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::similar_names)]
+#![allow(clippy::too_many_lines)]
+#![allow(clippy::struct_excessive_bools)]
+
 use std::{collections::HashMap, path::PathBuf};
 mod afl_stats;
 mod env_parser;

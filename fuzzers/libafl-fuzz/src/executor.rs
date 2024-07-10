@@ -12,10 +12,10 @@ use crate::{Opt, DEFER_SIG, PERSIST_SIG};
 // TODO better error messages and logging
 pub fn check_binary(opt: &mut Opt, shmem_env_var: &str) -> Result<(), Error> {
     println!("Validating target binary...");
-    let metadata;
+
     let bin_path;
     // check if it is a file path
-    if opt.executable.components().into_iter().count() == 1 {
+    if opt.executable.components().count() == 1 {
         // check $PATH for the binary.
         if let Some(full_bin_path) = find_executable_in_path(&opt.executable) {
             opt.executable = full_bin_path;
@@ -47,7 +47,7 @@ pub fn check_binary(opt: &mut Opt, shmem_env_var: &str) -> Result<(), Error> {
             }
         }
     }
-    metadata = bin_path.metadata()?;
+    let metadata = bin_path.metadata()?;
     let is_reg = !bin_path.is_symlink() && !bin_path.is_dir();
     let bin_size = metadata.st_size();
     let is_executable = metadata.permissions().mode() & 0o111 != 0;
@@ -167,19 +167,17 @@ fn mmap_has_substr(mmap: &Mmap, sub_str: &str) -> bool {
 }
 
 fn is_instrumented(mmap: &Mmap, shmem_env_var: &str) -> bool {
-    mmap_has_substr(&mmap, shmem_env_var)
+    mmap_has_substr(mmap, shmem_env_var)
 }
 fn find_executable_in_path(executable: &Path) -> Option<PathBuf> {
     std::env::var_os("PATH").and_then(|paths| {
-        std::env::split_paths(&paths)
-            .filter_map(|dir| {
-                let full_path = dir.join(&executable);
-                if full_path.is_file() {
-                    Some(full_path)
-                } else {
-                    None
-                }
-            })
-            .next()
+        std::env::split_paths(&paths).find_map(|dir| {
+            let full_path = dir.join(executable);
+            if full_path.is_file() {
+                Some(full_path)
+            } else {
+                None
+            }
+        })
     })
 }

@@ -48,7 +48,6 @@ use crate::{
     Opt, AFL_DEFAULT_INPUT_LEN_MAX, AFL_DEFAULT_INPUT_LEN_MIN, SHMEM_ENV_VAR,
 };
 
-#[allow(clippy::too_many_lines)]
 pub fn run_client<EMH, SP>(
     state: Option<LibaflFuzzState>,
     mut restarting_mgr: CentralizedEventManager<
@@ -145,7 +144,7 @@ where
 
     // Create our Scheduler
     let mut weighted_scheduler =
-        StdWeightedScheduler::with_schedule(&mut state, &edges_observer, Some(strategy.into()));
+        StdWeightedScheduler::with_schedule(&mut state, &edges_observer, Some(strategy));
     if opt.cycle_schedules {
         weighted_scheduler = weighted_scheduler.cycling_scheduler();
     }
@@ -275,7 +274,7 @@ where
 
         // Run our fuzzer; WITH CmpLog
         run_fuzzer_with_stages(
-            &opt,
+            opt,
             &mut fuzzer,
             &mut stages,
             &mut executor,
@@ -288,7 +287,7 @@ where
 
         // Run our fuzzer; NO CmpLog
         run_fuzzer_with_stages(
-            &opt,
+            opt,
             &mut fuzzer,
             &mut stages,
             &mut executor,
@@ -318,7 +317,7 @@ fn base_executor<'a>(
         executor = executor.envs(target_env);
     }
     if let Some(kill_signal) = opt.kill_signal {
-        executor = executor.kill_signal(kill_signal)
+        executor = executor.kill_signal(kill_signal);
     }
     if let Some(harness_input_type) = &opt.harness_input_type {
         executor = executor.parse_afl_cmdline([harness_input_type]);

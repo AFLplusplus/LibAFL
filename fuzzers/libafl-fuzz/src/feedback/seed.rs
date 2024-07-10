@@ -72,10 +72,8 @@ where
                             return Err(Error::invalid_corpus(
                                 "input led to a timeout; use AFL_IGNORE_SEED_ISSUES=true",
                             ));
-                        } else {
-                            // we regard all timeouts as uninteresting during seed loading.
-                            return Ok(false);
                         }
+                        return Ok(false);
                     }
                 }
                 ExitKind::Crash => {
