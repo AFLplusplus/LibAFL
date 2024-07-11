@@ -1,4 +1,5 @@
-//! The `MOpt` mutator scheduler, see <https://github.com/puppet-meteor/MOpt-AFL> and <https://www.usenix.org/conference/usenixsecurity19/presentation/lyu>
+//! The `MOpt` mutation scheduler used in AFL++. It uses a modified Particle Swarm Optimization algorithm to determine an optimal distribution of mutators.
+//! See <https://github.com/puppet-meteor/MOpt-AFL> and <https://www.usenix.org/conference/usenixsecurity19/presentation/lyu>
 use alloc::{borrow::Cow, string::ToString, vec::Vec};
 use core::{
     fmt::{self, Debug},
