@@ -1,4 +1,4 @@
-//! Architecture agnostic processor features
+//! Fast implementations for specific CPU architectures.
 
 #[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
 use core::arch::asm;
