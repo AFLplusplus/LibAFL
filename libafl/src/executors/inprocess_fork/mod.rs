@@ -41,7 +41,7 @@ pub mod inner;
 pub mod stateful;
 
 /// The `InProcessForkExecutor` with no user hooks. On Linux, when fuzzing a Rust target, set `panic = "abort"` in your `Cargo.toml` (see [Cargo documentation](https://doc.rust-lang.org/cargo/reference/profiles.html#panic)).
-/// Else panics can not be caught by LibAFL.
+/// Else panics can not be caught by `LibAFL`.
 pub type InProcessForkExecutor<'a, H, OT, S, SP, EM, Z> =
     GenericInProcessForkExecutor<'a, H, (), OT, S, SP, EM, Z>;
 
@@ -81,7 +81,7 @@ where
 }
 
 /// [`GenericInProcessForkExecutor`] is an executor that forks the current process before each execution. On Linux, when fuzzing a Rust target, set `panic = "abort"` in your `Cargo.toml` (see [Cargo documentation](https://doc.rust-lang.org/cargo/reference/profiles.html#panic)).
-/// Else panics can not be caught by LibAFL.
+/// Else panics can not be caught by `LibAFL`.
 pub struct GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, EM, Z>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,

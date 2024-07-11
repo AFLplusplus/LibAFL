@@ -107,9 +107,9 @@ fn find_llvm_config() -> Result<String, String> {
         if let Some(ver) = find_llvm_version("llvm-config".to_owned()) {
             if ver >= rustc_llvm_ver {
                 return Ok("llvm-config".to_owned());
-            } else {
-                return Err(format!("Version of llvm-config is {ver} but needs to be at least rustc's version({rustc_llvm_ver})"));
             }
+
+            return Err(format!("Version of llvm-config is {ver} but needs to be at least rustc's version({rustc_llvm_ver})"));
         }
     }
 
