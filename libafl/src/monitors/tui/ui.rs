@@ -35,10 +35,6 @@ pub struct TuiUi {
 }
 
 impl TuiUi {
-    #[deprecated(
-        since = "0.13.2",
-        note = "Please use TuiMonitor::builder() instead of creating TuiUi directly."
-    )]
     #[must_use]
     pub fn new(title: String, enhanced_graphics: bool) -> Self {
         Self::with_version(title, String::from("default"), enhanced_graphics)

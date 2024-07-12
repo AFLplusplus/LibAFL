@@ -30,6 +30,7 @@ use typed_builder::TypedBuilder;
 use super::{ClientPerfMonitor, PerfFeature};
 use crate::monitors::{Aggregator, AggregatorOps, ClientStats, Monitor, UserStats, UserStatsValue};
 
+#[allow(missing_docs)]
 pub mod ui;
 use ui::TuiUi;
 
@@ -57,19 +58,26 @@ pub struct TuiMonitorConfig {
     pub enhanced_graphics: bool,
 }
 
+/// A single status entry for timings
 #[derive(Debug, Copy, Clone)]
 pub struct TimedStat {
+    /// The time
     pub time: Duration,
+    /// The item
     pub item: u64,
 }
 
+/// Stats for timings
 #[derive(Debug, Clone)]
 pub struct TimedStats {
+    /// Series of [`TimedStat`] entries
     pub series: VecDeque<TimedStat>,
+    /// The time window to keep track of
     pub window: Duration,
 }
 
 impl TimedStats {
+    /// Create a new [`TimedStats`] struct
     #[must_use]
     pub fn new(window: Duration) -> Self {
         Self {
@@ -78,6 +86,7 @@ impl TimedStats {
         }
     }
 
+    /// Add a stat datapoint
     pub fn add(&mut self, time: Duration, item: u64) {
         if self.series.is_empty() || self.series.back().unwrap().item != item {
             if self.series.front().is_some()
@@ -89,6 +98,7 @@ impl TimedStats {
         }
     }
 
+    /// Add a stat datapoint for the `current_time`
     pub fn add_now(&mut self, item: u64) {
         if self.series.is_empty() || self.series[self.series.len() - 1].item != item {
             let time = current_time();
@@ -101,6 +111,7 @@ impl TimedStats {
         }
     }
 
+    /// Change the window duration
     pub fn update_window(&mut self, window: Duration) {
         self.window = window;
         while !self.series.is_empty()
@@ -111,6 +122,7 @@ impl TimedStats {
     }
 }
 
+/// The context to show performance metrics
 #[cfg(feature = "introspection")]
 #[derive(Debug, Default, Clone)]
 pub struct PerfTuiContext {
@@ -123,6 +135,7 @@ pub struct PerfTuiContext {
 
 #[cfg(feature = "introspection")]
 impl PerfTuiContext {
+    /// Get the data for performance metrics
     #[allow(clippy::cast_precision_loss)]
     pub fn grab_data(&mut self, m: &ClientPerfMonitor) {
         // Calculate the elapsed time from the monitor
@@ -186,15 +199,21 @@ impl PerfTuiContext {
     }
 }
 
+/// Data struct to process timings
 #[derive(Debug, Default, Clone)]
 pub struct ProcessTiming {
+    /// The start time
     pub client_start_time: Duration,
+    /// The executions speed
     pub exec_speed: String,
+    /// Timing of the last new corpus entry
     pub last_new_entry: Duration,
+    /// Timing of the last new solution
     pub last_saved_solution: Duration,
 }
 
 impl ProcessTiming {
+    /// Create a new [`ProcessTiming`] struct
     fn new() -> Self {
         Self {
             exec_speed: "0".to_string(),
@@ -203,6 +222,8 @@ impl ProcessTiming {
     }
 }
 
+/// The geometry of a single data point
+#[allow(missing_docs)]
 #[derive(Debug, Default, Clone)]
 pub struct ItemGeometry {
     pub pending: u64,
@@ -221,6 +242,8 @@ impl ItemGeometry {
     }
 }
 
+/// The context for a single client tracked in this [`TuiMonitor`]
+#[allow(missing_docs)]
 #[derive(Debug, Default, Clone)]
 pub struct ClientTuiContext {
     pub corpus: u64,
@@ -237,6 +260,7 @@ pub struct ClientTuiContext {
 }
 
 impl ClientTuiContext {
+    /// Grab data for a single client
     pub fn grab_data(&mut self, client: &ClientStats, exec_sec: String) {
         self.corpus = client.corpus_size;
         self.objectives = client.objective_size;
@@ -289,6 +313,8 @@ impl ClientTuiContext {
     }
 }
 
+/// The [`TuiContext`] for this [`TuiMonitor`]
+#[allow(missing_docs)]
 #[derive(Debug, Clone)]
 pub struct TuiContext {
     pub graphs: Vec<String>,
@@ -348,7 +374,7 @@ impl TuiContext {
     }
 }
 
-/// Tracking monitor during fuzzing and display with ratatui
+/// Tracking monitor during fuzzing and display with [`ratatui`](https://ratatui.rs/)
 #[derive(Debug, Clone)]
 pub struct TuiMonitor {
     pub(crate) context: Arc<RwLock<TuiContext>>,
@@ -359,6 +385,7 @@ pub struct TuiMonitor {
 }
 
 impl From<TuiMonitorConfig> for TuiMonitor {
+    #[allow(deprecated)]
     fn from(builder: TuiMonitorConfig) -> Self {
         Self::with_time(
             TuiUi::with_version(builder.title, builder.version, builder.enhanced_graphics),
@@ -481,18 +508,26 @@ impl TuiMonitor {
 
     /// Creates the monitor.
     ///
-    /// # Deprecation note
+    /// # Deprecation Note
     /// Use `TuiMonitor::builder()` instead.
     #[deprecated(
         since = "0.13.2",
         note = "Please use TuiMonitor::builder() instead of creating TuiUi directly."
     )]
     #[must_use]
+    #[allow(deprecated)]
     pub fn new(tui_ui: TuiUi) -> Self {
         Self::with_time(tui_ui, current_time())
     }
 
     /// Creates the monitor with a given `start_time`.
+    ///
+    /// # Deprecation Note
+    /// Use `TuiMonitor::builder()` instead.
+    #[deprecated(
+        since = "0.13.2",
+        note = "Please use TuiMonitor::builder() instead of creating TuiUi directly."
+    )]
     #[must_use]
     pub fn with_time(tui_ui: TuiUi, start_time: Duration) -> Self {
         let context = Arc::new(RwLock::new(TuiContext::new(start_time)));
