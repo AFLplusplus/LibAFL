@@ -24,16 +24,38 @@ use hashbrown::HashMap;
 use libafl_bolts::{current_time, format_duration_hms, ClientId};
 use ratatui::{backend::CrosstermBackend, Terminal};
 use serde_json::Value;
+use typed_builder::TypedBuilder;
 
 #[cfg(feature = "introspection")]
 use super::{ClientPerfMonitor, PerfFeature};
 use crate::monitors::{Aggregator, AggregatorOps, ClientStats, Monitor, UserStats, UserStatsValue};
 
 pub mod ui;
-use ui::TuiUI;
+use ui::TuiUi;
 
 const DEFAULT_TIME_WINDOW: u64 = 60 * 10; // 10 min
 const DEFAULT_LOGS_NUMBER: usize = 128;
+
+#[derive(Debug, Clone, TypedBuilder)]
+#[builder(build_method(into = TuiMonitor), builder_method(vis = "pub(crate)",
+    doc = "Build the [`TuiMonitor`] from the set values"))]
+/// Settings to create a new [`TuiMonitor`].
+/// Use `TuiMonitor::builder()` or create this config and call `.into()` to create a new [`TuiMonitor`].
+pub struct TuiMonitorConfig {
+    /// The title to show
+    #[builder(default_code = r#""LibAFL Fuzzer".to_string()"#, setter(into))]
+    pub title: String,
+    /// A version string to show for this (optional)
+    #[builder(default_code = r#""default".to_string()"#, setter(into))]
+    pub version: String,
+    /// Creates the monitor with an explicit `start_time`.
+    /// If nothings was set, this will use [`current_time`] instead.
+    #[builder(default_code = "current_time()")]
+    pub start_time: Duration,
+    /// Enables unicode TUI graphics, Looks better but may interfere with old terminals.
+    #[builder(default = true)]
+    pub enhanced_graphics: bool,
+}
 
 #[derive(Debug, Copy, Clone)]
 pub struct TimedStat {
@@ -336,6 +358,15 @@ pub struct TuiMonitor {
     aggregator: Aggregator,
 }
 
+impl From<TuiMonitorConfig> for TuiMonitor {
+    fn from(builder: TuiMonitorConfig) -> Self {
+        Self::with_time(
+            TuiUi::with_version(builder.title, builder.version, builder.enhanced_graphics),
+            builder.start_time,
+        )
+    }
+}
+
 impl Monitor for TuiMonitor {
     /// The client monitor, mutable
     /// This also includes disabled "padding" clients.
@@ -443,15 +474,27 @@ impl Monitor for TuiMonitor {
 }
 
 impl TuiMonitor {
-    /// Creates the monitor
+    /// Create a builder for [`TuiMonitor`]
+    pub fn builder() -> TuiMonitorConfigBuilder {
+        TuiMonitorConfig::builder()
+    }
+
+    /// Creates the monitor.
+    ///
+    /// # Deprecation note
+    /// Use `TuiMonitor::builder()` instead.
+    #[deprecated(
+        since = "0.13.2",
+        note = "Please use TuiMonitor::builder() instead of creating TuiUi directly."
+    )]
     #[must_use]
-    pub fn new(tui_ui: TuiUI) -> Self {
+    pub fn new(tui_ui: TuiUi) -> Self {
         Self::with_time(tui_ui, current_time())
     }
 
     /// Creates the monitor with a given `start_time`.
     #[must_use]
-    pub fn with_time(tui_ui: TuiUI, start_time: Duration) -> Self {
+    pub fn with_time(tui_ui: TuiUi, start_time: Duration) -> Self {
         let context = Arc::new(RwLock::new(TuiContext::new(start_time)));
 
         enable_raw_mode().unwrap();
@@ -565,7 +608,7 @@ impl TuiMonitor {
 fn run_tui_thread<W: Write + Send + Sync + 'static>(
     context: Arc<RwLock<TuiContext>>,
     tick_rate: Duration,
-    tui_ui: TuiUI,
+    tui_ui: TuiUi,
     stdout_provider: impl Send + Sync + 'static + Fn() -> W,
 ) {
     thread::spawn(move || -> io::Result<()> {

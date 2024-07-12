@@ -21,7 +21,7 @@ use super::{
 };
 
 #[derive(Default, Debug)]
-pub struct TuiUI {
+pub struct TuiUi {
     title: String,
     version: String,
     enhanced_graphics: bool,
@@ -34,13 +34,17 @@ pub struct TuiUI {
     pub should_quit: bool,
 }
 
-impl TuiUI {
+impl TuiUi {
+    #[deprecated(
+        since = "0.13.2",
+        note = "Please use TuiMonitor::builder() instead of creating TuiUi directly."
+    )]
     #[must_use]
     pub fn new(title: String, enhanced_graphics: bool) -> Self {
         Self::with_version(title, String::from("default"), enhanced_graphics)
     }
 
-    // create the TuiUI with a given `version`.
+    // create the TuiUi with a given `version`.
     #[must_use]
     pub fn with_version(title: String, version: String, enhanced_graphics: bool) -> Self {
         Self {
@@ -49,7 +53,7 @@ impl TuiUI {
             enhanced_graphics,
             show_logs: true,
             clients_idx: 1,
-            ..TuiUI::default()
+            ..TuiUi::default()
         }
     }
     pub fn on_key(&mut self, c: char) {
