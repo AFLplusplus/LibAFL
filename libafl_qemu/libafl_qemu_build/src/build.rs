@@ -430,7 +430,7 @@ pub fn build(
         );
     }
 
-    assert!(output_lib.is_file()); // Sanity check
+    assert!(output_lib.is_file()); // Make sure this isn't very very wrong
 
     /*
     let mut objects = vec![];

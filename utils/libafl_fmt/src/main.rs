@@ -78,7 +78,7 @@ use walkdir::{DirEntry, WalkDir};
 use which::which;
 
 async fn run_cargo_fmt(path: PathBuf, is_check: bool, verbose: bool) -> io::Result<()> {
-    // Sanity Check
+    // Make sure we parse the correct file
     assert_eq!(path.file_name().unwrap().to_str().unwrap(), "Cargo.toml");
 
     let task_str = if is_check { "Checking" } else { "Formatting" };
