@@ -1,4 +1,5 @@
-//! The `MOpt` mutator scheduler, see <https://github.com/puppet-meteor/MOpt-AFL> and <https://www.usenix.org/conference/usenixsecurity19/presentation/lyu>
+//! The `MOpt` mutation scheduler used in AFL++. It uses a modified Particle Swarm Optimization algorithm to determine an optimal distribution of mutators.
+//! See <https://github.com/puppet-meteor/MOpt-AFL> and <https://www.usenix.org/conference/usenixsecurity19/presentation/lyu>
 use alloc::{borrow::Cow, string::ToString, vec::Vec};
 use core::{
     fmt::{self, Debug},
@@ -22,7 +23,7 @@ use crate::{
 /// A Struct for managing MOpt-mutator parameters.
 /// There are 2 modes for `MOpt` scheduler, the core fuzzing mode and the pilot fuzzing mode.
 /// In short, in the pilot fuzzing mode, the fuzzer employs several `swarms` to compute the probability to choose the mutation operator.
-/// On the other hand, in the core fuzzing mode, the fuzzer chooses the best `swarms`, which was determined during the pilot fuzzing mode, to compute the probability to choose the operation operator.
+/// On the other hand, in the core fuzzing mode, the fuzzer chooses the best `swarms`, which was determined during the pilot fuzzing mode, to compute the probability to choose the mutation operator.
 /// With the current implementation we are always in the pacemaker fuzzing mode.
 #[derive(Serialize, Deserialize, Clone)]
 #[cfg_attr(

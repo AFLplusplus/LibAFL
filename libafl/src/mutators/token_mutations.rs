@@ -83,7 +83,7 @@ impl Tokens {
         let mut head = 0;
         loop {
             if head >= size {
-                // Sanity Check
+                // Make double sure this is not completely off
                 assert!(head == size);
                 break;
             }

@@ -139,7 +139,7 @@ impl CustomMutationStatus {
 }
 
 macro_rules! fuzz_with {
-    ($options:ident, $harness:ident, $operation:expr, $and_then:expr, $edge_maker:expr) => {{
+    ($options:ident, $harness:ident, $operation:expr, $and_then:expr, $edge_maker:expr, $extra_feedback:expr, $extra_obsv:expr) => {{
         use libafl_bolts::{
                 rands::StdRand,
                 tuples::{Merge, tuple_list},
@@ -169,7 +169,7 @@ macro_rules! fuzz_with {
             state::{HasCorpus, StdState},
             StdFuzzer,
         };
-        use libafl_targets::{CmpLogObserver, LLVMCustomMutator, OomFeedback, OomObserver};
+        use libafl_targets::{CmpLogObserver, LLVMCustomMutator, OomFeedback, OomObserver, CMP_MAP};
         use rand::{thread_rng, RngCore};
         use std::{env::temp_dir, fs::create_dir, path::PathBuf};
 
@@ -203,6 +203,9 @@ macro_rules! fuzz_with {
             // Create the Cmp observer
             let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
+            // Create an observer using the cmp map for value profile
+            let value_profile_observer = unsafe { StdMapObserver::from_mut_ptr("cmps", CMP_MAP.as_mut_ptr(), CMP_MAP.len()) };
+
             // Create a stacktrace observer
             let backtrace_observer = BacktraceObserver::owned(
                 "BacktraceObserver",
@@ -213,14 +216,27 @@ macro_rules! fuzz_with {
             let map_feedback = MaxMapFeedback::new(&edges_observer);
             let shrinking_map_feedback = ShrinkMapFeedback::new(&size_edges_observer);
 
+            // Value profile maximization feedback
+            let value_profile_feedback = MaxMapFeedback::new(&value_profile_observer);
+
             // Set up a generalization stage for grimoire
             let generalization = GeneralizationStage::new(&edges_observer);
             let generalization = IfStage::new(|_, _, _, _| Ok(grimoire.into()), tuple_list!(generalization));
 
             let calibration = CalibrationStage::new(&map_feedback);
 
+            let add_extra_feedback = $extra_feedback;
+            let coverage_feedback = add_extra_feedback(
+                feedback_or!(
+                    map_feedback,
+                    feedback_and_fast!(ConstFeedback::new($options.shrink()), shrinking_map_feedback),
+                    // Time feedback, this one does not need a feedback state
+                    TimeFeedback::new(&time_observer)
+                ),
+                value_profile_feedback
+            );
+
             // Feedback to rate the interestingness of an input
-            // This one is composed by two Feedbacks in OR
             let mut feedback = feedback_and_fast!(
                 feedback_not!(
                     feedback_or_fast!(
@@ -230,12 +246,7 @@ macro_rules! fuzz_with {
                     )
                 ),
                 keep_observer,
-                feedback_or!(
-                    map_feedback,
-                    feedback_and_fast!(ConstFeedback::new($options.shrink()), shrinking_map_feedback),
-                    // Time feedback, this one does not need a feedback state
-                    TimeFeedback::new(&time_observer)
-                )
+                coverage_feedback
             );
 
             // A feedback to choose if an input is a solution or not
@@ -424,10 +435,16 @@ macro_rules! fuzz_with {
 
             let mut tracing_harness = harness;
 
+            let add_extra_observer = $extra_obsv;
+            let observers = add_extra_observer(
+                tuple_list!(edges_observer, size_edges_observer, time_observer, backtrace_observer, oom_observer),
+                value_profile_observer
+            );
+
             // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
             let mut executor = InProcessExecutor::with_timeout(
                     &mut harness,
-                    tuple_list!(edges_observer, size_edges_observer, time_observer, backtrace_observer, oom_observer),
+                    observers,
                     &mut fuzzer,
                     &mut state,
                     &mut mgr,
@@ -466,7 +483,6 @@ macro_rules! fuzz_with {
                 }
             }
 
-
             // Setup a tracing stage in which we log comparisons
             let tracing = IfStage::new(|_, _, _, _| Ok(!$options.skip_tracing()), (TracingStage::new(InProcessExecutor::new(
                 &mut tracing_harness,
@@ -498,6 +514,21 @@ macro_rules! fuzz_with {
 
         #[allow(clippy::redundant_closure_call)]
         $and_then(closure)
+    }};
+
+    ($options:ident, $harness:ident, $operation:expr, $and_then:expr, $edge_maker:expr) => {{
+        if $options.use_value_profile() {
+            fuzz_with!($options, $harness, $operation, $and_then, $edge_maker,
+                |feedback, value_profile_feedback| {
+                    feedback_or!(feedback, value_profile_feedback)
+                },
+                |observers, value_profile_observer| {
+                    (value_profile_observer, observers) // Prepend the value profile observer in the tuple list
+                }
+            )
+        } else {
+            fuzz_with!($options, $harness, $operation, $and_then, $edge_maker, |feedback, _| feedback, |observers, _| observers)
+        }
     }};
 
     ($options:ident, $harness:ident, $operation:expr, $and_then:expr) => {{
