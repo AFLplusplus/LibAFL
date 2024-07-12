@@ -26,7 +26,7 @@ use libafl::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasLastReportTime, HasStartTime, StdState,
         UsesState,
     },
-    Error, Fuzzer, HasFeedback, HasMetadata,
+    Error, Fuzzer, HasFeedback, HasMetadata, SerdeAny,
 };
 use libafl_bolts::{
     current_nanos, current_time,
@@ -47,6 +47,11 @@ use crate::{
     feedback::{filepath::CustomFilepathToTestcaseFeedback, seed::SeedFeedback},
     Opt, AFL_DEFAULT_INPUT_LEN_MAX, AFL_DEFAULT_INPUT_LEN_MIN, SHMEM_ENV_VAR,
 };
+
+
+pub type LibaflFuzzState =
+    StdState<BytesInput, CachedOnDiskCorpus<BytesInput>, StdRand, OnDiskCorpus<BytesInput>>;
+
 
 pub fn run_client<EMH, SP>(
     state: Option<LibaflFuzzState>,
@@ -94,7 +99,8 @@ where
      */
     let mut feedback = SeedFeedback::new(
         feedback_or!(
-            feedback_or!(map_feedback, TimeFeedback::new(&time_observer)),
+            map_feedback,
+            TimeFeedback::new(&time_observer),
             CustomFilepathToTestcaseFeedback::new(set_corpus_filepath, fuzzer_dir.clone())
         ),
         opt,
@@ -125,7 +131,7 @@ where
         StdState::new(
             StdRand::with_seed(current_nanos()),
             // TODO: configure testcache size
-            CachedOnDiskCorpus::<BytesInput>::new(fuzzer_dir.join("queue"), 10).unwrap(),
+            CachedOnDiskCorpus::<BytesInput>::new(fuzzer_dir.join("queue"), 1000).unwrap(),
             OnDiskCorpus::<BytesInput>::new(fuzzer_dir.clone()).unwrap(),
             &mut feedback,
             &mut objective,
@@ -262,10 +268,12 @@ where
                   _event_manager: &mut _|
          -> Result<bool, Error> {
             let testcase = state.current_testcase()?;
-            if opt.cmplog_only_new && testcase.has_metadata::<IsInitialCorpusEntryMetadata>() {
+            if testcase.scheduled_count() == 1 {
+                return Ok(false)
+            } else if opt.cmplog_only_new && testcase.has_metadata::<IsInitialCorpusEntryMetadata>() {
                 return Ok(false);
             }
-            Ok(testcase.scheduled_count() == 1)
+            Ok(true)
         };
         let cmplog = IfStage::new(cb, tuple_list!(colorization, tracing, rq));
 
@@ -364,12 +372,8 @@ pub fn fuzzer_target_mode(opt: &Opt) -> Cow<'static, str> {
     Cow::Owned(res)
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, SerdeAny)]
 pub struct IsInitialCorpusEntryMetadata {}
-libafl_bolts::impl_serdeany!(IsInitialCorpusEntryMetadata);
-
-pub type LibaflFuzzState =
-    StdState<BytesInput, CachedOnDiskCorpus<BytesInput>, StdRand, OnDiskCorpus<BytesInput>>;
 
 pub fn run_fuzzer_with_stages<Z, ST, E, EM>(
     opt: &Opt,

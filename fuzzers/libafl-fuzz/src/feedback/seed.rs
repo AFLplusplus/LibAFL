@@ -135,7 +135,7 @@ where
 {
     #[inline]
     fn name(&self) -> &Cow<'static, str> {
-        static NAME: Cow<'static, str> = Cow::Borrowed("SeedFeedback {self.location}");
+        static NAME: Cow<'static, str> = Cow::Borrowed("SeedFeedback");
         &NAME
     }
 }
