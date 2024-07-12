@@ -1,4 +1,6 @@
-//! Fancy-looking terminal UI monitor, similar to AFL, based on [ratatui](https://ratatui.rs/)
+//! [`TuiMonitor`] is a fancy-looking TUI monitor similar to `AFL`.
+//!
+//! It's based on [ratatui](https://ratatui.rs/)
 
 use alloc::{borrow::Cow, boxed::Box, string::ToString};
 use core::cmp;

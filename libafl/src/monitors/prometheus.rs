@@ -1,4 +1,4 @@
-//! Prometheus Monitor to log to a prometheus endpoint.
+//! The [`PrometheusMonitor`] logs fuzzer progress to a prometheus endpoint.
 //!
 //! ## Overview
 //!
@@ -293,9 +293,9 @@ where
     }
 }
 
-/// set up an HTTP endpoint /metrics
+/// Set up an HTTP endpoint /metrics
 #[allow(clippy::too_many_arguments)]
-pub async fn serve_metrics(
+pub(crate) async fn serve_metrics(
     listener: String,
     corpus: Family<Labels, Gauge>,
     objectives: Family<Labels, Gauge>,
