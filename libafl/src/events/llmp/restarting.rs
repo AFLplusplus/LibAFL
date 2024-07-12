@@ -50,7 +50,7 @@ use crate::{
     inputs::UsesInput,
     monitors::Monitor,
     observers::{ObserversTuple, TimeObserver, UsesObservers},
-    state::{HasExecutions, HasLastReportTime, State, UsesState},
+    state::{HasExecutions, HasLastReportTime, State, UsesState, HasImported},
     Error, HasMetadata,
 };
 
@@ -208,7 +208,7 @@ where
     <E as UsesObservers>::Observers: Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata,
+    S: State + HasExecutions + HasMetadata + HasImported,
     SP: ShMemProvider,
     Z: ExecutionProcessor<State = S>
         + EvaluatorObservers<E::Observers>
@@ -232,7 +232,7 @@ where
     <E as UsesObservers>::Observers: Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata + HasLastReportTime,
+    S: State + HasExecutions + HasMetadata + HasLastReportTime + HasImported,
     SP: ShMemProvider,
     Z: ExecutionProcessor<State = S>
         + EvaluatorObservers<E::Observers>

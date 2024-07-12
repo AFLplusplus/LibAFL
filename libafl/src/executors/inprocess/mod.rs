@@ -16,19 +16,23 @@ use core::{
     time::Duration,
 };
 
-use libafl_bolts::tuples::{tuple_list, RefIndexable};
+use libafl_bolts::{
+    current_time,
+    tuples::{tuple_list, RefIndexable},
+};
 
 #[cfg(any(unix, feature = "std"))]
 use crate::executors::hooks::inprocess::GLOBAL_STATE;
 use crate::{
-    events::{EventFirer, EventRestarter},
+    corpus::Corpus,
+    events::{Event, EventFirer, EventRestarter},
     executors::{
         hooks::{inprocess::InProcessHooks, ExecutorHooksTuple},
         inprocess::inner::GenericInProcessExecutorInner,
         Executor, ExitKind, HasObservers,
     },
     feedbacks::Feedback,
-    fuzzer::HasObjective,
+    fuzzer::{ExecuteInputResult, HasObjective},
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
     schedulers::Scheduler,
@@ -432,7 +436,7 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
     input: &<E::State as UsesInput>::Input,
     fuzzer: &mut Z,
     event_mgr: &mut EM,
-    exitkind: ExitKind,
+    exit_kind: ExitKind,
 ) where
     E: HasObservers,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
@@ -447,9 +451,47 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
 
     let _ = scheduler.on_evaluation(state, input, &*observers);
 
-    let res = fuzzer.check_results(state, event_mgr, input, &*observers, &exitkind);
-    if let Ok(r) = res {
-        let _ = fuzzer.process_execution(state, event_mgr, &input, &r, &*observers);
+    let res = fuzzer.check_results(state, event_mgr, input, &*observers, &exit_kind);
+    if let Ok(exec_res) = res {
+        let _ = fuzzer.process_execution(state, event_mgr, input, &exec_res, &*observers);
+
+        // Now send off the event
+        // unlike in fuzzer/mod.rs we never serialize here.
+        // (because it doesn't work with generics)
+        match exec_res {
+            ExecuteInputResult::Corpus => {
+                if event_mgr.should_send() {
+                    // TODO set None for fast targets
+                    let _ = event_mgr.fire(
+                        state,
+                        Event::NewTestcase {
+                            input: input.clone(),
+                            observers_buf: None,
+                            exit_kind,
+                            corpus_size: state.corpus().count(),
+                            client_config: event_mgr.configuration(),
+                            time: current_time(),
+                            executions: *state.executions(),
+                            forward_id: None,
+                            #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
+                            node_id: None,
+                        },
+                    );
+                }
+            }
+            ExecuteInputResult::Solution => {
+                let executions = *state.executions();
+                let _ = event_mgr.fire(
+                    state,
+                    Event::Objective {
+                        objective_size: state.solutions().count(),
+                        executions,
+                        time: current_time(),
+                    },
+                );
+            }
+            ExecuteInputResult::None => (),
+        }
     } else {
         log::info!("Faild to check execution result");
     }

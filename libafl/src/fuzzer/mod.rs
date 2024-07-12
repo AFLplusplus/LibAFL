@@ -97,21 +97,6 @@ pub trait ExecutionProcessor: UsesState {
         EM: EventFirer<State = Self::State>,
         OT: ObserversTuple<Self::State>;
 
-    /// Send event via the event manager
-    fn dispatch_event<EM, OT>(
-        &mut self,
-        state: &mut Self::State,
-        manager: &mut EM,
-        input: <Self::State as UsesInput>::Input,
-        exec_res: &ExecuteInputResult,
-        observers: &OT,
-        exit_kind: &ExitKind,
-        send_events: bool,
-    ) -> Result<(), Error>
-    where
-        EM: EventFirer<State = Self::State>,
-        OT: ObserversTuple<Self::State> + Serialize;
-
     /// Evaluate if a set of observation channels has an interesting state
     fn evaluate_execution<EM, OT>(
         &mut self,
@@ -424,21 +409,23 @@ where
         Ok(res)
     }
 
-    /// Send event via the event manager
-    fn dispatch_event<EM, OT>(
+    fn evaluate_execution<EM, OT>(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
         input: <Self::State as UsesInput>::Input,
-        exec_res: &ExecuteInputResult,
         observers: &OT,
         exit_kind: &ExitKind,
         send_events: bool,
-    ) -> Result<(), Error>
+    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
     where
         EM: EventFirer<State = Self::State>,
         OT: ObserversTuple<Self::State> + Serialize,
     {
+        let exec_res = self.check_results(state, manager, &input, observers, exit_kind)?;
+        let corpus_id = self.process_execution(state, manager, &input, &exec_res, observers)?;
+
+        // Now send off the event
         match exec_res {
             ExecuteInputResult::Corpus => {
                 if send_events && manager.should_send() {
@@ -463,9 +450,6 @@ where
                             node_id: None,
                         },
                     )?;
-                } else {
-                    // This testcase is from the other fuzzers.
-                    *state.imported_mut() += 1;
                 }
             }
             ExecuteInputResult::Solution => {
@@ -481,36 +465,9 @@ where
                     )?;
                 }
             }
-            _ => (),
+            ExecuteInputResult::None => (),
         }
 
-        Ok(())
-    }
-
-    fn evaluate_execution<EM, OT>(
-        &mut self,
-        state: &mut Self::State,
-        manager: &mut EM,
-        input: <Self::State as UsesInput>::Input,
-        observers: &OT,
-        exit_kind: &ExitKind,
-        send_events: bool,
-    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
-    where
-        EM: EventFirer<State = Self::State>,
-        OT: ObserversTuple<Self::State> + Serialize,
-    {
-        let exec_res = self.check_results(state, manager, &input, observers, exit_kind)?;
-        let corpus_id = self.process_execution(state, manager, &input, &exec_res, observers)?;
-        self.dispatch_event(
-            state,
-            manager,
-            input,
-            &exec_res,
-            observers,
-            exit_kind,
-            send_events,
-        )?;
         Ok((exec_res, corpus_id))
     }
 
@@ -529,13 +486,13 @@ where
     {
         match exec_res {
             ExecuteInputResult::None => {
-                self.feedback_mut().discard_metadata(state, &input)?;
-                self.objective_mut().discard_metadata(state, &input)?;
+                self.feedback_mut().discard_metadata(state, input)?;
+                self.objective_mut().discard_metadata(state, input)?;
                 Ok(None)
             }
             ExecuteInputResult::Corpus => {
                 // Not a solution
-                self.objective_mut().discard_metadata(state, &input)?;
+                self.objective_mut().discard_metadata(state, input)?;
 
                 // Add the input to the main corpus
                 let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
@@ -551,7 +508,7 @@ where
             }
             ExecuteInputResult::Solution => {
                 // Not interesting
-                self.feedback_mut().discard_metadata(state, &input)?;
+                self.feedback_mut().discard_metadata(state, input)?;
 
                 let executions = *state.executions();
                 // The input is a solution, add it to the respective corpus
