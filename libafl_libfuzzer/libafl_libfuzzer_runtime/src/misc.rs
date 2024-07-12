@@ -1,9 +1,6 @@
-use std::{
-    collections::VecDeque,
-    path::PathBuf,
-};
-use hashbrown::HashSet;
+use std::{collections::VecDeque, path::PathBuf};
 
+use hashbrown::HashSet;
 use libafl::{Error, HasMetadata};
 use libafl_bolts::impl_serdeany;
 use serde::{Deserialize, Serialize};
