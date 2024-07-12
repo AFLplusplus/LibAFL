@@ -651,11 +651,11 @@ pub mod unix_shmem {
             ops::{Deref, DerefMut},
             ptr, slice,
         };
-        use std::process;
+        use std::{io, process};
 
         use libc::{
-            c_int, c_uchar, close, ftruncate, mmap, munmap, shm_open, shm_unlink, shmat, shmctl,
-            shmdt, shmget,
+            c_int, c_uchar, close, fcntl, ftruncate, mmap, munmap, shm_open, shm_unlink, shmat,
+            shmctl, shmdt, shmget,
         };
 
         use crate::{
@@ -824,6 +824,35 @@ pub mod unix_shmem {
             #[must_use]
             pub fn filename_path(&self) -> &Option<[u8; MAX_MMAP_FILENAME_LEN]> {
                 &self.filename_path
+            }
+
+            /// If called, the shared memory will also be available in subprocesses.
+            ///
+            /// You likely want to pass the [`crate::shmem::ShMemDescription`] and reopen the shared memory in the child process using [`crate::shmem::ShMemProvider::shmem_from_description`].
+            ///
+            /// # Errors
+            ///
+            /// This function will return an error if the appropriate flags could not be extracted or set.
+            pub fn persist_for_child_processes(&self) -> Result<&Self, Error> {
+                unsafe {
+                    let flags = fcntl(self.shm_fd, libc::F_GETFD);
+
+                    if flags == -1 {
+                        return Err(Error::os_error(
+                            io::Error::last_os_error(),
+                            "Failed to retrieve FD flags",
+                        ));
+                    }
+
+                    if fcntl(self.shm_fd, libc::F_SETFD, flags & !libc::FD_CLOEXEC) == -1 {
+                        return Err(Error::os_error(
+                            io::Error::last_os_error(),
+                            "Failed to set FD flags",
+                        ));
+                    }
+                }
+
+                Ok(self)
             }
         }
 
