@@ -308,9 +308,10 @@ impl Mutator {
 #[cfg(test)]
 mod tests {
     use alloc::{
-        string::{str, String, ToString},
+        string::{String, ToString},
         vec::Vec,
     };
+    use core::str;
 
     use hashbrown::HashSet;
     use libafl_bolts::rands::StdRand;
