@@ -38,7 +38,7 @@ where
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     OT: ObserversTuple<CS::State>,
     CS::State: HasRand + HasCorpus,
-    Z: ExecutionProcessor<OT, State = CS::State>
+    Z: ExecutionProcessor<State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
 {
@@ -59,7 +59,7 @@ where
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     OT: ObserversTuple<CS::State>,
     CS::State: HasRand + HasCorpus,
-    Z: ExecutionProcessor<OT, State = CS::State>
+    Z: ExecutionProcessor<State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
 {
@@ -84,7 +84,7 @@ where
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     OT: ObserversTuple<CS::State>,
     CS::State: HasRand + HasCorpus,
-    Z: ExecutionProcessor<OT, State = CS::State>
+    Z: ExecutionProcessor<State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
 {
@@ -114,7 +114,7 @@ where
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     OT: ObserversTuple<CS::State>,
     CS::State: HasRand + HasCorpus,
-    Z: ExecutionProcessor<OT, State = CS::State>
+    Z: ExecutionProcessor<State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
 {
@@ -183,7 +183,7 @@ where
     CS::State: HasRand + HasExecutions + HasMetadata + HasCorpus + HasLastReportTime,
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId + ProgressReporter,
     OT: ObserversTuple<CS::State>,
-    Z: ExecutionProcessor<OT, State = CS::State>
+    Z: ExecutionProcessor<State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
 {

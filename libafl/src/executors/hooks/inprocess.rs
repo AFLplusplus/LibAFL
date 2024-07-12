@@ -18,6 +18,7 @@ use libafl_bolts::current_time;
 use libafl_bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(windows, feature = "std"))]
 use libafl_bolts::os::windows_exceptions::setup_exception_handler;
+use serde::{de::DeserializeOwned, Serialize};
 #[cfg(all(windows, feature = "std"))]
 use windows::Win32::System::Threading::{CRITICAL_SECTION, PTP_TIMER};
 
@@ -31,7 +32,9 @@ use crate::{
     events::{EventFirer, EventRestarter},
     executors::{hooks::ExecutorHook, inprocess::HasInProcessHooks, Executor, HasObservers},
     feedbacks::Feedback,
+    fuzzer::{ExecutionProcessor, HasScheduler},
     inputs::UsesInput,
+    observers::UsesObservers,
     state::{HasCorpus, HasExecutions, HasSolutions},
     Error, HasObjective,
 };
@@ -232,10 +235,11 @@ where
     pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
     where
         E: Executor<EM, Z> + HasObservers + HasInProcessHooks<E::State>,
+        <E as UsesObservers>::Observers: Serialize,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State>,
+        Z: HasObjective<Objective = OF, State = E::State> + HasScheduler + ExecutionProcessor,
     {
         #[cfg_attr(miri, allow(unused_variables))]
         unsafe {

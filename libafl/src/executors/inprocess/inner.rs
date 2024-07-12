@@ -8,6 +8,7 @@ use core::{
 };
 
 use libafl_bolts::tuples::{tuple_list, Merge, RefIndexable};
+use serde::{Deserialize, Serialize};
 #[cfg(windows)]
 use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
@@ -26,11 +27,11 @@ use crate::{
         Executor, HasObservers,
     },
     feedbacks::Feedback,
-    fuzzer::HasObjective,
+    fuzzer::{HasObjective, HasScheduler},
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
     state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
-    Error,
+    Error, ExecutionProcessor,
 };
 
 /// The internal state of `GenericInProcessExecutor`.
@@ -174,10 +175,11 @@ where
     ) -> Result<Self, Error>
     where
         E: Executor<EM, Z, State = S> + HasObservers + HasInProcessHooks<S>,
+        <E as UsesObservers>::Observers: Serialize,
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF, State = S> + HasScheduler + ExecutionProcessor,
     {
         Self::with_timeout_generic::<E, EM, OF, Z>(
             user_hooks,
@@ -201,10 +203,11 @@ where
     ) -> Result<Self, Error>
     where
         E: Executor<EM, Z, State = S> + HasObservers + HasInProcessHooks<S>,
+        <E as UsesObservers>::Observers: Serialize,
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF, State = S> + HasScheduler + ExecutionProcessor,
     {
         let mut me = Self::with_timeout_generic::<E, EM, OF, Z>(
             user_hooks, observers, fuzzer, state, event_mgr, exec_tmout,
@@ -231,10 +234,11 @@ where
     ) -> Result<Self, Error>
     where
         E: Executor<EM, Z, State = S> + HasObservers + HasInProcessHooks<S>,
+        <E as UsesObservers>::Observers: Serialize,
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF, State = S> + HasScheduler + ExecutionProcessor,
     {
         let default = InProcessHooks::new::<E, EM, OF, Z>(timeout)?;
         let mut hooks = tuple_list!(default).merge(user_hooks);

@@ -9,6 +9,7 @@ use core::{
 };
 
 use libafl_bolts::tuples::{tuple_list, RefIndexable};
+use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
     events::{EventFirer, EventRestarter},
@@ -18,7 +19,7 @@ use crate::{
         Executor, ExitKind, HasObservers,
     },
     feedbacks::Feedback,
-    fuzzer::HasObjective,
+    fuzzer::{ExecutionProcessor, HasObjective, HasScheduler},
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
     state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
@@ -155,7 +156,7 @@ where
 impl<'a, H, OT, S, ES> StatefulInProcessExecutor<'a, H, OT, S, ES>
 where
     H: FnMut(&<S as UsesInput>::Input, &mut ES) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S> + Serialize,
     S: HasExecutions + HasSolutions + HasCorpus + State,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
@@ -172,7 +173,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF, State = S> + HasScheduler + ExecutionProcessor,
     {
         Self::with_timeout_generic(
             tuple_list!(),
@@ -202,7 +203,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF, State = S> + HasScheduler + ExecutionProcessor,
     {
         let inner = GenericInProcessExecutorInner::batched_timeout_generic::<Self, EM, OF, Z>(
             tuple_list!(),
@@ -243,7 +244,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF, State = S> + HasScheduler + ExecutionProcessor,
     {
         let inner = GenericInProcessExecutorInner::with_timeout_generic::<Self, EM, OF, Z>(
             tuple_list!(),
@@ -287,7 +288,7 @@ where
     H: FnMut(&S::Input, &mut ES) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S> + Serialize,
     S: State + HasExecutions + HasSolutions + HasCorpus,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
@@ -304,7 +305,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF, State = S> + HasScheduler + ExecutionProcessor,
     {
         Self::with_timeout_generic(
             user_hooks,
@@ -335,7 +336,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF, State = S> + HasScheduler + ExecutionProcessor,
     {
         let inner = GenericInProcessExecutorInner::batched_timeout_generic::<Self, EM, OF, Z>(
             user_hooks, observers, fuzzer, state, event_mgr, exec_tmout,
@@ -372,7 +373,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF, State = S> + HasScheduler + ExecutionProcessor,
     {
         let inner = GenericInProcessExecutorInner::with_timeout_generic::<Self, EM, OF, Z>(
             user_hooks, observers, fuzzer, state, event_mgr, timeout,

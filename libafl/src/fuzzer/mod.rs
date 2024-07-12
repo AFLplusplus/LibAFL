@@ -1,7 +1,7 @@
 //! The `Fuzzer` is the main struct for a fuzz campaign.
 
 use alloc::string::ToString;
-use core::{fmt::Debug, marker::PhantomData, time::Duration};
+use core::{fmt::Debug, time::Duration};
 
 use libafl_bolts::current_time;
 use serde::{de::DeserializeOwned, Serialize};
@@ -69,9 +69,9 @@ pub trait HasObjective: UsesState {
 }
 
 /// Evaluates if an input is interesting using the feedback
-pub trait ExecutionProcessor<OT>: UsesState {
+pub trait ExecutionProcessor: UsesState {
     /// Check the outcome of the execution, find if it is worth for corpus or objectives
-    fn check_results<EM>(
+    fn check_results<EM, OT>(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
@@ -80,11 +80,12 @@ pub trait ExecutionProcessor<OT>: UsesState {
         exit_kind: &ExitKind,
     ) -> Result<ExecuteInputResult, Error>
     where
-        EM: EventFirer<State = Self::State>;
+        EM: EventFirer<State = Self::State>,
+        OT: ObserversTuple<Self::State>;
 
     /// Process `ExecuteInputResult`. Add to corpus, solution or ignore
     #[allow(clippy::too_many_arguments)]
-    fn process_execution<EM>(
+    fn process_execution<EM, OT>(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
@@ -95,10 +96,11 @@ pub trait ExecutionProcessor<OT>: UsesState {
         send_events: bool,
     ) -> Result<Option<CorpusId>, Error>
     where
-        EM: EventFirer<State = Self::State>;
+        EM: EventFirer<State = Self::State>,
+        OT: ObserversTuple<Self::State> + Serialize;
 
     /// Evaluate if a set of observation channels has an interesting state
-    fn evaluate_execution<EM>(
+    fn evaluate_execution<EM, OT>(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
@@ -108,7 +110,8 @@ pub trait ExecutionProcessor<OT>: UsesState {
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
     where
-        EM: EventFirer<State = Self::State>;
+        EM: EventFirer<State = Self::State>,
+        OT: ObserversTuple<Self::State> + Serialize;
 }
 
 /// Evaluates an input modifying the state of the fuzzer
@@ -285,14 +288,13 @@ pub enum ExecuteInputResult {
 
 /// Your default fuzzer instance, for everyday use.
 #[derive(Debug)]
-pub struct StdFuzzer<CS, F, OF, OT> {
+pub struct StdFuzzer<CS, F, OF> {
     scheduler: CS,
     feedback: F,
     objective: OF,
-    phantom: PhantomData<OT>,
 }
 
-impl<CS, F, OF, OT> UsesState for StdFuzzer<CS, F, OF, OT>
+impl<CS, F, OF> UsesState for StdFuzzer<CS, F, OF>
 where
     CS: Scheduler,
     CS::State: HasCorpus,
@@ -300,7 +302,7 @@ where
     type State = CS::State;
 }
 
-impl<CS, F, OF, OT> HasScheduler for StdFuzzer<CS, F, OF, OT>
+impl<CS, F, OF> HasScheduler for StdFuzzer<CS, F, OF>
 where
     CS: Scheduler,
     CS::State: HasCorpus,
@@ -316,7 +318,7 @@ where
     }
 }
 
-impl<CS, F, OF, OT> HasFeedback for StdFuzzer<CS, F, OF, OT>
+impl<CS, F, OF> HasFeedback for StdFuzzer<CS, F, OF>
 where
     CS: Scheduler,
     F: Feedback<Self::State>,
@@ -334,7 +336,7 @@ where
     }
 }
 
-impl<CS, F, OF, OT> HasObjective for StdFuzzer<CS, F, OF, OT>
+impl<CS, F, OF> HasObjective for StdFuzzer<CS, F, OF>
 where
     CS: Scheduler,
     F: Feedback<Self::State>,
@@ -352,12 +354,11 @@ where
     }
 }
 
-impl<CS, F, OF, OT> ExecutionProcessor<OT> for StdFuzzer<CS, F, OF, OT>
+impl<CS, F, OF> ExecutionProcessor for StdFuzzer<CS, F, OF>
 where
     CS: Scheduler,
     F: Feedback<Self::State>,
     OF: Feedback<Self::State>,
-    OT: ObserversTuple<Self::State> + Serialize + DeserializeOwned,
     CS::State: HasCorpus
         + HasSolutions
         + HasExecutions
@@ -366,7 +367,7 @@ where
         + HasCurrentTestcase<<Self::State as UsesInput>::Input>
         + HasCurrentCorpusId,
 {
-    fn check_results<EM>(
+    fn check_results<EM, OT>(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
@@ -376,6 +377,7 @@ where
     ) -> Result<ExecuteInputResult, Error>
     where
         EM: EventFirer<State = Self::State>,
+        OT: ObserversTuple<Self::State>,
     {
         let mut res = ExecuteInputResult::None;
 
@@ -409,7 +411,7 @@ where
         Ok(res)
     }
 
-    fn evaluate_execution<EM>(
+    fn evaluate_execution<EM, OT>(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
@@ -420,6 +422,7 @@ where
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
     where
         EM: EventFirer<State = Self::State>,
+        OT: ObserversTuple<Self::State> + Serialize,
     {
         let exec_res = self.check_results(state, manager, &input, observers, exit_kind)?;
         let corpus_id = self.process_execution(
@@ -435,7 +438,7 @@ where
     }
 
     /// Evaluate if a set of observation channels has an interesting state
-    fn process_execution<EM>(
+    fn process_execution<EM, OT>(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
@@ -447,6 +450,7 @@ where
     ) -> Result<Option<CorpusId>, Error>
     where
         EM: EventFirer<State = Self::State>,
+        OT: ObserversTuple<Self::State> + Serialize,
     {
         match exec_res {
             ExecuteInputResult::None => {
@@ -531,7 +535,7 @@ where
     }
 }
 
-impl<CS, F, OF, OT> EvaluatorObservers<OT> for StdFuzzer<CS, F, OF, OT>
+impl<CS, F, OF, OT> EvaluatorObservers<OT> for StdFuzzer<CS, F, OF>
 where
     CS: Scheduler,
     OT: ObserversTuple<Self::State> + Serialize + DeserializeOwned,
@@ -562,7 +566,7 @@ where
     }
 }
 
-impl<CS, E, EM, F, OF, OT> Evaluator<E, EM> for StdFuzzer<CS, F, OF, OT>
+impl<CS, E, EM, F, OF, OT> Evaluator<E, EM> for StdFuzzer<CS, F, OF>
 where
     CS: Scheduler,
     E: HasObservers<State = Self::State, Observers = OT> + Executor<EM, Self>,
@@ -695,7 +699,7 @@ where
     }
 }
 
-impl<CS, E, EM, F, OF, OT, ST> Fuzzer<E, EM, ST> for StdFuzzer<CS, F, OF, OT>
+impl<CS, E, EM, F, OF, ST> Fuzzer<E, EM, ST> for StdFuzzer<CS, F, OF>
 where
     CS: Scheduler,
     E: UsesState<State = Self::State>,
@@ -768,7 +772,7 @@ where
     }
 }
 
-impl<CS, F, OF, OT> StdFuzzer<CS, F, OF, OT>
+impl<CS, F, OF> StdFuzzer<CS, F, OF>
 where
     CS: Scheduler,
     F: Feedback<<Self as UsesState>::State>,
@@ -781,7 +785,6 @@ where
             scheduler,
             feedback,
             objective,
-            phantom: PhantomData,
         }
     }
 
@@ -794,9 +797,8 @@ where
         input: &<<Self as UsesState>::State as UsesInput>::Input,
     ) -> Result<ExitKind, Error>
     where
-        E: Executor<EM, Self> + HasObservers<Observers = OT, State = <Self as UsesState>::State>,
+        E: Executor<EM, Self> + HasObservers<State = <Self as UsesState>::State>,
         EM: UsesState<State = <Self as UsesState>::State>,
-        OT: ObserversTuple<<Self as UsesState>::State>,
     {
         start_timer!(state);
         executor.observers_mut().pre_exec_all(state, input)?;
@@ -832,7 +834,7 @@ where
     ) -> Result<ExitKind, Error>;
 }
 
-impl<CS, E, EM, F, OF, OT> ExecutesInput<E, EM> for StdFuzzer<CS, F, OF, OT>
+impl<CS, E, EM, F, OF> ExecutesInput<E, EM> for StdFuzzer<CS, F, OF>
 where
     CS: Scheduler,
     F: Feedback<<Self as UsesState>::State>,

@@ -39,7 +39,7 @@ use crate::{
     executors::{Executor, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{NopInput, UsesInput},
-    observers::{ObserversTuple, TimeObserver},
+    observers::{ObserversTuple, TimeObserver, UsesObservers},
     state::{HasExecutions, HasLastReportTime, NopState, State, UsesState},
     Error, HasMetadata,
 };
@@ -404,10 +404,9 @@ where
     ) -> Result<(), Error>
     where
         E: Executor<Self, Z> + HasObservers<State = S>,
+        <E as UsesObservers>::Observers: Serialize,
         for<'a> E::Observers: Deserialize<'a>,
-        Z: ExecutionProcessor<E::Observers, State = S>
-            + EvaluatorObservers<E::Observers>
-            + Evaluator<E, Self>,
+        Z: ExecutionProcessor<State = S> + EvaluatorObservers<E::Observers> + Evaluator<E, Self>,
     {
         if !self.hooks.pre_exec_all(state, client_id, &event)? {
             return Ok(());
@@ -585,13 +584,12 @@ where
 impl<E, EMH, S, SP, Z> EventProcessor<E, Z> for LlmpEventManager<EMH, S, SP>
 where
     EMH: EventManagerHooksTuple<S>,
+    <E as UsesObservers>::Observers: Serialize,
     S: State + HasExecutions + HasMetadata,
     SP: ShMemProvider,
     E: HasObservers<State = S> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
-    Z: ExecutionProcessor<E::Observers, State = S>
-        + EvaluatorObservers<E::Observers>
-        + Evaluator<E, Self>,
+    Z: ExecutionProcessor<State = S> + EvaluatorObservers<E::Observers> + Evaluator<E, Self>,
 {
     fn process(
         &mut self,
@@ -638,13 +636,12 @@ where
 impl<E, EMH, S, SP, Z> EventManager<E, Z> for LlmpEventManager<EMH, S, SP>
 where
     E: HasObservers<State = S> + Executor<Self, Z>,
+    <E as UsesObservers>::Observers: Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata + HasLastReportTime,
     SP: ShMemProvider,
-    Z: ExecutionProcessor<E::Observers, State = S>
-        + EvaluatorObservers<E::Observers>
-        + Evaluator<E, Self>,
+    Z: ExecutionProcessor<State = S> + EvaluatorObservers<E::Observers> + Evaluator<E, Self>,
 {
 }
 

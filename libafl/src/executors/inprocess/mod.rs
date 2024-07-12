@@ -17,12 +17,12 @@ use core::{
 };
 
 use libafl_bolts::tuples::{tuple_list, RefIndexable};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 #[cfg(any(unix, feature = "std"))]
 use crate::executors::hooks::inprocess::GLOBAL_STATE;
 use crate::{
-    corpus::{Corpus, Testcase},
-    events::{Event, EventFirer, EventRestarter},
+    events::{EventFirer, EventRestarter},
     executors::{
         hooks::{inprocess::InProcessHooks, ExecutorHooksTuple},
         inprocess::inner::GenericInProcessExecutorInner,
@@ -32,8 +32,9 @@ use crate::{
     fuzzer::HasObjective,
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions, State, UsesState},
-    Error, HasMetadata,
+    schedulers::Scheduler,
+    state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
+    Error, ExecutionProcessor, HasScheduler,
 };
 
 /// The inner structure of `InProcessExecutor`.
@@ -180,7 +181,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF, State = S> + HasScheduler + ExecutionProcessor,
     {
         Self::with_timeout_generic(
             tuple_list!(),
@@ -208,7 +209,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF, State = S> + HasScheduler + ExecutionProcessor,
     {
         let inner = GenericInProcessExecutorInner::batched_timeout_generic::<Self, EM, OF, Z>(
             tuple_list!(),
@@ -247,7 +248,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF, State = S> + HasScheduler + ExecutionProcessor,
     {
         let inner = GenericInProcessExecutorInner::with_timeout_generic::<Self, EM, OF, Z>(
             tuple_list!(),
@@ -288,7 +289,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF, State = S> + HasScheduler + ExecutionProcessor,
     {
         Self::with_timeout_generic(
             user_hooks,
@@ -317,7 +318,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF, State = S> + HasScheduler + ExecutionProcessor,
     {
         let inner = GenericInProcessExecutorInner::batched_timeout_generic::<Self, EM, OF, Z>(
             user_hooks, observers, fuzzer, state, event_mgr, exec_tmout,
@@ -352,7 +353,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF, State = S> + HasScheduler + ExecutionProcessor,
     {
         let inner = GenericInProcessExecutorInner::with_timeout_generic::<Self, EM, OF, Z>(
             user_hooks, observers, fuzzer, state, event_mgr, timeout,
@@ -433,58 +434,37 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
     fuzzer: &mut Z,
     event_mgr: &mut EM,
     exitkind: ExitKind,
-) where
+) -> Result<(), Error>
+where
     E: HasObservers,
+    <E as UsesObservers>::Observers: Serialize,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
     OF: Feedback<E::State>,
     E::State: HasExecutions + HasSolutions + HasCorpus,
-    Z: HasObjective<Objective = OF, State = E::State>,
+    Z: HasObjective<Objective = OF, State = E::State>
+        + HasScheduler<State = E::State>
+        + ExecutionProcessor,
 {
-    let mut observers = executor.observers_mut();
+    let observers = executor.observers_mut();
+    let scheduler = fuzzer.scheduler_mut();
 
-    observers
-        .post_exec_all(state, input, &exitkind)
-        .expect("Observers post_exec_all failed");
+    scheduler.on_evaluation(state, &input, &*observers);
 
-    let interesting = fuzzer
-        .objective_mut()
-        .is_interesting(state, event_mgr, input, &*observers, &exitkind)
-        .expect("In run_observers_and_save_state objective failure.");
-
-    if interesting {
-        let executions = *state.executions();
-        let mut new_testcase = Testcase::with_executions(input.clone(), executions);
-        new_testcase.add_metadata(exitkind);
-        new_testcase.set_parent_id_optional(*state.corpus().current());
-
-        if let Ok(mut tc) = state.current_testcase_mut() {
-            tc.found_objective();
-        }
-
-        fuzzer
-            .objective_mut()
-            .append_metadata(state, event_mgr, &*observers, &mut new_testcase)
-            .expect("Failed adding metadata");
-        state
-            .solutions_mut()
-            .add(new_testcase)
-            .expect("In run_observers_and_save_state solutions failure.");
-        event_mgr
-            .fire(
-                state,
-                Event::Objective {
-                    objective_size: state.solutions().count(),
-                    executions,
-                    time: libafl_bolts::current_time(),
-                },
-            )
-            .expect("Could not save state in run_observers_and_save_state");
-    }
-
+    let res = fuzzer.check_results(state, event_mgr, input, &*observers, &exitkind)?;
+    fuzzer.process_execution(
+        state,
+        event_mgr,
+        input.clone(),
+        &res,
+        &*observers,
+        &exitkind,
+        true,
+    )?;
     // Serialize the state and wait safely for the broker to read pending messages
     event_mgr.on_restart(state).unwrap();
 
     log::info!("Bye!");
+    Ok(())
 }
 
 // TODO remove this after executor refactor and libafl qemu new executor
@@ -496,10 +476,13 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
 pub unsafe fn generic_inproc_crash_handler<E, EM, OF, Z>()
 where
     E: Executor<EM, Z> + HasObservers,
+    <E as UsesObservers>::Observers: Serialize,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
     OF: Feedback<E::State>,
     E::State: HasExecutions + HasSolutions + HasCorpus,
-    Z: HasObjective<Objective = OF, State = E::State>,
+    Z: HasObjective<Objective = OF, State = E::State>
+        + HasScheduler<State = E::State>
+        + ExecutionProcessor,
 {
     let data = addr_of_mut!(GLOBAL_STATE);
     let in_handler = (*data).set_in_handler(true);
@@ -556,7 +539,7 @@ mod tests {
         let mut mgr = NopEventManager::new();
         let mut state =
             StdState::new(rand, corpus, solutions, &mut feedback, &mut objective).unwrap();
-        let mut fuzzer = StdFuzzer::<_, _, _, ()>::new(sche, feedback, objective);
+        let mut fuzzer = StdFuzzer::<_, _, _>::new(sche, feedback, objective);
 
         let mut in_process_executor = InProcessExecutor::new(
             &mut harness,
