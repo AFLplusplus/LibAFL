@@ -8,7 +8,6 @@ use core::{
 };
 
 use libafl_bolts::tuples::{tuple_list, Merge, RefIndexable};
-use serde::Serialize;
 #[cfg(windows)]
 use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
@@ -175,7 +174,6 @@ where
     ) -> Result<Self, Error>
     where
         E: Executor<EM, Z, State = S> + HasObservers + HasInProcessHooks<S>,
-        <E as UsesObservers>::Observers: Serialize,
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
@@ -203,7 +201,6 @@ where
     ) -> Result<Self, Error>
     where
         E: Executor<EM, Z, State = S> + HasObservers + HasInProcessHooks<S>,
-        <E as UsesObservers>::Observers: Serialize,
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
@@ -234,7 +231,6 @@ where
     ) -> Result<Self, Error>
     where
         E: Executor<EM, Z, State = S> + HasObservers + HasInProcessHooks<S>,
-        <E as UsesObservers>::Observers: Serialize,
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,

@@ -17,7 +17,6 @@ use core::{
 };
 
 use libafl_bolts::tuples::{tuple_list, RefIndexable};
-use serde::Serialize;
 
 #[cfg(any(unix, feature = "std"))]
 use crate::executors::hooks::inprocess::GLOBAL_STATE;
@@ -165,7 +164,7 @@ where
 impl<'a, H, OT, S> InProcessExecutor<'a, H, OT, S>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S> + Serialize,
+    OT: ObserversTuple<S>,
     S: HasExecutions + HasSolutions + HasCorpus + State,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
@@ -272,7 +271,7 @@ where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S> + Serialize,
+    OT: ObserversTuple<S>,
     S: State + HasExecutions + HasSolutions + HasCorpus,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
@@ -436,7 +435,6 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
     exitkind: ExitKind,
 ) where
     E: HasObservers,
-    <E as UsesObservers>::Observers: Serialize,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
     OF: Feedback<E::State>,
     E::State: HasExecutions + HasSolutions + HasCorpus,
@@ -451,15 +449,7 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
 
     let res = fuzzer.check_results(state, event_mgr, input, &*observers, &exitkind);
     if let Ok(r) = res {
-        let _ = fuzzer.process_execution(
-            state,
-            event_mgr,
-            input.clone(),
-            &r,
-            &*observers,
-            &exitkind,
-            true,
-        );
+        let _ = fuzzer.process_execution(state, event_mgr, &input, &r, &*observers);
     } else {
         log::info!("Faild to check execution result");
     }
@@ -478,7 +468,6 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
 pub unsafe fn generic_inproc_crash_handler<E, EM, OF, Z>()
 where
     E: Executor<EM, Z> + HasObservers,
-    <E as UsesObservers>::Observers: Serialize,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
     OF: Feedback<E::State>,
     E::State: HasExecutions + HasSolutions + HasCorpus,

@@ -9,7 +9,6 @@ use core::{
 };
 
 use libafl_bolts::tuples::{tuple_list, RefIndexable};
-use serde::Serialize;
 
 use crate::{
     events::{EventFirer, EventRestarter},
@@ -156,7 +155,7 @@ where
 impl<'a, H, OT, S, ES> StatefulInProcessExecutor<'a, H, OT, S, ES>
 where
     H: FnMut(&<S as UsesInput>::Input, &mut ES) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S> + Serialize,
+    OT: ObserversTuple<S>,
     S: HasExecutions + HasSolutions + HasCorpus + State,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
@@ -288,7 +287,7 @@ where
     H: FnMut(&S::Input, &mut ES) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S> + Serialize,
+    OT: ObserversTuple<S>,
     S: State + HasExecutions + HasSolutions + HasCorpus,
 {
     /// Create a new in mem executor with the default timeout (5 sec)

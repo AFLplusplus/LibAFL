@@ -7,7 +7,6 @@ pub mod unix_signal_handler {
 
     use libafl_bolts::os::unix_signals::{ucontext_t, Handler, Signal};
     use libc::siginfo_t;
-    use serde::Serialize;
 
     use crate::{
         events::{EventFirer, EventRestarter},
@@ -20,7 +19,6 @@ pub mod unix_signal_handler {
         feedbacks::Feedback,
         fuzzer::{ExecutionProcessor, HasObjective},
         inputs::{Input, UsesInput},
-        observers::UsesObservers,
         state::{HasCorpus, HasExecutions, HasSolutions},
         HasScheduler,
     };
@@ -79,7 +77,6 @@ pub mod unix_signal_handler {
     pub fn setup_panic_hook<E, EM, OF, Z>()
     where
         E: HasObservers,
-        <E as UsesObservers>::Observers: Serialize,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
@@ -127,7 +124,6 @@ pub mod unix_signal_handler {
         data: &mut InProcessExecutorHandlerData,
     ) where
         E: HasObservers + HasInProcessHooks<E::State>,
-        <E as UsesObservers>::Observers: Serialize,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
@@ -183,7 +179,6 @@ pub mod unix_signal_handler {
         data: &mut InProcessExecutorHandlerData,
     ) where
         E: Executor<EM, Z> + HasObservers,
-        <E as UsesObservers>::Observers: Serialize,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,

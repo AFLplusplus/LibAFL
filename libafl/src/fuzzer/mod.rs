@@ -89,12 +89,25 @@ pub trait ExecutionProcessor: UsesState {
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
+        input: &<Self::State as UsesInput>::Input,
+        exec_res: &ExecuteInputResult,
+        observers: &OT,
+    ) -> Result<Option<CorpusId>, Error>
+    where
+        EM: EventFirer<State = Self::State>,
+        OT: ObserversTuple<Self::State>;
+
+    /// Send event via the event manager
+    fn dispatch_event<EM, OT>(
+        &mut self,
+        state: &mut Self::State,
+        manager: &mut EM,
         input: <Self::State as UsesInput>::Input,
         exec_res: &ExecuteInputResult,
         observers: &OT,
         exit_kind: &ExitKind,
         send_events: bool,
-    ) -> Result<Option<CorpusId>, Error>
+    ) -> Result<(), Error>
     where
         EM: EventFirer<State = Self::State>,
         OT: ObserversTuple<Self::State> + Serialize;
@@ -411,34 +424,8 @@ where
         Ok(res)
     }
 
-    fn evaluate_execution<EM, OT>(
-        &mut self,
-        state: &mut Self::State,
-        manager: &mut EM,
-        input: <Self::State as UsesInput>::Input,
-        observers: &OT,
-        exit_kind: &ExitKind,
-        send_events: bool,
-    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
-    where
-        EM: EventFirer<State = Self::State>,
-        OT: ObserversTuple<Self::State> + Serialize,
-    {
-        let exec_res = self.check_results(state, manager, &input, observers, exit_kind)?;
-        let corpus_id = self.process_execution(
-            state,
-            manager,
-            input,
-            &exec_res,
-            observers,
-            exit_kind,
-            send_events,
-        )?;
-        Ok((exec_res, corpus_id))
-    }
-
-    /// Evaluate if a set of observation channels has an interesting state
-    fn process_execution<EM, OT>(
+    /// Send event via the event manager
+    fn dispatch_event<EM, OT>(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
@@ -447,31 +434,13 @@ where
         observers: &OT,
         exit_kind: &ExitKind,
         send_events: bool,
-    ) -> Result<Option<CorpusId>, Error>
+    ) -> Result<(), Error>
     where
         EM: EventFirer<State = Self::State>,
         OT: ObserversTuple<Self::State> + Serialize,
     {
         match exec_res {
-            ExecuteInputResult::None => {
-                self.feedback_mut().discard_metadata(state, &input)?;
-                self.objective_mut().discard_metadata(state, &input)?;
-                Ok(None)
-            }
             ExecuteInputResult::Corpus => {
-                // Not a solution
-                self.objective_mut().discard_metadata(state, &input)?;
-
-                // Add the input to the main corpus
-                let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
-                #[cfg(feature = "track_hit_feedbacks")]
-                self.feedback_mut()
-                    .append_hit_feedbacks(testcase.hit_feedbacks_mut())?;
-                self.feedback_mut()
-                    .append_metadata(state, manager, observers, &mut testcase)?;
-                let id = state.corpus_mut().add(testcase)?;
-                self.scheduler_mut().on_add(state, id)?;
-
                 if send_events && manager.should_send() {
                     // TODO set None for fast targets
                     let observers_buf = if manager.configuration() == EventConfig::AlwaysUnique {
@@ -498,26 +467,9 @@ where
                     // This testcase is from the other fuzzers.
                     *state.imported_mut() += 1;
                 }
-                Ok(Some(id))
             }
             ExecuteInputResult::Solution => {
-                // Not interesting
-                self.feedback_mut().discard_metadata(state, &input)?;
-
                 let executions = *state.executions();
-                // The input is a solution, add it to the respective corpus
-                let mut testcase = Testcase::with_executions(input, executions);
-                testcase.set_parent_id_optional(*state.corpus().current());
-                if let Ok(mut tc) = state.current_testcase_mut() {
-                    tc.found_objective();
-                }
-                #[cfg(feature = "track_hit_feedbacks")]
-                self.objective_mut()
-                    .append_hit_feedbacks(testcase.hit_objectives_mut())?;
-                self.objective_mut()
-                    .append_metadata(state, manager, observers, &mut testcase)?;
-                state.solutions_mut().add(testcase)?;
-
                 if send_events {
                     manager.fire(
                         state,
@@ -528,6 +480,92 @@ where
                         },
                     )?;
                 }
+            }
+            _ => (),
+        }
+
+        Ok(())
+    }
+
+    fn evaluate_execution<EM, OT>(
+        &mut self,
+        state: &mut Self::State,
+        manager: &mut EM,
+        input: <Self::State as UsesInput>::Input,
+        observers: &OT,
+        exit_kind: &ExitKind,
+        send_events: bool,
+    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
+    where
+        EM: EventFirer<State = Self::State>,
+        OT: ObserversTuple<Self::State> + Serialize,
+    {
+        let exec_res = self.check_results(state, manager, &input, observers, exit_kind)?;
+        let corpus_id = self.process_execution(state, manager, &input, &exec_res, observers)?;
+        self.dispatch_event(
+            state,
+            manager,
+            input,
+            &exec_res,
+            observers,
+            exit_kind,
+            send_events,
+        )?;
+        Ok((exec_res, corpus_id))
+    }
+
+    /// Evaluate if a set of observation channels has an interesting state
+    fn process_execution<EM, OT>(
+        &mut self,
+        state: &mut Self::State,
+        manager: &mut EM,
+        input: &<Self::State as UsesInput>::Input,
+        exec_res: &ExecuteInputResult,
+        observers: &OT,
+    ) -> Result<Option<CorpusId>, Error>
+    where
+        EM: EventFirer<State = Self::State>,
+        OT: ObserversTuple<Self::State>,
+    {
+        match exec_res {
+            ExecuteInputResult::None => {
+                self.feedback_mut().discard_metadata(state, &input)?;
+                self.objective_mut().discard_metadata(state, &input)?;
+                Ok(None)
+            }
+            ExecuteInputResult::Corpus => {
+                // Not a solution
+                self.objective_mut().discard_metadata(state, &input)?;
+
+                // Add the input to the main corpus
+                let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
+                #[cfg(feature = "track_hit_feedbacks")]
+                self.feedback_mut()
+                    .append_hit_feedbacks(testcase.hit_feedbacks_mut())?;
+                self.feedback_mut()
+                    .append_metadata(state, manager, observers, &mut testcase)?;
+                let id = state.corpus_mut().add(testcase)?;
+                self.scheduler_mut().on_add(state, id)?;
+
+                Ok(Some(id))
+            }
+            ExecuteInputResult::Solution => {
+                // Not interesting
+                self.feedback_mut().discard_metadata(state, &input)?;
+
+                let executions = *state.executions();
+                // The input is a solution, add it to the respective corpus
+                let mut testcase = Testcase::with_executions(input.clone(), executions);
+                testcase.set_parent_id_optional(*state.corpus().current());
+                if let Ok(mut tc) = state.current_testcase_mut() {
+                    tc.found_objective();
+                }
+                #[cfg(feature = "track_hit_feedbacks")]
+                self.objective_mut()
+                    .append_hit_feedbacks(testcase.hit_objectives_mut())?;
+                self.objective_mut()
+                    .append_metadata(state, manager, observers, &mut testcase)?;
+                state.solutions_mut().add(testcase)?;
 
                 Ok(None)
             }
