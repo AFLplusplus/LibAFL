@@ -1,4 +1,4 @@
-//! Monitors that wrap a base one and log on disk
+//! Monitors that wrap a base monitor and also log to disk using different formats.
 
 use alloc::{string::String, vec::Vec};
 use core::time::Duration;
