@@ -176,11 +176,11 @@ pub extern "C" fn LLVMFuzzerRunDriver(
         });
 
         // Create a dictionary if not existing
-        if state.metadata_map().get::<Tokens>().is_none() {
-            for tokens_file in &token_files {
-                state.add_metadata(Tokens::from_file(tokens_file)?);
-            }
-        }
+        state.metadata_or_insert_with(|| {
+            Tokens::new()
+                .add_from_files(&token_files)
+                .expect("Could not read tokens files.")
+        });
 
         // A minimization+queue policy to get testcasess from the corpus
         let scheduler =
