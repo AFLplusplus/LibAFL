@@ -29,6 +29,7 @@ use libafl::{
     Error, Fuzzer, HasFeedback, HasMetadata, SerdeAny,
 };
 use libafl_bolts::{
+    core_affinity::CoreId,
     current_nanos, current_time,
     fs::get_unique_std_input_file,
     ownedref::OwnedRefMut,
@@ -48,10 +49,8 @@ use crate::{
     Opt, AFL_DEFAULT_INPUT_LEN_MAX, AFL_DEFAULT_INPUT_LEN_MIN, SHMEM_ENV_VAR,
 };
 
-
 pub type LibaflFuzzState =
     StdState<BytesInput, CachedOnDiskCorpus<BytesInput>, StdRand, OnDiskCorpus<BytesInput>>;
-
 
 pub fn run_client<EMH, SP>(
     state: Option<LibaflFuzzState>,
@@ -62,6 +61,7 @@ pub fn run_client<EMH, SP>(
         SP,
     >,
     fuzzer_dir: &PathBuf,
+    core_id: &CoreId,
     opt: &Opt,
 ) -> Result<(), Error>
 where
@@ -191,11 +191,13 @@ where
     // Load our seeds.
     if state.must_load_initial_inputs() {
         state
-            .load_initial_inputs(
+            .load_initial_inputs_multicore(
                 &mut fuzzer,
                 &mut executor,
                 &mut restarting_mgr,
                 &[fuzzer_dir.join("queue")],
+                &core_id,
+                &opt.cores.as_ref().expect("invariant; should never occur"),
             )
             .unwrap_or_else(|err| panic!("Failed to load initial corpus! {err:?}"));
         println!("We imported {} inputs from disk.", state.corpus().count());
@@ -269,8 +271,9 @@ where
          -> Result<bool, Error> {
             let testcase = state.current_testcase()?;
             if testcase.scheduled_count() == 1 {
-                return Ok(false)
-            } else if opt.cmplog_only_new && testcase.has_metadata::<IsInitialCorpusEntryMetadata>() {
+                return Ok(false);
+            } else if opt.cmplog_only_new && testcase.has_metadata::<IsInitialCorpusEntryMetadata>()
+            {
                 return Ok(false);
             }
             Ok(true)

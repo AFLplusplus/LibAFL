@@ -69,7 +69,7 @@ fn main() {
             println!("run primary client on core {}", core_id.0);
             let fuzzer_dir = opt.output_dir.join("fuzzer_main");
             check_autoresume(&fuzzer_dir, &opt.input_dir, opt.auto_resume).unwrap();
-            let res = run_client(state, mgr, &fuzzer_dir, &opt);
+            let res = run_client(state, mgr, &fuzzer_dir, &core_id, &opt);
             remove_main_node_file(&fuzzer_dir)
                 .expect("error removing main node's is_main_node file");
             res
@@ -80,7 +80,7 @@ fn main() {
                 .output_dir
                 .join(format!("fuzzer_secondary_{}", core_id.0));
             check_autoresume(&fuzzer_dir, &opt.input_dir, opt.auto_resume).unwrap();
-            run_client(state, mgr, &fuzzer_dir, &opt)
+            run_client(state, mgr, &fuzzer_dir, &core_id, &opt)
         })
         .cores(&opt.cores.clone().expect("invariant; should never occur"))
         .broker_port(opt.broker_port.unwrap_or(AFL_DEFAULT_BROKER_PORT))
