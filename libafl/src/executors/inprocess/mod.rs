@@ -64,7 +64,7 @@ where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S> + Serialize,
     S: State,
 {
     harness_fn: HB,
@@ -77,7 +77,7 @@ where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S> + Debug,
+    OT: ObserversTuple<S> + Debug + Serialize,
     S: State,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -93,7 +93,7 @@ where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S> + Serialize,
     S: State,
 {
     type State = S;
@@ -104,7 +104,7 @@ where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S> + Serialize,
     S: State,
 {
     type Observers = OT;
@@ -116,7 +116,7 @@ where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S> + Serialize,
     S: State + HasExecutions,
     Z: UsesState<State = S>,
 {
@@ -148,7 +148,7 @@ where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S> + Serialize,
     S: State,
 {
     #[inline]
@@ -165,7 +165,7 @@ where
 impl<'a, H, OT, S> InProcessExecutor<'a, H, OT, S>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S> + Serialize,
     S: HasExecutions + HasSolutions + HasCorpus + State,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
@@ -272,7 +272,7 @@ where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S> + Serialize,
     S: State + HasExecutions + HasSolutions + HasCorpus,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
@@ -408,7 +408,7 @@ where
     H: FnMut(&<S as UsesInput>::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S> + Serialize,
     S: State + HasExecutions + HasSolutions + HasCorpus,
 {
     /// the timeout handler
