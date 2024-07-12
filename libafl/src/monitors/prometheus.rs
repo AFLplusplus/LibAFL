@@ -22,10 +22,10 @@
 //! let mon = PrometheusMonitor::new(listener, |s| log::info!("{s}"));
 //!
 //! // and finally, like with any other monitor, pass it into the event manager like so:
-//! //let mgr = SimpleEventManager::new(mon);
+//! // let mgr = SimpleEventManager::new(mon);
 //! ```
 //!
-//! When using docker, you may need to point prometheus.yml to the docker0 interface or host.docker.internal
+//! When using docker, you may need to point `prometheus.yml` to the `docker0` interface or `host.docker.internal`
 
 use alloc::{borrow::Cow, fmt::Debug, string::String, vec::Vec};
 use core::{fmt, time::Duration};
