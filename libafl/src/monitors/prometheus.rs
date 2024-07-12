@@ -5,12 +5,12 @@
 //! The client (i.e., the fuzzer) sets up an HTTP endpoint (/metrics).
 //! The endpoint contains metrics such as execution rate.
 //!
-//! A prometheus server (can use a precompiled binary or docker) then scrapes \
+//! A prometheus server (can use a precompiled binary or docker) then scrapes
 //! the endpoint at regular intervals (configurable via prometheus.yml file).
 //!
 //! ## How to use it
 //!
-//! This monitor should plug into any fuzzer similar to other monitors.
+//! Create a [`PrometheusMonitor`] and plug it into any fuzzer similar to other monitors.
 //! In your fuzzer:
 //!
 //! ```rust
@@ -199,6 +199,9 @@ impl<F> PrometheusMonitor<F>
 where
     F: FnMut(&str),
 {
+    /// Create a new [`PrometheusMonitor`].
+    /// The `listener` is the address to send logs to.
+    /// The `print_fn` is the printing function that can output the logs otherwise.
     pub fn new(listener: String, print_fn: F) -> Self {
         // Gauge's implementation of clone uses Arc
         let corpus_count = Family::<Labels, Gauge>::default();
@@ -290,7 +293,7 @@ where
     }
 }
 
-// set up an HTTP endpoint /metrics
+/// set up an HTTP endpoint /metrics
 #[allow(clippy::too_many_arguments)]
 pub async fn serve_metrics(
     listener: String,
@@ -354,12 +357,16 @@ pub async fn serve_metrics(
     Ok(())
 }
 
+/// Struct used to define the labels in `prometheus`.
 #[derive(Clone, Hash, PartialEq, Eq, EncodeLabelSet, Debug)]
 pub struct Labels {
-    client: u32, // sender_id: u32, to differentiate between clients when multiple are spawned.
-    stat: Cow<'static, str>, // for custom_stat filtering.
+    /// The `sender_id` helps to differentiate between clients when multiple are spawned.
+    client: u32,
+    /// Used for `custom_stat` filtering.
+    stat: Cow<'static, str>,
 }
 
+/// The state for this monitor.
 #[derive(Clone)]
 struct State {
     registry: Arc<Registry>,
