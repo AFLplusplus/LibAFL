@@ -18,7 +18,7 @@ use libafl_bolts::current_time;
 use libafl_bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(windows, feature = "std"))]
 use libafl_bolts::os::windows_exceptions::setup_exception_handler;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::Serialize;
 #[cfg(all(windows, feature = "std"))]
 use windows::Win32::System::Threading::{CRITICAL_SECTION, PTP_TIMER};
 

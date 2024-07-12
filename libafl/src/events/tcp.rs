@@ -31,7 +31,7 @@ use libafl_bolts::os::{fork, ForkResult};
 use libafl_bolts::{shmem::ShMemProvider, tuples::tuple_list, ClientId};
 #[cfg(feature = "std")]
 use libafl_bolts::{shmem::StdShMemProvider, staterestore::StateRestorer};
-use serde::{de::DeserializeOwned, Deserialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     sync::{broadcast, broadcast::error::RecvError, mpsc},
@@ -53,6 +53,7 @@ use crate::{
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, UsesInput},
     monitors::Monitor,
+    observers::UsesObservers,
     state::{HasExecutions, HasLastReportTime, State, UsesState},
     Error, HasMetadata,
 };
@@ -610,8 +611,9 @@ where
     ) -> Result<(), Error>
     where
         E: Executor<Self, Z> + HasObservers<State = S>,
+        <E as UsesObservers>::Observers: Serialize,
         for<'a> E::Observers: Deserialize<'a>,
-        Z: ExecutionProcessor<E::Observers, State = S> + EvaluatorObservers<E::Observers>,
+        Z: ExecutionProcessor<State = S> + EvaluatorObservers<E::Observers>,
     {
         if !self.hooks.pre_exec_all(state, client_id, &event)? {
             return Ok(());
@@ -748,10 +750,11 @@ where
 impl<E, EMH, S, Z> EventProcessor<E, Z> for TcpEventManager<EMH, S>
 where
     E: HasObservers<State = S> + Executor<Self, Z>,
+    <E as UsesObservers>::Observers: Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata,
-    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers, State = S>,
+    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<State = S>,
 {
     fn process(
         &mut self,
@@ -821,10 +824,11 @@ where
 impl<E, EMH, S, Z> EventManager<E, Z> for TcpEventManager<EMH, S>
 where
     E: HasObservers<State = S> + Executor<Self, Z>,
+    <E as UsesObservers>::Observers: Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata + HasLastReportTime,
-    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers, State = S>,
+    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<State = S>,
 {
 }
 
@@ -966,10 +970,11 @@ impl<E, EMH, S, SP, Z> EventProcessor<E, Z> for TcpRestartingEventManager<EMH, S
 where
     E: HasObservers<State = S> + Executor<TcpEventManager<EMH, S>, Z>,
     for<'a> E::Observers: Deserialize<'a>,
+    <E as UsesObservers>::Observers: Serialize,
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata,
     SP: ShMemProvider + 'static,
-    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers>, //CE: CustomEvent<I>,
+    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor, //CE: CustomEvent<I>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         self.tcp_mgr.process(fuzzer, state, executor)
@@ -984,11 +989,12 @@ where
 impl<E, EMH, S, SP, Z> EventManager<E, Z> for TcpRestartingEventManager<EMH, S, SP>
 where
     E: HasObservers<State = S> + Executor<TcpEventManager<EMH, S>, Z>,
+    <E as UsesObservers>::Observers: Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata + HasLastReportTime,
     SP: ShMemProvider + 'static,
-    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers>, //CE: CustomEvent<I>,
+    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor, //CE: CustomEvent<I>,
 {
 }
 

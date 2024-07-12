@@ -8,7 +8,7 @@ use core::{
 };
 
 use libafl_bolts::tuples::{tuple_list, Merge, RefIndexable};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 #[cfg(windows)]
 use windows::Win32::System::Threading::SetThreadStackGuarantee;
 

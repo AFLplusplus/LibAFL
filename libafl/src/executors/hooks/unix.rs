@@ -7,7 +7,7 @@ pub mod unix_signal_handler {
 
     use libafl_bolts::os::unix_signals::{ucontext_t, Handler, Signal};
     use libc::siginfo_t;
-    use serde::{de::DeserializeOwned, Serialize};
+    use serde::Serialize;
 
     use crate::{
         events::{EventFirer, EventRestarter},

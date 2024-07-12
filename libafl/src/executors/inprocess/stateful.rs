@@ -9,7 +9,7 @@ use core::{
 };
 
 use libafl_bolts::tuples::{tuple_list, RefIndexable};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::Serialize;
 
 use crate::{
     events::{EventFirer, EventRestarter},

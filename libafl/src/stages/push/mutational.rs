@@ -8,7 +8,7 @@ use core::{
 };
 
 use libafl_bolts::rands::Rand;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::Serialize;
 
 use super::{PushStage, PushStageHelper, PushStageSharedState};
 use crate::{

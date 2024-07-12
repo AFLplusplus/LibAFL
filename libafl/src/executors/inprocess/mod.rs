@@ -17,7 +17,7 @@ use core::{
 };
 
 use libafl_bolts::tuples::{tuple_list, RefIndexable};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::Serialize;
 
 #[cfg(any(unix, feature = "std"))]
 use crate::executors::hooks::inprocess::GLOBAL_STATE;
@@ -165,7 +165,7 @@ where
 impl<'a, H, OT, S> InProcessExecutor<'a, H, OT, S>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S> + Serialize,
     S: HasExecutions + HasSolutions + HasCorpus + State,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
@@ -244,7 +244,7 @@ where
         timeout: Duration,
     ) -> Result<Self, Error>
     where
-        Self: Executor<EM, Z, State = S> + HasObservers,
+        Self: Executor<EM, Z, State = S>,
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
@@ -272,7 +272,7 @@ where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S> + Serialize,
     S: State + HasExecutions + HasSolutions + HasCorpus,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
@@ -285,7 +285,7 @@ where
         event_mgr: &mut EM,
     ) -> Result<Self, Error>
     where
-        Self: Executor<EM, Z, State = S> + HasObservers,
+        Self: Executor<EM, Z, State = S>,
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
@@ -314,7 +314,7 @@ where
         exec_tmout: Duration,
     ) -> Result<Self, Error>
     where
-        Self: Executor<EM, Z, State = S> + HasObservers,
+        Self: Executor<EM, Z, State = S>,
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
@@ -349,7 +349,7 @@ where
         timeout: Duration,
     ) -> Result<Self, Error>
     where
-        Self: Executor<EM, Z, State = S> + HasObservers,
+        Self: Executor<EM, Z, State = S>,
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
@@ -434,8 +434,7 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
     fuzzer: &mut Z,
     event_mgr: &mut EM,
     exitkind: ExitKind,
-) -> Result<(), Error>
-where
+) where
     E: HasObservers,
     <E as UsesObservers>::Observers: Serialize,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
@@ -448,23 +447,26 @@ where
     let observers = executor.observers_mut();
     let scheduler = fuzzer.scheduler_mut();
 
-    scheduler.on_evaluation(state, &input, &*observers);
+    let _ = scheduler.on_evaluation(state, input, &*observers);
 
-    let res = fuzzer.check_results(state, event_mgr, input, &*observers, &exitkind)?;
-    fuzzer.process_execution(
-        state,
-        event_mgr,
-        input.clone(),
-        &res,
-        &*observers,
-        &exitkind,
-        true,
-    )?;
+    let res = fuzzer.check_results(state, event_mgr, input, &*observers, &exitkind);
+    if let Ok(r) = res {
+        let _ = fuzzer.process_execution(
+            state,
+            event_mgr,
+            input.clone(),
+            &r,
+            &*observers,
+            &exitkind,
+            true,
+        );
+    } else {
+        log::info!("Faild to check execution result");
+    }
     // Serialize the state and wait safely for the broker to read pending messages
     event_mgr.on_restart(state).unwrap();
 
     log::info!("Bye!");
-    Ok(())
 }
 
 // TODO remove this after executor refactor and libafl qemu new executor

@@ -11,7 +11,7 @@ use libafl_bolts::{
     tuples::{Handle, Handled, MatchNameRef},
     HasLen, Named,
 };
-use serde::{de::DeserializeOwned, Serialize};
+use serde::Serialize;
 
 #[cfg(feature = "track_hit_feedbacks")]
 use crate::feedbacks::premature_last_result_err;
