@@ -520,7 +520,7 @@ mod tests {
         log::trace!("{:?}", input.bytes());
 
         // The pre-seeded rand should have spliced at position 2.
-        assert_eq!(input.bytes(), &[b'a', b'b', b'f']);
+        assert_eq!(input.bytes(), b"abf");
     }
 
     #[test]
