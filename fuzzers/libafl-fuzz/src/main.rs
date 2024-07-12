@@ -12,7 +12,7 @@ mod afl_stats;
 mod env_parser;
 mod feedback;
 use clap::Parser;
-use corpus::{check_autoresume, remove_main_node_file};
+use corpus::{check_autoresume, create_dir_if_not_exists, remove_main_node_file};
 mod corpus;
 mod executor;
 mod fuzzer;
@@ -51,9 +51,7 @@ fn main() {
         opt.input_dir.as_os_str() == "-"
     };
 
-    if !opt.output_dir.exists() {
-        std::fs::create_dir(&opt.output_dir).unwrap();
-    }
+   create_dir_if_not_exists(&opt.output_dir).expect("could not create output directory");
 
     // TODO: we need to think about the fuzzer naming scheme since they can be configured in
     // different ways (ASAN/mutators) etc.... and how to autoresume appropriately.

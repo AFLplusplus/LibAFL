@@ -156,7 +156,7 @@ pub fn check_autoresume(
     Ok(file)
 }
 
-fn create_dir_if_not_exists(path: &PathBuf) -> std::io::Result<()> {
+pub fn create_dir_if_not_exists(path: &PathBuf) -> std::io::Result<()> {
     if path.is_file() {
         return Err(io::Error::new(
             // TODO: change this to ErrorKind::NotADirectory
