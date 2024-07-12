@@ -1,13 +1,8 @@
 #![allow(clippy::cast_possible_wrap)]
 
-use std::{
-    borrow::Cow,
-    collections::{HashMap, HashSet},
-    env, fs,
-    path::PathBuf,
-    sync::Mutex,
-};
+use std::{borrow::Cow, env, fs, path::PathBuf, sync::Mutex};
 
+use hashbrown::{HashMap, HashSet};
 use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple, HasMetadata};
 use libc::{
     c_void, MAP_ANON, MAP_FAILED, MAP_FIXED, MAP_NORESERVE, MAP_PRIVATE, PROT_READ, PROT_WRITE,
