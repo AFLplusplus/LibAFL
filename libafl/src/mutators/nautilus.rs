@@ -1,5 +1,5 @@
 //! Mutators for the `Nautilus` grammmar fuzzer
-
+//! See <https://www.ndss-symposium.org/ndss-paper/nautilus-fishing-for-deep-bugs-with-grammars/>
 use alloc::borrow::Cow;
 use core::fmt::Debug;
 

@@ -25,7 +25,7 @@ ppc = ["libafl_qemu/ppc", "be"]
 vergen = { version = "8.2.1", features = ["build", "cargo", "git", "gitcl", "rustc", "si"] }
 
 [dependencies]
-clap = { version = "4.3.0", features = ["derive", "string"]}
+clap = { version = "4.5", features = ["derive", "string"]}
 libafl = { path = "../../libafl/" }
 libafl_bolts = { path = "../../libafl_bolts/" }
 libafl_qemu = { path = "../../libafl_qemu/", features = ["usermode"] }

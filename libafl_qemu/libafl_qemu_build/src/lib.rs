@@ -108,10 +108,12 @@ fn find_llvm_config() -> Result<String, String> {
             if ver >= rustc_llvm_ver {
                 return Ok("llvm-config".to_owned());
             }
+
+            return Err(format!("Version of llvm-config is {ver} but needs to be at least rustc's version({rustc_llvm_ver})"));
         }
     }
 
-    Err("could not find llvm-config".to_owned())
+    Err("Could not find llvm-config".to_owned())
 }
 
 fn exec_llvm_config(llvm_config: String, args: &[&str]) -> String {
@@ -165,7 +167,7 @@ fn qemu_bindgen_clang_args(
     is_usermode: bool,
 ) -> Vec<String> {
     if env::var("LLVM_CONFIG_PATH").is_err() {
-        let found = find_llvm_config().expect("Cannot find a suitable llvm-config, it must be a version equal or greater than the rustc LLVM version");
+        let found = find_llvm_config().expect("Cannot find a suitable llvm-config, it must be a version equal or greater than the rustc LLVM version. Try specifying LLVM_CONFIG_PATH.");
         env::set_var("LLVM_CONFIG_PATH", found);
     }
 
