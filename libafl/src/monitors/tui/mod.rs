@@ -128,10 +128,15 @@ impl TimedStats {
 #[cfg(feature = "introspection")]
 #[derive(Debug, Default, Clone)]
 pub struct PerfTuiContext {
+    /// Time spent in the scheduler
     pub scheduler: f64,
+    /// Time spent in the event manager
     pub manager: f64,
+    /// Additional time
     pub unmeasured: f64,
+    /// Time spent in each individual stage
     pub stages: Vec<Vec<(String, f64)>>,
+    /// Time spent in each individual feedback
     pub feedbacks: Vec<(String, f64)>,
 }
 
@@ -236,6 +241,7 @@ pub struct ItemGeometry {
 }
 
 impl ItemGeometry {
+    /// Create a new [`ItemGeometry`]
     fn new() -> Self {
         Self {
             stability: "0%".to_string(),
