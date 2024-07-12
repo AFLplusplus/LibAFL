@@ -308,11 +308,11 @@ impl Mutator {
 #[cfg(test)]
 mod tests {
     use alloc::{
-        string::{String, ToString},
+        string::{str, String, ToString},
         vec::Vec,
     };
-    use std::{collections::HashSet, str};
 
+    use hashbrown::HashSet;
     use libafl_bolts::rands::StdRand;
 
     use crate::{
