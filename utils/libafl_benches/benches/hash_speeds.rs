@@ -25,14 +25,14 @@ fn criterion_benchmark(c: &mut Criterion) {
             let mut hasher =
                 black_box(ahash::RandomState::with_seeds(123, 456, 789, 123).build_hasher());
             hasher.write(black_box(&bench_vec));
-            hasher.finish();
+            black_box(hasher.finish());
         });
     });
     c.bench_function("fxhash", |b| {
         b.iter(|| {
             let mut hasher = black_box(rustc_hash::FxHasher::default());
             hasher.write(black_box(&bench_vec));
-            hasher.finish();
+            black_box(hasher.finish());
         });
     });
 }
