@@ -280,7 +280,8 @@ impl Tree {
         for i in 0..self.size() {
             let node_id = NodeId::from(i);
             let nonterm = self.get_rule(node_id, ctx).nonterm();
-            //sanity check
+
+            // This should never panic!
             let (nterm_id, node) = stack.pop().expect("Not a valid tree for unparsing!");
             if nterm_id == nonterm {
                 self.paren[i] = node;
