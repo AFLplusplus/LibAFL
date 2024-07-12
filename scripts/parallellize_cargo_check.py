@@ -35,6 +35,8 @@ for task in output[
     print(os.environ)
     if "libafl_frida" in task:
         # DOCS_RS is needed for libafl_frida to build without auto-download feature
-        cargo_check = subprocess.check_output(task, shell=True, text=True, env=dict(os.environ, DOCS_RS="1"))
+        cargo_check = subprocess.check_output(
+            task, shell=True, text=True, env=dict(os.environ, DOCS_RS="1")
+        )
     else:
         cargo_check = subprocess.check_output(task, shell=True, text=True)

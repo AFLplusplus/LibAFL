@@ -24,9 +24,9 @@ use crate::{
 pub enum OnDiskMetadataFormat {
     /// A binary-encoded postcard
     Postcard,
-    /// JSON
+    /// Json
     Json,
-    /// JSON formatted for readability
+    /// Json formatted for readability
     #[default]
     JsonPretty,
     /// The same as [`OnDiskMetadataFormat::JsonPretty`], but compressed

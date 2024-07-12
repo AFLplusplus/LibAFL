@@ -18,7 +18,7 @@ use libafl::{
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
-    monitors::{MultiMonitor, OnDiskTOMLMonitor},
+    monitors::{MultiMonitor, OnDiskTomlMonitor},
     mutators::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::Tokens,
@@ -154,7 +154,7 @@ pub extern "C" fn libafl_main() {
 
     let shmem_provider = MmapShMemProvider::new().expect("Failed to init shared memory");
 
-    let monitor = OnDiskTOMLMonitor::new(
+    let monitor = OnDiskTomlMonitor::new(
         "./fuzzer_stats.toml",
         MultiMonitor::new(|s| println!("{s}")),
     );

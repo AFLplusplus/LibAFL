@@ -1,26 +1,31 @@
-// ===== overview for prommon =====
-// The client (i.e., the fuzzer) sets up an HTTP endpoint (/metrics).
-// The endpoint contains metrics such as execution rate.
-
-// A prometheus server (can use a precompiled binary or docker) then scrapes \
-// the endpoint at regular intervals (configurable via prometheus.yml file).
-// ====================
-//
-// == how to use it ===
-// This monitor should plug into any fuzzer similar to other monitors.
-// In your fuzzer, include:
-// ```rust,ignore
-// use libafl::monitors::PrometheusMonitor;
-// ```
-// as well as:
-// ```rust,ignore
-// let listener = "127.0.0.1:8080".to_string(); // point prometheus to scrape here in your prometheus.yml
-// let mon = PrometheusMonitor::new(listener, |s| log::info!("{s}"));
-// and then like with any other monitor, pass it into the event manager like so:
-// let mut mgr = SimpleEventManager::new(mon);
-// ```
-// When using docker, you may need to point prometheus.yml to the docker0 interface or host.docker.internal
-// ====================
+//! Prometheus Monitor to log to a prometheus endpoint.
+//!
+//! ## Overview
+//!
+//! The client (i.e., the fuzzer) sets up an HTTP endpoint (/metrics).
+//! The endpoint contains metrics such as execution rate.
+//!
+//! A prometheus server (can use a precompiled binary or docker) then scrapes \
+//! the endpoint at regular intervals (configurable via prometheus.yml file).
+//!
+//! ## How to use it
+//!
+//! This monitor should plug into any fuzzer similar to other monitors.
+//! In your fuzzer:
+//!
+//! ```rust
+//! // First, include:
+//! use libafl::monitors::PrometheusMonitor;
+//!
+//! // Then, create the monitor:
+//! let listener = "127.0.0.1:8080".to_string(); // point prometheus to scrape here in your prometheus.yml
+//! let mon = PrometheusMonitor::new(listener, |s| log::info!("{s}"));
+//!
+//! // and finally, like with any other monitor, pass it into the event manager like so:
+//! // let mgr = SimpleEventManager::new(mon);
+//! ```
+//!
+//! When using docker, you may need to point `prometheus.yml` to the `docker0` interface or `host.docker.internal`
 
 use alloc::{borrow::Cow, fmt::Debug, string::String, vec::Vec};
 use core::{fmt, time::Duration};
