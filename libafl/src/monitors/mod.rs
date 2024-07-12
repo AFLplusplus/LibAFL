@@ -19,7 +19,7 @@ use alloc::{borrow::Cow, fmt::Debug, string::String, vec::Vec};
 use core::{fmt, fmt::Write, time::Duration};
 
 #[cfg(feature = "std")]
-pub use disk::{OnDiskJSONMonitor, OnDiskTOMLMonitor};
+pub use disk::{OnDiskJSONMonitor, OnDiskTomlMonitor};
 use hashbrown::HashMap;
 use libafl_bolts::{current_time, format_duration_hms, ClientId};
 use serde::{Deserialize, Serialize};
