@@ -269,7 +269,7 @@ where
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: State + HasExecutions + HasSolutions + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State>,
+        Z: HasObjective<Objective = OF, State = E::State> + HasScheduler + ExecutionProcessor,
     {
         let ret;
         #[cfg(feature = "std")]
