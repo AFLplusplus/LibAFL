@@ -15,7 +15,7 @@ use libafl::{
     fuzzer::HasObjective,
     observers::{ObserversTuple, UsesObservers},
     state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
-    Error,
+    Error, ExecutionProcessor, HasScheduler,
 };
 use libafl_bolts::tuples::RefIndexable;
 
@@ -69,7 +69,7 @@ where
         EM: EventFirer<State = S> + EventRestarter<State = S>,
         OF: Feedback<S>,
         S: State + HasExecutions + HasCorpus + HasSolutions,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF, State = S> + HasScheduler + ExecutionProcessor,
     {
         let qemu_state = QemuExecutorState::new::<
             StatefulInProcessExecutor<'a, H, OT, S, QemuExecutorState<'a, QT, S>>,
