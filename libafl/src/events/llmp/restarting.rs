@@ -42,8 +42,7 @@ use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
     events::{
         Event, EventConfig, EventFirer, EventManager, EventManagerHooksTuple, EventManagerId,
-        EventProcessor, EventRestarter, HasEventManagerId, LlmpEventManager, LlmpShouldSaveState,
-        ProgressReporter, StdLlmpEventHook,
+        EventProcessor, EventRestarter, HasEventManagerId, LlmpEventManager, LlmpShouldSaveState, StdLlmpEventHook,
     },
     executors::{Executor, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
@@ -118,18 +117,10 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<EMH, S, SP> ProgressReporter for LlmpRestartingEventManager<EMH, S, SP>
-where
-    S: State + HasExecutions + HasMetadata + HasLastReportTime,
-    SP: ShMemProvider,
-{
-}
-
-#[cfg(feature = "std")]
 impl<EMH, S, SP> EventFirer for LlmpRestartingEventManager<EMH, S, SP>
 where
     SP: ShMemProvider,
-    S: State,
+    S: State + Serialize + for<'de> Deserialize<'de>,
     //CE: CustomEvent<I>,
 {
     fn should_send(&self) -> bool {
@@ -162,7 +153,7 @@ where
 #[cfg(feature = "std")]
 impl<EMH, S, SP> EventRestarter for LlmpRestartingEventManager<EMH, S, SP>
 where
-    S: State + HasExecutions,
+    S: State + HasExecutions + Serialize + for<'de> Deserialize<'de>,
     SP: ShMemProvider,
     //CE: CustomEvent<I>,
 {
@@ -207,7 +198,7 @@ where
     E: HasObservers<State = S> + Executor<LlmpEventManager<EMH, S, SP>, Z>,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata,
+    S: State + HasExecutions + HasMetadata + Serialize + for<'de> Deserialize<'de>,
     SP: ShMemProvider,
     Z: ExecutionProcessor<E::Observers, State = S>
         + EvaluatorObservers<E::Observers>
@@ -230,7 +221,12 @@ where
     E: HasObservers<State = S> + Executor<LlmpEventManager<EMH, S, SP>, Z>,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata + HasLastReportTime,
+    S: State
+        + HasExecutions
+        + HasMetadata
+        + HasLastReportTime
+        + Serialize
+        + for<'de> Deserialize<'de>,
     SP: ShMemProvider,
     Z: ExecutionProcessor<E::Observers, State = S>
         + EvaluatorObservers<E::Observers>
@@ -258,7 +254,7 @@ const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT";
 #[cfg(feature = "std")]
 impl<EMH, S, SP> LlmpRestartingEventManager<EMH, S, SP>
 where
-    S: State,
+    S: State + Serialize + for<'de> Deserialize<'de>,
     SP: ShMemProvider,
     //CE: CustomEvent<I>,
 {
@@ -339,7 +335,7 @@ pub fn setup_restarting_mgr_std<MT, S>(
 >
 where
     MT: Monitor + Clone,
-    S: State,
+    S: State + Serialize + for<'de> Deserialize<'de>,
 {
     RestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)
@@ -371,7 +367,7 @@ pub fn setup_restarting_mgr_std_adaptive<MT, S>(
 >
 where
     MT: Monitor + Clone,
-    S: State,
+    S: State + Serialize + for<'de> Deserialize<'de>,
 {
     RestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)
@@ -436,7 +432,7 @@ impl<EMH, MT, S, SP> RestartingMgr<EMH, MT, S, SP>
 where
     EMH: EventManagerHooksTuple<S> + Copy + Clone,
     SP: ShMemProvider,
-    S: State,
+    S: State + Serialize + for<'de> Deserialize<'de>,
     MT: Monitor + Clone,
 {
     /// Launch the broker and the clients and fuzz

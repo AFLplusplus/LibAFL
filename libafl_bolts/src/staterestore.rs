@@ -16,7 +16,7 @@ use std::{
 };
 
 use ahash::RandomState;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     shmem::{ShMem, ShMemProvider},
@@ -241,7 +241,7 @@ where
     /// Can only be read once.
     pub fn restore<S>(&self) -> Result<Option<S>, Error>
     where
-        S: DeserializeOwned,
+        S: Serialize + for<'de> Deserialize<'de>,
     {
         if !self.has_content() {
             return Ok(None);

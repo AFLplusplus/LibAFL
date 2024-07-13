@@ -19,10 +19,11 @@ use libafl_bolts::os::{fork, ForkResult};
 use libafl_bolts::ClientId;
 #[cfg(feature = "std")]
 use libafl_bolts::{os::CTRL_C_EXIT, shmem::ShMemProvider, staterestore::StateRestorer};
+use serde::Deserialize;
 #[cfg(feature = "std")]
 use serde::{de::DeserializeOwned, Serialize};
 
-use super::{CustomBufEventResult, CustomBufHandlerFn, HasCustomBufHandlers, ProgressReporter};
+use super::{CustomBufEventResult, CustomBufHandlerFn, HasCustomBufHandlers};
 #[cfg(all(unix, feature = "std", not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
@@ -155,13 +156,6 @@ where
     ) {
         self.custom_buf_handlers.push(handler);
     }
-}
-
-impl<MT, S> ProgressReporter for SimpleEventManager<MT, S>
-where
-    MT: Monitor,
-    S: State + HasExecutions + HasMetadata + HasLastReportTime,
-{
 }
 
 impl<MT, S> HasEventManagerId for SimpleEventManager<MT, S>
@@ -360,7 +354,7 @@ where
 impl<MT, S, SP> EventRestarter for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
-    S: State,
+    S: State + Serialize + for<'de> Deserialize<'de>,
     SP: ShMemProvider,
 {
     /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
@@ -386,7 +380,7 @@ where
 impl<E, MT, S, SP, Z> EventProcessor<E, Z> for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
-    S: State + HasExecutions,
+    S: State + HasExecutions + Serialize + for<'de> Deserialize<'de>,
     SP: ShMemProvider,
 {
     fn process(
@@ -406,7 +400,12 @@ where
 impl<E, MT, S, SP, Z> EventManager<E, Z> for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
-    S: State + HasExecutions + HasMetadata + HasLastReportTime + Serialize,
+    S: State
+        + HasExecutions
+        + HasMetadata
+        + HasLastReportTime
+        + Serialize
+        + for<'de> Deserialize<'de>,
     SP: ShMemProvider,
 {
 }
@@ -424,15 +423,6 @@ where
     ) {
         self.simple_event_mgr.add_custom_buf_handler(handler);
     }
-}
-
-#[cfg(feature = "std")]
-impl<MT, S, SP> ProgressReporter for SimpleRestartingEventManager<MT, S, SP>
-where
-    MT: Monitor,
-    S: State + HasExecutions + HasMetadata + HasLastReportTime,
-    SP: ShMemProvider,
-{
 }
 
 #[cfg(feature = "std")]

@@ -1,9 +1,9 @@
 //! The [`Testcase`] is a struct embedded in each [`Corpus`].
 //! It will contain a respective input, and metadata.
 
-use alloc::string::String;
 #[cfg(feature = "track_hit_feedbacks")]
 use alloc::{borrow::Cow, vec::Vec};
+use alloc::string::String;
 use core::{
     cell::{Ref, RefMut},
     time::Duration,
@@ -11,15 +11,17 @@ use core::{
 #[cfg(feature = "std")]
 use std::path::PathBuf;
 
-use libafl_bolts::{serdeany::SerdeAnyMap, HasLen};
 use serde::{Deserialize, Serialize};
 
-use super::Corpus;
+use libafl_bolts::{HasLen, serdeany::SerdeAnyMap};
+
 use crate::{
     corpus::CorpusId,
-    inputs::{Input, UsesInput},
-    Error, HasMetadata,
+    Error,
+    HasMetadata, inputs::{Input, UsesInput},
 };
+
+use super::Corpus;
 
 /// Shorthand to receive a [`Ref`] or [`RefMut`] to a stored [`Testcase`], by [`CorpusId`].
 /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
@@ -100,7 +102,7 @@ where
     I: Input,
 {
     /// Returns this [`Testcase`] with a loaded `Input`]
-    pub fn load_input<C: Corpus<Input = I>>(&mut self, corpus: &C) -> Result<&I, Error> {
+    pub fn load_input<C: Corpus<Input = I> + ?Sized>(&mut self, corpus: &C) -> Result<&I, Error> {
         corpus.load_input_into(self)?;
         Ok(self.input.as_ref().unwrap())
     }

@@ -15,32 +15,32 @@ use std::{
     path::{Path, PathBuf},
 };
 
-#[cfg(feature = "std")]
-use libafl_bolts::core_affinity::{CoreId, Cores};
+use serde::{Deserialize, Serialize};
+
 use libafl_bolts::{
     rands::{Rand, StdRand},
     serdeany::{NamedSerdeAnyMap, SerdeAnyMap},
 };
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-
-mod stack;
+#[cfg(feature = "std")]
+use libafl_bolts::core_affinity::{CoreId, Cores};
 pub use stack::StageStack;
 
-#[cfg(feature = "introspection")]
-use crate::monitors::ClientPerfMonitor;
-#[cfg(feature = "scalability_introspection")]
-use crate::monitors::ScalabilityMonitor;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
+    Error,
     events::{Event, EventFirer, LogSeverity},
     feedbacks::Feedback,
     fuzzer::{Evaluator, ExecuteInputResult},
     generators::Generator,
-    inputs::{Input, UsesInput},
-    stages::{HasCurrentStage, HasNestedStageStatus, StageId},
-    Error, HasMetadata, HasNamedMetadata,
+    HasMetadata,
+    HasNamedMetadata, inputs::{Input, UsesInput}, stages::{HasCurrentStage, HasNestedStageStatus, StageId},
 };
+#[cfg(feature = "introspection")]
+use crate::monitors::ClientPerfMonitor;
+#[cfg(feature = "scalability_introspection")]
+use crate::monitors::ScalabilityMonitor;
 
+mod stack;
 /// The maximum size of a testcase
 pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
 
@@ -49,8 +49,6 @@ pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
 /// Will be used to restart the fuzzing process at any time.
 pub trait State:
     UsesInput
-    + Serialize
-    + DeserializeOwned
     + MaybeHasClientPerfMonitor
     + MaybeHasScalabilityMonitor
     + HasCurrentCorpusId
@@ -218,11 +216,6 @@ impl<'a, I, S, Z> Debug for LoadConfig<'a, I, S, Z> {
 
 /// The state a fuzz run.
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "
-        C: serde::Serialize + for<'a> serde::Deserialize<'a>,
-        SC: serde::Serialize + for<'a> serde::Deserialize<'a>,
-        R: serde::Serialize + for<'a> serde::Deserialize<'a>
-    ")]
 pub struct StdState<I, C, R, SC> {
     /// RNG instance
     rand: R,
@@ -1314,8 +1307,9 @@ impl<I> HasScalabilityMonitor for NopState<I> {
 pub mod test {
     use libafl_bolts::rands::StdRand;
 
-    use super::StdState;
     use crate::{corpus::InMemoryCorpus, inputs::Input};
+
+    use super::StdState;
 
     #[must_use]
     pub fn test_std_state<I: Input>() -> StdState<I, InMemoryCorpus<I>, StdRand, InMemoryCorpus<I>>

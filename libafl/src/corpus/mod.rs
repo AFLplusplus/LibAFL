@@ -1,38 +1,34 @@
 //! Corpuses contain the testcases, either in memory, on disk, or somewhere else.
 
-pub mod testcase;
-pub use testcase::{HasTestcase, SchedulerTestcaseMetadata, Testcase};
-
-pub mod inmemory;
-pub use inmemory::InMemoryCorpus;
-
-#[cfg(feature = "std")]
-pub mod inmemory_ondisk;
-#[cfg(feature = "std")]
-pub use inmemory_ondisk::InMemoryOnDiskCorpus;
-
-#[cfg(feature = "std")]
-pub mod ondisk;
-#[cfg(feature = "std")]
-pub use ondisk::OnDiskCorpus;
-
-#[cfg(feature = "std")]
-pub mod cached;
-#[cfg(feature = "std")]
-pub use cached::CachedOnDiskCorpus;
-
-#[cfg(all(feature = "cmin", unix))]
-pub mod minimizer;
 use core::{cell::RefCell, fmt};
 
-pub mod nop;
+use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "std")]
+pub use cached::CachedOnDiskCorpus;
+pub use inmemory::InMemoryCorpus;
+#[cfg(feature = "std")]
+pub use inmemory_ondisk::InMemoryOnDiskCorpus;
 #[cfg(all(feature = "cmin", unix))]
 pub use minimizer::*;
 pub use nop::NopCorpus;
-use serde::{Deserialize, Serialize};
+#[cfg(feature = "std")]
+pub use ondisk::OnDiskCorpus;
+pub use testcase::{HasTestcase, SchedulerTestcaseMetadata, Testcase};
 
-use crate::{inputs::UsesInput, Error};
+use crate::{Error, inputs::UsesInput};
 
+#[cfg(feature = "std")]
+pub mod cached;
+pub mod inmemory;
+#[cfg(feature = "std")]
+pub mod inmemory_ondisk;
+#[cfg(all(feature = "cmin", unix))]
+pub mod minimizer;
+pub mod nop;
+#[cfg(feature = "std")]
+pub mod ondisk;
+pub mod testcase;
 /// An abstraction for the index that identify a testcase in the corpus
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[repr(transparent)]
@@ -85,7 +81,7 @@ macro_rules! random_corpus_id_with_disabled {
 }
 
 /// Corpus with all current [`Testcase`]s, or solutions
-pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
+pub trait Corpus: UsesInput {
     /// Returns the number of all enabled entries
     fn count(&self) -> usize;
 
@@ -193,7 +189,7 @@ pub trait HasCurrentCorpusId {
 #[derive(Debug)]
 pub struct CorpusIdIterator<'a, C>
 where
-    C: Corpus,
+    C: Corpus + ?Sized,
 {
     corpus: &'a C,
     cur: Option<CorpusId>,
@@ -202,7 +198,7 @@ where
 
 impl<'a, C> Iterator for CorpusIdIterator<'a, C>
 where
-    C: Corpus,
+    C: Corpus + ?Sized,
 {
     type Item = CorpusId;
 
@@ -218,7 +214,7 @@ where
 
 impl<'a, C> DoubleEndedIterator for CorpusIdIterator<'a, C>
 where
-    C: Corpus,
+    C: Corpus + ?Sized,
 {
     fn next_back(&mut self) -> Option<Self::Item> {
         if let Some(cur_back) = self.cur_back {

@@ -5,65 +5,53 @@ use alloc::{borrow::Cow, string::ToString, vec::Vec};
 use core::{hash::Hash, marker::PhantomData};
 
 use hashbrown::{HashMap, HashSet};
-use libafl_bolts::{
-    current_time,
-    tuples::{Handle, Handled},
-    AsIter, Named,
-};
 use num_traits::ToPrimitive;
 use z3::{ast::Bool, Config, Context, Optimize};
 
+use libafl_bolts::{
+    AsIter,
+    current_time,
+    Named, tuples::{Handle, Handled},
+};
+
 use crate::{
     corpus::Corpus,
+    Error,
     events::{Event, EventFirer, LogSeverity},
     executors::{Executor, HasObservers},
+    HasMetadata,
+    HasScheduler,
     monitors::{AggregatorOps, UserStats, UserStatsValue},
-    observers::{MapObserver, ObserversTuple},
-    schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
-    state::{HasCorpus, HasExecutions, UsesState},
-    Error, HasMetadata, HasScheduler,
+    observers::{MapObserver, ObserversTuple}, schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore}, state::{HasCorpus, HasExecutions},
 };
 
 /// `CorpusMinimizers` minimize corpora according to internal logic. See various implementations for
 /// details.
-pub trait CorpusMinimizer<E>
-where
-    E: UsesState,
-    E::State: HasCorpus,
-{
+pub trait CorpusMinimizer<CS, E, EM, S, Z> {
     /// Minimize the corpus of the provided state.
-    fn minimize<CS, EM, Z>(
+    fn minimize(
         &self,
         fuzzer: &mut Z,
         executor: &mut E,
         manager: &mut EM,
-        state: &mut E::State,
-    ) -> Result<(), Error>
-    where
-        E: Executor<EM, Z> + HasObservers,
-        CS: Scheduler<State = E::State> + RemovableScheduler, // schedulers that has on_remove/on_replace only!
-        EM: EventFirer<State = E::State>,
-        Z: HasScheduler<Scheduler = CS, State = E::State>;
+        state: &mut S,
+    ) -> Result<(), Error>;
 }
 
 /// Minimizes a corpus according to coverage maps, weighting by the specified `TestcaseScore`.
 ///
 /// Algorithm based on WMOPT: <https://hexhive.epfl.ch/publications/files/21ISSTA2.pdf>
 #[derive(Debug)]
-pub struct MapCorpusMinimizer<C, E, O, T, TS> {
+pub struct MapCorpusMinimizer<C, O, TS> {
     observer_handle: Handle<C>,
-    phantom: PhantomData<(E, O, T, TS)>,
+    phantom: PhantomData<fn() -> (O, TS)>,
 }
 
 /// Standard corpus minimizer, which weights inputs by length and time.
-pub type StdCorpusMinimizer<C, E, O, T> =
-    MapCorpusMinimizer<C, E, O, T, LenTimeMulTestcaseScore<<E as UsesState>::State>>;
+pub type StdCorpusMinimizer<C, O, S> = MapCorpusMinimizer<C, O, LenTimeMulTestcaseScore<S>>;
 
-impl<C, E, O, T, TS> MapCorpusMinimizer<C, E, O, T, TS>
+impl<C, O, TS> MapCorpusMinimizer<C, O, TS>
 where
-    E: UsesState,
-    E::State: HasCorpus + HasMetadata,
-    TS: TestcaseScore<E::State>,
     C: Named,
 {
     /// Constructs a new `MapCorpusMinimizer` from a provided observer. This observer will be used
@@ -76,29 +64,27 @@ where
     }
 }
 
-impl<C, E, O, T, TS> CorpusMinimizer<E> for MapCorpusMinimizer<C, E, O, T, TS>
+impl<C, CS, E, EM, O, TS, Z> CorpusMinimizer<CS, E, EM, E::State, Z>
+    for MapCorpusMinimizer<C, O, TS>
 where
-    E: UsesState,
-    for<'a> O: MapObserver<Entry = T> + AsIter<'a, Item = T>,
+    for<'a> O: MapObserver + AsIter<'a, Item = <O as MapObserver>::Entry>,
+    <O as MapObserver>::Entry: Eq + Hash,
     C: AsRef<O>,
+    CS: Scheduler<State = E::State> + RemovableScheduler,
+    E: Executor<EM, Z> + HasObservers,
     E::State: HasMetadata + HasCorpus + HasExecutions,
-    T: Copy + Hash + Eq,
+    EM: EventFirer<State = E::State>,
     TS: TestcaseScore<E::State>,
+    Z: HasScheduler<Scheduler = CS, State = E::State>,
 {
     #[allow(clippy::too_many_lines)]
-    fn minimize<CS, EM, Z>(
+    fn minimize(
         &self,
         fuzzer: &mut Z,
         executor: &mut E,
         manager: &mut EM,
         state: &mut E::State,
-    ) -> Result<(), Error>
-    where
-        E: Executor<EM, Z> + HasObservers,
-        CS: Scheduler<State = E::State> + RemovableScheduler,
-        EM: EventFirer<State = E::State>,
-        Z: HasScheduler<Scheduler = CS, State = E::State>,
-    {
+    ) -> Result<(), Error> {
         let cfg = Config::default();
         let ctx = Context::new(&cfg);
         let opt = Optimize::new(&ctx);

@@ -48,6 +48,7 @@ use libafl_bolts::{
     shmem::ShMemProvider,
     tuples::{tuple_list, Handle},
 };
+use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
@@ -175,7 +176,7 @@ where
     #[cfg(all(unix, feature = "std", feature = "fork"))]
     pub fn launch<S>(&mut self) -> Result<(), Error>
     where
-        S: State + HasExecutions,
+        S: State + HasExecutions + Serialize + for<'de> Deserialize<'de>,
         CF: FnOnce(Option<S>, LlmpRestartingEventManager<(), S, SP>, CoreId) -> Result<(), Error>,
     {
         Self::launch_with_hooks(self, tuple_list!())
@@ -205,7 +206,7 @@ where
     #[allow(clippy::too_many_lines)]
     pub fn launch_with_hooks<EMH, S>(&mut self, hooks: EMH) -> Result<(), Error>
     where
-        S: State + HasExecutions,
+        S: State + HasExecutions + Serialize + for<'de> Deserialize<'de>,
         EMH: EventManagerHooksTuple<S> + Clone + Copy,
         CF: FnOnce(Option<S>, LlmpRestartingEventManager<EMH, S, SP>, CoreId) -> Result<(), Error>,
     {
@@ -574,7 +575,7 @@ where
     /// Launch a standard Centralized-based fuzzer
     pub fn launch<S>(&mut self) -> Result<(), Error>
     where
-        S: State,
+        S: State + Serialize + for<'de> Deserialize<'de>,
         S::Input: Send + Sync + 'static,
         CF: FnOnce(
             Option<S>,

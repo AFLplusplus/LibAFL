@@ -1,26 +1,6 @@
 //! An [`EventManager`] manages all events that go to other instances of the fuzzer.
 //! The messages are commonly information about new Testcases as well as stats and other [`Event`]s.
 
-pub mod events_hooks;
-pub use events_hooks::*;
-
-pub mod simple;
-pub use simple::*;
-#[cfg(all(unix, feature = "std"))]
-pub mod centralized;
-#[cfg(all(unix, feature = "std"))]
-pub use centralized::*;
-#[cfg(feature = "std")]
-#[allow(clippy::ignored_unit_patterns)]
-pub mod launcher;
-#[allow(clippy::ignored_unit_patterns)]
-pub mod llmp;
-pub use llmp::*;
-#[cfg(feature = "tcp_manager")]
-#[allow(clippy::ignored_unit_patterns)]
-pub mod tcp;
-
-pub mod broker_hooks;
 use alloc::{borrow::Cow, boxed::Box, string::String, vec::Vec};
 use core::{
     fmt,
@@ -31,6 +11,9 @@ use core::{
 
 use ahash::RandomState;
 pub use broker_hooks::*;
+#[cfg(all(unix, feature = "std"))]
+pub use centralized::*;
+pub use events_hooks::*;
 #[cfg(feature = "std")]
 pub use launcher::*;
 #[cfg(all(unix, feature = "std"))]
@@ -40,18 +23,25 @@ use libafl_bolts::{
     tuples::{Handle, MatchNameRef},
     ClientId,
 };
+pub use llmp::*;
 use serde::{Deserialize, Serialize};
+pub use simple::*;
 #[cfg(feature = "std")]
 use uuid::Uuid;
 
+#[cfg(all(unix, feature = "std", feature = "multi_machine"))]
+use crate::events::multi_machine::NodeId;
+#[cfg(feature = "introspection")]
+use crate::monitors::ClientPerfMonitor;
 #[cfg(feature = "introspection")]
 use crate::state::HasClientPerfMonitor;
 use crate::{
     executors::ExitKind,
-    inputs::Input,
+    inputs::{Input, UsesInput},
     monitors::UserStats,
-    observers::ObserversTuple,
-    state::{HasExecutions, HasLastReportTime, State},
+    observers::{ObserversTuple, TimeObserver},
+    stages::HasCurrentStage,
+    state::{HasExecutions, HasLastReportTime, State, UsesState},
     Error, HasMetadata,
 };
 #[cfg(feature = "scalability_introspection")]
@@ -60,6 +50,20 @@ use crate::{
     state::HasScalabilityMonitor,
 };
 
+#[cfg(all(unix, feature = "std"))]
+pub mod centralized;
+pub mod events_hooks;
+#[cfg(feature = "std")]
+#[allow(clippy::ignored_unit_patterns)]
+pub mod launcher;
+#[allow(clippy::ignored_unit_patterns)]
+pub mod llmp;
+pub mod simple;
+#[cfg(feature = "tcp_manager")]
+#[allow(clippy::ignored_unit_patterns)]
+pub mod tcp;
+
+pub mod broker_hooks;
 /// Multi-machine mode
 #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
 pub mod multi_machine;
@@ -110,14 +114,6 @@ pub struct EventManagerId(
     /// The id
     pub usize,
 );
-
-#[cfg(all(unix, feature = "std", feature = "multi_machine"))]
-use crate::events::multi_machine::NodeId;
-#[cfg(feature = "introspection")]
-use crate::monitors::ClientPerfMonitor;
-use crate::{
-    inputs::UsesInput, observers::TimeObserver, stages::HasCurrentStage, state::UsesState,
-};
 
 /// The log event severity
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -452,13 +448,26 @@ pub trait EventFirer: UsesState {
 }
 
 /// [`ProgressReporter`] report progress to the broker.
-pub trait ProgressReporter: EventFirer
-where
-    Self::State: HasMetadata + HasExecutions + HasLastReportTime,
-{
+pub trait ProgressReporter: UsesState {
     /// Given the last time, if `monitor_timeout` seconds passed, send off an info/monitor/heartbeat message to the broker.
     /// Returns the new `last` time (so the old one, unless `monitor_timeout` time has passed and monitor have been sent)
     /// Will return an [`Error`], if the stats could not be sent.
+    fn maybe_report_progress(
+        &mut self,
+        state: &mut Self::State,
+        monitor_timeout: Duration,
+    ) -> Result<(), Error>;
+
+    /// Send off an info/monitor/heartbeat message to the broker.
+    /// Will return an [`Error`], if the stats could not be sent.
+    fn report_progress(&mut self, state: &mut Self::State) -> Result<(), Error>;
+}
+
+impl<EF> ProgressReporter for EF
+where
+    EF: EventFirer,
+    EF::State: HasMetadata + HasExecutions + HasLastReportTime,
+{
     fn maybe_report_progress(
         &mut self,
         state: &mut Self::State,
@@ -478,8 +487,6 @@ where
         Ok(())
     }
 
-    /// Send off an info/monitor/heartbeat message to the broker.
-    /// Will return an [`Error`], if the stats could not be sent.
     fn report_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
         let executions = *state.executions();
         let cur = current_time();
@@ -592,8 +599,6 @@ pub trait HasEventManagerId {
 /// For the "normal" multi-processed mode, you may want to look into [`LlmpRestartingEventManager`]
 pub trait EventManager<E, Z>:
     EventFirer + EventProcessor<E, Z> + EventRestarter + HasEventManagerId + ProgressReporter
-where
-    Self::State: HasMetadata + HasExecutions + HasLastReportTime,
 {
 }
 
@@ -688,11 +693,6 @@ where
         >,
     ) {
     }
-}
-
-impl<S> ProgressReporter for NopEventManager<S> where
-    S: State + HasExecutions + HasLastReportTime + HasMetadata
-{
 }
 
 impl<S> HasEventManagerId for NopEventManager<S> {
@@ -830,27 +830,6 @@ where
     }
 }
 
-impl<EM, M> ProgressReporter for MonitorTypedEventManager<EM, M>
-where
-    Self: UsesState,
-    EM: ProgressReporter<State = Self::State>,
-    Self::State: HasLastReportTime + HasExecutions + HasMetadata,
-{
-    #[inline]
-    fn maybe_report_progress(
-        &mut self,
-        state: &mut Self::State,
-        monitor_timeout: Duration,
-    ) -> Result<(), Error> {
-        self.inner.maybe_report_progress(state, monitor_timeout)
-    }
-
-    #[inline]
-    fn report_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        self.inner.report_progress(state)
-    }
-}
-
 impl<EM, M> HasEventManagerId for MonitorTypedEventManager<EM, M>
 where
     EM: HasEventManagerId,
@@ -937,7 +916,6 @@ pub trait AdaptiveSerializer {
 
 #[cfg(test)]
 mod tests {
-
     use core::ptr::addr_of_mut;
 
     use libafl_bolts::{current_time, tuples::tuple_list, Named};

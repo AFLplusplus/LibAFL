@@ -841,13 +841,6 @@ where
     }
 }
 
-impl<EMH, S> ProgressReporter for TcpEventManager<EMH, S>
-where
-    EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata + HasLastReportTime,
-{
-}
-
 impl<EMH, S> HasEventManagerId for TcpEventManager<EMH, S>
 where
     EMH: EventManagerHooksTuple<S>,
@@ -885,15 +878,6 @@ where
     SP: ShMemProvider + 'static,
 {
     type State = S;
-}
-
-#[cfg(feature = "std")]
-impl<EMH, S, SP> ProgressReporter for TcpRestartingEventManager<EMH, S, SP>
-where
-    EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata + HasLastReportTime,
-    SP: ShMemProvider,
-{
 }
 
 #[cfg(feature = "std")]

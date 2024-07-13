@@ -11,37 +11,39 @@ use alloc::{boxed::Box, string::String, vec::Vec};
 use core::{fmt::Debug, time::Duration};
 use std::{marker::PhantomData, process};
 
+use serde::{Deserialize, Serialize};
+
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{
     compress::GzipCompressor,
     llmp::{LLMP_FLAG_COMPRESSED, LLMP_FLAG_INITIALIZED},
 };
 use libafl_bolts::{
+    ClientId,
     llmp::{LlmpClient, LlmpClientDescription, Tag},
     shmem::{NopShMemProvider, ShMemProvider},
     tuples::Handle,
-    ClientId,
 };
-use serde::{Deserialize, Serialize};
 
-use super::NopEventManager;
+use crate::{
+    Error,
+    events::{
+        AdaptiveSerializer, CustomBufEventResult, Event, EventConfig, EventFirer, EventManager,
+        EventManagerHooksTuple, EventManagerId, EventProcessor, EventRestarter,
+        HasCustomBufHandlers, HasEventManagerId, LogSeverity,
+    },
+    executors::{Executor, HasObservers},
+    fuzzer::{EvaluatorObservers, ExecutionProcessor},
+    HasMetadata,
+    inputs::{Input, NopInput, UsesInput},
+    observers::{ObserversTuple, TimeObserver}, state::{HasExecutions, HasLastReportTime, NopState, State, Stoppable, UsesState},
+};
 #[cfg(feature = "llmp_compression")]
 use crate::events::llmp::COMPRESS_THRESHOLD;
 #[cfg(feature = "scalability_introspection")]
 use crate::state::HasScalabilityMonitor;
-use crate::{
-    events::{
-        AdaptiveSerializer, CustomBufEventResult, Event, EventConfig, EventFirer, EventManager,
-        EventManagerHooksTuple, EventManagerId, EventProcessor, EventRestarter,
-        HasCustomBufHandlers, HasEventManagerId, LogSeverity, ProgressReporter,
-    },
-    executors::{Executor, HasObservers},
-    fuzzer::{EvaluatorObservers, ExecutionProcessor},
-    inputs::{Input, NopInput, UsesInput},
-    observers::{ObserversTuple, TimeObserver},
-    state::{HasExecutions, HasLastReportTime, NopState, State, Stoppable, UsesState},
-    Error, HasMetadata,
-};
+
+use super::NopEventManager;
 
 pub(crate) const _LLMP_TAG_TO_MAIN: Tag = Tag(0x3453453);
 
@@ -430,16 +432,6 @@ where
     ) {
         self.inner.add_custom_buf_handler(handler);
     }
-}
-
-impl<EM, EMH, S, SP> ProgressReporter for CentralizedEventManager<EM, EMH, S, SP>
-where
-    EM: AdaptiveSerializer + ProgressReporter + HasEventManagerId,
-    EM::State: HasMetadata + HasExecutions + HasLastReportTime,
-    EMH: EventManagerHooksTuple<EM::State>,
-    S: State,
-    SP: ShMemProvider,
-{
 }
 
 impl<EM, EMH, S, SP> HasEventManagerId for CentralizedEventManager<EM, EMH, S, SP>

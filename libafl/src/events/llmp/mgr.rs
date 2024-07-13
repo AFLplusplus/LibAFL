@@ -34,7 +34,7 @@ use crate::{
         llmp::{LLMP_TAG_EVENT_TO_BOTH, _LLMP_TAG_EVENT_TO_BROKER},
         AdaptiveSerializer, CustomBufEventResult, CustomBufHandlerFn, Event, EventConfig,
         EventFirer, EventManager, EventManagerHooksTuple, EventManagerId, EventProcessor,
-        EventRestarter, HasCustomBufHandlers, HasEventManagerId, ProgressReporter,
+        EventRestarter, HasCustomBufHandlers, HasEventManagerId,
     },
     executors::{Executor, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
@@ -659,13 +659,6 @@ where
     ) {
         self.custom_buf_handlers.push(handler);
     }
-}
-
-impl<EMH, S, SP> ProgressReporter for LlmpEventManager<EMH, S, SP>
-where
-    S: State + HasExecutions + HasMetadata + HasLastReportTime,
-    SP: ShMemProvider,
-{
 }
 
 impl<EMH, S, SP> HasEventManagerId for LlmpEventManager<EMH, S, SP>
