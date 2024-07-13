@@ -445,20 +445,24 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
     let observers = executor.observers_mut();
     let scheduler = fuzzer.scheduler_mut();
 
-    if let Err(_) = scheduler.on_evaluation(state, input, &*observers) {
+    if scheduler.on_evaluation(state, input, &*observers).is_err() {
         log::info!("Failed to call on_evaluation");
         return;
     }
 
     let res = fuzzer.check_results(state, manager, input, &*observers, &exit_kind);
     if let Ok(exec_res) = res {
-        if let Err(_) = fuzzer.process_execution(state, manager, input, &exec_res, &*observers) {
+        if fuzzer
+            .process_execution(state, manager, input, &exec_res, &*observers)
+            .is_err()
+        {
             log::info!("Failed to call process_execution");
             return;
         }
 
-        if let Err(_) =
-            fuzzer.dispatch_event(state, manager, input.clone(), &exec_res, None, &exit_kind)
+        if fuzzer
+            .dispatch_event(state, manager, input.clone(), &exec_res, None, &exit_kind)
+            .is_err()
         {
             log::info!("Failed to dispatch_event");
             return;

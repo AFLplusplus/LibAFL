@@ -475,12 +475,11 @@ where
             ExecuteInputResult::Corpus => {
                 if manager.should_send() {
                     // TODO set None for fast targets
-                    let observers_buf = if manager.configuration() == EventConfig::AlwaysUnique {
+                    if manager.configuration() == EventConfig::AlwaysUnique {
                         None
                     } else {
                         manager.serialize_observers::<OT>(observers)?
-                    };
-                    observers_buf
+                    }
                 } else {
                     None
                 }
