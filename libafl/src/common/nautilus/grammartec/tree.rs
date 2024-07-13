@@ -1,6 +1,7 @@
 use alloc::vec::Vec;
-use std::{cmp, collections::HashSet, io, io::Write, marker::Sized};
+use std::{cmp, io, io::Write, marker::Sized};
 
+use hashbrown::HashSet;
 use libafl_bolts::rands::Rand;
 use pyo3::{
     prelude::{PyObject, PyResult, Python},

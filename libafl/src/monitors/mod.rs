@@ -7,7 +7,6 @@ pub use multi::MultiMonitor;
 pub mod tui;
 
 #[cfg(all(feature = "prometheus_monitor", feature = "std"))]
-#[allow(missing_docs)]
 pub mod prometheus;
 use alloc::string::ToString;
 

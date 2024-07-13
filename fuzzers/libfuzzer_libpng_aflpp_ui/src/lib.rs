@@ -69,8 +69,7 @@ fn fuzz(
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     // let monitor = MultiMonitor::new(|s| println!("{s}"));
 
-    //Setup an Monitor with AFL-Style UI to display the stats
-    #[cfg(feature = "tui")]
+    // Setup an Monitor with AFL-Style UI to display the stats
     let monitor = TuiMonitor::builder()
         .title("Libfuzzer in LibAFL")
         .version("0.0.1")

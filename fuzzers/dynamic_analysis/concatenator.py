@@ -25,7 +25,7 @@ def concatenate_json_files(input_dir):
     with open(output_file, 'w') as file:
         json.dump([data], file)
     
-    print(f"Json files concatenated successfully! Output file: {output_file}")
+    print(f"JSON files concatenated successfully! Output file: {output_file}")
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
