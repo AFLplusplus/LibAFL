@@ -17,6 +17,8 @@ pub mod gramatron;
 pub use gramatron::*;
 pub mod grimoire;
 pub use grimoire::*;
+pub mod mapping;
+pub use mapping::*;
 pub mod tuneable;
 pub use tuneable::*;
 
