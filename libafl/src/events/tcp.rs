@@ -54,7 +54,7 @@ use crate::{
     inputs::{Input, UsesInput},
     monitors::Monitor,
     observers::UsesObservers,
-    state::{HasExecutions, HasLastReportTime, State, UsesState, HasImported},
+    state::{HasExecutions, HasImported, HasLastReportTime, State, UsesState},
     Error, HasMetadata,
 };
 

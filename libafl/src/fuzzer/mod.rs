@@ -1,6 +1,6 @@
 //! The `Fuzzer` is the main struct for a fuzz campaign.
 
-use alloc::string::ToString;
+use alloc::{string::ToString, vec::Vec};
 use core::{fmt::Debug, time::Duration};
 
 use libafl_bolts::current_time;
@@ -96,6 +96,33 @@ pub trait ExecutionProcessor: UsesState {
     where
         EM: EventFirer<State = Self::State>,
         OT: ObserversTuple<Self::State>;
+
+    /// serialize and send event via manager
+    fn serialize_and_dispatch<EM, OT>(
+        &mut self,
+        state: &mut Self::State,
+        manager: &mut EM,
+        input: <Self::State as UsesInput>::Input,
+        exec_res: &ExecuteInputResult,
+        observers: &OT,
+        exit_kind: &ExitKind,
+    ) -> Result<(), Error>
+    where
+        EM: EventFirer<State = Self::State>,
+        OT: ObserversTuple<Self::State> + Serialize;
+
+    /// send event via manager
+    fn dispatch_event<EM>(
+        &mut self,
+        state: &mut Self::State,
+        manager: &mut EM,
+        input: <Self::State as UsesInput>::Input,
+        exec_res: &ExecuteInputResult,
+        obs_buf: Option<Vec<u8>>,
+        exit_kind: &ExitKind,
+    ) -> Result<(), Error>
+    where
+        EM: EventFirer<State = Self::State>;
 
     /// Evaluate if a set of observation channels has an interesting state
     fn evaluate_execution<EM, OT>(
@@ -424,17 +451,63 @@ where
     {
         let exec_res = self.check_results(state, manager, &input, observers, exit_kind)?;
         let corpus_id = self.process_execution(state, manager, &input, &exec_res, observers)?;
+        if send_events {
+            self.serialize_and_dispatch(state, manager, input, &exec_res, observers, exit_kind)?;
+        }
+        Ok((exec_res, corpus_id))
+    }
 
+    fn serialize_and_dispatch<EM, OT>(
+        &mut self,
+        state: &mut Self::State,
+        manager: &mut EM,
+        input: <Self::State as UsesInput>::Input,
+        exec_res: &ExecuteInputResult,
+        observers: &OT,
+        exit_kind: &ExitKind,
+    ) -> Result<(), Error>
+    where
+        EM: EventFirer<State = Self::State>,
+        OT: ObserversTuple<Self::State> + Serialize,
+    {
         // Now send off the event
-        match exec_res {
+        let observers_buf = match exec_res {
             ExecuteInputResult::Corpus => {
-                if send_events && manager.should_send() {
+                if manager.should_send() {
                     // TODO set None for fast targets
                     let observers_buf = if manager.configuration() == EventConfig::AlwaysUnique {
                         None
                     } else {
                         manager.serialize_observers::<OT>(observers)?
                     };
+                    observers_buf
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        };
+
+        self.dispatch_event(state, manager, input, exec_res, observers_buf, exit_kind)?;
+        Ok(())
+    }
+
+    fn dispatch_event<EM>(
+        &mut self,
+        state: &mut Self::State,
+        manager: &mut EM,
+        input: <Self::State as UsesInput>::Input,
+        exec_res: &ExecuteInputResult,
+        observers_buf: Option<Vec<u8>>,
+        exit_kind: &ExitKind,
+    ) -> Result<(), Error>
+    where
+        EM: EventFirer<State = Self::State>,
+    {
+        // Now send off the event
+        match exec_res {
+            ExecuteInputResult::Corpus => {
+                if manager.should_send() {
                     manager.fire(
                         state,
                         Event::NewTestcase {
@@ -453,8 +526,8 @@ where
                 }
             }
             ExecuteInputResult::Solution => {
-                let executions = *state.executions();
-                if send_events {
+                if manager.should_send() {
+                    let executions = *state.executions();
                     manager.fire(
                         state,
                         Event::Objective {
@@ -467,8 +540,7 @@ where
             }
             ExecuteInputResult::None => (),
         }
-
-        Ok((exec_res, corpus_id))
+        Ok(())
     }
 
     /// Evaluate if a set of observation channels has an interesting state

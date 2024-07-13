@@ -50,7 +50,7 @@ use crate::{
     inputs::UsesInput,
     monitors::Monitor,
     observers::{ObserversTuple, TimeObserver, UsesObservers},
-    state::{HasExecutions, HasLastReportTime, State, UsesState, HasImported},
+    state::{HasExecutions, HasImported, HasLastReportTime, State, UsesState},
     Error, HasMetadata,
 };
 

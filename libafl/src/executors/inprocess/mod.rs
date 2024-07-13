@@ -16,23 +16,19 @@ use core::{
     time::Duration,
 };
 
-use libafl_bolts::{
-    current_time,
-    tuples::{tuple_list, RefIndexable},
-};
+use libafl_bolts::tuples::{tuple_list, RefIndexable};
 
 #[cfg(any(unix, feature = "std"))]
 use crate::executors::hooks::inprocess::GLOBAL_STATE;
 use crate::{
-    corpus::Corpus,
-    events::{Event, EventFirer, EventRestarter},
+    events::{EventFirer, EventRestarter},
     executors::{
         hooks::{inprocess::InProcessHooks, ExecutorHooksTuple},
         inprocess::inner::GenericInProcessExecutorInner,
         Executor, ExitKind, HasObservers,
     },
     feedbacks::Feedback,
-    fuzzer::{ExecuteInputResult, HasObjective},
+    fuzzer::HasObjective,
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
     schedulers::Scheduler,
@@ -435,7 +431,7 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
     state: &mut E::State,
     input: &<E::State as UsesInput>::Input,
     fuzzer: &mut Z,
-    event_mgr: &mut EM,
+    manager: &mut EM,
     exit_kind: ExitKind,
 ) where
     E: HasObservers,
@@ -449,54 +445,29 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
     let observers = executor.observers_mut();
     let scheduler = fuzzer.scheduler_mut();
 
-    let _ = scheduler.on_evaluation(state, input, &*observers);
+    if let Err(_) = scheduler.on_evaluation(state, input, &*observers) {
+        log::info!("Failed to call on_evaluation");
+        return;
+    }
 
-    let res = fuzzer.check_results(state, event_mgr, input, &*observers, &exit_kind);
+    let res = fuzzer.check_results(state, manager, input, &*observers, &exit_kind);
     if let Ok(exec_res) = res {
-        let _ = fuzzer.process_execution(state, event_mgr, input, &exec_res, &*observers);
+        if let Err(_) = fuzzer.process_execution(state, manager, input, &exec_res, &*observers) {
+            log::info!("Failed to call process_execution");
+            return;
+        }
 
-        // Now send off the event
-        // unlike in fuzzer/mod.rs we never serialize here.
-        // (because it doesn't work with generics)
-        match exec_res {
-            ExecuteInputResult::Corpus => {
-                if event_mgr.should_send() {
-                    // TODO set None for fast targets
-                    let _ = event_mgr.fire(
-                        state,
-                        Event::NewTestcase {
-                            input: input.clone(),
-                            observers_buf: None,
-                            exit_kind,
-                            corpus_size: state.corpus().count(),
-                            client_config: event_mgr.configuration(),
-                            time: current_time(),
-                            executions: *state.executions(),
-                            forward_id: None,
-                            #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
-                            node_id: None,
-                        },
-                    );
-                }
-            }
-            ExecuteInputResult::Solution => {
-                let executions = *state.executions();
-                let _ = event_mgr.fire(
-                    state,
-                    Event::Objective {
-                        objective_size: state.solutions().count(),
-                        executions,
-                        time: current_time(),
-                    },
-                );
-            }
-            ExecuteInputResult::None => (),
+        if let Err(_) =
+            fuzzer.dispatch_event(state, manager, input.clone(), &exec_res, None, &exit_kind)
+        {
+            log::info!("Failed to dispatch_event");
+            return;
         }
     } else {
         log::info!("Faild to check execution result");
     }
     // Serialize the state and wait safely for the broker to read pending messages
-    event_mgr.on_restart(state).unwrap();
+    manager.on_restart(state).unwrap();
 
     log::info!("Bye!");
 }
