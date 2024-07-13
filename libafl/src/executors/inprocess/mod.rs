@@ -446,7 +446,7 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
     let scheduler = fuzzer.scheduler_mut();
 
     if scheduler.on_evaluation(state, input, &*observers).is_err() {
-        log::info!("Failed to call on_evaluation");
+        log::error!("Failed to call on_evaluation");
         return;
     }
 
@@ -456,7 +456,7 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
             .process_execution(state, manager, input, &exec_res, &*observers)
             .is_err()
         {
-            log::info!("Failed to call process_execution");
+            log::error!("Failed to call process_execution");
             return;
         }
 
@@ -464,11 +464,11 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
             .dispatch_event(state, manager, input.clone(), &exec_res, None, &exit_kind)
             .is_err()
         {
-            log::info!("Failed to dispatch_event");
+            log::error!("Failed to dispatch_event");
             return;
         }
     } else {
-        log::info!("Faild to check execution result");
+        log::error!("Faild to check execution result");
     }
     // Serialize the state and wait safely for the broker to read pending messages
     manager.on_restart(state).unwrap();
