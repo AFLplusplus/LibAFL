@@ -161,6 +161,7 @@ fn mmap_has_substr(mmap: &Mmap, sub_str: &str) -> bool {
 fn is_instrumented(mmap: &Mmap, shmem_env_var: &str) -> bool {
     mmap_has_substr(mmap, shmem_env_var)
 }
+
 fn find_executable_in_path(executable: &Path) -> Option<PathBuf> {
     std::env::var_os("PATH").and_then(|paths| {
         std::env::split_paths(&paths).find_map(|dir| {

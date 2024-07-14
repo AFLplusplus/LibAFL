@@ -1,4 +1,4 @@
-use std::{borrow::Cow, path::PathBuf, time::Duration};
+use std::{borrow::Cow, marker::PhantomData, path::PathBuf, time::Duration};
 
 use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
@@ -16,11 +16,12 @@ use libafl::{
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{
-        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
+        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, QueueScheduler,
+        StdWeightedScheduler,
     },
     stages::{
         mutational::MultiMutationalStage, CalibrationStage, ColorizationStage, IfStage,
-        StagesTuple, StdPowerMutationalStage,
+        StagesTuple, StdMutationalStage, StdPowerMutationalStage,
     },
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasLastReportTime, HasStartTime, StdState,
@@ -46,6 +47,8 @@ use crate::{
     corpus::{set_corpus_filepath, set_solution_filepath},
     env_parser::AFL_DEFAULT_MAP_SIZE,
     feedback::{filepath::CustomFilepathToTestcaseFeedback, seed::SeedFeedback},
+    mutational_stage::SupportMutationalStages,
+    scheduler::SupportedSchedulers,
     Opt, AFL_DEFAULT_INPUT_LEN_MAX, AFL_DEFAULT_INPUT_LEN_MIN, SHMEM_ENV_VAR,
 };
 
@@ -61,7 +64,7 @@ pub fn run_client<EMH, SP>(
         SP,
     >,
     fuzzer_dir: &PathBuf,
-    core_id: &CoreId,
+    core_id: CoreId,
     opt: &Opt,
 ) -> Result<(), Error>
 where
@@ -85,7 +88,11 @@ where
     let map_feedback = MaxMapFeedback::new(&edges_observer);
 
     // Create the CalibrationStage; used to measure the stability of an input.
-    let calibration = CalibrationStage::new(&map_feedback);
+    // We run the stage only if we are NOT doing sequential scheduling.
+    let calibration = IfStage::new(
+        |_, _, _, __| Ok(!opt.sequential_queue),
+        tuple_list!(CalibrationStage::new(&map_feedback)),
+    );
 
     // Create an observation channel to keep track of the execution time.
     let time_observer = TimeObserver::new("time");
@@ -140,21 +147,40 @@ where
     });
 
     // Create our Mutational Stage.
-    let power = StdPowerMutationalStage::new(StdScheduledMutator::new(
-        havoc_mutations().merge(tokens_mutations()),
-    ));
+    // We can either have a simple MutationalStage (for Queue scheduling)
+    // Or one that utilizes scheduling metadadata (Weighted Random scheduling)
+    let mutation = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
+    let mutational_stage = if opt.sequential_queue {
+        SupportMutationalStages::StdMutational(StdMutationalStage::new(mutation), PhantomData)
+    } else {
+        SupportMutationalStages::PowerMutational(
+            StdPowerMutationalStage::new(mutation),
+            PhantomData,
+        )
+    };
+
     let strategy = opt.power_schedule.unwrap_or(PowerSchedule::EXPLORE);
 
     // Create our ColorizationStage
     let colorization = ColorizationStage::new(&edges_observer);
 
     // Create our Scheduler
-    let mut weighted_scheduler =
-        StdWeightedScheduler::with_schedule(&mut state, &edges_observer, Some(strategy));
-    if opt.cycle_schedules {
-        weighted_scheduler = weighted_scheduler.cycling_scheduler();
+    // Our scheduler can either be a Queue
+    // Or a "Weighted Random" which prioritizes entries that take less time and hit more edges
+    let scheduler;
+    if opt.sequential_queue {
+        scheduler = SupportedSchedulers::Queue(QueueScheduler::new(), PhantomData);
+    } else {
+        let mut weighted_scheduler =
+            StdWeightedScheduler::with_schedule(&mut state, &edges_observer, Some(strategy));
+        if opt.cycle_schedules {
+            weighted_scheduler = weighted_scheduler.cycling_scheduler();
+        }
+        scheduler = SupportedSchedulers::Weighted(
+            IndexesLenTimeMinimizerScheduler::new(&edges_observer, weighted_scheduler),
+            PhantomData,
+        );
     }
-    let scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, weighted_scheduler);
 
     // Create our Fuzzer
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -197,7 +223,7 @@ where
                 &mut restarting_mgr,
                 &[fuzzer_dir.join("queue")],
                 &core_id,
-                &opt.cores.as_ref().expect("invariant; should never occur"),
+                opt.cores.as_ref().expect("invariant; should never occur"),
             )
             .unwrap_or_else(|err| panic!("Failed to load initial corpus! {err:?}"));
         println!("We imported {} inputs from disk.", state.corpus().count());
@@ -270,9 +296,8 @@ where
                   _event_manager: &mut _|
          -> Result<bool, Error> {
             let testcase = state.current_testcase()?;
-            if testcase.scheduled_count() == 1 {
-                return Ok(false);
-            } else if opt.cmplog_only_new && testcase.has_metadata::<IsInitialCorpusEntryMetadata>()
+            if testcase.scheduled_count() == 1
+                || (opt.cmplog_only_new && testcase.has_metadata::<IsInitialCorpusEntryMetadata>())
             {
                 return Ok(false);
             }
@@ -281,7 +306,7 @@ where
         let cmplog = IfStage::new(cb, tuple_list!(colorization, tracing, rq));
 
         // The order of the stages matter!
-        let mut stages = tuple_list!(calibration, cmplog, power, afl_stats_stage);
+        let mut stages = tuple_list!(calibration, cmplog, mutational_stage, afl_stats_stage);
 
         // Run our fuzzer; WITH CmpLog
         run_fuzzer_with_stages(
@@ -294,7 +319,7 @@ where
         )?;
     } else {
         // The order of the stages matter!
-        let mut stages = tuple_list!(calibration, power, afl_stats_stage);
+        let mut stages = tuple_list!(calibration, mutational_stage, afl_stats_stage);
 
         // Run our fuzzer; NO CmpLog
         run_fuzzer_with_stages(

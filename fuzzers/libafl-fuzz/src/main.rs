@@ -11,6 +11,8 @@ use std::{collections::HashMap, path::PathBuf};
 mod afl_stats;
 mod env_parser;
 mod feedback;
+mod mutational_stage;
+mod scheduler;
 use clap::Parser;
 use corpus::{check_autoresume, create_dir_if_not_exists, remove_main_node_file};
 mod corpus;
@@ -51,7 +53,7 @@ fn main() {
         opt.input_dir.as_os_str() == "-"
     };
 
-   create_dir_if_not_exists(&opt.output_dir).expect("could not create output directory");
+    create_dir_if_not_exists(&opt.output_dir).expect("could not create output directory");
 
     // TODO: we need to think about the fuzzer naming scheme since they can be configured in
     // different ways (ASAN/mutators) etc.... and how to autoresume appropriately.
@@ -67,9 +69,8 @@ fn main() {
             println!("run primary client on core {}", core_id.0);
             let fuzzer_dir = opt.output_dir.join("fuzzer_main");
             check_autoresume(&fuzzer_dir, &opt.input_dir, opt.auto_resume).unwrap();
-            let res = run_client(state, mgr, &fuzzer_dir, &core_id, &opt);
-            remove_main_node_file(&fuzzer_dir)
-                .expect("error removing main node's is_main_node file");
+            let res = run_client(state, mgr, &fuzzer_dir, core_id, &opt);
+            let _ = remove_main_node_file(&fuzzer_dir);
             res
         })
         .secondary_run_client(|state: Option<_>, mgr: _, core_id: CoreId| {
@@ -78,7 +79,7 @@ fn main() {
                 .output_dir
                 .join(format!("fuzzer_secondary_{}", core_id.0));
             check_autoresume(&fuzzer_dir, &opt.input_dir, opt.auto_resume).unwrap();
-            run_client(state, mgr, &fuzzer_dir, &core_id, &opt)
+            run_client(state, mgr, &fuzzer_dir, core_id, &opt)
         })
         .cores(&opt.cores.clone().expect("invariant; should never occur"))
         .broker_port(opt.broker_port.unwrap_or(AFL_DEFAULT_BROKER_PORT))
@@ -121,7 +122,15 @@ struct Opt {
     max_input_len: Option<usize>,
     #[arg(short = 'g')]
     min_input_len: Option<usize>,
-
+    // TODO
+    #[arg(short = 'Z')]
+    sequential_queue: bool,
+    // TODO: enforce
+    #[arg(short = 'm')]
+    memory_limit: Option<usize>,
+    // TODO: enforce
+    #[arg(short = 'V')]
+    fuzz_for_seconds: Option<usize>,
     // Environment Variables
     #[clap(skip)]
     bench_just_one: bool,
@@ -178,6 +187,11 @@ struct Opt {
     #[clap(skip)]
     crash_seed_as_new_crash: bool,
 
+    // Cmplog config
+    // TODO: actually use this config
+    #[arg(short='l', value_parser=parse_cmplog_args)]
+    cmplog_opts: Option<CmplogOpts>,
+
     // TODO:
     #[clap(skip)]
     frida_persistent_addr: Option<String>,
@@ -222,4 +236,42 @@ fn validate_harness_input_stdin(s: &str) -> Result<&'static str, String> {
         return Err("Unknown harness input type. Use \"@@\" for file, omit for stdin ".to_string());
     }
     Ok(AFL_HARNESS_FILE_INPUT)
+}
+
+#[derive(Debug, Clone)]
+pub struct CmplogOpts {
+    file_size: CmplogFileSize,
+    arith_solving: bool,
+    transform_solving: bool,
+    exterme_transform_solving: bool,
+    random_colorization: bool,
+}
+
+#[derive(Debug, Clone)]
+pub enum CmplogFileSize {
+    Small,
+    Larger,
+    All,
+}
+
+impl From<&str> for CmplogFileSize {
+    fn from(value: &str) -> Self {
+        if value.contains('1') {
+            Self::Small
+        } else if value.contains('3') {
+            Self::All
+        } else {
+            Self::Larger
+        }
+    }
+}
+
+fn parse_cmplog_args(s: &str) -> Result<CmplogOpts, String> {
+    Ok(CmplogOpts {
+        file_size: s.into(),
+        arith_solving: s.contains('A'),
+        transform_solving: s.contains('T'),
+        exterme_transform_solving: s.contains('X'),
+        random_colorization: s.contains('R'),
+    })
 }

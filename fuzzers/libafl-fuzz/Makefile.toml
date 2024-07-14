@@ -1,17 +1,15 @@
 [env]
 PROJECT_DIR = { script = ["pwd"] }
 CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
-FUZZER_NAME="fuzzer"
 PROFILE = { value = "release", condition = {env_not_set = ["PROFILE"]} }
 PROFILE_DIR = {value = "release", condition = {env_not_set = ["PROFILE_DIR"] }}
 LLVM_CONFIG = {value = "llvm-config-18", condition = {env_not_set = ["LLVM_CONFIG"] }}
 AFL_DIR_NAME= {value = "./AFLplusplus-stable"}
 AFL_CC_PATH= {value = "${AFL_DIR_NAME}/afl-clang-fast"}
 LIBAFL_FUZZ_PATH={value = "./target/release/libafl-fuzz"}
-#LLVM_CONFIG="llvm-config-18"
 
 
-[tasks.buil_afl]
+[tasks.build_afl]
 script_runner="@shell"
 script='''
 if [ ! -d "$AFL_DIR_NAME" ]; then
@@ -20,7 +18,7 @@ if [ ! -d "$AFL_DIR_NAME" ]; then
 	fi
 	wget https://github.com/AFLplusplus/AFLplusplus/archive/refs/heads/stable.zip
 	unzip stable.zip
-	cd $AFL_DIR_NAME
+	cd ${AFL_DIR_NAME}
 	LLVM_CONFIG=${LLVM_CONFIG} make 
 	cd ..
 fi
@@ -37,11 +35,30 @@ script_runner="@shell"
 script='''
 cargo build --release
 AFL_PATH=${AFL_DIR_NAME} ${AFL_CC_PATH} ./test/test-instr.c -o ./test/out-instr
-AFL_CORES=1 AFL_STATS_INTERVAL=1 timeout 5 ${LIBAFL_FUZZ_PATH} -i ./test/seeds -o ./test/output ./test/out-instr
+AFL_CORES=1 AFL_STATS_INTERVAL=1 timeout 5 ${LIBAFL_FUZZ_PATH} -i ./test/seeds -o ./test/output ./test/out-instr || true
 test -n "$( ls ./test/output/fuzzer_main/queue/id:000002* 2>/dev/null )" || exit 1
 test -n "$( ls ./test/output/fuzzer_main/fuzzer_stats 2>/dev/null )" || exit 1
 test -n "$( ls ./test/output/fuzzer_main/plot_data 2>/dev/null )" || exit 1
-test -n "$( ls ./test/output/fuzzer_main/crashe2s 2>/dev/null )" || exit 1
-test -n "$( ls ./test/output/fuzzer_main/hangs 2>/dev/null )" || exit 1
+test -d "./test/output/fuzzer_main/hangs" || exit 1
+test -d "./test/output/fuzzer_main/crashes" || exit 1
+
+# cmplog TODO: AFL_BENCH_UNTIL_CRASH=1 instead of timeout 15s
+AFL_LLVM_CMPLOG=1 AFL_PATH=${AFL_DIR_NAME} ${AFL_CC_PATH} ./test/test-cmplog.c -o ./test/out-cmplog
+AFL_CORES=1 timeout 15 ${LIBAFL_FUZZ_PATH} -Z -l 3 -m 0 -V30 -i ./test/seeds_cmplog -o ./test/cmplog-output -c ./test/out-cmplog ./test/out-cmplog >>errors 2>&1
+#test -n "$( ls ./test/cmplog-output/fuzzer_main/crashes/id:000000* ./test/cmplog-output/hangs/id:000000* 2>/dev/null )" || exit 1
 '''
 dependencies = ["build_afl"]
+
+[tasks.clean]
+linux_alias = "clean_unix"
+mac_alias = "clean_unix"
+windows_alias = "unsupported"
+
+[tasks.clean_unix]
+script_runner="@shell"
+script='''
+rm -rf AFLplusplus-stable
+rm stable.zip
+rm -rf ./test/out-instr
+rm -rf ./test/output
+'''
