@@ -120,7 +120,7 @@ pub fn dup(fd: RawFd) -> Result<RawFd, Error> {
 /// Get the peak rss (Resident Set Size) of the all child processes
 /// that have terminated and been waited for
 #[cfg(all(unix, feature = "std"))]
-pub fn peak_rss_mb_children() -> Result<i64, Error> {
+pub fn peak_rss_mb_child_processes() -> Result<i64, Error> {
     use core::mem;
     use std::io;
 
