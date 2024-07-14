@@ -7,7 +7,7 @@
 #![allow(clippy::too_many_lines)]
 #![allow(clippy::struct_excessive_bools)]
 
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf, time::Duration};
 mod afl_stats;
 mod env_parser;
 mod feedback;
@@ -69,7 +69,7 @@ fn main() {
             println!("run primary client on core {}", core_id.0);
             let fuzzer_dir = opt.output_dir.join("fuzzer_main");
             check_autoresume(&fuzzer_dir, &opt.input_dir, opt.auto_resume).unwrap();
-            let res = run_client(state, mgr, &fuzzer_dir, core_id, &opt);
+            let res = run_client(state, mgr, &fuzzer_dir, core_id, &opt, true);
             let _ = remove_main_node_file(&fuzzer_dir);
             res
         })
@@ -79,7 +79,7 @@ fn main() {
                 .output_dir
                 .join(format!("fuzzer_secondary_{}", core_id.0));
             check_autoresume(&fuzzer_dir, &opt.input_dir, opt.auto_resume).unwrap();
-            run_client(state, mgr, &fuzzer_dir, core_id, &opt)
+            run_client(state, mgr, &fuzzer_dir, core_id, &opt, false)
         })
         .cores(&opt.cores.clone().expect("invariant; should never occur"))
         .broker_port(opt.broker_port.unwrap_or(AFL_DEFAULT_BROKER_PORT))
@@ -115,7 +115,7 @@ struct Opt {
     power_schedule: Option<PowerSchedule>,
     #[arg(short = 'c')]
     cmplog_binary: Option<PathBuf>,
-    #[arg(short = 'F')]
+    #[arg(short = 'F', num_args=32)]
     foreign_sync_dirs: Vec<PathBuf>,
     // Environment + CLI variables
     #[arg(short = 'G')]
@@ -191,6 +191,9 @@ struct Opt {
     // TODO: actually use this config
     #[arg(short='l', value_parser=parse_cmplog_args)]
     cmplog_opts: Option<CmplogOpts>,
+    
+    #[clap(skip)]
+    foreign_sync_interval: Duration,
 
     // TODO:
     #[clap(skip)]

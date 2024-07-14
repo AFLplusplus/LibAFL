@@ -21,7 +21,7 @@ use libafl::{
     },
     stages::{
         mutational::MultiMutationalStage, CalibrationStage, ColorizationStage, IfStage,
-        StagesTuple, StdMutationalStage, StdPowerMutationalStage,
+        StagesTuple, StdMutationalStage, StdPowerMutationalStage, SyncFromDiskStage,
     },
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasLastReportTime, HasStartTime, StdState,
@@ -66,6 +66,7 @@ pub fn run_client<EMH, SP>(
     fuzzer_dir: &PathBuf,
     core_id: CoreId,
     opt: &Opt,
+    is_main_node: bool,
 ) -> Result<(), Error>
 where
     EMH: EventManagerHooksTuple<LibaflFuzzState> + Copy + Clone,
@@ -90,7 +91,7 @@ where
     // Create the CalibrationStage; used to measure the stability of an input.
     // We run the stage only if we are NOT doing sequential scheduling.
     let calibration = IfStage::new(
-        |_, _, _, __| Ok(!opt.sequential_queue),
+        |_, _, _, _| Ok(!opt.sequential_queue),
         tuple_list!(CalibrationStage::new(&map_feedback)),
     );
 
@@ -249,7 +250,7 @@ where
     // Tell [`SeedFeedback`] that we're done loading seeds; rendering it benign.
     fuzzer.feedback_mut().done_loading_seeds();
 
-    // Create a AFLStatsStage; TODO builder?
+    // Create a AFLStatsStage;
     let afl_stats_stage = AflStatsStage::new(opt, fuzzer_dir.clone());
 
     // Set LD_PRELOAD (Linux) && DYLD_INSERT_LIBRARIES (OSX) for target.
@@ -257,6 +258,15 @@ where
         std::env::set_var("LD_PRELOAD", preload_env);
         std::env::set_var("DYLD_INSERT_LIBRARIES", preload_env);
     }
+
+    // Create a Sync stage to sync from foreign fuzzers
+    let sync_stage = IfStage::new(
+        |_, _, _, _| Ok(is_main_node && opt.foreign_sync_dirs.len() > 0),
+        tuple_list!(SyncFromDiskStage::with_from_file(
+            opt.foreign_sync_dirs.clone(),
+            opt.foreign_sync_interval
+        )),
+    );
 
     // Create a CmpLog executor if configured.
     if let Some(ref cmplog_binary) = opt.cmplog_binary {
@@ -306,7 +316,13 @@ where
         let cmplog = IfStage::new(cb, tuple_list!(colorization, tracing, rq));
 
         // The order of the stages matter!
-        let mut stages = tuple_list!(calibration, cmplog, mutational_stage, afl_stats_stage);
+        let mut stages = tuple_list!(
+            calibration,
+            cmplog,
+            mutational_stage,
+            afl_stats_stage,
+            sync_stage
+        );
 
         // Run our fuzzer; WITH CmpLog
         run_fuzzer_with_stages(
@@ -319,7 +335,7 @@ where
         )?;
     } else {
         // The order of the stages matter!
-        let mut stages = tuple_list!(calibration, mutational_stage, afl_stats_stage);
+        let mut stages = tuple_list!(calibration, mutational_stage, afl_stats_stage, sync_stage);
 
         // Run our fuzzer; NO CmpLog
         run_fuzzer_with_stages(

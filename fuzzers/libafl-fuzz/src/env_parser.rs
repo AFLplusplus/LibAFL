@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf, time::Duration};
 
 use libafl::Error;
 use libafl_bolts::core_affinity::Cores;
@@ -99,6 +99,14 @@ pub fn parse_envs(opt: &mut Opt) -> Result<(), Error> {
     if let Ok(res) = std::env::var("AFL_KILL_SIGNAL") {
         opt.kill_signal = Some(res.parse()?);
     }
+    if let Ok(res) = std::env::var("AFL_KILL_SIGNAL") {
+        opt.kill_signal = Some(res.parse()?);
+    }
+    if let Ok(res) = std::env::var("AFL_SYNC_TIME") {
+        opt.foreign_sync_interval = Duration::from_secs(res.parse::<u64>()? * 60);
+    } else {
+        opt.foreign_sync_interval = Duration::from_secs(AFL_DEFAULT_FOREIGN_SYNC_INTERVAL);
+    }
     Ok(())
 }
 
@@ -143,4 +151,5 @@ fn validate_map_size(map_size: usize) -> Result<usize, Error> {
 
 const AFL_MAP_SIZE_MIN: usize = usize::pow(2, 3);
 const AFL_MAP_SIZE_MAX: usize = usize::pow(2, 30);
+const AFL_DEFAULT_FOREIGN_SYNC_INTERVAL: u64 = 20 * 60;
 pub const AFL_DEFAULT_MAP_SIZE: usize = 65536;
