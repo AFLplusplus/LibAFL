@@ -196,7 +196,6 @@ pub trait HasLastFoundTime {
     fn last_found_time_mut(&mut self) -> &mut Duration;
 }
 
-
 /// Trait for the last report time, the last time this node reported progress
 pub trait HasLastReportTime {
     /// The last time we reported progress,if available/used.

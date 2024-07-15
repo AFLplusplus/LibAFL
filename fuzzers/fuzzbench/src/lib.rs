@@ -34,9 +34,9 @@ use libafl::{
     },
     stages::{
         calibrate::CalibrationStage, power::StdPowerMutationalStage, StdMutationalStage,
-        TracingStage, pruning::{RestartStage, CorpusPruning}, logics::IfStage,
+        TracingStage,
     },
-    state::{HasCorpus, StdState, HasExecutions, HasLastFoundTime},
+    state::{HasCorpus, StdState},
     Error, HasMetadata,
 };
 use libafl_bolts::{
@@ -204,7 +204,7 @@ fn fuzz(
     timeout: Duration,
 ) -> Result<(), Error> {
     let log = RefCell::new(OpenOptions::new().append(true).create(true).open(logfile)?);
-    env_logger::init();
+
     #[cfg(unix)]
     let mut stdout_cpy = unsafe {
         let new_fd = dup(io::stdout().as_raw_fd())?;
@@ -349,24 +349,8 @@ fn fuzz(
         // Give it more time!
     );
 
-    let cb = |_fuzzer: &mut _, _executor: &mut _, state: &mut StdState<_, _, _, _>, _event_manager: &mut _| -> Result<bool, Error> {
-        let cur = current_time();
-        if *state.last_found_time() - cur > Duration::from_secs(5) {
-            *state.last_found_time_mut() = cur;
-            return Ok(true);
-        }
-        else{
-            return Ok(false);
-        }
-    };
-
-    let pruning = CorpusPruning::default();
-    let restart = RestartStage::new();
-
-    let restart_and_prune = IfStage::new(cb, tuple_list!(pruning, restart));
-
     // The order of the stages matter!
-    let mut stages = tuple_list!(calibration, tracing, i2s, power, restart_and_prune);
+    let mut stages = tuple_list!(calibration, tracing, i2s, power);
 
     // Read tokens
     if state.metadata_map().get::<Tokens>().is_none() {
@@ -392,20 +376,23 @@ fn fuzz(
                 println!("Failed to load initial corpus at {:?}", &seed_dir);
                 process::exit(0);
             });
-        println!("We imported {}/{} inputs from disk.", state.corpus().count(), state.corpus().count_all());
+        println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
     // Remove target output (logs still survive)
     #[cfg(unix)]
     {
         let null_fd = file_null.as_raw_fd();
+        dup2(null_fd, io::stdout().as_raw_fd())?;
+        if std::env::var("LIBAFL_FUZZBENCH_DEBUG").is_err() {
+            dup2(null_fd, io::stderr().as_raw_fd())?;
+        }
     }
     // reopen file to make sure we're at the end
     log.replace(OpenOptions::new().append(true).create(true).open(logfile)?);
 
     fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
 
-    println!("finished");
     // Never reached
     Ok(())
 }

@@ -366,7 +366,8 @@ jobs:
               - 'fuzzers/*qemu*/**'
 
   fuzzers-qemu:
-    needs: changes
+    needs:
+      - common
     if: ${{ needs.changes.outputs.qemu == 'true' }}
     strategy:
       matrix:

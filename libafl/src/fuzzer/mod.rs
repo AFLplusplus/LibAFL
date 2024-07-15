@@ -18,8 +18,8 @@ use crate::{
     stages::{HasCurrentStage, StagesTuple},
     start_timer,
     state::{
-        HasCorpus, HasCurrentTestcase, HasExecutions, HasLastReportTime, HasSolutions,
-        Stoppable, UsesState, HasLastFoundTime,
+        HasCorpus, HasCurrentTestcase, HasExecutions, HasLastFoundTime, HasLastReportTime,
+        HasSolutions, Stoppable, UsesState,
     },
     Error, HasMetadata,
 };
@@ -672,7 +672,6 @@ where
         manager: &mut EM,
         input: <Self::State as UsesInput>::Input,
     ) -> Result<CorpusId, Error> {
-
         *state.last_found_time_mut() = current_time();
 
         let exit_kind = self.execute_input(state, executor, manager, &input)?;

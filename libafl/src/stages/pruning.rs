@@ -6,7 +6,6 @@ use libafl_bolts::{rands::Rand, Error};
 
 use crate::{
     corpus::{Corpus, CorpusId},
-    events::EventRestarter,
     stages::Stage,
     state::{HasCorpus, HasRand, UsesState},
 };
@@ -50,6 +49,7 @@ where
     Z: UsesState<State = Self::State>,
     Self::State: HasCorpus + HasRand,
 {
+    #[allow(clippy::cast_precision_loss)]
     fn perform(
         &mut self,
         _fuzzer: &mut Z,
@@ -66,14 +66,14 @@ where
         }
 
         let corpus = state.corpus_mut();
-        for idx in 0..n_corpus {
-            if do_retain[idx] {
+        for (idx, retain) in do_retain.iter().enumerate().take(n_corpus) {
+            if !retain {
                 let removed = corpus.remove(CorpusId(idx))?;
                 corpus.add_disabled(removed)?;
             }
         }
 
-        println!("There was {}, and we retained {} corpura", n_corpus, state.corpus().count());
+        // println!("There was {}, and we retained {} corpura", n_corpus, state.corpus().count());
         Ok(())
     }
 
@@ -88,7 +88,7 @@ where
 }
 
 /// A stage for conditional restart
-#[derive(Debug)]
+#[derive(Debug, Default)]
 #[cfg(feature = "std")]
 pub struct RestartStage<E, EM, Z> {
     phantom: PhantomData<(E, EM, Z)>,
@@ -139,6 +139,7 @@ where
 {
     /// Constructor for this conditionally enabled stage.
     /// If the closure returns true, the wrapped stage will be executed, else it will be skipped.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
