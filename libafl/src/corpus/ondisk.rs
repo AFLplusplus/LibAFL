@@ -1,8 +1,8 @@
-//! The ondisk corpus stores all [`Testcase`]s to disk.
-//! It never keeps any of them in memory.
-//! This is a good solution for solutions that are never reused, and for very memory-constraint environments.
+//! The [`OnDiskCorpus`] stores all [`Testcase`]s to disk.
+//! It _never_ keeps any of them in memory.
+//! This is a good solution for solutions that are never reused, or for *very* memory-constraint environments.
 //! For any other occasions, consider using [`crate::corpus::CachedOnDiskCorpus`]
-//! which stores a certain number of testcases in memory and removes additional ones in a FIFO manner.
+//! which stores a certain number of [`Testcase`]s in memory and removes additional ones in a FIFO manner.
 
 use alloc::string::String;
 use core::{cell::RefCell, time::Duration};
@@ -11,9 +11,8 @@ use std::path::{Path, PathBuf};
 use libafl_bolts::serdeany::SerdeAnyMap;
 use serde::{Deserialize, Serialize};
 
-use super::{CachedOnDiskCorpus, HasTestcase};
 use crate::{
-    corpus::{Corpus, CorpusId, Testcase},
+    corpus::{CachedOnDiskCorpus, Corpus, CorpusId, HasTestcase, Testcase},
     inputs::{Input, UsesInput},
     Error,
 };
