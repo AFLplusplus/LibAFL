@@ -1,5 +1,3 @@
-#[cfg(emulation_mode = "systemmode")]
-use std::collections::HashSet;
 use std::{
     fmt::{Debug, Display, Error, Formatter},
     rc::Rc,
@@ -7,6 +5,8 @@ use std::{
 
 use enum_map::{Enum, EnumMap};
 use hashbrown::HashMap;
+#[cfg(emulation_mode = "systemmode")]
+use hashbrown::HashSet;
 use libafl::{
     executors::ExitKind,
     inputs::HasTargetBytes,

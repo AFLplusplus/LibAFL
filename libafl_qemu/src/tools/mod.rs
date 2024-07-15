@@ -1,6 +1,7 @@
 use core::{fmt::Debug, ops::Range};
-use std::{cell::UnsafeCell, collections::HashSet, hash::BuildHasher};
+use std::{cell::UnsafeCell, hash::BuildHasher};
 
+use hashbrown::HashSet;
 use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple};
 use libafl_bolts::tuples::{MatchFirstType, SplitBorrowExtractFirstType};
 use libafl_qemu_sys::{GuestAddr, GuestPhysAddr};

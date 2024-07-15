@@ -1,10 +1,6 @@
-use std::{
-    cell::UnsafeCell,
-    collections::{HashMap, HashSet},
-    mem::MaybeUninit,
-    sync::Mutex,
-};
+use std::{cell::UnsafeCell, mem::MaybeUninit, sync::Mutex};
 
+use hashbrown::{HashMap, HashSet};
 use libafl::inputs::UsesInput;
 use libafl_qemu_sys::{GuestAddr, MmapPerms};
 use meminterval::{Interval, IntervalTree};

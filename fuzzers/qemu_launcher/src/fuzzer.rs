@@ -10,10 +10,7 @@ use libafl::events::SimpleEventManager;
 #[cfg(not(feature = "simplemgr"))]
 use libafl::events::{EventConfig, Launcher, MonitorTypedEventManager};
 use libafl::{
-    monitors::{
-        tui::{ui::TuiUI, TuiMonitor},
-        Monitor, MultiMonitor,
-    },
+    monitors::{tui::TuiMonitor, Monitor, MultiMonitor},
     Error,
 };
 #[cfg(feature = "simplemgr")]
@@ -42,9 +39,11 @@ impl Fuzzer {
 
     pub fn fuzz(&self) -> Result<(), Error> {
         if self.options.tui {
-            let ui =
-                TuiUI::with_version(String::from("QEMU Launcher"), String::from("0.10.1"), true);
-            let monitor = TuiMonitor::new(ui);
+            let monitor = TuiMonitor::builder()
+                .title("QEMU Launcher")
+                .version("0.13.1")
+                .enhanced_graphics(true)
+                .build();
             self.launch(monitor)
         } else {
             let log = self.options.log.as_ref().and_then(|l| {

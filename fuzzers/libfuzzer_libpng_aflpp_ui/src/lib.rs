@@ -13,7 +13,7 @@ use libafl::{
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
-    monitors::tui::{ui::TuiUI, TuiMonitor},
+    monitors::tui::TuiMonitor,
     mutators::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::Tokens,
@@ -69,13 +69,12 @@ fn fuzz(
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     // let monitor = MultiMonitor::new(|s| println!("{s}"));
 
-    //Setup an Monitor with AFL-Style UI to display the stats
-    let ui = TuiUI::with_version(
-        String::from("Libfuzzer For Libpng"),
-        String::from("0.0.1"),
-        false,
-    );
-    let monitor = TuiMonitor::new(ui);
+    // Setup an Monitor with AFL-Style UI to display the stats
+    let monitor = TuiMonitor::builder()
+        .title("Libfuzzer in LibAFL")
+        .version("0.0.1")
+        .enhanced_graphics(true)
+        .build();
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =

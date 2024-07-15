@@ -1,6 +1,7 @@
 use alloc::vec::Vec;
-use std::{cmp, collections::HashSet, io, io::Write, marker::Sized};
+use std::{cmp, io, io::Write, marker::Sized};
 
+use hashbrown::HashSet;
 use libafl_bolts::rands::Rand;
 use pyo3::{
     prelude::{PyObject, PyResult, Python},
@@ -280,7 +281,8 @@ impl Tree {
         for i in 0..self.size() {
             let node_id = NodeId::from(i);
             let nonterm = self.get_rule(node_id, ctx).nonterm();
-            //sanity check
+
+            // This should never panic!
             let (nterm_id, node) = stack.pop().expect("Not a valid tree for unparsing!");
             if nterm_id == nonterm {
                 self.paren[i] = node;

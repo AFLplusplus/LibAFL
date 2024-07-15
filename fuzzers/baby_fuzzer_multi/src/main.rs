@@ -3,7 +3,7 @@ use std::ptr::write_volatile;
 use std::{path::PathBuf, ptr::write};
 
 #[cfg(feature = "tui")]
-use libafl::monitors::tui::{ui::TuiUI, TuiMonitor};
+use libafl::monitors::tui::TuiMonitor;
 #[cfg(not(feature = "tui"))]
 use libafl::monitors::SimpleMonitor;
 use libafl::{
@@ -118,9 +118,10 @@ pub fn main() {
     #[cfg(not(feature = "tui"))]
     let mon = SimpleMonitor::new(|s| println!("{s}"));
     #[cfg(feature = "tui")]
-    let ui = TuiUI::with_version(String::from("Baby Fuzzer"), String::from("0.0.1"), false);
-    #[cfg(feature = "tui")]
-    let mon = TuiMonitor::new(ui);
+    let mon = TuiMonitor::builder()
+        .title("Baby Fuzzer")
+        .enhanced_graphics(false)
+        .build();
 
     // The event manager handle the various events generated during the fuzzing loop
     // such as the notification of the addition of a new item to the corpus

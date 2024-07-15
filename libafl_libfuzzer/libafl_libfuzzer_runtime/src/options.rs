@@ -107,6 +107,7 @@ pub struct LibfuzzerOptions {
     artifact_prefix: ArtifactPrefix,
     timeout: Duration,
     grimoire: Option<bool>,
+    use_value_profile: bool,
     unicode: bool,
     forks: Option<usize>,
     dict: Option<Tokens>,
@@ -161,6 +162,10 @@ impl LibfuzzerOptions {
 
     pub fn grimoire(&self) -> Option<bool> {
         self.grimoire
+    }
+
+    pub fn use_value_profile(&self) -> bool {
+        self.use_value_profile
     }
 
     pub fn unicode(&self) -> bool {
@@ -235,6 +240,7 @@ struct LibfuzzerOptionsBuilder<'a> {
     artifact_prefix: Option<&'a str>,
     timeout: Option<Duration>,
     grimoire: Option<bool>,
+    use_value_profile: Option<bool>,
     unicode: Option<bool>,
     forks: Option<usize>,
     dict: Option<&'a str>,
@@ -298,6 +304,9 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                             }
                         }
                         "grimoire" => self.grimoire = Some(parse_or_bail!(name, value, u64) > 0),
+                        "use_value_profile" => {
+                            self.use_value_profile = Some(parse_or_bail!(name, value, u64) > 0);
+                        }
                         "unicode" => self.unicode = Some(parse_or_bail!(name, value, u64) > 0),
                         "artifact_prefix" => {
                             self.artifact_prefix = Some(value);
@@ -371,10 +380,11 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                 .unwrap_or_default(),
             timeout: self.timeout.unwrap_or(Duration::from_secs(1200)),
             grimoire: self.grimoire,
+            use_value_profile: self.use_value_profile.unwrap_or(false),
             unicode: self.unicode.unwrap_or(true),
             forks: self.forks,
             dict: self.dict.map(|path| {
-                Tokens::from_file(path).expect("Couldn't load tokens from specified dictionary")
+                Tokens::from_file(path).expect("Couldn't load tokens from specified tokens file")
             }),
             dirs: self.dirs.into_iter().map(PathBuf::from).collect(),
             ignore_crashes: self.ignore_crashes.unwrap_or_default(),

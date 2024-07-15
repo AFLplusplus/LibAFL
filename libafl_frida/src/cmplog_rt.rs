@@ -6,8 +6,6 @@
 
 #[cfg(target_arch = "aarch64")]
 use core::ffi::c_void;
-#[cfg(all(feature = "cmplog", target_arch = "x86_64"))]
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use dynasmrt::dynasm;
@@ -22,6 +20,8 @@ use frida_gum::{
     stalker::StalkerOutput,
 };
 use frida_gum_sys::Insn;
+#[cfg(all(feature = "cmplog", target_arch = "x86_64"))]
+use hashbrown::HashMap;
 #[cfg(all(feature = "cmplog", target_arch = "x86_64"))]
 use iced_x86::{
     BlockEncoder, Code, DecoderOptions, Instruction, InstructionBlock, MemoryOperand, MemorySize,

@@ -4,11 +4,9 @@ pub mod multi;
 pub use multi::MultiMonitor;
 
 #[cfg(all(feature = "tui_monitor", feature = "std"))]
-#[allow(missing_docs)]
 pub mod tui;
 
 #[cfg(all(feature = "prometheus_monitor", feature = "std"))]
-#[allow(missing_docs)]
 pub mod prometheus;
 use alloc::string::ToString;
 
@@ -20,7 +18,7 @@ use alloc::{borrow::Cow, fmt::Debug, string::String, vec::Vec};
 use core::{fmt, fmt::Write, time::Duration};
 
 #[cfg(feature = "std")]
-pub use disk::{OnDiskJSONMonitor, OnDiskTOMLMonitor};
+pub use disk::{OnDiskJsonMonitor, OnDiskTomlMonitor};
 use hashbrown::HashMap;
 use libafl_bolts::{current_time, format_duration_hms, ClientId};
 use serde::{Deserialize, Serialize};

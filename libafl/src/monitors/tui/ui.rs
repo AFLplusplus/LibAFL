@@ -21,7 +21,7 @@ use super::{
 };
 
 #[derive(Default, Debug)]
-pub struct TuiUI {
+pub struct TuiUi {
     title: String,
     version: String,
     enhanced_graphics: bool,
@@ -34,13 +34,13 @@ pub struct TuiUI {
     pub should_quit: bool,
 }
 
-impl TuiUI {
+impl TuiUi {
     #[must_use]
     pub fn new(title: String, enhanced_graphics: bool) -> Self {
         Self::with_version(title, String::from("default"), enhanced_graphics)
     }
 
-    // create the TuiUI with a given `version`.
+    // create the TuiUi with a given `version`.
     #[must_use]
     pub fn with_version(title: String, version: String, enhanced_graphics: bool) -> Self {
         Self {
@@ -49,7 +49,7 @@ impl TuiUI {
             enhanced_graphics,
             show_logs: true,
             clients_idx: 1,
-            ..TuiUI::default()
+            ..TuiUi::default()
         }
     }
     pub fn on_key(&mut self, c: char) {
@@ -278,7 +278,7 @@ impl TuiUI {
 
         let left_top_layout = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(6), Constraint::Length(0)].as_ref())
+            .constraints([Constraint::Length(6), Constraint::Length(5)].as_ref())
             .split(left_layout[0]);
         let left_bottom_layout = left_top_layout[1];
         self.draw_process_timing_text(f, app, left_top_layout[0], false);
@@ -286,7 +286,7 @@ impl TuiUI {
 
         let right_top_layout = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(7), Constraint::Length(0)].as_ref())
+            .constraints([Constraint::Length(7), Constraint::Length(5)].as_ref())
             .split(right_layout);
         let right_bottom_layout = right_top_layout[1];
         self.draw_item_geometry_text(f, app, right_top_layout[0], false);
@@ -646,10 +646,6 @@ impl TuiUI {
             ]
         };
 
-        let chunks = Layout::default()
-            .constraints([Constraint::Percentage(100)].as_ref())
-            .split(area);
-
         let table = Table::default()
             .rows(items)
             .block(
@@ -663,7 +659,7 @@ impl TuiUI {
                     .borders(Borders::ALL),
             )
             .widths([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)]);
-        f.render_widget(table, chunks[0]);
+        f.render_widget(table, area);
     }
 
     fn draw_client_generic_text(
@@ -702,10 +698,6 @@ impl TuiUI {
             ]
         };
 
-        let chunks = Layout::default()
-            .constraints([Constraint::Percentage(100)].as_ref())
-            .split(area);
-
         let table = Table::default()
             .rows(items)
             .block(
@@ -719,7 +711,7 @@ impl TuiUI {
                     .borders(Borders::ALL),
             )
             .widths([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)]);
-        f.render_widget(table, chunks[0]);
+        f.render_widget(table, area);
     }
 
     #[cfg(feature = "introspection")]
