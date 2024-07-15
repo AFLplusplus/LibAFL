@@ -89,7 +89,7 @@ To do so, [ensure a recent nightly version of Rust is installed](https://rustup.
 ./build.sh
 ```
 
-The static library will be available at `libFuzzer.a` in the [`libafl_libfuzzer_runtime`](runtime)
+The static library will be available at `libFuzzer.a` in the [`libafl_libfuzzer_runtime`](../libafl_libfuzzer_runtime)
 directory.
 If you encounter build failures without clear error outputs that help you resolve the issue, please [submit an issue].
 
