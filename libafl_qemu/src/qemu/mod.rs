@@ -82,8 +82,12 @@ create_hook_id!(Block, libafl_qemu_remove_block_hook, true);
 create_hook_id!(Read, libafl_qemu_remove_read_hook, true);
 create_hook_id!(Write, libafl_qemu_remove_write_hook, true);
 create_hook_id!(Cmp, libafl_qemu_remove_cmp_hook, true);
+
+#[cfg(emulation_mode = "usermode")]
 create_hook_id!(PreSyscall, libafl_qemu_remove_pre_syscall_hook, false);
+#[cfg(emulation_mode = "usermode")]
 create_hook_id!(PostSyscall, libafl_qemu_remove_post_syscall_hook, false);
+#[cfg(emulation_mode = "usermode")]
 create_hook_id!(NewThread, libafl_qemu_remove_new_thread_hook, false);
 
 #[derive(Debug)]
