@@ -161,6 +161,7 @@ where
     }
 }
 
+/// Trait for Schedulers which track queue cycles
 pub trait HasQueueCycles: Scheduler 
     where Self::State: HasCorpus
 {

@@ -15,7 +15,7 @@ use libafl::{
     executors::HasObservers,
     inputs::UsesInput,
     observers::MapObserver,
-    schedulers::{minimizer::IsFavoredMetadata, AflScheduler, HasQueueCycles, Scheduler},
+    schedulers::{minimizer::IsFavoredMetadata, HasQueueCycles, Scheduler},
     stages::{calibrate::UnstableEntriesMetadata, Stage},
     state::{HasCorpus, HasExecutions, HasImported, HasStartTime, Stoppable, UsesState},
     Error, HasMetadata, HasNamedMetadata, HasScheduler,

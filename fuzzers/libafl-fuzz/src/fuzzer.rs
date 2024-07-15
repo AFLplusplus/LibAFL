@@ -15,10 +15,7 @@ use libafl::{
         scheduled::havoc_mutations, tokens_mutations, AFLppRedQueen, StdScheduledMutator, Tokens,
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
-    schedulers::{
-        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, QueueScheduler,
-        StdWeightedScheduler,
-    },
+    schedulers::{powersched::PowerSchedule, QueueScheduler, StdWeightedScheduler},
     stages::{
         mutational::MultiMutationalStage, CalibrationStage, ColorizationStage, IfStage,
         StagesTuple, StdMutationalStage, StdPowerMutationalStage, SyncFromDiskStage,
