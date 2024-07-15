@@ -1,6 +1,6 @@
 [package]
 name = "libafl_bolts"
-version.workspace = true
+version = "0.13.1"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 description = "Low-level bolts to create fuzzers and so much more"
 documentation = "https://docs.rs/libafl"

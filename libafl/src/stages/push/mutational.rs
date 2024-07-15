@@ -8,6 +8,7 @@ use core::{
 };
 
 use libafl_bolts::rands::Rand;
+use serde::Serialize;
 
 use super::{PushStage, PushStageHelper, PushStageSharedState};
 use crate::{
@@ -43,9 +44,9 @@ where
     CS: Scheduler,
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     M: Mutator<CS::Input, CS::State>,
-    OT: ObserversTuple<CS::State>,
+    OT: ObserversTuple<CS::State> + Serialize,
     CS::State: HasRand + HasCorpus + Clone + Debug,
-    Z: ExecutionProcessor<OT, State = CS::State>
+    Z: ExecutionProcessor<State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
 {
@@ -63,9 +64,9 @@ where
     CS: Scheduler,
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     M: Mutator<CS::Input, CS::State>,
-    OT: ObserversTuple<CS::State>,
+    OT: ObserversTuple<CS::State> + Serialize,
     CS::State: HasCorpus + HasRand + Clone + Debug,
-    Z: ExecutionProcessor<OT, State = CS::State>
+    Z: ExecutionProcessor<State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
 {
@@ -86,10 +87,10 @@ where
     CS: Scheduler,
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId + ProgressReporter,
     M: Mutator<CS::Input, CS::State>,
-    OT: ObserversTuple<CS::State>,
+    OT: ObserversTuple<CS::State> + Serialize,
     CS::State:
         HasCorpus + HasRand + HasExecutions + HasLastReportTime + HasMetadata + Clone + Debug,
-    Z: ExecutionProcessor<OT, State = CS::State>
+    Z: ExecutionProcessor<State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
 {
@@ -197,10 +198,10 @@ where
     CS: Scheduler,
     EM: EventFirer + EventRestarter + HasEventManagerId + ProgressReporter<State = CS::State>,
     M: Mutator<CS::Input, CS::State>,
-    OT: ObserversTuple<CS::State>,
+    OT: ObserversTuple<CS::State> + Serialize,
     CS::State:
         HasCorpus + HasRand + HasExecutions + HasMetadata + HasLastReportTime + Clone + Debug,
-    Z: ExecutionProcessor<OT, State = CS::State>
+    Z: ExecutionProcessor<State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
 {
@@ -216,9 +217,9 @@ where
     CS: Scheduler,
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     M: Mutator<CS::Input, CS::State>,
-    OT: ObserversTuple<CS::State>,
+    OT: ObserversTuple<CS::State> + Serialize,
     CS::State: HasCorpus + HasRand + Clone + Debug,
-    Z: ExecutionProcessor<OT, State = CS::State>
+    Z: ExecutionProcessor<State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
 {
