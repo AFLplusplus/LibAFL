@@ -118,7 +118,7 @@ pub unsafe fn inproc_qemu_timeout_handler<'a, E, EM, OF, Z>(
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
     OF: Feedback<E::State>,
     E::State: HasSolutions + HasCorpus + HasExecutions,
-    Z: HasObjective<Objective = OF, State = E::State>,
+    Z: HasObjective<Objective = OF, State = E::State> + HasScheduler + ExecutionProcessor,
 {
     if BREAK_ON_TMOUT {
         qemu_system_debug_request();
