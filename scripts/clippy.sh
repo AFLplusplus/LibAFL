@@ -3,6 +3,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 cd "$SCRIPT_DIR/.." || exit 1
 
+set -e
 # Function to run Clippy on a single directory
 run_clippy() {
    local dir="$1"

@@ -1,5 +1,6 @@
 # Clippy Runner Script for PowerShell (Windows)
 
+$ErrorActionPreference = "Stop"  # This is similar to set -e in Bash
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location (Split-Path -Parent $ScriptDir)
 
