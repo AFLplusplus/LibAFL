@@ -38,6 +38,7 @@ exclude = [
     "libafl_concolic/symcc_libafl",
     "libafl_frida",
     "libafl_libfuzzer",
+    "libafl_libfuzzer_runtime",
     "libafl_nyx",
     "libafl_qemu",
     "libafl_tinyinst",

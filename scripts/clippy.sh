@@ -67,6 +67,7 @@ RUST_BACKTRACE=full cargo +nightly clippy --all --all-features --no-deps --tests
    -A clippy::module-name-repetitions \
    -A clippy::unreadable-literal
 
+
 # Loop through each project and run Clippy
 for project in "${PROJECTS[@]}"; do
    # Trim leading and trailing whitespace
