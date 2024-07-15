@@ -188,6 +188,16 @@ pub trait HasStartTime {
 }
 
 /// Trait for the last report time, the last time this node reported progress
+pub trait HasLastFoundTime {
+    /// The last time we found something by ourselves
+    fn last_found_time(&self) -> &Duration;
+
+    /// The last time we found something by ourselves (mutable)
+    fn last_report_time_mut(&mut self) -> &mut Duration;
+}
+
+
+/// Trait for the last report time, the last time this node reported progress
 pub trait HasLastReportTime {
     /// The last time we reported progress,if available/used.
     /// This information is used by fuzzer `maybe_report_progress`.
@@ -260,6 +270,8 @@ pub struct StdState<I, C, R, SC> {
     /// The last time we reported progress (if available/used).
     /// This information is used by fuzzer `maybe_report_progress`.
     last_report_time: Option<Duration>,
+    /// The last time something was added to the corpus
+    last_found_time: Duration,
     /// The current index of the corpus; used to record for resumable fuzzing.
     corpus_id: Option<CorpusId>,
     /// Request the fuzzer to stop at the start of the next stage
@@ -420,6 +432,20 @@ impl<I, C, R, SC> HasImported for StdState<I, C, R, SC> {
     /// Return the number of new paths that imported from other fuzzers
     #[inline]
     fn imported_mut(&mut self) -> &mut usize {
+        &mut self.imported
+    }
+}
+
+impl<I, C, R, SC> HasLastFoundTime for StdState<I, C, R, SC> {
+    /// Return the number of new paths that imported from other fuzzers
+    #[inline]
+    fn last_found_time(&self) -> &Duration {
+        &self.last_found_time
+    }
+
+    /// Return the number of new paths that imported from other fuzzers
+    #[inline]
+    fn last_found_time_mut(&mut self) -> &mut Duration {
         &mut self.imported
     }
 }
@@ -1127,6 +1153,7 @@ where
             #[cfg(feature = "std")]
             dont_reenter: None,
             last_report_time: None,
+            last_found_time: libafl_bolts::current_time(),
             corpus_id: None,
             stage_stack: StageStack::default(),
             phantom: PhantomData,
