@@ -259,7 +259,7 @@ where
 
     // Create a Sync stage to sync from foreign fuzzers
     let sync_stage = IfStage::new(
-        |_, _, _, _| Ok(is_main_node && opt.foreign_sync_dirs.len() > 0),
+        |_, _, _, _| Ok(is_main_node && !opt.foreign_sync_dirs.is_empty()),
         tuple_list!(SyncFromDiskStage::with_from_file(
             opt.foreign_sync_dirs.clone(),
             opt.foreign_sync_interval

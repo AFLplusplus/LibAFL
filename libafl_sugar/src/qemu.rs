@@ -208,7 +208,7 @@ where
 
             // A minimization+queue policy to get testcasess from the corpus
             let scheduler =
-                IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
+                IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new(&edges_observer));
 
             // A fuzzer with feedbacks and a corpus scheduler
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);

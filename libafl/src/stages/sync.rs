@@ -113,7 +113,7 @@ where
         let mut new_files = vec![];
         for dir in &self.sync_dirs {
             log::debug!("Syncing from dir: {:?}", dir);
-            let new_dir_files = self.load_from_directory(&dir, &max_time)?;
+            let new_dir_files = self.load_from_directory(dir, &max_time)?;
             new_files.extend(new_dir_files);
         }
         *state.metadata_mut::<SyncFromDiskMetadata>().unwrap() = SyncFromDiskMetadata {
@@ -171,7 +171,7 @@ impl<CB, E, EM, Z> SyncFromDiskStage<CB, E, EM, Z> {
             load_callback,
         }
     }
-
+    #[allow(clippy::only_used_in_recursion)]
     fn load_from_directory(
         &self,
         path: &PathBuf,
