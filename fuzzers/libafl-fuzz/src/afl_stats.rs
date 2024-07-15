@@ -1,4 +1,3 @@
-extern crate proc_macro;
 use core::{marker::PhantomData, time::Duration};
 use std::{
     borrow::Cow,

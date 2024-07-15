@@ -18,7 +18,7 @@ if [ ! -d "$AFL_DIR_NAME" ]; then
 	if [ -f "v${AFL_VERSION}.zip" ]; then
 		rm v${AFL_VERSION}.zip
 	fi
-	wget https://github.com/AFLplusplus/AFLplusplus/archive/refs/heads/v${AFL_VERSION}.zip
+	wget https://github.com/AFLplusplus/AFLplusplus/archive/refs/tags/v${AFL_VERSION}.zip
 	unzip v${AFL_VERSION}.zip
 	cd ${AFL_DIR_NAME}
 	LLVM_CONFIG=${LLVM_CONFIG} make 
