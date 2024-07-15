@@ -26,10 +26,9 @@ use libafl_bolts::{
     AsSlice,
 };
 use libafl_qemu::{
-    drcov::QemuDrCovTool, elf::EasyElf, ArchExtras, CallingConvention, GuestAddr, GuestReg,
-    MmapPerms, QemuExecutor, QemuExitReason,
+    command::NopCommandManager, drcov::QemuDrCovTool, elf::EasyElf, ArchExtras, CallingConvention,
+    Emulator, GuestAddr, GuestReg, MmapPerms, NopEmulatorExitHandler, QemuExecutor, QemuExitReason,
     QemuInstrumentationAddressRangeFilter, QemuRWError, QemuShutdownCause, Regs,
-    NopEmulatorExitHandler, Emulator, command::NopCommandManager
 };
 
 #[derive(Default)]
@@ -135,7 +134,7 @@ pub fn fuzz() {
         NopEmulatorExitHandler,
         NopCommandManager,
     )
-        .unwrap();
+    .unwrap();
 
     let qemu = emulator.qemu();
 
@@ -246,7 +245,11 @@ pub fn fuzz() {
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
             let coverage_name = coverage_path.file_stem().unwrap().to_str().unwrap();
-            let coverage_extension = coverage_path.extension().unwrap_or_default().to_str().unwrap();
+            let coverage_extension = coverage_path
+                .extension()
+                .unwrap_or_default()
+                .to_str()
+                .unwrap();
             let core = core_id.0;
             coverage_path.set_file_name(format!("{coverage_name}-{core:03}.{coverage_extension}"));
 

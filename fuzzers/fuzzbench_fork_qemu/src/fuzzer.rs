@@ -11,6 +11,7 @@ use std::{
     process,
     time::Duration,
 };
+
 use clap::{Arg, Command};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
@@ -45,12 +46,15 @@ use libafl_bolts::{
     AsSlice, AsSliceMut,
 };
 use libafl_qemu::{
-    tools::{cmplog::{CmpLogMap, CmpLogObserver, QemuCmpLogChildTool},
-    edges::{QemuEdgeCoverageChildTool, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE}},
+    command::NopCommandManager,
     elf::EasyElf,
     filter_qemu_args,
-    GuestReg, MmapPerms, QemuExitError, QemuExitReason, QemuForkExecutor, QemuShutdownCause,
-    Regs, NopEmulatorExitHandler, command::NopCommandManager, Emulator,
+    tools::{
+        cmplog::{CmpLogMap, CmpLogObserver, QemuCmpLogChildTool},
+        edges::{QemuEdgeCoverageChildTool, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},
+    },
+    Emulator, GuestReg, MmapPerms, NopEmulatorExitHandler, QemuExitError, QemuExitReason,
+    QemuForkExecutor, QemuShutdownCause, Regs,
 };
 #[cfg(unix)]
 use nix::unistd::dup;

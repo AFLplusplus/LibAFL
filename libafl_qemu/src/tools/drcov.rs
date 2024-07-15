@@ -111,7 +111,8 @@ where
                     .map(|p| ((m.start() as usize)..(m.end() as usize), p.to_string()))
                     .filter(|(_, p)| !p.is_empty())
             })
-            .enumerate() {
+            .enumerate()
+        {
             self.module_mapping.insert(r, (i as u16, p));
         }
     }
