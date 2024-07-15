@@ -159,6 +159,8 @@ where
 
         Ok(())
     }
+    
+    fn queue_cycles(&self) -> u64;
 }
 
 /// The scheduler define how the fuzzer requests a testcase from the corpus.

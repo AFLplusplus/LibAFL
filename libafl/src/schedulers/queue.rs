@@ -3,29 +3,41 @@
 use alloc::borrow::ToOwned;
 use core::marker::PhantomData;
 
+use libafl_bolts::{
+    tuples::{Handle, Handled},
+    Named,
+};
+
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase},
-    schedulers::{RemovableScheduler, Scheduler},
+    observers::MapObserver,
+    prelude::HasRand,
+    schedulers::{AflScheduler, RemovableScheduler, Scheduler},
     state::{HasCorpus, State, UsesState},
-    Error,
+    Error, HasMetadata,
 };
 
 /// Walk the corpus in a queue-like fashion
 #[derive(Debug, Clone)]
-pub struct QueueScheduler<S> {
-    phantom: PhantomData<S>,
+pub struct QueueScheduler<C, O, S> {
+    queue_cycles: u64,
+    runs_in_current_cycle: u64,
+    last_hash: usize,
+    map_observer_handle: Handle<C>,
+    phantom: PhantomData<(O, S)>,
 }
 
-impl<S> UsesState for QueueScheduler<S>
+impl<C, O, S> UsesState for QueueScheduler<C, O, S>
 where
     S: State,
 {
     type State = S;
 }
 
-impl<S> RemovableScheduler for QueueScheduler<S> where S: HasCorpus + HasTestcase + State {}
+impl<C, O, S> RemovableScheduler for QueueScheduler<C, O, S> where S: HasCorpus + HasTestcase + State
+{}
 
-impl<S> Scheduler for QueueScheduler<S>
+impl<C, O, S> Scheduler for QueueScheduler<C, O, S>
 where
     S: HasCorpus + HasTestcase + State,
 {
@@ -55,25 +67,55 @@ where
                 .map(|id| state.corpus().next(id))
                 .flatten()
                 .unwrap_or_else(|| state.corpus().first().unwrap());
+
+            self.runs_in_current_cycle += 1;
+            // TODO deal with corpus_counts decreasing due to removals
+            if self.runs_in_current_cycle >= state.corpus().count() as u64 {
+                self.queue_cycles += 1;
+            }
             self.set_current_scheduled(state, Some(id))?;
             Ok(id)
         }
     }
 }
 
-impl<S> QueueScheduler<S> {
+impl<C, O, S> QueueScheduler<C, O, S>
+where
+    C: AsRef<O> + Named,
+{
     /// Creates a new `QueueScheduler`
     #[must_use]
-    pub fn new() -> Self {
+    pub fn new(map_observer: &C) -> Self {
         Self {
+            runs_in_current_cycle: 0,
+            queue_cycles: 0,
+            last_hash: 0,
+            map_observer_handle: map_observer.handle(),
             phantom: PhantomData,
         }
     }
 }
 
-impl<S> Default for QueueScheduler<S> {
-    fn default() -> Self {
-        Self::new()
+impl<C, O, S> AflScheduler<C, O, S> for QueueScheduler<C, O, S>
+where
+    O: MapObserver,
+    S: HasCorpus + HasMetadata + HasTestcase + HasRand + State,
+    C: AsRef<O> + Named,
+{
+    fn last_hash(&self) -> usize {
+        self.last_hash
+    }
+
+    fn set_last_hash(&mut self, hash: usize) {
+        self.last_hash = hash;
+    }
+
+    fn map_observer_handle(&self) -> &Handle<C> {
+        &self.map_observer_handle
+    }
+
+    fn queue_cycles(&self) -> u64 {
+        self.queue_cycles
     }
 }
 
