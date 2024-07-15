@@ -266,7 +266,7 @@ where
         emulator_tools.syscalls(Hook::Function(syscall_hook::<ET, S>));
     }
 
-    fn first_exec<ET>(&self, emulator_tools: &mut EmulatorTools<ET, S>)
+    fn first_exec<ET>(&mut self, emulator_tools: &mut EmulatorTools<ET, S>)
     where
         ET: EmulatorToolTuple<S>,
     {

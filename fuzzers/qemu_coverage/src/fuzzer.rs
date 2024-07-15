@@ -31,7 +31,6 @@ use libafl_qemu::{
     QemuInstrumentationAddressRangeFilter, QemuRWError, QemuShutdownCause, Regs,
     NopEmulatorExitHandler, Emulator, command::NopCommandManager
 };
-use rangemap::RangeMap;
 
 #[derive(Default)]
 pub struct Version;
@@ -121,28 +120,11 @@ pub fn fuzz() {
     env::remove_var("LD_LIBRARY_PATH");
     let env: Vec<(String, String)> = env::vars().collect();
 
-    let rangemap = qemu
-        .mappings()
-        .filter_map(|m| {
-            m.path()
-                .map(|p| ((m.start() as usize)..(m.end() as usize), p.to_string()))
-                .filter(|(_, p)| !p.is_empty())
-        })
-        .enumerate()
-        .fold(
-            RangeMap::<usize, (u16, String)>::new(),
-            |mut rm, (i, (r, p))| {
-                rm.insert(r, (i as u16, p));
-                rm
-            },
-        );
-
-    let mut coverage = PathBuf::from(&options.coverage);
+    let mut coverage_path = PathBuf::from(&options.coverage);
 
     let emulator_tools = tuple_list!(QemuDrCovTool::new(
         QemuInstrumentationAddressRangeFilter::None,
-        rangemap,
-        coverage,
+        coverage_path.clone(),
         false,
     ));
 
@@ -263,10 +245,10 @@ pub fn fuzz() {
             let scheduler = QueueScheduler::new();
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-            let coverage_name = coverage.file_stem().unwrap().to_str().unwrap();
-            let coverage_extension = coverage.extension().unwrap_or_default().to_str().unwrap();
+            let coverage_name = coverage_path.file_stem().unwrap().to_str().unwrap();
+            let coverage_extension = coverage_path.extension().unwrap_or_default().to_str().unwrap();
             let core = core_id.0;
-            coverage.set_file_name(format!("{coverage_name}-{core:03}.{coverage_extension}"));
+            coverage_path.set_file_name(format!("{coverage_name}-{core:03}.{coverage_extension}"));
 
             let mut executor = QemuExecutor::new(
                 &mut emulator,

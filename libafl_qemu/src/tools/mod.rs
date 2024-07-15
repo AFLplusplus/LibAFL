@@ -65,7 +65,7 @@ where
     {
     }
 
-    fn first_exec<ET>(&self, _emulator_tools: &mut EmulatorTools<ET, S>)
+    fn first_exec<ET>(&mut self, _emulator_tools: &mut EmulatorTools<ET, S>)
     where
         ET: EmulatorToolTuple<S>,
     {
@@ -101,7 +101,7 @@ where
     where
         ET: EmulatorToolTuple<S>;
 
-    fn first_exec_all<ET>(&self, _emulator_tools: &mut EmulatorTools<ET, S>)
+    fn first_exec_all<ET>(&mut self, _emulator_tools: &mut EmulatorTools<ET, S>)
     where
         ET: EmulatorToolTuple<S>;
 
@@ -132,7 +132,7 @@ where
     {
     }
 
-    fn first_exec_all<ET>(&self, _emulator_tools: &mut EmulatorTools<ET, S>)
+    fn first_exec_all<ET>(&mut self, _emulator_tools: &mut EmulatorTools<ET, S>)
     where
         ET: EmulatorToolTuple<S>,
     {
@@ -173,7 +173,7 @@ where
         self.1.init_tools_all(emulator_tools);
     }
 
-    fn first_exec_all<ET>(&self, emulator_tools: &mut EmulatorTools<ET, S>)
+    fn first_exec_all<ET>(&mut self, emulator_tools: &mut EmulatorTools<ET, S>)
     where
         ET: EmulatorToolTuple<S>,
     {

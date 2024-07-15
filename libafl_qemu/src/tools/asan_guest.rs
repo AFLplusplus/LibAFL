@@ -272,7 +272,7 @@ impl<S> EmulatorTool<S> for QemuAsanGuestTool
 where
     S: Unpin + UsesInput,
 {
-    fn first_exec<ET>(&self, emulator_tools: &mut EmulatorTools<ET, S>)
+    fn first_exec<ET>(&mut self, emulator_tools: &mut EmulatorTools<ET, S>)
     where
         ET: EmulatorToolTuple<S>,
         S: Unpin + UsesInput,

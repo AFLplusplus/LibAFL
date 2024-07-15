@@ -50,7 +50,6 @@ impl QemuDrCovTool {
     #[allow(clippy::let_underscore_untyped)]
     pub fn new(
         filter: QemuInstrumentationAddressRangeFilter,
-        module_mapping: RangeMap<usize, (u16, String)>,
         filename: PathBuf,
         full_trace: bool,
     ) -> Self {
@@ -61,7 +60,7 @@ impl QemuDrCovTool {
         let _ = DRCOV_LENGTHS.lock().unwrap().insert(HashMap::new());
         Self {
             filter,
-            module_mapping,
+            module_mapping: RangeMap::new(),
             filename,
             full_trace,
             drcov_len: 0,
@@ -97,6 +96,24 @@ where
             Hook::Function(gen_block_lengths::<ET, S>),
             Hook::Function(exec_trace_block::<ET, S>),
         );
+    }
+
+    fn first_exec<ET>(&mut self, emulator_tools: &mut EmulatorTools<ET, S>)
+    where
+        ET: EmulatorToolTuple<S>,
+    {
+        let qemu = emulator_tools.qemu();
+
+        for (i, (r, p)) in qemu
+            .mappings()
+            .filter_map(|m| {
+                m.path()
+                    .map(|p| ((m.start() as usize)..(m.end() as usize), p.to_string()))
+                    .filter(|(_, p)| !p.is_empty())
+            })
+            .enumerate() {
+            self.module_mapping.insert(r, (i as u16, p));
+        }
     }
 
     fn post_exec<OT, ET>(

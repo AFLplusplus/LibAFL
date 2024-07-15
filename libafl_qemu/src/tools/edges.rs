@@ -155,7 +155,7 @@ impl<S> EmulatorTool<S> for QemuEdgeCoverageTool
 where
     S: Unpin + UsesInput + HasMetadata,
 {
-    fn first_exec<ET>(&self, emulator_tools: &mut EmulatorTools<ET, S>)
+    fn first_exec<ET>(&mut self, emulator_tools: &mut EmulatorTools<ET, S>)
     where
         ET: EmulatorToolTuple<S>,
     {
@@ -306,7 +306,7 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn first_exec<ET>(&self, emulator_tools: &mut EmulatorTools<ET, S>)
+    fn first_exec<ET>(&mut self, emulator_tools: &mut EmulatorTools<ET, S>)
     where
         ET: EmulatorToolTuple<S>,
     {
@@ -454,7 +454,7 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn first_exec<ET>(&self, emulator_tools: &mut EmulatorTools<ET, S>)
+    fn first_exec<ET>(&mut self, emulator_tools: &mut EmulatorTools<ET, S>)
     where
         ET: EmulatorToolTuple<S>,
     {

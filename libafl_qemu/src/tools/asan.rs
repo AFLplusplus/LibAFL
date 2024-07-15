@@ -938,7 +938,7 @@ where
         }
     }
 
-    fn first_exec<ET>(&self, emulator_tools: &mut EmulatorTools<ET, S>)
+    fn first_exec<ET>(&mut self, emulator_tools: &mut EmulatorTools<ET, S>)
     where
         ET: EmulatorToolTuple<S>,
     {
