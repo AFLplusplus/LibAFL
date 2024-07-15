@@ -15,7 +15,7 @@ use crate::{
 #[derive(Debug)]
 /// The stage to probablistically disable a corpus entry.
 /// This stage should be wrapped in a if stage and run only when the fuzzer perform restarting
-/// The idea comes from https://mschloegel.me/paper/schiller2023fuzzerrestarts.pdf
+/// The idea comes from `https://mschloegel.me/paper/schiller2023fuzzerrestarts.pdf`
 pub struct CorpusPruning<EM> {
     /// The chance of retaining this corpus
     prob: f64,
@@ -64,7 +64,7 @@ where
         let mut do_retain = vec![];
         for _ in 0..n_corpus {
             let r = state.rand_mut().below(100) as f64;
-            do_retain.push((self.prob * 100 as f64) < r);
+            do_retain.push((self.prob * 100_f64) < r);
         }
 
         let corpus = state.corpus_mut();
