@@ -4,7 +4,7 @@ use libafl::{
     corpus::{CorpusId, HasTestcase, Testcase},
     inputs::UsesInput,
     observers::ObserversTuple,
-    schedulers::{AflScheduler, HasQueueCycles, RemovableScheduler, Scheduler},
+    schedulers::{HasQueueCycles, RemovableScheduler, Scheduler},
     state::{HasCorpus, HasRand, State, UsesState},
     Error, HasMetadata,
 };

@@ -241,6 +241,7 @@ fn validate_harness_input_stdin(s: &str) -> Result<&'static str, String> {
     Ok(AFL_HARNESS_FILE_INPUT)
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct CmplogOpts {
     file_size: CmplogFileSize,
