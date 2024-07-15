@@ -11,7 +11,6 @@ use std::{
     process,
     time::Duration,
 };
-
 use clap::{Arg, Command};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
@@ -46,13 +45,12 @@ use libafl_bolts::{
     AsSlice, AsSliceMut,
 };
 use libafl_qemu::{
-    cmplog::{CmpLogMap, CmpLogObserver, QemuCmpLogChildHelper},
-    edges::{QemuEdgeCoverageChildHelper, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},
+    tools::{cmplog::{CmpLogMap, CmpLogObserver, QemuCmpLogChildTool},
+    edges::{QemuEdgeCoverageChildTool, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE}},
     elf::EasyElf,
     filter_qemu_args,
-    hooks::QemuHooks,
-    GuestReg, MmapPerms, Qemu, QemuExitError, QemuExitReason, QemuForkExecutor, QemuShutdownCause,
-    Regs,
+    GuestReg, MmapPerms, QemuExitError, QemuExitReason, QemuForkExecutor, QemuShutdownCause,
+    Regs, NopEmulatorExitHandler, command::NopCommandManager, Emulator,
 };
 #[cfg(unix)]
 use nix::unistd::dup;
@@ -148,7 +146,22 @@ fn fuzz(
 
     let args: Vec<String> = env::args().collect();
     let env: Vec<(String, String)> = env::vars().collect();
-    let qemu = Qemu::init(&args, &env)?;
+
+    let emulator_tools = tuple_list!(
+        QemuEdgeCoverageChildTool::default(),
+        QemuCmpLogChildTool::default(),
+    );
+
+    let mut emulator = Emulator::new(
+        args.as_slice(),
+        env.as_slice(),
+        emulator_tools,
+        NopEmulatorExitHandler,
+        NopCommandManager,
+    )
+    .unwrap();
+
+    let qemu = emulator.qemu();
 
     let mut elf_buffer = Vec::new();
     let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer)?;
@@ -336,16 +349,8 @@ fn fuzz(
         ExitKind::Ok
     };
 
-    let mut hooks = QemuHooks::new(
-        qemu.clone(),
-        tuple_list!(
-            QemuEdgeCoverageChildHelper::default(),
-            QemuCmpLogChildHelper::default(),
-        ),
-    );
-
     let executor = QemuForkExecutor::new(
-        &mut hooks,
+        &mut emulator,
         &mut harness,
         tuple_list!(edges_observer, time_observer),
         &mut fuzzer,

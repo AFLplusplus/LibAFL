@@ -26,9 +26,10 @@ use libafl_bolts::{
     AsSlice,
 };
 use libafl_qemu::{
-    drcov::QemuDrCovHelper, elf::EasyElf, ArchExtras, CallingConvention, GuestAddr, GuestReg,
-    MmapPerms, Qemu, QemuExecutor, QemuExitReason, QemuHooks,
+    drcov::QemuDrCovTool, elf::EasyElf, ArchExtras, CallingConvention, GuestAddr, GuestReg,
+    MmapPerms, QemuExecutor, QemuExitReason,
     QemuInstrumentationAddressRangeFilter, QemuRWError, QemuShutdownCause, Regs,
+    NopEmulatorExitHandler, Emulator, command::NopCommandManager
 };
 use rangemap::RangeMap;
 
@@ -119,7 +120,42 @@ pub fn fuzz() {
 
     env::remove_var("LD_LIBRARY_PATH");
     let env: Vec<(String, String)> = env::vars().collect();
-    let qemu = Qemu::init(&options.args, &env).unwrap();
+
+    let rangemap = qemu
+        .mappings()
+        .filter_map(|m| {
+            m.path()
+                .map(|p| ((m.start() as usize)..(m.end() as usize), p.to_string()))
+                .filter(|(_, p)| !p.is_empty())
+        })
+        .enumerate()
+        .fold(
+            RangeMap::<usize, (u16, String)>::new(),
+            |mut rm, (i, (r, p))| {
+                rm.insert(r, (i as u16, p));
+                rm
+            },
+        );
+
+    let mut coverage = PathBuf::from(&options.coverage);
+
+    let emulator_tools = tuple_list!(QemuDrCovTool::new(
+        QemuInstrumentationAddressRangeFilter::None,
+        rangemap,
+        coverage,
+        false,
+    ));
+
+    let mut emulator = Emulator::new(
+        &options.args,
+        &env,
+        emulator_tools,
+        NopEmulatorExitHandler,
+        NopCommandManager,
+    )
+        .unwrap();
+
+    let qemu = emulator.qemu();
 
     let mut elf_buffer = Vec::new();
     let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer).unwrap();
@@ -227,40 +263,13 @@ pub fn fuzz() {
             let scheduler = QueueScheduler::new();
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-            let rangemap = qemu
-                .mappings()
-                .filter_map(|m| {
-                    m.path()
-                        .map(|p| ((m.start() as usize)..(m.end() as usize), p.to_string()))
-                        .filter(|(_, p)| !p.is_empty())
-                })
-                .enumerate()
-                .fold(
-                    RangeMap::<usize, (u16, String)>::new(),
-                    |mut rm, (i, (r, p))| {
-                        rm.insert(r, (i as u16, p));
-                        rm
-                    },
-                );
-
-            let mut coverage = PathBuf::from(&options.coverage);
             let coverage_name = coverage.file_stem().unwrap().to_str().unwrap();
             let coverage_extension = coverage.extension().unwrap_or_default().to_str().unwrap();
             let core = core_id.0;
             coverage.set_file_name(format!("{coverage_name}-{core:03}.{coverage_extension}"));
 
-            let mut hooks = QemuHooks::new(
-                qemu,
-                tuple_list!(QemuDrCovHelper::new(
-                    QemuInstrumentationAddressRangeFilter::None,
-                    rangemap,
-                    coverage,
-                    false,
-                )),
-            );
-
             let mut executor = QemuExecutor::new(
-                &mut hooks,
+                &mut emulator,
                 &mut harness,
                 (),
                 &mut fuzzer,
