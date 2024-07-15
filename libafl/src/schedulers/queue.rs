@@ -16,7 +16,6 @@ use crate::{
 pub struct QueueScheduler<S> {
     queue_cycles: u64,
     runs_in_current_cycle: u64,
-    last_hash: usize,
     phantom: PhantomData<S>,
 }
 
@@ -78,9 +77,14 @@ impl<S> QueueScheduler<S> {
         Self {
             runs_in_current_cycle: 0,
             queue_cycles: 0,
-            last_hash: 0,
             phantom: PhantomData,
         }
+    }
+}
+
+impl<S> Default for QueueScheduler<S> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
