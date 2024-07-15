@@ -261,9 +261,7 @@ impl<'a> Client<'a> {
                 .build()
                 .run(tuple_list!(edge_coverage_tool, injection_tool), state)
         } else {
-            instance
-                .build()
-                .run(tuple_list!(edge_coverage_tool), state)
+            instance.build().run(tuple_list!(edge_coverage_tool), state)
         }
     }
 }
