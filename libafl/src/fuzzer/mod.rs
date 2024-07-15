@@ -827,7 +827,7 @@ where
         if state.stop_requested() {
             state.discard_stop_request();
             manager.on_shutdown()?;
-            return Err(Error::shutting_down())
+            return Err(Error::shutting_down());
         }
 
         Ok(id)
