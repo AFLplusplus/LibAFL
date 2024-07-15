@@ -20,7 +20,7 @@ RUST_BACKTRACE=full cargo +nightly clippy --all --all-features --no-deps --tests
    -A clippy::unreadable-literal
 
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-  cd libafl_libfuzzer/libafl_libfuzzer_runtime
+  cd libafl_libfuzzer_runtime
   RUST_BACKTRACE=full cargo +nightly clippy --all --all-features --no-deps --tests --examples --benches -- -Z macro-backtrace \
      -D clippy::all \
      -D clippy::pedantic \
