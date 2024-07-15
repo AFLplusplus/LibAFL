@@ -19,7 +19,7 @@ use crate::{
     start_timer,
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasLastReportTime, HasSolutions,
-        Stoppable, UsesState,
+        Stoppable, UsesState, HasLastFoundTime,
     },
     Error, HasMetadata,
 };
@@ -639,7 +639,7 @@ where
     F: Feedback<Self::State>,
     OF: Feedback<Self::State>,
     OT: ObserversTuple<Self::State> + Serialize + DeserializeOwned,
-    CS::State: HasCorpus + HasSolutions + HasExecutions,
+    CS::State: HasCorpus + HasSolutions + HasExecutions + HasLastFoundTime,
 {
     /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
@@ -672,6 +672,9 @@ where
         manager: &mut EM,
         input: <Self::State as UsesInput>::Input,
     ) -> Result<CorpusId, Error> {
+
+        *state.last_found_time_mut() = current_time();
+
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
         let observers = executor.observers();
         // Always consider this to be "interesting"
@@ -679,7 +682,7 @@ where
 
         // Maybe a solution
         #[cfg(not(feature = "introspection"))]
-        let is_solution =
+        let is_solution: bool =
             self.objective_mut()
                 .is_interesting(state, manager, &input, &*observers, &exit_kind)?;
 
