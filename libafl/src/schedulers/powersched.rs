@@ -9,12 +9,11 @@ use libafl_bolts::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::HasQueueCycles;
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
     inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
-    schedulers::{AflScheduler, RemovableScheduler, Scheduler},
+    schedulers::{AflScheduler, HasQueueCycles, RemovableScheduler, Scheduler},
     state::{HasCorpus, State, UsesState},
     Error, HasMetadata,
 };

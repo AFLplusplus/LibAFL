@@ -171,6 +171,7 @@ impl<CB, E, EM, Z> SyncFromDiskStage<CB, E, EM, Z> {
             load_callback,
         }
     }
+
     #[allow(clippy::only_used_in_recursion)]
     fn load_from_directory(
         &self,

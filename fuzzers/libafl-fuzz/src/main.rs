@@ -33,6 +33,15 @@ use libafl_bolts::{
 };
 use nix::sys::signal::Signal;
 
+const AFL_DEFAULT_INPUT_LEN_MAX: usize = 1_048_576;
+const AFL_DEFAULT_INPUT_LEN_MIN: usize = 1;
+const OUTPUT_GRACE: u64 = 25;
+pub const AFL_DEFAULT_BROKER_PORT: u16 = 1337;
+const PERSIST_SIG: &str = "##SIG_AFL_PERSISTENT##";
+const DEFER_SIG: &str = "##SIG_AFL_DEFER_FORKSRV##";
+const SHMEM_ENV_VAR: &str = "__AFL_SHM_ID";
+static AFL_HARNESS_FILE_INPUT: &str = "@@";
+
 #[allow(clippy::too_many_lines)]
 fn main() {
     env_logger::init();
@@ -45,7 +54,6 @@ fn main() {
 
     // Create our Monitor
     let monitor = MultiMonitor::new(|s| println!("{s}"));
-    /*     let monitor = MultiMonitor::new(|_s| {}); */
 
     opt.auto_resume = if opt.auto_resume {
         true
@@ -122,7 +130,6 @@ struct Opt {
     max_input_len: Option<usize>,
     #[arg(short = 'g')]
     min_input_len: Option<usize>,
-    // TODO
     #[arg(short = 'Z')]
     sequential_queue: bool,
     // TODO: enforce
@@ -224,15 +231,6 @@ struct Opt {
     #[clap(skip)]
     non_instrumented_mode: bool,
 }
-
-const AFL_DEFAULT_INPUT_LEN_MAX: usize = 1_048_576;
-const AFL_DEFAULT_INPUT_LEN_MIN: usize = 1;
-const OUTPUT_GRACE: u64 = 25;
-pub const AFL_DEFAULT_BROKER_PORT: u16 = 1337;
-const PERSIST_SIG: &str = "##SIG_AFL_PERSISTENT##";
-const DEFER_SIG: &str = "##SIG_AFL_DEFER_FORKSRV##";
-const SHMEM_ENV_VAR: &str = "__AFL_SHM_ID";
-static AFL_HARNESS_FILE_INPUT: &str = "@@";
 
 fn validate_harness_input_stdin(s: &str) -> Result<&'static str, String> {
     if s != "@@" {

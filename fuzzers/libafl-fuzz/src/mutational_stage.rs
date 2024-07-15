@@ -10,13 +10,13 @@ use libafl::{
 use libafl_bolts::Named;
 
 #[derive(Debug)]
-pub enum SupportMutationalStages<S, SM, P, E, EM, M, I, Z> {
+pub enum SupportedMutationalStages<S, SM, P, E, EM, M, I, Z> {
     StdMutational(SM, PhantomData<(S, I, M, EM, Z, E)>),
     PowerMutational(P, PhantomData<(S, I, M, EM, Z, E)>),
 }
 
 impl<S, SM, P, E, EM, M, I, Z> MutationalStage<E, EM, I, M, Z>
-    for SupportMutationalStages<S, SM, P, E, EM, M, I, Z>
+    for SupportedMutationalStages<S, SM, P, E, EM, M, I, Z>
 where
     E: UsesState<State = S>,
     EM: UsesState<State = S>,
@@ -54,14 +54,14 @@ where
     }
 }
 
-impl<S, SM, P, E, EM, M, I, Z> UsesState for SupportMutationalStages<S, SM, P, E, EM, M, I, Z>
+impl<S, SM, P, E, EM, M, I, Z> UsesState for SupportedMutationalStages<S, SM, P, E, EM, M, I, Z>
 where
     S: State + HasRand,
 {
     type State = S;
 }
 
-impl<S, SM, P, E, EM, M, I, Z> Named for SupportMutationalStages<S, SM, P, E, EM, M, I, Z>
+impl<S, SM, P, E, EM, M, I, Z> Named for SupportedMutationalStages<S, SM, P, E, EM, M, I, Z>
 where
     SM: Named,
     P: Named,
@@ -74,7 +74,7 @@ where
     }
 }
 
-impl<S, SM, P, E, EM, M, I, Z> Stage<E, EM, Z> for SupportMutationalStages<S, SM, P, E, EM, M, I, Z>
+impl<S, SM, P, E, EM, M, I, Z> Stage<E, EM, Z> for SupportedMutationalStages<S, SM, P, E, EM, M, I, Z>
 where
     E: UsesState<State = S>,
     EM: UsesState<State = S>,

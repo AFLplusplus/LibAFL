@@ -162,7 +162,7 @@ pub fn create_dir_if_not_exists(path: &PathBuf) -> std::io::Result<()> {
             // TODO: change this to ErrorKind::NotADirectory
             // when stabilitzed https://github.com/rust-lang/rust/issues/86442
             io::ErrorKind::Other,
-            format!("{} is a file!", path.display()),
+            format!("{} expected a directory; got a file", path.display()),
         ));
     }
     match std::fs::create_dir(path) {

@@ -3,10 +3,9 @@
 use alloc::borrow::ToOwned;
 use core::marker::PhantomData;
 
-use super::HasQueueCycles;
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase},
-    schedulers::{RemovableScheduler, Scheduler},
+    schedulers::{HasQueueCycles, RemovableScheduler, Scheduler},
     state::{HasCorpus, State, UsesState},
     Error,
 };

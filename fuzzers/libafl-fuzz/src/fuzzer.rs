@@ -44,7 +44,7 @@ use crate::{
     corpus::{set_corpus_filepath, set_solution_filepath},
     env_parser::AFL_DEFAULT_MAP_SIZE,
     feedback::{filepath::CustomFilepathToTestcaseFeedback, seed::SeedFeedback},
-    mutational_stage::SupportMutationalStages,
+    mutational_stage::SupportedMutationalStages,
     scheduler::SupportedSchedulers,
     Opt, AFL_DEFAULT_INPUT_LEN_MAX, AFL_DEFAULT_INPUT_LEN_MIN, SHMEM_ENV_VAR,
 };
@@ -152,9 +152,9 @@ where
     // Or one that utilizes scheduling metadadata (Weighted Random scheduling)
     let mutation = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
     let mutational_stage = if opt.sequential_queue {
-        SupportMutationalStages::StdMutational(StdMutationalStage::new(mutation), PhantomData)
+        SupportedMutationalStages::StdMutational(StdMutationalStage::new(mutation), PhantomData)
     } else {
-        SupportMutationalStages::PowerMutational(
+        SupportedMutationalStages::PowerMutational(
             StdPowerMutationalStage::new(mutation),
             PhantomData,
         )

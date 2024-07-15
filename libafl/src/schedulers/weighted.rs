@@ -19,13 +19,11 @@ use crate::{
     schedulers::{
         powersched::{PowerSchedule, SchedulerMetadata},
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
-        AflScheduler, RemovableScheduler, Scheduler,
+        AflScheduler, HasQueueCycles, RemovableScheduler, Scheduler,
     },
     state::{HasCorpus, HasRand, State, UsesState},
     Error, HasMetadata,
 };
-
-use super::HasQueueCycles;
 
 /// The Metadata for `WeightedScheduler`
 #[cfg_attr(
@@ -309,7 +307,6 @@ where
     fn map_observer_handle(&self) -> &Handle<C> {
         &self.map_observer_handle
     }
-    
 }
 
 impl<C, F, O, S> HasQueueCycles for WeightedScheduler<C, F, O, S>

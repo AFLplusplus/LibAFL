@@ -162,10 +162,11 @@ where
 }
 
 /// Trait for Schedulers which track queue cycles
-pub trait HasQueueCycles: Scheduler 
-    where Self::State: HasCorpus
+pub trait HasQueueCycles: Scheduler
+where
+    Self::State: HasCorpus,
 {
-    /// The amount of cycles the scheduler has completed. 
+    /// The amount of cycles the scheduler has completed.
     fn queue_cycles(&self) -> u64;
 }
 
