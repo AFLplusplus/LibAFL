@@ -296,7 +296,7 @@ where
         E: Executor<EM, Z> + HasObservers<State = S>,
         EM: UsesState<State = S> + EventFirer,
         for<'a> E::Observers: Deserialize<'a>,
-        Z: ExecutionProcessor<E::Observers, State = S> + EvaluatorObservers<E::Observers>,
+        Z: ExecutionProcessor<State = S> + EvaluatorObservers<E::Observers>,
     {
         match event {
             Event::NewTestcase {
@@ -350,7 +350,7 @@ where
         E: Executor<EM, Z> + HasObservers<State = S>,
         EM: UsesState<State = S> + EventFirer,
         for<'a> E::Observers: Deserialize<'a>,
-        Z: ExecutionProcessor<E::Observers, State = S> + EvaluatorObservers<E::Observers>,
+        Z: ExecutionProcessor<State = S> + EvaluatorObservers<E::Observers>,
     {
         // TODO: Get around local event copy by moving handle_in_client
         let self_id = self.llmp.sender().id();

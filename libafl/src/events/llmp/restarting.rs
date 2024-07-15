@@ -49,8 +49,8 @@ use crate::{
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::UsesInput,
     monitors::Monitor,
-    observers::{ObserversTuple, TimeObserver},
-    state::{HasExecutions, HasLastReportTime, State, UsesState},
+    observers::{ObserversTuple, TimeObserver, UsesObservers},
+    state::{HasExecutions, HasImported, HasLastReportTime, State, UsesState},
     Error, HasMetadata,
 };
 
@@ -205,11 +205,12 @@ where
 impl<E, EMH, S, SP, Z> EventProcessor<E, Z> for LlmpRestartingEventManager<EMH, S, SP>
 where
     E: HasObservers<State = S> + Executor<LlmpEventManager<EMH, S, SP>, Z>,
+    <E as UsesObservers>::Observers: Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata,
+    S: State + HasExecutions + HasMetadata + HasImported,
     SP: ShMemProvider,
-    Z: ExecutionProcessor<E::Observers, State = S>
+    Z: ExecutionProcessor<State = S>
         + EvaluatorObservers<E::Observers>
         + Evaluator<E, LlmpEventManager<EMH, S, SP>>,
 {
@@ -228,11 +229,12 @@ where
 impl<E, EMH, S, SP, Z> EventManager<E, Z> for LlmpRestartingEventManager<EMH, S, SP>
 where
     E: HasObservers<State = S> + Executor<LlmpEventManager<EMH, S, SP>, Z>,
+    <E as UsesObservers>::Observers: Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata + HasLastReportTime,
+    S: State + HasExecutions + HasMetadata + HasLastReportTime + HasImported,
     SP: ShMemProvider,
-    Z: ExecutionProcessor<E::Observers, State = S>
+    Z: ExecutionProcessor<State = S>
         + EvaluatorObservers<E::Observers>
         + Evaluator<E, LlmpEventManager<EMH, S, SP>>,
 {
