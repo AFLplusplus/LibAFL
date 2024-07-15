@@ -6,7 +6,9 @@ runs:
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
-        toolchain: stable
+        toolchain: nightly
+        components: llvm-tools, clippy, rustfmt
+        default: true
     - uses: actions/checkout@v3
     - uses: Swatinem/rust-cache@v2
     - name: Build docs

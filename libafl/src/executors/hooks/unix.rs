@@ -17,9 +17,10 @@ pub mod unix_signal_handler {
             Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
-        fuzzer::HasObjective,
+        fuzzer::{ExecutionProcessor, HasObjective},
         inputs::{Input, UsesInput},
         state::{HasCorpus, HasExecutions, HasSolutions},
+        HasScheduler,
     };
 
     pub(crate) type HandlerFuncPtr = unsafe fn(
@@ -79,7 +80,7 @@ pub mod unix_signal_handler {
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State>,
+        Z: HasObjective<Objective = OF, State = E::State> + ExecutionProcessor + HasScheduler,
     {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| unsafe {
@@ -126,7 +127,7 @@ pub mod unix_signal_handler {
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State>,
+        Z: HasObjective<Objective = OF, State = E::State> + ExecutionProcessor + HasScheduler,
     {
         // this stuff is for batch timeout
         if !data.executor_ptr.is_null()
@@ -181,7 +182,7 @@ pub mod unix_signal_handler {
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State>,
+        Z: HasObjective<Objective = OF, State = E::State> + ExecutionProcessor + HasScheduler,
     {
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
         let _context = _context.map(|p| {
