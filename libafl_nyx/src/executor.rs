@@ -32,6 +32,7 @@ pub struct NyxExecutor<S, OT> {
 
 impl NyxExecutor<(), ()> {
     /// Create a builder for [`NyxExeuctor`]
+    #[must_use]
     pub fn builder() -> NyxExecutorBuilder {
         NyxExecutorBuilder::new()
     }
@@ -157,6 +158,7 @@ impl Default for NyxExecutorBuilder {
 }
 
 impl NyxExecutorBuilder {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             stdout: None,
