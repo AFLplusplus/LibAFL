@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::CorpusId,
-    inputs::{HasBytes, HasMutatorBytes, HasTargetBytes, Input},
+    inputs::{HasMutatorBytes, HasTargetBytes, Input},
 };
 
 /// A bytes input is the basic input
@@ -52,7 +52,7 @@ impl Input for BytesInput {
     /// Generate a name for this input
     fn generate_name(&self, _id: Option<CorpusId>) -> String {
         let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
-        hasher.write(self.bytes_ref());
+        hasher.write(self.bytes());
         format!("{:016x}", hasher.finish())
     }
 }
@@ -64,25 +64,9 @@ impl From<BytesInput> for Rc<RefCell<BytesInput>> {
     }
 }
 
-impl HasLen for BytesInput {
-    #[inline]
-    fn len(&self) -> usize {
-        self.bytes.len()
-    }
-}
-
-impl HasBytes for BytesInput {
-    #[inline]
-    fn bytes(&self) -> OwnedSlice<u8> {
-        OwnedSlice::from(&self.bytes)
-    }
-}
-
-impl HasTargetBytes for BytesInput {}
-
 impl HasMutatorBytes for BytesInput {
     #[inline]
-    fn bytes_ref(&self) -> &[u8] {
+    fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 
@@ -112,6 +96,20 @@ impl HasMutatorBytes for BytesInput {
         R: core::ops::RangeBounds<usize>,
     {
         self.bytes.drain(range)
+    }
+}
+
+impl HasTargetBytes for BytesInput {
+    #[inline]
+    fn target_bytes(&self) -> OwnedSlice<u8> {
+        OwnedSlice::from(&self.bytes)
+    }
+}
+
+impl HasLen for BytesInput {
+    #[inline]
+    fn len(&self) -> usize {
+        self.bytes.len()
     }
 }
 

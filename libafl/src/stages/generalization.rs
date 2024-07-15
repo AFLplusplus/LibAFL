@@ -108,7 +108,7 @@ where
             let mut entry = state.corpus().get(corpus_id)?.borrow_mut();
             let input = entry.input_mut().as_mut().unwrap();
 
-            let payload: Vec<_> = input.bytes_ref().iter().map(|&x| Some(x)).collect();
+            let payload: Vec<_> = input.bytes().iter().map(|&x| Some(x)).collect();
             let original = input.clone();
             let meta = entry.metadata_map().get::<MapNoveltiesMetadata>().ok_or_else(|| {
                     Error::key_not_found(format!(

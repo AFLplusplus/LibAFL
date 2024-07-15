@@ -19,7 +19,7 @@ use libafl::{
     state::{HasCorpus, HasMaxSize, HasRand},
     Error,
 };
-use libafl_bolts::{rands::Rand, AsSlice, Named};
+use libafl_bolts::{rands::Rand, AsSlice, HasLen, Named};
 
 extern "C" {
     fn libafl_targets_has_libfuzzer_custom_mutator() -> bool;
@@ -173,7 +173,7 @@ where
                     drop(result);
 
                     if succeeded {
-                        let target = intermediary.bytes_ref();
+                        let target = intermediary.bytes();
                         if target.as_slice().len() > max_size {
                             self.result
                                 .replace(Err(Error::illegal_state("Mutation result was too long!")))
@@ -322,7 +322,7 @@ where
         input: &mut S::Input,
     ) -> Result<MutationResult, Error> {
         let seed = state.rand_mut().next();
-        let len_orig = input.bytes_ref().len();
+        let len_orig = input.bytes().len();
         let len_max = state.max_size();
         input.resize(len_max, 0);
 
@@ -407,7 +407,7 @@ where
 
         let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
         let other = other_testcase.load_input(state.corpus())?;
-        let data2 = Vec::from(other.bytes_ref());
+        let data2 = Vec::from(other.bytes());
         drop(other_testcase);
 
         let seed = state.rand_mut().next();

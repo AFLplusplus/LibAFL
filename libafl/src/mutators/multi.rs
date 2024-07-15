@@ -135,7 +135,7 @@ where
                 let choice = name_choice % input.names().len();
                 let name = input.names()[choice].clone();
 
-                let other_size = input.parts()[choice].bytes_ref().len();
+                let other_size = input.parts()[choice].bytes().len();
                 if other_size < 2 {
                     return Ok(MutationResult::Skipped);
                 }
@@ -150,7 +150,7 @@ where
                     .parts_by_name(&name)
                     .filter(|&(p, _)| p != choice)
                     .nth(part_choice % parts)
-                    .map(|(id, part)| (id, part.bytes_ref().len()));
+                    .map(|(id, part)| (id, part.bytes().len()));
 
                 if let Some((part_idx, size)) = maybe_size {
                     let target = state.rand_mut().below(size);
@@ -180,7 +180,7 @@ where
         let choice = name_choice % other.names().len();
         let name = &other.names()[choice];
 
-        let other_size = other.parts()[choice].bytes_ref().len();
+        let other_size = other.parts()[choice].bytes().len();
         if other_size < 2 {
             return Ok(MutationResult::Skipped);
         }
@@ -193,7 +193,7 @@ where
                 .nth(part_choice % parts)
                 .unwrap();
             drop(other_testcase);
-            let size = part.bytes_ref().len();
+            let size = part.bytes().len();
 
             let target = state.rand_mut().below(size);
             let range = rand_range(state, other_size, min(other_size, size - target));
@@ -239,7 +239,7 @@ where
                 let choice = name_choice % input.names().len();
                 let name = input.names()[choice].clone();
 
-                let other_size = input.parts()[choice].bytes_ref().len();
+                let other_size = input.parts()[choice].bytes().len();
                 if other_size < 2 {
                     return Ok(MutationResult::Skipped);
                 }
@@ -254,7 +254,7 @@ where
                     .parts_by_name(&name)
                     .filter(|&(p, _)| p != choice)
                     .nth(part_choice % parts)
-                    .map(|(id, part)| (id, part.bytes_ref().len()));
+                    .map(|(id, part)| (id, part.bytes().len()));
 
                 if let Some((part_idx, size)) = maybe_size {
                     let target = state.rand_mut().below(size);
@@ -284,7 +284,7 @@ where
         let choice = name_choice % other.names().len();
         let name = &other.names()[choice];
 
-        let other_size = other.parts()[choice].bytes_ref().len();
+        let other_size = other.parts()[choice].bytes().len();
         if other_size < 2 {
             return Ok(MutationResult::Skipped);
         }
@@ -297,7 +297,7 @@ where
                 .nth(part_choice % parts)
                 .unwrap();
             drop(other_testcase);
-            let size = part.bytes_ref().len();
+            let size = part.bytes().len();
 
             let target = state.rand_mut().below(size);
             let range = rand_range(state, other_size, min(other_size, size - target));

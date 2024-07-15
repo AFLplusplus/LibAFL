@@ -320,7 +320,7 @@ where
         };
         let token_idx = state.rand_mut().below(tokens_len);
 
-        let size = input.bytes_ref().len();
+        let size = input.bytes().len();
         let off = state.rand_mut().below(size + 1);
 
         let meta = state.metadata_map().get::<Tokens>().unwrap();
@@ -371,7 +371,7 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
-        let size = input.bytes_ref().len();
+        let size = input.bytes().len();
         if size == 0 {
             return Ok(MutationResult::Skipped);
         }
@@ -431,7 +431,7 @@ where
 {
     #[allow(clippy::too_many_lines)]
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
-        let size = input.bytes_ref().len();
+        let size = input.bytes().len();
         if size == 0 {
             return Ok(MutationResult::Skipped);
         }
@@ -449,7 +449,7 @@ where
         let idx = state.rand_mut().below(cmps_len);
 
         let off = state.rand_mut().below(size);
-        let len = input.bytes_ref().len();
+        let len = input.bytes().len();
         let bytes = input.bytes_mut();
 
         let meta = state.metadata_map().get::<CmpValuesMetadata>().unwrap();
@@ -561,7 +561,7 @@ where
                 'outer: for i in off..len {
                     let mut size = core::cmp::min(v.0.len(), len - i);
                     while size != 0 {
-                        if v.0[0..size] == input.bytes_ref()[i..i + size] {
+                        if v.0[0..size] == input.bytes()[i..i + size] {
                             unsafe {
                                 buffer_copy(input.bytes_mut(), &v.1, 0, i, size);
                             }
@@ -572,7 +572,7 @@ where
                     }
                     size = core::cmp::min(v.1.len(), len - i);
                     while size != 0 {
-                        if v.1[0..size] == input.bytes_ref()[i..i + size] {
+                        if v.1[0..size] == input.bytes()[i..i + size] {
                             unsafe {
                                 buffer_copy(input.bytes_mut(), &v.0, 0, i, size);
                             }
@@ -1100,7 +1100,7 @@ where
     ) -> Result<Vec<I>, Error> {
         // TODO
         // handle 128-bits logs
-        let size = input.bytes_ref().len();
+        let size = input.bytes().len();
         if size == 0 {
             return Ok(vec![]);
         }
@@ -1125,9 +1125,9 @@ where
         let orig_cmpvals = cmp_meta.orig_cmpvals();
         let new_cmpvals = cmp_meta.new_cmpvals();
         let headers = cmp_meta.headers();
-        let input_len = input.bytes_ref().len();
+        let input_len = input.bytes().len();
         let new_bytes = taint_meta.input_vec();
-        let orig_bytes = input.bytes_ref();
+        let orig_bytes = input.bytes();
 
         let taint = taint_meta.ranges();
         let mut ret = max_count.map_or_else(Vec::new, Vec::with_capacity);

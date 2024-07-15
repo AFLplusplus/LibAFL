@@ -126,7 +126,7 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
-        if input.bytes_ref().is_empty() {
+        if input.bytes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
             let bit = 1 << state.rand_mut().choose(0..8).unwrap();
@@ -162,7 +162,7 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
-        if input.bytes_ref().is_empty() {
+        if input.bytes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
             *state.rand_mut().choose(input.bytes_mut()).unwrap() ^= 0xff;
@@ -196,7 +196,7 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
-        if input.bytes_ref().is_empty() {
+        if input.bytes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
             let byte = state.rand_mut().choose(input.bytes_mut()).unwrap();
@@ -231,7 +231,7 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
-        if input.bytes_ref().is_empty() {
+        if input.bytes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
             let byte = state.rand_mut().choose(input.bytes_mut()).unwrap();
@@ -266,7 +266,7 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
-        if input.bytes_ref().is_empty() {
+        if input.bytes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
             let byte = state.rand_mut().choose(input.bytes_mut()).unwrap();
@@ -301,7 +301,7 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
-        if input.bytes_ref().is_empty() {
+        if input.bytes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
             let byte = state.rand_mut().choose(input.bytes_mut()).unwrap();
@@ -346,13 +346,13 @@ macro_rules! add_mutator_impl {
                 input: &mut I,
 
             ) -> Result<MutationResult, Error> {
-                if input.bytes_ref().len() < size_of::<$size>() {
+                if input.bytes().len() < size_of::<$size>() {
                     Ok(MutationResult::Skipped)
                 } else {
                     // choose a random window of bytes (windows overlap) and convert to $size
                     let (index, bytes) = state
                         .rand_mut()
-                        .choose(input.bytes_ref().windows(size_of::<$size>()).enumerate()).unwrap();
+                        .choose(input.bytes().windows(size_of::<$size>()).enumerate()).unwrap();
                     let val = <$size>::from_ne_bytes(bytes.try_into().unwrap());
 
                     // mutate
@@ -409,7 +409,7 @@ macro_rules! interesting_mutator_impl {
         {
             #[allow(clippy::cast_sign_loss)]
             fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
-                if input.bytes_ref().len() < size_of::<$size>() {
+                if input.bytes().len() < size_of::<$size>() {
                     Ok(MutationResult::Skipped)
                 } else {
                     let bytes = input.bytes_mut();
@@ -457,7 +457,7 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
-        let size = input.bytes_ref().len();
+        let size = input.bytes().len();
         if size <= 2 {
             return Ok(MutationResult::Skipped);
         }
@@ -496,7 +496,7 @@ where
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
-        let size = input.bytes_ref().len();
+        let size = input.bytes().len();
         if size == 0 || size >= max_size {
             return Ok(MutationResult::Skipped);
         }
@@ -543,7 +543,7 @@ where
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
-        let size = input.bytes_ref().len();
+        let size = input.bytes().len();
         if size == 0 || size >= max_size {
             return Ok(MutationResult::Skipped);
         }
@@ -559,7 +559,7 @@ where
             }
         }
 
-        let val = input.bytes_ref()[state.rand_mut().below(size)];
+        let val = input.bytes()[state.rand_mut().below(size)];
 
         input.resize(size + amount, 0);
         unsafe {
@@ -597,7 +597,7 @@ where
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
-        let size = input.bytes_ref().len();
+        let size = input.bytes().len();
         if size >= max_size {
             return Ok(MutationResult::Skipped);
         }
@@ -650,13 +650,13 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
-        let size = input.bytes_ref().len();
+        let size = input.bytes().len();
         if size == 0 {
             return Ok(MutationResult::Skipped);
         }
         let range = rand_range(state, size, min(size, 16));
 
-        let val = *state.rand_mut().choose(input.bytes_ref()).unwrap();
+        let val = *state.rand_mut().choose(input.bytes()).unwrap();
         let quantity = range.len();
         buffer_set(input.bytes_mut(), range.start, quantity, val);
 
@@ -689,7 +689,7 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
-        let size = input.bytes_ref().len();
+        let size = input.bytes().len();
         if size == 0 {
             return Ok(MutationResult::Skipped);
         }
@@ -728,7 +728,7 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
-        let size = input.bytes_ref().len();
+        let size = input.bytes().len();
         if size <= 1 {
             return Ok(MutationResult::Skipped);
         }
@@ -771,7 +771,7 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
-        let size = input.bytes_ref().len();
+        let size = input.bytes().len();
         if size <= 1 || size >= state.max_size() {
             return Ok(MutationResult::Skipped);
         }
@@ -786,7 +786,7 @@ where
         unsafe {
             buffer_copy(
                 &mut self.tmp_buf,
-                input.bytes_ref(),
+                input.bytes(),
                 range.start,
                 0,
                 range.len(),
@@ -832,7 +832,7 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
-        let size = input.bytes_ref().len();
+        let size = input.bytes().len();
         if size <= 1 {
             return Ok(MutationResult::Skipped);
         }
@@ -851,7 +851,7 @@ where
                     // copy first range to tmp
                     buffer_copy(
                         &mut self.tmp_buf,
-                        input.bytes_ref(),
+                        input.bytes(),
                         first.start,
                         0,
                         first.len(),
@@ -887,7 +887,7 @@ where
                     // copy first range to tmp
                     buffer_copy(
                         &mut self.tmp_buf,
-                        input.bytes_ref(),
+                        input.bytes(),
                         first.start,
                         0,
                         first.len(),
@@ -933,7 +933,7 @@ where
                     // copy second range to tmp
                     buffer_copy(
                         &mut self.tmp_buf,
-                        input.bytes_ref(),
+                        input.bytes(),
                         second.start,
                         0,
                         second.len(),
@@ -968,7 +968,7 @@ where
                     // copy second range to tmp
                     buffer_copy(
                         &mut self.tmp_buf,
-                        input.bytes_ref(),
+                        input.bytes(),
                         second.start,
                         0,
                         second.len(),
@@ -1050,7 +1050,7 @@ impl<I: HasMutatorBytes> CrossoverInsertMutator<I> {
         unsafe {
             buffer_copy(
                 input.bytes_mut(),
-                other.bytes_ref(),
+                other.bytes(),
                 range.start,
                 target,
                 range.len(),
@@ -1067,7 +1067,7 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
-        let size = input.bytes_ref().len();
+        let size = input.bytes().len();
         let max_size = state.max_size();
         if size >= max_size {
             return Ok(MutationResult::Skipped);
@@ -1083,7 +1083,7 @@ where
 
         let other_size = {
             let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
-            other_testcase.load_input(state.corpus())?.bytes_ref().len()
+            other_testcase.load_input(state.corpus())?.bytes().len()
         };
 
         if other_size < 2 {
@@ -1134,7 +1134,7 @@ impl<I: HasMutatorBytes> CrossoverReplaceMutator<I> {
         unsafe {
             buffer_copy(
                 input.bytes_mut(),
-                other.bytes_ref(),
+                other.bytes(),
                 range.start,
                 target,
                 range.len(),
@@ -1151,7 +1151,7 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
-        let size = input.bytes_ref().len();
+        let size = input.bytes().len();
         if size == 0 {
             return Ok(MutationResult::Skipped);
         }
@@ -1166,7 +1166,7 @@ where
 
         let other_size = {
             let mut testcase = state.corpus().get_from_all(id)?.borrow_mut();
-            testcase.load_input(state.corpus())?.bytes_ref().len()
+            testcase.load_input(state.corpus())?.bytes().len()
         };
 
         if other_size < 2 {
@@ -1241,7 +1241,7 @@ where
             let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
             let other = other_testcase.load_input(state.corpus())?;
 
-            let (f, l) = locate_diffs(input.bytes_ref(), other.bytes_ref());
+            let (f, l) = locate_diffs(input.bytes(), other.bytes());
 
             if f != l && f >= 0 && l >= 2 {
                 (f as usize, l as usize)
@@ -1256,7 +1256,7 @@ where
         // Input will already be loaded.
         let other = other_testcase.input().as_ref().unwrap();
 
-        input.splice(split_at.., other.bytes_ref()[split_at..].iter().copied());
+        input.splice(split_at.., other.bytes()[split_at..].iter().copied());
 
         Ok(MutationResult::Mutated)
     }
