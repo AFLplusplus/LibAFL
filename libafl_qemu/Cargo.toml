@@ -17,7 +17,6 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
 default = ["fork", "build_libgasan", "build_libqasan", "serdeany_autoreg", "injections"]
-clippy = ["libafl_qemu_sys/clippy"] # special feature for clippy, don't use in normal projects
 document-features = ["dep:document-features"]
 paranoid_debug = ["libafl_qemu_sys/paranoid_debug"] # Will perform as many checks as possible. The target will be greatly slowed down.
 
@@ -32,6 +31,9 @@ fork = ["libafl/fork"]
 ## Build libqasan for address sanitization
 build_libgasan = []
 build_libqasan = []
+#! ### Internal features, don't use in normal projects
+## clippy workaround
+clippy = ["libafl_qemu_sys/clippy"]
 
 #! ## The following architecture features are mutually exclusive.
 
