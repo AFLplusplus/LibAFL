@@ -27,8 +27,8 @@ use libafl_bolts::{
 };
 use libafl_qemu::{
     command::NopCommandManager, drcov::QemuDrCovTool, elf::EasyElf, ArchExtras, CallingConvention,
-    Emulator, GuestAddr, GuestReg, MmapPerms, NopEmulatorExitHandler, QemuExecutor, QemuExitReason,
-    QemuInstrumentationAddressRangeFilter, QemuRWError, QemuShutdownCause, Regs,
+    Emulator, GuestAddr, GuestReg, MmapPerms, NopEmulatorExitHandler, Qemu, QemuExecutor,
+    QemuExitReason, QemuInstrumentationAddressRangeFilter, QemuRWError, QemuShutdownCause, Regs,
 };
 
 #[derive(Default)]
@@ -72,10 +72,10 @@ impl From<Version> for Str {
 )]
 pub struct FuzzerOptions {
     #[arg(long, help = "Coverage file")]
-    coverage: String,
+    coverage_path: PathBuf,
 
     #[arg(long, help = "Input directory")]
-    input: String,
+    input_dir: PathBuf,
 
     #[arg(long, help = "Timeout in seconds", default_value = "5000", value_parser = timeout_from_millis_str)]
     timeout: Duration,
@@ -98,9 +98,8 @@ pub const MAX_INPUT_SIZE: usize = 1048576; // 1MB
 pub fn fuzz() {
     let mut options = FuzzerOptions::parse();
 
-    let corpus_dir = PathBuf::from(options.input);
-
-    let corpus_files = corpus_dir
+    let corpus_files = options
+        .input_dir
         .read_dir()
         .expect("Failed to read corpus dir")
         .collect::<Result<Vec<DirEntry>, io::Error>>()
@@ -119,24 +118,7 @@ pub fn fuzz() {
     env::remove_var("LD_LIBRARY_PATH");
     let env: Vec<(String, String)> = env::vars().collect();
 
-    let mut coverage_path: PathBuf = options.coverage.into();
-
-    let emulator_tools = tuple_list!(QemuDrCovTool::new(
-        QemuInstrumentationAddressRangeFilter::None,
-        coverage_path.clone(),
-        false,
-    ));
-
-    let mut emulator = Emulator::new(
-        &options.args,
-        &env,
-        emulator_tools,
-        NopEmulatorExitHandler,
-        NopCommandManager,
-    )
-    .unwrap();
-
-    let qemu = emulator.qemu();
+    let qemu = Qemu::init(&options.args, &env).unwrap();
 
     let mut elf_buffer = Vec::new();
     let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer).unwrap();
@@ -244,14 +226,25 @@ pub fn fuzz() {
             let scheduler = QueueScheduler::new();
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-            let coverage_name = coverage_path.file_stem().unwrap().to_str().unwrap();
-            let coverage_extension = coverage_path
-                .extension()
-                .unwrap_or_default()
-                .to_str()
-                .unwrap();
+            let mut cov_path = options.coverage_path.clone();
+            let coverage_name = cov_path.file_stem().unwrap().to_str().unwrap();
+            let coverage_extension = cov_path.extension().unwrap_or_default().to_str().unwrap();
             let core = core_id.0;
-            coverage_path.set_file_name(format!("{coverage_name}-{core:03}.{coverage_extension}"));
+            cov_path.set_file_name(format!("{coverage_name}-{core:03}.{coverage_extension}"));
+
+            let emulator_tools = tuple_list!(QemuDrCovTool::new(
+                QemuInstrumentationAddressRangeFilter::None,
+                cov_path,
+                false,
+            ));
+
+            let mut emulator = Emulator::new_with_qemu(
+                qemu,
+                emulator_tools,
+                NopEmulatorExitHandler,
+                NopCommandManager,
+            )
+            .unwrap();
 
             let mut executor = QemuExecutor::new(
                 &mut emulator,
@@ -268,7 +261,7 @@ pub fn fuzz() {
                 state
                     .load_initial_inputs_by_filenames(&mut fuzzer, &mut executor, &mut mgr, &files)
                     .unwrap_or_else(|_| {
-                        println!("Failed to load initial corpus at {:?}", &corpus_dir);
+                        println!("Failed to load initial corpus at {:?}", &options.input_dir);
                         process::exit(0);
                     });
                 log::debug!("We imported {} inputs from disk.", state.corpus().count());
