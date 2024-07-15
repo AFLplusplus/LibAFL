@@ -18,10 +18,7 @@ use libafl::{
     },
     executors::ExitKind,
     inputs::UsesInput,
-    monitors::{
-        tui::{ui::TuiUI, TuiMonitor},
-        Monitor, MultiMonitor,
-    },
+    monitors::{tui::TuiMonitor, Monitor, MultiMonitor},
     stages::{HasCurrentStage, StagesTuple},
     state::{HasExecutions, HasLastReportTime, HasSolutions, Stoppable, UsesState},
     Error, Fuzzer, HasMetadata,
@@ -208,7 +205,10 @@ pub fn fuzz(
     if let Some(forks) = options.forks() {
         let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
         if options.tui() {
-            let monitor = TuiMonitor::new(TuiUI::new(options.fuzzer_name().to_string(), true));
+            let monitor = TuiMonitor::builder()
+                .title(options.fuzzer_name())
+                .enhanced_graphics(true)
+                .build();
             fuzz_many_forking(options, harness, shmem_provider, forks, monitor)
         } else if forks == 1 {
             let monitor = MultiMonitor::with_time(
@@ -227,7 +227,10 @@ pub fn fuzz(
         // if the user specifies TUI, we assume they want to fork; it would not be possible to use
         // TUI safely otherwise
         let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
-        let monitor = TuiMonitor::new(TuiUI::new(options.fuzzer_name().to_string(), true));
+        let monitor = TuiMonitor::builder()
+            .title(options.fuzzer_name())
+            .enhanced_graphics(true)
+            .build();
         fuzz_many_forking(options, harness, shmem_provider, 1, monitor)
     } else {
         destroy_output_fds(options);

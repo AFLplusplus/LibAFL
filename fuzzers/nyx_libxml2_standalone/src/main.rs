@@ -5,7 +5,7 @@ use libafl::{
     events::SimpleEventManager,
     feedbacks::{CrashFeedback, MaxMapFeedback},
     inputs::BytesInput,
-    monitors::tui::{ui::TuiUI, TuiMonitor},
+    monitors::tui::TuiMonitor,
     mutators::{havoc_mutations, StdScheduledMutator},
     observers::StdMapObserver,
     schedulers::RandScheduler,
@@ -40,8 +40,7 @@ fn main() {
 
     // switch monitor if you want
     // let monitor = SimpleMonitor::new(|x|-> () {println!("{}",x)});
-    let ui = TuiUI::new(String::from("test_fuzz"), true);
-    let monitor = TuiMonitor::new(ui);
+    let monitor = TuiMonitor::builder().title("test_fuzz").build();
 
     let mut mgr = SimpleEventManager::new(monitor);
     let mut executor = NyxExecutor::builder().build(helper, tuple_list!(observer));

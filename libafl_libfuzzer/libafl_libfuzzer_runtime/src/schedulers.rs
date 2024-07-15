@@ -1,8 +1,6 @@
-use std::{
-    collections::{BTreeSet, HashMap},
-    marker::PhantomData,
-};
+use std::{collections::BTreeSet, marker::PhantomData};
 
+use hashbrown::HashMap;
 use libafl::{
     corpus::{Corpus, CorpusId, Testcase},
     feedbacks::MapNoveltiesMetadata,

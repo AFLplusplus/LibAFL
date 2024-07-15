@@ -8,7 +8,7 @@ use core::{
 
 use libafl_bolts::{ownedref::OwnedSlice, HasLen};
 
-use super::{HasBytes, HasMutatorBytes, HasTargetBytes};
+use super::HasMutatorBytes;
 
 /// Gets the relevant concrete start index from [`RangeBounds`] (inclusive)
 fn start_index<R>(range: &R) -> usize
@@ -43,7 +43,7 @@ where
 #[derive(Debug)]
 pub struct BytesSlice<'a> {
     /// The (complete) parent input we will work on
-    parent_input: OwnedSlice<'a, u8>,
+    parent_slice: OwnedSlice<'a, u8>,
     /// The range inside the parent input we will work on
     range: Range<usize>,
 }
@@ -58,12 +58,18 @@ impl<'a> BytesSlice<'a> {
         let parent_len = parent_slice.len();
 
         BytesSlice {
-            parent_input: parent_slice,
+            parent_slice,
             range: Range {
                 start: start_index(&range),
                 end: end_index(&range, parent_len),
             },
         }
+    }
+
+    /// Get the sub slice as bytes.
+    #[must_use]
+    pub fn bytes(&self) -> &[u8] {
+        &self.parent_slice[self.range.clone()]
     }
 
     /// Creates a new [`BytesSubInputMut`] that's a view on an input with mutator bytes.
@@ -77,8 +83,8 @@ impl<'a> BytesSlice<'a> {
 
     /// The parent input
     #[must_use]
-    pub fn parent_input(&self) -> OwnedSlice<'a, u8> {
-        self.parent_input.clone()
+    pub fn parent_slice(&self) -> OwnedSlice<'a, u8> {
+        self.parent_slice.clone()
     }
 
     /// The inclusive start index in the parent buffer
@@ -152,13 +158,13 @@ impl<'a> BytesSlice<'a> {
 /// # pub extern "C" fn external_current_millis() -> u64 { 0 }
 ///
 /// let mut bytes_input = BytesInput::new(vec![1,2,3]);
-/// let mut sub_input = bytes_input.sub_input_mut(1..);
+/// let mut sub_input = bytes_input.sub_input(1..);
 ///
 /// // Run any mutations on the sub input.
 /// sub_input.bytes_mut()[0] = 42;
 ///
 /// // The mutations are applied to the underlying input.
-/// assert_eq!(bytes_input.bytes_ref()[1], 42);
+/// assert_eq!(bytes_input.bytes()[1], 42);
 /// ```
 ///
 /// Growing or shrinking the sub input will grow or shrink the parent input,
@@ -178,15 +184,15 @@ impl<'a> BytesSlice<'a> {
 /// let mut bytes_input = BytesInput::new(vec![1, 2, 3, 4, 5]);
 ///
 /// // Note that the range ends on an exclusive value this time.
-/// let mut sub_input = bytes_input.sub_input_mut(1..=3);
+/// let mut sub_input = bytes_input.sub_input(1..=3);
 ///
-/// assert_eq!(sub_input.bytes_ref(), &[2, 3, 4]);
+/// assert_eq!(sub_input.bytes(), &[2, 3, 4]);
 ///
 /// // We extend it with a few values.
 /// sub_input.extend(&[42, 42, 42]);
 ///
 /// // The values outside of the range are moved back and forwards, accordingly.
-/// assert_eq!(bytes_input.bytes_ref(), [1, 2, 3, 4, 42, 42, 42, 5]);
+/// assert_eq!(bytes_input.bytes(), [1, 2, 3, 4, 42, 42, 42, 5]);
 /// ```
 ///
 /// The input supports all methods in the [`HasMutatorBytes`] trait if the parent input also implements this trait.
@@ -277,31 +283,13 @@ where
     }
 }
 
-impl<'a, I> HasLen for BytesSubInputMut<'a, I>
-where
-    I: HasMutatorBytes + ?Sized,
-{
-    fn len(&self) -> usize {
-        self.range.len()
-    }
-}
-
-impl<'a, I> HasBytes for BytesSubInputMut<'a, I>
-where
-    I: HasMutatorBytes + ?Sized,
-{
-    fn bytes(&self) -> OwnedSlice<u8> {
-        (&self.parent_input.bytes_ref()[self.range.clone()]).into()
-    }
-}
-
 impl<'a, I> HasMutatorBytes for BytesSubInputMut<'a, I>
 where
-    I: HasMutatorBytes,
+    I: HasMutatorBytes + HasLen,
 {
     #[inline]
-    fn bytes_ref(&self) -> &[u8] {
-        &self.parent_input.bytes_ref()[self.range.clone()]
+    fn bytes(&self) -> &[u8] {
+        &self.parent_input.bytes()[self.range.clone()]
     }
 
     #[inline]
@@ -401,13 +389,15 @@ impl<'a> HasLen for BytesSlice<'a> {
     }
 }
 
-impl<'a> HasBytes for BytesSlice<'a> {
-    fn bytes(&self) -> OwnedSlice<u8> {
-        self.parent_input.slice(self.range.clone())
+impl<'a, I> HasLen for BytesSubInputMut<'a, I>
+where
+    I: HasMutatorBytes
+{
+    #[inline]
+    fn len(&self) -> usize {
+        self.range.len()
     }
 }
-
-impl<'a> HasTargetBytes for BytesSlice<'a> {}
 
 #[cfg(test)]
 mod tests {
@@ -417,7 +407,7 @@ mod tests {
     use libafl_bolts::HasLen;
 
     use crate::{
-        inputs::{BytesInput, HasMutatorBytes, HasTargetBytes, MutVecInput, NopInput},
+        inputs::{BytesInput, HasMutatorBytes, MutVecInput, NopInput},
         mutators::{havoc_mutations_no_crossover, MutatorsTuple},
         state::NopState,
     };
@@ -432,35 +422,35 @@ mod tests {
     fn test_bytessubinput() {
         let (bytes_input, _) = init_bytes_input();
 
-        let sub_input = bytes_input.sub_input(0..1);
-        assert_eq!(*sub_input.target_bytes(), [1]);
+        let sub_input = bytes_input.sub_bytes(0..1);
+        assert_eq!(*sub_input.bytes(), [1]);
 
-        let sub_input = bytes_input.sub_input(1..=2);
-        assert_eq!(*sub_input.target_bytes(), [2, 3]);
+        let sub_input = bytes_input.sub_bytes(1..=2);
+        assert_eq!(*sub_input.bytes(), [2, 3]);
 
-        let sub_input = bytes_input.sub_input(..);
-        assert_eq!(*sub_input.target_bytes(), [1, 2, 3, 4, 5, 6, 7]);
+        let sub_input = bytes_input.sub_bytes(..);
+        assert_eq!(*sub_input.bytes(), [1, 2, 3, 4, 5, 6, 7]);
     }
 
     #[test]
     fn test_mutablebytessubinput() {
         let (mut bytes_input, len_orig) = init_bytes_input();
 
-        let mut sub_input = bytes_input.sub_input_mut(0..1);
+        let mut sub_input = bytes_input.sub_input(0..1);
         assert_eq!(sub_input.len(), 1);
         sub_input.bytes_mut()[0] = 2;
-        assert_eq!(bytes_input.bytes_ref()[0], 2);
+        assert_eq!(bytes_input.bytes()[0], 2);
 
-        let mut sub_input = bytes_input.sub_input_mut(1..=2);
+        let mut sub_input = bytes_input.sub_input(1..=2);
         assert_eq!(sub_input.len(), 2);
         sub_input.bytes_mut()[0] = 3;
-        assert_eq!(bytes_input.bytes_ref()[1], 3);
+        assert_eq!(bytes_input.bytes()[1], 3);
 
-        let mut sub_input = bytes_input.sub_input_mut(..);
+        let mut sub_input = bytes_input.sub_input(..);
         assert_eq!(sub_input.len(), len_orig);
         sub_input.bytes_mut()[0] = 1;
         sub_input.bytes_mut()[1] = 2;
-        assert_eq!(bytes_input.bytes_ref()[0], 1);
+        assert_eq!(bytes_input.bytes()[0], 1);
     }
 
     #[test]
@@ -468,44 +458,44 @@ mod tests {
         let (mut bytes_input, len_orig) = init_bytes_input();
         let bytes_input_orig = bytes_input.clone();
 
-        let mut sub_input = bytes_input.sub_input_mut(2..);
+        let mut sub_input = bytes_input.sub_input(2..);
         assert_eq!(sub_input.len(), len_orig - 2);
         sub_input.resize(len_orig, 0);
-        assert_eq!(sub_input.bytes_ref()[sub_input.len() - 1], 0);
+        assert_eq!(sub_input.bytes()[sub_input.len() - 1], 0);
         assert_eq!(sub_input.len(), len_orig);
         assert_eq!(bytes_input.len(), len_orig + 2);
-        assert_eq!(bytes_input.bytes_ref()[bytes_input.len() - 1], 0);
+        assert_eq!(bytes_input.bytes()[bytes_input.len() - 1], 0);
 
         let (mut bytes_input, len_orig) = init_bytes_input();
 
-        let mut sub_input = bytes_input.sub_input_mut(..2);
+        let mut sub_input = bytes_input.sub_input(..2);
         assert_eq!(sub_input.len(), 2);
         sub_input.resize(3, 0);
         assert_eq!(sub_input.len(), 3);
-        assert_eq!(sub_input.bytes_ref()[sub_input.len() - 1], 0);
+        assert_eq!(sub_input.bytes()[sub_input.len() - 1], 0);
         assert_eq!(bytes_input.len(), len_orig + 1);
 
-        let mut sub_input = bytes_input.sub_input_mut(..3);
+        let mut sub_input = bytes_input.sub_input(..3);
         assert_eq!(sub_input.len(), 3);
         sub_input.resize(2, 0);
         assert_eq!(sub_input.len(), 2);
         assert_eq!(bytes_input, bytes_input_orig);
 
-        let mut sub_input = bytes_input.sub_input_mut(2..=2);
+        let mut sub_input = bytes_input.sub_input(2..=2);
         sub_input.resize(2, 0);
         sub_input.resize(1, 0);
         assert_eq!(bytes_input, bytes_input_orig);
 
-        let mut sub_input = bytes_input.sub_input_mut(..);
+        let mut sub_input = bytes_input.sub_input(..);
         assert_eq!(sub_input.len(), bytes_input_orig.len());
         sub_input.resize(1, 0);
         assert_eq!(sub_input.len(), 1);
         sub_input.resize(10, 0);
         assert_eq!(sub_input.len(), 10);
         assert_eq!(bytes_input.len(), 10);
-        assert_eq!(bytes_input.bytes_ref()[2], 0);
+        assert_eq!(bytes_input.bytes()[2], 0);
 
-        let mut sub_input = bytes_input.sub_input_mut(..);
+        let mut sub_input = bytes_input.sub_input(..);
         sub_input.resize(1, 0);
         assert_eq!(bytes_input.len(), 1);
     }
@@ -515,12 +505,12 @@ mod tests {
         let (mut bytes_input, len_orig) = init_bytes_input();
         let bytes_input_cloned = bytes_input.clone();
 
-        let mut sub_input = bytes_input.sub_input_mut(..2);
+        let mut sub_input = bytes_input.sub_input(..2);
         let drained: Vec<_> = sub_input.drain(..).collect();
         assert_eq!(sub_input.len(), 0);
         assert_eq!(bytes_input.len(), len_orig - 2);
 
-        let mut sub_input = bytes_input.sub_input_mut(..0);
+        let mut sub_input = bytes_input.sub_input(..0);
         assert_eq!(sub_input.len(), 0);
         let drained_len = drained.len();
         sub_input.extend(&drained[..]);
@@ -533,7 +523,7 @@ mod tests {
         let (mut bytes_input, _len_orig) = init_bytes_input();
         let bytes_input_cloned = bytes_input.clone();
 
-        let mut sub_input = bytes_input.sub_input_mut(..2);
+        let mut sub_input = bytes_input.sub_input(..2);
 
         // Note that if you want to use NopState in production like this, you should see the rng! :)
         let mut state: NopState<NopInput> = NopState::new();
@@ -547,7 +537,7 @@ mod tests {
     fn test_bytessubinput_use_vec() {
         let mut test_vec = vec![0, 1, 2, 3, 4];
         let mut test_vec = MutVecInput::from(&mut test_vec);
-        let mut sub_vec = test_vec.sub_input_mut(1..2);
+        let mut sub_vec = test_vec.sub_input(1..2);
         drop(sub_vec.drain(..));
         assert_eq!(test_vec.len(), 4);
     }
@@ -556,6 +546,19 @@ mod tests {
     fn test_ranges() {
         let bytes_input = BytesInput::new(vec![1, 2, 3]);
 
+        assert_eq!(bytes_input.sub_bytes(..1).start_index(), 0);
+        assert_eq!(bytes_input.sub_bytes(1..=1).start_index(), 1);
+        assert_eq!(bytes_input.sub_bytes(..1).end_index(), 1);
+        assert_eq!(bytes_input.sub_bytes(..=1).end_index(), 2);
+        assert_eq!(bytes_input.sub_bytes(1..=1).end_index(), 2);
+        assert_eq!(bytes_input.sub_bytes(1..).end_index(), 3);
+        assert_eq!(bytes_input.sub_bytes(..3).end_index(), 3);
+    }
+
+    #[test]
+    fn test_ranges_mut() {
+        let mut bytes_input = BytesInput::new(vec![1, 2, 3]);
+
         assert_eq!(bytes_input.sub_input(..1).start_index(), 0);
         assert_eq!(bytes_input.sub_input(1..=1).start_index(), 1);
         assert_eq!(bytes_input.sub_input(..1).end_index(), 1);
@@ -563,18 +566,5 @@ mod tests {
         assert_eq!(bytes_input.sub_input(1..=1).end_index(), 2);
         assert_eq!(bytes_input.sub_input(1..).end_index(), 3);
         assert_eq!(bytes_input.sub_input(..3).end_index(), 3);
-    }
-
-    #[test]
-    fn test_ranges_mut() {
-        let mut bytes_input = BytesInput::new(vec![1, 2, 3]);
-
-        assert_eq!(bytes_input.sub_input_mut(..1).start_index(), 0);
-        assert_eq!(bytes_input.sub_input_mut(1..=1).start_index(), 1);
-        assert_eq!(bytes_input.sub_input_mut(..1).end_index(), 1);
-        assert_eq!(bytes_input.sub_input_mut(..=1).end_index(), 2);
-        assert_eq!(bytes_input.sub_input_mut(1..=1).end_index(), 2);
-        assert_eq!(bytes_input.sub_input_mut(1..).end_index(), 3);
-        assert_eq!(bytes_input.sub_input_mut(..3).end_index(), 3);
     }
 }

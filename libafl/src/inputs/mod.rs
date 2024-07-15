@@ -117,13 +117,11 @@ impl Input for NopInput {
         "nop-input".to_string()
     }
 }
-impl HasBytes for NopInput {
-    fn bytes(&self) -> OwnedSlice<u8> {
-        OwnedSlice::from(vec![])
+impl HasTargetBytes for NopInput {
+    fn target_bytes(&self) -> OwnedSlice<u8> {
+        OwnedSlice::from(vec![0])
     }
 }
-
-impl HasTargetBytes for NopInput {}
 
 impl HasLen for NopInput {
     fn len(&self) -> usize {
@@ -221,28 +219,20 @@ impl<'a> From<&'a [u8]> for BytesReader<'a> {
     }
 }
 
-/// Can be represented with a vector of bytes.
-pub trait HasBytes: HasLen {
-    /// The bytes
-    fn bytes(&self) -> OwnedSlice<u8>;
-}
-
 // TODO change this to fn target_bytes(&self, buffer: &mut Vec<u8>) -> &[u8];
 /// Has a byte representation intended for the target.
 /// Can be represented with a vector of bytes.
 /// This representation is not necessarily deserializable.
 /// Instead, it can be used as bytes input for a target
-pub trait HasTargetBytes: HasBytes {
-    /// The target bytes. Defaults to the byte representation.
-    fn target_bytes(&self) -> OwnedSlice<u8> {
-        self.bytes()
-    }
+pub trait HasTargetBytes {
+    /// Target bytes, that can be written to a target
+    fn target_bytes(&self) -> OwnedSlice<u8>;
 }
 
 /// Contains mutable and resizable bytes
-pub trait HasMutatorBytes: HasBytes {
+pub trait HasMutatorBytes: HasLen {
     /// The bytes
-    fn bytes_ref(&self) -> &[u8];
+    fn bytes(&self) -> &[u8];
 
     /// The bytes to mutate
     fn bytes_mut(&mut self) -> &mut [u8];
@@ -266,20 +256,18 @@ pub trait HasMutatorBytes: HasBytes {
     where
         R: RangeBounds<usize>;
 
-    /// Creates a [`BytesSlice`] from this input, that can be used for local mutations.
-    fn sub_input<R>(&self, range: R) -> BytesSlice
+    /// Creates a [`BytesSlice`] from this input, that can be used to slice a byte array.
+    fn sub_bytes<R>(&self, range: R) -> BytesSlice
     where
         R: RangeBounds<usize>,
-        Self: Sized,
     {
-        BytesSlice::new(self.bytes(), range)
+        BytesSlice::new(OwnedSlice::from(self.bytes()), range)
     }
 
-    /// Creates a [`BytesSubInputMut`] from this input, that can be used for local mutations.
-    fn sub_input_mut<R>(&mut self, range: R) -> BytesSubInputMut<Self>
+    /// Creates a [`BytesSlice`] from this input, that can be used for local mutations.
+    fn sub_input<R>(&mut self, range: R) -> BytesSubInputMut<Self>
     where
         R: RangeBounds<usize>,
-        Self: Sized,
     {
         BytesSubInputMut::new(self, range)
     }
@@ -301,14 +289,8 @@ impl<'a> HasLen for MutVecInput<'a> {
     }
 }
 
-impl<'a> HasBytes for MutVecInput<'a> {
-    fn bytes(&self) -> OwnedSlice<u8> {
-        OwnedSlice::from(self.0.as_slice())
-    }
-}
-
 impl<'a> HasMutatorBytes for MutVecInput<'a> {
-    fn bytes_ref(&self) -> &[u8] {
+    fn bytes(&self) -> &[u8] {
         self.0
     }
 
@@ -420,7 +402,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::inputs::{BytesReader, HasTargetBytes};
+    use crate::inputs::BytesReader;
 
     #[test]
     fn test_bytesreader_toslice_unchecked() {
@@ -428,17 +410,17 @@ mod tests {
         let mut bytes_reader = BytesReader::new(&bytes_input);
 
         let bytes_read = bytes_reader.next_sub_slice_truncated(2);
-        assert_eq!(*bytes_read.target_bytes(), [1, 2]);
+        assert_eq!(*bytes_read.bytes(), [1, 2]);
 
         let bytes_read = bytes_reader.next_sub_slice_truncated(3);
-        assert_eq!(*bytes_read.target_bytes(), [3, 4, 5]);
+        assert_eq!(*bytes_read.bytes(), [3, 4, 5]);
 
         let bytes_read = bytes_reader.next_sub_slice_truncated(8);
-        assert_eq!(*bytes_read.target_bytes(), [6, 7]);
+        assert_eq!(*bytes_read.bytes(), [6, 7]);
 
         let bytes_read = bytes_reader.next_sub_slice_truncated(8);
         let bytes_read_ref: &[u8] = &[];
-        assert_eq!(&*bytes_read.target_bytes(), bytes_read_ref);
+        assert_eq!(&*bytes_read.bytes(), bytes_read_ref);
     }
 
     #[test]
@@ -447,14 +429,14 @@ mod tests {
         let mut bytes_reader = BytesReader::new(&bytes_input);
 
         let bytes_read = bytes_reader.next_sub_input(2);
-        assert_eq!(*bytes_read.unwrap().target_bytes(), [1, 2]);
+        assert_eq!(*bytes_read.unwrap().bytes(), [1, 2]);
 
         let bytes_read = bytes_reader.next_sub_input(3);
-        assert_eq!(*bytes_read.unwrap().target_bytes(), [3, 4, 5]);
+        assert_eq!(*bytes_read.unwrap().bytes(), [3, 4, 5]);
 
         let bytes_read = bytes_reader.next_sub_input(8);
         assert_eq!(
-            *bytes_read.unwrap_err().partial().unwrap().target_bytes(),
+            *bytes_read.unwrap_err().partial().unwrap().bytes(),
             [6, 7]
         );
 
