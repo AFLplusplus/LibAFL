@@ -83,7 +83,7 @@ CXXFLAGS='-fsanitize=fuzzer-no-link'
 The runtime for `libafl_libfuzzer` may be used standalone as a direct replacement for libFuzzer with other targets as
 well.
 To do so, [ensure a recent nightly version of Rust is installed](https://rustup.rs/), then enter the
-[`libafl_libfuzzer_runtime`](runtime) folder and build the runtime with the following command:
+[`libafl_libfuzzer_runtime`](../libafl_libfuzzer_runtime) folder and build the runtime with the following command:
 
 ```bash
 ./build.sh

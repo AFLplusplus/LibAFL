@@ -21,7 +21,7 @@ cargo +nightly build --profile "$profile"
 
 if [[ "$OSTYPE" == "darwin"* ]]; then
   # MacOS and iOS
-  "${CXX:-clang++}" -dynamiclib -Wl,-force_load ../target/release/libafl_libfuzzer_runtime.a  \
+  "${CXX:-clang++}" -dynamiclib -Wl,-force_load target/release/libafl_libfuzzer_runtime.a  \
     -Wl,-U,_LLVMFuzzerInitialize -Wl,-U,_LLVMFuzzerCustomMutator -Wl,-U,_LLVMFuzzerCustomCrossOver -Wl,-U,_libafl_main \
     -o libafl_libfuzzer_runtime.dylib
 else
@@ -44,7 +44,7 @@ else
   trap cleanup INT TERM
 
   tmpdir="$(mktemp -d)"
-  "${RUST_LLD}" -flavor gnu -r --whole-archive ../target/release/libafl_libfuzzer_runtime.a -o "${tmpdir}/libFuzzer.o"
+  "${RUST_LLD}" -flavor gnu -r --whole-archive target/release/libafl_libfuzzer_runtime.a -o "${tmpdir}/libFuzzer.o"
   "${RUST_AR}" cr libFuzzer.a "${tmpdir}/libFuzzer.o"
 
   echo "Done! Wrote the runtime to \`${SCRIPT_DIR}/libFuzzer.a'"
