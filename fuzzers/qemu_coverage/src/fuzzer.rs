@@ -119,7 +119,7 @@ pub fn fuzz() {
     env::remove_var("LD_LIBRARY_PATH");
     let env: Vec<(String, String)> = env::vars().collect();
 
-    let mut coverage_path = PathBuf::from(&options.coverage);
+    let mut coverage_path: PathBuf = options.coverage.into();
 
     let emulator_tools = tuple_list!(QemuDrCovTool::new(
         QemuInstrumentationAddressRangeFilter::None,
