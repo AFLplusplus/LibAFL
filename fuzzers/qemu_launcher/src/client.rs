@@ -9,10 +9,10 @@ use libafl::{
 };
 use libafl_bolts::{core_affinity::CoreId, rands::StdRand, tuples::tuple_list};
 #[cfg(feature = "injections")]
-use libafl_qemu::injections::QemuInjectionHelper;
+use libafl_qemu::injections::QemuInjectionTool;
 use libafl_qemu::{
-    asan::{init_qemu_with_asan, QemuAsanHelper},
-    asan_guest::{init_qemu_with_asan_guest, QemuAsanGuestHelper},
+    asan::{init_qemu_with_asan, QemuAsanTool},
+    asan_guest::{init_qemu_with_asan_guest, QemuAsanGuestTool},
     cmplog::QemuCmpLogTool,
     edges::QemuEdgeCoverageTool,
     elf::EasyElf,
@@ -134,25 +134,25 @@ impl<'a> Client<'a> {
         log::debug!("start_pc @ {start_pc:#x}");
 
         #[cfg(not(feature = "injections"))]
-        let injection_helper = None;
+        let injection_tool = None;
 
         #[cfg(feature = "injections")]
-        let injection_helper = self
+        let injection_tool = self
             .options
             .injections
             .as_ref()
             .and_then(|injections_file| {
                 let lower = injections_file.to_lowercase();
                 if lower.ends_with("yaml") || lower.ends_with("yml") {
-                    Some(QemuInjectionHelper::from_yaml(injections_file).unwrap())
+                    Some(QemuInjectionTool::from_yaml(injections_file).unwrap())
                 } else if lower.ends_with("toml") {
-                    Some(QemuInjectionHelper::from_toml(injections_file).unwrap())
+                    Some(QemuInjectionTool::from_toml(injections_file).unwrap())
                 } else {
                     None
                 }
             });
 
-        let extra_tokens = injection_helper.as_ref().map(|h| h.tokens.clone());
+        let extra_tokens = injection_tool.as_ref().map(|h| h.tokens.clone());
 
         qemu.entry_break(start_pc);
 
@@ -164,7 +164,7 @@ impl<'a> Client<'a> {
 
         let is_cmplog = self.options.is_cmplog_core(core_id);
 
-        let edge_coverage_helper = QemuEdgeCoverageTool::new(self.coverage_filter(&qemu)?);
+        let edge_coverage_tool = QemuEdgeCoverageTool::new(self.coverage_filter(&qemu)?);
 
         let instance = Instance::builder()
             .options(self.options)
@@ -174,96 +174,96 @@ impl<'a> Client<'a> {
             .extra_tokens(extra_tokens);
 
         if is_asan && is_cmplog {
-            if let Some(injection_helper) = injection_helper {
+            if let Some(injection_tool) = injection_tool {
                 instance.build().run(
                     tuple_list!(
-                        edge_coverage_helper,
+                        edge_coverage_tool,
                         QemuCmpLogTool::default(),
-                        QemuAsanHelper::default(asan.take().unwrap()),
-                        injection_helper,
+                        QemuAsanTool::default(asan.take().unwrap()),
+                        injection_tool,
                     ),
                     state,
                 )
             } else {
                 instance.build().run(
                     tuple_list!(
-                        edge_coverage_helper,
+                        edge_coverage_tool,
                         QemuCmpLogTool::default(),
-                        QemuAsanHelper::default(asan.take().unwrap()),
+                        QemuAsanTool::default(asan.take().unwrap()),
                     ),
                     state,
                 )
             }
         } else if is_asan_guest && is_cmplog {
-            if let Some(injection_helper) = injection_helper {
+            if let Some(injection_tool) = injection_tool {
                 instance.build().run(
                     tuple_list!(
-                        edge_coverage_helper,
+                        edge_coverage_tool,
                         QemuCmpLogTool::default(),
-                        QemuAsanGuestHelper::default(&qemu, asan_lib.take().unwrap()),
-                        injection_helper
+                        QemuAsanGuestTool::default(&qemu, asan_lib.take().unwrap()),
+                        injection_tool
                     ),
                     state,
                 )
             } else {
                 instance.build().run(
                     tuple_list!(
-                        edge_coverage_helper,
+                        edge_coverage_tool,
                         QemuCmpLogTool::default(),
-                        QemuAsanGuestHelper::default(&qemu, asan_lib.take().unwrap()),
+                        QemuAsanGuestTool::default(&qemu, asan_lib.take().unwrap()),
                     ),
                     state,
                 )
             }
         } else if is_asan {
-            if let Some(injection_helper) = injection_helper {
+            if let Some(injection_tool) = injection_tool {
                 instance.build().run(
                     tuple_list!(
-                        edge_coverage_helper,
-                        QemuAsanHelper::default(asan.take().unwrap()),
-                        injection_helper
+                        edge_coverage_tool,
+                        QemuAsanTool::default(asan.take().unwrap()),
+                        injection_tool
                     ),
                     state,
                 )
             } else {
                 instance.build().run(
                     tuple_list!(
-                        edge_coverage_helper,
-                        QemuAsanHelper::default(asan.take().unwrap()),
+                        edge_coverage_tool,
+                        QemuAsanTool::default(asan.take().unwrap()),
                     ),
                     state,
                 )
             }
         } else if is_asan_guest {
-            let helpers = tuple_list!(
-                edge_coverage_helper,
-                QemuAsanGuestHelper::default(&qemu, asan_lib.take().unwrap())
+            let tools = tuple_list!(
+                edge_coverage_tool,
+                QemuAsanGuestTool::default(&qemu, asan_lib.take().unwrap())
             );
-            instance.build().run(helpers, state)
+            instance.build().run(tools, state)
         } else if is_cmplog {
-            if let Some(injection_helper) = injection_helper {
+            if let Some(injection_tool) = injection_tool {
                 instance.build().run(
                     tuple_list!(
-                        edge_coverage_helper,
+                        edge_coverage_tool,
                         QemuCmpLogTool::default(),
-                        injection_helper
+                        injection_tool
                     ),
                     state,
                 )
             } else {
                 instance.build().run(
-                    tuple_list!(edge_coverage_helper, QemuCmpLogTool::default()),
+                    tuple_list!(edge_coverage_tool, QemuCmpLogTool::default()),
                     state,
                 )
             }
-        } else if let Some(injection_helper) = injection_helper {
+        } else if let Some(injection_tool) = injection_tool {
             instance
                 .build()
-                .run(tuple_list!(edge_coverage_helper, injection_helper), state)
+                .run(tuple_list!(edge_coverage_tool, injection_tool), state)
         } else {
             instance
                 .build()
-                .run(tuple_list!(edge_coverage_helper), state)
+                .run(tuple_list!(edge_coverage_tool), state)
         }
     }
 }

@@ -40,8 +40,8 @@ use libafl_bolts::{
 use libafl_qemu::{
     cmplog::CmpLogObserver,
     edges::{edges_map_mut_ptr, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND},
-    helpers::QemuHelperTuple,
-    Qemu, QemuExecutor, QemuHooks,
+    EmulatorToolTuple,
+    Qemu, QemuExecutor, Emulator, NopEmulatorExitHandler, command::NopCommandManager
 };
 use typed_builder::TypedBuilder;
 
@@ -68,12 +68,10 @@ pub struct Instance<'a, M: Monitor> {
 }
 
 impl<'a, M: Monitor> Instance<'a, M> {
-    pub fn run<ET>(&mut self, helpers: ET, state: Option<ClientState>) -> Result<(), Error>
+    pub fn run<ET>(&mut self, tools: ET, state: Option<ClientState>) -> Result<(), Error>
     where
-        ET: QemuHelperTuple<ClientState> + Debug,
+        ET: EmulatorToolTuple<ClientState> + Debug,
     {
-        let mut hooks = QemuHooks::new(*self.qemu, helpers);
-
         // Create an observation channel using the coverage map
         let edges_observer = unsafe {
             HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
@@ -153,10 +151,12 @@ impl<'a, M: Monitor> Instance<'a, M> {
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
+        let mut emulator = Emulator::new_with_qemu(*self.qemu, tools, NopEmulatorExitHandler, NopCommandManager).unwrap();
+
         if self.options.is_cmplog_core(self.core_id) {
             // Create a QEMU in-process executor
             let executor = QemuExecutor::new(
-                &mut hooks,
+                &mut emulator,
                 &mut harness,
                 observers,
                 &mut fuzzer,
@@ -194,7 +194,7 @@ impl<'a, M: Monitor> Instance<'a, M> {
         } else {
             // Create a QEMU in-process executor
             let mut executor = QemuExecutor::new(
-                &mut hooks,
+                &mut emulator,
                 &mut harness,
                 observers,
                 &mut fuzzer,
