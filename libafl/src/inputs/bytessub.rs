@@ -36,7 +36,7 @@ where
     min(end, max_len)
 }
 
-/// An immutable contiguous subslice of an input implementing [`HasTargetBytes`].
+/// An immutable contiguous subslice of a byte slice.
 /// It is mostly useful to cheaply wrap a subslice of a given input.
 ///
 /// A mutable version is available: [`BytesSubInputMut`].
