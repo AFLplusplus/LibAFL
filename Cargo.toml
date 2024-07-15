@@ -7,6 +7,8 @@ members = [
     "libafl_derive",
     "libafl_targets",
     "libafl_sugar",
+    "libafl_concolic/test/dump_constraints",
+    "libafl_concolic/test/runtime_test",
     "utils/build_and_test_fuzzers",
     "utils/deexit",
     "utils/libafl_benches",
@@ -32,8 +34,7 @@ exclude = [
     "scripts",
     "libafl_concolic/symcc_runtime",
     "libafl_concolic/symcc_libafl",
-    "libafl_concolic/test/dump_constraints",
-    "libafl_concolic/test/runtime_test",
+
     "libafl_frida",
     "libafl_libfuzzer",
     "libafl_nyx",
