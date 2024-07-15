@@ -10,22 +10,24 @@ use std::{
 };
 
 use libafl::{
-    corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata, Testcase},
+    corpus::{Corpus, HasCurrentCorpusId, HasTestcase, SchedulerTestcaseMetadata, Testcase},
     events::EventFirer,
+    executors::HasObservers,
     inputs::UsesInput,
-    schedulers::{minimizer::IsFavoredMetadata, SchedulerMetadata},
+    observers::MapObserver,
+    schedulers::{minimizer::IsFavoredMetadata, AflScheduler, Scheduler},
     stages::{calibrate::UnstableEntriesMetadata, Stage},
     state::{HasCorpus, HasExecutions, HasImported, HasStartTime, Stoppable, UsesState},
-    Error, HasMetadata, HasNamedMetadata,
+    Error, HasMetadata, HasNamedMetadata, HasScheduler,
 };
-use libafl_bolts::{current_time, os::peak_rss_mb_child_processes};
+use libafl_bolts::{current_time, os::peak_rss_mb_child_processes, tuples::MatchNameRef};
 
 use crate::{fuzzer::fuzzer_target_mode, Opt};
 
 /// The [`AflStatsStage`] is a Stage that calculates and writes
 /// AFL++'s `fuzzer_stats` and `plot_data` information.
 #[derive(Debug, Clone)]
-pub struct AflStatsStage<E, EM, Z>
+pub struct AflStatsStage<E, EM, Z, C, O>
 where
     E: UsesState,
     EM: EventFirer<State = E::State>,
@@ -61,7 +63,7 @@ where
     target_mode: Cow<'static, str>,
     /// full command line used for the fuzzing session
     command_line: Cow<'static, str>,
-    phantom: PhantomData<(E, EM, Z)>,
+    phantom: PhantomData<(E, EM, Z, C, O)>,
 }
 
 #[derive(Debug, Clone)]
@@ -181,7 +183,7 @@ pub struct AFLPlotData<'a> {
     edges_found: &'a u64,
 }
 
-impl<E, EM, Z> UsesState for AflStatsStage<E, EM, Z>
+impl<E, EM, Z, C, O> UsesState for AflStatsStage<E, EM, Z, C, O>
 where
     E: UsesState,
     EM: EventFirer<State = E::State>,
@@ -190,23 +192,27 @@ where
     type State = E::State;
 }
 
-impl<E, EM, Z> Stage<E, EM, Z> for AflStatsStage<E, EM, Z>
+impl<E, EM, Z, C, O> Stage<E, EM, Z> for AflStatsStage<E, EM, Z, C, O>
 where
-    E: UsesState,
+    E: UsesState + HasObservers,
     EM: EventFirer<State = E::State>,
-    Z: UsesState<State = E::State>,
+    Z: UsesState<State = E::State> + HasScheduler,
     E::State: HasImported
         + HasCorpus
         + HasMetadata
         + HasStartTime
         + HasExecutions
         + HasNamedMetadata
-        + Stoppable,
+        + Stoppable
+        + HasTestcase,
+    O: MapObserver,
+    C: AsRef<O>,
+    <Z as HasScheduler>::Scheduler: Scheduler + AflScheduler<C, O, E::State>,
 {
     fn perform(
         &mut self,
-        _fuzzer: &mut Z,
-        _executor: &mut E,
+        fuzzer: &mut Z,
+        executor: &mut E,
         state: &mut E::State,
         _manager: &mut EM,
     ) -> Result<(), Error> {
@@ -240,13 +246,18 @@ where
         let corpus_size = state.corpus().count();
         let total_executions = *state.executions();
 
-        let scheduler_metadata = state.metadata::<SchedulerMetadata>().unwrap();
-        let queue_cycles = scheduler_metadata.queue_cycles();
+        let scheduler = fuzzer.scheduler();
+        let queue_cycles = scheduler.queue_cycles();
         self.maybe_update_cycles(queue_cycles);
         self.maybe_update_cycles_wo_finds(queue_cycles);
 
-        let filled_entries_in_map = scheduler_metadata.bitmap_entries();
-        let map_size = scheduler_metadata.bitmap_size();
+        let observers = executor.observers();
+        let map_observer = observers
+            .get(scheduler.map_observer_handle())
+            .ok_or_else(|| Error::key_not_found("invariant: MapObserver not found".to_string()))?
+            .as_ref();
+        let filled_entries_in_map = map_observer.count_bytes();
+        let map_size = map_observer.usable_count();
 
         let unstable_entries_metadata = state
             .metadata_map()
@@ -291,7 +302,7 @@ where
             slowest_exec_ms: self.slowest_exec.as_millis(),
             peak_rss_mb: peak_rss_mb_child_processes()?,
             cpu_affinity: 0, // TODO
-            total_edges: map_size,
+            total_edges: map_size as u64,
             edges_found: filled_entries_in_map,
             var_byte_count: unstable_entries_metadata.unstable_entries().len(),
             havoc_expansion: 0,   // TODO
@@ -331,9 +342,9 @@ where
     }
 }
 
-impl<E, EM, Z> AflStatsStage<E, EM, Z>
+impl<E, EM, Z, C, O> AflStatsStage<E, EM, Z, C, O>
 where
-    E: UsesState,
+    E: UsesState + HasObservers,
     EM: EventFirer<State = E::State>,
     Z: UsesState<State = E::State>,
     E::State: HasImported + HasCorpus + HasMetadata + HasExecutions,

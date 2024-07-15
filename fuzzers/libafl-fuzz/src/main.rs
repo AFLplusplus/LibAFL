@@ -115,7 +115,7 @@ struct Opt {
     power_schedule: Option<PowerSchedule>,
     #[arg(short = 'c')]
     cmplog_binary: Option<PathBuf>,
-    #[arg(short = 'F', num_args=32)]
+    #[arg(short = 'F', num_args = 32)]
     foreign_sync_dirs: Vec<PathBuf>,
     // Environment + CLI variables
     #[arg(short = 'G')]
@@ -191,7 +191,7 @@ struct Opt {
     // TODO: actually use this config
     #[arg(short='l', value_parser=parse_cmplog_args)]
     cmplog_opts: Option<CmplogOpts>,
-    
+
     #[clap(skip)]
     foreign_sync_interval: Duration,
 

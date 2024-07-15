@@ -170,17 +170,15 @@ where
     // Or a "Weighted Random" which prioritizes entries that take less time and hit more edges
     let scheduler;
     if opt.sequential_queue {
-        scheduler = SupportedSchedulers::Queue(QueueScheduler::new(), PhantomData);
+        scheduler = SupportedSchedulers::Queue(QueueScheduler::new(&edges_observer), PhantomData);
     } else {
         let mut weighted_scheduler =
             StdWeightedScheduler::with_schedule(&mut state, &edges_observer, Some(strategy));
         if opt.cycle_schedules {
             weighted_scheduler = weighted_scheduler.cycling_scheduler();
         }
-        scheduler = SupportedSchedulers::Weighted(
-            IndexesLenTimeMinimizerScheduler::new(&edges_observer, weighted_scheduler),
-            PhantomData,
-        );
+        // TODO: Go back to IndexesLenTimeMinimizerScheduler once AflScheduler is implemented for it.
+        scheduler = SupportedSchedulers::Weighted(weighted_scheduler, PhantomData);
     }
 
     // Create our Fuzzer

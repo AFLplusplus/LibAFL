@@ -159,7 +159,8 @@ where
 
         Ok(())
     }
-    
+
+    /// The amount of cycles the scheduler has completed. 
     fn queue_cycles(&self) -> u64;
 }
 
