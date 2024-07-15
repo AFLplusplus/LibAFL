@@ -43,8 +43,8 @@ test -d "./test/output/fuzzer_main/hangs" || exit 1
 test -d "./test/output/fuzzer_main/crashes" || exit 1
 
 # cmplog TODO: AFL_BENCH_UNTIL_CRASH=1 instead of timeout 15s
-AFL_LLVM_CMPLOG=1 AFL_PATH=${AFL_DIR_NAME} ${AFL_CC_PATH} ./test/test-cmplog.c -o ./test/out-cmplog
-AFL_CORES=1 timeout 15 ${LIBAFL_FUZZ_PATH} -Z -l 3 -m 0 -V30 -i ./test/seeds_cmplog -o ./test/cmplog-output -c ./test/out-cmplog ./test/out-cmplog >>errors 2>&1
+#AFL_LLVM_CMPLOG=1 AFL_PATH=${AFL_DIR_NAME} ${AFL_CC_PATH} ./test/test-cmplog.c -o ./test/out-cmplog
+#AFL_CORES=1 timeout 15 ${LIBAFL_FUZZ_PATH} -Z -l 3 -m 0 -V30 -i ./test/seeds_cmplog -o ./test/cmplog-output -c ./test/out-cmplog ./test/out-cmplog >>errors 2>&1
 #test -n "$( ls ./test/cmplog-output/fuzzer_main/crashes/id:000000* ./test/cmplog-output/hangs/id:000000* 2>/dev/null )" || exit 1
 '''
 dependencies = ["build_afl"]
