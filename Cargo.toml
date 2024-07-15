@@ -23,6 +23,7 @@ default-members = [
     "libafl_derive",
     "libafl_targets",
 ]
+
 exclude = [
     "bindings",
     "fuzzers",
@@ -32,10 +33,12 @@ exclude = [
     "utils/desyscall",
     "utils/multi_machine_generator",
     "scripts",
+    # additional crates
     "libafl_concolic/symcc_runtime",
     "libafl_concolic/symcc_libafl",
     "libafl_frida",
     "libafl_libfuzzer",
+    "libafl_libfuzzer_runtime",
     "libafl_nyx",
     "libafl_qemu",
     "libafl_tinyinst",
