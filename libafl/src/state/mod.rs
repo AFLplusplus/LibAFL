@@ -193,7 +193,7 @@ pub trait HasLastFoundTime {
     fn last_found_time(&self) -> &Duration;
 
     /// The last time we found something by ourselves (mutable)
-    fn last_report_time_mut(&mut self) -> &mut Duration;
+    fn last_found_time_mut(&mut self) -> &mut Duration;
 }
 
 
@@ -446,7 +446,7 @@ impl<I, C, R, SC> HasLastFoundTime for StdState<I, C, R, SC> {
     /// Return the number of new paths that imported from other fuzzers
     #[inline]
     fn last_found_time_mut(&mut self) -> &mut Duration {
-        &mut self.imported
+        &mut self.last_found_time
     }
 }
 

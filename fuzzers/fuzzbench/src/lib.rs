@@ -36,7 +36,7 @@ use libafl::{
         calibrate::CalibrationStage, power::StdPowerMutationalStage, StdMutationalStage,
         TracingStage, pruning::{RestartStage, CorpusPruning}, logics::IfStage,
     },
-    state::{HasCorpus, StdState, HasExecutions},
+    state::{HasCorpus, StdState, HasExecutions, HasLastFoundTime},
     Error, HasMetadata,
 };
 use libafl_bolts::{
@@ -351,8 +351,8 @@ fn fuzz(
 
     let cb = |_fuzzer: &mut _, _executor: &mut _, state: &mut StdState<_, _, _, _>, _event_manager: &mut _| -> Result<bool, Error> {
         let cur = current_time();
-        if state.last_report_time() - cur > Duration::from_secs(5) {
-            state.last_report_time_mut() = cur;
+        if *state.last_found_time() - cur > Duration::from_secs(5) {
+            *state.last_found_time_mut() = cur;
             return Ok(true);
         }
         else{

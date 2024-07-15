@@ -18,7 +18,7 @@ use crate::{
     stages::{HasCurrentStage, StagesTuple},
     start_timer,
     state::{
-        HasCorpus, HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime, HasSolutions,
+        HasCorpus, HasCurrentTestcase, HasExecutions, HasLastReportTime, HasSolutions,
         Stoppable, UsesState,
     },
     Error, HasMetadata,
@@ -388,7 +388,6 @@ where
         + HasSolutions
         + HasExecutions
         + HasCorpus
-        + HasImported
         + HasCurrentTestcase<<Self::State as UsesInput>::Input>
         + HasCurrentCorpusId,
 {
@@ -607,7 +606,7 @@ where
     OT: ObserversTuple<Self::State> + Serialize + DeserializeOwned,
     F: Feedback<Self::State>,
     OF: Feedback<Self::State>,
-    CS::State: HasCorpus + HasSolutions + HasExecutions + HasImported,
+    CS::State: HasCorpus + HasSolutions + HasExecutions,
 {
     /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
@@ -640,7 +639,7 @@ where
     F: Feedback<Self::State>,
     OF: Feedback<Self::State>,
     OT: ObserversTuple<Self::State> + Serialize + DeserializeOwned,
-    CS::State: HasCorpus + HasSolutions + HasExecutions + HasImported,
+    CS::State: HasCorpus + HasSolutions + HasExecutions,
 {
     /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
@@ -776,7 +775,6 @@ where
         + HasMetadata
         + HasCorpus
         + HasTestcase
-        + HasImported
         + HasLastReportTime
         + HasCurrentCorpusId
         + HasCurrentStage,
