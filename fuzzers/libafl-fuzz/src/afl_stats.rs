@@ -15,24 +15,25 @@ use libafl::{
     executors::HasObservers,
     inputs::UsesInput,
     observers::MapObserver,
-    schedulers::{minimizer::IsFavoredMetadata, AflScheduler, Scheduler},
+    schedulers::{minimizer::IsFavoredMetadata, AflScheduler, HasQueueCycles, Scheduler},
     stages::{calibrate::UnstableEntriesMetadata, Stage},
     state::{HasCorpus, HasExecutions, HasImported, HasStartTime, Stoppable, UsesState},
     Error, HasMetadata, HasNamedMetadata, HasScheduler,
 };
-use libafl_bolts::{current_time, os::peak_rss_mb_child_processes, tuples::MatchNameRef};
+use libafl_bolts::{
+    current_time,
+    os::peak_rss_mb_child_processes,
+    tuples::{Handle, Handled, MatchNameRef},
+    Named,
+};
 
 use crate::{fuzzer::fuzzer_target_mode, Opt};
 
 /// The [`AflStatsStage`] is a Stage that calculates and writes
 /// AFL++'s `fuzzer_stats` and `plot_data` information.
 #[derive(Debug, Clone)]
-pub struct AflStatsStage<E, EM, Z, C, O>
-where
-    E: UsesState,
-    EM: EventFirer<State = E::State>,
-    Z: UsesState<State = E::State>,
-{
+pub struct AflStatsStage<C, O, E, EM, Z> {
+    map_observer_handle: Handle<C>,
     fuzzer_dir: PathBuf,
     start_time: u64,
     // the number of testcases that have been fuzzed
@@ -63,7 +64,7 @@ where
     target_mode: Cow<'static, str>,
     /// full command line used for the fuzzing session
     command_line: Cow<'static, str>,
-    phantom: PhantomData<(E, EM, Z, C, O)>,
+    phantom: PhantomData<(C, O, E, EM, Z)>,
 }
 
 #[derive(Debug, Clone)]
@@ -183,7 +184,7 @@ pub struct AFLPlotData<'a> {
     edges_found: &'a u64,
 }
 
-impl<E, EM, Z, C, O> UsesState for AflStatsStage<E, EM, Z, C, O>
+impl<C, O, E, EM, Z> UsesState for AflStatsStage<C, O, E, EM, Z>
 where
     E: UsesState,
     EM: EventFirer<State = E::State>,
@@ -192,7 +193,7 @@ where
     type State = E::State;
 }
 
-impl<E, EM, Z, C, O> Stage<E, EM, Z> for AflStatsStage<E, EM, Z, C, O>
+impl<C, O, E, EM, Z> Stage<E, EM, Z> for AflStatsStage<C, O, E, EM, Z>
 where
     E: UsesState + HasObservers,
     EM: EventFirer<State = E::State>,
@@ -206,8 +207,8 @@ where
         + Stoppable
         + HasTestcase,
     O: MapObserver,
-    C: AsRef<O>,
-    <Z as HasScheduler>::Scheduler: Scheduler + AflScheduler<C, O, E::State>,
+    C: AsRef<O> + Named,
+    <Z as HasScheduler>::Scheduler: Scheduler + HasQueueCycles,
 {
     fn perform(
         &mut self,
@@ -253,7 +254,7 @@ where
 
         let observers = executor.observers();
         let map_observer = observers
-            .get(scheduler.map_observer_handle())
+            .get(&self.map_observer_handle)
             .ok_or_else(|| Error::key_not_found("invariant: MapObserver not found".to_string()))?
             .as_ref();
         let filled_entries_in_map = map_observer.count_bytes();
@@ -342,20 +343,23 @@ where
     }
 }
 
-impl<E, EM, Z, C, O> AflStatsStage<E, EM, Z, C, O>
+impl<C, O, E, EM, Z> AflStatsStage<C, O, E, EM, Z>
 where
     E: UsesState + HasObservers,
     EM: EventFirer<State = E::State>,
     Z: UsesState<State = E::State>,
     E::State: HasImported + HasCorpus + HasMetadata + HasExecutions,
+    C: AsRef<O> + Named,
+    O: MapObserver,
 {
     /// create a new instance of the [`AflStatsStage`]
     #[allow(clippy::too_many_arguments)]
     #[must_use]
-    pub fn new(opt: &Opt, fuzzer_dir: PathBuf) -> Self {
+    pub fn new(opt: &Opt, fuzzer_dir: PathBuf, map_observer: &C) -> Self {
         Self::create_plot_data_file(&fuzzer_dir).unwrap();
         Self::create_fuzzer_stats_file(&fuzzer_dir).unwrap();
         Self {
+            map_observer_handle: map_observer.handle(),
             start_time: current_time().as_secs(),
             stats_report_interval: Duration::from_secs(opt.stats_interval),
             has_fuzzed_size: 0,

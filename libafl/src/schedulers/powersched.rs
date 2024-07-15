@@ -9,6 +9,7 @@ use libafl_bolts::{
 };
 use serde::{Deserialize, Serialize};
 
+use super::HasQueueCycles;
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
     inputs::UsesInput,
@@ -236,11 +237,17 @@ where
     fn map_observer_handle(&self) -> &Handle<C> {
         &self.map_observer_handle
     }
+}
 
+impl<C, O, S> HasQueueCycles for PowerQueueScheduler<C, O, S>
+where
+    S: HasCorpus + HasMetadata + HasTestcase + State,
+    O: MapObserver,
+    C: AsRef<O>,
+{
     fn queue_cycles(&self) -> u64 {
-       self.queue_cycles
+        self.queue_cycles
     }
-
 }
 
 impl<C, O, S> Scheduler for PowerQueueScheduler<C, O, S>

@@ -159,7 +159,11 @@ where
 
         Ok(())
     }
+}
 
+pub trait HasQueueCycles: Scheduler 
+    where Self::State: HasCorpus
+{
     /// The amount of cycles the scheduler has completed. 
     fn queue_cycles(&self) -> u64;
 }

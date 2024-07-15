@@ -95,6 +95,9 @@ where
         tuple_list!(CalibrationStage::new(&map_feedback)),
     );
 
+    // Create a AFLStatsStage;
+    let afl_stats_stage = AflStatsStage::new(opt, fuzzer_dir.clone(), &edges_observer);
+
     // Create an observation channel to keep track of the execution time.
     let time_observer = TimeObserver::new("time");
 
@@ -170,7 +173,7 @@ where
     // Or a "Weighted Random" which prioritizes entries that take less time and hit more edges
     let scheduler;
     if opt.sequential_queue {
-        scheduler = SupportedSchedulers::Queue(QueueScheduler::new(&edges_observer), PhantomData);
+        scheduler = SupportedSchedulers::Queue(QueueScheduler::new(), PhantomData);
     } else {
         let mut weighted_scheduler =
             StdWeightedScheduler::with_schedule(&mut state, &edges_observer, Some(strategy));
@@ -247,9 +250,6 @@ where
 
     // Tell [`SeedFeedback`] that we're done loading seeds; rendering it benign.
     fuzzer.feedback_mut().done_loading_seeds();
-
-    // Create a AFLStatsStage;
-    let afl_stats_stage = AflStatsStage::new(opt, fuzzer_dir.clone());
 
     // Set LD_PRELOAD (Linux) && DYLD_INSERT_LIBRARIES (OSX) for target.
     if let Some(preload_env) = &opt.afl_preload {

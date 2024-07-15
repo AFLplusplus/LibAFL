@@ -3,41 +3,33 @@
 use alloc::borrow::ToOwned;
 use core::marker::PhantomData;
 
-use libafl_bolts::{
-    tuples::{Handle, Handled},
-    Named,
-};
-
+use super::HasQueueCycles;
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase},
-    observers::MapObserver,
-    prelude::HasRand,
-    schedulers::{AflScheduler, RemovableScheduler, Scheduler},
+    schedulers::{RemovableScheduler, Scheduler},
     state::{HasCorpus, State, UsesState},
-    Error, HasMetadata,
+    Error,
 };
 
 /// Walk the corpus in a queue-like fashion
 #[derive(Debug, Clone)]
-pub struct QueueScheduler<C, O, S> {
+pub struct QueueScheduler<S> {
     queue_cycles: u64,
     runs_in_current_cycle: u64,
     last_hash: usize,
-    map_observer_handle: Handle<C>,
-    phantom: PhantomData<(O, S)>,
+    phantom: PhantomData<S>,
 }
 
-impl<C, O, S> UsesState for QueueScheduler<C, O, S>
+impl<S> UsesState for QueueScheduler<S>
 where
     S: State,
 {
     type State = S;
 }
 
-impl<C, O, S> RemovableScheduler for QueueScheduler<C, O, S> where S: HasCorpus + HasTestcase + State
-{}
+impl<S> RemovableScheduler for QueueScheduler<S> where S: HasCorpus + HasTestcase + State {}
 
-impl<C, O, S> Scheduler for QueueScheduler<C, O, S>
+impl<S> Scheduler for QueueScheduler<S>
 where
     S: HasCorpus + HasTestcase + State,
 {
@@ -79,41 +71,23 @@ where
     }
 }
 
-impl<C, O, S> QueueScheduler<C, O, S>
-where
-    C: AsRef<O> + Named,
-{
+impl<S> QueueScheduler<S> {
     /// Creates a new `QueueScheduler`
     #[must_use]
-    pub fn new(map_observer: &C) -> Self {
+    pub fn new() -> Self {
         Self {
             runs_in_current_cycle: 0,
             queue_cycles: 0,
             last_hash: 0,
-            map_observer_handle: map_observer.handle(),
             phantom: PhantomData,
         }
     }
 }
 
-impl<C, O, S> AflScheduler<C, O, S> for QueueScheduler<C, O, S>
+impl<S> HasQueueCycles for QueueScheduler<S>
 where
-    O: MapObserver,
-    S: HasCorpus + HasMetadata + HasTestcase + HasRand + State,
-    C: AsRef<O> + Named,
+    S: HasCorpus + HasTestcase + State,
 {
-    fn last_hash(&self) -> usize {
-        self.last_hash
-    }
-
-    fn set_last_hash(&mut self, hash: usize) {
-        self.last_hash = hash;
-    }
-
-    fn map_observer_handle(&self) -> &Handle<C> {
-        &self.map_observer_handle
-    }
-
     fn queue_cycles(&self) -> u64 {
         self.queue_cycles
     }

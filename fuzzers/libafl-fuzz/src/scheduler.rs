@@ -4,7 +4,7 @@ use libafl::{
     corpus::{CorpusId, HasTestcase, Testcase},
     inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
-    schedulers::{AflScheduler, RemovableScheduler, Scheduler},
+    schedulers::{AflScheduler, HasQueueCycles, RemovableScheduler, Scheduler},
     state::{HasCorpus, HasRand, State, UsesState},
     Error, HasMetadata,
 };
@@ -13,19 +13,19 @@ use libafl_bolts::{
     Named,
 };
 
-pub enum SupportedSchedulers<S, Q, W, C, O> {
-    Queue(Q, PhantomData<(S, Q, W, C, O)>),
-    Weighted(W, PhantomData<(S, Q, W, C, O)>),
+pub enum SupportedSchedulers<S, Q, W> {
+    Queue(Q, PhantomData<(S, Q, W)>),
+    Weighted(W, PhantomData<(S, Q, W)>),
 }
 
-impl<S, Q, W, C, O> UsesState for SupportedSchedulers<S, Q, W, C, O>
+impl<S, Q, W> UsesState for SupportedSchedulers<S, Q, W>
 where
     S: State + HasRand + HasCorpus + HasMetadata + HasTestcase,
 {
     type State = S;
 }
 
-impl<S, Q, W, C, O> RemovableScheduler for SupportedSchedulers<S, Q, W, C, O>
+impl<S, Q, W> RemovableScheduler for SupportedSchedulers<S, Q, W>
 where
     S: UsesInput + HasTestcase + HasMetadata + HasCorpus + HasRand + State,
     Q: Scheduler<State = S> + RemovableScheduler,
@@ -56,7 +56,7 @@ where
     }
 }
 
-impl<S, Q, W, C, O> Scheduler for SupportedSchedulers<S, Q, W, C, O>
+impl<S, Q, W> Scheduler for SupportedSchedulers<S, Q, W>
 where
     S: UsesInput + HasTestcase + HasMetadata + HasCorpus + HasRand + State,
     Q: Scheduler<State = S>,
@@ -103,35 +103,12 @@ where
     }
 }
 
-impl<S, Q, W, C, O> AflScheduler<C, O, S> for SupportedSchedulers<S, Q, W, C, O>
+impl<S, Q, W> HasQueueCycles for SupportedSchedulers<S, Q, W>
 where
-    O: MapObserver,
-    C: AsRef<O> + Named,
     S: UsesInput + HasTestcase + HasMetadata + HasCorpus + HasRand + State,
-    Q: Scheduler<State = S> + RemovableScheduler + AflScheduler<C, O, S>,
-    W: Scheduler<State = S> + RemovableScheduler + AflScheduler<C, O, S>,
+    Q: Scheduler<State = S> + HasQueueCycles,
+    W: Scheduler<State = S> + HasQueueCycles,
 {
-    fn last_hash(&self) -> usize {
-        match self {
-            Self::Queue(queue, _) => queue.last_hash(),
-            Self::Weighted(weighted, _) => weighted.last_hash(),
-        }
-    }
-
-    fn set_last_hash(&mut self, hash: usize) {
-        match self {
-            Self::Queue(queue, _) => queue.set_last_hash(hash),
-            Self::Weighted(weighted, _) => weighted.set_last_hash(hash),
-        }
-    }
-
-    fn map_observer_handle(&self) -> &Handle<C> {
-        match self {
-            Self::Queue(queue, _) => queue.map_observer_handle(),
-            Self::Weighted(weighted, _) => weighted.map_observer_handle(),
-        }
-    }
-
     fn queue_cycles(&self) -> u64 {
         match self {
             Self::Queue(queue, _) => queue.queue_cycles(),

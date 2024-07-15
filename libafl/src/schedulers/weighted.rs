@@ -25,6 +25,8 @@ use crate::{
     Error, HasMetadata,
 };
 
+use super::HasQueueCycles;
+
 /// The Metadata for `WeightedScheduler`
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
@@ -308,8 +310,17 @@ where
         &self.map_observer_handle
     }
     
+}
+
+impl<C, F, O, S> HasQueueCycles for WeightedScheduler<C, F, O, S>
+where
+    F: TestcaseScore<S>,
+    O: MapObserver,
+    S: HasCorpus + HasMetadata + HasRand + HasTestcase + State,
+    C: AsRef<O> + Named,
+{
     fn queue_cycles(&self) -> u64 {
-       self.queue_cycles 
+        self.queue_cycles
     }
 }
 
