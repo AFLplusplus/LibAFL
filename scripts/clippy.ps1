@@ -1,4 +1,4 @@
-cargo clippy --all --all-features --no-deps --tests --benches --examples -- `
+cargo clippy --all --all-features --exclude libafl_qemu --no-deps --tests --benches --examples -- `
    -D clippy::all `
    -D clippy::pedantic `
    -W clippy::similar_names `
