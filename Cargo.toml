@@ -34,7 +34,6 @@ exclude = [
     "scripts",
     "libafl_concolic/symcc_runtime",
     "libafl_concolic/symcc_libafl",
-
     "libafl_frida",
     "libafl_libfuzzer",
     "libafl_nyx",
