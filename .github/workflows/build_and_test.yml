@@ -276,6 +276,7 @@ jobs:
     needs:
       - ubuntu
       - fuzzers-preflight
+      - common
     strategy:
       fail-fast: true
       matrix:
