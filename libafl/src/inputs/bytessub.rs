@@ -1,4 +1,4 @@
-//! [`BytesSubInput`] is a wrapper input that can be used to mutate parts of a byte slice
+//! [`BytesSubInputMut`] is a wrapper input that can be used to mutate parts of a byte slice
 
 use alloc::vec::Vec;
 use core::{
@@ -6,7 +6,7 @@ use core::{
     ops::{Bound, Range, RangeBounds},
 };
 
-use libafl_bolts::HasLen;
+use libafl_bolts::{ownedref::OwnedSlice, HasLen};
 
 use super::HasMutatorBytes;
 
@@ -27,14 +27,124 @@ fn end_index<R>(range: &R, max_len: usize) -> usize
 where
     R: RangeBounds<usize>,
 {
-    match range.end_bound() {
+    let end = match range.end_bound() {
         Bound::Unbounded => max_len,
         Bound::Included(end) => end + 1,
         Bound::Excluded(end) => *end,
+    };
+
+    min(end, max_len)
+}
+
+/// An immutable contiguous subslice of an input implementing [`HasTargetBytes`].
+/// It is mostly useful to cheaply wrap a subslice of a given input.
+///
+/// A mutable version is available: [`BytesSubInputMut`].
+#[derive(Debug)]
+pub struct BytesSlice<'a> {
+    /// The (complete) parent input we will work on
+    parent_slice: OwnedSlice<'a, u8>,
+    /// The range inside the parent input we will work on
+    range: Range<usize>,
+}
+
+impl<'a> BytesSlice<'a> {
+    /// Creates a new [`BytesSubInputMut`] that's a view on an input with mutator bytes.
+    /// The sub input can then be used to mutate parts of the original input.
+    pub fn new<R>(parent_slice: OwnedSlice<'a, u8>, range: R) -> Self
+    where
+        R: RangeBounds<usize>,
+    {
+        let parent_len = parent_slice.len();
+
+        BytesSlice {
+            parent_slice,
+            range: Range {
+                start: start_index(&range),
+                end: end_index(&range, parent_len),
+            },
+        }
+    }
+
+    /// Get the sub slice as bytes.
+    #[must_use]
+    pub fn bytes(&self) -> &[u8] {
+        &self.parent_slice[self.range.clone()]
+    }
+
+    /// Creates a new [`BytesSubInputMut`] that's a view on an input with mutator bytes.
+    /// The sub input can then be used to mutate parts of the original input.
+    pub fn with_slice<R>(parent_slice: &'a [u8], range: R) -> Self
+    where
+        R: RangeBounds<usize>,
+    {
+        Self::new(parent_slice.into(), range)
+    }
+
+    /// The parent input
+    #[must_use]
+    pub fn parent_slice(&self) -> OwnedSlice<'a, u8> {
+        self.parent_slice.clone()
+    }
+
+    /// The inclusive start index in the parent buffer
+    #[must_use]
+    pub fn start_index(&self) -> usize {
+        self.range.start
+    }
+
+    /// The exclusive end index in the parent buffer
+    #[must_use]
+    pub fn end_index(&self) -> usize {
+        self.range.end
+    }
+
+    /// Creates a sub range in the current own range
+    pub fn sub_range<R>(&self, range: R) -> (Bound<usize>, Bound<usize>)
+    where
+        R: RangeBounds<usize>,
+    {
+        let start = match (self.range.start_bound(), range.start_bound()) {
+            (Bound::Unbounded, Bound::Unbounded) => Bound::Unbounded,
+            (Bound::Excluded(bound), Bound::Unbounded)
+            | (Bound::Unbounded, Bound::Excluded(bound)) => Bound::Excluded(*bound),
+            (Bound::Included(bound), Bound::Unbounded)
+            | (Bound::Unbounded, Bound::Included(bound)) => Bound::Included(*bound),
+            (Bound::Included(own), Bound::Included(other)) => Bound::Included(own + other),
+            (Bound::Included(own), Bound::Excluded(other))
+            | (Bound::Excluded(own), Bound::Included(other)) => Bound::Excluded(own + other),
+            (Bound::Excluded(own), Bound::Excluded(other)) => Bound::Excluded(own + other + 1),
+        };
+
+        let end = match (self.range.end_bound(), range.end_bound()) {
+            (Bound::Unbounded, Bound::Unbounded) => Bound::Unbounded,
+            (Bound::Excluded(bound), Bound::Unbounded) => Bound::Excluded(*bound),
+            (Bound::Unbounded, Bound::Excluded(bound)) => {
+                Bound::Excluded(self.end_index() - *bound)
+            }
+            (Bound::Included(bound), Bound::Unbounded) => Bound::Included(*bound),
+            (Bound::Unbounded, Bound::Included(bound)) => {
+                Bound::Included(self.end_index() - *bound)
+            }
+            (Bound::Included(own), Bound::Included(other)) => {
+                Bound::Included(min(*own, self.start_index() + other))
+            }
+            (Bound::Included(own), Bound::Excluded(other)) => {
+                Bound::Included(min(*own, self.start_index() + other - 1))
+            }
+            (Bound::Excluded(own), Bound::Included(other)) => {
+                Bound::Included(min(*own - 1, self.start_index() + other))
+            }
+            (Bound::Excluded(own), Bound::Excluded(other)) => {
+                Bound::Excluded(min(*own, self.start_index() + other))
+            }
+        };
+
+        (start, end)
     }
 }
 
-/// The [`BytesSubInput`] makes it possible to use [`crate::mutators::Mutator`]`s` that work on
+/// The [`BytesSubInputMut`] makes it possible to use [`crate::mutators::Mutator`]`s` that work on
 /// inputs implementing the [`HasMutatorBytes`] for a sub-range of this input.
 /// For example, we can do the following:
 /// ```rust
@@ -85,9 +195,9 @@ where
 /// assert_eq!(bytes_input.bytes(), [1, 2, 3, 4, 42, 42, 42, 5]);
 /// ```
 ///
-/// The input supports all methods in the [`HasMutatorBytes`] trait.
+/// The input supports all methods in the [`HasMutatorBytes`] trait if the parent input also implements this trait.
 #[derive(Debug)]
-pub struct BytesSubInput<'a, I>
+pub struct BytesSubInputMut<'a, I>
 where
     I: HasMutatorBytes + ?Sized,
 {
@@ -97,11 +207,11 @@ where
     pub(crate) range: Range<usize>,
 }
 
-impl<'a, I> BytesSubInput<'a, I>
+impl<'a, I> BytesSubInputMut<'a, I>
 where
     I: HasMutatorBytes + ?Sized + HasLen,
 {
-    /// Creates a new [`BytesSubInput`] that's a view on an input with mutator bytes.
+    /// Creates a new [`BytesSubInputMut`] that's a view on an input with mutator bytes.
     /// The sub input can then be used to mutate parts of the original input.
     pub fn new<R>(parent_input: &'a mut I, range: R) -> Self
     where
@@ -109,7 +219,7 @@ where
     {
         let parent_len = parent_input.len();
 
-        BytesSubInput {
+        BytesSubInputMut {
             parent_input,
             range: Range {
                 start: start_index(&range),
@@ -173,7 +283,7 @@ where
     }
 }
 
-impl<'a, I> HasMutatorBytes for BytesSubInput<'a, I>
+impl<'a, I> HasMutatorBytes for BytesSubInputMut<'a, I>
 where
     I: HasMutatorBytes + HasLen,
 {
@@ -272,13 +382,20 @@ where
     }
 }
 
-impl<'a, I> HasLen for BytesSubInput<'a, I>
+impl<'a> HasLen for BytesSlice<'a> {
+    #[inline]
+    fn len(&self) -> usize {
+        self.range.len()
+    }
+}
+
+impl<'a, I> HasLen for BytesSubInputMut<'a, I>
 where
-    I: HasMutatorBytes + HasLen,
+    I: HasMutatorBytes
 {
     #[inline]
     fn len(&self) -> usize {
-        self.range.end - self.range.start
+        self.range.len()
     }
 }
 
@@ -303,6 +420,20 @@ mod tests {
 
     #[test]
     fn test_bytessubinput() {
+        let (bytes_input, _) = init_bytes_input();
+
+        let sub_input = bytes_input.sub_bytes(0..1);
+        assert_eq!(*sub_input.bytes(), [1]);
+
+        let sub_input = bytes_input.sub_bytes(1..=2);
+        assert_eq!(*sub_input.bytes(), [2, 3]);
+
+        let sub_input = bytes_input.sub_bytes(..);
+        assert_eq!(*sub_input.bytes(), [1, 2, 3, 4, 5, 6, 7]);
+    }
+
+    #[test]
+    fn test_mutablebytessubinput() {
         let (mut bytes_input, len_orig) = init_bytes_input();
 
         let mut sub_input = bytes_input.sub_input(0..1);
@@ -413,6 +544,19 @@ mod tests {
 
     #[test]
     fn test_ranges() {
+        let bytes_input = BytesInput::new(vec![1, 2, 3]);
+
+        assert_eq!(bytes_input.sub_bytes(..1).start_index(), 0);
+        assert_eq!(bytes_input.sub_bytes(1..=1).start_index(), 1);
+        assert_eq!(bytes_input.sub_bytes(..1).end_index(), 1);
+        assert_eq!(bytes_input.sub_bytes(..=1).end_index(), 2);
+        assert_eq!(bytes_input.sub_bytes(1..=1).end_index(), 2);
+        assert_eq!(bytes_input.sub_bytes(1..).end_index(), 3);
+        assert_eq!(bytes_input.sub_bytes(..3).end_index(), 3);
+    }
+
+    #[test]
+    fn test_ranges_mut() {
         let mut bytes_input = BytesInput::new(vec![1, 2, 3]);
 
         assert_eq!(bytes_input.sub_input(..1).start_index(), 0);
