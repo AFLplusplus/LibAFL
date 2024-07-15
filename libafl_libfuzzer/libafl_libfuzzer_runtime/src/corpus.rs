@@ -1,11 +1,12 @@
 use std::{
     cell::RefCell,
-    collections::{hash_map::Entry, BTreeMap, HashMap},
+    collections::BTreeMap,
     io::ErrorKind,
     path::PathBuf,
     sync::atomic::{AtomicU64, Ordering},
 };
 
+use hashbrown::{hash_map::Entry, HashMap};
 use libafl::{
     corpus::{
         inmemory::{TestcaseStorage, TestcaseStorageMap},
