@@ -212,7 +212,7 @@ pub trait Fuzzer<E, EM, ST>: Sized + UsesState
 where
     Self::State: HasMetadata + HasExecutions + HasLastReportTime + Stoppable,
     E: UsesState<State = Self::State>,
-    EM: ProgressReporter<State = Self::State> + EventProcessor<E, Self>,
+    EM: ProgressReporter<State = Self::State>,
     ST: StagesTuple<E, EM, Self::State, Self>,
 {
     /// Fuzz for a single iteration.
@@ -244,14 +244,8 @@ where
         loop {
             // log::info!("Starting another fuzz_loop");
             manager.maybe_report_progress(state, monitor_timeout)?;
-            if state.stop_requested() {
-                state.discard_stop_request();
-                manager.on_shutdown()?;
-                break;
-            }
             self.fuzz_one(stages, executor, state, manager)?;
         }
-        Ok(())
     }
 
     /// Fuzz for n iterations.
@@ -282,10 +276,6 @@ where
 
         for _ in 0..iters {
             manager.maybe_report_progress(state, monitor_timeout)?;
-            if state.stop_requested() {
-                state.discard_stop_request();
-                break;
-            }
             ret = Some(self.fuzz_one(stages, executor, state, manager)?);
         }
 
@@ -833,6 +823,12 @@ where
         }
 
         state.clear_corpus_id()?;
+
+        if state.stop_requested() {
+            state.discard_stop_request();
+            manager.on_shutdown()?;
+            return Err(Error::shutting_down())
+        }
 
         Ok(id)
     }
