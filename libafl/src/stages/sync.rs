@@ -1,15 +1,13 @@
 //! The [`SyncFromDiskStage`] is a stage that imports inputs from disk for e.g. sync with AFL
 
-use alloc::borrow::{Cow, ToOwned};
-use core::{marker::PhantomData, time::Duration};
-use std::{
-    fs,
-    path::{Path, PathBuf},
-    time::SystemTime,
+use alloc::{
+    borrow::{Cow, ToOwned},
     vec::Vec,
 };
+use core::{marker::PhantomData, time::Duration};
+use std::path::{Path, PathBuf};
 
-use libafl_bolts::{current_time, shmem::ShMemProvider, Named};
+use libafl_bolts::{current_time, fs::find_new_files_rec, shmem::ShMemProvider, Named};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "introspection")]
@@ -24,6 +22,9 @@ use crate::{
     state::{HasCorpus, HasExecutions, HasRand, State, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
+
+/// Default name for `SyncFromDiskStage`; derived from AFL++
+pub const SYNC_FROM_DISK_STAGE_NAME: &str = "sync";
 
 /// Metadata used to store information about disk sync time
 #[cfg_attr(
@@ -49,46 +50,6 @@ impl SyncFromDiskMetadata {
             left_to_sync,
         }
     }
-}
-
-/// Default name for `SyncFromDiskStage`; derived from AFL++
-pub const SYNC_FROM_DISK_STAGE_NAME: &str = "sync";
-
-/// Finds new files in the given directory, taking the last time we looked at this path as parameter.
-/// This method works recursively.
-/// If `last` is `None`, it'll load all file.
-fn find_new_files_rec<P: AsRef<Path>>(
-    dir: P,
-    last_check: &Option<Duration>,
-) -> Result<Vec<PathBuf>, Error> {
-    let mut new_files = Vec::<PathBuf>::new();
-    for entry in fs::read_dir(dir)? {
-        let entry = entry?;
-        let path = entry.path();
-        let attributes = fs::metadata(&path);
-
-        if attributes.is_err() {
-            continue;
-        }
-
-        let attr = attributes?;
-
-        if attr.is_file() && attr.len() > 0 {
-            if let Ok(time) = attr.modified() {
-                if let Some(last_check) = last_check {
-                    if time.duration_since(SystemTime::UNIX_EPOCH).unwrap() < *last_check {
-                        continue;
-                    }
-                }
-                new_files.push(path.clone());
-            }
-        } else if attr.is_dir() {
-            let dir_left_to_sync = find_new_files_rec(&entry.path(), last_check)?;
-            new_files.extend(dir_left_to_sync);
-        }
-    }
-
-    Ok(new_files)
 }
 
 /// A stage that loads testcases from disk to sync with other fuzzers such as AFL++
