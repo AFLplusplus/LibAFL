@@ -161,6 +161,15 @@ where
     }
 }
 
+/// Trait for Schedulers which track queue cycles
+pub trait HasQueueCycles: Scheduler
+where
+    Self::State: HasCorpus,
+{
+    /// The amount of cycles the scheduler has completed.
+    fn queue_cycles(&self) -> u64;
+}
+
 /// The scheduler define how the fuzzer requests a testcase from the corpus.
 /// It has hooks to corpus add/replace/remove to allow complex scheduling algorithms to collect data.
 pub trait Scheduler: UsesState

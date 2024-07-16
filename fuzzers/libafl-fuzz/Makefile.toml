@@ -1,0 +1,66 @@
+[env]
+PROJECT_DIR = { script = ["pwd"] }
+CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
+PROFILE = { value = "release", condition = {env_not_set = ["PROFILE"]} }
+PROFILE_DIR = {value = "release", condition = {env_not_set = ["PROFILE_DIR"] }}
+FUZZER_NAME = 'libafl-fuzz'
+FUZZER = '${CARGO_TARGET_DIR}/${PROFILE_DIR}/${FUZZER_NAME}'
+LLVM_CONFIG = {value = "llvm-config-18", condition = {env_not_set = ["LLVM_CONFIG"] }}
+AFL_VERSION = "4.21c"
+AFL_DIR_NAME= {value = "./AFLplusplus-${AFL_VERSION}"}
+AFL_CC_PATH= {value = "${AFL_DIR_NAME}/afl-clang-fast"}
+
+
+[tasks.build_afl]
+script_runner="@shell"
+script='''
+if [ ! -d "$AFL_DIR_NAME" ]; then
+	if [ -f "v${AFL_VERSION}.zip" ]; then
+		rm v${AFL_VERSION}.zip
+	fi
+	wget https://github.com/AFLplusplus/AFLplusplus/archive/refs/tags/v${AFL_VERSION}.zip
+	unzip v${AFL_VERSION}.zip
+	cd ${AFL_DIR_NAME}
+	LLVM_CONFIG=${LLVM_CONFIG} make 
+	cd ..
+fi
+
+'''
+# Test
+[tasks.test]
+linux_alias = "test_unix"
+mac_alias = "test_unix"
+windows_alias = "unsupported"
+
+[tasks.test_unix]
+script_runner="@shell"
+script='''
+cargo build --profile ${PROFILE}
+AFL_PATH=${AFL_DIR_NAME} ${AFL_CC_PATH} ./test/test-instr.c -o ./test/out-instr
+AFL_CORES=1 AFL_STATS_INTERVAL=1 timeout 5 ${FUZZER} -i ./test/seeds -o ./test/output ./test/out-instr || true
+test -n "$( ls ./test/output/fuzzer_main/queue/id:000002* 2>/dev/null )" || exit 1
+test -n "$( ls ./test/output/fuzzer_main/fuzzer_stats 2>/dev/null )" || exit 1
+test -n "$( ls ./test/output/fuzzer_main/plot_data 2>/dev/null )" || exit 1
+test -d "./test/output/fuzzer_main/hangs" || exit 1
+test -d "./test/output/fuzzer_main/crashes" || exit 1
+
+# cmplog TODO: AFL_BENCH_UNTIL_CRASH=1 instead of timeout 15s
+#AFL_LLVM_CMPLOG=1 AFL_PATH=${AFL_DIR_NAME} ${AFL_CC_PATH} ./test/test-cmplog.c -o ./test/out-cmplog
+#AFL_CORES=1 timeout 15 ${FUZZER} -Z -l 3 -m 0 -V30 -i ./test/seeds_cmplog -o ./test/cmplog-output -c ./test/out-cmplog ./test/out-cmplog >>errors 2>&1
+#test -n "$( ls ./test/cmplog-output/fuzzer_main/crashes/id:000000* ./test/cmplog-output/hangs/id:000000* 2>/dev/null )" || exit 1
+'''
+dependencies = ["build_afl"]
+
+[tasks.clean]
+linux_alias = "clean_unix"
+mac_alias = "clean_unix"
+windows_alias = "unsupported"
+
+[tasks.clean_unix]
+script_runner="@shell"
+script='''
+rm -rf AFLplusplus-${AFL_VERSION}
+rm v${AFL_VERSION}.zip
+rm -rf ./test/out-instr
+rm -rf ./test/output
+'''
