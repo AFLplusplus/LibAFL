@@ -5,7 +5,7 @@ use core::marker::PhantomData;
 use libafl_bolts::{rands::Rand, Error};
 
 #[cfg(feature = "std")]
-use crate::events::EventRestarter;
+use crate::{events::EventRestarter, state::Stoppable};
 use crate::{
     corpus::Corpus,
     stages::Stage,
