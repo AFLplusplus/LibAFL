@@ -35,9 +35,9 @@ use libafl_bolts::{
     tuples::{tuple_list, Handled, Merge},
     AsSlice,
 };
-pub use libafl_qemu::qemu::Qemu;
 #[cfg(not(any(feature = "mips", feature = "hexagon")))]
 use libafl_qemu::modules::CmpLogModule;
+pub use libafl_qemu::qemu::Qemu;
 use libafl_qemu::{
     command::NopCommandManager,
     modules::edges::{self, EdgeCoverageModule},

@@ -47,13 +47,13 @@ use libafl_bolts::{
 };
 use libafl_qemu::{
     command::NopCommandManager,
-    edges::{EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND},
     elf::EasyElf,
     filter_qemu_args,
     // asan::{init_with_asan, QemuAsanHelper},
     modules::cmplog::{CmpLogModule, CmpLogObserver},
-    modules::edges::edges_map_mut_ptr,
-    modules::edges::EdgeCoverageModule,
+    modules::edges::{
+        edges_map_mut_ptr, EdgeCoverageModule, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
+    },
     Emulator,
     GuestReg,
     //snapshot::QemuSnapshotHelper,
