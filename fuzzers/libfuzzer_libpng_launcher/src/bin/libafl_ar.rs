@@ -1,6 +1,6 @@
 use std::env;
 
-use libafl_cc::{ArWrapper, Configuration, ModuleWrapper};
+use libafl_cc::{ArWrapper, Configuration, ToolWrapper};
 
 pub fn main() {
     let args: Vec<String> = env::args().collect();
@@ -25,11 +25,11 @@ pub fn main() {
                 Configuration::UndefinedBehaviorSanitizer,
             ]))
             .run()
-            .expect("Failed to run the wrapped libmodule")
+            .expect("Failed to run the wrapped libtool")
         {
             std::process::exit(code);
         }
     } else {
-        panic!("LibAFL libmodule: No Arguments given");
+        panic!("LibAFL libtool: No Arguments given");
     }
 }
