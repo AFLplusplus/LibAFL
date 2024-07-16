@@ -97,7 +97,7 @@ where
             .map(|m| m.last_time);
 
         if let Some(last) = last {
-            if (last + self.interval) < current_time() {
+            if (last + self.interval) > current_time() {
                 return Ok(());
             }
         }
