@@ -54,11 +54,15 @@ impl SyncFromDiskMetadata {
 /// Default name for `SyncFromDiskStage`; derived from AFL++
 pub const SYNC_FROM_DISK_STAGE_NAME: &str = "sync";
 
-/// Loads new files from a directory, taking the last time we looked at this path as parameter.
+/// Finds new files in the given directory, taking the last time we looked at this path as parameter.
+/// This method works recursively.
 /// If `last` is `None`, it'll load all file.
-fn load_new_from_directory(path: &PathBuf, last: &Option<Duration>) -> Result<Vec<PathBuf>, Error> {
-    let mut left_to_sync = Vec::<PathBuf>::new();
-    for entry in fs::read_dir(path)? {
+fn find_new_files_rec<P: AsRef<Path>>(
+    dir: P,
+    last_check: &Option<Duration>,
+) -> Result<Vec<PathBuf>, Error> {
+    let mut new_files = Vec::<PathBuf>::new();
+    for entry in fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
         let attributes = fs::metadata(&path);
@@ -71,21 +75,20 @@ fn load_new_from_directory(path: &PathBuf, last: &Option<Duration>) -> Result<Ve
 
         if attr.is_file() && attr.len() > 0 {
             if let Ok(time) = attr.modified() {
-                if let Some(last) = last {
-                    if time.duration_since(SystemTime::UNIX_EPOCH).unwrap() < *last {
+                if let Some(last_check) = last_check {
+                    if time.duration_since(SystemTime::UNIX_EPOCH).unwrap() < *last_check {
                         continue;
                     }
                 }
-                log::info!("Syncing file: {:?}", path);
-                left_to_sync.push(path.clone());
+                new_files.push(path.clone());
             }
         } else if attr.is_dir() {
-            let dir_left_to_sync = load_new_from_directory(&entry.path(), last)?;
-            left_to_sync.extend(dir_left_to_sync);
+            let dir_left_to_sync = find_new_files_rec(&entry.path(), last_check)?;
+            new_files.extend(dir_left_to_sync);
         }
     }
 
-    Ok(left_to_sync)
+    Ok(new_files)
 }
 
 /// A stage that loads testcases from disk to sync with other fuzzers such as AFL++
@@ -147,7 +150,7 @@ where
         let mut new_files = vec![];
         for dir in &self.sync_dirs {
             log::debug!("Syncing from dir: {:?}", dir);
-            let new_dir_files = load_new_from_directory(dir, &max_time)?;
+            let new_dir_files = find_new_files_rec(dir, &max_time)?;
             new_files.extend(new_dir_files);
         }
         *state.metadata_mut::<SyncFromDiskMetadata>().unwrap() = SyncFromDiskMetadata {
@@ -170,7 +173,7 @@ where
                 .unwrap()
                 .left_to_sync
                 .retain(|p| p != &path);
-            log::debug!("Evaluating: {:?}", path);
+            log::debug!("Syncing and evaluating {:?}", path);
             fuzzer.evaluate_input(state, executor, manager, input)?;
         }
 
