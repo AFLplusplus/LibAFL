@@ -4,13 +4,13 @@ use core::marker::PhantomData;
 
 use libafl_bolts::{rands::Rand, Error};
 
-#[cfg(feature = "std")]
-use crate::{events::EventRestarter, state::Stoppable};
 use crate::{
     corpus::Corpus,
     stages::Stage,
     state::{HasCorpus, HasRand, UsesState},
 };
+#[cfg(feature = "std")]
+use crate::{events::EventRestarter, state::Stoppable};
 
 #[derive(Debug)]
 /// The stage to probablistically disable a corpus entry.
@@ -62,9 +62,20 @@ where
         // Iterate over every corpus entry
         let n_corpus = state.corpus().count_all();
         let mut do_retain = vec![];
+        let mut retain_any = false;
         for _ in 0..n_corpus {
             let r = state.rand_mut().below(100) as f64;
-            do_retain.push((self.prob * 100_f64) < r);
+            let retain = self.prob * 100_f64 < r;
+            if retain {
+                retain_any = true;
+            }
+            do_retain.push(retain);
+        }
+
+        // Make sure that at least somthing is in the
+        if !retain_any {
+            let r = state.rand_mut().below(n_corpus);
+            do_retain[r] = true;
         }
 
         for (i_th, retain) in do_retain.iter().enumerate().take(n_corpus) {
