@@ -22,9 +22,10 @@ use serde::{Deserialize, Serialize};
 use crate::SYS_execve;
 use crate::{
     elf::EasyElf,
-    emu::EmulatorTools,
+    emu::EmulatorModules,
+    modules::{EmulatorModule, EmulatorModuleTuple},
     qemu::{ArchExtras, Hook, SyscallHookResult},
-    CallingConvention, EmulatorTool, EmulatorToolTuple, Qemu,
+    CallingConvention, Qemu,
 };
 
 #[cfg(cpu_target = "hexagon")]
@@ -149,13 +150,13 @@ pub struct Match {
 }
 
 #[derive(Debug)]
-pub struct QemuInjectionTool {
+pub struct InjectionModule {
     pub tokens: Vec<String>,
     definitions: HashMap<String, InjectionDefinition>,
     matches_list: Vec<Matches>,
 }
 
-impl QemuInjectionTool {
+impl InjectionModule {
     /// `configure_injections` is the main function to activate the injection
     /// vulnerability detection feature.
     pub fn from_yaml<P: AsRef<Path> + Display>(yaml_file: P) -> Result<Self, Error> {
@@ -210,20 +211,20 @@ impl QemuInjectionTool {
         })
     }
 
-    fn on_call_check<ET, S>(emulator_tools: &mut EmulatorTools<ET, S>, id: usize, parameter: u8)
+    fn on_call_check<ET, S>(emulator_modules: &mut EmulatorModules<ET, S>, id: usize, parameter: u8)
     where
-        ET: EmulatorToolTuple<S>,
+        ET: EmulatorModuleTuple<S>,
         S: Unpin + UsesInput,
     {
-        let qemu = emulator_tools.qemu();
+        let qemu = emulator_modules.qemu();
         let reg: GuestAddr = qemu
             .current_cpu()
             .unwrap()
             .read_function_argument(CallingConvention::Cdecl, parameter)
             .unwrap_or_default();
 
-        let tool = emulator_tools.match_tool_mut::<Self>().unwrap();
-        let matches = &tool.matches_list[id];
+        let module = emulator_modules.match_module_mut::<Self>().unwrap();
+        let matches = &module.matches_list[id];
 
         //println!("reg value = {:x}", reg);
 
@@ -255,22 +256,22 @@ impl QemuInjectionTool {
     }
 }
 
-impl<S> EmulatorTool<S> for QemuInjectionTool
+impl<S> EmulatorModule<S> for InjectionModule
 where
     S: Unpin + UsesInput,
 {
-    fn init_tool<ET>(&self, emulator_tools: &mut EmulatorTools<ET, S>)
+    fn init_module<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
     where
-        ET: EmulatorToolTuple<S>,
+        ET: EmulatorModuleTuple<S>,
     {
-        emulator_tools.syscalls(Hook::Function(syscall_hook::<ET, S>));
+        emulator_modules.syscalls(Hook::Function(syscall_hook::<ET, S>));
     }
 
-    fn first_exec<ET>(&mut self, emulator_tools: &mut EmulatorTools<ET, S>)
+    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
     where
-        ET: EmulatorToolTuple<S>,
+        ET: EmulatorModuleTuple<S>,
     {
-        let qemu = emulator_tools.qemu();
+        let qemu = emulator_modules.qemu();
         let mut libs: Vec<LibInfo> = Vec::new();
 
         for region in qemu.mappings() {
@@ -319,7 +320,7 @@ where
                 let param = func_definition.param;
 
                 for hook_addr in hook_addrs {
-                    emulator_tools.instructions(
+                    emulator_modules.instructions(
                         hook_addr,
                         Hook::Closure(Box::new(move |hooks, _state, _guest_addr| {
                             Self::on_call_check(hooks, id, param);
@@ -333,7 +334,7 @@ where
 }
 
 fn syscall_hook<ET, S>(
-    emulator_tools: &mut EmulatorTools<ET, S>, // our instantiated QemuHooks
+    emulator_modules: &mut EmulatorModules<ET, S>, // our instantiated QemuHooks
     _state: Option<&mut S>,
     syscall: i32,  // syscall number
     x0: GuestAddr, // registers ...
@@ -346,14 +347,14 @@ fn syscall_hook<ET, S>(
     _x7: GuestAddr,
 ) -> SyscallHookResult
 where
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + UsesInput,
 {
     log::trace!("syscall_hook {syscall} {SYS_execve}");
     debug_assert!(i32::try_from(SYS_execve).is_ok());
     if syscall == SYS_execve as i32 {
-        let _tool = emulator_tools
-            .match_tool_mut::<QemuInjectionTool>()
+        let _module = emulator_modules
+            .match_module_mut::<InjectionModule>()
             .unwrap();
         if x0 > 0 && x1 > 0 {
             let c_array = x1 as *const *const c_char;

@@ -39,8 +39,9 @@ pub use libafl_qemu::qemu::Qemu;
 #[cfg(not(any(feature = "mips", feature = "hexagon")))]
 use libafl_qemu::QemuCmpLogTool;
 use libafl_qemu::{
-    command::NopCommandManager, edges, Emulator, NopEmulatorExitHandler, QemuEdgeCoverageTool,
-    QemuExecutor,
+    command::NopCommandManager,
+    modules::edges::{self, EdgeCoverageModule},
+    Emulator, NopEmulatorExitHandler, QemuExecutor,
 };
 use libafl_targets::{edges_map_mut_ptr, CmpLogObserver};
 use typed_builder::TypedBuilder;
@@ -228,11 +229,11 @@ where
                 let tools = {
                     #[cfg(not(any(feature = "mips", feature = "hexagon")))]
                     {
-                        tuple_list!(QemuEdgeCoverageTool::default(), QemuCmpLogTool::default(),)
+                        tuple_list!(EdgeCoverageModule::default(), CmpLogModule::default(),)
                     }
                     #[cfg(any(feature = "mips", feature = "hexagon"))]
                     {
-                        tuple_list!(QemuEdgeCoverageTool::default())
+                        tuple_list!(EdgeCoverageModule::default())
                     }
                 };
 
@@ -344,7 +345,7 @@ where
                     }
                 }
             } else {
-                let tools = tuple_list!(QemuEdgeCoverageTool::default());
+                let tools = tuple_list!(EdgeCoverageModule::default());
 
                 let mut emulator = Emulator::new_with_qemu(
                     qemu,

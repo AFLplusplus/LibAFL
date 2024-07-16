@@ -9,200 +9,206 @@ use libafl_qemu_sys::{GuestAddr, GuestPhysAddr};
 use crate::Qemu;
 
 pub mod edges;
-pub use edges::QemuEdgeCoverageTool;
+pub use edges::EdgeCoverageModule;
 
 #[cfg(not(cpu_target = "hexagon"))]
 pub mod calls;
 #[cfg(not(cpu_target = "hexagon"))]
-pub use calls::QemuCallTracerTool;
+pub use calls::CallTracerModule;
 
 #[cfg(not(cpu_target = "hexagon"))]
 pub mod drcov;
 #[cfg(not(cpu_target = "hexagon"))]
-pub use drcov::QemuDrCovTool;
+pub use drcov::DrCovModule;
 
 #[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]
 pub mod cmplog;
 #[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]
-pub use cmplog::QemuCmpLogTool;
+pub use cmplog::CmpLogModule;
 
 #[cfg(all(emulation_mode = "usermode", feature = "injections"))]
 pub mod injections;
 #[cfg(all(emulation_mode = "usermode", feature = "injections"))]
-pub use injections::QemuInjectionTool;
+pub use injections::InjectionModule;
 
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
 pub mod snapshot;
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
 pub use snapshot::IntervalSnapshotFilter;
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
-pub use snapshot::QemuSnapshotTool;
+pub use snapshot::SnapshotModule;
 
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
 pub mod asan;
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
-pub use asan::{init_qemu_with_asan, QemuAsanTool};
+pub use asan::{init_qemu_with_asan, AsanModule};
 
-use crate::emu::EmulatorTools;
+use crate::emu::EmulatorModules;
 
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
 pub mod asan_guest;
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
-pub use asan_guest::{init_qemu_with_asan_guest, QemuAsanGuestTool};
+pub use asan_guest::{init_qemu_with_asan_guest, AsanGuestModule};
 
-/// A tool for `libafl_qemu`.
+/// A module for `libafl_qemu`.
 // TODO remove 'static when specialization will be stable
-pub trait EmulatorTool<S>: 'static + Debug
+pub trait EmulatorModule<S>: 'static + Debug
 where
     S: Unpin + UsesInput,
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = true;
 
-    /// Initialize the tool, mostly used to install some hooks early.
-    fn init_tool<ET>(&self, _emulator_tools: &mut EmulatorTools<ET, S>)
+    /// Initialize the module, mostly used to install some hooks early.
+    fn init_module<ET>(&self, _emulator_modules: &mut EmulatorModules<ET, S>)
     where
-        ET: EmulatorToolTuple<S>,
+        ET: EmulatorModuleTuple<S>,
     {
     }
 
-    fn first_exec<ET>(&mut self, _emulator_tools: &mut EmulatorTools<ET, S>)
+    fn first_exec<ET>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>)
     where
-        ET: EmulatorToolTuple<S>,
+        ET: EmulatorModuleTuple<S>,
     {
     }
 
-    fn pre_exec<ET>(&mut self, _emulator_tools: &mut EmulatorTools<ET, S>, _input: &S::Input)
+    fn pre_exec<ET>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>, _input: &S::Input)
     where
-        ET: EmulatorToolTuple<S>,
+        ET: EmulatorModuleTuple<S>,
     {
     }
 
     fn post_exec<OT, ET>(
         &mut self,
-        _emulator_tools: &mut EmulatorTools<ET, S>,
+        _emulator_modules: &mut EmulatorModules<ET, S>,
         _input: &S::Input,
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
-        ET: EmulatorToolTuple<S>,
+        ET: EmulatorModuleTuple<S>,
     {
     }
 }
 
-pub trait EmulatorToolTuple<S>:
+pub trait EmulatorModuleTuple<S>:
     MatchFirstType + for<'a> SplitBorrowExtractFirstType<'a> + Unpin
 where
     S: Unpin + UsesInput,
 {
     const HOOKS_DO_SIDE_EFFECTS: bool;
 
-    fn init_tools_all<ET>(&self, _emulator_tools: &mut EmulatorTools<ET, S>)
+    fn init_modules_all<ET>(&self, _emulator_modules: &mut EmulatorModules<ET, S>)
     where
-        ET: EmulatorToolTuple<S>;
+        ET: EmulatorModuleTuple<S>;
 
-    fn first_exec_all<ET>(&mut self, _emulator_tools: &mut EmulatorTools<ET, S>)
+    fn first_exec_all<ET>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>)
     where
-        ET: EmulatorToolTuple<S>;
+        ET: EmulatorModuleTuple<S>;
 
-    fn pre_exec_all<ET>(&mut self, _emulator_tools: &mut EmulatorTools<ET, S>, _input: &S::Input)
-    where
-        ET: EmulatorToolTuple<S>;
+    fn pre_exec_all<ET>(
+        &mut self,
+        _emulator_modules: &mut EmulatorModules<ET, S>,
+        _input: &S::Input,
+    ) where
+        ET: EmulatorModuleTuple<S>;
 
     fn post_exec_all<OT, ET>(
         &mut self,
-        _emulator_tools: &mut EmulatorTools<ET, S>,
+        _emulator_modules: &mut EmulatorModules<ET, S>,
         _input: &S::Input,
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
-        ET: EmulatorToolTuple<S>;
+        ET: EmulatorModuleTuple<S>;
 }
 
-impl<S> EmulatorToolTuple<S> for ()
+impl<S> EmulatorModuleTuple<S> for ()
 where
     S: Unpin + UsesInput,
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn init_tools_all<ET>(&self, _emulator_tools: &mut EmulatorTools<ET, S>)
+    fn init_modules_all<ET>(&self, _emulator_modules: &mut EmulatorModules<ET, S>)
     where
-        ET: EmulatorToolTuple<S>,
+        ET: EmulatorModuleTuple<S>,
     {
     }
 
-    fn first_exec_all<ET>(&mut self, _emulator_tools: &mut EmulatorTools<ET, S>)
+    fn first_exec_all<ET>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>)
     where
-        ET: EmulatorToolTuple<S>,
+        ET: EmulatorModuleTuple<S>,
     {
     }
 
-    fn pre_exec_all<ET>(&mut self, _emulator_tools: &mut EmulatorTools<ET, S>, _input: &S::Input)
-    where
-        ET: EmulatorToolTuple<S>,
+    fn pre_exec_all<ET>(
+        &mut self,
+        _emulator_modules: &mut EmulatorModules<ET, S>,
+        _input: &S::Input,
+    ) where
+        ET: EmulatorModuleTuple<S>,
     {
     }
 
     fn post_exec_all<OT, ET>(
         &mut self,
-        _emulator_tools: &mut EmulatorTools<ET, S>,
+        _emulator_modules: &mut EmulatorModules<ET, S>,
         _input: &S::Input,
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
-        ET: EmulatorToolTuple<S>,
+        ET: EmulatorModuleTuple<S>,
     {
     }
 }
 
-impl<Head, Tail, S> EmulatorToolTuple<S> for (Head, Tail)
+impl<Head, Tail, S> EmulatorModuleTuple<S> for (Head, Tail)
 where
-    Head: EmulatorTool<S> + Unpin,
-    Tail: EmulatorToolTuple<S>,
+    Head: EmulatorModule<S> + Unpin,
+    Tail: EmulatorModuleTuple<S>,
     S: Unpin + UsesInput,
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = Head::HOOKS_DO_SIDE_EFFECTS || Tail::HOOKS_DO_SIDE_EFFECTS;
 
-    fn init_tools_all<ET>(&self, emulator_tools: &mut EmulatorTools<ET, S>)
+    fn init_modules_all<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
     where
-        ET: EmulatorToolTuple<S>,
+        ET: EmulatorModuleTuple<S>,
     {
-        self.0.init_tool(emulator_tools);
-        self.1.init_tools_all(emulator_tools);
+        self.0.init_module(emulator_modules);
+        self.1.init_modules_all(emulator_modules);
     }
 
-    fn first_exec_all<ET>(&mut self, emulator_tools: &mut EmulatorTools<ET, S>)
+    fn first_exec_all<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
     where
-        ET: EmulatorToolTuple<S>,
+        ET: EmulatorModuleTuple<S>,
     {
-        self.0.first_exec(emulator_tools);
-        self.1.first_exec_all(emulator_tools);
+        self.0.first_exec(emulator_modules);
+        self.1.first_exec_all(emulator_modules);
     }
 
-    fn pre_exec_all<ET>(&mut self, emulator_tools: &mut EmulatorTools<ET, S>, input: &S::Input)
+    fn pre_exec_all<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, input: &S::Input)
     where
-        ET: EmulatorToolTuple<S>,
+        ET: EmulatorModuleTuple<S>,
     {
-        self.0.pre_exec(emulator_tools, input);
-        self.1.pre_exec_all(emulator_tools, input);
+        self.0.pre_exec(emulator_modules, input);
+        self.1.pre_exec_all(emulator_modules, input);
     }
 
     fn post_exec_all<OT, ET>(
         &mut self,
-        emulator_tools: &mut EmulatorTools<ET, S>,
+        emulator_modules: &mut EmulatorModules<ET, S>,
         input: &S::Input,
         observers: &mut OT,
         exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
-        ET: EmulatorToolTuple<S>,
+        ET: EmulatorModuleTuple<S>,
     {
         self.0
-            .post_exec(emulator_tools, input, observers, exit_kind);
+            .post_exec(emulator_modules, input, observers, exit_kind);
         self.1
-            .post_exec_all(emulator_tools, input, observers, exit_kind);
+            .post_exec_all(emulator_modules, input, observers, exit_kind);
     }
 }
 

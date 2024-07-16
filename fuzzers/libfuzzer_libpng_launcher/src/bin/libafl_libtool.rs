@@ -1,11 +1,11 @@
 use std::env;
 
-use libafl_cc::{Configuration, LibtoolWrapper, ToolWrapper};
+use libafl_cc::{Configuration, LibmoduleWrapper, ModuleWrapper};
 
 pub fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() > 1 {
-        let mut cc = LibtoolWrapper::new();
+        let mut cc = LibmoduleWrapper::new();
         if let Some(code) = cc
             // silence the compiler wrapper output, needed for some configure scripts.
             .silence(true)
@@ -25,11 +25,11 @@ pub fn main() {
                 Configuration::UndefinedBehaviorSanitizer,
             ]))
             .run()
-            .expect("Failed to run the wrapped libtool")
+            .expect("Failed to run the wrapped libmodule")
         {
             std::process::exit(code);
         }
     } else {
-        panic!("LibAFL libtool: No Arguments given");
+        panic!("LibAFL libmodule: No Arguments given");
     }
 }

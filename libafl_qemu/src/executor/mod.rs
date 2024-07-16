@@ -32,8 +32,8 @@ use libafl_bolts::{
 };
 
 #[cfg(emulation_mode = "usermode")]
-use crate::emu::EmulatorTools;
-use crate::{command::CommandManager, tools::EmulatorToolTuple, Emulator, EmulatorExitHandler};
+use crate::emu::EmulatorModules;
+use crate::{command::CommandManager, modules::EmulatorModuleTuple, Emulator, EmulatorExitHandler};
 
 /// A version of `QemuExecutor` with a state accessible from the harness.
 pub mod stateful;
@@ -42,7 +42,7 @@ pub struct QemuExecutorState<'a, CM, EH, ET, S>
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     emulator: &'a mut Emulator<CM, EH, ET, S>,
@@ -54,7 +54,7 @@ where
     EH: EmulatorExitHandler<ET, S>,
     H: FnMut(&S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     inner: InProcessExecutor<'a, H, OT, S>,
@@ -68,7 +68,7 @@ where
     H: FnMut(&S::Input) -> ExitKind,
     S: Unpin + State + HasExecutions + Debug,
     OT: ObserversTuple<S> + Debug,
-    ET: EmulatorToolTuple<S> + Debug,
+    ET: EmulatorModuleTuple<S> + Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("QemuExecutor")
@@ -96,7 +96,7 @@ pub unsafe fn inproc_qemu_crash_handler<'a, E, EM, OF, Z, ET, S>(
     OF: Feedback<E::State>,
     E::State: HasExecutions + HasSolutions + HasCorpus,
     Z: HasObjective<Objective = OF, State = E::State>,
-    ET: EmulatorToolTuple<S> + Debug + 'a,
+    ET: EmulatorModuleTuple<S> + Debug + 'a,
     S: Unpin + State + HasExecutions + 'a,
 {
     let puc = match &mut context {
@@ -140,7 +140,7 @@ impl<'a, CM, EH, ET, S> QemuExecutorState<'a, CM, EH, ET, S>
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorToolTuple<S> + Debug,
+    ET: EmulatorModuleTuple<S> + Debug,
     S: Unpin + State + HasExecutions + HasCorpus + HasSolutions,
 {
     #[cfg(emulation_mode = "systemmode")]
@@ -166,17 +166,17 @@ where
     {
         #[cfg(emulation_mode = "usermode")]
         {
-            let handler = |emulator_tools: &mut EmulatorTools<ET, S>, host_sig| {
+            let handler = |emulator_modules: &mut EmulatorModules<ET, S>, host_sig| {
                 eprintln!("Crashed with signal {host_sig}");
                 unsafe {
                     libafl::executors::inprocess::generic_inproc_crash_handler::<E, EM, OF, Z>();
                 }
-                if let Some(cpu) = emulator_tools.qemu().current_cpu() {
+                if let Some(cpu) = emulator_modules.qemu().current_cpu() {
                     eprint!("Context:\n{}", cpu.display_context());
                 }
             };
 
-            emulator.tools_mut().crash_closure(Box::new(handler));
+            emulator.modules_mut().crash_closure(Box::new(handler));
         }
         Ok(QemuExecutorState { emulator })
     }
@@ -198,7 +198,7 @@ where
     H: FnMut(&S::Input) -> ExitKind,
     S: Unpin + State + HasExecutions,
     OT: ObserversTuple<S>,
-    ET: EmulatorToolTuple<S> + Debug,
+    ET: EmulatorModuleTuple<S> + Debug,
 {
     pub fn new<EM, OF, Z>(
         emulator: &'a mut Emulator<CM, EH, ET, S>,
@@ -259,7 +259,7 @@ impl<'a, CM, EH, ET, S> QemuExecutorState<'a, CM, EH, ET, S>
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     fn pre_exec<E, EM, OF, Z>(&mut self, input: &E::Input)
@@ -299,7 +299,7 @@ where
     S: Unpin + State + HasExecutions + HasCorpus + HasSolutions,
     OT: ObserversTuple<S>,
     OF: Feedback<S>,
-    ET: EmulatorToolTuple<S> + Debug,
+    ET: EmulatorModuleTuple<S> + Debug,
     Z: HasObjective<Objective = OF, State = S>,
 {
     fn run_target(
@@ -326,7 +326,7 @@ where
     EH: EmulatorExitHandler<ET, S>,
     H: FnMut(&S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     type State = S;
@@ -338,7 +338,7 @@ where
     EH: EmulatorExitHandler<ET, S>,
     H: FnMut(&S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     type Observers = OT;
@@ -351,7 +351,7 @@ where
     H: FnMut(&S::Input) -> ExitKind,
     S: Unpin + State + HasExecutions,
     OT: ObserversTuple<S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
 {
     #[inline]
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
@@ -372,7 +372,7 @@ where
     H: FnMut(&S::Input) -> ExitKind,
     S: Unpin + State + HasExecutions,
     OT: ObserversTuple<S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     SP: ShMemProvider,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,
@@ -390,7 +390,7 @@ where
     H: FnMut(&S::Input) -> ExitKind,
     S: Unpin + State + HasExecutions + Debug,
     OT: ObserversTuple<S> + Debug,
-    ET: EmulatorToolTuple<S> + Debug,
+    ET: EmulatorModuleTuple<S> + Debug,
     SP: ShMemProvider,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,
@@ -411,7 +411,7 @@ where
     H: FnMut(&S::Input) -> ExitKind,
     S: Unpin + State + HasExecutions,
     OT: ObserversTuple<S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     SP: ShMemProvider,
     EM: EventFirer<State = S> + EventRestarter,
     OF: Feedback<S>,
@@ -467,7 +467,7 @@ where
     H: FnMut(&S::Input) -> ExitKind,
     S: Unpin + State + HasMetadata + HasExecutions + HasLastReportTime + HasCorpus + HasSolutions,
     OT: ObserversTuple<S> + Debug,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     SP: ShMemProvider,
     OF: Feedback<S>,
     Z: HasObjective<Objective = OF, State = S>,
@@ -491,7 +491,7 @@ where
     EH: EmulatorExitHandler<ET, S>,
     H: FnMut(&S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
     SP: ShMemProvider,
     EM: UsesState<State = S>,
@@ -508,7 +508,7 @@ where
     EH: EmulatorExitHandler<ET, S>,
     H: FnMut(&S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
     SP: ShMemProvider,
     EM: UsesState<State = S>,
@@ -526,7 +526,7 @@ where
     H: FnMut(&S::Input) -> ExitKind,
     S: Unpin + State + HasExecutions,
     OT: ObserversTuple<S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     SP: ShMemProvider,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,

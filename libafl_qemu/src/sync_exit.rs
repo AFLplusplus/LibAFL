@@ -8,7 +8,9 @@ use libafl::state::{HasExecutions, State};
 
 use crate::{
     command::{CommandManager, IsCommand},
-    get_exit_arch_regs, EmulatorExitHandler, EmulatorToolTuple, GuestReg, Regs, CPU,
+    get_exit_arch_regs,
+    modules::EmulatorModuleTuple,
+    EmulatorExitHandler, GuestReg, Regs, CPU,
 };
 
 #[derive(Debug, Clone, Enum)]
@@ -28,7 +30,7 @@ pub struct SyncExit<CM, EH, ET, S>
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     command: Rc<dyn IsCommand<CM, EH, ET, S>>,
@@ -38,7 +40,7 @@ impl<CM, EH, ET, S> SyncExit<CM, EH, ET, S>
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     #[must_use]
@@ -66,7 +68,7 @@ impl<CM, EH, ET, S> Display for SyncExit<CM, EH, ET, S>
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

@@ -12,11 +12,14 @@ use libafl::inputs::UsesInput;
 #[cfg(not(feature = "clippy"))]
 use crate::sys::libafl_tcg_gen_asan;
 use crate::{
-    emu::EmulatorTools,
+    emu::EmulatorModules,
+    modules::{
+        EmulatorModule, EmulatorModuleTuple, HasInstrumentationFilter, IsFilter,
+        QemuInstrumentationAddressRangeFilter,
+    },
     qemu::{Hook, MemAccessInfo, Qemu, QemuInitError},
     sys::TCGTemp,
-    tools::{HasInstrumentationFilter, IsFilter, QemuInstrumentationAddressRangeFilter},
-    EmulatorTool, EmulatorToolTuple, GuestAddr, MapInfo,
+    GuestAddr, MapInfo,
 };
 
 static mut ASAN_GUEST_INITED: bool = false;
@@ -118,13 +121,13 @@ impl From<&MapInfo> for QemuAsanGuestMapping {
 }
 
 #[derive(Debug)]
-pub struct QemuAsanGuestTool {
+pub struct AsanGuestModule {
     filter: QemuInstrumentationAddressRangeFilter,
     mappings: Vec<QemuAsanGuestMapping>,
 }
 
 #[cfg(any(cpu_target = "aarch64", cpu_target = "x86_64", feature = "clippy"))]
-impl QemuAsanGuestTool {
+impl AsanGuestModule {
     const HIGH_SHADOW_START: GuestAddr = 0x02008fff7000;
     const HIGH_SHADOW_END: GuestAddr = 0x10007fff7fff;
     const LOW_SHADOW_START: GuestAddr = 0x00007fff8000;
@@ -137,14 +140,14 @@ impl QemuAsanGuestTool {
     cpu_target = "mips",
     cpu_target = "ppc"
 ))]
-impl QemuAsanGuestTool {
+impl AsanGuestModule {
     const HIGH_SHADOW_START: GuestAddr = 0x28000000;
     const HIGH_SHADOW_END: GuestAddr = 0x3fffffff;
     const LOW_SHADOW_START: GuestAddr = 0x20000000;
     const LOW_SHADOW_END: GuestAddr = 0x23ffffff;
 }
 
-impl QemuAsanGuestTool {
+impl AsanGuestModule {
     #[must_use]
     pub fn default(emu: &Qemu, asan: String) -> Self {
         Self::new(emu, asan, QemuInstrumentationAddressRangeFilter::None)
@@ -194,7 +197,7 @@ impl QemuAsanGuestTool {
     }
 }
 
-impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuAsanGuestTool {
+impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for AsanGuestModule {
     fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
         &self.filter
     }
@@ -205,7 +208,7 @@ impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuAsa
 }
 
 fn gen_readwrite_guest_asan<ET, S>(
-    emulator_tools: &mut EmulatorTools<ET, S>,
+    emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
     addr: *mut TCGTemp,
@@ -213,10 +216,10 @@ fn gen_readwrite_guest_asan<ET, S>(
 ) -> Option<u64>
 where
     S: Unpin + UsesInput,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
 {
-    let h = emulator_tools
-        .match_tool_mut::<QemuAsanGuestTool>()
+    let h = emulator_modules
+        .match_module_mut::<AsanGuestModule>()
         .unwrap();
     if !h.must_instrument(pc) {
         return None;
@@ -244,40 +247,40 @@ where
 unsafe fn libafl_tcg_gen_asan(addr: *mut TCGTemp, size: usize) {}
 
 fn guest_trace_error_asan<ET, S>(
-    _emulator_tools: &mut EmulatorTools<ET, S>,
+    _emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     _id: u64,
     _addr: GuestAddr,
 ) where
     S: Unpin + UsesInput,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
 {
     panic!("I really shouldn't be here");
 }
 
 fn guest_trace_error_n_asan<ET, S>(
-    _emulator_tools: &mut EmulatorTools<ET, S>,
+    _emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     _id: u64,
     _addr: GuestAddr,
     _n: usize,
 ) where
     S: Unpin + UsesInput,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
 {
     panic!("I really shouldn't be here either");
 }
 
-impl<S> EmulatorTool<S> for QemuAsanGuestTool
+impl<S> EmulatorModule<S> for AsanGuestModule
 where
     S: Unpin + UsesInput,
 {
-    fn first_exec<ET>(&mut self, emulator_tools: &mut EmulatorTools<ET, S>)
+    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
     where
-        ET: EmulatorToolTuple<S>,
+        ET: EmulatorModuleTuple<S>,
         S: Unpin + UsesInput,
     {
-        emulator_tools.reads(
+        emulator_modules.reads(
             Hook::Function(gen_readwrite_guest_asan::<ET, S>),
             Hook::Function(guest_trace_error_asan::<ET, S>),
             Hook::Function(guest_trace_error_asan::<ET, S>),
@@ -286,7 +289,7 @@ where
             Hook::Function(guest_trace_error_n_asan::<ET, S>),
         );
 
-        emulator_tools.writes(
+        emulator_modules.writes(
             Hook::Function(gen_readwrite_guest_asan::<ET, S>),
             Hook::Function(guest_trace_error_asan::<ET, S>),
             Hook::Function(guest_trace_error_asan::<ET, S>),

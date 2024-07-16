@@ -14,7 +14,8 @@ use libafl_qemu_sys::GuestAddr;
 
 use crate::{
     command::{CommandManager, IsCommand},
-    EmulatorExitHandler, EmulatorToolTuple, Qemu,
+    modules::EmulatorModuleTuple,
+    EmulatorExitHandler, Qemu,
 };
 
 #[repr(transparent)]
@@ -27,7 +28,7 @@ pub struct Breakpoint<CM, EH, ET, S>
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     id: BreakpointId,
@@ -57,7 +58,7 @@ impl<CM, EH, ET, S> Hash for Breakpoint<CM, EH, ET, S>
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -69,7 +70,7 @@ impl<CM, EH, ET, S> PartialEq for Breakpoint<CM, EH, ET, S>
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -81,7 +82,7 @@ impl<CM, EH, ET, S> Eq for Breakpoint<CM, EH, ET, S>
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
 {
 }
@@ -90,7 +91,7 @@ impl<CM, EH, ET, S> Display for Breakpoint<CM, EH, ET, S>
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -102,7 +103,7 @@ impl<CM, EH, ET, S> Borrow<BreakpointId> for Breakpoint<CM, EH, ET, S>
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     fn borrow(&self) -> &BreakpointId {
@@ -114,7 +115,7 @@ impl<CM, EH, ET, S> Borrow<GuestAddr> for Breakpoint<CM, EH, ET, S>
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     fn borrow(&self) -> &GuestAddr {
@@ -126,7 +127,7 @@ impl<CM, EH, ET, S> Breakpoint<CM, EH, ET, S>
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     // Emu will return with the breakpoint as exit reason.

@@ -49,9 +49,9 @@ use libafl_qemu::{
     command::NopCommandManager,
     elf::EasyElf,
     filter_qemu_args,
-    tools::{
-        cmplog::{CmpLogMap, CmpLogObserver, QemuCmpLogChildTool},
-        edges::{QemuEdgeCoverageChildTool, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},
+    modules::{
+        cmplog::{CmpLogMap, CmpLogObserver, QemuCmpLogChildModule},
+        edges::{QemuEdgeCoverageChildModule, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},
     },
     Emulator, GuestReg, MmapPerms, NopEmulatorExitHandler, QemuExitError, QemuExitReason,
     QemuForkExecutor, QemuShutdownCause, Regs,
@@ -151,15 +151,15 @@ fn fuzz(
     let args: Vec<String> = env::args().collect();
     let env: Vec<(String, String)> = env::vars().collect();
 
-    let emulator_tools = tuple_list!(
-        QemuEdgeCoverageChildTool::default(),
-        QemuCmpLogChildTool::default(),
+    let emulator_modules = tuple_list!(
+        QemuEdgeCoverageChildModule::default(),
+        QemuCmpLogChildModule::default(),
     );
 
     let mut emulator = Emulator::new(
         args.as_slice(),
         env.as_slice(),
-        emulator_tools,
+        emulator_modules,
         NopEmulatorExitHandler,
         NopCommandManager,
     )

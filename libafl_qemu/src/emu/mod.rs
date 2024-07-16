@@ -33,9 +33,8 @@ use crate::{
     breakpoint::Breakpoint,
     command::{CommandError, InputCommand, IsCommand},
     sync_exit::SyncExit,
-    EmulatorToolTuple, GuestReg, Qemu, QemuExitError, QemuExitReason, QemuInitError,
-    QemuMemoryChunk, QemuRWError, QemuShutdownCause, QemuSnapshotCheckResult, Regs,
-    StdInstrumentationFilter, CPU,
+    GuestReg, Qemu, QemuExitError, QemuExitReason, QemuInitError, QemuMemoryChunk, QemuRWError,
+    QemuShutdownCause, QemuSnapshotCheckResult, Regs, CPU,
 };
 
 mod hooks;
@@ -49,7 +48,11 @@ mod systemmode;
 #[cfg(emulation_mode = "systemmode")]
 pub use systemmode::*;
 
-use crate::{breakpoint::BreakpointId, command::CommandManager};
+use crate::{
+    breakpoint::BreakpointId,
+    command::CommandManager,
+    modules::{EmulatorModuleTuple, StdInstrumentationFilter},
+};
 
 type CommandRef<CM, E, ET, S> = Rc<dyn IsCommand<CM, E, ET, S>>;
 type BreakpointMutRef<CM, E, ET, S> = Rc<RefCell<Breakpoint<CM, E, ET, S>>>;
@@ -65,7 +68,7 @@ pub enum EmulatorExitResult<CM, EH, ET, S>
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     QemuExit(QemuShutdownCause), // QEMU ended for some reason.
@@ -86,7 +89,7 @@ pub enum ExitHandlerResult<CM, EH, ET, S>
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     ReturnToHarness(EmulatorExitResult<CM, EH, ET, S>), // Return to the harness immediately. Can happen at any point of the run when the handler is not supposed to handle a request.
@@ -97,7 +100,7 @@ impl<CM, EH, ET, S> ExitHandlerResult<CM, EH, ET, S>
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     #[must_use]
@@ -138,7 +141,7 @@ impl<CM, EH, ET, S> TryFrom<ExitHandlerResult<CM, EH, ET, S>> for ExitKind
 where
     CM: CommandManager<EH, ET, S> + Debug,
     EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorToolTuple<S> + Debug,
+    ET: EmulatorModuleTuple<S> + Debug,
     S: Unpin + State + HasExecutions + Debug,
 {
     type Error = String;
@@ -228,7 +231,7 @@ pub trait IsSnapshotManager: Debug + Clone {
 
 pub trait EmulatorExitHandler<ET, S>: Sized + Debug + Clone
 where
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     fn qemu_pre_exec<CM: CommandManager<Self, ET, S>>(
@@ -251,7 +254,7 @@ pub struct NopEmulatorExitHandler;
 
 impl<ET, S> EmulatorExitHandler<ET, S> for NopEmulatorExitHandler
 where
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     fn qemu_pre_exec<CM: CommandManager<Self, ET, S>>(
@@ -339,7 +342,7 @@ where
 // TODO: replace handlers with generics to permit compile-time customization of handlers
 impl<ET, S, SM> EmulatorExitHandler<ET, S> for StdEmulatorExitHandler<SM>
 where
-    ET: EmulatorToolTuple<S> + StdInstrumentationFilter + Debug,
+    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
     S: Unpin + State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -435,7 +438,7 @@ impl<CM, EH, ET, S> Display for EmulatorExitResult<CM, EH, ET, S>
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
@@ -462,10 +465,10 @@ pub struct Emulator<CM, EH, ET, S>
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
 {
-    tools: Pin<Box<EmulatorTools<ET, S>>>,
+    modules: Pin<Box<EmulatorModules<ET, S>>>,
     command_manager: CM,
     exit_handler: RefCell<EH>,
     #[builder(default)]
@@ -482,30 +485,30 @@ impl<CM, EH, ET, S> Emulator<CM, EH, ET, S>
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     #[allow(clippy::must_use_candidate, clippy::similar_names)]
     pub fn new(
         args: &[String],
         env: &[(String, String)],
-        tools: ET,
+        modules: ET,
         exit_handler: EH,
         command_manager: CM,
     ) -> Result<Self, QemuInitError> {
         let qemu = Qemu::init(args, env)?;
 
-        Self::new_with_qemu(qemu, tools, exit_handler, command_manager)
+        Self::new_with_qemu(qemu, modules, exit_handler, command_manager)
     }
 
     pub fn new_with_qemu(
         qemu: Qemu,
-        tools: ET,
+        modules: ET,
         exit_handler: EH,
         command_manager: CM,
     ) -> Result<Self, QemuInitError> {
         Ok(Emulator {
-            tools: EmulatorTools::new(qemu, tools),
+            modules: EmulatorModules::new(qemu, modules),
             command_manager,
             exit_handler: RefCell::new(exit_handler),
             breakpoints_by_addr: RefCell::new(HashMap::new()),
@@ -515,12 +518,12 @@ where
         })
     }
 
-    pub fn tools(&self) -> &EmulatorTools<ET, S> {
-        &self.tools
+    pub fn modules(&self) -> &EmulatorModules<ET, S> {
+        &self.modules
     }
 
-    pub fn tools_mut(&mut self) -> &mut EmulatorTools<ET, S> {
-        self.tools.as_mut().get_mut()
+    pub fn modules_mut(&mut self) -> &mut EmulatorModules<ET, S> {
+        self.modules.as_mut().get_mut()
     }
 
     #[must_use]
@@ -675,11 +678,11 @@ where
     }
 
     pub fn first_exec_all(&mut self) {
-        self.tools.first_exec_all();
+        self.modules.first_exec_all();
     }
 
     pub fn pre_exec_all(&mut self, input: &S::Input) {
-        self.tools.pre_exec_all(input);
+        self.modules.pre_exec_all(input);
     }
 
     pub fn post_exec_all<OT>(
@@ -690,7 +693,7 @@ where
     ) where
         OT: ObserversTuple<S>,
     {
-        self.tools.post_exec_all(input, observers, exit_kind);
+        self.modules.post_exec_all(input, observers, exit_kind);
     }
 
     /// This function will run the emulator until the next breakpoint, or until finish.
@@ -738,12 +741,12 @@ where
     ) -> Result<ExitHandlerResult<CM, EH, ET, S>, ExitHandlerError> {
         loop {
             // if self.first_exec {
-            //     self.tools_mut().first_exec_all();
+            //     self.modules_mut().first_exec_all();
             //     self.first_exec = false;
             // }
 
-            // // First run tools callback functions
-            // self.tools_mut().pre_exec_all(input);
+            // // First run modules callback functions
+            // self.modules_mut().pre_exec_all(input);
 
             // Insert input if the location is already known
             EH::qemu_pre_exec(self, input);

@@ -8,10 +8,12 @@ use rangemap::RangeMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    emu::EmulatorTools,
+    emu::EmulatorModules,
+    modules::{
+        EmulatorModule, EmulatorModuleTuple, HasInstrumentationFilter, IsFilter,
+        QemuInstrumentationAddressRangeFilter,
+    },
     qemu::Hook,
-    tools::{HasInstrumentationFilter, IsFilter, QemuInstrumentationAddressRangeFilter},
-    EmulatorTool, EmulatorToolTuple,
 };
 
 static DRCOV_IDS: Mutex<Option<Vec<u64>>> = Mutex::new(None);
@@ -37,7 +39,7 @@ impl QemuDrCovMetadata {
 libafl_bolts::impl_serdeany!(QemuDrCovMetadata);
 
 #[derive(Debug)]
-pub struct QemuDrCovTool {
+pub struct DrCovModule {
     filter: QemuInstrumentationAddressRangeFilter,
     module_mapping: RangeMap<usize, (u16, String)>,
     filename: PathBuf,
@@ -45,7 +47,7 @@ pub struct QemuDrCovTool {
     drcov_len: usize,
 }
 
-impl QemuDrCovTool {
+impl DrCovModule {
     #[must_use]
     #[allow(clippy::let_underscore_untyped)]
     pub fn new(
@@ -73,7 +75,7 @@ impl QemuDrCovTool {
     }
 }
 
-impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuDrCovTool {
+impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for DrCovModule {
     fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
         &self.filter
     }
@@ -83,26 +85,26 @@ impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuDrC
     }
 }
 
-impl<S> EmulatorTool<S> for QemuDrCovTool
+impl<S> EmulatorModule<S> for DrCovModule
 where
     S: Unpin + UsesInput + HasMetadata,
 {
-    fn init_tool<ET>(&self, emulator_tools: &mut EmulatorTools<ET, S>)
+    fn init_module<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
     where
-        ET: EmulatorToolTuple<S>,
+        ET: EmulatorModuleTuple<S>,
     {
-        emulator_tools.blocks(
+        emulator_modules.blocks(
             Hook::Function(gen_unique_block_ids::<ET, S>),
             Hook::Function(gen_block_lengths::<ET, S>),
             Hook::Function(exec_trace_block::<ET, S>),
         );
     }
 
-    fn first_exec<ET>(&mut self, emulator_tools: &mut EmulatorTools<ET, S>)
+    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
     where
-        ET: EmulatorToolTuple<S>,
+        ET: EmulatorModuleTuple<S>,
     {
-        let qemu = emulator_tools.qemu();
+        let qemu = emulator_modules.qemu();
 
         for (i, (r, p)) in qemu
             .mappings()
@@ -119,13 +121,13 @@ where
 
     fn post_exec<OT, ET>(
         &mut self,
-        _emulator_tools: &mut EmulatorTools<ET, S>,
+        _emulator_modules: &mut EmulatorModules<ET, S>,
         _input: &S::Input,
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
-        ET: EmulatorToolTuple<S>,
+        ET: EmulatorModuleTuple<S>,
     {
         let lengths_opt = DRCOV_LENGTHS.lock().unwrap();
         let lengths = lengths_opt.as_ref().unwrap();
@@ -208,16 +210,16 @@ where
 }
 
 pub fn gen_unique_block_ids<ET, S>(
-    emulator_tools: &mut EmulatorTools<ET, S>,
+    emulator_modules: &mut EmulatorModules<ET, S>,
     state: Option<&mut S>,
     pc: GuestAddr,
 ) -> Option<u64>
 where
     S: Unpin + UsesInput + HasMetadata,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
 {
-    let drcov_tool = emulator_tools.match_tool::<QemuDrCovTool>().unwrap();
-    if !drcov_tool.must_instrument(pc) {
+    let drcov_module = emulator_modules.match_module::<DrCovModule>().unwrap();
+    if !drcov_module.must_instrument(pc) {
         return None;
     }
 
@@ -237,7 +239,7 @@ where
     match DRCOV_MAP.lock().unwrap().as_mut().unwrap().entry(pc) {
         Entry::Occupied(e) => {
             let id = *e.get();
-            if drcov_tool.full_trace {
+            if drcov_module.full_trace {
                 Some(id)
             } else {
                 None
@@ -247,7 +249,7 @@ where
             let id = meta.current_id;
             e.insert(id);
             meta.current_id = id + 1;
-            if drcov_tool.full_trace {
+            if drcov_module.full_trace {
                 // GuestAddress is u32 for 32 bit guests
                 #[allow(clippy::unnecessary_cast)]
                 Some(id as u64)
@@ -259,16 +261,16 @@ where
 }
 
 pub fn gen_block_lengths<ET, S>(
-    emulator_tools: &mut EmulatorTools<ET, S>,
+    emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
     block_length: GuestUsize,
 ) where
     S: Unpin + UsesInput + HasMetadata,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
 {
-    let drcov_tool = emulator_tools.match_tool::<QemuDrCovTool>().unwrap();
-    if !drcov_tool.must_instrument(pc) {
+    let drcov_module = emulator_modules.match_module::<DrCovModule>().unwrap();
+    if !drcov_module.must_instrument(pc) {
         return;
     }
     DRCOV_LENGTHS
@@ -280,15 +282,15 @@ pub fn gen_block_lengths<ET, S>(
 }
 
 pub fn exec_trace_block<ET, S>(
-    emulator_tools: &mut EmulatorTools<ET, S>,
+    emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     id: u64,
 ) where
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + UsesInput + HasMetadata,
 {
-    if emulator_tools
-        .match_tool::<QemuDrCovTool>()
+    if emulator_modules
+        .match_module::<DrCovModule>()
         .unwrap()
         .full_trace
     {

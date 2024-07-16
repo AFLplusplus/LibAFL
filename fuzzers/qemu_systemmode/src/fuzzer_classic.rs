@@ -31,9 +31,11 @@ use libafl_bolts::{
 };
 use libafl_qemu::{
     command::NopCommandManager,
-    edges::{edges_map_mut_ptr, QemuEdgeCoverageTool, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND},
     elf::EasyElf,
     executor::{stateful::StatefulQemuExecutor, QemuExecutorState},
+    modules::edges::{
+        edges_map_mut_ptr, EdgeCoverageModule, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
+    },
     Emulator, NopEmulatorExitHandler, QemuExitError, QemuExitReason, QemuRWError,
     QemuShutdownCause, Regs,
 };
@@ -89,12 +91,12 @@ pub fn fuzz() {
         let args: Vec<String> = env::args().collect();
         let env: Vec<(String, String)> = env::vars().collect();
 
-        let emulator_tools = tuple_list!(QemuEdgeCoverageTool::default());
+        let emulator_modules = tuple_list!(EdgeCoverageModule::default());
 
         let mut emulator = Emulator::new(
             args.as_slice(),
             env.as_slice(),
-            emulator_tools,
+            emulator_modules,
             NopEmulatorExitHandler,
             NopCommandManager,
         )

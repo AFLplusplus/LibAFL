@@ -26,9 +26,12 @@ use libafl_bolts::{
     AsSlice,
 };
 use libafl_qemu::{
-    command::NopCommandManager, drcov::QemuDrCovTool, elf::EasyElf, ArchExtras, CallingConvention,
-    Emulator, GuestAddr, GuestReg, MmapPerms, NopEmulatorExitHandler, Qemu, QemuExecutor,
-    QemuExitReason, QemuInstrumentationAddressRangeFilter, QemuRWError, QemuShutdownCause, Regs,
+    command::NopCommandManager,
+    elf::EasyElf,
+    modules::{drcov::DrCovModule, QemuInstrumentationAddressRangeFilter},
+    ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms,
+    NopEmulatorExitHandler, Qemu, QemuExecutor, QemuExitReason, QemuRWError, QemuShutdownCause,
+    Regs,
 };
 
 #[derive(Default)]
@@ -68,7 +71,7 @@ impl From<Version> for Str {
     name = format!("qemu_coverage-{}",env!("CPU_TARGET")),
     version = Version::default(),
     about,
-    long_about = "Tool for generating DrCov coverage data using QEMU instrumentation"
+    long_about = "Module for generating DrCov coverage data using QEMU instrumentation"
 )]
 pub struct FuzzerOptions {
     #[arg(long, help = "Coverage file")]
@@ -232,7 +235,7 @@ pub fn fuzz() {
             let core = core_id.0;
             cov_path.set_file_name(format!("{coverage_name}-{core:03}.{coverage_extension}"));
 
-            let emulator_tools = tuple_list!(QemuDrCovTool::new(
+            let emulator_modules = tuple_list!(DrCovModule::new(
                 QemuInstrumentationAddressRangeFilter::None,
                 cov_path,
                 false,
@@ -240,7 +243,7 @@ pub fn fuzz() {
 
             let mut emulator = Emulator::new_with_qemu(
                 qemu,
-                emulator_tools,
+                emulator_modules,
                 NopEmulatorExitHandler,
                 NopCommandManager,
             )

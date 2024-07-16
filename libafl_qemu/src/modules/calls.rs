@@ -12,34 +12,36 @@ use thread_local::ThreadLocal;
 
 use crate::{
     capstone,
-    emu::EmulatorTools,
+    modules::{
+        EmulatorModule, EmulatorModuleTuple, EmulatorModules, HasInstrumentationFilter, IsFilter,
+        QemuInstrumentationAddressRangeFilter,
+    },
     qemu::{ArchExtras, Hook},
-    tools::{HasInstrumentationFilter, IsFilter, QemuInstrumentationAddressRangeFilter},
-    EmulatorTool, EmulatorToolTuple, Qemu,
+    Qemu,
 };
 
 pub trait CallTraceCollector: 'static {
     fn on_call<ET, S>(
         &mut self,
-        emulator_tools: &mut EmulatorTools<ET, S>,
+        emulator_modules: &mut EmulatorModules<ET, S>,
         state: Option<&mut S>,
         pc: GuestAddr,
         call_len: usize,
     ) where
         S: Unpin + UsesInput,
-        ET: EmulatorToolTuple<S>;
+        ET: EmulatorModuleTuple<S>;
 
     fn on_ret<ET, S>(
         &mut self,
-        emulator_tools: &mut EmulatorTools<ET, S>,
+        emulator_modules: &mut EmulatorModules<ET, S>,
         state: Option<&mut S>,
         pc: GuestAddr,
         ret_addr: GuestAddr,
     ) where
         S: Unpin + UsesInput,
-        ET: EmulatorToolTuple<S>;
+        ET: EmulatorModuleTuple<S>;
 
-    // Frowarded from the `QemuCallTracerTool`
+    // Frowarded from the `CallTracerModule`
     fn pre_exec<I>(&mut self, _qemu: Qemu, _input: &I)
     where
         I: Input,
@@ -62,23 +64,23 @@ pub trait CallTraceCollector: 'static {
 pub trait CallTraceCollectorTuple: 'static + MatchFirstType {
     fn on_call_all<ET, S>(
         &mut self,
-        emulator_tools: &mut EmulatorTools<ET, S>,
+        emulator_modules: &mut EmulatorModules<ET, S>,
         _state: Option<&mut S>,
         pc: GuestAddr,
         call_len: usize,
     ) where
         S: Unpin + UsesInput,
-        ET: EmulatorToolTuple<S>;
+        ET: EmulatorModuleTuple<S>;
 
     fn on_ret_all<ET, S>(
         &mut self,
-        emulator_tools: &mut EmulatorTools<ET, S>,
+        emulator_modules: &mut EmulatorModules<ET, S>,
         _state: Option<&mut S>,
         _pc: GuestAddr,
         ret_addr: GuestAddr,
     ) where
         S: Unpin + UsesInput,
-        ET: EmulatorToolTuple<S>;
+        ET: EmulatorModuleTuple<S>;
 
     fn pre_exec_all<I>(&mut self, _qemu: Qemu, input: &I)
     where
@@ -98,25 +100,25 @@ pub trait CallTraceCollectorTuple: 'static + MatchFirstType {
 impl CallTraceCollectorTuple for () {
     fn on_call_all<ET, S>(
         &mut self,
-        _emulator_tools: &mut EmulatorTools<ET, S>,
+        _emulator_modules: &mut EmulatorModules<ET, S>,
         _state: Option<&mut S>,
         _pc: GuestAddr,
         _call_len: usize,
     ) where
         S: Unpin + UsesInput,
-        ET: EmulatorToolTuple<S>,
+        ET: EmulatorModuleTuple<S>,
     {
     }
 
     fn on_ret_all<ET, S>(
         &mut self,
-        _emulator_tools: &mut EmulatorTools<ET, S>,
+        _emulator_modules: &mut EmulatorModules<ET, S>,
         _state: Option<&mut S>,
         _pc: GuestAddr,
         _ret_addr: GuestAddr,
     ) where
         S: Unpin + UsesInput,
-        ET: EmulatorToolTuple<S>,
+        ET: EmulatorModuleTuple<S>,
     {
     }
 
@@ -146,16 +148,16 @@ where
 {
     fn on_call_all<ET, S>(
         &mut self,
-        emulator_tools: &mut EmulatorTools<ET, S>,
+        emulator_modules: &mut EmulatorModules<ET, S>,
         mut state: Option<&mut S>,
         pc: GuestAddr,
         call_len: usize,
     ) where
         S: Unpin + UsesInput,
-        ET: EmulatorToolTuple<S>,
+        ET: EmulatorModuleTuple<S>,
     {
         self.0.on_call(
-            emulator_tools,
+            emulator_modules,
             match state.as_mut() {
                 Some(s) => Some(*s),
                 None => None,
@@ -163,21 +165,21 @@ where
             pc,
             call_len,
         );
-        self.1.on_call_all(emulator_tools, state, pc, call_len);
+        self.1.on_call_all(emulator_modules, state, pc, call_len);
     }
 
     fn on_ret_all<ET, S>(
         &mut self,
-        emulator_tools: &mut EmulatorTools<ET, S>,
+        emulator_modules: &mut EmulatorModules<ET, S>,
         mut state: Option<&mut S>,
         pc: GuestAddr,
         ret_addr: GuestAddr,
     ) where
         S: Unpin + UsesInput,
-        ET: EmulatorToolTuple<S>,
+        ET: EmulatorModuleTuple<S>,
     {
         self.0.on_ret(
-            emulator_tools,
+            emulator_modules,
             match state.as_mut() {
                 Some(s) => Some(*s),
                 None => None,
@@ -185,7 +187,7 @@ where
             pc,
             ret_addr,
         );
-        self.1.on_ret_all(emulator_tools, state, pc, ret_addr);
+        self.1.on_ret_all(emulator_modules, state, pc, ret_addr);
     }
 
     fn pre_exec_all<I>(&mut self, qemu: Qemu, input: &I)
@@ -212,7 +214,7 @@ where
 }
 
 #[derive(Debug)]
-pub struct QemuCallTracerTool<T>
+pub struct CallTracerModule<T>
 where
     T: CallTraceCollectorTuple,
 {
@@ -221,7 +223,7 @@ where
     collectors: Option<T>,
 }
 
-impl<T> QemuCallTracerTool<T>
+impl<T> CallTracerModule<T>
 where
     T: CallTraceCollectorTuple + Debug,
 {
@@ -240,18 +242,18 @@ where
     }
 
     fn on_ret<ET, S>(
-        emulator_tools: &mut EmulatorTools<ET, S>,
+        emulator_modules: &mut EmulatorModules<ET, S>,
         state: Option<&mut S>,
         pc: GuestAddr,
     ) where
         S: Unpin + UsesInput,
-        ET: EmulatorToolTuple<S>,
+        ET: EmulatorModuleTuple<S>,
     {
-        let ret_addr: GuestAddr = emulator_tools.qemu().read_return_address().unwrap();
+        let ret_addr: GuestAddr = emulator_modules.qemu().read_return_address().unwrap();
 
         // log::info!("RET @ 0x{:#x}", ret_addr);
 
-        let mut collectors = if let Some(h) = emulator_tools.match_tool_mut::<Self>() {
+        let mut collectors = if let Some(h) = emulator_modules.match_module_mut::<Self>() {
             h.collectors.take()
         } else {
             return;
@@ -262,20 +264,23 @@ where
         collectors
             .as_mut()
             .unwrap()
-            .on_ret_all(emulator_tools, state, pc, ret_addr);
-        emulator_tools.match_tool_mut::<Self>().unwrap().collectors = collectors;
+            .on_ret_all(emulator_modules, state, pc, ret_addr);
+        emulator_modules
+            .match_module_mut::<Self>()
+            .unwrap()
+            .collectors = collectors;
     }
 
     fn gen_blocks_calls<ET, S>(
-        emulator_tools: &mut EmulatorTools<ET, S>,
+        emulator_modules: &mut EmulatorModules<ET, S>,
         _state: Option<&mut S>,
         pc: GuestAddr,
     ) -> Option<u64>
     where
         S: Unpin + UsesInput,
-        ET: EmulatorToolTuple<S>,
+        ET: EmulatorModuleTuple<S>,
     {
-        if let Some(h) = emulator_tools.match_tool_mut::<Self>() {
+        if let Some(h) = emulator_modules.match_module_mut::<Self>() {
             if !h.must_instrument(pc) {
                 return None;
             }
@@ -289,12 +294,12 @@ where
             .unwrap();
         }
 
-        let qemu = emulator_tools.qemu();
+        let qemu = emulator_modules.qemu();
 
         let mut call_addrs: Vec<(GuestAddr, usize)> = Vec::new();
         let mut ret_addrs: Vec<GuestAddr> = Vec::new();
 
-        if let Some(h) = emulator_tools.tools().match_first_type::<Self>() {
+        if let Some(h) = emulator_modules.modules().match_first_type::<Self>() {
             #[allow(unused_mut)]
             let mut code = {
                 #[cfg(emulation_mode = "usermode")]
@@ -353,35 +358,39 @@ where
         for (call_addr, call_len) in call_addrs {
             // TODO do not use a closure, find a more efficient way to pass call_len
             let call_cb = Box::new(
-                move |emulator_tools: &mut EmulatorTools<ET, S>, state: Option<&mut S>, pc| {
+                move |emulator_modules: &mut EmulatorModules<ET, S>, state: Option<&mut S>, pc| {
                     // eprintln!("CALL @ 0x{:#x}", pc + call_len);
-                    let mut collectors = if let Some(h) = emulator_tools.match_tool_mut::<Self>() {
-                        h.collectors.take()
-                    } else {
-                        return;
-                    };
+                    let mut collectors =
+                        if let Some(h) = emulator_modules.match_module_mut::<Self>() {
+                            h.collectors.take()
+                        } else {
+                            return;
+                        };
                     if collectors.is_none() {
                         return; // TODO fix this, it can be None on races ret
                     }
                     collectors
                         .as_mut()
                         .unwrap()
-                        .on_call_all(emulator_tools, state, pc, call_len);
-                    emulator_tools.match_tool_mut::<Self>().unwrap().collectors = collectors;
+                        .on_call_all(emulator_modules, state, pc, call_len);
+                    emulator_modules
+                        .match_module_mut::<Self>()
+                        .unwrap()
+                        .collectors = collectors;
                 },
             );
-            emulator_tools.instruction_closure(call_addr, call_cb, false);
+            emulator_modules.instruction_closure(call_addr, call_cb, false);
         }
 
         for ret_addr in ret_addrs {
-            emulator_tools.instruction_function(ret_addr, Self::on_ret, false);
+            emulator_modules.instruction_function(ret_addr, Self::on_ret, false);
         }
 
         None
     }
 }
 
-impl<T> HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuCallTracerTool<T>
+impl<T> HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for CallTracerModule<T>
 where
     T: CallTraceCollectorTuple,
 {
@@ -394,44 +403,44 @@ where
     }
 }
 
-impl<S, T> EmulatorTool<S> for QemuCallTracerTool<T>
+impl<S, T> EmulatorModule<S> for CallTracerModule<T>
 where
     S: Unpin + UsesInput,
     T: CallTraceCollectorTuple + Debug,
 {
-    fn init_tool<ET>(&self, emulator_tools: &mut EmulatorTools<ET, S>)
+    fn init_module<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
     where
-        ET: EmulatorToolTuple<S>,
+        ET: EmulatorModuleTuple<S>,
     {
-        emulator_tools.blocks(
+        emulator_modules.blocks(
             Hook::Function(Self::gen_blocks_calls::<ET, S>),
             Hook::Empty,
             Hook::Empty,
         );
     }
 
-    fn pre_exec<ET>(&mut self, emulator_tools: &mut EmulatorTools<ET, S>, input: &S::Input)
+    fn pre_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, input: &S::Input)
     where
-        ET: EmulatorToolTuple<S>,
+        ET: EmulatorModuleTuple<S>,
     {
         self.collectors
             .as_mut()
             .unwrap()
-            .pre_exec_all(emulator_tools.qemu(), input);
+            .pre_exec_all(emulator_modules.qemu(), input);
     }
 
     fn post_exec<OT, ET>(
         &mut self,
-        emulator_tools: &mut EmulatorTools<ET, S>,
+        emulator_modules: &mut EmulatorModules<ET, S>,
         input: &S::Input,
         observers: &mut OT,
         exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
-        ET: EmulatorToolTuple<S>,
+        ET: EmulatorModuleTuple<S>,
     {
         self.collectors.as_mut().unwrap().post_exec_all(
-            emulator_tools.qemu(),
+            emulator_modules.qemu(),
             input,
             observers,
             exit_kind,
@@ -472,12 +481,12 @@ where
     #[allow(clippy::unnecessary_cast)]
     fn on_call<ET, S>(
         &mut self,
-        _emulator_tools: &mut EmulatorTools<ET, S>,
+        _emulator_modules: &mut EmulatorModules<ET, S>,
         _state: Option<&mut S>,
         pc: GuestAddr,
         call_len: usize,
     ) where
-        ET: EmulatorToolTuple<S>,
+        ET: EmulatorModuleTuple<S>,
         S: Unpin + UsesInput,
     {
         self.callstack_hash ^= pc as u64 + call_len as u64;
@@ -486,12 +495,12 @@ where
     #[allow(clippy::unnecessary_cast)]
     fn on_ret<ET, S>(
         &mut self,
-        _emulator_tools: &mut EmulatorTools<ET, S>,
+        _emulator_modules: &mut EmulatorModules<ET, S>,
         _state: Option<&mut S>,
         _pc: GuestAddr,
         ret_addr: GuestAddr,
     ) where
-        ET: EmulatorToolTuple<S>,
+        ET: EmulatorModuleTuple<S>,
         S: Unpin + UsesInput,
     {
         self.callstack_hash ^= ret_addr as u64;
@@ -561,12 +570,12 @@ impl CallTraceCollector for FullBacktraceCollector {
     #[allow(clippy::unnecessary_cast)]
     fn on_call<ET, S>(
         &mut self,
-        _emulator_tools: &mut EmulatorTools<ET, S>,
+        _emulator_modules: &mut EmulatorModules<ET, S>,
         _state: Option<&mut S>,
         pc: GuestAddr,
         call_len: usize,
     ) where
-        ET: EmulatorToolTuple<S>,
+        ET: EmulatorModuleTuple<S>,
         S: Unpin + UsesInput,
     {
         // TODO handle Thumb
@@ -578,12 +587,12 @@ impl CallTraceCollector for FullBacktraceCollector {
     #[allow(clippy::unnecessary_cast)]
     fn on_ret<ET, S>(
         &mut self,
-        _emulator_tools: &mut EmulatorTools<ET, S>,
+        _emulator_modules: &mut EmulatorModules<ET, S>,
         _state: Option<&mut S>,
         _pc: GuestAddr,
         ret_addr: GuestAddr,
     ) where
-        ET: EmulatorToolTuple<S>,
+        ET: EmulatorModuleTuple<S>,
         S: Unpin + UsesInput,
     {
         unsafe {

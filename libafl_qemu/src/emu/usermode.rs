@@ -3,14 +3,15 @@ use libafl_qemu_sys::{GuestAddr, MmapPerms, VerifyAccess};
 use crate::{
     command::CommandManager,
     emu::{HasExecutions, State},
-    Emulator, EmulatorExitHandler, EmulatorToolTuple, GuestMaps,
+    modules::EmulatorModuleTuple,
+    Emulator, EmulatorExitHandler, GuestMaps,
 };
 
 impl<CM, EH, ET, S> Emulator<CM, EH, ET, S>
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     /// This function gets the memory mappings from the emulator.

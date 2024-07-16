@@ -13,10 +13,12 @@ use crate::{
         bindings, CommandError, CommandManager, EndCommand, FilterCommand, InputCommand, IsCommand,
         LoadCommand, NativeExitKind, SaveCommand, StartCommand, VersionCommand,
     },
+    modules::{
+        EmulatorModuleTuple, QemuInstrumentationAddressRangeFilter, StdInstrumentationFilter,
+    },
     sync_exit::ExitArgs,
-    EmulatorExitHandler, EmulatorToolTuple, GuestReg, IsSnapshotManager, Qemu,
-    QemuInstrumentationAddressRangeFilter, QemuMemoryChunk, Regs, StdEmulatorExitHandler,
-    StdInstrumentationFilter,
+    EmulatorExitHandler, GuestReg, IsSnapshotManager, Qemu, QemuMemoryChunk, Regs,
+    StdEmulatorExitHandler,
 };
 
 pub static EMU_EXIT_KIND_MAP: OnceLock<EnumMap<NativeExitKind, Option<ExitKind>>> = OnceLock::new();
@@ -25,7 +27,7 @@ pub trait NativeCommandParser<CM, EH, ET, S>
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     fn command_id(&self) -> GuestReg;
@@ -42,7 +44,7 @@ impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, ET, S>
     for InputPhysCommandParser
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorToolTuple<S> + StdInstrumentationFilter + Debug,
+    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
     S: Unpin + State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -75,7 +77,7 @@ impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, ET, S>
     for InputVirtCommandParser
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorToolTuple<S> + StdInstrumentationFilter + Debug,
+    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
     S: Unpin + State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -104,7 +106,7 @@ impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, ET, S>
     for StartPhysCommandParser
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorToolTuple<S> + StdInstrumentationFilter + Debug,
+    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
     S: Unpin + State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -134,7 +136,7 @@ impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, ET, S>
     for StartVirtCommandParser
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorToolTuple<S> + StdInstrumentationFilter + Debug,
+    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
     S: Unpin + State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -163,7 +165,7 @@ pub struct SaveCommandParser;
 impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, ET, S> for SaveCommandParser
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorToolTuple<S> + StdInstrumentationFilter + Debug,
+    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
     S: Unpin + State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -185,7 +187,7 @@ pub struct LoadCommandParser;
 impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, ET, S> for LoadCommandParser
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorToolTuple<S> + StdInstrumentationFilter + Debug,
+    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
     S: Unpin + State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -207,7 +209,7 @@ pub struct EndCommandParser;
 impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, ET, S> for EndCommandParser
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorToolTuple<S> + StdInstrumentationFilter + Debug,
+    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
     S: Unpin + State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -243,7 +245,7 @@ impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, ET, S>
     for VersionCommandParser
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorToolTuple<S> + StdInstrumentationFilter + Debug,
+    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
     S: Unpin + State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -268,7 +270,7 @@ impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, ET, S>
     for VaddrFilterAllowRangeCommandParser
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorToolTuple<S> + StdInstrumentationFilter + Debug,
+    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
     S: Unpin + State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,

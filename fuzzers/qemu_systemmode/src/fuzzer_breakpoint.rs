@@ -30,10 +30,12 @@ use libafl_bolts::{
 use libafl_qemu::{
     breakpoint::Breakpoint,
     command::{EndCommand, StartCommand, StdCommandManager},
-    edges::{edges_map_mut_ptr, QemuEdgeCoverageTool, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND},
     elf::EasyElf,
     emu::Emulator,
     executor::{stateful::StatefulQemuExecutor, QemuExecutorState},
+    modules::edges::{
+        edges_map_mut_ptr, EdgeCoverageModule, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
+    },
     FastSnapshotManager, GuestPhysAddr, GuestReg, QemuMemoryChunk, StdEmulatorExitHandler,
 };
 
@@ -98,10 +100,10 @@ pub fn fuzz() {
         let cmd_manager = StdCommandManager::new();
 
         // Instantiate hooks
-        let tools = tuple_list!(QemuEdgeCoverageTool::default());
+        let modules = tuple_list!(EdgeCoverageModule::default());
 
         // Create emulator
-        let mut emu = Emulator::new(&args, &env, tools, emu_exit_handler, cmd_manager).unwrap();
+        let mut emu = Emulator::new(&args, &env, modules, emu_exit_handler, cmd_manager).unwrap();
 
         // Set breakpoints of interest with corresponding commands.
         emu.add_breakpoint(

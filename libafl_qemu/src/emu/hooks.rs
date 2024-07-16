@@ -20,6 +20,7 @@ use crate::qemu::{
     PreSyscallHookClosure, PreSyscallHookFn,
 };
 use crate::{
+    modules::{EmulatorModule, EmulatorModuleTuple},
     qemu::{
         block_0_exec_hook_wrapper, block_gen_hook_wrapper, block_post_gen_hook_wrapper,
         closure_backdoor_hook_wrapper, closure_instruction_hook_wrapper, cmp_0_exec_hook_wrapper,
@@ -36,7 +37,7 @@ use crate::{
         QemuHooks, ReadExecHook, ReadExecNHook, ReadGenHook, ReadHookId, WriteExecHook,
         WriteExecNHook, WriteGenHook, WriteHookId,
     },
-    EmulatorTool, EmulatorToolTuple, MemAccessInfo, Qemu,
+    MemAccessInfo, Qemu,
 };
 
 macro_rules! get_raw_hook {
@@ -71,7 +72,7 @@ static mut CRASH_HOOKS: Vec<HookRepr> = vec![];
 #[cfg(emulation_mode = "usermode")]
 pub extern "C" fn crash_hook_wrapper<ET, S>(target_sig: i32)
 where
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + UsesInput,
 {
     unsafe {
@@ -93,15 +94,15 @@ where
     }
 }
 
-/// High-level hooks, notably used by `QemuTool`s
+/// High-level `Emulator` modules, using `QemuHooks`.
 #[derive(Debug)]
-pub struct EmulatorTools<ET, S>
+pub struct EmulatorModules<ET, S>
 where
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + UsesInput,
 {
     qemu: Qemu,
-    tools: Pin<Box<ET>>,
+    modules: Pin<Box<ET>>,
     hooks: EmulatorHooks<ET, S>,
     phantom: PhantomData<S>,
 }
@@ -110,7 +111,7 @@ where
 #[derive(Debug)]
 pub struct EmulatorHooks<ET, S>
 where
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + UsesInput,
 {
     qemu_hooks: QemuHooks,
@@ -139,7 +140,7 @@ where
 
 impl<ET, S> EmulatorHooks<ET, S>
 where
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + UsesInput,
 {
     #[must_use]
@@ -631,7 +632,7 @@ where
 
     pub fn backdoor_function(
         &self,
-        hook: fn(&mut EmulatorTools<ET, S>, Option<&mut S>, cpu: CPUArchStatePtr, pc: GuestAddr),
+        hook: fn(&mut EmulatorModules<ET, S>, Option<&mut S>, cpu: CPUArchStatePtr, pc: GuestAddr),
     ) -> BackdoorHookId {
         unsafe {
             self.qemu_hooks
@@ -655,7 +656,7 @@ where
 #[cfg(emulation_mode = "usermode")]
 impl<ET, S> EmulatorHooks<ET, S>
 where
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + UsesInput,
 {
     #[allow(clippy::type_complexity)]
@@ -775,7 +776,7 @@ where
 
     pub fn thread_creation_function(
         &mut self,
-        hook: fn(&mut EmulatorTools<ET, S>, Option<&mut S>, tid: u32) -> bool,
+        hook: fn(&mut EmulatorModules<ET, S>, Option<&mut S>, tid: u32) -> bool,
     ) -> NewThreadHookId {
         unsafe {
             self.qemu_hooks
@@ -812,7 +813,7 @@ where
             id
         }
     }
-    pub fn crash_function(&mut self, hook: fn(&mut EmulatorTools<ET, S>, target_signal: i32)) {
+    pub fn crash_function(&mut self, hook: fn(&mut EmulatorModules<ET, S>, target_signal: i32)) {
         self.qemu_hooks.set_crash_hook(crash_hook_wrapper::<ET, S>);
         self.crash_hooks
             .push(HookRepr::Function(hook as *const libc::c_void));
@@ -828,7 +829,7 @@ where
 
 impl<ET, S> Default for EmulatorHooks<ET, S>
 where
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + UsesInput,
 {
     fn default() -> Self {
@@ -836,41 +837,41 @@ where
     }
 }
 
-impl<ET, S> EmulatorTools<ET, S>
+impl<ET, S> EmulatorModules<ET, S>
 where
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + UsesInput,
 {
-    pub(super) fn new(qemu: Qemu, tools: ET) -> Pin<Box<Self>> {
-        let mut tools = Box::pin(Self {
+    pub(super) fn new(qemu: Qemu, modules: ET) -> Pin<Box<Self>> {
+        let mut modules = Box::pin(Self {
             qemu,
-            tools: Box::pin(tools),
+            modules: Box::pin(modules),
             hooks: EmulatorHooks::default(),
             phantom: PhantomData,
         });
 
         // re-translate blocks with hooks
         // qemu.flush_jit();
-        // -> it should be useless, since EmulatorTools must be init before QEMU ever runs
+        // -> it should be useless, since EmulatorModules must be init before QEMU ever runs
 
-        // Set global EmulatorTools pointer
+        // Set global EmulatorModules pointer
         unsafe {
             if EMULATOR_TOOLS.is_null() {
-                EMULATOR_TOOLS = ptr::from_mut::<Self>(tools.as_mut().get_mut()) as *mut ();
+                EMULATOR_TOOLS = ptr::from_mut::<Self>(modules.as_mut().get_mut()) as *mut ();
             } else {
-                panic!("Emulator Tools have already been set and is still active. It is not supported to have multiple instances of `EmulatorTools` at the same time yet.")
+                panic!("Emulator Modules have already been set and is still active. It is not supported to have multiple instances of `EmulatorModules` at the same time yet.")
             }
         }
 
         unsafe {
-            // We give access to EmulatorToolTuple<S> during init, the compiler complains (for good reasons)
-            // TODO: We should find a way to be able to check for a tool without giving full access to the tuple.
-            tools
-                .tools
-                .init_tools_all(Self::emulator_tools_mut_unchecked());
+            // We give access to EmulatorModuleTuple<S> during init, the compiler complains (for good reasons)
+            // TODO: We should find a way to be able to check for a module without giving full access to the tuple.
+            modules
+                .modules
+                .init_modules_all(Self::emulator_modules_mut_unchecked());
         }
 
-        tools
+        modules
     }
 
     #[must_use]
@@ -879,12 +880,12 @@ where
     }
 
     #[must_use]
-    pub fn tools(&self) -> &ET {
-        self.tools.as_ref().get_ref()
+    pub fn modules(&self) -> &ET {
+        self.modules.as_ref().get_ref()
     }
 
-    pub fn tools_mut(&mut self) -> &mut ET {
-        self.tools.as_mut().get_mut()
+    pub fn modules_mut(&mut self) -> &mut ET {
+        self.modules.as_mut().get_mut()
     }
 
     pub fn hooks_mut(&mut self) -> &mut EmulatorHooks<ET, S> {
@@ -893,19 +894,19 @@ where
 
     pub fn first_exec_all(&mut self) {
         unsafe {
-            self.tools
+            self.modules
                 .as_mut()
                 .get_mut()
-                .first_exec_all(Self::emulator_tools_mut_unchecked());
+                .first_exec_all(Self::emulator_modules_mut_unchecked());
         }
     }
 
     pub fn pre_exec_all(&mut self, input: &S::Input) {
         unsafe {
-            self.tools
+            self.modules
                 .as_mut()
                 .get_mut()
-                .pre_exec_all(Self::emulator_tools_mut_unchecked(), input);
+                .pre_exec_all(Self::emulator_modules_mut_unchecked(), input);
         }
     }
 
@@ -918,8 +919,8 @@ where
         OT: ObserversTuple<S>,
     {
         unsafe {
-            self.tools.as_mut().get_mut().post_exec_all(
-                Self::emulator_tools_mut_unchecked(),
+            self.modules.as_mut().get_mut().post_exec_all(
+                Self::emulator_modules_mut_unchecked(),
                 input,
                 observers,
                 exit_kind,
@@ -928,45 +929,45 @@ where
     }
 
     #[must_use]
-    pub fn match_tool<T>(&self) -> Option<&T>
+    pub fn match_module<T>(&self) -> Option<&T>
     where
-        T: EmulatorTool<S>,
+        T: EmulatorModule<S>,
     {
-        self.tools.match_first_type::<T>()
+        self.modules.match_first_type::<T>()
     }
 
-    pub fn match_tool_mut<T>(&mut self) -> Option<&mut T>
+    pub fn match_module_mut<T>(&mut self) -> Option<&mut T>
     where
-        T: EmulatorTool<S>,
+        T: EmulatorModule<S>,
     {
-        self.tools.match_first_type_mut::<T>()
+        self.modules.match_first_type_mut::<T>()
     }
 
-    /// Get a mutable reference to `EmulatorTools` (supposedly initialized beforehand).
+    /// Get a mutable reference to `EmulatorModules` (supposedly initialized beforehand).
     ///
     /// # Safety
     ///
-    /// This will always return a reference, but it will be incorrect if `EmulatorTools` has not
+    /// This will always return a reference, but it will be incorrect if `EmulatorModules` has not
     /// been initialized previously.
     /// The user should also be consistent with the generic use (it will suppose they are the same
     /// as the ones used at initialization time).
     #[must_use]
-    pub unsafe fn emulator_tools_mut_unchecked<'a>() -> &'a mut EmulatorTools<ET, S> {
+    pub unsafe fn emulator_modules_mut_unchecked<'a>() -> &'a mut EmulatorModules<ET, S> {
         #[cfg(debug_assertions)]
         {
-            (EMULATOR_TOOLS as *mut EmulatorTools<ET, S>)
+            (EMULATOR_TOOLS as *mut EmulatorModules<ET, S>)
                 .as_mut()
                 .unwrap()
         }
 
         #[cfg(not(debug_assertions))]
         {
-            &mut *(EMULATOR_TOOLS as *mut EmulatorTools<ET, S>)
+            &mut *(EMULATOR_TOOLS as *mut EmulatorModules<ET, S>)
         }
     }
 
-    /// Get a mutable reference to `EmulatorTools`.
-    /// This version is safer than `emulator_tools_mut_unchecked` since it will check that
+    /// Get a mutable reference to `EmulatorModules`.
+    /// This version is safer than `emulator_modules_mut_unchecked` since it will check that
     /// initialization has occurred previously.
     ///
     /// # Safety
@@ -974,8 +975,8 @@ where
     /// This version still presents some unsafeness: The user should be consistent with the
     /// generic use (it will suppose they are the same as the ones used at initialization time).
     #[must_use]
-    pub unsafe fn emulator_tools_mut<'a>() -> Option<&'a mut EmulatorTools<ET, S>> {
-        unsafe { (EMULATOR_TOOLS as *mut EmulatorTools<ET, S>).as_mut() }
+    pub unsafe fn emulator_modules_mut<'a>() -> Option<&'a mut EmulatorModules<ET, S>> {
+        unsafe { (EMULATOR_TOOLS as *mut EmulatorModules<ET, S>).as_mut() }
     }
 
     pub fn instructions(
@@ -990,7 +991,7 @@ where
     pub fn instruction_function(
         &mut self,
         addr: GuestAddr,
-        hook: fn(&mut EmulatorTools<ET, S>, Option<&mut S>, GuestAddr),
+        hook: fn(&mut EmulatorModules<ET, S>, Option<&mut S>, GuestAddr),
         invalidate_block: bool,
     ) -> InstructionHookId {
         self.hooks
@@ -1096,9 +1097,9 @@ where
 
 /// Usermode-only high-level functions
 #[cfg(emulation_mode = "usermode")]
-impl<ET, S> EmulatorTools<ET, S>
+impl<ET, S> EmulatorModules<ET, S>
 where
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + UsesInput,
 {
     #[allow(clippy::type_complexity)]
@@ -1110,7 +1111,7 @@ where
     pub fn syscalls_function(
         &mut self,
         hook: fn(
-            &mut EmulatorTools<ET, S>,
+            &mut EmulatorModules<ET, S>,
             Option<&mut S>,
             sys_num: i32,
             a0: GuestAddr,
@@ -1131,7 +1132,7 @@ where
         &mut self,
         hook: Box<
             dyn for<'a> FnMut(
-                &'a mut EmulatorTools<ET, S>,
+                &'a mut EmulatorModules<ET, S>,
                 Option<&'a mut S>,
                 i32,
                 GuestAddr,
@@ -1157,7 +1158,7 @@ where
     pub fn after_syscalls_function(
         &mut self,
         hook: fn(
-            &mut EmulatorTools<ET, S>,
+            &mut EmulatorModules<ET, S>,
             Option<&mut S>,
             res: GuestAddr,
             sys_num: i32,
@@ -1179,7 +1180,7 @@ where
         &mut self,
         hook: Box<
             dyn for<'a> FnMut(
-                &'a mut EmulatorTools<ET, S>,
+                &'a mut EmulatorModules<ET, S>,
                 Option<&mut S>,
                 GuestAddr,
                 i32,
@@ -1203,7 +1204,7 @@ where
 
     pub fn thread_creation_function(
         &mut self,
-        hook: fn(&mut EmulatorTools<ET, S>, Option<&mut S>, tid: u32) -> bool,
+        hook: fn(&mut EmulatorModules<ET, S>, Option<&mut S>, tid: u32) -> bool,
     ) -> NewThreadHookId {
         self.hooks.thread_creation_function(hook)
     }
@@ -1214,7 +1215,7 @@ where
     ) -> NewThreadHookId {
         self.hooks.thread_creation_closure(hook)
     }
-    pub fn crash_function(&mut self, hook: fn(&mut EmulatorTools<ET, S>, target_signal: i32)) {
+    pub fn crash_function(&mut self, hook: fn(&mut EmulatorModules<ET, S>, target_signal: i32)) {
         self.hooks.crash_function(hook);
     }
 
@@ -1223,9 +1224,9 @@ where
     }
 }
 
-impl<ET, S> Drop for EmulatorTools<ET, S>
+impl<ET, S> Drop for EmulatorModules<ET, S>
 where
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + UsesInput,
 {
     fn drop(&mut self) {

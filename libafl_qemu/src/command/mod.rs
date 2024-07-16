@@ -24,11 +24,13 @@ use crate::{
         VaddrFilterAllowRangeCommandParser, VersionCommandParser,
     },
     get_exit_arch_regs,
+    modules::{
+        EmulatorModuleTuple, HasInstrumentationFilter, IsFilter,
+        QemuInstrumentationAddressRangeFilter, StdInstrumentationFilter,
+    },
     sync_exit::ExitArgs,
-    Emulator, EmulatorExitHandler, EmulatorToolTuple, ExitHandlerError, ExitHandlerResult,
-    GuestReg, HasInstrumentationFilter, InputLocation, IsFilter, IsSnapshotManager, Qemu,
-    QemuInstrumentationAddressRangeFilter, QemuMemoryChunk, QemuRWError, Regs,
-    StdEmulatorExitHandler, StdInstrumentationFilter, CPU,
+    Emulator, EmulatorExitHandler, ExitHandlerError, ExitHandlerResult, GuestReg, InputLocation,
+    IsSnapshotManager, Qemu, QemuMemoryChunk, QemuRWError, Regs, StdEmulatorExitHandler, CPU,
 };
 
 pub mod parser;
@@ -53,7 +55,7 @@ macro_rules! define_std_command_manager {
     ($name:ident, [$($native_command_parser:ident),+]) => {
         pub struct $name<ET, S, SM>
         where
-            ET: EmulatorToolTuple<S> + StdInstrumentationFilter + Debug,
+            ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
             S: Unpin + State + HasExecutions,
             S::Input: HasTargetBytes,
             SM: IsSnapshotManager,
@@ -64,7 +66,7 @@ macro_rules! define_std_command_manager {
 
         impl<ET, S, SM> $name<ET, S, SM>
         where
-            ET: EmulatorToolTuple<S> + StdInstrumentationFilter + Debug,
+            ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
             S: Unpin + State + HasExecutions,
             S::Input: HasTargetBytes,
             SM: IsSnapshotManager,
@@ -103,7 +105,7 @@ macro_rules! define_std_command_manager {
 
         impl<ET, S, SM> CommandManager<StdEmulatorExitHandler<SM>, ET, S> for $name<ET, S, SM>
         where
-            ET: EmulatorToolTuple<S> + StdInstrumentationFilter + Debug,
+            ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
             S: Unpin + State + HasExecutions,
             S::Input: HasTargetBytes,
             SM: IsSnapshotManager,
@@ -127,7 +129,7 @@ macro_rules! define_std_command_manager {
 
         impl<ET, S, SM> Debug for $name<ET, S, SM>
         where
-            ET: EmulatorToolTuple<S> + StdInstrumentationFilter + Debug,
+            ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
             S: Unpin + State + HasExecutions,
             S::Input: HasTargetBytes,
             SM: IsSnapshotManager,
@@ -139,7 +141,7 @@ macro_rules! define_std_command_manager {
 
         impl<ET, S, SM> Default for $name<ET, S, SM>
         where
-            ET: EmulatorToolTuple<S> + StdInstrumentationFilter + Debug,
+            ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
             S: Unpin + State + HasExecutions,
             S::Input: HasTargetBytes,
             SM: IsSnapshotManager,
@@ -156,7 +158,7 @@ pub struct NopCommandManager;
 impl<EH, ET, S> CommandManager<EH, ET, S> for NopCommandManager
 where
     EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     fn parse(&self, _qemu: Qemu) -> Result<Rc<dyn IsCommand<Self, EH, ET, S>>, CommandError> {
@@ -182,7 +184,7 @@ define_std_command_manager!(
 pub trait CommandManager<EH, ET, S>: Sized
 where
     EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     fn parse(&self, qemu: Qemu) -> Result<Rc<dyn IsCommand<Self, EH, ET, S>>, CommandError>;
@@ -200,7 +202,7 @@ pub trait IsCommand<CM, EH, ET, S>: Debug + Display
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     /// Used to know whether the command can be run during a backdoor, or if it is necessary to go out of
@@ -251,7 +253,7 @@ impl<CM, EH, ET, S> IsCommand<CM, EH, ET, S> for NopCommand
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     fn usable_at_runtime(&self) -> bool {
@@ -274,7 +276,7 @@ pub struct SaveCommand;
 impl<CM, ET, S, SM> IsCommand<CM, StdEmulatorExitHandler<SM>, ET, S> for SaveCommand
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorToolTuple<S> + StdInstrumentationFilter + Debug,
+    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
     S: Unpin + State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -303,7 +305,7 @@ where
 
         #[cfg(emulation_mode = "systemmode")]
         {
-            let emulator_tools = emu.tools_mut().tools_mut();
+            let emulator_modules = emu.modules_mut().modules_mut();
 
             let mut allowed_paging_ids = HashSet::new();
 
@@ -312,7 +314,7 @@ where
 
             let paging_filter =
                 HasInstrumentationFilter::<QemuInstrumentationPagingFilter>::filter_mut(
-                    emulator_tools,
+                    emulator_modules,
                 );
 
             *paging_filter = QemuInstrumentationPagingFilter::AllowList(allowed_paging_ids);
@@ -328,7 +330,7 @@ pub struct LoadCommand;
 impl<CM, ET, S, SM> IsCommand<CM, StdEmulatorExitHandler<SM>, ET, S> for LoadCommand
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorToolTuple<S> + StdInstrumentationFilter + Debug,
+    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
     S: Unpin + State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -373,7 +375,7 @@ pub struct InputCommand {
 impl<CM, ET, S, SM> IsCommand<CM, StdEmulatorExitHandler<SM>, ET, S> for InputCommand
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorToolTuple<S> + StdInstrumentationFilter + Debug,
+    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
     S: Unpin + State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -409,7 +411,7 @@ pub struct StartCommand {
 impl<CM, ET, S, SM> IsCommand<CM, StdEmulatorExitHandler<SM>, ET, S> for StartCommand
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorToolTuple<S> + StdInstrumentationFilter + Debug,
+    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
     S: Unpin + State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -459,7 +461,7 @@ pub struct EndCommand(Option<ExitKind>);
 impl<CM, ET, S, SM> IsCommand<CM, StdEmulatorExitHandler<SM>, ET, S> for EndCommand
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorToolTuple<S> + StdInstrumentationFilter + Debug,
+    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
     S: Unpin + State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -500,7 +502,7 @@ pub struct VersionCommand(u64);
 impl<CM, ET, S, SM> IsCommand<CM, StdEmulatorExitHandler<SM>, ET, S> for VersionCommand
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorToolTuple<S> + StdInstrumentationFilter + Debug,
+    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
     S: Unpin + State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -540,7 +542,7 @@ where
 impl<CM, ET, S, SM> IsCommand<CM, StdEmulatorExitHandler<SM>, ET, S> for PagingFilterCommand
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorToolTuple<S> + StdInstrumentationFilter + Debug,
+    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
     S: Unpin + State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -556,10 +558,10 @@ where
         _ret_reg: Option<Regs>,
     ) -> Result<Option<ExitHandlerResult<CM, StdEmulatorExitHandler<SM>, ET, S>>, ExitHandlerError>
     {
-        let qemu_tools = emu.tools_mut().tools_mut();
+        let qemu_modules = emu.modules_mut().modules_mut();
 
         let paging_filter =
-            HasInstrumentationFilter::<QemuInstrumentationPagingFilter>::filter_mut(qemu_tools);
+            HasInstrumentationFilter::<QemuInstrumentationPagingFilter>::filter_mut(qemu_modules);
 
         *paging_filter = self.filter.clone();
 
@@ -570,7 +572,7 @@ where
 impl<CM, ET, S, SM> IsCommand<CM, StdEmulatorExitHandler<SM>, ET, S> for AddressRangeFilterCommand
 where
     CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorToolTuple<S> + StdInstrumentationFilter + Debug,
+    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
     S: Unpin + State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -587,11 +589,11 @@ where
         _ret_reg: Option<Regs>,
     ) -> Result<Option<ExitHandlerResult<CM, StdEmulatorExitHandler<SM>, ET, S>>, ExitHandlerError>
     {
-        let qemu_tools = &mut ();
+        let qemu_modules = &mut ();
 
         let addr_range_filter =
             HasInstrumentationFilter::<QemuInstrumentationAddressRangeFilter>::filter_mut(
-                qemu_tools,
+                qemu_modules,
             );
 
         *addr_range_filter = self.filter.clone();

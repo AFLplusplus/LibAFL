@@ -28,9 +28,11 @@ use libafl_bolts::{
 };
 use libafl_qemu::{
     command::StdCommandManager,
-    edges::{edges_map_mut_ptr, QemuEdgeCoverageTool, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND},
     emu::Emulator,
     executor::{stateful::StatefulQemuExecutor, QemuExecutorState},
+    modules::edges::{
+        edges_map_mut_ptr, EdgeCoverageModule, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
+    },
     FastSnapshotManager, StdEmulatorExitHandler,
 };
 
@@ -61,10 +63,10 @@ pub fn fuzz() {
 
         let cmd_manager = StdCommandManager::new();
 
-        // Choose tools to use
-        let tools = tuple_list!(QemuEdgeCoverageTool::default());
+        // Choose modules to use
+        let modules = tuple_list!(EdgeCoverageModule::default());
 
-        let mut emu = Emulator::new(&args, &env, tools, emu_exit_handler, cmd_manager).unwrap(); // Create the emulator
+        let mut emu = Emulator::new(&args, &env, modules, emu_exit_handler, cmd_manager).unwrap(); // Create the emulator
 
         let devices = emu.list_devices();
         println!("Devices = {:?}", devices);

@@ -9,14 +9,14 @@ use std::{
 
 use which::which;
 
-fn build_dep_check(tools: &[&str]) {
-    for tool in tools {
-        println!("Checking for build tool {tool}...");
+fn build_dep_check(modules: &[&str]) {
+    for module in modules {
+        println!("Checking for build module {module}...");
 
-        if let Ok(path) = which(tool) {
-            println!("Found build tool {}", path.to_str().unwrap());
+        if let Ok(path) = which(module) {
+            println!("Found build module {}", path.to_str().unwrap());
         } else {
-            println!("ERROR: missing build tool {tool}");
+            println!("ERROR: missing build module {module}");
             exit(1);
         };
     }

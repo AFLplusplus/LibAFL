@@ -9,7 +9,7 @@ use libafl_qemu_sys::GuestPhysAddr;
 
 use crate::{
     command::CommandManager, emu::IsSnapshotManager, DeviceSnapshotFilter, Emulator,
-    EmulatorExitHandler, EmulatorToolTuple, Qemu, QemuSnapshotCheckResult, SnapshotId,
+    EmulatorExitHandler, EmulatorModuleTuple, Qemu, QemuSnapshotCheckResult, SnapshotId,
     SnapshotManagerError,
 };
 
@@ -175,7 +175,7 @@ impl<CM, EH, ET, S> Emulator<CM, EH, ET, S>
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorToolTuple<S>,
+    ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
 {
     /// Write a value to a phsical guest address, including ROM areas.

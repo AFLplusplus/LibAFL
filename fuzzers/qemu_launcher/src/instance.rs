@@ -38,10 +38,13 @@ use libafl_bolts::{
     tuples::{tuple_list, Merge},
 };
 use libafl_qemu::{
-    cmplog::CmpLogObserver,
     command::NopCommandManager,
-    edges::{edges_map_mut_ptr, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND},
-    Emulator, EmulatorToolTuple, NopEmulatorExitHandler, Qemu, QemuExecutor,
+    modules::{
+        cmplog::CmpLogObserver,
+        edges::{edges_map_mut_ptr, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND},
+        EmulatorModuleTuple,
+    },
+    Emulator, NopEmulatorExitHandler, Qemu, QemuExecutor,
 };
 use typed_builder::TypedBuilder;
 
@@ -68,9 +71,9 @@ pub struct Instance<'a, M: Monitor> {
 }
 
 impl<'a, M: Monitor> Instance<'a, M> {
-    pub fn run<ET>(&mut self, tools: ET, state: Option<ClientState>) -> Result<(), Error>
+    pub fn run<ET>(&mut self, modules: ET, state: Option<ClientState>) -> Result<(), Error>
     where
-        ET: EmulatorToolTuple<ClientState> + Debug,
+        ET: EmulatorModuleTuple<ClientState> + Debug,
     {
         // Create an observation channel using the coverage map
         let edges_observer = unsafe {
@@ -151,9 +154,13 @@ impl<'a, M: Monitor> Instance<'a, M> {
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-        let mut emulator =
-            Emulator::new_with_qemu(*self.qemu, tools, NopEmulatorExitHandler, NopCommandManager)
-                .unwrap();
+        let mut emulator = Emulator::new_with_qemu(
+            *self.qemu,
+            modules,
+            NopEmulatorExitHandler,
+            NopCommandManager,
+        )
+        .unwrap();
 
         if self.options.is_cmplog_core(self.core_id) {
             // Create a QEMU in-process executor

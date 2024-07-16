@@ -38,8 +38,7 @@ pub use arch::*;
 
 pub mod elf;
 
-pub mod tools;
-pub use tools::*;
+pub mod modules;
 
 pub mod executor;
 pub use executor::QemuExecutor;
