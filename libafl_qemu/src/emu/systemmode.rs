@@ -8,8 +8,8 @@ use libafl::state::{HasExecutions, State};
 use libafl_qemu_sys::GuestPhysAddr;
 
 use crate::{
-    command::CommandManager, emu::IsSnapshotManager, DeviceSnapshotFilter, Emulator,
-    EmulatorExitHandler, EmulatorModuleTuple, Qemu, QemuSnapshotCheckResult, SnapshotId,
+    command::CommandManager, emu::IsSnapshotManager, modules::EmulatorModuleTuple,
+    DeviceSnapshotFilter, Emulator, EmulatorExitHandler, Qemu, QemuSnapshotCheckResult, SnapshotId,
     SnapshotManagerError,
 };
 

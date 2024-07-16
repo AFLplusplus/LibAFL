@@ -25,18 +25,18 @@ static DRCOV_LENGTHS: Mutex<Option<HashMap<GuestAddr, GuestUsize>>> = Mutex::new
     allow(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
 #[derive(Debug, Default, Serialize, Deserialize)]
-pub struct QemuDrCovMetadata {
+pub struct DrCovMetadata {
     pub current_id: u64,
 }
 
-impl QemuDrCovMetadata {
+impl DrCovMetadata {
     #[must_use]
     pub fn new() -> Self {
         Self { current_id: 0 }
     }
 }
 
-libafl_bolts::impl_serdeany!(QemuDrCovMetadata);
+libafl_bolts::impl_serdeany!(DrCovMetadata);
 
 #[derive(Debug)]
 pub struct DrCovModule {
@@ -226,15 +226,12 @@ where
     let state = state.expect("The gen_unique_block_ids hook works only for in-process fuzzing");
     if state
         .metadata_map_mut()
-        .get_mut::<QemuDrCovMetadata>()
+        .get_mut::<DrCovMetadata>()
         .is_none()
     {
-        state.add_metadata(QemuDrCovMetadata::new());
+        state.add_metadata(DrCovMetadata::new());
     }
-    let meta = state
-        .metadata_map_mut()
-        .get_mut::<QemuDrCovMetadata>()
-        .unwrap();
+    let meta = state.metadata_map_mut().get_mut::<DrCovMetadata>().unwrap();
 
     match DRCOV_MAP.lock().unwrap().as_mut().unwrap().entry(pc) {
         Entry::Occupied(e) => {

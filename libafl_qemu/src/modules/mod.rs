@@ -8,6 +8,16 @@ use libafl_qemu_sys::{GuestAddr, GuestPhysAddr};
 
 use crate::Qemu;
 
+#[cfg(emulation_mode = "usermode")]
+pub mod usermode;
+#[cfg(emulation_mode = "usermode")]
+pub use usermode::*;
+
+#[cfg(emulation_mode = "systemmode")]
+pub mod systemmode;
+#[cfg(emulation_mode = "systemmode")]
+pub use systemmode::*;
+
 pub mod edges;
 pub use edges::EdgeCoverageModule;
 
@@ -16,39 +26,12 @@ pub mod calls;
 #[cfg(not(cpu_target = "hexagon"))]
 pub use calls::CallTracerModule;
 
-#[cfg(not(cpu_target = "hexagon"))]
-pub mod drcov;
-#[cfg(not(cpu_target = "hexagon"))]
-pub use drcov::DrCovModule;
-
 #[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]
 pub mod cmplog;
 #[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]
 pub use cmplog::CmpLogModule;
 
-#[cfg(all(emulation_mode = "usermode", feature = "injections"))]
-pub mod injections;
-#[cfg(all(emulation_mode = "usermode", feature = "injections"))]
-pub use injections::InjectionModule;
-
-#[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
-pub mod snapshot;
-#[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
-pub use snapshot::IntervalSnapshotFilter;
-#[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
-pub use snapshot::SnapshotModule;
-
-#[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
-pub mod asan;
-#[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
-pub use asan::{init_qemu_with_asan, AsanModule};
-
 use crate::emu::EmulatorModules;
-
-#[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
-pub mod asan_guest;
-#[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
-pub use asan_guest::{init_qemu_with_asan_guest, AsanGuestModule};
 
 /// A module for `libafl_qemu`.
 // TODO remove 'static when specialization will be stable
@@ -300,19 +283,6 @@ where
     }
 }
 
-#[cfg(emulation_mode = "usermode")]
-pub trait StdInstrumentationFilter:
-    HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter>
-{
-}
-
-#[cfg(emulation_mode = "systemmode")]
-pub trait StdInstrumentationFilter:
-    HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter>
-    + HasInstrumentationFilter<QemuInstrumentationPagingFilter>
-{
-}
-
 static mut EMPTY_ADDRESS_FILTER: UnsafeCell<QemuInstrumentationAddressRangeFilter> =
     UnsafeCell::new(QemuFilterList::None);
 static mut EMPTY_PAGING_FILTER: UnsafeCell<QemuInstrumentationPagingFilter> =
@@ -338,25 +308,6 @@ impl HasInstrumentationFilter<QemuInstrumentationPagingFilter> for () {
     }
 }
 
-#[cfg(emulation_mode = "systemmode")]
-impl<Head> StdInstrumentationFilter for (Head, ()) where
-    Head: HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter>
-        + HasInstrumentationFilter<QemuInstrumentationPagingFilter>
-{
-}
-
-#[cfg(emulation_mode = "usermode")]
-impl<Head> StdInstrumentationFilter for (Head, ()) where
-    Head: HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter>
-{
-}
-
-#[cfg(emulation_mode = "systemmode")]
-impl StdInstrumentationFilter for () {}
-
-#[cfg(emulation_mode = "usermode")]
-impl StdInstrumentationFilter for () {}
-
 pub trait IsFilter: Debug {
     type FilterParameter;
 
@@ -372,12 +323,6 @@ impl IsFilter for () {
 }
 
 pub trait IsAddressFilter: IsFilter<FilterParameter = GuestAddr> {}
-
-#[cfg(emulation_mode = "systemmode")]
-pub trait IsPagingFilter: IsFilter<FilterParameter = Option<GuestPhysAddr>> {}
-
-#[cfg(emulation_mode = "systemmode")]
-impl IsPagingFilter for QemuInstrumentationPagingFilter {}
 
 impl IsAddressFilter for QemuInstrumentationAddressRangeFilter {}
 

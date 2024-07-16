@@ -16,7 +16,7 @@ use libafl_bolts::AsSlice;
 use num_enum::TryFromPrimitive;
 
 #[cfg(emulation_mode = "systemmode")]
-use crate::QemuInstrumentationPagingFilter;
+use crate::modules::QemuInstrumentationPagingFilter;
 use crate::{
     command::parser::{
         EndCommandParser, InputPhysCommandParser, InputVirtCommandParser, LoadCommandParser,
