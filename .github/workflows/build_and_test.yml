@@ -337,6 +337,7 @@ jobs:
           - ./fuzzers/backtrace_baby_fuzzers/forkserver_executor
           - ./fuzzers/backtrace_baby_fuzzers/c_code_with_inprocess_executor
           - ./fuzzers/backtrace_baby_fuzzers/rust_code_with_fork_executor
+          - ./fuzzers/libafl-fuzz
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
