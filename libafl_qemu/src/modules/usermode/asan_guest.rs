@@ -219,7 +219,7 @@ where
     ET: EmulatorModuleTuple<S>,
 {
     let h = emulator_modules
-        .match_module_mut::<AsanGuestModule>()
+        .get_mut::<AsanGuestModule>()
         .unwrap();
     if !h.must_instrument(pc) {
         return None;

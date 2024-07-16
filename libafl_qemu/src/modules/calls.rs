@@ -253,7 +253,7 @@ where
 
         // log::info!("RET @ 0x{:#x}", ret_addr);
 
-        let mut collectors = if let Some(h) = emulator_modules.match_module_mut::<Self>() {
+        let mut collectors = if let Some(h) = emulator_modules.get_mut::<Self>() {
             h.collectors.take()
         } else {
             return;
@@ -266,7 +266,7 @@ where
             .unwrap()
             .on_ret_all(emulator_modules, state, pc, ret_addr);
         emulator_modules
-            .match_module_mut::<Self>()
+            .get_mut::<Self>()
             .unwrap()
             .collectors = collectors;
     }
@@ -280,7 +280,7 @@ where
         S: Unpin + UsesInput,
         ET: EmulatorModuleTuple<S>,
     {
-        if let Some(h) = emulator_modules.match_module_mut::<Self>() {
+        if let Some(h) = emulator_modules.get_mut::<Self>() {
             if !h.must_instrument(pc) {
                 return None;
             }
@@ -361,7 +361,7 @@ where
                 move |emulator_modules: &mut EmulatorModules<ET, S>, state: Option<&mut S>, pc| {
                     // eprintln!("CALL @ 0x{:#x}", pc + call_len);
                     let mut collectors =
-                        if let Some(h) = emulator_modules.match_module_mut::<Self>() {
+                        if let Some(h) = emulator_modules.get_mut::<Self>() {
                             h.collectors.take()
                         } else {
                             return;
@@ -374,7 +374,7 @@ where
                         .unwrap()
                         .on_call_all(emulator_modules, state, pc, call_len);
                     emulator_modules
-                        .match_module_mut::<Self>()
+                        .get_mut::<Self>()
                         .unwrap()
                         .collectors = collectors;
                 },

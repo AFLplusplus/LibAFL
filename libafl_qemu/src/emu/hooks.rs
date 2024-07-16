@@ -928,15 +928,17 @@ where
         }
     }
 
+    /// Get a reference to the first (type) matching member of the tuple.
     #[must_use]
-    pub fn match_module<T>(&self) -> Option<&T>
+    pub fn get<T>(&self) -> Option<&T>
     where
         T: EmulatorModule<S>,
     {
         self.modules.match_first_type::<T>()
     }
 
-    pub fn match_module_mut<T>(&mut self) -> Option<&mut T>
+    /// Get a mutable reference to the first (type) matching member of the tuple.
+    pub fn get_mut<T>(&mut self) -> Option<&mut T>
     where
         T: EmulatorModule<S>,
     {

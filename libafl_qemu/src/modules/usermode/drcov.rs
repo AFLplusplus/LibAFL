@@ -218,7 +218,7 @@ where
     S: Unpin + UsesInput + HasMetadata,
     ET: EmulatorModuleTuple<S>,
 {
-    let drcov_module = emulator_modules.match_module::<DrCovModule>().unwrap();
+    let drcov_module = emulator_modules.get::<DrCovModule>().unwrap();
     if !drcov_module.must_instrument(pc) {
         return None;
     }
@@ -266,7 +266,7 @@ pub fn gen_block_lengths<ET, S>(
     S: Unpin + UsesInput + HasMetadata,
     ET: EmulatorModuleTuple<S>,
 {
-    let drcov_module = emulator_modules.match_module::<DrCovModule>().unwrap();
+    let drcov_module = emulator_modules.get::<DrCovModule>().unwrap();
     if !drcov_module.must_instrument(pc) {
         return;
     }
@@ -287,7 +287,7 @@ pub fn exec_trace_block<ET, S>(
     S: Unpin + UsesInput + HasMetadata,
 {
     if emulator_modules
-        .match_module::<DrCovModule>()
+        .get::<DrCovModule>()
         .unwrap()
         .full_trace
     {

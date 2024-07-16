@@ -516,7 +516,7 @@ where
     ET: EmulatorModuleTuple<S>,
     S: Unpin + UsesInput + HasMetadata,
 {
-    if let Some(h) = emulator_modules.match_module::<EdgeCoverageModule>() {
+    if let Some(h) = emulator_modules.get::<EdgeCoverageModule>() {
         #[cfg(emulation_mode = "usermode")]
         {
             if !h.must_instrument(src) && !h.must_instrument(dest) {
@@ -584,7 +584,7 @@ where
     ET: EmulatorModuleTuple<S>,
     S: Unpin + UsesInput,
 {
-    if let Some(h) = emulator_modules.match_module::<EdgeCoverageChildModule>() {
+    if let Some(h) = emulator_modules.get::<EdgeCoverageChildModule>() {
         #[cfg(emulation_mode = "usermode")]
         if !h.must_instrument(src) && !h.must_instrument(dest) {
             return None;
@@ -630,7 +630,7 @@ where
     S: Unpin + UsesInput,
     ET: EmulatorModuleTuple<S>,
 {
-    if let Some(h) = emulator_modules.match_module::<EdgeCoverageClassicModule>() {
+    if let Some(h) = emulator_modules.get::<EdgeCoverageClassicModule>() {
         #[cfg(emulation_mode = "usermode")]
         {
             if !h.must_instrument(pc) {

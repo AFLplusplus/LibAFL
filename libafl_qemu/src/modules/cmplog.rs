@@ -148,7 +148,7 @@ where
     ET: EmulatorModuleTuple<S>,
     S: Unpin + UsesInput + HasMetadata,
 {
-    if let Some(h) = emulator_modules.match_module::<CmpLogModule>() {
+    if let Some(h) = emulator_modules.get::<CmpLogModule>() {
         if !h.must_instrument(pc) {
             return None;
         }
@@ -179,7 +179,7 @@ where
     S: HasMetadata + Unpin + UsesInput,
     ET: EmulatorModuleTuple<S>,
 {
-    if let Some(h) = emulator_modules.match_module::<CmpLogChildModule>() {
+    if let Some(h) = emulator_modules.get::<CmpLogChildModule>() {
         if !h.must_instrument(pc) {
             return None;
         }
@@ -269,7 +269,7 @@ impl CmpLogRoutinesModule {
         S: Unpin + UsesInput,
         ET: EmulatorModuleTuple<S>,
     {
-        if let Some(h) = emulator_modules.match_module_mut::<Self>() {
+        if let Some(h) = emulator_modules.get_mut::<Self>() {
             if !h.must_instrument(pc) {
                 return None;
             }
@@ -285,7 +285,7 @@ impl CmpLogRoutinesModule {
 
         let qemu = emulator_modules.qemu();
 
-        if let Some(h) = emulator_modules.match_module::<Self>() {
+        if let Some(h) = emulator_modules.get::<Self>() {
             #[allow(unused_mut)]
             let mut code = {
                 #[cfg(emulation_mode = "usermode")]
