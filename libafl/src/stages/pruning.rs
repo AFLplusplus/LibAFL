@@ -7,9 +7,9 @@ use libafl_bolts::{rands::Rand, Error};
 #[cfg(feature = "std")]
 use crate::events::EventRestarter;
 use crate::{
-    corpus::{Corpus, CorpusId},
+    corpus::Corpus,
     stages::Stage,
-    state::{HasCorpus, HasRand, UsesState},
+    state::{HasCorpus, HasRand, UsesState, Stoppable},
 };
 
 #[derive(Debug)]
@@ -67,10 +67,12 @@ where
             do_retain.push((self.prob * 100_f64) < r);
         }
 
-        let corpus = state.corpus_mut();
-        for (idx, retain) in do_retain.iter().enumerate().take(n_corpus) {
+        for (i_th, retain) in do_retain.iter().enumerate().take(n_corpus) {
             if !retain {
-                let removed = corpus.remove(CorpusId(idx))?;
+                let corpus_id = state.corpus().nth(i_th);
+
+                let corpus = state.corpus_mut();
+                let removed = corpus.remove(corpus_id)?;
                 corpus.add_disabled(removed)?;
             }
         }
@@ -120,8 +122,7 @@ where
         manager: &mut EM,
     ) -> Result<(), Error> {
         manager.on_restart(state).unwrap();
-        println!("Exiting!");
-        std::process::exit(0);
+        state.request_stop();
         Ok(())
     }
 
