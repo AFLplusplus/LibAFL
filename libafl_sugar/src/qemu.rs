@@ -37,7 +37,7 @@ use libafl_bolts::{
 };
 pub use libafl_qemu::qemu::Qemu;
 #[cfg(not(any(feature = "mips", feature = "hexagon")))]
-use libafl_qemu::QemuCmpLogTool;
+use libafl_qemu::modules::CmpLogModule;
 use libafl_qemu::{
     command::NopCommandManager,
     modules::edges::{self, EdgeCoverageModule},
