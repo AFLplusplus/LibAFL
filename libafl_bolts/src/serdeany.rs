@@ -23,7 +23,8 @@ pub type TypeRepr = u128;
 #[cfg(feature = "stable_anymap")]
 pub type TypeRepr = Cow<'static, str>;
 
-pub(crate) static ERR_EMPTY_TYPES_REGISTER: &'static str = "Empty types registry. Please enable the `serdeany_autoreg` feature in libafl_bolts or register all required types manually using RegistryBuilder::register().";
+/// Error string when no types at all have been registered yet.
+pub(crate) const ERR_EMPTY_TYPES_REGISTER: &'static str = "Empty types registry. Please enable the `serdeany_autoreg` feature in libafl_bolts or register all required types manually using RegistryBuilder::register().";
 
 #[cfg(not(feature = "stable_anymap"))]
 fn type_repr<T>() -> TypeRepr
@@ -123,7 +124,7 @@ pub mod serdeany_registry {
         hash_map::{Values, ValuesMut},
         HashMap,
     };
-    use serde::{Deserialize, Serialize};
+    use serde::{de, Deserialize, Serialize};
 
     use crate::{
         serdeany::{
@@ -158,9 +159,10 @@ pub mod serdeany_registry {
                 REGISTRY
                     .deserializers
                     .as_ref()
-                    .expect(super::ERR_EMPTY_TYPES_REGISTER)
+                    .ok_or_else(||
+                        de::Error::custom(super::ERR_EMPTY_TYPES_REGISTER))?
                     .get(&id)
-                    .unwrap_or_else(|| panic!("Cannot deserialize the unregistered type with id {id}. Enable the `serde_autoreg` feature in libafl_bolts or register all requried types manually."))
+                    .ok_or_else(|| de::Error::custom(format_args!("Cannot deserialize the unregistered type with id {id}. Enable the `serde_autoreg` feature in libafl_bolts or register all requried types manually.")))?
                     .0
             };
             let seed = DeserializeCallbackSeed::<dyn crate::serdeany::SerdeAny> { cb };
