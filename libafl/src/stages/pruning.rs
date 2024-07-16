@@ -9,7 +9,7 @@ use crate::events::EventRestarter;
 use crate::{
     corpus::Corpus,
     stages::Stage,
-    state::{HasCorpus, HasRand, UsesState, Stoppable},
+    state::{HasCorpus, HasRand, Stoppable, UsesState},
 };
 
 #[derive(Debug)]
@@ -69,7 +69,7 @@ where
 
         for (i_th, retain) in do_retain.iter().enumerate().take(n_corpus) {
             if !retain {
-                let corpus_id = state.corpus().nth(i_th);
+                let corpus_id = state.corpus().nth_from_all(i_th);
 
                 let corpus = state.corpus_mut();
                 let removed = corpus.remove(corpus_id)?;
