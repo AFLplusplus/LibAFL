@@ -269,7 +269,7 @@ impl CmpLogRoutinesModule {
         S: Unpin + UsesInput,
         ET: EmulatorModuleTuple<S>,
     {
-        if let Some(h) = emulator_modules.match_module::<Self>() {
+        if let Some(h) = emulator_modules.match_module_mut::<Self>() {
             if !h.must_instrument(pc) {
                 return None;
             }
