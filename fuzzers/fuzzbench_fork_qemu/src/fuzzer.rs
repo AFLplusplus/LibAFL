@@ -50,8 +50,8 @@ use libafl_qemu::{
     elf::EasyElf,
     filter_qemu_args,
     modules::{
-        cmplog::{CmpLogMap, CmpLogObserver, QemuCmpLogChildModule},
-        edges::{QemuEdgeCoverageChildModule, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},
+        cmplog::{CmpLogChildModule, CmpLogMap, CmpLogObserver},
+        edges::{EdgeCoverageChildModule, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},
     },
     Emulator, GuestReg, MmapPerms, NopEmulatorExitHandler, QemuExitError, QemuExitReason,
     QemuForkExecutor, QemuShutdownCause, Regs,
@@ -152,8 +152,8 @@ fn fuzz(
     let env: Vec<(String, String)> = env::vars().collect();
 
     let emulator_modules = tuple_list!(
-        QemuEdgeCoverageChildModule::default(),
-        QemuCmpLogChildModule::default(),
+        EdgeCoverageChildModule::default(),
+        CmpLogChildModule::default(),
     );
 
     let mut emulator = Emulator::new(
@@ -234,7 +234,9 @@ fn fuzz(
 
     // Beginning of a page should be properly aligned.
     #[allow(clippy::cast_ptr_alignment)]
-    let cmplog_map_ptr = cmplog.as_mut_ptr().cast::<libafl_qemu::cmplog::CmpLogMap>();
+    let cmplog_map_ptr = cmplog
+        .as_mut_ptr()
+        .cast::<libafl_qemu::modules::cmplog::CmpLogMap>();
 
     let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
     {
