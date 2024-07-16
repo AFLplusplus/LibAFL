@@ -201,6 +201,8 @@ struct Opt {
 
     #[clap(skip)]
     foreign_sync_interval: Duration,
+    #[clap(skip)]
+    persistent_record: usize,
 
     // TODO:
     #[clap(skip)]

@@ -43,7 +43,10 @@ use crate::{
     afl_stats::AflStatsStage,
     corpus::{set_corpus_filepath, set_solution_filepath},
     env_parser::AFL_DEFAULT_MAP_SIZE,
-    feedback::{filepath::CustomFilepathToTestcaseFeedback, seed::SeedFeedback},
+    feedback::{
+        filepath::CustomFilepathToTestcaseFeedback, persistent_record::PersitentRecordFeedback,
+        seed::SeedFeedback,
+    },
     mutational_stage::SupportedMutationalStages,
     scheduler::SupportedSchedulers,
     Opt, AFL_DEFAULT_INPUT_LEN_MAX, AFL_DEFAULT_INPUT_LEN_MIN, SHMEM_ENV_VAR,
@@ -119,6 +122,7 @@ where
      * We check if it's a crash or a timeout (if we are configured to consider timeouts)
      * The `CustomFilepathToTestcaseFeedback is used to adhere to AFL++'s corpus format.
      * The `MaxMapFeedback` saves objectives only if they hit new edges
+     * Note: The order of the feedbacks matter!
      * */
     let mut objective = feedback_or!(
         feedback_and!(
@@ -131,7 +135,8 @@ where
             ),
             MaxMapFeedback::with_name("edges_objective", &edges_observer)
         ),
-        CustomFilepathToTestcaseFeedback::new(set_solution_filepath, fuzzer_dir.clone())
+        CustomFilepathToTestcaseFeedback::new(set_solution_filepath, fuzzer_dir.clone()),
+        PersitentRecordFeedback::new(opt.persistent_record),
     );
 
     // Initialize our State if necessary
