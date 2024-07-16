@@ -54,6 +54,40 @@ impl SyncFromDiskMetadata {
 /// Default name for `SyncFromDiskStage`; derived from AFL++
 pub const SYNC_FROM_DISK_STAGE_NAME: &str = "sync";
 
+/// Loads new files from a directory, taking the last time we looked at this path as parameter.
+/// If `last` is `None`, it'll load all file.
+fn load_new_from_directory(path: &PathBuf, last: &Option<Duration>) -> Result<Vec<PathBuf>, Error> {
+    let mut left_to_sync = Vec::<PathBuf>::new();
+    for entry in fs::read_dir(path)? {
+        let entry = entry?;
+        let path = entry.path();
+        let attributes = fs::metadata(&path);
+
+        if attributes.is_err() {
+            continue;
+        }
+
+        let attr = attributes?;
+
+        if attr.is_file() && attr.len() > 0 {
+            if let Ok(time) = attr.modified() {
+                if let Some(last) = last {
+                    if time.duration_since(SystemTime::UNIX_EPOCH).unwrap() < *last {
+                        continue;
+                    }
+                }
+                log::info!("Syncing file: {:?}", path);
+                left_to_sync.push(path.clone());
+            }
+        } else if attr.is_dir() {
+            let dir_left_to_sync = load_new_from_directory(&entry.path(), last)?;
+            left_to_sync.extend(dir_left_to_sync);
+        }
+    }
+
+    Ok(left_to_sync)
+}
+
 /// A stage that loads testcases from disk to sync with other fuzzers such as AFL++
 #[derive(Debug)]
 pub struct SyncFromDiskStage<CB, E, EM, Z> {
@@ -113,7 +147,7 @@ where
         let mut new_files = vec![];
         for dir in &self.sync_dirs {
             log::debug!("Syncing from dir: {:?}", dir);
-            let new_dir_files = self.load_from_directory(dir, &max_time)?;
+            let new_dir_files = load_new_from_directory(dir, &max_time)?;
             new_files.extend(new_dir_files);
         }
         *state.metadata_mut::<SyncFromDiskMetadata>().unwrap() = SyncFromDiskMetadata {
@@ -170,43 +204,6 @@ impl<CB, E, EM, Z> SyncFromDiskStage<CB, E, EM, Z> {
             interval,
             load_callback,
         }
-    }
-
-    #[allow(clippy::only_used_in_recursion)]
-    fn load_from_directory(
-        &self,
-        path: &PathBuf,
-        last: &Option<Duration>,
-    ) -> Result<Vec<PathBuf>, Error> {
-        let mut left_to_sync = Vec::<PathBuf>::new();
-        for entry in fs::read_dir(path)? {
-            let entry = entry?;
-            let path = entry.path();
-            let attributes = fs::metadata(&path);
-
-            if attributes.is_err() {
-                continue;
-            }
-
-            let attr = attributes?;
-
-            if attr.is_file() && attr.len() > 0 {
-                if let Ok(time) = attr.modified() {
-                    if let Some(last) = last {
-                        if time.duration_since(SystemTime::UNIX_EPOCH).unwrap() < *last {
-                            continue;
-                        }
-                    }
-                    log::info!("Syncing file: {:?}", path);
-                    left_to_sync.push(path.clone());
-                }
-            } else if attr.is_dir() {
-                let dir_left_to_sync = self.load_from_directory(&entry.path(), last)?;
-                left_to_sync.extend(dir_left_to_sync);
-            }
-        }
-
-        Ok(left_to_sync)
     }
 }
 
