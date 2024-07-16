@@ -9,7 +9,7 @@ use crate::events::EventRestarter;
 use crate::{
     corpus::Corpus,
     stages::Stage,
-    state::{HasCorpus, HasRand, Stoppable, UsesState},
+    state::{HasCorpus, HasRand, UsesState},
 };
 
 #[derive(Debug)]
