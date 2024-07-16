@@ -226,7 +226,7 @@ where
             };
 
             if self.use_cmplog.unwrap_or(false) {
-                let tools = {
+                let modules = {
                     #[cfg(not(any(feature = "mips", feature = "hexagon")))]
                     {
                         tuple_list!(EdgeCoverageModule::default(), CmpLogModule::default(),)
@@ -239,7 +239,7 @@ where
 
                 let mut emulator = Emulator::new_with_qemu(
                     qemu,
-                    tools,
+                    modules,
                     NopEmulatorExitHandler,
                     NopCommandManager,
                 )?;
