@@ -28,10 +28,12 @@ use libafl_bolts::{
 };
 use libafl_qemu::{
     command::StdCommandManager,
-    edges::{edges_map_mut_ptr, QemuEdgeCoverageHelper, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND},
     emu::Emulator,
     executor::{stateful::StatefulQemuExecutor, QemuExecutorState},
-    FastSnapshotManager, QemuHooks, StdEmulatorExitHandler,
+    modules::edges::{
+        edges_map_mut_ptr, EdgeCoverageModule, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
+    },
+    FastSnapshotManager, StdEmulatorExitHandler,
 };
 
 // use libafl_qemu::QemuSnapshotBuilder; for normal qemu snapshot
@@ -61,15 +63,20 @@ pub fn fuzz() {
 
         let cmd_manager = StdCommandManager::new();
 
-        let emu = Emulator::new(&args, &env, emu_exit_handler, cmd_manager).unwrap(); // Create the emulator
+        // Choose modules to use
+        let modules = tuple_list!(EdgeCoverageModule::default());
+
+        let mut emu = Emulator::new(&args, &env, modules, emu_exit_handler, cmd_manager).unwrap(); // Create the emulator
 
         let devices = emu.list_devices();
         println!("Devices = {:?}", devices);
 
         // The wrapped harness function, calling out to the LLVM-style harness
         let mut harness =
-            |input: &BytesInput, qemu_executor_state: &mut QemuExecutorState<_, _>| unsafe {
-                emu.run(input, qemu_executor_state)
+            |input: &BytesInput, qemu_executor_state: &mut QemuExecutorState<_, _, _, _>| unsafe {
+                qemu_executor_state
+                    .emulator_mut()
+                    .run(input)
                     .unwrap()
                     .try_into()
                     .unwrap()
@@ -126,11 +133,6 @@ pub fn fuzz() {
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-        let mut hooks = QemuHooks::new(
-            emu.qemu().clone(),
-            tuple_list!(QemuEdgeCoverageHelper::default()),
-        );
-
         // Setup an havoc mutator with a mutational stage
         let mutator = StdScheduledMutator::new(havoc_mutations());
         let calibration_feedback = MaxMapFeedback::new(&edges_observer);
@@ -141,7 +143,7 @@ pub fn fuzz() {
 
         // Create a QEMU in-process executor
         let mut executor = StatefulQemuExecutor::new(
-            &mut hooks,
+            &mut emu,
             &mut harness,
             tuple_list!(edges_observer, time_observer),
             &mut fuzzer,

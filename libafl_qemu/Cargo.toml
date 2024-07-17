@@ -1,6 +1,6 @@
 [package]
 name = "libafl_qemu"
-version.workspace = true
+version = "0.13.1"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
 description = "QEMU user backend library for LibAFL"
 documentation = "https://docs.rs/libafl_qemu"
@@ -17,7 +17,6 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
 default = ["fork", "build_libgasan", "build_libqasan", "serdeany_autoreg", "injections"]
-clippy = [] # special feature for clippy, don't use in normal projects§
 document-features = ["dep:document-features"]
 paranoid_debug = ["libafl_qemu_sys/paranoid_debug"] # Will perform as many checks as possible. The target will be greatly slowed down.
 
@@ -61,6 +60,10 @@ slirp = [ "systemmode", "libafl_qemu_sys/slirp" ] # build qemu with host libslir
 
 # Requires the binary's build.rs to call `build_libafl_qemu`
 shared = [ "libafl_qemu_sys/shared" ]
+
+#! ## Internal features, don't use in normal projects
+## clippy workaround
+clippy = ["libafl_qemu_sys/clippy"]
 
 [dependencies]
 libafl = { path = "../libafl", version = "0.13.1", default-features = false, features = ["std", "derive", "regex"] }

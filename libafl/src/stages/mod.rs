@@ -80,6 +80,8 @@ pub mod tuneable;
 #[cfg(feature = "unicode")]
 pub mod unicode;
 
+pub mod pruning;
+
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
 pub trait Stage<E, EM, Z>: UsesState
@@ -448,7 +450,7 @@ where
     OT: ObserversTuple<Self::State>,
     PS: PushStage<CS, EM, OT, Z>,
     Z: ExecutesInput<E, EM, State = Self::State>
-        + ExecutionProcessor<OT, State = Self::State>
+        + ExecutionProcessor
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
 {

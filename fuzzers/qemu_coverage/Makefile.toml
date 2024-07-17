@@ -235,8 +235,8 @@ windows_alias = "unsupported"
 [tasks.run_unix]
 command = "${TARGET_DIR}/${PROFILE_DIR}/qemu_coverage-${CARGO_MAKE_PROFILE}"
 args = [
-    "--coverage", "${TARGET_DIR}/drcov.log",
-    "--input", "./corpus",
+    "--coverage-path", "${TARGET_DIR}/drcov.log",
+    "--input-dir", "./corpus",
     "--",
     "${TARGET_DIR}/libpng-harness-${CARGO_MAKE_PROFILE}",
 ]

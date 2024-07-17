@@ -276,6 +276,7 @@ jobs:
     needs:
       - ubuntu
       - fuzzers-preflight
+      - common
     strategy:
       fail-fast: true
       matrix:
@@ -336,6 +337,7 @@ jobs:
           - ./fuzzers/backtrace_baby_fuzzers/forkserver_executor
           - ./fuzzers/backtrace_baby_fuzzers/c_code_with_inprocess_executor
           - ./fuzzers/backtrace_baby_fuzzers/rust_code_with_fork_executor
+          - ./fuzzers/libafl-fuzz
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
@@ -358,11 +360,15 @@ jobs:
         with:
           filters: |
             qemu:
+              - 'libafl/**'
+              - 'libafl_bolts/**'
+              - 'libafl_targets/**'
               - 'libafl_qemu/**'
               - 'fuzzers/*qemu*/**'
 
   fuzzers-qemu:
-    needs: changes
+    needs:
+      - common
     if: ${{ needs.changes.outputs.qemu == 'true' }}
     strategy:
       matrix:

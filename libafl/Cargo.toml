@@ -1,6 +1,6 @@
 [package]
 name = "libafl"
-version.workspace = true
+version = "0.13.1"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 description = "Slot your own fuzzers together and extend their features using Rust"
 documentation = "https://docs.rs/libafl"
@@ -170,7 +170,7 @@ prometheus-client = { version = "0.22", optional = true } # For the prometheus m
 tide = { version = "0.16", optional = true }
 async-std = { version = "1.12", features = ["attributes"], optional = true }
 futures = { version = "0.3", optional = true }
-log = { version = "0.4", features = ["release_max_level_info"] }
+log = { version = "0.4" }
 tokio = { version = "1.38", optional = true, features = ["sync", "net", "rt", "io-util", "macros", "rt-multi-thread", "time"] } # used for TCP Event Manager and multi-machine
 enumflags2 = { version = "0.7", optional = true }
 
@@ -195,6 +195,8 @@ serial_test = { version = "3", optional = true, default-features = false, featur
 
 # Document all features of this crate (for `cargo doc`)
 document-features = { version = "0.2", optional = true }
+# Optional
+clap = {version = "4.5", optional = true}
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2" # For (*nix) libc

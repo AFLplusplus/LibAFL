@@ -5,7 +5,7 @@ use libafl::{
     executors::{hooks::windows::windows_asan_handler::asan_death_handler, Executor, HasObservers},
     feedbacks::Feedback,
     state::{HasCorpus, HasExecutions, HasSolutions},
-    HasObjective,
+    ExecutionProcessor, HasObjective, HasScheduler,
 };
 
 /// Asan death callback type
@@ -33,7 +33,7 @@ where
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
     OF: Feedback<E::State>,
     E::State: HasSolutions + HasCorpus + HasExecutions,
-    Z: HasObjective<Objective = OF, State = E::State>,
+    Z: HasObjective<Objective = OF, State = E::State> + HasScheduler + ExecutionProcessor,
 {
     __sanitizer_set_death_callback(Some(asan_death_handler::<E, EM, OF, Z>));
 }

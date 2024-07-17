@@ -1,15 +1,13 @@
 //! The [`SyncFromDiskStage`] is a stage that imports inputs from disk for e.g. sync with AFL
 
-use alloc::borrow::{Cow, ToOwned};
-use core::marker::PhantomData;
-use std::{
-    fs,
-    path::{Path, PathBuf},
-    time::SystemTime,
+use alloc::{
+    borrow::{Cow, ToOwned},
     vec::Vec,
 };
+use core::{marker::PhantomData, time::Duration};
+use std::path::{Path, PathBuf};
 
-use libafl_bolts::{current_time, shmem::ShMemProvider, Named};
+use libafl_bolts::{current_time, fs::find_new_files_rec, shmem::ShMemProvider, Named};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "introspection")]
@@ -25,6 +23,9 @@ use crate::{
     Error, HasMetadata, HasNamedMetadata,
 };
 
+/// Default name for `SyncFromDiskStage`; derived from AFL++
+pub const SYNC_FROM_DISK_STAGE_NAME: &str = "sync";
+
 /// Metadata used to store information about disk sync time
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
@@ -33,7 +34,7 @@ use crate::{
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SyncFromDiskMetadata {
     /// The last time the sync was done
-    pub last_time: SystemTime,
+    pub last_time: Duration,
     /// The paths that are left to sync
     pub left_to_sync: Vec<PathBuf>,
 }
@@ -43,7 +44,7 @@ libafl_bolts::impl_serdeany!(SyncFromDiskMetadata);
 impl SyncFromDiskMetadata {
     /// Create a new [`struct@SyncFromDiskMetadata`]
     #[must_use]
-    pub fn new(last_time: SystemTime, left_to_sync: Vec<PathBuf>) -> Self {
+    pub fn new(last_time: Duration, left_to_sync: Vec<PathBuf>) -> Self {
         Self {
             last_time,
             left_to_sync,
@@ -51,15 +52,13 @@ impl SyncFromDiskMetadata {
     }
 }
 
-/// Default name for `SyncFromDiskStage`; derived from AFL++
-pub const SYNC_FROM_DISK_STAGE_NAME: &str = "sync";
-
 /// A stage that loads testcases from disk to sync with other fuzzers such as AFL++
 #[derive(Debug)]
 pub struct SyncFromDiskStage<CB, E, EM, Z> {
     name: Cow<'static, str>,
-    sync_dir: PathBuf,
+    sync_dirs: Vec<PathBuf>,
     load_callback: CB,
+    interval: Duration,
     phantom: PhantomData<(E, EM, Z)>,
 }
 
@@ -92,54 +91,51 @@ where
         state: &mut Self::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        log::debug!("Syncing from disk: {:?}", self.sync_dir);
         let last = state
             .metadata_map()
             .get::<SyncFromDiskMetadata>()
             .map(|m| m.last_time);
 
-        if let (Some(max_time), mut new_files) = self.load_from_directory(None, &last)? {
-            if last.is_none() {
-                state
-                    .metadata_map_mut()
-                    .insert(SyncFromDiskMetadata::new(max_time, new_files));
-            } else {
-                state
-                    .metadata_map_mut()
-                    .get_mut::<SyncFromDiskMetadata>()
-                    .unwrap()
-                    .last_time = max_time;
-                state
-                    .metadata_map_mut()
-                    .get_mut::<SyncFromDiskMetadata>()
-                    .unwrap()
-                    .left_to_sync
-                    .append(&mut new_files);
+        if let Some(last) = last {
+            if current_time().saturating_sub(last) < self.interval {
+                return Ok(());
             }
         }
 
-        if let Some(sync_from_disk_metadata) =
-            state.metadata_map_mut().get_mut::<SyncFromDiskMetadata>()
-        {
-            // Iterate over the paths of files left to sync.
-            // By keeping track of these files, we ensure that no file is missed during synchronization,
-            // even in the event of a target restart.
-            let to_sync = sync_from_disk_metadata.left_to_sync.clone();
-            log::debug!("Number of files to sync: {:?}", to_sync.len());
-            for path in to_sync {
-                let input = (self.load_callback)(fuzzer, state, &path)?;
-                // Removing each path from the `left_to_sync` Vec before evaluating
-                // prevents duplicate processing and ensures that each file is evaluated only once. This approach helps
-                // avoid potential infinite loops that may occur if a file is an objective.
-                state
-                    .metadata_map_mut()
-                    .get_mut::<SyncFromDiskMetadata>()
-                    .unwrap()
-                    .left_to_sync
-                    .retain(|p| p != &path);
-                log::debug!("Evaluating: {:?}", path);
-                fuzzer.evaluate_input(state, executor, manager, input)?;
-            }
+        let max_time = match last {
+            None => None,
+            Some(last) => Some(last + self.interval),
+        };
+        let new_max_time = max_time.unwrap_or(current_time());
+
+        let mut new_files = vec![];
+        for dir in &self.sync_dirs {
+            log::debug!("Syncing from dir: {:?}", dir);
+            let new_dir_files = find_new_files_rec(dir, &max_time)?;
+            new_files.extend(new_dir_files);
+        }
+        *state.metadata_mut::<SyncFromDiskMetadata>().unwrap() = SyncFromDiskMetadata {
+            last_time: new_max_time,
+            left_to_sync: new_files,
+        };
+        let sync_from_disk_metadata = state.metadata_mut::<SyncFromDiskMetadata>().unwrap();
+        // Iterate over the paths of files left to sync.
+        // By keeping track of these files, we ensure that no file is missed during synchronization,
+        // even in the event of a target restart.
+        let to_sync = sync_from_disk_metadata.left_to_sync.clone();
+        log::debug!("Number of files to sync: {:?}", to_sync.len());
+        for path in to_sync {
+            let input = (self.load_callback)(fuzzer, state, &path)?;
+            // Removing each path from the `left_to_sync` Vec before evaluating
+            // prevents duplicate processing and ensures that each file is evaluated only once. This approach helps
+            // avoid potential infinite loops that may occur if a file is an objective.
+            state
+                .metadata_mut::<SyncFromDiskMetadata>()
+                .unwrap()
+                .left_to_sync
+                .retain(|p| p != &path);
+            log::debug!("Syncing and evaluating {:?}", path);
+            fuzzer.evaluate_input(state, executor, manager, input)?;
         }
 
         #[cfg(feature = "introspection")]
@@ -164,60 +160,14 @@ where
 impl<CB, E, EM, Z> SyncFromDiskStage<CB, E, EM, Z> {
     /// Creates a new [`SyncFromDiskStage`]
     #[must_use]
-    pub fn new(sync_dir: PathBuf, load_callback: CB, name: &str) -> Self {
+    pub fn new(sync_dirs: Vec<PathBuf>, load_callback: CB, interval: Duration, name: &str) -> Self {
         Self {
             name: Cow::Owned(SYNC_FROM_DISK_STAGE_NAME.to_owned() + ":" + name),
             phantom: PhantomData,
-            sync_dir,
+            sync_dirs,
+            interval,
             load_callback,
         }
-    }
-
-    fn load_from_directory(
-        &self,
-        path: Option<PathBuf>,
-        last: &Option<SystemTime>,
-    ) -> Result<(Option<SystemTime>, Vec<PathBuf>), Error> {
-        let mut max_time = None;
-        let mut left_to_sync = Vec::<PathBuf>::new();
-        let in_dir = match path {
-            Some(p) => p,
-            None => self.sync_dir.clone(),
-        };
-
-        for entry in fs::read_dir(in_dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            let attributes = fs::metadata(&path);
-
-            if attributes.is_err() {
-                continue;
-            }
-
-            let attr = attributes?;
-
-            if attr.is_file() && attr.len() > 0 {
-                if let Ok(time) = attr.modified() {
-                    if let Some(l) = last {
-                        if time.duration_since(*l).is_err() || time == *l {
-                            continue;
-                        }
-                    }
-                    max_time = Some(max_time.map_or(time, |t: SystemTime| t.max(time)));
-                    log::info!("Syncing file: {:?}", path);
-                    left_to_sync.push(path.clone());
-                }
-            } else if attr.is_dir() {
-                let (dir_max_time, dir_left_to_sync) =
-                    self.load_from_directory(Some(entry.path()), last)?;
-                if let Some(time) = dir_max_time {
-                    max_time = Some(max_time.map_or(time, |t: SystemTime| t.max(time)));
-                }
-                left_to_sync.extend(dir_left_to_sync);
-            }
-        }
-
-        Ok((max_time, left_to_sync))
     }
 }
 
@@ -233,7 +183,7 @@ where
 {
     /// Creates a new [`SyncFromDiskStage`] invoking `Input::from_file` to load inputs
     #[must_use]
-    pub fn with_from_file(sync_dir: PathBuf) -> Self {
+    pub fn with_from_file(sync_dirs: Vec<PathBuf>, interval: Duration) -> Self {
         fn load_callback<S: UsesInput, Z>(
             _: &mut Z,
             _: &mut S,
@@ -242,8 +192,9 @@ where
             Input::from_file(p)
         }
         Self {
+            interval,
             name: Cow::Borrowed(SYNC_FROM_DISK_STAGE_NAME),
-            sync_dir,
+            sync_dirs,
             load_callback: load_callback::<_, _>,
             phantom: PhantomData,
         }
@@ -302,7 +253,7 @@ where
     SP: ShMemProvider,
     E: HasObservers<State = S> + Executor<EM, Z>,
     for<'a> E::Observers: Deserialize<'a>,
-    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers, State = S>,
+    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<State = S>,
     IC: InputConverter<From = S::Input, To = DI>,
     ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,

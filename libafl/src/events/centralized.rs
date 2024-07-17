@@ -38,7 +38,7 @@ use crate::{
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, NopInput, UsesInput},
-    observers::{ObserversTuple, TimeObserver},
+    observers::{ObserversTuple, TimeObserver, UsesObservers},
     state::{HasExecutions, HasLastReportTime, NopState, State, Stoppable, UsesState},
     Error, HasMetadata,
 };
@@ -371,12 +371,13 @@ where
     EM: AdaptiveSerializer + EventProcessor<E, Z> + EventFirer + HasEventManagerId,
     EMH: EventManagerHooksTuple<EM::State>,
     E: HasObservers<State = Self::State> + Executor<Self, Z>,
+    <E as UsesObservers>::Observers: Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     S: State,
     Self::State: HasExecutions + HasMetadata,
     SP: ShMemProvider,
     Z: EvaluatorObservers<E::Observers, State = Self::State>
-        + ExecutionProcessor<E::Observers, State = Self::State>,
+        + ExecutionProcessor<State = Self::State>,
 {
     fn process(
         &mut self,
@@ -403,6 +404,7 @@ where
 impl<E, EM, EMH, S, SP, Z> EventManager<E, Z> for CentralizedEventManager<EM, EMH, S, SP>
 where
     E: HasObservers<State = Self::State> + Executor<Self, Z>,
+    <E as UsesObservers>::Observers: Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EM: AdaptiveSerializer + EventManager<E, Z>,
     EM::State: HasExecutions + HasMetadata + HasLastReportTime,
@@ -410,7 +412,7 @@ where
     S: State,
     SP: ShMemProvider,
     Z: EvaluatorObservers<E::Observers, State = Self::State>
-        + ExecutionProcessor<E::Observers, State = Self::State>,
+        + ExecutionProcessor<State = Self::State>,
 {
 }
 
@@ -527,9 +529,10 @@ where
     ) -> Result<usize, Error>
     where
         E: Executor<Self, Z> + HasObservers<State = <Self as UsesState>::State>,
+        <E as UsesObservers>::Observers: Serialize,
         <Self as UsesState>::State: UsesInput + HasExecutions + HasMetadata,
         for<'a> E::Observers: Deserialize<'a>,
-        Z: ExecutionProcessor<E::Observers, State = <Self as UsesState>::State>
+        Z: ExecutionProcessor<State = <Self as UsesState>::State>
             + EvaluatorObservers<E::Observers>,
     {
         // TODO: Get around local event copy by moving handle_in_client
@@ -576,8 +579,8 @@ where
     where
         E: Executor<Self, Z> + HasObservers<State = <Self as UsesState>::State>,
         <Self as UsesState>::State: UsesInput + HasExecutions + HasMetadata,
-        for<'a> E::Observers: Deserialize<'a>,
-        Z: ExecutionProcessor<E::Observers, State = <Self as UsesState>::State>
+        for<'a> E::Observers: Deserialize<'a> + Serialize,
+        Z: ExecutionProcessor<State = <Self as UsesState>::State>
             + EvaluatorObservers<E::Observers>,
     {
         log::debug!("handle_in_main!");

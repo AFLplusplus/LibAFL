@@ -1,6 +1,6 @@
 [package]
 name = "libafl_libfuzzer"
-version.workspace = true
+version = "0.13.1"
 description = "libFuzzer shim which uses LibAFL with common defaults"
 repository = "https://github.com/AFLplusplus/LibAFL/"
 readme = "../README.md"
@@ -13,8 +13,7 @@ include = [
     "/src",
     "/Cargo.toml",
     "/build.rs",
-    "/libafl_libfuzzer_runtime",
-    "!/libafl_libfuzzer_runtime/target",
+    "/runtime",
 ]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -22,6 +21,7 @@ include = [
 [build-dependencies]
 cc = "1.0"
 rustversion = "1.0"
+toml = { version = "0.8.14", features = ["preserve_order"] }
 
 [features]
 default = ["fork"]
@@ -42,6 +42,9 @@ embed-runtime = []
 
 ## 🐇
 rabbit = []
+
+## For testing and publishing purposes only: enforce that the runtime uses versions rather than paths
+libafl-libfuzzer-use-version = []
 
 [dependencies]
 libfuzzer-sys = { version = "0.4.7", default-features = false }
