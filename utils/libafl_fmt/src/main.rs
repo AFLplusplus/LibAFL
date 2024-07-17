@@ -77,6 +77,8 @@ use tokio::{process::Command, task::JoinSet};
 use walkdir::{DirEntry, WalkDir};
 use which::which;
 
+const REF_LLVM_VERSION: u32 = 18;
+
 async fn run_cargo_fmt(path: PathBuf, is_check: bool, verbose: bool) -> io::Result<()> {
     // Make sure we parse the correct file
     assert_eq!(path.file_name().unwrap().to_str().unwrap(), "Cargo.toml");
@@ -114,13 +116,13 @@ async fn run_cargo_fmt(path: PathBuf, is_check: bool, verbose: bool) -> io::Resu
 
 async fn run_clang_fmt(
     path: PathBuf,
-    clang: &str,
+    clang: String,
     is_check: bool,
     verbose: bool,
 ) -> io::Result<()> {
     let task_str = if is_check { "Checking" } else { "Formatting" };
 
-    let mut fmt_command = Command::new(clang);
+    let mut fmt_command = Command::new(&clang);
 
     fmt_command
         .arg("-i")
@@ -216,13 +218,15 @@ async fn main() -> io::Result<()> {
         tokio_joinset.spawn(run_cargo_fmt(project, cli.check, cli.verbose));
     }
 
-    let (clang, warning) = if which("clang-format-17").is_ok() {
+    let ref_clang_format = format!("clang-format-{REF_LLVM_VERSION}");
+
+    let (clang, warning) = if which(ref_clang_format.clone()).is_ok() {
         // can't use 18 for ci.
-        (Some("clang-format-17"), None)
+        (Some(ref_clang_format), None)
     } else if which("clang-format").is_ok() {
         (
-            Some("clang-format"),
-            Some("using clang-format, could provide a different result from clang-format-18"),
+            Some("clang-format".to_string()),
+            Some("using clang-format, could provide a different result from clang-format-17"),
         )
     } else {
         (
@@ -242,7 +246,7 @@ async fn main() -> io::Result<()> {
             .collect();
 
         for c_file in c_files_to_fmt {
-            tokio_joinset.spawn(run_clang_fmt(c_file, clang, cli.check, cli.verbose));
+            tokio_joinset.spawn(run_clang_fmt(c_file, clang.clone(), cli.check, cli.verbose));
         }
     }
 

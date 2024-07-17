@@ -24,4 +24,4 @@ runs:
       uses: KyleMayes/install-llvm-action@v2
       with:
         directory: ${{ runner.temp }}/llvm
-        version: 17
+        version: 18
