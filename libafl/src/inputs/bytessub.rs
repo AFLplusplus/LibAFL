@@ -104,8 +104,7 @@ pub struct BytesSliceMut<'a> {
 }
 
 impl<'a> BytesSlice<'a> {
-    /// Creates a new [`BytesSubInput`] that's a view on an input with mutator bytes.
-    /// The sub input can then be used to mutate parts of the original input.
+    /// Creates a new [`BytesSlice`], a sub-slice representation of a byte array.
     pub fn new<R>(parent_slice: OwnedSlice<'a, u8>, range: R) -> Self
     where
         R: RangeBounds<usize>,
@@ -127,8 +126,7 @@ impl<'a> BytesSlice<'a> {
         &self.parent_slice[self.range.clone()]
     }
 
-    /// Creates a new [`BytesSubInput`] that's a view on an input with mutator bytes.
-    /// The sub input can then be used to mutate parts of the original input.
+    /// Creates a new [`BytesSlice`] that's a sliced view on a bytes slice.
     pub fn with_slice<R>(parent_slice: &'a [u8], range: R) -> Self
     where
         R: RangeBounds<usize>,
@@ -164,8 +162,7 @@ impl<'a> BytesSlice<'a> {
 }
 
 impl<'a> BytesSliceMut<'a> {
-    /// Creates a new [`BytesSliceMut`] that's a view on an input with mutator bytes.
-    /// The sub input can then be used to mutate parts of the original input.
+    /// Creates a new [`BytesSliceMut`], a sub-slice representation of a byte array.
     pub fn new<R>(parent_slice: OwnedMutSlice<'a, u8>, range: R) -> Self
     where
         R: RangeBounds<usize>,
@@ -193,8 +190,8 @@ impl<'a> BytesSliceMut<'a> {
         &mut self.parent_slice[self.range.clone()]
     }
 
-    /// Creates a new [`BytesSliceMut`] that's a view on an input with mutator bytes.
-    /// The sub input can then be used to mutate parts of the original input.
+    /// Creates a new [`BytesSliceMut`] that's a view on a bytes slice.
+    /// The sub-slice can then be used to mutate parts of the original bytes.
     pub fn with_slice<R>(parent_slice: &'a mut [u8], range: R) -> Self
     where
         R: RangeBounds<usize>,
@@ -308,16 +305,6 @@ where
                 end: end_index(&range, parent_len),
             },
         }
-    }
-
-    /// Get a [`BytesSlice`] representation of the byte input.
-    pub fn bytes_slice(&mut self) -> BytesSlice {
-        BytesSlice::new(self.parent_input.bytes().into(), self.range.clone())
-    }
-
-    /// Get a [`BytesSliceMut`] representation of the byte input.
-    pub fn bytes_slice_mut(&mut self) -> BytesSliceMut {
-        BytesSliceMut::new(self.parent_input.bytes_mut().into(), self.range.clone())
     }
 }
 
@@ -601,12 +588,12 @@ mod tests {
     fn test_ranges_mut() {
         let mut bytes_input = BytesInput::new(vec![1, 2, 3]);
 
-        assert_eq!(bytes_input.sub_input(..1).bytes_slice().start_index(), 0);
-        assert_eq!(bytes_input.sub_input(1..=1).bytes_slice().start_index(), 1);
-        assert_eq!(bytes_input.sub_input(..1).bytes_slice().end_index(), 1);
-        assert_eq!(bytes_input.sub_input(..=1).bytes_slice().end_index(), 2);
-        assert_eq!(bytes_input.sub_input(1..=1).bytes_slice().end_index(), 2);
-        assert_eq!(bytes_input.sub_input(1..).bytes_slice().end_index(), 3);
-        assert_eq!(bytes_input.sub_input(..3).bytes_slice().end_index(), 3);
+        assert_eq!(bytes_input.sub_bytes_mut(..1).start_index(), 0);
+        assert_eq!(bytes_input.sub_bytes_mut(1..=1).start_index(), 1);
+        assert_eq!(bytes_input.sub_bytes_mut(..1).end_index(), 1);
+        assert_eq!(bytes_input.sub_bytes_mut(..=1).end_index(), 2);
+        assert_eq!(bytes_input.sub_bytes_mut(1..=1).end_index(), 2);
+        assert_eq!(bytes_input.sub_bytes_mut(1..).end_index(), 3);
+        assert_eq!(bytes_input.sub_bytes_mut(..3).end_index(), 3);
     }
 }

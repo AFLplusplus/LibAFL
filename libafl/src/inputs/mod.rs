@@ -34,12 +34,15 @@ use std::{fs::File, hash::Hash, io::Read, path::Path};
 
 #[cfg(feature = "std")]
 use libafl_bolts::fs::write_file_atomic;
-use libafl_bolts::{ownedref::OwnedSlice, Error, HasLen};
+use libafl_bolts::{
+    ownedref::{OwnedMutSlice, OwnedSlice},
+    Error, HasLen,
+};
 #[cfg(feature = "nautilus")]
 pub use nautilus::*;
 use serde::{Deserialize, Serialize};
 
-use crate::corpus::CorpusId;
+use crate::{corpus::CorpusId, inputs::bytessub::BytesSliceMut};
 
 /// An input for the target
 #[cfg(not(feature = "std"))]
@@ -262,6 +265,14 @@ pub trait HasMutatorBytes: HasLen {
         R: RangeBounds<usize>,
     {
         BytesSlice::new(OwnedSlice::from(self.bytes()), range)
+    }
+
+    /// Creates a [`BytesSliceMut`] from this input, that can be used to slice a byte array.
+    fn sub_bytes_mut<R>(&mut self, range: R) -> BytesSliceMut
+    where
+        R: RangeBounds<usize>,
+    {
+        BytesSliceMut::new(OwnedMutSlice::from(self.bytes_mut()), range)
     }
 
     /// Creates a [`BytesSlice`] from this input, that can be used for local mutations.
