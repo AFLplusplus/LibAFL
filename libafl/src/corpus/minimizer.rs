@@ -14,7 +14,7 @@ use num_traits::ToPrimitive;
 use z3::{ast::Bool, Config, Context, Optimize};
 
 use crate::{
-    corpus::{Corpus, HasCurrentCorpusId},
+    corpus::Corpus,
     events::{Event, EventFirer, LogSeverity},
     executors::{Executor, HasObservers},
     monitors::{AggregatorOps, UserStats, UserStatsValue},
@@ -227,7 +227,7 @@ where
             // reverse order; if indexes are stored in a vec, we need to remove from back to front
             removed.sort_unstable_by(|id1, id2| id2.cmp(id1));
             for id in removed {
-                if let Some(cur) = current {
+                if let Some(_cur) = current {
                     continue;
                 }
 
