@@ -13,7 +13,7 @@ pub mod generalized;
 pub use generalized::*;
 
 pub mod bytessub;
-pub use bytessub::{BytesSlice, BytesSubInputMut};
+pub use bytessub::{BytesSlice, BytesSubInput};
 
 #[cfg(feature = "multipart_inputs")]
 pub mod multi;
@@ -265,11 +265,11 @@ pub trait HasMutatorBytes: HasLen {
     }
 
     /// Creates a [`BytesSlice`] from this input, that can be used for local mutations.
-    fn sub_input<R>(&mut self, range: R) -> BytesSubInputMut<Self>
+    fn sub_input<R>(&mut self, range: R) -> BytesSubInput<Self>
     where
         R: RangeBounds<usize>,
     {
-        BytesSubInputMut::new(self, range)
+        BytesSubInput::new(self, range)
     }
 }
 
@@ -435,10 +435,7 @@ mod tests {
         assert_eq!(*bytes_read.unwrap().bytes(), [3, 4, 5]);
 
         let bytes_read = bytes_reader.next_sub_input(8);
-        assert_eq!(
-            *bytes_read.unwrap_err().partial().unwrap().bytes(),
-            [6, 7]
-        );
+        assert_eq!(*bytes_read.unwrap_err().partial().unwrap().bytes(), [6, 7]);
 
         let bytes_read = bytes_reader.next_sub_input(8);
         assert!(bytes_read.unwrap_err().empty());
