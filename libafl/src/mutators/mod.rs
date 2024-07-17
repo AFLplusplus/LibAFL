@@ -9,6 +9,8 @@ pub use mutations::*;
 pub mod token_mutations;
 use serde::{Deserialize, Serialize};
 pub use token_mutations::*;
+pub mod havoc_mutations;
+pub use havoc_mutations::*;
 pub mod encoded_mutations;
 pub use encoded_mutations::*;
 pub mod mopt_mutator;
