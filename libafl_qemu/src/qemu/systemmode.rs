@@ -15,8 +15,8 @@ use libafl_qemu_sys::{
 use num_traits::Zero;
 
 use crate::{
-    EmulatorMemoryChunk, FastSnapshotPtr, GuestAddrKind, MemAccessInfo, Qemu, QemuExitError,
-    QemuExitReason, QemuSnapshotCheckResult, CPU,
+    FastSnapshotPtr, GuestAddrKind, MemAccessInfo, Qemu, QemuMemoryChunk, QemuSnapshotCheckResult,
+    CPU,
 };
 
 pub(super) extern "C" fn qemu_cleanup_atexit() {
@@ -200,17 +200,9 @@ impl Qemu {
         );
     }
 
-    /// This function will run the emulator until the next breakpoint / sync exit, or until finish.
-    /// It is a low-level function and simply kicks QEMU.
-    /// # Safety
-    ///
-    /// Should, in general, be safe to call.
-    /// Of course, the emulated target is not contained securely and can corrupt state or interact with the operating system.
-    pub unsafe fn run(&self) -> Result<QemuExitReason, QemuExitError> {
+    pub(super) unsafe fn run_inner(&self) {
         vm_start();
         qemu_main_loop();
-
-        self.post_run()
     }
 
     pub fn save_snapshot(&self, name: &str, sync: bool) {
@@ -295,7 +287,7 @@ impl Qemu {
     }
 }
 
-impl EmulatorMemoryChunk {
+impl QemuMemoryChunk {
     pub fn phys_iter(&self, qemu: Qemu) -> PhysMemoryIter {
         PhysMemoryIter {
             addr: self.addr,

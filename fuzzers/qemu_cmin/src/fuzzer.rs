@@ -27,10 +27,12 @@ use libafl_bolts::{
     AsSlice, AsSliceMut,
 };
 use libafl_qemu::{
-    edges::{QemuEdgeCoverageChildHelper, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},
+    command::NopCommandManager,
     elf::EasyElf,
-    ArchExtras, CallingConvention, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExitError,
-    QemuExitReason, QemuForkExecutor, QemuHooks, QemuShutdownCause, Regs,
+    modules::edges::{EdgeCoverageChildModule, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},
+    ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms,
+    NopEmulatorExitHandler, Qemu, QemuExitError, QemuExitReason, QemuForkExecutor,
+    QemuShutdownCause, Regs,
 };
 
 #[derive(Default)]
@@ -65,7 +67,7 @@ impl From<Version> for Str {
 name = format ! ("qemu_cmin-{}", env ! ("CPU_TARGET")),
 version = Version::default(),
 about,
-long_about = "Tool for generating minimizing corpus using QEMU instrumentation"
+long_about = "Module for generating minimizing corpus using QEMU instrumentation"
 )]
 pub struct FuzzerOptions {
     #[arg(long, help = "Output directory")]
@@ -219,10 +221,13 @@ pub fn fuzz() -> Result<(), Error> {
         ExitKind::Ok
     };
 
-    let mut hooks = QemuHooks::new(qemu, tuple_list!(QemuEdgeCoverageChildHelper::default(),));
+    let modules = tuple_list!(EdgeCoverageChildModule::default(),);
+
+    let mut emulator =
+        Emulator::new_with_qemu(qemu, modules, NopEmulatorExitHandler, NopCommandManager)?;
 
     let mut executor = QemuForkExecutor::new(
-        &mut hooks,
+        &mut emulator,
         &mut harness,
         tuple_list!(edges_observer),
         &mut fuzzer,

@@ -8,8 +8,8 @@ use libafl::state::{HasExecutions, State};
 use libafl_qemu_sys::GuestPhysAddr;
 
 use crate::{
-    command::CommandManager, emu::IsSnapshotManager, DeviceSnapshotFilter, Emulator,
-    EmulatorExitHandler, Qemu, QemuHelperTuple, QemuSnapshotCheckResult, SnapshotId,
+    command::CommandManager, emu::IsSnapshotManager, modules::EmulatorModuleTuple,
+    DeviceSnapshotFilter, Emulator, EmulatorExitHandler, Qemu, QemuSnapshotCheckResult, SnapshotId,
     SnapshotManagerError,
 };
 
@@ -34,7 +34,7 @@ pub enum SnapshotManager {
 }
 
 impl IsSnapshotManager for SnapshotManager {
-    fn save(&mut self, qemu: &Qemu) -> SnapshotId {
+    fn save(&mut self, qemu: Qemu) -> SnapshotId {
         match self {
             SnapshotManager::Qemu(qemu_sm) => qemu_sm.save(qemu),
             SnapshotManager::Fast(fast_sm) => fast_sm.save(qemu),
@@ -44,7 +44,7 @@ impl IsSnapshotManager for SnapshotManager {
     fn restore(
         &mut self,
         snapshot_id: &SnapshotId,
-        qemu: &Qemu,
+        qemu: Qemu,
     ) -> Result<(), SnapshotManagerError> {
         match self {
             SnapshotManager::Qemu(qemu_sm) => qemu_sm.restore(snapshot_id, qemu),
@@ -55,7 +55,7 @@ impl IsSnapshotManager for SnapshotManager {
     fn do_check(
         &self,
         reference_snapshot_id: &SnapshotId,
-        qemu: &Qemu,
+        qemu: Qemu,
     ) -> Result<QemuSnapshotCheckResult, SnapshotManagerError> {
         match self {
             SnapshotManager::Qemu(qemu_sm) => qemu_sm.do_check(reference_snapshot_id, qemu),
@@ -105,7 +105,7 @@ impl QemuSnapshotManager {
 }
 
 impl IsSnapshotManager for QemuSnapshotManager {
-    fn save(&mut self, qemu: &Qemu) -> SnapshotId {
+    fn save(&mut self, qemu: Qemu) -> SnapshotId {
         let snapshot_id = SnapshotId::gen_unique_id();
         qemu.save_snapshot(
             self.snapshot_id_to_name(&snapshot_id).as_str(),
@@ -117,7 +117,7 @@ impl IsSnapshotManager for QemuSnapshotManager {
     fn restore(
         &mut self,
         snapshot_id: &SnapshotId,
-        qemu: &Qemu,
+        qemu: Qemu,
     ) -> Result<(), SnapshotManagerError> {
         qemu.load_snapshot(self.snapshot_id_to_name(snapshot_id).as_str(), self.is_sync);
         Ok(())
@@ -126,7 +126,7 @@ impl IsSnapshotManager for QemuSnapshotManager {
     fn do_check(
         &self,
         _reference_snapshot_id: &SnapshotId,
-        _qemu: &Qemu,
+        _qemu: Qemu,
     ) -> Result<QemuSnapshotCheckResult, SnapshotManagerError> {
         // We consider the qemu implementation to be 'ideal' for now.
         Ok(QemuSnapshotCheckResult::default())
@@ -134,7 +134,7 @@ impl IsSnapshotManager for QemuSnapshotManager {
 }
 
 impl IsSnapshotManager for FastSnapshotManager {
-    fn save(&mut self, qemu: &Qemu) -> SnapshotId {
+    fn save(&mut self, qemu: Qemu) -> SnapshotId {
         let snapshot_id = SnapshotId::gen_unique_id();
         self.snapshots
             .insert(snapshot_id, qemu.create_fast_snapshot(true));
@@ -144,7 +144,7 @@ impl IsSnapshotManager for FastSnapshotManager {
     fn restore(
         &mut self,
         snapshot_id: &SnapshotId,
-        qemu: &Qemu,
+        qemu: Qemu,
     ) -> Result<(), SnapshotManagerError> {
         let fast_snapshot_ptr = *self
             .snapshots
@@ -161,7 +161,7 @@ impl IsSnapshotManager for FastSnapshotManager {
     fn do_check(
         &self,
         reference_snapshot_id: &SnapshotId,
-        qemu: &Qemu,
+        qemu: Qemu,
     ) -> Result<QemuSnapshotCheckResult, SnapshotManagerError> {
         let fast_snapshot_ptr = *self.snapshots.get(reference_snapshot_id).ok_or(
             SnapshotManagerError::SnapshotIdNotFound(*reference_snapshot_id),
@@ -171,12 +171,12 @@ impl IsSnapshotManager for FastSnapshotManager {
     }
 }
 
-impl<CM, E, QT, S> Emulator<CM, E, QT, S>
+impl<CM, EH, ET, S> Emulator<CM, EH, ET, S>
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
-    QT: QemuHelperTuple<S>,
-    S: State + HasExecutions,
+    CM: CommandManager<EH, ET, S>,
+    EH: EmulatorExitHandler<ET, S>,
+    ET: EmulatorModuleTuple<S>,
+    S: Unpin + State + HasExecutions,
 {
     /// Write a value to a phsical guest address, including ROM areas.
     pub unsafe fn write_phys_mem(&self, paddr: GuestPhysAddr, buf: &[u8]) {

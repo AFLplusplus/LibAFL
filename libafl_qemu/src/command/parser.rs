@@ -13,19 +13,22 @@ use crate::{
         bindings, CommandError, CommandManager, EndCommand, FilterCommand, InputCommand, IsCommand,
         LoadCommand, NativeExitKind, SaveCommand, StartCommand, VersionCommand,
     },
+    modules::{
+        EmulatorModuleTuple, QemuInstrumentationAddressRangeFilter, StdInstrumentationFilter,
+    },
     sync_exit::ExitArgs,
-    EmulatorExitHandler, EmulatorMemoryChunk, GuestReg, IsSnapshotManager, Qemu, QemuHelperTuple,
-    QemuInstrumentationAddressRangeFilter, Regs, StdEmulatorExitHandler, StdInstrumentationFilter,
+    EmulatorExitHandler, GuestReg, IsSnapshotManager, Qemu, QemuMemoryChunk, Regs,
+    StdEmulatorExitHandler,
 };
 
 pub static EMU_EXIT_KIND_MAP: OnceLock<EnumMap<NativeExitKind, Option<ExitKind>>> = OnceLock::new();
 
-pub trait NativeCommandParser<CM, E, QT, S>
+pub trait NativeCommandParser<CM, EH, ET, S>
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
-    QT: QemuHelperTuple<S>,
-    S: State + HasExecutions,
+    CM: CommandManager<EH, ET, S>,
+    EH: EmulatorExitHandler<ET, S>,
+    ET: EmulatorModuleTuple<S>,
+    S: Unpin + State + HasExecutions,
 {
     fn command_id(&self) -> GuestReg;
 
@@ -33,16 +36,16 @@ where
         &self,
         qemu: Qemu,
         arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
-    ) -> Result<Rc<dyn IsCommand<CM, E, QT, S>>, CommandError>;
+    ) -> Result<Rc<dyn IsCommand<CM, EH, ET, S>>, CommandError>;
 }
 
 pub struct InputPhysCommandParser;
-impl<CM, QT, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, QT, S>
+impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, ET, S>
     for InputPhysCommandParser
 where
-    CM: CommandManager<StdEmulatorExitHandler<SM>, QT, S>,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
-    S: State + HasExecutions,
+    CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
+    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
+    S: Unpin + State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
 {
@@ -54,12 +57,12 @@ where
         &self,
         qemu: Qemu,
         arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
-    ) -> Result<Rc<dyn IsCommand<CM, StdEmulatorExitHandler<SM>, QT, S>>, CommandError> {
+    ) -> Result<Rc<dyn IsCommand<CM, StdEmulatorExitHandler<SM>, ET, S>>, CommandError> {
         let input_phys_addr: GuestPhysAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
         let max_input_size: GuestReg = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])?;
 
         Ok(Rc::new(InputCommand::new(
-            EmulatorMemoryChunk::phys(
+            QemuMemoryChunk::phys(
                 input_phys_addr,
                 max_input_size,
                 Some(qemu.current_cpu().unwrap()),
@@ -70,12 +73,12 @@ where
 }
 
 pub struct InputVirtCommandParser;
-impl<CM, QT, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, QT, S>
+impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, ET, S>
     for InputVirtCommandParser
 where
-    CM: CommandManager<StdEmulatorExitHandler<SM>, QT, S>,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
-    S: State + HasExecutions,
+    CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
+    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
+    S: Unpin + State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
 {
@@ -87,24 +90,24 @@ where
         &self,
         qemu: Qemu,
         arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
-    ) -> Result<Rc<dyn IsCommand<CM, StdEmulatorExitHandler<SM>, QT, S>>, CommandError> {
+    ) -> Result<Rc<dyn IsCommand<CM, StdEmulatorExitHandler<SM>, ET, S>>, CommandError> {
         let input_virt_addr: GuestVirtAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
         let max_input_size: GuestReg = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])?;
 
         Ok(Rc::new(InputCommand::new(
-            EmulatorMemoryChunk::virt(input_virt_addr, max_input_size, qemu.current_cpu().unwrap()),
+            QemuMemoryChunk::virt(input_virt_addr, max_input_size, qemu.current_cpu().unwrap()),
             qemu.current_cpu().unwrap(),
         )))
     }
 }
 
 pub struct StartPhysCommandParser;
-impl<CM, QT, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, QT, S>
+impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, ET, S>
     for StartPhysCommandParser
 where
-    CM: CommandManager<StdEmulatorExitHandler<SM>, QT, S>,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
-    S: State + HasExecutions,
+    CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
+    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
+    S: Unpin + State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
 {
@@ -116,11 +119,11 @@ where
         &self,
         qemu: Qemu,
         arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
-    ) -> Result<Rc<dyn IsCommand<CM, StdEmulatorExitHandler<SM>, QT, S>>, CommandError> {
+    ) -> Result<Rc<dyn IsCommand<CM, StdEmulatorExitHandler<SM>, ET, S>>, CommandError> {
         let input_phys_addr: GuestPhysAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
         let max_input_size: GuestReg = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])?;
 
-        Ok(Rc::new(StartCommand::new(EmulatorMemoryChunk::phys(
+        Ok(Rc::new(StartCommand::new(QemuMemoryChunk::phys(
             input_phys_addr,
             max_input_size,
             Some(qemu.current_cpu().unwrap()),
@@ -129,12 +132,12 @@ where
 }
 
 pub struct StartVirtCommandParser;
-impl<CM, QT, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, QT, S>
+impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, ET, S>
     for StartVirtCommandParser
 where
-    CM: CommandManager<StdEmulatorExitHandler<SM>, QT, S>,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
-    S: State + HasExecutions,
+    CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
+    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
+    S: Unpin + State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
 {
@@ -146,11 +149,11 @@ where
         &self,
         qemu: Qemu,
         arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
-    ) -> Result<Rc<dyn IsCommand<CM, StdEmulatorExitHandler<SM>, QT, S>>, CommandError> {
+    ) -> Result<Rc<dyn IsCommand<CM, StdEmulatorExitHandler<SM>, ET, S>>, CommandError> {
         let input_virt_addr: GuestVirtAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
         let max_input_size: GuestReg = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])?;
 
-        Ok(Rc::new(StartCommand::new(EmulatorMemoryChunk::virt(
+        Ok(Rc::new(StartCommand::new(QemuMemoryChunk::virt(
             input_virt_addr,
             max_input_size,
             qemu.current_cpu().unwrap(),
@@ -159,11 +162,11 @@ where
 }
 
 pub struct SaveCommandParser;
-impl<CM, QT, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, QT, S> for SaveCommandParser
+impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, ET, S> for SaveCommandParser
 where
-    CM: CommandManager<StdEmulatorExitHandler<SM>, QT, S>,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
-    S: State + HasExecutions,
+    CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
+    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
+    S: Unpin + State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
 {
@@ -175,17 +178,17 @@ where
         &self,
         _qemu: Qemu,
         _arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
-    ) -> Result<Rc<dyn IsCommand<CM, StdEmulatorExitHandler<SM>, QT, S>>, CommandError> {
+    ) -> Result<Rc<dyn IsCommand<CM, StdEmulatorExitHandler<SM>, ET, S>>, CommandError> {
         Ok(Rc::new(SaveCommand))
     }
 }
 
 pub struct LoadCommandParser;
-impl<CM, QT, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, QT, S> for LoadCommandParser
+impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, ET, S> for LoadCommandParser
 where
-    CM: CommandManager<StdEmulatorExitHandler<SM>, QT, S>,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
-    S: State + HasExecutions,
+    CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
+    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
+    S: Unpin + State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
 {
@@ -197,17 +200,17 @@ where
         &self,
         _qemu: Qemu,
         _arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
-    ) -> Result<Rc<dyn IsCommand<CM, StdEmulatorExitHandler<SM>, QT, S>>, CommandError> {
+    ) -> Result<Rc<dyn IsCommand<CM, StdEmulatorExitHandler<SM>, ET, S>>, CommandError> {
         Ok(Rc::new(LoadCommand))
     }
 }
 
 pub struct EndCommandParser;
-impl<CM, QT, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, QT, S> for EndCommandParser
+impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, ET, S> for EndCommandParser
 where
-    CM: CommandManager<StdEmulatorExitHandler<SM>, QT, S>,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
-    S: State + HasExecutions,
+    CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
+    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
+    S: Unpin + State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
 {
@@ -219,7 +222,7 @@ where
         &self,
         qemu: Qemu,
         arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
-    ) -> Result<Rc<dyn IsCommand<CM, StdEmulatorExitHandler<SM>, QT, S>>, CommandError> {
+    ) -> Result<Rc<dyn IsCommand<CM, StdEmulatorExitHandler<SM>, ET, S>>, CommandError> {
         let native_exit_kind: GuestReg = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
         let native_exit_kind: Result<NativeExitKind, _> = u64::from(native_exit_kind).try_into();
 
@@ -238,12 +241,12 @@ where
 }
 
 pub struct VersionCommandParser;
-impl<CM, QT, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, QT, S>
+impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, ET, S>
     for VersionCommandParser
 where
-    CM: CommandManager<StdEmulatorExitHandler<SM>, QT, S>,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
-    S: State + HasExecutions,
+    CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
+    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
+    S: Unpin + State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
 {
@@ -255,7 +258,7 @@ where
         &self,
         qemu: Qemu,
         arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
-    ) -> Result<Rc<dyn IsCommand<CM, StdEmulatorExitHandler<SM>, QT, S>>, CommandError> {
+    ) -> Result<Rc<dyn IsCommand<CM, StdEmulatorExitHandler<SM>, ET, S>>, CommandError> {
         let client_version = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
 
         Ok(Rc::new(VersionCommand::new(client_version)))
@@ -263,12 +266,12 @@ where
 }
 
 pub struct VaddrFilterAllowRangeCommandParser;
-impl<CM, QT, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, QT, S>
+impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, ET, S>
     for VaddrFilterAllowRangeCommandParser
 where
-    CM: CommandManager<StdEmulatorExitHandler<SM>, QT, S>,
-    QT: QemuHelperTuple<S> + StdInstrumentationFilter + Debug,
-    S: State + HasExecutions,
+    CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
+    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
+    S: Unpin + State + HasExecutions,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
 {
@@ -280,7 +283,7 @@ where
         &self,
         qemu: Qemu,
         arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
-    ) -> Result<Rc<dyn IsCommand<CM, StdEmulatorExitHandler<SM>, QT, S>>, CommandError> {
+    ) -> Result<Rc<dyn IsCommand<CM, StdEmulatorExitHandler<SM>, ET, S>>, CommandError> {
         let vaddr_start: GuestAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
         let vaddr_end: GuestAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])?;
 

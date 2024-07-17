@@ -125,7 +125,7 @@ where
         }
         self.inner.hooks.pre_exec_all(state, input);
 
-        let ret = (self.harness_fn.borrow_mut())(input, &mut self.exposed_executor_state);
+        let ret = self.harness_fn.borrow_mut()(input, &mut self.exposed_executor_state);
 
         self.inner.hooks.post_exec_all(state, input);
         self.inner.leave_target(fuzzer, state, mgr, input);

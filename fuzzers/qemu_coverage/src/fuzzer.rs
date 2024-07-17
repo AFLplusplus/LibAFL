@@ -26,11 +26,13 @@ use libafl_bolts::{
     AsSlice,
 };
 use libafl_qemu::{
-    drcov::QemuDrCovHelper, elf::EasyElf, ArchExtras, CallingConvention, GuestAddr, GuestReg,
-    MmapPerms, Qemu, QemuExecutor, QemuExitReason, QemuHooks,
-    QemuInstrumentationAddressRangeFilter, QemuRWError, QemuShutdownCause, Regs,
+    command::NopCommandManager,
+    elf::EasyElf,
+    modules::{drcov::DrCovModule, QemuInstrumentationAddressRangeFilter},
+    ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms,
+    NopEmulatorExitHandler, Qemu, QemuExecutor, QemuExitReason, QemuRWError, QemuShutdownCause,
+    Regs,
 };
-use rangemap::RangeMap;
 
 #[derive(Default)]
 pub struct Version;
@@ -69,14 +71,14 @@ impl From<Version> for Str {
     name = format!("qemu_coverage-{}",env!("CPU_TARGET")),
     version = Version::default(),
     about,
-    long_about = "Tool for generating DrCov coverage data using QEMU instrumentation"
+    long_about = "Module for generating DrCov coverage data using QEMU instrumentation"
 )]
 pub struct FuzzerOptions {
     #[arg(long, help = "Coverage file")]
-    coverage: String,
+    coverage_path: PathBuf,
 
     #[arg(long, help = "Input directory")]
-    input: String,
+    input_dir: PathBuf,
 
     #[arg(long, help = "Timeout in seconds", default_value = "5000", value_parser = timeout_from_millis_str)]
     timeout: Duration,
@@ -99,9 +101,8 @@ pub const MAX_INPUT_SIZE: usize = 1048576; // 1MB
 pub fn fuzz() {
     let mut options = FuzzerOptions::parse();
 
-    let corpus_dir = PathBuf::from(options.input);
-
-    let corpus_files = corpus_dir
+    let corpus_files = options
+        .input_dir
         .read_dir()
         .expect("Failed to read corpus dir")
         .collect::<Result<Vec<DirEntry>, io::Error>>()
@@ -119,6 +120,7 @@ pub fn fuzz() {
 
     env::remove_var("LD_LIBRARY_PATH");
     let env: Vec<(String, String)> = env::vars().collect();
+
     let qemu = Qemu::init(&options.args, &env).unwrap();
 
     let mut elf_buffer = Vec::new();
@@ -227,40 +229,28 @@ pub fn fuzz() {
             let scheduler = QueueScheduler::new();
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-            let rangemap = qemu
-                .mappings()
-                .filter_map(|m| {
-                    m.path()
-                        .map(|p| ((m.start() as usize)..(m.end() as usize), p.to_string()))
-                        .filter(|(_, p)| !p.is_empty())
-                })
-                .enumerate()
-                .fold(
-                    RangeMap::<usize, (u16, String)>::new(),
-                    |mut rm, (i, (r, p))| {
-                        rm.insert(r, (i as u16, p));
-                        rm
-                    },
-                );
-
-            let mut coverage = PathBuf::from(&options.coverage);
-            let coverage_name = coverage.file_stem().unwrap().to_str().unwrap();
-            let coverage_extension = coverage.extension().unwrap_or_default().to_str().unwrap();
+            let mut cov_path = options.coverage_path.clone();
+            let coverage_name = cov_path.file_stem().unwrap().to_str().unwrap();
+            let coverage_extension = cov_path.extension().unwrap_or_default().to_str().unwrap();
             let core = core_id.0;
-            coverage.set_file_name(format!("{coverage_name}-{core:03}.{coverage_extension}"));
+            cov_path.set_file_name(format!("{coverage_name}-{core:03}.{coverage_extension}"));
 
-            let mut hooks = QemuHooks::new(
+            let emulator_modules = tuple_list!(DrCovModule::new(
+                QemuInstrumentationAddressRangeFilter::None,
+                cov_path,
+                false,
+            ));
+
+            let mut emulator = Emulator::new_with_qemu(
                 qemu,
-                tuple_list!(QemuDrCovHelper::new(
-                    QemuInstrumentationAddressRangeFilter::None,
-                    rangemap,
-                    coverage,
-                    false,
-                )),
-            );
+                emulator_modules,
+                NopEmulatorExitHandler,
+                NopCommandManager,
+            )
+            .unwrap();
 
             let mut executor = QemuExecutor::new(
-                &mut hooks,
+                &mut emulator,
                 &mut harness,
                 (),
                 &mut fuzzer,
@@ -274,7 +264,7 @@ pub fn fuzz() {
                 state
                     .load_initial_inputs_by_filenames(&mut fuzzer, &mut executor, &mut mgr, &files)
                     .unwrap_or_else(|_| {
-                        println!("Failed to load initial corpus at {:?}", &corpus_dir);
+                        println!("Failed to load initial corpus at {:?}", &options.input_dir);
                         process::exit(0);
                     });
                 log::debug!("We imported {} inputs from disk.", state.corpus().count());
