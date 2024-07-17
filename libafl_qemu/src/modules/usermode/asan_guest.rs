@@ -7,17 +7,17 @@ use std::{
     path::PathBuf,
 };
 
-use libafl::{inputs::UsesInput, HasMetadata};
+use libafl::inputs::UsesInput;
 
 #[cfg(not(feature = "clippy"))]
 use crate::sys::libafl_tcg_gen_asan;
 use crate::{
-    helpers::{
-        HasInstrumentationFilter, IsFilter, QemuHelper, QemuHelperTuple,
+    emu::EmulatorModules,
+    modules::{
+        EmulatorModule, EmulatorModuleTuple, HasInstrumentationFilter, IsFilter,
         QemuInstrumentationAddressRangeFilter,
     },
-    hooks::{Hook, QemuHooks},
-    qemu::{MemAccessInfo, Qemu, QemuInitError},
+    qemu::{Hook, MemAccessInfo, Qemu, QemuInitError},
     sys::TCGTemp,
     GuestAddr, MapInfo,
 };
@@ -121,13 +121,13 @@ impl From<&MapInfo> for QemuAsanGuestMapping {
 }
 
 #[derive(Debug)]
-pub struct QemuAsanGuestHelper {
+pub struct AsanGuestModule {
     filter: QemuInstrumentationAddressRangeFilter,
     mappings: Vec<QemuAsanGuestMapping>,
 }
 
 #[cfg(any(cpu_target = "aarch64", cpu_target = "x86_64", feature = "clippy"))]
-impl QemuAsanGuestHelper {
+impl AsanGuestModule {
     const HIGH_SHADOW_START: GuestAddr = 0x02008fff7000;
     const HIGH_SHADOW_END: GuestAddr = 0x10007fff7fff;
     const LOW_SHADOW_START: GuestAddr = 0x00007fff8000;
@@ -140,14 +140,14 @@ impl QemuAsanGuestHelper {
     cpu_target = "mips",
     cpu_target = "ppc"
 ))]
-impl QemuAsanGuestHelper {
+impl AsanGuestModule {
     const HIGH_SHADOW_START: GuestAddr = 0x28000000;
     const HIGH_SHADOW_END: GuestAddr = 0x3fffffff;
     const LOW_SHADOW_START: GuestAddr = 0x20000000;
     const LOW_SHADOW_END: GuestAddr = 0x23ffffff;
 }
 
-impl QemuAsanGuestHelper {
+impl AsanGuestModule {
     #[must_use]
     pub fn default(emu: &Qemu, asan: String) -> Self {
         Self::new(emu, asan, QemuInstrumentationAddressRangeFilter::None)
@@ -197,7 +197,7 @@ impl QemuAsanGuestHelper {
     }
 }
 
-impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuAsanGuestHelper {
+impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for AsanGuestModule {
     fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
         &self.filter
     }
@@ -207,18 +207,20 @@ impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuAsa
     }
 }
 
-fn gen_readwrite_guest_asan<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+fn gen_readwrite_guest_asan<ET, S>(
+    emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
     addr: *mut TCGTemp,
     info: MemAccessInfo,
 ) -> Option<u64>
 where
-    S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    S: Unpin + UsesInput,
+    ET: EmulatorModuleTuple<S>,
 {
-    let h = hooks.match_helper_mut::<QemuAsanGuestHelper>().unwrap();
+    let h = emulator_modules
+        .get_mut::<AsanGuestModule>()
+        .unwrap();
     if !h.must_instrument(pc) {
         return None;
     }
@@ -244,55 +246,56 @@ where
 #[allow(unused_variables)]
 unsafe fn libafl_tcg_gen_asan(addr: *mut TCGTemp, size: usize) {}
 
-fn guest_trace_error_asan<QT, S>(
-    _hooks: &mut QemuHooks<QT, S>,
+fn guest_trace_error_asan<ET, S>(
+    _emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     _id: u64,
     _addr: GuestAddr,
 ) where
-    S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    S: Unpin + UsesInput,
+    ET: EmulatorModuleTuple<S>,
 {
     panic!("I really shouldn't be here");
 }
 
-fn guest_trace_error_n_asan<QT, S>(
-    _hooks: &mut QemuHooks<QT, S>,
+fn guest_trace_error_n_asan<ET, S>(
+    _emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     _id: u64,
     _addr: GuestAddr,
     _n: usize,
 ) where
-    S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    S: Unpin + UsesInput,
+    ET: EmulatorModuleTuple<S>,
 {
     panic!("I really shouldn't be here either");
 }
 
-impl<S> QemuHelper<S> for QemuAsanGuestHelper
+impl<S> EmulatorModule<S> for AsanGuestModule
 where
-    S: UsesInput + HasMetadata,
+    S: Unpin + UsesInput,
 {
-    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
+    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
     where
-        QT: QemuHelperTuple<S>,
+        ET: EmulatorModuleTuple<S>,
+        S: Unpin + UsesInput,
     {
-        hooks.reads(
-            Hook::Function(gen_readwrite_guest_asan::<QT, S>),
-            Hook::Function(guest_trace_error_asan::<QT, S>),
-            Hook::Function(guest_trace_error_asan::<QT, S>),
-            Hook::Function(guest_trace_error_asan::<QT, S>),
-            Hook::Function(guest_trace_error_asan::<QT, S>),
-            Hook::Function(guest_trace_error_n_asan::<QT, S>),
+        emulator_modules.reads(
+            Hook::Function(gen_readwrite_guest_asan::<ET, S>),
+            Hook::Function(guest_trace_error_asan::<ET, S>),
+            Hook::Function(guest_trace_error_asan::<ET, S>),
+            Hook::Function(guest_trace_error_asan::<ET, S>),
+            Hook::Function(guest_trace_error_asan::<ET, S>),
+            Hook::Function(guest_trace_error_n_asan::<ET, S>),
         );
 
-        hooks.writes(
-            Hook::Function(gen_readwrite_guest_asan::<QT, S>),
-            Hook::Function(guest_trace_error_asan::<QT, S>),
-            Hook::Function(guest_trace_error_asan::<QT, S>),
-            Hook::Function(guest_trace_error_asan::<QT, S>),
-            Hook::Function(guest_trace_error_asan::<QT, S>),
-            Hook::Function(guest_trace_error_n_asan::<QT, S>),
+        emulator_modules.writes(
+            Hook::Function(gen_readwrite_guest_asan::<ET, S>),
+            Hook::Function(guest_trace_error_asan::<ET, S>),
+            Hook::Function(guest_trace_error_asan::<ET, S>),
+            Hook::Function(guest_trace_error_asan::<ET, S>),
+            Hook::Function(guest_trace_error_asan::<ET, S>),
+            Hook::Function(guest_trace_error_n_asan::<ET, S>),
         );
     }
 }

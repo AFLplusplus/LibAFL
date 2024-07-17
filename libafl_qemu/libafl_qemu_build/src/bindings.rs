@@ -95,7 +95,13 @@ pub fn generate(
 ) -> Result<Bindings, BindgenError> {
     let wrapper_h = build_dir.join("wrapper.h");
 
-    store_generated_content_if_different(&wrapper_h, WRAPPER_HEADER.as_bytes(), None, None, false);
+    store_generated_content_if_different(
+        &wrapper_h,
+        WRAPPER_HEADER.as_bytes(),
+        None,
+        vec![],
+        false,
+    );
 
     let bindings = bindgen::Builder::default()
         .derive_debug(true)

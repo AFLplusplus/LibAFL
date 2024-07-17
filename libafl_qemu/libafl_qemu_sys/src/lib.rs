@@ -21,6 +21,16 @@ use strum_macros::EnumIter;
 
 #[cfg(all(not(feature = "clippy"), target_os = "linux"))]
 mod bindings {
+    #![allow(non_upper_case_globals)]
+    #![allow(non_camel_case_types)]
+    #![allow(non_snake_case)]
+    #![allow(improper_ctypes)]
+    #![allow(unused_mut)]
+    #![allow(unused)]
+    #![allow(unused_variables)]
+    #![allow(clippy::all)]
+    #![allow(clippy::pedantic)]
+
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
 #[cfg(all(not(feature = "clippy"), target_os = "linux"))]
@@ -107,8 +117,6 @@ macro_rules! extern_c_checked {
 use core::ops::BitAnd;
 use std::ffi::c_void;
 
-#[cfg(feature = "python")]
-use pyo3::{pyclass, pymethods, IntoPy, PyObject, Python};
 #[cfg(any(feature = "clippy", not(target_os = "linux")))]
 pub use x86_64_stub_bindings::*;
 
@@ -124,19 +132,6 @@ pub type GuestPhysAddr = crate::hwaddr;
 pub type GuestVirtAddr = crate::vaddr;
 
 pub type GuestHwAddrInfo = crate::qemu_plugin_hwaddr;
-
-#[derive(Debug)]
-#[repr(C)]
-#[cfg(target_os = "linux")]
-#[cfg_attr(feature = "python", pyclass(unsendable))]
-pub struct MapInfo {
-    start: GuestAddr,
-    end: GuestAddr,
-    offset: GuestAddr,
-    path: Option<String>,
-    flags: i32,
-    is_priv: i32,
-}
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -213,81 +208,4 @@ extern_c_checked! {
         data: *const ()
     );
     pub fn libafl_qemu_gdb_reply(buf: *const u8, len: usize);
-}
-
-#[cfg(target_os = "linux")]
-#[cfg_attr(feature = "python", pymethods)]
-impl MapInfo {
-    #[must_use]
-    pub fn start(&self) -> GuestAddr {
-        self.start
-    }
-
-    #[must_use]
-    pub fn end(&self) -> GuestAddr {
-        self.end
-    }
-
-    #[must_use]
-    pub fn offset(&self) -> GuestAddr {
-        self.offset
-    }
-
-    #[must_use]
-    pub fn path(&self) -> Option<&String> {
-        self.path.as_ref()
-    }
-
-    #[must_use]
-    pub fn flags(&self) -> MmapPerms {
-        MmapPerms::try_from(self.flags).unwrap()
-    }
-
-    #[must_use]
-    pub fn is_priv(&self) -> bool {
-        self.is_priv != 0
-    }
-}
-
-impl MmapPerms {
-    #[must_use]
-    pub fn readable(&self) -> bool {
-        matches!(
-            self,
-            MmapPerms::Read
-                | MmapPerms::ReadWrite
-                | MmapPerms::ReadExecute
-                | MmapPerms::ReadWriteExecute
-        )
-    }
-
-    #[must_use]
-    pub fn writable(&self) -> bool {
-        matches!(
-            self,
-            MmapPerms::Write
-                | MmapPerms::ReadWrite
-                | MmapPerms::WriteExecute
-                | MmapPerms::ReadWriteExecute
-        )
-    }
-
-    #[must_use]
-    pub fn executable(&self) -> bool {
-        matches!(
-            self,
-            MmapPerms::Execute
-                | MmapPerms::ReadExecute
-                | MmapPerms::WriteExecute
-                | MmapPerms::ReadWriteExecute
-        )
-    }
-}
-
-#[cfg(feature = "python")]
-impl IntoPy<PyObject> for MmapPerms {
-    fn into_py(self, py: Python) -> PyObject {
-        let n: i32 = self.into();
-        n.into_py(py)
-    }
 }

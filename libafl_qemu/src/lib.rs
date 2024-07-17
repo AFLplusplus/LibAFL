@@ -38,11 +38,7 @@ pub use arch::*;
 
 pub mod elf;
 
-pub mod helpers;
-pub use helpers::*;
-
-pub mod hooks;
-pub use hooks::*;
+pub mod modules;
 
 pub mod executor;
 pub use executor::QemuExecutor;

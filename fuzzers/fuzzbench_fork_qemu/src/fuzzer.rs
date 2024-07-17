@@ -46,13 +46,15 @@ use libafl_bolts::{
     AsSlice, AsSliceMut,
 };
 use libafl_qemu::{
-    cmplog::{CmpLogMap, CmpLogObserver, QemuCmpLogChildHelper},
-    edges::{QemuEdgeCoverageChildHelper, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},
+    command::NopCommandManager,
     elf::EasyElf,
     filter_qemu_args,
-    hooks::QemuHooks,
-    GuestReg, MmapPerms, Qemu, QemuExitError, QemuExitReason, QemuForkExecutor, QemuShutdownCause,
-    Regs,
+    modules::{
+        cmplog::{CmpLogChildModule, CmpLogMap, CmpLogObserver},
+        edges::{EdgeCoverageChildModule, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},
+    },
+    Emulator, GuestReg, MmapPerms, NopEmulatorExitHandler, QemuExitError, QemuExitReason,
+    QemuForkExecutor, QemuShutdownCause, Regs,
 };
 #[cfg(unix)]
 use nix::unistd::dup;
@@ -148,7 +150,22 @@ fn fuzz(
 
     let args: Vec<String> = env::args().collect();
     let env: Vec<(String, String)> = env::vars().collect();
-    let qemu = Qemu::init(&args, &env)?;
+
+    let emulator_modules = tuple_list!(
+        EdgeCoverageChildModule::default(),
+        CmpLogChildModule::default(),
+    );
+
+    let mut emulator = Emulator::new(
+        args.as_slice(),
+        env.as_slice(),
+        emulator_modules,
+        NopEmulatorExitHandler,
+        NopCommandManager,
+    )
+    .unwrap();
+
+    let qemu = emulator.qemu();
 
     let mut elf_buffer = Vec::new();
     let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer)?;
@@ -217,7 +234,9 @@ fn fuzz(
 
     // Beginning of a page should be properly aligned.
     #[allow(clippy::cast_ptr_alignment)]
-    let cmplog_map_ptr = cmplog.as_mut_ptr().cast::<libafl_qemu::cmplog::CmpLogMap>();
+    let cmplog_map_ptr = cmplog
+        .as_mut_ptr()
+        .cast::<libafl_qemu::modules::cmplog::CmpLogMap>();
 
     let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
     {
@@ -336,16 +355,8 @@ fn fuzz(
         ExitKind::Ok
     };
 
-    let mut hooks = QemuHooks::new(
-        qemu.clone(),
-        tuple_list!(
-            QemuEdgeCoverageChildHelper::default(),
-            QemuCmpLogChildHelper::default(),
-        ),
-    );
-
     let executor = QemuForkExecutor::new(
-        &mut hooks,
+        &mut emulator,
         &mut harness,
         tuple_list!(edges_observer, time_observer),
         &mut fuzzer,

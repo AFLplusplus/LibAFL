@@ -67,12 +67,11 @@ where
         let n_all = state.corpus().count_all();
         let n_enabled = state.corpus().count();
 
-        let currently_fuzzed_idx = match state.current_corpus_id()? {
-            Some(idx) => idx,
-            None => return Err(Error::illegal_state("Not fuzzing any testcase".to_string())),
+        let Some(currently_fuzzed_idx) = state.current_corpus_id()? else {
+            return Err(Error::illegal_state("Not fuzzing any testcase".to_string()));
         };
 
-        eprintln!("Currently fuzzing {:#?}", currently_fuzzed_idx);
+        // eprintln!("Currently fuzzing {:#?}", currently_fuzzed_idx);
 
         let mut disabled_to_enabled = vec![];
         let mut enabled_to_disabled = vec![];
@@ -85,7 +84,7 @@ where
                 // skip the currently fuzzed id; don't remove it
                 // because else after restart we can't call currrent.next() to find the next testcase
                 if idx == currently_fuzzed_idx {
-                    eprintln!("skipping {:#?}", idx);
+                    // eprintln!("skipping {:#?}", idx);
                     continue;
                 }
 

@@ -46,18 +46,19 @@ use libafl_bolts::{
     AsSlice,
 };
 use libafl_qemu::{
-    // asan::{init_with_asan, QemuAsanHelper},
-    cmplog::{CmpLogObserver, QemuCmpLogHelper},
-    edges::edges_map_mut_ptr,
-    edges::QemuEdgeCoverageHelper,
-    edges::{EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND},
+    command::NopCommandManager,
     elf::EasyElf,
     filter_qemu_args,
-    hooks::QemuHooks,
+    // asan::{init_with_asan, QemuAsanHelper},
+    modules::cmplog::{CmpLogModule, CmpLogObserver},
+    modules::edges::{
+        edges_map_mut_ptr, EdgeCoverageModule, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
+    },
     Emulator,
     GuestReg,
     //snapshot::QemuSnapshotHelper,
     MmapPerms,
+    NopEmulatorExitHandler,
     Qemu,
     QemuExecutor,
     QemuExitError,
@@ -358,19 +359,19 @@ fn fuzz(
         ExitKind::Ok
     };
 
-    let mut hooks = QemuHooks::new(
-        qemu.clone(),
-        tuple_list!(
-            QemuEdgeCoverageHelper::default(),
-            QemuCmpLogHelper::default(),
-            // QemuAsanHelper::default(asan),
-            //QemuSnapshotHelper::new()
-        ),
+    let modules = tuple_list!(
+        EdgeCoverageModule::default(),
+        CmpLogModule::default(),
+        // QemuAsanHelper::default(asan),
+        //QemuSnapshotHelper::new()
     );
+
+    let mut emulator =
+        Emulator::new_with_qemu(qemu, modules, NopEmulatorExitHandler, NopCommandManager)?;
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let executor = QemuExecutor::new(
-        &mut hooks,
+        &mut emulator,
         &mut harness,
         tuple_list!(edges_observer, time_observer),
         &mut fuzzer,
