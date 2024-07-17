@@ -1,13 +1,16 @@
 //! Corpus pruning stage
 
+use alloc::string::ToString;
 use core::marker::PhantomData;
 
 use libafl_bolts::{rands::Rand, Error};
 
 use crate::{
-    corpus::Corpus,
+    corpus::{Corpus, HasCurrentCorpusId},
+    schedulers::{RemovableScheduler, Scheduler},
     stages::Stage,
     state::{HasCorpus, HasRand, UsesState},
+    HasScheduler,
 };
 #[cfg(feature = "std")]
 use crate::{events::EventRestarter, state::Stoppable};
@@ -48,47 +51,76 @@ impl<E, EM, Z> Stage<E, EM, Z> for CorpusPruning<EM>
 where
     EM: UsesState,
     E: UsesState<State = Self::State>,
-    Z: UsesState<State = Self::State>,
+    Z: UsesState<State = Self::State> + HasScheduler,
+    <Z as HasScheduler>::Scheduler: RemovableScheduler,
     Self::State: HasCorpus + HasRand,
 {
     #[allow(clippy::cast_precision_loss)]
     fn perform(
         &mut self,
-        _fuzzer: &mut Z,
+        fuzzer: &mut Z,
         _executor: &mut E,
         state: &mut Self::State,
         _manager: &mut EM,
     ) -> Result<(), Error> {
-        // Iterate over every corpus entry
-        let n_corpus = state.corpus().count_all();
-        let mut do_retain = vec![];
-        let mut retain_any = false;
-        for _ in 0..n_corpus {
+        // Iterate over every corpus entr
+        let n_all = state.corpus().count_all();
+        let n_enabled = state.corpus().count();
+
+        let currently_fuzzed_idx = match state.current_corpus_id()? {
+            Some(idx) => idx,
+            None => return Err(Error::illegal_state("Not fuzzing any testcase".to_string())),
+        };
+
+        eprintln!("Currently fuzzing {:#?}", currently_fuzzed_idx);
+
+        let mut disabled_to_enabled = vec![];
+        let mut enabled_to_disabled = vec![];
+        // do it backwards so that the index won't change even after remove
+        for i in (0..n_all).rev() {
             let r = state.rand_mut().below(100) as f64;
-            let retain = self.prob * 100_f64 < r;
-            if retain {
-                retain_any = true;
+            if self.prob * 100_f64 < r {
+                let idx = state.corpus().nth_from_all(i);
+
+                // skip the currently fuzzed id; don't remove it
+                // because else after restart we can't call currrent.next() to find the next testcase
+                if idx == currently_fuzzed_idx {
+                    eprintln!("skipping {:#?}", idx);
+                    continue;
+                }
+
+                let removed = state.corpus_mut().remove(idx)?;
+                fuzzer
+                    .scheduler_mut()
+                    .on_remove(state, idx, &Some(removed.clone()))?;
+                // because [n_enabled, n_all) is disabled testcases
+                // and [0, n_enabled) is enabled testcases
+                if i >= n_enabled {
+                    // we are moving disabled to enabled now
+                    disabled_to_enabled.push((idx, removed));
+                } else {
+                    // we are moving enabled to disabled now
+                    enabled_to_disabled.push((idx, removed));
+                }
             }
-            do_retain.push(retain);
         }
 
-        // Make sure that at least somthing is in the
-        if !retain_any {
-            let r = state.rand_mut().below(n_corpus);
-            do_retain[r] = true;
+        // Actually move them
+        for (idx, testcase) in disabled_to_enabled {
+            state.corpus_mut().add(testcase)?;
+            fuzzer.scheduler_mut().on_add(state, idx)?;
         }
 
-        for (i_th, retain) in do_retain.iter().enumerate().take(n_corpus) {
-            if !retain {
-                let corpus_id = state.corpus().nth_from_all(i_th);
-
-                let corpus = state.corpus_mut();
-                let removed = corpus.remove(corpus_id)?;
-                corpus.add_disabled(removed)?;
-            }
+        for (idx, testcase) in enabled_to_disabled {
+            state.corpus_mut().add_disabled(testcase)?;
+            fuzzer.scheduler_mut().on_add(state, idx)?;
         }
 
-        // println!("There was {}, and we retained {} corpura", n_corpus, state.corpus().count());
+        eprintln!(
+            "There was {}, and we retained {} corpura",
+            n_all,
+            state.corpus().count()
+        );
         Ok(())
     }
 

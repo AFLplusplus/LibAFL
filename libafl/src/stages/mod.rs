@@ -81,6 +81,7 @@ pub mod tuneable;
 pub mod unicode;
 
 pub mod pruning;
+pub use pruning::*;
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
