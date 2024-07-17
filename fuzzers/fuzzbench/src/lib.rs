@@ -17,7 +17,7 @@ use std::{
 use clap::{Arg, Command};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
-    events::{SimpleRestartingEventManager, EventRestarter},
+    events::SimpleRestartingEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
@@ -34,9 +34,9 @@ use libafl::{
     },
     stages::{
         calibrate::CalibrationStage, power::StdPowerMutationalStage, StdMutationalStage,
-        TracingStage, CorpusPruning, RestartStage, IfStage,
+        TracingStage,
     },
-    state::{HasCorpus, StdState, HasExecutions},
+    state::{HasCorpus, StdState},
     Error, HasMetadata,
 };
 use libafl_bolts::{
@@ -348,17 +348,9 @@ fn fuzz(
         )?,
         // Give it more time!
     );
-    let cb = |_fuzzer: &mut _, _executor: &mut _, state: &mut StdState<_, _, _, _>, _event_manager: &mut _| -> Result<bool, Error> {
-        let execs = state.executions();
 
-        Ok(execs % 10 == 0)
-    };
-
-    let restarting = RestartStage::new();
-    let pruning = CorpusPruning::default();
-    let logics = IfStage::new(cb, tuple_list!(pruning, restarting));
     // The order of the stages matter!
-    let mut stages = tuple_list!(calibration, tracing, i2s, power, logics);
+    let mut stages = tuple_list!(calibration, tracing, i2s, power);
 
     // Read tokens
     if state.metadata_map().get::<Tokens>().is_none() {
@@ -391,17 +383,15 @@ fn fuzz(
     #[cfg(unix)]
     {
         let null_fd = file_null.as_raw_fd();
-        // dup2(null_fd, io::stdout().as_raw_fd())?;
+        dup2(null_fd, io::stdout().as_raw_fd())?;
         if std::env::var("LIBAFL_FUZZBENCH_DEBUG").is_err() {
-            // dup2(null_fd, io::stderr().as_raw_fd())?;
+            dup2(null_fd, io::stderr().as_raw_fd())?;
         }
     }
     // reopen file to make sure we're at the end
     log.replace(OpenOptions::new().append(true).create(true).open(logfile)?);
 
-    let _ = fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr);
-
-    mgr.on_restart(&mut state);
+    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
 
     // Never reached
     Ok(())

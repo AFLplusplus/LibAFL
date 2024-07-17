@@ -114,12 +114,13 @@ where
             state.corpus_mut().add_disabled(testcase)?;
             fuzzer.scheduler_mut().on_add(state, idx)?;
         }
-
+        /*
         eprintln!(
             "There was {}, and we retained {} corpura",
             n_all,
             state.corpus().count()
         );
+        */
         Ok(())
     }
 
