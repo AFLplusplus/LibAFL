@@ -24,15 +24,20 @@ jobs:
         os: [ ubuntu-latest, windows-latest, macOS-latest ]
     runs-on: ${{ matrix.os }}
     steps:
+      - name: Install deps
+        run: sudo apt update && sudo apt install -y lsb-release wget software-properties-common gnupg
+      - name: Install LLVM and Clang (Version ${{ env.MAIN_LLVM_VERSION }})
+        shell: bash
+        run: sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" ${{ env.MAIN_LLVM_VERSION }}
+      - name: Install mimetype
+        if: runner.os == 'Linux'
+        run: sudo apt-get install libfile-mimeinfo-perl
       - name: Where is llvm-config?
         if: runner.os == 'Linux'
         run: whereis llvm-config-18
       - name: Where is llvm-config?
         if: runner.os == 'Linux'
         run: whereis llvm-config
-      - name: Install mimetype
-        if: runner.os == 'Linux'
-        run: sudo apt-get install libfile-mimeinfo-perl
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
