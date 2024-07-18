@@ -26,9 +26,9 @@ runs:
       if: runner.os == 'Linux'
       shell: bash
       run: sudo apt purge -y llvm* clang*
-    - name: Install LLVM and Clang (Version 18)
+    - name: Install LLVM and Clang (Version ${{ env.MAIN_LLVM_VERSION }})
       shell: bash
-      run: sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" 18
+      run: sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" ${{ env.MAIN_LLVM_VERSION }}
     - name: pip install
       shell: bash
       run: python3 -m pip install msgpack jinja2 find_libpython
