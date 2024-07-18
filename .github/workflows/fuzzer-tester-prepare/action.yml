@@ -25,16 +25,28 @@ runs:
     - name: Add wasm target
       shell: bash
       run: rustup target add wasm32-unknown-unknown
-    - name: Remove obsolete llvm (Linux)
-      if: runner.os == 'Linux'
+    - name: Remove existing clang and LLVM
       shell: bash
-      run: sudo apt purge -y llvm* clang*
+      run: sudo apt purge *llvm* *clang*
     - name: Install deps
       shell: bash
       run: sudo apt update && sudo apt install -y lsb-release wget software-properties-common gnupg nasm nlohmann-json3-dev ninja-build gcc-arm-linux-gnueabi g++-arm-linux-gnueabi gcc-aarch64-linux-gnu g++-aarch64-linux-gnu gcc-mipsel-linux-gnu g++-mipsel-linux-gnu gcc-powerpc-linux-gnu g++-powerpc-linux-gnu libc6-dev-i386-cross libc6-dev libc6-dev-i386 lib32gcc-11-dev lib32stdc++-11-dev libgtk-3-dev pax-utils libz3-dev
+    - name: Add LLVM in sources list
+      shell: bash
+      run: |
+        sudo tee -a /etc/apt/sources.list.d/llvm.list << EOF
+        deb https://apt.llvm.org/jammy/ llvm-toolchain-jammy main
+        deb-src https://apt.llvm.org/jammy/ llvm-toolchain-jammy main
+        EOF
+    - name: Add LLVM archive signature
+      shell: bash
+      run: wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
     - name: Install LLVM and Clang (Version ${{ env.MAIN_LLVM_VERSION }})
       shell: bash
-      run: sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" ${{ env.MAIN_LLVM_VERSION }}
+      run: sudo apt update && sudo apt install llvm-${{ env.MAIN_LLVM_VERSION }} clang-${{ env.MAIN_LLVM_VERSION }} llvm-${{ env.MAIN_LLVM_VERSION }}-dev
+    - name: Add LLVM symlink
+      shell: bash
+      run: if [ ! -e /usr/bin/llvm-config ]; then sudo ln -s /usr/bin/llvm-config-19 /usr/bin/llvm-config; fi
     - name: pip install
       shell: bash
       run: python3 -m pip install msgpack jinja2 find_libpython
@@ -58,6 +70,5 @@ runs:
       with:
         chrome-version: stable
     - name: Symlink Headers
-      if: runner.os == 'Linux'
       shell: bash
       run: sudo ln -s /usr/include/asm-generic /usr/include/asm
