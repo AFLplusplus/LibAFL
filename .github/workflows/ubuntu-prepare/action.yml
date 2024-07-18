@@ -60,7 +60,7 @@ runs:
         do
         	link=${f::-3}
         	echo "linking binary $f to $link"
-        	sudo ln -f -s $f $link
+        	sudo ln -nsf $f $link
         	if [ -e $f ]; then
                 sudo cp $link /usr/local/bin/
         	fi
@@ -70,7 +70,8 @@ runs:
         do
             name=$(basename $f)
             final_path="/usr/lib/x86_64-linux-gnu/$name"
-            echo "linking $f to $final_path"
+            echo "linking library $f to $final_path"
+            rm -f "$final_path"
             sudo ln -nsf $f $final_path
         done
     - name: Replace old clang symlink
