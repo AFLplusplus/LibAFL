@@ -112,7 +112,7 @@ fn exec_llvm_config(args: &[&str]) -> String {
             .expect("Unexpected llvm-config output")
             .trim()
             .to_string(),
-        Err(e) => panic!("Could not execute llvm-config: {e}"),
+        Err(e) => panic!("Could not execute {llvm_config}: {e}"),
     }
 }
 
