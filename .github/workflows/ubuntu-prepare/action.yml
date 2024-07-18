@@ -55,9 +55,9 @@ runs:
         do
         	link=${f::-3}
         	echo "linking" $f "to" $link
-        	ln -s $f $link
-        	if [ -e $f ]
-        	  then cp $link /usr/local/bin/
+        	sudo ln -s $f $link
+        	if [ -e $f ]; then
+                sudo cp $link /usr/local/bin/
         	fi
         done
     - name: Replace old clang symlink
