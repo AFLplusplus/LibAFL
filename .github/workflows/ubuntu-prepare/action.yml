@@ -52,7 +52,7 @@ runs:
         OPT=/usr/bin/opt-19
         LLD=/usr/bin/lld-19
 
-        for f in $LLVMFILES $CLANGFILES $LLC $OPT $LLD
+        for f in $LLVMFILES $CLANGFILES $CLANGPPFILES $LLC $OPT $LLD
         do
         	link=${f::-3}
         	echo "linking" $f "to" $link

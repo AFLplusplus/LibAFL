@@ -149,12 +149,6 @@ jobs:
         run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
       - name: Add nightly clippy
         run: rustup toolchain install nightly --component clippy --allow-downgrade && rustup default nightly
-      - name: locate clang
-        run: whereis clang
-      - name: locate clang
-        run: ls -la /usr/bin
-      - name: locate clang
-        run: ls -la /etc/alternatives/clang
       - name: Run clippy
         run: ./scripts/clippy.sh
     # --- test embedding the libafl_libfuzzer_runtime library
