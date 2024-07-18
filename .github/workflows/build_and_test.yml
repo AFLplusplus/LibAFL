@@ -37,7 +37,7 @@ jobs:
       - name: Install LLVM and Clang (Version ${{ env.MAIN_LLVM_VERSION }})
         if: runner.os == 'Linux'
         shell: bash
-        run: sudo apt update && sudo apt install llvm-18 clang-18
+        run: sudo apt update && sudo apt install llvm-18 clang-18 llvm-18-dev
       - name: Install mimetype
         if: runner.os == 'Linux'
         run: sudo apt-get install libfile-mimeinfo-perl
