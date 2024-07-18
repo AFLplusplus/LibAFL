@@ -110,6 +110,7 @@ pub mod stages;
 pub mod state;
 
 pub use fuzzer::*;
+pub use libafl_bolts as bolts;
 pub use libafl_bolts::Error;
 
 /// The purpose of this module is to alleviate imports of many components by adding a glob import.
