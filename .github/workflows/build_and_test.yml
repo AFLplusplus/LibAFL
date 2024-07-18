@@ -10,8 +10,8 @@ on:
 env:
   CARGO_TERM_COLOR: always
   CARGO_NET_GIT_FETCH_WITH_CLI: true
-  MAIN_LLVM_VERSION: 18
-  LLVM_CONFIG: llvm-config-18
+  MAIN_LLVM_VERSION: 19
+  LLVM_CONFIG: llvm-config-19
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -28,8 +28,8 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo tee -a /etc/apt/sources.list.d/llvm.list << EOF
-          deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-${{ env.MAIN_LLVM_VERSION }} main
-          deb-src http://apt.llvm.org/jammy/ llvm-toolchain-jammy-${{ env.MAIN_LLVM_VERSION }} main
+          deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy main
+          deb-src http://apt.llvm.org/jammy/ llvm-toolchain-jammy main
           EOF
       - name: Add LLVM archive signature
         if: runner.os == 'Linux'
@@ -37,7 +37,7 @@ jobs:
       - name: Install LLVM and Clang (Version ${{ env.MAIN_LLVM_VERSION }})
         if: runner.os == 'Linux'
         shell: bash
-        run: sudo apt update && sudo apt install llvm-18 clang-18 llvm-18-dev
+        run: sudo apt update && sudo apt install llvm-${{ env.MAIN_LLVM_VERSION }} clang-${{ env.MAIN_LLVM_VERSION }} llvm-${{ env.MAIN_LLVM_VERSION }}-dev
       - name: Install mimetype
         if: runner.os == 'Linux'
         run: sudo apt-get install libfile-mimeinfo-perl
