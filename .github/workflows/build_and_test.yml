@@ -25,8 +25,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Install deps
+        if: runner.os == 'Linux'
         run: sudo apt update && sudo apt install -y lsb-release wget software-properties-common gnupg
       - name: Install LLVM and Clang (Version ${{ env.MAIN_LLVM_VERSION }})
+        if: runner.os == 'Linux'
         shell: bash
         run: sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" ${{ env.MAIN_LLVM_VERSION }}
       - name: Install mimetype
@@ -37,7 +39,7 @@ jobs:
         run: whereis llvm-config-18
       - name: Where is llvm-config?
         if: runner.os == 'Linux'
-        run: whereis llvm-config
+        run: ls -la /usr/bin
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
