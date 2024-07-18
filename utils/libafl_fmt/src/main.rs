@@ -107,7 +107,10 @@ async fn run_cargo_fmt(path: PathBuf, is_check: bool, verbose: bool) -> io::Resu
         println!("{}", from_utf8(&res.stderr).unwrap());
         return Err(io::Error::new(
             ErrorKind::Other,
-            format!("Cargo fmt failed. Run cargo fmt for {path:#?}"),
+            format!(
+                "Cargo fmt failed. Run cargo fmt for {path:#?}.\nResult: {}",
+                from_utf8(&res.stdout).unwrap()
+            ),
         ));
     }
 
