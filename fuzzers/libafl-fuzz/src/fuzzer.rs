@@ -15,7 +15,10 @@ use libafl::{
         scheduled::havoc_mutations, tokens_mutations, AFLppRedQueen, StdScheduledMutator, Tokens,
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
-    schedulers::{powersched::PowerSchedule, QueueScheduler, StdWeightedScheduler},
+    schedulers::{
+        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, QueueScheduler,
+        StdWeightedScheduler,
+    },
     stages::{
         mutational::MultiMutationalStage, CalibrationStage, ColorizationStage, IfStage,
         StagesTuple, StdMutationalStage, StdPowerMutationalStage, SyncFromDiskStage,
@@ -183,7 +186,10 @@ where
             weighted_scheduler = weighted_scheduler.cycling_scheduler();
         }
         // TODO: Go back to IndexesLenTimeMinimizerScheduler once AflScheduler is implemented for it.
-        scheduler = SupportedSchedulers::Weighted(weighted_scheduler, PhantomData);
+        scheduler = SupportedSchedulers::Weighted(
+            IndexesLenTimeMinimizerScheduler::new(&edges_observer, weighted_scheduler),
+            PhantomData,
+        );
     }
 
     // Create our Fuzzer
