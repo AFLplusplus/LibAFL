@@ -157,6 +157,8 @@ jobs:
         run: whereis clang
       - name: locate clang
         run: ls -la /usr/bin
+      - name: locate clang
+        run: ls -la /etc/alternatives/clang
       - name: Run clippy
         run: ./scripts/clippy.sh
     # --- test embedding the libafl_libfuzzer_runtime library
