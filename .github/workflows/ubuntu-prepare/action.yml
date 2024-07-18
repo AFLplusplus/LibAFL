@@ -35,18 +35,18 @@ runs:
     - name: Install LLVM and Clang (Version ${{ env.MAIN_LLVM_VERSION }})
       shell: bash
       run: sudo apt update && sudo apt install llvm-${{ env.MAIN_LLVM_VERSION }} clang-${{ env.MAIN_LLVM_VERSION }} llvm-${{ env.MAIN_LLVM_VERSION }}-dev
-    - name: Add LLVM symlink
+    - name: Fix LLVM symlinks
       shell: bash
       # run: if [ ! -e /usr/bin/llvm-config ]; then sudo ln -s /usr/bin/llvm-config-19 /usr/bin/llvm-config; fi
       run: |
-        # taken from https://gist.githubusercontent.com/tokatoka/26f4ba95991c6e33139999976332aa8e/raw/abd9a30d8e2e3561c86529fc9000a61d244bc4ca/createAliases.sh
+        # adapted from https://gist.githubusercontent.com/tokatoka/26f4ba95991c6e33139999976332aa8e/raw/abd9a30d8e2e3561c86529fc9000a61d244bc4ca/createAliases.sh
         #!/bin/bash
 
         # creates a symbolic link from bin-x.x to bin
         # This just strips off last 3 characters when creating a link
 
-        LLVMFILES=/usr/bin/llvm*
-        CLANGFILES=/usr/bin/clang*
+        LLVMFILES=/usr/bin/llvm-*
+        CLANGFILES=/usr/bin/clang-*
         LLC=/usr/bin/llc-19
         OPT=/usr/bin/opt-19
         LLD=/usr/bin/lld-19
@@ -55,6 +55,7 @@ runs:
         do
         	link=${f::-3}
         	echo "linking" $f "to" $link
+            sudo rm -f $link
         	sudo ln -s $f $link
         	if [ -e $f ]; then
                 sudo cp $link /usr/local/bin/
