@@ -104,13 +104,12 @@ async fn run_cargo_fmt(path: PathBuf, is_check: bool, verbose: bool) -> io::Resu
     let res = fmt_command.output().await?;
 
     if !res.status.success() {
-        println!("{}", from_utf8(&res.stderr).unwrap());
+        let stdout = from_utf8(&res.stdout).unwrap();
+        let stderr = from_utf8(&res.stderr).unwrap();
         return Err(io::Error::new(
             ErrorKind::Other,
             format!(
-                "Cargo fmt failed. Run cargo fmt for {path:#?}.\nResult: {}",
-                from_utf8(&res.stdout).unwrap()
-            ),
+                "Cargo fmt failed. Run cargo fmt for {path:#?}.\nstdout: {stdout}\nstderr: {stderr}"),
         ));
     }
 
