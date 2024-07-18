@@ -48,6 +48,7 @@ runs:
         LLVMFILES=/usr/bin/llvm-*
         CLANGFILES=/usr/bin/clang-*
         CLANGPPFILES=/usr/bin/clang++-*
+        LIBLLVM=/usr/lib/llvm-19/lib/*.so*
         LLC=/usr/bin/llc-19
         OPT=/usr/bin/opt-19
         LLD=/usr/bin/lld-19
@@ -60,6 +61,14 @@ runs:
         	if [ -e $f ]; then
                 sudo cp $link /usr/local/bin/
         	fi
+        done
+        
+        for f in $LIBLLVM
+        do
+            name=$(basename $f)
+            final_path="/usr/lib/x86_64-linux-gnu/$name"
+            echo "linking $f to $final_path"
+            sudo ln -f -s $f $final_path
         done
     - name: Replace old clang symlink
       shell: bash
