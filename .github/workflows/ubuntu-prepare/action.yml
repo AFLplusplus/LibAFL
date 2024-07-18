@@ -22,4 +22,4 @@ runs:
       run: rustup toolchain install nightly --allow-downgrade
     - name: Install LLVM and Clang (Version 18)
       shell: bash
-      run: bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" 18
+      run: sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" 18
