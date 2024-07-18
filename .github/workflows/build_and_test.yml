@@ -194,9 +194,13 @@ jobs:
       - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
-      - name: Create llvm-config symlink
-        shell: bash
-        run: sudo ln -s /usr/bin/llvm-config-${{ env.MAIN_LLVM_VERSION }} /usr/bin/llvm-config
+      - name: Remove existing clang and LLVM
+        run: sudo apt purge llvm* clang* lld* lldb* opt*
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          directory: ${{ runner.temp }}/llvm
+          version: 17
       # ---- build and feature check ----
       # cargo-hack's --feature-powerset would be nice here but libafl has a too many knobs
       - name: Check each feature
