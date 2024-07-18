@@ -13,7 +13,7 @@ if len(sys.argv) != 2:
 instance_idx = int(sys.argv[1])
 
 # Set llvm config
-os.environ["LLVM_CONFIG"] = "llvm-config"
+os.environ["LLVM_CONFIG"] = "llvm-config-18"
 
 command = (
     "DOCS_RS=1 cargo hack check --workspace --each-feature --clean-per-run "

@@ -145,9 +145,6 @@ jobs:
       - name: Install LLVM and Clang (Version ${{ env.MAIN_LLVM_VERSION }})
         shell: bash
         run: sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" ${{ env.MAIN_LLVM_VERSION }}
-      - name: Install LLVM and Clang (Latest Version)
-        shell: bash
-        run: sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
       # pcguard edges and pcguard hitcounts are not compatible and we need to build them seperately
       - name: Check pcguard edges
         run: cargo check --features=sancov_pcguard_edges
