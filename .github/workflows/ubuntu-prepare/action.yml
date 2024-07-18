@@ -10,7 +10,7 @@ runs:
         components: llvm-tools
     - name: Remove existing clang and LLVM
       shell: bash
-      run: sudo apt purge llvm* clang*
+      run: sudo apt purge *llvm* *clang*
     - name: Install and cache deps
       shell: bash
       run: sudo apt update && sudo apt install -y lsb-release wget software-properties-common gnupg ninja-build clang-format shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
@@ -38,6 +38,12 @@ runs:
       run: |
         if [ ! -f "/usr/bin/llvm-config" ]; then
           sudo ln -s /usr/bin/llvm-config-19 /usr/bin/llvm-config
+        fi
+        
+        if [ ! -f "/usr/bin/clang" ]; then
           sudo ln -s /usr/bin/clang-19 /usr/bin/clang
+        fi
+        
+        if [ ! -f "/usr/bin/clang++" ]; then
           sudo ln -s /usr/bin/clang++-19 /usr/bin/clang++
         fi
