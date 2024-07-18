@@ -39,7 +39,7 @@ jobs:
         run: ls -la /usr/bin
       - name: Where is llvm-config?
         if: runner.os == 'Linux'
-        run: ls -la /usr/lib/llvm18/bin
+        run: ls -la /usr/lib/llvm18
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
