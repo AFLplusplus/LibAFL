@@ -153,6 +153,10 @@ jobs:
         run: sudo apt update && sudo apt install lsb-release wget software-properties-common gnupg ninja-build shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
       - name: Add nightly clippy
         run: rustup toolchain install nightly --component clippy --allow-downgrade && rustup default nightly
+      - name: locate clang
+        run: whereis clang
+      - name: locate clang
+        run: ls -la /usr/bin
       - name: Run clippy
         run: ./scripts/clippy.sh
     # --- test embedding the libafl_libfuzzer_runtime library
