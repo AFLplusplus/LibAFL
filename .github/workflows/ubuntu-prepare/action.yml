@@ -47,6 +47,7 @@ runs:
 
         LLVMFILES=/usr/bin/llvm-*
         CLANGFILES=/usr/bin/clang-*
+        CLANGPPFILES=/usr/bin/clang++-*
         LLC=/usr/bin/llc-19
         OPT=/usr/bin/opt-19
         LLD=/usr/bin/lld-19
