@@ -11,7 +11,7 @@ use libafl_bolts::{
     HasLen,
 };
 
-use super::HasMutatorBytes;
+use crate::inputs::HasMutatorBytes;
 
 /// Gets the relevant concrete start index from [`RangeBounds`] (inclusive)
 fn start_index<R>(range: &R) -> usize
@@ -91,16 +91,11 @@ pub struct BytesSlice<'a> {
     range: Range<usize>,
 }
 
-/// A mutable contiguous subslice of a byte slice.
-/// It is mostly useful to cheaply wrap a subslice of a given input.
-///
-/// An immutable version is available: [`BytesSlice`].
-#[derive(Debug)]
-pub struct BytesSliceMut<'a> {
-    /// The (complete) parent input we will work on
-    parent_slice: OwnedMutSlice<'a, u8>,
-    /// The range inside the parent input we will work on
-    range: Range<usize>,
+impl<'a> HasLen for BytesSlice<'a> {
+    #[inline]
+    fn len(&self) -> usize {
+        self.range.len()
+    }
 }
 
 impl<'a> BytesSlice<'a> {
@@ -136,8 +131,8 @@ impl<'a> BytesSlice<'a> {
 
     /// The parent input
     #[must_use]
-    pub fn parent_slice(&self) -> OwnedSlice<'a, u8> {
-        self.parent_slice.clone()
+    pub fn parent_slice(self) -> OwnedSlice<'a, u8> {
+        self.parent_slice
     }
 
     /// The inclusive start index in the parent buffer
@@ -159,6 +154,18 @@ impl<'a> BytesSlice<'a> {
     {
         sub_range(&self.range, range)
     }
+}
+
+/// A mutable contiguous subslice of a byte slice.
+/// It is mostly useful to cheaply wrap a subslice of a given input.
+///
+/// An immutable version is available: [`BytesSlice`].
+#[derive(Debug)]
+pub struct BytesSliceMut<'a> {
+    /// The (complete) parent input we will work on
+    parent_slice: OwnedMutSlice<'a, u8>,
+    /// The range inside the parent input we will work on
+    range: Range<usize>,
 }
 
 impl<'a> BytesSliceMut<'a> {
@@ -201,8 +208,8 @@ impl<'a> BytesSliceMut<'a> {
 
     /// The parent input
     #[must_use]
-    pub fn parent_slice(&self) -> OwnedMutSlice<'a, u8> {
-        self.parent_slice.clone()
+    pub fn parent_slice(self) -> OwnedMutSlice<'a, u8> {
+        self.parent_slice
     }
 
     /// The inclusive start index in the parent buffer
@@ -223,6 +230,13 @@ impl<'a> BytesSliceMut<'a> {
         R: RangeBounds<usize>,
     {
         sub_range(&self.range, range)
+    }
+}
+
+impl<'a> HasLen for BytesSliceMut<'a> {
+    #[inline]
+    fn len(&self) -> usize {
+        self.range.len()
     }
 }
 
@@ -401,20 +415,6 @@ where
         let drain = self.parent_input.drain(sub_range);
         self.range.end -= drain.len();
         drain
-    }
-}
-
-impl<'a> HasLen for BytesSlice<'a> {
-    #[inline]
-    fn len(&self) -> usize {
-        self.range.len()
-    }
-}
-
-impl<'a> HasLen for BytesSliceMut<'a> {
-    #[inline]
-    fn len(&self) -> usize {
-        self.range.len()
     }
 }
 
