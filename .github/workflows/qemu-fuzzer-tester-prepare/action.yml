@@ -22,6 +22,9 @@ runs:
     - name: Add nightly clippy
       shell: bash
       run: rustup toolchain install nightly --component clippy --allow-downgrade
+    - name: Default to nightly
+      shell: bash
+      run: rustup default nightly
     - name: Remove obsolete llvm (Linux)
       shell: bash
       run: sudo apt purge -y llvm* clang*
