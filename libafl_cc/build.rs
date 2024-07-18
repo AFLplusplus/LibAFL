@@ -107,7 +107,7 @@ fn find_llvm_config() -> Result<String, String> {
 
 fn exec_llvm_config(args: &[&str]) -> String {
     let llvm_config = find_llvm_config().expect("Unexpected error");
-    match Command::new(llvm_config).args(args).output() {
+    match Command::new(&llvm_config).args(args).output() {
         Ok(output) => String::from_utf8(output.stdout)
             .expect("Unexpected llvm-config output")
             .trim()
