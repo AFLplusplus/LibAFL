@@ -47,7 +47,7 @@ exclude = [
 ]
 
 [workspace.package]
-version = "0.13.1"
+version = "0.13.2"
 
 [profile.release]
 lto = true

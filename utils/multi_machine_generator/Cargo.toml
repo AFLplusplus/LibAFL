@@ -2,6 +2,7 @@
 name = "multi_machine_generator"
 authors = ["Romain Malmain <romain.malmain@pm.me>"]
 edition = "2021"
+version = "0.13.2"
 
 [dependencies]
 petgraph = "0.6"
