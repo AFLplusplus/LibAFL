@@ -14,8 +14,8 @@ fn main() {
     println!("cargo:rerun-if-changed=src/syscalls.c");
 
     // Enforce clang for its -fsanitize-coverage support.
-    env::set_var("CC", "clang-19");
-    env::set_var("CXX", "clang++-19");
+    env::set_var("CC", "clang");
+    env::set_var("CXX", "clang++");
 
     cc::Build::new().file("src/syscalls.c").compile("syscalls");
     println!("cargo:rerun-if-changed=src/syscalls.c");
