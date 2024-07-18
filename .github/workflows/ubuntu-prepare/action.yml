@@ -35,4 +35,9 @@ runs:
       run: sudo apt update && sudo apt install llvm-${{ env.MAIN_LLVM_VERSION }} clang-${{ env.MAIN_LLVM_VERSION }} llvm-${{ env.MAIN_LLVM_VERSION }}-dev
     - name: Add LLVM symlink
       shell: bash
-      run: sudo ln -s /usr/bin/llvm-config-19 /usr/bin/llvm-config
+      run: |
+        if [ ! -f "/usr/bin/llvm-config" ]; then
+          sudo ln -s /usr/bin/llvm-config-19 /usr/bin/llvm-config
+          sudo ln -s /usr/bin/clang-19 /usr/bin/clang
+          sudo ln -s /usr/bin/clang++-19 /usr/bin/clang++
+        fi
