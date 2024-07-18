@@ -56,7 +56,6 @@ runs:
         do
         	link=${f::-3}
         	echo "linking" $f "to" $link
-            sudo rm -f $link
         	sudo ln -f -s $f $link
         	if [ -e $f ]; then
                 sudo cp $link /usr/local/bin/
