@@ -147,11 +147,12 @@ async fn run_clang_fmt(
     if res.status.success() {
         Ok(())
     } else {
-        let stderr = from_utf8(&res.stderr).unwrap().to_string();
+        let stdout = from_utf8(&res.stdout).unwrap();
+        let stderr = from_utf8(&res.stderr).unwrap();
         println!("{stderr}");
         Err(io::Error::new(
             ErrorKind::Other,
-            format!("{clang} failed: {stderr}"),
+            format!("{clang} failed.\nstdout:{stdout}\nstderr:{stderr}"),
         ))
     }
 }
