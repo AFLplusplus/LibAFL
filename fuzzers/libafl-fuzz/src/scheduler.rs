@@ -4,7 +4,9 @@ use libafl::{
     corpus::{CorpusId, HasTestcase, Testcase},
     inputs::UsesInput,
     observers::{CanTrack, ObserversTuple},
-    schedulers::{HasQueueCycles, MinimizerScheduler, RemovableScheduler, Scheduler, TestcaseScore},
+    schedulers::{
+        HasQueueCycles, MinimizerScheduler, RemovableScheduler, Scheduler, TestcaseScore,
+    },
     state::{HasCorpus, HasRand, State, UsesState},
     Error, HasMetadata,
 };
@@ -12,7 +14,10 @@ use libafl_bolts::{serdeany::SerdeAny, AsIter, HasRefCnt};
 
 pub enum SupportedSchedulers<S, Q, CS, F, M, O> {
     Queue(Q, PhantomData<(S, Q, CS, F, M, O)>),
-    Weighted(MinimizerScheduler<CS, F, M, O>, PhantomData<(S, Q, CS, F, M, O)>),
+    Weighted(
+        MinimizerScheduler<CS, F, M, O>,
+        PhantomData<(S, Q, CS, F, M, O)>,
+    ),
 }
 
 impl<S, Q, CS, F, M, O> UsesState for SupportedSchedulers<S, Q, CS, F, M, O>
@@ -63,7 +68,7 @@ where
     CS: Scheduler<State = S>,
     M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
     O: CanTrack,
-    F: TestcaseScore<S>
+    F: TestcaseScore<S>,
 {
     fn on_add(&mut self, state: &mut Self::State, id: CorpusId) -> Result<(), Error> {
         match self {
@@ -113,7 +118,7 @@ where
     CS: Scheduler<State = S> + HasQueueCycles,
     O: CanTrack,
     M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
-    F: TestcaseScore<S>
+    F: TestcaseScore<S>,
 {
     fn queue_cycles(&self) -> u64 {
         match self {
