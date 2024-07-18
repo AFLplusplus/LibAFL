@@ -7,12 +7,6 @@ runs:
       with:
         profile: minimal
         toolchain: stable
-    - name: Add stable rust
-      shell: bash
-      run: rustup toolchain install stable --allow-downgrade
-    - name: Add nightly rust
-      shell: bash
-      run: rustup toolchain install nightly --allow-downgrade
     - name: Remove existing clang and LLVM
       shell: bash
       run: sudo apt purge *llvm* *clang* lld* lldb* opt*

@@ -222,6 +222,9 @@ jobs:
       - name: Add rustfmt nightly
         shell: bash
         run: rustup component add --toolchain nightly-x86_64-unknown-linux-gnu rustfmt
+      - name: test
+        shell: bash
+        run: cargo +nightly fmt --version
       - name: Format Check
         run: ./scripts/fmt_all.sh check
 
