@@ -54,7 +54,8 @@ runs:
         LLD=/usr/bin/lld-19
         
         # Libraries
-        LIBLLVM=/usr/lib/llvm-19/lib/*.so*
+        LIBLLVM=/usr/lib/llvm-19/lib/*19*.so*
+        LIBLLVM2=/usr/lib/llvm-19/lib/*.so*19*
 
         for f in $LLVMFILES $CLANGFILES $CLANGPPFILES $LLC $OPT $LLD
         do
@@ -66,7 +67,7 @@ runs:
         	fi
         done
         
-        for f in $LIBLLVM
+        for f in $LIBLLVM $LIBLLVM2
         do
             name=$(basename $f)
             final_path="/usr/lib/x86_64-linux-gnu/$name"
