@@ -45,18 +45,21 @@ runs:
         # creates a symbolic link from bin-x.x to bin
         # This just strips off last 3 characters when creating a link
 
+        # Binaries
         LLVMFILES=/usr/bin/llvm-*
         CLANGFILES=/usr/bin/clang-*
         CLANGPPFILES=/usr/bin/clang++-*
-        LIBLLVM=/usr/lib/llvm-19/lib/*.so*
         LLC=/usr/bin/llc-19
         OPT=/usr/bin/opt-19
         LLD=/usr/bin/lld-19
+        
+        # Libraries
+        LIBLLVM=/usr/lib/llvm-19/lib/*.so*
 
         for f in $LLVMFILES $CLANGFILES $CLANGPPFILES $LLC $OPT $LLD
         do
         	link=${f::-3}
-        	echo "linking" $f "to" $link
+        	echo "linking binary $f to $link"
         	sudo ln -f -s $f $link
         	if [ -e $f ]; then
                 sudo cp $link /usr/local/bin/
@@ -68,7 +71,7 @@ runs:
             name=$(basename $f)
             final_path="/usr/lib/x86_64-linux-gnu/$name"
             echo "linking $f to $final_path"
-            sudo ln -f -s $f $final_path
+            sudo ln -nsf $f $final_path
         done
     - name: Replace old clang symlink
       shell: bash
