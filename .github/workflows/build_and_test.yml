@@ -257,11 +257,12 @@ jobs:
       - uses: actions/checkout@v3
       - name: Remove existing clang and LLVM
         run: sudo apt purge llvm* clang*
-      - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          directory: ${{ runner.temp }}/llvm
-          version: 17
+      - name: Install deps
+        shell: bash
+        run: sudo apt update && sudo apt install -y lsb-release wget software-properties-common gnupg
+      - name: Install LLVM and Clang (Version 18)
+        shell: bash
+        run: sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" 18
       - name: Format Check
         run: ./scripts/fmt_all.sh check
 
