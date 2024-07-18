@@ -24,28 +24,9 @@ jobs:
         os: [ ubuntu-latest, windows-latest, macOS-latest ]
     runs-on: ${{ matrix.os }}
     steps:
-      - name: Add LLVM in sources list
-        if: runner.os == 'Linux'
-        run: |
-          sudo tee -a /etc/apt/sources.list.d/llvm.list << EOF
-          deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy main
-          deb-src http://apt.llvm.org/jammy/ llvm-toolchain-jammy main
-          EOF
-      - name: Add LLVM archive signature
-        if: runner.os == 'Linux'
-        run: wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
-      - name: Install LLVM and Clang (Version ${{ env.MAIN_LLVM_VERSION }})
-        if: runner.os == 'Linux'
-        shell: bash
-        run: sudo apt update && sudo apt install llvm-${{ env.MAIN_LLVM_VERSION }} clang-${{ env.MAIN_LLVM_VERSION }} llvm-${{ env.MAIN_LLVM_VERSION }}-dev
-      - name: Install mimetype
-        if: runner.os == 'Linux'
-        run: sudo apt-get install libfile-mimeinfo-perl
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly
-          override: true
+      - uses: actions/checkout@v3
+      - if: runner.os == 'Linux'
+        uses: ./.github/workflows/ubuntu-prepare
       - name: Install mimetype
         if: runner.os == 'Linux'
         run: sudo apt-get install libfile-mimeinfo-perl
@@ -57,7 +38,6 @@ jobs:
         uses: baptiste0928/cargo-install@v1.3.0
         with:
           crate: mdbook-linkcheck
-      - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
         if: runner.os == 'Linux'
