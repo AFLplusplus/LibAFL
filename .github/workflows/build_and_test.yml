@@ -40,6 +40,12 @@ jobs:
       - name: Where is llvm-config?
         if: runner.os == 'Linux'
         run: ls -la /usr/bin
+      - name: Where is llvm-config?
+        if: runner.os == 'Linux'
+        run: ls -la /bin
+      - name: Where is llvm-config?
+        if: runner.os == 'Linux'
+        run: ls -la /usr/lib
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
