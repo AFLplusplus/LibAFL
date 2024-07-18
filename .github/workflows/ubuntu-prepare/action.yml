@@ -36,18 +36,18 @@ runs:
     - name: Add LLVM symlink
       shell: bash
       run: |
-        if [ ! -f /usr/bin/llvm-config ]; then
+        if [ ! -e /usr/bin/llvm-config ]; then
           sudo ln -s /usr/bin/llvm-config-19 /usr/bin/llvm-config
         fi
     - name: Add Clang symlink
       shell: bash
       run: |
-        if [ ! -f /usr/bin/clang ]; then
+        if [ ! -e /usr/bin/clang ]; then
           sudo ln -s /usr/bin/clang-19 /usr/bin/clang
         fi
     - name: Add Clang++ symlink
       shell: bash
       run: |
-        if [ ! -f /usr/bin/clang++ ]; then
+        if [ ! -e /usr/bin/clang++ ]; then
           sudo ln -s /usr/bin/clang++-19 /usr/bin/clang++
         fi
