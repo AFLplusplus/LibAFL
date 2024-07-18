@@ -11,7 +11,7 @@ env:
   CARGO_TERM_COLOR: always
   CARGO_NET_GIT_FETCH_WITH_CLI: true
   MAIN_LLVM_VERSION: 18
-  LLVM_CONFIG: /usr/lib/llvm18/bin/llvm-config-18
+  LLVM_CONFIG: /usr/lib/llvm-18/bin/llvm-config-18
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -39,7 +39,7 @@ jobs:
         run: ls -la /usr/bin
       - name: Where is llvm-config?
         if: runner.os == 'Linux'
-        run: ls -la /usr/lib/llvm18
+        run: ls -la /usr/lib/llvm-18/bin
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
