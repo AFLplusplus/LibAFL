@@ -13,7 +13,7 @@ pub mod generalized;
 pub use generalized::*;
 
 pub mod bytessub;
-pub use bytessub::{BytesSlice, BytesSubInput};
+pub use bytessub::BytesSubInput;
 
 #[cfg(feature = "multipart_inputs")]
 pub mod multi;
@@ -36,13 +36,14 @@ use std::{fs::File, hash::Hash, io::Read, path::Path};
 use libafl_bolts::fs::write_file_atomic;
 use libafl_bolts::{
     ownedref::{OwnedMutSlice, OwnedSlice},
+    subrange::{PartialSubRangeSlice, SubRangeSlice, SubRangeSliceMut},
     Error, HasLen,
 };
 #[cfg(feature = "nautilus")]
 pub use nautilus::*;
 use serde::{Deserialize, Serialize};
 
-use crate::{corpus::CorpusId, inputs::bytessub::BytesSliceMut};
+use crate::corpus::CorpusId;
 
 /// An input for the target
 #[cfg(not(feature = "std"))]
@@ -140,35 +141,6 @@ pub struct BytesReader<'a> {
     pos: usize,
 }
 
-/// Representation of a partial slice
-/// This is used when providing a slice smaller than the expected one.
-/// It notably happens when trying to read the end of an input.
-#[derive(Debug)]
-pub enum PartialBytesSubInput<'a> {
-    /// The slice is empty, and thus not kept
-    Empty,
-    /// The slice is strictly smaller than the expected one.
-    Partial(BytesSlice<'a>),
-}
-
-impl<'a> PartialBytesSubInput<'a> {
-    /// Consumes `PartialBytesSubInput` and returns true if it was empty, false otherwise.
-    #[must_use]
-    pub fn empty(self) -> bool {
-        matches!(self, PartialBytesSubInput::Empty)
-    }
-
-    /// Consumes `PartialBytesSubInput` and returns the partial slice if it was a partial slice, None otherwise.
-    #[must_use]
-    pub fn partial(self) -> Option<BytesSlice<'a>> {
-        #[allow(clippy::match_wildcard_for_single_variants)]
-        match self {
-            PartialBytesSubInput::Partial(partial_slice) => Some(partial_slice),
-            _ => None,
-        }
-    }
-}
-
 impl<'a> BytesReader<'a> {
     /// Create a new [`BytesReader`].
     /// The position of the reader is initialized to 0.
@@ -184,8 +156,8 @@ impl<'a> BytesReader<'a> {
     /// If the resulting slice would go beyond the end of the parent input, it will be truncated to the length of the parent input.
     /// This function does not provide any feedback on whether the slice was cropped or not.
     #[must_use]
-    pub fn next_sub_slice_truncated(&mut self, limit: usize) -> BytesSlice<'a> {
-        let sub_input = BytesSlice::with_slice(self.parent_input, self.pos..(self.pos + limit));
+    pub fn next_sub_slice_truncated(&mut self, limit: usize) -> PartialSubRangeSlice<'a, u8> {
+        let sub_input = SubRangeSlice::with_slice(self.parent_input, self.pos..(self.pos + limit));
 
         self.pos += sub_input.len();
 
@@ -201,15 +173,15 @@ impl<'a> BytesReader<'a> {
     pub fn next_sub_input(
         &mut self,
         limit: usize,
-    ) -> Result<BytesSlice<'a>, PartialBytesSubInput<'a>> {
+    ) -> Result<SubRangeSlice<'a, u8>, PartialSubRangeSlice<'a, u8>> {
         let slice_to_return = self.next_sub_slice_truncated(limit);
 
         let real_len = slice_to_return.len();
 
         if real_len == 0 {
-            Err(PartialBytesSubInput::Empty)
+            Err(PartialSubRangeSlice::Empty)
         } else if real_len < limit {
-            Err(PartialBytesSubInput::Partial(slice_to_return))
+            Err(PartialSubRangeSlice::Partial(slice_to_return))
         } else {
             Ok(slice_to_return)
         }
@@ -260,15 +232,15 @@ pub trait HasMutatorBytes: HasLen {
         R: RangeBounds<usize>;
 
     /// Creates a [`BytesSlice`] from this input, that can be used to slice a byte array.
-    fn sub_bytes<R>(&self, range: R) -> BytesSlice
+    fn sub_bytes<R>(&self, range: R) -> SubRangeSlice<'a, u8>
     where
         R: RangeBounds<usize>,
     {
-        BytesSlice::new(OwnedSlice::from(self.bytes()), range)
+        SubRangeSlice::new(OwnedSlice::from(self.bytes()), range)
     }
 
     /// Creates a [`BytesSliceMut`] from this input, that can be used to slice a byte array.
-    fn sub_bytes_mut<R>(&mut self, range: R) -> BytesSliceMut
+    fn sub_bytes_mut<R>(&mut self, range: R) -> SubRangeSliceMut<'a, u8>
     where
         R: RangeBounds<usize>,
     {
@@ -421,17 +393,17 @@ mod tests {
         let mut bytes_reader = BytesReader::new(&bytes_input);
 
         let bytes_read = bytes_reader.next_sub_slice_truncated(2);
-        assert_eq!(*bytes_read.bytes(), [1, 2]);
+        assert_eq!(*bytes_read.as_slice(), [1, 2]);
 
         let bytes_read = bytes_reader.next_sub_slice_truncated(3);
-        assert_eq!(*bytes_read.bytes(), [3, 4, 5]);
+        assert_eq!(*bytes_read.as_slice(), [3, 4, 5]);
 
         let bytes_read = bytes_reader.next_sub_slice_truncated(8);
-        assert_eq!(*bytes_read.bytes(), [6, 7]);
+        assert_eq!(*bytes_read.as_slice(), [6, 7]);
 
         let bytes_read = bytes_reader.next_sub_slice_truncated(8);
         let bytes_read_ref: &[u8] = &[];
-        assert_eq!(&*bytes_read.bytes(), bytes_read_ref);
+        assert_eq!(&*bytes_read.as_slice(), bytes_read_ref);
     }
 
     #[test]
@@ -440,13 +412,16 @@ mod tests {
         let mut bytes_reader = BytesReader::new(&bytes_input);
 
         let bytes_read = bytes_reader.next_sub_input(2);
-        assert_eq!(*bytes_read.unwrap().bytes(), [1, 2]);
+        assert_eq!(*bytes_read.unwrap().as_slice(), [1, 2]);
 
         let bytes_read = bytes_reader.next_sub_input(3);
-        assert_eq!(*bytes_read.unwrap().bytes(), [3, 4, 5]);
+        assert_eq!(*bytes_read.unwrap().as_slice(), [3, 4, 5]);
 
         let bytes_read = bytes_reader.next_sub_input(8);
-        assert_eq!(*bytes_read.unwrap_err().partial().unwrap().bytes(), [6, 7]);
+        assert_eq!(
+            *bytes_read.unwrap_err().partial().unwrap().as_slice(),
+            [6, 7]
+        );
 
         let bytes_read = bytes_reader.next_sub_input(8);
         assert!(bytes_read.unwrap_err().empty());
