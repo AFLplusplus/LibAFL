@@ -47,6 +47,9 @@ runs:
     - name: Add LLVM symlink
       shell: bash
       run: if [ ! -e /usr/bin/llvm-config ]; then sudo ln -s /usr/bin/llvm-config-19 /usr/bin/llvm-config; fi
+    - name: Replace old clang symlink
+      shell: bash
+      run: sudo rm -rf /etc/alternatives/clang && sudo ln -s /usr/bin/clang-${{ env.MAIN_LLVM_VERSION }} /etc/alternatives/clang
     - name: pip install
       shell: bash
       run: python3 -m pip install msgpack jinja2 find_libpython
