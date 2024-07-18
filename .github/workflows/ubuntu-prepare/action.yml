@@ -20,6 +20,16 @@ runs:
     - name: Add nightly
       shell: bash
       run: rustup toolchain install nightly --allow-downgrade
+    - name: Add LLVM in sources list
+      shell: bash
+      run: |
+        sudo tee -a /etc/apt/sources.list.d/llvm.list << EOF
+        deb https://apt.llvm.org/jammy/ llvm-toolchain-jammy main
+        deb-src https://apt.llvm.org/jammy/ llvm-toolchain-jammy main
+        EOF
+    - name: Add LLVM archive signature
+      shell: bash
+      run: wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
     - name: Install LLVM and Clang (Version ${{ env.MAIN_LLVM_VERSION }})
       shell: bash
-      run: sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" ${{ env.MAIN_LLVM_VERSION }}
+      run: sudo apt update && sudo apt install llvm-${{ env.MAIN_LLVM_VERSION }} clang-${{ env.MAIN_LLVM_VERSION }} llvm-${{ env.MAIN_LLVM_VERSION }}-dev

@@ -23,12 +23,22 @@ runs:
       shell: bash
       run: rustup toolchain install nightly --component clippy --allow-downgrade
     - name: Remove obsolete llvm (Linux)
-      if: runner.os == 'Linux'
       shell: bash
       run: sudo apt purge -y llvm* clang*
-    - name: Install LLVM and Clang (Version ${{ env.MAIN_LLVM_VERSION }})
+    - name: Add LLVM in sources list
       shell: bash
-      run: sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" ${{ env.MAIN_LLVM_VERSION }}
+      run: |
+        sudo tee -a /etc/apt/sources.list.d/llvm.list << EOF
+        deb https://apt.llvm.org/jammy/ llvm-toolchain-jammy main
+        deb-src https://apt.llvm.org/jammy/ llvm-toolchain-jammy main
+        EOF
+    - name: Add LLVM archive signature
+      shell: bash
+      run: wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+    - name: Install LLVM and Clang (Version ${{ env.MAIN_LLVM_VERSION }})
+      if: runner.os == 'Linux'
+      shell: bash
+      run: sudo apt update && sudo apt install llvm-${{ env.MAIN_LLVM_VERSION }} clang-${{ env.MAIN_LLVM_VERSION }} llvm-${{ env.MAIN_LLVM_VERSION }}-dev
     - name: pip install
       shell: bash
       run: python3 -m pip install msgpack jinja2 find_libpython
@@ -40,6 +50,5 @@ runs:
       with:
         crate: cargo-make
     - name: Symlink Headers
-      if: runner.os == 'Linux'
       shell: bash
       run: sudo ln -s /usr/include/asm-generic /usr/include/asm
