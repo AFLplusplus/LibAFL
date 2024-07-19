@@ -13,8 +13,6 @@ members = [
     "utils/deexit",
     "utils/libafl_benches",
     "utils/gramatron/construct_automata",
-    "utils/desyscall",
-    "utils/multi_machine_generator",
 ]
 default-members = [
     "libafl",
@@ -48,7 +46,7 @@ exclude = [
 ]
 
 [workspace.package]
-version = "0.13.1"
+version = "0.13.2"
 
 [profile.release]
 lto = true
