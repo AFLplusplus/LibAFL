@@ -3,10 +3,13 @@
 use core::{
     debug_assert,
     fmt::Debug,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::atomic::AtomicUsize,
 };
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+
+#[cfg(target_has_atomic = "ptr")]
+use core::sync::atomic::Ordering;
 
 #[cfg(feature = "alloc")]
 pub mod loaded_dice;

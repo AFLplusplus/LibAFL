@@ -1,9 +1,8 @@
 //! Subrange of things.
 //! Convenient wrappers to handle sub-slices efficiently.
 
-use std::cmp::min;
-use std::collections::Bound;
-use std::ops::{Range, RangeBounds};
+use core::cmp::min;
+use core::ops::{Range, RangeBounds, Bound};
 use crate::HasLen;
 use crate::ownedref::{OwnedMutSlice, OwnedSlice};
 
