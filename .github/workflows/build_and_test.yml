@@ -314,6 +314,7 @@ jobs:
         with:
           filters: |
             qemu:
+              - '.github/**'
               - 'libafl/**'
               - 'libafl_bolts/**'
               - 'libafl_targets/**'
