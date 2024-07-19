@@ -28,7 +28,7 @@ jobs:
         uses: ./.github/workflows/ubuntu-prepare
       - name: Install mimetype
         if: runner.os == 'Linux'
-        run: sudo apt-get install libfile-mimeinfo-perl
+        run: sudo apt-get install -y libfile-mimeinfo-perl
       - name: install mdbook
         uses: baptiste0928/cargo-install@v1.3.0
         with:
