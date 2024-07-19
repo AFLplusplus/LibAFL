@@ -310,7 +310,7 @@ pub enum Error {
     Unsupported(String, ErrorBacktrace),
     /// Shutting down, not really an error.
     ShuttingDown,
-    /// OS error, wrapping a [`std::io::Error`]
+    /// OS error, wrapping a [`io::Error`]
     #[cfg(feature = "std")]
     OsError(io::Error, String, ErrorBacktrace),
     /// Something else happened
@@ -412,7 +412,7 @@ impl Error {
     {
         Error::OsError(err, msg.into(), ErrorBacktrace::new())
     }
-    /// OS error from [`std::io::Error::last_os_error`] with additional message
+    /// OS error from [`io::Error::last_os_error`] with additional message
     #[cfg(feature = "std")]
     #[must_use]
     pub fn last_os_error<S>(msg: S) -> Self

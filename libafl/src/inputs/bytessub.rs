@@ -225,13 +225,13 @@ mod tests {
         let (bytes_input, _) = init_bytes_input();
 
         let sub_input = bytes_input.sub_bytes(0..1);
-        assert_eq!(*sub_input.bytes(), [1]);
+        assert_eq!(*sub_input.as_slice(), [1]);
 
         let sub_input = bytes_input.sub_bytes(1..=2);
-        assert_eq!(*sub_input.bytes(), [2, 3]);
+        assert_eq!(*sub_input.as_slice(), [2, 3]);
 
         let sub_input = bytes_input.sub_bytes(..);
-        assert_eq!(*sub_input.bytes(), [1, 2, 3, 4, 5, 6, 7]);
+        assert_eq!(*sub_input.as_slice(), [1, 2, 3, 4, 5, 6, 7]);
     }
 
     #[test]
