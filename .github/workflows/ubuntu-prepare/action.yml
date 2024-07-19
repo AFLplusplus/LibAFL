@@ -40,49 +40,49 @@ runs:
       run: wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
     - name: Install LLVM and Clang (Version ${{ env.MAIN_LLVM_VERSION }})
       shell: bash
-      run: sudo apt update && sudo apt install llvm-${{ env.MAIN_LLVM_VERSION }} clang-${{ env.MAIN_LLVM_VERSION }} llvm-${{ env.MAIN_LLVM_VERSION }}-dev libclang-cpp${{ env.MAIN_LLVM_VERSION }} libclang-cpp${{ env.MAIN_LLVM_VERSION }}-dev
-    - name: Fix LLVM symlinks
-      shell: bash
-      # run: if [ ! -e /usr/bin/llvm-config ]; then sudo ln -s /usr/bin/llvm-config-19 /usr/bin/llvm-config; fi
-      run: |
-        # adapted from https://gist.githubusercontent.com/tokatoka/26f4ba95991c6e33139999976332aa8e/raw/abd9a30d8e2e3561c86529fc9000a61d244bc4ca/createAliases.sh
-        #!/bin/bash
+      run: sudo apt update && sudo apt install llvm llvm-dev clang libclang-cpp llvm-${{ env.MAIN_LLVM_VERSION }} clang-${{ env.MAIN_LLVM_VERSION }} llvm-${{ env.MAIN_LLVM_VERSION }}-dev libclang-cpp${{ env.MAIN_LLVM_VERSION }} libclang-cpp${{ env.MAIN_LLVM_VERSION }}-dev
+    # - name: Fix LLVM symlinks
+    #   shell: bash
+    #   # run: if [ ! -e /usr/bin/llvm-config ]; then sudo ln -s /usr/bin/llvm-config-19 /usr/bin/llvm-config; fi
+    #   run: |
+    #     # adapted from https://gist.githubusercontent.com/tokatoka/26f4ba95991c6e33139999976332aa8e/raw/abd9a30d8e2e3561c86529fc9000a61d244bc4ca/createAliases.sh
+    #     #!/bin/bash
 
-        # creates a symbolic link from bin-x.x to bin
-        # This just strips off last 3 characters when creating a link
+    #     # creates a symbolic link from bin-x.x to bin
+    #     # This just strips off last 3 characters when creating a link
 
-        # Binaries
-        LLVMFILES=/usr/bin/llvm-*
-        CLANGFILES=/usr/bin/clang-*
-        CLANGPPFILES=/usr/bin/clang++-*
-        LLC=/usr/bin/llc-19
-        OPT=/usr/bin/opt-19
-        LLD=/usr/bin/lld-19
-        
-        # Libraries
-        LIBLLVM=/usr/lib/llvm-19/lib/libLLVM.so.19.*
+    #     # Binaries
+    #     LLVMFILES=/usr/bin/llvm-*
+    #     CLANGFILES=/usr/bin/clang-*
+    #     CLANGPPFILES=/usr/bin/clang++-*
+    #     LLC=/usr/bin/llc-19
+    #     OPT=/usr/bin/opt-19
+    #     LLD=/usr/bin/lld-19
+    #
+    #     # Libraries
+    #     LIBLLVM=/usr/lib/llvm-19/lib/libLLVM.so.19.*
 
-        for f in $LLVMFILES $CLANGFILES $CLANGPPFILES $LLC $OPT $LLD
-        do
-        	link=${f::-3}
-        	echo "linking binary $f to $link"
-        	sudo ln -nsf $f $link
-        	if [ -e $f ]; then
-                sudo cp $link /usr/local/bin/
-        	fi
-        done
-        
-        for f in $LIBLLVM
-        do
-            name=$(basename $f)
-            final_path="/usr/lib/x86_64-linux-gnu/$name"
-            echo "linking library $f to $final_path"
-            sudo rm -f "$final_path"
-            sudo ln -nsf $f $final_path
-        done
-    - name: Replace old clang symlink
-      shell: bash
-      run: sudo rm -rf /etc/alternatives/clang && sudo ln -s /usr/bin/clang-${{ env.MAIN_LLVM_VERSION }} /etc/alternatives/clang
+    #     for f in $LLVMFILES $CLANGFILES $CLANGPPFILES $LLC $OPT $LLD
+    #     do
+    #     	link=${f::-3}
+    #     	echo "linking binary $f to $link"
+    #     	sudo ln -nsf $f $link
+    #     	if [ -e $f ]; then
+    #             sudo cp $link /usr/local/bin/
+    #     	fi
+    #     done
+    #
+    #     for f in $LIBLLVM
+    #     do
+    #         name=$(basename $f)
+    #         final_path="/usr/lib/x86_64-linux-gnu/$name"
+    #         echo "linking library $f to $final_path"
+    #         sudo rm -f "$final_path"
+    #         sudo ln -nsf $f $final_path
+    #     done
+    # - name: Replace old clang symlink
+    #   shell: bash
+    #   run: sudo rm -rf /etc/alternatives/clang && sudo ln -s /usr/bin/clang-${{ env.MAIN_LLVM_VERSION }} /etc/alternatives/clang
     - name: Symlink Headers
       shell: bash
       run: sudo ln -s /usr/include/asm-generic /usr/include/asm
