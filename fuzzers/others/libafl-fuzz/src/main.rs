@@ -37,8 +37,8 @@ const AFL_DEFAULT_INPUT_LEN_MAX: usize = 1_048_576;
 const AFL_DEFAULT_INPUT_LEN_MIN: usize = 1;
 const OUTPUT_GRACE: u64 = 25;
 pub const AFL_DEFAULT_BROKER_PORT: u16 = 1337;
-const PERSIST_SIG: &str = "##SIG_AFL_PERSISTENT##";
-const DEFER_SIG: &str = "##SIG_AFL_DEFER_FORKSRV##";
+const PERSIST_SIG: &str = "##SIG_AFL_PERSISTENT##\0";
+const DEFER_SIG: &str = "##SIG_AFL_DEFER_FORKSRV##\0";
 const SHMEM_ENV_VAR: &str = "__AFL_SHM_ID";
 static AFL_HARNESS_FILE_INPUT: &str = "@@";
 
@@ -201,6 +201,8 @@ struct Opt {
 
     #[clap(skip)]
     foreign_sync_interval: Duration,
+    #[clap(skip)]
+    persistent_record: usize,
 
     // TODO:
     #[clap(skip)]

@@ -102,6 +102,9 @@ pub fn parse_envs(opt: &mut Opt) -> Result<(), Error> {
     if let Ok(res) = std::env::var("AFL_KILL_SIGNAL") {
         opt.kill_signal = Some(res.parse()?);
     }
+    if let Ok(res) = std::env::var("AFL_PERSISTENT_RECORD") {
+        opt.persistent_record = res.parse()?;
+    }
     if let Ok(res) = std::env::var("AFL_SYNC_TIME") {
         opt.foreign_sync_interval = Duration::from_secs(res.parse::<u64>()? * 60);
     } else {

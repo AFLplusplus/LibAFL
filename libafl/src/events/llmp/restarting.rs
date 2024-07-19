@@ -3,7 +3,7 @@
 //! When the target crashes, a watch process (the parent) will
 //! restart/refork it.
 
-use alloc::vec::Vec;
+use alloc::{boxed::Box, vec::Vec};
 #[cfg(all(unix, not(miri), feature = "std"))]
 use core::ptr::addr_of_mut;
 #[cfg(feature = "std")]
@@ -35,10 +35,10 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
-#[cfg(feature = "std")]
-use crate::events::AdaptiveSerializer;
 #[cfg(all(unix, feature = "std", not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
+#[cfg(feature = "std")]
+use crate::events::{AdaptiveSerializer, CustomBufEventResult, HasCustomBufHandlers};
 use crate::{
     events::{
         Event, EventConfig, EventFirer, EventManager, EventManagerHooksTuple, EventManagerId,
@@ -248,6 +248,20 @@ where
 {
     fn mgr_id(&self) -> EventManagerId {
         self.llmp_mgr.mgr_id()
+    }
+}
+
+#[cfg(feature = "std")]
+impl<EMH, S, SP> HasCustomBufHandlers for LlmpRestartingEventManager<EMH, S, SP>
+where
+    S: State,
+    SP: ShMemProvider,
+{
+    fn add_custom_buf_handler(
+        &mut self,
+        handler: Box<dyn FnMut(&mut S, &str, &[u8]) -> Result<CustomBufEventResult, Error>>,
+    ) {
+        self.llmp_mgr.add_custom_buf_handler(handler);
     }
 }
 

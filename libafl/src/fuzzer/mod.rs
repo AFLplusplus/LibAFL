@@ -18,8 +18,8 @@ use crate::{
     stages::{HasCurrentStage, StagesTuple},
     start_timer,
     state::{
-        HasCorpus, HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime, HasSolutions,
-        Stoppable, UsesState,
+        HasCorpus, HasCurrentTestcase, HasExecutions, HasLastFoundTime, HasLastReportTime,
+        HasSolutions, Stoppable, UsesState,
     },
     Error, HasMetadata,
 };
@@ -378,7 +378,6 @@ where
         + HasSolutions
         + HasExecutions
         + HasCorpus
-        + HasImported
         + HasCurrentTestcase<<Self::State as UsesInput>::Input>
         + HasCurrentCorpusId,
 {
@@ -597,7 +596,7 @@ where
     OT: ObserversTuple<Self::State> + Serialize + DeserializeOwned,
     F: Feedback<Self::State>,
     OF: Feedback<Self::State>,
-    CS::State: HasCorpus + HasSolutions + HasExecutions + HasImported,
+    CS::State: HasCorpus + HasSolutions + HasExecutions,
 {
     /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
@@ -630,7 +629,7 @@ where
     F: Feedback<Self::State>,
     OF: Feedback<Self::State>,
     OT: ObserversTuple<Self::State> + Serialize + DeserializeOwned,
-    CS::State: HasCorpus + HasSolutions + HasExecutions + HasImported,
+    CS::State: HasCorpus + HasSolutions + HasExecutions + HasLastFoundTime,
 {
     /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
@@ -663,6 +662,8 @@ where
         manager: &mut EM,
         input: <Self::State as UsesInput>::Input,
     ) -> Result<CorpusId, Error> {
+        *state.last_found_time_mut() = current_time();
+
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
         let observers = executor.observers();
         // Always consider this to be "interesting"
@@ -670,7 +671,7 @@ where
 
         // Maybe a solution
         #[cfg(not(feature = "introspection"))]
-        let is_solution =
+        let is_solution: bool =
             self.objective_mut()
                 .is_interesting(state, manager, &input, &*observers, &exit_kind)?;
 
@@ -766,7 +767,6 @@ where
         + HasMetadata
         + HasCorpus
         + HasTestcase
-        + HasImported
         + HasLastReportTime
         + HasCurrentCorpusId
         + HasCurrentStage,

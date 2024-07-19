@@ -21,9 +21,13 @@ use serde::{Deserialize, Serialize};
 #[cfg(not(cpu_target = "hexagon"))]
 use crate::SYS_execve;
 use crate::{
-    elf::EasyElf, qemu::ArchExtras, CallingConvention, Hook, Qemu, QemuHelper, QemuHelperTuple,
-    QemuHooks, SyscallHookResult,
+    elf::EasyElf,
+    emu::EmulatorModules,
+    modules::{EmulatorModule, EmulatorModuleTuple},
+    qemu::{ArchExtras, Hook, SyscallHookResult},
+    CallingConvention, Qemu,
 };
+
 #[cfg(cpu_target = "hexagon")]
 /// Hexagon syscalls are not currently supported by the `syscalls` crate, so we just paste this here for now.
 /// <https://github.com/qemu/qemu/blob/11be70677c70fdccd452a3233653949b79e97908/linux-user/hexagon/syscall_nr.h#L230>
@@ -146,13 +150,13 @@ pub struct Match {
 }
 
 #[derive(Debug)]
-pub struct QemuInjectionHelper {
+pub struct InjectionModule {
     pub tokens: Vec<String>,
     definitions: HashMap<String, InjectionDefinition>,
     matches_list: Vec<Matches>,
 }
 
-impl QemuInjectionHelper {
+impl InjectionModule {
     /// `configure_injections` is the main function to activate the injection
     /// vulnerability detection feature.
     pub fn from_yaml<P: AsRef<Path> + Display>(yaml_file: P) -> Result<Self, Error> {
@@ -207,20 +211,20 @@ impl QemuInjectionHelper {
         })
     }
 
-    fn on_call_check<S: UsesInput, QT: QemuHelperTuple<S>>(
-        hooks: &mut QemuHooks<QT, S>,
-        id: usize,
-        parameter: u8,
-    ) {
-        let qemu = hooks.qemu();
+    fn on_call_check<ET, S>(emulator_modules: &mut EmulatorModules<ET, S>, id: usize, parameter: u8)
+    where
+        ET: EmulatorModuleTuple<S>,
+        S: Unpin + UsesInput,
+    {
+        let qemu = emulator_modules.qemu();
         let reg: GuestAddr = qemu
             .current_cpu()
             .unwrap()
             .read_function_argument(CallingConvention::Cdecl, parameter)
             .unwrap_or_default();
 
-        let helper = hooks.helpers_mut().match_first_type_mut::<Self>().unwrap();
-        let matches = &helper.matches_list[id];
+        let module = emulator_modules.get_mut::<Self>().unwrap();
+        let matches = &module.matches_list[id];
 
         //println!("reg value = {:x}", reg);
 
@@ -252,22 +256,22 @@ impl QemuInjectionHelper {
     }
 }
 
-impl<S> QemuHelper<S> for QemuInjectionHelper
+impl<S> EmulatorModule<S> for InjectionModule
 where
-    S: UsesInput,
+    S: Unpin + UsesInput,
 {
-    fn init_hooks<QT>(&self, hooks: &QemuHooks<QT, S>)
+    fn init_module<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
     where
-        QT: QemuHelperTuple<S>,
+        ET: EmulatorModuleTuple<S>,
     {
-        hooks.syscalls(Hook::Function(syscall_hook::<QT, S>));
+        emulator_modules.syscalls(Hook::Function(syscall_hook::<ET, S>));
     }
 
-    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
+    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
     where
-        QT: QemuHelperTuple<S>,
+        ET: EmulatorModuleTuple<S>,
     {
-        let qemu = *hooks.qemu();
+        let qemu = emulator_modules.qemu();
         let mut libs: Vec<LibInfo> = Vec::new();
 
         for region in qemu.mappings() {
@@ -316,7 +320,7 @@ where
                 let param = func_definition.param;
 
                 for hook_addr in hook_addrs {
-                    hooks.instruction(
+                    emulator_modules.instructions(
                         hook_addr,
                         Hook::Closure(Box::new(move |hooks, _state, _guest_addr| {
                             Self::on_call_check(hooks, id, param);
@@ -329,8 +333,8 @@ where
     }
 }
 
-fn syscall_hook<QT, S>(
-    hooks: &mut QemuHooks<QT, S>, // our instantiated QemuHooks
+fn syscall_hook<ET, S>(
+    emulator_modules: &mut EmulatorModules<ET, S>, // our instantiated QemuHooks
     _state: Option<&mut S>,
     syscall: i32,  // syscall number
     x0: GuestAddr, // registers ...
@@ -343,15 +347,14 @@ fn syscall_hook<QT, S>(
     _x7: GuestAddr,
 ) -> SyscallHookResult
 where
-    QT: QemuHelperTuple<S>,
-    S: UsesInput,
+    ET: EmulatorModuleTuple<S>,
+    S: Unpin + UsesInput,
 {
     log::trace!("syscall_hook {syscall} {SYS_execve}");
     debug_assert!(i32::try_from(SYS_execve).is_ok());
     if syscall == SYS_execve as i32 {
-        let _helper = hooks
-            .helpers_mut()
-            .match_first_type_mut::<QemuInjectionHelper>()
+        let _module = emulator_modules
+            .get_mut::<InjectionModule>()
             .unwrap();
         if x0 > 0 && x1 > 0 {
             let c_array = x1 as *const *const c_char;

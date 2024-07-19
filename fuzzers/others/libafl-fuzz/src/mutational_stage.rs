@@ -74,7 +74,8 @@ where
     }
 }
 
-impl<S, SM, P, E, EM, M, I, Z> Stage<E, EM, Z> for SupportedMutationalStages<S, SM, P, E, EM, M, I, Z>
+impl<S, SM, P, E, EM, M, I, Z> Stage<E, EM, Z>
+    for SupportedMutationalStages<S, SM, P, E, EM, M, I, Z>
 where
     E: UsesState<State = S>,
     EM: UsesState<State = S>,
