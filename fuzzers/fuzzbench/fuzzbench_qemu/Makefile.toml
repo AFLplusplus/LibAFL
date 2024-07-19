@@ -50,7 +50,7 @@ make -C libpng-1.6.37
 cc -c "${PROJECT_DIR}/libfuzzer_main.c"
 # Build the libpng harness    
 c++ \
-    ../libfuzzer_libpng/harness.cc \
+    ../../libpng/libfuzzer_libpng/harness.cc \
     ./libpng-1.6.37/.libs/libpng16.a \
     ./libfuzzer_main.o \
     -I./libpng-1.6.37/ \
@@ -67,7 +67,7 @@ windows_alias = "unsupported"
 
 [tasks.run_unix]
 command = "cargo"
-args = ["run", "--profile", "${PROFILE}", "./${FUZZER_NAME}", "--", "--libafl-in", "../libfuzzer_libpng/corpus", "--libafl-out", "./out", "./${FUZZER_NAME}"]
+args = ["run", "--profile", "${PROFILE}", "./${FUZZER_NAME}", "--", "--libafl-in", "../../libpng/libfuzzer_libpng/corpus", "--libafl-out", "./out", "./${FUZZER_NAME}"]
 dependencies = [ "harness", "fuzzer" ]
 
 # Run the fuzzer
