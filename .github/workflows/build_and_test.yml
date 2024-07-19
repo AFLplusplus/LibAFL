@@ -328,7 +328,6 @@ jobs:
           - ./fuzzers/libpng/libfuzzer_libpng_centralized
           - ./fuzzers/libpng/libfuzzer_libpng_cmin
           - ./fuzzers/libpng/libfuzzer_libpng_norestart
-          # - ./fuzzers/libpng/libfuzzer_libpng_aflpp_ui
           # - ./fuzzers/libpng/libfuzzer_libpng_tcp_manager
 
           # Nyx
