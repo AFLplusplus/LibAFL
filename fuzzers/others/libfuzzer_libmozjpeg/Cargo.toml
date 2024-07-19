@@ -15,11 +15,11 @@ opt-level = 3
 debug = true
 
 [dependencies]
-libafl = { path = "../../libafl/" }
-libafl_bolts = { path = "../../libafl_bolts/" }
-libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_edges", "sancov_value_profile", "libfuzzer"] }
+libafl = { path = "../../../libafl/" }
+libafl_bolts = { path = "../../../libafl_bolts/" }
+libafl_targets = { path = "../../../libafl_targets/", features = ["sancov_pcguard_edges", "sancov_value_profile", "libfuzzer"] }
 # TODO Include it only when building cc
-libafl_cc = { path = "../../libafl_cc/" }
+libafl_cc = { path = "../../../libafl_cc/" }
 mimalloc = { version = "*", default-features = false }
 
 [build-dependencies]

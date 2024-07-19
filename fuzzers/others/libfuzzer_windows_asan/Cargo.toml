@@ -14,10 +14,10 @@ opt-level = 3
 debug = true
 
 [dependencies]
-libafl = { path = "../../libafl/" }
-libafl_bolts = { path = "../../libafl_bolts/" }
-libafl_targets = { path = "../../libafl_targets/", features = ["libfuzzer", "sancov_pcguard_edges"] }
-libafl_cc = { path = "../../libafl_cc/" }
+libafl = { path = "../../../libafl/" }
+libafl_bolts = { path = "../../../libafl_bolts/" }
+libafl_targets = { path = "../../../libafl_targets/", features = ["libfuzzer", "sancov_pcguard_edges"] }
+libafl_cc = { path = "../../../libafl_cc/" }
 
 [build-dependencies]
 cc = { version = "1.0" }
