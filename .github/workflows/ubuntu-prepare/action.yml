@@ -7,6 +7,12 @@ runs:
       with:
         profile: minimal
         toolchain: stable
+    - name: Add stable clippy
+      shell: bash
+      run: rustup toolchain install stable --component clippy --allow-downgrade
+    - name: Add nightly clippy
+      shell: bash
+      run: rustup toolchain install nightly --component clippy --allow-downgrade
     - name: Remove existing clang and LLVM
       shell: bash
       run: sudo apt purge *llvm* *clang* lld* lldb* opt*
@@ -77,3 +83,6 @@ runs:
     - name: Replace old clang symlink
       shell: bash
       run: sudo rm -rf /etc/alternatives/clang && sudo ln -s /usr/bin/clang-${{ env.MAIN_LLVM_VERSION }} /etc/alternatives/clang
+    - name: Symlink Headers
+      shell: bash
+      run: sudo ln -s /usr/include/asm-generic /usr/include/asm

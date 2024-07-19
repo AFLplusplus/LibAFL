@@ -7,55 +7,24 @@ runs:
       with:
         submodules: true
         fetch-depth: 0
+    - uses: ./.github/workflows/qemu-fuzzer-tester-prepare
     - uses: Swatinem/rust-cache@v2
       with: { shared-key: "${{ runner.os }}-shared-fuzzer-cache" }
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-    - name: Add stable clippy
+    - name: Install fuzzers deps
       shell: bash
-      run: rustup toolchain install stable --component clippy --allow-downgrade
-    - name: Add nightly clippy
-      shell: bash
-      run: rustup toolchain install nightly --component clippy --allow-downgrade
-    - name: Add no_std toolchain
-      shell: bash
-      run: rustup toolchain install nightly-x86_64-unknown-linux-gnu ; rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
-    - name: Add wasm target
-      shell: bash
-      run: rustup target add wasm32-unknown-unknown
-    - name: Remove existing clang and LLVM
-      shell: bash
-      run: sudo apt purge *llvm* *clang*
-    - name: Install deps
-      shell: bash
-      run: sudo apt update && sudo apt install -y lsb-release wget software-properties-common gnupg nasm nlohmann-json3-dev ninja-build gcc-arm-linux-gnueabi g++-arm-linux-gnueabi gcc-aarch64-linux-gnu g++-aarch64-linux-gnu gcc-mipsel-linux-gnu g++-mipsel-linux-gnu gcc-powerpc-linux-gnu g++-powerpc-linux-gnu libc6-dev-i386-cross libc6-dev libc6-dev-i386 lib32gcc-11-dev lib32stdc++-11-dev libgtk-3-dev pax-utils libz3-dev
-    - name: Add LLVM in sources list
-      shell: bash
-      run: |
-        sudo tee -a /etc/apt/sources.list.d/llvm.list << EOF
-        deb https://apt.llvm.org/jammy/ llvm-toolchain-jammy main
-        deb-src https://apt.llvm.org/jammy/ llvm-toolchain-jammy main
-        EOF
-    - name: Add LLVM archive signature
-      shell: bash
-      run: wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
-    - name: Install LLVM and Clang (Version ${{ env.MAIN_LLVM_VERSION }})
-      shell: bash
-      run: sudo apt update && sudo apt install llvm-${{ env.MAIN_LLVM_VERSION }} clang-${{ env.MAIN_LLVM_VERSION }} llvm-${{ env.MAIN_LLVM_VERSION }}-dev
-    - name: Add LLVM symlink
-      shell: bash
-      run: if [ ! -e /usr/bin/llvm-config ]; then sudo ln -s /usr/bin/llvm-config-19 /usr/bin/llvm-config; fi
-    - name: Replace old clang symlink
-      shell: bash
-      run: sudo rm -rf /etc/alternatives/clang && sudo ln -s /usr/bin/clang-${{ env.MAIN_LLVM_VERSION }} /etc/alternatives/clang
+      run: sudo apt update && sudo apt install -y nasm nlohmann-json3-dev gcc-aarch64-linux-gnu g++-aarch64-linux-gnu gcc-mipsel-linux-gnu g++-mipsel-linux-gnu gcc-powerpc-linux-gnu g++-powerpc-linux-gnu libc6-dev-i386-cross libc6-dev libc6-dev-i386 lib32gcc-11-dev lib32stdc++-11-dev libgtk-3-dev pax-utils
     - name: pip install
       shell: bash
       run: python3 -m pip install msgpack jinja2 find_libpython
     - name: enable mult-thread for `make`
       shell: bash
       run: export MAKEFLAGS="-j$(expr $(nproc) \+ 1)"
+    - name: Add no_std toolchain
+      shell: bash
+      run: rustup toolchain install nightly-x86_64-unknown-linux-gnu ; rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
+    - name: Add wasm target
+      shell: bash
+      run: rustup target add wasm32-unknown-unknown
     - name: install cargo-make
       uses: baptiste0928/cargo-install@v1.3.0
       with:
@@ -72,6 +41,3 @@ runs:
       uses: browser-actions/setup-chrome@v1
       with:
         chrome-version: stable
-    - name: Symlink Headers
-      shell: bash
-      run: sudo ln -s /usr/include/asm-generic /usr/include/asm
