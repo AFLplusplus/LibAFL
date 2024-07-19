@@ -170,7 +170,7 @@ pub trait HasMutatorBytes: HasLen {
     where
         R: RangeBounds<usize>;
 
-    /// Creates a [`BytesSlice`] from this input, that can be used to slice a byte array.
+    /// Creates a [`SubRangeSlice`] from this input, that can be used to slice a byte array.
     fn sub_bytes<R>(&self, range: R) -> SubRangeSlice<u8>
     where
         R: RangeBounds<usize>,
@@ -178,7 +178,7 @@ pub trait HasMutatorBytes: HasLen {
         SubRangeSlice::new(OwnedSlice::from(self.bytes()), range)
     }
 
-    /// Creates a [`BytesSliceMut`] from this input, that can be used to slice a byte array.
+    /// Creates a [`SubRangeMutSlice`] from this input, that can be used to slice a byte array.
     fn sub_bytes_mut<R>(&mut self, range: R) -> SubRangeMutSlice<u8>
     where
         R: RangeBounds<usize>,
@@ -186,7 +186,7 @@ pub trait HasMutatorBytes: HasLen {
         SubRangeMutSlice::new(OwnedMutSlice::from(self.bytes_mut()), range)
     }
 
-    /// Creates a [`BytesSlice`] from this input, that can be used for local mutations.
+    /// Creates a [`BytesSubInput`] from this input, that can be used for local mutations.
     fn sub_input<R>(&mut self, range: R) -> BytesSubInput<Self>
     where
         R: RangeBounds<usize>,
