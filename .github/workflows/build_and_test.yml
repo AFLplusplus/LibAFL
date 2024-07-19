@@ -256,7 +256,7 @@ jobs:
           - ./fuzzers/fuzzbench_qemu
           - ./fuzzers/nyx_libxml2_parallel
           - ./fuzzers/frida_gdiplus
-          - ./fuzzers/libfuzzer_stb_image_concolic
+          # - ./fuzzers/libfuzzer_stb_image_concolic not working with llvm 19 for now
           - ./fuzzers/nautilus_sync
           - ./fuzzers/push_harness
           - ./fuzzers/libfuzzer_libpng_centralized
