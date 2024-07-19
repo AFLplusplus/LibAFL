@@ -282,62 +282,77 @@ jobs:
       matrix:
         os: [ ubuntu-latest ]
         fuzzer:
-          - ./fuzzers/cargo_fuzz
-          - ./fuzzers/fuzzbench_fork_qemu
-          - ./fuzzers/libfuzzer_stb_image_sugar
-          - ./fuzzers/nyx_libxml2_standalone
-          - ./fuzzers/baby_fuzzer_gramatron
-          - ./fuzzers/tinyinst_simple
-          - ./fuzzers/baby_fuzzer_with_forkexecutor
-          - ./fuzzers/baby_no_std
-          - ./fuzzers/baby_fuzzer_swap_differential
-          - ./fuzzers/baby_fuzzer_grimoire
-          - ./fuzzers/baby_fuzzer
-          - ./fuzzers/libfuzzer_libpng_launcher
-          - ./fuzzers/libfuzzer_libpng_accounting
-          - ./fuzzers/forkserver_libafl_cc
+          # Baby
+          - ./fuzzers/baby/baby_fuzzer_with_forkexecutor
+          - ./fuzzers/baby/baby_no_std
+          - ./fuzzers/baby/baby_fuzzer_swap_differential
+          - ./fuzzers/baby/baby_fuzzer_grimoire
+          - ./fuzzers/baby/baby_fuzzer_gramatron
+          - ./fuzzers/baby/baby_fuzzer
+          - ./fuzzers/baby/baby_fuzzer_nautilus
+          # - ./fuzzers/baby/backtrace_baby_fuzzers
+          - ./fuzzers/baby/baby_fuzzer_unicode
+          - ./fuzzers/baby/baby_fuzzer_multi
+          - ./fuzzers/baby/baby_fuzzer_wasm
+          - ./fuzzers/baby/baby_fuzzer_minimizing
+          - ./fuzzers/baby/baby_fuzzer_tokens
+          - ./fuzzers/baby/backtrace_baby_fuzzers/c_code_with_fork_executor
+          - ./fuzzers/baby/backtrace_baby_fuzzers/c_code_with_inprocess_executor
+          - ./fuzzers/baby/backtrace_baby_fuzzers/rust_code_with_fork_executor
+          - ./fuzzers/baby/backtrace_baby_fuzzers/rust_code_with_inprocess_executor
+          - ./fuzzers/baby/backtrace_baby_fuzzers/command_executor
+          - ./fuzzers/baby/backtrace_baby_fuzzers/forkserver_executor
+
+          # Forkserver
+          - ./fuzzers/forkserver/forkserver_simple
+          - ./fuzzers/forkserver/forkserver_libafl_cc
+
+          # Frida
+          - ./fuzzers/frida/frida_executable_libpng
+          - ./fuzzers/frida/frida_gdiplus
+          - ./fuzzers/frida/frida_libpng
+
+          # Fuzzbench
+          - ./fuzzers/fuzzbench/fuzzbench
+          - ./fuzzers/fuzzbench/fuzzbench_qemu
+          - ./fuzzers/fuzzbench/fuzzbench_fork_qemu
+          - ./fuzzers/fuzzbench/fuzzbench_text
+          - ./fuzzers/fuzzbench/fuzzbench_ctx
+          - ./fuzzers/fuzzbench/fuzzbench_forkserver_cmplog
+          - ./fuzzers/fuzzbench/fuzzbench_forkserver
+
+          # LibPNG
+          - ./fuzzers/libpng/libfuzzer_libpng
+          - ./fuzzers/libpng/libfuzzer_libpng_launcher
+          - ./fuzzers/libpng/libfuzzer_libpng_accounting
+          - ./fuzzers/libpng/libfuzzer_libpng_centralized
+          - ./fuzzers/libpng/libfuzzer_libpng_cmin
+          - ./fuzzers/libpng/libfuzzer_libpng_norestart
+          # - ./fuzzers/libfuzzer_libpng_aflpp_ui
           # - ./fuzzers/libfuzzer_libpng_tcp_manager
-          # - ./fuzzers/sqlite_centralized_multi_machine
-          - ./fuzzers/backtrace_baby_fuzzers
-          - ./fuzzers/fuzzbench_qemu
-          - ./fuzzers/nyx_libxml2_parallel
-          - ./fuzzers/frida_gdiplus
-          - ./fuzzers/libfuzzer_stb_image_concolic
-          - ./fuzzers/nautilus_sync
-          - ./fuzzers/push_harness
-          - ./fuzzers/libfuzzer_libpng_centralized
-          - ./fuzzers/baby_fuzzer_nautilus
-          - ./fuzzers/fuzzbench_text
-          - ./fuzzers/libfuzzer_libpng_cmin
-          - ./fuzzers/forkserver_simple
-          - ./fuzzers/baby_fuzzer_unicode
-          - ./fuzzers/libfuzzer_libpng_norestart
-          - ./fuzzers/baby_fuzzer_multi
-          - ./fuzzers/libafl_atheris
-          - ./fuzzers/frida_libpng
-          - ./fuzzers/fuzzbench_ctx
-          - ./fuzzers/fuzzbench_forkserver_cmplog
-          - ./fuzzers/push_stage_harness
-          - ./fuzzers/libfuzzer_libmozjpeg
-          - ./fuzzers/libfuzzer_libpng_aflpp_ui
-          - ./fuzzers/libfuzzer_libpng
-          - ./fuzzers/baby_fuzzer_wasm
-          - ./fuzzers/fuzzbench
+
+          # Nyx
+          - ./fuzzers/nyx/nyx_libxml2_standalone
+          - ./fuzzers/nyx/nyx_libxml2_parallel
+
+          # Stb
+          - ./fuzzers/others/libfuzzer_stb_image_sugar
           - ./fuzzers/libfuzzer_stb_image
-          - ./fuzzers/fuzzbench_forkserver
-          # - ./fuzzers/libfuzzer_windows_asan
-          # - ./fuzzers/dynamic_analysis
-          - ./fuzzers/baby_fuzzer_minimizing
-          - ./fuzzers/frida_executable_libpng
-          - ./fuzzers/tutorial
-          - ./fuzzers/baby_fuzzer_tokens
-          - ./fuzzers/backtrace_baby_fuzzers/rust_code_with_inprocess_executor
-          - ./fuzzers/backtrace_baby_fuzzers/c_code_with_fork_executor
-          - ./fuzzers/backtrace_baby_fuzzers/command_executor
-          - ./fuzzers/backtrace_baby_fuzzers/forkserver_executor
-          - ./fuzzers/backtrace_baby_fuzzers/c_code_with_inprocess_executor
-          - ./fuzzers/backtrace_baby_fuzzers/rust_code_with_fork_executor
-          - ./fuzzers/libafl-fuzz
+          - ./fuzzers/libfuzzer_stb_image_concolic
+
+          # Others
+          - ./fuzzers/others/cargo_fuzz
+          # - ./fuzzers/others/dynamic_analysis
+          - ./fuzzers/others/libafl_atheris
+          - ./fuzzers/others/libafl-fuzz
+          - ./fuzzers/others/libfuzzer_libmozjpeg
+          # - ./fuzzers/others/libfuzzer_windows_asan
+          - ./fuzzers/others/nautilus_sync
+          - ./fuzzers/others/push_harness
+          - ./fuzzers/others/push_stage_harness
+          # - ./fuzzers/others/sqlite_centralized_multi_machine
+          - ./fuzzers/others/tinyinst_simple
+          - ./fuzzers/others/tutorial
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
