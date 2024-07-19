@@ -353,9 +353,7 @@ where
     log::trace!("syscall_hook {syscall} {SYS_execve}");
     debug_assert!(i32::try_from(SYS_execve).is_ok());
     if syscall == SYS_execve as i32 {
-        let _module = emulator_modules
-            .get_mut::<InjectionModule>()
-            .unwrap();
+        let _module = emulator_modules.get_mut::<InjectionModule>().unwrap();
         if x0 > 0 && x1 > 0 {
             let c_array = x1 as *const *const c_char;
             let cmd = unsafe {

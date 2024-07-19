@@ -44,6 +44,7 @@ exclude = [
     "libafl_tinyinst",
     "libafl_qemu/libafl_qemu_build",
     "libafl_qemu/libafl_qemu_sys",
+    "libafl_concolic/test/symcc/util/symcc_fuzzing_helper",
 ]
 
 [workspace.package]

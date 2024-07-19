@@ -265,10 +265,7 @@ where
             .as_mut()
             .unwrap()
             .on_ret_all(emulator_modules, state, pc, ret_addr);
-        emulator_modules
-            .get_mut::<Self>()
-            .unwrap()
-            .collectors = collectors;
+        emulator_modules.get_mut::<Self>().unwrap().collectors = collectors;
     }
 
     fn gen_blocks_calls<ET, S>(
@@ -360,12 +357,11 @@ where
             let call_cb = Box::new(
                 move |emulator_modules: &mut EmulatorModules<ET, S>, state: Option<&mut S>, pc| {
                     // eprintln!("CALL @ 0x{:#x}", pc + call_len);
-                    let mut collectors =
-                        if let Some(h) = emulator_modules.get_mut::<Self>() {
-                            h.collectors.take()
-                        } else {
-                            return;
-                        };
+                    let mut collectors = if let Some(h) = emulator_modules.get_mut::<Self>() {
+                        h.collectors.take()
+                    } else {
+                        return;
+                    };
                     if collectors.is_none() {
                         return; // TODO fix this, it can be None on races ret
                     }
@@ -373,10 +369,7 @@ where
                         .as_mut()
                         .unwrap()
                         .on_call_all(emulator_modules, state, pc, call_len);
-                    emulator_modules
-                        .get_mut::<Self>()
-                        .unwrap()
-                        .collectors = collectors;
+                    emulator_modules.get_mut::<Self>().unwrap().collectors = collectors;
                 },
             );
             emulator_modules.instruction_closure(call_addr, call_cb, false);
