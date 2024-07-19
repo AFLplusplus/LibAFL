@@ -418,9 +418,9 @@ jobs:
       - name: Add targets
         run: rustup target add arm-linux-androideabi && rustup target add thumbv6m-none-eabi
       - name: Build aarch64-unknown-none
-        run: cd ./fuzzers/baby_no_std && cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
+        run: cd ./fuzzers/baby/baby_no_std && cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
       - name: run x86_64 until panic!
-        run: cd ./fuzzers/baby_no_std && cargo +nightly run || test $? -ne 0 || exit 1
+        run: cd ./fuzzers/baby/baby_no_std && cargo +nightly run || test $? -ne 0 || exit 1
       - name: no_std tests
         run: cd ./libafl && cargo test --no-default-features
 
@@ -457,7 +457,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: ./.github/workflows/windows-tester-prepare
       - name: Build fuzzers/frida_libpng
-        run: cd fuzzers/frida_libpng/ && cargo make test
+        run: cd fuzzers/frida/frida_libpng/ && cargo make test
 
   windows-frida-libfuzzer-stb-image:
     runs-on: windows-latest
@@ -466,8 +466,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/workflows/windows-tester-prepare
-      - name: Build fuzzers/libfuzzer_stb_image
-        run: cd fuzzers/libfuzzer_stb_image && cargo build --release
+      - name: Build fuzzers/stb/libfuzzer_stb_image
+        run: cd fuzzers/stb/libfuzzer_stb_image && cargo build --release
 
   windows-frida-gdiplus:
     runs-on: windows-latest
@@ -476,8 +476,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/workflows/windows-tester-prepare
-      - name: Build fuzzers/frida_gdiplus
-        run: cd fuzzers/frida_gdiplus/ && cargo make test && cargo make test_cmplog
+      - name: Build fuzzers/frida/frida_gdiplus
+        run: cd fuzzers/frida/frida_gdiplus/ && cargo make test && cargo make test_cmplog
 
   windows-tinyinst-simple:
     runs-on: windows-latest
@@ -488,8 +488,8 @@ jobs:
       - uses: ./.github/workflows/windows-tester-prepare
       - name: install cxx bridge
         run: cargo install cxxbridge-cmd
-      - name: Build fuzzers/tinyinst_simple
-        run: cd fuzzers/tinyinst_simple/ && cargo make test
+      - name: Build fuzzers/others/tinyinst_simple
+        run: cd fuzzers/others/tinyinst_simple/ && cargo make test
 
   windows-clippy:
     runs-on: windows-latest
