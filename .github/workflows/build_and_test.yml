@@ -336,9 +336,9 @@ jobs:
           - ./fuzzers/nyx/nyx_libxml2_parallel
 
           # Stb
-          - ./fuzzers/others/libfuzzer_stb_image_sugar
-          - ./fuzzers/libfuzzer_stb_image
-          - ./fuzzers/libfuzzer_stb_image_concolic
+          - ./fuzzers/stb/libfuzzer_stb_image_sugar
+          - ./fuzzers/stb/libfuzzer_stb_image
+          - ./fuzzers/stb/libfuzzer_stb_image_concolic
 
           # Others
           - ./fuzzers/others/cargo_fuzz

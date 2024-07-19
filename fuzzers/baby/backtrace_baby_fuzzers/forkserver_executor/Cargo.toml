@@ -14,5 +14,5 @@ codegen-units = 1
 opt-level = 3
 
 [dependencies]
-libafl = { path = "../../../libafl/" }
-libafl_bolts = { path = "../../../libafl_bolts/" }
+libafl = { path = "../../../../libafl/" }
+libafl_bolts = { path = "../../../../libafl_bolts/" }
