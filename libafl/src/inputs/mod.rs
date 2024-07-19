@@ -36,7 +36,7 @@ use std::{fs::File, hash::Hash, io::Read, path::Path};
 use libafl_bolts::fs::write_file_atomic;
 use libafl_bolts::{
     ownedref::{OwnedMutSlice, OwnedSlice},
-    subrange::{SubRangeSlice, SubRangeMutSlice},
+    subrange::{SubRangeMutSlice, SubRangeSlice},
     Error, HasLen,
 };
 #[cfg(feature = "nautilus")]
@@ -321,4 +321,3 @@ where
         (self.convert_cb)(input)
     }
 }
-

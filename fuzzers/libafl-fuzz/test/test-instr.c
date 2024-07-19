@@ -23,38 +23,28 @@
 #endif
 
 int main(int argc, char **argv) {
-
   int   fd = 0, cnt;
   char  buff[8];
   char *buf = buff;
 
   // we support command line parameter and stdin
   if (argc == 2) {
-
     buf = argv[1];
 
   } else {
-
     if (argc >= 3 && strcmp(argv[1], "-f") == 0) {
-
       if ((fd = open(argv[2], O_RDONLY)) < 0) {
-
         fprintf(stderr, "Error: unable to open %s\n", argv[2]);
         exit(-1);
-
       }
-
     }
 
     if ((cnt = read(fd, buf, sizeof(buf) - 1)) < 1) {
-
       printf("Hum?\n");
       return 1;
-
     }
 
     buf[cnt] = 0;
-
   }
 
   if (getenv("AFL_DEBUG")) fprintf(stderr, "test-instr: %s\n", buf);
@@ -62,7 +52,6 @@ int main(int argc, char **argv) {
   // we support three input cases (plus a 4th if stdin is used but there is no
   // input)
   switch (buf[0]) {
-
     case '0':
       printf("Looks like a zero to me!\n");
       break;
@@ -74,10 +63,7 @@ int main(int argc, char **argv) {
     default:
       printf("Neither one or zero? How quaint!\n");
       break;
-
   }
 
   return 0;
-
 }
-

@@ -1,10 +1,15 @@
 //! Subrange of things.
 //! Convenient wrappers to handle sub-slices efficiently.
 
-use core::cmp::min;
-use core::ops::{Range, RangeBounds, Bound};
-use crate::HasLen;
-use crate::ownedref::{OwnedMutSlice, OwnedSlice};
+use core::{
+    cmp::min,
+    ops::{Bound, Range, RangeBounds},
+};
+
+use crate::{
+    ownedref::{OwnedMutSlice, OwnedSlice},
+    HasLen,
+};
 
 /// An immutable contiguous subslice of a byte slice.
 /// It is mostly useful to cheaply wrap a subslice of a given input.
@@ -104,8 +109,6 @@ impl<'a, T> HasLen for SubRangeMutSlice<'a, T> {
         self.range.len()
     }
 }
-
-
 
 /// Gets the relevant concrete start index from [`RangeBounds`] (inclusive)
 pub fn start_index<R>(range: &R) -> usize

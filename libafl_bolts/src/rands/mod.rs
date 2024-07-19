@@ -1,15 +1,10 @@
 //! The random number generators of `LibAFL`
 
-use core::{
-    debug_assert,
-    fmt::Debug,
-    sync::atomic::AtomicUsize,
-};
-
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-
 #[cfg(target_has_atomic = "ptr")]
 use core::sync::atomic::Ordering;
+use core::{debug_assert, fmt::Debug, sync::atomic::AtomicUsize};
+
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 #[cfg(feature = "alloc")]
 pub mod loaded_dice;

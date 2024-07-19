@@ -218,9 +218,7 @@ where
     S: Unpin + UsesInput,
     ET: EmulatorModuleTuple<S>,
 {
-    let h = emulator_modules
-        .get_mut::<AsanGuestModule>()
-        .unwrap();
+    let h = emulator_modules.get_mut::<AsanGuestModule>().unwrap();
     if !h.must_instrument(pc) {
         return None;
     }

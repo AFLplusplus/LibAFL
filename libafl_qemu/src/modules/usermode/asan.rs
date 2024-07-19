@@ -1204,9 +1204,7 @@ pub fn trace_write1_asan_snapshot<ET, S>(
         let h = emulator_modules.get_mut::<AsanModule>().unwrap();
         h.write_1(qemu, id as GuestAddr, addr);
     }
-    let h = emulator_modules
-        .get_mut::<SnapshotModule>()
-        .unwrap();
+    let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
     h.access(addr, 1);
 }
 
@@ -1224,9 +1222,7 @@ pub fn trace_write2_asan_snapshot<ET, S>(
         let h = emulator_modules.get_mut::<AsanModule>().unwrap();
         h.write_2(qemu, id as GuestAddr, addr);
     }
-    let h = emulator_modules
-        .get_mut::<SnapshotModule>()
-        .unwrap();
+    let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
     h.access(addr, 2);
 }
 
@@ -1244,9 +1240,7 @@ pub fn trace_write4_asan_snapshot<ET, S>(
         let h = emulator_modules.get_mut::<AsanModule>().unwrap();
         h.write_4(qemu, id as GuestAddr, addr);
     }
-    let h = emulator_modules
-        .get_mut::<SnapshotModule>()
-        .unwrap();
+    let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
     h.access(addr, 4);
 }
 
@@ -1264,9 +1258,7 @@ pub fn trace_write8_asan_snapshot<ET, S>(
         let h = emulator_modules.get_mut::<AsanModule>().unwrap();
         h.write_8(qemu, id as GuestAddr, addr);
     }
-    let h = emulator_modules
-        .get_mut::<SnapshotModule>()
-        .unwrap();
+    let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
     h.access(addr, 8);
 }
 
@@ -1285,9 +1277,7 @@ pub fn trace_write_n_asan_snapshot<ET, S>(
         let h = emulator_modules.get_mut::<AsanModule>().unwrap();
         h.read_n(qemu, id as GuestAddr, addr, size);
     }
-    let h = emulator_modules
-        .get_mut::<SnapshotModule>()
-        .unwrap();
+    let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
     h.access(addr, size);
 }
 
