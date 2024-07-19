@@ -40,7 +40,7 @@ runs:
       run: wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
     - name: Install LLVM and Clang (Version ${{ env.MAIN_LLVM_VERSION }})
       shell: bash
-      run: sudo apt update && sudo apt install llvm llvm-dev clang libclang-cpp llvm-${{ env.MAIN_LLVM_VERSION }} clang-${{ env.MAIN_LLVM_VERSION }} llvm-${{ env.MAIN_LLVM_VERSION }}-dev libclang-cpp${{ env.MAIN_LLVM_VERSION }} libclang-cpp${{ env.MAIN_LLVM_VERSION }}-dev
+      run: sudo apt update && sudo apt install llvm llvm-dev clang libclang-cpp-dev llvm-${{ env.MAIN_LLVM_VERSION }} clang-${{ env.MAIN_LLVM_VERSION }} llvm-${{ env.MAIN_LLVM_VERSION }}-dev libclang-cpp${{ env.MAIN_LLVM_VERSION }} libclang-cpp${{ env.MAIN_LLVM_VERSION }}-dev
     # - name: Fix LLVM symlinks
     #   shell: bash
     #   # run: if [ ! -e /usr/bin/llvm-config ]; then sudo ln -s /usr/bin/llvm-config-19 /usr/bin/llvm-config; fi
