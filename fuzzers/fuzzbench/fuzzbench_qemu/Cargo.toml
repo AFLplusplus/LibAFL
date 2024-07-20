@@ -21,7 +21,6 @@ strip = true
 
 [dependencies]
 libafl = { path = "../../../libafl/" }
-libafl_bolts = { path = "../../../libafl_bolts/" }
 libafl_qemu = { path = "../../../libafl_qemu/", features = ["x86_64", "usermode"] }
 
 clap = { version = "4.5", features = ["default"] }

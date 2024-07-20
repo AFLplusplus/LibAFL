@@ -1,7 +1,10 @@
 [package]
 name = "fuzzbench_forkserver_cmplog"
 version = "0.13.0"
-authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
+authors = [
+    "Andrea Fioraldi <andreafioraldi@gmail.com>",
+    "Dominik Maier <domenukk@gmail.com>",
+]
 edition = "2021"
 
 [profile.release]
@@ -21,7 +24,6 @@ which = "6.0"
 
 [dependencies]
 libafl = { path = "../../../libafl/" }
-libafl_bolts = { path = "../../../libafl_bolts/" }
 libafl_targets = { path = "../../../libafl_targets/" }
 clap = { version = "4.5", features = ["default"] }
 nix = { version = "0.29", features = ["signal"] }

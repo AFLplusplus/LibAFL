@@ -1,7 +1,10 @@
 [package]
 name = "libafl_atheris"
 version = "0.13.0"
-authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
+authors = [
+    "Andrea Fioraldi <andreafioraldi@gmail.com>",
+    "Dominik Maier <domenukk@gmail.com>",
+]
 edition = "2021"
 
 [features]
@@ -20,8 +23,12 @@ which = "6.0"
 
 [dependencies]
 libafl = { path = "../../../libafl/" }
-libafl_bolts = { path = "../../../libafl_bolts/" }
-libafl_targets = { path = "../../../libafl_targets/", features = ["pointer_maps", "sancov_cmplog", "libfuzzer", "sancov_8bit"] }
+libafl_targets = { path = "../../../libafl_targets/", features = [
+    "pointer_maps",
+    "sancov_cmplog",
+    "libfuzzer",
+    "sancov_8bit",
+] }
 clap = { version = "4.5", features = ["default"] }
 
 [lib]

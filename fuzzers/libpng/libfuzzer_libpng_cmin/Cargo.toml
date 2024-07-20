@@ -24,7 +24,6 @@ which = "6.0"
 env_logger = "0.10"
 libafl = { path = "../../../libafl/", features = ["default", "cmin"] }
 # libafl = { path = "../../../libafl/", features = ["default"] }
-libafl_bolts = { path = "../../../libafl_bolts/" }
 libafl_targets = { path = "../../../libafl_targets/", features = ["sancov_pcguard_hitcounts", "libfuzzer", "sancov_cmplog"] }
 # TODO Include it only when building cc
 libafl_cc = { path = "../../../libafl_cc/" }

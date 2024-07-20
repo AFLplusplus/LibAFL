@@ -24,7 +24,6 @@ which = { version = "6.0" }
 clap = { version = "4.5", features = ["derive"] }
 nix = { version = "0.29", features = ["signal"] }
 libafl = { path = "../../../libafl/" }
-libafl_bolts = { path = "../../../libafl_bolts/" }
 libafl_cc = { path = "../../../libafl_cc/" }
 libafl_targets = { path = "../../../libafl_targets/", features = ["sancov_pcguard_hitcounts", "libfuzzer", "pointer_maps"] }
 env_logger = "0.11"

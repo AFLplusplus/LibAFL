@@ -16,7 +16,6 @@ debug = true
 
 [dependencies]
 libafl = { path = "../../../../libafl/" }
-libafl_bolts = { path = "../../../../libafl_bolts/" }
 libc = "0.2"
 
 [build-dependencies]

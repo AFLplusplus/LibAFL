@@ -20,5 +20,4 @@ debug = true
 
 [dependencies]
 libafl = { path = "../../../libafl/" }
-libafl_bolts = { path = "../../../libafl_bolts/" }
 postcard = { version = "1.0", features = ["alloc"], default-features = false } # no_std compatible serde serialization format
