@@ -1,10 +1,10 @@
 /* ANCHOR: use */
 extern crate libafl;
-extern crate libafl_bolts;
 
 use std::path::PathBuf;
 
 use libafl::{
+    bolts::{rands::StdRand, tuples::tuple_list, AsSlice},
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
@@ -15,7 +15,6 @@ use libafl::{
     schedulers::QueueScheduler,
     state::StdState,
 };
-use libafl_bolts::{rands::StdRand, tuples::tuple_list, AsSlice};
 /* ANCHOR_END: use */
 
 fn main() {
