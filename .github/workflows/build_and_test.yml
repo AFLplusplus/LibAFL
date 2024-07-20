@@ -71,10 +71,7 @@ jobs:
     steps:
       - name: Remove Dotnet & Haskell
         run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
+      - uses: dtolnay/rust-toolchain@stable
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "llvm-tester" }
@@ -178,10 +175,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: ubuntu
     steps:
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
+      - uses: dtolnay/rust-toolchain@stable
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
@@ -362,11 +356,8 @@ jobs:
   nostd-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@nightly
         with:
-          profile: minimal
-          toolchain: nightly
-          override: true
           components: rust-src
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
@@ -382,11 +373,8 @@ jobs:
   nostd-clippy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@nightly
         with:
-          profile: minimal
-          toolchain: nightly
-          override: true
           components: clippy, rust-src
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
@@ -451,12 +439,9 @@ jobs:
     needs:
       - common
     steps:
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
+      - uses: dtolnay/rust-toolchain@stable
       - uses: actions/checkout@v4
-      - uses: ./.github/workflows/windows-tester-prepare      
+      - uses: ./.github/workflows/windows-tester-prepare
       - uses: Swatinem/rust-cache@v2
       - name: Run real clippy, not the fake one
         shell: pwsh
@@ -465,10 +450,7 @@ jobs:
   macos:
     runs-on: macOS-latest
     steps:
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
+      - uses: dtolnay/rust-toolchain@stable
       - name: Add nightly clippy
         run: rustup toolchain install nightly --component clippy --allow-downgrade && rustup default nightly
       - name: Install deps
@@ -489,10 +471,7 @@ jobs:
   ios:
     runs-on: macOS-latest
     steps:
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
+      - uses: dtolnay/rust-toolchain@stable
       - name: install ios
         run: rustup target add aarch64-apple-ios
       - uses: actions/checkout@v4
@@ -503,10 +482,7 @@ jobs:
   android:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
+      - uses: dtolnay/rust-toolchain@stable
       - uses: nttld/setup-ndk@v1
         with:
           ndk-version: r25b
