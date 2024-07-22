@@ -361,7 +361,6 @@ where
             afl_stats_stage,
             sync_stage
         );
-        println!("running with cmplog");
 
         // Run our fuzzer; WITH CmpLog
         run_fuzzer_with_stages(

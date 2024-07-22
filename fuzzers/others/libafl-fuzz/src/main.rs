@@ -128,7 +128,7 @@ struct Opt {
     /// power schedules compute a seed's performance score: explore(default), fast, exploit, seek, rare, mmopt, coe, lin
     #[arg(short = 'p')]
     power_schedule: Option<PowerSchedule>,
-    /// enable CmpLog by specifying a binary compiled for it.
+    /// enable `CmpLog` by specifying a binary compiled for it.
     #[arg(short = 'c')]
     cmplog: Option<String>,
     /// sync to a foreign fuzzer queue directory (requires -M, can be specified up to 32 times)

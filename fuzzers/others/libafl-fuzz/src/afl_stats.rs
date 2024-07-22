@@ -297,12 +297,13 @@ where
             .get::<UnstableEntriesMetadata>()
             .map_or(0, |m| m.unstable_entries().len());
 
-        let auto_dict_entries = match self.autotokens_enabled {
-            false => 0,
-            true => state
+        let auto_dict_entries = if self.autotokens_enabled {
+            state
                 .metadata::<Tokens>()?
                 .len()
-                .saturating_sub(self.provided_tokens),
+                .saturating_sub(self.provided_tokens)
+        } else {
+            0
         };
         let stats = AFLFuzzerStats {
             start_time: self.start_time,
