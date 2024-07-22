@@ -1,31 +1,40 @@
 use std::marker::PhantomData;
 
 use libafl::{
-    corpus::{CorpusId, HasTestcase, Testcase},
+    corpus::{Corpus, CorpusId, HasTestcase, SchedulerTestcaseMetadata, Testcase},
     inputs::UsesInput,
-    observers::ObserversTuple,
-    schedulers::{HasQueueCycles, RemovableScheduler, Scheduler},
+    observers::{CanTrack, ObserversTuple},
+    schedulers::{
+        HasQueueCycles, MinimizerScheduler, RemovableScheduler, Scheduler, TestcaseScore,
+    },
     state::{HasCorpus, HasRand, State, UsesState},
     Error, HasMetadata,
 };
+use libafl_bolts::{serdeany::SerdeAny, AsIter, HasRefCnt};
 
-pub enum SupportedSchedulers<S, Q, W> {
-    Queue(Q, PhantomData<(S, Q, W)>),
-    Weighted(W, PhantomData<(S, Q, W)>),
+pub enum SupportedSchedulers<S, Q, CS, F, M, O> {
+    Queue(Q, PhantomData<(S, Q, CS, F, M, O)>),
+    Weighted(
+        MinimizerScheduler<CS, F, M, O>,
+        PhantomData<(S, Q, CS, F, M, O)>,
+    ),
 }
 
-impl<S, Q, W> UsesState for SupportedSchedulers<S, Q, W>
+impl<S, Q, CS, F, M, O> UsesState for SupportedSchedulers<S, Q, CS, F, M, O>
 where
     S: State + HasRand + HasCorpus + HasMetadata + HasTestcase,
 {
     type State = S;
 }
 
-impl<S, Q, W> RemovableScheduler for SupportedSchedulers<S, Q, W>
+impl<S, Q, CS, F, M, O> RemovableScheduler for SupportedSchedulers<S, Q, CS, F, M, O>
 where
     S: UsesInput + HasTestcase + HasMetadata + HasCorpus + HasRand + State,
     Q: Scheduler<State = S> + RemovableScheduler,
-    W: Scheduler<State = S> + RemovableScheduler,
+    CS: RemovableScheduler<State = S>,
+    M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
+    O: CanTrack,
+    F: TestcaseScore<S>,
 {
     fn on_remove(
         &mut self,
@@ -52,15 +61,34 @@ where
     }
 }
 
-impl<S, Q, W> Scheduler for SupportedSchedulers<S, Q, W>
+impl<S, Q, CS, F, M, O> Scheduler for SupportedSchedulers<S, Q, CS, F, M, O>
 where
     S: UsesInput + HasTestcase + HasMetadata + HasCorpus + HasRand + State,
     Q: Scheduler<State = S>,
-    W: Scheduler<State = S>,
+    CS: Scheduler<State = S>,
+    M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
+    O: CanTrack,
+    F: TestcaseScore<S>,
 {
     fn on_add(&mut self, state: &mut Self::State, id: CorpusId) -> Result<(), Error> {
         match self {
-            Self::Queue(queue, _) => queue.on_add(state, id),
+            // We need to manually set the depth
+            // since we want to avoid implementing `AflScheduler` for `QueueScheduler`
+            Self::Queue(queue, _) => {
+                queue.on_add(state, id)?;
+                let current_id = *state.corpus().current();
+                let mut depth = match current_id {
+                    Some(parent_idx) => state
+                        .testcase(parent_idx)?
+                        .metadata::<SchedulerTestcaseMetadata>()?
+                        .depth(),
+                    None => 0,
+                };
+                depth += 1;
+                let mut testcase = state.corpus().get(id)?.borrow_mut();
+                testcase.add_metadata(SchedulerTestcaseMetadata::new(depth));
+                Ok(())
+            }
             Self::Weighted(weighted, _) => weighted.on_add(state, id),
         }
     }
@@ -99,16 +127,19 @@ where
     }
 }
 
-impl<S, Q, W> HasQueueCycles for SupportedSchedulers<S, Q, W>
+impl<S, Q, CS, F, M, O> HasQueueCycles for SupportedSchedulers<S, Q, CS, F, M, O>
 where
     S: UsesInput + HasTestcase + HasMetadata + HasCorpus + HasRand + State,
     Q: Scheduler<State = S> + HasQueueCycles,
-    W: Scheduler<State = S> + HasQueueCycles,
+    CS: Scheduler<State = S> + HasQueueCycles,
+    O: CanTrack,
+    M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
+    F: TestcaseScore<S>,
 {
     fn queue_cycles(&self) -> u64 {
         match self {
             Self::Queue(queue, _) => queue.queue_cycles(),
-            Self::Weighted(weighted, _) => weighted.queue_cycles(),
+            Self::Weighted(weighted, _) => weighted.base().queue_cycles(),
         }
     }
 }

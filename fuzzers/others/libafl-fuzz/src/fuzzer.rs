@@ -15,7 +15,10 @@ use libafl::{
         scheduled::havoc_mutations, tokens_mutations, AFLppRedQueen, StdScheduledMutator, Tokens,
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
-    schedulers::{powersched::PowerSchedule, QueueScheduler, StdWeightedScheduler},
+    schedulers::{
+        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, QueueScheduler,
+        StdWeightedScheduler,
+    },
     stages::{
         mutational::MultiMutationalStage, CalibrationStage, ColorizationStage, IfStage,
         StagesTuple, StdMutationalStage, StdPowerMutationalStage, SyncFromDiskStage,
@@ -197,7 +200,10 @@ where
         if opt.cycle_schedules {
             weighted_scheduler = weighted_scheduler.cycling_scheduler();
         }
-        scheduler = SupportedSchedulers::Weighted(weighted_scheduler, PhantomData);
+        scheduler = SupportedSchedulers::Weighted(
+            IndexesLenTimeMinimizerScheduler::new(&edges_observer, weighted_scheduler),
+            PhantomData,
+        );
     }
 
     // Create our Fuzzer
@@ -215,21 +221,22 @@ where
         executor = executor.autotokens(&mut tokens);
     };
 
-    // Set a custom directory for the current Input if configured;
-    // May be used to provide a ram-disk etc..
-    let mut file = get_unique_std_input_file();
-    if let Some(ext) = &opt.input_ext {
-        file = format!("{file}.{ext}");
-    }
-    if let Some(cur_input_dir) = &opt.cur_input_dir {
-        if opt.harness_input_type.is_none() {
-            return Err(Error::illegal_argument(
-                "cannot use AFL_TMPDIR with stdin input type.",
-            ));
+    // Set a custom directory for the current_input file if configured;
+    // Relevant only if harness input type is @@
+    if opt.harness_input_type.is_some() {
+        let mut file = get_unique_std_input_file();
+        if let Some(ext) = &opt.input_ext {
+            file = format!("{file}.{ext}");
         }
-        executor = executor.arg_input_file(cur_input_dir.join(file));
-    } else {
-        executor = executor.arg_input_file(file);
+        if let Some(cur_input_dir) = &opt.cur_input_dir {
+            executor = executor.arg_input_file(cur_input_dir.join(file));
+        } else {
+            executor = executor.arg_input_file(fuzzer_dir.join(file));
+        }
+    } else if opt.cur_input_dir.is_some() {
+        return Err(Error::illegal_argument(
+            "cannot use AFL_TMPDIR with stdin input type.",
+        ));
     }
 
     // Finalize and build our Executor
@@ -337,7 +344,7 @@ where
                   _event_manager: &mut _|
          -> Result<bool, Error> {
             let testcase = state.current_testcase()?;
-            if testcase.scheduled_count() == 1
+            if testcase.scheduled_count() == 2
                 || (opt.cmplog_only_new && testcase.has_metadata::<IsInitialCorpusEntryMetadata>())
             {
                 return Ok(false);
@@ -354,6 +361,7 @@ where
             afl_stats_stage,
             sync_stage
         );
+        println!("running with cmplog");
 
         // Run our fuzzer; WITH CmpLog
         run_fuzzer_with_stages(

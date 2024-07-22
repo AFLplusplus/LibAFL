@@ -291,12 +291,11 @@ where
             .as_ref();
         let filled_entries_in_map = map_observer.count_bytes();
         let map_size = map_observer.usable_count();
-
-        let unstable_entries_metadata = state
+        // Since we do not calibrate when using `QueueScheduler`; we cannot calculate unstable entries.
+        let unstable_entries_in_map = state
             .metadata_map()
             .get::<UnstableEntriesMetadata>()
-            .unwrap();
-        let unstable_entries_in_map = unstable_entries_metadata.unstable_entries().len();
+            .map_or(0, |m| m.unstable_entries().len());
 
         let auto_dict_entries = match self.autotokens_enabled {
             false => 0,
@@ -353,7 +352,7 @@ where
             cpu_affinity: self.core_id.0,
             total_edges: map_size as u64,
             edges_found: filled_entries_in_map,
-            var_byte_count: unstable_entries_metadata.unstable_entries().len(),
+            var_byte_count: unstable_entries_in_map,
             havoc_expansion: 0, // TODO
             auto_dict_entries,
             testcache_size: 0,
