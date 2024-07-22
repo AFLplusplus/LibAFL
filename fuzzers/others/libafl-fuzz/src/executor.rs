@@ -58,7 +58,7 @@ pub fn check_binary(opt: &mut Opt, shmem_env_var: &str) -> Result<(), Error> {
         )));
     }
     if opt.skip_bin_check
-        || opt.use_wine
+        || opt.wine_mode
         || opt.unicorn_mode
         || (opt.qemu_mode && opt.qemu_custom_bin)
         || (opt.forkserver_cs && opt.cs_custom_bin)

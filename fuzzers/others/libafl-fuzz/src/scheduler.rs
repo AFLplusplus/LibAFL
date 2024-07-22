@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use libafl::{
-    corpus::{CorpusId, HasTestcase, Testcase},
+    corpus::{Corpus, CorpusId, HasTestcase, SchedulerTestcaseMetadata, Testcase},
     inputs::UsesInput,
     observers::{CanTrack, ObserversTuple},
     schedulers::{
@@ -72,7 +72,23 @@ where
 {
     fn on_add(&mut self, state: &mut Self::State, id: CorpusId) -> Result<(), Error> {
         match self {
-            Self::Queue(queue, _) => queue.on_add(state, id),
+            // We need to manually set the depth
+            // since we want to avoid implementing `AflScheduler` for `QueueScheduler`
+            Self::Queue(queue, _) => {
+                queue.on_add(state, id)?;
+                let current_id = *state.corpus().current();
+                let mut depth = match current_id {
+                    Some(parent_idx) => state
+                        .testcase(parent_idx)?
+                        .metadata::<SchedulerTestcaseMetadata>()?
+                        .depth(),
+                    None => 0,
+                };
+                depth += 1;
+                let mut testcase = state.corpus().get(id)?.borrow_mut();
+                testcase.add_metadata(SchedulerTestcaseMetadata::new(depth));
+                Ok(())
+            }
             Self::Weighted(weighted, _) => weighted.on_add(state, id),
         }
     }

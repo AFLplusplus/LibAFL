@@ -43,15 +43,15 @@ use libafl_targets::{cmps::AFLppCmpLogMap, AFLppCmpLogObserver, AFLppCmplogTraci
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    afl_stats::AflStatsStage,
+    afl_stats::{AflStatsStage, CalibrationTime, FuzzTime, SyncTime},
     corpus::{set_corpus_filepath, set_solution_filepath},
     env_parser::AFL_DEFAULT_MAP_SIZE,
     feedback::{
         filepath::CustomFilepathToTestcaseFeedback, persistent_record::PersitentRecordFeedback,
         seed::SeedFeedback,
     },
-    mutational_stage::SupportedMutationalStages,
     scheduler::SupportedSchedulers,
+    stages::{mutational_stage::SupportedMutationalStages, time_tracker::TimeTrackingStageWrapper},
     Opt, AFL_DEFAULT_INPUT_LEN_MAX, AFL_DEFAULT_INPUT_LEN_MIN, SHMEM_ENV_VAR,
 };
 
@@ -95,11 +95,26 @@ where
     // We run the stage only if we are NOT doing sequential scheduling.
     let calibration = IfStage::new(
         |_, _, _, _| Ok(!opt.sequential_queue),
-        tuple_list!(CalibrationStage::new(&map_feedback)),
+        tuple_list!(TimeTrackingStageWrapper::<CalibrationTime, _, _>::new(
+            CalibrationStage::new(&map_feedback)
+        )),
     );
 
+    // Add user supplied dictionaries
+    let mut tokens = Tokens::new();
+    tokens = tokens.add_from_files(&opt.dicts)?;
+
+    let user_token_count = tokens.len();
+
     // Create a AFLStatsStage;
-    let afl_stats_stage = AflStatsStage::new(opt, fuzzer_dir.clone(), &edges_observer);
+    let afl_stats_stage = AflStatsStage::new(
+        opt,
+        fuzzer_dir.clone(),
+        &edges_observer,
+        user_token_count,
+        !opt.no_autodict,
+        core_id,
+    );
 
     // Create an observation channel to keep track of the execution time.
     let time_observer = TimeObserver::new("time");
@@ -145,7 +160,7 @@ where
     // Initialize our State if necessary
     let mut state = state.unwrap_or_else(|| {
         StdState::new(
-            StdRand::with_seed(current_nanos()),
+            StdRand::with_seed(opt.rng_seed.unwrap_or(current_nanos())),
             // TODO: configure testcache size
             CachedOnDiskCorpus::<BytesInput>::new(fuzzer_dir.join("queue"), 1000).unwrap(),
             OnDiskCorpus::<BytesInput>::new(fuzzer_dir.clone()).unwrap(),
@@ -159,7 +174,7 @@ where
     // We can either have a simple MutationalStage (for Queue scheduling)
     // Or one that utilizes scheduling metadadata (Weighted Random scheduling)
     let mutation = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
-    let mutational_stage = if opt.sequential_queue {
+    let inner_mutational_stage = if opt.sequential_queue {
         SupportedMutationalStages::StdMutational(StdMutationalStage::new(mutation), PhantomData)
     } else {
         SupportedMutationalStages::PowerMutational(
@@ -167,7 +182,7 @@ where
             PhantomData,
         )
     };
-
+    let mutational_stage = TimeTrackingStageWrapper::<FuzzTime, _, _>::new(inner_mutational_stage);
     let strategy = opt.power_schedule.unwrap_or(PowerSchedule::EXPLORE);
 
     // Create our ColorizationStage
@@ -185,7 +200,6 @@ where
         if opt.cycle_schedules {
             weighted_scheduler = weighted_scheduler.cycling_scheduler();
         }
-        // TODO: Go back to IndexesLenTimeMinimizerScheduler once AflScheduler is implemented for it.
         scheduler = SupportedSchedulers::Weighted(
             IndexesLenTimeMinimizerScheduler::new(&edges_observer, weighted_scheduler),
             PhantomData,
@@ -203,20 +217,26 @@ where
     }
 
     // Enable autodict if configured
-    let mut tokens = Tokens::new();
     if !opt.no_autodict {
         executor = executor.autotokens(&mut tokens);
     };
 
-    // Set a custom directory for the current Input if configured;
-    // May be used to provide a ram-disk etc..
-    if let Some(cur_input_dir) = &opt.cur_input_dir {
-        if opt.harness_input_type.is_none() {
-            return Err(Error::illegal_argument(
-                "cannot use AFL_TMPDIR with stdin input type.",
-            ));
+    // Set a custom directory for the current_input file if configured;
+    // Relevant only if harness input type is @@
+    if opt.harness_input_type.is_some() {
+        let mut file = get_unique_std_input_file();
+        if let Some(ext) = &opt.input_ext {
+            file = format!("{file}.{ext}");
         }
-        executor = executor.arg_input_file(cur_input_dir.join(get_unique_std_input_file()));
+        if let Some(cur_input_dir) = &opt.cur_input_dir {
+            executor = executor.arg_input_file(cur_input_dir.join(file));
+        } else {
+            executor = executor.arg_input_file(fuzzer_dir.join(file));
+        }
+    } else if opt.cur_input_dir.is_some() {
+        return Err(Error::illegal_argument(
+            "cannot use AFL_TMPDIR with stdin input type.",
+        ));
     }
 
     // Finalize and build our Executor
@@ -268,14 +288,26 @@ where
     // Create a Sync stage to sync from foreign fuzzers
     let sync_stage = IfStage::new(
         |_, _, _, _| Ok(is_main_node && !opt.foreign_sync_dirs.is_empty()),
-        tuple_list!(SyncFromDiskStage::with_from_file(
-            opt.foreign_sync_dirs.clone(),
-            opt.foreign_sync_interval
+        tuple_list!(TimeTrackingStageWrapper::<SyncTime, _, _>::new(
+            SyncFromDiskStage::with_from_file(
+                opt.foreign_sync_dirs.clone(),
+                opt.foreign_sync_interval
+            )
         )),
     );
 
     // Create a CmpLog executor if configured.
-    if let Some(ref cmplog_binary) = opt.cmplog_binary {
+    // We only run cmplog on the main node
+    let cmplog_executable_path = match &opt.cmplog {
+        None => "-",
+        Some(ref p) => match p.as_str() {
+            "0" => opt.executable.to_str().unwrap(),
+            _ => p,
+        },
+    };
+    let run_cmplog = cmplog_executable_path != "-" && is_main_node;
+
+    if run_cmplog {
         // The CmpLog map shared between the CmpLog observer and CmpLog executor
         let mut cmplog_shmem = shmem_provider.uninit_on_shmem::<AFLppCmpLogMap>().unwrap();
 
@@ -291,7 +323,7 @@ where
         // Cmplog has 25% execution overhead so we give it double the timeout
         let cmplog_executor = base_executor(opt, &mut shmem_provider)
             .timeout(Duration::from_millis(opt.hang_timeout * 2))
-            .program(cmplog_binary)
+            .program(cmplog_executable_path)
             .build(tuple_list!(cmplog_observer))
             .unwrap();
 

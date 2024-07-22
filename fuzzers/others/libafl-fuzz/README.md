@@ -26,9 +26,11 @@ Rewrite of afl-fuzz in Rust.
 - [x] AFL_FUZZER_STATS_UPDATE_INTERVAL
 - [x] AFL_DEFER_FORKSRV
 - [x] AFL_NO_WARN_INSTABILITY (we don't warn anyways, we should maybe?)
+- [x] AFL_IMPORT_FIRST (implicit)
 - [x] AFL_SYNC_TIME 
-- [ ] AFL_FINAL_SYNC 
 - [x] AFL_AUTORESUME
+- [x] AFL_PERSISTENT_RECORD
+- [ ] AFL_FINAL_SYNC 
 - [ ] AFL_CRASHING_SEEDS_AS_NEW_CRASH
 - [ ] AFL_IGNORE_UNKNOWN_ENVS
 - [ ] AFL_NO_UI
@@ -44,7 +46,6 @@ Rewrite of afl-fuzz in Rust.
 - [ ] AFL_FAST_CAL
 - [ ] AFL_NO_CRASH_README
 - [ ] AFL_KEEP_TIMEOUTS
-- [x] AFL_PERSISTENT_RECORD
 - [ ] AFL_TESTCACHE_SIZE
 - [ ] AFL_NO_ARITH
 - [ ] AFL_DISABLE_TRIM
@@ -56,7 +57,6 @@ Rewrite of afl-fuzz in Rust.
 - [ ] AFL_STATSD_PORT
 - [ ] AFL_STATSD_HOST
 - [ ] AFL_IMPORT
-- [x] AFL_IMPORT_FIRST (implicit)
 - [ ] AFL_SHUFFLE_QUEUE
 - [ ] AFL_CUSTOM_QEMU_BIN
 - [ ] AFL_PATH

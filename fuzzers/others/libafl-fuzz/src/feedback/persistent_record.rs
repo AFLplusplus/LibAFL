@@ -52,7 +52,7 @@ where
 {
     fn create_feedback(&self, _ctx: &T) -> PersitentRecordFeedback<I, S> {
         Self {
-            record_size: self.record_size.clone(),
+            record_size: self.record_size,
             record: self.record.clone(),
             phantomm: self.phantomm,
         }
@@ -156,6 +156,6 @@ where
     S: State<Input = I>,
 {
     fn should_run(&self) -> bool {
-        return self.record_size > 0;
+        self.record_size > 0
     }
 }
