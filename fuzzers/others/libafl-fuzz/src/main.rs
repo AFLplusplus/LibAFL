@@ -11,8 +11,8 @@ use std::{collections::HashMap, path::PathBuf, time::Duration};
 mod afl_stats;
 mod env_parser;
 mod feedback;
-mod mutational_stage;
 mod scheduler;
+mod stages;
 use clap::Parser;
 use corpus::{check_autoresume, create_dir_if_not_exists, remove_main_node_file};
 mod corpus;
@@ -119,17 +119,30 @@ struct Opt {
     input_dir: PathBuf,
     #[arg(short = 'o')]
     output_dir: PathBuf,
+    /// file extension for the fuzz test input file (if needed)
+    #[arg(short = 's')]
+    input_ext: Option<String>,
+    /// use a fixed seed for the RNG
+    #[arg(short = 's')]
+    rng_seed: Option<u64>,
+    /// power schedules compute a seed's performance score: explore(default), fast, exploit, seek, rare, mmopt, coe, lin
     #[arg(short = 'p')]
     power_schedule: Option<PowerSchedule>,
+    /// enable CmpLog by specifying a binary compiled for it.
     #[arg(short = 'c')]
-    cmplog_binary: Option<PathBuf>,
+    cmplog: Option<String>,
+    /// sync to a foreign fuzzer queue directory (requires -M, can be specified up to 32 times)
     #[arg(short = 'F', num_args = 32)]
     foreign_sync_dirs: Vec<PathBuf>,
+    /// fuzzer dictionary (see README.md, specify up to 4 times)
+    #[arg(short = 'x', num_args = 4)]
+    dicts: Vec<PathBuf>,
     // Environment + CLI variables
     #[arg(short = 'G')]
     max_input_len: Option<usize>,
     #[arg(short = 'g')]
     min_input_len: Option<usize>,
+    /// sequential queue selection instead of weighted random
     #[arg(short = 'Z')]
     sequential_queue: bool,
     // TODO: enforce
@@ -138,6 +151,7 @@ struct Opt {
     // TODO: enforce
     #[arg(short = 'V')]
     fuzz_for_seconds: Option<usize>,
+
     // Environment Variables
     #[clap(skip)]
     bench_just_one: bool,
@@ -211,18 +225,22 @@ struct Opt {
     qemu_custom_bin: bool,
     #[clap(skip)]
     cs_custom_bin: bool,
-    #[clap(skip)]
-    use_wine: bool,
+    /// use qemu-based instrumentation with Wine (Wine mode)
+    #[arg(short = 'W')]
+    wine_mode: bool,
     #[clap(skip)]
     uses_asan: bool,
-    #[clap(skip)]
+    /// use binary-only instrumentation (FRIDA mode)
+    #[arg(short = 'O')]
     frida_mode: bool,
-    #[clap(skip)]
+    /// use binary-only instrumentation (QEMU mode)
+    #[arg(short = 'Q')]
     qemu_mode: bool,
     #[cfg(target_os = "linux")]
     #[clap(skip)]
     nyx_mode: bool,
-    #[clap(skip)]
+    /// use unicorn-based instrumentation (Unicorn mode)
+    #[arg(short = 'U')]
     unicorn_mode: bool,
     #[clap(skip)]
     forkserver_cs: bool,

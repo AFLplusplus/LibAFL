@@ -13,20 +13,46 @@ use libafl::{
     events::EventFirer,
     executors::HasObservers,
     inputs::UsesInput,
+    mutators::Tokens,
     observers::MapObserver,
     schedulers::{minimizer::IsFavoredMetadata, HasQueueCycles, Scheduler},
     stages::{calibrate::UnstableEntriesMetadata, Stage},
     state::{HasCorpus, HasExecutions, HasImported, HasStartTime, Stoppable, UsesState},
-    Error, HasMetadata, HasNamedMetadata, HasScheduler,
+    Error, HasMetadata, HasNamedMetadata, HasScheduler, SerdeAny,
 };
 use libafl_bolts::{
+    core_affinity::CoreId,
     current_time,
     os::peak_rss_mb_child_processes,
     tuples::{Handle, Handled, MatchNameRef},
     Named,
 };
+use serde::{Deserialize, Serialize};
 
 use crate::{fuzzer::fuzzer_target_mode, Opt};
+
+#[derive(Debug, SerdeAny, Serialize, Deserialize)]
+pub struct CalibrationTime(pub Duration);
+impl From<Duration> for CalibrationTime {
+    fn from(value: Duration) -> Self {
+        Self(value)
+    }
+}
+#[derive(Debug, SerdeAny, Serialize, Deserialize)]
+pub struct SyncTime(pub Duration);
+impl From<Duration> for SyncTime {
+    fn from(value: Duration) -> Self {
+        Self(value)
+    }
+}
+
+#[derive(Debug, SerdeAny, Serialize, Deserialize)]
+pub struct FuzzTime(pub Duration);
+impl From<Duration> for FuzzTime {
+    fn from(value: Duration) -> Self {
+        Self(value)
+    }
+}
 
 /// The [`AflStatsStage`] is a Stage that calculates and writes
 /// AFL++'s `fuzzer_stats` and `plot_data` information.
@@ -63,6 +89,12 @@ pub struct AflStatsStage<C, O, E, EM, Z> {
     target_mode: Cow<'static, str>,
     /// full command line used for the fuzzing session
     command_line: Cow<'static, str>,
+    /// Amount of tokens provided by the user. Used to determine autotokens count.
+    provided_tokens: usize,
+    /// autotokens are enabled
+    autotokens_enabled: bool,
+    /// The core we are bound to
+    core_id: CoreId,
     phantom: PhantomData<(C, O, E, EM, Z)>,
 }
 
@@ -82,11 +114,12 @@ pub struct AFLFuzzerStats<'a> {
     cycles_wo_find: u64,
     /// longest time in seconds no new path was found
     time_wo_finds: u64,
-    /// TODO
+    /// Time spent fuzzing
     fuzz_time: u64,
-    /// TODO
+    /// Time spent calibrating inputs
     calibration_time: u64,
-    /// TODO
+    /// Time spent syncing with foreign fuzzers
+    /// NOTE: Syncing between our own instances is not counted.
     sync_time: u64,
     /// TODO
     trim_time: u64,
@@ -137,16 +170,16 @@ pub struct AFLFuzzerStats<'a> {
     /// max rss usage reached during fuzzing in MB
     peak_rss_mb: i64,
     /// TODO
-    cpu_affinity: i64,
+    cpu_affinity: usize,
     /// how many edges have been found
     edges_found: u64,
-    /// TODO:
+    /// Size of our edges map
     total_edges: u64,
     /// how many edges are non-deterministic
     var_byte_count: usize,
     /// TODO:
     havoc_expansion: usize,
-    /// TODO:
+    /// Amount of automatic dict entries found
     auto_dict_entries: usize,
     /// TODO:
     testcache_size: usize,
@@ -265,6 +298,13 @@ where
             .unwrap();
         let unstable_entries_in_map = unstable_entries_metadata.unstable_entries().len();
 
+        let auto_dict_entries = match self.autotokens_enabled {
+            false => 0,
+            true => state
+                .metadata::<Tokens>()?
+                .len()
+                .saturating_sub(self.provided_tokens),
+        };
         let stats = AFLFuzzerStats {
             start_time: self.start_time,
             last_update: self.last_report_time.as_secs(),
@@ -272,10 +312,19 @@ where
             fuzzer_pid: self.pid,
             cycles_done: queue_cycles,
             cycles_wo_find: self.cycles_wo_finds,
-            fuzz_time: 0,        // TODO
-            calibration_time: 0, // TODO
-            sync_time: 0,        // TODO
-            trim_time: 0,        // TODO
+            fuzz_time: state
+                .metadata::<FuzzTime>()
+                .map_or(Duration::from_secs(0), |d| d.0)
+                .as_secs(),
+            calibration_time: state
+                .metadata::<CalibrationTime>()
+                .map_or(Duration::from_secs(0), |d| d.0)
+                .as_secs(),
+            sync_time: state
+                .metadata::<SyncTime>()
+                .map_or(Duration::from_secs(0), |d| d.0)
+                .as_secs(),
+            trim_time: 0, // TODO
             execs_done: total_executions,
             execs_per_sec: *state.executions(),     // TODO
             execs_ps_last_min: *state.executions(), // TODO
@@ -298,15 +347,15 @@ where
             last_hang: self.last_hang,
             last_crash: self.last_crash,
             execs_since_crash: total_executions - self.execs_at_last_objective,
-            exec_timeout: self.exec_timeout, // TODO
+            exec_timeout: self.exec_timeout,
             slowest_exec_ms: self.slowest_exec.as_millis(),
             peak_rss_mb: peak_rss_mb_child_processes()?,
-            cpu_affinity: 0, // TODO
+            cpu_affinity: self.core_id.0,
             total_edges: map_size as u64,
             edges_found: filled_entries_in_map,
             var_byte_count: unstable_entries_metadata.unstable_entries().len(),
-            havoc_expansion: 0,   // TODO
-            auto_dict_entries: 0, // TODO
+            havoc_expansion: 0, // TODO
+            auto_dict_entries,
             testcache_size: 0,
             testcache_count: 0,
             testcache_evict: 0,
@@ -354,7 +403,14 @@ where
     /// create a new instance of the [`AflStatsStage`]
     #[allow(clippy::too_many_arguments)]
     #[must_use]
-    pub fn new(opt: &Opt, fuzzer_dir: PathBuf, map_observer: &C) -> Self {
+    pub fn new(
+        opt: &Opt,
+        fuzzer_dir: PathBuf,
+        map_observer: &C,
+        provided_tokens: usize,
+        autotokens_enabled: bool,
+        core_id: CoreId,
+    ) -> Self {
         Self::create_plot_data_file(&fuzzer_dir).unwrap();
         Self::create_fuzzer_stats_file(&fuzzer_dir).unwrap();
         Self {
@@ -381,6 +437,9 @@ where
             afl_version: Cow::Borrowed("libafl-fuzz-0.0.1"),
             command_line: get_run_cmdline(),
             fuzzer_dir,
+            provided_tokens,
+            core_id,
+            autotokens_enabled,
             phantom: PhantomData,
         }
     }
@@ -408,14 +467,17 @@ where
     }
 
     fn write_fuzzer_stats(&self, stats: &AFLFuzzerStats) -> Result<(), Error> {
-        std::fs::write(self.fuzzer_dir.join("fuzzer_stats"), stats.to_string())?;
+        let tmp_file = self.fuzzer_dir.join(".fuzzer_stats_tmp");
+        let stats_file = self.fuzzer_dir.join("fuzzer_stats");
+        std::fs::write(&tmp_file, stats.to_string())?;
+        std::fs::copy(&tmp_file, &stats_file)?;
+        std::fs::remove_file(tmp_file)?;
         Ok(())
     }
 
     fn write_plot_data(&self, plot_data: &AFLPlotData) -> Result<(), Error> {
-        let mut file = OpenOptions::new()
-            .append(true)
-            .open(self.fuzzer_dir.join("plot_data"))?;
+        let plot_file = self.fuzzer_dir.join("plot_data");
+        let mut file = OpenOptions::new().append(true).open(&plot_file)?;
         writeln!(file, "{plot_data}")?;
         Ok(())
     }
