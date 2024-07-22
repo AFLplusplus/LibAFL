@@ -336,9 +336,6 @@ where
                   state: &mut LibaflFuzzState,
                   _event_manager: &mut _|
          -> Result<bool, Error> {
-            if !is_main_node {
-                return Ok(false);
-            }
             let testcase = state.current_testcase()?;
             if testcase.scheduled_count() == 1
                 || (opt.cmplog_only_new && testcase.has_metadata::<IsInitialCorpusEntryMetadata>())
