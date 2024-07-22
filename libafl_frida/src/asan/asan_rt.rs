@@ -95,7 +95,7 @@ pub const ASAN_SAVE_REGISTER_NAMES: [&str; ASAN_SAVE_REGISTER_COUNT] = [
 ];
 
 thread_local! {
-    static ASAN_IN_HOOK: Cell<bool> = Cell::new(false);
+    static ASAN_IN_HOOK: Cell<bool> = const { Cell::new(false) };
 }
 
 /// The count of registers that need to be saved by the asan runtime
