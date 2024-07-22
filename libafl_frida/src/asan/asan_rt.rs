@@ -11,7 +11,11 @@ use core::{
     ptr::addr_of_mut,
 };
 use std::{
-    cell::Cell, ffi::{c_char, c_void}, ptr::write_volatile, rc::Rc, sync::MutexGuard
+    cell::Cell,
+    ffi::{c_char, c_void},
+    ptr::write_volatile,
+    rc::Rc,
+    sync::MutexGuard,
 };
 
 use backtrace::Backtrace;
