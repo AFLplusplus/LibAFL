@@ -344,7 +344,7 @@ where
                   _event_manager: &mut _|
          -> Result<bool, Error> {
             let testcase = state.current_testcase()?;
-            if testcase.scheduled_count() == 2
+            if testcase.scheduled_count() == 1
                 || (opt.cmplog_only_new && testcase.has_metadata::<IsInitialCorpusEntryMetadata>())
             {
                 return Ok(false);
