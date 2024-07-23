@@ -15,7 +15,6 @@ use crate::{
     corpus::{Corpus, CorpusId},
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::ExitKind,
-    inputs::UsesInput,
     mark_feature_time,
     mutators::Mutator,
     observers::ObserversTuple,

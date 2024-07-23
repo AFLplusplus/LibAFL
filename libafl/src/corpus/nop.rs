@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, CorpusId, Testcase},
-    inputs::{Input, UsesInput},
+    inputs::Input,
     Error,
 };
 

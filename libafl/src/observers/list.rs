@@ -4,7 +4,7 @@ use core::fmt::Debug;
 use libafl_bolts::{ownedref::OwnedMutPtr, Error, Named};
 use serde::{Deserialize, Serialize};
 
-use crate::{inputs::UsesInput, observers::Observer};
+use crate::observers::Observer;
 
 /// A simple observer with a list of things.
 #[derive(Serialize, Deserialize, Debug)]

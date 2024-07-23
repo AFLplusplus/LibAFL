@@ -39,7 +39,7 @@ pub use list::*;
 use serde::{Deserialize, Serialize};
 pub use value::*;
 
-use crate::{executors::ExitKind, inputs::UsesInput, state::UsesState, Error};
+use crate::{executors::ExitKind, Error};
 
 /// Observers observe different information about the target.
 /// They can then be used by various sorts of feedback.
@@ -87,13 +87,6 @@ where
     ) -> Result<(), Error> {
         Ok(())
     }
-}
-
-/// Defines the observer type shared across traits of the type.
-/// Needed for consistency across HasCorpus/HasSolutions and friends.
-pub trait UsesObservers: UsesState {
-    /// The observers type
-    type Observers: ObserversTuple<Self::State>;
 }
 
 /// A haskell-style tuple of observers

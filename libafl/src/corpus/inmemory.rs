@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 use super::HasTestcase;
 use crate::{
     corpus::{Corpus, CorpusId, Testcase},
-    inputs::{Input, UsesInput},
+    inputs::Input,
+    state::HasCorpus,
     Error,
 };
 
@@ -246,13 +247,6 @@ where
     pub disabled: TestcaseStorageMap<I>,
     /// The progressive id for both maps
     progressive_id: usize,
-}
-
-impl<I> UsesInput for TestcaseStorage<I>
-where
-    I: Input,
-{
-    type Input = I;
 }
 
 impl<I> TestcaseStorage<I>

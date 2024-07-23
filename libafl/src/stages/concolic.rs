@@ -20,7 +20,7 @@ use crate::{
     executors::{Executor, HasObservers},
     observers::concolic::ConcolicObserver,
     stages::{RetryCountRestartHelper, Stage, TracingStage},
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, UsesState},
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions},
     Error, HasMetadata, HasNamedMetadata,
 };
 #[cfg(feature = "concolic_mutation")]

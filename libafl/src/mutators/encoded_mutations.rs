@@ -10,7 +10,7 @@ use libafl_bolts::{
 
 use crate::{
     corpus::Corpus,
-    inputs::{EncodedInput, UsesInput},
+    inputs::EncodedInput,
     mutators::{
         mutations::{buffer_copy, buffer_self_copy, ARITH_MAX},
         MutationResult, Mutator, Named,

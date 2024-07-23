@@ -16,7 +16,6 @@ use crate::{
     events::EventFirer,
     executors::ExitKind,
     feedbacks::Feedback,
-    inputs::UsesInput,
     observers::{concolic::ConcolicObserver, ObserversTuple},
     state::State,
     Error, HasMetadata,

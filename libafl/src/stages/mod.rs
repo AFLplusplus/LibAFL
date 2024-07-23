@@ -47,11 +47,10 @@ use crate::{
     corpus::{CorpusId, HasCurrentCorpusId},
     events::{EventFirer, EventProcessor, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::{Executor, HasObservers},
-    inputs::UsesInput,
     observers::ObserversTuple,
     schedulers::Scheduler,
     stages::push::PushStage,
-    state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand, State, Stoppable, UsesState},
+    state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand, State, Stoppable},
     Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasMetadata, HasNamedMetadata,
     HasScheduler,
 };

@@ -12,9 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    inputs::UsesInput,
-    observers::{DifferentialObserversTuple, ObserversTuple, UsesObservers},
-    state::UsesState,
+    observers::{DifferentialObserversTuple, ObserversTuple},
     Error,
 };
 

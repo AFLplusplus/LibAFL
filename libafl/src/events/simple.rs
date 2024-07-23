@@ -30,9 +30,8 @@ use crate::{
         BrokerEventResult, Event, EventFirer, EventManager, EventManagerId, EventProcessor,
         EventRestarter, HasEventManagerId,
     },
-    inputs::UsesInput,
     monitors::Monitor,
-    state::{HasExecutions, HasLastReportTime, State, Stoppable, UsesState},
+    state::{HasExecutions, HasLastReportTime, State, Stoppable},
     Error, HasMetadata,
 };
 #[cfg(feature = "std")]
@@ -48,14 +47,11 @@ const _ENV_FUZZER_RECEIVER: &str = "_AFL_ENV_FUZZER_RECEIVER";
 const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT";
 
 /// A simple, single-threaded event manager that just logs
-pub struct SimpleEventManager<MT, S>
-where
-    S: UsesInput + Stoppable,
-{
+pub struct SimpleEventManager<I, MT, S> {
     /// The monitor
     monitor: MT,
     /// The events that happened since the last `handle_in_broker`
-    events: Vec<Event<S::Input>>,
+    events: Vec<Event<I>>,
     /// The custom buf handler
     custom_buf_handlers: Vec<Box<CustomBufHandlerFn<S>>>,
     phantom: PhantomData<S>,

@@ -37,9 +37,9 @@ use crate::{
     },
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
-    inputs::{Input, NopInput, UsesInput},
-    observers::{ObserversTuple, TimeObserver, UsesObservers},
-    state::{HasExecutions, HasLastReportTime, NopState, State, Stoppable, UsesState},
+    inputs::{Input, NopInput},
+    observers::{ObserversTuple, TimeObserver},
+    state::{HasExecutions, HasLastReportTime, NopState, State, Stoppable},
     Error, HasMetadata,
 };
 
@@ -49,7 +49,6 @@ pub(crate) const _LLMP_TAG_TO_MAIN: Tag = Tag(0x3453453);
 #[derive(Debug)]
 pub struct CentralizedEventManager<EM, EMH, S, SP>
 where
-    EM: UsesState,
     EMH: EventManagerHooksTuple<EM::State>,
     S: State,
     SP: ShMemProvider,

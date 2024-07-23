@@ -12,7 +12,7 @@ use hashbrown::HashMap;
 use libafl_bolts::{ownedref::OwnedRefMut, serdeany::SerdeAny, Named};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use crate::{executors::ExitKind, inputs::UsesInput, observers::Observer, Error, HasMetadata};
+use crate::{executors::ExitKind, observers::Observer, Error, HasMetadata};
 
 /// Generic metadata trait for use in a `CmpObserver`, which adds comparisons from a `CmpObserver`
 /// primarily intended for use with `AFLppCmpValuesMetadata` or `CmpValuesMetadata`

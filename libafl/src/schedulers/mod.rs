@@ -35,10 +35,9 @@ pub use tuneable::*;
 
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, SchedulerTestcaseMetadata, Testcase},
-    inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
     random_corpus_id,
-    state::{HasCorpus, HasRand, State, UsesState},
+    state::{HasCorpus, HasRand, State},
     Error, HasMetadata,
 };
 

@@ -17,7 +17,7 @@ use crate::{
     mutators::{MultiMutator, MutationResult, Mutator},
     stages::{RetryCountRestartHelper, Stage},
     start_timer,
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand},
     Error, HasMetadata, HasNamedMetadata,
 };
 #[cfg(feature = "introspection")]

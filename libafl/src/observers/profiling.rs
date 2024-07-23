@@ -5,7 +5,7 @@ use hashbrown::HashMap;
 use libafl_bolts::{ownedref::OwnedMutPtr, Named};
 use serde::{Deserialize, Serialize};
 
-use crate::{inputs::UsesInput, observers::Observer, state::State, Error};
+use crate::{observers::Observer, state::State, Error};
 #[derive(Debug, Serialize, Deserialize)]
 /// The json data
 pub struct FunctionData {

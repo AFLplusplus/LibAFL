@@ -8,7 +8,7 @@ use std::vec::Vec;
 use libafl_bolts::Named;
 use serde::{Deserialize, Serialize};
 
-use crate::{inputs::UsesInput, observers::Observer, state::State, Error};
+use crate::{observers::Observer, state::State, Error};
 
 /// An observer that captures stdout of a target.
 /// Only works for supported executors.

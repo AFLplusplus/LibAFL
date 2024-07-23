@@ -14,7 +14,6 @@ use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    inputs::UsesInput,
     observers::{map::MapObserver, Observer},
     Error,
 };

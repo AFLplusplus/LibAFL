@@ -20,7 +20,7 @@ use crate::{
     mutators::mutations::buffer_copy,
     observers::{MapObserver, ObserversTuple},
     stages::{RetryCountRestartHelper, Stage},
-    state::{HasCorpus, HasCurrentTestcase, HasRand, UsesState},
+    state::{HasCorpus, HasCurrentTestcase, HasRand},
     Error, HasMetadata, HasNamedMetadata,
 };
 

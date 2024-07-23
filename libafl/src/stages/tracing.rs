@@ -14,7 +14,7 @@ use crate::{
     observers::ObserversTuple,
     stages::{RetryCountRestartHelper, Stage},
     start_timer,
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, State, UsesState},
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, State},
     Error, HasNamedMetadata,
 };
 #[cfg(feature = "introspection")]

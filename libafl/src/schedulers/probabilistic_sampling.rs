@@ -10,9 +10,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
-    inputs::UsesInput,
     schedulers::{RemovableScheduler, Scheduler, TestcaseScore},
-    state::{HasCorpus, HasRand, State, UsesState},
+    state::{HasCorpus, HasRand, State},
     Error, HasMetadata,
 };
 

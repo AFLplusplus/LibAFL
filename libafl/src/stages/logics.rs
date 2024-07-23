@@ -4,7 +4,6 @@ use core::marker::PhantomData;
 
 use crate::{
     stages::{HasCurrentStage, HasNestedStageStatus, Stage, StageId, StagesTuple},
-    state::UsesState,
     Error,
 };
 

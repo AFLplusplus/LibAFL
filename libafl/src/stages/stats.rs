@@ -13,7 +13,7 @@ use crate::{
     events::EventFirer,
     schedulers::minimizer::IsFavoredMetadata,
     stages::Stage,
-    state::{HasCorpus, HasImported, UsesState},
+    state::{HasCorpus, HasImported},
     Error, HasMetadata,
 };
 #[cfg(feature = "std")]

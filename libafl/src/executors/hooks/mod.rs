@@ -1,7 +1,7 @@
 //! Hooks for the executors.
 //! These will be executed right before and after the executor's harness run.
 
-use crate::{executors::HasObservers, inputs::UsesInput};
+use crate::executors::HasObservers;
 
 /// windows crash/timeout handler and asan death callback
 #[cfg(windows)]

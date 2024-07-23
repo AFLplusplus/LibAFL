@@ -9,9 +9,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, CorpusId},
-    inputs::UsesInput,
     stages::Stage,
-    state::{HasCorpus, HasRand, HasSolutions, UsesState},
+    state::{HasCorpus, HasRand, HasSolutions},
     Error, HasMetadata,
 };
 

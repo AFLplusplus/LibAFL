@@ -217,13 +217,6 @@ impl<'a> HasMutatorBytes for MutVecInput<'a> {
     }
 }
 
-/// Defines the input type shared across traits of the type.
-/// Needed for consistency across HasCorpus/HasSolutions and friends.
-pub trait UsesInput {
-    /// Type which will be used throughout this state.
-    type Input: Input;
-}
-
 #[derive(Debug)]
 /// Basic `InputConverter` with just one type that is not converting
 pub struct NopInputConverter<I> {

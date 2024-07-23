@@ -15,13 +15,13 @@ use crate::{
     corpus::{Corpus, HasCurrentCorpusId},
     executors::{Executor, HasObservers},
     feedbacks::map::MapNoveltiesMetadata,
-    inputs::{BytesInput, GeneralizedInputMetadata, GeneralizedItem, HasMutatorBytes, UsesInput},
+    inputs::{BytesInput, GeneralizedInputMetadata, GeneralizedItem, HasMutatorBytes},
     mark_feature_time,
     observers::{CanTrack, MapObserver, ObserversTuple},
     require_novelties_tracking,
     stages::{RetryCountRestartHelper, Stage},
     start_timer,
-    state::{HasCorpus, HasExecutions, UsesState},
+    state::{HasCorpus, HasExecutions},
     Error, HasMetadata, HasNamedMetadata,
 };
 #[cfg(feature = "introspection")]
