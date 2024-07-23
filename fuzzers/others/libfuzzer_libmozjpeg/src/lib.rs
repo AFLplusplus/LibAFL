@@ -16,8 +16,8 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::{
-        scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
-        token_mutations::Tokens,
+        havoc_mutations::havoc_mutations,
+        scheduled::{tokens_mutations, StdScheduledMutator},        token_mutations::Tokens,
     },
     observers::StdMapObserver,
     schedulers::RandScheduler,
