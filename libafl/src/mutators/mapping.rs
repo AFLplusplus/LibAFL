@@ -51,19 +51,20 @@ impl<M> MappingFunctor<M> for ToMutVecMappingMutatorMapper {
 }
 
 #[derive(Debug)]
-pub struct FunctionMappingMutator<M, IO, II> {
-    mapper: fn(&mut IO) -> &mut II,
+pub struct FunctionMappingMutator<M, F> {
+    mapper: F,
     inner: M,
 }
 
-impl<M, IO, II> FunctionMappingMutator<M, IO, II> {
-    fn new(mapper: fn(&mut IO) -> &mut II, inner: M) -> Self {
+impl<M, F> FunctionMappingMutator<M, F> {
+    pub fn new(mapper: F, inner: M) -> Self {
         Self { mapper, inner }
     }
 }
 
-impl<M, S, IO, II> Mutator<IO, S> for FunctionMappingMutator<M, IO, II>
+impl<M, S, F, IO, II> Mutator<IO, S> for FunctionMappingMutator<M, F>
 where
+    F: for<'a> FnMut(&'a mut IO) -> &'a mut II,
     M: Mutator<II, S>,
 {
     fn mutate(&mut self, state: &mut S, input: &mut IO) -> Result<MutationResult, Error> {
@@ -71,31 +72,31 @@ where
     }
 }
 
-impl<M, IO, II> Named for FunctionMappingMutator<M, IO, II>
-where
-    M: Named,
-{
+impl<M, F> Named for FunctionMappingMutator<M, F> {
     fn name(&self) -> &Cow<'static, str> {
         &Cow::Borrowed("FunctionMappingMutator")
     }
 }
 
 #[derive(Debug)]
-pub struct ToFunctionMappingMutatorMapper<IO, II> {
-    mapper: for<'a> fn(&'a mut IO) -> &'a mut II,
+pub struct ToFunctionMappingMutatorMapper<F> {
+    mapper: F,
 }
 
-impl<IO, II> ToFunctionMappingMutatorMapper<IO, II> {
-    pub fn new(mapper: for<'a> fn(&'a mut IO) -> &'a mut II) -> Self {
+impl<F> ToFunctionMappingMutatorMapper<F> {
+    pub fn new(mapper: F) -> Self {
         Self { mapper }
     }
 }
 
-impl<M, IO, II> MappingFunctor<M> for ToFunctionMappingMutatorMapper<IO, II> {
-    type Output = FunctionMappingMutator<M, IO, II>;
+impl<M, F> MappingFunctor<M> for ToFunctionMappingMutatorMapper<F>
+where
+    F: Clone,
+{
+    type Output = FunctionMappingMutator<M, F>;
 
     fn apply(&mut self, from: M) -> Self::Output {
-        FunctionMappingMutator::new(self.mapper, from)
+        FunctionMappingMutator::new(self.mapper.clone(), from)
     }
 }
 

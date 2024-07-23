@@ -4,12 +4,11 @@ mod input;
 use std::ptr::write_volatile;
 use std::{path::PathBuf, ptr::write};
 
-use input::{CustomInput, CustomInputGenerator};
-use libafl::monitors::SimpleMonitor;
-use libafl::mutators::{
-    havoc_mutations_no_crossover, mapped_havoc_mutations, OptionMappingMutator,
-    ToFunctionMappingMutatorMapper, ToMutVecMappingMutatorMapper, ToOptionMappingMutatorMapper,
+use input::{
+    CustomInput, CustomInputGenerator, ToggleBooleanMutator, ToggleOptionalByteArrayMutator,
 };
+use libafl::monitors::SimpleMonitor;
+use libafl::mutators::{mapped_havoc_mutations, optional_mapped_havoc_mutations};
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
@@ -22,7 +21,8 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use libafl_bolts::tuples::{Map, Merge};
+
+use libafl_bolts::tuples::{Append, Merge};
 use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
@@ -31,6 +31,9 @@ static mut SIGNALS_PTR: *mut u8 = unsafe { SIGNALS.as_mut_ptr() };
 
 /// Assign a signal to the signals map
 fn signals_set(idx: usize) {
+    if idx > 2 {
+        println!("Setting signal: {idx}");
+    }
     unsafe { write(SIGNALS_PTR.add(idx), 1) };
 }
 
@@ -39,11 +42,11 @@ pub fn main() {
     // The closure that we want to fuzz
     let mut harness = |input: &CustomInput| {
         signals_set(0);
-        if input.boolean {
+        if input.byte_array == vec![b'a'] {
             signals_set(1);
-            if input.byte_array == vec![b'a', b'b', b'c'] {
+            if input.optional_byte_array == Some(vec![b'b']) {
                 signals_set(2);
-                if input.optional_byte_array == Some(vec![b'a', b'b', b'c']) {
+                if input.boolean {
                     #[cfg(unix)]
                     panic!("Artificial bug triggered =)");
 
@@ -111,33 +114,28 @@ pub fn main() {
     .expect("Failed to create the Executor");
 
     // Generator of printable bytearrays of max size 32
-    let mut generator = CustomInputGenerator::new(10);
+    let mut generator = CustomInputGenerator::new(1);
 
     // Generate 8 initial inputs
     state
         .generate_initial_inputs(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8)
         .expect("Failed to generate the initial corpus");
 
-    // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::new(
-        mapped_havoc_mutations(
-            |e: &CustomInput| &e.byte_array,
-            |e: &mut CustomInput| &mut e.byte_array,
-        )
-        .merge(
-            havoc_mutations_no_crossover()
-                .map(ToMutVecMappingMutatorMapper)
-                .map(ToOptionMappingMutatorMapper)
-                .map(ToFunctionMappingMutatorMapper::new(
-                    |e: &mut CustomInput| &mut e.optional_byte_array,
-                )),
-        ),
-    );
+    let mutations = mapped_havoc_mutations(
+        CustomInput::byte_array_mut,
+        &CustomInput::byte_array_optional,
+    )
+    .merge(optional_mapped_havoc_mutations(
+        CustomInput::optional_byte_array_mut,
+        &CustomInput::optional_byte_array_optional,
+    ))
+    .append(ToggleOptionalByteArrayMutator::new(1))
+    .append(ToggleBooleanMutator);
+
+    let mutator = StdScheduledMutator::new(mutations);
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     fuzzer
         .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
         .expect("Error in the fuzzing loop");
 }
-
-static mut ARRAY: Vec<u8> = Vec::new();

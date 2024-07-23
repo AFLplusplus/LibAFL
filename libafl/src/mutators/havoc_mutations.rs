@@ -2,8 +2,8 @@
 
 use crate::mutators::{
     mapping::{
-        FunctionMappingMutator, MutVecMappingMutator, ToFunctionMappingMutatorMapper,
-        ToMutVecMappingMutatorMapper,
+        FunctionMappingMutator, MutVecMappingMutator, OptionMappingMutator,
+        ToFunctionMappingMutatorMapper, ToMutVecMappingMutatorMapper,
     },
     mutations::{
         BitFlipMutator, ByteAddMutator, ByteDecMutator, ByteFlipMutator, ByteIncMutator,
@@ -16,9 +16,10 @@ use crate::mutators::{
     },
 };
 
-use alloc::vec::Vec;
 use libafl_bolts::tuples::{Map, Merge};
 use tuple_list::{tuple_list, tuple_list_type};
+
+use super::ToOptionMappingMutatorMapper;
 
 /// Tuple type of the mutations that compose the Havoc mutator without crossover mutations
 pub type HavocMutationsNoCrossoverType = tuple_list_type!(
@@ -49,172 +50,14 @@ pub type HavocMutationsNoCrossoverType = tuple_list_type!(
     BytesSwapMutator,
 );
 
-/// Tuple type of the mutations that compose the Havoc mutator without crossover mutations for mapped input types
-pub type MappedHavocMutationsNoCrossoverType<I> = tuple_list_type!(
-    FunctionMappingMutator<MutVecMappingMutator<BitFlipMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<ByteFlipMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<ByteIncMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<ByteDecMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<ByteNegMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<ByteRandMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<ByteAddMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<WordAddMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<DwordAddMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<QwordAddMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<ByteInterestingMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<WordInterestingMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<DwordInterestingMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<BytesDeleteMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<BytesDeleteMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<BytesDeleteMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<BytesDeleteMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<BytesExpandMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<BytesInsertMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<BytesRandInsertMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<BytesSetMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<BytesRandSetMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<BytesCopyMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<BytesInsertCopyMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<BytesSwapMutator>, I, Vec<u8>>,
-);
-
-/// Tuple type of the mutations that compose the Havoc mutator without crossover mutations for mapped optional input types
-// pub type OptionMappedHavocMutationsNoCrossoverType<I> = tuple_list_type!(
-//     FunctionMappingMutator<
-//         OptionMappingMutator<MutVecMappingMutator<BitFlipMutator>>,
-//         I,
-//         Option<&mut Vec<u8>>,
-//     >,
-//     FunctionMappingMutator<
-//         OptionMappingMutator<MutVecMappingMutator<ByteFlipMutator>>,
-//         I,
-//         Option<&mut Vec<u8>>,
-//     >,
-//     FunctionMappingMutator<
-//         OptionMappingMutator<MutVecMappingMutator<ByteIncMutator>>,
-//         I,
-//         Option<&mut Vec<u8>>,
-//     >,
-//     FunctionMappingMutator<
-//         OptionMappingMutator<MutVecMappingMutator<ByteDecMutator>>,
-//         I,
-//         Option<&mut Vec<u8>>,
-//     >,
-//     FunctionMappingMutator<
-//         OptionMappingMutator<MutVecMappingMutator<ByteNegMutator>>,
-//         I,
-//         Option<&mut Vec<u8>>,
-//     >,
-//     FunctionMappingMutator<
-//         OptionMappingMutator<MutVecMappingMutator<ByteRandMutator>>,
-//         I,
-//         Option<&mut Vec<u8>>,
-//     >,
-//     FunctionMappingMutator<
-//         OptionMappingMutator<MutVecMappingMutator<ByteAddMutator>>,
-//         I,
-//         Option<&mut Vec<u8>>,
-//     >,
-//     FunctionMappingMutator<
-//         OptionMappingMutator<MutVecMappingMutator<WordAddMutator>>,
-//         I,
-//         Option<&mut Vec<u8>>,
-//     >,
-//     FunctionMappingMutator<
-//         OptionMappingMutator<MutVecMappingMutator<DwordAddMutator>>,
-//         I,
-//         Option<&mut Vec<u8>>,
-//     >,
-//     FunctionMappingMutator<
-//         OptionMappingMutator<MutVecMappingMutator<QwordAddMutator>>,
-//         I,
-//         Option<&mut Vec<u8>>,
-//     >,
-//     FunctionMappingMutator<
-//         OptionMappingMutator<MutVecMappingMutator<ByteInterestingMutator>>,
-//         I,
-//         Option<&mut Vec<u8>>,
-//     >,
-//     FunctionMappingMutator<
-//         OptionMappingMutator<MutVecMappingMutator<WordInterestingMutator>>,
-//         I,
-//         Option<&mut Vec<u8>>,
-//     >,
-//     FunctionMappingMutator<
-//         OptionMappingMutator<MutVecMappingMutator<DwordInterestingMutator>>,
-//         I,
-//         Option<&mut Vec<u8>>,
-//     >,
-//     FunctionMappingMutator<
-//         OptionMappingMutator<MutVecMappingMutator<BytesDeleteMutator>>,
-//         I,
-//         Option<&mut Vec<u8>>,
-//     >,
-//     FunctionMappingMutator<
-//         OptionMappingMutator<MutVecMappingMutator<BytesDeleteMutator>>,
-//         I,
-//         Option<&mut Vec<u8>>,
-//     >,
-//     FunctionMappingMutator<
-//         OptionMappingMutator<MutVecMappingMutator<BytesDeleteMutator>>,
-//         I,
-//         Option<&mut Vec<u8>>,
-//     >,
-//     FunctionMappingMutator<
-//         OptionMappingMutator<MutVecMappingMutator<BytesDeleteMutator>>,
-//         I,
-//         Option<&mut Vec<u8>>,
-//     >,
-//     FunctionMappingMutator<
-//         OptionMappingMutator<MutVecMappingMutator<BytesExpandMutator>>,
-//         I,
-//         Option<&mut Vec<u8>>,
-//     >,
-//     FunctionMappingMutator<
-//         OptionMappingMutator<MutVecMappingMutator<BytesInsertMutator>>,
-//         I,
-//         Option<&mut Vec<u8>>,
-//     >,
-//     FunctionMappingMutator<
-//         OptionMappingMutator<MutVecMappingMutator<BytesRandInsertMutator>>,
-//         I,
-//         Option<&mut Vec<u8>>,
-//     >,
-//     FunctionMappingMutator<
-//         OptionMappingMutator<MutVecMappingMutator<BytesSetMutator>>,
-//         I,
-//         Option<&mut Vec<u8>>,
-//     >,
-//     FunctionMappingMutator<
-//         OptionMappingMutator<MutVecMappingMutator<BytesRandSetMutator>>,
-//         I,
-//         Option<&mut Vec<u8>>,
-//     >,
-//     FunctionMappingMutator<
-//         OptionMappingMutator<MutVecMappingMutator<BytesCopyMutator>>,
-//         I,
-//         Option<&mut Vec<u8>>,
-//     >,
-//     FunctionMappingMutator<
-//         OptionMappingMutator<MutVecMappingMutator<BytesInsertCopyMutator>>,
-//         I,
-//         Option<&mut Vec<u8>>,
-//     >,
-//     FunctionMappingMutator<
-//         OptionMappingMutator<MutVecMappingMutator<BytesSwapMutator>>,
-//         I,
-//         Option<&mut Vec<u8>>,
-//     >,
-// );
-
 /// Tuple type of the mutations that compose the Havoc mutator's crossover mutations
 pub type HavocCrossoverType<I> =
     tuple_list_type!(CrossoverInsertMutator<I>, CrossoverReplaceMutator<I>);
 
 /// Tuple type of the mutations that compose the Havoc mutator's crossover mutations for mapped input types
-pub type MappedHavocCrossoverType<I> = tuple_list_type!(
-    MappedCrossoverInsertMutator<I>,
-    MappedCrossoverReplaceMutator<I>
+pub type MappedHavocCrossoverType<'a, F> = tuple_list_type!(
+    MappedCrossoverInsertMutator<'a, F>,
+    MappedCrossoverReplaceMutator<'a, F>
 );
 
 /// Tuple type of the mutations that compose the Havoc mutator
@@ -249,34 +92,71 @@ pub type HavocMutationsType<I> = tuple_list_type!(
 );
 
 /// Tuple type of the mutations that compose the Havoc mutator for mapped input types
-pub type MappedHavocMutationsType<I> = tuple_list_type!(
-    FunctionMappingMutator<MutVecMappingMutator<BitFlipMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<ByteFlipMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<ByteIncMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<ByteDecMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<ByteNegMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<ByteRandMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<ByteAddMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<WordAddMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<DwordAddMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<QwordAddMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<ByteInterestingMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<WordInterestingMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<DwordInterestingMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<BytesDeleteMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<BytesDeleteMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<BytesDeleteMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<BytesDeleteMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<BytesExpandMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<BytesInsertMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<BytesRandInsertMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<BytesSetMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<BytesRandSetMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<BytesCopyMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<BytesInsertCopyMutator>, I, Vec<u8>>,
-    FunctionMappingMutator<MutVecMappingMutator<BytesSwapMutator>, I, Vec<u8>>,
-    MappedCrossoverInsertMutator<I>,
-    MappedCrossoverReplaceMutator<I>,
+pub type MappedHavocMutationsType<'a, F1, F2> = tuple_list_type!(
+    FunctionMappingMutator<MutVecMappingMutator<BitFlipMutator>, F1>,
+    FunctionMappingMutator<MutVecMappingMutator<ByteFlipMutator>, F1>,
+    FunctionMappingMutator<MutVecMappingMutator<ByteIncMutator>, F1>,
+    FunctionMappingMutator<MutVecMappingMutator<ByteDecMutator>, F1>,
+    FunctionMappingMutator<MutVecMappingMutator<ByteNegMutator>, F1>,
+    FunctionMappingMutator<MutVecMappingMutator<ByteRandMutator>, F1>,
+    FunctionMappingMutator<MutVecMappingMutator<ByteAddMutator>, F1>,
+    FunctionMappingMutator<MutVecMappingMutator<WordAddMutator>, F1>,
+    FunctionMappingMutator<MutVecMappingMutator<DwordAddMutator>, F1>,
+    FunctionMappingMutator<MutVecMappingMutator<QwordAddMutator>, F1>,
+    FunctionMappingMutator<MutVecMappingMutator<ByteInterestingMutator>, F1>,
+    FunctionMappingMutator<MutVecMappingMutator<WordInterestingMutator>, F1>,
+    FunctionMappingMutator<MutVecMappingMutator<DwordInterestingMutator>, F1>,
+    FunctionMappingMutator<MutVecMappingMutator<BytesDeleteMutator>, F1>,
+    FunctionMappingMutator<MutVecMappingMutator<BytesDeleteMutator>, F1>,
+    FunctionMappingMutator<MutVecMappingMutator<BytesDeleteMutator>, F1>,
+    FunctionMappingMutator<MutVecMappingMutator<BytesDeleteMutator>, F1>,
+    FunctionMappingMutator<MutVecMappingMutator<BytesExpandMutator>, F1>,
+    FunctionMappingMutator<MutVecMappingMutator<BytesInsertMutator>, F1>,
+    FunctionMappingMutator<MutVecMappingMutator<BytesRandInsertMutator>, F1>,
+    FunctionMappingMutator<MutVecMappingMutator<BytesSetMutator>, F1>,
+    FunctionMappingMutator<MutVecMappingMutator<BytesRandSetMutator>, F1>,
+    FunctionMappingMutator<MutVecMappingMutator<BytesCopyMutator>, F1>,
+    FunctionMappingMutator<MutVecMappingMutator<BytesInsertCopyMutator>, F1>,
+    FunctionMappingMutator<MutVecMappingMutator<BytesSwapMutator>, F1>,
+    FunctionMappingMutator<MutVecMappingMutator<MappedCrossoverInsertMutator<'a, F2>>, F1>,
+    FunctionMappingMutator<MutVecMappingMutator<MappedCrossoverReplaceMutator<'a, F2>>, F1>,
+);
+
+/// Tuple type of the mutations that compose the Havoc mutator for mapped input types
+pub type OptionMappedHavocMutationsType<'a, F1, F2> = tuple_list_type!(
+    FunctionMappingMutator<OptionMappingMutator<MutVecMappingMutator<BitFlipMutator>>, F1>,
+    FunctionMappingMutator<OptionMappingMutator<MutVecMappingMutator<ByteFlipMutator>>, F1>,
+    FunctionMappingMutator<OptionMappingMutator<MutVecMappingMutator<ByteIncMutator>>, F1>,
+    FunctionMappingMutator<OptionMappingMutator<MutVecMappingMutator<ByteDecMutator>>, F1>,
+    FunctionMappingMutator<OptionMappingMutator<MutVecMappingMutator<ByteNegMutator>>, F1>,
+    FunctionMappingMutator<OptionMappingMutator<MutVecMappingMutator<ByteRandMutator>>, F1>,
+    FunctionMappingMutator<OptionMappingMutator<MutVecMappingMutator<ByteAddMutator>>, F1>,
+    FunctionMappingMutator<OptionMappingMutator<MutVecMappingMutator<WordAddMutator>>, F1>,
+    FunctionMappingMutator<OptionMappingMutator<MutVecMappingMutator<DwordAddMutator>>, F1>,
+    FunctionMappingMutator<OptionMappingMutator<MutVecMappingMutator<QwordAddMutator>>, F1>,
+    FunctionMappingMutator<OptionMappingMutator<MutVecMappingMutator<ByteInterestingMutator>>, F1>,
+    FunctionMappingMutator<OptionMappingMutator<MutVecMappingMutator<WordInterestingMutator>>, F1>,
+    FunctionMappingMutator<OptionMappingMutator<MutVecMappingMutator<DwordInterestingMutator>>, F1>,
+    FunctionMappingMutator<OptionMappingMutator<MutVecMappingMutator<BytesDeleteMutator>>, F1>,
+    FunctionMappingMutator<OptionMappingMutator<MutVecMappingMutator<BytesDeleteMutator>>, F1>,
+    FunctionMappingMutator<OptionMappingMutator<MutVecMappingMutator<BytesDeleteMutator>>, F1>,
+    FunctionMappingMutator<OptionMappingMutator<MutVecMappingMutator<BytesDeleteMutator>>, F1>,
+    FunctionMappingMutator<OptionMappingMutator<MutVecMappingMutator<BytesExpandMutator>>, F1>,
+    FunctionMappingMutator<OptionMappingMutator<MutVecMappingMutator<BytesInsertMutator>>, F1>,
+    FunctionMappingMutator<OptionMappingMutator<MutVecMappingMutator<BytesRandInsertMutator>>, F1>,
+    FunctionMappingMutator<OptionMappingMutator<MutVecMappingMutator<BytesSetMutator>>, F1>,
+    FunctionMappingMutator<OptionMappingMutator<MutVecMappingMutator<BytesRandSetMutator>>, F1>,
+    FunctionMappingMutator<OptionMappingMutator<MutVecMappingMutator<BytesCopyMutator>>, F1>,
+    FunctionMappingMutator<OptionMappingMutator<MutVecMappingMutator<BytesInsertCopyMutator>>, F1>,
+    FunctionMappingMutator<OptionMappingMutator<MutVecMappingMutator<BytesSwapMutator>>, F1>,
+    FunctionMappingMutator<
+        OptionMappingMutator<MutVecMappingMutator<MappedCrossoverInsertMutator<'a, F2>>>,
+        F1,
+    >,
+    FunctionMappingMutator<
+        OptionMappingMutator<MutVecMappingMutator<MappedCrossoverReplaceMutator<'a, F2>>>,
+        F1,
+    >,
 );
 
 /// Get the mutations that compose the Havoc mutator (only applied to single inputs)
@@ -311,16 +191,6 @@ pub fn havoc_mutations_no_crossover() -> HavocMutationsNoCrossoverType {
     )
 }
 
-/// Get the mutations that compose the Havoc mutator (only applied to single inputs) for mapped input types
-#[must_use]
-pub fn mapped_havoc_mutations_no_crossover<I>(
-    mapper: for<'b> fn(&'b mut I) -> &'b mut Vec<u8>,
-) -> MappedHavocMutationsNoCrossoverType<I> {
-    havoc_mutations_no_crossover()
-        .map(ToMutVecMappingMutatorMapper)
-        .map(ToFunctionMappingMutatorMapper::new(mapper))
-}
-
 /// Get the mutations that compose the Havoc mutator's crossover strategy
 #[must_use]
 pub fn havoc_crossover<I>() -> HavocCrossoverType<I> {
@@ -330,15 +200,11 @@ pub fn havoc_crossover<I>() -> HavocCrossoverType<I> {
     )
 }
 
-/// Get the mutations that compose the Havoc mutator's crossover strategy for mapped input types
-#[must_use]
-pub fn mapped_havoc_crossover<I>(
-    mapper: for<'b> fn(&'b I) -> &'b Vec<u8>,
-    mapper_mut: for<'b> fn(&'b mut I) -> &'b mut Vec<u8>,
-) -> MappedHavocCrossoverType<I> {
+/// Get the mutations that compose the Havoc mutator's crossover strategy with custom corpus extraction logic
+pub fn havoc_crossover_with_corpus_mapper<F>(corpus_mapper: &F) -> MappedHavocCrossoverType<'_, F> {
     tuple_list!(
-        MappedCrossoverInsertMutator::new(mapper, mapper_mut),
-        MappedCrossoverReplaceMutator::new(mapper, mapper_mut),
+        MappedCrossoverInsertMutator::new(corpus_mapper),
+        MappedCrossoverReplaceMutator::new(corpus_mapper),
     )
 }
 
@@ -350,10 +216,31 @@ pub fn havoc_mutations<I>() -> HavocMutationsType<I> {
 
 /// Get the mutations that compose the Havoc mutator for mapped input types
 #[must_use]
-pub fn mapped_havoc_mutations<I>(
-    mapper: for<'b> fn(&'b I) -> &'b Vec<u8>,
-    mapper_mut: for<'b> fn(&'b mut I) -> &'b mut Vec<u8>,
-) -> MappedHavocMutationsType<I> {
-    mapped_havoc_mutations_no_crossover(mapper_mut)
-        .merge(mapped_havoc_crossover(mapper, mapper_mut))
+pub fn mapped_havoc_mutations<F1, F2>(
+    current_input_mapper: F1,
+    input_from_corpus_mapper: &F2,
+) -> MappedHavocMutationsType<'_, F1, F2>
+where
+    F1: Clone,
+{
+    havoc_mutations_no_crossover()
+        .merge(havoc_crossover_with_corpus_mapper(input_from_corpus_mapper))
+        .map(ToMutVecMappingMutatorMapper)
+        .map(ToFunctionMappingMutatorMapper::new(current_input_mapper))
+}
+
+/// Get the mutations that compose the Havoc mutator for mapped input types
+#[must_use]
+pub fn optional_mapped_havoc_mutations<F1, F2>(
+    current_input_mapper: F1,
+    input_from_corpus_mapper: &F2,
+) -> OptionMappedHavocMutationsType<'_, F1, F2>
+where
+    F1: Clone,
+{
+    havoc_mutations_no_crossover()
+        .merge(havoc_crossover_with_corpus_mapper(input_from_corpus_mapper))
+        .map(ToMutVecMappingMutatorMapper)
+        .map(ToOptionMappingMutatorMapper)
+        .map(ToFunctionMappingMutatorMapper::new(current_input_mapper))
 }

@@ -10,7 +10,7 @@ use libafl_bolts::{rands::Rand, Named};
 
 use crate::{
     corpus::Corpus,
-    inputs::{HasMutatorBytes, MutVecInput, UsesInput},
+    inputs::{HasMutatorBytes, UsesInput},
     mutators::{MutationResult, Mutator},
     random_corpus_id_with_disabled,
     state::{HasCorpus, HasMaxSize, HasRand},
@@ -1196,18 +1196,18 @@ impl<I> CrossoverReplaceMutator<I> {
 }
 /// Crossover insert mutation for inputs mapped to a bytes vector
 #[derive(Debug)]
-pub struct MappedCrossoverInsertMutator<I> {
-    input_from_corpus_mapper: for<'a> fn(&'a I) -> &Vec<u8>,
-    input_to_mutate_mapper: for<'a> fn(&'a mut I) -> &mut Vec<u8>,
+pub struct MappedCrossoverInsertMutator<'a, F> {
+    input_from_corpus_mapper: &'a F,
 }
 
-impl<S> Mutator<S::Input, S> for MappedCrossoverInsertMutator<S::Input>
+impl<'a, S, F, I> Mutator<I, S> for MappedCrossoverInsertMutator<'a, F>
 where
     S: HasCorpus + HasMaxSize + HasRand + UsesInput,
+    I: HasMutatorBytes,
+    F: for<'b> Fn(&'b S::Input) -> Option<&'b Vec<u8>>,
 {
-    fn mutate(&mut self, state: &mut S, input: &mut S::Input) -> Result<MutationResult, Error> {
-        let mapped_input: &mut MutVecInput = &mut (self.input_to_mutate_mapper)(input).into();
-        let size = mapped_input.bytes().len();
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        let size = input.bytes().len();
         let max_size = state.max_size();
         if size >= max_size {
             return Ok(MutationResult::Skipped);
@@ -1224,7 +1224,7 @@ where
         let other_size = {
             let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
             let other_input = other_testcase.load_input(state.corpus())?;
-            (self.input_from_corpus_mapper)(other_input).len()
+            (self.input_from_corpus_mapper)(other_input).map_or(0, Vec::len)
         };
 
         if other_size < 2 {
@@ -1236,53 +1236,62 @@ where
 
         let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
         // No need to load the input again, it'll still be cached.
-        let other = &mut other_testcase.input().as_ref().unwrap();
-        let mapped_other = (self.input_from_corpus_mapper)(other);
+        let other_input = &mut other_testcase.input().as_ref().unwrap();
+        let wrapped_mapped_other_input = (self.input_from_corpus_mapper)(other_input);
+        if wrapped_mapped_other_input.is_none() {
+            return Ok(MutationResult::Skipped);
+        }
+        let mapped_other_input = wrapped_mapped_other_input.unwrap();
 
         Ok(CrossoverInsertMutator::crossover_insert(
-            mapped_input,
+            input,
             size,
             target,
             range,
-            mapped_other,
+            mapped_other_input,
         ))
     }
 }
 
-impl<I> Named for MappedCrossoverInsertMutator<I> {
+impl<'a, F> Named for MappedCrossoverInsertMutator<'a, F> {
     fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("MappedCrossoverInsertMutator");
         &NAME
     }
 }
 
-impl<I> MappedCrossoverInsertMutator<I> {
+impl<'a, F> MappedCrossoverInsertMutator<'a, F> {
     /// Creates a new [`MappedCrossoverInsertMutator`].
-    pub fn new(
-        input_from_corpus_mapper: for<'a> fn(&'a I) -> &'a Vec<u8>,
-        input_to_mutate_mapper: for<'a> fn(&'a mut I) -> &'a mut Vec<u8>,
-    ) -> Self {
+    pub fn new(input_from_corpus_mapper: &'a F) -> Self {
         Self {
             input_from_corpus_mapper,
-            input_to_mutate_mapper,
         }
     }
 }
 
 /// Crossover replace mutation for inputs mapped to a bytes vector
 #[derive(Debug)]
-pub struct MappedCrossoverReplaceMutator<I> {
-    input_from_corpus_mapper: for<'a> fn(&'a I) -> &Vec<u8>,
-    input_to_mutate_mapper: for<'a> fn(&'a mut I) -> &mut Vec<u8>,
+pub struct MappedCrossoverReplaceMutator<'a, F> {
+    input_from_corpus_mapper: &'a F,
 }
 
-impl<S> Mutator<S::Input, S> for MappedCrossoverReplaceMutator<S::Input>
+impl<'a, F> MappedCrossoverReplaceMutator<'a, F> {
+    /// Creates a new [`MappedCrossoverReplaceMutator`].
+    pub fn new(input_from_corpus_mapper: &'a F) -> Self {
+        Self {
+            input_from_corpus_mapper,
+        }
+    }
+}
+
+impl<'a, S, I, F> Mutator<I, S> for MappedCrossoverReplaceMutator<'a, F>
 where
-    S: HasCorpus + HasRand + HasMaxSize + UsesInput,
+    S: HasCorpus + HasMaxSize + HasRand + UsesInput,
+    I: HasMutatorBytes,
+    F: for<'b> Fn(&'b S::Input) -> Option<&'b Vec<u8>>,
 {
-    fn mutate(&mut self, state: &mut S, input: &mut S::Input) -> Result<MutationResult, Error> {
-        let mapped_input: &mut MutVecInput = &mut (self.input_to_mutate_mapper)(input).into();
-        let size = mapped_input.bytes().len();
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        let size = input.bytes().len();
         if size == 0 {
             return Ok(MutationResult::Skipped);
         }
@@ -1296,9 +1305,9 @@ where
         }
 
         let other_size = {
-            let mut testcase = state.corpus().get_from_all(id)?.borrow_mut();
-            let other_input = testcase.load_input(state.corpus())?;
-            (self.input_from_corpus_mapper)(other_input).len()
+            let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
+            let other_input = other_testcase.load_input(state.corpus())?;
+            (self.input_from_corpus_mapper)(other_input).map_or(0, Vec::len)
         };
 
         if other_size < 2 {
@@ -1310,35 +1319,26 @@ where
 
         let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
         // No need to load the input again, it'll still be cached.
-        let other = &mut other_testcase.input().as_ref().unwrap();
-        let mapped_other = (self.input_from_corpus_mapper)(other);
+        let other_input = &mut other_testcase.input().as_ref().unwrap();
+        let wrapped_mapped_other_input = (self.input_from_corpus_mapper)(other_input);
+        if wrapped_mapped_other_input.is_none() {
+            return Ok(MutationResult::Skipped);
+        }
+        let mapped_other_input = wrapped_mapped_other_input.unwrap();
 
         Ok(CrossoverReplaceMutator::crossover_replace(
-            mapped_input,
+            input,
             target,
             range,
-            mapped_other,
+            mapped_other_input,
         ))
     }
 }
 
-impl<I> Named for MappedCrossoverReplaceMutator<I> {
+impl<'a, F> Named for MappedCrossoverReplaceMutator<'a, F> {
     fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("MappedCrossoverReplaceMutator");
         &NAME
-    }
-}
-
-impl<I> MappedCrossoverReplaceMutator<I> {
-    /// Creates a new [`MappedCrossoverReplaceMutator`].
-    pub fn new(
-        input_from_corpus_mapper: for<'a> fn(&'a I) -> &Vec<u8>,
-        input_to_mutate_mapper: for<'a> fn(&'a mut I) -> &mut Vec<u8>,
-    ) -> Self {
-        Self {
-            input_from_corpus_mapper,
-            input_to_mutate_mapper,
-        }
     }
 }
 
