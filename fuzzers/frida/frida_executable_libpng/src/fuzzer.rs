@@ -4,6 +4,13 @@ use std::{path::PathBuf, ptr::null};
 
 use frida_gum::Gum;
 use libafl::{
+    bolts::{
+        cli::{parse_args, FuzzerOptions},
+        rands::StdRand,
+        shmem::{ShMemProvider, StdShMemProvider},
+        tuples::{tuple_list, Merge},
+        AsSlice,
+    },
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::{launcher::Launcher, llmp::LlmpRestartingEventManager, EventConfig},
     executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
@@ -24,13 +31,6 @@ use libafl::{
 };
 #[cfg(unix)]
 use libafl::{feedback_and_fast, feedbacks::ConstFeedback};
-use libafl_bolts::{
-    cli::{parse_args, FuzzerOptions},
-    rands::StdRand,
-    shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, Merge},
-    AsSlice,
-};
 #[cfg(unix)]
 use libafl_frida::asan::{
     asan_rt::AsanRuntime,

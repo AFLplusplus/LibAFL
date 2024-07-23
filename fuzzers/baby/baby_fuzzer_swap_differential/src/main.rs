@@ -10,6 +10,7 @@ use libafl::monitors::tui::TuiMonitor;
 #[cfg(not(feature = "tui"))]
 use libafl::monitors::SimpleMonitor;
 use libafl::{
+    bolts::{rands::StdRand, tuples::tuple_list, AsSlice},
     corpus::{Corpus, InMemoryCorpus, InMemoryOnDiskCorpus},
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, DiffExecutor, ExitKind},
@@ -23,7 +24,6 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::{HasSolutions, StdState},
 };
-use libafl_bolts::{rands::StdRand, tuples::tuple_list, AsSlice};
 use libafl_targets::{edges_max_num, DifferentialAFLMapSwapObserver};
 #[cfg(not(miri))]
 use mimalloc::MiMalloc;
@@ -46,8 +46,10 @@ use bindings::{inspect_first, inspect_second};
 
 #[cfg(feature = "multimap")]
 mod multimap {
-    pub use libafl::observers::{HitcountsIterableMapObserver, MultiMapObserver};
-    pub use libafl_bolts::ownedref::OwnedMutSlice;
+    pub use libafl::{
+        bolts::ownedref::OwnedMutSlice,
+        observers::{HitcountsIterableMapObserver, MultiMapObserver},
+    };
 }
 #[cfg(feature = "multimap")]
 use multimap::{HitcountsIterableMapObserver, MultiMapObserver, OwnedMutSlice};

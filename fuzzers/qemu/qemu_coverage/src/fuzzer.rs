@@ -7,6 +7,14 @@ use std::{env, fs::DirEntry, io, path::PathBuf, process};
 
 use clap::{builder::Str, Parser};
 use libafl::{
+    bolts::{
+        core_affinity::Cores,
+        os::unix_signals::Signal,
+        rands::StdRand,
+        shmem::{ShMemProvider, StdShMemProvider},
+        tuples::tuple_list,
+        AsSlice,
+    },
     corpus::{Corpus, NopCorpus},
     events::{launcher::Launcher, EventConfig, EventRestarter, LlmpRestartingEventManager},
     executors::ExitKind,
@@ -16,14 +24,6 @@ use libafl::{
     schedulers::QueueScheduler,
     state::{HasCorpus, StdState},
     Error,
-};
-use libafl_bolts::{
-    core_affinity::Cores,
-    os::unix_signals::Signal,
-    rands::StdRand,
-    shmem::{ShMemProvider, StdShMemProvider},
-    tuples::tuple_list,
-    AsSlice,
 };
 use libafl_qemu::{
     command::NopCommandManager,

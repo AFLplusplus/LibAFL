@@ -1,6 +1,16 @@
 use std::{borrow::Cow, marker::PhantomData, path::PathBuf, time::Duration};
 
 use libafl::{
+    bolts::{
+        core_affinity::CoreId,
+        current_nanos, current_time,
+        fs::get_unique_std_input_file,
+        ownedref::OwnedRefMut,
+        rands::StdRand,
+        shmem::{ShMem, ShMemProvider, StdShMemProvider},
+        tuples::{tuple_list, Handled, Merge},
+        AsSliceMut,
+    },
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::{
         CentralizedEventManager, EventManagerHooksTuple, EventProcessor,
@@ -28,16 +38,6 @@ use libafl::{
         UsesState,
     },
     Error, Fuzzer, HasFeedback, HasMetadata, SerdeAny,
-};
-use libafl_bolts::{
-    core_affinity::CoreId,
-    current_nanos, current_time,
-    fs::get_unique_std_input_file,
-    ownedref::OwnedRefMut,
-    rands::StdRand,
-    shmem::{ShMem, ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, Handled, Merge},
-    AsSliceMut,
 };
 use libafl_targets::{cmps::AFLppCmpLogMap, AFLppCmpLogObserver, AFLppCmplogTracingStage};
 use serde::{Deserialize, Serialize};

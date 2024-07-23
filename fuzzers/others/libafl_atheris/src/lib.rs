@@ -12,6 +12,13 @@ use std::{
 
 use clap::{Arg, ArgAction, Command};
 use libafl::{
+    bolts::{
+        core_affinity::Cores,
+        rands::StdRand,
+        shmem::{ShMemProvider, StdShMemProvider},
+        tuples::{tuple_list, Merge},
+        AsSlice,
+    },
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig},
     executors::{inprocess::InProcessExecutor, ExitKind},
@@ -30,13 +37,6 @@ use libafl::{
     stages::{StdMutationalStage, TracingStage},
     state::{HasCorpus, StdState},
     Error, HasMetadata,
-};
-use libafl_bolts::{
-    core_affinity::Cores,
-    rands::StdRand,
-    shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, Merge},
-    AsSlice,
 };
 use libafl_targets::{extra_counters, CmpLogObserver};
 

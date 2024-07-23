@@ -7,6 +7,7 @@ use core::time::Duration;
 use std::{env, path::PathBuf};
 
 use libafl::{
+    bolts::{rands::StdRand, tuples::tuple_list, AsSlice},
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{setup_restarting_mgr_std, EventConfig, EventRestarter},
     executors::{inprocess::InProcessExecutor, ExitKind},
@@ -21,7 +22,6 @@ use libafl::{
     state::{HasCorpus, StdState},
     Error, Fuzzer,
 };
-use libafl_bolts::{rands::StdRand, tuples::tuple_list, AsSlice};
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
 
 mod input;

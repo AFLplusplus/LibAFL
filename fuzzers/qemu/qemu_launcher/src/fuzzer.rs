@@ -6,18 +6,18 @@ use std::{
 
 use clap::Parser;
 #[cfg(feature = "simplemgr")]
+use libafl::bolts::core_affinity::CoreId;
+#[cfg(not(feature = "simplemgr"))]
+use libafl::bolts::shmem::{ShMemProvider, StdShMemProvider};
+#[cfg(feature = "simplemgr")]
 use libafl::events::SimpleEventManager;
 #[cfg(not(feature = "simplemgr"))]
 use libafl::events::{EventConfig, Launcher, MonitorTypedEventManager};
 use libafl::{
+    bolts::current_time,
     monitors::{tui::TuiMonitor, Monitor, MultiMonitor},
     Error,
 };
-#[cfg(feature = "simplemgr")]
-use libafl_bolts::core_affinity::CoreId;
-use libafl_bolts::current_time;
-#[cfg(not(feature = "simplemgr"))]
-use libafl_bolts::shmem::{ShMemProvider, StdShMemProvider};
 #[cfg(unix)]
 use {
     nix::unistd::dup,

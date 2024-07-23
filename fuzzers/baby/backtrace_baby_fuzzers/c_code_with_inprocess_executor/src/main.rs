@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use libafl::{
+    bolts::{rands::StdRand, tuples::tuple_list, AsSlice},
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::InProcessExecutor,
@@ -16,7 +17,6 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use libafl_bolts::{rands::StdRand, tuples::tuple_list, AsSlice};
 use libc::c_uchar;
 extern crate libc;
 

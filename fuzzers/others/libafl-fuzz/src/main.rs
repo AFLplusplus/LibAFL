@@ -22,14 +22,14 @@ mod hooks;
 use env_parser::parse_envs;
 use fuzzer::run_client;
 use libafl::{
+    bolts::{
+        core_affinity::{CoreId, Cores},
+        shmem::{ShMemProvider, StdShMemProvider},
+    },
     events::{CentralizedLauncher, EventConfig},
     monitors::MultiMonitor,
     schedulers::powersched::PowerSchedule,
     Error,
-};
-use libafl_bolts::{
-    core_affinity::{CoreId, Cores},
-    shmem::{ShMemProvider, StdShMemProvider},
 };
 use nix::sys::signal::Signal;
 

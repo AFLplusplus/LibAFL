@@ -6,12 +6,12 @@ use std::{
 };
 
 use libafl::{
+    bolts::current_time,
     corpus::{Corpus, Testcase},
     inputs::BytesInput,
     state::{HasCorpus, HasExecutions, HasStartTime},
     Error,
 };
-use libafl_bolts::current_time;
 use nix::{
     errno::Errno,
     fcntl::{Flock, FlockArg},

@@ -1,13 +1,13 @@
 use std::{env, ops::Range};
 
 use libafl::{
+    bolts::{core_affinity::CoreId, rands::StdRand, tuples::tuple_list},
     corpus::{InMemoryOnDiskCorpus, OnDiskCorpus},
     inputs::BytesInput,
     monitors::Monitor,
     state::StdState,
     Error,
 };
-use libafl_bolts::{core_affinity::CoreId, rands::StdRand, tuples::tuple_list};
 #[cfg(feature = "injections")]
 use libafl_qemu::modules::injections::InjectionModule;
 use libafl_qemu::{

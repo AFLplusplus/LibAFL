@@ -7,6 +7,7 @@ use std::{
 };
 
 use libafl::{
+    bolts::{rands::StdRand, tuples::tuple_list},
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
@@ -24,7 +25,6 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use libafl_bolts::{rands::StdRand, tuples::tuple_list};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
@@ -123,7 +123,7 @@ pub fn main() {
     }
 
     let mut set = HashSet::new();
-    let st = libafl_bolts::current_milliseconds();
+    let st = libafl::bolts::current_milliseconds();
     let mut b = vec![];
     let mut c = 0;
     for _ in 0..100000 {
@@ -132,7 +132,7 @@ pub fn main() {
         set.insert(calculate_hash(&b));
         c += b.len();
     }
-    println!("{} / {}", c, libafl_bolts::current_milliseconds() - st);
+    println!("{} / {}", c, libafl::bolts::current_milliseconds() - st);
     println!("{} / 100000", set.len());
 
     return;

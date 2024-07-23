@@ -1,12 +1,12 @@
 use std::{marker::PhantomData, time::Duration};
 
 use libafl::{
+    bolts::current_time,
     inputs::UsesInput,
     stages::Stage,
     state::{State, UsesState},
     HasMetadata,
 };
-use libafl_bolts::current_time;
 
 pub struct TimeTrackingStageWrapper<T, S, ST> {
     inner: ST,
@@ -38,7 +38,7 @@ where
     M: UsesState<State = S>,
     Z: UsesState<State = S>,
     E: UsesState<State = S>,
-    T: libafl_bolts::serdeany::SerdeAny + From<Duration>,
+    T: libafl::bolts::serdeany::SerdeAny + From<Duration>,
 {
     fn perform(
         &mut self,

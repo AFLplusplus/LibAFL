@@ -11,6 +11,7 @@ use core::panic::PanicInfo;
 use core::ptr::write;
 
 use libafl::{
+    bolts::{rands::StdRand, tuples::tuple_list, AsSlice},
     corpus::InMemoryCorpus,
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
@@ -25,7 +26,6 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use libafl_bolts::{rands::StdRand, tuples::tuple_list, AsSlice};
 #[cfg(any(windows, unix))]
 use libc::{abort, printf};
 use static_alloc::Bump;

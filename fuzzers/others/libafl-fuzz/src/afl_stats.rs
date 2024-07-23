@@ -9,6 +9,13 @@ use std::{
 };
 
 use libafl::{
+    bolts::{
+        core_affinity::CoreId,
+        current_time,
+        os::peak_rss_mb_child_processes,
+        tuples::{Handle, Handled, MatchNameRef},
+        Named,
+    },
     corpus::{Corpus, HasCurrentCorpusId, HasTestcase, SchedulerTestcaseMetadata, Testcase},
     events::EventFirer,
     executors::HasObservers,
@@ -19,13 +26,6 @@ use libafl::{
     stages::{calibrate::UnstableEntriesMetadata, Stage},
     state::{HasCorpus, HasExecutions, HasImported, HasStartTime, Stoppable, UsesState},
     Error, HasMetadata, HasNamedMetadata, HasScheduler, SerdeAny,
-};
-use libafl_bolts::{
-    core_affinity::CoreId,
-    current_time,
-    os::peak_rss_mb_child_processes,
-    tuples::{Handle, Handled, MatchNameRef},
-    Named,
 };
 use serde::{Deserialize, Serialize};
 

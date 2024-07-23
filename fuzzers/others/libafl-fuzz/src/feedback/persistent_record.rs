@@ -6,6 +6,7 @@ use std::{
 };
 
 use libafl::{
+    bolts::{Error, Named},
     corpus::{Corpus, Testcase},
     events::EventFirer,
     executors::ExitKind,
@@ -14,7 +15,6 @@ use libafl::{
     observers::ObserversTuple,
     state::{HasCorpus, State},
 };
-use libafl_bolts::{Error, Named};
 use serde::{Deserialize, Serialize};
 
 /// A [`PersitentRecordFeedback`] tracks the last N inputs that the fuzzer has run.

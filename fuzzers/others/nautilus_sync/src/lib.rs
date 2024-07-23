@@ -8,6 +8,12 @@ use std::{env, net::SocketAddr, path::PathBuf, time::Duration};
 
 use clap::Parser;
 use libafl::{
+    bolts::{
+        core_affinity::Cores,
+        rands::StdRand,
+        shmem::{ShMemProvider, StdShMemProvider},
+        tuples::tuple_list,
+    },
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::{launcher::Launcher, llmp::LlmpEventConverter, EventConfig},
     executors::{inprocess::InProcessExecutor, ExitKind},
@@ -25,12 +31,6 @@ use libafl::{
     stages::{mutational::StdMutationalStage, sync::SyncFromBrokerStage},
     state::StdState,
     Error, HasMetadata,
-};
-use libafl_bolts::{
-    core_affinity::Cores,
-    rands::StdRand,
-    shmem::{ShMemProvider, StdShMemProvider},
-    tuples::tuple_list,
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
 

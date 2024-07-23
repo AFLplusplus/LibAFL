@@ -7,6 +7,13 @@ use std::{env, net::SocketAddr, path::PathBuf, str::FromStr};
 
 use clap::{self, Parser};
 use libafl::{
+    bolts::{
+        core_affinity::{CoreId, Cores},
+        rands::StdRand,
+        shmem::{ShMemProvider, StdShMemProvider},
+        tuples::{tuple_list, Merge},
+        AsSlice,
+    },
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{
         centralized::CentralizedEventManager, launcher::CentralizedLauncher,
@@ -27,13 +34,6 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, StdState},
     Error, HasMetadata,
-};
-use libafl_bolts::{
-    core_affinity::{CoreId, Cores},
-    rands::StdRand,
-    shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, Merge},
-    AsSlice,
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
 use mimalloc::MiMalloc;

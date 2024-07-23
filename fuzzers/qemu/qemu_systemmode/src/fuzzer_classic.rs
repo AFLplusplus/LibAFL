@@ -4,6 +4,16 @@ use core::{ptr::addr_of_mut, time::Duration};
 use std::{env, path::PathBuf, process};
 
 use libafl::{
+    bolts::{
+        core_affinity::Cores,
+        current_nanos,
+        os::unix_signals::{Signal, CTRL_C_EXIT},
+        ownedref::OwnedMutSlice,
+        rands::StdRand,
+        shmem::{ShMemProvider, StdShMemProvider},
+        tuples::tuple_list,
+        AsSlice,
+    },
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig},
     executors::ExitKind,
@@ -18,16 +28,6 @@ use libafl::{
     stages::StdMutationalStage,
     state::{HasCorpus, StdState},
     Error,
-};
-use libafl_bolts::{
-    core_affinity::Cores,
-    current_nanos,
-    os::unix_signals::{Signal, CTRL_C_EXIT},
-    ownedref::OwnedMutSlice,
-    rands::StdRand,
-    shmem::{ShMemProvider, StdShMemProvider},
-    tuples::tuple_list,
-    AsSlice,
 };
 use libafl_qemu::{
     command::NopCommandManager,

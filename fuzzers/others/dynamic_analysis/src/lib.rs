@@ -15,6 +15,15 @@ use std::{
 
 use clap::{Arg, Command};
 use libafl::{
+    bolts::{
+        current_time,
+        os::dup2,
+        ownedref::OwnedMutPtr,
+        rands::StdRand,
+        shmem::{ShMemProvider, StdShMemProvider},
+        tuples::{tuple_list, Merge},
+        AsSlice,
+    },
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleRestartingEventManager,
     executors::{inprocess::HookableInProcessExecutor, ExitKind},
@@ -37,15 +46,6 @@ use libafl::{
     },
     state::{HasCorpus, StdState},
     Error, HasMetadata,
-};
-use libafl_bolts::{
-    current_time,
-    os::dup2,
-    ownedref::OwnedMutPtr,
-    rands::StdRand,
-    shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, Merge},
-    AsSlice,
 };
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl_targets::autotokens;

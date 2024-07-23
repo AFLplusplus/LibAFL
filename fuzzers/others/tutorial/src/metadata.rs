@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 use libafl::{
+    bolts::{Named, SerdeAny},
     corpus::Testcase,
     events::EventFirer,
     executors::ExitKind,
@@ -10,7 +11,6 @@ use libafl::{
     state::{HasCorpus, State},
     Error, HasMetadata,
 };
-use libafl_bolts::{Named, SerdeAny};
 use serde::{Deserialize, Serialize};
 
 use crate::input::PacketData;

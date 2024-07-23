@@ -3,6 +3,12 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use libafl::{
+    bolts::{
+        rands::StdRand,
+        shmem::{ShMem, ShMemProvider, UnixShMemProvider},
+        tuples::{tuple_list, Handled, MatchNameRef, Merge},
+        AsSliceMut, Truncate,
+    },
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{forkserver::ForkserverExecutor, HasObservers},
@@ -17,12 +23,6 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, StdState},
     HasMetadata,
-};
-use libafl_bolts::{
-    rands::StdRand,
-    shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, Handled, MatchNameRef, Merge},
-    AsSliceMut, Truncate,
 };
 use libafl_targets::EDGES_MAP_SIZE_IN_USE;
 use nix::sys::signal::Signal;

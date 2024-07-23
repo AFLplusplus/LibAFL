@@ -2,10 +2,10 @@ use std::hash::Hash;
 
 use lain::prelude::*;
 use libafl::{
+    bolts::{ownedref::OwnedSlice, HasLen},
     corpus::CorpusId,
     inputs::{HasTargetBytes, Input},
 };
-use libafl_bolts::{ownedref::OwnedSlice, HasLen};
 use serde::{Deserialize, Serialize};
 
 #[derive(

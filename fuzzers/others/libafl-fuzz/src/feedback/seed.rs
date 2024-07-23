@@ -1,10 +1,9 @@
 use std::{borrow::Cow, marker::PhantomData};
 
 use libafl::{
-    corpus::Testcase, events::EventFirer, executors::ExitKind, feedbacks::Feedback,
+    bolts::Named, corpus::Testcase, events::EventFirer, executors::ExitKind, feedbacks::Feedback,
     observers::ObserversTuple, state::State, Error,
 };
-use libafl_bolts::Named;
 
 use crate::Opt;
 

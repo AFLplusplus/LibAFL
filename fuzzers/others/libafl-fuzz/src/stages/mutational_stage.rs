@@ -1,13 +1,13 @@
 use std::{borrow::Cow, marker::PhantomData};
 
 use libafl::{
+    bolts::Named,
     inputs::Input,
     mutators::Mutator,
     stages::{mutational::MutatedTransform, MutationalStage, Stage},
     state::{HasCorpus, HasRand, State, UsesState},
     Error, Evaluator, HasNamedMetadata,
 };
-use libafl_bolts::Named;
 
 #[derive(Debug)]
 pub enum SupportedMutationalStages<S, SM, P, E, EM, M, I, Z> {

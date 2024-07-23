@@ -6,6 +6,7 @@ use std::{
 };
 
 use libafl::{
+    bolts::{Error, Named},
     corpus::Testcase,
     events::EventFirer,
     executors::ExitKind,
@@ -14,7 +15,6 @@ use libafl::{
     observers::ObserversTuple,
     state::State,
 };
-use libafl_bolts::{Error, Named};
 use serde::{Deserialize, Serialize};
 
 /// A [`CustomFilepathToTestcaseFeedback`] takes a closure which can set the file name and path for the testcase.

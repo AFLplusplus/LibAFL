@@ -1,7 +1,6 @@
 use std::{collections::HashMap, path::PathBuf, time::Duration};
 
-use libafl::Error;
-use libafl_bolts::core_affinity::Cores;
+use libafl::{bolts::core_affinity::Cores, Error};
 
 use crate::Opt;
 

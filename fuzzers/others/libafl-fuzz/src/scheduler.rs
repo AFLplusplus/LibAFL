@@ -1,6 +1,7 @@
 use std::marker::PhantomData;
 
 use libafl::{
+    bolts::{serdeany::SerdeAny, AsIter, HasRefCnt},
     corpus::{Corpus, CorpusId, HasTestcase, SchedulerTestcaseMetadata, Testcase},
     inputs::UsesInput,
     observers::{CanTrack, ObserversTuple},
@@ -10,7 +11,6 @@ use libafl::{
     state::{HasCorpus, HasRand, State, UsesState},
     Error, HasMetadata,
 };
-use libafl_bolts::{serdeany::SerdeAny, AsIter, HasRefCnt};
 
 pub enum SupportedSchedulers<S, Q, CS, F, M, O> {
     Queue(Q, PhantomData<(S, Q, CS, F, M, O)>),

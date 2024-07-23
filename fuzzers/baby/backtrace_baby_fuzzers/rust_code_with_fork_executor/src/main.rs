@@ -3,6 +3,13 @@ use std::ptr::write_volatile;
 use std::{path::PathBuf, ptr::write};
 
 use libafl::{
+    bolts::{
+        ownedref::OwnedRefMut,
+        rands::StdRand,
+        shmem::{unix_shmem, ShMem, ShMemProvider},
+        tuples::tuple_list,
+        AsSlice, AsSliceMut,
+    },
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{ExitKind, InProcessForkExecutor},
@@ -17,13 +24,6 @@ use libafl::{
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::StdState,
-};
-use libafl_bolts::{
-    ownedref::OwnedRefMut,
-    rands::StdRand,
-    shmem::{unix_shmem, ShMem, ShMemProvider},
-    tuples::tuple_list,
-    AsSlice, AsSliceMut,
 };
 
 #[allow(clippy::similar_names)]

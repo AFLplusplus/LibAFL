@@ -1,9 +1,9 @@
 use libafl::{
+    bolts::ClientId,
     events::{Event, EventManagerHook},
     state::{State, Stoppable},
     Error,
 };
-use libafl_bolts::ClientId;
 
 #[derive(Clone, Copy)]
 pub struct LibAflFuzzEventHook {

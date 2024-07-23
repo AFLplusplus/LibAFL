@@ -21,6 +21,13 @@ use std::path::PathBuf;
 
 use frida_gum::Gum;
 use libafl::{
+    bolts::{
+        cli::{parse_args, FuzzerOptions},
+        rands::StdRand,
+        shmem::{ShMemProvider, StdShMemProvider},
+        tuples::{tuple_list, Merge},
+        AsSlice,
+    },
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::{launcher::Launcher, llmp::LlmpRestartingEventManager, EventConfig},
     executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
@@ -38,13 +45,6 @@ use libafl::{
     stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, StdState},
     Error, HasMetadata,
-};
-use libafl_bolts::{
-    cli::{parse_args, FuzzerOptions},
-    rands::StdRand,
-    shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, Merge},
-    AsSlice,
 };
 use libafl_frida::{
     asan::{

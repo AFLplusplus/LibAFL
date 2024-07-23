@@ -4,6 +4,14 @@ use core::{ptr::addr_of_mut, time::Duration};
 use std::{env, path::PathBuf, process};
 
 use libafl::{
+    bolts::{
+        core_affinity::Cores,
+        current_nanos,
+        ownedref::OwnedMutSlice,
+        rands::StdRand,
+        shmem::{ShMemProvider, StdShMemProvider},
+        tuples::tuple_list,
+    },
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig},
     feedback_or, feedback_or_fast,
@@ -17,14 +25,6 @@ use libafl::{
     stages::{CalibrationStage, StdMutationalStage},
     state::{HasCorpus, StdState},
     Error,
-};
-use libafl_bolts::{
-    core_affinity::Cores,
-    current_nanos,
-    ownedref::OwnedMutSlice,
-    rands::StdRand,
-    shmem::{ShMemProvider, StdShMemProvider},
-    tuples::tuple_list,
 };
 use libafl_qemu::{
     command::StdCommandManager,

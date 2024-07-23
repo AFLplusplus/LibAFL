@@ -1,6 +1,11 @@
 use std::{path::PathBuf, ptr::addr_of_mut, time::Duration};
 
+#[cfg(unix)]
+use libafl::bolts::shmem::UnixShMemProvider;
+#[cfg(windows)]
+use libafl::bolts::shmem::Win32ShMemProvider;
 use libafl::{
+    bolts::{ownedref::OwnedMutPtr, rands::StdRand, shmem::ShMemProvider, tuples::tuple_list},
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus, Testcase},
     events::SimpleEventManager,
     feedbacks::{CrashFeedback, ListFeedback},
@@ -12,13 +17,6 @@ use libafl::{
     stages::StdMutationalStage,
     state::StdState,
     Fuzzer, StdFuzzer,
-};
-#[cfg(unix)]
-use libafl_bolts::shmem::UnixShMemProvider;
-#[cfg(windows)]
-use libafl_bolts::shmem::Win32ShMemProvider;
-use libafl_bolts::{
-    ownedref::OwnedMutPtr, rands::StdRand, shmem::ShMemProvider, tuples::tuple_list,
 };
 use libafl_tinyinst::executor::TinyInstExecutor;
 static mut COVERAGE: Vec<u64> = vec![];

@@ -14,6 +14,14 @@ use std::{
 
 use clap::{Arg, Command};
 use libafl::{
+    bolts::{
+        current_time,
+        os::{dup2, unix_signals::Signal},
+        rands::StdRand,
+        shmem::{ShMemProvider, StdShMemProvider},
+        tuples::{tuple_list, Merge},
+        AsSlice, AsSliceMut,
+    },
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleRestartingEventManager,
     executors::{ExitKind, ShadowExecutor},
@@ -36,14 +44,6 @@ use libafl::{
     },
     state::{HasCorpus, StdState},
     Error, HasMetadata,
-};
-use libafl_bolts::{
-    current_time,
-    os::{dup2, unix_signals::Signal},
-    rands::StdRand,
-    shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, Merge},
-    AsSlice, AsSliceMut,
 };
 use libafl_qemu::{
     command::NopCommandManager,

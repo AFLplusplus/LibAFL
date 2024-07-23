@@ -1,9 +1,9 @@
 use libafl::{
+    bolts::AsSlice,
     executors::ExitKind,
     inputs::{BytesInput, HasTargetBytes},
     Error,
 };
-use libafl_bolts::AsSlice;
 use libafl_qemu::{ArchExtras, CallingConvention, GuestAddr, GuestReg, MmapPerms, Qemu, Regs};
 
 pub struct Harness<'a> {

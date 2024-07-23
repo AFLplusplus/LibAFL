@@ -2,8 +2,10 @@ use core::time::Duration;
 use std::{env, ops::Range, path::PathBuf};
 
 use clap::{error::ErrorKind, CommandFactory, Parser};
-use libafl::Error;
-use libafl_bolts::core_affinity::{CoreId, Cores};
+use libafl::{
+    bolts::core_affinity::{CoreId, Cores},
+    Error,
+};
 use libafl_qemu::GuestAddr;
 
 use crate::version::Version;

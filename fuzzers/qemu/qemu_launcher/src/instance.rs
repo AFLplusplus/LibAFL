@@ -1,11 +1,19 @@
 use core::{fmt::Debug, ptr::addr_of_mut};
 use std::{marker::PhantomData, process};
 
+#[cfg(not(feature = "simplemgr"))]
+use libafl::bolts::shmem::StdShMemProvider;
 #[cfg(feature = "simplemgr")]
 use libafl::events::SimpleEventManager;
 #[cfg(not(feature = "simplemgr"))]
 use libafl::events::{LlmpRestartingEventManager, MonitorTypedEventManager};
 use libafl::{
+    bolts::{
+        core_affinity::CoreId,
+        ownedref::OwnedMutSlice,
+        rands::StdRand,
+        tuples::{tuple_list, Merge},
+    },
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::EventRestarter,
     executors::ShadowExecutor,
@@ -28,14 +36,6 @@ use libafl::{
     },
     state::{HasCorpus, StdState, UsesState},
     Error, HasMetadata,
-};
-#[cfg(not(feature = "simplemgr"))]
-use libafl_bolts::shmem::StdShMemProvider;
-use libafl_bolts::{
-    core_affinity::CoreId,
-    ownedref::OwnedMutSlice,
-    rands::StdRand,
-    tuples::{tuple_list, Merge},
 };
 use libafl_qemu::{
     command::NopCommandManager,

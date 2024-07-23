@@ -9,6 +9,14 @@ use std::{
 
 use clap::{Arg, ArgAction, Command};
 use libafl::{
+    bolts::{
+        current_time,
+        ownedref::OwnedRefMut,
+        rands::StdRand,
+        shmem::{ShMem, ShMemProvider, UnixShMemProvider},
+        tuples::{tuple_list, Merge},
+        AsSliceMut,
+    },
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::forkserver::ForkserverExecutor,
@@ -33,14 +41,6 @@ use libafl::{
     },
     state::{HasCorpus, StdState},
     Error, HasMetadata,
-};
-use libafl_bolts::{
-    current_time,
-    ownedref::OwnedRefMut,
-    rands::StdRand,
-    shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, Merge},
-    AsSliceMut,
 };
 use libafl_targets::cmps::AFLppCmpLogMap;
 use nix::sys::signal::Signal;
