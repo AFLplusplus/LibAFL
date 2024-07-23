@@ -1,7 +1,10 @@
 [package]
 name = "libfuzzer_libmozjpeg"
 version = "0.13.0"
-authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
+authors = [
+  "Andrea Fioraldi <andreafioraldi@gmail.com>",
+  "Dominik Maier <domenukk@gmail.com>",
+]
 edition = "2021"
 
 [features]
@@ -17,7 +20,11 @@ debug = true
 [dependencies]
 libafl = { path = "../../../libafl/" }
 libafl_bolts = { path = "../../../libafl_bolts/" }
-libafl_targets = { path = "../../../libafl_targets/", features = ["sancov_pcguard_edges", "sancov_value_profile", "libfuzzer"] }
+libafl_targets = { path = "../../../libafl_targets/", features = [
+  "sancov_pcguard_edges",
+  "sancov_value_profile",
+  "libfuzzer",
+] }
 # TODO Include it only when building cc
 libafl_cc = { path = "../../../libafl_cc/" }
 mimalloc = { version = "*", default-features = false }

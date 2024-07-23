@@ -1,6 +1,8 @@
 [env]
-PROFILE = { value = "release", condition = {env_not_set = ["PROFILE"]} }
-PROFILE_DIR = {value = "release", condition = {env_not_set = ["PROFILE_DIR"] }}
+PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
+PROFILE_DIR = { value = "release", condition = { env_not_set = [
+  "PROFILE_DIR",
+] } }
 CROSS_CC = "x86_64-linux-gnu-gcc"
 CROSS_CXX = "x86_64-linux-gnu-g++"
 CROSS_CFLAGS = ""
@@ -66,31 +68,31 @@ LIBPNG_OPTIMIZATIONS = "no"
 FEATURE = "ppc"
 
 [tasks.unsupported]
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 echo "Qemu fuzzer not supported on windows/mac"
 '''
 
 [tasks.target_dir]
-condition = { files_not_exist = [ "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}" ] }
-script_runner="@shell"
-script='''
+condition = { files_not_exist = ["${CARGO_MAKE_CRATE_TARGET_DIRECTORY}"] }
+script_runner = "@shell"
+script = '''
 mkdir ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}
 '''
 
 [tasks.deps_dir]
 dependencies = ["target_dir"]
-condition = { files_not_exist = [ "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/" ] }
-script_runner="@shell"
-script='''
+condition = { files_not_exist = ["${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/"] }
+script_runner = "@shell"
+script = '''
 mkdir ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/
 '''
 
 [tasks.arch_target_dir]
 dependencies = ["target_dir"]
-condition = { files_not_exist = [ "${TARGET_DIR}" ] }
-script_runner="@shell"
-script='''
+condition = { files_not_exist = ["${TARGET_DIR}"] }
+script_runner = "@shell"
+script = '''
 mkdir ${TARGET_DIR}
 '''
 
@@ -101,11 +103,13 @@ windows_alias = "unsupported"
 
 [tasks.zlib_unix_wget]
 dependencies = ["deps_dir"]
-condition = { files_not_exist = [ "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/zlib-1.2.13" ] }
-script_runner="@shell"
+condition = { files_not_exist = [
+  "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/zlib-1.2.13",
+] }
+script_runner = "@shell"
 # NOTE: There's no specific reason we're using an old version of zlib,
 # but newer versions get moved to fossils/ after a while.
-script='''
+script = '''
 wget \
     -O "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/zlib-1.2.13.tar.gz" \
     https://zlib.net/fossils/zlib-1.2.13.tar.gz
@@ -116,10 +120,10 @@ tar \
 '''
 
 [tasks.zlib_unix]
-dependencies = ["arch_target_dir", "zlib_unix_wget" ]
-condition = { files_not_exist = [ "${TARGET_DIR}/build-zlib/libz.a" ] }
-script_runner="@shell"
-script='''
+dependencies = ["arch_target_dir", "zlib_unix_wget"]
+condition = { files_not_exist = ["${TARGET_DIR}/build-zlib/libz.a"] }
+script_runner = "@shell"
+script = '''
 rm -rf ${TARGET_DIR}/build-zlib/
 
 mkdir ${TARGET_DIR}/build-zlib/
@@ -140,9 +144,11 @@ windows_alias = "unsupported"
 
 [tasks.libpng_unix_wget]
 dependencies = ["deps_dir"]
-condition = { files_not_exist = [ "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/libpng-1.6.37" ] }
-script_runner="@shell"
-script='''
+condition = { files_not_exist = [
+  "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/libpng-1.6.37",
+] }
+script_runner = "@shell"
+script = '''
 wget \
     -O "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/v1.6.37.tar.gz" \
     https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
@@ -153,10 +159,10 @@ tar \
 '''
 
 [tasks.libpng_unix]
-dependencies = [ "arch_target_dir", "zlib", "libpng_unix_wget" ]
-condition = { files_not_exist = [ "${TARGET_DIR}/build-png/.libs/libpng16.a" ] }
-script_runner="@shell"
-script='''
+dependencies = ["arch_target_dir", "zlib", "libpng_unix_wget"]
+condition = { files_not_exist = ["${TARGET_DIR}/build-png/.libs/libpng16.a"] }
+script_runner = "@shell"
+script = '''
 rm -rf ${TARGET_DIR}/build-png/
 
 mkdir ${TARGET_DIR}/build-png/
@@ -183,17 +189,19 @@ windows_alias = "unsupported"
 [tasks.build_unix]
 command = "cargo"
 args = [
-    "build",
-    "--profile",
-    "${PROFILE}",
-    "--features", "${FEATURE}",
-    "--target-dir", "${TARGET_DIR}"
+  "build",
+  "--profile",
+  "${PROFILE}",
+  "--features",
+  "${FEATURE}",
+  "--target-dir",
+  "${TARGET_DIR}",
 ]
 
 [tasks.fuzzer]
 dependencies = ["build"]
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 rm -f ${TARGET_DIR}/${PROFILE_DIR}/qemu_launcher-${CARGO_MAKE_PROFILE}
 mv ${TARGET_DIR}/${PROFILE_DIR}/qemu_launcher ${TARGET_DIR}/${PROFILE_DIR}/qemu_launcher-${CARGO_MAKE_PROFILE}
 '''
@@ -204,8 +212,8 @@ mac_alias = "unsupported"
 windows_alias = "unsupported"
 
 [tasks.harness_unix]
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 ${CROSS_CXX} \
     ./harness.cc \
     $CROSS_CFLAGS \
@@ -218,7 +226,7 @@ ${CROSS_CXX} \
     -o"${TARGET_DIR}/libpng-harness-${CARGO_MAKE_PROFILE}" \
     -lm
 '''
-dependencies = [ "libpng" ]
+dependencies = ["libpng"]
 
 [tasks.debug]
 linux_alias = "debug_unix"
@@ -228,18 +236,25 @@ windows_alias = "unsupported"
 [tasks.debug_unix]
 command = "${TARGET_DIR}/${PROFILE_DIR}/qemu_launcher-${CARGO_MAKE_PROFILE}"
 args = [
-    "--input", "./corpus",
-    "--output", "${TARGET_DIR}/output/",
-    "--log", "${TARGET_DIR}/output/log.txt",
-    "--cores", "0-7",
-    "--asan-cores", "0-3",
-    "--cmplog-cores", "2-5",
-    "--iterations", "100000",
-    "--verbose",
-    "--",
-    "${TARGET_DIR}/libpng-harness-${CARGO_MAKE_PROFILE}",
+  "--input",
+  "./corpus",
+  "--output",
+  "${TARGET_DIR}/output/",
+  "--log",
+  "${TARGET_DIR}/output/log.txt",
+  "--cores",
+  "0-7",
+  "--asan-cores",
+  "0-3",
+  "--cmplog-cores",
+  "2-5",
+  "--iterations",
+  "100000",
+  "--verbose",
+  "--",
+  "${TARGET_DIR}/libpng-harness-${CARGO_MAKE_PROFILE}",
 ]
-dependencies = [ "harness", "fuzzer" ]
+dependencies = ["harness", "fuzzer"]
 
 [tasks.run]
 linux_alias = "run_unix"
@@ -249,18 +264,25 @@ windows_alias = "unsupported"
 [tasks.run_unix]
 command = "${TARGET_DIR}/${PROFILE_DIR}/qemu_launcher-${CARGO_MAKE_PROFILE}"
 args = [
-    "--input", "./corpus",
-    "--output", "${TARGET_DIR}/output/",
-    "--log", "${TARGET_DIR}/output/log.txt",
-    "--cores", "0-7",
-    "--asan-cores", "0-3",
-    "--cmplog-cores", "2-5",
-    "--iterations", "1000000",
-    "--tui",
-    "--",
-    "${TARGET_DIR}/libpng-harness-${CARGO_MAKE_PROFILE}",
+  "--input",
+  "./corpus",
+  "--output",
+  "${TARGET_DIR}/output/",
+  "--log",
+  "${TARGET_DIR}/output/log.txt",
+  "--cores",
+  "0-7",
+  "--asan-cores",
+  "0-3",
+  "--cmplog-cores",
+  "2-5",
+  "--iterations",
+  "1000000",
+  "--tui",
+  "--",
+  "${TARGET_DIR}/libpng-harness-${CARGO_MAKE_PROFILE}",
 ]
-dependencies = [ "harness", "fuzzer" ]
+dependencies = ["harness", "fuzzer"]
 
 [tasks.single]
 linux_alias = "single_unix"
@@ -270,14 +292,18 @@ windows_alias = "unsupported"
 [tasks.single_unix]
 command = "${TARGET_DIR}/${PROFILE_DIR}/qemu_launcher-${CARGO_MAKE_PROFILE}"
 args = [
-    "--input", "./corpus",
-    "--output", "${TARGET_DIR}/output/",
-    "--log", "${TARGET_DIR}/output/log.txt",
-    "--cores", "0",
-    "--",
-    "${TARGET_DIR}/libpng-harness-${CARGO_MAKE_PROFILE}",
+  "--input",
+  "./corpus",
+  "--output",
+  "${TARGET_DIR}/output/",
+  "--log",
+  "${TARGET_DIR}/output/log.txt",
+  "--cores",
+  "0",
+  "--",
+  "${TARGET_DIR}/libpng-harness-${CARGO_MAKE_PROFILE}",
 ]
-dependencies = [ "harness", "fuzzer" ]
+dependencies = ["harness", "fuzzer"]
 
 [tasks.asan]
 linux_alias = "asan_unix"
@@ -287,15 +313,20 @@ windows_alias = "unsupported"
 [tasks.asan_unix]
 command = "${TARGET_DIR}/${PROFILE_DIR}/qemu_launcher-${CARGO_MAKE_PROFILE}"
 args = [
-    "--input", "./corpus",
-    "--output", "${TARGET_DIR}/output/",
-    "--log", "${TARGET_DIR}/output/log.txt",
-    "--cores", "0",
-    "--asan-cores", "0",
-    "--",
-    "${TARGET_DIR}/libpng-harness-${CARGO_MAKE_PROFILE}",
+  "--input",
+  "./corpus",
+  "--output",
+  "${TARGET_DIR}/output/",
+  "--log",
+  "${TARGET_DIR}/output/log.txt",
+  "--cores",
+  "0",
+  "--asan-cores",
+  "0",
+  "--",
+  "${TARGET_DIR}/libpng-harness-${CARGO_MAKE_PROFILE}",
 ]
-dependencies = [ "harness", "fuzzer" ]
+dependencies = ["harness", "fuzzer"]
 
 [tasks.asan_guest]
 linux_alias = "asan_guest_unix"
@@ -305,15 +336,20 @@ windows_alias = "unsupported"
 [tasks.asan_guest_unix]
 command = "${TARGET_DIR}/${PROFILE_DIR}/qemu_launcher-${CARGO_MAKE_PROFILE}"
 args = [
-    "--input", "./corpus",
-    "--output", "${TARGET_DIR}/output/",
-    "--log", "${TARGET_DIR}/output/log.txt",
-    "--cores", "0",
-    "--asan-guest-cores", "0",
-    "--",
-    "${TARGET_DIR}/libpng-harness-${CARGO_MAKE_PROFILE}",
+  "--input",
+  "./corpus",
+  "--output",
+  "${TARGET_DIR}/output/",
+  "--log",
+  "${TARGET_DIR}/output/log.txt",
+  "--cores",
+  "0",
+  "--asan-guest-cores",
+  "0",
+  "--",
+  "${TARGET_DIR}/libpng-harness-${CARGO_MAKE_PROFILE}",
 ]
-dependencies = [ "harness", "fuzzer" ]
+dependencies = ["harness", "fuzzer"]
 
 [tasks.test]
 linux_alias = "test_unix"
@@ -321,8 +357,8 @@ mac_alias = "unsupported"
 windows_alias = "unsupported"
 
 [tasks.test_unix]
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 echo "Profile: ${PROFILE}"
 cd injection_test || exit 1
 make
@@ -350,66 +386,35 @@ windows_alias = "unsupported"
 [tasks.clean_unix]
 # Disable default `clean` definition
 clear = true
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 rm -rf ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}
 cargo clean
 '''
 
 [tasks.arm]
 command = "cargo"
-args = [
-    "make",
-    "-p", "arm",
-    "run",
-]
+args = ["make", "-p", "arm", "run"]
 
 [tasks.aarch64]
 command = "cargo"
-args = [
-    "make",
-    "-p", "aarch64",
-    "run",
-]
+args = ["make", "-p", "aarch64", "run"]
 
 [tasks.x86_64]
 command = "cargo"
-args = [
-    "make",
-    "-p", "x86_64",
-    "run",
-]
+args = ["make", "-p", "x86_64", "run"]
 
 [tasks.i386]
 command = "cargo"
-args = [
-    "make",
-    "-p", "i386",
-    "run",
-]
+args = ["make", "-p", "i386", "run"]
 
 [tasks.mips]
 command = "cargo"
-args = [
-    "make",
-    "-p", "mips",
-    "run",
-]
+args = ["make", "-p", "mips", "run"]
 
 [tasks.ppc]
 command = "cargo"
-args = [
-    "make",
-    "-p", "ppc",
-    "run",
-]
+args = ["make", "-p", "ppc", "run"]
 
 [tasks.all]
-dependencies = [
-    "arm",
-    "aarch64",
-    "x86_64",
-    "i386",
-    "mips",
-    "ppc"
-]
+dependencies = ["arm", "aarch64", "x86_64", "i386", "mips", "ppc"]
