@@ -13,7 +13,7 @@ use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
     inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
-    schedulers::{AflScheduler, RemovableScheduler, Scheduler},
+    schedulers::{AflScheduler, HasQueueCycles, RemovableScheduler, Scheduler},
     state::{HasCorpus, State, UsesState},
     Error, HasMetadata,
 };
@@ -157,6 +157,7 @@ impl SchedulerMetadata {
 
 /// The power schedule to use
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 pub enum PowerSchedule {
     /// The `explore` power schedule
     EXPLORE,
@@ -177,6 +178,7 @@ pub enum PowerSchedule {
 /// and here we DON'T actually calculate the power (we do it in the stage)
 #[derive(Clone, Debug)]
 pub struct PowerQueueScheduler<C, O, S> {
+    queue_cycles: u64,
     strat: PowerSchedule,
     map_observer_handle: Handle<C>,
     last_hash: usize,
@@ -236,6 +238,17 @@ where
     }
 }
 
+impl<C, O, S> HasQueueCycles for PowerQueueScheduler<C, O, S>
+where
+    S: HasCorpus + HasMetadata + HasTestcase + State,
+    O: MapObserver,
+    C: AsRef<O>,
+{
+    fn queue_cycles(&self) -> u64 {
+        self.queue_cycles
+    }
+}
+
 impl<C, O, S> Scheduler for PowerQueueScheduler<C, O, S>
 where
     S: HasCorpus + HasMetadata + HasTestcase + State,
@@ -270,8 +283,9 @@ where
                     if let Some(next) = state.corpus().next(*cur) {
                         next
                     } else {
+                        self.queue_cycles += 1;
                         let psmeta = state.metadata_mut::<SchedulerMetadata>()?;
-                        psmeta.set_queue_cycles(psmeta.queue_cycles() + 1);
+                        psmeta.set_queue_cycles(self.queue_cycles());
                         state.corpus().first().unwrap()
                     }
                 }
@@ -309,6 +323,7 @@ where
             state.add_metadata::<SchedulerMetadata>(SchedulerMetadata::new(Some(strat)));
         }
         PowerQueueScheduler {
+            queue_cycles: 0,
             strat,
             map_observer_handle: map_observer.handle(),
             last_hash: 0,

@@ -3,34 +3,17 @@ description: Sets up the QEMU fuzzers environment
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         submodules: true
         fetch-depth: 0
-    - name: Install deps
+    - name: Install QEMU deps
       shell: bash
-      run: apt update && apt install -y nasm ninja-build libc6-dev libgtk-3-dev pax-utils libz3-dev wget qemu-utils libsqlite3-dev gcc-arm-none-eabi sudo gcc g++ build-essential gcc-arm-linux-gnueabi g++-arm-linux-gnueabi
+      run: apt-get update && apt-get install -y qemu-utils sudo
+    - uses: ./.github/workflows/ubuntu-prepare
     - uses: Swatinem/rust-cache@v2
       with: { shared-key: "${{ runner.os }}-shared-fuzzer-cache" }
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-    - name: Add stable clippy
-      shell: bash
-      run: rustup toolchain install stable --component clippy --allow-downgrade
-    - name: Add nightly clippy
-      shell: bash
-      run: rustup toolchain install nightly --component clippy --allow-downgrade
-    - name: Remove obsolete llvm (Linux)
-      if: runner.os == 'Linux'
-      shell: bash
-      run: sudo apt purge -y llvm* clang*
-    - name: Install LLVM and Clang
-      uses: KyleMayes/install-llvm-action@v2
-      with:
-        directory: ${{ runner.temp }}/llvm
-        version: 17
+    - uses: dtolnay/rust-toolchain@stable
     - name: pip install
       shell: bash
       run: python3 -m pip install msgpack jinja2 find_libpython
@@ -38,10 +21,6 @@ runs:
       shell: bash
       run: export MAKEFLAGS="-j$(expr $(nproc) \+ 1)"
     - name: install cargo-make
-      uses: baptiste0928/cargo-install@v1.3.0
+      uses: baptiste0928/cargo-install@v3
       with:
         crate: cargo-make
-    - name: Symlink Headers
-      if: runner.os == 'Linux'
-      shell: bash
-      run: sudo ln -s /usr/include/asm-generic /usr/include/asm

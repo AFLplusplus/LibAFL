@@ -3,11 +3,10 @@ description: Sets up the Rust environment for the CI workflow
 runs:
   using: composite
   steps:
-    - uses: actions-rs/toolchain@v1
+    - uses: dtolnay/rust-toolchain@nightly
       with:
-        profile: minimal
-        toolchain: stable
-    - uses: actions/checkout@v3
+        components: llvm-tools, clippy, rustfmt
+    - uses: actions/checkout@v4
     - uses: Swatinem/rust-cache@v2
     - name: Build docs
       shell: pwsh

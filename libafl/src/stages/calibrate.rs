@@ -2,6 +2,7 @@
 
 use alloc::{
     borrow::{Cow, ToOwned},
+    string::ToString,
     vec::Vec,
 };
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
@@ -260,7 +261,14 @@ where
             let map = observers[&self.map_observer_handle].as_ref();
 
             let mut bitmap_size = map.count_bytes();
-            assert!(bitmap_size != 0);
+
+            if bitmap_size < 1 {
+                return Err(Error::invalid_corpus(
+                    "This testcase doesnot trigger trigger any edges. Check your instrumentation!"
+                        .to_string(),
+                ));
+            }
+
             bitmap_size = bitmap_size.max(1); // just don't make it 0 because we take log2 of it later.
             let psmeta = state
                 .metadata_map_mut()

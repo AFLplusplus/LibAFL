@@ -1,6 +1,6 @@
 [package]
 name = "libafl_bolts"
-version.workspace = true
+version = "0.13.2"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 description = "Low-level bolts to create fuzzers and so much more"
 documentation = "https://docs.rs/libafl"
@@ -92,7 +92,7 @@ llmp_small_maps = ["alloc"]
 rustversion = "1.0"
 
 [dependencies]
-libafl_derive = { version = "0.13.1", optional = true, path = "../libafl_derive" }
+libafl_derive = { version = "0.13.2", optional = true, path = "../libafl_derive" }
 static_assertions = "1.1.0"
 
 tuple_list = { version = "0.1.3" }
@@ -113,7 +113,7 @@ rand_core = { version = "0.6", optional = true }
 nix = { version = "0.29", default-features = false, optional = true, features = ["signal", "socket", "poll"] }
 uuid = { version = "1.4", optional = true, features = ["serde", "v4"] }
 clap = { version = "4.5", features = ["derive", "wrap_help"], optional = true } # CLI parsing, for libafl_bolts::cli / the `cli` feature
-log = { version = "0.4", features = ["release_max_level_info"] }
+log = { version = "0.4" }
 
 pyo3 = { version = "0.18", optional = true, features = ["serde", "macros"] }
 

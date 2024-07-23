@@ -22,8 +22,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     });*/
     c.bench_function("ahash", |b| {
         b.iter(|| {
-            let mut hasher =
-                black_box(ahash::RandomState::with_seeds(123, 456, 789, 123).build_hasher());
+            let mut hasher = ahash::RandomState::with_seeds(123, 456, 789, 123).build_hasher();
             hasher.write(black_box(&bench_vec));
             black_box(hasher.finish());
         });

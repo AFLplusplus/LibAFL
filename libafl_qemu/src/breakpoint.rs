@@ -14,7 +14,8 @@ use libafl_qemu_sys::GuestAddr;
 
 use crate::{
     command::{CommandManager, IsCommand},
-    EmulatorExitHandler, Qemu, QemuHelperTuple,
+    modules::EmulatorModuleTuple,
+    EmulatorExitHandler, Qemu,
 };
 
 #[repr(transparent)]
@@ -23,16 +24,16 @@ pub struct BreakpointId(u64);
 
 // TODO: distinguish breakpoints with IDs instead of addresses to avoid collisions.
 #[derive(Debug)]
-pub struct Breakpoint<CM, E, QT, S>
+pub struct Breakpoint<CM, EH, ET, S>
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
-    QT: QemuHelperTuple<S>,
-    S: State + HasExecutions,
+    CM: CommandManager<EH, ET, S>,
+    EH: EmulatorExitHandler<ET, S>,
+    ET: EmulatorModuleTuple<S>,
+    S: Unpin + State + HasExecutions,
 {
     id: BreakpointId,
     addr: GuestAddr,
-    cmd: Option<Rc<dyn IsCommand<CM, E, QT, S>>>,
+    cmd: Option<Rc<dyn IsCommand<CM, EH, ET, S>>>,
     disable_on_trigger: bool,
     enabled: bool,
 }
@@ -53,81 +54,81 @@ impl Default for BreakpointId {
     }
 }
 
-impl<CM, E, QT, S> Hash for Breakpoint<CM, E, QT, S>
+impl<CM, EH, ET, S> Hash for Breakpoint<CM, EH, ET, S>
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
-    QT: QemuHelperTuple<S>,
-    S: State + HasExecutions,
+    CM: CommandManager<EH, ET, S>,
+    EH: EmulatorExitHandler<ET, S>,
+    ET: EmulatorModuleTuple<S>,
+    S: Unpin + State + HasExecutions,
 {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.id.hash(state);
     }
 }
 
-impl<CM, E, QT, S> PartialEq for Breakpoint<CM, E, QT, S>
+impl<CM, EH, ET, S> PartialEq for Breakpoint<CM, EH, ET, S>
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
-    QT: QemuHelperTuple<S>,
-    S: State + HasExecutions,
+    CM: CommandManager<EH, ET, S>,
+    EH: EmulatorExitHandler<ET, S>,
+    ET: EmulatorModuleTuple<S>,
+    S: Unpin + State + HasExecutions,
 {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 }
 
-impl<CM, E, QT, S> Eq for Breakpoint<CM, E, QT, S>
+impl<CM, EH, ET, S> Eq for Breakpoint<CM, EH, ET, S>
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
-    QT: QemuHelperTuple<S>,
-    S: State + HasExecutions,
+    CM: CommandManager<EH, ET, S>,
+    EH: EmulatorExitHandler<ET, S>,
+    ET: EmulatorModuleTuple<S>,
+    S: Unpin + State + HasExecutions,
 {
 }
 
-impl<CM, E, QT, S> Display for Breakpoint<CM, E, QT, S>
+impl<CM, EH, ET, S> Display for Breakpoint<CM, EH, ET, S>
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
-    QT: QemuHelperTuple<S>,
-    S: State + HasExecutions,
+    CM: CommandManager<EH, ET, S>,
+    EH: EmulatorExitHandler<ET, S>,
+    ET: EmulatorModuleTuple<S>,
+    S: Unpin + State + HasExecutions,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Breakpoint @vaddr 0x{:x}", self.addr)
     }
 }
 
-impl<CM, E, QT, S> Borrow<BreakpointId> for Breakpoint<CM, E, QT, S>
+impl<CM, EH, ET, S> Borrow<BreakpointId> for Breakpoint<CM, EH, ET, S>
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
-    QT: QemuHelperTuple<S>,
-    S: State + HasExecutions,
+    CM: CommandManager<EH, ET, S>,
+    EH: EmulatorExitHandler<ET, S>,
+    ET: EmulatorModuleTuple<S>,
+    S: Unpin + State + HasExecutions,
 {
     fn borrow(&self) -> &BreakpointId {
         &self.id
     }
 }
 
-impl<CM, E, QT, S> Borrow<GuestAddr> for Breakpoint<CM, E, QT, S>
+impl<CM, EH, ET, S> Borrow<GuestAddr> for Breakpoint<CM, EH, ET, S>
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
-    QT: QemuHelperTuple<S>,
-    S: State + HasExecutions,
+    CM: CommandManager<EH, ET, S>,
+    EH: EmulatorExitHandler<ET, S>,
+    ET: EmulatorModuleTuple<S>,
+    S: Unpin + State + HasExecutions,
 {
     fn borrow(&self) -> &GuestAddr {
         &self.addr
     }
 }
 
-impl<CM, E, QT, S> Breakpoint<CM, E, QT, S>
+impl<CM, EH, ET, S> Breakpoint<CM, EH, ET, S>
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
-    QT: QemuHelperTuple<S>,
-    S: State + HasExecutions,
+    CM: CommandManager<EH, ET, S>,
+    EH: EmulatorExitHandler<ET, S>,
+    ET: EmulatorModuleTuple<S>,
+    S: Unpin + State + HasExecutions,
 {
     // Emu will return with the breakpoint as exit reason.
     #[must_use]
@@ -143,7 +144,7 @@ where
 
     // Emu will execute the command when it meets the breakpoint.
     #[must_use]
-    pub fn with_command<C: IsCommand<CM, E, QT, S> + 'static>(
+    pub fn with_command<C: IsCommand<CM, EH, ET, S> + 'static>(
         addr: GuestAddr,
         cmd: C,
         disable_on_trigger: bool,
@@ -167,21 +168,21 @@ where
         self.addr
     }
 
-    pub fn enable(&mut self, qemu: &Qemu) {
+    pub fn enable(&mut self, qemu: Qemu) {
         if !self.enabled {
             qemu.set_breakpoint(self.addr);
             self.enabled = true;
         }
     }
 
-    pub fn disable(&mut self, qemu: &Qemu) {
+    pub fn disable(&mut self, qemu: Qemu) {
         if self.enabled {
             qemu.remove_breakpoint(self.addr.into());
             self.enabled = false;
         }
     }
 
-    pub fn trigger(&mut self, qemu: &Qemu) -> Option<Rc<dyn IsCommand<CM, E, QT, S>>> {
+    pub fn trigger(&mut self, qemu: Qemu) -> Option<Rc<dyn IsCommand<CM, EH, ET, S>>> {
         if self.disable_on_trigger {
             self.disable(qemu);
         }

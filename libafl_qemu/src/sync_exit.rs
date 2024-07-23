@@ -8,7 +8,9 @@ use libafl::state::{HasExecutions, State};
 
 use crate::{
     command::{CommandManager, IsCommand},
-    get_exit_arch_regs, EmulatorExitHandler, GuestReg, QemuHelperTuple, Regs, CPU,
+    get_exit_arch_regs,
+    modules::EmulatorModuleTuple,
+    EmulatorExitHandler, GuestReg, Regs, CPU,
 };
 
 #[derive(Debug, Clone, Enum)]
@@ -24,30 +26,30 @@ pub enum ExitArgs {
 }
 
 #[derive(Debug)]
-pub struct SyncExit<CM, E, QT, S>
+pub struct SyncExit<CM, EH, ET, S>
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
-    QT: QemuHelperTuple<S>,
-    S: State + HasExecutions,
+    CM: CommandManager<EH, ET, S>,
+    EH: EmulatorExitHandler<ET, S>,
+    ET: EmulatorModuleTuple<S>,
+    S: Unpin + State + HasExecutions,
 {
-    command: Rc<dyn IsCommand<CM, E, QT, S>>,
+    command: Rc<dyn IsCommand<CM, EH, ET, S>>,
 }
 
-impl<CM, E, QT, S> SyncExit<CM, E, QT, S>
+impl<CM, EH, ET, S> SyncExit<CM, EH, ET, S>
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
-    QT: QemuHelperTuple<S>,
-    S: State + HasExecutions,
+    CM: CommandManager<EH, ET, S>,
+    EH: EmulatorExitHandler<ET, S>,
+    ET: EmulatorModuleTuple<S>,
+    S: Unpin + State + HasExecutions,
 {
     #[must_use]
-    pub fn new(command: Rc<dyn IsCommand<CM, E, QT, S>>) -> Self {
+    pub fn new(command: Rc<dyn IsCommand<CM, EH, ET, S>>) -> Self {
         Self { command }
     }
 
     #[must_use]
-    pub fn command(&self) -> Rc<dyn IsCommand<CM, E, QT, S>> {
+    pub fn command(&self) -> Rc<dyn IsCommand<CM, EH, ET, S>> {
         self.command.clone()
     }
 
@@ -62,12 +64,12 @@ where
     }
 }
 
-impl<CM, E, QT, S> Display for SyncExit<CM, E, QT, S>
+impl<CM, EH, ET, S> Display for SyncExit<CM, EH, ET, S>
 where
-    CM: CommandManager<E, QT, S>,
-    E: EmulatorExitHandler<QT, S>,
-    QT: QemuHelperTuple<S>,
-    S: State + HasExecutions,
+    CM: CommandManager<EH, ET, S>,
+    EH: EmulatorExitHandler<ET, S>,
+    ET: EmulatorModuleTuple<S>,
+    S: Unpin + State + HasExecutions,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.command)

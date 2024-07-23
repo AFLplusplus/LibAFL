@@ -31,6 +31,7 @@ use crate::{
     events::{EventFirer, EventRestarter},
     executors::{hooks::ExecutorHook, inprocess::HasInProcessHooks, Executor, HasObservers},
     feedbacks::Feedback,
+    fuzzer::{ExecutionProcessor, HasScheduler},
     inputs::UsesInput,
     state::{HasCorpus, HasExecutions, HasSolutions},
     Error, HasObjective,
@@ -235,7 +236,7 @@ where
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State>,
+        Z: HasObjective<Objective = OF, State = E::State> + HasScheduler + ExecutionProcessor,
     {
         #[cfg_attr(miri, allow(unused_variables))]
         unsafe {
@@ -268,7 +269,7 @@ where
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: State + HasExecutions + HasSolutions + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State>,
+        Z: HasObjective<Objective = OF, State = E::State> + HasScheduler + ExecutionProcessor,
     {
         let ret;
         #[cfg(feature = "std")]

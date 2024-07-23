@@ -3,7 +3,7 @@
 //! When the target crashes, a watch process (the parent) will
 //! restart/refork it.
 
-use alloc::vec::Vec;
+use alloc::{boxed::Box, vec::Vec};
 #[cfg(all(unix, not(miri), feature = "std"))]
 use core::ptr::addr_of_mut;
 #[cfg(feature = "std")]
@@ -35,10 +35,10 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
-#[cfg(feature = "std")]
-use crate::events::AdaptiveSerializer;
 #[cfg(all(unix, feature = "std", not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
+#[cfg(feature = "std")]
+use crate::events::{AdaptiveSerializer, CustomBufEventResult, HasCustomBufHandlers};
 use crate::{
     events::{
         Event, EventConfig, EventFirer, EventManager, EventManagerHooksTuple, EventManagerId,
@@ -49,8 +49,8 @@ use crate::{
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::UsesInput,
     monitors::Monitor,
-    observers::{ObserversTuple, TimeObserver},
-    state::{HasExecutions, HasLastReportTime, State, UsesState},
+    observers::{ObserversTuple, TimeObserver, UsesObservers},
+    state::{HasExecutions, HasImported, HasLastReportTime, State, UsesState},
     Error, HasMetadata,
 };
 
@@ -205,11 +205,12 @@ where
 impl<E, EMH, S, SP, Z> EventProcessor<E, Z> for LlmpRestartingEventManager<EMH, S, SP>
 where
     E: HasObservers<State = S> + Executor<LlmpEventManager<EMH, S, SP>, Z>,
+    <E as UsesObservers>::Observers: Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata,
+    S: State + HasExecutions + HasMetadata + HasImported,
     SP: ShMemProvider,
-    Z: ExecutionProcessor<E::Observers, State = S>
+    Z: ExecutionProcessor<State = S>
         + EvaluatorObservers<E::Observers>
         + Evaluator<E, LlmpEventManager<EMH, S, SP>>,
 {
@@ -228,11 +229,12 @@ where
 impl<E, EMH, S, SP, Z> EventManager<E, Z> for LlmpRestartingEventManager<EMH, S, SP>
 where
     E: HasObservers<State = S> + Executor<LlmpEventManager<EMH, S, SP>, Z>,
+    <E as UsesObservers>::Observers: Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata + HasLastReportTime,
+    S: State + HasExecutions + HasMetadata + HasLastReportTime + HasImported,
     SP: ShMemProvider,
-    Z: ExecutionProcessor<E::Observers, State = S>
+    Z: ExecutionProcessor<State = S>
         + EvaluatorObservers<E::Observers>
         + Evaluator<E, LlmpEventManager<EMH, S, SP>>,
 {
@@ -246,6 +248,20 @@ where
 {
     fn mgr_id(&self) -> EventManagerId {
         self.llmp_mgr.mgr_id()
+    }
+}
+
+#[cfg(feature = "std")]
+impl<EMH, S, SP> HasCustomBufHandlers for LlmpRestartingEventManager<EMH, S, SP>
+where
+    S: State,
+    SP: ShMemProvider,
+{
+    fn add_custom_buf_handler(
+        &mut self,
+        handler: Box<dyn FnMut(&mut S, &str, &[u8]) -> Result<CustomBufEventResult, Error>>,
+    ) {
+        self.llmp_mgr.add_custom_buf_handler(handler);
     }
 }
 
