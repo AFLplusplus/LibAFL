@@ -3,7 +3,7 @@ description: Sets up the QEMU fuzzers environment
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         submodules: true
         fetch-depth: 0
@@ -13,10 +13,7 @@ runs:
     - uses: ./.github/workflows/ubuntu-prepare
     - uses: Swatinem/rust-cache@v2
       with: { shared-key: "${{ runner.os }}-shared-fuzzer-cache" }
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
+    - uses: dtolnay/rust-toolchain@stable
     - name: pip install
       shell: bash
       run: python3 -m pip install msgpack jinja2 find_libpython
@@ -24,6 +21,6 @@ runs:
       shell: bash
       run: export MAKEFLAGS="-j$(expr $(nproc) \+ 1)"
     - name: install cargo-make
-      uses: baptiste0928/cargo-install@v1.3.0
+      uses: baptiste0928/cargo-install@v3
       with:
         crate: cargo-make
