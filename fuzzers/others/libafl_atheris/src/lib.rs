@@ -23,7 +23,8 @@ use libafl::{
     monitors::MultiMonitor,
     mutators::{
         havoc_mutations::havoc_mutations,
-        scheduled::{tokens_mutations, StdScheduledMutator},        token_mutations::{I2SRandReplace, Tokens},
+        scheduled::{tokens_mutations, StdScheduledMutator},
+        token_mutations::{I2SRandReplace, Tokens},
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
