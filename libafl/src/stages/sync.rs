@@ -17,9 +17,9 @@ use crate::{
     events::{llmp::LlmpEventConverter, Event, EventConfig, EventFirer},
     executors::{Executor, ExitKind, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
-    inputs::{Input, InputConverter, UsesInput},
+    inputs::{Input, InputConverter},
     stages::{RetryCountRestartHelper, Stage},
-    state::{HasCorpus, HasExecutions, HasRand, State, UsesState},
+    state::{HasCorpus, HasExecutions, HasRand, State},
     Error, HasMetadata, HasNamedMetadata,
 };
 

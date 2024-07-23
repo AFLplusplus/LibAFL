@@ -13,13 +13,12 @@ use serde::{Deserialize, Serialize};
 use crate::{
     corpus::{Corpus, CorpusId},
     feedbacks::MapIndexesMetadata,
-    inputs::UsesInput,
     observers::{CanTrack, ObserversTuple},
     schedulers::{
         minimizer::{IsFavoredMetadata, MinimizerScheduler, DEFAULT_SKIP_NON_FAVORED_PROB},
         LenTimeMulTestcaseScore, Scheduler,
     },
-    state::{HasCorpus, HasRand, UsesState},
+    state::{HasCorpus, HasRand},
     Error, HasMetadata,
 };
 

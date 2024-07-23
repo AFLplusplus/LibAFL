@@ -20,19 +20,16 @@ use crate::{
     events::EventFirer,
     executors::{ExitKind, HasObservers},
     feedbacks::{Feedback, FeedbackFactory, HasObserverHandle},
-    inputs::UsesInput,
     mark_feature_time,
     mutators::{MutationResult, Mutator},
-    observers::{MapObserver, ObserversTuple, UsesObservers},
+    observers::{MapObserver, ObserversTuple},
     schedulers::RemovableScheduler,
     stages::{
         mutational::{MutatedTransform, MutatedTransformPost},
         ExecutionCountRestartHelper, Stage,
     },
     start_timer,
-    state::{
-        HasCorpus, HasCurrentTestcase, HasExecutions, HasMaxSize, HasSolutions, State, UsesState,
-    },
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasMaxSize, HasSolutions, State},
     Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasMetadata, HasNamedMetadata,
     HasScheduler,
 };

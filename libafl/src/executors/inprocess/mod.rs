@@ -29,10 +29,9 @@ use crate::{
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
-    inputs::UsesInput,
-    observers::{ObserversTuple, UsesObservers},
+    observers::ObserversTuple,
     schedulers::Scheduler,
-    state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
+    state::{HasCorpus, HasExecutions, HasSolutions, State},
     Error, ExecutionProcessor, HasScheduler,
 };
 

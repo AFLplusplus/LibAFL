@@ -14,7 +14,7 @@ use crate::{
     mutators::Mutator,
     schedulers::{testcase_score::CorpusPowerTestcaseScore, TestcaseScore},
     stages::{mutational::MutatedTransform, MutationalStage, RetryCountRestartHelper, Stage},
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand},
     Error, HasMetadata, HasNamedMetadata,
 };
 

@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{CachedOnDiskCorpus, Corpus, CorpusId, HasTestcase, Testcase},
-    inputs::{Input, UsesInput},
+    inputs::Input,
     Error,
 };
 

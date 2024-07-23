@@ -6,9 +6,8 @@ use core::marker::PhantomData;
 
 use crate::{
     generators::Generator,
-    inputs::UsesInput,
     stages::Stage,
-    state::{HasCorpus, HasRand, UsesState},
+    state::{HasCorpus, HasRand},
     Error, Evaluator,
 };
 

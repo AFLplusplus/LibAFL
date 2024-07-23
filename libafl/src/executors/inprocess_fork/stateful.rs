@@ -19,9 +19,8 @@ use crate::{
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
-    inputs::UsesInput,
-    observers::{ObserversTuple, UsesObservers},
-    state::{HasExecutions, HasSolutions, State, UsesState},
+    observers::ObserversTuple,
+    state::{HasExecutions, HasSolutions, State},
     Error,
 };
 

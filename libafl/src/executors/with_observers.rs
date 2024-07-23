@@ -6,8 +6,7 @@ use libafl_bolts::tuples::RefIndexable;
 
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    observers::{ObserversTuple, UsesObservers},
-    state::UsesState,
+    observers::ObserversTuple,
     Error,
 };
 
@@ -21,8 +20,6 @@ pub struct WithObservers<E, OT> {
 impl<E, EM, OT, Z> Executor<EM, Z> for WithObservers<E, OT>
 where
     E: Executor<EM, Z>,
-    EM: UsesState<State = Self::State>,
-    Z: UsesState<State = Self::State>,
 {
     fn run_target(
         &mut self,

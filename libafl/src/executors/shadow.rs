@@ -6,8 +6,7 @@ use libafl_bolts::tuples::RefIndexable;
 
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    observers::{ObserversTuple, UsesObservers},
-    state::UsesState,
+    observers::ObserversTuple,
     Error,
 };
 

@@ -36,7 +36,7 @@ use crate::{
     feedbacks::Feedback,
     fuzzer::{Evaluator, ExecuteInputResult},
     generators::Generator,
-    inputs::{Input, UsesInput},
+    inputs::Input,
     stages::{HasCurrentStage, HasNestedStageStatus, StageId},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -48,8 +48,7 @@ pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
 /// Contains all important information about the current run.
 /// Will be used to restart the fuzzing process at any time.
 pub trait State:
-    UsesInput
-    + Serialize
+    Serialize
     + DeserializeOwned
     + MaybeHasClientPerfMonitor
     + MaybeHasScalabilityMonitor
@@ -59,24 +58,10 @@ pub trait State:
 {
 }
 
-/// Structs which implement this trait are aware of the state. This is used for type enforcement.
-pub trait UsesState: UsesInput<Input = <Self::State as UsesInput>::Input> {
-    /// The state known by this type.
-    type State: State;
-}
-
-// blanket impl which automatically defines UsesInput for anything that implements UsesState
-impl<KS> UsesInput for KS
-where
-    KS: UsesState,
-{
-    type Input = <KS::State as UsesInput>::Input;
-}
-
 /// Trait for elements offering a corpus
-pub trait HasCorpus: UsesInput {
+pub trait HasCorpus {
     /// The associated type implementing [`Corpus`].
-    type Corpus: Corpus<Input = <Self as UsesInput>::Input>;
+    type Corpus: Corpus;
 
     /// The testcase corpus
     fn corpus(&self) -> &Self::Corpus;

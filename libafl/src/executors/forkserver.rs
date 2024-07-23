@@ -40,10 +40,10 @@ use nix::{
 use crate::observers::{get_asan_runtime_flags_with_log_path, AsanBacktraceObserver};
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    inputs::{HasTargetBytes, Input, UsesInput},
+    inputs::{HasTargetBytes, Input},
     mutators::Tokens,
-    observers::{MapObserver, Observer, ObserversTuple, UsesObservers},
-    state::{HasExecutions, State, UsesState},
+    observers::{MapObserver, Observer, ObserversTuple},
+    state::{HasExecutions, State},
     Error,
 };
 

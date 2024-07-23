@@ -28,9 +28,8 @@ use crate::{
         },
         ExitKind, HasObservers,
     },
-    inputs::UsesInput,
-    observers::{ObserversTuple, UsesObservers},
-    state::{State, UsesState},
+    observers::ObserversTuple,
+    state::State,
     Error,
 };
 
@@ -38,11 +37,8 @@ use crate::{
 pub struct GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
 where
     OT: ObserversTuple<S>,
-    S: UsesInput,
     SP: ShMemProvider,
     HT: ExecutorHooksTuple<S>,
-    EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
 {
     pub(super) hooks: (InChildProcessHooks<S>, HT),
     pub(super) shmem_provider: SP,

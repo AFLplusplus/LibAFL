@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     executors::ExitKind,
-    inputs::UsesInput,
     observers::{map::MapObserver, DifferentialObserver, Observer, ObserversTuple},
     Error,
 };

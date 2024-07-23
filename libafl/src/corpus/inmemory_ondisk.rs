@@ -23,7 +23,7 @@ use super::{
 };
 use crate::{
     corpus::{Corpus, CorpusId, InMemoryCorpus, Testcase},
-    inputs::{Input, UsesInput},
+    inputs::Input,
     Error, HasMetadata,
 };
 

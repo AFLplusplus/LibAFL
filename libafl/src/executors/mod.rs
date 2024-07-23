@@ -20,11 +20,7 @@ use serde::{Deserialize, Serialize};
 pub use shadow::ShadowExecutor;
 pub use with_observers::WithObservers;
 
-use crate::{
-    observers::{ObserversTuple, UsesObservers},
-    state::UsesState,
-    Error,
-};
+use crate::{observers::ObserversTuple, Error};
 
 pub mod combined;
 #[cfg(all(feature = "std", any(unix, doc)))]

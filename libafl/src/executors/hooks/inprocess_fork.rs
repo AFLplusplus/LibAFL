@@ -20,7 +20,6 @@ use crate::{
         inprocess_fork::{child_signal_handlers, ForkHandlerFuncPtr},
         HasObservers,
     },
-    inputs::UsesInput,
     Error,
 };
 

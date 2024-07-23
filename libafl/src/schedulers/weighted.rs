@@ -13,7 +13,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
-    inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
     random_corpus_id,
     schedulers::{
@@ -21,7 +20,7 @@ use crate::{
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
         AflScheduler, HasQueueCycles, RemovableScheduler, Scheduler,
     },
-    state::{HasCorpus, HasRand, State, UsesState},
+    state::{HasCorpus, HasRand, State},
     Error, HasMetadata,
 };
 

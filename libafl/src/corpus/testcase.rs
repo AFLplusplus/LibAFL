@@ -15,25 +15,26 @@ use libafl_bolts::{serdeany::SerdeAnyMap, HasLen};
 use serde::{Deserialize, Serialize};
 
 use super::Corpus;
-use crate::{
-    corpus::CorpusId,
-    inputs::{Input, UsesInput},
-    Error, HasMetadata,
-};
+use crate::{corpus::CorpusId, inputs::Input, state::HasCorpus, Error, HasMetadata};
 
 /// Shorthand to receive a [`Ref`] or [`RefMut`] to a stored [`Testcase`], by [`CorpusId`].
 /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
-pub trait HasTestcase: UsesInput {
+pub trait HasTestcase: HasCorpus {
+    type Corpus: Corpus;
+
     /// Shorthand to receive a [`Ref`] to a stored [`Testcase`], by [`CorpusId`].
     /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
-    fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<<Self as UsesInput>::Input>>, Error>;
+    fn testcase(
+        &self,
+        id: CorpusId,
+    ) -> Result<Ref<Testcase<<Self::Corpus as Corpus>::Input>>, Error>;
 
     /// Shorthand to receive a [`RefMut`] to a stored [`Testcase`], by [`CorpusId`].
     /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
     fn testcase_mut(
         &self,
         id: CorpusId,
-    ) -> Result<RefMut<Testcase<<Self as UsesInput>::Input>>, Error>;
+    ) -> Result<RefMut<Testcase<<Self::Corpus as Corpus>::Input>>, Error>;
 }
 
 /// An entry in the [`Testcase`] Corpus

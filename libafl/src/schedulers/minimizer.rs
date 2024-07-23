@@ -11,11 +11,10 @@ use serde::{Deserialize, Serialize};
 use crate::{
     corpus::{Corpus, CorpusId, Testcase},
     feedbacks::MapIndexesMetadata,
-    inputs::UsesInput,
     observers::{CanTrack, ObserversTuple},
     require_index_tracking,
     schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
-    state::{HasCorpus, HasRand, UsesState},
+    state::{HasCorpus, HasRand},
     Error, HasMetadata,
 };
 

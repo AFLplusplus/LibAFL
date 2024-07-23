@@ -22,7 +22,7 @@ use crate::{
     observers::{MapObserver, ObserversTuple},
     schedulers::powersched::SchedulerMetadata,
     stages::{RetryCountRestartHelper, Stage},
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, UsesState},
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions},
     Error, HasMetadata, HasNamedMetadata,
 };
 

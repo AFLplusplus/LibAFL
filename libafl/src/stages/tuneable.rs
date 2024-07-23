@@ -14,7 +14,7 @@ use crate::{
         ExecutionCountRestartHelper, MutationalStage, Stage,
     },
     start_timer,
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand},
     Error, Evaluator, HasMetadata, HasNamedMetadata,
 };
 #[cfg(feature = "introspection")]

@@ -9,7 +9,7 @@ use crate::{
     corpus::{Corpus, HasCurrentCorpusId},
     schedulers::{RemovableScheduler, Scheduler},
     stages::Stage,
-    state::{HasCorpus, HasRand, UsesState},
+    state::{HasCorpus, HasRand},
     HasScheduler,
 };
 #[cfg(feature = "std")]

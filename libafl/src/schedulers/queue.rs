@@ -6,7 +6,7 @@ use core::marker::PhantomData;
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase},
     schedulers::{HasQueueCycles, RemovableScheduler, Scheduler},
-    state::{HasCorpus, State, UsesState},
+    state::{HasCorpus, State},
     Error,
 };
 

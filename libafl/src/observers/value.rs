@@ -13,7 +13,7 @@ use libafl_bolts::{ownedref::OwnedRef, AsIter, AsIterMut, AsSlice, AsSliceMut, N
 use serde::{Deserialize, Serialize};
 
 use super::Observer;
-use crate::{inputs::UsesInput, observers::ObserverWithHashField, Error};
+use crate::{observers::ObserverWithHashField, Error};
 
 /// A simple observer with a single value.
 ///

@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 use crate::mutators::str_decode;
 use crate::{
     corpus::{CorpusId, HasCurrentCorpusId},
-    inputs::{HasMutatorBytes, UsesInput},
+    inputs::HasMutatorBytes,
     mutators::{
         buffer_self_copy, mutations::buffer_copy, MultiMutator, MutationResult, Mutator, Named,
     },

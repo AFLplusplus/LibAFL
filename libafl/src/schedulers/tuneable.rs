@@ -12,7 +12,7 @@ use super::RemovableScheduler;
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase},
     schedulers::Scheduler,
-    state::{HasCorpus, State, UsesState},
+    state::{HasCorpus, State},
     Error, HasMetadata,
 };
 

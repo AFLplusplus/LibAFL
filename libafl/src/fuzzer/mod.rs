@@ -11,7 +11,6 @@ use crate::{
     events::{Event, EventConfig, EventFirer, EventProcessor, ProgressReporter},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
-    inputs::UsesInput,
     mark_feature_time,
     observers::ObserversTuple,
     schedulers::Scheduler,
@@ -19,7 +18,7 @@ use crate::{
     start_timer,
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasLastFoundTime, HasLastReportTime,
-        HasSolutions, Stoppable, UsesState,
+        HasSolutions, Stoppable,
     },
     Error, HasMetadata,
 };

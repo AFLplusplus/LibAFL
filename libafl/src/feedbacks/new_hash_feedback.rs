@@ -16,7 +16,6 @@ use crate::{
     events::EventFirer,
     executors::ExitKind,
     feedbacks::{Feedback, HasObserverHandle},
-    inputs::UsesInput,
     observers::{ObserverWithHashField, ObserversTuple},
     state::State,
     Error, HasNamedMetadata,

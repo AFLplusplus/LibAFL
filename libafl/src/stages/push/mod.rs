@@ -19,7 +19,6 @@ use crate::{
     corpus::CorpusId,
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::ExitKind,
-    inputs::UsesInput,
     observers::ObserversTuple,
     schedulers::Scheduler,
     state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand},

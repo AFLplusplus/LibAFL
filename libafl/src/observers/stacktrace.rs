@@ -39,7 +39,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use super::ObserverWithHashField;
-use crate::{executors::ExitKind, inputs::UsesInput, observers::Observer, Error};
+use crate::{executors::ExitKind, observers::Observer, Error};
 
 #[cfg(not(feature = "casr"))]
 /// Collects the backtrace via [`Backtrace`] and [`Debug`]

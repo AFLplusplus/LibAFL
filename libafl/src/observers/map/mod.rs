@@ -15,7 +15,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     executors::ExitKind,
-    inputs::UsesInput,
     observers::{DifferentialObserver, Observer, ObserversTuple},
     Error,
 };

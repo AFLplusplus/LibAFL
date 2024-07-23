@@ -11,7 +11,7 @@ use crate::{
         inmemory_ondisk::InMemoryOnDiskCorpus, ondisk::OnDiskMetadataFormat, Corpus, CorpusId,
         HasTestcase, Testcase,
     },
-    inputs::{Input, UsesInput},
+    inputs::Input,
     Error,
 };
 

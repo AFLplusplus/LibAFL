@@ -25,7 +25,6 @@ use crate::{
     events::{Event, EventFirer},
     executors::ExitKind,
     feedbacks::{Feedback, HasObserverHandle},
-    inputs::UsesInput,
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{CanTrack, MapObserver, Observer, ObserversTuple},
     state::State,

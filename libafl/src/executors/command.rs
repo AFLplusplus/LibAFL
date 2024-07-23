@@ -27,9 +27,9 @@ use libafl_bolts::{
 use crate::executors::{Executor, ExitKind};
 use crate::{
     executors::HasObservers,
-    inputs::{HasTargetBytes, UsesInput},
-    observers::{ObserversTuple, StdErrObserver, StdOutObserver, UsesObservers},
-    state::{HasExecutions, State, UsesState},
+    inputs::HasTargetBytes,
+    observers::{ObserversTuple, StdErrObserver, StdOutObserver},
+    state::{HasExecutions, State},
     std::borrow::ToOwned,
 };
 #[cfg(feature = "std")]

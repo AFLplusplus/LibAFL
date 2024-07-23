@@ -18,7 +18,7 @@ pub mod unix_signal_handler {
         },
         feedbacks::Feedback,
         fuzzer::{ExecutionProcessor, HasObjective},
-        inputs::{Input, UsesInput},
+        inputs::Input,
         state::{HasCorpus, HasExecutions, HasSolutions},
         HasScheduler,
     };
