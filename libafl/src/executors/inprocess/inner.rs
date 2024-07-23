@@ -16,6 +16,7 @@ use crate::executors::hooks::inprocess::HasTimeout;
 #[cfg(all(windows, feature = "std"))]
 use crate::executors::hooks::inprocess::HasTimeout;
 use crate::{
+    corpus::HasCorpus,
     events::{EventFirer, EventRestarter},
     executors::{
         hooks::{
@@ -28,7 +29,7 @@ use crate::{
     feedbacks::Feedback,
     fuzzer::{HasObjective, HasScheduler},
     observers::ObserversTuple,
-    state::{HasCorpus, HasExecutions, HasSolutions, State},
+    state::{HasExecutions, HasSolutions, State},
     Error, ExecutionProcessor,
 };
 

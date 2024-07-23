@@ -12,6 +12,7 @@ pub mod windows_asan_handler {
     };
 
     use crate::{
+        corpus::HasCorpus,
         events::{EventFirer, EventRestarter},
         executors::{
             hooks::inprocess::GLOBAL_STATE, inprocess::run_observers_and_save_state, Executor,
@@ -20,7 +21,7 @@ pub mod windows_asan_handler {
         feedbacks::Feedback,
         fuzzer::{ExecutionProcessor, HasObjective, HasScheduler},
         inputs::UsesInput,
-        state::{HasCorpus, HasExecutions, HasSolutions},
+        state::{HasExecutions, HasSolutions},
     };
 
     /// # Safety
@@ -125,6 +126,7 @@ pub mod windows_exception_handler {
     };
 
     use crate::{
+        corpus::HasCorpus,
         events::{EventFirer, EventRestarter},
         executors::{
             hooks::inprocess::{HasTimeout, InProcessExecutorHandlerData, GLOBAL_STATE},
@@ -134,7 +136,7 @@ pub mod windows_exception_handler {
         feedbacks::Feedback,
         fuzzer::{ExecutionProcessor, HasObjective, HasScheduler},
         inputs::{Input, UsesInput},
-        state::{HasCorpus, HasExecutions, HasSolutions, State},
+        state::{HasExecutions, HasSolutions, State},
     };
 
     pub(crate) type HandlerFuncPtr =

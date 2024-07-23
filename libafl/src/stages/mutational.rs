@@ -10,19 +10,18 @@ use core::marker::PhantomData;
 use libafl_bolts::{rands::Rand, Named};
 
 use crate::{
-    corpus::{Corpus, CorpusId, Testcase},
+    corpus::{Corpus, CorpusId, HasCorpus, Testcase},
     fuzzer::Evaluator,
     inputs::Input,
     mark_feature_time,
     mutators::{MultiMutator, MutationResult, Mutator},
     stages::{RetryCountRestartHelper, Stage},
     start_timer,
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand},
+    state::{HasCurrentTestcase, HasExecutions, HasRand},
     Error, HasMetadata, HasNamedMetadata,
 };
 #[cfg(feature = "introspection")]
 use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
-
 // TODO multi mutators stage
 
 /// Action performed after the un-transformed input is executed (e.g., updating metadata)

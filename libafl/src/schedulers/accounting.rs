@@ -11,14 +11,14 @@ use libafl_bolts::{rands::Rand, HasLen, HasRefCnt};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, CorpusId},
+    corpus::{Corpus, CorpusId, HasCorpus},
     feedbacks::MapIndexesMetadata,
     observers::{CanTrack, ObserversTuple},
     schedulers::{
         minimizer::{IsFavoredMetadata, MinimizerScheduler, DEFAULT_SKIP_NON_FAVORED_PROB},
         LenTimeMulTestcaseScore, Scheduler,
     },
-    state::{HasCorpus, HasRand},
+    state::HasRand,
     Error, HasMetadata,
 };
 

@@ -140,7 +140,7 @@ mod tests {
     #[cfg(miri)]
     use crate::stages::ExecutionCountRestartHelperMetadata;
     use crate::{
-        corpus::{Corpus, InMemoryCorpus, Testcase},
+        corpus::{Corpus, HasCorpus, InMemoryCorpus, Testcase},
         events::NopEventManager,
         executors::{ExitKind, InProcessExecutor},
         feedbacks::ConstFeedback,
@@ -150,7 +150,7 @@ mod tests {
         mutators::{mutations::BitFlipMutator, StdScheduledMutator},
         schedulers::RandScheduler,
         stages::StdMutationalStage,
-        state::{HasCorpus, StdState},
+        state::StdState,
         StdFuzzer,
     };
 

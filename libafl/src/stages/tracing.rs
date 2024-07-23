@@ -9,12 +9,13 @@ use core::{fmt::Debug, marker::PhantomData};
 use libafl_bolts::Named;
 
 use crate::{
+    corpus::HasCorpus,
     executors::{Executor, HasObservers, ShadowExecutor},
     mark_feature_time,
     observers::ObserversTuple,
     stages::{RetryCountRestartHelper, Stage},
     start_timer,
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, State},
+    state::{HasCurrentTestcase, HasExecutions, State},
     Error, HasNamedMetadata,
 };
 #[cfg(feature = "introspection")]

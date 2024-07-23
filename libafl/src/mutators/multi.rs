@@ -5,7 +5,7 @@ use core::cmp::{min, Ordering};
 use libafl_bolts::{rands::Rand, Error};
 
 use crate::{
-    corpus::{Corpus, CorpusId},
+    corpus::{Corpus, CorpusId, HasCorpus},
     impl_default_multipart,
     inputs::{multi::MultipartInput, HasMutatorBytes, Input},
     mutators::{
@@ -21,7 +21,7 @@ use crate::{
         MutationResult, Mutator,
     },
     random_corpus_id,
-    state::{HasCorpus, HasMaxSize, HasRand},
+    state::{HasMaxSize, HasRand},
 };
 
 /// Marker trait for if the default multipart input mutator implementation is appropriate.

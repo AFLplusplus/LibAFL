@@ -12,7 +12,7 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, CorpusId, HasTestcase, Testcase},
+    corpus::{Corpus, CorpusId, HasCorpus, HasTestcase, Testcase},
     observers::{MapObserver, ObserversTuple},
     random_corpus_id,
     schedulers::{
@@ -20,7 +20,7 @@ use crate::{
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
         AflScheduler, HasQueueCycles, RemovableScheduler, Scheduler,
     },
-    state::{HasCorpus, HasRand, State},
+    state::{HasRand, State},
     Error, HasMetadata,
 };
 

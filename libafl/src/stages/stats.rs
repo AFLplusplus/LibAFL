@@ -9,11 +9,11 @@ use libafl_bolts::current_time;
 use serde_json::json;
 
 use crate::{
-    corpus::{Corpus, HasCurrentCorpusId},
+    corpus::{Corpus, HasCorpus, HasCurrentCorpusId},
     events::EventFirer,
     schedulers::minimizer::IsFavoredMetadata,
     stages::Stage,
-    state::{HasCorpus, HasImported},
+    state::HasImported,
     Error, HasMetadata,
 };
 #[cfg(feature = "std")]

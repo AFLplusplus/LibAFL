@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 
 use super::MutationId;
 use crate::{
-    corpus::{Corpus, CorpusId},
+    corpus::{Corpus, CorpusId, HasCorpus},
     mutators::{
         mutations::{
             BitFlipMutator, ByteAddMutator, ByteDecMutator, ByteFlipMutator, ByteIncMutator,
@@ -29,7 +29,7 @@ use crate::{
         token_mutations::{TokenInsert, TokenReplace},
         MutationResult, Mutator, MutatorsTuple,
     },
-    state::{HasCorpus, HasRand},
+    state::HasRand,
     Error, HasMetadata,
 };
 

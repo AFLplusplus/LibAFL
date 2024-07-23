@@ -9,9 +9,9 @@ use libafl_bolts::rands::Rand;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, CorpusId, HasTestcase, Testcase},
+    corpus::{Corpus, CorpusId, HasCorpus, HasTestcase, Testcase},
     schedulers::{RemovableScheduler, Scheduler, TestcaseScore},
-    state::{HasCorpus, HasRand, State},
+    state::{HasRand, State},
     Error, HasMetadata,
 };
 
@@ -197,11 +197,11 @@ mod tests {
     use libafl_bolts::rands::StdRand;
 
     use crate::{
-        corpus::{Corpus, InMemoryCorpus, Testcase},
+        corpus::{Corpus, HasCorpus, InMemoryCorpus, Testcase},
         feedbacks::ConstFeedback,
         inputs::{bytes::BytesInput, Input, UsesInput},
         schedulers::{ProbabilitySamplingScheduler, Scheduler, TestcaseScore},
-        state::{HasCorpus, StdState},
+        state::StdState,
         Error, HasMetadata,
     };
 

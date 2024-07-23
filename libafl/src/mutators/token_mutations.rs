@@ -23,14 +23,14 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use crate::mutators::str_decode;
 use crate::{
-    corpus::{CorpusId, HasCurrentCorpusId},
+    corpus::{CorpusId, HasCorpus, HasCurrentCorpusId},
     inputs::HasMutatorBytes,
     mutators::{
         buffer_self_copy, mutations::buffer_copy, MultiMutator, MutationResult, Mutator, Named,
     },
     observers::cmp::{AFLppCmpValuesMetadata, CmpValues, CmpValuesMetadata},
     stages::TaintMetadata,
-    state::{HasCorpus, HasMaxSize, HasRand},
+    state::{HasMaxSize, HasRand},
     Error, HasMetadata,
 };
 

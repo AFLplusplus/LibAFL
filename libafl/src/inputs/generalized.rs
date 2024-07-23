@@ -6,10 +6,9 @@ use libafl_bolts::impl_serdeany;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::Testcase,
+    corpus::{HasCorpus, Testcase},
     inputs::BytesInput,
     stages::mutational::{MutatedTransform, MutatedTransformPost},
-    state::HasCorpus,
     Error, HasMetadata,
 };
 

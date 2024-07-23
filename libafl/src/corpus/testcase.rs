@@ -14,14 +14,12 @@ use std::path::PathBuf;
 use libafl_bolts::{serdeany::SerdeAnyMap, HasLen};
 use serde::{Deserialize, Serialize};
 
-use super::Corpus;
-use crate::{corpus::CorpusId, inputs::Input, state::HasCorpus, Error, HasMetadata};
+use super::{Corpus, HasCorpus};
+use crate::{corpus::CorpusId, inputs::Input, Error, HasMetadata};
 
 /// Shorthand to receive a [`Ref`] or [`RefMut`] to a stored [`Testcase`], by [`CorpusId`].
 /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
 pub trait HasTestcase: HasCorpus {
-    type Corpus: Corpus;
-
     /// Shorthand to receive a [`Ref`] to a stored [`Testcase`], by [`CorpusId`].
     /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
     fn testcase(
@@ -39,11 +37,7 @@ pub trait HasTestcase: HasCorpus {
 
 /// An entry in the [`Testcase`] Corpus
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct Testcase<I>
-where
-    I: Input,
-{
+pub struct Testcase<I> {
     /// The [`Input`] of this [`Testcase`], or `None`, if it is not currently in memory
     input: Option<I>,
     /// The filename for this [`Testcase`]
@@ -78,10 +72,7 @@ where
     hit_objectives: Vec<Cow<'static, str>>,
 }
 
-impl<I> HasMetadata for Testcase<I>
-where
-    I: Input,
-{
+impl<I> HasMetadata for Testcase<I> {
     /// Get all the metadata into an [`hashbrown::HashMap`]
     #[inline]
     fn metadata_map(&self) -> &SerdeAnyMap {
@@ -96,10 +87,7 @@ where
 }
 
 /// Impl of a testcase
-impl<I> Testcase<I>
-where
-    I: Input,
-{
+impl<I> Testcase<I> {
     /// Returns this [`Testcase`] with a loaded `Input`]
     pub fn load_input<C: Corpus<Input = I>>(&mut self, corpus: &C) -> Result<&I, Error> {
         corpus.load_input_into(self)?;
@@ -379,10 +367,7 @@ where
     }
 }
 
-impl<I> Default for Testcase<I>
-where
-    I: Input,
-{
+impl<I> Default for Testcase<I> {
     /// Create a new default Testcase
     #[inline]
     fn default() -> Self {
@@ -412,7 +397,7 @@ where
 /// Impl of a testcase when the input has len
 impl<I> Testcase<I>
 where
-    I: Input + HasLen,
+    I: HasLen,
 {
     /// Get the cached `len`. Will `Error::EmptyOptional` if `len` is not yet cached.
     #[inline]
@@ -442,10 +427,7 @@ where
 }
 
 /// Create a testcase from an input
-impl<I> From<I> for Testcase<I>
-where
-    I: Input,
-{
+impl<I> From<I> for Testcase<I> {
     fn from(input: I) -> Self {
         Testcase::new(input)
     }
@@ -564,10 +546,7 @@ impl SchedulerTestcaseMetadata {
 libafl_bolts::impl_serdeany!(SchedulerTestcaseMetadata);
 
 #[cfg(feature = "std")]
-impl<I> Drop for Testcase<I>
-where
-    I: Input,
-{
+impl<I> Drop for Testcase<I> {
     fn drop(&mut self) {
         if let Some(filename) = &self.filename {
             let mut path = PathBuf::from(filename);

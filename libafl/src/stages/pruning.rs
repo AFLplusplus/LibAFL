@@ -6,10 +6,10 @@ use core::marker::PhantomData;
 use libafl_bolts::{rands::Rand, Error};
 
 use crate::{
-    corpus::{Corpus, HasCurrentCorpusId},
+    corpus::{Corpus, HasCorpus, HasCurrentCorpusId},
     schedulers::{RemovableScheduler, Scheduler},
     stages::Stage,
-    state::{HasCorpus, HasRand},
+    state::HasRand,
     HasScheduler,
 };
 #[cfg(feature = "std")]

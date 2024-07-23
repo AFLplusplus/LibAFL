@@ -11,12 +11,12 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, HasTestcase},
+    corpus::{Corpus, HasCorpus, HasTestcase},
     generators::GramatronGenerator,
     inputs::{GramatronInput, Terminal},
     mutators::{MutationResult, Mutator},
     random_corpus_id,
-    state::{HasCorpus, HasRand},
+    state::HasRand,
     Error, HasMetadata,
 };
 

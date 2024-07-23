@@ -21,6 +21,7 @@ use libafl_bolts::tuples::{tuple_list, RefIndexable};
 #[cfg(any(unix, feature = "std"))]
 use crate::executors::hooks::inprocess::GLOBAL_STATE;
 use crate::{
+    corpus::HasCorpus,
     events::{EventFirer, EventRestarter},
     executors::{
         hooks::{inprocess::InProcessHooks, ExecutorHooksTuple},
@@ -31,7 +32,7 @@ use crate::{
     fuzzer::HasObjective,
     observers::ObserversTuple,
     schedulers::Scheduler,
-    state::{HasCorpus, HasExecutions, HasSolutions, State},
+    state::{HasExecutions, HasSolutions, State},
     Error, ExecutionProcessor, HasScheduler,
 };
 

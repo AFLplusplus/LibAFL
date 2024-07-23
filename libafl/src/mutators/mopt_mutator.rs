@@ -14,9 +14,9 @@ use serde::{Deserialize, Serialize};
 
 use super::MutationId;
 use crate::{
-    corpus::{Corpus, CorpusId},
+    corpus::{Corpus, CorpusId, HasCorpus},
     mutators::{ComposedByMutations, MutationResult, Mutator, MutatorsTuple, ScheduledMutator},
-    state::{HasCorpus, HasRand, HasSolutions},
+    state::{HasRand, HasSolutions},
     Error, HasMetadata,
 };
 

@@ -5,10 +5,7 @@
 use core::marker::PhantomData;
 
 use crate::{
-    generators::Generator,
-    stages::Stage,
-    state::{HasCorpus, HasRand},
-    Error, Evaluator,
+    corpus::HasCorpus, generators::Generator, stages::Stage, state::HasRand, Error, Evaluator,
 };
 
 /// A [`Stage`] that generates a single input via a [`Generator`] and evaluates

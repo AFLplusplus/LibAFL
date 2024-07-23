@@ -26,12 +26,13 @@ pub mod minimizer;
 use core::{cell::RefCell, fmt};
 
 pub mod nop;
+use libafl_bolts::rands::Rand;
 #[cfg(all(feature = "cmin", unix))]
 pub use minimizer::*;
 pub use nop::NopCorpus;
 use serde::{Deserialize, Serialize};
 
-use crate::{inputs::Input, Error};
+use crate::Error;
 
 /// An abstraction for the index that identify a testcase in the corpus
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -229,5 +230,32 @@ where
         } else {
             None
         }
+    }
+}
+
+/// Trait for elements offering a corpus
+pub trait HasCorpus {
+    /// The associated type implementing [`Corpus`].
+    type Corpus: Corpus;
+
+    /// The testcase corpus
+    fn corpus(&self) -> &Self::Corpus;
+    /// The testcase corpus (mutable)
+    fn corpus_mut(&mut self) -> &mut Self::Corpus;
+}
+
+// Reflexivity
+impl<C> HasCorpus for C
+where
+    C: Corpus,
+{
+    type Corpus = Self;
+
+    fn corpus(&self) -> &Self::Corpus {
+        self
+    }
+
+    fn corpus_mut(&mut self) -> &mut Self::Corpus {
+        self
     }
 }
