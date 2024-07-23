@@ -1,6 +1,5 @@
 //! Allowing mixing and matching between [`Mutator`] and [`crate::inputs::Input`] types.
-use alloc::vec::Vec;
-use std::borrow::Cow;
+use alloc::{borrow::Cow, vec::Vec};
 
 use libafl_bolts::{tuples::MappingFunctor, Named};
 
@@ -145,14 +144,14 @@ impl<M> MappingFunctor<M> for ToOptionMappingMutatorMapper {
 
 #[cfg(test)]
 mod test {
-
     use libafl_bolts::tuples::Map;
     use tuple_list::tuple_list;
 
     use super::{OptionMappingMutator, ToOptionMappingMutatorMapper};
     use crate::{
         inputs::MutVecInput,
-        prelude::{ByteIncMutator, MutationResult, Mutator, NopState},
+        mutators::{ByteIncMutator, MutationResult, Mutator},
+        state::NopState,
     };
 
     #[test]
