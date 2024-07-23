@@ -32,8 +32,8 @@ use frida_gum_sys::Insn;
 use hashbrown::HashMap;
 use libafl_bolts::{cli::FuzzerOptions, AsSlice};
 use libc::wchar_t;
-use rangemap::RangeMap;
 use os_thread_local::ThreadLocal;
+use rangemap::RangeMap;
 #[cfg(target_arch = "aarch64")]
 use yaxpeax_arch::Arch;
 #[cfg(target_arch = "aarch64")]
