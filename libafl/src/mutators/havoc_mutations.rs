@@ -1,4 +1,4 @@
-//! [`Mutator`] collection equivalent to AFL++'s havoc mutations
+//! [`crate::mutators::Mutator`] collection equivalent to AFL++'s havoc mutations
 
 use libafl_bolts::tuples::{Map, Merge};
 use tuple_list::{tuple_list, tuple_list_type};
