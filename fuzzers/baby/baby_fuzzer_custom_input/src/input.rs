@@ -1,5 +1,3 @@
-use libafl_bolts::{rands::Rand, Named};
-use serde::{Deserialize, Serialize};
 use std::{
     borrow::Cow,
     hash::{DefaultHasher, Hash, Hasher},
@@ -13,6 +11,8 @@ use libafl::{
     state::HasRand,
     Error, SerdeAny,
 };
+use libafl_bolts::{rands::Rand, Named};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Hash, SerdeAny)]
 pub struct CustomInput {

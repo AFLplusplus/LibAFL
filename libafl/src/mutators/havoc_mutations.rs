@@ -1,5 +1,9 @@
 //! [`Mutator`] collection equivalent to AFL++'s havoc mutations
 
+use libafl_bolts::tuples::{Map, Merge};
+use tuple_list::{tuple_list, tuple_list_type};
+
+use super::ToOptionMappingMutatorMapper;
 use crate::mutators::{
     mapping::{
         FunctionMappingMutator, MutVecMappingMutator, OptionMappingMutator,
@@ -15,11 +19,6 @@ use crate::mutators::{
         WordAddMutator, WordInterestingMutator,
     },
 };
-
-use libafl_bolts::tuples::{Map, Merge};
-use tuple_list::{tuple_list, tuple_list_type};
-
-use super::ToOptionMappingMutatorMapper;
 
 /// Tuple type of the mutations that compose the Havoc mutator without crossover mutations
 pub type HavocMutationsNoCrossoverType = tuple_list_type!(
