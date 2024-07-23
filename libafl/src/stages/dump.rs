@@ -8,9 +8,9 @@ use libafl_bolts::impl_serdeany;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, CorpusId},
+    corpus::{Corpus, CorpusId, HasCorpus},
     stages::Stage,
-    state::{HasCorpus, HasRand, HasSolutions},
+    state::{HasRand, HasSolutions},
     Error, HasMetadata,
 };
 

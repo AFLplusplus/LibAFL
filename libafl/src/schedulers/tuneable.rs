@@ -10,9 +10,9 @@ use serde::{Deserialize, Serialize};
 
 use super::RemovableScheduler;
 use crate::{
-    corpus::{Corpus, CorpusId, HasTestcase},
+    corpus::{Corpus, CorpusId, HasCorpus, HasTestcase},
     schedulers::Scheduler,
-    state::{HasCorpus, State},
+    state::State,
     Error, HasMetadata,
 };
 

@@ -50,7 +50,7 @@ use crate::{
     observers::ObserversTuple,
     schedulers::Scheduler,
     stages::push::PushStage,
-    state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand, State, Stoppable},
+    state::{HasExecutions, HasLastReportTime, HasRand, State, Stoppable},
     Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasMetadata, HasNamedMetadata,
     HasScheduler,
 };
@@ -81,6 +81,8 @@ pub mod unicode;
 
 pub mod pruning;
 pub use pruning::*;
+
+use crate::corpus::HasCorpus;
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
@@ -707,10 +709,10 @@ pub mod test {
     use serde::{Deserialize, Serialize};
 
     use crate::{
-        corpus::{Corpus, HasCurrentCorpusId, Testcase},
+        corpus::{Corpus, HasCorpus, HasCurrentCorpusId, Testcase},
         inputs::NopInput,
         stages::{RetryCountRestartHelper, Stage},
-        state::{test::test_std_state, HasCorpus, State, UsesState},
+        state::{test::test_std_state, State, UsesState},
         HasMetadata,
     };
 

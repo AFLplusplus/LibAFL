@@ -9,12 +9,13 @@ use core::{fmt::Debug, marker::PhantomData};
 use libafl_bolts::Named;
 
 use crate::{
+    corpus::HasCorpus,
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
     mutators::Mutator,
     schedulers::{testcase_score::CorpusPowerTestcaseScore, TestcaseScore},
     stages::{mutational::MutatedTransform, MutationalStage, RetryCountRestartHelper, Stage},
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand},
+    state::{HasCurrentTestcase, HasExecutions, HasRand},
     Error, HasMetadata, HasNamedMetadata,
 };
 

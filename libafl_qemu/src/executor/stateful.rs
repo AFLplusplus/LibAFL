@@ -6,6 +6,7 @@ use core::{
 };
 
 use libafl::{
+    corpus::HasCorpus,
     events::{EventFirer, EventRestarter},
     executors::{
         inprocess::{stateful::StatefulInProcessExecutor, HasInProcessHooks},
@@ -14,7 +15,7 @@ use libafl::{
     feedbacks::Feedback,
     fuzzer::HasObjective,
     observers::{ObserversTuple, UsesObservers},
-    state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
+    state::{HasExecutions, HasSolutions, State, UsesState},
     Error, ExecutionProcessor, HasScheduler,
 };
 use libafl_bolts::tuples::RefIndexable;

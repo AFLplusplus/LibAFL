@@ -13,13 +13,13 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "introspection")]
 use crate::state::HasClientPerfMonitor;
 use crate::{
-    corpus::{Corpus, CorpusId, HasTestcase},
+    corpus::{Corpus, CorpusId, HasCorpus, HasTestcase},
     events::{llmp::LlmpEventConverter, Event, EventConfig, EventFirer},
     executors::{Executor, ExitKind, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter},
     stages::{RetryCountRestartHelper, Stage},
-    state::{HasCorpus, HasExecutions, HasRand, State},
+    state::{HasExecutions, HasRand, State},
     Error, HasMetadata, HasNamedMetadata,
 };
 

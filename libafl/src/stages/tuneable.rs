@@ -7,6 +7,7 @@ use libafl_bolts::{current_time, impl_serdeany, rands::Rand};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    corpus::HasCorpus,
     mark_feature_time,
     mutators::{MutationResult, Mutator},
     stages::{
@@ -14,7 +15,7 @@ use crate::{
         ExecutionCountRestartHelper, MutationalStage, Stage,
     },
     start_timer,
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand},
+    state::{HasCurrentTestcase, HasExecutions, HasRand},
     Error, Evaluator, HasMetadata, HasNamedMetadata,
 };
 #[cfg(feature = "introspection")]

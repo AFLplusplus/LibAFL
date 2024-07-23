@@ -13,7 +13,7 @@ use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, SchedulerTestcaseMetadata},
+    corpus::{Corpus, HasCorpus, SchedulerTestcaseMetadata},
     events::{Event, EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{map::MapFeedbackMetadata, HasObserverHandle},
@@ -22,7 +22,7 @@ use crate::{
     observers::{MapObserver, ObserversTuple},
     schedulers::powersched::SchedulerMetadata,
     stages::{RetryCountRestartHelper, Stage},
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions},
+    state::{HasCurrentTestcase, HasExecutions},
     Error, HasMetadata, HasNamedMetadata,
 };
 

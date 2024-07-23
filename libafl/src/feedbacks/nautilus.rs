@@ -8,14 +8,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     common::nautilus::grammartec::{chunkstore::ChunkStore, context::Context},
-    corpus::{Corpus, Testcase},
+    corpus::{Corpus, HasCorpus, Testcase},
     events::EventFirer,
     executors::ExitKind,
     feedbacks::Feedback,
     generators::NautilusContext,
     inputs::NautilusInput,
     observers::ObserversTuple,
-    state::{HasCorpus, State},
+    state::State,
     Error, HasMetadata,
 };
 

@@ -34,10 +34,10 @@ use libafl_bolts::{
 pub use tuneable::*;
 
 use crate::{
-    corpus::{Corpus, CorpusId, HasTestcase, SchedulerTestcaseMetadata, Testcase},
+    corpus::{Corpus, CorpusId, HasCorpus, HasTestcase, SchedulerTestcaseMetadata, Testcase},
     observers::{MapObserver, ObserversTuple},
     random_corpus_id,
-    state::{HasCorpus, HasRand, State},
+    state::{HasRand, State},
     Error, HasMetadata,
 };
 

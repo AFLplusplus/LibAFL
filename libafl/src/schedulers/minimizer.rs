@@ -9,12 +9,12 @@ use libafl_bolts::{rands::Rand, serdeany::SerdeAny, AsIter, HasRefCnt};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, CorpusId, Testcase},
+    corpus::{Corpus, CorpusId, HasCorpus, Testcase},
     feedbacks::MapIndexesMetadata,
     observers::{CanTrack, ObserversTuple},
     require_index_tracking,
     schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
-    state::{HasCorpus, HasRand},
+    state::HasRand,
     Error, HasMetadata,
 };
 

@@ -8,10 +8,10 @@ use libafl_bolts::{impl_serdeany, Error};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::HasTestcase,
+    corpus::{HasCorpus, HasTestcase},
     inputs::{BytesInput, HasMutatorBytes},
     stages::Stage,
-    state::{HasCorpus, HasCurrentTestcase, State, UsesState},
+    state::{HasCurrentTestcase, State, UsesState},
     HasMetadata,
 };
 

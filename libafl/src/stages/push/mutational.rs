@@ -12,7 +12,7 @@ use serde::Serialize;
 
 use super::{PushStage, PushStageHelper, PushStageSharedState};
 use crate::{
-    corpus::{Corpus, CorpusId},
+    corpus::{Corpus, CorpusId, HasCorpus},
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::ExitKind,
     mark_feature_time,
@@ -20,7 +20,7 @@ use crate::{
     observers::ObserversTuple,
     schedulers::Scheduler,
     start_timer,
-    state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand},
+    state::{HasExecutions, HasLastReportTime, HasRand},
     Error, EvaluatorObservers, ExecutionProcessor, HasMetadata, HasScheduler,
 };
 #[cfg(feature = "introspection")]

@@ -10,10 +10,10 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, CorpusId, HasTestcase, Testcase},
+    corpus::{Corpus, CorpusId, HasCorpus, HasTestcase, Testcase},
     observers::{MapObserver, ObserversTuple},
     schedulers::{AflScheduler, HasQueueCycles, RemovableScheduler, Scheduler},
-    state::{HasCorpus, State},
+    state::State,
     Error, HasMetadata,
 };
 

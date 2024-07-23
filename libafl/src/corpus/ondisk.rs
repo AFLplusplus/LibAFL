@@ -1,11 +1,14 @@
 //! The [`OnDiskCorpus`] stores all [`Testcase`]s to disk.
 //! It _never_ keeps any of them in memory.
 //! This is a good solution for solutions that are never reused, or for *very* memory-constraint environments.
-//! For any other occasions, consider using [`crate::corpus::CachedOnDiskCorpus`]
+//! For any other occasions, consider using [`CachedOnDiskCorpus`]
 //! which stores a certain number of [`Testcase`]s in memory and removes additional ones in a FIFO manner.
 
 use alloc::string::String;
-use core::{cell::RefCell, time::Duration};
+use core::{
+    cell::{Ref, RefCell, RefMut},
+    time::Duration,
+};
 use std::path::{Path, PathBuf};
 
 use libafl_bolts::serdeany::SerdeAnyMap;
@@ -48,28 +51,19 @@ pub struct OnDiskMetadata<'a> {
 ///
 /// Metadata is written to a `.<filename>.metadata` file in the same folder by default.
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct OnDiskCorpus<I>
-where
-    I: Input,
-{
+pub struct OnDiskCorpus<I> {
     /// The root directory backing this corpus
     dir_path: PathBuf,
     /// We wrapp a cached corpus and set its size to 1.
     inner: CachedOnDiskCorpus<I>,
 }
 
-impl<I> UsesInput for OnDiskCorpus<I>
-where
-    I: Input,
-{
-    type Input = I;
-}
-
 impl<I> Corpus for OnDiskCorpus<I>
 where
     I: Input,
 {
+    type Input = I;
+
     /// Returns the number of all enabled entries
     #[inline]
     fn count(&self) -> usize {
@@ -105,12 +99,6 @@ where
         self.inner.replace(id, testcase)
     }
 
-    /// Peek the next free corpus id
-    #[inline]
-    fn peek_free_id(&self) -> CorpusId {
-        self.inner.peek_free_id()
-    }
-
     /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases
     #[inline]
     fn remove(&mut self, id: CorpusId) -> Result<Testcase<I>, Error> {
@@ -144,6 +132,12 @@ where
     #[inline]
     fn next(&self, id: CorpusId) -> Option<CorpusId> {
         self.inner.next(id)
+    }
+
+    /// Peek the next free corpus id
+    #[inline]
+    fn peek_free_id(&self) -> CorpusId {
+        self.inner.peek_free_id()
     }
 
     #[inline]
@@ -187,17 +181,11 @@ impl<I> HasTestcase for OnDiskCorpus<I>
 where
     I: Input,
 {
-    fn testcase(
-        &self,
-        id: CorpusId,
-    ) -> Result<core::cell::Ref<Testcase<<Self as UsesInput>::Input>>, Error> {
+    fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<I>>, Error> {
         Ok(self.get(id)?.borrow())
     }
 
-    fn testcase_mut(
-        &self,
-        id: CorpusId,
-    ) -> Result<core::cell::RefMut<Testcase<<Self as UsesInput>::Input>>, Error> {
+    fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<Testcase<I>>, Error> {
         Ok(self.get(id)?.borrow_mut())
     }
 }

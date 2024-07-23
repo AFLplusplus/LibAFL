@@ -9,7 +9,7 @@ use core::{
 use libafl_bolts::{rands::Rand, Error, HasLen, Named};
 
 use crate::{
-    corpus::{CorpusId, HasTestcase, Testcase},
+    corpus::{CorpusId, HasCorpus, HasTestcase, Testcase},
     inputs::{BytesInput, HasMutatorBytes},
     mutators::{rand_range, MutationResult, Mutator, Tokens},
     stages::{
@@ -17,7 +17,7 @@ use crate::{
         mutational::{MutatedTransform, MutatedTransformPost},
         UnicodeIdentificationMetadata,
     },
-    state::{HasCorpus, HasMaxSize, HasRand},
+    state::{HasMaxSize, HasRand},
     HasMetadata,
 };
 

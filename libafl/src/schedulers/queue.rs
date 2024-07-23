@@ -4,9 +4,9 @@ use alloc::borrow::ToOwned;
 use core::marker::PhantomData;
 
 use crate::{
-    corpus::{Corpus, CorpusId, HasTestcase},
+    corpus::{Corpus, CorpusId, HasCorpus, HasTestcase},
     schedulers::{HasQueueCycles, RemovableScheduler, Scheduler},
-    state::{HasCorpus, State},
+    state::State,
     Error,
 };
 
@@ -105,11 +105,11 @@ mod tests {
     use libafl_bolts::rands::StdRand;
 
     use crate::{
-        corpus::{Corpus, OnDiskCorpus, Testcase},
+        corpus::{Corpus, HasCorpus, OnDiskCorpus, Testcase},
         feedbacks::ConstFeedback,
         inputs::bytes::BytesInput,
         schedulers::{QueueScheduler, Scheduler},
-        state::{HasCorpus, StdState},
+        state::StdState,
     };
 
     #[test]

@@ -17,10 +17,11 @@ use crate::monitors::PerfFeature;
 #[cfg(all(feature = "introspection", feature = "concolic_mutation"))]
 use crate::state::HasClientPerfMonitor;
 use crate::{
+    corpus::HasCorpus,
     executors::{Executor, HasObservers},
     observers::concolic::ConcolicObserver,
     stages::{RetryCountRestartHelper, Stage, TracingStage},
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions},
+    state::{HasCurrentTestcase, HasExecutions},
     Error, HasMetadata, HasNamedMetadata,
 };
 #[cfg(feature = "concolic_mutation")]

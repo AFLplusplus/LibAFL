@@ -9,11 +9,11 @@ use core::{cmp::min, marker::PhantomData, mem::size_of, ops::Range};
 use libafl_bolts::{rands::Rand, Named};
 
 use crate::{
-    corpus::Corpus,
+    corpus::{Corpus, HasCorpus},
     inputs::HasMutatorBytes,
     mutators::{MutationResult, Mutator},
     random_corpus_id_with_disabled,
-    state::{HasCorpus, HasMaxSize, HasRand},
+    state::{HasMaxSize, HasRand},
     Error,
 };
 

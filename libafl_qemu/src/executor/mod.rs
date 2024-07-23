@@ -7,11 +7,8 @@ use core::{
     time::Duration,
 };
 
-#[cfg(feature = "fork")]
 use libafl::{
-    events::EventManager, executors::InProcessForkExecutor, state::HasLastReportTime, HasMetadata,
-};
-use libafl::{
+    corpus::HasCorpus,
     events::{EventFirer, EventRestarter},
     executors::{
         hooks::inprocess::InProcessExecutorHandlerData,
@@ -21,8 +18,12 @@ use libafl::{
     feedbacks::Feedback,
     fuzzer::HasObjective,
     observers::{ObserversTuple, UsesObservers},
-    state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
+    state::{HasExecutions, HasSolutions, State, UsesState},
     Error, ExecutionProcessor, HasScheduler,
+};
+#[cfg(feature = "fork")]
+use libafl::{
+    events::EventManager, executors::InProcessForkExecutor, state::HasLastReportTime, HasMetadata,
 };
 #[cfg(feature = "fork")]
 use libafl_bolts::shmem::ShMemProvider;

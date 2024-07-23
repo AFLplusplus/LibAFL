@@ -10,11 +10,11 @@ use libafl_bolts::{
 };
 
 use crate::{
-    corpus::Corpus,
+    corpus::{Corpus, HasCorpus},
     inputs::{GeneralizedInputMetadata, GeneralizedItem},
     mutators::{token_mutations::Tokens, MutationResult, Mutator},
     random_corpus_id,
-    state::{HasCorpus, HasRand},
+    state::HasRand,
     Error, HasMetadata,
 };
 

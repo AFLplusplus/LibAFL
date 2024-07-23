@@ -16,12 +16,12 @@ use core::{
 pub use mutational::StdMutationalPushStage;
 
 use crate::{
-    corpus::CorpusId,
+    corpus::{CorpusId, HasCorpus},
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::ExitKind,
     observers::ObserversTuple,
     schedulers::Scheduler,
-    state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand},
+    state::{HasExecutions, HasLastReportTime, HasRand},
     Error, EvaluatorObservers, ExecutionProcessor, HasMetadata, HasScheduler,
 };
 

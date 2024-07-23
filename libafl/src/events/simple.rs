@@ -23,6 +23,8 @@ use libafl_bolts::{os::CTRL_C_EXIT, shmem::ShMemProvider, staterestore::StateRes
 use serde::{de::DeserializeOwned, Serialize};
 
 use super::{CustomBufEventResult, CustomBufHandlerFn, HasCustomBufHandlers, ProgressReporter};
+#[cfg(feature = "std")]
+use crate::corpus::HasCorpus;
 #[cfg(all(unix, feature = "std", not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
@@ -37,7 +39,7 @@ use crate::{
 #[cfg(feature = "std")]
 use crate::{
     monitors::{ClientStats, SimplePrintingMonitor},
-    state::{HasCorpus, HasSolutions},
+    state::HasSolutions,
 };
 
 /// The llmp connection from the actual fuzzer to the process supervising it

@@ -7,7 +7,7 @@ use libafl_bolts::current_time;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
-    corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
+    corpus::{Corpus, CorpusId, HasCorpus, HasCurrentCorpusId, HasTestcase, Testcase},
     events::{Event, EventConfig, EventFirer, EventProcessor, ProgressReporter},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
@@ -17,8 +17,8 @@ use crate::{
     stages::{HasCurrentStage, StagesTuple},
     start_timer,
     state::{
-        HasCorpus, HasCurrentTestcase, HasExecutions, HasLastFoundTime, HasLastReportTime,
-        HasSolutions, Stoppable,
+        HasCurrentTestcase, HasExecutions, HasLastFoundTime, HasLastReportTime, HasSolutions,
+        Stoppable,
     },
     Error, HasMetadata,
 };

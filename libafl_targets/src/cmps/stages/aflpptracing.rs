@@ -2,11 +2,12 @@ use alloc::borrow::{Cow, ToOwned};
 use core::marker::PhantomData;
 
 use libafl::{
+    corpus::HasCorpus,
     executors::{Executor, HasObservers},
     inputs::{BytesInput, UsesInput},
     observers::ObserversTuple,
     stages::{colorization::TaintMetadata, RetryCountRestartHelper, Stage},
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, UsesState},
+    state::{HasCurrentTestcase, HasExecutions, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
 use libafl_bolts::{

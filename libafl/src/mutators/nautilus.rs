@@ -14,11 +14,12 @@ use crate::{
         mutator::Mutator as BackingMutator,
         tree::{Tree, TreeMutation},
     },
+    corpus::HasCorpus,
     feedbacks::NautilusChunksMetadata,
     generators::nautilus::NautilusContext,
     inputs::nautilus::NautilusInput,
     mutators::{MutationResult, Mutator},
-    state::{HasCorpus, HasRand},
+    state::HasRand,
     Error, HasMetadata,
 };
 

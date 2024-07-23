@@ -12,7 +12,7 @@ use libafl_bolts::{
 };
 
 use crate::{
-    corpus::{Corpus, HasCurrentCorpusId},
+    corpus::{Corpus, HasCorpus, HasCurrentCorpusId},
     executors::{Executor, HasObservers},
     feedbacks::map::MapNoveltiesMetadata,
     inputs::{BytesInput, GeneralizedInputMetadata, GeneralizedItem, HasMutatorBytes},
@@ -21,7 +21,7 @@ use crate::{
     require_novelties_tracking,
     stages::{RetryCountRestartHelper, Stage},
     start_timer,
-    state::{HasCorpus, HasExecutions},
+    state::HasExecutions,
     Error, HasMetadata, HasNamedMetadata,
 };
 #[cfg(feature = "introspection")]

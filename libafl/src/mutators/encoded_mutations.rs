@@ -9,14 +9,14 @@ use libafl_bolts::{
 };
 
 use crate::{
-    corpus::Corpus,
+    corpus::{Corpus, HasCorpus},
     inputs::EncodedInput,
     mutators::{
         mutations::{buffer_copy, buffer_self_copy, ARITH_MAX},
         MutationResult, Mutator, Named,
     },
     random_corpus_id_with_disabled,
-    state::{HasCorpus, HasMaxSize, HasRand},
+    state::{HasMaxSize, HasRand},
     Error,
 };
 

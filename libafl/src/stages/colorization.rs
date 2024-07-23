@@ -14,13 +14,14 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    corpus::HasCorpus,
     events::EventFirer,
     executors::{Executor, HasObservers},
     inputs::HasMutatorBytes,
     mutators::mutations::buffer_copy,
     observers::{MapObserver, ObserversTuple},
     stages::{RetryCountRestartHelper, Stage},
-    state::{HasCorpus, HasCurrentTestcase, HasRand},
+    state::{HasCurrentTestcase, HasRand},
     Error, HasMetadata, HasNamedMetadata,
 };
 

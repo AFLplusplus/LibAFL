@@ -31,7 +31,7 @@ use crate::monitors::ClientPerfMonitor;
 #[cfg(feature = "scalability_introspection")]
 use crate::monitors::ScalabilityMonitor;
 use crate::{
-    corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
+    corpus::{Corpus, CorpusId, HasCorpus, HasCurrentCorpusId, HasTestcase, Testcase},
     events::{Event, EventFirer, LogSeverity},
     feedbacks::Feedback,
     fuzzer::{Evaluator, ExecuteInputResult},
@@ -56,17 +56,6 @@ pub trait State:
     + HasCurrentStage
     + Stoppable
 {
-}
-
-/// Trait for elements offering a corpus
-pub trait HasCorpus {
-    /// The associated type implementing [`Corpus`].
-    type Corpus: Corpus;
-
-    /// The testcase corpus
-    fn corpus(&self) -> &Self::Corpus;
-    /// The testcase corpus (mutable)
-    fn corpus_mut(&mut self) -> &mut Self::Corpus;
 }
 
 /// Interact with the maximum size
@@ -272,6 +261,27 @@ where
     type Input = I;
 }
 
+impl<I, C, R, SC> HasCorpus for StdState<I, C, R, SC>
+where
+    I: Input,
+    C: Corpus<Input = <Self as UsesInput>::Input>,
+    R: Rand,
+{
+    type Corpus = C;
+
+    /// Returns the corpus
+    #[inline]
+    fn corpus(&self) -> &Self::Corpus {
+        &self.corpus
+    }
+
+    /// Returns the mutable corpus
+    #[inline]
+    fn corpus_mut(&mut self) -> &mut Self::Corpus {
+        &mut self.corpus
+    }
+}
+
 impl<I, C, R, SC> State for StdState<I, C, R, SC>
 where
     C: Corpus<Input = Self::Input>,
@@ -297,27 +307,6 @@ where
     #[inline]
     fn rand_mut(&mut self) -> &mut Self::Rand {
         &mut self.rand
-    }
-}
-
-impl<I, C, R, SC> HasCorpus for StdState<I, C, R, SC>
-where
-    I: Input,
-    C: Corpus<Input = <Self as UsesInput>::Input>,
-    R: Rand,
-{
-    type Corpus = C;
-
-    /// Returns the corpus
-    #[inline]
-    fn corpus(&self) -> &Self::Corpus {
-        &self.corpus
-    }
-
-    /// Returns the mutable corpus
-    #[inline]
-    fn corpus_mut(&mut self) -> &mut Self::Corpus {
-        &mut self.corpus
     }
 }
 

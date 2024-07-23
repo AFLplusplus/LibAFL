@@ -9,6 +9,7 @@ pub mod unix_signal_handler {
     use libc::siginfo_t;
 
     use crate::{
+        corpus::HasCorpus,
         events::{EventFirer, EventRestarter},
         executors::{
             common_signals,
@@ -19,7 +20,7 @@ pub mod unix_signal_handler {
         feedbacks::Feedback,
         fuzzer::{ExecutionProcessor, HasObjective},
         inputs::Input,
-        state::{HasCorpus, HasExecutions, HasSolutions},
+        state::{HasExecutions, HasSolutions},
         HasScheduler,
     };
 

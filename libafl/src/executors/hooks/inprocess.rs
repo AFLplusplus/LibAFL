@@ -28,13 +28,15 @@ use crate::executors::hooks::unix::unix_signal_handler;
 #[cfg(windows)]
 use crate::state::State;
 use crate::{
+    corpus::HasCorpus,
     events::{EventFirer, EventRestarter},
     executors::{hooks::ExecutorHook, inprocess::HasInProcessHooks, Executor, HasObservers},
     feedbacks::Feedback,
     fuzzer::{ExecutionProcessor, HasScheduler},
-    state::{HasCorpus, HasExecutions, HasSolutions},
+    state::{HasExecutions, HasSolutions},
     Error, HasObjective,
 };
+
 /// The inmem executor's handlers.
 #[allow(missing_debug_implementations)]
 pub struct InProcessHooks<S>
