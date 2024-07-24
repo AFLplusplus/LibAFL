@@ -1,0 +1,17 @@
+dcheck_always_on = false
+enable_nacl = false
+ffmpeg_branding = "Chrome"
+is_asan = false
+is_component_build = true
+is_debug = false
+optimize_for_fuzzing = true
+pdf_enable_xfa = true
+proprietary_codecs = true
+use_goma = false
+use_libfuzzer = false
+use_external_fuzzing_engine = true
+sanitizer_coverage_flags = "trace-pc-guard,trace-cmp"
+clang_base_path = "/home/addisoncrump/Dokumente/xss-fuzzing/chromium/src/headless/jif/libjif/llvm/"
+clang_use_chrome_plugins = false
+mac_deployment_target="10.14.0"
+mac_sdk_path="/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk" # must be 12.3 or higher, use xcrun --show-sdk-path
