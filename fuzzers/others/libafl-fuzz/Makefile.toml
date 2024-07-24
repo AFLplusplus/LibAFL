@@ -6,7 +6,7 @@ PROFILE_DIR = {value = "release", condition = {env_not_set = ["PROFILE_DIR"] }}
 FUZZER_NAME = 'libafl-fuzz'
 FUZZER = '${CARGO_TARGET_DIR}/${PROFILE_DIR}/${FUZZER_NAME}'
 LLVM_CONFIG = {value = "llvm-config-18", condition = {env_not_set = ["LLVM_CONFIG"] }}
-AFL_VERSION = "stable"
+AFL_VERSION = "db23931e7c1727ddac8691a6241c97b2203ec6fc"
 AFL_DIR_NAME= {value = "./AFLplusplus-${AFL_VERSION}"}
 AFL_CC_PATH= {value = "${AFL_DIR_NAME}/afl-clang-fast"}
 
@@ -18,7 +18,7 @@ if [ ! -d "$AFL_DIR_NAME" ]; then
 	if [ -f "v${AFL_VERSION}.zip" ]; then
 		rm v${AFL_VERSION}.zip
 	fi
-	wget https://github.com/AFLplusplus/AFLplusplus/archive/refs/heads/stable.zip
+	wget https://github.com/AFLplusplus/AFLplusplus/archive/${AFL_VERSION}.zip
 	unzip ${AFL_VERSION}.zip
 	cd ${AFL_DIR_NAME}
 	LLVM_CONFIG=${LLVM_CONFIG} make 

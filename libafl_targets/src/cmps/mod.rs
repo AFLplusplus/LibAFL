@@ -434,7 +434,7 @@ pub static mut libafl_cmplog_map_extended: AFLppCmpLogMap = AFLppCmpLogMap {
             v0_256_0: 0,
             v0_256_1: 0,
             v1:0,
-            v1_128,
+            v1_128: 0,
             v1_256_0: 0,
             v1_256_1: 0,
             unused: [0; 8],
