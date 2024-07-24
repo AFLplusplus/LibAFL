@@ -413,7 +413,9 @@ where
             file_name
         };
 
-        *testcase.file_path_mut() = Some(self.dir_path.join(&file_name));
+        if testcase.file_path().is_none() {
+            *testcase.file_path_mut() = Some(self.dir_path.join(&file_name));
+        }
         *testcase.filename_mut() = Some(file_name);
 
         if self.meta_format.is_some() {

@@ -88,9 +88,14 @@ pub struct CmpLogHeader {
 /// comparison size is determined by the `hits` field of the associated `AFLppCmpLogHeader`.
 pub struct AFLppCmpLogOperands {
     v0: u64,
-    v1: u64,
     v0_128: u64,
+    v0_256_0: u64,
+    v0_256_1: u64,
+    v1: u64,
     v1_128: u64,
+    v1_256_0: u64,
+    v1_256_1: u64,
+    unused: [u8; 8],
 }
 
 impl AFLppCmpLogOperands {
@@ -99,9 +104,14 @@ impl AFLppCmpLogOperands {
     pub fn new(v0: u64, v1: u64) -> Self {
         Self {
             v0,
-            v1,
             v0_128: 0,
+            v0_256_0: 0,
+            v0_256_1: 0,
+            v1,
             v1_128: 0,
+            v1_256_0: 0,
+            v1_256_1: 0,
+            unused: [0; 8],
         }
     }
 
@@ -115,9 +125,14 @@ impl AFLppCmpLogOperands {
 
         Self {
             v0,
-            v1,
             v0_128,
+            v0_256_0: 0,
+            v0_256_1: 0,
+            v1,
             v1_128,
+            v1_256_0: 0,
+            v1_256_1: 0,
+            unused: [0; 8],
         }
     }
 
@@ -535,18 +550,16 @@ impl CmpMap for AFLppCmpLogMap {
                         self.vals.operands[idx][execution].v0,
                         self.vals.operands[idx][execution].v1,
                     ))),
-                    // TODO handle 128 bits cmps
+                    // TODO handle 128 bits & 256 bits cmps
                     // other => panic!("Invalid CmpLog shape {}", other),
                     _ => None,
                 }
             }
         } else {
             unsafe {
-                let v0_len = self.vals.fn_operands[idx][execution].v0_len & (0x80 - 1);
-                let v1_len = self.vals.fn_operands[idx][execution].v1_len & (0x80 - 1);
                 Some(CmpValues::Bytes((
-                    self.vals.fn_operands[idx][execution].v0[..(v0_len as usize)].to_vec(),
-                    self.vals.fn_operands[idx][execution].v1[..(v1_len as usize)].to_vec(),
+                    self.vals.fn_operands[idx][execution].v0.to_vec(),
+                    self.vals.fn_operands[idx][execution].v1.to_vec(),
                 )))
             }
         }
