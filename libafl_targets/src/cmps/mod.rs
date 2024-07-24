@@ -429,10 +429,15 @@ pub static mut libafl_cmplog_map_extended: AFLppCmpLogMap = AFLppCmpLogMap {
     headers: [AFLppCmpLogHeader { data: [0; 2] }; CMPLOG_MAP_W],
     vals: AFLppCmpLogVals {
         operands: [[AFLppCmpLogOperands {
-            v0: 0,
-            v1: 0,
-            v0_128: 0,
-            v1_128: 0,
+            v0:0,
+            v0_128:0,
+            v0_256_0: 0,
+            v0_256_1: 0,
+            v1:0,
+            v1_128,
+            v1_256_0: 0,
+            v1_256_1: 0,
+            unused: [0; 8],
         }; CMPLOG_MAP_H]; CMPLOG_MAP_W],
     },
 };
