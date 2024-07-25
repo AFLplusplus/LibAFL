@@ -1,15 +1,14 @@
 //! A very simple event manager, that just supports log outputs, but no multiprocessing
 
 use alloc::{boxed::Box, vec::Vec};
-use core::fmt::Debug;
 #[cfg(all(unix, not(miri), feature = "std"))]
 use core::ptr::addr_of_mut;
+use core::{fmt::Debug, time::Duration};
 #[cfg(feature = "std")]
 use core::{
+    ops::{Deref, DerefMut},
     sync::atomic::{compiler_fence, Ordering},
-    time::Duration,
 };
-use std::ops::{Deref, DerefMut};
 
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use libafl_bolts::os::startable_self;
@@ -38,13 +37,13 @@ use crate::{
         HasEventManagerId,
     },
     monitors::Monitor,
-    stages::HasCurrentStage,
     state::{HasExecutions, HasLastReportTime, Stoppable},
     Error, HasMetadata,
 };
 #[cfg(feature = "std")]
 use crate::{
     monitors::{ClientStats, SimplePrintingMonitor},
+    stages::HasCurrentStage,
     state::HasSolutions,
 };
 
@@ -323,6 +322,7 @@ where
 }
 
 // impl Deref, DerefMut to inherit the impls from inner, where possible
+#[cfg(feature = "std")]
 impl<I, HT, MT, SP> Deref for SimpleRestartingEventManager<I, HT, MT, SP>
 where
     SP: ShMemProvider,
@@ -334,6 +334,7 @@ where
     }
 }
 
+#[cfg(feature = "std")]
 impl<I, HT, MT, SP> DerefMut for SimpleRestartingEventManager<I, HT, MT, SP>
 where
     SP: ShMemProvider,
