@@ -602,7 +602,7 @@ pub trait HasEventManagerId {
 /// In previous versions, you could dynamically add such fn-based handlers with the
 /// `add_custom_buf_handler` function. If you wish to continue to do so, use [`Vec::new`] as your
 /// [`CustomBufHandlerTuple`] in the associated `handlers` parameter for your event manager. You may
-/// then use [`HasDynamicHandlers::add_custom_buf_handler`].
+/// then use [`SupportsDynamicHandlers::add_custom_buf_handler`].
 #[deprecated(
     note = "Using function pointers may limit your ability to use some stages due to type conflicts regarding the state"
 )]
@@ -672,7 +672,7 @@ pub trait HasCustomBufHandlers<S> {
 /// dynamic custom buf handlers.
 ///
 /// This is automatically implemented for the appropriate traits.
-pub trait HasDynamicHandlers<S> {
+pub trait SupportsDynamicHandlers<S> {
     /// Adds a custom buffer handler that will run for each incoming `CustomBuf` event.
     #[deprecated(
         note = "Using function pointers may limit your ability to use some stages due to type conflicts regarding the state"
@@ -682,7 +682,7 @@ pub trait HasDynamicHandlers<S> {
 }
 
 #[allow(deprecated)]
-impl<EM, S> HasDynamicHandlers<S> for EM
+impl<EM, S> SupportsDynamicHandlers<S> for EM
 where
     EM: HasCustomBufHandlers<S, Handlers = Vec<Box<CustomBufHandlerFn<S>>>>,
 {
