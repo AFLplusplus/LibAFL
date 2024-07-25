@@ -555,10 +555,12 @@ impl FeedbackLogic for LogicFastAnd {
             && second(state, manager, input, observers, exit_kind)?)
     }
 
+    #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(first: Result<bool, Error>, second: Result<bool, Error>) -> Result<bool, Error> {
         Ok(first? && second?)
     }
 
+    #[cfg(feature = "track_hit_feedbacks")]
     fn append_hit_feedbacks<F1, F2>(
         first_result: Result<bool, Error>,
         if_first: F1,
