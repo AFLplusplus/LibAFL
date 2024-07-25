@@ -43,10 +43,7 @@ use crate::{executors::ExitKind, Error};
 
 /// Observers observe different information about the target.
 /// They can then be used by various sorts of feedback.
-pub trait Observer<S>: Named
-where
-    S: UsesInput,
-{
+pub trait Observer<I, S>: Named {
     /// The testcase finished execution, calculate any changes.
     /// Reserved for future use.
     #[inline]
@@ -56,7 +53,7 @@ where
 
     /// Called right before execution starts.
     #[inline]
-    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         Ok(())
     }
 
@@ -65,7 +62,7 @@ where
     fn post_exec(
         &mut self,
         _state: &mut S,
-        _input: &S::Input,
+        _input: &I,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         Ok(())
@@ -73,7 +70,7 @@ where
 
     /// Called right before execution starts in the child process, if any.
     #[inline]
-    fn pre_exec_child(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
+    fn pre_exec_child(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         Ok(())
     }
 
@@ -82,7 +79,7 @@ where
     fn post_exec_child(
         &mut self,
         _state: &mut S,
-        _input: &S::Input,
+        _input: &I,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         Ok(())
@@ -90,71 +87,64 @@ where
 }
 
 /// A haskell-style tuple of observers
-pub trait ObserversTuple<S>: MatchName
-where
-    S: UsesInput,
-{
+pub trait ObserversTuple<I, S>: MatchName {
     /// This is called right before the next execution.
-    fn pre_exec_all(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error>;
+    fn pre_exec_all(&mut self, state: &mut S, input: &I) -> Result<(), Error>;
 
     /// This is called right after the last execution
     fn post_exec_all(
         &mut self,
         state: &mut S,
-        input: &S::Input,
+        input: &I,
         exit_kind: &ExitKind,
     ) -> Result<(), Error>;
 
     /// This is called right before the next execution in the child process, if any.
-    fn pre_exec_child_all(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error>;
+    fn pre_exec_child_all(&mut self, state: &mut S, input: &I) -> Result<(), Error>;
 
     /// This is called right after the last execution in the child process, if any.
     fn post_exec_child_all(
         &mut self,
         state: &mut S,
-        input: &S::Input,
+        input: &I,
         exit_kind: &ExitKind,
     ) -> Result<(), Error>;
 }
 
-impl<S> ObserversTuple<S> for ()
-where
-    S: UsesInput,
-{
-    fn pre_exec_all(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
+impl<I, S> ObserversTuple<I, S> for () {
+    fn pre_exec_all(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         Ok(())
     }
 
     fn post_exec_all(
         &mut self,
         _state: &mut S,
-        _input: &S::Input,
+        _input: &I,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         Ok(())
     }
 
-    fn pre_exec_child_all(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
+    fn pre_exec_child_all(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         Ok(())
     }
 
     fn post_exec_child_all(
         &mut self,
         _state: &mut S,
-        _input: &S::Input,
+        _input: &I,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         Ok(())
     }
 }
 
-impl<Head, Tail, S> ObserversTuple<S> for (Head, Tail)
+impl<Head, Tail, I, S> ObserversTuple<I, S> for (Head, Tail)
 where
-    Head: Observer<S>,
-    Tail: ObserversTuple<S>,
-    S: UsesInput,
+    Head: Observer<I, S>,
+    Tail: ObserversTuple<I, S>,
 {
-    fn pre_exec_all(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
+    fn pre_exec_all(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
         self.0.pre_exec(state, input)?;
         self.1.pre_exec_all(state, input)
     }
@@ -162,14 +152,14 @@ where
     fn post_exec_all(
         &mut self,
         state: &mut S,
-        input: &S::Input,
+        input: &I,
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         self.0.post_exec(state, input, exit_kind)?;
         self.1.post_exec_all(state, input, exit_kind)
     }
 
-    fn pre_exec_child_all(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
+    fn pre_exec_child_all(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
         self.0.pre_exec_child(state, input)?;
         self.1.pre_exec_child_all(state, input)
     }
@@ -177,7 +167,7 @@ where
     fn post_exec_child_all(
         &mut self,
         state: &mut S,
-        input: &S::Input,
+        input: &I,
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         self.0.post_exec_child(state, input, exit_kind)?;
@@ -194,30 +184,25 @@ pub trait ObserverWithHashField {
 /// A trait for [`Observer`]`s` which observe over differential execution.
 ///
 /// Differential observers have the following flow during a single execution:
-///  - `Observer::pre_exec` for the differential observer is invoked.
-///  - `DifferentialObserver::pre_observe_first` for the differential observer is invoked.
-///  - `Observer::pre_exec` for each of the observers for the first executor is invoked.
+///  - [`Observer::pre_exec`] for the differential observer is invoked.
+///  - [`DifferentialObserver::pre_observe_first`] for the differential observer is invoked.
+///  - [`Observer::pre_exec`] for each of the observers for the first executor is invoked.
 ///  - The first executor is invoked.
-///  - `Observer::post_exec` for each of the observers for the first executor is invoked.
-///  - `DifferentialObserver::post_observe_first` for the differential observer is invoked.
-///  - `DifferentialObserver::pre_observe_second` for the differential observer is invoked.
-///  - `Observer::pre_exec` for each of the observers for the second executor is invoked.
+///  - [`Observer::post_exec`] for each of the observers for the first executor is invoked.
+///  - [`DifferentialObserver::post_observe_first`] for the differential observer is invoked.
+///  - [`DifferentialObserver::pre_observe_second`] for the differential observer is invoked.
+///  - [`Observer::pre_exec`] for each of the observers for the second executor is invoked.
 ///  - The second executor is invoked.
-///  - `Observer::post_exec` for each of the observers for the second executor is invoked.
-///  - `DifferentialObserver::post_observe_second` for the differential observer is invoked.
-///  - `Observer::post_exec` for the differential observer is invoked.
+///  - [`Observer::post_exec`] for each of the observers for the second executor is invoked.
+///  - [`DifferentialObserver::post_observe_second`] for the differential observer is invoked.
+///  - [`Observer::post_exec`] for the differential observer is invoked.
 ///
-/// You should perform any preparation for the diff execution in `Observer::pre_exec` and respective
-/// cleanup in `Observer::post_exec`. For individual executions, use
+/// You should perform any preparation for the diff execution in [`Observer::pre_exec`] and respective
+/// cleanup in [`Observer::post_exec`]. For individual executions, use the corresponding
 /// `DifferentialObserver::{pre,post}_observe_{first,second}` as necessary for first and second,
 /// respectively.
 #[allow(unused_variables)]
-pub trait DifferentialObserver<OTA, OTB, S>: Observer<S>
-where
-    OTA: ObserversTuple<S>,
-    OTB: ObserversTuple<S>,
-    S: UsesInput,
-{
+pub trait DifferentialObserver<OTA, OTB, I, S>: Observer<I, S> {
     /// Perform an operation with the first set of observers before they are `pre_exec`'d.
     fn pre_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
         Ok(())
@@ -240,12 +225,7 @@ where
 }
 
 /// Differential observers tuple, for when you're using multiple differential observers.
-pub trait DifferentialObserversTuple<OTA, OTB, S>: ObserversTuple<S>
-where
-    OTA: ObserversTuple<S>,
-    OTB: ObserversTuple<S>,
-    S: UsesInput,
-{
+pub trait DifferentialObserversTuple<OTA, OTB> {
     /// Perform an operation with the first set of observers before they are `pre_exec`'d on all the
     /// differential observers in this tuple.
     fn pre_observe_first_all(&mut self, observers: &mut OTA) -> Result<(), Error>;
@@ -263,12 +243,7 @@ where
     fn post_observe_second_all(&mut self, observers: &mut OTB) -> Result<(), Error>;
 }
 
-impl<OTA, OTB, S> DifferentialObserversTuple<OTA, OTB, S> for ()
-where
-    OTA: ObserversTuple<S>,
-    OTB: ObserversTuple<S>,
-    S: UsesInput,
-{
+impl<OTA, OTB, I, S> DifferentialObserversTuple<OTA, OTB> for () {
     fn pre_observe_first_all(&mut self, _: &mut OTA) -> Result<(), Error> {
         Ok(())
     }
@@ -286,13 +261,10 @@ where
     }
 }
 
-impl<Head, Tail, OTA, OTB, S> DifferentialObserversTuple<OTA, OTB, S> for (Head, Tail)
+impl<Head, Tail, OTA, OTB, I, S> DifferentialObserversTuple<OTA, OTB> for (Head, Tail)
 where
-    Head: DifferentialObserver<OTA, OTB, S>,
-    Tail: DifferentialObserversTuple<OTA, OTB, S>,
-    OTA: ObserversTuple<S>,
-    OTB: ObserversTuple<S>,
-    S: UsesInput,
+    Head: DifferentialObserver<OTA, OTB, I, S>,
+    Tail: DifferentialObserversTuple<OTA, OTB>,
 {
     fn pre_observe_first_all(&mut self, observers: &mut OTA) -> Result<(), Error> {
         self.0.pre_observe_first(observers)?;
@@ -380,19 +352,16 @@ impl TimeObserver {
     }
 }
 
-impl<S> Observer<S> for TimeObserver
-where
-    S: UsesInput,
-{
+impl<I, S> Observer<I, S> for TimeObserver {
     #[cfg(feature = "std")]
-    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.last_runtime = None;
         self.start_time = Instant::now();
         Ok(())
     }
 
     #[cfg(not(feature = "std"))]
-    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.last_runtime = None;
         self.start_time = current_time();
         Ok(())
@@ -402,7 +371,7 @@ where
     fn post_exec(
         &mut self,
         _state: &mut S,
-        _input: &S::Input,
+        _input: &I,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         self.last_runtime = Some(self.start_time.elapsed());
@@ -413,7 +382,7 @@ where
     fn post_exec(
         &mut self,
         _state: &mut S,
-        _input: &S::Input,
+        _input: &I,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         self.last_runtime = current_time().checked_sub(self.start_time);
@@ -427,13 +396,7 @@ impl Named for TimeObserver {
     }
 }
 
-impl<OTA, OTB, S> DifferentialObserver<OTA, OTB, S> for TimeObserver
-where
-    OTA: ObserversTuple<S>,
-    OTB: ObserversTuple<S>,
-    S: UsesInput,
-{
-}
+impl<OTA, OTB, I, S> DifferentialObserver<OTA, OTB, I, S> for TimeObserver {}
 
 #[cfg(feature = "std")]
 #[cfg(test)]
