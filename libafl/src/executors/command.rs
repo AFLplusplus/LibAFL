@@ -181,7 +181,7 @@ impl<EM, I, OT, S, T, Z> Executor<EM, I, S, Z> for CommandExecutor<OT, T>
 where
     S: HasExecutions,
     T: CommandConfigurator<I>,
-    OT: MatchName + ObserversTuple<S>,
+    OT: MatchName + ObserversTuple<I, S>,
 {
     fn run_target(
         &mut self,
