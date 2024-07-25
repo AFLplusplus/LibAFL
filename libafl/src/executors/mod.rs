@@ -1,7 +1,6 @@
 //! Executors take input, and run it in the target.
 
-#[cfg(unix)]
-use alloc::vec::Vec;
+use alloc::boxed::Box;
 use core::fmt::Debug;
 
 pub use combined::CombinedExecutor;
@@ -20,7 +19,7 @@ use serde::{Deserialize, Serialize};
 pub use shadow::ShadowExecutor;
 pub use with_observers::WithObservers;
 
-use crate::{observers::ObserversTuple, Error};
+use crate::Error;
 
 pub mod combined;
 #[cfg(all(feature = "std", any(unix, doc)))]
@@ -42,7 +41,7 @@ pub mod with_observers;
 pub mod hooks;
 
 /// How an execution finished.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
     allow(clippy::unsafe_derive_deserialize)
@@ -67,45 +66,15 @@ pub enum ExitKind {
     // Custom(Box<dyn SerdeAny>),
 }
 
-/// How one of the diffing executions finished.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(
-    any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
-)] // for SerdeAny
-pub enum DiffExitKind {
-    /// The run exited normally.
-    Ok,
-    /// The run resulted in a target crash.
-    Crash,
-    /// The run hit an out of memory error.
-    Oom,
-    /// The run timed out
-    Timeout,
-    /// One of the executors itelf repots a differential, we can't go into further details.
-    Diff,
-    // The run resulted in a custom `ExitKind`.
-    // Custom(Box<dyn SerdeAny>),
-}
+/// The type of the crash observed in one of the differential executors
+pub type DiffExitKind = Box<ExitKind>;
 
 libafl_bolts::impl_serdeany!(ExitKind);
 
-impl From<ExitKind> for DiffExitKind {
-    fn from(exitkind: ExitKind) -> Self {
-        match exitkind {
-            ExitKind::Ok => DiffExitKind::Ok,
-            ExitKind::Crash => DiffExitKind::Crash,
-            ExitKind::Oom => DiffExitKind::Oom,
-            ExitKind::Timeout => DiffExitKind::Timeout,
-            ExitKind::Diff { .. } => DiffExitKind::Diff,
-        }
-    }
-}
-
-libafl_bolts::impl_serdeany!(DiffExitKind);
-
 /// Holds a tuple of Observers
-pub trait HasObservers: UsesObservers {
+pub trait HasObservers {
+    type Observers;
+
     /// Get the linked observers
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers>;
 
@@ -114,29 +83,21 @@ pub trait HasObservers: UsesObservers {
 }
 
 /// An executor takes the given inputs, and runs the harness/target.
-pub trait Executor<EM, Z>: UsesState
-where
-    EM: UsesState<State = Self::State>,
-    Z: UsesState<State = Self::State>,
-{
+pub trait Executor<EM, I, S, Z> {
     /// Instruct the target about the input and run
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut Self::State,
+        state: &mut S,
         mgr: &mut EM,
-        input: &Self::Input,
+        input: &I,
     ) -> Result<ExitKind, Error>;
 
     /// Wraps this Executor with the given [`ObserversTuple`] to implement [`HasObservers`].
     ///
     /// If the executor already implements [`HasObservers`], then the original implementation will be overshadowed by
     /// the implementation of this wrapper.
-    fn with_observers<OT>(self, observers: OT) -> WithObservers<Self, OT>
-    where
-        Self: Sized,
-        OT: ObserversTuple<Self::State>,
-    {
+    fn with_observers<OT>(self, observers: OT) -> WithObservers<Self, OT> {
         WithObservers::new(self, observers)
     }
 }
@@ -145,8 +106,8 @@ where
 #[cfg(unix)]
 #[inline]
 #[must_use]
-pub fn common_signals() -> Vec<Signal> {
-    vec![
+pub fn common_signals() -> &'static [Signal] {
+    static SIGNALS: &'static [Signal] = &[
         Signal::SigAlarm,
         Signal::SigUser2,
         Signal::SigAbort,
@@ -157,13 +118,12 @@ pub fn common_signals() -> Vec<Signal> {
         Signal::SigIllegalInstruction,
         Signal::SigSegmentationFault,
         Signal::SigTrap,
-    ]
+    ];
+    SIGNALS
 }
 
 #[cfg(test)]
 pub mod test {
-    use core::marker::PhantomData;
-
     use libafl_bolts::{AsSlice, Error};
 
     use crate::{
@@ -171,44 +131,18 @@ pub mod test {
         executors::{Executor, ExitKind},
         fuzzer::test::NopFuzzer,
         inputs::{BytesInput, HasTargetBytes},
-        state::{HasExecutions, NopState, State, UsesState},
+        state::{HasExecutions, NopState},
     };
 
     /// A simple executor that does nothing.
-    /// If intput len is 0, `run_target` will return Err
-    #[derive(Debug)]
-    pub struct NopExecutor<S> {
-        phantom: PhantomData<S>,
-    }
+    /// If input len is 0, `run_target` will return Err
+    #[derive(Debug, Default)]
+    pub struct NopExecutor;
 
-    impl<S> NopExecutor<S> {
-        #[must_use]
-        pub fn new() -> Self {
-            Self {
-                phantom: PhantomData,
-            }
-        }
-    }
-
-    impl<S> Default for NopExecutor<S> {
-        fn default() -> Self {
-            Self::new()
-        }
-    }
-
-    impl<S> UsesState for NopExecutor<S>
+    impl<EM, I, S, Z> Executor<EM, I, S, Z> for NopExecutor
     where
-        S: State,
-    {
-        type State = S;
-    }
-
-    impl<EM, S, Z> Executor<EM, Z> for NopExecutor<S>
-    where
-        EM: UsesState<State = S>,
-        S: State + HasExecutions,
-        S::Input: HasTargetBytes,
-        Z: UsesState<State = S>,
+        I: HasTargetBytes,
+        S: HasExecutions,
     {
         fn run_target(
             &mut self,
