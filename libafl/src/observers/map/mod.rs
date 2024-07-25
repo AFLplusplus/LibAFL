@@ -5,7 +5,6 @@ use core::{
     fmt::Debug,
     hash::{Hash, Hasher},
     ops::{Deref, DerefMut},
-    slice::{Iter, IterMut},
 };
 
 use ahash::RandomState;
@@ -348,7 +347,10 @@ pub struct StdMapObserver<'a, T, const DIFFERENTIAL: bool> {
     name: Cow<'static, str>,
 }
 
-impl<'a, I, S, T> Observer<I, S> for StdMapObserver<'a, T, false> {
+impl<'a, I, S, T> Observer<I, S> for StdMapObserver<'a, T, false>
+where
+    Self: MapObserver,
+{
     #[inline]
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.reset_map()
@@ -368,42 +370,6 @@ impl<'a, T, const DIFFERENTIAL: bool> HasLen for StdMapObserver<'a, T, DIFFERENT
     #[inline]
     fn len(&self) -> usize {
         self.map.as_slice().len()
-    }
-}
-
-impl<'a, 'it, T, const DIFFERENTIAL: bool> IntoIterator
-    for &'it StdMapObserver<'a, T, DIFFERENTIAL>
-{
-    type Item = <Iter<'it, T> as Iterator>::Item;
-    type IntoIter = Iter<'it, T>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let cnt = self.usable_count();
-        self.as_slice()[..cnt].iter()
-    }
-}
-
-impl<'a, 'it, T, const DIFFERENTIAL: bool> IntoIterator
-    for &'it mut StdMapObserver<'a, T, DIFFERENTIAL>
-{
-    type Item = <IterMut<'it, T> as Iterator>::Item;
-    type IntoIter = IterMut<'it, T>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let cnt = self.usable_count();
-        self.as_slice_mut()[..cnt].iter_mut()
-    }
-}
-
-impl<'a, T, const DIFFERENTIAL: bool> StdMapObserver<'a, T, DIFFERENTIAL> {
-    /// Returns an iterator over the map.
-    pub fn iter(&self) -> Iter<'_, T> {
-        <&Self as IntoIterator>::into_iter(self)
-    }
-
-    /// Returns a mutable iterator over the map.
-    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
-        <&mut Self as IntoIterator>::into_iter(self)
     }
 }
 

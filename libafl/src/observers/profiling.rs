@@ -124,14 +124,11 @@ impl Named for ProfilingObserver {
     }
 }
 
-impl<S> Observer<S> for ProfilingObserver
-where
-    S: State,
-{
+impl<I, S> Observer<I, S> for ProfilingObserver {
     fn post_exec(
         &mut self,
         _state: &mut S,
-        _input: &<S as UsesInput>::Input,
+        _input: &I,
         _exit_kind: &crate::executors::ExitKind,
     ) -> Result<(), Error> {
         // in reality, this should be done in a stage

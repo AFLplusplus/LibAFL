@@ -396,7 +396,7 @@ impl Named for TimeObserver {
     }
 }
 
-impl<OTA, OTB, I, S> DifferentialObserver<OTA, OTB> for TimeObserver {}
+impl<OTA, OTB> DifferentialObserver<OTA, OTB> for TimeObserver {}
 
 #[cfg(feature = "std")]
 #[cfg(test)]
