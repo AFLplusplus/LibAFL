@@ -202,7 +202,7 @@ pub trait ObserverWithHashField {
 /// `DifferentialObserver::{pre,post}_observe_{first,second}` as necessary for first and second,
 /// respectively.
 #[allow(unused_variables)]
-pub trait DifferentialObserver<OTA, OTB, I, S>: Observer<I, S> {
+pub trait DifferentialObserver<OTA, OTB> {
     /// Perform an operation with the first set of observers before they are `pre_exec`'d.
     fn pre_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
         Ok(())
@@ -243,7 +243,7 @@ pub trait DifferentialObserversTuple<OTA, OTB> {
     fn post_observe_second_all(&mut self, observers: &mut OTB) -> Result<(), Error>;
 }
 
-impl<OTA, OTB, I, S> DifferentialObserversTuple<OTA, OTB> for () {
+impl<OTA, OTB> DifferentialObserversTuple<OTA, OTB> for () {
     fn pre_observe_first_all(&mut self, _: &mut OTA) -> Result<(), Error> {
         Ok(())
     }
@@ -261,9 +261,9 @@ impl<OTA, OTB, I, S> DifferentialObserversTuple<OTA, OTB> for () {
     }
 }
 
-impl<Head, Tail, OTA, OTB, I, S> DifferentialObserversTuple<OTA, OTB> for (Head, Tail)
+impl<Head, Tail, OTA, OTB> DifferentialObserversTuple<OTA, OTB> for (Head, Tail)
 where
-    Head: DifferentialObserver<OTA, OTB, I, S>,
+    Head: DifferentialObserver<OTA, OTB>,
     Tail: DifferentialObserversTuple<OTA, OTB>,
 {
     fn pre_observe_first_all(&mut self, observers: &mut OTA) -> Result<(), Error> {
@@ -396,7 +396,7 @@ impl Named for TimeObserver {
     }
 }
 
-impl<OTA, OTB, I, S> DifferentialObserver<OTA, OTB, I, S> for TimeObserver {}
+impl<OTA, OTB, I, S> DifferentialObserver<OTA, OTB> for TimeObserver {}
 
 #[cfg(feature = "std")]
 #[cfg(test)]

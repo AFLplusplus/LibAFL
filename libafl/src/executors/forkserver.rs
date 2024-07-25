@@ -518,7 +518,7 @@ impl Forkserver {
 /// This [`Executor`] can run binaries compiled for AFL/AFL++ that make use of a forkserver.
 /// Shared memory feature is also available, but you have to set things up in your code.
 /// Please refer to AFL++'s docs. <https://github.com/AFLplusplus/AFLplusplus/blob/stable/instrumentation/README.persistent_mode.md>
-pub struct ForkserverExecutor<OT, S, SP>
+pub struct ForkserverExecutor<OT, SP>
 where
     SP: ShMemProvider,
 {
@@ -529,7 +529,6 @@ where
     forkserver: Forkserver,
     observers: OT,
     map: Option<SP::ShMem>,
-    phantom: PhantomData<S>,
     map_size: Option<usize>,
     min_input_size: usize,
     max_input_size: usize,
@@ -539,7 +538,7 @@ where
     crash_exitcode: Option<i8>,
 }
 
-impl<OT, S, SP> Debug for ForkserverExecutor<OT, S, SP>
+impl<OT, SP> Debug for ForkserverExecutor<OT, SP>
 where
     OT: Debug,
     SP: ShMemProvider,
@@ -557,7 +556,7 @@ where
     }
 }
 
-impl ForkserverExecutor<(), (), UnixShMemProvider> {
+impl ForkserverExecutor<(), UnixShMemProvider> {
     /// Builder for `ForkserverExecutor`
     #[must_use]
     pub fn builder() -> ForkserverExecutorBuilder<'static, UnixShMemProvider> {
@@ -565,10 +564,8 @@ impl ForkserverExecutor<(), (), UnixShMemProvider> {
     }
 }
 
-impl<OT, S, SP> ForkserverExecutor<OT, S, SP>
+impl<OT, SP> ForkserverExecutor<OT, SP>
 where
-    OT: ObserversTuple<S>,
-    S: UsesInput,
     SP: ShMemProvider,
 {
     /// The `target` binary that's going to run.
@@ -634,11 +631,8 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
     /// in case no input file is specified.
     /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
     #[allow(clippy::pedantic)]
-    pub fn build<OT, S>(&mut self, observers: OT) -> Result<ForkserverExecutor<OT, S, SP>, Error>
+    pub fn build<OT>(&mut self, observers: OT) -> Result<ForkserverExecutor<OT, SP>, Error>
     where
-        OT: ObserversTuple<S>,
-        S: UsesInput,
-        S::Input: Input + HasTargetBytes,
         SP: ShMemProvider,
     {
         let (forkserver, input_file, map) = self.build_helper()?;
@@ -679,7 +673,6 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             forkserver,
             observers,
             map,
-            phantom: PhantomData,
             map_size: self.map_size,
             min_input_size: self.min_input_size,
             max_input_size: self.max_input_size,
@@ -692,19 +685,17 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         })
     }
 
-    /// Builds `ForkserverExecutor` downsizing the coverage map to fit exaclty the AFL++ map size.
+    /// Builds `ForkserverExecutor` downsizing the coverage map to fit exactly the AFL++ map size.
     #[allow(clippy::pedantic)]
     pub fn build_dynamic_map<A, MO, OT, S>(
         &mut self,
         mut map_observer: A,
         other_observers: OT,
-    ) -> Result<ForkserverExecutor<(A, OT), S, SP>, Error>
+    ) -> Result<ForkserverExecutor<(A, OT), SP>, Error>
     where
         MO: MapObserver + Truncate, // TODO maybe enforce Entry = u8 for the cov map
-        A: Observer<S> + AsRef<MO> + AsMut<MO>,
-        OT: ObserversTuple<S> + Prepend<MO, PreprendResult = OT>,
-        S: UsesInput,
-        S::Input: Input + HasTargetBytes,
+        A: AsMut<MO>,
+        OT: Prepend<MO, PreprendResult = OT>,
         SP: ShMemProvider,
     {
         let (forkserver, input_file, map) = self.build_helper()?;
@@ -743,7 +734,6 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             forkserver,
             observers,
             map,
-            phantom: PhantomData,
             map_size: self.map_size,
             min_input_size: self.min_input_size,
             max_input_size: self.max_input_size,
@@ -1207,22 +1197,19 @@ impl<'a> Default for ForkserverExecutorBuilder<'a, UnixShMemProvider> {
     }
 }
 
-impl<EM, OT, S, SP, Z> Executor<EM, Z> for ForkserverExecutor<OT, S, SP>
+impl<EM, I, OT, S, SP, Z> Executor<EM, I, S, Z> for ForkserverExecutor<OT, SP>
 where
-    OT: ObserversTuple<S>,
+    I: HasTargetBytes,
+    S: HasExecutions,
     SP: ShMemProvider,
-    S: State + HasExecutions,
-    S::Input: HasTargetBytes,
-    EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
 {
     #[inline]
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
-        state: &mut Self::State,
+        state: &mut S,
         _mgr: &mut EM,
-        input: &Self::Input,
+        input: &I,
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
 
@@ -1322,29 +1309,12 @@ where
     }
 }
 
-impl<OT, S, SP> UsesState for ForkserverExecutor<OT, S, SP>
+impl<OT, SP> HasObservers for ForkserverExecutor<OT, SP>
 where
-    S: State,
-    SP: ShMemProvider,
-{
-    type State = S;
-}
-
-impl<OT, S, SP> UsesObservers for ForkserverExecutor<OT, S, SP>
-where
-    OT: ObserversTuple<S>,
-    S: State,
     SP: ShMemProvider,
 {
     type Observers = OT;
-}
 
-impl<OT, S, SP> HasObservers for ForkserverExecutor<OT, S, SP>
-where
-    OT: ObserversTuple<S>,
-    S: State,
-    SP: ShMemProvider,
-{
     #[inline]
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         RefIndexable::from(&self.observers)
@@ -1397,7 +1367,7 @@ mod tests {
             .args(args)
             .debug_child(false)
             .shmem_provider(&mut shmem_provider)
-            .build::<_, ()>(tuple_list!(edges_observer));
+            .build(tuple_list!(edges_observer));
 
         // Since /usr/bin/echo is not a instrumented binary file, the test will just check if the forkserver has failed at the initial handshake
         let result = match executor {
