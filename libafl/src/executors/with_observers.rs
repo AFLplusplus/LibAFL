@@ -1,14 +1,13 @@
 //! A wrapper for any [`Executor`] to make it implement [`HasObservers`] using a given [`ObserversTuple`].
 
-use core::fmt::Debug;
+use core::{
+    fmt::Debug,
+    ops::{Deref, DerefMut},
+};
 
 use libafl_bolts::tuples::RefIndexable;
 
-use crate::{
-    executors::{Executor, ExitKind, HasObservers},
-    observers::ObserversTuple,
-    Error,
-};
+use crate::executors::HasObservers;
 
 /// A wrapper for any [`Executor`] to make it implement [`HasObservers`] using a given [`ObserversTuple`].
 #[derive(Debug)]
@@ -17,41 +16,23 @@ pub struct WithObservers<E, OT> {
     observers: OT,
 }
 
-impl<E, EM, OT, Z> Executor<EM, Z> for WithObservers<E, OT>
-where
-    E: Executor<EM, Z>,
-{
-    fn run_target(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut Self::State,
-        mgr: &mut EM,
-        input: &Self::Input,
-    ) -> Result<ExitKind, Error> {
-        self.executor.run_target(fuzzer, state, mgr, input)
+impl<E, OT> Deref for WithObservers<E, OT> {
+    type Target = E;
+
+    fn deref(&self) -> &Self::Target {
+        &self.executor
     }
 }
 
-impl<E, OT> UsesState for WithObservers<E, OT>
-where
-    E: UsesState,
-{
-    type State = E::State;
+impl<E, OT> DerefMut for WithObservers<E, OT> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.executor
+    }
 }
 
-impl<E, OT> UsesObservers for WithObservers<E, OT>
-where
-    E: UsesState,
-    OT: ObserversTuple<Self::State>,
-{
+impl<E, OT> HasObservers for WithObservers<E, OT> {
     type Observers = OT;
-}
 
-impl<E, OT> HasObservers for WithObservers<E, OT>
-where
-    E: UsesState,
-    OT: ObserversTuple<Self::State>,
-{
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         RefIndexable::from(&self.observers)
     }
