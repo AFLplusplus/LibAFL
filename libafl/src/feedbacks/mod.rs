@@ -29,6 +29,8 @@ pub use new_hash_feedback::NewHashFeedback;
 pub use new_hash_feedback::NewHashFeedbackMetadata;
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "introspection")]
+use crate::state::HasClientPerfMonitor;
 use crate::{
     corpus::Testcase,
     events::EventFirer,
@@ -37,6 +39,7 @@ use crate::{
     state::State,
     Error,
 };
+
 #[cfg(feature = "std")]
 pub mod concolic;
 #[cfg(feature = "std")]
@@ -57,10 +60,7 @@ pub mod transferred;
 /// Feedbacks evaluate the observers.
 /// Basically, they reduce the information provided by an observer to a value,
 /// indicating the "interestingness" of the last run.
-pub trait Feedback<S>: Named
-where
-    S: State,
-{
+pub trait Feedback<EM, I, OT, S>: Named {
     /// Initializes the feedback state.
     /// This method is called after that the `State` is created.
     fn init_state(&mut self, _state: &mut S) -> Result<(), Error> {
@@ -69,34 +69,30 @@ where
 
     /// `is_interesting ` return if an input is worth the addition to the corpus
     #[allow(clippy::wrong_self_convention)]
-    fn is_interesting<EM, OT>(
+    fn is_interesting(
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: &S::Input,
+        input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>;
+    ) -> Result<bool, Error>;
 
     /// Returns if the result of a run is interesting and the value input should be stored in a corpus.
     /// It also keeps track of introspection stats.
     #[cfg(feature = "introspection")]
     #[allow(clippy::too_many_arguments)]
     #[allow(clippy::wrong_self_convention)]
-    fn is_interesting_introspection<EM, OT>(
+    fn is_interesting_introspection(
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: &S::Input,
+        input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        S: HasClientPerfMonitor,
     {
         // Start a timer for this feedback
         let start_time = libafl_bolts::cpu::read_time_counter();
@@ -133,23 +129,19 @@ where
     /// Append to the testcase the generated metadata in case of a new corpus item
     #[inline]
     #[allow(unused_variables)]
-    fn append_metadata<EM, OT>(
+    fn append_metadata(
         &mut self,
         state: &mut S,
         manager: &mut EM,
         observers: &OT,
-        testcase: &mut Testcase<S::Input>,
-    ) -> Result<(), Error>
-    where
-        OT: ObserversTuple<S>,
-        EM: EventFirer<State = S>,
-    {
+        testcase: &mut Testcase<I>,
+    ) -> Result<(), Error> {
         Ok(())
     }
 
     /// Discard the stored metadata in case that the testcase is not added to the corpus
     #[inline]
-    fn discard_metadata(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
+    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -165,39 +157,24 @@ pub trait HasObserverHandle {
 
 /// A combined feedback consisting of multiple [`Feedback`]s
 #[derive(Debug)]
-pub struct CombinedFeedback<A, B, FL, S>
-where
-    A: Feedback<S>,
-    B: Feedback<S>,
-    FL: FeedbackLogic<A, B, S>,
-    S: State,
-{
-    /// First [`Feedback`]
-    pub first: A,
-    /// Second [`Feedback`]
-    pub second: B,
+pub struct CombinedFeedback<A, B, FL> {
+    first: A,
+    second: B,
     name: Cow<'static, str>,
-    phantom: PhantomData<(S, FL)>,
+    phantom: PhantomData<fn() -> FL>,
 }
 
-impl<A, B, FL, S> Named for CombinedFeedback<A, B, FL, S>
-where
-    A: Feedback<S>,
-    B: Feedback<S>,
-    FL: FeedbackLogic<A, B, S>,
-    S: State,
-{
+impl<A, B, FL> Named for CombinedFeedback<A, B, FL> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<A, B, FL, S> CombinedFeedback<A, B, FL, S>
+impl<A, B, FL> CombinedFeedback<A, B, FL>
 where
-    A: Feedback<S>,
-    B: Feedback<S>,
-    FL: FeedbackLogic<A, B, S>,
-    S: State,
+    A: Named,
+    B: Named,
+    FL: FeedbackLogic,
 {
     /// Create a new combined feedback
     pub fn new(first: A, second: B) -> Self {
@@ -216,42 +193,36 @@ where
     }
 }
 
-impl<A, B, FL, S> Feedback<S> for CombinedFeedback<A, B, FL, S>
+impl<A, B, FL, EM, I, OT, S> Feedback<EM, I, OT, S> for CombinedFeedback<A, B, FL>
 where
-    A: Feedback<S>,
-    B: Feedback<S>,
-    FL: FeedbackLogic<A, B, S>,
-    S: State,
+    A: Feedback<EM, I, OT, S>,
+    B: Feedback<EM, I, OT, S>,
+    FL: FeedbackLogic,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         self.first.init_state(state)?;
         self.second.init_state(state)?;
         Ok(())
     }
-    #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Result<bool, Error> {
-        FL::last_result(&self.first, &self.second)
-    }
-    #[cfg(feature = "track_hit_feedbacks")]
-    fn append_hit_feedbacks(&self, list: &mut Vec<Cow<'static, str>>) -> Result<(), Error> {
-        FL::append_hit_feedbacks(&self.first, &self.second, list)
-    }
+
     #[allow(clippy::wrong_self_convention)]
-    fn is_interesting<EM, OT>(
+    fn is_interesting(
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: &S::Input,
+        input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
-    {
+    ) -> Result<bool, Error> {
         FL::is_pair_interesting(
-            &mut self.first,
-            &mut self.second,
+            |state, manager, input, observers, exit_kind| {
+                self.first
+                    .is_interesting(state, manager, input, observers, exit_kind)
+            },
+            |state, manager, input, observers, exit_kind| {
+                self.second
+                    .is_interesting(state, manager, input, observers, exit_kind)
+            },
             state,
             manager,
             input,
@@ -259,44 +230,59 @@ where
             exit_kind,
         )
     }
-
     #[cfg(feature = "introspection")]
     #[allow(clippy::wrong_self_convention)]
-    fn is_interesting_introspection<EM, OT>(
+    fn is_interesting_introspection(
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: &S::Input,
+        input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        S: HasClientPerfMonitor,
     {
-        FL::is_pair_interesting_introspection(
-            &mut self.first,
-            &mut self.second,
+        FL::is_pair_interesting(
+            |state, manager, input, observers, exit_kind| {
+                self.first
+                    .is_interesting_introspection(state, manager, input, observers, exit_kind)
+            },
+            |state, manager, input, observers, exit_kind| {
+                self.second
+                    .is_interesting_introspection(state, manager, input, observers, exit_kind)
+            },
             state,
             manager,
             input,
             observers,
             exit_kind,
+        )
+    }
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Result<bool, Error> {
+        FL::last_result(self.first.last_result(), self.second.last_result())
+    }
+
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn append_hit_feedbacks(&self, list: &mut Vec<Cow<'static, str>>) -> Result<(), Error> {
+        FL::append_hit_feedbacks(
+            self.first.last_result(),
+            |list| self.first.append_hit_feedbacks(list),
+            self.second.last_result(),
+            |list| self.second.append_hit_feedbacks(list),
+            list,
         )
     }
 
     #[inline]
-    fn append_metadata<EM, OT>(
+    fn append_metadata(
         &mut self,
         state: &mut S,
         manager: &mut EM,
         observers: &OT,
-        testcase: &mut Testcase<S::Input>,
-    ) -> Result<(), Error>
-    where
-        OT: ObserversTuple<S>,
-        EM: EventFirer<State = S>,
-    {
+        testcase: &mut Testcase<I>,
+    ) -> Result<(), Error> {
         self.first
             .append_metadata(state, manager, observers, testcase)?;
         self.second
@@ -304,21 +290,19 @@ where
     }
 
     #[inline]
-    fn discard_metadata(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
+    fn discard_metadata(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
         self.first.discard_metadata(state, input)?;
         self.second.discard_metadata(state, input)
     }
 }
 
-impl<A, B, FL, S, T> FeedbackFactory<CombinedFeedback<A, B, FL, S>, T>
-    for CombinedFeedback<A, B, FL, S>
+impl<A, B, FL, T> FeedbackFactory<CombinedFeedback<A, B, FL>, T> for CombinedFeedback<A, B, FL>
 where
-    A: Feedback<S> + FeedbackFactory<A, T>,
-    B: Feedback<S> + FeedbackFactory<B, T>,
-    FL: FeedbackLogic<A, B, S>,
-    S: State,
+    A: FeedbackFactory<A, T>,
+    B: FeedbackFactory<B, T>,
+    FL: FeedbackLogic,
 {
-    fn create_feedback(&self, ctx: &T) -> CombinedFeedback<A, B, FL, S> {
+    fn create_feedback(&self, ctx: &T) -> CombinedFeedback<A, B, FL> {
         CombinedFeedback::new(
             self.first.create_feedback(ctx),
             self.second.create_feedback(ctx),
@@ -327,58 +311,46 @@ where
 }
 
 /// Logical combination of two feedbacks
-pub trait FeedbackLogic<A, B, S>: 'static
-where
-    A: Feedback<S>,
-    B: Feedback<S>,
-    S: State,
-{
+pub trait FeedbackLogic {
     /// The name of this combination
     fn name() -> &'static str;
 
-    /// If the feedback pair is interesting
-    fn is_pair_interesting<EM, OT>(
-        first: &mut A,
-        second: &mut B,
+    /// If the feedback pair is interesting.
+    ///
+    /// `first` and `second` are closures which invoke the corresponding
+    /// [`Feedback::is_interesting`] methods of the associated feedbacks. Implementors may choose to
+    /// use the closure or not, depending on eagerness logic.
+    fn is_pair_interesting<EM, I, OT, S, F1, F2>(
+        first: F1,
+        second: F2,
         state: &mut S,
         manager: &mut EM,
-        input: &S::Input,
+        input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>;
+        F1: FnOnce(&mut S, &mut EM, &I, &OT, &ExitKind) -> Result<bool, Error>,
+        F2: FnOnce(&mut S, &mut EM, &I, &OT, &ExitKind) -> Result<bool, Error>;
 
     /// Get the result of the last `Self::is_interesting` run
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(first: &A, second: &B) -> Result<bool, Error>;
+    fn last_result(first: Result<bool, Error>, second: Result<bool, Error>) -> Result<bool, Error>;
 
-    /// Append this [`Feedback`]'s name if [`Feedback::last_result`] is true
-    /// If you have any nested Feedbacks, you must call this function on them if relevant.
-    /// See the implementations of [`CombinedFeedback`]
+    /// Append each [`Feedback`]'s name according to the logic implemented by this
+    /// [`FeedbackLogic`]. `if_first` and `if_second` are closures which invoke the corresponding
+    /// [`Feedback::append_hit_feedbacks`] logics of the relevant closures.
     #[cfg(feature = "track_hit_feedbacks")]
-    fn append_hit_feedbacks(
-        first: &A,
-        second: &B,
+    fn append_hit_feedbacks<F1, F2>(
+        first_result: Result<bool, Error>,
+        if_first: F1,
+        second_result: Result<bool, Error>,
+        if_second: F2,
         list: &mut Vec<Cow<'static, str>>,
-    ) -> Result<(), Error>;
-
-    /// If this pair is interesting (with introspection features enabled)
-    #[cfg(feature = "introspection")]
-    #[allow(clippy::too_many_arguments)]
-    fn is_pair_interesting_introspection<EM, OT>(
-        first: &mut A,
-        second: &mut B,
-        state: &mut S,
-        manager: &mut EM,
-        input: &S::Input,
-        observers: &OT,
-        exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
+    ) -> Result<(), Error>
     where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>;
+        F1: FnOnce(&mut Vec<Cow<'static, str>>) -> Result<(), Error>,
+        F2: FnOnce(&mut Vec<Cow<'static, str>>) -> Result<(), Error>;
 }
 
 /// Factory for feedbacks which should be sensitive to an existing context, e.g. observer(s) from a
@@ -396,335 +368,233 @@ where
         self(ctx)
     }
 }
+
 /// Eager `OR` combination of two feedbacks
+///
+/// When the `track_hit_feedbacks` feature is used, [`LogicEagerOr`]'s hit feedback preferences will
+/// behave like [`LogicFastOr`]'s because the second feedback will not have contributed to the
+/// result. When using [`crate::feedback_or`], ensure that you set the first parameter to the
+/// prioritized feedback.
 #[derive(Debug, Clone)]
-pub struct LogicEagerOr {}
+pub struct LogicEagerOr;
 
 /// Fast `OR` combination of two feedbacks
 #[derive(Debug, Clone)]
-pub struct LogicFastOr {}
+pub struct LogicFastOr;
 
 /// Eager `AND` combination of two feedbacks
 #[derive(Debug, Clone)]
-pub struct LogicEagerAnd {}
+pub struct LogicEagerAnd;
 
 /// Fast `AND` combination of two feedbacks
 #[derive(Debug, Clone)]
-pub struct LogicFastAnd {}
+pub struct LogicFastAnd;
 
-impl<A, B, S> FeedbackLogic<A, B, S> for LogicEagerOr
-where
-    A: Feedback<S>,
-    B: Feedback<S>,
-    S: State,
-{
+impl FeedbackLogic for LogicEagerOr {
     fn name() -> &'static str {
         "Eager OR"
     }
 
-    fn is_pair_interesting<EM, OT>(
-        first: &mut A,
-        second: &mut B,
+    fn is_pair_interesting<EM, I, OT, S, F1, F2>(
+        first: F1,
+        second: F2,
         state: &mut S,
         manager: &mut EM,
-        input: &S::Input,
+        input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        F1: FnOnce(&mut S, &mut EM, &I, &OT, &ExitKind) -> Result<bool, Error>,
+        F2: FnOnce(&mut S, &mut EM, &I, &OT, &ExitKind) -> Result<bool, Error>,
     {
-        let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
-        let b = second.is_interesting(state, manager, input, observers, exit_kind)?;
-        Ok(a || b)
+        Ok(first(state, manager, input, observers, exit_kind)?
+            | second(state, manager, input, observers, exit_kind)?)
     }
+
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(first: &A, second: &B) -> Result<bool, Error> {
-        Ok(first.last_result()? || second.last_result()?)
+    fn last_result(first: Result<bool, Error>, second: Result<bool, Error>) -> Result<bool, Error> {
+        first.and_then(|first| second.map(|second| first | second))
     }
-    /// Note: Eager OR's hit feedbacks will behave like Fast OR
-    /// because the second feedback will not have contributed to the result.
-    /// Set the second feedback as the first (A, B) vs (B, A)
-    /// to "prioritize" the result in case of Eager OR.
+
     #[cfg(feature = "track_hit_feedbacks")]
-    fn append_hit_feedbacks(
-        first: &A,
-        second: &B,
+    fn append_hit_feedbacks<F1, F2>(
+        first_result: Result<bool, Error>,
+        if_first: F1,
+        second_result: Result<bool, Error>,
+        if_second: F2,
         list: &mut Vec<Cow<'static, str>>,
-    ) -> Result<(), Error> {
-        if first.last_result()? {
-            first.append_hit_feedbacks(list)?;
-        } else if second.last_result()? {
-            second.append_hit_feedbacks(list)?;
-        }
-        Ok(())
-    }
-
-    #[cfg(feature = "introspection")]
-    fn is_pair_interesting_introspection<EM, OT>(
-        first: &mut A,
-        second: &mut B,
-        state: &mut S,
-        manager: &mut EM,
-        input: &S::Input,
-        observers: &OT,
-        exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
+    ) -> Result<(), Error>
     where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        F1: FnOnce(&mut Vec<Cow<'static, str>>) -> Result<(), Error>,
+        F2: FnOnce(&mut Vec<Cow<'static, str>>) -> Result<(), Error>,
     {
-        // Execute this feedback
-        let a = first.is_interesting_introspection(state, manager, input, observers, exit_kind)?;
-
-        let b = second.is_interesting_introspection(state, manager, input, observers, exit_kind)?;
-        Ok(a || b)
+        LogicFastOr::append_hit_feedbacks(first_result, if_first, second_result, if_second, list)
     }
 }
 
-impl<A, B, S> FeedbackLogic<A, B, S> for LogicFastOr
-where
-    A: Feedback<S>,
-    B: Feedback<S>,
-    S: State,
-{
+impl FeedbackLogic for LogicFastOr {
     fn name() -> &'static str {
         "Fast OR"
     }
 
-    fn is_pair_interesting<EM, OT>(
-        first: &mut A,
-        second: &mut B,
+    fn is_pair_interesting<EM, I, OT, S, F1, F2>(
+        first: F1,
+        second: F2,
         state: &mut S,
         manager: &mut EM,
-        input: &S::Input,
+        input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        F1: FnOnce(&mut S, &mut EM, &I, &OT, &ExitKind) -> Result<bool, Error>,
+        F2: FnOnce(&mut S, &mut EM, &I, &OT, &ExitKind) -> Result<bool, Error>,
     {
-        let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
+        let a = first(state, manager, input, observers, exit_kind)?;
         if a {
             return Ok(true);
         }
 
-        second.is_interesting(state, manager, input, observers, exit_kind)
+        second(state, manager, input, observers, exit_kind)
     }
-    #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(first: &A, second: &B) -> Result<bool, Error> {
-        if first.last_result()? {
-            return Ok(true);
-        }
 
-        // The second must have run if the first wasn't interesting
-        second.last_result()
-    }
     #[cfg(feature = "track_hit_feedbacks")]
-    fn append_hit_feedbacks(
-        first: &A,
-        second: &B,
+    fn last_result(first: Result<bool, Error>, second: Result<bool, Error>) -> Result<bool, Error> {
+        first.and_then(|first| Ok(first || second?))
+    }
+
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn append_hit_feedbacks<F1, F2>(
+        first_result: Result<bool, Error>,
+        if_first: F1,
+        second_result: Result<bool, Error>,
+        if_second: F2,
         list: &mut Vec<Cow<'static, str>>,
-    ) -> Result<(), Error> {
-        if first.last_result()? {
-            first.append_hit_feedbacks(list)?;
-        } else if second.last_result()? {
-            second.append_hit_feedbacks(list)?;
-        }
-        Ok(())
-    }
-
-    #[cfg(feature = "introspection")]
-    fn is_pair_interesting_introspection<EM, OT>(
-        first: &mut A,
-        second: &mut B,
-        state: &mut S,
-        manager: &mut EM,
-        input: &S::Input,
-        observers: &OT,
-        exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
+    ) -> Result<(), Error>
     where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        F1: FnOnce(&mut Vec<Cow<'static, str>>) -> Result<(), Error>,
+        F2: FnOnce(&mut Vec<Cow<'static, str>>) -> Result<(), Error>,
     {
-        // Execute this feedback
-        let a = first.is_interesting_introspection(state, manager, input, observers, exit_kind)?;
-
-        if a {
-            return Ok(true);
+        if first_result? {
+            if_first(list)
+        } else if second_result? {
+            if_second(list)
+        } else {
+            Ok(())
         }
-
-        second.is_interesting_introspection(state, manager, input, observers, exit_kind)
     }
 }
 
-impl<A, B, S> FeedbackLogic<A, B, S> for LogicEagerAnd
-where
-    A: Feedback<S>,
-    B: Feedback<S>,
-    S: State,
-{
+impl FeedbackLogic for LogicEagerAnd {
     fn name() -> &'static str {
         "Eager AND"
     }
 
-    fn is_pair_interesting<EM, OT>(
-        first: &mut A,
-        second: &mut B,
+    fn is_pair_interesting<EM, I, OT, S, F1, F2>(
+        first: F1,
+        second: F2,
         state: &mut S,
         manager: &mut EM,
-        input: &S::Input,
+        input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        F1: FnOnce(&mut S, &mut EM, &I, &OT, &ExitKind) -> Result<bool, Error>,
+        F2: FnOnce(&mut S, &mut EM, &I, &OT, &ExitKind) -> Result<bool, Error>,
     {
-        let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
-        let b = second.is_interesting(state, manager, input, observers, exit_kind)?;
-        Ok(a && b)
+        Ok(first(state, manager, input, observers, exit_kind)?
+            & second(state, manager, input, observers, exit_kind)?)
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(first: &A, second: &B) -> Result<bool, Error> {
-        Ok(first.last_result()? && second.last_result()?)
+    fn last_result(first: Result<bool, Error>, second: Result<bool, Error>) -> Result<bool, Error> {
+        Ok(first? & second?)
     }
+
     #[cfg(feature = "track_hit_feedbacks")]
-    fn append_hit_feedbacks(
-        first: &A,
-        second: &B,
+    fn append_hit_feedbacks<F1, F2>(
+        first_result: Result<bool, Error>,
+        if_first: F1,
+        second_result: Result<bool, Error>,
+        if_second: F2,
         list: &mut Vec<Cow<'static, str>>,
-    ) -> Result<(), Error> {
-        if first.last_result()? && second.last_result()? {
-            first.append_hit_feedbacks(list)?;
-            second.append_hit_feedbacks(list)?;
+    ) -> Result<(), Error>
+    where
+        F1: FnOnce(&mut Vec<Cow<'static, str>>) -> Result<(), Error>,
+        F2: FnOnce(&mut Vec<Cow<'static, str>>) -> Result<(), Error>,
+    {
+        if first_result? & second_result? {
+            if_first(list)?;
+            if_second(list)?;
         }
         Ok(())
     }
-
-    #[cfg(feature = "introspection")]
-    fn is_pair_interesting_introspection<EM, OT>(
-        first: &mut A,
-        second: &mut B,
-        state: &mut S,
-        manager: &mut EM,
-        input: &S::Input,
-        observers: &OT,
-        exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
-    {
-        // Execute this feedback
-        let a = first.is_interesting_introspection(state, manager, input, observers, exit_kind)?;
-
-        let b = second.is_interesting_introspection(state, manager, input, observers, exit_kind)?;
-        Ok(a && b)
-    }
 }
 
-impl<A, B, S> FeedbackLogic<A, B, S> for LogicFastAnd
-where
-    A: Feedback<S>,
-    B: Feedback<S>,
-    S: State,
-{
+impl FeedbackLogic for LogicFastAnd {
     fn name() -> &'static str {
         "Fast AND"
     }
 
-    fn is_pair_interesting<EM, OT>(
-        first: &mut A,
-        second: &mut B,
+    fn is_pair_interesting<EM, I, OT, S, F1, F2>(
+        first: F1,
+        second: F2,
         state: &mut S,
         manager: &mut EM,
-        input: &S::Input,
+        input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        F1: FnOnce(&mut S, &mut EM, &I, &OT, &ExitKind) -> Result<bool, Error>,
+        F2: FnOnce(&mut S, &mut EM, &I, &OT, &ExitKind) -> Result<bool, Error>,
     {
-        let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
-        if !a {
-            return Ok(false);
-        }
-
-        second.is_interesting(state, manager, input, observers, exit_kind)
+        Ok(first(state, manager, input, observers, exit_kind)?
+            && second(state, manager, input, observers, exit_kind)?)
     }
 
-    #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(first: &A, second: &B) -> Result<bool, Error> {
-        if !first.last_result()? {
-            return Ok(false);
-        }
-
-        // The second must have run if the first wasn't interesting
-        second.last_result()
+    fn last_result(first: Result<bool, Error>, second: Result<bool, Error>) -> Result<bool, Error> {
+        Ok(first? && second?)
     }
 
-    #[cfg(feature = "track_hit_feedbacks")]
-    fn append_hit_feedbacks(
-        first: &A,
-        second: &B,
+    fn append_hit_feedbacks<F1, F2>(
+        first_result: Result<bool, Error>,
+        if_first: F1,
+        second_result: Result<bool, Error>,
+        if_second: F2,
         list: &mut Vec<Cow<'static, str>>,
-    ) -> Result<(), Error> {
-        if first.last_result()? {
-            first.append_hit_feedbacks(list)?;
-        } else if second.last_result()? {
-            second.append_hit_feedbacks(list)?;
+    ) -> Result<(), Error>
+    where
+        F1: FnOnce(&mut Vec<Cow<'static, str>>) -> Result<(), Error>,
+        F2: FnOnce(&mut Vec<Cow<'static, str>>) -> Result<(), Error>,
+    {
+        if first_result? && second_result? {
+            if_first(list)?;
+            if_second(list)?;
         }
         Ok(())
-    }
-
-    #[cfg(feature = "introspection")]
-    fn is_pair_interesting_introspection<EM, OT>(
-        first: &mut A,
-        second: &mut B,
-        state: &mut S,
-        manager: &mut EM,
-        input: &S::Input,
-        observers: &OT,
-        exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
-    {
-        // Execute this feedback
-        let a = first.is_interesting_introspection(state, manager, input, observers, exit_kind)?;
-
-        if !a {
-            return Ok(false);
-        }
-
-        second.is_interesting_introspection(state, manager, input, observers, exit_kind)
     }
 }
 
 /// Combine two feedbacks with an eager AND operation,
 /// will call all feedbacks functions even if not necessary to conclude the result
-pub type EagerAndFeedback<A, B, S> = CombinedFeedback<A, B, LogicEagerAnd, S>;
+pub type EagerAndFeedback<A, B> = CombinedFeedback<A, B, LogicEagerAnd>;
 
 /// Combine two feedbacks with an fast AND operation,
 /// might skip calling feedbacks functions if not necessary to conclude the result
-pub type FastAndFeedback<A, B, S> = CombinedFeedback<A, B, LogicFastAnd, S>;
+pub type FastAndFeedback<A, B> = CombinedFeedback<A, B, LogicFastAnd>;
 
 /// Combine two feedbacks with an eager OR operation,
 /// will call all feedbacks functions even if not necessary to conclude the result
-pub type EagerOrFeedback<A, B, S> = CombinedFeedback<A, B, LogicEagerOr, S>;
+pub type EagerOrFeedback<A, B> = CombinedFeedback<A, B, LogicEagerOr>;
 
 /// Combine two feedbacks with an fast OR operation,
 /// might skip calling feedbacks functions if not necessary to conclude the result.
 /// This means any feedback that is not first might be skipped, use caution when using with
 /// `TimeFeedback`
-pub type FastOrFeedback<A, B, S> = CombinedFeedback<A, B, LogicFastOr, S>;
+pub type FastOrFeedback<A, B> = CombinedFeedback<A, B, LogicFastOr>;
 
 /// Compose feedbacks with an `NOT` operation
 #[derive(Clone)]
@@ -767,7 +637,7 @@ where
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: &S::Input,
+        input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -786,7 +656,7 @@ where
         state: &mut S,
         manager: &mut EM,
         observers: &OT,
-        testcase: &mut Testcase<S::Input>,
+        testcase: &mut Testcase<I>,
     ) -> Result<(), Error>
     where
         OT: ObserversTuple<S>,
@@ -797,7 +667,7 @@ where
     }
 
     #[inline]
-    fn discard_metadata(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
+    fn discard_metadata(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
         self.first.discard_metadata(state, input)
     }
 
@@ -904,7 +774,7 @@ where
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
-        _input: &S::Input,
+        _input: &I,
         _observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -937,7 +807,7 @@ where
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
-        _input: &S::Input,
+        _input: &I,
         _observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -1007,7 +877,7 @@ where
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
-        _input: &S::Input,
+        _input: &I,
         _observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -1078,7 +948,7 @@ where
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
-        _input: &S::Input,
+        _input: &I,
         _observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -1148,7 +1018,7 @@ where
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
-        _input: &S::Input,
+        _input: &I,
         _observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -1167,7 +1037,7 @@ where
         _state: &mut S,
         _manager: &mut EM,
         observers: &OT,
-        testcase: &mut Testcase<S::Input>,
+        testcase: &mut Testcase<I>,
     ) -> Result<(), Error>
     where
         OT: ObserversTuple<S>,
@@ -1180,7 +1050,7 @@ where
 
     /// Discard the stored metadata in case that the testcase is not added to the corpus
     #[inline]
-    fn discard_metadata(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
+    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         Ok(())
     }
 
@@ -1227,7 +1097,7 @@ where
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
-        _input: &S::Input,
+        _input: &I,
         _observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
