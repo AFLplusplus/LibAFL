@@ -6,7 +6,7 @@ PROFILE_DIR = {value = "release", condition = {env_not_set = ["PROFILE_DIR"] }}
 FUZZER_NAME = 'libafl-fuzz'
 FUZZER = '${CARGO_TARGET_DIR}/${PROFILE_DIR}/${FUZZER_NAME}'
 LLVM_CONFIG = {value = "llvm-config-18", condition = {env_not_set = ["LLVM_CONFIG"] }}
-AFL_VERSION = "4.21c"
+AFL_VERSION = "db23931e7c1727ddac8691a6241c97b2203ec6fc"
 AFL_DIR_NAME= {value = "./AFLplusplus-${AFL_VERSION}"}
 AFL_CC_PATH= {value = "${AFL_DIR_NAME}/afl-clang-fast"}
 
@@ -18,8 +18,8 @@ if [ ! -d "$AFL_DIR_NAME" ]; then
 	if [ -f "v${AFL_VERSION}.zip" ]; then
 		rm v${AFL_VERSION}.zip
 	fi
-	wget https://github.com/AFLplusplus/AFLplusplus/archive/refs/tags/v${AFL_VERSION}.zip
-	unzip v${AFL_VERSION}.zip
+	wget https://github.com/AFLplusplus/AFLplusplus/archive/${AFL_VERSION}.zip
+	unzip ${AFL_VERSION}.zip
 	cd ${AFL_DIR_NAME}
 	LLVM_CONFIG=${LLVM_CONFIG} make 
 	cd ..
@@ -60,9 +60,9 @@ test -d "./test/output/fuzzer_main/crashes" || {
 }
 # cmplog TODO: AFL_BENCH_UNTIL_CRASH=1 instead of timeout 15s
 AFL_LLVM_CMPLOG=1 AFL_PATH=${AFL_DIR_NAME} ${AFL_CC_PATH} ./test/test-cmplog.c -o ./test/out-cmplog
-AFL_CORES=1 timeout 15 ${FUZZER} -Z -l 3 -m 0 -V30 -i ./test/seeds_cmplog -o ./test/cmplog-output -c 0 ./test/out-cmplog >>errors 2>&1
-test -n "$( ls ./test/cmplog-output/fuzzer_main/crashes/id:000000* ./test/cmplog-output/hangs/id:000000* 2>/dev/null )" || {
-	echo "no crashes found when running cmplog"
+AFL_CORES=1 timeout 10 ${FUZZER} -Z -l 3 -m 0 -V30 -i ./test/seeds_cmplog -o ./test/cmplog-output -c 0 ./test/out-cmplog || true
+test -n "$( ls ./test/cmplog-output/fuzzer_main/crashes/id:0* 2>/dev/null )" || {
+	echo "No crashes found"
 	exit 1
 }
 '''
@@ -77,7 +77,7 @@ windows_alias = "unsupported"
 script_runner="@shell"
 script='''
 rm -rf AFLplusplus-${AFL_VERSION}
-rm v${AFL_VERSION}.zip
+rm ${AFL_VERSION}.zip
 rm -rf ./test/out-instr
 rm -rf ./test/output
 '''
