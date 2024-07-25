@@ -191,8 +191,8 @@ impl AFLppCmpLogOperands {
 /// Comparison function operands, like for strcmp/memcmp, represented as two byte arrays.
 pub struct AFLppCmpLogFnOperands {
     v0: [u8; 32],
-    v0_len: u8,
     v1: [u8; 32],
+    v0_len: u8,
     v1_len: u8,
     unused: [u8; 6],
 }
@@ -431,11 +431,11 @@ pub static mut libafl_cmplog_map_extended: AFLppCmpLogMap = AFLppCmpLogMap {
     headers: [AFLppCmpLogHeader { data: [0; 2] }; CMPLOG_MAP_W],
     vals: AFLppCmpLogVals {
         operands: [[AFLppCmpLogOperands {
-            v0:0,
-            v0_128:0,
+            v0: 0,
+            v0_128: 0,
             v0_256_0: 0,
             v0_256_1: 0,
-            v1:0,
+            v1: 0,
             v1_128: 0,
             v1_256_0: 0,
             v1_256_1: 0,

@@ -69,8 +69,8 @@ typedef struct CmpLogRoutine {
 
 typedef struct CmpLogRoutineExtended {
   uint8_t v0[CMPLOG_RTN_LEN];
-  uint8_t v0_len;
   uint8_t v1[CMPLOG_RTN_LEN];
+  uint8_t v0_len;
   uint8_t v1_len;
   uint8_t unused[6];
 } __attribute__((packed)) CmpLogRoutineExtended;
