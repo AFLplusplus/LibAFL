@@ -7,10 +7,7 @@
 use alloc::borrow::Cow;
 #[cfg(feature = "track_hit_feedbacks")]
 use alloc::vec::Vec;
-use core::{
-    fmt::{self, Debug, Formatter},
-    marker::PhantomData,
-};
+use core::{fmt::Debug, marker::PhantomData};
 
 #[cfg(feature = "std")]
 pub use concolic::ConcolicFeedback;
@@ -69,6 +66,7 @@ pub trait Feedback<EM, I, OT, S>: Named {
 
     /// `is_interesting ` return if an input is worth the addition to the corpus
     #[allow(clippy::wrong_self_convention)]
+    #[allow(unused)]
     fn is_interesting(
         &mut self,
         state: &mut S,
@@ -76,7 +74,9 @@ pub trait Feedback<EM, I, OT, S>: Named {
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
-    ) -> Result<bool, Error>;
+    ) -> Result<bool, Error> {
+        Ok(false)
+    }
 
     /// Returns if the result of a run is interesting and the value input should be stored in a corpus.
     /// It also keeps track of introspection stats.
@@ -599,110 +599,74 @@ pub type EagerOrFeedback<A, B> = CombinedFeedback<A, B, LogicEagerOr>;
 pub type FastOrFeedback<A, B> = CombinedFeedback<A, B, LogicFastOr>;
 
 /// Compose feedbacks with an `NOT` operation
-#[derive(Clone)]
-pub struct NotFeedback<A, S>
-where
-    A: Feedback<S>,
-    S: State,
-{
+#[derive(Clone, Debug)]
+pub struct NotFeedback<A> {
     /// The feedback to invert
-    pub first: A,
+    inner: A,
     /// The name
     name: Cow<'static, str>,
-    phantom: PhantomData<S>,
 }
 
-impl<A, S> Debug for NotFeedback<A, S>
+impl<A, EM, I, OT, S> Feedback<EM, I, OT, S> for NotFeedback<A>
 where
-    A: Feedback<S> + Debug,
-    S: State,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("NotFeedback")
-            .field("name", &self.name)
-            .field("first", &self.first)
-            .finish()
-    }
-}
-
-impl<A, S> Feedback<S> for NotFeedback<A, S>
-where
-    A: Feedback<S>,
-    S: State,
+    A: Feedback<EM, I, OT, S>,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
-        self.first.init_state(state)
+        self.inner.init_state(state)
     }
 
     #[allow(clippy::wrong_self_convention)]
-    fn is_interesting<EM, OT>(
+    fn is_interesting(
         &mut self,
         state: &mut S,
         manager: &mut EM,
         input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
-    {
+    ) -> Result<bool, Error> {
         Ok(!self
-            .first
+            .inner
             .is_interesting(state, manager, input, observers, exit_kind)?)
     }
 
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Result<bool, Error> {
+        Ok(!self.inner.last_result()?)
+    }
+
     #[inline]
-    fn append_metadata<EM, OT>(
+    fn append_metadata(
         &mut self,
         state: &mut S,
         manager: &mut EM,
         observers: &OT,
         testcase: &mut Testcase<I>,
-    ) -> Result<(), Error>
-    where
-        OT: ObserversTuple<S>,
-        EM: EventFirer<State = S>,
-    {
-        self.first
+    ) -> Result<(), Error> {
+        self.inner
             .append_metadata(state, manager, observers, testcase)
     }
 
     #[inline]
     fn discard_metadata(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
-        self.first.discard_metadata(state, input)
-    }
-
-    #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Result<bool, Error> {
-        Ok(!self.first.last_result()?)
+        self.inner.discard_metadata(state, input)
     }
 }
 
-impl<A, S> Named for NotFeedback<A, S>
-where
-    A: Feedback<S>,
-    S: State,
-{
+impl<A> Named for NotFeedback<A> {
     #[inline]
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<A, S> NotFeedback<A, S>
+impl<A> NotFeedback<A>
 where
-    A: Feedback<S>,
-    S: State,
+    A: Named,
 {
     /// Creates a new [`NotFeedback`].
-    pub fn new(first: A) -> Self {
-        let name = Cow::from(format!("Not({})", first.name()));
-        Self {
-            first,
-            name,
-            phantom: PhantomData,
-        }
+    pub fn new(inner: A) -> Self {
+        let name = Cow::from(format!("Not({})", inner.name()));
+        Self { inner, name }
     }
 }
 
@@ -718,7 +682,7 @@ macro_rules! feedback_and {
         $crate::feedbacks::EagerAndFeedback::new($head , feedback_and!($($tail),+))
     };
 }
-///
+
 /// Variadic macro to create a chain of (fast) [`AndFeedback`](FastAndFeedback)
 #[macro_export]
 macro_rules! feedback_and_fast {
@@ -767,241 +731,126 @@ macro_rules! feedback_not {
 }
 
 /// Hack to use () as empty Feedback
-impl<S> Feedback<S> for ()
+impl<EM, I, OT, S> Feedback<EM, I, OT, S> for () {
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Result<bool, Error> {
+        Ok(false)
+    }
+}
+
+pub trait ExitKindLogic {
+    const NAME: Cow<'static, str>;
+
+    fn check_exit_kind(kind: &ExitKind) -> Result<bool, Error>;
+}
+
+pub struct CrashLogic;
+
+impl ExitKindLogic for CrashLogic {
+    const NAME: Cow<'static, str> = Cow::Borrowed("CrashFeedback");
+
+    fn check_exit_kind(kind: &ExitKind) -> Result<bool, Error> {
+        Ok(matches!(kind, ExitKind::Crash))
+    }
+}
+
+pub struct TimeoutLogic;
+
+impl ExitKindLogic for TimeoutLogic {
+    const NAME: Cow<'static, str> = Cow::Borrowed("TimeoutFeedback");
+
+    fn check_exit_kind(kind: &ExitKind) -> Result<bool, Error> {
+        Ok(matches!(kind, ExitKind::Timeout))
+    }
+}
+
+pub struct GenericDiffLogic;
+
+impl ExitKindLogic for GenericDiffLogic {
+    const NAME: Cow<'static, str> = Cow::Borrowed("DiffExitKindFeedback");
+
+    fn check_exit_kind(kind: &ExitKind) -> Result<bool, Error> {
+        Ok(matches!(kind, ExitKind::Diff { .. }))
+    }
+}
+
+/// A generic exit type checking feedback. Use [`CrashFeedback`], [`TimeoutFeedback`], or
+/// [`DiffExitKindFeedback`] directly instead.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ExitKindFeedback<L> {
+    #[cfg(feature = "track_hit_feedbacks")]
+    // The previous run's result of `Self::is_interesting`
+    last_result: Option<bool>,
+    phantom: PhantomData<fn() -> L>,
+}
+
+impl<EM, I, L, OT, S> Feedback<EM, I, OT, S> for ExitKindFeedback<L>
 where
-    S: State,
+    L: ExitKindLogic,
 {
     #[allow(clippy::wrong_self_convention)]
-    fn is_interesting<EM, OT>(
+    fn is_interesting(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
         _input: &I,
         _observers: &OT,
-        _exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
-    {
-        Ok(false)
+        exit_kind: &ExitKind,
+    ) -> Result<bool, Error> {
+        let res = L::check_exit_kind(exit_kind)?;
+        #[cfg(feature = "track_hit_feedbacks")]
+        {
+            self.last_result = Some(res);
+        }
+        Ok(res)
     }
+
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Result<bool, Error> {
-        Ok(false)
+        self.last_result.ok_or(premature_last_result_err())
+    }
+}
+
+impl<L> Named for ExitKindFeedback<L>
+where
+    L: ExitKindLogic,
+{
+    #[inline]
+    fn name(&self) -> &Cow<'static, str> {
+        &L::NAME
+    }
+}
+
+impl<L> ExitKindFeedback<L> {
+    /// Creates a new [`ExitKindFeedback`]
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            #[cfg(feature = "track_hit_feedbacks")]
+            last_result: None,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<L> Default for ExitKindFeedback<L> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<L, T> FeedbackFactory<ExitKindFeedback<L>, T> for ExitKindFeedback<L> {
+    fn create_feedback(&self, _ctx: &T) -> ExitKindFeedback<L> {
+        Self::new()
     }
 }
 
 /// A [`CrashFeedback`] reports as interesting if the target crashed.
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct CrashFeedback {
-    #[cfg(feature = "track_hit_feedbacks")]
-    // The previous run's result of `Self::is_interesting`
-    last_result: Option<bool>,
-}
-
-impl<S> Feedback<S> for CrashFeedback
-where
-    S: State,
-{
-    #[allow(clippy::wrong_self_convention)]
-    fn is_interesting<EM, OT>(
-        &mut self,
-        _state: &mut S,
-        _manager: &mut EM,
-        _input: &I,
-        _observers: &OT,
-        exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
-    {
-        let res = matches!(exit_kind, ExitKind::Crash);
-        #[cfg(feature = "track_hit_feedbacks")]
-        {
-            self.last_result = Some(res);
-        }
-        Ok(res)
-    }
-
-    #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Result<bool, Error> {
-        self.last_result.ok_or(premature_last_result_err())
-    }
-}
-
-impl Named for CrashFeedback {
-    #[inline]
-    fn name(&self) -> &Cow<'static, str> {
-        static NAME: Cow<'static, str> = Cow::Borrowed("CrashFeedback");
-        &NAME
-    }
-}
-
-impl CrashFeedback {
-    /// Creates a new [`CrashFeedback`]
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            #[cfg(feature = "track_hit_feedbacks")]
-            last_result: None,
-        }
-    }
-}
-
-impl Default for CrashFeedback {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<T> FeedbackFactory<CrashFeedback, T> for CrashFeedback {
-    fn create_feedback(&self, _ctx: &T) -> CrashFeedback {
-        CrashFeedback::new()
-    }
-}
-
+pub type CrashFeedback = ExitKindFeedback<CrashLogic>;
 /// A [`TimeoutFeedback`] reduces the timeout value of a run.
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct TimeoutFeedback {
-    #[cfg(feature = "track_hit_feedbacks")]
-    // The previous run's result of `Self::is_interesting`
-    last_result: Option<bool>,
-}
-
-impl<S> Feedback<S> for TimeoutFeedback
-where
-    S: State,
-{
-    #[allow(clippy::wrong_self_convention)]
-    fn is_interesting<EM, OT>(
-        &mut self,
-        _state: &mut S,
-        _manager: &mut EM,
-        _input: &I,
-        _observers: &OT,
-        exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
-    {
-        let res = matches!(exit_kind, ExitKind::Timeout);
-        #[cfg(feature = "track_hit_feedbacks")]
-        {
-            self.last_result = Some(res);
-        }
-        Ok(res)
-    }
-
-    #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Result<bool, Error> {
-        self.last_result.ok_or(premature_last_result_err())
-    }
-}
-
-impl Named for TimeoutFeedback {
-    #[inline]
-    fn name(&self) -> &Cow<'static, str> {
-        static NAME: Cow<'static, str> = Cow::Borrowed("TimeoutFeedback");
-        &NAME
-    }
-}
-
-impl TimeoutFeedback {
-    /// Returns a new [`TimeoutFeedback`].
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            #[cfg(feature = "track_hit_feedbacks")]
-            last_result: None,
-        }
-    }
-}
-
-impl Default for TimeoutFeedback {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-/// A feedback factory for timeout feedbacks
-impl<T> FeedbackFactory<TimeoutFeedback, T> for TimeoutFeedback {
-    fn create_feedback(&self, _ctx: &T) -> TimeoutFeedback {
-        TimeoutFeedback::new()
-    }
-}
-
-/// A [`DiffExitKindFeedback`] checks if there is a difference in the [`crate::executors::ExitKind`]s in a [`crate::executors::DiffExecutor`].
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct DiffExitKindFeedback {
-    #[cfg(feature = "track_hit_feedbacks")]
-    // The previous run's result of `Self::is_interesting`
-    last_result: Option<bool>,
-}
-
-impl<S> Feedback<S> for DiffExitKindFeedback
-where
-    S: State,
-{
-    #[allow(clippy::wrong_self_convention)]
-    fn is_interesting<EM, OT>(
-        &mut self,
-        _state: &mut S,
-        _manager: &mut EM,
-        _input: &I,
-        _observers: &OT,
-        exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
-    {
-        let res = matches!(exit_kind, ExitKind::Diff { .. });
-        #[cfg(feature = "track_hit_feedbacks")]
-        {
-            self.last_result = Some(res);
-        }
-        Ok(res)
-    }
-    #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Result<bool, Error> {
-        self.last_result.ok_or(premature_last_result_err())
-    }
-}
-
-impl Named for DiffExitKindFeedback {
-    #[inline]
-    fn name(&self) -> &Cow<'static, str> {
-        static NAME: Cow<'static, str> = Cow::Borrowed("DiffExitKindFeedback");
-        &NAME
-    }
-}
-
-impl DiffExitKindFeedback {
-    /// Returns a new [`DiffExitKindFeedback`].
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            #[cfg(feature = "track_hit_feedbacks")]
-            last_result: None,
-        }
-    }
-}
-
-impl Default for DiffExitKindFeedback {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-/// A feedback factory for diff exit kind feedbacks
-impl<T> FeedbackFactory<DiffExitKindFeedback, T> for DiffExitKindFeedback {
-    fn create_feedback(&self, _ctx: &T) -> DiffExitKindFeedback {
-        DiffExitKindFeedback::new()
-    }
-}
+pub type TimeoutFeedback = ExitKindFeedback<TimeoutLogic>;
+/// A [`DiffExitKindFeedback`] checks if there is a difference in the [`ExitKind`]s in a [`crate::executors::DiffExecutor`].
+pub type DiffExitKindFeedback = ExitKindFeedback<GenericDiffLogic>;
 
 /// Nop feedback that annotates execution time in the new testcase, if any
 /// for this Feedback, the testcase is never interesting (use with an OR).
@@ -1011,54 +860,24 @@ pub struct TimeFeedback {
     observer_handle: Handle<TimeObserver>,
 }
 
-impl<S> Feedback<S> for TimeFeedback
-where
-    S: State,
-{
-    #[allow(clippy::wrong_self_convention)]
-    fn is_interesting<EM, OT>(
-        &mut self,
-        _state: &mut S,
-        _manager: &mut EM,
-        _input: &I,
-        _observers: &OT,
-        _exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
-    {
-        // TODO Replace with match_name_type when stable
+impl<EM, I, OT, S> Feedback<EM, I, OT, S> for TimeFeedback {
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Result<bool, Error> {
         Ok(false)
     }
 
     /// Append to the testcase the generated metadata in case of a new corpus item
     #[inline]
-    fn append_metadata<EM, OT>(
+    fn append_metadata(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
         observers: &OT,
         testcase: &mut Testcase<I>,
-    ) -> Result<(), Error>
-    where
-        OT: ObserversTuple<S>,
-        EM: EventFirer<State = S>,
-    {
+    ) -> Result<(), Error> {
         let observer = observers.get(&self.observer_handle).unwrap();
         *testcase.exec_time_mut() = *observer.last_runtime();
         Ok(())
-    }
-
-    /// Discard the stored metadata in case that the testcase is not added to the corpus
-    #[inline]
-    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
-        Ok(())
-    }
-
-    #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Result<bool, Error> {
-        Ok(false)
     }
 }
 
@@ -1085,28 +904,21 @@ impl TimeFeedback {
 pub enum ConstFeedback {
     /// Always returns `true`
     True,
-    /// Alsways returns `false`
+    /// Always returns `false`
     False,
 }
 
-impl<S> Feedback<S> for ConstFeedback
-where
-    S: State,
-{
+impl<EM, I, OT, S> Feedback<EM, I, OT, S> for ConstFeedback {
     #[inline]
     #[allow(clippy::wrong_self_convention)]
-    fn is_interesting<EM, OT>(
+    fn is_interesting(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
         _input: &I,
         _observers: &OT,
         _exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
-    {
+    ) -> Result<bool, Error> {
         Ok((*self).into())
     }
 
