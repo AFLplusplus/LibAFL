@@ -5,7 +5,6 @@ use core::{
     fmt::Debug,
     hash::{Hash, Hasher},
     ops::{Deref, DerefMut},
-    slice::{Iter, IterMut},
 };
 
 use ahash::RandomState;
@@ -13,8 +12,7 @@ use libafl_bolts::{
     ownedref::{OwnedMutPtr, OwnedMutSlice},
     AsSlice, AsSliceMut, HasLen, Named,
 };
-use num_traits::Bounded;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     observers::{map::MapObserver, Observer},
@@ -23,141 +21,41 @@ use crate::{
 
 /// Overlooking a variable bitmap
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(bound = "T: serde::de::DeserializeOwned")]
 #[allow(clippy::unsafe_derive_deserialize)]
-pub struct VariableMapObserver<'a, T>
-where
-    T: Default + Copy + 'static + Serialize + PartialEq + Bounded,
-{
+pub struct VariableMapObserver<'a, T> {
     map: OwnedMutSlice<'a, T>,
     size: OwnedMutPtr<usize>,
     initial: T,
     name: Cow<'static, str>,
 }
 
-impl<'a, S, T> Observer<S> for VariableMapObserver<'a, T>
+impl<'a, I, S, T> Observer<I, S> for VariableMapObserver<'a, T>
 where
-    S: UsesInput,
-    T: Default
-        + Copy
-        + 'static
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Debug
-        + Bounded
-        + PartialEq,
     Self: MapObserver,
 {
     #[inline]
-    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.reset_map()
     }
 }
 
-impl<'a, T> Named for VariableMapObserver<'a, T>
-where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Bounded + PartialEq,
-{
+impl<'a, T> Named for VariableMapObserver<'a, T> {
     #[inline]
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<'a, T> HasLen for VariableMapObserver<'a, T>
-where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + PartialEq + Bounded,
-{
+impl<'a, T> HasLen for VariableMapObserver<'a, T> {
     #[inline]
     fn len(&self) -> usize {
         *self.size.as_ref()
     }
 }
 
-impl<'a, 'it, T> IntoIterator for &'it VariableMapObserver<'a, T>
-where
-    T: Bounded
-        + PartialEq
-        + Default
-        + Copy
-        + Hash
-        + 'static
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Debug
-        + PartialEq
-        + Bounded,
-{
-    type Item = <Iter<'it, T> as Iterator>::Item;
-    type IntoIter = Iter<'it, T>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let cnt = self.usable_count();
-        self.as_slice()[..cnt].iter()
-    }
-}
-
-impl<'a, 'it, T> IntoIterator for &'it mut VariableMapObserver<'a, T>
-where
-    T: Bounded
-        + PartialEq
-        + Default
-        + Copy
-        + Hash
-        + 'static
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Debug
-        + PartialEq
-        + Bounded,
-{
-    type Item = <IterMut<'it, T> as Iterator>::Item;
-    type IntoIter = IterMut<'it, T>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let cnt = self.usable_count();
-        self.as_slice_mut()[..cnt].iter_mut()
-    }
-}
-
-impl<'a, T> VariableMapObserver<'a, T>
-where
-    T: Bounded
-        + PartialEq
-        + Default
-        + Copy
-        + Hash
-        + 'static
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Debug
-        + PartialEq
-        + Bounded,
-{
-    /// Returns an iterator over the map.
-    pub fn iter(&self) -> Iter<'_, T> {
-        <&Self as IntoIterator>::into_iter(self)
-    }
-
-    /// Returns a mutable iterator over the map.
-    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
-        <&mut Self as IntoIterator>::into_iter(self)
-    }
-}
-
 impl<'a, T> Hash for VariableMapObserver<'a, T>
 where
-    T: Bounded
-        + PartialEq
-        + Default
-        + Copy
-        + Hash
-        + 'static
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Debug
-        + PartialEq
-        + Bounded,
+    T: Hash,
 {
     #[inline]
     fn hash<H: Hasher>(&self, hasher: &mut H) {
@@ -165,19 +63,13 @@ where
     }
 }
 
-impl<'a, T> AsRef<Self> for VariableMapObserver<'a, T>
-where
-    T: Default + Copy + 'static + Serialize + PartialEq + Bounded,
-{
+impl<'a, T> AsRef<Self> for VariableMapObserver<'a, T> {
     fn as_ref(&self) -> &Self {
         self
     }
 }
 
-impl<'a, T> AsMut<Self> for VariableMapObserver<'a, T>
-where
-    T: Default + Copy + 'static + Serialize + PartialEq + Bounded,
-{
+impl<'a, T> AsMut<Self> for VariableMapObserver<'a, T> {
     fn as_mut(&mut self) -> &mut Self {
         self
     }
@@ -185,29 +77,9 @@ where
 
 impl<'a, T> MapObserver for VariableMapObserver<'a, T>
 where
-    T: Bounded
-        + PartialEq
-        + Default
-        + Copy
-        + Hash
-        + 'static
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Debug
-        + PartialEq
-        + Bounded,
+    T: PartialEq + Copy + Hash + Serialize + DeserializeOwned,
 {
     type Entry = T;
-
-    #[inline]
-    fn initial(&self) -> T {
-        self.initial
-    }
-
-    #[inline]
-    fn usable_count(&self) -> usize {
-        *self.size.as_ref()
-    }
 
     fn get(&self, idx: usize) -> T {
         self.map.as_slice()[idx]
@@ -215,6 +87,11 @@ where
 
     fn set(&mut self, idx: usize, val: T) {
         self.map.as_slice_mut()[idx] = val;
+    }
+
+    #[inline]
+    fn usable_count(&self) -> usize {
+        *self.size.as_ref()
     }
 
     /// Count the set bytes in the map
@@ -234,6 +111,11 @@ where
     #[inline]
     fn hash_simple(&self) -> u64 {
         RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
+    }
+
+    #[inline]
+    fn initial(&self) -> T {
+        self.initial
     }
 
     /// Reset the map
@@ -267,48 +149,25 @@ where
     }
 }
 
-impl<'a, T> Deref for VariableMapObserver<'a, T>
-where
-    T: Bounded
-        + PartialEq
-        + Default
-        + Copy
-        + Hash
-        + 'static
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Debug
-        + PartialEq
-        + Bounded,
-{
+impl<'a, T> Deref for VariableMapObserver<'a, T> {
     type Target = [T];
+
     fn deref(&self) -> &[T] {
-        let cnt = self.usable_count();
+        let cnt = *self.size.as_ref();
         &self.map[..cnt]
     }
 }
 
-impl<'a, T> DerefMut for VariableMapObserver<'a, T>
-where
-    T: 'static
-        + Default
-        + Copy
-        + Hash
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Debug
-        + PartialEq
-        + Bounded,
-{
+impl<'a, T> DerefMut for VariableMapObserver<'a, T> {
     fn deref_mut(&mut self) -> &mut [T] {
-        let cnt = self.usable_count();
+        let cnt = *self.size.as_ref();
         &mut self.map[..cnt]
     }
 }
 
 impl<'a, T> VariableMapObserver<'a, T>
 where
-    T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + PartialEq + Bounded,
+    T: Default,
 {
     /// Creates a new [`MapObserver`] from an [`OwnedMutSlice`]
     ///

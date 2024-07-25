@@ -16,7 +16,7 @@ pub struct ConcolicObserver<'map> {
     name: Cow<'static, str>,
 }
 
-impl<'map, S> Observer<S> for ConcolicObserver<'map> where S: UsesInput {}
+impl<'map, I, S> Observer<I, S> for ConcolicObserver<'map> {}
 
 impl<'map> ConcolicObserver<'map> {
     /// Create the concolic observer metadata for this run

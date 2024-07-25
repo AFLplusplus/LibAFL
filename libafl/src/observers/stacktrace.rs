@@ -196,16 +196,8 @@ impl<'a> ObserverWithHashField for BacktraceObserver<'a> {
     }
 }
 
-impl<'a, S> Observer<S> for BacktraceObserver<'a>
-where
-    S: UsesInput,
-{
-    fn post_exec(
-        &mut self,
-        _state: &mut S,
-        _input: &S::Input,
-        exit_kind: &ExitKind,
-    ) -> Result<(), Error> {
+impl<'a, I, S> Observer<I, S> for BacktraceObserver<'a> {
+    fn post_exec(&mut self, _state: &mut S, _input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
         if self.harness_type == HarnessType::InProcess {
             if *exit_kind == ExitKind::Crash {
                 self.update_hash(collect_backtrace());
@@ -218,18 +210,11 @@ where
 
     fn post_exec_child(
         &mut self,
-        _state: &mut S,
-        _input: &S::Input,
+        state: &mut S,
+        input: &I,
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
-        if self.harness_type == HarnessType::Child {
-            if *exit_kind == ExitKind::Crash {
-                self.update_hash(collect_backtrace());
-            } else {
-                self.clear_hash();
-            }
-        }
-        Ok(())
+        self.post_exec(state, input, exit_kind)
     }
 }
 
@@ -373,23 +358,7 @@ impl Default for AsanBacktraceObserver {
     }
 }
 
-impl<S> Observer<S> for AsanBacktraceObserver
-where
-    S: UsesInput,
-{
-    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
-        Ok(())
-    }
-
-    fn post_exec(
-        &mut self,
-        _state: &mut S,
-        _input: &S::Input,
-        _exit_kind: &ExitKind,
-    ) -> Result<(), Error> {
-        Ok(())
-    }
-}
+impl<I, S> Observer<I, S> for AsanBacktraceObserver {}
 
 impl Named for AsanBacktraceObserver {
     fn name(&self) -> &Cow<'static, str> {
