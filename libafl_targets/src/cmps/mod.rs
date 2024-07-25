@@ -190,10 +190,11 @@ impl AFLppCmpLogOperands {
 #[repr(C, packed)]
 /// Comparison function operands, like for strcmp/memcmp, represented as two byte arrays.
 pub struct AFLppCmpLogFnOperands {
-    v0: [u8; 31],
+    v0: [u8; 32],
     v0_len: u8,
-    v1: [u8; 31],
+    v1: [u8; 32],
     v1_len: u8,
+    unused: [u8; 6],
 }
 
 impl AFLppCmpLogFnOperands {
@@ -203,8 +204,8 @@ impl AFLppCmpLogFnOperands {
         let v0_len = v0.len() as u8;
         let v1_len = v1.len() as u8;
 
-        let mut v0_arr = [0; 31];
-        let mut v1_arr = [0; 31];
+        let mut v0_arr = [0; 32];
+        let mut v1_arr = [0; 32];
 
         v0_arr.copy_from_slice(v0);
         v1_arr.copy_from_slice(v1);
@@ -214,12 +215,13 @@ impl AFLppCmpLogFnOperands {
             v0_len,
             v1: v1_arr,
             v1_len,
+            unused: [0; 6],
         }
     }
 
     #[must_use]
     /// first rtn operand
-    pub fn v0(&self) -> &[u8; 31] {
+    pub fn v0(&self) -> &[u8; 32] {
         &self.v0
     }
 
@@ -231,7 +233,7 @@ impl AFLppCmpLogFnOperands {
 
     #[must_use]
     /// first rtn operand len
-    pub fn v1(&self) -> &[u8; 31] {
+    pub fn v1(&self) -> &[u8; 32] {
         &self.v1
     }
 
@@ -562,9 +564,11 @@ impl CmpMap for AFLppCmpLogMap {
             }
         } else {
             unsafe {
+                let v0_len = self.vals.fn_operands[idx][execution].v0_len & (0x80 - 1);
+                let v1_len = self.vals.fn_operands[idx][execution].v1_len & (0x80 - 1);
                 Some(CmpValues::Bytes((
-                    self.vals.fn_operands[idx][execution].v0.to_vec(),
-                    self.vals.fn_operands[idx][execution].v1.to_vec(),
+                    self.vals.fn_operands[idx][execution].v0[..(v0_len as usize)].to_vec(),
+                    self.vals.fn_operands[idx][execution].v1[..(v1_len as usize)].to_vec(),
                 )))
             }
         }
