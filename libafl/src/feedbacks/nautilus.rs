@@ -120,9 +120,6 @@ where
         Ok(())
     }
 
-    fn discard_metadata(&mut self, _state: &mut S, _input: &NautilusInput) -> Result<(), Error> {
-        Ok(())
-    }
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Result<bool, Error> {
         Ok(false)
