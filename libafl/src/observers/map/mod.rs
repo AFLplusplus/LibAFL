@@ -9,31 +9,25 @@ use core::{
 };
 
 use ahash::RandomState;
+pub use const_map::*;
+pub use hitcount_map::*;
 use libafl_bolts::{ownedref::OwnedMutSlice, AsSlice, AsSliceMut, HasLen, Named, Truncate};
+pub use multi_map::*;
 use num_traits::Bounded;
-use serde::{Deserialize, Serialize};
+pub use owned_map::*;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+pub use variable_map::*;
 
 use crate::{
-    executors::ExitKind,
     observers::{DifferentialObserver, Observer, ObserversTuple},
     Error,
 };
 
 pub mod const_map;
-pub use const_map::*;
-
-pub mod variable_map;
-pub use variable_map::*;
-
 pub mod hitcount_map;
-pub use hitcount_map::*;
-
 pub mod multi_map;
-pub use multi_map::*;
-
 pub mod owned_map;
-pub use owned_map::*;
-
+pub mod variable_map;
 /// Trait marker which indicates that this [`MapObserver`] is tracked for indices or novelties.
 /// Implementors of feedbacks similar to [`crate::feedbacks::MapFeedback`] may wish to use this to
 /// ensure that edge metadata is recorded as is appropriate for the provided observer.
@@ -130,85 +124,17 @@ impl<T, const ITH: bool, const NTH: bool> CanTrack for ExplicitTracking<T, ITH, 
     }
 }
 
-impl<T, const ITH: bool, const NTH: bool> AsRef<T> for ExplicitTracking<T, ITH, NTH> {
-    fn as_ref(&self) -> &T {
+impl<T, const ITH: bool, const NTH: bool> Deref for ExplicitTracking<T, ITH, NTH> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<T, const ITH: bool, const NTH: bool> AsMut<T> for ExplicitTracking<T, ITH, NTH> {
-    fn as_mut(&mut self) -> &mut T {
+impl<T, const ITH: bool, const NTH: bool> DerefMut for ExplicitTracking<T, ITH, NTH> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
-    }
-}
-
-impl<T, const ITH: bool, const NTH: bool> Named for ExplicitTracking<T, ITH, NTH>
-where
-    T: Named,
-{
-    fn name(&self) -> &Cow<'static, str> {
-        self.0.name()
-    }
-}
-
-impl<S, T, const ITH: bool, const NTH: bool> Observer<S> for ExplicitTracking<T, ITH, NTH>
-where
-    S: UsesInput,
-    T: Observer<S>,
-{
-    fn flush(&mut self) -> Result<(), Error> {
-        self.0.flush()
-    }
-
-    fn pre_exec(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
-        self.0.pre_exec(state, input)
-    }
-
-    fn post_exec(
-        &mut self,
-        state: &mut S,
-        input: &S::Input,
-        exit_kind: &ExitKind,
-    ) -> Result<(), Error> {
-        self.0.post_exec(state, input, exit_kind)
-    }
-
-    fn pre_exec_child(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
-        self.0.pre_exec_child(state, input)
-    }
-
-    fn post_exec_child(
-        &mut self,
-        state: &mut S,
-        input: &S::Input,
-        exit_kind: &ExitKind,
-    ) -> Result<(), Error> {
-        self.0.post_exec_child(state, input, exit_kind)
-    }
-}
-
-impl<S, T, OTA, OTB, const ITH: bool, const NTH: bool> DifferentialObserver<OTA, OTB, S>
-    for ExplicitTracking<T, ITH, NTH>
-where
-    OTA: ObserversTuple<S>,
-    OTB: ObserversTuple<S>,
-    S: UsesInput,
-    T: DifferentialObserver<OTA, OTB, S>,
-{
-    fn pre_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
-        self.as_mut().pre_observe_first(observers)
-    }
-
-    fn post_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
-        self.as_mut().post_observe_first(observers)
-    }
-
-    fn pre_observe_second(&mut self, observers: &mut OTB) -> Result<(), Error> {
-        self.as_mut().pre_observe_second(observers)
-    }
-
-    fn post_observe_second(&mut self, observers: &mut OTB) -> Result<(), Error> {
-        self.as_mut().post_observe_second(observers)
     }
 }
 
@@ -358,12 +284,12 @@ pub mod macros {
 ///
 /// TODO: enforce `iter() -> AssociatedTypeIter` when generic associated types stabilize
 pub trait MapObserver:
-    HasLen + Named + Serialize + serde::de::DeserializeOwned + AsRef<Self> + AsMut<Self> + Hash
+    HasLen + Named + Serialize + DeserializeOwned + AsRef<Self> + AsMut<Self> + Hash
 // where
 //     for<'it> &'it Self: IntoIterator<Item = &'it Self::Entry>
 {
     /// Type of each entry in this map
-    type Entry: Bounded + PartialEq + Default + Copy + Debug + Hash + 'static;
+    type Entry: PartialEq + Copy;
 
     /// Get the value at `idx`
     fn get(&self, idx: usize) -> Self::Entry;
@@ -415,81 +341,38 @@ where
 /// that will get updated by the target.
 /// A well-known example is the AFL-Style coverage map.
 #[derive(Clone, Serialize, Deserialize, Debug)]
-#[serde(bound = "T: serde::de::DeserializeOwned")]
 #[allow(clippy::unsafe_derive_deserialize)]
-pub struct StdMapObserver<'a, T, const DIFFERENTIAL: bool>
-where
-    T: Default + Copy + 'static + Serialize,
-{
+pub struct StdMapObserver<'a, T, const DIFFERENTIAL: bool> {
     map: OwnedMutSlice<'a, T>,
     initial: T,
     name: Cow<'static, str>,
 }
 
-impl<'a, S, T> Observer<S> for StdMapObserver<'a, T, false>
-where
-    S: UsesInput,
-    T: Bounded
-        + PartialEq
-        + Default
-        + Copy
-        + Hash
-        + 'static
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Debug,
-{
+impl<'a, I, S, T> Observer<I, S> for StdMapObserver<'a, T, false> {
     #[inline]
-    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.reset_map()
     }
 }
 
-impl<'a, S, T> Observer<S> for StdMapObserver<'a, T, true>
-where
-    S: UsesInput,
-    T: Bounded
-        + PartialEq
-        + Default
-        + Copy
-        + 'static
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Debug,
-{
-}
+impl<'a, I, S, T> Observer<I, S> for StdMapObserver<'a, T, true> {}
 
-impl<'a, T, const DIFFERENTIAL: bool> Named for StdMapObserver<'a, T, DIFFERENTIAL>
-where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
-{
+impl<'a, T, const DIFFERENTIAL: bool> Named for StdMapObserver<'a, T, DIFFERENTIAL> {
     #[inline]
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<'a, T, const DIFFERENTIAL: bool> HasLen for StdMapObserver<'a, T, DIFFERENTIAL>
-where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
-{
+impl<'a, T, const DIFFERENTIAL: bool> HasLen for StdMapObserver<'a, T, DIFFERENTIAL> {
     #[inline]
     fn len(&self) -> usize {
         self.map.as_slice().len()
     }
 }
 
-impl<'a, 'it, T, const DIFFERENTIAL: bool> IntoIterator for &'it StdMapObserver<'a, T, DIFFERENTIAL>
-where
-    T: Bounded
-        + PartialEq
-        + Default
-        + Copy
-        + Hash
-        + 'static
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Debug,
+impl<'a, 'it, T, const DIFFERENTIAL: bool> IntoIterator
+    for &'it StdMapObserver<'a, T, DIFFERENTIAL>
 {
     type Item = <Iter<'it, T> as Iterator>::Item;
     type IntoIter = Iter<'it, T>;
@@ -502,16 +385,6 @@ where
 
 impl<'a, 'it, T, const DIFFERENTIAL: bool> IntoIterator
     for &'it mut StdMapObserver<'a, T, DIFFERENTIAL>
-where
-    T: Bounded
-        + PartialEq
-        + Default
-        + Copy
-        + Hash
-        + 'static
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Debug,
 {
     type Item = <IterMut<'it, T> as Iterator>::Item;
     type IntoIter = IterMut<'it, T>;
@@ -522,18 +395,7 @@ where
     }
 }
 
-impl<'a, T, const DIFFERENTIAL: bool> StdMapObserver<'a, T, DIFFERENTIAL>
-where
-    T: Bounded
-        + PartialEq
-        + Default
-        + Copy
-        + Hash
-        + 'static
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Debug,
-{
+impl<'a, T, const DIFFERENTIAL: bool> StdMapObserver<'a, T, DIFFERENTIAL> {
     /// Returns an iterator over the map.
     pub fn iter(&self) -> Iter<'_, T> {
         <&Self as IntoIterator>::into_iter(self)
@@ -547,15 +409,7 @@ where
 
 impl<'a, T, const DIFFERENTIAL: bool> Hash for StdMapObserver<'a, T, DIFFERENTIAL>
 where
-    T: Bounded
-        + PartialEq
-        + Default
-        + Copy
-        + Hash
-        + 'static
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Debug,
+    T: Hash,
 {
     #[inline]
     fn hash<H: Hasher>(&self, hasher: &mut H) {
@@ -563,19 +417,13 @@ where
     }
 }
 
-impl<'a, T, const DIFFERENTIAL: bool> AsRef<Self> for StdMapObserver<'a, T, DIFFERENTIAL>
-where
-    T: Default + Copy + 'static + Serialize,
-{
+impl<'a, T, const DIFFERENTIAL: bool> AsRef<Self> for StdMapObserver<'a, T, DIFFERENTIAL> {
     fn as_ref(&self) -> &Self {
         self
     }
 }
 
-impl<'a, T, const DIFFERENTIAL: bool> AsMut<Self> for StdMapObserver<'a, T, DIFFERENTIAL>
-where
-    T: Default + Copy + 'static + Serialize,
-{
+impl<'a, T, const DIFFERENTIAL: bool> AsMut<Self> for StdMapObserver<'a, T, DIFFERENTIAL> {
     fn as_mut(&mut self) -> &mut Self {
         self
     }
@@ -583,15 +431,7 @@ where
 
 impl<'a, T, const DIFFERENTIAL: bool> MapObserver for StdMapObserver<'a, T, DIFFERENTIAL>
 where
-    T: Bounded
-        + PartialEq
-        + Default
-        + Copy
-        + Hash
-        + 'static
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Debug,
+    T: PartialEq + Copy + Hash + Serialize + DeserializeOwned,
 {
     type Entry = T;
 
@@ -602,6 +442,11 @@ where
 
     fn set(&mut self, pos: usize, val: T) {
         self.map.as_slice_mut()[pos] = val;
+    }
+
+    #[inline]
+    fn usable_count(&self) -> usize {
+        self.as_slice().len()
     }
 
     /// Count the set bytes in the map
@@ -619,11 +464,6 @@ where
     }
 
     #[inline]
-    fn usable_count(&self) -> usize {
-        self.as_slice().len()
-    }
-
-    #[inline]
     fn hash_simple(&self) -> u64 {
         RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
     }
@@ -631,10 +471,6 @@ where
     #[inline]
     fn initial(&self) -> T {
         self.initial
-    }
-
-    fn to_vec(&self) -> Vec<T> {
-        self.as_slice().to_vec()
     }
 
     /// Reset the map
@@ -648,6 +484,10 @@ where
             *x = initial;
         }
         Ok(())
+    }
+
+    fn to_vec(&self) -> Vec<T> {
+        self.as_slice().to_vec()
     }
 
     fn how_many_set(&self, indexes: &[usize]) -> usize {
@@ -664,36 +504,21 @@ where
     }
 }
 
-impl<'a, T, const DIFFERENTIAL: bool> Truncate for StdMapObserver<'a, T, DIFFERENTIAL>
-where
-    T: Bounded
-        + PartialEq
-        + Default
-        + Copy
-        + 'static
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Debug,
-{
+impl<'a, T, const DIFFERENTIAL: bool> Truncate for StdMapObserver<'a, T, DIFFERENTIAL> {
     fn truncate(&mut self, new_len: usize) {
         self.map.truncate(new_len);
     }
 }
 
-impl<'a, T, const DIFFERENTIAL: bool> Deref for StdMapObserver<'a, T, DIFFERENTIAL>
-where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-{
+impl<'a, T, const DIFFERENTIAL: bool> Deref for StdMapObserver<'a, T, DIFFERENTIAL> {
     type Target = [T];
+
     fn deref(&self) -> &[T] {
         &self.map
     }
 }
 
-impl<'a, T, const DIFFERENTIAL: bool> DerefMut for StdMapObserver<'a, T, DIFFERENTIAL>
-where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-{
+impl<'a, T, const DIFFERENTIAL: bool> DerefMut for StdMapObserver<'a, T, DIFFERENTIAL> {
     fn deref_mut(&mut self) -> &mut [T] {
         &mut self.map
     }
@@ -701,7 +526,7 @@ where
 
 impl<'a, T, const DIFFERENTIAL: bool> StdMapObserver<'a, T, DIFFERENTIAL>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: Default,
 {
     /// Creates a new [`MapObserver`]
     ///
@@ -792,7 +617,7 @@ where
 
 impl<'a, T> StdMapObserver<'a, T, false>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: Default,
 {
     /// Creates a new [`MapObserver`]
     ///
@@ -850,7 +675,7 @@ where
 
 impl<'a, T> StdMapObserver<'a, T, true>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: Default,
 {
     /// Creates a new [`MapObserver`] in differential mode
     ///
@@ -898,18 +723,4 @@ where
     }
 }
 
-impl<'a, OTA, OTB, S, T> DifferentialObserver<OTA, OTB, S> for StdMapObserver<'a, T, true>
-where
-    OTA: ObserversTuple<S>,
-    OTB: ObserversTuple<S>,
-    S: UsesInput,
-    T: Bounded
-        + PartialEq
-        + Default
-        + Copy
-        + 'static
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Debug,
-{
-}
+impl<'a, OTA, OTB, T> DifferentialObserver<OTA, OTB> for StdMapObserver<'a, T, true> {}
