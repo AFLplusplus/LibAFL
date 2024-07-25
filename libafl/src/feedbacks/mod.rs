@@ -127,6 +127,8 @@ pub trait Feedback<EM, I, OT, S>: Named {
     }
 
     /// Append to the testcase the generated metadata in case of a new corpus item
+    ///
+    /// Precondition: `testcase` must contain an input.
     #[inline]
     #[allow(unused_variables)]
     fn append_metadata(
