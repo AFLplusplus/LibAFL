@@ -39,10 +39,7 @@ use crate::{
 
 /// The inmem executor's handlers.
 #[allow(missing_debug_implementations)]
-pub struct InProcessHooks<S>
-where
-    S: UsesInput,
-{
+pub struct InProcessHooks {
     /// On crash C function pointer
     #[cfg(feature = "std")]
     pub crash_handler: *const c_void,
@@ -52,7 +49,6 @@ where
     /// `TImer` struct
     #[cfg(feature = "std")]
     pub timer: TimerStruct,
-    phantom: PhantomData<S>,
 }
 
 /// Any hooks that is about timeout
@@ -88,10 +84,7 @@ pub trait HasTimeout {
     fn handle_timeout(&mut self, data: &mut InProcessExecutorHandlerData) -> bool;
 }
 
-impl<S> HasTimeout for InProcessHooks<S>
-where
-    S: UsesInput,
-{
+impl HasTimeout for InProcessHooks {
     #[cfg(feature = "std")]
     fn timer(&self) -> &TimerStruct {
         &self.timer
@@ -195,11 +188,7 @@ where
     }
 }
 
-impl<S> ExecutorHook<S> for InProcessHooks<S>
-where
-    S: UsesInput,
-{
-    fn init<E: HasObservers>(&mut self, _state: &mut S) {}
+impl<I, S> ExecutorHook<I, S> for InProcessHooks {
     /// Call before running a target.
     #[allow(clippy::unused_self)]
     #[allow(unused_variables)]
