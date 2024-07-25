@@ -1,19 +1,13 @@
 //! The command executor executes a sub program for each run
 use alloc::vec::Vec;
-use core::{
-    fmt::{self, Debug, Formatter},
-    marker::PhantomData,
-    ops::IndexMut,
-};
+use core::{fmt::Debug, ops::IndexMut};
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
-#[cfg(feature = "std")]
-use std::process::Child;
 use std::{
     ffi::{OsStr, OsString},
     io::{Read, Write},
     path::{Path, PathBuf},
-    process::{Command, Stdio},
+    process::{Child, Command, Stdio},
     time::Duration,
 };
 
@@ -23,17 +17,16 @@ use libafl_bolts::{
     AsSlice,
 };
 
-#[cfg(all(feature = "std", unix))]
+#[cfg(unix)]
 use crate::executors::{Executor, ExitKind};
 use crate::{
     executors::HasObservers,
-    inputs::HasTargetBytes,
+    inputs::{HasTargetBytes, Input},
     observers::{ObserversTuple, StdErrObserver, StdOutObserver},
     state::{HasExecutions, State},
     std::borrow::ToOwned,
+    Error,
 };
-#[cfg(feature = "std")]
-use crate::{inputs::Input, Error};
 
 /// How to deliver input to an external program
 /// `StdIn`: The target reads from stdin
@@ -153,18 +146,18 @@ where
     }
 }
 
-/// A `CommandExecutor` is a wrapper around [`std::process::Command`] to execute a target as a child process.
+/// A `CommandExecutor` is a wrapper around [`Command`] to execute a target as a child process.
 /// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] on it.
 /// Instead, you can use [`CommandExecutor::builder()`] to construct a [`CommandExecutor`] backed by a [`StdCommandConfigurator`].
-pub struct CommandExecutor<OT, S, T> {
+#[derive(Debug)]
+pub struct CommandExecutor<OT, T> {
     /// The wrapped command configurer
     configurer: T,
     /// The observers used by this executor
     observers: OT,
-    phantom: PhantomData<S>,
 }
 
-impl CommandExecutor<(), (), ()> {
+impl CommandExecutor<(), ()> {
     /// Creates a builder for a new [`CommandExecutor`],
     /// backed by a [`StdCommandConfigurator`]
     /// This is usually the easiest way to construct a [`CommandExecutor`].
@@ -182,46 +175,20 @@ impl CommandExecutor<(), (), ()> {
     }
 }
 
-impl<OT, S, T> Debug for CommandExecutor<OT, S, T>
-where
-    T: Debug,
-    OT: Debug,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("CommandExecutor")
-            .field("inner", &self.configurer)
-            .field("observers", &self.observers)
-            .finish()
-    }
-}
-
-impl<OT, S, T> CommandExecutor<OT, S, T>
-where
-    T: Debug,
-    OT: Debug,
-{
-    /// Accesses the inner value
-    pub fn inner(&mut self) -> &mut T {
-        &mut self.configurer
-    }
-}
-
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
-#[cfg(all(feature = "std", unix))]
-impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<OT, S, T>
+#[cfg(unix)]
+impl<EM, I, OT, S, T, Z> Executor<EM, I, S, Z> for CommandExecutor<OT, T>
 where
-    EM: UsesState<State = S>,
-    S: State + HasExecutions,
-    T: CommandConfigurator<S::Input> + Debug,
-    OT: Debug + MatchName + ObserversTuple<S>,
-    Z: UsesState<State = S>,
+    S: HasExecutions,
+    T: CommandConfigurator<I>,
+    OT: MatchName + ObserversTuple<S>,
 {
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
-        state: &mut Self::State,
+        state: &mut S,
         _mgr: &mut EM,
-        input: &Self::Input,
+        input: &I,
     ) -> Result<ExitKind, Error> {
         use std::os::unix::prelude::ExitStatusExt;
 
@@ -251,9 +218,9 @@ where
             }
         };
 
-        if let Ok(exit_kind) = res {
+        if let Ok(exit_kind) = &res {
             self.observers
-                .post_exec_child_all(state, input, &exit_kind)?;
+                .post_exec_child_all(state, input, exit_kind)?;
         }
 
         if let Some(h) = &mut self.configurer.stdout_observer() {
@@ -282,27 +249,9 @@ where
     }
 }
 
-impl<OT, S, T> UsesState for CommandExecutor<OT, S, T>
-where
-    S: State,
-{
-    type State = S;
-}
-
-impl<OT, S, T> UsesObservers for CommandExecutor<OT, S, T>
-where
-    OT: ObserversTuple<S>,
-    S: State,
-{
+impl<OT, T> HasObservers for CommandExecutor<OT, T> {
     type Observers = OT;
-}
 
-impl<OT, S, T> HasObservers for CommandExecutor<OT, S, T>
-where
-    S: State,
-    T: Debug,
-    OT: ObserversTuple<S>,
-{
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         RefIndexable::from(&self.observers)
     }
@@ -476,15 +425,10 @@ impl CommandExecutorBuilder {
     }
 
     /// Builds the `CommandExecutor`
-    pub fn build<OT, S>(
+    pub fn build<OT>(
         &self,
         observers: OT,
-    ) -> Result<CommandExecutor<OT, S, StdCommandConfigurator>, Error>
-    where
-        OT: MatchName + ObserversTuple<S>,
-        S: UsesInput,
-        S::Input: Input + HasTargetBytes,
-    {
+    ) -> Result<CommandExecutor<OT, StdCommandConfigurator>, Error> {
         let Some(program) = &self.program else {
             return Err(Error::illegal_argument(
                 "CommandExecutor::builder: no program set!",
@@ -522,7 +466,7 @@ impl CommandExecutorBuilder {
             command.stderr(Stdio::piped());
         }
 
-        let configurator = StdCommandConfigurator {
+        let configurer = StdCommandConfigurator {
             debug_child: self.debug_child,
             stdout_observer: self.stdout.clone(),
             stderr_observer: self.stderr.clone(),
@@ -530,19 +474,17 @@ impl CommandExecutorBuilder {
             timeout: self.timeout,
             command,
         };
-        Ok(
-            <StdCommandConfigurator as CommandConfigurator<S::Input>>::into_executor::<OT, S>(
-                configurator,
-                observers,
-            ),
-        )
+        Ok(CommandExecutor {
+            configurer,
+            observers,
+        })
     }
 }
 
-/// A `CommandConfigurator` takes care of creating and spawning a [`std::process::Command`] for the [`CommandExecutor`].
+/// A `CommandConfigurator` takes care of creating and spawning a [`Command`] for the [`CommandExecutor`].
 /// # Example
-#[cfg_attr(all(feature = "std", unix), doc = " ```")]
-#[cfg_attr(not(all(feature = "std", unix)), doc = " ```ignore")]
+#[cfg_attr(unix, doc = " ```")]
+#[cfg_attr(not(unix), doc = " ```ignore")]
 /// use std::{io::Write, process::{Stdio, Command, Child}, time::Duration};
 /// use libafl::{Error, inputs::{BytesInput, HasTargetBytes, Input, UsesInput}, executors::{Executor, command::CommandConfigurator}, state::{UsesState, HasExecutions}};
 /// use libafl_bolts::AsSlice;
@@ -581,7 +523,7 @@ impl CommandExecutorBuilder {
 /// }
 /// ```
 
-#[cfg(all(feature = "std", any(unix, doc)))]
+#[cfg(any(unix, doc))]
 pub trait CommandConfigurator<I>: Sized {
     /// Get the stdout
     fn stdout_observer(&self) -> Option<Handle<StdOutObserver>> {
@@ -597,18 +539,6 @@ pub trait CommandConfigurator<I>: Sized {
 
     /// Provides timeout duration for execution of the child process.
     fn exec_timeout(&self) -> Duration;
-
-    /// Create an `Executor` from this `CommandConfigurator`.
-    fn into_executor<OT, S>(self, observers: OT) -> CommandExecutor<OT, S, Self>
-    where
-        OT: MatchName,
-    {
-        CommandExecutor {
-            configurer: self,
-            observers,
-            phantom: PhantomData,
-        }
-    }
 }
 
 #[cfg(test)]
