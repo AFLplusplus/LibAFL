@@ -85,5 +85,5 @@ serde = { version = "1.0", default-features = false, features = [
   "alloc",
 ] } # serialization lib
 meminterval = { version = "0.4", features = ["serde"], optional = true }
-ahash = { version = "0.8.3", default-features = false, optional = true }
+ahash = { version = "0.8", default-features = false, optional = true }
 # serde-big-array = "0.3.2"
