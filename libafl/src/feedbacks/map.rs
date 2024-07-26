@@ -24,10 +24,9 @@ use crate::{
     corpus::Testcase,
     events::{Event, EventFirer},
     executors::ExitKind,
-    feedbacks::{Feedback, HasObserverHandle},
+    feedbacks::{Feedback, HasObserverHandle, StateInitializer},
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{CanTrack, MapObserver, Observer, ObserversTuple},
-    state::State,
     Error, HasMetadata, HasNamedMetadata,
 };
 
@@ -381,6 +380,15 @@ pub struct MapFeedback<C, N, O, R> {
     phantom: PhantomData<fn() -> (N, O, R)>,
 }
 
+impl<C, N, O, R, S> StateInitializer<S> for MapFeedback<C, N, O, R> {
+    fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
+        // Initialize `MapFeedbackMetadata` with an empty vector and add it to the state.
+        // The `MapFeedbackMetadata` would be resized on-demand in `is_interesting`
+        state.add_named_metadata(&self.name, MapFeedbackMetadata::<O::Entry>::default());
+        Ok(())
+    }
+}
+
 impl<C, N, O, R, EM, I, OT, S> Feedback<EM, I, OT, S> for MapFeedback<C, N, O, R>
 where
     N: IsNovel<O::Entry>,
@@ -390,13 +398,6 @@ where
     C: CanTrack + AsRef<O>,
     OT: MatchName,
 {
-    fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
-        // Initialize `MapFeedbackMetadata` with an empty vector and add it to the state.
-        // The `MapFeedbackMetadata` would be resized on-demand in `is_interesting`
-        state.add_named_metadata(&self.name, MapFeedbackMetadata::<O::Entry>::default());
-        Ok(())
-    }
-
     #[rustversion::nightly]
     default fn is_interesting(
         &mut self,

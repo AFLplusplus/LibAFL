@@ -61,13 +61,15 @@ use crate::events::multi_machine::TcpMultiMachineHooks;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use crate::events::{centralized::CentralizedEventManager, CentralizedLlmpHook};
 #[cfg(feature = "std")]
+use crate::observers::TimeObserver;
+#[cfg(feature = "std")]
 use crate::{
     events::{
         llmp::{LlmpRestartingEventManager, LlmpShouldSaveState, ManagerKind, RestartingMgr},
         EventConfig,
     },
     monitors::Monitor,
-    state::{HasExecutions, State},
+    state::HasExecutions,
     Error,
 };
 

@@ -157,15 +157,15 @@ pub trait EvaluatorObservers<OT>: UsesState + Sized {
 }
 
 /// Evaluate an input modifying the state of the fuzzer
-pub trait Evaluator<E, EM>: UsesState {
+pub trait Evaluator<E, EM, I, S> {
     /// Runs the input and triggers observers and feedback,
     /// returns if is interesting an (option) the index of the new [`crate::corpus::Testcase`] in the corpus
     fn evaluate_input(
         &mut self,
-        state: &mut Self::State,
+        state: &mut S,
         executor: &mut E,
         manager: &mut EM,
-        input: <Self::State as UsesInput>::Input,
+        input: I,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
         self.evaluate_input_events(state, executor, manager, input, true)
     }
@@ -175,10 +175,10 @@ pub trait Evaluator<E, EM>: UsesState {
     /// This version has a boolean to decide if send events to the manager.
     fn evaluate_input_events(
         &mut self,
-        state: &mut Self::State,
+        state: &mut S,
         executor: &mut E,
         manager: &mut EM,
-        input: <Self::State as UsesInput>::Input,
+        input: I,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>;
 
@@ -188,10 +188,10 @@ pub trait Evaluator<E, EM>: UsesState {
     /// Usually, you want to use [`Evaluator::evaluate_input`], unless you know what you are doing.
     fn add_input(
         &mut self,
-        state: &mut Self::State,
+        state: &mut S,
         executor: &mut E,
         manager: &mut EM,
-        input: <Self::State as UsesInput>::Input,
+        input: I,
     ) -> Result<CorpusId, Error>;
 
     /// Adds the input to the corpus as disabled a input.
@@ -199,11 +199,7 @@ pub trait Evaluator<E, EM>: UsesState {
     /// Disabled testcases are only used for splicing
     /// Returns the `index` of the new testcase in the corpus.
     /// Usually, you want to use [`Evaluator::evaluate_input`], unless you know what you are doing.
-    fn add_disabled_input(
-        &mut self,
-        state: &mut Self::State,
-        input: <Self::State as UsesInput>::Input,
-    ) -> Result<CorpusId, Error>;
+    fn add_disabled_input(&mut self, state: &mut S, input: I) -> Result<CorpusId, Error>;
 }
 
 /// The main fuzzer trait.

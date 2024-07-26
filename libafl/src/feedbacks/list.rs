@@ -8,7 +8,12 @@ use libafl_bolts::{
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use crate::{executors::ExitKind, feedbacks::Feedback, observers::ListObserver, HasNamedMetadata};
+use crate::{
+    executors::ExitKind,
+    feedbacks::{Feedback, StateInitializer},
+    observers::ListObserver,
+    HasNamedMetadata,
+};
 
 /// The metadata to remember past observed value
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
@@ -58,17 +63,22 @@ libafl_bolts::impl_serdeany!(
     <u8>,<u16>,<u32>,<u64>,<i8>,<i16>,<i32>,<i64>,<bool>,<char>,<usize>
 );
 
+impl<S, T> StateInitializer<S> for ListFeedback<T>
+where
+    S: HasNamedMetadata,
+{
+    fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
+        state.add_named_metadata(self.name(), ListFeedbackMetadata::<T>::default());
+        Ok(())
+    }
+}
+
 impl<EM, I, OT, S, T> Feedback<EM, I, OT, S> for ListFeedback<T>
 where
     OT: MatchName,
     S: HasNamedMetadata,
     T: Debug + Serialize + Hash + Eq + DeserializeOwned + Default + Copy + 'static,
 {
-    fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
-        state.add_named_metadata(self.name(), ListFeedbackMetadata::<T>::default());
-        Ok(())
-    }
-
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting(
         &mut self,

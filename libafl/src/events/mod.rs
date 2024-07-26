@@ -51,7 +51,7 @@ use crate::{
     inputs::Input,
     monitors::UserStats,
     observers::ObserversTuple,
-    state::{HasExecutions, HasLastReportTime, State},
+    state::{HasExecutions, HasLastReportTime},
     Error, HasMetadata,
 };
 #[cfg(feature = "scalability_introspection")]

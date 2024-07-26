@@ -33,7 +33,6 @@ use crate::{
     events::EventFirer,
     executors::ExitKind,
     observers::{ObserversTuple, TimeObserver},
-    state::State,
     Error,
 };
 
@@ -54,16 +53,18 @@ pub mod new_hash_feedback;
 pub mod stdio;
 pub mod transferred;
 
-/// Feedbacks evaluate the observers.
-/// Basically, they reduce the information provided by an observer to a value,
-/// indicating the "interestingness" of the last run.
-pub trait Feedback<EM, I, OT, S>: Named {
+pub trait StateInitializer<S> {
     /// Initializes the feedback state.
     /// This method is called after that the `State` is created.
     fn init_state(&mut self, _state: &mut S) -> Result<(), Error> {
         Ok(())
     }
+}
 
+/// Feedbacks evaluate the observers.
+/// Basically, they reduce the information provided by an observer to a value,
+/// indicating the "interestingness" of the last run.
+pub trait Feedback<EM, I, OT, S>: StateInitializer<S> + Named {
     /// `is_interesting ` return if an input is worth the addition to the corpus
     #[allow(clippy::wrong_self_convention)]
     #[allow(unused)]
@@ -195,18 +196,24 @@ where
     }
 }
 
-impl<A, B, FL, EM, I, OT, S> Feedback<EM, I, OT, S> for CombinedFeedback<A, B, FL>
+impl<A, B, FL, S> StateInitializer<S> for CombinedFeedback<A, B, FL>
 where
-    A: Feedback<EM, I, OT, S>,
-    B: Feedback<EM, I, OT, S>,
-    FL: FeedbackLogic,
+    A: StateInitializer<S>,
+    B: StateInitializer<S>,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         self.first.init_state(state)?;
         self.second.init_state(state)?;
         Ok(())
     }
+}
 
+impl<A, B, FL, EM, I, OT, S> Feedback<EM, I, OT, S> for CombinedFeedback<A, B, FL>
+where
+    A: Feedback<EM, I, OT, S>,
+    B: Feedback<EM, I, OT, S>,
+    FL: FeedbackLogic,
+{
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting(
         &mut self,
@@ -609,14 +616,19 @@ pub struct NotFeedback<A> {
     name: Cow<'static, str>,
 }
 
-impl<A, EM, I, OT, S> Feedback<EM, I, OT, S> for NotFeedback<A>
+impl<A, S> StateInitializer<S> for NotFeedback<A>
 where
-    A: Feedback<EM, I, OT, S>,
+    A: StateInitializer<S>,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         self.inner.init_state(state)
     }
+}
 
+impl<A, EM, I, OT, S> Feedback<EM, I, OT, S> for NotFeedback<A>
+where
+    A: Feedback<EM, I, OT, S>,
+{
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting(
         &mut self,
