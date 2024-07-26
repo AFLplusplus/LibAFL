@@ -38,7 +38,7 @@ jobs:
         with:
           crate: mdbook-linkcheck
           # NOTE: The current crates.io release of mdbook-linkcheck (v0.7.7) is broken
-          #       => https://github.com/Michael-F-Bryan/mdbook-linkcheck/pull/82#issuecomment-2441058491
+          #       => https://github.com/Michael-F-Bryan/mdbook-linkcheck/pull/82#issuecomment-2241058491
           git: https://github.com/Michael-F-Bryan/mdbook-linkcheck.git
           rev: 8c783c5d754d83bcd50c28fb4174854b04ece990
       - uses: Swatinem/rust-cache@v2
