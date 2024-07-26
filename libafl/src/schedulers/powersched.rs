@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, CorpusId, HasCorpus, HasTestcase, Testcase},
-    observers::{MapObserver, ObserversTuple},
+    observers::MapObserver,
     schedulers::{AflScheduler, HasQueueCycles, RemovableScheduler, Scheduler},
     state::State,
     Error, HasMetadata,
@@ -176,33 +176,21 @@ pub enum PowerSchedule {
 /// Note that this corpus is merely holding the metadata necessary for the power calculation
 /// and here we DON'T actually calculate the power (we do it in the stage)
 #[derive(Clone, Debug)]
-pub struct PowerQueueScheduler<C, O, S> {
+pub struct PowerQueueScheduler<C, O> {
     queue_cycles: u64,
     strat: PowerSchedule,
     map_observer_handle: Handle<C>,
     last_hash: usize,
-    phantom: PhantomData<(O, S)>,
+    phantom: PhantomData<fn() -> O>,
 }
 
-impl<C, O, S> UsesState for PowerQueueScheduler<C, O, S>
-where
-    S: State,
-{
-    type State = S;
-}
-
-impl<C, O, S> RemovableScheduler for PowerQueueScheduler<C, O, S>
-where
-    S: State + HasTestcase + HasMetadata + HasCorpus,
-    O: MapObserver,
-    C: AsRef<O>,
-{
+impl<C, I, O, S> RemovableScheduler<I, S> for PowerQueueScheduler<C, O> {
     /// This will *NOT* neutralize the effect of this removed testcase from the global data such as `SchedulerMetadata`
     fn on_remove(
         &mut self,
-        _state: &mut Self::State,
+        _state: &mut S,
         _id: CorpusId,
-        _prev: &Option<Testcase<<Self::State as UsesInput>::Input>>,
+        _prev: &Option<Testcase<I>>,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -210,20 +198,17 @@ where
     /// This will *NOT* neutralize the effect of this removed testcase from the global data such as `SchedulerMetadata`
     fn on_replace(
         &mut self,
-        _state: &mut Self::State,
+        _state: &mut S,
         _id: CorpusId,
-        _prev: &Testcase<<Self::State as UsesInput>::Input>,
+        _prev: &Testcase<I>,
     ) -> Result<(), Error> {
         Ok(())
     }
 }
 
-impl<C, O, S> AflScheduler<C, O, S> for PowerQueueScheduler<C, O, S>
-where
-    S: HasCorpus + HasMetadata + HasTestcase + State,
-    O: MapObserver,
-    C: AsRef<O>,
-{
+impl<C, O> AflScheduler for PowerQueueScheduler<C, O> {
+    type MapObserverRef = C;
+
     fn last_hash(&self) -> usize {
         self.last_hash
     }
@@ -237,41 +222,28 @@ where
     }
 }
 
-impl<C, O, S> HasQueueCycles for PowerQueueScheduler<C, O, S>
-where
-    S: HasCorpus + HasMetadata + HasTestcase + State,
-    O: MapObserver,
-    C: AsRef<O>,
-{
+impl<C, O> HasQueueCycles for PowerQueueScheduler<C, O> {
     fn queue_cycles(&self) -> u64 {
         self.queue_cycles
     }
 }
 
-impl<C, O, S> Scheduler for PowerQueueScheduler<C, O, S>
+impl<C, I, O, OT, S> Scheduler<I, OT, S> for PowerQueueScheduler<C, O>
 where
     S: HasCorpus + HasMetadata + HasTestcase + State,
     O: MapObserver,
     C: AsRef<O>,
 {
     /// Called when a [`Testcase`] is added to the corpus
-    fn on_add(&mut self, state: &mut Self::State, id: CorpusId) -> Result<(), Error> {
+    fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         self.on_add_metadata(state, id)
     }
 
-    fn on_evaluation<OT>(
-        &mut self,
-        state: &mut Self::State,
-        input: &<Self::State as UsesInput>::Input,
-        observers: &OT,
-    ) -> Result<(), Error>
-    where
-        OT: ObserversTuple<Self::State>,
-    {
+    fn on_evaluation(&mut self, state: &mut S, input: &I, observers: &OT) -> Result<(), Error> {
         self.on_evaluation_metadata(state, input, observers)
     }
 
-    fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
+    fn next(&mut self, state: &mut S) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
             Err(Error::empty(
                 "No entries in corpus. This often implies the target is not properly instrumented.",
@@ -299,7 +271,7 @@ where
     /// Set current fuzzed corpus id and `scheduled_count`
     fn set_current_scheduled(
         &mut self,
-        state: &mut Self::State,
+        state: &mut S,
         next_id: Option<CorpusId>,
     ) -> Result<(), Error> {
         self.on_next_metadata(state, next_id)?;
@@ -309,15 +281,17 @@ where
     }
 }
 
-impl<C, O, S> PowerQueueScheduler<C, O, S>
+impl<C, O> PowerQueueScheduler<C, O>
 where
-    S: HasMetadata,
     O: MapObserver,
     C: AsRef<O> + Named,
 {
     /// Create a new [`PowerQueueScheduler`]
     #[must_use]
-    pub fn new(state: &mut S, map_observer: &C, strat: PowerSchedule) -> Self {
+    pub fn new<S>(state: &mut S, map_observer: &C, strat: PowerSchedule) -> Self
+    where
+        S: HasMetadata,
+    {
         if !state.has_metadata::<SchedulerMetadata>() {
             state.add_metadata::<SchedulerMetadata>(SchedulerMetadata::new(Some(strat)));
         }
