@@ -16,20 +16,14 @@ use crate::{
 };
 
 /// Conduct reservoir sampling (probabilistic sampling) over all corpus elements.
-#[derive(Debug, Clone)]
-pub struct ProbabilitySamplingScheduler<F, S>
-where
-    S: UsesInput,
-{
-    phantom: PhantomData<(F, S)>,
+#[derive(Debug, Clone, Default)]
+pub struct ProbabilitySamplingScheduler<F> {
+    phantom: PhantomData<fn() -> F>,
 }
 
 /// A state metadata holding a map of probability of corpus elements.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(
-    any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
-)] // for SerdeAny
+#[derive(Debug, Serialize, Deserialize, Default)]
+#[allow(clippy::unsafe_derive_deserialize)] // for SerdeAny
 pub struct ProbabilityMetadata {
     /// corpus index -> probability
     pub map: HashMap<CorpusId, f64>,
@@ -43,36 +37,25 @@ impl ProbabilityMetadata {
     /// Creates a new [`struct@ProbabilityMetadata`]
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            map: HashMap::default(),
-            total_probability: 0.0,
-        }
+        Self::default()
     }
 }
 
-impl Default for ProbabilityMetadata {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<F, S> ProbabilitySamplingScheduler<F, S>
-where
-    F: TestcaseScore<S>,
-    S: HasCorpus + HasMetadata + HasRand,
-{
+impl<F> ProbabilitySamplingScheduler<F> {
     /// Creates a new [`struct@ProbabilitySamplingScheduler`]
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
+        Self::default()
     }
 
     /// Calculate the score and store in `ProbabilityMetadata`
     #[allow(clippy::cast_precision_loss)]
     #[allow(clippy::unused_self)]
-    pub fn store_probability(&self, state: &mut S, id: CorpusId) -> Result<(), Error> {
+    pub fn store_probability<S>(&self, state: &mut S, id: CorpusId) -> Result<(), Error>
+    where
+        F: TestcaseScore<<S::Corpus as Corpus>::Input, S>,
+        S: HasCorpus + HasMetadata + HasRand,
+    {
         let prob = F::compute(state, &mut *state.corpus().get(id)?.borrow_mut())?;
         debug_assert!(
             prob >= 0.0 && prob.is_finite(),
@@ -88,16 +71,15 @@ where
     }
 }
 
-impl<F, S> RemovableScheduler for ProbabilitySamplingScheduler<F, S>
+impl<F, I, S> RemovableScheduler<I, S> for ProbabilitySamplingScheduler<F>
 where
-    F: TestcaseScore<S>,
-    S: HasCorpus + HasMetadata + HasRand + HasTestcase + State,
+    S: HasMetadata,
 {
     fn on_remove(
         &mut self,
-        state: &mut Self::State,
+        state: &mut S,
         id: CorpusId,
-        _testcase: &Option<Testcase<<Self::State as UsesInput>::Input>>,
+        _testcase: &Option<Testcase<I>>,
     ) -> Result<(), Error> {
         let meta = state
             .metadata_map_mut()
@@ -111,9 +93,9 @@ where
 
     fn on_replace(
         &mut self,
-        state: &mut Self::State,
+        state: &mut S,
         id: CorpusId,
-        _prev: &Testcase<<Self::State as UsesInput>::Input>,
+        _prev: &Testcase<I>,
     ) -> Result<(), Error> {
         let meta = state
             .metadata_map_mut()
@@ -127,19 +109,12 @@ where
     }
 }
 
-impl<F, S> UsesState for ProbabilitySamplingScheduler<F, S>
+impl<F, I, OT, S> Scheduler<I, OT, S> for ProbabilitySamplingScheduler<F>
 where
-    S: State + HasTestcase,
-{
-    type State = S;
-}
-
-impl<F, S> Scheduler for ProbabilitySamplingScheduler<F, S>
-where
-    F: TestcaseScore<S>,
+    F: TestcaseScore<I, S>,
     S: HasCorpus + HasMetadata + HasRand + HasTestcase + State,
 {
-    fn on_add(&mut self, state: &mut Self::State, id: CorpusId) -> Result<(), Error> {
+    fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         let current_id = *state.corpus().current();
         state
             .corpus()
@@ -155,7 +130,7 @@ where
 
     /// Gets the next entry
     #[allow(clippy::cast_precision_loss)]
-    fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
+    fn next(&mut self, state: &mut S) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
             Err(Error::empty(String::from(
                 "No entries in corpus. This often implies the target is not properly instrumented.",
@@ -177,55 +152,46 @@ where
             Ok(ret)
         }
     }
-}
 
-impl<F, S> Default for ProbabilitySamplingScheduler<F, S>
-where
-    F: TestcaseScore<S>,
-    S: HasCorpus + HasMetadata + HasRand,
-{
-    fn default() -> Self {
-        Self::new()
+    fn set_current_scheduled(
+        &mut self,
+        state: &mut S,
+        next_id: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        *state.corpus_mut().current_mut() = next_id;
+        Ok(())
     }
 }
 
 #[cfg(test)]
 #[cfg(feature = "std")]
 mod tests {
-    use core::{borrow::BorrowMut, marker::PhantomData};
+    use core::borrow::BorrowMut;
 
     use libafl_bolts::rands::StdRand;
 
     use crate::{
         corpus::{Corpus, HasCorpus, InMemoryCorpus, Testcase},
         feedbacks::ConstFeedback,
-        inputs::{bytes::BytesInput, Input, UsesInput},
+        inputs::bytes::BytesInput,
         schedulers::{ProbabilitySamplingScheduler, Scheduler, TestcaseScore},
         state::StdState,
-        Error, HasMetadata,
+        Error,
     };
 
     const FACTOR: f64 = 1337.0;
 
     #[derive(Debug, Clone)]
-    pub struct UniformDistribution<I>
-    where
-        I: Input,
-    {
-        phantom: PhantomData<I>,
-    }
+    pub struct UniformDistribution;
 
-    impl<S> TestcaseScore<S> for UniformDistribution<S::Input>
-    where
-        S: HasMetadata + HasCorpus,
-    {
+    impl<I, S> TestcaseScore<I, S> for UniformDistribution {
         fn compute(_state: &S, _: &mut Testcase<S::Input>) -> Result<f64, Error> {
             Ok(FACTOR)
         }
     }
 
-    pub type UniformProbabilitySamplingScheduler<S> =
-        ProbabilitySamplingScheduler<UniformDistribution<<S as UsesInput>::Input>, S>;
+    pub type UniformProbabilitySamplingScheduler =
+        ProbabilitySamplingScheduler<UniformDistribution>;
 
     #[test]
     fn test_prob_sampling() {
