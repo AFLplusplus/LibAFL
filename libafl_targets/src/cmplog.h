@@ -4,6 +4,15 @@
 #include "common.h"
 #include <stddef.h>
 
+#ifdef _MSC_VER
+  #define PACKED(__Declaration__) \
+    __pragma(pack(push, 1)) __Declaration__ __pragma(pack(pop))
+#endif
+
+#ifndef _MSC_VER
+  #define PACKED(__Declaration__) __Declaration__ __attribute__((__packed__))
+#endif
+
 #ifndef CMPLOG_MAP_W
   #define CMPLOG_MAP_W 65536
 #endif
@@ -28,52 +37,43 @@ typedef struct CmpLogHeader {
   uint8_t  kind;
 } CmpLogHeader;
 
-#ifndef _WIN32
-typedef struct CmpLogHeaderExtended {
+PACKED(typedef struct CmpLogHeaderExtended {
   unsigned hits : 6;
   unsigned shape : 5;
   unsigned type : 1;
   unsigned attribute : 4;
-} __attribute__((packed)) CmpLogHeaderExtended;
-#else
-__pragma(pack(push, 1)) typedef struct CmpLogHeaderExtended {
-  unsigned hits : 6;
-  unsigned shape : 5;
-  unsigned type : 1;
-  unsigned attribute : 4;
-} CmpLogHeaderExtended;
-__pragma(pack(pop))
-#endif
+} CmpLogHeaderExtended;)
 
 typedef struct CmpLogInstruction {
   uint64_t v0;
   uint64_t v1;
 } CmpLogInstruction;
 
-typedef struct CmpLogInstructionExtended {
+PACKED(typedef struct CmpLogInstructionExtended {
   uint64_t v0;
   uint64_t v0_128;
-  uint64_t v0_256_0;  // u256 is unsupported by any compiler for now, so future use
+  uint64_t
+      v0_256_0;  // u256 is unsupported by any compiler for now, so future use
   uint64_t v0_256_1;
   uint64_t v1;
   uint64_t v1_128;
   uint64_t v1_256_0;
   uint64_t v1_256_1;
-  uint8_t unused[8];
-} __attribute__((packed)) CmpLogInstructionExtended;
+  uint8_t  unused[8];
+} CmpLogInstructionExtended;)
 
 typedef struct CmpLogRoutine {
   uint8_t v0[CMPLOG_RTN_LEN];
   uint8_t v1[CMPLOG_RTN_LEN];
 } CmpLogRoutine;
 
-typedef struct CmpLogRoutineExtended {
+PACKED(typedef struct CmpLogRoutineExtended {
   uint8_t v0[CMPLOG_RTN_LEN];
   uint8_t v1[CMPLOG_RTN_LEN];
   uint8_t v0_len;
   uint8_t v1_len;
   uint8_t unused[6];
-} __attribute__((packed)) CmpLogRoutineExtended;
+} CmpLogRoutineExtended;)
 
 typedef struct CmpLogMap {
   CmpLogHeader headers[CMPLOG_MAP_W];
