@@ -19,9 +19,9 @@ pub use weighted::{StdWeightedScheduler, WeightedScheduler};
 
 use crate::{
     corpus::{Corpus, CorpusId, HasCorpus, HasTestcase, SchedulerTestcaseMetadata, Testcase},
-    observers::{MapObserver, ObserversTuple},
+    observers::MapObserver,
     random_corpus_id,
-    state::{HasRand, State},
+    state::HasRand,
     Error, HasMetadata,
 };
 
@@ -33,6 +33,7 @@ pub mod queue;
 pub mod testcase_score;
 pub mod tuneable;
 pub mod weighted;
+
 /// The scheduler also implements `on_remove` and `on_replace` if it implements this stage.
 pub trait RemovableScheduler<I, S> {
     /// Removed the given entry from the corpus at the given index
