@@ -11,12 +11,7 @@
   #define CMPLOG_MAP_H 32
 #endif
 
-// difference between aflpp and libafl
-#ifdef CMPLOG_EXTENDED
-  #define CMPLOG_RTN_LEN 31
-#else
-  #define CMPLOG_RTN_LEN 32
-#endif
+#define CMPLOG_RTN_LEN 32
 
 #define CMPLOG_MAP_RTN_H \
   ((CMPLOG_MAP_H * sizeof(CmpLogInstruction)) / sizeof(CmpLogRoutine))
@@ -57,10 +52,15 @@ typedef struct CmpLogInstruction {
 
 typedef struct CmpLogInstructionExtended {
   uint64_t v0;
-  uint64_t v1;
   uint64_t v0_128;
+  uint64_t v0_256_0;  // u256 is unsupported by any compiler for now, so future use
+  uint64_t v0_256_1;
+  uint64_t v1;
   uint64_t v1_128;
-} CmpLogInstructionExtended;
+  uint64_t v1_256_0;
+  uint64_t v1_256_1;
+  uint8_t unused[8];
+} __attribute__((packed)) CmpLogInstructionExtended;
 
 typedef struct CmpLogRoutine {
   uint8_t v0[CMPLOG_RTN_LEN];
@@ -69,10 +69,11 @@ typedef struct CmpLogRoutine {
 
 typedef struct CmpLogRoutineExtended {
   uint8_t v0[CMPLOG_RTN_LEN];
-  uint8_t v0_len;
   uint8_t v1[CMPLOG_RTN_LEN];
+  uint8_t v0_len;
   uint8_t v1_len;
-} CmpLogRoutineExtended;
+  uint8_t unused[6];
+} __attribute__((packed)) CmpLogRoutineExtended;
 
 typedef struct CmpLogMap {
   CmpLogHeader headers[CMPLOG_MAP_W];
