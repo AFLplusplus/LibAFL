@@ -1,10 +1,19 @@
 [package]
 name = "libfuzzer_stb_image_sugar"
 version = "0.13.0"
-authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
+authors = [
+  "Andrea Fioraldi <andreafioraldi@gmail.com>",
+  "Dominik Maier <domenukk@gmail.com>",
+]
 edition = "2021"
 build = "build.rs"
-categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
+categories = [
+  "development-tools::testing",
+  "emulators",
+  "embedded",
+  "os",
+  "no-std",
+]
 
 [features]
 default = ["std"]
@@ -19,7 +28,11 @@ debug = true
 [dependencies]
 libafl = { path = "../../../libafl/" }
 libafl_bolts = { path = "../../../libafl_bolts/" }
-libafl_targets = { path = "../../../libafl_targets/", features = ["sancov_pcguard_edges", "sancov_cmplog", "libfuzzer"] }
+libafl_targets = { path = "../../../libafl_targets/", features = [
+  "sancov_pcguard_edges",
+  "sancov_cmplog",
+  "libfuzzer",
+] }
 libafl_sugar = { path = "../../../libafl_sugar/" }
 mimalloc = { version = "*", default-features = false }
 

@@ -1,13 +1,17 @@
 # Variables
 [env]
-FUZZER_NAME='libfuzzer_windows_asan'
-CARGO_TARGET_DIR = { value = "./target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
-PROFILE = { value = "release", condition = {env_not_set = ["PROFILE"]} }
-PROFILE_DIR = {value = "release", condition = {env_not_set = ["PROFILE_DIR"] }}
+FUZZER_NAME = 'libfuzzer_windows_asan'
+CARGO_TARGET_DIR = { value = "./target", condition = { env_not_set = [
+  "CARGO_TARGET_DIR",
+] } }
+PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
+PROFILE_DIR = { value = "release", condition = { env_not_set = [
+  "PROFILE_DIR",
+] } }
 
 [tasks.unsupported]
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 echo "Cargo-make not integrated yet on this"
 '''
 
@@ -19,7 +23,7 @@ windows_alias = "cxx_unix"
 
 [tasks.cxx_unix]
 command = "cargo"
-args = ["build" , "--profile", "${PROFILE}"]
+args = ["build", "--profile", "${PROFILE}"]
 
 [tasks.cc]
 linux_alias = "cc_unix"
@@ -28,7 +32,7 @@ windows_alias = "cc_unix"
 
 [tasks.cc_unix]
 command = "cargo"
-args = ["build" , "--profile", "${PROFILE}"]
+args = ["build", "--profile", "${PROFILE}"]
 
 [tasks.crash_cxx]
 linux_alias = "unsupported"
@@ -47,7 +51,7 @@ mac_alias = "unsupported"
 windows_alias = "lib_unix"
 
 [tasks.lib_unix]
-dependencies = [ "cxx", "cc" ]
+dependencies = ["cxx", "cc"]
 
 # Harness
 [tasks.fuzzer]
@@ -58,7 +62,7 @@ windows_alias = "fuzzer_windows"
 [tasks.fuzzer_windows]
 command = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cxx"
 args = ["./harness.cpp", "-o", "${FUZZER_NAME}.exe"]
-dependencies = [ "lib", "cxx", "cc" ]
+dependencies = ["lib", "cxx", "cc"]
 
 # Run the fuzzer
 [tasks.run]
@@ -68,9 +72,9 @@ windows_alias = "run_windows" # TODO
 
 [tasks.run_windows]
 script_runner = "@shell"
-script='''
+script = '''
 '''
-dependencies = [ "fuzzer" ]
+dependencies = ["fuzzer"]
 
 # Test
 [tasks.test]
@@ -80,14 +84,14 @@ windows_alias = "test_windows" # TODO
 
 [tasks.test_windows]
 script_runner = "@shell"
-script='''
+script = '''
 start "" "${FUZZER_NAME}.exe"
 start "" "${FUZZER_NAME}.exe"
 #ping is for timeout
 ping -n 10 127.0.0.1>NUL && taskkill /im ${FUZZER_NAME}.exe /F
 >nul 2>nul dir /a-d "crashes\*" && (echo Files exist) || (exit /b 1337)
 '''
-dependencies = [ "fuzzer" ]
+dependencies = ["fuzzer"]
 
 # Clean up
 [tasks.clean]
@@ -98,8 +102,8 @@ windows_alias = "clean_windows"
 [tasks.clean_windows]
 # Disable default `clean` definition
 clear = true
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 del ./${FUZZER_NAME}
 cargo clean
 '''

@@ -1,13 +1,17 @@
 [env]
 PROJECT_DIR = { script = ["pwd"] }
-CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
-FUZZER_NAME="fuzzer"
-PROFILE = { value = "release", condition = {env_not_set = ["PROFILE"]} }
-PROFILE_DIR = {value = "release", condition = {env_not_set = ["PROFILE_DIR"] }}
+CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = [
+  "CARGO_TARGET_DIR",
+] } }
+FUZZER_NAME = "fuzzer"
+PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
+PROFILE_DIR = { value = "release", condition = { env_not_set = [
+  "PROFILE_DIR",
+] } }
 
 [tasks.unsupported]
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 echo "Cargo-make not integrated yet on this"
 '''
 
@@ -38,7 +42,16 @@ windows_alias = "unsupported"
 
 [tasks.fuzz_o_unix]
 command = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cxx"
-args = ["--libafl-no-link", "-O3","-I", "./Little-CMS/include", "-c", "cms_transform_fuzzer.cc", "-o", "cms_transform_fuzzer.o"]
+args = [
+  "--libafl-no-link",
+  "-O3",
+  "-I",
+  "./Little-CMS/include",
+  "-c",
+  "cms_transform_fuzzer.cc",
+  "-o",
+  "cms_transform_fuzzer.o",
+]
 dependencies = ["cc", "cxx"]
 
 # Fuzzer
@@ -49,7 +62,15 @@ windows_alias = "unsupported"
 
 [tasks.fuzzer_unix]
 command = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cxx"
-args = ["--libafl", "cms_transform_fuzzer.o", "./Little-CMS/src/.libs/liblcms2.a", "-o", "${FUZZER_NAME}", "-lm", "-lz"]
+args = [
+  "--libafl",
+  "cms_transform_fuzzer.o",
+  "./Little-CMS/src/.libs/liblcms2.a",
+  "-o",
+  "${FUZZER_NAME}",
+  "-lm",
+  "-lz",
+]
 dependencies = ["cc", "cxx", "fuzz_o"]
 
 # Run
@@ -59,8 +80,8 @@ mac_alias = "run_unix"
 windows_alias = "unsupported"
 
 [tasks.run_unix]
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 rm -rf libafl_unix_shmem_server || true
 mkdir in || true
 echo a > in/a
@@ -76,8 +97,8 @@ mac_alias = "test_unix"
 windows_alias = "unsupported"
 
 [tasks.test_unix]
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 rm -rf libafl_unix_shmem_server || true
 mkdir in || true
 echo a > in/a
@@ -101,8 +122,8 @@ mac_alias = "clean_unix"
 windows_alias = "unsupported"
 
 [tasks.clean_unix]
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 rm ./${FUZZER_NAME} || true
 rm fuzz.o || true
 '''
