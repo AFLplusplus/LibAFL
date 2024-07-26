@@ -194,13 +194,13 @@ jobs:
       - name: Install deps
         run: sudo apt-get install -y lsb-release wget software-properties-common gnupg ninja-build python3-dev python3-pip python3-venv libz3-dev
       - name: Install maturin
-        run: python3 -m pip install maturin
+        run: cargo install --locked maturin
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
       - name: Run a maturin build
-        run: export LLVM_CONFIG=llvm-config-16 && cd ./bindings/pylibafl && python3 -m venv .env && . .env/bin/activate && pip install --upgrade --force-reinstall . && ./test.sh
+        run: export LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} && cd ./bindings/pylibafl && python3 -m venv .env && . .env/bin/activate && pip install --upgrade --force-reinstall . && ./test.sh
       - name: Run python test
         run: . ./bindings/pylibafl/.env/bin/activate # && cd ./fuzzers/qemu/python_qemu/ && python3 fuzzer.py 2>&1 | grep "Bye"
 
@@ -311,7 +311,7 @@ jobs:
       - name: Build and run example fuzzers (Linux)
         if: runner.os == 'Linux'
         shell: bash
-        run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
+        run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
 
   changes:
     runs-on: ubuntu-24.04
@@ -355,7 +355,7 @@ jobs:
       - name: Build and run example QEMU fuzzers (Linux)
         if: runner.os == 'Linux'
         shell: bash
-        run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
+        run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
 
   nostd-build:
     runs-on: ubuntu-24.04
