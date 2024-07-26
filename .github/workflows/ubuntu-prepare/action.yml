@@ -29,8 +29,8 @@ runs:
       shell: bash
       run: |
         sudo tee -a /etc/apt/sources.list.d/llvm.list << EOF
-        deb https://apt.llvm.org/jammy/ llvm-toolchain-jammy main
-        deb-src https://apt.llvm.org/jammy/ llvm-toolchain-jammy main
+        deb http://apt.llvm.org/noble/ llvm-toolchain-noble main
+        deb-src http://apt.llvm.org/noble/ llvm-toolchain-noble main
         EOF
     - name: Add LLVM archive signature
       shell: bash

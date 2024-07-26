@@ -10,7 +10,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   CARGO_NET_GIT_FETCH_WITH_CLI: true
-  MAIN_LLVM_VERSION: 18
+  MAIN_LLVM_VERSION: 19
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-latest, windows-latest, macOS-latest ]
+        os: [ ubuntu-24.04, windows-latest, macOS-latest ]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -38,7 +38,7 @@ jobs:
         with:
           crate: mdbook-linkcheck
           # NOTE: The current crates.io release of mdbook-linkcheck (v0.7.7) is broken
-          #       => https://github.com/Michael-F-Bryan/mdbook-linkcheck/pull/82#issuecomment-2241058491
+          #       => https://github.com/Michael-F-Bryan/mdbook-linkcheck/pull/82#issuecomment-2441058491
           git: https://github.com/Michael-F-Bryan/mdbook-linkcheck.git
           rev: 8c783c5d754d83bcd50c28fb4174854b04ece990
       - uses: Swatinem/rust-cache@v2
@@ -67,7 +67,7 @@ jobs:
         run: cd libafl_targets && cargo test --no-default-features
 
   llvm-tester:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     continue-on-error: true
     strategy:
       matrix:
@@ -87,7 +87,7 @@ jobs:
         run: pwd && ls & cd libafl_cc && cargo build --release
 
   ubuntu-doc-build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
@@ -97,7 +97,7 @@ jobs:
         run: RUSTFLAGS="--cfg docsrs" cargo +nightly doc --all-features --no-deps
 
   ubuntu-doc-test:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
@@ -107,7 +107,7 @@ jobs:
         run: RUSTFLAGS="--cfg docsrs" cargo +nightly test --doc --all-features
 
   ubuntu-miri:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: ubuntu
     steps:
       - uses: actions/checkout@v4
@@ -120,7 +120,7 @@ jobs:
         run: RUST_BACKTRACE=1 MIRIFLAGS="-Zmiri-disable-isolation" cargo +nightly miri test
 
   ubuntu:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
@@ -140,7 +140,7 @@ jobs:
         run: cargo build --examples --verbose
 
   ubuntu-clippy:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
@@ -158,7 +158,7 @@ jobs:
     #  run: cargo +nightly test --features=embed-runtime --manifest-path libafl_libfuzzer/Cargo.toml
 
   ubuntu-check:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: ubuntu
     strategy:
       matrix:
@@ -348,7 +348,7 @@ jobs:
           - ./fuzzers/qemu/qemu_launcher
 
     runs-on: [ self-hosted, qemu ]
-    container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
+    container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2404:latest
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/qemu-fuzzer-tester-prepare
@@ -484,7 +484,7 @@ jobs:
         run: cargo build --target aarch64-apple-ios && cd libafl_frida && cargo build --target aarch64-apple-ios && cd ..
 
   android:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: dtolnay/rust-toolchain@stable
       - uses: nttld/setup-ndk@v1
@@ -510,7 +510,7 @@ jobs:
     #  run: C:\Rust\.cargo\bin\cargo.exe test --verbose
 
   freebsd:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     name: Simple build in FreeBSD
     steps:
       - uses: actions/checkout@v4
