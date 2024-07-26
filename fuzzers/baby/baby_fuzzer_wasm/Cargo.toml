@@ -23,9 +23,12 @@ libafl_bolts = { path = "../../../libafl_bolts", default-features = false }
 # code size when deploying.
 console_error_panic_hook = { version = "0.1.6", optional = true }
 
-[dependencies.web-sys]
-version = "0.3"
-features = ['console', 'Window', 'Performance', 'PerformanceTiming']
+web-sys = { version = "0.3", features = [
+  'console',
+  'Window',
+  'Performance',
+  'PerformanceTiming',
+] }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.13"
