@@ -389,6 +389,15 @@ jobs:
       - name: Build no_std no_alloc bolts
         run: cd ./libafl_bolts && cargo +nightly build -Zbuild-std=core --target aarch64-unknown-none --no-default-features -v --release && cd ../
 
+  format-toml:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Install taplo
+        run: curl -fsSL https://github.com/tamasfe/taplo/releases/latest/download/taplo-full-linux-x86_64.gz | gzip -d - | install -m 755 /dev/stdin /usr/local/bin/taplo
+      - uses: actions/checkout@v4
+      - name: Run taplo
+        run: taplo format --check
+
   build-docker:
     runs-on: ubuntu-latest
     steps:
