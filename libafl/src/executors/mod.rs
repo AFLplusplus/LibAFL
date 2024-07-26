@@ -42,10 +42,7 @@ pub mod hooks;
 
 /// How an execution finished.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(
-    any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
-)] // for SerdeAny
+#[allow(clippy::unsafe_derive_deserialize)] // for SerdeAny
 pub enum ExitKind {
     /// The run exited normally.
     Ok,

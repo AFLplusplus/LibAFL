@@ -152,7 +152,6 @@ pub trait MutatorsTuple<I, S>: HasLen {
         &mut self,
         index: usize,
         state: &mut S,
-
         corpus_id: Option<CorpusId>,
     ) -> Result<(), Error>;
 
@@ -324,12 +323,12 @@ where
         self.0.get_and_post_exec(index, state, new_corpus_id)
     }
 
-    fn names(&self) -> Vec<&str> {
-        self.0.names()
-    }
-
     fn names_reversed(&self) -> Vec<&str> {
         self.0.names_reversed()
+    }
+
+    fn names(&self) -> Vec<&str> {
+        self.0.names()
     }
 }
 

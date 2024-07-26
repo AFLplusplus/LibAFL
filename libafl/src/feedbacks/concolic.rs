@@ -36,7 +36,7 @@ impl<'map> ConcolicFeedback<'map> {
     }
 }
 
-impl<S> Named for ConcolicFeedback<'_> {
+impl Named for ConcolicFeedback<'_> {
     fn name(&self) -> &Cow<'static, str> {
         self.observer_handle.name()
     }
