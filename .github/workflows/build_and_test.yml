@@ -10,7 +10,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   CARGO_NET_GIT_FETCH_WITH_CLI: true
-  MAIN_LLVM_VERSION: 19
+  MAIN_LLVM_VERSION: 18
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -23,9 +23,6 @@ jobs:
         os: [ ubuntu-24.04, windows-latest, macOS-latest ]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - if: runner.os == 'Linux'
-        uses: ./.github/workflows/ubuntu-prepare
       - name: Install mimetype
         if: runner.os == 'Linux'
         run: sudo apt-get install -y libfile-mimeinfo-perl
@@ -41,6 +38,9 @@ jobs:
           #       => https://github.com/Michael-F-Bryan/mdbook-linkcheck/pull/82#issuecomment-2241058491
           git: https://github.com/Michael-F-Bryan/mdbook-linkcheck.git
           rev: 8c783c5d754d83bcd50c28fb4174854b04ece990
+      - uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
         if: runner.os == 'Linux'
@@ -76,13 +76,13 @@ jobs:
       - name: Remove Dotnet & Haskell
         run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
       - uses: dtolnay/rust-toolchain@stable
-      - uses: actions/checkout@v4
-      - uses: Swatinem/rust-cache@v2
-        with: { shared-key: "llvm-tester" }
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
         with:
           version: "${{matrix.llvm-version}}"
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+        with: { shared-key: "llvm-tester" }
       - name: Build and test with llvm-${{ matrix.llvm-version }}
         run: pwd && ls & cd libafl_cc && cargo build --release
 
@@ -122,12 +122,12 @@ jobs:
   ubuntu:
     runs-on: ubuntu-24.04
     steps:
+      - name: Remove Dotnet & Haskell
+        run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
-      - name: Remove Dotnet & Haskell
-        run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
       # pcguard edges and pcguard hitcounts are not compatible and we need to build them seperately
       - name: Check pcguard edges
         run: cargo check --features=sancov_pcguard_edges
@@ -142,14 +142,14 @@ jobs:
   ubuntu-clippy:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/workflows/ubuntu-prepare
-      - uses: Swatinem/rust-cache@v2
-        with: { shared-key: "ubuntu" }
       - name: Remove Dotnet & Haskell
         run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
       - name: Add nightly clippy
         run: rustup toolchain install nightly --component clippy --allow-downgrade && rustup default nightly
+      - uses: actions/checkout@v4
+      - uses: ./.github/workflows/ubuntu-prepare
+      - uses: Swatinem/rust-cache@v2
+        with: { shared-key: "ubuntu" }
       - name: Run clippy
         run: ./scripts/clippy.sh
     # --- test embedding the libafl_libfuzzer_runtime library
@@ -191,14 +191,14 @@ jobs:
   python-bindings:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/workflows/ubuntu-prepare
-      - uses: Swatinem/rust-cache@v2
-        with: { shared-key: "ubuntu" }
       - name: Install deps
         run: sudo apt-get install -y lsb-release wget software-properties-common gnupg ninja-build python3-dev python3-pip python3-venv libz3-dev
       - name: Install maturin
         run: python3 -m pip install maturin
+      - uses: actions/checkout@v4
+      - uses: ./.github/workflows/ubuntu-prepare
+      - uses: Swatinem/rust-cache@v2
+        with: { shared-key: "ubuntu" }
       - name: Run a maturin build
         run: export LLVM_CONFIG=llvm-config-16 && cd ./bindings/pylibafl && python3 -m venv .env && . .env/bin/activate && pip install --upgrade --force-reinstall . && ./test.sh
       - name: Run python test
@@ -363,10 +363,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: rust-src
-      - uses: actions/checkout@v4
-      - uses: Swatinem/rust-cache@v2
       - name: Add targets
         run: rustup target add arm-linux-androideabi && rustup target add thumbv6m-none-eabi
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
       - name: Build aarch64-unknown-none
         run: cd ./fuzzers/baby/baby_no_std && cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
       - name: run x86_64 until panic!
@@ -380,10 +380,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: clippy, rust-src
-      - uses: actions/checkout@v4
-      - uses: Swatinem/rust-cache@v2
       - name: Add targets
         run: rustup target add arm-linux-androideabi && rustup target add thumbv6m-none-eabi
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
       - name: libafl armv6m-none-eabi (32 bit no_std) clippy
         run: cd ./libafl && cargo clippy --target thumbv6m-none-eabi --no-default-features
       - name: Build no_std no_alloc bolts

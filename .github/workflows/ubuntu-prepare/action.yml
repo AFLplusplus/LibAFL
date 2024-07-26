@@ -28,16 +28,9 @@ runs:
     - name: Add LLVM in sources list
       shell: bash
       run: |
-        sudo tee -a /etc/apt/sources.list.d/llvm.list << EOF
-        deb http://apt.llvm.org/noble/ llvm-toolchain-noble main
-        deb-src http://apt.llvm.org/noble/ llvm-toolchain-noble main
-        EOF
-    - name: Add LLVM archive signature
-      shell: bash
-      run: wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
-    - name: Install LLVM and Clang (Version ${{ env.MAIN_LLVM_VERSION }})
-      shell: bash
-      run: sudo apt-get update && sudo apt-get install -y llvm llvm-dev clang libclang-cpp-dev llvm-${{ env.MAIN_LLVM_VERSION }} clang-${{ env.MAIN_LLVM_VERSION }} llvm-${{ env.MAIN_LLVM_VERSION }}-dev libclang-cpp${{ env.MAIN_LLVM_VERSION }} libclang-cpp${{ env.MAIN_LLVM_VERSION }}-dev
+        wget https://apt.llvm.org/llvm.sh
+        chmod +x llvm.sh
+        sudo ./llvm.sh ${{env.MAIN_LLVM_VERSION}} all
     - name: Symlink Headers
       shell: bash
       run: sudo ln -s /usr/include/asm-generic /usr/include/asm
