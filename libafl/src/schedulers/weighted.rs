@@ -26,10 +26,7 @@ use crate::{
 };
 
 /// The Metadata for `WeightedScheduler`
-#[cfg_attr(
-    any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
-)] // for SerdeAny
+#[allow(clippy::unsafe_derive_deserialize)] // for SerdeAny
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct WeightedScheduleMetadata {
     /// The fuzzer execution spent in the current cycles

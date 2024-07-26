@@ -14,7 +14,7 @@ use crate::{
         mutator::Mutator as BackingMutator,
         tree::{Tree, TreeMutation},
     },
-    corpus::HasCorpus,
+    corpus::{Corpus, HasCorpus},
     feedbacks::NautilusChunksMetadata,
     generators::nautilus::NautilusContext,
     inputs::nautilus::NautilusInput,
@@ -35,7 +35,10 @@ impl Debug for NautilusRandomMutator<'_> {
     }
 }
 
-impl<S: HasRand> Mutator<NautilusInput, S> for NautilusRandomMutator<'_> {
+impl<S> Mutator<NautilusInput, S> for NautilusRandomMutator<'_>
+where
+    S: HasRand,
+{
     fn mutate(
         &mut self,
         state: &mut S,
@@ -97,7 +100,10 @@ impl Debug for NautilusRecursionMutator<'_> {
     }
 }
 
-impl<S: HasRand> Mutator<NautilusInput, S> for NautilusRecursionMutator<'_> {
+impl<S> Mutator<NautilusInput, S> for NautilusRecursionMutator<'_>
+where
+    S: HasRand,
+{
     fn mutate(
         &mut self,
         state: &mut S,
@@ -163,7 +169,8 @@ impl Debug for NautilusSpliceMutator<'_> {
 
 impl<S> Mutator<NautilusInput, S> for NautilusSpliceMutator<'_>
 where
-    S: HasCorpus<Input = NautilusInput> + HasMetadata + HasRand,
+    S: HasCorpus + HasMetadata + HasRand,
+    S::Corpus: Corpus<Input = NautilusInput>,
 {
     fn mutate(
         &mut self,

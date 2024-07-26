@@ -26,10 +26,7 @@ use crate::{
 /// On the other hand, in the core fuzzing mode, the fuzzer chooses the best `swarms`, which was determined during the pilot fuzzing mode, to compute the probability to choose the mutation operator.
 /// With the current implementation we are always in the pacemaker fuzzing mode.
 #[derive(Serialize, Deserialize, Clone)]
-#[cfg_attr(
-    any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
-)] // for SerdeAny
+#[allow(clippy::unsafe_derive_deserialize)] // for SerdeAny
 pub struct MOpt {
     /// Random number generator
     pub rand: StdRand,
@@ -360,35 +357,16 @@ pub enum MOptMode {
 
 /// This is the main struct of `MOpt`, an `AFL` mutator.
 /// See the original `MOpt` implementation in <https://github.com/puppet-meteor/MOpt-AFL>
-pub struct StdMOptMutator<I, MT, S>
-where
-    MT: MutatorsTuple<I, S>,
-    S: HasRand + HasMetadata + HasCorpus + HasSolutions,
-{
+#[derive(Debug)]
+pub struct StdMOptMutator<MT> {
     name: Cow<'static, str>,
     mode: MOptMode,
     finds_before: usize,
     mutations: MT,
     max_stack_pow: usize,
-    phantom: PhantomData<(I, S)>,
 }
 
-impl<I, MT, S> Debug for StdMOptMutator<I, MT, S>
-where
-    MT: MutatorsTuple<I, S>,
-    S: HasRand + HasMetadata + HasCorpus + HasSolutions,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "StdMOptMutator with {} mutations for Input type {}",
-            self.mutations.len(),
-            core::any::type_name::<I>()
-        )
-    }
-}
-
-impl<I, MT, S> Mutator<I, S> for StdMOptMutator<I, MT, S>
+impl<I, MT, S> Mutator<I, S> for StdMOptMutator<MT>
 where
     MT: MutatorsTuple<I, S>,
     S: HasRand + HasMetadata + HasCorpus + HasSolutions,
@@ -513,18 +491,17 @@ where
     }
 }
 
-impl<I, MT, S> StdMOptMutator<I, MT, S>
-where
-    MT: MutatorsTuple<I, S>,
-    S: HasRand + HasMetadata + HasCorpus + HasSolutions,
-{
+impl<MT> StdMOptMutator<MT> {
     /// Create a new [`StdMOptMutator`].
-    pub fn new(
+    pub fn new<S>(
         state: &mut S,
         mutations: MT,
         max_stack_pow: usize,
         swarm_num: usize,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, Error>
+    where
+        S: HasMetadata,
+    {
         if !state.has_metadata::<MOpt>() {
             let rand_seed = state.rand_mut().next();
             state.add_metadata::<MOpt>(MOpt::new(mutations.len(), swarm_num, rand_seed)?);
@@ -535,10 +512,14 @@ where
             finds_before: 0,
             mutations,
             max_stack_pow,
-            phantom: PhantomData,
         })
     }
-    fn core_mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+
+    fn core_mutate<I, S>(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error>
+    where
+        MT: MutatorsTuple<I, S>,
+        S: HasRand + HasMetadata + HasCorpus + HasSolutions,
+    {
         let mut r = MutationResult::Skipped;
         let mopt = state.metadata_map_mut().get_mut::<MOpt>().unwrap();
         for i in 0..mopt.operator_num {

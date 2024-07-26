@@ -114,9 +114,10 @@ impl_default_multipart!(
     I2SRandReplace,
 );
 
-impl<I, S> Mutator<MultipartInput<I>, S> for CrossoverInsertMutator<I>
+impl<I, S> Mutator<MultipartInput<I>, S> for CrossoverInsertMutator
 where
-    S: HasCorpus<Input = MultipartInput<I>> + HasMaxSize + HasRand,
+    S: HasCorpus + HasMaxSize + HasRand,
+    S::Corpus: Corpus<Input = MultipartInput<I>>,
     I: Input + HasMutatorBytes,
 {
     fn mutate(
@@ -218,9 +219,10 @@ where
     }
 }
 
-impl<I, S> Mutator<MultipartInput<I>, S> for CrossoverReplaceMutator<I>
+impl<I, S> Mutator<MultipartInput<I>, S> for CrossoverReplaceMutator
 where
-    S: HasCorpus<Input = MultipartInput<I>> + HasMaxSize + HasRand,
+    S: HasCorpus + HasMaxSize + HasRand,
+    S::Corpus: Corpus<Input = MultipartInput<I>>,
     I: Input + HasMutatorBytes,
 {
     fn mutate(

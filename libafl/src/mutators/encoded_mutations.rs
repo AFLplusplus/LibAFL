@@ -24,7 +24,10 @@ use crate::{
 #[derive(Debug, Default)]
 pub struct EncodedRandMutator;
 
-impl<S: HasRand> Mutator<EncodedInput, S> for EncodedRandMutator {
+impl<S> Mutator<EncodedInput, S> for EncodedRandMutator
+where
+    S: HasRand,
+{
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         if input.codes().is_empty() {
             Ok(MutationResult::Skipped)
@@ -55,7 +58,10 @@ impl EncodedRandMutator {
 #[derive(Debug, Default)]
 pub struct EncodedIncMutator;
 
-impl<S: HasRand> Mutator<EncodedInput, S> for EncodedIncMutator {
+impl<S> Mutator<EncodedInput, S> for EncodedIncMutator
+where
+    S: HasRand,
+{
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         if input.codes().is_empty() {
             Ok(MutationResult::Skipped)
@@ -86,7 +92,10 @@ impl EncodedIncMutator {
 #[derive(Debug, Default)]
 pub struct EncodedDecMutator;
 
-impl<S: HasRand> Mutator<EncodedInput, S> for EncodedDecMutator {
+impl<S> Mutator<EncodedInput, S> for EncodedDecMutator
+where
+    S: HasRand,
+{
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         if input.codes().is_empty() {
             Ok(MutationResult::Skipped)
@@ -117,7 +126,10 @@ impl EncodedDecMutator {
 #[derive(Debug, Default)]
 pub struct EncodedAddMutator;
 
-impl<S: HasRand> Mutator<EncodedInput, S> for EncodedAddMutator {
+impl<S> Mutator<EncodedInput, S> for EncodedAddMutator
+where
+    S: HasRand,
+{
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         if input.codes().is_empty() {
             Ok(MutationResult::Skipped)
@@ -152,7 +164,10 @@ impl EncodedAddMutator {
 #[derive(Debug, Default)]
 pub struct EncodedDeleteMutator;
 
-impl<S: HasRand> Mutator<EncodedInput, S> for EncodedDeleteMutator {
+impl<S> Mutator<EncodedInput, S> for EncodedDeleteMutator
+where
+    S: HasRand,
+{
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         let size = input.codes().len();
         if size <= 2 {
@@ -247,7 +262,10 @@ impl EncodedInsertCopyMutator {
 #[derive(Debug, Default)]
 pub struct EncodedCopyMutator;
 
-impl<S: HasRand> Mutator<EncodedInput, S> for EncodedCopyMutator {
+impl<S> Mutator<EncodedInput, S> for EncodedCopyMutator
+where
+    S: HasRand,
+{
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         let size = input.codes().len();
         if size <= 1 {
@@ -285,9 +303,10 @@ impl EncodedCopyMutator {
 #[derive(Debug, Default)]
 pub struct EncodedCrossoverInsertMutator;
 
-impl<S> Mutator<S::Input, S> for EncodedCrossoverInsertMutator
+impl<S> Mutator<EncodedInput, S> for EncodedCrossoverInsertMutator
 where
-    S: UsesInput<Input = EncodedInput> + HasRand + HasCorpus + HasMaxSize,
+    S: HasRand + HasCorpus + HasMaxSize,
+    S::Corpus: Corpus<Input = EncodedInput>,
 {
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         let size = input.codes().len();
@@ -355,9 +374,10 @@ impl EncodedCrossoverInsertMutator {
 #[derive(Debug, Default)]
 pub struct EncodedCrossoverReplaceMutator;
 
-impl<S> Mutator<S::Input, S> for EncodedCrossoverReplaceMutator
+impl<S> Mutator<EncodedInput, S> for EncodedCrossoverReplaceMutator
 where
-    S: UsesInput<Input = EncodedInput> + HasRand + HasCorpus,
+    S: HasRand + HasCorpus,
+    S::Corpus: Corpus<Input = EncodedInput>,
 {
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         let size = input.codes().len();

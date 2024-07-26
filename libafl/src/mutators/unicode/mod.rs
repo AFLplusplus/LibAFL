@@ -9,7 +9,7 @@ use core::{
 use libafl_bolts::{rands::Rand, Error, HasLen, Named};
 
 use crate::{
-    corpus::{CorpusId, HasCorpus, HasTestcase, Testcase},
+    corpus::{Corpus, CorpusId, HasCorpus, HasTestcase, Testcase},
     inputs::{BytesInput, HasMutatorBytes},
     mutators::{rand_range, MutationResult, Mutator, Tokens},
     stages::{
@@ -32,7 +32,8 @@ pub type UnicodeInput = (BytesInput, UnicodeIdentificationMetadata);
 
 impl<S> MutatedTransform<BytesInput, S> for UnicodeInput
 where
-    S: HasCorpus<Input = BytesInput> + HasTestcase,
+    S: HasCorpus + HasTestcase,
+    S::Corpus: Corpus<Input = BytesInput>,
 {
     type Post = UnicodeIdentificationMetadata;
 
@@ -62,11 +63,14 @@ where
 
 const MAX_CHARS: usize = 16;
 
-fn choose_start<R: Rand>(
+fn choose_start<R>(
     rand: &mut R,
     bytes: &[u8],
     meta: &UnicodeIdentificationMetadata,
-) -> Option<(usize, usize)> {
+) -> Option<(usize, usize)>
+where
+    R: Rand,
+{
     let idx = rand.below(bytes.len());
     let mut options = Vec::new();
     for (start, range) in meta.ranges() {
@@ -92,7 +96,10 @@ fn choose_start<R: Rand>(
     }
 }
 
-fn get_subcategory<T: Ord + Copy>(needle: T, haystack: &[(T, T)]) -> Option<(T, T)> {
+fn get_subcategory<T>(needle: T, haystack: &[(T, T)]) -> Option<(T, T)>
+where
+    T: Ord + Copy,
+{
     haystack
         .binary_search_by(|&(min, max)| match min.cmp(&needle) {
             Ordering::Less | Ordering::Equal => match needle.cmp(&max) {
@@ -105,11 +112,10 @@ fn get_subcategory<T: Ord + Copy>(needle: T, haystack: &[(T, T)]) -> Option<(T, 
         .map(|idx| haystack[idx])
 }
 
-fn find_range<F: Fn(char) -> bool>(
-    chars: &[(usize, char)],
-    idx: usize,
-    predicate: F,
-) -> Range<usize> {
+fn find_range<F>(chars: &[(usize, char)], idx: usize, predicate: F) -> Range<usize>
+where
+    F: Fn(char) -> bool,
+{
     // walk backwards and discover
     let start = chars[..idx]
         .iter()
@@ -129,10 +135,10 @@ fn find_range<F: Fn(char) -> bool>(
     start..end
 }
 
-fn choose_category_range<R: Rand>(
-    rand: &mut R,
-    string: &str,
-) -> (Range<usize>, &'static [(u32, u32)]) {
+fn choose_category_range<R>(rand: &mut R, string: &str) -> (Range<usize>, &'static [(u32, u32)])
+where
+    R: Rand,
+{
     let chars = string.char_indices().collect::<Vec<_>>();
     let idx = rand.below(chars.len());
     let c = chars[idx].1;
@@ -176,7 +182,10 @@ fn choose_category_range<R: Rand>(
     )
 }
 
-fn choose_subcategory_range<R: Rand>(rand: &mut R, string: &str) -> (Range<usize>, (u32, u32)) {
+fn choose_subcategory_range<R>(rand: &mut R, string: &str) -> (Range<usize>, (u32, u32))
+where
+    R: Rand,
+{
     let chars = string.char_indices().collect::<Vec<_>>();
     let idx = rand.below(chars.len());
     let c = chars[idx].1;
@@ -216,12 +225,16 @@ fn choose_subcategory_range<R: Rand>(rand: &mut R, string: &str) -> (Range<usize
     )
 }
 
-fn rand_replace_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
+fn rand_replace_range<S, F>(
     state: &mut S,
     input: &mut UnicodeInput,
     range: Range<usize>,
     char_gen: F,
-) -> MutationResult {
+) -> MutationResult
+where
+    S: HasRand + HasMaxSize,
+    F: Fn(&mut S) -> char,
+{
     let temp_range = rand_range(state, range.end - range.start, MAX_CHARS);
     let range = (range.start + temp_range.start)..(range.start + temp_range.end);
     let range = match core::str::from_utf8(&input.0.bytes()[range.clone()]) {
@@ -498,74 +511,60 @@ mod test {
     use libafl_bolts::{rands::StdRand, Error};
 
     use crate::{
-        corpus::NopCorpus,
+        corpus::{HasCorpus, NopCorpus},
         inputs::{BytesInput, HasMutatorBytes},
-        mutators::{Mutator, UnicodeCategoryRandMutator, UnicodeSubcategoryRandMutator},
+        mutators::{
+            Mutator, UnicodeCategoryRandMutator, UnicodeInput, UnicodeSubcategoryRandMutator,
+        },
         stages::extract_metadata,
         state::StdState,
     };
 
+    fn test_unicode<M, S>(mut mutator: M, mut state: S) -> Result<(), Error>
+    where
+        M: Mutator<UnicodeInput, S>,
+    {
+        let hex = "0123456789abcdef0123456789abcdef";
+        let mut bytes = BytesInput::from(hex.as_bytes());
+
+        for _ in 0..(1 << 12) {
+            let metadata = extract_metadata(bytes.bytes());
+            let mut input = (bytes, metadata);
+            let _ = mutator.mutate(&mut state, &mut input);
+            println!("{:?}", core::str::from_utf8(input.0.bytes()).unwrap());
+            bytes = input.0;
+        }
+
+        Ok(())
+    }
+
     // a not-so-useful test for this
     #[test]
     fn mutate_hex() {
-        let result: Result<(), Error> = (|| {
-            let hex = "0123456789abcdef0123456789abcdef";
-            let mut bytes = BytesInput::from(hex.as_bytes());
+        let state = StdState::new(
+            StdRand::with_seed(0),
+            NopCorpus::<BytesInput>::new(),
+            NopCorpus::new(),
+            &mut (),
+            &mut (),
+        )?;
 
-            let mut mutator = UnicodeCategoryRandMutator;
-
-            let mut state = StdState::new(
-                StdRand::with_seed(0),
-                NopCorpus::<BytesInput>::new(),
-                NopCorpus::new(),
-                &mut (),
-                &mut (),
-            )?;
-
-            for _ in 0..(1 << 12) {
-                let metadata = extract_metadata(bytes.bytes());
-                let mut input = (bytes, metadata);
-                let _ = mutator.mutate(&mut state, &mut input);
-                println!("{:?}", core::str::from_utf8(input.0.bytes()).unwrap());
-                bytes = input.0;
-            }
-
-            Ok(())
-        })();
-
-        if let Err(e) = result {
+        if let Err(e) = test_unicode(UnicodeCategoryRandMutator, state) {
             panic!("failed with error: {e}");
         }
     }
 
     #[test]
     fn mutate_hex_subcat() {
-        let result: Result<(), Error> = (|| {
-            let hex = "0123456789abcdef0123456789abcdef";
-            let mut bytes = BytesInput::from(hex.as_bytes());
+        let state = StdState::new(
+            StdRand::with_seed(0),
+            NopCorpus::<BytesInput>::new(),
+            NopCorpus::new(),
+            &mut (),
+            &mut (),
+        )?;
 
-            let mut mutator = UnicodeSubcategoryRandMutator;
-
-            let mut state = StdState::new(
-                StdRand::with_seed(0),
-                NopCorpus::<BytesInput>::new(),
-                NopCorpus::new(),
-                &mut (),
-                &mut (),
-            )?;
-
-            for _ in 0..(1 << 12) {
-                let metadata = extract_metadata(bytes.bytes());
-                let mut input = (bytes, metadata);
-                let _ = mutator.mutate(&mut state, &mut input);
-                println!("{:?}", core::str::from_utf8(input.0.bytes()).unwrap());
-                bytes = input.0;
-            }
-
-            Ok(())
-        })();
-
-        if let Err(e) = result {
+        if let Err(e) = test_unicode(UnicodeSubcategoryRandMutator, state) {
             panic!("failed with error: {e}");
         }
     }
