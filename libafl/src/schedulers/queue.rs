@@ -1,37 +1,27 @@
 //! The queue corpus scheduler implements an AFL-like queue mechanism
 
 use alloc::borrow::ToOwned;
-use core::marker::PhantomData;
 
 use crate::{
-    corpus::{Corpus, CorpusId, HasCorpus, HasTestcase},
+    corpus::{Corpus, CorpusId, HasCorpus},
     schedulers::{HasQueueCycles, RemovableScheduler, Scheduler},
-    state::State,
     Error,
 };
 
 /// Walk the corpus in a queue-like fashion
-#[derive(Debug, Clone)]
-pub struct QueueScheduler<S> {
+#[derive(Debug, Clone, Default)]
+pub struct QueueScheduler {
     queue_cycles: u64,
     runs_in_current_cycle: u64,
-    phantom: PhantomData<S>,
 }
 
-impl<S> UsesState for QueueScheduler<S>
-where
-    S: State,
-{
-    type State = S;
-}
+impl<I, S> RemovableScheduler<I, S> for QueueScheduler {}
 
-impl<S> RemovableScheduler for QueueScheduler<S> where S: HasCorpus + HasTestcase + State {}
-
-impl<S> Scheduler for QueueScheduler<S>
+impl<I, OT, S> Scheduler<I, OT, S> for QueueScheduler
 where
-    S: HasCorpus + HasTestcase + State,
+    S: HasCorpus,
 {
-    fn on_add(&mut self, state: &mut Self::State, id: CorpusId) -> Result<(), Error> {
+    fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         // Set parent id
         let current_id = *state.corpus().current();
         state
@@ -44,7 +34,7 @@ where
     }
 
     /// Gets the next entry in the queue
-    fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
+    fn next(&mut self, state: &mut S) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
             Err(Error::empty(
                 "No entries in corpus. This often implies the target is not properly instrumented."
@@ -54,8 +44,7 @@ where
             let id = state
                 .corpus()
                 .current()
-                .map(|id| state.corpus().next(id))
-                .flatten()
+                .and_then(|id| state.corpus().next(id))
                 .unwrap_or_else(|| state.corpus().first().unwrap());
 
             self.runs_in_current_cycle += 1;
@@ -67,30 +56,26 @@ where
             Ok(id)
         }
     }
+
+    fn set_current_scheduled(
+        &mut self,
+        state: &mut S,
+        next_id: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        *state.corpus_mut().current_mut() = next_id;
+        Ok(())
+    }
 }
 
-impl<S> QueueScheduler<S> {
+impl QueueScheduler {
     /// Creates a new `QueueScheduler`
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            runs_in_current_cycle: 0,
-            queue_cycles: 0,
-            phantom: PhantomData,
-        }
+        Self::default()
     }
 }
 
-impl<S> Default for QueueScheduler<S> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<S> HasQueueCycles for QueueScheduler<S>
-where
-    S: HasCorpus + HasTestcase + State,
-{
+impl HasQueueCycles for QueueScheduler {
     fn queue_cycles(&self) -> u64 {
         self.queue_cycles
     }
@@ -99,7 +84,6 @@ where
 #[cfg(test)]
 #[cfg(feature = "std")]
 mod tests {
-
     use std::{fs, path::PathBuf};
 
     use libafl_bolts::rands::StdRand;
