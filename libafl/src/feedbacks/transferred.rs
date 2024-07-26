@@ -8,7 +8,11 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "track_hit_feedbacks")]
 use crate::feedbacks::premature_last_result_err;
-use crate::{executors::ExitKind, feedbacks::Feedback, HasMetadata};
+use crate::{
+    executors::ExitKind,
+    feedbacks::{Feedback, StateInitializer},
+    HasMetadata,
+};
 
 /// Constant name of the [`TransferringMetadata`].
 pub const TRANSFERRED_FEEDBACK_NAME: Cow<'static, str> =
@@ -48,7 +52,7 @@ impl Named for TransferredFeedback {
     }
 }
 
-impl<EM, I, OT, S> Feedback<EM, I, OT, S> for TransferredFeedback
+impl<S> StateInitializer<S> for TransferredFeedback
 where
     S: HasMetadata,
 {
@@ -56,7 +60,12 @@ where
         state.add_metadata(TransferringMetadata { transferring: true });
         Ok(())
     }
+}
 
+impl<EM, I, OT, S> Feedback<EM, I, OT, S> for TransferredFeedback
+where
+    S: HasMetadata,
+{
     fn is_interesting(
         &mut self,
         state: &mut S,

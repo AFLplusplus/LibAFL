@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use crate::feedbacks::premature_last_result_err;
 use crate::{
     executors::ExitKind,
-    feedbacks::{Feedback, HasObserverHandle},
+    feedbacks::{Feedback, HasObserverHandle, StateInitializer},
     observers::ObserverWithHashField,
     Error, HasNamedMetadata,
 };
@@ -97,10 +97,8 @@ pub struct NewHashFeedback<O> {
     last_result: Option<bool>,
 }
 
-impl<O, EM, I, OT, S> Feedback<EM, I, OT, S> for NewHashFeedback<O>
+impl<O, S> StateInitializer<S> for NewHashFeedback<O>
 where
-    O: ObserverWithHashField,
-    OT: MatchName,
     S: HasNamedMetadata,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
@@ -110,7 +108,14 @@ where
         );
         Ok(())
     }
+}
 
+impl<O, EM, I, OT, S> Feedback<EM, I, OT, S> for NewHashFeedback<O>
+where
+    O: ObserverWithHashField,
+    OT: MatchName,
+    S: HasNamedMetadata,
+{
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting(
         &mut self,
