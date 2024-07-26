@@ -23,7 +23,7 @@ use crate::{
     executors::HasObservers,
     inputs::{HasTargetBytes, Input},
     observers::{ObserversTuple, StdErrObserver, StdOutObserver},
-    state::{HasExecutions, State},
+    state::HasExecutions,
     std::borrow::ToOwned,
     Error,
 };
