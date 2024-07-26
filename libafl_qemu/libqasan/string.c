@@ -135,7 +135,8 @@ unsigned char __libqasan_tolower(unsigned char c) {
 
 int __libqasan_strcasecmp(const char *str1, const char *str2) {
   while (1) {
-    const unsigned char c1 = __libqasan_tolower(*str1), c2 = __libqasan_tolower(*str2);
+    const unsigned char c1 = __libqasan_tolower(*str1),
+                        c2 = __libqasan_tolower(*str2);
 
     if (c1 != c2) { return c1 - c2; }
     if (!c1) { return 0; }
@@ -148,7 +149,8 @@ int __libqasan_strcasecmp(const char *str1, const char *str2) {
 
 int __libqasan_strncasecmp(const char *str1, const char *str2, size_t len) {
   while (len--) {
-    const unsigned char c1 = __libqasan_tolower(*str1), c2 = __libqasan_tolower(*str2);
+    const unsigned char c1 = __libqasan_tolower(*str1),
+                        c2 = __libqasan_tolower(*str2);
 
     if (c1 != c2) { return c1 - c2; }
     if (!c1) { return 0; }
