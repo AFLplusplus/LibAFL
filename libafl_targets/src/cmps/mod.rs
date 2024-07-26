@@ -390,8 +390,14 @@ impl CmpMap for CmpLogMap {
         } else {
             unsafe {
                 Some(CmpValues::Bytes((
-                    self.vals.routines[idx][execution].0.to_vec(),
-                    self.vals.routines[idx][execution].1.to_vec(),
+                    CmplogBytes::from_buf_and_len(
+                        self.vals.routines[idx][execution].0,
+                        CMPLOG_RTN_LEN as u8,
+                    ),
+                    CmplogBytes::from_buf_and_len(
+                        self.vals.routines[idx][execution].1,
+                        CMPLOG_RTN_LEN as u8,
+                    ),
                 )))
             }
         }

@@ -44,8 +44,10 @@ pub struct CmplogBytes {
 
 impl CmplogBytes {
     /// Creates a new [`CmplogBytes`] object from the provided buf and length.
+    /// Lengths above 32 are illegal but will be ignored.
     pub fn from_buf_and_len(buf: [u8; 32], len: u8) -> Self {
-        CmplogBytes { buf, len }
+        debug_assert!(len <= 32, "Len too big: {len}, max: 32");
+        CmplogBytes { buf, len: len % 32 }
     }
 }
 
