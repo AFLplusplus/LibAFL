@@ -392,15 +392,9 @@ jobs:
   format-toml:
     runs-on: ubuntu-24.04
     steps:
-      - uses: dtolnay/rust-toolchain@nightly
-        with:
-          components: clippy, rust-src
-      - name: Install openssl
-        run: sudo apt-get install libssl-dev
       - name: Install taplo
-        run: cargo install taplo-cli --locked
+        run: curl -fsSL https://github.com/tamasfe/taplo/releases/latest/download/taplo-full-linux-x86_64.gz | gzip -d - | install -m 755 /dev/stdin /usr/local/bin/taplo
       - uses: actions/checkout@v4
-      - uses: Swatinem/rust-cache@v2
       - name: Run taplo
         run: taplo format --check
 
