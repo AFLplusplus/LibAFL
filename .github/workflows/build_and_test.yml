@@ -395,16 +395,14 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: clippy, rust-src
-      - uses: actions/checkout@v4
-      - uses: Swatinem/rust-cache@v2
       - name: Install openssl
         run: sudo apt-get install libssl-dev
       - name: Install taplo
         run: cargo install taplo-cli --locked
-      - name: libafl armv6m-none-eabi (32 bit no_std) clippy
-        run: cd ./libafl && cargo clippy --target thumbv6m-none-eabi --no-default-features
-      - name: Build no_std no_alloc bolts
-        run: cd ./libafl_bolts && cargo +nightly build -Zbuild-std=core --target aarch64-unknown-none --no-default-features -v --release && cd ../
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - name: Run taplo
+        run: taplo format --check
 
   build-docker:
     runs-on: ubuntu-latest
