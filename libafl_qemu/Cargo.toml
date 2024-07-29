@@ -123,7 +123,7 @@ paste = "1"
 enum-map = "2.7"
 serde_yaml = { version = "0.9", optional = true } # For parsing the injections yaml file
 toml = { version = "0.8.13", optional = true } # For parsing the injections toml file
-pyo3 = { version = "0.18", optional = true, features = ["multiple-pymethods"] }
+pyo3 = { version = "0.22", optional = true, features = ["multiple-pymethods"] }
 bytes-utils = "0.1"
 typed-builder = "0.18"
 memmap2 = "0.9"
@@ -132,7 +132,7 @@ document-features = { version = "0.2", optional = true }
 
 [build-dependencies]
 libafl_qemu_build = { path = "./libafl_qemu_build", version = "0.13.2" }
-pyo3-build-config = { version = "0.21", optional = true }
+pyo3-build-config = { version = "0.22", optional = true }
 rustversion = "1.0"
 bindgen = "0.69"
 cc = "1.0"
