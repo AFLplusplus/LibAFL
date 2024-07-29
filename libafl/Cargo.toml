@@ -264,7 +264,7 @@ arrayvec = { version = "0.7.4", optional = true, default-features = false } # us
 const_format = "0.2.32" # used for providing helpful compiler output
 const_panic = "0.2.8"   # similarly, for formatting const panic output
 
-pyo3 = { version = "0.22", optional = true }        # For nautilus
+pyo3 = { version = "0.22", optional = true }          # For nautilus
 regex-syntax = { version = "0.8.3", optional = true } # For nautilus
 
 # optional-dev deps (change when target.'cfg(accessible(::std))'.test-dependencies will be stable)
