@@ -447,8 +447,6 @@ jobs:
     needs:
       - common
     steps:
-      - name: Install curl
-        run: sudo apt-get install clang
       - uses: dtolnay/rust-toolchain@stable
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
