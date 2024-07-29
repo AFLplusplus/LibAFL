@@ -36,8 +36,8 @@ use libafl_qemu::{
     modules::edges::{
         edges_map_mut_ptr, EdgeCoverageModule, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
     },
-    Emulator, NopEmulatorExitHandler, QemuExitError, QemuExitReason, QemuRWError,
-    QemuShutdownCause, Regs,
+    qemu_config, Emulator, NopEmulatorExitHandler, Qemu, QemuExitError, QemuExitReason,
+    QemuRWError, QemuShutdownCause, Regs,
 };
 use libafl_qemu_sys::GuestPhysAddr;
 
@@ -87,15 +87,28 @@ pub fn fuzz() {
     println!("Breakpoint address = {breakpoint:#x}");
 
     let mut run_client = |state: Option<_>, mut mgr, _core_id| {
+        let target_dir = env::var("TARGET_DIR").expect("TARGET_DIR env not set");
         // Initialize QEMU
-        let args: Vec<String> = env::args().collect();
-        let env: Vec<(String, String)> = env::vars().collect();
+        let qemu = Qemu::builder()
+            .machine("mps2-an385")
+            .monitor(qemu_config::Monitor::null)
+            .kernel(format!("{target_dir}/example.elf"))
+            .serial(qemu_config::Serial::null)
+            .no_graphic(true)
+            .snapshot(true)
+            .drives([qemu_config::Drive::builder()
+                .interface(qemu_config::DriveInterface::none)
+                .format(qemu_config::DiskImageFileFormat::qcow2)
+                .file(format!("{target_dir}/dummy.qcow2"))
+                .build()])
+            .start_cpu(false)
+            .build()
+            .expect("Failed to initialized QEMU");
 
         let emulator_modules = tuple_list!(EdgeCoverageModule::default());
 
-        let mut emulator = Emulator::new(
-            args.as_slice(),
-            env.as_slice(),
+        let mut emulator = Emulator::new_with_qemu(
+            qemu,
             emulator_modules,
             NopEmulatorExitHandler,
             NopCommandManager,
