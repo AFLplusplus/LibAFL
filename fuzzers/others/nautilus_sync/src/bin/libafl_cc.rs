@@ -1,25 +1,8 @@
-use std::{env, process::Command, str};
+use std::env;
 
 use libafl_cc::{ClangWrapper, CompilerWrapper, ToolWrapper};
 
-fn find_libpython() -> Result<String, String> {
-    match Command::new("python3")
-        .args(["-m", "find_libpython"])
-        .output()
-    {
-        Ok(output) => {
-            let shared_obj = str::from_utf8(&output.stdout).unwrap_or_default().trim();
-            if shared_obj.is_empty() {
-                return Err("Empty return from python3 -m find_libpython".to_string());
-            }
-            Ok(shared_obj.to_owned())
-        }
-        Err(err) => Err(format!(
-            "Could not execute python3 -m find_libpython: {err:?}"
-        )),
-    }
-}
-
+#[allow(clippy::missing_panics_doc)]
 pub fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() > 1 {
@@ -34,8 +17,6 @@ pub fn main() {
 
         dir.pop();
 
-        let libpython = find_libpython().expect("Failed to find libpython");
-
         let mut cc = ClangWrapper::new();
         if let Some(code) = cc
             .cpp(is_cpp)
@@ -45,9 +26,10 @@ pub fn main() {
             .expect("Failed to parse the command line")
             .link_staticlib(&dir, "nautilus_sync")
             .add_arg("-fsanitize-coverage=trace-pc-guard")
-            // needed by Nautilus
-            .add_link_arg(libpython)
             .add_link_arg("-lutil")
+            // needed by Nautilus
+            .link_libpython()
+            .expect("Could not find libpython")
             .run()
             .expect("Failed to run the wrapped compiler")
         {
