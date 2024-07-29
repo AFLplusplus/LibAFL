@@ -83,6 +83,7 @@ macro_rules! extern_c_checked {
             unsafe impl Sync for [<__ $c_var:upper _STRUCT__>] {}
 
             #[cfg_attr(nightly, used(linker))]
+            #[allow(unused_unsafe)]
             static [<__ $c_var:upper __>]: [<__ $c_var:upper _STRUCT__>] = unsafe { [<__ $c_var:upper _STRUCT__>] { member: core::ptr::addr_of!($c_var) } };
         }
 
@@ -102,6 +103,7 @@ macro_rules! extern_c_checked {
             unsafe impl Sync for [<__ $c_var:upper _STRUCT__>] {}
 
             #[cfg_attr(nightly, used(linker))]
+            #[allow(unused_unsafe)]
             static mut [<__ $c_var:upper __>]: [<__ $c_var:upper _STRUCT__>] = unsafe { [<__ $c_var:upper _STRUCT__>] { member: core::ptr::addr_of!($c_var) } };
         }
 
