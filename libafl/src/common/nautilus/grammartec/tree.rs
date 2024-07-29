@@ -88,10 +88,10 @@ impl<'data, 'tree: 'data, 'ctx: 'data, W: Write, T: TreeLike> Unparser<'data, 't
         let byte_arrays = bufs.iter().map(|b| PyBytes::new(py, b));
         let res = expr.call1(py, PyTuple::new(py, byte_arrays))?;
         if PyString::is_type_of(res.as_ref(py)) {
-            let pystr = <&PyString>::extract(res.as_ref(py))?;
+            let pystr = <&PyString>::extract_bound(res.as_ref(py))?;
             self.write(pystr.to_string_lossy().as_bytes());
         } else if PyBytes::is_type_of(res.as_ref(py)) {
-            let pybytes = <&PyBytes>::extract(res.as_ref(py))?;
+            let pybytes = <&PyBytes>::extract_bound(res.as_ref(py))?;
             self.write(pybytes.as_bytes());
         } else {
             return Err(pyo3::exceptions::PyValueError::new_err(

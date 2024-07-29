@@ -23,7 +23,6 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
 default = [
-  "python",
   "fork",
   "build_libgasan",
   "build_libqasan",
