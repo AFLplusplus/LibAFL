@@ -75,6 +75,8 @@ jobs:
     steps:
       - name: Remove Dotnet & Haskell
         run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
+      - name: Install curl
+        run: sudo apt-get install clang
       - uses: dtolnay/rust-toolchain@stable
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
@@ -179,6 +181,8 @@ jobs:
     runs-on: ubuntu-24.04
     needs: ubuntu
     steps:
+      - name: Install curl
+        run: sudo apt-get install clang
       - uses: dtolnay/rust-toolchain@stable
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
@@ -443,6 +447,8 @@ jobs:
     needs:
       - common
     steps:
+      - name: Install curl
+        run: sudo apt-get install clang
       - uses: dtolnay/rust-toolchain@stable
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
@@ -486,6 +492,8 @@ jobs:
   android:
     runs-on: ubuntu-24.04
     steps:
+      - name: Install curl
+        run: sudo apt-get install clang
       - uses: dtolnay/rust-toolchain@stable
       - uses: nttld/setup-ndk@v1
         with:
