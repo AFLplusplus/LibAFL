@@ -233,7 +233,7 @@ impl Qemu {
 pub mod pybind {
     use libafl_qemu_sys::{GuestAddr, MmapPerms};
     use pyo3::{
-        exceptions::PyValueError, pymethods, types::PyInt, FromPyObject, PyObject, PyResult, Python,
+        exceptions::PyValueError, pymethods, types::PyInt, PyObject, PyObject, PyResult, Python,
     };
 
     use crate::{pybind::Qemu, qemu::hooks::SyscallHookResult};

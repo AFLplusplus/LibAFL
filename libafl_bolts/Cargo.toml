@@ -27,6 +27,7 @@ all-features = true
 
 [features]
 default = [
+  "python",
   "std",
   "derive",
   "llmp_compression",
