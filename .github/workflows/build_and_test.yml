@@ -91,8 +91,8 @@ jobs:
   ubuntu-doc-build:
     runs-on: ubuntu-24.04
     steps:
-      - uses: ./.github/workflows/ubuntu-prepare
       - uses: actions/checkout@v4
+      - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
       # ---- doc check ----
       - name: Build Docs
@@ -101,8 +101,8 @@ jobs:
   ubuntu-doc-test:
     runs-on: ubuntu-24.04
     steps:
-      - uses: ./.github/workflows/ubuntu-prepare
       - uses: actions/checkout@v4
+      - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
       # ---- doc check ----
       - name: Test Docs
@@ -112,10 +112,10 @@ jobs:
     runs-on: ubuntu-24.04
     needs: ubuntu
     steps:
-      - uses: ./.github/workflows/ubuntu-prepare
       - name: Add nightly clippy
         run: rustup toolchain install nightly --component miri --allow-downgrade
       - uses: actions/checkout@v4
+      - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
       # --- miri undefined behavior test --
       - name: Run miri tests
@@ -126,8 +126,8 @@ jobs:
     steps:
       - name: Remove Dotnet & Haskell
         run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
-      - uses: ./.github/workflows/ubuntu-prepare
       - uses: actions/checkout@v4
+      - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
       # pcguard edges and pcguard hitcounts are not compatible and we need to build them seperately
@@ -148,8 +148,8 @@ jobs:
         run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
       - name: Add nightly clippy
         run: rustup toolchain install nightly --component clippy --allow-downgrade && rustup default nightly
-      - uses: ./.github/workflows/ubuntu-prepare
       - uses: actions/checkout@v4
+      - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
       - name: Run clippy
@@ -166,8 +166,8 @@ jobs:
       matrix:
         instance_idx: [ "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17" ]
     steps:
-      - uses: ./.github/workflows/ubuntu-prepare
       - uses: actions/checkout@v4
+      - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
       # ---- build and feature check ----
@@ -199,8 +199,8 @@ jobs:
         run: sudo apt-get install -y lsb-release wget software-properties-common gnupg ninja-build python3-dev python3-pip python3-venv libz3-dev
       - name: Install maturin
         run: cargo install --locked maturin
-      - uses: ./.github/workflows/ubuntu-prepare
       - uses: actions/checkout@v4
+      - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
       - name: Run a maturin build
@@ -211,11 +211,11 @@ jobs:
   cargo-fmt:
     runs-on: ubuntu-24.04
     steps:
-      - uses: ./.github/workflows/ubuntu-prepare
       - name: Add rustfmt nightly
         shell: bash
         run: rustup component add --toolchain nightly-x86_64-unknown-linux-gnu rustfmt
       - uses: actions/checkout@v4
+      - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
       - name: Format Check
@@ -310,8 +310,8 @@ jobs:
           - ./fuzzers/others/tutorial
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: ./.github/workflows/fuzzer-tester-prepare
       - uses: actions/checkout@v4
+      - uses: ./.github/workflows/fuzzer-tester-prepare
       - name: Build and run example fuzzers (Linux)
         if: runner.os == 'Linux'
         shell: bash
@@ -354,8 +354,8 @@ jobs:
     runs-on: [ self-hosted, qemu ]
     container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
     steps:
-      - uses: ./.github/workflows/qemu-fuzzer-tester-prepare
       - uses: actions/checkout@v4
+      - uses: ./.github/workflows/qemu-fuzzer-tester-prepare
       - name: Build and run example QEMU fuzzers (Linux)
         if: runner.os == 'Linux'
         shell: bash
@@ -414,8 +414,8 @@ jobs:
     needs:
       - common
     steps:
-      - uses: ./.github/workflows/windows-tester-prepare
       - uses: actions/checkout@v4
+      - uses: ./.github/workflows/windows-tester-prepare
       - name: Build fuzzers/frida_libpng
         run: cd fuzzers/frida/frida_libpng/ && cargo make test
 
@@ -424,8 +424,8 @@ jobs:
     needs:
       - common
     steps:
-      - uses: ./.github/workflows/windows-tester-prepare
       - uses: actions/checkout@v4
+      - uses: ./.github/workflows/windows-tester-prepare
       - name: Build fuzzers/stb/libfuzzer_stb_image
         run: cd fuzzers/stb/libfuzzer_stb_image && cargo build --release
 
@@ -434,8 +434,8 @@ jobs:
     needs:
       - common
     steps:
-      - uses: ./.github/workflows/windows-tester-prepare
       - uses: actions/checkout@v4
+      - uses: ./.github/workflows/windows-tester-prepare
       - name: Build fuzzers/frida/frida_gdiplus
         run: cd fuzzers/frida/frida_gdiplus/ && cargo make test && cargo make test_cmplog
 
@@ -444,10 +444,10 @@ jobs:
     needs:
       - common
     steps:
-      - uses: ./.github/workflows/windows-tester-prepare
       - name: install cxx bridge
         run: cargo install cxxbridge-cmd
       - uses: actions/checkout@v4
+      - uses: ./.github/workflows/windows-tester-prepare
       - name: Build fuzzers/others/tinyinst_simple
         run: cd fuzzers/others/tinyinst_simple/ && cargo make test
 
@@ -457,8 +457,8 @@ jobs:
       - common
     steps:
       - uses: dtolnay/rust-toolchain@stable
-      - uses: ./.github/workflows/windows-tester-prepare
       - uses: actions/checkout@v4
+      - uses: ./.github/workflows/windows-tester-prepare
       - uses: Swatinem/rust-cache@v2
       - name: Run real clippy, not the fake one
         shell: pwsh
