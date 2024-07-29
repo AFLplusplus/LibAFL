@@ -16,7 +16,7 @@ instance_idx = int(sys.argv[1])
 
 # Set llvm config if it's not already set
 if "LLVM_CONFIG" not in os.environ:
-    os.environ["LLVM_CONFIG"] = f"llvm-config-${LLVM_VERSION}"
+    os.environ["LLVM_CONFIG"] = f"llvm-config-{LLVM_VERSION}"
 
 command = (
     "DOCS_RS=1 cargo hack check --workspace --each-feature --clean-per-run "
