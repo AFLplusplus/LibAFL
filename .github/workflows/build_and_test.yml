@@ -211,11 +211,11 @@ jobs:
   cargo-fmt:
     runs-on: ubuntu-24.04
     steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/workflows/ubuntu-prepare
       - name: Add rustfmt nightly
         shell: bash
         run: rustup component add --toolchain nightly-x86_64-unknown-linux-gnu rustfmt
-      - uses: actions/checkout@v4
-      - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
       - name: Format Check
