@@ -38,6 +38,8 @@ jobs:
           #       => https://github.com/Michael-F-Bryan/mdbook-linkcheck/pull/82#issuecomment-2241058491
           git: https://github.com/Michael-F-Bryan/mdbook-linkcheck.git
           rev: 8c783c5d754d83bcd50c28fb4174854b04ece990
+      - name: default nightly
+        run: rustup default nightly
       - uses: actions/checkout@v4
       - if: runner.os == 'Linux'
         uses: ./.github/workflows/ubuntu-prepare
@@ -49,8 +51,6 @@ jobs:
       - name: Check for binary blobs
         if: runner.os == 'Linux'
         run: ./scripts/check_for_blobs.sh
-      - name: default nightly
-        run: rustup default nightly
       - name: Build libafl debug
         run: cargo build -p libafl
       - name: Test the book
@@ -112,11 +112,11 @@ jobs:
     runs-on: ubuntu-24.04
     needs: ubuntu
     steps:
+      - name: Add nightly clippy
+        run: rustup toolchain install nightly --component miri --allow-downgrade
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
-      - name: Add nightly clippy
-        run: rustup toolchain install nightly --component miri --allow-downgrade
       # --- miri undefined behavior test --
       - name: Run miri tests
         run: RUST_BACKTRACE=1 MIRIFLAGS="-Zmiri-disable-isolation" cargo +nightly miri test
@@ -213,11 +213,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
-      - uses: Swatinem/rust-cache@v2
-        with: { shared-key: "ubuntu" }
       - name: Add rustfmt nightly
         shell: bash
         run: rustup component add --toolchain nightly-x86_64-unknown-linux-gnu rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with: { shared-key: "ubuntu" }
       - name: Format Check
         run: ./scripts/fmt_all.sh check
 
@@ -444,10 +444,10 @@ jobs:
     needs:
       - common
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/workflows/windows-tester-prepare
       - name: install cxx bridge
         run: cargo install cxxbridge-cmd
+      - uses: actions/checkout@v4
+      - uses: ./.github/workflows/windows-tester-prepare
       - name: Build fuzzers/others/tinyinst_simple
         run: cd fuzzers/others/tinyinst_simple/ && cargo make test
 
