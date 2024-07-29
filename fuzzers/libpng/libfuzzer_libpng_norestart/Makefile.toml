@@ -1,17 +1,21 @@
 # Variables
 [env]
-FUZZER_NAME='fuzzer_libpng_launcher'
-CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
-PROFILE = { value = "release", condition = {env_not_set = ["PROFILE"]} }
-PROFILE_DIR = {value = "release", condition = {env_not_set = ["PROFILE_DIR"] }}
+FUZZER_NAME = 'fuzzer_libpng_launcher'
+CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = [
+  "CARGO_TARGET_DIR",
+] } }
+PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
+PROFILE_DIR = { value = "release", condition = { env_not_set = [
+  "PROFILE_DIR",
+] } }
 LIBAFL_CC = '${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cc'
 LIBAFL_CXX = '${CARGO_TARGET_DIR}/${PROFILE}/libafl_cxx'
 FUZZER = '${CARGO_TARGET_DIR}/${PROFILE_DIR}/${FUZZER_NAME}'
 PROJECT_DIR = { script = ["pwd"] }
 
 [tasks.unsupported]
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 echo "Cargo-make not integrated yet on this platform"
 '''
 
@@ -22,9 +26,9 @@ mac_alias = "libpng_unix"
 windows_alias = "unsupported"
 
 [tasks.libpng_unix]
-condition = { files_not_exist = ["./libpng-1.6.37"]}
-script_runner="@shell"
-script='''
+condition = { files_not_exist = ["./libpng-1.6.37"] }
+script_runner = "@shell"
+script = '''
 wget https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
 tar -xvf v1.6.37.tar.gz
 '''
@@ -36,7 +40,7 @@ windows_alias = "unsupported"
 
 [tasks.cc_unix]
 command = "cargo"
-args = ["build" , "--profile", "${PROFILE}"]
+args = ["build", "--profile", "${PROFILE}"]
 
 # Library
 [tasks.lib]
@@ -45,13 +49,13 @@ mac_alias = "lib_unix"
 windows_alias = "unsupported"
 
 [tasks.lib_unix]
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
 cd "${PROJECT_DIR}"
 make -C libpng-1.6.37 CC="${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cc" CXX="${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cxx"
 '''
-dependencies = [ "libpng", "cc" ]
+dependencies = ["libpng", "cc"]
 
 
 # Harness
@@ -62,8 +66,17 @@ windows_alias = "unsupported"
 
 [tasks.fuzzer_unix]
 command = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cxx"
-args = ["${PROJECT_DIR}/harness.cc", "${PROJECT_DIR}/libpng-1.6.37/.libs/libpng16.a", "-I", "${PROJECT_DIR}/libpng-1.6.37/", "-o", "${FUZZER_NAME}", "-lm", "-lz"]
-dependencies = [ "lib", "cc" ]
+args = [
+  "${PROJECT_DIR}/harness.cc",
+  "${PROJECT_DIR}/libpng-1.6.37/.libs/libpng16.a",
+  "-I",
+  "${PROJECT_DIR}/libpng-1.6.37/",
+  "-o",
+  "${FUZZER_NAME}",
+  "-lm",
+  "-lz",
+]
+dependencies = ["lib", "cc"]
 
 # Run the fuzzer
 [tasks.run]
@@ -73,13 +86,13 @@ windows_alias = "unsupported"
 
 [tasks.run_unix]
 script_runner = "@shell"
-script='''
+script = '''
 rm -rf corpus/ || true
 mkdir corpus/ || true
 cp seeds/* corpus/ || true
 ./${FUZZER_NAME} --cores 0 --input ./corpus
 '''
-dependencies = [ "fuzzer" ]
+dependencies = ["fuzzer"]
 
 # Test
 [tasks.test]
@@ -89,7 +102,7 @@ windows_alias = "unsupported"
 
 [tasks.test_unix]
 script_runner = "@shell"
-script='''
+script = '''
 rm -rf libafl_unix_shmem_server || true
 rm -rf corpus/ || true
 mkdir corpus/ || true
@@ -102,7 +115,7 @@ else
     exit 1
 fi
 '''
-dependencies = [ "fuzzer" ]
+dependencies = ["fuzzer"]
 
 # Clean up
 [tasks.clean]
@@ -113,8 +126,8 @@ windows_alias = "unsupported"
 [tasks.clean_unix]
 # Disable default `clean` definition
 clear = true
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 rm -rf corpus/ || true
 rm -f ./${FUZZER_NAME}
 make -C libpng-1.6.37 clean

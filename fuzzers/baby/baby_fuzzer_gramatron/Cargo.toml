@@ -1,7 +1,10 @@
 [package]
 name = "baby_fuzzer_gramatron"
-version = "0.13.0"
-authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
+version = "0.13.2"
+authors = [
+  "Andrea Fioraldi <andreafioraldi@gmail.com>",
+  "Dominik Maier <domenukk@gmail.com>",
+]
 edition = "2021"
 
 [features]
@@ -21,4 +24,6 @@ debug = true
 [dependencies]
 libafl = { path = "../../../libafl/" }
 libafl_bolts = { path = "../../../libafl_bolts/" }
-postcard = { version = "1.0", features = ["alloc"], default-features = false } # no_std compatible serde serialization format
+postcard = { version = "1.0", features = [
+  "alloc",
+], default-features = false } # no_std compatible serde serialization format

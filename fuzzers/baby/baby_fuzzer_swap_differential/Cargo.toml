@@ -1,6 +1,6 @@
 [package]
 name = "baby_fuzzer_swap_differential"
-version = "0.13.0"
+version = "0.13.2"
 authors = ["Addison Crump <research@addisoncrump.info>"]
 edition = "2021"
 default-run = "fuzzer_sd"
@@ -27,7 +27,12 @@ cc = "1.0"
 [dependencies]
 libafl = { path = "../../../libafl" }
 libafl_bolts = { path = "../../../libafl_bolts" }
-libafl_targets = { path = "../../../libafl_targets", features = ["sancov_pcguard_hitcounts", "libfuzzer", "sancov_cmplog", "pointer_maps"] }
+libafl_targets = { path = "../../../libafl_targets", features = [
+  "sancov_pcguard_hitcounts",
+  "libfuzzer",
+  "sancov_cmplog",
+  "pointer_maps",
+] }
 mimalloc = { version = "*", default-features = false }
 
 libafl_cc = { path = "../../../libafl_cc/" }

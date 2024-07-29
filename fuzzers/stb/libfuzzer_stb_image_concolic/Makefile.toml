@@ -1,10 +1,12 @@
 # Variables
 [env]
 PROJECT_DIR = { script = ["pwd"] }
-CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
+CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = [
+  "CARGO_TARGET_DIR",
+] } }
 PROFILE = { value = "release" }
-PROFILE_DIR = {value = "release" }
-FUZZER_NAME='libfuzzer_stb_image_concolic'
+PROFILE_DIR = { value = "release" }
+FUZZER_NAME = 'libfuzzer_stb_image_concolic'
 
 # Compilers
 [tasks.runtime]
@@ -40,7 +42,7 @@ alias = "fuzzer"
 [tasks.unsupported]
 # Do nothing
 script_runner = "@shell"
-script='''
+script = '''
 echo "Not supported on this platform."
 '''
 
@@ -48,7 +50,7 @@ echo "Not supported on this platform."
 [tasks.clean]
 # Disable default `clean` definition
 clear = true
-script='''
+script = '''
 cd fuzzer 
 cargo clean
 cd ..

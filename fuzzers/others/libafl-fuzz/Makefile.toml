@@ -1,19 +1,25 @@
 [env]
 PROJECT_DIR = { script = ["pwd"] }
-CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
-PROFILE = { value = "release", condition = {env_not_set = ["PROFILE"]} }
-PROFILE_DIR = {value = "release", condition = {env_not_set = ["PROFILE_DIR"] }}
+CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = [
+  "CARGO_TARGET_DIR",
+] } }
+PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
+PROFILE_DIR = { value = "release", condition = { env_not_set = [
+  "PROFILE_DIR",
+] } }
 FUZZER_NAME = 'libafl-fuzz'
 FUZZER = '${CARGO_TARGET_DIR}/${PROFILE_DIR}/${FUZZER_NAME}'
-LLVM_CONFIG = {value = "llvm-config-18", condition = {env_not_set = ["LLVM_CONFIG"] }}
+LLVM_CONFIG = { value = "llvm-config-18", condition = { env_not_set = [
+  "LLVM_CONFIG",
+] } }
 AFL_VERSION = "db23931e7c1727ddac8691a6241c97b2203ec6fc"
-AFL_DIR_NAME= {value = "./AFLplusplus-${AFL_VERSION}"}
-AFL_CC_PATH= {value = "${AFL_DIR_NAME}/afl-clang-fast"}
+AFL_DIR_NAME = { value = "./AFLplusplus-${AFL_VERSION}" }
+AFL_CC_PATH = { value = "${AFL_DIR_NAME}/afl-clang-fast" }
 
 
 [tasks.build_afl]
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 if [ ! -d "$AFL_DIR_NAME" ]; then
 	if [ -f "v${AFL_VERSION}.zip" ]; then
 		rm v${AFL_VERSION}.zip
@@ -33,8 +39,8 @@ mac_alias = "test_unix"
 windows_alias = "unsupported"
 
 [tasks.test_unix]
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 cargo build --profile ${PROFILE}
 AFL_PATH=${AFL_DIR_NAME} ${AFL_CC_PATH} ./test/test-instr.c -o ./test/out-instr
 LIBAFL_DEBUG_OUTPUT=1 AFL_CORES=1 AFL_STATS_INTERVAL=1 timeout 5 ${FUZZER} -i ./test/seeds -o ./test/output ./test/out-instr || true
@@ -74,8 +80,8 @@ mac_alias = "clean_unix"
 windows_alias = "unsupported"
 
 [tasks.clean_unix]
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 rm -rf AFLplusplus-${AFL_VERSION}
 rm ${AFL_VERSION}.zip
 rm -rf ./test/out-instr

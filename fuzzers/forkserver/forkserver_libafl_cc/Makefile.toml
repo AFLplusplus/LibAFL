@@ -1,17 +1,21 @@
 # Variables
 [env]
-FUZZER_NAME='fuzzer_libafl_cc'
-CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
-PROFILE = { value = "release", condition = {env_not_set = ["PROFILE"]} }
-PROFILE_DIR = {value = "release", condition = {env_not_set = ["PROFILE_DIR"] }}
+FUZZER_NAME = 'fuzzer_libafl_cc'
+CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = [
+  "CARGO_TARGET_DIR",
+] } }
+PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
+PROFILE_DIR = { value = "release", condition = { env_not_set = [
+  "PROFILE_DIR",
+] } }
 LIBAFL_CC = '${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cc'
 LIBAFL_CXX = '${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cxx'
 FUZZER = '${CARGO_TARGET_DIR}/${PROFILE_DIR}/${FUZZER_NAME}'
 PROJECT_DIR = { script = ["pwd"] }
 
 [tasks.unsupported]
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 echo "Cargo-make not integrated yet on this"
 '''
 
@@ -23,7 +27,7 @@ windows_alias = "unsupported"
 
 [tasks.cxx_unix]
 command = "cargo"
-args = ["build" , "--profile","${PROFILE}"]
+args = ["build", "--profile", "${PROFILE}"]
 
 [tasks.cc]
 linux_alias = "cc_unix"
@@ -32,7 +36,7 @@ windows_alias = "unsupported"
 
 [tasks.cc_unix]
 command = "cargo"
-args = ["build" , "--profile", "${PROFILE}"]
+args = ["build", "--profile", "${PROFILE}"]
 
 [tasks.crash_cxx]
 linux_alias = "crash_cxx_unix"
@@ -41,7 +45,7 @@ windows_alias = "unsupported"
 
 [tasks.crash_cxx_unix]
 command = "cargo"
-args = ["build" , "--profile", "${PROFILE}", "--features=crash"]
+args = ["build", "--profile", "${PROFILE}", "--features=crash"]
 
 [tasks.crash_cc]
 linux_alias = "crash_cc_unix"
@@ -50,7 +54,7 @@ windows_alias = "unsupported"
 
 [tasks.crash_cc_unix]
 command = "cargo"
-args = ["build" , "--profile", "${PROFILE}", "--features=crash"]
+args = ["build", "--profile", "${PROFILE}", "--features=crash"]
 
 # Harness
 [tasks.fuzzer]
@@ -61,7 +65,7 @@ windows_alias = "unsupported"
 [tasks.fuzzer_unix]
 command = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cc"
 args = ["${PROJECT_DIR}/src/program.c", "-o", "${FUZZER_NAME}", "-lm"]
-dependencies = [ "cxx", "cc" ]
+dependencies = ["cxx", "cc"]
 
 # Crashing Harness
 [tasks.fuzzer_crash]
@@ -72,7 +76,7 @@ windows_alias = "unsupported"
 [tasks.fuzzer_crash_unix]
 command = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cc"
 args = ["${PROJECT_DIR}/src/program.c", "-o", "${FUZZER_NAME}_crash", "-lm"]
-dependencies = [ "crash_cxx", "crash_cc" ]
+dependencies = ["crash_cxx", "crash_cc"]
 
 # Run the fuzzer
 [tasks.run]
@@ -82,10 +86,10 @@ windows_alias = "unsupported"
 
 [tasks.run_unix]
 script_runner = "@shell"
-script='''
+script = '''
 taskset -c 1 ${CARGO_TARGET_DIR}/${PROFILE_DIR}/${CARGO_MAKE_PROJECT_NAME} ./${FUZZER_NAME} ./corpus/ -t 1000
 '''
-dependencies = [ "fuzzer" ]
+dependencies = ["fuzzer"]
 
 
 # Run the fuzzer with a crash
@@ -96,10 +100,10 @@ windows_alias = "unsupported"
 
 [tasks.crash_unix]
 script_runner = "@shell"
-script='''
+script = '''
 taskset -c 1 ${CARGO_TARGET_DIR}/${PROFILE_DIR}/${CARGO_MAKE_PROJECT_NAME} ./${FUZZER_NAME}_crash ./corpus/ -t 1000
 '''
-dependencies = [ "fuzzer_crash" ]
+dependencies = ["fuzzer_crash"]
 
 # Test
 [tasks.test]
@@ -109,7 +113,7 @@ windows_alias = "unsupported"
 
 [tasks.test_unix]
 script_runner = "@shell"
-script='''
+script = '''
 timeout 30s ${CARGO_TARGET_DIR}/${PROFILE_DIR}/${CARGO_MAKE_PROJECT_NAME} ./${FUZZER_NAME} ./corpus/ -t 1000 | tee fuzz_stdout.log || true
 if grep -qa "objectives: 1" fuzz_stdout.log; then
     echo "Fuzzer is working"
@@ -119,7 +123,7 @@ else
 fi
 
 '''
-dependencies = [ "fuzzer" ]
+dependencies = ["fuzzer"]
 
 # Clean up
 [tasks.clean]
@@ -130,8 +134,8 @@ windows_alias = "unsupported"
 [tasks.clean_unix]
 # Disable default `clean` definition
 clear = true
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 rm -f ./${FUZZER_NAME}
 cargo clean
 '''
