@@ -1,26 +1,6 @@
-use std::{env, process::Command, str};
+use std::env;
 
 use libafl_cc::{ClangWrapper, CompilerWrapper, ToolWrapper};
-
-fn find_python3_version() -> Result<String, String> {
-    match Command::new("python3").arg("--version").output() {
-        Ok(output) => {
-            let python_version = str::from_utf8(&output.stdout).unwrap_or_default().trim();
-            if python_version.is_empty() {
-                return Err("Empty return from python3 --version".to_string());
-            }
-            let version = python_version.split("Python 3.").nth(1).ok_or_else(|| {
-                format!("Could not find Python 3 in version string: {python_version}")
-            })?;
-            let mut version = version.split('.');
-            let version = version.next().ok_or_else(|| {
-                format!("Could not split python3 version string {python_version}")
-            })?;
-            Ok(format!("python3.{version}"))
-        }
-        Err(err) => Err(format!("Could not execute python3 --version: {err:?}")),
-    }
-}
 
 #[allow(clippy::missing_panics_doc)]
 pub fn main() {
@@ -37,8 +17,6 @@ pub fn main() {
 
         dir.pop();
 
-        let python3_version = find_python3_version().expect("Failed to get python version");
-
         let mut cc = ClangWrapper::new();
         if let Some(code) = cc
             .cpp(is_cpp)
@@ -48,9 +26,10 @@ pub fn main() {
             .expect("Failed to parse the command line")
             .link_staticlib(&dir, "nautilus_sync")
             .add_arg("-fsanitize-coverage=trace-pc-guard")
-            // needed by Nautilus
-            .add_link_arg(format!("-l{python3_version}"))
             .add_link_arg("-lutil")
+            // needed by Nautilus
+            .link_libpython()
+            .expect("Could not find libpython")
             .run()
             .expect("Failed to run the wrapped compiler")
         {
