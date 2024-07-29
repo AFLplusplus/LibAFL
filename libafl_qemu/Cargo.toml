@@ -96,6 +96,7 @@ libafl_bolts = { path = "../libafl_bolts", version = "0.13.2", default-features 
 ] }
 libafl_targets = { path = "../libafl_targets", version = "0.13.2" }
 libafl_qemu_sys = { path = "./libafl_qemu_sys", version = "0.13.2" }
+libafl_derive = { path = "../libafl_derive", version = "0.13.2" }
 
 serde = { version = "1.0", default-features = false, features = [
   "alloc",
@@ -127,6 +128,7 @@ pyo3 = { version = "0.22", optional = true, features = ["multiple-pymethods"] }
 bytes-utils = "0.1"
 typed-builder = "0.19"
 memmap2 = "0.9"
+getset = "0.1"
 # Document all features of this crate (for `cargo doc`)
 document-features = { version = "0.2", optional = true }
 
