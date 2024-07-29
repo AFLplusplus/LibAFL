@@ -934,7 +934,9 @@ impl QemuHooks {
 #[pymethods]
 impl SyscallHookResult {
     #[new]
-    #[pyo3(signature = (value=None))]
+    #[pyo3(signature = (
+        value=None
+    ))]
     #[must_use]
     pub fn new(value: Option<GuestAddr>) -> Self {
         Self::new_internal(value)

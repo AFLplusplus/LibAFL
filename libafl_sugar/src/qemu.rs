@@ -494,7 +494,16 @@ pub mod pybind {
         /// Create a new [`QemuBytesCoverageSugar`]
         #[new]
         #[allow(clippy::too_many_arguments)]
-        #[pyo3(signature = (input_dirs, output_dir, broker_port, cores, use_cmplog=None, iterations=None, tokens_file=None, timeout=None))]
+        #[pyo3(signature = (
+            input_dirs,
+            output_dir,
+            broker_port,
+            cores,
+            use_cmplog=None,
+            iterations=None,
+            tokens_file=None,
+            timeout=None
+        ))]
         fn new(
             input_dirs: Vec<PathBuf>,
             output_dir: PathBuf,
