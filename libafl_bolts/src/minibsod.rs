@@ -482,6 +482,7 @@ pub fn dump_registers<W: Write>(
     Ok(())
 }
 
+/// Write the content of all important registers
 #[cfg(all(target_os = "haiku", target_arch = "x86_64"))]
 #[allow(clippy::similar_names)]
 pub fn dump_registers<W: Write>(

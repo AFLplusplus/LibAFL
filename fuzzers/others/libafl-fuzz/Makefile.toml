@@ -13,8 +13,8 @@ LLVM_CONFIG = { value = "llvm-config-18", condition = { env_not_set = [
   "LLVM_CONFIG",
 ] } }
 AFL_VERSION = "db23931e7c1727ddac8691a6241c97b2203ec6fc"
-AFL_DIR_NAME= {value = "./AFLplusplus-${AFL_VERSION}"}
-AFL_CC_PATH= {value = "${AFL_DIR_NAME}/afl-clang-fast"}
+AFL_DIR_NAME = { value = "./AFLplusplus-${AFL_VERSION}" }
+AFL_CC_PATH = { value = "${AFL_DIR_NAME}/afl-clang-fast" }
 
 
 [tasks.build_afl]
