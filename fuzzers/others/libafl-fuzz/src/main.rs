@@ -120,7 +120,7 @@ struct Opt {
     #[arg(short = 'o')]
     output_dir: PathBuf,
     /// file extension for the fuzz test input file (if needed)
-    #[arg(short = 's')]
+    #[arg(short = 'e')]
     input_ext: Option<String>,
     /// use a fixed seed for the RNG
     #[arg(short = 's')]
