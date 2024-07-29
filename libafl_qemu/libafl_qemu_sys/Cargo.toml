@@ -59,9 +59,9 @@ num_enum = "0.7"
 libc = "0.2"
 strum = "0.26"
 strum_macros = "0.26"
-pyo3 = { version = "0.18", optional = true }
+pyo3 = { version = "0.22", optional = true }
 
 [build-dependencies]
 libafl_qemu_build = { path = "../libafl_qemu_build", version = "0.13.2" }
-pyo3-build-config = { version = "0.21", optional = true }
+pyo3-build-config = { version = "0.22", optional = true }
 rustversion = "1.0"

@@ -233,7 +233,11 @@ impl Qemu {
 pub mod pybind {
     use libafl_qemu_sys::{GuestAddr, MmapPerms};
     use pyo3::{
-        exceptions::PyValueError, pymethods, types::PyInt, FromPyObject, PyObject, PyResult, Python,
+        conversion::FromPyObject,
+        exceptions::PyValueError,
+        pymethods,
+        types::{PyAnyMethods, PyInt},
+        Bound, PyObject, PyResult, Python,
     };
 
     use crate::{pybind::Qemu, qemu::hooks::SyscallHookResult};
@@ -258,17 +262,17 @@ pub mod pybind {
                 let args = (sys_num, a0, a1, a2, a3, a4, a5, a6, a7);
                 Python::with_gil(|py| {
                     let ret = obj.call1(py, args).expect("Error in the syscall hook");
-                    let any = ret.as_ref(py);
+                    let any = ret.bind(py);
                     if any.is_none() {
                         SyscallHookResult::new(None)
                     } else {
-                        let a: Result<&PyInt, _> = any.downcast();
+                        let a: Result<&Bound<'_, PyInt>, _> = any.downcast_exact();
                         if let Ok(i) = a {
                             SyscallHookResult::new(Some(
                                 i.extract().expect("Invalid syscall hook return value"),
                             ))
                         } else {
-                            SyscallHookResult::extract(any)
+                            SyscallHookResult::extract_bound(ret.bind(py))
                                 .expect("The syscall hook must return a SyscallHookResult")
                         }
                     }
