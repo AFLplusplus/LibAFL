@@ -348,7 +348,7 @@ jobs:
           - ./fuzzers/qemu/qemu_launcher
 
     runs-on: [ self-hosted, qemu ]
-    container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2404:latest
+    container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/qemu-fuzzer-tester-prepare

@@ -3,16 +3,9 @@ description: Sets up the QEMU fuzzers environment
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: true
-        fetch-depth: 0
     - name: Install QEMU deps
       shell: bash
       run: apt-get update && apt-get install -y qemu-utils sudo
-    - uses: ./.github/workflows/ubuntu-prepare
-    - uses: Swatinem/rust-cache@v2
-      with: { shared-key: "${{ runner.os }}-shared-fuzzer-cache" }
     - uses: dtolnay/rust-toolchain@stable
     - name: pip install
       shell: bash
@@ -24,3 +17,10 @@ runs:
       uses: baptiste0928/cargo-install@v3
       with:
         crate: cargo-make
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+        fetch-depth: 0
+    - uses: ./.github/workflows/ubuntu-prepare
+    - uses: Swatinem/rust-cache@v2
+      with: { shared-key: "${{ runner.os }}-shared-fuzzer-cache" }
