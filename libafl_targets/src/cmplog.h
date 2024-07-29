@@ -37,19 +37,19 @@ typedef struct CmpLogHeader {
   uint8_t  kind;
 } CmpLogHeader;
 
-PACKED(typedef struct CmpLogHeaderExtended {
+typedef PACKED(struct CmpLogHeaderExtended {
   unsigned hits : 6;
   unsigned shape : 5;
   unsigned type : 1;
   unsigned attribute : 4;
-} CmpLogHeaderExtended;)
+}) CmpLogHeaderExtended;
 
 typedef struct CmpLogInstruction {
   uint64_t v0;
   uint64_t v1;
 } CmpLogInstruction;
 
-PACKED(typedef struct CmpLogInstructionExtended {
+typedef PACKED(struct CmpLogInstructionExtended {
   uint64_t v0;
   uint64_t v0_128;
   uint64_t
@@ -60,20 +60,20 @@ PACKED(typedef struct CmpLogInstructionExtended {
   uint64_t v1_256_0;
   uint64_t v1_256_1;
   uint8_t  unused[8];
-} CmpLogInstructionExtended;)
+}) CmpLogInstructionExtended;
 
 typedef struct CmpLogRoutine {
   uint8_t v0[CMPLOG_RTN_LEN];
   uint8_t v1[CMPLOG_RTN_LEN];
 } CmpLogRoutine;
 
-PACKED(typedef struct CmpLogRoutineExtended {
+typedef PACKED(struct CmpLogRoutineExtended {
   uint8_t v0[CMPLOG_RTN_LEN];
   uint8_t v1[CMPLOG_RTN_LEN];
   uint8_t v0_len;
   uint8_t v1_len;
   uint8_t unused[6];
-} CmpLogRoutineExtended;)
+}) CmpLogRoutineExtended;
 
 typedef struct CmpLogMap {
   CmpLogHeader headers[CMPLOG_MAP_W];

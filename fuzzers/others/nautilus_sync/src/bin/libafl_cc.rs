@@ -2,24 +2,27 @@ use std::{env, process::Command, str};
 
 use libafl_cc::{ClangWrapper, CompilerWrapper, ToolWrapper};
 
-fn find_libpython() -> Result<String, String> {
-    match Command::new("python3")
-        .args(["-m", "find_libpython"])
-        .output()
-    {
+fn find_python3_version() -> Result<String, String> {
+    match Command::new("python3").arg("--version").output() {
         Ok(output) => {
-            let shared_obj = str::from_utf8(&output.stdout).unwrap_or_default().trim();
-            if shared_obj.is_empty() {
-                return Err("Empty return from python3 -m find_libpython".to_string());
+            let python_version = str::from_utf8(&output.stdout).unwrap_or_default().trim();
+            if python_version.is_empty() {
+                return Err("Empty return from python3 --version".to_string());
             }
-            Ok(shared_obj.to_owned())
+            let version = python_version.split("Python 3.").nth(1).ok_or_else(|| {
+                format!("Could not find Python 3 in version string: {python_version}")
+            })?;
+            let mut version = version.split('.');
+            let version = version.next().ok_or_else(|| {
+                format!("Could not split python3 version string {python_version}")
+            })?;
+            Ok(format!("python3.{version}"))
         }
-        Err(err) => Err(format!(
-            "Could not execute python3 -m find_libpython: {err:?}"
-        )),
+        Err(err) => Err(format!("Could not execute python3 --version: {err:?}")),
     }
 }
 
+#[allow(clippy::missing_panics_doc)]
 pub fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() > 1 {
@@ -34,7 +37,7 @@ pub fn main() {
 
         dir.pop();
 
-        let libpython = find_libpython().expect("Failed to find libpython");
+        let python3_version = find_python3_version().expect("Failed to get python version");
 
         let mut cc = ClangWrapper::new();
         if let Some(code) = cc
@@ -46,7 +49,7 @@ pub fn main() {
             .link_staticlib(&dir, "nautilus_sync")
             .add_arg("-fsanitize-coverage=trace-pc-guard")
             // needed by Nautilus
-            .add_link_arg(libpython)
+            .add_link_arg(format!("-l{python3_version}"))
             .add_link_arg("-lutil")
             .run()
             .expect("Failed to run the wrapped compiler")
