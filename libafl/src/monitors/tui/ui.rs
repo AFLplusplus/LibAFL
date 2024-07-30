@@ -743,14 +743,14 @@ impl TuiUi {
 
                     for (key, val) in &client.stages[i] {
                         items.push(Row::new(vec![
-                            Cell::from(Span::raw(&key)),
+                            Cell::from(Span::raw(key.clone())),
                             Cell::from(Span::raw(format!("{:.2}%", val * 100.0))),
                         ]));
                     }
                 }
                 for (key, val) in &client.feedbacks {
                     items.push(Row::new(vec![
-                        Cell::from(Span::raw(&key)),
+                        Cell::from(Span::raw(key.clone())),
                         Cell::from(Span::raw(format!("{:.2}%", val * 100.0))),
                     ]));
                 }
