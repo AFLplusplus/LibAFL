@@ -1,6 +1,6 @@
 [package]
 name = "libnoaslr"
-version = "0.1.0"
+version = "0.13.2"
 edition = "2021"
 
 [lib]
@@ -13,7 +13,10 @@ crate-type = ["dylib"]
 [dependencies]
 anyhow = { version = "1.0", default-features = false }
 ctor = { version = "0.2", default-features = false }
-nix = { version = "0.29", default-features = false, features = ["process", "personality"] }
+nix = { version = "0.29", default-features = false, features = [
+  "process",
+  "personality",
+] }
 
 [target.'cfg(any(target_os = "freebsd", target_os = "netbsd"))'.dependencies]
-libc = "0.2" 
+libc = "0.2"

@@ -625,7 +625,7 @@ impl From<pyo3::PyErr> for Error {
         pyo3::Python::with_gil(|py| {
             if err.matches(
                 py,
-                pyo3::types::PyType::new::<pyo3::exceptions::PyKeyboardInterrupt>(py),
+                pyo3::types::PyType::new_bound::<pyo3::exceptions::PyKeyboardInterrupt>(py),
             ) {
                 Self::shutting_down()
             } else {
@@ -1058,7 +1058,7 @@ pub unsafe fn set_error_print_panic_hook(new_stderr: RawFd) {
 #[allow(missing_docs)]
 pub mod pybind {
 
-    use pyo3::{pymodule, types::PyModule, PyResult, Python};
+    use pyo3::{pymodule, types::PyModule, Bound, PyResult};
 
     #[macro_export]
     macro_rules! unwrap_me_body {
@@ -1190,8 +1190,8 @@ pub mod pybind {
     #[pymodule]
     #[pyo3(name = "libafl_bolts")]
     /// Register the classes to the python module
-    pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
-        crate::rands::pybind::register(py, m)?;
+    pub fn python_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
+        crate::rands::pybind::register(m)?;
         Ok(())
     }
 }

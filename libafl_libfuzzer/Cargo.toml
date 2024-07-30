@@ -1,6 +1,6 @@
 [package]
 name = "libafl_libfuzzer"
-version = "0.13.1"
+version = "0.13.2"
 description = "libFuzzer shim which uses LibAFL with common defaults"
 repository = "https://github.com/AFLplusplus/LibAFL/"
 readme = "../README.md"
@@ -9,12 +9,7 @@ keywords = ["fuzzing", "testing", "security"]
 edition = "2021"
 categories = ["development-tools::testing"]
 
-include = [
-    "/src",
-    "/Cargo.toml",
-    "/build.rs",
-    "/runtime",
-]
+include = ["/src", "/Cargo.toml", "/build.rs", "/runtime"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

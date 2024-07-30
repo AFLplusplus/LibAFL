@@ -4,16 +4,16 @@ build-backend = "maturin"
 
 [project]
 name = "PyLibAFL"
-version = "0.10.1"
+version = "0.13.2"
 description = "Advanced Fuzzing Library for Python"
 readme = "README.md"
 requires-python = ">=3.8"
-license = {text = "Apache-2.0"}
+license = { text = "Apache-2.0" }
 classifiers = [
-    "License :: OSI Approved :: Apache Software License",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Rust",
-    "Topic :: Security",
+  "License :: OSI Approved :: Apache Software License",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Rust",
+  "Topic :: Security",
 ]
 
 [project.urls]

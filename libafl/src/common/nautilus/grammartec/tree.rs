@@ -5,7 +5,7 @@ use hashbrown::HashSet;
 use libafl_bolts::rands::Rand;
 use pyo3::{
     prelude::{PyObject, PyResult, Python},
-    types::{PyBytes, PyString, PyTuple},
+    types::{PyAnyMethods, PyBytes, PyBytesMethods, PyString, PyStringMethods, PyTuple},
     FromPyObject, PyTypeInfo,
 };
 use serde::{Deserialize, Serialize};
@@ -85,13 +85,14 @@ impl<'data, 'tree: 'data, 'ctx: 'data, W: Write, T: TreeLike> Unparser<'data, 't
             .into_iter()
             .map(io::Cursor::into_inner)
             .collect::<Vec<_>>();
-        let byte_arrays = bufs.iter().map(|b| PyBytes::new(py, b));
-        let res = expr.call1(py, PyTuple::new(py, byte_arrays))?;
-        if PyString::is_type_of(res.as_ref(py)) {
-            let pystr = <&PyString>::extract(res.as_ref(py))?;
+        let byte_arrays = bufs.iter().map(|b| PyBytes::new_bound(py, b));
+        let res = expr.call1(py, PyTuple::new_bound(py, byte_arrays))?;
+        let bound = res.bind(py);
+        if PyString::is_type_of_bound(bound) {
+            let pystr = bound.downcast::<PyString>()?;
             self.write(pystr.to_string_lossy().as_bytes());
-        } else if PyBytes::is_type_of(res.as_ref(py)) {
-            let pybytes = <&PyBytes>::extract(res.as_ref(py))?;
+        } else if PyBytes::is_type_of_bound(bound) {
+            let pybytes = bound.downcast::<PyBytes>()?;
             self.write(pybytes.as_bytes());
         } else {
             return Err(pyo3::exceptions::PyValueError::new_err(

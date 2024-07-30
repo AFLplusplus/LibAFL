@@ -60,7 +60,7 @@ impl<S> InChildProcessHooks<S> {
     where
         E: HasObservers,
     {
-        #[cfg_attr(miri, allow(unused_variables))]
+        #[cfg_attr(miri, allow(unused_variables, unused_unsafe))]
         unsafe {
             let data = addr_of_mut!(FORK_EXECUTOR_GLOBAL_DATA);
             // child_signal_handlers::setup_child_panic_hook::<E, I, OT, S>();

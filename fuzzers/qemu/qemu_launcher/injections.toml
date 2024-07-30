@@ -1,0 +1,58 @@
+# The TOML Structure:
+#
+# You can specify multiple different injection types if you want.
+# [name] # any name you want, it is not important
+# tokens = ["a string", ...]  # an injection string to add to the tokens list
+# matches = ["a string", ...] # if on of these substrings (case insensitive) is found
+#                             # in the parameter of the function then crash!
+#                             # note that this is not a regex.
+#
+# [name.functions]
+#     # multiple function targets to hook can be defined
+#     function_name =   # name of the function you want to hook.
+#                       # if the function name starts with 0x then
+#                       # this is the QEMU Guest address of a
+#                       # function you want to hook that does not
+#                       # have a symbol.
+#     {param = number}  # which parameter to the function contains the string
+#                       # 0 = first, 1 = second, ... 0-5 are supported (depending on architecture)
+
+[sql]
+tokens = ["'\"\"'\"\n", "\"1\" OR '1'=\"1\""]
+matches = ["'\"\"'\"", "1\" OR '1'=\"1"]
+
+[sql.functions]
+sqlite3_exec = { param = 1 }
+PQexec = { param = 1 }
+PQexecParams = { param = 1 }
+mysql_query = { param = 1 }
+mysql_send_query = { param = 1 }
+
+
+# Command injection. Note that for most you will need a libc with debug symbols
+# We do not need this as we watch the SYS_execve syscall, this is just an
+# example.
+[cmd]
+tokens = ["'\"FUZZ\"'", "\";FUZZ;\"", "';FUZZ;'", "$(FUZZ)"]
+matches = ["'\"FUZZ\"'"]
+
+[cmd.functions]
+popen = { param = 0 }
+system = { param = 0 }
+
+# LDAP injection tests
+[ldap]
+tokens = ["*)(FUZZ=*))(|"]
+matches = ["*)(FUZZ=*))(|"]
+
+[ldap.functions]
+ldap_search_ext = { param = 3 }
+ldap_search_ext_s = { param = 3 }
+
+# XSS injection tests
+# This is a minimal example that only checks for libxml2
+[xss]
+tokens = ["'\"><FUZZ"]
+matches = ["'\"><FUZZ"]
+[xss.functions]
+htmlReadMemory = { param = 0 }

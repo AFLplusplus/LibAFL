@@ -1,53 +1,52 @@
 [workspace]
 resolver = "2"
 members = [
-    "libafl",
-    "libafl_bolts",
-    "libafl_cc",
-    "libafl_derive",
-    "libafl_targets",
-    "libafl_sugar",
-    "libafl_concolic/test/dump_constraints",
-    "libafl_concolic/test/runtime_test",
-    "utils/build_and_test_fuzzers",
-    "utils/deexit",
-    "utils/libafl_benches",
-    "utils/gramatron/construct_automata",
-    "utils/desyscall",
-    "utils/multi_machine_generator",
+  "libafl",
+  "libafl_bolts",
+  "libafl_cc",
+  "libafl_derive",
+  "libafl_targets",
+  "libafl_sugar",
+  "libafl_concolic/test/dump_constraints",
+  "libafl_concolic/test/runtime_test",
+  "utils/build_and_test_fuzzers",
+  "utils/deexit",
+  "utils/libafl_benches",
+  "utils/gramatron/construct_automata",
 ]
 default-members = [
-    "libafl",
-    "libafl_bolts",
-    "libafl_cc",
-    "libafl_derive",
-    "libafl_targets",
+  "libafl",
+  "libafl_bolts",
+  "libafl_cc",
+  "libafl_derive",
+  "libafl_targets",
 ]
 
 exclude = [
-    "bindings",
-    "fuzzers",
-    "utils/noaslr",
-    "utils/gdb_qemu",
-    "utils/libafl_fmt",
-    "utils/desyscall",
-    "utils/multi_machine_generator",
-    "scripts",
-    # additional crates
-    "libafl_concolic/symcc_runtime",
-    "libafl_concolic/symcc_libafl",
-    "libafl_frida",
-    "libafl_libfuzzer",
-    "libafl_libfuzzer_runtime",
-    "libafl_nyx",
-    "libafl_qemu",
-    "libafl_tinyinst",
-    "libafl_qemu/libafl_qemu_build",
-    "libafl_qemu/libafl_qemu_sys",
+  "bindings",
+  "fuzzers",
+  "utils/noaslr",
+  "utils/gdb_qemu",
+  "utils/libafl_fmt",
+  "utils/desyscall",
+  "utils/multi_machine_generator",
+  "scripts",
+  # additional crates
+  "libafl_concolic/symcc_runtime",
+  "libafl_concolic/symcc_libafl",
+  "libafl_frida",
+  "libafl_libfuzzer",
+  "libafl_libfuzzer_runtime",
+  "libafl_nyx",
+  "libafl_qemu",
+  "libafl_tinyinst",
+  "libafl_qemu/libafl_qemu_build",
+  "libafl_qemu/libafl_qemu_sys",
+  "libafl_concolic/test/symcc/util/symcc_fuzzing_helper",
 ]
 
 [workspace.package]
-version = "0.13.1"
+version = "0.13.2"
 
 [profile.release]
 lto = true

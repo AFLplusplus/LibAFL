@@ -238,26 +238,33 @@ where
         E::State: HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State> + HasScheduler + ExecutionProcessor,
     {
-        #[cfg_attr(miri, allow(unused_variables))]
+        // # Safety
+        // We get a pointer to `GLOBAL_STATE` that will be initialized at this point in time.
+        // This unsafe is needed in stable but not in nightly. Remove in the future(?)
+        #[allow(unused_unsafe)]
+        let data = unsafe { addr_of_mut!(GLOBAL_STATE) };
+        #[cfg(feature = "std")]
+        unix_signal_handler::setup_panic_hook::<E, EM, OF, Z>();
+        // # Safety
+        // Setting up the signal handlers with a pointer to the `GLOBAL_STATE` which should not be NULL at this point.
+        // We are the sole users of `GLOBAL_STATE` right now, and only dereference it in case of Segfault/Panic.
+        // In that case we get the mutable borrow. Otherwise we don't use it.
+        #[cfg(all(not(miri), unix, feature = "std"))]
         unsafe {
-            let data = addr_of_mut!(GLOBAL_STATE);
-            #[cfg(feature = "std")]
-            unix_signal_handler::setup_panic_hook::<E, EM, OF, Z>();
-            #[cfg(all(not(miri), unix, feature = "std"))]
             setup_signal_handler(data)?;
-            compiler_fence(Ordering::SeqCst);
-            Ok(Self {
-                #[cfg(feature = "std")]
-                crash_handler: unix_signal_handler::inproc_crash_handler::<E, EM, OF, Z>
-                    as *const c_void,
-                #[cfg(feature = "std")]
-                timeout_handler: unix_signal_handler::inproc_timeout_handler::<E, EM, OF, Z>
-                    as *const _,
-                #[cfg(feature = "std")]
-                timer: TimerStruct::new(exec_tmout),
-                phantom: PhantomData,
-            })
         }
+        compiler_fence(Ordering::SeqCst);
+        Ok(Self {
+            #[cfg(feature = "std")]
+            crash_handler: unix_signal_handler::inproc_crash_handler::<E, EM, OF, Z>
+                as *const c_void,
+            #[cfg(feature = "std")]
+            timeout_handler: unix_signal_handler::inproc_timeout_handler::<E, EM, OF, Z>
+                as *const _,
+            #[cfg(feature = "std")]
+            timer: TimerStruct::new(exec_tmout),
+            phantom: PhantomData,
+        })
     }
 
     /// Create new [`InProcessHooks`].

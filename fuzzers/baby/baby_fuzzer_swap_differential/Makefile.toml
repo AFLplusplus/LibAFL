@@ -1,0 +1,58 @@
+# Variables
+[env]
+FUZZER_NAME = 'fuzzer_sd'
+PROJECT_DIR = { script = ["pwd"] }
+CARGO_TARGET_DIR = { value = "target", condition = { env_not_set = [
+  "CARGO_TARGET_DIR",
+] } }
+PROFILE = { value = "release" }
+PROFILE_DIR = { value = "release" }
+LIBAFL_CC = '${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cc'
+FUZZER = '${CARGO_TARGET_DIR}/${PROFILE_DIR}/${FUZZER_NAME}'
+
+# Compilers
+[tasks.cc]
+command = "cargo"
+args = ["build", "--profile", "${PROFILE}", "--bin", "libafl_cc"]
+
+# Harness
+[tasks.fuzzer]
+command = "cargo"
+args = ["build", "--profile", "${PROFILE}", "--bin", "${FUZZER_NAME}"]
+dependencies = ["cc"]
+
+[tasks.build]
+alias = "fuzzer"
+
+# Run the fuzzer
+[tasks.run]
+command = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/${FUZZER_NAME}"
+dependencies = ["fuzzer"]
+
+# Test
+[tasks.test]
+linux_alias = "test_unix"
+mac_alias = "test_unix"
+windows_alias = "unsupported"
+
+[tasks.test_unix]
+script_runner = "@shell"
+script = '''
+timeout 30s ${CARGO_TARGET_DIR}/${PROFILE_DIR}/${FUZZER_NAME} | tee fuzz_stdout.log || true
+if grep -qa "objectives: 1" fuzz_stdout.log; then
+    echo "Fuzzer is working"
+else
+    echo "Fuzzer does not generate any testcases or any crashes"
+    exit 1
+fi
+'''
+dependencies = ["fuzzer"]
+
+# Clean up
+[tasks.clean]
+# Disable default `clean` definition
+clear = true
+script_runner = "@shell"
+script = '''
+cargo clean
+'''
