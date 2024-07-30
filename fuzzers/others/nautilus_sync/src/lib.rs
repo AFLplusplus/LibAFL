@@ -98,6 +98,7 @@ struct Opt {
 
 /// The main fn, `no_mangle` as it is a C symbol
 #[no_mangle]
+#[allow(clippy::missing_panics_doc, clippy::too_many_lines)]
 pub extern "C" fn libafl_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
@@ -202,7 +203,7 @@ pub extern "C" fn libafl_main() {
         // Call LLVMFUzzerInitialize() if present.
         let args: Vec<String> = env::args().collect();
         if libfuzzer_initialize(&args) == -1 {
-            println!("Warning: LLVMFuzzerInitialize failed with -1")
+            println!("Warning: LLVMFuzzerInitialize failed with -1");
         }
 
         let mut generator = NautilusGenerator::new(&context);

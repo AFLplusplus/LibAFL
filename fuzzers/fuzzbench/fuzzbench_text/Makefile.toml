@@ -1,13 +1,17 @@
 [env]
 PROJECT_DIR = { script = ["pwd"] }
-CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
-FUZZER_NAME="fuzzer"
-PROFILE = { value = "release", condition = {env_not_set = ["PROFILE"]} }
-PROFILE_DIR = {value = "release", condition = {env_not_set = ["PROFILE_DIR"] }}
+CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = [
+  "CARGO_TARGET_DIR",
+] } }
+FUZZER_NAME = "fuzzer"
+PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
+PROFILE_DIR = { value = "release", condition = { env_not_set = [
+  "PROFILE_DIR",
+] } }
 
 [tasks.unsupported]
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 echo "Cargo-make not integrated yet on this"
 '''
 
@@ -19,7 +23,7 @@ windows_alias = "unsupported"
 
 [tasks.cxx_unix]
 command = "cargo"
-args = ["build" , "--profile", "${PROFILE}"]
+args = ["build", "--profile", "${PROFILE}"]
 
 [tasks.cc]
 linux_alias = "cc_unix"
@@ -28,7 +32,7 @@ windows_alias = "unsupported"
 
 [tasks.cc_unix]
 command = "cargo"
-args = ["build" , "--profile", "${PROFILE}"]
+args = ["build", "--profile", "${PROFILE}"]
 
 # fuzz.o File
 [tasks.fuzz_o]
@@ -59,8 +63,8 @@ mac_alias = "run_unix"
 windows_alias = "unsupported"
 
 [tasks.run_unix]
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 rm -rf libafl_unix_shmem_server || true
 mkdir in || true
 echo a > in/a
@@ -77,8 +81,8 @@ mac_alias = "test_unix"
 windows_alias = "unsupported"
 
 [tasks.test_unix]
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 rm -rf libafl_unix_shmem_server || true
 mkdir in || true
 echo a > in/a
@@ -103,8 +107,8 @@ mac_alias = "clean_unix"
 windows_alias = "unsupported"
 
 [tasks.clean_unix]
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 rm ./${FUZZER_NAME} || true
 rm fuzz.o || true
 '''

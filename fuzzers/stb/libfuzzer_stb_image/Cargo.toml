@@ -1,7 +1,10 @@
 [package]
 name = "libfuzzer_stb_image"
-version = "0.13.0"
-authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
+version = "0.13.2"
+authors = [
+  "Andrea Fioraldi <andreafioraldi@gmail.com>",
+  "Dominik Maier <domenukk@gmail.com>",
+]
 edition = "2021"
 build = "build.rs"
 
@@ -18,7 +21,12 @@ debug = true
 [dependencies]
 libafl = { path = "../../../libafl/" }
 libafl_bolts = { path = "../../../libafl_bolts/" }
-libafl_targets = { path = "../../../libafl_targets/", features = ["sancov_pcguard_edges", "sancov_cmplog", "libfuzzer", "libfuzzer_no_link_main"] }
+libafl_targets = { path = "../../../libafl_targets/", features = [
+  "sancov_pcguard_edges",
+  "sancov_cmplog",
+  "libfuzzer",
+  "libfuzzer_no_link_main",
+] }
 mimalloc = { version = "*", default-features = false }
 
 [build-dependencies]

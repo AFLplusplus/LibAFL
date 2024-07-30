@@ -5,7 +5,13 @@ edition = "2021"
 description = "DeSyscall: Hooks syscalls for reduces overhead during in-process fuzzing"
 repository = "https://github.com/AFLplusplus/LibAFL/"
 license = "MIT OR Apache-2.0"
-categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
+categories = [
+  "development-tools::testing",
+  "emulators",
+  "embedded",
+  "os",
+  "no-std",
+]
 keywords = ["fuzzing", "libafl", "ldpreload"]
 
 [dependencies]

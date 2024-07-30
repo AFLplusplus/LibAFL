@@ -413,11 +413,7 @@ where
             file_name
         };
 
-        if testcase
-            .file_path()
-            .as_ref()
-            .map_or(true, |path| !path.starts_with(&self.dir_path))
-        {
+        if testcase.file_path().is_none() {
             *testcase.file_path_mut() = Some(self.dir_path.join(&file_name));
         }
         *testcase.filename_mut() = Some(file_name);
