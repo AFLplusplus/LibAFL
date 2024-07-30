@@ -131,6 +131,8 @@ pub mod serdeany;
 pub mod shmem;
 #[cfg(feature = "std")]
 pub mod staterestore;
+#[cfg(feature = "alloc")]
+pub mod subrange;
 // TODO: reenable once ahash works in no-alloc
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
 pub mod tuples;
@@ -309,7 +311,7 @@ pub enum Error {
     Unsupported(String, ErrorBacktrace),
     /// Shutting down, not really an error.
     ShuttingDown,
-    /// OS error, wrapping a [`std::io::Error`]
+    /// OS error, wrapping a [`io::Error`]
     #[cfg(feature = "std")]
     OsError(io::Error, String, ErrorBacktrace),
     /// Something else happened
@@ -411,7 +413,7 @@ impl Error {
     {
         Error::OsError(err, msg.into(), ErrorBacktrace::new())
     }
-    /// OS error from [`std::io::Error::last_os_error`] with additional message
+    /// OS error from [`io::Error::last_os_error`] with additional message
     #[cfg(feature = "std")]
     #[must_use]
     pub fn last_os_error<S>(msg: S) -> Self
