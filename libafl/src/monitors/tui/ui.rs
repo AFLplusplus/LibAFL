@@ -504,17 +504,18 @@ impl TuiUi {
         } else if self.clients < 2 {
             (current_time(), ProcessTiming::new())
         } else {
-            let client = app
-                .read()
-                .unwrap()
-                .clients
-                .get(&self.clients_idx)
-                .unwrap()
-                .clone();
-            (
-                client.process_timing.client_start_time,
-                client.process_timing,
-            )
+            let clients = &app.read().unwrap().clients;
+            let client = clients.get(&self.clients_idx);
+            let client = client.as_ref();
+            if let Some(client) = client {
+                (
+                    client.process_timing.client_start_time,
+                    client.process_timing.clone(),
+                )
+            } else {
+                log::warn!("Client {} was `None`. Race condition?", &self.clients_idx);
+                (current_time(), ProcessTiming::new())
+            }
         };
         let items = vec![
             Row::new(vec![
