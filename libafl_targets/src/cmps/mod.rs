@@ -13,7 +13,7 @@ use core::{
 };
 
 use libafl::{
-    observers::{cmp::AFLppCmpLogHeader, CmpMap, CmpValues},
+    observers::{cmp::AFLppCmpLogHeader, CmpMap, CmpValues, CmplogBytes},
     Error,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -390,8 +390,14 @@ impl CmpMap for CmpLogMap {
         } else {
             unsafe {
                 Some(CmpValues::Bytes((
-                    self.vals.routines[idx][execution].0.to_vec(),
-                    self.vals.routines[idx][execution].1.to_vec(),
+                    CmplogBytes::from_buf_and_len(
+                        self.vals.routines[idx][execution].0,
+                        CMPLOG_RTN_LEN as u8,
+                    ),
+                    CmplogBytes::from_buf_and_len(
+                        self.vals.routines[idx][execution].1,
+                        CMPLOG_RTN_LEN as u8,
+                    ),
                 )))
             }
         }
@@ -567,8 +573,8 @@ impl CmpMap for AFLppCmpLogMap {
                 let v0_len = self.vals.fn_operands[idx][execution].v0_len & (0x80 - 1);
                 let v1_len = self.vals.fn_operands[idx][execution].v1_len & (0x80 - 1);
                 Some(CmpValues::Bytes((
-                    self.vals.fn_operands[idx][execution].v0[..(v0_len as usize)].to_vec(),
-                    self.vals.fn_operands[idx][execution].v1[..(v1_len as usize)].to_vec(),
+                    CmplogBytes::from_buf_and_len(self.vals.fn_operands[idx][execution].v0, v0_len),
+                    CmplogBytes::from_buf_and_len(self.vals.fn_operands[idx][execution].v1, v1_len),
                 )))
             }
         }
