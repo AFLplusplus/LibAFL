@@ -354,7 +354,7 @@ impl ShMemProvider for NopShMemProvider {
     }
 }
 
-/// An [`ShMem]` that does not have any mem nor share anything.
+/// An [`ShMem`] that does not have any mem nor share anything.
 #[cfg(feature = "alloc")]
 #[derive(Debug, Clone, Default)]
 pub struct NopShMem {
