@@ -153,9 +153,9 @@ pub fn check_autoresume(
             );
             if let Err(e) = cpy_res {
                 if matches!(e.kind(), io::ErrorKind::InvalidInput) {
-                    println!("skipping {} since it is not a regular file", path.display())
+                    println!("skipping {} since it is not a regular file", path.display());
                 } else {
-                    return Err(e.into())
+                    return Err(e.into());
                 }
             }
         }
