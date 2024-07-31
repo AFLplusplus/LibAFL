@@ -113,6 +113,10 @@ where
         let client_id = self.inner.id();
         ShMemId::from_string(&format!("{}:{client_id}", self.server_fd))
     }
+
+    fn map(&self) -> *mut u8 {
+        self.inner.map()
+    }
 }
 
 impl<SP> ServedShMemProvider<SP>

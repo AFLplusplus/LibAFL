@@ -199,6 +199,9 @@ pub trait ShMem: Sized + Debug + Clone + DerefMut<Target = [u8]> {
     /// Get the id of this shared memory mapping
     fn id(&self) -> ShMemId;
 
+    /// Get the map ptr
+    fn map(&self) -> *mut u8;
+
     /// Convert to a ptr of a given type, checking the size.
     /// If the map is too small, returns `None`
     fn as_ptr_of<T: Sized>(&self) -> Option<*const T> {
@@ -351,7 +354,7 @@ impl ShMemProvider for NopShMemProvider {
     }
 }
 
-/// An [`ShMem]`] that does not have any mem nor share anything.
+/// An [`ShMem]` that does not have any mem nor share anything.
 #[cfg(feature = "alloc")]
 #[derive(Debug, Clone, Default)]
 pub struct NopShMem {
@@ -363,6 +366,10 @@ pub struct NopShMem {
 impl ShMem for NopShMem {
     fn id(&self) -> ShMemId {
         self.id
+    }
+
+    fn map(&self) -> *mut u8 {
+        std::ptr::null_mut()
     }
 }
 
@@ -399,6 +406,10 @@ where
 {
     fn id(&self) -> ShMemId {
         self.internal.id()
+    }
+
+    fn map(&self) -> *mut u8 {
+        self.internal.map()
     }
 }
 
@@ -907,6 +918,10 @@ pub mod unix_shmem {
             fn id(&self) -> ShMemId {
                 self.id
             }
+
+            fn map(&self) -> *mut u8 {
+                self.map
+            }
         }
 
         impl Deref for MmapShMem {
@@ -1018,6 +1033,10 @@ pub mod unix_shmem {
         impl ShMem for CommonUnixShMem {
             fn id(&self) -> ShMemId {
                 self.id
+            }
+
+            fn map(&self) -> *mut u8 {
+                self.map
             }
         }
 
@@ -1228,6 +1247,10 @@ pub mod unix_shmem {
         impl ShMem for AshmemShMem {
             fn id(&self) -> ShMemId {
                 self.id
+            }
+
+            fn map(&self) -> *mut u8 {
+                self.map
             }
         }
 
