@@ -34,7 +34,7 @@ where
     pub fn new(inner: A, opt: &Opt) -> Self {
         Self {
             inner,
-            ignore_timeouts: opt.ignore_seed_issues,
+            ignore_timeouts: opt.ignore_timeouts,
             ignore_seed_issues: opt.ignore_seed_issues,
             exit_on_seed_issues: opt.exit_on_seed_issues,
             phantom: PhantomData,
