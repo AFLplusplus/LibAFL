@@ -152,13 +152,16 @@ struct Opt {
     #[arg(short = 'V')]
     fuzz_for_seconds: Option<usize>,
 
+    /// timeout for each run
+    #[arg(short = 't', default_value_t = 1000)]
+    hang_timeout: u64,
+
     // Environment Variables
     #[clap(skip)]
     bench_just_one: bool,
     #[clap(skip)]
     bench_until_crash: bool,
-    #[clap(skip)]
-    hang_timeout: u64,
+
     #[clap(skip)]
     debug_child: bool,
     #[clap(skip)]
