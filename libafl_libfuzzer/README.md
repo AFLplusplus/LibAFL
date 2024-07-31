@@ -37,17 +37,17 @@ to
 libfuzzer-sys = { version = "0.11.0", features = ["your", "features", "here"], package = "libafl_libfuzzer" }
 ```
 
-If, in the case that you want to work with experimental changes, the `libfuzzer-best` branch contains the current
-experimental best version of `libafl_libfuzzer`.
-To use the experimental version, use:
+To use the most up-to-date version (with experimental changes), use:
 
 ```toml
-libfuzzer-sys = { git = "https://github.com/AFLplusplus/LibAFL.git", branch = "libfuzzer-best", features = ["your", "features", "here"], package = "libafl_libfuzzer" }
+libfuzzer-sys = { git = "https://github.com/AFLplusplus/LibAFL.git", features = ["your", "features", "here"], package = "libafl_libfuzzer" }
 ```
 
-As this branch generally offers the highest performance version of `libafl_libfuzzer`, we recommend the latter.
+As the repository generally offers the highest performance version of `libafl_libfuzzer`, we recommend the latter.
 Remember to `cargo update` often if using the experimental changes, and please [submit an issue]
-if you encounter problems while using `libfuzzer-best`!
+if you encounter problems while using the git branch!
+
+For stability purposes, consider [specifying a commit](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#choice-of-commit).
 
 #### macOS
 
