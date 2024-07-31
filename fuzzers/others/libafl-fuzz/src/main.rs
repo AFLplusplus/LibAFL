@@ -134,8 +134,8 @@ struct Opt {
     /// sync to a foreign fuzzer queue directory (requires -M, can be specified up to 32 times)
     #[arg(short = 'F', num_args = 32)]
     foreign_sync_dirs: Vec<PathBuf>,
-    /// fuzzer dictionary (see README.md, specify up to 4 times)
-    #[arg(short = 'x', num_args = 4)]
+    /// fuzzer dictionary (see README.md)
+    #[arg(short = 'x')]
     dicts: Vec<PathBuf>,
     // Environment + CLI variables
     #[arg(short = 'G')]
