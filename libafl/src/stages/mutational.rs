@@ -52,7 +52,10 @@ pub trait MutatedTransform<I, S>: Sized {
 }
 
 // reflexive definition
-impl<I, S> MutatedTransform<I, S> for I {
+impl<I, S> MutatedTransform<I, S> for I
+where
+    S: HasCorpus,
+{
     type Post = ();
 
     #[inline]
@@ -67,68 +70,64 @@ impl<I, S> MutatedTransform<I, S> for I {
     }
 }
 
+/// Runs this (mutational) stage for the given testcase
+#[allow(clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
+pub(crate) fn perform_mutational<E, EM, I, M, S, Z>(
+    fuzzer: &mut Z,
+    executor: &mut E,
+    state: &mut S,
+    manager: &mut EM,
+    mutator: &mut M,
+    num: usize,
+) -> Result<(), Error> {
+    start_timer!(state);
+    // Here saturating_sub is needed as self.iterations() might be actually smaller than the previous value before reset.
+    /*
+    let num = self
+        .iterations(state)?
+        .saturating_sub(self.execs_since_progress_start(state)?);
+    */
+    let mut testcase = state.current_testcase_mut()?;
+
+    let Ok(input) = I::try_transform_from(&mut testcase, state) else {
+        return Ok(());
+    };
+    drop(testcase);
+    mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
+    for _ in 0..num {
+        let mut input = input.clone();
+        start_timer!(state);
+        let mutated = mutator.mutate(state, &mut input)?;
+        mark_feature_time!(state, PerfFeature::Mutate);
+        if mutated == MutationResult::Skipped {
+            continue;
+        }
+        // Time is measured directly the `evaluate_input` function
+        let (untransformed, post) = input.try_transform_into(state)?;
+        let (_, corpus_id) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
+        start_timer!(state);
+        mutator.post_exec(state, corpus_id)?;
+        post.post_exec(state, corpus_id)?;
+        mark_feature_time!(state, PerfFeature::MutatePostExec);
+    }
+    Ok(())
+}
+
 /// A Mutational stage is the stage in a fuzzing run that mutates inputs.
 /// Mutational stages will usually have a range of mutations that are
 /// being applied to the input one by one, between executions.
-pub trait MutationalStage<E, EM, I, M, S, Z>: Stage<E, EM, S, Z> {
+pub trait MutationalStage<S> {
+    type M;
+    type I;
+
     /// The mutator registered for this stage
-    fn mutator(&self) -> &M;
+    fn mutator(&self) -> &Self::M;
 
     /// The mutator registered for this stage (mutable)
-    fn mutator_mut(&mut self) -> &mut M;
+    fn mutator_mut(&mut self) -> &mut Self::M;
 
     /// Gets the number of iterations this mutator should run for.
     fn iterations(&self, state: &mut S) -> Result<usize, Error>;
-
-    /// Runs this (mutational) stage for the given testcase
-    #[allow(clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
-    fn perform_mutational(
-        &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
-        state: &mut S,
-        manager: &mut EM,
-    ) -> Result<(), Error> {
-        start_timer!(state);
-
-        // Here saturating_sub is needed as self.iterations() might be actually smaller than the previous value before reset.
-        /*
-        let num = self
-            .iterations(state)?
-            .saturating_sub(self.execs_since_progress_start(state)?);
-        */
-        let num = self.iterations(state)?;
-        let mut testcase = state.current_testcase_mut()?;
-
-        let Ok(input) = I::try_transform_from(&mut testcase, state) else {
-            return Ok(());
-        };
-        drop(testcase);
-        mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
-
-        for _ in 0..num {
-            let mut input = input.clone();
-
-            start_timer!(state);
-            let mutated = self.mutator_mut().mutate(state, &mut input)?;
-            mark_feature_time!(state, PerfFeature::Mutate);
-
-            if mutated == MutationResult::Skipped {
-                continue;
-            }
-
-            // Time is measured directly the `evaluate_input` function
-            let (untransformed, post) = input.try_transform_into(state)?;
-            let (_, corpus_id) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
-
-            start_timer!(state);
-            self.mutator_mut().post_exec(state, corpus_id)?;
-            post.post_exec(state, corpus_id)?;
-            mark_feature_time!(state, PerfFeature::MutatePostExec);
-        }
-
-        Ok(())
-    }
 }
 
 /// Default value, how many iterations each stage gets, as an upper bound.
@@ -144,19 +143,24 @@ pub struct StdMutationalStage<I, M> {
     mutator: M,
     /// The maximum amount of iterations we should do each round
     max_iterations: usize,
-    phantom: PhantomData<I>,
 }
 
-impl<E, EM, I, M, S, Z> MutationalStage<E, EM, I, M, S, Z> for StdMutationalStage<I, M> {
+impl<I, M, S> MutationalStage<S> for StdMutationalStage<I, M>
+where
+    S: HasCorpus,
+{
+    type M = Self::M;
+    type I = Self::I;
+
     /// The mutator, added to this stage
     #[inline]
-    fn mutator(&self) -> &M {
+    fn mutator(&self) -> &Self::M {
         &self.mutator
     }
 
     /// The list of mutators, added to this stage (as mutable ref)
     #[inline]
-    fn mutator_mut(&mut self) -> &mut M {
+    fn mutator_mut(&mut self) -> &mut Self::M {
         &mut self.mutator
     }
 
@@ -187,7 +191,8 @@ impl<E, EM, I, M, S, Z> Stage<E, EM, S, Z> for StdMutationalStage<I, M> {
         state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        let ret = self.perform_mutational(fuzzer, executor, state, manager);
+        let iter = self.iterations(state)?;
+        let ret = perform_mutational(fuzzer, executor, state, manager, self.mutator_mut(), iter);
 
         #[cfg(feature = "introspection")]
         state.introspection_monitor_mut().finish_stage();
@@ -236,7 +241,6 @@ impl<I, M> StdMutationalStage<I, M> {
             ),
             mutator,
             max_iterations,
-            phantom: PhantomData,
         }
     }
 }
