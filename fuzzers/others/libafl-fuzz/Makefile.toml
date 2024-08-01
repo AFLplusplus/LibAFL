@@ -15,7 +15,7 @@ LLVM_CONFIG = { value = "llvm-config-18", condition = { env_not_set = [
 AFL_VERSION = "db23931e7c1727ddac8691a6241c97b2203ec6fc"
 AFL_DIR_NAME = { value = "./AFLplusplus-${AFL_VERSION}" }
 AFL_CC_PATH = { value = "${AFL_DIR_NAME}/afl-clang-fast" }
-
+CC= { value = "clang" }
 
 [tasks.build_afl]
 script_runner = "@shell"
@@ -28,7 +28,9 @@ if [ ! -d "$AFL_DIR_NAME" ]; then
 	unzip ${AFL_VERSION}.zip
 	cd ${AFL_DIR_NAME}
 	LLVM_CONFIG=${LLVM_CONFIG} make 
-	cd ..
+	cd frida_mode
+	LLVM_CONFIG=${LLVM_CONFIG} make
+	cd ../..
 fi
 
 '''
@@ -66,10 +68,44 @@ test -d "./test/output/fuzzer_main/crashes" || {
 }
 # cmplog TODO: AFL_BENCH_UNTIL_CRASH=1 instead of timeout 15s
 AFL_LLVM_CMPLOG=1 AFL_PATH=${AFL_DIR_NAME} ${AFL_CC_PATH} ./test/test-cmplog.c -o ./test/out-cmplog
-AFL_CORES=1 timeout 5 ${FUZZER} -Z -l 3 -m 0 -V30 -i ./test/seeds_cmplog -o ./test/cmplog-output -c 0 ./test/out-cmplog || true
-test -n "$( find "./test/cmplog-output/fuzzer_main/crashes/" -maxdepth 1 -type f) 2>/dev/null )" || {
+AFL_CORES=1 timeout 5 ${FUZZER} -Z -l 3 -m 0 -V30 -i ./test/seeds_cmplog -o ./test/output-cmplog -c 0 ./test/out-cmplog || true
+test -n "$( find "./test/output-cmplog/fuzzer_main/crashes/" -maxdepth 1 -type f) 2>/dev/null )" || {
 	echo "No crashes found"
 	exit 1
+}
+
+# test FRIDA mode
+${CC} ./test/test-instr.c -o ./test/out-frida
+LIBAFL_DEBUG_OUTPUT=1 AFL_DEBUG=1 AFL_CORES=1 AFL_FRIDA_VERBOSE=1 timeout 5 ${FUZZER} -m 0 -V07 -O -i ./test/seeds-frida -o ./test/output-frida -- ./test/out-frida || true
+test -n "$( ls ./test/output-frida/fuzzer_main/queue/id:000002* 2>/dev/null )" || {
+	echo "No new corpus entries found for FRIDA mode"
+	exit 1
+}
+
+${CC} ./test/test-cmpcov.c -o ./test/out-frida-cmpcov
+LIBAFL_DEBUG_OUTPUT=1 AFL_DEBUG=1 AFL_CORES=1 AFL_FRIDA_VERBOSE=1 timeout 10 ${FUZZER} -m 0 -V07 -O -c 0 -l 3 -i ./test/seeds-frida -o ./test/output-frida-cmpcov -- ./test/out-frida-cmpcov || true
+test -n "$( ls ./test/output-frida-cmpcov/fuzzer_main/queue/id:000003* 2>/dev/null )" || {
+	echo "No new corpus entries found for FRIDA cmplog mode"
+	exit 1
+}
+export AFL_FRIDA_PERSISTENT_ADDR=0x`nm ./test/out-frida | grep -Ei "T _main|T main" | awk '{print $1}'`
+AFL_STATS_INTERVAL=1 LIBAFL_DEBUG_OUTPUT=1 AFL_DEBUG=1 AFL_CORES=1 AFL_FRIDA_VERBOSE=1 timeout 5 ${FUZZER} -m 0 -V07 -O -c 0 -l 3 -i ./test/seeds-frida -o ./test/output-frida-persistent -- ./test/out-frida || true
+test -n "$( ls ./test/output-frida-persistent/fuzzer_main/queue/id:000003* 2>/dev/null )" || {
+	echo "No new corpus entries found for FRIDA persistent mode"
+	exit 1
+}
+RUNTIME_PERSISTENT=`grep execs_done ./test/output-frida-persistent/fuzzer_main/fuzzer_stats | awk '{print$3}'`
+RUNTIME=`grep execs_done ./test/output-frida/fuzzer_main/fuzzer_stats | awk '{print$3}'`
+test -n "$RUNTIME" -a -n "$RUNTIME_PERSISTENT" && {
+  DIFF=`expr $RUNTIME_PERSISTENT / $RUNTIME`
+  test "$DIFF" -gt 1 && { # must be at least twice as fast
+    echo "persistent frida_mode was noticeable faster than standard frida_mode"
+  } || {
+    echo "persistent frida_mode was not noticeable faster than standard frida_mode"
+    exit 1
+  }
+} || {
+  echo "we got no data on executions performed? weird!"
 }
 '''
 dependencies = ["build_afl"]
@@ -86,4 +122,10 @@ rm -rf AFLplusplus-${AFL_VERSION}
 rm ${AFL_VERSION}.zip
 rm -rf ./test/out-instr
 rm -rf ./test/output
+rm -rf ./test/cmplog-output
+rm -rf ./test/output-frida
+rm -rf ./test/output-frida-cmpcov
+rm -rf ./test/output-frida-persistent
+rm -rf ./test/output-cmplog
+rm ./test/out-*
 '''
