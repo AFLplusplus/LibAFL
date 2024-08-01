@@ -15,13 +15,13 @@ use crate::{
     events::{EventFirer, EventRestarter},
     executors::{
         hooks::{inprocess::InProcessHooks, ExecutorHooksTuple},
-        inprocess::{GenericInProcessExecutorInner, HasInProcessHooks},
+        inprocess::GenericInProcessExecutorInner,
         Executor, ExitKind, HasObservers,
     },
     feedbacks::Feedback,
     fuzzer::{ExecutionProcessor, HasObjective, HasScheduler},
     observers::ObserversTuple,
-    state::{HasExecutions, HasSolutions, State},
+    state::{HasExecutions, HasSolutions},
     Error,
 };
 
@@ -408,27 +408,5 @@ where
     #[inline]
     pub fn hooks_mut(&mut self) -> &mut (InProcessHooks<S>, HT) {
         self.inner.hooks_mut()
-    }
-}
-
-impl<H, HB, HT, OT, S, ES> HasInProcessHooks<S>
-    for StatefulGenericInProcessExecutor<H, HB, HT, OT, S, ES>
-where
-    H: FnMut(&<S as UsesInput>::Input, &mut ES) -> ExitKind + ?Sized,
-    HB: BorrowMut<H>,
-    HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
-    S: State + HasExecutions + HasSolutions + HasCorpus,
-{
-    /// the timeout handler
-    #[inline]
-    fn inprocess_hooks(&self) -> &InProcessHooks<S> {
-        self.inner.inprocess_hooks()
-    }
-
-    /// the timeout handler
-    #[inline]
-    fn inprocess_hooks_mut(&mut self) -> &mut InProcessHooks<S> {
-        self.inner.inprocess_hooks_mut()
     }
 }

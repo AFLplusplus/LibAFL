@@ -1,6 +1,5 @@
 //! Signal handling for unix
-#[cfg(feature = "alloc")]
-use alloc::vec::Vec;
+
 #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
 use core::mem::size_of;
 #[cfg(feature = "alloc")]
@@ -391,7 +390,7 @@ pub trait Handler {
     /// Handle a signal
     fn handle(&mut self, signal: Signal, info: &mut siginfo_t, _context: Option<&mut ucontext_t>);
     /// Return a list of signals to handle
-    fn signals(&self) -> Vec<Signal>;
+    fn signals(&self) -> &'static [Signal];
 }
 
 #[cfg(feature = "alloc")]
@@ -473,7 +472,7 @@ pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: *mut T) -> Res
     sa.sa_flags = SA_NODEFER | SA_SIGINFO | SA_ONSTACK;
     sa.sa_sigaction = handle_signal as usize;
     let signals = unsafe { (*handler).signals() };
-    for sig in signals {
+    for &sig in signals {
         write_volatile(
             addr_of_mut!(SIGNAL_HANDLERS[sig as usize]),
             Some(HandlerHolder {

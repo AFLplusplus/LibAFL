@@ -1,26 +1,25 @@
 //! An [`EventManager`] manages all events that go to other instances of the fuzzer.
 //! The messages are commonly information about new Testcases as well as stats and other [`Event`]s.
 
-pub mod events_hooks;
-pub use events_hooks::*;
+// pub mod events_hooks;
+// pub use events_hooks::*;
 
 pub mod simple;
-pub use simple::*;
-#[cfg(all(unix, feature = "std"))]
-pub mod centralized;
-#[cfg(all(unix, feature = "std"))]
-pub use centralized::*;
-#[cfg(feature = "std")]
-#[allow(clippy::ignored_unit_patterns)]
-pub mod launcher;
-#[allow(clippy::ignored_unit_patterns)]
-pub mod llmp;
-pub use llmp::*;
-#[cfg(feature = "tcp_manager")]
-#[allow(clippy::ignored_unit_patterns)]
-pub mod tcp;
+// #[cfg(all(unix, feature = "std"))]
+// pub mod centralized;
+// #[cfg(all(unix, feature = "std"))]
+// pub use centralized::*;
+// #[cfg(feature = "std")]
+// #[allow(clippy::ignored_unit_patterns)]
+// pub mod launcher;
+// #[allow(clippy::ignored_unit_patterns)]
+// pub mod llmp;
+// pub use llmp::*;
+// #[cfg(feature = "tcp_manager")]
+// #[allow(clippy::ignored_unit_patterns)]
+// pub mod tcp;
 
-pub mod broker_hooks;
+// pub mod broker_hooks;
 use alloc::{borrow::Cow, boxed::Box, string::String, vec::Vec};
 use core::{
     fmt,
@@ -30,17 +29,18 @@ use core::{
 };
 
 use ahash::RandomState;
-pub use broker_hooks::*;
-#[cfg(feature = "std")]
-pub use launcher::*;
+// pub use broker_hooks::*;
+// #[cfg(feature = "std")]
+// pub use launcher::*;
 #[cfg(all(unix, feature = "std"))]
 use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal, CTRL_C_EXIT};
 use libafl_bolts::{
     current_time,
-    tuples::{Handle, MatchNameRef},
+    tuples::{Handle, MatchName, MatchNameRef},
     ClientId,
 };
 use serde::{Deserialize, Serialize};
+pub use simple::*;
 #[cfg(feature = "std")]
 use uuid::Uuid;
 
@@ -97,8 +97,10 @@ impl Handler for ShutdownSignalData {
         }
     }
 
-    fn signals(&self) -> Vec<Signal> {
-        vec![Signal::SigTerm, Signal::SigInterrupt, Signal::SigQuit]
+    fn signals(&self) -> &'static [Signal] {
+        static SHUTDOWN_SIGNALS: [Signal; 3] =
+            [Signal::SigTerm, Signal::SigInterrupt, Signal::SigQuit];
+        &SHUTDOWN_SIGNALS
     }
 }
 
@@ -371,7 +373,10 @@ impl<I> Event<I> {
     }
 
     /// Event's corresponding name with additional info
-    fn name_detailed(&self) -> Cow<'static, str> {
+    fn name_detailed(&self) -> Cow<'static, str>
+    where
+        I: Input,
+    {
         match self {
             Event::NewTestcase { input, .. } => {
                 Cow::Owned(format!("Testcase {}", input.generate_name(None)))
@@ -424,7 +429,7 @@ pub trait EventFirer<I, S> {
     /// Serialize all observers for this type and manager
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
     where
-        OT: ObserversTuple<S> + Serialize,
+        OT: Serialize,
     {
         Ok(Some(postcard::to_allocvec(observers)?))
     }
@@ -464,6 +469,7 @@ where
 pub fn default_report_progress<I, PR, S>(reporter: &mut PR, state: &mut S) -> Result<(), Error>
 where
     PR: EventFirer<I, S>,
+    S: HasExecutions + HasLastReportTime,
 {
     let executions = *state.executions();
     let cur = current_time();
@@ -658,9 +664,9 @@ impl<S> CustomBufHandlerTuple<S> for Vec<Box<CustomBufHandlerFn<S>>> {
 }
 
 /// An event manager which can handle custom buffers
-pub trait HasCustomBufHandlers<S> {
+pub trait HasCustomBufHandlers {
     /// The type of the handlers
-    type Handlers: CustomBufHandlerTuple<S>;
+    type Handlers;
 
     /// Getter for the handlers
     fn handlers(&self) -> &Self::Handlers;
@@ -684,7 +690,7 @@ pub trait SupportsDynamicHandlers<S> {
 #[allow(deprecated)]
 impl<EM, S> SupportsDynamicHandlers<S> for EM
 where
-    EM: HasCustomBufHandlers<S, Handlers = Vec<Box<CustomBufHandlerFn<S>>>>,
+    EM: HasCustomBufHandlers<Handlers = Vec<Box<CustomBufHandlerFn<S>>>>,
 {
     fn add_custom_buf_handler(&mut self, handler: Box<CustomBufHandlerFn<S>>) {
         self.handlers_mut().push(handler);
@@ -786,7 +792,7 @@ where
     #[inline]
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
     where
-        OT: ObserversTuple<S> + Serialize,
+        OT: Serialize,
     {
         self.inner.serialize_observers(observers)
     }
@@ -835,9 +841,9 @@ where
     }
 }
 
-impl<EM, S> HasCustomBufHandlers<S> for MonitorTypedEventManager<EM>
+impl<EM> HasCustomBufHandlers for MonitorTypedEventManager<EM>
 where
-    EM: HasCustomBufHandlers<S>,
+    EM: HasCustomBufHandlers,
 {
     type Handlers = EM::Handlers;
 
@@ -911,7 +917,7 @@ pub trait AdaptiveSerializer {
         percentage_threshold: usize,
     ) -> Result<Option<Vec<u8>>, Error>
     where
-        OT: ObserversTuple<S> + Serialize,
+        OT: MatchName + Serialize,
     {
         match self.time_ref() {
             Some(t) => {

@@ -17,6 +17,7 @@ use crate::{
 
 /// The metadata to remember past observed value
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
+#[serde(bound = "T: Eq + Hash + for<'a> Deserialize<'a> + Serialize")]
 pub struct ListFeedbackMetadata<T> {
     /// Contains the information of past observed set of values.
     pub set: HashSet<T>,
@@ -66,6 +67,7 @@ libafl_bolts::impl_serdeany!(
 impl<S, T> StateInitializer<S> for ListFeedback<T>
 where
     S: HasNamedMetadata,
+    T: Debug + Serialize + Hash + Eq + DeserializeOwned + Default + Copy + 'static,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         state.add_named_metadata(self.name(), ListFeedbackMetadata::<T>::default());

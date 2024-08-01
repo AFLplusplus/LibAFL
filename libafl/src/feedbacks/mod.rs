@@ -307,8 +307,8 @@ where
 
 impl<A, B, FL, T> FeedbackFactory<CombinedFeedback<A, B, FL>, T> for CombinedFeedback<A, B, FL>
 where
-    A: FeedbackFactory<A, T>,
-    B: FeedbackFactory<B, T>,
+    A: FeedbackFactory<A, T> + Named,
+    B: FeedbackFactory<B, T> + Named,
     FL: FeedbackLogic,
 {
     fn create_feedback(&self, ctx: &T) -> CombinedFeedback<A, B, FL> {
@@ -744,6 +744,8 @@ macro_rules! feedback_not {
     };
 }
 
+impl<S> StateInitializer<S> for () {}
+
 /// Hack to use () as empty Feedback
 impl<EM, I, OT, S> Feedback<EM, I, OT, S> for () {
     #[cfg(feature = "track_hit_feedbacks")]
@@ -797,6 +799,8 @@ pub struct ExitKindFeedback<L> {
     last_result: Option<bool>,
     phantom: PhantomData<fn() -> L>,
 }
+
+impl<L, S> StateInitializer<S> for ExitKindFeedback<L> where L: ExitKindLogic {}
 
 impl<EM, I, L, OT, S> Feedback<EM, I, OT, S> for ExitKindFeedback<L>
 where
@@ -874,6 +878,8 @@ pub struct TimeFeedback {
     observer_handle: Handle<TimeObserver>,
 }
 
+impl<S> StateInitializer<S> for TimeFeedback {}
+
 impl<EM, I, OT, S> Feedback<EM, I, OT, S> for TimeFeedback {
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Result<bool, Error> {
@@ -921,6 +927,8 @@ pub enum ConstFeedback {
     /// Always returns `false`
     False,
 }
+
+impl<S> StateInitializer<S> for ConstFeedback {}
 
 impl<EM, I, OT, S> Feedback<EM, I, OT, S> for ConstFeedback {
     #[inline]

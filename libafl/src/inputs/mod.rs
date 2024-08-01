@@ -1,28 +1,5 @@
 //! Inputs are the actual contents sent to a target for each exeuction.
 
-pub mod bytes;
-pub use bytes::BytesInput;
-
-pub mod encoded;
-pub use encoded::*;
-
-pub mod gramatron;
-pub use gramatron::*;
-
-pub mod generalized;
-pub use generalized::*;
-
-pub mod bytessub;
-pub use bytessub::BytesSubInput;
-
-#[cfg(feature = "multipart_inputs")]
-pub mod multi;
-#[cfg(feature = "multipart_inputs")]
-pub use multi::*;
-
-#[cfg(feature = "nautilus")]
-pub mod nautilus;
-
 use alloc::{
     boxed::Box,
     string::{String, ToString},
@@ -32,6 +9,11 @@ use core::{clone::Clone, fmt::Debug, marker::PhantomData, ops::RangeBounds};
 #[cfg(feature = "std")]
 use std::{fs::File, hash::Hash, io::Read, path::Path};
 
+pub use bytes::BytesInput;
+pub use bytessub::BytesSubInput;
+// pub use encoded::*;
+// pub use generalized::*;
+// pub use gramatron::*;
 #[cfg(feature = "std")]
 use libafl_bolts::fs::write_file_atomic;
 use libafl_bolts::{
@@ -39,12 +21,24 @@ use libafl_bolts::{
     subrange::{SubRangeMutSlice, SubRangeSlice},
     Error, HasLen,
 };
-#[cfg(feature = "nautilus")]
-pub use nautilus::*;
+// #[cfg(feature = "multipart_inputs")]
+// pub use multi::*;
+// #[cfg(feature = "nautilus")]
+// pub use nautilus::*;
 use serde::{Deserialize, Serialize};
 
 use crate::corpus::CorpusId;
 
+pub mod bytes;
+pub mod bytessub;
+// pub mod encoded;
+// pub mod generalized;
+// pub mod gramatron;
+//
+// #[cfg(feature = "multipart_inputs")]
+// pub mod multi;
+// #[cfg(feature = "nautilus")]
+// pub mod nautilus;
 /// An input for the target
 #[cfg(not(feature = "std"))]
 pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
@@ -89,9 +83,6 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
 
     /// Generate a name for this input, the user is responsible for making each name of testcase unique.
     fn generate_name(&self, id: Option<CorpusId>) -> String;
-
-    /// An hook executed if the input is stored as `Testcase`
-    fn wrapped_as_testcase(&mut self) {}
 }
 
 /// Convert between two input types with a state
@@ -156,7 +147,7 @@ pub trait HasMutatorBytes: HasLen {
     /// See [`Vec::splice`].
     fn resize(&mut self, new_len: usize, value: u8);
 
-    /// Extends the given buffer with an iterator. See [`alloc::vec::Vec::extend`]
+    /// Extends the given buffer with an iterator. See [`Vec::extend`]
     fn extend<'a, I: IntoIterator<Item = &'a u8>>(&mut self, iter: I);
 
     /// Splices the given target bytes according to [`Vec::splice`]'s rules
