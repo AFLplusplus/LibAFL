@@ -36,6 +36,9 @@ impl<F, I, M> Named for PowerMutationalStage<F, I, M> {
 }
 
 impl<E, F, EM, I, S, M, Z> MutationalStage<E, EM, I, M, S, Z> for PowerMutationalStage<F, I, M> {
+    type M = Self::M;
+    type I = Self::I;
+
     /// The mutator, added to this stage
     #[inline]
     fn mutator(&self) -> &M {
