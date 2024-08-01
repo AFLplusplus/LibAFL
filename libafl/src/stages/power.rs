@@ -11,7 +11,7 @@ use libafl_bolts::Named;
 use crate::{
     schedulers::{testcase_score::CorpusPowerTestcaseScore, TestcaseScore},
     stages::{MutationalStage, RetryCountRestartHelper, Stage},
-    state::HasCurrentTestcase,
+    state::{HasCurrentTestcase, HasRand},
     Error,
 };
 
@@ -35,7 +35,10 @@ impl<F, I, M> Named for PowerMutationalStage<F, I, M> {
     }
 }
 
-impl<E, F, EM, I, S, M, Z> MutationalStage<E, EM, I, M, S, Z> for PowerMutationalStage<F, I, M> {
+impl<F, I, M, S> MutationalStage<S> for PowerMutationalStage<F, I, M>
+where
+    S: HasRand,
+{
     type M = Self::M;
     type I = Self::I;
 
