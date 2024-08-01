@@ -295,12 +295,8 @@ impl MapNoveltiesMetadata {
 
 /// The state of [`MapFeedback`]
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "T: DeserializeOwned")]
 #[allow(clippy::unsafe_derive_deserialize)] // for SerdeAny
-pub struct MapFeedbackMetadata<T>
-where
-    T: Default + Copy + 'static + Serialize,
-{
+pub struct MapFeedbackMetadata<T> {
     /// Contains information about untouched entries
     pub history_map: Vec<T>,
     /// Tells us how many non-initial entries there are in `history_map`
@@ -308,7 +304,7 @@ where
 }
 
 libafl_bolts::impl_serdeany!(
-    MapFeedbackMetadata<T: Debug + Default + Copy + 'static + Serialize + DeserializeOwned>,
+    MapFeedbackMetadata<T: 'static + Debug + Serialize + DeserializeOwned>,
     <u8>,<u16>,<u32>,<u64>,<i8>,<i16>,<i32>,<i64>,<f32>,<f64>,<bool>,<char>,<usize>
 );
 
@@ -380,7 +376,12 @@ pub struct MapFeedback<C, N, O, R> {
     phantom: PhantomData<fn() -> (N, O, R)>,
 }
 
-impl<C, N, O, R, S> StateInitializer<S> for MapFeedback<C, N, O, R> {
+impl<C, N, O, R, S> StateInitializer<S> for MapFeedback<C, N, O, R>
+where
+    O: MapObserver,
+    O::Entry: Default + Debug + DeserializeOwned + Serialize,
+    S: HasNamedMetadata,
+{
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         // Initialize `MapFeedbackMetadata` with an empty vector and add it to the state.
         // The `MapFeedbackMetadata` would be resized on-demand in `is_interesting`
@@ -389,14 +390,16 @@ impl<C, N, O, R, S> StateInitializer<S> for MapFeedback<C, N, O, R> {
     }
 }
 
-impl<C, N, O, R, EM, I, OT, S> Feedback<EM, I, OT, S> for MapFeedback<C, N, O, R>
+impl<C, EM, I, N, O, OT, R, S> Feedback<EM, I, OT, S> for MapFeedback<C, N, O, R>
 where
+    C: CanTrack + AsRef<O>,
+    EM: EventFirer<I, S>,
     N: IsNovel<O::Entry>,
     O: MapObserver + for<'it> AsIter<'it, Item = O::Entry>,
+    O::Entry: Default + Debug + DeserializeOwned + Serialize,
+    OT: MatchName,
     R: Reducer<O::Entry>,
     S: HasNamedMetadata,
-    C: CanTrack + AsRef<O>,
-    OT: MatchName,
 {
     #[rustversion::nightly]
     default fn is_interesting(
@@ -532,10 +535,11 @@ where
 #[rustversion::nightly]
 impl<C, O, EM, I, OT, S> Feedback<EM, I, OT, S> for MapFeedback<C, DifferentIsNovel, O, MaxReducer>
 where
-    O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
-    S: HasNamedMetadata,
     C: CanTrack + AsRef<O>,
+    EM: EventFirer<I, S>,
+    O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
     OT: MatchName,
+    S: HasNamedMetadata,
 {
     #[allow(clippy::wrong_self_convention)]
     #[allow(clippy::needless_range_loop)]
@@ -711,6 +715,7 @@ impl<C, N, O, R> MapFeedback<C, N, O, R>
 where
     R: Reducer<O::Entry>,
     O: MapObserver + for<'it> AsIter<'it, Item = O::Entry>,
+    O::Entry: 'static + Debug + Serialize + DeserializeOwned,
     N: IsNovel<O::Entry>,
     C: AsRef<O>,
 {

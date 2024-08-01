@@ -60,7 +60,7 @@ pub trait SerdeAny: Any + erased_serde::Serialize + Debug {
     fn as_any_mut(&mut self) -> &mut dyn Any;
     /// Returns this as boxed [`Any`] trait.
     fn as_any_boxed(self: Box<Self>) -> Box<dyn Any>;
-    /// Returns the [`core::any::type_name`] of this type.
+    /// Returns the [`type_name`] of this type.
     fn type_name(&self) -> &'static str;
 }
 

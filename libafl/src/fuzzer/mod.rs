@@ -284,24 +284,27 @@ impl<CS, F, OF> HasObjective for StdFuzzer<CS, F, OF> {
     }
 }
 
-impl<CS, EM, F, I, OF, OT, S> ExecutionProcessor<EM, I, OT, S> for StdFuzzer<CS, F, OF>
+impl<CS, EM, F, OF, OT, S> ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, OT, S>
+    for StdFuzzer<CS, F, OF>
 where
-    CS: Scheduler<I, OT, S>,
-    F: Feedback<EM, I, OT, S>,
-    OF: Feedback<EM, I, OT, S>,
+    CS: Scheduler<<S::Corpus as Corpus>::Input, OT, S>,
+    F: Feedback<EM, <S::Corpus as Corpus>::Input, OT, S>,
+    OF: Feedback<EM, <S::Corpus as Corpus>::Input, OT, S>,
     S: HasSolutions
         + HasExecutions
         + HasCurrentTestcase
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
-    EM: EventFirer<I, S>,
-    OT: ObserversTuple<I, S>,
+    <S::Corpus as Corpus>::Input: Clone,
+    S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
+    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
 {
     fn check_results(
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: &I,
+        input: &<S::Corpus as Corpus>::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<ExecuteInputResult, Error> {
@@ -342,7 +345,7 @@ where
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: &I,
+        input: &<S::Corpus as Corpus>::Input,
         exec_res: &ExecuteInputResult,
         observers: &OT,
     ) -> Result<Option<CorpusId>, Error> {
@@ -395,7 +398,7 @@ where
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: I,
+        input: <S::Corpus as Corpus>::Input,
         exec_res: &ExecuteInputResult,
         observers: &OT,
         exit_kind: &ExitKind,
@@ -425,7 +428,7 @@ where
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: I,
+        input: <S::Corpus as Corpus>::Input,
         exec_res: &ExecuteInputResult,
         observers_buf: Option<Vec<u8>>,
         exit_kind: &ExitKind,
@@ -473,7 +476,7 @@ where
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: I,
+        input: <S::Corpus as Corpus>::Input,
         observers: &OT,
         exit_kind: &ExitKind,
         send_events: bool,
@@ -487,13 +490,14 @@ where
     }
 }
 
-impl<CS, E, EM, F, I, OF, S> EvaluatorObservers<E, EM, I, S> for StdFuzzer<CS, F, OF>
+impl<CS, E, EM, F, OF, S> EvaluatorObservers<E, EM, <S::Corpus as Corpus>::Input, S>
+    for StdFuzzer<CS, F, OF>
 where
-    CS: Scheduler<I, E::Observers, S>,
-    E: HasObservers,
-    F: Feedback<EM, I, E::Observers, S>,
-    OF: Feedback<EM, I, E::Observers, S>,
-    S: HasCorpus + HasSolutions + HasExecutions,
+    CS: Scheduler<<S::Corpus as Corpus>::Input, E::Observers, S>,
+    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Self> + HasObservers,
+    E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    S: HasCorpus,
+    Self: ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
 {
     /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
@@ -502,7 +506,7 @@ where
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
-        input: I,
+        input: <S::Corpus as Corpus>::Input,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
@@ -514,14 +518,18 @@ where
     }
 }
 
-impl<CS, E, EM, F, I, OF, S> Evaluator<E, EM, I, S> for StdFuzzer<CS, F, OF>
+impl<CS, E, EM, F, OF, S> Evaluator<E, EM, <S::Corpus as Corpus>::Input, S> for StdFuzzer<CS, F, OF>
 where
-    CS: Scheduler<I, E::Observers, S>,
-    E: HasObservers,
-    E::Observers: Serialize,
-    F: Feedback<EM, I, E::Observers, S>,
-    OF: Feedback<EM, I, E::Observers, S>,
-    S: HasCorpus + HasSolutions + HasExecutions,
+    CS: Scheduler<<S::Corpus as Corpus>::Input, E::Observers, S>,
+    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Self> + HasObservers,
+    E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
+    F: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
+    OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
+    S: HasCorpus + HasExecutions + HasLastFoundTime + HasSolutions,
+    <S::Corpus as Corpus>::Input: Clone,
+    S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
+    Self: EvaluatorObservers<E, EM, <S::Corpus as Corpus>::Input, S>,
 {
     /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
@@ -530,18 +538,10 @@ where
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
-        input: I,
+        input: <S::Corpus as Corpus>::Input,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
         self.evaluate_input_with_observers(state, executor, manager, input, send_events)
-    }
-
-    fn add_disabled_input(&mut self, state: &mut S, input: I) -> Result<CorpusId, Error> {
-        let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
-        testcase.set_disabled(true);
-        // Add the disabled input to the main corpus
-        let id = state.corpus_mut().add_disabled(testcase)?;
-        Ok(id)
     }
 
     /// Adds an input, even if it's not considered `interesting` by any of the executors
@@ -550,7 +550,7 @@ where
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
-        input: I,
+        input: <S::Corpus as Corpus>::Input,
     ) -> Result<CorpusId, Error> {
         *state.last_found_time_mut() = current_time();
 
@@ -642,6 +642,18 @@ where
                 node_id: None,
             },
         )?;
+        Ok(id)
+    }
+
+    fn add_disabled_input(
+        &mut self,
+        state: &mut S,
+        input: <S::Corpus as Corpus>::Input,
+    ) -> Result<CorpusId, Error> {
+        let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
+        testcase.set_disabled(true);
+        // Add the disabled input to the main corpus
+        let id = state.corpus_mut().add_disabled(testcase)?;
         Ok(id)
     }
 }
@@ -775,16 +787,17 @@ impl<CS, F, OF> StdFuzzer<CS, F, OF> {
     }
 
     /// Runs the input and triggers observers
-    pub fn execute_input<E, EM, I, S>(
+    pub fn execute_input<E, EM, S>(
         &mut self,
         state: &mut S,
         executor: &mut E,
         event_mgr: &mut EM,
-        input: &I,
+        input: &<S::Corpus as Corpus>::Input,
     ) -> Result<ExitKind, Error>
     where
-        E: Executor<EM, I, S, Self> + HasObservers,
-        E::Observers: ObserversTuple<I, S>,
+        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Self> + HasObservers,
+        E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+        S: HasCorpus,
     {
         start_timer!(state);
         executor.observers_mut().pre_exec_all(state, input)?;
@@ -816,10 +829,12 @@ pub trait ExecutesInput<E, EM, I, S> {
     ) -> Result<ExitKind, Error>;
 }
 
-impl<CS, E, EM, F, I, OF, S> ExecutesInput<E, EM, I, S> for StdFuzzer<CS, F, OF>
+impl<CS, E, EM, F, OF, S> ExecutesInput<E, EM, <S::Corpus as Corpus>::Input, S>
+    for StdFuzzer<CS, F, OF>
 where
-    E: Executor<EM, I, S, Self> + HasObservers,
-    E::Observers: ObserversTuple<I, S>,
+    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Self> + HasObservers,
+    E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    S: HasCorpus,
 {
     /// Runs the input and triggers observers and feedback
     fn execute_input(
@@ -827,7 +842,7 @@ where
         state: &mut S,
         executor: &mut E,
         event_mgr: &mut EM,
-        input: &I,
+        input: &<S::Corpus as Corpus>::Input,
     ) -> Result<ExitKind, Error> {
         start_timer!(state);
         executor.observers_mut().pre_exec_all(state, input)?;

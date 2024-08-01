@@ -13,7 +13,7 @@ use core::{fmt::Debug, marker::PhantomData};
 pub use concolic::ConcolicFeedback;
 pub use differential::DiffFeedback;
 use libafl_bolts::{
-    tuples::{Handle, Handled, MatchNameRef},
+    tuples::{Handle, Handled, MatchName, MatchNameRef},
     Named,
 };
 pub use list::*;
@@ -880,7 +880,10 @@ pub struct TimeFeedback {
 
 impl<S> StateInitializer<S> for TimeFeedback {}
 
-impl<EM, I, OT, S> Feedback<EM, I, OT, S> for TimeFeedback {
+impl<EM, I, OT, S> Feedback<EM, I, OT, S> for TimeFeedback
+where
+    OT: MatchName,
+{
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Result<bool, Error> {
         Ok(false)

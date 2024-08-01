@@ -53,9 +53,9 @@ pub trait HasMaxSize {
 }
 
 /// Trait for elements offering a corpus of solutions
-pub trait HasSolutions: HasCorpus {
+pub trait HasSolutions {
     /// The associated type implementing [`Corpus`] for solutions
-    type Solutions: Corpus<Input = <Self::Corpus as Corpus>::Input>;
+    type Solutions: Corpus;
 
     /// The solutions corpus
     fn solutions(&self) -> &Self::Solutions;
