@@ -45,14 +45,11 @@ pub use unicode::*;
 
 use crate::{
     corpus::{CorpusId, HasCurrentCorpusId},
-    events::{EventFirer, EventProcessor, EventRestarter, HasEventManagerId, ProgressReporter},
-    executors::{Executor, HasObservers},
-    observers::ObserversTuple,
-    schedulers::Scheduler,
+    events::EventProcessor,
+    executors::HasObservers,
     stages::push::PushStage,
-    state::{HasExecutions, HasLastReportTime, HasRand, Stoppable},
-    Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasMetadata, HasNamedMetadata,
-    HasScheduler,
+    state::{HasExecutions, Stoppable},
+    Error, ExecutesInput, HasMetadata, HasNamedMetadata,
 };
 
 /// Mutational stage is the normal fuzzing stage.
@@ -81,8 +78,6 @@ pub mod unicode;
 
 pub mod pruning;
 pub use pruning::*;
-
-use crate::corpus::HasCorpus;
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
