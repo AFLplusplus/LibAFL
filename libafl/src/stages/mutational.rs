@@ -12,13 +12,12 @@ use libafl_bolts::{rands::Rand, Named};
 use crate::{
     corpus::{Corpus, CorpusId, HasCorpus, Testcase},
     fuzzer::Evaluator,
-    inputs::Input,
     mark_feature_time,
     mutators::{MultiMutator, MutationResult, Mutator},
     stages::{RetryCountRestartHelper, Stage},
     start_timer,
-    state::{HasCurrentTestcase, HasExecutions, HasRand},
-    Error, HasMetadata, HasNamedMetadata,
+    state::{HasCurrentTestcase, HasRand},
+    Error,
 };
 #[cfg(feature = "introspection")]
 use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
@@ -41,10 +40,7 @@ impl<S> MutatedTransformPost<S> for () {}
 ///
 /// This trait is implemented such that all testcases inherently transform to their inputs, should
 /// the input be cloneable.
-pub trait MutatedTransform<I, S>: Sized
-where
-    I: Input,
-{
+pub trait MutatedTransform<I, S>: Sized {
     /// Type indicating actions to be taken after the post-transformation input is executed
     type Post: MutatedTransformPost<S>;
 
@@ -56,11 +52,7 @@ where
 }
 
 // reflexive definition
-impl<I, S> MutatedTransform<I, S> for I
-where
-    I: Input + Clone,
-    S: HasCorpus,
-{
+impl<I, S> MutatedTransform<I, S> for I {
     type Post = ();
 
     #[inline]
@@ -78,13 +70,7 @@ where
 /// A Mutational stage is the stage in a fuzzing run that mutates inputs.
 /// Mutational stages will usually have a range of mutations that are
 /// being applied to the input one by one, between executions.
-pub trait MutationalStage<E, EM, I, M, S, Z>: Stage<E, EM, S, Z>
-where
-    M: Mutator<I, S>,
-    Z: Evaluator<E, EM, I, S>,
-    I: MutatedTransform<I, S> + Clone,
-    I: Input,
-{
+pub trait MutationalStage<E, EM, I, M, S, Z>: Stage<E, EM, S, Z> {
     /// The mutator registered for this stage
     fn mutator(&self) -> &M;
 
@@ -161,13 +147,7 @@ pub struct StdMutationalStage<I, M> {
     phantom: PhantomData<I>,
 }
 
-impl<E, EM, I, M, S, Z> MutationalStage<E, EM, I, M, S, Z> for StdMutationalStage<I, M>
-where
-    M: Mutator<I, S>,
-    Z: Evaluator<E, EM, I, S>,
-    S: HasCorpus + HasRand + HasExecutions + HasMetadata + HasNamedMetadata,
-    I: MutatedTransform<I, S> + Clone,
-{
+impl<E, EM, I, M, S, Z> MutationalStage<E, EM, I, M, S, Z> for StdMutationalStage<I, M> {
     /// The mutator, added to this stage
     #[inline]
     fn mutator(&self) -> &M {
@@ -197,13 +177,7 @@ impl<I, M> Named for StdMutationalStage<I, M> {
     }
 }
 
-impl<E, EM, I, M, S, Z> Stage<E, EM, S, Z> for StdMutationalStage<I, M>
-where
-    M: Mutator<I, S>,
-    Z: Evaluator<E, EM, I, S>,
-    S: HasCorpus + HasRand + HasMetadata + HasExecutions + HasNamedMetadata,
-    I: MutatedTransform<I, S> + Clone,
-{
+impl<E, EM, I, M, S, Z> Stage<E, EM, S, Z> for StdMutationalStage<I, M> {
     #[inline]
     #[allow(clippy::let_and_return)]
     fn perform(
@@ -287,13 +261,7 @@ impl<I, M> Named for MultiMutationalStage<I, M> {
     }
 }
 
-impl<E, EM, I, M, S, Z> Stage<E, EM, S, Z> for MultiMutationalStage<I, M>
-where
-    M: MultiMutator<I, S>,
-    Z: Evaluator<E, EM, I, S>,
-    S: HasCorpus + HasRand + HasNamedMetadata,
-    I: MutatedTransform<I, S> + Clone,
-{
+impl<E, EM, I, M, S, Z> Stage<E, EM, S, Z> for MultiMutationalStage<I, M> {
     #[inline]
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         // Make sure we don't get stuck crashing on a single testcase

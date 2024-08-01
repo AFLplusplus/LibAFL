@@ -42,12 +42,6 @@ use serde::{Deserialize, Serialize};
 // pub use tuneable::*;
 use tuple_list::NonEmptyTuple;
 
-// #[cfg(feature = "unicode")]
-// pub use unicode::*;
-
-// /// Mutational stage is the normal fuzzing stage.
-// pub mod mutational;
-pub mod push;
 // pub mod tmin;
 //
 // pub mod calibrate;
@@ -73,15 +67,24 @@ pub mod push;
 // pub use pruning::*;
 use crate::{
     corpus::{CorpusId, HasCorpus, HasCurrentCorpusId},
-    events::{EventFirer, EventProcessor, EventRestarter, HasEventManagerId, ProgressReporter},
+    events::EventProcessor,
     executors::{Executor, HasObservers},
     observers::ObserversTuple,
     schedulers::Scheduler,
-    state::{HasExecutions, HasLastReportTime, HasRand, Stoppable},
+    state::{HasExecutions, Stoppable},
+    state::{HasLastReportTime, HasRand},
     Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasMetadata, HasNamedMetadata,
     HasScheduler,
 };
 
+// #[cfg(feature = "unicode")]
+// pub use unicode::*;
+
+// /// Mutational stage is the normal fuzzing stage.
+// pub mod mutational;
+/// Mutational stage is the normal fuzzing stage.
+pub mod mutational;
+pub mod push;
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
 pub trait Stage<E, EM, S, Z> {
