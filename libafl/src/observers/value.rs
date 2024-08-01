@@ -260,7 +260,10 @@ impl<'a, A: Hash> Hash for RefCellValueObserver<'a, A> {
 
 /// Panics if the contained value is already mutably borrowed (calls
 /// [`RefCell::borrow`]).
-impl<A> HasLen for RefCellValueObserver<'_, A> {
+impl<A> HasLen for RefCellValueObserver<'_, A>
+where
+    A: HasLen,
+{
     /// Panics if the contained value is already mutably borrowed (calls
     /// [`RefCell::borrow`]).
     fn len(&self) -> usize {
@@ -288,8 +291,8 @@ impl<T> AsMut<Self> for RefCellValueObserver<'_, T> {
 
 impl<T, A> MapObserver for RefCellValueObserver<'_, A>
 where
-    T: PartialEq + Copy + Hash,
-    A: DerefMut<Target = [T]> + Hash + Serialize + DeserializeOwned,
+    T: PartialEq + Copy + Hash + Default,
+    A: DerefMut<Target = [T]> + Hash + Serialize + DeserializeOwned + HasLen + Default,
 {
     type Entry = T;
 
