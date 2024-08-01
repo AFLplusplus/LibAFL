@@ -10,12 +10,11 @@ use core::{
     time::Duration,
 };
 
-pub use mutational::StdMutationalPushStage;
-
+// pub use mutational::StdMutationalPushStage;
 use crate::{corpus::CorpusId, events::ProgressReporter, executors::ExitKind, Error};
 
 /// Mutational stage is the normal fuzzing stage.
-pub mod mutational;
+// pub mod mutational;
 /// Send a monitor update all 15 (or more) seconds
 const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
 

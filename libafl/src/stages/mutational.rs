@@ -10,14 +10,14 @@ use core::marker::PhantomData;
 use libafl_bolts::{rands::Rand, Named};
 
 use crate::{
-    corpus::{Corpus, CorpusId, HasCorpus, Testcase},
+    corpus::{Corpus, CorpusId, HasCorpus, HasCurrentCorpusId, Testcase},
     fuzzer::Evaluator,
     mark_feature_time,
     mutators::{MultiMutator, MutationResult, Mutator},
     stages::{RetryCountRestartHelper, Stage},
     start_timer,
     state::{HasCurrentTestcase, HasRand},
-    Error,
+    Error, HasNamedMetadata,
 };
 #[cfg(feature = "introspection")]
 use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
@@ -79,7 +79,13 @@ pub(crate) fn perform_mutational<E, EM, I, M, S, Z>(
     manager: &mut EM,
     mutator: &mut M,
     num: usize,
-) -> Result<(), Error> {
+) -> Result<(), Error> 
+where 
+    S: HasCorpus + HasCurrentCorpusId,
+    I: Clone,
+    M: Mutator<I, S>,
+    Z: Evaluator<E, EM, I, S>,
+{
     start_timer!(state);
     // Here saturating_sub is needed as self.iterations() might be actually smaller than the previous value before reset.
     /*
@@ -143,14 +149,15 @@ pub struct StdMutationalStage<I, M> {
     mutator: M,
     /// The maximum amount of iterations we should do each round
     max_iterations: usize,
+    phantom: PhantomData<I>,
 }
 
-impl<I, M, S> MutationalStage<S> for StdMutationalStage<I, M>
-where
-    S: HasCorpus,
+impl<I, M, S> MutationalStage<S> for StdMutationalStage<I, M> 
+where 
+    S: HasRand,
 {
-    type M = Self::M;
-    type I = Self::I;
+    type M = M;
+    type I = I;
 
     /// The mutator, added to this stage
     #[inline]
@@ -181,7 +188,13 @@ impl<I, M> Named for StdMutationalStage<I, M> {
     }
 }
 
-impl<E, EM, I, M, S, Z> Stage<E, EM, S, Z> for StdMutationalStage<I, M> {
+impl<E, EM, I, M, S, Z> Stage<E, EM, S, Z> for StdMutationalStage<I, M> 
+where
+    I: Clone,
+    S: HasRand + HasCurrentCorpusId + HasCorpus + HasNamedMetadata,
+    Z: Evaluator<E, EM, I, S>,
+    <Self as MutationalStage<S>>::M: Mutator<I, S>,
+{
     #[inline]
     #[allow(clippy::let_and_return)]
     fn perform(
@@ -192,7 +205,8 @@ impl<E, EM, I, M, S, Z> Stage<E, EM, S, Z> for StdMutationalStage<I, M> {
         manager: &mut EM,
     ) -> Result<(), Error> {
         let iter = self.iterations(state)?;
-        let ret = perform_mutational(fuzzer, executor, state, manager, self.mutator_mut(), iter);
+        let mutator = self.mutator_mut();
+        let ret = perform_mutational(fuzzer, executor, state, manager, mutator, iter);
 
         #[cfg(feature = "introspection")]
         state.introspection_monitor_mut().finish_stage();
@@ -241,6 +255,7 @@ impl<I, M> StdMutationalStage<I, M> {
             ),
             mutator,
             max_iterations,
+            phantom: PhantomData,
         }
     }
 }
@@ -265,7 +280,12 @@ impl<I, M> Named for MultiMutationalStage<I, M> {
     }
 }
 
-impl<E, EM, I, M, S, Z> Stage<E, EM, S, Z> for MultiMutationalStage<I, M> {
+impl<E, EM, I, M, S, Z> Stage<E, EM, S, Z> for MultiMutationalStage<I, M>
+where 
+    S: HasNamedMetadata + HasCorpus + HasCurrentCorpusId,
+    M: MultiMutator<I, S>,
+    Z: Evaluator<E, EM, I, S>
+{
     #[inline]
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         // Make sure we don't get stuck crashing on a single testcase

@@ -390,57 +390,22 @@ where
     }
 }
 
-/// The struct has [`InProcessHooks`].
-pub trait HasInProcessHooks<S>
-where
-    S: UsesInput,
-{
-    /// Get the in-process handlers.
-    fn inprocess_hooks(&self) -> &InProcessHooks<S>;
-
-    /// Get the mut in-process handlers.
-    fn inprocess_hooks_mut(&mut self) -> &mut InProcessHooks<S>;
-}
-
-impl<H, HB, HT, OT, S> HasInProcessHooks<S> for GenericInProcessExecutor<H, HB, HT, OT, S>
-where
-    H: FnMut(&<S as UsesInput>::Input) -> ExitKind + ?Sized,
-    HB: BorrowMut<H>,
-    HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
-    S: State + HasExecutions + HasSolutions + HasCorpus,
-{
-    /// the timeout handler
-    #[inline]
-    fn inprocess_hooks(&self) -> &InProcessHooks<S> {
-        self.inner.inprocess_hooks()
-    }
-
-    /// the timeout handler
-    #[inline]
-    fn inprocess_hooks_mut(&mut self) -> &mut InProcessHooks<S> {
-        self.inner.inprocess_hooks_mut()
-    }
-}
-
 #[inline]
 #[allow(clippy::too_many_arguments)]
 /// Save state if it is an objective
-pub fn run_observers_and_save_state<E, EM, OF, Z>(
+pub fn run_observers_and_save_state<E, EM, I, S, Z>(
     executor: &mut E,
-    state: &mut E::State,
-    input: &<E::State as UsesInput>::Input,
+    state: &mut S,
+    input: &I,
     fuzzer: &mut Z,
     manager: &mut EM,
     exit_kind: ExitKind,
 ) where
     E: HasObservers,
-    EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-    OF: Feedback<E::State>,
-    E::State: HasExecutions + HasSolutions + HasCorpus,
-    Z: HasObjective<Objective = OF, State = E::State>
-        + HasScheduler<State = E::State>
-        + ExecutionProcessor,
+    EM: EventFirer<I, S> + EventRestarter<S>,
+    S: HasExecutions + HasSolutions + HasCorpus,
+    Z: HasObjective + HasScheduler + ExecutionProcessor<EM, I, E::Observers, S>,
+    Z::Objective: Feedback<EM, I, E::Observers, S>,
 {
     let observers = executor.observers_mut();
     let scheduler = fuzzer.scheduler_mut();

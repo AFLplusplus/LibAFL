@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::Testcase,
-    feedbacks::{Feedback, FeedbackFactory},
+    feedbacks::{Feedback, FeedbackFactory, StateInitializer},
     Error,
 };
 
@@ -69,6 +69,8 @@ impl<N> Debug for CustomFilenameToTestcaseFeedback<N> {
             .finish_non_exhaustive()
     }
 }
+
+impl<N, S> StateInitializer<S> for CustomFilenameToTestcaseFeedback<N> {}
 
 impl<EM, I, OT, N, S> Feedback<EM, I, OT, S> for CustomFilenameToTestcaseFeedback<N>
 where

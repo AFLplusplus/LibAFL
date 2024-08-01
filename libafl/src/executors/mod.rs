@@ -3,42 +3,42 @@
 use alloc::boxed::Box;
 use core::fmt::Debug;
 
-pub use combined::CombinedExecutor;
-#[cfg(all(feature = "std", any(unix, doc)))]
-pub use command::CommandExecutor;
-pub use differential::DiffExecutor;
-#[cfg(all(feature = "std", feature = "fork", unix))]
-pub use forkserver::{Forkserver, ForkserverExecutor};
-pub use inprocess::InProcessExecutor;
-#[cfg(all(feature = "std", feature = "fork", unix))]
-pub use inprocess_fork::InProcessForkExecutor;
+// pub use combined::CombinedExecutor;
+// #[cfg(all(feature = "std", any(unix, doc)))]
+// pub use command::CommandExecutor;
+// pub use differential::DiffExecutor;
+// #[cfg(all(feature = "std", feature = "fork", unix))]
+// pub use forkserver::{Forkserver, ForkserverExecutor};
+// pub use inprocess::InProcessExecutor;
+// #[cfg(all(feature = "std", feature = "fork", unix))]
+// pub use inprocess_fork::InProcessForkExecutor;
 #[cfg(unix)]
 use libafl_bolts::os::unix_signals::Signal;
 use libafl_bolts::tuples::RefIndexable;
 use serde::{Deserialize, Serialize};
-pub use shadow::ShadowExecutor;
+// pub use shadow::ShadowExecutor;
 pub use with_observers::WithObservers;
 
 use crate::Error;
 
-pub mod combined;
-#[cfg(all(feature = "std", any(unix, doc)))]
-pub mod command;
-pub mod differential;
-#[cfg(all(feature = "std", feature = "fork", unix))]
-pub mod forkserver;
-pub mod inprocess;
-
-/// The module for inproc fork executor
-#[cfg(all(feature = "std", unix))]
-pub mod inprocess_fork;
-
-pub mod shadow;
-
+// pub mod combined;
+// #[cfg(all(feature = "std", any(unix, doc)))]
+// pub mod command;
+// pub mod differential;
+// #[cfg(all(feature = "std", feature = "fork", unix))]
+// pub mod forkserver;
+// pub mod inprocess;
+//
+// /// The module for inproc fork executor
+// #[cfg(all(feature = "std", unix))]
+// pub mod inprocess_fork;
+//
+// pub mod shadow;
+//
 pub mod with_observers;
-
-/// The module for all the hooks
-pub mod hooks;
+//
+// /// The module for all the hooks
+// pub mod hooks;
 
 /// How an execution finished.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -89,14 +89,6 @@ pub trait Executor<EM, I, S, Z> {
         mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error>;
-
-    /// Wraps this Executor with the given [`ObserversTuple`] to implement [`HasObservers`].
-    ///
-    /// If the executor already implements [`HasObservers`], then the original implementation will be overshadowed by
-    /// the implementation of this wrapper.
-    fn with_observers<OT>(self, observers: OT) -> WithObservers<Self, OT> {
-        WithObservers::new(self, observers)
-    }
 }
 
 /// The common signals we want to handle

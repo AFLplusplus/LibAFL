@@ -7,13 +7,15 @@ use alloc::borrow::Cow;
 use core::fmt::Debug;
 
 use libafl_bolts::{
-    tuples::{Handle, Handled, MatchNameRef},
+    tuples::{Handle, Handled, MatchName, MatchNameRef},
     Named,
 };
 
 use crate::{
-    corpus::Testcase, feedbacks::Feedback, observers::concolic::ConcolicObserver, Error,
-    HasMetadata,
+    corpus::Testcase,
+    feedbacks::{Feedback, StateInitializer},
+    observers::concolic::ConcolicObserver,
+    Error, HasMetadata,
 };
 
 /// The concolic feedback. It is used to attach concolic tracing metadata to the testcase.
@@ -42,7 +44,12 @@ impl Named for ConcolicFeedback<'_> {
     }
 }
 
-impl<EM, I, OT, S> Feedback<EM, I, OT, S> for ConcolicFeedback<'_> {
+impl<S> StateInitializer<S> for ConcolicFeedback<'_> {}
+
+impl<EM, I, OT, S> Feedback<EM, I, OT, S> for ConcolicFeedback<'_>
+where
+    OT: MatchName,
+{
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Result<bool, Error> {
         Ok(false)

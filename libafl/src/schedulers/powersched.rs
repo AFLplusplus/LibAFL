@@ -13,7 +13,6 @@ use crate::{
     corpus::{Corpus, CorpusId, HasCorpus, HasTestcase, Testcase},
     observers::MapObserver,
     schedulers::{AflScheduler, HasQueueCycles, RemovableScheduler, Scheduler},
-    state::State,
     Error, HasMetadata,
 };
 
@@ -227,7 +226,7 @@ impl<C, O> HasQueueCycles for PowerQueueScheduler<C, O> {
 
 impl<C, I, O, OT, S> Scheduler<I, OT, S> for PowerQueueScheduler<C, O>
 where
-    S: HasCorpus + HasMetadata + HasTestcase + State,
+    S: HasCorpus + HasMetadata + HasTestcase,
     O: MapObserver,
     C: AsRef<O>,
 {

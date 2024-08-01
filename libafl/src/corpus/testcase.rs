@@ -109,8 +109,7 @@ impl<I> Testcase<I> {
 
     /// Set the input
     #[inline]
-    pub fn set_input(&mut self, mut input: I) {
-        input.wrapped_as_testcase();
+    pub fn set_input(&mut self, input: I) {
         self.input = Some(input);
     }
 
@@ -239,7 +238,6 @@ impl<I> Testcase<I> {
     /// Create a new Testcase instance given an input
     #[inline]
     pub fn new(mut input: I) -> Self {
-        input.wrapped_as_testcase();
         Self {
             input: Some(input),
             filename: None,
@@ -265,7 +263,6 @@ impl<I> Testcase<I> {
     /// Creates a testcase, attaching the id of the parent
     /// that this [`Testcase`] was derived from on creation
     pub fn with_parent_id(mut input: I, parent_id: CorpusId) -> Self {
-        input.wrapped_as_testcase();
         Testcase {
             input: Some(input),
             filename: None,
@@ -291,7 +288,6 @@ impl<I> Testcase<I> {
     /// Create a new Testcase instance given an [`Input`] and a `filename`
     #[inline]
     pub fn with_filename(mut input: I, filename: String) -> Self {
-        input.wrapped_as_testcase();
         Self {
             input: Some(input),
             filename: Some(filename),
@@ -317,7 +313,6 @@ impl<I> Testcase<I> {
     /// Create a new Testcase instance given an [`Input`] and the number of executions
     #[inline]
     pub fn with_executions(mut input: I, executions: u64) -> Self {
-        input.wrapped_as_testcase();
         Self {
             input: Some(input),
             filename: None,

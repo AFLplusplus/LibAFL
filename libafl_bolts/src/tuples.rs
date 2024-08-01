@@ -596,7 +596,6 @@ pub struct RefIndexable<RM, M>(RM, PhantomData<M>);
 impl<RM, M> From<RM> for RefIndexable<RM, M>
 where
     RM: Deref<Target = M>,
-    M: MatchName,
 {
     fn from(value: RM) -> Self {
         RefIndexable(value, PhantomData)
