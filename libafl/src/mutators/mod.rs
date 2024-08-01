@@ -1,43 +1,42 @@
 //! [`Mutator`]`s` mutate input during fuzzing. These can be used standalone or in combination with other mutators to explore the input space more effectively.
 //! You can read more about mutators in the [libAFL book](https://aflplus.plus/libafl-book/core_concepts/mutator.html)
-pub mod scheduled;
+// pub mod scheduled;
+//
+// pub use scheduled::*;
+// pub mod mutations;
+// pub use mutations::*;
+// pub mod token_mutations;
+// pub use token_mutations::*;
+// pub mod encoded_mutations;
+// pub use encoded_mutations::*;
+// pub mod mopt_mutator;
+// pub use mopt_mutator::*;
+// pub mod gramatron;
+// pub use gramatron::*;
+// pub mod grimoire;
+// pub use grimoire::*;
+// pub mod tuneable;
+// pub use tuneable::*;
+//
+// #[cfg(feature = "unicode")]
+// pub mod unicode;
+// #[cfg(feature = "unicode")]
+// pub use unicode::*;
+//
+// #[cfg(feature = "multipart_inputs")]
+// pub mod multi;
+// #[cfg(feature = "multipart_inputs")]
+// pub use multi::*;
+//
+// #[cfg(feature = "nautilus")]
+// pub mod nautilus;
+use alloc::{borrow::Cow, boxed::Box, vec::Vec};
 use core::fmt;
 
-pub use scheduled::*;
-pub mod mutations;
-pub use mutations::*;
-pub mod token_mutations;
-use serde::{Deserialize, Serialize};
-pub use token_mutations::*;
-pub mod encoded_mutations;
-pub use encoded_mutations::*;
-pub mod mopt_mutator;
-pub use mopt_mutator::*;
-pub mod gramatron;
-pub use gramatron::*;
-pub mod grimoire;
-pub use grimoire::*;
-pub mod tuneable;
-pub use tuneable::*;
-
-#[cfg(feature = "unicode")]
-pub mod unicode;
-#[cfg(feature = "unicode")]
-pub use unicode::*;
-
-#[cfg(feature = "multipart_inputs")]
-pub mod multi;
-#[cfg(feature = "multipart_inputs")]
-pub use multi::*;
-
-#[cfg(feature = "nautilus")]
-pub mod nautilus;
-
-use alloc::{borrow::Cow, boxed::Box, vec::Vec};
-
 use libafl_bolts::{tuples::IntoVec, HasLen, Named};
-#[cfg(feature = "nautilus")]
-pub use nautilus::*;
+use serde::{Deserialize, Serialize};
+// #[cfg(feature = "nautilus")]
+// pub use nautilus::*;
 use tuple_list::NonEmptyTuple;
 
 use crate::{corpus::CorpusId, Error};

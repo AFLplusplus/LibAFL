@@ -26,7 +26,10 @@ pub struct CachedOnDiskCorpus<I> {
     cache_max_len: usize,
 }
 
-impl<I> CachedOnDiskCorpus<I> {
+impl<I> CachedOnDiskCorpus<I>
+where
+    I: Input,
+{
     fn cache_testcase<'a>(
         &'a self,
         testcase: &'a RefCell<Testcase<I>>,
@@ -53,6 +56,7 @@ impl<I> CachedOnDiskCorpus<I> {
         Ok(())
     }
 }
+
 impl<I> Corpus for CachedOnDiskCorpus<I>
 where
     I: Input,

@@ -14,8 +14,8 @@ pub mod unix_signal_handler {
         executors::{
             common_signals,
             hooks::inprocess::{HasTimeout, InProcessExecutorHandlerData, GLOBAL_STATE},
-            inprocess::{run_observers_and_save_state, HasInProcessHooks},
-            Executor, ExitKind, HasObservers,
+            inprocess::run_observers_and_save_state,
+            ExitKind, HasObservers,
         },
         feedbacks::Feedback,
         fuzzer::{ExecutionProcessor, HasObjective},
@@ -75,13 +75,13 @@ pub mod unix_signal_handler {
     }
 
     /// invokes the `post_exec` hook on all observer in case of panic
-    pub fn setup_panic_hook<E, EM, OF, Z>()
+    pub fn setup_panic_hook<E, EM, I, S, Z>()
     where
         E: HasObservers,
-        EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
-        E::State: HasExecutions + HasSolutions + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State> + ExecutionProcessor + HasScheduler,
+        EM: EventFirer<I, S> + EventRestarter<S>,
+        S: HasExecutions + HasSolutions + HasCorpus,
+        Z: HasObjective + HasScheduler + ExecutionProcessor<EM, I, E::Observers, S>,
+        Z::Objective: Feedback<EM, I, E::Observers, S>,
     {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| unsafe {
@@ -91,12 +91,12 @@ pub mod unix_signal_handler {
             if (*data).is_valid() {
                 // We are fuzzing!
                 let executor = (*data).executor_mut::<E>();
-                let state = (*data).state_mut::<E::State>();
-                let input = (*data).take_current_input::<<E::State as UsesInput>::Input>();
+                let state = (*data).state_mut::<S>();
+                let input = (*data).take_current_input::<I>();
                 let fuzzer = (*data).fuzzer_mut::<Z>();
                 let event_mgr = (*data).event_mgr_mut::<EM>();
 
-                run_observers_and_save_state::<E, EM, OF, Z>(
+                run_observers_and_save_state::<E, EM, I, S, Z>(
                     executor,
                     state,
                     input,
@@ -118,17 +118,17 @@ pub mod unix_signal_handler {
     /// Well, signal handling is not safe
     #[cfg(unix)]
     #[allow(clippy::needless_pass_by_value)]
-    pub unsafe fn inproc_timeout_handler<E, EM, OF, Z>(
+    pub unsafe fn inproc_timeout_handler<E, EM, I, S, Z>(
         _signal: Signal,
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: HasObservers + HasInProcessHooks<E::State>,
-        EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
-        E::State: HasExecutions + HasSolutions + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State> + ExecutionProcessor + HasScheduler,
+        E: HasObservers,
+        EM: EventFirer<I, S> + EventRestarter<S>,
+        S: HasExecutions + HasSolutions + HasCorpus,
+        Z: HasObjective + HasScheduler + ExecutionProcessor<EM, I, E::Observers, S>,
+        Z::Objective: Feedback<EM, I, E::Observers, S>,
     {
         // this stuff is for batch timeout
         if !data.executor_ptr.is_null()
@@ -146,14 +146,14 @@ pub mod unix_signal_handler {
         }
 
         let executor = data.executor_mut::<E>();
-        let state = data.state_mut::<E::State>();
+        let state = data.state_mut::<S>();
         let event_mgr = data.event_mgr_mut::<EM>();
         let fuzzer = data.fuzzer_mut::<Z>();
-        let input = data.take_current_input::<<E::State as UsesInput>::Input>();
+        let input = data.take_current_input::<I>();
 
         log::error!("Timeout in fuzz run.");
 
-        run_observers_and_save_state::<E, EM, OF, Z>(
+        run_observers_and_save_state::<E, EM, I, S, Z>(
             executor,
             state,
             input,
@@ -173,17 +173,17 @@ pub mod unix_signal_handler {
     /// Well, signal handling is not safe
     #[allow(clippy::too_many_lines)]
     #[allow(clippy::needless_pass_by_value)]
-    pub unsafe fn inproc_crash_handler<E, EM, OF, Z>(
+    pub unsafe fn inproc_crash_handler<E, EM, I, S, Z>(
         signal: Signal,
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: Executor<EM, Z> + HasObservers,
-        EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
-        E::State: HasExecutions + HasSolutions + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State> + ExecutionProcessor + HasScheduler,
+        E: HasObservers,
+        EM: EventFirer<I, S> + EventRestarter<S>,
+        S: HasExecutions + HasSolutions + HasCorpus,
+        Z: HasObjective + HasScheduler + ExecutionProcessor<EM, I, E::Observers, S>,
+        Z::Objective: Feedback<EM, I, E::Observers, S>,
     {
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
         let _context = _context.map(|p| {
@@ -195,10 +195,10 @@ pub mod unix_signal_handler {
         if data.is_valid() {
             let executor = data.executor_mut::<E>();
             // disarms timeout in case of timeout
-            let state = data.state_mut::<E::State>();
+            let state = data.state_mut::<S>();
             let event_mgr = data.event_mgr_mut::<EM>();
             let fuzzer = data.fuzzer_mut::<Z>();
-            let input = data.take_current_input::<<E::State as UsesInput>::Input>();
+            let input = data.take_current_input::<I>();
 
             log::error!("Child crashed!");
 
@@ -223,7 +223,7 @@ pub mod unix_signal_handler {
                 }
             }
 
-            run_observers_and_save_state::<E, EM, OF, Z>(
+            run_observers_and_save_state::<E, EM, I, S, Z>(
                 executor,
                 state,
                 input,

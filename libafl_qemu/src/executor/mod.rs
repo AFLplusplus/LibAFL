@@ -122,7 +122,7 @@ pub unsafe fn inproc_qemu_timeout_handler<'a, E, EM, OF, Z>(
     context: Option<&'a mut ucontext_t>,
     data: &'a mut InProcessExecutorHandlerData,
 ) where
-    E: Executor<EM, Z> + HasObservers + HasInProcessHooks<E::State>,
+    E: Executor<EM, Z> + HasObservers,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
     OF: Feedback<E::State>,
     E::State: HasSolutions + HasCorpus + HasExecutions,
@@ -147,7 +147,7 @@ where
     #[cfg(emulation_mode = "systemmode")]
     pub fn new<E, EM, OF, OT, Z>(emulator: &'a mut Emulator<CM, EH, ET, S>) -> Result<Self, Error>
     where
-        E: Executor<EM, Z, State = S> + HasInProcessHooks<S> + HasObservers,
+        E: Executor<EM, Z, State = S> + HasObservers,
         EM: EventFirer<State = S> + EventRestarter<State = S>,
         OF: Feedback<S>,
         OT: ObserversTuple<S>,
@@ -159,7 +159,7 @@ where
     #[cfg(emulation_mode = "usermode")]
     pub fn new<E, EM, OF, OT, Z>(emulator: &'a mut Emulator<CM, EH, ET, S>) -> Result<Self, Error>
     where
-        E: Executor<EM, Z, State = S> + HasInProcessHooks<S> + HasObservers,
+        E: Executor<EM, Z, State = S> + HasObservers,
         EM: EventFirer<State = S> + EventRestarter<State = S>,
         OF: Feedback<S>,
         OT: ObserversTuple<S>,

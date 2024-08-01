@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use crate::feedbacks::premature_last_result_err;
 use crate::{
     executors::ExitKind,
-    feedbacks::{Feedback, FeedbackFactory},
+    feedbacks::{Feedback, FeedbackFactory, StateInitializer},
     Error,
 };
 
@@ -135,6 +135,8 @@ where
             .finish_non_exhaustive()
     }
 }
+
+impl<C, O1, O2, S> StateInitializer<S> for DiffFeedback<C, O1, O2> {}
 
 impl<C, EM, I, O1, O2, OT, S> Feedback<EM, I, OT, S> for DiffFeedback<C, O1, O2>
 where

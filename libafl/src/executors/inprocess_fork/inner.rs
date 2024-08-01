@@ -34,12 +34,7 @@ use crate::{
 };
 
 /// Inner state of GenericInProcessExecutor-like structures.
-pub struct GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
-where
-    OT: ObserversTuple<S>,
-    SP: ShMemProvider,
-    HT: ExecutorHooksTuple<S>,
-{
+pub struct GenericInProcessForkExecutorInner<HT, OT, S, SP> {
     pub(super) hooks: (InChildProcessHooks<S>, HT),
     pub(super) shmem_provider: SP,
     pub(super) observers: OT,
@@ -47,17 +42,13 @@ where
     pub(super) itimerspec: libc::itimerspec,
     #[cfg(all(unix, not(target_os = "linux")))]
     pub(super) itimerval: Itimerval,
-    pub(super) phantom: PhantomData<(S, EM, Z)>,
 }
 
-impl<HT, OT, S, SP, EM, Z> Debug for GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
+impl<HT, OT, S, SP> Debug for GenericInProcessForkExecutorInner<HT, OT, S, SP>
 where
-    OT: ObserversTuple<S> + Debug,
-    S: UsesInput,
-    SP: ShMemProvider,
-    HT: ExecutorHooksTuple<S> + Debug,
-    EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
+    OT: Debug,
+    SP: Debug,
+    HT: Debug,
 {
     #[cfg(target_os = "linux")]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -80,19 +71,7 @@ where
     }
 }
 
-impl<HT, OT, S, SP, EM, Z> UsesState for GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
-where
-    OT: ObserversTuple<S>,
-    S: State,
-    SP: ShMemProvider,
-    HT: ExecutorHooksTuple<S>,
-    EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
-{
-    type State = S;
-}
-
-impl<EM, HT, OT, S, SP, Z> GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
+impl<HT, OT, S, SP> GenericInProcessForkExecutorInner<HT, OT, S, SP>
 where
     OT: ObserversTuple<S> + Debug,
     S: State + UsesInput,

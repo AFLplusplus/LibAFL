@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::Testcase,
-    feedbacks::Feedback,
+    feedbacks::{Feedback, StateInitializer},
     observers::{StdErrObserver, StdOutObserver},
     Error, HasMetadata,
 };
@@ -31,6 +31,8 @@ impl_serdeany!(StdOutMetadata);
 pub struct StdOutToMetadataFeedback {
     o_ref: Handle<StdOutObserver>,
 }
+
+impl<S> StateInitializer<S> for StdOutToMetadataFeedback {}
 
 impl<EM, I, OT, S> Feedback<EM, I, OT, S> for StdOutToMetadataFeedback
 where
@@ -99,6 +101,8 @@ impl_serdeany!(StdErrMetadata);
 pub struct StdErrToMetadataFeedback {
     o_ref: Handle<StdErrObserver>,
 }
+
+impl<S> StateInitializer<S> for StdErrToMetadataFeedback {}
 
 impl<EM, I, OT, S> Feedback<EM, I, OT, S> for StdErrToMetadataFeedback
 where

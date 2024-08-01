@@ -2187,8 +2187,10 @@ impl Handler for LlmpShutdownSignalHandler {
         }
     }
 
-    fn signals(&self) -> Vec<Signal> {
-        vec![Signal::SigTerm, Signal::SigInterrupt, Signal::SigQuit]
+    fn signals(&self) -> &'static [Signal] {
+        static LLMP_SHUTDOWN_SIGNALS: [Signal; 3] =
+            [Signal::SigTerm, Signal::SigInterrupt, Signal::SigQuit];
+        &LLMP_SHUTDOWN_SIGNALS
     }
 }
 

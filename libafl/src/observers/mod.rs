@@ -1,8 +1,8 @@
 //! Observers give insights about runs of a target, such as coverage, timing, stack depth, and more.
 use alloc::borrow::Cow;
 
-pub mod cmp;
-pub use cmp::*;
+// pub mod cmp;
+// pub use cmp::*;
 
 #[cfg(feature = "std")]
 pub mod stdio;

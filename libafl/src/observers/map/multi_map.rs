@@ -239,7 +239,11 @@ where
     }
 }
 
-impl<'a, 'it, T, const DIFFERENTIAL: bool> AsIter<'it> for MultiMapObserver<'a, T, DIFFERENTIAL> {
+impl<'a, 'it, T, const DIFFERENTIAL: bool> AsIter<'it> for MultiMapObserver<'a, T, DIFFERENTIAL>
+where
+    T: 'a,
+    'a: 'it,
+{
     type Item = T;
     type Ref = &'it T;
     type IntoIter = Flatten<Iter<'it, OwnedMutSlice<'a, T>>>;
@@ -249,8 +253,10 @@ impl<'a, 'it, T, const DIFFERENTIAL: bool> AsIter<'it> for MultiMapObserver<'a, 
     }
 }
 
-impl<'a, 'it, T, const DIFFERENTIAL: bool> AsIterMut<'it>
-    for MultiMapObserver<'a, T, DIFFERENTIAL>
+impl<'a, 'it, T, const DIFFERENTIAL: bool> AsIterMut<'it> for MultiMapObserver<'a, T, DIFFERENTIAL>
+where
+    T: 'a,
+    'a: 'it,
 {
     type RefMut = &'it mut T;
     type IntoIterMut = Flatten<IterMut<'it, OwnedMutSlice<'a, T>>>;

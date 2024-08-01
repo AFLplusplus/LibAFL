@@ -25,7 +25,8 @@ use serde::{de::DeserializeOwned, Serialize};
 #[allow(deprecated)]
 use super::CustomBufHandlerFn;
 use super::{
-    default_maybe_report_progress, default_report_progress, HasCustomBufHandlers, ProgressReporter,
+    default_maybe_report_progress, default_report_progress, CustomBufHandlerTuple,
+    HasCustomBufHandlers, ProgressReporter,
 };
 #[cfg(feature = "std")]
 use crate::corpus::HasCorpus;
@@ -104,6 +105,8 @@ impl<I, HT, MT, S> EventRestarter<S> for SimpleEventManager<I, HT, MT> {
 
 impl<E, I, HT, MT, S, Z> EventProcessor<E, S, Z> for SimpleEventManager<I, HT, MT>
 where
+    HT: CustomBufHandlerTuple<S>,
+    I: Debug,
     MT: Monitor,
     S: Stoppable,
 {
@@ -121,11 +124,11 @@ where
     }
 
     fn on_shutdown(&mut self) -> Result<(), Error> {
-        self.send_exiting()
+        <Self as EventRestarter<S>>::send_exiting(self)
     }
 }
 
-impl<I, HT, MT, S> HasCustomBufHandlers<S> for SimpleEventManager<I, HT, MT> {
+impl<I, HT, MT> HasCustomBufHandlers for SimpleEventManager<I, HT, MT> {
     type Handlers = HT;
 
     fn handlers(&self) -> &Self::Handlers {
@@ -286,14 +289,13 @@ where
         &mut self,
         state: &mut S,
         event: Event<I>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+        HT: CustomBufHandlerTuple<S>,
+        I: Debug,
+    {
         match event {
-            Event::CustomBuf { buf, tag } => {
-                for handler in &mut self.handlers {
-                    handler(state, &tag, &buf)?;
-                }
-                Ok(())
-            }
+            Event::CustomBuf { buf, tag } => self.handlers.handle_all(state, &tag, &buf),
             Event::Stop => {
                 state.request_stop();
                 Ok(())
@@ -371,9 +373,10 @@ where
 }
 
 #[cfg(feature = "std")]
-#[allow(clippy::type_complexity, clippy::too_many_lines)]
-impl<I, HT, MT, SP> SimpleRestartingEventManager<I, HT, MT, SP>
+#[allow(clippy::type_complexity, clippy::too_many_lines, deprecated)]
+impl<I, MT, S, SP> SimpleRestartingEventManager<I, Vec<Box<CustomBufHandlerFn<S>>>, MT, SP>
 where
+    MT: Monitor,
     SP: ShMemProvider, //TODO CE: CustomEvent,
 {
     /// Creates a new [`SimpleEventManager`].
@@ -388,7 +391,7 @@ where
     /// This [`EventManager`] is simple and single threaded,
     /// but can still used shared maps to recover from crashes and timeouts.
     #[allow(clippy::similar_names)]
-    pub fn launch<S>(mut monitor: MT, shmem_provider: &mut SP) -> Result<(Option<S>, Self), Error>
+    pub fn launch(mut monitor: MT, shmem_provider: &mut SP) -> Result<(Option<S>, Self), Error>
     where
         S: DeserializeOwned + Serialize + HasCorpus + HasSolutions,
         MT: Debug,

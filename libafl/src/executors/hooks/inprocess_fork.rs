@@ -1,5 +1,4 @@
 //! The hook for the `InProcessForkExecutor`
-use alloc::vec::Vec;
 use core::{
     ffi::c_void,
     marker::PhantomData,
@@ -18,30 +17,29 @@ use crate::{
         common_signals,
         hooks::ExecutorHook,
         inprocess_fork::{child_signal_handlers, ForkHandlerFuncPtr},
-        HasObservers,
+        Executor,
     },
     Error,
 };
 
 /// The inmem fork executor's hooks.
 #[derive(Debug)]
-pub struct InChildProcessHooks<S> {
+pub struct InChildProcessHooks<E> {
     /// On crash C function pointer
     pub crash_handler: *const c_void,
     /// On timeout C function pointer
     pub timeout_handler: *const c_void,
-    phantom: PhantomData<S>,
+    phantom: PhantomData<E>,
 }
 
-impl<S> ExecutorHook<S> for InChildProcessHooks<S>
+impl<E, EM, I, S, Z> ExecutorHook<EM, I, S, Z> for InChildProcessHooks<E>
 where
-    S: UsesInput,
+    E: Executor<EM, I, S, Z>,
 {
-    /// Init this hook
-    fn init<E: HasObservers>(&mut self, _state: &mut S) {}
+    type Executor = E;
 
     /// Call before running a target.
-    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) {
         unsafe {
             let data = addr_of_mut!(FORK_EXECUTOR_GLOBAL_DATA);
             (*data).crash_handler = self.crash_handler;
@@ -50,15 +48,12 @@ where
         }
     }
 
-    fn post_exec(&mut self, _state: &mut S, _input: &S::Input) {}
+    fn post_exec(&mut self, _state: &mut S, _input: &I) {}
 }
 
-impl<S> InChildProcessHooks<S> {
+impl<E> InChildProcessHooks<E> {
     /// Create new [`InChildProcessHooks`].
-    pub fn new<E>() -> Result<Self, Error>
-    where
-        E: HasObservers,
-    {
+    pub fn new() -> Result<Self, Error> {
         #[cfg_attr(miri, allow(unused_variables, unused_unsafe))]
         unsafe {
             let data = addr_of_mut!(FORK_EXECUTOR_GLOBAL_DATA);
@@ -170,7 +165,7 @@ impl Handler for InProcessForkExecutorGlobalData {
         }
     }
 
-    fn signals(&self) -> Vec<Signal> {
+    fn signals(&self) -> &'static [Signal] {
         common_signals()
     }
 }
