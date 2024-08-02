@@ -26,7 +26,6 @@ pub mod minimizer;
 use core::{cell::RefCell, fmt};
 
 pub mod nop;
-use libafl_bolts::rands::Rand;
 #[cfg(all(feature = "cmin", unix))]
 pub use minimizer::*;
 pub use nop::NopCorpus;
@@ -87,6 +86,7 @@ macro_rules! random_corpus_id_with_disabled {
 
 /// Corpus with all current [`Testcase`]s, or solutions
 pub trait Corpus: Sized {
+    /// The type of input contained in this corpus
     type Input;
 
     /// Returns the number of all enabled entries

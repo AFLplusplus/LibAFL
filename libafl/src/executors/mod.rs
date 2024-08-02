@@ -70,6 +70,7 @@ libafl_bolts::impl_serdeany!(ExitKind);
 
 /// Holds a tuple of Observers
 pub trait HasObservers {
+    /// The [`crate::observers::ObserverTuple`] held by this type
     type Observers;
 
     /// Get the linked observers
@@ -96,7 +97,7 @@ pub trait Executor<EM, I, S, Z> {
 #[inline]
 #[must_use]
 pub fn common_signals() -> &'static [Signal] {
-    static SIGNALS: &'static [Signal] = &[
+    static SIGNALS: &[Signal] = &[
         Signal::SigAlarm,
         Signal::SigUser2,
         Signal::SigAbort,

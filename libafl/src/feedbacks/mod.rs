@@ -762,6 +762,7 @@ pub trait ExitKindLogic {
     fn check_exit_kind(kind: &ExitKind) -> Result<bool, Error>;
 }
 
+/// Logic which finds all [`ExitKind::Crash`] exits interesting
 #[derive(Debug, Copy, Clone)]
 pub struct CrashLogic;
 
@@ -773,6 +774,8 @@ impl ExitKindLogic for CrashLogic {
     }
 }
 
+/// Logic which finds all [`ExitKind::Timeout`] exits interesting
+#[derive(Debug, Copy, Clone)]
 pub struct TimeoutLogic;
 
 impl ExitKindLogic for TimeoutLogic {
@@ -783,6 +786,8 @@ impl ExitKindLogic for TimeoutLogic {
     }
 }
 
+/// Logic which finds all [`ExitKind::Diff`] exits interesting
+#[derive(Debug, Copy, Clone)]
 pub struct GenericDiffLogic;
 
 impl ExitKindLogic for GenericDiffLogic {

@@ -10,7 +10,9 @@ use crate::{
     Error,
 };
 
+/// Type which can generate a custom filename for a given input/state pair
 pub trait CustomFilenameGenerator<I, S> {
+    /// Sets the name of the provided [`Testcase`] based on the state and input
     fn set_name(&mut self, state: &mut S, testcase: &mut Testcase<I>) -> Result<String, Error>;
 }
 

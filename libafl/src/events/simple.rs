@@ -190,6 +190,7 @@ impl<I, HT, MT> SimpleEventManager<I, HT, MT>
 where
     MT: Monitor,
 {
+    /// The event manager but with the specified handlers
     pub fn with_handlers<HT2>(self, handlers: HT2) -> SimpleEventManager<I, HT2, MT> {
         SimpleEventManager {
             monitor: self.monitor,

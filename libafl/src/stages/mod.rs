@@ -72,14 +72,11 @@ pub mod push;
 // pub mod pruning;
 // pub use pruning::*;
 use crate::{
-    corpus::{CorpusId, HasCorpus, HasCurrentCorpusId},
-    events::{EventFirer, EventProcessor, EventRestarter, HasEventManagerId, ProgressReporter},
-    executors::{Executor, HasObservers},
-    observers::ObserversTuple,
-    schedulers::Scheduler,
-    state::{HasExecutions, HasLastReportTime, HasRand, Stoppable},
-    Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasMetadata, HasNamedMetadata,
-    HasScheduler,
+    corpus::{CorpusId, HasCurrentCorpusId},
+    events::EventProcessor,
+    executors::HasObservers,
+    state::{HasExecutions, Stoppable},
+    Error, ExecutesInput, HasMetadata, HasNamedMetadata,
 };
 
 /// A stage is one step in the fuzzing process.

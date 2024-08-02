@@ -142,6 +142,7 @@ where
 
 /// Defines the common metadata operations for the AFL-style schedulers
 pub trait AflScheduler {
+    /// The type of [`MapObserver`] that this scheduler will use as reference
     type MapObserverRef;
 
     /// Return the last hash

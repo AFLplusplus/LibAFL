@@ -188,6 +188,7 @@ pub trait PushStage<EM, OT, S, Z> {
     }
 }
 
+/// Blanket implementation for getting the next input from the state
 pub trait PushStageNext<EM, OT, S, Z>: PushStage<EM, OT, S, Z> {
     /// This is the default implementation for `next` for this stage
     fn next_std(&mut self) -> Option<Result<Self::Input, Error>>;

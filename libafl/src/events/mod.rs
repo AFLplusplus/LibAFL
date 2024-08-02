@@ -50,7 +50,6 @@ use crate::{
     executors::ExitKind,
     inputs::Input,
     monitors::UserStats,
-    observers::ObserversTuple,
     state::{HasExecutions, HasLastReportTime},
     Error, HasMetadata,
 };
@@ -443,6 +442,8 @@ pub trait EventFirer<I, S> {
     fn should_send(&self) -> bool;
 }
 
+/// Default implementation of [`ProgressReporter::maybe_report_progress`] for implementors with the
+/// given constraints
 pub fn default_maybe_report_progress<PR, S>(
     reporter: &mut PR,
     state: &mut S,
@@ -466,6 +467,8 @@ where
     Ok(())
 }
 
+/// Default implementation of [`ProgressReporter::report_progress`] for implementors with the
+/// given constraints
 pub fn default_report_progress<I, PR, S>(reporter: &mut PR, state: &mut S) -> Result<(), Error>
 where
     PR: EventFirer<I, S>,
@@ -551,6 +554,8 @@ pub trait ProgressReporter<S> {
     fn report_progress(&mut self, state: &mut S) -> Result<(), Error>;
 }
 
+/// Default implementation of [`EventRestarter::on_restart`] for implementors with the given
+/// constraints
 pub fn default_on_restart<S>(
     restarter: &mut impl EventRestarter<S>,
     state: &mut S,

@@ -26,7 +26,7 @@ use crate::{
     executors::ExitKind,
     feedbacks::{Feedback, HasObserverHandle, StateInitializer},
     monitors::{AggregatorOps, UserStats, UserStatsValue},
-    observers::{CanTrack, MapObserver, Observer, ObserversTuple},
+    observers::{CanTrack, MapObserver},
     Error, HasMetadata, HasNamedMetadata,
 };
 
