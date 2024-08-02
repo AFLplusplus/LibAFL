@@ -96,13 +96,10 @@ pub use push::*;
 // pub use pruning::*;
 use crate::{
     corpus::{CorpusId, HasCorpus, HasCurrentCorpusId},
-    events::{EventFirer, EventProcessor, EventRestarter, HasEventManagerId, ProgressReporter},
-    executors::{Executor, HasObservers},
-    observers::ObserversTuple,
-    schedulers::Scheduler,
-    state::{HasExecutions, HasLastReportTime, HasRand, Stoppable},
-    Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasMetadata, HasNamedMetadata,
-    HasScheduler,
+    events::EventProcessor,
+    executors::HasObservers,
+    state::{HasExecutions, Stoppable},
+    Error, ExecutesInput, HasMetadata, HasNamedMetadata,
 };
 
 /// A stage is one step in the fuzzing process.
@@ -313,7 +310,7 @@ impl<CB> Named for ClosureStage<CB> {
 impl<CB, E, EM, S, Z> Stage<E, EM, S, Z> for ClosureStage<CB>
 where
     CB: FnMut(&mut Z, &mut E, &mut S, &mut EM) -> Result<(), Error>,
-    S: HasNamedMetadata,
+    S: HasNamedMetadata + HasCurrentCorpusId,
 {
     #[inline]
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
@@ -399,6 +396,8 @@ impl<E, EM, PS, S, Z> Stage<E, EM, S, Z> for PushStageAdapter<PS>
 where
     PS: PushStage<EM, E::Observers, S, Z>,
     E: HasObservers,
+    S: HasNamedMetadata + HasCurrentCorpusId + HasCorpus,
+    Z: ExecutesInput<E, EM, <S::Corpus as Corpus>::Input, S>,
 {
     #[inline]
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
