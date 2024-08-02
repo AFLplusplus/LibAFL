@@ -379,7 +379,7 @@ pub struct MapFeedback<C, N, O, R> {
 impl<C, N, O, R, S> StateInitializer<S> for MapFeedback<C, N, O, R>
 where
     O: MapObserver,
-    O::Entry: Default + Debug + DeserializeOwned + Serialize,
+    O::Entry: 'static + Default + Debug + DeserializeOwned + Serialize,
     S: HasNamedMetadata,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
@@ -396,7 +396,7 @@ where
     EM: EventFirer<I, S>,
     N: IsNovel<O::Entry>,
     O: MapObserver + for<'it> AsIter<'it, Item = O::Entry>,
-    O::Entry: Default + Debug + DeserializeOwned + Serialize,
+    O::Entry: 'static + Default + Debug + DeserializeOwned + Serialize,
     OT: MatchName,
     R: Reducer<O::Entry>,
     S: HasNamedMetadata,

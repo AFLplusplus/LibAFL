@@ -5,10 +5,7 @@
 //!
 
 use alloc::rc::Rc;
-use core::{
-    cell::{Cell, RefCell},
-    time::Duration,
-};
+use core::{cell::RefCell, time::Duration};
 
 // pub use mutational::StdMutationalPushStage;
 use crate::{corpus::CorpusId, events::ProgressReporter, executors::ExitKind, Error};
@@ -63,7 +60,7 @@ pub struct PushStageHelper<EM, OT, I, S, Z> {
     /// The input we just ran
     pub current_input: Option<I>, // Todo: Get rid of copy
 
-    exit_kind: Rc<Cell<Option<ExitKind>>>,
+    exit_kind: Rc<RefCell<Option<ExitKind>>>,
 }
 
 impl<EM, OT, I, S, Z> PushStageHelper<EM, OT, I, S, Z> {
@@ -72,7 +69,7 @@ impl<EM, OT, I, S, Z> PushStageHelper<EM, OT, I, S, Z> {
     #[allow(clippy::type_complexity)]
     pub fn new(
         shared_state: Rc<RefCell<Option<PushStageSharedState<EM, OT, S, Z>>>>,
-        exit_kind_ref: Rc<Cell<Option<ExitKind>>>,
+        exit_kind_ref: Rc<RefCell<Option<ExitKind>>>,
     ) -> Self {
         Self {
             shared_state,
@@ -98,17 +95,17 @@ impl<EM, OT, I, S, Z> PushStageHelper<EM, OT, I, S, Z> {
         shared_state_ref.take()
     }
 
-    /// Returns the exit kind of the last run
+    /// Takes the exit kind of the last run
     #[inline]
     #[must_use]
-    pub fn exit_kind(&self) -> Option<ExitKind> {
-        self.exit_kind.get()
+    pub fn take_exit_kind(&self) -> Option<ExitKind> {
+        self.exit_kind.take()
     }
 
     /// Resets the exit kind
     #[inline]
     pub fn reset_exit_kind(&mut self) {
-        self.exit_kind.set(None);
+        self.exit_kind.replace(None);
     }
 
     /// Resets this state after a full stage iter.
@@ -189,7 +186,18 @@ pub trait PushStage<EM, OT, S, Z> {
     ) -> Result<(), Error> {
         Ok(())
     }
+}
 
+pub trait PushStageNext<EM, OT, S, Z>: PushStage<EM, OT, S, Z> {
+    /// This is the default implementation for `next` for this stage
+    fn next_std(&mut self) -> Option<Result<Self::Input, Error>>;
+}
+
+impl<PS, EM, OT, S, Z> PushStageNext<EM, OT, S, Z> for PS
+where
+    PS: PushStage<EM, OT, S, Z>,
+    EM: ProgressReporter<S>,
+{
     /// This is the default implementation for `next` for this stage
     fn next_std(&mut self) -> Option<Result<Self::Input, Error>> {
         let mut shared_state = {
@@ -208,7 +216,7 @@ pub trait PushStage<EM, OT, S, Z> {
                 &mut shared_state.event_mgr,
                 &mut shared_state.observers,
                 last_input,
-                self.push_stage_helper().exit_kind().unwrap(),
+                self.push_stage_helper().take_exit_kind().unwrap(),
             )
         } else {
             self.init(

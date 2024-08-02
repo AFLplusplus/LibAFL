@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use core::{marker::PhantomData, time::Duration};
 
 use libafl_bolts::{
-    tuples::{Handle, Handled},
+    tuples::{Handle, Handled, MatchName},
     Named,
 };
 use serde::{Deserialize, Serialize};
@@ -12,7 +12,10 @@ use serde::{Deserialize, Serialize};
 use crate::{
     corpus::{Corpus, CorpusId, HasCorpus, HasTestcase, Testcase},
     observers::MapObserver,
-    schedulers::{AflScheduler, HasQueueCycles, RemovableScheduler, Scheduler},
+    schedulers::{
+        on_add_metadata, on_evaluation_metadata, on_next_metadata, AflScheduler, HasQueueCycles,
+        RemovableScheduler, Scheduler,
+    },
     Error, HasMetadata,
 };
 
@@ -226,17 +229,18 @@ impl<C, O> HasQueueCycles for PowerQueueScheduler<C, O> {
 
 impl<C, I, O, OT, S> Scheduler<I, OT, S> for PowerQueueScheduler<C, O>
 where
-    S: HasCorpus + HasMetadata + HasTestcase,
-    O: MapObserver,
     C: AsRef<O>,
+    O: MapObserver,
+    OT: MatchName,
+    S: HasCorpus + HasMetadata + HasTestcase,
 {
     /// Called when a [`Testcase`] is added to the corpus
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
-        self.on_add_metadata(state, id)
+        on_add_metadata(self, state, id)
     }
 
-    fn on_evaluation(&mut self, state: &mut S, input: &I, observers: &OT) -> Result<(), Error> {
-        self.on_evaluation_metadata(state, input, observers)
+    fn on_evaluation(&mut self, state: &mut S, _input: &I, observers: &OT) -> Result<(), Error> {
+        on_evaluation_metadata(self, state, observers)
     }
 
     fn next(&mut self, state: &mut S) -> Result<CorpusId, Error> {
@@ -258,7 +262,7 @@ where
                 }
                 None => state.corpus().first().unwrap(),
             };
-            self.set_current_scheduled(state, Some(id))?;
+            <Self as Scheduler<I, OT, S>>::set_current_scheduled(self, state, Some(id))?;
 
             Ok(id)
         }
@@ -270,7 +274,7 @@ where
         state: &mut S,
         next_id: Option<CorpusId>,
     ) -> Result<(), Error> {
-        self.on_next_metadata(state, next_id)?;
+        on_next_metadata(state)?;
 
         *state.corpus_mut().current_mut() = next_id;
         Ok(())

@@ -28,13 +28,7 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "introspection")]
 use crate::state::HasClientPerfMonitor;
-use crate::{
-    corpus::Testcase,
-    events::EventFirer,
-    executors::ExitKind,
-    observers::{ObserversTuple, TimeObserver},
-    Error,
-};
+use crate::{corpus::Testcase, executors::ExitKind, observers::TimeObserver, Error};
 
 #[cfg(feature = "std")]
 pub mod concolic;
@@ -53,6 +47,10 @@ pub mod new_hash_feedback;
 pub mod stdio;
 pub mod transferred;
 
+/// Feedback which initializes a state.
+///
+/// This trait is separate from the general [`Feedback`] definition as it would not be sufficiently
+/// specified otherwise.
 pub trait StateInitializer<S> {
     /// Initializes the feedback state.
     /// This method is called after that the `State` is created.
@@ -754,12 +752,17 @@ impl<EM, I, OT, S> Feedback<EM, I, OT, S> for () {
     }
 }
 
+/// Logic for measuring whether a given [`ExitKind`] is interesting as a [`Feedback`]. Use with
+/// [`ExitKindFeedback`].
 pub trait ExitKindLogic {
+    /// The name of this kind of logic
     const NAME: Cow<'static, str>;
 
+    /// Check whether the provided [`ExitKind`] is actually interesting
     fn check_exit_kind(kind: &ExitKind) -> Result<bool, Error>;
 }
 
+#[derive(Debug, Copy, Clone)]
 pub struct CrashLogic;
 
 impl ExitKindLogic for CrashLogic {
@@ -797,6 +800,7 @@ pub struct ExitKindFeedback<L> {
     #[cfg(feature = "track_hit_feedbacks")]
     // The previous run's result of `Self::is_interesting`
     last_result: Option<bool>,
+    name: Cow<'static, str>,
     phantom: PhantomData<fn() -> L>,
 }
 
@@ -829,35 +833,42 @@ where
     }
 }
 
-impl<L> Named for ExitKindFeedback<L>
-where
-    L: ExitKindLogic,
-{
+impl<L> Named for ExitKindFeedback<L> {
     #[inline]
     fn name(&self) -> &Cow<'static, str> {
-        &L::NAME
+        &self.name
     }
 }
 
-impl<L> ExitKindFeedback<L> {
+impl<L> ExitKindFeedback<L>
+where
+    L: ExitKindLogic,
+{
     /// Creates a new [`ExitKindFeedback`]
     #[must_use]
     pub fn new() -> Self {
         Self {
             #[cfg(feature = "track_hit_feedbacks")]
             last_result: None,
+            name: L::NAME,
             phantom: PhantomData,
         }
     }
 }
 
-impl<L> Default for ExitKindFeedback<L> {
+impl<L> Default for ExitKindFeedback<L>
+where
+    L: ExitKindLogic,
+{
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<L, T> FeedbackFactory<ExitKindFeedback<L>, T> for ExitKindFeedback<L> {
+impl<L, T> FeedbackFactory<ExitKindFeedback<L>, T> for ExitKindFeedback<L>
+where
+    L: ExitKindLogic,
+{
     fn create_feedback(&self, _ctx: &T) -> ExitKindFeedback<L> {
         Self::new()
     }

@@ -12,13 +12,12 @@ pub use const_map::*;
 pub use hitcount_map::*;
 use libafl_bolts::{ownedref::OwnedMutSlice, AsSlice, AsSliceMut, HasLen, Named, Truncate};
 pub use multi_map::*;
-use num_traits::Bounded;
 pub use owned_map::*;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 pub use variable_map::*;
 
 use crate::{
-    observers::{DifferentialObserver, Observer, ObserversTuple},
+    observers::{DifferentialObserver, Observer},
     Error,
 };
 

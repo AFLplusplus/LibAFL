@@ -247,6 +247,7 @@ impl<E, EM, S, Z> IntoVec<Box<dyn Stage<E, EM, S, Z>>> for Vec<Box<dyn Stage<E, 
 
 impl<E, EM, S, Z> StagesTuple<E, EM, S, Z> for Vec<Box<dyn Stage<E, EM, S, Z>>>
 where
+    EM: EventProcessor<E, S, Z>,
     S: HasCurrentStage + Stoppable,
 {
     /// Performs all stages in the `Vec`
@@ -290,7 +291,7 @@ impl<CB> Named for ClosureStage<CB> {
 impl<CB, E, EM, S, Z> Stage<E, EM, S, Z> for ClosureStage<CB>
 where
     CB: FnMut(&mut Z, &mut E, &mut S, &mut EM) -> Result<(), Error>,
-    S: HasNamedMetadata,
+    S: HasNamedMetadata + HasCurrentCorpusId,
 {
     #[inline]
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
@@ -374,8 +375,10 @@ impl<PS> Named for PushStageAdapter<PS> {
 
 impl<E, EM, PS, S, Z> Stage<E, EM, S, Z> for PushStageAdapter<PS>
 where
-    PS: PushStage<EM, E::Observers, S, Z>,
     E: HasObservers,
+    PS: PushStage<EM, E::Observers, S, Z>,
+    S: HasNamedMetadata + HasCurrentCorpusId,
+    Z: ExecutesInput<E, EM, PS::Input, S>,
 {
     #[inline]
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
