@@ -1,7 +1,7 @@
 //! The [`DumpToDiskStage`] is a stage that dumps the corpus and the solutions to disk to e.g. allow AFL to sync
 
 use alloc::{string::String, vec::Vec};
-use core::{clone::Clone, marker::PhantomData};
+use core::clone::Clone;
 use std::{fs, fs::File, io::Write, path::PathBuf};
 
 use libafl_bolts::impl_serdeany;
@@ -36,6 +36,7 @@ impl<CB, E, EM, S, Z> Stage<E, EM, S, Z> for DumpToDiskStage<CB>
 where
     CB: FnMut(&<S::Corpus as Corpus>::Input, &S) -> Vec<u8>,
     S: HasCorpus + HasSolutions + HasRand + HasMetadata,
+    S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
 {
     #[inline]
     fn perform(

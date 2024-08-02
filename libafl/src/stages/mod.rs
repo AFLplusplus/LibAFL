@@ -14,27 +14,15 @@ use core::fmt;
 
 // #[cfg(all(feature = "std", feature = "concolic_mutation", unix))]
 // pub use concolic::SimpleConcolicMutationalStage;
-// pub use generalization::GeneralizationStage;
 use hashbrown::HashSet;
 use libafl_bolts::{
     impl_serdeany,
     tuples::{HasConstLen, IntoVec},
     Named,
 };
-// pub use logics::*;
 use push::PushStage;
 use serde::{Deserialize, Serialize};
-// pub use stats::AflStatsStage;
-// #[cfg(feature = "std")]
-// pub use sync::*;
-// pub use tmin::{
-//     MapEqualityFactory, MapEqualityFeedback, StdTMinMutationalStage, TMinMutationalStage,
-// };
-// pub use tuneable::*;
 use tuple_list::NonEmptyTuple;
-
-// #[cfg(feature = "unicode")]
-// pub use unicode::*;
 
 /// Mutational stage is the normal fuzzing stage.
 pub mod mutational;
@@ -62,18 +50,45 @@ pub mod dump;
 #[cfg(feature = "std")]
 pub use dump::*;
 
+#[cfg(feature = "std")]
+pub mod generalization;
+#[cfg(feature = "std")]
+pub use generalization::*;
+
+/// The [`generation::GenStage`] generates a single input and evaluates it.
+pub mod generation;
+pub use generation::*;
+
+pub mod logics;
+pub use logics::*;
+
+pub mod stats;
+pub use stats::*;
+
+#[cfg(feature = "std")]
+pub mod sync;
+#[cfg(feature = "std")]
+pub use sync::*;
+
+#[cfg(feature = "unicode")]
+pub mod unicode;
+
+#[cfg(feature = "unicode")]
+pub use unicode::*;
+
+/*
+pub mod tmin;
+pub use tmin::*;
+*/
+
+pub mod tuneable;
+pub use tuneable::*;
+
 pub mod push;
-// pub mod tmin;
+pub use push::*;
 
 // #[cfg(feature = "std")]
-// pub mod generalization;
-// /// The [`generation::GenStage`] generates a single input and evaluates it.
-// pub mod generation;
-// pub mod logics;
-// pub mod stats;
-// #[cfg(feature = "std")]
 // pub mod sync;
-// pub mod tuneable;
 // #[cfg(feature = "unicode")]
 // pub mod unicode;
 //
