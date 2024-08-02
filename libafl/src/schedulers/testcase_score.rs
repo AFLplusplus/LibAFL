@@ -14,12 +14,13 @@ use crate::{
 };
 
 /// Compute the favor factor of a [`Testcase`]. Higher is better.
-pub trait TestcaseScore<S> 
-where 
+pub trait TestcaseScore<S>
+where
     S: HasCorpus,
 {
     /// Computes the favor factor of a [`Testcase`]. Higher is better.
-    fn compute(state: &S, entry: &mut Testcase<<S::Corpus as Corpus>::Input>) -> Result<f64, Error>;
+    fn compute(state: &S, entry: &mut Testcase<<S::Corpus as Corpus>::Input>)
+        -> Result<f64, Error>;
 }
 
 /// Multiply the testcase size with the execution time.
@@ -33,7 +34,10 @@ where
     <S::Corpus as Corpus>::Input: HasLen,
 {
     #[allow(clippy::cast_precision_loss, clippy::cast_lossless)]
-    fn compute(state: &S, entry: &mut Testcase<<S::Corpus as Corpus>::Input>) -> Result<f64, Error> {
+    fn compute(
+        state: &S,
+        entry: &mut Testcase<<S::Corpus as Corpus>::Input>,
+    ) -> Result<f64, Error> {
         // TODO maybe enforce entry.exec_time().is_some()
         Ok(entry.exec_time().map_or(1, |d| d.as_millis()) as f64
             * entry.load_len(state.corpus())? as f64)
@@ -61,7 +65,10 @@ where
         clippy::cast_sign_loss,
         clippy::cast_lossless
     )]
-    fn compute(state: &S, entry: &mut Testcase<<S::Corpus as Corpus>::Input>) -> Result<f64, Error> {
+    fn compute(
+        state: &S,
+        entry: &mut Testcase<<S::Corpus as Corpus>::Input>,
+    ) -> Result<f64, Error> {
         let psmeta = state.metadata::<SchedulerMetadata>()?;
 
         let fuzz_mu = if let Some(strat) = psmeta.strat() {
@@ -271,7 +278,10 @@ where
 {
     /// Compute the `weight` used in weighted corpus entry selection algo
     #[allow(clippy::cast_precision_loss, clippy::cast_lossless)]
-    fn compute(state: &S, entry: &mut Testcase<<S::Corpus as Corpus>::Input>) -> Result<f64, Error> {
+    fn compute(
+        state: &S,
+        entry: &mut Testcase<<S::Corpus as Corpus>::Input>,
+    ) -> Result<f64, Error> {
         let mut weight = 1.0;
         let psmeta = state.metadata::<SchedulerMetadata>()?;
 

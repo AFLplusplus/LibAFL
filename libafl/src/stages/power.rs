@@ -10,9 +10,9 @@ use libafl_bolts::Named;
 
 use crate::{
     corpus::{Corpus, HasCorpus, HasCurrentCorpusId},
+    mutators::Mutator,
     schedulers::{testcase_score::CorpusPowerTestcaseScore, TestcaseScore},
     stages::{perform_mutational, MutationalStage, RetryCountRestartHelper, Stage},
-    mutators::Mutator,
     state::HasCurrentTestcase,
     Error, Evaluator, HasNamedMetadata,
 };
@@ -55,7 +55,7 @@ impl<F, M> MutationalStage for PowerMutationalStage<F, M> {
 
 impl<E, F, EM, M, S, Z> Stage<E, EM, S, Z> for PowerMutationalStage<F, M>
 where
-    S: HasCorpus + HasNamedMetadata + HasCurrentCorpusId,
+    S: HasCorpus + HasCurrentCorpusId + HasNamedMetadata,
     F: TestcaseScore<S>,
     Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
     <S::Corpus as Corpus>::Input: Clone,

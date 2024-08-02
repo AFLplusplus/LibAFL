@@ -73,7 +73,7 @@ impl<'a, T, const N: usize> AsMut<Self> for ConstMapObserver<'a, T, N> {
 
 impl<'a, T, const N: usize> MapObserver for ConstMapObserver<'a, T, N>
 where
-    T: PartialEq + Copy + Hash + Serialize + DeserializeOwned,
+    T: PartialEq + Copy + Hash + Serialize + DeserializeOwned + Debug + 'static,
 {
     type Entry = T;
 

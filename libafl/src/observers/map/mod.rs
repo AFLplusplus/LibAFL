@@ -12,13 +12,12 @@ pub use const_map::*;
 pub use hitcount_map::*;
 use libafl_bolts::{ownedref::OwnedMutSlice, AsSlice, AsSliceMut, HasLen, Named, Truncate};
 pub use multi_map::*;
-use num_traits::Bounded;
 pub use owned_map::*;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 pub use variable_map::*;
 
 use crate::{
-    observers::{DifferentialObserver, Observer, ObserversTuple},
+    observers::{DifferentialObserver, Observer},
     Error,
 };
 
@@ -288,7 +287,7 @@ pub trait MapObserver:
 //     for<'it> &'it Self: IntoIterator<Item = &'it Self::Entry>
 {
     /// Type of each entry in this map
-    type Entry: PartialEq + Copy;
+    type Entry: PartialEq + Copy + Debug + Serialize + DeserializeOwned;
 
     /// Get the value at `idx`
     fn get(&self, idx: usize) -> Self::Entry;
@@ -397,7 +396,7 @@ impl<'a, T, const DIFFERENTIAL: bool> AsMut<Self> for StdMapObserver<'a, T, DIFF
 
 impl<'a, T, const DIFFERENTIAL: bool> MapObserver for StdMapObserver<'a, T, DIFFERENTIAL>
 where
-    T: PartialEq + Copy + Hash + Serialize + DeserializeOwned,
+    T: PartialEq + Copy + Hash + Serialize + DeserializeOwned + Debug,
 {
     type Entry = T;
 

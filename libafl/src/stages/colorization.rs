@@ -2,6 +2,7 @@
 use alloc::{
     borrow::{Cow, ToOwned},
     collections::binary_heap::BinaryHeap,
+    string::ToString,
     vec::Vec,
 };
 use core::{cmp::Ordering, fmt::Debug, marker::PhantomData, ops::Range};
@@ -14,8 +15,7 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::HasCorpus,
-    events::EventFirer,
+    corpus::{Corpus, HasCorpus, HasCurrentCorpusId},
     executors::{Executor, HasObservers},
     inputs::HasMutatorBytes,
     mutators::mutations::buffer_copy,
@@ -57,42 +57,33 @@ impl Ord for Earlier {
     }
 }
 
+/// The unique id for mutational stage
+static mut COLORIZATION_STAGE_ID: usize = 0;
 /// Default name for `ColorizationStage`; derived from ALF++
 pub const COLORIZATION_STAGE_NAME: &str = "colorization";
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
-pub struct ColorizationStage<C, E, EM, O, Z> {
+pub struct ColorizationStage<C, O> {
     map_observer_handle: Handle<C>,
     name: Cow<'static, str>,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(E, EM, O, E, Z)>,
+    phantom: PhantomData<O>,
 }
 
-impl<C, E, EM, O, Z> UsesState for ColorizationStage<C, E, EM, O, Z>
-where
-    E: UsesState,
-{
-    type State = E::State;
-}
-
-impl<C, E, EM, O, Z> Named for ColorizationStage<C, E, EM, O, Z>
-where
-    E: UsesState,
-{
+impl<C, O> Named for ColorizationStage<C, O> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<C, E, EM, O, Z> Stage<E, EM, Z> for ColorizationStage<C, E, EM, O, Z>
+impl<C, E, EM, O, S, Z> Stage<E, EM, S, Z> for ColorizationStage<C, O>
 where
-    EM: UsesState<State = Self::State> + EventFirer,
-    E: HasObservers + Executor<EM, Z>,
-    Self::State: HasCorpus + HasMetadata + HasRand + HasNamedMetadata,
-    E::Input: HasMutatorBytes,
+    E: HasObservers + Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
+    E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    S: HasCorpus + HasMetadata + HasRand + HasNamedMetadata + HasCurrentCorpusId,
+    <S::Corpus as Corpus>::Input: HasMutatorBytes + Clone,
     O: MapObserver,
     C: AsRef<O> + Named,
-    Z: UsesState<State = Self::State>,
 {
     #[inline]
     #[allow(clippy::let_and_return)]
@@ -100,7 +91,7 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E, // don't need the *main* executor for tracing
-        state: &mut Self::State,
+        state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error> {
         // Run with the mutated input
@@ -109,14 +100,14 @@ where
         Ok(())
     }
 
-    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         // This is a deterministic stage
         // Once it failed, then don't retry,
         // It will just fail again
         RetryCountRestartHelper::no_retry(state, &self.name)
     }
 
-    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
         RetryCountRestartHelper::clear_progress(state, &self.name)
     }
 }
@@ -157,25 +148,26 @@ impl TaintMetadata {
 
 libafl_bolts::impl_serdeany!(TaintMetadata);
 
-impl<C, E, EM, O, Z> ColorizationStage<C, E, EM, O, Z>
+impl<C, O> ColorizationStage<C, O>
 where
-    EM: UsesState<State = <Self as UsesState>::State> + EventFirer,
     O: MapObserver,
     C: AsRef<O> + Named,
-    E: HasObservers + Executor<EM, Z>,
-    <Self as UsesState>::State: HasCorpus + HasMetadata + HasRand,
-    E::Input: HasMutatorBytes,
-    Z: UsesState<State = <Self as UsesState>::State>,
 {
     #[inline]
     #[allow(clippy::let_and_return)]
-    fn colorize(
+    fn colorize<E, EM, S, Z>(
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut <Self as UsesState>::State,
+        state: &mut S,
         manager: &mut EM,
         observer_handle: &Handle<C>,
-    ) -> Result<E::Input, Error> {
+    ) -> Result<<S::Corpus as Corpus>::Input, Error>
+    where
+        E: HasObservers + Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
+        E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+        S: HasCorpus + HasMetadata + HasRand + HasCurrentCorpusId,
+        <S::Corpus as Corpus>::Input: HasMutatorBytes + Clone,
+    {
         let mut input = state.current_input_cloned()?;
         // The backup of the input
         let backup = input.clone();
@@ -312,23 +304,35 @@ where
     #[must_use]
     /// Creates a new [`ColorizationStage`]
     pub fn new(map_observer: &C) -> Self {
-        let obs_name = map_observer.name().clone().into_owned();
+        // unsafe but impossible that you create two threads both instantiating this instance
+        let stage_id = unsafe {
+            let ret = COLORIZATION_STAGE_ID;
+            COLORIZATION_STAGE_ID += 1;
+            ret
+        };
         Self {
             map_observer_handle: map_observer.handle(),
-            name: Cow::Owned(COLORIZATION_STAGE_NAME.to_owned() + ":" + obs_name.as_str()),
+            name: Cow::Owned(
+                COLORIZATION_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_str(),
+            ),
             phantom: PhantomData,
         }
     }
 
     // Run the target and get map hash but before hitcounts's post_exec is used
-    fn get_raw_map_hash_run(
+    fn get_raw_map_hash_run<E, EM, S, Z>(
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut <Self as UsesState>::State,
+        state: &mut S,
         manager: &mut EM,
-        input: E::Input,
+        input: <S::Corpus as Corpus>::Input,
         observer_handle: &Handle<C>,
-    ) -> Result<usize, Error> {
+    ) -> Result<usize, Error>
+    where
+        S: HasCorpus,
+        E: HasObservers + Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
+        E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    {
         executor.observers_mut().pre_exec_all(state, &input)?;
 
         let exit_kind = executor.run_target(fuzzer, state, manager, &input)?;
@@ -350,7 +354,10 @@ where
 
     /// Replace bytes with random values but following certain rules
     #[allow(clippy::needless_range_loop)]
-    fn type_replace(bytes: &mut [u8], state: &mut <Self as UsesState>::State) {
+    fn type_replace<S>(bytes: &mut [u8], state: &mut S)
+    where
+        S: HasRand,
+    {
         let len = bytes.len();
         for idx in 0..len {
             let c = match bytes[idx] {

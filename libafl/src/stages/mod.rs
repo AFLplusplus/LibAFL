@@ -12,7 +12,6 @@ use alloc::{
 };
 use core::fmt;
 
-// pub use calibrate::CalibrationStage;
 // pub use colorization::*;
 // #[cfg(all(feature = "std", unix))]
 // pub use concolic::ConcolicTracingStage;
@@ -50,16 +49,20 @@ pub use mutational::*;
 pub mod power;
 pub use power::*;
 
-// pub mod calibrate;
-// pub use calibrate::*;
+pub mod calibrate;
+pub use calibrate::*;
+
+pub mod colorization;
+pub use colorization::*;
+
+#[cfg(all(feature = "std", unix))]
+pub mod concolic;
+#[cfg(all(feature = "std", unix))]
+pub use concolic::*;
 
 pub mod push;
 // pub mod tmin;
-//
-// pub mod calibrate;
-// pub mod colorization;
-// #[cfg(all(feature = "std", unix))]
-// pub mod concolic;
+
 // #[cfg(feature = "std")]
 // pub mod dump;
 // pub mod generalization;

@@ -171,7 +171,7 @@ mod tests {
     use libafl_bolts::rands::StdRand;
 
     use crate::{
-        corpus::{Corpus, InMemoryCorpus, Testcase, HasCorpus},
+        corpus::{Corpus, HasCorpus, InMemoryCorpus, Testcase},
         feedbacks::ConstFeedback,
         inputs::bytes::BytesInput,
         schedulers::{ProbabilitySamplingScheduler, Scheduler, TestcaseScore},

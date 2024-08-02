@@ -80,8 +80,8 @@ pub(crate) fn perform_mutational<E, EM, M, S, Z>(
     manager: &mut EM,
     mutator: &mut M,
     num: usize,
-) -> Result<(), Error> 
-where 
+) -> Result<(), Error>
+where
     S: HasCorpus + HasCurrentCorpusId,
     M: Mutator<<S::Corpus as Corpus>::Input, S>,
     <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,
@@ -148,8 +148,7 @@ pub struct StdMutationalStage<M> {
     max_iterations: usize,
 }
 
-impl<M> MutationalStage for StdMutationalStage<M> 
-{
+impl<M> MutationalStage for StdMutationalStage<M> {
     type M = M;
 
     /// The mutator, added to this stage
@@ -176,7 +175,7 @@ impl<M> Named for StdMutationalStage<M> {
     }
 }
 
-impl<E, EM, M, S, Z> Stage<E, EM, S, Z> for StdMutationalStage<M> 
+impl<E, EM, M, S, Z> Stage<E, EM, S, Z> for StdMutationalStage<M>
 where
     <S::Corpus as Corpus>::Input: Clone,
     S: HasRand + HasCurrentCorpusId + HasCorpus + HasNamedMetadata,
@@ -223,8 +222,8 @@ impl<M> StdMutationalStage<M> {
     }
 
     /// Gets the number of iterations as a random number
-    fn iterations<S>(&self, state: &mut S) -> Result<usize, Error> 
-    where 
+    fn iterations<S>(&self, state: &mut S) -> Result<usize, Error>
+    where
         S: HasRand,
     {
         Ok(1 + state.rand_mut().below(self.max_iterations))
@@ -274,7 +273,7 @@ impl<M> Named for MultiMutationalStage<M> {
 }
 
 impl<E, EM, M, S, Z> Stage<E, EM, S, Z> for MultiMutationalStage<M>
-where 
+where
     S: HasNamedMetadata + HasCorpus + HasCurrentCorpusId,
     M: MultiMutator<<S::Corpus as Corpus>::Input, S>,
     Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
@@ -302,7 +301,8 @@ where
         manager: &mut EM,
     ) -> Result<(), Error> {
         let mut testcase = state.current_testcase_mut()?;
-        let Ok(input) = <S::Corpus as Corpus>::Input::try_transform_from(&mut testcase, state) else {
+        let Ok(input) = <S::Corpus as Corpus>::Input::try_transform_from(&mut testcase, state)
+        else {
             return Ok(());
         };
         drop(testcase);
