@@ -2,21 +2,11 @@
 
 use alloc::{borrow::ToOwned, string::ToString};
 
-// pub use accounting::CoverageAccountingScheduler;
 use libafl_bolts::{
     rands::Rand,
     tuples::{Handle, MatchName, MatchNameRef},
 };
-// pub use minimizer::{
-//     IndexesLenTimeMinimizerScheduler, LenTimeMinimizerScheduler, MinimizerScheduler,
-// };
-pub use powersched::{PowerQueueScheduler, SchedulerMetadata};
 
-// pub use probabilistic_sampling::ProbabilitySamplingScheduler;
-// pub use queue::QueueScheduler;
-// pub use testcase_score::{LenTimeMulTestcaseScore, TestcaseScore};
-// pub use tuneable::*;
-// pub use weighted::{StdWeightedScheduler, WeightedScheduler};
 use crate::{
     corpus::{Corpus, CorpusId, HasCorpus, HasTestcase, SchedulerTestcaseMetadata, Testcase},
     observers::MapObserver,
@@ -26,13 +16,26 @@ use crate::{
 };
 
 // pub mod accounting;
-// pub mod minimizer;
+pub mod minimizer;
+pub use minimizer::*;
+
 pub mod powersched;
-// pub mod probabilistic_sampling;
-// pub mod queue;
-// pub mod testcase_score;
-// pub mod tuneable;
-// pub mod weighted;
+pub use powersched::*;
+
+pub mod probabilistic_sampling;
+pub use probabilistic_sampling::*;
+
+pub mod queue;
+pub use queue::*;
+
+pub mod testcase_score;
+pub use testcase_score::*;
+
+pub mod tuneable;
+pub use tuneable::*;
+
+pub mod weighted;
+pub use weighted::*;
 
 /// The scheduler also implements `on_remove` and `on_replace` if it implements this stage.
 pub trait RemovableScheduler<I, S> {

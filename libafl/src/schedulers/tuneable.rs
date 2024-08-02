@@ -102,7 +102,7 @@ impl<I, S> RemovableScheduler<I, S> for TuneableScheduler {}
 
 impl<I, OT, S> Scheduler<I, OT, S> for TuneableScheduler
 where
-    S: HasCorpus,
+    S: HasCorpus + HasMetadata,
 {
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         // Set parent id

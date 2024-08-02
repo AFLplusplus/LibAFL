@@ -28,8 +28,6 @@ use libafl_bolts::{
     Named,
 };
 // pub use logics::*;
-// pub use mutational::{MutationalStage, StdMutationalStage};
-// pub use power::{PowerMutationalStage, StdPowerMutationalStage};
 use push::PushStage;
 use serde::{Deserialize, Serialize};
 // pub use stats::AflStatsStage;
@@ -45,8 +43,16 @@ use tuple_list::NonEmptyTuple;
 // #[cfg(feature = "unicode")]
 // pub use unicode::*;
 
-// /// Mutational stage is the normal fuzzing stage.
-// pub mod mutational;
+/// Mutational stage is the normal fuzzing stage.
+pub mod mutational;
+pub use mutational::*;
+
+pub mod power;
+pub use power::*;
+
+// pub mod calibrate;
+// pub use calibrate::*;
+
 pub mod push;
 // pub mod tmin;
 //
@@ -60,7 +66,6 @@ pub mod push;
 // /// The [`generation::GenStage`] generates a single input and evaluates it.
 // pub mod generation;
 // pub mod logics;
-// pub mod power;
 // pub mod stats;
 // #[cfg(feature = "std")]
 // pub mod sync;

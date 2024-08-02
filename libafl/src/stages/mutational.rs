@@ -5,20 +5,18 @@ use alloc::{
     borrow::{Cow, ToOwned},
     string::ToString,
 };
-use core::marker::PhantomData;
 
 use libafl_bolts::{rands::Rand, Named};
 
 use crate::{
-    corpus::{Corpus, CorpusId, HasCorpus, Testcase},
+    corpus::{Corpus, CorpusId, HasCorpus, HasCurrentCorpusId, Testcase},
     fuzzer::Evaluator,
-    inputs::Input,
     mark_feature_time,
     mutators::{MultiMutator, MutationResult, Mutator},
     stages::{RetryCountRestartHelper, Stage},
     start_timer,
-    state::{HasCurrentTestcase, HasExecutions, HasRand},
-    Error, HasMetadata, HasNamedMetadata,
+    state::{HasCurrentTestcase, HasRand},
+    Error, HasNamedMetadata,
 };
 #[cfg(feature = "introspection")]
 use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
@@ -41,10 +39,7 @@ impl<S> MutatedTransformPost<S> for () {}
 ///
 /// This trait is implemented such that all testcases inherently transform to their inputs, should
 /// the input be cloneable.
-pub trait MutatedTransform<I, S>: Sized
-where
-    I: Input,
-{
+pub trait MutatedTransform<I, S>: Sized {
     /// Type indicating actions to be taken after the post-transformation input is executed
     type Post: MutatedTransformPost<S>;
 
@@ -58,8 +53,9 @@ where
 // reflexive definition
 impl<I, S> MutatedTransform<I, S> for I
 where
-    I: Input + Clone,
-    S: HasCorpus<Input = I>,
+    S: HasCorpus,
+    S::Corpus: Corpus<Input = I>,
+    I: Clone,
 {
     type Post = ();
 
@@ -75,76 +71,66 @@ where
     }
 }
 
+/// Runs this (mutational) stage for the given testcase
+#[allow(clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
+pub(crate) fn perform_mutational<E, EM, M, S, Z>(
+    fuzzer: &mut Z,
+    executor: &mut E,
+    state: &mut S,
+    manager: &mut EM,
+    mutator: &mut M,
+    num: usize,
+) -> Result<(), Error> 
+where 
+    S: HasCorpus + HasCurrentCorpusId,
+    M: Mutator<<S::Corpus as Corpus>::Input, S>,
+    <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,
+    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
+{
+    start_timer!(state);
+    // Here saturating_sub is needed as self.iterations() might be actually smaller than the previous value before reset.
+    /*
+    let num = self
+        .iterations(state)?
+        .saturating_sub(self.execs_since_progress_start(state)?);
+    */
+    let mut testcase = state.current_testcase_mut()?;
+
+    let Ok(input) = <S::Corpus as Corpus>::Input::try_transform_from(&mut testcase, state) else {
+        return Ok(());
+    };
+    drop(testcase);
+    mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
+    for _ in 0..num {
+        let mut input = input.clone();
+        start_timer!(state);
+        let mutated = mutator.mutate(state, &mut input)?;
+        mark_feature_time!(state, PerfFeature::Mutate);
+        if mutated == MutationResult::Skipped {
+            continue;
+        }
+        // Time is measured directly the `evaluate_input` function
+        let (untransformed, post) = input.try_transform_into(state)?;
+        let (_, corpus_id) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
+        start_timer!(state);
+        mutator.post_exec(state, corpus_id)?;
+        post.post_exec(state, corpus_id)?;
+        mark_feature_time!(state, PerfFeature::MutatePostExec);
+    }
+    Ok(())
+}
+
 /// A Mutational stage is the stage in a fuzzing run that mutates inputs.
 /// Mutational stages will usually have a range of mutations that are
 /// being applied to the input one by one, between executions.
-pub trait MutationalStage<E, EM, I, M, Z>: Stage<E, EM, Z>
-where
-    E: UsesState<State = Self::State>,
-    M: Mutator<I, Self::State>,
-    EM: UsesState<State = Self::State>,
-    Z: Evaluator<E, EM, State = Self::State>,
-    Self::State: HasCorpus,
-    I: MutatedTransform<Self::Input, Self::State> + Clone,
-{
+pub trait MutationalStage {
+    type M;
+
     /// The mutator registered for this stage
-    fn mutator(&self) -> &M;
+    fn mutator(&self) -> &Self::M;
 
     /// The mutator registered for this stage (mutable)
-    fn mutator_mut(&mut self) -> &mut M;
-
-    /// Gets the number of iterations this mutator should run for.
-    fn iterations(&self, state: &mut Self::State) -> Result<usize, Error>;
-
-    /// Runs this (mutational) stage for the given testcase
-    #[allow(clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
-    fn perform_mutational(
-        &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
-        state: &mut Self::State,
-        manager: &mut EM,
-    ) -> Result<(), Error> {
-        start_timer!(state);
-
-        // Here saturating_sub is needed as self.iterations() might be actually smaller than the previous value before reset.
-        /*
-        let num = self
-            .iterations(state)?
-            .saturating_sub(self.execs_since_progress_start(state)?);
-        */
-        let num = self.iterations(state)?;
-        let mut testcase = state.current_testcase_mut()?;
-
-        let Ok(input) = I::try_transform_from(&mut testcase, state) else {
-            return Ok(());
-        };
-        drop(testcase);
-        mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
-
-        for _ in 0..num {
-            let mut input = input.clone();
-
-            start_timer!(state);
-            let mutated = self.mutator_mut().mutate(state, &mut input)?;
-            mark_feature_time!(state, PerfFeature::Mutate);
-
-            if mutated == MutationResult::Skipped {
-                continue;
-            }
-
-            // Time is measured directly the `evaluate_input` function
-            let (untransformed, post) = input.try_transform_into(state)?;
-            let (_, corpus_id) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
-
-            start_timer!(state);
-            self.mutator_mut().post_exec(state, corpus_id)?;
-            post.post_exec(state, corpus_id)?;
-            mark_feature_time!(state, PerfFeature::MutatePostExec);
-        }
-
-        Ok(())
-    }
+    fn mutator_mut(&mut self) -> &mut Self::M;
 }
 
 /// Default value, how many iterations each stage gets, as an upper bound.
@@ -153,41 +139,29 @@ pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: usize = 128;
 
 /// The default mutational stage
 #[derive(Clone, Debug)]
-pub struct StdMutationalStage<E, EM, I, M, Z> {
+pub struct StdMutationalStage<M> {
     /// The name
     name: Cow<'static, str>,
     /// The mutator(s) to use
     mutator: M,
     /// The maximum amount of iterations we should do each round
     max_iterations: usize,
-    #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(E, EM, I, Z)>,
 }
 
-impl<E, EM, I, M, Z> MutationalStage<E, EM, I, M, Z> for StdMutationalStage<E, EM, I, M, Z>
-where
-    E: UsesState<State = Self::State>,
-    EM: UsesState<State = Self::State>,
-    M: Mutator<I, Self::State>,
-    Z: Evaluator<E, EM>,
-    Self::State: HasCorpus + HasRand + HasExecutions + HasMetadata + HasNamedMetadata,
-    I: MutatedTransform<Self::Input, Self::State> + Clone,
+impl<M> MutationalStage for StdMutationalStage<M> 
 {
+    type M = M;
+
     /// The mutator, added to this stage
     #[inline]
-    fn mutator(&self) -> &M {
+    fn mutator(&self) -> &Self::M {
         &self.mutator
     }
 
     /// The list of mutators, added to this stage (as mutable ref)
     #[inline]
-    fn mutator_mut(&mut self) -> &mut M {
+    fn mutator_mut(&mut self) -> &mut Self::M {
         &mut self.mutator
-    }
-
-    /// Gets the number of iterations as a random number
-    fn iterations(&self, state: &mut Self::State) -> Result<usize, Error> {
-        Ok(1 + state.rand_mut().below(self.max_iterations))
     }
 }
 
@@ -196,27 +170,18 @@ static mut MUTATIONAL_STAGE_ID: usize = 0;
 /// The name for mutational stage
 pub static MUTATIONAL_STAGE_NAME: &str = "mutational";
 
-impl<E, EM, I, M, Z> UsesState for StdMutationalStage<E, EM, I, M, Z>
-where
-    Z: UsesState,
-{
-    type State = Z::State;
-}
-
-impl<E, EM, I, M, Z> Named for StdMutationalStage<E, EM, I, M, Z> {
+impl<M> Named for StdMutationalStage<M> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<E, EM, I, M, Z> Stage<E, EM, Z> for StdMutationalStage<E, EM, I, M, Z>
+impl<E, EM, M, S, Z> Stage<E, EM, S, Z> for StdMutationalStage<M> 
 where
-    E: UsesState<State = Self::State>,
-    EM: UsesState<State = Self::State>,
-    M: Mutator<I, Self::State>,
-    Z: Evaluator<E, EM>,
-    Self::State: HasCorpus + HasRand + HasMetadata + HasExecutions + HasNamedMetadata,
-    I: MutatedTransform<Self::Input, Self::State> + Clone,
+    <S::Corpus as Corpus>::Input: Clone,
+    S: HasRand + HasCurrentCorpusId + HasCorpus + HasNamedMetadata,
+    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
+    M: Mutator<<S::Corpus as Corpus>::Input, S>,
 {
     #[inline]
     #[allow(clippy::let_and_return)]
@@ -224,10 +189,12 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut Self::State,
+        state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        let ret = self.perform_mutational(fuzzer, executor, state, manager);
+        let iter = self.iterations(state)?;
+        let mutator = self.mutator_mut();
+        let ret = perform_mutational(fuzzer, executor, state, manager, mutator, iter);
 
         #[cfg(feature = "introspection")]
         state.introspection_monitor_mut().finish_stage();
@@ -235,23 +202,16 @@ where
         ret
     }
 
-    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         RetryCountRestartHelper::should_restart(state, &self.name, 3)
     }
 
-    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
         RetryCountRestartHelper::clear_progress(state, &self.name)
     }
 }
 
-impl<E, EM, M, Z> StdMutationalStage<E, EM, Z::Input, M, Z>
-where
-    E: UsesState<State = <Self as UsesState>::State>,
-    EM: UsesState<State = <Self as UsesState>::State>,
-    M: Mutator<Z::Input, <Self as UsesState>::State>,
-    Z: Evaluator<E, EM>,
-    <Self as UsesState>::State: HasCorpus + HasRand,
-{
+impl<M> StdMutationalStage<M> {
     /// Creates a new default mutational stage
     pub fn new(mutator: M) -> Self {
         Self::transforming_with_max_iterations(mutator, DEFAULT_MUTATIONAL_MAX_ITERATIONS)
@@ -261,16 +221,17 @@ where
     pub fn with_max_iterations(mutator: M, max_iterations: usize) -> Self {
         Self::transforming_with_max_iterations(mutator, max_iterations)
     }
+
+    /// Gets the number of iterations as a random number
+    fn iterations<S>(&self, state: &mut S) -> Result<usize, Error> 
+    where 
+        S: HasRand,
+    {
+        Ok(1 + state.rand_mut().below(self.max_iterations))
+    }
 }
 
-impl<E, EM, I, M, Z> StdMutationalStage<E, EM, I, M, Z>
-where
-    E: UsesState<State = <Self as UsesState>::State>,
-    EM: UsesState<State = <Self as UsesState>::State>,
-    M: Mutator<I, <Self as UsesState>::State>,
-    Z: Evaluator<E, EM>,
-    <Self as UsesState>::State: HasCorpus + HasRand,
-{
+impl<M> StdMutationalStage<M> {
     /// Creates a new transforming mutational stage with the default max iterations
     pub fn transforming(mutator: M) -> Self {
         Self::transforming_with_max_iterations(mutator, DEFAULT_MUTATIONAL_MAX_ITERATIONS)
@@ -290,18 +251,15 @@ where
             ),
             mutator,
             max_iterations,
-            phantom: PhantomData,
         }
     }
 }
 
 /// A mutational stage that operates on multiple inputs, as returned by [`MultiMutator::multi_mutate`].
 #[derive(Clone, Debug)]
-pub struct MultiMutationalStage<E, EM, I, M, Z> {
+pub struct MultiMutationalStage<M> {
     name: Cow<'static, str>,
     mutator: M,
-    #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(E, EM, I, Z)>,
 }
 
 /// The unique id for multi mutational stage
@@ -309,36 +267,27 @@ static mut MULTI_MUTATIONAL_STAGE_ID: usize = 0;
 /// The name for multi mutational stage
 pub static MULTI_MUTATIONAL_STAGE_NAME: &str = "multimutational";
 
-impl<E, EM, I, M, Z> UsesState for MultiMutationalStage<E, EM, I, M, Z>
-where
-    Z: UsesState,
-{
-    type State = Z::State;
-}
-
-impl<E, EM, I, M, Z> Named for MultiMutationalStage<E, EM, I, M, Z> {
+impl<M> Named for MultiMutationalStage<M> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<E, EM, I, M, Z> Stage<E, EM, Z> for MultiMutationalStage<E, EM, I, M, Z>
-where
-    E: UsesState<State = Self::State>,
-    EM: UsesState<State = Self::State>,
-    M: MultiMutator<I, Self::State>,
-    Z: Evaluator<E, EM>,
-    Self::State: HasCorpus + HasRand + HasNamedMetadata,
-    I: MutatedTransform<Self::Input, Self::State> + Clone,
+impl<E, EM, M, S, Z> Stage<E, EM, S, Z> for MultiMutationalStage<M>
+where 
+    S: HasNamedMetadata + HasCorpus + HasCurrentCorpusId,
+    M: MultiMutator<<S::Corpus as Corpus>::Input, S>,
+    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
+    <S::Corpus as Corpus>::Input: Clone,
 {
     #[inline]
-    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         // Make sure we don't get stuck crashing on a single testcase
         RetryCountRestartHelper::should_restart(state, &self.name, 3)
     }
 
     #[inline]
-    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
         RetryCountRestartHelper::clear_progress(state, &self.name)
     }
 
@@ -349,11 +298,11 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut Self::State,
+        state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error> {
         let mut testcase = state.current_testcase_mut()?;
-        let Ok(input) = I::try_transform_from(&mut testcase, state) else {
+        let Ok(input) = <S::Corpus as Corpus>::Input::try_transform_from(&mut testcase, state) else {
             return Ok(());
         };
         drop(testcase);
@@ -373,17 +322,14 @@ where
     }
 }
 
-impl<E, EM, M, Z> MultiMutationalStage<E, EM, Z::Input, M, Z>
-where
-    Z: UsesState,
-{
+impl<M> MultiMutationalStage<M> {
     /// Creates a new [`MultiMutationalStage`]
     pub fn new(mutator: M) -> Self {
         Self::transforming(mutator)
     }
 }
 
-impl<E, EM, I, M, Z> MultiMutationalStage<E, EM, I, M, Z> {
+impl<M> MultiMutationalStage<M> {
     /// Creates a new transforming mutational stage
     pub fn transforming(mutator: M) -> Self {
         // unsafe but impossible that you create two threads both instantiating this instance
@@ -397,7 +343,6 @@ impl<E, EM, I, M, Z> MultiMutationalStage<E, EM, I, M, Z> {
                 MULTI_MUTATIONAL_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_str(),
             ),
             mutator,
-            phantom: PhantomData,
         }
     }
 }

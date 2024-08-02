@@ -74,7 +74,7 @@ pub struct MinimizerScheduler<CS, F, M, O> {
 impl<CS, F, I, M, O, S> RemovableScheduler<I, S> for MinimizerScheduler<CS, F, M, O>
 where
     CS: RemovableScheduler<I, S>,
-    F: TestcaseScore<I, S>,
+    F: TestcaseScore<S>,
     M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
     S: HasCorpus + HasMetadata + HasRand,
 {
@@ -181,7 +181,7 @@ where
 impl<CS, F, M, O, I, OT, S> Scheduler<I, OT, S> for MinimizerScheduler<CS, F, M, O>
 where
     CS: Scheduler<I, OT, S>,
-    F: TestcaseScore<I, S>,
+    F: TestcaseScore<S>,
     M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
     S: HasCorpus + HasMetadata + HasRand,
 {

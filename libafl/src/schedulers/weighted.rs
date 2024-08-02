@@ -21,7 +21,7 @@ use crate::{
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
         AflScheduler, HasQueueCycles, RemovableScheduler, Scheduler,
     },
-    state::{HasRand, State},
+    state::HasRand,
     Error, HasMetadata,
 };
 
@@ -155,7 +155,7 @@ impl<C, F, O> WeightedScheduler<C, F, O> {
     )]
     pub fn create_alias_table<S>(&self, state: &mut S) -> Result<(), Error>
     where
-        F: TestcaseScore<<S::Corpus as Corpus>::Input, S>,
+        F: TestcaseScore<S>,
         S: HasCorpus + HasMetadata,
     {
         let n = state.corpus().count();
@@ -301,9 +301,9 @@ impl<C, F, O> HasQueueCycles for WeightedScheduler<C, F, O> {
 
 impl<C, F, I, O, OT, S> Scheduler<I, OT, S> for WeightedScheduler<C, F, O>
 where
-    F: TestcaseScore<I, S>,
+    F: TestcaseScore<S>,
     O: MapObserver,
-    S: HasCorpus + HasMetadata + HasRand + HasTestcase + State,
+    S: HasCorpus + HasMetadata + HasRand + HasTestcase,
     C: AsRef<O> + Named,
 {
     /// Called when a [`Testcase`] is added to the corpus

@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     corpus::{Corpus, CorpusId, HasCorpus, HasTestcase, Testcase},
     schedulers::{RemovableScheduler, Scheduler, TestcaseScore},
-    state::{HasRand, State},
+    state::HasRand,
     Error, HasMetadata,
 };
 
@@ -53,7 +53,7 @@ impl<F> ProbabilitySamplingScheduler<F> {
     #[allow(clippy::unused_self)]
     pub fn store_probability<S>(&self, state: &mut S, id: CorpusId) -> Result<(), Error>
     where
-        F: TestcaseScore<<S::Corpus as Corpus>::Input, S>,
+        F: TestcaseScore<S>,
         S: HasCorpus + HasMetadata + HasRand,
     {
         let prob = F::compute(state, &mut *state.corpus().get(id)?.borrow_mut())?;
@@ -111,8 +111,8 @@ where
 
 impl<F, I, OT, S> Scheduler<I, OT, S> for ProbabilitySamplingScheduler<F>
 where
-    F: TestcaseScore<I, S>,
-    S: HasCorpus + HasMetadata + HasRand + HasTestcase + State,
+    F: TestcaseScore<S>,
+    S: HasCorpus + HasMetadata + HasRand + HasTestcase,
 {
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         let current_id = *state.corpus().current();
@@ -171,7 +171,7 @@ mod tests {
     use libafl_bolts::rands::StdRand;
 
     use crate::{
-        corpus::{Corpus, HasCorpus, InMemoryCorpus, Testcase},
+        corpus::{Corpus, InMemoryCorpus, Testcase, HasCorpus},
         feedbacks::ConstFeedback,
         inputs::bytes::BytesInput,
         schedulers::{ProbabilitySamplingScheduler, Scheduler, TestcaseScore},
@@ -184,8 +184,14 @@ mod tests {
     #[derive(Debug, Clone)]
     pub struct UniformDistribution;
 
-    impl<I, S> TestcaseScore<I, S> for UniformDistribution {
-        fn compute(_state: &S, _: &mut Testcase<S::Input>) -> Result<f64, Error> {
+    impl<S> TestcaseScore<S> for UniformDistribution
+    where
+        S: HasCorpus,
+    {
+        fn compute(
+            _state: &S,
+            _: &mut Testcase<<S::Corpus as Corpus>::Input>,
+        ) -> Result<f64, Error> {
             Ok(FACTOR)
         }
     }
