@@ -111,7 +111,7 @@ goblin = "0.8"
 libc = "0.2"
 strum = "0.26"
 strum_macros = "0.26"
-syscall-numbers = "3.0"
+syscall-numbers = "4.0"
 meminterval = "0.4"
 thread_local = "1.1.4"
 capstone = "0.12.0"
@@ -129,6 +129,7 @@ bytes-utils = "0.1"
 typed-builder = "0.19"
 memmap2 = "0.9"
 getset = "0.1"
+bitflags = "2.6"
 # Document all features of this crate (for `cargo doc`)
 document-features = { version = "0.2", optional = true }
 
