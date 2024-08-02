@@ -134,6 +134,17 @@ pub fn build() {
         .write_to_file(&runtime_bindings_file)
         .expect("Could not write bindings.");
 
+    // TODO restrict generated stuff with allowlists
+    let perf_event_h = "/usr/include/linux/perf_event.h";
+    if emulation_mode == "systemmode" && Path::new(perf_event_h).exists() {
+        bindgen::Builder::default()
+            .header(perf_event_h)
+            .generate()
+            .expect("Unable to generate perf_event.h bindings")
+            .write_to_file("src/qemu/systemmode/perf_event_bindings.rs")
+            .expect("Unable to write perf_event.h bindings");
+    }
+
     maybe_generate_stub_bindings(
         &cpu_target,
         &emulation_mode,

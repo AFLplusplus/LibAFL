@@ -20,6 +20,9 @@ use crate::{
     CPU,
 };
 
+mod intel_pt;
+use intel_pt::*;
+
 pub(super) extern "C" fn qemu_cleanup_atexit() {
     unsafe {
         qemu_cleanup(EXIT_SUCCESS);
