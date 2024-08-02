@@ -373,6 +373,7 @@ pub struct MapFeedback<C, N, O, R> {
     #[cfg(feature = "track_hit_feedbacks")]
     last_result: Option<bool>,
     /// Phantom Data of Reducer
+    #[allow(clippy::type_complexity)]
     phantom: PhantomData<fn() -> (N, O, R)>,
 }
 

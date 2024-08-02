@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, CorpusId, HasCorpus},
-    observers::CanTrack,
+    observers::{CanTrack, MapObserver},
     schedulers::{
         minimizer::{IsFavoredMetadata, MinimizerScheduler, DEFAULT_SKIP_NON_FAVORED_PROB},
         IndexesLenTimeMinimizerScheduler, Scheduler,
@@ -100,22 +100,28 @@ impl TopAccountingMetadata {
 #[derive(Debug)]
 pub struct CoverageAccountingScheduler<'a, CS, O> {
     accounting_map: &'a [u32],
-    skip_non_favored_prob: f64,
     inner: IndexesLenTimeMinimizerScheduler<CS, O>,
 }
 
-impl<'a, CS, I, O, OT, S> Scheduler<I, OT, S> for CoverageAccountingScheduler<'a, CS, O>
+impl<'a, CS, O, OT, S> Scheduler<<S::Corpus as Corpus>::Input, OT, S>
+    for CoverageAccountingScheduler<'a, CS, O>
 where
-    CS: Scheduler<I, OT, S>,
+    CS: Scheduler<<S::Corpus as Corpus>::Input, OT, S>,
+    <S::Corpus as Corpus>::Input: HasLen,
+    O: MapObserver,
     S: HasCorpus + HasMetadata + HasRand,
-    I: HasLen,
 {
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         self.update_accounting_score(state, id)?;
         self.inner.on_add(state, id)
     }
 
-    fn on_evaluation(&mut self, state: &mut S, input: &I, observers: &OT) -> Result<(), Error> {
+    fn on_evaluation(
+        &mut self,
+        state: &mut S,
+        input: &<S::Corpus as Corpus>::Input,
+        observers: &OT,
+    ) -> Result<(), Error> {
         self.inner.on_evaluation(state, input, observers)
     }
 
@@ -319,7 +325,6 @@ where
         Self {
             accounting_map,
             inner: MinimizerScheduler::with_skip_prob(observer, base, skip_non_favored_prob),
-            skip_non_favored_prob,
         }
     }
 }

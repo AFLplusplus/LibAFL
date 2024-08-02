@@ -11,9 +11,9 @@ use std::{fs::File, hash::Hash, io::Read, path::Path};
 
 pub use bytes::BytesInput;
 pub use bytessub::BytesSubInput;
-// pub use encoded::*;
+pub use encoded::*;
 // pub use generalized::*;
-// pub use gramatron::*;
+pub use gramatron::*;
 #[cfg(feature = "std")]
 use libafl_bolts::fs::write_file_atomic;
 use libafl_bolts::{
@@ -21,24 +21,25 @@ use libafl_bolts::{
     subrange::{SubRangeMutSlice, SubRangeSlice},
     Error, HasLen,
 };
-// #[cfg(feature = "multipart_inputs")]
-// pub use multi::*;
-// #[cfg(feature = "nautilus")]
-// pub use nautilus::*;
+#[cfg(feature = "multipart_inputs")]
+pub use multi::*;
+#[cfg(feature = "nautilus")]
+pub use nautilus::*;
 use serde::{Deserialize, Serialize};
 
 use crate::corpus::CorpusId;
 
 pub mod bytes;
 pub mod bytessub;
-// pub mod encoded;
+pub mod encoded;
 // pub mod generalized;
-// pub mod gramatron;
-//
-// #[cfg(feature = "multipart_inputs")]
-// pub mod multi;
-// #[cfg(feature = "nautilus")]
-// pub mod nautilus;
+pub mod gramatron;
+
+#[cfg(feature = "multipart_inputs")]
+pub mod multi;
+#[cfg(feature = "nautilus")]
+pub mod nautilus;
+
 /// An input for the target
 #[cfg(not(feature = "std"))]
 pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {

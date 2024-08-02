@@ -1,21 +1,17 @@
 //! Nautilus grammar mutator, see <https://github.com/nautilus-fuzz/nautilus>
 use alloc::{borrow::Cow, string::String};
-use core::{fmt::Debug, marker::PhantomData};
+use core::fmt::Debug;
 use std::fs::create_dir_all;
 
-use libafl_bolts::{tuples::MatchName, Named};
+use libafl_bolts::Named;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     common::nautilus::grammartec::{chunkstore::ChunkStore, context::Context},
-    corpus::{Corpus, HasCorpus, Testcase},
-    events::EventFirer,
-    executors::ExitKind,
-    feedbacks::Feedback,
+    corpus::Testcase,
+    feedbacks::{Feedback, StateInitializer},
     generators::NautilusContext,
     inputs::NautilusInput,
-    observers::ObserversTuple,
-    state::State,
     Error, HasMetadata,
 };
 
@@ -75,6 +71,8 @@ impl<'a> Named for NautilusFeedback<'a> {
         &NAME
     }
 }
+
+impl<S> StateInitializer<S> for NautilusFeedback<'_> where S: HasMetadata {}
 
 impl<'a, EM, OT, S> Feedback<EM, NautilusInput, OT, S> for NautilusFeedback<'a>
 where

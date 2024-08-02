@@ -24,13 +24,16 @@ pub trait TestcaseScore<I, S> {
 #[derive(Debug, Copy, Clone)]
 pub struct LenTimeMulTestcaseScore;
 
-impl<I, S> TestcaseScore<I, S> for LenTimeMulTestcaseScore
+impl<S> TestcaseScore<<S::Corpus as Corpus>::Input, S> for LenTimeMulTestcaseScore
 where
+    <S::Corpus as Corpus>::Input: HasLen,
     S: HasCorpus + HasMetadata,
-    I: HasLen,
 {
     #[allow(clippy::cast_precision_loss, clippy::cast_lossless)]
-    fn compute(state: &S, entry: &mut Testcase<I>) -> Result<f64, Error> {
+    fn compute(
+        state: &S,
+        entry: &mut Testcase<<S::Corpus as Corpus>::Input>,
+    ) -> Result<f64, Error> {
         // TODO maybe enforce entry.exec_time().is_some()
         Ok(entry.exec_time().map_or(1, |d| d.as_millis()) as f64
             * entry.load_len(state.corpus())? as f64)

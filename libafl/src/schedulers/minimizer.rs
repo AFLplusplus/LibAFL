@@ -71,10 +71,11 @@ pub struct MinimizerScheduler<CS, F, M, O> {
     phantom: PhantomData<fn() -> (F, M, O)>,
 }
 
-impl<CS, F, I, M, O, S> RemovableScheduler<I, S> for MinimizerScheduler<CS, F, M, O>
+impl<CS, F, M, O, S> RemovableScheduler<<S::Corpus as Corpus>::Input, S>
+    for MinimizerScheduler<CS, F, M, O>
 where
-    CS: RemovableScheduler<I, S>,
-    F: TestcaseScore<I, S>,
+    CS: RemovableScheduler<<S::Corpus as Corpus>::Input, S>,
+    F: TestcaseScore<<S::Corpus as Corpus>::Input, S>,
     M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
     S: HasCorpus + HasMetadata + HasRand,
 {
@@ -83,7 +84,7 @@ where
         &mut self,
         state: &mut S,
         id: CorpusId,
-        testcase: &Option<Testcase<I>>,
+        testcase: &Option<Testcase<<S::Corpus as Corpus>::Input>>,
     ) -> Result<(), Error> {
         self.base.on_remove(state, id, testcase)?;
         let mut entries =
@@ -171,17 +172,18 @@ where
         &mut self,
         state: &mut S,
         id: CorpusId,
-        testcase: &Testcase<I>,
+        testcase: &Testcase<<S::Corpus as Corpus>::Input>,
     ) -> Result<(), Error> {
         self.base.on_replace(state, id, testcase)?;
         self.update_score(state, id)
     }
 }
 
-impl<CS, F, M, O, I, OT, S> Scheduler<I, OT, S> for MinimizerScheduler<CS, F, M, O>
+impl<CS, F, M, O, OT, S> Scheduler<<S::Corpus as Corpus>::Input, OT, S>
+    for MinimizerScheduler<CS, F, M, O>
 where
-    CS: Scheduler<I, OT, S>,
-    F: TestcaseScore<I, S>,
+    CS: Scheduler<<S::Corpus as Corpus>::Input, OT, S>,
+    F: TestcaseScore<<S::Corpus as Corpus>::Input, S>,
     M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
     S: HasCorpus + HasMetadata + HasRand,
 {
@@ -192,7 +194,12 @@ where
     }
 
     /// An input has been evaluated
-    fn on_evaluation(&mut self, state: &mut S, input: &I, observers: &OT) -> Result<(), Error> {
+    fn on_evaluation(
+        &mut self,
+        state: &mut S,
+        input: &<S::Corpus as Corpus>::Input,
+        observers: &OT,
+    ) -> Result<(), Error> {
         self.base.on_evaluation(state, input, observers)
     }
 
@@ -234,6 +241,7 @@ where
     #[allow(clippy::cast_possible_wrap)]
     pub fn update_score<S>(&self, state: &mut S, id: CorpusId) -> Result<(), Error>
     where
+        F: TestcaseScore<<S::Corpus as Corpus>::Input, S>,
         S: HasCorpus + HasMetadata,
     {
         // Create a new top rated meta if not existing
@@ -399,6 +407,7 @@ where
         }
     }
 
+    /// Gets the likelihood that a non-favored testcase is skipped
     pub fn skip_non_favored_prob(&self) -> f64 {
         self.skip_non_favored_prob
     }

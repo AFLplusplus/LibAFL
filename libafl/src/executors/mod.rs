@@ -3,10 +3,10 @@
 use alloc::boxed::Box;
 use core::fmt::Debug;
 
-// pub use combined::CombinedExecutor;
+pub use combined::CombinedExecutor;
 // #[cfg(all(feature = "std", any(unix, doc)))]
 // pub use command::CommandExecutor;
-// pub use differential::DiffExecutor;
+pub use differential::DiffExecutor;
 // #[cfg(all(feature = "std", feature = "fork", unix))]
 // pub use forkserver::{Forkserver, ForkserverExecutor};
 // pub use inprocess::InProcessExecutor;
@@ -16,15 +16,15 @@ use core::fmt::Debug;
 use libafl_bolts::os::unix_signals::Signal;
 use libafl_bolts::tuples::RefIndexable;
 use serde::{Deserialize, Serialize};
-// pub use shadow::ShadowExecutor;
+pub use shadow::ShadowExecutor;
 pub use with_observers::WithObservers;
 
 use crate::Error;
 
-// pub mod combined;
+pub mod combined;
 // #[cfg(all(feature = "std", any(unix, doc)))]
 // pub mod command;
-// pub mod differential;
+pub mod differential;
 // #[cfg(all(feature = "std", feature = "fork", unix))]
 // pub mod forkserver;
 // pub mod inprocess;
@@ -33,10 +33,10 @@ use crate::Error;
 // #[cfg(all(feature = "std", unix))]
 // pub mod inprocess_fork;
 //
-// pub mod shadow;
-//
+pub mod shadow;
+
 pub mod with_observers;
-//
+
 // /// The module for all the hooks
 // pub mod hooks;
 

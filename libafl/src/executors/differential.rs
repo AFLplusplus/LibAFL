@@ -63,8 +63,10 @@ impl<A, B, DOT, EM, I, S, Z> Executor<EM, I, S, Z>
     for DiffExecutor<A, B, DOT, A::Observers, B::Observers>
 where
     A: Executor<EM, I, S, Z> + HasObservers,
+    A::Observers: ObserversTuple<I, S>,
     B: Executor<EM, I, S, Z> + HasObservers,
-    DOT: DifferentialObserversTuple<A::Observers, B::Observers>,
+    B::Observers: ObserversTuple<I, S>,
+    DOT: DifferentialObserversTuple<A::Observers, B::Observers> + ObserversTuple<I, S>,
 {
     fn run_target(
         &mut self,

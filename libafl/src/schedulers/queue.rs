@@ -52,7 +52,7 @@ where
             if self.runs_in_current_cycle >= state.corpus().count() as u64 {
                 self.queue_cycles += 1;
             }
-            self.set_current_scheduled(state, Some(id))?;
+            <Self as Scheduler<I, OT, S>>::set_current_scheduled(self, state, Some(id))?;
             Ok(id)
         }
     }
