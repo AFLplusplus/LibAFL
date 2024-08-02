@@ -12,13 +12,8 @@ use alloc::{
 };
 use core::fmt;
 
-// pub use colorization::*;
-// #[cfg(all(feature = "std", unix))]
-// pub use concolic::ConcolicTracingStage;
 // #[cfg(all(feature = "std", feature = "concolic_mutation", unix))]
 // pub use concolic::SimpleConcolicMutationalStage;
-// #[cfg(feature = "std")]
-// pub use dump::*;
 // pub use generalization::GeneralizationStage;
 use hashbrown::HashSet;
 use libafl_bolts::{
@@ -35,7 +30,6 @@ use serde::{Deserialize, Serialize};
 // pub use tmin::{
 //     MapEqualityFactory, MapEqualityFeedback, StdTMinMutationalStage, TMinMutationalStage,
 // };
-// pub use tracing::{ShadowTracingStage, TracingStage};
 // pub use tuneable::*;
 use tuple_list::NonEmptyTuple;
 
@@ -60,11 +54,18 @@ pub mod concolic;
 #[cfg(all(feature = "std", unix))]
 pub use concolic::*;
 
+pub mod tracing;
+pub use tracing::*;
+
+#[cfg(feature = "std")]
+pub mod dump;
+#[cfg(feature = "std")]
+pub use dump::*;
+
 pub mod push;
 // pub mod tmin;
 
 // #[cfg(feature = "std")]
-// pub mod dump;
 // pub mod generalization;
 // /// The [`generation::GenStage`] generates a single input and evaluates it.
 // pub mod generation;
@@ -72,7 +73,6 @@ pub mod push;
 // pub mod stats;
 // #[cfg(feature = "std")]
 // pub mod sync;
-// pub mod tracing;
 // pub mod tuneable;
 // #[cfg(feature = "unicode")]
 // pub mod unicode;

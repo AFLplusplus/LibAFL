@@ -16,7 +16,6 @@ use core::fmt::Debug;
 use libafl_bolts::os::unix_signals::Signal;
 use libafl_bolts::tuples::RefIndexable;
 use serde::{Deserialize, Serialize};
-// pub use shadow::ShadowExecutor;
 pub use with_observers::WithObservers;
 
 use crate::Error;
@@ -33,8 +32,9 @@ use crate::Error;
 // #[cfg(all(feature = "std", unix))]
 // pub mod inprocess_fork;
 //
-// pub mod shadow;
-//
+pub mod shadow;
+pub use shadow::*;
+
 pub mod with_observers;
 //
 // /// The module for all the hooks

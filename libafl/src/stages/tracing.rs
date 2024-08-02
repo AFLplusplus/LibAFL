@@ -4,18 +4,18 @@ use alloc::{
     borrow::{Cow, ToOwned},
     string::ToString,
 };
-use core::{fmt::Debug, marker::PhantomData};
+use core::fmt::Debug;
 
 use libafl_bolts::Named;
 
 use crate::{
-    corpus::HasCorpus,
+    corpus::{Corpus, HasCorpus, HasCurrentCorpusId},
     executors::{Executor, HasObservers, ShadowExecutor},
     mark_feature_time,
     observers::ObserversTuple,
     stages::{RetryCountRestartHelper, Stage},
     start_timer,
-    state::{HasCurrentTestcase, HasExecutions, State},
+    state::HasCurrentTestcase,
     Error, HasNamedMetadata,
 };
 #[cfg(feature = "introspection")]
@@ -23,37 +23,27 @@ use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 
 /// A stage that runs a tracer executor
 #[derive(Clone, Debug)]
-pub struct TracingStage<EM, TE, Z> {
+pub struct TracingStage<TE> {
     name: Cow<'static, str>,
     tracer_executor: TE,
-    #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(EM, TE, Z)>,
 }
 
-impl<EM, TE, Z> UsesState for TracingStage<EM, TE, Z>
-where
-    TE: UsesState,
-{
-    type State = TE::State;
-}
-
-impl<EM, TE, Z> TracingStage<EM, TE, Z>
-where
-    TE: Executor<EM, Z> + HasObservers,
-    <Self as UsesState>::State: HasExecutions + HasCorpus + HasNamedMetadata,
-    EM: UsesState<State = <Self as UsesState>::State>,
-    Z: UsesState<State = <Self as UsesState>::State>,
-{
+impl<TE> TracingStage<TE> {
     #[allow(rustdoc::broken_intra_doc_links)]
     /// Perform tracing on the given `CorpusId`. Useful for if wrapping [`TracingStage`] with your
     /// own stage and you need to manage [`super::NestedStageRetryCountRestartHelper`] differently
     /// see [`super::ConcolicTracingStage`]'s implementation as an example of usage.
-    pub fn trace(
+    pub fn trace<EM, S, Z>(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut <Self as UsesState>::State,
+        state: &mut S,
         manager: &mut EM,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+        TE: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
+        S: HasCorpus + HasNamedMetadata + HasCurrentTestcase,
+        TE::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    {
         start_timer!(state);
         let input = state.current_input_cloned()?;
 
@@ -81,35 +71,33 @@ where
     }
 }
 
-impl<E, EM, TE, Z> Stage<E, EM, Z> for TracingStage<EM, TE, Z>
+impl<E, EM, TE, S, Z> Stage<E, EM, S, Z> for TracingStage<TE>
 where
-    E: UsesState<State = <Self as UsesState>::State>,
-    TE: Executor<EM, Z> + HasObservers,
-    <Self as UsesState>::State: HasExecutions + HasCorpus + HasNamedMetadata,
-    EM: UsesState<State = <Self as UsesState>::State>,
-    Z: UsesState<State = <Self as UsesState>::State>,
+    TE: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
+    TE::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    S: HasCorpus + HasNamedMetadata + HasCurrentTestcase + HasCurrentCorpusId,
 {
     #[inline]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         _executor: &mut E,
-        state: &mut <Self as UsesState>::State,
+        state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error> {
         self.trace(fuzzer, state, manager)
     }
 
-    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         RetryCountRestartHelper::no_retry(state, &self.name)
     }
 
-    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
         RetryCountRestartHelper::clear_progress(state, &self.name)
     }
 }
 
-impl<EM, TE, Z> Named for TracingStage<EM, TE, Z> {
+impl<TE> Named for TracingStage<TE> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
@@ -120,7 +108,7 @@ static mut TRACING_STAGE_ID: usize = 0;
 /// The name for tracing stage
 pub static TRACING_STAGE_NAME: &str = "tracing";
 
-impl<EM, TE, Z> TracingStage<EM, TE, Z> {
+impl<TE> TracingStage<TE> {
     /// Creates a new default stage
     pub fn new(tracer_executor: TE) -> Self {
         // unsafe but impossible that you create two threads both instantiating this instance
@@ -133,7 +121,6 @@ impl<EM, TE, Z> TracingStage<EM, TE, Z> {
         Self {
             name: Cow::Owned(TRACING_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_ref()),
             tracer_executor,
-            phantom: PhantomData,
         }
     }
 
@@ -150,46 +137,34 @@ impl<EM, TE, Z> TracingStage<EM, TE, Z> {
 
 /// A stage that runs the shadow executor using also the shadow observers
 #[derive(Clone, Debug)]
-pub struct ShadowTracingStage<E, EM, SOT, Z> {
+pub struct ShadowTracingStage {
     name: Cow<'static, str>,
-    #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(E, EM, SOT, Z)>,
 }
 
-impl<E, EM, SOT, Z> UsesState for ShadowTracingStage<E, EM, SOT, Z>
-where
-    E: UsesState,
-{
-    type State = E::State;
-}
 /// The counter for giving this stage unique id
 static mut SHADOW_TRACING_STAGE_ID: usize = 0;
 /// Name for shadow tracing stage
 pub static SHADOW_TRACING_STAGE_NAME: &str = "shadow";
 
-impl<E, EM, SOT, Z> Named for ShadowTracingStage<E, EM, SOT, Z>
-where
-    E: UsesState,
-{
+impl Named for ShadowTracingStage {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<E, EM, SOT, Z> Stage<ShadowExecutor<E, SOT>, EM, Z> for ShadowTracingStage<E, EM, SOT, Z>
+impl<E, EM, SOT, S, Z> Stage<ShadowExecutor<E, SOT>, EM, S, Z> for ShadowTracingStage
 where
-    E: Executor<EM, Z> + HasObservers,
-    EM: UsesState<State = <Self as UsesState>::State>,
-    SOT: ObserversTuple<E::State>,
-    Z: UsesState<State = <Self as UsesState>::State>,
-    <Self as UsesState>::State: State + HasExecutions + HasCorpus + HasNamedMetadata + Debug,
+    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
+    E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    S: HasCorpus + HasCurrentCorpusId + HasNamedMetadata,
+    SOT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
 {
     #[inline]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut ShadowExecutor<E, SOT>,
-        state: &mut <Self as UsesState>::State,
+        state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error> {
         start_timer!(state);
@@ -220,25 +195,18 @@ where
         Ok(())
     }
 
-    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         RetryCountRestartHelper::no_retry(state, &self.name)
     }
 
-    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
         RetryCountRestartHelper::clear_progress(state, &self.name)
     }
 }
 
-impl<E, EM, SOT, Z> ShadowTracingStage<E, EM, SOT, Z>
-where
-    E: Executor<EM, Z> + HasObservers,
-    <Self as UsesState>::State: State + HasExecutions + HasCorpus,
-    EM: UsesState<State = <Self as UsesState>::State>,
-    SOT: ObserversTuple<E::State>,
-    Z: UsesState<State = <Self as UsesState>::State>,
-{
+impl ShadowTracingStage {
     /// Creates a new default stage
-    pub fn new(_executor: &mut ShadowExecutor<E, SOT>) -> Self {
+    pub fn new<E, SOT>(_executor: &mut ShadowExecutor<E, SOT>) -> Self {
         // unsafe but impossible that you create two threads both instantiating this instance
         let stage_id = unsafe {
             let ret = SHADOW_TRACING_STAGE_ID;
@@ -249,7 +217,6 @@ where
             name: Cow::Owned(
                 SHADOW_TRACING_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_str(),
             ),
-            phantom: PhantomData,
         }
     }
 }
