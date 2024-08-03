@@ -30,8 +30,8 @@ pub struct LenTimeMulTestcaseScore;
 
 impl<S> TestcaseScore<S> for LenTimeMulTestcaseScore
 where
-    S: HasCorpus + HasMetadata,
     <S::Corpus as Corpus>::Input: HasLen,
+    S: HasCorpus + HasMetadata,
 {
     #[allow(clippy::cast_precision_loss, clippy::cast_lossless)]
     fn compute(

@@ -26,9 +26,12 @@ pub mod minimizer;
 use core::{cell::RefCell, fmt};
 
 pub mod nop;
+<<<<<<< HEAD
 use alloc::fmt::Debug;
 
 use libafl_bolts::rands::Rand;
+=======
+>>>>>>> origin/no-uses
 #[cfg(all(feature = "cmin", unix))]
 pub use minimizer::*;
 pub use nop::NopCorpus;

@@ -6,7 +6,7 @@ use core::marker::PhantomData;
 use hashbrown::HashMap;
 use libafl_bolts::{
     rands::Rand,
-    tuples::{Handle, Handled},
+    tuples::{Handle, Handled, MatchName},
     Named,
 };
 use serde::{Deserialize, Serialize};
@@ -16,7 +16,7 @@ use crate::{
     observers::MapObserver,
     random_corpus_id,
     schedulers::{
-        on_evaluation_metadata,
+        on_add_metadata, on_evaluation_metadata, on_next_metadata,
         powersched::{PowerSchedule, SchedulerMetadata},
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
         AflScheduler, HasQueueCycles, RemovableScheduler, Scheduler,
@@ -103,7 +103,10 @@ pub struct WeightedScheduler<C, F, O> {
     cycle_schedules: bool,
 }
 
-impl<C, F, O> WeightedScheduler<C, F, O> {
+impl<C, F, O> WeightedScheduler<C, F, O>
+where
+    C: Named,
+{
     /// Create a new [`WeightedScheduler`] without any power schedule
     #[must_use]
     pub fn new<S>(state: &mut S, map_observer: &C) -> Self
@@ -299,21 +302,27 @@ impl<C, F, O> HasQueueCycles for WeightedScheduler<C, F, O> {
     }
 }
 
-impl<C, F, I, O, OT, S> Scheduler<I, OT, S> for WeightedScheduler<C, F, O>
+impl<C, F, O, OT, S> Scheduler<<S::Corpus as Corpus>::Input, OT, S> for WeightedScheduler<C, F, O>
 where
+    C: AsRef<O> + Named,
     F: TestcaseScore<S>,
     O: MapObserver,
+    OT: MatchName,
     S: HasCorpus + HasMetadata + HasRand + HasTestcase,
-    C: AsRef<O> + Named,
 {
     /// Called when a [`Testcase`] is added to the corpus
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
-        self.on_add_metadata(state, id)?;
+        on_add_metadata(self, state, id)?;
         self.table_invalidated = true;
         Ok(())
     }
 
-    fn on_evaluation(&mut self, state: &mut S, _input: &I, observers: &OT) -> Result<(), Error> {
+    fn on_evaluation(
+        &mut self,
+        state: &mut S,
+        _input: &<S::Corpus as Corpus>::Input,
+        observers: &OT,
+    ) -> Result<(), Error> {
         on_evaluation_metadata(self, state, observers)
     }
 
@@ -361,7 +370,11 @@ where
                 }
             }
 
-            self.set_current_scheduled(state, Some(idx))?;
+            <Self as Scheduler<<S::Corpus as Corpus>::Input, OT, S>>::set_current_scheduled(
+                self,
+                state,
+                Some(idx),
+            )?;
             Ok(idx)
         }
     }
@@ -372,7 +385,7 @@ where
         state: &mut S,
         next_id: Option<CorpusId>,
     ) -> Result<(), Error> {
-        self.on_next_metadata(state, next_id)?;
+        on_next_metadata(state)?;
 
         *state.corpus_mut().current_mut() = next_id;
         Ok(())

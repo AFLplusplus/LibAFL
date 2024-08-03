@@ -62,12 +62,15 @@ impl NewHashFeedbackMetadata {
         Ok(())
     }
 
+    /// Gets the associated [`HashSet`] being used to track hashes
+    #[must_use]
     pub fn hash_set(&self) -> &HashSet<u64> {
         &self.hash_set
     }
 
-    pub fn hash_set_mut(&mut self) {
-        &mut self.hash_set;
+    /// Gets the associated [`HashSet`] being used to track hashes, mutably
+    pub fn hash_set_mut(&mut self) -> &mut HashSet<u64> {
+        &mut self.hash_set
     }
 }
 

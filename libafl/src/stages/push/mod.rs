@@ -5,10 +5,14 @@
 //!
 
 use alloc::rc::Rc;
+<<<<<<< HEAD
 use core::cell::{Cell, RefCell};
 
 pub mod mutational;
 pub use mutational::*;
+=======
+use core::{cell::RefCell, time::Duration};
+>>>>>>> origin/no-uses
 
 // pub use mutational::StdMutationalPushStage;
 use crate::{corpus::CorpusId, executors::ExitKind, Error};
@@ -58,7 +62,7 @@ pub struct PushStageHelper<EM, I, OT, S, Z> {
     /// The input we just ran
     pub current_input: Option<I>, // Todo: Get rid of copy
 
-    exit_kind: Rc<Cell<Option<ExitKind>>>,
+    exit_kind: Rc<RefCell<Option<ExitKind>>>,
 }
 
 impl<EM, I, OT, S, Z> PushStageHelper<EM, I, OT, S, Z> {
@@ -67,7 +71,7 @@ impl<EM, I, OT, S, Z> PushStageHelper<EM, I, OT, S, Z> {
     #[allow(clippy::type_complexity)]
     pub fn new(
         shared_state: Rc<RefCell<Option<PushStageSharedState<EM, OT, S, Z>>>>,
-        exit_kind_ref: Rc<Cell<Option<ExitKind>>>,
+        exit_kind_ref: Rc<RefCell<Option<ExitKind>>>,
     ) -> Self {
         Self {
             shared_state,
@@ -93,17 +97,17 @@ impl<EM, I, OT, S, Z> PushStageHelper<EM, I, OT, S, Z> {
         shared_state_ref.take()
     }
 
-    /// Returns the exit kind of the last run
+    /// Takes the exit kind of the last run
     #[inline]
     #[must_use]
-    pub fn exit_kind(&self) -> Option<ExitKind> {
-        self.exit_kind.get()
+    pub fn take_exit_kind(&self) -> Option<ExitKind> {
+        self.exit_kind.take()
     }
 
     /// Resets the exit kind
     #[inline]
     pub fn reset_exit_kind(&mut self) {
-        self.exit_kind.set(None);
+        self.exit_kind.replace(None);
     }
 
     /// Resets this state after a full stage iter.
@@ -184,4 +188,89 @@ pub trait PushStage<EM, OT, S, Z> {
     ) -> Result<(), Error> {
         Ok(())
     }
+<<<<<<< HEAD
+=======
+}
+
+/// Blanket implementation for getting the next input from the state
+pub trait PushStageNext<EM, OT, S, Z>: PushStage<EM, OT, S, Z> {
+    /// This is the default implementation for `next` for this stage
+    fn next_std(&mut self) -> Option<Result<Self::Input, Error>>;
+}
+
+impl<PS, EM, OT, S, Z> PushStageNext<EM, OT, S, Z> for PS
+where
+    PS: PushStage<EM, OT, S, Z>,
+    EM: ProgressReporter<S>,
+{
+    /// This is the default implementation for `next` for this stage
+    fn next_std(&mut self) -> Option<Result<Self::Input, Error>> {
+        let mut shared_state = {
+            let shared_state_ref = &mut (*self.push_stage_helper_mut().shared_state).borrow_mut();
+            shared_state_ref.take().unwrap()
+        };
+
+        let step_success = if self.push_stage_helper().initialized {
+            // We already ran once
+
+            let last_input = self.push_stage_helper_mut().current_input.take().unwrap();
+
+            self.post_exec(
+                &mut shared_state.fuzzer,
+                &mut shared_state.state,
+                &mut shared_state.event_mgr,
+                &mut shared_state.observers,
+                last_input,
+                self.push_stage_helper().take_exit_kind().unwrap(),
+            )
+        } else {
+            self.init(
+                &mut shared_state.fuzzer,
+                &mut shared_state.state,
+                &mut shared_state.event_mgr,
+                &mut shared_state.observers,
+            )
+        };
+        if let Err(err) = step_success {
+            self.push_stage_helper_mut().end_of_iter(shared_state, true);
+            return Some(Err(err));
+        }
+
+        //for i in 0..num {
+        let ret = self.pre_exec(
+            &mut shared_state.fuzzer,
+            &mut shared_state.state,
+            &mut shared_state.event_mgr,
+            &mut shared_state.observers,
+        );
+        if ret.is_none() {
+            // We're done.
+            drop(self.push_stage_helper_mut().current_input.take());
+            self.push_stage_helper_mut().initialized = false;
+
+            if let Err(err) = self.deinit(
+                &mut shared_state.fuzzer,
+                &mut shared_state.state,
+                &mut shared_state.event_mgr,
+                &mut shared_state.observers,
+            ) {
+                self.push_stage_helper_mut().end_of_iter(shared_state, true);
+                return Some(Err(err));
+            };
+
+            if let Err(err) = shared_state
+                .event_mgr
+                .maybe_report_progress(&mut shared_state.state, STATS_TIMEOUT_DEFAULT)
+            {
+                self.push_stage_helper_mut().end_of_iter(shared_state, true);
+                return Some(Err(err));
+            };
+        } else {
+            self.push_stage_helper_mut().reset_exit_kind();
+        }
+        self.push_stage_helper_mut()
+            .end_of_iter(shared_state, false);
+        ret
+    }
+>>>>>>> origin/no-uses
 }

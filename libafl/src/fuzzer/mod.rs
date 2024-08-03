@@ -4,7 +4,7 @@ use alloc::{string::ToString, vec::Vec};
 use core::{fmt::Debug, time::Duration};
 
 use libafl_bolts::current_time;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::Serialize;
 
 use crate::{
     corpus::{Corpus, CorpusId, HasCorpus, HasCurrentCorpusId, HasTestcase, Testcase},
@@ -14,13 +14,13 @@ use crate::{
     mark_feature_time,
     observers::ObserversTuple,
     schedulers::Scheduler,
-    stages::{HasCurrentStage, StagesTuple},
+    stages::StagesTuple,
     start_timer,
     state::{
-        HasCurrentTestcase, HasExecutions, HasLastFoundTime, HasLastReportTime, HasSolutions,
+        HasCurrentTestcase, HasExecutions, HasLastFoundTime, HasSolutions,
         MaybeHasClientPerfMonitor, Stoppable,
     },
-    Error, HasMetadata,
+    Error,
 };
 #[cfg(feature = "introspection")]
 use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};

@@ -26,7 +26,7 @@ use crate::{
     executors::ExitKind,
     feedbacks::{Feedback, HasObserverHandle, StateInitializer},
     monitors::{AggregatorOps, UserStats, UserStatsValue},
-    observers::{CanTrack, MapObserver, Observer, ObserversTuple},
+    observers::{CanTrack, MapObserver},
     Error, HasMetadata, HasNamedMetadata,
 };
 
@@ -373,13 +373,14 @@ pub struct MapFeedback<C, N, O, R> {
     #[cfg(feature = "track_hit_feedbacks")]
     last_result: Option<bool>,
     /// Phantom Data of Reducer
+    #[allow(clippy::type_complexity)]
     phantom: PhantomData<fn() -> (N, O, R)>,
 }
 
 impl<C, N, O, R, S> StateInitializer<S> for MapFeedback<C, N, O, R>
 where
     O: MapObserver,
-    O::Entry: Default + Debug + DeserializeOwned + Serialize,
+    O::Entry: 'static + Default + Debug + DeserializeOwned + Serialize,
     S: HasNamedMetadata,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
@@ -396,7 +397,7 @@ where
     EM: EventFirer<I, S>,
     N: IsNovel<O::Entry>,
     O: MapObserver + for<'it> AsIter<'it, Item = O::Entry>,
-    O::Entry: Default + Debug + DeserializeOwned + Serialize,
+    O::Entry: 'static + Default + Debug + DeserializeOwned + Serialize,
     OT: MatchName,
     R: Reducer<O::Entry>,
     S: HasNamedMetadata,

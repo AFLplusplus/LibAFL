@@ -11,13 +11,13 @@ use crate::{
     Error,
 };
 
-// pub mod gramatron;
-// pub use gramatron::*;
-//
-// #[cfg(feature = "nautilus")]
-// pub mod nautilus;
-// #[cfg(feature = "nautilus")]
-// pub use nautilus::*;
+pub mod gramatron;
+pub use gramatron::*;
+
+#[cfg(feature = "nautilus")]
+pub mod nautilus;
+#[cfg(feature = "nautilus")]
+pub use nautilus::*;
 
 /// Generators can generate ranges of bytes.
 pub trait Generator<I, S> {

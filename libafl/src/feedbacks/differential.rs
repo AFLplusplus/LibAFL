@@ -44,7 +44,9 @@ impl DiffResult {
     }
 }
 
+/// Compares two [`crate::observers::Observer`]s to see if the result should be denoted as equal
 pub trait DiffComparator<O1, O2> {
+    /// Performs the comparison between two [`crate::observers::Observer`]s
     fn compare(&mut self, first: &O1, second: &O2) -> DiffResult;
 }
 

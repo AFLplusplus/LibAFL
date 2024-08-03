@@ -132,7 +132,7 @@ where
         } else {
             state.corpus().first().unwrap()
         };
-        self.set_current_scheduled(state, Some(id))?;
+        <Self as Scheduler<I, OT, S>>::set_current_scheduled(self, state, Some(id))?;
         Ok(id)
     }
 

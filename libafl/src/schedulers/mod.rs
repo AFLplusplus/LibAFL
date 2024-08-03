@@ -65,6 +65,7 @@ pub trait RemovableScheduler<I, S> {
 pub fn on_add_metadata<CS, S>(scheduler: &CS, state: &mut S, id: CorpusId) -> Result<(), Error>
 where
     CS: AflScheduler,
+    S: HasTestcase,
 {
     let current_id = *state.corpus().current();
 
@@ -144,6 +145,7 @@ where
 
 /// Defines the common metadata operations for the AFL-style schedulers
 pub trait AflScheduler {
+    /// The type of [`MapObserver`] that this scheduler will use as reference
     type MapObserverRef;
 
     /// Return the last hash
@@ -215,7 +217,7 @@ where
             ))
         } else {
             let id = random_corpus_id!(state.corpus(), state.rand_mut());
-            self.set_current_scheduled(state, Some(id))?;
+            <Self as Scheduler<I, OT, S>>::set_current_scheduled(self, state, Some(id))?;
             Ok(id)
         }
     }

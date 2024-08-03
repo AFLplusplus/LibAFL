@@ -21,7 +21,7 @@ use libafl_bolts::{
     rands::{Rand, StdRand},
     serdeany::{NamedSerdeAnyMap, SerdeAnyMap},
 };
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 mod stack;
 pub use stack::StageStack;
@@ -33,7 +33,7 @@ use crate::monitors::ScalabilityMonitor;
 use crate::{
     corpus::{Corpus, CorpusId, HasCorpus, HasCurrentCorpusId, HasTestcase, Testcase},
     events::{Event, EventFirer, LogSeverity},
-    feedbacks::{Feedback, StateInitializer},
+    feedbacks::StateInitializer,
     fuzzer::{Evaluator, ExecuteInputResult},
     generators::Generator,
     inputs::Input,
@@ -462,6 +462,7 @@ pub trait HasCurrentTestcase: HasCorpus {
 impl<T> HasCurrentTestcase for T
 where
     T: HasCorpus + HasCurrentCorpusId,
+    <Self::Corpus as Corpus>::Input: Clone,
 {
     fn current_testcase(
         &self,

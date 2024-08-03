@@ -267,6 +267,7 @@ impl<E, EM, S, Z> IntoVec<Box<dyn Stage<E, EM, S, Z>>> for Vec<Box<dyn Stage<E, 
 
 impl<E, EM, S, Z> StagesTuple<E, EM, S, Z> for Vec<Box<dyn Stage<E, EM, S, Z>>>
 where
+    EM: EventProcessor<E, S, Z>,
     S: HasCurrentStage + Stoppable,
 {
     /// Performs all stages in the `Vec`
@@ -394,7 +395,6 @@ impl<PS> Named for PushStageAdapter<PS> {
 
 impl<E, EM, PS, S, Z> Stage<E, EM, S, Z> for PushStageAdapter<PS>
 where
-    PS: PushStage<EM, E::Observers, S, Z>,
     E: HasObservers,
     S: HasNamedMetadata + HasCurrentCorpusId + HasCorpus,
     Z: ExecutesInput<E, EM, <S::Corpus as Corpus>::Input, S>,

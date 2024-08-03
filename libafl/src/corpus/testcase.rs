@@ -15,7 +15,7 @@ use libafl_bolts::{serdeany::SerdeAnyMap, HasLen};
 use serde::{Deserialize, Serialize};
 
 use super::{Corpus, HasCorpus};
-use crate::{corpus::CorpusId, inputs::Input, Error, HasMetadata};
+use crate::{corpus::CorpusId, Error, HasMetadata};
 
 /// Shorthand to receive a [`Ref`] or [`RefMut`] to a stored [`Testcase`], by [`CorpusId`].
 /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
@@ -237,7 +237,7 @@ impl<I> Testcase<I> {
 
     /// Create a new Testcase instance given an input
     #[inline]
-    pub fn new(mut input: I) -> Self {
+    pub fn new(input: I) -> Self {
         Self {
             input: Some(input),
             filename: None,
@@ -262,7 +262,7 @@ impl<I> Testcase<I> {
 
     /// Creates a testcase, attaching the id of the parent
     /// that this [`Testcase`] was derived from on creation
-    pub fn with_parent_id(mut input: I, parent_id: CorpusId) -> Self {
+    pub fn with_parent_id(input: I, parent_id: CorpusId) -> Self {
         Testcase {
             input: Some(input),
             filename: None,
@@ -287,7 +287,7 @@ impl<I> Testcase<I> {
 
     /// Create a new Testcase instance given an [`Input`] and a `filename`
     #[inline]
-    pub fn with_filename(mut input: I, filename: String) -> Self {
+    pub fn with_filename(input: I, filename: String) -> Self {
         Self {
             input: Some(input),
             filename: Some(filename),
@@ -312,7 +312,7 @@ impl<I> Testcase<I> {
 
     /// Create a new Testcase instance given an [`Input`] and the number of executions
     #[inline]
-    pub fn with_executions(mut input: I, executions: u64) -> Self {
+    pub fn with_executions(input: I, executions: u64) -> Self {
         Self {
             input: Some(input),
             filename: None,

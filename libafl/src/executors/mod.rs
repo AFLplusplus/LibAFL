@@ -3,10 +3,10 @@
 use alloc::boxed::Box;
 use core::fmt::Debug;
 
-// pub use combined::CombinedExecutor;
+pub use combined::CombinedExecutor;
 // #[cfg(all(feature = "std", any(unix, doc)))]
 // pub use command::CommandExecutor;
-// pub use differential::DiffExecutor;
+pub use differential::DiffExecutor;
 // #[cfg(all(feature = "std", feature = "fork", unix))]
 // pub use forkserver::{Forkserver, ForkserverExecutor};
 // pub use inprocess::InProcessExecutor;
@@ -20,10 +20,10 @@ pub use with_observers::WithObservers;
 
 use crate::Error;
 
-// pub mod combined;
+pub mod combined;
 // #[cfg(all(feature = "std", any(unix, doc)))]
 // pub mod command;
-// pub mod differential;
+pub mod differential;
 // #[cfg(all(feature = "std", feature = "fork", unix))]
 // pub mod forkserver;
 // pub mod inprocess;
@@ -36,7 +36,7 @@ pub mod shadow;
 pub use shadow::*;
 
 pub mod with_observers;
-//
+
 // /// The module for all the hooks
 // pub mod hooks;
 
@@ -70,6 +70,7 @@ libafl_bolts::impl_serdeany!(ExitKind);
 
 /// Holds a tuple of Observers
 pub trait HasObservers {
+    /// The [`crate::observers::ObserverTuple`] held by this type
     type Observers;
 
     /// Get the linked observers
@@ -96,7 +97,7 @@ pub trait Executor<EM, I, S, Z> {
 #[inline]
 #[must_use]
 pub fn common_signals() -> &'static [Signal] {
-    static SIGNALS: &'static [Signal] = &[
+    static SIGNALS: &[Signal] = &[
         Signal::SigAlarm,
         Signal::SigUser2,
         Signal::SigAbort,

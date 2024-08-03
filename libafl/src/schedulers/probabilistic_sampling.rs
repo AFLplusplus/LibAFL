@@ -16,9 +16,17 @@ use crate::{
 };
 
 /// Conduct reservoir sampling (probabilistic sampling) over all corpus elements.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct ProbabilitySamplingScheduler<F> {
     phantom: PhantomData<fn() -> F>,
+}
+
+impl<F> Default for ProbabilitySamplingScheduler<F> {
+    fn default() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
 }
 
 /// A state metadata holding a map of probability of corpus elements.
@@ -71,15 +79,16 @@ impl<F> ProbabilitySamplingScheduler<F> {
     }
 }
 
-impl<F, I, S> RemovableScheduler<I, S> for ProbabilitySamplingScheduler<F>
+impl<F, S> RemovableScheduler<<S::Corpus as Corpus>::Input, S> for ProbabilitySamplingScheduler<F>
 where
-    S: HasMetadata,
+    F: TestcaseScore<<S::Corpus as Corpus>::Input, S>,
+    S: HasCorpus + HasMetadata + HasRand,
 {
     fn on_remove(
         &mut self,
         state: &mut S,
         id: CorpusId,
-        _testcase: &Option<Testcase<I>>,
+        _testcase: &Option<Testcase<<S::Corpus as Corpus>::Input>>,
     ) -> Result<(), Error> {
         let meta = state
             .metadata_map_mut()
@@ -95,7 +104,7 @@ where
         &mut self,
         state: &mut S,
         id: CorpusId,
-        _prev: &Testcase<I>,
+        _prev: &Testcase<<S::Corpus as Corpus>::Input>,
     ) -> Result<(), Error> {
         let meta = state
             .metadata_map_mut()
@@ -109,7 +118,7 @@ where
     }
 }
 
-impl<F, I, OT, S> Scheduler<I, OT, S> for ProbabilitySamplingScheduler<F>
+impl<F, OT, S> Scheduler<<S::Corpus as Corpus>::Input, OT, S> for ProbabilitySamplingScheduler<F>
 where
     F: TestcaseScore<S>,
     S: HasCorpus + HasMetadata + HasRand + HasTestcase,
@@ -148,7 +157,11 @@ where
                     break;
                 }
             }
-            self.set_current_scheduled(state, Some(ret))?;
+            <Self as Scheduler<<S::Corpus as Corpus>::Input, OT, S>>::set_current_scheduled(
+                self,
+                state,
+                Some(ret),
+            )?;
             Ok(ret)
         }
     }

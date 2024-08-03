@@ -1,12 +1,5 @@
 //! [`Mutator`]`s` mutate input during fuzzing. These can be used standalone or in combination with other mutators to explore the input space more effectively.
 //! You can read more about mutators in the [libAFL book](https://aflplus.plus/libafl-book/core_concepts/mutator.html)
-// pub mod scheduled;
-//
-// pub use scheduled::*;
-// pub mod mutations;
-// pub use mutations::*;
-// pub mod token_mutations;
-// pub use token_mutations::*;
 // pub mod encoded_mutations;
 // pub use encoded_mutations::*;
 // pub mod mopt_mutator;
@@ -34,12 +27,19 @@ use alloc::{borrow::Cow, boxed::Box, vec::Vec};
 use core::fmt;
 
 use libafl_bolts::{tuples::IntoVec, HasLen, Named};
+// pub use mutations::*;
+// pub use scheduled::*;
 use serde::{Deserialize, Serialize};
+// pub use token_mutations::*;
 // #[cfg(feature = "nautilus")]
 // pub use nautilus::*;
 use tuple_list::NonEmptyTuple;
 
 use crate::{corpus::CorpusId, Error};
+
+// pub mod mutations;
+// pub mod scheduled;
+// pub mod token_mutations;
 
 // TODO mutator stats method that produces something that can be sent with the NewTestcase event
 // We can use it to report which mutations generated the testcase in the broker logs
