@@ -5,14 +5,10 @@
 //!
 
 use alloc::rc::Rc;
-<<<<<<< HEAD
-use core::cell::{Cell, RefCell};
 
 pub mod mutational;
 pub use mutational::*;
-=======
 use core::{cell::RefCell, time::Duration};
->>>>>>> origin/no-uses
 
 // pub use mutational::StdMutationalPushStage;
 use crate::{corpus::CorpusId, executors::ExitKind, Error};
@@ -188,8 +184,6 @@ pub trait PushStage<EM, OT, S, Z> {
     ) -> Result<(), Error> {
         Ok(())
     }
-<<<<<<< HEAD
-=======
 }
 
 /// Blanket implementation for getting the next input from the state
@@ -197,6 +191,10 @@ pub trait PushStageNext<EM, OT, S, Z>: PushStage<EM, OT, S, Z> {
     /// This is the default implementation for `next` for this stage
     fn next_std(&mut self) -> Option<Result<Self::Input, Error>>;
 }
+
+
+/// Send a monitor update all 15 (or more) seconds
+const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
 
 impl<PS, EM, OT, S, Z> PushStageNext<EM, OT, S, Z> for PS
 where
@@ -272,5 +270,4 @@ where
             .end_of_iter(shared_state, false);
         ret
     }
->>>>>>> origin/no-uses
 }
