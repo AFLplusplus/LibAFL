@@ -152,12 +152,6 @@ pub trait MutatorsTuple<I, S>: HasLen {
         state: &mut S,
         corpus_id: Option<CorpusId>,
     ) -> Result<(), Error>;
-
-    /// Gets all names of the wrapped [`Mutator`]`s`, reversed.
-    fn names_reversed(&self) -> Vec<&str>;
-
-    /// Gets all names of the wrapped [`Mutator`]`s`.
-    fn names(&self) -> Vec<&str>;
 }
 
 impl<I, S> MutatorsTuple<I, S> for () {
@@ -193,16 +187,6 @@ impl<I, S> MutatorsTuple<I, S> for () {
         _new_corpus_id: Option<CorpusId>,
     ) -> Result<(), Error> {
         Ok(())
-    }
-
-    #[inline]
-    fn names_reversed(&self) -> Vec<&str> {
-        Vec::new()
-    }
-
-    #[inline]
-    fn names(&self) -> Vec<&str> {
-        Vec::new()
     }
 }
 
@@ -258,12 +242,6 @@ where
     fn names_reversed(&self) -> Vec<&str> {
         let mut ret = self.1.names_reversed();
         ret.push(self.0.name());
-        ret
-    }
-
-    fn names(&self) -> Vec<&str> {
-        let mut ret = self.names_reversed();
-        ret.reverse();
         ret
     }
 }

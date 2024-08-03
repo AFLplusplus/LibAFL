@@ -159,13 +159,16 @@ where
     }
 }
 
-impl<MT> StdScheduledMutator<MT> {
+impl<MT> StdScheduledMutator<MT> 
+where
+    MT: NamedTuple
+{
     /// Create a new [`StdScheduledMutator`] instance specifying mutations
     pub fn new(mutations: MT) -> Self {
         StdScheduledMutator {
             name: Cow::from(format!(
                 "StdScheduledMutator[{}]",
-                mutations.names().join(", ")
+                mutations.name().join(", ")
             )),
             mutations,
             max_stack_pow: 7,
@@ -177,7 +180,7 @@ impl<MT> StdScheduledMutator<MT> {
         StdScheduledMutator {
             name: Cow::from(format!(
                 "StdScheduledMutator[{}]",
-                mutations.names().join(", ")
+                mutations.name().join(", ")
             )),
             mutations,
             max_stack_pow,
