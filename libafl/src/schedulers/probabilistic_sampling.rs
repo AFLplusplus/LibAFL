@@ -81,7 +81,7 @@ impl<F> ProbabilitySamplingScheduler<F> {
 
 impl<F, S> RemovableScheduler<<S::Corpus as Corpus>::Input, S> for ProbabilitySamplingScheduler<F>
 where
-    F: TestcaseScore<<S::Corpus as Corpus>::Input, S>,
+    F: TestcaseScore<S>,
     S: HasCorpus + HasMetadata + HasRand,
 {
     fn on_remove(

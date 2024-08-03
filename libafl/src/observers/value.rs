@@ -291,7 +291,7 @@ impl<T> AsMut<Self> for RefCellValueObserver<'_, T> {
 
 impl<T, A> MapObserver for RefCellValueObserver<'_, A>
 where
-    T: PartialEq + Copy + Hash + Default,
+    T: PartialEq + Copy + Hash + Default + DeserializeOwned + Serialize + Debug,
     A: DerefMut<Target = [T]> + Hash + Serialize + DeserializeOwned + HasLen + Default,
 {
     type Entry = T;

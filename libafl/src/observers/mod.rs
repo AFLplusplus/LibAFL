@@ -26,6 +26,9 @@ pub use map::*;
 
 pub mod value;
 
+pub mod cmp;
+pub use cmp::*;
+
 /// List observer
 pub mod list;
 use core::{fmt::Debug, time::Duration};

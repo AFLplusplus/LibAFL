@@ -157,6 +157,7 @@ where
     E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     S: HasCorpus + HasCurrentCorpusId + HasNamedMetadata,
+    <S::Corpus as Corpus>::Input: Clone,
     SOT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
 {
     #[inline]

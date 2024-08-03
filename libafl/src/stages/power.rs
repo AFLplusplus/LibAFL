@@ -108,7 +108,7 @@ impl<F, M> PowerMutationalStage<F, M> {
     #[allow(clippy::cast_sign_loss)]
     fn iterations<S>(&self, state: &mut S) -> Result<usize, Error>
     where
-        S: HasCorpus + HasCurrentCorpusId,
+        S: HasCorpus + HasCurrentCorpusId + HasCurrentTestcase,
         F: TestcaseScore<S>,
     {
         // Update handicap

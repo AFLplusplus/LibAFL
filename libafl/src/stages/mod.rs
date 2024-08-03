@@ -64,10 +64,10 @@ pub use logics::*;
 pub mod stats;
 pub use stats::*;
 
-#[cfg(feature = "std")]
-pub mod sync;
-#[cfg(feature = "std")]
-pub use sync::*;
+// #[cfg(feature = "std")]
+// pub mod sync;
+// #[cfg(feature = "std")]
+// pub use sync::*;
 
 #[cfg(feature = "unicode")]
 pub mod unicode;
@@ -83,8 +83,8 @@ pub use tmin::*;
 pub mod tuneable;
 pub use tuneable::*;
 
-pub mod push;
-pub use push::*;
+// pub mod push;
+// pub use push::*;
 
 // #[cfg(feature = "std")]
 // pub mod sync;
@@ -94,7 +94,7 @@ pub use push::*;
 // pub mod pruning;
 // pub use pruning::*;
 use crate::{
-    corpus::{CorpusId, HasCorpus, HasCurrentCorpusId},
+    corpus::{Corpus, CorpusId, HasCorpus, HasCurrentCorpusId},
     events::EventProcessor,
     executors::HasObservers,
     state::{HasExecutions, Stoppable},

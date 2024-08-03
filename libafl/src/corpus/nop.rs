@@ -1,4 +1,5 @@
 //! The null corpus does not store any [`Testcase`]s.
+use alloc::fmt::Debug;
 use core::{cell::RefCell, marker::PhantomData};
 
 use serde::{Deserialize, Serialize};
@@ -15,7 +16,10 @@ pub struct NopCorpus<I> {
     phantom: PhantomData<I>,
 }
 
-impl<I> Corpus for NopCorpus<I> {
+impl<I> Corpus for NopCorpus<I>
+where
+    I: Debug,
+{
     type Input = I;
 
     /// Returns the number of all enabled entries

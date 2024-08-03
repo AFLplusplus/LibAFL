@@ -241,7 +241,7 @@ where
     #[allow(clippy::cast_possible_wrap)]
     pub fn update_score<S>(&self, state: &mut S, id: CorpusId) -> Result<(), Error>
     where
-        F: TestcaseScore<<S::Corpus as Corpus>::Input, S>,
+        F: TestcaseScore<S>,
         S: HasCorpus + HasMetadata,
     {
         // Create a new top rated meta if not existing
