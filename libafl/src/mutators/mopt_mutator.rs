@@ -5,6 +5,7 @@ use core::fmt::{self, Debug};
 
 use libafl_bolts::{
     rands::{Rand, StdRand},
+    tuples::NamedTuple,
     Named,
 };
 use serde::{Deserialize, Serialize};
@@ -363,8 +364,8 @@ pub struct StdMOptMutator<MT> {
     max_stack_pow: usize,
 }
 
-impl<I, MT, S> Mutator<I, S> for StdMOptMutator<MT> 
-where 
+impl<I, MT, S> Mutator<I, S> for StdMOptMutator<MT>
+where
     S: HasCorpus + HasSolutions + HasRand + HasMetadata,
     MT: MutatorsTuple<I, S>,
 {
@@ -496,9 +497,9 @@ impl<MT> StdMOptMutator<MT> {
         max_stack_pow: usize,
         swarm_num: usize,
     ) -> Result<Self, Error>
-    where 
+    where
         S: HasMetadata + HasRand,
-        MT: MutatorsTuple<I, S>,
+        MT: MutatorsTuple<I, S> + NamedTuple,
     {
         if !state.has_metadata::<MOpt>() {
             let rand_seed = state.rand_mut().next();
@@ -513,9 +514,9 @@ impl<MT> StdMOptMutator<MT> {
         })
     }
 
-    fn core_mutate<I, S>(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> 
-    where 
-        S: HasMetadata + HasRand + HasSolutions,
+    fn core_mutate<I, S>(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error>
+    where
+        S: HasMetadata + HasRand + HasSolutions + HasCorpus,
         MT: MutatorsTuple<I, S>,
     {
         let mut r = MutationResult::Skipped;
@@ -540,13 +541,9 @@ impl<MT> StdMOptMutator<MT> {
         Ok(r)
     }
 
-    fn pilot_mutate<I, S>(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-    ) -> Result<MutationResult, Error> 
-    where 
-        S: HasMetadata + HasRand + HasSolutions,
+    fn pilot_mutate<I, S>(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error>
+    where
+        S: HasMetadata + HasRand + HasSolutions + HasCorpus,
         MT: MutatorsTuple<I, S>,
     {
         let mut r = MutationResult::Skipped;

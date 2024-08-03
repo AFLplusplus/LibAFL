@@ -15,8 +15,7 @@ use crate::{executors::ExitKind, observers::Observer, Error, HasMetadata};
 
 /// Generic metadata trait for use in a `CmpObserver`, which adds comparisons from a `CmpObserver`
 /// primarily intended for use with `AFLppCmpValuesMetadata` or `CmpValuesMetadata`
-pub trait CmpObserverMetadata<'a, CM>: SerdeAny + Debug
-{
+pub trait CmpObserverMetadata<'a, CM>: SerdeAny + Debug {
     /// Extra data used by the metadata when adding information from a `CmpObserver`, for example
     /// the `original` field in `AFLppCmpLogObserver`
     type Data: 'a + Debug + Default + Serialize + DeserializeOwned;
@@ -226,7 +225,7 @@ pub trait CmpMap: Debug {
 }
 
 /// A [`CmpObserver`] observes the traced comparisons during the current execution using a [`CmpMap`]
-pub trait CmpObserver<'a, I, S> : Observer<I, S> {
+pub trait CmpObserver<'a, I, S>: Observer<I, S> {
     type CM;
     type Metadata;
 
@@ -293,10 +292,9 @@ where
 
     fn post_exec(&mut self, state: &mut S, _input: &I, _exit_kind: &ExitKind) -> Result<(), Error> {
         if self.add_meta {
-
             #[allow(clippy::option_if_let_else)] // we can't mutate state in a closure
             let meta = state.metadata_or_insert_with(|| M::new_metadata());
-        
+
             let map = self.cmp_map_mut();
             meta.add_from(self.usable_count(), self.cmp_map_mut());
         }

@@ -238,12 +238,6 @@ where
             self.1.get_and_post_exec(index - 1, state, new_corpus_id)
         }
     }
-
-    fn names_reversed(&self) -> Vec<&str> {
-        let mut ret = self.1.names_reversed();
-        ret.push(self.0.name());
-        ret
-    }
 }
 
 impl<Head, Tail, I, S> IntoVec<Box<dyn Mutator<I, S>>> for (Head, Tail)
@@ -297,14 +291,6 @@ where
         new_corpus_id: Option<CorpusId>,
     ) -> Result<(), Error> {
         self.0.get_and_post_exec(index, state, new_corpus_id)
-    }
-
-    fn names_reversed(&self) -> Vec<&str> {
-        self.0.names_reversed()
-    }
-
-    fn names(&self) -> Vec<&str> {
-        self.0.names()
     }
 }
 
@@ -362,14 +348,6 @@ impl<I, S> MutatorsTuple<I, S> for Vec<Box<dyn Mutator<I, S>>> {
             .get_mut(index)
             .ok_or_else(|| Error::key_not_found("Mutator with id {index:?} not found."))?;
         mutator.post_exec(state, new_corpus_id)
-    }
-
-    fn names_reversed(&self) -> Vec<&str> {
-        self.iter().rev().map(|x| x.name().as_ref()).collect()
-    }
-
-    fn names(&self) -> Vec<&str> {
-        self.iter().map(|x| x.name().as_ref()).collect()
     }
 }
 
