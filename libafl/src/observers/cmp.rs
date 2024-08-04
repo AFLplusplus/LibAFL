@@ -145,7 +145,7 @@ where
         Self::new()
     }
 
-    fn add_from(&mut self, usable_count: usize, cmp_map: &mut CM, _: Self::Data) {
+    fn add_from(&mut self, usable_count: usize, cmp_map: &mut CM) {
         self.list.clear();
         let count = usable_count;
         for i in 0..count {
@@ -225,7 +225,7 @@ pub trait CmpMap: Debug {
 }
 
 /// A [`CmpObserver`] observes the traced comparisons during the current execution using a [`CmpMap`]
-pub trait CmpObserver<'a, I, S>: Observer<I, S> {
+pub trait CmpObserver {
     type CM;
     type Metadata;
 
@@ -254,7 +254,7 @@ where
     data: M::Data,
 }
 
-impl<'a, CM, I, S, M> CmpObserver<'a, I, S> for StdCmpObserver<'a, CM, M>
+impl<'a, CM, M> CmpObserver for StdCmpObserver<'a, CM, M>
 where
     CM: Serialize + CmpMap,
     M: CmpObserverMetadata<'a, CM>,
@@ -281,9 +281,9 @@ where
 
 impl<'a, CM, I, S, M> Observer<I, S> for StdCmpObserver<'a, CM, M>
 where
-    CM: Serialize + DeserializeOwned + CmpMap,
-    S: HasMetadata,
+    CM: Serialize + CmpMap,
     M: CmpObserverMetadata<'a, CM>,
+    S: HasMetadata,
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.cmp_map.as_mut().reset()?;
@@ -295,7 +295,6 @@ where
             #[allow(clippy::option_if_let_else)] // we can't mutate state in a closure
             let meta = state.metadata_or_insert_with(|| M::new_metadata());
 
-            let map = self.cmp_map_mut();
             meta.add_from(self.usable_count(), self.cmp_map_mut());
         }
         Ok(())
@@ -304,7 +303,7 @@ where
 
 impl<'a, CM, M> Named for StdCmpObserver<'a, CM, M>
 where
-    CM: CmpMap + Serialize + DeserializeOwned,
+    CM: Serialize,
     M: CmpObserverMetadata<'a, CM>,
 {
     fn name(&self) -> &Cow<'static, str> {
