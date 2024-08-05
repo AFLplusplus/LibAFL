@@ -805,6 +805,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         };
 
         let (rlen, version_status) = forkserver.read_st()?; // Initial handshake, read 4-bytes hello message from the forkserver.
+
         if rlen != 4 {
             return Err(Error::unknown("Failed to start a forkserver".to_string()));
         }
