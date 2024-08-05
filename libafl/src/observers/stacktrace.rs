@@ -267,7 +267,7 @@ pub fn get_asan_runtime_flags() -> String {
     flags.join(":")
 }
 
-/// An observer looking at the backtrace of target command using ASAN output. This observer is only compatible with [`crate::executors::forkserver::ForkserverExecutor`].
+/// An observer looking at the backtrace of target command using ASAN output. This observer is only compatible with a `ForkserverExecutor`.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AsanBacktraceObserver {
     observer_name: Cow<'static, str>,
