@@ -968,6 +968,91 @@ impl SimpleStdoutLogger {
     }
 }
 
+use std::arch::asm;
+#[cfg(target_os = "windows")]
+fn get_thread_id() -> u64 {
+    #[cfg(target_arch = "x86_64")]
+    unsafe {
+        let teb: *const u8;
+        asm!("mov {}, gs:[0x30]", out(reg) teb);
+        let thread_id_ptr = teb.add(0x48) as *const u32;
+        *thread_id_ptr as u64
+    }
+
+    #[cfg(target_arch = "x86")]
+    unsafe {
+        let teb: *const u8;
+        asm!("mov {}, fs:[0x18]", out(reg) teb);
+        let thread_id_ptr = teb.add(0x24) as *const u32;
+        *thread_id_ptr as u64
+    }
+}
+#[cfg(target_os = "linux")]
+fn get_thread_id() -> u64 {
+    use libc::syscall;
+    use libc::SYS_gettid;
+
+    unsafe { syscall(SYS_gettid) as u64 }
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "linux")))]
+fn get_thread_id() -> u64 {
+    // Fallback for other platforms
+    thread::current().id().as_u64().into()
+}
+
+use std::ptr;
+use winapi::um::winbase::STD_OUTPUT_HANDLE;
+use winapi::um::fileapi::WriteFile;
+use winapi::um::handleapi::INVALID_HANDLE_VALUE;
+use winapi::um::processenv::GetStdHandle;
+use winapi::um::winnt::HANDLE;
+use once_cell::sync::OnceCell;
+
+// Safe wrapper around HANDLE
+struct StdOutHandle(HANDLE);
+
+// Implement Send and Sync for StdOutHandle, assuming it's safe to share
+unsafe impl Send for StdOutHandle {}
+unsafe impl Sync for StdOutHandle {}
+
+static H_STDOUT: OnceCell<StdOutHandle> = OnceCell::new();
+
+fn get_stdout_handle() -> HANDLE {
+    H_STDOUT.get_or_init(|| {
+        let handle = unsafe { GetStdHandle(STD_OUTPUT_HANDLE) };
+        StdOutHandle(handle)
+    }).0
+}
+
+pub fn log(message: &str) {
+    // Get the handle to standard output
+    let h_stdout: HANDLE = get_stdout_handle();
+
+    if h_stdout == INVALID_HANDLE_VALUE {
+        eprintln!("Failed to get standard output handle");
+        return;
+    }
+
+    let bytes = message.as_bytes();
+    let mut bytes_written = 0;
+
+    // Write the message to standard output
+    let result = unsafe {
+        WriteFile(
+            h_stdout,
+            bytes.as_ptr() as *const _,
+            bytes.len() as u32,
+            &mut bytes_written,
+            ptr::null_mut(),
+        )
+    };
+
+    if result == 0 {
+        eprintln!("Failed to write to standard output");
+    } 
+}
+
 #[cfg(feature = "std")]
 impl log::Log for SimpleStdoutLogger {
     #[inline]
@@ -976,13 +1061,23 @@ impl log::Log for SimpleStdoutLogger {
     }
 
     fn log(&self, record: &Record) {
-        println!(
-            "[{:?}, {:?}] {}: {}",
+        // println!(
+        //     "[{:?}, {:?}:{:?}] {}: {}",
+        //     current_time(),
+        //     std::process::id(),
+        //     get_thread_id(),
+        //     record.level(),
+        //     record.args()
+        // );
+        let msg = format!(
+            "[{:?}, {:?}:{:?}] {}: {}\n",
             current_time(),
             std::process::id(),
+            get_thread_id(),
             record.level(),
             record.args()
         );
+        log(msg.as_str());
     }
 
     fn flush(&self) {}

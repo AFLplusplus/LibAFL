@@ -171,7 +171,7 @@ impl Allocator {
     #[must_use]
     #[expect(clippy::missing_safety_doc)]
     pub unsafe fn alloc(&mut self, size: usize, _alignment: usize) -> *mut c_void {
-        log::trace!("alloc");
+        log::info!("alloc {size}");
         let mut is_malloc_zero = false;
         let size = if size == 0 {
             is_malloc_zero = true;
@@ -202,7 +202,7 @@ impl Allocator {
             }
             metadata
         } else {
-            // log::trace!("{:x}, {:x}", self.current_mapping_addr, rounded_up_size);
+            log::info!("Mapping {:x}, size {rounded_up_size:x}", self.current_mapping_addr);
             let mapping = match MmapOptions::new(rounded_up_size)
                 .unwrap()
                 .with_address(self.current_mapping_addr)
@@ -260,7 +260,7 @@ impl Allocator {
     /// Releases the allocation at the given address.
     #[expect(clippy::missing_safety_doc)]
     pub unsafe fn release(&mut self, ptr: *mut c_void) {
-        log::trace!("release {:?}", ptr);
+        log::info!("releasing {:?}", ptr);
         let Some(metadata) = self.allocations.get_mut(&(ptr as usize)) else {
             if !ptr.is_null() {
                 AsanErrors::get_mut_blocking()
@@ -403,14 +403,14 @@ impl Allocator {
         unpoison: bool,
     ) -> (usize, usize) {
         let shadow_mapping_start = map_to_shadow!(self, start);
-        log::trace!("map_shadow_for_region: {:x}, {:x}", start, end);
+        // log::trace!("map_shadow_for_region: {:x}, {:x}", start, end);
         let shadow_start = self.round_down_to_page(shadow_mapping_start);
         let shadow_end = self.round_up_to_page((end - start) / 8 + self.page_size + shadow_start);
-        log::trace!(
-            "map_shadow_for_region: shadow_start {:x}, shadow_end {:x}",
-            shadow_start,
-            shadow_end
-        );
+        // log::trace!(
+        //     "map_shadow_for_region: shadow_start {:x}, shadow_end {:x}",
+        //     shadow_start,
+        //     shadow_end
+        // );
         if self.using_pre_allocated_shadow_mapping {
             let mut newly_committed_regions = Vec::new();
             for gap in self.shadow_pages.gaps(&(shadow_start..shadow_end)) {
@@ -439,11 +439,11 @@ impl Allocator {
                 }
             }
             for newly_committed_region in newly_committed_regions {
-                log::trace!(
-                    "committed shadow pages: start {:x}, end {:x}",
-                    newly_committed_region.start(),
-                    newly_committed_region.end()
-                );
+                // log::trace!(
+                //     "committed shadow pages: start {:x}, end {:x}",
+                //     newly_committed_region.start(),
+                //     newly_committed_region.end()
+                // );
                 self.shadow_pages
                     .insert(newly_committed_region.start()..newly_committed_region.end());
                 self.mappings
@@ -654,7 +654,7 @@ impl Allocator {
                 if self.shadow_offset <= start && end <= self.current_mapping_addr {
                     log::trace!("Reached the shadow/allocator region - skipping");
                 } else {
-                    log::trace!("Unpoisoning: {:#x}-{:#x}", start, end);
+                    // log::trace!("Unpoisoning: {:#x}-{:#x}", start, end);
                     self.map_shadow_for_region(start, end, true);
                 }
                 true
@@ -664,6 +664,7 @@ impl Allocator {
 
     /// Initialize the allocator, making sure a valid shadow bit is selected.
     pub fn init(&mut self) {
+
         // probe to find a usable shadow bit:
         if self.shadow_bit != 0 {
             return;

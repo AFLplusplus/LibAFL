@@ -12,7 +12,8 @@ use std::{
     ffi::{c_char, c_void},
     ptr::write_volatile,
     rc::Rc,
-    sync::MutexGuard,
+    sync::{Mutex, MutexGuard},
+    u64
 };
 
 use backtrace::Backtrace;
@@ -23,12 +24,13 @@ use frida_gum::instruction_writer::X86Register;
 use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 use frida_gum::{
     instruction_writer::InstructionWriter, interceptor::Interceptor, stalker::StalkerOutput, Gum,
-    Module, ModuleDetails, ModuleMap, NativePointer, PageProtection, RangeDetails,
+    Module, ModuleDetails, ModuleMap, NativePointer, PageProtection, RangeDetails
 };
 use frida_gum_sys::Insn;
 use hashbrown::HashMap;
 use libafl_bolts::cli::FuzzerOptions;
 use libc::wchar_t;
+use os_thread_local::ThreadLocal;
 use rangemap::RangeMap;
 #[cfg(target_arch = "aarch64")]
 use yaxpeax_arch::Arch;
@@ -52,6 +54,8 @@ use crate::{
     helper::{FridaRuntime, SkipRange},
     utils::disas_count,
 };
+#[cfg(target_os = "windows")]
+use winapi::um::fibersapi::FlsAlloc;
 
 extern "C" {
     fn __register_frame(begin: *mut c_void);
@@ -61,6 +65,165 @@ extern "C" {
 extern "C" {
     fn tls_ptr() -> *const c_void;
 }
+
+use std::arch::asm;
+#[repr(C)]
+struct TEB {
+    reserved1: [u8; 0x58],
+    tls_pointer: *mut *mut u8,
+    reserved2: [u8; 0xC0],
+}
+
+#[cfg(target_arch = "x86")]
+#[inline(always)]
+fn nt_current_teb() -> *mut TEB {
+    let teb: *mut TEB;
+    unsafe {
+        asm!("mov {}, fs:0x18", out(reg) teb);
+    }
+    teb
+}
+
+#[cfg(target_arch = "x86_64")]
+#[inline(always)]
+fn nt_current_teb() -> *mut TEB {
+    let teb: *mut TEB;
+    unsafe {
+        asm!("mov {}, gs:0x30", out(reg) teb);
+    }
+    teb
+}
+
+unsafe fn has_tls() -> bool {
+    let teb = nt_current_teb();
+    if teb.is_null() {
+        return false;
+    }
+
+    let tls_array = (*teb).tls_pointer;
+    if tls_array.is_null() {
+        // let tls_dummy = ThreadLocal::new(|| Cell::new(false));
+        // tls_dummy.with(|f|f.set(true));
+        // log::error!("No TLS. Initializing it.");
+        return false;
+    }
+    return true;   
+}
+
+thread_local! {
+    static ASAN_IN_HOOK: Cell<bool> = const { Cell::new(false) };
+}
+
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::thread;
+#[derive(Debug)]
+struct Lock {
+    state: AtomicU64,
+}
+impl Lock {
+    const fn new() -> Self {
+        Lock {
+            state: AtomicU64::new(u64::MAX),
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    fn get_thread_id() -> u64 {
+        #[cfg(target_arch = "x86_64")]
+        unsafe {
+            let teb: *const u8;
+            asm!("mov {}, gs:[0x30]", out(reg) teb);
+            let thread_id_ptr = teb.add(0x48) as *const u32;
+            *thread_id_ptr as u64
+        }
+    
+        #[cfg(target_arch = "x86")]
+        unsafe {
+            let teb: *const u8;
+            asm!("mov {}, fs:[0x18]", out(reg) teb);
+            let thread_id_ptr = teb.add(0x24) as *const u32;
+            *thread_id_ptr as u64
+        }
+    }
+    #[cfg(target_os = "linux")]
+    fn get_thread_id() -> u64 {
+        use libc::syscall;
+        use libc::SYS_gettid;
+    
+        unsafe { syscall(SYS_gettid) as u64 }
+    }
+    
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+    fn get_thread_id() -> u64 {
+        // Fallback for other platforms
+        thread::current().id().as_u64().into()
+    }
+        
+    fn lock(&self) -> LockResult {
+        let current_thread_id = Lock::get_thread_id();
+        loop {
+            let current_lock = self.state.load(Ordering::Relaxed);
+            if current_lock == u64::MAX {
+                if self.state.compare_exchange(u64::MAX, current_thread_id, Ordering::Acquire, Ordering::Relaxed).is_ok() {
+                    return LockResult::Acquired; // Lock acquired
+                }
+            } else if current_lock == current_thread_id {
+                return LockResult::AlreadyLocked; // Already locked by the same thread
+            }
+            thread::yield_now(); // Busy wait
+        }
+    }
+
+    fn unlock(&self) -> UnlockResult {
+        let current_thread_id = Lock::get_thread_id();
+        let current_lock = self.state.load(Ordering::Relaxed);
+        if current_lock == current_thread_id {
+            self.state.store(u64::MAX, Ordering::Release);
+            return UnlockResult::Success; // Lock released
+        }
+        UnlockResult::NotOwner // Lock not owned by the current thread
+    }
+}
+
+use winapi::um::errhandlingapi::{GetLastError, SetLastError};
+use winapi::shared::minwindef::DWORD;
+struct LastErrorGuard {
+    last_error: DWORD,
+}
+
+impl LastErrorGuard {
+    // Constructor to save the current last error
+    fn new() -> Self {
+        let last_error = unsafe { GetLastError() };
+        LastErrorGuard { last_error }
+    }
+}
+
+// Implement the Drop trait to restore the last error
+impl Drop for LastErrorGuard {
+    fn drop(&mut self) {
+        unsafe { SetLastError(self.last_error) };
+    }
+}
+
+#[derive(Debug)]
+#[derive(PartialEq)]
+enum LockResult {
+    Acquired,
+    AlreadyLocked,
+}
+
+#[derive(Debug)]
+#[derive(PartialEq)]
+enum UnlockResult {
+    Success,
+    NotOwner,
+}
+// For threads without TLS, we use a static lock to prevent hook reentrancy
+// This is not as efficient as using TLS, because it prevent TLS-free threads 
+// from running in parallel, but such situations are very rare (Windows loaded thread pool)
+// and should not affect performance significantly
+static TLS_LESS_LOCK: Lock = Lock::new();
 
 /// The count of registers that need to be saved by the `ASan` runtime.
 ///
@@ -116,7 +279,7 @@ const ASAN_EH_FRAME_FDE_ADDRESS_OFFSET: u32 = 28;
 pub struct AsanRuntime {
     check_for_leaks_enabled: bool,
     current_report_impl: u64,
-    allocator: Allocator,
+    allocator: Mutex<Allocator>,
     regs: [usize; ASAN_SAVE_REGISTER_COUNT],
     blob_report: Option<Box<[u8]>>,
     blob_check_mem_byte: Option<Box<[u8]>>,
@@ -139,6 +302,7 @@ pub struct AsanRuntime {
     pc: Option<usize>,
     hooks: Vec<NativePointer>,
     pub(crate) hooks_enabled: bool,
+    // thread_in_hook: ThreadLocal<Cell<bool>>,
     #[cfg(target_arch = "aarch64")]
     eh_frame: [u32; ASAN_EH_FRAME_DWORD_COUNT],
 }
@@ -155,6 +319,54 @@ impl Debug for AsanRuntime {
     }
 }
 
+/// A helper function that fixes the implementation of ModuleDetails::with_name on Windows
+fn module_base_address_with_name(name: &str) -> usize {
+    use frida_gum_sys as gum_sys;
+    use core::ffi::{c_void, CStr};
+    use std::path::Path;
+    struct SaveModuleAddressByNameContext {
+        name: String,
+        address: usize,
+    }
+    
+    unsafe extern "C" fn save_module_address_by_name(
+        details: *const gum_sys::GumModuleDetails,
+        context: *mut c_void,
+    ) -> i32 {
+        let context = &mut *(context as *mut SaveModuleAddressByNameContext);
+        let path_string = CStr::from_ptr((*details).path as *const _)
+            .to_string_lossy()
+            .to_string();
+        log::info!("module {:?}", path_string);
+        if Path::new(&path_string)
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .eq(&context.name)
+        {
+            context.address = (*(*details).range).base_address as usize;
+            log::info!("{:?} address is {:?}", path_string, context.address);
+            return 0;
+        }
+        1
+    }
+    
+    let mut context = SaveModuleAddressByNameContext {
+        name: name.to_owned(),
+        address: 0,
+    };
+
+    unsafe { 
+        gum_sys::gum_process_enumerate_modules(
+            Some(save_module_address_by_name),
+            &mut context as *mut _ as *mut c_void,
+        );
+    }
+
+    context.address
+}
+
+
 impl FridaRuntime for AsanRuntime {
     /// Initialize the runtime so that it is read for action. Take care not to move the runtime
     /// instance after this function has been called, as the generated blobs would become
@@ -165,7 +377,7 @@ impl FridaRuntime for AsanRuntime {
         _ranges: &RangeMap<u64, (u16, String)>,
         module_map: &Rc<ModuleMap>,
     ) {
-        self.allocator.init();
+        self.allocator.lock().unwrap().init();
 
         AsanErrors::get_mut_blocking().set_continue_on_error(self.continue_on_error);
 
@@ -174,8 +386,15 @@ impl FridaRuntime for AsanRuntime {
             .extend(self.skip_ranges.iter().map(|skip| match skip {
                 SkipRange::Absolute(range) => range.start,
                 SkipRange::ModuleRelative { name, range } => {
-                    let module_details = ModuleDetails::with_name(name.clone()).unwrap();
-                    let lib_start = module_details.range().base_address().0 as usize;
+                    // On Windows,  ModuleDetails::with_name does not work due to a buggy loggic
+                    // let module_details = ModuleDetails::with_name(name.clone()).unwrap();
+                    // let module_range = module_range_with_name(name).unwrap();
+                    // let lib_start = module_range.base_address().0 as usize;
+                    let lib_start = module_base_address_with_name(name);
+                    if lib_start == 0 {
+                        log::error!("Module {} not found", name);
+                        return 0;
+                    }
                     lib_start + range.start
                 }
             }));
@@ -228,7 +447,7 @@ impl AsanRuntime {
         let continue_on_error = options.continue_on_error;
         Self {
             check_for_leaks_enabled: options.detect_leaks,
-            allocator: Allocator::new(options),
+            allocator: Mutex::new(Allocator::new(options)),
             skip_ranges,
             continue_on_error,
             ..Self::default()
@@ -237,23 +456,33 @@ impl AsanRuntime {
 
     /// Reset all allocations so that they can be reused for new allocation requests.
     pub fn reset_allocations(&mut self) {
-        self.allocator.reset();
+        self.allocator.lock().unwrap().reset();
     }
 
     /// Gets the allocator
-    #[must_use]
-    pub fn allocator(&self) -> &Allocator {
-        &self.allocator
+    // #[must_use]
+    // pub fn allocator(&self) -> &Allocator {
+    //     &self.allocator
+    // }
+
+    // /// Gets the allocator (mutable)
+    // pub fn allocator_mut(&mut self) -> &mut Allocator {
+    //     &mut self.allocator
+    // }
+
+    /// Gets the allocator
+    pub fn allocator(&self) -> MutexGuard<Allocator> {
+        self.allocator.lock().unwrap()
     }
 
     /// Gets the allocator (mutable)
-    pub fn allocator_mut(&mut self) -> &mut Allocator {
-        &mut self.allocator
+    pub fn allocator_mut(&mut self) -> MutexGuard<Allocator> {
+        self.allocator.lock().unwrap()
     }
 
     /// Check if the test leaked any memory and report it if so.
     pub fn check_for_leaks(&mut self) {
-        self.allocator.check_for_leaks();
+        self.allocator.lock().unwrap().check_for_leaks();
     }
 
     /// Returns the `AsanErrors` from the recent run.
@@ -264,7 +493,7 @@ impl AsanRuntime {
 
     /// Make sure the specified memory is unpoisoned
     pub fn unpoison(&mut self, address: usize, size: usize) {
-        self.allocator
+        self.allocator.lock().unwrap()
             .map_shadow_for_region(address, address + size, true);
     }
 
@@ -274,7 +503,7 @@ impl AsanRuntime {
     /// The address needs to be a valid address, the size needs to be correct.
     /// This will dereference at the address.
     pub unsafe fn poison(&mut self, address: usize, size: usize) {
-        Allocator::poison(self.allocator.map_to_shadow(address), size);
+        Allocator::poison(self.allocator.lock().unwrap().map_to_shadow(address), size);
     }
 
     /// Add a stalked address to real address mapping.
@@ -294,15 +523,17 @@ impl AsanRuntime {
 
     /// Unpoison all the memory that is currently mapped with read/write permissions.
     pub fn unpoison_all_existing_memory(&mut self) {
-        self.allocator.unpoison_all_existing_memory();
+        self.allocator.lock().unwrap().unpoison_all_existing_memory();
     }
 
     /// Enable all function hooks
     pub fn enable_hooks(&mut self) {
+        log::warn!("Enabling hooks");
         self.hooks_enabled = true;
     }
     /// Disable all function hooks
     pub fn disable_hooks(&mut self) {
+        log::warn!("Disabling hooks");
         self.hooks_enabled = false;
     }
 
@@ -312,14 +543,15 @@ impl AsanRuntime {
     pub fn register_thread(&mut self) {
         let (stack_start, stack_end) = Self::current_stack();
         let (tls_start, tls_end) = Self::current_tls();
-        log::info!(
-            "registering thread with stack {stack_start:x}:{stack_end:x} and tls {tls_start:x}:{tls_end:x}"
+        println!(
+            "registering thread {:?} with stack {stack_start:x}:{stack_end:x} and tls {tls_start:x}:{tls_end:x}", 
+                unsafe{winapi::um::processthreadsapi::GetCurrentThreadId()}
         );
-        self.allocator
+        self.allocator.lock().unwrap()
             .map_shadow_for_region(stack_start, stack_end, true);
 
         #[cfg(unix)]
-        self.allocator
+        self.allocator.lock().unwrap()
             .map_shadow_for_region(tls_start, tls_end, true);
     }
 
@@ -327,7 +559,7 @@ impl AsanRuntime {
     #[cfg(target_vendor = "apple")]
     pub fn register_thread(&mut self) {
         let (stack_start, stack_end) = Self::current_stack();
-        self.allocator
+        self.allocator.lock().unwrap()
             .map_shadow_for_region(stack_start, stack_end, true);
 
         log::info!("registering thread with stack {stack_start:x}:{stack_end:x}");
@@ -452,6 +684,7 @@ impl AsanRuntime {
         self.pc = None;
     }
 
+
     /// Register the required hooks
     #[expect(clippy::too_many_lines)]
     pub fn register_hooks(&mut self, gum: &Gum) {
@@ -471,22 +704,31 @@ impl AsanRuntime {
 
                     #[allow(non_snake_case)] // depends on the values the macro is invoked with
                     unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
+                        let _last_error_guard = LastErrorGuard::new();
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
                         //is this necessary? The stalked return address will always be the real return address
                      //   let real_address = this.real_address_for_stalked(invocation.return_addr());
-                     let original = [<$name:snake:upper _PTR>].get().unwrap();
-
-                     if !ASAN_IN_HOOK.get() && this.hooks_enabled {
-                        ASAN_IN_HOOK.set(true);
-                        let ret = this.[<hook_ $name>](*original, $($param),*);
-                        ASAN_IN_HOOK.set(false);
-                        ret
-                    } else {
-                        let ret = (original)($($param),*);
-                        ret
+                        let original = [<$name:snake:upper _PTR>].get().unwrap();
+                        if this.hooks_enabled {
+                            if has_tls() {
+                                if !ASAN_IN_HOOK.get(){
+                                    ASAN_IN_HOOK.set(true);
+                                    let ret = this.[<hook_ $name>](*original, $($param),*);
+                                    ASAN_IN_HOOK.set(false);
+                                    return ret;
+                                }
+                            } 
+                            else{
+                                log::warn!("{} called without TLS", stringify!($name));
+                                $(
+                                    log::warn!("{}: {:?}", stringify!($param), $param);
+                                )*
+                                
+                            } 
+                        }
+                        (original)($($param),*)
                     }
-                 }
 
                     let self_ptr = core::ptr::from_ref(self) as usize;
                     let _ = interceptor.replace(
@@ -511,20 +753,31 @@ impl AsanRuntime {
 
                     #[allow(non_snake_case)]
                     unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
+                        let _last_error_guard = LastErrorGuard::new();
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
                         //is this necessary? The stalked return address will always be the real return address
                      //   let real_address = this.real_address_for_stalked(invocation.return_addr());
                         let original = [<$lib_ident:snake:upper _ $name:snake:upper _PTR>].get().unwrap();
-                        if !ASAN_IN_HOOK.get() && this.hooks_enabled {
-                            ASAN_IN_HOOK.set(true);
-                            let ret = this.[<hook_ $name>](*original, $($param),*);
-                            ASAN_IN_HOOK.set(false);
-                            ret
-                        } else {
-                            let ret = (original)($($param),*);
-                            ret
+                        if this.hooks_enabled {
+                            if has_tls() {
+                                if !ASAN_IN_HOOK.get(){
+                                    ASAN_IN_HOOK.set(true);
+                                    let ret = this.[<hook_ $name>](*original, $($param),*);
+                                    ASAN_IN_HOOK.set(false);
+                                    
+                                    return ret;
+                                }
+                            } 
+                            else{
+                                log::warn!("{} called without TLS", stringify!($name));
+                                $(
+                                    log::warn!("{}: {:?}", stringify!($param), $param);
+                                )*
+                                
+                            } 
                         }
+                        (original)($($param),*)
                     }
 
                     let self_ptr = core::ptr::from_ref(self) as usize;
@@ -542,34 +795,52 @@ impl AsanRuntime {
         #[expect(unused_macro_rules)]
         macro_rules! hook_func_with_check {
             //No library case
-            ($name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
+            ($name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty, $always_enabled:expr ) => {
                 paste::paste! {
                     log::trace!("Hooking {}", stringify!($name));
                     let target_function = module.find_export_by_name(None, stringify!($name)).expect("Failed to find function");
 
                     static [<$name:snake:upper _PTR>]: std::sync::OnceLock<extern "C" fn($($param: $param_type),*) -> $return_type> = std::sync::OnceLock::new();
 
-
-
                     let _ = [<$name:snake:upper _PTR>].set(unsafe {std::mem::transmute::<*const c_void, extern "C" fn($($param: $param_type),*) -> $return_type>(target_function.0)}).unwrap_or_else(|e| println!("{:?}", e));
 
                     #[allow(non_snake_case)] // depends on the values the macro is invoked with
                     unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
+                        let _last_error_guard = LastErrorGuard::new();
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
                         let original = [<$name:snake:upper _PTR>].get().unwrap();
-                        //don't check if hooks are enabled as there are certain cases where we want to run the hook even if we are out of the program
-                        //For example, sometimes libafl will allocate certain things during the run and free them after the run. This results in a bug where a buffer will come from libafl-frida alloc and be freed in the normal allocator.
-                        if !ASAN_IN_HOOK.get() && this.[<hook_check_ $name>]($($param),*){
-                            ASAN_IN_HOOK.set(true);
-                            let ret = this.[<hook_ $name>](*original, $($param),*);
-                            ASAN_IN_HOOK.set(false);
-                            ret
-                        } else {
-                            let ret = (original)($($param),*);
-                            ret
+                        if $always_enabled || this.hooks_enabled {
+                            if has_tls() {
+                                if !ASAN_IN_HOOK.get() && this.[<hook_check_ $name>]($($param),*){
+                                    ASAN_IN_HOOK.set(true);
+                                    let ret = this.[<hook_ $name>](*original, $($param),*);
+                                    ASAN_IN_HOOK.set(false);
+                                    
+                                    return ret;
+                                }
+                            } 
+                            else{
+                                log::warn!("{} called without TLS", stringify!($name));
+                                $(
+                                    log::warn!("Params: {}: {:?}", stringify!($param), $param);
+                                )*
+                                if $always_enabled {
+                                    if TLS_LESS_LOCK.lock() == LockResult::Acquired && this.[<hook_check_ $name>]($($param),*){
+                                        // There is no TLS and we have grabbed the lock - call the hook
+                                        let ret = this.[<hook_ $name>](*original, $($param),*);
+                                        TLS_LESS_LOCK.unlock();
+                                        
+                                        return ret;
+                                    }
+                                    else {
+                                        TLS_LESS_LOCK.unlock(); // Return the original function
+                                    }
+                                    
+                                }
+                            } 
                         }
-
+                        (original)($($param),*)
                     }
 
                     let self_ptr = core::ptr::from_ref(self) as usize;
@@ -582,34 +853,52 @@ impl AsanRuntime {
                 }
             };
             //Library specific macro rule. lib and lib_ident are both needed because we need to generate a unique static variable and only name is insufficient. In addition, the lib name could contain invalid characters (i.e., lib.so is an invalid name)
-            ($lib:literal, $lib_ident:ident, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
+            ($lib:literal, $lib_ident:ident, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty, $always_enabled:expr ) => {
                 paste::paste! {
                     log::trace!("Hooking {}:{}", $lib, stringify!($name));
                     let target_function = module.find_export_by_name(Some($lib), stringify!($name)).expect("Failed to find function");
 
                     static [<$lib_ident:snake:upper _ $name:snake:upper _PTR>]: std::sync::OnceLock<extern "C" fn($($param: $param_type),*) -> $return_type> = std::sync::OnceLock::new();
 
-
-
                     let _ = [<$lib_ident:snake:upper _ $name:snake:upper _PTR>].set(unsafe {std::mem::transmute::<*const c_void, extern "C" fn($($param: $param_type),*) -> $return_type>(target_function.0)}).unwrap_or_else(|e| println!("{:?}", e));
 
                     #[allow(non_snake_case)]
                     unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
+                        let _last_error_guard = LastErrorGuard::new();
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
                         let original = [<$lib_ident:snake:upper _ $name:snake:upper _PTR>].get().unwrap();
-                        //don't check if hooks are enabled as there are certain cases where we want to run the hook even if we are out of the program
-                        //For example, sometimes libafl will allocate certain things during the run and free them after the run. This results in a bug where a buffer will come from libafl-frida alloc and be freed in the normal allocator.
-                        if !ASAN_IN_HOOK.get() && this.[<hook_check_ $name>]($($param),*){
-                            ASAN_IN_HOOK.set(true);
-                            let ret = this.[<hook_ $name>](*original, $($param),*);
-                            ASAN_IN_HOOK.set(false);
-                            ret
-                        } else {
-                            let ret = (original)($($param),*);
-                            ret
+                        if $always_enabled || this.hooks_enabled {
+                            if has_tls() {
+                                if !ASAN_IN_HOOK.get() && this.[<hook_check_ $name>]($($param),*){
+                                    ASAN_IN_HOOK.set(true);
+                                    let ret = this.[<hook_ $name>](*original, $($param),*);
+                                    ASAN_IN_HOOK.set(false);
+                                    
+                                    return ret;
+                                }
+                            }
+                            else{
+                                log::warn!("{} called without TLS", stringify!($name));
+                                $(
+                                    log::warn!("Params: {}: {:?}", stringify!($param), $param);
+                                )*
+                                if $always_enabled {
+                                    if TLS_LESS_LOCK.lock() == LockResult::Acquired && this.[<hook_check_ $name>]($($param),*){
+                                        // There is no TLS and we have grabbed the lock - call the hook
+                                        let ret = this.[<hook_ $name>](*original, $($param),*);
+                                        TLS_LESS_LOCK.unlock();
+                                        
+                                        return ret;
+                                    }
+                                    else {
+                                        TLS_LESS_LOCK.unlock(); // Return the original function
+                                    }
+                                }
+                                
+                            } 
                         }
-
+                        (original)($($param),*)
                     }
 
                     let self_ptr = core::ptr::from_ref(self) as usize;
@@ -620,7 +909,14 @@ impl AsanRuntime {
                     );
                     self.hooks.push(target_function);
                 }
-            }
+            };
+            // Default case without check_enabled parameter
+            ($name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
+                hook_func_with_check!($name, ($($param: $param_type),*), $return_type, false);
+            };
+            ($lib:literal, $lib_ident:ident, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
+                hook_func_with_check!($lib, $lib_ident, $name, ($($param: $param_type),*), $return_type, false);
+            };
         }
         // Hook the memory allocator functions
 
@@ -696,7 +992,7 @@ impl AsanRuntime {
                         hook_func_with_check!($libname, $lib_ident, HeapFree, (handle: *mut c_void, flags: u32, mem: *mut c_void), bool);
                     }
                     "RtlFreeHeap" => {
-                        hook_func_with_check!($libname, $lib_ident, RtlFreeHeap, (handle: *mut c_void, flags: u32, mem: *mut c_void), usize);
+                        hook_func_with_check!($libname, $lib_ident, RtlFreeHeap, (handle: *mut c_void, flags: u32, mem: *mut c_void), usize, true);
                     }
                     "HeapSize" => {
                         hook_func_with_check!($libname, $lib_ident, HeapSize, (handle: *mut c_void, flags: u32, mem: *mut c_void), usize);
@@ -842,6 +1138,14 @@ impl AsanRuntime {
                             *const c_void
                         );
                     }
+                    "UnmapViewOfFile" => {
+                        hook_func!(
+                            $libname, $lib_ident,
+                            UnmapViewOfFile,
+                            (ptr: *const c_void),
+                            bool
+                        );
+                    }
                     "LoadLibraryExW" => {
                         hook_func!(
                             $libname, $lib_ident,
@@ -879,6 +1183,7 @@ impl AsanRuntime {
                 "api-ms-win-core-heap-obsolete-l1-1-0",
                 api_ms_heap2_obsolete
             );
+            hook_heap_windows!("api-ms-win-core-memory-l1-1-0", api_ms_memory1);
         }
 
         /*
@@ -1252,6 +1557,8 @@ impl AsanRuntime {
     #[expect(clippy::cast_sign_loss)]
     #[expect(clippy::too_many_lines)]
     extern "system" fn handle_trap(&mut self) {
+        // log::error!("Attach the debugger to process {:#?}", std::process::id());
+        // std::thread::sleep(std::time::Duration::from_secs(30));
         self.disable_hooks();
 
         self.dump_registers();
@@ -1345,7 +1652,7 @@ impl AsanRuntime {
                 }
             } else if base_value.is_some() {
                 if let Some(metadata) = self
-                    .allocator
+                    .allocator.lock().unwrap()
                     .find_metadata(fault_address, base_value.unwrap())
                 {
                     match access_type {
@@ -1664,7 +1971,7 @@ impl AsanRuntime {
     */
     #[cfg(target_arch = "x86_64")]
     fn generate_shadow_check_blob(&mut self, size: u32) -> Box<[u8]> {
-        let shadow_bit = self.allocator.shadow_bit();
+        let shadow_bit = self.allocator.lock().unwrap().shadow_bit();
         // Rcx, Rax, Rdi, Rdx, Rsi, R8 are used, so we save them in emit_shadow_check
         //at this point RDI contains the
         let mask_shift = 32 - size;
@@ -1712,7 +2019,7 @@ impl AsanRuntime {
         x0 and x1 are saved by the asan_check
         The maximum size this supports is up to 25 bytes. This is because we load 4 bytes of the shadow value. And, in the case that we have a misaligned address with an offset of 7 into the word. For example, if we load 25 bytes from 0x1007 - [0x1007,0x101f], then we require the shadow values from 0x1000, 0x1008, 0x1010, and 0x1018 */
 
-        let shadow_bit = self.allocator.shadow_bit();
+        let shadow_bit = self.allocator.lock().unwrap().shadow_bit();
         macro_rules! shadow_check {
             ($ops:ident, $width:expr) => {dynasm!($ops
                 ; .arch aarch64
@@ -1758,7 +2065,7 @@ impl AsanRuntime {
 
         assert!(width <= 64, "width must be <= 64");
         let shift = 64 - width;
-        let shadow_bit = self.allocator.shadow_bit();
+        let shadow_bit = self.allocator.lock().unwrap().shadow_bit();
         macro_rules! shadow_check_exact {
             ($ops:ident, $shift:expr) => {dynasm!($ops
                 ; .arch aarch64
@@ -2665,7 +2972,8 @@ impl AsanRuntime {
             16 + i64::from(redzone_size),
             IndexMode::PostAdjust,
         ));
-    }
+    }  
+    
 }
 
 impl Default for AsanRuntime {
@@ -2673,7 +2981,7 @@ impl Default for AsanRuntime {
         Self {
             check_for_leaks_enabled: false,
             current_report_impl: 0,
-            allocator: Allocator::default(),
+            allocator: Mutex::new(Allocator::default()),
             regs: [0; ASAN_SAVE_REGISTER_COUNT],
             blob_report: None,
             blob_check_mem_byte: None,
@@ -2698,6 +3006,7 @@ impl Default for AsanRuntime {
             pc: None,
             hooks: Vec::new(),
             hooks_enabled: false,
+            // thread_in_hook: ThreadLocal::new(|| Cell::new(false)),
         }
     }
 }

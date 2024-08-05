@@ -461,11 +461,14 @@ impl FridaInstrumentationHelperBuilder {
                         .borrow_mut()
                         .remove(range.start as u64..range.end as u64),
                     SkipRange::ModuleRelative { name, range } => {
-                        let module_details = ModuleDetails::with_name(name).unwrap();
-                        let lib_start = module_details.range().base_address().0 as u64;
-                        ranges.borrow_mut().remove(
-                            (lib_start + range.start as u64)..(lib_start + range.end as u64),
-                        );
+                        if name.eq(&module.name()){
+                            log::trace!("Skipping {:?} {:?}", name, range);
+                            let module_details = ModuleDetails::with_name(name).unwrap();
+                            let lib_start = module_details.range().base_address().0 as u64;
+                            ranges.borrow_mut().remove(
+                                (lib_start + range.start as u64)..(lib_start + range.end as u64),
+                            );
+                        }
                     }
                 }
             }
