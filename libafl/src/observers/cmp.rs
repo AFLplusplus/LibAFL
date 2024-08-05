@@ -237,10 +237,9 @@ pub trait CmpObserver {
 
 /// A standard [`CmpObserver`] observer
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(bound = "CM: serde::de::DeserializeOwned")]
+#[serde(bound = "CM: serde::de::DeserializeOwned + Serialize")]
 pub struct StdCmpObserver<'a, CM, M>
 where
-    CM: Serialize,
     M: CmpObserverMetadata<'a, CM>,
 {
     cmp_map: OwnedRefMut<'a, CM>,
@@ -252,7 +251,7 @@ where
 
 impl<'a, CM, M> CmpObserver for StdCmpObserver<'a, CM, M>
 where
-    CM: Serialize + CmpMap,
+    CM: CmpMap,
     M: CmpObserverMetadata<'a, CM>,
 {
     type Map = CM;
@@ -267,10 +266,6 @@ where
 
     fn cmp_map(&self) -> &Self::Map {
         self.cmp_map.as_ref()
-    }
-
-    fn cmp_map_mut(&mut self) -> &mut Self::Map {
-        self.cmp_map.as_mut()
     }
 }
 
