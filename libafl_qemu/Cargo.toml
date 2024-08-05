@@ -130,6 +130,7 @@ typed-builder = "0.19"
 memmap2 = "0.9"
 getset = "0.1"
 bitflags = "2.6"
+perf-event-open-sys = "4"
 # Document all features of this crate (for `cargo doc`)
 document-features = { version = "0.2", optional = true }
 
