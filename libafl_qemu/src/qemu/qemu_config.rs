@@ -17,34 +17,31 @@ use crate::{Qemu, QemuInitError};
 pub(super) static QEMU_CONFIG: OnceLock<QemuConfig> = OnceLock::new();
 
 #[cfg(emulation_mode = "systemmode")]
-#[allow(non_camel_case_types)]
 #[derive(Debug, strum_macros::Display, Clone)]
-#[strum(prefix = "-accel ")]
+#[strum(prefix = "-accel ", serialize_all = "lowercase")]
 pub enum Accelerator {
-    kvm,
-    tcg,
+    Kvm,
+    Tcg,
 }
 
-#[allow(non_camel_case_types)]
 #[derive(Debug, strum_macros::Display, Clone)]
-#[strum(prefix = "if=")]
+#[strum(prefix = "if=", serialize_all = "lowercase")]
 pub enum DriveInterface {
-    floppy,
-    ide,
-    mtd,
-    none,
-    pflash,
-    scsi,
-    sd,
-    virtio,
+    Floppy,
+    Ide,
+    Mtd,
+    None,
+    Pflash,
+    Scsi,
+    Sd,
+    Virtio,
 }
 
-#[allow(non_camel_case_types)]
 #[derive(Debug, strum_macros::Display, Clone)]
-#[strum(prefix = "format=")]
+#[strum(prefix = "format=", serialize_all = "lowercase")]
 pub enum DiskImageFileFormat {
-    qcow2,
-    raw,
+    Qcow2,
+    Raw,
 }
 
 #[derive(Debug, Clone, Default, TypedBuilder)]
@@ -85,22 +82,20 @@ impl Display for Drive {
     }
 }
 
-#[allow(non_camel_case_types)]
 #[derive(Debug, strum_macros::Display, Clone)]
-#[strum(prefix = "-serial ")]
+#[strum(prefix = "-serial ", serialize_all = "lowercase")]
 pub enum Serial {
-    none,
-    null,
-    stdio,
+    None,
+    Null,
+    Stdio,
 }
 
-#[allow(non_camel_case_types)]
 #[derive(Debug, strum_macros::Display, Clone)]
-#[strum(prefix = "-monitor ")]
+#[strum(prefix = "-monitor ", serialize_all = "lowercase")]
 pub enum Monitor {
-    none,
-    null,
-    stdio,
+    None,
+    Null,
+    Stdio,
 }
 
 /// Set the directory for the BIOS, VGA BIOS and keymaps.
@@ -396,9 +391,16 @@ mod test {
     #[test]
     fn drive_no_file_fmt() {
         let drive = Drive::builder()
-            .format(DiskImageFileFormat::raw)
-            .interface(DriveInterface::ide)
+            .format(DiskImageFileFormat::Raw)
+            .interface(DriveInterface::Ide)
             .build();
         assert_eq!(drive.to_string(), "-drive format=raw,if=ide");
+    }
+
+    #[test]
+    #[cfg(emulation_mode = "systemmode")]
+    fn accelerator_kvm_to_string() {
+        let accel = Accelerator::Kvm;
+        assert_eq!(accel.to_string(), "-accel kvm");
     }
 }
