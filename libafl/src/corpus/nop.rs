@@ -13,13 +13,10 @@ use crate::{
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 pub struct NopCorpus<I> {
     empty: Option<CorpusId>,
-    phantom: PhantomData<I>,
+    phantom: PhantomData<fn() -> I>,
 }
 
-impl<I> Corpus for NopCorpus<I>
-where
-    I: Debug,
-{
+impl<I> Corpus for NopCorpus<I> {
     type Input = I;
 
     /// Returns the number of all enabled entries

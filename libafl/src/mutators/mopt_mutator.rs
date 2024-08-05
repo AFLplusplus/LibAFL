@@ -499,11 +499,11 @@ impl<MT> StdMOptMutator<MT> {
     ) -> Result<Self, Error>
     where
         S: HasMetadata + HasRand,
-        MT: MutatorsTuple<I, S> + NamedTuple,
+        MT: NamedTuple,
     {
         if !state.has_metadata::<MOpt>() {
             let rand_seed = state.rand_mut().next();
-            state.add_metadata::<MOpt>(MOpt::new(mutations.len(), swarm_num, rand_seed)?);
+            state.add_metadata::<MOpt>(MOpt::new(MT::LEN, swarm_num, rand_seed)?);
         }
         Ok(Self {
             name: Cow::from(format!("StdMOptMutator[{}]", mutations.names().join(","))),

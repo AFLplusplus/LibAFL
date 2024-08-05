@@ -86,7 +86,7 @@ where
     E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers<Observers = OT>,
     EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
     O: MapObserver,
-    <O as MapObserver>::Entry: Bounded + Default + Debug +  Serialize + DeserializeOwned + 'static,
+    <O as MapObserver>::Entry: Bounded + Default + Debug + Serialize + DeserializeOwned + 'static,
     C: AsRef<O>,
     OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     S: HasCorpus + HasMetadata + HasNamedMetadata + HasCurrentTestcase + HasCurrentCorpusId,
