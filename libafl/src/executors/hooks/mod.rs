@@ -23,40 +23,150 @@ pub mod inprocess;
 pub mod timer;
 
 /// The hook that runs before and after the executor runs the target
-pub trait ExecutorHook<EM, I, S, Z> {
-    type Executor: Executor<EM, I, S, Z>;
+pub trait ExecutorHook<E, EM, I, S, Z> {
+    /// The hook that runs before the target
+    fn pre_exec(
+        &mut self,
+        executor: &mut E,
+        fuzzer: &mut Z,
+        state: &mut S,
+        mgr: &mut EM,
+        input: &S,
+    );
+
+    /// The hook that runs after the target
+    fn post_exec(
+        &mut self,
+        executor: &mut E,
+        fuzzer: &mut Z,
+        state: &mut S,
+        mgr: &mut EM,
+        input: &S,
+    );
+}
+
+/// The hook that runs before and after the executor runs the target, controlling the use of the
+/// provided data via ownership
+pub trait ConsumingExecutorHook<E, EM, I, S, Z> {
+    type Handle<'a>: ConsumedExecutorHandle<'a>;
 
     /// The hook that runs before runs the target
-    fn pre_exec(&mut self, state: &mut S, input: &I);
+    fn pre_exec<'a>(
+        &mut self,
+        executor: &'a mut E,
+        fuzzer: &'a mut Z,
+        state: &'a mut S,
+        mgr: &'a mut EM,
+        input: &'a I,
+    ) -> Self::Handle<'a>;
+
     /// The hook that runs before runs the target
-    fn post_exec(&mut self, state: &mut S, input: &I);
+    fn post_exec(&mut self, release: Self::Handle);
 }
+
+pub trait ConsumedExecutorHandle<'a> {
+    type Executor;
+    type EventManager;
+    type Input;
+    type State;
+    type Fuzzer;
+
+    fn decompose(
+        self,
+    ) -> (
+        &'a mut Self::Executor,
+        &'a mut Self::Fuzzer,
+        &'a mut Self::State,
+        &'a mut Self::EventManager,
+        &'a Self::Input,
+    );
+}
+
+pub struct DefaultExecutorHandle<'a, E, EM, I, S, Z> {}
 
 /// The hook that runs before and after the executor runs the target
 pub trait ExecutorHooksTuple<E, EM, I, S, Z> {
+    type Handle<'a>;
+
     /// The hooks that runs before runs the target
-    fn pre_exec_all(&mut self, state: &mut S, input: &I);
+    fn pre_exec_all<'a>(
+        &mut self,
+        executor: &'a mut E,
+        fuzzer: &'a mut Z,
+        state: &'a mut S,
+        mgr: &'a mut EM,
+        input: &'a I,
+    ) -> Self::Handle<'a>;
+
     /// The hooks that runs after runs the target
-    fn post_exec_all(&mut self, state: &mut S, input: &I);
+    fn post_exec_all(&mut self, release: Self::Handle);
 }
 
 impl<E, EM, I, S, Z> ExecutorHooksTuple<E, EM, I, S, Z> for () {
-    fn pre_exec_all(&mut self, _state: &mut S, _input: &I) {}
-    fn post_exec_all(&mut self, _state: &mut S, _input: &I) {}
-}
+    type Handle<'a> = (&'a mut E, &'a mut Z, &'a mut S, &'a mut EM, &'a I);
 
-impl<Head, Tail, EM, I, S, Z> ExecutorHooksTuple<Head::Executor, EM, I, S, Z> for (Head, Tail)
-where
-    Head: ExecutorHook<EM, I, S, Z>,
-    Tail: ExecutorHooksTuple<Head::Executor, EM, I, S, Z>,
-{
-    fn pre_exec_all(&mut self, state: &mut S, input: &I) {
-        self.0.pre_exec(state, input);
-        self.1.pre_exec_all(state, input);
+    fn pre_exec_all<'a>(
+        &mut self,
+        executor: &'a mut E,
+        fuzzer: &'a mut Z,
+        state: &'a mut S,
+        mgr: &'a mut EM,
+        input: &'a I,
+    ) -> Self::Handle<'a> {
+        (executor, fuzzer, state, mgr, input)
     }
 
-    fn post_exec_all(&mut self, state: &mut S, input: &I) {
-        self.0.post_exec(state, input);
-        self.1.post_exec_all(state, input);
+    fn post_exec_all(&mut self, _release: Self::Handle) {}
+}
+
+impl<CEH, E, EM, I, S, Z> ExecutorHooksTuple<E, EM, I, S, Z> for (CEH, ())
+where
+    CEH: ConsumingExecutorHook<E, EM, I, S, Z>,
+{
+    type Handle<'a> = CEH::Handle<'a>;
+
+    fn pre_exec_all<'a>(
+        &mut self,
+        executor: &'a mut E,
+        fuzzer: &'a mut Z,
+        state: &'a mut S,
+        mgr: &'a mut EM,
+        input: &'a I,
+    ) -> Self::Handle<'a> {
+        self.0.pre_exec(executor, fuzzer, state, mgr, input)
+    }
+
+    fn post_exec_all(&mut self, release: Self::Handle) {
+        self.0.post_exec(release)
+    }
+}
+
+impl<Head, Tail, E, EM, I, S, Z> ExecutorHooksTuple<E, EM, I, S, Z> for (Head, Tail)
+where
+    Head: ExecutorHook<E, EM, I, S, Z>,
+    Tail: ExecutorHooksTuple<E, EM, I, S, Z>,
+{
+    fn pre_exec_all(
+        &mut self,
+        executor: &mut E,
+        fuzzer: &mut Z,
+        state: &mut S,
+        mgr: &mut EM,
+        input: &S,
+    ) {
+        self.0.pre_exec(executor, fuzzer, state, mgr, input);
+        self.1.pre_exec_all(executor, fuzzer, state, mgr, input);
+    }
+
+    fn post_exec_all(
+        &mut self,
+        executor: &mut E,
+        fuzzer: &mut Z,
+        state: &mut S,
+        mgr: &mut EM,
+        input: &S,
+    ) {
+        self.0.post_exec(executor, fuzzer, state, mgr, input);
+        self.1.post_exec_all(executor, fuzzer, state, mgr, input);
     }
 }

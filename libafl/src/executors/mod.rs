@@ -37,8 +37,8 @@ pub mod shadow;
 
 pub mod with_observers;
 
-// /// The module for all the hooks
-// pub mod hooks;
+/// The module for all the hooks
+pub mod hooks;
 
 /// How an execution finished.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
