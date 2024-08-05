@@ -477,6 +477,7 @@ where
     breakpoints_by_id: RefCell<HashMap<BreakpointId, BreakpointMutRef<CM, EH, ET, S>>>,
     #[builder(setter(transform = |args: &[String], env: &[(String, String)]| Qemu::init(args, env).unwrap()))]
     qemu: Qemu,
+    first_exec: bool,
     _phantom: PhantomData<(ET, S)>,
 }
 
@@ -513,6 +514,7 @@ where
             exit_handler: RefCell::new(exit_handler),
             breakpoints_by_addr: RefCell::new(HashMap::new()),
             breakpoints_by_id: RefCell::new(HashMap::new()),
+            first_exec: true,
             _phantom: PhantomData,
             qemu,
         })
@@ -678,7 +680,10 @@ where
     }
 
     pub fn first_exec_all(&mut self) {
-        self.modules.first_exec_all();
+        if self.first_exec {
+            self.modules.first_exec_all();
+            self.first_exec = false;
+        }
     }
 
     pub fn pre_exec_all(&mut self, input: &S::Input) {
