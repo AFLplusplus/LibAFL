@@ -6,8 +6,12 @@ use std::{
 
 use libafl::Error;
 use memmap2::{Mmap, MmapOptions};
+use nix::libc::{S_IRUSR, S_IXUSR};
 
 use crate::{Opt, DEFER_SIG, PERSIST_SIG};
+
+const AFL_PATH: &str = "/usr/local/lib/afl/";
+const BIN_PATH: &str = "/usr/local/bin/";
 
 // TODO better error messages and logging
 pub fn check_binary(opt: &mut Opt, shmem_env_var: &str) -> Result<(), Error> {
@@ -115,7 +119,9 @@ pub fn check_binary(opt: &mut Opt, shmem_env_var: &str) -> Result<(), Error> {
 
     if opt.forkserver_cs || opt.qemu_mode || opt.frida_mode && is_instrumented(&mmap, shmem_env_var)
     {
-        return Err(Error::illegal_argument("Instrumentation found in -Q mode"));
+        return Err(Error::illegal_argument(
+            "Instrumentation found in -Q/-O mode",
+        ));
     }
 
     if mmap_has_substr(&mmap, "__asan_init")
@@ -130,6 +136,8 @@ pub fn check_binary(opt: &mut Opt, shmem_env_var: &str) -> Result<(), Error> {
     } else if opt.is_persistent {
         println!("persistent mode enforced");
     } else if opt.frida_persistent_addr.is_some() {
+        opt.is_persistent = true;
+        opt.defer_forkserver = true;
         println!("FRIDA persistent mode configuration options detected");
     }
 
@@ -162,7 +170,7 @@ fn is_instrumented(mmap: &Mmap, shmem_env_var: &str) -> bool {
     mmap_has_substr(mmap, shmem_env_var)
 }
 
-fn find_executable_in_path(executable: &Path) -> Option<PathBuf> {
+fn find_executable_in_path<P: AsRef<Path>>(executable: &P) -> Option<PathBuf> {
     std::env::var_os("PATH").and_then(|paths| {
         std::env::split_paths(&paths).find_map(|dir| {
             let full_path = dir.join(executable);
@@ -173,4 +181,58 @@ fn find_executable_in_path(executable: &Path) -> Option<PathBuf> {
             }
         })
     })
+}
+
+pub fn find_afl_binary(filename: &str, same_dir_as: Option<PathBuf>) -> Result<PathBuf, Error> {
+    let is_library =
+        filename.contains('.') && filename.ends_with(".so") || filename.ends_with(".dylib");
+
+    let permission = if is_library {
+        S_IRUSR // user can read
+    } else {
+        S_IXUSR // user can exec
+    };
+
+    // First we check if it is present in AFL_PATH
+    if let Ok(afl_path) = std::env::var("AFL_PATH") {
+        let file = PathBuf::from(afl_path).join(filename);
+        if check_file_found(&file, permission) {
+            return Ok(file);
+        }
+    }
+
+    // next we check the same directory as the provided parameter
+    if let Some(same_dir_as) = same_dir_as {
+        if let Some(parent_dir) = same_dir_as.parent() {
+            let file = parent_dir.join(filename);
+            if check_file_found(&file, permission) {
+                return Ok(file);
+            }
+        }
+    }
+
+    // check sensible defaults
+    let file = PathBuf::from(if is_library { AFL_PATH } else { BIN_PATH }).join(filename);
+    let found = check_file_found(&file, permission);
+    if found {
+        return Ok(file);
+    }
+
+    if !is_library {
+        // finally, check the path for the binary
+        return find_executable_in_path(&filename)
+            .ok_or(Error::unknown(format!("cannot find {filename}")));
+    }
+
+    Err(Error::unknown(format!("cannot find {filename}")))
+}
+
+fn check_file_found(file: &PathBuf, perm: u32) -> bool {
+    if !file.exists() {
+        return false;
+    }
+    if let Ok(metadata) = file.metadata() {
+        return metadata.permissions().mode() & perm != 0;
+    }
+    false
 }

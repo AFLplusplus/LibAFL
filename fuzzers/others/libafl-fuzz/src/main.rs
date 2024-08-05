@@ -6,6 +6,7 @@
 #![allow(clippy::similar_names)]
 #![allow(clippy::too_many_lines)]
 #![allow(clippy::struct_excessive_bools)]
+#![allow(clippy::case_sensitive_file_extension_comparisons)]
 
 use std::{collections::HashMap, path::PathBuf, time::Duration};
 mod afl_stats;
@@ -236,6 +237,8 @@ struct Opt {
     /// use binary-only instrumentation (FRIDA mode)
     #[arg(short = 'O')]
     frida_mode: bool,
+    #[clap(skip)]
+    frida_asan: bool,
     /// use binary-only instrumentation (QEMU mode)
     #[arg(short = 'Q')]
     qemu_mode: bool,

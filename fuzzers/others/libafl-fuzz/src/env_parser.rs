@@ -110,6 +110,9 @@ pub fn parse_envs(opt: &mut Opt) -> Result<(), Error> {
     } else {
         opt.foreign_sync_interval = Duration::from_secs(AFL_DEFAULT_FOREIGN_SYNC_INTERVAL);
     }
+    if let Ok(res) = std::env::var("AFL_USE_FASAN") {
+        opt.frida_asan = parse_bool(&res)?;
+    }
     Ok(())
 }
 
