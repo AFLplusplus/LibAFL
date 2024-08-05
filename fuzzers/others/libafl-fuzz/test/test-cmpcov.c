@@ -6,17 +6,14 @@
 char global_cmpval[] = "GLOBALVARIABLE";
 
 int main(int argc, char **argv) {
-
   char *input = argv[1], *buf, buffer[20];
   char  cmpval[] = "LOCALVARIABLE";
   char  shortval[4] = "abc";
 
   if (argc < 2) {
-
     ssize_t ret = read(0, buffer, sizeof(buffer) - 1);
     buffer[ret] = 0;
     input = buffer;
-
   }
 
   if (strcmp(input, "LIBTOKENCAP") == 0)
@@ -36,7 +33,6 @@ int main(int argc, char **argv) {
   else if (strstr(input, "tsala") != NULL)
     printf("your string is a fruit salad\n");
   else if (strcmp(input, "BUFFEROVERFLOW") == 0) {
-
     buf = (char *)malloc(16);
     strcpy(buf, "TEST");
     strcat(buf, input);
@@ -57,7 +53,4 @@ int main(int argc, char **argv) {
     printf("I do not know your string\n");
 
   return 0;
-
 }
-
-
