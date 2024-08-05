@@ -106,7 +106,7 @@ test -n "$( ls ./test/output-frida-cmpcov/fuzzer_main/queue/id:000003* 2>/dev/nu
 	exit 1
 }
 export AFL_FRIDA_PERSISTENT_ADDR=0x`nm ./test/out-frida | grep -Ei "T _main|T main" | awk '{print $1}'`
-AFL_PATH=${AFL_DIR_NAME} AFL_STATS_INTERVAL=1 LIBAFL_DEBUG_OUTPUT=1 AFL_DEBUG=1 AFL_CORES=1 AFL_FRIDA_VERBOSE=1 timeout 5 ${FUZZER} -m 0 -V07 -O -c 0 -l 3 -i ./test/seeds-frida -o ./test/output-frida-persistent -- ./test/out-frida || true
+AFL_PATH=${AFL_DIR_NAME} AFL_STATS_INTERVAL=1 LIBAFL_DEBUG_OUTPUT=1 AFL_DEBUG=1 AFL_CORES=1 AFL_FRIDA_VERBOSE=1 timeout 5 ${FUZZER} -m 0 -V07 -O -i ./test/seeds-frida -o ./test/output-frida-persistent -- ./test/out-frida || true
 # TODO: change it to id:000003* once persistent mode is fixed
 test -n "$( ls ./test/output-frida-persistent/fuzzer_main/queue/id:000002* 2>/dev/null )" || {
 	echo "No new corpus entries found for FRIDA persistent mode"
