@@ -1,26 +1,24 @@
 //! Hooks for the executors.
 //! These will be executed right before and after the executor's harness run.
 
-use crate::executors::Executor;
-
 /// windows crash/timeout handler and asan death callback
 #[cfg(windows)]
 pub mod windows;
 
-/// *nix crash handler
-#[cfg(all(unix, feature = "std"))]
-pub mod unix;
-
-#[cfg(all(feature = "std", unix))]
-/// The hook for inprocess fork executor
-pub mod inprocess_fork;
-
-/// The hook for inprocess executor
-pub mod inprocess;
-
-/// Timer-related stuff
-#[cfg(feature = "std")]
-pub mod timer;
+// /// *nix crash handler
+// #[cfg(all(unix, feature = "std"))]
+// pub mod unix;
+//
+// #[cfg(all(feature = "std", unix))]
+// /// The hook for inprocess fork executor
+// pub mod inprocess_fork;
+//
+// /// The hook for inprocess executor
+// pub mod inprocess;
+//
+// /// Timer-related stuff
+// #[cfg(feature = "std")]
+// pub mod timer;
 
 /// The hook that runs before and after the executor runs the target
 pub trait ExecutorHook<E, EM, I, S, Z> {
@@ -82,7 +80,39 @@ pub trait ConsumedExecutorHandle<'a> {
     );
 }
 
-pub struct DefaultExecutorHandle<'a, E, EM, I, S, Z> {}
+pub struct DefaultExecutorHandle<'a, E, EM, I, S, Z> {
+    executor: &'a mut E,
+    manager: &'a mut EM,
+    input: &'a I,
+    state: &'a mut S,
+    fuzzer: &'a mut Z,
+}
+
+impl<'a, E, EM, I, S, Z> ConsumedExecutorHandle<'a> for DefaultExecutorHandle<'a, E, EM, I, S, Z> {
+    type Executor = E;
+    type EventManager = EM;
+    type Input = I;
+    type State = S;
+    type Fuzzer = Z;
+
+    fn decompose(
+        self,
+    ) -> (
+        &'a mut Self::Executor,
+        &'a mut Self::Fuzzer,
+        &'a mut Self::State,
+        &'a mut Self::EventManager,
+        &'a Self::Input,
+    ) {
+        (
+            self.executor,
+            self.fuzzer,
+            self.state,
+            self.manager,
+            self.input,
+        )
+    }
+}
 
 /// The hook that runs before and after the executor runs the target
 pub trait ExecutorHooksTuple<E, EM, I, S, Z> {
@@ -99,24 +129,50 @@ pub trait ExecutorHooksTuple<E, EM, I, S, Z> {
     ) -> Self::Handle<'a>;
 
     /// The hooks that runs after runs the target
-    fn post_exec_all(&mut self, release: Self::Handle);
+    fn post_exec_all<'a>(
+        &mut self,
+        release: Self::Handle<'a>,
+    ) -> (
+        &'a mut Self::Executor,
+        &'a mut Self::Fuzzer,
+        &'a mut Self::State,
+        &'a mut Self::EventManager,
+        &'a Self::Input,
+    );
 }
 
 impl<E, EM, I, S, Z> ExecutorHooksTuple<E, EM, I, S, Z> for () {
-    type Handle<'a> = (&'a mut E, &'a mut Z, &'a mut S, &'a mut EM, &'a I);
+    type Handle<'a> = DefaultExecutorHandle<'a, E, EM, I, S, Z>;
 
     fn pre_exec_all<'a>(
         &mut self,
         executor: &'a mut E,
         fuzzer: &'a mut Z,
         state: &'a mut S,
-        mgr: &'a mut EM,
+        manager: &'a mut EM,
         input: &'a I,
     ) -> Self::Handle<'a> {
-        (executor, fuzzer, state, mgr, input)
+        DefaultExecutorHandle {
+            executor,
+            manager,
+            input,
+            state,
+            fuzzer,
+        }
     }
 
-    fn post_exec_all(&mut self, _release: Self::Handle) {}
+    fn post_exec_all<'a>(
+        &mut self,
+        release: Self::Handle<'a>,
+    ) -> (
+        &'a mut Self::Executor,
+        &'a mut Self::Fuzzer,
+        &'a mut Self::State,
+        &'a mut Self::EventManager,
+        &'a Self::Input,
+    ) {
+        release.decompose()
+    }
 }
 
 impl<CEH, E, EM, I, S, Z> ExecutorHooksTuple<E, EM, I, S, Z> for (CEH, ())
@@ -146,27 +202,32 @@ where
     Head: ExecutorHook<E, EM, I, S, Z>,
     Tail: ExecutorHooksTuple<E, EM, I, S, Z>,
 {
-    fn pre_exec_all(
+    type Handle<'a> = Tail::Handle<'a>;
+
+    fn pre_exec_all<'a>(
         &mut self,
-        executor: &mut E,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
-        input: &S,
-    ) {
+        executor: &'a mut E,
+        fuzzer: &'a mut Z,
+        state: &'a mut S,
+        mgr: &'a mut EM,
+        input: &'a I,
+    ) -> Self::Handle<'a> {
         self.0.pre_exec(executor, fuzzer, state, mgr, input);
         self.1.pre_exec_all(executor, fuzzer, state, mgr, input);
     }
 
-    fn post_exec_all(
+    fn post_exec_all<'a>(
         &mut self,
-        executor: &mut E,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
-        input: &S,
+        release: Self::Handle<'a>,
+    ) -> (
+        &'a mut Self::Executor,
+        &'a mut Self::Fuzzer,
+        &'a mut Self::State,
+        &'a mut Self::EventManager,
+        &'a Self::Input,
     ) {
+        let (executor, fuzzer, state, mgr, input) = self.1.post_exec_all(release);
         self.0.post_exec(executor, fuzzer, state, mgr, input);
-        self.1.post_exec_all(executor, fuzzer, state, mgr, input);
+        (executor, fuzzer, state, mgr, input)
     }
 }
