@@ -124,13 +124,13 @@ where
 /// Mutational stages will usually have a range of mutations that are
 /// being applied to the input one by one, between executions.
 pub trait MutationalStage {
-    type M;
+    type Mutator;
 
     /// The mutator registered for this stage
-    fn mutator(&self) -> &Self::M;
+    fn mutator(&self) -> &Self::Mutator;
 
     /// The mutator registered for this stage (mutable)
-    fn mutator_mut(&mut self) -> &mut Self::M;
+    fn mutator_mut(&mut self) -> &mut Self::Mutator;
 }
 
 /// Default value, how many iterations each stage gets, as an upper bound.
@@ -149,17 +149,17 @@ pub struct StdMutationalStage<M> {
 }
 
 impl<M> MutationalStage for StdMutationalStage<M> {
-    type M = M;
+    type Mutator = M;
 
     /// The mutator, added to this stage
     #[inline]
-    fn mutator(&self) -> &Self::M {
+    fn mutator(&self) -> &Self::Mutator {
         &self.mutator
     }
 
     /// The list of mutators, added to this stage (as mutable ref)
     #[inline]
-    fn mutator_mut(&mut self) -> &mut Self::M {
+    fn mutator_mut(&mut self) -> &mut Self::Mutator {
         &mut self.mutator
     }
 }
