@@ -10,7 +10,7 @@ use core::{fmt::Debug, marker::PhantomData, time::Duration};
 use hashbrown::HashSet;
 use libafl_bolts::{current_time, impl_serdeany, tuples::Handle, Named};
 use num_traits::Bounded;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, HasCorpus, HasCurrentCorpusId, SchedulerTestcaseMetadata},
@@ -86,7 +86,7 @@ where
     E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers<Observers = OT>,
     EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
     O: MapObserver,
-    <O as MapObserver>::Entry: Bounded + Default + 'static,
+    <O as MapObserver>::Entry: Bounded + Default + Debug +  Serialize + DeserializeOwned + 'static,
     C: AsRef<O>,
     OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     S: HasCorpus + HasMetadata + HasNamedMetadata + HasCurrentTestcase + HasCurrentCorpusId,

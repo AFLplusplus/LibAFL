@@ -89,7 +89,7 @@ macro_rules! random_corpus_id_with_disabled {
 
 /// Corpus with all current [`Testcase`]s, or solutions
 pub trait Corpus: Sized {
-    type Input: Debug;
+    type Input;
 
     /// Returns the number of all enabled entries
     fn count(&self) -> usize;
