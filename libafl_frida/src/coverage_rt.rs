@@ -202,7 +202,7 @@ impl CoverageRuntime {
         //
         // Since we also need to spill some registers in order to update our
         // coverage map, in the event of a long branch, we can simply re-use
-        // these spilt registers. This, however, means we need to retard the
+        // these spilt registers. This, however, means we need to reset the
         // code writer so that we can overwrite the so-called "restoration
         // prologue".
         #[cfg(target_arch = "aarch64")]

@@ -37,17 +37,17 @@ to
 libfuzzer-sys = { version = "0.11.0", features = ["your", "features", "here"], package = "libafl_libfuzzer" }
 ```
 
-If, in the case that you want to work with experimental changes, the `libfuzzer-best` branch contains the current
-experimental best version of `libafl_libfuzzer`.
-To use the experimental version, use:
+To use the most up-to-date version (with experimental changes), use:
 
 ```toml
-libfuzzer-sys = { git = "https://github.com/AFLplusplus/LibAFL.git", branch = "libfuzzer-best", features = ["your", "features", "here"], package = "libafl_libfuzzer" }
+libfuzzer-sys = { git = "https://github.com/AFLplusplus/LibAFL.git", features = ["your", "features", "here"], package = "libafl_libfuzzer" }
 ```
 
-As this branch generally offers the highest performance version of `libafl_libfuzzer`, we recommend the latter.
+As the repository generally offers the highest performance version of `libafl_libfuzzer`, we recommend the latter.
 Remember to `cargo update` often if using the experimental changes, and please [submit an issue]
-if you encounter problems while using `libfuzzer-best`!
+if you encounter problems while using the git branch!
+
+For stability purposes, consider [specifying a commit](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#choice-of-commit).
 
 #### macOS
 
@@ -83,13 +83,13 @@ CXXFLAGS='-fsanitize=fuzzer-no-link'
 The runtime for `libafl_libfuzzer` may be used standalone as a direct replacement for libFuzzer with other targets as
 well.
 To do so, [ensure a recent nightly version of Rust is installed](https://rustup.rs/), then enter the
-[`libafl_libfuzzer_runtime`](libafl_libfuzzer_runtime) folder and build the runtime with the following command:
+[`libafl_libfuzzer_runtime`](../libafl_libfuzzer_runtime) folder and build the runtime with the following command:
 
 ```bash
 ./build.sh
 ```
 
-The static library will be available at `libFuzzer.a` in the [`libafl_libfuzzer_runtime`](libafl_libfuzzer_runtime)
+The static library will be available at `libFuzzer.a` in the [`libafl_libfuzzer_runtime`](../libafl_libfuzzer_runtime)
 directory.
 If you encounter build failures without clear error outputs that help you resolve the issue, please [submit an issue].
 
@@ -144,7 +144,8 @@ to partial support of libfuzzer flags, `libafl_libfuzzer` offers:
 - `-fork` and `-jobs`
     - in `libafl_libfuzzer`, these are synonymous
 - `-ignore_crashes`, `-ignore_ooms`, and `-ignore_timeouts`
-    - note that setting `-tui=1` enables these flags by default, so you'll need to explicitly mention `-ignore_...=0` to disable them
+    - note that setting `-tui=1` enables these flags by default, so you'll need to explicitly mention `-ignore_...=0` to
+      disable them
 - `-rss_limit_mb` and `-malloc_limit_mb`
 - `-ignore_remaining_args`
 - `-shrink`
@@ -152,7 +153,11 @@ to partial support of libfuzzer flags, `libafl_libfuzzer` offers:
 - `-close_fd_mask`
 
 [libFuzzer]: https://llvm.org/docs/LibFuzzer.html
+
 [`libfuzzer-sys`]: https://docs.rs/libfuzzer-sys/
+
 [de-facto deprecation of libFuzzer]: https://llvm.org/docs/LibFuzzer.html#status
+
 [submit an issue]: https://github.com/AFLplusplus/LibAFL/issues/new/choose
+
 [grimoire]: https://www.usenix.org/conference/usenixsecurity19/presentation/blazytko

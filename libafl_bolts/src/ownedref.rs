@@ -9,8 +9,9 @@ use alloc::{
 use core::{
     clone::Clone,
     fmt::Debug,
-    ops::{Deref, DerefMut},
+    ops::{Deref, DerefMut, RangeBounds},
     slice,
+    slice::SliceIndex,
 };
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -456,6 +457,17 @@ impl<'a, T> OwnedSlice<'a, T> {
     /// Returns an iterator over the slice.
     pub fn iter(&self) -> Iter<'_, T> {
         <&Self as IntoIterator>::into_iter(self)
+    }
+
+    /// Returns a subslice of the slice.
+    #[must_use]
+    pub fn slice<R: RangeBounds<usize> + SliceIndex<[T], Output = [T]>>(
+        &'a self,
+        range: R,
+    ) -> OwnedSlice<'a, T> {
+        OwnedSlice {
+            inner: OwnedSliceInner::Ref(&self[range]),
+        }
     }
 }
 

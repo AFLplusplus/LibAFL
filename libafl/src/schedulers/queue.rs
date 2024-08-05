@@ -5,7 +5,7 @@ use core::marker::PhantomData;
 
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase},
-    schedulers::{RemovableScheduler, Scheduler},
+    schedulers::{HasQueueCycles, RemovableScheduler, Scheduler},
     state::{HasCorpus, State, UsesState},
     Error,
 };
@@ -13,6 +13,8 @@ use crate::{
 /// Walk the corpus in a queue-like fashion
 #[derive(Debug, Clone)]
 pub struct QueueScheduler<S> {
+    queue_cycles: u64,
+    runs_in_current_cycle: u64,
     phantom: PhantomData<S>,
 }
 
@@ -55,6 +57,12 @@ where
                 .map(|id| state.corpus().next(id))
                 .flatten()
                 .unwrap_or_else(|| state.corpus().first().unwrap());
+
+            self.runs_in_current_cycle += 1;
+            // TODO deal with corpus_counts decreasing due to removals
+            if self.runs_in_current_cycle >= state.corpus().count() as u64 {
+                self.queue_cycles += 1;
+            }
             self.set_current_scheduled(state, Some(id))?;
             Ok(id)
         }
@@ -66,6 +74,8 @@ impl<S> QueueScheduler<S> {
     #[must_use]
     pub fn new() -> Self {
         Self {
+            runs_in_current_cycle: 0,
+            queue_cycles: 0,
             phantom: PhantomData,
         }
     }
@@ -74,6 +84,15 @@ impl<S> QueueScheduler<S> {
 impl<S> Default for QueueScheduler<S> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl<S> HasQueueCycles for QueueScheduler<S>
+where
+    S: HasCorpus + HasTestcase + State,
+{
+    fn queue_cycles(&self) -> u64 {
+        self.queue_cycles
     }
 }
 

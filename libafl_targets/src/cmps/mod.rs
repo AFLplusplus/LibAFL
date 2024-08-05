@@ -13,7 +13,7 @@ use core::{
 };
 
 use libafl::{
-    observers::{cmp::AFLppCmpLogHeader, CmpMap, CmpValues},
+    observers::{cmp::AFLppCmpLogHeader, CmpMap, CmpValues, CmplogBytes},
     Error,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -88,9 +88,14 @@ pub struct CmpLogHeader {
 /// comparison size is determined by the `hits` field of the associated `AFLppCmpLogHeader`.
 pub struct AFLppCmpLogOperands {
     v0: u64,
-    v1: u64,
     v0_128: u64,
+    v0_256_0: u64,
+    v0_256_1: u64,
+    v1: u64,
     v1_128: u64,
+    v1_256_0: u64,
+    v1_256_1: u64,
+    unused: [u8; 8],
 }
 
 impl AFLppCmpLogOperands {
@@ -99,9 +104,14 @@ impl AFLppCmpLogOperands {
     pub fn new(v0: u64, v1: u64) -> Self {
         Self {
             v0,
-            v1,
             v0_128: 0,
+            v0_256_0: 0,
+            v0_256_1: 0,
+            v1,
             v1_128: 0,
+            v1_256_0: 0,
+            v1_256_1: 0,
+            unused: [0; 8],
         }
     }
 
@@ -115,9 +125,14 @@ impl AFLppCmpLogOperands {
 
         Self {
             v0,
-            v1,
             v0_128,
+            v0_256_0: 0,
+            v0_256_1: 0,
+            v1,
             v1_128,
+            v1_256_0: 0,
+            v1_256_1: 0,
+            unused: [0; 8],
         }
     }
 
@@ -175,10 +190,11 @@ impl AFLppCmpLogOperands {
 #[repr(C, packed)]
 /// Comparison function operands, like for strcmp/memcmp, represented as two byte arrays.
 pub struct AFLppCmpLogFnOperands {
-    v0: [u8; 31],
+    v0: [u8; 32],
+    v1: [u8; 32],
     v0_len: u8,
-    v1: [u8; 31],
     v1_len: u8,
+    unused: [u8; 6],
 }
 
 impl AFLppCmpLogFnOperands {
@@ -188,8 +204,8 @@ impl AFLppCmpLogFnOperands {
         let v0_len = v0.len() as u8;
         let v1_len = v1.len() as u8;
 
-        let mut v0_arr = [0; 31];
-        let mut v1_arr = [0; 31];
+        let mut v0_arr = [0; 32];
+        let mut v1_arr = [0; 32];
 
         v0_arr.copy_from_slice(v0);
         v1_arr.copy_from_slice(v1);
@@ -199,12 +215,13 @@ impl AFLppCmpLogFnOperands {
             v0_len,
             v1: v1_arr,
             v1_len,
+            unused: [0; 6],
         }
     }
 
     #[must_use]
     /// first rtn operand
-    pub fn v0(&self) -> &[u8; 31] {
+    pub fn v0(&self) -> &[u8; 32] {
         &self.v0
     }
 
@@ -216,7 +233,7 @@ impl AFLppCmpLogFnOperands {
 
     #[must_use]
     /// first rtn operand len
-    pub fn v1(&self) -> &[u8; 31] {
+    pub fn v1(&self) -> &[u8; 32] {
         &self.v1
     }
 
@@ -373,8 +390,14 @@ impl CmpMap for CmpLogMap {
         } else {
             unsafe {
                 Some(CmpValues::Bytes((
-                    self.vals.routines[idx][execution].0.to_vec(),
-                    self.vals.routines[idx][execution].1.to_vec(),
+                    CmplogBytes::from_buf_and_len(
+                        self.vals.routines[idx][execution].0,
+                        CMPLOG_RTN_LEN as u8,
+                    ),
+                    CmplogBytes::from_buf_and_len(
+                        self.vals.routines[idx][execution].1,
+                        CMPLOG_RTN_LEN as u8,
+                    ),
                 )))
             }
         }
@@ -415,9 +438,14 @@ pub static mut libafl_cmplog_map_extended: AFLppCmpLogMap = AFLppCmpLogMap {
     vals: AFLppCmpLogVals {
         operands: [[AFLppCmpLogOperands {
             v0: 0,
-            v1: 0,
             v0_128: 0,
+            v0_256_0: 0,
+            v0_256_1: 0,
+            v1: 0,
             v1_128: 0,
+            v1_256_0: 0,
+            v1_256_1: 0,
+            unused: [0; 8],
         }; CMPLOG_MAP_H]; CMPLOG_MAP_W],
     },
 };
@@ -535,7 +563,7 @@ impl CmpMap for AFLppCmpLogMap {
                         self.vals.operands[idx][execution].v0,
                         self.vals.operands[idx][execution].v1,
                     ))),
-                    // TODO handle 128 bits cmps
+                    // TODO handle 128 bits & 256 bits cmps
                     // other => panic!("Invalid CmpLog shape {}", other),
                     _ => None,
                 }
@@ -545,8 +573,8 @@ impl CmpMap for AFLppCmpLogMap {
                 let v0_len = self.vals.fn_operands[idx][execution].v0_len & (0x80 - 1);
                 let v1_len = self.vals.fn_operands[idx][execution].v1_len & (0x80 - 1);
                 Some(CmpValues::Bytes((
-                    self.vals.fn_operands[idx][execution].v0[..(v0_len as usize)].to_vec(),
-                    self.vals.fn_operands[idx][execution].v1[..(v1_len as usize)].to_vec(),
+                    CmplogBytes::from_buf_and_len(self.vals.fn_operands[idx][execution].v0, v0_len),
+                    CmplogBytes::from_buf_and_len(self.vals.fn_operands[idx][execution].v1, v1_len),
                 )))
             }
         }

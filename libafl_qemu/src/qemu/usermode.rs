@@ -4,19 +4,16 @@ use std::{
 };
 
 use libafl_qemu_sys::{
-    exec_path, free_self_maps, guest_base, libafl_dump_core_hook, libafl_force_dfl, libafl_get_brk,
-    libafl_load_addr, libafl_maps_first, libafl_maps_next, libafl_qemu_run, libafl_set_brk,
-    mmap_next_start, pageflags_get_root, read_self_maps, strlen, GuestAddr, GuestUsize,
-    IntervalTreeNode, IntervalTreeRoot, MapInfo, MmapPerms, VerifyAccess,
+    exec_path, free_self_maps, guest_base, libafl_force_dfl, libafl_get_brk, libafl_load_addr,
+    libafl_maps_first, libafl_maps_next, libafl_qemu_run, libafl_set_brk, mmap_next_start,
+    pageflags_get_root, read_self_maps, strlen, GuestAddr, GuestUsize, IntervalTreeNode,
+    IntervalTreeRoot, MapInfo, MmapPerms, VerifyAccess,
 };
 use libc::c_int;
 #[cfg(feature = "python")]
 use pyo3::{pyclass, pymethods, IntoPy, PyObject, PyRef, PyRefMut, Python};
 
-use crate::{
-    HookData, NewThreadHookId, PostSyscallHookId, PreSyscallHookId, Qemu, QemuExitError,
-    QemuExitReason, SyscallHookResult, CPU,
-};
+use crate::{Qemu, CPU};
 
 #[cfg_attr(feature = "python", pyclass(unsendable))]
 pub struct GuestMaps {
@@ -135,15 +132,8 @@ impl Qemu {
         }
     }
 
-    /// This function will run the emulator until the next breakpoint, or until finish.
-    /// # Safety
-    ///
-    /// Should, in general, be safe to call.
-    /// Of course, the emulated target is not contained securely and can corrupt state or interact with the operating system.
-    pub unsafe fn run(&self) -> Result<QemuExitReason, QemuExitError> {
+    pub(super) unsafe fn run_inner(self) {
         libafl_qemu_run();
-
-        self.post_run()
     }
 
     #[must_use]
@@ -237,110 +227,20 @@ impl Qemu {
             Err(format!("Failed to unmap {addr}"))
         }
     }
-
-    #[allow(clippy::type_complexity)]
-    pub fn add_pre_syscall_hook<T: Into<HookData>>(
-        &self,
-        data: T,
-        callback: extern "C" fn(
-            T,
-            i32,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-        ) -> SyscallHookResult,
-    ) -> PreSyscallHookId {
-        unsafe {
-            let data: u64 = data.into().0;
-            let callback: extern "C" fn(
-                u64,
-                i32,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-            ) -> libafl_qemu_sys::syshook_ret = core::mem::transmute(callback);
-            let num = libafl_qemu_sys::libafl_add_pre_syscall_hook(Some(callback), data);
-            PreSyscallHookId(num)
-        }
-    }
-
-    #[allow(clippy::type_complexity)]
-    pub fn add_post_syscall_hook<T: Into<HookData>>(
-        &self,
-        data: T,
-        callback: extern "C" fn(
-            T,
-            GuestAddr,
-            i32,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-        ) -> GuestAddr,
-    ) -> PostSyscallHookId {
-        unsafe {
-            let data: u64 = data.into().0;
-            let callback: extern "C" fn(
-                u64,
-                GuestAddr,
-                i32,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-            ) -> GuestAddr = core::mem::transmute(callback);
-            let num = libafl_qemu_sys::libafl_add_post_syscall_hook(Some(callback), data);
-            PostSyscallHookId(num)
-        }
-    }
-
-    pub fn add_new_thread_hook<T: Into<HookData>>(
-        &self,
-        data: T,
-        callback: extern "C" fn(T, tid: u32) -> bool,
-    ) -> NewThreadHookId {
-        unsafe {
-            let data: u64 = data.into().0;
-            let callback: extern "C" fn(u64, u32) -> bool = core::mem::transmute(callback);
-            let num = libafl_qemu_sys::libafl_add_new_thread_hook(Some(callback), data);
-            NewThreadHookId(num)
-        }
-    }
-
-    #[allow(clippy::type_complexity)]
-    pub fn set_crash_hook(&self, callback: extern "C" fn(i32)) {
-        unsafe {
-            libafl_dump_core_hook = callback;
-        }
-    }
 }
 
 #[cfg(feature = "python")]
 pub mod pybind {
     use libafl_qemu_sys::{GuestAddr, MmapPerms};
     use pyo3::{
-        exceptions::PyValueError, pymethods, types::PyInt, FromPyObject, PyObject, PyResult, Python,
+        conversion::FromPyObject,
+        exceptions::PyValueError,
+        pymethods,
+        types::{PyAnyMethods, PyInt},
+        Bound, PyObject, PyResult, Python,
     };
 
-    use crate::{pybind::Qemu, SyscallHookResult};
+    use crate::{pybind::Qemu, qemu::hooks::SyscallHookResult};
 
     static mut PY_SYSCALL_HOOK: Option<PyObject> = None;
 
@@ -362,17 +262,17 @@ pub mod pybind {
                 let args = (sys_num, a0, a1, a2, a3, a4, a5, a6, a7);
                 Python::with_gil(|py| {
                     let ret = obj.call1(py, args).expect("Error in the syscall hook");
-                    let any = ret.as_ref(py);
+                    let any = ret.bind(py);
                     if any.is_none() {
                         SyscallHookResult::new(None)
                     } else {
-                        let a: Result<&PyInt, _> = any.downcast();
+                        let a: Result<&Bound<'_, PyInt>, _> = any.downcast_exact();
                         if let Ok(i) = a {
                             SyscallHookResult::new(Some(
                                 i.extract().expect("Invalid syscall hook return value"),
                             ))
                         } else {
-                            SyscallHookResult::extract(any)
+                            SyscallHookResult::extract_bound(ret.bind(py))
                                 .expect("The syscall hook must return a SyscallHookResult")
                         }
                     }
@@ -438,6 +338,7 @@ pub mod pybind {
                 PY_SYSCALL_HOOK = Some(hook);
             }
             self.qemu
+                .hooks()
                 .add_pre_syscall_hook(0u64, py_syscall_hook_wrapper);
         }
     }

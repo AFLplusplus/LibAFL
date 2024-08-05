@@ -30,7 +30,7 @@ for subdir, dirs, files in os.walk(os.getcwd()):
         continue
 
     for file in files:
-        if file != "Cargo.toml":
+        if file not in ["Cargo.toml", "pyproject.toml"]:
             continue
         fname = os.path.join(subdir, file)
         print(fname)

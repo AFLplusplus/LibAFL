@@ -48,6 +48,7 @@ where
     Self::State: HasCorpus,
 {
     /// Removed the given entry from the corpus at the given index
+    /// When you remove testcases, make sure that that testcase is not currently fuzzed one!
     fn on_remove(
         &mut self,
         _state: &mut Self::State,
@@ -159,6 +160,15 @@ where
 
         Ok(())
     }
+}
+
+/// Trait for Schedulers which track queue cycles
+pub trait HasQueueCycles: Scheduler
+where
+    Self::State: HasCorpus,
+{
+    /// The amount of cycles the scheduler has completed.
+    fn queue_cycles(&self) -> u64;
 }
 
 /// The scheduler define how the fuzzer requests a testcase from the corpus.

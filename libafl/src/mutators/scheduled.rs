@@ -520,19 +520,15 @@ mod tests {
         log::trace!("{:?}", input.bytes());
 
         // The pre-seeded rand should have spliced at position 2.
-        assert_eq!(input.bytes(), &[b'a', b'b', b'f']);
+        assert_eq!(input.bytes(), b"abf");
     }
 
     #[test]
     fn test_havoc() {
         let rand = StdRand::with_seed(0x1337);
         let mut corpus: InMemoryCorpus<BytesInput> = InMemoryCorpus::new();
-        corpus
-            .add(Testcase::new(vec![b'a', b'b', b'c'].into()))
-            .unwrap();
-        corpus
-            .add(Testcase::new(vec![b'd', b'e', b'f'].into()))
-            .unwrap();
+        corpus.add(Testcase::new(b"abc".to_vec().into())).unwrap();
+        corpus.add(Testcase::new(b"def".to_vec().into())).unwrap();
 
         let mut input = corpus.cloned_input_for_id(corpus.first().unwrap()).unwrap();
         let input_prior = input.clone();

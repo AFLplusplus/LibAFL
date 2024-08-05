@@ -361,6 +361,7 @@ void qasan_dealloc(const char *start) {
 int qasan_swap(int state) {
   QASAN_DEBUG("SWAP: %d\n", state);
   /* Do Nothing */
+  return 0;
 }
 #endif
 

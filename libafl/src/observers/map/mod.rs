@@ -243,11 +243,11 @@ pub mod macros {
     #[macro_export]
     macro_rules! require_index_tracking {
         ($name: literal, $obs: ident) => {
-            struct SanityCheck<O: $crate::observers::CanTrack> {
+            struct TrackingEnabledCheck<O: $crate::observers::CanTrack> {
                 phantom: ::core::marker::PhantomData<O>,
             }
 
-            impl<O: $crate::observers::CanTrack> SanityCheck<O> {
+            impl<O: $crate::observers::CanTrack> TrackingEnabledCheck<O> {
                 #[rustfmt::skip]
                 const MESSAGE: &'static str = {
                     const LINE_OFFSET: usize = line!().ilog10() as usize + 2;
@@ -263,7 +263,7 @@ pub mod macros {
                         SPACING, "| ",
                     )
                 };
-                const TRACKING_SANITY: bool = {
+                const TRACKING_ENABLED: bool = {
                     if !O::INDICES {
                         panic!("{}", Self::MESSAGE)
                     } else {
@@ -272,13 +272,13 @@ pub mod macros {
                 };
 
                 #[inline(always)]
-                fn check_sanity() {
-                    if !Self::TRACKING_SANITY {
+                fn check_enabled() {
+                    if !Self::TRACKING_ENABLED {
                         unreachable!("{}", Self::MESSAGE);
                     }
                 }
             }
-            SanityCheck::<$obs>::check_sanity(); // check that tracking is enabled for this map
+            TrackingEnabledCheck::<$obs>::check_enabled(); // check that tracking is enabled for this map
         };
     }
 
@@ -306,11 +306,11 @@ pub mod macros {
     #[macro_export]
     macro_rules! require_novelties_tracking {
         ($name: literal, $obs: ident) => {
-            struct SanityCheck<O: $crate::observers::CanTrack> {
+            struct TrackingEnabledCheck<O: $crate::observers::CanTrack> {
                 phantom: ::core::marker::PhantomData<O>,
             }
 
-            impl<O: $crate::observers::CanTrack> SanityCheck<O> {
+            impl<O: $crate::observers::CanTrack> TrackingEnabledCheck<O> {
                 #[rustfmt::skip]
                 const MESSAGE: &'static str = {
                     const LINE_OFFSET: usize = line!().ilog10() as usize + 2;
@@ -327,7 +327,7 @@ pub mod macros {
                         SPACING, "| ",
                     )
                 };
-                const TRACKING_SANITY: bool = {
+                const TRACKING_ENABLED: bool = {
                     if !O::NOVELTIES {
                         panic!("{}", Self::MESSAGE)
                     } else {
@@ -336,13 +336,13 @@ pub mod macros {
                 };
 
                 #[inline(always)]
-                fn check_sanity() {
-                    if !Self::TRACKING_SANITY {
+                fn check_enabled() {
+                    if !Self::TRACKING_ENABLED {
                         unreachable!("{}", Self::MESSAGE);
                     }
                 }
             }
-            SanityCheck::<$obs>::check_sanity(); // check that tracking is enabled for this map
+            TrackingEnabledCheck::<$obs>::check_enabled(); // check that tracking is enabled for this map
         };
     }
 }

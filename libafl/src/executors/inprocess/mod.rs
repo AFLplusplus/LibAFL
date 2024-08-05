@@ -21,8 +21,7 @@ use libafl_bolts::tuples::{tuple_list, RefIndexable};
 #[cfg(any(unix, feature = "std"))]
 use crate::executors::hooks::inprocess::GLOBAL_STATE;
 use crate::{
-    corpus::{Corpus, Testcase},
-    events::{Event, EventFirer, EventRestarter},
+    events::{EventFirer, EventRestarter},
     executors::{
         hooks::{inprocess::InProcessHooks, ExecutorHooksTuple},
         inprocess::inner::GenericInProcessExecutorInner,
@@ -32,8 +31,9 @@ use crate::{
     fuzzer::HasObjective,
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions, State, UsesState},
-    Error, HasMetadata,
+    schedulers::Scheduler,
+    state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
+    Error, ExecutionProcessor, HasScheduler,
 };
 
 /// The inner structure of `InProcessExecutor`.
@@ -180,7 +180,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF, State = S> + HasScheduler + ExecutionProcessor,
     {
         Self::with_timeout_generic(
             tuple_list!(),
@@ -208,7 +208,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF, State = S> + HasScheduler + ExecutionProcessor,
     {
         let inner = GenericInProcessExecutorInner::batched_timeout_generic::<Self, EM, OF, Z>(
             tuple_list!(),
@@ -243,11 +243,11 @@ where
         timeout: Duration,
     ) -> Result<Self, Error>
     where
-        Self: Executor<EM, Z, State = S> + HasObservers,
+        Self: Executor<EM, Z, State = S>,
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF, State = S> + HasScheduler + ExecutionProcessor,
     {
         let inner = GenericInProcessExecutorInner::with_timeout_generic::<Self, EM, OF, Z>(
             tuple_list!(),
@@ -284,11 +284,11 @@ where
         event_mgr: &mut EM,
     ) -> Result<Self, Error>
     where
-        Self: Executor<EM, Z, State = S> + HasObservers,
+        Self: Executor<EM, Z, State = S>,
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF, State = S> + HasScheduler + ExecutionProcessor,
     {
         Self::with_timeout_generic(
             user_hooks,
@@ -313,11 +313,11 @@ where
         exec_tmout: Duration,
     ) -> Result<Self, Error>
     where
-        Self: Executor<EM, Z, State = S> + HasObservers,
+        Self: Executor<EM, Z, State = S>,
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF, State = S> + HasScheduler + ExecutionProcessor,
     {
         let inner = GenericInProcessExecutorInner::batched_timeout_generic::<Self, EM, OF, Z>(
             user_hooks, observers, fuzzer, state, event_mgr, exec_tmout,
@@ -348,11 +348,11 @@ where
         timeout: Duration,
     ) -> Result<Self, Error>
     where
-        Self: Executor<EM, Z, State = S> + HasObservers,
+        Self: Executor<EM, Z, State = S>,
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF, State = S> + HasScheduler + ExecutionProcessor,
     {
         let inner = GenericInProcessExecutorInner::with_timeout_generic::<Self, EM, OF, Z>(
             user_hooks, observers, fuzzer, state, event_mgr, timeout,
@@ -431,58 +431,47 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
     state: &mut E::State,
     input: &<E::State as UsesInput>::Input,
     fuzzer: &mut Z,
-    event_mgr: &mut EM,
-    exitkind: ExitKind,
+    manager: &mut EM,
+    exit_kind: ExitKind,
 ) where
     E: HasObservers,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
     OF: Feedback<E::State>,
     E::State: HasExecutions + HasSolutions + HasCorpus,
-    Z: HasObjective<Objective = OF, State = E::State>,
+    Z: HasObjective<Objective = OF, State = E::State>
+        + HasScheduler<State = E::State>
+        + ExecutionProcessor,
 {
-    let mut observers = executor.observers_mut();
+    let observers = executor.observers_mut();
+    let scheduler = fuzzer.scheduler_mut();
 
-    observers
-        .post_exec_all(state, input, &exitkind)
-        .expect("Observers post_exec_all failed");
-
-    let interesting = fuzzer
-        .objective_mut()
-        .is_interesting(state, event_mgr, input, &*observers, &exitkind)
-        .expect("In run_observers_and_save_state objective failure.");
-
-    if interesting {
-        let executions = *state.executions();
-        let mut new_testcase = Testcase::with_executions(input.clone(), executions);
-        new_testcase.add_metadata(exitkind);
-        new_testcase.set_parent_id_optional(*state.corpus().current());
-
-        if let Ok(mut tc) = state.current_testcase_mut() {
-            tc.found_objective();
-        }
-
-        fuzzer
-            .objective_mut()
-            .append_metadata(state, event_mgr, &*observers, &mut new_testcase)
-            .expect("Failed adding metadata");
-        state
-            .solutions_mut()
-            .add(new_testcase)
-            .expect("In run_observers_and_save_state solutions failure.");
-        event_mgr
-            .fire(
-                state,
-                Event::Objective {
-                    objective_size: state.solutions().count(),
-                    executions,
-                    time: libafl_bolts::current_time(),
-                },
-            )
-            .expect("Could not save state in run_observers_and_save_state");
+    if scheduler.on_evaluation(state, input, &*observers).is_err() {
+        log::error!("Failed to call on_evaluation");
+        return;
     }
 
+    let res = fuzzer.check_results(state, manager, input, &*observers, &exit_kind);
+    if let Ok(exec_res) = res {
+        if fuzzer
+            .process_execution(state, manager, input, &exec_res, &*observers)
+            .is_err()
+        {
+            log::error!("Failed to call process_execution");
+            return;
+        }
+
+        if fuzzer
+            .dispatch_event(state, manager, input.clone(), &exec_res, None, &exit_kind)
+            .is_err()
+        {
+            log::error!("Failed to dispatch_event");
+            return;
+        }
+    } else {
+        log::error!("Faild to check execution result");
+    }
     // Serialize the state and wait safely for the broker to read pending messages
-    event_mgr.on_restart(state).unwrap();
+    manager.on_restart(state).unwrap();
 
     log::info!("Bye!");
 }
@@ -499,7 +488,9 @@ where
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
     OF: Feedback<E::State>,
     E::State: HasExecutions + HasSolutions + HasCorpus,
-    Z: HasObjective<Objective = OF, State = E::State>,
+    Z: HasObjective<Objective = OF, State = E::State>
+        + HasScheduler<State = E::State>
+        + ExecutionProcessor,
 {
     let data = addr_of_mut!(GLOBAL_STATE);
     let in_handler = (*data).set_in_handler(true);
@@ -556,7 +547,7 @@ mod tests {
         let mut mgr = NopEventManager::new();
         let mut state =
             StdState::new(rand, corpus, solutions, &mut feedback, &mut objective).unwrap();
-        let mut fuzzer = StdFuzzer::<_, _, _, ()>::new(sche, feedback, objective);
+        let mut fuzzer = StdFuzzer::<_, _, _>::new(sche, feedback, objective);
 
         let mut in_process_executor = InProcessExecutor::new(
             &mut harness,

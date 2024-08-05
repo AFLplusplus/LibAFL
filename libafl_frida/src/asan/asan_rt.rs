@@ -11,6 +11,7 @@ use core::{
     ptr::addr_of_mut,
 };
 use std::{
+    cell::Cell,
     ffi::{c_char, c_void},
     ptr::write_volatile,
     rc::Rc,
@@ -92,6 +93,10 @@ pub const ASAN_SAVE_REGISTER_NAMES: [&str; ASAN_SAVE_REGISTER_COUNT] = [
     "fault address",
     "actual rip",
 ];
+
+thread_local! {
+    static ASAN_IN_HOOK: Cell<bool> = const { Cell::new(false) };
+}
 
 /// The count of registers that need to be saved by the asan runtime
 #[cfg(target_arch = "aarch64")]
@@ -551,18 +556,13 @@ impl AsanRuntime {
                         //is this necessary? The stalked return address will always be the real return address
                      //   let real_address = this.real_address_for_stalked(invocation.return_addr());
                         let original = [<$lib_ident:snake:upper _ $name:snake:upper _PTR>].get().unwrap();
-                        if this.hooks_enabled {
-                            let previous_hook_state = this.hooks_enabled;
-                            this.hooks_enabled = false;
+                        if !ASAN_IN_HOOK.get() && this.hooks_enabled {
+                            ASAN_IN_HOOK.set(true);
                             let ret = this.[<hook_ $name>](*original, $($param),*);
-                            this.hooks_enabled = previous_hook_state;
+                            ASAN_IN_HOOK.set(false);
                             ret
                         } else {
-
-                            let previous_hook_state = this.hooks_enabled;
-                            this.hooks_enabled = false;
                             let ret = (original)($($param),*);
-                            this.hooks_enabled = previous_hook_state;
                             ret
                         }
                     }
@@ -599,17 +599,13 @@ impl AsanRuntime {
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
                         let original = [<$name:snake:upper _PTR>].get().unwrap();
 
-                        if this.hooks_enabled && this.[<hook_check_ $name>]($($param),*){
-                            let previous_hook_state = this.hooks_enabled;
-                            this.hooks_enabled = false;
+                        if !ASAN_IN_HOOK.get() && this.hooks_enabled && this.[<hook_check_ $name>]($($param),*){
+                            ASAN_IN_HOOK.set(true);
                             let ret = this.[<hook_ $name>](*original, $($param),*);
-                            this.hooks_enabled = previous_hook_state;
+                            ASAN_IN_HOOK.set(false);
                             ret
                         } else {
-                            let previous_hook_state = this.hooks_enabled;
-                            this.hooks_enabled = false;
                             let ret = (original)($($param),*);
-                            this.hooks_enabled = previous_hook_state;
                             ret
                         }
 
@@ -642,17 +638,13 @@ impl AsanRuntime {
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
                         let original = [<$lib_ident:snake:upper _ $name:snake:upper _PTR>].get().unwrap();
 
-                        if this.hooks_enabled && this.[<hook_check_ $name>]($($param),*){
-                            let previous_hook_state = this.hooks_enabled;
-                            this.hooks_enabled = false;
+                        if !ASAN_IN_HOOK.get() && this.hooks_enabled && this.[<hook_check_ $name>]($($param),*){
+                            ASAN_IN_HOOK.set(true);
                             let ret = this.[<hook_ $name>](*original, $($param),*);
-                            this.hooks_enabled = previous_hook_state;
+                            ASAN_IN_HOOK.set(false);
                             ret
                         } else {
-                            let previous_hook_state = this.hooks_enabled;
-                            this.hooks_enabled = false;
                             let ret = (original)($($param),*);
-                            this.hooks_enabled = previous_hook_state;
                             ret
                         }
 

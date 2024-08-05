@@ -131,6 +131,8 @@ pub mod serdeany;
 pub mod shmem;
 #[cfg(feature = "std")]
 pub mod staterestore;
+#[cfg(feature = "alloc")]
+pub mod subrange;
 // TODO: reenable once ahash works in no-alloc
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
 pub mod tuples;
@@ -309,7 +311,7 @@ pub enum Error {
     Unsupported(String, ErrorBacktrace),
     /// Shutting down, not really an error.
     ShuttingDown,
-    /// OS error, wrapping a [`std::io::Error`]
+    /// OS error, wrapping a [`io::Error`]
     #[cfg(feature = "std")]
     OsError(io::Error, String, ErrorBacktrace),
     /// Something else happened
@@ -411,7 +413,7 @@ impl Error {
     {
         Error::OsError(err, msg.into(), ErrorBacktrace::new())
     }
-    /// OS error from [`std::io::Error::last_os_error`] with additional message
+    /// OS error from [`io::Error::last_os_error`] with additional message
     #[cfg(feature = "std")]
     #[must_use]
     pub fn last_os_error<S>(msg: S) -> Self
@@ -623,7 +625,7 @@ impl From<pyo3::PyErr> for Error {
         pyo3::Python::with_gil(|py| {
             if err.matches(
                 py,
-                pyo3::types::PyType::new::<pyo3::exceptions::PyKeyboardInterrupt>(py),
+                pyo3::types::PyType::new_bound::<pyo3::exceptions::PyKeyboardInterrupt>(py),
             ) {
                 Self::shutting_down()
             } else {
@@ -1056,7 +1058,7 @@ pub unsafe fn set_error_print_panic_hook(new_stderr: RawFd) {
 #[allow(missing_docs)]
 pub mod pybind {
 
-    use pyo3::{pymodule, types::PyModule, PyResult, Python};
+    use pyo3::{pymodule, types::PyModule, Bound, PyResult};
 
     #[macro_export]
     macro_rules! unwrap_me_body {
@@ -1188,8 +1190,8 @@ pub mod pybind {
     #[pymodule]
     #[pyo3(name = "libafl_bolts")]
     /// Register the classes to the python module
-    pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
-        crate::rands::pybind::register(py, m)?;
+    pub fn python_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
+        crate::rands::pybind::register(m)?;
         Ok(())
     }
 }

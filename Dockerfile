@@ -131,8 +131,9 @@ COPY libafl_concolic/symcc_runtime libafl_concolic/symcc_runtime
 COPY libafl_concolic/test libafl_concolic/test
 COPY libafl_nyx/src libafl_nyx/src
 RUN touch libafl_nyx/src/lib.rs
+COPY libafl_libfuzzer_runtime libafl_libfuzzer_runtime
 COPY libafl_libfuzzer/src libafl_libfuzzer/src
-COPY libafl_libfuzzer/libafl_libfuzzer_runtime libafl_libfuzzer/libafl_libfuzzer_runtime
+COPY libafl_libfuzzer/runtime libafl_libfuzzer/runtime
 COPY libafl_libfuzzer/build.rs libafl_libfuzzer/build.rs
 RUN touch libafl_libfuzzer/src/lib.rs
 RUN cargo build && cargo build --release

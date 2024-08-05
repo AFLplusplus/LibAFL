@@ -248,7 +248,7 @@ LIBAFL_DEFINE_FUNCTIONS(backdoor, LIBAFL_BACKDOOR_OPCODE)
   _libafl_sync_exit_call2(LIBAFL_QEMU_COMMAND_INPUT_VIRT, buf_vaddr, max_len)
 
 #define LIBAFL_QEMU_INPUT_PHYS(buf_paddr, max_len) \
-  _libafl_exit_call2(LIBAFL_QEMU_COMMAND_INPUT_PHYS, buf_paddr, max_len)
+  _libafl_sync_exit_call2(LIBAFL_QEMU_COMMAND_INPUT_PHYS, buf_paddr, max_len)
 
 #define LIBAFL_QEMU_END(status) _libafl_sync_exit_call1(LIBAFL_QEMU_COMMAND_END, status)
 
