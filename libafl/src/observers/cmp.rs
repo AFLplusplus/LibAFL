@@ -226,17 +226,17 @@ pub trait CmpMap: Debug {
 
 /// A [`CmpObserver`] observes the traced comparisons during the current execution using a [`CmpMap`]
 pub trait CmpObserver {
-    type CM;
+    type Map;
     type Metadata;
 
     /// Get the number of usable cmps (all by default)
     fn usable_count(&self) -> usize;
 
     /// Get the `CmpMap`
-    fn cmp_map(&self) -> &Self::CM;
+    fn cmp_map(&self) -> &Self::Map;
 
     /// Get the `CmpMap` (mutable)
-    fn cmp_map_mut(&mut self) -> &mut Self::CM;
+    fn cmp_map_mut(&mut self) -> &mut Self::Map;
 }
 
 /// A standard [`CmpObserver`] observer
@@ -259,7 +259,7 @@ where
     CM: Serialize + CmpMap,
     M: CmpObserverMetadata<'a, CM>,
 {
-    type CM = CM;
+    type Map = CM;
     type Metadata = M;
 
     /// Get the number of usable cmps (all by default)
@@ -270,11 +270,11 @@ where
         }
     }
 
-    fn cmp_map(&self) -> &CM {
+    fn cmp_map(&self) -> &Self::Map {
         self.cmp_map.as_ref()
     }
 
-    fn cmp_map_mut(&mut self) -> &mut CM {
+    fn cmp_map_mut(&mut self) -> &mut Self::Map {
         self.cmp_map.as_mut()
     }
 }

@@ -78,7 +78,7 @@ impl<'a, S> CmpObserver for AFLppCmpLogObserver<'a, S>
 where
     S: UsesInput + HasMetadata,
 {
-    type CM = AFLppCmpLogMap;
+    type Map = AFLppCmpLogMap;
     type Metadata = AFLppCmpValuesMetadata;
 
     /// Get the number of usable cmps (all by default)
