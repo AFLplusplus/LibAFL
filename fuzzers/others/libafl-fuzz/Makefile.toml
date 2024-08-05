@@ -81,7 +81,7 @@ cargo build --profile ${PROFILE}
 # cmplog TODO: AFL_BENCH_UNTIL_CRASH=1 instead of timeout 15s
 AFL_LLVM_CMPLOG=1 AFL_PATH=${AFL_DIR_NAME} ${AFL_CC_PATH} ./test/test-cmplog.c -o ./test/out-cmplog
 AFL_CORES=1 timeout 5 ${FUZZER} -Z -l 3 -m 0 -V30 -i ./test/seeds_cmplog -o ./test/output-cmplog -c 0 ./test/out-cmplog || true
-test -n "$( find "./test/output-cmplog/fuzzer_main/crashes/" -maxdepth 1 -type f) 2>/dev/null )" || {
+test -n "$( ls -A ./test/output-cmplog/fuzzer_main/crashes/)" || {
 	echo "No crashes found"
 	exit 1
 }
