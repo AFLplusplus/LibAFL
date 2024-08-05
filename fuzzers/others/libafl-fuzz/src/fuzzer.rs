@@ -46,6 +46,7 @@ use crate::{
     afl_stats::{AflStatsStage, CalibrationTime, FuzzTime, SyncTime},
     corpus::{set_corpus_filepath, set_solution_filepath},
     env_parser::AFL_DEFAULT_MAP_SIZE,
+    executor::find_afl_binary,
     feedback::{
         filepath::CustomFilepathToTestcaseFeedback, persistent_record::PersitentRecordFeedback,
         seed::SeedFeedback,
@@ -209,6 +210,29 @@ where
     // Create our Fuzzer
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
+    // Set LD_PRELOAD (Linux) && DYLD_INSERT_LIBRARIES (OSX) for target.
+    if let Some(preload_env) = &opt.afl_preload {
+        std::env::set_var("LD_PRELOAD", preload_env);
+        std::env::set_var("DYLD_INSERT_LIBRARIES", preload_env);
+    }
+
+    // Insert appropriate shared libraries if frida_mode
+    if opt.frida_mode {
+        if opt.frida_asan {
+            std::env::set_var("ASAN_OPTIONS", "detect_leaks=false");
+        }
+        let frida_bin = find_afl_binary("afl-frida-trace.so", Some(opt.executable.clone()))?
+            .display()
+            .to_string();
+        let preload = if let Some(preload_env) = &opt.afl_preload {
+            format!("{preload_env}:{frida_bin}")
+        } else {
+            frida_bin
+        };
+        std::env::set_var("LD_PRELOAD", &preload);
+        std::env::set_var("DYLD_INSERT_LIBRARIES", &preload);
+    }
+
     // Create the base Executor
     let mut executor = base_executor(opt, &mut shmem_provider);
     // Set a custom exit code to be interpreted as a Crash if configured.
@@ -278,12 +302,6 @@ where
 
     // Tell [`SeedFeedback`] that we're done loading seeds; rendering it benign.
     fuzzer.feedback_mut().done_loading_seeds();
-
-    // Set LD_PRELOAD (Linux) && DYLD_INSERT_LIBRARIES (OSX) for target.
-    if let Some(preload_env) = &opt.afl_preload {
-        std::env::set_var("LD_PRELOAD", preload_env);
-        std::env::set_var("DYLD_INSERT_LIBRARIES", preload_env);
-    }
 
     // Create a Sync stage to sync from foreign fuzzers
     let sync_stage = IfStage::new(
@@ -395,7 +413,6 @@ fn base_executor<'a>(
 ) -> ForkserverExecutorBuilder<'a, StdShMemProvider> {
     let mut executor = ForkserverExecutor::builder()
         .program(opt.executable.clone())
-        .shmem_provider(shmem_provider)
         .coverage_map_size(opt.map_size.unwrap_or(AFL_DEFAULT_MAP_SIZE))
         .debug_child(opt.debug_child)
         .is_persistent(opt.is_persistent)
@@ -408,6 +425,9 @@ fn base_executor<'a>(
     }
     if let Some(kill_signal) = opt.kill_signal {
         executor = executor.kill_signal(kill_signal);
+    }
+    if opt.is_persistent {
+        executor = executor.shmem_provider(shmem_provider);
     }
     if let Some(harness_input_type) = &opt.harness_input_type {
         executor = executor.parse_afl_cmdline([harness_input_type]);
