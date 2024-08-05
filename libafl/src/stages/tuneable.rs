@@ -156,7 +156,7 @@ pub struct TuneableMutationalStage<M> {
 }
 
 impl<M> MutationalStage for TuneableMutationalStage<M> {
-    type M = M;
+    type Mutator = M;
 
     /// The mutator, added to this stage
     #[inline]

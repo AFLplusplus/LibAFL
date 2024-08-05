@@ -41,7 +41,7 @@ pub mod with_observers;
 // pub mod hooks;
 
 /// How an execution finished.
-#[derive(Debug, Copy, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[allow(clippy::unsafe_derive_deserialize)] // for SerdeAny
 pub enum ExitKind {
     /// The run exited normally.

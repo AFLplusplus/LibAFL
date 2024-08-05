@@ -38,7 +38,7 @@ impl<F, M> Named for PowerMutationalStage<F, M> {
 }
 
 impl<F, M> MutationalStage for PowerMutationalStage<F, M> {
-    type M = M;
+    type Mutator = M;
 
     /// The mutator, added to this stage
     #[inline]

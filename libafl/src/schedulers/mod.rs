@@ -15,7 +15,9 @@ use crate::{
     Error, HasMetadata,
 };
 
-// pub mod accounting;
+pub mod accounting;
+pub use accounting::*;
+
 pub mod minimizer;
 pub use minimizer::*;
 
