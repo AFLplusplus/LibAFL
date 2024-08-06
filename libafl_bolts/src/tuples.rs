@@ -460,7 +460,7 @@ where
     fn names(&self) -> Vec<Cow<'static, str>> {
         let first = self.0.name().to_owned();
         let mut last = self.1.names();
-        last.push(first);
+        last.insert(0, first);
         last
     }
 }

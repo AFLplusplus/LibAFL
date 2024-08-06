@@ -89,6 +89,7 @@ macro_rules! random_corpus_id_with_disabled {
 
 /// Corpus with all current [`Testcase`]s, or solutions
 pub trait Corpus: Sized {
+    /// The type of input contained in this corpus
     type Input;
 
     /// Returns the number of all enabled entries
