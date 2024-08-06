@@ -74,11 +74,13 @@ pub struct AFLppCmpLogObserver<'a, S> {
     phantom: PhantomData<S>,
 }
 
-impl<'a, S> CmpObserver<'a, AFLppCmpLogMap, S, AFLppCmpValuesMetadata>
-    for AFLppCmpLogObserver<'a, S>
+impl<'a, S> CmpObserver for AFLppCmpLogObserver<'a, S>
 where
     S: UsesInput + HasMetadata,
 {
+    type Map = AFLppCmpLogMap;
+    type Metadata = AFLppCmpValuesMetadata;
+
     /// Get the number of usable cmps (all by default)
     fn usable_count(&self) -> usize {
         match &self.size {
@@ -93,47 +95,6 @@ where
 
     fn cmp_map_mut(&mut self) -> &mut AFLppCmpLogMap {
         self.cmp_map.as_mut()
-    }
-
-    fn cmp_observer_data(
-        &self,
-    ) -> <AFLppCmpValuesMetadata as CmpObserverMetadata<'a, AFLppCmpLogMap>>::Data {
-        self.original
-    }
-
-    /// Add `AFLppCmpValuesMetadata` to the State including the logged values.
-    /// This routine does a basic loop filtering because loop index cmps are not interesting.
-    fn add_cmpvalues_meta(&mut self, state: &mut S)
-    where
-        S: HasMetadata,
-    {
-        #[allow(clippy::option_if_let_else)] // we can't mutate state in a closure
-        let meta = if let Some(meta) = state.metadata_map_mut().get_mut::<AFLppCmpValuesMetadata>()
-        {
-            meta
-        } else {
-            state.add_metadata(AFLppCmpValuesMetadata::new());
-            state
-                .metadata_map_mut()
-                .get_mut::<AFLppCmpValuesMetadata>()
-                .unwrap()
-        };
-
-        if self.original {
-            // If this observer is for original input, then we have run the un-mutated input
-            // Clear orig_cmpvals
-            meta.orig_cmpvals.clear();
-            // Clear headers
-            meta.headers.clear();
-        } else {
-            // If this observer is for the mutated input
-            meta.new_cmpvals.clear();
-        }
-
-        let usable_count = self.usable_count();
-        let cmp_observer_data = self.cmp_observer_data();
-
-        meta.add_from(usable_count, self.cmp_map_mut(), cmp_observer_data);
     }
 }
 
@@ -167,8 +128,34 @@ where
             CMPLOG_ENABLED = 0;
         }
         if self.add_meta {
-            self.add_cmpvalues_meta(state);
+            #[allow(clippy::option_if_let_else)] // we can't mutate state in a closure
+            let meta =
+                if let Some(meta) = state.metadata_map_mut().get_mut::<AFLppCmpValuesMetadata>() {
+                    meta
+                } else {
+                    state.add_metadata(AFLppCmpValuesMetadata::new());
+                    state
+                        .metadata_map_mut()
+                        .get_mut::<AFLppCmpValuesMetadata>()
+                        .unwrap()
+                };
+
+            if self.original {
+                // If this observer is for original input, then we have run the un-mutated input
+                // Clear orig_cmpvals
+                meta.orig_cmpvals.clear();
+                // Clear headers
+                meta.headers.clear();
+            } else {
+                // If this observer is for the mutated input
+                meta.new_cmpvals.clear();
+            }
+
+            let usable_count = self.usable_count();
+
+            meta.add_from(usable_count, self.cmp_map_mut());
         }
+
         Ok(())
     }
 }
@@ -228,17 +215,12 @@ impl<'a> CmpObserverMetadata<'a, AFLppCmpLogMap> for AFLppCmpValuesMetadata {
         Self::new()
     }
 
-    fn add_from(
-        &mut self,
-        usable_count: usize,
-        cmp_map: &mut AFLppCmpLogMap,
-        cmp_observer_data: Self::Data,
-    ) {
+    fn add_from(&mut self, usable_count: usize, cmp_map: &mut AFLppCmpLogMap) {
         let count = usable_count;
         for i in 0..count {
             let execs = cmp_map.usable_executions_for(i);
             if execs > 0 {
-                if cmp_observer_data {
+                if self.original {
                     // Update header
                     self.headers.push((i, cmp_map.headers[i]));
                 }
@@ -285,7 +267,7 @@ impl<'a> CmpObserverMetadata<'a, AFLppCmpLogMap> for AFLppCmpValuesMetadata {
 
                 let cmpmap_idx = i;
                 let mut cmp_values = Vec::new();
-                if cmp_observer_data {
+                if self.original {
                     // push into orig_cmpvals
                     // println!("Adding to orig_cmpvals");
                     for j in 0..execs {

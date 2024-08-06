@@ -158,7 +158,7 @@ where
     )]
     pub fn create_alias_table<S>(&self, state: &mut S) -> Result<(), Error>
     where
-        F: TestcaseScore<<S::Corpus as Corpus>::Input, S>,
+        F: TestcaseScore<S>,
         S: HasCorpus + HasMetadata,
     {
         let n = state.corpus().count();
@@ -305,7 +305,7 @@ impl<C, F, O> HasQueueCycles for WeightedScheduler<C, F, O> {
 impl<C, F, O, OT, S> Scheduler<<S::Corpus as Corpus>::Input, OT, S> for WeightedScheduler<C, F, O>
 where
     C: AsRef<O> + Named,
-    F: TestcaseScore<<S::Corpus as Corpus>::Input, S>,
+    F: TestcaseScore<S>,
     O: MapObserver,
     OT: MatchName,
     S: HasCorpus + HasMetadata + HasRand + HasTestcase,

@@ -1,7 +1,7 @@
 //! The [`DumpToDiskStage`] is a stage that dumps the corpus and the solutions to disk to e.g. allow AFL to sync
 
 use alloc::{string::String, vec::Vec};
-use core::{clone::Clone, marker::PhantomData};
+use core::clone::Clone;
 use std::{fs, fs::File, io::Write, path::PathBuf};
 
 use libafl_bolts::impl_serdeany;
@@ -26,34 +26,24 @@ impl_serdeany!(DumpToDiskMetadata);
 
 /// The [`DumpToDiskStage`] is a stage that dumps the corpus and the solutions to disk
 #[derive(Debug)]
-pub struct DumpToDiskStage<CB, EM, Z> {
+pub struct DumpToDiskStage<CB> {
     solutions_dir: PathBuf,
     corpus_dir: PathBuf,
     to_bytes: CB,
-    phantom: PhantomData<(EM, Z)>,
 }
 
-impl<CB, EM, Z> UsesState for DumpToDiskStage<CB, EM, Z>
+impl<CB, E, EM, S, Z> Stage<E, EM, S, Z> for DumpToDiskStage<CB>
 where
-    EM: UsesState,
-{
-    type State = EM::State;
-}
-
-impl<CB, E, EM, Z> Stage<E, EM, Z> for DumpToDiskStage<CB, EM, Z>
-where
-    CB: FnMut(&<Self::State as UsesInput>::Input, &Self::State) -> Vec<u8>,
-    EM: UsesState,
-    E: UsesState<State = Self::State>,
-    Z: UsesState<State = Self::State>,
-    Self::State: HasCorpus + HasSolutions + HasRand + HasMetadata,
+    CB: FnMut(&<S::Corpus as Corpus>::Input, &S) -> Vec<u8>,
+    S: HasCorpus + HasSolutions + HasRand + HasMetadata,
+    S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
 {
     #[inline]
     fn perform(
         &mut self,
         _fuzzer: &mut Z,
         _executor: &mut E,
-        state: &mut Self::State,
+        state: &mut S,
         _manager: &mut EM,
     ) -> Result<(), Error> {
         let (mut corpus_id, mut solutions_id) =
@@ -111,24 +101,19 @@ where
     }
 
     #[inline]
-    fn should_restart(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
         // Not executing the target, so restart safety is not needed
         Ok(true)
     }
 
     #[inline]
-    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, _state: &mut S) -> Result<(), Error> {
         // Not executing the target, so restart safety is not needed
         Ok(())
     }
 }
 
-impl<CB, EM, Z> DumpToDiskStage<CB, EM, Z>
-where
-    EM: UsesState,
-    Z: UsesState,
-    <Self as UsesState>::State: HasCorpus + HasSolutions + HasRand + HasMetadata,
-{
+impl<CB> DumpToDiskStage<CB> {
     /// Create a new [`DumpToDiskStage`]
     pub fn new<A, B>(to_bytes: CB, corpus_dir: A, solutions_dir: B) -> Result<Self, Error>
     where
@@ -157,7 +142,6 @@ where
             to_bytes,
             solutions_dir,
             corpus_dir,
-            phantom: PhantomData,
         })
     }
 }

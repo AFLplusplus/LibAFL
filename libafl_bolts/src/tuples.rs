@@ -13,6 +13,7 @@ use core::{
     ops::{Index, IndexMut},
     ptr::{addr_of, addr_of_mut},
 };
+use std::borrow::ToOwned;
 
 #[cfg(feature = "alloc")]
 use serde::{Deserialize, Serialize};
@@ -415,14 +416,21 @@ where
 #[cfg(feature = "alloc")]
 /// A named tuple
 pub trait NamedTuple: HasConstLen {
-    /// Gets the name of this tuple
+    /// Gets the name at index
     fn name(&self, index: usize) -> Option<&Cow<'static, str>>;
+
+    /// Gets all the names
+    fn names(&self) -> Vec<Cow<'static, str>>;
 }
 
 #[cfg(feature = "alloc")]
 impl NamedTuple for () {
     fn name(&self, _index: usize) -> Option<&Cow<'static, str>> {
         None
+    }
+
+    fn names(&self) -> Vec<Cow<'static, str>> {
+        Vec::new()
     }
 }
 
@@ -447,6 +455,13 @@ where
         } else {
             self.1.name(index - 1)
         }
+    }
+
+    fn names(&self) -> Vec<Cow<'static, str>> {
+        let first = self.0.name().to_owned();
+        let mut last = self.1.names();
+        last.insert(0, first);
+        last
     }
 }
 

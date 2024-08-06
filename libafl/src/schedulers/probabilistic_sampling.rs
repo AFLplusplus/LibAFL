@@ -61,7 +61,7 @@ impl<F> ProbabilitySamplingScheduler<F> {
     #[allow(clippy::unused_self)]
     pub fn store_probability<S>(&self, state: &mut S, id: CorpusId) -> Result<(), Error>
     where
-        F: TestcaseScore<<S::Corpus as Corpus>::Input, S>,
+        F: TestcaseScore<S>,
         S: HasCorpus + HasMetadata + HasRand,
     {
         let prob = F::compute(state, &mut *state.corpus().get(id)?.borrow_mut())?;
@@ -81,7 +81,7 @@ impl<F> ProbabilitySamplingScheduler<F> {
 
 impl<F, S> RemovableScheduler<<S::Corpus as Corpus>::Input, S> for ProbabilitySamplingScheduler<F>
 where
-    F: TestcaseScore<<S::Corpus as Corpus>::Input, S>,
+    F: TestcaseScore<S>,
     S: HasCorpus + HasMetadata + HasRand,
 {
     fn on_remove(
@@ -120,7 +120,7 @@ where
 
 impl<F, OT, S> Scheduler<<S::Corpus as Corpus>::Input, OT, S> for ProbabilitySamplingScheduler<F>
 where
-    F: TestcaseScore<<S::Corpus as Corpus>::Input, S>,
+    F: TestcaseScore<S>,
     S: HasCorpus + HasMetadata + HasRand + HasTestcase,
 {
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
@@ -197,8 +197,14 @@ mod tests {
     #[derive(Debug, Clone)]
     pub struct UniformDistribution;
 
-    impl<I, S> TestcaseScore<I, S> for UniformDistribution {
-        fn compute(_state: &S, _: &mut Testcase<S::Input>) -> Result<f64, Error> {
+    impl<S> TestcaseScore<S> for UniformDistribution
+    where
+        S: HasCorpus,
+    {
+        fn compute(
+            _state: &S,
+            _: &mut Testcase<<S::Corpus as Corpus>::Input>,
+        ) -> Result<f64, Error> {
             Ok(FACTOR)
         }
     }

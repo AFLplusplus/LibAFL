@@ -75,7 +75,7 @@ impl<CS, F, M, O, S> RemovableScheduler<<S::Corpus as Corpus>::Input, S>
     for MinimizerScheduler<CS, F, M, O>
 where
     CS: RemovableScheduler<<S::Corpus as Corpus>::Input, S>,
-    F: TestcaseScore<<S::Corpus as Corpus>::Input, S>,
+    F: TestcaseScore<S>,
     M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
     S: HasCorpus + HasMetadata + HasRand,
 {
@@ -183,7 +183,7 @@ impl<CS, F, M, O, OT, S> Scheduler<<S::Corpus as Corpus>::Input, OT, S>
     for MinimizerScheduler<CS, F, M, O>
 where
     CS: Scheduler<<S::Corpus as Corpus>::Input, OT, S>,
-    F: TestcaseScore<<S::Corpus as Corpus>::Input, S>,
+    F: TestcaseScore<S>,
     M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
     S: HasCorpus + HasMetadata + HasRand,
 {
@@ -241,7 +241,7 @@ where
     #[allow(clippy::cast_possible_wrap)]
     pub fn update_score<S>(&self, state: &mut S, id: CorpusId) -> Result<(), Error>
     where
-        F: TestcaseScore<<S::Corpus as Corpus>::Input, S>,
+        F: TestcaseScore<S>,
         S: HasCorpus + HasMetadata,
     {
         // Create a new top rated meta if not existing

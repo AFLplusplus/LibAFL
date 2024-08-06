@@ -23,8 +23,8 @@ use crate::{
 };
 
 /// The [`AflStatsStage`] is a simple stage that computes and reports some stats.
-#[derive(Debug, Clone)]
-pub struct AflStatsStage<E, EM, Z> {
+#[derive(Debug, Clone, Default)]
+pub struct AflStatsStage {
     // the number of testcases that have been fuzzed
     has_fuzzed_size: usize,
     // the number of "favored" testcases
@@ -37,29 +37,18 @@ pub struct AflStatsStage<E, EM, Z> {
     last_report_time: Duration,
     // the interval that we report all stats
     stats_report_interval: Duration,
-
-    phantom: PhantomData<(E, EM, Z)>,
 }
 
-impl<E, EM, Z> UsesState for AflStatsStage<E, EM, Z>
+impl<E, EM, S, Z> Stage<E, EM, S, Z> for AflStatsStage
 where
-    E: UsesState,
-{
-    type State = E::State;
-}
-
-impl<E, EM, Z> Stage<E, EM, Z> for AflStatsStage<E, EM, Z>
-where
-    E: UsesState,
-    EM: EventFirer<State = Self::State>,
-    Z: UsesState<State = Self::State>,
-    Self::State: HasImported + HasCorpus + HasMetadata,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
+    S: HasImported + HasCorpus + HasMetadata + HasCurrentCorpusId,
 {
     fn perform(
         &mut self,
         _fuzzer: &mut Z,
         _executor: &mut E,
-        state: &mut Self::State,
+        state: &mut S,
         _manager: &mut EM,
     ) -> Result<(), Error> {
         let Some(corpus_id) = state.current_corpus_id()? else {
@@ -126,41 +115,25 @@ where
     }
 
     #[inline]
-    fn should_restart(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
         // Not running the target so we wont't crash/timeout and, hence, don't need to restore anything
         Ok(true)
     }
 
     #[inline]
-    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, _state: &mut S) -> Result<(), Error> {
         // Not running the target so we wont't crash/timeout and, hence, don't need to restore anything
         Ok(())
     }
 }
 
-impl<E, EM, Z> AflStatsStage<E, EM, Z> {
+impl AflStatsStage {
     /// create a new instance of the [`AflStatsStage`]
     #[must_use]
     pub fn new(interval: Duration) -> Self {
         Self {
             stats_report_interval: interval,
             ..Default::default()
-        }
-    }
-}
-
-impl<E, EM, Z> Default for AflStatsStage<E, EM, Z> {
-    /// the default instance of the [`AflStatsStage`]
-    #[must_use]
-    fn default() -> Self {
-        Self {
-            has_fuzzed_size: 0,
-            is_favored_size: 0,
-            own_finds_size: 0,
-            imported_size: 0,
-            last_report_time: current_time(),
-            stats_report_interval: Duration::from_secs(15),
-            phantom: PhantomData,
         }
     }
 }
