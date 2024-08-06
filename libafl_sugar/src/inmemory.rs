@@ -5,7 +5,7 @@ use core::fmt::{self, Debug, Formatter};
 use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
 
 use libafl::{
-    corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
+    corpus::{CachedOnDiskCorpus, Corpus, HasCorpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig, EventRestarter, LlmpRestartingEventManager},
     executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
     feedback_or, feedback_or_fast,
@@ -21,7 +21,7 @@ use libafl::{
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
-    state::{HasCorpus, StdState},
+    state::StdState,
     Error, HasMetadata,
 };
 use libafl_bolts::{

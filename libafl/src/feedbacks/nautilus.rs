@@ -1,6 +1,6 @@
 //! Nautilus grammar mutator, see <https://github.com/nautilus-fuzz/nautilus>
 use alloc::{borrow::Cow, string::String};
-use core::{fmt::Debug, marker::PhantomData};
+use core::fmt::Debug;
 use std::fs::create_dir_all;
 
 use libafl_bolts::Named;
@@ -8,14 +8,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     common::nautilus::grammartec::{chunkstore::ChunkStore, context::Context},
-    corpus::{Corpus, Testcase},
-    events::EventFirer,
-    executors::ExitKind,
-    feedbacks::Feedback,
+    corpus::Testcase,
+    feedbacks::{Feedback, StateInitializer},
     generators::NautilusContext,
     inputs::NautilusInput,
-    observers::ObserversTuple,
-    state::{HasCorpus, State},
     Error, HasMetadata,
 };
 
@@ -51,80 +47,62 @@ impl NautilusChunksMetadata {
 }
 
 /// A nautilus feedback for grammar fuzzing
-pub struct NautilusFeedback<'a, S> {
+pub struct NautilusFeedback<'a> {
     ctx: &'a Context,
-    phantom: PhantomData<S>,
 }
 
-impl<S> Debug for NautilusFeedback<'_, S> {
+impl Debug for NautilusFeedback<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "NautilusFeedback {{}}")
+        f.debug_struct("NautilusFeedback").finish_non_exhaustive()
     }
 }
 
-impl<'a, S> NautilusFeedback<'a, S> {
+impl<'a> NautilusFeedback<'a> {
     /// Create a new [`NautilusFeedback`]
     #[must_use]
     pub fn new(context: &'a NautilusContext) -> Self {
-        Self {
-            ctx: &context.ctx,
-            phantom: PhantomData,
-        }
+        Self { ctx: &context.ctx }
     }
 }
 
-impl<'a, S> Named for NautilusFeedback<'a, S> {
+impl<'a> Named for NautilusFeedback<'a> {
     fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("NautilusFeedback");
         &NAME
     }
 }
 
-impl<'a, S> Feedback<S> for NautilusFeedback<'a, S>
+impl<S> StateInitializer<S> for NautilusFeedback<'_> where S: HasMetadata {}
+
+impl<'a, EM, OT, S> Feedback<EM, NautilusInput, OT, S> for NautilusFeedback<'a>
 where
-    S: HasMetadata + HasCorpus<Input = NautilusInput> + State<Input = NautilusInput>,
+    S: HasMetadata,
 {
-    #[allow(clippy::wrong_self_convention)]
-    fn is_interesting<EM, OT>(
-        &mut self,
-        _state: &mut S,
-        _manager: &mut EM,
-        _input: &NautilusInput,
-        _observers: &OT,
-        _exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
-    {
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Result<bool, Error> {
         Ok(false)
     }
 
-    fn append_metadata<EM, OT>(
+    fn append_metadata(
         &mut self,
         state: &mut S,
         _manager: &mut EM,
         _observers: &OT,
-        testcase: &mut Testcase<S::Input>,
-    ) -> Result<(), Error>
-    where
-        OT: ObserversTuple<S>,
-    {
-        state.corpus().load_input_into(testcase)?;
-        let input = testcase.input().as_ref().unwrap().clone();
+        testcase: &mut Testcase<NautilusInput>,
+    ) -> Result<(), Error> {
+        // TODO is it necessary to clone the whole input here? Maybe we should improve add_tree
+        let input = testcase
+            .input()
+            .as_ref()
+            .ok_or_else(|| {
+                Error::illegal_state("Testcase presumed to be filled when calling append_metadata")
+            })?
+            .clone();
         let meta = state
             .metadata_map_mut()
             .get_mut::<NautilusChunksMetadata>()
             .expect("NautilusChunksMetadata not in the state");
         meta.cks.add_tree(input.tree, self.ctx);
         Ok(())
-    }
-
-    fn discard_metadata(&mut self, _state: &mut S, _input: &NautilusInput) -> Result<(), Error> {
-        Ok(())
-    }
-    #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Result<bool, Error> {
-        Ok(false)
     }
 }

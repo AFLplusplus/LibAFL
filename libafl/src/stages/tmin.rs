@@ -16,28 +16,26 @@ use serde::Serialize;
 #[cfg(feature = "track_hit_feedbacks")]
 use crate::feedbacks::premature_last_result_err;
 use crate::{
-    corpus::{Corpus, HasCurrentCorpusId, Testcase},
+    corpus::{Corpus, HasCorpus, HasCurrentCorpusId, Testcase},
     events::EventFirer,
     executors::{ExitKind, HasObservers},
     feedbacks::{Feedback, FeedbackFactory, HasObserverHandle},
-    inputs::UsesInput,
     mark_feature_time,
     mutators::{MutationResult, Mutator},
-    observers::{MapObserver, ObserversTuple, UsesObservers},
+    observers::{MapObserver, ObserversTuple},
     schedulers::RemovableScheduler,
     stages::{
         mutational::{MutatedTransform, MutatedTransformPost},
         ExecutionCountRestartHelper, Stage,
     },
     start_timer,
-    state::{
-        HasCorpus, HasCurrentTestcase, HasExecutions, HasMaxSize, HasSolutions, State, UsesState,
-    },
+    state::{HasCurrentTestcase, HasExecutions, HasMaxSize, HasSolutions, State},
     Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasMetadata, HasNamedMetadata,
     HasScheduler,
 };
 #[cfg(feature = "introspection")]
 use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
+
 /// Mutational stage which minimizes corpus entries.
 ///
 /// You must provide at least one mutator that actually reduces size.

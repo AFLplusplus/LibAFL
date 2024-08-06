@@ -28,20 +28,18 @@ use crate::executors::hooks::unix::unix_signal_handler;
 #[cfg(windows)]
 use crate::state::State;
 use crate::{
+    corpus::HasCorpus,
     events::{EventFirer, EventRestarter},
-    executors::{hooks::ExecutorHook, inprocess::HasInProcessHooks, Executor, HasObservers},
+    executors::{hooks::ExecutorHook, Executor, HasObservers},
     feedbacks::Feedback,
     fuzzer::{ExecutionProcessor, HasScheduler},
-    inputs::UsesInput,
-    state::{HasCorpus, HasExecutions, HasSolutions},
+    state::{HasExecutions, HasSolutions},
     Error, HasObjective,
 };
+
 /// The inmem executor's handlers.
 #[allow(missing_debug_implementations)]
-pub struct InProcessHooks<S>
-where
-    S: UsesInput,
-{
+pub struct InProcessHooks<E> {
     /// On crash C function pointer
     #[cfg(feature = "std")]
     pub crash_handler: *const c_void,
@@ -51,7 +49,7 @@ where
     /// `TImer` struct
     #[cfg(feature = "std")]
     pub timer: TimerStruct,
-    phantom: PhantomData<S>,
+    phantom: PhantomData<E>,
 }
 
 /// Any hooks that is about timeout
@@ -87,10 +85,7 @@ pub trait HasTimeout {
     fn handle_timeout(&mut self, data: &mut InProcessExecutorHandlerData) -> bool;
 }
 
-impl<S> HasTimeout for InProcessHooks<S>
-where
-    S: UsesInput,
-{
+impl<E> HasTimeout for InProcessHooks<E> {
     #[cfg(feature = "std")]
     fn timer(&self) -> &TimerStruct {
         &self.timer
@@ -194,11 +189,12 @@ where
     }
 }
 
-impl<S> ExecutorHook<S> for InProcessHooks<S>
+impl<E, EM, I, S, Z> ExecutorHook<EM, I, S, Z> for InProcessHooks<E>
 where
-    S: UsesInput,
+    E: Executor<EM, I, S, Z>,
 {
-    fn init<E: HasObservers>(&mut self, _state: &mut S) {}
+    type Executor = E;
+
     /// Call before running a target.
     #[allow(clippy::unused_self)]
     #[allow(unused_variables)]
@@ -223,20 +219,17 @@ where
     }
 }
 
-impl<S> InProcessHooks<S>
-where
-    S: UsesInput,
-{
+impl<E> InProcessHooks<E> {
     /// Create new [`InProcessHooks`].
     #[cfg(unix)]
     #[allow(unused_variables)]
-    pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
+    pub fn new<EM, I, S, Z>(exec_tmout: Duration) -> Result<Self, Error>
     where
-        E: Executor<EM, Z> + HasObservers + HasInProcessHooks<E::State>,
-        EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
-        E::State: HasExecutions + HasSolutions + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State> + HasScheduler + ExecutionProcessor,
+        E: HasObservers,
+        EM: EventFirer<I, S> + EventRestarter<S>,
+        S: HasExecutions + HasSolutions + HasCorpus,
+        Z: HasObjective + HasScheduler + ExecutionProcessor<EM, I, E::Observers, S>,
+        Z::Objective: Feedback<EM, I, E::Observers, S>,
     {
         // # Safety
         // We get a pointer to `GLOBAL_STATE` that will be initialized at this point in time.
@@ -244,7 +237,7 @@ where
         #[allow(unused_unsafe)]
         let data = unsafe { addr_of_mut!(GLOBAL_STATE) };
         #[cfg(feature = "std")]
-        unix_signal_handler::setup_panic_hook::<E, EM, OF, Z>();
+        unix_signal_handler::setup_panic_hook::<E, EM, I, S, Z>();
         // # Safety
         // Setting up the signal handlers with a pointer to the `GLOBAL_STATE` which should not be NULL at this point.
         // We are the sole users of `GLOBAL_STATE` right now, and only dereference it in case of Segfault/Panic.
@@ -256,10 +249,10 @@ where
         compiler_fence(Ordering::SeqCst);
         Ok(Self {
             #[cfg(feature = "std")]
-            crash_handler: unix_signal_handler::inproc_crash_handler::<E, EM, OF, Z>
+            crash_handler: unix_signal_handler::inproc_crash_handler::<E, EM, I, S, Z>
                 as *const c_void,
             #[cfg(feature = "std")]
-            timeout_handler: unix_signal_handler::inproc_timeout_handler::<E, EM, OF, Z>
+            timeout_handler: unix_signal_handler::inproc_timeout_handler::<E, EM, I, S, Z>
                 as *const _,
             #[cfg(feature = "std")]
             timer: TimerStruct::new(exec_tmout),
@@ -270,13 +263,13 @@ where
     /// Create new [`InProcessHooks`].
     #[cfg(windows)]
     #[allow(unused)]
-    pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
+    pub fn new<EM, I, S, Z>(exec_tmout: Duration) -> Result<Self, Error>
     where
-        E: Executor<EM, Z> + HasObservers + HasInProcessHooks<E::State>,
-        EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
-        E::State: State + HasExecutions + HasSolutions + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State> + HasScheduler + ExecutionProcessor,
+        E: HasObservers,
+        EM: EventFirer<I, S> + EventRestarter<S>,
+        S: HasExecutions + HasSolutions + HasCorpus,
+        Z: HasObjective + HasScheduler + ExecutionProcessor<EM, I, E::Observers, S>,
+        Z::Objective: Feedback<EM, I, E::Observers, S>,
     {
         let ret;
         #[cfg(feature = "std")]
@@ -285,7 +278,8 @@ where
             crate::executors::hooks::windows::windows_exception_handler::setup_panic_hook::<
                 E,
                 EM,
-                OF,
+                I,
+                S,
                 Z,
             >();
             setup_exception_handler(data)?;
@@ -294,14 +288,16 @@ where
                 crate::executors::hooks::windows::windows_exception_handler::inproc_crash_handler::<
                     E,
                     EM,
-                    OF,
+                    I,
+                    S,
                     Z,
                 > as *const _;
             let timeout_handler =
                 crate::executors::hooks::windows::windows_exception_handler::inproc_timeout_handler::<
                     E,
                     EM,
-                    OF,
+                    I,
+                    S,
                     Z,
                 > as *const c_void;
             let timer = TimerStruct::new(exec_tmout, timeout_handler);
@@ -325,14 +321,7 @@ where
     /// Create a new [`InProcessHooks`]
     #[cfg(all(not(unix), not(windows)))]
     #[allow(unused_variables)]
-    pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
-    where
-        E: Executor<EM, Z> + HasObservers + HasInProcessHooks<E::State>,
-        EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
-        E::State: HasExecutions + HasSolutions + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State>,
-    {
+    pub fn new<EM, I, S, Z>(exec_tmout: Duration) -> Result<Self, Error> {
         #[cfg_attr(miri, allow(unused_variables))]
         let ret = Self {
             phantom: PhantomData,

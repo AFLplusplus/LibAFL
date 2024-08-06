@@ -20,10 +20,7 @@ pub mod nautilus;
 pub use nautilus::*;
 
 /// Generators can generate ranges of bytes.
-pub trait Generator<I, S>
-where
-    I: Input,
-{
+pub trait Generator<I, S> {
     /// Generate a new input
     fn generate(&mut self, state: &mut S) -> Result<I, Error>;
 }

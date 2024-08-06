@@ -23,14 +23,14 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use crate::mutators::str_decode;
 use crate::{
-    corpus::{CorpusId, HasCurrentCorpusId},
-    inputs::{HasMutatorBytes, UsesInput},
+    corpus::{CorpusId, HasCorpus, HasCurrentCorpusId},
+    inputs::HasMutatorBytes,
     mutators::{
         buffer_self_copy, mutations::buffer_copy, MultiMutator, MutationResult, Mutator, Named,
     },
     observers::cmp::{AFLppCmpValuesMetadata, CmpValues, CmpValuesMetadata},
     stages::TaintMetadata,
-    state::{HasCorpus, HasMaxSize, HasRand},
+    state::{HasMaxSize, HasRand},
     Error, HasMetadata,
 };
 
@@ -367,7 +367,7 @@ pub struct TokenReplace;
 
 impl<I, S> Mutator<I, S> for TokenReplace
 where
-    S: UsesInput + HasMetadata + HasRand + HasMaxSize,
+    S: HasMetadata + HasRand + HasMaxSize,
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
@@ -426,7 +426,7 @@ pub struct I2SRandReplace;
 
 impl<I, S> Mutator<I, S> for I2SRandReplace
 where
-    S: UsesInput + HasMetadata + HasRand + HasMaxSize,
+    S: HasMetadata + HasRand + HasMaxSize,
     I: HasMutatorBytes,
 {
     #[allow(clippy::too_many_lines)]
@@ -1087,7 +1087,7 @@ impl AFLppRedQueen {
 
 impl<I, S> MultiMutator<I, S> for AFLppRedQueen
 where
-    S: UsesInput + HasMetadata + HasRand + HasMaxSize + HasCorpus + HasCurrentCorpusId,
+    S: HasMetadata + HasRand + HasMaxSize + HasCorpus + HasCurrentCorpusId,
     I: HasMutatorBytes + From<Vec<u8>>,
 {
     #[allow(clippy::needless_range_loop)]

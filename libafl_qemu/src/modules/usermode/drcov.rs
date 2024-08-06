@@ -20,10 +20,7 @@ static DRCOV_IDS: Mutex<Option<Vec<u64>>> = Mutex::new(None);
 static DRCOV_MAP: Mutex<Option<HashMap<GuestAddr, u64>>> = Mutex::new(None);
 static DRCOV_LENGTHS: Mutex<Option<HashMap<GuestAddr, GuestUsize>>> = Mutex::new(None);
 
-#[cfg_attr(
-    any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
-)] // for SerdeAny
+#[allow(clippy::unsafe_derive_deserialize)] // for SerdeAny
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct DrCovMetadata {
     pub current_id: u64,

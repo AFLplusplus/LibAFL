@@ -5,7 +5,7 @@ use core::cmp::{min, Ordering};
 use libafl_bolts::{rands::Rand, Error};
 
 use crate::{
-    corpus::{Corpus, CorpusId},
+    corpus::{Corpus, CorpusId, HasCorpus},
     impl_default_multipart,
     inputs::{multi::MultipartInput, HasMutatorBytes, Input},
     mutators::{
@@ -21,7 +21,7 @@ use crate::{
         MutationResult, Mutator,
     },
     random_corpus_id,
-    state::{HasCorpus, HasMaxSize, HasRand},
+    state::{HasMaxSize, HasRand},
 };
 
 /// Marker trait for if the default multipart input mutator implementation is appropriate.
@@ -114,9 +114,10 @@ impl_default_multipart!(
     I2SRandReplace,
 );
 
-impl<I, S> Mutator<MultipartInput<I>, S> for CrossoverInsertMutator<I>
+impl<I, S> Mutator<MultipartInput<I>, S> for CrossoverInsertMutator
 where
-    S: HasCorpus<Input = MultipartInput<I>> + HasMaxSize + HasRand,
+    S: HasCorpus + HasMaxSize + HasRand,
+    S::Corpus: Corpus<Input = MultipartInput<I>>,
     I: Input + HasMutatorBytes,
 {
     fn mutate(
@@ -218,9 +219,10 @@ where
     }
 }
 
-impl<I, S> Mutator<MultipartInput<I>, S> for CrossoverReplaceMutator<I>
+impl<I, S> Mutator<MultipartInput<I>, S> for CrossoverReplaceMutator
 where
-    S: HasCorpus<Input = MultipartInput<I>> + HasMaxSize + HasRand,
+    S: HasCorpus + HasMaxSize + HasRand,
+    S::Corpus: Corpus<Input = MultipartInput<I>>,
     I: Input + HasMutatorBytes,
 {
     fn mutate(

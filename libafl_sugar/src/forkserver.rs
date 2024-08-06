@@ -3,7 +3,7 @@
 use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
 
 use libafl::{
-    corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
+    corpus::{CachedOnDiskCorpus, Corpus, HasCorpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig, EventRestarter, LlmpRestartingEventManager},
     executors::forkserver::ForkserverExecutor,
     feedback_or, feedback_or_fast,
@@ -18,7 +18,7 @@ use libafl::{
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::StdMutationalStage,
-    state::{HasCorpus, StdState},
+    state::StdState,
     Error, HasMetadata,
 };
 use libafl_bolts::{

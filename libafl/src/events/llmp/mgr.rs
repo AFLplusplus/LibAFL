@@ -38,9 +38,9 @@ use crate::{
     },
     executors::{Executor, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
-    inputs::{NopInput, UsesInput},
-    observers::{ObserversTuple, TimeObserver, UsesObservers},
-    state::{HasExecutions, HasImported, HasLastReportTime, NopState, State, UsesState},
+    inputs::NopInput,
+    observers::{ObserversTuple, TimeObserver},
+    state::{HasExecutions, HasImported, HasLastReportTime, NopState, State},
     Error, HasMetadata,
 };
 

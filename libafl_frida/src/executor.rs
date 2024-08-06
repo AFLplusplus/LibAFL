@@ -232,26 +232,3 @@ where
         }
     }
 }
-
-#[cfg(windows)]
-impl<'a, 'b, 'c, H, OT, RT, S> HasInProcessHooks<S>
-    for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
-where
-    H: FnMut(&S::Input) -> ExitKind,
-    S: State + HasSolutions + HasCorpus + HasExecutions,
-    S::Input: HasTargetBytes,
-    OT: ObserversTuple<S>,
-    RT: FridaRuntimeTuple,
-{
-    /// the timeout handler
-    #[inline]
-    fn inprocess_hooks(&self) -> &InProcessHooks<S> {
-        &self.base.hooks().0
-    }
-
-    /// the timeout handler
-    #[inline]
-    fn inprocess_hooks_mut(&mut self) -> &mut InProcessHooks<S> {
-        &mut self.base.hooks_mut().0
-    }
-}

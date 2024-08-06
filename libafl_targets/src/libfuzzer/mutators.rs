@@ -10,13 +10,13 @@ use std::{
 };
 
 use libafl::{
-    corpus::Corpus,
+    corpus::{Corpus, HasCorpus},
     inputs::{BytesInput, HasMutatorBytes, UsesInput},
     mutators::{
         ComposedByMutations, MutationId, MutationResult, Mutator, MutatorsTuple, ScheduledMutator,
     },
     random_corpus_id_with_disabled,
-    state::{HasCorpus, HasMaxSize, HasRand},
+    state::{HasMaxSize, HasRand},
     Error,
 };
 use libafl_bolts::{rands::Rand, AsSlice, HasLen, Named};

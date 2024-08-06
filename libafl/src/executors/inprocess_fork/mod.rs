@@ -21,9 +21,8 @@ use crate::{
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
-    inputs::UsesInput,
-    observers::{ObserversTuple, UsesObservers},
-    state::{HasExecutions, HasSolutions, State, UsesState},
+    observers::ObserversTuple,
+    state::{HasExecutions, HasSolutions, State},
     Error,
 };
 
@@ -282,7 +281,6 @@ pub mod child_signal_handlers {
             hooks::inprocess_fork::{InProcessForkExecutorGlobalData, FORK_EXECUTOR_GLOBAL_DATA},
             ExitKind, HasObservers,
         },
-        inputs::UsesInput,
         observers::ObserversTuple,
     };
 

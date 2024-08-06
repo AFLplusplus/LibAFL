@@ -7,7 +7,7 @@ use core::{
 use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
 
 use libafl::{
-    corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
+    corpus::{CachedOnDiskCorpus, Corpus, HasCorpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig, EventRestarter, LlmpRestartingEventManager},
     executors::{ExitKind, ShadowExecutor},
     feedback_or, feedback_or_fast,
@@ -24,7 +24,7 @@ use libafl::{
     observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
-    state::{HasCorpus, StdState},
+    state::StdState,
     HasMetadata,
 };
 use libafl_bolts::{

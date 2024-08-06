@@ -19,8 +19,8 @@ use crate::{
     events::{CustomBufEventResult, CustomBufHandlerFn, Event, EventFirer},
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
-    inputs::{Input, InputConverter, NopInput, NopInputConverter, UsesInput},
-    state::{HasExecutions, NopState, State, Stoppable, UsesState},
+    inputs::{Input, InputConverter, NopInput, NopInputConverter},
+    state::{HasExecutions, NopState, State, Stoppable},
     Error, HasMetadata,
 };
 

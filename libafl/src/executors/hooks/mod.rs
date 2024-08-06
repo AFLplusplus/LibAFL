@@ -1,7 +1,7 @@
 //! Hooks for the executors.
 //! These will be executed right before and after the executor's harness run.
 
-use crate::{executors::HasObservers, inputs::UsesInput};
+use crate::executors::Executor;
 
 /// windows crash/timeout handler and asan death callback
 #[cfg(windows)]
@@ -23,57 +23,39 @@ pub mod inprocess;
 pub mod timer;
 
 /// The hook that runs before and after the executor runs the target
-pub trait ExecutorHook<S>
-where
-    S: UsesInput,
-{
-    /// Init this hook
-    fn init<E: HasObservers>(&mut self, state: &mut S);
+pub trait ExecutorHook<EM, I, S, Z> {
+    type Executor: Executor<EM, I, S, Z>;
+
     /// The hook that runs before runs the target
-    fn pre_exec(&mut self, state: &mut S, input: &S::Input);
+    fn pre_exec(&mut self, state: &mut S, input: &I);
     /// The hook that runs before runs the target
-    fn post_exec(&mut self, state: &mut S, input: &S::Input);
+    fn post_exec(&mut self, state: &mut S, input: &I);
 }
 
 /// The hook that runs before and after the executor runs the target
-pub trait ExecutorHooksTuple<S>
-where
-    S: UsesInput,
-{
-    /// Init these hooks
-    fn init_all<E: HasObservers>(&mut self, state: &mut S);
+pub trait ExecutorHooksTuple<E, EM, I, S, Z> {
     /// The hooks that runs before runs the target
-    fn pre_exec_all(&mut self, state: &mut S, input: &S::Input);
+    fn pre_exec_all(&mut self, state: &mut S, input: &I);
     /// The hooks that runs after runs the target
-    fn post_exec_all(&mut self, state: &mut S, input: &S::Input);
+    fn post_exec_all(&mut self, state: &mut S, input: &I);
 }
 
-impl<S> ExecutorHooksTuple<S> for ()
-where
-    S: UsesInput,
-{
-    fn init_all<E: HasObservers>(&mut self, _state: &mut S) {}
-    fn pre_exec_all(&mut self, _state: &mut S, _input: &S::Input) {}
-    fn post_exec_all(&mut self, _state: &mut S, _input: &S::Input) {}
+impl<E, EM, I, S, Z> ExecutorHooksTuple<E, EM, I, S, Z> for () {
+    fn pre_exec_all(&mut self, _state: &mut S, _input: &I) {}
+    fn post_exec_all(&mut self, _state: &mut S, _input: &I) {}
 }
 
-impl<Head, Tail, S> ExecutorHooksTuple<S> for (Head, Tail)
+impl<Head, Tail, EM, I, S, Z> ExecutorHooksTuple<Head::Executor, EM, I, S, Z> for (Head, Tail)
 where
-    S: UsesInput,
-    Head: ExecutorHook<S>,
-    Tail: ExecutorHooksTuple<S>,
+    Head: ExecutorHook<EM, I, S, Z>,
+    Tail: ExecutorHooksTuple<Head::Executor, EM, I, S, Z>,
 {
-    fn init_all<E: HasObservers>(&mut self, state: &mut S) {
-        self.0.init::<E>(state);
-        self.1.init_all::<E>(state);
-    }
-
-    fn pre_exec_all(&mut self, state: &mut S, input: &S::Input) {
+    fn pre_exec_all(&mut self, state: &mut S, input: &I) {
         self.0.pre_exec(state, input);
         self.1.pre_exec_all(state, input);
     }
 
-    fn post_exec_all(&mut self, state: &mut S, input: &S::Input) {
+    fn post_exec_all(&mut self, state: &mut S, input: &I) {
         self.0.post_exec(state, input);
         self.1.post_exec_all(state, input);
     }

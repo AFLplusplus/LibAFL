@@ -47,10 +47,9 @@ use crate::{
     },
     executors::{Executor, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
-    inputs::UsesInput,
     monitors::Monitor,
-    observers::{ObserversTuple, TimeObserver, UsesObservers},
-    state::{HasExecutions, HasImported, HasLastReportTime, State, UsesState},
+    observers::{ObserversTuple, TimeObserver},
+    state::{HasExecutions, HasImported, HasLastReportTime, State},
     Error, HasMetadata,
 };
 

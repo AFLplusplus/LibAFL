@@ -60,11 +60,8 @@ use crate::events::multi_machine::NodeDescriptor;
 use crate::events::multi_machine::TcpMultiMachineHooks;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use crate::events::{centralized::CentralizedEventManager, CentralizedLlmpHook};
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use crate::inputs::UsesInput;
+#[cfg(feature = "std")]
 use crate::observers::TimeObserver;
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use crate::state::UsesState;
 #[cfg(feature = "std")]
 use crate::{
     events::{
@@ -72,7 +69,7 @@ use crate::{
         EventConfig,
     },
     monitors::Monitor,
-    state::{HasExecutions, State},
+    state::HasExecutions,
     Error,
 };
 
