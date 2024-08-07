@@ -6,6 +6,7 @@ use std::{
         fd::{AsRawFd, FromRawFd, OwnedFd},
         raw::c_void,
     },
+    ptr,
 };
 
 use bitflags::bitflags;
@@ -16,7 +17,7 @@ use perf_event_open_sys::{
 };
 
 const PAGE_SIZE: usize = 4096;
-const PERF_BUFFER_SIZE: usize = ((1 + (1 << 1)) * PAGE_SIZE) as usize;
+const PERF_BUFFER_SIZE: usize = ((1 + (1 << 7)) * PAGE_SIZE) as usize;
 const PERF_AUX_BUFFER_SIZE: usize = 64 * 1024;
 const PT_EVENT_TYPE_PATH: &str = "/sys/bus/event_source/devices/intel_pt/type";
 
@@ -37,7 +38,7 @@ pub struct IntelPT {
     // TODO use proper types
     perf_buffer: *mut c_void,
     perf_aux_buffer: *mut c_void,
-    buff_metadata: perf_event_mmap_page,
+    buff_metadata: *mut perf_event_mmap_page,
 }
 
 impl IntelPT {
@@ -63,12 +64,23 @@ impl IntelPT {
         let perf_buffer = setup_perf_buffer(&fd).unwrap();
 
         // the first page is a metadata page
-        let mut buff_metadata = unsafe { *perf_buffer.cast::<perf_event_mmap_page>() };
-        buff_metadata.aux_offset =
-            next_page_aligned_addr(buff_metadata.data_offset + buff_metadata.data_size);
-        buff_metadata.aux_size = PERF_AUX_BUFFER_SIZE as u64;
+        let buff_metadata = unsafe { perf_buffer.cast::<perf_event_mmap_page>() };
+        let aux_offset = unsafe { ptr::addr_of_mut!((*buff_metadata).aux_offset) };
+        let aux_size = unsafe { ptr::addr_of_mut!((*buff_metadata).aux_size) };
+        let data_offset = unsafe { ptr::addr_of_mut!((*buff_metadata).data_offset) };
+        let data_size = unsafe { ptr::addr_of_mut!((*buff_metadata).data_size) };
 
-        let perf_aux_buffer = setup_perf_aux_buffer(&fd, &buff_metadata).unwrap();
+        unsafe {
+            aux_offset.write_volatile(next_page_aligned_addr(
+                data_offset.read_volatile() + data_size.read_volatile(),
+            ));
+            aux_size.write_volatile(PERF_AUX_BUFFER_SIZE as u64);
+        }
+
+        let perf_aux_buffer = unsafe {
+            setup_perf_aux_buffer(&fd, aux_size.read_volatile(), aux_offset.read_volatile())
+                .unwrap()
+        };
 
         Ok(Self {
             fd,
@@ -112,9 +124,12 @@ impl IntelPT {
         // TODO save tracing state or maybe better to check with the kernel?
     }
 
-    pub fn read_trace_into<T: Write>(&self, buff: &mut T) {
-        let head = wrap_aux_pointer(self.buff_metadata.aux_head);
-        let tail = wrap_aux_pointer(self.buff_metadata.aux_tail);
+    pub fn read_trace_into<T: Write>(&self, buff: &mut T) -> Result<(), ()> {
+        let aux_head = unsafe { ptr::addr_of_mut!((*self.buff_metadata).aux_head) };
+        let aux_tail = unsafe { ptr::addr_of_mut!((*self.buff_metadata).aux_tail) };
+
+        let head = wrap_aux_pointer(unsafe { aux_head.read_volatile() });
+        let tail = wrap_aux_pointer(unsafe { aux_tail.read_volatile() });
         // smp_rmb(); // TODO check how to call this in Rust
 
         // fwrite(perf_aux_buf + tail, 1, head - tail, f);
@@ -124,9 +139,10 @@ impl IntelPT {
                 (head - tail) as usize,
             )
         })
-        .unwrap();
+        .map_err(|_| ())?;
 
         // pc->aux_tail = head;
+        Ok(())
     }
 }
 
@@ -145,7 +161,6 @@ const fn next_page_aligned_addr(address: u64) -> u64 {
 }
 
 fn setup_perf_buffer(fd: &OwnedFd) -> Result<*mut c_void, &'static str> {
-    println!("fd: {:?}", fd);
     let mmap_addr = unsafe {
         libc::mmap(
             std::ptr::null_mut(),
@@ -165,25 +180,22 @@ fn setup_perf_buffer(fd: &OwnedFd) -> Result<*mut c_void, &'static str> {
 
 fn setup_perf_aux_buffer(
     fd: &OwnedFd,
-    buff_metadata: &perf_event_mmap_page,
+    size: u64,
+    offset: u64,
 ) -> Result<*mut c_void, &'static str> {
-    println!(
-        "aux_offset: {}, aux_size: {}, fd: {:?}",
-        buff_metadata.aux_offset as i64, buff_metadata.aux_size as usize, fd
-    );
     // PROT_WRITE sets PT to stop when the buffer is full
     let mmap_addr = unsafe {
         libc::mmap(
             std::ptr::null_mut(),
-            buff_metadata.aux_size as usize,
+            size as usize,
             libc::PROT_READ | libc::PROT_WRITE,
             libc::MAP_SHARED,
             fd.as_raw_fd(),
-            buff_metadata.aux_offset as i64,
+            offset as i64,
         )
     };
     if mmap_addr == libc::MAP_FAILED {
-        println!("Err: {}", std::io::Error::last_os_error().to_string());
+        // println!("Err: {}", std::io::Error::last_os_error().to_string());
         Err("IntelPT: Failed to mmap perf aux buffer")
     } else {
         Ok(mmap_addr)
@@ -275,14 +287,23 @@ mod test {
             Err(e) => panic!("Fork failed {e}"),
         };
 
-        // brakes at aux mmap, EINVAL... maybe should add some barriers to let the kenrnel know
-        // about the new metadata? why don't I have this problem in C?
         let mut pt = IntelPT::try_new(pid.as_raw()).expect("Failed to create IntelPT");
+        pt.enable_tracing().expect("Failed to enable tracing");
 
         waitpid(pid, Some(WaitPidFlag::WUNTRACED)).expect("Failed to wait for the child process");
         kill(pid, Signal::SIGCONT).expect("Failed to continue the process");
 
+        let mut file = OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open("ipt_raw_trace")
+            .expect("Unable to open trace output file");
+
         waitpid(pid, None).expect("Failed to wait for the child process");
+
+        pt.disable_tracing().expect("Failed to disable tracing");
+        pt.read_trace_into(&mut file)
+            .expect("Failed to write traces");
     }
 
     struct LoggerToFile {
