@@ -125,7 +125,7 @@ serde_yaml = { version = "0.9", optional = true } # For parsing the injections y
 toml = { version = "0.8.13", optional = true } # For parsing the injections toml file
 pyo3 = { version = "0.22", optional = true, features = ["multiple-pymethods"] }
 bytes-utils = "0.1"
-typed-builder = "0.18"
+typed-builder = "0.19"
 memmap2 = "0.9"
 # Document all features of this crate (for `cargo doc`)
 document-features = { version = "0.2", optional = true }

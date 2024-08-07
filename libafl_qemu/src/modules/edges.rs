@@ -162,7 +162,7 @@ where
         ET: EmulatorModuleTuple<S>,
     {
         if self.use_hitcounts {
-            // hooks.edges(
+            // emulator_modules.edges(
             //     Hook::Function(gen_unique_edge_ids::<ET, S>),
             //     Hook::Raw(trace_edge_hitcount),
             // );
@@ -175,7 +175,7 @@ where
                 );
             }
         } else {
-            // hooks.edges(
+            // emulator_modules.edges(
             //     Hook::Function(gen_unique_edge_ids::<ET, S>),
             //     Hook::Raw(trace_edge_single),
             // );
