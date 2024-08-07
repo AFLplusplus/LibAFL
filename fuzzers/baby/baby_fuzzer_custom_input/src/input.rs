@@ -14,6 +14,12 @@ use libafl::{
 use libafl_bolts::{rands::Rand, Named};
 use serde::{Deserialize, Serialize};
 
+/// The custom [`Input`] type used in this example, consisting of a byte array part, a byte array that is not always present, and a boolean
+///
+/// Imagine these could be used to model command line arguments for a bash command, where
+/// - `byte_array` is binary data that is always needed like what is passed to stdin,
+/// - `optional_byte_array` is binary data passed as a command line arg, and it is only passed if it is not `None` in the input,
+/// - `boolean` models the presence or absence of a command line flag that does not require additional data
 #[derive(Serialize, Deserialize, Clone, Debug, Hash, SerdeAny)]
 pub struct CustomInput {
     pub byte_array: Vec<u8>,
@@ -31,27 +37,34 @@ impl Input for CustomInput {
 }
 
 impl CustomInput {
+    /// Returns a mutable reference to the byte array
     pub fn byte_array_mut(&mut self) -> &mut Vec<u8> {
         &mut self.byte_array
     }
 
+    /// Returns an immutable reference to the byte array wrapped in [`Some`]
     pub fn byte_array_optional(&self) -> Option<&Vec<u8>> {
         Some(&self.byte_array)
     }
 
+    /// Returns a mutable reference to the optional byte array
     pub fn optional_byte_array_mut(&mut self) -> &mut Option<Vec<u8>> {
         &mut self.optional_byte_array
     }
+
+    /// Returns an immutable reference to the optional byte array
     pub fn optional_byte_array_optional(&self) -> Option<&Vec<u8>> {
         self.optional_byte_array.as_ref()
     }
 }
 
+/// A generator for [`CustomInput`] used in this example
 pub struct CustomInputGenerator {
     pub max_len: usize,
 }
 
 impl CustomInputGenerator {
+    /// Creates a new [`CustomInputGenerator`]
     pub fn new(max_len: usize) -> Self {
         Self { max_len }
     }
@@ -77,6 +90,7 @@ where
     }
 }
 
+/// Generate a [`Vec<u8>`] of a length between 1 (incl.) and `length` (incl.) filled with random bytes
 fn generate_bytes<S: HasRand>(length: usize, state: &mut S) -> Vec<u8> {
     let rand = state.rand_mut();
     let len = rand.between(1, length);
@@ -85,11 +99,13 @@ fn generate_bytes<S: HasRand>(length: usize, state: &mut S) -> Vec<u8> {
     vec
 }
 
+/// [`Mutator`] that toggles the optional byte array of a [`CustomInput`], i.e. sets it to [`None`] if it is not, and to a random byte array if it is [`None`]
 pub struct ToggleOptionalByteArrayMutator {
     length: usize,
 }
 
 impl ToggleOptionalByteArrayMutator {
+    /// Creates a new [`ToggleOptionalByteArrayMutator`]
     pub fn new(length: usize) -> Self {
         Self { length }
     }
@@ -114,6 +130,7 @@ impl Named for ToggleOptionalByteArrayMutator {
     }
 }
 
+/// [`Mutator`] that toggles the boolean field in a [`CustomInput`]
 pub struct ToggleBooleanMutator;
 
 impl<S> Mutator<CustomInput, S> for ToggleBooleanMutator {

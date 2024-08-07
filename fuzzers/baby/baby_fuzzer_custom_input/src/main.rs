@@ -43,6 +43,8 @@ fn signals_set(idx: usize) {
 #[allow(clippy::similar_names, clippy::manual_assert)]
 pub fn main() {
     // The closure that we want to fuzz
+    // The pseudo program under test uses all parts of the custom input
+    // We are manually setting bytes in a pseudo coverage map to guide the fuzzer
     let mut harness = |input: &CustomInput| {
         signals_set(0);
         if input.byte_array == vec![b'a'] {
@@ -124,20 +126,29 @@ pub fn main() {
         .generate_initial_inputs(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8)
         .expect("Failed to generate the initial corpus");
 
+    // Merging multiple lists of mutators that mutate a sub-part of the custom input
+    // This collection could be expanded with default or custom mutators as needed for the input
+    // First, mutators for the simple byte array
     let mutations = mapped_havoc_mutations(
         CustomInput::byte_array_mut,
         &CustomInput::byte_array_optional,
     )
+    // Then, mutators for the optional byte array, these return MutationResult::Skipped if the part is not present
     .merge(optional_mapped_havoc_mutations(
         CustomInput::optional_byte_array_mut,
         &CustomInput::optional_byte_array_optional,
     ))
+    // A custom mutator that sets the optional byte array to None if present, and generates a random byte array of length 1 if it is not
     .append(ToggleOptionalByteArrayMutator::new(1))
+    // Finally, a custom mutator that toggles the boolean part of the input
     .append(ToggleBooleanMutator);
 
+    // Scheduling layer for the mutations
     let mutator = StdScheduledMutator::new(mutations);
+    // Defining the mutator stage
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
+    // Run the fuzzer
     fuzzer
         .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
         .expect("Error in the fuzzing loop");
