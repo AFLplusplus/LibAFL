@@ -35,6 +35,15 @@ pub struct InProcessHook<H> {
     phantom_data: PhantomData<fn() -> H>,
 }
 
+impl<H> InProcessHook<H> {
+    /// Create a new [`InProcessHook`]. You will likely want to call this function from an alias
+    pub fn new() -> Self {
+        Self {
+            phantom_data: PhantomData,
+        }
+    }
+}
+
 // impl<E> HasTimeout for InProcessHooks<E> {
 //     #[cfg(feature = "std")]
 //     fn timer(&self) -> &TimerStruct {
@@ -242,6 +251,11 @@ where
 impl GlobalContextGuard<'static, (), (), (), (), ()> {
     /// Take the global context using the provided [`HookContext`]. You must call this function like
     /// `GlobalContextGuard::take_guard::<C>()`, with `C` as your context.
+    ///
+    /// ## Safety
+    ///
+    /// This function is marked unsafe because if you specify an invalid `C`, the types will
+    /// certainly be wrong. Provided you appropriately specify `C`, this function is otherwise safe.
     pub unsafe fn take_global<'a, C>(
     ) -> Option<GlobalContextGuard<'a, C::Executor, C::EventManager, C::Input, C::State, C::Fuzzer>>
     where
@@ -265,7 +279,13 @@ impl GlobalContextGuard<'static, (), (), (), (), ()> {
 }
 
 impl<'a, E, EM, I, S, Z> GlobalContextGuard<'a, E, EM, I, S, Z> {
-    /// Access the members of the global access.
+    /// Access the members of the global context.
+    ///
+    /// ## Safety
+    ///
+    /// This function internally accesses the global context, which involves casting the
+    /// corresponding members of the context according to `C` of
+    /// [`GlobalContextGuard::take_global`].
     pub fn access(&mut self) -> (&mut E, &mut Z, &mut S, &mut EM, &I) {
         unsafe {
             (
@@ -430,8 +450,9 @@ pub fn on_timeout(guard: &mut impl InProcessStateSaver) {
     }
 }
 
+/// [`InProcessHook`]s for handling Rust panics
 #[cfg(feature = "std")]
-mod panic {
+pub mod panic {
     use alloc::boxed::Box;
     use std::{
         marker::PhantomData,
@@ -444,7 +465,9 @@ mod panic {
 
     use crate::{
         executors::{
-            hooks::inprocess::{GlobalContextGuard, InProcessHookHandler, InProcessStateSaver},
+            hooks::inprocess::{
+                GlobalContextGuard, InProcessHook, InProcessHookHandler, InProcessStateSaver,
+            },
             ExitKind,
         },
         prelude::hooks::HookContext,
@@ -452,11 +475,13 @@ mod panic {
 
     /// Callback for [`PanicHookHandler`] which will run when a Rust panic occurs
     pub trait PanicCallback<'a, C> {
+        /// Handle the panic
         fn on_panic(info: &PanicHookInfo);
     }
 
     /// Default callback for [`PanicHookHandler`], which invokes [`run_observers_and_save_state`]
     /// and denotes that the [`ExitKind`] is [`ExitKind::Crash`].
+    #[derive(Debug)]
     pub struct StdPanicCallback;
 
     impl<'a, C> PanicCallback<'a, C> for StdPanicCallback
@@ -469,6 +494,10 @@ mod panic {
             let maybe_guard = unsafe { GlobalContextGuard::take_global::<C>() };
             if let Some(mut guard) = maybe_guard {
                 guard.run_observers_and_save_state(ExitKind::Crash);
+
+                unsafe {
+                    libc::_exit(128 + 6); // SIGABRT exit code
+                }
             } else {
             }
         }
@@ -500,8 +529,6 @@ mod panic {
                 {
                     (holder.hook)(panic_info);
                     A::on_panic(panic_info);
-
-                    libc::_exit(128 + 6); // SIGABRT exit code
                 }
             }));
             Ok(())
@@ -521,319 +548,7 @@ mod panic {
             Ok(())
         }
     }
-}
 
-// impl<E> InProcessHook<E> {
-//     /// Create new [`InProcessHook`].
-//     #[cfg(unix)]
-//     #[allow(unused_variables)]
-//     pub fn new<EM, I, S, Z>(exec_tmout: Duration) -> Result<Self, Error>
-//     where
-//         E: HasObservers,
-//         EM: EventFirer<I, S> + EventRestarter<S>,
-//         S: HasExecutions + HasSolutions + HasCorpus,
-//         Z: HasObjective + HasScheduler + ExecutionProcessor<EM, I, E::Observers, S>,
-//         Z::Objective: Feedback<EM, I, E::Observers, S>,
-//     {
-//         // # Safety
-//         // We get a pointer to `GLOBAL_STATE` that will be initialized at this point in time.
-//         // This unsafe is needed in stable but not in nightly. Remove in the future(?)
-//         #[allow(unused_unsafe)]
-//         let data = unsafe { addr_of_mut!(GLOBAL_STATE) };
-//         #[cfg(feature = "std")]
-//         unix_signal_handler::setup_panic_hook::<E, EM, I, S, Z>();
-//         // # Safety
-//         // Setting up the signal handlers with a pointer to the `GLOBAL_STATE` which should not be NULL at this point.
-//         // We are the sole users of `GLOBAL_STATE` right now, and only dereference it in case of Segfault/Panic.
-//         // In that case we get the mutable borrow. Otherwise we don't use it.
-//         #[cfg(all(not(miri), unix, feature = "std"))]
-//         unsafe {
-//             setup_signal_handler(data)?;
-//         }
-//         compiler_fence(Ordering::SeqCst);
-//         Ok(Self {
-//             #[cfg(feature = "std")]
-//             crash_handler: unix_signal_handler::inproc_crash_handler::<E, EM, I, S, Z>
-//                 as *const c_void,
-//             #[cfg(feature = "std")]
-//             timeout_handler: unix_signal_handler::inproc_timeout_handler::<E, EM, I, S, Z>
-//                 as *const _,
-//             #[cfg(feature = "std")]
-//             timer: TimerStruct::new(exec_tmout),
-//             phantom: PhantomData,
-//         })
-//     }
-//
-//     /// Create new [`InProcessHook`].
-//     #[cfg(windows)]
-//     #[allow(unused)]
-//     pub fn new<EM, I, S, Z>(exec_tmout: Duration) -> Result<Self, Error>
-//     where
-//         E: HasObservers,
-//         EM: EventFirer<I, S> + EventRestarter<S>,
-//         S: HasExecutions + HasSolutions + HasCorpus,
-//         Z: HasObjective + HasScheduler + ExecutionProcessor<EM, I, E::Observers, S>,
-//         Z::Objective: Feedback<EM, I, E::Observers, S>,
-//     {
-//         let ret;
-//         #[cfg(feature = "std")]
-//         unsafe {
-//             let data = addr_of_mut!(GLOBAL_STATE);
-//             crate::executors::hooks::windows::windows_exception_handler::setup_panic_hook::<
-//                 E,
-//                 EM,
-//                 I,
-//                 S,
-//                 Z,
-//             >();
-//             setup_exception_handler(data)?;
-//             compiler_fence(Ordering::SeqCst);
-//             let crash_handler =
-//                 crate::executors::hooks::windows::windows_exception_handler::inproc_crash_handler::<
-//                     E,
-//                     EM,
-//                     I,
-//                     S,
-//                     Z,
-//                 > as *const _;
-//             let timeout_handler =
-//                 crate::executors::hooks::windows::windows_exception_handler::inproc_timeout_handler::<
-//                     E,
-//                     EM,
-//                     I,
-//                     S,
-//                     Z,
-//                 > as *const c_void;
-//             let timer = TimerStruct::new(exec_tmout, timeout_handler);
-//             ret = Ok(Self {
-//                 crash_handler,
-//                 timeout_handler,
-//                 timer,
-//                 phantom: PhantomData,
-//             });
-//         }
-//         #[cfg(not(feature = "std"))]
-//         {
-//             ret = Ok(Self {
-//                 phantom: PhantomData,
-//             });
-//         }
-//
-//         ret
-//     }
-//
-//     /// Create a new [`InProcessHook`]
-//     #[cfg(all(not(unix), not(windows)))]
-//     #[allow(unused_variables)]
-//     pub fn new<EM, I, S, Z>(exec_tmout: Duration) -> Result<Self, Error> {
-//         #[cfg_attr(miri, allow(unused_variables))]
-//         let ret = Self {
-//             phantom: PhantomData,
-//         };
-//         Ok(ret)
-//     }
-//
-//     /// Replace the handlers with `nop` handlers, deactivating the handlers
-//     #[must_use]
-//     #[cfg(not(windows))]
-//     pub fn nop() -> Self {
-//         Self {
-//             #[cfg(feature = "std")]
-//             crash_handler: ptr::null(),
-//             #[cfg(feature = "std")]
-//             timeout_handler: ptr::null(),
-//             #[cfg(feature = "std")]
-//             timer: TimerStruct::new(Duration::from_millis(5000)),
-//             phantom: PhantomData,
-//         }
-//     }
-// }
-//
-// /// The global state of the in-process harness.
-// #[derive(Debug)]
-// pub struct InProcessExecutorHandlerData {
-//     /// the pointer to the state
-//     pub state_ptr: *mut c_void,
-//     /// the pointer to the event mgr
-//     pub event_mgr_ptr: *mut c_void,
-//     /// the pointer to the fuzzer
-//     pub fuzzer_ptr: *mut c_void,
-//     /// the pointer to the executor
-//     pub executor_ptr: *const c_void,
-//     pub(crate) current_input_ptr: *const c_void,
-//     pub(crate) in_handler: bool,
-//
-//     /// The timeout handler
-//     #[cfg(feature = "std")]
-//     pub(crate) crash_handler: *const c_void,
-//     /// The timeout handler
-//     #[cfg(feature = "std")]
-//     pub(crate) timeout_handler: *const c_void,
-//
-//     #[cfg(all(windows, feature = "std"))]
-//     pub(crate) ptp_timer: Option<PTP_TIMER>,
-//     #[cfg(all(windows, feature = "std"))]
-//     pub(crate) in_target: u64,
-//     #[cfg(all(windows, feature = "std"))]
-//     pub(crate) critical: *mut c_void,
-// }
-//
-// unsafe impl Send for InProcessExecutorHandlerData {}
-// unsafe impl Sync for InProcessExecutorHandlerData {}
-//
-// impl InProcessExecutorHandlerData {
-//     #[cfg(any(unix, feature = "std"))]
-//     pub(crate) fn executor_mut<'a, E>(&self) -> &'a mut E {
-//         unsafe { (self.executor_ptr as *mut E).as_mut().unwrap() }
-//     }
-//
-//     #[cfg(any(unix, feature = "std"))]
-//     pub(crate) fn state_mut<'a, S>(&self) -> &'a mut S {
-//         unsafe { (self.state_ptr as *mut S).as_mut().unwrap() }
-//     }
-//
-//     #[cfg(any(unix, feature = "std"))]
-//     pub(crate) fn event_mgr_mut<'a, EM>(&self) -> &'a mut EM {
-//         unsafe { (self.event_mgr_ptr as *mut EM).as_mut().unwrap() }
-//     }
-//
-//     #[cfg(any(unix, feature = "std"))]
-//     pub(crate) fn fuzzer_mut<'a, Z>(&self) -> &'a mut Z {
-//         unsafe { (self.fuzzer_ptr as *mut Z).as_mut().unwrap() }
-//     }
-//
-//     #[cfg(any(unix, feature = "std"))]
-//     pub(crate) fn take_current_input<'a, I>(&mut self) -> &'a I {
-//         let r = unsafe { (self.current_input_ptr as *const I).as_ref().unwrap() };
-//         self.current_input_ptr = ptr::null();
-//         r
-//     }
-//
-//     #[cfg(any(unix, feature = "std"))]
-//     pub(crate) fn is_valid(&self) -> bool {
-//         !self.current_input_ptr.is_null()
-//     }
-//
-//     #[cfg(any(unix, feature = "std"))]
-//     pub(crate) fn set_in_handler(&mut self, v: bool) -> bool {
-//         let old = self.in_handler;
-//         self.in_handler = v;
-//         old
-//     }
-// }
-//
-// /// Exception handling needs some nasty unsafe.
-// pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHandlerData {
-//     // The state ptr for signal handling
-//     state_ptr: null_mut(),
-//     // The event manager ptr for signal handling
-//     event_mgr_ptr: null_mut(),
-//     // The fuzzer ptr for signal handling
-//     fuzzer_ptr: null_mut(),
-//     // The executor ptr for signal handling
-//     executor_ptr: ptr::null(),
-//     // The current input for signal handling
-//     current_input_ptr: ptr::null(),
-//
-//     in_handler: false,
-//
-//     // The crash handler fn
-//     #[cfg(feature = "std")]
-//     crash_handler: ptr::null(),
-//     // The timeout handler fn
-//     #[cfg(feature = "std")]
-//     timeout_handler: ptr::null(),
-//     #[cfg(all(windows, feature = "std"))]
-//     ptp_timer: None,
-//     #[cfg(all(windows, feature = "std"))]
-//     in_target: 0,
-//     #[cfg(all(windows, feature = "std"))]
-//     critical: null_mut(),
-// };
-//
-// /// Get the inprocess [`crate::state::State`]
-// #[must_use]
-// pub fn inprocess_get_state<'a, S>() -> Option<&'a mut S> {
-//     unsafe { (GLOBAL_STATE.state_ptr as *mut S).as_mut() }
-// }
-//
-// /// Get the [`crate::events::EventManager`]
-// #[must_use]
-// pub fn inprocess_get_event_manager<'a, EM>() -> Option<&'a mut EM> {
-//     unsafe { (GLOBAL_STATE.event_mgr_ptr as *mut EM).as_mut() }
-// }
-//
-// /// Gets the inprocess [`crate::fuzzer::Fuzzer`]
-// #[must_use]
-// pub fn inprocess_get_fuzzer<'a, F>() -> Option<&'a mut F> {
-//     unsafe { (GLOBAL_STATE.fuzzer_ptr as *mut F).as_mut() }
-// }
-//
-// /// Gets the inprocess [`Executor`]
-// #[must_use]
-// pub fn inprocess_get_executor<'a, E>() -> Option<&'a mut E> {
-//     unsafe { (GLOBAL_STATE.executor_ptr as *mut E).as_mut() }
-// }
-//
-// /// Gets the inprocess input
-// #[must_use]
-// pub fn inprocess_get_input<'a, I>() -> Option<&'a I> {
-//     unsafe { (GLOBAL_STATE.current_input_ptr as *const I).as_ref() }
-// }
-//
-// /// Know if we ar eexecuting in a crash/timeout handler
-// #[must_use]
-// pub fn inprocess_in_handler() -> bool {
-//     unsafe { GLOBAL_STATE.in_handler }
-// }
-//
-// #[inline]
-// #[allow(clippy::too_many_arguments)]
-// /// Save state if it is an objective
-// pub fn run_observers_and_save_state<E, EM, I, S, Z>(
-//     executor: &mut E,
-//     state: &mut S,
-//     input: &I,
-//     fuzzer: &mut Z,
-//     manager: &mut EM,
-//     exit_kind: ExitKind,
-// ) where
-//     E: HasObservers,
-//     EM: EventFirer<I, S> + EventRestarter<S>,
-//     S: HasExecutions + HasSolutions + HasCorpus,
-//     Z: HasObjective + HasScheduler + ExecutionProcessor<EM, I, E::Observers, S>,
-//     Z::Objective: Feedback<EM, I, E::Observers, S>,
-// {
-//     let observers = executor.observers_mut();
-//     let scheduler = fuzzer.scheduler_mut();
-//
-//     if scheduler.on_evaluation(state, input, &*observers).is_err() {
-//         log::error!("Failed to call on_evaluation");
-//         return;
-//     }
-//
-//     let res = fuzzer.check_results(state, manager, input, &*observers, &exit_kind);
-//     if let Ok(exec_res) = res {
-//         if fuzzer
-//             .process_execution(state, manager, input, &exec_res, &*observers)
-//             .is_err()
-//         {
-//             log::error!("Failed to call process_execution");
-//             return;
-//         }
-//
-//         if fuzzer
-//             .dispatch_event(state, manager, input.clone(), &exec_res, None, &exit_kind)
-//             .is_err()
-//         {
-//             log::error!("Failed to dispatch_event");
-//             return;
-//         }
-//     } else {
-//         log::error!("Faild to check execution result");
-//     }
-//     // Serialize the state and wait safely for the broker to read pending messages
-//     manager.on_restart(state).unwrap();
-//
-//     log::info!("Bye!");
-// }
+    /// The [`InProcessHook`] which installs a handler for panics via [`panic::set_hook`]
+    pub type InProcessPanicHook<A = StdPanicCallback> = InProcessHook<PanicHookHandler<A>>;
+}
