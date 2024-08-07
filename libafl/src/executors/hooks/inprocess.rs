@@ -3,13 +3,21 @@
 use alloc::boxed::Box;
 use core::{
     ffi::c_void,
+    marker::PhantomData,
     sync::atomic::{AtomicPtr, Ordering},
 };
-use std::marker::PhantomData;
 
 use crate::{
-    executors::hooks::{ExecutorHook, HookContext},
-    Error,
+    corpus::{Corpus, HasCorpus},
+    events::{EventFirer, EventRestarter},
+    executors::{
+        hooks::{ExecutorHook, HookContext},
+        ExitKind, HasObservers,
+    },
+    feedbacks::Feedback,
+    schedulers::Scheduler,
+    state::{HasExecutions, HasSolutions},
+    Error, ExecutionProcessor, HasObjective, HasScheduler,
 };
 
 /// In-process hooks which install global handlers by safely lifting the local execution context
@@ -23,8 +31,8 @@ use crate::{
 /// continue, and your timeout handler is executed during the handling of another event, the timeout
 /// will be lost. For handlers which terminate execution, this is a non-issue.
 #[allow(missing_debug_implementations)]
-pub struct InProcessHook<A, I> {
-    phantom_data: PhantomData<fn() -> (A, I)>,
+pub struct InProcessHook<H> {
+    phantom_data: PhantomData<fn() -> H>,
 }
 
 // impl<E> HasTimeout for InProcessHooks<E> {
@@ -131,61 +139,149 @@ pub struct InProcessHook<A, I> {
 //     }
 // }
 
-/// Installer of a given callback into the platform-specific handler, e.g. `signal`
-pub trait InProcessHookInstaller {
-    /// Install the provided handler as appropriate for this platform
-    fn install(callback: unsafe fn()) -> Result<(), Error>;
+/// Handle an event with the corresponding data, as retrieved from the global context
+pub trait InProcessHookHandler<C> {
+    /// Install the handler as appropriate for this platform
+    fn install() -> Result<(), Error>;
     /// Uninstall the handler
     fn uninstall() -> Result<(), Error>;
 }
 
-/// Handle an event with the corresponding data, as retrieved from the global context
-pub trait InProcessHookHandler<E, EM, I, S, Z> {
-    /// Handle the in-process event (e.g., a timer expiration)
-    fn on_execution_event(
-        executor: &mut E,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
-        input: &I,
-    ) -> Result<(), Error>;
+/// Data trait for tracking fixed content in [`GlobalContextGuard`], to reduce some generics
+pub trait InProcessGlobalContext {
+    /// The executor stored in the global context
+    type Executor;
+    /// The event manager stored in the global context
+    type EventManager;
+    /// The input stored in the global context
+    type Input;
+    /// The state stored in the global context
+    type State;
+    /// The fuzzer stored in the global context
+    type Fuzzer;
 }
 
-/// Callback to be used with all in-process event types that extracts the information from the
-/// corresponding execution context
-unsafe fn generic_event_callback<A, E, EM, I, S, Z>()
+/// Utility trait for saving state; just use `impl InProcessStateSaver` for functions and
+/// `GlobalContextGuard<'a, E, EM, I, S, Z>: InProcessStateSaver` when handling the guard directly.
+pub trait InProcessStateSaver: InProcessGlobalContext {
+    /// Process the results of an execution in the case of an event that triggers the end of execution
+    /// (e.g., a timeout or a crash). You must still terminate the process yourself.
+    fn run_observers_and_save_state(&mut self, exit_kind: ExitKind);
+}
+
+/// Guard for the global context. When this guard exists, the global context is stored within. On
+/// drop (e.g., when exiting scope), the context is returned to global availability. This ensures
+/// exclusive mutable access to the execution context.
+#[derive(Debug)]
+pub struct GlobalContextGuard<'a, E, EM, I, S, Z> {
+    ctx: &'a mut ExecutionContextData,
+    phantom: PhantomData<fn() -> (E, EM, I, S, Z)>,
+}
+
+impl<'a, E, EM, I, S, Z> InProcessGlobalContext for GlobalContextGuard<'a, E, EM, I, S, Z> {
+    type Executor = E;
+    type EventManager = EM;
+    type Input = I;
+    type State = S;
+    type Fuzzer = Z;
+}
+
+impl<'a, E, EM, S, Z> InProcessStateSaver
+    for GlobalContextGuard<'a, E, EM, <S::Corpus as Corpus>::Input, S, Z>
 where
-    A: InProcessHookHandler<E, EM, I, S, Z>,
+    E: HasObservers,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S> + EventRestarter<S>,
+    S: HasExecutions + HasSolutions + HasCorpus,
+    S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
+    <S::Corpus as Corpus>::Input: Clone,
+    Z: HasObjective
+        + HasScheduler
+        + ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
+    Z::Scheduler: Scheduler<<S::Corpus as Corpus>::Input, E::Observers, S>,
+    Z::Objective: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
 {
-    if let Some(context) = CONTEXT
-        .swap(core::ptr::null_mut(), Ordering::Relaxed)
-        .as_mut()
-    {
-        if let Err(e) = A::on_execution_event(
-            context.executor(),
-            context.fuzzer(),
-            context.state(),
-            context.manager(),
-            context.input(),
-        ) {
-            // in std, we can try to report this
-            #[cfg(feature = "std")]
+    #[inline]
+    fn run_observers_and_save_state(&mut self, exit_kind: ExitKind) {
+        let (executor, fuzzer, state, manager, input) = self.access();
+
+        let observers = executor.observers_mut();
+        let scheduler = fuzzer.scheduler_mut();
+
+        if scheduler.on_evaluation(state, input, &*observers).is_err() {
+            log::error!("Failed to call on_evaluation");
+            return;
+        }
+
+        let res = fuzzer.check_results(state, manager, input, &*observers, &exit_kind);
+        if let Ok(exec_res) = res {
+            if fuzzer
+                .process_execution(state, manager, input, &exec_res, &*observers)
+                .is_err()
             {
-                use std::io::Write;
-                let mut stderr = std::io::stderr();
-                let _ = write!(stderr, "In-process event handler failed: {e}\n");
+                log::error!("Failed to call process_execution");
+                return;
             }
+
+            if fuzzer
+                .dispatch_event(state, manager, input.clone(), &exec_res, None, &exit_kind)
+                .is_err()
+            {
+                log::error!("Failed to dispatch_event");
+                return;
+            }
+        } else {
+            log::error!("Faild to check execution result");
         }
-        // it is possible that this hook
-        CONTEXT.swap(context, Ordering::Relaxed);
-    } else {
-        // if the handler is not available, we are likely in an invalid state
-        #[cfg(feature = "std")]
-        {
-            use std::io::Write;
-            let mut stderr = std::io::stderr();
-            let _ = write!(stderr, "In-process event handler was not present; assuming we are already in another event processing routine...\n");
+        // Serialize the state and wait safely for the broker to read pending messages
+        manager.on_restart(state).unwrap();
+
+        log::info!("Bye!");
+    }
+}
+
+impl GlobalContextGuard<'static, (), (), (), (), ()> {
+    /// Take the global context using the provided [`HookContext`]. You must call this function like
+    /// `GlobalContextGuard::take_guard::<C>()`, with `C` as your context.
+    pub unsafe fn take_global<'a, C>(
+    ) -> Option<GlobalContextGuard<'a, C::Executor, C::EventManager, C::Input, C::State, C::Fuzzer>>
+    where
+        C: HookContext<'a>,
+    {
+        CONTEXT
+            .swap(core::ptr::null_mut(), Ordering::Relaxed)
+            .as_mut()
+            .map(|ctx| GlobalContextGuard::<
+                'a,
+                C::Executor,
+                C::EventManager,
+                C::Input,
+                C::State,
+                C::Fuzzer,
+            > {
+                ctx,
+                phantom: PhantomData,
+            })
+    }
+}
+
+impl<'a, E, EM, I, S, Z> GlobalContextGuard<'a, E, EM, I, S, Z> {
+    /// Access the members of the global access.
+    pub fn access(&mut self) -> (&mut E, &mut Z, &mut S, &mut EM, &I) {
+        unsafe {
+            (
+                self.ctx.executor(),
+                self.ctx.fuzzer(),
+                self.ctx.state(),
+                self.ctx.manager(),
+                self.ctx.input(),
+            )
         }
+    }
+}
+
+impl<'a, E, EM, I, S, Z> Drop for GlobalContextGuard<'a, E, EM, I, S, Z> {
+    fn drop(&mut self) {
+        CONTEXT.store(self.ctx, Ordering::Relaxed);
     }
 }
 
@@ -230,11 +326,10 @@ impl<C> InProcessContext<C> {
     }
 }
 
-impl<'a, A, C, I> ExecutorHook<C> for InProcessHook<A, I>
+impl<'a, C, H> ExecutorHook<C> for InProcessHook<H>
 where
-    A: InProcessHookHandler<C::Executor, C::EventManager, C::Input, C::State, C::Fuzzer>,
+    H: InProcessHookHandler<C>,
     C: HookContext<'a> + 'a,
-    I: InProcessHookInstaller,
 {
     type Context = InProcessContext<C>;
 
@@ -272,15 +367,13 @@ where
         }
 
         // install the handlers!
-        I::install(
-            generic_event_callback::<A, C::Executor, C::EventManager, C::Input, C::State, C::Fuzzer>,
-        )?;
+        H::install()?;
 
         Ok(InProcessContext::new(context))
     }
 
     fn post_exec(&mut self, context: Self::Context) -> Result<C, Error> {
-        I::uninstall()?;
+        H::uninstall()?;
 
         let execution_data = CONTEXT.swap(core::ptr::null_mut(), Ordering::Relaxed);
         if execution_data == core::ptr::null_mut() {
@@ -303,27 +396,130 @@ where
 }
 
 // Definition with the execution context already installed for inserting multiple in-process hooks
-impl<'a, A, C, I> ExecutorHook<InProcessContext<C>> for InProcessHook<A, I>
+impl<'a, H, C> ExecutorHook<InProcessContext<C>> for InProcessHook<H>
 where
-    A: InProcessHookHandler<C::Executor, C::EventManager, C::Input, C::State, C::Fuzzer>,
+    H: InProcessHookHandler<C>,
     C: HookContext<'a> + 'a,
-    I: InProcessHookInstaller,
 {
     type Context = InProcessContext<C>;
 
     fn pre_exec(&mut self, context: Self::Context) -> Result<Self::Context, Error> {
         // install the handlers!
-        I::install(
-            generic_event_callback::<A, C::Executor, C::EventManager, C::Input, C::State, C::Fuzzer>,
-        )?;
+        H::install()?;
 
         Ok(context)
     }
 
     fn post_exec(&mut self, context: Self::Context) -> Result<Self::Context, Error> {
-        I::uninstall()?;
+        H::uninstall()?;
 
         Ok(context)
+    }
+}
+
+/// Default callback for timeouts, regardless of platform
+pub fn on_timeout(guard: &mut impl InProcessStateSaver) {
+    log::error!("Timeout in fuzz run.");
+
+    guard.run_observers_and_save_state(ExitKind::Timeout);
+
+    log::info!("Exiting");
+
+    unsafe {
+        libc::_exit(55);
+    }
+}
+
+#[cfg(feature = "std")]
+mod panic {
+    use alloc::boxed::Box;
+    use std::{
+        marker::PhantomData,
+        panic,
+        panic::PanicHookInfo,
+        sync::atomic::{AtomicPtr, Ordering},
+    };
+
+    use libafl_bolts::Error;
+
+    use crate::{
+        executors::{
+            hooks::inprocess::{GlobalContextGuard, InProcessHookHandler, InProcessStateSaver},
+            ExitKind,
+        },
+        prelude::hooks::HookContext,
+    };
+
+    /// Callback for [`PanicHookHandler`] which will run when a Rust panic occurs
+    pub trait PanicCallback<'a, C> {
+        fn on_panic(info: &PanicHookInfo);
+    }
+
+    /// Default callback for [`PanicHookHandler`], which invokes [`run_observers_and_save_state`]
+    /// and denotes that the [`ExitKind`] is [`ExitKind::Crash`].
+    pub struct StdPanicCallback;
+
+    impl<'a, C> PanicCallback<'a, C> for StdPanicCallback
+    where
+        C: HookContext<'a>,
+        GlobalContextGuard<'a, C::Executor, C::EventManager, C::Input, C::State, C::Fuzzer>:
+            InProcessStateSaver,
+    {
+        fn on_panic(_info: &PanicHookInfo) {
+            let maybe_guard = unsafe { GlobalContextGuard::take_global::<C>() };
+            if let Some(mut guard) = maybe_guard {
+                guard.run_observers_and_save_state(ExitKind::Crash);
+            } else {
+            }
+        }
+    }
+
+    /// Install a panic hook via [`panic::set_hook`]
+    #[derive(Debug)]
+    pub struct PanicHookHandler<A = StdPanicCallback>(PhantomData<fn() -> A>);
+
+    struct OldHookHolder {
+        hook: Box<dyn Fn(&PanicHookInfo<'_>) + 'static + Sync + Send>,
+    }
+
+    static OLD_HOOK: AtomicPtr<OldHookHolder> = AtomicPtr::new(core::ptr::null_mut());
+
+    impl<A, C> InProcessHookHandler<C> for PanicHookHandler<A>
+    where
+        A: for<'a> PanicCallback<'a, C>,
+    {
+        fn install() -> Result<(), Error> {
+            let hook = panic::take_hook();
+            let holder = Box::leak(Box::new(OldHookHolder { hook }));
+            OLD_HOOK.store(holder, Ordering::Relaxed);
+
+            panic::set_hook(Box::new(move |panic_info| unsafe {
+                if let Some(holder) = OLD_HOOK
+                    .swap(core::ptr::null_mut(), Ordering::Relaxed)
+                    .as_mut()
+                {
+                    (holder.hook)(panic_info);
+                    A::on_panic(panic_info);
+
+                    libc::_exit(128 + 6); // SIGABRT exit code
+                }
+            }));
+            Ok(())
+        }
+
+        fn uninstall() -> Result<(), Error> {
+            let holder = unsafe {
+                OLD_HOOK
+                    .swap(core::ptr::null_mut(), Ordering::Relaxed)
+                    .as_mut()
+                    .ok_or_else(|| {
+                        Error::illegal_state("Old hook was unset, but we should have installed it")
+                    })?
+            };
+            let holder = unsafe { Box::from_raw(holder) };
+            panic::set_hook(holder.hook);
+            Ok(())
+        }
     }
 }
 

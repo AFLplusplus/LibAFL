@@ -386,57 +386,6 @@ where
     }
 }
 
-#[inline]
-#[allow(clippy::too_many_arguments)]
-/// Save state if it is an objective
-pub fn run_observers_and_save_state<E, EM, I, S, Z>(
-    executor: &mut E,
-    state: &mut S,
-    input: &I,
-    fuzzer: &mut Z,
-    manager: &mut EM,
-    exit_kind: ExitKind,
-) where
-    E: HasObservers,
-    EM: EventFirer<I, S> + EventRestarter<S>,
-    S: HasExecutions + HasSolutions + HasCorpus,
-    Z: HasObjective + HasScheduler + ExecutionProcessor<EM, I, E::Observers, S>,
-    Z::Objective: Feedback<EM, I, E::Observers, S>,
-{
-    let observers = executor.observers_mut();
-    let scheduler = fuzzer.scheduler_mut();
-
-    if scheduler.on_evaluation(state, input, &*observers).is_err() {
-        log::error!("Failed to call on_evaluation");
-        return;
-    }
-
-    let res = fuzzer.check_results(state, manager, input, &*observers, &exit_kind);
-    if let Ok(exec_res) = res {
-        if fuzzer
-            .process_execution(state, manager, input, &exec_res, &*observers)
-            .is_err()
-        {
-            log::error!("Failed to call process_execution");
-            return;
-        }
-
-        if fuzzer
-            .dispatch_event(state, manager, input.clone(), &exec_res, None, &exit_kind)
-            .is_err()
-        {
-            log::error!("Failed to dispatch_event");
-            return;
-        }
-    } else {
-        log::error!("Faild to check execution result");
-    }
-    // Serialize the state and wait safely for the broker to read pending messages
-    manager.on_restart(state).unwrap();
-
-    log::info!("Bye!");
-}
-
 // TODO remove this after executor refactor and libafl qemu new executor
 /// Expose a version of the crash handler that can be called from e.g. an emulator
 ///
