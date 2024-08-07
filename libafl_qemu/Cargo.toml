@@ -142,6 +142,7 @@ bindgen = "0.69"
 cc = "1.0"
 
 [dev-dependencies]
+static_assertions = "1.1"
 nix = {version = "0.29", features = ["signal", "process"]}
 caps = "0.5"
 
