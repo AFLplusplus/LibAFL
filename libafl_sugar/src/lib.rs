@@ -86,15 +86,15 @@ use pyo3::prelude::*;
 #[cfg(feature = "python")]
 #[pymodule]
 #[pyo3(name = "libafl_sugar")]
-pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
-    inmemory::pybind::register(py, m)?;
+pub fn python_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    inmemory::pybind::register(m)?;
     #[cfg(target_os = "linux")]
     {
-        qemu::pybind::register(py, m)?;
+        qemu::pybind::register(m)?;
     }
     #[cfg(unix)]
     {
-        forkserver::pybind::register(py, m)?;
+        forkserver::pybind::register(m)?;
     }
     Ok(())
 }

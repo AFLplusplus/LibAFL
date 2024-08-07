@@ -393,6 +393,16 @@ pub mod pybind {
         /// Create a new [`InMemoryBytesCoverageSugar`]
         #[new]
         #[allow(clippy::too_many_arguments)]
+        #[pyo3(signature = (
+            input_dirs,
+            output_dir,
+            broker_port,
+            cores,
+            use_cmplog=None,
+            iterations=None,
+            tokens_file=None,
+            timeout=None
+        ))]
         fn new(
             input_dirs: Vec<PathBuf>,
             output_dir: PathBuf,
@@ -425,7 +435,7 @@ pub mod pybind {
                 .cores(&self.cores)
                 .harness(|buf| {
                     Python::with_gil(|py| -> PyResult<()> {
-                        let args = (PyBytes::new(py, buf),); // TODO avoid copy
+                        let args = (PyBytes::new_bound(py, buf),); // TODO avoid copy
                         harness.call1(py, args)?;
                         Ok(())
                     })
@@ -441,7 +451,7 @@ pub mod pybind {
     }
 
     /// Register the module
-    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+    pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
         m.add_class::<InMemoryBytesCoverageSugar>()?;
         Ok(())
     }

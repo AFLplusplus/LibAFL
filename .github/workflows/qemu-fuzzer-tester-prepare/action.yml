@@ -3,20 +3,10 @@ description: Sets up the QEMU fuzzers environment
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: true
-        fetch-depth: 0
     - name: Install QEMU deps
       shell: bash
-      run: apt-get update && apt-get install -y qemu-utils sudo
-    - uses: ./.github/workflows/ubuntu-prepare
-    - uses: Swatinem/rust-cache@v2
-      with: { shared-key: "${{ runner.os }}-shared-fuzzer-cache" }
+      run: apt-get update && apt-get install -y qemu-utils sudo python3-msgpack python3-jinja2 curl
     - uses: dtolnay/rust-toolchain@stable
-    - name: pip install
-      shell: bash
-      run: python3 -m pip install msgpack jinja2 find_libpython
     - name: enable mult-thread for `make`
       shell: bash
       run: export MAKEFLAGS="-j$(expr $(nproc) \+ 1)"
@@ -24,3 +14,10 @@ runs:
       uses: baptiste0928/cargo-install@v3
       with:
         crate: cargo-make
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+        fetch-depth: 0
+    - uses: ./.github/workflows/ubuntu-prepare
+    - uses: Swatinem/rust-cache@v2
+      with: { shared-key: "${{ runner.os }}-shared-fuzzer-cache" }

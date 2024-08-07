@@ -34,7 +34,11 @@ use std::{fs::File, hash::Hash, io::Read, path::Path};
 
 #[cfg(feature = "std")]
 use libafl_bolts::fs::write_file_atomic;
-use libafl_bolts::{ownedref::OwnedSlice, Error, HasLen};
+use libafl_bolts::{
+    ownedref::{OwnedMutSlice, OwnedSlice},
+    subrange::{SubRangeMutSlice, SubRangeSlice},
+    Error, HasLen,
+};
 #[cfg(feature = "nautilus")]
 pub use nautilus::*;
 use serde::{Deserialize, Serialize};
@@ -123,7 +127,14 @@ impl HasTargetBytes for NopInput {
     }
 }
 
+impl HasLen for NopInput {
+    fn len(&self) -> usize {
+        0
+    }
+}
+
 // TODO change this to fn target_bytes(&self, buffer: &mut Vec<u8>) -> &[u8];
+/// Has a byte representation intended for the target.
 /// Can be represented with a vector of bytes.
 /// This representation is not necessarily deserializable.
 /// Instead, it can be used as bytes input for a target
@@ -132,7 +143,7 @@ pub trait HasTargetBytes {
     fn target_bytes(&self) -> OwnedSlice<u8>;
 }
 
-/// Contains mutateable and resizable bytes
+/// Contains mutable and resizable bytes
 pub trait HasMutatorBytes: HasLen {
     /// The bytes
     fn bytes(&self) -> &[u8];
@@ -142,22 +153,38 @@ pub trait HasMutatorBytes: HasLen {
 
     /// Resize the mutator bytes to a given new size.
     /// Use `value` to fill new slots in case the buffer grows.
-    /// See [`alloc::vec::Vec::splice`].
+    /// See [`Vec::splice`].
     fn resize(&mut self, new_len: usize, value: u8);
 
     /// Extends the given buffer with an iterator. See [`alloc::vec::Vec::extend`]
     fn extend<'a, I: IntoIterator<Item = &'a u8>>(&mut self, iter: I);
 
-    /// Splices the given target bytes according to [`alloc::vec::Vec::splice`]'s rules
+    /// Splices the given target bytes according to [`Vec::splice`]'s rules
     fn splice<R, I>(&mut self, range: R, replace_with: I) -> Splice<'_, I::IntoIter>
     where
         R: RangeBounds<usize>,
         I: IntoIterator<Item = u8>;
 
-    /// Drains the given target bytes according to [`alloc::vec::Vec::drain`]'s rules
+    /// Drains the given target bytes according to [`Vec::drain`]'s rules
     fn drain<R>(&mut self, range: R) -> Drain<'_, u8>
     where
         R: RangeBounds<usize>;
+
+    /// Creates a [`SubRangeSlice`] from this input, that can be used to slice a byte array.
+    fn sub_bytes<R>(&self, range: R) -> SubRangeSlice<u8>
+    where
+        R: RangeBounds<usize>,
+    {
+        SubRangeSlice::new(OwnedSlice::from(self.bytes()), range)
+    }
+
+    /// Creates a [`SubRangeMutSlice`] from this input, that can be used to slice a byte array.
+    fn sub_bytes_mut<R>(&mut self, range: R) -> SubRangeMutSlice<u8>
+    where
+        R: RangeBounds<usize>,
+    {
+        SubRangeMutSlice::new(OwnedMutSlice::from(self.bytes_mut()), range)
+    }
 
     /// Creates a [`BytesSubInput`] from this input, that can be used for local mutations.
     fn sub_input<R>(&mut self, range: R) -> BytesSubInput<Self>

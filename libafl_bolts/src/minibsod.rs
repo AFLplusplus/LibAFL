@@ -1,7 +1,7 @@
 //! Implements a mini-bsod generator.
 //! It dumps all important registers and prints a stacktrace.
 
-#[cfg(target_vendor = "apple")]
+#[cfg(any(target_vendor = "apple", target_os = "openbsd"))]
 use core::mem::size_of;
 use std::io::{BufWriter, Write};
 #[cfg(any(target_os = "solaris", target_os = "illumos"))]
@@ -482,6 +482,7 @@ pub fn dump_registers<W: Write>(
     Ok(())
 }
 
+/// Write the content of all important registers
 #[cfg(all(target_os = "haiku", target_arch = "x86_64"))]
 #[allow(clippy::similar_names)]
 pub fn dump_registers<W: Write>(

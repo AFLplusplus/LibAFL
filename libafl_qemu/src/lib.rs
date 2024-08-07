@@ -79,20 +79,22 @@ use pyo3::prelude::*;
 #[pymodule]
 #[pyo3(name = "libafl_qemu")]
 #[allow(clippy::items_after_statements, clippy::too_many_lines)]
-pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
-    let regsm = PyModule::new(py, "regs")?;
+pub fn python_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    use pyo3::types::PyString;
+
+    let regsm = PyModule::new_bound(m.py(), "regs")?;
     for r in Regs::iter() {
         let v: i32 = r.into();
-        regsm.add(&format!("{r:?}"), v)?;
+        regsm.add(PyString::new_bound(m.py(), &format!("{r:?}")), v)?;
     }
-    m.add_submodule(regsm)?;
+    m.add_submodule(&regsm)?;
 
-    let mmapm = PyModule::new(py, "mmap")?;
+    let mmapm = PyModule::new_bound(m.py(), "mmap")?;
     for r in sys::MmapPerms::iter() {
         let v: i32 = r.into();
-        mmapm.add(&format!("{r:?}"), v)?;
+        mmapm.add(PyString::new_bound(m.py(), &format!("{r:?}")), v)?;
     }
-    m.add_submodule(mmapm)?;
+    m.add_submodule(&mmapm)?;
 
     m.add_class::<sys::MapInfo>()?;
 

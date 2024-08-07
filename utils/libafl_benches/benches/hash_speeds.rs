@@ -15,7 +15,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     }
 
     c.bench_function("xxh3", |b| {
-        b.iter(|| xxh3::xxh3_64_with_seed(black_box(&bench_vec), 0));
+        b.iter(|| black_box(xxh3::xxh3_64_with_seed(&bench_vec, 0)));
     });
     /*c.bench_function("const_xxh3", |b| {
         b.iter(|| const_xxh3::xxh3_64_with_seed(black_box(&bench_vec), 0))
@@ -29,7 +29,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     });
     c.bench_function("fxhash", |b| {
         b.iter(|| {
-            let mut hasher = black_box(rustc_hash::FxHasher::default());
+            let mut hasher = rustc_hash::FxHasher::default();
             hasher.write(black_box(&bench_vec));
             black_box(hasher.finish());
         });

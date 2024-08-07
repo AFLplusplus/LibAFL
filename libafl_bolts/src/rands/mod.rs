@@ -1,10 +1,8 @@
 //! The random number generators of `LibAFL`
 
-use core::{
-    debug_assert,
-    fmt::Debug,
-    sync::atomic::{AtomicUsize, Ordering},
-};
+#[cfg(target_has_atomic = "ptr")]
+use core::sync::atomic::Ordering;
+use core::{debug_assert, fmt::Debug, sync::atomic::AtomicUsize};
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -689,7 +687,7 @@ pub mod pybind {
         }
     }
 
-    #[derive(Serialize, Deserialize, Debug, Clone)]
+    #[derive(Serialize, Deserialize, Debug)]
     enum PythonRandWrapper {
         Std(Py<PythonStdRand>),
     }
@@ -697,7 +695,7 @@ pub mod pybind {
     /// Rand Trait binding
     #[pyclass(unsendable, name = "Rand")]
     #[allow(clippy::unsafe_derive_deserialize)]
-    #[derive(Serialize, Deserialize, Debug, Clone)]
+    #[derive(Serialize, Deserialize, Debug)]
     pub struct PythonRand {
         wrapper: PythonRandWrapper,
     }
@@ -730,7 +728,7 @@ pub mod pybind {
     }
 
     /// Register the classes to the python module
-    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+    pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
         m.add_class::<PythonStdRand>()?;
         m.add_class::<PythonRand>()?;
         Ok(())

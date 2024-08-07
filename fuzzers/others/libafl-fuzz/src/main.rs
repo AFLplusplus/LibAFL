@@ -6,6 +6,7 @@
 #![allow(clippy::similar_names)]
 #![allow(clippy::too_many_lines)]
 #![allow(clippy::struct_excessive_bools)]
+#![allow(clippy::case_sensitive_file_extension_comparisons)]
 
 use std::{collections::HashMap, path::PathBuf, time::Duration};
 mod afl_stats;
@@ -120,7 +121,7 @@ struct Opt {
     #[arg(short = 'o')]
     output_dir: PathBuf,
     /// file extension for the fuzz test input file (if needed)
-    #[arg(short = 's')]
+    #[arg(short = 'e')]
     input_ext: Option<String>,
     /// use a fixed seed for the RNG
     #[arg(short = 's')]
@@ -134,8 +135,8 @@ struct Opt {
     /// sync to a foreign fuzzer queue directory (requires -M, can be specified up to 32 times)
     #[arg(short = 'F', num_args = 32)]
     foreign_sync_dirs: Vec<PathBuf>,
-    /// fuzzer dictionary (see README.md, specify up to 4 times)
-    #[arg(short = 'x', num_args = 4)]
+    /// fuzzer dictionary (see README.md)
+    #[arg(short = 'x')]
     dicts: Vec<PathBuf>,
     // Environment + CLI variables
     #[arg(short = 'G')]
@@ -152,13 +153,16 @@ struct Opt {
     #[arg(short = 'V')]
     fuzz_for_seconds: Option<usize>,
 
+    /// timeout for each run
+    #[arg(short = 't', default_value_t = 1000)]
+    hang_timeout: u64,
+
     // Environment Variables
     #[clap(skip)]
     bench_just_one: bool,
     #[clap(skip)]
     bench_until_crash: bool,
-    #[clap(skip)]
-    hang_timeout: u64,
+
     #[clap(skip)]
     debug_child: bool,
     #[clap(skip)]
@@ -233,6 +237,8 @@ struct Opt {
     /// use binary-only instrumentation (FRIDA mode)
     #[arg(short = 'O')]
     frida_mode: bool,
+    #[clap(skip)]
+    frida_asan: bool,
     /// use binary-only instrumentation (QEMU mode)
     #[arg(short = 'Q')]
     qemu_mode: bool,

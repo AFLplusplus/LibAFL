@@ -1,10 +1,10 @@
 [env]
-FUZZER_NAME="fuzzer"
+FUZZER_NAME = "fuzzer"
 PROJECT_DIR = { script = ["pwd"] }
 
 [tasks.unsupported]
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 echo "Cargo-make not integrated yet on this"
 '''
 

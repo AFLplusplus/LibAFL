@@ -18,32 +18,27 @@
 #                       # 0 = first, 1 = second, ... 0-5 are supported (depending on architecture)
 
 [sql]
-tokens = [ "'\"\"'\"\n", "\"1\" OR '1'=\"1\"" ]
-matches = [ "'\"\"'\"", "1\" OR '1'=\"1" ]
+tokens = ["'\"\"'\"\n", "\"1\" OR '1'=\"1\""]
+matches = ["'\"\"'\"", "1\" OR '1'=\"1"]
 
 [sql.functions]
-sqlite3_exec = {param = 1}
-PQexec = {param = 1}
-PQexecParams = {param = 1}
-mysql_query = {param = 1}
-mysql_send_query = {param = 1}
+sqlite3_exec = { param = 1 }
+PQexec = { param = 1 }
+PQexecParams = { param = 1 }
+mysql_query = { param = 1 }
+mysql_send_query = { param = 1 }
 
 
 # Command injection. Note that for most you will need a libc with debug symbols
 # We do not need this as we watch the SYS_execve syscall, this is just an
 # example.
 [cmd]
-tokens = [
-    "'\"FUZZ\"'",
-    "\";FUZZ;\"",
-    "';FUZZ;'",
-    "$(FUZZ)",
-]
+tokens = ["'\"FUZZ\"'", "\";FUZZ;\"", "';FUZZ;'", "$(FUZZ)"]
 matches = ["'\"FUZZ\"'"]
 
 [cmd.functions]
-popen = {param = 0}
-system = {param = 0}
+popen = { param = 0 }
+system = { param = 0 }
 
 # LDAP injection tests
 [ldap]
@@ -51,8 +46,8 @@ tokens = ["*)(FUZZ=*))(|"]
 matches = ["*)(FUZZ=*))(|"]
 
 [ldap.functions]
-ldap_search_ext = {param = 3}
-ldap_search_ext_s = {param = 3}
+ldap_search_ext = { param = 3 }
+ldap_search_ext_s = { param = 3 }
 
 # XSS injection tests
 # This is a minimal example that only checks for libxml2
@@ -60,4 +55,4 @@ ldap_search_ext_s = {param = 3}
 tokens = ["'\"><FUZZ"]
 matches = ["'\"><FUZZ"]
 [xss.functions]
-htmlReadMemory = {param = 0}
+htmlReadMemory = { param = 0 }

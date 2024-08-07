@@ -10,7 +10,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   CARGO_NET_GIT_FETCH_WITH_CLI: true
-  MAIN_LLVM_VERSION: 19
+  MAIN_LLVM_VERSION: 18
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -20,12 +20,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-latest, windows-latest, macOS-latest ]
+        os: [ ubuntu-24.04, windows-latest, macOS-latest ]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - if: runner.os == 'Linux'
-        uses: ./.github/workflows/ubuntu-prepare
       - name: Install mimetype
         if: runner.os == 'Linux'
         run: sudo apt-get install -y libfile-mimeinfo-perl
@@ -41,6 +38,11 @@ jobs:
           #       => https://github.com/Michael-F-Bryan/mdbook-linkcheck/pull/82#issuecomment-2241058491
           git: https://github.com/Michael-F-Bryan/mdbook-linkcheck.git
           rev: 8c783c5d754d83bcd50c28fb4174854b04ece990
+      - name: default nightly
+        run: rustup default nightly
+      - uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
         if: runner.os == 'Linux'
@@ -49,8 +51,6 @@ jobs:
       - name: Check for binary blobs
         if: runner.os == 'Linux'
         run: ./scripts/check_for_blobs.sh
-      - name: default nightly
-        run: rustup default nightly
       - name: Build libafl debug
         run: cargo build -p libafl
       - name: Test the book
@@ -67,7 +67,7 @@ jobs:
         run: cd libafl_targets && cargo test --no-default-features
 
   llvm-tester:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     continue-on-error: true
     strategy:
       matrix:
@@ -75,19 +75,21 @@ jobs:
     steps:
       - name: Remove Dotnet & Haskell
         run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
+      - name: Install curl
+        run: sudo apt-get install clang
       - uses: dtolnay/rust-toolchain@stable
-      - uses: actions/checkout@v4
-      - uses: Swatinem/rust-cache@v2
-        with: { shared-key: "llvm-tester" }
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
         with:
           version: "${{matrix.llvm-version}}"
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+        with: { shared-key: "llvm-tester" }
       - name: Build and test with llvm-${{ matrix.llvm-version }}
         run: pwd && ls & cd libafl_cc && cargo build --release
 
   ubuntu-doc-build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
@@ -97,7 +99,7 @@ jobs:
         run: RUSTFLAGS="--cfg docsrs" cargo +nightly doc --all-features --no-deps
 
   ubuntu-doc-test:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
@@ -107,27 +109,27 @@ jobs:
         run: RUSTFLAGS="--cfg docsrs" cargo +nightly test --doc --all-features
 
   ubuntu-miri:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: ubuntu
     steps:
+      - name: Add nightly clippy
+        run: rustup toolchain install nightly --component miri --allow-downgrade
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
-      - name: Add nightly clippy
-        run: rustup toolchain install nightly --component miri --allow-downgrade
       # --- miri undefined behavior test --
       - name: Run miri tests
         run: RUST_BACKTRACE=1 MIRIFLAGS="-Zmiri-disable-isolation" cargo +nightly miri test
 
   ubuntu:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
+      - name: Remove Dotnet & Haskell
+        run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
-      - name: Remove Dotnet & Haskell
-        run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
       # pcguard edges and pcguard hitcounts are not compatible and we need to build them seperately
       - name: Check pcguard edges
         run: cargo check --features=sancov_pcguard_edges
@@ -140,16 +142,16 @@ jobs:
         run: cargo build --examples --verbose
 
   ubuntu-clippy:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/workflows/ubuntu-prepare
-      - uses: Swatinem/rust-cache@v2
-        with: { shared-key: "ubuntu" }
       - name: Remove Dotnet & Haskell
         run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
       - name: Add nightly clippy
         run: rustup toolchain install nightly --component clippy --allow-downgrade && rustup default nightly
+      - uses: actions/checkout@v4
+      - uses: ./.github/workflows/ubuntu-prepare
+      - uses: Swatinem/rust-cache@v2
+        with: { shared-key: "ubuntu" }
       - name: Run clippy
         run: ./scripts/clippy.sh
     # --- test embedding the libafl_libfuzzer_runtime library
@@ -158,7 +160,7 @@ jobs:
     #  run: cargo +nightly test --features=embed-runtime --manifest-path libafl_libfuzzer/Cargo.toml
 
   ubuntu-check:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: ubuntu
     strategy:
       matrix:
@@ -176,9 +178,11 @@ jobs:
         run: python3 ./scripts/parallellize_cargo_check.py ${{ matrix.instance_idx }}
 
   ubuntu-concolic:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: ubuntu
     steps:
+      - name: Install curl
+        run: sudo apt-get install clang
       - uses: dtolnay/rust-toolchain@stable
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
@@ -189,36 +193,36 @@ jobs:
         run: ./libafl_concolic/test/smoke_test.sh
 
   python-bindings:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
+      - name: Install deps
+        run: sudo apt-get install -y lsb-release wget software-properties-common gnupg ninja-build python3-dev python3-pip python3-venv libz3-dev
+      - name: Install maturin
+        run: cargo install --locked maturin
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
-      - name: Install deps
-        run: sudo apt-get install -y lsb-release wget software-properties-common gnupg ninja-build python3-dev python3-pip python3-venv libz3-dev
-      - name: Install maturin
-        run: python3 -m pip install maturin
       - name: Run a maturin build
-        run: export LLVM_CONFIG=llvm-config-16 && cd ./bindings/pylibafl && python3 -m venv .env && . .env/bin/activate && pip install --upgrade --force-reinstall . && ./test.sh
+        run: export LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} && cd ./bindings/pylibafl && python3 -m venv .env && . .env/bin/activate && pip install --upgrade --force-reinstall . && ./test.sh
       - name: Run python test
         run: . ./bindings/pylibafl/.env/bin/activate # && cd ./fuzzers/qemu/python_qemu/ && python3 fuzzer.py 2>&1 | grep "Bye"
 
   cargo-fmt:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
-      - uses: Swatinem/rust-cache@v2
-        with: { shared-key: "ubuntu" }
       - name: Add rustfmt nightly
         shell: bash
         run: rustup component add --toolchain nightly-x86_64-unknown-linux-gnu rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with: { shared-key: "ubuntu" }
       - name: Format Check
         run: ./scripts/fmt_all.sh check
 
   fuzzers-preflight:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Fuzzer in CI Check
@@ -232,7 +236,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        os: [ ubuntu-latest ]
+        os: [ ubuntu-24.04 ]
         fuzzer:
           # Baby
           - ./fuzzers/baby/baby_fuzzer_with_forkexecutor
@@ -312,10 +316,10 @@ jobs:
       - name: Build and run example fuzzers (Linux)
         if: runner.os == 'Linux'
         shell: bash
-        run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
+        run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
 
   changes:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       pull-requests: read
     outputs:
@@ -341,7 +345,7 @@ jobs:
     if: ${{ needs.changes.outputs.qemu == 'true' }}
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-24.04]
         fuzzer:
           - ./fuzzers/qemu/qemu_cmin
           - ./fuzzers/qemu/qemu_systemmode
@@ -356,18 +360,18 @@ jobs:
       - name: Build and run example QEMU fuzzers (Linux)
         if: runner.os == 'Linux'
         shell: bash
-        run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
+        run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
 
   nostd-build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: rust-src
-      - uses: actions/checkout@v4
-      - uses: Swatinem/rust-cache@v2
       - name: Add targets
         run: rustup target add arm-linux-androideabi && rustup target add thumbv6m-none-eabi
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
       - name: Build aarch64-unknown-none
         run: cd ./fuzzers/baby/baby_no_std && cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
       - name: run x86_64 until panic!
@@ -376,22 +380,31 @@ jobs:
         run: cd ./libafl && cargo test --no-default-features
 
   nostd-clippy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: clippy, rust-src
-      - uses: actions/checkout@v4
-      - uses: Swatinem/rust-cache@v2
       - name: Add targets
         run: rustup target add arm-linux-androideabi && rustup target add thumbv6m-none-eabi
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
       - name: libafl armv6m-none-eabi (32 bit no_std) clippy
         run: cd ./libafl && cargo clippy --target thumbv6m-none-eabi --no-default-features
       - name: Build no_std no_alloc bolts
         run: cd ./libafl_bolts && cargo +nightly build -Zbuild-std=core --target aarch64-unknown-none --no-default-features -v --release && cd ../
 
+  format-toml:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Install taplo
+        run: curl -fsSL https://github.com/tamasfe/taplo/releases/latest/download/taplo-full-linux-x86_64.gz | gzip -d - | install -m 755 /dev/stdin /usr/local/bin/taplo
+      - uses: actions/checkout@v4
+      - name: Run taplo
+        run: taplo format --check
+
   build-docker:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Build docker
@@ -432,10 +445,10 @@ jobs:
     needs:
       - common
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/workflows/windows-tester-prepare
       - name: install cxx bridge
         run: cargo install cxxbridge-cmd
+      - uses: actions/checkout@v4
+      - uses: ./.github/workflows/windows-tester-prepare
       - name: Build fuzzers/others/tinyinst_simple
         run: cd fuzzers/others/tinyinst_simple/ && cargo make test
 
@@ -485,8 +498,10 @@ jobs:
         run: cargo build --target aarch64-apple-ios && cd libafl_frida && cargo build --target aarch64-apple-ios && cd ..
 
   android:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
+      - name: Install curl
+        run: sudo apt-get install clang
       - uses: dtolnay/rust-toolchain@stable
       - uses: nttld/setup-ndk@v1
         with:

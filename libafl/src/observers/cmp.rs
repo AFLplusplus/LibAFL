@@ -9,7 +9,7 @@ use core::{
 
 use c2rust_bitfields::BitfieldStruct;
 use hashbrown::HashMap;
-use libafl_bolts::{ownedref::OwnedRefMut, serdeany::SerdeAny, Named};
+use libafl_bolts::{ownedref::OwnedRefMut, serdeany::SerdeAny, AsSlice, HasLen, Named};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{executors::ExitKind, inputs::UsesInput, observers::Observer, Error, HasMetadata};
@@ -35,6 +35,39 @@ where
     fn add_from(&mut self, usable_count: usize, cmp_map: &mut CM, cmp_observer_data: Self::Data);
 }
 
+/// A bytes string for cmplog with up to 32 elements.
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct CmplogBytes {
+    buf: [u8; 32],
+    len: u8,
+}
+
+impl CmplogBytes {
+    /// Creates a new [`CmplogBytes`] object from the provided buf and length.
+    /// Lengths above 32 are illegal but will be ignored.
+    #[must_use]
+    pub fn from_buf_and_len(buf: [u8; 32], len: u8) -> Self {
+        debug_assert!(len <= 32, "Len too big: {len}, max: 32");
+        CmplogBytes { buf, len }
+    }
+}
+
+impl<'a> AsSlice<'a> for CmplogBytes {
+    type Entry = u8;
+
+    type SliceRef = &'a [u8];
+
+    fn as_slice(&'a self) -> Self::SliceRef {
+        &self.buf[0..(self.len as usize)]
+    }
+}
+
+impl HasLen for CmplogBytes {
+    fn len(&self) -> usize {
+        self.len as usize
+    }
+}
+
 /// Compare values collected during a run
 #[derive(Eq, PartialEq, Debug, Serialize, Deserialize, Clone)]
 pub enum CmpValues {
@@ -47,7 +80,7 @@ pub enum CmpValues {
     /// Two u64 values
     U64((u64, u64)),
     /// Two vecs of u8 values/byte
-    Bytes((Vec<u8>, Vec<u8>)),
+    Bytes((CmplogBytes, CmplogBytes)),
 }
 
 impl CmpValues {

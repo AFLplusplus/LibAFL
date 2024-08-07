@@ -1,13 +1,15 @@
 # Variables
 [env]
-FUZZER_NAME='libpng_harness'
+FUZZER_NAME = 'libpng_harness'
 PROJECT_DIR = { script = ["pwd"] }
-PROFILE = { value = "release", condition = {env_not_set = ["PROFILE"]} }
-PROFILE_DIR = {value = "release", condition = {env_not_set = ["PROFILE_DIR"] }}
+PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
+PROFILE_DIR = { value = "release", condition = { env_not_set = [
+  "PROFILE_DIR",
+] } }
 
 [tasks.unsupported]
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 echo "Qemu fuzzer not supported on windows"
 '''
 
@@ -18,9 +20,9 @@ mac_alias = "libpng_unix"
 windows_alias = "unsupported"
 
 [tasks.libpng_unix]
-condition = { files_not_exist = [ "./libpng-1.6.37" ] }
-script_runner="@shell"
-script='''
+condition = { files_not_exist = ["./libpng-1.6.37"] }
+script_runner = "@shell"
+script = '''
 wget https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
 tar -xvf v1.6.37.tar.gz
 '''
@@ -42,8 +44,8 @@ mac_alias = "harness_unix"
 windows_alias = "unsupported"
 
 [tasks.harness_unix]
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
 cd "${PROJECT_DIR}"
 make -C libpng-1.6.37
@@ -67,8 +69,19 @@ windows_alias = "unsupported"
 
 [tasks.run_unix]
 command = "cargo"
-args = ["run", "--profile", "${PROFILE_DIR}", "./${FUZZER_NAME}", "--", "--libafl-in", "../libfuzzer_libpng/corpus", "--libafl-out", "./out", "./${FUZZER_NAME}"]
-dependencies = [ "harness", "fuzzer" ]
+args = [
+  "run",
+  "--profile",
+  "${PROFILE_DIR}",
+  "./${FUZZER_NAME}",
+  "--",
+  "--libafl-in",
+  "../libfuzzer_libpng/corpus",
+  "--libafl-out",
+  "./out",
+  "./${FUZZER_NAME}",
+]
+dependencies = ["harness", "fuzzer"]
 
 # Run the fuzzer
 [tasks.test]
@@ -79,10 +92,10 @@ windows_alias = "unsupported"
 # Short test
 [tasks.test_unix]
 script_runner = "@shell"
-script='''
+script = '''
 echo "This test is skipped. QEMU-based fuzzer doesn't work on Github runners"
 '''
-dependencies = [ "harness", "fuzzer" ]
+dependencies = ["harness", "fuzzer"]
 
 # Clean up
 [tasks.clean]
@@ -93,8 +106,8 @@ windows_alias = "unsupported"
 [tasks.clean_unix]
 # Disable default `clean` definition
 clear = true
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 rm -f ./${FUZZER_NAME} libfuzzer_main.o
 make -C libpng-1.6.37 clean
 cargo clean

@@ -1,12 +1,16 @@
 # Variables
 [env]
-CARGO_TARGET_DIR = { value = "target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
-PROFILE = { value = "release", condition = {env_not_set = ["PROFILE"]} }
-PROFILE_DIR = {value = "release", condition = {env_not_set = ["PROFILE_DIR"] }}
+CARGO_TARGET_DIR = { value = "target", condition = { env_not_set = [
+  "CARGO_TARGET_DIR",
+] } }
+PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
+PROFILE_DIR = { value = "release", condition = { env_not_set = [
+  "PROFILE_DIR",
+] } }
 
 [tasks.unsupported]
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 echo "Cargo-make not integrated yet on this"
 '''
 
@@ -17,9 +21,9 @@ mac_alias = "unsupported"
 windows_alias = "unsupported"
 
 [tasks.libpng_unix]
-condition = { files_not_exist = ["./libpng-1.6.37"]}
-script_runner="@shell"
-script='''
+condition = { files_not_exist = ["./libpng-1.6.37"] }
+script_runner = "@shell"
+script = '''
 wget https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
 tar -xvf v1.6.37.tar.gz
 '''
@@ -31,13 +35,13 @@ mac_alias = "unsupported"
 windows_alias = "unsupported"
 
 [tasks.lib_unix]
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
 cd ..
 make -C libpng-1.6.37
 '''
-dependencies = [ "libpng" ]
+dependencies = ["libpng"]
 
 # Harness
 [tasks.harness]
@@ -46,12 +50,12 @@ mac_alias = "unsupported"
 windows_alias = "unsupported"
 
 [tasks.harness_unix]
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 clang++ -O0 -c -fPIC harness.cc -o harness.o
 clang++ -O0 harness.cc libpng-1.6.37/.libs/libpng16.a -lz -o libpng-harness -g
 '''
-dependencies = [ "lib" ]
+dependencies = ["lib"]
 
 # Fuzzer
 [tasks.fuzzer]
@@ -60,8 +64,8 @@ mac_alias = "unsupported"
 windows_alias = "unsupported"
 
 [tasks.fuzzer_unix]
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 cargo build --profile ${PROFILE}
 '''
 
@@ -73,10 +77,10 @@ windows_alias = "unsupported"
 
 [tasks.run_unix]
 script_runner = "@shell"
-script='''
+script = '''
 LD_PRELOAD=$CARGO_TARGET_DIR/${PROFILE_DIR}/libfrida_executable_fuzzer.so ./libpng-harness -i corpus -o out -H ./libpng-harness
 '''
-dependencies = [ "fuzzer", "harness" ]
+dependencies = ["fuzzer", "harness"]
 
 # Test
 [tasks.test]
@@ -86,7 +90,7 @@ windows_alias = "unsupported"
 
 [tasks.test_unix]
 script_runner = "@shell"
-script='''
+script = '''
 rm -rf libafl_unix_shmem_server || true
 LD_PRELOAD=$CARGO_TARGET_DIR/${PROFILE_DIR}/libfrida_executable_fuzzer.so ./libpng-harness -i corpus -o out -H ./libpng-harness > fuzz_stdout.log &
 sleep 10s && pkill libpng-harness
@@ -97,7 +101,7 @@ else
     exit 1
 fi
 '''
-dependencies = [ "fuzzer", "harness" ]
+dependencies = ["fuzzer", "harness"]
 
 # Clean up
 [tasks.clean]
@@ -108,8 +112,8 @@ windows_alias = "unsupported"
 [tasks.clean_unix]
 # Disable default `clean` definition
 clear = true
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 rm -f ./libpng-harness
 make -C libpng-1.6.37 clean
 cargo clean

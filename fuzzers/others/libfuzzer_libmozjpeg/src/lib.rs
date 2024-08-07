@@ -81,10 +81,17 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let edges_observer = unsafe { std_edges_map_observer("edges") };
 
     // Create an observation channel using the cmp map
-    let cmps_observer = unsafe { StdMapObserver::new("cmps", &mut CMP_MAP) };
+    let cmps_observer =
+        unsafe { StdMapObserver::from_mut_ptr("cmps", CMP_MAP.as_mut_ptr(), CMP_MAP.len()) };
 
     // Create an observation channel using the allocations map
-    let allocs_observer = unsafe { StdMapObserver::new("allocs", &mut libafl_alloc_map) };
+    let allocs_observer = unsafe {
+        StdMapObserver::from_mut_ptr(
+            "allocs",
+            libafl_alloc_map.as_mut_ptr(),
+            libafl_alloc_map.len(),
+        )
+    };
 
     // Feedback to rate the interestingness of an input
     let mut feedback = feedback_or!(
@@ -153,7 +160,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // Call LLVMFUzzerInitialize() if present.
     let args: Vec<String> = env::args().collect();
     if libfuzzer_initialize(&args) == -1 {
-        println!("Warning: LLVMFuzzerInitialize failed with -1")
+        println!("Warning: LLVMFuzzerInitialize failed with -1");
     }
 
     // In case the corpus is empty (on first run), reset

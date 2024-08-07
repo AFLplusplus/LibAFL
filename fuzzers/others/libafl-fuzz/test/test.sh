@@ -17,7 +17,7 @@ cargo build --release
 
 AFL_PATH=$AFL_DIR_NAME $AFL_CC_PATH $AFL_DIR_NAME/test-instr.c -o out-instr
 
-AFL_CORES=1 LLVM_CONFIG=llvm-config-18 AFL_STATS_INTERVAL=1 AFL_NUM_CORES=1 timeout 5 $LIBAFL_FUZZ_PATH -i ./seeds -o ./output $(pwd)/out-instr
+AFL_CORES=1 LLVM_CONFIG=${LLVM_CONFIG} AFL_STATS_INTERVAL=1 AFL_NUM_CORES=1 timeout 5 $LIBAFL_FUZZ_PATH -i ./seeds -o ./output $(pwd)/out-instr
 test -n "$( ls output/fuzzer_main/queue/id:000002* 2>/dev/null )" || exit 1
 test -n "$( ls output/fuzzer_main/fuzzer_stats 2>/dev/null )" || exit 1
 test -n "$( ls output/fuzzer_main/plot_data 2>/dev/null )" || exit 1

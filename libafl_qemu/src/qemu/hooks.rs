@@ -934,25 +934,24 @@ impl QemuHooks {
 #[pymethods]
 impl SyscallHookResult {
     #[new]
+    #[pyo3(signature = (
+        value=None
+    ))]
     #[must_use]
     pub fn new(value: Option<GuestAddr>) -> Self {
-        value.map_or(
-            Self {
-                retval: 0,
-                skip_syscall: false,
-            },
-            |v| Self {
-                retval: v,
-                skip_syscall: true,
-            },
-        )
+        Self::new_internal(value)
     }
 }
 
-#[cfg(not(feature = "python"))]
 impl SyscallHookResult {
+    #[cfg(not(feature = "python"))]
     #[must_use]
     pub fn new(value: Option<GuestAddr>) -> Self {
+        Self::new_internal(value)
+    }
+
+    #[must_use]
+    fn new_internal(value: Option<GuestAddr>) -> Self {
         value.map_or(
             Self {
                 retval: 0,

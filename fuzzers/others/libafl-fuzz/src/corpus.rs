@@ -144,13 +144,20 @@ pub fn check_autoresume(
         // Copy all our seeds to queue
         for file in std::fs::read_dir(intial_inputs)? {
             let path = file?.path();
-            std::fs::copy(
+            let cpy_res = std::fs::copy(
                 &path,
                 queue_dir.join(path.file_name().ok_or(Error::illegal_state(format!(
                     "file {} in input directory does not have a filename",
                     path.display()
                 )))?),
-            )?;
+            );
+            match cpy_res {
+                Err(e) if e.kind() == io::ErrorKind::InvalidInput => {
+                    println!("skipping {} since it is not a regular file", path.display());
+                }
+                Err(e) => return Err(e.into()),
+                Ok(_) => {}
+            }
         }
     }
     Ok(file)
