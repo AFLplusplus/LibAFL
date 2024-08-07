@@ -3,11 +3,10 @@
 use libafl_bolts::tuples::{Map, Merge};
 use tuple_list::{tuple_list, tuple_list_type};
 
-use super::ToOptionMappingMutatorMapper;
 use crate::mutators::{
     mapping::{
         FunctionMappingMutator, MutVecMappingMutator, OptionMappingMutator,
-        ToFunctionMappingMutatorMapper, ToMutVecMappingMutatorMapper,
+        ToFunctionMappingMutatorMapper, ToMutVecMappingMutatorMapper, ToOptionMappingMutatorMapper,
     },
     mutations::{
         BitFlipMutator, ByteAddMutator, ByteDecMutator, ByteFlipMutator, ByteIncMutator,
@@ -121,7 +120,7 @@ pub type MappedHavocMutationsType<'a, F1, F2> = tuple_list_type!(
     FunctionMappingMutator<MutVecMappingMutator<MappedCrossoverReplaceMutator<'a, F2>>, F1>,
 );
 
-/// Tuple type of the mutations that compose the Havoc mutator for mapped input types
+/// Tuple type of the mutations that compose the Havoc mutator for mapped input types, for optional byte array input parts
 pub type OptionMappedHavocMutationsType<'a, F1, F2> = tuple_list_type!(
     FunctionMappingMutator<OptionMappingMutator<MutVecMappingMutator<BitFlipMutator>>, F1>,
     FunctionMappingMutator<OptionMappingMutator<MutVecMappingMutator<ByteFlipMutator>>, F1>,
@@ -228,7 +227,7 @@ where
         .map(ToFunctionMappingMutatorMapper::new(current_input_mapper))
 }
 
-/// Get the mutations that compose the Havoc mutator for mapped input types
+/// Get the mutations that compose the Havoc mutator for mapped input types, for optional byte array input parts
 #[must_use]
 pub fn optional_mapped_havoc_mutations<F1, F2>(
     current_input_mapper: F1,
