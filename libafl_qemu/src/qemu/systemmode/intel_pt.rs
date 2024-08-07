@@ -30,25 +30,6 @@ bitflags! {
     }
 }
 
-// TODO consider moving to static assert crate
-const _: () = assert!(
-    ((PERF_BUFFER_SIZE - PAGE_SIZE) & (PERF_BUFFER_SIZE - PAGE_SIZE - 1)) == 0,
-    "PERF_BUFFER_SIZE should be 1+2^n pages"
-);
-const _: () = assert!(
-    (PERF_AUX_BUFFER_SIZE % PAGE_SIZE) == 0,
-    "PERF_AUX_BUFFER_SIZE must be page aligned"
-);
-const _: () = assert!(
-    (PERF_AUX_BUFFER_SIZE & (PERF_AUX_BUFFER_SIZE - 1)) == 0,
-    "PERF_AUX_BUFFER_SIZE must be a power of two"
-);
-// Ensure we can use usize and u64 interchangeably
-const _: () = assert!(
-    size_of::<usize>() == size_of::<u64>(),
-    "IntelPT: Only 64-bit systems are supported"
-);
-
 // TODO use libaflerr instead of () for Result
 
 pub struct IntelPT {
@@ -236,10 +217,7 @@ const fn wrap_aux_pointer(ptr: u64) -> u64 {
 #[cfg(test)]
 mod test {
     use core::panic;
-    use std::{
-        fs::OpenOptions, io, os::unix::process::CommandExt, process, process::Command,
-        thread::sleep, time::Duration,
-    };
+    use std::{fs::OpenOptions, io, os::unix::process::CommandExt, process, process::Command};
 
     use caps::{CapSet, Capability};
     use nix::{
@@ -251,6 +229,18 @@ mod test {
     };
 
     use super::*;
+
+    // PERF_BUFFER_SIZE should be 1+2^n pages
+    const_assert_eq!(
+        (PERF_BUFFER_SIZE - PAGE_SIZE) & (PERF_BUFFER_SIZE - PAGE_SIZE - 1),
+        0
+    );
+    // PERF_AUX_BUFFER_SIZE must be page aligned
+    const_assert_eq!(PERF_AUX_BUFFER_SIZE % PAGE_SIZE, 0);
+    // PERF_AUX_BUFFER_SIZE must be a power of two
+    const_assert_eq!(PERF_AUX_BUFFER_SIZE & (PERF_AUX_BUFFER_SIZE - 1), 0);
+    // Only 64-bit systems are supported, ensure we can use usize and u64 interchangeably
+    assert_eq_size!(usize, u64);
 
     #[test]
     fn trace_pid() {
@@ -282,7 +272,7 @@ mod test {
                 }
                 process::exit(0);
             }
-            Err(_) => panic!("Fork failed"),
+            Err(e) => panic!("Fork failed {e}"),
         };
 
         // brakes at aux mmap, EINVAL... maybe should add some barriers to let the kenrnel know

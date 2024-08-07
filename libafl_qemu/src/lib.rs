@@ -55,9 +55,9 @@ pub mod breakpoint;
 pub mod command;
 pub mod sync_exit;
 
-pub use libafl_qemu_sys::{GuestAddr, MmapPerms};
-#[cfg(emulation_mode = "systemmode")]
-pub use libafl_qemu_sys::{GuestPhysAddr, GuestVirtAddr};
+#[cfg(test)]
+#[macro_use]
+extern crate static_assertions;
 
 #[must_use]
 pub fn filter_qemu_args() -> Vec<String> {
