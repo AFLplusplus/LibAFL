@@ -818,6 +818,16 @@ where
     }
 }
 
+impl<A, S, T> FeedbackFactory<NotFeedback<A, S>, T> for NotFeedback<A, S>
+where
+    A: Feedback<S> + FeedbackFactory<A, T>,
+    S: State,
+{
+    fn create_feedback(&self, ctx: &T) -> NotFeedback<A, S> {
+        NotFeedback::new(self.first.create_feedback(ctx))
+    }
+}
+
 impl<A, S> NotFeedback<A, S>
 where
     A: Feedback<S>,
