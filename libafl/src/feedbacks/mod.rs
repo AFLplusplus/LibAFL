@@ -1289,6 +1289,12 @@ impl From<ConstFeedback> for bool {
     }
 }
 
+impl<T> FeedbackFactory<ConstFeedback, T> for ConstFeedback {
+    fn create_feedback(&self, _ctx: &T) -> ConstFeedback {
+        *self
+    }
+}
+
 #[cfg(feature = "track_hit_feedbacks")]
 /// Error if [`Feedback::last_result`] is called before the `Feedback` is actually run.
 pub(crate) fn premature_last_result_err() -> Error {
