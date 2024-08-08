@@ -10,6 +10,7 @@ use std::{
 };
 
 use bitflags::bitflags;
+use caps::{CapSet, Capability};
 use perf_event_open_sys::{
     bindings::{perf_event_attr, perf_event_mmap_page, PERF_FLAG_FD_CLOEXEC},
     ioctls::{DISABLE, ENABLE, SET_FILTER},
@@ -17,8 +18,9 @@ use perf_event_open_sys::{
 };
 
 const PAGE_SIZE: usize = 4096;
-const PERF_BUFFER_SIZE: usize = ((1 + (1 << 7)) * PAGE_SIZE) as usize;
-const PERF_AUX_BUFFER_SIZE: usize = 64 * 1024;
+const PERF_BUFFER_SIZE: usize = (1 + (1 << 7)) * PAGE_SIZE;
+const PERF_AUX_BUFFER_SIZE: usize = 64 * 1024 * 1024;
+const CPU_INFO_PATH: &str = "/proc/cpuinfo";
 const PT_EVENT_TYPE_PATH: &str = "/sys/bus/event_source/devices/intel_pt/type";
 
 bitflags! {
@@ -33,9 +35,9 @@ bitflags! {
 
 // TODO use libaflerr instead of () for Result
 
+#[derive(Debug)]
 pub struct IntelPT {
     fd: OwnedFd,
-    // TODO use proper types
     perf_buffer: *mut c_void,
     perf_aux_buffer: *mut c_void,
     buff_metadata: *mut perf_event_mmap_page,
@@ -43,8 +45,7 @@ pub struct IntelPT {
 
 impl IntelPT {
     pub fn try_new(pid: i32) -> Result<Self, ()> {
-        // TODO change the unwrap
-        let mut perf_event_attr = new_perf_event_attr_intel_pt().unwrap();
+        let mut perf_event_attr = new_perf_event_attr_intel_pt()?;
 
         let perf_event_open_ret = unsafe {
             perf_event_open(
@@ -64,7 +65,7 @@ impl IntelPT {
         let perf_buffer = setup_perf_buffer(&fd).unwrap();
 
         // the first page is a metadata page
-        let buff_metadata = unsafe { perf_buffer.cast::<perf_event_mmap_page>() };
+        let buff_metadata = perf_buffer.cast::<perf_event_mmap_page>();
         let aux_offset = unsafe { ptr::addr_of_mut!((*buff_metadata).aux_offset) };
         let aux_size = unsafe { ptr::addr_of_mut!((*buff_metadata).aux_size) };
         let data_offset = unsafe { ptr::addr_of_mut!((*buff_metadata).data_offset) };
@@ -130,9 +131,11 @@ impl IntelPT {
 
         let head = wrap_aux_pointer(unsafe { aux_head.read_volatile() });
         let tail = wrap_aux_pointer(unsafe { aux_tail.read_volatile() });
+
+        // TODO if head < tail
+
         // smp_rmb(); // TODO check how to call this in Rust
 
-        // fwrite(perf_aux_buf + tail, 1, head - tail, f);
         buff.write_all(unsafe {
             slice::from_raw_parts(
                 self.perf_aux_buffer.add(tail as usize) as *const _,
@@ -141,8 +144,62 @@ impl IntelPT {
         })
         .map_err(|_| ())?;
 
-        // pc->aux_tail = head;
+        unsafe { aux_tail.write_volatile(tail) }
         Ok(())
+    }
+
+    /// Check if Intel PT is available on the current system.
+    ///
+    /// This function can be helpful when `IntelPT::try_new()` fails for an unclear reason.
+    ///
+    /// Returns `Ok(())` if Intel PT is available, otherwise an `Err` with the reasons.
+    pub fn availability() -> Result<(), Vec<&'static str>> {
+        let mut reasons = Vec::new();
+        if cfg!(not(target_os = "linux")) {
+            reasons.push("Only linux hosts are supported at the moment.");
+        }
+        if cfg!(not(target_arch = "x86_64")) {
+            reasons.push("Only x86_64 is supported.");
+        }
+
+        if let Ok(cpu_info) = fs::read_to_string(CPU_INFO_PATH) {
+            if !cpu_info.contains("GenuineIntel") && !cpu_info.contains("GenuineIotel") {
+                reasons.push("Only Intel CPUs are supported.");
+            }
+            if !cpu_info.contains("intel_pt") {
+                reasons.push("Intel PT is not supported by the CPU.");
+            }
+        } else {
+            reasons.push("Failed to read CPU info");
+        }
+
+        if let Ok(current_capabilities) = caps::read(None, CapSet::Permitted) {
+            let required_caps = [
+                Capability::CAP_IPC_LOCK,
+                Capability::CAP_SYS_PTRACE,
+                Capability::CAP_SYS_ADMIN,
+                Capability::CAP_SYSLOG,
+            ];
+
+            let is_missing = required_caps
+                .map(|rc| current_capabilities.contains(&rc))
+                .iter()
+                .any(|c| !c);
+            if is_missing {
+                reasons.push(
+                    "Required capability missing. \
+                    Required caps are cap_ipc_lock, cap_sys_ptrace, cap_sys_admin, cap_syslog.",
+                );
+            }
+        } else {
+            reasons.push("Failed to read linux capabilities");
+        }
+
+        if reasons.is_empty() {
+            Ok(())
+        } else {
+            Err(reasons)
+        }
     }
 }
 
@@ -202,11 +259,8 @@ fn setup_perf_aux_buffer(
     }
 }
 
-pub fn new_perf_event_attr_intel_pt() -> Result<perf_event_attr, ()> {
-    let mut attr: perf_event_attr;
-    unsafe {
-        attr = core::mem::zeroed();
-    }
+fn new_perf_event_attr_intel_pt() -> Result<perf_event_attr, ()> {
+    let mut attr: perf_event_attr = unsafe { core::mem::zeroed() };
     attr.size = core::mem::size_of::<perf_event_attr>() as u32;
     attr.type_ = intel_pt_perf_type()?;
     attr.set_disabled(1);
@@ -228,16 +282,14 @@ const fn wrap_aux_pointer(ptr: u64) -> u64 {
 
 #[cfg(test)]
 mod test {
-    use core::panic;
-    use std::{fs::OpenOptions, io, os::unix::process::CommandExt, process, process::Command};
+    use std::{fs::OpenOptions, process};
 
-    use caps::{CapSet, Capability};
     use nix::{
         sys::{
             signal::{kill, raise, Signal},
             wait::{waitpid, WaitPidFlag},
         },
-        unistd::{fork, pause, write, ForkResult, Pid},
+        unistd::{fork, ForkResult, Pid},
     };
 
     use super::*;
@@ -254,24 +306,35 @@ mod test {
     // Only 64-bit systems are supported, ensure we can use usize and u64 interchangeably
     assert_eq_size!(usize, u64);
 
+    /// To run this test ensure that the executable has the required capabilities.
+    /// This can be achieved with the following command:
+    /// ```bash
+    /// #!/bin/bash
+    ///
+    /// # Find the test binaries
+    /// for test_bin in target/debug/deps/libafl_qemu*; do
+    ///   # Check if the file is a binary
+    ///   if file "$test_bin" | grep -q "ELF"; then
+    ///     # Set the desired capabilities on the binary
+    ///     sudo setcap cap_ipc_lock,cap_sys_ptrace,cap_sys_admin,cap_syslog=ep "$test_bin"
+    ///   fi
+    /// done
+    /// ```
+    /// Or by running with `sudo`:
+    /// ```toml
+    /// # libafl_qemu/.cargo/config.toml
+    /// [target.x86_64-unknown-linux-gnu]
+    /// runner = 'sudo -E'
+    /// ```
     #[test]
     fn trace_pid() {
-        let current_capabilities =
-            caps::read(None, CapSet::Permitted).expect("Failed to read linux capabilities");
-        // TODO enforce this outside tests somewhere?
-        let required_caps = [
-            Capability::CAP_IPC_LOCK,
-            Capability::CAP_SYS_PTRACE,
-            Capability::CAP_SYS_ADMIN,
-            Capability::CAP_SYSLOG,
-        ];
-
-        for rc in &required_caps {
-            if !current_capabilities.contains(rc) {
-                println!("Required capability {:?} is missing, skipping test.", rc);
-                // Mark as `skipped` once this will be possible https://github.com/rust-lang/rust/issues/68007
-                return;
+        if let Err(reasons) = IntelPT::availability() {
+            // Mark as `skipped` once this will be possible https://github.com/rust-lang/rust/issues/68007
+            println!("Intel PT is not available, skipping test. Reasons:");
+            for reason in reasons {
+                println!("\t- {}", reason);
             }
+            return;
         }
 
         let pid = match unsafe { fork() } {
@@ -293,36 +356,18 @@ mod test {
         waitpid(pid, Some(WaitPidFlag::WUNTRACED)).expect("Failed to wait for the child process");
         kill(pid, Signal::SIGCONT).expect("Failed to continue the process");
 
+        let trace_path = "test_trace_pid_ipt_raw_trace.tmp";
         let mut file = OpenOptions::new()
             .append(true)
             .create(true)
-            .open("ipt_raw_trace")
-            .expect("Unable to open trace output file");
+            .open(trace_path)
+            .expect("Failed to open trace output file");
 
         waitpid(pid, None).expect("Failed to wait for the child process");
 
         pt.disable_tracing().expect("Failed to disable tracing");
         pt.read_trace_into(&mut file)
             .expect("Failed to write traces");
-    }
-
-    struct LoggerToFile {
-        file: std::fs::File,
-    }
-
-    impl LoggerToFile {
-        fn new() -> Self {
-            let file = OpenOptions::new()
-                .append(true)
-                .create(true)
-                .open("ipt_raw_trace")
-                .expect("Unable to open trace output file");
-            Self { file }
-        }
-
-        fn log(&mut self, msg: &str) {
-            use std::io::Write;
-            self.file.write_all(msg.as_bytes()).unwrap();
-        }
+        fs::remove_file(trace_path).expect("Failed to remove trace file");
     }
 }
