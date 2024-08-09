@@ -43,8 +43,7 @@ impl CustomInput {
         state: &mut S,
         mutator: &mut M,
     ) -> Result<MutationResult, Error> {
-        let byte_array = &mut self.byte_array;
-        let mut byte_array = MutVecInput::from(byte_array);
+        let mut byte_array = MutVecInput::from(&mut self.byte_array);
         mutator.mutate(state, &mut byte_array)
     }
 
