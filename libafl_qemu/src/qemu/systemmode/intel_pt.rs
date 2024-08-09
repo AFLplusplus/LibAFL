@@ -1,3 +1,6 @@
+// TODO: This module is not bound to QEMU. Consider moving it somewhere else, it could be used in
+// other libafl modules.
+
 use core::slice;
 use std::{
     fs,
@@ -11,6 +14,7 @@ use std::{
 
 use bitflags::bitflags;
 use caps::{CapSet, Capability};
+use libafl::Error;
 use perf_event_open_sys::{
     bindings::{perf_event_attr, perf_event_mmap_page, PERF_FLAG_FD_CLOEXEC},
     ioctls::{DISABLE, ENABLE, SET_FILTER},
@@ -33,8 +37,6 @@ bitflags! {
     }
 }
 
-// TODO use libaflerr instead of () for Result
-
 #[derive(Debug)]
 pub struct IntelPT {
     fd: OwnedFd,
@@ -44,10 +46,10 @@ pub struct IntelPT {
 }
 
 impl IntelPT {
-    pub fn try_new(pid: i32) -> Result<Self, ()> {
+    pub fn try_new(pid: i32) -> Result<Self, Error> {
         let mut perf_event_attr = new_perf_event_attr_intel_pt()?;
 
-        let perf_event_open_ret = unsafe {
+        let fd = match unsafe {
             perf_event_open(
                 &mut perf_event_attr as *mut _,
                 pid,
@@ -55,16 +57,18 @@ impl IntelPT {
                 -1,
                 PERF_FLAG_FD_CLOEXEC as u64,
             )
+        } {
+            -1 => return Err(Error::last_os_error("Failed to open Intel PT perf event")),
+            fd => {
+                // SAFETY: On success, perf_event_open() returns a new file descriptor.
+                // On error, -1 is returned, and it is checked above
+                unsafe { OwnedFd::from_raw_fd(fd) }
+            }
         };
-        if perf_event_open_ret == -1 {
-            return Err(());
-        }
-        // SAFETY: On success, perf_event_open() returns a new file descriptor.
-        // On error, -1 is returned, and is checked above
-        let fd = unsafe { OwnedFd::from_raw_fd(perf_event_open_ret) };
+
         let perf_buffer = setup_perf_buffer(&fd).unwrap();
 
-        // the first page is a metadata page
+        // the first perf_buff page is a metadata page
         let buff_metadata = perf_buffer.cast::<perf_event_mmap_page>();
         let aux_offset = unsafe { ptr::addr_of_mut!((*buff_metadata).aux_offset) };
         let aux_size = unsafe { ptr::addr_of_mut!((*buff_metadata).aux_size) };
@@ -91,48 +95,46 @@ impl IntelPT {
         })
     }
 
-    pub fn set_ip_filter(&mut self) -> Result<(), ()> {
+    pub fn set_ip_filter(&mut self) -> Result<(), Error> {
         let filter = c"filter 0x7c00/512".to_owned(); //TODO use a param
-        let ret = unsafe { SET_FILTER(self.fd.as_raw_fd(), filter.into_raw()) };
-
-        if ret == 0 {
-            Ok(())
-        } else {
-            Err(())
+        match unsafe { SET_FILTER(self.fd.as_raw_fd(), filter.into_raw()) } {
+            -1 => Err(Error::last_os_error("Failed to set IP filter")),
+            0 => Ok(()),
+            ret => Err(Error::unsupported(format!(
+                "Failed to set IP filter, ioctl returned unexpected value {ret}"
+            ))),
         }
-        // TODO save ip filters somewhere in the struct
     }
 
-    pub fn enable_tracing(&mut self) -> Result<(), ()> {
-        let ret = unsafe { ENABLE(self.fd.as_raw_fd(), 0) };
-
-        if ret == 0 {
-            Ok(())
-        } else {
-            Err(())
+    pub fn enable_tracing(&mut self) -> Result<(), Error> {
+        match unsafe { ENABLE(self.fd.as_raw_fd(), 0) } {
+            -1 => Err(Error::last_os_error("Failed to enable tracing")),
+            0 => Ok(()),
+            ret => Err(Error::unsupported(format!(
+                "Failed to enable tracing, ioctl returned unexpected value {ret}"
+            ))),
         }
-        // TODO save tracing state or maybe better to check with the kernel?
     }
 
-    pub fn disable_tracing(&mut self) -> Result<(), ()> {
-        let ret = unsafe { DISABLE(self.fd.as_raw_fd(), 0) };
-
-        if ret == 0 {
-            Ok(())
-        } else {
-            Err(())
+    pub fn disable_tracing(&mut self) -> Result<(), Error> {
+        match unsafe { DISABLE(self.fd.as_raw_fd(), 0) } {
+            -1 => Err(Error::last_os_error("Failed to disable tracing")),
+            0 => Ok(()),
+            ret => Err(Error::unsupported(format!(
+                "Failed to disable tracing, ioctl returned unexpected value {ret}"
+            ))),
         }
-        // TODO save tracing state or maybe better to check with the kernel?
     }
 
-    pub fn read_trace_into<T: Write>(&self, buff: &mut T) -> Result<(), ()> {
+    pub fn read_trace_into<T: Write>(&self, buff: &mut T) -> Result<(), Error> {
+        // TODO: should we read also the normal buffer?
         let aux_head = unsafe { ptr::addr_of_mut!((*self.buff_metadata).aux_head) };
         let aux_tail = unsafe { ptr::addr_of_mut!((*self.buff_metadata).aux_tail) };
 
         let head = wrap_aux_pointer(unsafe { aux_head.read_volatile() });
         let tail = wrap_aux_pointer(unsafe { aux_tail.read_volatile() });
 
-        // TODO if head < tail
+        debug_assert!(head >= tail, "Intel PT: aux head is behind aux tail");
 
         // smp_rmb(); // TODO check how to call this in Rust
 
@@ -142,7 +144,7 @@ impl IntelPT {
                 (head - tail) as usize,
             )
         })
-        .map_err(|_| ())?;
+        .map_err(|e| Error::os_error(e, "Failed to write traces"))?;
 
         unsafe { aux_tail.write_volatile(tail) }
         Ok(())
@@ -153,24 +155,28 @@ impl IntelPT {
     /// This function can be helpful when `IntelPT::try_new()` fails for an unclear reason.
     ///
     /// Returns `Ok(())` if Intel PT is available, otherwise an `Err` with the reasons.
-    pub fn availability() -> Result<(), Vec<&'static str>> {
+    pub fn availability() -> Result<(), Error> {
         let mut reasons = Vec::new();
         if cfg!(not(target_os = "linux")) {
-            reasons.push("Only linux hosts are supported at the moment.");
+            reasons.push("Only linux hosts are supported at the moment.".to_owned());
         }
         if cfg!(not(target_arch = "x86_64")) {
-            reasons.push("Only x86_64 is supported.");
+            reasons.push("Only x86_64 is supported.".to_owned());
         }
 
         if let Ok(cpu_info) = fs::read_to_string(CPU_INFO_PATH) {
             if !cpu_info.contains("GenuineIntel") && !cpu_info.contains("GenuineIotel") {
-                reasons.push("Only Intel CPUs are supported.");
+                reasons.push("Only Intel CPUs are supported.".to_owned());
             }
             if !cpu_info.contains("intel_pt") {
-                reasons.push("Intel PT is not supported by the CPU.");
+                reasons.push("Intel PT is not supported by the CPU.".to_owned());
             }
         } else {
-            reasons.push("Failed to read CPU info");
+            reasons.push("Failed to read CPU info".to_owned());
+        }
+
+        if let Err(e) = intel_pt_perf_type() {
+            reasons.push(e.to_string());
         }
 
         if let Ok(current_capabilities) = caps::read(None, CapSet::Permitted) {
@@ -181,24 +187,19 @@ impl IntelPT {
                 Capability::CAP_SYSLOG,
             ];
 
-            let is_missing = required_caps
-                .map(|rc| current_capabilities.contains(&rc))
-                .iter()
-                .any(|c| !c);
-            if is_missing {
-                reasons.push(
-                    "Required capability missing. \
-                    Required caps are cap_ipc_lock, cap_sys_ptrace, cap_sys_admin, cap_syslog.",
-                );
+            for rc in required_caps {
+                if !current_capabilities.contains(&rc) {
+                    reasons.push(format!("Required capability {} missing.", rc));
+                }
             }
         } else {
-            reasons.push("Failed to read linux capabilities");
+            reasons.push("Failed to read linux capabilities".to_owned());
         }
 
         if reasons.is_empty() {
             Ok(())
         } else {
-            Err(reasons)
+            Err(Error::unsupported(reasons.join("\n")))
         }
     }
 }
@@ -217,8 +218,8 @@ const fn next_page_aligned_addr(address: u64) -> u64 {
     (address + PAGE_SIZE as u64 - 1) & !(PAGE_SIZE as u64 - 1)
 }
 
-fn setup_perf_buffer(fd: &OwnedFd) -> Result<*mut c_void, &'static str> {
-    let mmap_addr = unsafe {
+fn setup_perf_buffer(fd: &OwnedFd) -> Result<*mut c_void, Error> {
+    match unsafe {
         libc::mmap(
             std::ptr::null_mut(),
             PERF_BUFFER_SIZE,
@@ -227,21 +228,15 @@ fn setup_perf_buffer(fd: &OwnedFd) -> Result<*mut c_void, &'static str> {
             fd.as_raw_fd(),
             0,
         )
-    };
-    if mmap_addr == libc::MAP_FAILED {
-        Err("IntelPT: Failed to mmap perf buffer")
-    } else {
-        Ok(mmap_addr)
+    } {
+        libc::MAP_FAILED => Err(Error::last_os_error("IntelPT: Failed to mmap perf buffer")),
+        mmap_addr => Ok(mmap_addr),
     }
 }
 
-fn setup_perf_aux_buffer(
-    fd: &OwnedFd,
-    size: u64,
-    offset: u64,
-) -> Result<*mut c_void, &'static str> {
+fn setup_perf_aux_buffer(fd: &OwnedFd, size: u64, offset: u64) -> Result<*mut c_void, Error> {
     // PROT_WRITE sets PT to stop when the buffer is full
-    let mmap_addr = unsafe {
+    match unsafe {
         libc::mmap(
             std::ptr::null_mut(),
             size as usize,
@@ -250,16 +245,15 @@ fn setup_perf_aux_buffer(
             fd.as_raw_fd(),
             offset as i64,
         )
-    };
-    if mmap_addr == libc::MAP_FAILED {
-        // println!("Err: {}", std::io::Error::last_os_error().to_string());
-        Err("IntelPT: Failed to mmap perf aux buffer")
-    } else {
-        Ok(mmap_addr)
+    } {
+        libc::MAP_FAILED => Err(Error::last_os_error(
+            "IntelPT: Failed to mmap perf aux buffer",
+        )),
+        mmap_addr => Ok(mmap_addr),
     }
 }
 
-fn new_perf_event_attr_intel_pt() -> Result<perf_event_attr, ()> {
+fn new_perf_event_attr_intel_pt() -> Result<perf_event_attr, Error> {
     let mut attr: perf_event_attr = unsafe { core::mem::zeroed() };
     attr.size = core::mem::size_of::<perf_event_attr>() as u32;
     attr.type_ = intel_pt_perf_type()?;
@@ -269,10 +263,18 @@ fn new_perf_event_attr_intel_pt() -> Result<perf_event_attr, ()> {
     Ok(attr)
 }
 
-fn intel_pt_perf_type() -> Result<u32, ()> {
-    let s = fs::read_to_string(PT_EVENT_TYPE_PATH).map_err(|_| ())?;
-    s.trim().parse::<u32>().map_err(|_| ())
-    // TODO better Err()
+fn intel_pt_perf_type() -> Result<u32, Error> {
+    let s = fs::read_to_string(PT_EVENT_TYPE_PATH).map_err(|e| {
+        Error::os_error(
+            e,
+            format!("Failed to read Intel PT perf event type from {PT_EVENT_TYPE_PATH}"),
+        )
+    })?;
+    s.trim().parse::<u32>().map_err(|_| {
+        Error::unsupported(format!(
+            "Failed to parse Intel PT perf event type in {PT_EVENT_TYPE_PATH}"
+        ))
+    })
 }
 
 #[inline]
@@ -328,12 +330,10 @@ mod test {
     /// ```
     #[test]
     fn trace_pid() {
-        if let Err(reasons) = IntelPT::availability() {
+        if let Err(reason) = IntelPT::availability() {
             // Mark as `skipped` once this will be possible https://github.com/rust-lang/rust/issues/68007
             println!("Intel PT is not available, skipping test. Reasons:");
-            for reason in reasons {
-                println!("\t- {}", reason);
-            }
+            println!("{reason}");
             return;
         }
 
