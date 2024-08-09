@@ -14,9 +14,7 @@ use libafl::{
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     monitors::SimpleMonitor,
-    mutators::{
-        mapped_havoc_mutations, optional_mapped_havoc_mutations, scheduled::StdScheduledMutator,
-    },
+    mutators::{mapped_havoc_mutations, scheduled::StdScheduledMutator},
     observers::StdMapObserver,
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
@@ -130,14 +128,14 @@ pub fn main() {
     // This collection could be expanded with default or custom mutators as needed for the input
     // First, mutators for the simple byte array
     let mutations = mapped_havoc_mutations(
-        CustomInput::byte_array_mut,
-        &CustomInput::byte_array_optional,
+        CustomInput::mutate_byte_array,
+        //&CustomInput::byte_array_optional,
     )
     // Then, mutators for the optional byte array, these return MutationResult::Skipped if the part is not present
-    .merge(optional_mapped_havoc_mutations(
+    /*.merge(optional_mapped_havoc_mutations(
         CustomInput::optional_byte_array_mut,
         &CustomInput::optional_byte_array_optional,
-    ))
+    ))*/
     // A custom mutator that sets the optional byte array to None if present, and generates a random byte array of length 1 if it is not
     .append(ToggleOptionalByteArrayMutator::new(1))
     // Finally, a custom mutator that toggles the boolean part of the input

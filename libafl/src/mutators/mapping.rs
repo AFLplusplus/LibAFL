@@ -4,107 +4,10 @@ use alloc::{borrow::Cow, vec::Vec};
 use libafl_bolts::{tuples::MappingFunctor, Named};
 
 use crate::{
-    inputs::MutVecInput,
+    inputs::{HasMutatorBytes, Input, MutVecInput},
     mutators::{MutationResult, Mutator},
     Error,
 };
-
-/// Mapping [`Mutator`] that allows using [`Mutator`]s for [`Vec<u8>`] on (parts of) other input types that can be mapped to [`Vec<u8>`].
-///
-/// # Example
-#[cfg_attr(feature = "std", doc = " ```")]
-#[cfg_attr(not(feature = "std"), doc = " ```ignore")]
-///
-/// use std::vec::Vec;
-///
-/// use libafl::{
-///     mutators::{
-///         ByteIncMutator, MutationResult, MutVecMappingMutator, Mutator,
-///     },
-///     state::NopState,
-/// };
-///
-/// type CustomInput = Vec<u8>;
-///
-/// let inner = ByteIncMutator::new();
-/// let mut outer = MutVecMappingMutator::new(inner);
-///
-/// let mut input: CustomInput = vec![1];
-/// let mut state: NopState<CustomInput> = NopState::new();
-/// let res = outer.mutate(&mut state, &mut input).unwrap();
-/// assert_eq!(res, MutationResult::Mutated);
-/// assert_eq!(input, vec![2]);
-/// ```
-#[derive(Debug)]
-pub struct MutVecMappingMutator<M> {
-    inner: M,
-}
-
-impl<M> MutVecMappingMutator<M> {
-    /// Creates a new [`MutVecMappingMutator`]
-    pub fn new(inner: M) -> Self {
-        Self { inner }
-    }
-}
-
-impl<S, M> Mutator<Vec<u8>, S> for MutVecMappingMutator<M>
-where
-    M: for<'a> Mutator<MutVecInput<'a>, S>,
-{
-    fn mutate(&mut self, state: &mut S, input: &mut Vec<u8>) -> Result<MutationResult, Error> {
-        self.inner.mutate(state, &mut input.into())
-    }
-}
-
-impl<M> Named for MutVecMappingMutator<M>
-where
-    M: Named,
-{
-    fn name(&self) -> &Cow<'static, str> {
-        &Cow::Borrowed("MutVecMappingMutator")
-    }
-}
-
-/// Mapper to use when mapping a `tuple_list` of [`Mutator`]s defined for [`Vec<u8>`] for (parts of) a custom input type using a [`MutVecMappingMutator`].
-///
-/// # Example
-#[cfg_attr(feature = "std", doc = " ```")]
-#[cfg_attr(not(feature = "std"), doc = " ```ignore")]
-///
-/// use std::vec::Vec;
-///
-/// use libafl_bolts::tuples::Map;
-/// use tuple_list::tuple_list;
-///
-/// use libafl::{
-///     mutators::{
-///         ByteIncMutator, MutationResult, Mutator, ToMutVecMappingMutatorMapper
-///     },
-///     state::NopState,
-/// };
-///
-/// type CustomInput = Vec<u8>;
-///
-/// let inner = tuple_list!(ByteIncMutator::new());
-/// let outer_list = inner.map(ToMutVecMappingMutatorMapper);
-/// let mut outer = outer_list.0;
-///
-/// let mut input: CustomInput = vec![1];
-/// let mut state: NopState<CustomInput> = NopState::new();
-/// let res = outer.mutate(&mut state, &mut input).unwrap();
-/// assert_eq!(res, MutationResult::Mutated);
-/// assert_eq!(input, vec![2]);
-/// ```
-#[derive(Debug)]
-pub struct ToMutVecMappingMutatorMapper;
-
-impl<M> MappingFunctor<M> for ToMutVecMappingMutatorMapper {
-    type Output = MutVecMappingMutator<M>;
-
-    fn apply(&mut self, from: M) -> Self::Output {
-        MutVecMappingMutator::new(from)
-    }
-}
 
 /// Mapping [`Mutator`] that allows using [`Mutator`]s for a certain type on (parts of) other input types that can be mapped to this type using a function.
 ///
@@ -150,13 +53,12 @@ impl<M, F> FunctionMappingMutator<M, F> {
     }
 }
 
-impl<M, S, F, IO, II> Mutator<IO, S> for FunctionMappingMutator<M, F>
+impl<M, S, F, IO> Mutator<IO, S> for FunctionMappingMutator<M, F>
 where
-    F: for<'a> FnMut(&'a mut IO) -> &'a mut II,
-    M: Mutator<II, S>,
+    F: FnMut(&mut IO, &mut S, &mut M) -> Result<MutationResult, Error>,
 {
     fn mutate(&mut self, state: &mut S, input: &mut IO) -> Result<MutationResult, Error> {
-        self.inner.mutate(state, (self.mapper)(input))
+        (self.mapper)(input, state, &mut self.inner)
     }
 }
 

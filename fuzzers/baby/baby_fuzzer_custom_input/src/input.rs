@@ -6,7 +6,7 @@ use std::{
 use libafl::{
     corpus::CorpusId,
     generators::Generator,
-    inputs::Input,
+    inputs::{HasMutatorBytes, Input, MutVecInput},
     prelude::{MutationResult, Mutator},
     state::HasRand,
     Error, SerdeAny,
@@ -38,8 +38,14 @@ impl Input for CustomInput {
 
 impl CustomInput {
     /// Returns a mutable reference to the byte array
-    pub fn byte_array_mut(&mut self) -> &mut Vec<u8> {
-        &mut self.byte_array
+    pub fn mutate_byte_array<M: for<'a> Mutator<MutVecInput<'a>, S>, S>(
+        &mut self,
+        state: &mut S,
+        mutator: &mut M,
+    ) -> Result<MutationResult, Error> {
+        let byte_array = &mut self.byte_array;
+        let mut byte_array = MutVecInput::from(byte_array);
+        mutator.mutate(state, &mut byte_array)
     }
 
     /// Returns an immutable reference to the byte array wrapped in [`Some`]
