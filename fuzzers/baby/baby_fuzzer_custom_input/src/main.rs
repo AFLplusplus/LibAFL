@@ -1,26 +1,30 @@
+mod input;
+
 #[cfg(windows)]
 use std::ptr::write_volatile;
 use std::{path::PathBuf, ptr::write};
 
-#[cfg(feature = "tui")]
-use libafl::monitors::tui::TuiMonitor;
-#[cfg(not(feature = "tui"))]
-use libafl::monitors::SimpleMonitor;
+use input::{
+    CustomInput, CustomInputGenerator, ToggleBooleanMutator, ToggleOptionalByteArrayMutator,
+};
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    generators::RandPrintablesGenerator,
-    inputs::{BytesInput, HasTargetBytes},
-    mutators::{havoc_mutations::havoc_mutations, scheduled::StdScheduledMutator},
+    monitors::SimpleMonitor,
+    mutators::{mapped_havoc_mutations, scheduled::StdScheduledMutator},
     observers::StdMapObserver,
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
+use libafl_bolts::{
+    current_nanos,
+    rands::StdRand,
+    tuples::{tuple_list, Append, Merge},
+};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
@@ -28,21 +32,24 @@ static mut SIGNALS_PTR: *mut u8 = unsafe { SIGNALS.as_mut_ptr() };
 
 /// Assign a signal to the signals map
 fn signals_set(idx: usize) {
+    if idx > 2 {
+        println!("Setting signal: {idx}");
+    }
     unsafe { write(SIGNALS_PTR.add(idx), 1) };
 }
 
 #[allow(clippy::similar_names, clippy::manual_assert)]
 pub fn main() {
     // The closure that we want to fuzz
-    let mut harness = |input: &BytesInput| {
-        let target = input.target_bytes();
-        let buf = target.as_slice();
+    // The pseudo program under test uses all parts of the custom input
+    // We are manually setting bytes in a pseudo coverage map to guide the fuzzer
+    let mut harness = |input: &CustomInput| {
         signals_set(0);
-        if !buf.is_empty() && buf[0] == b'a' {
+        if input.byte_array == vec![b'a'] {
             signals_set(1);
-            if buf.len() > 1 && buf[1] == b'b' {
+            if input.optional_byte_array == Some(vec![b'b']) {
                 signals_set(2);
-                if buf.len() > 2 && buf[2] == b'c' {
+                if input.boolean {
                     #[cfg(unix)]
                     panic!("Artificial bug triggered =)");
 
@@ -87,13 +94,7 @@ pub fn main() {
     .unwrap();
 
     // The Monitor trait define how the fuzzer stats are displayed to the user
-    #[cfg(not(feature = "tui"))]
     let mon = SimpleMonitor::new(|s| println!("{s}"));
-    #[cfg(feature = "tui")]
-    let mon = TuiMonitor::builder()
-        .title("Baby Fuzzer")
-        .enhanced_graphics(false)
-        .build();
 
     // The event manager handle the various events generated during the fuzzing loop
     // such as the notification of the addition of a new item to the corpus
@@ -116,17 +117,36 @@ pub fn main() {
     .expect("Failed to create the Executor");
 
     // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(32);
+    let mut generator = CustomInputGenerator::new(1);
 
     // Generate 8 initial inputs
     state
         .generate_initial_inputs(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8)
         .expect("Failed to generate the initial corpus");
 
-    // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::new(havoc_mutations());
+    // Merging multiple lists of mutators that mutate a sub-part of the custom input
+    // This collection could be expanded with default or custom mutators as needed for the input
+    // First, mutators for the simple byte array
+    let mutations = mapped_havoc_mutations(
+        CustomInput::mutate_byte_array,
+        //&CustomInput::byte_array_optional,
+    )
+    // Then, mutators for the optional byte array, these return MutationResult::Skipped if the part is not present
+    /*.merge(optional_mapped_havoc_mutations(
+        CustomInput::optional_byte_array_mut,
+        &CustomInput::optional_byte_array_optional,
+    ))*/
+    // A custom mutator that sets the optional byte array to None if present, and generates a random byte array of length 1 if it is not
+    .append(ToggleOptionalByteArrayMutator::new(1))
+    // Finally, a custom mutator that toggles the boolean part of the input
+    .append(ToggleBooleanMutator);
+
+    // Scheduling layer for the mutations
+    let mutator = StdScheduledMutator::new(mutations);
+    // Defining the mutator stage
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
+    // Run the fuzzer
     fuzzer
         .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
         .expect("Error in the fuzzing loop");

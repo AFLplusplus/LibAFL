@@ -12,7 +12,8 @@ use libafl::{
     generators::RandBytesGenerator,
     monitors::MultiMonitor,
     mutators::{
-        scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
+        havoc_mutations::havoc_mutations,
+        scheduled::{tokens_mutations, StdScheduledMutator},
         token_mutations::Tokens,
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},

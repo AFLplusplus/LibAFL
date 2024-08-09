@@ -18,8 +18,7 @@ use libafl::{
     inputs::BytesInput,
     monitors::SimpleMonitor,
     mutators::{
-        scheduled::havoc_mutations, token_mutations::AFLppRedQueen, tokens_mutations,
-        StdMOptMutator, Tokens,
+        havoc_mutations, token_mutations::AFLppRedQueen, tokens_mutations, StdMOptMutator, Tokens,
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{

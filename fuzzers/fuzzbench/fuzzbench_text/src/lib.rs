@@ -30,7 +30,7 @@ use libafl::{
             GrimoireExtensionMutator, GrimoireRandomDeleteMutator,
             GrimoireRecursiveReplacementMutator, GrimoireStringReplacementMutator,
         },
-        scheduled::havoc_mutations,
+        havoc_mutations,
         token_mutations::I2SRandReplace,
         tokens_mutations, StdMOptMutator, StdScheduledMutator, Tokens,
     },
