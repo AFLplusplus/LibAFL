@@ -1,8 +1,8 @@
 //! An [`EventManager`] manages all events that go to other instances of the fuzzer.
 //! The messages are commonly information about new Testcases as well as stats and other [`Event`]s.
 
-// pub mod events_hooks;
-// pub use events_hooks::*;
+pub mod events_hooks;
+pub use events_hooks::*;
 
 pub mod simple;
 // #[cfg(all(unix, feature = "std"))]
@@ -12,15 +12,14 @@ pub mod simple;
 // #[cfg(feature = "std")]
 // #[allow(clippy::ignored_unit_patterns)]
 // pub mod launcher;
-// #[allow(clippy::ignored_unit_patterns)]
-// pub mod llmp;
-// pub use llmp::*;
+#[allow(clippy::ignored_unit_patterns)]
+pub mod llmp;
 // #[cfg(feature = "tcp_manager")]
 // #[allow(clippy::ignored_unit_patterns)]
 // pub mod tcp;
 
 // pub mod broker_hooks;
-use alloc::{borrow::Cow, boxed::Box, string::String, vec::Vec};
+use alloc::{borrow::Cow, string::String, vec::Vec};
 use core::{
     fmt,
     hash::{BuildHasher, Hasher},
@@ -39,6 +38,7 @@ use libafl_bolts::{
     tuples::{Handle, MatchName, MatchNameRef},
     ClientId,
 };
+pub use llmp::*;
 use serde::{Deserialize, Serialize};
 pub use simple::*;
 #[cfg(feature = "std")]
@@ -607,101 +607,6 @@ pub trait HasEventManagerId {
     fn mgr_id(&self) -> EventManagerId;
 }
 
-/// The handler function for custom buffers exchanged via [`EventManager`]. This signature matches
-/// [`CustomBufHandler::handle`].
-///
-/// In previous versions, you could dynamically add such fn-based handlers with the
-/// `add_custom_buf_handler` function. If you wish to continue to do so, use [`Vec::new`] as your
-/// [`CustomBufHandlerTuple`] in the associated `handlers` parameter for your event manager. You may
-/// then use [`SupportsDynamicHandlers::add_custom_buf_handler`].
-#[deprecated(
-    note = "Using function pointers may limit your ability to use some stages due to type conflicts regarding the state"
-)]
-type CustomBufHandlerFn<S> = dyn FnMut(&mut S, &str, &[u8]) -> Result<CustomBufEventResult, Error>;
-
-/// A handler for custom buffers exchanged via event managers
-pub trait CustomBufHandler<S> {
-    /// Attempt to handle the custom buffer
-    fn handle(
-        &mut self,
-        state: &mut S,
-        name: &str,
-        buf: &[u8],
-    ) -> Result<CustomBufEventResult, Error>;
-}
-
-/// A tuple of custom buffer handlers
-pub trait CustomBufHandlerTuple<S> {
-    /// Attempt to handle the custom buffer, breaking at the first successful usage
-    fn handle_all(&mut self, state: &mut S, name: &str, buf: &[u8]) -> Result<(), Error>;
-}
-
-impl<S> CustomBufHandlerTuple<S> for () {
-    fn handle_all(&mut self, _state: &mut S, _name: &str, _buf: &[u8]) -> Result<(), Error> {
-        Ok(())
-    }
-}
-
-impl<Head, Tail, S> CustomBufHandlerTuple<S> for (Head, Tail)
-where
-    Head: CustomBufHandler<S>,
-    Tail: CustomBufHandlerTuple<S>,
-{
-    fn handle_all(&mut self, state: &mut S, name: &str, buf: &[u8]) -> Result<(), Error> {
-        if let CustomBufEventResult::Next = self.0.handle(state, name, buf)? {
-            self.1.handle_all(state, name, buf)
-        } else {
-            Ok(())
-        }
-    }
-}
-
-#[allow(deprecated)]
-impl<S> CustomBufHandlerTuple<S> for Vec<Box<CustomBufHandlerFn<S>>> {
-    fn handle_all(&mut self, state: &mut S, name: &str, buf: &[u8]) -> Result<(), Error> {
-        for handler in self {
-            if let CustomBufEventResult::Handled = handler(state, name, buf)? {
-                return Ok(());
-            }
-        }
-        Ok(())
-    }
-}
-
-/// An event manager which can handle custom buffers
-pub trait HasCustomBufHandlers {
-    /// The type of the handlers
-    type Handlers;
-
-    /// Getter for the handlers
-    fn handlers(&self) -> &Self::Handlers;
-    /// Mutable getter for the handlers
-    fn handlers_mut(&mut self) -> &mut Self::Handlers;
-}
-
-/// Utility trait to maintain compatibility with previous versions which strictly used a list of
-/// dynamic custom buf handlers.
-///
-/// This is automatically implemented for the appropriate traits.
-pub trait SupportsDynamicHandlers<S> {
-    /// Adds a custom buffer handler that will run for each incoming `CustomBuf` event.
-    #[deprecated(
-        note = "Using function pointers may limit your ability to use some stages due to type conflicts regarding the state"
-    )]
-    #[allow(deprecated)]
-    fn add_custom_buf_handler(&mut self, handler: Box<CustomBufHandlerFn<S>>);
-}
-
-#[allow(deprecated)]
-impl<EM, S> SupportsDynamicHandlers<S> for EM
-where
-    EM: HasCustomBufHandlers<Handlers = Vec<Box<CustomBufHandlerFn<S>>>>,
-{
-    fn add_custom_buf_handler(&mut self, handler: Box<CustomBufHandlerFn<S>>) {
-        self.handlers_mut().push(handler);
-    }
-}
-
 /// An eventmgr for tests, and as placeholder if you really don't need an event manager.
 #[derive(Copy, Clone, Debug, Default)]
 pub struct NopEventManager;
@@ -843,21 +748,6 @@ where
 
     fn on_shutdown(&mut self) -> Result<(), Error> {
         self.inner.on_shutdown()
-    }
-}
-
-impl<EM> HasCustomBufHandlers for MonitorTypedEventManager<EM>
-where
-    EM: HasCustomBufHandlers,
-{
-    type Handlers = EM::Handlers;
-
-    fn handlers(&self) -> &Self::Handlers {
-        self.inner.handlers()
-    }
-
-    fn handlers_mut(&mut self) -> &mut Self::Handlers {
-        self.inner.handlers_mut()
     }
 }
 
