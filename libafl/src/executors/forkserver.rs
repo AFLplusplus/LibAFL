@@ -842,10 +842,12 @@ where
     }
 
     fn is_old_forkserver(version_status: i32) -> bool {
-        !(version_status >= 0x41464c00 && version_status <= 0x41464cff)
+        !(0x41464c00..0x41464cff).contains(&version_status)
     }
 
     /// Intialize forkserver > v4.20c
+    #[allow(clippy::cast_possible_wrap)]
+    #[allow(clippy::cast_sign_loss)]
     fn initialize_forkserver(
         &mut self,
         status: i32,
@@ -894,7 +896,7 @@ where
                     "Failed to read map size from forkserver".to_string(),
                 ));
             }
-            self.set_map_size(fsrv_map_size)
+            self.set_map_size(fsrv_map_size);
         }
 
         if status & FS_NEW_OPT_SHDMEM_FUZZ != 0 {
@@ -943,14 +945,15 @@ where
 
         if aflx != keep {
             return Err(Error::unknown(format!(
-                "Error in forkserver communication ({:x}=>{:x})",
-                keep, aflx
+                "Error in forkserver communication ({aflx:?}=>{keep:?})",
             )));
         }
         Ok(())
     }
-    
+
     /// Intialize old forkserver. < v4.20c
+    #[allow(clippy::cast_possible_wrap)]
+    #[allow(clippy::cast_sign_loss)]
     fn initialize_old_forkserver(
         &mut self,
         status: i32,
@@ -1026,6 +1029,7 @@ where
         Ok(())
     }
 
+    #[allow(clippy::cast_sign_loss)]
     fn set_map_size(&mut self, fsrv_map_size: i32) {
         // When 0, we assume that map_size was filled by the user or const
         /* TODO autofill map size from the observer
