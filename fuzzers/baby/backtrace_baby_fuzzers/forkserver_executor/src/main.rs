@@ -10,7 +10,7 @@ use libafl::{
     generators::RandPrintablesGenerator,
     inputs::BytesInput,
     monitors::SimpleMonitor,
-    mutators::scheduled::{havoc_mutations, StdScheduledMutator},
+    mutators::{havoc_mutations::havoc_mutations, scheduled::StdScheduledMutator},
     observers::{AsanBacktraceObserver, ConstMapObserver, HitcountsMapObserver},
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,

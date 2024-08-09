@@ -167,7 +167,13 @@ where
                         }
                     };
 
-                    return Ok(Self::crossover_insert(part, size, target, range, chosen));
+                    return Ok(Self::crossover_insert(
+                        part,
+                        size,
+                        target,
+                        range,
+                        chosen.bytes(),
+                    ));
                 }
 
                 return Ok(MutationResult::Skipped);
@@ -207,7 +213,7 @@ where
                 size,
                 target,
                 range,
-                &other.parts()[choice],
+                other.parts()[choice].bytes(),
             ))
         } else {
             // just add it!
@@ -271,7 +277,7 @@ where
                         }
                     };
 
-                    return Ok(Self::crossover_replace(part, target, range, chosen));
+                    return Ok(Self::crossover_replace(part, target, range, chosen.bytes()));
                 }
 
                 return Ok(MutationResult::Skipped);
@@ -310,7 +316,7 @@ where
                 part,
                 target,
                 range,
-                &other.parts()[choice],
+                other.parts()[choice].bytes(),
             ))
         } else {
             // just add it!
