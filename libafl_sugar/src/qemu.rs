@@ -41,7 +41,7 @@ pub use libafl_qemu::qemu::Qemu;
 use libafl_qemu::{
     command::NopCommandManager,
     modules::edges::{self, EdgeCoverageModule},
-    Emulator, NopEmulatorExitHandler, QemuExecutor,
+    Emulator, NopEmulatorExitHandler, StatelessQemuExecutor,
 };
 use libafl_targets::{edges_map_mut_ptr, CmpLogObserver};
 use typed_builder::TypedBuilder;
@@ -244,7 +244,7 @@ where
                     NopCommandManager,
                 )?;
 
-                let executor = QemuExecutor::new(
+                let executor = StatelessQemuExecutor::new(
                     &mut emulator,
                     &mut harness,
                     tuple_list!(edges_observer, time_observer),
@@ -354,7 +354,7 @@ where
                     NopCommandManager,
                 )?;
 
-                let mut executor = QemuExecutor::new(
+                let mut executor = StatelessQemuExecutor::new(
                     &mut emulator,
                     &mut harness,
                     tuple_list!(edges_observer, time_observer),
