@@ -106,13 +106,11 @@ class DumpCfgPass : public ModulePass {
 #else
     if (n.startswith("llvm.")) {
 #endif
+      return true;
+    } else {
+      return false;
     }
-    return true;
   }
-  else {
-    return false;
-  }
-}
 };
 
 }  // namespace
