@@ -130,7 +130,7 @@ typed-builder = "0.19"
 memmap2 = "0.9"
 getset = "0.1"
 bitflags = "2.6"
-perf-event-open-sys = "4"
+perf-event-open-sys = "4" # Uses Linux 5.19.4 headers, consider forking if we need to bump
 caps = "0.5"
 # Document all features of this crate (for `cargo doc`)
 document-features = { version = "0.2", optional = true }
