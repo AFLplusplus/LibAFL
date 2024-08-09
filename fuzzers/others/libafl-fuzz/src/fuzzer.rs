@@ -1,4 +1,4 @@
-use std::{borrow::Cow, marker::PhantomData, path::PathBuf, time::Duration};
+use std::{borrow::Cow, env, marker::PhantomData, path::PathBuf, time::Duration};
 
 use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
@@ -426,11 +426,25 @@ fn base_executor<'a>(
     if let Some(kill_signal) = opt.kill_signal {
         executor = executor.kill_signal(kill_signal);
     }
-    if opt.is_persistent {
+    if opt.is_persistent || opt.qemu_mode {
         executor = executor.shmem_provider(shmem_provider);
     }
     if let Some(harness_input_type) = &opt.harness_input_type {
         executor = executor.parse_afl_cmdline([harness_input_type]);
+    }
+    if opt.qemu_mode {
+        let exec = opt.executable.display().to_string();
+        executor = executor.program(
+            find_afl_binary("afl-qemu-trace", Some(opt.executable.clone()))
+                .expect("to find afl-qemu-trace"),
+        );
+        // we skip all libafl-fuzz arguments.
+        let (skip, _) = env::args()
+            .enumerate()
+            .find(|i| i.1 == exec)
+            .expect("invariant; should never occur");
+        let args = env::args().skip(skip);
+        executor = executor.args(args);
     }
     executor
 }

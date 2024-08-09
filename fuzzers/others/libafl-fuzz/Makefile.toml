@@ -13,27 +13,32 @@ LLVM_CONFIG = { value = "llvm-config-18", condition = { env_not_set = [
   "LLVM_CONFIG",
 ] } }
 AFL_VERSION = "db23931e7c1727ddac8691a6241c97b2203ec6fc"
-AFL_DIR_NAME = { value = "./AFLplusplus-${AFL_VERSION}" }
-AFL_CC_PATH = { value = "${AFL_DIR_NAME}/afl-clang-fast" }
+AFL_DIR = { value = "./AFLplusplus" }
+AFL_CC_PATH = { value = "${AFL_DIR}/afl-clang-fast" }
 CC = { value = "clang" }
 
 [tasks.build_afl]
 script_runner = "@shell"
 script = '''
-if [ ! -d "$AFL_DIR_NAME" ]; then
-	if [ -f "v${AFL_VERSION}.zip" ]; then
-		rm v${AFL_VERSION}.zip
-	fi
-	wget https://github.com/AFLplusplus/AFLplusplus/archive/${AFL_VERSION}.zip
-	unzip ${AFL_VERSION}.zip
-	cd ${AFL_DIR_NAME}
+if [ ! -d "$AFL_DIR" ]; then
+	git clone https://github.com/AFLplusplus/AFLplusplus.git
+	cd ${AFL_DIR}
+	git checkout ${AFL_VERSION}
 	LLVM_CONFIG=${LLVM_CONFIG} make 
 	cd frida_mode
 	LLVM_CONFIG=${LLVM_CONFIG} make
 	cd ../..
 fi
-
 '''
+
+[tasks.build_qemuafl]
+script_runner = "@shell"
+script = '''
+cd ${AFL_DIR}/qemu_mode
+./build_qemu_support.sh
+cd ../..
+'''
+dependencies = ["build_afl"]
 # Test
 [tasks.test]
 linux_alias = "test_unix"
@@ -43,14 +48,22 @@ windows_alias = "unsupported"
 [tasks.test_unix]
 script_runner = "@shell"
 script = "echo done"
-dependencies = ["build_afl", "test_instr", "test_cmplog", "test_frida"]
+dependencies = ["build_afl", "test_instr", "test_cmplog", "test_frida", "test_qemu"]
+
+[tasks.build_libafl_fuzz]
+script_runner = "@shell"
+script = "cargo build --profile ${PROFILE}"
 
 [tasks.test_instr]
 script_runner = "@shell"
 script = '''
-cargo build --profile ${PROFILE}
-AFL_PATH=${AFL_DIR_NAME} ${AFL_CC_PATH} ./test/test-instr.c -o ./test/out-instr
-LIBAFL_DEBUG_OUTPUT=1 AFL_CORES=1 AFL_STATS_INTERVAL=1 timeout 5 ${FUZZER} -i ./test/seeds -o ./test/output ./test/out-instr || true
+AFL_PATH=${AFL_DIR} ${AFL_CC_PATH} ./test/test-instr.c -o ./test/out-instr
+
+export LIBAFL_DEBUG_OUTPUT=1 
+export AFL_CORES=1 
+export AFL_STATS_INTERVAL=1 
+
+timeout 5 ${FUZZER} -i ./test/seeds -o ./test/output ./test/out-instr || true
 test -n "$( ls ./test/output/fuzzer_main/queue/id:000002* 2>/dev/null )" || {
 	echo "No new corpus entries found"
 	exit 1
@@ -72,46 +85,50 @@ test -d "./test/output/fuzzer_main/crashes" || {
 	exit 1
 }
 '''
-dependencies = ["build_afl"]
+dependencies = ["build_afl", "build_libafl_fuzz"]
 
 [tasks.test_cmplog]
 script_runner = "@shell"
 script = '''
-cargo build --profile ${PROFILE}
 # cmplog TODO: AFL_BENCH_UNTIL_CRASH=1 instead of timeout 15s
-AFL_LLVM_CMPLOG=1 AFL_PATH=${AFL_DIR_NAME} ${AFL_CC_PATH} ./test/test-cmplog.c -o ./test/out-cmplog
+AFL_LLVM_CMPLOG=1 AFL_PATH=${AFL_DIR} ${AFL_CC_PATH} ./test/test-cmplog.c -o ./test/out-cmplog
 AFL_CORES=1 timeout 5 ${FUZZER} -Z -l 3 -m 0 -V30 -i ./test/seeds_cmplog -o ./test/output-cmplog -c 0 ./test/out-cmplog || true
 test -n "$( ls -A ./test/output-cmplog/fuzzer_main/crashes/)" || {
 	echo "No crashes found"
 	exit 1
 }
 '''
-dependencies = ["build_afl"]
+dependencies = ["build_afl", "build_libafl_fuzz"]
 
 [tasks.test_frida]
 script_runner = "@shell"
 script = '''
-cargo build --profile ${PROFILE}
 ${CC} -no-pie ./test/test-instr.c -o ./test/out-frida
-AFL_PATH=${AFL_DIR_NAME} AFL_CORES=1 AFL_STATS_INTERVAL=1 timeout 5 ${FUZZER} -m 0 -V07 -O -i ./test/seeds-frida -o ./test/output-frida -- ./test/out-frida || true
+
+export AFL_PATH=${AFL_DIR} 
+export AFL_CORES=1 
+export AFL_STATS_INTERVAL=1 
+
+timeout 5 ${FUZZER} -m 0 -V07 -O -i ./test/seeds_frida -o ./test/output-frida -- ./test/out-frida || true
 test -n "$( ls ./test/output-frida/fuzzer_main/queue/id:000002* 2>/dev/null )" || {
 	echo "No new corpus entries found for FRIDA mode"
 	exit 1
 }
 
 ${CC} ./test/test-cmpcov.c -o ./test/out-frida-cmpcov
-AFL_PATH=${AFL_DIR_NAME} LIBAFL_DEBUG_OUTPUT=1 AFL_DEBUG=1 AFL_CORES=1 AFL_FRIDA_VERBOSE=1 timeout 10 ${FUZZER} -m 0 -V07 -O -c 0 -l 3 -i ./test/seeds-frida -o ./test/output-frida-cmpcov -- ./test/out-frida-cmpcov || true
+AFL_FRIDA_VERBOSE=1 timeout 10 ${FUZZER} -m 0 -V07 -O -c 0 -l 3 -i ./test/seeds_frida -o ./test/output-frida-cmpcov -- ./test/out-frida-cmpcov || true
 test -n "$( ls ./test/output-frida-cmpcov/fuzzer_main/queue/id:000003* 2>/dev/null )" || {
 	echo "No new corpus entries found for FRIDA cmplog mode"
 	exit 1
 }
 export AFL_FRIDA_PERSISTENT_ADDR=0x`nm ./test/out-frida | grep -Ei "T _main|T main" | awk '{print $1}'`
-AFL_PATH=${AFL_DIR_NAME} AFL_STATS_INTERVAL=1 AFL_CORES=1 timeout 5 ${FUZZER} -m 0 -V07 -O -i ./test/seeds-frida -o ./test/output-frida-persistent -- ./test/out-frida || true
-# TODO: change it to id:000003* once persistent mode is fixed
+timeout 5 ${FUZZER} -m 0 -V07 -O -i ./test/seeds_frida -o ./test/output-frida-persistent -- ./test/out-frida || true
+
 test -n "$( ls ./test/output-frida-persistent/fuzzer_main/queue/id:000002* 2>/dev/null )" || {
 	echo "No new corpus entries found for FRIDA persistent mode"
 	exit 1
 }
+
 RUNTIME_PERSISTENT=`grep execs_done ./test/output-frida-persistent/fuzzer_main/fuzzer_stats | awk '{print$3}'`
 RUNTIME=`grep execs_done ./test/output-frida/fuzzer_main/fuzzer_stats | awk '{print$3}'`
 test -n "$RUNTIME" -a -n "$RUNTIME_PERSISTENT" && {
@@ -125,8 +142,44 @@ test -n "$RUNTIME" -a -n "$RUNTIME_PERSISTENT" && {
 } || {
   echo "we got no data on executions performed? weird!"
 }
+
+unset AFL_FRIDA_PERSISTENT_ADDR
 '''
-dependencies = ["build_afl"]
+dependencies = ["build_afl", "build_libafl_fuzz"]
+
+[tasks.test_qemu]
+script_runner = "@shell"
+script = '''
+${CC} -pie -fPIE ./test/test-instr.c -o ./test/out-qemu
+${CC} -o ./test/out-qemu-cmpcov ./test/test-cmpcov.c
+
+export AFL_PATH=${AFL_DIR}
+export AFL_CORES=1
+export AFL_STATS_INTERVAL=1
+
+timeout 5 ${FUZZER} -m 0 -V07 -Q -i ./test/seeds_qemu -o ./test/output-qemu -- ./test/out-qemu || true
+test -n "$( ls ./test/output-qemu/fuzzer_main/queue/id:000002* 2>/dev/null )" || {
+	echo "No new corpus entries found for QEMU mode"
+	exit 1
+}
+
+export AFL_ENTRYPOINT=`printf 1 | AFL_DEBUG=1 ${AFL_DIR}/afl-qemu-trace ./test/out-qemu 2>&1 >/dev/null | awk '/forkserver/{print $4; exit}'`
+timeout 5 ${FUZZER} -m 0 -V2 -Q -i ./test/seeds_qemu -o ./test/output-qemu-entrypoint -- ./test/out-qemu || true
+test -n "$( ls ./test/output-qemu-entrypoint/fuzzer_main/queue/id:000002* 2>/dev/null )" || {
+	echo "No new corpus entries found for QEMU mode with AFL_ENTRYPOINT"
+	exit 1
+}
+unset AFL_ENTRYPOINT
+
+export AFL_PRELOAD=${AFL_DIR}/libcompcov.so
+export AFL_COMPCOV_LEVEL=2
+timeout 5 ${FUZZER} -V07 -Q -i ./test/seeds_qemu -o ./test/output-qemu-cmpcov -- ./test/out-qemu-cmpcov || true
+test -n "$( ls ./test/output-qemu-cmpcov/fuzzer_main/queue/id:000002* 2>/dev/null )" || {
+	echo "No new corpus entries found for QEMU mode"
+	exit 1
+}
+'''
+dependencies = ["build_afl", "build_qemuafl","build_libafl_fuzz"]
 
 [tasks.clean]
 linux_alias = "clean_unix"
@@ -136,14 +189,12 @@ windows_alias = "unsupported"
 [tasks.clean_unix]
 script_runner = "@shell"
 script = '''
-rm -rf AFLplusplus-${AFL_VERSION}
-rm ${AFL_VERSION}.zip
+rm -rf AFLplusplus
 rm -rf ./test/out-instr
 rm -rf ./test/output
 rm -rf ./test/cmplog-output
-rm -rf ./test/output-frida
-rm -rf ./test/output-frida-cmpcov
-rm -rf ./test/output-frida-persistent
+rm -rf ./test/output-frida*
 rm -rf ./test/output-cmplog
+rm -rf ./test/output-qemu*
 rm ./test/out-*
 '''

@@ -53,12 +53,24 @@ const FS_NEW_ERROR: i32 = 0xeffe0000_u32 as i32;
 
 const FS_NEW_VERSION_MIN: u32 = 1;
 const FS_NEW_VERSION_MAX: u32 = 1;
+
+#[allow(clippy::cast_possible_wrap)]
+const FS_OPT_ENABLED: i32 = 0x80000001_u32 as i32;
+
 #[allow(clippy::cast_possible_wrap)]
 const FS_NEW_OPT_MAPSIZE: i32 = 1_u32 as i32;
 #[allow(clippy::cast_possible_wrap)]
+const FS_OPT_MAPSIZE: i32 = 0x40000000_u32 as i32;
+
+#[allow(clippy::cast_possible_wrap)]
+const FS_OPT_SHDMEM_FUZZ: i32 = 0x01000000_u32 as i32;
+#[allow(clippy::cast_possible_wrap)]
 const FS_NEW_OPT_SHDMEM_FUZZ: i32 = 2_u32 as i32;
+
 #[allow(clippy::cast_possible_wrap)]
 const FS_NEW_OPT_AUTODICT: i32 = 0x00000800_u32 as i32;
+#[allow(clippy::cast_possible_wrap)]
+const FS_OPT_AUTODICT: i32 = 0x10000000_u32 as i32;
 
 #[allow(clippy::cast_possible_wrap)]
 const FS_ERROR_MAP_SIZE: i32 = 1_u32 as i32;
@@ -280,6 +292,10 @@ impl Drop for Forkserver {
     }
 }
 
+const fn fs_opt_get_mapsize(x: i32) -> i32 {
+    ((x & 0x00fffffe) >> 1) + 1
+}
+
 #[allow(clippy::fn_params_excessive_bools)]
 impl Forkserver {
     /// Create a new [`Forkserver`]
@@ -343,7 +359,6 @@ impl Forkserver {
         };
 
         let mut command = Command::new(target);
-
         // Setup args, stdio
         command
             .args(args)
@@ -627,7 +642,10 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
     crash_exitcode: Option<i8>,
 }
 
-impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
+impl<'a, SP> ForkserverExecutorBuilder<'a, SP>
+where
+    SP: ShMemProvider,
+{
     /// Builds `ForkserverExecutor`.
     /// This Forkserver will attempt to provide inputs over shared mem when `shmem_provider` is given.
     /// Else this forkserver will pass the input to the target via `stdin`
@@ -814,27 +832,47 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             report_error_and_exit(version_status & 0x0000ffff)?;
         }
 
-        let keep = version_status;
-        let version: u32 = version_status as u32 - 0x41464c00_u32;
-        if (0x41464c00..=0x41464cff).contains(&version_status) {
-            match version {
-                0 => {
-                    return Err(Error::unknown("Fork server version is not assigned, this should not happen. Recompile target."));
-                }
-                FS_NEW_VERSION_MIN..=FS_NEW_VERSION_MAX => {
-                    // good, do nothing
-                }
-                _ => {
-                    return Err(Error::unknown(
-                        "Fork server version is not supported. Recompile the target.",
-                    ));
-                }
+        if Self::is_old_forkserver(version_status) {
+            log::info!("Old fork server model is used by the target, this still works though.");
+            self.initialize_old_forkserver(version_status, &map, &mut forkserver)?;
+        } else {
+            self.initialize_forkserver(version_status, &map, &mut forkserver)?;
+        }
+        Ok((forkserver, input_file, map))
+    }
+
+    fn is_old_forkserver(version_status: i32) -> bool {
+        !(0x41464c00..0x41464cff).contains(&version_status)
+    }
+
+    /// Intialize forkserver > v4.20c
+    #[allow(clippy::cast_possible_wrap)]
+    #[allow(clippy::cast_sign_loss)]
+    fn initialize_forkserver(
+        &mut self,
+        status: i32,
+        map: &Option<SP::ShMem>,
+        forkserver: &mut Forkserver,
+    ) -> Result<(), Error> {
+        let keep = status;
+        let version: u32 = status as u32 - 0x41464c00_u32;
+        match version {
+            0 => {
+                return Err(Error::unknown("Fork server version is not assigned, this should not happen. Recompile target."));
+            }
+            FS_NEW_VERSION_MIN..=FS_NEW_VERSION_MAX => {
+                // good, do nothing
+            }
+            _ => {
+                return Err(Error::unknown(
+                    "Fork server version is not supported. Recompile the target.",
+                ));
             }
         }
 
-        let xored_version_status = (version_status as u32 ^ 0xffffffff) as i32;
+        let xored_status = (status as u32 ^ 0xffffffff) as i32;
 
-        let send_len = forkserver.write_ctl(xored_version_status)?;
+        let send_len = forkserver.write_ctl(xored_status)?;
         if send_len != 4 {
             return Err(Error::unknown("Writing to forkserver failed.".to_string()));
         }
@@ -852,29 +890,13 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         }
 
         if status & FS_NEW_OPT_MAPSIZE == FS_NEW_OPT_MAPSIZE {
-            // When 0, we assume that map_size was filled by the user or const
-            /* TODO autofill map size from the observer
-
-            if map_size > 0 {
-                self.map_size = Some(map_size as usize);
-            }
-            */
-            let (read_len, mut map_size) = forkserver.read_st()?;
+            let (read_len, fsrv_map_size) = forkserver.read_st()?;
             if read_len != 4 {
                 return Err(Error::unknown(
                     "Failed to read map size from forkserver".to_string(),
                 ));
             }
-
-            if map_size % 64 != 0 {
-                map_size = ((map_size + 63) >> 6) << 6;
-            }
-
-            // TODO set AFL_MAP_SIZE
-            assert!(self.map_size.is_none() || map_size as usize <= self.map_size.unwrap());
-
-            // we'll use this later when we truncate the observer
-            self.map_size = Some(map_size as usize);
+            self.set_map_size(fsrv_map_size);
         }
 
         if status & FS_NEW_OPT_SHDMEM_FUZZ != 0 {
@@ -921,14 +943,111 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             return Err(Error::unknown("Reading from forkserver failed".to_string()));
         }
 
-        if aflx != version_status {
+        if aflx != keep {
             return Err(Error::unknown(format!(
-                "Error in forkserver communication ({:x}=>{:x})",
-                keep, aflx
+                "Error in forkserver communication ({aflx:?}=>{keep:?})",
             )));
         }
+        Ok(())
+    }
 
-        Ok((forkserver, input_file, map))
+    /// Intialize old forkserver. < v4.20c
+    #[allow(clippy::cast_possible_wrap)]
+    #[allow(clippy::cast_sign_loss)]
+    fn initialize_old_forkserver(
+        &mut self,
+        status: i32,
+        map: &Option<SP::ShMem>,
+        forkserver: &mut Forkserver,
+    ) -> Result<(), Error> {
+        if status & FS_OPT_ENABLED == FS_OPT_ENABLED && status & FS_OPT_MAPSIZE == FS_OPT_MAPSIZE {
+            let fsrv_map_size = fs_opt_get_mapsize(status);
+            self.set_map_size(fsrv_map_size);
+        }
+
+        // Only with SHMEM or AUTODICT we can send send_status back or it breaks!
+        // If forkserver is responding, we then check if there's any option enabled.
+        // We'll send 4-bytes message back to the forkserver to tell which features to use
+        // The forkserver is listening to our response if either shmem fuzzing is enabled or auto dict is enabled
+        // <https://github.com/AFLplusplus/AFLplusplus/blob/147654f8715d237fe45c1657c87b2fe36c4db22a/instrumentation/afl-compiler-rt.o.c#L1026>
+        if status & FS_OPT_ENABLED == FS_OPT_ENABLED
+            && (status & FS_OPT_SHDMEM_FUZZ == FS_OPT_SHDMEM_FUZZ
+                || status & FS_OPT_AUTODICT == FS_OPT_AUTODICT)
+        {
+            let mut send_status = FS_OPT_ENABLED;
+
+            if (status & FS_OPT_SHDMEM_FUZZ == FS_OPT_SHDMEM_FUZZ) && map.is_some() {
+                log::info!("Using SHARED MEMORY FUZZING feature.");
+                send_status |= FS_OPT_SHDMEM_FUZZ;
+                self.uses_shmem_testcase = true;
+            }
+
+            if (status & FS_OPT_AUTODICT == FS_OPT_AUTODICT) && self.autotokens.is_some() {
+                log::info!("Using AUTODICT feature");
+                send_status |= FS_OPT_AUTODICT;
+            }
+
+            if send_status != FS_OPT_ENABLED {
+                // if send_status is not changed (Options are available but we didn't use any), then don't send the next write_ctl message.
+                // This is important
+
+                let send_len = forkserver.write_ctl(send_status)?;
+                if send_len != 4 {
+                    return Err(Error::unknown("Writing to forkserver failed.".to_string()));
+                }
+
+                if (send_status & FS_OPT_AUTODICT) == FS_OPT_AUTODICT {
+                    let (read_len, dict_size) = forkserver.read_st()?;
+                    if read_len != 4 {
+                        return Err(Error::unknown(
+                            "Reading from forkserver failed.".to_string(),
+                        ));
+                    }
+
+                    if !(2..=0xffffff).contains(&dict_size) {
+                        return Err(Error::illegal_state(
+                            "Dictionary has an illegal size".to_string(),
+                        ));
+                    }
+
+                    log::info!("Autodict size {dict_size:x}");
+
+                    let (rlen, buf) = forkserver.read_st_size(dict_size as usize)?;
+
+                    if rlen != dict_size as usize {
+                        return Err(Error::unknown("Failed to load autodictionary".to_string()));
+                    }
+                    if let Some(t) = &mut self.autotokens {
+                        t.parse_autodict(&buf, dict_size as usize);
+                    }
+                }
+            }
+        } else {
+            log::warn!("Forkserver Options are not available.");
+        }
+
+        Ok(())
+    }
+
+    #[allow(clippy::cast_sign_loss)]
+    fn set_map_size(&mut self, fsrv_map_size: i32) {
+        // When 0, we assume that map_size was filled by the user or const
+        /* TODO autofill map size from the observer
+
+        if fsrv_map_size > 0 {
+            self.map_size = Some(fsrv_map_size as usize);
+        }
+        */
+        let mut map_size = fsrv_map_size;
+        if map_size % 64 != 0 {
+            map_size = ((map_size + 63) >> 6) << 6;
+        }
+
+        // TODO set AFL_MAP_SIZE
+        assert!(self.map_size.is_none() || map_size as usize <= self.map_size.unwrap());
+
+        // we'll use this later when we truncate the observer
+        self.map_size = Some(map_size as usize);
     }
 
     /// Use autodict?

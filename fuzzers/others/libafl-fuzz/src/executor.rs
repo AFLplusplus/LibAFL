@@ -117,7 +117,8 @@ pub fn check_binary(opt: &mut Opt, shmem_env_var: &str) -> Result<(), Error> {
         ));
     }
 
-    if opt.forkserver_cs || opt.qemu_mode || opt.frida_mode && is_instrumented(&mmap, shmem_env_var)
+    if (opt.forkserver_cs || opt.qemu_mode || opt.frida_mode)
+        && is_instrumented(&mmap, shmem_env_var)
     {
         return Err(Error::illegal_argument(
             "Instrumentation found in -Q/-O mode",
