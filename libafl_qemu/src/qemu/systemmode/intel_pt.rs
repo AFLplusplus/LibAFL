@@ -15,6 +15,7 @@ use std::{
 use bitflags::bitflags;
 use caps::{CapSet, Capability};
 use libafl::Error;
+use num_enum::TryFromPrimitive;
 use perf_event_open_sys::{
     bindings::{perf_event_attr, perf_event_mmap_page, PERF_FLAG_FD_CLOEXEC},
     ioctls::{DISABLE, ENABLE, SET_FILTER},
@@ -26,6 +27,13 @@ const PERF_BUFFER_SIZE: usize = (1 + (1 << 7)) * PAGE_SIZE;
 const PERF_AUX_BUFFER_SIZE: usize = 64 * 1024 * 1024;
 const CPU_INFO_PATH: &str = "/proc/cpuinfo";
 const PT_EVENT_PATH: &str = "/sys/bus/event_source/devices/intel_pt";
+
+#[derive(TryFromPrimitive, Debug)]
+#[repr(i32)]
+enum KvmPTMode {
+    System = 0,
+    HostGuest = 1,
+}
 
 bitflags! {
     /// IA32_RTIT_CTL MSR flags
@@ -102,6 +110,7 @@ impl IntelPT {
             str_filter.push_str(format!("filter {:#x}/{:#x} ", filter.start, size).as_str());
         }
 
+        debug_assert!(!str_filter.contains("\0"));
         // SAFETY: CString::from_vec_unchecked is safe because no null bytes are present in the
         // string
         let c_str_filter = unsafe { CString::from_vec_unchecked(str_filter.into_bytes()) };
@@ -192,6 +201,21 @@ impl IntelPT {
         if let Err(e) = intel_pt_nr_addr_filters() {
             reasons.push(e.to_string());
         }
+
+        let kvm_pt_mode_path = "/sys/module/kvm_intel/parameters/pt_mode";
+        if let Ok(s) = fs::read_to_string(kvm_pt_mode_path) {
+            match s.trim().parse::<i32>().map(|i| i.try_into()) {
+                Ok(Ok(KvmPTMode::System)) => (),
+                Ok(Ok(KvmPTMode::HostGuest)) => reasons.push(format!(
+                    "KVM Intel PT mode must be set to {:?} `{}` to be used with libafl_qemu",
+                    KvmPTMode::System,
+                    KvmPTMode::System as i32
+                )),
+                _ => reasons.push(format!(
+                    "Failed to parse KVM Intel PT mode in {kvm_pt_mode_path}"
+                )),
+            }
+        };
 
         if let Ok(current_capabilities) = caps::read(None, CapSet::Permitted) {
             let required_caps = [
