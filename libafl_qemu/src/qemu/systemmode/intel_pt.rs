@@ -1,15 +1,15 @@
 // TODO: This module is not bound to QEMU. Consider moving it somewhere else, it could be used in
 // other libafl modules.
 
-use core::slice;
+use core::{ops::Range, ptr, slice};
 use std::{
+    ffi::CString,
     fs,
     io::Write,
     os::{
         fd::{AsRawFd, FromRawFd, OwnedFd},
         raw::c_void,
     },
-    ptr,
 };
 
 use bitflags::bitflags;
@@ -25,7 +25,7 @@ const PAGE_SIZE: usize = 4096;
 const PERF_BUFFER_SIZE: usize = (1 + (1 << 7)) * PAGE_SIZE;
 const PERF_AUX_BUFFER_SIZE: usize = 64 * 1024 * 1024;
 const CPU_INFO_PATH: &str = "/proc/cpuinfo";
-const PT_EVENT_TYPE_PATH: &str = "/sys/bus/event_source/devices/intel_pt/type";
+const PT_EVENT_PATH: &str = "/sys/bus/event_source/devices/intel_pt";
 
 bitflags! {
     /// IA32_RTIT_CTL MSR flags
@@ -95,10 +95,18 @@ impl IntelPT {
         })
     }
 
-    pub fn set_ip_filter(&mut self) -> Result<(), Error> {
-        let filter = c"filter 0x7c00/512".to_owned(); //TODO use a param
-        match unsafe { SET_FILTER(self.fd.as_raw_fd(), filter.into_raw()) } {
-            -1 => Err(Error::last_os_error("Failed to set IP filter")),
+    pub fn set_ip_filters(&mut self, filters: &[Range<usize>]) -> Result<(), Error> {
+        let mut str_filter = String::new();
+        for filter in filters {
+            let size = filter.end - filter.start;
+            str_filter.push_str(format!("filter {:#x}/{:#x} ", filter.start, size).as_str());
+        }
+
+        // SAFETY: CString::from_vec_unchecked is safe because no null bytes are present in the
+        // string
+        let c_str_filter = unsafe { CString::from_vec_unchecked(str_filter.into_bytes()) };
+        match unsafe { SET_FILTER(self.fd.as_raw_fd(), c_str_filter.into_raw()) } {
+            -1 => Err(Error::last_os_error("Failed to set IP filters")),
             0 => Ok(()),
             ret => Err(Error::unsupported(format!(
                 "Failed to set IP filter, ioctl returned unexpected value {ret}"
@@ -152,9 +160,11 @@ impl IntelPT {
 
     /// Check if Intel PT is available on the current system.
     ///
-    /// This function can be helpful when `IntelPT::try_new()` fails for an unclear reason.
+    /// This function can be helpful when `IntelPT::try_new` or `set_ip_filter` fail for an unclear
+    /// reason.
     ///
-    /// Returns `Ok(())` if Intel PT is available, otherwise an `Err` with the reasons.
+    /// Returns `Ok(())` if Intel PT is available with all the features used by LibAFL, otherwise
+    /// returns an `Err` containing the reasons.
     pub fn availability() -> Result<(), Error> {
         let mut reasons = Vec::new();
         if cfg!(not(target_os = "linux")) {
@@ -179,6 +189,10 @@ impl IntelPT {
             reasons.push(e.to_string());
         }
 
+        if let Err(e) = intel_pt_nr_addr_filters() {
+            reasons.push(e.to_string());
+        }
+
         if let Ok(current_capabilities) = caps::read(None, CapSet::Permitted) {
             let required_caps = [
                 Capability::CAP_IPC_LOCK,
@@ -189,7 +203,7 @@ impl IntelPT {
 
             for rc in required_caps {
                 if !current_capabilities.contains(&rc) {
-                    reasons.push(format!("Required capability {} missing.", rc));
+                    reasons.push(format!("Required capability {rc} missing."));
                 }
             }
         } else {
@@ -207,8 +221,10 @@ impl IntelPT {
 impl Drop for IntelPT {
     fn drop(&mut self) {
         unsafe {
-            libc::munmap(self.perf_buffer, PERF_BUFFER_SIZE);
-            libc::munmap(self.perf_aux_buffer, PERF_AUX_BUFFER_SIZE);
+            let ret = libc::munmap(self.perf_aux_buffer, PERF_AUX_BUFFER_SIZE);
+            debug_assert_eq!(ret, 0, "Intel PT: Failed to unmap perf aux buffer");
+            let ret = libc::munmap(self.perf_buffer, PERF_BUFFER_SIZE);
+            debug_assert_eq!(ret, 0, "Intel PT: Failed to unmap perf buffer");
         }
     }
 }
@@ -264,15 +280,31 @@ fn new_perf_event_attr_intel_pt() -> Result<perf_event_attr, Error> {
 }
 
 fn intel_pt_perf_type() -> Result<u32, Error> {
-    let s = fs::read_to_string(PT_EVENT_TYPE_PATH).map_err(|e| {
+    let path = format!("{PT_EVENT_PATH}/type");
+    let s = fs::read_to_string(&path).map_err(|e| {
         Error::os_error(
             e,
-            format!("Failed to read Intel PT perf event type from {PT_EVENT_TYPE_PATH}"),
+            format!("Failed to read Intel PT perf event type from {path}"),
         )
     })?;
     s.trim().parse::<u32>().map_err(|_| {
         Error::unsupported(format!(
-            "Failed to parse Intel PT perf event type in {PT_EVENT_TYPE_PATH}"
+            "Failed to parse Intel PT perf event type in {path}"
+        ))
+    })
+}
+
+fn intel_pt_nr_addr_filters() -> Result<u32, Error> {
+    let path = format!("{PT_EVENT_PATH}/nr_addr_filters");
+    let s = fs::read_to_string(&path).map_err(|e| {
+        Error::os_error(
+            e,
+            format!("Failed to read Intel PT number of address filters from {path}"),
+        )
+    })?;
+    s.trim().parse::<u32>().map_err(|_| {
+        Error::unsupported(format!(
+            "Failed to parse Intel PT number of address filters in {path}"
         ))
     })
 }
