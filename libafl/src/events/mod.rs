@@ -9,14 +9,12 @@ pub mod centralized;
 pub mod simple;
 #[cfg(all(unix, feature = "std"))]
 pub use centralized::*;
-// #[cfg(feature = "std")]
-// #[allow(clippy::ignored_unit_patterns)]
-// pub mod launcher;
+
 #[allow(clippy::ignored_unit_patterns)]
 pub mod llmp;
-// #[cfg(feature = "tcp_manager")]
-// #[allow(clippy::ignored_unit_patterns)]
-// pub mod tcp;
+#[cfg(feature = "tcp_manager")]
+#[allow(clippy::ignored_unit_patterns)]
+pub mod tcp;
 
 use alloc::{borrow::Cow, string::String, vec::Vec};
 use core::{
@@ -29,8 +27,11 @@ use core::{
 use ahash::RandomState;
 pub mod broker_hooks;
 pub use broker_hooks::*;
-// #[cfg(feature = "std")]
-// pub use launcher::*;
+#[cfg(feature = "std")]
+#[allow(clippy::ignored_unit_patterns)]
+pub mod launcher;
+#[cfg(feature = "std")]
+pub use launcher::*;
 #[cfg(all(unix, feature = "std"))]
 use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal, CTRL_C_EXIT};
 use libafl_bolts::{current_time, tuples::Handle, ClientId};
@@ -428,6 +429,14 @@ pub trait EventFirer<I, S> {
 
     /// Return if we really send this event or not
     fn should_send(&self) -> bool;
+}
+
+/// Serialize all observers for this type and manager
+pub(crate) fn serialize_observers<OT>(observers: &OT) -> Result<Option<Vec<u8>>, Error>
+where
+    OT: Serialize,
+{
+    Ok(Some(postcard::to_allocvec(observers)?))
 }
 
 /// Default implementation of [`ProgressReporter::maybe_report_progress`] for implementors with the

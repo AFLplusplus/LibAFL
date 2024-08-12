@@ -8,7 +8,9 @@ use serde::Serialize;
 
 use crate::{
     corpus::{Corpus, CorpusId, HasCorpus, HasCurrentCorpusId, HasTestcase, Testcase},
-    events::{Event, EventConfig, EventFirer, EventProcessor, ProgressReporter},
+    events::{
+        serialize_observers, Event, EventConfig, EventFirer, EventProcessor, ProgressReporter,
+    },
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     mark_feature_time,
@@ -411,7 +413,7 @@ where
                     if manager.configuration() == EventConfig::AlwaysUnique {
                         None
                     } else {
-                        manager.serialize_observers::<OT>(observers)?
+                        serialize_observers::<OT>(observers)?
                     }
                 } else {
                     None
@@ -625,7 +627,7 @@ where
         let observers_buf = if manager.configuration() == EventConfig::AlwaysUnique {
             None
         } else {
-            manager.serialize_observers::<E::Observers>(&*observers)?
+            serialize_observers::<E::Observers>(&*observers)?
         };
         manager.fire(
             state,
