@@ -4,11 +4,11 @@
 pub mod events_hooks;
 pub use events_hooks::*;
 
+#[cfg(all(unix, feature = "std"))]
+pub mod centralized;
 pub mod simple;
-// #[cfg(all(unix, feature = "std"))]
-// pub mod centralized;
-// #[cfg(all(unix, feature = "std"))]
-// pub use centralized::*;
+#[cfg(all(unix, feature = "std"))]
+pub use centralized::*;
 // #[cfg(feature = "std")]
 // #[allow(clippy::ignored_unit_patterns)]
 // pub mod launcher;
@@ -18,7 +18,6 @@ pub mod llmp;
 // #[allow(clippy::ignored_unit_patterns)]
 // pub mod tcp;
 
-// pub mod broker_hooks;
 use alloc::{borrow::Cow, string::String, vec::Vec};
 use core::{
     fmt,
@@ -28,16 +27,13 @@ use core::{
 };
 
 use ahash::RandomState;
-// pub use broker_hooks::*;
+pub mod broker_hooks;
+pub use broker_hooks::*;
 // #[cfg(feature = "std")]
 // pub use launcher::*;
 #[cfg(all(unix, feature = "std"))]
 use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal, CTRL_C_EXIT};
-use libafl_bolts::{
-    current_time,
-    tuples::{Handle, MatchName, MatchNameRef},
-    ClientId,
-};
+use libafl_bolts::{current_time, tuples::Handle, ClientId};
 pub use llmp::*;
 use serde::{Deserialize, Serialize};
 pub use simple::*;
@@ -425,14 +421,6 @@ pub trait EventFirer<I, S> {
         )
     }
 
-    /// Serialize all observers for this type and manager
-    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
-    where
-        OT: Serialize,
-    {
-        Ok(Some(postcard::to_allocvec(observers)?))
-    }
-
     /// Get the configuration
     fn configuration(&self) -> EventConfig {
         EventConfig::AlwaysUnique
@@ -557,7 +545,7 @@ pub trait ProgressReporter<S> {
 /// Default implementation of [`EventRestarter::on_restart`] for implementors with the given
 /// constraints
 pub fn default_on_restart<S>(
-    restarter: &mut impl EventRestarter<S>,
+    restarter: &mut (impl EventRestarter<S> + ManagerExit),
     state: &mut S,
 ) -> Result<(), Error>
 where
@@ -576,7 +564,10 @@ pub trait EventRestarter<S> {
     ///
     /// Implementors: if in doubt, use [`default_on_restart`].
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error>;
+}
 
+/// APIs called before exiting
+pub trait ManagerExit {
     /// Send information that this client is exiting.
     /// No need to restart us any longer, and no need to print an error, either.
     fn send_exiting(&mut self) -> Result<(), Error> {
@@ -629,6 +620,8 @@ where
         default_on_restart(self, state)
     }
 }
+
+impl ManagerExit for NopEventManager {}
 
 impl<E, S, Z> EventProcessor<E, S, Z> for NopEventManager {
     fn process(
@@ -700,14 +693,6 @@ where
     }
 
     #[inline]
-    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
-    where
-        OT: Serialize,
-    {
-        self.inner.serialize_observers(observers)
-    }
-
-    #[inline]
     fn configuration(&self) -> EventConfig {
         self.inner.configuration()
     }
@@ -725,7 +710,12 @@ where
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
         self.inner.on_restart(state)
     }
+}
 
+impl<EM> ManagerExit for MonitorTypedEventManager<EM>
+where
+    EM: ManagerExit,
+{
     #[inline]
     fn send_exiting(&mut self) -> Result<(), Error> {
         self.inner.send_exiting()
@@ -802,55 +792,6 @@ pub trait AdaptiveSerializer {
 
     /// A [`Handle`] to the time observer to determine the `time_factor`
     fn time_ref(&self) -> &Option<Handle<TimeObserver>>;
-
-    /// Serialize the observer using the `time_factor` and `percentage_threshold`.
-    /// These parameters are unique to each of the different types of `EventManager`
-    fn serialize_observers_adaptive<S, OT>(
-        &mut self,
-        observers: &OT,
-        time_factor: u32,
-        percentage_threshold: usize,
-    ) -> Result<Option<Vec<u8>>, Error>
-    where
-        OT: MatchName + Serialize,
-    {
-        match self.time_ref() {
-            Some(t) => {
-                let exec_time = observers
-                    .get(t)
-                    .map(|o| o.last_runtime().unwrap_or(Duration::ZERO))
-                    .unwrap();
-
-                let mut must_ser = (self.serialization_time() + self.deserialization_time())
-                    * time_factor
-                    < exec_time;
-                if must_ser {
-                    *self.should_serialize_cnt_mut() += 1;
-                }
-
-                if self.serializations_cnt() > 32 {
-                    must_ser = (self.should_serialize_cnt() * 100 / self.serializations_cnt())
-                        > percentage_threshold;
-                }
-
-                if self.serialization_time() == Duration::ZERO
-                    || must_ser
-                    || self.serializations_cnt().trailing_zeros() >= 8
-                {
-                    let start = current_time();
-                    let ser = postcard::to_allocvec(observers)?;
-                    *self.serialization_time_mut() = current_time() - start;
-
-                    *self.serializations_cnt_mut() += 1;
-                    Ok(Some(ser))
-                } else {
-                    *self.serializations_cnt_mut() += 1;
-                    Ok(None)
-                }
-            }
-            None => Ok(None),
-        }
-    }
 }
 
 #[cfg(test)]

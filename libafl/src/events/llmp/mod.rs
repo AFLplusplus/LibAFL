@@ -22,14 +22,14 @@ use crate::{
 };
 
 /// The llmp event manager
-// pub mod mgr;
-// pub use mgr::*;
+pub mod mgr;
+pub use mgr::*;
 
 /// The llmp restarting manager
-/// #[cfg(feature = "std")]
-/// pub mod restarting;
-/// #[cfg(feature = "std")]
-/// pub use restarting::*;
+#[cfg(feature = "std")]
+pub mod restarting;
+#[cfg(feature = "std")]
+pub use restarting::*;
 
 /// Forward this to the client
 pub(crate) const _LLMP_TAG_EVENT_TO_CLIENT: Tag = Tag(0x2C11E471);

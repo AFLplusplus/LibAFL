@@ -7,10 +7,9 @@
 // 3. The "main evaluator", the evaluator node that will evaluate all the testcases pass by the centralized event manager to see if the testcases are worth propagating
 // 4. The "main broker", the gathers the stats from the fuzzer clients and broadcast the newly found testcases from the main evaluator.
 
-use alloc::{boxed::Box, string::String, vec::Vec};
+use alloc::string::String;
 use core::{fmt::Debug, time::Duration};
 use std::{
-    marker::PhantomData,
     ops::{Deref, DerefMut},
     process,
 };
@@ -23,27 +22,25 @@ use libafl_bolts::{
 use libafl_bolts::{
     llmp::{LlmpClient, LlmpClientDescription, Tag},
     shmem::{NopShMemProvider, ShMemProvider},
-    tuples::Handle,
     ClientId,
 };
-use serde::{Deserialize, Serialize};
+use serde::de::DeserializeOwned;
 
-use super::NopEventManager;
+use super::{default_maybe_report_progress, default_report_progress, ManagerExit, NopEventManager};
 #[cfg(feature = "llmp_compression")]
 use crate::events::llmp::COMPRESS_THRESHOLD;
 #[cfg(feature = "scalability_introspection")]
 use crate::state::HasScalabilityMonitor;
 use crate::{
+    corpus::{Corpus, HasCorpus},
     events::{
-        AdaptiveSerializer, CustomBufEventResult, Event, EventConfig, EventFirer,
-        EventManagerHooksTuple, EventManagerId, EventProcessor, EventRestarter,
-        HasCustomBufHandlers, HasEventManagerId, LogSeverity, ProgressReporter,
+        Event, EventConfig, EventFirer, EventManagerHooksTuple, EventManagerId, EventProcessor,
+        EventRestarter, HasEventManagerId, LogSeverity, ProgressReporter,
     },
-    executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
-    inputs::{Input, NopInput},
-    observers::{ObserversTuple, TimeObserver},
-    state::{HasExecutions, HasLastReportTime, NopState, State, Stoppable},
+    inputs::Input,
+    prelude::HasObservers,
+    state::{HasExecutions, HasLastReportTime, Stoppable},
     Error, HasMetadata,
 };
 
@@ -189,7 +186,10 @@ impl CentralizedEventManagerBuilder {
     }
 }
 
-impl<EM, EMH, SP> Deref for CentralizedEventManager<EM, EMH, SP> {
+impl<EM, EMH, SP> Deref for CentralizedEventManager<EM, EMH, SP>
+where
+    SP: ShMemProvider,
+{
     type Target = EM;
 
     fn deref(&self) -> &Self::Target {
@@ -197,21 +197,29 @@ impl<EM, EMH, SP> Deref for CentralizedEventManager<EM, EMH, SP> {
     }
 }
 
-impl<EM, EMH, SP> DerefMut for CentralizedEventManager<EM, EMH, SP> {
+impl<EM, EMH, SP> DerefMut for CentralizedEventManager<EM, EMH, SP>
+where
+    SP: ShMemProvider,
+{
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }
 }
 
-impl<I, EM, EMH, S, SP> EventFirer<I, S> for CentralizedEventManager<EM, EMH, SP>
+impl<EM, EMH, S, SP> EventFirer<<S::Corpus as Corpus>::Input, S>
+    for CentralizedEventManager<EM, EMH, SP>
 where
-    EM: AdaptiveSerializer + EventFirer<I, S> + HasEventManagerId,
-    EMH: EventManagerHooksTuple<EM::State>,
-    S: State,
+    S: HasCorpus,
     SP: ShMemProvider,
+    EM: HasEventManagerId + EventFirer<<S::Corpus as Corpus>::Input, S>,
+    <S::Corpus as Corpus>::Input: Input,
 {
     #[allow(clippy::match_same_arms)]
-    fn fire(&mut self, state: &mut S, mut event: Event<I>) -> Result<(), Error> {
+    fn fire(
+        &mut self,
+        state: &mut S,
+        mut event: Event<<S::Corpus as Corpus>::Input>,
+    ) -> Result<(), Error> {
         if !self.is_main {
             // secondary node
             let mut is_tc = false;
@@ -249,19 +257,6 @@ where
         self.inner.log(state, severity_level, message)
     }
 
-    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
-    where
-        OT: ObserversTuple<S> + Serialize,
-    {
-        const SERIALIZE_TIME_FACTOR: u32 = 4; // twice as much as the normal llmp em's value cuz it does this job twice.
-        const SERIALIZE_PERCENTAGE_THRESHOLD: usize = 80;
-        self.inner.serialize_observers_adaptive(
-            observers,
-            SERIALIZE_TIME_FACTOR,
-            SERIALIZE_PERCENTAGE_THRESHOLD,
-        )
-    }
-
     fn configuration(&self) -> EventConfig {
         self.inner.configuration()
     }
@@ -282,7 +277,13 @@ where
         self.inner.on_restart(state)?;
         Ok(())
     }
+}
 
+impl<EM, EMH, SP> ManagerExit for CentralizedEventManager<EM, EMH, SP>
+where
+    EM: ManagerExit,
+    SP: ShMemProvider,
+{
     fn send_exiting(&mut self) -> Result<(), Error> {
         self.client.sender_mut().send_exiting()?;
         self.inner.send_exiting()
@@ -295,25 +296,19 @@ where
     }
 }
 
-impl<E, EM, EMH, S, SP, Z> EventProcessor<E, Z> for CentralizedEventManager<EM, EMH, S, SP>
+impl<E, EM, EMH, S, SP, Z> EventProcessor<E, S, Z> for CentralizedEventManager<EM, EMH, SP>
 where
-    EM: AdaptiveSerializer + EventProcessor<E, Z> + EventFirer + HasEventManagerId,
-    EMH: EventManagerHooksTuple<EM::State>,
-    E: HasObservers<State = Self::State> + Executor<Self, Z>,
-    <E as UsesObservers>::Observers: Serialize,
-    for<'a> E::Observers: Deserialize<'a>,
-    S: State,
-    Self::State: HasExecutions + HasMetadata,
+    E: HasObservers,
+    E::Observers: DeserializeOwned,
+    EM: EventProcessor<E, S, Z> + HasEventManagerId + EventFirer<<S::Corpus as Corpus>::Input, S>,
+    EMH: EventManagerHooksTuple<<S::Corpus as Corpus>::Input, S>,
     SP: ShMemProvider,
-    Z: EvaluatorObservers<E::Observers, State = Self::State>
-        + ExecutionProcessor<State = Self::State>,
+    S: HasCorpus + Stoppable,
+    <S::Corpus as Corpus>::Input: Input,
+    Z: EvaluatorObservers<E, EM, <S::Corpus as Corpus>::Input, S>
+        + ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
 {
-    fn process(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut Self::State,
-        executor: &mut E,
-    ) -> Result<usize, Error> {
+    fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         if self.is_main {
             // main node
             self.receive_from_secondary(fuzzer, state, executor)
@@ -330,51 +325,29 @@ where
     }
 }
 
-impl<E, EM, EMH, S, SP, Z> EventManager<E, Z> for CentralizedEventManager<EM, EMH, S, SP>
+impl<EM, EMH, S, SP> ProgressReporter<S> for CentralizedEventManager<EM, EMH, SP>
 where
-    E: HasObservers<State = S> + Executor<Self, Z>,
-    <E as UsesObservers>::Observers: Serialize,
-    for<'a> E::Observers: Deserialize<'a>,
-    EM: AdaptiveSerializer + EventManager<E, Z>,
-    EM::State: HasExecutions + HasMetadata + HasLastReportTime,
-    EMH: EventManagerHooksTuple<EM::State>,
-    S: State,
     SP: ShMemProvider,
-    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<State = S>,
+    S: HasMetadata + HasExecutions + HasLastReportTime + HasCorpus,
+    <S::Corpus as Corpus>::Input: Input,
+    EM: HasEventManagerId + EventFirer<<S::Corpus as Corpus>::Input, S>,
 {
-}
-
-impl<EM, EMH, S, SP> HasCustomBufHandlers for CentralizedEventManager<EM, EMH, S, SP>
-where
-    EM: HasCustomBufHandlers,
-    EMH: EventManagerHooksTuple<EM::State>,
-    S: State,
-    SP: ShMemProvider,
-{
-    /// Adds a custom buffer handler that will run for each incoming `CustomBuf` event.
-    fn add_custom_buf_handler(
+    fn maybe_report_progress(
         &mut self,
-        handler: Box<dyn FnMut(&mut S, &str, &[u8]) -> Result<CustomBufEventResult, Error>>,
-    ) {
-        self.inner.add_custom_buf_handler(handler);
+        state: &mut S,
+        monitor_timeout: Duration,
+    ) -> Result<(), Error> {
+        default_maybe_report_progress(self, state, monitor_timeout)
+    }
+
+    fn report_progress(&mut self, state: &mut S) -> Result<(), Error> {
+        default_report_progress(self, state)
     }
 }
 
-impl<EM, EMH, S, SP> ProgressReporter for CentralizedEventManager<EM, EMH, S, SP>
+impl<EM, EMH, SP> HasEventManagerId for CentralizedEventManager<EM, EMH, SP>
 where
-    EM: AdaptiveSerializer + ProgressReporter + HasEventManagerId,
-    EM::State: HasMetadata + HasExecutions + HasLastReportTime,
-    EMH: EventManagerHooksTuple<EM::State>,
-    S: State,
-    SP: ShMemProvider,
-{
-}
-
-impl<EM, EMH, S, SP> HasEventManagerId for CentralizedEventManager<EM, EMH, S, SP>
-where
-    EM: HasEventManagerId + UsesState,
-    EMH: EventManagerHooksTuple<EM::State>,
-    S: State,
+    EM: HasEventManagerId,
     SP: ShMemProvider,
 {
     fn mgr_id(&self) -> EventManagerId {
@@ -382,11 +355,8 @@ where
     }
 }
 
-impl<EM, EMH, S, SP> CentralizedEventManager<EM, EMH, S, SP>
+impl<EM, EMH, SP> CentralizedEventManager<EM, EMH, SP>
 where
-    EM: UsesState,
-    EMH: EventManagerHooksTuple<EM::State>,
-    S: State,
     SP: ShMemProvider,
 {
     /// Describe the client event manager's LLMP parts in a restorable fashion
@@ -407,11 +377,8 @@ where
     }
 }
 
-impl<EM, EMH, S, SP> CentralizedEventManager<EM, EMH, S, SP>
+impl<EM, EMH, SP> CentralizedEventManager<EM, EMH, SP>
 where
-    EM: UsesState + EventFirer + AdaptiveSerializer + HasEventManagerId,
-    EMH: EventManagerHooksTuple<EM::State>,
-    S: State + Stoppable,
     SP: ShMemProvider,
 {
     #[cfg(feature = "llmp_compression")]
@@ -447,19 +414,21 @@ where
         Ok(())
     }
 
-    fn receive_from_secondary<E, Z>(
+    fn receive_from_secondary<E, S, Z>(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut <Self as UsesState>::State,
+        state: &mut S,
         executor: &mut E,
     ) -> Result<usize, Error>
     where
-        E: Executor<Self, Z> + HasObservers<State = <Self as UsesState>::State>,
-        <E as UsesObservers>::Observers: Serialize,
-        <Self as UsesState>::State: UsesInput + HasExecutions + HasMetadata,
-        for<'a> E::Observers: Deserialize<'a>,
-        Z: ExecutionProcessor<State = <Self as UsesState>::State>
-            + EvaluatorObservers<E::Observers>,
+        S: HasCorpus + Stoppable,
+        <S::Corpus as Corpus>::Input: DeserializeOwned + Input,
+        EMH: EventManagerHooksTuple<<S::Corpus as Corpus>::Input, S>,
+        E: HasObservers,
+        E::Observers: DeserializeOwned,
+        EM: HasEventManagerId + EventFirer<<S::Corpus as Corpus>::Input, S>,
+        Z: EvaluatorObservers<E, EM, <S::Corpus as Corpus>::Input, S>
+            + ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
     {
         // TODO: Get around local event copy by moving handle_in_client
         let self_id = self.client.sender().id();
@@ -484,8 +453,7 @@ where
             } else {
                 msg
             };
-            let event: Event<<<Self as UsesState>::State as UsesInput>::Input> =
-                postcard::from_bytes(event_bytes)?;
+            let event: Event<<S::Corpus as Corpus>::Input> = postcard::from_bytes(event_bytes)?;
             log::debug!("Processor received message {}", event.name_detailed());
             self.handle_in_main(fuzzer, executor, state, client_id, event)?;
             count += 1;
@@ -494,20 +462,23 @@ where
     }
 
     // Handle arriving events in the main node
-    fn handle_in_main<E, Z>(
+    fn handle_in_main<E, S, Z>(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut <Self as UsesState>::State,
+        state: &mut S,
         client_id: ClientId,
-        event: Event<<<Self as UsesState>::State as UsesInput>::Input>,
+        event: Event<<S::Corpus as Corpus>::Input>,
     ) -> Result<(), Error>
     where
-        E: Executor<Self, Z> + HasObservers<State = <Self as UsesState>::State>,
-        <Self as UsesState>::State: UsesInput + HasExecutions + HasMetadata,
-        for<'a> E::Observers: Deserialize<'a> + Serialize,
-        Z: ExecutionProcessor<State = <Self as UsesState>::State>
-            + EvaluatorObservers<E::Observers>,
+        E: HasObservers,
+        E::Observers: DeserializeOwned,
+        S: HasCorpus + Stoppable,
+        EMH: EventManagerHooksTuple<<S::Corpus as Corpus>::Input, S>,
+        <S::Corpus as Corpus>::Input: Input,
+        EM: HasEventManagerId + EventFirer<<S::Corpus as Corpus>::Input, S>,
+        Z: EvaluatorObservers<E, EM, <S::Corpus as Corpus>::Input, S>
+            + ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
     {
         log::debug!("handle_in_main!");
 
@@ -562,7 +533,7 @@ where
                             process::id(),
                             event_name
                         );
-                        fuzzer.evaluate_input_with_observers::<E, Self>(
+                        fuzzer.evaluate_input_with_observers(
                             state,
                             executor,
                             self,

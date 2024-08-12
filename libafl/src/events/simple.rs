@@ -22,6 +22,7 @@ use libafl_bolts::{os::CTRL_C_EXIT, shmem::ShMemProvider, staterestore::StateRes
 #[cfg(feature = "std")]
 use serde::{de::DeserializeOwned, Serialize};
 
+use super::ManagerExit;
 #[allow(deprecated)]
 use super::{default_maybe_report_progress, default_report_progress, ProgressReporter};
 #[cfg(feature = "std")]
@@ -98,16 +99,7 @@ where
     }
 }
 
-impl<MT, S> EventRestarter<S> for SimpleEventManager<MT, S>
-where
-    S: HasCorpus,
-{
-    fn on_restart(&mut self, _state: &mut S) -> Result<(), Error> {
-        Err(Error::not_implemented(
-            "Restarting is not implemented for SimpleEventManager",
-        ))
-    }
-}
+impl<MT, S> ManagerExit for SimpleEventManager<MT, S> where S: HasCorpus {}
 
 impl<E, MT, S, Z> EventProcessor<E, S, Z> for SimpleEventManager<MT, S>
 where
@@ -128,7 +120,7 @@ where
     }
 
     fn on_shutdown(&mut self) -> Result<(), Error> {
-        <Self as EventRestarter<S>>::send_exiting(self)
+        self.send_exiting()
     }
 }
 
@@ -376,7 +368,14 @@ where
             self.inner.monitor.client_stats(),
         ))
     }
+}
 
+#[cfg(feature = "std")]
+impl<MT, S, SP> ManagerExit for SimpleRestartingEventManager<MT, S, SP>
+where
+    SP: ShMemProvider,
+    S: HasCorpus,
+{
     fn send_exiting(&mut self) -> Result<(), Error> {
         self.staterestorer.send_exiting();
         Ok(())
