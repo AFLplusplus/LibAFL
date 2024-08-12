@@ -349,6 +349,7 @@ mod test {
         },
         unistd::{fork, ForkResult, Pid},
     };
+    use static_assertions::{assert_eq_size, const_assert_eq};
 
     use super::*;
 

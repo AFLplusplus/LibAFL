@@ -55,10 +55,6 @@ pub mod breakpoint;
 pub mod command;
 pub mod sync_exit;
 
-#[cfg(test)]
-#[macro_use]
-extern crate static_assertions;
-
 #[must_use]
 pub fn filter_qemu_args() -> Vec<String> {
     let mut args = vec![env::args().next().unwrap()];
