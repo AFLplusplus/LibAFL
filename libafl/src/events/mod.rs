@@ -575,6 +575,10 @@ pub trait EventRestarter<S> {
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error>;
 }
 
+pub trait CanSerializeObserver<OT> {
+    fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>;
+}
+
 /// APIs called before exiting
 pub trait ManagerExit {
     /// Send information that this client is exiting.

@@ -9,7 +9,7 @@ use serde::Serialize;
 use crate::{
     corpus::{Corpus, CorpusId, HasCorpus, HasCurrentCorpusId, HasTestcase, Testcase},
     events::{
-        serialize_observers, Event, EventConfig, EventFirer, EventProcessor, ProgressReporter,
+        CanSerializeObserver, Event, EventConfig, EventFirer, EventProcessor, ProgressReporter,
     },
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
@@ -299,7 +299,7 @@ where
         + MaybeHasClientPerfMonitor,
     <S::Corpus as Corpus>::Input: Clone,
     S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
-    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S> + CanSerializeObserver<OT>,
     OT: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
 {
     fn check_results(
@@ -413,7 +413,7 @@ where
                     if manager.configuration() == EventConfig::AlwaysUnique {
                         None
                     } else {
-                        serialize_observers::<OT>(observers)?
+                        manager.serialize_observers(observers)?
                     }
                 } else {
                     None
@@ -525,7 +525,7 @@ where
     CS: Scheduler<<S::Corpus as Corpus>::Input, E::Observers, S>,
     E: Executor<EM, <S::Corpus as Corpus>::Input, S, Self> + HasObservers,
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
-    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S> + CanSerializeObserver<E::Observers>,
     F: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
     OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
     S: HasCorpus + HasExecutions + HasLastFoundTime + HasSolutions,
@@ -627,7 +627,7 @@ where
         let observers_buf = if manager.configuration() == EventConfig::AlwaysUnique {
             None
         } else {
-            serialize_observers::<E::Observers>(&*observers)?
+            manager.serialize_observers(&*observers)?
         };
         manager.fire(
             state,
