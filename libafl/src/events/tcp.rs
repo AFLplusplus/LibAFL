@@ -46,8 +46,9 @@ use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
     corpus::{Corpus, HasCorpus},
     events::{
-        BrokerEventResult, Event, EventConfig, EventFirer, EventManagerHooksTuple, EventManagerId,
-        EventProcessor, EventRestarter, HasEventManagerId, ManagerExit, ProgressReporter,
+        BrokerEventResult, CanSerializeObserver, Event, EventConfig, EventFirer,
+        EventManagerHooksTuple, EventManagerId, EventProcessor, EventRestarter, HasEventManagerId,
+        ManagerExit, ProgressReporter,
     },
     executors::HasObservers,
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
@@ -774,6 +775,16 @@ where
     }
 }
 
+#[cfg(feature = "std")]
+impl<EMH, OT, S> CanSerializeObserver<OT> for TcpEventManager<EMH, S>
+where
+    OT: Serialize,
+{
+    fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
+        Ok(Some(postcard::to_allocvec(observers)?))
+    }
+}
+
 impl<EMH, S> ProgressReporter<S> for TcpEventManager<EMH, S>
 where
     S: HasMetadata + HasCorpus + HasExecutions + HasLastReportTime,
@@ -831,6 +842,17 @@ where
 
     fn report_progress(&mut self, state: &mut S) -> Result<(), Error> {
         default_report_progress(self, state)
+    }
+}
+
+#[cfg(feature = "std")]
+impl<EMH, OT, S, SP> CanSerializeObserver<OT> for TcpRestartingEventManager<EMH, S, SP>
+where
+    SP: ShMemProvider,
+    OT: Serialize,
+{
+    fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
+        Ok(Some(postcard::to_allocvec(observers)?))
     }
 }
 

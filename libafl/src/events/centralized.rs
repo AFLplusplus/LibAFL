@@ -22,11 +22,15 @@ use libafl_bolts::{
 use libafl_bolts::{
     llmp::{LlmpClient, LlmpClientDescription, Tag},
     shmem::{NopShMemProvider, ShMemProvider},
+    tuples::MatchNameRef,
     ClientId,
 };
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Serialize};
 
-use super::{default_maybe_report_progress, default_report_progress, ManagerExit, NopEventManager};
+use super::{
+    default_maybe_report_progress, default_report_progress, AdaptiveSerializer,
+    CanSerializeObserver, ManagerExit, NopEventManager,
+};
 #[cfg(feature = "llmp_compression")]
 use crate::events::llmp::COMPRESS_THRESHOLD;
 #[cfg(feature = "scalability_introspection")]
@@ -34,8 +38,9 @@ use crate::state::HasScalabilityMonitor;
 use crate::{
     corpus::{Corpus, HasCorpus},
     events::{
-        Event, EventConfig, EventFirer, EventManagerHooksTuple, EventManagerId, EventProcessor,
-        EventRestarter, HasEventManagerId, LogSeverity, ProgressReporter,
+        serialize_observers_adaptive, Event, EventConfig, EventFirer, EventManagerHooksTuple,
+        EventManagerId, EventProcessor, EventRestarter, HasEventManagerId, LogSeverity,
+        ProgressReporter,
     },
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::Input,
@@ -342,6 +347,18 @@ where
 
     fn report_progress(&mut self, state: &mut S) -> Result<(), Error> {
         default_report_progress(self, state)
+    }
+}
+
+#[cfg(feature = "std")]
+impl<EMH, OT, S, SP> CanSerializeObserver<OT> for CentralizedEventManager<EMH, S, SP>
+where
+    EMH: AdaptiveSerializer,
+    SP: ShMemProvider,
+    OT: Serialize + MatchNameRef,
+{
+    fn serialize_observers(&mut self, observers: &OT) -> Result<Option<std::vec::Vec<u8>>, Error> {
+        serialize_observers_adaptive::<EMH, S, OT>(self, observers, 2, 80)
     }
 }
 

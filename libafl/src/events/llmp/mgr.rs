@@ -22,6 +22,7 @@ use libafl_bolts::{
 #[cfg(feature = "std")]
 use libafl_bolts::{
     llmp::{recv_tcp_msg, send_tcp_msg, TcpRequest, TcpResponse},
+    tuples::MatchNameRef,
     IP_LOCALHOST,
 };
 use serde::{de::DeserializeOwned, Serialize};
@@ -33,8 +34,9 @@ use crate::{
     events::{
         default_maybe_report_progress, default_on_restart, default_report_progress,
         llmp::{LLMP_TAG_EVENT_TO_BOTH, _LLMP_TAG_EVENT_TO_BROKER},
-        AdaptiveSerializer, Event, EventConfig, EventFirer, EventManagerHooksTuple, EventManagerId,
-        EventProcessor, EventRestarter, HasEventManagerId, ManagerExit, ProgressReporter,
+        serialize_observers_adaptive, AdaptiveSerializer, CanSerializeObserver, Event, EventConfig,
+        EventFirer, EventManagerHooksTuple, EventManagerId, EventProcessor, EventRestarter,
+        HasEventManagerId, ManagerExit, ProgressReporter,
     },
     executors::HasObservers,
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
@@ -292,6 +294,17 @@ where
 
     fn time_ref(&self) -> &Option<Handle<TimeObserver>> {
         &self.time_ref
+    }
+}
+
+#[cfg(feature = "std")]
+impl<EMH, OT, S, SP> CanSerializeObserver<OT> for LlmpEventManager<EMH, S, SP>
+where
+    SP: ShMemProvider,
+    OT: Serialize + MatchNameRef,
+{
+    fn serialize_observers(&mut self, observers: &OT) -> Result<Option<std::vec::Vec<u8>>, Error> {
+        serialize_observers_adaptive::<Self, S, OT>(self, observers, 2, 80)
     }
 }
 

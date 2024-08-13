@@ -28,7 +28,7 @@ use libafl_bolts::{
 use libafl_bolts::{
     llmp::{Broker, LlmpBroker},
     shmem::ShMemProvider,
-    tuples::{tuple_list, Handle},
+    tuples::{tuple_list, Handle, MatchNameRef},
 };
 use serde::{de::DeserializeOwned, Serialize};
 #[cfg(feature = "std")]
@@ -41,9 +41,10 @@ use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
     corpus::{Corpus, HasCorpus},
     events::{
-        default_maybe_report_progress, default_report_progress, Event, EventConfig, EventFirer,
-        EventManagerHooksTuple, EventManagerId, EventProcessor, EventRestarter, HasEventManagerId,
-        LlmpEventManager, LlmpShouldSaveState, ManagerExit, ProgressReporter, StdLlmpEventHook,
+        default_maybe_report_progress, default_report_progress, serialize_observers_adaptive,
+        CanSerializeObserver, Event, EventConfig, EventFirer, EventManagerHooksTuple,
+        EventManagerId, EventProcessor, EventRestarter, HasEventManagerId, LlmpEventManager,
+        LlmpShouldSaveState, ManagerExit, ProgressReporter, StdLlmpEventHook,
     },
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::Input,
@@ -69,6 +70,17 @@ where
     staterestorer: StateRestorer<SP>,
     /// Decide if the state restorer must save the serialized state
     save_state: LlmpShouldSaveState,
+}
+
+#[cfg(feature = "std")]
+impl<EMH, OT, S, SP> CanSerializeObserver<OT> for LlmpRestartingEventManager<EMH, S, SP>
+where
+    SP: ShMemProvider,
+    OT: Serialize + MatchNameRef,
+{
+    fn serialize_observers(&mut self, observers: &OT) -> Result<Option<std::vec::Vec<u8>>, Error> {
+        serialize_observers_adaptive::<Self, S, OT>(self, observers, 2, 80)
+    }
 }
 
 #[cfg(feature = "std")]

@@ -34,7 +34,11 @@ pub mod launcher;
 pub use launcher::*;
 #[cfg(all(unix, feature = "std"))]
 use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal, CTRL_C_EXIT};
-use libafl_bolts::{current_time, tuples::Handle, ClientId};
+use libafl_bolts::{
+    current_time,
+    tuples::{Handle, MatchNameRef},
+    ClientId,
+};
 pub use llmp::*;
 use serde::{Deserialize, Serialize};
 pub use simple::*;
@@ -432,11 +436,54 @@ pub trait EventFirer<I, S> {
 }
 
 /// Serialize all observers for this type and manager
-pub(crate) fn serialize_observers<OT>(observers: &OT) -> Result<Option<Vec<u8>>, Error>
+/// Serialize the observer using the `time_factor` and `percentage_threshold`.
+/// These parameters are unique to each of the different types of `EventManager`
+pub(crate) fn serialize_observers_adaptive<EM, S, OT>(
+    manager: &mut EM,
+    observers: &OT,
+    time_factor: u32,
+    percentage_threshold: usize,
+) -> Result<Option<Vec<u8>>, Error>
 where
-    OT: Serialize,
+    EM: AdaptiveSerializer,
+    OT: MatchNameRef + Serialize,
 {
-    Ok(Some(postcard::to_allocvec(observers)?))
+    match manager.time_ref() {
+        Some(t) => {
+            let exec_time = observers
+                .get(t)
+                .map(|o| o.last_runtime().unwrap_or(Duration::ZERO))
+                .unwrap();
+
+            let mut must_ser = (manager.serialization_time() + manager.deserialization_time())
+                * time_factor
+                < exec_time;
+            if must_ser {
+                *manager.should_serialize_cnt_mut() += 1;
+            }
+
+            if manager.serializations_cnt() > 32 {
+                must_ser = (manager.should_serialize_cnt() * 100 / manager.serializations_cnt())
+                    > percentage_threshold;
+            }
+
+            if manager.serialization_time() == Duration::ZERO
+                || must_ser
+                || manager.serializations_cnt().trailing_zeros() >= 8
+            {
+                let start = current_time();
+                let ser = postcard::to_allocvec(observers)?;
+                *manager.serialization_time_mut() = current_time() - start;
+
+                *manager.serializations_cnt_mut() += 1;
+                Ok(Some(ser))
+            } else {
+                *manager.serializations_cnt_mut() += 1;
+                Ok(None)
+            }
+        }
+        None => Ok(None),
+    }
 }
 
 /// Default implementation of [`ProgressReporter::maybe_report_progress`] for implementors with the
@@ -651,6 +698,15 @@ impl<E, S, Z> EventProcessor<E, S, Z> for NopEventManager {
     }
 }
 
+impl<OT> CanSerializeObserver<OT> for NopEventManager
+where
+    OT: Serialize,
+{
+    fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
+        Ok(Some(postcard::to_allocvec(observers)?))
+    }
+}
+
 impl<S> ProgressReporter<S> for NopEventManager {
     fn maybe_report_progress(
         &mut self,
@@ -683,6 +739,15 @@ impl<EM> MonitorTypedEventManager<EM> {
     #[must_use]
     pub fn new(inner: EM) -> Self {
         MonitorTypedEventManager { inner }
+    }
+}
+
+impl<EM, OT> CanSerializeObserver<OT> for MonitorTypedEventManager<EM>
+where
+    OT: Serialize,
+{
+    fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
+        Ok(Some(postcard::to_allocvec(observers)?))
     }
 }
 

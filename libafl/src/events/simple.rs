@@ -22,9 +22,9 @@ use libafl_bolts::{os::CTRL_C_EXIT, shmem::ShMemProvider, staterestore::StateRes
 #[cfg(feature = "std")]
 use serde::{de::DeserializeOwned, Serialize};
 
-use super::ManagerExit;
 #[allow(deprecated)]
 use super::{default_maybe_report_progress, default_report_progress, ProgressReporter};
+use super::{CanSerializeObserver, ManagerExit};
 #[cfg(feature = "std")]
 use crate::corpus::HasCorpus;
 #[cfg(all(unix, feature = "std", not(miri)))]
@@ -121,6 +121,16 @@ where
 
     fn on_shutdown(&mut self) -> Result<(), Error> {
         self.send_exiting()
+    }
+}
+
+impl<MT, OT, S> CanSerializeObserver<OT> for SimpleEventManager<MT, S>
+where
+    S: HasCorpus,
+    OT: Serialize,
+{
+    fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
+        Ok(Some(postcard::to_allocvec(observers)?))
     }
 }
 
@@ -367,6 +377,17 @@ where
             self.inner.monitor.start_time(),
             self.inner.monitor.client_stats(),
         ))
+    }
+}
+
+impl<MT, OT, S, SP> CanSerializeObserver<OT> for SimpleRestartingEventManager<MT, S, SP>
+where
+    SP: ShMemProvider,
+    S: HasCorpus,
+    OT: Serialize,
+{
+    fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
+        Ok(Some(postcard::to_allocvec(observers)?))
     }
 }
 
