@@ -218,13 +218,6 @@ where
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
             // The wrapped harness function, calling out to the LLVM-style harness
-            let mut harness = |_emulator: &mut Emulator<_, _, _, _>, input: &BytesInput| {
-                let target = input.target_bytes();
-                let buf = target.as_slice();
-                harness_bytes(buf);
-                ExitKind::Ok
-            };
-
             if self.use_cmplog.unwrap_or(false) {
                 let modules = {
                     #[cfg(not(any(feature = "mips", feature = "hexagon")))]
@@ -235,6 +228,13 @@ where
                     {
                         tuple_list!(EdgeCoverageModule::default())
                     }
+                };
+
+                let mut harness = |_emulator: &mut Emulator<_, _, _, _>, input: &BytesInput| {
+                    let target = input.target_bytes();
+                    let buf = target.as_slice();
+                    harness_bytes(buf);
+                    ExitKind::Ok
                 };
 
                 let emulator = Emulator::new_with_qemu(
@@ -346,6 +346,13 @@ where
                 }
             } else {
                 let tools = tuple_list!(EdgeCoverageModule::default());
+
+                let mut harness = |_emulator: &mut Emulator<_, _, _, _>, input: &BytesInput| {
+                    let target = input.target_bytes();
+                    let buf = target.as_slice();
+                    harness_bytes(buf);
+                    ExitKind::Ok
+                };
 
                 let emulator = Emulator::new_with_qemu(
                     qemu,
