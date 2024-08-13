@@ -218,7 +218,7 @@ where
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
             // The wrapped harness function, calling out to the LLVM-style harness
-            let mut harness = |input: &BytesInput, _emulator: &mut Emulator<_, _, _, _>| {
+            let mut harness = |_emulator: &mut Emulator<_, _, _, _>, input: &BytesInput| {
                 let target = input.target_bytes();
                 let buf = target.as_slice();
                 harness_bytes(buf);
