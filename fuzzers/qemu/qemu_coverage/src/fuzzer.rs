@@ -178,7 +178,7 @@ pub fn fuzz() {
         }
     };
 
-    let mut harness = |input: &BytesInput| {
+    let mut harness = |_emulator: &mut Emulator<_, _, _, _>, input: &BytesInput| {
         let target = input.target_bytes();
         let mut buf = target.as_slice();
         let mut len = buf.len();
@@ -241,7 +241,7 @@ pub fn fuzz() {
                 false,
             ));
 
-            let mut emulator = Emulator::new_with_qemu(
+            let emulator = Emulator::new_with_qemu(
                 qemu,
                 emulator_modules,
                 NopEmulatorExitHandler,
@@ -250,7 +250,7 @@ pub fn fuzz() {
             .unwrap();
 
             let mut executor = QemuExecutor::new(
-                &mut emulator,
+                emulator,
                 &mut harness,
                 (),
                 &mut fuzzer,
