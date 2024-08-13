@@ -1,11 +1,11 @@
 //! A `QEMU`-based executor for binary-only instrumentation in `LibAFL`
-#[cfg(emulation_mode = "usermode")]
-use core::ptr;
 use core::{
     ffi::c_void,
     fmt::{self, Debug, Formatter},
     time::Duration,
 };
+#[cfg(emulation_mode = "usermode")]
+use std::ptr;
 
 #[cfg(feature = "fork")]
 use libafl::{
@@ -15,7 +15,7 @@ use libafl::{
     events::{EventFirer, EventRestarter},
     executors::{
         hooks::inprocess::InProcessExecutorHandlerData,
-        inprocess::{HasInProcessHooks, InProcessExecutor},
+        inprocess::{stateful::StatefulInProcessExecutor, HasInProcessHooks},
         Executor, ExitKind, HasObservers,
     },
     feedbacks::Feedback,
@@ -30,58 +30,29 @@ use libafl_bolts::{
     os::unix_signals::{siginfo_t, ucontext_t, Signal},
     tuples::RefIndexable,
 };
+#[cfg(emulation_mode = "systemmode")]
+use libafl_qemu_sys::qemu_system_debug_request;
 
 #[cfg(emulation_mode = "usermode")]
-use crate::emu::EmulatorModules;
+use crate::EmulatorModules;
 use crate::{command::CommandManager, modules::EmulatorModuleTuple, Emulator, EmulatorExitHandler};
 
-/// A version of `QemuExecutor` with a state accessible from the harness.
-pub mod stateful;
-
-pub struct QemuExecutorState<'a, CM, EH, ET, S>
-where
-    CM: CommandManager<EH, ET, S>,
-    EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorModuleTuple<S>,
-    S: Unpin + State + HasExecutions,
-{
-    emulator: &'a mut Emulator<CM, EH, ET, S>,
+#[cfg(emulation_mode = "usermode")]
+extern "C" {
+    // Original QEMU user signal handler
+    fn libafl_qemu_handle_crash(signal: i32, info: *mut siginfo_t, puc: *mut c_void);
 }
 
 pub struct QemuExecutor<'a, CM, EH, H, OT, ET, S>
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
-    H: FnMut(&S::Input) -> ExitKind,
+    H: FnMut(&mut Emulator<CM, EH, ET, S>, &S::Input) -> ExitKind,
+    S: Unpin + State + HasExecutions,
     OT: ObserversTuple<S>,
     ET: EmulatorModuleTuple<S>,
-    S: Unpin + State + HasExecutions,
 {
-    inner: InProcessExecutor<'a, H, OT, S>,
-    state: QemuExecutorState<'a, CM, EH, ET, S>,
-}
-
-impl<'a, CM, EH, H, OT, ET, S> Debug for QemuExecutor<'a, CM, EH, H, OT, ET, S>
-where
-    CM: CommandManager<EH, ET, S> + Debug,
-    EH: EmulatorExitHandler<ET, S>,
-    H: FnMut(&S::Input) -> ExitKind,
-    S: Unpin + State + HasExecutions + Debug,
-    OT: ObserversTuple<S> + Debug,
-    ET: EmulatorModuleTuple<S> + Debug,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("QemuExecutor")
-            .field("emulator", &self.state.emulator)
-            .field("inner", &self.inner)
-            .finish()
-    }
-}
-
-#[cfg(emulation_mode = "usermode")]
-extern "C" {
-    // Original QEMU user signal handler
-    fn libafl_qemu_handle_crash(signal: i32, info: *mut siginfo_t, puc: *mut c_void);
+    inner: StatefulInProcessExecutor<'a, H, OT, S, Emulator<CM, EH, ET, S>>,
 }
 
 #[cfg(emulation_mode = "usermode")]
@@ -103,16 +74,11 @@ pub unsafe fn inproc_qemu_crash_handler<'a, E, EM, OF, Z, ET, S>(
         Some(v) => ptr::from_mut::<ucontext_t>(*v) as *mut c_void,
         None => ptr::null_mut(),
     };
-    libafl_qemu_handle_crash(signal as i32, info, puc);
+    libafl_qemu_handle_crash(signal as i32, std::ptr::from_mut::<siginfo_t>(info), puc);
 }
 
 #[cfg(emulation_mode = "systemmode")]
 pub(crate) static mut BREAK_ON_TMOUT: bool = false;
-
-#[cfg(emulation_mode = "systemmode")]
-extern "C" {
-    fn qemu_system_debug_request();
-}
 
 #[cfg(emulation_mode = "systemmode")]
 pub unsafe fn inproc_qemu_timeout_handler<'a, E, EM, OF, Z>(
@@ -136,58 +102,19 @@ pub unsafe fn inproc_qemu_timeout_handler<'a, E, EM, OF, Z>(
     }
 }
 
-impl<'a, CM, EH, ET, S> QemuExecutorState<'a, CM, EH, ET, S>
+impl<'a, CM, EH, H, OT, ET, S> Debug for QemuExecutor<'a, CM, EH, H, OT, ET, S>
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
+    H: FnMut(&mut Emulator<CM, EH, ET, S>, &S::Input) -> ExitKind,
+    S: Unpin + State + HasExecutions,
+    OT: ObserversTuple<S> + Debug,
     ET: EmulatorModuleTuple<S> + Debug,
-    S: Unpin + State + HasExecutions + HasCorpus + HasSolutions,
 {
-    #[cfg(emulation_mode = "systemmode")]
-    pub fn new<E, EM, OF, OT, Z>(emulator: &'a mut Emulator<CM, EH, ET, S>) -> Result<Self, Error>
-    where
-        E: Executor<EM, Z, State = S> + HasInProcessHooks<S> + HasObservers,
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
-        OF: Feedback<S>,
-        OT: ObserversTuple<S>,
-        Z: HasObjective<Objective = OF, State = S>,
-    {
-        Ok(QemuExecutorState { emulator })
-    }
-
-    #[cfg(emulation_mode = "usermode")]
-    pub fn new<E, EM, OF, OT, Z>(emulator: &'a mut Emulator<CM, EH, ET, S>) -> Result<Self, Error>
-    where
-        E: Executor<EM, Z, State = S> + HasInProcessHooks<S> + HasObservers,
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
-        OF: Feedback<S>,
-        OT: ObserversTuple<S>,
-        Z: HasObjective<Objective = OF, State = S> + ExecutionProcessor + HasScheduler,
-    {
-        #[cfg(emulation_mode = "usermode")]
-        {
-            let handler = |emulator_modules: &mut EmulatorModules<ET, S>, host_sig| {
-                eprintln!("Crashed with signal {host_sig}");
-                unsafe {
-                    libafl::executors::inprocess::generic_inproc_crash_handler::<E, EM, OF, Z>();
-                }
-                if let Some(cpu) = emulator_modules.qemu().current_cpu() {
-                    eprint!("Context:\n{}", cpu.display_context());
-                }
-            };
-
-            emulator.modules_mut().crash_closure(Box::new(handler));
-        }
-        Ok(QemuExecutorState { emulator })
-    }
-
-    #[must_use]
-    pub fn emulator(&self) -> &Emulator<CM, EH, ET, S> {
-        self.emulator
-    }
-
-    pub fn emulator_mut(&mut self) -> &mut Emulator<CM, EH, ET, S> {
-        self.emulator
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("QemuExecutor")
+            .field("inner", &self.inner)
+            .finish()
     }
 }
 
@@ -195,13 +122,13 @@ impl<'a, CM, EH, H, OT, ET, S> QemuExecutor<'a, CM, EH, H, OT, ET, S>
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
-    H: FnMut(&S::Input) -> ExitKind,
+    H: FnMut(&mut Emulator<CM, EH, ET, S>, &S::Input) -> ExitKind,
     S: Unpin + State + HasExecutions,
     OT: ObserversTuple<S>,
     ET: EmulatorModuleTuple<S> + Debug,
 {
     pub fn new<EM, OF, Z>(
-        emulator: &'a mut Emulator<CM, EH, ET, S>,
+        emulator: Emulator<CM, EH, ET, S>,
         harness_fn: &'a mut H,
         observers: OT,
         fuzzer: &mut Z,
@@ -215,31 +142,51 @@ where
         S: Unpin + State + HasExecutions + HasCorpus + HasSolutions,
         Z: HasObjective<Objective = OF, State = S> + HasScheduler + ExecutionProcessor,
     {
-        let mut inner = InProcessExecutor::with_timeout(
-            harness_fn, observers, fuzzer, state, event_mgr, timeout,
+        let mut inner = StatefulInProcessExecutor::with_timeout(
+            harness_fn, emulator, observers, fuzzer, state, event_mgr, timeout,
         )?;
 
         #[cfg(emulation_mode = "usermode")]
         {
-            inner.inprocess_hooks_mut().crash_handler =
-                inproc_qemu_crash_handler::<InProcessExecutor<'a, H, OT, S>, EM, OF, Z, ET, S>
-                    as *const c_void;
+            inner.inprocess_hooks_mut().crash_handler = inproc_qemu_crash_handler::<
+                StatefulInProcessExecutor<'a, H, OT, S, Emulator<CM, EH, ET, S>>,
+                EM,
+                OF,
+                Z,
+                ET,
+                S,
+            > as *const c_void;
+
+            let handler = |emulator_modules: &mut EmulatorModules<ET, S>, host_sig| {
+                eprintln!("Crashed with signal {host_sig}");
+                unsafe {
+                    libafl::executors::inprocess::generic_inproc_crash_handler::<Self, EM, OF, Z>();
+                }
+                if let Some(cpu) = emulator_modules.qemu().current_cpu() {
+                    eprint!("Context:\n{}", cpu.display_context());
+                }
+            };
+
+            inner
+                .exposed_executor_state_mut()
+                .modules_mut()
+                .crash_closure(Box::new(handler));
         }
 
         #[cfg(emulation_mode = "systemmode")]
         {
-            inner.inprocess_hooks_mut().timeout_handler =
-                inproc_qemu_timeout_handler::<InProcessExecutor<'a, H, OT, S>, EM, OF, Z>
-                    as *const c_void;
+            inner.inprocess_hooks_mut().timeout_handler = inproc_qemu_timeout_handler::<
+                StatefulInProcessExecutor<'a, H, OT, S, Emulator<CM, EH, ET, S>>,
+                EM,
+                OF,
+                Z,
+            > as *const c_void;
         }
 
-        let state =
-            QemuExecutorState::new::<InProcessExecutor<'a, H, OT, S>, EM, OF, OT, Z>(emulator)?;
-
-        Ok(Self { inner, state })
+        Ok(Self { inner })
     }
 
-    pub fn inner(&self) -> &InProcessExecutor<'a, H, OT, S> {
+    pub fn inner(&self) -> &StatefulInProcessExecutor<'a, H, OT, S, Emulator<CM, EH, ET, S>> {
         &self.inner
     }
 
@@ -250,43 +197,10 @@ where
         }
     }
 
-    pub fn inner_mut(&mut self) -> &mut InProcessExecutor<'a, H, OT, S> {
-        &mut self.inner
-    }
-}
-
-impl<'a, CM, EH, ET, S> QemuExecutorState<'a, CM, EH, ET, S>
-where
-    CM: CommandManager<EH, ET, S>,
-    EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorModuleTuple<S>,
-    S: Unpin + State + HasExecutions,
-{
-    fn pre_exec<E, EM, OF, Z>(&mut self, input: &E::Input)
-    where
-        E: Executor<EM, Z, State = S>,
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
-        OF: Feedback<S>,
-        Z: HasObjective<Objective = OF, State = S>,
-    {
-        self.emulator.first_exec_all();
-
-        self.emulator.pre_exec_all(input);
-    }
-
-    fn post_exec<E, EM, OT, OF, Z>(
+    pub fn inner_mut(
         &mut self,
-        input: &E::Input,
-        observers: &mut OT,
-        exit_kind: &mut ExitKind,
-    ) where
-        E: Executor<EM, Z, State = S> + HasObservers,
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
-        OT: ObserversTuple<S>,
-        OF: Feedback<S>,
-        Z: HasObjective<Objective = OF, State = S>,
-    {
-        self.emulator.post_exec_all(input, observers, exit_kind);
+    ) -> &mut StatefulInProcessExecutor<'a, H, OT, S, Emulator<CM, EH, ET, S>> {
+        &mut self.inner
     }
 }
 
@@ -295,7 +209,7 @@ where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
     EM: EventFirer<State = S> + EventRestarter<State = S>,
-    H: FnMut(&S::Input) -> ExitKind,
+    H: FnMut(&mut Emulator<CM, EH, ET, S>, &S::Input) -> ExitKind,
     S: Unpin + State + HasExecutions + HasCorpus + HasSolutions,
     OT: ObserversTuple<S>,
     OF: Feedback<S>,
@@ -309,13 +223,18 @@ where
         mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
-        self.state.pre_exec::<Self, EM, OF, Z>(input);
+        self.inner.exposed_executor_state_mut().first_exec_all();
+
+        self.inner.exposed_executor_state_mut().pre_exec_all(input);
+
         let mut exit_kind = self.inner.run_target(fuzzer, state, mgr, input)?;
-        self.state.post_exec::<Self, EM, OT, OF, Z>(
+
+        self.inner.exposed_executor_state.post_exec_all(
             input,
-            &mut *self.inner.observers_mut(),
+            &mut *self.inner.inner.observers_mut(),
             &mut exit_kind,
         );
+
         Ok(exit_kind)
     }
 }
@@ -324,7 +243,7 @@ impl<'a, CM, EH, H, OT, ET, S> UsesState for QemuExecutor<'a, CM, EH, H, OT, ET,
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
-    H: FnMut(&S::Input) -> ExitKind,
+    H: FnMut(&mut Emulator<CM, EH, ET, S>, &S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
     ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
@@ -336,7 +255,7 @@ impl<'a, CM, EH, H, OT, ET, S> UsesObservers for QemuExecutor<'a, CM, EH, H, OT,
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
-    H: FnMut(&S::Input) -> ExitKind,
+    H: FnMut(&mut Emulator<CM, EH, ET, S>, &S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
     ET: EmulatorModuleTuple<S>,
     S: Unpin + State + HasExecutions,
@@ -348,7 +267,7 @@ impl<'a, CM, EH, H, OT, ET, S> HasObservers for QemuExecutor<'a, CM, EH, H, OT, 
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
-    H: FnMut(&S::Input) -> ExitKind,
+    H: FnMut(&mut Emulator<CM, EH, ET, S>, &S::Input) -> ExitKind,
     S: Unpin + State + HasExecutions,
     OT: ObserversTuple<S>,
     ET: EmulatorModuleTuple<S>,
@@ -378,7 +297,7 @@ where
     Z: UsesState<State = S>,
 {
     inner: InProcessForkExecutor<'a, H, OT, S, SP, EM, Z>,
-    state: QemuExecutorState<'a, CM, EH, ET, S>,
+    emulator: Emulator<CM, EH, ET, S>,
 }
 
 #[cfg(feature = "fork")]
@@ -397,8 +316,8 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("QemuForkExecutor")
-            .field("emulator", &self.state.emulator)
             .field("inner", &self.inner)
+            .field("emulator", &self.emulator)
             .finish()
     }
 }
@@ -419,7 +338,7 @@ where
     Z: HasObjective<Objective = OF, State = S>,
 {
     pub fn new(
-        emulator: &'a mut Emulator<CM, EH, ET, S>,
+        emulator: Emulator<CM, EH, ET, S>,
         harness_fn: &'a mut H,
         observers: OT,
         fuzzer: &mut Z,
@@ -440,7 +359,7 @@ where
                 timeout,
                 shmem_provider,
             )?,
-            state: QemuExecutorState { emulator },
+            emulator,
         })
     }
 
@@ -453,7 +372,11 @@ where
     }
 
     pub fn emulator(&self) -> &Emulator<CM, EH, ET, S> {
-        self.state.emulator
+        &self.emulator
+    }
+
+    pub fn emulator_mut(&mut self) -> &Emulator<CM, EH, ET, S> {
+        &mut self.emulator
     }
 }
 

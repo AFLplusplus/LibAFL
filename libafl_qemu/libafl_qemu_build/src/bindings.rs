@@ -58,6 +58,7 @@ const WRAPPER_HEADER: &str = r#"
 #include "hw/core/sysemu-cpu-ops.h"
 #include "exec/address-spaces.h"
 #include "sysemu/tcg.h"
+#include "sysemu/runstate.h"
 #include "sysemu/replay.h"
 
 #include "libafl/syx-snapshot/device-save.h"
@@ -148,6 +149,7 @@ pub fn generate(
         .allowlist_type("libafl_mapinfo")
         .allowlist_type("IntervalTreeRoot")
         .allowlist_function("qemu_user_init")
+        .allowlist_function("qemu_system_debug_request")
         .allowlist_function("target_mmap")
         .allowlist_function("target_mprotect")
         .allowlist_function("target_munmap")
