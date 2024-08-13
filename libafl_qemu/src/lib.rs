@@ -56,6 +56,8 @@ pub mod command;
 pub mod sync_exit;
 
 pub use libafl_qemu_sys::{GuestAddr, MmapPerms};
+#[cfg(emulation_mode = "systemmode")]
+pub use libafl_qemu_sys::{GuestPhysAddr, GuestVirtAddr};
 
 #[must_use]
 pub fn filter_qemu_args() -> Vec<String> {
