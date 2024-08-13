@@ -223,11 +223,11 @@ pub fn fuzz() -> Result<(), Error> {
 
     let modules = tuple_list!(EdgeCoverageChildModule::default(),);
 
-    let mut emulator =
+    let emulator =
         Emulator::new_with_qemu(qemu, modules, NopEmulatorExitHandler, NopCommandManager)?;
 
     let mut executor = QemuForkExecutor::new(
-        &mut emulator,
+        emulator,
         &mut harness,
         tuple_list!(edges_observer),
         &mut fuzzer,

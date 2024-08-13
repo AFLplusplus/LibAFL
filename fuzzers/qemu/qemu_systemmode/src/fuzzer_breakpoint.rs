@@ -103,7 +103,7 @@ pub fn fuzz() {
         let modules = tuple_list!(EdgeCoverageModule::default());
 
         // Create emulator
-        let mut emu = Emulator::new(&args, &env, modules, emu_exit_handler, cmd_manager).unwrap();
+        let emu = Emulator::new(&args, &env, modules, emu_exit_handler, cmd_manager).unwrap();
 
         // Set breakpoints of interest with corresponding commands.
         emu.add_breakpoint(
@@ -127,15 +127,9 @@ pub fn fuzz() {
         println!("Devices = {:?}", devices);
 
         // The wrapped harness function, calling out to the LLVM-style harness
-        let mut harness =
-            |input: &BytesInput, qemu_executor_state: &mut QemuExecutorState<_, _, _, _>| unsafe {
-                qemu_executor_state
-                    .emulator_mut()
-                    .run(input)
-                    .unwrap()
-                    .try_into()
-                    .unwrap()
-            };
+        let mut harness = |emulator: &mut Emulator<_, _, _, _>, input: &BytesInput| unsafe {
+            emulator.run(input).unwrap().try_into().unwrap()
+        };
 
         // Create an observation channel using the coverage map
         let edges_observer = unsafe {
@@ -198,7 +192,7 @@ pub fn fuzz() {
 
         // Create a QEMU in-process executor
         let mut executor = StatefulQemuExecutor::new(
-            &mut emu,
+            emu,
             &mut harness,
             tuple_list!(edges_observer, time_observer),
             &mut fuzzer,

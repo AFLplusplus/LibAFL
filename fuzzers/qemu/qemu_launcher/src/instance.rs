@@ -149,12 +149,13 @@ impl<'a, M: Monitor> Instance<'a, M> {
         state.add_metadata(tokens);
 
         let harness = Harness::new(self.qemu)?;
-        let mut harness = |input: &BytesInput| harness.run(input);
+        let mut harness =
+            |_emulator: &mut Emulator<_, _, _, _>, input: &BytesInput| harness.run(input);
 
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-        let mut emulator = Emulator::new_with_qemu(
+        let emulator = Emulator::new_with_qemu(
             *self.qemu,
             modules,
             NopEmulatorExitHandler,
@@ -165,7 +166,7 @@ impl<'a, M: Monitor> Instance<'a, M> {
         if self.options.is_cmplog_core(self.core_id) {
             // Create a QEMU in-process executor
             let executor = QemuExecutor::new(
-                &mut emulator,
+                emulator,
                 &mut harness,
                 observers,
                 &mut fuzzer,
@@ -203,7 +204,7 @@ impl<'a, M: Monitor> Instance<'a, M> {
         } else {
             // Create a QEMU in-process executor
             let mut executor = QemuExecutor::new(
-                &mut emulator,
+                emulator,
                 &mut harness,
                 observers,
                 &mut fuzzer,

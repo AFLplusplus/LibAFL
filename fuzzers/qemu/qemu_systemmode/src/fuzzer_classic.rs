@@ -93,7 +93,7 @@ pub fn fuzz() {
 
         let emulator_modules = tuple_list!(EdgeCoverageModule::default());
 
-        let mut emulator = Emulator::new(
+        let emulator = Emulator::new(
             args.as_slice(),
             env.as_slice(),
             emulator_modules,
@@ -129,8 +129,7 @@ pub fn fuzz() {
         let snap = qemu.create_fast_snapshot(true);
 
         // The wrapped harness function, calling out to the LLVM-style harness
-        let mut harness = |input: &BytesInput, state: &mut QemuExecutorState<_, _, _, _>| {
-            let emulator = state.emulator_mut();
+        let mut harness = |emulator: &mut Emulator<_, _, _, _>, input: &BytesInput| {
             let target = input.target_bytes();
             let mut buf = target.as_slice();
             let len = buf.len();
@@ -230,7 +229,7 @@ pub fn fuzz() {
 
         // Create a QEMU in-process executor
         let mut executor = StatefulQemuExecutor::new(
-            &mut emulator,
+            emulator,
             &mut harness,
             tuple_list!(edges_observer, time_observer),
             &mut fuzzer,
