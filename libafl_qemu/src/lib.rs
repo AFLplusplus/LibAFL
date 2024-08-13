@@ -55,6 +55,8 @@ pub mod breakpoint;
 pub mod command;
 pub mod sync_exit;
 
+pub use libafl_qemu_sys::{GuestAddr, MmapPerms};
+
 #[must_use]
 pub fn filter_qemu_args() -> Vec<String> {
     let mut args = vec![env::args().next().unwrap()];

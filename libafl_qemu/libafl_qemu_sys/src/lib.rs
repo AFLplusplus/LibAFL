@@ -15,6 +15,10 @@ __Warning__: The documentation is built by default for `x86_64` in `usermode`. T
 #![allow(clippy::pedantic)]
 #![cfg_attr(nightly, feature(used_with_arg))]
 
+#[cfg(target_os = "linux")]
+use core::ops::BitAnd;
+use std::ffi::c_void;
+
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use paste::paste;
 use strum_macros::EnumIter;
@@ -40,6 +44,8 @@ pub use bindings::*;
 #[allow(dead_code)]
 #[rustfmt::skip]
 mod x86_64_stub_bindings;
+#[cfg(any(feature = "clippy", not(target_os = "linux")))]
+pub use x86_64_stub_bindings::*;
 
 #[cfg(emulation_mode = "usermode")]
 mod usermode;
@@ -115,25 +121,18 @@ macro_rules! extern_c_checked {
     };
 }
 
-#[cfg(target_os = "linux")]
-use core::ops::BitAnd;
-use std::ffi::c_void;
+pub type CPUStatePtr = *mut CPUState;
+pub type CPUArchStatePtr = *mut CPUArchState;
+pub type ExitReasonPtr = *mut libafl_exit_reason;
 
-#[cfg(any(feature = "clippy", not(target_os = "linux")))]
-pub use x86_64_stub_bindings::*;
+pub type GuestUsize = target_ulong;
+pub type GuestIsize = target_long;
 
-pub type CPUStatePtr = *mut crate::CPUState;
-pub type CPUArchStatePtr = *mut crate::CPUArchState;
-pub type ExitReasonPtr = *mut crate::libafl_exit_reason;
+pub type GuestAddr = target_ulong;
+pub type GuestPhysAddr = hwaddr;
+pub type GuestVirtAddr = vaddr;
 
-pub type GuestUsize = crate::target_ulong;
-pub type GuestIsize = crate::target_long;
-
-pub type GuestAddr = crate::target_ulong;
-pub type GuestPhysAddr = crate::hwaddr;
-pub type GuestVirtAddr = crate::vaddr;
-
-pub type GuestHwAddrInfo = crate::qemu_plugin_hwaddr;
+pub type GuestHwAddrInfo = qemu_plugin_hwaddr;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -179,35 +178,5 @@ pub fn cpu_env(cpu: *mut CPUState) -> *mut CPUArchState {
 }
 
 extern_c_checked! {
-    //static libafl_page_size: GuestUsize;
-    pub fn libafl_page_from_addr(addr: GuestAddr) -> GuestAddr;
-
-    // CPUState* libafl_qemu_get_cpu(int cpu_index);
-    pub fn libafl_qemu_get_cpu(cpu_index: i32) -> CPUStatePtr;
-    // int libafl_qemu_num_cpus(void);
-    pub fn libafl_qemu_num_cpus() -> i32;
-    // CPUState* libafl_qemu_current_cpu(void);
-    pub fn libafl_qemu_current_cpu() -> CPUStatePtr;
-
-    // struct libafl_exit_reason* libafl_get_exit_reason(void);
-    // fn libafl_get_exit_reason() -> ExitReasonPtr;
-
-    pub fn libafl_qemu_cpu_index(cpu: CPUStatePtr) -> i32;
-
-    pub fn libafl_qemu_write_reg(cpu: CPUStatePtr, reg: i32, val: *const u8) -> i32;
-    pub fn libafl_qemu_read_reg(cpu: CPUStatePtr, reg: i32, val: *mut u8) -> i32;
-    pub fn libafl_qemu_num_regs(cpu: CPUStatePtr) -> i32;
-
-    // fn libafl_qemu_set_breakpoint(addr: u64) -> i32;
-    // fn libafl_qemu_remove_breakpoint(addr: u64) -> i32;
-    pub fn libafl_flush_jit();
-    // fn libafl_qemu_trigger_breakpoint(cpu: CPUStatePtr);
-
     pub fn strlen(s: *const u8) -> usize;
-
-    pub fn libafl_qemu_add_gdb_cmd(
-        callback: extern "C" fn(*const (), *const u8, usize) -> i32,
-        data: *const ()
-    );
-    pub fn libafl_qemu_gdb_reply(buf: *const u8, len: usize);
 }
