@@ -1,6 +1,6 @@
 //! A very simple event manager, that just supports log outputs, but no multiprocessing
 
-use alloc::{boxed::Box, vec::Vec};
+use alloc::vec::Vec;
 #[cfg(all(unix, not(miri), feature = "std"))]
 use core::ptr::addr_of_mut;
 use core::{fmt::Debug, time::Duration};
@@ -23,16 +23,14 @@ use libafl_bolts::{os::CTRL_C_EXIT, shmem::ShMemProvider, staterestore::StateRes
 use serde::{de::DeserializeOwned, Serialize};
 
 #[allow(deprecated)]
-use super::CustomBufHandlerFn;
-use super::{
-    default_maybe_report_progress, default_report_progress, CustomBufHandlerTuple,
-    HasCustomBufHandlers, ProgressReporter,
-};
+use super::{default_maybe_report_progress, default_report_progress, ProgressReporter};
+use super::{CanSerializeObserver, ManagerExit};
 #[cfg(feature = "std")]
 use crate::corpus::HasCorpus;
 #[cfg(all(unix, feature = "std", not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
+    corpus::Corpus,
     events::{
         BrokerEventResult, Event, EventFirer, EventManagerId, EventProcessor, EventRestarter,
         HasEventManagerId,
@@ -45,7 +43,6 @@ use crate::{
 use crate::{
     monitors::{ClientStats, SimplePrintingMonitor},
     stages::HasCurrentStage,
-    state::HasSolutions,
 };
 
 /// The llmp connection from the actual fuzzer to the process supervising it
@@ -55,18 +52,20 @@ const _ENV_FUZZER_RECEIVER: &str = "_AFL_ENV_FUZZER_RECEIVER";
 const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT";
 
 /// A simple, single-threaded event manager that just logs
-pub struct SimpleEventManager<I, HT, MT> {
+pub struct SimpleEventManager<MT, S>
+where
+    S: HasCorpus,
+{
     /// The monitor
     monitor: MT,
     /// The events that happened since the last `handle_in_broker`
-    events: Vec<Event<I>>,
-    /// The custom buf handlers
-    handlers: HT,
+    events: Vec<Event<<S::Corpus as Corpus>::Input>>,
 }
 
-impl<I, HT, MT> Debug for SimpleEventManager<I, HT, MT>
+impl<MT, S> Debug for SimpleEventManager<MT, S>
 where
-    I: Debug,
+    S: HasCorpus,
+    <S::Corpus as Corpus>::Input: Debug,
     MT: Debug,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -78,11 +77,16 @@ where
     }
 }
 
-impl<I, HT, MT, S> EventFirer<I, S> for SimpleEventManager<I, HT, MT>
+impl<MT, S> EventFirer<<S::Corpus as Corpus>::Input, S> for SimpleEventManager<MT, S>
 where
+    S: HasCorpus,
     MT: Monitor,
 {
-    fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
+    fn fire(
+        &mut self,
+        _state: &mut S,
+        event: Event<<S::Corpus as Corpus>::Input>,
+    ) -> Result<(), Error> {
         match Self::handle_in_broker(&mut self.monitor, &event)? {
             BrokerEventResult::Forward => self.events.push(event),
             BrokerEventResult::Handled => (),
@@ -95,20 +99,13 @@ where
     }
 }
 
-impl<I, HT, MT, S> EventRestarter<S> for SimpleEventManager<I, HT, MT> {
-    fn on_restart(&mut self, _state: &mut S) -> Result<(), Error> {
-        Err(Error::not_implemented(
-            "Restarting is not implemented for SimpleEventManager",
-        ))
-    }
-}
+impl<MT, S> ManagerExit for SimpleEventManager<MT, S> where S: HasCorpus {}
 
-impl<E, I, HT, MT, S, Z> EventProcessor<E, S, Z> for SimpleEventManager<I, HT, MT>
+impl<E, MT, S, Z> EventProcessor<E, S, Z> for SimpleEventManager<MT, S>
 where
-    HT: CustomBufHandlerTuple<S>,
-    I: Debug,
+    S: HasCorpus + Stoppable,
+    <S::Corpus as Corpus>::Input: Debug,
     MT: Monitor,
-    S: Stoppable,
 {
     fn process(
         &mut self,
@@ -124,26 +121,24 @@ where
     }
 
     fn on_shutdown(&mut self) -> Result<(), Error> {
-        <Self as EventRestarter<S>>::send_exiting(self)
+        self.send_exiting()
     }
 }
 
-impl<I, HT, MT> HasCustomBufHandlers for SimpleEventManager<I, HT, MT> {
-    type Handlers = HT;
-
-    fn handlers(&self) -> &Self::Handlers {
-        &self.handlers
-    }
-
-    fn handlers_mut(&mut self) -> &mut Self::Handlers {
-        &mut self.handlers
-    }
-}
-
-impl<I, HT, MT, S> ProgressReporter<S> for SimpleEventManager<I, HT, MT>
+impl<MT, OT, S> CanSerializeObserver<OT> for SimpleEventManager<MT, S>
 where
-    Self: EventFirer<I, S>,
-    S: HasMetadata + HasExecutions + HasLastReportTime,
+    S: HasCorpus,
+    OT: Serialize,
+{
+    fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
+        Ok(Some(postcard::to_allocvec(observers)?))
+    }
+}
+
+impl<MT, S> ProgressReporter<S> for SimpleEventManager<MT, S>
+where
+    S: HasCorpus + HasMetadata + HasExecutions + HasLastReportTime,
+    MT: Monitor,
 {
     fn maybe_report_progress(
         &mut self,
@@ -158,7 +153,10 @@ where
     }
 }
 
-impl<I, HT, MT> HasEventManagerId for SimpleEventManager<I, HT, MT> {
+impl<MT, S> HasEventManagerId for SimpleEventManager<MT, S>
+where
+    S: HasCorpus,
+{
     fn mgr_id(&self) -> EventManagerId {
         EventManagerId(0)
     }
@@ -166,7 +164,10 @@ impl<I, HT, MT> HasEventManagerId for SimpleEventManager<I, HT, MT> {
 
 #[cfg(feature = "std")]
 #[allow(deprecated)]
-impl<I, S> SimpleEventManager<I, Vec<Box<CustomBufHandlerFn<S>>>, SimplePrintingMonitor> {
+impl<S> SimpleEventManager<SimplePrintingMonitor, S>
+where
+    S: HasCorpus,
+{
     /// Creates a [`SimpleEventManager`] that just prints to `stdout`.
     #[must_use]
     pub fn printing() -> Self {
@@ -175,33 +176,30 @@ impl<I, S> SimpleEventManager<I, Vec<Box<CustomBufHandlerFn<S>>>, SimplePrinting
 }
 
 #[allow(deprecated)]
-impl<I, MT, S> SimpleEventManager<I, Vec<Box<CustomBufHandlerFn<S>>>, MT> {
+impl<MT, S> SimpleEventManager<MT, S>
+where
+    S: HasCorpus,
+{
     /// Creates a new [`SimpleEventManager`].
     pub fn new(monitor: MT) -> Self {
         Self {
             monitor,
             events: vec![],
-            handlers: vec![],
         }
     }
 }
 
-impl<I, HT, MT> SimpleEventManager<I, HT, MT>
+impl<MT, S> SimpleEventManager<MT, S>
 where
+    S: HasCorpus,
     MT: Monitor,
 {
-    /// The event manager but with the specified handlers
-    pub fn with_handlers<HT2>(self, handlers: HT2) -> SimpleEventManager<I, HT2, MT> {
-        SimpleEventManager {
-            monitor: self.monitor,
-            events: self.events,
-            handlers,
-        }
-    }
-
     /// Handle arriving events in the broker
     #[allow(clippy::unnecessary_wraps)]
-    fn handle_in_broker(monitor: &mut MT, event: &Event<I>) -> Result<BrokerEventResult, Error> {
+    fn handle_in_broker(
+        monitor: &mut MT,
+        event: &Event<<S::Corpus as Corpus>::Input>,
+    ) -> Result<BrokerEventResult, Error> {
         match event {
             Event::NewTestcase {
                 corpus_size,
@@ -286,23 +284,22 @@ where
 
     // Handle arriving events in the client
     #[allow(clippy::needless_pass_by_value, clippy::unused_self)]
-    fn handle_in_client<S: Stoppable>(
+    fn handle_in_client(
         &mut self,
         state: &mut S,
-        event: Event<I>,
+        event: Event<<S::Corpus as Corpus>::Input>,
     ) -> Result<(), Error>
     where
-        HT: CustomBufHandlerTuple<S>,
-        I: Debug,
+        S: Stoppable,
+        <S::Corpus as Corpus>::Input: Debug,
     {
         match event {
-            Event::CustomBuf { buf, tag } => self.handlers.handle_all(state, &tag, &buf),
             Event::Stop => {
                 state.request_stop();
                 Ok(())
             }
             _ => Err(Error::unknown(format!(
-                "Received illegal message that message should not have arrived: {event:?}."
+                "Received illegal message that message should not have arrived: {event:?}"
             ))),
         }
     }
@@ -313,33 +310,50 @@ where
 /// `restarter` will start a new process each time the child crashes or times out.
 #[cfg(feature = "std")]
 #[allow(clippy::default_trait_access)]
-#[derive(Debug)]
-pub struct SimpleRestartingEventManager<I, HT, MT, SP>
+pub struct SimpleRestartingEventManager<MT, S, SP>
 where
     SP: ShMemProvider, //CE: CustomEvent<I, OT>,
+    S: HasCorpus,
 {
     /// The actual simple event mgr
-    inner: SimpleEventManager<I, HT, MT>,
+    inner: SimpleEventManager<MT, S>,
     /// [`StateRestorer`] for restarts
     staterestorer: StateRestorer<SP>,
 }
 
 // impl Deref, DerefMut to inherit the impls from inner, where possible
 #[cfg(feature = "std")]
-impl<I, HT, MT, SP> Deref for SimpleRestartingEventManager<I, HT, MT, SP>
+impl<MT, S, SP> Deref for SimpleRestartingEventManager<MT, S, SP>
 where
+    S: HasCorpus,
     SP: ShMemProvider,
 {
-    type Target = SimpleEventManager<I, HT, MT>;
+    type Target = SimpleEventManager<MT, S>;
 
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
 }
 
-#[cfg(feature = "std")]
-impl<I, HT, MT, SP> DerefMut for SimpleRestartingEventManager<I, HT, MT, SP>
+impl<MT, S, SP> Debug for SimpleRestartingEventManager<MT, S, SP>
 where
+    S: HasCorpus,
+    SP: ShMemProvider,
+    <S::Corpus as Corpus>::Input: Debug,
+    MT: Debug,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("SimpleRestartingEventManager")
+            //.field("handlers", self.handlers)
+            .field("inner", &self.inner)
+            .finish_non_exhaustive()
+    }
+}
+
+#[cfg(feature = "std")]
+impl<MT, S, SP> DerefMut for SimpleRestartingEventManager<MT, S, SP>
+where
+    S: HasCorpus,
     SP: ShMemProvider,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
@@ -348,10 +362,10 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<I, HT, MT, S, SP> EventRestarter<S> for SimpleRestartingEventManager<I, HT, MT, SP>
+impl<MT, S, SP> EventRestarter<S> for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
-    S: HasCurrentStage + Serialize,
+    S: HasCorpus + Serialize + HasCurrentStage,
     SP: ShMemProvider,
 {
     /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
@@ -366,7 +380,25 @@ where
             self.inner.monitor.client_stats(),
         ))
     }
+}
 
+impl<MT, OT, S, SP> CanSerializeObserver<OT> for SimpleRestartingEventManager<MT, S, SP>
+where
+    SP: ShMemProvider,
+    S: HasCorpus,
+    OT: Serialize,
+{
+    fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
+        Ok(Some(postcard::to_allocvec(observers)?))
+    }
+}
+
+#[cfg(feature = "std")]
+impl<MT, S, SP> ManagerExit for SimpleRestartingEventManager<MT, S, SP>
+where
+    SP: ShMemProvider,
+    S: HasCorpus,
+{
     fn send_exiting(&mut self) -> Result<(), Error> {
         self.staterestorer.send_exiting();
         Ok(())
@@ -375,9 +407,9 @@ where
 
 #[cfg(feature = "std")]
 #[allow(clippy::type_complexity, clippy::too_many_lines, deprecated)]
-impl<I, MT, S, SP> SimpleRestartingEventManager<I, Vec<Box<CustomBufHandlerFn<S>>>, MT, SP>
+impl<MT, S, SP> SimpleRestartingEventManager<MT, S, SP>
 where
-    MT: Monitor,
+    S: HasCorpus,
     SP: ShMemProvider, //TODO CE: CustomEvent,
 {
     /// Creates a new [`SimpleEventManager`].
@@ -394,8 +426,8 @@ where
     #[allow(clippy::similar_names)]
     pub fn launch(mut monitor: MT, shmem_provider: &mut SP) -> Result<(Option<S>, Self), Error>
     where
-        S: DeserializeOwned + Serialize + HasCorpus + HasSolutions,
-        MT: Debug,
+        MT: Monitor,
+        S: DeserializeOwned,
     {
         // We start ourself as child process to actually fuzz
         let mut staterestorer = if std::env::var(_ENV_FUZZER_SENDER).is_err() {

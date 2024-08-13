@@ -57,6 +57,7 @@ __pycache__
 **/libxml2
 **/corpus_discovered
 **/libxml2-*.tar.gz
+**/sqlite3
 
 libafl_nyx/QEMU-Nyx
 libafl_nyx/packer
