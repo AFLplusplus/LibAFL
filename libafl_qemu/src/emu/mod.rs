@@ -22,8 +22,6 @@ use libafl::{
 };
 use libafl_bolts::os::unix_signals::Signal;
 use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestUsize, GuestVirtAddr};
-#[cfg(emulation_mode = "usermode")]
-use libafl_qemu_sys::{MapInfo, MmapPerms, MmapPermsIter};
 use typed_builder::TypedBuilder;
 
 use crate::{
