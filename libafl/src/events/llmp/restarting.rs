@@ -221,7 +221,7 @@ where
     EMH: EventManagerHooksTuple<<S::Corpus as Corpus>::Input, S>,
     SP: ShMemProvider,
     E: HasObservers,
-    for<'de> E::Observers: DeserializeOwned,
+    E::Observers: DeserializeOwned,
     S: HasCorpus + HasImported + Stoppable + Serialize,
     <S::Corpus as Corpus>::Input: DeserializeOwned + Input,
     S::Corpus: Serialize,

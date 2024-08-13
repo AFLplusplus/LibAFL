@@ -104,6 +104,7 @@ impl<MT, S> ManagerExit for SimpleEventManager<MT, S> where S: HasCorpus {}
 impl<E, MT, S, Z> EventProcessor<E, S, Z> for SimpleEventManager<MT, S>
 where
     S: HasCorpus + Stoppable,
+    <S::Corpus as Corpus>::Input: Debug,
     MT: Monitor,
 {
     fn process(
@@ -290,6 +291,7 @@ where
     ) -> Result<(), Error>
     where
         S: Stoppable,
+        <S::Corpus as Corpus>::Input: Debug,
     {
         match event {
             Event::Stop => {
@@ -297,7 +299,7 @@ where
                 Ok(())
             }
             _ => Err(Error::unknown(format!(
-                "Received illegal message that message should not have arrived"
+                "Received illegal message that message should not have arrived: {event:?}"
             ))),
         }
     }
@@ -343,7 +345,7 @@ where
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("SimpleRestartingEventManager")
             //.field("handlers", self.handlers)
-            .field("monitor", &self.inner)
+            .field("inner", &self.inner)
             .finish_non_exhaustive()
     }
 }
