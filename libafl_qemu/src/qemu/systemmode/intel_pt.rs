@@ -10,6 +10,7 @@ use std::{
         fd::{AsRawFd, FromRawFd, OwnedFd},
         raw::c_void,
     },
+    path::Path,
 };
 
 use bitflags::bitflags;
@@ -202,6 +203,15 @@ impl IntelPT {
             reasons.push(e.to_string());
         }
 
+        // official way of knowing if perf_event_open() support is enabled
+        // https://man7.org/linux/man-pages/man2/perf_event_open.2.html
+        let perf_event_support_path: &str = "/proc/sys/kernel/perf_event_paranoid";
+        if !Path::new(perf_event_support_path).exists() {
+            reasons.push(format!(
+                "perf_event_open() support is not enabled: {perf_event_support_path} not found"
+            ));
+        }
+
         let kvm_pt_mode_path = "/sys/module/kvm_intel/parameters/pt_mode";
         if let Ok(s) = fs::read_to_string(kvm_pt_mode_path) {
             match s.trim().parse::<i32>().map(|i| i.try_into()) {
@@ -221,7 +231,7 @@ impl IntelPT {
             let required_caps = [
                 Capability::CAP_IPC_LOCK,
                 Capability::CAP_SYS_PTRACE,
-                Capability::CAP_SYS_ADMIN,
+                Capability::CAP_SYS_ADMIN, // TODO: CAP_PERFMON doesn't look to be enough!?
                 Capability::CAP_SYSLOG,
             ];
 
