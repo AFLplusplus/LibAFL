@@ -82,9 +82,23 @@ const WRAPPER_HEADER: &str = r#"
 #include "qemu/plugin-memory.h"
 
 #include "libafl/exit.h"
-#include "libafl/hook.h"
 #include "libafl/jit.h"
 #include "libafl/utils.h"
+
+#include "libafl/hook.h"
+
+#include "libafl/hooks/tcg/backdoor.h"
+#include "libafl/hooks/tcg/block.h"
+#include "libafl/hooks/tcg/cmp.h"
+#include "libafl/hooks/tcg/edge.h"
+#include "libafl/hooks/tcg/instruction.h"
+#include "libafl/hooks/tcg/read_write.h"
+#include "libafl/hooks/cpu_run.h"
+
+#ifdef CONFIG_USER_ONLY
+#include "libafl/hooks/thread.h"
+#include "libafl/hooks/syscall.h"
+#endif
 
 "#;
 
