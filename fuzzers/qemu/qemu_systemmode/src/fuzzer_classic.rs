@@ -32,7 +32,7 @@ use libafl_bolts::{
 use libafl_qemu::{
     command::NopCommandManager,
     elf::EasyElf,
-    executor::{stateful::StatefulQemuExecutor, QemuExecutorState},
+    executor::QemuExecutor,
     modules::edges::{
         edges_map_mut_ptr, EdgeCoverageModule, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
     },
@@ -228,7 +228,7 @@ pub fn fuzz() {
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
         // Create a QEMU in-process executor
-        let mut executor = StatefulQemuExecutor::new(
+        let mut executor = QemuExecutor::new(
             emulator,
             &mut harness,
             tuple_list!(edges_observer, time_observer),
