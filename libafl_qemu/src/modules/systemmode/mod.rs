@@ -1,5 +1,9 @@
 use std::fmt::Debug;
 
+#[cfg(all(cpu_target = "x86_64", target_os = "linux"))]
+pub mod intel_pt;
+#[cfg(all(cpu_target = "x86_64", target_os = "linux"))]
+pub use intel_pt::*;
 use libafl_qemu_sys::GuestPhysAddr;
 
 use crate::modules::{
