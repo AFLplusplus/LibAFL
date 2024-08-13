@@ -12,7 +12,6 @@ use pyo3::{pyclass, pymethods, FromPyObject};
 
 use crate::{
     emu::EmulatorModules,
-    modules::EmulatorModuleTuple,
     qemu::{MemAccessInfo, Qemu},
     sys::TCGTemp,
     HookData, HookId,
@@ -77,8 +76,7 @@ macro_rules! create_wrapper {
         paste::paste! {
             pub extern "C" fn [<func_ $name _hook_wrapper>]<ET, S>(hook: &mut c_void, $($param: $param_type),*)
             where
-                ET: EmulatorModuleTuple<S>,
-                S: Unpin + UsesInput,
+                S: UsesInput + Unpin,
             {
                 unsafe {
                     let modules = EmulatorModules::<ET, S>::emulator_modules_mut_unchecked();
@@ -89,7 +87,6 @@ macro_rules! create_wrapper {
 
             pub extern "C" fn [<closure_ $name _hook_wrapper>]<ET, S>(hook: &mut FatPtr, $($param: $param_type),*)
             where
-                ET: EmulatorModuleTuple<S>,
                 S: Unpin + UsesInput,
             {
                 unsafe {
@@ -104,8 +101,7 @@ macro_rules! create_wrapper {
         paste::paste! {
             pub extern "C" fn [<func_ $name _hook_wrapper>]<ET, S>(hook: &mut c_void, $($param: $param_type),*) -> $ret_type
             where
-                ET: EmulatorModuleTuple<S>,
-                S: Unpin + UsesInput,
+                S: UsesInput + Unpin,
             {
                 unsafe {
                     let modules = EmulatorModules::<ET, S>::emulator_modules_mut_unchecked();
@@ -116,8 +112,7 @@ macro_rules! create_wrapper {
 
             pub extern "C" fn [<closure_ $name _hook_wrapper>]<ET, S>(hook: &mut FatPtr, $($param: $param_type),*) -> $ret_type
             where
-                ET: EmulatorModuleTuple<S>,
-                S: Unpin + UsesInput,
+                S: UsesInput + Unpin,
             {
                 unsafe {
                     let modules = EmulatorModules::<ET, S>::emulator_modules_mut_unchecked();
@@ -134,8 +129,7 @@ macro_rules! create_gen_wrapper {
         paste::paste! {
             pub extern "C" fn [<$name _gen_hook_wrapper>]<ET, S>(hook: &mut HookState<{ $execs }, $hook_id>, $($param: $param_type),*) -> $ret_type
             where
-                ET: EmulatorModuleTuple<S>,
-               S: Unpin + UsesInput,
+                S: UsesInput + Unpin,
             {
                 unsafe {
                     let modules = EmulatorModules::<ET, S>::emulator_modules_mut_unchecked();
@@ -165,8 +159,7 @@ macro_rules! create_post_gen_wrapper {
         paste::paste! {
             pub extern "C" fn [<$name _post_gen_hook_wrapper>]<ET, S>(hook: &mut HookState<{ $execs }, $hook_id>, $($param: $param_type),*)
             where
-                ET: EmulatorModuleTuple<S>,
-               S: Unpin + UsesInput,
+                S: UsesInput + Unpin,
             {
                 unsafe {
                     let modules = EmulatorModules::<ET, S>::emulator_modules_mut_unchecked();
@@ -195,8 +188,7 @@ macro_rules! create_exec_wrapper {
         paste::paste! {
             pub extern "C" fn [<$name _ $execidx _exec_hook_wrapper>]<ET, S>(hook: &mut HookState<{ $execs }, $hook_id>, $($param: $param_type),*)
             where
-                ET: EmulatorModuleTuple<S>,
-               S: Unpin + UsesInput,
+                S: UsesInput + Unpin,
             {
                 unsafe {
                     let modules = EmulatorModules::<ET, S>::emulator_modules_mut_unchecked();

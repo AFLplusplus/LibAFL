@@ -1,34 +1,27 @@
-use std::{fmt::Debug, rc::Rc, sync::OnceLock};
+use std::{rc::Rc, sync::OnceLock};
 
 use enum_map::{enum_map, EnumMap};
 use libafl::{
     executors::ExitKind,
-    inputs::HasTargetBytes,
-    state::{HasExecutions, State},
+    inputs::{HasTargetBytes, UsesInput},
 };
 use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestVirtAddr};
 
 use crate::{
     command::{
-        bindings, CommandError, CommandManager, EndCommand, FilterCommand, InputCommand, IsCommand,
-        LoadCommand, NativeExitKind, SaveCommand, StartCommand, VersionCommand,
+        bindings, CommandError, EndCommand, FilterCommand, InputCommand, IsCommand, LoadCommand,
+        NativeExitKind, SaveCommand, StartCommand, VersionCommand,
     },
-    modules::{
-        EmulatorModuleTuple, QemuInstrumentationAddressRangeFilter, StdInstrumentationFilter,
-    },
+    modules::{QemuInstrumentationAddressRangeFilter, StdInstrumentationFilter},
     sync_exit::ExitArgs,
-    EmulatorExitHandler, GuestReg, IsSnapshotManager, Qemu, QemuMemoryChunk, Regs,
-    StdEmulatorExitHandler,
+    GuestReg, IsSnapshotManager, Qemu, QemuMemoryChunk, Regs, StdEmulatorExitHandler,
 };
 
 pub static EMU_EXIT_KIND_MAP: OnceLock<EnumMap<NativeExitKind, Option<ExitKind>>> = OnceLock::new();
 
 pub trait NativeCommandParser<CM, EH, ET, S>
 where
-    CM: CommandManager<EH, ET, S>,
-    EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorModuleTuple<S>,
-    S: Unpin + State + HasExecutions,
+    S: UsesInput,
 {
     fn command_id(&self) -> GuestReg;
 
@@ -43,11 +36,8 @@ pub struct InputPhysCommandParser;
 impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, ET, S>
     for InputPhysCommandParser
 where
-    CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
-    S: Unpin + State + HasExecutions,
+    S: UsesInput,
     S::Input: HasTargetBytes,
-    SM: IsSnapshotManager,
 {
     fn command_id(&self) -> GuestReg {
         GuestReg::from(bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_INPUT_PHYS.0)
@@ -76,11 +66,8 @@ pub struct InputVirtCommandParser;
 impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, ET, S>
     for InputVirtCommandParser
 where
-    CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
-    S: Unpin + State + HasExecutions,
+    S: UsesInput,
     S::Input: HasTargetBytes,
-    SM: IsSnapshotManager,
 {
     fn command_id(&self) -> GuestReg {
         GuestReg::from(bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_INPUT_VIRT.0)
@@ -105,9 +92,7 @@ pub struct StartPhysCommandParser;
 impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, ET, S>
     for StartPhysCommandParser
 where
-    CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
-    S: Unpin + State + HasExecutions,
+    S: UsesInput,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
 {
@@ -135,9 +120,7 @@ pub struct StartVirtCommandParser;
 impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, ET, S>
     for StartVirtCommandParser
 where
-    CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
-    S: Unpin + State + HasExecutions,
+    S: UsesInput,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
 {
@@ -164,10 +147,8 @@ where
 pub struct SaveCommandParser;
 impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, ET, S> for SaveCommandParser
 where
-    CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
-    S: Unpin + State + HasExecutions,
-    S::Input: HasTargetBytes,
+    ET: StdInstrumentationFilter + Unpin,
+    S: UsesInput + Unpin,
     SM: IsSnapshotManager,
 {
     fn command_id(&self) -> GuestReg {
@@ -186,10 +167,7 @@ where
 pub struct LoadCommandParser;
 impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, ET, S> for LoadCommandParser
 where
-    CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
-    S: Unpin + State + HasExecutions,
-    S::Input: HasTargetBytes,
+    S: UsesInput,
     SM: IsSnapshotManager,
 {
     fn command_id(&self) -> GuestReg {
@@ -208,10 +186,7 @@ where
 pub struct EndCommandParser;
 impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, ET, S> for EndCommandParser
 where
-    CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
-    S: Unpin + State + HasExecutions,
-    S::Input: HasTargetBytes,
+    S: UsesInput,
     SM: IsSnapshotManager,
 {
     fn command_id(&self) -> GuestReg {
@@ -244,11 +219,7 @@ pub struct VersionCommandParser;
 impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, ET, S>
     for VersionCommandParser
 where
-    CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
-    S: Unpin + State + HasExecutions,
-    S::Input: HasTargetBytes,
-    SM: IsSnapshotManager,
+    S: UsesInput,
 {
     fn command_id(&self) -> GuestReg {
         GuestReg::from(bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_VERSION.0)
@@ -269,11 +240,7 @@ pub struct VaddrFilterAllowRangeCommandParser;
 impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorExitHandler<SM>, ET, S>
     for VaddrFilterAllowRangeCommandParser
 where
-    CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
-    S: Unpin + State + HasExecutions,
-    S::Input: HasTargetBytes,
-    SM: IsSnapshotManager,
+    S: UsesInput,
 {
     fn command_id(&self) -> GuestReg {
         GuestReg::from(bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_VADDR_FILTER_ALLOW.0)

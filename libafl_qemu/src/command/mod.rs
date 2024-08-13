@@ -9,8 +9,7 @@ use hashbrown::HashMap;
 use hashbrown::HashSet;
 use libafl::{
     executors::ExitKind,
-    inputs::HasTargetBytes,
-    state::{HasExecutions, State},
+    inputs::{HasTargetBytes, UsesInput},
 };
 use libafl_bolts::AsSlice;
 use num_enum::TryFromPrimitive;
@@ -25,12 +24,11 @@ use crate::{
     },
     get_exit_arch_regs,
     modules::{
-        EmulatorModuleTuple, HasInstrumentationFilter, IsFilter,
-        QemuInstrumentationAddressRangeFilter, StdInstrumentationFilter,
+        HasInstrumentationFilter, QemuInstrumentationAddressRangeFilter, StdInstrumentationFilter,
     },
     sync_exit::ExitArgs,
-    Emulator, EmulatorExitHandler, ExitHandlerError, ExitHandlerResult, GuestReg, InputLocation,
-    IsSnapshotManager, Qemu, QemuMemoryChunk, QemuRWError, Regs, StdEmulatorExitHandler, CPU,
+    Emulator, ExitHandlerError, ExitHandlerResult, GuestReg, InputLocation, IsSnapshotManager,
+    Qemu, QemuMemoryChunk, QemuRWError, Regs, StdEmulatorExitHandler, CPU,
 };
 
 pub mod parser;
@@ -55,10 +53,7 @@ macro_rules! define_std_command_manager {
     ($name:ident, [$($native_command_parser:ident),+]) => {
         pub struct $name<ET, S, SM>
         where
-            ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
-            S: Unpin + State + HasExecutions,
-            S::Input: HasTargetBytes,
-            SM: IsSnapshotManager,
+            S: UsesInput,
         {
             native_command_parsers:
                 HashMap<GuestReg, Box<dyn NativeCommandParser<Self, StdEmulatorExitHandler<SM>, ET, S>>>,
@@ -66,8 +61,8 @@ macro_rules! define_std_command_manager {
 
         impl<ET, S, SM> $name<ET, S, SM>
         where
-            ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
-            S: Unpin + State + HasExecutions,
+            ET: StdInstrumentationFilter + Unpin,
+            S: UsesInput + Unpin,
             S::Input: HasTargetBytes,
             SM: IsSnapshotManager,
         {
@@ -105,10 +100,7 @@ macro_rules! define_std_command_manager {
 
         impl<ET, S, SM> CommandManager<StdEmulatorExitHandler<SM>, ET, S> for $name<ET, S, SM>
         where
-            ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
-            S: Unpin + State + HasExecutions,
-            S::Input: HasTargetBytes,
-            SM: IsSnapshotManager,
+            S: UsesInput,
         {
             fn parse(
                 &self,
@@ -129,10 +121,7 @@ macro_rules! define_std_command_manager {
 
         impl<ET, S, SM> Debug for $name<ET, S, SM>
         where
-            ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
-            S: Unpin + State + HasExecutions,
-            S::Input: HasTargetBytes,
-            SM: IsSnapshotManager,
+            S: UsesInput,
         {
             fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
                 write!(f, stringify!($name))
@@ -141,8 +130,8 @@ macro_rules! define_std_command_manager {
 
         impl<ET, S, SM> Default for $name<ET, S, SM>
         where
-            ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
-            S: Unpin + State + HasExecutions,
+            ET: StdInstrumentationFilter + Unpin,
+            S: UsesInput + Unpin,
             S::Input: HasTargetBytes,
             SM: IsSnapshotManager,
         {
@@ -157,9 +146,7 @@ pub struct NopCommandManager;
 
 impl<EH, ET, S> CommandManager<EH, ET, S> for NopCommandManager
 where
-    EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorModuleTuple<S>,
-    S: Unpin + State + HasExecutions,
+    S: UsesInput,
 {
     fn parse(&self, _qemu: Qemu) -> Result<Rc<dyn IsCommand<Self, EH, ET, S>>, CommandError> {
         Ok(Rc::new(NopCommand))
@@ -183,9 +170,7 @@ define_std_command_manager!(
 
 pub trait CommandManager<EH, ET, S>: Sized
 where
-    EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorModuleTuple<S>,
-    S: Unpin + State + HasExecutions,
+    S: UsesInput,
 {
     fn parse(&self, qemu: Qemu) -> Result<Rc<dyn IsCommand<Self, EH, ET, S>>, CommandError>;
 }
@@ -200,10 +185,7 @@ pub enum NativeExitKind {
 
 pub trait IsCommand<CM, EH, ET, S>: Debug + Display
 where
-    CM: CommandManager<EH, ET, S>,
-    EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorModuleTuple<S>,
-    S: Unpin + State + HasExecutions,
+    S: UsesInput,
 {
     /// Used to know whether the command can be run during a backdoor, or if it is necessary to go out of
     /// the QEMU VM to run the command.
@@ -251,10 +233,7 @@ impl Display for NopCommand {
 
 impl<CM, EH, ET, S> IsCommand<CM, EH, ET, S> for NopCommand
 where
-    CM: CommandManager<EH, ET, S>,
-    EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorModuleTuple<S>,
-    S: Unpin + State + HasExecutions,
+    S: UsesInput,
 {
     fn usable_at_runtime(&self) -> bool {
         true
@@ -275,10 +254,8 @@ pub struct SaveCommand;
 
 impl<CM, ET, S, SM> IsCommand<CM, StdEmulatorExitHandler<SM>, ET, S> for SaveCommand
 where
-    CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
-    S: Unpin + State + HasExecutions,
-    S::Input: HasTargetBytes,
+    ET: StdInstrumentationFilter + Unpin,
+    S: UsesInput + Unpin,
     SM: IsSnapshotManager,
 {
     fn usable_at_runtime(&self) -> bool {
@@ -329,10 +306,7 @@ pub struct LoadCommand;
 
 impl<CM, ET, S, SM> IsCommand<CM, StdEmulatorExitHandler<SM>, ET, S> for LoadCommand
 where
-    CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
-    S: Unpin + State + HasExecutions,
-    S::Input: HasTargetBytes,
+    S: UsesInput,
     SM: IsSnapshotManager,
 {
     fn usable_at_runtime(&self) -> bool {
@@ -374,11 +348,8 @@ pub struct InputCommand {
 
 impl<CM, ET, S, SM> IsCommand<CM, StdEmulatorExitHandler<SM>, ET, S> for InputCommand
 where
-    CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
-    S: Unpin + State + HasExecutions,
+    S: UsesInput,
     S::Input: HasTargetBytes,
-    SM: IsSnapshotManager,
 {
     fn usable_at_runtime(&self) -> bool {
         true
@@ -410,9 +381,7 @@ pub struct StartCommand {
 
 impl<CM, ET, S, SM> IsCommand<CM, StdEmulatorExitHandler<SM>, ET, S> for StartCommand
 where
-    CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
-    S: Unpin + State + HasExecutions,
+    S: UsesInput,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
 {
@@ -460,10 +429,7 @@ pub struct EndCommand(Option<ExitKind>);
 
 impl<CM, ET, S, SM> IsCommand<CM, StdEmulatorExitHandler<SM>, ET, S> for EndCommand
 where
-    CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
-    S: Unpin + State + HasExecutions,
-    S::Input: HasTargetBytes,
+    S: UsesInput,
     SM: IsSnapshotManager,
 {
     fn usable_at_runtime(&self) -> bool {
@@ -501,11 +467,7 @@ pub struct VersionCommand(u64);
 
 impl<CM, ET, S, SM> IsCommand<CM, StdEmulatorExitHandler<SM>, ET, S> for VersionCommand
 where
-    CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
-    S: Unpin + State + HasExecutions,
-    S::Input: HasTargetBytes,
-    SM: IsSnapshotManager,
+    S: UsesInput,
 {
     fn usable_at_runtime(&self) -> bool {
         true
@@ -531,21 +493,15 @@ where
 }
 
 #[derive(Debug, Clone)]
-pub struct FilterCommand<T>
-where
-    T: IsFilter + Debug,
-{
+pub struct FilterCommand<T> {
     filter: T,
 }
 
 #[cfg(emulation_mode = "systemmode")]
 impl<CM, ET, S, SM> IsCommand<CM, StdEmulatorExitHandler<SM>, ET, S> for PagingFilterCommand
 where
-    CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
-    S: Unpin + State + HasExecutions,
-    S::Input: HasTargetBytes,
-    SM: IsSnapshotManager,
+    ET: StdInstrumentationFilter + Unpin,
+    S: UsesInput + Unpin,
 {
     fn usable_at_runtime(&self) -> bool {
         true
@@ -571,11 +527,7 @@ where
 
 impl<CM, ET, S, SM> IsCommand<CM, StdEmulatorExitHandler<SM>, ET, S> for AddressRangeFilterCommand
 where
-    CM: CommandManager<StdEmulatorExitHandler<SM>, ET, S>,
-    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter + Debug,
-    S: Unpin + State + HasExecutions,
-    S::Input: HasTargetBytes,
-    SM: IsSnapshotManager,
+    S: UsesInput,
 {
     fn usable_at_runtime(&self) -> bool {
         true
@@ -609,10 +561,7 @@ impl VersionCommand {
     }
 }
 
-impl<T> FilterCommand<T>
-where
-    T: IsFilter + Debug,
-{
+impl<T> FilterCommand<T> {
     pub fn new(filter: T) -> Self {
         Self { filter }
     }

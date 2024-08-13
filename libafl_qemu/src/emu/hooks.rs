@@ -98,8 +98,7 @@ where
 #[derive(Debug)]
 pub struct EmulatorModules<ET, S>
 where
-    ET: EmulatorModuleTuple<S>,
-    S: Unpin + UsesInput,
+    S: UsesInput,
 {
     qemu: Qemu,
     modules: Pin<Box<ET>>,
@@ -111,8 +110,7 @@ where
 #[derive(Debug)]
 pub struct EmulatorHooks<ET, S>
 where
-    ET: EmulatorModuleTuple<S>,
-    S: Unpin + UsesInput,
+    S: UsesInput,
 {
     qemu_hooks: QemuHooks,
     phantom: PhantomData<(ET, S)>,
@@ -140,8 +138,7 @@ where
 
 impl<ET, S> EmulatorHooks<ET, S>
 where
-    ET: EmulatorModuleTuple<S>,
-    S: Unpin + UsesInput,
+    S: UsesInput + Unpin,
 {
     #[must_use]
     pub fn new(qemu_hooks: QemuHooks) -> Self {
@@ -829,7 +826,6 @@ where
 
 impl<ET, S> Default for EmulatorHooks<ET, S>
 where
-    ET: EmulatorModuleTuple<S>,
     S: Unpin + UsesInput,
 {
     fn default() -> Self {
@@ -839,112 +835,8 @@ where
 
 impl<ET, S> EmulatorModules<ET, S>
 where
-    ET: EmulatorModuleTuple<S>,
-    S: Unpin + UsesInput,
+    S: UsesInput,
 {
-    pub(super) fn new(qemu: Qemu, modules: ET) -> Pin<Box<Self>> {
-        let mut modules = Box::pin(Self {
-            qemu,
-            modules: Box::pin(modules),
-            hooks: EmulatorHooks::default(),
-            phantom: PhantomData,
-        });
-
-        // re-translate blocks with hooks
-        // qemu.flush_jit();
-        // -> it should be useless, since EmulatorModules must be init before QEMU ever runs
-
-        // Set global EmulatorModules pointer
-        unsafe {
-            if EMULATOR_TOOLS.is_null() {
-                EMULATOR_TOOLS = ptr::from_mut::<Self>(modules.as_mut().get_mut()) as *mut ();
-            } else {
-                panic!("Emulator Modules have already been set and is still active. It is not supported to have multiple instances of `EmulatorModules` at the same time yet.")
-            }
-        }
-
-        unsafe {
-            // We give access to EmulatorModuleTuple<S> during init, the compiler complains (for good reasons)
-            // TODO: We should find a way to be able to check for a module without giving full access to the tuple.
-            modules
-                .modules
-                .init_modules_all(Self::emulator_modules_mut_unchecked());
-        }
-
-        modules
-    }
-
-    #[must_use]
-    pub fn qemu(&self) -> Qemu {
-        self.qemu
-    }
-
-    #[must_use]
-    pub fn modules(&self) -> &ET {
-        self.modules.as_ref().get_ref()
-    }
-
-    pub fn modules_mut(&mut self) -> &mut ET {
-        self.modules.as_mut().get_mut()
-    }
-
-    pub fn hooks_mut(&mut self) -> &mut EmulatorHooks<ET, S> {
-        &mut self.hooks
-    }
-
-    pub fn first_exec_all(&mut self) {
-        unsafe {
-            self.modules
-                .as_mut()
-                .get_mut()
-                .first_exec_all(Self::emulator_modules_mut_unchecked());
-        }
-    }
-
-    pub fn pre_exec_all(&mut self, input: &S::Input) {
-        unsafe {
-            self.modules
-                .as_mut()
-                .get_mut()
-                .pre_exec_all(Self::emulator_modules_mut_unchecked(), input);
-        }
-    }
-
-    pub fn post_exec_all<OT>(
-        &mut self,
-        input: &S::Input,
-        observers: &mut OT,
-        exit_kind: &mut ExitKind,
-    ) where
-        OT: ObserversTuple<S>,
-    {
-        unsafe {
-            self.modules.as_mut().get_mut().post_exec_all(
-                Self::emulator_modules_mut_unchecked(),
-                input,
-                observers,
-                exit_kind,
-            );
-        }
-    }
-
-    /// Get a reference to the first (type) matching member of the tuple.
-    #[must_use]
-    pub fn get<T>(&self) -> Option<&T>
-    where
-        T: EmulatorModule<S>,
-    {
-        self.modules.match_first_type::<T>()
-    }
-
-    /// Get a mutable reference to the first (type) matching member of the tuple.
-    pub fn get_mut<T>(&mut self) -> Option<&mut T>
-    where
-        T: EmulatorModule<S>,
-    {
-        self.modules.match_first_type_mut::<T>()
-    }
-
     /// Get a mutable reference to `EmulatorModules` (supposedly initialized beforehand).
     ///
     /// # Safety
@@ -979,6 +871,16 @@ where
     #[must_use]
     pub unsafe fn emulator_modules_mut<'a>() -> Option<&'a mut EmulatorModules<ET, S>> {
         unsafe { (EMULATOR_TOOLS as *mut EmulatorModules<ET, S>).as_mut() }
+    }
+}
+
+impl<ET, S> EmulatorModules<ET, S>
+where
+    ET: Unpin,
+    S: UsesInput + Unpin,
+{
+    pub fn modules_mut(&mut self) -> &mut ET {
+        self.modules.as_mut().get_mut()
     }
 
     pub fn instructions(
@@ -1094,6 +996,113 @@ where
 
     pub fn backdoor_closure(&mut self, hook: BackdoorHookClosure<ET, S>) -> BackdoorHookId {
         self.hooks.backdoor_closure(hook)
+    }
+}
+
+impl<ET, S> EmulatorModules<ET, S>
+where
+    ET: EmulatorModuleTuple<S>,
+    S: UsesInput + Unpin,
+{
+    pub(super) fn new(qemu: Qemu, modules: ET) -> Pin<Box<Self>> {
+        let mut modules = Box::pin(Self {
+            qemu,
+            modules: Box::pin(modules),
+            hooks: EmulatorHooks::default(),
+            phantom: PhantomData,
+        });
+
+        // re-translate blocks with hooks
+        // qemu.flush_jit();
+        // -> it should be useless, since EmulatorModules must be init before QEMU ever runs
+        // TODO: Check if this is true
+
+        // Set global EmulatorModules pointer
+        unsafe {
+            if EMULATOR_TOOLS.is_null() {
+                EMULATOR_TOOLS = ptr::from_mut::<Self>(modules.as_mut().get_mut()) as *mut ();
+            } else {
+                panic!("Emulator Modules have already been set and is still active. It is not supported to have multiple instances of `EmulatorModules` at the same time yet.")
+            }
+        }
+
+        unsafe {
+            // We give access to EmulatorModuleTuple<S> during init, the compiler complains (for good reasons)
+            // TODO: We should find a way to be able to check for a module without giving full access to the tuple.
+            modules
+                .modules
+                .init_modules_all(Self::emulator_modules_mut_unchecked());
+        }
+
+        modules
+    }
+
+    pub fn first_exec_all(&mut self) {
+        unsafe {
+            self.modules_mut()
+                .first_exec_all(Self::emulator_modules_mut_unchecked());
+        }
+    }
+
+    pub fn pre_exec_all(&mut self, input: &S::Input) {
+        unsafe {
+            self.modules_mut()
+                .pre_exec_all(Self::emulator_modules_mut_unchecked(), input);
+        }
+    }
+
+    pub fn post_exec_all<OT>(
+        &mut self,
+        input: &S::Input,
+        observers: &mut OT,
+        exit_kind: &mut ExitKind,
+    ) where
+        OT: ObserversTuple<S>,
+    {
+        unsafe {
+            self.modules_mut().post_exec_all(
+                Self::emulator_modules_mut_unchecked(),
+                input,
+                observers,
+                exit_kind,
+            );
+        }
+    }
+
+    /// Get a reference to the first (type) matching member of the tuple.
+    #[must_use]
+    pub fn get<T>(&self) -> Option<&T>
+    where
+        T: EmulatorModule<S>,
+    {
+        self.modules.match_first_type::<T>()
+    }
+
+    /// Get a mutable reference to the first (type) matching member of the tuple.
+    pub fn get_mut<T>(&mut self) -> Option<&mut T>
+    where
+        T: EmulatorModule<S>,
+    {
+        self.modules.match_first_type_mut::<T>()
+    }
+}
+
+impl<ET, S> EmulatorModules<ET, S>
+where
+    S: UsesInput,
+{
+    #[must_use]
+    pub fn qemu(&self) -> Qemu {
+        self.qemu
+    }
+
+    #[must_use]
+    pub fn modules(&self) -> &ET {
+        self.modules.as_ref().get_ref()
+    }
+
+    pub fn hooks_mut(&mut self) -> &mut EmulatorHooks<ET, S> {
+        &mut self.hooks
     }
 }
 
@@ -1228,8 +1237,7 @@ where
 
 impl<ET, S> Drop for EmulatorModules<ET, S>
 where
-    ET: EmulatorModuleTuple<S>,
-    S: Unpin + UsesInput,
+    S: UsesInput,
 {
     fn drop(&mut self) {
         // Make the global pointer null at drop time

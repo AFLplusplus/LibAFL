@@ -99,10 +99,10 @@ pub fn python_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<sys::MapInfo>()?;
 
     #[cfg(emulation_mode = "usermode")]
-    m.add_class::<qemu::GuestMaps>()?;
+    m.add_class::<GuestMaps>()?;
 
-    m.add_class::<qemu::SyscallHookResult>()?;
-    m.add_class::<qemu::pybind::Qemu>()?;
+    m.add_class::<SyscallHookResult>()?;
+    m.add_class::<pybind::Qemu>()?;
 
     Ok(())
 }
