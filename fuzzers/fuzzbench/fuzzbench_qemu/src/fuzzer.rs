@@ -329,7 +329,7 @@ fn fuzz(
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // The wrapped harness function, calling out to the LLVM-style harness
-    let mut harness = |input: &BytesInput| {
+    let mut harness = |_emulator: Emulator<_, _, _, _>, input: &BytesInput| {
         let target = input.target_bytes();
         let mut buf = target.as_slice();
         let mut len = buf.len();
@@ -366,12 +366,12 @@ fn fuzz(
         //QemuSnapshotHelper::new()
     );
 
-    let mut emulator =
+    let emulator =
         Emulator::new_with_qemu(qemu, modules, NopEmulatorExitHandler, NopCommandManager)?;
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let executor = QemuExecutor::new(
-        &mut emulator,
+        emulator,
         &mut harness,
         tuple_list!(edges_observer, time_observer),
         &mut fuzzer,
