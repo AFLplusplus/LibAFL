@@ -33,17 +33,21 @@ use libafl_bolts::shmem::ShMemProvider;
 
 #[cfg(emulation_mode = "usermode")]
 use crate::EmulatorModules;
-#[cfg(emulation_mode = "usermode")]
-use libafl_qemu_sys::{libafl_qemu_handle_crash, siginfo_t};
 
-#[cfg(emulation_mode = "systemmode")]
 use libafl_bolts::os::unix_signals::siginfo_t;
+
 #[cfg(emulation_mode = "systemmode")]
 use libafl_qemu_sys::qemu_system_debug_request;
 
 use libafl_bolts::{
     os::unix_signals::{ucontext_t, Signal},
 };
+
+#[cfg(emulation_mode = "usermode")]
+extern "C" {
+    // Original QEMU user signal handler
+    fn libafl_qemu_handle_crash(signal: i32, info: *mut siginfo_t, puc: *mut c_void);
+}
 
 pub struct QemuExecutor<'a, CM, EH, H, OT, ET, S>
 where
