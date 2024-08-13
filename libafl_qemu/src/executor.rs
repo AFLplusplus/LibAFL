@@ -4,13 +4,17 @@ use core::{
     fmt::{self, Debug, Formatter},
     time::Duration,
 };
-
 #[cfg(emulation_mode = "usermode")]
 use std::ptr;
 
+#[cfg(feature = "fork")]
+use libafl::{
+    events::EventManager, executors::InProcessForkExecutor, state::HasLastReportTime, HasMetadata,
+};
 use libafl::{
     events::{EventFirer, EventRestarter},
     executors::{
+        hooks::inprocess::InProcessExecutorHandlerData,
         inprocess::{stateful::StatefulInProcessExecutor, HasInProcessHooks},
         Executor, ExitKind, HasObservers,
     },
@@ -20,28 +24,18 @@ use libafl::{
     state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
     Error, ExecutionProcessor, HasScheduler,
 };
-use libafl::executors::hooks::inprocess::InProcessExecutorHandlerData;
-use libafl_bolts::tuples::RefIndexable;
-use crate::{command::CommandManager, modules::EmulatorModuleTuple, Emulator, EmulatorExitHandler};
-
-#[cfg(feature = "fork")]
-use libafl::{
-    events::EventManager, executors::InProcessForkExecutor, state::HasLastReportTime, HasMetadata,
-};
 #[cfg(feature = "fork")]
 use libafl_bolts::shmem::ShMemProvider;
-
-#[cfg(emulation_mode = "usermode")]
-use crate::EmulatorModules;
-
-use libafl_bolts::os::unix_signals::siginfo_t;
-
+use libafl_bolts::{
+    os::unix_signals::{siginfo_t, ucontext_t, Signal},
+    tuples::RefIndexable,
+};
 #[cfg(emulation_mode = "systemmode")]
 use libafl_qemu_sys::qemu_system_debug_request;
 
-use libafl_bolts::{
-    os::unix_signals::{ucontext_t, Signal},
-};
+#[cfg(emulation_mode = "usermode")]
+use crate::EmulatorModules;
+use crate::{command::CommandManager, modules::EmulatorModuleTuple, Emulator, EmulatorExitHandler};
 
 #[cfg(emulation_mode = "usermode")]
 extern "C" {
@@ -108,7 +102,6 @@ pub unsafe fn inproc_qemu_timeout_handler<'a, E, EM, OF, Z>(
     }
 }
 
-
 impl<'a, CM, EH, H, OT, ET, S> Debug for QemuExecutor<'a, CM, EH, H, OT, ET, S>
 where
     CM: CommandManager<EH, ET, S>,
@@ -174,7 +167,10 @@ where
                 }
             };
 
-            inner.exposed_executor_state_mut().modules_mut().crash_closure(Box::new(handler));
+            inner
+                .exposed_executor_state_mut()
+                .modules_mut()
+                .crash_closure(Box::new(handler));
         }
 
         #[cfg(emulation_mode = "systemmode")]
@@ -190,9 +186,7 @@ where
         Ok(Self { inner })
     }
 
-    pub fn inner(
-        &self,
-    ) -> &StatefulInProcessExecutor<'a, H, OT, S, Emulator<CM, EH, ET, S>> {
+    pub fn inner(&self) -> &StatefulInProcessExecutor<'a, H, OT, S, Emulator<CM, EH, ET, S>> {
         &self.inner
     }
 
@@ -210,8 +204,7 @@ where
     }
 }
 
-impl<'a, CM, EH, EM, H, OT, OF, ET, S, Z> Executor<EM, Z>
-for QemuExecutor<'a, CM, EH, H, OT, ET, S>
+impl<'a, CM, EH, EM, H, OT, OF, ET, S, Z> Executor<EM, Z> for QemuExecutor<'a, CM, EH, H, OT, ET, S>
 where
     CM: CommandManager<EH, ET, S>,
     EH: EmulatorExitHandler<ET, S>,
@@ -230,23 +223,17 @@ where
         mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
-        self.inner
-            .exposed_executor_state_mut()
-            .first_exec_all();
+        self.inner.exposed_executor_state_mut().first_exec_all();
 
-        self.inner
-            .exposed_executor_state_mut()
-            .pre_exec_all(input);
+        self.inner.exposed_executor_state_mut().pre_exec_all(input);
 
         let mut exit_kind = self.inner.run_target(fuzzer, state, mgr, input)?;
 
-        self.inner
-            .exposed_executor_state
-            .post_exec_all(
-                input,
-                &mut *self.inner.inner.observers_mut(),
-                &mut exit_kind,
-            );
+        self.inner.exposed_executor_state.post_exec_all(
+            input,
+            &mut *self.inner.inner.observers_mut(),
+            &mut exit_kind,
+        );
 
         Ok(exit_kind)
     }
