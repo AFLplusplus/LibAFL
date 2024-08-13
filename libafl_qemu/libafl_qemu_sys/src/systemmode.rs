@@ -1,6 +1,6 @@
 use paste::paste;
 
-use crate::{extern_c_checked, CPUStatePtr, GuestPhysAddr};
+use crate::extern_c_checked;
 
 extern_c_checked! {
     pub fn qemu_init(argc: i32, argv: *const *const u8, envp: *const *const u8);

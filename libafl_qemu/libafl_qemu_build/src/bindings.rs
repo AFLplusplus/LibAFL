@@ -60,6 +60,7 @@ const WRAPPER_HEADER: &str = r#"
 #include "sysemu/tcg.h"
 #include "sysemu/replay.h"
 
+#include "libafl/qemu_snapshot.h"
 #include "libafl/syx-snapshot/device-save.h"
 #include "libafl/syx-snapshot/syx-snapshot.h"
 
