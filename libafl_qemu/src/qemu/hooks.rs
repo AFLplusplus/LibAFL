@@ -150,8 +150,7 @@ macro_rules! create_pre_exec_wrapper {
         paste::paste! {
             pub extern "C" fn [<$name _pre_exec_hook_wrapper>]<ET, S>(hook: &mut HookState<$hook_id>, $($param: $param_type),*)
             where
-                ET: EmulatorModuleTuple<S>,
-                S: Unpin + UsesInput,
+                S: UsesInput + Unpin,
             {
                 unsafe {
                     let modules = EmulatorModules::<ET, S>::emulator_modules_mut_unchecked();
@@ -181,8 +180,7 @@ macro_rules! create_post_exec_wrapper {
         paste::paste! {
             pub extern "C" fn [<$name _post_exec_hook_wrapper>]<ET, S>(hook: &mut HookState<$hook_id>, $($param: $param_type),*)
             where
-                ET: EmulatorModuleTuple<S>,
-                S: Unpin + UsesInput,
+                S: UsesInput + Unpin,
             {
                 unsafe {
                     let modules = EmulatorModules::<ET, S>::emulator_modules_mut_unchecked();

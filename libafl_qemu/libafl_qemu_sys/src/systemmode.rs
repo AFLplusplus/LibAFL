@@ -8,9 +8,4 @@ extern_c_checked! {
     pub fn vm_start();
     pub fn qemu_main_loop();
     pub fn qemu_cleanup();
-
-    pub fn libafl_save_qemu_snapshot(name: *const u8, sync: bool);
-    pub fn libafl_load_qemu_snapshot(name: *const u8, sync: bool);
-
-    pub fn libafl_qemu_current_paging_id(cpu: CPUStatePtr) -> GuestPhysAddr;
 }

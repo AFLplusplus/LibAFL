@@ -20,7 +20,6 @@ use core::ops::BitAnd;
 use std::ffi::c_void;
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use paste::paste;
 use strum_macros::EnumIter;
 
 #[cfg(all(not(feature = "clippy"), target_os = "linux"))]
@@ -175,8 +174,4 @@ pub fn make_plugin_meminfo(oi: MemOpIdx, rw: qemu_plugin_mem_rw) -> qemu_plugin_
 #[cfg(target_os = "linux")]
 pub fn cpu_env(cpu: *mut CPUState) -> *mut CPUArchState {
     unsafe { cpu.add(1) as *mut CPUArchState }
-}
-
-extern_c_checked! {
-    pub fn strlen(s: *const u8) -> usize;
 }

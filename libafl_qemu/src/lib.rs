@@ -92,7 +92,7 @@ pub fn python_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_submodule(&regsm)?;
 
     let mmapm = PyModule::new_bound(m.py(), "mmap")?;
-    for r in sys::MmapPerms::iter() {
+    for r in MmapPerms::iter() {
         let v: i32 = r.into();
         mmapm.add(PyString::new_bound(m.py(), &format!("{r:?}")), v)?;
     }

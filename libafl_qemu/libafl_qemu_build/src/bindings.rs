@@ -81,6 +81,8 @@ const WRAPPER_HEADER: &str = r#"
 
 #include "qemu/plugin-memory.h"
 
+#include "libafl/cpu.h"
+#include "libafl/gdb.h"
 #include "libafl/exit.h"
 #include "libafl/jit.h"
 #include "libafl/utils.h"
