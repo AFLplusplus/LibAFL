@@ -74,7 +74,7 @@ pub unsafe fn inproc_qemu_crash_handler<'a, E, EM, OF, Z, ET, S>(
         Some(v) => ptr::from_mut::<ucontext_t>(*v) as *mut c_void,
         None => ptr::null_mut(),
     };
-    libafl_qemu_handle_crash(signal as i32, info as *mut siginfo_t, puc);
+    libafl_qemu_handle_crash(signal as i32, std::ptr::from_mut::<siginfo_t>(info), puc);
 }
 
 #[cfg(emulation_mode = "systemmode")]
