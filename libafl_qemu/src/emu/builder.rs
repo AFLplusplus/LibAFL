@@ -32,6 +32,7 @@ impl<S> EmulatorBuilder<NopCommandManager, NopEmulatorExitHandler, (), S>
 where
     S: UsesInput,
 {
+    #[must_use]
     pub fn empty() -> Self {
         Self {
             modules: tuple_list!(),
@@ -55,6 +56,8 @@ where
     S: State + HasExecutions + Unpin,
     S::Input: HasTargetBytes,
 {
+    #[must_use]
+    #[allow(clippy::should_implement_trait)]
     pub fn default() -> Self {
         let snapshot_manager = { NopSnapshotManager };
 
