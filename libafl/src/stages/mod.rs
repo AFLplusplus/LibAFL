@@ -64,35 +64,25 @@ pub use logics::*;
 pub mod stats;
 pub use stats::*;
 
-// #[cfg(feature = "std")]
-// pub mod sync;
-// #[cfg(feature = "std")]
-// pub use sync::*;
+#[cfg(feature = "std")]
+pub mod sync;
+#[cfg(feature = "std")]
+pub use sync::*;
 
 #[cfg(feature = "unicode")]
 pub mod unicode;
-
 #[cfg(feature = "unicode")]
 pub use unicode::*;
 
-/*
 pub mod tmin;
 pub use tmin::*;
-*/
 
 pub mod tuneable;
 pub use tuneable::*;
 
-// pub mod push;
-// pub use push::*;
+pub mod push;
+pub use push::*;
 
-// #[cfg(feature = "std")]
-// pub mod sync;
-// #[cfg(feature = "unicode")]
-// pub mod unicode;
-//
-// pub mod pruning;
-// pub use pruning::*;
 use crate::{
     corpus::{Corpus, CorpusId, HasCorpus, HasCurrentCorpusId},
     events::EventProcessor,
@@ -397,6 +387,7 @@ where
     E: HasObservers,
     S: HasNamedMetadata + HasCurrentCorpusId + HasCorpus,
     Z: ExecutesInput<E, EM, <S::Corpus as Corpus>::Input, S>,
+    PS: PushStage<EM, E::Observers, S, Z, Input = <S::Corpus as Corpus>::Input>,
 {
     #[inline]
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {

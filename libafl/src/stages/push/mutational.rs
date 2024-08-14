@@ -2,11 +2,7 @@
 //! For the current input, it will perform a range of random mutations, and then run them in the executor.
 
 use alloc::rc::Rc;
-use core::{
-    cell::{Cell, RefCell},
-    fmt::Debug,
-    time::Duration,
-};
+use core::{cell::RefCell, fmt::Debug, time::Duration};
 
 use libafl_bolts::rands::Rand;
 
@@ -18,6 +14,7 @@ use crate::{
     mark_feature_time,
     mutators::Mutator,
     schedulers::Scheduler,
+    stages::push::PushStageNext,
     start_timer,
     state::HasRand,
     Error, ExecutionProcessor, HasScheduler,
@@ -39,7 +36,6 @@ pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: usize = 128;
 /// It may randomly continue earlier.
 ///
 /// The default mutational push stage
-#[derive(Debug)]
 pub struct StdMutationalPushStage<EM, OT, S, M, Z>
 where
     S: HasCorpus,
@@ -51,6 +47,20 @@ where
     mutator: M,
 
     psh: PushStageHelper<EM, <S::Corpus as Corpus>::Input, OT, S, Z>,
+}
+
+impl<EM, OT, S, M, Z> Debug for StdMutationalPushStage<EM, OT, S, M, Z>
+where
+    S: HasCorpus,
+{
+    fn fmt(&self, f: &mut alloc::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut debug_struct = f.debug_struct("LlmpEventConverter");
+        let debug = debug_struct.field("llmp", &self.current_corpus_id);
+        debug
+            .field("testcases_to_do", &self.testcases_to_do)
+            .field("testcases_done", &self.testcases_done)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<EM, OT, S, M, Z> StdMutationalPushStage<EM, OT, S, M, Z>
@@ -208,7 +218,7 @@ where
     pub fn new(
         mutator: M,
         shared_state: Rc<RefCell<Option<PushStageSharedState<EM, OT, S, Z>>>>,
-        exit_kind: Rc<Cell<Option<ExitKind>>>,
+        exit_kind: Rc<RefCell<Option<ExitKind>>>,
     ) -> Self {
         Self {
             mutator,
