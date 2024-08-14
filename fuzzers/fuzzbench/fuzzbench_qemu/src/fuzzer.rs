@@ -177,8 +177,7 @@ fn fuzz(
     env::remove_var("LD_LIBRARY_PATH");
 
     let args: Vec<String> = env::args().collect();
-    let env: Vec<(String, String)> = env::vars().collect();
-    let qemu = Qemu::init(&args, &env).unwrap();
+    let qemu = Qemu::init(&args).unwrap();
     // let (emu, asan) = init_with_asan(&mut args, &mut env).unwrap();
 
     let mut elf_buffer = Vec::new();

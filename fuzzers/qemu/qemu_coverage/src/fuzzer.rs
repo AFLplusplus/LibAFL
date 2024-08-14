@@ -119,9 +119,8 @@ pub fn fuzz() {
     log::debug!("ARGS: {:#?}", options.args);
 
     env::remove_var("LD_LIBRARY_PATH");
-    let env: Vec<(String, String)> = env::vars().collect();
 
-    let qemu = Qemu::init(&options.args, &env).unwrap();
+    let qemu = Qemu::init(&options.args).unwrap();
 
     let mut elf_buffer = Vec::new();
     let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer).unwrap();
