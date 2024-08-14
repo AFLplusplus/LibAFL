@@ -7,11 +7,12 @@
 use alloc::rc::Rc;
 
 pub mod mutational;
-pub use mutational::*;
 use core::{cell::RefCell, time::Duration};
 
+pub use mutational::*;
+
 // pub use mutational::StdMutationalPushStage;
-use crate::{corpus::CorpusId, executors::ExitKind, Error};
+use crate::{corpus::CorpusId, events::ProgressReporter, executors::ExitKind, Error};
 
 // The shared state for all [`PushStage`]s
 /// Should be stored inside a `[Rc<RefCell<_>>`]
@@ -191,7 +192,6 @@ pub trait PushStageNext<EM, OT, S, Z>: PushStage<EM, OT, S, Z> {
     /// This is the default implementation for `next` for this stage
     fn next_std(&mut self) -> Option<Result<Self::Input, Error>>;
 }
-
 
 /// Send a monitor update all 15 (or more) seconds
 const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);

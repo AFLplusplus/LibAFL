@@ -11,25 +11,24 @@ use libafl_bolts::{
     tuples::{Handle, Handled, MatchNameRef},
     HasLen, Named,
 };
-use serde::Serialize;
 
 #[cfg(feature = "track_hit_feedbacks")]
 use crate::feedbacks::premature_last_result_err;
 use crate::{
     corpus::{Corpus, HasCorpus, HasCurrentCorpusId, Testcase},
-    events::EventFirer,
     executors::{ExitKind, HasObservers},
     feedbacks::{Feedback, FeedbackFactory, HasObserverHandle},
     mark_feature_time,
     mutators::{MutationResult, Mutator},
-    observers::{MapObserver, ObserversTuple},
+    observers::MapObserver,
+    prelude::StateInitializer,
     schedulers::RemovableScheduler,
     stages::{
         mutational::{MutatedTransform, MutatedTransformPost},
         ExecutionCountRestartHelper, Stage,
     },
     start_timer,
-    state::{HasCurrentTestcase, HasExecutions, HasMaxSize, HasSolutions, State},
+    state::{HasCurrentTestcase, HasExecutions, HasMaxSize, HasSolutions},
     Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasMetadata, HasNamedMetadata,
     HasScheduler,
 };
@@ -39,42 +38,155 @@ use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 /// Mutational stage which minimizes corpus entries.
 ///
 /// You must provide at least one mutator that actually reduces size.
-pub trait TMinMutationalStage<E, EM, F, IP, M, Z>:
-    Stage<E, EM, Z> + FeedbackFactory<F, E::Observers>
-where
-    E: UsesState<State = Self::State> + HasObservers,
-    <E as UsesObservers>::Observers: Serialize,
-    EM: UsesState<State = Self::State> + EventFirer,
-    F: Feedback<Self::State>,
-    Self::State: HasMaxSize + HasCorpus + HasSolutions + HasExecutions,
-    Self::Input: MutatedTransform<Self::Input, Self::State, Post = IP> + Clone + Hash + HasLen,
-    IP: Clone + MutatedTransformPost<Self::State>,
-    M: Mutator<Self::Input, Self::State>,
-    Z: UsesState<State = Self::State>
-        + HasScheduler
-        + HasFeedback
-        + ExecutesInput<E, EM>
-        + ExecutionProcessor,
-    Z::Scheduler: RemovableScheduler<State = Self::State>,
-{
+pub trait TMinMutationalStage {
+    type Mutator;
+
     /// The mutator registered for this stage
-    fn mutator(&self) -> &M;
+    fn mutator(&self) -> &Self::Mutator;
 
     /// The mutator registered for this stage (mutable)
-    fn mutator_mut(&mut self) -> &mut M;
+    fn mutator_mut(&mut self) -> &mut Self::Mutator;
+}
 
-    /// Gets the number of iterations this mutator should run for.
-    fn iterations(&self, state: &mut Self::State) -> Result<usize, Error>;
+/// The default corpus entry minimising mutational stage
+#[derive(Clone, Debug)]
+pub struct StdTMinMutationalStage<E, FF, M> {
+    /// The name
+    name: Cow<'static, str>,
+    /// The mutator(s) this stage uses
+    mutator: M,
+    /// The factory
+    factory: FF,
+    /// The runs (=iterations) we are supposed to do
+    runs: usize,
+    /// The progress helper for this stage, keeping track of resumes after timeouts/crashes
+    restart_helper: ExecutionCountRestartHelper,
+    phantom: PhantomData<E>,
+}
 
-    /// Runs this (mutational) stage for new objectives
-    #[allow(clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
-    fn perform_minification(
+impl<E, EM, FF, M, S, Z> Stage<E, EM, S, Z> for StdTMinMutationalStage<E, FF, M>
+where
+    E: HasObservers,
+    Z::Feedback: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
+    FF: FeedbackFactory<Z::Feedback, E::Observers>,
+    S: HasCurrentCorpusId
+        + HasMaxSize
+        + HasNamedMetadata
+        + HasMetadata
+        + HasExecutions
+        + HasCurrentTestcase
+        + HasCorpus
+        + HasSolutions,
+    <S::Corpus as Corpus>::Input: Clone + Hash + HasLen,
+    M: Mutator<<S::Corpus as Corpus>::Input, S>,
+    Z: HasFeedback
+        + ExecutesInput<E, EM, <S::Corpus as Corpus>::Input, S>
+        + ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, E::Observers, S>
+        + HasScheduler,
+    Z::Scheduler: RemovableScheduler<<S::Corpus as Corpus>::Input, S>,
+{
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
+        self.restart_helper.should_restart(state, &self.name)
+    }
+
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
+        self.restart_helper.clear_progress(state)
+    }
+
+    fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut Self::State,
+        state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error> {
+        self.perform_minification(fuzzer, executor, state, manager)?;
+
+        #[cfg(feature = "introspection")]
+        state.introspection_monitor_mut().finish_stage();
+
+        Ok(())
+    }
+}
+
+impl<E, F, FF, M> FeedbackFactory<F, E::Observers> for StdTMinMutationalStage<E, FF, M>
+where
+    E: HasObservers,
+    FF: FeedbackFactory<F, E::Observers>,
+{
+    fn create_feedback(&self, ctx: &E::Observers) -> F {
+        self.factory.create_feedback(ctx)
+    }
+}
+
+impl<E, FF, M> Named for StdTMinMutationalStage<E, FF, M> {
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
+    }
+}
+
+/// The counter for giving this stage unique id
+static mut TMIN_STAGE_ID: usize = 0;
+/// The name for tmin stage
+pub static TMIN_STAGE_NAME: &str = "tmin";
+
+impl<E, FF, M> TMinMutationalStage for StdTMinMutationalStage<E, FF, M> {
+    type Mutator = M;
+    /// The mutator, added to this stage
+    #[inline]
+    fn mutator(&self) -> &M {
+        &self.mutator
+    }
+
+    /// The list of mutators, added to this stage (as mutable ref)
+    #[inline]
+    fn mutator_mut(&mut self) -> &mut M {
+        &mut self.mutator
+    }
+}
+
+impl<E, FF, M> StdTMinMutationalStage<E, FF, M> {
+    /// Gets the number of iterations from a fixed number of runs
+    fn iterations<S>(&self, _state: &mut S) -> Result<usize, Error> {
+        Ok(self.runs)
+    }
+
+    fn execs_since_progress_start<S>(&mut self, state: &mut S) -> Result<u64, Error>
+    where
+        S: HasNamedMetadata + HasExecutions,
+    {
+        self.restart_helper
+            .execs_since_progress_start(state, &self.name)
+    }
+
+    /// Runs this (mutational) stage for new objectives
+    #[allow(clippy::cast_possible_wrap)]
+    pub(crate) fn perform_minification<EM, S, Z>(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut S,
+        manager: &mut EM,
+    ) -> Result<(), Error>
+    where
+        E: HasObservers,
+        Z::Feedback: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
+        FF: FeedbackFactory<Z::Feedback, E::Observers>,
+        S: HasCurrentCorpusId
+            + HasMaxSize
+            + HasNamedMetadata
+            + HasExecutions
+            + HasCurrentTestcase
+            + HasCorpus
+            + HasSolutions,
+        <S::Corpus as Corpus>::Input: Clone + Hash + HasLen,
+        M: Mutator<<S::Corpus as Corpus>::Input, S>,
+        Z: HasFeedback
+            + ExecutesInput<E, EM, <S::Corpus as Corpus>::Input, S>
+            + ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, E::Observers, S>
+            + HasScheduler,
+        Z::Scheduler: RemovableScheduler<<S::Corpus as Corpus>::Input, S>,
+    {
         let Some(base_corpus_id) = state.current_corpus_id()? else {
             return Err(Error::illegal_state(
                 "state is not currently processing a corpus index",
@@ -93,8 +205,10 @@ where
         }
 
         start_timer!(state);
-        let transformed =
-            Self::Input::try_transform_from(state.current_testcase_mut()?.borrow_mut(), state)?;
+        let transformed = <S::Corpus as Corpus>::Input::try_transform_from(
+            state.current_testcase_mut()?.borrow_mut(),
+            state,
+        )?;
         let mut base = state.current_input_cloned()?;
         // potential post operation if base is replaced by a shorter input
         let mut base_post = None;
@@ -206,135 +320,6 @@ where
         Ok(())
     }
 
-    /// Gets the number of executions this mutator already did since it got first called in this fuzz round.
-    fn execs_since_progress_start(&mut self, state: &mut Self::State) -> Result<u64, Error>;
-}
-
-/// The default corpus entry minimising mutational stage
-#[derive(Clone, Debug)]
-pub struct StdTMinMutationalStage<E, EM, F, FF, IP, M, Z> {
-    /// The name
-    name: Cow<'static, str>,
-    /// The mutator(s) this stage uses
-    mutator: M,
-    /// The factory
-    factory: FF,
-    /// The runs (=iterations) we are supposed to do
-    runs: usize,
-    /// The progress helper for this stage, keeping track of resumes after timeouts/crashes
-    restart_helper: ExecutionCountRestartHelper,
-    #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(E, EM, F, IP, Z)>,
-}
-
-impl<E, EM, F, FF, IP, M, Z> UsesState for StdTMinMutationalStage<E, EM, F, FF, IP, M, Z>
-where
-    Z: UsesState,
-{
-    type State = Z::State;
-}
-
-impl<E, EM, F, FF, IP, M, Z> Stage<E, EM, Z> for StdTMinMutationalStage<E, EM, F, FF, IP, M, Z>
-where
-    Z: HasScheduler + ExecutionProcessor + ExecutesInput<E, EM> + HasFeedback,
-    Z::Scheduler: RemovableScheduler,
-    E: HasObservers<State = Self::State>,
-    <E as UsesObservers>::Observers: Serialize,
-    EM: EventFirer<State = Self::State>,
-    FF: FeedbackFactory<F, E::Observers>,
-    F: Feedback<Self::State>,
-    Self::Input: MutatedTransform<Self::Input, Self::State, Post = IP> + Clone + HasLen + Hash,
-    Self::State:
-        HasMetadata + HasExecutions + HasSolutions + HasCorpus + HasMaxSize + HasNamedMetadata,
-    M: Mutator<Self::Input, Self::State>,
-    IP: MutatedTransformPost<Self::State> + Clone,
-{
-    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
-        self.restart_helper.should_restart(state, &self.name)
-    }
-
-    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        self.restart_helper.clear_progress(state)
-    }
-
-    fn perform(
-        &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
-        state: &mut Z::State,
-        manager: &mut EM,
-    ) -> Result<(), Error> {
-        self.perform_minification(fuzzer, executor, state, manager)?;
-
-        #[cfg(feature = "introspection")]
-        state.introspection_monitor_mut().finish_stage();
-
-        Ok(())
-    }
-}
-
-impl<E, EM, F, FF, IP, M, Z> FeedbackFactory<F, E::Observers>
-    for StdTMinMutationalStage<E, EM, F, FF, IP, M, Z>
-where
-    E: HasObservers,
-    FF: FeedbackFactory<F, E::Observers>,
-{
-    fn create_feedback(&self, ctx: &E::Observers) -> F {
-        self.factory.create_feedback(ctx)
-    }
-}
-
-impl<E, EM, F, FF, IP, M, Z> Named for StdTMinMutationalStage<E, EM, F, FF, IP, M, Z> {
-    fn name(&self) -> &Cow<'static, str> {
-        &self.name
-    }
-}
-
-/// The counter for giving this stage unique id
-static mut TMIN_STAGE_ID: usize = 0;
-/// The name for tmin stage
-pub static TMIN_STAGE_NAME: &str = "tmin";
-
-impl<E, EM, F, FF, IP, M, Z> TMinMutationalStage<E, EM, F, IP, M, Z>
-    for StdTMinMutationalStage<E, EM, F, FF, IP, M, Z>
-where
-    Z: HasScheduler + ExecutionProcessor + ExecutesInput<E, EM> + HasFeedback,
-    Z::Scheduler: RemovableScheduler,
-    E: HasObservers<State = Self::State>,
-    <E as UsesObservers>::Observers: Serialize,
-    EM: EventFirer<State = Self::State>,
-    FF: FeedbackFactory<F, E::Observers>,
-    F: Feedback<Self::State>,
-    Self::Input: MutatedTransform<Self::Input, Self::State, Post = IP> + Clone + HasLen + Hash,
-    Self::State:
-        HasMetadata + HasExecutions + HasSolutions + HasCorpus + HasMaxSize + HasNamedMetadata,
-    M: Mutator<Self::Input, Self::State>,
-    IP: MutatedTransformPost<Self::State> + Clone,
-{
-    /// The mutator, added to this stage
-    #[inline]
-    fn mutator(&self) -> &M {
-        &self.mutator
-    }
-
-    /// The list of mutators, added to this stage (as mutable ref)
-    #[inline]
-    fn mutator_mut(&mut self) -> &mut M {
-        &mut self.mutator
-    }
-
-    /// Gets the number of iterations from a fixed number of runs
-    fn iterations(&self, _state: &mut Self::State) -> Result<usize, Error> {
-        Ok(self.runs)
-    }
-
-    fn execs_since_progress_start(&mut self, state: &mut Self::State) -> Result<u64, Error> {
-        self.restart_helper
-            .execs_since_progress_start(state, &self.name)
-    }
-}
-
-impl<E, EM, F, FF, IP, M, Z> StdTMinMutationalStage<E, EM, F, FF, IP, M, Z> {
     /// Creates a new minimizing mutational stage that will minimize provided corpus entries
     pub fn new(mutator: M, factory: FF, runs: usize) -> Self {
         // unsafe but impossible that you create two threads both instantiating this instance
@@ -381,24 +366,23 @@ impl<C, M, S> HasObserverHandle for MapEqualityFeedback<C, M, S> {
     }
 }
 
-impl<C, M, S> Feedback<S> for MapEqualityFeedback<C, M, S>
+impl<C, M, S> StateInitializer<S> for MapEqualityFeedback<C, M, S> {}
+
+impl<C, EM, I, M, OT, S> Feedback<EM, I, OT, S> for MapEqualityFeedback<C, M, S>
 where
     M: MapObserver,
     C: AsRef<M>,
-    S: State,
+    S: HasCorpus,
+    OT: MatchNameRef,
 {
-    fn is_interesting<EM, OT>(
+    fn is_interesting(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
-        _input: &S::Input,
+        _input: &I,
         observers: &OT,
         _exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
-    {
+    ) -> Result<bool, Error> {
         let obs = observers
             .get(self.observer_handle())
             .expect("Should have been provided valid observer name.");
@@ -446,10 +430,7 @@ impl<C, M, S> HasObserverHandle for MapEqualityFactory<C, M, S> {
 
 impl<C, M, OT, S> FeedbackFactory<MapEqualityFeedback<C, M, S>, OT> for MapEqualityFactory<C, M, S>
 where
-    M: MapObserver,
-    C: AsRef<M> + Handled,
-    OT: ObserversTuple<S>,
-    S: UsesInput,
+    OT: MatchNameRef,
 {
     fn create_feedback(&self, observers: &OT) -> MapEqualityFeedback<C, M, S> {
         let obs = observers
