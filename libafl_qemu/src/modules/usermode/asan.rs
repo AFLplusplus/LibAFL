@@ -685,6 +685,7 @@ pub fn init_qemu_with_asan(
     let add_asan =
         |e: &str| "LD_PRELOAD=".to_string() + &asan_lib + " " + &e["LD_PRELOAD=".len()..];
 
+    // TODO: adapt since qemu does not take envp anymore as parameter
     let mut added = false;
     for (k, v) in &mut *env {
         if k == "QEMU_SET_ENV" {
@@ -717,7 +718,7 @@ pub fn init_qemu_with_asan(
         ASAN_INITED = true;
     }
 
-    let qemu = Qemu::init(args, env)?;
+    let qemu = Qemu::init(args)?;
     let rt = AsanGiovese::new(qemu.hooks());
 
     Ok((qemu, rt))

@@ -36,6 +36,9 @@ use crate::{
 mod hooks;
 pub use hooks::*;
 
+mod builder;
+pub use builder::*;
+
 #[cfg(emulation_mode = "usermode")]
 mod usermode;
 
@@ -147,6 +150,31 @@ pub enum SnapshotManagerCheckError {
     SnapshotCheckError(QemuSnapshotCheckResult),
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct NopSnapshotManager;
+
+impl IsSnapshotManager for NopSnapshotManager {
+    fn save(&mut self, _qemu: Qemu) -> SnapshotId {
+        SnapshotId { id: 0 }
+    }
+
+    fn restore(
+        &mut self,
+        _snapshot_id: &SnapshotId,
+        _qemu: Qemu,
+    ) -> Result<(), SnapshotManagerError> {
+        Ok(())
+    }
+
+    fn do_check(
+        &self,
+        _reference_snapshot_id: &SnapshotId,
+        _qemu: Qemu,
+    ) -> Result<QemuSnapshotCheckResult, SnapshotManagerError> {
+        Ok(QemuSnapshotCheckResult::default())
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct SnapshotId {
     id: u64,
@@ -198,7 +226,7 @@ pub struct StdEmulatorExitHandler<SM> {
 
 // TODO: Replace TypedBuilder by something better, it does not work correctly with default and
 // inter-dependent fields.
-#[derive(Debug, TypedBuilder)]
+#[derive(Debug)]
 pub struct Emulator<CM, EH, ET, S>
 where
     S: UsesInput,
@@ -206,11 +234,8 @@ where
     modules: Pin<Box<EmulatorModules<ET, S>>>,
     command_manager: CM,
     exit_handler: RefCell<EH>,
-    #[builder(default)]
     breakpoints_by_addr: RefCell<HashMap<GuestAddr, BreakpointMutRef<CM, EH, ET, S>>>,
-    #[builder(default)]
     breakpoints_by_id: RefCell<HashMap<BreakpointId, BreakpointMutRef<CM, EH, ET, S>>>,
-    #[builder(setter(transform = |args: &[String], env: &[(String, String)]| Qemu::init(args, env).unwrap()))]
     qemu: Qemu,
     first_exec: bool,
     _phantom: PhantomData<(ET, S)>,
@@ -463,13 +488,12 @@ where
 {
     #[allow(clippy::must_use_candidate, clippy::similar_names)]
     pub fn new(
-        args: &[String],
-        env: &[(String, String)],
+        qemu_args: &[String],
         modules: ET,
         exit_handler: EH,
         command_manager: CM,
     ) -> Result<Self, QemuInitError> {
-        let qemu = Qemu::init(args, env)?;
+        let qemu = Qemu::init(qemu_args)?;
 
         Self::new_with_qemu(qemu, modules, exit_handler, command_manager)
     }
