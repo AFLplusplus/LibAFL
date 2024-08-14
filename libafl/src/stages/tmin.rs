@@ -431,6 +431,8 @@ impl<C, M, S> HasObserverHandle for MapEqualityFactory<C, M, S> {
 impl<C, M, OT, S> FeedbackFactory<MapEqualityFeedback<C, M, S>, OT> for MapEqualityFactory<C, M, S>
 where
     OT: MatchNameRef,
+    C: Named + AsRef<M>,
+    M: MapObserver,
 {
     fn create_feedback(&self, observers: &OT) -> MapEqualityFeedback<C, M, S> {
         let obs = observers
