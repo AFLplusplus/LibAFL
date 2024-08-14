@@ -6,7 +6,7 @@
 use core::fmt;
 use std::{
     cmp::{Ordering, PartialOrd},
-    ffi::CString,
+    ffi::{c_void, CString},
     fmt::{Display, Formatter},
     intrinsics::{copy_nonoverlapping, transmute},
     mem::MaybeUninit,
@@ -159,12 +159,12 @@ pub struct QemuMemoryChunk {
 #[allow(clippy::vec_box)]
 static mut GDB_COMMANDS: Vec<Box<FatPtr>> = vec![];
 
-extern "C" fn gdb_cmd(data: *const (), buf: *const u8, len: usize) -> i32 {
+unsafe extern "C" fn gdb_cmd(data: *mut c_void, buf: *mut u8, len: usize) -> bool {
     unsafe {
         let closure = &mut *(data as *mut Box<dyn for<'r> FnMut(&Qemu, &'r str) -> bool>);
         let cmd = std::str::from_utf8_unchecked(std::slice::from_raw_parts(buf, len));
         let qemu = Qemu::get_unchecked();
-        i32::from(closure(&qemu, cmd))
+        closure(&qemu, cmd)
     }
 }
 
@@ -369,7 +369,7 @@ impl CPU {
         let val = GuestReg::to_le(val.into());
 
         let success =
-            unsafe { libafl_qemu_write_reg(self.ptr, reg_id, ptr::addr_of!(val) as *const u8) };
+            unsafe { libafl_qemu_write_reg(self.ptr, reg_id, ptr::addr_of!(val) as *mut u8) };
         if success == 0 {
             Err(QemuRWError {
                 kind: QemuRWErrorKind::Write,
@@ -797,7 +797,7 @@ impl Qemu {
                 Box<dyn for<'a, 'b> FnMut(&'a Qemu, &'b str) -> bool>,
                 FatPtr,
             >(callback));
-            libafl_qemu_add_gdb_cmd(gdb_cmd, ptr::from_ref(&*fat) as *const ());
+            libafl_qemu_add_gdb_cmd(Some(gdb_cmd), ptr::from_ref(&*fat) as *mut c_void);
             GDB_COMMANDS.push(fat);
         }
     }

@@ -218,13 +218,6 @@ where
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
             // The wrapped harness function, calling out to the LLVM-style harness
-            let mut harness = |input: &BytesInput| {
-                let target = input.target_bytes();
-                let buf = target.as_slice();
-                harness_bytes(buf);
-                ExitKind::Ok
-            };
-
             if self.use_cmplog.unwrap_or(false) {
                 let modules = {
                     #[cfg(not(any(feature = "mips", feature = "hexagon")))]
@@ -237,7 +230,14 @@ where
                     }
                 };
 
-                let mut emulator = Emulator::new_with_qemu(
+                let mut harness = |_emulator: &mut Emulator<_, _, _, _>, input: &BytesInput| {
+                    let target = input.target_bytes();
+                    let buf = target.as_slice();
+                    harness_bytes(buf);
+                    ExitKind::Ok
+                };
+
+                let emulator = Emulator::new_with_qemu(
                     qemu,
                     modules,
                     NopEmulatorExitHandler,
@@ -245,7 +245,7 @@ where
                 )?;
 
                 let executor = QemuExecutor::new(
-                    &mut emulator,
+                    emulator,
                     &mut harness,
                     tuple_list!(edges_observer, time_observer),
                     &mut fuzzer,
@@ -347,7 +347,14 @@ where
             } else {
                 let tools = tuple_list!(EdgeCoverageModule::default());
 
-                let mut emulator = Emulator::new_with_qemu(
+                let mut harness = |_emulator: &mut Emulator<_, _, _, _>, input: &BytesInput| {
+                    let target = input.target_bytes();
+                    let buf = target.as_slice();
+                    harness_bytes(buf);
+                    ExitKind::Ok
+                };
+
+                let emulator = Emulator::new_with_qemu(
                     qemu,
                     tools,
                     NopEmulatorExitHandler,
@@ -355,7 +362,7 @@ where
                 )?;
 
                 let mut executor = QemuExecutor::new(
-                    &mut emulator,
+                    emulator,
                     &mut harness,
                     tuple_list!(edges_observer, time_observer),
                     &mut fuzzer,

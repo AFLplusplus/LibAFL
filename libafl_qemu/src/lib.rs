@@ -55,6 +55,10 @@ pub mod breakpoint;
 pub mod command;
 pub mod sync_exit;
 
+pub use libafl_qemu_sys::{GuestAddr, MmapPerms};
+#[cfg(emulation_mode = "systemmode")]
+pub use libafl_qemu_sys::{GuestPhysAddr, GuestVirtAddr};
+
 #[must_use]
 pub fn filter_qemu_args() -> Vec<String> {
     let mut args = vec![env::args().next().unwrap()];
@@ -90,7 +94,7 @@ pub fn python_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_submodule(&regsm)?;
 
     let mmapm = PyModule::new_bound(m.py(), "mmap")?;
-    for r in sys::MmapPerms::iter() {
+    for r in MmapPerms::iter() {
         let v: i32 = r.into();
         mmapm.add(PyString::new_bound(m.py(), &format!("{r:?}")), v)?;
     }
@@ -99,10 +103,10 @@ pub fn python_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<sys::MapInfo>()?;
 
     #[cfg(emulation_mode = "usermode")]
-    m.add_class::<qemu::GuestMaps>()?;
+    m.add_class::<GuestMaps>()?;
 
-    m.add_class::<qemu::SyscallHookResult>()?;
-    m.add_class::<qemu::pybind::Qemu>()?;
+    m.add_class::<SyscallHookResult>()?;
+    m.add_class::<pybind::Qemu>()?;
 
     Ok(())
 }

@@ -58,8 +58,10 @@ const WRAPPER_HEADER: &str = r#"
 #include "hw/core/sysemu-cpu-ops.h"
 #include "exec/address-spaces.h"
 #include "sysemu/tcg.h"
+#include "sysemu/runstate.h"
 #include "sysemu/replay.h"
 
+#include "libafl/qemu_snapshot.h"
 #include "libafl/syx-snapshot/device-save.h"
 #include "libafl/syx-snapshot/syx-snapshot.h"
 
@@ -81,10 +83,26 @@ const WRAPPER_HEADER: &str = r#"
 
 #include "qemu/plugin-memory.h"
 
+#include "libafl/cpu.h"
+#include "libafl/gdb.h"
 #include "libafl/exit.h"
-#include "libafl/hook.h"
 #include "libafl/jit.h"
 #include "libafl/utils.h"
+
+#include "libafl/hook.h"
+
+#include "libafl/hooks/tcg/backdoor.h"
+#include "libafl/hooks/tcg/block.h"
+#include "libafl/hooks/tcg/cmp.h"
+#include "libafl/hooks/tcg/edge.h"
+#include "libafl/hooks/tcg/instruction.h"
+#include "libafl/hooks/tcg/read_write.h"
+#include "libafl/hooks/cpu_run.h"
+
+#ifdef CONFIG_USER_ONLY
+#include "libafl/hooks/thread.h"
+#include "libafl/hooks/syscall.h"
+#endif
 
 "#;
 
@@ -134,6 +152,7 @@ pub fn generate(
         .allowlist_type("libafl_mapinfo")
         .allowlist_type("IntervalTreeRoot")
         .allowlist_function("qemu_user_init")
+        .allowlist_function("qemu_system_debug_request")
         .allowlist_function("target_mmap")
         .allowlist_function("target_mprotect")
         .allowlist_function("target_munmap")

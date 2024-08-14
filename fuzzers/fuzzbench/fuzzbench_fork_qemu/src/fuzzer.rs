@@ -156,7 +156,7 @@ fn fuzz(
         CmpLogChildModule::default(),
     );
 
-    let mut emulator = Emulator::new(
+    let emulator = Emulator::new(
         args.as_slice(),
         env.as_slice(),
         emulator_modules,
@@ -356,7 +356,7 @@ fn fuzz(
     };
 
     let executor = QemuForkExecutor::new(
-        &mut emulator,
+        emulator,
         &mut harness,
         tuple_list!(edges_observer, time_observer),
         &mut fuzzer,
