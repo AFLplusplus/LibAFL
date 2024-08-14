@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use std::{fmt::Debug, marker::PhantomData};
 
 use libafl::{
     inputs::{HasTargetBytes, UsesInput},
@@ -12,9 +12,17 @@ use crate::FastSnapshotManager;
 use crate::NopSnapshotManager;
 use crate::{
     command::{NopCommandManager, StdCommandManager},
+    config::QemuConfig,
     modules::{EmulatorModule, EmulatorModuleTuple},
-    NopEmulatorExitHandler, StdEmulatorExitHandler,
+    Emulator, NopEmulatorExitHandler, Qemu, QemuInitError, StdEmulatorExitHandler,
 };
+
+#[derive(Clone, Debug)]
+enum QemuBuilder {
+    Qemu(Qemu),
+    QemuConfig(QemuConfig),
+    QemuString(Vec<String>),
+}
 
 #[derive(Clone, Debug)]
 pub struct EmulatorBuilder<CM, EH, ET, S>
@@ -24,7 +32,7 @@ where
     modules: ET,
     command_manager: CM,
     exit_handler: EH,
-    qemu_cmd: Option<String>,
+    qemu_builder: Option<QemuBuilder>,
     phantom: PhantomData<S>,
 }
 
@@ -38,7 +46,7 @@ where
             modules: tuple_list!(),
             command_manager: NopCommandManager,
             exit_handler: NopEmulatorExitHandler,
-            qemu_cmd: None,
+            qemu_builder: None,
             phantom: PhantomData,
         }
     }
@@ -65,7 +73,7 @@ where
             modules: (),
             command_manager: StdCommandManager::new(),
             exit_handler: StdEmulatorExitHandler::new(snapshot_manager),
-            qemu_cmd: None,
+            qemu_builder: None,
             phantom: PhantomData,
         }
     }
@@ -95,31 +103,87 @@ where
         }
     }
 }
-
 impl<CM, EH, ET, S> EmulatorBuilder<CM, EH, ET, S>
 where
-    S: UsesInput,
+    S: UsesInput + Unpin,
 {
-    fn new(modules: ET, command_manager: CM, exit_handler: EH, qemu_cmd: Option<String>) -> Self {
+    fn new(
+        modules: ET,
+        command_manager: CM,
+        exit_handler: EH,
+        qemu_builder: Option<QemuBuilder>,
+    ) -> Self {
         Self {
             modules,
             command_manager,
             exit_handler,
-            qemu_cmd,
+            qemu_builder,
             phantom: PhantomData,
         }
+    }
+
+    pub fn build(self) -> Result<Emulator<CM, EH, ET, S>, QemuInitError>
+    where
+        ET: EmulatorModuleTuple<S>,
+    {
+        let qemu_builder = self.qemu_builder.ok_or(QemuInitError::EmptyArgs)?;
+
+        let qemu: Qemu = match qemu_builder {
+            QemuBuilder::Qemu(qemu) => qemu,
+            QemuBuilder::QemuConfig(qemu_config) => {
+                let res: Result<Qemu, QemuInitError> = qemu_config.into();
+                res?
+            }
+            QemuBuilder::QemuString(qemu_string) => Qemu::init(&qemu_string)?,
+        };
+
+        Emulator::new_with_qemu(qemu, self.modules, self.exit_handler, self.command_manager)
+    }
+}
+
+impl<CM, EH, ET, S> EmulatorBuilder<CM, EH, ET, S>
+where
+    S: UsesInput + Unpin,
+{
+    #[must_use]
+    pub fn qemu_config(self, qemu_config: QemuConfig) -> EmulatorBuilder<CM, EH, ET, S> {
+        EmulatorBuilder::new(
+            self.modules,
+            self.command_manager,
+            self.exit_handler,
+            Some(QemuBuilder::QemuConfig(qemu_config)),
+        )
+    }
+
+    #[must_use]
+    pub fn qemu_cli(self, qemu_cli: Vec<String>) -> EmulatorBuilder<CM, EH, ET, S> {
+        EmulatorBuilder::new(
+            self.modules,
+            self.command_manager,
+            self.exit_handler,
+            Some(QemuBuilder::QemuString(qemu_cli)),
+        )
+    }
+
+    #[must_use]
+    pub fn qemu(self, qemu: Qemu) -> EmulatorBuilder<CM, EH, ET, S> {
+        EmulatorBuilder::new(
+            self.modules,
+            self.command_manager,
+            self.exit_handler,
+            Some(QemuBuilder::Qemu(qemu)),
+        )
     }
 
     pub fn prepend_module<EM>(self, module: EM) -> EmulatorBuilder<CM, EH, (EM, ET), S>
     where
         EM: EmulatorModule<S> + Unpin,
-        S: Unpin,
     {
         EmulatorBuilder::new(
             self.modules.prepend(module),
             self.command_manager,
             self.exit_handler,
-            self.qemu_cmd,
+            self.qemu_builder,
         )
     }
 
@@ -127,49 +191,39 @@ where
     where
         EM: EmulatorModule<S> + Unpin,
         ET: EmulatorModuleTuple<S>,
-        S: Unpin,
     {
         EmulatorBuilder::new(
             self.modules.append(module),
             self.command_manager,
             self.exit_handler,
-            self.qemu_cmd,
+            self.qemu_builder,
         )
     }
 
-    pub fn command_manager<CM2>(self, command_manager: CM2) -> EmulatorBuilder<CM2, EH, ET, S>
-    where
-        S: Unpin,
-    {
+    pub fn command_manager<CM2>(self, command_manager: CM2) -> EmulatorBuilder<CM2, EH, ET, S> {
         EmulatorBuilder::new(
             self.modules,
             command_manager,
             self.exit_handler,
-            self.qemu_cmd,
+            self.qemu_builder,
         )
     }
 
-    pub fn exit_handler<EH2>(self, exit_handler: EH2) -> EmulatorBuilder<CM, EH2, ET, S>
-    where
-        S: Unpin,
-    {
+    pub fn exit_handler<EH2>(self, exit_handler: EH2) -> EmulatorBuilder<CM, EH2, ET, S> {
         EmulatorBuilder::new(
             self.modules,
             self.command_manager,
             exit_handler,
-            self.qemu_cmd,
+            self.qemu_builder,
         )
     }
 
-    pub fn modules<ET2>(self, modules: ET2) -> EmulatorBuilder<CM, EH, ET2, S>
-    where
-        S: Unpin,
-    {
+    pub fn modules<ET2>(self, modules: ET2) -> EmulatorBuilder<CM, EH, ET2, S> {
         EmulatorBuilder::new(
             modules,
             self.command_manager,
             self.exit_handler,
-            self.qemu_cmd,
+            self.qemu_builder,
         )
     }
 }

@@ -31,8 +31,8 @@ use strum::IntoEnumIterator;
 
 use crate::{GuestAddrKind, GuestReg, Regs};
 
-pub mod qemu_config;
-use qemu_config::{QemuConfig, QemuConfigBuilder, QEMU_CONFIG};
+pub mod config;
+use config::{QemuConfig, QemuConfigBuilder, QEMU_CONFIG};
 
 #[cfg(emulation_mode = "usermode")]
 mod usermode;
