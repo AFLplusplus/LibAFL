@@ -968,8 +968,8 @@ pub mod pybind {
     impl Qemu {
         #[allow(clippy::needless_pass_by_value)]
         #[new]
-        fn new(args: Vec<String>, env: Vec<(String, String)>) -> PyResult<Qemu> {
-            let qemu = super::Qemu::init(&args, &env)
+        fn new(args: Vec<String>) -> PyResult<Qemu> {
+            let qemu = super::Qemu::init(&args)
                 .map_err(|e| PyValueError::new_err(format!("{e}")))?;
 
             Ok(Qemu { qemu })
