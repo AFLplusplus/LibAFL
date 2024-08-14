@@ -4,13 +4,12 @@ use std::{
 };
 
 use hashbrown::HashMap;
-use libafl::state::{HasExecutions, State};
+use libafl::inputs::UsesInput;
 use libafl_qemu_sys::GuestPhysAddr;
 
 use crate::{
-    command::CommandManager, emu::IsSnapshotManager, modules::EmulatorModuleTuple,
-    DeviceSnapshotFilter, Emulator, EmulatorExitHandler, Qemu, QemuSnapshotCheckResult, SnapshotId,
-    SnapshotManagerError,
+    emu::IsSnapshotManager, DeviceSnapshotFilter, Emulator, Qemu, QemuSnapshotCheckResult,
+    SnapshotId, SnapshotManagerError,
 };
 
 impl SnapshotId {
@@ -173,10 +172,7 @@ impl IsSnapshotManager for FastSnapshotManager {
 
 impl<CM, EH, ET, S> Emulator<CM, EH, ET, S>
 where
-    CM: CommandManager<EH, ET, S>,
-    EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorModuleTuple<S>,
-    S: Unpin + State + HasExecutions,
+    S: UsesInput,
 {
     /// Write a value to a phsical guest address, including ROM areas.
     pub unsafe fn write_phys_mem(&self, paddr: GuestPhysAddr, buf: &[u8]) {

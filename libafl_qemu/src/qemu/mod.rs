@@ -1,12 +1,12 @@
 //! Low-level QEMU library
 //!
 //! This module exposes the low-level QEMU library through [`Qemu`].
-//! To access higher-level features of QEMU, it is recommanded to use [`crate::Emulator`] instead.
+//! To access higher-level features of QEMU, it is recommended to use [`crate::Emulator`] instead.
 
 use core::fmt;
 use std::{
     cmp::{Ordering, PartialOrd},
-    ffi::CString,
+    ffi::{c_void, CString},
     fmt::{Display, Formatter},
     intrinsics::{copy_nonoverlapping, transmute},
     mem::MaybeUninit,
@@ -32,6 +32,9 @@ use num_traits::Num;
 use strum::IntoEnumIterator;
 
 use crate::{GuestAddrKind, GuestReg, Regs};
+
+pub mod qemu_config;
+use qemu_config::{QemuConfig, QemuConfigBuilder, QEMU_CONFIG};
 
 #[cfg(emulation_mode = "usermode")]
 mod usermode;
@@ -156,12 +159,12 @@ pub struct QemuMemoryChunk {
 #[allow(clippy::vec_box)]
 static mut GDB_COMMANDS: Vec<Box<FatPtr>> = vec![];
 
-extern "C" fn gdb_cmd(data: *const (), buf: *const u8, len: usize) -> i32 {
+unsafe extern "C" fn gdb_cmd(data: *mut c_void, buf: *mut u8, len: usize) -> bool {
     unsafe {
         let closure = &mut *(data as *mut Box<dyn for<'r> FnMut(&Qemu, &'r str) -> bool>);
         let cmd = std::str::from_utf8_unchecked(std::slice::from_raw_parts(buf, len));
         let qemu = Qemu::get_unchecked();
-        i32::from(closure(&qemu, cmd))
+        closure(&qemu, cmd)
     }
 }
 
@@ -366,7 +369,7 @@ impl CPU {
         let val = GuestReg::to_le(val.into());
 
         let success =
-            unsafe { libafl_qemu_write_reg(self.ptr, reg_id, ptr::addr_of!(val) as *const u8) };
+            unsafe { libafl_qemu_write_reg(self.ptr, reg_id, ptr::addr_of!(val) as *mut u8) };
         if success == 0 {
             Err(QemuRWError {
                 kind: QemuRWErrorKind::Write,
@@ -519,6 +522,12 @@ impl From<u8> for HookData {
 
 #[allow(clippy::unused_self)]
 impl Qemu {
+    /// For more details about the parameters check
+    /// [the QEMU documentation](https://www.qemu.org/docs/master/about/).
+    pub fn builder() -> QemuConfigBuilder {
+        QemuConfig::builder()
+    }
+
     #[allow(clippy::must_use_candidate, clippy::similar_names)]
     pub fn init(args: &[String], env: &[(String, String)]) -> Result<Self, QemuInitError> {
         if args.is_empty() {
@@ -557,7 +566,7 @@ impl Qemu {
             qemu_user_init(argc, argv.as_ptr(), envp.as_ptr());
             #[cfg(emulation_mode = "systemmode")]
             {
-                qemu_init(argc, argv.as_ptr(), envp.as_ptr());
+                qemu_init(argc, argv.as_ptr());
                 libc::atexit(qemu_cleanup_atexit);
                 libafl_qemu_sys::syx_snapshot_init(true);
             }
@@ -593,6 +602,14 @@ impl Qemu {
                 None
             }
         }
+    }
+
+    /// Get QEMU configuration.
+    /// Returns `Some` only if QEMU was initialized with the builder.
+    /// Returns `None` if QEMU was initialized with `init` and raw string args.
+    #[must_use]
+    pub fn get_config(&self) -> Option<&'static QemuConfig> {
+        QEMU_CONFIG.get()
     }
 
     /// This function will run the emulator until the next breakpoint / sync exit, or until finish.
@@ -780,7 +797,7 @@ impl Qemu {
                 Box<dyn for<'a, 'b> FnMut(&'a Qemu, &'b str) -> bool>,
                 FatPtr,
             >(callback));
-            libafl_qemu_add_gdb_cmd(gdb_cmd, ptr::from_ref(&*fat) as *const ());
+            libafl_qemu_add_gdb_cmd(Some(gdb_cmd), ptr::from_ref(&*fat) as *mut c_void);
             GDB_COMMANDS.push(fat);
         }
     }

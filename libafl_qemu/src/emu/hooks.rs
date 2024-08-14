@@ -5,7 +5,7 @@ use std::ptr::addr_of_mut;
 use std::{fmt::Debug, marker::PhantomData, mem::transmute, pin::Pin, ptr};
 
 use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple};
-use libafl_qemu_sys::{CPUArchStatePtr, FatPtr, GuestAddr, GuestUsize, TCGTemp};
+use libafl_qemu_sys::{CPUArchStatePtr, CPUStatePtr, FatPtr, GuestAddr, GuestUsize, TCGTemp};
 
 #[cfg(emulation_mode = "usermode")]
 use crate::qemu::{
@@ -20,6 +20,7 @@ use crate::qemu::{
     PreSyscallHookClosure, PreSyscallHookFn,
 };
 use crate::{
+    cpu_run_post_exec_hook_wrapper, cpu_run_pre_exec_hook_wrapper,
     modules::{EmulatorModule, EmulatorModuleTuple},
     qemu::{
         block_0_exec_hook_wrapper, block_gen_hook_wrapper, block_post_gen_hook_wrapper,
@@ -33,11 +34,11 @@ use crate::{
         write_4_exec_hook_wrapper, write_gen_hook_wrapper, BackdoorHook, BackdoorHookClosure,
         BackdoorHookFn, BackdoorHookId, BlockExecHook, BlockGenHook, BlockHookId, BlockPostGenHook,
         CmpExecHook, CmpGenHook, CmpHookId, EdgeExecHook, EdgeGenHook, EdgeHookId, Hook, HookRepr,
-        HookState, InstructionHook, InstructionHookClosure, InstructionHookFn, InstructionHookId,
-        QemuHooks, ReadExecHook, ReadExecNHook, ReadGenHook, ReadHookId, WriteExecHook,
+        InstructionHook, InstructionHookClosure, InstructionHookFn, InstructionHookId, QemuHooks,
+        ReadExecHook, ReadExecNHook, ReadGenHook, ReadHookId, TcgHookState, WriteExecHook,
         WriteExecNHook, WriteGenHook, WriteHookId,
     },
-    MemAccessInfo, Qemu,
+    CpuPostRunHook, CpuPreRunHook, CpuRunHookId, HookState, MemAccessInfo, Qemu,
 };
 
 macro_rules! get_raw_hook {
@@ -98,8 +99,7 @@ where
 #[derive(Debug)]
 pub struct EmulatorModules<ET, S>
 where
-    ET: EmulatorModuleTuple<S>,
-    S: Unpin + UsesInput,
+    S: UsesInput,
 {
     qemu: Qemu,
     modules: Pin<Box<ET>>,
@@ -111,19 +111,20 @@ where
 #[derive(Debug)]
 pub struct EmulatorHooks<ET, S>
 where
-    ET: EmulatorModuleTuple<S>,
-    S: Unpin + UsesInput,
+    S: UsesInput,
 {
     qemu_hooks: QemuHooks,
     phantom: PhantomData<(ET, S)>,
 
     instruction_hooks: Vec<Pin<Box<(InstructionHookId, FatPtr)>>>,
     backdoor_hooks: Vec<Pin<Box<(BackdoorHookId, FatPtr)>>>,
-    edge_hooks: Vec<Pin<Box<HookState<1, EdgeHookId>>>>,
-    block_hooks: Vec<Pin<Box<HookState<1, BlockHookId>>>>,
-    read_hooks: Vec<Pin<Box<HookState<5, ReadHookId>>>>,
-    write_hooks: Vec<Pin<Box<HookState<5, WriteHookId>>>>,
-    cmp_hooks: Vec<Pin<Box<HookState<4, CmpHookId>>>>,
+    edge_hooks: Vec<Pin<Box<TcgHookState<1, EdgeHookId>>>>,
+    block_hooks: Vec<Pin<Box<TcgHookState<1, BlockHookId>>>>,
+    read_hooks: Vec<Pin<Box<TcgHookState<5, ReadHookId>>>>,
+    write_hooks: Vec<Pin<Box<TcgHookState<5, WriteHookId>>>>,
+    cmp_hooks: Vec<Pin<Box<TcgHookState<4, CmpHookId>>>>,
+
+    cpu_run_hooks: Vec<Pin<Box<HookState<CpuRunHookId>>>>,
 
     #[cfg(emulation_mode = "usermode")]
     pre_syscall_hooks: Vec<Pin<Box<(PreSyscallHookId, FatPtr)>>>,
@@ -140,8 +141,7 @@ where
 
 impl<ET, S> EmulatorHooks<ET, S>
 where
-    ET: EmulatorModuleTuple<S>,
-    S: Unpin + UsesInput,
+    S: UsesInput + Unpin,
 {
     #[must_use]
     pub fn new(qemu_hooks: QemuHooks) -> Self {
@@ -155,6 +155,8 @@ where
             read_hooks: Vec::new(),
             write_hooks: Vec::new(),
             cmp_hooks: Vec::new(),
+
+            cpu_run_hooks: Vec::new(),
 
             #[cfg(emulation_mode = "usermode")]
             pre_syscall_hooks: Vec::new(),
@@ -252,7 +254,7 @@ where
                 generation_hook,
                 edge_gen_hook_wrapper::<ET, S>,
                 unsafe extern "C" fn(
-                    &mut HookState<1, EdgeHookId>,
+                    &mut TcgHookState<1, EdgeHookId>,
                     src: GuestAddr,
                     dest: GuestAddr,
                 ) -> u64
@@ -261,17 +263,17 @@ where
             let exec = get_raw_hook!(
                 execution_hook,
                 edge_0_exec_hook_wrapper::<ET, S>,
-                unsafe extern "C" fn(&mut HookState<1, EdgeHookId>, id: u64)
+                unsafe extern "C" fn(&mut TcgHookState<1, EdgeHookId>, id: u64)
             );
 
-            self.edge_hooks.push(Box::pin(HookState::new(
+            self.edge_hooks.push(Box::pin(TcgHookState::new(
                 EdgeHookId::invalid(),
                 hook_to_repr!(generation_hook),
                 HookRepr::Empty,
                 [hook_to_repr!(execution_hook)],
             )));
 
-            let hook_state = &mut *ptr::from_mut::<HookState<1, EdgeHookId>>(
+            let hook_state = &mut *ptr::from_mut::<TcgHookState<1, EdgeHookId>>(
                 self.edge_hooks
                     .last_mut()
                     .unwrap()
@@ -302,14 +304,14 @@ where
             let gen = get_raw_hook!(
                 generation_hook,
                 block_gen_hook_wrapper::<ET, S>,
-                unsafe extern "C" fn(&mut HookState<1, BlockHookId>, pc: GuestAddr) -> u64
+                unsafe extern "C" fn(&mut TcgHookState<1, BlockHookId>, pc: GuestAddr) -> u64
             );
 
             let postgen = get_raw_hook!(
                 post_generation_hook,
                 block_post_gen_hook_wrapper::<ET, S>,
                 unsafe extern "C" fn(
-                    &mut HookState<1, BlockHookId>,
+                    &mut TcgHookState<1, BlockHookId>,
                     pc: GuestAddr,
                     block_length: GuestUsize,
                 )
@@ -318,17 +320,17 @@ where
             let exec = get_raw_hook!(
                 execution_hook,
                 block_0_exec_hook_wrapper::<ET, S>,
-                unsafe extern "C" fn(&mut HookState<1, BlockHookId>, id: u64)
+                unsafe extern "C" fn(&mut TcgHookState<1, BlockHookId>, id: u64)
             );
 
-            self.block_hooks.push(Box::pin(HookState::new(
+            self.block_hooks.push(Box::pin(TcgHookState::new(
                 BlockHookId::invalid(),
                 hook_to_repr!(generation_hook),
                 hook_to_repr!(post_generation_hook),
                 [hook_to_repr!(execution_hook)],
             )));
 
-            let hook_state = &mut *ptr::from_mut::<HookState<1, BlockHookId>>(
+            let hook_state = &mut *ptr::from_mut::<TcgHookState<1, BlockHookId>>(
                 self.block_hooks
                     .last_mut()
                     .unwrap()
@@ -341,6 +343,53 @@ where
                 .add_block_hooks(hook_state, gen, postgen, exec);
 
             self.block_hooks
+                .last_mut()
+                .unwrap()
+                .as_mut()
+                .get_unchecked_mut()
+                .set_id(id);
+
+            id
+        }
+    }
+
+    pub fn cpu_runs(
+        &mut self,
+        pre_exec_hook: CpuPreRunHook<ET, S>,
+        post_exec_hook: CpuPostRunHook<ET, S>,
+    ) -> CpuRunHookId {
+        unsafe {
+            let pre_run = get_raw_hook!(
+                pre_exec_hook,
+                cpu_run_pre_exec_hook_wrapper::<ET, S>,
+                unsafe extern "C" fn(&mut HookState<CpuRunHookId>, cpu: CPUStatePtr)
+            );
+
+            let post_run = get_raw_hook!(
+                post_exec_hook,
+                cpu_run_post_exec_hook_wrapper::<ET, S>,
+                unsafe extern "C" fn(&mut HookState<CpuRunHookId>, cpu: CPUStatePtr)
+            );
+
+            self.cpu_run_hooks.push(Box::pin(HookState::new(
+                CpuRunHookId::invalid(),
+                hook_to_repr!(pre_exec_hook),
+                hook_to_repr!(post_exec_hook),
+            )));
+
+            let hook_state = &mut *ptr::from_mut::<HookState<CpuRunHookId>>(
+                self.cpu_run_hooks
+                    .last_mut()
+                    .unwrap()
+                    .as_mut()
+                    .get_unchecked_mut(),
+            );
+
+            let id = self
+                .qemu_hooks
+                .add_cpu_run_hooks(hook_state, pre_run, post_run);
+
+            self.cpu_run_hooks
                 .last_mut()
                 .unwrap()
                 .as_mut()
@@ -366,7 +415,7 @@ where
                 generation_hook,
                 read_gen_hook_wrapper::<ET, S>,
                 unsafe extern "C" fn(
-                    &mut HookState<5, ReadHookId>,
+                    &mut TcgHookState<5, ReadHookId>,
                     pc: GuestAddr,
                     addr: *mut TCGTemp,
                     info: MemAccessInfo,
@@ -375,35 +424,35 @@ where
             let exec1 = get_raw_hook!(
                 execution_hook_1,
                 read_0_exec_hook_wrapper::<ET, S>,
-                unsafe extern "C" fn(&mut HookState<5, ReadHookId>, id: u64, addr: GuestAddr)
+                unsafe extern "C" fn(&mut TcgHookState<5, ReadHookId>, id: u64, addr: GuestAddr)
             );
             let exec2 = get_raw_hook!(
                 execution_hook_2,
                 read_1_exec_hook_wrapper::<ET, S>,
-                unsafe extern "C" fn(&mut HookState<5, ReadHookId>, id: u64, addr: GuestAddr)
+                unsafe extern "C" fn(&mut TcgHookState<5, ReadHookId>, id: u64, addr: GuestAddr)
             );
             let exec4 = get_raw_hook!(
                 execution_hook_4,
                 read_2_exec_hook_wrapper::<ET, S>,
-                unsafe extern "C" fn(&mut HookState<5, ReadHookId>, id: u64, addr: GuestAddr)
+                unsafe extern "C" fn(&mut TcgHookState<5, ReadHookId>, id: u64, addr: GuestAddr)
             );
             let exec8 = get_raw_hook!(
                 execution_hook_8,
                 read_3_exec_hook_wrapper::<ET, S>,
-                unsafe extern "C" fn(&mut HookState<5, ReadHookId>, id: u64, addr: GuestAddr)
+                unsafe extern "C" fn(&mut TcgHookState<5, ReadHookId>, id: u64, addr: GuestAddr)
             );
             let execn = get_raw_hook!(
                 execution_hook_n,
                 read_4_exec_hook_wrapper::<ET, S>,
                 unsafe extern "C" fn(
-                    &mut HookState<5, ReadHookId>,
+                    &mut TcgHookState<5, ReadHookId>,
                     id: u64,
                     addr: GuestAddr,
                     size: usize,
                 )
             );
 
-            self.read_hooks.push(Box::pin(HookState::new(
+            self.read_hooks.push(Box::pin(TcgHookState::new(
                 ReadHookId::invalid(),
                 hook_to_repr!(generation_hook),
                 HookRepr::Empty,
@@ -416,7 +465,7 @@ where
                 ],
             )));
 
-            let hook_state = &mut *ptr::from_mut::<HookState<5, ReadHookId>>(
+            let hook_state = &mut *ptr::from_mut::<TcgHookState<5, ReadHookId>>(
                 self.read_hooks
                     .last_mut()
                     .unwrap()
@@ -454,7 +503,7 @@ where
                 generation_hook,
                 write_gen_hook_wrapper::<ET, S>,
                 unsafe extern "C" fn(
-                    &mut HookState<5, WriteHookId>,
+                    &mut TcgHookState<5, WriteHookId>,
                     pc: GuestAddr,
                     addr: *mut TCGTemp,
                     info: MemAccessInfo,
@@ -463,35 +512,35 @@ where
             let exec1 = get_raw_hook!(
                 execution_hook_1,
                 write_0_exec_hook_wrapper::<ET, S>,
-                unsafe extern "C" fn(&mut HookState<5, WriteHookId>, id: u64, addr: GuestAddr)
+                unsafe extern "C" fn(&mut TcgHookState<5, WriteHookId>, id: u64, addr: GuestAddr)
             );
             let exec2 = get_raw_hook!(
                 execution_hook_2,
                 write_1_exec_hook_wrapper::<ET, S>,
-                unsafe extern "C" fn(&mut HookState<5, WriteHookId>, id: u64, addr: GuestAddr)
+                unsafe extern "C" fn(&mut TcgHookState<5, WriteHookId>, id: u64, addr: GuestAddr)
             );
             let exec4 = get_raw_hook!(
                 execution_hook_4,
                 write_2_exec_hook_wrapper::<ET, S>,
-                unsafe extern "C" fn(&mut HookState<5, WriteHookId>, id: u64, addr: GuestAddr)
+                unsafe extern "C" fn(&mut TcgHookState<5, WriteHookId>, id: u64, addr: GuestAddr)
             );
             let exec8 = get_raw_hook!(
                 execution_hook_8,
                 write_3_exec_hook_wrapper::<ET, S>,
-                unsafe extern "C" fn(&mut HookState<5, WriteHookId>, id: u64, addr: GuestAddr)
+                unsafe extern "C" fn(&mut TcgHookState<5, WriteHookId>, id: u64, addr: GuestAddr)
             );
             let execn = get_raw_hook!(
                 execution_hook_n,
                 write_4_exec_hook_wrapper::<ET, S>,
                 unsafe extern "C" fn(
-                    &mut HookState<5, WriteHookId>,
+                    &mut TcgHookState<5, WriteHookId>,
                     id: u64,
                     addr: GuestAddr,
                     size: usize,
                 )
             );
 
-            self.write_hooks.push(Box::pin(HookState::new(
+            self.write_hooks.push(Box::pin(TcgHookState::new(
                 WriteHookId::invalid(),
                 hook_to_repr!(generation_hook),
                 HookRepr::Empty,
@@ -504,7 +553,7 @@ where
                 ],
             )));
 
-            let hook_state = &mut *ptr::from_mut::<HookState<5, WriteHookId>>(
+            let hook_state = &mut *ptr::from_mut::<TcgHookState<5, WriteHookId>>(
                 self.write_hooks
                     .last_mut()
                     .unwrap()
@@ -540,7 +589,7 @@ where
                 generation_hook,
                 cmp_gen_hook_wrapper::<ET, S>,
                 unsafe extern "C" fn(
-                    &mut HookState<4, CmpHookId>,
+                    &mut TcgHookState<4, CmpHookId>,
                     pc: GuestAddr,
                     size: usize,
                 ) -> u64
@@ -548,25 +597,25 @@ where
             let exec1 = get_raw_hook!(
                 execution_hook_1,
                 cmp_0_exec_hook_wrapper::<ET, S>,
-                unsafe extern "C" fn(&mut HookState<4, CmpHookId>, id: u64, v0: u8, v1: u8)
+                unsafe extern "C" fn(&mut TcgHookState<4, CmpHookId>, id: u64, v0: u8, v1: u8)
             );
             let exec2 = get_raw_hook!(
                 execution_hook_2,
                 cmp_1_exec_hook_wrapper::<ET, S>,
-                unsafe extern "C" fn(&mut HookState<4, CmpHookId>, id: u64, v0: u16, v1: u16)
+                unsafe extern "C" fn(&mut TcgHookState<4, CmpHookId>, id: u64, v0: u16, v1: u16)
             );
             let exec4 = get_raw_hook!(
                 execution_hook_4,
                 cmp_2_exec_hook_wrapper::<ET, S>,
-                unsafe extern "C" fn(&mut HookState<4, CmpHookId>, id: u64, v0: u32, v1: u32)
+                unsafe extern "C" fn(&mut TcgHookState<4, CmpHookId>, id: u64, v0: u32, v1: u32)
             );
             let exec8 = get_raw_hook!(
                 execution_hook_8,
                 cmp_3_exec_hook_wrapper::<ET, S>,
-                unsafe extern "C" fn(&mut HookState<4, CmpHookId>, id: u64, v0: u64, v1: u64)
+                unsafe extern "C" fn(&mut TcgHookState<4, CmpHookId>, id: u64, v0: u64, v1: u64)
             );
 
-            self.cmp_hooks.push(Box::pin(HookState::new(
+            self.cmp_hooks.push(Box::pin(TcgHookState::new(
                 CmpHookId::invalid(),
                 hook_to_repr!(generation_hook),
                 HookRepr::Empty,
@@ -578,7 +627,7 @@ where
                 ],
             )));
 
-            let hook_state = &mut *ptr::from_mut::<HookState<4, CmpHookId>>(
+            let hook_state = &mut *ptr::from_mut::<TcgHookState<4, CmpHookId>>(
                 self.cmp_hooks
                     .last_mut()
                     .unwrap()
@@ -776,7 +825,12 @@ where
 
     pub fn thread_creation_function(
         &mut self,
-        hook: fn(&mut EmulatorModules<ET, S>, Option<&mut S>, tid: u32) -> bool,
+        hook: fn(
+            &mut EmulatorModules<ET, S>,
+            Option<&mut S>,
+            env: CPUArchStatePtr,
+            tid: u32,
+        ) -> bool,
     ) -> NewThreadHookId {
         unsafe {
             self.qemu_hooks
@@ -829,7 +883,6 @@ where
 
 impl<ET, S> Default for EmulatorHooks<ET, S>
 where
-    ET: EmulatorModuleTuple<S>,
     S: Unpin + UsesInput,
 {
     fn default() -> Self {
@@ -839,112 +892,8 @@ where
 
 impl<ET, S> EmulatorModules<ET, S>
 where
-    ET: EmulatorModuleTuple<S>,
-    S: Unpin + UsesInput,
+    S: UsesInput,
 {
-    pub(super) fn new(qemu: Qemu, modules: ET) -> Pin<Box<Self>> {
-        let mut modules = Box::pin(Self {
-            qemu,
-            modules: Box::pin(modules),
-            hooks: EmulatorHooks::default(),
-            phantom: PhantomData,
-        });
-
-        // re-translate blocks with hooks
-        // qemu.flush_jit();
-        // -> it should be useless, since EmulatorModules must be init before QEMU ever runs
-
-        // Set global EmulatorModules pointer
-        unsafe {
-            if EMULATOR_TOOLS.is_null() {
-                EMULATOR_TOOLS = ptr::from_mut::<Self>(modules.as_mut().get_mut()) as *mut ();
-            } else {
-                panic!("Emulator Modules have already been set and is still active. It is not supported to have multiple instances of `EmulatorModules` at the same time yet.")
-            }
-        }
-
-        unsafe {
-            // We give access to EmulatorModuleTuple<S> during init, the compiler complains (for good reasons)
-            // TODO: We should find a way to be able to check for a module without giving full access to the tuple.
-            modules
-                .modules
-                .init_modules_all(Self::emulator_modules_mut_unchecked());
-        }
-
-        modules
-    }
-
-    #[must_use]
-    pub fn qemu(&self) -> Qemu {
-        self.qemu
-    }
-
-    #[must_use]
-    pub fn modules(&self) -> &ET {
-        self.modules.as_ref().get_ref()
-    }
-
-    pub fn modules_mut(&mut self) -> &mut ET {
-        self.modules.as_mut().get_mut()
-    }
-
-    pub fn hooks_mut(&mut self) -> &mut EmulatorHooks<ET, S> {
-        &mut self.hooks
-    }
-
-    pub fn first_exec_all(&mut self) {
-        unsafe {
-            self.modules
-                .as_mut()
-                .get_mut()
-                .first_exec_all(Self::emulator_modules_mut_unchecked());
-        }
-    }
-
-    pub fn pre_exec_all(&mut self, input: &S::Input) {
-        unsafe {
-            self.modules
-                .as_mut()
-                .get_mut()
-                .pre_exec_all(Self::emulator_modules_mut_unchecked(), input);
-        }
-    }
-
-    pub fn post_exec_all<OT>(
-        &mut self,
-        input: &S::Input,
-        observers: &mut OT,
-        exit_kind: &mut ExitKind,
-    ) where
-        OT: ObserversTuple<S>,
-    {
-        unsafe {
-            self.modules.as_mut().get_mut().post_exec_all(
-                Self::emulator_modules_mut_unchecked(),
-                input,
-                observers,
-                exit_kind,
-            );
-        }
-    }
-
-    /// Get a reference to the first (type) matching member of the tuple.
-    #[must_use]
-    pub fn get<T>(&self) -> Option<&T>
-    where
-        T: EmulatorModule<S>,
-    {
-        self.modules.match_first_type::<T>()
-    }
-
-    /// Get a mutable reference to the first (type) matching member of the tuple.
-    pub fn get_mut<T>(&mut self) -> Option<&mut T>
-    where
-        T: EmulatorModule<S>,
-    {
-        self.modules.match_first_type_mut::<T>()
-    }
-
     /// Get a mutable reference to `EmulatorModules` (supposedly initialized beforehand).
     ///
     /// # Safety
@@ -979,6 +928,16 @@ where
     #[must_use]
     pub unsafe fn emulator_modules_mut<'a>() -> Option<&'a mut EmulatorModules<ET, S>> {
         unsafe { (EMULATOR_TOOLS as *mut EmulatorModules<ET, S>).as_mut() }
+    }
+}
+
+impl<ET, S> EmulatorModules<ET, S>
+where
+    ET: Unpin,
+    S: UsesInput + Unpin,
+{
+    pub fn modules_mut(&mut self) -> &mut ET {
+        self.modules.as_mut().get_mut()
     }
 
     pub fn instructions(
@@ -1097,6 +1056,113 @@ where
     }
 }
 
+impl<ET, S> EmulatorModules<ET, S>
+where
+    ET: EmulatorModuleTuple<S>,
+    S: UsesInput + Unpin,
+{
+    pub(super) fn new(qemu: Qemu, modules: ET) -> Pin<Box<Self>> {
+        let mut modules = Box::pin(Self {
+            qemu,
+            modules: Box::pin(modules),
+            hooks: EmulatorHooks::default(),
+            phantom: PhantomData,
+        });
+
+        // re-translate blocks with hooks
+        // qemu.flush_jit();
+        // -> it should be useless, since EmulatorModules must be init before QEMU ever runs
+        // TODO: Check if this is true
+
+        // Set global EmulatorModules pointer
+        unsafe {
+            if EMULATOR_TOOLS.is_null() {
+                EMULATOR_TOOLS = ptr::from_mut::<Self>(modules.as_mut().get_mut()) as *mut ();
+            } else {
+                panic!("Emulator Modules have already been set and is still active. It is not supported to have multiple instances of `EmulatorModules` at the same time yet.")
+            }
+        }
+
+        unsafe {
+            // We give access to EmulatorModuleTuple<S> during init, the compiler complains (for good reasons)
+            // TODO: We should find a way to be able to check for a module without giving full access to the tuple.
+            modules
+                .modules
+                .init_modules_all(Self::emulator_modules_mut_unchecked());
+        }
+
+        modules
+    }
+
+    pub fn first_exec_all(&mut self) {
+        unsafe {
+            self.modules_mut()
+                .first_exec_all(Self::emulator_modules_mut_unchecked());
+        }
+    }
+
+    pub fn pre_exec_all(&mut self, input: &S::Input) {
+        unsafe {
+            self.modules_mut()
+                .pre_exec_all(Self::emulator_modules_mut_unchecked(), input);
+        }
+    }
+
+    pub fn post_exec_all<OT>(
+        &mut self,
+        input: &S::Input,
+        observers: &mut OT,
+        exit_kind: &mut ExitKind,
+    ) where
+        OT: ObserversTuple<S>,
+    {
+        unsafe {
+            self.modules_mut().post_exec_all(
+                Self::emulator_modules_mut_unchecked(),
+                input,
+                observers,
+                exit_kind,
+            );
+        }
+    }
+
+    /// Get a reference to the first (type) matching member of the tuple.
+    #[must_use]
+    pub fn get<T>(&self) -> Option<&T>
+    where
+        T: EmulatorModule<S>,
+    {
+        self.modules.match_first_type::<T>()
+    }
+
+    /// Get a mutable reference to the first (type) matching member of the tuple.
+    pub fn get_mut<T>(&mut self) -> Option<&mut T>
+    where
+        T: EmulatorModule<S>,
+    {
+        self.modules.match_first_type_mut::<T>()
+    }
+}
+
+impl<ET, S> EmulatorModules<ET, S>
+where
+    S: UsesInput,
+{
+    #[must_use]
+    pub fn qemu(&self) -> Qemu {
+        self.qemu
+    }
+
+    #[must_use]
+    pub fn modules(&self) -> &ET {
+        self.modules.as_ref().get_ref()
+    }
+
+    pub fn hooks_mut(&mut self) -> &mut EmulatorHooks<ET, S> {
+        &mut self.hooks
+    }
+}
+
 /// Usermode-only high-level functions
 #[cfg(emulation_mode = "usermode")]
 impl<ET, S> EmulatorModules<ET, S>
@@ -1206,7 +1272,12 @@ where
 
     pub fn thread_creation_function(
         &mut self,
-        hook: fn(&mut EmulatorModules<ET, S>, Option<&mut S>, tid: u32) -> bool,
+        hook: fn(
+            &mut EmulatorModules<ET, S>,
+            Option<&mut S>,
+            env: CPUArchStatePtr,
+            tid: u32,
+        ) -> bool,
     ) -> NewThreadHookId {
         self.hooks.thread_creation_function(hook)
     }
@@ -1228,8 +1299,7 @@ where
 
 impl<ET, S> Drop for EmulatorModules<ET, S>
 where
-    ET: EmulatorModuleTuple<S>,
-    S: Unpin + UsesInput,
+    S: UsesInput,
 {
     fn drop(&mut self) {
         // Make the global pointer null at drop time

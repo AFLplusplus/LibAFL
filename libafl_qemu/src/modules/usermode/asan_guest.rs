@@ -8,6 +8,7 @@ use std::{
 };
 
 use libafl::inputs::UsesInput;
+use libafl_qemu_sys::{GuestAddr, MapInfo};
 
 #[cfg(not(feature = "clippy"))]
 use crate::sys::libafl_tcg_gen_asan;
@@ -19,7 +20,6 @@ use crate::{
     },
     qemu::{Hook, MemAccessInfo, Qemu, QemuInitError},
     sys::TCGTemp,
-    GuestAddr, MapInfo,
 };
 
 static mut ASAN_GUEST_INITED: bool = false;
