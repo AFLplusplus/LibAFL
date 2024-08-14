@@ -294,10 +294,9 @@ static mut PC_TABLES: Vec<&'static [PcTableEntry]> = Vec::new();
 unsafe extern "C" fn __sanitizer_cov_pcs_init(pcs_beg: *const usize, pcs_end: *const usize) {
     // "The Unsafe Code Guidelines also notably defines that usize and isize are respectively compatible with uintptr_t and intptr_t defined in C."
     let len = pcs_end.offset_from(pcs_beg);
-    assert!(
-        len > 0,
-        "Invalid PC Table bounds - start: {pcs_beg:x?} end: {pcs_end:x?}"
-    );
+    let Ok(len) = usize::try_from(len) else {
+        panic!("Invalid PC Table bounds - start: {pcs_beg:x?} end: {pcs_end:x?}")
+    };
     assert_eq!(
         len % 2,
         0,
@@ -309,10 +308,7 @@ unsafe extern "C" fn __sanitizer_cov_pcs_init(pcs_beg: *const usize, pcs_end: *c
         "Unaligned PC Table - start: {pcs_beg:x?} end: {pcs_end:x?}"
     );
 
-    PC_TABLES.push(slice::from_raw_parts(
-        pcs_beg as *const PcTableEntry,
-        len as usize,
-    ))
+    PC_TABLES.push(slice::from_raw_parts(pcs_beg as *const PcTableEntry, len));
 }
 
 /// An entry to the `sanitizer_cov` `pc_table`
