@@ -421,6 +421,8 @@ pub fn maybe_generate_stub_bindings(
                 force_regeneration,
             );
         }
+    } else if env::var("CARGO_CFG_DOC").is_ok() {
+        println!("cargo:warning=Bindings regeneration has been skipped. Please rerun with x86_64 with usermode to trigger the bindings regeneration.");
     }
 }
 

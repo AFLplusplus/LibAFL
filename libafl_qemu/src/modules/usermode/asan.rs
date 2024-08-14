@@ -19,7 +19,7 @@ use crate::{
     },
     qemu::{MemAccessInfo, QemuInitError},
     sys::TCGTemp,
-    GuestAddr, Qemu, Regs,
+    Qemu, Regs,
 };
 
 // TODO at some point, merge parts with libafl_frida
@@ -149,6 +149,7 @@ impl AllocTreeItem {
 }
 use std::pin::Pin;
 
+use libafl_qemu_sys::GuestAddr;
 use object::{Object, ObjectSection};
 
 use crate::{

@@ -37,7 +37,7 @@ use crate::emu::EmulatorModules;
 // TODO remove 'static when specialization will be stable
 pub trait EmulatorModule<S>: 'static + Debug
 where
-    S: Unpin + UsesInput,
+    S: UsesInput,
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = true;
 
@@ -76,7 +76,7 @@ where
 pub trait EmulatorModuleTuple<S>:
     MatchFirstType + for<'a> SplitBorrowExtractFirstType<'a> + Unpin
 where
-    S: Unpin + UsesInput,
+    S: UsesInput,
 {
     const HOOKS_DO_SIDE_EFFECTS: bool;
 
@@ -108,7 +108,7 @@ where
 
 impl<S> EmulatorModuleTuple<S> for ()
 where
-    S: Unpin + UsesInput,
+    S: UsesInput,
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
@@ -150,7 +150,7 @@ impl<Head, Tail, S> EmulatorModuleTuple<S> for (Head, Tail)
 where
     Head: EmulatorModule<S> + Unpin,
     Tail: EmulatorModuleTuple<S>,
-    S: Unpin + UsesInput,
+    S: UsesInput + Unpin,
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = Head::HOOKS_DO_SIDE_EFFECTS || Tail::HOOKS_DO_SIDE_EFFECTS;
 

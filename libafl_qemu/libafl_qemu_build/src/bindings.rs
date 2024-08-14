@@ -61,6 +61,7 @@ const WRAPPER_HEADER: &str = r#"
 #include "sysemu/runstate.h"
 #include "sysemu/replay.h"
 
+#include "libafl/qemu_snapshot.h"
 #include "libafl/syx-snapshot/device-save.h"
 #include "libafl/syx-snapshot/syx-snapshot.h"
 
@@ -82,6 +83,8 @@ const WRAPPER_HEADER: &str = r#"
 
 #include "qemu/plugin-memory.h"
 
+#include "libafl/cpu.h"
+#include "libafl/gdb.h"
 #include "libafl/exit.h"
 #include "libafl/jit.h"
 #include "libafl/utils.h"
