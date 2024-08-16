@@ -54,6 +54,6 @@ explained [here](https://clang.llvm.org/get_started.html).
 
 If you do not have Rust installed, you can easily follow the steps described [here](https://www.rust-lang.org/tools/install)
 to install it on any supported system.
-Be aware that Rust versions shipped with Linux distributions may be outdated, LibAFL always targets the latest `stable` version available via `rustup upgrade`.
+Be aware that Rust versions shipped with Linux distributions may be outdated, LibAFL always targets the latest `stable` version available via `rustup update`.
 
 We suggest installing Clang and LLVM first.
