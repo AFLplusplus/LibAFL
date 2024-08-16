@@ -46,12 +46,17 @@ bitflags! {
     }
 }
 
+pub trait IntelPTDecoder {
+    fn decode(&mut self, traces) -> TraceResult;
+}
+
 #[derive(Debug)]
-pub struct IntelPT {
+pub struct IntelPT<D> {
     fd: OwnedFd,
     perf_buffer: *mut c_void,
     perf_aux_buffer: *mut c_void,
     buff_metadata: *mut perf_event_mmap_page,
+    decoder: D,
 }
 
 impl IntelPT {
