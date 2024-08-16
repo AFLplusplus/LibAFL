@@ -46,8 +46,30 @@ bitflags! {
     }
 }
 
-pub trait IntelPTDecoder {
-    fn decode(&mut self, traces) -> TraceResult;
+ pub trait IntelPTDecoder {
+    fn decode(&mut self, traces: &IntelPTTraces) -> IntelPTTracesResult;
+}
+
+pub struct IntelPTTracesResult {}
+
+pub struct IntelPTTraces {}
+
+/// Intel official Intel PT trace decoder
+pub struct Libipt {}
+
+/// kAFL Intel PT trace decoder
+pub struct Libxdc {}
+
+impl IntelPTDecoder for Libipt {
+    fn decode(&mut self, traces: &IntelPTTraces) -> IntelPTTracesResult {
+        todo!()
+    }
+}
+
+impl IntelPTDecoder for Libxdc {
+    fn decode(&mut self, traces: &IntelPTTraces) -> IntelPTTracesResult {
+        todo!()
+    }
 }
 
 #[derive(Debug)]
