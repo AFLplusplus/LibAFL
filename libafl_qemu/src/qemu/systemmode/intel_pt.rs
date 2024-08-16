@@ -357,7 +357,7 @@ mod test {
             signal::{kill, raise, Signal},
             wait::{waitpid, WaitPidFlag},
         },
-        unistd::{fork, ForkResult, Pid},
+        unistd::{fork, ForkResult},
     };
     use static_assertions::{assert_eq_size, const_assert_eq};
 
