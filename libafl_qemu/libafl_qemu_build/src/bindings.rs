@@ -99,9 +99,9 @@ const WRAPPER_HEADER: &str = r#"
 #include "libafl/hooks/tcg/instruction.h"
 #include "libafl/hooks/tcg/read_write.h"
 #include "libafl/hooks/cpu_run.h"
+#include "libafl/hooks/thread.h"
 
 #ifdef CONFIG_USER_ONLY
-#include "libafl/hooks/thread.h"
 #include "libafl/hooks/syscall.h"
 #endif
 

@@ -2,7 +2,6 @@ use std::{
     borrow::Borrow,
     fmt::{Display, Formatter},
     hash::{Hash, Hasher},
-    rc::Rc,
     sync::{
         atomic::{AtomicU64, Ordering},
         OnceLock,
@@ -12,21 +11,22 @@ use std::{
 use libafl::inputs::UsesInput;
 use libafl_qemu_sys::GuestAddr;
 
-use crate::{command::IsCommand, Qemu};
+use crate::{command::CommandManager, Qemu};
 
 #[repr(transparent)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct BreakpointId(u64);
 
 // TODO: distinguish breakpoints with IDs instead of addresses to avoid collisions.
-#[derive(Debug)]
-pub struct Breakpoint<CM, EH, ET, S>
+#[derive(Clone, Debug)]
+pub struct Breakpoint<CM, S>
 where
+    CM: CommandManager<S>,
     S: UsesInput,
 {
     id: BreakpointId,
     addr: GuestAddr,
-    cmd: Option<Rc<dyn IsCommand<CM, EH, ET, S>>>,
+    cmd: Option<CM::Commands>,
     disable_on_trigger: bool,
     enabled: bool,
 }
@@ -47,8 +47,9 @@ impl Default for BreakpointId {
     }
 }
 
-impl<CM, EH, ET, S> Hash for Breakpoint<CM, EH, ET, S>
+impl<CM, S> Hash for Breakpoint<CM, S>
 where
+    CM: CommandManager<S>,
     S: UsesInput,
 {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -56,8 +57,9 @@ where
     }
 }
 
-impl<CM, EH, ET, S> PartialEq for Breakpoint<CM, EH, ET, S>
+impl<CM, S> PartialEq for Breakpoint<CM, S>
 where
+    CM: CommandManager<S>,
     S: UsesInput,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -65,10 +67,16 @@ where
     }
 }
 
-impl<CM, EH, ET, S> Eq for Breakpoint<CM, EH, ET, S> where S: UsesInput {}
-
-impl<CM, EH, ET, S> Display for Breakpoint<CM, EH, ET, S>
+impl<CM, S> Eq for Breakpoint<CM, S>
 where
+    CM: CommandManager<S>,
+    S: UsesInput,
+{
+}
+
+impl<CM, S> Display for Breakpoint<CM, S>
+where
+    CM: CommandManager<S>,
     S: UsesInput,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -76,8 +84,9 @@ where
     }
 }
 
-impl<CM, EH, ET, S> Borrow<BreakpointId> for Breakpoint<CM, EH, ET, S>
+impl<CM, S> Borrow<BreakpointId> for Breakpoint<CM, S>
 where
+    CM: CommandManager<S>,
     S: UsesInput,
 {
     fn borrow(&self) -> &BreakpointId {
@@ -85,8 +94,9 @@ where
     }
 }
 
-impl<CM, EH, ET, S> Borrow<GuestAddr> for Breakpoint<CM, EH, ET, S>
+impl<CM, S> Borrow<GuestAddr> for Breakpoint<CM, S>
 where
+    CM: CommandManager<S>,
     S: UsesInput,
 {
     fn borrow(&self) -> &GuestAddr {
@@ -94,8 +104,9 @@ where
     }
 }
 
-impl<CM, EH, ET, S> Breakpoint<CM, EH, ET, S>
+impl<CM, S> Breakpoint<CM, S>
 where
+    CM: CommandManager<S>,
     S: UsesInput,
 {
     // Emu will return with the breakpoint as exit reason.
@@ -112,15 +123,11 @@ where
 
     // Emu will execute the command when it meets the breakpoint.
     #[must_use]
-    pub fn with_command<C: IsCommand<CM, EH, ET, S> + 'static>(
-        addr: GuestAddr,
-        cmd: C,
-        disable_on_trigger: bool,
-    ) -> Self {
+    pub fn with_command(addr: GuestAddr, cmd: CM::Commands, disable_on_trigger: bool) -> Self {
         Self {
             id: BreakpointId::new(),
             addr,
-            cmd: Some(Rc::new(cmd)),
+            cmd: Some(cmd),
             disable_on_trigger,
             enabled: false,
         }
@@ -150,7 +157,7 @@ where
         }
     }
 
-    pub fn trigger(&mut self, qemu: Qemu) -> Option<Rc<dyn IsCommand<CM, EH, ET, S>>> {
+    pub fn trigger(&mut self, qemu: Qemu) -> Option<CM::Commands> {
         if self.disable_on_trigger {
             self.disable(qemu);
         }

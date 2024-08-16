@@ -70,11 +70,6 @@ pub enum QemuExitError {
     UnexpectedExit, // Qemu exited without going through an expected exit point. Can be caused by a crash for example.
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct QemuSnapshotCheckResult {
-    nb_page_inconsistencies: u64,
-}
-
 #[derive(Debug, Clone)]
 pub enum QemuRWErrorKind {
     Read,
@@ -127,15 +122,6 @@ impl QemuRWError {
         }
 
         Ok(())
-    }
-}
-
-/// Represents a QEMU snapshot check result for which no error was detected
-impl Default for QemuSnapshotCheckResult {
-    fn default() -> Self {
-        Self {
-            nb_page_inconsistencies: 0,
-        }
     }
 }
 

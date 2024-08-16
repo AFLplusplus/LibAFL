@@ -115,7 +115,6 @@ where
     S: UsesInput,
 {
     qemu_hooks: QemuHooks,
-    phantom: PhantomData<(ET, S)>,
 
     instruction_hooks: Vec<Pin<Box<(InstructionHookId, FatPtr)>>>,
     backdoor_hooks: Vec<Pin<Box<(BackdoorHookId, FatPtr)>>>,
@@ -137,6 +136,8 @@ where
 
     #[cfg(emulation_mode = "usermode")]
     crash_hooks: Vec<HookRepr>,
+
+    phantom: PhantomData<(ET, S)>,
 }
 
 impl<ET, S> EmulatorHooks<ET, S>
