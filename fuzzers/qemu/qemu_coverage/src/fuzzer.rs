@@ -26,12 +26,10 @@ use libafl_bolts::{
     AsSlice,
 };
 use libafl_qemu::{
-    command::NopCommandManager,
     elf::EasyElf,
     modules::{drcov::DrCovModule, QemuInstrumentationAddressRangeFilter},
-    ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms,
-    NopEmulatorExitHandler, Qemu, QemuExecutor, QemuExitReason, QemuRWError, QemuShutdownCause,
-    Regs,
+    ArchExtras, CallingConvention, Emulator, EmulatorBuilder, GuestAddr, GuestReg, MmapPerms, Qemu,
+    QemuExecutor, QemuExitReason, QemuRWError, QemuShutdownCause, Regs,
 };
 
 #[derive(Default)]
@@ -177,7 +175,7 @@ pub fn fuzz() {
         }
     };
 
-    let mut harness = |_emulator: &mut Emulator<_, _, _, _>, input: &BytesInput| {
+    let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>, input: &BytesInput| {
         let target = input.target_bytes();
         let mut buf = target.as_slice();
         let mut len = buf.len();
@@ -240,13 +238,10 @@ pub fn fuzz() {
                 false,
             ));
 
-            let emulator = Emulator::new_with_qemu(
-                qemu,
-                emulator_modules,
-                NopEmulatorExitHandler,
-                NopCommandManager,
-            )
-            .unwrap();
+            let emulator = EmulatorBuilder::empty()
+                .qemu(qemu)
+                .modules(emulator_modules)
+                .build()?;
 
             let mut executor = QemuExecutor::new(
                 emulator,
