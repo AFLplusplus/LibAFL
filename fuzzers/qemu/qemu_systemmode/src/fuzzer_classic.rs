@@ -35,8 +35,8 @@ use libafl_qemu::{
     modules::edges::{
         edges_map_mut_ptr, EdgeCoverageModule, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
     },
-    qemu_config, Emulator, Qemu, QemuExitError, QemuExitReason, QemuRWError, QemuShutdownCause,
-    Regs,
+    qemu_config, Emulator, EmulatorBuilder, Qemu, QemuExitError, QemuExitReason, QemuRWError,
+    QemuShutdownCause, Regs,
 };
 use libafl_qemu_sys::GuestPhysAddr;
 
