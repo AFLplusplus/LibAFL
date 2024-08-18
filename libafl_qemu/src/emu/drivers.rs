@@ -115,14 +115,17 @@ where
     fn post_exec_all<EDT, ET>(
         &mut self,
         _emulator: &mut Emulator<CM, EDT, ET, S, SM>,
-        _exit_reason: &mut Result<EmulatorExitResult<CM, S>, EmulatorExitError>,
+        exit_reason: &mut Result<EmulatorExitResult<CM, S>, EmulatorExitError>,
         _input: &S::Input,
     ) -> Result<Option<EmulatorDriverResult<CM, S>>, EmulatorDriverError>
     where
         ET: StdInstrumentationFilter + Unpin,
         EDT: EmulatorDriverTuple<CM, S, SM>,
     {
-        Ok(None)
+        match exit_reason {
+            Ok(reason) => Ok(Some(EmulatorDriverResult::ReturnToHarness(reason.clone()))),
+            Err(error) => Err(error.clone().into()),
+        }
     }
 }
 
