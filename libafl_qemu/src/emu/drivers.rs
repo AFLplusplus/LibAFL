@@ -65,7 +65,7 @@ where
         ET: StdInstrumentationFilter + Unpin,
         EDT: EmulatorDriverTuple<CM, S, SM>,
     {
-        todo!()
+        Ok(None)
     }
 }
 
@@ -115,17 +115,14 @@ where
     fn post_exec_all<EDT, ET>(
         &mut self,
         _emulator: &mut Emulator<CM, EDT, ET, S, SM>,
-        exit_reason: &mut Result<EmulatorExitResult<CM, S>, EmulatorExitError>,
+        _exit_reason: &mut Result<EmulatorExitResult<CM, S>, EmulatorExitError>,
         _input: &S::Input,
     ) -> Result<Option<EmulatorDriverResult<CM, S>>, EmulatorDriverError>
     where
         ET: StdInstrumentationFilter + Unpin,
         EDT: EmulatorDriverTuple<CM, S, SM>,
     {
-        match exit_reason {
-            Ok(reason) => Ok(Some(EmulatorDriverResult::ReturnToHarness(reason.clone()))),
-            Err(error) => Err(error.clone().into()),
-        }
+        Ok(None)
     }
 }
 
@@ -138,26 +135,37 @@ where
 {
     fn pre_exec_all<EDT, ET>(
         &mut self,
-        _emulator: &mut Emulator<CM, EDT, ET, S, SM>,
-        _input: &S::Input,
+        emulator: &mut Emulator<CM, EDT, ET, S, SM>,
+        input: &S::Input,
     ) where
         ET: StdInstrumentationFilter + Unpin,
         EDT: EmulatorDriverTuple<CM, S, SM>,
     {
-        todo!()
+        self.0.pre_exec(emulator, input);
+        self.1.pre_exec_all(emulator, input)
     }
 
     fn post_exec_all<EDT, ET>(
         &mut self,
-        _emulator: &mut Emulator<CM, EDT, ET, S, SM>,
-        _exit_reason: &mut Result<EmulatorExitResult<CM, S>, EmulatorExitError>,
-        _input: &S::Input,
+        emulator: &mut Emulator<CM, EDT, ET, S, SM>,
+        exit_reason: &mut Result<EmulatorExitResult<CM, S>, EmulatorExitError>,
+        input: &S::Input,
     ) -> Result<Option<EmulatorDriverResult<CM, S>>, EmulatorDriverError>
     where
         ET: StdInstrumentationFilter + Unpin,
         EDT: EmulatorDriverTuple<CM, S, SM>,
     {
-        todo!()
+        if let Some(driver_result) = self.0.post_exec(emulator, exit_reason, input)? {
+            match driver_result {
+                EmulatorDriverResult::ReturnToHarness(exit_result) => {
+                    self.1.post_exec_all(emulator, exit_reason, input)?;
+                    return Ok(Some(EmulatorDriverResult::ReturnToHarness(exit_result)));
+                }
+                _ => {}
+            }
+        }
+
+        self.1.post_exec_all(emulator, exit_reason, input)
     }
 }
 
