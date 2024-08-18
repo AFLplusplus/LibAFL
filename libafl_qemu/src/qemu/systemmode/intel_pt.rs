@@ -16,6 +16,7 @@ use std::{
 use bitflags::bitflags;
 use caps::{CapSet, Capability};
 use libafl::Error;
+use libipt::{block::BlockDecoder, ConfigBuilder};
 use num_enum::TryFromPrimitive;
 use perf_event_open_sys::{
     bindings::{perf_event_attr, perf_event_mmap_page, PERF_FLAG_FD_CLOEXEC},
@@ -46,39 +47,26 @@ bitflags! {
     }
 }
 
- pub trait IntelPTDecoder {
-    fn decode(&mut self, traces: &IntelPTTraces) -> IntelPTTracesResult;
-}
+// pub trait IntelPTDecoder {
+//     fn decode(&mut self, traces: &IntelPTTraces) -> Result((), Error);
+// }
 
-pub struct IntelPTTracesResult {}
+// /// Intel official Intel PT trace decoder
+// pub struct Libipt {}
 
-pub struct IntelPTTraces {}
+// impl IntelPTDecoder for Libipt {
+//     fn decode(&mut self, traces: &IntelPTTraces) -> IntelPTTracesResult {
+//         todo!()
+//     }
+// }
 
-/// Intel official Intel PT trace decoder
-pub struct Libipt {}
-
-/// kAFL Intel PT trace decoder
-pub struct Libxdc {}
-
-impl IntelPTDecoder for Libipt {
-    fn decode(&mut self, traces: &IntelPTTraces) -> IntelPTTracesResult {
-        todo!()
-    }
-}
-
-impl IntelPTDecoder for Libxdc {
-    fn decode(&mut self, traces: &IntelPTTraces) -> IntelPTTracesResult {
-        todo!()
-    }
-}
-
+// TODO generic decoder: D,
 #[derive(Debug)]
-pub struct IntelPT<D> {
+pub struct IntelPT {
     fd: OwnedFd,
     perf_buffer: *mut c_void,
     perf_aux_buffer: *mut c_void,
     buff_metadata: *mut perf_event_mmap_page,
-    decoder: D,
 }
 
 impl IntelPT {
@@ -171,7 +159,9 @@ impl IntelPT {
         }
     }
 
-    pub fn read_trace_into<T: Write>(&self, buff: &mut T) -> Result<(), Error> {
+    // TODO remove
+    #[deprecated]
+    fn read_trace_into<T: Write>(&self, buff: &mut T) -> Result<(), Error> {
         // TODO: should we read also the normal buffer?
         let aux_head = unsafe { ptr::addr_of_mut!((*self.buff_metadata).aux_head) };
         let aux_tail = unsafe { ptr::addr_of_mut!((*self.buff_metadata).aux_tail) };
@@ -193,6 +183,73 @@ impl IntelPT {
 
         unsafe { aux_tail.write_volatile(tail) }
         Ok(())
+    }
+
+    pub fn decode(&mut self) -> Vec<u64> {
+        let mut ips = Vec::new();
+
+        let aux_head = unsafe { ptr::addr_of_mut!((*self.buff_metadata).aux_head) };
+        let aux_tail = unsafe { ptr::addr_of_mut!((*self.buff_metadata).aux_tail) };
+
+        let head = wrap_aux_pointer(unsafe { aux_head.read_volatile() });
+        let tail = wrap_aux_pointer(unsafe { aux_tail.read_volatile() });
+        let data = unsafe { self.perf_aux_buffer.add(tail as usize) } as *mut u8;
+        let len = (head - tail) as usize;
+
+        debug_assert!(head >= tail, "Intel PT: aux head is behind aux tail");
+
+        smp_rmb(); // TODO double check impl
+
+        // TODO config.cpu = <cpu identifier>; ?
+        // TODO handle decoding failures with config.decode.callback = <decode function>; config.decode.context = <decode context>;
+        // TODO remove unwrap()
+        let config = ConfigBuilder::new(unsafe { slice::from_raw_parts_mut(data, len) })
+            .unwrap()
+            .finish();
+        let mut decoder = BlockDecoder::new(&config).unwrap();
+
+        // TODO rewrite decently
+        loop {
+            let mut status = match decoder.sync_forward() {
+                Ok(s) => s,
+                Err(e) => break,
+            };
+
+            loop {
+                if loop {
+                    if !status.event_pending() {
+                        break Ok(());
+                    }
+                    match decoder.event() {
+                        Ok((_, s)) => {
+                            status = s;
+                        }
+                        Err(e) => break Err(e),
+                    };
+                }
+                .is_err()
+                {
+                    break;
+                }
+
+                let packet = decoder.next();
+                match packet {
+                    Err(e) => {
+                        println!("pterror in packet next {:?}", e);
+                        break;
+                    }
+                    Ok((b, s)) => {
+                        ips.push(b.ip());
+
+                        if s.eos() {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        // TODO load the binary
+        ips
     }
 
     /// Check if Intel PT is available on the current system.
@@ -238,6 +295,12 @@ impl IntelPT {
                 "perf_event_open() support is not enabled: {perf_event_support_path} not found"
             ));
         }
+
+        // TODO check also the value of perf_event_paranoid, check which values are required by pt
+        // https://www.kernel.org/doc/Documentation/sysctl/kernel.txt
+        // also, looks like it is distribution dependent
+        // https://askubuntu.com/questions/1400874/what-does-perf-paranoia-level-four-do
+        // CAP_SYS_ADMIN might make this check useless
 
         let kvm_pt_mode_path = "/sys/module/kvm_intel/parameters/pt_mode";
         if let Ok(s) = fs::read_to_string(kvm_pt_mode_path) {
@@ -332,7 +395,7 @@ fn setup_perf_aux_buffer(fd: &OwnedFd, size: u64, offset: u64) -> Result<*mut c_
 
 fn new_perf_event_attr_intel_pt() -> Result<perf_event_attr, Error> {
     let mut attr: perf_event_attr = unsafe { core::mem::zeroed() };
-    attr.size = core::mem::size_of::<perf_event_attr>() as u32;
+    attr.size = size_of::<perf_event_attr>() as u32;
     attr.type_ = intel_pt_perf_type()?;
     attr.set_disabled(1);
     attr.config |= PtConfig::NORETCOMP.bits();
@@ -373,6 +436,13 @@ fn intel_pt_nr_addr_filters() -> Result<u32, Error> {
 #[inline]
 const fn wrap_aux_pointer(ptr: u64) -> u64 {
     ptr & (PERF_AUX_BUFFER_SIZE as u64 - 1)
+}
+
+#[inline]
+pub fn smp_rmb() {
+    unsafe {
+        core::arch::asm!("lfence", options(nostack, preserves_flags));
+    }
 }
 
 #[cfg(test)]
@@ -459,9 +529,10 @@ mod test {
 
         waitpid(pid, None).expect("Failed to wait for the child process");
 
+        // pt.read_trace_into(&mut file)
+        //     .expect("Failed to write traces");
+        // fs::remove_file(trace_path).expect("Failed to remove trace file");
+        println!("Intel PT traces: {:?}", pt.decode());
         pt.disable_tracing().expect("Failed to disable tracing");
-        pt.read_trace_into(&mut file)
-            .expect("Failed to write traces");
-        fs::remove_file(trace_path).expect("Failed to remove trace file");
     }
 }

@@ -131,7 +131,8 @@ memmap2 = "0.9"
 getset = "0.1"
 bitflags = "2.6"
 perf-event-open-sys = "4" # Uses Linux 5.19.4 headers, consider forking if we need to bump
-caps = "0.5" # TODO: Mark deps used only in systemmode as optional
+caps = "0.5" # TODO: Mark deps used only in systemmode as optional (requires fixing linux_build.rs)
+libipt = {git = "https://github.com/sum-catnip/libipt-rs", rev = "1dc124b"} # v2 is not on crates.io
 # Document all features of this crate (for `cargo doc`)
 document-features = { version = "0.2", optional = true }
 
