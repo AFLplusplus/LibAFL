@@ -168,6 +168,7 @@ impl Default for StdEmulatorDriver {
 }
 
 impl StdEmulatorDriver {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             snapshot_id: OnceCell::new(),

@@ -36,7 +36,7 @@ use libafl_qemu::{
     modules::edges::{
         edges_map_mut_ptr, EdgeCoverageModule, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
     },
-    GuestPhysAddr, GuestReg, QemuMemoryChunk, EmulatorBuilder
+    EmulatorBuilder, GuestPhysAddr, GuestReg, QemuMemoryChunk,
 };
 
 // use libafl_qemu::QemuSnapshotBuilder; // for normal qemu snapshot

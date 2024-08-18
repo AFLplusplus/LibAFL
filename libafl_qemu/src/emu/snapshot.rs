@@ -89,6 +89,7 @@ impl Default for QemuSnapshotCheckResult {
 }
 
 impl QemuSnapshotCheckResult {
+    #[must_use]
     pub fn new(nb_page_inconsistencies: u64) -> Self {
         Self {
             nb_page_inconsistencies,
@@ -105,6 +106,7 @@ impl SnapshotId {
         SnapshotId { id: unique_id }
     }
 
+    #[must_use]
     pub fn inner(&self) -> u64 {
         self.id
     }

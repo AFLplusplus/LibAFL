@@ -81,7 +81,7 @@ macro_rules! define_std_command_manager {
                     match cmd_id {
                         // <StartPhysCommandParser as NativeCommandParser<S>>::COMMAND_ID => Ok(StdCommandManagerCommands::StartPhysCommandParserCmd(<StartPhysCommandParser as NativeCommandParser<S>>::parse(qemu, arch_regs_map)?)),
                         $(<$native_command_parser as NativeCommandParser<S>>::COMMAND_ID => Ok([<$name Commands>]::$native_command_parser(<$native_command_parser as NativeCommandParser<S>>::parse(qemu, arch_regs_map)?))),+,
-                        _ => Err(CommandError::UnknownCommand(cmd_id as GuestReg)),
+                        _ => Err(CommandError::UnknownCommand(cmd_id.into())),
                     }
                 }
             }

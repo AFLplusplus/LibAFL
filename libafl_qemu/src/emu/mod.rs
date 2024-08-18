@@ -190,15 +190,15 @@ impl From<CommandError> for EmulatorDriverError {
 
 impl<CM, S> Display for EmulatorExitResult<CM, S>
 where
-    CM: CommandManager<S>,
-    S: UsesInput,
+    CM: CommandManager<S> + Debug,
+    S: UsesInput + Debug,
 {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             EmulatorExitResult::QemuExit(shutdown_cause) => write!(f, "End: {shutdown_cause:?}"),
-            EmulatorExitResult::Breakpoint(bp) => write!(f, "{}", bp),
-            EmulatorExitResult::SyncExit(_sync_exit) => {
-                write!(f, "Sync exit")
+            EmulatorExitResult::Breakpoint(bp) => write!(f, "{bp}"),
+            EmulatorExitResult::SyncExit(sync_exit) => {
+                write!(f, "Sync exit: {sync_exit:?}")
             }
         }
     }
