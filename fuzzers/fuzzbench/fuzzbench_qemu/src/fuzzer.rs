@@ -364,7 +364,10 @@ fn fuzz(
         //QemuSnapshotHelper::new()
     );
 
-    let emulator = EmulatorBuilder::empty().qemu(qemu).modules(modules).build()?;
+    let emulator = EmulatorBuilder::empty()
+        .qemu(qemu)
+        .modules(modules)
+        .build()?;
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let executor = QemuExecutor::new(
