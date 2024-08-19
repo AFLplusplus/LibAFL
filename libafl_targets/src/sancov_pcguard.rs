@@ -5,7 +5,7 @@
 use core::simd::num::SimdUint;
 use core::{mem::align_of, slice};
 
-#[cfg(any(feature = "sancov_ngram4", feature = "sancov_ctx"))]
+#[cfg(any(feature = "sancov_ngram4", feature = "sancov_ctx", feature = "sancov_ngram8"))]
 use libafl::executors::{hooks::ExecutorHook, HasObservers};
 
 #[cfg(any(
