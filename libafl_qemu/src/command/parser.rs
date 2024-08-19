@@ -1,4 +1,4 @@
-use std::sync::OnceLock;
+use std::{fmt::Debug, sync::OnceLock};
 
 use enum_map::{enum_map, EnumMap};
 use libafl::{
@@ -10,21 +10,24 @@ use libc::c_uint;
 
 use crate::{
     command::{
-        bindings, CommandError, EndCommand, FilterCommand, InputCommand, IsCommand, LoadCommand,
-        NativeExitKind, SaveCommand, StartCommand, VersionCommand,
+        bindings, CommandError, CommandManager, EndCommand, FilterCommand, InputCommand, IsCommand,
+        LoadCommand, NativeExitKind, SaveCommand, StartCommand, VersionCommand,
     },
-    modules::QemuInstrumentationAddressRangeFilter,
+    modules::{
+        EmulatorModuleTuple, QemuInstrumentationAddressRangeFilter, StdInstrumentationFilter,
+    },
     sync_exit::ExitArgs,
-    GuestReg, Qemu, QemuMemoryChunk, Regs,
+    GuestReg, IsSnapshotManager, Qemu, QemuMemoryChunk, Regs, StdEmulatorDriver,
 };
 
 pub static EMU_EXIT_KIND_MAP: OnceLock<EnumMap<NativeExitKind, Option<ExitKind>>> = OnceLock::new();
 
-pub trait NativeCommandParser<S>
+pub trait NativeCommandParser<CM, ED, ET, S, SM>
 where
+    CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
 {
-    type OutputCommand: IsCommand<S>;
+    type OutputCommand: IsCommand<CM, ED, ET, S, SM>;
 
     const COMMAND_ID: c_uint;
 
@@ -35,8 +38,9 @@ where
 }
 
 pub struct InputPhysCommandParser;
-impl<S> NativeCommandParser<S> for InputPhysCommandParser
+impl<CM, ED, ET, S, SM> NativeCommandParser<CM, ED, ET, S, SM> for InputPhysCommandParser
 where
+    CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
     S::Input: HasTargetBytes,
 {
@@ -63,8 +67,9 @@ where
 }
 
 pub struct InputVirtCommandParser;
-impl<S> NativeCommandParser<S> for InputVirtCommandParser
+impl<CM, ED, ET, S, SM> NativeCommandParser<CM, ED, ET, S, SM> for InputVirtCommandParser
 where
+    CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
     S::Input: HasTargetBytes,
 {
@@ -88,10 +93,12 @@ where
 
 pub struct StartPhysCommandParser;
 
-impl<S> NativeCommandParser<S> for StartPhysCommandParser
+impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorDriver, ET, S, SM> for StartPhysCommandParser
 where
-    S: UsesInput,
+    CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
+    S: UsesInput + Debug,
     S::Input: HasTargetBytes,
+    SM: IsSnapshotManager,
 {
     type OutputCommand = StartCommand;
 
@@ -114,10 +121,12 @@ where
 
 pub struct StartVirtCommandParser;
 
-impl<S> NativeCommandParser<S> for StartVirtCommandParser
+impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorDriver, ET, S, SM> for StartVirtCommandParser
 where
-    S: UsesInput,
+    CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
+    S: UsesInput + Debug,
     S::Input: HasTargetBytes,
+    SM: IsSnapshotManager,
 {
     type OutputCommand = StartCommand;
 
@@ -139,9 +148,12 @@ where
 }
 
 pub struct SaveCommandParser;
-impl<S> NativeCommandParser<S> for SaveCommandParser
+impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorDriver, ET, S, SM> for SaveCommandParser
 where
-    S: UsesInput,
+    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter,
+    CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
+    S: UsesInput + Unpin,
+    SM: IsSnapshotManager,
 {
     type OutputCommand = SaveCommand;
 
@@ -156,9 +168,11 @@ where
 }
 
 pub struct LoadCommandParser;
-impl<S> NativeCommandParser<S> for LoadCommandParser
+impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorDriver, ET, S, SM> for LoadCommandParser
 where
+    CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
     S: UsesInput,
+    SM: IsSnapshotManager,
 {
     type OutputCommand = LoadCommand;
 
@@ -174,9 +188,11 @@ where
 
 pub struct EndCommandParser;
 
-impl<S> NativeCommandParser<S> for EndCommandParser
+impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorDriver, ET, S, SM> for EndCommandParser
 where
+    CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
     S: UsesInput,
+    SM: IsSnapshotManager,
 {
     type OutputCommand = EndCommand;
 
@@ -204,8 +220,9 @@ where
 }
 
 pub struct VersionCommandParser;
-impl<S> NativeCommandParser<S> for VersionCommandParser
+impl<CM, ED, ET, S, SM> NativeCommandParser<CM, ED, ET, S, SM> for VersionCommandParser
 where
+    CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
 {
     type OutputCommand = VersionCommand;
@@ -223,8 +240,10 @@ where
 }
 
 pub struct VaddrFilterAllowRangeCommandParser;
-impl<S> NativeCommandParser<S> for VaddrFilterAllowRangeCommandParser
+impl<CM, ED, ET, S, SM> NativeCommandParser<CM, ED, ET, S, SM>
+    for VaddrFilterAllowRangeCommandParser
 where
+    CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
 {
     type OutputCommand = FilterCommand<QemuInstrumentationAddressRangeFilter>;

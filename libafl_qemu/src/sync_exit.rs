@@ -1,3 +1,5 @@
+use std::fmt::{Debug, Formatter};
+
 use enum_map::Enum;
 use libafl::inputs::UsesInput;
 
@@ -15,18 +17,39 @@ pub enum ExitArgs {
     Arg6,
 }
 
-#[derive(Clone, Debug)]
-pub struct SyncExit<CM, S>
+pub struct SyncExit<CM, ED, ET, S, SM>
 where
-    CM: CommandManager<S>,
+    CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
 {
     command: CM::Commands,
 }
 
-impl<CM, S> SyncExit<CM, S>
+impl<CM, ED, ET, S, SM> Clone for SyncExit<CM, ED, ET, S, SM>
 where
-    CM: CommandManager<S>,
+    CM: CommandManager<ED, ET, S, SM>,
+    S: UsesInput,
+{
+    fn clone(&self) -> Self {
+        Self {
+            command: self.command.clone(),
+        }
+    }
+}
+
+impl<CM, ED, ET, S, SM> Debug for SyncExit<CM, ED, ET, S, SM>
+where
+    CM: CommandManager<ED, ET, S, SM>,
+    S: UsesInput,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Sync Exit")
+    }
+}
+
+impl<CM, ED, ET, S, SM> SyncExit<CM, ED, ET, S, SM>
+where
+    CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
 {
     #[must_use]

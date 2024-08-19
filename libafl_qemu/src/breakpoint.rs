@@ -1,6 +1,6 @@
 use std::{
     borrow::Borrow,
-    fmt::{Display, Formatter},
+    fmt::{Debug, Display, Formatter},
     hash::{Hash, Hasher},
     sync::{
         atomic::{AtomicU64, Ordering},
@@ -18,10 +18,9 @@ use crate::{command::CommandManager, Qemu};
 pub struct BreakpointId(u64);
 
 // TODO: distinguish breakpoints with IDs instead of addresses to avoid collisions.
-#[derive(Clone, Debug)]
-pub struct Breakpoint<CM, S>
+pub struct Breakpoint<CM, ED, ET, S, SM>
 where
-    CM: CommandManager<S>,
+    CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
 {
     id: BreakpointId,
@@ -29,6 +28,32 @@ where
     cmd: Option<CM::Commands>,
     disable_on_trigger: bool,
     enabled: bool,
+}
+
+impl<CM, ED, ET, S, SM> Clone for Breakpoint<CM, ED, ET, S, SM>
+where
+    CM: CommandManager<ED, ET, S, SM>,
+    S: UsesInput,
+{
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id.clone(),
+            addr: self.addr.clone(),
+            cmd: self.cmd.clone(),
+            disable_on_trigger: self.disable_on_trigger,
+            enabled: self.enabled,
+        }
+    }
+}
+
+impl<CM, ED, ET, S, SM> Debug for Breakpoint<CM, ED, ET, S, SM>
+where
+    CM: CommandManager<ED, ET, S, SM>,
+    S: UsesInput,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "BP {:?} @ addr {:?}", self.id, self.addr)
+    }
 }
 
 impl BreakpointId {
@@ -47,9 +72,9 @@ impl Default for BreakpointId {
     }
 }
 
-impl<CM, S> Hash for Breakpoint<CM, S>
+impl<CM, ED, ET, S, SM> Hash for Breakpoint<CM, ED, ET, S, SM>
 where
-    CM: CommandManager<S>,
+    CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
 {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -57,9 +82,9 @@ where
     }
 }
 
-impl<CM, S> PartialEq for Breakpoint<CM, S>
+impl<CM, ED, ET, S, SM> PartialEq for Breakpoint<CM, ED, ET, S, SM>
 where
-    CM: CommandManager<S>,
+    CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -67,16 +92,16 @@ where
     }
 }
 
-impl<CM, S> Eq for Breakpoint<CM, S>
+impl<CM, ED, ET, S, SM> Eq for Breakpoint<CM, ED, ET, S, SM>
 where
-    CM: CommandManager<S>,
+    CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
 {
 }
 
-impl<CM, S> Display for Breakpoint<CM, S>
+impl<CM, ED, ET, S, SM> Display for Breakpoint<CM, ED, ET, S, SM>
 where
-    CM: CommandManager<S>,
+    CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -84,9 +109,9 @@ where
     }
 }
 
-impl<CM, S> Borrow<BreakpointId> for Breakpoint<CM, S>
+impl<CM, ED, ET, S, SM> Borrow<BreakpointId> for Breakpoint<CM, ED, ET, S, SM>
 where
-    CM: CommandManager<S>,
+    CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
 {
     fn borrow(&self) -> &BreakpointId {
@@ -94,9 +119,9 @@ where
     }
 }
 
-impl<CM, S> Borrow<GuestAddr> for Breakpoint<CM, S>
+impl<CM, ED, ET, S, SM> Borrow<GuestAddr> for Breakpoint<CM, ED, ET, S, SM>
 where
-    CM: CommandManager<S>,
+    CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
 {
     fn borrow(&self) -> &GuestAddr {
@@ -104,9 +129,9 @@ where
     }
 }
 
-impl<CM, S> Breakpoint<CM, S>
+impl<CM, ED, ET, S, SM> Breakpoint<CM, ED, ET, S, SM>
 where
-    CM: CommandManager<S>,
+    CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
 {
     // Emu will return with the breakpoint as exit reason.

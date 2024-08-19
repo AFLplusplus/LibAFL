@@ -1,29 +1,28 @@
 //! Emulator Drivers, as the name suggests, drive QEMU execution
 //! They are used to perform specific actions on the emulator before and / or after QEMU runs.
 
-use std::cell::OnceCell;
+use std::{cell::OnceCell, fmt::Debug};
 
 use libafl::{
     executors::ExitKind,
     inputs::{HasTargetBytes, UsesInput},
 };
-use libafl_bolts::{os::unix_signals::Signal, tuples::MatchFirstType};
+use libafl_bolts::os::unix_signals::Signal;
 
 use crate::{
     command::{CommandError, CommandManager, InputCommand, IsCommand},
-    modules::StdInstrumentationFilter,
     Emulator, EmulatorExitError, EmulatorExitResult, InputLocation, IsSnapshotManager,
     QemuShutdownCause, Regs, SnapshotId, SnapshotManagerCheckError, SnapshotManagerError,
 };
 
 #[derive(Debug, Clone)]
-pub enum EmulatorDriverResult<CM, S>
+pub enum EmulatorDriverResult<CM, ED, ET, S, SM>
 where
-    CM: CommandManager<S>,
+    CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
 {
     /// Return to the harness immediately. Can happen at any point of the run when the handler is not supposed to handle a request.
-    ReturnToHarness(EmulatorExitResult<CM, S>),
+    ReturnToHarness(EmulatorExitResult<CM, ED, ET, S, SM>),
 
     /// The run is over and the emulator is ready for the next iteration.
     EndOfRun(ExitKind),
@@ -43,85 +42,19 @@ pub enum EmulatorDriverError {
 
 /// An Emulator Driver.
 // TODO remove 'static when specialization will be stable
-pub trait EmulatorDriver<CM, S, SM>: 'static
+pub trait EmulatorDriver<CM, ET, S, SM>: 'static + Sized
 where
-    CM: CommandManager<S>,
+    CM: CommandManager<Self, ET, S, SM>,
     S: UsesInput,
 {
-    fn pre_exec<EDT, ET>(&mut self, _emulator: &mut Emulator<CM, EDT, ET, S, SM>, _input: &S::Input)
-    where
-        ET: StdInstrumentationFilter + Unpin,
-        EDT: EmulatorDriverTuple<CM, S, SM>,
-    {
-    }
+    fn pre_exec(&mut self, _emulator: &mut Emulator<CM, Self, ET, S, SM>, _input: &S::Input) {}
 
-    fn post_exec<EDT, ET>(
+    fn post_exec(
         &mut self,
-        _emulator: &mut Emulator<CM, EDT, ET, S, SM>,
-        _exit_reason: &mut Result<EmulatorExitResult<CM, S>, EmulatorExitError>,
+        _emulator: &mut Emulator<CM, Self, ET, S, SM>,
+        exit_reason: &mut Result<EmulatorExitResult<CM, Self, ET, S, SM>, EmulatorExitError>,
         _input: &S::Input,
-    ) -> Result<Option<EmulatorDriverResult<CM, S>>, EmulatorDriverError>
-    where
-        ET: StdInstrumentationFilter + Unpin,
-        EDT: EmulatorDriverTuple<CM, S, SM>,
-    {
-        Ok(None)
-    }
-}
-
-pub trait EmulatorDriverTuple<CM, S, SM>: MatchFirstType
-where
-    CM: CommandManager<S>,
-    S: UsesInput,
-{
-    fn pre_exec_all<EDT, ET>(
-        &mut self,
-        emulator: &mut Emulator<CM, EDT, ET, S, SM>,
-        input: &S::Input,
-    ) where
-        ET: StdInstrumentationFilter + Unpin,
-        EDT: EmulatorDriverTuple<CM, S, SM>;
-
-    fn post_exec_all<EDT, ET>(
-        &mut self,
-        emulator: &mut Emulator<CM, EDT, ET, S, SM>,
-        exit_reason: &mut Result<EmulatorExitResult<CM, S>, EmulatorExitError>,
-        input: &S::Input,
-    ) -> Result<Option<EmulatorDriverResult<CM, S>>, EmulatorDriverError>
-    where
-        ET: StdInstrumentationFilter + Unpin,
-        EDT: EmulatorDriverTuple<CM, S, SM>;
-}
-pub struct StdEmulatorDriver {
-    snapshot_id: OnceCell<SnapshotId>,
-    input_location: OnceCell<InputLocation>,
-}
-
-impl<CM, S, SM> EmulatorDriverTuple<CM, S, SM> for ()
-where
-    CM: CommandManager<S> + Clone,
-    S: UsesInput + Clone,
-{
-    fn pre_exec_all<EDT, ET>(
-        &mut self,
-        _emulator: &mut Emulator<CM, EDT, ET, S, SM>,
-        _input: &S::Input,
-    ) where
-        ET: StdInstrumentationFilter + Unpin,
-        EDT: EmulatorDriverTuple<CM, S, SM>,
-    {
-    }
-
-    fn post_exec_all<EDT, ET>(
-        &mut self,
-        _emulator: &mut Emulator<CM, EDT, ET, S, SM>,
-        exit_reason: &mut Result<EmulatorExitResult<CM, S>, EmulatorExitError>,
-        _input: &S::Input,
-    ) -> Result<Option<EmulatorDriverResult<CM, S>>, EmulatorDriverError>
-    where
-        ET: StdInstrumentationFilter + Unpin,
-        EDT: EmulatorDriverTuple<CM, S, SM>,
-    {
+    ) -> Result<Option<EmulatorDriverResult<CM, Self, ET, S, SM>>, EmulatorDriverError> {
         match exit_reason {
             Ok(reason) => Ok(Some(EmulatorDriverResult::ReturnToHarness(reason.clone()))),
             Err(error) => Err(error.clone().into()),
@@ -129,47 +62,18 @@ where
     }
 }
 
-impl<Head, Tail, CM, S, SM> EmulatorDriverTuple<CM, S, SM> for (Head, Tail)
+pub struct NopEmulatorDriver;
+impl<CM, ET, S, SM> EmulatorDriver<CM, ET, S, SM> for NopEmulatorDriver
 where
-    Head: EmulatorDriver<CM, S, SM>,
-    Tail: EmulatorDriverTuple<CM, S, SM>,
-    CM: CommandManager<S>,
+    CM: CommandManager<Self, ET, S, SM>,
     S: UsesInput,
 {
-    fn pre_exec_all<EDT, ET>(
-        &mut self,
-        emulator: &mut Emulator<CM, EDT, ET, S, SM>,
-        input: &S::Input,
-    ) where
-        ET: StdInstrumentationFilter + Unpin,
-        EDT: EmulatorDriverTuple<CM, S, SM>,
-    {
-        self.0.pre_exec(emulator, input);
-        self.1.pre_exec_all(emulator, input)
-    }
+}
 
-    fn post_exec_all<EDT, ET>(
-        &mut self,
-        emulator: &mut Emulator<CM, EDT, ET, S, SM>,
-        exit_reason: &mut Result<EmulatorExitResult<CM, S>, EmulatorExitError>,
-        input: &S::Input,
-    ) -> Result<Option<EmulatorDriverResult<CM, S>>, EmulatorDriverError>
-    where
-        ET: StdInstrumentationFilter + Unpin,
-        EDT: EmulatorDriverTuple<CM, S, SM>,
-    {
-        if let Some(driver_result) = self.0.post_exec(emulator, exit_reason, input)? {
-            match driver_result {
-                EmulatorDriverResult::ReturnToHarness(exit_result) => {
-                    self.1.post_exec_all(emulator, exit_reason, input)?;
-                    return Ok(Some(EmulatorDriverResult::ReturnToHarness(exit_result)));
-                }
-                _ => {}
-            }
-        }
-
-        self.1.post_exec_all(emulator, exit_reason, input)
-    }
+#[derive(Clone, Debug)]
+pub struct StdEmulatorDriver {
+    snapshot_id: OnceCell<SnapshotId>,
+    input_location: OnceCell<InputLocation>,
 }
 
 impl Default for StdEmulatorDriver {
@@ -201,18 +105,14 @@ impl StdEmulatorDriver {
 }
 
 // TODO: replace handlers with generics to permit compile-time customization of handlers
-impl<CM, S, SM> EmulatorDriver<CM, S, SM> for StdEmulatorDriver
+impl<CM, ET, S, SM> EmulatorDriver<CM, ET, S, SM> for StdEmulatorDriver
 where
-    CM: CommandManager<S> + Clone,
-    S: UsesInput + Clone + Unpin,
+    CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
+    S: UsesInput + Unpin,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
 {
-    fn pre_exec<EDT, ET>(&mut self, emulator: &mut Emulator<CM, EDT, ET, S, SM>, input: &S::Input)
-    where
-        ET: StdInstrumentationFilter + Unpin,
-        EDT: EmulatorDriverTuple<CM, S, SM>,
-    {
+    fn pre_exec(&mut self, emulator: &mut Emulator<CM, Self, ET, S, SM>, input: &S::Input) {
         let input_location = { self.input_location.get().cloned() };
 
         if let Some(input_location) = input_location {
@@ -220,21 +120,17 @@ where
                 InputCommand::new(input_location.mem_chunk.clone(), input_location.cpu);
 
             input_command
-                .run(emulator, input, input_location.ret_register)
+                .run(emulator, self, input, input_location.ret_register)
                 .unwrap();
         }
     }
 
-    fn post_exec<EDT, ET>(
+    fn post_exec(
         &mut self,
-        emulator: &mut Emulator<CM, EDT, ET, S, SM>,
-        exit_reason: &mut Result<EmulatorExitResult<CM, S>, EmulatorExitError>,
+        emulator: &mut Emulator<CM, Self, ET, S, SM>,
+        exit_reason: &mut Result<EmulatorExitResult<CM, Self, ET, S, SM>, EmulatorExitError>,
         input: &S::Input,
-    ) -> Result<Option<EmulatorDriverResult<CM, S>>, EmulatorDriverError>
-    where
-        ET: StdInstrumentationFilter + Unpin,
-        EDT: EmulatorDriverTuple<CM, S, SM>,
-    {
+    ) -> Result<Option<EmulatorDriverResult<CM, Self, ET, S, SM>>, EmulatorDriverError> {
         let qemu = emulator.qemu();
 
         let mut exit_reason = match exit_reason {
@@ -270,11 +166,28 @@ where
         };
 
         if let Some(cmd) = command {
-            cmd.run(emulator, input, ret_reg)
+            cmd.run(emulator, self, input, ret_reg)
         } else {
             Ok(Some(EmulatorDriverResult::ReturnToHarness(
                 exit_reason.clone(),
             )))
+        }
+    }
+}
+
+impl<CM, ED, ET, S, SM> TryFrom<EmulatorDriverResult<CM, ED, ET, S, SM>> for ExitKind
+where
+    CM: CommandManager<ED, ET, S, SM>,
+    S: UsesInput,
+{
+    type Error = String;
+
+    fn try_from(value: EmulatorDriverResult<CM, ED, ET, S, SM>) -> Result<Self, Self::Error> {
+        match value {
+            EmulatorDriverResult::ReturnToHarness(unhandled_qemu_exit) => {
+                Err(format!("Unhandled QEMU exit: {:?}", &unhandled_qemu_exit))
+            }
+            EmulatorDriverResult::EndOfRun(exit_kind) => Ok(exit_kind),
         }
     }
 }

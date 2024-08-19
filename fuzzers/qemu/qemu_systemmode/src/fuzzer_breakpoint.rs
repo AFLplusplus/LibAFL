@@ -102,13 +102,13 @@ pub fn fuzz() {
                     input_addr,
                     unsafe { MAX_INPUT_SIZE } as GuestReg,
                     None,
-                )),
+                )).into(),
                 true,
             ),
             true,
         );
         emu.add_breakpoint(
-            Breakpoint::with_command(breakpoint, EndCommand::new(Some(ExitKind::Ok)), false),
+            Breakpoint::with_command(breakpoint, EndCommand::new(Some(ExitKind::Ok)).into(), false),
             true,
         );
 

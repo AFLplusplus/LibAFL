@@ -154,9 +154,9 @@ impl IsSnapshotManager for FastSnapshotManager {
     }
 }
 
-impl<CM, EH, ET, S, SM> Emulator<CM, EH, ET, S, SM>
+impl<CM, ED, ET, S, SM> Emulator<CM, ED, ET, S, SM>
 where
-    CM: CommandManager<S>,
+    CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
 {
     /// Write a value to a phsical guest address, including ROM areas.

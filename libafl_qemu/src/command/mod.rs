@@ -25,12 +25,12 @@ use crate::{
     },
     get_exit_arch_regs,
     modules::{
-        HasInstrumentationFilter, QemuInstrumentationAddressRangeFilter, StdInstrumentationFilter,
+        EmulatorModuleTuple, HasInstrumentationFilter, QemuInstrumentationAddressRangeFilter,
+        StdInstrumentationFilter,
     },
     sync_exit::ExitArgs,
-    Emulator, EmulatorDriverError, EmulatorDriverResult, EmulatorDriverTuple, GuestReg,
-    InputLocation, IsSnapshotManager, Qemu, QemuMemoryChunk, QemuRWError, Regs, StdEmulatorDriver,
-    CPU,
+    Emulator, EmulatorDriverError, EmulatorDriverResult, GuestReg, InputLocation,
+    IsSnapshotManager, Qemu, QemuMemoryChunk, QemuRWError, Regs, StdEmulatorDriver, CPU,
 };
 
 pub mod parser;
@@ -52,27 +52,29 @@ mod bindings {
 pub const VERSION: u64 = bindings::LIBAFL_QEMU_HDR_VERSION_NUMBER as u64;
 
 macro_rules! define_std_command_manager {
-    ($name:ident, [$($native_command_parser:ident),+]) => {
+    ($name:ident, [$($command:ty),+], [$($native_command_parser:ty),+]) => {
         paste! {
-            #[derive(Clone)]
+            #[derive(Clone, Debug)]
             pub struct $name<S> {
                 phantom: PhantomData<S>,
             }
 
             impl<S> Default for $name<S> {
                 fn default() -> Self {
-                    StdCommandManager {
+                    Self {
                         phantom: PhantomData
                     }
                 }
             }
 
-            impl<S> CommandManager<S> for $name<S>
+            impl<ET, S, SM> CommandManager<StdEmulatorDriver, ET, S, SM> for $name<S>
             where
-                S: UsesInput + Clone + Debug,
+                ET: EmulatorModuleTuple<S> + StdInstrumentationFilter,
+                S: UsesInput + Clone + Debug + Unpin,
                 S::Input: HasTargetBytes,
+                SM: IsSnapshotManager,
             {
-                type Commands = [<$name Commands>]<S>;
+                type Commands = [<$name Commands>];
 
                 fn parse(&self, qemu: Qemu) -> Result<Self::Commands, CommandError> {
                     let arch_regs_map: &'static EnumMap<ExitArgs, Regs> = get_exit_arch_regs();
@@ -80,55 +82,61 @@ macro_rules! define_std_command_manager {
 
                     match cmd_id {
                         // <StartPhysCommandParser as NativeCommandParser<S>>::COMMAND_ID => Ok(StdCommandManagerCommands::StartPhysCommandParserCmd(<StartPhysCommandParser as NativeCommandParser<S>>::parse(qemu, arch_regs_map)?)),
-                        $(<$native_command_parser as NativeCommandParser<S>>::COMMAND_ID => Ok([<$name Commands>]::$native_command_parser(<$native_command_parser as NativeCommandParser<S>>::parse(qemu, arch_regs_map)?))),+,
+                        $(<$native_command_parser as NativeCommandParser<Self, StdEmulatorDriver, ET, S, SM>>::COMMAND_ID => Ok(<$native_command_parser as NativeCommandParser<Self, StdEmulatorDriver, ET, S, SM>>::parse(qemu, arch_regs_map)?.into())),+,
                         _ => Err(CommandError::UnknownCommand(cmd_id.into())),
                     }
                 }
             }
 
             #[derive(Clone, Debug)]
-            pub enum [<$name Commands>]<S>
-            where
-                S: UsesInput,
-                S::Input: HasTargetBytes,
+            pub enum [<$name Commands>]
             {
-                // StartPhysCommandParserCmd(<StartPhysCommandParser as NativeCommandParser<S>>::OutputCommand)
-                $($native_command_parser(<$native_command_parser as NativeCommandParser<S>>::OutputCommand)),+
+                // StartPhysCommand(StartPhysCommand)
+                $($command($command)),+,
             }
 
-            impl<S> IsCommand<S> for [<$name Commands>]<S>
+            impl<ET, S, SM> IsCommand<$name<S>, StdEmulatorDriver, ET, S, SM> for [<$name Commands>]
             where
-                S: UsesInput + Debug,
+                ET: EmulatorModuleTuple<S> + StdInstrumentationFilter,
+                S: UsesInput + Debug + Clone + Unpin,
                 S::Input: HasTargetBytes,
+                SM: IsSnapshotManager,
             {
                 fn usable_at_runtime(&self) -> bool {
                     match self {
                         // [<$name Commands>]::StartPhysCommandParserCmd(cmd) => <StartCommand as IsCommand<S>>::usable_at_runtime(cmd)
-                        $([<$name Commands>]::$native_command_parser(cmd) => <<$native_command_parser as NativeCommandParser<S>>::OutputCommand as IsCommand<S>>::usable_at_runtime(cmd)),+
+                        $([<$name Commands>]::$command(cmd) => <$command as IsCommand<$name<S>, StdEmulatorDriver, ET, S, SM>>::usable_at_runtime(cmd)),+
                     }
                 }
 
-                fn run<CM, EDT, ET, SM>(&self, emu: &mut Emulator<CM, EDT, ET, S, SM>, input: &S::Input, ret_reg: Option<Regs>) -> Result<Option<EmulatorDriverResult<CM, S>>, EmulatorDriverError>
-                where
-                    CM: CommandManager<S>,
-                    ET: StdInstrumentationFilter + Unpin,
-                    EDT: EmulatorDriverTuple<CM, S, SM>,
-                    S: UsesInput + Unpin,
-                    SM: IsSnapshotManager
-                {
+                fn run(&self,
+                    emu: &mut Emulator<$name<S>, StdEmulatorDriver, ET, S, SM>,
+                    driver: &mut StdEmulatorDriver,
+                    input: &S::Input,
+                    ret_reg: Option<Regs>
+                ) -> Result<Option<EmulatorDriverResult<$name<S>, StdEmulatorDriver, ET, S, SM>>, EmulatorDriverError> {
                     match self {
                         // [<$name Commands>]::StartPhysCommandParserCmd(cmd) => cmd.run(emu, input, ret_reg)
-                        $([<$name Commands>]::$native_command_parser(cmd) => cmd.run(emu, input, ret_reg)),+
+                        $([<$name Commands>]::$command(cmd) => cmd.run(emu, driver, input, ret_reg)),+
                     }
                 }
             }
+
+            $(
+                impl From<$command> for [<$name Commands>] {
+                    fn from(cmd: $command) -> [<$name Commands>] {
+                        [<$name Commands>]::$command(cmd)
+                    }
+                }
+            )+
         }
-    }
+    };
 }
 
+#[derive(Clone, Debug)]
 pub struct NopCommandManager;
 
-impl<S> CommandManager<S> for NopCommandManager
+impl<ED, ET, S, SM> CommandManager<ED, ET, S, SM> for NopCommandManager
 where
     S: UsesInput,
 {
@@ -142,6 +150,15 @@ where
 define_std_command_manager!(
     StdCommandManager,
     [
+        StartCommand,
+        InputCommand,
+        SaveCommand,
+        LoadCommand,
+        EndCommand,
+        VersionCommand,
+        AddressRangeFilterCommand
+    ],
+    [
         StartPhysCommandParser,
         StartVirtCommandParser,
         InputPhysCommandParser,
@@ -154,11 +171,11 @@ define_std_command_manager!(
     ]
 );
 
-pub trait CommandManager<S>: Sized
+pub trait CommandManager<ED, ET, S, SM>: Sized + Debug
 where
     S: UsesInput,
 {
-    type Commands: IsCommand<S> + Clone;
+    type Commands: IsCommand<Self, ED, ET, S, SM>;
 
     fn parse(&self, qemu: Qemu) -> Result<Self::Commands, CommandError>;
 }
@@ -171,8 +188,9 @@ pub enum NativeExitKind {
     Crash = bindings::LibaflQemuEndStatus_LIBAFL_QEMU_END_CRASH.0 as u64, // Crash reported in the VM
 }
 
-pub trait IsCommand<S>: Debug
+pub trait IsCommand<CM, ED, ET, S, SM>: Debug + Clone
 where
+    CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
 {
     /// Used to know whether the command can be run during a backdoor, or if it is necessary to go out of
@@ -184,18 +202,13 @@ where
     ///     - `ret_reg`: The register in which the guest return value should be written, if any.
     /// Returns
     ///     - `InnerHandlerResult`: How the high-level handler should behave
-    fn run<CM, EDT, ET, SM>(
+    fn run(
         &self,
-        emu: &mut Emulator<CM, EDT, ET, S, SM>,
+        emu: &mut Emulator<CM, ED, ET, S, SM>,
+        driver: &mut ED,
         input: &S::Input,
         ret_reg: Option<Regs>,
-    ) -> Result<Option<EmulatorDriverResult<CM, S>>, EmulatorDriverError>
-    where
-        CM: CommandManager<S>,
-        ET: StdInstrumentationFilter + Unpin,
-        EDT: EmulatorDriverTuple<CM, S, SM>,
-        S: UsesInput + Unpin,
-        SM: IsSnapshotManager;
+    ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError>;
 }
 
 #[cfg(emulation_mode = "systemmode")]
@@ -225,63 +238,51 @@ impl Display for NopCommand {
     }
 }
 
-impl<S> IsCommand<S> for NopCommand
+impl<CM, ED, ET, S, SM> IsCommand<CM, ED, ET, S, SM> for NopCommand
 where
+    CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
 {
     fn usable_at_runtime(&self) -> bool {
         true
     }
 
-    fn run<CM, EDT, ET, SM>(
+    fn run(
         &self,
-        _emu: &mut Emulator<CM, EDT, ET, S, SM>,
+        _emu: &mut Emulator<CM, ED, ET, S, SM>,
+        _driver: &mut ED,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
-    ) -> Result<Option<EmulatorDriverResult<CM, S>>, EmulatorDriverError>
-    where
-        CM: CommandManager<S>,
-        ET: StdInstrumentationFilter + Unpin,
-        EDT: EmulatorDriverTuple<CM, S, SM>,
-        S: UsesInput + Unpin,
-        SM: IsSnapshotManager,
-    {
+    ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {
         Ok(None)
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct SaveCommand;
-impl<S> IsCommand<S> for SaveCommand
+impl<CM, ET, S, SM> IsCommand<CM, StdEmulatorDriver, ET, S, SM> for SaveCommand
 where
-    S: UsesInput,
+    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter,
+    CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
+    S: UsesInput + Unpin,
+    SM: IsSnapshotManager,
 {
     fn usable_at_runtime(&self) -> bool {
         false
     }
 
-    fn run<CM, EDT, ET, SM>(
+    fn run(
         &self,
-        emu: &mut Emulator<CM, EDT, ET, S, SM>,
+        emu: &mut Emulator<CM, StdEmulatorDriver, ET, S, SM>,
+        driver: &mut StdEmulatorDriver,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
-    ) -> Result<Option<EmulatorDriverResult<CM, S>>, EmulatorDriverError>
-    where
-        CM: CommandManager<S>,
-        ET: StdInstrumentationFilter + Unpin,
-        EDT: EmulatorDriverTuple<CM, S, SM>,
-        S: UsesInput + Unpin,
-        SM: IsSnapshotManager,
+    ) -> Result<Option<EmulatorDriverResult<CM, StdEmulatorDriver, ET, S, SM>>, EmulatorDriverError>
     {
         let qemu = emu.qemu();
         let snapshot_id = emu.snapshot_manager_mut().save(qemu);
 
-        let std_emu_driver = emu
-            .drivers_mut()
-            .match_first_type_mut::<StdEmulatorDriver>()
-            .unwrap();
-
-        std_emu_driver
+        driver
             .set_snapshot_id(snapshot_id)
             .map_err(|_| EmulatorDriverError::MultipleSnapshotDefinition)?;
 
@@ -309,34 +310,27 @@ where
 #[derive(Debug, Clone)]
 pub struct LoadCommand;
 
-impl<S> IsCommand<S> for LoadCommand
+impl<CM, ET, S, SM> IsCommand<CM, StdEmulatorDriver, ET, S, SM> for LoadCommand
 where
+    CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
     S: UsesInput,
+    SM: IsSnapshotManager,
 {
     fn usable_at_runtime(&self) -> bool {
         false
     }
 
-    fn run<CM, EDT, ET, SM>(
+    fn run(
         &self,
-        emu: &mut Emulator<CM, EDT, ET, S, SM>,
+        emu: &mut Emulator<CM, StdEmulatorDriver, ET, S, SM>,
+        driver: &mut StdEmulatorDriver,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
-    ) -> Result<Option<EmulatorDriverResult<CM, S>>, EmulatorDriverError>
-    where
-        CM: CommandManager<S>,
-        ET: StdInstrumentationFilter + Unpin,
-        EDT: EmulatorDriverTuple<CM, S, SM>,
-        S: UsesInput + Unpin,
-        SM: IsSnapshotManager,
+    ) -> Result<Option<EmulatorDriverResult<CM, StdEmulatorDriver, ET, S, SM>>, EmulatorDriverError>
     {
         let qemu = emu.qemu();
-        let std_emu_driver = emu
-            .drivers()
-            .match_first_type::<StdEmulatorDriver>()
-            .unwrap();
 
-        let snapshot_id = std_emu_driver
+        let snapshot_id = driver
             .snapshot_id()
             .ok_or(EmulatorDriverError::SnapshotNotFound)?;
 
@@ -355,8 +349,9 @@ pub struct InputCommand {
     cpu: CPU,
 }
 
-impl<S> IsCommand<S> for InputCommand
+impl<CM, ED, ET, S, SM> IsCommand<CM, ED, ET, S, SM> for InputCommand
 where
+    CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
     S::Input: HasTargetBytes,
 {
@@ -364,19 +359,13 @@ where
         true
     }
 
-    fn run<CM, EDT, ET, SM>(
+    fn run(
         &self,
-        emu: &mut Emulator<CM, EDT, ET, S, SM>,
+        emu: &mut Emulator<CM, ED, ET, S, SM>,
+        _driver: &mut ED,
         input: &S::Input,
         ret_reg: Option<Regs>,
-    ) -> Result<Option<EmulatorDriverResult<CM, S>>, EmulatorDriverError>
-    where
-        CM: CommandManager<S>,
-        ET: StdInstrumentationFilter + Unpin,
-        EDT: EmulatorDriverTuple<CM, S, SM>,
-        S: UsesInput + Unpin,
-        SM: IsSnapshotManager,
-    {
+    ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {
         let qemu = emu.qemu();
 
         let ret_value = self.location.write(qemu, input.target_bytes().as_slice());
@@ -394,41 +383,33 @@ pub struct StartCommand {
     input_location: QemuMemoryChunk,
 }
 
-impl<S> IsCommand<S> for StartCommand
+impl<CM, ET, S, SM> IsCommand<CM, StdEmulatorDriver, ET, S, SM> for StartCommand
 where
-    S: UsesInput,
+    CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
+    S: UsesInput + Debug,
     S::Input: HasTargetBytes,
+    SM: IsSnapshotManager,
 {
     fn usable_at_runtime(&self) -> bool {
         false
     }
 
-    fn run<CM, EDT, ET, SM>(
+    fn run(
         &self,
-        emu: &mut Emulator<CM, EDT, ET, S, SM>,
+        emu: &mut Emulator<CM, StdEmulatorDriver, ET, S, SM>,
+        driver: &mut StdEmulatorDriver,
         input: &S::Input,
         ret_reg: Option<Regs>,
-    ) -> Result<Option<EmulatorDriverResult<CM, S>>, EmulatorDriverError>
-    where
-        CM: CommandManager<S>,
-        ET: StdInstrumentationFilter + Unpin,
-        EDT: EmulatorDriverTuple<CM, S, SM>,
-        S: UsesInput + Unpin,
-        SM: IsSnapshotManager,
+    ) -> Result<Option<EmulatorDriverResult<CM, StdEmulatorDriver, ET, S, SM>>, EmulatorDriverError>
     {
         let qemu = emu.qemu();
         let snapshot_id = emu.snapshot_manager_mut().save(qemu);
 
-        let std_emu_driver = emu
-            .drivers_mut()
-            .match_first_type_mut::<StdEmulatorDriver>()
-            .unwrap();
-
-        std_emu_driver
+        driver
             .set_snapshot_id(snapshot_id)
             .map_err(|_| EmulatorDriverError::MultipleSnapshotDefinition)?;
 
-        std_emu_driver
+        driver
             .set_input_location(InputLocation::new(
                 self.input_location.clone(),
                 qemu.current_cpu().unwrap(),
@@ -453,34 +434,27 @@ pub struct EndCommand {
     exit_kind: Option<ExitKind>,
 }
 
-impl<S> IsCommand<S> for EndCommand
+impl<CM, ET, S, SM> IsCommand<CM, StdEmulatorDriver, ET, S, SM> for EndCommand
 where
+    CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
     S: UsesInput,
+    SM: IsSnapshotManager,
 {
     fn usable_at_runtime(&self) -> bool {
         false
     }
 
-    fn run<CM, EDT, ET, SM>(
+    fn run(
         &self,
-        emu: &mut Emulator<CM, EDT, ET, S, SM>,
+        emu: &mut Emulator<CM, StdEmulatorDriver, ET, S, SM>,
+        driver: &mut StdEmulatorDriver,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
-    ) -> Result<Option<EmulatorDriverResult<CM, S>>, EmulatorDriverError>
-    where
-        CM: CommandManager<S>,
-        ET: StdInstrumentationFilter + Unpin,
-        EDT: EmulatorDriverTuple<CM, S, SM>,
-        S: UsesInput + Unpin,
-        SM: IsSnapshotManager,
+    ) -> Result<Option<EmulatorDriverResult<CM, StdEmulatorDriver, ET, S, SM>>, EmulatorDriverError>
     {
-        let emu_exit_handler = emu
-            .drivers()
-            .match_first_type::<StdEmulatorDriver>()
-            .unwrap();
         let qemu = emu.qemu();
 
-        let snapshot_id = emu_exit_handler
+        let snapshot_id = driver
             .snapshot_id()
             .ok_or(EmulatorDriverError::SnapshotNotFound)?;
 
@@ -498,27 +472,22 @@ where
 #[derive(Debug, Clone)]
 pub struct VersionCommand(u64);
 
-impl<S> IsCommand<S> for VersionCommand
+impl<CM, ED, ET, S, SM> IsCommand<CM, ED, ET, S, SM> for VersionCommand
 where
+    CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
 {
     fn usable_at_runtime(&self) -> bool {
         true
     }
 
-    fn run<CM, EDT, ET, SM>(
+    fn run(
         &self,
-        _emu: &mut Emulator<CM, EDT, ET, S, SM>,
+        _emu: &mut Emulator<CM, ED, ET, S, SM>,
+        _driver: &mut ED,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
-    ) -> Result<Option<EmulatorDriverResult<CM, S>>, EmulatorDriverError>
-    where
-        CM: CommandManager<S>,
-        ET: StdInstrumentationFilter + Unpin,
-        EDT: EmulatorDriverTuple<CM, S, SM>,
-        S: UsesInput + Unpin,
-        SM: IsSnapshotManager,
-    {
+    ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {
         let guest_version = self.0;
 
         if VERSION == guest_version {
@@ -537,27 +506,23 @@ pub struct FilterCommand<T> {
 }
 
 #[cfg(emulation_mode = "systemmode")]
-impl<S> IsCommand<S> for PagingFilterCommand
+impl<CM, ED, ET, S, SM> IsCommand<CM, ED, ET, S, SM> for PagingFilterCommand
 where
-    S: UsesInput,
+    ET: StdInstrumentationFilter + Unpin,
+    CM: CommandManager<ED, ET, S, SM>,
+    S: UsesInput + Unpin,
 {
     fn usable_at_runtime(&self) -> bool {
         true
     }
 
-    fn run<CM, EDT, ET, SM>(
+    fn run(
         &self,
-        emu: &mut Emulator<CM, EDT, ET, S, SM>,
+        emu: &mut Emulator<CM, ED, ET, S, SM>,
+        _driver: &mut ED,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
-    ) -> Result<Option<EmulatorDriverResult<CM, S>>, EmulatorDriverError>
-    where
-        CM: CommandManager<S>,
-        ET: StdInstrumentationFilter + Unpin,
-        EDT: EmulatorDriverTuple<CM, S, SM>,
-        S: UsesInput + Unpin,
-        SM: IsSnapshotManager,
-    {
+    ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {
         let qemu_modules = emu.modules_mut().modules_mut();
 
         let paging_filter =
@@ -569,28 +534,22 @@ where
     }
 }
 
-impl<S> IsCommand<S> for AddressRangeFilterCommand
+impl<CM, ED, ET, S, SM> IsCommand<CM, ED, ET, S, SM> for AddressRangeFilterCommand
 where
+    CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
 {
     fn usable_at_runtime(&self) -> bool {
         true
     }
 
-    #[allow(clippy::type_complexity)] // TODO: refactor with correct type.
-    fn run<CM, EDT, ET, SM>(
+    fn run(
         &self,
-        _emu: &mut Emulator<CM, EDT, ET, S, SM>,
+        _emu: &mut Emulator<CM, ED, ET, S, SM>,
+        _driver: &mut ED,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
-    ) -> Result<Option<EmulatorDriverResult<CM, S>>, EmulatorDriverError>
-    where
-        CM: CommandManager<S>,
-        ET: StdInstrumentationFilter + Unpin,
-        EDT: EmulatorDriverTuple<CM, S, SM>,
-        S: UsesInput + Unpin,
-        SM: IsSnapshotManager,
-    {
+    ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {
         let qemu_modules = &mut ();
 
         let addr_range_filter =

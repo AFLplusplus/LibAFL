@@ -44,15 +44,15 @@ use libc::siginfo_t;
 use crate::EmulatorModules;
 use crate::{command::CommandManager, modules::EmulatorModuleTuple, Emulator};
 
-pub struct QemuExecutor<'a, CM, EDT, ET, H, OT, S, SM>
+pub struct QemuExecutor<'a, CM, ED, ET, H, OT, S, SM>
 where
-    CM: CommandManager<S>,
+    CM: CommandManager<ED, ET, S, SM>,
     ET: EmulatorModuleTuple<S>,
-    H: FnMut(&mut Emulator<CM, EDT, ET, S, SM>, &S::Input) -> ExitKind,
+    H: FnMut(&mut Emulator<CM, ED, ET, S, SM>, &S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
     S: State,
 {
-    inner: StatefulInProcessExecutor<'a, H, OT, S, Emulator<CM, EDT, ET, S, SM>>,
+    inner: StatefulInProcessExecutor<'a, H, OT, S, Emulator<CM, ED, ET, S, SM>>,
 }
 
 #[cfg(emulation_mode = "usermode")]
@@ -94,11 +94,11 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, OF, Z>(
     }
 }
 
-impl<'a, CM, EDT, ET, H, OT, S, SM> Debug for QemuExecutor<'a, CM, EDT, ET, H, OT, S, SM>
+impl<'a, CM, ED, ET, H, OT, S, SM> Debug for QemuExecutor<'a, CM, ED, ET, H, OT, S, SM>
 where
-    CM: CommandManager<S>,
+    CM: CommandManager<ED, ET, S, SM>,
     ET: EmulatorModuleTuple<S> + Debug,
-    H: FnMut(&mut Emulator<CM, EDT, ET, S, SM>, &S::Input) -> ExitKind,
+    H: FnMut(&mut Emulator<CM, ED, ET, S, SM>, &S::Input) -> ExitKind,
     OT: ObserversTuple<S> + Debug,
     S: State,
 {
@@ -109,16 +109,16 @@ where
     }
 }
 
-impl<'a, CM, EDT, ET, H, OT, S, SM> QemuExecutor<'a, CM, EDT, ET, H, OT, S, SM>
+impl<'a, CM, ED, ET, H, OT, S, SM> QemuExecutor<'a, CM, ED, ET, H, OT, S, SM>
 where
-    CM: CommandManager<S>,
+    CM: CommandManager<ED, ET, S, SM>,
     ET: EmulatorModuleTuple<S>,
-    H: FnMut(&mut Emulator<CM, EDT, ET, S, SM>, &S::Input) -> ExitKind,
+    H: FnMut(&mut Emulator<CM, ED, ET, S, SM>, &S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
     S: State,
 {
     pub fn new<EM, OF, Z>(
-        emulator: Emulator<CM, EDT, ET, S, SM>,
+        emulator: Emulator<CM, ED, ET, S, SM>,
         harness_fn: &'a mut H,
         observers: OT,
         fuzzer: &mut Z,
@@ -159,7 +159,7 @@ where
         #[cfg(emulation_mode = "systemmode")]
         {
             inner.inprocess_hooks_mut().timeout_handler = inproc_qemu_timeout_handler::<
-                StatefulInProcessExecutor<'a, H, OT, S, Emulator<CM, EDT, ET, S, SM>>,
+                StatefulInProcessExecutor<'a, H, OT, S, Emulator<CM, ED, ET, S, SM>>,
                 EM,
                 OF,
                 Z,
@@ -169,7 +169,7 @@ where
         Ok(Self { inner })
     }
 
-    pub fn inner(&self) -> &StatefulInProcessExecutor<'a, H, OT, S, Emulator<CM, EDT, ET, S, SM>> {
+    pub fn inner(&self) -> &StatefulInProcessExecutor<'a, H, OT, S, Emulator<CM, ED, ET, S, SM>> {
         &self.inner
     }
 
@@ -182,18 +182,18 @@ where
 
     pub fn inner_mut(
         &mut self,
-    ) -> &mut StatefulInProcessExecutor<'a, H, OT, S, Emulator<CM, EDT, ET, S, SM>> {
+    ) -> &mut StatefulInProcessExecutor<'a, H, OT, S, Emulator<CM, ED, ET, S, SM>> {
         &mut self.inner
     }
 }
 
-impl<'a, CM, EDT, EM, ET, H, OT, S, SM, Z> Executor<EM, Z>
-    for QemuExecutor<'a, CM, EDT, ET, H, OT, S, SM>
+impl<'a, CM, ED, EM, ET, H, OT, S, SM, Z> Executor<EM, Z>
+    for QemuExecutor<'a, CM, ED, ET, H, OT, S, SM>
 where
-    CM: CommandManager<S>,
+    CM: CommandManager<ED, ET, S, SM>,
     EM: UsesState<State = S>,
     ET: EmulatorModuleTuple<S>,
-    H: FnMut(&mut Emulator<CM, EDT, ET, S, SM>, &S::Input) -> ExitKind,
+    H: FnMut(&mut Emulator<CM, ED, ET, S, SM>, &S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
     S: State + HasExecutions + Unpin,
     Z: UsesState<State = S>,
@@ -221,33 +221,33 @@ where
     }
 }
 
-impl<'a, CM, EDT, ET, H, OT, S, SM> UsesState for QemuExecutor<'a, CM, EDT, ET, H, OT, S, SM>
+impl<'a, CM, ED, ET, H, OT, S, SM> UsesState for QemuExecutor<'a, CM, ED, ET, H, OT, S, SM>
 where
-    CM: CommandManager<S>,
+    CM: CommandManager<ED, ET, S, SM>,
     ET: EmulatorModuleTuple<S>,
-    H: FnMut(&mut Emulator<CM, EDT, ET, S, SM>, &S::Input) -> ExitKind,
+    H: FnMut(&mut Emulator<CM, ED, ET, S, SM>, &S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
     S: State,
 {
     type State = S;
 }
 
-impl<'a, CM, EDT, ET, H, OT, S, SM> UsesObservers for QemuExecutor<'a, CM, EDT, ET, H, OT, S, SM>
+impl<'a, CM, ED, ET, H, OT, S, SM> UsesObservers for QemuExecutor<'a, CM, ED, ET, H, OT, S, SM>
 where
-    CM: CommandManager<S>,
+    CM: CommandManager<ED, ET, S, SM>,
     ET: EmulatorModuleTuple<S>,
-    H: FnMut(&mut Emulator<CM, EDT, ET, S, SM>, &S::Input) -> ExitKind,
+    H: FnMut(&mut Emulator<CM, ED, ET, S, SM>, &S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
     S: State,
 {
     type Observers = OT;
 }
 
-impl<'a, CM, EDT, ET, H, OT, S, SM> HasObservers for QemuExecutor<'a, CM, EDT, ET, H, OT, S, SM>
+impl<'a, CM, ED, ET, H, OT, S, SM> HasObservers for QemuExecutor<'a, CM, ED, ET, H, OT, S, SM>
 where
-    CM: CommandManager<S>,
+    CM: CommandManager<ED, ET, S, SM>,
     ET: EmulatorModuleTuple<S>,
-    H: FnMut(&mut Emulator<CM, EDT, ET, S, SM>, &S::Input) -> ExitKind,
+    H: FnMut(&mut Emulator<CM, ED, ET, S, SM>, &S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
     S: State,
 {
@@ -263,9 +263,9 @@ where
 }
 
 #[cfg(feature = "fork")]
-pub struct QemuForkExecutor<'a, CM, EDT, EM, ET, H, OT, S, SM, SP, Z>
+pub struct QemuForkExecutor<'a, CM, ED, EM, ET, H, OT, S, SM, SP, Z>
 where
-    CM: CommandManager<S>,
+    CM: CommandManager<ED, ET, S, SM>,
     EM: UsesState<State = S>,
     ET: EmulatorModuleTuple<S>,
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
@@ -275,16 +275,16 @@ where
     Z: UsesState<State = S>,
 {
     inner: InProcessForkExecutor<'a, H, OT, S, SP, EM, Z>,
-    emulator: Emulator<CM, EDT, ET, S, SM>,
+    emulator: Emulator<CM, ED, ET, S, SM>,
 }
 
 #[cfg(feature = "fork")]
-impl<'a, CM, EDT, EM, ET, H, OT, S, SM, SP, Z> Debug
-    for QemuForkExecutor<'a, CM, EDT, EM, ET, H, OT, S, SM, SP, Z>
+impl<'a, CM, ED, EM, ET, H, OT, S, SM, SP, Z> Debug
+    for QemuForkExecutor<'a, CM, ED, EM, ET, H, OT, S, SM, SP, Z>
 where
-    CM: CommandManager<S> + Debug,
+    CM: CommandManager<ED, ET, S, SM> + Debug,
     EM: UsesState<State = S>,
-    EDT: Debug,
+    ED: Debug,
     ET: EmulatorModuleTuple<S> + Debug,
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S> + Debug,
@@ -302,10 +302,10 @@ where
 }
 
 #[cfg(feature = "fork")]
-impl<'a, CM, EDT, EM, ET, H, OT, S, SM, SP, Z>
-    QemuForkExecutor<'a, CM, EDT, EM, ET, H, OT, S, SM, SP, Z>
+impl<'a, CM, ED, EM, ET, H, OT, S, SM, SP, Z>
+    QemuForkExecutor<'a, CM, ED, EM, ET, H, OT, S, SM, SP, Z>
 where
-    CM: CommandManager<S>,
+    CM: CommandManager<ED, ET, S, SM>,
     EM: EventFirer<State = S> + EventRestarter<State = S>,
     ET: EmulatorModuleTuple<S>,
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
@@ -315,7 +315,7 @@ where
     Z: HasObjective<State = S>,
 {
     pub fn new(
-        emulator: Emulator<CM, EDT, ET, S, SM>,
+        emulator: Emulator<CM, ED, ET, S, SM>,
         harness_fn: &'a mut H,
         observers: OT,
         fuzzer: &mut Z,
@@ -348,20 +348,20 @@ where
         &mut self.inner
     }
 
-    pub fn emulator(&self) -> &Emulator<CM, EDT, ET, S, SM> {
+    pub fn emulator(&self) -> &Emulator<CM, ED, ET, S, SM> {
         &self.emulator
     }
 
-    pub fn emulator_mut(&mut self) -> &Emulator<CM, EDT, ET, S, SM> {
+    pub fn emulator_mut(&mut self) -> &Emulator<CM, ED, ET, S, SM> {
         &mut self.emulator
     }
 }
 
 #[cfg(feature = "fork")]
-impl<'a, CM, EDT, EM, ET, H, OF, OT, S, SM, SP, Z> Executor<EM, Z>
-    for QemuForkExecutor<'a, CM, EDT, EM, ET, H, OT, S, SM, SP, Z>
+impl<'a, CM, ED, EM, ET, H, OF, OT, S, SM, SP, Z> Executor<EM, Z>
+    for QemuForkExecutor<'a, CM, ED, EM, ET, H, OT, S, SM, SP, Z>
 where
-    CM: CommandManager<S>,
+    CM: CommandManager<ED, ET, S, SM>,
     EM: EventManager<InProcessForkExecutor<'a, H, OT, S, SP, EM, Z>, Z, State = S>,
     H: FnMut(&S::Input) -> ExitKind,
     S: Unpin + State + HasMetadata + HasExecutions + HasLastReportTime + HasCorpus + HasSolutions,
@@ -383,10 +383,10 @@ where
 }
 
 #[cfg(feature = "fork")]
-impl<'a, CM, EDT, EM, ET, H, OT, S, SM, SP, Z> UsesObservers
-    for QemuForkExecutor<'a, CM, EDT, EM, ET, H, OT, S, SM, SP, Z>
+impl<'a, CM, ED, EM, ET, H, OT, S, SM, SP, Z> UsesObservers
+    for QemuForkExecutor<'a, CM, ED, EM, ET, H, OT, S, SM, SP, Z>
 where
-    CM: CommandManager<S>,
+    CM: CommandManager<ED, ET, S, SM>,
     EM: UsesState<State = S>,
     ET: EmulatorModuleTuple<S>,
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
@@ -399,10 +399,10 @@ where
 }
 
 #[cfg(feature = "fork")]
-impl<'a, CM, EDT, EM, ET, H, OT, S, SM, SP, Z> UsesState
-    for QemuForkExecutor<'a, CM, EDT, EM, ET, H, OT, S, SM, SP, Z>
+impl<'a, CM, ED, EM, ET, H, OT, S, SM, SP, Z> UsesState
+    for QemuForkExecutor<'a, CM, ED, EM, ET, H, OT, S, SM, SP, Z>
 where
-    CM: CommandManager<S>,
+    CM: CommandManager<ED, ET, S, SM>,
     EM: UsesState<State = S>,
     ET: EmulatorModuleTuple<S>,
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
@@ -415,10 +415,10 @@ where
 }
 
 #[cfg(feature = "fork")]
-impl<'a, CM, EDT, EM, ET, H, OT, S, SM, SP, Z> HasObservers
-    for QemuForkExecutor<'a, CM, EDT, EM, ET, H, OT, S, SM, SP, Z>
+impl<'a, CM, ED, EM, ET, H, OT, S, SM, SP, Z> HasObservers
+    for QemuForkExecutor<'a, CM, ED, EM, ET, H, OT, S, SM, SP, Z>
 where
-    CM: CommandManager<S>,
+    CM: CommandManager<ED, ET, S, SM>,
     EM: UsesState<State = S>,
     ET: EmulatorModuleTuple<S>,
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
