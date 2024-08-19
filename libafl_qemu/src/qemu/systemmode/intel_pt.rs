@@ -16,7 +16,7 @@ use std::{
 use bitflags::bitflags;
 use caps::{CapSet, Capability};
 use libafl::Error;
-use libipt::{block::BlockDecoder, ConfigBuilder};
+use libipt::{block::BlockDecoder, ConfigBuilder, Image};
 use num_enum::TryFromPrimitive;
 use perf_event_open_sys::{
     bindings::{perf_event_attr, perf_event_mmap_page, PERF_FLAG_FD_CLOEXEC},
@@ -185,7 +185,7 @@ impl IntelPT {
         Ok(())
     }
 
-    pub fn decode(&mut self) -> Vec<u64> {
+    pub fn decode(&mut self, image: &mut Image) -> Vec<u64> {
         let mut ips = Vec::new();
 
         let aux_head = unsafe { ptr::addr_of_mut!((*self.buff_metadata).aux_head) };
@@ -207,12 +207,18 @@ impl IntelPT {
             .unwrap()
             .finish();
         let mut decoder = BlockDecoder::new(&config).unwrap();
+        decoder.set_image(Some(image)).expect("Failed to set image");
 
         // TODO rewrite decently
+        // TODO consider dropping libipt-rs and using sys, or bingen ourselves
+        let mut status;
         loop {
-            let mut status = match decoder.sync_forward() {
+            status = match decoder.sync_forward() {
                 Ok(s) => s,
-                Err(e) => break,
+                Err(e) => {
+                    println!("pterror in sync {:?}", e);
+                    break;
+                }
             };
 
             loop {
@@ -222,9 +228,13 @@ impl IntelPT {
                     }
                     match decoder.event() {
                         Ok((_, s)) => {
+                            // TODO maybe we care about some events?
                             status = s;
                         }
-                        Err(e) => break Err(e),
+                        Err(e) => {
+                            println!("pterror in event {:?}", e);
+                            break Err(e);
+                        }
                     };
                 }
                 .is_err()
@@ -232,13 +242,21 @@ impl IntelPT {
                     break;
                 }
 
-                let packet = decoder.next();
-                match packet {
-                    Err(e) => {
+                let block = decoder.next();
+                match block {
+                    Err((b, e)) => {
+                        // libipt-rs library ignores the fact that
+                        // Even in case of errors, we may have succeeded in decoding some instructions.
+                        // https://github.com/intel/libipt/blob/4a06fdffae39dadef91ae18247add91029ff43c0/ptxed/src/ptxed.c#L1954
+                        // Using my fork that fixes this atm
                         println!("pterror in packet next {:?}", e);
+                        println!("err block ip: 0x{:x?}", b.ip());
+                        ips.push(b.ip());
+                        // status = Status::from_bits(e.code() as u32).unwrap();
                         break;
                     }
                     Ok((b, s)) => {
+                        status = s;
                         ips.push(b.ip());
 
                         if s.eos() {
@@ -248,7 +266,6 @@ impl IntelPT {
                 }
             }
         }
-        // TODO load the binary
         ips
     }
 
@@ -447,7 +464,7 @@ pub fn smp_rmb() {
 
 #[cfg(test)]
 mod test {
-    use std::{fs::OpenOptions, process};
+    use std::{env, fs::OpenOptions, process};
 
     use nix::{
         sys::{
@@ -456,6 +473,7 @@ mod test {
         },
         unistd::{fork, ForkResult},
     };
+    use proc_maps::{get_process_maps, MapRange, Pid};
     use static_assertions::{assert_eq_size, const_assert_eq};
 
     use super::*;
@@ -505,10 +523,6 @@ mod test {
             Ok(ForkResult::Parent { child }) => child,
             Ok(ForkResult::Child) => {
                 raise(Signal::SIGSTOP).expect("Failed to stop the process");
-                let mut dummy = false;
-                for _ in 0..1000 {
-                    dummy = !dummy;
-                }
                 process::exit(0);
             }
             Err(e) => panic!("Fork failed {e}"),
@@ -518,21 +532,39 @@ mod test {
         pt.enable_tracing().expect("Failed to enable tracing");
 
         waitpid(pid, Some(WaitPidFlag::WUNTRACED)).expect("Failed to wait for the child process");
+        let maps = get_process_maps(pid.into()).unwrap();
         kill(pid, Signal::SIGCONT).expect("Failed to continue the process");
 
-        let trace_path = "test_trace_pid_ipt_raw_trace.tmp";
-        let mut file = OpenOptions::new()
-            .append(true)
-            .create(true)
-            .open(trace_path)
-            .expect("Failed to open trace output file");
-
         waitpid(pid, None).expect("Failed to wait for the child process");
-
-        // pt.read_trace_into(&mut file)
-        //     .expect("Failed to write traces");
-        // fs::remove_file(trace_path).expect("Failed to remove trace file");
-        println!("Intel PT traces: {:?}", pt.decode());
         pt.disable_tracing().expect("Failed to disable tracing");
+
+        let mut image = Image::new(Some("test_trace_pid")).unwrap();
+        for map in maps {
+            if map.is_exec() && map.filename().is_some() {
+                match image.add_file(
+                    map.filename().unwrap().to_str().unwrap(),
+                    map.offset as u64,
+                    map.size() as u64,
+                    None,
+                    map.start() as u64,
+                ) {
+                    Err(e) => println!(
+                        "Error adding mapping for {:?}: {:?}",
+                        map.filename().unwrap(),
+                        e
+                    ),
+                    _ => (),
+                }
+            }
+        }
+        let mut ips = pt.decode(&mut image);
+        // remove kernel ips
+        ips = ips
+            .into_iter()
+            .filter(|&addr| addr < 0xff00_0000_0000_0000)
+            .collect();
+        ips.sort();
+        ips.dedup();
+        println!("Intel PT traces unique non kernel block ips: {}", ips.len());
     }
 }
