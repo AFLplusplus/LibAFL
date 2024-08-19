@@ -27,13 +27,12 @@ use libafl_bolts::{
     tuples::tuple_list,
 };
 use libafl_qemu::{
-    command::StdCommandManager,
     emu::Emulator,
     executor::QemuExecutor,
     modules::edges::{
         edges_map_mut_ptr, EdgeCoverageModule, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
     },
-    EmulatorBuilder, FastSnapshotManager,
+    EmulatorBuilder,
 };
 
 // use libafl_qemu::QemuSnapshotBuilder; for normal qemu snapshot

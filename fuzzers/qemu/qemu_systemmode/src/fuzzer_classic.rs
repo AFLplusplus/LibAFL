@@ -30,13 +30,14 @@ use libafl_bolts::{
     AsSlice,
 };
 use libafl_qemu::{
+    config,
     elf::EasyElf,
     executor::QemuExecutor,
     modules::edges::{
         edges_map_mut_ptr, EdgeCoverageModule, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
     },
-    qemu_config, Emulator, EmulatorBuilder, Qemu, QemuExitError, QemuExitReason, QemuRWError,
-    QemuShutdownCause, Regs,
+    Emulator, EmulatorBuilder, Qemu, QemuExitError, QemuExitReason, QemuRWError, QemuShutdownCause,
+    Regs,
 };
 use libafl_qemu_sys::GuestPhysAddr;
 
@@ -90,14 +91,14 @@ pub fn fuzz() {
         // Initialize QEMU
         let qemu = Qemu::builder()
             .machine("mps2-an385")
-            .monitor(qemu_config::Monitor::Null)
+            .monitor(config::Monitor::Null)
             .kernel(format!("{target_dir}/example.elf"))
-            .serial(qemu_config::Serial::Null)
+            .serial(config::Serial::Null)
             .no_graphic(true)
             .snapshot(true)
-            .drives([qemu_config::Drive::builder()
-                .interface(qemu_config::DriveInterface::None)
-                .format(qemu_config::DiskImageFileFormat::Qcow2)
+            .drives([config::Drive::builder()
+                .interface(config::DriveInterface::None)
+                .format(config::DiskImageFileFormat::Qcow2)
                 .file(format!("{target_dir}/dummy.qcow2"))
                 .build()])
             .start_cpu(false)
@@ -106,7 +107,7 @@ pub fn fuzz() {
 
         let emulator_modules = tuple_list!(EdgeCoverageModule::default());
 
-        let mut emulator = EmulatorBuilder::empty()
+        let emulator = EmulatorBuilder::empty()
             .qemu(qemu)
             .modules(emulator_modules)
             .build()?;
