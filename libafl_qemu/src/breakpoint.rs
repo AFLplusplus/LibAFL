@@ -37,8 +37,8 @@ where
 {
     fn clone(&self) -> Self {
         Self {
-            id: self.id.clone(),
-            addr: self.addr.clone(),
+            id: self.id,
+            addr: self.addr,
             cmd: self.cmd.clone(),
             disable_on_trigger: self.disable_on_trigger,
             enabled: self.enabled,

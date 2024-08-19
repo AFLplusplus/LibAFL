@@ -49,6 +49,7 @@ where
 {
     fn pre_exec(&mut self, _emulator: &mut Emulator<CM, Self, ET, S, SM>, _input: &S::Input) {}
 
+    #[allow(clippy::type_complexity)]
     fn post_exec(
         &mut self,
         _emulator: &mut Emulator<CM, Self, ET, S, SM>,

@@ -109,6 +109,7 @@ pub struct InputLocation {
 }
 
 #[derive(Debug)]
+#[allow(clippy::type_complexity)]
 pub struct Emulator<CM, ED, ET, S, SM>
 where
     CM: CommandManager<ED, ET, S, SM>,

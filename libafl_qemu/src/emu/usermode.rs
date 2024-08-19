@@ -3,9 +3,9 @@ use libafl_qemu_sys::{GuestAddr, MmapPerms, VerifyAccess};
 
 use crate::{command::CommandManager, Emulator, GuestMaps};
 
-impl<CM, EDT, ET, S, SM> Emulator<CM, EDT, ET, S, SM>
+impl<CM, ED, ET, S, SM> Emulator<CM, ED, ET, S, SM>
 where
-    CM: CommandManager<S>,
+    CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
 {
     /// This function gets the memory mappings from the emulator.
