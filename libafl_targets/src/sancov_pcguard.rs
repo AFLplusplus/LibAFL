@@ -1,7 +1,7 @@
 //! [`LLVM` `PcGuard`](https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-pcs-with-guards) runtime for `LibAFL`.
 
 #[rustversion::nightly]
-#[cfg(feature = "sancov_ngram4")]
+#[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
 use core::simd::num::SimdUint;
 use core::{mem::align_of, slice};
 
@@ -17,7 +17,7 @@ use libafl::executors::{hooks::ExecutorHook, HasObservers};
 ))]
 use crate::coverage::EDGES_MAP;
 use crate::coverage::MAX_EDGES_FOUND;
-#[cfg(feature = "sancov_ngram4")]
+#[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
 #[allow(unused)]
 use crate::EDGES_MAP_SIZE_IN_USE;
 #[cfg(feature = "pointer_maps")]
