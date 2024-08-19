@@ -48,7 +48,13 @@ windows_alias = "unsupported"
 [tasks.test_unix]
 script_runner = "@shell"
 script = "echo done"
-dependencies = ["build_afl", "test_instr", "test_cmplog", "test_frida", "test_qemu"]
+dependencies = [
+  "build_afl",
+  "test_instr",
+  "test_cmplog",
+  "test_frida",
+  "test_qemu",
+]
 
 [tasks.build_libafl_fuzz]
 script_runner = "@shell"
@@ -179,7 +185,7 @@ test -n "$( ls ./test/output-qemu-cmpcov/fuzzer_main/queue/id:000002* 2>/dev/nul
 	exit 1
 }
 '''
-dependencies = ["build_afl", "build_qemuafl","build_libafl_fuzz"]
+dependencies = ["build_afl", "build_qemuafl", "build_libafl_fuzz"]
 
 [tasks.clean]
 linux_alias = "clean_unix"
