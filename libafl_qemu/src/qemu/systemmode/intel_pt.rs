@@ -16,18 +16,18 @@ use std::{
 use bitflags::bitflags;
 use caps::{CapSet, Capability};
 use libafl::Error;
-use libipt::{block::BlockDecoder, ConfigBuilder, Image};
+use libipt::{block::BlockDecoder, ConfigBuilder, Cpu, Image};
 use num_enum::TryFromPrimitive;
 use perf_event_open_sys::{
     bindings::{perf_event_attr, perf_event_mmap_page, PERF_FLAG_FD_CLOEXEC},
     ioctls::{DISABLE, ENABLE, SET_FILTER},
     perf_event_open,
 };
+use raw_cpuid::CpuId;
 
 const PAGE_SIZE: usize = 4096;
 const PERF_BUFFER_SIZE: usize = (1 + (1 << 7)) * PAGE_SIZE;
 const PERF_AUX_BUFFER_SIZE: usize = 64 * 1024 * 1024;
-const CPU_INFO_PATH: &str = "/proc/cpuinfo";
 const PT_EVENT_PATH: &str = "/sys/bus/event_source/devices/intel_pt";
 
 #[derive(TryFromPrimitive, Debug)]
@@ -200,17 +200,18 @@ impl IntelPT {
 
         smp_rmb(); // TODO double check impl
 
-        // TODO config.cpu = <cpu identifier>; ?
         // TODO handle decoding failures with config.decode.callback = <decode function>; config.decode.context = <decode context>;
         // TODO remove unwrap()
-        let config = ConfigBuilder::new(unsafe { slice::from_raw_parts_mut(data, len) })
-            .unwrap()
-            .finish();
-        let mut decoder = BlockDecoder::new(&config).unwrap();
+        let mut config =
+            ConfigBuilder::new(unsafe { slice::from_raw_parts_mut(data, len) }).unwrap();
+        if let Some(cpu) = current_cpu() {
+            config.cpu(cpu);
+        }
+        let mut decoder = BlockDecoder::new(&config.finish()).unwrap();
         decoder.set_image(Some(image)).expect("Failed to set image");
 
         // TODO rewrite decently
-        // TODO consider dropping libipt-rs and using sys, or bingen ourselves
+        // TODO consider dropping libipt-rs and using sys, or bindgen ourselves
         let mut status;
         loop {
             status = match decoder.sync_forward() {
@@ -285,15 +286,21 @@ impl IntelPT {
             reasons.push("Only x86_64 is supported.".to_owned());
         }
 
-        if let Ok(cpu_info) = fs::read_to_string(CPU_INFO_PATH) {
-            if !cpu_info.contains("GenuineIntel") && !cpu_info.contains("GenuineIotel") {
+        let cpuid = CpuId::new();
+        if let Some(vendor) = cpuid.get_vendor_info() {
+            if vendor.as_str() != "GenuineIntel" && vendor.as_str() != "GenuineIotel" {
                 reasons.push("Only Intel CPUs are supported.".to_owned());
             }
-            if !cpu_info.contains("intel_pt") {
+        } else {
+            reasons.push("Failed to read CPU vendor".to_owned());
+        }
+
+        if let Some(ef) = cpuid.get_extended_feature_info() {
+            if !ef.has_processor_trace() {
                 reasons.push("Intel PT is not supported by the CPU.".to_owned());
             }
         } else {
-            reasons.push("Failed to read CPU info".to_owned());
+            reasons.push("Failed to read CPU Extended Features".to_owned());
         }
 
         if let Err(e) = intel_pt_perf_type() {
@@ -460,6 +467,14 @@ pub fn smp_rmb() {
     unsafe {
         core::arch::asm!("lfence", options(nostack, preserves_flags));
     }
+}
+
+#[inline]
+pub fn current_cpu() -> Option<Cpu> {
+    let cpuid = CpuId::new();
+    cpuid
+        .get_feature_info()
+        .map(|fi| Cpu::intel(fi.family_id() as u16, fi.model_id(), fi.stepping_id()))
 }
 
 #[cfg(test)]
