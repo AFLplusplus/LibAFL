@@ -88,7 +88,7 @@ pub fn fuzz() {
         let args: Vec<String> = env::args().collect();
 
         // Initialize QEMU Emulator
-        let emu = Emulator::default()
+        let emu = Emulator::builder()
             .qemu_cli(args)
             .add_module(EdgeCoverageModule::default())
             .build()

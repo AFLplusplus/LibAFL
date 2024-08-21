@@ -4,10 +4,7 @@ use libafl::{
 };
 use libafl_qemu_sys::{GuestAddr, MmapPerms, VerifyAccess};
 
-use crate::{
-    command::{CommandManager, StdCommandManager},
-    Emulator, EmulatorBuilder, GuestMaps, NopSnapshotManager, StdEmulatorDriver,
-};
+use crate::{command::{CommandManager, StdCommandManager}, Emulator, EmulatorBuilder, GuestMaps, NopEmulatorDriver, NopSnapshotManager, StdEmulatorDriver};
 
 pub type StdSnapshotManager = NopSnapshotManager;
 
@@ -16,10 +13,9 @@ where
     S: State + HasExecutions + Unpin,
     S::Input: HasTargetBytes,
 {
-    #[allow(clippy::should_implement_trait)]
     #[must_use]
-    pub fn default(
-    ) -> EmulatorBuilder<StdCommandManager<S>, StdEmulatorDriver, (), S, StdSnapshotManager> {
+    pub fn builder(
+    ) -> EmulatorBuilder<StdCommandManager<S>, NopEmulatorDriver, (), S, StdSnapshotManager> {
         EmulatorBuilder::default()
     }
 }

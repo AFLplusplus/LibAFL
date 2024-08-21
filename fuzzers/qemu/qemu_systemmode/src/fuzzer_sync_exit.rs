@@ -56,7 +56,7 @@ pub fn fuzz() {
         // Choose modules to use
         let modules = tuple_list!(EdgeCoverageModule::default());
 
-        let emu = Emulator::default()
+        let emu = Emulator::builder()
             .qemu_cli(args)
             .modules(modules)
             .build()?;

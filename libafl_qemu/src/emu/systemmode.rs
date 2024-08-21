@@ -160,14 +160,13 @@ impl IsSnapshotManager for FastSnapshotManager {
     }
 }
 
-impl<S> EmulatorBuilder<StdCommandManager<S>, StdEmulatorDriver, (), S, crate::StdSnapshotManager>
+impl<S> EmulatorBuilder<StdCommandManager<S>, StdEmulatorDriver, (), S, StdSnapshotManager>
 where
     S: State + HasExecutions + Unpin,
     S::Input: HasTargetBytes,
 {
-    #[allow(clippy::should_implement_trait)]
     #[must_use]
-    pub fn default(
+    pub fn builder(
     ) -> EmulatorBuilder<StdCommandManager<S>, StdEmulatorDriver, (), S, StdSnapshotManager> {
         EmulatorBuilder::default()
     }

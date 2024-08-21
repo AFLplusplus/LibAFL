@@ -54,7 +54,7 @@ where
 }
 
 #[cfg(emulation_mode = "usermode")]
-impl<S> EmulatorBuilder<StdCommandManager<S>, StdEmulatorDriver, (), S, StdSnapshotManager>
+impl<S> EmulatorBuilder<StdCommandManager<S>, NopEmulatorDriver, (), S, StdSnapshotManager>
 where
     S: State + HasExecutions + Unpin,
     S::Input: HasTargetBytes,
@@ -66,7 +66,7 @@ where
             modules: tuple_list!(),
             command_manager: StdCommandManager::default(),
             snapshot_manager: NopSnapshotManager,
-            driver: StdEmulatorDriver::default(),
+            driver: NopEmulatorDriver,
             qemu_builder: None,
             phantom: PhantomData,
         }
