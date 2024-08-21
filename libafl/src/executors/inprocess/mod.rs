@@ -438,7 +438,7 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
     OF: Feedback<E::State>,
     E::State: HasExecutions + HasSolutions + HasCorpus,
-    Z: HasObjective<Objective = OF, State = E::State>
+    Z: HasObjective<Objective = OF, State = E::State>,
 {
     let mut observers = executor.observers_mut();
 
