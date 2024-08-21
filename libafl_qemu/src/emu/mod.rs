@@ -6,12 +6,17 @@ use core::fmt::{self, Debug, Display, Formatter};
 use std::{cell::RefCell, ops::Add, pin::Pin};
 
 use hashbrown::HashMap;
-use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple};
+use libafl::{
+    executors::ExitKind,
+    inputs::{HasTargetBytes, UsesInput},
+    observers::ObserversTuple,
+    state::{HasExecutions, State},
+};
 use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestUsize, GuestVirtAddr};
 
 use crate::{
     breakpoint::{Breakpoint, BreakpointId},
-    command::{CommandError, CommandManager, NopCommandManager},
+    command::{CommandError, CommandManager, NopCommandManager, StdCommandManager},
     modules::{EmulatorModuleTuple, StdInstrumentationFilter},
     sync_exit::SyncExit,
     Qemu, QemuExitError, QemuExitReason, QemuInitError, QemuMemoryChunk, QemuShutdownCause, Regs,
@@ -234,6 +239,18 @@ where
     pub fn empty(
     ) -> EmulatorBuilder<NopCommandManager, NopEmulatorDriver, (), S, NopSnapshotManager> {
         EmulatorBuilder::empty()
+    }
+}
+
+impl<S> Emulator<StdCommandManager<S>, StdEmulatorDriver, (), S, StdSnapshotManager>
+where
+    S: State + HasExecutions + Unpin,
+    S::Input: HasTargetBytes,
+{
+    #[must_use]
+    pub fn builder(
+    ) -> EmulatorBuilder<StdCommandManager<S>, StdEmulatorDriver, (), S, StdSnapshotManager> {
+        EmulatorBuilder::default()
     }
 }
 

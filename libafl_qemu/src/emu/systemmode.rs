@@ -160,18 +160,6 @@ impl IsSnapshotManager for FastSnapshotManager {
     }
 }
 
-impl<S> Emulator<StdCommandManager<S>, StdEmulatorDriver, (), S, StdSnapshotManager>
-where
-    S: State + HasExecutions + Unpin,
-    S::Input: HasTargetBytes,
-{
-    #[must_use]
-    pub fn builder(
-    ) -> EmulatorBuilder<StdCommandManager<S>, StdEmulatorDriver, (), S, StdSnapshotManager> {
-        EmulatorBuilder::default()
-    }
-}
-
 impl<CM, ED, ET, S, SM> Emulator<CM, ED, ET, S, SM>
 where
     CM: CommandManager<ED, ET, S, SM>,

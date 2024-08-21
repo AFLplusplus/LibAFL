@@ -1,27 +1,9 @@
-use libafl::{
-    inputs::{HasTargetBytes, UsesInput},
-    state::{HasExecutions, State},
-};
+use libafl::inputs::UsesInput;
 use libafl_qemu_sys::{GuestAddr, MmapPerms, VerifyAccess};
 
-use crate::{
-    command::{CommandManager, StdCommandManager},
-    Emulator, EmulatorBuilder, GuestMaps, NopEmulatorDriver, NopSnapshotManager, StdEmulatorDriver,
-};
+use crate::{command::CommandManager, Emulator, GuestMaps, NopSnapshotManager};
 
 pub type StdSnapshotManager = NopSnapshotManager;
-
-impl<S> Emulator<StdCommandManager<S>, StdEmulatorDriver, (), S, StdSnapshotManager>
-where
-    S: State + HasExecutions + Unpin,
-    S::Input: HasTargetBytes,
-{
-    #[must_use]
-    pub fn builder(
-    ) -> EmulatorBuilder<StdCommandManager<S>, NopEmulatorDriver, (), S, StdSnapshotManager> {
-        EmulatorBuilder::default()
-    }
-}
 
 impl<CM, ED, ET, S, SM> Emulator<CM, ED, ET, S, SM>
 where

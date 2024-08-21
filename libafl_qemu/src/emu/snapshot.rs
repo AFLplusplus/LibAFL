@@ -52,6 +52,12 @@ pub enum SnapshotManagerCheckError {
 #[derive(Debug, Clone, Copy)]
 pub struct NopSnapshotManager;
 
+impl Default for NopSnapshotManager {
+    fn default() -> Self {
+        NopSnapshotManager
+    }
+}
+
 impl IsSnapshotManager for NopSnapshotManager {
     fn save(&mut self, _qemu: Qemu) -> SnapshotId {
         SnapshotId { id: 0 }
