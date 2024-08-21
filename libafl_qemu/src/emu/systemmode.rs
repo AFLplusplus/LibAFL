@@ -1,36 +1,26 @@
-use std::{
-    fmt::Debug,
-    sync::atomic::{AtomicU64, Ordering},
-};
+use std::fmt::Debug;
 
 use hashbrown::HashMap;
-use libafl::inputs::UsesInput;
+use libafl::{
+    inputs::{HasTargetBytes, UsesInput},
+    prelude::{HasExecutions, State},
+};
 use libafl_qemu_sys::GuestPhysAddr;
 
 use crate::{
-    emu::IsSnapshotManager, DeviceSnapshotFilter, Emulator, Qemu, QemuSnapshotCheckResult,
-    SnapshotId, SnapshotManagerError,
+    command::{CommandManager, StdCommandManager},
+    emu::{IsSnapshotManager, QemuSnapshotCheckResult},
+    DeviceSnapshotFilter, Emulator, EmulatorBuilder, Qemu, SnapshotId, SnapshotManagerError,
+    StdEmulatorDriver,
 };
-
-impl SnapshotId {
-    fn gen_unique_id() -> SnapshotId {
-        static UNIQUE_ID: AtomicU64 = AtomicU64::new(0);
-
-        let unique_id = UNIQUE_ID.fetch_add(1, Ordering::SeqCst);
-
-        SnapshotId { id: unique_id }
-    }
-
-    fn inner(&self) -> u64 {
-        self.id
-    }
-}
 
 #[derive(Debug, Clone)]
 pub enum SnapshotManager {
     Qemu(QemuSnapshotManager),
     Fast(FastSnapshotManager),
 }
+
+pub type StdSnapshotManager = FastSnapshotManager;
 
 impl IsSnapshotManager for SnapshotManager {
     fn save(&mut self, qemu: Qemu) -> SnapshotId {
@@ -42,23 +32,23 @@ impl IsSnapshotManager for SnapshotManager {
 
     fn restore(
         &mut self,
-        snapshot_id: &SnapshotId,
         qemu: Qemu,
+        snapshot_id: &SnapshotId,
     ) -> Result<(), SnapshotManagerError> {
         match self {
-            SnapshotManager::Qemu(qemu_sm) => qemu_sm.restore(snapshot_id, qemu),
-            SnapshotManager::Fast(fast_sm) => fast_sm.restore(snapshot_id, qemu),
+            SnapshotManager::Qemu(qemu_sm) => qemu_sm.restore(qemu, snapshot_id),
+            SnapshotManager::Fast(fast_sm) => fast_sm.restore(qemu, snapshot_id),
         }
     }
 
     fn do_check(
         &self,
-        reference_snapshot_id: &SnapshotId,
         qemu: Qemu,
+        reference_snapshot_id: &SnapshotId,
     ) -> Result<QemuSnapshotCheckResult, SnapshotManagerError> {
         match self {
-            SnapshotManager::Qemu(qemu_sm) => qemu_sm.do_check(reference_snapshot_id, qemu),
-            SnapshotManager::Fast(fast_sm) => fast_sm.do_check(reference_snapshot_id, qemu),
+            SnapshotManager::Qemu(qemu_sm) => qemu_sm.do_check(qemu, reference_snapshot_id),
+            SnapshotManager::Fast(fast_sm) => fast_sm.do_check(qemu, reference_snapshot_id),
         }
     }
 }
@@ -115,8 +105,8 @@ impl IsSnapshotManager for QemuSnapshotManager {
 
     fn restore(
         &mut self,
-        snapshot_id: &SnapshotId,
         qemu: Qemu,
+        snapshot_id: &SnapshotId,
     ) -> Result<(), SnapshotManagerError> {
         qemu.load_snapshot(self.snapshot_id_to_name(snapshot_id).as_str(), self.is_sync);
         Ok(())
@@ -124,8 +114,8 @@ impl IsSnapshotManager for QemuSnapshotManager {
 
     fn do_check(
         &self,
-        _reference_snapshot_id: &SnapshotId,
         _qemu: Qemu,
+        _reference_snapshot_id: &SnapshotId,
     ) -> Result<QemuSnapshotCheckResult, SnapshotManagerError> {
         // We consider the qemu implementation to be 'ideal' for now.
         Ok(QemuSnapshotCheckResult::default())
@@ -142,8 +132,8 @@ impl IsSnapshotManager for FastSnapshotManager {
 
     fn restore(
         &mut self,
-        snapshot_id: &SnapshotId,
         qemu: Qemu,
+        snapshot_id: &SnapshotId,
     ) -> Result<(), SnapshotManagerError> {
         let fast_snapshot_ptr = *self
             .snapshots
@@ -159,8 +149,8 @@ impl IsSnapshotManager for FastSnapshotManager {
 
     fn do_check(
         &self,
-        reference_snapshot_id: &SnapshotId,
         qemu: Qemu,
+        reference_snapshot_id: &SnapshotId,
     ) -> Result<QemuSnapshotCheckResult, SnapshotManagerError> {
         let fast_snapshot_ptr = *self.snapshots.get(reference_snapshot_id).ok_or(
             SnapshotManagerError::SnapshotIdNotFound(*reference_snapshot_id),
@@ -170,8 +160,9 @@ impl IsSnapshotManager for FastSnapshotManager {
     }
 }
 
-impl<CM, EH, ET, S> Emulator<CM, EH, ET, S>
+impl<CM, ED, ET, S, SM> Emulator<CM, ED, ET, S, SM>
 where
+    CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
 {
     /// Write a value to a phsical guest address, including ROM areas.

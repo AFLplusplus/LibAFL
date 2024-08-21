@@ -38,13 +38,12 @@ use libafl_bolts::{
     tuples::{tuple_list, Merge},
 };
 use libafl_qemu::{
-    command::NopCommandManager,
     modules::{
         cmplog::CmpLogObserver,
         edges::{edges_map_mut_ptr, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND},
         EmulatorModuleTuple,
     },
-    Emulator, NopEmulatorExitHandler, Qemu, QemuExecutor,
+    Emulator, Qemu, QemuExecutor,
 };
 use typed_builder::TypedBuilder;
 
@@ -150,18 +149,15 @@ impl<'a, M: Monitor> Instance<'a, M> {
 
         let harness = Harness::new(self.qemu)?;
         let mut harness =
-            |_emulator: &mut Emulator<_, _, _, _>, input: &BytesInput| harness.run(input);
+            |_emulator: &mut Emulator<_, _, _, _, _>, input: &BytesInput| harness.run(input);
 
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-        let emulator = Emulator::new_with_qemu(
-            *self.qemu,
-            modules,
-            NopEmulatorExitHandler,
-            NopCommandManager,
-        )
-        .unwrap();
+        let emulator = Emulator::empty()
+            .qemu(*self.qemu)
+            .modules(modules)
+            .build()?;
 
         if self.options.is_cmplog_core(self.core_id) {
             // Create a QEMU in-process executor

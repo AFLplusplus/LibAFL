@@ -29,14 +29,14 @@ use libafl_bolts::{
 };
 use libafl_qemu::{
     breakpoint::Breakpoint,
-    command::{EndCommand, StartCommand, StdCommandManager},
+    command::{EndCommand, StartCommand},
     elf::EasyElf,
     emu::Emulator,
     executor::QemuExecutor,
     modules::edges::{
         edges_map_mut_ptr, EdgeCoverageModule, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
     },
-    FastSnapshotManager, GuestPhysAddr, GuestReg, QemuMemoryChunk, StdEmulatorExitHandler,
+    GuestPhysAddr, GuestReg, QemuMemoryChunk,
 };
 
 // use libafl_qemu::QemuSnapshotBuilder; // for normal qemu snapshot
@@ -85,25 +85,14 @@ pub fn fuzz() {
     println!("Breakpoint address = {breakpoint:#x}");
 
     let mut run_client = |state: Option<_>, mut mgr, _core_id| {
-        // Initialize QEMU
         let args: Vec<String> = env::args().collect();
-        let env: Vec<(String, String)> = env::vars().collect();
 
-        // Choose Snapshot Builder
-        // let emu_snapshot_manager = QemuSnapshotBuilder::new(true);
-        let emu_snapshot_manager = FastSnapshotManager::new();
-
-        // Choose Exit Handler
-        let emu_exit_handler = StdEmulatorExitHandler::new(emu_snapshot_manager);
-
-        // Choose Command Manager
-        let cmd_manager = StdCommandManager::new();
-
-        // Instantiate hooks
-        let modules = tuple_list!(EdgeCoverageModule::default());
-
-        // Create emulator
-        let emu = Emulator::new(&args, &env, modules, emu_exit_handler, cmd_manager).unwrap();
+        // Initialize QEMU Emulator
+        let emu = Emulator::builder()
+            .qemu_cli(args)
+            .add_module(EdgeCoverageModule::default())
+            .build()
+            .unwrap();
 
         // Set breakpoints of interest with corresponding commands.
         emu.add_breakpoint(
@@ -113,13 +102,18 @@ pub fn fuzz() {
                     input_addr,
                     unsafe { MAX_INPUT_SIZE } as GuestReg,
                     None,
-                )),
+                ))
+                .into(),
                 true,
             ),
             true,
         );
         emu.add_breakpoint(
-            Breakpoint::with_command(breakpoint, EndCommand::new(Some(ExitKind::Ok)), false),
+            Breakpoint::with_command(
+                breakpoint,
+                EndCommand::new(Some(ExitKind::Ok)).into(),
+                false,
+            ),
             true,
         );
 
@@ -127,7 +121,7 @@ pub fn fuzz() {
         println!("Devices = {:?}", devices);
 
         // The wrapped harness function, calling out to the LLVM-style harness
-        let mut harness = |emulator: &mut Emulator<_, _, _, _>, input: &BytesInput| unsafe {
+        let mut harness = |emulator: &mut Emulator<_, _, _, _, _>, input: &BytesInput| unsafe {
             emulator.run(input).unwrap().try_into().unwrap()
         };
 

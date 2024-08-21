@@ -39,9 +39,8 @@ use libafl_bolts::{
 use libafl_qemu::modules::CmpLogModule;
 pub use libafl_qemu::qemu::Qemu;
 use libafl_qemu::{
-    command::NopCommandManager,
     modules::edges::{self, EdgeCoverageModule},
-    Emulator, NopEmulatorExitHandler, QemuExecutor,
+    Emulator, QemuExecutor,
 };
 use libafl_targets::{edges_map_mut_ptr, CmpLogObserver};
 use typed_builder::TypedBuilder;
@@ -230,19 +229,14 @@ where
                     }
                 };
 
-                let mut harness = |_emulator: &mut Emulator<_, _, _, _>, input: &BytesInput| {
+                let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>, input: &BytesInput| {
                     let target = input.target_bytes();
                     let buf = target.as_slice();
                     harness_bytes(buf);
                     ExitKind::Ok
                 };
 
-                let emulator = Emulator::new_with_qemu(
-                    qemu,
-                    modules,
-                    NopEmulatorExitHandler,
-                    NopCommandManager,
-                )?;
+                let emulator = Emulator::empty().qemu(qemu).modules(modules).build()?;
 
                 let executor = QemuExecutor::new(
                     emulator,
@@ -345,21 +339,16 @@ where
                     }
                 }
             } else {
-                let tools = tuple_list!(EdgeCoverageModule::default());
+                let modules = tuple_list!(EdgeCoverageModule::default());
 
-                let mut harness = |_emulator: &mut Emulator<_, _, _, _>, input: &BytesInput| {
+                let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>, input: &BytesInput| {
                     let target = input.target_bytes();
                     let buf = target.as_slice();
                     harness_bytes(buf);
                     ExitKind::Ok
                 };
 
-                let emulator = Emulator::new_with_qemu(
-                    qemu,
-                    tools,
-                    NopEmulatorExitHandler,
-                    NopCommandManager,
-                )?;
+                let emulator = Emulator::empty().qemu(qemu).modules(modules).build()?;
 
                 let mut executor = QemuExecutor::new(
                     emulator,

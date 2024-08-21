@@ -365,9 +365,9 @@ impl From<QemuConfig> for Result<Qemu, QemuInitError> {
         let args = config
             .to_string()
             .split(' ')
-            .map(std::string::ToString::to_string)
+            .map(ToString::to_string)
             .collect::<Vec<String>>();
-        let qemu = Qemu::init(&args, &[])?;
+        let qemu = Qemu::init(&args)?;
         QEMU_CONFIG
             .set(config)
             .map_err(|_| unreachable!("BUG: QEMU_CONFIG was already set but Qemu was not init!"))?;

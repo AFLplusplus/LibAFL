@@ -129,7 +129,7 @@ impl<'a> Client<'a> {
                 let (emu, asan_lib) = init_qemu_with_asan_guest(&mut args, &mut env)?;
                 (emu, None, Some(asan_lib))
             } else {
-                (Qemu::init(&args, &env)?, None, None)
+                (Qemu::init(&args)?, None, None)
             }
         };
 

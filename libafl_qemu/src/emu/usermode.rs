@@ -1,10 +1,13 @@
 use libafl::inputs::UsesInput;
 use libafl_qemu_sys::{GuestAddr, MmapPerms, VerifyAccess};
 
-use crate::{Emulator, GuestMaps};
+use crate::{command::CommandManager, Emulator, GuestMaps, NopSnapshotManager};
 
-impl<CM, EH, ET, S> Emulator<CM, EH, ET, S>
+pub type StdSnapshotManager = NopSnapshotManager;
+
+impl<CM, ED, ET, S, SM> Emulator<CM, ED, ET, S, SM>
 where
+    CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
 {
     /// This function gets the memory mappings from the emulator.

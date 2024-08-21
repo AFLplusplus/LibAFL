@@ -720,7 +720,7 @@ where
     where
         MO: MapObserver + Truncate, // TODO maybe enforce Entry = u8 for the cov map
         A: Observer<S> + AsRef<MO> + AsMut<MO>,
-        OT: ObserversTuple<S> + Prepend<MO, PreprendResult = OT>,
+        OT: ObserversTuple<S> + Prepend<MO>,
         S: UsesInput,
         S::Input: Input + HasTargetBytes,
         SP: ShMemProvider,
