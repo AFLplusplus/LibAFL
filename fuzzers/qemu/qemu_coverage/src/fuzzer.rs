@@ -28,8 +28,8 @@ use libafl_bolts::{
 use libafl_qemu::{
     elf::EasyElf,
     modules::{drcov::DrCovModule, QemuInstrumentationAddressRangeFilter},
-    ArchExtras, CallingConvention, Emulator, EmulatorBuilder, GuestAddr, GuestReg, MmapPerms, Qemu,
-    QemuExecutor, QemuExitReason, QemuRWError, QemuShutdownCause, Regs,
+    ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExecutor,
+    QemuExitReason, QemuRWError, QemuShutdownCause, Regs,
 };
 
 #[derive(Default)]
@@ -238,7 +238,7 @@ pub fn fuzz() {
                 false,
             ));
 
-            let emulator = EmulatorBuilder::empty()
+            let emulator = Emulator::empty()
                 .qemu(qemu)
                 .modules(emulator_modules)
                 .build()?;

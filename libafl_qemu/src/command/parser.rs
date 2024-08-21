@@ -1,4 +1,4 @@
-use std::{fmt::Debug, sync::OnceLock};
+use std::sync::OnceLock;
 
 use enum_map::{enum_map, EnumMap};
 use libafl::{
@@ -96,7 +96,7 @@ pub struct StartPhysCommandParser;
 impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorDriver, ET, S, SM> for StartPhysCommandParser
 where
     CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
-    S: UsesInput + Debug,
+    S: UsesInput,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
 {
@@ -124,7 +124,7 @@ pub struct StartVirtCommandParser;
 impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorDriver, ET, S, SM> for StartVirtCommandParser
 where
     CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
-    S: UsesInput + Debug,
+    S: UsesInput,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
 {

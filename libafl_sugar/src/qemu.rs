@@ -40,7 +40,7 @@ use libafl_qemu::modules::CmpLogModule;
 pub use libafl_qemu::qemu::Qemu;
 use libafl_qemu::{
     modules::edges::{self, EdgeCoverageModule},
-    Emulator, EmulatorBuilder, QemuExecutor,
+    Emulator, QemuExecutor,
 };
 use libafl_targets::{edges_map_mut_ptr, CmpLogObserver};
 use typed_builder::TypedBuilder;
@@ -236,10 +236,7 @@ where
                     ExitKind::Ok
                 };
 
-                let emulator = EmulatorBuilder::empty()
-                    .qemu(qemu)
-                    .modules(modules)
-                    .build()?;
+                let emulator = Emulator::empty().qemu(qemu).modules(modules).build()?;
 
                 let executor = QemuExecutor::new(
                     emulator,
@@ -351,10 +348,7 @@ where
                     ExitKind::Ok
                 };
 
-                let emulator = EmulatorBuilder::empty()
-                    .qemu(qemu)
-                    .modules(modules)
-                    .build()?;
+                let emulator = Emulator::empty().qemu(qemu).modules(modules).build()?;
 
                 let mut executor = QemuExecutor::new(
                     emulator,

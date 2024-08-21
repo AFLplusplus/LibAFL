@@ -43,7 +43,7 @@ use libafl_qemu::{
         edges::{edges_map_mut_ptr, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND},
         EmulatorModuleTuple,
     },
-    Emulator, EmulatorBuilder, Qemu, QemuExecutor,
+    Emulator, Qemu, QemuExecutor,
 };
 use typed_builder::TypedBuilder;
 
@@ -154,7 +154,7 @@ impl<'a, M: Monitor> Instance<'a, M> {
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-        let emulator = EmulatorBuilder::empty()
+        let emulator = Emulator::empty()
             .qemu(*self.qemu)
             .modules(modules)
             .build()?;

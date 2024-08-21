@@ -54,7 +54,6 @@ use libafl_qemu::{
         edges_map_mut_ptr, EdgeCoverageModule, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
     },
     Emulator,
-    EmulatorBuilder,
     GuestReg,
     //snapshot::QemuSnapshotHelper,
     MmapPerms,
@@ -364,10 +363,7 @@ fn fuzz(
         //QemuSnapshotHelper::new()
     );
 
-    let emulator = EmulatorBuilder::empty()
-        .qemu(qemu)
-        .modules(modules)
-        .build()?;
+    let emulator = Emulator::empty().qemu(qemu).modules(modules).build()?;
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let executor = QemuExecutor::new(

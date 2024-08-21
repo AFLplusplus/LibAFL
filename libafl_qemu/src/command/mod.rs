@@ -1,4 +1,5 @@
 use std::{
+    fmt,
     fmt::{Debug, Display, Formatter},
     marker::PhantomData,
 };
@@ -54,9 +55,22 @@ pub const VERSION: u64 = bindings::LIBAFL_QEMU_HDR_VERSION_NUMBER as u64;
 macro_rules! define_std_command_manager {
     ($name:ident, [$($command:ty),+], [$($native_command_parser:ty),+]) => {
         paste! {
-            #[derive(Clone, Debug)]
             pub struct $name<S> {
                 phantom: PhantomData<S>,
+            }
+
+            impl<S> Clone for $name<S> {
+                fn clone(&self) -> Self {
+                    Self {
+                        phantom: PhantomData
+                    }
+                }
+            }
+
+            impl<S> Debug for $name<S> {
+                fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+                    write!(f, stringify!($name))
+                }
             }
 
             impl<S> Default for $name<S> {
@@ -70,7 +84,7 @@ macro_rules! define_std_command_manager {
             impl<ET, S, SM> CommandManager<StdEmulatorDriver, ET, S, SM> for $name<S>
             where
                 ET: EmulatorModuleTuple<S> + StdInstrumentationFilter,
-                S: UsesInput + Clone + Debug + Unpin,
+                S: UsesInput + Unpin,
                 S::Input: HasTargetBytes,
                 SM: IsSnapshotManager,
             {
@@ -98,13 +112,12 @@ macro_rules! define_std_command_manager {
             impl<ET, S, SM> IsCommand<$name<S>, StdEmulatorDriver, ET, S, SM> for [<$name Commands>]
             where
                 ET: EmulatorModuleTuple<S> + StdInstrumentationFilter,
-                S: UsesInput + Debug + Clone + Unpin,
+                S: UsesInput + Unpin,
                 S::Input: HasTargetBytes,
                 SM: IsSnapshotManager,
             {
                 fn usable_at_runtime(&self) -> bool {
                     match self {
-                        // [<$name Commands>]::StartPhysCommandParserCmd(cmd) => <StartCommand as IsCommand<S>>::usable_at_runtime(cmd)
                         $([<$name Commands>]::$command(cmd) => <$command as IsCommand<$name<S>, StdEmulatorDriver, ET, S, SM>>::usable_at_runtime(cmd)),+
                     }
                 }
@@ -116,7 +129,6 @@ macro_rules! define_std_command_manager {
                     ret_reg: Option<Regs>
                 ) -> Result<Option<EmulatorDriverResult<$name<S>, StdEmulatorDriver, ET, S, SM>>, EmulatorDriverError> {
                     match self {
-                        // [<$name Commands>]::StartPhysCommandParserCmd(cmd) => cmd.run(emu, input, ret_reg)
                         $([<$name Commands>]::$command(cmd) => cmd.run(emu, driver, input, ret_reg)),+
                     }
                 }
@@ -133,9 +145,17 @@ macro_rules! define_std_command_manager {
     };
 }
 
+pub trait CommandManager<ED, ET, S, SM>: Sized + Debug
+where
+    S: UsesInput,
+{
+    type Commands: IsCommand<Self, ED, ET, S, SM>;
+
+    fn parse(&self, qemu: Qemu) -> Result<Self::Commands, CommandError>;
+}
+
 #[derive(Clone, Debug)]
 pub struct NopCommandManager;
-
 impl<ED, ET, S, SM> CommandManager<ED, ET, S, SM> for NopCommandManager
 where
     S: UsesInput,
@@ -171,15 +191,6 @@ define_std_command_manager!(
     ]
 );
 
-pub trait CommandManager<ED, ET, S, SM>: Sized + Debug
-where
-    S: UsesInput,
-{
-    type Commands: IsCommand<Self, ED, ET, S, SM>;
-
-    fn parse(&self, qemu: Qemu) -> Result<Self::Commands, CommandError>;
-}
-
 #[derive(Debug, Clone, Enum, TryFromPrimitive)]
 #[repr(u64)]
 pub enum NativeExitKind {
@@ -188,7 +199,7 @@ pub enum NativeExitKind {
     Crash = bindings::LibaflQemuEndStatus_LIBAFL_QEMU_END_CRASH.0 as u64, // Crash reported in the VM
 }
 
-pub trait IsCommand<CM, ED, ET, S, SM>: Debug + Clone
+pub trait IsCommand<CM, ED, ET, S, SM>: Clone + Debug
 where
     CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
@@ -234,7 +245,7 @@ impl From<QemuRWError> for CommandError {
 pub struct NopCommand;
 
 impl Display for NopCommand {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "NopCommand")
     }
 }
@@ -387,7 +398,7 @@ pub struct StartCommand {
 impl<CM, ET, S, SM> IsCommand<CM, StdEmulatorDriver, ET, S, SM> for StartCommand
 where
     CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
-    S: UsesInput + Debug,
+    S: UsesInput,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
 {

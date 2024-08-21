@@ -32,7 +32,6 @@ use libafl_qemu::{
     modules::edges::{
         edges_map_mut_ptr, EdgeCoverageModule, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
     },
-    EmulatorBuilder,
 };
 
 // use libafl_qemu::QemuSnapshotBuilder; for normal qemu snapshot
@@ -57,7 +56,7 @@ pub fn fuzz() {
         // Choose modules to use
         let modules = tuple_list!(EdgeCoverageModule::default());
 
-        let emu = EmulatorBuilder::default()
+        let emu = Emulator::default()
             .qemu_cli(args)
             .modules(modules)
             .build()?;

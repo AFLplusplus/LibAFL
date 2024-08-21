@@ -1,13 +1,17 @@
 use std::fmt::Debug;
 
 use hashbrown::HashMap;
-use libafl::inputs::UsesInput;
+use libafl::{
+    inputs::{HasTargetBytes, UsesInput},
+    prelude::{HasExecutions, State},
+};
 use libafl_qemu_sys::GuestPhysAddr;
 
 use crate::{
-    command::CommandManager,
+    command::{CommandManager, StdCommandManager},
     emu::{IsSnapshotManager, QemuSnapshotCheckResult},
-    DeviceSnapshotFilter, Emulator, Qemu, SnapshotId, SnapshotManagerError,
+    DeviceSnapshotFilter, Emulator, EmulatorBuilder, Qemu, SnapshotId, SnapshotManagerError,
+    StdEmulatorDriver,
 };
 
 #[derive(Debug, Clone)]
@@ -15,6 +19,8 @@ pub enum SnapshotManager {
     Qemu(QemuSnapshotManager),
     Fast(FastSnapshotManager),
 }
+
+pub type StdSnapshotManager = FastSnapshotManager;
 
 impl IsSnapshotManager for SnapshotManager {
     fn save(&mut self, qemu: Qemu) -> SnapshotId {
@@ -151,6 +157,19 @@ impl IsSnapshotManager for FastSnapshotManager {
         )?;
 
         unsafe { Ok(qemu.check_fast_snapshot(fast_snapshot_ptr)) }
+    }
+}
+
+impl<S> EmulatorBuilder<StdCommandManager<S>, StdEmulatorDriver, (), S, crate::StdSnapshotManager>
+where
+    S: State + HasExecutions + Unpin,
+    S::Input: HasTargetBytes,
+{
+    #[allow(clippy::should_implement_trait)]
+    #[must_use]
+    pub fn default(
+    ) -> EmulatorBuilder<StdCommandManager<S>, StdEmulatorDriver, (), S, StdSnapshotManager> {
+        EmulatorBuilder::default()
     }
 }
 

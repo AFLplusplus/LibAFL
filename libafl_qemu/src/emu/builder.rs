@@ -13,6 +13,7 @@ use crate::{
     config::QemuConfig,
     modules::{EmulatorModule, EmulatorModuleTuple},
     Emulator, NopEmulatorDriver, NopSnapshotManager, Qemu, QemuInitError, StdEmulatorDriver,
+    StdSnapshotManager,
 };
 
 #[derive(Clone, Debug)]
@@ -53,7 +54,7 @@ where
 }
 
 #[cfg(emulation_mode = "usermode")]
-impl<S> EmulatorBuilder<StdCommandManager<S>, StdEmulatorDriver, (), S, NopSnapshotManager>
+impl<S> EmulatorBuilder<StdCommandManager<S>, StdEmulatorDriver, (), S, StdSnapshotManager>
 where
     S: State + HasExecutions + Unpin,
     S::Input: HasTargetBytes,
@@ -73,7 +74,7 @@ where
 }
 
 #[cfg(emulation_mode = "systemmode")]
-impl<S> EmulatorBuilder<StdCommandManager<S>, StdEmulatorDriver, (), S, FastSnapshotManager>
+impl<S> EmulatorBuilder<StdCommandManager<S>, StdEmulatorDriver, (), S, StdSnapshotManager>
 where
     S: State + HasExecutions + Unpin,
     S::Input: HasTargetBytes,

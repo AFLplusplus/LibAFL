@@ -11,8 +11,8 @@ use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestUsize, GuestVirtAddr};
 
 use crate::{
     breakpoint::{Breakpoint, BreakpointId},
-    command::{CommandError, CommandManager},
-    modules::EmulatorModuleTuple,
+    command::{CommandError, CommandManager, NopCommandManager},
+    modules::{EmulatorModuleTuple, StdInstrumentationFilter},
     sync_exit::SyncExit,
     Qemu, QemuExitError, QemuExitReason, QemuInitError, QemuMemoryChunk, QemuShutdownCause, Regs,
     CPU,
@@ -32,13 +32,13 @@ pub use snapshot::*;
 
 #[cfg(emulation_mode = "usermode")]
 mod usermode;
+#[cfg(emulation_mode = "usermode")]
+pub use usermode::*;
 
 #[cfg(emulation_mode = "systemmode")]
 mod systemmode;
 #[cfg(emulation_mode = "systemmode")]
 pub use systemmode::*;
-
-use crate::modules::StdInstrumentationFilter;
 
 #[derive(Clone, Copy)]
 pub enum GuestAddrKind {
@@ -226,6 +226,52 @@ impl From<CommandError> for EmulatorExitError {
     }
 }
 
+impl<S> Emulator<NopCommandManager, NopEmulatorDriver, (), S, NopSnapshotManager>
+where
+    S: UsesInput,
+{
+    #[must_use]
+    pub fn empty(
+    ) -> EmulatorBuilder<NopCommandManager, NopEmulatorDriver, (), S, NopSnapshotManager> {
+        EmulatorBuilder::empty()
+    }
+}
+
+impl<CM, ED, ET, S, SM> Emulator<CM, ED, ET, S, SM>
+where
+    CM: CommandManager<ED, ET, S, SM>,
+    S: UsesInput,
+{
+    pub fn modules(&self) -> &EmulatorModules<ET, S> {
+        &self.modules
+    }
+
+    #[must_use]
+    pub fn qemu(&self) -> Qemu {
+        self.qemu
+    }
+
+    #[must_use]
+    pub fn driver(&self) -> &ED {
+        self.driver.as_ref().unwrap()
+    }
+
+    #[must_use]
+    pub fn driver_mut(&mut self) -> &mut ED {
+        self.driver.as_mut().unwrap()
+    }
+
+    #[must_use]
+    pub fn snapshot_manager(&self) -> &SM {
+        &self.snapshot_manager
+    }
+
+    #[must_use]
+    pub fn snapshot_manager_mut(&mut self) -> &mut SM {
+        &mut self.snapshot_manager
+    }
+}
+
 impl<CM, ED, ET, S, SM> Emulator<CM, ED, ET, S, SM>
 where
     CM: CommandManager<ED, ET, S, SM>,
@@ -295,41 +341,6 @@ where
         OT: ObserversTuple<S>,
     {
         self.modules.post_exec_all(input, observers, exit_kind);
-    }
-}
-
-impl<CM, ED, ET, S, SM> Emulator<CM, ED, ET, S, SM>
-where
-    CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput,
-{
-    pub fn modules(&self) -> &EmulatorModules<ET, S> {
-        &self.modules
-    }
-
-    #[must_use]
-    pub fn qemu(&self) -> Qemu {
-        self.qemu
-    }
-
-    #[must_use]
-    pub fn driver(&self) -> &ED {
-        self.driver.as_ref().unwrap()
-    }
-
-    #[must_use]
-    pub fn driver_mut(&mut self) -> &mut ED {
-        self.driver.as_mut().unwrap()
-    }
-
-    #[must_use]
-    pub fn snapshot_manager(&self) -> &SM {
-        &self.snapshot_manager
-    }
-
-    #[must_use]
-    pub fn snapshot_manager_mut(&mut self) -> &mut SM {
-        &mut self.snapshot_manager
     }
 }
 

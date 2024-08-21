@@ -52,8 +52,8 @@ use libafl_qemu::{
         cmplog::{CmpLogChildModule, CmpLogMap, CmpLogObserver},
         edges::{EdgeCoverageChildModule, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},
     },
-    Emulator, EmulatorBuilder, GuestReg, MmapPerms, QemuExitError, QemuExitReason,
-    QemuForkExecutor, QemuShutdownCause, Regs,
+    Emulator, GuestReg, MmapPerms, QemuExitError, QemuExitReason, QemuForkExecutor,
+    QemuShutdownCause, Regs,
 };
 #[cfg(unix)]
 use nix::unistd::dup;
@@ -155,7 +155,7 @@ fn fuzz(
         CmpLogChildModule::default(),
     );
 
-    let emulator = EmulatorBuilder::empty()
+    let emulator = Emulator::empty()
         .qemu_cli(args)
         .modules(emulator_modules)
         .build()?;

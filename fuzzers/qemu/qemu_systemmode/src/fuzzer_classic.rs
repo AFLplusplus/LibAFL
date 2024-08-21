@@ -36,8 +36,7 @@ use libafl_qemu::{
     modules::edges::{
         edges_map_mut_ptr, EdgeCoverageModule, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
     },
-    Emulator, EmulatorBuilder, Qemu, QemuExitError, QemuExitReason, QemuRWError, QemuShutdownCause,
-    Regs,
+    Emulator, Qemu, QemuExitError, QemuExitReason, QemuRWError, QemuShutdownCause, Regs,
 };
 use libafl_qemu_sys::GuestPhysAddr;
 
@@ -107,7 +106,7 @@ pub fn fuzz() {
 
         let emulator_modules = tuple_list!(EdgeCoverageModule::default());
 
-        let emulator = EmulatorBuilder::empty()
+        let emulator = Emulator::empty()
             .qemu(qemu)
             .modules(emulator_modules)
             .build()?;
