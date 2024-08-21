@@ -236,7 +236,7 @@ where
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State> + HasScheduler + ExecutionProcessor,
+        Z: HasObjective<Objective = OF, State = E::State>,
     {
         // # Safety
         // We get a pointer to `GLOBAL_STATE` that will be initialized at this point in time.
@@ -276,7 +276,7 @@ where
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: State + HasExecutions + HasSolutions + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State> + HasScheduler + ExecutionProcessor,
+        Z: HasObjective<Objective = OF, State = E::State>,
     {
         let ret;
         #[cfg(feature = "std")]
