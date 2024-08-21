@@ -4,7 +4,10 @@ use libafl::{
 };
 use libafl_qemu_sys::{GuestAddr, MmapPerms, VerifyAccess};
 
-use crate::{command::{CommandManager, StdCommandManager}, Emulator, EmulatorBuilder, GuestMaps, NopEmulatorDriver, NopSnapshotManager, StdEmulatorDriver};
+use crate::{
+    command::{CommandManager, StdCommandManager},
+    Emulator, EmulatorBuilder, GuestMaps, NopEmulatorDriver, NopSnapshotManager, StdEmulatorDriver,
+};
 
 pub type StdSnapshotManager = NopSnapshotManager;
 
