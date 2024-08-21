@@ -18,7 +18,7 @@ pub mod windows_asan_handler {
             ExitKind, HasObservers,
         },
         feedbacks::Feedback,
-        fuzzer::{ExecutionProcessor, HasObjective, HasScheduler},
+        fuzzer::HasObjective,
         inputs::UsesInput,
         state::{HasCorpus, HasExecutions, HasSolutions},
     };
@@ -132,7 +132,7 @@ pub mod windows_exception_handler {
             Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
-        fuzzer::{ExecutionProcessor, HasObjective, HasScheduler},
+        fuzzer::HasObjective,
         inputs::{Input, UsesInput},
         state::{HasCorpus, HasExecutions, HasSolutions, State},
     };
