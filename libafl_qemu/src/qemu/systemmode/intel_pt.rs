@@ -159,33 +159,7 @@ impl IntelPT {
         }
     }
 
-    // TODO remove
-    #[deprecated]
-    fn read_trace_into<T: Write>(&self, buff: &mut T) -> Result<(), Error> {
-        // TODO: should we read also the normal buffer?
-        let aux_head = unsafe { ptr::addr_of_mut!((*self.buff_metadata).aux_head) };
-        let aux_tail = unsafe { ptr::addr_of_mut!((*self.buff_metadata).aux_tail) };
-
-        let head = wrap_aux_pointer(unsafe { aux_head.read_volatile() });
-        let tail = wrap_aux_pointer(unsafe { aux_tail.read_volatile() });
-
-        debug_assert!(head >= tail, "Intel PT: aux head is behind aux tail");
-
-        // smp_rmb(); // TODO check how to call this in Rust
-
-        buff.write_all(unsafe {
-            slice::from_raw_parts(
-                self.perf_aux_buffer.add(tail as usize) as *const _,
-                (head - tail) as usize,
-            )
-        })
-        .map_err(|e| Error::os_error(e, "Failed to write traces"))?;
-
-        unsafe { aux_tail.write_volatile(tail) }
-        Ok(())
-    }
-
-    pub fn decode(&mut self, image: &mut Image) -> Vec<u64> {
+    pub fn decode(&mut self, image: &mut Image, copy_buffer: Option<&mut Vec<u8>>) -> Vec<u64> {
         let mut ips = Vec::new();
 
         let aux_head = unsafe { ptr::addr_of_mut!((*self.buff_metadata).aux_head) };
@@ -197,10 +171,14 @@ impl IntelPT {
         let len = (head - tail) as usize;
 
         debug_assert!(head >= tail, "Intel PT: aux head is behind aux tail");
+        println!("Intel PT: decoding {} bytes", len);
+        if let Some(copy_buffer) = copy_buffer {
+            copy_buffer.extend_from_slice(unsafe { slice::from_raw_parts(data, len) });
+        }
 
         smp_rmb(); // TODO double check impl
 
-        // TODO handle decoding failures with config.decode.callback = <decode function>; config.decode.context = <decode context>;
+        // TODO handle decoding failures with config.decode.callback = <decode function>; config.decode.context = <decode context>;??
         // TODO remove unwrap()
         let mut config =
             ConfigBuilder::new(unsafe { slice::from_raw_parts_mut(data, len) }).unwrap();
@@ -479,8 +457,9 @@ pub fn current_cpu() -> Option<Cpu> {
 
 #[cfg(test)]
 mod test {
-    use std::{env, fs::OpenOptions, process};
+    use std::{arch::asm, env, fs::OpenOptions, process};
 
+    use libc::getpid;
     use nix::{
         sys::{
             signal::{kill, raise, Signal},
@@ -538,6 +517,17 @@ mod test {
             Ok(ForkResult::Parent { child }) => child,
             Ok(ForkResult::Child) => {
                 raise(Signal::SIGSTOP).expect("Failed to stop the process");
+                unsafe {
+                    let mut count = 0;
+                    asm!(
+                        "2:",
+                        "add {0}, 1",
+                        "cmp {0}, 255",
+                        "jle 2b",
+                        in(reg) &mut count,
+                        options(nostack)
+                    );
+                }
                 process::exit(0);
             }
             Err(e) => panic!("Fork failed {e}"),
@@ -564,15 +554,22 @@ mod test {
                     map.start() as u64,
                 ) {
                     Err(e) => println!(
-                        "Error adding mapping for {:?}: {:?}",
+                        "Error adding mapping for {:?}: {:?}, skipping",
                         map.filename().unwrap(),
                         e
                     ),
-                    _ => (),
+                    Ok(()) => println!(
+                        "mapping for {:?} added successfully {:#x} - {:#x}",
+                        map.filename().unwrap(),
+                        map.start(),
+                        map.start() + map.size()
+                    ),
                 }
             }
         }
-        let mut ips = pt.decode(&mut image);
+        let mut trace = Vec::new();
+        let mut ips = pt.decode(&mut image, Some(&mut trace));
+        dump_trace_to_file(&trace);
         // remove kernel ips
         ips = ips
             .into_iter()
@@ -580,6 +577,20 @@ mod test {
             .collect();
         ips.sort();
         ips.dedup();
-        println!("Intel PT traces unique non kernel block ips: {}", ips.len());
+        println!("Intel PT traces unique non kernel block ips: {:#x?}", ips);
+    }
+
+    fn dump_trace_to_file(buff: &[u8]) -> Result<(), Error> {
+        let trace_path = "test_trace_pid_ipt_raw_trace.tmp";
+        let mut file = OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(trace_path)
+            .expect("Failed to open trace output file");
+
+        file.write_all(buff)
+            .map_err(|e| Error::os_error(e, "Failed to write traces"))?;
+
+        Ok(())
     }
 }
