@@ -16,14 +16,12 @@ use std::{
 };
 
 use libafl_bolts::os::unix_signals::Signal;
-#[cfg(emulation_mode = "systemmode")]
-use libafl_qemu_sys::qemu_init;
 #[cfg(emulation_mode = "usermode")]
-use libafl_qemu_sys::{guest_base, qemu_user_init, VerifyAccess};
+use libafl_qemu_sys::{guest_base, VerifyAccess};
 use libafl_qemu_sys::{
     libafl_flush_jit, libafl_get_exit_reason, libafl_page_from_addr, libafl_qemu_add_gdb_cmd,
     libafl_qemu_cpu_index, libafl_qemu_current_cpu, libafl_qemu_gdb_reply, libafl_qemu_get_cpu,
-    libafl_qemu_num_cpus, libafl_qemu_num_regs, libafl_qemu_read_reg,
+    libafl_qemu_init, libafl_qemu_num_cpus, libafl_qemu_num_regs, libafl_qemu_read_reg,
     libafl_qemu_remove_breakpoint, libafl_qemu_set_breakpoint, libafl_qemu_trigger_breakpoint,
     libafl_qemu_write_reg, CPUArchState, CPUStatePtr, FatPtr, GuestAddr, GuestPhysAddr, GuestUsize,
     GuestVirtAddr,
@@ -33,8 +31,8 @@ use strum::IntoEnumIterator;
 
 use crate::{GuestAddrKind, GuestReg, Regs};
 
-pub mod qemu_config;
-use qemu_config::{QemuConfig, QemuConfigBuilder, QEMU_CONFIG};
+pub mod config;
+use config::{QemuConfig, QemuConfigBuilder, QEMU_CONFIG};
 
 #[cfg(emulation_mode = "usermode")]
 mod usermode;
@@ -70,11 +68,6 @@ pub enum QemuExitReason {
 pub enum QemuExitError {
     UnknownKind, // Exit reason was not NULL, but exit kind is unknown. Should never happen.
     UnexpectedExit, // Qemu exited without going through an expected exit point. Can be caused by a crash for example.
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct QemuSnapshotCheckResult {
-    nb_page_inconsistencies: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -129,15 +122,6 @@ impl QemuRWError {
         }
 
         Ok(())
-    }
-}
-
-/// Represents a QEMU snapshot check result for which no error was detected
-impl Default for QemuSnapshotCheckResult {
-    fn default() -> Self {
-        Self {
-            nb_page_inconsistencies: 0,
-        }
     }
 }
 
@@ -529,7 +513,7 @@ impl Qemu {
     }
 
     #[allow(clippy::must_use_candidate, clippy::similar_names)]
-    pub fn init(args: &[String], env: &[(String, String)]) -> Result<Self, QemuInitError> {
+    pub fn init(args: &[String]) -> Result<Self, QemuInitError> {
         if args.is_empty() {
             return Err(QemuInitError::EmptyArgs);
         }
@@ -555,21 +539,15 @@ impl Qemu {
             .collect();
         let mut argv: Vec<*const u8> = args.iter().map(|x| x.as_ptr() as *const u8).collect();
         argv.push(ptr::null()); // argv is always null terminated.
-        let env_strs: Vec<String> = env
-            .iter()
-            .map(|(k, v)| format!("{}={}\0", &k, &v))
-            .collect();
-        let mut envp: Vec<*const u8> = env_strs.iter().map(|x| x.as_bytes().as_ptr()).collect();
-        envp.push(ptr::null());
+
         unsafe {
-            #[cfg(emulation_mode = "usermode")]
-            qemu_user_init(argc, argv.as_ptr(), envp.as_ptr());
-            #[cfg(emulation_mode = "systemmode")]
-            {
-                qemu_init(argc, argv.as_ptr());
-                libc::atexit(qemu_cleanup_atexit);
-                libafl_qemu_sys::syx_snapshot_init(true);
-            }
+            libafl_qemu_init(argc, argv.as_ptr() as *mut *mut i8);
+        }
+
+        #[cfg(emulation_mode = "systemmode")]
+        unsafe {
+            libc::atexit(qemu_cleanup_atexit);
+            libafl_qemu_sys::syx_snapshot_init(true);
         }
 
         Ok(Qemu { _private: () })
@@ -993,9 +971,9 @@ pub mod pybind {
     impl Qemu {
         #[allow(clippy::needless_pass_by_value)]
         #[new]
-        fn new(args: Vec<String>, env: Vec<(String, String)>) -> PyResult<Qemu> {
-            let qemu = super::Qemu::init(&args, &env)
-                .map_err(|e| PyValueError::new_err(format!("{e}")))?;
+        fn new(args: Vec<String>) -> PyResult<Qemu> {
+            let qemu =
+                super::Qemu::init(&args).map_err(|e| PyValueError::new_err(format!("{e}")))?;
 
             Ok(Qemu { qemu })
         }

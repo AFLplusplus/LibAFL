@@ -12,6 +12,7 @@ use libafl_qemu_sys::{
     libafl_save_qemu_snapshot, qemu_cleanup, qemu_main_loop, vm_start, GuestAddr, GuestPhysAddr,
     GuestUsize, GuestVirtAddr,
 };
+use libc::EXIT_SUCCESS;
 use num_traits::Zero;
 
 use crate::{
@@ -21,7 +22,7 @@ use crate::{
 
 pub(super) extern "C" fn qemu_cleanup_atexit() {
     unsafe {
-        qemu_cleanup();
+        qemu_cleanup(EXIT_SUCCESS);
     }
 }
 
@@ -254,9 +255,7 @@ impl Qemu {
     ) -> QemuSnapshotCheckResult {
         let check_result = libafl_qemu_sys::syx_snapshot_check(ref_snapshot);
 
-        QemuSnapshotCheckResult {
-            nb_page_inconsistencies: check_result.nb_inconsistencies,
-        }
+        QemuSnapshotCheckResult::new(check_result.nb_inconsistencies)
     }
 
     pub fn list_devices(&self) -> Vec<String> {

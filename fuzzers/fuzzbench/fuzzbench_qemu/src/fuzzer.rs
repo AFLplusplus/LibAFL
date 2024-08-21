@@ -46,7 +46,6 @@ use libafl_bolts::{
     AsSlice,
 };
 use libafl_qemu::{
-    command::NopCommandManager,
     elf::EasyElf,
     filter_qemu_args,
     // asan::{init_with_asan, QemuAsanHelper},
@@ -58,7 +57,6 @@ use libafl_qemu::{
     GuestReg,
     //snapshot::QemuSnapshotHelper,
     MmapPerms,
-    NopEmulatorExitHandler,
     Qemu,
     QemuExecutor,
     QemuExitError,
@@ -177,8 +175,7 @@ fn fuzz(
     env::remove_var("LD_LIBRARY_PATH");
 
     let args: Vec<String> = env::args().collect();
-    let env: Vec<(String, String)> = env::vars().collect();
-    let qemu = Qemu::init(&args, &env).unwrap();
+    let qemu = Qemu::init(&args).unwrap();
     // let (emu, asan) = init_with_asan(&mut args, &mut env).unwrap();
 
     let mut elf_buffer = Vec::new();
@@ -329,7 +326,7 @@ fn fuzz(
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // The wrapped harness function, calling out to the LLVM-style harness
-    let mut harness = |_emulator: &mut Emulator<_, _, _, _>, input: &BytesInput| {
+    let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>, input: &BytesInput| {
         let target = input.target_bytes();
         let mut buf = target.as_slice();
         let mut len = buf.len();
@@ -366,8 +363,7 @@ fn fuzz(
         //QemuSnapshotHelper::new()
     );
 
-    let emulator =
-        Emulator::new_with_qemu(qemu, modules, NopEmulatorExitHandler, NopCommandManager)?;
+    let emulator = Emulator::empty().qemu(qemu).modules(modules).build()?;
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let executor = QemuExecutor::new(

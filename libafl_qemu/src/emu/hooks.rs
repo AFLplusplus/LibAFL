@@ -9,34 +9,35 @@ use libafl_qemu_sys::{CPUArchStatePtr, CPUStatePtr, FatPtr, GuestAddr, GuestUsiz
 
 #[cfg(emulation_mode = "usermode")]
 use crate::qemu::{
-    closure_new_thread_hook_wrapper, closure_post_syscall_hook_wrapper,
-    closure_pre_syscall_hook_wrapper, func_new_thread_hook_wrapper, func_post_syscall_hook_wrapper,
-    func_pre_syscall_hook_wrapper, NewThreadHook, NewThreadHookId, PostSyscallHook,
+    closure_post_syscall_hook_wrapper, closure_pre_syscall_hook_wrapper,
+    func_post_syscall_hook_wrapper, func_pre_syscall_hook_wrapper, PostSyscallHook,
     PostSyscallHookId, PreSyscallHook, PreSyscallHookId, SyscallHookResult,
 };
 #[cfg(emulation_mode = "usermode")]
 use crate::qemu::{
-    CrashHookClosure, NewThreadHookClosure, PostSyscallHookClosure, PostSyscallHookFn,
-    PreSyscallHookClosure, PreSyscallHookFn,
+    CrashHookClosure, PostSyscallHookClosure, PostSyscallHookFn, PreSyscallHookClosure,
+    PreSyscallHookFn,
 };
 use crate::{
     cpu_run_post_exec_hook_wrapper, cpu_run_pre_exec_hook_wrapper,
     modules::{EmulatorModule, EmulatorModuleTuple},
     qemu::{
         block_0_exec_hook_wrapper, block_gen_hook_wrapper, block_post_gen_hook_wrapper,
-        closure_backdoor_hook_wrapper, closure_instruction_hook_wrapper, cmp_0_exec_hook_wrapper,
-        cmp_1_exec_hook_wrapper, cmp_2_exec_hook_wrapper, cmp_3_exec_hook_wrapper,
-        cmp_gen_hook_wrapper, edge_0_exec_hook_wrapper, edge_gen_hook_wrapper,
-        func_backdoor_hook_wrapper, func_instruction_hook_wrapper, read_0_exec_hook_wrapper,
+        closure_backdoor_hook_wrapper, closure_instruction_hook_wrapper,
+        closure_new_thread_hook_wrapper, cmp_0_exec_hook_wrapper, cmp_1_exec_hook_wrapper,
+        cmp_2_exec_hook_wrapper, cmp_3_exec_hook_wrapper, cmp_gen_hook_wrapper,
+        edge_0_exec_hook_wrapper, edge_gen_hook_wrapper, func_backdoor_hook_wrapper,
+        func_instruction_hook_wrapper, func_new_thread_hook_wrapper, read_0_exec_hook_wrapper,
         read_1_exec_hook_wrapper, read_2_exec_hook_wrapper, read_3_exec_hook_wrapper,
         read_4_exec_hook_wrapper, read_gen_hook_wrapper, write_0_exec_hook_wrapper,
         write_1_exec_hook_wrapper, write_2_exec_hook_wrapper, write_3_exec_hook_wrapper,
         write_4_exec_hook_wrapper, write_gen_hook_wrapper, BackdoorHook, BackdoorHookClosure,
         BackdoorHookFn, BackdoorHookId, BlockExecHook, BlockGenHook, BlockHookId, BlockPostGenHook,
         CmpExecHook, CmpGenHook, CmpHookId, EdgeExecHook, EdgeGenHook, EdgeHookId, Hook, HookRepr,
-        InstructionHook, InstructionHookClosure, InstructionHookFn, InstructionHookId, QemuHooks,
-        ReadExecHook, ReadExecNHook, ReadGenHook, ReadHookId, TcgHookState, WriteExecHook,
-        WriteExecNHook, WriteGenHook, WriteHookId,
+        InstructionHook, InstructionHookClosure, InstructionHookFn, InstructionHookId,
+        NewThreadHook, NewThreadHookClosure, NewThreadHookId, QemuHooks, ReadExecHook,
+        ReadExecNHook, ReadGenHook, ReadHookId, TcgHookState, WriteExecHook, WriteExecNHook,
+        WriteGenHook, WriteHookId,
     },
     CpuPostRunHook, CpuPreRunHook, CpuRunHookId, HookState, MemAccessInfo, Qemu,
 };
@@ -114,7 +115,6 @@ where
     S: UsesInput,
 {
     qemu_hooks: QemuHooks,
-    phantom: PhantomData<(ET, S)>,
 
     instruction_hooks: Vec<Pin<Box<(InstructionHookId, FatPtr)>>>,
     backdoor_hooks: Vec<Pin<Box<(BackdoorHookId, FatPtr)>>>,
@@ -126,6 +126,8 @@ where
 
     cpu_run_hooks: Vec<Pin<Box<HookState<CpuRunHookId>>>>,
 
+    new_thread_hooks: Vec<Pin<Box<(NewThreadHookId, FatPtr)>>>,
+
     #[cfg(emulation_mode = "usermode")]
     pre_syscall_hooks: Vec<Pin<Box<(PreSyscallHookId, FatPtr)>>>,
 
@@ -133,10 +135,9 @@ where
     post_syscall_hooks: Vec<Pin<Box<(PostSyscallHookId, FatPtr)>>>,
 
     #[cfg(emulation_mode = "usermode")]
-    new_thread_hooks: Vec<Pin<Box<(NewThreadHookId, FatPtr)>>>,
-
-    #[cfg(emulation_mode = "usermode")]
     crash_hooks: Vec<HookRepr>,
+
+    phantom: PhantomData<(ET, S)>,
 }
 
 impl<ET, S> EmulatorHooks<ET, S>
@@ -158,14 +159,13 @@ where
 
             cpu_run_hooks: Vec::new(),
 
+            new_thread_hooks: Vec::new(),
+
             #[cfg(emulation_mode = "usermode")]
             pre_syscall_hooks: Vec::new(),
 
             #[cfg(emulation_mode = "usermode")]
             post_syscall_hooks: Vec::new(),
-
-            #[cfg(emulation_mode = "usermode")]
-            new_thread_hooks: Vec::new(),
 
             #[cfg(emulation_mode = "usermode")]
             crash_hooks: Vec::new(),
@@ -700,6 +700,63 @@ where
             Hook::Empty => None, // TODO error type
         }
     }
+
+    pub fn thread_creation(&mut self, hook: NewThreadHook<ET, S>) -> Option<NewThreadHookId> {
+        match hook {
+            Hook::Function(f) => Some(self.thread_creation_function(f)),
+            Hook::Closure(c) => Some(self.thread_creation_closure(c)),
+            Hook::Raw(r) => {
+                let z: *const () = ptr::null::<()>();
+                Some(self.qemu_hooks.add_new_thread_hook(z, r))
+            }
+            Hook::Empty => None, // TODO error type
+        }
+    }
+
+    pub fn thread_creation_function(
+        &mut self,
+        hook: fn(
+            &mut EmulatorModules<ET, S>,
+            Option<&mut S>,
+            env: CPUArchStatePtr,
+            tid: u32,
+        ) -> bool,
+    ) -> NewThreadHookId {
+        unsafe {
+            self.qemu_hooks
+                .add_new_thread_hook(transmute(hook), func_new_thread_hook_wrapper::<ET, S>)
+        }
+    }
+
+    pub fn thread_creation_closure(
+        &mut self,
+        hook: NewThreadHookClosure<ET, S>,
+    ) -> NewThreadHookId {
+        unsafe {
+            let fat: FatPtr = transmute(hook);
+            self.new_thread_hooks
+                .push(Box::pin((NewThreadHookId::invalid(), fat)));
+
+            let hook_state = &mut self
+                .new_thread_hooks
+                .last_mut()
+                .unwrap()
+                .as_mut()
+                .get_unchecked_mut()
+                .1 as *mut FatPtr;
+
+            let id = self
+                .qemu_hooks
+                .add_new_thread_hook(&mut *hook_state, closure_new_thread_hook_wrapper::<ET, S>);
+            self.new_thread_hooks
+                .last_mut()
+                .unwrap()
+                .as_mut()
+                .get_unchecked_mut()
+                .0 = id;
+            id
+        }
+    }
 }
 
 #[cfg(emulation_mode = "usermode")]
@@ -811,62 +868,6 @@ where
         }
     }
 
-    pub fn thread_creation(&mut self, hook: NewThreadHook<ET, S>) -> Option<NewThreadHookId> {
-        match hook {
-            Hook::Function(f) => Some(self.thread_creation_function(f)),
-            Hook::Closure(c) => Some(self.thread_creation_closure(c)),
-            Hook::Raw(r) => {
-                let z: *const () = ptr::null::<()>();
-                Some(self.qemu_hooks.add_new_thread_hook(z, r))
-            }
-            Hook::Empty => None, // TODO error type
-        }
-    }
-
-    pub fn thread_creation_function(
-        &mut self,
-        hook: fn(
-            &mut EmulatorModules<ET, S>,
-            Option<&mut S>,
-            env: CPUArchStatePtr,
-            tid: u32,
-        ) -> bool,
-    ) -> NewThreadHookId {
-        unsafe {
-            self.qemu_hooks
-                .add_new_thread_hook(transmute(hook), func_new_thread_hook_wrapper::<ET, S>)
-        }
-    }
-
-    pub fn thread_creation_closure(
-        &mut self,
-        hook: NewThreadHookClosure<ET, S>,
-    ) -> NewThreadHookId {
-        unsafe {
-            let fat: FatPtr = transmute(hook);
-            self.new_thread_hooks
-                .push(Box::pin((NewThreadHookId::invalid(), fat)));
-
-            let hook_state = &mut self
-                .new_thread_hooks
-                .last_mut()
-                .unwrap()
-                .as_mut()
-                .get_unchecked_mut()
-                .1 as *mut FatPtr;
-
-            let id = self
-                .qemu_hooks
-                .add_new_thread_hook(&mut *hook_state, closure_new_thread_hook_wrapper::<ET, S>);
-            self.new_thread_hooks
-                .last_mut()
-                .unwrap()
-                .as_mut()
-                .get_unchecked_mut()
-                .0 = id;
-            id
-        }
-    }
     pub fn crash_function(&mut self, hook: fn(&mut EmulatorModules<ET, S>, target_signal: i32)) {
         self.qemu_hooks.set_crash_hook(crash_hook_wrapper::<ET, S>);
         self.crash_hooks
@@ -1053,6 +1054,29 @@ where
 
     pub fn backdoor_closure(&mut self, hook: BackdoorHookClosure<ET, S>) -> BackdoorHookId {
         self.hooks.backdoor_closure(hook)
+    }
+
+    pub fn thread_creation(&mut self, hook: NewThreadHook<ET, S>) -> Option<NewThreadHookId> {
+        self.hooks.thread_creation(hook)
+    }
+
+    pub fn thread_creation_function(
+        &mut self,
+        hook: fn(
+            &mut EmulatorModules<ET, S>,
+            Option<&mut S>,
+            env: CPUArchStatePtr,
+            tid: u32,
+        ) -> bool,
+    ) -> NewThreadHookId {
+        self.hooks.thread_creation_function(hook)
+    }
+
+    pub fn thread_creation_closure(
+        &mut self,
+        hook: NewThreadHookClosure<ET, S>,
+    ) -> NewThreadHookId {
+        self.hooks.thread_creation_closure(hook)
     }
 }
 
@@ -1266,28 +1290,6 @@ where
         self.hooks.after_syscalls_closure(hook)
     }
 
-    pub fn thread_creation(&mut self, hook: NewThreadHook<ET, S>) -> Option<NewThreadHookId> {
-        self.hooks.thread_creation(hook)
-    }
-
-    pub fn thread_creation_function(
-        &mut self,
-        hook: fn(
-            &mut EmulatorModules<ET, S>,
-            Option<&mut S>,
-            env: CPUArchStatePtr,
-            tid: u32,
-        ) -> bool,
-    ) -> NewThreadHookId {
-        self.hooks.thread_creation_function(hook)
-    }
-
-    pub fn thread_creation_closure(
-        &mut self,
-        hook: NewThreadHookClosure<ET, S>,
-    ) -> NewThreadHookId {
-        self.hooks.thread_creation_closure(hook)
-    }
     pub fn crash_function(&mut self, hook: fn(&mut EmulatorModules<ET, S>, target_signal: i32)) {
         self.hooks.crash_function(hook);
     }

@@ -11,7 +11,7 @@ use crate::cargo_add_rpath;
 
 pub const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 pub const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-pub const QEMU_REVISION: &str = "7f468ebba6ec4b74d6ca6f4267f365f551c71fe4";
+pub const QEMU_REVISION: &str = "ee43af7f80d1117857e58b0b7ef556652d5893d5";
 
 #[allow(clippy::module_name_repetitions)]
 pub struct BuildResult {
@@ -144,7 +144,6 @@ fn configure_qemu(
         .arg("--disable-iconv")
         .arg("--disable-jack")
         .arg("--disable-keyring")
-        .arg("--disable-kvm")
         .arg("--disable-libdaxctl")
         .arg("--disable-libiscsi")
         .arg("--disable-libnfs")

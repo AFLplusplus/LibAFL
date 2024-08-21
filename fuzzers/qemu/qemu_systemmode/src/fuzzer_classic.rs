@@ -30,14 +30,13 @@ use libafl_bolts::{
     AsSlice,
 };
 use libafl_qemu::{
-    command::NopCommandManager,
+    config,
     elf::EasyElf,
     executor::QemuExecutor,
     modules::edges::{
         edges_map_mut_ptr, EdgeCoverageModule, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
     },
-    qemu_config, Emulator, NopEmulatorExitHandler, Qemu, QemuExitError, QemuExitReason,
-    QemuRWError, QemuShutdownCause, Regs,
+    Emulator, Qemu, QemuExitError, QemuExitReason, QemuRWError, QemuShutdownCause, Regs,
 };
 use libafl_qemu_sys::GuestPhysAddr;
 
@@ -91,14 +90,14 @@ pub fn fuzz() {
         // Initialize QEMU
         let qemu = Qemu::builder()
             .machine("mps2-an385")
-            .monitor(qemu_config::Monitor::Null)
+            .monitor(config::Monitor::Null)
             .kernel(format!("{target_dir}/example.elf"))
-            .serial(qemu_config::Serial::Null)
+            .serial(config::Serial::Null)
             .no_graphic(true)
             .snapshot(true)
-            .drives([qemu_config::Drive::builder()
-                .interface(qemu_config::DriveInterface::None)
-                .format(qemu_config::DiskImageFileFormat::Qcow2)
+            .drives([config::Drive::builder()
+                .interface(config::DriveInterface::None)
+                .format(config::DiskImageFileFormat::Qcow2)
                 .file(format!("{target_dir}/dummy.qcow2"))
                 .build()])
             .start_cpu(false)
@@ -107,13 +106,10 @@ pub fn fuzz() {
 
         let emulator_modules = tuple_list!(EdgeCoverageModule::default());
 
-        let mut emulator = Emulator::new_with_qemu(
-            qemu,
-            emulator_modules,
-            NopEmulatorExitHandler,
-            NopCommandManager,
-        )
-        .unwrap();
+        let emulator = Emulator::empty()
+            .qemu(qemu)
+            .modules(emulator_modules)
+            .build()?;
 
         qemu.set_breakpoint(main_addr);
 
@@ -140,7 +136,7 @@ pub fn fuzz() {
         let snap = qemu.create_fast_snapshot(true);
 
         // The wrapped harness function, calling out to the LLVM-style harness
-        let mut harness = |emulator: &mut Emulator<_, _, _, _>, input: &BytesInput| {
+        let mut harness = |emulator: &mut Emulator<_, _, _, _, _>, input: &BytesInput| {
             let target = input.target_bytes();
             let mut buf = target.as_slice();
             let len = buf.len();

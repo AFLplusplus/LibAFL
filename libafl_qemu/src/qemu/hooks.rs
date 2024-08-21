@@ -497,7 +497,6 @@ create_wrapper!(
 );
 
 // New thread hook wrappers
-#[cfg(emulation_mode = "usermode")]
 create_hook_types!(
     NewThread,
     fn(&mut EmulatorModules<ET, S>, Option<&mut S>, env: CPUArchStatePtr, tid: u32) -> bool,
@@ -511,9 +510,7 @@ create_hook_types!(
     >,
     extern "C" fn(*const (), env: CPUArchStatePtr, tid: u32) -> bool
 );
-#[cfg(emulation_mode = "usermode")]
 create_hook_id!(NewThread, libafl_qemu_remove_new_thread_hook, false);
-#[cfg(emulation_mode = "usermode")]
 create_wrapper!(new_thread, (env: CPUArchStatePtr, tid: u32), bool);
 
 // CPU Run hook wrappers
@@ -943,6 +940,19 @@ impl QemuHooks {
             BackdoorHookId(num)
         }
     }
+
+    pub fn add_new_thread_hook<T: Into<HookData>>(
+        &self,
+        data: T,
+        callback: extern "C" fn(T, env: CPUArchStatePtr, tid: u32) -> bool,
+    ) -> NewThreadHookId {
+        unsafe {
+            let data: u64 = data.into().0;
+            let callback: extern "C" fn(u64, CPUArchStatePtr, u32) -> bool = transmute(callback);
+            let num = libafl_qemu_sys::libafl_add_new_thread_hook(Some(callback), data);
+            NewThreadHookId(num)
+        }
+    }
 }
 
 #[cfg(emulation_mode = "usermode")]
@@ -980,19 +990,6 @@ impl QemuHooks {
             ) -> libafl_qemu_sys::syshook_ret = transmute(callback);
             let num = libafl_qemu_sys::libafl_add_pre_syscall_hook(Some(callback), data);
             PreSyscallHookId(num)
-        }
-    }
-
-    pub fn add_new_thread_hook<T: Into<HookData>>(
-        &self,
-        data: T,
-        callback: extern "C" fn(T, env: CPUArchStatePtr, tid: u32) -> bool,
-    ) -> NewThreadHookId {
-        unsafe {
-            let data: u64 = data.into().0;
-            let callback: extern "C" fn(u64, CPUArchStatePtr, u32) -> bool = transmute(callback);
-            let num = libafl_qemu_sys::libafl_add_new_thread_hook(Some(callback), data);
-            NewThreadHookId(num)
         }
     }
 

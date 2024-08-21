@@ -10,8 +10,6 @@ use strum_macros::EnumIter;
 use crate::{extern_c_checked, libafl_mapinfo, GuestAddr, MmapPerms};
 
 extern_c_checked! {
-    pub fn qemu_user_init(argc: i32, argv: *const *const u8, envp: *const *const u8) -> i32;
-
     pub static exec_path: *const u8;
     pub static guest_base: usize;
     pub static mut mmap_next_start: GuestAddr;
