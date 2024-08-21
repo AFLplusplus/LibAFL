@@ -26,11 +26,11 @@ use crate::{
         Executor, HasObservers,
     },
     feedbacks::Feedback,
-    fuzzer::{HasObjective, HasScheduler},
+    fuzzer::HasObjective,
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
     state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
-    Error, ExecutionProcessor,
+    Error,
 };
 
 /// The internal state of `GenericInProcessExecutor`.

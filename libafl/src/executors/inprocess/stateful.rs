@@ -18,7 +18,7 @@ use crate::{
         Executor, ExitKind, HasObservers,
     },
     feedbacks::Feedback,
-    fuzzer::{ExecutionProcessor, HasObjective, HasScheduler},
+    fuzzer::HasObjective,
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
     state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},

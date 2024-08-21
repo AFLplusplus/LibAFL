@@ -31,7 +31,6 @@ use crate::{
     events::{EventFirer, EventRestarter},
     executors::{hooks::ExecutorHook, inprocess::HasInProcessHooks, Executor, HasObservers},
     feedbacks::Feedback,
-    fuzzer::{ExecutionProcessor, HasScheduler},
     inputs::UsesInput,
     state::{HasCorpus, HasExecutions, HasSolutions},
     Error, HasObjective,
