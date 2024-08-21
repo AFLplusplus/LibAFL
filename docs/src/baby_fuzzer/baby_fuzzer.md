@@ -6,7 +6,7 @@ While the following chapters discuss the components of LibAFL in detail, here we
 
 We are going to fuzz a simple Rust function that panics under a condition. The fuzzer will be single-threaded and will stop after the crash, just like libFuzzer normally does.
 
-You can find a complete version of this tutorial as an example fuzzer in [`fuzzers/baby_fuzzer`](https://github.com/AFLplusplus/LibAFL/tree/main/fuzzers/baby_fuzzer).
+You can find a complete version of this tutorial as an example fuzzer in [`fuzzers/baby/baby_fuzzer`](https://github.com/AFLplusplus/LibAFL/tree/main/fuzzers/baby/baby_fuzzer).
 
 > ### Warning
 >
@@ -222,4 +222,4 @@ Bye!
 
 As you can see, after the panic message, the `objectives` count of the log increased by one and you will find the crashing input in `crashes/`.
 
-The complete code can be found in [`./fuzzers/baby_fuzzer`](https://github.com/AFLplusplus/LibAFL/tree/main/fuzzers/baby_fuzzer) alongside other `baby_` fuzzers.
+The complete code can be found in [`./fuzzers/baby/baby_fuzzer`](https://github.com/AFLplusplus/LibAFL/tree/main/fuzzers/baby/baby_fuzzer) alongside other `baby_` fuzzers.
