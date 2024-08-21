@@ -26,11 +26,11 @@ use crate::{
         Executor, HasObservers,
     },
     feedbacks::Feedback,
-    fuzzer::{HasObjective, HasScheduler},
+    fuzzer::HasObjective,
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
     state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
-    Error, ExecutionProcessor,
+    Error,
 };
 
 /// The internal state of `GenericInProcessExecutor`.
@@ -177,7 +177,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S> + HasScheduler + ExecutionProcessor,
+        Z: HasObjective<Objective = OF, State = S>,
     {
         Self::with_timeout_generic::<E, EM, OF, Z>(
             user_hooks,
@@ -204,7 +204,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S> + HasScheduler + ExecutionProcessor,
+        Z: HasObjective<Objective = OF, State = S>,
     {
         let mut me = Self::with_timeout_generic::<E, EM, OF, Z>(
             user_hooks, observers, fuzzer, state, event_mgr, exec_tmout,
@@ -234,7 +234,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S> + HasScheduler + ExecutionProcessor,
+        Z: HasObjective<Objective = OF, State = S>,
     {
         let default = InProcessHooks::new::<E, EM, OF, Z>(timeout)?;
         let mut hooks = tuple_list!(default).merge(user_hooks);
