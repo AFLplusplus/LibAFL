@@ -1,5 +1,3 @@
-extern crate libafl;
-extern crate libafl_bolts;
 use libafl::{
     executors::ExitKind,
     inputs::{BytesInput, HasTargetBytes},
