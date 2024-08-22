@@ -454,7 +454,7 @@ pub fn dump_registers<W: Write>(
 }
 
 /// Write the content of all important registers
-#[cfg(windows)]
+#[cfg(all(target_os = "windows", target_arch = "x86_64"))]
 #[allow(clippy::similar_names)]
 pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
@@ -479,6 +479,26 @@ pub fn dump_registers<W: Write>(
     write!(writer, "rip: {:#016x}, ", context.Rip)?;
     writeln!(writer, "efl: {:#016x}, ", context.EFlags)?;
 
+    Ok(())
+}
+
+/// Write the content of all important registers
+#[cfg(all(target_os = "windows", target_arch = "x86"))]
+#[allow(clippy::similar_names)]
+pub fn dump_registers<W: Write>(
+    writer: &mut BufWriter<W>,
+    context: &CONTEXT,
+) -> Result<(), std::io::Error> {
+    write!(writer, "eax: {:#08x}, ", context.Eax)?;
+    write!(writer, "ebx: {:#08x}, ", context.Ebx)?;
+    write!(writer, "ecx: {:#08x}, ", context.Ecx)?;
+    writeln!(writer, "edx: {:#08x}, ", context.Edx)?;
+    write!(writer, "edi: {:#08x}, ", context.Edi)?;
+    write!(writer, "esi: {:#08x}, ", context.Esi)?;
+    write!(writer, "esp: {:#08x}, ", context.Esp)?;
+    writeln!(writer, "ebp: {:#08x}, ", context.Ebp)?;
+    write!(writer, "eip: {:#08x}, ", context.Eip)?;
+    writeln!(writer, "efl: {:#08x} ", context.EFlags)?;
     Ok(())
 }
 
