@@ -222,7 +222,6 @@ jobs:
         run: ./scripts/fmt_all.sh check
 
   md-links-check:
-    name: Check Markdown links validity
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
