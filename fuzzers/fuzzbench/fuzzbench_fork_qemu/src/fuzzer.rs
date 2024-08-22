@@ -46,15 +46,14 @@ use libafl_bolts::{
     AsSlice, AsSliceMut,
 };
 use libafl_qemu::{
-    command::NopCommandManager,
     elf::EasyElf,
     filter_qemu_args,
     modules::{
         cmplog::{CmpLogChildModule, CmpLogMap, CmpLogObserver},
         edges::{EdgeCoverageChildModule, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},
     },
-    Emulator, GuestReg, MmapPerms, NopEmulatorExitHandler, QemuExitError, QemuExitReason,
-    QemuForkExecutor, QemuShutdownCause, Regs,
+    Emulator, GuestReg, MmapPerms, QemuExitError, QemuExitReason, QemuForkExecutor,
+    QemuShutdownCause, Regs,
 };
 #[cfg(unix)]
 use nix::unistd::dup;
@@ -156,14 +155,10 @@ fn fuzz(
         CmpLogChildModule::default(),
     );
 
-    let emulator = Emulator::new(
-        args.as_slice(),
-        env.as_slice(),
-        emulator_modules,
-        NopEmulatorExitHandler,
-        NopCommandManager,
-    )
-    .unwrap();
+    let emulator = Emulator::empty()
+        .qemu_cli(args)
+        .modules(emulator_modules)
+        .build()?;
 
     let qemu = emulator.qemu();
 

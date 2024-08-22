@@ -2,93 +2,48 @@
 //!
 //! [`Emulator`] is built above [`Qemu`] and provides convenient abstractions.
 
-use core::{
-    fmt::{self, Debug, Display, Formatter},
-    marker::PhantomData,
-};
-use std::{
-    cell::{OnceCell, Ref, RefCell, RefMut},
-    hash::Hash,
-    ops::Add,
-    pin::Pin,
-    rc::Rc,
-};
+use core::fmt::{self, Debug, Display, Formatter};
+use std::{cell::RefCell, ops::Add, pin::Pin};
 
 use hashbrown::HashMap;
 use libafl::{
     executors::ExitKind,
     inputs::{HasTargetBytes, UsesInput},
     observers::ObserversTuple,
+    state::{HasExecutions, State},
 };
-use libafl_bolts::os::unix_signals::Signal;
 use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestUsize, GuestVirtAddr};
-use typed_builder::TypedBuilder;
 
 use crate::{
     breakpoint::{Breakpoint, BreakpointId},
-    command::{CommandError, CommandManager, InputCommand, IsCommand},
-    modules::EmulatorModuleTuple,
+    command::{CommandError, CommandManager, NopCommandManager, StdCommandManager},
+    modules::{EmulatorModuleTuple, StdInstrumentationFilter},
     sync_exit::SyncExit,
-    Qemu, QemuExitError, QemuExitReason, QemuInitError, QemuMemoryChunk, QemuShutdownCause,
-    QemuSnapshotCheckResult, Regs, CPU,
+    Qemu, QemuExitError, QemuExitReason, QemuInitError, QemuMemoryChunk, QemuShutdownCause, Regs,
+    CPU,
 };
 
 mod hooks;
 pub use hooks::*;
 
+mod builder;
+pub use builder::*;
+
+mod drivers;
+pub use drivers::*;
+
+mod snapshot;
+pub use snapshot::*;
+
 #[cfg(emulation_mode = "usermode")]
 mod usermode;
+#[cfg(emulation_mode = "usermode")]
+pub use usermode::*;
 
 #[cfg(emulation_mode = "systemmode")]
 mod systemmode;
 #[cfg(emulation_mode = "systemmode")]
 pub use systemmode::*;
-
-type CommandRef<CM, E, ET, S> = Rc<dyn IsCommand<CM, E, ET, S>>;
-type BreakpointMutRef<CM, E, ET, S> = Rc<RefCell<Breakpoint<CM, E, ET, S>>>;
-
-pub trait IsSnapshotManager: Clone + Debug {
-    fn save(&mut self, qemu: Qemu) -> SnapshotId;
-    fn restore(&mut self, snapshot_id: &SnapshotId, qemu: Qemu)
-        -> Result<(), SnapshotManagerError>;
-    fn do_check(
-        &self,
-        reference_snapshot_id: &SnapshotId,
-        qemu: Qemu,
-    ) -> Result<QemuSnapshotCheckResult, SnapshotManagerError>;
-
-    fn check(
-        &self,
-        reference_snapshot_id: &SnapshotId,
-        qemu: Qemu,
-    ) -> Result<(), SnapshotManagerCheckError> {
-        let check_result = self
-            .do_check(reference_snapshot_id, qemu)
-            .map_err(SnapshotManagerCheckError::SnapshotManagerError)?;
-
-        if check_result == QemuSnapshotCheckResult::default() {
-            Ok(())
-        } else {
-            Err(SnapshotManagerCheckError::SnapshotCheckError(check_result))
-        }
-    }
-}
-
-pub trait EmulatorExitHandler<ET, S>: Sized + Debug + Clone
-where
-    S: UsesInput,
-{
-    fn qemu_pre_exec<CM: CommandManager<Self, ET, S>>(
-        emu: &mut Emulator<CM, Self, ET, S>,
-        input: &S::Input,
-    );
-
-    fn qemu_post_exec<CM: CommandManager<Self, ET, S>>(
-        emu: &mut Emulator<CM, Self, ET, S>,
-        exit_reason: Result<EmulatorExitResult<CM, Self, ET, S>, EmulatorExitError>,
-        input: &S::Input,
-    ) -> Result<Option<ExitHandlerResult<CM, Self, ET, S>>, ExitHandlerError>;
-}
 
 #[derive(Clone, Copy)]
 pub enum GuestAddrKind {
@@ -96,16 +51,53 @@ pub enum GuestAddrKind {
     Virtual(GuestVirtAddr),
 }
 
-#[derive(Debug, Clone)]
-pub enum EmulatorExitResult<CM, EH, ET, S>
+pub enum EmulatorExitResult<CM, ED, ET, S, SM>
 where
+    CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
 {
-    QemuExit(QemuShutdownCause), // QEMU ended for some reason.
-    Breakpoint(Rc<RefCell<Breakpoint<CM, EH, ET, S>>>), // Breakpoint triggered. Contains the address of the trigger.
-    SyncExit(Rc<RefCell<SyncExit<CM, EH, ET, S>>>), // Synchronous backdoor: The guest triggered a backdoor and should return to LibAFL.
+    QemuExit(QemuShutdownCause),               // QEMU ended for some reason.
+    Breakpoint(Breakpoint<CM, ED, ET, S, SM>), // Breakpoint triggered. Contains the address of the trigger.
+    SyncExit(SyncExit<CM, ED, ET, S, SM>), // Synchronous backdoor: The guest triggered a backdoor and should return to LibAFL.
 }
 
+impl<CM, ED, ET, S, SM> Clone for EmulatorExitResult<CM, ED, ET, S, SM>
+where
+    CM: CommandManager<ED, ET, S, SM>,
+    S: UsesInput,
+{
+    fn clone(&self) -> Self {
+        match self {
+            EmulatorExitResult::QemuExit(qemu_exit) => {
+                EmulatorExitResult::QemuExit(qemu_exit.clone())
+            }
+            EmulatorExitResult::Breakpoint(bp) => EmulatorExitResult::Breakpoint(bp.clone()),
+            EmulatorExitResult::SyncExit(sync_exit) => {
+                EmulatorExitResult::SyncExit(sync_exit.clone())
+            }
+        }
+    }
+}
+
+impl<CM, ED, ET, S, SM> Debug for EmulatorExitResult<CM, ED, ET, S, SM>
+where
+    CM: CommandManager<ED, ET, S, SM>,
+    S: UsesInput,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EmulatorExitResult::QemuExit(qemu_exit) => {
+                write!(f, "{qemu_exit:?}")
+            }
+            EmulatorExitResult::Breakpoint(bp) => {
+                write!(f, "{bp:?}")
+            }
+            EmulatorExitResult::SyncExit(sync_exit) => {
+                write!(f, "{sync_exit:?}")
+            }
+        }
+    }
+}
 #[derive(Debug, Clone)]
 pub enum EmulatorExitError {
     UnknownKind,
@@ -115,136 +107,40 @@ pub enum EmulatorExitError {
 }
 
 #[derive(Debug, Clone)]
-pub enum ExitHandlerError {
-    QemuExitReasonError(EmulatorExitError),
-    SMError(SnapshotManagerError),
-    SMCheckError(SnapshotManagerCheckError),
-    CommandError(CommandError),
-    UnhandledSignal(Signal),
-    MultipleSnapshotDefinition,
-    MultipleInputDefinition,
-    SnapshotNotFound,
-}
-
-#[derive(Debug, Clone)]
-pub enum ExitHandlerResult<CM, EH, ET, S>
-where
-    S: UsesInput,
-{
-    ReturnToHarness(EmulatorExitResult<CM, EH, ET, S>), // Return to the harness immediately. Can happen at any point of the run when the handler is not supposed to handle a request.
-    EndOfRun(ExitKind), // The run is over and the emulator is ready for the next iteration.
-}
-
-#[derive(Debug, Clone)]
-pub enum SnapshotManagerError {
-    SnapshotIdNotFound(SnapshotId),
-    MemoryInconsistencies(u64),
-}
-
-#[derive(Debug, Clone)]
-pub enum SnapshotManagerCheckError {
-    SnapshotManagerError(SnapshotManagerError),
-    SnapshotCheckError(QemuSnapshotCheckResult),
-}
-
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
-pub struct SnapshotId {
-    id: u64,
-}
-
-/// Special kind of Exit handler with no data embedded.
-/// As a result, it is safe to transmute from any `Emulator` implementing `EmuExitHandler` to this one,
-/// since it won't use any data which could cause type confusion.
-#[derive(Clone, Debug)]
-pub struct NopEmulatorExitHandler;
-impl<ET, S> EmulatorExitHandler<ET, S> for NopEmulatorExitHandler
-where
-    S: UsesInput,
-{
-    fn qemu_pre_exec<CM: CommandManager<Self, ET, S>>(
-        _: &mut Emulator<CM, Self, ET, S>,
-        _: &S::Input,
-    ) {
-    }
-
-    fn qemu_post_exec<CM: CommandManager<Self, ET, S>>(
-        _: &mut Emulator<CM, Self, ET, S>,
-        exit_reason: Result<EmulatorExitResult<CM, Self, ET, S>, EmulatorExitError>,
-        _: &S::Input,
-    ) -> Result<Option<ExitHandlerResult<CM, Self, ET, S>>, ExitHandlerError> {
-        match exit_reason {
-            Ok(reason) => Ok(Some(ExitHandlerResult::ReturnToHarness(reason))),
-            Err(error) => Err(error)?,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
 pub struct InputLocation {
     mem_chunk: QemuMemoryChunk,
     cpu: CPU,
     ret_register: Option<Regs>,
 }
 
-/// Synchronous Exit handler maintaining only one snapshot.
-#[derive(Debug, Clone, TypedBuilder)]
-pub struct StdEmulatorExitHandler<SM> {
-    snapshot_manager: RefCell<SM>,
-    #[builder(default)]
-    snapshot_id: OnceCell<SnapshotId>,
-    #[builder(default)]
-    input_location: OnceCell<InputLocation>,
-}
-
-// TODO: Replace TypedBuilder by something better, it does not work correctly with default and
-// inter-dependent fields.
-#[derive(Debug, TypedBuilder)]
-pub struct Emulator<CM, EH, ET, S>
+#[derive(Debug)]
+#[allow(clippy::type_complexity)]
+pub struct Emulator<CM, ED, ET, S, SM>
 where
+    CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
 {
+    snapshot_manager: SM,
     modules: Pin<Box<EmulatorModules<ET, S>>>,
     command_manager: CM,
-    exit_handler: RefCell<EH>,
-    #[builder(default)]
-    breakpoints_by_addr: RefCell<HashMap<GuestAddr, BreakpointMutRef<CM, EH, ET, S>>>,
-    #[builder(default)]
-    breakpoints_by_id: RefCell<HashMap<BreakpointId, BreakpointMutRef<CM, EH, ET, S>>>,
-    #[builder(setter(transform = |args: &[String], env: &[(String, String)]| Qemu::init(args, env).unwrap()))]
+    driver: Option<ED>,
+    breakpoints_by_addr: RefCell<HashMap<GuestAddr, Breakpoint<CM, ED, ET, S, SM>>>, // TODO: change to RC here
+    breakpoints_by_id: RefCell<HashMap<BreakpointId, Breakpoint<CM, ED, ET, S, SM>>>,
     qemu: Qemu,
     first_exec: bool,
-    _phantom: PhantomData<(ET, S)>,
 }
 
-impl<CM, EH, ET, S> ExitHandlerResult<CM, EH, ET, S>
+impl<CM, ED, ET, S, SM> EmulatorDriverResult<CM, ED, ET, S, SM>
 where
+    CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
 {
     #[must_use]
     #[allow(clippy::match_wildcard_for_single_variants)]
     pub fn end_of_run(&self) -> Option<ExitKind> {
         match self {
-            ExitHandlerResult::EndOfRun(exit_kind) => Some(*exit_kind),
+            EmulatorDriverResult::EndOfRun(exit_kind) => Some(*exit_kind),
             _ => None,
-        }
-    }
-}
-
-impl<CM, EH, ET, S> TryFrom<ExitHandlerResult<CM, EH, ET, S>> for ExitKind
-where
-    CM: Debug,
-    EH: Debug,
-    ET: Debug,
-    S: UsesInput + Debug,
-{
-    type Error = String;
-
-    fn try_from(value: ExitHandlerResult<CM, EH, ET, S>) -> Result<Self, Self::Error> {
-        match value {
-            ExitHandlerResult::ReturnToHarness(unhandled_qemu_exit) => {
-                Err(format!("Unhandled QEMU exit: {:?}", &unhandled_qemu_exit))
-            }
-            ExitHandlerResult::EndOfRun(exit_kind) => Ok(exit_kind),
         }
     }
 }
@@ -270,7 +166,7 @@ impl Add<GuestUsize> for GuestAddrKind {
 }
 
 impl Display for GuestAddrKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             GuestAddrKind::Physical(phys_addr) => write!(f, "hwaddr 0x{phys_addr:x}"),
             GuestAddrKind::Virtual(virt_addr) => write!(f, "vaddr 0x{virt_addr:x}"),
@@ -278,15 +174,15 @@ impl Display for GuestAddrKind {
     }
 }
 
-impl From<SnapshotManagerError> for ExitHandlerError {
+impl From<SnapshotManagerError> for EmulatorDriverError {
     fn from(sm_error: SnapshotManagerError) -> Self {
-        ExitHandlerError::SMError(sm_error)
+        EmulatorDriverError::SMError(sm_error)
     }
 }
 
-impl From<SnapshotManagerCheckError> for ExitHandlerError {
+impl From<SnapshotManagerCheckError> for EmulatorDriverError {
     fn from(sm_check_error: SnapshotManagerCheckError) -> Self {
-        ExitHandlerError::SMCheckError(sm_check_error)
+        EmulatorDriverError::SMCheckError(sm_check_error)
     }
 }
 
@@ -301,140 +197,29 @@ impl InputLocation {
     }
 }
 
-impl<SM> StdEmulatorExitHandler<SM> {
-    pub fn new(snapshot_manager: SM) -> Self {
-        Self {
-            snapshot_manager: RefCell::new(snapshot_manager),
-            snapshot_id: OnceCell::new(),
-            input_location: OnceCell::new(),
-        }
-    }
-
-    pub fn set_input_location(&self, input_location: InputLocation) -> Result<(), InputLocation> {
-        self.input_location.set(input_location)
-    }
-
-    pub fn set_snapshot_id(&self, snapshot_id: SnapshotId) -> Result<(), SnapshotId> {
-        self.snapshot_id.set(snapshot_id)
-    }
-
-    pub fn snapshot_id(&self) -> Option<SnapshotId> {
-        Some(*self.snapshot_id.get()?)
-    }
-
-    pub fn snapshot_manager_borrow(&self) -> Ref<SM> {
-        self.snapshot_manager.borrow()
-    }
-
-    pub fn snapshot_manager_borrow_mut(&self) -> RefMut<SM> {
-        self.snapshot_manager.borrow_mut()
-    }
-}
-
-// TODO: replace handlers with generics to permit compile-time customization of handlers
-impl<ET, S, SM> EmulatorExitHandler<ET, S> for StdEmulatorExitHandler<SM>
-where
-    S: UsesInput,
-    S::Input: HasTargetBytes,
-    SM: IsSnapshotManager,
-{
-    fn qemu_pre_exec<CM: CommandManager<Self, ET, S>>(
-        emu: &mut Emulator<CM, Self, ET, S>,
-        input: &S::Input,
-    ) {
-        let input_location = {
-            let exit_handler = emu.exit_handler.borrow();
-            exit_handler.input_location.get().cloned()
-        };
-
-        if let Some(input_location) = input_location {
-            let input_command =
-                InputCommand::new(input_location.mem_chunk.clone(), input_location.cpu);
-
-            input_command
-                .run(emu, input, input_location.ret_register)
-                .unwrap();
-        }
-    }
-
-    fn qemu_post_exec<CM: CommandManager<Self, ET, S>>(
-        emu: &mut Emulator<CM, Self, ET, S>,
-        exit_reason: Result<EmulatorExitResult<CM, Self, ET, S>, EmulatorExitError>,
-        input: &S::Input,
-    ) -> Result<Option<ExitHandlerResult<CM, Self, ET, S>>, ExitHandlerError> {
-        let exit_handler = emu.exit_handler().borrow_mut();
-        let qemu = emu.qemu();
-
-        let mut exit_reason = match exit_reason {
-            Ok(exit_reason) => exit_reason,
-            Err(exit_error) => match exit_error {
-                EmulatorExitError::UnexpectedExit => {
-                    if let Some(snapshot_id) = exit_handler.snapshot_id.get() {
-                        exit_handler
-                            .snapshot_manager
-                            .borrow_mut()
-                            .restore(snapshot_id, qemu)?;
-                    }
-                    return Ok(Some(ExitHandlerResult::EndOfRun(ExitKind::Crash)));
-                }
-                _ => Err(exit_error)?,
-            },
-        };
-
-        #[allow(clippy::type_complexity)]
-        let (command, ret_reg): (Option<CommandRef<CM, Self, ET, S>>, Option<Regs>) =
-            match &mut exit_reason {
-                EmulatorExitResult::QemuExit(shutdown_cause) => match shutdown_cause {
-                    QemuShutdownCause::HostSignal(signal) => {
-                        signal.handle();
-                        return Err(ExitHandlerError::UnhandledSignal(*signal));
-                    }
-                    QemuShutdownCause::GuestPanic => {
-                        return Ok(Some(ExitHandlerResult::EndOfRun(ExitKind::Crash)))
-                    }
-                    _ => panic!("Unhandled QEMU shutdown cause: {shutdown_cause:?}."),
-                },
-                EmulatorExitResult::Breakpoint(bp) => (bp.borrow_mut().trigger(qemu), None),
-                EmulatorExitResult::SyncExit(sync_backdoor) => {
-                    let sync_backdoor = sync_backdoor.borrow();
-                    let command = sync_backdoor.command();
-                    (Some(command), Some(sync_backdoor.ret_reg()))
-                }
-            };
-
-        // manually drop ref cell here to avoid keeping it alive in cmd.
-        drop(exit_handler);
-
-        if let Some(cmd) = command {
-            cmd.run(emu, input, ret_reg)
-        } else {
-            Ok(Some(ExitHandlerResult::ReturnToHarness(exit_reason)))
-        }
-    }
-}
-
-impl From<EmulatorExitError> for ExitHandlerError {
+impl From<EmulatorExitError> for EmulatorDriverError {
     fn from(error: EmulatorExitError) -> Self {
-        ExitHandlerError::QemuExitReasonError(error)
+        EmulatorDriverError::QemuExitReasonError(error)
     }
 }
 
-impl From<CommandError> for ExitHandlerError {
+impl From<CommandError> for EmulatorDriverError {
     fn from(error: CommandError) -> Self {
-        ExitHandlerError::CommandError(error)
+        EmulatorDriverError::CommandError(error)
     }
 }
 
-impl<CM, EH, ET, S> Display for EmulatorExitResult<CM, EH, ET, S>
+impl<CM, ED, ET, S, SM> Display for EmulatorExitResult<CM, ED, ET, S, SM>
 where
+    CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
 {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             EmulatorExitResult::QemuExit(shutdown_cause) => write!(f, "End: {shutdown_cause:?}"),
-            EmulatorExitResult::Breakpoint(bp) => write!(f, "{}", bp.borrow()),
+            EmulatorExitResult::Breakpoint(bp) => write!(f, "{bp}"),
             EmulatorExitResult::SyncExit(sync_exit) => {
-                write!(f, "Sync exit: {}", sync_exit.borrow())
+                write!(f, "Sync exit: {sync_exit:?}")
             }
         }
     }
@@ -446,8 +231,67 @@ impl From<CommandError> for EmulatorExitError {
     }
 }
 
-impl<CM, EH, ET, S> Emulator<CM, EH, ET, S>
+impl<S> Emulator<NopCommandManager, NopEmulatorDriver, (), S, NopSnapshotManager>
 where
+    S: UsesInput,
+{
+    #[must_use]
+    pub fn empty(
+    ) -> EmulatorBuilder<NopCommandManager, NopEmulatorDriver, (), S, NopSnapshotManager> {
+        EmulatorBuilder::empty()
+    }
+}
+
+impl<S> Emulator<StdCommandManager<S>, StdEmulatorDriver, (), S, StdSnapshotManager>
+where
+    S: State + HasExecutions + Unpin,
+    S::Input: HasTargetBytes,
+{
+    #[must_use]
+    pub fn builder(
+    ) -> EmulatorBuilder<StdCommandManager<S>, StdEmulatorDriver, (), S, StdSnapshotManager> {
+        EmulatorBuilder::default()
+    }
+}
+
+impl<CM, ED, ET, S, SM> Emulator<CM, ED, ET, S, SM>
+where
+    CM: CommandManager<ED, ET, S, SM>,
+    S: UsesInput,
+{
+    pub fn modules(&self) -> &EmulatorModules<ET, S> {
+        &self.modules
+    }
+
+    #[must_use]
+    pub fn qemu(&self) -> Qemu {
+        self.qemu
+    }
+
+    #[must_use]
+    pub fn driver(&self) -> &ED {
+        self.driver.as_ref().unwrap()
+    }
+
+    #[must_use]
+    pub fn driver_mut(&mut self) -> &mut ED {
+        self.driver.as_mut().unwrap()
+    }
+
+    #[must_use]
+    pub fn snapshot_manager(&self) -> &SM {
+        &self.snapshot_manager
+    }
+
+    #[must_use]
+    pub fn snapshot_manager_mut(&mut self) -> &mut SM {
+        &mut self.snapshot_manager
+    }
+}
+
+impl<CM, ED, ET, S, SM> Emulator<CM, ED, ET, S, SM>
+where
+    CM: CommandManager<ED, ET, S, SM>,
     ET: Unpin,
     S: UsesInput + Unpin,
 {
@@ -456,38 +300,40 @@ where
     }
 }
 
-impl<CM, EH, ET, S> Emulator<CM, EH, ET, S>
+impl<CM, ED, ET, S, SM> Emulator<CM, ED, ET, S, SM>
 where
+    CM: CommandManager<ED, ET, S, SM>,
     ET: EmulatorModuleTuple<S>,
     S: UsesInput + Unpin,
 {
     #[allow(clippy::must_use_candidate, clippy::similar_names)]
     pub fn new(
-        args: &[String],
-        env: &[(String, String)],
+        qemu_args: &[String],
         modules: ET,
-        exit_handler: EH,
+        drivers: ED,
+        snapshot_manager: SM,
         command_manager: CM,
     ) -> Result<Self, QemuInitError> {
-        let qemu = Qemu::init(args, env)?;
+        let qemu = Qemu::init(qemu_args)?;
 
-        Self::new_with_qemu(qemu, modules, exit_handler, command_manager)
+        Self::new_with_qemu(qemu, modules, drivers, snapshot_manager, command_manager)
     }
 
     pub fn new_with_qemu(
         qemu: Qemu,
         modules: ET,
-        exit_handler: EH,
+        driver: ED,
+        snapshot_manager: SM,
         command_manager: CM,
     ) -> Result<Self, QemuInitError> {
         Ok(Emulator {
             modules: EmulatorModules::new(qemu, modules),
             command_manager,
-            exit_handler: RefCell::new(exit_handler),
+            snapshot_manager,
+            driver: Some(driver),
             breakpoints_by_addr: RefCell::new(HashMap::new()),
             breakpoints_by_id: RefCell::new(HashMap::new()),
             first_exec: true,
-            _phantom: PhantomData,
             qemu,
         })
     }
@@ -515,29 +361,11 @@ where
     }
 }
 
-impl<CM, EH, ET, S> Emulator<CM, EH, ET, S>
+impl<CM, ED, ET, S, SM> Emulator<CM, ED, ET, S, SM>
 where
-    S: UsesInput,
-{
-    pub fn modules(&self) -> &EmulatorModules<ET, S> {
-        &self.modules
-    }
-
-    #[must_use]
-    pub fn qemu(&self) -> Qemu {
-        self.qemu
-    }
-
-    #[must_use]
-    pub fn exit_handler(&self) -> &RefCell<EH> {
-        &self.exit_handler
-    }
-}
-
-impl<CM, EH, ET, S> Emulator<CM, EH, ET, S>
-where
-    EH: EmulatorExitHandler<ET, S>,
-    CM: CommandManager<EH, ET, S>,
+    CM: CommandManager<ED, ET, S, SM>,
+    ED: EmulatorDriver<CM, ET, S, SM>,
+    ET: StdInstrumentationFilter + Unpin,
     S: UsesInput,
 {
     /// This function will run the emulator until the exit handler decides to stop the execution for
@@ -551,24 +379,19 @@ where
     pub unsafe fn run(
         &mut self,
         input: &S::Input,
-    ) -> Result<ExitHandlerResult<CM, EH, ET, S>, ExitHandlerError> {
+    ) -> Result<EmulatorDriverResult<CM, ED, ET, S, SM>, EmulatorDriverError> {
+        let mut driver = self.driver.take().unwrap();
+
         loop {
-            // if self.first_exec {
-            //     self.modules_mut().first_exec_all();
-            //     self.first_exec = false;
-            // }
-
-            // // First run modules callback functions
-            // self.modules_mut().pre_exec_all(input);
-
             // Insert input if the location is already known
-            EH::qemu_pre_exec(self, input);
+            driver.pre_exec(self, input);
 
             // Run QEMU
-            let exit_reason = self.run_qemu();
+            let mut exit_reason = self.run_qemu();
 
             // Handle QEMU exit
-            if let Some(exit_handler_result) = EH::qemu_post_exec(self, exit_reason, input)? {
+            if let Some(exit_handler_result) = driver.post_exec(self, &mut exit_reason, input)? {
+                self.driver = Some(driver);
                 return Ok(exit_handler_result);
             }
         }
@@ -579,7 +402,9 @@ where
     ///
     /// Should, in general, be safe to call.
     /// Of course, the emulated target is not contained securely and can corrupt state or interact with the operating system.
-    pub unsafe fn run_qemu(&self) -> Result<EmulatorExitResult<CM, EH, ET, S>, EmulatorExitError> {
+    pub unsafe fn run_qemu(
+        &self,
+    ) -> Result<EmulatorExitResult<CM, ED, ET, S, SM>, EmulatorExitError> {
         match self.qemu.run() {
             Ok(qemu_exit_reason) => Ok(match qemu_exit_reason {
                 QemuExitReason::End(qemu_shutdown_cause) => {
@@ -594,9 +419,9 @@ where
                         .clone();
                     EmulatorExitResult::Breakpoint(bp.clone())
                 }
-                QemuExitReason::SyncExit => EmulatorExitResult::SyncExit(Rc::new(RefCell::new(
-                    SyncExit::new(self.command_manager.parse(self.qemu)?),
-                ))),
+                QemuExitReason::SyncExit => EmulatorExitResult::SyncExit(SyncExit::new(
+                    self.command_manager.parse(self.qemu)?,
+                )),
             }),
             Err(qemu_exit_reason_error) => Err(match qemu_exit_reason_error {
                 QemuExitError::UnexpectedExit => EmulatorExitError::UnexpectedExit,
@@ -607,11 +432,16 @@ where
 }
 
 #[allow(clippy::unused_self)]
-impl<CM, EH, ET, S> Emulator<CM, EH, ET, S>
+impl<CM, ED, ET, S, SM> Emulator<CM, ED, ET, S, SM>
 where
+    CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
 {
-    pub fn add_breakpoint(&self, mut bp: Breakpoint<CM, EH, ET, S>, enable: bool) -> BreakpointId {
+    pub fn add_breakpoint(
+        &self,
+        mut bp: Breakpoint<CM, ED, ET, S, SM>,
+        enable: bool,
+    ) -> BreakpointId {
         if enable {
             bp.enable(self.qemu);
         }
@@ -619,12 +449,10 @@ where
         let bp_id = bp.id();
         let bp_addr = bp.addr();
 
-        let bp_ref = Rc::new(RefCell::new(bp));
-
         assert!(
             self.breakpoints_by_addr
                 .borrow_mut()
-                .insert(bp_addr, bp_ref.clone())
+                .insert(bp_addr, bp.clone())
                 .is_none(),
             "Adding multiple breakpoints at the same address"
         );
@@ -632,7 +460,7 @@ where
         assert!(
             self.breakpoints_by_id
                 .borrow_mut()
-                .insert(bp_id, bp_ref)
+                .insert(bp_id, bp)
                 .is_none(),
             "Adding the same breakpoint multiple times"
         );
@@ -643,10 +471,7 @@ where
     pub fn remove_breakpoint(&self, bp_id: BreakpointId) {
         let bp_addr = {
             let mut bp_map = self.breakpoints_by_id.borrow_mut();
-            let mut bp = bp_map
-                .get_mut(&bp_id)
-                .expect("Did not find the breakpoint")
-                .borrow_mut();
+            let bp = bp_map.get_mut(&bp_id).expect("Did not find the breakpoint");
             bp.disable(self.qemu);
             bp.addr()
         };

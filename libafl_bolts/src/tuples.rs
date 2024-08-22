@@ -657,54 +657,32 @@ where
 
 /// Allows prepending of values to a tuple
 pub trait Prepend<T> {
-    /// The Resulting [`TupleList`], of an [`Prepend::prepend()`] call,
-    /// including the prepended entry.
-    type PreprendResult;
-
     /// Prepend a value to this tuple, returning a new tuple with prepended value.
     #[must_use]
-    fn prepend(self, value: T) -> (T, Self::PreprendResult);
+    fn prepend(self, value: T) -> (T, Self);
 }
 
 /// Implement prepend for tuple list.
 impl<Tail, T> Prepend<T> for Tail {
-    type PreprendResult = Self;
-
-    fn prepend(self, value: T) -> (T, Self::PreprendResult) {
+    fn prepend(self, value: T) -> (T, Self) {
         (value, self)
     }
 }
 
 /// Append to a tuple
-pub trait Append<T> {
-    /// The Resulting [`TupleList`], of an [`Append::append()`] call,
-    /// including the appended entry.
-    type AppendResult;
-
+pub trait Append<T>
+where
+    Self: Sized,
+{
     /// Append Value and return the tuple
     #[must_use]
-    fn append(self, value: T) -> Self::AppendResult;
+    fn append(self, value: T) -> (Self, T);
 }
 
-/// Implement append for an empty tuple list.
-impl<T> Append<T> for () {
-    type AppendResult = (T, ());
-
-    fn append(self, value: T) -> Self::AppendResult {
-        (value, ())
-    }
-}
-
-/// Implement append for non-empty tuple list.
-impl<Head, Tail, T> Append<T> for (Head, Tail)
-where
-    Tail: Append<T>,
-{
-    type AppendResult = (Head, Tail::AppendResult);
-
-    fn append(self, value: T) -> Self::AppendResult {
-        let (head, tail) = self;
-        (head, tail.append(value))
+/// Implement append for tuple list.
+impl<Head, T> Append<T> for Head {
+    fn append(self, value: T) -> (Self, T) {
+        (self, value)
     }
 }
 

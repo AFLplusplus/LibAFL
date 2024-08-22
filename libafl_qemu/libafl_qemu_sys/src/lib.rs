@@ -51,10 +51,10 @@ mod usermode;
 #[cfg(emulation_mode = "usermode")]
 pub use usermode::*;
 
-#[cfg(emulation_mode = "systemmode")]
-mod systemmode;
-#[cfg(emulation_mode = "systemmode")]
-pub use systemmode::*;
+// #[cfg(emulation_mode = "systemmode")]
+// mod systemmode;
+// #[cfg(emulation_mode = "systemmode")]
+// pub use systemmode::*;
 
 /// Safe linking with of extern "C" functions.
 /// This macro makes sure the declared symbol is defined *at link time*, avoiding declaring non-existant symbols

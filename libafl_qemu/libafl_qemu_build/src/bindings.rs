@@ -61,6 +61,7 @@ const WRAPPER_HEADER: &str = r#"
 #include "sysemu/runstate.h"
 #include "sysemu/replay.h"
 
+#include "libafl/system.h"
 #include "libafl/qemu_snapshot.h"
 #include "libafl/syx-snapshot/device-save.h"
 #include "libafl/syx-snapshot/syx-snapshot.h"
@@ -98,9 +99,9 @@ const WRAPPER_HEADER: &str = r#"
 #include "libafl/hooks/tcg/instruction.h"
 #include "libafl/hooks/tcg/read_write.h"
 #include "libafl/hooks/cpu_run.h"
+#include "libafl/hooks/thread.h"
 
 #ifdef CONFIG_USER_ONLY
-#include "libafl/hooks/thread.h"
 #include "libafl/hooks/syscall.h"
 #endif
 
@@ -151,7 +152,6 @@ pub fn generate(
         .allowlist_type("Syx.*")
         .allowlist_type("libafl_mapinfo")
         .allowlist_type("IntervalTreeRoot")
-        .allowlist_function("qemu_user_init")
         .allowlist_function("qemu_system_debug_request")
         .allowlist_function("target_mmap")
         .allowlist_function("target_mprotect")
@@ -172,6 +172,9 @@ pub fn generate(
         .allowlist_function("read_self_maps")
         .allowlist_function("free_self_maps")
         .allowlist_function("pageflags_get_root")
+        .allowlist_function("vm_start")
+        .allowlist_function("qemu_main_loop")
+        .allowlist_function("qemu_cleanup")
         .blocklist_function("main_loop_wait") // bindgen issue #1313
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()));
 

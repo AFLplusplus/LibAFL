@@ -94,7 +94,7 @@ pub fn init_qemu_with_asan_guest(
         ASAN_GUEST_INITED = true;
     }
 
-    let emu = Qemu::init(args, env)?;
+    let emu = Qemu::init(args)?;
     Ok((emu, asan_lib))
 }
 

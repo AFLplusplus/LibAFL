@@ -27,12 +27,10 @@ use libafl_bolts::{
     AsSlice, AsSliceMut,
 };
 use libafl_qemu::{
-    command::NopCommandManager,
     elf::EasyElf,
     modules::edges::{EdgeCoverageChildModule, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},
-    ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms,
-    NopEmulatorExitHandler, Qemu, QemuExitError, QemuExitReason, QemuForkExecutor,
-    QemuShutdownCause, Regs,
+    ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExitError,
+    QemuExitReason, QemuForkExecutor, QemuShutdownCause, Regs,
 };
 
 #[derive(Default)]
@@ -113,8 +111,7 @@ pub fn fuzz() -> Result<(), Error> {
     log::debug!("ARGS: {:#?}", options.args);
 
     env::remove_var("LD_LIBRARY_PATH");
-    let env: Vec<(String, String)> = env::vars().collect();
-    let qemu = Qemu::init(&options.args, &env).unwrap();
+    let qemu = Qemu::init(&options.args).unwrap();
 
     let mut elf_buffer = Vec::new();
     let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer).unwrap();
@@ -223,8 +220,7 @@ pub fn fuzz() -> Result<(), Error> {
 
     let modules = tuple_list!(EdgeCoverageChildModule::default(),);
 
-    let emulator =
-        Emulator::new_with_qemu(qemu, modules, NopEmulatorExitHandler, NopCommandManager)?;
+    let emulator = Emulator::empty().qemu(qemu).modules(modules).build()?;
 
     let mut executor = QemuForkExecutor::new(
         emulator,
