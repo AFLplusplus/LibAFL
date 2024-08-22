@@ -21,6 +21,7 @@
 
 // Target Specific imports / definitions
 #ifdef _WIN32
+  // Windows only
   #include <stdint.h>
   #include <intsafe.h>
 
@@ -28,17 +29,34 @@ typedef UINT64 libafl_word;
   #define LIBAFL_CALLING_CONVENTION __fastcall
 
 #else
-  #include <stdint.h>
+    // Linux
+    #ifdef __KERNEL__
+      // Linux kernel
+      #include <asm-generic/int-ll64.h>
 
-  #if defined(__x86_64__) || defined(__aarch64__)
-    typedef uint64_t libafl_word;
-    #define LIBAFL_CALLING_CONVENTION __attribute__(())
-  #endif
+      #if defined(__x86_64__) || defined(__aarch64__)
+        typedef __u64 libafl_word;
+        #define LIBAFL_CALLING_CONVENTION __attribute__(())
+      #endif
 
-  #ifdef __arm__
-    typedef uint32_t libafl_word;
-    #define LIBAFL_CALLING_CONVENTION __attribute__(())
-  #endif
+      #ifdef __arm__
+        typedef __u32 libafl_word;
+        #define LIBAFL_CALLING_CONVENTION __attribute__(())
+      #endif
+    #else
+      // Linux userland
+      #include <stdint.h>
+
+      #if defined(__x86_64__) || defined(__aarch64__)
+        typedef uint64_t libafl_word;
+        #define LIBAFL_CALLING_CONVENTION __attribute__(())
+      #endif
+
+      #ifdef __arm__
+        typedef uint32_t libafl_word;
+        #define LIBAFL_CALLING_CONVENTION __attribute__(())
+      #endif
+    #endif
 #endif
 
 #define LIBAFL_SYNC_EXIT_OPCODE 0x66f23a0f
