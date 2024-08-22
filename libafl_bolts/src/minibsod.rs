@@ -1174,8 +1174,10 @@ mod tests {
 #[cfg(test)]
 mod tests {
 
-    use std::io::{stdout, BufWriter};
-    use std::sync::mpsc;
+    use std::{
+        io::{stdout, BufWriter},
+        sync::mpsc,
+    };
 
     use windows::Win32::{
         Foundation::{CloseHandle, DuplicateHandle, DUPLICATE_SAME_ACCESS},
