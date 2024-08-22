@@ -4,12 +4,12 @@ use core::{ptr::addr_of_mut, time::Duration};
 use std::{env, path::PathBuf, process};
 
 use libafl::{
-    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
+    corpus::{Corpus, InMemoryCorpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    inputs::BytesInput,
+    inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
@@ -29,9 +29,12 @@ use libafl_bolts::{
 use libafl_qemu::{
     emu::Emulator,
     executor::QemuExecutor,
-    modules::edges::{
-        edges_map_mut_ptr, EdgeCoverageClassicModule, EdgeCoverageModule, EDGES_MAP_SIZE_IN_USE,
-        MAX_EDGES_FOUND,
+    modules::{
+        edges::{
+            edges_map_mut_ptr, EdgeCoverageClassicModule, EdgeCoverageModule,
+            EDGES_MAP_SIZE_IN_USE, EDGES_MAP_SIZE_MAX, MAX_EDGES_FOUND,
+        },
+        CmpLogModule,
     },
 };
 
@@ -53,7 +56,10 @@ pub fn fuzz() {
         let args: Vec<String> = env::args().collect();
 
         // Choose modules to use
-        let modules = tuple_list!(EdgeCoverageClassicModule::default());
+        let modules = tuple_list!(
+            EdgeCoverageClassicModule::default(),
+            CmpLogModule::default(),
+        );
 
         let emu = Emulator::builder()
             .qemu_cli(args)
@@ -72,7 +78,7 @@ pub fn fuzz() {
         let edges_observer = unsafe {
             HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
                 "edges",
-                OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_SIZE_IN_USE),
+                OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_SIZE_MAX),
                 addr_of_mut!(MAX_EDGES_FOUND),
             ))
             .track_indices()
@@ -99,7 +105,7 @@ pub fn fuzz() {
                 // RNG
                 StdRand::with_seed(current_nanos()),
                 // Corpus that will be evolved, we keep it in memory for performance
-                InMemoryCorpus::new(),
+                InMemoryOnDiskCorpus::new("corpus_gen").unwrap(),
                 // Corpus in which we store solutions (crashes in this example),
                 // on disk so the user can get them after stopping the fuzzer
                 OnDiskCorpus::new(objective_dir.clone()).unwrap(),
@@ -123,8 +129,8 @@ pub fn fuzz() {
         let mutator = StdScheduledMutator::new(havoc_mutations());
         let calibration_feedback = MaxMapFeedback::new(&edges_observer);
         let mut stages = tuple_list!(
+            CalibrationStage::new(&calibration_feedback),
             StdMutationalStage::new(mutator),
-            CalibrationStage::new(&calibration_feedback)
         );
 
         // Create a QEMU in-process executor

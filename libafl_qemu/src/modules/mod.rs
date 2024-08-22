@@ -1,12 +1,10 @@
 use core::{fmt::Debug, ops::Range};
-use std::{cell::UnsafeCell, hash::BuildHasher};
+use std::cell::UnsafeCell;
 
 use hashbrown::HashSet;
 use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple};
 use libafl_bolts::tuples::{MatchFirstType, SplitBorrowExtractFirstType};
 use libafl_qemu_sys::{GuestAddr, GuestPhysAddr};
-
-use crate::Qemu;
 
 #[cfg(emulation_mode = "usermode")]
 pub mod usermode;
@@ -31,7 +29,7 @@ pub mod cmplog;
 #[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]
 pub use cmplog::CmpLogModule;
 
-use crate::emu::EmulatorModules;
+use crate::{emu::EmulatorModules, Qemu};
 
 /// A module for `libafl_qemu`.
 // TODO remove 'static when specialization will be stable
@@ -39,6 +37,9 @@ pub trait EmulatorModule<S>: 'static + Debug
 where
     S: UsesInput,
 {
+    type ModuleAddressFilter: AddressFilter;
+    type ModulePageFilter: PageFilter;
+
     const HOOKS_DO_SIDE_EFFECTS: bool = true;
 
     /// Initialize the module, mostly used to install some hooks early.
@@ -71,6 +72,12 @@ where
         ET: EmulatorModuleTuple<S>,
     {
     }
+
+    fn address_filter(&self) -> &Self::ModuleAddressFilter;
+    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter;
+
+    fn page_filter(&self) -> &Self::ModulePageFilter;
+    fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter;
 }
 
 pub trait EmulatorModuleTuple<S>:
@@ -84,26 +91,27 @@ where
     where
         ET: EmulatorModuleTuple<S>;
 
-    fn first_exec_all<ET>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>)
+    fn first_exec_all<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
     where
         ET: EmulatorModuleTuple<S>;
 
-    fn pre_exec_all<ET>(
-        &mut self,
-        _emulator_modules: &mut EmulatorModules<ET, S>,
-        _input: &S::Input,
-    ) where
+    fn pre_exec_all<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, input: &S::Input)
+    where
         ET: EmulatorModuleTuple<S>;
 
     fn post_exec_all<OT, ET>(
         &mut self,
-        _emulator_modules: &mut EmulatorModules<ET, S>,
-        _input: &S::Input,
-        _observers: &mut OT,
-        _exit_kind: &mut ExitKind,
+        emulator_modules: &mut EmulatorModules<ET, S>,
+        input: &S::Input,
+        observers: &mut OT,
+        exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
         ET: EmulatorModuleTuple<S>;
+
+    fn allow_address_range_all(&mut self, address_range: Range<GuestAddr>);
+
+    fn allow_page_id_all(&mut self, page_id: GuestPhysAddr);
 }
 
 impl<S> EmulatorModuleTuple<S> for ()
@@ -144,6 +152,10 @@ where
         ET: EmulatorModuleTuple<S>,
     {
     }
+
+    fn allow_address_range_all(&mut self, _address_range: Range<GuestAddr>) {}
+
+    fn allow_page_id_all(&mut self, _page_id: GuestPhysAddr) {}
 }
 
 impl<Head, Tail, S> EmulatorModuleTuple<S> for (Head, Tail)
@@ -193,143 +205,176 @@ where
         self.1
             .post_exec_all(emulator_modules, input, observers, exit_kind);
     }
-}
 
-impl HasInstrumentationFilter<()> for () {
-    fn filter(&self) -> &() {
-        self
+    fn allow_address_range_all(&mut self, address_range: Range<GuestAddr>) {
+        self.0.address_filter_mut().allow(address_range.clone());
+        self.1.allow_address_range_all(address_range)
     }
 
-    fn filter_mut(&mut self) -> &mut () {
-        self
-    }
-}
-
-impl<Head, F> HasInstrumentationFilter<F> for (Head, ())
-where
-    Head: HasInstrumentationFilter<F>,
-    F: IsFilter,
-{
-    fn filter(&self) -> &F {
-        self.0.filter()
-    }
-
-    fn filter_mut(&mut self) -> &mut F {
-        self.0.filter_mut()
+    fn allow_page_id_all(&mut self, page_id: GuestPhysAddr) {
+        self.0.page_filter_mut().allow(page_id.clone());
+        self.1.allow_page_id_all(page_id)
     }
 }
 
 #[derive(Debug, Clone)]
-pub enum QemuFilterList<T: IsFilter + Debug + Clone> {
-    AllowList(T),
-    DenyList(T),
+pub enum FilterList<F> {
+    AllowList(F),
+    DenyList(F),
     None,
 }
 
-impl<T> IsFilter for QemuFilterList<T>
+impl<T> AddressFilter for FilterList<T>
 where
-    T: IsFilter + Clone,
+    T: AddressFilter,
 {
-    type FilterParameter = T::FilterParameter;
-
-    fn allowed(&self, filter_parameter: Self::FilterParameter) -> bool {
+    fn allow(&mut self, address_range: Range<GuestAddr>) {
         match self {
-            QemuFilterList::AllowList(allow_list) => allow_list.allowed(filter_parameter),
-            QemuFilterList::DenyList(deny_list) => !deny_list.allowed(filter_parameter),
-            QemuFilterList::None => true,
+            FilterList::AllowList(allow_list) => allow_list.allow(address_range),
+            FilterList::DenyList(_deny_list) => {
+                todo!()
+            }
+            FilterList::None => {}
+        }
+    }
+
+    fn allowed(&self, address: &GuestAddr) -> bool {
+        match self {
+            FilterList::AllowList(allow_list) => allow_list.allowed(address),
+            FilterList::DenyList(deny_list) => !deny_list.allowed(address),
+            FilterList::None => true,
         }
     }
 }
 
-pub type QemuInstrumentationPagingFilter = QemuFilterList<HashSet<GuestPhysAddr>>;
-
-impl<H> IsFilter for HashSet<GuestPhysAddr, H>
+impl<T> PageFilter for FilterList<T>
 where
-    H: BuildHasher,
+    T: PageFilter,
 {
-    type FilterParameter = Option<GuestPhysAddr>;
+    fn allow(&mut self, page_id: GuestPhysAddr) {
+        match self {
+            FilterList::AllowList(allow_list) => allow_list.allow(page_id),
+            FilterList::DenyList(_deny_list) => {
+                todo!()
+            }
+            FilterList::None => {}
+        }
+    }
 
-    fn allowed(&self, paging_id: Self::FilterParameter) -> bool {
-        paging_id.is_some_and(|pid| self.contains(&pid))
+    fn allowed(&self, page: &GuestPhysAddr) -> bool {
+        match self {
+            FilterList::AllowList(allow_list) => allow_list.allowed(page),
+            FilterList::DenyList(deny_list) => !deny_list.allowed(page),
+            FilterList::None => true,
+        }
     }
 }
 
-pub type QemuInstrumentationAddressRangeFilter = QemuFilterList<Vec<Range<GuestAddr>>>;
+#[derive(Clone, Debug)]
+pub struct StdAddressFilter {
+    // ideally, we should use a tree
+    allowed_addresses: Vec<Range<GuestAddr>>,
+}
 
-impl IsFilter for Vec<Range<GuestAddr>> {
-    type FilterParameter = GuestAddr;
+impl Default for StdAddressFilter {
+    fn default() -> Self {
+        Self {
+            allowed_addresses: Vec::new(),
+        }
+    }
+}
 
-    fn allowed(&self, addr: Self::FilterParameter) -> bool {
-        for rng in self {
-            if rng.contains(&addr) {
+impl AddressFilter for StdAddressFilter {
+    fn allow(&mut self, address_range: Range<GuestAddr>) {
+        self.allowed_addresses.push(address_range);
+        Qemu::get().unwrap().flush_jit()
+    }
+
+    fn allowed(&self, addr: &GuestAddr) -> bool {
+        if self.allowed_addresses.is_empty() {
+            return true;
+        }
+
+        for addr_range in &self.allowed_addresses {
+            if addr_range.contains(addr) {
                 return true;
             }
         }
+
         false
     }
 }
 
-pub trait HasInstrumentationFilter<F>
-where
-    F: IsFilter,
-{
-    fn filter(&self) -> &F;
+#[derive(Clone, Debug)]
+pub struct StdPageFilter {
+    allowed_pages: HashSet<GuestPhysAddr>,
+}
 
-    fn filter_mut(&mut self) -> &mut F;
-
-    fn update_filter(&mut self, filter: F, emu: &Qemu) {
-        *self.filter_mut() = filter;
-        emu.flush_jit();
+impl Default for StdPageFilter {
+    fn default() -> Self {
+        Self {
+            allowed_pages: HashSet::new(),
+        }
     }
 }
 
-static mut EMPTY_ADDRESS_FILTER: UnsafeCell<QemuInstrumentationAddressRangeFilter> =
-    UnsafeCell::new(QemuFilterList::None);
-static mut EMPTY_PAGING_FILTER: UnsafeCell<QemuInstrumentationPagingFilter> =
-    UnsafeCell::new(QemuFilterList::None);
-
-impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for () {
-    fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
-        &QemuFilterList::None
+impl PageFilter for StdPageFilter {
+    fn allow(&mut self, page_id: GuestPhysAddr) {
+        self.allowed_pages.insert(page_id);
+        Qemu::get().unwrap().flush_jit()
     }
 
-    fn filter_mut(&mut self) -> &mut QemuInstrumentationAddressRangeFilter {
-        unsafe { EMPTY_ADDRESS_FILTER.get_mut() }
-    }
-}
+    fn allowed(&self, paging_id: &GuestPhysAddr) -> bool {
+        if self.allowed_pages.is_empty() {
+            return true;
+        }
 
-impl HasInstrumentationFilter<QemuInstrumentationPagingFilter> for () {
-    fn filter(&self) -> &QemuInstrumentationPagingFilter {
-        &QemuFilterList::None
-    }
-
-    fn filter_mut(&mut self) -> &mut QemuInstrumentationPagingFilter {
-        unsafe { EMPTY_PAGING_FILTER.get_mut() }
+        self.allowed_pages.contains(paging_id)
     }
 }
 
-pub trait IsFilter: Debug {
-    type FilterParameter;
-
-    fn allowed(&self, filter_parameter: Self::FilterParameter) -> bool;
+// adapted from https://xorshift.di.unimi.it/splitmix64.c
+#[must_use]
+pub fn hash_me(mut x: u64) -> u64 {
+    x = (x ^ (x.overflowing_shr(30).0))
+        .overflowing_mul(0xbf58476d1ce4e5b9)
+        .0;
+    x = (x ^ (x.overflowing_shr(27).0))
+        .overflowing_mul(0x94d049bb133111eb)
+        .0;
+    x ^ (x.overflowing_shr(31).0)
 }
 
-impl IsFilter for () {
-    type FilterParameter = ();
+pub trait AddressFilter {
+    fn allow(&mut self, address_range: Range<GuestAddr>);
 
-    fn allowed(&self, _filter_parameter: Self::FilterParameter) -> bool {
+    fn allowed(&self, address: &GuestAddr) -> bool;
+}
+
+pub struct NopAddressFilter;
+impl AddressFilter for NopAddressFilter {
+    fn allow(&mut self, _address: Range<GuestAddr>) {}
+
+    fn allowed(&self, _address: &GuestAddr) -> bool {
         true
     }
 }
 
-pub trait IsAddressFilter: IsFilter<FilterParameter = GuestAddr> {}
+pub trait PageFilter {
+    fn allow(&mut self, page_id: GuestPhysAddr);
 
-impl IsAddressFilter for QemuInstrumentationAddressRangeFilter {}
-
-#[must_use]
-pub fn hash_me(mut x: u64) -> u64 {
-    x = (x.overflowing_shr(16).0 ^ x).overflowing_mul(0x45d9f3b).0;
-    x = (x.overflowing_shr(16).0 ^ x).overflowing_mul(0x45d9f3b).0;
-    x = (x.overflowing_shr(16).0 ^ x) ^ x;
-    x
+    fn allowed(&self, page_id: &GuestPhysAddr) -> bool;
 }
+
+pub struct NopPageFilter;
+impl PageFilter for NopPageFilter {
+    fn allow(&mut self, _page_id: GuestPhysAddr) {}
+
+    fn allowed(&self, _page_id: &GuestPhysAddr) -> bool {
+        true
+    }
+}
+
+// static mut NOP_ADDRESS_FILTER: UnsafeCell<NopAddressFilter> =
+//      UnsafeCell::new(NopAddressFilter);
+static mut NOP_PAGE_FILTER: UnsafeCell<NopPageFilter> = UnsafeCell::new(NopPageFilter);

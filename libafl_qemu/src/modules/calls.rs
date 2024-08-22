@@ -13,8 +13,8 @@ use thread_local::ThreadLocal;
 use crate::{
     capstone,
     modules::{
-        EmulatorModule, EmulatorModuleTuple, EmulatorModules, HasInstrumentationFilter, IsFilter,
-        QemuInstrumentationAddressRangeFilter,
+        AddressFilter, EmulatorModule, EmulatorModuleTuple, EmulatorModules, NopPageFilter,
+        StdAddressFilter, NOP_PAGE_FILTER,
     },
     qemu::{ArchExtras, Hook},
     Qemu,
@@ -218,7 +218,7 @@ pub struct CallTracerModule<T>
 where
     T: CallTraceCollectorTuple,
 {
-    filter: QemuInstrumentationAddressRangeFilter,
+    filter: StdAddressFilter,
     cs: Capstone,
     collectors: Option<T>,
 }
@@ -228,7 +228,7 @@ where
     T: CallTraceCollectorTuple + Debug,
 {
     #[must_use]
-    pub fn new(filter: QemuInstrumentationAddressRangeFilter, collectors: T) -> Self {
+    pub fn new(filter: StdAddressFilter, collectors: T) -> Self {
         Self {
             filter,
             cs: capstone().detail(true).build().unwrap(),
@@ -238,7 +238,7 @@ where
 
     #[must_use]
     pub fn must_instrument(&self, addr: GuestAddr) -> bool {
-        self.filter.allowed(addr)
+        self.filter.allowed(&addr)
     }
 
     fn on_ret<ET, S>(
@@ -383,24 +383,14 @@ where
     }
 }
 
-impl<T> HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for CallTracerModule<T>
-where
-    T: CallTraceCollectorTuple,
-{
-    fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
-        &self.filter
-    }
-
-    fn filter_mut(&mut self) -> &mut QemuInstrumentationAddressRangeFilter {
-        &mut self.filter
-    }
-}
-
 impl<S, T> EmulatorModule<S> for CallTracerModule<T>
 where
     S: Unpin + UsesInput,
     T: CallTraceCollectorTuple + Debug,
 {
+    type ModuleAddressFilter = StdAddressFilter;
+    type ModulePageFilter = NopPageFilter;
+
     fn init_module<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
     where
         ET: EmulatorModuleTuple<S>,
@@ -438,6 +428,22 @@ where
             observers,
             exit_kind,
         );
+    }
+
+    fn address_filter(&self) -> &Self::ModuleAddressFilter {
+        &self.filter
+    }
+
+    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
+        &mut self.filter
+    }
+
+    fn page_filter(&self) -> &Self::ModulePageFilter {
+        &NopPageFilter
+    }
+
+    fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
+        unsafe { NOP_PAGE_FILTER.get_mut() }
     }
 }
 

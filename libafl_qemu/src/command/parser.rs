@@ -10,12 +10,10 @@ use libc::c_uint;
 
 use crate::{
     command::{
-        bindings, CommandError, CommandManager, EndCommand, FilterCommand, InputCommand, IsCommand,
-        LoadCommand, NativeExitKind, SaveCommand, StartCommand, VersionCommand,
+        bindings, AddressAllowCommand, CommandError, CommandManager, EndCommand, InputCommand,
+        IsCommand, LoadCommand, NativeExitKind, SaveCommand, StartCommand, VersionCommand,
     },
-    modules::{
-        EmulatorModuleTuple, QemuInstrumentationAddressRangeFilter, StdInstrumentationFilter,
-    },
+    modules::EmulatorModuleTuple,
     sync_exit::ExitArgs,
     GuestReg, IsSnapshotManager, Qemu, QemuMemoryChunk, Regs, StdEmulatorDriver,
 };
@@ -150,7 +148,7 @@ where
 pub struct SaveCommandParser;
 impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorDriver, ET, S, SM> for SaveCommandParser
 where
-    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter,
+    ET: EmulatorModuleTuple<S>,
     CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
     S: UsesInput + Unpin,
     SM: IsSnapshotManager,
@@ -243,10 +241,11 @@ pub struct VaddrFilterAllowRangeCommandParser;
 impl<CM, ED, ET, S, SM> NativeCommandParser<CM, ED, ET, S, SM>
     for VaddrFilterAllowRangeCommandParser
 where
+    ET: EmulatorModuleTuple<S>,
     CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput,
+    S: UsesInput + Unpin,
 {
-    type OutputCommand = FilterCommand<QemuInstrumentationAddressRangeFilter>;
+    type OutputCommand = AddressAllowCommand;
 
     const COMMAND_ID: c_uint = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_VADDR_FILTER_ALLOW.0;
 
@@ -257,9 +256,6 @@ where
         let vaddr_start: GuestAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
         let vaddr_end: GuestAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])?;
 
-        Ok(FilterCommand::new(
-            #[allow(clippy::single_range_in_vec_init)]
-            QemuInstrumentationAddressRangeFilter::AllowList(vec![vaddr_start..vaddr_end]),
-        ))
+        Ok(AddressAllowCommand::new(vaddr_start..vaddr_end))
     }
 }

@@ -22,7 +22,7 @@ end
 PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
 WORKING_DIR = "${CARGO_MAKE_WORKING_DIRECTORY}"
 TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}"
-LIBAFL_QEMU_CLONE_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/qemu-libafl-bridge"
+LIBAFL_QEMU_DIR = { value = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/qemu-libafl-bridge", condition = { env_not_set = ["LIBAFL_QEMU_DIR"] }}
 
 LINUX_BUILDER_URL = "git@github.com:AFLplusplus/linux-qemu-image-builder.git"
 LINUX_BUILDER_DIR = { value = "${TARGET_DIR}/linux_builder", condition = { env_not_set = ["LINUX_BUILDER_DIR"] } }
@@ -48,10 +48,9 @@ dependencies = ["target_dir", "linux_builder_dir"]
 command = "clang"
 args = [
   "${WORKING_DIR}/example/harness.c",
-  "-o",
-  "${TARGET_DIR}/runtime/harness",
-  "-I",
-  "${TARGET_DIR}/${PROFILE_DIR}/include",
+  "-o", "${TARGET_DIR}/runtime/harness",
+  "-I", "${TARGET_DIR}/${PROFILE_DIR}/include",
+  "-O0",
 ]
 
 [tasks.target]
@@ -80,6 +79,7 @@ args = [
 ]
 
 [tasks.run]
+dependencies = ["build"]
 command = "${TARGET_DIR}/${PROFILE_DIR}/qemu_systemmode_linux"
 args = [
   "-accel", "tcg",
@@ -90,17 +90,20 @@ args = [
   "-blockdev", "driver=qcow2,file=storage,node-name=disk",
   "-device", "virtio-scsi-pci,id=scsi0",
   "-device", "scsi-hd,bus=scsi0.0,drive=disk,id=virtio-disk0,bootindex=1",
-  "-L", "${LIBAFL_QEMU_CLONE_DIR}/build/qemu-bundle/usr/local/share/qemu",
+  "-L", "${LIBAFL_QEMU_DIR}/build/qemu-bundle/usr/local/share/qemu",
   "-nographic",
   "-monitor", "null",
   "-serial", "null",
+  "-snapshot",
 
   # "-icount", "shift=auto,align=off,sleep=off",
 ]
 
 [tasks.debug]
-command = "${TARGET_DIR}/${PROFILE_DIR}/qemu_systemmode_linux"
+dependencies = ["build"]
+command = "time"
 args = [
+  "${TARGET_DIR}/${PROFILE_DIR}/qemu_systemmode_linux",
   "-accel", "tcg",
   "-m", "4G",
   "-drive", "if=pflash,format=raw,readonly=on,file=${LINUX_BUILDER_OUT}/OVMF_CODE.fd",
@@ -109,7 +112,7 @@ args = [
   "-blockdev", "driver=qcow2,file=storage,node-name=disk",
   "-device", "virtio-scsi-pci,id=scsi0",
   "-device", "scsi-hd,bus=scsi0.0,drive=disk,id=virtio-disk0,bootindex=1",
-  "-L", "${LIBAFL_QEMU_CLONE_DIR}/build/qemu-bundle/usr/local/share/qemu",
+  "-L", "${LIBAFL_QEMU_DIR}/build/qemu-bundle/usr/local/share/qemu",
   "-snapshot",
 ]
 
@@ -127,7 +130,7 @@ args = [
   "-blockdev", "driver=qcow2,file=storage,node-name=disk",
   "-device", "virtio-scsi-pci,id=scsi0",
   "-device", "scsi-hd,bus=scsi0.0,drive=disk,id=virtio-disk0,bootindex=1",
-  "-L", "${LIBAFL_QEMU_CLONE_DIR}/build/qemu-bundle/usr/local/share/qemu",
+  "-L", "${LIBAFL_QEMU_DIR}/build/qemu-bundle/usr/local/share/qemu",
   "-snapshot",
   # "-icount", "shift=auto,align=off,sleep=off",
   # "-monitor", "null",

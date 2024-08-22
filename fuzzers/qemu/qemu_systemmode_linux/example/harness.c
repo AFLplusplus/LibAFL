@@ -3,12 +3,23 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 #include <libafl_qemu.h>
 
 bool FuzzMe(const uint8_t *Data, size_t DataSize) {
-  return DataSize >= 3 && Data[0] == 'F' && Data[1] == 'U' && Data[2] == 'Z' &&
-         Data[3] == 'Z';  // :‑<
+  if (DataSize > 0 && Data[0] == 'F') {
+    if (DataSize > 1 && Data[1] == 'U') {
+      if (DataSize > 2 && Data[2] == 'Z') {
+        if (DataSize > 3 && Data[3] == 'Z') { return true; }
+      }
+    }
+  }
+
+  return false;
+  // return DataSize >= 3 && Data[0] == 'F' && Data[1] == 'U' && Data[2] == 'Z'
+  // &&
+  //        Data[3] == 'Z';  // :‑<
 }
 
 int main() {

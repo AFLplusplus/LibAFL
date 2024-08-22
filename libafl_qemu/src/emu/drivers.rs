@@ -157,7 +157,7 @@ where
                 QemuShutdownCause::GuestPanic => {
                     return Ok(Some(EmulatorDriverResult::EndOfRun(ExitKind::Crash)))
                 }
-                QemuShutdownCause::GuestShutdown => {
+                QemuShutdownCause::GuestShutdown | QemuShutdownCause::HostQmpQuit => {
                     log::warn!("Guest shutdown. Stopping fuzzing...");
                     std::process::exit(CTRL_C_EXIT);
                 }

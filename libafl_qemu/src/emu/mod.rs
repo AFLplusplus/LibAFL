@@ -17,7 +17,7 @@ use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestUsize, GuestVirtAddr};
 use crate::{
     breakpoint::{Breakpoint, BreakpointId},
     command::{CommandError, CommandManager, NopCommandManager, StdCommandManager},
-    modules::{EmulatorModuleTuple, StdInstrumentationFilter},
+    modules::EmulatorModuleTuple,
     sync_exit::SyncExit,
     Qemu, QemuExitError, QemuExitReason, QemuInitError, QemuMemoryChunk, QemuShutdownCause, Regs,
     CPU,
@@ -373,7 +373,7 @@ impl<CM, ED, ET, S, SM> Emulator<CM, ED, ET, S, SM>
 where
     CM: CommandManager<ED, ET, S, SM>,
     ED: EmulatorDriver<CM, ET, S, SM>,
-    ET: StdInstrumentationFilter + Unpin,
+    ET: Unpin,
     S: UsesInput,
 {
     /// This function will run the emulator until the exit handler decides to stop the execution for
