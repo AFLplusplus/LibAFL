@@ -35,7 +35,6 @@ use crate::{
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions, State, UsesState},
     Error, HasMetadata,
 };
-
 #[cfg(any(unix, feature = "std"))]
 use crate::{ExecutionProcessor, HasScheduler};
 
