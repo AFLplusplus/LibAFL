@@ -33,8 +33,10 @@ use crate::{
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions, State, UsesState},
-    Error, ExecutionProcessor, HasMetadata, HasScheduler,
+    Error, HasMetadata,
 };
+#[cfg(any(unix, feature = "std"))]
+use crate::{ExecutionProcessor, HasScheduler};
 
 /// The inner structure of `InProcessExecutor`.
 pub mod inner;
