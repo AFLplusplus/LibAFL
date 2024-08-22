@@ -512,7 +512,7 @@ pub unsafe extern "system" fn handle_exception(
 /// It is just casting into another type, nothing unsafe.
 #[must_use]
 pub const unsafe fn sig_ign() -> NativeSignalHandlerType {
-    core::mem::transmute(1u64)
+    core::mem::transmute(1usize)
 }
 
 type NativeSignalHandlerType = unsafe extern "C" fn(i32);
