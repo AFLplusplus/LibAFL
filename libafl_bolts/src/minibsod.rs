@@ -460,24 +460,24 @@ pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
     context: &CONTEXT,
 ) -> Result<(), std::io::Error> {
-    write!(writer, "r8 : {:#016x}, ", context.R8)?;
-    write!(writer, "r9 : {:#016x}, ", context.R9)?;
-    write!(writer, "r10: {:#016x}, ", context.R10)?;
-    writeln!(writer, "r11: {:#016x}, ", context.R11)?;
-    write!(writer, "r12: {:#016x}, ", context.R12)?;
-    write!(writer, "r13: {:#016x}, ", context.R13)?;
-    write!(writer, "r14: {:#016x}, ", context.R14)?;
-    writeln!(writer, "r15: {:#016x}, ", context.R15)?;
-    write!(writer, "rdi: {:#016x}, ", context.Rdi)?;
-    write!(writer, "rsi: {:#016x}, ", context.Rsi)?;
-    write!(writer, "rbp: {:#016x}, ", context.Rbp)?;
-    writeln!(writer, "rbx: {:#016x}, ", context.Rbx)?;
-    write!(writer, "rdx: {:#016x}, ", context.Rdx)?;
-    write!(writer, "rax: {:#016x}, ", context.Rax)?;
-    write!(writer, "rcx: {:#016x}, ", context.Rcx)?;
-    writeln!(writer, "rsp: {:#016x}, ", context.Rsp)?;
-    write!(writer, "rip: {:#016x}, ", context.Rip)?;
-    writeln!(writer, "efl: {:#016x}, ", context.EFlags)?;
+    write!(writer, "r8 : {:#018x}, ", context.R8)?;
+    write!(writer, "r9 : {:#018x}, ", context.R9)?;
+    write!(writer, "r10: {:#018x}, ", context.R10)?;
+    writeln!(writer, "r11: {:#018x}, ", context.R11)?;
+    write!(writer, "r12: {:#018x}, ", context.R12)?;
+    write!(writer, "r13: {:#018x}, ", context.R13)?;
+    write!(writer, "r14: {:#018x}, ", context.R14)?;
+    writeln!(writer, "r15: {:#018x}, ", context.R15)?;
+    write!(writer, "rdi: {:#018x}, ", context.Rdi)?;
+    write!(writer, "rsi: {:#018x}, ", context.Rsi)?;
+    write!(writer, "rbp: {:#018x}, ", context.Rbp)?;
+    writeln!(writer, "rbx: {:#018x}, ", context.Rbx)?;
+    write!(writer, "rdx: {:#018x}, ", context.Rdx)?;
+    write!(writer, "rax: {:#018x}, ", context.Rax)?;
+    write!(writer, "rcx: {:#018x}, ", context.Rcx)?;
+    writeln!(writer, "rsp: {:#018x}, ", context.Rsp)?;
+    write!(writer, "rip: {:#018x}, ", context.Rip)?;
+    writeln!(writer, "efl: {:#018x}", context.EFlags)?;
 
     Ok(())
 }
@@ -489,16 +489,16 @@ pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
     context: &CONTEXT,
 ) -> Result<(), std::io::Error> {
-    write!(writer, "eax: {:#08x}, ", context.Eax)?;
-    write!(writer, "ebx: {:#08x}, ", context.Ebx)?;
-    write!(writer, "ecx: {:#08x}, ", context.Ecx)?;
-    writeln!(writer, "edx: {:#08x}, ", context.Edx)?;
-    write!(writer, "edi: {:#08x}, ", context.Edi)?;
-    write!(writer, "esi: {:#08x}, ", context.Esi)?;
-    write!(writer, "esp: {:#08x}, ", context.Esp)?;
-    writeln!(writer, "ebp: {:#08x}, ", context.Ebp)?;
-    write!(writer, "eip: {:#08x}, ", context.Eip)?;
-    writeln!(writer, "efl: {:#08x} ", context.EFlags)?;
+    write!(writer, "eax: {:#010x}, ", context.Eax)?;
+    write!(writer, "ebx: {:#010x}, ", context.Ebx)?;
+    write!(writer, "ecx: {:#010x}, ", context.Ecx)?;
+    writeln!(writer, "edx: {:#010x}, ", context.Edx)?;
+    write!(writer, "edi: {:#010x}, ", context.Edi)?;
+    write!(writer, "esi: {:#010x}, ", context.Esi)?;
+    write!(writer, "esp: {:#010x}, ", context.Esp)?;
+    writeln!(writer, "ebp: {:#010x}, ", context.Ebp)?;
+    write!(writer, "eip: {:#010x}, ", context.Eip)?;
+    writeln!(writer, "efl: {:#010x} ", context.EFlags)?;
     Ok(())
 }
 
@@ -513,7 +513,7 @@ pub fn dump_registers<W: Write>(
         write!(writer, "x{:02}: 0x{:016x} ", reg, unsafe {
             context.Anonymous.X[reg]
         })?;
-        if reg % 4 == 3 {
+        if reg % 4 == 3 || reg == 28_usize {
             writeln!(writer)?;
         }
     }
