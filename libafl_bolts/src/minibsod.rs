@@ -503,6 +503,33 @@ pub fn dump_registers<W: Write>(
 }
 
 /// Write the content of all important registers
+#[cfg(all(target_os = "windows", target_arch = "aarch64"))]
+#[allow(clippy::similar_names)]
+pub fn dump_registers<W: Write>(
+    writer: &mut BufWriter<W>,
+    context: &CONTEXT,
+) -> Result<(), std::io::Error> {
+    for reg in 0..29_usize {
+        write!(writer, "x{:02}: 0x{:016x} ", reg, unsafe {
+            context.Anonymous.X[reg]
+        })?;
+        if reg % 4 == 3 {
+            writeln!(writer)?;
+        }
+    }
+    writeln!(writer, "pc : 0x{:016x} ", context.Pc)?;
+    writeln!(writer, "sp : 0x{:016x} ", context.Sp)?;
+    writeln!(writer, "fp : 0x{:016x} ", unsafe {
+        context.Anonymous.Anonymous.Fp
+    })?;
+    writeln!(writer, "lr : 0x{:016x} ", unsafe {
+        context.Anonymous.Anonymous.Lr
+    })?;
+
+    Ok(())
+}
+
+/// Write the content of all important registers
 #[cfg(all(target_os = "haiku", target_arch = "x86_64"))]
 #[allow(clippy::similar_names)]
 pub fn dump_registers<W: Write>(
