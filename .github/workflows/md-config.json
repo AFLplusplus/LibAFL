@@ -4,5 +4,5 @@
       "pattern": "^https://crates.io"
     }
   ],
-  "aliveStatusCodes": [0]
+  "aliveStatusCodes": [0, 200]
 }
