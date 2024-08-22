@@ -1169,3 +1169,78 @@ mod tests {
         dump_registers(&mut writer, &ucontext).unwrap();
     }
 }
+
+#[cfg(windows)]
+#[cfg(test)]
+mod tests {
+
+    use std::io::{stdout, BufWriter};
+    use std::sync::mpsc;
+
+    use windows::Win32::{
+        Foundation::{CloseHandle, DuplicateHandle, DUPLICATE_SAME_ACCESS},
+        System::{
+            Diagnostics::Debug::{
+                GetThreadContext, CONTEXT, CONTEXT_FULL_AMD64, CONTEXT_FULL_ARM64, CONTEXT_FULL_X86,
+            },
+            Threading::{GetCurrentProcess, GetCurrentThread, ResumeThread, SuspendThread},
+        },
+    };
+
+    use crate::minibsod::dump_registers;
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    pub fn test_dump_registers() {
+        let (tx, rx) = mpsc::channel();
+        let (evt_tx, evt_rx) = mpsc::channel();
+        let t = std::thread::spawn(move || {
+            let cur = unsafe { GetCurrentThread() };
+            let proc = unsafe { GetCurrentProcess() };
+            let mut out = Default::default();
+            unsafe {
+                DuplicateHandle(
+                    proc,
+                    cur,
+                    proc,
+                    &mut out as *mut _,
+                    0,
+                    true,
+                    DUPLICATE_SAME_ACCESS,
+                )
+                .unwrap()
+            };
+            tx.send(out).unwrap();
+            evt_rx.recv().unwrap();
+        });
+
+        let thread = rx.recv().unwrap();
+        eprintln!("thread: {:?}", thread);
+        unsafe { SuspendThread(thread) };
+
+        #[derive(Default)]
+        #[repr(align(16))]
+        struct Align16 {
+            pub ctx: CONTEXT,
+        }
+
+        // https://stackoverflow.com/questions/56516445/getting-0x3e6-when-calling-getthreadcontext-for-debugged-thread
+        let mut c = Align16::default();
+        if cfg!(target_arch = "x86") {
+            c.ctx.ContextFlags = CONTEXT_FULL_X86;
+        } else if cfg!(target_arch = "x86_64") {
+            c.ctx.ContextFlags = CONTEXT_FULL_AMD64;
+        } else if cfg!(target_arch = "aarch64") {
+            c.ctx.ContextFlags = CONTEXT_FULL_ARM64;
+        }
+        unsafe { GetThreadContext(thread, &mut c.ctx as *mut _).unwrap() };
+
+        let mut writer = BufWriter::new(stdout());
+        dump_registers(&mut writer, &c.ctx).unwrap();
+
+        unsafe { ResumeThread(thread) };
+        unsafe { CloseHandle(thread).unwrap() };
+        evt_tx.send(true).unwrap();
+        t.join().unwrap();
+    }
+}
