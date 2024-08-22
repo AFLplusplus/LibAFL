@@ -5,7 +5,6 @@ use core::{ops::Range, ptr, slice};
 use std::{
     ffi::CString,
     fs,
-    io::Write,
     os::{
         fd::{AsRawFd, FromRawFd, OwnedFd},
         raw::c_void,
@@ -457,7 +456,7 @@ pub fn current_cpu() -> Option<Cpu> {
 
 #[cfg(test)]
 mod test {
-    use std::{arch::asm, env, fs::OpenOptions, process};
+    use std::{arch::asm, env, fs::OpenOptions, io::Write, process};
 
     use libc::getpid;
     use nix::{
@@ -517,16 +516,18 @@ mod test {
             Ok(ForkResult::Parent { child }) => child,
             Ok(ForkResult::Child) => {
                 raise(Signal::SIGSTOP).expect("Failed to stop the process");
+                // This will generate a sequence of tnt packets containing 255 taken branches
                 unsafe {
                     let mut count = 0;
                     asm!(
                         "2:",
-                        "add {0}, 1",
-                        "cmp {0}, 255",
+                        "add {0:r}, 1",
+                        "cmp {0:r}, 255",
                         "jle 2b",
-                        in(reg) &mut count,
+                        inout(reg) count,
                         options(nostack)
                     );
+                    let _ = count;
                 }
                 process::exit(0);
             }
@@ -569,7 +570,8 @@ mod test {
         }
         let mut trace = Vec::new();
         let mut ips = pt.decode(&mut image, Some(&mut trace));
-        dump_trace_to_file(&trace);
+        let _ = dump_trace_to_file(&trace)
+            .inspect_err(|e| println!("Failed to dump trace to file: {e}"));
         // remove kernel ips
         ips = ips
             .into_iter()

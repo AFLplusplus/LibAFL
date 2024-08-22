@@ -1,10 +1,11 @@
 use libafl::{inputs::UsesInput, observers::ObserversTuple, HasMetadata};
 use libafl_qemu_sys::{CPUArchStatePtr, GuestVirtAddr};
+use libipt::Image;
 
 use crate::{
     modules::{EmulatorModule, EmulatorModuleTuple, ExitKind},
     qemu::intel_pt::IntelPT,
-    EmulatorModules,
+    EmulatorModules, NewThreadHook,
 };
 
 #[derive(Debug)]
@@ -18,25 +19,30 @@ impl IntelPTModule {
     }
 }
 
-// pub fn intel_pt_new_thread<ET, S>(
-//     emulator_modules: &mut EmulatorModules<ET, S>,
-//     _state: Option<&mut S>,
-//     _env: CPUArchStatePtr,
-//     tid: u32
-// ) -> bool
-// where
-//     S: HasMetadata + Unpin + UsesInput,
-//     ET: EmulatorModuleTuple<S>,
-// {
-//     let intel_pt_module = emulator_modules.modules().match_first_type_mut::<IntelPTModule>().unwrap();
+pub fn intel_pt_new_thread<ET, S>(
+    emulator_modules: &mut EmulatorModules<ET, S>,
+    _state: Option<&mut S>,
+    _env: CPUArchStatePtr,
+    tid: u32,
+) -> bool
+where
+    S: HasMetadata + Unpin + UsesInput,
+    ET: EmulatorModuleTuple<S>,
+{
+    let intel_pt_module = emulator_modules
+        .modules_mut()
+        .match_first_type_mut::<IntelPTModule>()
+        .unwrap();
 
-//     if let Some(pt) = &mut intel_pt_module.pt {
-//         // update PT state
-//     }
+    if intel_pt_module.pt.is_some() {
+        panic!("Intel PT module already initialized, only single core VMs are supported ATM.");
+    }
 
-//     // Why a bool here?
-//     true
-// }
+    intel_pt_module.pt = Some(IntelPT::try_new(tid as i32).unwrap());
+
+    // What does this bool mean?
+    true
+}
 
 impl<S> EmulatorModule<S> for IntelPTModule
 where
@@ -46,10 +52,8 @@ where
     where
         ET: EmulatorModuleTuple<S>,
     {
-        // emulator_modules.thread_creation(
-        //     NewThreadHook::Function(intel_pt_new_thread::<ET, S>)
-        // );
-
+        emulator_modules.thread_creation(NewThreadHook::Function(intel_pt_new_thread::<ET, S>));
+        // TODO emulator_modules.thread_teradown
         // emulator_modules.cpu_runs(
         //     CpuPostRunHook::Function(...),
         // );
@@ -65,18 +69,21 @@ where
         OT: ObserversTuple<S>,
         ET: EmulatorModuleTuple<S>,
     {
-        // 1. decode traces
-        // Output: List of block's IPs we are going through during the fuzzer's run (after filtering)
-        // let indexes: Vec<GuestVirtAddr> = {
-        //     // result of decoding
-        //     // use libxdc...
-        // };
+        if self.pt.is_none() {
+            panic!("Intel PT module not initialized.");
+        }
+
+        // we need the memory map to decode the traces here
+        // TODO handle self modifying code
+        let mut image = Image::new(Some("empty_image")).expect("Failed to create image");
+
+        let block_ips = self.pt.as_mut().unwrap().decode(&mut image, None);
 
         // 2. update map
-        // for idx in indexes {
-        //     unsafe {
-        //         EDGES_MAP[idx] += 1;
-        //     }
-        // }
+        for ip in block_ips {
+            // unsafe {
+            //     EDGES_MAP[idx] += 1;
+            // }
+        }
     }
 }

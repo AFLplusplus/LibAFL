@@ -133,7 +133,7 @@ bitflags = "2.6"
 perf-event-open-sys = "4" # Uses Linux 5.19.4 headers, consider forking if we need to bump
 caps = "0.5" # TODO: Mark deps used only in systemmode as optional (requires fixing linux_build.rs)
 raw-cpuid = "11"
-libipt = {git = "https://github.com/Marcondiro/libipt-rs"} # v2 is not on crates.io
+libipt = { git = "https://github.com/Marcondiro/libipt-rs" } # v2 is not on crates.io
 # Document all features of this crate (for `cargo doc`)
 document-features = { version = "0.2", optional = true }
 
