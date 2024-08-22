@@ -31,10 +31,10 @@ use libafl_bolts::{
     os::unix_signals::{ucontext_t, Signal},
     tuples::RefIndexable,
 };
+#[cfg(emulation_mode = "systemmode")]
+use libafl_qemu_sys::libafl_exit_request_timeout;
 #[cfg(emulation_mode = "usermode")]
 use libafl_qemu_sys::libafl_qemu_handle_crash;
-#[cfg(emulation_mode = "systemmode")]
-use libafl_qemu_sys::qemu_system_debug_request;
 #[cfg(emulation_mode = "usermode")]
 use libafl_qemu_sys::siginfo_t;
 #[cfg(emulation_mode = "systemmode")]
@@ -86,7 +86,7 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, OF, Z>(
     Z: HasObjective<Objective = OF, State = E::State> + ExecutionProcessor + HasScheduler,
 {
     if BREAK_ON_TMOUT {
-        qemu_system_debug_request();
+        libafl_exit_request_timeout();
     } else {
         libafl::executors::hooks::unix::unix_signal_handler::inproc_timeout_handler::<E, EM, OF, Z>(
             signal, info, context, data,

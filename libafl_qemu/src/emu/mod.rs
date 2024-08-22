@@ -59,6 +59,7 @@ where
     QemuExit(QemuShutdownCause),               // QEMU ended for some reason.
     Breakpoint(Breakpoint<CM, ED, ET, S, SM>), // Breakpoint triggered. Contains the address of the trigger.
     SyncExit(SyncExit<CM, ED, ET, S, SM>), // Synchronous backdoor: The guest triggered a backdoor and should return to LibAFL.
+    Timeout,                               // Timeout
 }
 
 impl<CM, ED, ET, S, SM> Clone for EmulatorExitResult<CM, ED, ET, S, SM>
@@ -75,6 +76,7 @@ where
             EmulatorExitResult::SyncExit(sync_exit) => {
                 EmulatorExitResult::SyncExit(sync_exit.clone())
             }
+            EmulatorExitResult::Timeout => EmulatorExitResult::Timeout,
         }
     }
 }
@@ -94,6 +96,9 @@ where
             }
             EmulatorExitResult::SyncExit(sync_exit) => {
                 write!(f, "{sync_exit:?}")
+            }
+            EmulatorExitResult::Timeout => {
+                write!(f, "Timeout")
             }
         }
     }
@@ -220,6 +225,9 @@ where
             EmulatorExitResult::Breakpoint(bp) => write!(f, "{bp}"),
             EmulatorExitResult::SyncExit(sync_exit) => {
                 write!(f, "Sync exit: {sync_exit:?}")
+            }
+            EmulatorExitResult::Timeout => {
+                write!(f, "Timeout")
             }
         }
     }
@@ -410,6 +418,7 @@ where
                 QemuExitReason::End(qemu_shutdown_cause) => {
                     EmulatorExitResult::QemuExit(qemu_shutdown_cause)
                 }
+                QemuExitReason::Timeout => EmulatorExitResult::Timeout,
                 QemuExitReason::Breakpoint(bp_addr) => {
                     let bp = self
                         .breakpoints_by_addr

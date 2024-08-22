@@ -59,9 +59,17 @@ pub enum QemuInitError {
 
 #[derive(Debug, Clone)]
 pub enum QemuExitReason {
-    End(QemuShutdownCause), // QEMU ended for some reason.
-    Breakpoint(GuestAddr),  // Breakpoint triggered. Contains the address of the trigger.
-    SyncExit, // Synchronous backdoor: The guest triggered a backdoor and should return to LibAFL.
+    /// QEMU ended for some internal reason
+    End(QemuShutdownCause),
+
+    /// Breakpoint triggered. Contains the address of the trigger
+    Breakpoint(GuestAddr),
+
+    /// Synchronous exit: The guest triggered a backdoor and should return to LibAFL.
+    SyncExit,
+
+    /// Timeout, and it has been requested to be handled by the harness.
+    Timeout,
 }
 
 #[derive(Debug, Clone)]
@@ -224,6 +232,7 @@ impl Display for QemuExitReason {
             QemuExitReason::End(shutdown_cause) => write!(f, "End: {shutdown_cause:?}"),
             QemuExitReason::Breakpoint(bp) => write!(f, "Breakpoint: {bp}"),
             QemuExitReason::SyncExit => write!(f, "Sync Exit"),
+            QemuExitReason::Timeout => write!(f, "Timeout"),
         }
     }
 }
@@ -655,6 +664,7 @@ impl Qemu {
                     QemuExitReason::Breakpoint(bp_addr)
                 },
                 libafl_qemu_sys::libafl_exit_reason_kind_SYNC_EXIT => QemuExitReason::SyncExit,
+                libafl_qemu_sys::libafl_exit_reason_kind_TIMEOUT => QemuExitReason::Timeout,
                 _ => return Err(QemuExitError::UnknownKind),
             })
         }

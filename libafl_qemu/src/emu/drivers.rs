@@ -7,7 +7,7 @@ use libafl::{
     executors::ExitKind,
     inputs::{HasTargetBytes, UsesInput},
 };
-use libafl_bolts::os::unix_signals::Signal;
+use libafl_bolts::{bolts_prelude::CTRL_C_EXIT, os::unix_signals::Signal};
 
 use crate::{
     command::{CommandError, CommandManager, InputCommand, IsCommand},
@@ -157,8 +157,17 @@ where
                 QemuShutdownCause::GuestPanic => {
                     return Ok(Some(EmulatorDriverResult::EndOfRun(ExitKind::Crash)))
                 }
+                QemuShutdownCause::GuestShutdown => {
+                    log::warn!("Guest shutdown. Stopping fuzzing...");
+                    std::process::exit(CTRL_C_EXIT);
+                }
                 _ => panic!("Unhandled QEMU shutdown cause: {shutdown_cause:?}."),
             },
+            EmulatorExitResult::Timeout => {
+                return Ok(Some(EmulatorDriverResult::ReturnToHarness(
+                    EmulatorExitResult::Timeout,
+                )))
+            }
             EmulatorExitResult::Breakpoint(bp) => (bp.trigger(qemu), None),
             EmulatorExitResult::SyncExit(sync_backdoor) => {
                 let command = sync_backdoor.command().clone();
