@@ -1,4 +1,7 @@
 /* ANCHOR: use */
+extern crate libafl;
+extern crate libafl_bolts;
+
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
