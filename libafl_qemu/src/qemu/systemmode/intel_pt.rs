@@ -290,7 +290,7 @@ impl IntelPT {
 
         // official way of knowing if perf_event_open() support is enabled
         // https://man7.org/linux/man-pages/man2/perf_event_open.2.html
-        let perf_event_support_path: &str = "/proc/sys/kernel/perf_event_paranoid";
+        let perf_event_support_path = "/proc/sys/kernel/perf_event_paranoid";
         if !Path::new(perf_event_support_path).exists() {
             reasons.push(format!(
                 "perf_event_open() support is not enabled: {perf_event_support_path} not found"
@@ -580,6 +580,15 @@ mod test {
         ips.sort();
         ips.dedup();
         println!("Intel PT traces unique non kernel block ips: {:#x?}", ips);
+        // TODO: it seems like some userspace traces are not decoded
+        // probably because of smth like this in the traces:
+        // PSB
+        // kernel stuff -> ERROR: not in memory image! sync to next PSB
+        // ...                          |
+        // userspace skipped stuff      |
+        // ...                          |
+        // PSB                      <----
+        // ...
     }
 
     fn dump_trace_to_file(buff: &[u8]) -> Result<(), Error> {

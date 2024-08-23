@@ -1,5 +1,7 @@
+use std::{fmt::Debug, fs::OpenOptions, io::Write};
+
 use libafl::{inputs::UsesInput, observers::ObserversTuple, HasMetadata};
-use libafl_qemu_sys::{CPUArchStatePtr, GuestVirtAddr};
+use libafl_qemu_sys::CPUArchStatePtr;
 use libipt::Image;
 
 use crate::{
@@ -8,14 +10,33 @@ use crate::{
     EmulatorModules, NewThreadHook,
 };
 
-#[derive(Debug)]
+//#[derive(Debug)]
 pub struct IntelPTModule {
     pt: Option<IntelPT>,
+    image: Option<Image<'static>>,
+}
+
+impl Debug for IntelPTModule {
+    // TODO image is not debug
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("IntelPTModule")
+            .field("pt", &self.pt)
+            .finish()
+    }
 }
 
 impl IntelPTModule {
     pub fn new() -> Self {
-        Self { pt: None }
+        Self {
+            pt: None,
+            image: None,
+        }
+    }
+}
+
+impl Default for IntelPTModule {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -39,8 +60,14 @@ where
     }
 
     intel_pt_module.pt = Some(IntelPT::try_new(tid as i32).unwrap());
+    intel_pt_module
+        .pt
+        .as_mut()
+        .unwrap()
+        .enable_tracing()
+        .unwrap();
 
-    // What does this bool mean?
+    // What does this bool mean? ignore for the moment
     true
 }
 
@@ -54,9 +81,21 @@ where
     {
         emulator_modules.thread_creation(NewThreadHook::Function(intel_pt_new_thread::<ET, S>));
         // TODO emulator_modules.thread_teradown
-        // emulator_modules.cpu_runs(
-        //     CpuPostRunHook::Function(...),
-        // );
+    }
+
+    fn pre_exec<ET>(
+        &mut self,
+        emulator_modules: &mut EmulatorModules<ET, S>,
+        _input: &<S as UsesInput>::Input,
+    ) where
+        ET: EmulatorModuleTuple<S>,
+    {
+        if self.image.is_none() {
+            // emulator_modules.qemu()
+            // we need the memory map to decode the traces here take it in prexec. use QemuMemoryChunk
+            // TODO handle self modifying code
+            self.image = Some(Image::new(Some("empty_image")).expect("Failed to create image"));
+        }
     }
 
     fn post_exec<OT, ET>(
@@ -73,17 +112,25 @@ where
             panic!("Intel PT module not initialized.");
         }
 
-        // we need the memory map to decode the traces here
-        // TODO handle self modifying code
-        let mut image = Image::new(Some("empty_image")).expect("Failed to create image");
-
-        let block_ips = self.pt.as_mut().unwrap().decode(&mut image, None);
-
-        // 2. update map
-        for ip in block_ips {
-            // unsafe {
-            //     EDGES_MAP[idx] += 1;
-            // }
+        if self.image.is_none() {
+            panic!("Intel PT module: memory image not initialized.");
         }
+
+        let mut buff = Vec::new();
+        let block_ips = self
+            .pt
+            .as_mut()
+            .unwrap()
+            .decode(&mut self.image.as_mut().unwrap(), Some(&mut buff));
+
+        let trace_path = "trace.out";
+        let mut file = OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(trace_path)
+            .expect("Failed to open trace output file");
+
+        file.write_all(&buff).unwrap();
+        println!("Block IPs: {:#x?}", block_ips);
     }
 }
