@@ -53,7 +53,8 @@ use crate::{
     },
     scheduler::SupportedSchedulers,
     stages::{mutational_stage::SupportedMutationalStages, time_tracker::TimeTrackingStageWrapper},
-    Opt, AFL_DEFAULT_INPUT_LEN_MAX, AFL_DEFAULT_INPUT_LEN_MIN, SHMEM_ENV_VAR,
+    Opt, AFL_DEFAULT_INPUT_LEN_MAX, AFL_DEFAULT_INPUT_LEN_MIN, AFL_HARNESS_FILE_INPUT,
+    SHMEM_ENV_VAR,
 };
 
 pub type LibaflFuzzState =
@@ -234,7 +235,7 @@ where
     }
 
     // Create the base Executor
-    let mut executor = base_executor(opt, &mut shmem_provider);
+    let mut executor = base_executor(opt, &mut shmem_provider, fuzzer_dir)?;
     // Set a custom exit code to be interpreted as a Crash if configured.
     if let Some(crash_exitcode) = opt.crash_exitcode {
         executor = executor.crash_exitcode(crash_exitcode);
@@ -244,24 +245,6 @@ where
     if !opt.no_autodict {
         executor = executor.autotokens(&mut tokens);
     };
-
-    // Set a custom directory for the current_input file if configured;
-    // Relevant only if harness input type is @@
-    if opt.harness_input_type.is_some() {
-        let mut file = get_unique_std_input_file();
-        if let Some(ext) = &opt.input_ext {
-            file = format!("{file}.{ext}");
-        }
-        if let Some(cur_input_dir) = &opt.cur_input_dir {
-            executor = executor.arg_input_file(cur_input_dir.join(file));
-        } else {
-            executor = executor.arg_input_file(fuzzer_dir.join(file));
-        }
-    } else if opt.cur_input_dir.is_some() {
-        return Err(Error::illegal_argument(
-            "cannot use AFL_TMPDIR with stdin input type.",
-        ));
-    }
 
     // Finalize and build our Executor
     let mut executor = executor
@@ -339,7 +322,7 @@ where
 
         // Create the CmpLog executor.
         // Cmplog has 25% execution overhead so we give it double the timeout
-        let cmplog_executor = base_executor(opt, &mut shmem_provider)
+        let cmplog_executor = base_executor(opt, &mut shmem_provider, fuzzer_dir)?
             .timeout(Duration::from_millis(opt.hang_timeout * 2))
             .program(cmplog_executable_path)
             .build(tuple_list!(cmplog_observer))
@@ -410,7 +393,8 @@ where
 fn base_executor<'a>(
     opt: &'a Opt,
     shmem_provider: &'a mut StdShMemProvider,
-) -> ForkserverExecutorBuilder<'a, StdShMemProvider> {
+    fuzzer_dir: &PathBuf,
+) -> Result<ForkserverExecutorBuilder<'a, StdShMemProvider>, Error> {
     let mut executor = ForkserverExecutor::builder()
         .program(opt.executable.clone())
         .coverage_map_size(opt.map_size.unwrap_or(AFL_DEFAULT_MAP_SIZE))
@@ -429,24 +413,36 @@ fn base_executor<'a>(
     if opt.is_persistent || opt.qemu_mode {
         executor = executor.shmem_provider(shmem_provider);
     }
-    if let Some(harness_input_type) = &opt.harness_input_type {
-        executor = executor.parse_afl_cmdline([harness_input_type]);
+    // Set arguments for the target if necessary
+    let exec = opt.executable.display().to_string();
+    // we skip all libafl-fuzz arguments.
+    let (skip, _) = env::args()
+        .enumerate()
+        .find(|i| i.1 == exec)
+        .expect("invariant; should never occur");
+    let args = env::args().skip(skip + 1);
+    for arg in args {
+        if arg == AFL_HARNESS_FILE_INPUT {
+            let mut file = get_unique_std_input_file();
+            if let Some(ext) = &opt.input_ext {
+                file = format!("{file}.{ext}");
+            }
+            if let Some(cur_input_dir) = &opt.cur_input_dir {
+                executor = executor.arg_input_file(cur_input_dir.join(file));
+            } else {
+                executor = executor.arg_input_file(fuzzer_dir.join(file));
+            }
+        } else {
+            executor = executor.arg(arg);
+        }
     }
     if opt.qemu_mode {
-        let exec = opt.executable.display().to_string();
         executor = executor.program(
             find_afl_binary("afl-qemu-trace", Some(opt.executable.clone()))
                 .expect("to find afl-qemu-trace"),
         );
-        // we skip all libafl-fuzz arguments.
-        let (skip, _) = env::args()
-            .enumerate()
-            .find(|i| i.1 == exec)
-            .expect("invariant; should never occur");
-        let args = env::args().skip(skip);
-        executor = executor.args(args);
     }
-    executor
+    Ok(executor)
 }
 
 pub fn fuzzer_target_mode(opt: &Opt) -> Cow<'static, str> {
