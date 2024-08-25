@@ -111,5 +111,7 @@ iced-x86 = { version = "1.21.0", features = ["code_asm"], optional = true }
 winsafe = { version = "0.0.22", features = ["kernel"] }
 winapi = { version = "0.3", features = ["processthreadsapi", "winnt", "memoryapi", "errhandlingapi", "debugapi"]}
 
+[target.'cfg(unix)'.dependencies]
+errno = "0.2"
 [target.'cfg(target_vendor="apple")'.dependencies]
 mach-sys = { version = "0.5.4" }

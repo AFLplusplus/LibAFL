@@ -48,7 +48,7 @@ EXTERN int heap_oob_read(const uint8_t *_data, size_t _size) {
 
   // OutputDebugStringA("heap_oob_read\n");
   int *array = new int[100];
-  fprintf(stdout, "%d\n", array[100]);
+  fprintf(stdout, "heap_oob_read%d\n", array[100]);
   delete[] array;
   return 0;
 }
@@ -160,6 +160,38 @@ EXTERN int malloc_heap_oob_write_0x17_int_at_0x13(const uint8_t *_data,
   char *array = static_cast<char *>(malloc(0x17));
   *(int *)(&array[0x13]) = 1;
   free(array);
+  return 0;
+}
+
+EXTERN int heap_oob_memcpy_write(const uint8_t *_data, size_t _size) {
+  (void)_data;
+  (void)_size;
+
+  const size_t REAL_SIZE = 10;
+  const size_t LARGER_SIZE = REAL_SIZE + 1;
+  
+  char *dest = new char[REAL_SIZE];
+  char *src = new char[LARGER_SIZE];
+  memcpy(dest, src, LARGER_SIZE);
+
+  delete[] dest;
+  delete[] src;
+  return 0;
+}
+
+EXTERN int heap_oob_memcpy_read(const uint8_t *_data, size_t _size) {
+  (void)_data;
+  (void)_size;
+
+  const size_t REAL_SIZE = 10;
+  const size_t LARGER_SIZE = REAL_SIZE + 1;
+  
+  char *dest = new char[LARGER_SIZE];
+  char *src = new char[REAL_SIZE];
+  memcpy(dest, src, LARGER_SIZE);
+
+  delete[] dest;
+  delete[] src;
   return 0;
 }
 

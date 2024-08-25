@@ -404,6 +404,8 @@ mod tests {
             ),
             ("malloc_heap_uaf_write", Some("heap use-after-free write")),
             ("malloc_heap_uaf_read", Some("heap use-after-free read")),
+            ("heap_oob_memcpy_read", Some("function arg resulting in bad read")),
+            ("heap_oob_memcpy_write", Some("function arg resulting in bad write")),            
         ];
 
         //NOTE: RTLD_NOW is required on linux as otherwise the hooks will NOT work

@@ -39,7 +39,7 @@ impl AsanRuntime {
         _hdc: *const c_void,
     ) -> *mut c_void {
         unsafe { 
-            self.allocator().alloc(8, 8) 
+            self.allocator_mut().alloc(8, 8) 
         }
     }
 
@@ -235,13 +235,7 @@ impl AsanRuntime {
         flags: u32,
         size: usize,
     ) -> *mut c_void {
-        use winapi::um::winbase::DebugBreakProcess;
-
         log::trace!("hook_RtlAllocateHeap handle {_handle:#?} flags {flags:x} size {size}");
-        // if size == 1064 {
-        //     use winapi::um::debugapi::DebugBreak;
-        //     unsafe { DebugBreak(); }
-        // }
 
         let mut allocator = self.allocator_mut();
         let ret = unsafe { allocator.alloc(size, 8) };
@@ -355,7 +349,7 @@ impl AsanRuntime {
         _flags: u32,
         ptr: *mut c_void,
     ) -> bool {
-        log::info!("hook_check_RtlFreeHeap ptr {ptr:#?}");
+        log::trace!("hook_check_RtlFreeHeap ptr {ptr:#?}");
         self.allocator_mut().is_managed(ptr)
     }
     #[inline]
@@ -368,7 +362,7 @@ impl AsanRuntime {
         _flags: u32,
         ptr: *mut c_void,
     ) -> usize {
-        log::info!("hook_RtlFreeHeap address handle {_handle:#?} flags 0x{_flags:x} ptr {ptr:#?}");
+        log::trace!("hook_RtlFreeHeap address handle {_handle:#?} flags 0x{_flags:x} ptr {ptr:#?}");
         unsafe { self.allocator_mut().release(ptr) };
         0
     }

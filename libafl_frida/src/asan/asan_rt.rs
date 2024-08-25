@@ -24,13 +24,12 @@ use frida_gum::instruction_writer::X86Register;
 use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 use frida_gum::{
     instruction_writer::InstructionWriter, interceptor::Interceptor, stalker::StalkerOutput, Gum,
-    Module, ModuleDetails, ModuleMap, NativePointer, PageProtection, RangeDetails
+    Module, ModuleMap, NativePointer, PageProtection, RangeDetails
 };
 use frida_gum_sys::Insn;
 use hashbrown::HashMap;
 use libafl_bolts::cli::FuzzerOptions;
 use libc::wchar_t;
-use os_thread_local::ThreadLocal;
 use rangemap::RangeMap;
 #[cfg(target_arch = "aarch64")]
 use yaxpeax_arch::Arch;
@@ -54,8 +53,6 @@ use crate::{
     helper::{FridaRuntime, SkipRange},
     utils::disas_count,
 };
-#[cfg(target_os = "windows")]
-use winapi::um::fibersapi::FlsAlloc;
 
 extern "C" {
     fn __register_frame(begin: *mut c_void);
@@ -94,6 +91,8 @@ fn nt_current_teb() -> *mut TEB {
     teb
 }
 
+/// Some of our hooks can be invoked from threads that do not have TLS yet.
+/// Many Rust and Frida functions require TLS to be set up, so we need to check if we have TLS.
 unsafe fn has_tls() -> bool {
     let teb = nt_current_teb();
     if teb.is_null() {
@@ -102,18 +101,38 @@ unsafe fn has_tls() -> bool {
 
     let tls_array = (*teb).tls_pointer;
     if tls_array.is_null() {
-        // let tls_dummy = ThreadLocal::new(|| Cell::new(false));
-        // tls_dummy.with(|f|f.set(true));
-        // log::error!("No TLS. Initializing it.");
         return false;
     }
     return true;   
 }
 
+// Reentrancy guard for the hooks
+// We don't want to hook any operation initiated by the code of our hook
+// Otherwise, we get into infinite recursion or deadlock
 thread_local! {
     static ASAN_IN_HOOK: Cell<bool> = const { Cell::new(false) };
 }
 
+/// RAII guard to set and reset the ASAN_IN_HOOK properly
+struct AsanInHookGuard;
+
+impl AsanInHookGuard {
+    // Constructor to save the current last error
+    fn new() -> Self {
+        ASAN_IN_HOOK.set(true);
+        AsanInHookGuard
+    }
+}
+impl Drop for AsanInHookGuard {
+    fn drop(&mut self) {
+        ASAN_IN_HOOK.set(false);
+    }
+}
+
+/// The Lock below is a simple spinlock that uses the thread id as the lock value.
+/// This is a simple way to prevent reentrancy in the hooks when we don't have TLS.
+/// This is not a perfect solution, as it is global so it orders all threads without TLS.
+/// However, this is a rare situation and should not affect performance significantly.
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
 #[derive(Debug)]
@@ -185,16 +204,29 @@ impl Lock {
     }
 }
 
+/// We need to save and restore the last error in the hooks
+#[cfg(target_os = "windows")]
 use winapi::um::errhandlingapi::{GetLastError, SetLastError};
+#[cfg(target_os = "windows")]
 use winapi::shared::minwindef::DWORD;
+#[cfg(target_os = "linux")]
+use errno::{Errno, errno, set_errno};
+
 struct LastErrorGuard {
+    #[cfg(target_os = "windows")]
     last_error: DWORD,
+    #[cfg(target_os = "linux")]
+    last_error: Errno,
 }
 
 impl LastErrorGuard {
     // Constructor to save the current last error
     fn new() -> Self {
+        #[cfg(target_os = "windows")]
         let last_error = unsafe { GetLastError() };
+        #[cfg(target_os = "linux")]
+        let last_error = errno();
+
         LastErrorGuard { last_error }
     }
 }
@@ -202,9 +234,13 @@ impl LastErrorGuard {
 // Implement the Drop trait to restore the last error
 impl Drop for LastErrorGuard {
     fn drop(&mut self) {
+        #[cfg(target_os = "windows")]
         unsafe { SetLastError(self.last_error) };
+        #[cfg(target_os = "linux")]
+        set_errno(self.last_error);
     }
 }
+
 
 #[derive(Debug)]
 #[derive(PartialEq)]
@@ -219,6 +255,7 @@ enum UnlockResult {
     Success,
     NotOwner,
 }
+
 // For threads without TLS, we use a static lock to prevent hook reentrancy
 // This is not as efficient as using TLS, because it prevent TLS-free threads 
 // from running in parallel, but such situations are very rare (Windows loaded thread pool)
@@ -377,7 +414,7 @@ impl FridaRuntime for AsanRuntime {
         _ranges: &RangeMap<u64, (u16, String)>,
         module_map: &Rc<ModuleMap>,
     ) {
-        self.allocator.lock().unwrap().init();
+        self.allocator_mut().init();
 
         AsanErrors::get_mut_blocking().set_continue_on_error(self.continue_on_error);
 
@@ -456,7 +493,7 @@ impl AsanRuntime {
 
     /// Reset all allocations so that they can be reused for new allocation requests.
     pub fn reset_allocations(&mut self) {
-        self.allocator.lock().unwrap().reset();
+        self.allocator_mut().reset();
     }
 
     /// Gets the allocator
@@ -482,7 +519,7 @@ impl AsanRuntime {
 
     /// Check if the test leaked any memory and report it if so.
     pub fn check_for_leaks(&mut self) {
-        self.allocator.lock().unwrap().check_for_leaks();
+        self.allocator_mut().check_for_leaks();
     }
 
     /// Returns the `AsanErrors` from the recent run.
@@ -493,7 +530,7 @@ impl AsanRuntime {
 
     /// Make sure the specified memory is unpoisoned
     pub fn unpoison(&mut self, address: usize, size: usize) {
-        self.allocator.lock().unwrap()
+        self.allocator_mut()
             .map_shadow_for_region(address, address + size, true);
     }
 
@@ -503,7 +540,7 @@ impl AsanRuntime {
     /// The address needs to be a valid address, the size needs to be correct.
     /// This will dereference at the address.
     pub unsafe fn poison(&mut self, address: usize, size: usize) {
-        Allocator::poison(self.allocator.lock().unwrap().map_to_shadow(address), size);
+        Allocator::poison(self.allocator_mut().map_to_shadow(address), size);
     }
 
     /// Add a stalked address to real address mapping.
@@ -523,7 +560,7 @@ impl AsanRuntime {
 
     /// Unpoison all the memory that is currently mapped with read/write permissions.
     pub fn unpoison_all_existing_memory(&mut self) {
-        self.allocator.lock().unwrap().unpoison_all_existing_memory();
+        self.allocator_mut().unpoison_all_existing_memory();
     }
 
     /// Enable all function hooks
@@ -533,8 +570,8 @@ impl AsanRuntime {
     }
     /// Disable all function hooks
     pub fn disable_hooks(&mut self) {
-        log::warn!("Disabling hooks");
         self.hooks_enabled = false;
+        log::warn!("Disabling hooks");
     }
 
     /// Register the current thread with the runtime, implementing shadow memory for its stack and
@@ -547,11 +584,11 @@ impl AsanRuntime {
             "registering thread {:?} with stack {stack_start:x}:{stack_end:x} and tls {tls_start:x}:{tls_end:x}", 
                 unsafe{winapi::um::processthreadsapi::GetCurrentThreadId()}
         );
-        self.allocator.lock().unwrap()
+        self.allocator_mut()
             .map_shadow_for_region(stack_start, stack_end, true);
 
         #[cfg(unix)]
-        self.allocator.lock().unwrap()
+        self.allocator_mut()
             .map_shadow_for_region(tls_start, tls_end, true);
     }
 
@@ -559,7 +596,7 @@ impl AsanRuntime {
     #[cfg(target_vendor = "apple")]
     pub fn register_thread(&mut self) {
         let (stack_start, stack_end) = Self::current_stack();
-        self.allocator.lock().unwrap()
+        self.allocator_mut()
             .map_shadow_for_region(stack_start, stack_end, true);
 
         log::info!("registering thread with stack {stack_start:x}:{stack_end:x}");
@@ -713,19 +750,17 @@ impl AsanRuntime {
                         if this.hooks_enabled {
                             if has_tls() {
                                 if !ASAN_IN_HOOK.get(){
-                                    ASAN_IN_HOOK.set(true);
-                                    let ret = this.[<hook_ $name>](*original, $($param),*);
-                                    ASAN_IN_HOOK.set(false);
-                                    return ret;
+                                    let _guard = AsanInHookGuard::new(); // Ensure ASAN_IN_HOOK is set and reset
+                                    return this.[<hook_ $name>](*original, $($param),*);
                                 }
                             } 
-                            else{
-                                log::warn!("{} called without TLS", stringify!($name));
-                                $(
-                                    log::warn!("{}: {:?}", stringify!($param), $param);
-                                )*
+                            // else{
+                            //     log::warn!("{} called without TLS", stringify!($name));
+                            //     $(
+                            //         log::warn!("{}: {:?}", stringify!($param), $param);
+                            //     )*
                                 
-                            } 
+                            // } 
                         }
                         (original)($($param),*)
                     }
@@ -762,19 +797,9 @@ impl AsanRuntime {
                         if this.hooks_enabled {
                             if has_tls() {
                                 if !ASAN_IN_HOOK.get(){
-                                    ASAN_IN_HOOK.set(true);
-                                    let ret = this.[<hook_ $name>](*original, $($param),*);
-                                    ASAN_IN_HOOK.set(false);
-                                    
-                                    return ret;
+                                    let _guard = AsanInHookGuard::new(); // Ensure ASAN_IN_HOOK is set and reset
+                                    return this.[<hook_ $name>](*original, $($param),*);
                                 }
-                            } 
-                            else{
-                                log::warn!("{} called without TLS", stringify!($name));
-                                $(
-                                    log::warn!("{}: {:?}", stringify!($param), $param);
-                                )*
-                                
                             } 
                         }
                         (original)($($param),*)
@@ -812,19 +837,18 @@ impl AsanRuntime {
                         let original = [<$name:snake:upper _PTR>].get().unwrap();
                         if $always_enabled || this.hooks_enabled {
                             if has_tls() {
-                                if !ASAN_IN_HOOK.get() && this.[<hook_check_ $name>]($($param),*){
-                                    ASAN_IN_HOOK.set(true);
-                                    let ret = this.[<hook_ $name>](*original, $($param),*);
-                                    ASAN_IN_HOOK.set(false);
-                                    
-                                    return ret;
+                                if !ASAN_IN_HOOK.get(){
+                                    let _guard = AsanInHookGuard::new(); // Ensure ASAN_IN_HOOK is set and reset
+                                    if this.[<hook_check_ $name>]($($param),*){
+                                        return this.[<hook_ $name>](*original, $($param),*);
+                                    }
                                 }
                             } 
                             else{
-                                log::warn!("{} called without TLS", stringify!($name));
-                                $(
-                                    log::warn!("Params: {}: {:?}", stringify!($param), $param);
-                                )*
+                                // log::warn!("{} called without TLS", stringify!($name));
+                                // $(
+                                //     log::warn!("Params: {}: {:?}", stringify!($param), $param);
+                                // )*
                                 if $always_enabled {
                                     if TLS_LESS_LOCK.lock() == LockResult::Acquired && this.[<hook_check_ $name>]($($param),*){
                                         // There is no TLS and we have grabbed the lock - call the hook
@@ -870,19 +894,14 @@ impl AsanRuntime {
                         let original = [<$lib_ident:snake:upper _ $name:snake:upper _PTR>].get().unwrap();
                         if $always_enabled || this.hooks_enabled {
                             if has_tls() {
-                                if !ASAN_IN_HOOK.get() && this.[<hook_check_ $name>]($($param),*){
-                                    ASAN_IN_HOOK.set(true);
-                                    let ret = this.[<hook_ $name>](*original, $($param),*);
-                                    ASAN_IN_HOOK.set(false);
-                                    
-                                    return ret;
+                                if !ASAN_IN_HOOK.get(){
+                                    let _guard = AsanInHookGuard::new(); // Ensure ASAN_IN_HOOK is set and reset
+                                    if this.[<hook_check_ $name>]($($param),*){
+                                        return this.[<hook_ $name>](*original, $($param),*);
+                                    }
                                 }
                             }
                             else{
-                                log::warn!("{} called without TLS", stringify!($name));
-                                $(
-                                    log::warn!("Params: {}: {:?}", stringify!($param), $param);
-                                )*
                                 if $always_enabled {
                                     if TLS_LESS_LOCK.lock() == LockResult::Acquired && this.[<hook_check_ $name>]($($param),*){
                                         // There is no TLS and we have grabbed the lock - call the hook
@@ -991,6 +1010,8 @@ impl AsanRuntime {
                     "HeapFree" => {
                         hook_func_with_check!($libname, $lib_ident, HeapFree, (handle: *mut c_void, flags: u32, mem: *mut c_void), bool);
                     }
+                    // NOTE: we call it with always_enabled, because on Windows, some COM memory deallocation occurs later in the process
+                    // after we have completed the run
                     "RtlFreeHeap" => {
                         hook_func_with_check!($libname, $lib_ident, RtlFreeHeap, (handle: *mut c_void, flags: u32, mem: *mut c_void), usize, true);
                     }
@@ -1184,6 +1205,7 @@ impl AsanRuntime {
                 api_ms_heap2_obsolete
             );
             hook_heap_windows!("api-ms-win-core-memory-l1-1-0", api_ms_memory1);
+            hook_heap_windows!("VCRUNTIME140", VCRUNTIME140);
         }
 
         /*
@@ -1971,7 +1993,7 @@ impl AsanRuntime {
     */
     #[cfg(target_arch = "x86_64")]
     fn generate_shadow_check_blob(&mut self, size: u32) -> Box<[u8]> {
-        let shadow_bit = self.allocator.lock().unwrap().shadow_bit();
+        let shadow_bit = self.allocator_mut().shadow_bit();
         // Rcx, Rax, Rdi, Rdx, Rsi, R8 are used, so we save them in emit_shadow_check
         //at this point RDI contains the
         let mask_shift = 32 - size;
@@ -2019,7 +2041,7 @@ impl AsanRuntime {
         x0 and x1 are saved by the asan_check
         The maximum size this supports is up to 25 bytes. This is because we load 4 bytes of the shadow value. And, in the case that we have a misaligned address with an offset of 7 into the word. For example, if we load 25 bytes from 0x1007 - [0x1007,0x101f], then we require the shadow values from 0x1000, 0x1008, 0x1010, and 0x1018 */
 
-        let shadow_bit = self.allocator.lock().unwrap().shadow_bit();
+        let shadow_bit = self.allocator_mut().shadow_bit();
         macro_rules! shadow_check {
             ($ops:ident, $width:expr) => {dynasm!($ops
                 ; .arch aarch64
@@ -2065,7 +2087,7 @@ impl AsanRuntime {
 
         assert!(width <= 64, "width must be <= 64");
         let shift = 64 - width;
-        let shadow_bit = self.allocator.lock().unwrap().shadow_bit();
+        let shadow_bit = self.allocator_mut().shadow_bit();
         macro_rules! shadow_check_exact {
             ($ops:ident, $shift:expr) => {dynasm!($ops
                 ; .arch aarch64
@@ -2735,6 +2757,9 @@ impl AsanRuntime {
                 // on amd64 jump can takes 10 bytes at most, so that's why I put 10 bytes.
                 writer.put_nop();
             }
+        }
+        else {
+            log::trace!("Cannot check instructions for {:?} bytes.", width);
         }
 
         writer.put_pop_reg(X86Register::Rdi);

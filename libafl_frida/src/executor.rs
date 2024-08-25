@@ -188,6 +188,7 @@ where
         let mut stalker = Stalker::new(gum);
         // Include the current module (the fuzzer) in stalked ranges. We clone the ranges so that
         // we don't add it to the INSTRUMENTED ranges.
+        // Without stalkering the fuzzer, we can't hook the calls into the harness and thus are not transforming it
         let mut ranges = helper.ranges().clone();
         for module in frida_gum::Module::obtain(gum).enumerate_modules() {
             if module.base_address < Self::with_target_bytes_converter as usize
@@ -198,6 +199,7 @@ where
                     module.base_address as u64..(module.base_address as u64 + module.size as u64),
                     (0xffff, "fuzzer".to_string()),
                 );
+                log::info!("Fuzzer range: {:x}-{:x}", module.base_address, module.base_address + module.size);
                 break;
             }
         }

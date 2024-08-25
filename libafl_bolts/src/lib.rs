@@ -970,13 +970,14 @@ impl SimpleStdoutLogger {
 
 use std::arch::asm;
 #[cfg(target_os = "windows")]
+#[allow(clippy::cast_ptr_alignment)]
 fn get_thread_id() -> u64 {
     #[cfg(target_arch = "x86_64")]
     unsafe {
         let teb: *const u8;
         asm!("mov {}, gs:[0x30]", out(reg) teb);
         let thread_id_ptr = teb.add(0x48) as *const u32;
-        *thread_id_ptr as u64
+        u64::from(*thread_id_ptr)
     }
 
     #[cfg(target_arch = "x86")]
@@ -1025,7 +1026,10 @@ fn get_stdout_handle() -> HANDLE {
     }).0
 }
 
-pub fn log(message: &str) {
+/// A function that writes directly to stdout using `WinAPI`. 
+/// Works much faster than println and does not need TLS
+#[cfg(target_os = "windows")]
+pub fn direct_log(message: &str) {
     // Get the handle to standard output
     let h_stdout: HANDLE = get_stdout_handle();
 
@@ -1060,15 +1064,21 @@ impl log::Log for SimpleStdoutLogger {
         true
     }
 
+    #[cfg(not(target_os = "windows"))]
     fn log(&self, record: &Record) {
-        // println!(
-        //     "[{:?}, {:?}:{:?}] {}: {}",
-        //     current_time(),
-        //     std::process::id(),
-        //     get_thread_id(),
-        //     record.level(),
-        //     record.args()
-        // );
+        println!(
+            "[{:?}, {:?}:{:?}] {}: {}",
+            current_time(),
+            std::process::id(),
+            get_thread_id(),
+            record.level(),
+            record.args()
+        );
+    }
+
+    #[cfg(target_os = "windows")]
+    fn log(&self, record: &Record) {
+        // println is not safe in TLS-less environment
         let msg = format!(
             "[{:?}, {:?}:{:?}] {}: {}\n",
             current_time(),
@@ -1077,7 +1087,7 @@ impl log::Log for SimpleStdoutLogger {
             record.level(),
             record.args()
         );
-        log(msg.as_str());
+        direct_log(msg.as_str());
     }
 
     fn flush(&self) {}
