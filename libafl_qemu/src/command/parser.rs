@@ -1,17 +1,19 @@
-use std::sync::OnceLock;
+use std::{ffi::CStr, sync::OnceLock};
 
 use enum_map::{enum_map, EnumMap};
 use libafl::{
     executors::ExitKind,
     inputs::{HasTargetBytes, UsesInput},
 };
+use libafl_bolts::AsSliceMut;
 use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestVirtAddr};
 use libc::c_uint;
 
 use crate::{
     command::{
         bindings, AddressAllowCommand, CommandError, CommandManager, EndCommand, InputCommand,
-        IsCommand, LoadCommand, NativeExitKind, SaveCommand, StartCommand, VersionCommand,
+        IsCommand, LoadCommand, LqprintfCommand, NativeExitKind, SaveCommand, StartCommand,
+        VersionCommand,
     },
     modules::EmulatorModuleTuple,
     sync_exit::ExitArgs,
@@ -93,8 +95,9 @@ pub struct StartPhysCommandParser;
 
 impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorDriver, ET, S, SM> for StartPhysCommandParser
 where
+    ET: EmulatorModuleTuple<S>,
     CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
-    S: UsesInput,
+    S: UsesInput + Unpin,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
 {
@@ -121,8 +124,9 @@ pub struct StartVirtCommandParser;
 
 impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorDriver, ET, S, SM> for StartVirtCommandParser
 where
+    ET: EmulatorModuleTuple<S>,
     CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
-    S: UsesInput,
+    S: UsesInput + Unpin,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
 {
@@ -257,5 +261,43 @@ where
         let vaddr_end: GuestAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])?;
 
         Ok(AddressAllowCommand::new(vaddr_start..vaddr_end))
+    }
+}
+
+pub struct LqprintfCommandParser;
+impl<CM, ED, ET, S, SM> NativeCommandParser<CM, ED, ET, S, SM> for LqprintfCommandParser
+where
+    ET: EmulatorModuleTuple<S>,
+    CM: CommandManager<ED, ET, S, SM>,
+    S: UsesInput + Unpin,
+{
+    type OutputCommand = LqprintfCommand;
+    const COMMAND_ID: c_uint = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_LQPRINTF.0;
+
+    fn parse(
+        qemu: Qemu,
+        arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
+    ) -> Result<Self::OutputCommand, CommandError> {
+        let buf_addr: GuestAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
+        let str_size: usize = qemu
+            .read_reg::<Regs, GuestAddr>(arch_regs_map[ExitArgs::Arg2])?
+            .try_into()
+            .unwrap(); // without null byte
+        let cpu = qemu.current_cpu().unwrap();
+
+        let total_size = str_size + 1;
+
+        let mut str_copy: Vec<u8> = unsafe {
+            let mut res = Vec::<u8>::with_capacity(total_size);
+            res.set_len(total_size);
+            res
+        };
+
+        let mem_chunk = QemuMemoryChunk::virt(buf_addr, total_size as u64, cpu);
+        mem_chunk.read(qemu, str_copy.as_slice_mut());
+
+        let c_str: &CStr = CStr::from_bytes_with_nul(str_copy.as_slice()).unwrap();
+
+        Ok(LqprintfCommand::new(c_str.to_str().unwrap().to_string()))
     }
 }

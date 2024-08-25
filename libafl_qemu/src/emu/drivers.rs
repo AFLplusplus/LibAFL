@@ -6,11 +6,14 @@ use std::{cell::OnceCell, fmt::Debug};
 use libafl::{
     executors::ExitKind,
     inputs::{HasTargetBytes, UsesInput},
+    observers::ObserversTuple,
 };
 use libafl_bolts::{bolts_prelude::CTRL_C_EXIT, os::unix_signals::Signal};
+use typed_builder::TypedBuilder;
 
 use crate::{
     command::{CommandError, CommandManager, InputCommand, IsCommand},
+    modules::EmulatorModuleTuple,
     Emulator, EmulatorExitError, EmulatorExitResult, InputLocation, IsSnapshotManager,
     QemuShutdownCause, Regs, SnapshotId, SnapshotManagerCheckError, SnapshotManagerError,
 };
@@ -45,13 +48,38 @@ pub enum EmulatorDriverError {
 pub trait EmulatorDriver<CM, ET, S, SM>: 'static + Sized
 where
     CM: CommandManager<Self, ET, S, SM>,
-    S: UsesInput,
+    ET: EmulatorModuleTuple<S>,
+    S: UsesInput + Unpin,
 {
-    fn pre_exec(&mut self, _emulator: &mut Emulator<CM, Self, ET, S, SM>, _input: &S::Input) {}
+    /// Just before calling user's harness for the first time.
+    /// Called only once
+    fn first_harness_exec(emulator: &mut Emulator<CM, Self, ET, S, SM>) {
+        emulator.modules.first_exec_all();
+    }
 
+    /// Just before calling user's harness
+    fn pre_harness_exec(emulator: &mut Emulator<CM, Self, ET, S, SM>, input: &S::Input) {
+        emulator.modules.pre_exec_all(input);
+    }
+
+    /// Just after returning from user's harness
+    fn post_harness_exec<OT>(
+        emulator: &mut Emulator<CM, Self, ET, S, SM>,
+        input: &S::Input,
+        observers: &mut OT,
+        exit_kind: &mut ExitKind,
+    ) where
+        OT: ObserversTuple<S>,
+    {
+        emulator.modules.post_exec_all(input, observers, exit_kind);
+    }
+
+    /// Just before entering QEMU
+    fn pre_qemu_exec(_emulator: &mut Emulator<CM, Self, ET, S, SM>, _input: &S::Input) {}
+
+    /// Just after QEMU exits
     #[allow(clippy::type_complexity)]
-    fn post_exec(
-        &mut self,
+    fn post_qemu_exec(
         _emulator: &mut Emulator<CM, Self, ET, S, SM>,
         exit_reason: &mut Result<EmulatorExitResult<CM, Self, ET, S, SM>, EmulatorExitError>,
         _input: &S::Input,
@@ -67,31 +95,26 @@ pub struct NopEmulatorDriver;
 impl<CM, ET, S, SM> EmulatorDriver<CM, ET, S, SM> for NopEmulatorDriver
 where
     CM: CommandManager<Self, ET, S, SM>,
-    S: UsesInput,
+    ET: EmulatorModuleTuple<S>,
+    S: UsesInput + Unpin,
 {
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, TypedBuilder)]
 pub struct StdEmulatorDriver {
+    #[builder(default = OnceCell::new())]
     snapshot_id: OnceCell<SnapshotId>,
+    #[builder(default = OnceCell::new())]
     input_location: OnceCell<InputLocation>,
-}
-
-impl Default for StdEmulatorDriver {
-    fn default() -> Self {
-        StdEmulatorDriver::new()
-    }
+    #[builder(default = true)]
+    hooks_locked: bool,
+    #[builder(default = true)]
+    allow_page_on_start: bool,
+    #[builder(default = true)]
+    process_only: bool,
 }
 
 impl StdEmulatorDriver {
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            snapshot_id: OnceCell::new(),
-            input_location: OnceCell::new(),
-        }
-    }
-
     pub fn set_input_location(&self, input_location: InputLocation) -> Result<(), InputLocation> {
         self.input_location.set(input_location)
     }
@@ -103,31 +126,71 @@ impl StdEmulatorDriver {
     pub fn snapshot_id(&self) -> Option<SnapshotId> {
         Some(*self.snapshot_id.get()?)
     }
+
+    // return if was locked or not
+    pub fn unlock_hooks(&mut self) -> bool {
+        let was_locked = self.hooks_locked;
+        self.hooks_locked = false;
+        was_locked
+    }
+
+    pub fn allow_page_on_start(&self) -> bool {
+        self.allow_page_on_start
+    }
+
+    pub fn is_process_only(&self) -> bool {
+        self.process_only
+    }
 }
 
 // TODO: replace handlers with generics to permit compile-time customization of handlers
 impl<CM, ET, S, SM> EmulatorDriver<CM, ET, S, SM> for StdEmulatorDriver
 where
     CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
+    ET: EmulatorModuleTuple<S>,
     S: UsesInput + Unpin,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
 {
-    fn pre_exec(&mut self, emulator: &mut Emulator<CM, Self, ET, S, SM>, input: &S::Input) {
-        let input_location = { self.input_location.get().cloned() };
+    fn first_harness_exec(emulator: &mut Emulator<CM, Self, ET, S, SM>) {
+        if !emulator.driver.hooks_locked {
+            emulator.modules.first_exec_all();
+        }
+    }
+
+    fn pre_harness_exec(emulator: &mut Emulator<CM, Self, ET, S, SM>, input: &S::Input) {
+        if !emulator.driver.hooks_locked {
+            emulator.modules.pre_exec_all(input);
+        }
+    }
+
+    fn post_harness_exec<OT>(
+        emulator: &mut Emulator<CM, Self, ET, S, SM>,
+        input: &S::Input,
+        observers: &mut OT,
+        exit_kind: &mut ExitKind,
+    ) where
+        OT: ObserversTuple<S>,
+    {
+        if !emulator.driver.hooks_locked {
+            emulator.modules.post_exec_all(input, observers, exit_kind);
+        }
+    }
+
+    fn pre_qemu_exec(emulator: &mut Emulator<CM, Self, ET, S, SM>, input: &S::Input) {
+        let input_location = { emulator.driver.input_location.get().cloned() };
 
         if let Some(input_location) = input_location {
             let input_command =
                 InputCommand::new(input_location.mem_chunk.clone(), input_location.cpu);
 
             input_command
-                .run(emulator, self, input, input_location.ret_register)
+                .run(emulator, input, input_location.ret_register)
                 .unwrap();
         }
     }
 
-    fn post_exec(
-        &mut self,
+    fn post_qemu_exec(
         emulator: &mut Emulator<CM, Self, ET, S, SM>,
         exit_reason: &mut Result<EmulatorExitResult<CM, Self, ET, S, SM>, EmulatorExitError>,
         input: &S::Input,
@@ -138,7 +201,7 @@ where
             Ok(exit_reason) => exit_reason,
             Err(exit_error) => match exit_error {
                 EmulatorExitError::UnexpectedExit => {
-                    if let Some(snapshot_id) = self.snapshot_id.get() {
+                    if let Some(snapshot_id) = emulator.driver.snapshot_id.get() {
                         emulator.snapshot_manager.restore(qemu, snapshot_id)?;
                     }
                     return Ok(Some(EmulatorDriverResult::EndOfRun(ExitKind::Crash)));
@@ -176,7 +239,7 @@ where
         };
 
         if let Some(cmd) = command {
-            cmd.run(emulator, self, input, ret_reg)
+            cmd.run(emulator, input, ret_reg)
         } else {
             Ok(Some(EmulatorDriverResult::ReturnToHarness(
                 exit_reason.clone(),

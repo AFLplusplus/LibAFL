@@ -79,6 +79,12 @@ pub struct QemuSnapshotManager {
     is_sync: bool,
 }
 
+impl Default for QemuSnapshotManager {
+    fn default() -> Self {
+        QemuSnapshotManager::new(true)
+    }
+}
+
 impl QemuSnapshotManager {
     pub fn new(is_sync: bool) -> Self {
         Self { is_sync }

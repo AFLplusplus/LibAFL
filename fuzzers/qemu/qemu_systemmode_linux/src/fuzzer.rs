@@ -1,20 +1,24 @@
 //! A fuzzer using qemu in systemmode for binary-only coverage of linux
 
 use core::{ptr::addr_of_mut, time::Duration};
-use std::{env, path::PathBuf, process};
+use std::{env, fs, path::PathBuf, process};
 
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig},
+    executors::ShadowExecutor,
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
-    mutators::scheduled::{havoc_mutations, StdScheduledMutator},
+    mutators::{
+        scheduled::{havoc_mutations, StdScheduledMutator},
+        I2SRandReplace,
+    },
     observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
-    stages::{CalibrationStage, StdMutationalStage},
+    stages::{CalibrationStage, ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, StdState},
     Error,
 };
@@ -30,16 +34,20 @@ use libafl_qemu::{
     emu::Emulator,
     executor::QemuExecutor,
     modules::{
+        cmplog::CmpLogObserver,
         edges::{
-            edges_map_mut_ptr, EdgeCoverageClassicModule, EdgeCoverageModule,
+            edges_map_mut_ptr, EdgeCoverageClassicVariant, EdgeCoverageModule,
             EDGES_MAP_SIZE_IN_USE, EDGES_MAP_SIZE_MAX, MAX_EDGES_FOUND,
         },
         CmpLogModule,
     },
+    QemuSnapshotManager,
 };
 
 pub fn fuzz() {
     env_logger::init();
+
+    fs::remove_dir("corpus_gen");
 
     if let Ok(s) = env::var("FUZZ_SIZE") {
         str::parse::<usize>(&s).expect("FUZZ_SIZE was not a number");
@@ -57,13 +65,16 @@ pub fn fuzz() {
 
         // Choose modules to use
         let modules = tuple_list!(
-            EdgeCoverageClassicModule::default(),
+            EdgeCoverageModule::builder()
+                .variant(EdgeCoverageClassicVariant)
+                .build(),
             CmpLogModule::default(),
         );
 
         let emu = Emulator::builder()
             .qemu_cli(args)
             .modules(modules)
+            // .snapshot_manager(QemuSnapshotManager::default())
             .build()?;
 
         let devices = emu.list_devices();
@@ -86,6 +97,9 @@ pub fn fuzz() {
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
+
+        // Create a cmplog observer
+        let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
         // Feedback to rate the interestingness of an input
         // This one is composed by two Feedbacks in OR
@@ -125,14 +139,6 @@ pub fn fuzz() {
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-        // Setup an havoc mutator with a mutational stage
-        let mutator = StdScheduledMutator::new(havoc_mutations());
-        let calibration_feedback = MaxMapFeedback::new(&edges_observer);
-        let mut stages = tuple_list!(
-            CalibrationStage::new(&calibration_feedback),
-            StdMutationalStage::new(mutator),
-        );
-
         // Create a QEMU in-process executor
         let mut executor = QemuExecutor::new(
             emu,
@@ -148,6 +154,8 @@ pub fn fuzz() {
         // Instead of calling the timeout handler and restart the process, trigger a breakpoint ASAP
         executor.break_on_timeout();
 
+        let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
+
         if state.must_load_initial_inputs() {
             state
                 .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &corpus_dirs)
@@ -158,10 +166,25 @@ pub fn fuzz() {
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
 
-        fuzzer
-            .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
-            .unwrap();
-        Ok(())
+        let tracing = ShadowTracingStage::new(&mut executor);
+
+        let i2s =
+            StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
+
+        // Setup an havoc mutator with a mutational stage
+        let mutator = StdScheduledMutator::new(havoc_mutations());
+        // let calibration_feedback = MaxMapFeedback::new(&edges_observer);
+        let mut stages = tuple_list!(
+            // CalibrationStage::new(&calibration_feedback),
+            tracing,
+            i2s,
+            StdMutationalStage::new(mutator),
+        );
+
+        match fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr) {
+            Ok(_) | Err(Error::ShuttingDown) => Ok(()),
+            Err(e) => return Err(e),
+        }
     };
 
     // The shared memory allocator

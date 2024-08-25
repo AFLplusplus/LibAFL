@@ -128,11 +128,10 @@ where
     snapshot_manager: SM,
     modules: Pin<Box<EmulatorModules<ET, S>>>,
     command_manager: CM,
-    driver: Option<ED>,
+    driver: ED,
     breakpoints_by_addr: RefCell<HashMap<GuestAddr, Breakpoint<CM, ED, ET, S, SM>>>, // TODO: change to RC here
     breakpoints_by_id: RefCell<HashMap<BreakpointId, Breakpoint<CM, ED, ET, S, SM>>>,
     qemu: Qemu,
-    first_exec: bool,
 }
 
 impl<CM, ED, ET, S, SM> EmulatorDriverResult<CM, ED, ET, S, SM>
@@ -278,12 +277,12 @@ where
 
     #[must_use]
     pub fn driver(&self) -> &ED {
-        self.driver.as_ref().unwrap()
+        &self.driver
     }
 
     #[must_use]
     pub fn driver_mut(&mut self) -> &mut ED {
-        self.driver.as_mut().unwrap()
+        &mut self.driver
     }
 
     #[must_use]
@@ -338,34 +337,11 @@ where
             modules: EmulatorModules::new(qemu, modules),
             command_manager,
             snapshot_manager,
-            driver: Some(driver),
+            driver,
             breakpoints_by_addr: RefCell::new(HashMap::new()),
             breakpoints_by_id: RefCell::new(HashMap::new()),
-            first_exec: true,
             qemu,
         })
-    }
-
-    pub fn first_exec_all(&mut self) {
-        if self.first_exec {
-            self.modules.first_exec_all();
-            self.first_exec = false;
-        }
-    }
-
-    pub fn pre_exec_all(&mut self, input: &S::Input) {
-        self.modules.pre_exec_all(input);
-    }
-
-    pub fn post_exec_all<OT>(
-        &mut self,
-        input: &S::Input,
-        observers: &mut OT,
-        exit_kind: &mut ExitKind,
-    ) where
-        OT: ObserversTuple<S>,
-    {
-        self.modules.post_exec_all(input, observers, exit_kind);
     }
 }
 
@@ -373,8 +349,8 @@ impl<CM, ED, ET, S, SM> Emulator<CM, ED, ET, S, SM>
 where
     CM: CommandManager<ED, ET, S, SM>,
     ED: EmulatorDriver<CM, ET, S, SM>,
-    ET: Unpin,
-    S: UsesInput,
+    ET: EmulatorModuleTuple<S> + Unpin,
+    S: UsesInput + Unpin,
 {
     /// This function will run the emulator until the exit handler decides to stop the execution for
     /// whatever reason, depending on the choosen handler.
@@ -388,18 +364,15 @@ where
         &mut self,
         input: &S::Input,
     ) -> Result<EmulatorDriverResult<CM, ED, ET, S, SM>, EmulatorDriverError> {
-        let mut driver = self.driver.take().unwrap();
-
         loop {
             // Insert input if the location is already known
-            driver.pre_exec(self, input);
+            ED::pre_qemu_exec(self, input);
 
             // Run QEMU
             let mut exit_reason = self.run_qemu();
 
             // Handle QEMU exit
-            if let Some(exit_handler_result) = driver.post_exec(self, &mut exit_reason, input)? {
-                self.driver = Some(driver);
+            if let Some(exit_handler_result) = ED::post_qemu_exec(self, &mut exit_reason, input)? {
                 return Ok(exit_handler_result);
             }
         }
@@ -437,6 +410,24 @@ where
                 QemuExitError::UnknownKind => EmulatorExitError::UnknownKind,
             }),
         }
+    }
+
+    /// First exec of Emulator, called before calling to user harness the first time
+    pub fn first_exec(&mut self) {
+        ED::first_harness_exec(self)
+    }
+
+    /// Pre exec of Emulator, called before calling to user harness
+    pub fn pre_exec(&mut self, input: &S::Input) {
+        ED::pre_harness_exec(self, input)
+    }
+
+    /// Post exec of Emulator, called before calling to user harness
+    pub fn post_exec<OT>(&mut self, input: &S::Input, observers: &mut OT, exit_kind: &mut ExitKind)
+    where
+        OT: ObserversTuple<S>,
+    {
+        ED::post_harness_exec(self, input, observers, exit_kind)
     }
 }
 

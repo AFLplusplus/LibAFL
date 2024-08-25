@@ -922,7 +922,42 @@ impl QemuMemoryChunk {
         })
     }
 
+    /// Returns the number of bytes effectively read.
+    /// output will get chunked at `size` bytes.
+    pub fn read(&self, qemu: Qemu, output: &mut [u8]) -> GuestReg {
+        let max_len: usize = self.size.try_into().unwrap();
+
+        let output_sliced = if output.len() > max_len {
+            &mut output[0..max_len]
+        } else {
+            output
+        };
+
+        match self.addr {
+            GuestAddrKind::Physical(hwaddr) => unsafe {
+                #[cfg(emulation_mode = "usermode")]
+                {
+                    // For now the default behaviour is to fall back to virtual addresses
+                    qemu.read_mem(hwaddr.try_into().unwrap(), output_sliced);
+                }
+                #[cfg(emulation_mode = "systemmode")]
+                {
+                    qemu.read_phys_mem(hwaddr, output_sliced);
+                }
+            },
+            GuestAddrKind::Virtual(vaddr) => unsafe {
+                self.cpu
+                    .as_ref()
+                    .unwrap()
+                    .read_mem(vaddr.try_into().unwrap(), output_sliced);
+            },
+        };
+
+        output_sliced.len().try_into().unwrap()
+    }
+
     /// Returns the number of bytes effectively written.
+    /// Input will get chunked at `size` bytes.
     #[must_use]
     pub fn write(&self, qemu: Qemu, input: &[u8]) -> GuestReg {
         let max_len: usize = self.size.try_into().unwrap();

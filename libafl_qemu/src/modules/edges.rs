@@ -1,4 +1,4 @@
-use std::{cell::UnsafeCell, cmp::max};
+use std::{cell::UnsafeCell, cmp::max, fmt::Debug};
 
 use hashbrown::{hash_map::Entry, HashMap};
 use libafl::{inputs::UsesInput, HasMetadata};
@@ -30,6 +30,8 @@ pub struct QemuEdgesMapMetadata {
     pub current_id: u64,
 }
 
+libafl_bolts::impl_serdeany!(QemuEdgesMapMetadata);
+
 impl QemuEdgesMapMetadata {
     #[must_use]
     pub fn new() -> Self {
@@ -40,348 +42,367 @@ impl QemuEdgesMapMetadata {
     }
 }
 
-libafl_bolts::impl_serdeany!(QemuEdgesMapMetadata);
+pub type CollidingEdgeCoverageModule<AF, PF> = EdgeCoverageModule<AF, PF, EdgeCoverageChildVariant>;
 
-#[cfg(emulation_mode = "usermode")]
-#[derive(Debug)]
-pub struct EdgeCoverageModule {
-    address_filter: StdAddressFilter,
-    use_hitcounts: bool,
-}
+pub trait EdgeCoverageVariant<AF, PF>: 'static + Debug {
+    const DO_SIDE_EFFECTS: bool = true;
 
-#[cfg(emulation_mode = "systemmode")]
-#[derive(Debug)]
-pub struct EdgeCoverageModule {
-    address_filter: StdAddressFilter,
-    page_filter: StdPageFilter,
-    use_hitcounts: bool,
-}
-
-#[cfg(emulation_mode = "usermode")]
-impl EdgeCoverageModule {
-    #[must_use]
-    pub fn new(address_filter: StdAddressFilter) -> Self {
-        Self {
-            address_filter,
-            use_hitcounts: true,
-        }
-    }
-
-    #[must_use]
-    pub fn without_hitcounts(address_filter: StdAddressFilter) -> Self {
-        Self {
-            address_filter,
-            use_hitcounts: false,
-        }
-    }
-
-    #[must_use]
-    pub fn must_instrument(&self, addr: GuestAddr) -> bool {
-        self.address_filter.allowed(&addr)
-    }
-}
-
-#[cfg(emulation_mode = "systemmode")]
-impl EdgeCoverageModule {
-    #[must_use]
-    pub fn new(address_filter: StdAddressFilter, page_filter: StdPageFilter) -> Self {
-        Self {
-            address_filter,
-            page_filter,
-            use_hitcounts: true,
-        }
-    }
-
-    #[must_use]
-    pub fn without_hitcounts(address_filter: StdAddressFilter, page_filter: StdPageFilter) -> Self {
-        Self {
-            address_filter,
-            page_filter,
-            use_hitcounts: false,
-        }
-    }
-
-    #[must_use]
-    pub fn must_instrument(&self, addr: GuestAddr, page_id: Option<GuestPhysAddr>) -> bool {
-        if let Some(page_id) = page_id {
-            self.address_filter.allowed(&addr) && self.page_filter.allowed(&page_id)
-        } else {
-            self.address_filter.allowed(&addr)
-        }
-    }
-}
-
-#[cfg(emulation_mode = "usermode")]
-impl Default for EdgeCoverageModule {
-    fn default() -> Self {
-        Self::new(AddressFilter::None)
-    }
-}
-
-#[cfg(emulation_mode = "systemmode")]
-impl Default for EdgeCoverageModule {
-    fn default() -> Self {
-        Self::new(StdAddressFilter::default(), StdPageFilter::default())
-    }
-}
-
-impl<S> EmulatorModule<S> for EdgeCoverageModule
-where
-    S: Unpin + UsesInput + HasMetadata,
-{
-    type ModuleAddressFilter = StdAddressFilter;
-    type ModulePageFilter = StdPageFilter;
-
-    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn jit_hitcount<ET, S>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>)
     where
+        AF: AddressFilter,
         ET: EmulatorModuleTuple<S>,
+        PF: PageFilter,
+        S: Unpin + UsesInput + HasMetadata,
     {
-        if self.use_hitcounts {
-            // emulator_modules.edges(
-            //     Hook::Function(gen_unique_edge_ids::<ET, S>),
-            //     Hook::Raw(trace_edge_hitcount),
-            // );
-            let hook_id =
-                emulator_modules.edges(Hook::Function(gen_unique_edge_ids::<ET, S>), Hook::Empty);
-            unsafe {
-                libafl_qemu_sys::libafl_qemu_edge_hook_set_jit(
-                    hook_id.0,
-                    Some(libafl_qemu_sys::libafl_jit_trace_edge_hitcount),
-                );
-            }
-        } else {
-            // emulator_modules.edges(
-            //     Hook::Function(gen_unique_edge_ids::<ET, S>),
-            //     Hook::Raw(trace_edge_single),
-            // );
-            let hook_id =
-                emulator_modules.edges(Hook::Function(gen_unique_edge_ids::<ET, S>), Hook::Empty);
-            unsafe {
-                libafl_qemu_sys::libafl_qemu_edge_hook_set_jit(
-                    hook_id.0,
-                    Some(libafl_qemu_sys::libafl_jit_trace_edge_single),
-                );
-            }
-        }
+        panic!("JIT hitcount is not supported.")
     }
 
-    fn address_filter(&self) -> &Self::ModuleAddressFilter {
-        &self.address_filter
-    }
-
-    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
-        &mut self.address_filter
-    }
-
-    fn page_filter(&self) -> &Self::ModulePageFilter {
-        &self.page_filter
-    }
-
-    fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
-        &mut self.page_filter
-    }
-}
-
-pub type CollidingEdgeCoverageModule = EdgeCoverageChildModule;
-
-#[cfg(emulation_mode = "usermode")]
-#[derive(Debug)]
-pub struct EdgeCoverageChildModule {
-    address_filter: StdAddressFilter,
-    use_hitcounts: bool,
-}
-
-#[cfg(emulation_mode = "systemmode")]
-#[derive(Debug)]
-pub struct EdgeCoverageChildModule {
-    address_filter: StdAddressFilter,
-    page_filter: StdPageFilter,
-    use_hitcounts: bool,
-}
-
-#[cfg(emulation_mode = "usermode")]
-impl EdgeCoverageChildModule {
-    #[must_use]
-    pub fn new(address_filter: StdAddressFilter) -> Self {
-        Self {
-            address_filter,
-            use_hitcounts: true,
-        }
-    }
-
-    #[must_use]
-    pub fn without_hitcounts(address_filter: StdAddressFilter) -> Self {
-        Self {
-            address_filter,
-            use_hitcounts: false,
-        }
-    }
-
-    #[must_use]
-    pub fn must_instrument(&self, addr: GuestAddr) -> bool {
-        self.address_filter.allowed(&addr)
-    }
-}
-
-#[cfg(emulation_mode = "systemmode")]
-impl EdgeCoverageChildModule {
-    #[must_use]
-    pub fn new(address_filter: StdAddressFilter, page_filter: StdPageFilter) -> Self {
-        Self {
-            address_filter,
-            page_filter,
-            use_hitcounts: true,
-        }
-    }
-
-    #[must_use]
-    pub fn without_hitcounts(address_filter: StdAddressFilter, page_filter: StdPageFilter) -> Self {
-        Self {
-            address_filter,
-            page_filter,
-            use_hitcounts: false,
-        }
-    }
-
-    #[must_use]
-    pub fn must_instrument(&self, addr: GuestAddr, page_id: Option<GuestPhysAddr>) -> bool {
-        if let Some(page_id) = page_id {
-            self.address_filter.allowed(&addr) && self.page_filter.allowed(&page_id)
-        } else {
-            self.address_filter.allowed(&addr)
-        }
-    }
-}
-
-#[cfg(emulation_mode = "usermode")]
-impl Default for EdgeCoverageChildModule {
-    fn default() -> Self {
-        Self::new(AddressFilter::None)
-    }
-}
-
-#[cfg(emulation_mode = "systemmode")]
-impl Default for EdgeCoverageChildModule {
-    fn default() -> Self {
-        Self::new(StdAddressFilter::default(), StdPageFilter::default())
-    }
-}
-
-impl<S> EmulatorModule<S> for EdgeCoverageChildModule
-where
-    S: Unpin + UsesInput,
-{
-    type ModuleAddressFilter = StdAddressFilter;
-    type ModulePageFilter = StdPageFilter;
-    const HOOKS_DO_SIDE_EFFECTS: bool = false;
-
-    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn jit_no_hitcount<ET, S>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>)
     where
+        AF: AddressFilter,
         ET: EmulatorModuleTuple<S>,
+        PF: PageFilter,
+        S: Unpin + UsesInput + HasMetadata,
     {
-        if self.use_hitcounts {
-            emulator_modules.edges(
-                Hook::Function(gen_hashed_edge_ids::<ET, S>),
-                Hook::Raw(trace_edge_hitcount_ptr),
-            );
-        } else {
-            emulator_modules.edges(
-                Hook::Function(gen_hashed_edge_ids::<ET, S>),
-                Hook::Raw(trace_edge_single_ptr),
+        panic!("JIT no hitcount is not supported.")
+    }
+
+    fn fn_hitcount<ET, S>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>)
+    where
+        AF: AddressFilter,
+        ET: EmulatorModuleTuple<S>,
+        PF: PageFilter,
+        S: Unpin + UsesInput + HasMetadata,
+    {
+        panic!("Func hitcount is not supported.")
+    }
+
+    fn fn_no_hitcount<ET, S>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>)
+    where
+        AF: AddressFilter,
+        ET: EmulatorModuleTuple<S>,
+        PF: PageFilter,
+        S: Unpin + UsesInput + HasMetadata,
+    {
+        panic!("Func no hitcount is not supported.")
+    }
+}
+
+#[derive(Debug)]
+pub struct EdgeCoverageFullVariant;
+impl<AF, PF> EdgeCoverageVariant<AF, PF> for EdgeCoverageFullVariant {
+    fn jit_hitcount<ET, S>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
+    where
+        AF: AddressFilter,
+        ET: EmulatorModuleTuple<S>,
+        PF: PageFilter,
+        S: Unpin + UsesInput + HasMetadata,
+    {
+        let hook_id = emulator_modules.edges(
+            Hook::Function(gen_unique_edge_ids::<AF, ET, PF, S, Self>),
+            Hook::Empty,
+        );
+        unsafe {
+            libafl_qemu_sys::libafl_qemu_edge_hook_set_jit(
+                hook_id.0,
+                Some(libafl_qemu_sys::libafl_jit_trace_edge_hitcount),
             );
         }
     }
 
-    fn address_filter(&self) -> &Self::ModuleAddressFilter {
-        &self.address_filter
+    fn jit_no_hitcount<ET, S>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
+    where
+        AF: AddressFilter,
+        ET: EmulatorModuleTuple<S>,
+        PF: PageFilter,
+        S: Unpin + UsesInput + HasMetadata,
+    {
+        let hook_id = emulator_modules.edges(
+            Hook::Function(gen_unique_edge_ids::<AF, ET, PF, S, Self>),
+            Hook::Empty,
+        );
+        unsafe {
+            libafl_qemu_sys::libafl_qemu_edge_hook_set_jit(
+                hook_id.0,
+                Some(libafl_qemu_sys::libafl_jit_trace_edge_single),
+            );
+        }
     }
 
-    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
-        &mut self.address_filter
+    fn fn_hitcount<ET, S>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
+    where
+        AF: AddressFilter,
+        ET: EmulatorModuleTuple<S>,
+        PF: PageFilter,
+        S: Unpin + UsesInput + HasMetadata,
+    {
+        emulator_modules.edges(
+            Hook::Function(gen_unique_edge_ids::<AF, ET, PF, S, Self>),
+            Hook::Raw(trace_edge_hitcount),
+        );
     }
 
-    fn page_filter(&self) -> &Self::ModulePageFilter {
-        &self.page_filter
-    }
-
-    fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
-        &mut self.page_filter
+    fn fn_no_hitcount<ET, S>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
+    where
+        AF: AddressFilter,
+        ET: EmulatorModuleTuple<S>,
+        PF: PageFilter,
+        S: Unpin + UsesInput + HasMetadata,
+    {
+        emulator_modules.edges(
+            Hook::Function(gen_unique_edge_ids::<AF, ET, PF, S, Self>),
+            Hook::Raw(trace_edge_single),
+        );
     }
 }
 
-#[cfg(emulation_mode = "usermode")]
 #[derive(Debug)]
-pub struct EdgeCoverageClassicModule {
-    address_filter: StdAddressFilter,
+pub struct EdgeCoverageClassicVariant;
+impl<AF, PF> EdgeCoverageVariant<AF, PF> for EdgeCoverageClassicVariant {
+    const DO_SIDE_EFFECTS: bool = false;
+
+    fn jit_hitcount<ET, S>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
+    where
+        AF: AddressFilter,
+        ET: EmulatorModuleTuple<S>,
+        PF: PageFilter,
+        S: Unpin + UsesInput + HasMetadata,
+    {
+        let hook_id = emulator_modules.blocks(
+            Hook::Function(gen_hashed_block_ids::<AF, ET, PF, S, Self>),
+            Hook::Empty,
+            Hook::Empty,
+        );
+
+        unsafe {
+            libafl_qemu_sys::libafl_qemu_block_hook_set_jit(
+                hook_id.0,
+                Some(libafl_qemu_sys::libafl_jit_trace_block_hitcount),
+            );
+        }
+    }
+
+    fn jit_no_hitcount<ET, S>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
+    where
+        AF: AddressFilter,
+        ET: EmulatorModuleTuple<S>,
+        PF: PageFilter,
+        S: Unpin + UsesInput + HasMetadata,
+    {
+        let hook_id = emulator_modules.blocks(
+            Hook::Function(gen_hashed_block_ids::<AF, ET, PF, S, Self>),
+            Hook::Empty,
+            Hook::Empty,
+        );
+
+        unsafe {
+            libafl_qemu_sys::libafl_qemu_block_hook_set_jit(
+                hook_id.0,
+                Some(libafl_qemu_sys::libafl_jit_trace_block_single),
+            );
+        }
+    }
+
+    fn fn_hitcount<ET, S>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
+    where
+        AF: AddressFilter,
+        ET: EmulatorModuleTuple<S>,
+        PF: PageFilter,
+        S: Unpin + UsesInput + HasMetadata,
+    {
+        emulator_modules.blocks(
+            Hook::Function(gen_hashed_block_ids::<AF, ET, PF, S, Self>),
+            Hook::Empty,
+            Hook::Raw(trace_block_transition_hitcount),
+        );
+    }
+
+    fn fn_no_hitcount<ET, S>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
+    where
+        AF: AddressFilter,
+        ET: EmulatorModuleTuple<S>,
+        PF: PageFilter,
+        S: Unpin + UsesInput + HasMetadata,
+    {
+        emulator_modules.blocks(
+            Hook::Function(gen_hashed_block_ids::<AF, ET, PF, S, Self>),
+            Hook::Empty,
+            Hook::Raw(trace_block_transition_single),
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct EdgeCoverageChildVariant;
+impl<AF, PF> EdgeCoverageVariant<AF, PF> for EdgeCoverageChildVariant {
+    fn fn_hitcount<ET, S>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
+    where
+        AF: AddressFilter,
+        ET: EmulatorModuleTuple<S>,
+        PF: PageFilter,
+        S: Unpin + UsesInput + HasMetadata,
+    {
+        emulator_modules.edges(
+            Hook::Function(gen_hashed_edge_ids::<AF, ET, PF, S, Self>),
+            Hook::Raw(trace_edge_hitcount_ptr),
+        );
+    }
+
+    fn fn_no_hitcount<ET, S>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
+    where
+        AF: AddressFilter,
+        ET: EmulatorModuleTuple<S>,
+        PF: PageFilter,
+        S: Unpin + UsesInput + HasMetadata,
+    {
+        emulator_modules.edges(
+            Hook::Function(gen_hashed_edge_ids::<AF, ET, PF, S, Self>),
+            Hook::Raw(trace_edge_single_ptr),
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct EdgeCoverageModuleBuilder<AF, PF, V> {
+    variant: V,
+    address_filter: AF,
+    page_filter: PF,
     use_hitcounts: bool,
     use_jit: bool,
 }
 
-#[cfg(emulation_mode = "systemmode")]
 #[derive(Debug)]
-pub struct EdgeCoverageClassicModule {
-    address_filter: StdAddressFilter,
-    page_filter: StdPageFilter,
+pub struct EdgeCoverageModule<AF, PF, V> {
+    variant: V,
+    address_filter: AF,
+    page_filter: PF,
     use_hitcounts: bool,
     use_jit: bool,
 }
 
-#[cfg(emulation_mode = "usermode")]
-impl EdgeCoverageClassicModule {
-    #[must_use]
-    pub fn new(address_filter: AddressFilter, use_jit: bool) -> Self {
+impl Default
+    for EdgeCoverageModuleBuilder<StdAddressFilter, StdPageFilter, EdgeCoverageFullVariant>
+{
+    fn default() -> Self {
         Self {
-            address_filter,
+            variant: EdgeCoverageFullVariant,
+            address_filter: StdAddressFilter::default(),
+            page_filter: StdPageFilter::default(),
             use_hitcounts: true,
-            use_jit,
+            use_jit: true,
         }
-    }
-
-    #[must_use]
-    pub fn without_hitcounts(address_filter: StdAddressFilter, use_jit: bool) -> Self {
-        Self {
-            address_filter,
-            use_hitcounts: false,
-            use_jit,
-        }
-    }
-
-    #[must_use]
-    pub fn must_instrument(&self, addr: GuestAddr) -> bool {
-        self.address_filter.allowed(&addr)
     }
 }
 
-#[cfg(emulation_mode = "systemmode")]
-impl EdgeCoverageClassicModule {
+impl EdgeCoverageModule<StdAddressFilter, StdPageFilter, EdgeCoverageFullVariant> {
+    pub fn builder(
+    ) -> EdgeCoverageModuleBuilder<StdAddressFilter, StdPageFilter, EdgeCoverageFullVariant> {
+        EdgeCoverageModuleBuilder::default()
+    }
+}
+
+impl<AF, PF, V> EdgeCoverageModuleBuilder<AF, PF, V> {
+    pub fn new(
+        variant: V,
+        address_filter: AF,
+        page_filter: PF,
+        use_hitcounts: bool,
+        use_jit: bool,
+    ) -> Self {
+        Self {
+            variant,
+            address_filter,
+            page_filter,
+            use_hitcounts,
+            use_jit,
+        }
+    }
+
+    pub fn build(self) -> EdgeCoverageModule<AF, PF, V> {
+        EdgeCoverageModule::new(
+            self.address_filter,
+            self.page_filter,
+            self.variant,
+            self.use_hitcounts,
+            self.use_jit,
+        )
+    }
+
+    pub fn variant<V2>(self, variant: V2) -> EdgeCoverageModuleBuilder<AF, PF, V2> {
+        EdgeCoverageModuleBuilder::new(
+            variant,
+            self.address_filter,
+            self.page_filter,
+            self.use_hitcounts,
+            self.use_jit,
+        )
+    }
+
+    pub fn address_filter<AF2>(self, address_filter: AF2) -> EdgeCoverageModuleBuilder<AF2, PF, V> {
+        EdgeCoverageModuleBuilder::new(
+            self.variant,
+            address_filter,
+            self.page_filter,
+            self.use_hitcounts,
+            self.use_jit,
+        )
+    }
+
+    pub fn page_filter<PF2>(self, page_filter: PF2) -> EdgeCoverageModuleBuilder<AF, PF2, V> {
+        EdgeCoverageModuleBuilder::new(
+            self.variant,
+            self.address_filter,
+            page_filter,
+            self.use_hitcounts,
+            self.use_jit,
+        )
+    }
+
+    pub fn hitcounts(self, use_hitcounts: bool) -> EdgeCoverageModuleBuilder<AF, PF, V> {
+        EdgeCoverageModuleBuilder::new(
+            self.variant,
+            self.address_filter,
+            self.page_filter,
+            use_hitcounts,
+            self.use_jit,
+        )
+    }
+
+    pub fn jit(self, use_jit: bool) -> EdgeCoverageModuleBuilder<AF, PF, V> {
+        EdgeCoverageModuleBuilder::new(
+            self.variant,
+            self.address_filter,
+            self.page_filter,
+            self.use_hitcounts,
+            use_jit,
+        )
+    }
+}
+
+impl<AF, PF, V> EdgeCoverageModule<AF, PF, V> {
     #[must_use]
     pub fn new(
-        address_filter: StdAddressFilter,
-        page_filter: StdPageFilter,
+        address_filter: AF,
+        page_filter: PF,
+        variant: V,
+        use_hitcounts: bool,
         use_jit: bool,
     ) -> Self {
         Self {
             address_filter,
             page_filter,
-            use_hitcounts: true,
+            variant,
+            use_hitcounts,
             use_jit,
         }
     }
+}
 
-    #[must_use]
-    pub fn without_hitcounts(
-        address_filter: StdAddressFilter,
-        page_filter: StdPageFilter,
-        use_jit: bool,
-    ) -> Self {
-        Self {
-            address_filter,
-            page_filter,
-            use_hitcounts: false,
-            use_jit,
-        }
-    }
-
+impl<AF, PF, V> EdgeCoverageModule<AF, PF, V>
+where
+    AF: AddressFilter,
+    PF: PageFilter,
+{
     #[must_use]
     pub fn must_instrument(&self, addr: GuestAddr, page_id: Option<GuestPhysAddr>) -> bool {
         if let Some(page_id) = page_id {
@@ -392,29 +413,15 @@ impl EdgeCoverageClassicModule {
     }
 }
 
-#[cfg(emulation_mode = "usermode")]
-impl Default for EdgeCoverageClassicModule {
-    fn default() -> Self {
-        Self::new(AddressFilter::None, true)
-    }
-}
-
-#[cfg(emulation_mode = "systemmode")]
-impl Default for EdgeCoverageClassicModule {
-    fn default() -> Self {
-        Self::new(StdAddressFilter::default(), StdPageFilter::default(), false)
-    }
-}
-
-#[allow(clippy::collapsible_else_if)]
-impl<S> EmulatorModule<S> for EdgeCoverageClassicModule
+impl<S, AF, PF, V> EmulatorModule<S> for EdgeCoverageModule<AF, PF, V>
 where
-    S: Unpin + UsesInput,
+    AF: AddressFilter + 'static,
+    PF: PageFilter + 'static,
+    S: Unpin + UsesInput + HasMetadata,
+    V: EdgeCoverageVariant<AF, PF> + 'static,
 {
-    type ModuleAddressFilter = StdAddressFilter;
-    type ModulePageFilter = StdPageFilter;
-
-    const HOOKS_DO_SIDE_EFFECTS: bool = false;
+    type ModuleAddressFilter = AF;
+    type ModulePageFilter = PF;
 
     fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
     where
@@ -422,45 +429,15 @@ where
     {
         if self.use_hitcounts {
             if self.use_jit {
-                let hook_id = emulator_modules.blocks(
-                    Hook::Function(gen_hashed_block_ids::<ET, S>),
-                    Hook::Empty,
-                    Hook::Empty,
-                );
-
-                unsafe {
-                    libafl_qemu_sys::libafl_qemu_block_hook_set_jit(
-                        hook_id.0,
-                        Some(libafl_qemu_sys::libafl_jit_trace_block_hitcount),
-                    );
-                }
+                self.variant.jit_hitcount(emulator_modules)
             } else {
-                emulator_modules.blocks(
-                    Hook::Function(gen_hashed_block_ids::<ET, S>),
-                    Hook::Empty,
-                    Hook::Raw(trace_block_transition_hitcount),
-                );
+                self.variant.fn_hitcount(emulator_modules)
             }
         } else {
             if self.use_jit {
-                let hook_id = emulator_modules.blocks(
-                    Hook::Function(gen_hashed_block_ids::<ET, S>),
-                    Hook::Empty,
-                    Hook::Empty,
-                );
-
-                unsafe {
-                    libafl_qemu_sys::libafl_qemu_block_hook_set_jit(
-                        hook_id.0,
-                        Some(libafl_qemu_sys::libafl_jit_trace_block_single),
-                    );
-                }
+                self.variant.jit_no_hitcount(emulator_modules)
             } else {
-                emulator_modules.blocks(
-                    Hook::Function(gen_hashed_block_ids::<ET, S>),
-                    Hook::Empty,
-                    Hook::Raw(trace_block_transition_single),
-                );
+                self.variant.fn_no_hitcount(emulator_modules)
             }
         }
     }
@@ -483,21 +460,23 @@ where
 }
 
 thread_local!(static PREV_LOC : UnsafeCell<u64> = const { UnsafeCell::new(0) });
-
-pub fn gen_unique_edge_ids<ET, S>(
+pub fn gen_unique_edge_ids<AF, ET, PF, S, V>(
     emulator_modules: &mut EmulatorModules<ET, S>,
     state: Option<&mut S>,
     src: GuestAddr,
     dest: GuestAddr,
 ) -> Option<u64>
 where
+    AF: AddressFilter,
     ET: EmulatorModuleTuple<S>,
+    PF: PageFilter,
     S: Unpin + UsesInput + HasMetadata,
+    V: EdgeCoverageVariant<AF, PF>,
 {
-    if let Some(h) = emulator_modules.get::<EdgeCoverageModule>() {
+    if let Some(h) = emulator_modules.get::<EdgeCoverageModule<AF, PF, V>>() {
         #[cfg(emulation_mode = "usermode")]
         {
-            if !h.must_instrument(src) && !h.must_instrument(dest) {
+            if !h.must_instrument(src, None) && !h.must_instrument(dest, None) {
                 return None;
             }
         }
@@ -552,19 +531,22 @@ pub extern "C" fn trace_edge_single(_: *const (), id: u64) {
     }
 }
 
-pub fn gen_hashed_edge_ids<ET, S>(
+pub fn gen_hashed_edge_ids<AF, ET, PF, S, V>(
     emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     src: GuestAddr,
     dest: GuestAddr,
 ) -> Option<u64>
 where
+    AF: AddressFilter,
     ET: EmulatorModuleTuple<S>,
-    S: Unpin + UsesInput,
+    PF: PageFilter,
+    S: Unpin + UsesInput + HasMetadata,
+    V: EdgeCoverageVariant<AF, PF>,
 {
-    if let Some(h) = emulator_modules.get::<EdgeCoverageChildModule>() {
+    if let Some(h) = emulator_modules.get::<EdgeCoverageModule<AF, PF, V>>() {
         #[cfg(emulation_mode = "usermode")]
-        if !h.must_instrument(src) && !h.must_instrument(dest) {
+        if !h.must_instrument(src, None) && !h.must_instrument(dest, None) {
             return None;
         }
 
@@ -607,30 +589,33 @@ pub extern "C" fn trace_edge_single_ptr(_: *const (), id: u64) {
     }
 }
 
-pub fn gen_hashed_block_ids<ET, S>(
+pub fn gen_hashed_block_ids<AF, ET, PF, S, V>(
     emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
 ) -> Option<u64>
 where
-    S: Unpin + UsesInput,
+    AF: AddressFilter,
     ET: EmulatorModuleTuple<S>,
+    PF: PageFilter,
+    S: Unpin + UsesInput + HasMetadata,
+    V: EdgeCoverageVariant<AF, PF>,
 {
-    if let Some(h) = emulator_modules.get::<EdgeCoverageClassicModule>() {
+    if let Some(h) = emulator_modules.get::<EdgeCoverageModule<AF, PF, V>>() {
         #[cfg(emulation_mode = "usermode")]
         {
-            if !h.must_instrument(pc) {
+            if !h.must_instrument(pc, None) {
                 return None;
             }
         }
         #[cfg(emulation_mode = "systemmode")]
         {
-            let paging_id = emulator_modules
+            let page_id = emulator_modules
                 .qemu()
                 .current_cpu()
                 .and_then(|cpu| cpu.current_paging_id());
 
-            if !h.must_instrument(pc, paging_id) {
+            if !h.must_instrument(pc, page_id) {
                 return None;
             }
         }

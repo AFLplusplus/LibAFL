@@ -19,8 +19,8 @@ use paste::paste;
 use crate::{
     command::parser::{
         EndCommandParser, InputPhysCommandParser, InputVirtCommandParser, LoadCommandParser,
-        NativeCommandParser, SaveCommandParser, StartPhysCommandParser, StartVirtCommandParser,
-        VaddrFilterAllowRangeCommandParser, VersionCommandParser,
+        LqprintfCommandParser, NativeCommandParser, SaveCommandParser, StartPhysCommandParser,
+        StartVirtCommandParser, VaddrFilterAllowRangeCommandParser, VersionCommandParser,
     },
     get_exit_arch_regs,
     modules::EmulatorModuleTuple,
@@ -119,12 +119,11 @@ macro_rules! define_std_command_manager {
 
                 fn run(&self,
                     emu: &mut Emulator<$name<S>, StdEmulatorDriver, ET, S, SM>,
-                    driver: &mut StdEmulatorDriver,
                     input: &S::Input,
                     ret_reg: Option<Regs>
                 ) -> Result<Option<EmulatorDriverResult<$name<S>, StdEmulatorDriver, ET, S, SM>>, EmulatorDriverError> {
                     match self {
-                        $([<$name Commands>]::$command(cmd) => cmd.run(emu, driver, input, ret_reg)),+
+                        $([<$name Commands>]::$command(cmd) => cmd.run(emu, input, ret_reg)),+
                     }
                 }
             }
@@ -171,7 +170,8 @@ define_std_command_manager!(
         LoadCommand,
         EndCommand,
         VersionCommand,
-        AddressAllowCommand
+        AddressAllowCommand,
+        LqprintfCommand
     ],
     [
         StartPhysCommandParser,
@@ -182,7 +182,8 @@ define_std_command_manager!(
         LoadCommandParser,
         EndCommandParser,
         VersionCommandParser,
-        VaddrFilterAllowRangeCommandParser
+        VaddrFilterAllowRangeCommandParser,
+        LqprintfCommandParser
     ]
 );
 
@@ -212,7 +213,6 @@ where
     fn run(
         &self,
         emu: &mut Emulator<CM, ED, ET, S, SM>,
-        driver: &mut ED,
         input: &S::Input,
         ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError>;
@@ -252,7 +252,6 @@ where
     fn run(
         &self,
         _emu: &mut Emulator<CM, ED, ET, S, SM>,
-        _driver: &mut ED,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {
@@ -276,7 +275,6 @@ where
     fn run(
         &self,
         emu: &mut Emulator<CM, StdEmulatorDriver, ET, S, SM>,
-        driver: &mut StdEmulatorDriver,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<CM, StdEmulatorDriver, ET, S, SM>>, EmulatorDriverError>
@@ -284,7 +282,7 @@ where
         let qemu = emu.qemu();
         let snapshot_id = emu.snapshot_manager_mut().save(qemu);
 
-        driver
+        emu.driver_mut()
             .set_snapshot_id(snapshot_id)
             .map_err(|_| EmulatorDriverError::MultipleSnapshotDefinition)?;
 
@@ -308,14 +306,14 @@ where
     fn run(
         &self,
         emu: &mut Emulator<CM, StdEmulatorDriver, ET, S, SM>,
-        driver: &mut StdEmulatorDriver,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<CM, StdEmulatorDriver, ET, S, SM>>, EmulatorDriverError>
     {
         let qemu = emu.qemu();
 
-        let snapshot_id = driver
+        let snapshot_id = emu
+            .driver_mut()
             .snapshot_id()
             .ok_or(EmulatorDriverError::SnapshotNotFound)?;
 
@@ -347,7 +345,6 @@ where
     fn run(
         &self,
         emu: &mut Emulator<CM, ED, ET, S, SM>,
-        _driver: &mut ED,
         input: &S::Input,
         ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {
@@ -371,7 +368,8 @@ pub struct StartCommand {
 impl<CM, ET, S, SM> IsCommand<CM, StdEmulatorDriver, ET, S, SM> for StartCommand
 where
     CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
-    S: UsesInput,
+    ET: EmulatorModuleTuple<S>,
+    S: UsesInput + Unpin,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
 {
@@ -382,19 +380,22 @@ where
     fn run(
         &self,
         emu: &mut Emulator<CM, StdEmulatorDriver, ET, S, SM>,
-        driver: &mut StdEmulatorDriver,
         input: &S::Input,
         ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<CM, StdEmulatorDriver, ET, S, SM>>, EmulatorDriverError>
     {
         let qemu = emu.qemu();
+
+        // Snapshot VM
         let snapshot_id = emu.snapshot_manager_mut().save(qemu);
 
-        driver
+        // Set snapshot ID to restore to after fuzzing ends
+        emu.driver_mut()
             .set_snapshot_id(snapshot_id)
             .map_err(|_| EmulatorDriverError::MultipleSnapshotDefinition)?;
 
-        driver
+        // Save input location for next runs
+        emu.driver_mut()
             .set_input_location(InputLocation::new(
                 self.input_location.clone(),
                 qemu.current_cpu().unwrap(),
@@ -402,13 +403,39 @@ where
             ))
             .unwrap();
 
+        // Write input to input location
         let ret_value = self
             .input_location
             .write(qemu, input.target_bytes().as_slice());
 
+        // Unleash hooks if locked
+        if emu.driver_mut().unlock_hooks() {
+            // Prepare hooks
+            emu.modules_mut().first_exec_all();
+            emu.modules_mut().pre_exec_all(input);
+        }
+
+        // Auto page filtering if option is enabled
+        if emu.driver_mut().allow_page_on_start() {
+            let page_id = qemu.current_cpu().unwrap().current_paging_id().unwrap();
+            emu.modules_mut().modules_mut().allow_page_id_all(page_id);
+        }
+
+        if emu.driver_mut().is_process_only() {
+            emu.modules_mut()
+                .modules_mut()
+                .allow_address_range_all(0..0x0000_7fff_ffff_ffff);
+        }
+
+        // Make sure JIT cache is empty just before starting
+        qemu.flush_jit();
+
+        // Set input size in return register if there is any
         if let Some(reg) = ret_reg {
             qemu.write_reg(reg, ret_value).unwrap();
         }
+
+        log::info!("Fuzzing starts");
 
         Ok(None)
     }
@@ -432,14 +459,14 @@ where
     fn run(
         &self,
         emu: &mut Emulator<CM, StdEmulatorDriver, ET, S, SM>,
-        driver: &mut StdEmulatorDriver,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<CM, StdEmulatorDriver, ET, S, SM>>, EmulatorDriverError>
     {
         let qemu = emu.qemu();
 
-        let snapshot_id = driver
+        let snapshot_id = emu
+            .driver_mut()
             .snapshot_id()
             .ok_or(EmulatorDriverError::SnapshotNotFound)?;
 
@@ -469,7 +496,6 @@ where
     fn run(
         &self,
         _emu: &mut Emulator<CM, ED, ET, S, SM>,
-        _driver: &mut ED,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {
@@ -505,7 +531,6 @@ where
     fn run(
         &self,
         emu: &mut Emulator<CM, ED, ET, S, SM>,
-        _driver: &mut ED,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {
@@ -515,8 +540,6 @@ where
         Ok(None)
     }
 }
-
-use crate::modules::EmulatorModule;
 
 #[derive(Debug, Clone)]
 pub struct AddressAllowCommand {
@@ -535,7 +558,6 @@ where
     fn run(
         &self,
         emu: &mut Emulator<CM, ED, ET, S, SM>,
-        _driver: &mut ED,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {
@@ -543,6 +565,37 @@ where
             .modules_mut()
             .allow_address_range_all(self.address_range.clone());
         Ok(None)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct LqprintfCommand {
+    content: String,
+}
+impl<CM, ED, ET, S, SM> IsCommand<CM, ED, ET, S, SM> for LqprintfCommand
+where
+    ET: EmulatorModuleTuple<S>,
+    CM: CommandManager<ED, ET, S, SM>,
+    S: UsesInput + Unpin,
+{
+    fn usable_at_runtime(&self) -> bool {
+        true
+    }
+
+    fn run(
+        &self,
+        _emu: &mut Emulator<CM, ED, ET, S, SM>,
+        _input: &S::Input,
+        _ret_reg: Option<Regs>,
+    ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {
+        print!("LQPRINTF: {}", self.content);
+        Ok(None)
+    }
+}
+
+impl LqprintfCommand {
+    pub fn new(content: String) -> Self {
+        Self { content }
     }
 }
 

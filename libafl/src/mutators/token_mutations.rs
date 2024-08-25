@@ -424,6 +424,15 @@ impl TokenReplace {
 #[derive(Debug, Default)]
 pub struct I2SRandReplace;
 
+fn random_slice_size<const SZ: usize, S>(state: &mut S) -> usize
+where
+    S: HasRand,
+{
+    let sz_log = SZ.ilog2() as usize;
+    let res = state.rand_mut().below_incl(sz_log);
+    2_usize.pow(res as u32)
+}
+
 impl<I, S> Mutator<I, S> for I2SRandReplace
 where
     S: UsesInput + HasMetadata + HasRand + HasMaxSize,
@@ -455,8 +464,10 @@ where
         let meta = state.metadata_map().get::<CmpValuesMetadata>().unwrap();
         let cmp_values = &meta.list[idx];
 
+        // TODO: do not use from_ne_bytes, it's for host not for target!! we should use a from_target_ne_bytes....
+
         let mut result = MutationResult::Skipped;
-        match cmp_values {
+        match cmp_values.clone() {
             CmpValues::U8(v) => {
                 for byte in bytes.iter_mut().take(len).skip(off) {
                     if *byte == v.0 {
@@ -471,28 +482,32 @@ where
                 }
             }
             CmpValues::U16(v) => {
-                if len >= size_of::<u16>() {
-                    for i in off..len - (size_of::<u16>() - 1) {
-                        let val =
-                            u16::from_ne_bytes(bytes[i..i + size_of::<u16>()].try_into().unwrap());
+                let cmp_size = random_slice_size::<{ size_of::<u16>() }, S>(state);
+
+                if len >= cmp_size {
+                    for i in off..len - (cmp_size - 1) {
+                        let mut val_bytes = [0; size_of::<u16>()];
+                        val_bytes[..cmp_size].copy_from_slice(&bytes[i..i + cmp_size]);
+                        let val = u16::from_ne_bytes(val_bytes);
+
                         if val == v.0 {
-                            let new_bytes = v.1.to_ne_bytes();
-                            bytes[i..i + size_of::<u16>()].copy_from_slice(&new_bytes);
+                            let new_bytes = &v.1.to_ne_bytes()[..cmp_size];
+                            bytes[i..i + cmp_size].copy_from_slice(new_bytes);
+                            result = MutationResult::Mutated;
+                            break;
+                        } else if val == v.1 {
+                            let new_bytes = &v.0.to_ne_bytes()[..cmp_size];
+                            bytes[i..i + cmp_size].copy_from_slice(new_bytes);
                             result = MutationResult::Mutated;
                             break;
                         } else if val.swap_bytes() == v.0 {
                             let new_bytes = v.1.swap_bytes().to_ne_bytes();
-                            bytes[i..i + size_of::<u16>()].copy_from_slice(&new_bytes);
-                            result = MutationResult::Mutated;
-                            break;
-                        } else if val == v.1 {
-                            let new_bytes = v.0.to_ne_bytes();
-                            bytes[i..i + size_of::<u16>()].copy_from_slice(&new_bytes);
+                            bytes[i..i + cmp_size].copy_from_slice(&new_bytes[..cmp_size]);
                             result = MutationResult::Mutated;
                             break;
                         } else if val.swap_bytes() == v.1 {
                             let new_bytes = v.0.swap_bytes().to_ne_bytes();
-                            bytes[i..i + size_of::<u16>()].copy_from_slice(&new_bytes);
+                            bytes[i..i + cmp_size].copy_from_slice(&new_bytes[..cmp_size]);
                             result = MutationResult::Mutated;
                             break;
                         }
@@ -500,28 +515,31 @@ where
                 }
             }
             CmpValues::U32(v) => {
-                if len >= size_of::<u32>() {
-                    for i in off..len - (size_of::<u32>() - 1) {
-                        let val =
-                            u32::from_ne_bytes(bytes[i..i + size_of::<u32>()].try_into().unwrap());
+                let cmp_size = random_slice_size::<{ size_of::<u32>() }, S>(state);
+                if len >= cmp_size {
+                    for i in off..len - (cmp_size - 1) {
+                        let mut val_bytes = [0; size_of::<u32>()];
+                        val_bytes[..cmp_size].copy_from_slice(&bytes[i..i + cmp_size]);
+                        let val = u32::from_ne_bytes(val_bytes);
+
                         if val == v.0 {
-                            let new_bytes = v.1.to_ne_bytes();
-                            bytes[i..i + size_of::<u32>()].copy_from_slice(&new_bytes);
+                            let new_bytes = &v.1.to_ne_bytes()[..cmp_size];
+                            bytes[i..i + cmp_size].copy_from_slice(new_bytes);
+                            result = MutationResult::Mutated;
+                            break;
+                        } else if val == v.1 {
+                            let new_bytes = &v.0.to_ne_bytes()[..cmp_size];
+                            bytes[i..i + cmp_size].copy_from_slice(new_bytes);
                             result = MutationResult::Mutated;
                             break;
                         } else if val.swap_bytes() == v.0 {
                             let new_bytes = v.1.swap_bytes().to_ne_bytes();
-                            bytes[i..i + size_of::<u32>()].copy_from_slice(&new_bytes);
-                            result = MutationResult::Mutated;
-                            break;
-                        } else if val == v.1 {
-                            let new_bytes = v.0.to_ne_bytes();
-                            bytes[i..i + size_of::<u32>()].copy_from_slice(&new_bytes);
+                            bytes[i..i + cmp_size].copy_from_slice(&new_bytes[..cmp_size]);
                             result = MutationResult::Mutated;
                             break;
                         } else if val.swap_bytes() == v.1 {
                             let new_bytes = v.0.swap_bytes().to_ne_bytes();
-                            bytes[i..i + size_of::<u32>()].copy_from_slice(&new_bytes);
+                            bytes[i..i + cmp_size].copy_from_slice(&new_bytes[..cmp_size]);
                             result = MutationResult::Mutated;
                             break;
                         }
@@ -529,28 +547,32 @@ where
                 }
             }
             CmpValues::U64(v) => {
-                if len >= size_of::<u64>() {
-                    for i in off..len - (size_of::<u64>() - 1) {
-                        let val =
-                            u64::from_ne_bytes(bytes[i..i + size_of::<u64>()].try_into().unwrap());
+                let cmp_size = random_slice_size::<{ size_of::<u64>() }, S>(state);
+
+                if len >= cmp_size {
+                    for i in off..(len - (cmp_size - 1)) {
+                        let mut val_bytes = [0; size_of::<u64>()];
+                        val_bytes[..cmp_size].copy_from_slice(&bytes[i..i + cmp_size]);
+                        let val = u64::from_ne_bytes(val_bytes);
+
                         if val == v.0 {
-                            let new_bytes = v.1.to_ne_bytes();
-                            bytes[i..i + size_of::<u64>()].copy_from_slice(&new_bytes);
+                            let new_bytes = &v.1.to_ne_bytes()[..cmp_size];
+                            bytes[i..i + cmp_size].copy_from_slice(new_bytes);
+                            result = MutationResult::Mutated;
+                            break;
+                        } else if val == v.1 {
+                            let new_bytes = &v.0.to_ne_bytes()[..cmp_size];
+                            bytes[i..i + cmp_size].copy_from_slice(new_bytes);
                             result = MutationResult::Mutated;
                             break;
                         } else if val.swap_bytes() == v.0 {
                             let new_bytes = v.1.swap_bytes().to_ne_bytes();
-                            bytes[i..i + size_of::<u64>()].copy_from_slice(&new_bytes);
-                            result = MutationResult::Mutated;
-                            break;
-                        } else if val == v.1 {
-                            let new_bytes = v.0.to_ne_bytes();
-                            bytes[i..i + size_of::<u64>()].copy_from_slice(&new_bytes);
+                            bytes[i..i + cmp_size].copy_from_slice(&new_bytes[..cmp_size]);
                             result = MutationResult::Mutated;
                             break;
                         } else if val.swap_bytes() == v.1 {
                             let new_bytes = v.0.swap_bytes().to_ne_bytes();
-                            bytes[i..i + size_of::<u64>()].copy_from_slice(&new_bytes);
+                            bytes[i..i + cmp_size].copy_from_slice(&new_bytes[..cmp_size]);
                             result = MutationResult::Mutated;
                             break;
                         }

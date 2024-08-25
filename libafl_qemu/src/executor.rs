@@ -42,7 +42,7 @@ use libc::siginfo_t;
 
 #[cfg(emulation_mode = "usermode")]
 use crate::EmulatorModules;
-use crate::{command::CommandManager, modules::EmulatorModuleTuple, Emulator};
+use crate::{command::CommandManager, modules::EmulatorModuleTuple, Emulator, EmulatorDriver};
 
 pub struct QemuExecutor<'a, CM, ED, ET, H, OT, S, SM>
 where
@@ -53,6 +53,7 @@ where
     S: State,
 {
     inner: StatefulInProcessExecutor<'a, H, OT, S, Emulator<CM, ED, ET, S, SM>>,
+    first_exec: bool,
 }
 
 #[cfg(emulation_mode = "usermode")]
@@ -166,7 +167,10 @@ where
             > as *const c_void;
         }
 
-        Ok(Self { inner })
+        Ok(Self {
+            inner,
+            first_exec: true,
+        })
     }
 
     pub fn inner(&self) -> &StatefulInProcessExecutor<'a, H, OT, S, Emulator<CM, ED, ET, S, SM>> {
@@ -191,6 +195,7 @@ impl<'a, CM, ED, EM, ET, H, OT, S, SM, Z> Executor<EM, Z>
     for QemuExecutor<'a, CM, ED, ET, H, OT, S, SM>
 where
     CM: CommandManager<ED, ET, S, SM>,
+    ED: EmulatorDriver<CM, ET, S, SM>,
     EM: UsesState<State = S>,
     ET: EmulatorModuleTuple<S>,
     H: FnMut(&mut Emulator<CM, ED, ET, S, SM>, &S::Input) -> ExitKind,
@@ -205,13 +210,16 @@ where
         mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
-        self.inner.exposed_executor_state_mut().first_exec_all();
+        if self.first_exec {
+            self.inner.exposed_executor_state_mut().first_exec();
+            self.first_exec = false;
+        }
 
-        self.inner.exposed_executor_state_mut().pre_exec_all(input);
+        self.inner.exposed_executor_state_mut().pre_exec(input);
 
         let mut exit_kind = self.inner.run_target(fuzzer, state, mgr, input)?;
 
-        self.inner.exposed_executor_state.post_exec_all(
+        self.inner.exposed_executor_state.post_exec(
             input,
             &mut *self.inner.inner.observers_mut(),
             &mut exit_kind,

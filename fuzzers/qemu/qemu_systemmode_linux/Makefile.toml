@@ -47,10 +47,11 @@ git clone ${LINUX_BUILDER_URL} ${LINUX_BUILDER_DIR}
 dependencies = ["target_dir", "linux_builder_dir"]
 command = "clang"
 args = [
+  "-O0",
+  "-static",
   "${WORKING_DIR}/example/harness.c",
   "-o", "${TARGET_DIR}/runtime/harness",
   "-I", "${TARGET_DIR}/${PROFILE_DIR}/include",
-  "-O0",
 ]
 
 [tasks.target]
@@ -59,12 +60,27 @@ script_runner = "@shell"
 script = '''
 git -C ${LINUX_BUILDER_DIR} pull
 
-cp ${TARGET_DIR}/runtime/* ${LINUX_BUILDER_DIR}/runtime/
+# Copy generated harness
+cp -r ${TARGET_DIR}/runtime/* ${LINUX_BUILDER_DIR}/runtime/
 
-cp ${WORKING_DIR}/setup/* ${LINUX_BUILDER_DIR}/setup/
-cp ${WORKING_DIR}/runtime/* ${LINUX_BUILDER_DIR}/runtime/
+# Copy setup & runtime fixed files
+cp -r ${WORKING_DIR}/setup/* ${LINUX_BUILDER_DIR}/setup/
+cp -r ${WORKING_DIR}/runtime/* ${LINUX_BUILDER_DIR}/runtime/
 
 ${LINUX_BUILDER_DIR}/build.sh
+'''
+
+[tasks.update_target]
+dependencies = ["build", "compile_target"]
+script_runner = "@shell"
+script = '''
+# Copy generated harness
+cp -r ${TARGET_DIR}/runtime/* ${LINUX_BUILDER_DIR}/runtime/
+
+# Copy setup & runtime fixed files
+cp -r ${WORKING_DIR}/runtime/* ${LINUX_BUILDER_DIR}/runtime/
+
+${LINUX_BUILDER_DIR}/update.sh
 '''
 
 [tasks.build]

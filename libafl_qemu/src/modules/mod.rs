@@ -43,24 +43,32 @@ where
     const HOOKS_DO_SIDE_EFFECTS: bool = true;
 
     /// Initialize the module, mostly used to install some hooks early.
+    /// This is always run when Emulator gets initialized, in any case.
+    /// Install here hooks that should be alive for the whole execution of the VM.
     fn init_module<ET>(&self, _emulator_modules: &mut EmulatorModules<ET, S>)
     where
         ET: EmulatorModuleTuple<S>,
     {
     }
 
+    /// Run once just before fuzzing starts.
+    /// This call can be delayed to the point at which fuzzing is supposed to start.
+    /// It is mostly used to avoid running hooks during VM initialization, either
+    /// because it is useless or it would produce wrong results.
     fn first_exec<ET>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>)
     where
         ET: EmulatorModuleTuple<S>,
     {
     }
 
+    /// Run before a new fuzzing run starts.
     fn pre_exec<ET>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>, _input: &S::Input)
     where
         ET: EmulatorModuleTuple<S>,
     {
     }
 
+    /// Run after a fuzzing run ends.
     fn post_exec<OT, ET>(
         &mut self,
         _emulator_modules: &mut EmulatorModules<ET, S>,
@@ -218,9 +226,9 @@ where
 }
 
 #[derive(Debug, Clone)]
-pub enum FilterList<F> {
-    AllowList(F),
-    DenyList(F),
+pub enum FilterList<T> {
+    AllowList(T),
+    DenyList(T),
     None,
 }
 
@@ -325,9 +333,9 @@ impl PageFilter for StdPageFilter {
     }
 
     fn allowed(&self, paging_id: &GuestPhysAddr) -> bool {
-        if self.allowed_pages.is_empty() {
-            return true;
-        }
+        // if self.allowed_pages.is_empty() {
+        //     return true;
+        // }
 
         self.allowed_pages.contains(paging_id)
     }
@@ -345,12 +353,13 @@ pub fn hash_me(mut x: u64) -> u64 {
     x ^ (x.overflowing_shr(31).0)
 }
 
-pub trait AddressFilter {
+pub trait AddressFilter: 'static + Debug {
     fn allow(&mut self, address_range: Range<GuestAddr>);
 
     fn allowed(&self, address: &GuestAddr) -> bool;
 }
 
+#[derive(Debug)]
 pub struct NopAddressFilter;
 impl AddressFilter for NopAddressFilter {
     fn allow(&mut self, _address: Range<GuestAddr>) {}
@@ -360,12 +369,13 @@ impl AddressFilter for NopAddressFilter {
     }
 }
 
-pub trait PageFilter {
+pub trait PageFilter: 'static + Debug {
     fn allow(&mut self, page_id: GuestPhysAddr);
 
     fn allowed(&self, page_id: &GuestPhysAddr) -> bool;
 }
 
+#[derive(Debug)]
 pub struct NopPageFilter;
 impl PageFilter for NopPageFilter {
     fn allow(&mut self, _page_id: GuestPhysAddr) {}

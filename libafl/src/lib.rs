@@ -1,3 +1,4 @@
+#![feature(once_cell_get_mut)]
 /*!
 Welcome to `LibAFL`
 */
