@@ -22,7 +22,7 @@ end
 PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
 WORKING_DIR = "${CARGO_MAKE_WORKING_DIRECTORY}"
 TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}"
-LIBAFL_QEMU_DIR = { value = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/qemu-libafl-bridge", condition = { env_not_set = ["LIBAFL_QEMU_DIR"] }}
+LIBAFL_QEMU_CLONE_DIR = { value = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/qemu-libafl-bridge", condition = { env_not_set = ["LIBAFL_QEMU_DIR"] }}
 
 LINUX_BUILDER_URL = "git@github.com:AFLplusplus/linux-qemu-image-builder.git"
 LINUX_BUILDER_DIR = { value = "${TARGET_DIR}/linux_builder", condition = { env_not_set = ["LINUX_BUILDER_DIR"] } }
@@ -70,7 +70,7 @@ cp -r ${WORKING_DIR}/runtime/* ${LINUX_BUILDER_DIR}/runtime/
 ${LINUX_BUILDER_DIR}/build.sh
 '''
 
-[tasks.update_target]
+[tasks.target_update]
 dependencies = ["build", "compile_target"]
 script_runner = "@shell"
 script = '''
@@ -96,24 +96,32 @@ args = [
 
 [tasks.run]
 dependencies = ["build"]
-command = "${TARGET_DIR}/${PROFILE_DIR}/qemu_systemmode_linux"
-args = [
-  "-accel", "tcg",
-  "-m", "4G",
-  "-drive", "if=pflash,format=raw,readonly=on,file=${LINUX_BUILDER_OUT}/OVMF_CODE.fd",
-  "-drive", "if=pflash,format=raw,snapshot=off,file=${LINUX_BUILDER_OUT}/OVMF_VARS.fd",
-  "-blockdev", "filename=${LINUX_BUILDER_OUT}/linux.qcow2,node-name=storage,driver=file",
-  "-blockdev", "driver=qcow2,file=storage,node-name=disk",
-  "-device", "virtio-scsi-pci,id=scsi0",
-  "-device", "scsi-hd,bus=scsi0.0,drive=disk,id=virtio-disk0,bootindex=1",
-  "-L", "${LIBAFL_QEMU_DIR}/build/qemu-bundle/usr/local/share/qemu",
-  "-nographic",
-  "-monitor", "null",
-  "-serial", "null",
-  "-snapshot",
+script_runner = "@shell"
+script = '''
+rm -rf "${WORKING_DIR}/corpus_gen"
 
-  # "-icount", "shift=auto,align=off,sleep=off",
-]
+# Find the bios dir of LibAFL QEMU
+if [ ! -z "${LIBAFL_QEMU_DIR}" ]; then
+  LIBAFL_QEMU_BIOS_DIR=${LIBAFL_QEMU_DIR}/build/qemu-bundle/usr/local/share/qemu
+else
+  LIBAFL_QEMU_BIOS_DIR=${LIBAFL_QEMU_CLONE_DIR}/build/qemu-bundle/usr/local/share/qemu
+fi
+
+${TARGET_DIR}/${PROFILE_DIR}/qemu_systemmode_linux \
+  -accel tcg \
+  -m 4G \
+  -drive if=pflash,format=raw,readonly=on,file="${LINUX_BUILDER_OUT}/OVMF_CODE.fd" \
+  -drive if=pflash,format=raw,snapshot=off,file="${LINUX_BUILDER_OUT}/OVMF_VARS.fd" \
+  -blockdev filename="${LINUX_BUILDER_OUT}/linux.qcow2",node-name=storage,driver=file \
+  -blockdev driver=qcow2,file=storage,node-name=disk \
+  -device virtio-scsi-pci,id=scsi0 \
+  -device scsi-hd,bus=scsi0.0,drive=disk,id=virtio-disk0,bootindex=1 \
+  -L "${LIBAFL_QEMU_BIOS_DIR}" \
+  -nographic \
+  -monitor null \
+  -serial null \
+  -snapshot
+'''
 
 [tasks.debug]
 dependencies = ["build"]

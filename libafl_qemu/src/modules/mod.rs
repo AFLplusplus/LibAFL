@@ -14,6 +14,7 @@ pub use usermode::*;
 #[cfg(emulation_mode = "systemmode")]
 pub mod systemmode;
 #[cfg(emulation_mode = "systemmode")]
+#[allow(unused_imports)]
 pub use systemmode::*;
 
 pub mod edges;

@@ -1,16 +1,16 @@
 //! A fuzzer using qemu in systemmode for binary-only coverage of linux
 
 use core::{ptr::addr_of_mut, time::Duration};
-use std::{env, fs, path::PathBuf, process};
+use std::{env, path::PathBuf, process};
 
 use libafl::{
-    corpus::{Corpus, InMemoryCorpus, InMemoryOnDiskCorpus, OnDiskCorpus},
+    corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig},
     executors::ShadowExecutor,
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    inputs::{BytesInput, HasTargetBytes},
+    inputs::BytesInput,
     monitors::MultiMonitor,
     mutators::{
         scheduled::{havoc_mutations, StdScheduledMutator},
@@ -18,7 +18,7 @@ use libafl::{
     },
     observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
-    stages::{CalibrationStage, ShadowTracingStage, StdMutationalStage},
+    stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, StdState},
     Error,
 };
@@ -36,24 +36,21 @@ use libafl_qemu::{
     modules::{
         cmplog::CmpLogObserver,
         edges::{
-            edges_map_mut_ptr, EdgeCoverageClassicVariant, EdgeCoverageModule,
-            EDGES_MAP_SIZE_IN_USE, EDGES_MAP_SIZE_MAX, MAX_EDGES_FOUND,
+            edges_map_mut_ptr, EdgeCoverageClassicVariant, EdgeCoverageModule, EDGES_MAP_SIZE_MAX,
+            MAX_EDGES_FOUND,
         },
         CmpLogModule,
     },
-    QemuSnapshotManager,
 };
 
 pub fn fuzz() {
     env_logger::init();
 
-    fs::remove_dir("corpus_gen");
-
     if let Ok(s) = env::var("FUZZ_SIZE") {
         str::parse::<usize>(&s).expect("FUZZ_SIZE was not a number");
     };
     // Hardcoded parameters
-    let timeout = Duration::from_secs(2000000000000000);
+    let timeout = Duration::from_secs(60);
     let broker_port = 1337;
     let cores = Cores::from_cmdline("1").unwrap();
     let corpus_dirs = [PathBuf::from("./corpus")];
@@ -74,7 +71,6 @@ pub fn fuzz() {
         let emu = Emulator::builder()
             .qemu_cli(args)
             .modules(modules)
-            // .snapshot_manager(QemuSnapshotManager::default())
             .build()?;
 
         let devices = emu.list_devices();
@@ -166,20 +162,14 @@ pub fn fuzz() {
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
 
-        let tracing = ShadowTracingStage::new(&mut executor);
-
+        // a CmpLog-based mutational stage
         let i2s =
             StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
 
         // Setup an havoc mutator with a mutational stage
+        let tracing = ShadowTracingStage::new(&mut executor);
         let mutator = StdScheduledMutator::new(havoc_mutations());
-        // let calibration_feedback = MaxMapFeedback::new(&edges_observer);
-        let mut stages = tuple_list!(
-            // CalibrationStage::new(&calibration_feedback),
-            tracing,
-            i2s,
-            StdMutationalStage::new(mutator),
-        );
+        let mut stages = tuple_list!(tracing, i2s, StdMutationalStage::new(mutator),);
 
         match fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr) {
             Ok(_) | Err(Error::ShuttingDown) => Ok(()),
