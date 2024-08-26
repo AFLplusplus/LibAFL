@@ -16,7 +16,9 @@ use crate::{
 pub const TRANSFERRED_FEEDBACK_NAME: Cow<'static, str> =
     Cow::Borrowed("transferred_feedback_internal");
 
-/// Metadata which denotes whether we are currently transferring an input. Implementors of
+/// Metadata which denotes whether we are currently transferring an input.
+///
+/// Implementors of
 /// multi-node communication systems (like [`crate::events::LlmpEventManager`]) should wrap any
 /// [`crate::EvaluatorObservers::evaluate_input_with_observers`] or
 /// [`crate::ExecutionProcessor::process_execution`] calls with setting this metadata to true/false

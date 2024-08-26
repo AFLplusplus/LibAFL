@@ -102,8 +102,10 @@ impl ShMemDescription {
     }
 }
 
+/// The id describing shared memory for the current provider
+///
 /// An id associated with a given shared memory mapping ([`ShMem`]), which can be used to
-/// establish shared-mappings between proccesses.
+/// establish shared-mappings between processes.
 /// Id is a file descriptor if you use `MmapShMem` or `AshmemShMem`.
 /// That means you have to use shmem server to access to the shmem segment from other processes in these cases.
 /// On the other hand, id is a unique identifier if you use `CommonUnixShMem` or `Win32ShMem`.
@@ -193,6 +195,7 @@ impl Display for ShMemId {
 }
 
 /// A [`ShMem`] is an interface to shared maps.
+///
 /// They are the backbone of [`crate::llmp`] for inter-process communication.
 /// All you need for scaling on a new target is to implement this interface, as well as the respective [`ShMemProvider`].
 pub trait ShMem: Sized + Debug + Clone + DerefMut<Target = [u8]> {
@@ -239,6 +242,7 @@ pub trait ShMem: Sized + Debug + Clone + DerefMut<Target = [u8]> {
 }
 
 /// A [`ShMemProvider`] provides access to shared maps.
+///
 /// They are the backbone of [`crate::llmp`] for inter-process communication.
 /// All you need for scaling on a new target is to implement this interface, as well as the respective [`ShMem`].
 pub trait ShMemProvider: Clone + Default + Debug {
@@ -317,6 +321,7 @@ pub trait ShMemProvider: Clone + Default + Debug {
 }
 
 /// An [`ShMemProvider`] that does not provide any [`ShMem`].
+///
 /// This is mainly for testing and type magic.
 /// The resulting [`NopShMem`] is backed by a simple byte buffer to do some simple non-shared things with.
 /// Calling [`NopShMemProvider::shmem_from_id_and_size`] will return new maps for the same id every time.

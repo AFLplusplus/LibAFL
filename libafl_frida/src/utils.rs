@@ -184,9 +184,10 @@ pub fn get_register(context: &CpuContext, reg: X86Register) -> u64 {
     }
 }
 
-/// The writer registers
-/// frida registers: <https://docs.rs/frida-gum/latest/frida_gum/instruction_writer/enum.X86Register.html>
-/// capstone registers: <https://docs.rs/capstone-sys/latest/capstone_sys/x86_reg/index.html>
+/// The writer registers.
+///
+///  `FRIDA` registers: <https://docs.rs/frida-gum/latest/frida_gum/instruction_writer/enum.X86Register.html>
+/// `capstone` registers: <https://docs.rs/capstone-sys/latest/capstone_sys/x86_reg/index.html>
 #[cfg(target_arch = "x86_64")]
 #[must_use]
 #[inline]
@@ -201,7 +202,7 @@ pub fn writer_register(reg: RegSpec) -> X86Register {
     X86Register::None
 }
 
-/// Translates a frida instruction to a disassembled instruction.
+/// Translates a `FRIDA` instruction to a disassembled instruction.
 #[cfg(target_arch = "x86_64")]
 pub(crate) fn frida_to_cs(
     decoder: InstDecoder,
@@ -224,7 +225,7 @@ pub(crate) fn frida_to_cs(
 }
 
 #[cfg(target_arch = "x86_64")]
-/// Get the base, idx, scale, disp for each operand
+/// Get the `base`, `idx`, `scale`, `disp` for each operand
 pub fn operand_details(operand: &Operand) -> Option<(X86Register, X86Register, u8, i32)> {
     match operand {
         Operand::RegDeref(base) => {

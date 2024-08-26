@@ -15,6 +15,7 @@ use crate::inputs::HasMutatorBytes;
 
 /// The [`BytesSubInput`] makes it possible to use [`crate::mutators::Mutator`]`s` that work on
 /// inputs implementing the [`HasMutatorBytes`] for a sub-range of this input.
+///
 /// For example, we can do the following:
 /// ```rust
 /// # extern crate alloc;

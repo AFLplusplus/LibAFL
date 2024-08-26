@@ -1,3 +1,5 @@
+//! The [`FRIDA`](https://frida.re) `CmpLog` runtime
+//!
 //! Functionality for [`frida`](https://frida.re)-based binary-only `CmpLog`.
 //! With it, a fuzzer can collect feedback about each compare that happened in the target
 //! This allows the fuzzer to potentially solve the compares, if a compare value is directly

@@ -1,5 +1,5 @@
-//! The Minimizer schedulers are a family of corpus schedulers that feed the fuzzer
-//! with testcases only from a subset of the total corpus.
+//! The [`MinimizerScheduler`]`s` are a family of corpus schedulers that feed the fuzzer
+//! with [`Testcase`]`s` only from a subset of the total [`Corpus`].
 
 use alloc::vec::Vec;
 use core::{any::type_name, cmp::Ordering, marker::PhantomData};
@@ -68,8 +68,9 @@ impl Default for TopRatedsMetadata {
 }
 
 /// The [`MinimizerScheduler`] employs a genetic algorithm to compute a subset of the
-/// corpus that exercise all the requested features (e.g. all the coverage seen so far)
-/// prioritizing [`Testcase`]`s` using [`TestcaseScore`]
+/// corpus that exercise all the requested features.
+///
+/// E.g., it can use all the coverage seen so far to prioritize [`Testcase`]`s` using a [`TestcaseScore`].
 #[derive(Debug, Clone)]
 pub struct MinimizerScheduler<CS, F, M, O> {
     base: CS,
@@ -93,7 +94,7 @@ where
     <Self as UsesState>::State: HasCorpus + HasMetadata + HasRand,
     O: CanTrack,
 {
-    /// Replaces the testcase at the given id
+    /// Replaces the [`Testcase`] at the given [`CorpusId`]
     fn on_replace(
         &mut self,
         state: &mut <Self as UsesState>::State,
