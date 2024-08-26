@@ -720,7 +720,7 @@ pub type FastAndFeedback<A, B, S> = CombinedFeedback<A, B, LogicFastAnd, S>;
 /// will call all feedbacks functions even if not necessary to conclude the result
 pub type EagerOrFeedback<A, B, S> = CombinedFeedback<A, B, LogicEagerOr, S>;
 
-/// Combine two feedbacks with an fast OR operation.
+/// Combine two feedbacks with an fast OR operation - fast.
 ///
 /// This might skip calling feedbacks functions if not necessary to conclude the result.
 /// This means any feedback that is not first might be skipped, use caution when using with
