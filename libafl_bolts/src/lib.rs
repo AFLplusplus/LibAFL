@@ -80,7 +80,9 @@
 #[cfg(not(feature = "alloc"))]
 type String = &'static str;
 
-/// We also need a non-allocating format...
+/// A simple non-allocating "format" string wrapper for no-std.
+///
+/// Problem is that we really need a non-allocating format...
 /// This one simply returns the `fmt` string.
 /// Good enough for simple errors, for anything else, use the `alloc` feature.
 #[cfg(not(feature = "alloc"))]

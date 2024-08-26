@@ -184,9 +184,10 @@ pub fn get_register(context: &CpuContext, reg: X86Register) -> u64 {
     }
 }
 
-/// The writer registers
-/// frida registers: <https://docs.rs/frida-gum/latest/frida_gum/instruction_writer/enum.X86Register.html>
-/// capstone registers: <https://docs.rs/capstone-sys/latest/capstone_sys/x86_reg/index.html>
+/// The writer registers.
+///
+///  `FRIDA` registers: <https://docs.rs/frida-gum/latest/frida_gum/instruction_writer/enum.X86Register.html>
+/// `capstone` registers: <https://docs.rs/capstone-sys/latest/capstone_sys/x86_reg/index.html>
 #[cfg(target_arch = "x86_64")]
 #[must_use]
 #[inline]
