@@ -82,7 +82,6 @@ pub mod coverage_rt;
 pub mod pthread_hook;
 
 #[cfg(feature = "cmplog")]
-/// The frida cmplog runtime
 pub mod cmplog_rt;
 
 /// The `LibAFL` firda helper
