@@ -238,8 +238,6 @@ where
             Err(Error::unknown("Corpus minimization failed; unsat."))
         };
 
-        
-
         res
     }
 }
