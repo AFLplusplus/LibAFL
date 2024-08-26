@@ -1,4 +1,5 @@
 //! An extension to the `ScheduledMutator` which schedules multiple mutations internally.
+//!
 //! Instead of a random mutator for a random amount of iterations, we can run
 //! a specific mutator for a specified amount of iterations
 

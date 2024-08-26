@@ -67,6 +67,8 @@ impl Default for TopRatedsMetadata {
     }
 }
 
+/// A genetic algorithm-based scheduler
+///
 /// The [`MinimizerScheduler`] employs a genetic algorithm to compute a subset of the
 /// corpus that exercise all the requested features (e.g. all the coverage seen so far)
 /// prioritizing [`Testcase`]`s` using [`TestcaseScore`]
@@ -93,7 +95,7 @@ where
     <Self as UsesState>::State: HasCorpus + HasMetadata + HasRand,
     O: CanTrack,
 {
-    /// Replaces the testcase at the given id
+    /// Replaces the [`Testcase`] at the given [`CorpusId`]
     fn on_replace(
         &mut self,
         state: &mut <Self as UsesState>::State,
