@@ -67,11 +67,10 @@ impl Default for TopRatedsMetadata {
     }
 }
 
-/// A genetic algorithm-based scheduler
-///
 /// The [`MinimizerScheduler`] employs a genetic algorithm to compute a subset of the
-/// corpus that exercise all the requested features (e.g. all the coverage seen so far)
-/// prioritizing [`Testcase`]`s` using [`TestcaseScore`]
+/// corpus that exercise all the requested features.
+///
+/// E.g., it can use all the coverage seen so far to prioritize [`Testcase`]`s` using a [`TestcaseScore`].
 #[derive(Debug, Clone)]
 pub struct MinimizerScheduler<CS, F, M, O> {
     base: CS,
