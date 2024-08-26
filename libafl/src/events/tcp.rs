@@ -1074,7 +1074,8 @@ pub enum TcpManagerKind {
 }
 
 /// Sets up a restarting fuzzer, using the [`StdShMemProvider`], and standard features.
-/// The restarting mgr is a combination of restarter and runner, that can be used on systems with and without `fork` support.
+///
+/// The [`TcpRestartingEventManager`] is a combination of restarter and runner, that can be used on systems with and without `fork` support.
 /// The restarter will spawn a new process each time the child crashes or timeouts.
 #[cfg(feature = "std")]
 #[allow(clippy::type_complexity)]
@@ -1103,7 +1104,9 @@ where
         .launch()
 }
 
-/// Provides a `builder` which can be used to build a [`TcpRestartingMgr`], which is a combination of a
+/// Provides a `builder` which can be used to build a [`TcpRestartingMgr`].
+///
+/// The [`TcpRestartingMgr`] is a combination of a
 /// `restarter` and `runner`, that can be used on systems both with and without `fork` support. The
 /// `restarter` will start a new process each time the child crashes or times out.
 #[cfg(feature = "std")]

@@ -1,5 +1,6 @@
 /*!
 The [`Frida`](https://frida.re) executor is a binary-only mode for `LibAFL`.
+
 It can report coverage and, on supported architectures, even reports memory access errors.
 
 Additional documentation is available in [the `LibAFL` book](https://aflplus.plus/libafl-book/advanced_features/frida.html).
@@ -81,7 +82,6 @@ pub mod coverage_rt;
 pub mod pthread_hook;
 
 #[cfg(feature = "cmplog")]
-/// The frida cmplog runtime
 pub mod cmplog_rt;
 
 /// The `LibAFL` firda helper

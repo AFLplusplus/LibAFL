@@ -1,4 +1,5 @@
-//! [`GramatronRandomMutator`] ist a random mutator using grammar automatons to perform grammar-aware fuzzing.
+//! [`GramatronRandomMutator`] is a random mutator using grammar automatons to perform grammar-aware fuzzing.
+//!
 //! See the original gramatron repo [`Gramatron`](https://github.com/HexHive/Gramatron) for more details.
 use alloc::{borrow::Cow, vec::Vec};
 use core::cmp::max;

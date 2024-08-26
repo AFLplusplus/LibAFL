@@ -480,6 +480,8 @@ where
     }
 }
 
+/// A Launcher that minimizes re-execution of shared testcases.
+///
 /// Provides a Launcher, which can be used to launch a fuzzing run on a specified list of cores with a single main and multiple secondary nodes
 /// This is for centralized, the 4th argument of the closure should mean if this is the main node.
 #[cfg(all(unix, feature = "std", feature = "fork"))]

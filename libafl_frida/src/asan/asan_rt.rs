@@ -65,12 +65,13 @@ extern "C" {
     fn tls_ptr() -> *const c_void;
 }
 
-/// The count of registers that need to be saved by the asan runtime
-/// sixteen general purpose registers are put in this order, rax, rbx, rcx, rdx, rbp, rsp, rsi, rdi, r8-r15, plus instrumented rip, accessed memory addr and true rip
+/// The count of registers that need to be saved by the `ASan` runtime.
+///
+/// Sixteen general purpose registers are put in this order, `rax`, `rbx`, `rcx`, `rdx`, `rbp`, `rsp`, `rsi`, `rdi`, `r8-r15`, plus instrumented `rip`, accessed memory addr and true `rip`
 #[cfg(target_arch = "x86_64")]
 pub const ASAN_SAVE_REGISTER_COUNT: usize = 19;
 
-/// The registers that need to be saved by the asan runtime, as names
+/// The registers that need to be saved by the `ASan` runtime, as names
 #[cfg(target_arch = "x86_64")]
 pub const ASAN_SAVE_REGISTER_NAMES: [&str; ASAN_SAVE_REGISTER_COUNT] = [
     "rax",
@@ -109,8 +110,9 @@ const ASAN_EH_FRAME_FDE_OFFSET: u32 = 20;
 #[cfg(target_arch = "aarch64")]
 const ASAN_EH_FRAME_FDE_ADDRESS_OFFSET: u32 = 28;
 
-/// The frida address sanitizer runtime, providing address sanitization.
-/// When executing in `ASAN`, each memory access will get checked, using frida stalker under the hood.
+/// The `FRIDA` address sanitizer runtime, providing address sanitization.
+///
+/// When executing in `ASan`, each memory access will get checked, using `FRIDA` stalker under the hood.
 /// The runtime can report memory errors that occurred during execution,
 /// even if the target would not have crashed under normal conditions.
 /// this helps finding mem errors early.

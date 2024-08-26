@@ -1,4 +1,5 @@
 //! The [`OnDiskCorpus`] stores all [`Testcase`]s to disk.
+//!
 //! It _never_ keeps any of them in memory.
 //! This is a good solution for solutions that are never reused, or for *very* memory-constraint environments.
 //! For any other occasions, consider using [`crate::corpus::CachedOnDiskCorpus`]
