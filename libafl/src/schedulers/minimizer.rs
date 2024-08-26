@@ -1,5 +1,5 @@
-//! The Minimizer schedulers are a family of corpus schedulers that feed the fuzzer
-//! with testcases only from a subset of the total corpus.
+//! The [`MinimizerScheduler`]`s` are a family of corpus schedulers that feed the fuzzer
+//! with [`Testcase`]`s` only from a subset of the total [`Corpus`].
 
 use alloc::vec::Vec;
 use core::{any::type_name, cmp::Ordering, marker::PhantomData};
