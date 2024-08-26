@@ -13,7 +13,7 @@ LLVM_CONFIG = { value = "llvm-config-18", condition = { env_not_set = [
   "LLVM_CONFIG",
 ] } }
 AFL_VERSION = "598a3c6b5e24bd33e84b914e145810d39f88adf6"
-AFL_DIR = { value = "./AFLplusplus" }
+AFL_DIR = { value = "${PROJECT_DIR}/AFLplusplus" }
 AFL_CC_PATH = { value = "${AFL_DIR}/afl-clang-fast" }
 CC = { value = "clang" }
 
@@ -204,12 +204,15 @@ script = '''
 export AFL_PATH=${AFL_DIR}
 export AFL_CORES=1
 export AFL_STATS_INTERVAL=1
+
 # TODO: test unicorn persistent mode once it's fixed on AFL++
+
 LIBAFL_DEBUG_OUTPUT=1 AFL_DEBUG=1 AFL_DEBUG_CHILD=1 timeout 15s ${FUZZER} -m 0 -U -i ./test/seeds_unicorn -o ./test/output-unicorn-python -- python3 ${AFL_DIR}/unicorn_mode/samples/python_simple/simple_test_harness.py @@ || true
 test -n "$( ls ./test/output-unicorn-python/fuzzer_main/queue/id:000003* 2>/dev/null )" || {
 	echo "No new corpus entries found for Unicorn python3 mode"
 	exit 1
 }
+
 export AFL_COMPCOV_LEVEL=2
 LIBAFL_DEBUG_OUTPUT=1 AFL_DEBUG=1 AFL_DEBUG_CHILD=1 timeout 15s ${FUZZER} -m 0 -U -i ./test/seeds_unicorn_cmpcov -o ./test/output-unicorn-cmpcov -- python3 ${AFL_DIR}/unicorn_mode/samples/compcov_x64/compcov_test_harness.py @@ || true
 test -n "$( ls ./test/output-unicorn-cmpcov/fuzzer_main/queue/id:000002* 2>/dev/null )" || {

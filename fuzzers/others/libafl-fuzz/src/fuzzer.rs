@@ -400,7 +400,7 @@ fn base_executor<'a>(
         .coverage_map_size(opt.map_size.unwrap_or(AFL_DEFAULT_MAP_SIZE))
         .debug_child(opt.debug_child)
         .is_persistent(opt.is_persistent)
-        .is_deferred_frksrv(opt.defer_forkserver || opt.unicorn_mode)
+        .is_deferred_frksrv(opt.defer_forkserver)
         .min_input_size(opt.min_input_len.unwrap_or(AFL_DEFAULT_INPUT_LEN_MIN))
         .max_input_size(opt.max_input_len.unwrap_or(AFL_DEFAULT_INPUT_LEN_MAX))
         .timeout(Duration::from_millis(opt.hang_timeout));
@@ -410,7 +410,7 @@ fn base_executor<'a>(
     if let Some(kill_signal) = opt.kill_signal {
         executor = executor.kill_signal(kill_signal);
     }
-    if opt.is_persistent || opt.qemu_mode {
+    if opt.is_persistent || opt.qemu_mode || opt.unicorn_mode {
         executor = executor.shmem_provider(shmem_provider);
     }
     // Set arguments for the target if necessary
