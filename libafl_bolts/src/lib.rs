@@ -971,7 +971,9 @@ impl SimpleStdoutLogger {
 use std::arch::asm;
 #[cfg(target_os = "windows")]
 #[allow(clippy::cast_ptr_alignment)]
-fn get_thread_id() -> u64 {
+#[must_use]
+/// Return thread ID without using TLS
+pub fn get_thread_id() -> u64 {
     #[cfg(target_arch = "x86_64")]
     unsafe {
         let teb: *const u8;
@@ -989,26 +991,25 @@ fn get_thread_id() -> u64 {
     }
 }
 #[cfg(target_os = "linux")]
-fn get_thread_id() -> u64 {
-    use libc::syscall;
-    use libc::SYS_gettid;
+pub fn get_thread_id() -> u64 {
+    use libc::{syscall, SYS_gettid};
 
     unsafe { syscall(SYS_gettid) as u64 }
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "linux")))]
-fn get_thread_id() -> u64 {
+pub fn get_thread_id() -> u64 {
     // Fallback for other platforms
     thread::current().id().as_u64().into()
 }
 
 use std::ptr;
-use winapi::um::winbase::STD_OUTPUT_HANDLE;
-use winapi::um::fileapi::WriteFile;
-use winapi::um::handleapi::INVALID_HANDLE_VALUE;
-use winapi::um::processenv::GetStdHandle;
-use winapi::um::winnt::HANDLE;
+
 use once_cell::sync::OnceCell;
+use winapi::um::{
+    fileapi::WriteFile, handleapi::INVALID_HANDLE_VALUE, processenv::GetStdHandle,
+    winbase::STD_OUTPUT_HANDLE, winnt::HANDLE,
+};
 
 // Safe wrapper around HANDLE
 struct StdOutHandle(HANDLE);
@@ -1020,13 +1021,15 @@ unsafe impl Sync for StdOutHandle {}
 static H_STDOUT: OnceCell<StdOutHandle> = OnceCell::new();
 
 fn get_stdout_handle() -> HANDLE {
-    H_STDOUT.get_or_init(|| {
-        let handle = unsafe { GetStdHandle(STD_OUTPUT_HANDLE) };
-        StdOutHandle(handle)
-    }).0
+    H_STDOUT
+        .get_or_init(|| {
+            let handle = unsafe { GetStdHandle(STD_OUTPUT_HANDLE) };
+            StdOutHandle(handle)
+        })
+        .0
 }
 
-/// A function that writes directly to stdout using `WinAPI`. 
+/// A function that writes directly to stdout using `WinAPI`.
 /// Works much faster than println and does not need TLS
 #[cfg(target_os = "windows")]
 pub fn direct_log(message: &str) {
@@ -1054,7 +1057,7 @@ pub fn direct_log(message: &str) {
 
     if result == 0 {
         eprintln!("Failed to write to standard output");
-    } 
+    }
 }
 
 #[cfg(feature = "std")]

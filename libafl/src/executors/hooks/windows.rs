@@ -382,7 +382,7 @@ pub mod windows_exception_handler {
                         .as_mut()
                         .unwrap()
                         .ExceptionAddress,
-                        winapi::um::processthreadsapi::GetCurrentThreadId()
+                    winapi::um::processthreadsapi::GetCurrentThreadId()
                 );
                 // Minidump support (if desired).
                 // Notice that with Frida, the usefullness of the stack mught be very limited.
@@ -422,7 +422,7 @@ pub mod windows_exception_handler {
                             CallbackParam: *mut c_void,
                         ) -> BOOL;
                     }
-                    
+
                     const MINI_DUMP_FULL_MEMORY_INFO: i32 = 0x00000800;
                     const MINI_DUMP_WITH_FULL_MEMORY: i32 = 0x2;
                     const MINI_DUMP_WITH_HANDLE_DATA: i32 = 0x4;

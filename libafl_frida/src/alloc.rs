@@ -202,7 +202,10 @@ impl Allocator {
             }
             metadata
         } else {
-            log::info!("Mapping {:x}, size {rounded_up_size:x}", self.current_mapping_addr);
+            log::info!(
+                "Mapping {:x}, size {rounded_up_size:x}",
+                self.current_mapping_addr
+            );
             let mapping = match MmapOptions::new(rounded_up_size)
                 .unwrap()
                 .with_address(self.current_mapping_addr)
@@ -664,7 +667,6 @@ impl Allocator {
 
     /// Initialize the allocator, making sure a valid shadow bit is selected.
     pub fn init(&mut self) {
-
         // probe to find a usable shadow bit:
         if self.shadow_bit != 0 {
             return;

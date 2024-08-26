@@ -24,11 +24,11 @@ use frida_gum::instruction_writer::X86Register;
 use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 use frida_gum::{
     instruction_writer::InstructionWriter, interceptor::Interceptor, stalker::StalkerOutput, Gum,
-    Module, ModuleMap, NativePointer, PageProtection, RangeDetails
+    Module, ModuleMap, NativePointer, PageProtection, RangeDetails,
 };
 use frida_gum_sys::Insn;
 use hashbrown::HashMap;
-use libafl_bolts::cli::FuzzerOptions;
+use libafl_bolts::{cli::FuzzerOptions, get_thread_id, AsSlice};
 use libc::wchar_t;
 use rangemap::RangeMap;
 #[cfg(target_arch = "aarch64")]
@@ -103,7 +103,7 @@ unsafe fn has_tls() -> bool {
     if tls_array.is_null() {
         return false;
     }
-    return true;   
+    return true;
 }
 
 // Reentrancy guard for the hooks
@@ -146,44 +146,21 @@ impl Lock {
         }
     }
 
-    #[cfg(target_os = "windows")]
-    fn get_thread_id() -> u64 {
-        #[cfg(target_arch = "x86_64")]
-        unsafe {
-            let teb: *const u8;
-            asm!("mov {}, gs:[0x30]", out(reg) teb);
-            let thread_id_ptr = teb.add(0x48) as *const u32;
-            *thread_id_ptr as u64
-        }
-    
-        #[cfg(target_arch = "x86")]
-        unsafe {
-            let teb: *const u8;
-            asm!("mov {}, fs:[0x18]", out(reg) teb);
-            let thread_id_ptr = teb.add(0x24) as *const u32;
-            *thread_id_ptr as u64
-        }
-    }
-    #[cfg(target_os = "linux")]
-    fn get_thread_id() -> u64 {
-        use libc::syscall;
-        use libc::SYS_gettid;
-    
-        unsafe { syscall(SYS_gettid) as u64 }
-    }
-    
-    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
-    fn get_thread_id() -> u64 {
-        // Fallback for other platforms
-        thread::current().id().as_u64().into()
-    }
-        
     fn lock(&self) -> LockResult {
-        let current_thread_id = Lock::get_thread_id();
+        let current_thread_id = get_thread_id();
         loop {
             let current_lock = self.state.load(Ordering::Relaxed);
             if current_lock == u64::MAX {
-                if self.state.compare_exchange(u64::MAX, current_thread_id, Ordering::Acquire, Ordering::Relaxed).is_ok() {
+                if self
+                    .state
+                    .compare_exchange(
+                        u64::MAX,
+                        current_thread_id,
+                        Ordering::Acquire,
+                        Ordering::Relaxed,
+                    )
+                    .is_ok()
+                {
                     return LockResult::Acquired; // Lock acquired
                 }
             } else if current_lock == current_thread_id {
@@ -194,7 +171,7 @@ impl Lock {
     }
 
     fn unlock(&self) -> UnlockResult {
-        let current_thread_id = Lock::get_thread_id();
+        let current_thread_id = get_thread_id();
         let current_lock = self.state.load(Ordering::Relaxed);
         if current_lock == current_thread_id {
             self.state.store(u64::MAX, Ordering::Release);
@@ -204,13 +181,13 @@ impl Lock {
     }
 }
 
+#[cfg(target_os = "linux")]
+use errno::{errno, set_errno, Errno};
+#[cfg(target_os = "windows")]
+use winapi::shared::minwindef::DWORD;
 /// We need to save and restore the last error in the hooks
 #[cfg(target_os = "windows")]
 use winapi::um::errhandlingapi::{GetLastError, SetLastError};
-#[cfg(target_os = "windows")]
-use winapi::shared::minwindef::DWORD;
-#[cfg(target_os = "linux")]
-use errno::{Errno, errno, set_errno};
 
 struct LastErrorGuard {
     #[cfg(target_os = "windows")]
@@ -235,29 +212,28 @@ impl LastErrorGuard {
 impl Drop for LastErrorGuard {
     fn drop(&mut self) {
         #[cfg(target_os = "windows")]
-        unsafe { SetLastError(self.last_error) };
+        unsafe {
+            SetLastError(self.last_error)
+        };
         #[cfg(target_os = "linux")]
         set_errno(self.last_error);
     }
 }
 
-
-#[derive(Debug)]
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 enum LockResult {
     Acquired,
     AlreadyLocked,
 }
 
-#[derive(Debug)]
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 enum UnlockResult {
     Success,
     NotOwner,
 }
 
 // For threads without TLS, we use a static lock to prevent hook reentrancy
-// This is not as efficient as using TLS, because it prevent TLS-free threads 
+// This is not as efficient as using TLS, because it prevent TLS-free threads
 // from running in parallel, but such situations are very rare (Windows loaded thread pool)
 // and should not affect performance significantly
 static TLS_LESS_LOCK: Lock = Lock::new();
@@ -358,14 +334,15 @@ impl Debug for AsanRuntime {
 
 /// A helper function that fixes the implementation of ModuleDetails::with_name on Windows
 fn module_base_address_with_name(name: &str) -> usize {
-    use frida_gum_sys as gum_sys;
     use core::ffi::{c_void, CStr};
     use std::path::Path;
+
+    use frida_gum_sys as gum_sys;
     struct SaveModuleAddressByNameContext {
         name: String,
         address: usize,
     }
-    
+
     unsafe extern "C" fn save_module_address_by_name(
         details: *const gum_sys::GumModuleDetails,
         context: *mut c_void,
@@ -376,10 +353,10 @@ fn module_base_address_with_name(name: &str) -> usize {
             .to_string();
         log::info!("module {:?}", path_string);
         if Path::new(&path_string)
-        .file_name()
-        .unwrap_or_default()
-        .to_string_lossy()
-        .eq(&context.name)
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .eq(&context.name)
         {
             context.address = (*(*details).range).base_address as usize;
             log::info!("{:?} address is {:?}", path_string, context.address);
@@ -387,13 +364,13 @@ fn module_base_address_with_name(name: &str) -> usize {
         }
         1
     }
-    
+
     let mut context = SaveModuleAddressByNameContext {
         name: name.to_owned(),
         address: 0,
     };
 
-    unsafe { 
+    unsafe {
         gum_sys::gum_process_enumerate_modules(
             Some(save_module_address_by_name),
             &mut context as *mut _ as *mut c_void,
@@ -402,7 +379,6 @@ fn module_base_address_with_name(name: &str) -> usize {
 
     context.address
 }
-
 
 impl FridaRuntime for AsanRuntime {
     /// Initialize the runtime so that it is read for action. Take care not to move the runtime
@@ -721,7 +697,6 @@ impl AsanRuntime {
         self.pc = None;
     }
 
-
     /// Register the required hooks
     #[expect(clippy::too_many_lines)]
     pub fn register_hooks(&mut self, gum: &Gum) {
@@ -753,14 +728,14 @@ impl AsanRuntime {
                                     let _guard = AsanInHookGuard::new(); // Ensure ASAN_IN_HOOK is set and reset
                                     return this.[<hook_ $name>](*original, $($param),*);
                                 }
-                            } 
+                            }
                             // else{
                             //     log::warn!("{} called without TLS", stringify!($name));
                             //     $(
                             //         log::warn!("{}: {:?}", stringify!($param), $param);
                             //     )*
-                                
-                            // } 
+
+                            // }
                         }
                         (original)($($param),*)
                     }
@@ -800,7 +775,7 @@ impl AsanRuntime {
                                     let _guard = AsanInHookGuard::new(); // Ensure ASAN_IN_HOOK is set and reset
                                     return this.[<hook_ $name>](*original, $($param),*);
                                 }
-                            } 
+                            }
                         }
                         (original)($($param),*)
                     }
@@ -843,7 +818,7 @@ impl AsanRuntime {
                                         return this.[<hook_ $name>](*original, $($param),*);
                                     }
                                 }
-                            } 
+                            }
                             else{
                                 // log::warn!("{} called without TLS", stringify!($name));
                                 // $(
@@ -854,15 +829,15 @@ impl AsanRuntime {
                                         // There is no TLS and we have grabbed the lock - call the hook
                                         let ret = this.[<hook_ $name>](*original, $($param),*);
                                         TLS_LESS_LOCK.unlock();
-                                        
+
                                         return ret;
                                     }
                                     else {
                                         TLS_LESS_LOCK.unlock(); // Return the original function
                                     }
-                                    
+
                                 }
-                            } 
+                            }
                         }
                         (original)($($param),*)
                     }
@@ -907,15 +882,15 @@ impl AsanRuntime {
                                         // There is no TLS and we have grabbed the lock - call the hook
                                         let ret = this.[<hook_ $name>](*original, $($param),*);
                                         TLS_LESS_LOCK.unlock();
-                                        
+
                                         return ret;
                                     }
                                     else {
                                         TLS_LESS_LOCK.unlock(); // Return the original function
                                     }
                                 }
-                                
-                            } 
+
+                            }
                         }
                         (original)($($param),*)
                     }
@@ -1674,7 +1649,9 @@ impl AsanRuntime {
                 }
             } else if base_value.is_some() {
                 if let Some(metadata) = self
-                    .allocator.lock().unwrap()
+                    .allocator
+                    .lock()
+                    .unwrap()
                     .find_metadata(fault_address, base_value.unwrap())
                 {
                     match access_type {
@@ -2757,8 +2734,7 @@ impl AsanRuntime {
                 // on amd64 jump can takes 10 bytes at most, so that's why I put 10 bytes.
                 writer.put_nop();
             }
-        }
-        else {
+        } else {
             log::trace!("Cannot check instructions for {:?} bytes.", width);
         }
 
@@ -2997,8 +2973,7 @@ impl AsanRuntime {
             16 + i64::from(redzone_size),
             IndexMode::PostAdjust,
         ));
-    }  
-    
+    }
 }
 
 impl Default for AsanRuntime {

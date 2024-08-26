@@ -199,7 +199,11 @@ where
                     module.base_address as u64..(module.base_address as u64 + module.size as u64),
                     (0xffff, "fuzzer".to_string()),
                 );
-                log::info!("Fuzzer range: {:x}-{:x}", module.base_address, module.base_address + module.size);
+                log::info!(
+                    "Fuzzer range: {:x}-{:x}",
+                    module.base_address,
+                    module.base_address + module.size
+                );
                 break;
             }
         }
