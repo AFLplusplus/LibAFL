@@ -40,7 +40,6 @@ use libafl_qemu::{
             MAX_EDGES_FOUND,
         },
         CmpLogModule,
-
     },
     // StdEmulatorDriver
 };

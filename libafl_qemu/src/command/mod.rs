@@ -20,7 +20,8 @@ use crate::{
     command::parser::{
         EndCommandParser, InputPhysCommandParser, InputVirtCommandParser, LoadCommandParser,
         LqprintfCommandParser, NativeCommandParser, SaveCommandParser, StartPhysCommandParser,
-        StartVirtCommandParser, VaddrFilterAllowRangeCommandParser, VersionCommandParser,
+        StartVirtCommandParser, TestCommandParser, VaddrFilterAllowRangeCommandParser,
+        VersionCommandParser,
     },
     get_exit_arch_regs,
     modules::EmulatorModuleTuple,
@@ -28,7 +29,6 @@ use crate::{
     Emulator, EmulatorDriverError, EmulatorDriverResult, GuestPhysAddr, GuestReg, InputLocation,
     IsSnapshotManager, Qemu, QemuMemoryChunk, QemuRWError, Regs, StdEmulatorDriver, CPU,
 };
-use crate::command::parser::TestCommandParser;
 
 pub mod parser;
 
@@ -402,10 +402,14 @@ where
         emu: &mut Emulator<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM>,
         input: &S::Input,
         ret_reg: Option<Regs>,
-    ) -> Result<Option<EmulatorDriverResult<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM>>, EmulatorDriverError>
-    {
+    ) -> Result<
+        Option<EmulatorDriverResult<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM>>,
+        EmulatorDriverError,
+    > {
         if emu.command_manager_mut().start() {
-            return Err(EmulatorDriverError::CommandError(CommandError::StartedTwice));
+            return Err(EmulatorDriverError::CommandError(
+                CommandError::StartedTwice,
+            ));
         }
 
         let qemu = emu.qemu();
@@ -486,12 +490,16 @@ where
         emu: &mut Emulator<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM>,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
-    ) -> Result<Option<EmulatorDriverResult<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM>>, EmulatorDriverError>
-    {
+    ) -> Result<
+        Option<EmulatorDriverResult<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM>>,
+        EmulatorDriverError,
+    > {
         let qemu = emu.qemu();
 
         if !emu.command_manager_mut().has_started() {
-            return Err(EmulatorDriverError::CommandError(CommandError::EndBeforeStart));
+            return Err(EmulatorDriverError::CommandError(
+                CommandError::EndBeforeStart,
+            ));
         }
 
         let snapshot_id = emu
@@ -644,7 +652,9 @@ where
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {
         if self.expected_value != self.received_value {
-            Err(EmulatorDriverError::CommandError(CommandError::TestDifference(self.received_value, self.expected_value)))
+            Err(EmulatorDriverError::CommandError(
+                CommandError::TestDifference(self.received_value, self.expected_value),
+            ))
         } else {
             println!("Test succeeded");
             Ok(None)

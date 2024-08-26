@@ -34,27 +34,26 @@ static int                       dev_major = 0;
 static struct class             *harness_class = NULL;
 static struct mychar_device_data harness_data;
 
-#define KPROBE_PRE_HANDLER(fname) static int __kprobes fname(struct kprobe *p, struct pt_regs *regs)
+#define KPROBE_PRE_HANDLER(fname) \
+  static int __kprobes fname(struct kprobe *p, struct pt_regs *regs)
 
 long unsigned int kln_addr = 0;
 unsigned long (*kln_pointer)(const char *name) = NULL;
 
 static struct kprobe kp0, kp1;
 
-KPROBE_PRE_HANDLER(handler_pre0)
-{
+KPROBE_PRE_HANDLER(handler_pre0) {
   kln_addr = (--regs->ip);
 
   return 0;
 }
 
-KPROBE_PRE_HANDLER(handler_pre1)
-{
+KPROBE_PRE_HANDLER(handler_pre1) {
   return 0;
 }
 
-static int do_register_kprobe(struct kprobe *kp, char *symbol_name, void *handler)
-{
+static int do_register_kprobe(struct kprobe *kp, char *symbol_name,
+                              void *handler) {
   int ret;
 
   kp->symbol_name = symbol_name;
@@ -62,7 +61,8 @@ static int do_register_kprobe(struct kprobe *kp, char *symbol_name, void *handle
 
   ret = register_kprobe(kp);
   if (ret < 0) {
-    pr_err("register_probe() for symbol %s failed, returned %d\n", symbol_name, ret);
+    pr_err("register_probe() for symbol %s failed, returned %d\n", symbol_name,
+           ret);
     return ret;
   }
 
@@ -72,14 +72,13 @@ static int do_register_kprobe(struct kprobe *kp, char *symbol_name, void *handle
 }
 
 // Find kallsyms_lookup_name
-// taken from https://github.com/zizzu0/LinuxKernelModules/blob/main/FindKallsymsLookupName.c
-static int harness_find_kallsyms_lookup(void)
-{
+// taken from
+// https://github.com/zizzu0/LinuxKernelModules/blob/main/FindKallsymsLookupName.c
+static int harness_find_kallsyms_lookup(void) {
   int ret;
 
   ret = do_register_kprobe(&kp0, "kallsyms_lookup_name", handler_pre0);
-  if (ret < 0)
-    return ret;
+  if (ret < 0) return ret;
 
   ret = do_register_kprobe(&kp1, "kallsyms_lookup_name", handler_pre1);
   if (ret < 0) {
@@ -92,11 +91,10 @@ static int harness_find_kallsyms_lookup(void)
 
   lqprintf("kallsyms_lookup_name address = 0x%lx\n", kln_addr);
 
-  kln_pointer = (unsigned long (*)(const char *name)) kln_addr;
+  kln_pointer = (unsigned long (*)(const char *name))kln_addr;
 
   return ret;
 }
-
 
 static int harness_uevent(const struct device    *dev,
                           struct kobj_uevent_env *env) {
@@ -141,7 +139,7 @@ static int harness_open(struct inode *inode, struct file *file) {
   lqprintf("harness: Device open\n");
 
   char *data = kzalloc(BUF_SIZE, GFP_KERNEL);
-  data[0] = 0xff; // init page
+  data[0] = 0xff;  // init page
 
   unsigned long x509_fn_addr = kln_pointer("x509_cert_parse");
   lqprintf("harness: x509 fn addr: 0x%lx\n", x509_fn_addr);

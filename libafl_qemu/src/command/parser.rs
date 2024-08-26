@@ -13,13 +13,12 @@ use crate::{
     command::{
         bindings, AddressAllowCommand, CommandError, CommandManager, EndCommand, InputCommand,
         IsCommand, LoadCommand, LqprintfCommand, NativeExitKind, SaveCommand, StartCommand,
-        VersionCommand,
+        StdCommandManager, TestCommand, VersionCommand,
     },
     modules::EmulatorModuleTuple,
     sync_exit::ExitArgs,
     GuestReg, IsSnapshotManager, Qemu, QemuMemoryChunk, Regs, StdEmulatorDriver,
 };
-use crate::command::{StdCommandManager, TestCommand};
 
 pub static EMU_EXIT_KIND_MAP: OnceLock<EnumMap<NativeExitKind, Option<ExitKind>>> = OnceLock::new();
 
@@ -94,7 +93,8 @@ where
 
 pub struct StartPhysCommandParser;
 
-impl<ET, S, SM> NativeCommandParser<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM> for StartPhysCommandParser
+impl<ET, S, SM> NativeCommandParser<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM>
+    for StartPhysCommandParser
 where
     ET: EmulatorModuleTuple<S>,
     S: UsesInput + Unpin,
@@ -122,7 +122,8 @@ where
 
 pub struct StartVirtCommandParser;
 
-impl<ET, S, SM> NativeCommandParser<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM> for StartVirtCommandParser
+impl<ET, S, SM> NativeCommandParser<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM>
+    for StartVirtCommandParser
 where
     ET: EmulatorModuleTuple<S>,
     S: UsesInput + Unpin,
@@ -189,7 +190,8 @@ where
 
 pub struct EndCommandParser;
 
-impl<ET, S, SM> NativeCommandParser<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM> for EndCommandParser
+impl<ET, S, SM> NativeCommandParser<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM>
+    for EndCommandParser
 where
     ET: EmulatorModuleTuple<S>,
     S: UsesInput + Unpin,
@@ -318,6 +320,9 @@ where
     ) -> Result<Self::OutputCommand, CommandError> {
         let received_value: GuestReg = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
 
-        Ok(TestCommand::new(received_value, bindings::LIBAFL_QEMU_TEST_VALUE as GuestReg))
+        Ok(TestCommand::new(
+            received_value,
+            bindings::LIBAFL_QEMU_TEST_VALUE as GuestReg,
+        ))
     }
 }
